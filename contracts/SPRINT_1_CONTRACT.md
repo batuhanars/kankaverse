@@ -250,6 +250,6 @@ interface MessageDto {
 - [ ] **R7:** auth modülü (register/login/refresh rotasyon + Session) diff'i kullanıcı incelemesinden geçti.
 
 **Açık sorular (PM'e yönlendir):**
-- [ ] Geliştirme ortamı: PostgreSQL + Redis lokal mi (docker-compose) yoksa dev VPS mi? (PM kararı — varsayılan: lokal docker-compose)
+- [x] Geliştirme ortamı: **lokal docker-compose** (kök `docker-compose.yml` — PostgreSQL 16 + Redis 7). Karar kapandı.
 - [ ] `POST /guilds/:id/join` Sprint 1 basitleştirmesi onaylandı mı, yoksa minimal davet kodu mu tercih edilir? (varsayılan: join-by-id, davet Sprint 7)
 - [ ] Avatar yükleme Sprint 1'de yok; `avatarUrl` null + UI'da username baş harfi placeholder yeterli mi? (varsayılan: evet)

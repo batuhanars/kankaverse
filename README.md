@@ -18,7 +18,14 @@ Masaüstü (Electron) ve mobil (Flutter) tier'ları ileride aynı monorepoya ekl
 
 ## Geliştirme
 
-Kurulum ve çalıştırma adımları yakında eklenecek (paket seçimi ve dev ortamı kararından sonra).
+Yerel altyapı (PostgreSQL + Redis) Docker Compose ile:
+
+```bash
+cp .env.example .env
+docker compose up -d        # postgres:16 + redis:7
+```
+
+`api/` ve `web/` için kurulum/çalıştırma adımları ilk sprint geliştirmesiyle eklenecek.
 
 Proje yol haritası ve mimari kararlar için `PLAN.md`; aktif sprint için `contracts/`; çalışma kuralları
 için `CLAUDE.md`.

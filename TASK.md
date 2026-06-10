@@ -8,8 +8,8 @@
 ## Sprint 1 — Walking Skeleton
 
 ### Ortak / Kurulum
-- [ ] PostgreSQL + Redis dev ortamı (varsayılan: docker-compose) — açık soru, contract §10
-- [ ] `api/.git` yuva sorunu çözümü (kökte git init) — kullanıcı onayı bekliyor
+- [x] PostgreSQL + Redis dev ortamı → kök `docker-compose.yml` + `.env.example` (PM sağladı). Dev: `cp .env.example .env && docker compose up -d`
+- [x] Git: kök depo başlatıldı, GitHub'a push edildi (yuva-git sorunu kalmadı)
 
 ### Backend (`api/`)
 - [ ] Prisma + PostgreSQL kurulumu, `schema.prisma` (contract §2), ilk migration
