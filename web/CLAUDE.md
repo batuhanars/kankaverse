@@ -1,0 +1,81 @@
+# Kankaverse Web — Frontend CLAUDE.md (Vue 3 SPA)
+
+> Bu dosya **kök `../CLAUDE.md` ile birlikte** yüklenir (cascade). Cross-cutting kurallar kökte; burada
+> yalnızca web-spesifik kurallar var.
+
+Stack: **Vue 3 + Vite + TypeScript + Pinia + vue-router + vue-i18n + Tailwind**.
+Referans: `knowledge/stack/frontend/component-organization.md`.
+
+---
+
+## Klasör Yapısı
+
+```
+src/
+├── views/<x>/                  # auth, app (sohbet), settings, ...
+│   ├── XView.vue               # SADECE compose eder, state yönetmez (50-100 satır)
+│   └── components/             # o view'a özel component'lar (inline yazma)
+├── components/
+│   ├── ui/                     # primitive'ler (buton, input, modal) — dokunulmaz tabaka
+│   ├── layout/                 # AppShell, ServerRail, ChannelPanel, MemberPanel, TopBar
+│   └── shared/                 # birden fazla view'da kullanılan (ConfirmDialog, Avatar, ...)
+├── composables/                # useAuth, useSocket, useConfirm — tekrar eden reactive logic
+├── stores/                     # Pinia: auth, guilds, channels, messages
+├── router/                     # vue-router
+├── api/                        # axios instance + interceptor + (OpenAPI'dan üretilen) client
+├── i18n/                       # vue-i18n; tr.json tek kaynak
+├── styles/                     # tokens.css (--kv-* değişkenleri), tailwind giriş
+└── main.ts
+```
+
+## Kurallar
+
+- **View sadece compose eder.** Render mantığı component'lara dağılır; state Pinia store'a / composable'a çıkar.
+  Component prop alır + emit yapar.
+- **Inline component yazma.** Sezgi: "bu component'a isim vermek istiyor muyum?" → evetse ayrı dosya.
+  3-5 satırlık, tek yerde kullanılan parça inline kalabilir (over-abstraction tuzağı).
+- **Promosyon (Rule of Three):** component 2. view'da gerekince `components/shared/`'a taşı, ismini view-bağımsız
+  yap, konfigürasyonu prop'a çevir. 3. kullanımda promote et, 2'de bekle.
+- **Composable eşiği:** bir component'ın `<script setup>`'ı 80+ satıra ulaşınca reactive logic'i composable'a böl.
+
+---
+
+## API Katmanı
+
+- Tek axios instance (`api/`); base URL config'ten.
+- **Interceptor (envelope-aware):** gerçek payload `response.data.data`'dan çıkar; hata mesajı `response.data.message`
+  (Türkçe) gösterilir, `error` kodu loglanır.
+- **401 → otomatik refresh:** in-flight refresh promise pattern (eş zamanlı 401'lerde tek refresh). Refresh
+  başarısız → login'e yönlendir.
+- Tipler/client OpenAPI spec'ten üretilir (kök CLAUDE.md "tek doğruluk kaynağı").
+
+## Gerçek Zamanlı
+
+- `useSocket` composable: Socket.IO client, handshake'te access token, kanal room'una join/leave.
+- `message.created` event'i → ilgili Pinia store'a yazılır, UI reaktif güncellenir.
+
+## i18n
+
+- vue-i18n; **görünen hiçbir string template'e gömülü değil** → `i18n/tr.json`. Tarih "25 Ekim 2023", saat "18.42".
+
+---
+
+## Tasarım Sistemi (token = tek kaynak)
+
+Kaynak: `knowledge/projects/kankaverse/kankaverse-design-tokens.md`. Tailwind config + `styles/tokens.css`
+oradan türetilir.
+
+- **Tema:** koyu varsayılan (sıcak kömür nötrler — Discord'un soğuk mavi-grisinden bilinçli ayrışma).
+- **Aksan "Kor"** `#FF6B3D` (`--kv-accent-500`): birincil buton/aktif kanal/seçim. **Saf kırmızı yalnızca
+  hata/tehlike/DnD** (`--kv-danger #F23B4B`) — aksanla karıştırma.
+- **Font:** Figtree (UI/gövde), JetBrains Mono (kod blokları). Ölçek: 11/13/14/15/16/18/22 px.
+- **İmza öğesi — altıgen:** sunucu ikonları `clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)`.
+  **Kullanıcı avatarları daire kalır.**
+- **Gölge YOK.** Katman ayrımı arka plan tonu (`--kv-bg-rail/sidebar/content/elevated`) + ince kenarlık ile.
+- **App shell ölçüleri:** sunucu rayı 72px sabit · kanal paneli 248px · mesaj alanı esnek (min 480) · üye paneli 248px ·
+  üst bar 48px · mesaj input min 44px (max 50vh). Breakpoint: 768 (drawer) · 1024 (üye paneli yok) · 1280 (tam).
+- Presence renkleri: çevrimiçi `#3DB46E` · boşta `#E8A33D` · DnD `#F23B4B` · çevrimdışı `#6E675E`.
+
+## Sapma Kuralı
+
+Contract'taki endpoint/DTO/enum'a uymuyorsa kod yazma → **dur, kullanıcıya bildir, PM'e dön.**
