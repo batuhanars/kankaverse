@@ -16,7 +16,7 @@
 - [x] `PrismaModule` (global) + `PrismaService`
 - [x] `common/`: `TransformInterceptor`, `GlobalExceptionFilter` (envelope), `JwtAuthGuard`, `@CurrentUser()`
 - [x] `main.ts`: global `ValidationPipe` + interceptor + filter + `@nestjs/swagger` (`/api/docs`) + Socket.IO Redis adapter
-- [ ] `auth` modülü: register, login, refresh (rotasyon + reuse tespiti), logout, me — **R7 insan incelemesi**
+- [x] `auth` modülü: register, login, refresh (rotasyon + reuse tespiti), logout, me — **R7 insan incelemesi**
 - [x] argon2id hash + JWT access (15dk) + rotasyonlu refresh + `Session` kaydı + httpOnly cookie
 - [x] `guilds` modülü: POST (atomik: guild + OWNER member + `#genel-sohbet`), GET, POST join
 - [x] `channels` modülü: POST (OWNER/ADMIN), GET (üye)
@@ -41,4 +41,4 @@
 - [ ] 401 → otomatik refresh şeffaf
 - [ ] Tüm UI metni i18n'den (gömülü string yok)
 - [ ] Envelope tutarlı + Swagger üretiyor + Redis adapter bağlı
-- [ ] Auth modülü diff'i kullanıcı incelemesinden geçti (R7)
+- [x] Auth modülü diff'i kullanıcı incelemesinden geçti (R7)
