@@ -7,6 +7,24 @@ Stack: **NestJS 11 + Prisma + PostgreSQL**. Referans: `knowledge/stack/nestjs/co
 
 ---
 
+## Paket Yığını (kilitli)
+
+Çekirdek NestJS 11 zaten scaffold'da (`@nestjs/common|core|platform-express`). Eklenecekler:
+
+- **DB:** `prisma` (dev) + `@prisma/client` — PostgreSQL
+- **Config:** `@nestjs/config` (typed env)
+- **API sözleşmesi:** `@nestjs/swagger` (OpenAPI üretimi — tek doğruluk kaynağı)
+- **Auth:** `@nestjs/jwt` + `@nestjs/passport` + `passport` + `passport-jwt` (e-Devlet/OAuth ileride
+  Passport strateji deseniyle gelir) + `argon2` (argon2id hash)
+- **Validation:** `class-validator` + `class-transformer` (DTO — vault NestJS konvansiyonu)
+- **Realtime:** `@nestjs/platform-socket.io` + `socket.io` + `@socket.io/redis-adapter` + `ioredis`
+- **Koruma:** `@nestjs/throttler` (rate limit) + `cookie-parser` (httpOnly refresh cookie)
+
+Sürümler kurulum anında en güncel kararlı sürümden alınır (lockfile pinler); NestJS **11.x** scaffold
+(`^11`) ile hizalı tutulur. **Yeni runtime bağımlılığı eklemek = PM onayı** (scope/güvenlik denetimi).
+
+---
+
 ## Klasör Yapısı
 
 ```

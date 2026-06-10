@@ -8,6 +8,20 @@ Referans: `knowledge/stack/frontend/component-organization.md`.
 
 ---
 
+## Paket Yığını (kilitli)
+
+Vue 3 + Vite zaten scaffold'da. Eklenecekler:
+
+- **State / routing / i18n:** `pinia`, `vue-router`, `vue-i18n`
+- **HTTP / realtime:** `axios` (envelope-aware interceptor + 401 refresh), `socket.io-client`
+- **Stil:** `tailwindcss` **v4** + `@tailwindcss/vite` (CSS-first config — token'larımız CSS değişkeni
+  tabanlı olduğu için doğal uyum; ayrı `postcss`/`autoprefixer` yapılandırması gerekmez)
+- **Font:** `@fontsource/figtree` + `@fontsource/jetbrains-mono` (self-host; CDN bağımlılığı yok)
+
+Sürümler kurulum anında en güncel kararlıdan; **Tailwind 4.x** kilitli. **Yeni bağımlılık = PM onayı.**
+
+---
+
 ## Klasör Yapısı
 
 ```
