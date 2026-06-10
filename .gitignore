@@ -1,0 +1,41 @@
+# Kök .gitignore — tier (api/, web/) gitignore'larına ek güvenlik ağı.
+# Tier-spesifik kurallar ilgili alt dizinlerdeki .gitignore dosyalarında.
+
+# Bağımlılıklar / derleme çıktıları (her seviyede)
+node_modules/
+dist/
+dist-ssr/
+build/
+coverage/
+.nyc_output/
+
+# Ortam değişkenleri / sırlar
+.env
+.env.*
+!.env.example
+
+# Loglar
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editör
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.suo
+*.sw?
+
+# Geçici
+.temp/
+.tmp/
+*.pid
+*.seed
