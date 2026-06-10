@@ -1,0 +1,59 @@
+@import './tokens.css';
+@import './shadcn-bridge.css';
+@import '@fontsource/figtree/400.css';
+@import '@fontsource/figtree/500.css';
+@import '@fontsource/figtree/600.css';
+@import '@fontsource/jetbrains-mono/400.css';
+
+@import 'tailwindcss';
+
+@theme {
+  --color-kv-bg-rail: var(--kv-bg-rail);
+  --color-kv-bg-sidebar: var(--kv-bg-sidebar);
+  --color-kv-bg-content: var(--kv-bg-content);
+  --color-kv-bg-elevated: var(--kv-bg-elevated);
+  --color-kv-border-subtle: var(--kv-border-subtle);
+  --color-kv-border-strong: var(--kv-border-strong);
+  --color-kv-text-primary: var(--kv-text-primary);
+  --color-kv-text-body: var(--kv-text-body);
+  --color-kv-text-secondary: var(--kv-text-secondary);
+  --color-kv-text-muted: var(--kv-text-muted);
+  --color-kv-accent-400: var(--kv-accent-400);
+  --color-kv-accent-500: var(--kv-accent-500);
+  --color-kv-accent-600: var(--kv-accent-600);
+  --color-kv-danger: var(--kv-danger);
+  --color-kv-success: var(--kv-success);
+  --color-kv-warning: var(--kv-warning);
+  --color-kv-info: var(--kv-info);
+  --color-kv-online: var(--kv-online);
+  --color-kv-idle: var(--kv-idle);
+  --color-kv-dnd: var(--kv-dnd);
+  --color-kv-offline: var(--kv-offline);
+
+  --font-ui: var(--kv-font-ui);
+  --font-mono: var(--kv-font-mono);
+
+  --radius-sm: var(--kv-radius-sm);
+  --radius-md: var(--kv-radius-md);
+  --radius-lg: var(--kv-radius-lg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--kv-bg-content);
+  color: var(--kv-text-body);
+  font-family: var(--kv-font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+code, pre, .font-mono {
+  font-family: var(--kv-font-mono);
+}

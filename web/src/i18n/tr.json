@@ -1,0 +1,105 @@
+{
+  "auth": {
+    "login": "Giriş Yap",
+    "register": "Kayıt Ol",
+    "logout": "Çıkış Yap",
+    "email": "E-posta",
+    "password": "Şifre",
+    "username": "Kullanıcı Adı",
+    "birthDate": "Doğum Tarihi",
+    "birthDateDay": "Gün",
+    "birthDateMonth": "Ay",
+    "birthDateYear": "Yıl",
+    "emailPlaceholder": "ornek@mail.com",
+    "passwordPlaceholder": "En az 8 karakter",
+    "usernamePlaceholder": "ornek_kullanici",
+    "birthDateHelp": "Güvenli bir platform için doğum tarihiniz zorunludur.",
+    "loginTitle": "Tekrar hoş geldin!",
+    "loginSubtitle": "Hesabına giriş yap",
+    "registerTitle": "Hesap Oluştur",
+    "registerSubtitle": "Kankaverse'e katıl",
+    "noAccount": "Hesabın yok mu?",
+    "hasAccount": "Zaten hesabın var mı?",
+    "edevletLogin": "e-Devlet ile Giriş Yap",
+    "edevletComingSoon": "e-Devlet entegrasyonu yakında",
+    "or": "veya",
+    "errors": {
+      "USERNAME_TAKEN": "Bu kullanıcı adı zaten kullanılıyor.",
+      "EMAIL_TAKEN": "Bu e-posta adresi zaten kayıtlı.",
+      "INVALID_CREDENTIALS": "E-posta veya şifre hatalı.",
+      "VALIDATION_FAILED": "Lütfen tüm alanları doğru doldurun."
+    },
+    "validation": {
+      "emailRequired": "E-posta adresi zorunludur.",
+      "emailInvalid": "Geçerli bir e-posta adresi girin.",
+      "passwordRequired": "Şifre zorunludur.",
+      "passwordMin": "Şifre en az 8 karakter olmalıdır.",
+      "usernameRequired": "Kullanıcı adı zorunludur.",
+      "usernameMin": "Kullanıcı adı en az 3 karakter olmalıdır.",
+      "usernameMax": "Kullanıcı adı en fazla 32 karakter olabilir.",
+      "usernamePattern": "Yalnızca harf, rakam ve alt çizgi (_) kullanılabilir.",
+      "birthDateRequired": "Doğum tarihi zorunludur.",
+      "birthDateInvalid": "Geçerli bir doğum tarihi seçin."
+    }
+  },
+  "months": {
+    "1": "Ocak",
+    "2": "Şubat",
+    "3": "Mart",
+    "4": "Nisan",
+    "5": "Mayıs",
+    "6": "Haziran",
+    "7": "Temmuz",
+    "8": "Ağustos",
+    "9": "Eylül",
+    "10": "Ekim",
+    "11": "Kasım",
+    "12": "Aralık"
+  },
+  "guild": {
+    "create": "Sunucu Oluştur",
+    "join": "Sunucuya Katıl",
+    "createTitle": "Yeni Sunucu",
+    "joinTitle": "Sunucuya Katıl",
+    "nameLabel": "Sunucu Adı",
+    "namePlaceholder": "Harika Sunucum",
+    "idLabel": "Sunucu ID",
+    "idPlaceholder": "Sunucu ID'sini girin",
+    "createButton": "Oluştur",
+    "joinButton": "Katıl",
+    "errors": {
+      "GUILD_NOT_FOUND": "Sunucu bulunamadı.",
+      "ALREADY_MEMBER": "Bu sunucuda zaten üyesiniz."
+    }
+  },
+  "channel": {
+    "generalChat": "genel-sohbet",
+    "textChannels": "METİN KANALLARI",
+    "noChannels": "Henüz kanal yok."
+  },
+  "message": {
+    "inputPlaceholder": "#{channel} kanalına mesaj yaz",
+    "send": "Gönder",
+    "loadMore": "Daha fazla yükle",
+    "noMessages": "Henüz mesaj yok. İlk mesajı sen gönder!"
+  },
+  "member": {
+    "panel": "Üyeler",
+    "online": "Çevrimiçi",
+    "offline": "Çevrimdışı"
+  },
+  "common": {
+    "cancel": "İptal",
+    "close": "Kapat",
+    "save": "Kaydet",
+    "loading": "Yükleniyor...",
+    "error": "Bir hata oluştu.",
+    "retry": "Tekrar dene",
+    "settings": "Ayarlar",
+    "search": "Ara"
+  },
+  "time": {
+    "today": "Bugün",
+    "yesterday": "Dün"
+  }
+}

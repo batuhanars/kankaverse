@@ -17,8 +17,21 @@ Vue 3 + Vite zaten scaffold'da. Eklenecekler:
 - **Stil:** `tailwindcss` **v4** + `@tailwindcss/vite` (CSS-first config — token'larımız CSS değişkeni
   tabanlı olduğu için doğal uyum; ayrı `postcss`/`autoprefixer` yapılandırması gerekmez)
 - **Font:** `@fontsource/figtree` + `@fontsource/jetbrains-mono` (self-host; CDN bağımlılığı yok)
+- **Form & validasyon:** `vee-validate` + `zod` + `@vee-validate/zod` (`useForm` + `toTypedSchema`)
+- **UI primitive (a11y):** `reka-ui` + shadcn-vue (CLI ile kopyalanan primitive'ler) + `clsx` + `tailwind-merge` (`cn` util)
 
 Sürümler kurulum anında en güncel kararlıdan; **Tailwind 4.x** kilitli. **Yeni bağımlılık = PM onayı.**
+
+### UI primitive & form konvansiyonu
+
+- **Kv\* basit primitive'ler kalır** (`KvButton`, `KvInput`, `KvModal`) — çalışıyor, tasarımla uyumlu; yeniden yazılmaz.
+- **shadcn-vue / Reka UI yalnız karmaşık/a11y primitive için** kullanılır (`Select`, `Calendar`, `Dropdown`,
+  `Tooltip`, `Dialog`, `ContextMenu`) — `components/ui/` altında, `--kv-*` token'larıyla temalanır
+  (shadcn semantic değişkenleri → `--kv-*` eşlemesi `styles/`'da).
+- **Formlar vee-validate + zod ile** yönetilir; manuel `reactive` form state yeni formlarda kullanılmaz.
+  zod şemaları `contracts/SPRINT_X_CONTRACT.md` §4 sabitlerini (uzunluk/pattern kuralları) uygular.
+- **Frontend validasyon yalnız UX'tir; güvenlik otoritesi backend** (`class-validator`). İkisi de contract
+  sabitlerini kaynak alır (R7).
 
 ---
 

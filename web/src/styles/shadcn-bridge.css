@@ -1,0 +1,35 @@
+/*
+  shadcn-vue semantic değişkenleri → --kv-* token eşlemesi.
+  shadcn CLI ile üretilen herhangi bir bileşen bu eşlemeyi miras alır.
+*/
+:root {
+  --background:           var(--kv-bg-content);
+  --foreground:           var(--kv-text-primary);
+
+  --card:                 var(--kv-bg-elevated);
+  --card-foreground:      var(--kv-text-primary);
+
+  --popover:              var(--kv-bg-sidebar);
+  --popover-foreground:   var(--kv-text-primary);
+
+  --primary:              var(--kv-accent-500);
+  --primary-foreground:   #ffffff;
+
+  --secondary:            var(--kv-bg-elevated);
+  --secondary-foreground: var(--kv-text-secondary);
+
+  --muted:                var(--kv-bg-elevated);
+  --muted-foreground:     var(--kv-text-muted);
+
+  --accent:               var(--kv-accent-subtle);
+  --accent-foreground:    var(--kv-accent-400);
+
+  --destructive:          var(--kv-danger);
+  --destructive-foreground: #ffffff;
+
+  --border:               var(--kv-border-strong);
+  --input:                var(--kv-bg-elevated);
+  --ring:                 var(--kv-accent-500);
+
+  --radius: var(--kv-radius-md);
+}

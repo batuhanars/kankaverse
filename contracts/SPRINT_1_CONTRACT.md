@@ -253,3 +253,27 @@ interface MessageDto {
 - [x] Geliştirme ortamı: **lokal docker-compose** (kök `docker-compose.yml` — PostgreSQL 16 + Redis 7). Karar kapandı.
 - [ ] `POST /guilds/:id/join` Sprint 1 basitleştirmesi onaylandı mı, yoksa minimal davet kodu mu tercih edilir? (varsayılan: join-by-id, davet Sprint 7)
 - [ ] Avatar yükleme Sprint 1'de yok; `avatarUrl` null + UI'da username baş harfi placeholder yeterli mi? (varsayılan: evet)
+
+---
+
+## 11. UI Sertleştirme Eki (frontend — Sprint 1 sonrası polish)
+
+> Walking skeleton sonrası eklenen frontend görevi. Backend sözleşmesi (§5-9) **değişmez**. Yalnız `web/` tier'ı.
+
+**Kapsam:**
+- shadcn-vue / Reka UI **seçici** kurulum (`components.json`, `lib/utils.ts` `cn`, Reka UI) — shadcn semantic
+  değişkenleri `--kv-*` token'larına eşlenir. `Kv*` primitive'leri korunur.
+- **Segment doğum tarihi seçici** (`views/auth/components/BirthDateSelect.vue`): gün/ay/yıl ayrı `Select`
+  (shadcn). Native `<input type="date">` kaldırılır. Çıktı `YYYY-MM-DD` → submit `new Date(...).toISOString()`
+  uyumlu. Geçersiz gün (31 Şubat vb.) engellenir; yıl bugünden geriye.
+- **vee-validate + zod** form yönetimi: `lib/validation/auth.ts` (`registerSchema`/`loginSchema`).
+  Kurallar §4 sabitlerinden: email format, username `^[a-zA-Z0-9_]{3,32}$`, password ≥8, birthDate geçerli tarih.
+  `RegisterView`/`LoginView` `useForm`+`toTypedSchema` ile bağlanır; `KvInput` değişmez (`v-model`+`:error`).
+- API hata kodu map'i (`USERNAME_TAKEN`/`EMAIL_TAKEN`) korunur; i18n'e validasyon mesajları + ay adları eklenir.
+
+**DoD:**
+- [ ] Boş/geçersiz alanda anında client-side hata; submit yalnız form geçerliyken.
+- [ ] DOB segment seçici tasarım sistemiyle uyumlu; native picker gitti; ISO değer backend'e gidiyor.
+- [ ] En az bir shadcn primitive (`Select`) `--kv-*` temalı, renkler tutarlı.
+- [ ] `npm run build` (vue-tsc + vite) temiz.
+- [ ] **R7:** auth oturum/mantığı değişmedi; frontend diff kullanıcı incelemesinden geçti.
