@@ -24,7 +24,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       const res = exception.getResponse();
       if (typeof res === 'object' && res !== null) {
         const r = res as Record<string, unknown>;
-        message = (r.message as string) ?? message;
+        // ThrottlerException message is an array; flatten to string
+        const raw = r.message;
+        message = Array.isArray(raw) ? raw.join(', ') : ((raw as string) ?? message);
         error = (r.error as string) ?? this.defaultError(statusCode);
       } else {
         message = res as string;
@@ -56,6 +58,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       404: 'NOT_FOUND',
       409: 'CONFLICT',
       422: 'VALIDATION_FAILED',
+      429: 'TOO_MANY_REQUESTS',
     };
     return map[status] ?? 'INTERNAL_ERROR';
   }

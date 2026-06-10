@@ -10,6 +10,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -22,7 +23,7 @@ const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax' as const,
-  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 gün ms
+  maxAge: 30 * 24 * 60 * 60 * 1000,
   path: '/',
 };
 
@@ -33,28 +34,28 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Yeni kullanıcı kaydı' })
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @ApiOperation({ summary: 'Yeni kullanıcı kaydı (3/dk/IP)' })
   async register(
     @Body() dto: RegisterDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const ip = req.ip;
-    const { user, accessToken, refreshToken } = await this.authService.register(dto, ip);
+    const { user, accessToken, refreshToken } = await this.authService.register(dto, req.ip);
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
     return { user, accessToken };
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Kullanıcı girişi' })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: 'Kullanıcı girişi (5/dk/IP)' })
   async login(
     @Body() dto: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const ip = req.ip;
-    const { user, accessToken, refreshToken } = await this.authService.login(dto, ip);
+    const { user, accessToken, refreshToken } = await this.authService.login(dto, req.ip);
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
     return { user, accessToken };
   }
@@ -67,8 +68,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const rawToken: string = req.cookies?.[REFRESH_COOKIE];
-    const ip = req.ip;
-    const { accessToken, refreshToken } = await this.authService.refresh(rawToken, ip);
+    const { accessToken, refreshToken } = await this.authService.refresh(rawToken, req.ip);
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
     return { accessToken };
   }

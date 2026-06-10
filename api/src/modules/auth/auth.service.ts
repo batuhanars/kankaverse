@@ -2,6 +2,8 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
+  UnprocessableEntityException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -12,6 +14,9 @@ import { LoginDto } from './dto/login.dto';
 import { User } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
+const ARGON2_OPTIONS = { type: argon2.argon2id, memoryCost: 19456, timeCost: 2 } as const;
+const MIN_AGE = 13;
+const MAX_AGE = 120;
 
 function toUserDto(user: User) {
   return {
@@ -25,47 +30,74 @@ function toUserDto(user: User) {
   };
 }
 
-function calculateIsMinor(birthDate: Date): boolean {
+function calculateAge(birthDate: Date): number {
   const now = new Date();
   let age = now.getFullYear() - birthDate.getFullYear();
-  const monthDiff = now.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birthDate.getDate())) {
-    age--;
+  const m = now.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) age--;
+  return age;
+}
+
+function calculateIsMinor(birthDate: Date): boolean {
+  return calculateAge(birthDate) < 18;
+}
+
+function validateBirthDate(raw: string): Date {
+  const birthDate = new Date(raw);
+  if (isNaN(birthDate.getTime())) {
+    throw new UnprocessableEntityException({ message: 'Geçersiz doğum tarihi.', error: 'INVALID_BIRTHDATE' });
   }
-  return age < 18;
+  if (birthDate >= new Date()) {
+    throw new UnprocessableEntityException({ message: 'Doğum tarihi geçmişte olmalıdır.', error: 'INVALID_BIRTHDATE' });
+  }
+  const age = calculateAge(birthDate);
+  if (age > MAX_AGE) {
+    throw new UnprocessableEntityException({ message: 'Geçersiz doğum tarihi.', error: 'INVALID_BIRTHDATE' });
+  }
+  if (age < MIN_AGE) {
+    throw new UnprocessableEntityException({ message: 'Kayıt için en az 13 yaşında olmalısın.', error: 'UNDERAGE' });
+  }
+  return birthDate;
 }
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
+  private dummyHash: string;
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private config: ConfigService,
   ) {}
 
+  async onModuleInit() {
+    // Timing saldırısına karşı: kullanıcı bulunamadığında harcanan süre eşitleniyor
+    this.dummyHash = await argon2.hash('dummy-timing-placeholder', ARGON2_OPTIONS);
+  }
+
   async register(dto: RegisterDto, ip?: string) {
-    const existingUsername = await this.prisma.user.findUnique({
-      where: { username: dto.username },
-    });
+    const email = dto.email.toLowerCase().trim();
+    const birthDate = validateBirthDate(dto.birthDate);
+
+    const [existingUsername, existingEmail] = await Promise.all([
+      this.prisma.user.findUnique({ where: { username: dto.username } }),
+      this.prisma.user.findUnique({ where: { email } }),
+    ]);
+
     if (existingUsername) {
       throw new ConflictException({ message: 'Bu kullanıcı adı zaten kullanımda.', error: 'USERNAME_TAKEN' });
     }
-
-    const existingEmail = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
     if (existingEmail) {
       throw new ConflictException({ message: 'Bu e-posta adresi zaten kayıtlı.', error: 'EMAIL_TAKEN' });
     }
 
-    const passwordHash = await argon2.hash(dto.password, { type: argon2.argon2id });
-    const birthDate = new Date(dto.birthDate);
+    const passwordHash = await argon2.hash(dto.password, ARGON2_OPTIONS);
     const isMinor = calculateIsMinor(birthDate);
 
     const user = await this.prisma.user.create({
       data: {
         username: dto.username,
-        email: dto.email,
+        email,
         passwordHash,
         birthDate,
         isMinor,
@@ -80,10 +112,15 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, ip?: string) {
+    const email = dto.email.toLowerCase().trim();
+
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email, deletedAt: null },
+      where: { email, deletedAt: null },
     });
+
     if (!user) {
+      // Kullanıcı bulunamasa bile argon2 maliyeti harcayarak timing farkını kapatıyoruz
+      await argon2.verify(this.dummyHash, dto.password).catch(() => {});
       throw new UnauthorizedException({ message: 'E-posta veya şifre hatalı.', error: 'INVALID_CREDENTIALS' });
     }
 
@@ -97,6 +134,10 @@ export class AuthService {
   }
 
   async refresh(rawRefreshToken: string, ip?: string) {
+    if (!rawRefreshToken) {
+      throw new UnauthorizedException({ message: 'Yenileme tokeni bulunamadı.', error: 'INVALID_REFRESH' });
+    }
+
     let payload: { sub: string; sessionId: string; family: string };
     try {
       payload = this.jwtService.verify(rawRefreshToken, {
@@ -111,7 +152,7 @@ export class AuthService {
     });
 
     if (!session) {
-      // Token ailesi yoksa; olası sızdırma
+      // Session hiç yok — yine de aile iptal dene (race/leaked token)
       await this.prisma.session.updateMany({
         where: { tokenFamily: payload.family, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -120,7 +161,7 @@ export class AuthService {
     }
 
     if (session.revokedAt !== null) {
-      // Önceden iptal edilmiş — tüm aileyi iptal et (token theft)
+      // İptal edilmiş session tekrar kullanıldı → tüm aileyi iptal et
       await this.prisma.session.updateMany({
         where: { tokenFamily: session.tokenFamily, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -137,13 +178,11 @@ export class AuthService {
       throw new UnauthorizedException({ message: 'Geçersiz yenileme tokeni.', error: 'INVALID_REFRESH' });
     }
 
-    // Eski session'ı iptal et
     await this.prisma.session.update({
       where: { id: session.id },
       data: { revokedAt: new Date() },
     });
 
-    // Yeni session aynı aileyle oluştur (rotasyon)
     const { accessToken, refreshToken } = await this.createSession(
       session.userId,
       ip,
@@ -172,7 +211,7 @@ export class AuthService {
     const sessionId = randomUUID();
 
     const accessToken = this.jwtService.sign(
-      { sub: userId, username: '', sessionId },
+      { sub: userId, sessionId },
       {
         secret: this.config.get<string>('jwt.accessSecret'),
         expiresIn: '15m',
@@ -187,7 +226,7 @@ export class AuthService {
       },
     );
 
-    const refreshTokenHash = await argon2.hash(refreshToken, { type: argon2.argon2id });
+    const refreshTokenHash = await argon2.hash(refreshToken, ARGON2_OPTIONS);
 
     await this.prisma.session.create({
       data: {

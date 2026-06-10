@@ -6,20 +6,20 @@ import { PrismaService } from '../../../prisma/prisma.service';
 
 export interface JwtPayload {
   sub: string;
-  username: string;
   sessionId: string;
 }
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
-    private config: ConfigService,
+    config: ConfigService,
     private prisma: PrismaService,
   ) {
+    // configuration.ts boot'ta zorunlu doğrulama yaptığından string garantili
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.get<string>('jwt.accessSecret')!,
+      secretOrKey: config.get<string>('jwt.accessSecret') as string,
     });
   }
 

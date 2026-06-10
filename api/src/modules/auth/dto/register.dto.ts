@@ -16,9 +16,10 @@ export class RegisterDto {
   @ApiProperty({ example: 'gizliSifre123' })
   @IsString()
   @MinLength(8, { message: 'Şifre en az 8 karakter olmalıdır.' })
+  @MaxLength(128, { message: 'Şifre en fazla 128 karakter olabilir.' })
   password: string;
 
-  @ApiProperty({ example: '2000-05-15' })
+  @ApiProperty({ example: '2000-05-15', description: 'ISO 8601 tarih (YYYY-MM-DD)' })
   @IsISO8601({}, { message: 'Doğum tarihi geçerli bir ISO tarih formatında olmalıdır.' })
   birthDate: string;
 }
