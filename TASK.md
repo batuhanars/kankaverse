@@ -12,28 +12,28 @@
 - [x] Git: kök depo başlatıldı, GitHub'a push edildi (yuva-git sorunu kalmadı)
 
 ### Backend (`api/`)
-- [ ] Prisma + PostgreSQL kurulumu, `schema.prisma` (contract §2), ilk migration
-- [ ] `PrismaModule` (global) + `PrismaService`
-- [ ] `common/`: `TransformInterceptor`, `GlobalExceptionFilter` (envelope), `JwtAuthGuard`, `@CurrentUser()`
-- [ ] `main.ts`: global `ValidationPipe` + interceptor + filter + `@nestjs/swagger` (`/api/docs`) + Socket.IO Redis adapter
+- [x] Prisma + PostgreSQL kurulumu, `schema.prisma` (contract §2), ilk migration
+- [x] `PrismaModule` (global) + `PrismaService`
+- [x] `common/`: `TransformInterceptor`, `GlobalExceptionFilter` (envelope), `JwtAuthGuard`, `@CurrentUser()`
+- [x] `main.ts`: global `ValidationPipe` + interceptor + filter + `@nestjs/swagger` (`/api/docs`) + Socket.IO Redis adapter
 - [ ] `auth` modülü: register, login, refresh (rotasyon + reuse tespiti), logout, me — **R7 insan incelemesi**
-- [ ] argon2id hash + JWT access (15dk) + rotasyonlu refresh + `Session` kaydı + httpOnly cookie
-- [ ] `guilds` modülü: POST (atomik: guild + OWNER member + `#genel-sohbet`), GET, POST join
-- [ ] `channels` modülü: POST (OWNER/ADMIN), GET (üye)
-- [ ] `messages` modülü: GET (cursor `before`, 50), POST (+ WS broadcast tetikle)
-- [ ] WS gateway: handshake auth, `channel:join`/`channel:leave`, `message.created` broadcast
+- [x] argon2id hash + JWT access (15dk) + rotasyonlu refresh + `Session` kaydı + httpOnly cookie
+- [x] `guilds` modülü: POST (atomik: guild + OWNER member + `#genel-sohbet`), GET, POST join
+- [x] `channels` modülü: POST (OWNER/ADMIN), GET (üye)
+- [x] `messages` modülü: GET (cursor `before`, 50), POST (+ WS broadcast tetikle)
+- [x] WS gateway: handshake auth, `channel:join`/`channel:leave`, `message.created` broadcast
 
 ### Frontend (`web/`)
-- [ ] Altyapı: Tailwind + `styles/tokens.css` (design-tokens), Figtree + JetBrains Mono fontları
-- [ ] Pinia + vue-router + vue-i18n (`i18n/tr.json`)
-- [ ] `api/` axios instance + envelope-aware interceptor + 401→refresh (in-flight promise)
-- [ ] `stores/`: auth, guilds, channels, messages
-- [ ] `useSocket` composable (Socket.IO client, token handshake, room join/leave)
-- [ ] `LoginView` (tasarım giris_yap; e-Devlet butonu disabled placeholder)
-- [ ] `RegisterView` (doğum tarihi zorunlu alan)
-- [ ] App shell: `ServerRail` (altıgen ikon + "+") · `ChannelPanel` · mesaj alanı · `MemberPanel` (statik stub)
-- [ ] Guild oluştur / guild'e join akışı
-- [ ] Gerçek zamanlı mesaj gönder/al + geçmiş yükleme
+- [x] Altyapı: Tailwind + `styles/tokens.css` (design-tokens), Figtree + JetBrains Mono fontları
+- [x] Pinia + vue-router + vue-i18n (`i18n/tr.json`)
+- [x] `api/` axios instance + envelope-aware interceptor + 401→refresh (in-flight promise)
+- [x] `stores/`: auth, guilds, channels, messages
+- [x] `useSocket` composable (Socket.IO client, token handshake, room join/leave)
+- [x] `LoginView` (tasarım giris_yap; e-Devlet butonu disabled placeholder)
+- [x] `RegisterView` (doğum tarihi zorunlu alan)
+- [x] App shell: `ServerRail` (altıgen ikon + "+") · `ChannelPanel` · mesaj alanı · `MemberPanel` (statik stub)
+- [x] Guild oluştur / guild'e join akışı
+- [x] Gerçek zamanlı mesaj gönder/al + geçmiş yükleme
 
 ### Sprint 1 DoD (contract §10)
 - [ ] İki kullanıcı uçtan uca gerçek zamanlı mesajlaşma

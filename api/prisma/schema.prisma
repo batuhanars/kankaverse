@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum VerificationStatus {
+  NONE
+  EDEVLET_VERIFIED
+}
+
+enum DmPolicy {
+  EVERYONE
+  FRIENDS
+  NONE
+}
+
+enum MediaPolicy {
+  EVERYONE
+  FRIENDS
+  NONE
+}
+
+enum GuildRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum ChannelType {
+  GUILD_TEXT
+  DM
+  GROUP_DM
+}
+
+model User {
+  id                  String             @id @default(cuid())
+  username            String             @unique
+  email               String             @unique
+  passwordHash        String
+  birthDate           DateTime
+  isMinor             Boolean
+  verificationStatus  VerificationStatus @default(NONE)
+  dmPolicy            DmPolicy           @default(FRIENDS)
+  mediaPolicy         MediaPolicy        @default(FRIENDS)
+  profileDiscoverable Boolean            @default(true)
+  emailVerifiedAt     DateTime?
+  avatarUrl           String?
+  deletedAt           DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  sessions            Session[]
+  memberships         GuildMember[]
+  ownedGuilds         Guild[]            @relation("GuildOwner")
+  messages            Message[]
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  refreshTokenHash String
+  tokenFamily      String
+  device           String?
+  ip               String?
+  lastActiveAt     DateTime  @default(now())
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Guild {
+  id        String      @id @default(cuid())
+  name      String
+  ownerId   String
+  owner     User        @relation("GuildOwner", fields: [ownerId], references: [id])
+  adultsOnly Boolean    @default(false)
+  iconUrl   String?
+  deletedAt DateTime?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  members   GuildMember[]
+  channels  Channel[]
+}
+
+model GuildMember {
+  id       String    @id @default(cuid())
+  guildId  String
+  guild    Guild     @relation(fields: [guildId], references: [id])
+  userId   String
+  user     User      @relation(fields: [userId], references: [id])
+  role     GuildRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+
+  @@unique([guildId, userId])
+  @@index([userId])
+}
+
+model Channel {
+  id        String      @id @default(cuid())
+  type      ChannelType @default(GUILD_TEXT)
+  guildId   String?
+  guild     Guild?      @relation(fields: [guildId], references: [id])
+  name      String?
+  ageGated  Boolean     @default(false)
+  position  Int         @default(0)
+  deletedAt DateTime?
+  createdAt DateTime    @default(now())
+  messages  Message[]
+
+  @@index([guildId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id])
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  content   String
+  replyToId String?
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([channelId, createdAt])
+}

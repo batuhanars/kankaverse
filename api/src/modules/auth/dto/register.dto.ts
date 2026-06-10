@@ -1,0 +1,24 @@
+import { IsEmail, IsString, MinLength, MaxLength, Matches, IsISO8601 } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+export class RegisterDto {
+  @ApiProperty({ example: 'batuhan_42' })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(32)
+  @Matches(/^[a-zA-Z0-9_]+$/, { message: 'Kullanıcı adı yalnızca harf, rakam ve alt çizgi içerebilir.' })
+  username: string;
+
+  @ApiProperty({ example: 'batuhan@example.com' })
+  @IsEmail({}, { message: 'Geçerli bir e-posta adresi giriniz.' })
+  email: string;
+
+  @ApiProperty({ example: 'gizliSifre123' })
+  @IsString()
+  @MinLength(8, { message: 'Şifre en az 8 karakter olmalıdır.' })
+  password: string;
+
+  @ApiProperty({ example: '2000-05-15' })
+  @IsISO8601({}, { message: 'Doğum tarihi geçerli bir ISO tarih formatında olmalıdır.' })
+  birthDate: string;
+}
