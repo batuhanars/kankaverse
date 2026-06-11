@@ -2,7 +2,6 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
-  UnprocessableEntityException,
   BadRequestException,
   Logger,
   OnModuleInit,
@@ -17,7 +16,6 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { User } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import {
   generateAuthToken,
@@ -25,58 +23,18 @@ import {
   EMAIL_VERIFICATION_TTL_MS,
   PASSWORD_RESET_TTL_MS,
 } from './utils/auth-token.util';
+import { validateBirthDate, calculateIsMinor } from './utils/birthdate.util';
+import { toUserDto } from './utils/user-dto.util';
 
 const ARGON2_OPTIONS = { type: argon2.argon2id, memoryCost: 19456, timeCost: 2 } as const;
-const MIN_AGE = 13;
-const MAX_AGE = 120;
-
-function toUserDto(user: User) {
-  return {
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    avatarUrl: user.avatarUrl,
-    isMinor: user.isMinor,
-    verificationStatus: user.verificationStatus,
-    createdAt: user.createdAt.toISOString(),
-    emailVerified: user.emailVerifiedAt !== null,
-  };
-}
-
-function calculateAge(birthDate: Date): number {
-  const now = new Date();
-  let age = now.getFullYear() - birthDate.getFullYear();
-  const m = now.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) age--;
-  return age;
-}
-
-function calculateIsMinor(birthDate: Date): boolean {
-  return calculateAge(birthDate) < 18;
-}
-
-function validateBirthDate(raw: string): Date {
-  const birthDate = new Date(raw);
-  if (isNaN(birthDate.getTime())) {
-    throw new UnprocessableEntityException({ message: 'Geçersiz doğum tarihi.', error: 'INVALID_BIRTHDATE' });
-  }
-  if (birthDate >= new Date()) {
-    throw new UnprocessableEntityException({ message: 'Doğum tarihi geçmişte olmalıdır.', error: 'INVALID_BIRTHDATE' });
-  }
-  const age = calculateAge(birthDate);
-  if (age > MAX_AGE) {
-    throw new UnprocessableEntityException({ message: 'Geçersiz doğum tarihi.', error: 'INVALID_BIRTHDATE' });
-  }
-  if (age < MIN_AGE) {
-    throw new UnprocessableEntityException({ message: 'Kayıt için en az 13 yaşında olmalısın.', error: 'UNDERAGE' });
-  }
-  return birthDate;
-}
+// Eşzamanlı refresh yarışında, az önce döndürülmüş session'a aynı geçerli token'la
+// gelen ikinci istek "reuse" sayılıp tüm aileyi iptal etmesin diye küçük grace penceresi.
+const REFRESH_RACE_GRACE_MS = 10_000;
 
 @Injectable()
 export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
-  private dummyHash: string;
+  private dummyHash!: string;
 
   constructor(
     private prisma: PrismaService,
@@ -175,7 +133,18 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException({ message: 'Yenileme tokeni yeniden kullanımı tespit edildi.', error: 'REFRESH_REUSE_DETECTED' });
     }
 
+    // Token hash'i önce doğrula — durum kararında (iyi huylu yarış mı, reuse mu) kullanılır
+    const tokenValid = await argon2.verify(session.refreshTokenHash, rawRefreshToken);
+
     if (session.revokedAt !== null) {
+      // İptal edilmiş session'a token sunuldu. Ayrım:
+      //  - token geçerli + iptal grace penceresi içinde → iyi huylu eşzamanlı rotasyon yarışı
+      //    (aynı geçerli token iki sekmeden/cihazdan geldi). Aileyi İPTAL ETME; retry'lanabilir hata.
+      //  - aksi halde (eski token replay veya hash uyuşmaz) → gerçek reuse → tüm aileyi iptal et.
+      const withinGrace = Date.now() - session.revokedAt.getTime() < REFRESH_RACE_GRACE_MS;
+      if (tokenValid && withinGrace) {
+        throw new UnauthorizedException({ message: 'Oturum az önce yenilendi, tekrar dene.', error: 'INVALID_REFRESH' });
+      }
       await this.prisma.session.updateMany({
         where: { tokenFamily: session.tokenFamily, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -183,7 +152,6 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException({ message: 'Yenileme tokeni yeniden kullanımı tespit edildi.', error: 'REFRESH_REUSE_DETECTED' });
     }
 
-    const tokenValid = await argon2.verify(session.refreshTokenHash, rawRefreshToken);
     if (!tokenValid) {
       await this.prisma.session.update({
         where: { id: session.id },
@@ -192,10 +160,15 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException({ message: 'Geçersiz yenileme tokeni.', error: 'INVALID_REFRESH' });
     }
 
-    await this.prisma.session.update({
-      where: { id: session.id },
+    // Atomik rotasyon claim'i: yalnız hâlâ revokedAt:null ise bu istek döndürür.
+    // Eşzamanlı ikinci istek count:0 alır → çift rotasyon (tek token'dan iki session) önlenir.
+    const claim = await this.prisma.session.updateMany({
+      where: { id: session.id, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    if (claim.count === 0) {
+      throw new UnauthorizedException({ message: 'Oturum az önce yenilendi, tekrar dene.', error: 'INVALID_REFRESH' });
+    }
 
     const { accessToken, refreshToken } = await this.createSession(
       session.userId,
@@ -317,10 +290,15 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException({ message: 'Geçersiz veya süresi dolmuş bağlantı.', error: 'INVALID_TOKEN' });
     }
 
-    await this.prisma.authToken.update({
-      where: { id: token.id },
+    // Atomik tek-kullanım: yalnız hâlâ usedAt:null ise tüket. Eşzamanlı çift-submit'te
+    // ikinci istek count:0 alır → tokenın iki kez geçerli sayılması engellenir (TOCTOU).
+    const claim = await this.prisma.authToken.updateMany({
+      where: { id: token.id, usedAt: null },
       data: { usedAt: new Date() },
     });
+    if (claim.count === 0) {
+      throw new BadRequestException({ message: 'Geçersiz veya süresi dolmuş bağlantı.', error: 'INVALID_TOKEN' });
+    }
 
     return token;
   }
