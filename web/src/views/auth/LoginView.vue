@@ -95,6 +95,16 @@ function getError(field: string): string | undefined {
           {{ apiError }}
         </p>
 
+        <div class="flex justify-end">
+          <RouterLink
+            :to="{ name: 'forgot-password' }"
+            class="text-[12px]"
+            style="color: var(--kv-text-muted);"
+          >
+            {{ t('auth.forgotPassword') }}
+          </RouterLink>
+        </div>
+
         <KvButton type="submit" :loading="loading" class="w-full mt-1">
           {{ t('auth.login') }}
         </KvButton>

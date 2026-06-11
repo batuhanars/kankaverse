@@ -26,11 +26,15 @@
     "edevletLogin": "e-Devlet ile Giriş Yap",
     "edevletComingSoon": "e-Devlet entegrasyonu yakında",
     "or": "veya",
+    "forgotPassword": "Şifremi unuttum",
     "errors": {
       "USERNAME_TAKEN": "Bu kullanıcı adı zaten kullanılıyor.",
       "EMAIL_TAKEN": "Bu e-posta adresi zaten kayıtlı.",
       "INVALID_CREDENTIALS": "E-posta veya şifre hatalı.",
-      "VALIDATION_FAILED": "Lütfen tüm alanları doğru doldurun."
+      "VALIDATION_FAILED": "Lütfen tüm alanları doğru doldurun.",
+      "EMAIL_NOT_VERIFIED": "Sunucu oluşturmak için e-postanı doğrulamalısın.",
+      "INVALID_TOKEN": "Link geçersiz veya süresi dolmuş.",
+      "EMAIL_ALREADY_VERIFIED": "E-posta adresin zaten doğrulanmış."
     },
     "validation": {
       "emailRequired": "E-posta adresi zorunludur.",
@@ -42,8 +46,38 @@
       "usernameMax": "Kullanıcı adı en fazla 32 karakter olabilir.",
       "usernamePattern": "Yalnızca harf, rakam ve alt çizgi (_) kullanılabilir.",
       "birthDateRequired": "Doğum tarihi zorunludur.",
-      "birthDateInvalid": "Geçerli bir doğum tarihi seçin."
+      "birthDateInvalid": "Geçerli bir doğum tarihi seçin.",
+      "newPasswordRequired": "Yeni şifre zorunludur.",
+      "newPasswordMin": "Şifre en az 8 karakter olmalıdır."
     }
+  },
+  "emailVerification": {
+    "bannerMessage": "E-postanı henüz doğrulamadın. Bazı özellikler kısıtlı.",
+    "resend": "Tekrar gönder",
+    "resendSuccess": "Doğrulama linki gönderildi. Kutunu kontrol et.",
+    "verifyTitle": "E-posta Doğrulama",
+    "verifySuccess": "E-postan başarıyla doğrulandı!",
+    "verifyError": "Link geçersiz veya süresi dolmuş.",
+    "goToApp": "Uygulamaya Git",
+    "goToLogin": "Giriş Yap",
+    "resendLink": "Yeni link gönder"
+  },
+  "forgotPassword": {
+    "title": "Şifremi Unuttum",
+    "subtitle": "Kayıtlı e-posta adresini gir, sıfırlama linki gönderelim.",
+    "submitButton": "Link Gönder",
+    "successMessage": "Kayıtlı bir hesap varsa, sıfırlama linki gönderildi. Kutunu kontrol et.",
+    "backToLogin": "Giriş sayfasına dön"
+  },
+  "resetPassword": {
+    "title": "Yeni Şifre Belirle",
+    "subtitle": "Yeni şifreni gir.",
+    "newPassword": "Yeni Şifre",
+    "newPasswordPlaceholder": "En az 8 karakter",
+    "submitButton": "Şifremi Değiştir",
+    "successMessage": "Şifren değiştirildi. Tüm oturumların kapatıldı, tekrar giriş yap.",
+    "invalidToken": "Link geçersiz veya süresi dolmuş.",
+    "goToLogin": "Giriş Yap"
   },
   "months": {
     "1": "Ocak",

@@ -16,6 +16,22 @@ const router = createRouter({
       component: () => import('@/views/auth/RegisterView.vue'),
       meta: { requiresGuest: true },
     },
+    // Sprint 2A — e-posta & şifre akışları (auth gerektirmez, guest redirect yok)
+    {
+      path: '/verify-email',
+      name: 'verify-email',
+      component: () => import('@/views/auth/VerifyEmailView.vue'),
+    },
+    {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('@/views/auth/ForgotPasswordView.vue'),
+    },
+    {
+      path: '/reset-password',
+      name: 'reset-password',
+      component: () => import('@/views/auth/ResetPasswordView.vue'),
+    },
     {
       path: '/',
       name: 'app',

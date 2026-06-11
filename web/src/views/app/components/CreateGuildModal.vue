@@ -29,8 +29,12 @@ async function submit() {
     if (channels.length) channelsStore.setActiveChannel(channels[0].id)
     emit('close')
   } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } } }
-    error.value = err.response?.data?.message ?? t('common.error')
+    const err = e as { response?: { data?: { error?: string; message?: string } } }
+    const code = err.response?.data?.error
+    error.value =
+      code === 'EMAIL_NOT_VERIFIED'
+        ? t('auth.errors.EMAIL_NOT_VERIFIED')
+        : err.response?.data?.message ?? t('common.error')
   } finally {
     loading.value = false
   }

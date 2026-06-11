@@ -29,4 +29,18 @@ export const authApi = {
   me() {
     return http.get<UserDto>('/auth/me')
   },
+  // Sprint 2A — e-posta doğrulama
+  verifyEmail(token: string) {
+    return http.post<{ user: UserDto }>('/auth/verify-email', { token })
+  },
+  resendVerification() {
+    return http.post<null>('/auth/resend-verification')
+  },
+  // Sprint 2A — şifre sıfırlama
+  forgotPassword(email: string) {
+    return http.post<null>('/auth/forgot-password', { email })
+  },
+  resetPassword(token: string, newPassword: string) {
+    return http.post<null>('/auth/reset-password', { token, newPassword })
+  },
 }

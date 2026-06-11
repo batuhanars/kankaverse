@@ -41,6 +41,11 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const isAuthenticated = () => !!user.value
+  const isEmailVerified = () => user.value?.emailVerified === true
 
-  return { user, ready, init, register, login, logout, isAuthenticated }
+  function updateUser(updated: UserDto) {
+    user.value = updated
+  }
+
+  return { user, ready, init, register, login, logout, isAuthenticated, isEmailVerified, updateUser }
 })

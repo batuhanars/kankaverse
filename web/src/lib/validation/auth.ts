@@ -36,5 +36,22 @@ export const registerSchema = z.object({
     .refine((val) => !isNaN(new Date(val).getTime()), 'auth.validation.birthDateInvalid'),
 })
 
+// Sprint 2A — şifre sıfırlama şemaları
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string({ error: 'auth.validation.emailRequired' })
+    .min(1, 'auth.validation.emailRequired')
+    .email('auth.validation.emailInvalid'),
+})
+
+export const resetPasswordSchema = z.object({
+  newPassword: z
+    .string({ error: 'auth.validation.newPasswordRequired' })
+    .min(1, 'auth.validation.newPasswordRequired')
+    .min(8, 'auth.validation.newPasswordMin'),
+})
+
 export type LoginFormValues = z.infer<typeof loginSchema>
 export type RegisterFormValues = z.infer<typeof registerSchema>
+export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>

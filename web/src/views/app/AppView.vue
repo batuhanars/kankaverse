@@ -12,6 +12,7 @@ import MemberPanel from '@/components/layout/MemberPanel.vue'
 import MessageArea from './components/MessageArea.vue'
 import CreateGuildModal from './components/CreateGuildModal.vue'
 import JoinGuildModal from './components/JoinGuildModal.vue'
+import EmailVerificationBanner from '@/components/shared/EmailVerificationBanner.vue'
 import hexagonLogo from '@/assets/brand/kankaverse-hexagon.png'
 
 const { t } = useI18n()
@@ -49,7 +50,11 @@ async function logout() {
 </script>
 
 <template>
-  <div class="flex h-full overflow-hidden" style="background-color: var(--kv-bg-content);">
+  <div class="flex flex-col h-full overflow-hidden">
+    <!-- Doğrulama bandı — emailVerified false iken tüm genişlikte üst şerit -->
+    <EmailVerificationBanner v-if="authStore.user && !authStore.user.emailVerified" />
+
+    <div class="flex flex-1 overflow-hidden" style="background-color: var(--kv-bg-content);">
     <ServerRail
       :on-create-guild="() => (showCreateGuild = true)"
       :on-join-guild="() => (showJoinGuild = true)"
@@ -70,16 +75,22 @@ async function logout() {
         class="pointer-events-none select-none absolute"
         style="width: 300px; opacity: 0.06;"
       />
-      <p class="relative text-[var(--kv-text-muted)] text-[16px]">{{ t('guild.emptyState') }}</p>
+      <p class="relative text-[16px]" style="color: var(--kv-text-muted);">{{ t('guild.emptyState') }}</p>
       <div class="relative flex gap-3">
         <button
-          class="px-4 py-2 rounded-[var(--kv-radius-md)] bg-[var(--kv-accent-500)] text-white text-[14px] font-medium hover:bg-[var(--kv-accent-400)] cursor-pointer"
-          @click="showCreateGuild = true"
+          class="px-4 py-2 rounded-[var(--kv-radius-md)] text-white text-[14px] font-medium transition-colors"
+          :class="authStore.isEmailVerified()
+            ? 'bg-[var(--kv-accent-500)] hover:bg-[var(--kv-accent-400)] cursor-pointer'
+            : 'bg-[var(--kv-accent-500)] opacity-50 cursor-not-allowed'"
+          :title="!authStore.isEmailVerified() ? t('auth.errors.EMAIL_NOT_VERIFIED') : undefined"
+          :disabled="!authStore.isEmailVerified()"
+          @click="authStore.isEmailVerified() && (showCreateGuild = true)"
         >
           {{ t('guild.create') }}
         </button>
         <button
-          class="px-4 py-2 rounded-[var(--kv-radius-md)] bg-[var(--kv-bg-elevated)] text-[var(--kv-text-secondary)] text-[14px] font-medium hover:bg-[var(--kv-border-strong)] cursor-pointer"
+          class="px-4 py-2 rounded-[var(--kv-radius-md)] bg-[var(--kv-bg-elevated)] text-[14px] font-medium hover:bg-[var(--kv-border-strong)] cursor-pointer"
+          style="color: var(--kv-text-secondary);"
           @click="showJoinGuild = true"
         >
           {{ t('guild.join') }}
@@ -99,6 +110,7 @@ async function logout() {
       </div>
       <MemberPanel v-if="showMemberPanel" class="hidden xl:flex" />
     </template>
+    </div>
   </div>
 
   <CreateGuildModal v-if="showCreateGuild" @close="showCreateGuild = false" />

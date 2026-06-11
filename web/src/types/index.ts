@@ -33,7 +33,7 @@ export const ChannelType = {
 } as const
 export type ChannelType = (typeof ChannelType)[keyof typeof ChannelType]
 
-// Sprint 1 Contract §5 — DTO'lar
+// Sprint 1 Contract §5 + Sprint 2A §4 — DTO'lar
 export interface UserDto {
   id: string
   username: string
@@ -42,6 +42,7 @@ export interface UserDto {
   isMinor: boolean
   verificationStatus: VerificationStatus
   createdAt: string
+  emailVerified: boolean // Sprint 2A eklendi
 }
 
 export interface GuildDto {
