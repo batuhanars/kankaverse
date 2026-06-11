@@ -3,16 +3,28 @@ import {
   ConflictException,
   UnauthorizedException,
   UnprocessableEntityException,
+  BadRequestException,
+  Logger,
   OnModuleInit,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
+import { AuthTokenType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../../shared/email/email.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { User } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import {
+  generateAuthToken,
+  hashAuthToken,
+  EMAIL_VERIFICATION_TTL_MS,
+  PASSWORD_RESET_TTL_MS,
+} from './utils/auth-token.util';
 
 const ARGON2_OPTIONS = { type: argon2.argon2id, memoryCost: 19456, timeCost: 2 } as const;
 const MIN_AGE = 13;
@@ -27,6 +39,7 @@ function toUserDto(user: User) {
     isMinor: user.isMinor,
     verificationStatus: user.verificationStatus,
     createdAt: user.createdAt.toISOString(),
+    emailVerified: user.emailVerifiedAt !== null,
   };
 }
 
@@ -62,16 +75,17 @@ function validateBirthDate(raw: string): Date {
 
 @Injectable()
 export class AuthService implements OnModuleInit {
+  private readonly logger = new Logger(AuthService.name);
   private dummyHash: string;
 
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private config: ConfigService,
+    private emailService: EmailService,
   ) {}
 
   async onModuleInit() {
-    // Timing saldırısına karşı: kullanıcı bulunamadığında harcanan süre eşitleniyor
     this.dummyHash = await argon2.hash('dummy-timing-placeholder', ARGON2_OPTIONS);
   }
 
@@ -107,6 +121,9 @@ export class AuthService implements OnModuleInit {
       },
     });
 
+    // Doğrulama e-postası gönder — hata register'ı bloke etmez
+    this.sendVerificationEmailSilent(user.id, user.email);
+
     const { accessToken, refreshToken } = await this.createSession(user.id, ip);
     return { user: toUserDto(user), accessToken, refreshToken };
   }
@@ -119,7 +136,6 @@ export class AuthService implements OnModuleInit {
     });
 
     if (!user) {
-      // Kullanıcı bulunamasa bile argon2 maliyeti harcayarak timing farkını kapatıyoruz
       await argon2.verify(this.dummyHash, dto.password).catch(() => {});
       throw new UnauthorizedException({ message: 'E-posta veya şifre hatalı.', error: 'INVALID_CREDENTIALS' });
     }
@@ -152,7 +168,6 @@ export class AuthService implements OnModuleInit {
     });
 
     if (!session) {
-      // Session hiç yok — yine de aile iptal dene (race/leaked token)
       await this.prisma.session.updateMany({
         where: { tokenFamily: payload.family, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -161,7 +176,6 @@ export class AuthService implements OnModuleInit {
     }
 
     if (session.revokedAt !== null) {
-      // İptal edilmiş session tekrar kullanıldı → tüm aileyi iptal et
       await this.prisma.session.updateMany({
         where: { tokenFamily: session.tokenFamily, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -206,6 +220,112 @@ export class AuthService implements OnModuleInit {
     return toUserDto(user);
   }
 
+  async verifyEmail(rawToken: string) {
+    const token = await this.consumeAuthToken(rawToken, AuthTokenType.EMAIL_VERIFICATION);
+
+    const user = await this.prisma.user.findUnique({ where: { id: token.userId } });
+    if (!user) throw new UnauthorizedException('Kullanıcı bulunamadı.');
+
+    if (user.emailVerifiedAt !== null) {
+      throw new ConflictException({ message: 'E-posta adresi zaten doğrulanmış.', error: 'EMAIL_ALREADY_VERIFIED' });
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerifiedAt: new Date() },
+    });
+
+    return { user: toUserDto(updated) };
+  }
+
+  async resendVerification(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId, deletedAt: null } });
+    if (!user) throw new UnauthorizedException('Kullanıcı bulunamadı.');
+
+    if (user.emailVerifiedAt !== null) {
+      throw new ConflictException({ message: 'E-posta adresi zaten doğrulanmış.', error: 'EMAIL_ALREADY_VERIFIED' });
+    }
+
+    const rawToken = await this.createAuthToken(userId, AuthTokenType.EMAIL_VERIFICATION, EMAIL_VERIFICATION_TTL_MS);
+    await this.emailService.sendVerificationEmail(user.email, rawToken);
+    return null;
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto) {
+    const email = dto.email.toLowerCase().trim();
+    const user = await this.prisma.user.findUnique({ where: { email, deletedAt: null } });
+
+    // Her zaman 200 döner — kullanıcı var/yok bilgisi sızdırılmaz
+    if (!user) return null;
+
+    const rawToken = await this.createAuthToken(user.id, AuthTokenType.PASSWORD_RESET, PASSWORD_RESET_TTL_MS);
+    await this.emailService.sendPasswordResetEmail(user.email, rawToken).catch((err) => {
+      this.logger.error(`Şifre sıfırlama e-postası gönderilemedi: ${String(err)}`);
+    });
+
+    return null;
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const token = await this.consumeAuthToken(dto.token, AuthTokenType.PASSWORD_RESET);
+    const newHash = await argon2.hash(dto.newPassword, ARGON2_OPTIONS);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: token.userId },
+        data: {
+          passwordHash: newHash,
+          // Şifre sıfırlama e-postasını alabilmek e-posta sahipliğini kanıtlar
+          emailVerifiedAt: new Date(),
+        },
+      }),
+      // Tüm aktif oturumları iptal et
+      this.prisma.session.updateMany({
+        where: { userId: token.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    return null;
+  }
+
+  // ─── Private helpers ────────────────────────────────────────────────────────
+
+  private async createAuthToken(userId: string, type: AuthTokenType, ttlMs: number): Promise<string> {
+    const { raw, hash } = generateAuthToken();
+    const expiresAt = new Date(Date.now() + ttlMs);
+
+    // Önceki kullanılmamış tokenları iptal et (en son link geçerli kuralı)
+    await this.prisma.authToken.updateMany({
+      where: { userId, type, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    await this.prisma.authToken.create({
+      data: { userId, type, tokenHash: hash, expiresAt },
+    });
+
+    return raw;
+  }
+
+  private async consumeAuthToken(rawToken: string, type: AuthTokenType) {
+    const hash = hashAuthToken(rawToken);
+    const token = await this.prisma.authToken.findFirst({
+      where: { tokenHash: hash, type },
+    });
+
+    if (!token || token.usedAt !== null || token.expiresAt < new Date()) {
+      throw new BadRequestException({ message: 'Geçersiz veya süresi dolmuş bağlantı.', error: 'INVALID_TOKEN' });
+    }
+
+    await this.prisma.authToken.update({
+      where: { id: token.id },
+      data: { usedAt: new Date() },
+    });
+
+    return token;
+  }
+
   private async createSession(userId: string, ip?: string, existingFamily?: string) {
     const family = existingFamily ?? randomUUID();
     const sessionId = randomUUID();
@@ -240,5 +360,13 @@ export class AuthService implements OnModuleInit {
     });
 
     return { accessToken, refreshToken };
+  }
+
+  private sendVerificationEmailSilent(userId: string, email: string): void {
+    this.createAuthToken(userId, AuthTokenType.EMAIL_VERIFICATION, EMAIL_VERIFICATION_TTL_MS)
+      .then((rawToken) => this.emailService.sendVerificationEmail(email, rawToken))
+      .catch((err) => {
+        this.logger.error(`Doğrulama e-postası gönderilemedi (kullanıcı: ${userId}): ${String(err)}`);
+      });
   }
 }

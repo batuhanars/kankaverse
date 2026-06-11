@@ -10,6 +10,13 @@ export default () => {
     }
   }
 
+  if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY) {
+    throw new Error(
+      `FATAL: Production ortamında 'RESEND_API_KEY' zorunludur. ` +
+      `E-posta gönderimi yapılamaz.`,
+    );
+  }
+
   return {
     port: parseInt(process.env.PORT ?? '3001', 10),
     database: {
@@ -21,6 +28,11 @@ export default () => {
     jwt: {
       accessSecret: process.env.JWT_ACCESS_SECRET as string,
       refreshSecret: process.env.JWT_REFRESH_SECRET as string,
+    },
+    email: {
+      resendApiKey: process.env.RESEND_API_KEY,
+      from: process.env.EMAIL_FROM ?? 'noreply@kankaverse.app',
+      frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
     },
   };
 };

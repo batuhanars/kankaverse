@@ -57,17 +57,17 @@
 > Aktif sözleşme: `contracts/SPRINT_2A_CONTRACT.md`. **R7: tamamı insan incelemesi.** Dev checkbox işaretler, item EKLEMEZ.
 
 ### Backend (`api/`)
-- [ ] Prisma: `AuthToken` modeli + `AuthTokenType` enum + `User.authTokens` ilişki + migration (additive)
-- [ ] `EmailService` (SharedModule): Resend adaptörü + konsol fallback (anahtarsız dev); `RESEND_API_KEY` prod fail-fast
-- [ ] Token util: 32-byte rastgele üret + `SHA-256` hash + tek-kullanım/süre doğrulama
-- [ ] `POST /auth/verify-email` (token → emailVerifiedAt set, usedAt)
-- [ ] `POST /auth/resend-verification` (auth, rate-limit, zaten-doğrulanmış 409)
-- [ ] `POST /auth/forgot-password` (her zaman 200, sızıntı yok, rate-limit)
-- [ ] `POST /auth/reset-password` (şifre set + TÜM oturum revoke + emailVerifiedAt set)
-- [ ] `register` yan etkisi: doğrulama e-postası gönder (gönderim register'ı bloke etmez)
-- [ ] `VerifiedEmailGuard` → `POST /guilds` doğrulanmamışta 403 EMAIL_NOT_VERIFIED
-- [ ] `toUserDto`: `emailVerified` alanı; Swagger güncel
-- [ ] Yeni env: `RESEND_API_KEY`, `EMAIL_FROM`, `FRONTEND_URL` → `.env.example`
+- [x] Prisma: `AuthToken` modeli + `AuthTokenType` enum + `User.authTokens` ilişki + migration (additive)
+- [x] `EmailService` (SharedModule): Resend adaptörü + konsol fallback (anahtarsız dev); `RESEND_API_KEY` prod fail-fast
+- [x] Token util: 32-byte rastgele üret + `SHA-256` hash + tek-kullanım/süre doğrulama
+- [x] `POST /auth/verify-email` (token → emailVerifiedAt set, usedAt)
+- [x] `POST /auth/resend-verification` (auth, rate-limit, zaten-doğrulanmış 409)
+- [x] `POST /auth/forgot-password` (her zaman 200, sızıntı yok, rate-limit)
+- [x] `POST /auth/reset-password` (şifre set + TÜM oturum revoke + emailVerifiedAt set)
+- [x] `register` yan etkisi: doğrulama e-postası gönder (gönderim register'ı bloke etmez)
+- [x] `VerifiedEmailGuard` → `POST /guilds` doğrulanmamışta 403 EMAIL_NOT_VERIFIED
+- [x] `toUserDto`: `emailVerified` alanı; Swagger güncel
+- [x] Yeni env: `RESEND_API_KEY`, `EMAIL_FROM`, `FRONTEND_URL` → `.env.example`
 
 ### Frontend (`web/`)
 - [ ] `UserDto.emailVerified` tip + tüketim

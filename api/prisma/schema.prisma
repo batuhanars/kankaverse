@@ -6,6 +6,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum AuthTokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
 enum VerificationStatus {
   NONE
   EDEVLET_VERIFIED
@@ -55,6 +60,21 @@ model User {
   memberships         GuildMember[]
   ownedGuilds         Guild[]            @relation("GuildOwner")
   messages            Message[]
+  authTokens          AuthToken[]
+}
+
+model AuthToken {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
+  type      AuthTokenType
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([userId, type])
+  @@index([tokenHash])
 }
 
 model Session {

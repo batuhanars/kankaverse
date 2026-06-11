@@ -15,6 +15,9 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -93,5 +96,39 @@ export class AuthController {
   @ApiOperation({ summary: 'Mevcut kullanıcı bilgisi' })
   async me(@CurrentUser() user: { id: string }) {
     return this.authService.me(user.id);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 3600000 } })
+  @ApiOperation({ summary: 'E-posta doğrulama (10/saat/IP)' })
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.token);
+  }
+
+  @Post('resend-verification')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 3600000 } })
+  @ApiOperation({ summary: 'Doğrulama e-postasını yeniden gönder (5/saat)' })
+  async resendVerification(@CurrentUser() user: { id: string }) {
+    return this.authService.resendVerification(user.id);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 3, ttl: 3600000 } })
+  @ApiOperation({ summary: 'Şifre sıfırlama linki gönder — sızdırmaz (3/saat/IP)' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 3600000 } })
+  @ApiOperation({ summary: 'Şifre sıfırla + tüm oturumları düşür (10/saat/IP)' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 }

@@ -12,6 +12,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GuildsService } from './guilds.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { VerifiedEmailGuard } from '../../common/guards/verified-email.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('guilds')
@@ -22,8 +23,9 @@ export class GuildsController {
   constructor(private guildsService: GuildsService) {}
 
   @Post()
+  @UseGuards(VerifiedEmailGuard)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Yeni sunucu oluştur (guild + owner member + #genel-sohbet)' })
+  @ApiOperation({ summary: 'Yeni sunucu oluştur (guild + owner member + #genel-sohbet); e-posta doğrulanmış gerekir' })
   create(@CurrentUser() user: { id: string }, @Body() dto: CreateGuildDto) {
     return this.guildsService.create(user.id, dto);
   }
