@@ -39,7 +39,15 @@
       "TWO_FACTOR_ALREADY_ENABLED": "2FA zaten etkin.",
       "TWO_FACTOR_NOT_ENABLED": "2FA zaten kapalı.",
       "SESSION_NOT_FOUND": "Oturum bulunamadı.",
-      "ACCOUNT_DELETION_PENDING": "Hesabın silinmek üzere."
+      "ACCOUNT_DELETION_PENDING": "Hesabın silinmek üzere.",
+      "USER_NOT_FOUND": "Kullanıcı bulunamadı.",
+      "CANNOT_FRIEND_SELF": "Kendinize arkadaşlık isteği gönderemezsiniz.",
+      "CANNOT_BLOCK_SELF": "Kendinizi engelleyemezsiniz.",
+      "CANNOT_DM_SELF": "Kendinize mesaj gönderemezsiniz.",
+      "ALREADY_FRIENDS": "Bu kullanıcıyla zaten arkadaşsınız.",
+      "REQUEST_EXISTS": "Bu kullanıcıya zaten istek gönderilmiş.",
+      "BLOCKED": "Bu kullanıcıyla mesajlaşamazsınız.",
+      "DM_NOT_ALLOWED": "Bu kullanıcı mesajlara kapalı."
     },
     "validation": {
       "emailRequired": "E-posta adresi zorunludur.",
@@ -228,9 +236,49 @@
     "online": "Çevrimiçi",
     "offline": "Çevrimdışı"
   },
+  "friends": {
+    "title": "Arkadaşlar",
+    "myCode": "Arkadaş Kodum",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı!",
+    "codePlaceholder": "Arkadaş kodu gir (ör: K7M2QX9F)",
+    "addButton": "İstek Gönder",
+    "requestSent": "Arkadaşlık isteği gönderildi.",
+    "tabAll": "Tüm",
+    "tabPending": "Bekleyen",
+    "tabBlocked": "Engellenenler",
+    "noFriends": "Henüz arkadaşın yok. Arkadaş kodu ile istek gönder!",
+    "noPending": "Bekleyen istek yok.",
+    "noBlocked": "Engellenen kullanıcı yok.",
+    "incoming": "Gelen İstekler",
+    "outgoing": "Giden İstekler",
+    "pending": "Beklemede",
+    "accept": "Kabul Et",
+    "decline": "Reddet",
+    "dm": "Mesaj Gönder",
+    "remove": "Arkadaşlıktan Çıkar",
+    "block": "Engelle",
+    "unblock": "Engeli Kaldır",
+    "confirmRemove": "Bu kullanıcıyı arkadaş listenizden çıkarmak istediğinizden emin misiniz?",
+    "confirmBlock": "Bu kullanıcıyı engellemek istediğinizden emin misiniz? Arkadaşlığınız silinir ve mesajlaşma durur.",
+    "errors": {
+      "USER_NOT_FOUND": "Kullanıcı bulunamadı.",
+      "CANNOT_FRIEND_SELF": "Kendinize arkadaşlık isteği gönderemezsiniz.",
+      "ALREADY_FRIENDS": "Bu kullanıcıyla zaten arkadaşsınız.",
+      "REQUEST_EXISTS": "Bu kullanıcıya zaten istek gönderilmiş.",
+      "BLOCKED": "Bu kullanıcıyla arkadaş olamazsınız."
+    }
+  },
+  "dm": {
+    "sectionHeader": "MESAJLAR",
+    "noDms": "Henüz mesaj yok.",
+    "empty": "Henüz mesaj yok. İlk mesajı sen gönder!",
+    "placeholder": "@{user} kullanıcısına mesaj yaz"
+  },
   "common": {
     "cancel": "İptal",
     "close": "Kapat",
+    "confirm": "Onayla",
     "save": "Kaydet",
     "loading": "Yükleniyor...",
     "error": "Bir hata oluştu.",

@@ -33,7 +33,7 @@ export const ChannelType = {
 } as const
 export type ChannelType = (typeof ChannelType)[keyof typeof ChannelType]
 
-// Sprint 1 §5 + Sprint 2A §4 + Sprint 2B §4 — DTO'lar
+// Sprint 1 §5 + Sprint 2A §4 + Sprint 2B §4 + Sprint 3 §5 — DTO'lar
 export interface UserDto {
   id: string
   username: string
@@ -44,6 +44,39 @@ export interface UserDto {
   createdAt: string
   emailVerified: boolean
   twoFactorEnabled: boolean // Sprint 2B
+  friendCode: string // Sprint 3
+}
+
+// Sprint 3 §5 — sosyal katman DTO'ları
+export interface FriendCodeUserDto {
+  id: string
+  username: string
+  avatarUrl: string | null
+}
+
+export interface FriendDto {
+  friendshipId: string
+  user: FriendCodeUserDto
+  since: string
+}
+
+export interface FriendRequestDto {
+  id: string
+  direction: 'incoming' | 'outgoing'
+  user: FriendCodeUserDto
+  createdAt: string
+}
+
+export interface BlockedUserDto {
+  user: FriendCodeUserDto
+  since: string
+}
+
+export interface DmChannelDto {
+  id: string
+  otherUser: FriendCodeUserDto
+  lastMessage: MessageDto | null
+  unread: boolean
 }
 
 export interface SessionDto {

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useGuildsStore } from '@/stores/guilds'
 import { useSocket } from '@/composables/useSocket'
@@ -13,9 +12,8 @@ import MessageArea from './components/MessageArea.vue'
 import CreateGuildModal from './components/CreateGuildModal.vue'
 import JoinGuildModal from './components/JoinGuildModal.vue'
 import EmailVerificationBanner from '@/components/shared/EmailVerificationBanner.vue'
-import hexagonLogo from '@/assets/brand/kankaverse-hexagon.png'
+import HomeView from '@/views/home/HomeView.vue'
 
-const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
 const guildsStore = useGuildsStore()
@@ -62,41 +60,8 @@ async function logout() {
 
     <ChannelPanel v-if="guildsStore.activeGuildId" />
 
-    <!-- Boş durum: guild seçilmemişse -->
-    <div
-      v-if="!guildsStore.activeGuildId"
-      class="relative flex-1 flex flex-col items-center justify-center gap-4 overflow-hidden"
-      style="background-color: var(--kv-bg-content);"
-    >
-      <img
-        :src="hexagonLogo"
-        alt=""
-        aria-hidden="true"
-        class="pointer-events-none select-none absolute"
-        style="width: 300px; opacity: 0.06;"
-      />
-      <p class="relative text-[16px]" style="color: var(--kv-text-muted);">{{ t('guild.emptyState') }}</p>
-      <div class="relative flex gap-3">
-        <button
-          class="px-4 py-2 rounded-[var(--kv-radius-md)] text-white text-[14px] font-medium transition-colors"
-          :class="authStore.isEmailVerified()
-            ? 'bg-[var(--kv-accent-500)] hover:bg-[var(--kv-accent-400)] cursor-pointer'
-            : 'bg-[var(--kv-accent-500)] opacity-50 cursor-not-allowed'"
-          :title="!authStore.isEmailVerified() ? t('auth.errors.EMAIL_NOT_VERIFIED') : undefined"
-          :disabled="!authStore.isEmailVerified()"
-          @click="authStore.isEmailVerified() && (showCreateGuild = true)"
-        >
-          {{ t('guild.create') }}
-        </button>
-        <button
-          class="px-4 py-2 rounded-[var(--kv-radius-md)] bg-[var(--kv-bg-elevated)] text-[14px] font-medium hover:bg-[var(--kv-border-strong)] cursor-pointer"
-          style="color: var(--kv-text-secondary);"
-          @click="showJoinGuild = true"
-        >
-          {{ t('guild.join') }}
-        </button>
-      </div>
-    </div>
+    <!-- Home ekranı: guild seçilmemişse (DM + Arkadaşlar) -->
+    <HomeView v-if="!guildsStore.activeGuildId" />
 
     <!-- Kanal seçilmişse -->
     <template v-if="guildsStore.activeGuildId">
