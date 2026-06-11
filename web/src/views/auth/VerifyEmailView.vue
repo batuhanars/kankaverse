@@ -23,7 +23,7 @@ onMounted(async () => {
   }
   try {
     const res = await authApi.verifyEmail(token)
-    auth.updateUser(res.data)
+    auth.updateUser(res.data.user)
     state.value = 'success'
   } catch {
     state.value = 'error'
