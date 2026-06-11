@@ -115,3 +115,33 @@
 - [x] Hassas işlemler reauth ister; e-posta değişim+geri-al; hesap silme gated (purge no-op)
 - [x] `isMinor` job; challenge token access kabul edilmiyor
 - [x] **R7:** 2B diff'i satır satır incelemesinden geçti (PM review: çekirdek güvenlik doğru; #2 düzeltildi, #1/#4 debt, #3 §7 senkron)
+
+---
+
+## Sprint 3 — DM + Arkadaşlık + Engelleme + Merkezi DM Karar Fonksiyonu
+
+> Aktif sözleşme: `contracts/SPRINT_3_CONTRACT.md`. **R7: `DmPermissionService` + DM erişim kontrolü** (T&S karar fonksiyonu) insan incelemesi. Dev checkbox işaretler, item EKLEMEZ.
+
+### Backend (`api/`)
+- [ ] Prisma: `User.friendCode` (unique, register'da üret + backfill), `Friendship`/`FriendshipStatus`, `UserBlock`, `ChannelMember` + migration
+- [ ] **`DmPermissionService.canDm`** — §3 matrisi: blok→arkadaş→minor→**yeni hesap (§5.1.b, `NEW_ACCOUNT_DM_LOCK` config)**→dmPolicy→ortak sunucu; `verificationStatus` okuma + davranış/report/karantina no-op hook **[R7]**
+- [ ] `friendCode` util (8-char base32, çakışmada yeniden üret); register yan etkisi
+- [ ] Arkadaşlık: GET friends/requests, POST request (kodla, karşılıklı otomatik kabul), accept/decline, DELETE
+- [ ] Engelleme: GET/POST/DELETE blocks (block → arkadaşlık sil + istek iptal, transaction)
+- [ ] DM: GET/POST `/dm/channels` (canDm kapısı), POST read; `DmChannelDto` (son mesaj + unread)
+- [ ] **`MembershipService.requireChannelAccess` DM `ChannelMember` kontrolü** (güvenlik açığı kapanışı) **[R7]** + DM send blok kontrolü
+- [ ] `toUserDto`: `friendCode`; yeni hata kodları
+
+### Frontend (`web/`)
+- [ ] Home ekranı (rail hexagon → DM listesi + Arkadaşlar sekmesi); kendi kodunu göster/kopyala (`useClipboard`)
+- [ ] Arkadaş ekle (kod gir), bekleyen istekler, kabul/reddet/sil
+- [ ] DM görünümü (mevcut mesaj bileşenleri) + unread rozeti
+- [ ] Engelle/arkadaşlıktan çıkar (bağlam menüsü + ConfirmDialog)
+- [ ] `UserDto.friendCode`; yeni hata kodları i18n map + metinler `tr.json`
+
+### Sprint 3 DoD (contract §11)
+- [ ] Kod ile arkadaşlık (karşılıklı otomatik kabul); username araması yok
+- [ ] `canDm` matrisi birebir: blok yener, minor↔yabancı DM kapalı, arkadaş izinli, dmPolicy kapıları
+- [ ] DM erişim açığı kapandı (ChannelMember olmayan erişemez, REST+WS); blok sonradan DM keser
+- [ ] DM gerçek zamanlı + unread `lastReadAt`
+- [ ] **R7:** `canDm` + DM erişim kontrolü incelemesinden geçti
