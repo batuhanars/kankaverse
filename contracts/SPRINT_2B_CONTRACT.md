@@ -57,8 +57,10 @@ enum AuthTokenType {
 > gerekir → `AuthToken`'a opsiyonel `payload String?` eklenir (yeni e-posta adresi burada tutulur).
 
 **Güvenlik kuralları (R7):**
-- `totpSecret`: **AES-256-GCM**, anahtar env `TOTP_ENC_KEY` (32 byte, base64). Saklama formatı `iv:authTag:ciphertext`
-  (hepsi base64). Şifre çöz yalnız doğrulama anında, bellekte. `crypto.util.ts`: `encryptSecret`/`decryptSecret`.
+- `totpSecret`: **AES-256-GCM**, anahtar env `TOTP_ENC_KEY` = **32 byte hex** (`openssl rand -hex 32` → 64 hex karakter;
+  `Buffer.from(TOTP_ENC_KEY, 'hex')` → 32 byte). **Boot'ta uzunluk doğrulanır: ≠32 byte → fail-fast.** Şifreli çıktının
+  saklama formatı `iv:authTag:ciphertext` (hepsi base64 — bu KEY değil, çıktı kodlaması). Çöz yalnız doğrulama anında,
+  bellekte. `crypto.util.ts`: `encryptSecret`/`decryptSecret`.
 - `RecoveryCode`: 10 adet, kurulumda üretilir, **bir kez gösterilir**, SHA-256 hash'li saklanır, tek-kullanım.
 - Kurtarma kodu entropisi: 10 byte rastgele → base32, `XXXX-XXXX-XXXX-XXXX` (80-bit; SHA-256 lookup yeterli).
 
