@@ -82,3 +82,36 @@
 - [x] forgot sızdırmaz; reset tüm oturumları düşürür + emailVerified yapar
 - [x] Token tek-kullanım + süreli; EmailService soyut (anahtarsız konsol)
 - [x] **R7:** 2A diff'i satır satır kullanıcı incelemesinden geçti (PM review: F1/F3 düzeltildi; kullanıcı görünen tarafı test etti)
+
+---
+
+## Sprint 2B — 2FA, Oturum Yönetimi, Hassas İşlemler & Hesap Silme
+
+> Aktif sözleşme: `contracts/SPRINT_2B_CONTRACT.md`. **R7: tamamı insan incelemesi.** Dev checkbox işaretler, item EKLEMEZ.
+
+### Backend (`api/`)
+- [ ] Prisma: `User.twoFactorEnabled/totpSecret/deletionRequestedAt`, `RecoveryCode` modeli, `AuthToken.payload` + `EMAIL_CHANGE`/`EMAIL_CHANGE_UNDO` tipleri + migration
+- [ ] `crypto.util`: AES-256-GCM `encryptSecret`/`decryptSecret`; `TOTP_ENC_KEY` prod fail-fast
+- [ ] 2FA: `setup` (otplib+qrcode, reauth), `enable` (kod→kurtarma kodları), `disable` (reauth)
+- [ ] Login 2 adım: `login` challenge dönüşü + `login/2fa` (TOTP/kurtarma kodu); JwtStrategy challenge token'ı reddeder
+- [ ] `verifyReauth` paylaşılan helper (şifre + varsa TOTP)
+- [ ] Oturumlar: `GET /auth/sessions`, `DELETE /auth/sessions/:id`, `POST /auth/sessions/revoke-others`
+- [ ] Şifre değiştir (reauth, diğer oturumları düşür) + e-posta değiştir/confirm/undo
+- [ ] Hesap silme (reauth → deletionRequestedAt + oturum düşür), grace'te giriş=iptal, cancel
+- [ ] EmailService: yeni-cihaz + e-posta-değişim bildirim/geri-al
+- [ ] `@nestjs/schedule`: `isMinor` 18-yaş job + 30-gün purge **GATED** (no-op, `PURGE_ENABLED` default false)
+- [ ] `toUserDto`: `twoFactorEnabled`; yeni env `.env.example`'a
+
+### Frontend (`web/`)
+- [ ] Ayarlar → Güvenlik ekranı (2FA kur/kapat, kurtarma kodları, şifre/e-posta değiştir, oturumlarım, hesap sil)
+- [ ] Login 2FA adımı (challenge → TOTP/kurtarma kodu)
+- [ ] Paylaşılan reauth modalı
+- [ ] E-posta değişim confirm/undo landing'leri + deaktif/grace uyarı akışı
+- [ ] `UserDto.twoFactorEnabled`; yeni hata kodları i18n map + metinler `tr.json`
+
+### Sprint 2B DoD (contract §10)
+- [ ] 2FA kur→etkinleştir→2 adım login; kurtarma kodu login + tek-kullanım
+- [ ] `totpSecret` şifreli; oturumlarım liste+çıkış; yeni-cihaz bildirimi
+- [ ] Hassas işlemler reauth ister; e-posta değişim+geri-al; hesap silme gated (purge no-op)
+- [ ] `isMinor` job; challenge token access kabul edilmiyor
+- [ ] **R7:** 2B diff'i satır satır kullanıcı incelemesinden geçti
