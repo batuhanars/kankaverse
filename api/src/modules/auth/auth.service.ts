@@ -135,16 +135,8 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException({ message: 'E-posta veya şifre hatalı.', error: 'INVALID_CREDENTIALS' });
     }
 
-    // Grace'te giriş → silme talebini iptal et, normal session aç
-    if (user.deletionRequestedAt !== null) {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { deletionRequestedAt: null },
-      });
-      this.logger.log(`Hesap silme talebi login ile iptal edildi (kullanıcı: ${user.id})`);
-    }
-
-    // 2FA etkinse challenge döndür, session açma
+    // 2FA etkinse challenge döndür, session açma. Silme iptali ancak tam giriş
+    // tamamlanınca yapılır (login2fa) — başarısız 2FA bekleyen silmeyi iptal etmesin (#2).
     if (user.twoFactorEnabled) {
       const challengeToken = this.jwtService.sign(
         { sub: user.id, twoFactorChallenge: true },
@@ -152,6 +144,9 @@ export class AuthService implements OnModuleInit {
       );
       return { type: 'challenge', challengeToken };
     }
+
+    // Tam giriş (2FA'sız) tamamlandı → bekleyen silme talebini iptal et
+    await this.cancelPendingDeletionOnLogin(user);
 
     const { accessToken, refreshToken } = await this.createSession(user.id, ip, undefined, user.email);
     return { type: 'session', user: toUserDto(user), accessToken, refreshToken };
@@ -181,6 +176,9 @@ export class AuthService implements OnModuleInit {
     if (!codeValid) {
       throw new BadRequestException({ message: 'Geçersiz 2FA kodu.', error: 'INVALID_TWO_FACTOR_CODE' });
     }
+
+    // Tam giriş tamamlandı (şifre + 2FA) → bekleyen silme talebini iptal et
+    await this.cancelPendingDeletionOnLogin(user);
 
     const { accessToken, refreshToken } = await this.createSession(user.id, ip, undefined, user.email);
     return { user: toUserDto(user), accessToken, refreshToken };
@@ -553,6 +551,17 @@ export class AuthService implements OnModuleInit {
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────
+
+  /** Tam giriş tamamlandığında bekleyen hesap silme talebini iptal eder (brief §8: giriş = iptal). */
+  private async cancelPendingDeletionOnLogin(user: User): Promise<void> {
+    if (user.deletionRequestedAt !== null) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { deletionRequestedAt: null },
+      });
+      this.logger.log(`Hesap silme talebi login ile iptal edildi (kullanıcı: ${user.id})`);
+    }
+  }
 
   private async verifyReauth(user: User, password: string, totpCode?: string): Promise<void> {
     const valid = await argon2.verify(user.passwordHash, password);
