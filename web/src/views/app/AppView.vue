@@ -27,7 +27,7 @@ const showJoinGuild = ref(false)
 
 onMounted(async () => {
   const token = sessionStorage.getItem('kv_access_token')
-  if (token) connect(token)
+  if (token) connect()
   await guildsStore.fetchGuilds()
 
   window.addEventListener('kv:auth:expired', onAuthExpired)

@@ -9,7 +9,7 @@ const http: AxiosInstance = axios.create({
 // In-flight refresh promise — eş zamanlı 401'lerde tek refresh
 let refreshPromise: Promise<string> | null = null
 
-function getAccessToken(): string | null {
+export function getAccessToken(): string | null {
   return sessionStorage.getItem('kv_access_token')
 }
 

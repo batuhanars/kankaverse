@@ -1,6 +1,7 @@
 import { ref, onUnmounted } from 'vue'
 import { io, type Socket } from 'socket.io-client'
 import { useMessagesStore } from '@/stores/messages'
+import { getAccessToken } from '@/api/axios'
 import type { MessageDto } from '@/types'
 
 let socket: Socket | null = null
@@ -13,10 +14,15 @@ export function useSocket() {
   const messagesStore = useMessagesStore()
 
   function _joinRoom(channelId: string) {
-    socket?.emit('channel:join', { channelId }, (_ack: unknown) => {})
+    socket?.emit('channel:join', { channelId }, (ack: { ok: boolean; error?: string }) => {
+      // Reconnect sonrası yeniden join ack'i artık yutulmuyor (denetim #4)
+      if (!ack?.ok) {
+        console.warn('[WS] reconnect yeniden-join başarısız:', ack?.error ?? 'bilinmiyor')
+      }
+    })
   }
 
-  function connect(accessToken: string) {
+  function connect() {
     if (socket?.connected) {
       connected.value = true
       refCount++
@@ -24,7 +30,9 @@ export function useSocket() {
     }
 
     socket = io('/', {
-      auth: { token: accessToken },
+      // auth fonksiyon formu: her (yeniden) bağlantıda sessionStorage'dan EN GÜNCEL access token okunur.
+      // Sabit token verilseydi (denetim #4) 15dk sonra reconnect bayat token'la el sıkışıp auth'ta düşerdi.
+      auth: (cb: (data: { token: string }) => void) => cb({ token: getAccessToken() ?? '' }),
       transports: ['websocket'],
     })
 
