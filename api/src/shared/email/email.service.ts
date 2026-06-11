@@ -67,7 +67,7 @@ function verificationEmailHtml(link: string): string {
       <p>Kankaverse hesabını doğrulamak için aşağıdaki butona tıkla.</p>
       <p>Bu bağlantı <strong>24 saat</strong> geçerlidir.</p>
       <p style="margin:24px 0">
-        <a href="${link}" style="background:#5865f2;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none">
+        <a href="${link}" style="background:#FF6B3D;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none">
           E-postanı Doğrula
         </a>
       </p>
@@ -83,7 +83,7 @@ function passwordResetEmailHtml(link: string): string {
       <p>Şifreni sıfırlamak için aşağıdaki butona tıkla.</p>
       <p>Bu bağlantı <strong>30 dakika</strong> geçerlidir.</p>
       <p style="margin:24px 0">
-        <a href="${link}" style="background:#5865f2;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none">
+        <a href="${link}" style="background:#FF6B3D;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none">
           Şifremi Sıfırla
         </a>
       </p>

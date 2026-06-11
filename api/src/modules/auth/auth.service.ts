@@ -255,13 +255,12 @@ export class AuthService implements OnModuleInit {
     const email = dto.email.toLowerCase().trim();
     const user = await this.prisma.user.findUnique({ where: { email, deletedAt: null } });
 
-    // Her zaman 200 döner — kullanıcı var/yok bilgisi sızdırılmaz
-    if (!user) return null;
-
-    const rawToken = await this.createAuthToken(user.id, AuthTokenType.PASSWORD_RESET, PASSWORD_RESET_TTL_MS);
-    await this.emailService.sendPasswordResetEmail(user.email, rawToken).catch((err) => {
-      this.logger.error(`Şifre sıfırlama e-postası gönderilemedi: ${String(err)}`);
-    });
+    // Fire-and-forget: token üretimi + e-posta gönderimi await edilmez.
+    // Her iki dal (kullanıcı var/yok) yalnızca üstteki tek DB okuması kadar bekler →
+    // yanıt süresi eşitlenir, zamanlama ile kullanıcı sayımı engellenir.
+    if (user) {
+      this.sendPasswordResetEmailSilent(user.id, user.email);
+    }
 
     return null;
   }
@@ -367,6 +366,14 @@ export class AuthService implements OnModuleInit {
       .then((rawToken) => this.emailService.sendVerificationEmail(email, rawToken))
       .catch((err) => {
         this.logger.error(`Doğrulama e-postası gönderilemedi (kullanıcı: ${userId}): ${String(err)}`);
+      });
+  }
+
+  private sendPasswordResetEmailSilent(userId: string, email: string): void {
+    this.createAuthToken(userId, AuthTokenType.PASSWORD_RESET, PASSWORD_RESET_TTL_MS)
+      .then((rawToken) => this.emailService.sendPasswordResetEmail(email, rawToken))
+      .catch((err) => {
+        this.logger.error(`Şifre sıfırlama e-postası gönderilemedi (kullanıcı: ${userId}): ${String(err)}`);
       });
   }
 }
