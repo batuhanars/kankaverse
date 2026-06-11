@@ -17,10 +17,16 @@ Vue 3 + Vite zaten scaffold'da. Eklenecekler:
 - **Stil:** `tailwindcss` **v4** + `@tailwindcss/vite` (CSS-first config — token'larımız CSS değişkeni
   tabanlı olduğu için doğal uyum; ayrı `postcss`/`autoprefixer` yapılandırması gerekmez)
 - **Font:** `@fontsource/figtree` + `@fontsource/jetbrains-mono` (self-host; CDN bağımlılığı yok)
-- **Form & validasyon:** `vee-validate` + `zod` + `@vee-validate/zod` (`useForm` + `toTypedSchema`)
+- **Form & validasyon:** `vee-validate` + `zod` (**v4**) + `@vee-validate/zod` (`useForm` + `toTypedSchema`)
+- **Composable yardımcıları:** `@vueuse/core` (breakpoint/clipboard/onClickOutside vb. — elle reaktif logic yazmak yerine)
 - **UI primitive (a11y):** `reka-ui` + shadcn-vue (CLI ile kopyalanan primitive'ler) + `clsx` + `tailwind-merge` (`cn` util)
 
 Sürümler kurulum anında en güncel kararlıdan; **Tailwind 4.x** kilitli. **Yeni bağımlılık = PM onayı.**
+
+> **zod sürüm notu (önemli):** zod **v4** bilinçli — şemalar v4 syntax'ı kullanır (`z.string({ error })`; v3'te `required_error`).
+> `@vee-validate/zod`'un peer metadata'sı bayat (en yeni 4.15.1 bile hâlâ `zod@^3.24` ister) ama runtime'da v4 ile sorunsuz
+> çalışır. Yanlış-pozitif peer hatası `package.json` `overrides` (`@vee-validate/zod → zod: $zod`) ile çözüldü.
+> **zod'u v3'e DÜŞÜRME** — tüm form şemaları kırılır. Override'ı kaldırma; yeni `npm install`'lar patlar.
 
 ### UI primitive & form konvansiyonu
 
