@@ -51,6 +51,29 @@ export const resetPasswordSchema = z.object({
     .min(8, 'auth.validation.newPasswordMin'),
 })
 
+// Sprint 2B — güvenlik ayarları şemaları
+export const changePasswordSchema = z.object({
+  currentPassword: z
+    .string({ error: 'reauth.validation.passwordRequired' })
+    .min(1, 'reauth.validation.passwordRequired'),
+  newPassword: z
+    .string({ error: 'auth.validation.newPasswordRequired' })
+    .min(1, 'auth.validation.newPasswordRequired')
+    .min(8, 'auth.validation.newPasswordMin'),
+  totpCode: z.string().optional(),
+})
+
+export const changeEmailSchema = z.object({
+  currentPassword: z
+    .string({ error: 'reauth.validation.passwordRequired' })
+    .min(1, 'reauth.validation.passwordRequired'),
+  newEmail: z
+    .string({ error: 'security.email.validation.newEmailRequired' })
+    .min(1, 'security.email.validation.newEmailRequired')
+    .email('security.email.validation.newEmailInvalid'),
+  totpCode: z.string().optional(),
+})
+
 export type LoginFormValues = z.infer<typeof loginSchema>
 export type RegisterFormValues = z.infer<typeof registerSchema>
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>

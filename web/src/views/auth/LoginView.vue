@@ -28,8 +28,13 @@ const onSubmit = handleSubmit(async (values) => {
   loading.value = true
   apiError.value = ''
   try {
-    await auth.login(values)
-    await router.push({ name: 'app' })
+    const challenge = await auth.login(values)
+    if (challenge) {
+      sessionStorage.setItem('kv_2fa_challenge', challenge.challengeToken)
+      await router.push({ name: 'login-2fa' })
+    } else {
+      await router.push({ name: 'app' })
+    }
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string; error?: string } } }
     const code = err.response?.data?.error

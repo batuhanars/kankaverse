@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { authApi, type LoginPayload, type RegisterPayload } from '@/api/auth'
 import { setAccessToken, clearAccessToken } from '@/api/axios'
-import type { UserDto } from '@/types'
+import type { UserDto, LoginChallengeDto } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserDto | null>(null)
@@ -25,8 +25,21 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = res.data.user
   }
 
-  async function login(payload: LoginPayload) {
-    const res = await authApi.login(payload)
+  // Sprint 2B: login artık 2FA challenge dönebilir
+  async function login(payload: LoginPayload): Promise<LoginChallengeDto | null> {
+    const res = await authApi.loginWithChallenge(payload)
+    const data = res.data as LoginChallengeDto | { user: UserDto; accessToken: string }
+    if ('twoFactorRequired' in data) {
+      return data as LoginChallengeDto
+    }
+    const authData = data as { user: UserDto; accessToken: string }
+    setAccessToken(authData.accessToken)
+    user.value = authData.user
+    return null
+  }
+
+  async function loginTwoFa(challengeToken: string, code: string) {
+    const res = await authApi.loginTwoFa(challengeToken, code)
     setAccessToken(res.data.accessToken)
     user.value = res.data.user
   }
@@ -47,5 +60,11 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = updated
   }
 
-  return { user, ready, init, register, login, logout, isAuthenticated, isEmailVerified, updateUser }
+  // Tüm oturum kapatıldığında (hesap silme vb.) API çağrısı olmadan local state temizler
+  function clearAuth() {
+    clearAccessToken()
+    user.value = null
+  }
+
+  return { user, ready, init, register, login, loginTwoFa, logout, clearAuth, isAuthenticated, isEmailVerified, updateUser }
 })

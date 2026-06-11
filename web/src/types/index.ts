@@ -33,7 +33,7 @@ export const ChannelType = {
 } as const
 export type ChannelType = (typeof ChannelType)[keyof typeof ChannelType]
 
-// Sprint 1 Contract §5 + Sprint 2A §4 — DTO'lar
+// Sprint 1 §5 + Sprint 2A §4 + Sprint 2B §4 — DTO'lar
 export interface UserDto {
   id: string
   username: string
@@ -42,7 +42,32 @@ export interface UserDto {
   isMinor: boolean
   verificationStatus: VerificationStatus
   createdAt: string
-  emailVerified: boolean // Sprint 2A eklendi
+  emailVerified: boolean
+  twoFactorEnabled: boolean // Sprint 2B
+}
+
+export interface SessionDto {
+  id: string
+  device: string | null
+  ip: string | null
+  lastActiveAt: string
+  createdAt: string
+  current: boolean
+}
+
+export interface TwoFactorSetupDto {
+  otpauthUrl: string
+  qrDataUrl: string
+  secret: string
+}
+
+export interface RecoveryCodesDto {
+  codes: string[]
+}
+
+export interface LoginChallengeDto {
+  twoFactorRequired: true
+  challengeToken: string
 }
 
 export interface GuildDto {

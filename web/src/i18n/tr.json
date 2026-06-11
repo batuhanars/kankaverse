@@ -34,7 +34,12 @@
       "VALIDATION_FAILED": "Lütfen tüm alanları doğru doldurun.",
       "EMAIL_NOT_VERIFIED": "Sunucu oluşturmak için e-postanı doğrulamalısın.",
       "INVALID_TOKEN": "Link geçersiz veya süresi dolmuş.",
-      "EMAIL_ALREADY_VERIFIED": "E-posta adresin zaten doğrulanmış."
+      "EMAIL_ALREADY_VERIFIED": "E-posta adresin zaten doğrulanmış.",
+      "INVALID_TWO_FACTOR_CODE": "Geçersiz doğrulama kodu.",
+      "TWO_FACTOR_ALREADY_ENABLED": "2FA zaten etkin.",
+      "TWO_FACTOR_NOT_ENABLED": "2FA zaten kapalı.",
+      "SESSION_NOT_FOUND": "Oturum bulunamadı.",
+      "ACCOUNT_DELETION_PENDING": "Hesabın silinmek üzere."
     },
     "validation": {
       "emailRequired": "E-posta adresi zorunludur.",
@@ -78,6 +83,102 @@
     "successMessage": "Şifren değiştirildi. Tüm oturumların kapatıldı, tekrar giriş yap.",
     "invalidToken": "Link geçersiz veya süresi dolmuş.",
     "goToLogin": "Giriş Yap"
+  },
+  "twoFactorLogin": {
+    "title": "İki Faktörlü Doğrulama",
+    "subtitle": "Authenticator uygulamanındaki 6 haneli kodu gir.",
+    "recoverySubtitle": "Kurtarma kodunu gir.",
+    "code": "Doğrulama Kodu",
+    "codePlaceholder": "123456",
+    "recoveryCode": "Kurtarma Kodu",
+    "recoveryCodePlaceholder": "XXXX-XXXX-XXXX-XXXX",
+    "submit": "Doğrula",
+    "useRecovery": "Kurtarma kodu kullan",
+    "useTotp": "Doğrulama koduna dön",
+    "back": "Girişe Dön"
+  },
+  "emailChange": {
+    "confirmTitle": "E-posta Değişimi Onayı",
+    "confirmSuccess": "E-posta adresin başarıyla güncellendi!",
+    "confirmError": "Link geçersiz veya süresi dolmuş.",
+    "undoTitle": "E-posta Değişimini Geri Al",
+    "undoSuccess": "E-posta adresin eski haline döndürüldü. Tüm oturumların kapatıldı.",
+    "undoError": "Link geçersiz veya süresi dolmuş.",
+    "goToApp": "Uygulamaya Git",
+    "goToLogin": "Giriş Yap"
+  },
+  "reauth": {
+    "title": "Kimliğini Doğrula",
+    "subtitle": "Devam etmek için şifreni gir.",
+    "currentPassword": "Mevcut Şifre",
+    "totpCode": "2FA Kodu",
+    "totpCodePlaceholder": "6 haneli kod",
+    "confirm": "Devam Et"
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "security": "Güvenlik"
+  },
+  "security": {
+    "title": "Güvenlik Ayarları",
+    "backToApp": "Uygulamaya Dön",
+    "twoFactor": {
+      "title": "İki Faktörlü Doğrulama (2FA)",
+      "description": "Hesabına yetkisiz erişimi önlemek için 2FA kullan.",
+      "statusEnabled": "Etkin",
+      "statusDisabled": "Kapalı",
+      "setup": "2FA Kur",
+      "disable": "2FA Kapat",
+      "setupPasswordLabel": "Kurulumu başlatmak için şifreni gir.",
+      "scanTitle": "QR Kodu Tara",
+      "scanHint": "Google Authenticator veya Authy uygulamanla tara. Elle girmek için:",
+      "secret": "Gizli Anahtar",
+      "enterCodeLabel": "Doğrulama Kodu",
+      "enterCodePlaceholder": "6 haneli kod",
+      "enableButton": "Etkinleştir",
+      "recoveryTitle": "Kurtarma Kodları",
+      "recoveryHint": "Bu kodları güvenli bir yere kaydet. Her kod yalnızca bir kez kullanılabilir.",
+      "downloadCodes": "Kodları İndir (.txt)",
+      "done": "Tamamlandı",
+      "disableHint": "Şifren ve 2FA kodunu gir."
+    },
+    "sessions": {
+      "title": "Aktif Oturumlar",
+      "current": "Bu cihaz",
+      "unknown": "Bilinmiyor",
+      "lastActive": "Son aktivite",
+      "terminate": "Kapat",
+      "terminateOthers": "Diğerlerini Kapat",
+      "noSessions": "Aktif oturum bulunamadı."
+    },
+    "password": {
+      "title": "Şifre Değiştir",
+      "currentPassword": "Mevcut Şifre",
+      "newPassword": "Yeni Şifre",
+      "totpCode": "2FA Kodu (varsa)",
+      "totpCodePlaceholder": "6 haneli kod",
+      "submit": "Şifreyi Değiştir",
+      "success": "Şifren başarıyla değiştirildi. Diğer oturumların kapatıldı."
+    },
+    "email": {
+      "title": "E-posta Değiştir",
+      "current": "Mevcut E-posta",
+      "newEmail": "Yeni E-posta",
+      "totpCode": "2FA Kodu (varsa)",
+      "totpCodePlaceholder": "6 haneli kod",
+      "submit": "Değişikliği İste",
+      "success": "Yeni e-posta adresine doğrulama linki gönderildi.",
+      "validation": {
+        "newEmailRequired": "Yeni e-posta zorunludur.",
+        "newEmailInvalid": "Geçerli bir e-posta adresi girin."
+      }
+    },
+    "deleteAccount": {
+      "title": "Hesabı Sil",
+      "warning": "Hesabın 30 gün içinde kalıcı olarak silinecek. 30 gün içinde tekrar giriş yaparsan talep iptal edilir.",
+      "confirm": "Hesabımı Silmek İstiyorum",
+      "grace": "Hesabın silinmek üzere. Geri dönmek için 30 gün içinde tekrar giriş yap."
+    }
   },
   "months": {
     "1": "Ocak",

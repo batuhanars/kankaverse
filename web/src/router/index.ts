@@ -32,6 +32,30 @@ const router = createRouter({
       name: 'reset-password',
       component: () => import('@/views/auth/ResetPasswordView.vue'),
     },
+    // Sprint 2B — 2FA login challenge
+    {
+      path: '/login/2fa',
+      name: 'login-2fa',
+      component: () => import('@/views/auth/TwoFactorChallengeView.vue'),
+    },
+    // Sprint 2B — e-posta değişim landing'leri
+    {
+      path: '/email/change/confirm',
+      name: 'email-change-confirm',
+      component: () => import('@/views/auth/EmailChangeConfirmView.vue'),
+    },
+    {
+      path: '/email/change/undo',
+      name: 'email-change-undo',
+      component: () => import('@/views/auth/EmailChangeUndoView.vue'),
+    },
+    // Sprint 2B — güvenlik ayarları
+    {
+      path: '/settings/security',
+      name: 'settings-security',
+      component: () => import('@/views/settings/SecurityView.vue'),
+      meta: { requiresAuth: true },
+    },
     {
       path: '/',
       name: 'app',
