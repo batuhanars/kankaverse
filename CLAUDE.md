@@ -23,16 +23,19 @@ mimariye gömülü olması**. Detaylı brief: `knowledge/projects/kankaverse/kan
 
 ---
 
-## Çalışma Modeli — PM / Dev / Contract
+## Çalışma Modeli — Fable / Opus / Sonnet (üç katman)
 
-Vault pattern: `knowledge/stack/claude-code/multi-session-pm-dev-contract.md`.
+Vault pattern: `knowledge/stack/claude-code/multi-session-pm-dev-contract.md`. Ekip modeli brief §11.1.
 
-- **PM session (Opus):** plan, mimari karar, contract yazımı, `TASK.md` güncellemesi. **Kod yazmaz.**
-- **Dev session(ler) (Sonnet):** `cd api/` veya `cd web/` ile açılır, sadece o tier'a dokunur.
-  `SPRINT_X_CONTRACT.md`'i **tek doğruluk kaynağı** kabul eder. Endpoint imzası, DTO şekli, enum değeri
-  contract'tan **sapamaz**.
-- **Sapma ihtiyacı doğarsa:** dev DURUR, kullanıcıya bildirir, PM contract'ı revize eder, sonra devam.
-- **`TASK.md`:** dev checkbox işaretler, **item EKLEMEZ** (yeni item = scope creep = PM onayı).
+- **Fable (vault / mimari danışma):** **vault-seviyesi dosyalardan** sorumlu (brief, `principles/`, `decisions-log/`).
+  En kritik kararlar Fable ile alınır — örn. brief'e eklenen §5.1.b yaş güvencesi gibi mimari/T&S yön kararları.
+- **Opus (software manager / proje yönetimi):** **proje-seviyesi dosyalar** — `PLAN.md`, `TASK.md`,
+  `contracts/SPRINT_X_CONTRACT.md` — ve bunlar üzerindeki kararlar. Plan→görev ayrıştırma, contract yazımı/revizyonu,
+  R7 incelemesi. Genelde kod yazmaz (kararı verir, dev'e delege eder).
+- **Sonnet (developer):** `cd api/` veya `cd web/` ile açılır, sadece o tier'a dokunur. `SPRINT_X_CONTRACT.md`'i
+  **tek doğruluk kaynağı** kabul eder; endpoint imzası, DTO şekli, enum değeri contract'tan **sapamaz**.
+- **Sapma ihtiyacı doğarsa:** dev DURUR, kullanıcıya bildirir, Opus contract'ı revize eder, sonra devam.
+- **`TASK.md`:** dev checkbox işaretler, **item EKLEMEZ** (yeni item = scope creep = Opus onayı).
 
 ---
 
