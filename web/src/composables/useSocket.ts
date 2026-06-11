@@ -66,8 +66,18 @@ export function useSocket() {
     activeChannelId = channelId
     return new Promise((resolve) => {
       if (!socket) return resolve({ ok: false, error: 'NOT_CONNECTED' })
-      socket.emit('channel:join', { channelId }, (ack: { ok: boolean; error?: string }) => {
+      // Ack gelmezse (auth başarısız → emit kuyrukta asılı kalır) promise sonsuza
+      // beklemesin; 5sn sonra TIMEOUT döndür ki çağıran (MessageArea) ilerleyebilsin.
+      let settled = false
+      const done = (ack: { ok: boolean; error?: string }) => {
+        if (settled) return
+        settled = true
         resolve(ack)
+      }
+      const timer = setTimeout(() => done({ ok: false, error: 'TIMEOUT' }), 5000)
+      socket.emit('channel:join', { channelId }, (ack: { ok: boolean; error?: string }) => {
+        clearTimeout(timer)
+        done(ack)
       })
     })
   }

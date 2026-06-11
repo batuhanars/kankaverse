@@ -206,6 +206,10 @@ interface MessageDto {
 - **Sunucu → istemci:**
   - `message.created` payload `MessageDto` → `room:<channelId>`'deki herkese (gönderen dahil) broadcast.
     REST `POST .../messages` başarılı olunca yayılır (tek kaynak: REST yazar, WS yayar).
+  - **İstemci yerel eko (frontend robustluk):** gönderen, REST POST yanıtındaki `MessageDto`'yu beklemeden
+    kendi listesine ekler; broadcast'i beklemez. WS kopuk/yeniden bağlanırken bile gönderen kendi mesajını görür.
+    Store `id`-dedup yaptığından broadcast geldiğinde çiftlemez. Bu §7 "REST yazar, WS yayar" modelini bozmaz —
+    yazım ve fanout backend'de aynı; eko yalnız istemci render önlemidir.
 - Sprint 1'de typing/presence event'i YOK (Sprint 6).
 
 ---

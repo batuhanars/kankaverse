@@ -81,7 +81,8 @@
     "inputPlaceholder": "#{channel} kanalına mesaj yaz",
     "send": "Gönder",
     "loadMore": "Daha fazla yükle",
-    "noMessages": "Henüz mesaj yok. İlk mesajı sen gönder!"
+    "noMessages": "Henüz mesaj yok. İlk mesajı sen gönder!",
+    "realtimeError": "Gerçek zamanlı bağlantı kurulamadı — yeni mesajlar anlık görünmeyebilir."
   },
   "member": {
     "panel": "Üyeler",
