@@ -70,15 +70,15 @@
 - [x] Yeni env: `RESEND_API_KEY`, `EMAIL_FROM`, `FRONTEND_URL` → `.env.example`
 
 ### Frontend (`web/`)
-- [ ] `UserDto.emailVerified` tip + tüketim
-- [ ] Doğrulama bandı (emailVerified=false → uyarı + "Tekrar gönder")
-- [ ] `VerifyEmailView` (`/verify-email`), `ForgotPasswordView` (`/forgot-password`), `ResetPasswordView` (`/reset-password`)
-- [ ] Login'e "Şifremi unuttum" linki
-- [ ] Guild oluşturmada 403 EMAIL_NOT_VERIFIED ele alımı (buton disabled/tooltip)
-- [ ] Yeni hata kodları i18n map + tüm yeni metinler `tr.json`
+- [x] `UserDto.emailVerified` tip + tüketim
+- [x] Doğrulama bandı (emailVerified=false → uyarı + "Tekrar gönder")
+- [x] `VerifyEmailView` (`/verify-email`), `ForgotPasswordView` (`/forgot-password`), `ResetPasswordView` (`/reset-password`)
+- [x] Login'e "Şifremi unuttum" linki
+- [x] Guild oluşturmada 403 EMAIL_NOT_VERIFIED ele alımı (buton disabled/tooltip)
+- [x] Yeni hata kodları i18n map + tüm yeni metinler `tr.json`
 
 ### Sprint 2A DoD (contract §9)
-- [ ] Doğrulanmamış girer ama sunucu kuramaz; link doğrular
-- [ ] forgot sızdırmaz; reset tüm oturumları düşürür + emailVerified yapar
-- [ ] Token tek-kullanım + süreli; EmailService soyut (anahtarsız konsol)
-- [ ] **R7:** 2A diff'i satır satır kullanıcı incelemesinden geçti
+- [x] Doğrulanmamış girer ama sunucu kuramaz; link doğrular
+- [x] forgot sızdırmaz; reset tüm oturumları düşürür + emailVerified yapar
+- [x] Token tek-kullanım + süreli; EmailService soyut (anahtarsız konsol)
+- [x] **R7:** 2A diff'i satır satır kullanıcı incelemesinden geçti (PM review: F1/F3 düzeltildi; kullanıcı görünen tarafı test etti)
