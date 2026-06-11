@@ -1,6 +1,6 @@
 import { User } from '@prisma/client';
 
-/** Prisma User → istemciye dönen UserDto. passwordHash vb. hassas alanlar ASLA dahil edilmez. */
+/** Prisma User → istemciye dönen UserDto. passwordHash/totpSecret vb. hassas alanlar ASLA dahil edilmez. */
 export function toUserDto(user: User) {
   return {
     id: user.id,
@@ -11,5 +11,6 @@ export function toUserDto(user: User) {
     verificationStatus: user.verificationStatus,
     createdAt: user.createdAt.toISOString(),
     emailVerified: user.emailVerifiedAt !== null,
+    twoFactorEnabled: user.twoFactorEnabled,
   };
 }

@@ -9,6 +9,8 @@ datasource db {
 enum AuthTokenType {
   EMAIL_VERIFICATION
   PASSWORD_RESET
+  EMAIL_CHANGE
+  EMAIL_CHANGE_UNDO
 }
 
 enum VerificationStatus {
@@ -56,11 +58,15 @@ model User {
   deletedAt           DateTime?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
+  twoFactorEnabled    Boolean        @default(false)
+  totpSecret          String?
+  deletionRequestedAt DateTime?
   sessions            Session[]
   memberships         GuildMember[]
   ownedGuilds         Guild[]            @relation("GuildOwner")
   messages            Message[]
   authTokens          AuthToken[]
+  recoveryCodes       RecoveryCode[]
 }
 
 model AuthToken {
@@ -69,12 +75,24 @@ model AuthToken {
   user      User          @relation(fields: [userId], references: [id])
   type      AuthTokenType
   tokenHash String
+  payload   String?       // EMAIL_CHANGE: hedef e-posta; EMAIL_CHANGE_UNDO: eski e-posta
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime      @default(now())
 
   @@index([userId, type])
   @@index([tokenHash])
+}
+
+model RecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Session {

@@ -17,6 +17,18 @@ export default () => {
     );
   }
 
+  // TOTP_ENC_KEY: tanımlıysa kesinlikle 32 byte olmalı
+  if (process.env.TOTP_ENC_KEY) {
+    const keyBytes = Buffer.from(process.env.TOTP_ENC_KEY, 'base64');
+    if (keyBytes.length !== 32) {
+      throw new Error(
+        `FATAL: TOTP_ENC_KEY tam olarak 32 byte (base64) olmalıdır; mevcut: ${keyBytes.length} byte.`,
+      );
+    }
+  } else if (process.env.NODE_ENV === 'production') {
+    throw new Error(`FATAL: Production ortamında 'TOTP_ENC_KEY' zorunludur.`);
+  }
+
   return {
     port: parseInt(process.env.PORT ?? '3001', 10),
     database: {
@@ -34,5 +46,10 @@ export default () => {
       from: process.env.EMAIL_FROM ?? 'noreply@kankaverse.app',
       frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
     },
+    totp: {
+      encKey: process.env.TOTP_ENC_KEY,
+      appName: process.env.APP_NAME ?? 'Kankaverse',
+    },
+    purgeEnabled: process.env.PURGE_ENABLED === 'true',
   };
 };

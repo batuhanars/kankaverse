@@ -7,6 +7,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 export interface JwtPayload {
   sub: string;
   sessionId: string;
+  twoFactorChallenge?: never; // challenge token'lar access olarak kabul edilmez (R7)
 }
 
 @Injectable()
@@ -15,7 +16,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     config: ConfigService,
     private prisma: PrismaService,
   ) {
-    // configuration.ts boot'ta zorunlu doğrulama yaptığından string garantili
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -23,7 +23,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: JwtPayload) {
+  async validate(payload: JwtPayload & { twoFactorChallenge?: boolean }) {
+    // 2FA challenge token'ı access token olarak kullanmayı reddet (R7 §5.2)
+    if (payload.twoFactorChallenge) {
+      throw new UnauthorizedException('2FA challenge token access olarak kabul edilmiyor.');
+    }
+
     const session = await this.prisma.session.findFirst({
       where: { id: payload.sessionId, revokedAt: null },
     });
