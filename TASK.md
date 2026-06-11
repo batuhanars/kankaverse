@@ -32,8 +32,15 @@
 - [x] `LoginView` (tasarım giris_yap; e-Devlet butonu disabled placeholder)
 - [x] `RegisterView` (doğum tarihi zorunlu alan)
 - [x] App shell: `ServerRail` (altıgen ikon + "+") · `ChannelPanel` · mesaj alanı · `MemberPanel` (statik stub)
-- [x] Guild oluştur / guild'e join akışı
+- [x] Guild oluştur / guild'e join akışı (kısmen — bkz. PM notu ↓)
 - [x] Gerçek zamanlı mesaj gönder/al + geçmiş yükleme
+
+> **PM notu (2026-06-11) — join-by-ID UI bağlama ertelendi.** Backend `POST /guilds/:id/join` ve
+> frontend `JoinGuildModal.vue` + `guildsApi.join` hazır, ama ServerRail'de modalı açan düğme ve guild
+> ID'yi gösterip kopyalama affordance'ı **bilinçli olarak yazılmadı**. `onJoinGuild` prop'u + modal şu an
+> öksüz kod; bu kabul edilmiş bir karar (scope creep değil), gerçek davet sistemiyle (Sprint 7) birleştirilecek.
+> Ham guild ID paylaşımı zaten atılacak geçici köprüydü; Sprint 7'de davet kodu/linki + T&S kapıları
+> (`adultsOnly`/minor) ile değişecek. → DoD §10 "ikinci kullanıcı join olur" maddesi UI'dan o zamana kadar açık.
 
 ### Sprint 1 DoD (contract §10)
 - [ ] İki kullanıcı uçtan uca gerçek zamanlı mesajlaşma
