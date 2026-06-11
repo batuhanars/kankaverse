@@ -1,9 +1,6 @@
-import {
-  Injectable,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MembershipService } from '../../shared/membership/membership.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { Message, User } from '@prisma/client';
 
@@ -26,30 +23,13 @@ function toMessageDto(msg: MessageWithAuthor) {
 
 @Injectable()
 export class MessagesService {
-  constructor(private prisma: PrismaService) {}
-
-  private async requireChannelMembership(userId: string, channelId: string) {
-    const channel = await this.prisma.channel.findUnique({
-      where: { id: channelId, deletedAt: null },
-    });
-    if (!channel) {
-      throw new NotFoundException({ message: 'Kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
-    }
-
-    if (channel.guildId) {
-      const membership = await this.prisma.guildMember.findUnique({
-        where: { guildId_userId: { guildId: channel.guildId, userId } },
-      });
-      if (!membership) {
-        throw new ForbiddenException({ message: 'Bu kanala erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
-      }
-    }
-
-    return channel;
-  }
+  constructor(
+    private prisma: PrismaService,
+    private membership: MembershipService,
+  ) {}
 
   async findMessages(userId: string, channelId: string, before?: string, limit = 50) {
-    await this.requireChannelMembership(userId, channelId);
+    await this.membership.requireChannelAccess(userId, channelId);
 
     const take = Math.min(limit, 50);
     const cursorCondition = before
@@ -73,7 +53,7 @@ export class MessagesService {
   }
 
   async create(userId: string, channelId: string, dto: CreateMessageDto) {
-    await this.requireChannelMembership(userId, channelId);
+    await this.membership.requireChannelAccess(userId, channelId);
 
     const message = await this.prisma.message.create({
       data: {

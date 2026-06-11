@@ -1,9 +1,6 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MembershipService } from '../../shared/membership/membership.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { Channel } from '@prisma/client';
 
@@ -20,28 +17,13 @@ function toChannelDto(channel: Channel) {
 
 @Injectable()
 export class ChannelsService {
-  constructor(private prisma: PrismaService) {}
-
-  private async requireMembership(userId: string, guildId: string) {
-    const guild = await this.prisma.guild.findUnique({
-      where: { id: guildId, deletedAt: null },
-    });
-    if (!guild) {
-      throw new NotFoundException({ message: 'Sunucu bulunamadı.', error: 'GUILD_NOT_FOUND' });
-    }
-
-    const membership = await this.prisma.guildMember.findUnique({
-      where: { guildId_userId: { guildId, userId } },
-    });
-    if (!membership) {
-      throw new ForbiddenException({ message: 'Bu sunucuya erişim izniniz yok.', error: 'FORBIDDEN' });
-    }
-
-    return { guild, membership };
-  }
+  constructor(
+    private prisma: PrismaService,
+    private membership: MembershipService,
+  ) {}
 
   async create(userId: string, guildId: string, dto: CreateChannelDto) {
-    const { membership } = await this.requireMembership(userId, guildId);
+    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
 
     if (membership.role === 'MEMBER') {
       throw new ForbiddenException({ message: 'Kanal oluşturmak için yetkiniz yok.', error: 'FORBIDDEN' });
@@ -65,7 +47,7 @@ export class ChannelsService {
   }
 
   async findByGuild(userId: string, guildId: string) {
-    await this.requireMembership(userId, guildId);
+    await this.membership.requireGuildMembership(userId, guildId);
 
     const channels = await this.prisma.channel.findMany({
       where: { guildId, deletedAt: null },

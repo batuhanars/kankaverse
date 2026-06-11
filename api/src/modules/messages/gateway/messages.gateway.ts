@@ -7,10 +7,12 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
+import { HttpException } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { MembershipService } from '../../../shared/membership/membership.service';
 
 interface AuthSocket extends Socket {
   data: { userId: string; sessionId: string };
@@ -25,6 +27,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private jwtService: JwtService,
     private config: ConfigService,
     private prisma: PrismaService,
+    private membership: MembershipService,
   ) {}
 
   async handleConnection(socket: AuthSocket) {
@@ -61,21 +64,12 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const userId = socket.data.userId;
     const { channelId } = payload;
 
-    const channel = await this.prisma.channel.findUnique({
-      where: { id: channelId, deletedAt: null },
-    });
-
-    if (!channel) {
-      return { ok: false, error: 'CHANNEL_NOT_FOUND' };
-    }
-
-    if (channel.guildId) {
-      const membership = await this.prisma.guildMember.findUnique({
-        where: { guildId_userId: { guildId: channel.guildId, userId } },
-      });
-      if (!membership) {
-        return { ok: false, error: 'NOT_CHANNEL_MEMBER' };
-      }
+    // Yetki kontrolü tek kaynak (MembershipService); HTTP exception → WS ack'e çevrilir
+    try {
+      await this.membership.requireChannelAccess(userId, channelId);
+    } catch (e) {
+      const res = e instanceof HttpException ? (e.getResponse() as { error?: string }) : null;
+      return { ok: false, error: res?.error ?? 'FORBIDDEN' };
     }
 
     socket.join(`room:${channelId}`);
