@@ -1,15 +1,24 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import type { GuildDto } from '@/types'
+import hexagonLogo from '@/assets/brand/kankaverse-hexagon.png'
 
 defineProps<{
   onCreateGuild: () => void
   onJoinGuild: () => void
 }>()
 
+const { t } = useI18n()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
+
+// Marka/home: guild seçimini temizle → boş landing'e dön (Sprint 3+ DM/home girişi olacak)
+function goHome() {
+  guildsStore.setActiveGuild(null)
+  channelsStore.setActiveChannel(null)
+}
 
 async function selectGuild(guild: GuildDto) {
   guildsStore.setActiveGuild(guild.id)
@@ -31,6 +40,14 @@ function guildInitial(name: string) {
 
 <template>
   <nav class="rail">
+    <!-- Marka / home — guild'lerin üstünde sabit (prototip) -->
+    <button class="guild-btn" :title="t('brand.name')" @click="goHome">
+      <span :class="['hex-home', { 'hex-home--active': guildsStore.activeGuildId === null }]">
+        <img :src="hexagonLogo" :alt="t('brand.name')" class="home-img" />
+      </span>
+    </button>
+    <div class="divider" />
+
     <!-- Guild ikonları -->
     <button
       v-for="guild in guildsStore.guilds"
@@ -122,6 +139,32 @@ function guildInitial(name: string) {
 
 .hex-label {
   pointer-events: none;
+}
+
+/* Marka/home hexagon — logo zaten hexagon şeklinde, clip-path gerekmez */
+.hex-home {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  transition: transform 0.15s;
+}
+
+.home-img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.guild-btn:hover .hex-home {
+  transform: scale(1.05);
+}
+
+/* Home aktifken (guild seçili değilken) hafif accent parıltısı */
+.hex-home--active .home-img {
+  filter: drop-shadow(0 0 6px var(--kv-accent-500));
 }
 
 /* Aktif guild */

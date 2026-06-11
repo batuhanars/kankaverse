@@ -1,4 +1,7 @@
 {
+  "brand": {
+    "name": "Kankaverse"
+  },
   "auth": {
     "login": "Giriş Yap",
     "register": "Kayıt Ol",
@@ -67,6 +70,7 @@
     "idPlaceholder": "Sunucu ID'sini girin",
     "createButton": "Oluştur",
     "joinButton": "Katıl",
+    "emptyState": "Bir sunucu seç veya oluştur",
     "errors": {
       "GUILD_NOT_FOUND": "Sunucu bulunamadı.",
       "ALREADY_MEMBER": "Bu sunucuda zaten üyesiniz."

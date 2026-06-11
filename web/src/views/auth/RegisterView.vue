@@ -9,6 +9,7 @@ import { registerSchema } from '@/lib/validation/auth'
 import KvInput from '@/components/ui/KvInput.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import BirthDateSelect from './components/BirthDateSelect.vue'
+import logoDikey from '@/assets/brand/kankaverse-logo-dikey.png'
 
 const router = useRouter()
 const { t, te } = useI18n()
@@ -67,6 +68,12 @@ function getError(field: string): string | undefined {
       style="background-color: var(--kv-bg-sidebar);"
     >
       <div class="mb-6 text-center">
+        <img
+          :src="logoDikey"
+          :alt="t('brand.name')"
+          class="mx-auto mb-5"
+          style="width: 150px; height: auto;"
+        />
         <h1 class="text-[22px] font-semibold" style="color: var(--kv-text-primary);">
           {{ t('auth.registerTitle') }}
         </h1>
