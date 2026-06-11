@@ -47,7 +47,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       socket.data.userId = payload.sub;
       socket.data.sessionId = payload.sessionId;
     } catch {
-      socket.emit('connect_error', { error: 'UNAUTHORIZED' });
+      socket.emit('auth_error', { error: 'UNAUTHORIZED' });
       socket.disconnect(true);
     }
   }

@@ -52,6 +52,11 @@ export function useSocket() {
       console.error('[WS] connect_error', err.message)
     })
 
+    socket.on('auth_error', (data: { error: string }) => {
+      console.error('[WS] auth hatası, bağlantı kesiliyor:', data.error)
+      socket?.disconnect()
+    })
+
     socket.on('message.created', (message: MessageDto) => {
       messagesStore.appendMessage(message)
     })
