@@ -49,3 +49,36 @@
 - [ ] Tüm UI metni i18n'den (gömülü string yok)
 - [ ] Envelope tutarlı + Swagger üretiyor + Redis adapter bağlı
 - [x] Auth modülü diff'i kullanıcı incelemesinden geçti (R7)
+
+---
+
+## Sprint 2A — E-posta Doğrulama & Şifre Kurtarma
+
+> Aktif sözleşme: `contracts/SPRINT_2A_CONTRACT.md`. **R7: tamamı insan incelemesi.** Dev checkbox işaretler, item EKLEMEZ.
+
+### Backend (`api/`)
+- [ ] Prisma: `AuthToken` modeli + `AuthTokenType` enum + `User.authTokens` ilişki + migration (additive)
+- [ ] `EmailService` (SharedModule): Resend adaptörü + konsol fallback (anahtarsız dev); `RESEND_API_KEY` prod fail-fast
+- [ ] Token util: 32-byte rastgele üret + `SHA-256` hash + tek-kullanım/süre doğrulama
+- [ ] `POST /auth/verify-email` (token → emailVerifiedAt set, usedAt)
+- [ ] `POST /auth/resend-verification` (auth, rate-limit, zaten-doğrulanmış 409)
+- [ ] `POST /auth/forgot-password` (her zaman 200, sızıntı yok, rate-limit)
+- [ ] `POST /auth/reset-password` (şifre set + TÜM oturum revoke + emailVerifiedAt set)
+- [ ] `register` yan etkisi: doğrulama e-postası gönder (gönderim register'ı bloke etmez)
+- [ ] `VerifiedEmailGuard` → `POST /guilds` doğrulanmamışta 403 EMAIL_NOT_VERIFIED
+- [ ] `toUserDto`: `emailVerified` alanı; Swagger güncel
+- [ ] Yeni env: `RESEND_API_KEY`, `EMAIL_FROM`, `FRONTEND_URL` → `.env.example`
+
+### Frontend (`web/`)
+- [ ] `UserDto.emailVerified` tip + tüketim
+- [ ] Doğrulama bandı (emailVerified=false → uyarı + "Tekrar gönder")
+- [ ] `VerifyEmailView` (`/verify-email`), `ForgotPasswordView` (`/forgot-password`), `ResetPasswordView` (`/reset-password`)
+- [ ] Login'e "Şifremi unuttum" linki
+- [ ] Guild oluşturmada 403 EMAIL_NOT_VERIFIED ele alımı (buton disabled/tooltip)
+- [ ] Yeni hata kodları i18n map + tüm yeni metinler `tr.json`
+
+### Sprint 2A DoD (contract §9)
+- [ ] Doğrulanmamış girer ama sunucu kuramaz; link doğrular
+- [ ] forgot sızdırmaz; reset tüm oturumları düşürür + emailVerified yapar
+- [ ] Token tek-kullanım + süreli; EmailService soyut (anahtarsız konsol)
+- [ ] **R7:** 2A diff'i satır satır kullanıcı incelemesinden geçti
