@@ -229,7 +229,7 @@ interface MessageDto {
 
 `USERNAME_TAKEN`, `EMAIL_TAKEN`, `INVALID_CREDENTIALS`, `INVALID_REFRESH`, `REFRESH_REUSE_DETECTED`,
 `UNAUTHORIZED`, `FORBIDDEN`, `GUILD_NOT_FOUND`, `ALREADY_MEMBER`, `CHANNEL_NOT_FOUND`, `NOT_CHANNEL_MEMBER`,
-`VALIDATION_FAILED`. Hepsi Türkçe `message` ile birlikte döner.
+`VALIDATION_FAILED`, `UNDERAGE`, `INVALID_BIRTHDATE`. Hepsi Türkçe `message` ile birlikte döner.
 
 ---
 
@@ -277,3 +277,47 @@ interface MessageDto {
 - [ ] En az bir shadcn primitive (`Select`) `--kv-*` temalı, renkler tutarlı.
 - [ ] `npm run build` (vue-tsc + vite) temiz.
 - [ ] **R7:** auth oturum/mantığı değişmedi; frontend diff kullanıcı incelemesinden geçti.
+
+---
+
+## 12. Auth Sertleştirme Eki (backend — R7 incelemesi düzeltmeleri)
+
+> R7 insan incelemesi sonucu çıkan düzeltme listesi. Çekirdek mimari (rotasyonlu refresh + reuse iptali,
+> argon2id, session-bağlı access) **doğru ve korunur**. Aşağıdakiler merge öncesi kapatılır. Yalnız `api/`.
+
+**Merge-blocker:**
+1. **Rate limit enforce et.** `app.module.ts:14` `ThrottlerModule` import edilmiş ama uygulanmıyor.
+   `APP_GUARD` olarak `ThrottlerGuard` ekle; auth route'larına sıkı `@Throttle`: **login 5/dk/IP, register 3/dk/IP**
+   (global default 100/dk korunur). Brief §8 şartı.
+2. **JWT secret fail-fast.** `configuration.ts` / boot'ta zorunlu env doğrulaması: `JWT_ACCESS_SECRET`,
+   `JWT_REFRESH_SECRET`, `DATABASE_URL` yoksa **uygulama başlamasın** (açık hata). `jwt.strategy.ts:22`'deki `!`
+   maskelemesi yerine garanti edilmiş değer. Secret'lar güçlü rastgele (`.env`, repo'da değil).
+3. **`birthDate` backend doğrulaması (otorite backend).** `register.dto.ts` / service'te: tarih **geçmişte** olmalı
+   (max = bugün), makul alt sınır (yaş ≤ 120). **Taban yaş = 13**: 13'ten küçükse reddet → `422 UNDERAGE`,
+   message "Kayıt için en az 13 yaşında olmalısın." `calculateIsMinor` zaten var; yanına `calculateAge` + bu kontroller.
+4. **E-posta normalizasyonu.** Kayıt/login/lookup'ta `email.toLowerCase().trim()` (mükerrer hesap + login uyuşmazlığı önlenir).
+
+**Aynı turda:**
+5. **Login timing eşitleme.** `auth.service.ts:86-88` kullanıcı yokken sahte hash'e karşı dummy `argon2.verify`
+   çalıştır (yanıt süresi farkıyla kullanıcı sayımını engelle).
+
+**Düşük öncelik (vakit varsa):**
+6. argon2 parametrelerini açıkça sabitle (`memoryCost: 19456, timeCost: 2`).
+7. Access token payload'ından ölü `username: ''` alanını kaldır (`auth.service.ts:175`).
+8. `password`'a `@MaxLength(128)` (uzun-girdi argon2 DoS'u).
+
+**Teyit et:**
+- V1. `findUnique({ where: { ..., deletedAt: null } })` (`auth.service.ts:84`, `:164`) Prisma sürümünüzde
+  çalışıyor mu? Çalışmıyorsa `findFirst`'e geç.
+
+**Yeni hata kodu (§9'a eklenir):** `UNDERAGE`, `INVALID_BIRTHDATE`.
+
+**DoD:**
+- [ ] login/register rate-limit'li (test: limit aşımında `429`).
+- [ ] Secret/DB env eksikse uygulama boot'ta açık hatayla durur.
+- [ ] Gelecek tarih / 13 altı kayıt reddediliyor (`UNDERAGE`/`INVALID_BIRTHDATE`); 13+ geçiyor.
+- [ ] E-posta büyük/küçük harf duyarsız (mükerrer kayıt engelleniyor).
+- [ ] **R7:** düzeltme diff'i tekrar kullanıcı incelemesinden geçti.
+
+> **Frontend follow-up (küçük):** yeni `UNDERAGE` hata kodu `web` i18n hata map'ine eklenir (mevcut
+> `USERNAME_TAKEN`/`EMAIL_TAKEN` deseni); BirthDateSelect yıl aralığı 13+ ile sınırlanabilir (UX, otorite backend).
