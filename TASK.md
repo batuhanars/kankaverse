@@ -103,15 +103,15 @@
 - [x] `toUserDto`: `twoFactorEnabled`; yeni env `.env.example`'a
 
 ### Frontend (`web/`)
-- [ ] Ayarlar → Güvenlik ekranı (2FA kur/kapat, kurtarma kodları, şifre/e-posta değiştir, oturumlarım, hesap sil)
-- [ ] Login 2FA adımı (challenge → TOTP/kurtarma kodu)
-- [ ] Paylaşılan reauth modalı
-- [ ] E-posta değişim confirm/undo landing'leri + deaktif/grace uyarı akışı
-- [ ] `UserDto.twoFactorEnabled`; yeni hata kodları i18n map + metinler `tr.json`
+- [x] Ayarlar → Güvenlik ekranı (2FA kur/kapat, kurtarma kodları, şifre/e-posta değiştir, oturumlarım, hesap sil)
+- [x] Login 2FA adımı (challenge → TOTP/kurtarma kodu)
+- [x] Paylaşılan reauth modalı
+- [x] E-posta değişim confirm/undo landing'leri + deaktif/grace uyarı akışı
+- [x] `UserDto.twoFactorEnabled`; yeni hata kodları i18n map + metinler `tr.json`
 
 ### Sprint 2B DoD (contract §10)
-- [ ] 2FA kur→etkinleştir→2 adım login; kurtarma kodu login + tek-kullanım
-- [ ] `totpSecret` şifreli; oturumlarım liste+çıkış; yeni-cihaz bildirimi
-- [ ] Hassas işlemler reauth ister; e-posta değişim+geri-al; hesap silme gated (purge no-op)
-- [ ] `isMinor` job; challenge token access kabul edilmiyor
-- [ ] **R7:** 2B diff'i satır satır kullanıcı incelemesinden geçti
+- [x] 2FA kur→etkinleştir→2 adım login; kurtarma kodu login + tek-kullanım
+- [x] `totpSecret` şifreli; oturumlarım liste+çıkış; yeni-cihaz bildirimi
+- [x] Hassas işlemler reauth ister; e-posta değişim+geri-al; hesap silme gated (purge no-op)
+- [x] `isMinor` job; challenge token access kabul edilmiyor
+- [x] **R7:** 2B diff'i satır satır incelemesinden geçti (PM review: çekirdek güvenlik doğru; #2 düzeltildi, #1/#4 debt, #3 §7 senkron)

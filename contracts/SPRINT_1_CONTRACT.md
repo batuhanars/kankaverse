@@ -199,7 +199,9 @@ interface MessageDto {
 
 ## 7. WebSocket Event Sözleşmesi (Socket.IO)
 
-- **Bağlantı:** handshake `auth: { token: <accessToken> }`. Geçersiz → `connect_error` (`UNAUTHORIZED`).
+- **Bağlantı:** handshake `auth: { token: <accessToken> }`. Geçersiz → sunucu özel `auth_error` (`UNAUTHORIZED`)
+  event'i yayar + bağlantıyı keser. (Not: `connect_error` Socket.IO'da rezerve built-in event olduğundan özel ad
+  `auth_error` kullanılır — Sprint 2B'de düzeltildi.)
 - **İstemci → sunucu:**
   - `channel:join` payload `{ channelId }` → sunucu üyelik doğrular, `room:<channelId>`'e join. Ack `{ ok: true }` / `{ ok:false, error }`.
   - `channel:leave` payload `{ channelId }`.
