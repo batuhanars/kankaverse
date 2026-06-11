@@ -3,12 +3,14 @@ import { ref, watch, nextTick, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMessagesStore } from '@/stores/messages'
 import { useChannelsStore } from '@/stores/channels'
+import { useSocket } from '@/composables/useSocket'
 import { messagesApi } from '@/api/messages'
 import MessageItem from '@/components/shared/MessageItem.vue'
 
 const { t } = useI18n()
 const messagesStore = useMessagesStore()
 const channelsStore = useChannelsStore()
+const { joinChannel, leaveChannel } = useSocket()
 
 const content = ref('')
 const sending = ref(false)
@@ -23,11 +25,21 @@ const hasMore = computed(() =>
 )
 const channelName = computed(() => channelsStore.activeChannel()?.name ?? '')
 
-watch(channelId, async (id) => {
-  if (!id) return
-  await messagesStore.fetchMessages(id)
-  scrollToBottom()
-})
+watch(
+  channelId,
+  async (id, oldId) => {
+    // Eski kanaldan ayrıl
+    if (oldId) leaveChannel(oldId)
+    if (!id) return
+
+    // Önce room'a join et (§7: channel:join olmadan message.created gelmez)
+    await joinChannel(id)
+    // Sonra REST'ten geçmiş yükle
+    await messagesStore.fetchMessages(id)
+    scrollToBottom()
+  },
+  { immediate: true },
+)
 
 watch(
   messages,
@@ -57,9 +69,9 @@ async function send() {
   content.value = ''
   try {
     await messagesApi.send(channelId.value, text)
-    // WS broadcast message.created store'a yazacak, ek işlem yok
+    // WS broadcast message.created store'a yazacak — UI otomatik güncellenir
   } catch {
-    content.value = text // Geri koy
+    content.value = text
   } finally {
     sending.value = false
   }
@@ -75,16 +87,16 @@ function onKeydown(e: KeyboardEvent) {
 
 <template>
   <div class="flex flex-col flex-1 min-w-0" style="background-color: var(--kv-bg-content);">
-    <!-- Mesaj listesi -->
     <div ref="listEl" class="flex-1 overflow-y-auto py-4 flex flex-col gap-0.5">
       <div v-if="!channelId" class="flex-1 flex items-center justify-center">
-        <p class="text-[var(--kv-text-muted)]">Bir kanal seç</p>
+        <p style="color: var(--kv-text-muted);">Bir kanal seç</p>
       </div>
 
       <template v-else>
         <div v-if="hasMore" class="flex justify-center py-2">
           <button
-            class="text-[13px] text-[var(--kv-info)] hover:underline cursor-pointer"
+            class="text-[13px] hover:underline cursor-pointer"
+            style="color: var(--kv-info);"
             @click="loadMore"
           >
             {{ t('message.loadMore') }}
@@ -93,7 +105,8 @@ function onKeydown(e: KeyboardEvent) {
 
         <p
           v-if="!messages.length"
-          class="text-center text-[var(--kv-text-muted)] text-[14px] py-8"
+          class="text-center text-[14px] py-8"
+          style="color: var(--kv-text-muted);"
         >
           {{ t('message.noMessages') }}
         </p>
@@ -102,7 +115,6 @@ function onKeydown(e: KeyboardEvent) {
       </template>
     </div>
 
-    <!-- Input -->
     <div v-if="channelId" class="px-4 pb-6 pt-2">
       <div
         class="flex items-end gap-2 px-4 rounded-[var(--kv-radius-md)] border"
@@ -112,8 +124,8 @@ function onKeydown(e: KeyboardEvent) {
           v-model="content"
           rows="1"
           :placeholder="t('message.inputPlaceholder', { channel: channelName })"
-          class="flex-1 py-3 bg-transparent text-[15px] text-[var(--kv-text-primary)] placeholder:text-[var(--kv-text-muted)] resize-none outline-none"
-          style="max-height: 50vh; font-family: var(--kv-font-ui);"
+          class="flex-1 py-3 bg-transparent text-[15px] resize-none outline-none"
+          style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
           @keydown="onKeydown"
           @input="($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
         />
