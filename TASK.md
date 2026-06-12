@@ -215,6 +215,19 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] Dashboard kabuğu: karşılama + hızlı-aksiyonlar (Kanka Ekle/Alan Oluştur/Katıl, mevcut akışlar) + Kankalar paneli + son sunucular (`GET /guilds`)
 - [ ] Keşfet/Önerilen/Son Aktiviteler → gizli ya da "yakında" stub (boş bölüm gösterme)
 
+**Faz 1 — RAFİNE (kullanıcı feedback 2026-06-12, ilk pass sonrası):**
+- [ ] **3-KOLON segment layout (iç-içe kart DEĞİL):** sol sidebar / orta alan / sağ Kankalar = **3 ayrı yüzen yuvarlak panel**, aralarında **boşluk** (arada en koyu sayfa zemini görünür). Sol sidebar **rail'e yapışık** (sol kenar flush) ama panel görünümünde. **Orta panelin içindeki "HIZLI AKSİYONLAR"/"ORTAMLARIN" border-kutuları KALDIR** → orta panelde başlıklı bölüm olarak akar. Sayfa bg en koyu, paneller `--kv-bg-sidebar/content`. (`anasayfa.png`)
+- [ ] **Sidebar arama:** "Sohbet bul ya da başlat" butonu KALK → üstte **arama input'u**; yazınca **gruplu sonuç** (KANKALAR / ORTAMLAR / DM başlıkları altında client-side filtre: friends+guilds+dm store); boşken normal sidebar
+- [ ] **Kanka Ekle modalı → ara-ve-ekle:** "Kankalık İsteği Gönder" butonu KALK; input kanka-kodu arama çubuğu; kod girilince eşleşen kanka **altta listede + yanında "+ user" ikonu**; "+" → istek gönder
+  - ⚠ **BACKEND GEREKİR (karar):** `POST /friends/lookup { friendCode } → FriendCodeUserDto|404` (rate-limited) — "önizle sonra gönder". "Sıfır backend"e PM-onaylı küçük istisna. T&S: gizli kod + rate-limit güvenli. **Alternatif:** ertele, mevcut tek-adım submit kalsın. → kullanıcı kararı
+- [ ] **Polish:** "+ Yeni Kanka Ekle" sağ-alt bar → Kankalar paneli başlığına taşı; dashboard boşluğunu dengele
+
+**Faz 1 — RAFİNE 2 (üst bar + bildirim, 2026-06-12):**
+- [ ] **Üst arama çubuğu (tasarım-only):** ekranın en üstünde, orta HomeDashboard panelinin **HEMEN ÜSTÜNDE ve DIŞINDA** (canvas'ta, panel içinde değil), geniş arama çubuğu — `anasayfa.png` gibi. Davranış BACKEND fazında: tıkla → aşağı açılır menü, **KANKALAR** + **ORTAMLAR** başlıkları + listeleri. → redundant olan sidebar "Sohbet bul ya da başlat" butonunu KALDIR (tek arama kalsın)
+- [ ] **Bildirim zili (tasarım-only):** ekranın sağ üstünde, yüzen panellerden **bağımsız** zil ikonu → tıkla bildirim paneli (şimdilik stub/boş). Bildirim SİSTEMİ → Sprint 6, şimdi yalnız ikon+giriş noktası
+- [ ] **Kanka-ekle ara-ve-ekle (BACKEND fazı, kullanıcı ONAYLADI = A):** modalda kod girilince ilgili kullanıcı profili + yanında "+ kanka ekle" butonu belirir → küçük `POST /friends/lookup { friendCode } → FriendCodeUserDto|404` (rate-limited) gerekir
+- [ ] **UserCard → niş pill + popover (karar A):** şişman kart yerine kompakt **avatar + durum pill**; tıkla → **popover** (profil / durum / ayarlar / çıkış yap). **Çıkış Yap buraya girer → home sağ-üstteki geçici "Çıkış Yap" (U1 borcu) KALKAR**; ayarlar çarkı da popover'a taşınır. Ses ikonları (mic/kulaklık) → V2'ye ertelenir, yer rezerve. Konum bottom-left, yüzen mini-panel.
+
 **Faz 2/3 — DM + Sunucu (`web/`, `dm-chat.png` / `sunucu-detay.png`):**
 - [ ] DM: liste + sohbet (yuvarlak baloncuk) + sağ profil paneli (mevcut aksiyonlar); Ortak Kankalar/Medya = stub
 - [ ] Sunucu: kanal listesi + mesajlar + sabitlenmiş duyuru stili + üye paneli + temel sunucu-bilgi paneli; etkinlik = stub
