@@ -6,6 +6,7 @@ import { useDmStore } from '@/stores/dm'
 import { useAuthStore } from '@/stores/auth'
 import { useFriendsStore } from '@/stores/friends'
 import { useSocket } from '@/composables/useSocket'
+import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { messagesApi } from '@/api/messages'
 import { dmApi } from '@/api/dm'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
@@ -25,6 +26,8 @@ const dmStore = useDmStore()
 const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
 const { joinChannel, leaveChannel } = useSocket()
+const { onInput: onTypingInput, stopTyping } = useTyping(() => props.channelId)
+const { label: typingLabel } = useTypingLabel(() => props.channelId, t)
 
 const content = ref('')
 const sending = ref(false)
@@ -67,6 +70,7 @@ async function loadMore() {
 
 async function send() {
   if (!content.value.trim() || sending.value || !props.canMessage) return
+  stopTyping()
   sending.value = true
   const text = content.value.trim()
   content.value = ''
@@ -226,6 +230,15 @@ async function unblockUser() {
 
     <!-- Mesaj input / Engel bandı -->
     <div class="px-4 pb-4 pt-2 shrink-0">
+      <!-- Yazıyor göstergesi -->
+      <div
+        v-if="typingLabel"
+        class="h-5 px-1 mb-1 text-[12px] italic"
+        style="color: var(--kv-text-muted);"
+      >
+        {{ typingLabel }}
+      </div>
+
       <!-- canMessage=false bandı -->
       <div
         v-if="!canMessage"
@@ -258,7 +271,8 @@ async function unblockUser() {
           class="flex-1 py-3 bg-transparent text-[15px] resize-none outline-none"
           style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
           @keydown="onKeydown"
-          @input="($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
+          @input="onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
+          @blur="stopTyping"
         />
       </div>
     </div>

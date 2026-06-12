@@ -370,5 +370,10 @@
   "time": {
     "today": "Bugün",
     "yesterday": "Dün"
+  },
+  "typing": {
+    "one": "{user} yazıyor…",
+    "two": "{user1} ve {user2} yazıyor…",
+    "many": "Birkaç kişi yazıyor…"
   }
 }

@@ -41,6 +41,9 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
         v-else-if="activeView === 'dm' && activeDmChannel"
         :channel-id="activeDmChannel.id"
         :other-user="activeDmChannel.otherUser"
+        :can-message="activeDmChannel.canMessage"
+        :self-blocked="activeDmChannel.selfBlocked"
+        @cleared="selectFriends"
       />
     </div>
   </div>

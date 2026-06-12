@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useMessagesStore } from '@/stores/messages'
 import { useChannelsStore } from '@/stores/channels'
 import { useSocket } from '@/composables/useSocket'
+import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { messagesApi } from '@/api/messages'
 import MessageItem from '@/components/shared/MessageItem.vue'
 
@@ -11,6 +12,8 @@ const { t } = useI18n()
 const messagesStore = useMessagesStore()
 const channelsStore = useChannelsStore()
 const { joinChannel, leaveChannel } = useSocket()
+const { onInput: onTypingInput, stopTyping } = useTyping(() => channelId.value)
+const { label: typingLabel } = useTypingLabel(() => channelId.value, t)
 
 const content = ref('')
 const sending = ref(false)
@@ -68,6 +71,7 @@ async function loadMore() {
 
 async function send() {
   if (!content.value.trim() || !channelId.value || sending.value) return
+  stopTyping()
   sending.value = true
   const text = content.value.trim()
   content.value = ''
@@ -130,6 +134,14 @@ function onKeydown(e: KeyboardEvent) {
     </div>
 
     <div v-if="channelId" class="px-4 pb-6 pt-2">
+      <!-- Yazıyor göstergesi -->
+      <div
+        v-if="typingLabel"
+        class="h-5 px-1 mb-1 text-[12px] italic"
+        style="color: var(--kv-text-muted);"
+      >
+        {{ typingLabel }}
+      </div>
       <div
         class="flex items-end gap-2 px-4 rounded-[var(--kv-radius-md)] border"
         style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
@@ -141,7 +153,8 @@ function onKeydown(e: KeyboardEvent) {
           class="flex-1 py-3 bg-transparent text-[15px] resize-none outline-none"
           style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
           @keydown="onKeydown"
-          @input="($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
+          @input="onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
+          @blur="stopTyping"
         />
       </div>
     </div>

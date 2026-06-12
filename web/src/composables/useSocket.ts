@@ -3,6 +3,12 @@ import { io, type Socket } from 'socket.io-client'
 import { useMessagesStore } from '@/stores/messages'
 import { useFriendsStore } from '@/stores/friends'
 import { getAccessToken } from '@/api/axios'
+import {
+  _bindTypingEmitters,
+  handleTypingUpdate,
+  handleTypingClear,
+  clearTypingForChannel,
+} from '@/composables/useTyping'
 import type { MessageDto, FriendRequestDto, FriendDto } from '@/types'
 
 let socket: Socket | null = null
@@ -61,6 +67,8 @@ export function useSocket() {
 
     socket.on('message.created', (message: MessageDto) => {
       messagesStore.appendMessage(message)
+      // Mesaj gelince o kanalda yazıyor göstergesini temizle
+      clearTypingForChannel(message.channelId)
     })
 
     socket.on('friend.request', (request: FriendRequestDto) => {
@@ -74,6 +82,20 @@ export function useSocket() {
     socket.on('friend.remove', (data: { userId: string }) => {
       friendsStore.wsHandleRemoved(data.userId)
     })
+
+    socket.on('typing:update', (data: { userId: string; username: string; channelId: string }) => {
+      handleTypingUpdate(data.userId, data.username, data.channelId)
+    })
+
+    socket.on('typing:clear', (data: { userId: string; username: string; channelId: string }) => {
+      handleTypingClear(data.userId, data.channelId)
+    })
+
+    // Typing emit fonksiyonlarını useTyping composable'ına bağla
+    _bindTypingEmitters(
+      (channelId: string) => socket?.emit('typing:start', { channelId }),
+      (channelId: string) => socket?.emit('typing:stop', { channelId }),
+    )
 
     refCount++
   }
@@ -112,6 +134,7 @@ export function useSocket() {
   function leaveChannel(channelId: string) {
     if (activeChannelId === channelId) activeChannelId = null
     socket?.emit('channel:leave', { channelId })
+    clearTypingForChannel(channelId)
   }
 
   onUnmounted(() => {
