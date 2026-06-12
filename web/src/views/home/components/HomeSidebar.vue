@@ -21,7 +21,7 @@ const showSearch = ref(false)
     style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle);"
   >
     <!-- Arama butonu — ortalanmış metin -->
-    <div class="border-b px-3 pt-4 pb-2 shrink-0" style="border-color: var(--kv-border-subtle);">
+    <div class="h-16 flex items-center border-b px-3 shrink-0" style="border-color: var(--kv-border-subtle);">
       <button
         class="flex w-full items-center justify-center px-3 py-2 text-[13px] rounded-[var(--kv-radius-sm)] cursor-pointer"
         style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"

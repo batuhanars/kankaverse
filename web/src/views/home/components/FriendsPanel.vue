@@ -113,7 +113,7 @@ async function openDm(userId: string) {
 
     <!-- Üst bar: başlık + sekmeler + Arkadaş Ekle butonu -->
     <div
-      class="flex items-center gap-1 px-4 shrink-0 border-b pb-3 pt-3"
+      class="h-16 flex items-center px-4 gap-1 shrink-0 border-b"
       style="border-color: var(--kv-border-subtle);"
     >
       <!-- Başlık -->

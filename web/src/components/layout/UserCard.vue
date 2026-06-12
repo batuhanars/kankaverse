@@ -14,7 +14,7 @@ function goToSettings() {
 
 <template>
   <!-- Dış alan: absolute bottom, yeterli iç boşluk -->
-  <div class="absolute bottom-0 shrink-0 px-2 pt-2 pb-3 w-full">
+  <div class="absolute bottom-0 shrink-0 px-2 pt-2 pb-4 w-full">
     <!-- Kart: belirgin arka plan, hover'da açılır -->
     <div
       class="group flex items-center gap-2 px-3 py-2.5 rounded-[var(--kv-radius-lg)] transition-colors cursor-pointer"

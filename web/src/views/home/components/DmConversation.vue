@@ -81,7 +81,7 @@ function onKeydown(e: KeyboardEvent) {
   <div class="flex flex-col flex-1 min-w-0 overflow-hidden" style="background-color: var(--kv-bg-content);">
     <!-- DM başlık çubuğu -->
     <div
-      class="h-12 flex items-center px-4 gap-3 shrink-0 border-b"
+      class="h-16 flex items-center px-4 gap-3 shrink-0 border-b"
       style="border-color: var(--kv-border-subtle);"
     >
       <div class="w-7 h-7 rounded-full shrink-0 overflow-hidden" style="background-color: var(--kv-bg-elevated);">
@@ -128,7 +128,7 @@ function onKeydown(e: KeyboardEvent) {
       <MessageItem v-for="msg in messages" :key="msg.id" :message="msg" />
     </div>
 
-    <div class="px-4 pb-6 pt-2 shrink-0">
+    <div class="px-4 pb-4 pt-2 shrink-0">
       <div
         class="flex items-end gap-2 px-4 rounded-[var(--kv-radius-md)] border"
         style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
