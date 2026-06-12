@@ -44,13 +44,9 @@ function goToSettings() {
         >{{ authStore.user?.username }}</span>
         <div class="relative overflow-hidden" style="height: 15px;">
           <span
-            class="absolute inset-0 flex items-center text-[12px] truncate transition-[transform,opacity] duration-200 ease-out group-hover:opacity-0 group-hover:-translate-y-full"
+            class="absolute inset-0 flex items-center text-[12px] truncate transition-[transform,opacity] duration-200 ease-out"
             style="color: #3DB46E;"
           >{{ t('presence.online') }}</span>
-          <span
-            class="absolute inset-0 flex items-center text-[12px] truncate transition-[transform,opacity] duration-200 ease-out translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
-            style="color: var(--kv-text-muted);"
-          >{{ authStore.user?.username }}</span>
         </div>
       </div>
 
