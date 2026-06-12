@@ -106,7 +106,7 @@ oradan türetilir.
   **Kullanıcı avatarları daire kalır.**
 - **Gölge YOK.** Katman ayrımı arka plan tonu (`--kv-bg-rail/sidebar/content/elevated`) + ince kenarlık ile.
 - **App shell ölçüleri:** sunucu rayı 72px sabit · kanal paneli 248px · mesaj alanı esnek (min 480) · üye paneli 248px ·
-  üst bar 48px · mesaj input min 44px (max 50vh). Breakpoint: 768 (drawer) · 1024 (üye paneli yok) · 1280 (tam).
+  üst bar 64px (tüm header/sidebar-header tek yükseklik — 2026-06-12) · mesaj input min 44px (max 50vh). Breakpoint: 768 (drawer) · 1024 (üye paneli yok) · 1280 (tam).
 - Presence renkleri: çevrimiçi `#3DB46E` · boşta `#E8A33D` · DnD `#F23B4B` · çevrimdışı `#6E675E`.
 
 ## Sapma Kuralı

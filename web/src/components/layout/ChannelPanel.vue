@@ -27,7 +27,7 @@ async function selectChannel(channel: ChannelDto) {
   >
     <!-- Guild başlık -->
     <div
-      class="h-12 flex items-center px-4 border-b font-semibold text-[15px] text-[var(--kv-text-primary)]"
+      class="h-16 flex items-center px-4 border-b font-semibold text-[15px] text-[var(--kv-text-primary)]"
       style="border-color: var(--kv-border-subtle);"
     >
       {{ guildsStore.activeGuild()?.name ?? '' }}

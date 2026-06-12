@@ -11,7 +11,7 @@ const { t } = useI18n()
     style="width: 248px; background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle);"
   >
     <div
-      class="h-12 flex items-center px-4 border-b text-[13px] font-semibold uppercase tracking-widest text-[var(--kv-text-muted)]"
+      class="h-16 flex items-center px-4 border-b text-[13px] font-semibold uppercase tracking-widest text-[var(--kv-text-muted)]"
       style="border-color: var(--kv-border-subtle);"
     >
       {{ t('member.panel') }}
