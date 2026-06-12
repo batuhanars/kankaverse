@@ -50,7 +50,7 @@ function goToSettings() {
           <span
             class="absolute inset-0 flex items-center text-[12px] truncate transition-[transform,opacity] duration-200 ease-out translate-y-full opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
             style="color: var(--kv-text-muted);"
-          >{{ authStore.user?.username }}#{{ authStore.user?.friendTag }}</span>
+          >{{ authStore.user?.username }}</span>
         </div>
       </div>
 

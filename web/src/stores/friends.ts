@@ -23,8 +23,8 @@ export const useFriendsStore = defineStore('friends', () => {
     blocked.value = res.data
   }
 
-  async function sendRequest(handle: string) {
-    await friendsApi.sendRequest(handle)
+  async function sendRequest(friendCode: string) {
+    await friendsApi.sendRequest(friendCode)
     await Promise.all([fetchRequests(), fetchFriends()])
   }
 

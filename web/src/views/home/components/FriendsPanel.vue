@@ -16,12 +16,10 @@ const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
 const dmStore = useDmStore()
 
-const HANDLE_REGEX = /^[a-zA-Z0-9_.]{3,32}#\d{4}$/
-
 type Tab = 'all' | 'pending' | 'blocked' | 'add'
 const activeTab = ref<Tab>(props.initialTab ?? 'all')
 const searchQuery = ref('')
-const handleInput = ref('')
+const codeInput = ref('')
 const addError = ref('')
 const addSuccess = ref('')
 const addLoading = ref(false)
@@ -33,11 +31,8 @@ const confirmState = ref<{ show: boolean; message: string; action: () => Promise
 })
 const confirmLoading = ref(false)
 
-const ownHandle = computed(() => {
-  const user = authStore.user
-  return user ? `${user.username}#${user.friendTag}` : ''
-})
-const { copy, copied } = useClipboard({ source: ownHandle })
+const ownCode = computed(() => authStore.user?.friendCode ?? '')
+const { copy, copied } = useClipboard({ source: ownCode })
 
 const incomingRequests = computed(() => friendsStore.requests.filter((r) => r.direction === 'incoming'))
 const outgoingRequests = computed(() => friendsStore.requests.filter((r) => r.direction === 'outgoing'))
@@ -58,18 +53,18 @@ function toggleMenu(id: string) {
 }
 
 async function sendRequest() {
-  const handle = handleInput.value.trim()
-  if (!handle) return
-  if (!HANDLE_REGEX.test(handle)) {
-    addError.value = t('friends.errors.INVALID_HANDLE')
+  const code = codeInput.value.trim().toUpperCase()
+  if (!code) return
+  if (code.length !== 8) {
+    addError.value = t('friends.errors.INVALID_CODE')
     return
   }
   addLoading.value = true
   addError.value = ''
   addSuccess.value = ''
   try {
-    await friendsStore.sendRequest(handle)
-    handleInput.value = ''
+    await friendsStore.sendRequest(code)
+    codeInput.value = ''
     addSuccess.value = t('friends.requestSent')
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string; message?: string } } }
@@ -425,7 +420,7 @@ async function openDm(userId: string) {
           </p>
           <form class="flex gap-3" @submit.prevent="sendRequest">
             <input
-              v-model="handleInput"
+              v-model="codeInput"
               :placeholder="t('friends.codePlaceholder')"
               class="flex-1 px-4 py-3 text-[14px] rounded-[var(--kv-radius-md)] outline-none"
               style="background-color: var(--kv-bg-rail); color: var(--kv-text-primary); border: 2px solid var(--kv-border-subtle);"
@@ -447,7 +442,7 @@ async function openDm(userId: string) {
           </p>
           <div class="flex items-center gap-3">
             <code class="text-[15px] font-mono font-semibold tracking-wider" style="color: var(--kv-text-primary);">
-              {{ ownHandle }}
+              {{ ownCode }}
             </code>
             <button
               class="px-3 py-1 text-[12px] font-medium rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
