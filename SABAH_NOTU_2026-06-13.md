@@ -11,7 +11,8 @@
 - **Sprint 5 (dosya + CSAM tarama):** R5 araç-seçimi (senin araştırman) bekliyor. Yapılmadı.
 
 ## ✅ Gece yapılanlar (hepsi push'lu, non-R7, çekirdeğe bahis YOK)
-Hepsi `origin/main`'de. Tüm api test suite **62/62 yeşil**, `nest build` + `vue-tsc/vite build` temiz, ağaç temiz.
+Hepsi `origin/main`'de. Tüm api test suite **69/69 yeşil** (4 suite), `nest build` + `vue-tsc/vite build` temiz, ağaç temiz.
+**+ B1 regresyon testi** (`9d80464`) — `findMessages` clearedAt+cursor birleşimi 7 test (düzelttiğim bug'ın geri gelmesi kilitlendi). Yan-gözlem: silinmiş-mesaj cursor'ı → PLAN D10 borcu.
 
 1. **`canDm` birim testleri** (`d07651f`) — 27 test, T&S çekirdek matrisinin TÜM dalları (self/fail-closed/blok-çift-yön/arkadaş-bypass/minör/yeni-hesap-sınır/dmPolicy-fail-closed). Önceden `canDm` çıplaktı.
 2. **`MembershipService` testleri** (`1dcab58`) — 17 test; yaş-kapılı guard (`ageGated&&isMinor→AGE_RESTRICTED`), DM erişim açığı kapanışı, **G3: `requireNoDmBlock` `DM_NOT_ALLOWED` döndürür, `BLOCKED` DEĞİL** (ayrı assert ile sızıntı kilidi).
