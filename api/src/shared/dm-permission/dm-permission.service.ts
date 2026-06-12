@@ -56,7 +56,7 @@ export class DmPermissionService {
       return { allowed: false, reason: 'DM_NOT_ALLOWED' };
     }
 
-    // Kural 2: blok (her iki yönde)
+    // Kural 2: blok (her iki yönde) — G3: JENERİK DM_NOT_ALLOWED (BLOCKED istemciye dönmez)
     const block = await this.prisma.userBlock.findFirst({
       where: {
         OR: [
@@ -66,7 +66,7 @@ export class DmPermissionService {
       },
     });
     if (block) {
-      return { allowed: false, reason: 'BLOCKED' };
+      return { allowed: false, reason: 'DM_NOT_ALLOWED' };
     }
 
     // Kural 3: arkadaş (ACCEPTED) — minor + arkadaş = izinli

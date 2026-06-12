@@ -13,6 +13,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { FriendsService } from './friends.service';
 import { SendFriendRequestDto } from './dto/send-friend-request.dto';
+import { SendFriendRequestByUserDto } from './dto/send-friend-request-by-user.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -38,9 +39,17 @@ export class FriendsController {
   @Post('requests')
   @Throttle({ default: { ttl: 3600000, limit: 20 } })
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Arkadaş kodu ile istek gönder; karşılıklı istek varsa otomatik kabul' })
+  @ApiOperation({ summary: 'Arkadaş kodu ile istek gönder (CODE yolu, minör dahil açık)' })
   sendRequest(@CurrentUser() user: { id: string }, @Body() dto: SendFriendRequestDto) {
     return this.friendsService.sendFriendRequest(user.id, dto);
+  }
+
+  @Post('requests/by-user')
+  @Throttle({ default: { ttl: 3600000, limit: 20 } })
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Kullanıcı ID ile istek gönder (USER_CLICK, G2 tıkla-ekle) — ortak ortam + yetişkin zorunlu' })
+  sendRequestByUser(@CurrentUser() user: { id: string }, @Body() dto: SendFriendRequestByUserDto) {
+    return this.friendsService.sendFriendRequestByUser(user.id, dto);
   }
 
   @Post('requests/:id/accept')

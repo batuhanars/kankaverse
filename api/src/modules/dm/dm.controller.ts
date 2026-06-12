@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -23,7 +24,7 @@ export class DmController {
   constructor(private dmService: DmService) {}
 
   @Get('channels')
-  @ApiOperation({ summary: 'Kullanıcının DM kanalları (son mesaj + unread)' })
+  @ApiOperation({ summary: 'DM kanalları (son mesaj + unread + canMessage + selfBlocked). G4: temizlenmiş kanallar filtrelenir.' })
   getDmChannels(@CurrentUser() user: { id: string }) {
     return this.dmService.getDmChannels(user.id);
   }
@@ -34,6 +35,13 @@ export class DmController {
   @ApiOperation({ summary: 'DM kanalı aç (canDm kontrolü); mevcut kanal varsa döndür' })
   createDmChannel(@CurrentUser() user: { id: string }, @Body() dto: CreateDmChannelDto) {
     return this.dmService.getOrCreateDmChannel(user.id, dto);
+  }
+
+  @Delete('channels/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'G4 inbox soft-delete: DM kaydı çağıranın listesinden temizlenir, mesajlar DB\'de durur' })
+  clearChannel(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
+    return this.dmService.clearDmChannel(user.id, channelId);
   }
 
   @Post('channels/:id/read')

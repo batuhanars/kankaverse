@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
+import { FriendPermissionService } from '../../shared/friend-permission/friend-permission.service';
 import { SendFriendRequestDto } from './dto/send-friend-request.dto';
+import { SendFriendRequestByUserDto } from './dto/send-friend-request-by-user.dto';
 
 function toFriendCodeUserDto(user: { id: string; username: string; avatarUrl: string | null }) {
   return { id: user.id, username: user.username, avatarUrl: user.avatarUrl };
@@ -18,6 +20,7 @@ export class FriendsService {
   constructor(
     private prisma: PrismaService,
     private realtime: RealtimeService,
+    private friendPermission: FriendPermissionService,
   ) {}
 
   async getFriends(userId: string) {
@@ -64,31 +67,32 @@ export class FriendsService {
     }));
   }
 
-  async sendFriendRequest(senderId: string, dto: SendFriendRequestDto) {
-    const target = await this.prisma.user.findFirst({
-      where: { friendCode: dto.friendCode, deletedAt: null },
-      select: { id: true, username: true, avatarUrl: true },
-    });
-    if (!target) {
-      throw new NotFoundException({ message: 'Bu kodla kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+  /** G3: hata nedenini HTTP exception'a dönüştür; BLOCKED istemciye dönmez. */
+  private throwFromPermissionReason(reason: string | undefined): never {
+    switch (reason) {
+      case 'CANNOT_FRIEND_SELF':
+        throw new BadRequestException({ message: 'Kendinize arkadaşlık isteği gönderemezsiniz.', error: 'CANNOT_FRIEND_SELF' });
+      case 'ALREADY_FRIENDS':
+        throw new ConflictException({ message: 'Zaten arkadaşsınız.', error: 'ALREADY_FRIENDS' });
+      case 'REQUEST_EXISTS':
+        throw new ConflictException({ message: 'Bekleyen bir istek zaten mevcut.', error: 'REQUEST_EXISTS' });
+      case 'USER_NOT_FOUND':
+      default:
+        // USER_NOT_FOUND kapsayıcı jenerik: yok / blok / minör / ortam yok — ayırt edilemez (G3)
+        throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
     }
+  }
 
-    if (target.id === senderId) {
-      throw new BadRequestException({ message: 'Kendinize arkadaşlık isteği gönderemezsiniz.', error: 'CANNOT_FRIEND_SELF' });
-    }
-
-    const block = await this.prisma.userBlock.findFirst({
-      where: {
-        OR: [
-          { blockerId: senderId, blockedId: target.id },
-          { blockerId: target.id, blockedId: senderId },
-        ],
-      },
-    });
-    if (block) {
-      throw new ForbiddenException({ message: 'Bu kullanıcıya istek gönderemezsiniz.', error: 'BLOCKED' });
-    }
-
+  /**
+   * İzin alındıktan sonra arkadaşlık kaydını oluştur veya güncelle.
+   * - Karşıdan PENDING istek varsa otomatik kabul et.
+   * - DECLINED durumu varsa yeniden PENDING yap veya yeni kayıt oluştur.
+   * - Hiçbiri yoksa yeni PENDING oluştur.
+   */
+  private async executeFriendshipCreation(
+    senderId: string,
+    target: { id: string; username: string; avatarUrl: string | null },
+  ) {
     const existing = await this.prisma.friendship.findFirst({
       where: {
         OR: [
@@ -98,65 +102,55 @@ export class FriendsService {
       },
     });
 
-    if (existing) {
-      if (existing.status === 'ACCEPTED') {
-        throw new ConflictException({ message: 'Zaten arkadaşsınız.', error: 'ALREADY_FRIENDS' });
-      }
-      if (existing.status === 'PENDING') {
-        // Karşı taraftan bekleyen istek varsa otomatik kabul et
-        if (existing.addresseeId === senderId) {
-          const accepted = await this.prisma.friendship.update({
-            where: { id: existing.id },
-            data: { status: 'ACCEPTED' },
-            include: {
-              requester: { select: { id: true, username: true, avatarUrl: true } },
-              addressee: { select: { id: true, username: true, avatarUrl: true } },
-            },
-          });
-          const result = {
-            type: 'accepted' as const,
-            friendshipId: accepted.id,
-            user: toFriendCodeUserDto(accepted.requester),
-            since: accepted.updatedAt.toISOString(),
-          };
-          // Özgün requester'a friend.accept yay
-          this.realtime.emitToUser(accepted.requesterId, 'friend.accept', {
-            friendshipId: accepted.id,
-            user: toFriendCodeUserDto(accepted.addressee),
-            since: accepted.updatedAt.toISOString(),
-          });
-          return result;
-        }
-        throw new ConflictException({ message: 'Bekleyen bir istek zaten mevcut.', error: 'REQUEST_EXISTS' });
-      }
-      // DECLINED → izin ver, yeni istek olarak güncelle
-      if (existing.requesterId === senderId) {
-        const updated = await this.prisma.friendship.update({
-          where: { id: existing.id },
-          data: { status: 'PENDING', requesterId: senderId, addresseeId: target.id },
-          include: {
-            addressee: { select: { id: true, username: true, avatarUrl: true } },
-            requester: { select: { id: true, username: true, avatarUrl: true } },
-          },
-        });
-        const result = {
-          type: 'requested' as const,
-          id: updated.id,
-          direction: 'outgoing' as const,
-          user: toFriendCodeUserDto(updated.addressee),
-          createdAt: updated.createdAt.toISOString(),
-        };
-        this.realtime.emitToUser(target.id, 'friend.request', {
-          id: updated.id,
-          direction: 'incoming',
-          user: toFriendCodeUserDto(updated.requester),
-          createdAt: updated.createdAt.toISOString(),
-        });
-        return result;
-      }
-      // Eski declined isteği gönderen hedef; yeni istek
+    // Karşıdan PENDING → otomatik kabul (canSendFriendRequest kural 5'te allowed döndü)
+    if (existing?.status === 'PENDING' && existing.addresseeId === senderId) {
+      const accepted = await this.prisma.friendship.update({
+        where: { id: existing.id },
+        data: { status: 'ACCEPTED' },
+        include: {
+          requester: { select: { id: true, username: true, avatarUrl: true } },
+          addressee: { select: { id: true, username: true, avatarUrl: true } },
+        },
+      });
+      this.realtime.emitToUser(accepted.requesterId, 'friend.accept', {
+        friendshipId: accepted.id,
+        user: toFriendCodeUserDto(accepted.addressee),
+        since: accepted.updatedAt.toISOString(),
+      });
+      return {
+        type: 'accepted' as const,
+        friendshipId: accepted.id,
+        user: toFriendCodeUserDto(accepted.requester),
+        since: accepted.updatedAt.toISOString(),
+      };
     }
 
+    // DECLINED (biz gönderdik) → yeniden PENDING'e çevir
+    if (existing?.status === 'DECLINED' && existing.requesterId === senderId) {
+      const updated = await this.prisma.friendship.update({
+        where: { id: existing.id },
+        data: { status: 'PENDING' },
+        include: {
+          addressee: { select: { id: true, username: true, avatarUrl: true } },
+          requester: { select: { id: true, username: true, avatarUrl: true } },
+        },
+      });
+      this.realtime.emitToUser(target.id, 'friend.request', {
+        id: updated.id,
+        direction: 'incoming',
+        user: toFriendCodeUserDto(updated.requester),
+        createdAt: updated.createdAt.toISOString(),
+      });
+      return {
+        type: 'requested' as const,
+        id: updated.id,
+        direction: 'outgoing' as const,
+        user: toFriendCodeUserDto(updated.addressee),
+        createdAt: updated.createdAt.toISOString(),
+      };
+    }
+
+    // Yeni PENDING oluştur
     const request = await this.prisma.friendship.create({
       data: { requesterId: senderId, addresseeId: target.id },
       include: {
@@ -164,20 +158,58 @@ export class FriendsService {
         requester: { select: { id: true, username: true, avatarUrl: true } },
       },
     });
-    const result = {
-      type: 'requested' as const,
-      id: request.id,
-      direction: 'outgoing' as const,
-      user: toFriendCodeUserDto(request.addressee),
-      createdAt: request.createdAt.toISOString(),
-    };
     this.realtime.emitToUser(target.id, 'friend.request', {
       id: request.id,
       direction: 'incoming',
       user: toFriendCodeUserDto(request.requester),
       createdAt: request.createdAt.toISOString(),
     });
-    return result;
+    return {
+      type: 'requested' as const,
+      id: request.id,
+      direction: 'outgoing' as const,
+      user: toFriendCodeUserDto(request.addressee),
+      createdAt: request.createdAt.toISOString(),
+    };
+  }
+
+  /** POST /friends/requests — friendCode ile istek (CODE yolu, minör dahil açık). */
+  async sendFriendRequest(senderId: string, dto: SendFriendRequestDto) {
+    const target = await this.prisma.user.findFirst({
+      where: { friendCode: dto.friendCode, deletedAt: null },
+      select: { id: true, username: true, avatarUrl: true },
+    });
+    if (!target) {
+      throw new NotFoundException({ message: 'Bu kodla kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+    }
+
+    const check = await this.friendPermission.canSendFriendRequest(senderId, target.id, 'CODE');
+    if (!check.allowed) {
+      this.throwFromPermissionReason(check.reason);
+    }
+
+    return this.executeFriendshipCreation(senderId, target);
+  }
+
+  /**
+   * POST /friends/requests/by-user — userId ile istek (USER_CLICK yolu).
+   * G2: tıkla-ekle; ortak ortam zorunlu + her iki taraf yetişkin (G1).
+   */
+  async sendFriendRequestByUser(senderId: string, dto: SendFriendRequestByUserDto) {
+    const check = await this.friendPermission.canSendFriendRequest(senderId, dto.userId, 'USER_CLICK');
+    if (!check.allowed) {
+      this.throwFromPermissionReason(check.reason);
+    }
+
+    const target = await this.prisma.user.findUnique({
+      where: { id: dto.userId, deletedAt: null },
+      select: { id: true, username: true, avatarUrl: true },
+    });
+    if (!target) {
+      throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+    }
+
+    return this.executeFriendshipCreation(senderId, target);
   }
 
   async acceptFriendRequest(userId: string, requestId: string) {
@@ -202,7 +234,6 @@ export class FriendsService {
       user: toFriendCodeUserDto(accepted.requester),
       since: accepted.updatedAt.toISOString(),
     };
-    // Özgün requester'a friend.accept yay
     this.realtime.emitToUser(accepted.requesterId, 'friend.accept', {
       friendshipId: accepted.id,
       user: toFriendCodeUserDto(accepted.addressee),
@@ -221,7 +252,6 @@ export class FriendsService {
     }
 
     await this.prisma.friendship.update({ where: { id: requestId }, data: { status: 'DECLINED' } });
-    // Reddetme → event yok (Discord da bildirmez; gönderene "reddedildi" sızdırma)
     return null;
   }
 

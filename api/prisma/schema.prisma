@@ -213,6 +213,7 @@ model ChannelMember {
   userId     String
   user       User      @relation(fields: [userId], references: [id])
   lastReadAt DateTime?
+  clearedAt  DateTime? // G4: kullanıcı DM'i inbox'tan temizledi; mesaj KAYDEDILIR, bu tarihten öncesi gizlenir
   createdAt  DateTime  @default(now())
 
   @@unique([channelId, userId])

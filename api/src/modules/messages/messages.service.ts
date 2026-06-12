@@ -29,18 +29,35 @@ export class MessagesService {
   ) {}
 
   async findMessages(userId: string, channelId: string, before?: string, limit = 50) {
-    await this.membership.requireChannelAccess(userId, channelId);
+    const channel = await this.membership.requireChannelAccess(userId, channelId);
 
     const take = Math.min(limit, 50);
-    const cursorCondition = before
-      ? { createdAt: { lt: (await this.prisma.message.findUnique({ where: { id: before } }))?.createdAt } }
-      : {};
+
+    // createdAt filtresi: G4 clearedAt (gt) + cursor before (lt) TEK objede birleşir.
+    // (Ayrı spread'lerde ikisi de `createdAt` anahtarını yazıp üzerine binerdi → load-more'da
+    //  clearedAt filtresi düşer, temizlenmiş geçmiş geri görünürdü. B1 düzeltmesi.)
+    const createdAtFilter: { gt?: Date; lt?: Date } = {};
+
+    if (before) {
+      const beforeMsg = await this.prisma.message.findUnique({ where: { id: before } });
+      if (beforeMsg) createdAtFilter.lt = beforeMsg.createdAt;
+    }
+
+    // G4: DM kanalında çağıranın clearedAt'inden SONRASINI döndür (kendi temizlediği geçmiş kapanır).
+    // Kayıt DB'de durur; karşı tarafın görünümü tam. Guild kanallarında clearedAt yoktur.
+    if (!channel.guildId) {
+      const member = await this.prisma.channelMember.findUnique({
+        where: { channelId_userId: { channelId, userId } },
+        select: { clearedAt: true },
+      });
+      if (member?.clearedAt) createdAtFilter.gt = member.clearedAt;
+    }
 
     const messages = await this.prisma.message.findMany({
       where: {
         channelId,
         deletedAt: null,
-        ...cursorCondition,
+        ...(Object.keys(createdAtFilter).length ? { createdAt: createdAtFilter } : {}),
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },

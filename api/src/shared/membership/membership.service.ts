@@ -38,6 +38,7 @@ export class MembershipService {
    * Kanal var mı + kullanıcı erişebilir mi.
    *  - Guild kanalı: guild üyeliği kontrolü (eski davranış korundu)
    *  - DM/GROUP_DM kanalı: ChannelMember kaydı kontrolü (R7 — Sprint 3'te kapanan güvenlik açığı)
+   *  - ageGated kanal: isMinor kullanıcı → 403 AGE_RESTRICTED (Sprint 4A §7 — savunma derinliği)
    */
   async requireChannelAccess(userId: string, channelId: string) {
     const channel = await this.prisma.channel.findUnique({
@@ -45,6 +46,18 @@ export class MembershipService {
     });
     if (!channel) {
       throw new NotFoundException({ message: 'Kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
+    }
+
+    // Yaş-kapılı guard (Sprint 4A §7): ageGated=true ise minör erişemez.
+    // ageGated kanal oluşturma yüzeyi Sprint 7'de gelir; bu guard savunma derinliği — set edilirse çalışır.
+    if (channel.ageGated) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { isMinor: true },
+      });
+      if (user?.isMinor) {
+        throw new ForbiddenException({ message: 'Bu kanala yaşınız nedeniyle erişemezsiniz.', error: 'AGE_RESTRICTED' });
+      }
     }
 
     if (channel.guildId) {
@@ -71,6 +84,7 @@ export class MembershipService {
   /**
    * DM kanalında aktif blok kontrolü.
    * DM mesajı GÖNDERİMİNDE çağrılır: blok sonradan konuşmayı keser.
+   * G3: BLOCKED yerine JENERİK DM_NOT_ALLOWED — engellenme bilgisi sızdırılmaz.
    */
   async requireNoDmBlock(userId: string, channelId: string): Promise<void> {
     const otherMember = await this.prisma.channelMember.findFirst({
@@ -88,7 +102,7 @@ export class MembershipService {
       },
     });
     if (block) {
-      throw new ForbiddenException({ message: 'Bu kullanıcıyla mesajlaşamazsınız.', error: 'BLOCKED' });
+      throw new ForbiddenException({ message: 'Bu kullanıcıya mesaj gönderemezsiniz.', error: 'DM_NOT_ALLOWED' });
     }
   }
 }

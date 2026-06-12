@@ -283,16 +283,16 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > Türetildiği kararlar: PLAN "Sprint 4 Girdileri G1-G4". **4B (Report/moderasyon) ayrı contract, hukuki görüş sonrası.**
 
 ### Backend (`api/`)
-- [ ] Prisma: `ChannelMember.clearedAt DateTime?` + migration (additive). Register: `isMinor` ise `profileDiscoverable=false`; migration mevcut minörlere backfill
-- [ ] **`FriendPermissionService.canSendFriendRequest(sender, target, method)` (§3, R7)** — self/blok(jenerik)/zaten-arkadaş/bekleyen; `USER_CLICK`→ortak-ortam zorunlu + **biri minörse jenerik ret (G1)**; `CODE`→minör dahil açık
-- [ ] `POST /friends/requests` → `canSendFriendRequest(…, CODE)`; **blok artık `USER_NOT_FOUND` jenerik** (G3)
-- [ ] **`POST /friends/requests/by-user` { userId }** (YENİ, G2) → `canSendFriendRequest(…, USER_CLICK)`; jenerik retler; rate limit 20/saat
-- [ ] **`GET /users/:id/card`** (YENİ) → `UserProfileCardDto` (friendStatus + selfBlocked); erişim: ortak ortam VEYA ilişki, yoksa `404` **[R7 erişim-darlık inceleme noktası]**
-- [ ] **G3 blok-obfuscation:** `requireNoDmBlock` + dm/friends blok dalları → jenerik (`DM_NOT_ALLOWED`/`USER_NOT_FOUND`); **`BLOCKED` istemciye dönen hiçbir yolda kalmaz**
-- [ ] **G4 inbox soft-delete:** `DELETE /dm/channels/:id` → çağıranın `clearedAt=now`; `GET /dm/channels` clearedAt-sonrası-mesajsız kanalı gizler; `findMessages` çağıranın clearedAt'inden sonrasını döner; **mesaj DB'de durur**
-- [ ] DM DTO: `canMessage` + `selfBlocked` hesapla (selfBlocked = yalnız ben→o; "o→ben" ASLA dönmez)
-- [ ] **Yaş-kapılı guard:** `requireChannelAccess` — `ageGated && isMinor → 403 AGE_RESTRICTED`
-- [ ] Yeni hata kodu `AGE_RESTRICTED`; Swagger güncel; WS `friend.request` tıkla-ekle isteğinde de yayılır
+- [x] Prisma: `ChannelMember.clearedAt DateTime?` + migration (additive). Register: `isMinor` ise `profileDiscoverable=false`; migration mevcut minörlere backfill
+- [x] **`FriendPermissionService.canSendFriendRequest(sender, target, method)` (§3, R7)** — self/blok(jenerik)/zaten-arkadaş/bekleyen; `USER_CLICK`→ortak-ortam zorunlu + **biri minörse jenerik ret (G1)**; `CODE`→minör dahil açık
+- [x] `POST /friends/requests` → `canSendFriendRequest(…, CODE)`; **blok artık `USER_NOT_FOUND` jenerik** (G3)
+- [x] **`POST /friends/requests/by-user` { userId }** (YENİ, G2) → `canSendFriendRequest(…, USER_CLICK)`; jenerik retler; rate limit 20/saat
+- [x] **`GET /users/:id/card`** (YENİ) → `UserProfileCardDto` (friendStatus + selfBlocked); erişim: ortak ortam VEYA ilişki, yoksa `404` **[R7 erişim-darlık inceleme noktası]**
+- [x] **G3 blok-obfuscation:** `requireNoDmBlock` + dm/friends blok dalları → jenerik (`DM_NOT_ALLOWED`/`USER_NOT_FOUND`); **`BLOCKED` istemciye dönen hiçbir yolda kalmaz**
+- [x] **G4 inbox soft-delete:** `DELETE /dm/channels/:id` → çağıranın `clearedAt=now`; `GET /dm/channels` clearedAt-sonrası-mesajsız kanalı gizler; `findMessages` çağıranın clearedAt'inden sonrasını döner; **mesaj DB'de durur**
+- [x] DM DTO: `canMessage` + `selfBlocked` hesapla (selfBlocked = yalnız ben→o; "o→ben" ASLA dönmez)
+- [x] **Yaş-kapılı guard:** `requireChannelAccess` — `ageGated && isMinor → 403 AGE_RESTRICTED`
+- [x] Yeni hata kodu `AGE_RESTRICTED`; Swagger güncel; WS `friend.request` tıkla-ekle isteğinde de yayılır
 
 ### Frontend (`web/`)
 - [x] **Kullanıcı detay kartı (G2):** mesaj yazarı ad/avatar tıkla → popover (`GET /users/:id/card`); `+user` → `by-user` istek, ret **jenerik toast** (sebep gösterme); buton minöre göre **gizlenmez**; rumuz → "tam profil" minimal/stub
@@ -301,9 +301,11 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Yeni metin/hata kodları `tr.json`; `--kv-*` token
 
 ### Sprint 4A DoD (contract §11)
-- [ ] `canSendFriendRequest` matrisi birebir; **minör statüsü hiçbir yanıt/event/UI'da sızmıyor** (jenerik kodlar, buton gizlenmiyor)
-- [ ] Tıkla-ekle çalışır; G3 engel-belirsizliği; G4 soft-delete (kayıt durur, karşı taraf etkilenmez, yeni mesajda döner)
-- [ ] Minör `profileDiscoverable=false`; yaş-kapılı guard
-- [ ] **Sıralama kilidi (G1):** tıkla-ekle + minör kapısı **aynı PR** — kapısız canlıya alınmaz
-- [ ] **R7:** `canSendFriendRequest` + blok-obfuscation + yaş-kapılı guard incelemeden geçti
-- [ ] **Ertelenen:** uçtan-uca runtime testi (2 hesap + ortak ortam) → ortam join/davet UI gelince (PLAN açık kalem); birim test + R7 kod incelemesi bu sprint'te
+- [x] `canSendFriendRequest` matrisi birebir; **minör statüsü hiçbir yanıt/event/UI'da sızmıyor** (jenerik kodlar, buton gizlenmiyor) *(PM denetim: 18 birim test geçti)*
+- [x] Tıkla-ekle çalışır; G3 engel-belirsizliği; G4 soft-delete (kayıt durur, karşı taraf etkilenmez, yeni mesajda döner) *(PM denetim: **B1 bug bulundu→düzeltildi** — clearedAt cursor'da eziliyordu, `findMessages` createdAt gt+lt tek objede birleştirildi)*
+- [x] Minör `profileDiscoverable=false`; yaş-kapılı guard
+- [x] **Sıralama kilidi (G1):** tıkla-ekle + minör kapısı **aynı PR** — kapısız canlıya alınmaz
+- [x] **R7:** `canSendFriendRequest` + blok-obfuscation + yaş-kapılı guard incelemeden geçti *(PM+kullanıcı 2026-06-12: sızıntı disiplini temiz, blok hiçbir yolda dönmüyor, kart erişimi dar, statü gizli; kullanıcı imzaladı)*
+- [ ] **Ertelenen:** uçtan-uca runtime testi (2 hesap + ortak ortam) → ortam join/davet UI gelince (PLAN açık kalem); birim test + R7 kod incelemesi bu sprint'te ✅
+
+> **PM denetim notu (2026-06-12):** Backend+frontend onaylandı. `nest build` temiz, 18/18 test geçti. B1 (G4 clearedAt cursor ezilmesi) PM tarafından düzeltildi. Küçük açık: ölü `auth.errors.BLOCKED` i18n anahtarı (zararsız); DECLINED ters-yön dormant satır (güvenlik etkisi yok). 4B (Report/moderasyon) → hukuki görüş sonrası.
