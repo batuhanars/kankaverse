@@ -148,7 +148,7 @@
 - [x] `canDm` matrisi birebir: blok yener, minor↔yabancı DM kapalı, arkadaş izinli, dmPolicy kapıları
 - [x] DM erişim açığı kapandı (ChannelMember olmayan erişemez, REST+WS); blok sonradan DM keser
 - [x] DM gerçek zamanlı + unread `lastReadAt`
-- [ ] **R7:** `canDm` + DM erişim kontrolü incelemesinden geçti *(backend `[R7]`-tag'li teslim; PM satır-satır imzası bekliyor — kullanıcı teyidi)*
+- [x] **R7:** `canDm` + DM erişim kontrolü incelemesinden geçti *(PM+kullanıcı satır-satır inceleme 2026-06-12: çekirdek mantık T&S-sağlam — her dalda fail-closed, blok arkadaşlıktan önce, tek choke-point REST + her DM send'de `requireNoDmBlock`, WS'de send yok = baypas vektörü yok, `deletedAt`/`isMinor` güvenli yön. Bulgular F1-F5 değerlendirildi, dispozisyonlar PLAN "Sprint 4 girdileri"ne işlendi.)*
 
 ### Sprint 3 — Revizyon R1+R2 (2026-06-12, PM onaylı kapsam; bkz. contract "Revizyon R1+R2")
 
