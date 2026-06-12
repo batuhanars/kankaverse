@@ -67,7 +67,7 @@ model User {
   twoFactorEnabled    Boolean            @default(false)
   totpSecret          String?
   deletionRequestedAt DateTime?
-  friendTag           String
+  friendCode          String          @unique
   sessions            Session[]
   memberships         GuildMember[]
   ownedGuilds         Guild[]            @relation("GuildOwner")

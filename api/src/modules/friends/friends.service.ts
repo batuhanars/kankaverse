@@ -9,8 +9,6 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { SendFriendRequestDto } from './dto/send-friend-request.dto';
 
-const HANDLE_REGEX = /^[a-zA-Z0-9_.]{3,32}#\d{4}$/;
-
 function toFriendCodeUserDto(user: { id: string; username: string; avatarUrl: string | null }) {
   return { id: user.id, username: user.username, avatarUrl: user.avatarUrl };
 }
@@ -67,20 +65,12 @@ export class FriendsService {
   }
 
   async sendFriendRequest(senderId: string, dto: SendFriendRequestDto) {
-    if (!HANDLE_REGEX.test(dto.handle)) {
-      throw new BadRequestException({ message: 'Geçersiz kullanıcı tanımlayıcısı.', error: 'INVALID_HANDLE' });
-    }
-
-    const hashIndex = dto.handle.lastIndexOf('#');
-    const username = dto.handle.slice(0, hashIndex);
-    const tag = dto.handle.slice(hashIndex + 1);
-
     const target = await this.prisma.user.findFirst({
-      where: { username, friendTag: tag, deletedAt: null },
+      where: { friendCode: dto.friendCode, deletedAt: null },
       select: { id: true, username: true, avatarUrl: true },
     });
     if (!target) {
-      throw new NotFoundException({ message: 'Bu handle ile kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+      throw new NotFoundException({ message: 'Bu kodla kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
     }
 
     if (target.id === senderId) {
