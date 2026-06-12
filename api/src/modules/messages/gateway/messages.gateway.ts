@@ -17,7 +17,7 @@ import { MembershipService } from '../../../shared/membership/membership.service
 import { RealtimeService } from '../../../shared/realtime/realtime.service';
 
 interface AuthSocket extends Socket {
-  data: { userId: string; sessionId: string };
+  data: { userId: string; sessionId: string; username?: string };
 }
 
 @WebSocketGateway({ cors: { origin: '*' } })
@@ -53,6 +53,14 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       socket.data.userId = payload.sub;
       socket.data.sessionId = payload.sessionId;
+
+      // username'i handshake'te önbelleğe al; typing broadcast'te tekrar sorguya gerek kalmaz
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { username: true },
+      });
+      socket.data.username = user?.username ?? payload.sub;
+
       socket.join(`user:${payload.sub}`);
     } catch {
       socket.emit('auth_error', { error: 'UNAUTHORIZED' });
@@ -90,6 +98,46 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() payload: { channelId: string },
   ) {
     socket.leave(`room:${payload.channelId}`);
+  }
+
+  @SubscribeMessage('typing:start')
+  async handleTypingStart(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { channelId: string },
+  ) {
+    const userId = socket.data.userId;
+    const { channelId } = payload;
+
+    try {
+      await this.membership.requireChannelAccess(userId, channelId);
+    } catch {
+      // Sessiz drop: erişim yoksa veya yaş kısıtlıysa yaymadan ack ile dön
+      return { ok: false };
+    }
+
+    const username = socket.data.username ?? userId;
+    socket.to(`room:${channelId}`).emit('typing:update', { userId, username, channelId });
+    return { ok: true };
+  }
+
+  @SubscribeMessage('typing:stop')
+  async handleTypingStop(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { channelId: string },
+  ) {
+    const userId = socket.data.userId;
+    const { channelId } = payload;
+
+    try {
+      await this.membership.requireChannelAccess(userId, channelId);
+    } catch {
+      // Sessiz drop
+      return { ok: false };
+    }
+
+    const username = socket.data.username ?? userId;
+    socket.to(`room:${channelId}`).emit('typing:clear', { userId, username, channelId });
+    return { ok: true };
   }
 
   broadcastMessage(channelId: string, messageDto: unknown) {
