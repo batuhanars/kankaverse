@@ -45,6 +45,7 @@ import {
 import { validateBirthDate, calculateIsMinor } from './utils/birthdate.util';
 import { toUserDto } from './utils/user-dto.util';
 import { encryptSecret, decryptSecret } from '../../common/utils/crypto.util';
+import { generateFriendTag } from './utils/friend-tag.util';
 
 const ARGON2_OPTIONS = { type: argon2.argon2id, memoryCost: 19456, timeCost: 2 } as const;
 const RECOVERY_CODE_COUNT = 10;
@@ -106,6 +107,7 @@ export class AuthService implements OnModuleInit {
         passwordHash,
         birthDate,
         isMinor,
+        friendTag: generateFriendTag(),
         dmPolicy: isMinor ? 'NONE' : 'FRIENDS',
         mediaPolicy: isMinor ? 'NONE' : 'FRIENDS',
         profileDiscoverable: !isMinor,

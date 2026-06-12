@@ -51,5 +51,6 @@ export default () => {
       appName: process.env.APP_NAME ?? 'Kankaverse',
     },
     purgeEnabled: process.env.PURGE_ENABLED === 'true',
+    newAccountDmLockDays: parseInt(process.env.NEW_ACCOUNT_DM_LOCK_DAYS ?? '7', 10),
   };
 };

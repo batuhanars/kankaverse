@@ -8,6 +8,9 @@ import { AuthModule } from './modules/auth/auth.module';
 import { GuildsModule } from './modules/guilds/guilds.module';
 import { ChannelsModule } from './modules/channels/channels.module';
 import { MessagesModule } from './modules/messages/messages.module';
+import { FriendsModule } from './modules/friends/friends.module';
+import { BlocksModule } from './modules/blocks/blocks.module';
+import { DmModule } from './modules/dm/dm.module';
 import { JobsModule } from './common/jobs/jobs.module';
 import configuration from './config/configuration';
 
@@ -21,6 +24,9 @@ import configuration from './config/configuration';
     GuildsModule,
     ChannelsModule,
     MessagesModule,
+    FriendsModule,
+    BlocksModule,
+    DmModule,
     JobsModule,
   ],
   providers: [

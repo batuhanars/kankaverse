@@ -30,6 +30,12 @@ enum MediaPolicy {
   NONE
 }
 
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
 enum GuildRole {
   OWNER
   ADMIN
@@ -58,15 +64,21 @@ model User {
   deletedAt           DateTime?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
-  twoFactorEnabled    Boolean        @default(false)
+  twoFactorEnabled    Boolean            @default(false)
   totpSecret          String?
   deletionRequestedAt DateTime?
+  friendTag           String
   sessions            Session[]
   memberships         GuildMember[]
   ownedGuilds         Guild[]            @relation("GuildOwner")
   messages            Message[]
   authTokens          AuthToken[]
   recoveryCodes       RecoveryCode[]
+  friendshipsSent     Friendship[]       @relation("FriendRequester")
+  friendshipsReceived Friendship[]       @relation("FriendAddressee")
+  blocksMade          UserBlock[]        @relation("Blocker")
+  blocksReceived      UserBlock[]        @relation("Blocked")
+  channelMemberships  ChannelMember[]
 }
 
 model AuthToken {
@@ -148,6 +160,7 @@ model Channel {
   deletedAt DateTime?
   createdAt DateTime    @default(now())
   messages  Message[]
+  members   ChannelMember[]
 
   @@index([guildId])
 }
@@ -165,4 +178,43 @@ model Message {
   updatedAt DateTime @updatedAt
 
   @@index([channelId, createdAt])
+}
+
+model Friendship {
+  id          String           @id @default(cuid())
+  requesterId String
+  requester   User             @relation("FriendRequester", fields: [requesterId], references: [id])
+  addresseeId String
+  addressee   User             @relation("FriendAddressee", fields: [addresseeId], references: [id])
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+}
+
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id])
+  blockedId String
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model ChannelMember {
+  id         String    @id @default(cuid())
+  channelId  String
+  channel    Channel   @relation(fields: [channelId], references: [id])
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  lastReadAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@unique([channelId, userId])
+  @@index([userId])
 }

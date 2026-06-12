@@ -6,6 +6,7 @@ import {
   MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
 } from '@nestjs/websockets';
 import { HttpException } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
@@ -13,13 +14,14 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { MembershipService } from '../../../shared/membership/membership.service';
+import { RealtimeService } from '../../../shared/realtime/realtime.service';
 
 interface AuthSocket extends Socket {
   data: { userId: string; sessionId: string };
 }
 
 @WebSocketGateway({ cors: { origin: '*' } })
-export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit {
   @WebSocketServer()
   server: Server;
 
@@ -28,7 +30,12 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private config: ConfigService,
     private prisma: PrismaService,
     private membership: MembershipService,
+    private realtime: RealtimeService,
   ) {}
+
+  afterInit(server: Server) {
+    this.realtime.setServer(server);
+  }
 
   async handleConnection(socket: AuthSocket) {
     try {
@@ -46,6 +53,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       socket.data.userId = payload.sub;
       socket.data.sessionId = payload.sessionId;
+      socket.join(`user:${payload.sub}`);
     } catch {
       socket.emit('auth_error', { error: 'UNAUTHORIZED' });
       socket.disconnect(true);

@@ -53,7 +53,12 @@ export class MessagesService {
   }
 
   async create(userId: string, channelId: string, dto: CreateMessageDto) {
-    await this.membership.requireChannelAccess(userId, channelId);
+    const channel = await this.membership.requireChannelAccess(userId, channelId);
+
+    // DM kanalında blok kontrolü: blok sonradan konuşmayı keser
+    if (!channel.guildId) {
+      await this.membership.requireNoDmBlock(userId, channelId);
+    }
 
     const message = await this.prisma.message.create({
       data: {
