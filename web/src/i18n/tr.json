@@ -41,10 +41,10 @@
       "SESSION_NOT_FOUND": "Oturum bulunamadı.",
       "ACCOUNT_DELETION_PENDING": "Hesabın silinmek üzere.",
       "USER_NOT_FOUND": "Kullanıcı bulunamadı.",
-      "CANNOT_FRIEND_SELF": "Kendinize arkadaşlık isteği gönderemezsiniz.",
+      "CANNOT_FRIEND_SELF": "Kendinize kankalık isteği gönderemezsiniz.",
       "CANNOT_BLOCK_SELF": "Kendinizi engelleyemezsiniz.",
       "CANNOT_DM_SELF": "Kendinize mesaj gönderemezsiniz.",
-      "ALREADY_FRIENDS": "Bu kullanıcıyla zaten arkadaşsınız.",
+      "ALREADY_FRIENDS": "Bu kullanıcıyla zaten kankasınız.",
       "REQUEST_EXISTS": "Bu kullanıcıya zaten istek gönderilmiş.",
       "BLOCKED": "Bu kullanıcıyla mesajlaşamazsınız.",
       "DM_NOT_ALLOWED": "Bu kullanıcı mesajlara kapalı."
@@ -207,13 +207,26 @@
     "join": "Sunucuya Katıl",
     "createTitle": "Yeni Sunucu",
     "joinTitle": "Sunucuya Katıl",
-    "nameLabel": "Sunucu Adı",
+    "nameLabel": "SUNUCU ADI",
     "namePlaceholder": "Harika Sunucum",
-    "idLabel": "Sunucu ID",
-    "idPlaceholder": "Sunucu ID'sini girin",
+    "idLabel": "SUNUCU ID",
+    "idPlaceholder": "Sunucu ID'sini gir",
     "createButton": "Oluştur",
     "joinButton": "Katıl",
     "emptyState": "Bir sunucu seç veya oluştur",
+    "modal": {
+      "chooseTitle": "Sunucunu Oluştur",
+      "chooseDesc": "Sunucun sesin ve oyun alanın. Kendininkini oluştur ya da var olan birine katıl.",
+      "createOption": "Kendin Oluştur",
+      "createOptionDesc": "Sıfırdan bir sunucu kur, dilediğin gibi yapılandır.",
+      "joinOption": "Bir Sunucuya Katıl",
+      "joinOptionDesc": "Zaten bir davetin mi var? Sunucuya katıl.",
+      "back": "Geri",
+      "createTitle": "Sunucunu Özelleştir",
+      "createDesc": "Sunucuna bir isim ver. İstediğin zaman değiştirebilirsin.",
+      "joinTitle": "Sunucuya Katıl",
+      "joinDesc": "Sunucu ID'sini girerek katılabilirsin."
+    },
     "errors": {
       "GUILD_NOT_FOUND": "Sunucu bulunamadı.",
       "ALREADY_MEMBER": "Bu sunucuda zaten üyesiniz."
@@ -237,36 +250,44 @@
     "offline": "Çevrimdışı"
   },
   "friends": {
-    "title": "Arkadaşlar",
-    "myCode": "Arkadaş Kodum",
+    "title": "Kankalar",
+    "myCode": "Senin rumuzun",
     "copy": "Kopyala",
     "copied": "Kopyalandı!",
-    "codePlaceholder": "Arkadaş kodu gir (ör: K7M2QX9F)",
-    "addButton": "İstek Gönder",
-    "requestSent": "Arkadaşlık isteği gönderildi.",
-    "tabAll": "Tüm",
+    "codePlaceholder": "rumuz#etiket gir (ör: nadir#4511)",
+    "addButton": "Kankalık İsteği Gönder",
+    "addTitle": "Kanka Ekle",
+    "addDescription": "Kankanın rumuz#etiketini girerek istek gönder.",
+    "tabAdd": "Kanka Ekle",
+    "requestSent": "Kankalık isteği gönderildi.",
+    "tabAll": "Tümü",
     "tabPending": "Bekleyen",
-    "tabBlocked": "Engellenenler",
-    "noFriends": "Henüz arkadaşın yok. Arkadaş kodu ile istek gönder!",
+    "tabBlocked": "Engellenmiş",
+    "allCount": "Tüm kankalar — {count}",
+    "searchFriends": "Kanka ara",
+    "statusOffline": "Çevrim Dışı",
+    "noFriends": "Henüz kankan yok.",
     "noPending": "Bekleyen istek yok.",
     "noBlocked": "Engellenen kullanıcı yok.",
     "incoming": "Gelen İstekler",
-    "outgoing": "Giden İstekler",
+    "incomingRequestLabel": "Gelen kankalık isteği",
+    "outgoing": "Gönderilen İstekler",
     "pending": "Beklemede",
     "accept": "Kabul Et",
     "decline": "Reddet",
     "dm": "Mesaj Gönder",
-    "remove": "Arkadaşlıktan Çıkar",
+    "remove": "Kankalıktan Çıkar",
     "block": "Engelle",
     "unblock": "Engeli Kaldır",
-    "confirmRemove": "Bu kullanıcıyı arkadaş listenizden çıkarmak istediğinizden emin misiniz?",
-    "confirmBlock": "Bu kullanıcıyı engellemek istediğinizden emin misiniz? Arkadaşlığınız silinir ve mesajlaşma durur.",
+    "confirmRemove": "Bu kullanıcıyı kanka listemenizden çıkarmak istediğinizden emin misiniz?",
+    "confirmBlock": "Bu kullanıcıyı engellemek istediğinizden emin misiniz? Kankalığınız silinir ve mesajlaşma durur.",
     "errors": {
       "USER_NOT_FOUND": "Kullanıcı bulunamadı.",
-      "CANNOT_FRIEND_SELF": "Kendinize arkadaşlık isteği gönderemezsiniz.",
-      "ALREADY_FRIENDS": "Bu kullanıcıyla zaten arkadaşsınız.",
+      "CANNOT_FRIEND_SELF": "Kendinize kankalık isteği gönderemezsiniz.",
+      "ALREADY_FRIENDS": "Bu kullanıcıyla zaten kankasınız.",
       "REQUEST_EXISTS": "Bu kullanıcıya zaten istek gönderilmiş.",
-      "BLOCKED": "Bu kullanıcıyla arkadaş olamazsınız."
+      "BLOCKED": "Bu kullanıcıyla kanka olamazsınız.",
+      "INVALID_HANDLE": "Geçersiz format. rumuz#etiket şeklinde gir (ör: nadir#4511)."
     }
   },
   "dm": {
@@ -274,6 +295,18 @@
     "noDms": "Henüz mesaj yok.",
     "empty": "Henüz mesaj yok. İlk mesajı sen gönder!",
     "placeholder": "@{user} kullanıcısına mesaj yaz"
+  },
+  "sidebar": {
+    "searchPlaceholder": "Sohbet bul ya da başlat",
+    "messageRequests": "Mesaj İstekleri"
+  },
+  "search": {
+    "title": "Sunucuları, kanalları veya DM'leri ara",
+    "placeholder": "Nereye gitmek istersin?",
+    "sectionGuilds": "Sunucular",
+    "sectionDms": "Direkt Mesajlar",
+    "empty": "Sonuç bulunamadı.",
+    "tip": "TÜYO: Sunucular için sunucu adını, DM için @ ile başlayın."
   },
   "common": {
     "cancel": "İptal",
@@ -284,7 +317,15 @@
     "error": "Bir hata oluştu.",
     "retry": "Tekrar dene",
     "settings": "Ayarlar",
-    "search": "Ara"
+    "search": "Ara", 
+    "logout": "Çıkış Yap"
+  },
+  "presence": {
+    "online": "çevrimiçi"
+  },
+  "userCard": {
+    "micMuted": "Mikrofon kapalı",
+    "headphones": "Kulaklık"
   },
   "time": {
     "today": "Bugün",

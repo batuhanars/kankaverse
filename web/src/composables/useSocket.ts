@@ -1,8 +1,9 @@
 import { ref, onUnmounted } from 'vue'
 import { io, type Socket } from 'socket.io-client'
 import { useMessagesStore } from '@/stores/messages'
+import { useFriendsStore } from '@/stores/friends'
 import { getAccessToken } from '@/api/axios'
-import type { MessageDto } from '@/types'
+import type { MessageDto, FriendRequestDto, FriendDto } from '@/types'
 
 let socket: Socket | null = null
 let refCount = 0
@@ -12,6 +13,7 @@ let activeChannelId: string | null = null
 export function useSocket() {
   const connected = ref(false)
   const messagesStore = useMessagesStore()
+  const friendsStore = useFriendsStore()
 
   function _joinRoom(channelId: string) {
     socket?.emit('channel:join', { channelId }, (ack: { ok: boolean; error?: string }) => {
@@ -59,6 +61,18 @@ export function useSocket() {
 
     socket.on('message.created', (message: MessageDto) => {
       messagesStore.appendMessage(message)
+    })
+
+    socket.on('friend.request', (request: FriendRequestDto) => {
+      friendsStore.wsAddIncomingRequest(request)
+    })
+
+    socket.on('friend.accept', (friend: FriendDto) => {
+      friendsStore.wsHandleAccepted(friend)
+    })
+
+    socket.on('friend.remove', (data: { userId: string }) => {
+      friendsStore.wsHandleRemoved(data.userId)
     })
 
     refCount++

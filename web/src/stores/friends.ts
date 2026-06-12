@@ -23,8 +23,8 @@ export const useFriendsStore = defineStore('friends', () => {
     blocked.value = res.data
   }
 
-  async function sendRequest(friendCode: string) {
-    await friendsApi.sendRequest(friendCode)
+  async function sendRequest(handle: string) {
+    await friendsApi.sendRequest(handle)
     await Promise.all([fetchRequests(), fetchFriends()])
   }
 
@@ -55,6 +55,25 @@ export const useFriendsStore = defineStore('friends', () => {
     blocked.value = blocked.value.filter((b) => b.user.id !== userId)
   }
 
+  // WS event handler'ları (R2) — useSocket tarafından çağrılır
+  function wsAddIncomingRequest(request: FriendRequestDto) {
+    if (!requests.value.find((r) => r.id === request.id)) {
+      requests.value.push(request)
+    }
+  }
+
+  function wsHandleAccepted(friend: FriendDto) {
+    requests.value = requests.value.filter((r) => r.user.id !== friend.user.id)
+    if (!friends.value.find((f) => f.friendshipId === friend.friendshipId)) {
+      friends.value.push(friend)
+    }
+  }
+
+  function wsHandleRemoved(userId: string) {
+    friends.value = friends.value.filter((f) => f.user.id !== userId)
+    requests.value = requests.value.filter((r) => r.user.id !== userId)
+  }
+
   return {
     friends,
     requests,
@@ -68,5 +87,8 @@ export const useFriendsStore = defineStore('friends', () => {
     removeFriend,
     blockUser,
     unblockUser,
+    wsAddIncomingRequest,
+    wsHandleAccepted,
+    wsHandleRemoved,
   }
 })

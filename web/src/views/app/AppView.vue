@@ -1,33 +1,37 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useGuildsStore } from '@/stores/guilds'
+import { useDmStore } from '@/stores/dm'
 import { useSocket } from '@/composables/useSocket'
 import ServerRail from '@/components/layout/ServerRail.vue'
 import ChannelPanel from '@/components/layout/ChannelPanel.vue'
 import TopBar from '@/components/layout/TopBar.vue'
 import MemberPanel from '@/components/layout/MemberPanel.vue'
+import UserCard from '@/components/layout/UserCard.vue'
 import MessageArea from './components/MessageArea.vue'
-import CreateGuildModal from './components/CreateGuildModal.vue'
-import JoinGuildModal from './components/JoinGuildModal.vue'
+import ServerModal from './components/ServerModal.vue'
 import EmailVerificationBanner from '@/components/shared/EmailVerificationBanner.vue'
-import HomeView from '@/views/home/HomeView.vue'
+import HomeSidebar from '@/views/home/components/HomeSidebar.vue'
+import FriendsPanel from '@/views/home/components/FriendsPanel.vue'
+import DmConversation from '@/views/home/components/DmConversation.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const guildsStore = useGuildsStore()
+const dmStore = useDmStore()
 const { connect, disconnect } = useSocket()
 
 const showMemberPanel = ref(true)
-const showCreateGuild = ref(false)
-const showJoinGuild = ref(false)
+const showServerModal = ref(false)
+const homeView = ref<'friends' | 'message-requests' | 'dm'>('friends')
 
 onMounted(async () => {
   const token = sessionStorage.getItem('kv_access_token')
   if (token) connect()
   await guildsStore.fetchGuilds()
-
+  dmStore.fetchChannels()
   window.addEventListener('kv:auth:expired', onAuthExpired)
 })
 
@@ -45,39 +49,84 @@ async function logout() {
   disconnect()
   await router.push({ name: 'login' })
 }
+
+function selectFriends() {
+  homeView.value = 'friends'
+  dmStore.setActiveChannel(null)
+}
+
+function selectMessageRequests() {
+  homeView.value = 'message-requests'
+  dmStore.setActiveChannel(null)
+}
+
+function selectDm(channelId: string) {
+  homeView.value = 'dm'
+  dmStore.setActiveChannel(channelId)
+}
+
+function openDm(channelId: string) {
+  homeView.value = 'dm'
+  dmStore.setActiveChannel(channelId)
+}
+
+const activeDmChannel = computed(() => dmStore.activeChannel())
 </script>
 
 <template>
   <div class="flex flex-col h-full overflow-hidden">
-    <!-- Doğrulama bandı — emailVerified false iken tüm genişlikte üst şerit -->
     <EmailVerificationBanner v-if="authStore.user && !authStore.user.emailVerified" />
 
     <div class="flex flex-1 overflow-hidden" style="background-color: var(--kv-bg-content);">
-    <ServerRail
-      :on-create-guild="() => (showCreateGuild = true)"
-      :on-join-guild="() => (showJoinGuild = true)"
-    />
 
-    <ChannelPanel v-if="guildsStore.activeGuildId" />
+      <!-- SOL KOLON: ServerRail + (ChannelPanel | HomeSidebar) + UserCard (tam genişlik) -->
+      <div class="flex flex-col shrink-0 h-full relative">
+        <div class="flex flex-1 overflow-hidden">
+          <ServerRail
+            :on-create-guild="() => (showServerModal = true)"
+            :on-join-guild="() => (showServerModal = true)"
+          />
+          <ChannelPanel v-if="guildsStore.activeGuildId" />
+          <HomeSidebar
+            v-if="!guildsStore.activeGuildId"
+            :active-view="homeView"
+            :active-dm-channel-id="dmStore.activeDmChannelId"
+            @select-friends="selectFriends"
+            @select-message-requests="selectMessageRequests"
+            @select-dm="selectDm"
+          />
+        </div>
+        <!-- UserCard: ServerRail + sidebar genişliğini kaplar -->
+        <UserCard />
+      </div>
 
-    <!-- Home ekranı: guild seçilmemişse (DM + Arkadaşlar) -->
-    <HomeView v-if="!guildsStore.activeGuildId" />
+      <!-- ANA İÇERİK ALANI -->
+      <template v-if="guildsStore.activeGuildId">
+        <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
+          <TopBar
+            :show-member-panel="showMemberPanel"
+            @toggle-members="showMemberPanel = !showMemberPanel"
+          />
+          <MessageArea />
+        </div>
+        <MemberPanel v-if="showMemberPanel" class="hidden xl:flex" />
+      </template>
 
-    <!-- Kanal seçilmişse -->
-    <template v-if="guildsStore.activeGuildId">
-      <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <TopBar
-          :show-member-panel="showMemberPanel"
-          @toggle-members="showMemberPanel = !showMemberPanel"
+      <template v-else>
+        <FriendsPanel
+          v-if="homeView === 'friends' || homeView === 'message-requests'"
+          :initial-tab="homeView === 'message-requests' ? 'pending' : undefined"
+          @open-dm="openDm"
           @logout="logout"
         />
-        <MessageArea />
-      </div>
-      <MemberPanel v-if="showMemberPanel" class="hidden xl:flex" />
-    </template>
+        <DmConversation
+          v-else-if="homeView === 'dm' && activeDmChannel"
+          :channel-id="activeDmChannel.id"
+          :other-user="activeDmChannel.otherUser"
+        />
+      </template>
     </div>
   </div>
 
-  <CreateGuildModal v-if="showCreateGuild" @close="showCreateGuild = false" />
-  <JoinGuildModal v-if="showJoinGuild" @close="showJoinGuild = false" />
+  <ServerModal v-if="showServerModal" @close="showServerModal = false" />
 </template>

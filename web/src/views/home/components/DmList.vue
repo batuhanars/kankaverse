@@ -14,7 +14,7 @@ function truncate(text: string, max = 40) {
 </script>
 
 <template>
-  <div class="flex-1 overflow-y-auto px-2 pt-3">
+  <div class="flex-1 overflow-y-auto px-2 pt-4 pb-20">
     <p class="px-2 mb-1 text-[11px] font-semibold uppercase tracking-wider" style="color: var(--kv-text-muted);">
       {{ t('dm.sectionHeader') }}
     </p>

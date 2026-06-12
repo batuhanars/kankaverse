@@ -44,7 +44,7 @@ export interface UserDto {
   createdAt: string
   emailVerified: boolean
   twoFactorEnabled: boolean // Sprint 2B
-  friendCode: string // Sprint 3
+  friendTag: string // Sprint 3 R1
 }
 
 // Sprint 3 §5 — sosyal katman DTO'ları

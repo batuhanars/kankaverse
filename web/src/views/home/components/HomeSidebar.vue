@@ -1,30 +1,45 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useDmStore } from '@/stores/dm'
 import DmList from './DmList.vue'
+import GlobalSearch from '@/components/shared/GlobalSearch.vue'
 
-defineProps<{ activeView: 'friends' | 'dm'; activeDmChannelId: string | null }>()
-const emit = defineEmits<{ selectFriends: []; selectDm: [channelId: string] }>()
+defineProps<{ activeView: 'friends' | 'message-requests' | 'dm'; activeDmChannelId: string | null }>()
+const emit = defineEmits<{
+  selectFriends: []
+  selectMessageRequests: []
+  selectDm: [channelId: string]
+}>()
 
 const { t } = useI18n()
-const dmStore = useDmStore()
-
-onMounted(() => dmStore.fetchChannels())
+const showSearch = ref(false)
 </script>
 
 <template>
   <aside
-    class="w-[280px] flex flex-col shrink-0 border-r"
+    class="w-[264px] h-full flex flex-col shrink-0 border-r"
     style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle);"
   >
-    <!-- Arkadaşlar nav düğmesi -->
-    <div class="p-3 border-b shrink-0" style="border-color: var(--kv-border-subtle);">
+    <!-- Arama butonu — ortalanmış metin -->
+    <div class="border-b px-3 pt-4 pb-2 shrink-0" style="border-color: var(--kv-border-subtle);">
       <button
-        class="w-full flex items-center gap-3 px-3 py-2 rounded-[var(--kv-radius-md)] text-[14px] font-medium transition-colors cursor-pointer"
-        :style="activeView === 'friends'
-          ? 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);'
-          : 'color: var(--kv-text-secondary);'"
+        class="flex w-full items-center justify-center px-3 py-2 text-[13px] rounded-[var(--kv-radius-sm)] cursor-pointer"
+        style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+        @click="showSearch = true"
+      >
+        {{ t('sidebar.searchPlaceholder') }}
+      </button>
+    </div>
+
+    <!-- Nav öğeleri -->
+    <div class="px-2 pt-3 pb-2 shrink-0 space-y-1 border-b" style="border-color: var(--kv-border-subtle);">
+      <!-- Arkadaşlar -->
+      <button
+        class="w-full flex items-center gap-3 px-3 py-3 rounded-[var(--kv-radius-md)] text-[14px] font-medium transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+        :class="activeView === 'friends'
+          ? 'text-[var(--kv-text-primary)]'
+          : 'text-[var(--kv-text-secondary)] hover:text-[var(--kv-text-primary)]'"
+        :style="activeView === 'friends' ? 'background-color: var(--kv-accent-subtle);' : ''"
         @click="emit('selectFriends')"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
@@ -35,6 +50,22 @@ onMounted(() => dmStore.fetchChannels())
         </svg>
         {{ t('friends.title') }}
       </button>
+
+      <!-- Mesaj İstekleri -->
+      <button
+        class="w-full flex items-center gap-3 px-3 py-3 rounded-[var(--kv-radius-md)] text-[14px] font-medium transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+        :class="activeView === 'message-requests'
+          ? 'text-[var(--kv-text-primary)]'
+          : 'text-[var(--kv-text-secondary)] hover:text-[var(--kv-text-primary)]'"
+        :style="activeView === 'message-requests' ? 'background-color: var(--kv-accent-subtle);' : ''"
+        @click="emit('selectMessageRequests')"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+          <polyline points="22,6 12,13 2,6"/>
+        </svg>
+        {{ t('sidebar.messageRequests') }}
+      </button>
     </div>
 
     <!-- DM listesi -->
@@ -43,4 +74,11 @@ onMounted(() => dmStore.fetchChannels())
       @select="(id) => emit('selectDm', id)"
     />
   </aside>
+
+  <!-- Arama modalı -->
+  <GlobalSearch
+    v-if="showSearch"
+    @close="showSearch = false"
+    @select-dm="(id) => { showSearch = false; emit('selectDm', id) }"
+  />
 </template>
