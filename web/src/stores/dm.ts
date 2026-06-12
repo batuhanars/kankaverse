@@ -31,6 +31,11 @@ export const useDmStore = defineStore('dm', () => {
     if (ch) ch.unread = false
   }
 
+  function removeChannel(channelId: string) {
+    channels.value = channels.value.filter((c) => c.id !== channelId)
+    if (activeDmChannelId.value === channelId) activeDmChannelId.value = null
+  }
+
   function setActiveChannel(channelId: string | null) {
     activeDmChannelId.value = channelId
   }
@@ -45,6 +50,7 @@ export const useDmStore = defineStore('dm', () => {
     fetchChannels,
     openChannel,
     markRead,
+    removeChannel,
     setActiveChannel,
     activeChannel,
   }

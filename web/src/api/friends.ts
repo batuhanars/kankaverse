@@ -6,6 +6,8 @@ export const friendsApi = {
   getRequests: () => http.get<FriendRequestDto[]>('/friends/requests'),
   sendRequest: (friendCode: string) =>
     http.post<FriendRequestDto | FriendDto>('/friends/requests', { friendCode }),
+  sendRequestByUser: (userId: string) =>
+    http.post<FriendRequestDto | FriendDto>('/friends/requests/by-user', { userId }),
   acceptRequest: (requestId: string) =>
     http.post<FriendDto>(`/friends/requests/${requestId}/accept`),
   declineRequest: (requestId: string) =>

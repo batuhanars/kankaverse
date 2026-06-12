@@ -77,6 +77,17 @@ export interface DmChannelDto {
   otherUser: FriendCodeUserDto
   lastMessage: MessageDto | null
   unread: boolean
+  canMessage: boolean
+  selfBlocked: boolean
+}
+
+// Sprint 4A §3 — kullanıcı profil kartı DTO
+export interface UserProfileCardDto {
+  id: string
+  username: string
+  avatarUrl: string | null
+  friendStatus: 'none' | 'friends' | 'pending_in' | 'pending_out' | 'self'
+  selfBlocked: boolean
 }
 
 export interface SessionDto {

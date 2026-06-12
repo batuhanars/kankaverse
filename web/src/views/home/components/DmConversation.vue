@@ -4,25 +4,35 @@ import { useI18n } from 'vue-i18n'
 import { useMessagesStore } from '@/stores/messages'
 import { useDmStore } from '@/stores/dm'
 import { useAuthStore } from '@/stores/auth'
+import { useFriendsStore } from '@/stores/friends'
 import { useSocket } from '@/composables/useSocket'
 import { messagesApi } from '@/api/messages'
+import { dmApi } from '@/api/dm'
+import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import type { FriendCodeUserDto, MessageDto } from '@/types'
 
 const props = defineProps<{
   channelId: string
   otherUser: FriendCodeUserDto
+  canMessage: boolean
+  selfBlocked: boolean
 }>()
+const emit = defineEmits<{ cleared: [] }>()
 
 const { t } = useI18n()
 const messagesStore = useMessagesStore()
 const dmStore = useDmStore()
 const authStore = useAuthStore()
+const friendsStore = useFriendsStore()
 const { joinChannel, leaveChannel } = useSocket()
 
 const content = ref('')
 const sending = ref(false)
 const listEl = ref<HTMLElement | null>(null)
 const realtimeError = ref(false)
+const showClearConfirm = ref(false)
+const clearing = ref(false)
+const unblocking = ref(false)
 
 const messages = computed(() => messagesStore.messagesForChannel(props.channelId))
 const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channelId] ?? false)
@@ -56,7 +66,7 @@ async function loadMore() {
 }
 
 async function send() {
-  if (!content.value.trim() || sending.value) return
+  if (!content.value.trim() || sending.value || !props.canMessage) return
   sending.value = true
   const text = content.value.trim()
   content.value = ''
@@ -84,6 +94,28 @@ function isMine(msg: MessageDto): boolean {
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
 }
+
+async function clearConversation() {
+  clearing.value = true
+  try {
+    await dmApi.clearChannel(props.channelId)
+    dmStore.removeChannel(props.channelId)
+    emit('cleared')
+  } finally {
+    clearing.value = false
+    showClearConfirm.value = false
+  }
+}
+
+async function unblockUser() {
+  unblocking.value = true
+  try {
+    await friendsStore.unblockUser(props.otherUser.id)
+    await dmStore.fetchChannels()
+  } finally {
+    unblocking.value = false
+  }
+}
 </script>
 
 <template>
@@ -108,9 +140,19 @@ function formatTime(iso: string): string {
         />
         <span v-else>{{ otherUser.username[0].toUpperCase() }}</span>
       </div>
-      <span class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+      <span class="flex-1 text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
         {{ otherUser.username }}
       </span>
+      <!-- Sohbeti temizle -->
+      <button
+        class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+        style="color: var(--kv-text-muted);"
+        @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-text-secondary)'"
+        @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
+        @click="showClearConfirm = true"
+      >
+        {{ t('dm.clearConversation') }}
+      </button>
     </div>
 
     <!-- Gerçek zamanlı hata bandı -->
@@ -182,9 +224,30 @@ function formatTime(iso: string): string {
       </div>
     </div>
 
-    <!-- Mesaj input -->
+    <!-- Mesaj input / Engel bandı -->
     <div class="px-4 pb-4 pt-2 shrink-0">
+      <!-- canMessage=false bandı -->
       <div
+        v-if="!canMessage"
+        class="flex items-center justify-center gap-3 py-3 rounded-[var(--kv-radius-md)] text-[13px]"
+        style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+      >
+        <span v-if="selfBlocked">{{ t('dm.selfBlocked') }}</span>
+        <span v-else>{{ t('dm.cannotMessage') }}</span>
+        <button
+          v-if="selfBlocked"
+          class="text-[13px] font-medium underline cursor-pointer transition-opacity hover:opacity-80"
+          :class="unblocking ? 'opacity-60 pointer-events-none' : ''"
+          style="color: var(--kv-accent-500);"
+          @click="unblockUser"
+        >
+          {{ t('dm.unblock') }}
+        </button>
+      </div>
+
+      <!-- Normal input -->
+      <div
+        v-else
         class="flex items-end gap-2 px-4 rounded-[var(--kv-radius-md)] border"
         style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
       >
@@ -200,4 +263,14 @@ function formatTime(iso: string): string {
       </div>
     </div>
   </div>
+
+  <!-- Sohbeti temizle onayı -->
+  <ConfirmDialog
+    v-if="showClearConfirm"
+    :message="t('dm.clearConfirmMsg')"
+    :confirm-label="t('dm.clearButton')"
+    :loading="clearing"
+    @confirm="clearConversation"
+    @cancel="showClearConfirm = false"
+  />
 </template>

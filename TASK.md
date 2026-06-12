@@ -295,10 +295,10 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] Yeni hata kodu `AGE_RESTRICTED`; Swagger güncel; WS `friend.request` tıkla-ekle isteğinde de yayılır
 
 ### Frontend (`web/`)
-- [ ] **Kullanıcı detay kartı (G2):** mesaj yazarı ad/avatar tıkla → popover (`GET /users/:id/card`); `+user` → `by-user` istek, ret **jenerik toast** (sebep gösterme); buton minöre göre **gizlenmez**; rumuz → "tam profil" minimal/stub
-- [ ] **Engel UX (G3):** DM'de `canMessage=false` → textarea pasif; `selfBlocked`→"Engeli kaldır", değilse **jenerik** "mesaj gönderemezsiniz"
-- [ ] **Inbox temizle (G4):** DM satırı/başlık "Sohbeti temizle" → `ConfirmDialog` → `DELETE /dm/channels/:id`; listeden düşer, sıfırdan açılır ("sil" değil "temizle" dili)
-- [ ] Yeni metin/hata kodları `tr.json`; `--kv-*` token
+- [x] **Kullanıcı detay kartı (G2):** mesaj yazarı ad/avatar tıkla → popover (`GET /users/:id/card`); `+user` → `by-user` istek, ret **jenerik toast** (sebep gösterme); buton minöre göre **gizlenmez**; rumuz → "tam profil" minimal/stub
+- [x] **Engel UX (G3):** DM'de `canMessage=false` → textarea pasif; `selfBlocked`→"Engeli kaldır", değilse **jenerik** "mesaj gönderemezsiniz"
+- [x] **Inbox temizle (G4):** DM başlık "Sohbeti temizle" → `ConfirmDialog` → `DELETE /dm/channels/:id`; listeden düşer, sıfırdan açılır ("sil" değil "temizle" dili)
+- [x] Yeni metin/hata kodları `tr.json`; `--kv-*` token
 
 ### Sprint 4A DoD (contract §11)
 - [ ] `canSendFriendRequest` matrisi birebir; **minör statüsü hiçbir yanıt/event/UI'da sızmıyor** (jenerik kodlar, buton gizlenmiyor)

@@ -141,6 +141,9 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
           <DmConversation
             :channel-id="activeDmChannel.id"
             :other-user="activeDmChannel.otherUser"
+            :can-message="activeDmChannel.canMessage"
+            :self-blocked="activeDmChannel.selfBlocked"
+            @cleared="selectFriends"
           />
           <div class="hidden xl:flex">
             <DmProfilePanel :other-user="activeDmChannel.otherUser" />

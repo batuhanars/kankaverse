@@ -5,4 +5,5 @@ export const dmApi = {
   getChannels: () => http.get<DmChannelDto[]>('/dm/channels'),
   openChannel: (userId: string) => http.post<DmChannelDto>('/dm/channels', { userId }),
   markRead: (channelId: string) => http.post<null>(`/dm/channels/${channelId}/read`),
+  clearChannel: (channelId: string) => http.delete<null>(`/dm/channels/${channelId}`),
 }
