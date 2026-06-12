@@ -183,7 +183,8 @@ interface UserDto { /* ... mevcut ... */ friendCode: string; }
 
 - DM kanalı = room (`room:<channelId>`). `channel:join` mevcut akış; `requireChannelAccess` artık DM `ChannelMember`'ı doğrular.
 - `message.created` DM room'una yayılır (mevcut REST-yazar-WS-yayar + istemci yerel eko deseni korunur).
-- Yeni event YOK (arkadaş isteği/DM bildirimleri için real-time push Sprint 6 presence/bildirim kapsamı; şimdilik liste yenilemeyle).
+- ~~Yeni event YOK (arkadaş isteği/DM bildirimleri Sprint 6 kapsamı; liste yenilemeyle)~~ → **Revizyon R2 geçersiz kıldı:**
+  arkadaş isteği/kabul/silme anlık `user:<id>` odasıyla bu sprint'te (bkz. Revizyon R1+R2 §R2).
 
 ---
 
@@ -230,3 +231,75 @@ interface UserDto { /* ... mevcut ... */ friendCode: string; }
 
 - **Yeni runtime bağımlılığı YOK** (friendCode = crypto, zaten var). Migration additive + `friendCode` backfill.
 - Backend/frontend §3,5,6 sözleşmesinden paralel. `canDm` matrisi (§3) ikisinin de referansı (frontend UX gating, backend otorite).
+
+---
+
+## Revizyon R1+R2 (2026-06-12, PM onaylı — proje sahibi kararı)
+
+> Sprint 3 çekirdeği merge edildi ve test edildi (görünür akış: arkadaş ekle/sil/engelle/DM çalışıyor; R7 denetimi
+> geçti). Bu revizyon iki **onaylı kapsam değişikliği** içerir — scope creep değil, proje sahibi talebi. Dev'ler
+> bu bölümü §2/§5/§6/§8/§10/§11'in **üstüne yazan delta** kabul eder; çelişkide R1+R2 geçerli.
+
+### R1→R3 — Arkadaş kimliği: A modeline GERİ DÖNÜLDÜ (`rumuz#etiket` İPTAL)
+
+> **Durum (2026-06-12, `/kurul` + proje sahibi sonrası):** R1'de `friendCode` → `rumuz#etiket` (model B) yapılmıştı;
+> **iptal edildi, orijinal A modeline dönüldü.** İlke: **arkadaş-ekleme anahtarı, herkese görünen alandan AYRI ve GİZLİ
+> olmalı.** B bunu ihlal ediyordu (username hem görünür hem anahtarın parçası → hedefli harvest yüzeyi).
+>
+> **Nihai model (A):** `username` herkese görünür (rumuz/kimlik) **ama arkadaş anahtarı DEĞİL**. Arkadaş eklemek için
+> **tahmin edilemez `friendCode`** (gizli, 40-bit) gerekir; yalnız kişi paylaşınca açığa çıkar (onu da arkadaşı bilir).
+> brief §5.1 **olduğu gibi korunur** → **Fable'a §5.1 uzlaştırması artık GEREKMİYOR** (yumuşatma yapılmadı).
+
+**Bu, B'yi geri alır; şema/DTO/endpoint/util orijinal Sprint 3 §2/§5/§6 haline döner:**
+- **§2:** `friendTag` **kaldırılır** → `friendCode String @unique` **geri** (8-char base32, register'da üret, çakışmada yenile). `username @unique` + public kalır. Migration: `friendCode` geri ekle (backfill üret) + `friendTag` drop.
+- **§5:** `SendFriendRequestDto { friendCode }` (`@Length(8,8)`). `UserDto`: `friendTag` → `friendCode` (kullanıcı kendi kodunu görüp paylaşır).
+- **§6:** `POST /friends/requests` body `{ friendCode }` → `findUnique({ where: { friendCode } })`; bulunamaz → `404 USER_NOT_FOUND`. `handle` ayrıştırma + `INVALID_HANDLE` **kaldırılır**.
+- **util:** `friend-tag.util` → `friend-code.util` (`generateFriendCode`) geri.
+
+**§9/UI deltası (web) — Discord yerleşimine hizalama:**
+
+> **Referans görüntüler repo'da:** `design-refs/discord/` + okunması ZORUNLU `design-refs/discord/INDEX.md`
+> (her görüntünün ne gösterdiği + mevcut `FriendsPanel.vue`'nun **yapısal sapmaları** maddelenmiş).
+> (Eski contract vault yolunu gösteriyordu — dev session vault'a erişemez; düzeltildi. Tema DAİMA `tokens.css`:
+> Discord'un DÜZENİNİ al, RENGİNİ alma.)
+
+Mevcut akış çalışıyor; bu **yerleşim yeniden yapılandırması** (davranış değişmez). INDEX.md'deki 6 sapmayı kapat:
+- **Üst bar (~48px, yatay):** `[👥 Arkadaşlar] ⎮ [Tümü] [Bekleyen] [Engellenmiş] …… [+ Arkadaş Ekle (yeşil)]` — başlık,
+  sekmeler ve ekle-butonu **aynı satırda**. (Mevcuttaki "başlık + kod kutusu + form" üst bloğu + ayrı sekme şeridi kaldırılır.)
+- **"Arkadaş Ekle" = sekme/mod**, inline form DEĞİL: butona tıklayınca içerik alanı ayrı sayfaya geçer → başlık + açıklama +
+  tek geniş input **arkadaş kodu** (gizli `friendCode`, 8-char, örn. `K7M2QX9F`) + "Arkadaşlık İsteği Gönder". **Kendi kodu
+  bu sayfanın altında:** "Senin kodun: `friendCode` [Kopyala]" (`useClipboard`). (R3: `rumuz#etiket` değil — gizli kod.)
+- **Liste:** üstte sayaç başlığı ("Tüm arkadaşlar — N"); satır = avatar + ad / altında durum satırı + satır-arası ayraç +
+  hover'da sağda yuvarlak ikonlar (mesaj, ⋮ → Mesaj/Arkadaşlıktan çıkar/Engelle).
+- **Sol sidebar:** üstte "Sohbet bul ya da başlat" + "Direkt Mesajlar" başlığı + DM satırları (avatar + ad + unread rozeti).
+- **Kapsam DIŞI (sapma olur):** presence noktası + "Çevrim İçi" sekmesinin gerçek filtresi → **Sprint 6** (durum satırı
+  şimdilik statik); "Şimdi Aktif" sağ kolon / "Mesaj İstekleri" / "Mağaza" nav → kapsam dışı.
+
+### R2 — Arkadaş isteği/kabul/silme ANLIK (WS) — §8 "Yeni event YOK" kararını geçersiz kılar
+
+**Sorun:** Mesajlar anlık düşüyor (REST yazar → WS yayar) ama arkadaşlık isteği/kabul **sayfa yenilenmeden görünmüyor**.
+§8 bunu Sprint 6'ya ertelemişti; proje sahibi şimdi istiyor → bu sprint'e çekildi.
+
+**Tasarım (yeni runtime bağımlılığı YOK — mevcut Socket.IO sunucusu yeniden kullanılır):**
+- **Kullanıcı-bazlı oda:** WS handshake'te socket `user:<userId>` odasına da katılır (mevcut gateway `handleConnection`).
+- **Paylaşılan yayıcı:** `SharedModule`'de ince `RealtimeService` — Socket.IO `Server` referansını tutar (gateway init'te
+  set eder), `emitToUser(userId, event, payload)` sunar. Böylece `friends`/`blocks` servisleri **messages modülünü
+  import etmeden** push yapar (circular dep yok). Emit **REST işleminden/transaction'dan SONRA** (mesaj deseninin aynısı).
+- **Eventler (sunucu → istemci):**
+  - `friend.request` → **addressee**'ye; payload `FriendRequestDto` (`direction:'incoming'`). Bekleyen liste anlık dolar.
+  - `friend.accept` → karşı tarafa; payload `FriendDto`. Açık kabulde → **requester**'a; karşılıklı otomatik kabulde →
+    özgün **requester**'a. İki taraf da arkadaş listesini günceller / bekleyenden düşürür.
+  - `friend.remove` → karşı tarafa; payload `{ userId }`. **Arkadaşlıktan çıkarma VE engelleme yan etkisi** bunu yayar
+    (engellenen tarafın UI'ı sessizce arkadaşlıktan düşürür — "engellendin" sızdırmaz, salt kaldırma görünür).
+  - Reddetme (`decline`) → **event YOK** (Discord da bildirmez; gönderene "reddedildi" sızdırma).
+- **Frontend:** `useSocket`/friends store bu eventleri dinler, bekleyen+arkadaş listelerini reaktif günceller; **manuel
+  yenileme yok**. (DM kanal listesinin yeni-mesajda anlık güncellenmesi de aynı `user:<id>` odasıyla ileride; bu sprint
+  zorunlu değil — arkadaşlık eventleri öncelik.)
+
+**§10 ekleri:** R3 sonrası `INVALID_HANDLE` **YOK** (handle iptal); `friendCode` **korunur** (orijinal §10). R2 yalnız real-time ekler.
+
+**§11 DoD ekleri (R2 + R3):**
+- [ ] **R3:** Arkadaş kimliği = gizli `friendCode` (A modeli); username public ama anahtar DEĞİL; istek kodla, bulunamaz → `USER_NOT_FOUND`.
+- [ ] **R3:** `friendTag`/`handle`/`INVALID_HANDLE` geri alındı; kullanıcı kendi `friendCode`'unu görüp kopyalar.
+- [ ] Arkadaş isteği gönder/kabul/sil **anlık** yansır (karşı taraf sayfa yenilemeden görür) — `user:<id>` odası + eventler.
+- [ ] UI yerleşimi Discord referansıyla hizalı (sekme şeridi, liste satırı hover menüsü, Arkadaş Ekle tek-input).

@@ -123,14 +123,14 @@
 > Aktif sözleşme: `contracts/SPRINT_3_CONTRACT.md`. **R7: `DmPermissionService` + DM erişim kontrolü** (T&S karar fonksiyonu) insan incelemesi. Dev checkbox işaretler, item EKLEMEZ.
 
 ### Backend (`api/`)
-- [ ] Prisma: `User.friendCode` (unique, register'da üret + backfill), `Friendship`/`FriendshipStatus`, `UserBlock`, `ChannelMember` + migration
-- [ ] **`DmPermissionService.canDm`** — §3 matrisi: blok→arkadaş→minor→**yeni hesap (§5.1.b, `NEW_ACCOUNT_DM_LOCK` config)**→dmPolicy→ortak sunucu; `verificationStatus` okuma + davranış/report/karantina no-op hook **[R7]**
-- [ ] `friendCode` util (8-char base32, çakışmada yeniden üret); register yan etkisi
-- [ ] Arkadaşlık: GET friends/requests, POST request (kodla, karşılıklı otomatik kabul), accept/decline, DELETE
-- [ ] Engelleme: GET/POST/DELETE blocks (block → arkadaşlık sil + istek iptal, transaction)
-- [ ] DM: GET/POST `/dm/channels` (canDm kapısı), POST read; `DmChannelDto` (son mesaj + unread)
-- [ ] **`MembershipService.requireChannelAccess` DM `ChannelMember` kontrolü** (güvenlik açığı kapanışı) **[R7]** + DM send blok kontrolü
-- [ ] `toUserDto`: `friendCode`; yeni hata kodları
+- [x] Prisma: `User.friendCode` (unique, register'da üret + backfill), `Friendship`/`FriendshipStatus`, `UserBlock`, `ChannelMember` + migration
+- [x] **`DmPermissionService.canDm`** — §3 matrisi: blok→arkadaş→minor→**yeni hesap (§5.1.b, `NEW_ACCOUNT_DM_LOCK` config)**→dmPolicy→ortak sunucu; `verificationStatus` okuma + davranış/report/karantina no-op hook **[R7]**
+- [x] `friendCode` util (8-char base32, çakışmada yeniden üret); register yan etkisi
+- [x] Arkadaşlık: GET friends/requests, POST request (kodla, karşılıklı otomatik kabul), accept/decline, DELETE
+- [x] Engelleme: GET/POST/DELETE blocks (block → arkadaşlık sil + istek iptal, transaction)
+- [x] DM: GET/POST `/dm/channels` (canDm kapısı), POST read; `DmChannelDto` (son mesaj + unread)
+- [x] **`MembershipService.requireChannelAccess` DM `ChannelMember` kontrolü** (güvenlik açığı kapanışı) **[R7]** + DM send blok kontrolü
+- [x] `toUserDto`: `friendCode`; yeni hata kodları
 
 ### Frontend (`web/`)
 - [ ] Home ekranı (rail hexagon → DM listesi + Arkadaşlar sekmesi); kendi kodunu göster/kopyala (`useClipboard`)
@@ -145,3 +145,54 @@
 - [ ] DM erişim açığı kapandı (ChannelMember olmayan erişemez, REST+WS); blok sonradan DM keser
 - [ ] DM gerçek zamanlı + unread `lastReadAt`
 - [ ] **R7:** `canDm` + DM erişim kontrolü incelemesinden geçti
+
+### Sprint 3 — Revizyon R1+R2 (2026-06-12, PM onaylı kapsam; bkz. contract "Revizyon R1+R2")
+
+> Çekirdek merge sonrası proje-sahibi talebi. **Scope creep DEĞİL** (PM onayı var). Dev checkbox işaretler, item EKLEMEZ.
+
+**R1 — Arkadaş kimliği `rumuz#etiket` (Backend `api/`):** ~~[x] uygulandı~~ → **R3 İLE GERİ ALINDI** (aşağı bkz.)
+
+**R3 — Arkadaş kimliği A modeline geri (Backend `api/`) — `rumuz#etiket` revert (PM onaylı, /kurul sonrası):**
+- [ ] Prisma: `User.friendTag` **drop** → `friendCode String @unique` **geri** + migration (friendCode backfill üret, friendTag kaldır)
+- [ ] `friend-tag.util` → `friend-code.util` (`generateFriendCode` 8-char base32, çakışmada yenile); register yan etkisi geri
+- [ ] `SendFriendRequestDto`: `handle` → `friendCode` (`@Length(8,8)`); servis `findUnique({ where: { friendCode } })`; bulunamaz → `USER_NOT_FOUND`; `handle` ayrıştırma + `INVALID_HANDLE` **kaldır**
+- [ ] `toUserDto`: `friendTag` → `friendCode`; Swagger + hata kodları geri
+
+**R1 — UI Discord yerleşimine hizalama (Frontend `web/`) — ÖNCE `design-refs/discord/INDEX.md` oku:**
+- [ ] **Üst bar (yatay):** başlık + sekmeler (Tümü/Bekleyen/Engellenmiş) + yeşil "Arkadaş Ekle" aynı satırda; mevcut "başlık+kod kutusu+form" üst bloğu + ayrı sekme şeridi KALDIRILIR
+- [ ] **"Arkadaş Ekle" = ayrı sekme/sayfa** (inline form değil): başlık+açıklama+tek geniş input **arkadaş kodu** (`friendCode`, 8-char)+gönder; kendi `friendCode` bu sayfanın altında [Kopyala] *(R3: rumuz#etiket değil)*
+- [ ] **Liste:** sayaç başlığı + satır (avatar + ad / altında durum satırı + ayraç + hover yuvarlak ikonlar: mesaj/çıkar/engelle)
+- [ ] **Sol sidebar:** "Sohbet bul ya da başlat" + "Direkt Mesajlar" başlığı + DM satırları (unread rozeti)
+- [ ] Kapsam DIŞI tut: presence/"Çevrim İçi" filtresi (Sprint 6), "Şimdi Aktif"/Mesaj İstekleri/Mağaza nav
+- [ ] **R3:** `UserDto` `friendCode` geri; `INVALID_HANDLE` i18n kaldır; `friendTag`/`handle` UI referansları → `friendCode`
+
+**R2 — Arkadaşlık eventleri anlık (Backend `api/`):**
+- [ ] WS gateway handshake'te `user:<userId>` odasına katıl
+- [ ] `SharedModule` `RealtimeService` (`Server` ref + `emitToUser`); gateway init'te ref set eder
+- [ ] `friends.service`: istek→`friend.request` (addressee), kabul→`friend.accept` (karşı taraf), sil→`friend.remove`; emit transaction SONRASI
+- [ ] `blocks.service`: engelleme yan etkisinde engellenen tarafa `friend.remove` (sessiz kaldırma)
+
+**R2 — Arkadaşlık eventleri anlık (Frontend `web/`):**
+- [ ] `useSocket`/friends store `friend.request`/`friend.accept`/`friend.remove` dinler → bekleyen+arkadaş listeleri reaktif; manuel yenileme yok
+
+### Sprint 3 R2+R3 DoD (contract §11 ekleri)
+- [ ] **R3:** Arkadaş kimliği = gizli `friendCode` (A); username public ama anahtar değil; `friendTag`/`handle`/`INVALID_HANDLE` geri alındı
+- [ ] Arkadaş isteği gönder/kabul/sil anlık yansır (yenileme yok)
+- [ ] UI Discord referansıyla hizalı (layout R1 korunur; yalnız Arkadaş Ekle input'u kod)
+
+---
+
+## UI Polish — Sunucu Oluştur/Katıl modalı Discord hizalaması (sprint-bağımsız, PM onaylı 2026-06-12)
+
+> Frontend-only görsel hizalama; backend değişmez. Referans + sınırlar: `design-refs/discord/INDEX.md` §B
+> (`server-create-modal.png`). Dev checkbox işaretler. **Tema daima `tokens.css` — Discord düzenini al, rengini alma.**
+
+**Frontend (`web/`):**
+- [ ] `CreateGuildModal.vue` + `JoinGuildModal.vue` → tek `ServerModal.vue` (adım: `choose | create | join`)
+- [ ] Adım `choose`: "Kendin Oluştur" + alt bölüm "Zaten davetin var mı?" → "Bir Sunucuya Katıl" (Discord düzeni)
+- [ ] Adım `create`: sunucu adı input + Oluştur + geri ok; mevcut `guildsStore.createGuild` aynen
+- [ ] Adım `join`: davet/ID input + Katıl + geri ok; mevcut `guildsStore.joinGuild` aynen (ham ID interim)
+- [ ] ServerRail "+" düğmesi yeni `ServerModal`'ı `choose` adımında açar
+
+**Kapsam DIŞI (yapma — Sprint 7/sonrası):** tematik şablonlar (backend), sunucu ikonu yükleme (upload altyapısı yok),
+gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunlara dokunma → sapma + PM'e dön.
