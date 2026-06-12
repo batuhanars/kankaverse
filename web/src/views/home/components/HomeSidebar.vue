@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DmList from './DmList.vue'
-import GlobalSearch from '@/components/shared/GlobalSearch.vue'
 
 defineProps<{ activeView: 'friends' | 'message-requests' | 'dm'; activeDmChannelId: string | null }>()
 const emit = defineEmits<{
@@ -12,25 +10,13 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const showSearch = ref(false)
 </script>
 
 <template>
   <aside
-    class="w-[264px] h-full flex flex-col shrink-0 border-r"
-    style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle);"
+    class="w-[264px] flex flex-col shrink-0 rounded-[var(--kv-radius-lg)] overflow-hidden"
+    style="background-color: var(--kv-bg-sidebar);"
   >
-    <!-- Arama butonu — ortalanmış metin -->
-    <div class="h-16 flex items-center border-b px-3 shrink-0" style="border-color: var(--kv-border-subtle);">
-      <button
-        class="flex w-full items-center justify-center px-3 py-2 text-[13px] rounded-[var(--kv-radius-sm)] cursor-pointer"
-        style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
-        @click="showSearch = true"
-      >
-        {{ t('sidebar.searchPlaceholder') }}
-      </button>
-    </div>
-
     <!-- Nav öğeleri -->
     <div class="px-2 pt-3 pb-2 shrink-0 space-y-1 border-b" style="border-color: var(--kv-border-subtle);">
       <!-- Arkadaşlar -->
@@ -68,17 +54,16 @@ const showSearch = ref(false)
       </button>
     </div>
 
+    <!-- DM bölüm başlığı -->
+    <p
+      class="px-4 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-widest shrink-0"
+      style="color: var(--kv-text-muted);"
+    >{{ t('sidebar.dmSection') }}</p>
+
     <!-- DM listesi -->
     <DmList
       :active-channel-id="activeDmChannelId"
       @select="(id) => emit('selectDm', id)"
     />
   </aside>
-
-  <!-- Arama modalı -->
-  <GlobalSearch
-    v-if="showSearch"
-    @close="showSearch = false"
-    @select-dm="(id) => { showSearch = false; emit('selectDm', id) }"
-  />
 </template>

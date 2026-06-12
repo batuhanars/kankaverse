@@ -14,8 +14,12 @@ import MessageArea from './components/MessageArea.vue'
 import ServerModal from './components/ServerModal.vue'
 import EmailVerificationBanner from '@/components/shared/EmailVerificationBanner.vue'
 import HomeSidebar from '@/views/home/components/HomeSidebar.vue'
-import FriendsPanel from '@/views/home/components/FriendsPanel.vue'
+import HomeDashboard from '@/views/home/components/HomeDashboard.vue'
+import FriendsRightPanel from '@/views/home/components/FriendsRightPanel.vue'
+import FriendAddModal from '@/views/home/components/FriendAddModal.vue'
 import DmConversation from '@/views/home/components/DmConversation.vue'
+import DmProfilePanel from '@/views/home/components/DmProfilePanel.vue'
+import HomeTopBar from '../home/components/HomeTopBar.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -25,6 +29,7 @@ const { connect, disconnect } = useSocket()
 
 const showMemberPanel = ref(true)
 const showServerModal = ref(false)
+const showAddFriendModal = ref(false)
 const homeView = ref<'friends' | 'message-requests' | 'dm'>('friends')
 
 onMounted(async () => {
@@ -74,10 +79,10 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
 </script>
 
 <template>
-  <div class="flex flex-col h-full overflow-hidden">
+  <div class="flex flex-col h-full overflow-hidden" style="background-color: var(--kv-bg-rail);">
     <EmailVerificationBanner v-if="authStore.user && !authStore.user.emailVerified" />
 
-    <div class="flex flex-1 overflow-hidden" style="background-color: var(--kv-bg-content);">
+    <div class="flex flex-1 gap-4 overflow-hidden">
 
       <!-- SOL KOLON: ServerRail + (ChannelPanel | HomeSidebar) + UserCard (tam genişlik) -->
       <div class="flex flex-col shrink-0 h-full relative">
@@ -97,9 +102,11 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
           />
         </div>
         <!-- UserCard: ServerRail + sidebar genişliğini kaplar -->
-        <UserCard />
+        <UserCard @logout="logout" />
       </div>
 
+      
+      
       <!-- ANA İÇERİK ALANI -->
       <template v-if="guildsStore.activeGuildId">
         <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -113,20 +120,37 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
       </template>
 
       <template v-else>
-        <FriendsPanel
-          v-if="homeView === 'friends' || homeView === 'message-requests'"
-          :initial-tab="homeView === 'message-requests' ? 'pending' : undefined"
-          @open-dm="openDm"
-          @logout="logout"
-        />
-        <DmConversation
-          v-else-if="homeView === 'dm' && activeDmChannel"
-          :channel-id="activeDmChannel.id"
-          :other-user="activeDmChannel.otherUser"
-        />
+        <div class="flex flex-col w-full h-full overflow-hidden">
+          <HomeTopBar v-if="!guildsStore.activeGuildId" @select-dm="selectDm" />
+        <template v-if="homeView !== 'dm'">
+         <div class="flex flex-1 min-w-0 overflow-hidden gap-4">
+           <HomeDashboard
+            @add-friend="showAddFriendModal = true"
+            @create-ortam="showServerModal = true"
+            @join-ortam="showServerModal = true"
+          />
+          <FriendsRightPanel
+            :key="homeView === 'message-requests' ? 'pending' : 'all'"
+            :initial-tab="homeView === 'message-requests' ? 'pending' : 'all'"
+            @add-friend="showAddFriendModal = true"
+            @open-dm="openDm"
+          />
+         </div>
+        </template>
+        <div v-else-if="homeView === 'dm' && activeDmChannel" class="flex flex-1 min-w-0 overflow-hidden gap-4">
+          <DmConversation
+            :channel-id="activeDmChannel.id"
+            :other-user="activeDmChannel.otherUser"
+          />
+          <div class="hidden xl:flex">
+            <DmProfilePanel :other-user="activeDmChannel.otherUser" />
+          </div>
+        </div>
+        </div>
       </template>
     </div>
   </div>
 
   <ServerModal v-if="showServerModal" @close="showServerModal = false" />
+  <FriendAddModal v-if="showAddFriendModal" @close="showAddFriendModal = false" />
 </template>

@@ -32,7 +32,7 @@
       "EMAIL_TAKEN": "Bu e-posta adresi zaten kayıtlı.",
       "INVALID_CREDENTIALS": "E-posta veya şifre hatalı.",
       "VALIDATION_FAILED": "Lütfen tüm alanları doğru doldurun.",
-      "EMAIL_NOT_VERIFIED": "Sunucu oluşturmak için e-postanı doğrulamalısın.",
+      "EMAIL_NOT_VERIFIED": "Ortam oluşturmak için e-postanı doğrulamalısın.",
       "INVALID_TOKEN": "Link geçersiz veya süresi dolmuş.",
       "EMAIL_ALREADY_VERIFIED": "E-posta adresin zaten doğrulanmış.",
       "INVALID_TWO_FACTOR_CODE": "Geçersiz doğrulama kodu.",
@@ -203,33 +203,33 @@
     "12": "Aralık"
   },
   "guild": {
-    "create": "Sunucu Oluştur",
-    "join": "Sunucuya Katıl",
-    "createTitle": "Yeni Sunucu",
-    "joinTitle": "Sunucuya Katıl",
-    "nameLabel": "SUNUCU ADI",
-    "namePlaceholder": "Harika Sunucum",
-    "idLabel": "SUNUCU ID",
-    "idPlaceholder": "Sunucu ID'sini gir",
+    "create": "Ortam Oluştur",
+    "join": "Ortama Katıl",
+    "createTitle": "Yeni Ortam",
+    "joinTitle": "Ortama Katıl",
+    "nameLabel": "ORTAM ADI",
+    "namePlaceholder": "Harika Ortamım",
+    "idLabel": "ORTAM ID",
+    "idPlaceholder": "Ortam ID'sini gir",
     "createButton": "Oluştur",
     "joinButton": "Katıl",
-    "emptyState": "Bir sunucu seç veya oluştur",
+    "emptyState": "Bir ortam seç veya oluştur",
     "modal": {
-      "chooseTitle": "Sunucunu Oluştur",
-      "chooseDesc": "Sunucun sesin ve oyun alanın. Kendininkini oluştur ya da var olan birine katıl.",
+      "chooseTitle": "Ortamını Oluştur",
+      "chooseDesc": "Ortamın sesin ve oyun alanın. Kendininkini oluştur ya da var olan birine katıl.",
       "createOption": "Kendin Oluştur",
-      "createOptionDesc": "Sıfırdan bir sunucu kur, dilediğin gibi yapılandır.",
-      "joinOption": "Bir Sunucuya Katıl",
-      "joinOptionDesc": "Zaten bir davetin mi var? Sunucuya katıl.",
+      "createOptionDesc": "Sıfırdan bir ortam kur, dilediğin gibi yapılandır.",
+      "joinOption": "Bir Ortama Katıl",
+      "joinOptionDesc": "Zaten bir davetin mi var? Ortama katıl.",
       "back": "Geri",
-      "createTitle": "Sunucunu Özelleştir",
-      "createDesc": "Sunucuna bir isim ver. İstediğin zaman değiştirebilirsin.",
-      "joinTitle": "Sunucuya Katıl",
-      "joinDesc": "Sunucu ID'sini girerek katılabilirsin."
+      "createTitle": "Ortamını Özelleştir",
+      "createDesc": "Ortamina bir isim ver. İstediğin zaman değiştirebilirsin.",
+      "joinTitle": "Ortama Katıl",
+      "joinDesc": "Ortam ID'sini girerek katılabilirsin."
     },
     "errors": {
-      "GUILD_NOT_FOUND": "Sunucu bulunamadı.",
-      "ALREADY_MEMBER": "Bu sunucuda zaten üyesiniz."
+      "GUILD_NOT_FOUND": "Ortam bulunamadı.",
+      "ALREADY_MEMBER": "Bu ortamda zaten üyesiniz."
     }
   },
   "channel": {
@@ -290,6 +290,21 @@
       "INVALID_CODE": "Geçersiz kod. 8 haneli kanka kodunu gir (ör: K7M2QX9F)."
     }
   },
+  "home": {
+    "welcome": "Hoş geldin, {username}!",
+    "welcomeSubtitle": "Bugün ne yapmak istiyorsun?",
+    "quickActions": "Hızlı Aksiyonlar",
+    "addFriend": "Kanka Ekle",
+    "addFriendDesc": "Yeni kankalar bul ve ekle",
+    "createOrtam": "Ortam Oluştur",
+    "createOrtamDesc": "Kendi topluluğunu kur",
+    "joinOrtam": "Ortama Katıl",
+    "joinOrtamDesc": "Davet koduyla katıl",
+    "myOrtamlar": "Ortamların",
+    "noOrtam": "Henüz bir ortamda değilsin.",
+    "addFriendBtn": "+ Yeni Kanka Ekle",
+    "offlineSection": "Çevrimdışı — {count}"
+  },
   "dm": {
     "sectionHeader": "MESAJLAR",
     "noDms": "Henüz mesaj yok.",
@@ -298,15 +313,21 @@
   },
   "sidebar": {
     "searchPlaceholder": "Sohbet bul ya da başlat",
-    "messageRequests": "Mesaj İstekleri"
+    "messageRequests": "Mesaj İstekleri",
+    "dmSection": "Direkt Mesajlar"
   },
   "search": {
-    "title": "Sunucuları, kanalları veya DM'leri ara",
+    "title": "Ortmları, kanalları veya DM'leri ara",
     "placeholder": "Nereye gitmek istersin?",
-    "sectionGuilds": "Sunucular",
+    "topbarPlaceholder": "Kanka veya ortam ara",
+    "sectionGuilds": "Ortamlar",
     "sectionDms": "Direkt Mesajlar",
     "empty": "Sonuç bulunamadı.",
-    "tip": "TÜYO: Sunucular için sunucu adını, DM için @ ile başlayın."
+    "tip": "TÜYO: Ortamlar için ortam adını, DM için @ ile başlayın."
+  },
+  "notifications": {
+    "title": "Bildirimler",
+    "empty": "Henüz bildirim yok."
   },
   "common": {
     "cancel": "İptal",
@@ -321,11 +342,16 @@
     "logout": "Çıkış Yap"
   },
   "presence": {
-    "online": "çevrimiçi"
+    "online": "çevrimiçi",
+    "idle": "boşta",
+    "dnd": "rahatsız etme",
+    "invisible": "görünmez"
   },
   "userCard": {
     "micMuted": "Mikrofon kapalı",
-    "headphones": "Kulaklık"
+    "headphones": "Kulaklık",
+    "status": "Durum",
+    "v2placeholder": "Ses kontrolleri (V2)"
   },
   "time": {
     "today": "Bugün",
