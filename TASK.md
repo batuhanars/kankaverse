@@ -196,3 +196,30 @@
 
 **Kapsam DIŞI (yapma — Sprint 7/sonrası):** tematik şablonlar (backend), sunucu ikonu yükleme (upload altyapısı yok),
 gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunlara dokunma → sapma + PM'e dön.
+
+---
+
+## UI Redesign — Özgün tasarım diline geçiş (frontend-only, PM onaylı 2026-06-12)
+
+> Sözleşme: `contracts/UI_REDESIGN_CONTRACT.md`. Görsel: `design-refs/{anasayfa,dm-chat,sunucu-detay}.png` (yerelde Read).
+> **SIFIR backend. §3 "şimdi yapma" haritasındaki gelecek özellikleri İNŞA ETME.** Dev checkbox işaretler.
+
+**Terminoloji (i18n sweep, /kurul kararı):**
+- [ ] `tr.json` "Sunucu" → "Ortam" ("Ortam Oluştur"/"Ortama Katıl"/"3 ortamdasın"); kod İngilizce (`guild`) kalır
+
+**Faz 0 — Foundation (`web/`):**
+- [ ] Design-system primitive'leri: `Card`, `ContextPanel`, `QuickActionTile`, mesaj baloncuğu — `components/ui/`, token-temalı
+- [ ] Layout shell (ray + nav-kolon + içerik + sağ-bağlam paneli); header 64px sistemi korunur
+
+**Faz 1 — Anasayfa (`web/`, `anasayfa.png`):**
+- [ ] Dashboard kabuğu: karşılama + hızlı-aksiyonlar (Kanka Ekle/Alan Oluştur/Katıl, mevcut akışlar) + Kankalar paneli + son sunucular (`GET /guilds`)
+- [ ] Keşfet/Önerilen/Son Aktiviteler → gizli ya da "yakında" stub (boş bölüm gösterme)
+
+**Faz 2/3 — DM + Sunucu (`web/`, `dm-chat.png` / `sunucu-detay.png`):**
+- [ ] DM: liste + sohbet (yuvarlak baloncuk) + sağ profil paneli (mevcut aksiyonlar); Ortak Kankalar/Medya = stub
+- [ ] Sunucu: kanal listesi + mesajlar + sabitlenmiş duyuru stili + üye paneli + temel sunucu-bilgi paneli; etkinlik = stub
+
+**Faz 4 — Auth (`web/`):**
+- [ ] Auth ekranlarına yeni görsel dil (kart/buton/input); akış değişmez
+
+**DoD:** sıfır backend; §3 özellikleri yapılmadı; tüm ekranlar primitive kullanıyor; metin i18n + renk/şekil token; regresyon yok.
