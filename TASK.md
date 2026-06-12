@@ -309,3 +309,32 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] **Ertelenen:** uçtan-uca runtime testi (2 hesap + ortak ortam) → ortam join/davet UI gelince (PLAN açık kalem); birim test + R7 kod incelemesi bu sprint'te ✅
 
 > **PM denetim notu (2026-06-12):** Backend+frontend onaylandı. `nest build` temiz, 18/18 test geçti. B1 (G4 clearedAt cursor ezilmesi) PM tarafından düzeltildi. Küçük açık: ölü `auth.errors.BLOCKED` i18n anahtarı (zararsız); DECLINED ters-yön dormant satır (güvenlik etkisi yok). 4B (Report/moderasyon) → hukuki görüş sonrası.
+
+---
+
+## Sprint 6 — Presence + Yazıyor Göstergesi + Bildirimler (gece otonom 2026-06-13)
+
+> Sözleşme: `contracts/SPRINT_6_CONTRACT.md`. **Yalnız 6.1 (yazıyor göstergesi) gece ship edildi — T&S-nötr.**
+> 6.2 (presence görünürlük) + 6.3 (bildirim kapsamı) = **proje sahibi sabah kararı** (minör görünürlüğü kilitlenmedi).
+
+### 6.1 — Yazıyor göstergesi (T&S-nötr, ship)
+**Backend (`api/`):**
+- [x] Gateway `typing:start`/`typing:stop` → `requireChannelAccess` kapılı (sessiz drop) → `room:`'a `typing:update`/`typing:clear` (sender hariç); ephemeral, sıfır DB. handshake'te username önbellek (auth path değişmedi). *(a82b944 — PM incelendi: auth zayıflamadı, build temiz)*
+
+**Frontend (`web/`):**
+- [~] Typing emit (debounce) + dinleme (timeout + çoklu kullanıcı) DM+guild mesaj alanında; i18n `typing.*` *(gece dev session — PM incelemesi sonrası işaretlenecek)*
+
+### 6.2 / 6.3 — SABAH KARARI (gece yapılmadı)
+- [ ] **6.2 presence görünürlük politikası** (A: arkadaş+yetişkin-ortak / B: Discord-benzeri / C: yalnız arkadaş) — **minör çevrimiçiliği kime görünür? (çocuk güvenliği)**
+- [ ] **6.3 bildirim kapsamı + kalıcılık** (Notification modeli mi, anlık mı; hangi olaylar)
+
+---
+
+## Sprint 1 DoD — PM reconcile (2026-06-13)
+
+> Fonksiyonel olarak Sprint 2A/2B/3/4A boyunca doğrulandı (uygulama uçtan uca çalışıyor); checkbox'lar bayattı.
+- [x] Mesaj geçmişi yenilemede REST'ten yükleniyor *(messages.service `findMessages`)*
+- [x] 401 → otomatik refresh şeffaf *(axios interceptor, in-flight promise)*
+- [x] Tüm UI metni i18n'den *(tr.json; gömülü string denetimi Faz 3'te yapıldı)*
+- [x] Envelope tutarlı + Swagger üretiyor + Redis adapter bağlı
+- [~] İki kullanıcı uçtan uca gerçek zamanlı mesajlaşma — kod yolu çalışıyor; **2-hesap manuel e2e** PLAN açık kalemi (ortam join UI ile birlikte)
