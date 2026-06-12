@@ -133,18 +133,22 @@
 - [x] `toUserDto`: `friendCode`; yeni hata kodları
 
 ### Frontend (`web/`)
-- [ ] Home ekranı (rail hexagon → DM listesi + Arkadaşlar sekmesi); kendi kodunu göster/kopyala (`useClipboard`)
-- [ ] Arkadaş ekle (kod gir), bekleyen istekler, kabul/reddet/sil
-- [ ] DM görünümü (mevcut mesaj bileşenleri) + unread rozeti
-- [ ] Engelle/arkadaşlıktan çıkar (bağlam menüsü + ConfirmDialog)
-- [ ] `UserDto.friendCode`; yeni hata kodları i18n map + metinler `tr.json`
+
+> **PM reconcile (2026-06-12):** aşağıdakiler home redesign (Faz 1) içinde teslim edildi; kodda doğrulandı
+> (`HomeView`/`DmList`/`FriendsPanel`/`FriendAddModal`/`DmConversation`). DM görünümü **fonksiyonel** çalışıyor;
+> prototip re-skin'i (yuvarlak baloncuk + sağ profil paneli) ayrı iş = **UI Redesign Faz 2**.
+- [x] Home ekranı (rail hexagon → DM listesi + Arkadaşlar sekmesi); kendi kodunu göster/kopyala (`useClipboard`)
+- [x] Arkadaş ekle (kod gir), bekleyen istekler, kabul/reddet/sil
+- [x] DM görünümü (mevcut mesaj bileşenleri) + unread rozeti *(fonksiyonel; görsel re-skin Faz 2)*
+- [x] Engelle/arkadaşlıktan çıkar (bağlam menüsü + ConfirmDialog)
+- [x] `UserDto.friendCode`; yeni hata kodları i18n map + metinler `tr.json`
 
 ### Sprint 3 DoD (contract §11)
-- [ ] Kod ile arkadaşlık (karşılıklı otomatik kabul); username araması yok
-- [ ] `canDm` matrisi birebir: blok yener, minor↔yabancı DM kapalı, arkadaş izinli, dmPolicy kapıları
-- [ ] DM erişim açığı kapandı (ChannelMember olmayan erişemez, REST+WS); blok sonradan DM keser
-- [ ] DM gerçek zamanlı + unread `lastReadAt`
-- [ ] **R7:** `canDm` + DM erişim kontrolü incelemesinden geçti
+- [x] Kod ile arkadaşlık (karşılıklı otomatik kabul); username araması yok
+- [x] `canDm` matrisi birebir: blok yener, minor↔yabancı DM kapalı, arkadaş izinli, dmPolicy kapıları
+- [x] DM erişim açığı kapandı (ChannelMember olmayan erişemez, REST+WS); blok sonradan DM keser
+- [x] DM gerçek zamanlı + unread `lastReadAt`
+- [ ] **R7:** `canDm` + DM erişim kontrolü incelemesinden geçti *(backend `[R7]`-tag'li teslim; PM satır-satır imzası bekliyor — kullanıcı teyidi)*
 
 ### Sprint 3 — Revizyon R1+R2 (2026-06-12, PM onaylı kapsam; bkz. contract "Revizyon R1+R2")
 
@@ -152,33 +156,29 @@
 
 **R1 — Arkadaş kimliği `rumuz#etiket` (Backend `api/`):** ~~[x] uygulandı~~ → **R3 İLE GERİ ALINDI** (aşağı bkz.)
 
-**R3 — Arkadaş kimliği A modeline geri (Backend `api/`) — `rumuz#etiket` revert (PM onaylı, /kurul sonrası):**
-- [ ] Prisma: `User.friendTag` **drop** → `friendCode String @unique` **geri** + migration (friendCode backfill üret, friendTag kaldır)
-- [ ] `friend-tag.util` → `friend-code.util` (`generateFriendCode` 8-char base32, çakışmada yenile); register yan etkisi geri
-- [ ] `SendFriendRequestDto`: `handle` → `friendCode` (`@Length(8,8)`); servis `findUnique({ where: { friendCode } })`; bulunamaz → `USER_NOT_FOUND`; `handle` ayrıştırma + `INVALID_HANDLE` **kaldır**
-- [ ] `toUserDto`: `friendTag` → `friendCode`; Swagger + hata kodları geri
+**R3 — Arkadaş kimliği A modeline geri (Backend `api/`) — `rumuz#etiket` revert (PM onaylı, /kurul sonrası):** ✅ *(PM reconcile 2026-06-12: `..._friend_code_revert` migration + `friend-code.util` + DTO + `toUserDto` kodda doğrulandı)*
+- [x] Prisma: `User.friendTag` **drop** → `friendCode String @unique` **geri** + migration (friendCode backfill üret, friendTag kaldır)
+- [x] `friend-tag.util` → `friend-code.util` (`generateFriendCode` 8-char base32, çakışmada yenile); register yan etkisi geri
+- [x] `SendFriendRequestDto`: `handle` → `friendCode` (`@Length(8,8)`); servis `findUnique({ where: { friendCode } })`; bulunamaz → `USER_NOT_FOUND`; `handle` ayrıştırma + `INVALID_HANDLE` **kaldır**
+- [x] `toUserDto`: `friendTag` → `friendCode`; Swagger + hata kodları geri
 
-**R1 — UI Discord yerleşimine hizalama (Frontend `web/`) — ÖNCE `design-refs/discord/INDEX.md` oku:**
-- [ ] **Üst bar (yatay):** başlık + sekmeler (Tümü/Bekleyen/Engellenmiş) + yeşil "Arkadaş Ekle" aynı satırda; mevcut "başlık+kod kutusu+form" üst bloğu + ayrı sekme şeridi KALDIRILIR
-- [ ] **"Arkadaş Ekle" = ayrı sekme/sayfa** (inline form değil): başlık+açıklama+tek geniş input **arkadaş kodu** (`friendCode`, 8-char)+gönder; kendi `friendCode` bu sayfanın altında [Kopyala] *(R3: rumuz#etiket değil)*
-- [ ] **Liste:** sayaç başlığı + satır (avatar + ad / altında durum satırı + ayraç + hover yuvarlak ikonlar: mesaj/çıkar/engelle)
-- [ ] **Sol sidebar:** "Sohbet bul ya da başlat" + "Direkt Mesajlar" başlığı + DM satırları (unread rozeti)
-- [ ] Kapsam DIŞI tut: presence/"Çevrim İçi" filtresi (Sprint 6), "Şimdi Aktif"/Mesaj İstekleri/Mağaza nav
-- [ ] **R3:** `UserDto` `friendCode` geri; `INVALID_HANDLE` i18n kaldır; `friendTag`/`handle` UI referansları → `friendCode`
+**R1 — UI Discord yerleşimine hizalama (Frontend `web/`):** ⚠️ *(PM reconcile: bu R1 Discord-hizalama UI Redesign Faz 1 ile **YERİNİ ALDI** — özgün tasarım diline geçildi, Discord referansı terk edildi. Fonksiyonel yapı [sekmeler/arkadaş-ekle/liste/sidebar] `FriendsPanel`+`HomeSidebar`'da mevcut; görsel dil artık `anasayfa.png`. R1 "Discord'a hizala" maddesi olarak kapanmaz → **SUPERSEDED**.)*
+- [~] Üst bar / Arkadaş Ekle / Liste / Sol sidebar → fonksiyonel yapı var; görsel dil Faz 1 (özgün) ile değişti
+- [x] **R3:** `UserDto` `friendCode` geri; `INVALID_HANDLE` i18n kaldırıldı (tr.json'da yok); `friendTag`/`handle` UI referansları → `friendCode`
 
-**R2 — Arkadaşlık eventleri anlık (Backend `api/`):**
-- [ ] WS gateway handshake'te `user:<userId>` odasına katıl
-- [ ] `SharedModule` `RealtimeService` (`Server` ref + `emitToUser`); gateway init'te ref set eder
-- [ ] `friends.service`: istek→`friend.request` (addressee), kabul→`friend.accept` (karşı taraf), sil→`friend.remove`; emit transaction SONRASI
-- [ ] `blocks.service`: engelleme yan etkisinde engellenen tarafa `friend.remove` (sessiz kaldırma)
+**R2 — Arkadaşlık eventleri anlık (Backend `api/`):** ✅ *(PM reconcile: `RealtimeService`+`emitToUser`+`friend.*` event'leri kodda doğrulandı)*
+- [x] WS gateway handshake'te `user:<userId>` odasına katıl
+- [x] `SharedModule` `RealtimeService` (`Server` ref + `emitToUser`); gateway init'te ref set eder
+- [x] `friends.service`: istek→`friend.request` (addressee), kabul→`friend.accept` (karşı taraf), sil→`friend.remove`; emit transaction SONRASI
+- [x] `blocks.service`: engelleme yan etkisinde engellenen tarafa `friend.remove` (sessiz kaldırma)
 
-**R2 — Arkadaşlık eventleri anlık (Frontend `web/`):**
-- [ ] `useSocket`/friends store `friend.request`/`friend.accept`/`friend.remove` dinler → bekleyen+arkadaş listeleri reaktif; manuel yenileme yok
+**R2 — Arkadaşlık eventleri anlık (Frontend `web/`):** ✅ *(`useSocket.ts` `friend.*` dinliyor — doğrulandı)*
+- [x] `useSocket`/friends store `friend.request`/`friend.accept`/`friend.remove` dinler → bekleyen+arkadaş listeleri reaktif; manuel yenileme yok
 
 ### Sprint 3 R2+R3 DoD (contract §11 ekleri)
-- [ ] **R3:** Arkadaş kimliği = gizli `friendCode` (A); username public ama anahtar değil; `friendTag`/`handle`/`INVALID_HANDLE` geri alındı
-- [ ] Arkadaş isteği gönder/kabul/sil anlık yansır (yenileme yok)
-- [ ] UI Discord referansıyla hizalı (layout R1 korunur; yalnız Arkadaş Ekle input'u kod)
+- [x] **R3:** Arkadaş kimliği = gizli `friendCode` (A); username public ama anahtar değil; `friendTag`/`handle`/`INVALID_HANDLE` geri alındı
+- [x] Arkadaş isteği gönder/kabul/sil anlık yansır (yenileme yok)
+- [~] UI hizalı — **NOT:** R1'in "Discord referansı" kriteri SUPERSEDED; UI artık özgün tasarım dili (Faz 1). Arkadaş Ekle input'u kod (`friendCode`) ✓
 
 ---
 
@@ -204,32 +204,54 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > Sözleşme: `contracts/UI_REDESIGN_CONTRACT.md`. Görsel: `design-refs/{anasayfa,dm-chat,sunucu-detay}.png` (yerelde Read).
 > **SIFIR backend. §3 "şimdi yapma" haritasındaki gelecek özellikleri İNŞA ETME.** Dev checkbox işaretler.
 
-**Terminoloji (i18n sweep, /kurul kararı):**
-- [ ] `tr.json` "Sunucu" → "Ortam" ("Ortam Oluştur"/"Ortama Katıl"/"3 ortamdasın"); kod İngilizce (`guild`) kalır
+**Terminoloji (i18n sweep, /kurul kararı):** ✅ *(tr.json: 0 "Sunucu", 28 "Ortam" — doğrulandı)*
+- [x] `tr.json` "Sunucu" → "Ortam" ("Ortam Oluştur"/"Ortama Katıl"/"3 ortamdasın"); kod İngilizce (`guild`) kalır
 
-**Faz 0 — Foundation (`web/`):**
-- [ ] Design-system primitive'leri: `Card`, `ContextPanel`, `QuickActionTile`, mesaj baloncuğu — `components/ui/`, token-temalı
-- [ ] Layout shell (ray + nav-kolon + içerik + sağ-bağlam paneli); header 64px sistemi korunur
+**Faz 0 — Foundation (`web/`):** ⚠️ *(PM reconcile 2026-06-12: layout shell yapıldı; ama `Card`/`ContextPanel`/`QuickActionTile` **ayrı primitive dosyası olarak çıkarılmadı** — panel/kart stilleri home bileşenlerine inline. Bkz. PLAN.md teknik borç **D9**. Faz 2 kararı: aşağıda.)*
+- [~] Design-system primitive'leri: `Card`, `ContextPanel`, `QuickActionTile`, mesaj baloncuğu — **inline yazıldı**, `components/ui/`'a promote EDİLMEDİ (Rule of Three henüz tetiklenmedi; bkz. D9)
+- [x] Layout shell (ray + nav-kolon + içerik + sağ-bağlam paneli); header 64px sistemi korunur
 
-**Faz 1 — Anasayfa (`web/`, `anasayfa.png`):**
-- [ ] Dashboard kabuğu: karşılama + hızlı-aksiyonlar (Kanka Ekle/Alan Oluştur/Katıl, mevcut akışlar) + Kankalar paneli + son sunucular (`GET /guilds`)
-- [ ] Keşfet/Önerilen/Son Aktiviteler → gizli ya da "yakında" stub (boş bölüm gösterme)
+**Faz 1 — Anasayfa (`web/`, `anasayfa.png`):** ✅ *(ana ekran tamamlandı — kullanıcı onayı 2026-06-12)*
+- [x] Dashboard kabuğu: karşılama + hızlı-aksiyonlar (Kanka Ekle/Alan Oluştur/Katıl, mevcut akışlar) + Kankalar paneli + son sunucular (`GET /guilds`)
+- [x] Keşfet/Önerilen/Son Aktiviteler → gizli ya da "yakında" stub (boş bölüm gösterme)
 
-**Faz 1 — RAFİNE (kullanıcı feedback 2026-06-12, ilk pass sonrası):**
-- [ ] **3-KOLON segment layout (iç-içe kart DEĞİL):** sol sidebar / orta alan / sağ Kankalar = **3 ayrı yüzen yuvarlak panel**, aralarında **boşluk** (arada en koyu sayfa zemini görünür). Sol sidebar **rail'e yapışık** (sol kenar flush) ama panel görünümünde. **Orta panelin içindeki "HIZLI AKSİYONLAR"/"ORTAMLARIN" border-kutuları KALDIR** → orta panelde başlıklı bölüm olarak akar. Sayfa bg en koyu, paneller `--kv-bg-sidebar/content`. (`anasayfa.png`)
-- [ ] **Sidebar arama:** "Sohbet bul ya da başlat" butonu KALK → üstte **arama input'u**; yazınca **gruplu sonuç** (KANKALAR / ORTAMLAR / DM başlıkları altında client-side filtre: friends+guilds+dm store); boşken normal sidebar
-- [ ] **Kanka Ekle modalı → ara-ve-ekle:** "Kankalık İsteği Gönder" butonu KALK; input kanka-kodu arama çubuğu; kod girilince eşleşen kanka **altta listede + yanında "+ user" ikonu**; "+" → istek gönder
-  - ⚠ **BACKEND GEREKİR (karar):** `POST /friends/lookup { friendCode } → FriendCodeUserDto|404` (rate-limited) — "önizle sonra gönder". "Sıfır backend"e PM-onaylı küçük istisna. T&S: gizli kod + rate-limit güvenli. **Alternatif:** ertele, mevcut tek-adım submit kalsın. → kullanıcı kararı
-- [ ] **Polish:** "+ Yeni Kanka Ekle" sağ-alt bar → Kankalar paneli başlığına taşı; dashboard boşluğunu dengele
+**Faz 1 — RAFİNE (kullanıcı feedback 2026-06-12, ilk pass sonrası):** ✅
+- [x] **3-KOLON segment layout (iç-içe kart DEĞİL):** sol sidebar / orta alan / sağ Kankalar = **3 ayrı yüzen yuvarlak panel**, aralarında **boşluk** (arada en koyu sayfa zemini görünür). Sol sidebar **rail'e yapışık** (sol kenar flush) ama panel görünümünde. **Orta panelin içindeki "HIZLI AKSİYONLAR"/"ORTAMLARIN" border-kutuları KALDIR** → orta panelde başlıklı bölüm olarak akar. Sayfa bg en koyu, paneller `--kv-bg-sidebar/content`. (`anasayfa.png`)
+- [x] **Sidebar arama:** "Sohbet bul ya da başlat" butonu KALK → üstte **arama input'u**; yazınca **gruplu sonuç** (KANKALAR / ORTAMLAR / DM başlıkları altında client-side filtre: friends+guilds+dm store); boşken normal sidebar
+- [~] **Kanka Ekle modalı → ara-ve-ekle:** ⚠️ **ERTELENDİ — alternatif seçildi.** `FriendAddModal` şu an **tek-adım submit** (kod gir → direkt `sendRequest`; önizleme/lookup yok). "Ara-ve-ekle önizleme" akışı `POST /friends/lookup` gerektirir → eklenmedi. Yeni dile uygun modal var, akış sade.
+- [x] **Polish:** "+ Yeni Kanka Ekle" sağ-alt bar → Kankalar paneli başlığına taşı; dashboard boşluğunu dengele
 
-**Faz 1 — RAFİNE 2 (üst bar + bildirim, 2026-06-12):**
-- [ ] **Üst arama çubuğu (tasarım-only):** ekranın en üstünde, orta HomeDashboard panelinin **HEMEN ÜSTÜNDE ve DIŞINDA** (canvas'ta, panel içinde değil), geniş arama çubuğu — `anasayfa.png` gibi. Davranış BACKEND fazında: tıkla → aşağı açılır menü, **KANKALAR** + **ORTAMLAR** başlıkları + listeleri. → redundant olan sidebar "Sohbet bul ya da başlat" butonunu KALDIR (tek arama kalsın)
-- [ ] **Bildirim zili (tasarım-only):** ekranın sağ üstünde, yüzen panellerden **bağımsız** zil ikonu → tıkla bildirim paneli (şimdilik stub/boş). Bildirim SİSTEMİ → Sprint 6, şimdi yalnız ikon+giriş noktası
-- [ ] **Kanka-ekle ara-ve-ekle (BACKEND fazı, kullanıcı ONAYLADI = A):** modalda kod girilince ilgili kullanıcı profili + yanında "+ kanka ekle" butonu belirir → küçük `POST /friends/lookup { friendCode } → FriendCodeUserDto|404` (rate-limited) gerekir
-- [ ] **UserCard → niş pill + popover (karar A):** şişman kart yerine kompakt **avatar + durum pill**; tıkla → **popover** (profil / durum / ayarlar / çıkış yap). **Çıkış Yap buraya girer → home sağ-üstteki geçici "Çıkış Yap" (U1 borcu) KALKAR**; ayarlar çarkı da popover'a taşınır. Ses ikonları (mic/kulaklık) → V2'ye ertelenir, yer rezerve. Konum bottom-left, yüzen mini-panel.
+**Faz 1 — RAFİNE 2 (üst bar + bildirim, 2026-06-12):** ✅
+- [x] **Üst arama çubuğu (tasarım-only):** ekranın en üstünde, orta HomeDashboard panelinin **HEMEN ÜSTÜNDE ve DIŞINDA** (canvas'ta, panel içinde değil), geniş arama çubuğu — `anasayfa.png` gibi. Davranış BACKEND fazında: tıkla → aşağı açılır menü, **KANKALAR** + **ORTAMLAR** başlıkları + listeleri. → redundant olan sidebar "Sohbet bul ya da başlat" butonunu KALDIR (tek arama kalsın)
+- [x] **Bildirim zili (tasarım-only):** ekranın sağ üstünde, yüzen panellerden **bağımsız** zil ikonu → tıkla bildirim paneli (şimdilik stub/boş). Bildirim SİSTEMİ → Sprint 6, şimdi yalnız ikon+giriş noktası
+- [x] **UserCard → niş pill + popover (karar A):** şişman kart yerine kompakt **avatar + durum pill**; tıkla → **popover** (profil / durum / ayarlar / çıkış yap). **Çıkış Yap buraya girer → home sağ-üstteki geçici "Çıkış Yap" (U1 borcu) KALKAR**; ayarlar çarkı da popover'a taşınır. Ses ikonları (mic/kulaklık) → V2'ye ertelenir, yer rezerve. Konum bottom-left, yüzen mini-panel.
 
-**Faz 2/3 — DM + Sunucu (`web/`, `dm-chat.png` / `sunucu-detay.png`):**
-- [ ] DM: liste + sohbet (yuvarlak baloncuk) + sağ profil paneli (mevcut aksiyonlar); Ortak Kankalar/Medya = stub
+> **Kanka-ekle "lookup" backend istisnası — KAPANDI (PM reconcile 2026-06-12):** RAFİNE'deki ara-ve-ekle önizleme akışı
+> `POST /friends/lookup` gerektiriyordu; **endpoint eklenMEDİ** (`friends.service`'te `lookup` metodu/route yok, yalnız
+> `toFriendCodeUserDto` helper'ı mevcut endpoint'lerde). `FriendAddModal` tek-adım submit ile kaldı. Yani **"sıfır backend"
+> istisnası kullanılmadı** — redesign saf frontend kaldı. İleride önizleme istenirse Sprint-bağımsız küçük backend işi (PM kararı).
+
+**Faz 2 — DM ekranı (`web/`, `dm-chat.png`) — KİLİTLİ spec (PM, 2026-06-12):**
+
+> 3 bağlamsal kolon; **ray (`ServerRail`) dokunulmaz (§2.5)**. SIFIR backend. Mevcut `DmConversation`+`DmList`
+> fonksiyonel → iş **re-skin + yeni sağ profil paneli**. §3 haritasındaki öğeler **gösterilmez** (stub/gizle, "yakında" yok).
+>
+> **Primitive kararı (D9 tetikleyici):** DM panelleri home'daki panel/kart desenini tekrar kullanır. Bu **2.-3. tekrar** →
+> Rule of Three eşiği. **Gerçek kopya-stil acısı varsa** `components/ui/Card`+`ContextPanel`'a promote et (home'u da ona geçir);
+> **yoksa inline kal** — temiz kod uğruna erken soyutlama YAPMA (kullanıcı uyarısı). Sapma hissi → dur, PM'e dön.
+
+- [x] **Kol-2 (DM listesi):** mevcut `HomeSidebar` arama + "DİREKT MESAJLAR" başlığı + `DmList` korunur. Prototipteki "Mesaj İstekleri" sekmesi → Sprint 3'te yok, **GÖSTERME** (yeni sekme/nav ekleme).
+- [x] **Kol-3 (`DmConversation` re-skin) — yuvarlak baloncuk:** kendi mesajın → **Kor-vurgulu, sağa hizalı**; karşının → nötr `--kv-bg-elevated`, sola. Baloncuk **DM-özel** (sunucu mesajı klasik liste kalır → `MessageItem`'a DOKUNMA, Rule of Three: baloncuk şimdilik tek yerde).
+- [x] **Başlık çubuğu (64px korunur):** daire avatar + ad. Sağdaki **Sesli/Görüntülü Ara** ikonları → V2, **GÖSTERME** (buton bile değil). **Mesaj arama / sabitlenmiş** ikonları → V2, gizle. Sağda en çok profil-panel toggle (opsiyonel) — minimal tut.
+- [x] **Embed/medya kartları (markalı, müzik):** link-önizleme + medya → V1'de yok (Sprint 5), **GÖSTERME** → yalnız düz metin mesaj.
+- [x] **Mesaj input (mevcut, min 44px):** ek (📎)=Sprint 5 gizle · emoji=V1 dışı gizle · gönder=Enter zaten (opsiyonel işlevsel gönder ikonu eklenebilir). Dekoratif ikon ekleme.
+- [x] **Kol-4 (`DmProfilePanel`, YENİ component):** büyük daire avatar + ad *(not: `friendCode` `FriendCodeUserDto`'da yok — backend DTO değişikliği olmadan gösterilemiyor; sıfır-backend kuralı gereği atlandı)*. Aksiyonlar = **yalnız mevcut akışlar:** [Engelle] + [Arkadaşlıktan Çıkar] (Sprint 3 blocks/friends store + `ConfirmDialog`). "Profil Gör" zengin modal → §3 yok. **Sesli/Görüntülü Ara** → V2 GÖSTERME.
+- [x] **Sağ panel stub bölümleri GÖSTERME:** "ORTAK ALANLAR" (yeni sorgu = backend) + "PAYLAŞILAN MEDYA" (Sprint 5) → boş bölüm bile koyma (§3, "boş bölüm gösterme" kuralı).
+- [x] **Presence:** çevrimiçi yeşil nokta/durum metni → Sprint 6, **statik gösterme**. (DmList unread rozeti gerçek veri → kalır.)
+- [x] **Entegrasyon:** `HomeView` aktif DM'de Kol-3=`DmConversation` + Kol-4=`DmProfilePanel` render eder. Responsive: sağ panel <1280 gizli (`hidden xl:flex` wrapper), DM listesi <768 drawer (shell breakpoint sistemi).
+- [x] **i18n:** tüm yeni metin `tr.json`; renk/şekil token (`--kv-*`). Gömülü string/stil yok.
+
+**Faz 3 — Sunucu/Ortam detay (`web/`, `sunucu-detay.png`):** *(PM spec'i Faz 2 merge sonrası yazılır)*
 - [ ] Sunucu: kanal listesi + mesajlar + sabitlenmiş duyuru stili + üye paneli + temel sunucu-bilgi paneli; etkinlik = stub
 
 **Faz 4 — Auth (`web/`):**
