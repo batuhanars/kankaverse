@@ -235,7 +235,8 @@
   "channel": {
     "generalChat": "genel-sohbet",
     "textChannels": "METİN KANALLARI",
-    "noChannels": "Henüz kanal yok."
+    "noChannels": "Henüz kanal yok.",
+    "selectChannel": "Bir kanal seç"
   },
   "message": {
     "inputPlaceholder": "#{channel} kanalına mesaj yaz",
@@ -247,7 +248,8 @@
   "member": {
     "panel": "Üyeler",
     "online": "Çevrimiçi",
-    "offline": "Çevrimdışı"
+    "offline": "Çevrimdışı",
+    "comingSoon": "Üye listesi çok yakında."
   },
   "friends": {
     "title": "Kankalar",

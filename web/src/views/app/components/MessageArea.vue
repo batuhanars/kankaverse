@@ -103,7 +103,7 @@ function onKeydown(e: KeyboardEvent) {
     </div>
     <div ref="listEl" class="flex-1 overflow-y-auto py-4 flex flex-col gap-0.5">
       <div v-if="!channelId" class="flex-1 flex items-center justify-center">
-        <p style="color: var(--kv-text-muted);">Bir kanal seç</p>
+        <p style="color: var(--kv-text-muted);">{{ t('channel.selectChannel') }}</p>
       </div>
 
       <template v-else>

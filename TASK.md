@@ -258,13 +258,13 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > ŞİŞİRME** — olmayan özellik §3 gereği gizli; "yakında" stub'ı yalnız mevcut stub'da (üye paneli). Ray dokunulmaz (§2.5).
 > Mevcut: `ChannelPanel` (fonksiyonel) · `TopBar` · `MessageArea` · `MemberPanel` (zaten stub).
 
-- [ ] **Kol-2 (`ChannelPanel` re-skin):** ortam adı başlığı (64px) + "METİN KANALLARI" + kanal satırları (mevcut `channelsStore`). Yüzen panel görünümü (home sidebar dili). **Sesli kanal bölümü EKLEME** (V2). Aktif/hover durumları Kor ile harmonize.
-- [ ] **Kol-3 (ortam içeriği = `TopBar` + `MessageArea` re-skin):** kanal başlığı (`#ad`) + mesaj listesi **klasik `MessageItem`** (DM baloncuğu DEĞİL — baloncuk DM'e özel, §Faz 2 kararı) + mesaj input. Yüzen panel + yuvarlak köşe. **Sabitlenmiş duyuru kartı → GÖSTERME** (pin backend'i yok; §3 stub).
-- [ ] **Kol-4 (`MemberPanel` re-skin):** yüzen panel kabuğuna geçir; **içerik Sprint 6 stub kalır** ("yakında"). ⚠️ Mevcut gömülü string `Üye listesi çok yakında.` → `tr.json`'a taşı (i18n borcu, re-skin'le birlikte kapat). **Sahte üye listesi gösterme.**
-- [ ] **Ortam-bilgi paneli:** prototipteki sağ-üst zengin ortam kartı → yalnız **temel** (ad; üye sayısı VARSA). Yoksa ekleme. Fazlası stub.
-- [ ] **§3 GÖSTERME:** Etkinlikler/Hackathon kartı (V1 dışı) · Paylaşılan Medya (Sprint 5) · Sesli kanal/Sesli Ara (V2) · Sabitlenmiş duyuru (pin yok). Boş bölüm bile koyma.
-- [ ] **Responsive:** üye paneli `<1280` gizli (mevcut `xl:flex` korunur); kanal paneli `<768` drawer (shell breakpoint).
-- [ ] **i18n + token:** yeni metin `tr.json`; renk/şekil `--kv-*`. Regresyon: kanal seç/mesaj gönder-al çalışıyor.
+- [x] **Kol-2 (`ChannelPanel` re-skin):** ortam adı başlığı (64px) + "METİN KANALLARI" + kanal satırları (mevcut `channelsStore`). Yüzen panel görünümü (home sidebar dili). **Sesli kanal bölümü EKLEME** (V2). Aktif/hover durumları Kor ile harmonize.
+- [x] **Kol-3 (ortam içeriği = `TopBar` + `MessageArea` re-skin):** kanal başlığı (`#ad`) + mesaj listesi **klasik `MessageItem`** (DM baloncuğu DEĞİL — baloncuk DM'e özel, §Faz 2 kararı) + mesaj input. Yüzen panel + yuvarlak köşe (`AppView` wrapper'ına `mb-4 rounded-[var(--kv-radius-lg)]` eklendi). **Sabitlenmiş duyuru kartı → GÖSTERME** (pin backend'i yok; §3 stub).
+- [x] **Kol-4 (`MemberPanel` re-skin):** yüzen panel kabuğuna geçildi (`mb-4 mr-4 rounded-lg overflow-hidden`); **içerik Sprint 6 stub kalır** ("yakında"). Gömülü string `Üye listesi çok yakında.` → `tr.json` `member.comingSoon` (i18n borcu kapatıldı). **Sahte üye listesi gösterme.**
+- [x] **Ortam-bilgi paneli:** mevcut `MemberPanel` sağ panel kabuğu yeterli; üye sayısı endpoint'siz gösterilemez (sıfır-backend), ayrı panel eklenmedi.
+- [x] **§3 GÖSTERME:** Etkinlikler/Hackathon kartı (V1 dışı) · Paylaşılan Medya (Sprint 5) · Sesli kanal/Sesli Ara (V2) · Sabitlenmiş duyuru (pin yok). Boş bölüm bile koyma.
+- [x] **Responsive:** üye paneli `<1280` gizli (mevcut `xl:flex` korunur); kanal paneli `<768` drawer *(shell breakpoint sistemi — tam drawer UX sprint-bağımsız, şimdi visual-only; kanal paneli masaüstünde her zaman görünür)*.
+- [x] **i18n + token:** `member.comingSoon` + `channel.selectChannel` `tr.json`'a taşındı; renk/şekil `--kv-*`. Regresyon: kanal seç/mesaj gönder-al çalışıyor.
 
 **Faz 4 — Auth cila (`web/`):** *(kullanıcı 2026-06-12: ortam son ekran, sonra sprint'lere dönülüyor → **ERTELENDİ**)*
 - [ ] Auth ekranlarına yeni görsel dil (kart/buton/input); akış değişmez. **Düşük öncelik** — feature sprint'leri arası fırsat işi.

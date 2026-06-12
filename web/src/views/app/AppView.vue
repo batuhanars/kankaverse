@@ -109,7 +109,7 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
       
       <!-- ANA İÇERİK ALANI -->
       <template v-if="guildsStore.activeGuildId">
-        <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <div class="flex flex-col flex-1 min-w-0 overflow-hidden mb-4 rounded-[var(--kv-radius-lg)]">
           <TopBar
             :show-member-panel="showMemberPanel"
             @toggle-members="showMemberPanel = !showMemberPanel"
