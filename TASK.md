@@ -322,7 +322,8 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Gateway `typing:start`/`typing:stop` → `requireChannelAccess` kapılı (sessiz drop) → `room:`'a `typing:update`/`typing:clear` (sender hariç); ephemeral, sıfır DB. handshake'te username önbellek (auth path değişmedi). *(a82b944 — PM incelendi: auth zayıflamadı, build temiz)*
 
 **Frontend (`web/`):**
-- [~] Typing emit (debounce) + dinleme (timeout + çoklu kullanıcı) DM+guild mesaj alanında; i18n `typing.*` *(gece dev session — PM incelemesi sonrası işaretlenecek)*
+- [x] Typing emit (debounce 3sn) + dinleme (timeout 5sn + çoklu kullanıcı) DM+guild; i18n `typing.*` *(c5ac63c — PM incelendi: `useTyping` ephemeral, sızıntı yok, vue-tsc+vite build temiz)*
+- [x] **Yan-düzeltme:** Sprint 4A `d6ed6ab` HomeView'da `DmConversation`'a `canMessage`/`selfBlocked`/`@cleared` bağlanmamıştı (TS hatası → G3 blok-UX + G4 temizle wire değildi) → düzeltildi *(Sprint 4A frontend incelememde web build çalıştırılmamıştı; açık not edildi)*
 
 ### 6.2 / 6.3 — SABAH KARARI (gece yapılmadı)
 - [ ] **6.2 presence görünürlük politikası** (A: arkadaş+yetişkin-ortak / B: Discord-benzeri / C: yalnız arkadaş) — **minör çevrimiçiliği kime görünür? (çocuk güvenliği)**
