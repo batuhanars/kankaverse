@@ -35,6 +35,10 @@ export class StorageService {
       credentials: { accessKeyId, secretAccessKey },
       // MinIO için zorunlu: path-style URL (virtual-hosted desteklemez)
       forcePathStyle: true,
+      // Presigned PUT uyumluluğu: tarayıcı x-amz-checksum-* başlıklarını gönderemez.
+      // SDK v3.729+ ile bu seçenekler checksum eklenmesini yalnız zorunlu durumlara kısıtlar.
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
     });
   }
 

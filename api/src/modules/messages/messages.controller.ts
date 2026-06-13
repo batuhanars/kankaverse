@@ -47,6 +47,7 @@ export class MessagesController {
   ) {
     const message = await this.messagesService.create(user.id, channelId, dto);
     this.messagesGateway.broadcastMessage(channelId, message);
+    await this.messagesGateway.notifyDmActivity(channelId, message);
     return message;
   }
 }
