@@ -648,3 +648,61 @@ describe('MessagesService.create — yavaş mod', () => {
     expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
   });
 });
+
+// ── GROUP_DM mesajında requireNoDmBlock atlanır ───────────────────────────────
+
+describe('MessagesService.create — GROUP_DM requireNoDmBlock skip', () => {
+  let service: MessagesService;
+
+  const GROUP_CHANNEL_ID = 'ch-group-1';
+  const GROUP_DM_CHANNEL = { id: GROUP_CHANNEL_ID, guildId: null, type: 'GROUP_DM', slowModeSeconds: 0 };
+  const DTO = { content: 'grup mesajı' };
+
+  const CREATED_GROUP_MSG = {
+    id: 'msg-group-1',
+    channelId: GROUP_CHANNEL_ID,
+    content: 'grup mesajı',
+    replyToId: null,
+    createdAt: new Date('2026-06-13T12:00:00Z'),
+    author: { id: 'author-1', username: 'kanka', avatarUrl: null },
+    attachments: [],
+  };
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    moderationMock.hasActiveBan.mockResolvedValue(false);
+    moderationMock.hasActiveMute.mockResolvedValue(false);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GROUP_DM kanalında requireNoDmBlock ÇAĞRILMAZ
+  // ─────────────────────────────────────────────────────────────────────────
+  it('GROUP_DM kanalı → requireNoDmBlock çağrılmaz; mesaj oluşturulur', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GROUP_DM_CHANNEL);
+    prismaMock.message.create.mockResolvedValue(CREATED_GROUP_MSG);
+
+    await service.create(USER_ID, GROUP_CHANNEL_ID, DTO);
+
+    expect(membershipMock.requireNoDmBlock).not.toHaveBeenCalled();
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 1-1 DM kanalında requireNoDmBlock ÇAĞRILIR (regresyon koruması)
+  // ─────────────────────────────────────────────────────────────────────────
+  it('1-1 DM kanalı (type=DM) → requireNoDmBlock çağrılır', async () => {
+    const dm1Channel = { id: CHANNEL_ID, guildId: null, type: 'DM', slowModeSeconds: 0 };
+    membershipMock.requireChannelAccess.mockResolvedValue(dm1Channel);
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    prismaMock.message.create.mockResolvedValue({
+      ...CREATED_GROUP_MSG,
+      channelId: CHANNEL_ID,
+      id: 'msg-dm-1',
+    });
+
+    await service.create(USER_ID, CHANNEL_ID, DTO);
+
+    expect(membershipMock.requireNoDmBlock).toHaveBeenCalledWith(USER_ID, CHANNEL_ID);
+  });
+});
