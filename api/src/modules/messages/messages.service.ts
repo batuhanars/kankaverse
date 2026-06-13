@@ -554,6 +554,61 @@ export class MessagesService {
     return null;
   }
 
+  async searchMessages(userId: string, channelId: string, q: string, before?: string) {
+    // Erişim + yaş kapısı + DM throw'ları propagate
+    const channel = await this.membership.requireChannelAccess(userId, channelId);
+
+    // q doğrulama: trim, min 2 karakter
+    const trimmedQ = q.trim();
+    if (trimmedQ.length < 2) {
+      throw new BadRequestException({
+        error: 'QUERY_TOO_SHORT',
+        message: 'Arama için en az 2 karakter girin.',
+      });
+    }
+    // Maks 100 karakterde kes
+    const safeQ = trimmedQ.slice(0, 100);
+
+    // createdAt filtresi: findMessages'deki B1 dersiyle aynı — DM clearedAt (gt) + cursor before (lt)
+    // TEK objede birleştirilir; ayrı spread kullanılmaz.
+    const createdAtFilter: { gt?: Date; lt?: Date } = {};
+
+    if (before) {
+      const beforeMsg = await this.prisma.message.findUnique({ where: { id: before } });
+      if (beforeMsg) createdAtFilter.lt = beforeMsg.createdAt;
+    }
+
+    // G4: DM kanalında clearedAt filtrelemesi (findMessages ile birebir)
+    if (!channel.guildId) {
+      const member = await this.prisma.channelMember.findUnique({
+        where: { channelId_userId: { channelId, userId } },
+        select: { clearedAt: true },
+      });
+      if (member?.clearedAt) createdAtFilter.gt = member.clearedAt;
+    }
+
+    const messages = await this.prisma.message.findMany({
+      where: {
+        channelId,
+        deletedAt: null,
+        content: { contains: safeQ, mode: 'insensitive' },
+        ...(Object.keys(createdAtFilter).length ? { createdAt: createdAtFilter } : {}),
+      },
+      include: {
+        author: { select: { id: true, username: true, avatarUrl: true } },
+        attachments: {
+          select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+        },
+        reactions: { select: { userId: true, emoji: true } },
+        replyTo: REPLY_TO_INCLUDE,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+
+    return messages.map((msg) => toMessageDto(msg, userId));
+  }
+
   async findPins(userId: string, channelId: string) {
     // requireChannelAccess: üyelik + yaş kapısı dahil
     await this.membership.requireChannelAccess(userId, channelId);
