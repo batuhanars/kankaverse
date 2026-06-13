@@ -2,13 +2,29 @@ import {
   Injectable,
   ForbiddenException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
+import { StorageService } from '../../shared/storage/storage.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { UpdateGuildDto } from './dto/update-guild.dto';
+import { PresignIconDto } from './dto/presign-icon.dto';
+import { SetIconDto } from './dto/set-icon.dto';
 import { GuildMemberDto } from './dto/guild-member.dto';
 import { Guild, GuildRole } from '@prisma/client';
+
+// İkon yüklemesi için izin verilen görsel tipler (allowlist)
+const ALLOWED_ICON_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+
+const ICON_EXT: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+};
 
 export function toGuildDto(guild: Guild) {
   return {
@@ -33,6 +49,8 @@ export class GuildsService {
   constructor(
     private prisma: PrismaService,
     private membership: MembershipService,
+    private storage: StorageService,
+    private config: ConfigService,
   ) {}
 
   async create(userId: string, dto: CreateGuildDto) {
@@ -103,6 +121,68 @@ export class GuildsService {
     });
 
     return toGuildDto(updated);
+  }
+
+  /** POST /guilds/:id/icon/presign — yalnız OWNER */
+  async presignIcon(userId: string, guildId: string, dto: PresignIconDto) {
+    if (!ALLOWED_ICON_TYPES.has(dto.contentType)) {
+      throw new BadRequestException({
+        message: 'Bu dosya türü ikon olarak desteklenmiyor. PNG, JPEG, GIF veya WebP kullanın.',
+        error: 'UNSUPPORTED_TYPE',
+      });
+    }
+
+    await this.requireOwner(userId, guildId);
+
+    const ext = ICON_EXT[dto.contentType];
+    const storageKey = `icons/${guildId}/${randomUUID()}.${ext}`;
+    const uploadUrl = await this.storage.presignPut(storageKey, dto.contentType);
+
+    return { uploadUrl, storageKey };
+  }
+
+  /** PATCH /guilds/:id/icon — yalnız OWNER */
+  async setIcon(userId: string, guildId: string, dto: SetIconDto) {
+    await this.requireOwner(userId, guildId);
+
+    let iconUrl: string | null = null;
+
+    if (dto.storageKey != null) {
+      // Güvenlik: yalnız bu guild'e ait icons/ prefix'i kabul edilir
+      if (!dto.storageKey.startsWith(`icons/${guildId}/`)) {
+        throw new BadRequestException({
+          message: 'Geçersiz storage anahtarı.',
+          error: 'INVALID_STORAGE_KEY',
+        });
+      }
+
+      const publicBase = this.config.get<string>('s3.publicUrl')!;
+      iconUrl = `${publicBase}/${dto.storageKey}`;
+    }
+
+    const updated = await this.prisma.guild.update({
+      where: { id: guildId },
+      data: { iconUrl },
+    });
+
+    return toGuildDto(updated);
+  }
+
+  /** Ortak yardımcı: guild var mı + OWNER mı doğrular; değilse exception fırlatır */
+  private async requireOwner(userId: string, guildId: string) {
+    const guild = await this.prisma.guild.findUnique({
+      where: { id: guildId, deletedAt: null },
+    });
+    if (!guild) {
+      throw new NotFoundException({ message: 'Sunucu bulunamadı.', error: 'GUILD_NOT_FOUND' });
+    }
+
+    const membership = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId } },
+    });
+    if (!membership || membership.role !== 'OWNER') {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+    }
   }
 
   async getMembers(userId: string, guildId: string): Promise<GuildMemberDto[]> {

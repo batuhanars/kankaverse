@@ -71,6 +71,8 @@ services:
         mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
         mc mb --ignore-existing local/${MINIO_BUCKET:-kankaverse};
         echo 'Bucket hazir: ${MINIO_BUCKET:-kankaverse}';
+        mc anonymous set download local/${MINIO_BUCKET:-kankaverse}/icons;
+        echo 'icons/ public-read; ikon servis için';
       "
 
 volumes:
