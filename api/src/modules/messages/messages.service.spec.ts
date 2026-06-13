@@ -1,4 +1,6 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+// ForbiddenException alias for reaction tests
+const FE = ForbiddenException;
 import { MessagesService } from './messages.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
@@ -20,6 +22,10 @@ const prismaMock = {
   attachment: {
     findMany: jest.fn(),
     updateMany: jest.fn(),
+  },
+  messageReaction: {
+    upsert: jest.fn(),
+    deleteMany: jest.fn(),
   },
 };
 
@@ -80,6 +86,8 @@ function makeMsg(id: string, createdAt: Date) {
     replyToId: null,
     createdAt,
     author: { id: 'author-1', username: 'kanka', avatarUrl: null },
+    attachments: [],
+    reactions: [],
   };
 }
 
@@ -257,6 +265,7 @@ describe('MessagesService.create — automod', () => {
     createdAt: new Date('2026-06-12T12:00:00Z'),
     author: { id: 'author-1', username: 'kanka', avatarUrl: null },
     attachments: [],
+    reactions: [],
   };
 
   beforeEach(() => {
@@ -352,6 +361,7 @@ describe('MessagesService.create — attachment linking + scan-gate', () => {
     createdAt: new Date('2026-06-13T10:00:00Z'),
     author: { id: 'author-1', username: 'kanka', avatarUrl: null },
     attachments: [],
+    reactions: [],
   };
 
   const VALID_ATTACHMENTS = [
@@ -522,6 +532,7 @@ describe('MessagesService.create — yavaş mod', () => {
     createdAt: new Date('2026-06-13T12:00:00Z'),
     author: { id: USER_ID, username: 'kanka', avatarUrl: null },
     attachments: [],
+    reactions: [],
   };
 
   const MEMBER_ROLE = { role: 'MEMBER' };
@@ -667,6 +678,7 @@ describe('MessagesService.create — GROUP_DM requireNoDmBlock skip', () => {
     createdAt: new Date('2026-06-13T12:00:00Z'),
     author: { id: 'author-1', username: 'kanka', avatarUrl: null },
     attachments: [],
+    reactions: [],
   };
 
   beforeEach(() => {
@@ -741,6 +753,7 @@ describe('MessagesService.editMessage', () => {
       createdAt: new Date('2026-06-13T10:00:00Z'),
       author: { id: AUTHOR_ID, username: 'kanka', avatarUrl: null },
       attachments: [],
+      reactions: [],
     };
   }
 
@@ -952,5 +965,257 @@ describe('MessagesService.deleteMessage', () => {
     const response = thrown!.getResponse() as { error: string };
     expect(response.error).toBe('MESSAGE_NOT_FOUND');
     expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+});
+
+// ── MessagesService.addReaction / removeReaction ─────────────────────────────
+
+describe('MessagesService.addReaction', () => {
+  let service: MessagesService;
+
+  const MSG_ID = 'msg-react-1';
+  const EMOJI = '👍';
+
+  function makeExistingMsg(deletedAt: Date | null = null) {
+    return {
+      id: MSG_ID,
+      channelId: GUILD_CHANNEL_ID,
+      authorId: USER_ID,
+      deletedAt,
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Başarılı ekleme: upsert çağrılır, null döner
+  // ─────────────────────────────────────────────────────────────────────────
+  it('geçerli mesaj + emoji → upsert çağrılır, null döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
+    prismaMock.messageReaction.upsert.mockResolvedValue({});
+
+    const result = await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
+
+    expect(prismaMock.messageReaction.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { messageId_userId_emoji: { messageId: MSG_ID, userId: USER_ID, emoji: EMOJI } },
+        create: { messageId: MSG_ID, userId: USER_ID, emoji: EMOJI },
+        update: {},
+      }),
+    );
+    expect(result).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // İdempotent: ikinci çağrı da upsert eder, hata fırlatmaz
+  // ─────────────────────────────────────────────────────────────────────────
+  it('aynı emoji iki kez eklense bile hata fırlatmaz (idempotent)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
+    prismaMock.messageReaction.upsert.mockResolvedValue({});
+
+    await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
+    await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
+
+    expect(prismaMock.messageReaction.upsert).toHaveBeenCalledTimes(2);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Silinmiş mesaj → 404 MESSAGE_NOT_FOUND
+  // ─────────────────────────────────────────────────────────────────────────
+  it('silinmiş mesaj → NotFoundException MESSAGE_NOT_FOUND', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg(new Date()));
+
+    let thrown: NotFoundException | undefined;
+    try {
+      await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
+    } catch (e) {
+      thrown = e as NotFoundException;
+    }
+
+    expect(thrown).toBeInstanceOf(NotFoundException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('MESSAGE_NOT_FOUND');
+    expect(prismaMock.messageReaction.upsert).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // requireChannelAccess: yetkisiz erişim → servis zaten hata fırlatır (kontrolü delege eder)
+  // ─────────────────────────────────────────────────────────────────────────
+  it('requireChannelAccess hata fırlatırsa → propgate edilir', async () => {
+    membershipMock.requireChannelAccess.mockRejectedValue(
+      new FE({ message: 'Erişim yok.', error: 'CHANNEL_FORBIDDEN' }),
+    );
+
+    await expect(service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prismaMock.messageReaction.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('MessagesService.removeReaction', () => {
+  let service: MessagesService;
+
+  const MSG_ID = 'msg-react-2';
+  const EMOJI = '❤️';
+
+  function makeExistingMsg(deletedAt: Date | null = null) {
+    return {
+      id: MSG_ID,
+      channelId: GUILD_CHANNEL_ID,
+      authorId: USER_ID,
+      deletedAt,
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Başarılı kaldırma: deleteMany çağrılır, null döner
+  // ─────────────────────────────────────────────────────────────────────────
+  it('geçerli mesaj + emoji → deleteMany çağrılır, null döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
+    prismaMock.messageReaction.deleteMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.removeReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
+
+    expect(prismaMock.messageReaction.deleteMany).toHaveBeenCalledWith({
+      where: { messageId: MSG_ID, userId: USER_ID, emoji: EMOJI },
+    });
+    expect(result).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // No-op: reaksiyon yoksa deleteMany count=0, hata fırlatmaz
+  // ─────────────────────────────────────────────────────────────────────────
+  it('reaksiyon yoksa deleteMany 0 döner, hata fırlatmaz (no-op)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
+    prismaMock.messageReaction.deleteMany.mockResolvedValue({ count: 0 });
+
+    const result = await service.removeReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
+
+    expect(prismaMock.messageReaction.deleteMany).toHaveBeenCalledTimes(1);
+    expect(result).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Silinmiş mesaj → 404 MESSAGE_NOT_FOUND
+  // ─────────────────────────────────────────────────────────────────────────
+  it('silinmiş mesaj → NotFoundException MESSAGE_NOT_FOUND', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg(new Date()));
+
+    let thrown: NotFoundException | undefined;
+    try {
+      await service.removeReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
+    } catch (e) {
+      thrown = e as NotFoundException;
+    }
+
+    expect(thrown).toBeInstanceOf(NotFoundException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('MESSAGE_NOT_FOUND');
+    expect(prismaMock.messageReaction.deleteMany).not.toHaveBeenCalled();
+  });
+});
+
+// ── MessageDto — reactions aggregation ───────────────────────────────────────
+
+describe('MessagesService.findMessages — reactions aggregation', () => {
+  let service: MessagesService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('reaksiyon yoksa reactions dizisi boş döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findMany.mockResolvedValue([
+      {
+        id: 'msg-1',
+        channelId: GUILD_CHANNEL_ID,
+        content: 'test',
+        replyToId: null,
+        editedAt: null,
+        createdAt: new Date(),
+        author: { id: 'author-1', username: 'kanka', avatarUrl: null },
+        attachments: [],
+        reactions: [],
+      },
+    ]);
+
+    const results = await service.findMessages(USER_ID, GUILD_CHANNEL_ID);
+    expect(results[0].reactions).toEqual([]);
+  });
+
+  it('reaksiyonlar emoji bazında gruplanır, count doğru hesaplanır', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findMany.mockResolvedValue([
+      {
+        id: 'msg-2',
+        channelId: GUILD_CHANNEL_ID,
+        content: 'test',
+        replyToId: null,
+        editedAt: null,
+        createdAt: new Date(),
+        author: { id: 'author-1', username: 'kanka', avatarUrl: null },
+        attachments: [],
+        reactions: [
+          { userId: 'user-a', emoji: '👍' },
+          { userId: 'user-b', emoji: '👍' },
+          { userId: 'user-c', emoji: '❤️' },
+        ],
+      },
+    ]);
+
+    const results = await service.findMessages('user-x', GUILD_CHANNEL_ID);
+    const reactions = results[0].reactions;
+
+    const thumbs = reactions.find((r) => r.emoji === '👍');
+    const heart = reactions.find((r) => r.emoji === '❤️');
+
+    expect(thumbs).toBeDefined();
+    expect(thumbs!.count).toBe(2);
+    expect(thumbs!.reactedByMe).toBe(false);
+
+    expect(heart).toBeDefined();
+    expect(heart!.count).toBe(1);
+    expect(heart!.reactedByMe).toBe(false);
+  });
+
+  it('çağıranın reaksiyonu varsa reactedByMe=true döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findMany.mockResolvedValue([
+      {
+        id: 'msg-3',
+        channelId: GUILD_CHANNEL_ID,
+        content: 'test',
+        replyToId: null,
+        editedAt: null,
+        createdAt: new Date(),
+        author: { id: 'author-1', username: 'kanka', avatarUrl: null },
+        attachments: [],
+        reactions: [
+          { userId: USER_ID, emoji: '👍' },
+          { userId: 'user-b', emoji: '👍' },
+        ],
+      },
+    ]);
+
+    const results = await service.findMessages(USER_ID, GUILD_CHANNEL_ID);
+    const thumbs = results[0].reactions.find((r) => r.emoji === '👍');
+
+    expect(thumbs!.reactedByMe).toBe(true);
+    expect(thumbs!.count).toBe(2);
   });
 });

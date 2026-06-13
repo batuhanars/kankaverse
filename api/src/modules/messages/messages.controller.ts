@@ -16,6 +16,7 @@ import { MessagesService } from './messages.service';
 import { MessagesGateway } from './gateway/messages.gateway';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
+import { AddReactionDto } from './dto/add-reaction.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -78,6 +79,44 @@ export class MessagesController {
   ) {
     await this.messagesService.deleteMessage(user.id, channelId, messageId);
     this.messagesGateway.broadcastMessageDelete(channelId, { messageId, channelId });
+    return null;
+  }
+
+  @Post(':messageId/reactions')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Mesaja emoji reaksiyonu ekle (idempotent)' })
+  async addReaction(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Param('messageId') messageId: string,
+    @Body() dto: AddReactionDto,
+  ) {
+    await this.messagesService.addReaction(user.id, channelId, messageId, dto.emoji);
+    this.messagesGateway.broadcastReaction(channelId, 'reaction.added', {
+      messageId,
+      channelId,
+      emoji: dto.emoji,
+      userId: user.id,
+    });
+    return null;
+  }
+
+  @Delete(':messageId/reactions/:emoji')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mesajdan emoji reaksiyonunu kaldır (yoksa no-op)' })
+  async removeReaction(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Param('messageId') messageId: string,
+    @Param('emoji') emoji: string,
+  ) {
+    await this.messagesService.removeReaction(user.id, channelId, messageId, emoji);
+    this.messagesGateway.broadcastReaction(channelId, 'reaction.removed', {
+      messageId,
+      channelId,
+      emoji,
+      userId: user.id,
+    });
     return null;
   }
 }

@@ -188,20 +188,33 @@ model Channel {
 }
 
 model Message {
-  id          String       @id @default(cuid())
+  id          String            @id @default(cuid())
   channelId   String
-  channel     Channel      @relation(fields: [channelId], references: [id])
+  channel     Channel           @relation(fields: [channelId], references: [id])
   authorId    String
-  author      User         @relation(fields: [authorId], references: [id])
+  author      User              @relation(fields: [authorId], references: [id])
   content     String
   replyToId   String?
   editedAt    DateTime?
   deletedAt   DateTime?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
   attachments Attachment[]
+  reactions   MessageReaction[]
 
   @@index([channelId, createdAt])
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id])
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
 }
 
 model Attachment {
