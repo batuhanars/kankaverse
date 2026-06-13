@@ -75,14 +75,33 @@ export interface BlockedUserDto {
   since: string
 }
 
-export interface DmChannelDto {
+// Sprint 12 §3 — GROUP_DM üye DTO (slim, kanal listesi + panel için)
+export interface GroupDmMemberDto {
   id: string
-  otherUser: FriendCodeUserDto
-  lastMessage: MessageDto | null
-  unread: boolean
-  canMessage: boolean
-  selfBlocked: boolean
+  username: string
+  avatarUrl: string | null
 }
+
+// Sprint 12 §3 — DmChannelDto discriminated union: 1-1 DM | GROUP_DM
+export type DmChannelDto =
+  | {
+      type: 'DM'
+      id: string
+      otherUser: FriendCodeUserDto
+      lastMessage: MessageDto | null
+      unread: boolean
+      canMessage: boolean
+      selfBlocked: boolean
+    }
+  | {
+      type: 'GROUP_DM'
+      id: string
+      name: string | null
+      ownerId: string
+      members: GroupDmMemberDto[]
+      lastMessage: MessageDto | null
+      unread: boolean
+    }
 
 // Sprint 4A §3 — kullanıcı profil kartı DTO
 export interface UserProfileCardDto {

@@ -13,15 +13,13 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import AttachmentView from '@/components/shared/AttachmentView.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import ReportModal from '@/components/shared/ReportModal.vue'
-import type { FriendCodeUserDto, MessageDto } from '@/types'
+import GroupManagePanel from './GroupManagePanel.vue'
+import type { DmChannelDto, MessageDto } from '@/types'
 
 const props = defineProps<{
-  channelId: string
-  otherUser: FriendCodeUserDto
-  canMessage: boolean
-  selfBlocked: boolean
+  channel: DmChannelDto
 }>()
-const emit = defineEmits<{ cleared: [] }>()
+const emit = defineEmits<{ cleared: []; left: []; deleted: [] }>()
 
 const { t } = useI18n()
 const messagesStore = useMessagesStore()
@@ -29,8 +27,23 @@ const dmStore = useDmStore()
 const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
 const { joinChannel, leaveChannel } = useSocket()
-const { onInput: onTypingInput, stopTyping } = useTyping(() => props.channelId)
-const { label: typingLabel } = useTypingLabel(() => props.channelId, t, { named: false })
+const { onInput: onTypingInput, stopTyping } = useTyping(() => props.channel.id)
+const { label: typingLabel } = useTypingLabel(() => props.channel.id, t, { named: false })
+
+// Tip yardımcıları
+const isGroup = computed(() => props.channel.type === 'GROUP_DM')
+const dmChannel = computed(() => props.channel.type === 'DM' ? props.channel : null)
+const groupChannel = computed(() => props.channel.type === 'GROUP_DM' ? props.channel : null)
+
+// Grup adı: verilen ad yoksa üye adlarından üretilir
+const groupDisplayName = computed(() => {
+  const g = groupChannel.value
+  if (!g) return ''
+  if (g.name) return g.name
+  const names = g.members.map((m) => m.username)
+  if (names.length <= 3) return names.join(', ')
+  return names.slice(0, 2).join(', ') + ` +${names.length - 2}`
+})
 
 const content = ref('')
 const sending = ref(false)
@@ -43,8 +56,9 @@ const clearing = ref(false)
 const unblocking = ref(false)
 const reportTargetId = ref<string | null>(null)
 const reportTargetType = ref<'MESSAGE' | 'USER'>('MESSAGE')
+const showGroupPanel = ref(false)
 
-// Sprint 5 R1 — modal akışı (inline çentik kaldırıldı)
+// Sprint 5 R1 — modal akışı
 const composeFile = ref<File | null>(null)
 
 function openReportMessage(msgId: string) {
@@ -53,15 +67,17 @@ function openReportMessage(msgId: string) {
 }
 
 function openReportUser() {
-  reportTargetType.value = 'USER'
-  reportTargetId.value = props.otherUser.id
+  if (dmChannel.value) {
+    reportTargetType.value = 'USER'
+    reportTargetId.value = dmChannel.value.otherUser.id
+  }
 }
 
-const messages = computed(() => messagesStore.messagesForChannel(props.channelId))
-const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channelId] ?? false)
+const messages = computed(() => messagesStore.messagesForChannel(props.channel.id))
+const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channel.id] ?? false)
 
 watch(
-  () => props.channelId,
+  () => props.channel.id,
   async (id, oldId) => {
     if (oldId) leaveChannel(oldId)
     if (!id) return
@@ -85,10 +101,9 @@ function scrollToBottom() {
 
 async function loadMore() {
   if (!messages.value.length) return
-  await messagesStore.fetchMessages(props.channelId, messages.value[0].id)
+  await messagesStore.fetchMessages(props.channel.id, messages.value[0].id)
 }
 
-// Dosya seçimi → modal aç
 function openFilePicker() {
   fileInputEl.value?.click()
 }
@@ -102,11 +117,10 @@ function onFileSelected(e: Event) {
   composeFile.value = file
 }
 
-// Modal'dan gelen sent event'i → mesaj gönder
 async function onAttachmentSent({ attachmentId, caption }: { attachmentId: string; caption: string }) {
   composeFile.value = null
   try {
-    const { data } = await messagesApi.send(props.channelId, caption, undefined, [attachmentId])
+    const { data } = await messagesApi.send(props.channel.id, caption, undefined, [attachmentId])
     messagesStore.appendMessage(data)
   } catch {
     // hata sessizce yutulur — modal zaten kapandı
@@ -115,14 +129,16 @@ async function onAttachmentSent({ attachmentId, caption }: { attachmentId: strin
 
 async function send() {
   const hasText = content.value.trim()
-  if (!hasText || sending.value || !props.canMessage) return
+  // Grup kanallarında canMessage kontrolü yok (backend kontrol eder)
+  const canSend = isGroup.value || dmChannel.value?.canMessage
+  if (!hasText || sending.value || !canSend) return
   stopTyping()
   sendError.value = ''
   sending.value = true
   const text = content.value.trim()
   content.value = ''
   try {
-    const { data } = await messagesApi.send(props.channelId, text)
+    const { data } = await messagesApi.send(props.channel.id, text)
     messagesStore.appendMessage(data)
   } catch (e: unknown) {
     content.value = text
@@ -151,11 +167,12 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
 }
 
+// 1-1 DM: sohbeti temizle
 async function clearConversation() {
   clearing.value = true
   try {
-    await dmApi.clearChannel(props.channelId)
-    dmStore.removeChannel(props.channelId)
+    await dmApi.clearChannel(props.channel.id)
+    dmStore.removeChannel(props.channel.id)
     emit('cleared')
   } finally {
     clearing.value = false
@@ -164,230 +181,310 @@ async function clearConversation() {
 }
 
 async function unblockUser() {
+  if (!dmChannel.value) return
   unblocking.value = true
   try {
-    await friendsStore.unblockUser(props.otherUser.id)
+    await friendsStore.unblockUser(dmChannel.value.otherUser.id)
     await dmStore.fetchChannels()
   } finally {
     unblocking.value = false
   }
 }
+
+// Mesaj inputu için placeholder
+const inputPlaceholder = computed(() => {
+  if (isGroup.value) {
+    const name = groupDisplayName.value || t('group.noName')
+    return t('dm.groupPlaceholder', { name })
+  }
+  return t('dm.placeholder', { user: dmChannel.value?.otherUser.username ?? '' })
+})
+
+// 1-1 DM: mesaj gönderme aktif mi?
+const canMessage = computed(() => isGroup.value || (dmChannel.value?.canMessage ?? false))
+const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
 </script>
 
 <template>
-  <div
-    class="flex flex-col flex-1 min-w-0 overflow-hidden mb-4 rounded-[var(--kv-radius-lg)]"
-    style="background-color: var(--kv-bg-content);"
-  >
-    <!-- Başlık çubuğu: 64px -->
+  <div class="flex flex-1 min-w-0 overflow-hidden">
+    <!-- Ana sohbet alanı -->
     <div
-      class="h-16 flex items-center px-4 gap-3 shrink-0 border-b rounded-t-[var(--kv-radius-lg)]"
-      style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-content);"
+      class="flex flex-col flex-1 min-w-0 overflow-hidden mb-4 rounded-[var(--kv-radius-lg)]"
+      style="background-color: var(--kv-bg-content);"
     >
+      <!-- Başlık çubuğu: 64px -->
       <div
-        class="w-8 h-8 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-bold text-white"
-        style="background-color: var(--kv-accent-500);"
+        class="h-16 flex items-center px-4 gap-3 shrink-0 border-b rounded-t-[var(--kv-radius-lg)]"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-content);"
       >
-        <img
-          v-if="otherUser.avatarUrl"
-          :src="otherUser.avatarUrl"
-          :alt="otherUser.username"
-          class="w-full h-full object-cover"
-        />
-        <span v-else>{{ otherUser.username[0].toUpperCase() }}</span>
-      </div>
-      <span class="flex-1 text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
-        {{ otherUser.username }}
-      </span>
-      <!-- Kullanıcıyı şikâyet et -->
-      <button
-        class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-        style="color: var(--kv-text-muted);"
-        @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-danger)'"
-        @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
-        @click="openReportUser"
-      >
-        {{ t('report.reportUser') }}
-      </button>
-      <!-- Sohbeti temizle -->
-      <button
-        class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-        style="color: var(--kv-text-muted);"
-        @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-text-secondary)'"
-        @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
-        @click="showClearConfirm = true"
-      >
-        {{ t('dm.clearConversation') }}
-      </button>
-    </div>
-
-    <!-- Gerçek zamanlı hata bandı -->
-    <div
-      v-if="realtimeError"
-      class="shrink-0 px-4 py-2 text-[13px] text-center"
-      style="background-color: var(--kv-warning); color: var(--kv-bg-rail);"
-    >
-      {{ t('message.realtimeError') }}
-    </div>
-
-    <!-- Mesaj listesi: DM baloncukları -->
-    <div ref="listEl" class="flex-1 overflow-y-auto py-4 flex flex-col gap-1">
-      <div v-if="hasMore" class="flex justify-center py-2">
-        <button
-          class="text-[13px] hover:underline cursor-pointer"
-          style="color: var(--kv-info);"
-          @click="loadMore"
-        >
-          {{ t('message.loadMore') }}
-        </button>
-      </div>
-      <p
-        v-if="!messages.length"
-        class="text-center text-[14px] py-8"
-        style="color: var(--kv-text-muted);"
-      >
-        {{ t('dm.empty') }}
-      </p>
-
-      <div
-        v-for="msg in messages"
-        :key="msg.id"
-        class="flex items-end gap-2 px-4 py-0.5 group"
-        :class="isMine(msg) ? 'flex-row-reverse' : 'flex-row'"
-      >
-        <!-- Karşı tarafın küçük avatarı -->
-        <div
-          v-if="!isMine(msg)"
-          class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-bold text-white"
-          style="background-color: var(--kv-accent-500);"
-        >
-          <img
-            v-if="msg.author.avatarUrl"
-            :src="msg.author.avatarUrl"
-            :alt="msg.author.username"
-            class="w-full h-full object-cover"
-          />
-          <span v-else>{{ msg.author.username[0].toUpperCase() }}</span>
-        </div>
-
-        <!-- Baloncuk + ekler -->
-        <div class="flex flex-col max-w-[70%]" :class="isMine(msg) ? 'items-end' : 'items-start'">
+        <!-- 1-1 DM başlığı -->
+        <template v-if="dmChannel">
           <div
-            v-if="msg.content"
-            class="px-4 py-2.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
-            :class="isMine(msg)
-              ? 'rounded-2xl rounded-br-[4px]'
-              : 'rounded-2xl rounded-bl-[4px]'"
-            :style="isMine(msg)
-              ? 'background-color: var(--kv-accent-500); color: #fff;'
-              : 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);'"
+            class="w-8 h-8 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-bold text-white"
+            style="background-color: var(--kv-accent-500);"
           >
-            {{ msg.content }}
+            <img
+              v-if="dmChannel.otherUser.avatarUrl"
+              :src="dmChannel.otherUser.avatarUrl"
+              :alt="dmChannel.otherUser.username"
+              class="w-full h-full object-cover"
+            />
+            <span v-else>{{ dmChannel.otherUser.username[0].toUpperCase() }}</span>
           </div>
-          <!-- Sprint 5 §7: Attachment'lar -->
-          <AttachmentView
-            v-for="att in msg.attachments"
-            :key="att.id"
-            :attachment="att"
-          />
-          <div class="flex items-center gap-2 px-1 mt-1">
-            <span class="text-[11px]" style="color: var(--kv-text-muted);">
-              {{ formatTime(msg.createdAt) }}
-            </span>
-            <!-- Mesaj şikâyet butonu — kendi mesajı değilse hover'da görünür -->
-            <button
-              v-if="!isMine(msg)"
-              class="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] cursor-pointer"
-              style="color: var(--kv-text-muted);"
-              :title="t('report.reportMessage')"
-              @click="openReportMessage(msg.id)"
+          <span class="flex-1 text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
+            {{ dmChannel.otherUser.username }}
+          </span>
+          <!-- Kullanıcıyı şikâyet et -->
+          <button
+            class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+            style="color: var(--kv-text-muted);"
+            @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-danger)'"
+            @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
+            @click="openReportUser"
+          >
+            {{ t('report.reportUser') }}
+          </button>
+          <!-- Sohbeti temizle -->
+          <button
+            class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+            style="color: var(--kv-text-muted);"
+            @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-text-secondary)'"
+            @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
+            @click="showClearConfirm = true"
+          >
+            {{ t('dm.clearConversation') }}
+          </button>
+        </template>
+
+        <!-- GROUP_DM başlığı -->
+        <template v-else-if="groupChannel">
+          <!-- Grup ikonu (küçük çoklu avatar, 2 çember) -->
+          <div class="relative w-9 h-8 shrink-0">
+            <div
+              v-if="groupChannel.members[1]"
+              class="absolute bottom-0 right-0 w-6 h-6 rounded-full overflow-hidden border-2 flex items-center justify-center text-[9px] font-semibold text-white"
+              style="background-color: var(--kv-accent-500); border-color: var(--kv-bg-content);"
             >
-              {{ t('report.reportMessage') }}
-            </button>
+              <img v-if="groupChannel.members[1].avatarUrl" :src="groupChannel.members[1].avatarUrl" :alt="groupChannel.members[1].username" class="w-full h-full object-cover" />
+              <span v-else>{{ groupChannel.members[1].username[0].toUpperCase() }}</span>
+            </div>
+            <div
+              class="absolute top-0 left-0 w-6 h-6 rounded-full overflow-hidden border-2 flex items-center justify-center text-[9px] font-semibold text-white"
+              style="background-color: var(--kv-accent-500); border-color: var(--kv-bg-content);"
+            >
+              <img v-if="groupChannel.members[0]?.avatarUrl" :src="groupChannel.members[0].avatarUrl" :alt="groupChannel.members[0].username" class="w-full h-full object-cover" />
+              <span v-else>{{ (groupChannel.members[0]?.username ?? '?')[0].toUpperCase() }}</span>
+            </div>
           </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
+              {{ groupDisplayName }}
+            </p>
+            <p class="text-[12px]" style="color: var(--kv-text-muted);">
+              {{ t('group.memberCount', { n: groupChannel.members.length }) }}
+            </p>
+          </div>
+          <!-- Üye panelini aç/kapat -->
+          <button
+            class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+            style="color: var(--kv-text-muted);"
+            :style="showGroupPanel ? 'color: var(--kv-text-primary);' : ''"
+            @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-text-primary)'"
+            @mouseleave="!showGroupPanel && (($event.target as HTMLElement).style.color = 'var(--kv-text-muted)')"
+            @click="showGroupPanel = !showGroupPanel"
+          >
+            👥 {{ t('group.members') }}
+          </button>
+        </template>
+      </div>
+
+      <!-- Gerçek zamanlı hata bandı -->
+      <div
+        v-if="realtimeError"
+        class="shrink-0 px-4 py-2 text-[13px] text-center"
+        style="background-color: var(--kv-warning); color: var(--kv-bg-rail);"
+      >
+        {{ t('message.realtimeError') }}
+      </div>
+
+      <!-- Mesaj listesi -->
+      <div ref="listEl" class="flex-1 overflow-y-auto py-4 flex flex-col gap-1">
+        <div v-if="hasMore" class="flex justify-center py-2">
+          <button
+            class="text-[13px] hover:underline cursor-pointer"
+            style="color: var(--kv-info);"
+            @click="loadMore"
+          >
+            {{ t('message.loadMore') }}
+          </button>
         </div>
-      </div>
-    </div>
-
-    <!-- Mesaj input / Engel bandı -->
-    <div class="px-4 pb-4 pt-2 shrink-0">
-      <!-- Gönderme hatası (USER_BANNED / USER_MUTED vb.) -->
-      <div
-        v-if="sendError"
-        class="px-1 mb-1 text-[13px]"
-        style="color: var(--kv-danger);"
-      >
-        {{ sendError }}
-      </div>
-      <!-- Yazıyor göstergesi -->
-      <div
-        v-if="typingLabel"
-        class="h-5 px-1 mb-1 text-[12px] italic"
-        style="color: var(--kv-text-muted);"
-      >
-        {{ typingLabel }}
-      </div>
-
-      <!-- canMessage=false bandı -->
-      <div
-        v-if="!canMessage"
-        class="flex items-center justify-center gap-3 py-3 rounded-[var(--kv-radius-md)] text-[13px]"
-        style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
-      >
-        <span v-if="selfBlocked">{{ t('dm.selfBlocked') }}</span>
-        <span v-else>{{ t('dm.cannotMessage') }}</span>
-        <button
-          v-if="selfBlocked"
-          class="text-[13px] font-medium underline cursor-pointer transition-opacity hover:opacity-80"
-          :class="unblocking ? 'opacity-60 pointer-events-none' : ''"
-          style="color: var(--kv-accent-500);"
-          @click="unblockUser"
+        <p
+          v-if="!messages.length"
+          class="text-center text-[14px] py-8"
+          style="color: var(--kv-text-muted);"
         >
-          {{ t('dm.unblock') }}
-        </button>
-      </div>
-
-      <!-- Normal input -->
-      <div v-else>
-        <!-- Gizli dosya input -->
-        <input
-          ref="fileInputEl"
-          type="file"
-          class="hidden"
-          accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain"
-          @change="onFileSelected"
-        />
+          {{ t('dm.empty') }}
+        </p>
 
         <div
-          class="flex items-end gap-2 px-4 rounded-[var(--kv-radius-md)] border"
-          style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
+          v-for="msg in messages"
+          :key="msg.id"
+          class="flex items-end gap-2 px-4 py-0.5 group"
+          :class="isMine(msg) ? 'flex-row-reverse' : 'flex-row'"
         >
-          <!-- Ek (📎) butonu — Sprint 4A'da gizliydi, Sprint 5'te açıldı -->
-          <button
-            type="button"
-            class="shrink-0 py-3 cursor-pointer hover:opacity-80 transition-opacity"
-            style="color: var(--kv-text-muted);"
-            :aria-label="t('attachment.addFile')"
-            @click="openFilePicker"
+          <!-- Karşı tarafın küçük avatarı -->
+          <div
+            v-if="!isMine(msg)"
+            class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-bold text-white"
+            style="background-color: var(--kv-accent-500);"
           >
-            📎
+            <img
+              v-if="msg.author.avatarUrl"
+              :src="msg.author.avatarUrl"
+              :alt="msg.author.username"
+              class="w-full h-full object-cover"
+            />
+            <span v-else>{{ msg.author.username[0].toUpperCase() }}</span>
+          </div>
+
+          <!-- Baloncuk + ekler -->
+          <div class="flex flex-col max-w-[70%]" :class="isMine(msg) ? 'items-end' : 'items-start'">
+            <!-- Grup: gönderen adı (başkasının mesajında) -->
+            <span
+              v-if="isGroup && !isMine(msg)"
+              class="text-[11px] font-semibold mb-0.5 px-1"
+              style="color: var(--kv-accent-500);"
+            >
+              {{ msg.author.username }}
+            </span>
+            <div
+              v-if="msg.content"
+              class="px-4 py-2.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
+              :class="isMine(msg)
+                ? 'rounded-2xl rounded-br-[4px]'
+                : 'rounded-2xl rounded-bl-[4px]'"
+              :style="isMine(msg)
+                ? 'background-color: var(--kv-accent-500); color: #fff;'
+                : 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);'"
+            >
+              {{ msg.content }}
+            </div>
+            <!-- Sprint 5 §7: Attachment'lar -->
+            <AttachmentView
+              v-for="att in msg.attachments"
+              :key="att.id"
+              :attachment="att"
+            />
+            <div class="flex items-center gap-2 px-1 mt-1">
+              <span class="text-[11px]" style="color: var(--kv-text-muted);">
+                {{ formatTime(msg.createdAt) }}
+              </span>
+              <!-- Mesaj şikâyet butonu — kendi mesajı değilse hover'da görünür -->
+              <button
+                v-if="!isMine(msg)"
+                class="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] cursor-pointer"
+                style="color: var(--kv-text-muted);"
+                :title="t('report.reportMessage')"
+                @click="openReportMessage(msg.id)"
+              >
+                {{ t('report.reportMessage') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mesaj input / Engel bandı -->
+      <div class="px-4 pb-4 pt-2 shrink-0">
+        <!-- Gönderme hatası -->
+        <div
+          v-if="sendError"
+          class="px-1 mb-1 text-[13px]"
+          style="color: var(--kv-danger);"
+        >
+          {{ sendError }}
+        </div>
+        <!-- Yazıyor göstergesi -->
+        <div
+          v-if="typingLabel"
+          class="h-5 px-1 mb-1 text-[12px] italic"
+          style="color: var(--kv-text-muted);"
+        >
+          {{ typingLabel }}
+        </div>
+
+        <!-- 1-1 DM: canMessage=false bandı -->
+        <div
+          v-if="!canMessage"
+          class="flex items-center justify-center gap-3 py-3 rounded-[var(--kv-radius-md)] text-[13px]"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+        >
+          <span v-if="selfBlocked">{{ t('dm.selfBlocked') }}</span>
+          <span v-else>{{ t('dm.cannotMessage') }}</span>
+          <button
+            v-if="selfBlocked"
+            class="text-[13px] font-medium underline cursor-pointer transition-opacity hover:opacity-80"
+            :class="unblocking ? 'opacity-60 pointer-events-none' : ''"
+            style="color: var(--kv-accent-500);"
+            @click="unblockUser"
+          >
+            {{ t('dm.unblock') }}
           </button>
-          <textarea
-            v-model="content"
-            rows="1"
-            :placeholder="t('dm.placeholder', { user: otherUser.username })"
-            class="flex-1 py-3 bg-transparent text-[15px] resize-none outline-none"
-            style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
-            @keydown="onKeydown"
-            @input="sendError = ''; onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
-            @blur="stopTyping"
+        </div>
+
+        <!-- Normal input -->
+        <div v-else>
+          <!-- Gizli dosya input -->
+          <input
+            ref="fileInputEl"
+            type="file"
+            class="hidden"
+            accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain"
+            @change="onFileSelected"
           />
+
+          <div
+            class="flex items-end gap-2 px-4 rounded-[var(--kv-radius-md)] border"
+            style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
+          >
+            <button
+              type="button"
+              class="shrink-0 py-3 cursor-pointer hover:opacity-80 transition-opacity"
+              style="color: var(--kv-text-muted);"
+              :aria-label="t('attachment.addFile')"
+              @click="openFilePicker"
+            >
+              📎
+            </button>
+            <textarea
+              v-model="content"
+              rows="1"
+              :placeholder="inputPlaceholder"
+              class="flex-1 py-3 bg-transparent text-[15px] resize-none outline-none"
+              style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
+              @keydown="onKeydown"
+              @input="sendError = ''; onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
+              @blur="stopTyping"
+            />
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- Grup yönetim paneli (sağ kenar) -->
+    <GroupManagePanel
+      v-if="isGroup && showGroupPanel && groupChannel"
+      :group-id="groupChannel.id"
+      :group-name="groupChannel.name"
+      :owner-id="groupChannel.ownerId"
+      :members="groupChannel.members"
+      @close="showGroupPanel = false"
+      @left="emit('left')"
+      @deleted="emit('deleted')"
+    />
   </div>
 
-  <!-- Sohbeti temizle onayı -->
+  <!-- Sohbeti temizle onayı (1-1 DM) -->
   <ConfirmDialog
     v-if="showClearConfirm"
     :message="t('dm.clearConfirmMsg')"
@@ -401,7 +498,7 @@ async function unblockUser() {
   <AttachmentComposeModal
     v-if="composeFile"
     :file="composeFile"
-    :channel-id="channelId"
+    :channel-id="channel.id"
     @sent="onAttachmentSent"
     @close="composeFile = null"
   />

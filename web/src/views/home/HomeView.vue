@@ -39,11 +39,10 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
       <FriendsPanel v-if="activeView === 'friends'" @open-dm="openDm" />
       <DmConversation
         v-else-if="activeView === 'dm' && activeDmChannel"
-        :channel-id="activeDmChannel.id"
-        :other-user="activeDmChannel.otherUser"
-        :can-message="activeDmChannel.canMessage"
-        :self-blocked="activeDmChannel.selfBlocked"
+        :channel="activeDmChannel"
         @cleared="selectFriends"
+        @left="selectFriends"
+        @deleted="selectFriends"
       />
     </div>
   </div>
