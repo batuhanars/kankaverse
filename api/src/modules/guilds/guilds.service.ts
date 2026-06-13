@@ -4,9 +4,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MembershipService } from '../../shared/membership/membership.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { UpdateGuildDto } from './dto/update-guild.dto';
-import { Guild } from '@prisma/client';
+import { GuildMemberDto } from './dto/guild-member.dto';
+import { Guild, GuildRole } from '@prisma/client';
 
 export function toGuildDto(guild: Guild) {
   return {
@@ -19,9 +21,18 @@ export function toGuildDto(guild: Guild) {
   };
 }
 
+const ROLE_ORDER: Record<GuildRole, number> = {
+  OWNER: 0,
+  ADMIN: 1,
+  MEMBER: 2,
+};
+
 @Injectable()
 export class GuildsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private membership: MembershipService,
+  ) {}
 
   async create(userId: string, dto: CreateGuildDto) {
     const result = await this.prisma.$transaction(async (tx) => {
@@ -90,5 +101,29 @@ export class GuildsService {
     });
 
     return toGuildDto(updated);
+  }
+
+  async getMembers(userId: string, guildId: string): Promise<GuildMemberDto[]> {
+    await this.membership.requireGuildMembership(userId, guildId);
+
+    const members = await this.prisma.guildMember.findMany({
+      where: { guildId },
+      include: {
+        user: { select: { id: true, username: true, avatarUrl: true } },
+      },
+    });
+
+    return members
+      .sort((a, b) => {
+        const roleDiff = ROLE_ORDER[a.role] - ROLE_ORDER[b.role];
+        if (roleDiff !== 0) return roleDiff;
+        return a.user.username.localeCompare(b.user.username, 'tr');
+      })
+      .map((m) => ({
+        userId: m.user.id,
+        username: m.user.username,
+        avatarUrl: m.user.avatarUrl,
+        role: m.role,
+      }));
   }
 }
