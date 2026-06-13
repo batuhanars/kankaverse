@@ -38,6 +38,12 @@ export class GuildsController {
     return this.guildsService.findMyGuilds(user.id);
   }
 
+  @Get(':id/members')
+  @ApiOperation({ summary: 'Ortam üye listesini getir (yalnız üyeler görebilir); rol önceliği OWNER>ADMIN>MEMBER, sonra username' })
+  getMembers(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
+    return this.guildsService.getMembers(user.id, guildId);
+  }
+
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Ortam ayarlarını güncelle: ad ve/veya adultsOnly (yalnız OWNER)' })
