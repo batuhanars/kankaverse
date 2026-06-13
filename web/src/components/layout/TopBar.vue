@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChannelsStore } from '@/stores/channels'
 import PinsPopover from '@/components/shared/PinsPopover.vue'
+import NotificationBell from '@/components/shared/NotificationBell.vue'
 
 defineProps<{ showMemberPanel: boolean }>()
 const emit = defineEmits<{ toggleMembers: [] }>()
@@ -61,6 +62,9 @@ function togglePins(e: MouseEvent) {
       >
         {{ t('member.panel') }}
       </button>
+
+      <!-- Bildirim çanı -->
+      <NotificationBell />
     </div>
   </header>
 </template>
