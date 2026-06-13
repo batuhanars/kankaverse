@@ -9,8 +9,11 @@
  * Hover araç çubuğu: absolute -top-3 right-4, opacity-0 group-hover:opacity-100.
  * Satır hover vurgusu: kv-bg-elevated (hafif).
  * Gölge yok, baloncuk yok.
+ *
+ * Sprint V2: mentionResolver prop — userId → username çözümleyici (guild/DM bağlamı sağlar).
+ *            isMentioned prop — kendi-bahsedilme sol-aksan vurgusu.
  */
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AttachmentView from './AttachmentView.vue'
 import MessageActionsMenu from './MessageActionsMenu.vue'
@@ -22,6 +25,10 @@ const props = defineProps<{
   isGroupStart: boolean
   // Düzenleme modunda mı? (parent yönetir, bu sadece UI'ı gizler)
   isEditing?: boolean
+  // Sprint V2: userId → username çözücü (parent sağlar; guild/DM bağlamına göre)
+  mentionResolver?: (userId: string) => string
+  // Sprint V2: kendi-bahsedilme vurgusu
+  isMentioned?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -51,6 +58,39 @@ function onRowLeave(e: MouseEvent) {
   ;(e.currentTarget as HTMLElement).style.backgroundColor = ''
   showFollowTime.value = false
 }
+
+// Sprint V2: mesaj içeriğini segmentlere ayır (metin | mention token)
+// Güvenli parça-render: string injection YOK — v-for segment ile render edilir.
+interface TextSegment { kind: 'text'; text: string }
+interface MentionSegment { kind: 'mention'; userId: string; username: string }
+type Segment = TextSegment | MentionSegment
+
+const MENTION_RE = /<@([a-zA-Z0-9_-]+)>/g
+
+const contentSegments = computed<Segment[]>(() => {
+  const content = props.message.content
+  if (!content) return []
+  const segments: Segment[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  MENTION_RE.lastIndex = 0
+  while ((match = MENTION_RE.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ kind: 'text', text: content.slice(lastIndex, match.index) })
+    }
+    const userId = match[1]
+    const username = props.mentionResolver ? props.mentionResolver(userId) : t('mention.unknown')
+    segments.push({ kind: 'mention', userId, username })
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < content.length) {
+    segments.push({ kind: 'text', text: content.slice(lastIndex) })
+  }
+  return segments
+})
+
+// Mention token olmayan sade metin mi? → eski <p>{{ content }}</p> yolu (whitespace/break korunur)
+const hasMentions = computed(() => contentSegments.value.some((s) => s.kind === 'mention'))
 </script>
 
 <template>
@@ -60,10 +100,12 @@ function onRowLeave(e: MouseEvent) {
     - Sağ: içerik sütunu (flex-1 min-w-0)
     isGroupStart=true  → mt-4 (grup arası boşluk)
     isGroupStart=false → py-0.5 (sıkı takip)
+    Sprint V2: isMentioned → sol-aksan border + accent-subtle zemin
   -->
   <div
     class="relative flex gap-3 px-4 rounded group"
-    :class="isGroupStart ? 'mt-4 py-0.5' : 'py-0.5'"
+    :class="[isGroupStart ? 'mt-4 py-0.5' : 'py-0.5', isMentioned ? 'border-l-2' : '']"
+    :style="isMentioned ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);' : ''"
     @mouseenter="onRowEnter"
     @mouseleave="onRowLeave"
   >
@@ -174,18 +216,39 @@ function onRowLeave(e: MouseEvent) {
               class="px-3 pb-3 pt-1.5 text-[16px] break-words whitespace-pre-wrap"
               style="color: var(--kv-text-primary);"
             >
-              {{ message.content }}
+              <template v-if="hasMentions">
+                <template v-for="(seg, i) in contentSegments" :key="i">
+                  <span v-if="seg.kind === 'text'">{{ seg.text }}</span>
+                  <span
+                    v-else
+                    class="inline-flex items-center px-1 rounded text-[14px] font-medium cursor-default"
+                    style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
+                  >@{{ seg.username }}</span>
+                </template>
+              </template>
+              <template v-else>{{ message.content }}</template>
             </p>
           </div>
         </template>
         <template v-else>
-          <!-- Yalnız metin -->
+          <!-- Yalnız metin (mention token'ı varsa segmentli render; yoksa sade) -->
           <p
             v-if="message.content"
             class="text-[16px] break-words whitespace-pre-wrap"
             style="color: var(--kv-text-primary);"
           >
-            {{ message.content }}
+            <!-- Sprint V2: mention token içeriyorsa parça-render (XSS güvenli: v-for, v-text, innerHTML yok) -->
+            <template v-if="hasMentions">
+              <template v-for="(seg, i) in contentSegments" :key="i">
+                <span v-if="seg.kind === 'text'">{{ seg.text }}</span>
+                <span
+                  v-else
+                  class="inline-flex items-center px-1 rounded text-[14px] font-medium cursor-default"
+                  style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
+                >@{{ seg.username }}</span>
+              </template>
+            </template>
+            <template v-else>{{ message.content }}</template>
             <!-- Takip mesajında (başlık yok) "(düzenlendi)" metni gövde sonrasında -->
             <span
               v-if="message.editedAt && !isGroupStart"

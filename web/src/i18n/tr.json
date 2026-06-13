@@ -499,7 +499,12 @@
     "empty": "Henüz bildirim yok.",
     "friend_request": "{username} sana kankalık isteği gönderdi.",
     "friend_accept": "{username} kankalık isteğini kabul etti.",
-    "friend_remove": "Bir kullanıcı seni kanka listesinden çıkardı."
+    "friend_remove": "Bir kullanıcı seni kanka listesinden çıkardı.",
+    "mention": "@{username} seni bir mesajda andı."
+  },
+  "mention": {
+    "unknown": "bilinmeyen",
+    "autocompleteEmpty": "Eşleşen üye bulunamadı."
   },
   "server": {
     "addOrtam": "Ortam Ekle"
