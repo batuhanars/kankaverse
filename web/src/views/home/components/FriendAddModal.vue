@@ -21,7 +21,7 @@ const { copy, copied } = useClipboard({ source: ownCode })
 async function send() {
   const code = codeInput.value.trim().toUpperCase()
   if (!code) return
-  if (code.length !== 8) {
+  if (code.length !== 6) {
     error.value = t('friends.errors.INVALID_CODE')
     return
   }
@@ -76,7 +76,7 @@ async function send() {
         <input
           v-model="codeInput"
           :placeholder="t('friends.codePlaceholder')"
-          maxlength="8"
+          maxlength="6"
           class="flex-1 px-4 py-3 text-[14px] rounded-[var(--kv-radius-md)] outline-none uppercase tracking-widest"
           style="background-color: var(--kv-bg-rail); color: var(--kv-text-primary); border: 2px solid var(--kv-border-subtle);"
           @focus="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-accent-500)'"

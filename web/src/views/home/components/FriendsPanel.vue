@@ -58,7 +58,7 @@ function toggleMenu(id: string) {
 async function sendRequest() {
   const code = codeInput.value.trim().toUpperCase()
   if (!code) return
-  if (code.length !== 8) {
+  if (code.length !== 6) {
     addError.value = t('friends.errors.INVALID_CODE')
     return
   }
@@ -437,7 +437,8 @@ async function openDm(userId: string) {
             <input
               v-model="codeInput"
               :placeholder="t('friends.codePlaceholder')"
-              class="flex-1 px-4 py-3 text-[14px] rounded-[var(--kv-radius-md)] outline-none"
+              maxlength="6"
+              class="flex-1 px-4 py-3 text-[14px] rounded-[var(--kv-radius-md)] outline-none uppercase tracking-widest"
               style="background-color: var(--kv-bg-rail); color: var(--kv-text-primary); border: 2px solid var(--kv-border-subtle);"
               @focus="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-accent-500)'"
               @blur="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-border-subtle)'"

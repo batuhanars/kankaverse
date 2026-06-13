@@ -338,10 +338,10 @@
     "myCode": "Senin kanka kodun",
     "copy": "Kopyala",
     "copied": "Kopyalandı!",
-    "codePlaceholder": "Kanka kodunu gir (ör: K7M2QX9F)",
+    "codePlaceholder": "Kanka kodunu gir (ör: K7M2QX)",
     "addButton": "Kankalık İsteği Gönder",
     "addTitle": "Kanka Ekle",
-    "addDescription": "Kankanın 8 haneli kanka kodunu girerek istek gönder.",
+    "addDescription": "Kankanın 6 haneli kanka kodunu girerek istek gönder.",
     "tabAdd": "Kanka Ekle",
     "requestSent": "Kankalık isteği gönderildi.",
     "tabAll": "Tümü",
@@ -371,7 +371,7 @@
       "ALREADY_FRIENDS": "Bu kullanıcıyla zaten kankasınız.",
       "REQUEST_EXISTS": "Bu kullanıcıya zaten istek gönderilmiş.",
       "BLOCKED": "Bu kullanıcıyla kanka olamazsınız.",
-      "INVALID_CODE": "Geçersiz kod. 8 haneli kanka kodunu gir (ör: K7M2QX9F)."
+      "INVALID_CODE": "Geçersiz kod. 6 haneli kanka kodunu gir (ör: K7M2QX)."
     }
   },
   "home": {
