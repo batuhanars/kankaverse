@@ -233,4 +233,42 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   broadcastMessage(channelId: string, messageDto: unknown) {
     this.server.to(`room:${channelId}`).emit('message.created', messageDto);
   }
+
+  /**
+   * DM kanalında mesaj gönderildiğinde üyelerin user:<id> odalarına bildirim yayar.
+   * Alıcı o anda DM odasına join etmemiş olsa bile DM listesi (son mesaj + okunmamış) güncellenir.
+   * Guild kanalıysa (guildId dolu) hiçbir şey yapmaz — guild kanallarda room:* yayını yeterli.
+   */
+  async notifyDmActivity(channelId: string, messageDto: Record<string, unknown>) {
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { guildId: true },
+    });
+
+    // Guild kanalı → çık
+    if (!channel || channel.guildId !== null) return;
+
+    const members = await this.prisma.channelMember.findMany({
+      where: { channelId },
+      select: { userId: true },
+    });
+
+    const content =
+      typeof messageDto['content'] === 'string' && messageDto['content'].trim().length > 0
+        ? (messageDto['content'] as string)
+        : '[dosya]';
+
+    const payload = {
+      channelId,
+      lastMessage: {
+        content,
+        createdAt: messageDto['createdAt'] as string,
+      },
+      senderId: (messageDto['author'] as Record<string, string>)['id'],
+    };
+
+    for (const member of members) {
+      this.realtime.emitToUser(member.userId, 'dm.message', payload);
+    }
+  }
 }
