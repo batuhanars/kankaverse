@@ -249,12 +249,12 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
           <GuildTopBar />
           <!-- Kanal bar + mesaj alanı + üye paneli yan yana -->
           <div class="flex flex-1 min-w-0 overflow-hidden gap-4 mb-4">
-            <div class="flex flex-col flex-1 min-w-0 overflow-hidden rounded-[var(--kv-radius-lg)]">
+            <div class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden rounded-[var(--kv-radius-lg)]">
               <TopBar
                 :show-member-panel="showMemberPanel"
                 @toggle-members="showMemberPanel = !showMemberPanel"
               />
-              <MessageArea />
+              <MessageArea class="flex-1 min-h-0" />
             </div>
             <MemberPanel v-if="showMemberPanel" class="hidden xl:flex" />
           </div>
