@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, computed } from 'vue'
+import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMessagesStore } from '@/stores/messages'
 import { useChannelsStore } from '@/stores/channels'
@@ -8,6 +8,7 @@ import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { messagesApi } from '@/api/messages'
 import MessageItem from '@/components/shared/MessageItem.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
+import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 
 const { t } = useI18n()
 const messagesStore = useMessagesStore()
@@ -20,6 +21,8 @@ const content = ref('')
 const sending = ref(false)
 const listEl = ref<HTMLElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
+const textareaEl = ref<HTMLTextAreaElement | null>(null)
+const showEmojiPicker = ref(false)
 // Room'a join başarısızsa realtime çalışmaz; kullanıcıyı sessiz bırakmıyoruz
 const realtimeError = ref(false)
 const sendError = ref('')
@@ -44,6 +47,39 @@ function inputPlaceholder() {
   }
   return t('message.inputPlaceholder', { channel: channelName.value })
 }
+
+// Emoji compose picker
+function toggleEmojiPicker(e: MouseEvent) {
+  e.stopPropagation()
+  showEmojiPicker.value = !showEmojiPicker.value
+}
+
+function onComposeEmojiSelect(emoji: string) {
+  showEmojiPicker.value = false
+  const el = textareaEl.value
+  if (!el) {
+    content.value += emoji
+    return
+  }
+  const start = el.selectionStart ?? content.value.length
+  const end = el.selectionEnd ?? content.value.length
+  content.value = content.value.slice(0, start) + emoji + content.value.slice(end)
+  nextTick(() => {
+    el.focus()
+    const pos = start + emoji.length
+    el.setSelectionRange(pos, pos)
+  })
+}
+
+function onComposePickerDocClick(e: MouseEvent) {
+  const picker = document.getElementById('kv-compose-emoji-picker')
+  if (picker && !picker.contains(e.target as Node)) {
+    showEmojiPicker.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', onComposePickerDocClick))
+onUnmounted(() => document.removeEventListener('click', onComposePickerDocClick))
 
 watch(
   channelId,
@@ -243,6 +279,7 @@ function onKeydown(e: KeyboardEvent) {
           📎
         </button>
         <textarea
+          ref="textareaEl"
           v-model="content"
           rows="1"
           :placeholder="inputPlaceholder()"
@@ -252,6 +289,26 @@ function onKeydown(e: KeyboardEvent) {
           @input="sendError = ''; slowModeSeconds = null; onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
           @blur="stopTyping"
         />
+        <!-- Emoji (😊) butonu -->
+        <div class="relative shrink-0 self-center">
+          <button
+            type="button"
+            class="py-1 px-1 cursor-pointer hover:opacity-80 transition-opacity"
+            style="color: var(--kv-text-muted); font-size: 18px; line-height: 1;"
+            :aria-label="t('message.emojiButton')"
+            @click.stop="toggleEmojiPicker"
+          >
+            😊
+          </button>
+          <div
+            v-if="showEmojiPicker"
+            id="kv-compose-emoji-picker"
+            class="absolute bottom-full right-0 mb-2 z-50"
+            @click.stop
+          >
+            <EmojiPicker @select="onComposeEmojiSelect" />
+          </div>
+        </div>
       </div>
     </div>
   </div>
