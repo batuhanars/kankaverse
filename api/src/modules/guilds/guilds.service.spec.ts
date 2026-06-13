@@ -19,6 +19,9 @@ const prismaMock = {
   channel: {
     create: jest.fn(),
   },
+  message: {
+    count: jest.fn(),
+  },
   $transaction: jest.fn(),
 };
 
@@ -287,29 +290,20 @@ describe('GuildsService.setIcon', () => {
   });
 });
 
-// ── GuildsService.findMyGuilds — hasUnread ────────────────────────────────────
+// ── GuildsService.findMyGuilds — unreadCount ─────────────────────────────────
 
-describe('GuildsService.findMyGuilds — hasUnread', () => {
+describe('GuildsService.findMyGuilds — unreadCount', () => {
   let service: GuildsService;
 
   const NOW = new Date('2026-06-13T12:00:00Z');
-  const BEFORE = new Date('2026-06-13T11:00:00Z');
-  const AFTER = new Date('2026-06-13T13:00:00Z');
 
-  function makeGuildWithChannels(channels: {
-    lastMsgAuthorId?: string;
-    lastMsgCreatedAt?: Date | null;
-    lastReadAt?: Date | null;
-  }[]) {
+  function makeGuildWithChannels(channels: { lastReadAt?: Date | null }[]) {
     return {
       guild: {
         ...GUILD_FIXTURE,
-        channels: channels.map((ch) => ({
-          id: 'ch-1',
+        channels: channels.map((ch, idx) => ({
+          id: `ch-${idx + 1}`,
           guildId: GUILD_ID,
-          messages: ch.lastMsgCreatedAt
-            ? [{ authorId: ch.lastMsgAuthorId ?? 'other-user', createdAt: ch.lastMsgCreatedAt }]
-            : [],
           channelReads: ch.lastReadAt ? [{ lastReadAt: ch.lastReadAt }] : [],
         })),
       },
@@ -321,63 +315,79 @@ describe('GuildsService.findMyGuilds — hasUnread', () => {
     service = makeService();
   });
 
-  it('tüm kanallar mesajsız → guild hasUnread false', async () => {
+  it('tüm kanallar okunmuş (count=0) → guild unreadCount 0', async () => {
     prismaMock.guildMember.findMany.mockResolvedValue([
-      makeGuildWithChannels([{ lastMsgCreatedAt: null }]),
+      makeGuildWithChannels([{ lastReadAt: NOW }]),
     ]);
+    prismaMock.message.count.mockResolvedValue(0);
 
     const result = await service.findMyGuilds(OWNER_ID);
-    expect(result[0].hasUnread).toBe(false);
+    expect(result[0].unreadCount).toBe(0);
   });
 
-  it('bir kanalda okunmamış mesaj → guild hasUnread true', async () => {
+  it('bir kanalda 3 okunmamış → guild unreadCount 3', async () => {
     prismaMock.guildMember.findMany.mockResolvedValue([
-      makeGuildWithChannels([{ lastMsgCreatedAt: AFTER, lastReadAt: BEFORE }]),
+      makeGuildWithChannels([{ lastReadAt: NOW }]),
     ]);
+    prismaMock.message.count.mockResolvedValue(3);
 
     const result = await service.findMyGuilds(OWNER_ID);
-    expect(result[0].hasUnread).toBe(true);
+    expect(result[0].unreadCount).toBe(3);
   });
 
-  it('son mesaj kullanıcının kendi mesajı → guild hasUnread false', async () => {
+  it('okuma kaydı yok → message.count authorId filtresi içerir, createdAt filtresi olmaz', async () => {
     prismaMock.guildMember.findMany.mockResolvedValue([
-      makeGuildWithChannels([{ lastMsgAuthorId: OWNER_ID, lastMsgCreatedAt: AFTER, lastReadAt: BEFORE }]),
+      makeGuildWithChannels([{ lastReadAt: null }]),
     ]);
+    prismaMock.message.count.mockResolvedValue(5);
 
     const result = await service.findMyGuilds(OWNER_ID);
-    expect(result[0].hasUnread).toBe(false);
+    expect(result[0].unreadCount).toBe(5);
+
+    const callArg = prismaMock.message.count.mock.calls[0][0];
+    expect(callArg.where).toMatchObject({ authorId: { not: OWNER_ID } });
+    expect(callArg.where).not.toHaveProperty('createdAt');
   });
 
-  it('okuma kaydı yok + başka kullanıcıdan mesaj → guild hasUnread true', async () => {
+  it('birden fazla kanal → unreadCount toplamları guild sayacına yansır', async () => {
     prismaMock.guildMember.findMany.mockResolvedValue([
-      makeGuildWithChannels([{ lastMsgCreatedAt: NOW, lastReadAt: null }]),
+      makeGuildWithChannels([{ lastReadAt: NOW }, { lastReadAt: null }]),
     ]);
+    prismaMock.message.count
+      .mockResolvedValueOnce(2)  // ch-1
+      .mockResolvedValueOnce(3); // ch-2
 
     const result = await service.findMyGuilds(OWNER_ID);
-    expect(result[0].hasUnread).toBe(true);
+    expect(result[0].unreadCount).toBe(5);
   });
 
-  it('birden fazla kanal, biri okunmamış → guild hasUnread true', async () => {
+  it('kanalı olmayan guild → unreadCount 0', async () => {
     prismaMock.guildMember.findMany.mockResolvedValue([
-      makeGuildWithChannels([
-        { lastMsgCreatedAt: BEFORE, lastReadAt: NOW }, // okunmuş
-        { lastMsgCreatedAt: AFTER, lastReadAt: BEFORE }, // okunmamış
-      ]),
+      makeGuildWithChannels([]),
     ]);
 
     const result = await service.findMyGuilds(OWNER_ID);
-    expect(result[0].hasUnread).toBe(true);
+    expect(result[0].unreadCount).toBe(0);
+    expect(prismaMock.message.count).not.toHaveBeenCalled();
   });
 
-  it('tüm kanallar okunmuş → guild hasUnread false', async () => {
+  it('birden fazla guild → her guild bağımsız unreadCount alır', async () => {
+    const guild2 = { ...GUILD_FIXTURE, id: 'guild-2', name: 'İkinci Ortam' };
     prismaMock.guildMember.findMany.mockResolvedValue([
-      makeGuildWithChannels([
-        { lastMsgCreatedAt: BEFORE, lastReadAt: NOW },
-        { lastMsgCreatedAt: BEFORE, lastReadAt: NOW },
-      ]),
+      makeGuildWithChannels([{ lastReadAt: NOW }]),
+      {
+        guild: {
+          ...guild2,
+          channels: [{ id: 'ch-g2', guildId: 'guild-2', channelReads: [] }],
+        },
+      },
     ]);
+    prismaMock.message.count
+      .mockResolvedValueOnce(1)  // guild-1 ch
+      .mockResolvedValueOnce(7); // guild-2 ch
 
     const result = await service.findMyGuilds(OWNER_ID);
-    expect(result[0].hasUnread).toBe(false);
+    expect(result[0].unreadCount).toBe(1);
+    expect(result[1].unreadCount).toBe(7);
   });
 });

@@ -26,7 +26,7 @@ const ICON_EXT: Record<string, string> = {
   'image/webp': 'webp',
 };
 
-export function toGuildDto(guild: Guild, hasUnread = false) {
+export function toGuildDto(guild: Guild, unreadCount = 0) {
   return {
     id: guild.id,
     name: guild.name,
@@ -35,7 +35,7 @@ export function toGuildDto(guild: Guild, hasUnread = false) {
     iconUrl: guild.iconUrl,
     rules: guild.rules ?? null,
     createdAt: guild.createdAt.toISOString(),
-    hasUnread,
+    unreadCount,
   };
 }
 
@@ -95,12 +95,6 @@ export class GuildsService {
             channels: {
               where: { deletedAt: null },
               include: {
-                messages: {
-                  where: { deletedAt: null },
-                  orderBy: { createdAt: 'desc' },
-                  take: 1,
-                  select: { authorId: true, createdAt: true },
-                },
                 channelReads: {
                   where: { userId },
                   select: { lastReadAt: true },
@@ -112,19 +106,29 @@ export class GuildsService {
       },
     });
 
-    return memberships
-      .filter((m) => m.guild.deletedAt === null)
-      .map((m) => {
-        const guildHasUnread = m.guild.channels.some((ch) => {
-          const lastMsg = ch.messages[0] ?? null;
-          if (!lastMsg) return false;
-          if (lastMsg.authorId === userId) return false;
-          const lastRead = ch.channelReads[0]?.lastReadAt ?? null;
-          if (lastRead === null) return true;
-          return lastMsg.createdAt > lastRead;
-        });
-        return toGuildDto(m.guild, guildHasUnread);
-      });
+    const activeGuilds = memberships.filter((m) => m.guild.deletedAt === null);
+
+    // Her guild'in kanalları için okunmamış sayılarını paralel hesapla
+    const guildUnreadCounts = await Promise.all(
+      activeGuilds.map(async (m) => {
+        const channelCounts = await Promise.all(
+          m.guild.channels.map((ch) => {
+            const lastRead = ch.channelReads[0]?.lastReadAt ?? null;
+            return this.prisma.message.count({
+              where: {
+                channelId: ch.id,
+                deletedAt: null,
+                authorId: { not: userId }, // kendi mesajları sayma
+                ...(lastRead !== null && { createdAt: { gt: lastRead } }),
+              },
+            });
+          }),
+        );
+        return channelCounts.reduce((sum, n) => sum + n, 0);
+      }),
+    );
+
+    return activeGuilds.map((m, i) => toGuildDto(m.guild, guildUnreadCounts[i]));
   }
 
   /** PATCH /guilds/:id — yalnız OWNER */
