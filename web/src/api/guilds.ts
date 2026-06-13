@@ -19,7 +19,7 @@ export const guildsApi = {
   getChannels(guildId: string) {
     return http.get<ChannelDto[]>(`/guilds/${guildId}/channels`)
   },
-  createChannel(guildId: string, payload: { name: string; ageGated?: boolean; categoryId?: string | null }) {
+  createChannel(guildId: string, payload: { name: string; ageGated?: boolean; isPrivate?: boolean; categoryId?: string | null }) {
     return http.post<ChannelDto>(`/guilds/${guildId}/channels`, payload)
   },
   getMembers(guildId: string) {

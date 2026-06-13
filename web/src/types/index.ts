@@ -153,6 +153,7 @@ export interface ChannelDto {
   guildId: string | null
   name: string | null
   ageGated: boolean
+  isPrivate: boolean
   position: number
   slowModeSeconds: number
   unreadCount: number
