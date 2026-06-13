@@ -17,6 +17,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AttachmentView from './AttachmentView.vue'
 import MessageActionsMenu from './MessageActionsMenu.vue'
+import { formatMentionsPlain } from '@/utils/mentions'
 import type { MessageDto } from '@/types'
 
 const props = defineProps<{
@@ -205,7 +206,7 @@ const hasMentions = computed(() => contentSegments.value.some((s) => s.kind === 
           <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">
             {{ message.replyTo.authorUsername }}
           </span>
-          <span class="truncate">{{ message.replyTo.content }}</span>
+          <span class="truncate">{{ formatMentionsPlain(message.replyTo.content, (id) => mentionResolver?.(id), t('mention.unknown')) }}</span>
         </template>
         <template v-else>
           <span class="italic">{{ t('reply.deleted') }}</span>

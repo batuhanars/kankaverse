@@ -10,6 +10,7 @@ import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { messagesApi } from '@/api/messages'
 import { useMessagesStore } from '@/stores/messages'
+import { formatMentionsPlain } from '@/utils/mentions'
 import type { MessageDto } from '@/types'
 
 defineOptions({ name: 'PinsPopover' })
@@ -84,6 +85,11 @@ watch(
     }
   },
 )
+
+// PinsPopover bağlamında üye kaynağı yok; bilinmeyen → @bilinmeyen (ham token asla görünmez)
+function pinContentPlain(content: string): string {
+  return formatMentionsPlain(content, () => undefined, t('mention.unknown'))
+}
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
@@ -193,7 +199,7 @@ defineExpose({ refresh })
               class="text-[13px] break-words line-clamp-3"
               style="color: var(--kv-text-body);"
             >
-              {{ pin.content }}
+              {{ pinContentPlain(pin.content) }}
             </p>
             <p
               v-else-if="pin.attachments?.length"
