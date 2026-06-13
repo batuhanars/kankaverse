@@ -1,5 +1,8 @@
 const REQUIRED_ENVS = ['DATABASE_URL', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const;
 
+// S3 değişkenleri: dev'de opsiyonel (MinIO), prod'da zorunlu
+const S3_REQUIRED_PROD_ENVS = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY', 'S3_SECRET_KEY'] as const;
+
 export default () => {
   for (const key of REQUIRED_ENVS) {
     if (!process.env[key]) {
@@ -7,6 +10,17 @@ export default () => {
         `FATAL: Zorunlu ortam değişkeni '${key}' tanımlanmamış. ` +
         `'.env' dosyasını kontrol edin. Uygulama başlamıyor.`,
       );
+    }
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    for (const key of S3_REQUIRED_PROD_ENVS) {
+      if (!process.env[key]) {
+        throw new Error(
+          `FATAL: Production ortamında S3 değişkeni '${key}' zorunludur. ` +
+          `Dosya paylaşımı çalışmaz.`,
+        );
+      }
     }
   }
 
@@ -54,5 +68,16 @@ export default () => {
     newAccountDmLockDays: parseInt(process.env.NEW_ACCOUNT_DM_LOCK_DAYS ?? '7', 10),
     // Yeni üye karantina süresi (saat) — 0 = karantina kapalı [Sprint 7B]
     quarantineHours: parseInt(process.env.QUARANTINE_HOURS ?? '24', 10),
+    s3: {
+      endpoint: process.env.S3_ENDPOINT ?? 'http://localhost:9000',
+      region: process.env.S3_REGION ?? 'us-east-1',
+      bucket: process.env.S3_BUCKET ?? 'kankaverse',
+      accessKey: process.env.S3_ACCESS_KEY ?? 'minioadmin',
+      secretKey: process.env.S3_SECRET_KEY ?? 'minioadmin',
+      publicUrl: process.env.S3_PUBLIC_URL ?? 'http://localhost:9000/kankaverse',
+    },
+    maxUploadMb: parseInt(process.env.MAX_UPLOAD_MB ?? '25', 10),
+    // LANSMAN: ATTACHMENT_SCAN_ENABLED=true + gerçek CSAM tarayıcı olmadan canlıya ALINMAZ (R5)
+    attachmentScanEnabled: process.env.ATTACHMENT_SCAN_ENABLED === 'true',
   };
 };
