@@ -491,9 +491,35 @@ onUnmounted(() => {
         <div
           v-for="msg in messages"
           :key="msg.id"
-          class="flex px-4 py-0.5 group relative"
+          class="flex px-4 py-0.5 group relative rounded transition-colors"
           :class="isMine(msg) ? 'flex-row-reverse' : 'flex-row'"
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
         >
+          <!-- Kebab menü: satırın sağ-üstünde, baloncuk dışında -->
+          <div class="absolute top-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            <MessageActionsMenu
+              v-if="isGroup && !isMine(msg)"
+              :message-id="msg.id"
+              :is-mine="false"
+              :has-content="!!msg.content"
+              @reply="startReply(msg)"
+              @report="openReportMessage(msg.id)"
+              @add-reaction="(emoji) => pickDmEmoji(msg, emoji)"
+            />
+            <MessageActionsMenu
+              v-else-if="!(isMine(msg) && editState?.messageId === msg.id)"
+              :message-id="msg.id"
+              :is-mine="isMine(msg)"
+              :has-content="!!msg.content"
+              @reply="startReply(msg)"
+              @edit="startEdit(msg)"
+              @delete="openDeleteConfirm(msg.id)"
+              @report="openReportMessage(msg.id)"
+              @add-reaction="(emoji) => pickDmEmoji(msg, emoji)"
+            />
+          </div>
+
           <!-- Grup başkasının mesajı: avatar + ad header satırı -->
           <template v-if="isGroup && !isMine(msg)">
             <div class="flex flex-col max-w-[70%] items-start">
@@ -535,51 +561,53 @@ onUnmounted(() => {
               </div>
               <!-- Baloncuk + ekler (aynı flex col içinde) -->
               <!-- Ek+açıklama → tek birim; yalnız ek → sadece ek; yalnız metin → baloncuk -->
-              <template v-if="msg.attachments?.length && msg.content">
-                <!-- Birleşik: ek üstte, açıklama altında, tek kapsayıcı — saat baloncuk içinde sağ-alt -->
-                <div class="overflow-hidden rounded-2xl rounded-bl-[4px]" style="max-width: 320px; background-color: var(--kv-bg-elevated);">
-                  <AttachmentView
-                    v-for="att in msg.attachments"
-                    :key="att.id"
-                    :attachment="att"
-                    class="!mt-0"
-                  />
-                  <p class="px-4 pb-1.5 pt-1.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap" style="color: var(--kv-text-primary);">
-                    {{ msg.content }}
-                  </p>
-                  <!-- Saat + düzenlendi — baloncuk içi sağ-alt -->
-                  <div class="flex items-center justify-end gap-1 px-3 pb-2">
-                    <span v-if="msg.editedAt" class="text-[10px]" style="color: var(--kv-text-muted);">{{ t('message.edited') }}</span>
-                    <span class="text-[10px]" style="color: var(--kv-text-muted);">{{ formatTime(msg.createdAt) }}</span>
-                  </div>
-                </div>
-              </template>
-              <template v-else>
-                <div
-                  v-if="msg.content"
-                  class="px-4 pt-2.5 pb-1.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap rounded-2xl rounded-bl-[4px]"
-                  style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
-                >
-                  {{ msg.content }}
-                  <!-- Saat + düzenlendi — metin sonunda sağ-alt -->
-                  <div class="flex items-center justify-end gap-1 mt-0.5">
-                    <span v-if="msg.editedAt" class="text-[10px]" style="color: var(--kv-text-muted);">{{ t('message.edited') }}</span>
-                    <span class="text-[10px]" style="color: var(--kv-text-muted);">{{ formatTime(msg.createdAt) }}</span>
-                  </div>
-                </div>
-                <!-- Yalnız ek: saat altta -->
-                <template v-if="msg.attachments?.length && !msg.content">
-                  <AttachmentView
-                    v-for="att in msg.attachments"
-                    :key="att.id"
-                    :attachment="att"
-                  />
-                  <div class="flex items-center justify-end gap-1 mt-0.5 px-1">
-                    <span v-if="msg.editedAt" class="text-[10px]" style="color: var(--kv-text-muted);">{{ t('message.edited') }}</span>
-                    <span class="text-[10px]" style="color: var(--kv-text-muted);">{{ formatTime(msg.createdAt) }}</span>
+              <div>
+                <template v-if="msg.attachments?.length && msg.content">
+                  <!-- Birleşik: ek üstte, açıklama altında, tek kapsayıcı — saat baloncuk içinde sağ-alt -->
+                  <div class="overflow-hidden rounded-2xl rounded-bl-[4px]" style="max-width: 320px; background-color: var(--kv-bg-elevated);">
+                    <AttachmentView
+                      v-for="att in msg.attachments"
+                      :key="att.id"
+                      :attachment="att"
+                      class="!mt-0"
+                    />
+                    <p class="px-4 pb-1.5 pt-1.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap" style="color: var(--kv-text-primary);">
+                      {{ msg.content }}
+                    </p>
+                    <!-- Saat + düzenlendi — baloncuk içi sağ-alt -->
+                    <div class="flex items-center justify-end gap-1 px-3 pb-2">
+                      <span v-if="msg.editedAt" class="text-[10px]" style="color: var(--kv-text-muted);">{{ t('message.edited') }}</span>
+                      <span class="text-[10px]" style="color: var(--kv-text-muted);">{{ formatTime(msg.createdAt) }}</span>
+                    </div>
                   </div>
                 </template>
-              </template>
+                <template v-else>
+                  <div
+                    v-if="msg.content"
+                    class="px-4 pt-2.5 pb-1.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap rounded-2xl rounded-bl-[4px]"
+                    style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
+                  >
+                    {{ msg.content }}
+                    <!-- Saat + düzenlendi — metin sonunda sağ-alt -->
+                    <div class="flex items-center justify-end gap-1 mt-0.5">
+                      <span v-if="msg.editedAt" class="text-[10px]" style="color: var(--kv-text-muted);">{{ t('message.edited') }}</span>
+                      <span class="text-[10px]" style="color: var(--kv-text-muted);">{{ formatTime(msg.createdAt) }}</span>
+                    </div>
+                  </div>
+                  <!-- Yalnız ek: saat altta -->
+                  <template v-if="msg.attachments?.length && !msg.content">
+                    <AttachmentView
+                      v-for="att in msg.attachments"
+                      :key="att.id"
+                      :attachment="att"
+                    />
+                    <div class="flex items-center justify-end gap-1 mt-0.5 px-1">
+                      <span v-if="msg.editedAt" class="text-[10px]" style="color: var(--kv-text-muted);">{{ t('message.edited') }}</span>
+                      <span class="text-[10px]" style="color: var(--kv-text-muted);">{{ formatTime(msg.createdAt) }}</span>
+                    </div>
+                  </template>
+                </template>
+              </div>
               <!-- Reaksiyon pill'leri (grup) -->
               <div v-if="msg.reactions?.length" class="flex flex-wrap gap-1 mt-1 px-1">
                 <button
@@ -596,17 +624,6 @@ onUnmounted(() => {
                   <span class="font-medium">{{ reaction.count }}</span>
                 </button>
               </div>
-            </div>
-            <!-- Kebab menü: yüzen, layout'u itmez (grup başkasının mesajı) -->
-            <div class="absolute top-0.5 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-              <MessageActionsMenu
-                :message-id="msg.id"
-                :is-mine="false"
-                :has-content="!!msg.content"
-                @reply="startReply(msg)"
-                @report="openReportMessage(msg.id)"
-                @add-reaction="(emoji) => pickDmEmoji(msg, emoji)"
-              />
             </div>
           </template>
 
@@ -667,65 +684,67 @@ onUnmounted(() => {
                 </template>
               </div>
               <!-- Ek+açıklama → tek birim; yalnız ek → sadece ek; yalnız metin → baloncuk -->
-              <template v-if="msg.attachments?.length && msg.content">
-                <!-- Birleşik: ek üstte, açıklama altında, tek kapsayıcı — saat baloncuk içinde sağ-alt -->
-                <div
-                  class="overflow-hidden"
-                  :class="isMine(msg) ? 'rounded-2xl rounded-br-[4px]' : 'rounded-2xl rounded-bl-[4px]'"
-                  :style="isMine(msg)
-                    ? 'max-width: 320px; background-color: var(--kv-accent-500);'
-                    : 'max-width: 320px; background-color: var(--kv-bg-elevated);'"
-                >
-                  <AttachmentView
-                    v-for="att in msg.attachments"
-                    :key="att.id"
-                    :attachment="att"
-                    class="!mt-0"
-                  />
-                  <p
-                    class="px-4 pb-1.5 pt-1.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
-                    :style="isMine(msg) ? 'color: #fff;' : 'color: var(--kv-text-primary);'"
+              <div>
+                <template v-if="msg.attachments?.length && msg.content">
+                  <!-- Birleşik: ek üstte, açıklama altında, tek kapsayıcı — saat baloncuk içinde sağ-alt -->
+                  <div
+                    class="overflow-hidden"
+                    :class="isMine(msg) ? 'rounded-2xl rounded-br-[4px]' : 'rounded-2xl rounded-bl-[4px]'"
+                    :style="isMine(msg)
+                      ? 'max-width: 320px; background-color: var(--kv-accent-500);'
+                      : 'max-width: 320px; background-color: var(--kv-bg-elevated);'"
                   >
-                    {{ msg.content }}
-                  </p>
-                  <!-- Saat + düzenlendi — baloncuk içi sağ-alt -->
-                  <div class="flex items-center justify-end gap-1 px-3 pb-2">
-                    <span v-if="msg.editedAt" class="text-[10px]" :style="isMine(msg) ? 'color: rgba(255,255,255,0.65);' : 'color: var(--kv-text-muted);'">{{ t('message.edited') }}</span>
-                    <span class="text-[10px]" :style="isMine(msg) ? 'color: rgba(255,255,255,0.65);' : 'color: var(--kv-text-muted);'">{{ formatTime(msg.createdAt) }}</span>
-                  </div>
-                </div>
-              </template>
-              <template v-else>
-                <div
-                  v-if="msg.content"
-                  class="px-4 pt-2.5 pb-1.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
-                  :class="isMine(msg)
-                    ? 'rounded-2xl rounded-br-[4px]'
-                    : 'rounded-2xl rounded-bl-[4px]'"
-                  :style="isMine(msg)
-                    ? 'background-color: var(--kv-accent-500); color: #fff;'
-                    : 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);'"
-                >
-                  {{ msg.content }}
-                  <!-- Saat + düzenlendi — metin sonunda sağ-alt -->
-                  <div class="flex items-center justify-end gap-1 mt-0.5">
-                    <span v-if="msg.editedAt" class="text-[10px]" :style="isMine(msg) ? 'color: rgba(255,255,255,0.65);' : 'color: var(--kv-text-muted);'">{{ t('message.edited') }}</span>
-                    <span class="text-[10px]" :style="isMine(msg) ? 'color: rgba(255,255,255,0.65);' : 'color: var(--kv-text-muted);'">{{ formatTime(msg.createdAt) }}</span>
-                  </div>
-                </div>
-                <!-- Yalnız ek (açıklamasız): saat altta -->
-                <template v-if="msg.attachments?.length && !msg.content">
-                  <AttachmentView
-                    v-for="att in msg.attachments"
-                    :key="att.id"
-                    :attachment="att"
-                  />
-                  <div class="flex items-center justify-end gap-1 mt-0.5 px-1">
-                    <span v-if="msg.editedAt" class="text-[10px]" style="color: var(--kv-text-muted);">{{ t('message.edited') }}</span>
-                    <span class="text-[10px]" style="color: var(--kv-text-muted);">{{ formatTime(msg.createdAt) }}</span>
+                    <AttachmentView
+                      v-for="att in msg.attachments"
+                      :key="att.id"
+                      :attachment="att"
+                      class="!mt-0"
+                    />
+                    <p
+                      class="px-4 pb-1.5 pt-1.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
+                      :style="isMine(msg) ? 'color: #fff;' : 'color: var(--kv-text-primary);'"
+                    >
+                      {{ msg.content }}
+                    </p>
+                    <!-- Saat + düzenlendi — baloncuk içi sağ-alt -->
+                    <div class="flex items-center justify-end gap-1 px-3 pb-2">
+                      <span v-if="msg.editedAt" class="text-[10px]" :style="isMine(msg) ? 'color: rgba(255,255,255,0.65);' : 'color: var(--kv-text-muted);'">{{ t('message.edited') }}</span>
+                      <span class="text-[10px]" :style="isMine(msg) ? 'color: rgba(255,255,255,0.65);' : 'color: var(--kv-text-muted);'">{{ formatTime(msg.createdAt) }}</span>
+                    </div>
                   </div>
                 </template>
-              </template>
+                <template v-else>
+                  <div
+                    v-if="msg.content"
+                    class="px-4 pt-2.5 pb-1.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
+                    :class="isMine(msg)
+                      ? 'rounded-2xl rounded-br-[4px]'
+                      : 'rounded-2xl rounded-bl-[4px]'"
+                    :style="isMine(msg)
+                      ? 'background-color: var(--kv-accent-500); color: #fff;'
+                      : 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);'"
+                  >
+                    {{ msg.content }}
+                    <!-- Saat + düzenlendi — metin sonunda sağ-alt -->
+                    <div class="flex items-center justify-end gap-1 mt-0.5">
+                      <span v-if="msg.editedAt" class="text-[10px]" :style="isMine(msg) ? 'color: rgba(255,255,255,0.65);' : 'color: var(--kv-text-muted);'">{{ t('message.edited') }}</span>
+                      <span class="text-[10px]" :style="isMine(msg) ? 'color: rgba(255,255,255,0.65);' : 'color: var(--kv-text-muted);'">{{ formatTime(msg.createdAt) }}</span>
+                    </div>
+                  </div>
+                  <!-- Yalnız ek (açıklamasız): saat altta -->
+                  <template v-if="msg.attachments?.length && !msg.content">
+                    <AttachmentView
+                      v-for="att in msg.attachments"
+                      :key="att.id"
+                      :attachment="att"
+                    />
+                    <div class="flex items-center justify-end gap-1 mt-0.5 px-1">
+                      <span v-if="msg.editedAt" class="text-[10px]" style="color: var(--kv-text-muted);">{{ t('message.edited') }}</span>
+                      <span class="text-[10px]" style="color: var(--kv-text-muted);">{{ formatTime(msg.createdAt) }}</span>
+                    </div>
+                  </template>
+                </template>
+              </div>
               <!-- Reaksiyon pill'leri (DM / kendi mesajı) -->
               <div v-if="msg.reactions?.length" class="flex flex-wrap gap-1 mt-1 px-1">
                 <button
@@ -743,23 +762,6 @@ onUnmounted(() => {
                 </button>
               </div>
             </template>
-          </div>
-          <!-- Kebab menü: yüzen, layout'u itmez (DM / kendi mesajı) -->
-          <div
-            v-if="!(isMine(msg) && editState?.messageId === msg.id)"
-            class="absolute top-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-            :class="isMine(msg) ? 'left-4' : 'right-4'"
-          >
-            <MessageActionsMenu
-              :message-id="msg.id"
-              :is-mine="isMine(msg)"
-              :has-content="!!msg.content"
-              @reply="startReply(msg)"
-              @edit="startEdit(msg)"
-              @delete="openDeleteConfirm(msg.id)"
-              @report="openReportMessage(msg.id)"
-              @add-reaction="(emoji) => pickDmEmoji(msg, emoji)"
-            />
           </div>
           </template>
         </div>
