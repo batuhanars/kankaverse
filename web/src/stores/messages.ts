@@ -38,11 +38,31 @@ export const useMessagesStore = defineStore('messages', () => {
     }
   }
 
+  // Sprint 6.2: mesaj düzenleme WS / HTTP yanıtı
+  function updateMessage(dto: MessageDto) {
+    const list = messagesByChannel.value[dto.channelId]
+    if (!list) return
+    const idx = list.findIndex((m) => m.id === dto.id)
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], content: dto.content, editedAt: dto.editedAt }
+    }
+  }
+
+  // Sprint 6.2: mesaj silme WS / HTTP yanıtı
+  function removeMessage(channelId: string, messageId: string) {
+    const list = messagesByChannel.value[channelId]
+    if (!list) return
+    const idx = list.findIndex((m) => m.id === messageId)
+    if (idx !== -1) list.splice(idx, 1)
+  }
+
   return {
     messagesByChannel,
     hasMoreByChannel,
     messagesForChannel,
     fetchMessages,
     appendMessage,
+    updateMessage,
+    removeMessage,
   }
 })

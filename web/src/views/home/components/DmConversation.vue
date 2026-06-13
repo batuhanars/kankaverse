@@ -16,6 +16,20 @@ import ReportModal from '@/components/shared/ReportModal.vue'
 import GroupManagePanel from './GroupManagePanel.vue'
 import type { DmChannelDto, MessageDto } from '@/types'
 
+// Sprint 6.2: mesaj düzenleme / silme state
+interface EditState {
+  messageId: string
+  content: string
+  loading: boolean
+  error: string
+}
+
+const editState = ref<EditState | null>(null)
+const editTextareaEl = ref<HTMLTextAreaElement | null>(null)
+const showDeleteConfirm = ref(false)
+const deleteTargetId = ref<string | null>(null)
+const deleteLoading = ref(false)
+
 const props = defineProps<{
   channel: DmChannelDto
 }>()
@@ -64,6 +78,73 @@ const composeFile = ref<File | null>(null)
 function openReportMessage(msgId: string) {
   reportTargetType.value = 'MESSAGE'
   reportTargetId.value = msgId
+}
+
+// Sprint 6.2: düzenleme fonksiyonları
+function startEdit(msg: MessageDto) {
+  editState.value = { messageId: msg.id, content: msg.content, loading: false, error: '' }
+  nextTick(() => {
+    if (editTextareaEl.value) {
+      editTextareaEl.value.focus()
+      editTextareaEl.value.style.height = 'auto'
+      editTextareaEl.value.style.height = editTextareaEl.value.scrollHeight + 'px'
+    }
+  })
+}
+
+function cancelEdit() {
+  editState.value = null
+}
+
+async function saveEdit() {
+  if (!editState.value || editState.value.loading) return
+  const state = editState.value
+  const trimmed = state.content.trim()
+  if (!trimmed) return
+  state.loading = true
+  state.error = ''
+  try {
+    const { data } = await messagesApi.editMessage(props.channel.id, state.messageId, trimmed)
+    messagesStore.updateMessage(data)
+    editState.value = null
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { error?: string } } }
+    const code = err.response?.data?.error
+    state.error = code === 'MESSAGE_BLOCKED'
+      ? t('message.errors.MESSAGE_BLOCKED')
+      : t('common.error')
+    state.loading = false
+  }
+}
+
+function onEditKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    saveEdit()
+  }
+  if (e.key === 'Escape') {
+    cancelEdit()
+  }
+}
+
+function openDeleteConfirm(msgId: string) {
+  deleteTargetId.value = msgId
+  showDeleteConfirm.value = true
+}
+
+async function confirmDelete() {
+  if (!deleteTargetId.value) return
+  deleteLoading.value = true
+  try {
+    await messagesApi.deleteMessage(props.channel.id, deleteTargetId.value)
+    messagesStore.removeMessage(props.channel.id, deleteTargetId.value)
+  } catch {
+    // WS zaten kaldıracak; sessizce yut
+  } finally {
+    deleteLoading.value = false
+    showDeleteConfirm.value = false
+    deleteTargetId.value = null
+  }
 }
 
 function openReportUser() {
@@ -373,6 +454,9 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
                 <span class="text-[11px]" style="color: var(--kv-text-muted);">
                   {{ formatTime(msg.createdAt) }}
                 </span>
+                <span v-if="msg.editedAt" class="text-[11px]" style="color: var(--kv-text-muted);">
+                  {{ t('message.edited') }}
+                </span>
                 <button
                   class="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] cursor-pointer"
                   style="color: var(--kv-text-muted);"
@@ -404,40 +488,83 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
 
           <!-- Baloncuk + ekler -->
           <div class="flex flex-col max-w-[70%]" :class="isMine(msg) ? 'items-end' : 'items-start'">
-            <span v-if="false" />
-            <div
-              v-if="msg.content"
-              class="px-4 py-2.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
-              :class="isMine(msg)
-                ? 'rounded-2xl rounded-br-[4px]'
-                : 'rounded-2xl rounded-bl-[4px]'"
-              :style="isMine(msg)
-                ? 'background-color: var(--kv-accent-500); color: #fff;'
-                : 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);'"
-            >
-              {{ msg.content }}
-            </div>
-            <!-- Sprint 5 §7: Attachment'lar -->
-            <AttachmentView
-              v-for="att in msg.attachments"
-              :key="att.id"
-              :attachment="att"
-            />
-            <div class="flex items-center gap-2 px-1 mt-1">
-              <span class="text-[11px]" style="color: var(--kv-text-muted);">
-                {{ formatTime(msg.createdAt) }}
-              </span>
-              <!-- Mesaj şikâyet butonu — kendi mesajı değilse hover'da görünür -->
-              <button
-                v-if="!isMine(msg)"
-                class="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] cursor-pointer"
-                style="color: var(--kv-text-muted);"
-                :title="t('report.reportMessage')"
-                @click="openReportMessage(msg.id)"
+            <!-- Inline düzenleme modu (kendi mesajı) -->
+            <template v-if="isMine(msg) && editState?.messageId === msg.id">
+              <textarea
+                ref="editTextareaEl"
+                v-model="editState.content"
+                rows="1"
+                class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] resize-none outline-none border"
+                style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary); border-color: var(--kv-border-strong); font-family: var(--kv-font-ui); max-height: 200px; min-width: 200px;"
+                :disabled="editState.loading"
+                @keydown="onEditKeydown"
+                @input="($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
+              />
+              <p v-if="editState.error" class="text-[12px] mt-1" style="color: var(--kv-danger);">{{ editState.error }}</p>
+              <div class="flex gap-2 mt-1 text-[12px]" style="color: var(--kv-text-muted);">
+                <span>{{ t('message.editHint') }}</span>
+                <button class="underline cursor-pointer hover:opacity-80" style="color: var(--kv-danger);" @click="cancelEdit">
+                  {{ t('common.cancel') }}
+                </button>
+              </div>
+            </template>
+            <template v-else>
+              <div
+                v-if="msg.content"
+                class="px-4 py-2.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
+                :class="isMine(msg)
+                  ? 'rounded-2xl rounded-br-[4px]'
+                  : 'rounded-2xl rounded-bl-[4px]'"
+                :style="isMine(msg)
+                  ? 'background-color: var(--kv-accent-500); color: #fff;'
+                  : 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);'"
               >
-                {{ t('report.reportMessage') }}
-              </button>
-            </div>
+                {{ msg.content }}
+              </div>
+              <!-- Sprint 5 §7: Attachment'lar -->
+              <AttachmentView
+                v-for="att in msg.attachments"
+                :key="att.id"
+                :attachment="att"
+              />
+              <div class="flex items-center gap-2 px-1 mt-1">
+                <span class="text-[11px]" style="color: var(--kv-text-muted);">
+                  {{ formatTime(msg.createdAt) }}
+                </span>
+                <span v-if="msg.editedAt" class="text-[11px]" style="color: var(--kv-text-muted);">
+                  {{ t('message.edited') }}
+                </span>
+                <!-- Kendi mesajı: düzenle + sil hover butonları -->
+                <template v-if="isMine(msg)">
+                  <button
+                    class="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] cursor-pointer"
+                    style="color: var(--kv-text-muted);"
+                    :title="t('message.edit')"
+                    @click="startEdit(msg)"
+                  >
+                    {{ t('message.edit') }}
+                  </button>
+                  <button
+                    class="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] cursor-pointer"
+                    style="color: var(--kv-danger);"
+                    :title="t('message.delete')"
+                    @click="openDeleteConfirm(msg.id)"
+                  >
+                    {{ t('message.delete') }}
+                  </button>
+                </template>
+                <!-- Mesaj şikâyet butonu — kendi mesajı değilse hover'da görünür -->
+                <button
+                  v-else
+                  class="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] cursor-pointer"
+                  style="color: var(--kv-text-muted);"
+                  :title="t('report.reportMessage')"
+                  @click="openReportMessage(msg.id)"
+                >
+                  {{ t('report.reportMessage') }}
+                </button>
+              </div>
+            </template>
           </div>
           </template>
         </div>
@@ -541,6 +668,16 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
     :loading="clearing"
     @confirm="clearConversation"
     @cancel="showClearConfirm = false"
+  />
+
+  <!-- Mesaj silme onayı -->
+  <ConfirmDialog
+    v-if="showDeleteConfirm"
+    :message="t('message.deleteConfirm')"
+    :confirm-label="t('message.delete')"
+    :loading="deleteLoading"
+    @confirm="confirmDelete"
+    @cancel="showDeleteConfirm = false"
   />
 
   <!-- Dosya compose modal -->

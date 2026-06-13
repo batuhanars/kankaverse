@@ -68,6 +68,7 @@ export const useDmStore = defineStore('dm', () => {
           replyToId: null,
           author: { id: payload.senderId, username: '', avatarUrl: null },
           createdAt: payload.lastMessage.createdAt,
+          editedAt: null,
         }
       }
 

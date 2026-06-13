@@ -315,6 +315,11 @@
     "loadMore": "Daha fazla yükle",
     "noMessages": "Henüz mesaj yok. İlk mesajı sen gönder!",
     "realtimeError": "Gerçek zamanlı bağlantı kurulamadı — yeni mesajlar anlık görünmeyebilir.",
+    "edit": "Düzenle",
+    "delete": "Sil",
+    "edited": "(düzenlendi)",
+    "deleteConfirm": "Bu mesajı silmek istediğinden emin misin? Bu işlem geri alınamaz.",
+    "editHint": "Enter kaydet · Esc iptal",
     "errors": {
       "MESSAGE_BLOCKED": "Mesajınız topluluk kurallarına uygun değil.",
       "USER_BANNED": "Hesabınız askıya alındı. Mesaj gönderemezsiniz.",
