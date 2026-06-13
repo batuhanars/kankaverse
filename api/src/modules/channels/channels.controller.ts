@@ -14,6 +14,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ChannelsService } from './channels.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
+import { AddChannelMemberDto } from './dto/add-channel-member.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -73,5 +74,39 @@ export class ChannelsController {
     @Param('id') channelId: string,
   ) {
     return this.channelsService.markRead(user.id, channelId);
+  }
+
+  // ─── Özel kanal üye yönetimi (Sprint V2 §1) ────────────────────────────────
+
+  @Get('channels/:id/members')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Özel kanalın üyelerini listele (OWNER/ADMIN); genel kanalda boş []' })
+  getChannelMembers(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+  ) {
+    return this.channelsService.getChannelMembers(user.id, channelId);
+  }
+
+  @Post('channels/:id/members')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Özel kanala guild üyesi ekle (OWNER/ADMIN; idempotent)' })
+  addChannelMember(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Body() dto: AddChannelMemberDto,
+  ) {
+    return this.channelsService.addChannelMember(user.id, channelId, dto);
+  }
+
+  @Delete('channels/:id/members/:userId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Özel kanaldan üye çıkar (OWNER/ADMIN; no-op eğer yoksa)' })
+  removeChannelMember(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Param('userId') targetUserId: string,
+  ) {
+    return this.channelsService.removeChannelMember(user.id, channelId, targetUserId);
   }
 }
