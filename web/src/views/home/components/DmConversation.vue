@@ -329,13 +329,68 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
         <div
           v-for="msg in messages"
           :key="msg.id"
-          class="flex items-end gap-2 px-4 py-0.5 group"
+          class="flex px-4 py-0.5 group"
           :class="isMine(msg) ? 'flex-row-reverse' : 'flex-row'"
         >
-          <!-- Karşı tarafın küçük avatarı -->
+          <!-- Grup başkasının mesajı: avatar + ad header satırı -->
+          <template v-if="isGroup && !isMine(msg)">
+            <div class="flex flex-col max-w-[70%] items-start">
+              <!-- Header: avatar + üye adı aynı satırda -->
+              <div class="flex items-center gap-2 mb-1">
+                <div
+                  class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-bold text-white"
+                  style="background-color: var(--kv-accent-500);"
+                >
+                  <img
+                    v-if="msg.author.avatarUrl"
+                    :src="msg.author.avatarUrl"
+                    :alt="msg.author.username"
+                    class="w-full h-full object-cover"
+                  />
+                  <span v-else>{{ msg.author.username[0].toUpperCase() }}</span>
+                </div>
+                <span
+                  class="text-[14px] font-semibold"
+                  style="color: var(--kv-text-secondary);"
+                >
+                  {{ msg.author.username }}
+                </span>
+              </div>
+              <!-- Baloncuk + ekler (aynı flex col içinde) -->
+              <div
+                v-if="msg.content"
+                class="px-4 py-2.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap rounded-2xl rounded-bl-[4px]"
+                style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
+              >
+                {{ msg.content }}
+              </div>
+              <AttachmentView
+                v-for="att in msg.attachments"
+                :key="att.id"
+                :attachment="att"
+              />
+              <div class="flex items-center gap-2 px-1 mt-1">
+                <span class="text-[11px]" style="color: var(--kv-text-muted);">
+                  {{ formatTime(msg.createdAt) }}
+                </span>
+                <button
+                  class="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] cursor-pointer"
+                  style="color: var(--kv-text-muted);"
+                  :title="t('report.reportMessage')"
+                  @click="openReportMessage(msg.id)"
+                >
+                  {{ t('report.reportMessage') }}
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <!-- 1-1 DM veya kendi mesajı -->
+          <template v-else>
+          <!-- Karşı tarafın küçük avatarı (1-1 DM) -->
           <div
             v-if="!isMine(msg)"
-            class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-bold text-white"
+            class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-bold text-white self-end"
             style="background-color: var(--kv-accent-500);"
           >
             <img
@@ -349,14 +404,7 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
 
           <!-- Baloncuk + ekler -->
           <div class="flex flex-col max-w-[70%]" :class="isMine(msg) ? 'items-end' : 'items-start'">
-            <!-- Grup: gönderen adı (başkasının mesajında) -->
-            <span
-              v-if="isGroup && !isMine(msg)"
-              class="text-[11px] font-semibold mb-0.5 px-1"
-              style="color: var(--kv-accent-500);"
-            >
-              {{ msg.author.username }}
-            </span>
+            <span v-if="false" />
             <div
               v-if="msg.content"
               class="px-4 py-2.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
@@ -391,6 +439,7 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
               </button>
             </div>
           </div>
+          </template>
         </div>
       </div>
 

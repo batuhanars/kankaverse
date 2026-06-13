@@ -104,15 +104,22 @@ function avatarInitial(username: string) {
               {{ member.username }}
             </span>
           </div>
+          <!-- Taç: owner -->
           <span
-            v-if="member.role !== 'MEMBER'"
-            class="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded"
-            :style="{
-              backgroundColor: member.role === 'OWNER' ? 'var(--kv-accent-500)' : 'var(--kv-bg-elevated)',
-              color: member.role === 'OWNER' ? '#fff' : 'var(--kv-text-muted)',
-            }"
+            v-if="member.role === 'OWNER'"
+            class="shrink-0 text-[10px] px-1 py-0.5 rounded"
+            style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
+            :title="t('member.role.OWNER')"
           >
-            {{ t(`member.role.${member.role}`) }}
+            👑
+          </span>
+          <!-- Rozet: admin -->
+          <span
+            v-else-if="member.role === 'ADMIN'"
+            class="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+          >
+            {{ t('member.role.ADMIN') }}
           </span>
         </div>
       </template>
@@ -163,12 +170,22 @@ function avatarInitial(username: string) {
               {{ member.username }}
             </span>
           </div>
+          <!-- Taç: owner -->
           <span
-            v-if="member.role !== 'MEMBER'"
+            v-if="member.role === 'OWNER'"
+            class="shrink-0 text-[10px] px-1 py-0.5 rounded"
+            style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
+            :title="t('member.role.OWNER')"
+          >
+            👑
+          </span>
+          <!-- Rozet: admin -->
+          <span
+            v-else-if="member.role === 'ADMIN'"
             class="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded"
             style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
           >
-            {{ t(`member.role.${member.role}`) }}
+            {{ t('member.role.ADMIN') }}
           </span>
         </div>
       </template>

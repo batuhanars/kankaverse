@@ -22,6 +22,25 @@ const authStore = useAuthStore()
 
 const isOwner = computed(() => authStore.user?.id === props.ownerId)
 
+// --- Üye çıkar (owner) ---
+const removeMemberTarget = ref<GroupDmMemberDto | null>(null)
+const removing = ref(false)
+const removeError = ref('')
+
+async function removeMember() {
+  if (!removeMemberTarget.value || removing.value) return
+  removeError.value = ''
+  removing.value = true
+  try {
+    await dmStore.removeGroupMember(props.groupId, removeMemberTarget.value.id)
+  } catch {
+    removeError.value = t('group.removeMemberError')
+  } finally {
+    removing.value = false
+    removeMemberTarget.value = null
+  }
+}
+
 // Grupta olmayan kankalar (eklenebilir)
 const addableFriends = computed(() =>
   friendsStore.friends.filter((f) => !props.members.find((m) => m.id === f.user.id))
@@ -103,9 +122,9 @@ async function renameGroup() {
 </script>
 
 <template>
-  <div
-    class="w-[220px] flex flex-col shrink-0 border-l overflow-hidden"
-    style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle);"
+  <aside
+    class="w-[220px] flex flex-col shrink-0 mb-4 mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
+    style="background-color: var(--kv-bg-sidebar);"
   >
     <!-- Başlık -->
     <div
@@ -129,7 +148,7 @@ async function renameGroup() {
       <div
         v-for="member in members"
         :key="member.id"
-        class="flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)]"
+        class="group flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)]"
       >
         <div
           class="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-semibold text-white"
@@ -143,16 +162,29 @@ async function renameGroup() {
           />
           <span v-else>{{ member.username[0].toUpperCase() }}</span>
         </div>
-        <span class="text-[13px] truncate" style="color: var(--kv-text-primary);">
+        <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-primary);">
           {{ member.username }}
         </span>
+        <!-- Taç: owner işareti -->
         <span
           v-if="member.id === ownerId"
-          class="text-[10px] px-1.5 py-0.5 rounded ml-auto shrink-0"
+          class="text-[10px] px-1.5 py-0.5 rounded shrink-0"
           style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
         >
           👑
         </span>
+        <!-- Çıkar butonu: isOwner=true AND bu üye owner değilse -->
+        <button
+          v-else-if="isOwner && member.id !== authStore.user?.id"
+          class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 w-5 h-5 flex items-center justify-center rounded cursor-pointer"
+          style="color: var(--kv-danger);"
+          :title="t('group.removeMember')"
+          @click="removeMemberTarget = member"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
       </div>
     </div>
 
@@ -204,7 +236,7 @@ async function renameGroup() {
         🗑 {{ t('group.deleteGroup') }}
       </button>
     </div>
-  </div>
+  </aside>
 
   <!-- Üye ekle mini-modal -->
   <div
@@ -314,5 +346,15 @@ async function renameGroup() {
     :loading="deleting"
     @confirm="deleteGroup"
     @cancel="showDeleteConfirm = false"
+  />
+
+  <!-- Üye çıkar onayı (owner) -->
+  <ConfirmDialog
+    v-if="removeMemberTarget"
+    :message="t('group.removeMemberConfirm', { username: removeMemberTarget.username })"
+    :confirm-label="t('group.removeMemberAction')"
+    :loading="removing"
+    @confirm="removeMember"
+    @cancel="removeMemberTarget = null"
   />
 </template>

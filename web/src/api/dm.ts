@@ -19,4 +19,6 @@ export const dmApi = {
     http.delete<null>(`/dm/groups/${groupId}`),
   renameGroup: (groupId: string, name: string) =>
     http.patch<DmChannelDto>(`/dm/groups/${groupId}`, { name }),
+  removeGroupMember: (groupId: string, userId: string) =>
+    http.delete<null>(`/dm/groups/${groupId}/members/${userId}`),
 }

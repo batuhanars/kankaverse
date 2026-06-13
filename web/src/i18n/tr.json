@@ -433,7 +433,11 @@
     "renamePlaceholder": "Grup adı…",
     "renameAction": "Kaydet",
     "renameError": "Grup adı değiştirilemedi.",
-    "noName": "Grup"
+    "noName": "Grup",
+    "removeMember": "Üyeyi Gruptan Çıkar",
+    "removeMemberConfirm": "{username} adlı üyeyi gruptan çıkarmak istediğinden emin misin?",
+    "removeMemberAction": "Çıkar",
+    "removeMemberError": "Üye çıkarılamadı."
   },
   "startChat": {
     "title": "Sohbet Başlat",
