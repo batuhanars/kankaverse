@@ -13,6 +13,7 @@ import EmojiPicker from './EmojiPicker.vue'
 import type { MessageDto } from '@/types'
 
 const props = defineProps<{ message: MessageDto }>()
+const emit = defineEmits<{ reply: [message: MessageDto] }>()
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -267,6 +268,15 @@ onUnmounted(() => {
           <EmojiPicker @select="pickEmoji" />
         </div>
       </div>
+      <!-- Yanıtla -->
+      <button
+        class="text-[12px] cursor-pointer px-1 py-0.5 rounded transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+        style="color: var(--kv-text-muted);"
+        :title="t('reply.button')"
+        @click.stop="emit('reply', message)"
+      >
+        ↩ {{ t('reply.button') }}
+      </button>
       <!-- Şikâyet (kendi mesajı değilse) -->
       <button
         v-if="!isMine"
@@ -319,6 +329,22 @@ onUnmounted(() => {
         >
           {{ t('message.edited') }}
         </span>
+      </div>
+
+      <!-- Yanıt alıntısı (replyToId doluysa mesajın üstünde) -->
+      <div
+        v-if="message.replyToId"
+        class="flex items-center gap-1.5 mt-0.5 mb-0.5 pl-2 text-[12px] rounded-[var(--kv-radius-sm)] max-w-[480px] truncate cursor-default"
+        style="border-left: 2px solid var(--kv-text-muted); color: var(--kv-text-muted);"
+      >
+        <span class="shrink-0">↩</span>
+        <template v-if="message.replyTo">
+          <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">{{ message.replyTo.authorUsername }}</span>
+          <span class="truncate">{{ message.replyTo.content }}</span>
+        </template>
+        <template v-else>
+          <span class="italic">{{ t('reply.deleted') }}</span>
+        </template>
       </div>
 
       <!-- Inline düzenleme modu -->
