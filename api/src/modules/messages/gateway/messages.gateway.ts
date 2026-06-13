@@ -15,6 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { MembershipService } from '../../../shared/membership/membership.service';
 import { RealtimeService } from '../../../shared/realtime/realtime.service';
+import { PresenceService, ActiveStatus } from '../../../shared/presence/presence.service';
 
 interface AuthSocket extends Socket {
   data: { userId: string; sessionId: string; username?: string };
@@ -31,6 +32,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private prisma: PrismaService,
     private membership: MembershipService,
     private realtime: RealtimeService,
+    private presence: PresenceService,
   ) {}
 
   afterInit(server: Server) {
@@ -62,14 +64,41 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       socket.data.username = user?.username ?? payload.sub;
 
       socket.join(`user:${payload.sub}`);
+
+      // Presence bağlantısı: count++ ve mevcut durumu al
+      const userId = payload.sub;
+      const currentStatus = this.presence.connect(userId);
+
+      // İzinli kitleye presence:update yay (ilk bağlantıda online; sonraki sekmelerde mevcut durum)
+      const audience = await this.presence.audienceFor(userId);
+      for (const recipientId of audience) {
+        this.realtime.emitToUser(recipientId, 'presence:update', { userId, status: currentStatus });
+      }
+
+      // Bağlanan kullanıcıya snapshot: görebileceği + şu an online olanların durumları
+      // visibleOnlineFor(userId) doğru yönü kullanır: canSeePresence(userId, aday)
+      const states = await this.presence.visibleOnlineFor(userId);
+      socket.emit('presence:snapshot', { states });
     } catch {
       socket.emit('auth_error', { error: 'UNAUTHORIZED' });
       socket.disconnect(true);
     }
   }
 
-  handleDisconnect(_socket: AuthSocket) {
-    // Temizlik gerekmez; room'lar otomatik ayrılır
+  async handleDisconnect(socket: AuthSocket) {
+    const userId = socket.data?.userId;
+    if (!userId) return; // auth olmamış socket — hiçbir şey yapma
+
+    const nowOffline = this.presence.disconnect(userId);
+    if (nowOffline) {
+      const audience = await this.presence.audienceFor(userId);
+      for (const recipientId of audience) {
+        this.realtime.emitToUser(recipientId, 'presence:update', {
+          userId,
+          status: 'offline',
+        });
+      }
+    }
   }
 
   @SubscribeMessage('channel:join')
@@ -108,15 +137,30 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const userId = socket.data.userId;
     const { channelId } = payload;
 
+    let channel: Awaited<ReturnType<typeof this.membership.requireChannelAccess>>;
     try {
-      await this.membership.requireChannelAccess(userId, channelId);
+      channel = await this.membership.requireChannelAccess(userId, channelId);
     } catch {
       // Sessiz drop: erişim yoksa veya yaş kısıtlıysa yaymadan ack ile dön
       return { ok: false };
     }
 
     const username = socket.data.username ?? userId;
-    socket.to(`room:${channelId}`).emit('typing:update', { userId, username, channelId });
+
+    if (channel.guildId === null) {
+      // DM kanalı: alıcıların user:<id> odasına yay (room'a bakmayanlar da alsın)
+      const others = await this.prisma.channelMember.findMany({
+        where: { channelId, userId: { not: userId } },
+        select: { userId: true },
+      });
+      for (const other of others) {
+        this.realtime.emitToUser(other.userId, 'typing:update', { userId, username, channelId });
+      }
+    } else {
+      // Guild kanalı: mevcut room yayını
+      socket.to(`room:${channelId}`).emit('typing:update', { userId, username, channelId });
+    }
+
     return { ok: true };
   }
 
@@ -128,15 +172,61 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const userId = socket.data.userId;
     const { channelId } = payload;
 
+    let channel: Awaited<ReturnType<typeof this.membership.requireChannelAccess>>;
     try {
-      await this.membership.requireChannelAccess(userId, channelId);
+      channel = await this.membership.requireChannelAccess(userId, channelId);
     } catch {
       // Sessiz drop
       return { ok: false };
     }
 
     const username = socket.data.username ?? userId;
-    socket.to(`room:${channelId}`).emit('typing:clear', { userId, username, channelId });
+
+    if (channel.guildId === null) {
+      // DM kanalı: alıcıların user:<id> odasına yay
+      const others = await this.prisma.channelMember.findMany({
+        where: { channelId, userId: { not: userId } },
+        select: { userId: true },
+      });
+      for (const other of others) {
+        this.realtime.emitToUser(other.userId, 'typing:clear', { userId, username, channelId });
+      }
+    } else {
+      // Guild kanalı: mevcut room yayını
+      socket.to(`room:${channelId}`).emit('typing:clear', { userId, username, channelId });
+    }
+
+    return { ok: true };
+  }
+
+  @SubscribeMessage('presence:set')
+  async handlePresenceSet(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { status: ActiveStatus },
+  ) {
+    const userId = socket.data?.userId;
+    if (!userId) return { ok: false };
+
+    const VALID_STATUSES: ActiveStatus[] = ['online', 'away', 'dnd'];
+    if (!payload?.status || !VALID_STATUSES.includes(payload.status)) {
+      return { ok: false };
+    }
+
+    const applied = this.presence.setStatus(userId, payload.status);
+    if (applied === 'offline') {
+      // Bağlı değil — ack ile dön (güncelleme olmadı)
+      return { ok: false };
+    }
+
+    // İzinli kitleye yay
+    const audience = await this.presence.audienceFor(userId);
+    for (const recipientId of audience) {
+      this.realtime.emitToUser(recipientId, 'presence:update', {
+        userId,
+        status: applied,
+      });
+    }
+
     return { ok: true };
   }
 
