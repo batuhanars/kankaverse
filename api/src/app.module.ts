@@ -13,6 +13,7 @@ import { BlocksModule } from './modules/blocks/blocks.module';
 import { DmModule } from './modules/dm/dm.module';
 import { UsersModule } from './modules/users/users.module';
 import { JobsModule } from './common/jobs/jobs.module';
+import { InvitesModule } from './modules/invites/invites.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -30,6 +31,7 @@ import configuration from './config/configuration';
     DmModule,
     UsersModule,
     JobsModule,
+    InvitesModule,
   ],
   providers: [
     {

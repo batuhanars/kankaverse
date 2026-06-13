@@ -10,6 +10,9 @@ import { PrismaService } from '../../prisma/prisma.service';
  *
  * R7 (Sprint 3): DM kanalı erişim açığı kapatıldı — guildId=null kanalda
  * ChannelMember kontrolü yapılıyor (önceden atlanıyordu, herkes DM okuyabilirdi).
+ *
+ * R7 (Sprint 7A): guild.adultsOnly enforce edildi — guild kanalı dalında tek
+ * isMinor sorgusuyla hem ageGated hem adultsOnly kapısı kontrol edilir (DRY).
  */
 @Injectable()
 export class MembershipService {
@@ -39,29 +42,32 @@ export class MembershipService {
    *  - Guild kanalı: guild üyeliği kontrolü (eski davranış korundu)
    *  - DM/GROUP_DM kanalı: ChannelMember kaydı kontrolü (R7 — Sprint 3'te kapanan güvenlik açığı)
    *  - ageGated kanal: isMinor kullanıcı → 403 AGE_RESTRICTED (Sprint 4A §7 — savunma derinliği)
+   *  - adultsOnly guild: isMinor kullanıcı → 403 AGE_RESTRICTED (Sprint 7A §4 — savunma derinliği)
+   *
+   * DRY: tek isMinor sorgusu guild kanalında ageGated + adultsOnly her ikisini kapsar.
    */
   async requireChannelAccess(userId: string, channelId: string) {
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId, deletedAt: null },
+      include: { guild: true },
     });
     if (!channel) {
       throw new NotFoundException({ message: 'Kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
     }
 
-    // Yaş-kapılı guard (Sprint 4A §7): ageGated=true ise minör erişemez.
-    // ageGated kanal oluşturma yüzeyi Sprint 7'de gelir; bu guard savunma derinliği — set edilirse çalışır.
-    if (channel.ageGated) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { isMinor: true },
-      });
-      if (user?.isMinor) {
-        throw new ForbiddenException({ message: 'Bu kanala yaşınız nedeniyle erişemezsiniz.', error: 'AGE_RESTRICTED' });
-      }
-    }
-
     if (channel.guildId) {
-      // Guild kanalı: guild üyeliği
+      // Guild kanalı: yaş kapısı (ageGated + adultsOnly) + guild üyeliği
+      const needsAgeCheck = channel.ageGated || (channel.guild?.adultsOnly ?? false);
+      if (needsAgeCheck) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { isMinor: true },
+        });
+        if (user?.isMinor) {
+          throw new ForbiddenException({ message: 'Bu kanala yaşınız nedeniyle erişemezsiniz.', error: 'AGE_RESTRICTED' });
+        }
+      }
+
       const membership = await this.prisma.guildMember.findUnique({
         where: { guildId_userId: { guildId: channel.guildId, userId } },
       });
@@ -70,6 +76,19 @@ export class MembershipService {
       }
     } else {
       // DM kanalı: ChannelMember kaydı — R7 §7 Sprint 3 açık kapanışı
+      // Not: DM kanalı adultsOnly'den etkilenmez (guild kanalı değil)
+
+      // ageGated DM kanalı (teorik) için yine de kontrol
+      if (channel.ageGated) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { isMinor: true },
+        });
+        if (user?.isMinor) {
+          throw new ForbiddenException({ message: 'Bu kanala yaşınız nedeniyle erişemezsiniz.', error: 'AGE_RESTRICTED' });
+        }
+      }
+
       const member = await this.prisma.channelMember.findUnique({
         where: { channelId_userId: { channelId, userId } },
       });

@@ -1,13 +1,14 @@
 import {
   Injectable,
-  ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
+import { UpdateGuildDto } from './dto/update-guild.dto';
 import { Guild } from '@prisma/client';
 
-function toGuildDto(guild: Guild) {
+export function toGuildDto(guild: Guild) {
   return {
     id: guild.id,
     name: guild.name,
@@ -64,7 +65,8 @@ export class GuildsService {
       .map((m) => toGuildDto(m.guild));
   }
 
-  async join(userId: string, guildId: string) {
+  /** PATCH /guilds/:id — yalnız OWNER */
+  async update(userId: string, guildId: string, dto: UpdateGuildDto) {
     const guild = await this.prisma.guild.findUnique({
       where: { id: guildId, deletedAt: null },
     });
@@ -72,17 +74,21 @@ export class GuildsService {
       throw new NotFoundException({ message: 'Sunucu bulunamadı.', error: 'GUILD_NOT_FOUND' });
     }
 
-    const existing = await this.prisma.guildMember.findUnique({
+    const membership = await this.prisma.guildMember.findUnique({
       where: { guildId_userId: { guildId, userId } },
     });
-    if (existing) {
-      throw new ConflictException({ message: 'Bu sunucuya zaten üyesiniz.', error: 'ALREADY_MEMBER' });
+    if (!membership || membership.role !== 'OWNER') {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
 
-    await this.prisma.guildMember.create({
-      data: { guildId, userId, role: 'MEMBER' },
+    const updated = await this.prisma.guild.update({
+      where: { id: guildId },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.adultsOnly !== undefined && { adultsOnly: dto.adultsOnly }),
+      },
     });
 
-    return toGuildDto(guild);
+    return toGuildDto(updated);
   }
 }

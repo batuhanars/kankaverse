@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   Param,
   UseGuards,
@@ -11,6 +12,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GuildsService } from './guilds.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
+import { UpdateGuildDto } from './dto/update-guild.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from '../../common/guards/verified-email.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -36,10 +38,14 @@ export class GuildsController {
     return this.guildsService.findMyGuilds(user.id);
   }
 
-  @Post(':id/join')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Guild ID ile sunucuya katıl (Sprint 1 basitleştirmesi)' })
-  join(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
-    return this.guildsService.join(user.id, guildId);
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Ortam ayarlarını güncelle: ad ve/veya adultsOnly (yalnız OWNER)' })
+  update(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Body() dto: UpdateGuildDto,
+  ) {
+    return this.guildsService.update(user.id, guildId, dto);
   }
 }

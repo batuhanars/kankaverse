@@ -20,14 +20,18 @@ function resetMocks() {
 }
 
 // ── Sabit fixtures ───────────────────────────────────────────────────────────
-const GUILD = { id: 'guild1', deletedAt: null };
+const GUILD = { id: 'guild1', deletedAt: null, adultsOnly: false };
 const MEMBERSHIP = { guildId: 'guild1', userId: 'user1', role: 'MEMBER' };
 const ADULT_USER = { id: 'user1', isMinor: false };
 const MINOR_USER = { id: 'minor1', isMinor: true };
 
-const GUILD_CHANNEL = { id: 'ch1', guildId: 'guild1', ageGated: false, deletedAt: null };
-const DM_CHANNEL = { id: 'dm1', guildId: null, ageGated: false, deletedAt: null };
-const AGE_GATED_CHANNEL = { id: 'ch-adult', guildId: 'guild1', ageGated: true, deletedAt: null };
+// Kanallar: channel.findUnique artık guild'i include ederek döner (Sprint 7A)
+const GUILD_CHANNEL = { id: 'ch1', guildId: 'guild1', ageGated: false, deletedAt: null, guild: GUILD };
+const DM_CHANNEL = { id: 'dm1', guildId: null, ageGated: false, deletedAt: null, guild: null };
+const AGE_GATED_CHANNEL = { id: 'ch-adult', guildId: 'guild1', ageGated: true, deletedAt: null, guild: GUILD };
+// adultsOnly guild kanalı (Sprint 7A §4 erişim-zamanı enforcement)
+const ADULTS_ONLY_GUILD = { id: 'guild2', deletedAt: null, adultsOnly: true };
+const ADULTS_ONLY_CHANNEL = { id: 'ch-ao', guildId: 'guild2', ageGated: false, deletedAt: null, guild: ADULTS_ONLY_GUILD };
 
 // ── requireGuildMembership ───────────────────────────────────────────────────
 describe('MembershipService.requireGuildMembership', () => {
@@ -105,6 +109,8 @@ describe('MembershipService.requireChannelAccess', () => {
         ForbiddenException,
       );
 
+      prismaMock.channel.findUnique.mockResolvedValue(AGE_GATED_CHANNEL);
+      prismaMock.user.findUnique.mockResolvedValue({ isMinor: true });
       await expect(service.requireChannelAccess(MINOR_USER.id, AGE_GATED_CHANNEL.id)).rejects.toMatchObject({
         response: { error: 'AGE_RESTRICTED' },
       });
@@ -115,9 +121,8 @@ describe('MembershipService.requireChannelAccess', () => {
       prismaMock.user.findUnique.mockResolvedValue({ isMinor: false });
       prismaMock.guildMember.findUnique.mockResolvedValue(MEMBERSHIP);
 
-      await expect(
-        service.requireChannelAccess(ADULT_USER.id, AGE_GATED_CHANNEL.id),
-      ).resolves.toEqual(AGE_GATED_CHANNEL);
+      const result = await service.requireChannelAccess(ADULT_USER.id, AGE_GATED_CHANNEL.id);
+      expect(result).toMatchObject({ id: AGE_GATED_CHANNEL.id });
     });
 
     it('ageGated kanal + yetişkin + guild üyesi değil → NOT_CHANNEL_MEMBER fırlatır', async () => {
@@ -131,6 +136,57 @@ describe('MembershipService.requireChannelAccess', () => {
     });
   });
 
+  // adultsOnly guild-seviyesi erişim kapısı — Sprint 7A §4 (KRİTİK)
+  describe('adultsOnly guild kanalı (Sprint 7A §4 — savunma derinliği)', () => {
+    it('adultsOnly guild kanalı + minör → AGE_RESTRICTED fırlatır', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue(ADULTS_ONLY_CHANNEL);
+      prismaMock.user.findUnique.mockResolvedValue({ isMinor: true });
+
+      await expect(
+        service.requireChannelAccess(MINOR_USER.id, ADULTS_ONLY_CHANNEL.id),
+      ).rejects.toMatchObject({ response: { error: 'AGE_RESTRICTED' } });
+    });
+
+    it('adultsOnly guild kanalı + yetişkin + üye → geçer', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue(ADULTS_ONLY_CHANNEL);
+      prismaMock.user.findUnique.mockResolvedValue({ isMinor: false });
+      prismaMock.guildMember.findUnique.mockResolvedValue({ guildId: 'guild2', userId: 'adult1', role: 'MEMBER' });
+
+      const result = await service.requireChannelAccess('adult1', ADULTS_ONLY_CHANNEL.id);
+      expect(result).toMatchObject({ id: ADULTS_ONLY_CHANNEL.id });
+    });
+
+    it('adultsOnly guild kanalı + minör → tek isMinor sorgusu yapılır (DRY)', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue(ADULTS_ONLY_CHANNEL);
+      prismaMock.user.findUnique.mockResolvedValue({ isMinor: true });
+
+      await expect(
+        service.requireChannelAccess(MINOR_USER.id, ADULTS_ONLY_CHANNEL.id),
+      ).rejects.toThrow(ForbiddenException);
+
+      // user.findUnique yalnız BİR kez çağrılmalı (hem ageGated hem adultsOnly tek sorgu — DRY)
+      expect(prismaMock.user.findUnique).toHaveBeenCalledTimes(1);
+    });
+
+    it('non-adultsOnly guild kanalı (ageGated=false) → isMinor sorgusu yapılmaz', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue(GUILD_CHANNEL); // adultsOnly=false
+      prismaMock.guildMember.findUnique.mockResolvedValue(MEMBERSHIP);
+
+      await service.requireChannelAccess(ADULT_USER.id, GUILD_CHANNEL.id);
+
+      expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('DM kanalı adultsOnly\'den etkilenmez', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue(DM_CHANNEL);
+      prismaMock.channelMember.findUnique.mockResolvedValue({ channelId: 'dm1', userId: MINOR_USER.id });
+
+      // Minör DM kanalına girebilir (adultsOnly guild kanalı değil)
+      const result = await service.requireChannelAccess(MINOR_USER.id, DM_CHANNEL.id);
+      expect(result).toMatchObject({ id: DM_CHANNEL.id });
+    });
+  });
+
   // Guild kanalı erişim
   describe('Guild kanalı', () => {
     it('guild kanalı + guild üyesi → kanalı döner', async () => {
@@ -139,7 +195,7 @@ describe('MembershipService.requireChannelAccess', () => {
 
       const result = await service.requireChannelAccess('user1', GUILD_CHANNEL.id);
 
-      expect(result).toEqual(GUILD_CHANNEL);
+      expect(result).toMatchObject({ id: GUILD_CHANNEL.id, guildId: 'guild1' });
     });
 
     it('guild kanalı + guild üyesi değil → ForbiddenException NOT_CHANNEL_MEMBER fırlatır', async () => {
@@ -164,7 +220,7 @@ describe('MembershipService.requireChannelAccess', () => {
 
       const result = await service.requireChannelAccess('user1', DM_CHANNEL.id);
 
-      expect(result).toEqual(DM_CHANNEL);
+      expect(result).toMatchObject({ id: DM_CHANNEL.id, guildId: null });
     });
 
     it('DM kanalı + ChannelMember kaydı YOK → ForbiddenException NOT_CHANNEL_MEMBER fırlatır', async () => {
