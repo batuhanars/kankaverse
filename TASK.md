@@ -494,6 +494,9 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] `nest build`+`vue-tsc` temiz; **245 test**; migration uygulandı
 - [ ] **Borç D14:** ikon scan-gate'siz public → lansman öncesi R5 scan (PLAN)
 
+### Sistem cilası (PM compose, önizleme yolu)
+- [x] **Yavaş mod** (kanal başına anti-spam): `Channel.slowModeSeconds` + migration; `PATCH /channels` ayar (OWNER/ADMIN); `messages.create` enforcement (OWNER/ADMIN muaf, DM hariç, `SLOW_MODE` + retryAfter); UI select + saat rozeti + hata gösterimi. 257 test
+
 ---
 
 ## Sprint 1 DoD — PM reconcile (2026-06-13)
