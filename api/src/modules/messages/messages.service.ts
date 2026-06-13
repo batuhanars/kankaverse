@@ -12,11 +12,27 @@ type AttachmentDto = Pick<Attachment, 'id' | 'filename' | 'contentType' | 'size'
 
 type ReactionAggDto = { emoji: string; count: number; reactedByMe: boolean };
 
+type ReplyToDto = { id: string; content: string; authorUsername: string } | null;
+
+type ReplyToRaw = (Pick<Message, 'id' | 'content' | 'deletedAt'> & {
+  author: Pick<User, 'username'>;
+}) | null;
+
 type MessageWithAuthor = Message & {
   author: Pick<User, 'id' | 'username' | 'avatarUrl'>;
   attachments: AttachmentDto[];
   reactions?: Pick<MessageReaction, 'userId' | 'emoji'>[];
+  replyTo?: ReplyToRaw;
 };
+
+// replyTo snippet: ≤100 karakter; dosya ekli + boş içerik → "[dosya]"; silinmişse null
+function buildReplyToDto(raw: ReplyToRaw): ReplyToDto {
+  if (!raw || raw.deletedAt !== null) return null;
+  const snippet = raw.content.trim().length > 0
+    ? raw.content.slice(0, 100)
+    : '[dosya]';
+  return { id: raw.id, content: snippet, authorUsername: raw.author.username };
+}
 
 function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
   // Aggregate reactions: group by emoji, count, reactedByMe
@@ -45,6 +61,7 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
     channelId: msg.channelId,
     content: msg.content,
     replyToId: msg.replyToId,
+    replyTo: buildReplyToDto(msg.replyTo ?? null),
     editedAt: msg.editedAt ? msg.editedAt.toISOString() : null,
     author: {
       id: msg.author.id,
@@ -62,6 +79,16 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
     createdAt: msg.createdAt.toISOString(),
   };
 }
+
+// replyTo include fragmanı — tüm sorgularda aynı şekil kullanılır
+const REPLY_TO_INCLUDE = {
+  select: {
+    id: true,
+    content: true,
+    deletedAt: true,
+    author: { select: { username: true } },
+  },
+} as const;
 
 @Injectable()
 export class MessagesService {
@@ -115,6 +142,7 @@ export class MessagesService {
         },
         // Reaksiyonları tek sorguda çek — N+1 yok; aggregation JS tarafında
         reactions: { select: { userId: true, emoji: true } },
+        replyTo: REPLY_TO_INCLUDE,
       },
       orderBy: { createdAt: 'desc' },
       take,
@@ -194,6 +222,17 @@ export class MessagesService {
       }
     }
 
+    // replyToId doğrulama: var + silinmemiş + AYNI kanal
+    if (dto.replyToId) {
+      const replyTarget = await this.prisma.message.findUnique({
+        where: { id: dto.replyToId },
+        select: { id: true, channelId: true, deletedAt: true },
+      });
+      if (!replyTarget || replyTarget.deletedAt !== null || replyTarget.channelId !== channelId) {
+        throw new BadRequestException({ message: 'Geçersiz yanıt hedefi.', error: 'INVALID_REPLY' });
+      }
+    }
+
     // Attachment doğrulama: sahiplik + messageId null (henüz başka mesaja bağlanmamış)
     if (hasAttachments) {
       const attachments = await this.prisma.attachment.findMany({
@@ -237,6 +276,7 @@ export class MessagesService {
           select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
         },
         reactions: { select: { userId: true, emoji: true } },
+        replyTo: REPLY_TO_INCLUDE,
       },
     });
 
@@ -307,6 +347,7 @@ export class MessagesService {
           select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
         },
         reactions: { select: { userId: true, emoji: true } },
+        replyTo: REPLY_TO_INCLUDE,
       },
     });
 

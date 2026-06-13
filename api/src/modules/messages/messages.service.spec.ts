@@ -84,6 +84,7 @@ function makeMsg(id: string, createdAt: Date) {
     channelId: CHANNEL_ID,
     content: 'merhaba',
     replyToId: null,
+    replyTo: null,
     createdAt,
     author: { id: 'author-1', username: 'kanka', avatarUrl: null },
     attachments: [],
@@ -262,6 +263,7 @@ describe('MessagesService.create — automod', () => {
     channelId: GUILD_CHANNEL_ID,
     content: 'merhaba',
     replyToId: null,
+    replyTo: null,
     createdAt: new Date('2026-06-12T12:00:00Z'),
     author: { id: 'author-1', username: 'kanka', avatarUrl: null },
     attachments: [],
@@ -358,6 +360,7 @@ describe('MessagesService.create — attachment linking + scan-gate', () => {
     channelId: GUILD_CHANNEL_ID,
     content: 'dosya var',
     replyToId: null,
+    replyTo: null,
     createdAt: new Date('2026-06-13T10:00:00Z'),
     author: { id: 'author-1', username: 'kanka', avatarUrl: null },
     attachments: [],
@@ -529,6 +532,7 @@ describe('MessagesService.create — yavaş mod', () => {
     channelId: GUILD_CHANNEL_ID,
     content: 'merhaba',
     replyToId: null,
+    replyTo: null,
     createdAt: new Date('2026-06-13T12:00:00Z'),
     author: { id: USER_ID, username: 'kanka', avatarUrl: null },
     attachments: [],
@@ -675,6 +679,7 @@ describe('MessagesService.create — GROUP_DM requireNoDmBlock skip', () => {
     channelId: GROUP_CHANNEL_ID,
     content: 'grup mesajı',
     replyToId: null,
+    replyTo: null,
     createdAt: new Date('2026-06-13T12:00:00Z'),
     author: { id: 'author-1', username: 'kanka', avatarUrl: null },
     attachments: [],
@@ -748,6 +753,7 @@ describe('MessagesService.editMessage', () => {
       channelId: GUILD_CHANNEL_ID,
       content,
       replyToId: null,
+      replyTo: null,
       editedAt: new Date(),
       deletedAt: null,
       createdAt: new Date('2026-06-13T10:00:00Z'),
@@ -1146,6 +1152,7 @@ describe('MessagesService.findMessages — reactions aggregation', () => {
         channelId: GUILD_CHANNEL_ID,
         content: 'test',
         replyToId: null,
+        replyTo: null,
         editedAt: null,
         createdAt: new Date(),
         author: { id: 'author-1', username: 'kanka', avatarUrl: null },
@@ -1166,6 +1173,7 @@ describe('MessagesService.findMessages — reactions aggregation', () => {
         channelId: GUILD_CHANNEL_ID,
         content: 'test',
         replyToId: null,
+        replyTo: null,
         editedAt: null,
         createdAt: new Date(),
         author: { id: 'author-1', username: 'kanka', avatarUrl: null },
@@ -1201,6 +1209,7 @@ describe('MessagesService.findMessages — reactions aggregation', () => {
         channelId: GUILD_CHANNEL_ID,
         content: 'test',
         replyToId: null,
+        replyTo: null,
         editedAt: null,
         createdAt: new Date(),
         author: { id: 'author-1', username: 'kanka', avatarUrl: null },
@@ -1217,5 +1226,247 @@ describe('MessagesService.findMessages — reactions aggregation', () => {
 
     expect(thumbs!.reactedByMe).toBe(true);
     expect(thumbs!.count).toBe(2);
+  });
+});
+
+// ── MessagesService.create — reply (replyToId) doğrulama + DTO ───────────────
+
+describe('MessagesService.create — reply doğrulama + replyTo DTO', () => {
+  let service: MessagesService;
+
+  const REPLY_TARGET_ID = 'msg-reply-target';
+  const OTHER_CHANNEL_ID = 'ch-other-1';
+
+  // Geçerli yanıt hedefi: aynı kanal, silinmemiş
+  const VALID_REPLY_TARGET = {
+    id: REPLY_TARGET_ID,
+    channelId: GUILD_CHANNEL_ID,
+    deletedAt: null,
+  };
+
+  // Geçerli reply ile oluşturulan mesaj
+  function makeCreatedMsgWithReply(replyTo: object | null) {
+    return {
+      id: 'msg-reply-new',
+      channelId: GUILD_CHANNEL_ID,
+      content: 'cevap mesajı',
+      replyToId: replyTo ? REPLY_TARGET_ID : null,
+      replyTo,
+      createdAt: new Date('2026-06-13T13:00:00Z'),
+      author: { id: USER_ID, username: 'kanka', avatarUrl: null },
+      attachments: [],
+      reactions: [],
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    automodMock.check.mockReturnValue({ blocked: false });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Geçerli reply → replyTo dolu döner
+  // ─────────────────────────────────────────────────────────────────────────
+  it('geçerli replyToId → mesaj oluşturulur, replyTo DTO dolu döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+
+    // findUnique: önce replyTo doğrulama, sonra (create'den sonra) yok
+    prismaMock.message.findUnique.mockResolvedValueOnce(VALID_REPLY_TARGET);
+
+    const replyToRaw = {
+      id: REPLY_TARGET_ID,
+      content: 'orijinal mesaj',
+      deletedAt: null,
+      author: { username: 'eski-kanka' },
+    };
+    prismaMock.message.create.mockResolvedValue(
+      makeCreatedMsgWithReply(replyToRaw),
+    );
+
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: 'cevap mesajı',
+      replyToId: REPLY_TARGET_ID,
+    });
+
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+    expect(result.replyToId).toBe(REPLY_TARGET_ID);
+    expect(result.replyTo).not.toBeNull();
+    expect(result.replyTo!.id).toBe(REPLY_TARGET_ID);
+    expect(result.replyTo!.authorUsername).toBe('eski-kanka');
+    expect(result.replyTo!.content).toBe('orijinal mesaj');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // replyToId başka kanala ait → 400 INVALID_REPLY
+  // ─────────────────────────────────────────────────────────────────────────
+  it('replyToId başka kanala ait → BadRequestException INVALID_REPLY', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValueOnce({
+      id: REPLY_TARGET_ID,
+      channelId: OTHER_CHANNEL_ID, // farklı kanal!
+      deletedAt: null,
+    });
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.create(USER_ID, GUILD_CHANNEL_ID, {
+        content: 'deneme',
+        replyToId: REPLY_TARGET_ID,
+      });
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('INVALID_REPLY');
+    expect(prismaMock.message.create).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // replyToId DB'de yok → 400 INVALID_REPLY
+  // ─────────────────────────────────────────────────────────────────────────
+  it('replyToId DB\'de yok → BadRequestException INVALID_REPLY', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValueOnce(null);
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.create(USER_ID, GUILD_CHANNEL_ID, {
+        content: 'deneme',
+        replyToId: 'ghost-msg-id',
+      });
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('INVALID_REPLY');
+    expect(prismaMock.message.create).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // replyToId silinmiş mesaja işaret → 400 INVALID_REPLY
+  // ─────────────────────────────────────────────────────────────────────────
+  it('replyToId silinmiş mesaja işaret → BadRequestException INVALID_REPLY', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValueOnce({
+      id: REPLY_TARGET_ID,
+      channelId: GUILD_CHANNEL_ID,
+      deletedAt: new Date(), // silinmiş!
+    });
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.create(USER_ID, GUILD_CHANNEL_ID, {
+        content: 'deneme',
+        replyToId: REPLY_TARGET_ID,
+      });
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('INVALID_REPLY');
+    expect(prismaMock.message.create).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // replyTo content snippet: 100 karakterde kesilir
+  // ─────────────────────────────────────────────────────────────────────────
+  it('replyTo content 100 karakteri aşıyorsa snippet 100\'de kesilir', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValueOnce(VALID_REPLY_TARGET);
+
+    const longContent = 'a'.repeat(200);
+    const replyToRaw = {
+      id: REPLY_TARGET_ID,
+      content: longContent,
+      deletedAt: null,
+      author: { username: 'uzun-kanka' },
+    };
+    prismaMock.message.create.mockResolvedValue(
+      makeCreatedMsgWithReply(replyToRaw),
+    );
+
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: 'cevap',
+      replyToId: REPLY_TARGET_ID,
+    });
+
+    expect(result.replyTo).not.toBeNull();
+    expect(result.replyTo!.content.length).toBe(100);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // replyTo content boş → "[dosya]" snippet
+  // ─────────────────────────────────────────────────────────────────────────
+  it('replyTo content boş (dosya mesajı) → snippet "[dosya]" döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValueOnce(VALID_REPLY_TARGET);
+
+    const replyToRaw = {
+      id: REPLY_TARGET_ID,
+      content: '',   // dosya eki olan mesaj, content boş
+      deletedAt: null,
+      author: { username: 'dosya-kanka' },
+    };
+    prismaMock.message.create.mockResolvedValue(
+      makeCreatedMsgWithReply(replyToRaw),
+    );
+
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: 'cevap',
+      replyToId: REPLY_TARGET_ID,
+    });
+
+    expect(result.replyTo).not.toBeNull();
+    expect(result.replyTo!.content).toBe('[dosya]');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Yanıtlanan mesaj silinince → replyTo null döner (DTO)
+  // ─────────────────────────────────────────────────────────────────────────
+  it('yanıtlanan mesaj silinmişse → replyTo null döner (DTO)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValueOnce(VALID_REPLY_TARGET);
+
+    // replyTo kaydı silindi (deletedAt dolu)
+    const deletedReplyTo = {
+      id: REPLY_TARGET_ID,
+      content: 'eski içerik',
+      deletedAt: new Date(),
+      author: { username: 'kanka' },
+    };
+    prismaMock.message.create.mockResolvedValue(
+      makeCreatedMsgWithReply(deletedReplyTo),
+    );
+
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: 'cevap',
+      replyToId: REPLY_TARGET_ID,
+    });
+
+    // replyTo DTO: silinmiş mesaj → null
+    expect(result.replyTo).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // replyToId verilmemişse → replyTo null, doğrulama sorgusu yok
+  // ─────────────────────────────────────────────────────────────────────────
+  it('replyToId verilmemiş → replyTo null döner, findUnique doğrulama sorgusu yapılmaz', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.create.mockResolvedValue(
+      makeCreatedMsgWithReply(null),
+    );
+
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, { content: 'normal mesaj' });
+
+    // doğrulama için findUnique çağrılmamalı
+    expect(prismaMock.message.findUnique).not.toHaveBeenCalled();
+    expect(result.replyTo).toBeNull();
   });
 });
