@@ -544,6 +544,9 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Kapsamlı emoji picker** (`vue3-emoji-picker`, PM onaylı, koyu tema) — mesaj yazarken cursor'a emoji ekleme (guild+DM+grup) + reaksiyona "⋯ daha fazla" (tam set)
 - [x] **Mesaj saati baloncuk içine** (WhatsApp) + hover aksiyonları yüzen (layout itmiyor)
 - [x] **Mesaja yanıt (reply)** — `Message.replyTo` self-relation; `create` doğrulama (`INVALID_REPLY`, aynı kanal); MessageDto `replyTo{id,content,authorUsername}`; ↩ Yanıtla + input önizleme bandı + alıntı render; guild+DM+grup. 328 test
+- [x] **Mesaj düzeni → klasik liste** (baloncuk bırakıldı) — ortak `MessageRow.vue` (avatar 40px + ad 16px kalın · saat 12px · gövde 16px), ardışık-yazar gruplama (>7dk yeni grup), yatay hover araç çubuğu (hızlı emoji/yanıt/⋯), satır hover vurgusu; DM+grup+ortam özdeş. README "Discord alternatifi"→"yerli ve milli"
+- [x] **@bahsetme (mentions)** — `Message.mentions String[]` + migration; `resolveMentions` (token parse + erişim + **R7 yaş kapısı**: ageGated/adultsOnly kanalda minör elenir → preview sızıntısı kapalı) + ≤10 cap; MessageDto `mentions`; WS `mention` (preview token→@username, yazar hariç). Frontend: `useMentionAutocomplete` popover + gönderimde `<@id>` dönüşümü + güvenli pill render + kendi-bahsedilme sol-aksan vurgusu + `mention` bildirimi. 347 test. Sözleşme `contracts/SPRINT_V2_MENTIONS_CONTRACT.md`
+- [x] **Kanal kategorileri** — `ChannelCategory` modeli + `Channel.categoryId` + migration; ayrı `modules/categories/` CRUD (POST/GET/PATCH/DELETE); cross-guild `INVALID_CATEGORY`; sil→kanallar tx ile kategorisize düşer. Frontend: gruplu katlanabilir ChannelPanel (katlama localStorage) + OWNER/ADMIN yönetim (oluştur/adlandır/sil/ata) + kanal formu kategori dropdown. 369 test. Sözleşme `contracts/SPRINT_V2_CATEGORIES_CONTRACT.md`. **Ertelendi:** sürükle-bırak reorder (position altyapısı hazır, UI yok)
 
 ---
 
