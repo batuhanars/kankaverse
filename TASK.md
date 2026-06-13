@@ -540,7 +540,8 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 > V1 kapsamlı bitti; V2 özelliklerine geçildi. (Ertelenenler: ses/video LiveKit, göç+Discord-OAuth, rol/izin matrisi.)
 
-- [x] **Mesaj reaksiyonları (emoji)** — `MessageReaction` + migration; `POST`/`DELETE /channels/:id/messages/:messageId/reactions` (idempotent); MessageDto `reactions[{emoji,count,reactedByMe}]`; WS `reaction.added`/`removed`; emoji popover (8'li, kütüphanesiz) + toggle pill; guild+DM+grup. 320 test
+- [x] **Mesaj reaksiyonları (emoji)** — `MessageReaction` + migration; `POST`/`DELETE /channels/:id/messages/:messageId/reactions` (idempotent); MessageDto `reactions[{emoji,count,reactedByMe}]`; WS `reaction.added`/`removed`; emoji popover (8'li hızlı set) + toggle pill; guild+DM+grup. 320 test. **Fix:** çift-sayım (optimistik kaldırıldı, tek kaynak WS)
+- [x] **Kapsamlı emoji picker** (`vue3-emoji-picker`, PM onaylı, koyu tema) — mesaj yazarken cursor'a emoji ekleme (guild+DM+grup) + reaksiyona "⋯ daha fazla" (tam set)
 
 ---
 

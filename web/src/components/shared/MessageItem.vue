@@ -9,6 +9,7 @@ import UserCardPopover from './UserCardPopover.vue'
 import AttachmentView from './AttachmentView.vue'
 import ReportModal from './ReportModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
+import EmojiPicker from './EmojiPicker.vue'
 import type { MessageDto } from '@/types'
 
 const props = defineProps<{ message: MessageDto }>()
@@ -49,14 +50,24 @@ const EMOJI_SET = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '�
 
 // Emoji picker görünürlüğü
 const showEmojiPicker = ref(false)
+// Tam emoji picker (vue3-emoji-picker) görünürlüğü
+const showFullEmojiPicker = ref(false)
 
 function toggleEmojiPicker(e: MouseEvent) {
   e.stopPropagation()
   showEmojiPicker.value = !showEmojiPicker.value
+  showFullEmojiPicker.value = false
+}
+
+function openFullEmojiPicker(e: MouseEvent) {
+  e.stopPropagation()
+  showFullEmojiPicker.value = !showFullEmojiPicker.value
+  showEmojiPicker.value = false
 }
 
 async function pickEmoji(emoji: string) {
   showEmojiPicker.value = false
+  showFullEmojiPicker.value = false
   try {
     await messagesApi.addReaction(props.message.channelId, props.message.id, emoji)
     // Store güncellemesi useSocket reaction.added handler'ından gelir (çift-sayım önleme)
@@ -82,6 +93,10 @@ function onPickerDocClick(e: MouseEvent) {
   const picker = document.getElementById(`kv-emoji-picker-${props.message.id}`)
   if (picker && !picker.contains(e.target as Node)) {
     showEmojiPicker.value = false
+  }
+  const fullPicker = document.getElementById(`kv-full-emoji-picker-${props.message.id}`)
+  if (fullPicker && !fullPicker.contains(e.target as Node)) {
+    showFullEmojiPicker.value = false
   }
 }
 
@@ -230,7 +245,7 @@ onUnmounted(() => {
           >
             🙂
           </button>
-          <!-- Emoji picker popover -->
+          <!-- Hızlı emoji picker popover (8'li set + daha fazla butonu) -->
           <div
             v-if="showEmojiPicker"
             :id="`kv-emoji-picker-${message.id}`"
@@ -246,6 +261,24 @@ onUnmounted(() => {
             >
               {{ emoji }}
             </button>
+            <!-- Daha fazla: tam picker aç -->
+            <button
+              class="text-[13px] w-8 h-8 flex items-center justify-center rounded cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)] font-medium"
+              style="color: var(--kv-text-muted);"
+              :title="t('reaction.morePicker')"
+              @click.stop="openFullEmojiPicker"
+            >
+              ⋯
+            </button>
+          </div>
+          <!-- Tam emoji picker (vue3-emoji-picker) -->
+          <div
+            v-if="showFullEmojiPicker"
+            :id="`kv-full-emoji-picker-${message.id}`"
+            class="absolute bottom-full right-0 mb-1 z-50"
+            @click.stop
+          >
+            <EmojiPicker @select="pickEmoji" />
           </div>
         </div>
         <!-- Şikâyet hover butonu (kendi mesajı değilse) -->

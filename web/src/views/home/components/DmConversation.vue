@@ -13,6 +13,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import AttachmentView from '@/components/shared/AttachmentView.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import ReportModal from '@/components/shared/ReportModal.vue'
+import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import GroupManagePanel from './GroupManagePanel.vue'
 import type { DmChannelDto, MessageDto } from '@/types'
 
@@ -33,14 +34,27 @@ const deleteLoading = ref(false)
 // Sprint V2: reaksiyon emoji seti + picker state
 const EMOJI_SET = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '👀']
 const activeEmojiPickerId = ref<string | null>(null)
+// Tam emoji picker (vue3-emoji-picker) için aktif mesaj ID'si
+const activeFullEmojiPickerId = ref<string | null>(null)
+// Compose picker
+const showComposeEmojiPicker = ref(false)
+const dmTextareaEl = ref<HTMLTextAreaElement | null>(null)
 
 function toggleDmEmojiPicker(msgId: string, e: MouseEvent) {
   e.stopPropagation()
+  activeFullEmojiPickerId.value = null
   activeEmojiPickerId.value = activeEmojiPickerId.value === msgId ? null : msgId
+}
+
+function openDmFullEmojiPicker(msgId: string, e: MouseEvent) {
+  e.stopPropagation()
+  activeEmojiPickerId.value = null
+  activeFullEmojiPickerId.value = activeFullEmojiPickerId.value === msgId ? null : msgId
 }
 
 async function pickDmEmoji(msg: MessageDto, emoji: string) {
   activeEmojiPickerId.value = null
+  activeFullEmojiPickerId.value = null
   try {
     await messagesApi.addReaction(props.channel.id, msg.id, emoji)
     // Store güncellemesi useSocket reaction.added handler'ından gelir (çift-sayım önleme)
@@ -317,9 +331,36 @@ const inputPlaceholder = computed(() => {
 const canMessage = computed(() => isGroup.value || (dmChannel.value?.canMessage ?? false))
 const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
 
+// Compose emoji picker
+function toggleComposeEmojiPicker(e: MouseEvent) {
+  e.stopPropagation()
+  showComposeEmojiPicker.value = !showComposeEmojiPicker.value
+}
+
+function onDmComposeEmojiSelect(emoji: string) {
+  showComposeEmojiPicker.value = false
+  const el = dmTextareaEl.value
+  if (!el) {
+    content.value += emoji
+    return
+  }
+  const start = el.selectionStart ?? content.value.length
+  const end = el.selectionEnd ?? content.value.length
+  content.value = content.value.slice(0, start) + emoji + content.value.slice(end)
+  nextTick(() => {
+    el.focus()
+    const pos = start + emoji.length
+    el.setSelectionRange(pos, pos)
+  })
+}
+
 // Emoji picker dışı tıklamada kapat
-function onDmPickerDocClick() {
+function onDmPickerDocClick(e: MouseEvent) {
   activeEmojiPickerId.value = null
+  activeFullEmojiPickerId.value = null
+  const composePicker = document.getElementById('kv-dm-compose-emoji-picker')
+  if (composePicker && composePicker.contains(e.target as Node)) return
+  showComposeEmojiPicker.value = false
 }
 
 onMounted(() => {
@@ -544,6 +585,7 @@ onUnmounted(() => {
                   >
                     🙂
                   </button>
+                  <!-- Hızlı 8'li set -->
                   <div
                     v-if="activeEmojiPickerId === msg.id"
                     class="absolute bottom-full left-0 mb-1 z-50 flex gap-1 p-1.5 rounded-[var(--kv-radius-md)]"
@@ -558,6 +600,23 @@ onUnmounted(() => {
                     >
                       {{ emoji }}
                     </button>
+                    <!-- Daha fazla: tam picker -->
+                    <button
+                      class="text-[12px] w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)] font-medium"
+                      style="color: var(--kv-text-muted);"
+                      :title="t('reaction.morePicker')"
+                      @click.stop="openDmFullEmojiPicker(msg.id, $event)"
+                    >
+                      ⋯
+                    </button>
+                  </div>
+                  <!-- Tam emoji picker -->
+                  <div
+                    v-if="activeFullEmojiPickerId === msg.id"
+                    class="absolute bottom-full left-0 mb-1 z-50"
+                    @click.stop
+                  >
+                    <EmojiPicker @select="(emoji) => pickDmEmoji(msg, emoji)" />
                   </div>
                 </div>
                 <button
@@ -689,6 +748,7 @@ onUnmounted(() => {
                   >
                     🙂
                   </button>
+                  <!-- Hızlı 8'li set -->
                   <div
                     v-if="activeEmojiPickerId === msg.id"
                     class="absolute bottom-full mb-1 z-50 flex gap-1 p-1.5 rounded-[var(--kv-radius-md)]"
@@ -704,6 +764,24 @@ onUnmounted(() => {
                     >
                       {{ emoji }}
                     </button>
+                    <!-- Daha fazla: tam picker -->
+                    <button
+                      class="text-[12px] w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)] font-medium"
+                      style="color: var(--kv-text-muted);"
+                      :title="t('reaction.morePicker')"
+                      @click.stop="openDmFullEmojiPicker(msg.id, $event)"
+                    >
+                      ⋯
+                    </button>
+                  </div>
+                  <!-- Tam emoji picker -->
+                  <div
+                    v-if="activeFullEmojiPickerId === msg.id"
+                    class="absolute bottom-full mb-1 z-50"
+                    :class="isMine(msg) ? 'right-0' : 'left-0'"
+                    @click.stop
+                  >
+                    <EmojiPicker @select="(emoji) => pickDmEmoji(msg, emoji)" />
                   </div>
                 </div>
                 <!-- Kendi mesajı: düzenle (metin varsa) + sil hover butonları -->
@@ -806,6 +884,7 @@ onUnmounted(() => {
               📎
             </button>
             <textarea
+              ref="dmTextareaEl"
               v-model="content"
               rows="1"
               :placeholder="inputPlaceholder"
@@ -815,6 +894,26 @@ onUnmounted(() => {
               @input="sendError = ''; onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
               @blur="stopTyping"
             />
+            <!-- Emoji (😊) butonu -->
+            <div class="relative shrink-0 self-center">
+              <button
+                type="button"
+                class="py-1 px-1 cursor-pointer hover:opacity-80 transition-opacity"
+                style="color: var(--kv-text-muted); font-size: 18px; line-height: 1;"
+                :aria-label="t('message.emojiButton')"
+                @click.stop="toggleComposeEmojiPicker"
+              >
+                😊
+              </button>
+              <div
+                v-if="showComposeEmojiPicker"
+                id="kv-dm-compose-emoji-picker"
+                class="absolute bottom-full right-0 mb-2 z-50"
+                @click.stop
+              >
+                <EmojiPicker @select="onDmComposeEmojiSelect" />
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -319,10 +319,12 @@
   },
   "reaction": {
     "addReaction": "Reaksiyon ekle",
-    "toggleTitle": "Reaksiyonu değiştir"
+    "toggleTitle": "Reaksiyonu değiştir",
+    "morePicker": "Daha fazla emoji"
   },
   "message": {
     "inputPlaceholder": "#{channel} kanalına mesaj yaz",
+    "emojiButton": "Emoji ekle",
     "send": "Gönder",
     "loadMore": "Daha fazla yükle",
     "noMessages": "Henüz mesaj yok. İlk mesajı sen gönder!",
