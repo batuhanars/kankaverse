@@ -6,16 +6,40 @@ import { AutomodService } from '../../shared/automod/automod.service';
 import { ModerationService } from '../../shared/moderation/moderation.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
-import { Attachment, Message, ScanStatus, User } from '@prisma/client';
+import { Attachment, Message, MessageReaction, ScanStatus, User } from '@prisma/client';
 
 type AttachmentDto = Pick<Attachment, 'id' | 'filename' | 'contentType' | 'size' | 'scanStatus'>;
+
+type ReactionAggDto = { emoji: string; count: number; reactedByMe: boolean };
 
 type MessageWithAuthor = Message & {
   author: Pick<User, 'id' | 'username' | 'avatarUrl'>;
   attachments: AttachmentDto[];
+  reactions?: Pick<MessageReaction, 'userId' | 'emoji'>[];
 };
 
-function toMessageDto(msg: MessageWithAuthor) {
+function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
+  // Aggregate reactions: group by emoji, count, reactedByMe
+  const reactionsAgg: ReactionAggDto[] = [];
+  if (msg.reactions && msg.reactions.length > 0) {
+    const byEmoji = new Map<string, { count: number; reactedByMe: boolean }>();
+    for (const r of msg.reactions) {
+      const existing = byEmoji.get(r.emoji);
+      if (existing) {
+        existing.count += 1;
+        if (callerId && r.userId === callerId) existing.reactedByMe = true;
+      } else {
+        byEmoji.set(r.emoji, {
+          count: 1,
+          reactedByMe: callerId ? r.userId === callerId : false,
+        });
+      }
+    }
+    for (const [emoji, agg] of byEmoji) {
+      reactionsAgg.push({ emoji, count: agg.count, reactedByMe: agg.reactedByMe });
+    }
+  }
+
   return {
     id: msg.id,
     channelId: msg.channelId,
@@ -34,6 +58,7 @@ function toMessageDto(msg: MessageWithAuthor) {
       size: a.size,
       scanStatus: a.scanStatus,
     })),
+    reactions: reactionsAgg,
     createdAt: msg.createdAt.toISOString(),
   };
 }
@@ -88,12 +113,14 @@ export class MessagesService {
         attachments: {
           select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
         },
+        // Reaksiyonları tek sorguda çek — N+1 yok; aggregation JS tarafında
+        reactions: { select: { userId: true, emoji: true } },
       },
       orderBy: { createdAt: 'desc' },
       take,
     });
 
-    return messages.map(toMessageDto);
+    return messages.map((msg) => toMessageDto(msg, userId));
   }
 
   async create(userId: string, channelId: string, dto: CreateMessageDto) {
@@ -209,6 +236,7 @@ export class MessagesService {
         attachments: {
           select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
         },
+        reactions: { select: { userId: true, emoji: true } },
       },
     });
 
@@ -233,10 +261,10 @@ export class MessagesService {
         select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
       });
 
-      return toMessageDto({ ...message, attachments: linkedAttachments });
+      return toMessageDto({ ...message, attachments: linkedAttachments, reactions: [] }, userId);
     }
 
-    return toMessageDto(message);
+    return toMessageDto(message, userId);
   }
 
   async editMessage(userId: string, channelId: string, messageId: string, dto: UpdateMessageDto) {
@@ -278,10 +306,11 @@ export class MessagesService {
         attachments: {
           select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
         },
+        reactions: { select: { userId: true, emoji: true } },
       },
     });
 
-    return toMessageDto(updated);
+    return toMessageDto(updated, userId);
   }
 
   async deleteMessage(userId: string, channelId: string, messageId: string) {
@@ -302,6 +331,40 @@ export class MessagesService {
     await this.prisma.message.update({
       where: { id: messageId },
       data: { deletedAt: new Date() },
+    });
+
+    return null;
+  }
+
+  async addReaction(userId: string, channelId: string, messageId: string, emoji: string) {
+    await this.membership.requireChannelAccess(userId, channelId);
+
+    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
+    if (!message || message.deletedAt !== null) {
+      throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'MESSAGE_NOT_FOUND' });
+    }
+
+    // Idempotent: zaten varsa no-op (upsert)
+    await this.prisma.messageReaction.upsert({
+      where: { messageId_userId_emoji: { messageId, userId, emoji } },
+      create: { messageId, userId, emoji },
+      update: {},
+    });
+
+    return null;
+  }
+
+  async removeReaction(userId: string, channelId: string, messageId: string, emoji: string) {
+    await this.membership.requireChannelAccess(userId, channelId);
+
+    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
+    if (!message || message.deletedAt !== null) {
+      throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'MESSAGE_NOT_FOUND' });
+    }
+
+    // No-op: kayıt yoksa hata fırlama (deleteMany = 0 affected → ok)
+    await this.prisma.messageReaction.deleteMany({
+      where: { messageId, userId, emoji },
     });
 
     return null;

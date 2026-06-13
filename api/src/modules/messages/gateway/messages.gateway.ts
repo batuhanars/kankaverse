@@ -244,6 +244,14 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(`room:${channelId}`).emit('message.deleted', payload);
   }
 
+  broadcastReaction(
+    channelId: string,
+    event: 'reaction.added' | 'reaction.removed',
+    payload: { messageId: string; channelId: string; emoji: string; userId: string },
+  ) {
+    this.server.to(`room:${channelId}`).emit(event, payload);
+  }
+
   /**
    * DM kanalında mesaj gönderildiğinde üyelerin user:<id> odalarına bildirim yayar.
    * Alıcı o anda DM odasına join etmemiş olsa bile DM listesi (son mesaj + okunmamış) güncellenir.
