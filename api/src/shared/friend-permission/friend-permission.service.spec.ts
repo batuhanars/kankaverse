@@ -8,8 +8,13 @@ const prismaMock = {
   guildMember: { findFirst: jest.fn() },
 };
 
+// ── Mock ConfigService ───────────────────────────────────────────────────────
+const configMock = {
+  get: jest.fn(),
+};
+
 function makeService() {
-  return new FriendPermissionService(prismaMock as any);
+  return new FriendPermissionService(prismaMock as any, configMock as any);
 }
 
 // ── Helper: varsayılan mock'ları sıfırla ────────────────────────────────────
@@ -18,7 +23,12 @@ function resetMocks() {
   prismaMock.userBlock.findFirst.mockResolvedValue(null);
   prismaMock.friendship.findFirst.mockResolvedValue(null);
   prismaMock.guildMember.findFirst.mockResolvedValue(null);
+  // Varsayılan: quarantineHours=24
+  configMock.get.mockReturnValue(24);
 }
+
+// ── Zaman sabitleri ──────────────────────────────────────────────────────────
+const NOW = new Date('2026-06-12T12:00:00.000Z').getTime();
 
 const ADULT = { id: 'adult1', isMinor: false };
 const ADULT2 = { id: 'adult2', isMinor: false };
@@ -30,6 +40,11 @@ describe('FriendPermissionService.canSendFriendRequest — §3 matrisi', () => {
   beforeEach(() => {
     resetMocks();
     service = makeService();
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   // ── Kural 1: kendi kendine ──────────────────────────────────────────────
@@ -192,6 +207,52 @@ describe('FriendPermissionService.canSendFriendRequest — §3 matrisi', () => {
       });
       const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'CODE');
       expect(r).toEqual({ allowed: true });
+    });
+  });
+
+  // ── Kural 6a: Karantina (R7) — USER_CLICK ortak-ortam basamağı ──────────
+  describe('Kural 6a karantina (R7): sender yeni üye → ortak-ortam basamağı geçmez', () => {
+    // joinedAt sabitleri
+    const ONE_HOUR_AGO = new Date(NOW - 1 * 60 * 60 * 1000);        // karantinada (24s içinde)
+    const TWO_DAYS_AGO = new Date(NOW - 48 * 60 * 60 * 1000);        // yerleşik (24s dışında)
+
+    it('sender karantinada (joinedAt 1 saat önce, quarantine 24s) → ortak-ortam null → USER_NOT_FOUND', async () => {
+      configMock.get.mockReturnValue(24);
+      prismaMock.user.findUnique.mockResolvedValueOnce(ADULT).mockResolvedValueOnce(ADULT2);
+      // guildMember karantina filtresi eşleşmez → null döner
+      prismaMock.guildMember.findFirst.mockResolvedValue(null);
+      const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: false, reason: 'USER_NOT_FOUND' });
+    });
+
+    it('sender yerleşik (joinedAt 48 saat önce, quarantine 24s) → ortak-ortam var → allowed', async () => {
+      configMock.get.mockReturnValue(24);
+      prismaMock.user.findUnique.mockResolvedValueOnce(ADULT).mockResolvedValueOnce(ADULT2);
+      // guildMember karantina filtresi eşleşir → kayıt döner
+      prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm-settled', joinedAt: TWO_DAYS_AGO });
+      const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: true });
+    });
+
+    it('quarantineHours=0 → karantina kapalı → ortak-ortam var → allowed', async () => {
+      configMock.get.mockReturnValue(0); // karantina kapalı
+      prismaMock.user.findUnique.mockResolvedValueOnce(ADULT).mockResolvedValueOnce(ADULT2);
+      // cutoff=now → joinedAt { lt: now } — 1 saat önce katılmış dahil geçer
+      prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm-any', joinedAt: ONE_HOUR_AGO });
+      const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: true });
+    });
+
+    it('karantina yalnız 6a USER_CLICK basamağını etkiler — G1 minör kalkanı bozulmaz', async () => {
+      // Sender minör + ortak ortam → G1 devreye girmeli, 6a karantinaya ulaşılmamalı
+      // (6b minör kontrolü, 6a'dan sonra gelir — ama guildMember.findFirst null dönerse
+      //  6a zaten USER_NOT_FOUND verir; minör için karantinalı durumda test edelim)
+      configMock.get.mockReturnValue(24);
+      prismaMock.user.findUnique.mockResolvedValueOnce(MINOR).mockResolvedValueOnce(ADULT2);
+      // Ortak ortam var ama sender minör → 6b engellenmeli
+      prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm1', joinedAt: TWO_DAYS_AGO });
+      const r = await service.canSendFriendRequest(MINOR.id, ADULT2.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: false, reason: 'USER_NOT_FOUND' });
     });
   });
 });

@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
+import { AutomodService } from '../../shared/automod/automod.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { Message, User } from '@prisma/client';
 
@@ -26,6 +27,7 @@ export class MessagesService {
   constructor(
     private prisma: PrismaService,
     private membership: MembershipService,
+    private automod: AutomodService,
   ) {}
 
   async findMessages(userId: string, channelId: string, before?: string, limit = 50) {
@@ -75,6 +77,18 @@ export class MessagesService {
     // DM kanalında blok kontrolü: blok sonradan konuşmayı keser
     if (!channel.guildId) {
       await this.membership.requireNoDmBlock(userId, channelId);
+    }
+
+    // Automod: guild kanalı mesajlarında içerik filtresi (DM hariç — özel alan)
+    // Sıfır DB, sıfır kayıt — sadece block-on-send.
+    if (channel.guildId) {
+      const { blocked } = this.automod.check(dto.content);
+      if (blocked) {
+        throw new BadRequestException({
+          message: 'Mesajınız topluluk kurallarına uygun değil.',
+          error: 'MESSAGE_BLOCKED',
+        });
+      }
     }
 
     const message = await this.prisma.message.create({

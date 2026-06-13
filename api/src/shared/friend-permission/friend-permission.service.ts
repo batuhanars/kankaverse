@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 
 export type FriendRequestMethod = 'CODE' | 'USER_CLICK';
@@ -31,7 +32,10 @@ export interface CanSendFriendRequestResult {
  */
 @Injectable()
 export class FriendPermissionService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+  ) {}
 
   async canSendFriendRequest(
     senderId: string,
@@ -99,10 +103,14 @@ export class FriendPermissionService {
 
     // Kural 6: USER_CLICK — kod istemeden, karttan
     if (method === 'USER_CLICK') {
-      // 6a. Ortak ortam zorunlu
+      // 6a. Ortak ortam zorunlu — karantina: sender o guild'de yeni üyeyse basamak geçmez (R7)
+      // Yalnız initiator (sender) karantinası kapılar; target joinedAt bakılmaz.
+      const quarantineHours = this.config.get<number>('quarantineHours') ?? 24;
+      const cutoff = new Date(Date.now() - quarantineHours * 60 * 60 * 1000);
       const sharedGuild = await this.prisma.guildMember.findFirst({
         where: {
           userId: senderId,
+          joinedAt: { lt: cutoff }, // sender karantinada değil (joinedAt cutoff'tan önce)
           guild: {
             deletedAt: null,
             members: { some: { userId: targetId } },

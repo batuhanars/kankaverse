@@ -5,9 +5,10 @@ import { DmPermissionService } from './dm-permission/dm-permission.service';
 import { FriendPermissionService } from './friend-permission/friend-permission.service';
 import { RealtimeService } from './realtime/realtime.service';
 import { PresenceService } from './presence/presence.service';
+import { AutomodService } from './automod/automod.service';
 
 @Module({
-  providers: [EmailService, MembershipService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService],
-  exports: [EmailService, MembershipService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService],
+  providers: [EmailService, MembershipService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService],
+  exports: [EmailService, MembershipService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService],
 })
 export class SharedModule {}

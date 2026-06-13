@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
@@ -18,12 +19,18 @@ const membershipMock = {
   requireNoDmBlock: jest.fn(),
 };
 
+const automodMock = {
+  check: jest.fn(),
+};
+
 function makeService() {
-  return new MessagesService(prismaMock as any, membershipMock as any);
+  return new MessagesService(prismaMock as any, membershipMock as any, automodMock as any);
 }
 
 function resetMocks() {
   jest.resetAllMocks();
+  // Varsayılan: automod geçirir
+  automodMock.check.mockReturnValue({ blocked: false });
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -203,5 +210,99 @@ describe('MessagesService.findMessages', () => {
 
     const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
     expect(findManyCall.where.createdAt).toBeUndefined();
+  });
+});
+
+// ── MessagesService.create — automod ────────────────────────────────────────
+
+describe('MessagesService.create — automod', () => {
+  let service: MessagesService;
+
+  const DTO = { content: 'merhaba', replyToId: undefined };
+
+  const CREATED_MSG = {
+    id: 'msg-1',
+    channelId: GUILD_CHANNEL_ID,
+    content: 'merhaba',
+    replyToId: null,
+    createdAt: new Date('2026-06-12T12:00:00Z'),
+    author: { id: 'author-1', username: 'kanka', avatarUrl: null },
+  };
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Automod — guild kanalı: yasak kelime → MESSAGE_BLOCKED
+  // ─────────────────────────────────────────────────────────────────────────
+  it('guild kanalı + automod blocked → BadRequestException MESSAGE_BLOCKED', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    automodMock.check.mockReturnValue({ blocked: true });
+
+    await expect(service.create(USER_ID, GUILD_CHANNEL_ID, DTO)).rejects.toThrow(BadRequestException);
+
+    // Mesaj DB'ye yazılmamalı
+    expect(prismaMock.message.create).not.toHaveBeenCalled();
+  });
+
+  it('guild kanalı + automod blocked → hata error kodu MESSAGE_BLOCKED', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    automodMock.check.mockReturnValue({ blocked: true });
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string; message: string };
+    expect(response.error).toBe('MESSAGE_BLOCKED');
+  });
+
+  it('guild kanalı + automod temiz → mesaj oluşturulur', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    automodMock.check.mockReturnValue({ blocked: false });
+    prismaMock.message.create.mockResolvedValue(CREATED_MSG);
+
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
+
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+    expect(result.id).toBe('msg-1');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Automod — DM kanalı: automod çağrılmaz (DM hariç)
+  // ─────────────────────────────────────────────────────────────────────────
+  it('DM kanalı → automod.check çağrılmaz; mesaj oluşturulur', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    prismaMock.message.create.mockResolvedValue({
+      ...CREATED_MSG,
+      channelId: CHANNEL_ID,
+    });
+
+    await service.create(USER_ID, CHANNEL_ID, DTO);
+
+    expect(automodMock.check).not.toHaveBeenCalled();
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('DM kanalı + automod blocked mock olsa bile → automod çağrılmaz → mesaj oluşturulur', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    automodMock.check.mockReturnValue({ blocked: true }); // DM için geçersiz — çağrılmamalı
+    prismaMock.message.create.mockResolvedValue({
+      ...CREATED_MSG,
+      channelId: CHANNEL_ID,
+    });
+
+    await service.create(USER_ID, CHANNEL_ID, DTO);
+
+    expect(automodMock.check).not.toHaveBeenCalled();
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
   });
 });

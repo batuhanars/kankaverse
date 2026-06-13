@@ -108,10 +108,14 @@ export class DmPermissionService {
         return { allowed: true };
 
       case 'FRIENDS': {
-        // Ortak sunucu kontrolü
+        // Ortak sunucu kontrolü — karantina: sender o guild'de yeni üyeyse basamak geçmez (R7)
+        // Yalnız initiator (sender) karantinası kapılar; target joinedAt bakılmaz.
+        const quarantineHours = this.config.get<number>('quarantineHours') ?? 24;
+        const cutoff = new Date(Date.now() - quarantineHours * 60 * 60 * 1000);
         const sharedGuild = await this.prisma.guildMember.findFirst({
           where: {
             userId: senderId,
+            joinedAt: { lt: cutoff }, // sender karantinada değil (joinedAt cutoff'tan önce)
             guild: {
               members: { some: { userId: targetId } },
               deletedAt: null,
