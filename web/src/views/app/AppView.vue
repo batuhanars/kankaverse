@@ -91,8 +91,8 @@ async function syncFromRoute() {
     if (prev && prev !== channelId) leaveChannel(prev)
     channelsStore.setActiveChannel(channelId)
     await joinChannel(channelId)
-    // Kanal açılınca okundu işaretle → unread badge temizle
-    await channelsStore.markChannelRead(channelId)
+    // Kanal açılınca okundu işaretle → unread badge temizle (guildId ile otoritatif tazele)
+    await channelsStore.markChannelRead(channelId, guildId)
     recheckGuildUnread(guildId)
     dmStore.setActiveChannel(null)
     homeView.value = 'friends'
