@@ -503,7 +503,7 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Mesaj düzenle/sil (kendi mesajı)** — `PATCH`/`DELETE /channels/:id/messages/:messageId` (yazar-only, automod, soft-delete); WS `message.updated`/`message.deleted`; guild+DM+grup UI + "(düzenlendi)". 290 test
 - [x] **Ek UX:** görsel lightbox (sekme yok) + ek+açıklama tek birim (WhatsApp) + düzenle yalnız metinli mesajda
 - [x] **Ölçü/layout token katmanı** + yan paneller tek genişlik (264) + kontrol boyutu tutarlı
-- [x] **Kanal okunmamış sistemi** — `ChannelRead` + `POST /channels/:id/read` + `hasUnread` (kanal+guild) + WS `channel.activity`; ChannelPanel okunmamış göstergesi + ServerRail ortam pill'i. 309 test
+- [x] **Kanal okunmamış sistemi** — `ChannelRead` + `POST /channels/:id/read` + **`unreadCount`** (kanal+guild, kendi-mesaj hariç) + WS `channel.activity`; ChannelPanel + ServerRail **kırmızı sayaç rozeti**; rail sol pill = hover/aktif (unread değil); görsel-ikon bg/hover-turuncu kaldırıldı. 310 test
 - [x] **Rail özel tooltip** (Discord-tarzı, anında, ok+pill — native title gecikmesi giderildi)
 
 ---

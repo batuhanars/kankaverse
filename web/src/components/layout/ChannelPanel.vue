@@ -209,17 +209,6 @@ async function confirmDelete() {
             : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
         ]"
       >
-        <!-- Okunmamış sol gösterge (aktif kanal hariç) -->
-        <span
-          class="absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full transition-all"
-          :class="[
-            channel.hasUnread && channelsStore.activeChannelId !== channel.id
-              ? 'h-2 opacity-100'
-              : 'h-0 opacity-0',
-          ]"
-          style="background-color: var(--kv-text-primary);"
-        />
-
         <!-- Kanal adına tıklama -->
         <button
           class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-2 pr-2"
@@ -229,7 +218,7 @@ async function confirmDelete() {
           <span
             class="truncate"
             :class="[
-              channel.hasUnread && channelsStore.activeChannelId !== channel.id
+              channel.unreadCount > 0 && channelsStore.activeChannelId !== channel.id
                 ? 'font-semibold text-[var(--kv-text-primary)]'
                 : '',
             ]"
@@ -255,6 +244,14 @@ async function confirmDelete() {
             </svg>
           </span>
         </button>
+
+        <!-- Kırmızı okunmamış sayaç rozeti (sağ taraf, aktif kanal hariç) -->
+        <span
+          v-if="channel.unreadCount > 0 && channelsStore.activeChannelId !== channel.id"
+          class="shrink-0 channel-unread-badge"
+        >
+          {{ channel.unreadCount > 99 ? '99+' : channel.unreadCount }}
+        </span>
 
         <!-- OWNER: yönetim ikonları (hover'da görünür) -->
         <div
@@ -433,3 +430,22 @@ async function confirmDelete() {
     @cancel="deleteTarget = null"
   />
 </template>
+
+<style scoped>
+/* Kırmızı okunmamış sayaç rozeti — kanal satırı sağında */
+.channel-unread-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background-color: var(--kv-danger);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  white-space: nowrap;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+</style>
