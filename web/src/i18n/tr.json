@@ -374,6 +374,9 @@
     "friend_accept": "{username} kankalık isteğini kabul etti.",
     "friend_remove": "Bir kullanıcı seni kanka listesinden çıkardı."
   },
+  "server": {
+    "addOrtam": "Ortam Ekle"
+  },
   "common": {
     "cancel": "İptal",
     "close": "Kapat",

@@ -29,7 +29,13 @@ const { connect, disconnect } = useSocket()
 
 const showMemberPanel = ref(true)
 const showServerModal = ref(false)
+const serverModalStep = ref<'choose' | 'create' | 'join'>('choose')
 const showAddFriendModal = ref(false)
+
+function openServerModal(step: 'choose' | 'create' | 'join') {
+  serverModalStep.value = step
+  showServerModal.value = true
+}
 const homeView = ref<'friends' | 'message-requests' | 'dm'>('friends')
 
 onMounted(async () => {
@@ -88,8 +94,8 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
       <div class="flex flex-col shrink-0 h-full relative">
         <div class="flex flex-1 overflow-hidden">
           <ServerRail
-            :on-create-guild="() => (showServerModal = true)"
-            :on-join-guild="() => (showServerModal = true)"
+            :on-create-guild="() => openServerModal('choose')"
+            :on-join-guild="() => openServerModal('choose')"
           />
           <ChannelPanel v-if="guildsStore.activeGuildId" />
           <HomeSidebar
@@ -126,8 +132,8 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
          <div class="flex flex-1 min-w-0 overflow-hidden gap-4">
            <HomeDashboard
             @add-friend="showAddFriendModal = true"
-            @create-ortam="showServerModal = true"
-            @join-ortam="showServerModal = true"
+            @create-ortam="openServerModal('create')"
+            @join-ortam="openServerModal('join')"
           />
           <FriendsRightPanel
             :key="homeView === 'message-requests' ? 'pending' : 'all'"
@@ -154,6 +160,6 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
     </div>
   </div>
 
-  <ServerModal v-if="showServerModal" @close="showServerModal = false" />
+  <ServerModal v-if="showServerModal" :initial-step="serverModalStep" @close="showServerModal = false" />
   <FriendAddModal v-if="showAddFriendModal" @close="showAddFriendModal = false" />
 </template>

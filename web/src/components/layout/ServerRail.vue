@@ -70,8 +70,8 @@ function guildInitial(name: string) {
     <!-- Ayraç -->
     <div v-if="guildsStore.guilds.length" class="divider" />
 
-    <!-- Sunucu ekle — hexagonal, accent-subtle → hover accent-500 -->
-    <button class="guild-btn add-btn" title="Sunucu Ekle" @click="onCreateGuild">
+    <!-- Ortam ekle — hexagonal, accent-subtle → hover accent-500 -->
+    <button class="guild-btn add-btn" :title="t('server.addOrtam')" @click="onCreateGuild">
       <span class="hex hex--add">
         <svg
           xmlns="http://www.w3.org/2000/svg"
