@@ -325,6 +325,24 @@
     "addUncategorized": "Kategorisiz kanal ekle",
     "errors": {
       "LAST_CHANNEL": "Son kanal silinemez. Ortamda en az bir kanal olmalıdır."
+    },
+    "members": {
+      "sectionTitle": "Üyeler",
+      "adminNote": "OWNER ve ADMIN zaten bu kanala erişir.",
+      "privateNote": "Bu kanala yalnızca eklenen kişiler erişir. OWNER ve ADMIN her zaman erişir.",
+      "addMember": "Üye Ekle",
+      "addMemberSearch": "Üye ara…",
+      "remove": "Çıkar",
+      "noMembers": "Henüz ekli üye yok.",
+      "noEligible": "Eklenebilecek üye yok.",
+      "loading": "Üyeler yükleniyor…",
+      "addLoading": "Ekleniyor…",
+      "errors": {
+        "NOT_PRIVATE_CHANNEL": "Bu işlem yalnızca özel kanallar için geçerlidir.",
+        "NOT_GUILD_MEMBER": "Kullanıcı bu ortamın üyesi değil.",
+        "AGE_RESTRICTED": "Yaş-kapılı kanala reşit olmayan üye eklenemez.",
+        "FORBIDDEN": "Bu işlem için yetkiniz yok."
+      }
     }
   },
   "category": {

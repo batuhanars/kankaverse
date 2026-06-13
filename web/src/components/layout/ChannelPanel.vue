@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useAuthStore } from '@/stores/auth'
+import { guildsApi } from '@/api/guilds'
+import { channelsApi } from '@/api/channels'
 import GuildSettingsModal from '@/views/app/components/GuildSettingsModal.vue'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
-import type { ChannelDto, CategoryDto } from '@/types'
+import type { ChannelDto, CategoryDto, ChannelMemberDto, GuildMemberDto } from '@/types'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -155,7 +157,109 @@ function openSettings(channel: ChannelDto) {
   settingsSlowMode.value = channel.slowModeSeconds ?? 0
   settingsCategoryId.value = channel.categoryId ?? null
   settingsError.value = ''
+  // Özel kanal ise üye listesini ve guild üyelerini çek
+  if (channel.isPrivate) {
+    fetchChannelMembers(channel.id)
+    fetchGuildMembersForPicker()
+  }
 }
+
+// ── Özel kanal üye yönetimi ──
+
+const channelMembers = ref<ChannelMemberDto[]>([])
+const membersLoading = ref(false)
+const membersError = ref('')
+
+const guildMembersAll = ref<GuildMemberDto[]>([])
+const memberSearchQuery = ref('')
+const addMemberLoading = ref(false)
+const addMemberError = ref('')
+
+async function fetchChannelMembers(channelId: string) {
+  membersLoading.value = true
+  membersError.value = ''
+  try {
+    const res = await channelsApi.getMembers(channelId)
+    channelMembers.value = res.data
+  } catch {
+    channelMembers.value = []
+  } finally {
+    membersLoading.value = false
+  }
+}
+
+async function fetchGuildMembersForPicker() {
+  const guildId = guildsStore.activeGuildId
+  if (!guildId) return
+  try {
+    const res = await guildsApi.getMembers(guildId)
+    guildMembersAll.value = res.data
+  } catch {
+    guildMembersAll.value = []
+  }
+}
+
+// Guild üyeleri arasından henüz ekli olmayanlar (OWNER/ADMIN zaten erişir — göstermek opsiyonel ama ekleyemeyiz)
+const eligibleToAdd = computed(() => {
+  const channel = settingsTarget.value
+  if (!channel) return []
+  const addedIds = new Set(channelMembers.value.map((m) => m.id))
+  const query = memberSearchQuery.value.toLowerCase().trim()
+  return guildMembersAll.value.filter((m) => {
+    // Zaten ekli mi?
+    if (addedIds.has(m.userId)) return false
+    // Yaş-kapılı kanalda minör gösterme
+    if (channel.ageGated && (m as GuildMemberDto & { isMinor?: boolean }).isMinor) return false
+    // Arama filtresi
+    if (query && !m.username.toLowerCase().includes(query)) return false
+    return true
+  })
+})
+
+async function addChannelMember(userId: string) {
+  const target = settingsTarget.value
+  if (!target) return
+  addMemberLoading.value = true
+  addMemberError.value = ''
+  try {
+    await channelsApi.addMember(target.id, userId)
+    await fetchChannelMembers(target.id)
+    memberSearchQuery.value = ''
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { error?: string; message?: string } } }
+    const code = err.response?.data?.error
+    addMemberError.value = code && ['NOT_PRIVATE_CHANNEL', 'NOT_GUILD_MEMBER', 'AGE_RESTRICTED', 'FORBIDDEN'].includes(code)
+      ? t(`channel.members.errors.${code}`)
+      : (err.response?.data?.message ?? t('common.error'))
+  } finally {
+    addMemberLoading.value = false
+  }
+}
+
+async function removeChannelMember(userId: string) {
+  const target = settingsTarget.value
+  if (!target) return
+  try {
+    await channelsApi.removeMember(target.id, userId)
+    await fetchChannelMembers(target.id)
+  } catch {
+    // sessiz — liste zaten güncel kalır
+  }
+}
+
+// Ayarlar kapanınca üye state'ini temizle
+watch(
+  () => settingsTarget.value,
+  (val) => {
+    if (!val) {
+      channelMembers.value = []
+      guildMembersAll.value = []
+      memberSearchQuery.value = ''
+      addMemberError.value = ''
+      membersError.value = ''
+    }
+  },
+)
 
 async function submitSettings() {
   const target = settingsTarget.value
@@ -849,6 +953,142 @@ function closeCategoryMenu() {
           >{{ cat.name }}</option>
         </select>
       </div>
+
+      <!-- ── Özel kanal üye yönetimi (yalnız isPrivate + OWNER/ADMIN) ── -->
+      <template v-if="settingsTarget.isPrivate && isAdmin">
+        <div class="flex flex-col gap-3 pt-1">
+          <!-- Bölüm başlığı -->
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
+              {{ t('channel.members.sectionTitle') }}
+            </p>
+            <p class="text-[12px]" style="color: var(--kv-text-muted);">
+              {{ t('channel.members.privateNote') }}
+            </p>
+          </div>
+
+          <!-- Mevcut üyeler listesi -->
+          <div
+            class="rounded-[var(--kv-radius-md)] border overflow-hidden"
+            style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+          >
+            <p
+              v-if="membersLoading"
+              class="px-3 py-2 text-[13px]"
+              style="color: var(--kv-text-muted);"
+            >
+              {{ t('channel.members.loading') }}
+            </p>
+            <p
+              v-else-if="channelMembers.length === 0"
+              class="px-3 py-2 text-[13px]"
+              style="color: var(--kv-text-muted);"
+            >
+              {{ t('channel.members.noMembers') }}
+            </p>
+            <div
+              v-for="member in channelMembers"
+              v-else
+              :key="member.id"
+              class="flex items-center gap-2 px-3 py-2 border-b last:border-b-0"
+              style="border-color: var(--kv-border-subtle);"
+            >
+              <!-- Avatar (daire) -->
+              <div
+                class="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[12px] font-semibold overflow-hidden"
+                style="background-color: var(--kv-accent-500); color: #fff;"
+              >
+                <img
+                  v-if="member.avatarUrl"
+                  :src="member.avatarUrl"
+                  :alt="member.username"
+                  class="w-full h-full object-cover"
+                />
+                <span v-else>{{ member.username.charAt(0).toUpperCase() }}</span>
+              </div>
+              <!-- Ad -->
+              <span class="flex-1 text-[14px] truncate" style="color: var(--kv-text-primary);">
+                {{ member.username }}
+              </span>
+              <!-- Çıkar butonu -->
+              <button
+                class="shrink-0 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-rail)]"
+                style="width: 24px; height: 24px; color: var(--kv-danger);"
+                :title="t('channel.members.remove')"
+                type="button"
+                @click="removeChannelMember(member.id)"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Üye ekle: arama + liste -->
+          <div class="flex flex-col gap-2">
+            <p class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+              {{ t('channel.members.addMember') }}
+            </p>
+            <input
+              v-model="memberSearchQuery"
+              type="text"
+              :placeholder="t('channel.members.addMemberSearch')"
+              class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] outline-none border"
+              style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
+            />
+            <!-- Hata mesajı -->
+            <p v-if="addMemberError" class="text-[12px]" style="color: var(--kv-danger);">
+              {{ addMemberError }}
+            </p>
+            <!-- Eklenebilir üye listesi -->
+            <div
+              v-if="eligibleToAdd.length > 0"
+              class="rounded-[var(--kv-radius-md)] border overflow-hidden"
+              style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); max-height: 180px; overflow-y: auto;"
+            >
+              <button
+                v-for="member in eligibleToAdd"
+                :key="member.userId"
+                type="button"
+                :disabled="addMemberLoading"
+                class="w-full flex items-center gap-2 px-3 py-2 text-left border-b last:border-b-0 transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)] disabled:opacity-50 disabled:cursor-not-allowed"
+                style="border-color: var(--kv-border-subtle);"
+                @click="addChannelMember(member.userId)"
+              >
+                <!-- Avatar (daire) -->
+                <div
+                  class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[11px] font-semibold overflow-hidden"
+                  style="background-color: var(--kv-accent-500); color: #fff;"
+                >
+                  <img
+                    v-if="member.avatarUrl"
+                    :src="member.avatarUrl"
+                    :alt="member.username"
+                    class="w-full h-full object-cover"
+                  />
+                  <span v-else>{{ member.username.charAt(0).toUpperCase() }}</span>
+                </div>
+                <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-secondary);">
+                  {{ member.username }}
+                </span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted); shrink: 0;">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
+            </div>
+            <p
+              v-else-if="!addMemberLoading && guildMembersAll.length > 0"
+              class="text-[13px]"
+              style="color: var(--kv-text-muted);"
+            >
+              {{ t('channel.members.noEligible') }}
+            </p>
+          </div>
+        </div>
+      </template>
 
       <div class="flex justify-end gap-3 pt-1">
         <KvButton type="button" variant="ghost" @click="settingsTarget = null">

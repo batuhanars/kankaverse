@@ -1,5 +1,5 @@
 import http from './axios'
-import type { ChannelDto, CategoryDto } from '@/types'
+import type { ChannelDto, CategoryDto, ChannelMemberDto } from '@/types'
 
 export const channelsApi = {
   update(channelId: string, payload: { name?: string; ageGated?: boolean; slowModeSeconds?: number; categoryId?: string | null }) {
@@ -10,6 +10,16 @@ export const channelsApi = {
   },
   markRead(channelId: string) {
     return http.post<null>(`/channels/${channelId}/read`)
+  },
+  // Sprint V2 — Özel kanal üye yönetimi (§1)
+  getMembers(channelId: string) {
+    return http.get<ChannelMemberDto[]>(`/channels/${channelId}/members`)
+  },
+  addMember(channelId: string, userId: string) {
+    return http.post<ChannelMemberDto>(`/channels/${channelId}/members`, { userId })
+  },
+  removeMember(channelId: string, userId: string) {
+    return http.delete<null>(`/channels/${channelId}/members/${userId}`)
   },
 }
 

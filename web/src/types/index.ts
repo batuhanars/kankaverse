@@ -215,6 +215,13 @@ export interface MessageDto {
   pinnedAt: string | null  // Sprint V2 Pins — dolu ise sabitlenen mesaj
 }
 
+// Sprint V2 — Özel kanal üye DTO (GET/POST /channels/:id/members)
+export interface ChannelMemberDto {
+  id: string
+  username: string
+  avatarUrl: string | null
+}
+
 // Sprint 7B — Ortam üye DTO
 export const GuildMemberRole = {
   OWNER: 'OWNER',
