@@ -22,6 +22,15 @@ const authStore = useAuthStore()
 
 const isOwner = computed(() => authStore.user?.id === props.ownerId)
 
+// Owner daima listenin en üstünde
+const sortedMembers = computed(() => {
+  return [...props.members].sort((a, b) => {
+    if (a.id === props.ownerId) return -1
+    if (b.id === props.ownerId) return 1
+    return 0
+  })
+})
+
 // --- Üye çıkar (owner) ---
 const removeMemberTarget = ref<GroupDmMemberDto | null>(null)
 const removing = ref(false)
@@ -123,8 +132,8 @@ async function renameGroup() {
 
 <template>
   <aside
-    class="w-[220px] flex flex-col shrink-0 mb-4 mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
-    style="background-color: var(--kv-bg-sidebar);"
+    class="flex flex-col shrink-0 mb-4 mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
+    style="width: 248px; background-color: var(--kv-bg-sidebar);"
   >
     <!-- Başlık -->
     <div
@@ -146,7 +155,7 @@ async function renameGroup() {
     <!-- Üye listesi -->
     <div class="flex-1 overflow-y-auto px-3 py-3">
       <div
-        v-for="member in members"
+        v-for="member in sortedMembers"
         :key="member.id"
         class="group flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)]"
       >
