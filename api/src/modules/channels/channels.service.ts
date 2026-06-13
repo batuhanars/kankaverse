@@ -19,6 +19,7 @@ export function toChannelDto(channel: Channel, unreadCount = 0) {
     categoryId: channel.categoryId,
     name: channel.name,
     ageGated: channel.ageGated,
+    isPrivate: channel.isPrivate,
     position: channel.position,
     slowModeSeconds: channel.slowModeSeconds,
     unreadCount,
@@ -51,6 +52,7 @@ export class ChannelsService {
         type: 'GUILD_TEXT',
         name: dto.name,
         ageGated: dto.ageGated ?? false,
+        isPrivate: dto.isPrivate ?? false,
         position: (maxPosition._max.position ?? -1) + 1,
         slowModeSeconds: dto.slowModeSeconds ?? 0,
         categoryId: dto.categoryId ?? null,
@@ -61,7 +63,7 @@ export class ChannelsService {
   }
 
   async findByGuild(userId: string, guildId: string) {
-    await this.membership.requireGuildMembership(userId, guildId);
+    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
 
     // Kanalları ve kullanıcının okuma kayıtlarını çek
     const channels = await this.prisma.channel.findMany({
@@ -75,9 +77,26 @@ export class ChannelsService {
       },
     });
 
-    // Her kanal için okunmamış mesaj sayısını paralel olarak hesapla
+    // B4/B5 (R7): özel kanal filtresi — OWNER/ADMIN tüm kanalları görür;
+    // MEMBER yalnız genel kanallar + üyesi olduğu özel kanalları görür.
+    const isPrivileged = membership.role === 'OWNER' || membership.role === 'ADMIN';
+    let visibleChannels = channels;
+    if (!isPrivileged) {
+      // Kullanıcının ChannelMember olduğu kanalların id kümesini tek sorguyla al
+      const channelMemberships = await this.prisma.channelMember.findMany({
+        where: { userId, channelId: { in: channels.map((ch) => ch.id) } },
+        select: { channelId: true },
+      });
+      const memberChannelIds = new Set(channelMemberships.map((cm) => cm.channelId));
+
+      visibleChannels = channels.filter(
+        (ch) => !ch.isPrivate || memberChannelIds.has(ch.id),
+      );
+    }
+
+    // Her görünür kanal için okunmamış mesaj sayısını paralel olarak hesapla
     const unreadCounts = await Promise.all(
-      channels.map((ch) => {
+      visibleChannels.map((ch) => {
         const lastRead = ch.channelReads[0]?.lastReadAt ?? null;
         return this.prisma.message.count({
           where: {
@@ -90,7 +109,7 @@ export class ChannelsService {
       }),
     );
 
-    return channels.map((ch, i) => toChannelDto(ch, unreadCounts[i]));
+    return visibleChannels.map((ch, i) => toChannelDto(ch, unreadCounts[i]));
   }
 
   /** POST /channels/:id/read — kanaldaki son mesajı okundu işaretle */
@@ -127,6 +146,7 @@ export class ChannelsService {
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.ageGated !== undefined && { ageGated: dto.ageGated }),
+        ...(dto.isPrivate !== undefined && { isPrivate: dto.isPrivate }),
         ...(dto.slowModeSeconds !== undefined && { slowModeSeconds: dto.slowModeSeconds }),
         ...('categoryId' in dto && { categoryId: dto.categoryId ?? null }),
       },

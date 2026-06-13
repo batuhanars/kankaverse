@@ -27,4 +27,9 @@ export class UpdateChannelDto {
   @ValidateIf((o) => o.categoryId !== null)
   @IsString()
   categoryId?: string | null;
+
+  @ApiPropertyOptional({ example: false, description: 'Özel kanal — yalnız OWNER/ADMIN ve izin verilen üyeler erişir' })
+  @IsOptional()
+  @IsBoolean()
+  isPrivate?: boolean;
 }
