@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -15,6 +16,7 @@ import { CreateGuildDto } from './dto/create-guild.dto';
 import { UpdateGuildDto } from './dto/update-guild.dto';
 import { PresignIconDto } from './dto/presign-icon.dto';
 import { SetIconDto } from './dto/set-icon.dto';
+import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from '../../common/guards/verified-email.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -78,5 +80,44 @@ export class GuildsController {
     @Body() dto: SetIconDto,
   ) {
     return this.guildsService.setIcon(user.id, guildId, dto);
+  }
+
+  // ─── §A: Ortam silme ──────────────────────────────────────────────────────
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Ortamı sil (soft-delete; yalnız OWNER). Dönüş null.' })
+  deleteGuild(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+  ) {
+    return this.guildsService.deleteGuild(user.id, guildId);
+  }
+
+  // ─── §B: Rol değiştir ─────────────────────────────────────────────────────
+
+  @Patch(':id/members/:userId/role')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Üye rolünü değiştir (yalnız OWNER; ADMIN|MEMBER; OWNER rolü atılamaz).' })
+  updateMemberRole(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Param('userId') targetUserId: string,
+    @Body() dto: UpdateMemberRoleDto,
+  ) {
+    return this.guildsService.updateMemberRole(user.id, guildId, targetUserId, dto);
+  }
+
+  // ─── §C: Üye at (kick) ───────────────────────────────────────────────────
+
+  @Delete(':id/members/:userId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Üyeyi ortamdan at (OWNER: ADMIN/MEMBER; ADMIN: yalnız MEMBER). Dönüş null.' })
+  kickMember(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Param('userId') targetUserId: string,
+  ) {
+    return this.guildsService.kickMember(user.id, guildId, targetUserId);
   }
 }
