@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
@@ -9,6 +9,7 @@ const prismaMock = {
     findUnique: jest.fn(),
     findFirst: jest.fn(),
     create: jest.fn(),
+    update: jest.fn(),
   },
   channelMember: {
     findUnique: jest.fn(),
@@ -704,5 +705,252 @@ describe('MessagesService.create — GROUP_DM requireNoDmBlock skip', () => {
     await service.create(USER_ID, CHANNEL_ID, DTO);
 
     expect(membershipMock.requireNoDmBlock).toHaveBeenCalledWith(USER_ID, CHANNEL_ID);
+  });
+});
+
+// ── MessagesService.editMessage ───────────────────────────────────────────────
+
+describe('MessagesService.editMessage', () => {
+  let service: MessagesService;
+
+  const MSG_ID = 'msg-edit-1';
+  const AUTHOR_ID = USER_ID;
+  const OTHER_USER_ID = 'user-other';
+
+  function makeExistingMsg(overrides: Partial<{ authorId: string; deletedAt: Date | null }> = {}) {
+    return {
+      id: MSG_ID,
+      channelId: GUILD_CHANNEL_ID,
+      authorId: overrides.authorId ?? AUTHOR_ID,
+      content: 'eski içerik',
+      replyToId: null,
+      editedAt: null,
+      deletedAt: overrides.deletedAt ?? null,
+      createdAt: new Date('2026-06-13T10:00:00Z'),
+    };
+  }
+
+  function makeUpdatedMsg(content: string) {
+    return {
+      id: MSG_ID,
+      channelId: GUILD_CHANNEL_ID,
+      content,
+      replyToId: null,
+      editedAt: new Date(),
+      deletedAt: null,
+      createdAt: new Date('2026-06-13T10:00:00Z'),
+      author: { id: AUTHOR_ID, username: 'kanka', avatarUrl: null },
+      attachments: [],
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Başarılı düzenleme: content + editedAt güncellenir
+  // ─────────────────────────────────────────────────────────────────────────
+  it('yazar düzenler → content ve editedAt güncellenir, DTO döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
+    automodMock.check.mockReturnValue({ blocked: false });
+    const updatedMsg = makeUpdatedMsg('yeni içerik');
+    prismaMock.message.update.mockResolvedValue(updatedMsg);
+
+    const result = await service.editMessage(AUTHOR_ID, GUILD_CHANNEL_ID, MSG_ID, { content: 'yeni içerik' });
+
+    expect(prismaMock.message.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: MSG_ID },
+      data: expect.objectContaining({ content: 'yeni içerik', editedAt: expect.any(Date) }),
+    }));
+    expect(result.editedAt).not.toBeNull();
+    expect(result.content).toBe('yeni içerik');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Yazar değilse → 403 NOT_MESSAGE_AUTHOR
+  // ─────────────────────────────────────────────────────────────────────────
+  it('yazar değil → ForbiddenException NOT_MESSAGE_AUTHOR', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg({ authorId: OTHER_USER_ID }));
+
+    let thrown: ForbiddenException | undefined;
+    try {
+      await service.editMessage(AUTHOR_ID, GUILD_CHANNEL_ID, MSG_ID, { content: 'deneme' });
+    } catch (e) {
+      thrown = e as ForbiddenException;
+    }
+
+    expect(thrown).toBeInstanceOf(ForbiddenException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('NOT_MESSAGE_AUTHOR');
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Boş içerik → 400 EMPTY_MESSAGE
+  // ─────────────────────────────────────────────────────────────────────────
+  it('boş içerik → BadRequestException EMPTY_MESSAGE', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.editMessage(AUTHOR_ID, GUILD_CHANNEL_ID, MSG_ID, { content: '   ' });
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('EMPTY_MESSAGE');
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Automod eşleşme (guild kanalı) → 400 MESSAGE_BLOCKED
+  // ─────────────────────────────────────────────────────────────────────────
+  it('guild kanalı + automod blocked → BadRequestException MESSAGE_BLOCKED', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
+    automodMock.check.mockReturnValue({ blocked: true });
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.editMessage(AUTHOR_ID, GUILD_CHANNEL_ID, MSG_ID, { content: 'yasaklı kelime' });
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('MESSAGE_BLOCKED');
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Silinmiş mesaj → 404 MESSAGE_NOT_FOUND
+  // ─────────────────────────────────────────────────────────────────────────
+  it('silinmiş mesaj → NotFoundException MESSAGE_NOT_FOUND', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg({ deletedAt: new Date() }));
+
+    let thrown: NotFoundException | undefined;
+    try {
+      await service.editMessage(AUTHOR_ID, GUILD_CHANNEL_ID, MSG_ID, { content: 'deneme' });
+    } catch (e) {
+      thrown = e as NotFoundException;
+    }
+
+    expect(thrown).toBeInstanceOf(NotFoundException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('MESSAGE_NOT_FOUND');
+  });
+});
+
+// ── MessagesService.deleteMessage ────────────────────────────────────────────
+
+describe('MessagesService.deleteMessage', () => {
+  let service: MessagesService;
+
+  const MSG_ID = 'msg-del-1';
+  const AUTHOR_ID = USER_ID;
+  const OTHER_USER_ID = 'user-other';
+
+  function makeExistingMsg(overrides: Partial<{ authorId: string; deletedAt: Date | null }> = {}) {
+    return {
+      id: MSG_ID,
+      channelId: GUILD_CHANNEL_ID,
+      authorId: overrides.authorId ?? AUTHOR_ID,
+      content: 'silinecek mesaj',
+      replyToId: null,
+      editedAt: null,
+      deletedAt: overrides.deletedAt ?? null,
+      createdAt: new Date('2026-06-13T10:00:00Z'),
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Başarılı soft-delete: deletedAt set edilir
+  // ─────────────────────────────────────────────────────────────────────────
+  it('yazar siler → deletedAt set edilir, null döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
+    prismaMock.message.update.mockResolvedValue({ ...makeExistingMsg(), deletedAt: new Date() });
+
+    const result = await service.deleteMessage(AUTHOR_ID, GUILD_CHANNEL_ID, MSG_ID);
+
+    expect(prismaMock.message.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: MSG_ID },
+      data: expect.objectContaining({ deletedAt: expect.any(Date) }),
+    }));
+    expect(result).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Yazar değilse → 403 NOT_MESSAGE_AUTHOR
+  // ─────────────────────────────────────────────────────────────────────────
+  it('yazar değil → ForbiddenException NOT_MESSAGE_AUTHOR', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg({ authorId: OTHER_USER_ID }));
+
+    let thrown: ForbiddenException | undefined;
+    try {
+      await service.deleteMessage(AUTHOR_ID, GUILD_CHANNEL_ID, MSG_ID);
+    } catch (e) {
+      thrown = e as ForbiddenException;
+    }
+
+    expect(thrown).toBeInstanceOf(ForbiddenException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('NOT_MESSAGE_AUTHOR');
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Zaten silinmiş mesaj → 404 MESSAGE_NOT_FOUND
+  // ─────────────────────────────────────────────────────────────────────────
+  it('zaten silinmiş mesaj → NotFoundException MESSAGE_NOT_FOUND', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg({ deletedAt: new Date() }));
+
+    let thrown: NotFoundException | undefined;
+    try {
+      await service.deleteMessage(AUTHOR_ID, GUILD_CHANNEL_ID, MSG_ID);
+    } catch (e) {
+      thrown = e as NotFoundException;
+    }
+
+    expect(thrown).toBeInstanceOf(NotFoundException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('MESSAGE_NOT_FOUND');
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Mesaj hiç yoksa → 404 MESSAGE_NOT_FOUND
+  // ─────────────────────────────────────────────────────────────────────────
+  it('mesaj DB\'de yok → NotFoundException MESSAGE_NOT_FOUND', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(null);
+
+    let thrown: NotFoundException | undefined;
+    try {
+      await service.deleteMessage(AUTHOR_ID, GUILD_CHANNEL_ID, MSG_ID);
+    } catch (e) {
+      thrown = e as NotFoundException;
+    }
+
+    expect(thrown).toBeInstanceOf(NotFoundException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('MESSAGE_NOT_FOUND');
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
   });
 });
