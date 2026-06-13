@@ -59,8 +59,7 @@ async function pickEmoji(emoji: string) {
   showEmojiPicker.value = false
   try {
     await messagesApi.addReaction(props.message.channelId, props.message.id, emoji)
-    // Optimistik güncelleme WS olmasa da çalışsın
-    messagesStore.applyReaction(props.message.id, emoji, authStore.user!.id, authStore.user!.id, true)
+    // Store güncellemesi useSocket reaction.added handler'ından gelir (çift-sayım önleme)
   } catch {
     // sessizce yut — WS zaten senkronize eder
   }
@@ -70,11 +69,10 @@ async function toggleReaction(emoji: string, reactedByMe: boolean) {
   try {
     if (reactedByMe) {
       await messagesApi.removeReaction(props.message.channelId, props.message.id, emoji)
-      messagesStore.applyReaction(props.message.id, emoji, authStore.user!.id, authStore.user!.id, false)
     } else {
       await messagesApi.addReaction(props.message.channelId, props.message.id, emoji)
-      messagesStore.applyReaction(props.message.id, emoji, authStore.user!.id, authStore.user!.id, true)
     }
+    // Store güncellemesi useSocket reaction.added/reaction.removed handler'ından gelir (çift-sayım önleme)
   } catch {
     // sessizce yut
   }
