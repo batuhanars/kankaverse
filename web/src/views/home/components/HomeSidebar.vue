@@ -22,8 +22,8 @@ function onChatCreated(channelId: string) {
 
 <template>
   <aside
-    class="w-[264px] flex flex-col shrink-0 rounded-[var(--kv-radius-lg)] overflow-hidden mt-4"
-    style="background-color: var(--kv-bg-sidebar);"
+    class="flex flex-col shrink-0 rounded-[var(--kv-radius-lg)] overflow-hidden mt-4"
+    style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
   >
     <!-- Nav öğeleri -->
     <div class="px-2 pt-4 pb-2 shrink-0 space-y-1 border-b" style="border-color: var(--kv-border-subtle);">
@@ -69,8 +69,8 @@ function onChatCreated(channelId: string) {
         style="color: var(--kv-text-muted);"
       >{{ t('sidebar.dmSection') }}</p>
       <button
-        class="w-6 h-6 flex items-center justify-center rounded-[var(--kv-radius-sm)] text-[16px] font-semibold leading-none cursor-pointer transition-colors"
-        style="color: var(--kv-text-secondary); background-color: transparent;"
+        class="flex items-center justify-center rounded-[var(--kv-radius-sm)] text-[18px] font-semibold leading-none cursor-pointer transition-colors"
+        style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-secondary); background-color: transparent;"
         :title="t('startChat.openChatButton')"
         @mouseenter="($event.target as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'; ($event.target as HTMLElement).style.color = 'var(--kv-accent-500)'"
         @mouseleave="($event.target as HTMLElement).style.backgroundColor = 'transparent'; ($event.target as HTMLElement).style.color = 'var(--kv-text-secondary)'"

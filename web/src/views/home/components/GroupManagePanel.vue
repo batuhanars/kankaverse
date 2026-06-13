@@ -133,12 +133,12 @@ async function renameGroup() {
 <template>
   <aside
     class="flex flex-col shrink-0 mb-4 mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
-    style="width: 248px; background-color: var(--kv-bg-sidebar);"
+    style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
   >
     <!-- Başlık -->
     <div
-      class="h-16 flex items-center justify-between px-4 border-b shrink-0"
-      style="border-color: var(--kv-border-subtle);"
+      class="flex items-center justify-between px-4 border-b shrink-0"
+      style="height: var(--kv-header-height); border-color: var(--kv-border-subtle);"
     >
       <span class="text-[13px] font-semibold uppercase tracking-wide" style="color: var(--kv-text-muted);">
         {{ t('group.members') }}

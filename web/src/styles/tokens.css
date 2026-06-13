@@ -34,4 +34,12 @@
   /* tipografi */
   --kv-font-ui: 'Figtree', system-ui, -apple-system, sans-serif;
   --kv-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* ölçü / layout */
+  --kv-rail-width: 72px;
+  --kv-panel-width: 264px;
+  --kv-header-height: 64px;
+  --kv-panel-gap: 16px;
+  --kv-input-min-height: 44px;
+  --kv-control: 32px;
+  --kv-control-sm: 28px;
 }
