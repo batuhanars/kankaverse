@@ -94,6 +94,7 @@ function selectChannel(channel: ChannelDto) {
 const showCreate = ref(false)
 const createName = ref('')
 const createAgeGated = ref(false)
+const createIsPrivate = ref(false)
 const createCategoryId = ref<string | null>(null)
 const creating = ref(false)
 const createError = ref('')
@@ -101,6 +102,7 @@ const createError = ref('')
 function openCreate(categoryId?: string | null) {
   createName.value = ''
   createAgeGated.value = false
+  createIsPrivate.value = false
   createCategoryId.value = categoryId ?? null
   createError.value = ''
   showCreate.value = true
@@ -117,6 +119,7 @@ async function submitCreate() {
     await channelsStore.createChannel(guildId, {
       name,
       ageGated: createAgeGated.value,
+      isPrivate: createIsPrivate.value,
       categoryId: createCategoryId.value,
     })
     showCreate.value = false
@@ -314,8 +317,9 @@ function closeCategoryMenu() {
 </script>
 
 <template>
+  <!-- F: 4 köşe radius — HomeSidebar ile tutarlı -->
   <aside
-    class="flex flex-col h-full shrink-0 rounded-r-[var(--kv-radius-lg)] overflow-hidden mt-4"
+    class="flex flex-col h-full shrink-0 rounded-[var(--kv-radius-lg)] overflow-hidden mt-4"
     style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
     @click="closeCategoryMenu"
   >
@@ -361,20 +365,13 @@ function closeCategoryMenu() {
     <!-- Kanal listesi -->
     <div class="flex-1 overflow-y-auto pt-4 pb-20 px-2">
 
-      <!-- ── Başlık satırı: "METİN KANALLARI" + kanal-oluştur "+" (ADMIN) ── -->
-      <div class="mb-1 px-2 flex items-center justify-between">
-        <span
-          class="text-[11px] font-semibold uppercase tracking-widest"
-          style="color: var(--kv-text-muted);"
-        >
-          {{ t('channel.textChannels') }}
-        </span>
-        <!-- ADMIN: kanal oluştur -->
+      <!-- ── (1) Kategorisiz kanallar — en üstte; ADMIN için üst-seviye "+" (D/E) ── -->
+      <!-- E: Sabit "METİN KANALLARI" başlığı KALDIRILDI. Yalnız üst-seviye "+" kalır (ADMIN). -->
+      <div v-if="isAdmin" class="mb-1 px-2 flex items-center justify-end">
         <button
-          v-if="isAdmin"
           class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
           style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
-          :title="t('channel.createTitle')"
+          :title="t('channel.addUncategorized')"
           @click.stop="openCreate(null)"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -384,7 +381,6 @@ function closeCategoryMenu() {
         </button>
       </div>
 
-      <!-- ── (1) Kategorisiz kanallar — en üstte ── -->
       <div
         v-for="channel in uncategorizedChannels"
         :key="channel.id"
@@ -399,6 +395,7 @@ function closeCategoryMenu() {
           class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-2 pr-2"
           @click="selectChannel(channel)"
         >
+          <!-- C: kanal türü ikonu (şimdi hep #; ileride genişletilebilir) -->
           <span style="color: var(--kv-text-muted);">#</span>
           <span
             class="truncate"
@@ -408,6 +405,18 @@ function closeCategoryMenu() {
                 : '',
             ]"
           >{{ channel.name }}</span>
+          <!-- C: isPrivate kilit rozeti -->
+          <span
+            v-if="channel.isPrivate"
+            class="shrink-0"
+            :title="t('channel.privateLabel')"
+            style="color: var(--kv-text-muted);"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </span>
           <span
             v-if="channel.ageGated"
             class="shrink-0 text-[10px] font-bold px-1 rounded"
@@ -464,7 +473,7 @@ function closeCategoryMenu() {
         </div>
       </div>
 
-      <!-- ── (2) Kategoriler — position asc ── -->
+      <!-- ── (2) Kategoriler — position asc; E: başlıklar DB'den gelir ── -->
       <template v-for="cat in sortedCategories" :key="cat.id">
         <!-- Kategori başlığı -->
         <div class="group/cat mt-3 mb-0.5 px-1 flex items-center gap-1">
@@ -492,7 +501,7 @@ function closeCategoryMenu() {
 
           <!-- ADMIN: kategori menü butonu + kanal ekle -->
           <div v-if="isAdmin" class="shrink-0 flex items-center gap-0.5">
-            <!-- Bu kategoriye kanal ekle -->
+            <!-- Bu kategoriye kanal ekle (D: per-kategori "+", categoryId geçirir) -->
             <button
               class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
               style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
@@ -562,6 +571,7 @@ function closeCategoryMenu() {
               class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-4 pr-2"
               @click="selectChannel(channel)"
             >
+              <!-- C: kanal türü ikonu -->
               <span style="color: var(--kv-text-muted);">#</span>
               <span
                 class="truncate"
@@ -571,6 +581,18 @@ function closeCategoryMenu() {
                     : '',
                 ]"
               >{{ channel.name }}</span>
+              <!-- C: isPrivate kilit rozeti -->
+              <span
+                v-if="channel.isPrivate"
+                class="shrink-0"
+                :title="t('channel.privateLabel')"
+                style="color: var(--kv-text-muted);"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </span>
               <span
                 v-if="channel.ageGated"
                 class="shrink-0 text-[10px] font-bold px-1 rounded"
@@ -662,7 +684,80 @@ function closeCategoryMenu() {
         autofocus
       />
 
-      <!-- 18+ yaş-kapılı toggle -->
+      <!-- C: Kanal türü seçici (yalnız görsel) -->
+      <div class="flex flex-col gap-2">
+        <p class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+          {{ t('channel.channelTypeLabel') }}
+        </p>
+        <div class="flex gap-2">
+          <!-- Metin — etkin/seçili -->
+          <div
+            class="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-[var(--kv-radius-md)] border-2 cursor-default"
+            style="border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);"
+          >
+            <span class="text-[18px] font-bold leading-none" style="color: var(--kv-accent-500);">#</span>
+            <span class="text-[12px] font-medium" style="color: var(--kv-text-primary);">{{ t('channel.channelTypeText') }}</span>
+          </div>
+          <!-- Ses — devre dışı -->
+          <div
+            class="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-[var(--kv-radius-md)] border cursor-not-allowed opacity-50"
+            style="border-color: var(--kv-border-subtle);"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+            </svg>
+            <span class="text-[12px] font-medium" style="color: var(--kv-text-muted);">{{ t('channel.channelTypeVoice') }}</span>
+            <span
+              class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
+              style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+            >{{ t('channel.channelTypeSoon') }}</span>
+          </div>
+          <!-- Forum — devre dışı -->
+          <div
+            class="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-[var(--kv-radius-md)] border cursor-not-allowed opacity-50"
+            style="border-color: var(--kv-border-subtle);"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span class="text-[12px] font-medium" style="color: var(--kv-text-muted);">{{ t('channel.channelTypeForum') }}</span>
+            <span
+              class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
+              style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+            >{{ t('channel.channelTypeSoon') }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- D: isPrivate toggle -->
+      <div
+        class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+      >
+        <div class="flex-1 min-w-0">
+          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
+            {{ t('channel.privateLabel') }}
+          </p>
+          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+            {{ t('channel.privateDesc') }}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+          :style="createIsPrivate ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'"
+          @click="createIsPrivate = !createIsPrivate"
+        >
+          <span
+            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200"
+            :class="createIsPrivate ? 'translate-x-5' : 'translate-x-0'"
+          />
+        </button>
+      </div>
+
+      <!-- 18+ yaş-kapılı toggle (aynen durur) -->
       <div
         class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
         style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
@@ -688,24 +783,7 @@ function closeCategoryMenu() {
         </button>
       </div>
 
-      <!-- Kategori seçimi -->
-      <div class="flex flex-col gap-1.5">
-        <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
-          {{ t('channel.categoryLabel') }}
-        </label>
-        <select
-          v-model="createCategoryId"
-          class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] outline-none border cursor-pointer"
-          style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
-        >
-          <option :value="null">{{ t('channel.categoryNone') }}</option>
-          <option
-            v-for="cat in sortedCategories"
-            :key="cat.id"
-            :value="cat.id"
-          >{{ cat.name }}</option>
-        </select>
-      </div>
+      <!-- D: Kategori dropdown KALDIRILDI -->
 
       <div class="flex justify-end gap-3 pt-1">
         <KvButton type="button" variant="ghost" @click="showCreate = false">
@@ -754,7 +832,7 @@ function closeCategoryMenu() {
         </select>
       </div>
 
-      <!-- Kategori seçimi -->
+      <!-- Kategori seçimi (settings modalında kategori değiştirme korunur) -->
       <div class="flex flex-col gap-1.5">
         <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
           {{ t('channel.categoryLabel') }}

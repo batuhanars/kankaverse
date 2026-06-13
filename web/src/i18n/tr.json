@@ -315,6 +315,14 @@
     "slowModeHint": "Yavaş mod açık — {seconds} sn bekleyin",
     "categoryLabel": "KATEGORİ",
     "categoryNone": "Kategorisiz",
+    "channelTypeLabel": "KANAL TÜRÜ",
+    "channelTypeText": "Metin",
+    "channelTypeVoice": "Ses",
+    "channelTypeForum": "Forum",
+    "channelTypeSoon": "yakında",
+    "privateLabel": "Özel Kanal",
+    "privateDesc": "Özel kanalı yalnızca seçili kişiler ve yöneticiler görür.",
+    "addUncategorized": "Kategorisiz kanal ekle",
     "errors": {
       "LAST_CHANNEL": "Son kanal silinemez. Ortamda en az bir kanal olmalıdır."
     }
