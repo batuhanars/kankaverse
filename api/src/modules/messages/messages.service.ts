@@ -1,10 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { AutomodService } from '../../shared/automod/automod.service';
 import { ModerationService } from '../../shared/moderation/moderation.service';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { UpdateMessageDto } from './dto/update-message.dto';
 import { Attachment, Message, ScanStatus, User } from '@prisma/client';
 
 type AttachmentDto = Pick<Attachment, 'id' | 'filename' | 'contentType' | 'size' | 'scanStatus'>;
@@ -20,6 +21,7 @@ function toMessageDto(msg: MessageWithAuthor) {
     channelId: msg.channelId,
     content: msg.content,
     replyToId: msg.replyToId,
+    editedAt: msg.editedAt ? msg.editedAt.toISOString() : null,
     author: {
       id: msg.author.id,
       username: msg.author.username,
@@ -235,5 +237,73 @@ export class MessagesService {
     }
 
     return toMessageDto(message);
+  }
+
+  async editMessage(userId: string, channelId: string, messageId: string, dto: UpdateMessageDto) {
+    const channel = await this.membership.requireChannelAccess(userId, channelId);
+
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+    });
+
+    if (!message || message.deletedAt !== null) {
+      throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'MESSAGE_NOT_FOUND' });
+    }
+
+    if (message.authorId !== userId) {
+      throw new ForbiddenException({ message: 'Bu mesajı düzenleme yetkiniz yok.', error: 'NOT_MESSAGE_AUTHOR' });
+    }
+
+    // İçerik boş olamaz
+    if (!dto.content || dto.content.trim().length === 0) {
+      throw new BadRequestException({ message: 'Mesaj içeriği boş olamaz.', error: 'EMPTY_MESSAGE' });
+    }
+
+    // Automod: guild kanalı içerik filtresi
+    if (channel.guildId) {
+      const { blocked } = this.automod.check(dto.content);
+      if (blocked) {
+        throw new BadRequestException({
+          message: 'Mesajınız topluluk kurallarına uygun değil.',
+          error: 'MESSAGE_BLOCKED',
+        });
+      }
+    }
+
+    const updated = await this.prisma.message.update({
+      where: { id: messageId },
+      data: { content: dto.content, editedAt: new Date() },
+      include: {
+        author: { select: { id: true, username: true, avatarUrl: true } },
+        attachments: {
+          select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+        },
+      },
+    });
+
+    return toMessageDto(updated);
+  }
+
+  async deleteMessage(userId: string, channelId: string, messageId: string) {
+    await this.membership.requireChannelAccess(userId, channelId);
+
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+    });
+
+    if (!message || message.deletedAt !== null) {
+      throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'MESSAGE_NOT_FOUND' });
+    }
+
+    if (message.authorId !== userId) {
+      throw new ForbiddenException({ message: 'Bu mesajı silme yetkiniz yok.', error: 'NOT_MESSAGE_AUTHOR' });
+    }
+
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { deletedAt: new Date() },
+    });
+
+    return null;
   }
 }

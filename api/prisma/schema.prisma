@@ -193,6 +193,7 @@ model Message {
   author      User         @relation(fields: [authorId], references: [id])
   content     String
   replyToId   String?
+  editedAt    DateTime?
   deletedAt   DateTime?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt

@@ -2,6 +2,8 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -13,6 +15,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { MessagesService } from './messages.service';
 import { MessagesGateway } from './gateway/messages.gateway';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { UpdateMessageDto } from './dto/update-message.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -49,5 +52,31 @@ export class MessagesController {
     this.messagesGateway.broadcastMessage(channelId, message);
     await this.messagesGateway.notifyDmActivity(channelId, message);
     return message;
+  }
+
+  @Patch(':messageId')
+  @ApiOperation({ summary: 'Mesajı düzenle — yalnız yazar (WS message.updated yayar)' })
+  async editMessage(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Param('messageId') messageId: string,
+    @Body() dto: UpdateMessageDto,
+  ) {
+    const message = await this.messagesService.editMessage(user.id, channelId, messageId, dto);
+    this.messagesGateway.broadcastMessageUpdate(channelId, message);
+    return message;
+  }
+
+  @Delete(':messageId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mesajı sil (soft-delete) — yalnız yazar (WS message.deleted yayar)' })
+  async deleteMessage(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Param('messageId') messageId: string,
+  ) {
+    await this.messagesService.deleteMessage(user.id, channelId, messageId);
+    this.messagesGateway.broadcastMessageDelete(channelId, { messageId, channelId });
+    return null;
   }
 }
