@@ -12,6 +12,10 @@ const prismaMock = {
   channelMember: {
     findUnique: jest.fn(),
   },
+  attachment: {
+    findMany: jest.fn(),
+    updateMany: jest.fn(),
+  },
 };
 
 const membershipMock = {
@@ -23,8 +27,18 @@ const automodMock = {
   check: jest.fn(),
 };
 
+// scanEnabled=false (dev varsayılan) — bazı testlerde override edilir
+const configMock = {
+  get: jest.fn((key: string) => {
+    const values: Record<string, unknown> = {
+      attachmentScanEnabled: false,
+    };
+    return values[key];
+  }),
+};
+
 function makeService() {
-  return new MessagesService(prismaMock as any, membershipMock as any, automodMock as any);
+  return new MessagesService(prismaMock as any, membershipMock as any, automodMock as any, configMock as any);
 }
 
 function resetMocks() {
@@ -227,6 +241,7 @@ describe('MessagesService.create — automod', () => {
     replyToId: null,
     createdAt: new Date('2026-06-12T12:00:00Z'),
     author: { id: 'author-1', username: 'kanka', avatarUrl: null },
+    attachments: [],
   };
 
   beforeEach(() => {
@@ -304,5 +319,175 @@ describe('MessagesService.create — automod', () => {
 
     expect(automodMock.check).not.toHaveBeenCalled();
     expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── MessagesService.create — attachment linking + scan-gate ──────────────────
+
+describe('MessagesService.create — attachment linking + scan-gate', () => {
+  let service: MessagesService;
+
+  const ATTACHMENT_IDS = ['att-1', 'att-2'];
+
+  const CREATED_MSG_WITH_ATT = {
+    id: 'msg-att-1',
+    channelId: GUILD_CHANNEL_ID,
+    content: 'dosya var',
+    replyToId: null,
+    createdAt: new Date('2026-06-13T10:00:00Z'),
+    author: { id: 'author-1', username: 'kanka', avatarUrl: null },
+    attachments: [],
+  };
+
+  const VALID_ATTACHMENTS = [
+    { id: 'att-1', uploaderId: USER_ID, messageId: null },
+    { id: 'att-2', uploaderId: USER_ID, messageId: null },
+  ];
+
+  const LINKED_ATTACHMENTS = [
+    { id: 'att-1', filename: 'a.png', contentType: 'image/png', size: 1000, scanStatus: 'CLEAN' },
+    { id: 'att-2', filename: 'b.pdf', contentType: 'application/pdf', size: 2000, scanStatus: 'CLEAN' },
+  ];
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    automodMock.check.mockReturnValue({ blocked: false });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // İçerik boş + ek yok → EMPTY_MESSAGE
+  // ─────────────────────────────────────────────────────────────────────────
+  it('content boş + attachmentIds yok → BadRequestException EMPTY_MESSAGE', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.create(USER_ID, GUILD_CHANNEL_ID, { content: undefined });
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('EMPTY_MESSAGE');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Ek var, content boş → geçerli (ek yeterli)
+  // ─────────────────────────────────────────────────────────────────────────
+  it('content boş + attachmentIds set → geçerli (mesaj oluşturulur)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.attachment.findMany.mockResolvedValue(VALID_ATTACHMENTS);
+    prismaMock.message.create.mockResolvedValue(CREATED_MSG_WITH_ATT);
+    prismaMock.attachment.updateMany.mockResolvedValue({ count: 2 });
+    prismaMock.attachment.findMany
+      .mockResolvedValueOnce(VALID_ATTACHMENTS) // doğrulama
+      .mockResolvedValueOnce(LINKED_ATTACHMENTS); // bağlama sonrası
+
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: undefined,
+      attachmentIds: ATTACHMENT_IDS,
+    });
+
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.attachment.updateMany).toHaveBeenCalledTimes(1);
+    expect(result.id).toBe('msg-att-1');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Scan-gate: disabled → CLEAN olarak bağlanır
+  // ─────────────────────────────────────────────────────────────────────────
+  it('scan disabled (default) → attachment updateMany scanStatus=CLEAN ile çağrılır', async () => {
+    // configMock.get('attachmentScanEnabled') = false (default)
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.attachment.findMany.mockResolvedValueOnce(VALID_ATTACHMENTS);
+    prismaMock.message.create.mockResolvedValue(CREATED_MSG_WITH_ATT);
+    prismaMock.attachment.updateMany.mockResolvedValue({ count: 2 });
+    prismaMock.attachment.findMany.mockResolvedValueOnce(LINKED_ATTACHMENTS);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: 'dosya',
+      attachmentIds: ATTACHMENT_IDS,
+    });
+
+    const updateCall = prismaMock.attachment.updateMany.mock.calls[0][0];
+    expect(updateCall.data.scanStatus).toBe('CLEAN');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Scan-gate: enabled → PENDING olarak bırakılır
+  // ─────────────────────────────────────────────────────────────────────────
+  it('scan enabled → attachment updateMany scanStatus=PENDING ile çağrılır', async () => {
+    // Config override: scanEnabled=true
+    configMock.get.mockImplementation((key: string) => {
+      if (key === 'attachmentScanEnabled') return true;
+      return undefined;
+    });
+    service = makeService(); // yeni config ile service oluştur
+
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.attachment.findMany.mockResolvedValueOnce(VALID_ATTACHMENTS);
+    prismaMock.message.create.mockResolvedValue(CREATED_MSG_WITH_ATT);
+    prismaMock.attachment.updateMany.mockResolvedValue({ count: 2 });
+    prismaMock.attachment.findMany.mockResolvedValueOnce(LINKED_ATTACHMENTS);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: 'dosya',
+      attachmentIds: ATTACHMENT_IDS,
+    });
+
+    const updateCall = prismaMock.attachment.updateMany.mock.calls[0][0];
+    expect(updateCall.data.scanStatus).toBe('PENDING');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Sahiplik kontrolü: başkasının attachment → ATTACHMENT_FORBIDDEN
+  // ─────────────────────────────────────────────────────────────────────────
+  it('attachment başkasına ait → BadRequestException ATTACHMENT_FORBIDDEN', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.attachment.findMany.mockResolvedValue([
+      { id: 'att-1', uploaderId: 'other-user', messageId: null },
+    ]);
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.create(USER_ID, GUILD_CHANNEL_ID, {
+        content: 'dosya',
+        attachmentIds: ['att-1'],
+      });
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('ATTACHMENT_FORBIDDEN');
+    expect(prismaMock.message.create).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Zaten bağlanmış attachment → ATTACHMENT_ALREADY_LINKED
+  // ─────────────────────────────────────────────────────────────────────────
+  it('attachment zaten başka mesaja bağlı → BadRequestException ATTACHMENT_ALREADY_LINKED', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.attachment.findMany.mockResolvedValue([
+      { id: 'att-1', uploaderId: USER_ID, messageId: 'already-linked-msg' },
+    ]);
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.create(USER_ID, GUILD_CHANNEL_ID, {
+        content: 'dosya',
+        attachmentIds: ['att-1'],
+      });
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('ATTACHMENT_ALREADY_LINKED');
+    expect(prismaMock.message.create).not.toHaveBeenCalled();
   });
 });

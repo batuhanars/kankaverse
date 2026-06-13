@@ -1,11 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { AutomodService } from '../../shared/automod/automod.service';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { Message, User } from '@prisma/client';
+import { Attachment, Message, ScanStatus, User } from '@prisma/client';
 
-type MessageWithAuthor = Message & { author: Pick<User, 'id' | 'username' | 'avatarUrl'> };
+type AttachmentDto = Pick<Attachment, 'id' | 'filename' | 'contentType' | 'size' | 'scanStatus'>;
+
+type MessageWithAuthor = Message & {
+  author: Pick<User, 'id' | 'username' | 'avatarUrl'>;
+  attachments: AttachmentDto[];
+};
 
 function toMessageDto(msg: MessageWithAuthor) {
   return {
@@ -18,17 +24,29 @@ function toMessageDto(msg: MessageWithAuthor) {
       username: msg.author.username,
       avatarUrl: msg.author.avatarUrl,
     },
+    attachments: msg.attachments.map((a) => ({
+      id: a.id,
+      filename: a.filename,
+      contentType: a.contentType,
+      size: a.size,
+      scanStatus: a.scanStatus,
+    })),
     createdAt: msg.createdAt.toISOString(),
   };
 }
 
 @Injectable()
 export class MessagesService {
+  private readonly scanEnabled: boolean;
+
   constructor(
     private prisma: PrismaService,
     private membership: MembershipService,
     private automod: AutomodService,
-  ) {}
+    private config: ConfigService,
+  ) {
+    this.scanEnabled = config.get<boolean>('attachmentScanEnabled') ?? false;
+  }
 
   async findMessages(userId: string, channelId: string, before?: string, limit = 50) {
     const channel = await this.membership.requireChannelAccess(userId, channelId);
@@ -63,6 +81,9 @@ export class MessagesService {
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
+        attachments: {
+          select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take,
@@ -74,6 +95,16 @@ export class MessagesService {
   async create(userId: string, channelId: string, dto: CreateMessageDto) {
     const channel = await this.membership.requireChannelAccess(userId, channelId);
 
+    // İçerik + ek doğrulama: ikisi de boş olamaz
+    const hasContent = dto.content && dto.content.trim().length > 0;
+    const hasAttachments = dto.attachmentIds && dto.attachmentIds.length > 0;
+    if (!hasContent && !hasAttachments) {
+      throw new BadRequestException({
+        message: 'Mesaj içeriği veya en az bir dosya eki gereklidir.',
+        error: 'EMPTY_MESSAGE',
+      });
+    }
+
     // DM kanalında blok kontrolü: blok sonradan konuşmayı keser
     if (!channel.guildId) {
       await this.membership.requireNoDmBlock(userId, channelId);
@@ -81,8 +112,8 @@ export class MessagesService {
 
     // Automod: guild kanalı mesajlarında içerik filtresi (DM hariç — özel alan)
     // Sıfır DB, sıfır kayıt — sadece block-on-send.
-    if (channel.guildId) {
-      const { blocked } = this.automod.check(dto.content);
+    if (channel.guildId && hasContent) {
+      const { blocked } = this.automod.check(dto.content!);
       if (blocked) {
         throw new BadRequestException({
           message: 'Mesajınız topluluk kurallarına uygun değil.',
@@ -91,17 +122,74 @@ export class MessagesService {
       }
     }
 
+    // Attachment doğrulama: sahiplik + messageId null (henüz başka mesaja bağlanmamış)
+    if (hasAttachments) {
+      const attachments = await this.prisma.attachment.findMany({
+        where: { id: { in: dto.attachmentIds } },
+        select: { id: true, uploaderId: true, messageId: true },
+      });
+
+      if (attachments.length !== dto.attachmentIds!.length) {
+        throw new BadRequestException({
+          message: 'Geçersiz dosya eki ID\'si.',
+          error: 'ATTACHMENT_NOT_FOUND',
+        });
+      }
+
+      for (const att of attachments) {
+        if (att.uploaderId !== userId) {
+          throw new BadRequestException({
+            message: 'Bu dosya size ait değil.',
+            error: 'ATTACHMENT_FORBIDDEN',
+          });
+        }
+        if (att.messageId !== null) {
+          throw new BadRequestException({
+            message: 'Bu dosya zaten başka bir mesaja eklenmiş.',
+            error: 'ATTACHMENT_ALREADY_LINKED',
+          });
+        }
+      }
+    }
+
     const message = await this.prisma.message.create({
       data: {
         channelId,
         authorId: userId,
-        content: dto.content,
+        content: dto.content ?? '',
         replyToId: dto.replyToId ?? null,
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
+        attachments: {
+          select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+        },
       },
     });
+
+    // Attachment'ları mesaja bağla + scan-gate uygula
+    if (hasAttachments) {
+      // LANSMAN: ATTACHMENT_SCAN_ENABLED=true + gerçek CSAM tarayıcı bağlanmadan canlıya ALINMAZ (R5)
+      // false (dev): auto-CLEAN — feature test edilebilir
+      // true (prod, gelecek): PENDING bırak → tarama servisi (R5 aracı bağlanır; bu sprint stub/no-op)
+      const newScanStatus: ScanStatus = this.scanEnabled ? ScanStatus.PENDING : ScanStatus.CLEAN;
+
+      await this.prisma.attachment.updateMany({
+        where: { id: { in: dto.attachmentIds } },
+        data: {
+          messageId: message.id,
+          scanStatus: newScanStatus,
+        },
+      });
+
+      // Güncellenen attachment'ları mesaj DTO'suna yansıt
+      const linkedAttachments = await this.prisma.attachment.findMany({
+        where: { messageId: message.id },
+        select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+      });
+
+      return toMessageDto({ ...message, attachments: linkedAttachments });
+    }
 
     return toMessageDto(message);
   }

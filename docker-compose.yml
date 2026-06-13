@@ -1,6 +1,8 @@
-# Kankaverse — yerel geliştirme altyapısı (PostgreSQL + Redis)
+# Kankaverse — yerel geliştirme altyapısı (PostgreSQL + Redis + MinIO)
 # Kullanım:  cp .env.example .env   →   docker compose up -d
 # Durdur:    docker compose down   (veri korunur)   |   down -v (veriyi de sil)
+# MinIO konsol: http://localhost:9001  (minioadmin / minioadmin)
+# Bucket otomatik oluşturulur: kankaverse  (minio-init servisi ile)
 
 services:
   postgres:
@@ -35,6 +37,43 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── MinIO (S3-uyumlu yerel storage — KVKK/yerel barındırma uyumlu) ──────────
+  minio:
+    image: minio/minio:latest
+    container_name: kankaverse-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"    # S3 API
+      - "${MINIO_CONSOLE_PORT:-9001}:9001" # Web konsol
+    volumes:
+      - kankaverse_miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Bucket init: minio başlar başlamaz 'kankaverse' bucket'ını oluşturur.
+  # Tek seferlik; başarılı olunca container kapanır (restart: no).
+  minio-init:
+    image: minio/mc:latest
+    container_name: kankaverse-minio-init
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
+        mc mb --ignore-existing local/${MINIO_BUCKET:-kankaverse};
+        echo 'Bucket hazir: ${MINIO_BUCKET:-kankaverse}';
+      "
+
 volumes:
   kankaverse_pgdata:
   kankaverse_redisdata:
+  kankaverse_miniodata:

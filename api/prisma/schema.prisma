@@ -48,6 +48,12 @@ enum ChannelType {
   GROUP_DM
 }
 
+enum ScanStatus {
+  PENDING
+  CLEAN
+  FLAGGED
+}
+
 model User {
   id                  String             @id @default(cuid())
   username            String             @unique
@@ -80,6 +86,7 @@ model User {
   blocksReceived      UserBlock[]        @relation("Blocked")
   channelMemberships  ChannelMember[]
   createdInvites      Invite[]           @relation("InviteCreator")
+  attachments         Attachment[]
 }
 
 model AuthToken {
@@ -168,18 +175,35 @@ model Channel {
 }
 
 model Message {
-  id        String   @id @default(cuid())
-  channelId String
-  channel   Channel  @relation(fields: [channelId], references: [id])
-  authorId  String
-  author    User     @relation(fields: [authorId], references: [id])
-  content   String
-  replyToId String?
-  deletedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String       @id @default(cuid())
+  channelId   String
+  channel     Channel      @relation(fields: [channelId], references: [id])
+  authorId    String
+  author      User         @relation(fields: [authorId], references: [id])
+  content     String
+  replyToId   String?
+  deletedAt   DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  attachments Attachment[]
 
   @@index([channelId, createdAt])
+}
+
+model Attachment {
+  id          String     @id @default(cuid())
+  uploaderId  String
+  uploader    User       @relation(fields: [uploaderId], references: [id])
+  messageId   String?    // mesaja iliştirilince set (önce PENDING, presign anında null olabilir)
+  message     Message?   @relation(fields: [messageId], references: [id])
+  storageKey  String     @unique  // S3 objesi anahtarı
+  filename    String
+  contentType String
+  size        Int
+  scanStatus  ScanStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+
+  @@index([messageId])
 }
 
 model Friendship {
