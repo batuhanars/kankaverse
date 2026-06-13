@@ -123,6 +123,7 @@ export interface GuildDto {
   ownerId: string
   adultsOnly: boolean
   iconUrl: string | null
+  rules: string | null
   createdAt: string
 }
 

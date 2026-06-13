@@ -260,13 +260,35 @@
     "adultsOnlySection": "İçerik Yaşı",
     "adultsOnlyLabel": "Yalnızca Yetişkinler (18+)",
     "adultsOnlyDesc": "Bu ortama yalnızca yetişkinler katılabilir ve içeriklere erişebilir. Açıldığında minör kullanıcılar engellenir.",
-    "inviteSection": "Davet Yönetimi"
+    "inviteSection": "Davet Yönetimi",
+    "rulesSection": "Ortam Kuralları",
+    "rulesLabel": "Kurallar",
+    "rulesPlaceholder": "Ortam kurallarını buraya yaz... (ör: saygılı ol, spam yapma)",
+    "rulesSave": "Kaydet",
+    "rulesEmpty": "Henüz kural belirlenmemiş."
   },
   "channel": {
     "generalChat": "genel-sohbet",
     "textChannels": "METİN KANALLARI",
     "noChannels": "Henüz kanal yok.",
-    "selectChannel": "Bir kanal seç"
+    "selectChannel": "Bir kanal seç",
+    "createTitle": "Kanal Oluştur",
+    "nameLabel": "KANAL ADI",
+    "namePlaceholder": "yeni-kanal",
+    "createButton": "Oluştur",
+    "ageGatedLabel": "18+ yaş-kapılı kanal",
+    "ageGatedDesc": "Bu kanala yalnızca yetişkin üyeler erişebilir.",
+    "ageGatedBadge": "18+",
+    "renameTitle": "Kanalı Yeniden Adlandır",
+    "renameButton": "Kaydet",
+    "deleteTitle": "Kanalı Sil",
+    "deleteConfirm": "{name} kanalını silmek istediğinden emin misin? Bu işlem geri alınamaz.",
+    "deleteButton": "Sil",
+    "rename": "Yeniden Adlandır",
+    "delete": "Sil",
+    "errors": {
+      "LAST_CHANNEL": "Son kanal silinemez. Ortamda en az bir kanal olmalıdır."
+    }
   },
   "message": {
     "inputPlaceholder": "#{channel} kanalına mesaj yaz",

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { guildsApi } from '@/api/guilds'
+import { channelsApi } from '@/api/channels'
 import type { ChannelDto } from '@/types'
 
 export const useChannelsStore = defineStore('channels', () => {
@@ -23,6 +24,32 @@ export const useChannelsStore = defineStore('channels', () => {
     channelsByGuild.value[guildId] = res.data
   }
 
+  async function createChannel(guildId: string, payload: { name: string; ageGated?: boolean }): Promise<ChannelDto> {
+    const res = await guildsApi.createChannel(guildId, payload)
+    if (!channelsByGuild.value[guildId]) channelsByGuild.value[guildId] = []
+    channelsByGuild.value[guildId].push(res.data)
+    return res.data
+  }
+
+  async function updateChannel(channelId: string, guildId: string, payload: { name?: string; ageGated?: boolean }): Promise<ChannelDto> {
+    const res = await channelsApi.update(channelId, payload)
+    const list = channelsByGuild.value[guildId]
+    if (list) {
+      const idx = list.findIndex((c) => c.id === channelId)
+      if (idx !== -1) list[idx] = res.data
+    }
+    return res.data
+  }
+
+  async function deleteChannel(channelId: string, guildId: string): Promise<void> {
+    await channelsApi.delete(channelId)
+    const list = channelsByGuild.value[guildId]
+    if (list) {
+      channelsByGuild.value[guildId] = list.filter((c) => c.id !== channelId)
+    }
+    if (activeChannelId.value === channelId) activeChannelId.value = null
+  }
+
   function setActiveChannel(id: string | null) {
     activeChannelId.value = id
   }
@@ -33,6 +60,9 @@ export const useChannelsStore = defineStore('channels', () => {
     activeChannel,
     channelsForGuild,
     fetchChannels,
+    createChannel,
+    updateChannel,
+    deleteChannel,
     setActiveChannel,
   }
 })
