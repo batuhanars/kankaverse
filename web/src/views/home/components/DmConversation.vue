@@ -17,6 +17,7 @@ import ReportModal from '@/components/shared/ReportModal.vue'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import MessageRow from '@/components/shared/MessageRow.vue'
 import PinsPopover from '@/components/shared/PinsPopover.vue'
+import SearchPopover from '@/components/shared/SearchPopover.vue'
 import GroupManagePanel from './GroupManagePanel.vue'
 import type { DmChannelDto, MessageDto } from '@/types'
 
@@ -344,6 +345,14 @@ function toggleDmPins(e: MouseEvent) {
   showDmPins.value = !showDmPins.value
 }
 
+// Sprint V2 Search: DM/grup DM mesaj araması
+const showDmSearch = ref(false)
+
+function toggleDmSearch(e: MouseEvent) {
+  e.stopPropagation()
+  showDmSearch.value = !showDmSearch.value
+}
+
 async function onPinMessage(messageId: string) {
   try {
     await messagesApi.pinMessage(props.channel.id, messageId)
@@ -506,6 +515,28 @@ function isGroupStart(index: number): boolean {
               @close="showDmPins = false"
             />
           </div>
+          <!-- Mesajlarda Ara butonu (1-1 DM) -->
+          <div class="relative">
+            <button
+              class="w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+              :class="showDmSearch ? 'bg-[var(--kv-accent-subtle)]' : ''"
+              :style="showDmSearch ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
+              :title="t('messageSearch.buttonTitle')"
+              @mouseenter="!showDmSearch && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
+              @mouseleave="!showDmSearch && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
+              @click="toggleDmSearch"
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+            </button>
+            <SearchPopover
+              :channel-id="channel.id"
+              :open="showDmSearch"
+              @close="showDmSearch = false"
+            />
+          </div>
           <!-- Kullanıcıyı şikâyet et -->
           <button
             class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
@@ -573,6 +604,28 @@ function isGroupStart(index: number): boolean {
               :channel-id="channel.id"
               :open="showDmPins"
               @close="showDmPins = false"
+            />
+          </div>
+          <!-- Mesajlarda Ara butonu (GROUP_DM) -->
+          <div class="relative">
+            <button
+              class="w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+              :class="showDmSearch ? 'bg-[var(--kv-accent-subtle)]' : ''"
+              :style="showDmSearch ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
+              :title="t('messageSearch.buttonTitle')"
+              @mouseenter="!showDmSearch && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
+              @mouseleave="!showDmSearch && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
+              @click="toggleDmSearch"
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+            </button>
+            <SearchPopover
+              :channel-id="channel.id"
+              :open="showDmSearch"
+              @close="showDmSearch = false"
             />
           </div>
           <!-- Üye panelini aç/kapat -->

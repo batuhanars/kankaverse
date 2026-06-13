@@ -43,4 +43,10 @@ export const messagesApi = {
   fetchPins(channelId: string) {
     return http.get<MessageDto[]>(`/channels/${channelId}/pins`)
   },
+  // Sprint V2 Search: kanal mesaj araması (§3 contract)
+  searchMessages(channelId: string, q: string, before?: string) {
+    const params: Record<string, string> = { q }
+    if (before) params.before = before
+    return http.get<MessageDto[]>(`/channels/${channelId}/messages/search`, { params })
+  },
 }

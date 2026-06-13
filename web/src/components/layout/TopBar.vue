@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChannelsStore } from '@/stores/channels'
 import PinsPopover from '@/components/shared/PinsPopover.vue'
+import SearchPopover from '@/components/shared/SearchPopover.vue'
 import NotificationBell from '@/components/shared/NotificationBell.vue'
 
 defineProps<{ showMemberPanel: boolean }>()
@@ -12,10 +13,16 @@ const { t } = useI18n()
 const channelsStore = useChannelsStore()
 
 const showPins = ref(false)
+const showSearch = ref(false)
 
 function togglePins(e: MouseEvent) {
   e.stopPropagation()
   showPins.value = !showPins.value
+}
+
+function toggleSearch(e: MouseEvent) {
+  e.stopPropagation()
+  showSearch.value = !showSearch.value
 }
 </script>
 
@@ -30,6 +37,30 @@ function togglePins(e: MouseEvent) {
     </span>
 
     <div class="ml-auto flex items-center gap-1">
+      <!-- Mesajlarda Ara butonu -->
+      <div class="relative">
+        <button
+          class="w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+          :class="showSearch ? 'bg-[var(--kv-accent-subtle)]' : ''"
+          :style="showSearch ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
+          :title="t('messageSearch.buttonTitle')"
+          @mouseenter="!showSearch && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
+          @mouseleave="!showSearch && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
+          @click="toggleSearch"
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+        </button>
+        <SearchPopover
+          v-if="channelsStore.activeChannel()"
+          :channel-id="channelsStore.activeChannel()!.id"
+          :open="showSearch"
+          @close="showSearch = false"
+        />
+      </div>
+
       <!-- Sabitlenen Mesajlar butonu -->
       <div class="relative">
         <button
