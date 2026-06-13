@@ -37,6 +37,8 @@ const showQuickEmoji = ref(false)
 
 const moreEl = ref<HTMLElement | null>(null)
 const emojiEl = ref<HTMLElement | null>(null)
+// Emoji picker tetikleyici butonu (Teleport konumlandırması için)
+const emojiTriggerEl = ref<HTMLElement | null>(null)
 
 function closeAll() {
   showMore.value = false
@@ -94,7 +96,10 @@ function pickEmoji(emoji: string) {
 
 function onDocClick(e: MouseEvent) {
   const moreOpen = moreEl.value && moreEl.value.contains(e.target as Node)
-  const emojiOpen = emojiEl.value && emojiEl.value.contains(e.target as Node)
+  // Picker body'e Teleport edildiği için emojiEl.contains yetmez; .v3-emoji-picker ile de kontrol et.
+  const emojiOpen =
+    (emojiEl.value && emojiEl.value.contains(e.target as Node)) ||
+    !!(e.target as Element)?.closest?.('.v3-emoji-picker')
   if (!moreOpen && !emojiOpen) {
     closeAll()
   }
@@ -139,6 +144,7 @@ onUnmounted(() => {
     <!-- 🙂 Reaksiyon ekle (tam picker) -->
     <div ref="emojiEl" class="relative">
       <button
+        ref="emojiTriggerEl"
         class="w-8 h-8 flex items-center justify-center text-[15px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
         :class="showEmojiPicker ? 'bg-[var(--kv-bg-sidebar)]' : ''"
         :title="t('reaction.addReaction')"
@@ -146,14 +152,12 @@ onUnmounted(() => {
       >
         🙂
       </button>
-      <!-- Tam emoji picker -->
-      <div
+      <!-- Tam emoji picker — Teleport to body ile viewport-farkındalıklı konumlandırma -->
+      <EmojiPicker
         v-if="showEmojiPicker"
-        class="absolute bottom-full right-0 mb-2 z-50"
-        @click.stop
-      >
-        <EmojiPicker @select="pickEmoji" />
-      </div>
+        :anchor-el="emojiTriggerEl"
+        @select="pickEmoji"
+      />
     </div>
 
     <!-- ↩ Yanıtla -->
