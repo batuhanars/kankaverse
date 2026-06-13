@@ -3,7 +3,7 @@ import { io, type Socket } from 'socket.io-client'
 import { useMessagesStore } from '@/stores/messages'
 import { useFriendsStore } from '@/stores/friends'
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
-import { useNotificationsStore } from '@/stores/notifications'
+import { useNotificationsStore, type MentionPayload } from '@/stores/notifications'
 import { useDmStore } from '@/stores/dm'
 import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
@@ -146,6 +146,16 @@ export function useSocket() {
 
     socket.on('reaction.removed', (data: { messageId: string; channelId: string; emoji: string; userId: string }) => {
       messagesStore.applyReaction(data.messageId, data.emoji, data.userId, authStore.user?.id ?? '', false)
+    })
+
+    // Sprint V2: @bahsetme bildirimi
+    socket.on('mention', (payload: MentionPayload) => {
+      notificationsStore.push({
+        type: 'mention',
+        user: payload.author,
+        mention: payload,
+        at: new Date().toISOString(),
+      })
     })
 
     // Kanal aktivitesi — başka üyenin mesajı: aktif değilse unread sayacını artır

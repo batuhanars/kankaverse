@@ -129,7 +129,9 @@ function openNotifications() {
                   ? t('notifications.friend_request', { username: item.user?.username ?? '?' })
                   : item.type === 'friend_accept'
                     ? t('notifications.friend_accept', { username: item.user?.username ?? '?' })
-                    : t('notifications.friend_remove') }}
+                    : item.type === 'mention'
+                      ? t('notifications.mention', { username: item.mention?.author.username ?? '?' })
+                      : t('notifications.friend_remove') }}
             </p>
           </div>
         </div>

@@ -1,12 +1,21 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
-export type NotificationType = 'friend_request' | 'friend_accept' | 'friend_remove'
+export type NotificationType = 'friend_request' | 'friend_accept' | 'friend_remove' | 'mention'
+
+export interface MentionPayload {
+  messageId: string
+  channelId: string
+  guildId: string | null
+  author: { id: string; username: string; avatarUrl: string | null }
+  preview: string
+}
 
 export interface NotificationItem {
   id: string
   type: NotificationType
   user?: { id: string; username: string; avatarUrl: string | null }
+  mention?: MentionPayload
   at: string
   read: boolean
 }

@@ -201,6 +201,7 @@ export interface MessageDto {
   editedAt: string | null
   attachments?: AttachmentDto[]
   reactions?: ReactionDto[]
+  mentions?: string[]  // Sprint V2 — doğrulanmış bahsedilen userId'ler (boşsa [])
 }
 
 // Sprint 7B — Ortam üye DTO

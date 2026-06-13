@@ -8,11 +8,13 @@ import MessageRow from './MessageRow.vue'
 import UserCardPopover from './UserCardPopover.vue'
 import ReportModal from './ReportModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
-import type { MessageDto } from '@/types'
+import type { MessageDto, GuildMemberDto } from '@/types'
 
 const props = defineProps<{
   message: MessageDto
   isGroupStart: boolean
+  // Sprint V2: guild üyeleri (MessageArea'dan aktarılır; mention çözümü için)
+  guildMembers?: GuildMemberDto[]
 }>()
 const emit = defineEmits<{ reply: [message: MessageDto] }>()
 
@@ -21,6 +23,17 @@ const authStore = useAuthStore()
 const messagesStore = useMessagesStore()
 
 const isMine = computed(() => props.message.author.id === authStore.user?.id)
+
+// Sprint V2: mention çözücü — guild üye listesinden userId → username
+function mentionResolver(userId: string): string {
+  const member = props.guildMembers?.find((m) => m.userId === userId)
+  return member ? member.username : t('mention.unknown')
+}
+
+// Sprint V2: kendi bahsedilme vurgusu
+const isMentioned = computed(
+  () => !!(props.message.mentions?.includes(authStore.user?.id ?? ''))
+)
 
 // Kullanıcı kartı popover (yazar adına tıklama — MessageRow gelecekte emit ile bağlanabilir)
 const showCard = ref(false)
@@ -153,6 +166,8 @@ onUnmounted(() => {
     :is-mine="isMine"
     :is-group-start="isGroupStart"
     :is-editing="editing"
+    :mention-resolver="mentionResolver"
+    :is-mentioned="isMentioned"
     @reply="emit('reply', $event)"
     @edit="startEdit"
     @delete="openDeleteConfirm"

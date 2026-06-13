@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useFriendsStore } from '@/stores/friends'
 import { useSocket } from '@/composables/useSocket'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
+import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
 import { messagesApi } from '@/api/messages'
 import { dmApi } from '@/api/dm'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
@@ -82,6 +83,39 @@ const friendsStore = useFriendsStore()
 const { joinChannel, leaveChannel } = useSocket()
 const { onInput: onTypingInput, stopTyping } = useTyping(() => props.channel.id)
 const { label: typingLabel } = useTypingLabel(() => props.channel.id, t, { named: false })
+
+// Sprint V2: mention üye kaynağı — DM bağlamına göre
+// 1-1 DM: karşı kullanıcı; GROUP_DM: grup üyeleri
+const dmMentionMembers = computed(() => {
+  if (props.channel.type === 'DM') {
+    return [{ id: props.channel.otherUser.id, username: props.channel.otherUser.username, avatarUrl: props.channel.otherUser.avatarUrl }]
+  }
+  // GROUP_DM
+  return props.channel.members.map((m) => ({ id: m.id, username: m.username, avatarUrl: m.avatarUrl }))
+})
+
+// Sprint V2: mention çözücü — userId → username (DM katılımcıları)
+function dmMentionResolver(userId: string): string {
+  const member = dmMentionMembers.value.find((m) => m.id === userId)
+  if (member) return member.username
+  // Gönderen kendisi de olabilir
+  if (userId === authStore.user?.id) return authStore.user.username
+  return t('mention.unknown')
+}
+
+// Sprint V2: kendi-bahsedilme vurgusu (DM bağlamı)
+function isDmMentioned(msg: MessageDto): boolean {
+  return !!(msg.mentions?.includes(authStore.user?.id ?? ''))
+}
+
+// Sprint V2: mention autocomplete
+const mention = useMentionAutocomplete(
+  dmMentionMembers,
+  () => content.value,
+  (v) => { content.value = v },
+  () => dmTextareaEl.value?.selectionStart ?? 0,
+  (pos) => { nextTick(() => { dmTextareaEl.value?.setSelectionRange(pos, pos) }) },
+)
 
 // Tip yardımcıları
 const isGroup = computed(() => props.channel.type === 'GROUP_DM')
@@ -257,7 +291,9 @@ async function send() {
   stopTyping()
   sendError.value = ''
   sending.value = true
-  const text = content.value.trim()
+  // Sprint V2: @username → <@userId> dönüşümü gönderimden önce
+  const text = mention.applyMentionTokens(content.value.trim())
+  mention.clearPending()
   content.value = ''
   const replyId = replyingTo.value?.id
   replyingTo.value = null
@@ -277,10 +313,21 @@ async function send() {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  // Sprint V2: mention popover açıkken ↑/↓/Enter/Tab/Esc → autocomplete'e yönlendir
+  if (mention.onKeydown(e)) return
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     send()
   }
+}
+
+function onDmTextareaInput() {
+  sendError.value = ''
+  onTypingInput()
+  const el = dmTextareaEl.value
+  if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }
+  // Sprint V2: mention autocomplete tetikle
+  mention.onInput()
 }
 
 function isMine(msg: MessageDto): boolean {
@@ -507,6 +554,8 @@ function isGroupStart(index: number): boolean {
           :is-mine="isMine(msg)"
           :is-group-start="isGroupStart(index)"
           :is-editing="isMine(msg) && editState?.messageId === msg.id"
+          :mention-resolver="dmMentionResolver"
+          :is-mentioned="isDmMentioned(msg)"
           @reply="startReply"
           @edit="startEdit"
           @delete="openDeleteConfirm"
@@ -637,17 +686,45 @@ function isGroupStart(index: number): boolean {
             >
               📎
             </button>
-            <textarea
-              ref="dmTextareaEl"
-              v-model="content"
-              rows="1"
-              :placeholder="inputPlaceholder"
-              class="flex-1 py-3 bg-transparent text-[15px] resize-none outline-none"
-              style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
-              @keydown="onKeydown"
-              @input="sendError = ''; onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
-              @blur="stopTyping"
-            />
+            <!-- Sprint V2: mention autocomplete — relative sarmalayıcı popover için -->
+            <div class="relative flex-1 min-w-0">
+              <div
+                v-if="mention.showPopover.value"
+                class="absolute bottom-full left-0 mb-1 z-50 min-w-[200px] max-w-[320px] overflow-hidden rounded-[var(--kv-radius-md)] border"
+                style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+                @mousedown.prevent
+              >
+                <div
+                  v-for="(member, idx) in mention.suggestions.value"
+                  :key="member.id"
+                  class="flex items-center gap-2 px-3 py-2 cursor-pointer text-[14px]"
+                  :style="idx === mention.activeIndex.value
+                    ? 'background-color: var(--kv-accent-subtle); color: var(--kv-text-primary);'
+                    : 'color: var(--kv-text-secondary);'"
+                  @click="mention.selectSuggestion(member)"
+                >
+                  <div
+                    class="w-6 h-6 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-white"
+                    style="background-color: var(--kv-accent-500);"
+                  >
+                    <img v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.username" class="w-full h-full object-cover" />
+                    <span v-else>{{ member.username[0].toUpperCase() }}</span>
+                  </div>
+                  <span class="font-medium">@{{ member.username }}</span>
+                </div>
+              </div>
+              <textarea
+                ref="dmTextareaEl"
+                v-model="content"
+                rows="1"
+                :placeholder="inputPlaceholder"
+                class="w-full py-3 bg-transparent text-[15px] resize-none outline-none"
+                style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
+                @keydown="onKeydown"
+                @input="onDmTextareaInput"
+                @blur="stopTyping"
+              />
+            </div>
             <!-- Emoji (😊) butonu -->
             <div class="relative shrink-0 self-center">
               <button

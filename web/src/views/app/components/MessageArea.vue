@@ -3,17 +3,21 @@ import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMessagesStore } from '@/stores/messages'
 import { useChannelsStore } from '@/stores/channels'
+import { useGuildsStore } from '@/stores/guilds'
 import { useSocket } from '@/composables/useSocket'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
+import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
 import { messagesApi } from '@/api/messages'
+import { guildsApi } from '@/api/guilds'
 import MessageItem from '@/components/shared/MessageItem.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
-import type { MessageDto } from '@/types'
+import type { MessageDto, GuildMemberDto } from '@/types'
 
 const { t } = useI18n()
 const messagesStore = useMessagesStore()
 const channelsStore = useChannelsStore()
+const guildsStore = useGuildsStore()
 const { joinChannel, leaveChannel } = useSocket()
 const { onInput: onTypingInput, stopTyping } = useTyping(() => channelId.value)
 const { label: typingLabel } = useTypingLabel(() => channelId.value, t)
@@ -34,6 +38,9 @@ const composeFile = ref<File | null>(null)
 
 // Yanıt state
 const replyingTo = ref<MessageDto | null>(null)
+
+// Sprint V2: guild üyeleri (mention autocomplete + resolver için)
+const guildMembers = ref<GuildMemberDto[]>([])
 
 function setReplyingTo(msg: MessageDto) {
   replyingTo.value = msg
@@ -104,6 +111,34 @@ function onComposePickerDocClick(e: MouseEvent) {
 
 onMounted(() => document.addEventListener('click', onComposePickerDocClick))
 onUnmounted(() => document.removeEventListener('click', onComposePickerDocClick))
+
+// Sprint V2: guild değişince üyeleri yükle (mention autocomplete için)
+watch(
+  () => guildsStore.activeGuildId,
+  async (guildId) => {
+    if (!guildId) { guildMembers.value = []; return }
+    try {
+      const res = await guildsApi.getMembers(guildId)
+      guildMembers.value = res.data
+    } catch {
+      guildMembers.value = []
+    }
+  },
+  { immediate: true },
+)
+
+// Sprint V2: mention autocomplete (guild kanalı → guild üyeleri)
+const mentionMembers = computed(() =>
+  guildMembers.value.map((m) => ({ id: m.userId, username: m.username, avatarUrl: m.avatarUrl }))
+)
+
+const mention = useMentionAutocomplete(
+  mentionMembers,
+  () => content.value,
+  (v) => { content.value = v },
+  () => textareaEl.value?.selectionStart ?? 0,
+  (pos) => { nextTick(() => { textareaEl.value?.setSelectionRange(pos, pos) }) },
+)
 
 watch(
   channelId,
@@ -192,7 +227,9 @@ async function send() {
   sendError.value = ''
   slowModeSeconds.value = null
   sending.value = true
-  const text = content.value.trim()
+  // Sprint V2: @username → <@userId> dönüşümü gönderimden önce
+  const text = mention.applyMentionTokens(content.value.trim())
+  mention.clearPending()
   content.value = ''
   const replyId = replyingTo.value?.id
   replyingTo.value = null
@@ -222,10 +259,22 @@ async function send() {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  // Sprint V2: mention popover açıkken ↑/↓/Enter/Tab/Esc → autocomplete'e yönlendir
+  if (mention.onKeydown(e)) return
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     send()
   }
+}
+
+function onTextareaInput() {
+  sendError.value = ''
+  slowModeSeconds.value = null
+  onTypingInput()
+  const el = textareaEl.value
+  if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }
+  // Sprint V2: mention autocomplete tetikle
+  mention.onInput()
 }
 </script>
 
@@ -267,6 +316,7 @@ function onKeydown(e: KeyboardEvent) {
           :key="msg.id"
           :message="msg"
           :is-group-start="isGroupStart(index)"
+          :guild-members="guildMembers"
           @reply="setReplyingTo"
         />
       </template>
@@ -332,17 +382,46 @@ function onKeydown(e: KeyboardEvent) {
         >
           📎
         </button>
-        <textarea
-          ref="textareaEl"
-          v-model="content"
-          rows="1"
-          :placeholder="inputPlaceholder()"
-          class="flex-1 py-3 bg-transparent text-[15px] resize-none outline-none"
-          style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
-          @keydown="onKeydown"
-          @input="sendError = ''; slowModeSeconds = null; onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
-          @blur="stopTyping"
-        />
+        <!-- Sprint V2: mention autocomplete — relative sarmalayıcı popover için -->
+        <div class="relative flex-1 min-w-0">
+          <div
+            v-if="mention.showPopover.value"
+            class="absolute bottom-full left-0 mb-1 z-50 min-w-[200px] max-w-[320px] overflow-hidden rounded-[var(--kv-radius-md)] border"
+            style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+            @mousedown.prevent
+          >
+            <div
+              v-for="(member, idx) in mention.suggestions.value"
+              :key="member.id"
+              class="flex items-center gap-2 px-3 py-2 cursor-pointer text-[14px]"
+              :style="idx === mention.activeIndex.value
+                ? 'background-color: var(--kv-accent-subtle); color: var(--kv-text-primary);'
+                : 'color: var(--kv-text-secondary);'"
+              @click="mention.selectSuggestion(member)"
+            >
+              <!-- Daire avatar -->
+              <div
+                class="w-6 h-6 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-white"
+                style="background-color: var(--kv-accent-500);"
+              >
+                <img v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.username" class="w-full h-full object-cover" />
+                <span v-else>{{ member.username[0].toUpperCase() }}</span>
+              </div>
+              <span class="font-medium">@{{ member.username }}</span>
+            </div>
+          </div>
+          <textarea
+            ref="textareaEl"
+            v-model="content"
+            rows="1"
+            :placeholder="inputPlaceholder()"
+            class="w-full py-3 bg-transparent text-[15px] resize-none outline-none"
+            style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
+            @keydown="onKeydown"
+            @input="onTextareaInput"
+            @blur="stopTyping"
+          />
+        </div>
         <!-- Emoji (😊) butonu -->
         <div class="relative shrink-0 self-center">
           <button
