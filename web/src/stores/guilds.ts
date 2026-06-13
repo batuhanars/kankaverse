@@ -47,5 +47,13 @@ export const useGuildsStore = defineStore('guilds', () => {
     activeGuildId.value = id
   }
 
-  return { guilds, activeGuildId, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, setActiveGuild }
+  /** Guild'in hasUnread'ini doğrudan set et (WS channel.activity → true) */
+  function setGuildUnread(guildId: string, value: boolean): void {
+    const idx = guilds.value.findIndex((g) => g.id === guildId)
+    if (idx !== -1 && guilds.value[idx].hasUnread !== value) {
+      guilds.value[idx] = { ...guilds.value[idx], hasUnread: value }
+    }
+  }
+
+  return { guilds, activeGuildId, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, setActiveGuild, setGuildUnread }
 })

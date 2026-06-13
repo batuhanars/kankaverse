@@ -501,6 +501,10 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **DM/grup oluşturma birleşik** ("Sohbet Başlat": 1=DM `canDm`, 2+=grup; iki T&S kapısı ayrı)
 - [x] **Grup üye paneli yüzen + üye çıkar (owner) + yöneticiler daima üstte (ortam+grup) + sahip tacı**
 - [x] **Mesaj düzenle/sil (kendi mesajı)** — `PATCH`/`DELETE /channels/:id/messages/:messageId` (yazar-only, automod, soft-delete); WS `message.updated`/`message.deleted`; guild+DM+grup UI + "(düzenlendi)". 290 test
+- [x] **Ek UX:** görsel lightbox (sekme yok) + ek+açıklama tek birim (WhatsApp) + düzenle yalnız metinli mesajda
+- [x] **Ölçü/layout token katmanı** + yan paneller tek genişlik (264) + kontrol boyutu tutarlı
+- [x] **Kanal okunmamış sistemi** — `ChannelRead` + `POST /channels/:id/read` + `hasUnread` (kanal+guild) + WS `channel.activity`; ChannelPanel okunmamış göstergesi + ServerRail ortam pill'i. 309 test
+- [x] **Rail özel tooltip** (Discord-tarzı, anında, ok+pill — native title gecikmesi giderildi)
 
 ---
 

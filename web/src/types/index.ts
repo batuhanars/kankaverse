@@ -144,6 +144,7 @@ export interface GuildDto {
   iconUrl: string | null
   rules: string | null
   createdAt: string
+  hasUnread: boolean
 }
 
 export interface ChannelDto {
@@ -154,6 +155,7 @@ export interface ChannelDto {
   ageGated: boolean
   position: number
   slowModeSeconds: number
+  hasUnread: boolean
 }
 
 // Sprint 5 §4 — Attachment DTO

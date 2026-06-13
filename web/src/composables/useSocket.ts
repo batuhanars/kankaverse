@@ -5,6 +5,8 @@ import { useFriendsStore } from '@/stores/friends'
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useDmStore } from '@/stores/dm'
+import { useChannelsStore } from '@/stores/channels'
+import { useGuildsStore } from '@/stores/guilds'
 import { getAccessToken } from '@/api/axios'
 import {
   _bindTypingEmitters,
@@ -26,6 +28,8 @@ export function useSocket() {
   const presenceStore = usePresenceStore()
   const notificationsStore = useNotificationsStore()
   const dmStore = useDmStore()
+  const channelsStore = useChannelsStore()
+  const guildsStore = useGuildsStore()
 
   function _joinRoom(channelId: string) {
     socket?.emit('channel:join', { channelId }, (ack: { ok: boolean; error?: string }) => {
@@ -131,6 +135,14 @@ export function useSocket() {
 
     socket.on('typing:clear', (data: { userId: string; username: string; channelId: string }) => {
       handleTypingClear(data.userId, data.channelId)
+    })
+
+    // Kanal aktivitesi — başka üyenin mesajı: aktif değilse unread işaretle
+    socket.on('channel.activity', (data: { channelId: string; guildId: string; authorId: string }) => {
+      // Kullanıcı o kanalı şu an izliyorsa unread saymıyoruz
+      if (activeChannelId === data.channelId) return
+      channelsStore.markChannelUnread(data.channelId, data.guildId)
+      guildsStore.setGuildUnread(data.guildId, true)
     })
 
     // Typing emit fonksiyonlarını useTyping composable'ına bağla

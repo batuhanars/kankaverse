@@ -30,6 +30,18 @@ const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
 const { connect, disconnect, joinChannel, leaveChannel } = useSocket()
 
+/** Guild'in tüm kanallarından hesaplanan unread: herhangi biri unread → guild unread */
+function recheckGuildUnread(guildId: string) {
+  const channels = channelsStore.channelsForGuild(guildId)
+  const anyUnread = channels.some((c) => c.hasUnread)
+  guildsStore.setGuildUnread(guildId, anyUnread)
+}
+
+function onRecheckUnread(e: Event) {
+  const { guildId } = (e as CustomEvent<{ guildId: string }>).detail
+  recheckGuildUnread(guildId)
+}
+
 const showMemberPanel = ref(true)
 const showServerModal = ref(false)
 const serverModalStep = ref<'choose' | 'create' | 'join'>('choose')
@@ -80,6 +92,9 @@ async function syncFromRoute() {
     if (prev && prev !== channelId) leaveChannel(prev)
     channelsStore.setActiveChannel(channelId)
     await joinChannel(channelId)
+    // Kanal açılınca okundu işaretle → unread badge temizle
+    await channelsStore.markChannelRead(channelId)
+    recheckGuildUnread(guildId)
     dmStore.setActiveChannel(null)
     homeView.value = 'friends'
 
@@ -133,11 +148,13 @@ onMounted(async () => {
   // Veriler yüklendikten sonra route'u senkronize et (derin-link + yenileme)
   await syncFromRoute()
   window.addEventListener('kv:auth:expired', onAuthExpired)
+  window.addEventListener('kv:guild:recheck-unread', onRecheckUnread)
 })
 
 onUnmounted(() => {
   disconnect()
   window.removeEventListener('kv:auth:expired', onAuthExpired)
+  window.removeEventListener('kv:guild:recheck-unread', onRecheckUnread)
 })
 
 // Sonraki gezinmelerde route değişince store'u senkronize et
