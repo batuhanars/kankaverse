@@ -14,11 +14,11 @@ const { t } = useI18n()
 
 <template>
   <aside
-    class="w-[264px] flex flex-col shrink-0 rounded-[var(--kv-radius-lg)] overflow-hidden"
+    class="w-[264px] flex flex-col shrink-0 rounded-[var(--kv-radius-lg)] overflow-hidden mt-4"
     style="background-color: var(--kv-bg-sidebar);"
   >
     <!-- Nav öğeleri -->
-    <div class="px-2 pt-3 pb-2 shrink-0 space-y-1 border-b" style="border-color: var(--kv-border-subtle);">
+    <div class="px-2 pt-4 pb-2 shrink-0 space-y-1 border-b" style="border-color: var(--kv-border-subtle);">
       <!-- Arkadaşlar -->
       <button
         class="w-full flex items-center gap-3 px-3 py-3 rounded-[var(--kv-radius-md)] text-[14px] font-medium transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"

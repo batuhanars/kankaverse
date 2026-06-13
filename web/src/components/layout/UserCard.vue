@@ -57,7 +57,7 @@ function onLogout() {
 </script>
 
 <template>
-  <div ref="cardRef" class="relative z-10 px-2 pb-2 pt-2 shrink-0">
+  <div ref="cardRef" class="relative z-10 px-2 pb-4 pt-4 shrink-0">
 
     <!-- Upward popover -->
     <div

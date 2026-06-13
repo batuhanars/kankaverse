@@ -4,6 +4,7 @@ import { useMessagesStore } from '@/stores/messages'
 import { useFriendsStore } from '@/stores/friends'
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
 import { useNotificationsStore } from '@/stores/notifications'
+import { useDmStore } from '@/stores/dm'
 import { getAccessToken } from '@/api/axios'
 import {
   _bindTypingEmitters,
@@ -24,6 +25,7 @@ export function useSocket() {
   const friendsStore = useFriendsStore()
   const presenceStore = usePresenceStore()
   const notificationsStore = useNotificationsStore()
+  const dmStore = useDmStore()
 
   function _joinRoom(channelId: string) {
     socket?.emit('channel:join', { channelId }, (ack: { ok: boolean; error?: string }) => {
@@ -73,6 +75,10 @@ export function useSocket() {
       messagesStore.appendMessage(message)
       // Mesaj gelince o kanalda yazıyor göstergesini temizle
       clearTypingForChannel(message.channelId)
+    })
+
+    socket.on('dm.message', (data: { channelId: string; lastMessage: { content: string; createdAt: string }; senderId: string }) => {
+      dmStore.applyActivity(data)
     })
 
     socket.on('friend.request', (request: FriendRequestDto) => {
