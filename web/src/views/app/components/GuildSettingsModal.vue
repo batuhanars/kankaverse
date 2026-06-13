@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@vueuse/core'
 import { useGuildsStore } from '@/stores/guilds'
@@ -18,25 +18,66 @@ const emit = defineEmits<{ close: []; updated: [guild: GuildDto] }>()
 const { t } = useI18n()
 const guildsStore = useGuildsStore()
 
-// ── İkon yükleme ──
+// ── Birleşik taslak state ──────────────────────────────────────────────────
+
+const draftName = ref(props.guild.name)
+const draftAdultsOnly = ref(props.guild.adultsOnly)
+const draftRules = ref(props.guild.rules ?? '')
+
+// Bekleyen ikon state: null = değişiklik yok, File = yeni dosya, 'remove' = kaldır
+const pendingIconFile = ref<File | null>(null)
+const pendingIconRemove = ref(false)
+// Yerel önizleme için object URL (yalnızca pendingIconFile varken)
+const pendingIconPreviewUrl = ref<string | null>(null)
+
+// ── Dirty hesaplama ────────────────────────────────────────────────────────
+
+const isDirty = computed(() => {
+  if (draftName.value.trim() !== props.guild.name) return true
+  if (draftAdultsOnly.value !== props.guild.adultsOnly) return true
+  if (draftRules.value !== (props.guild.rules ?? '')) return true
+  if (pendingIconFile.value !== null) return true
+  if (pendingIconRemove.value) return true
+  return false
+})
+
+// ── İkon yükleme ──────────────────────────────────────────────────────────
+
 const iconFileInput = ref<HTMLInputElement | null>(null)
-const iconUploading = ref(false)
-const iconUploadPct = ref(0)
 const iconError = ref('')
+const saveError = ref('')
+const saving = ref(false)
+const iconUploadPct = ref(0)
 
 const ICON_MAX_BYTES = 2 * 1024 * 1024 // 2 MB
 const ICON_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+
+// İkon önizlemesi: bekleyen dosya varsa yerel URL, kaldır işaretliyse null, yoksa mevcut URL
+const previewIconUrl = computed<string | null>(() => {
+  if (pendingIconFile.value) return pendingIconPreviewUrl.value
+  if (pendingIconRemove.value) return null
+  return props.guild.iconUrl ?? null
+})
+
+// İkon için baş harfler
+function guildInitial(name: string): string {
+  return name
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase())
+    .slice(0, 2)
+    .join('')
+}
 
 function triggerIconPicker() {
   iconFileInput.value?.click()
 }
 
-async function onIconFileChange(event: Event) {
+function onIconFileChange(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
 
-  // istemci kontrolü
+  // İstemci kontrolü
   if (!ICON_ACCEPTED_TYPES.includes(file.type)) {
     iconError.value = t('guildSettings.iconErrorType')
     input.value = ''
@@ -48,118 +89,106 @@ async function onIconFileChange(event: Event) {
     return
   }
 
+  // Önceki object URL'i temizle
+  if (pendingIconPreviewUrl.value) {
+    URL.revokeObjectURL(pendingIconPreviewUrl.value)
+  }
+
   iconError.value = ''
-  iconUploading.value = true
+  saveError.value = ''
+  pendingIconFile.value = file
+  pendingIconRemove.value = false
+  pendingIconPreviewUrl.value = URL.createObjectURL(file)
+  input.value = ''
+}
+
+function cancelPendingIcon() {
+  if (pendingIconPreviewUrl.value) {
+    URL.revokeObjectURL(pendingIconPreviewUrl.value)
+    pendingIconPreviewUrl.value = null
+  }
+  pendingIconFile.value = null
+  pendingIconRemove.value = false
+  iconError.value = ''
+}
+
+function markIconForRemoval() {
+  cancelPendingIcon()
+  pendingIconRemove.value = true
+}
+
+// Object URL'i component unmount'ta temizle
+onUnmounted(() => {
+  if (pendingIconPreviewUrl.value) {
+    URL.revokeObjectURL(pendingIconPreviewUrl.value)
+  }
+})
+
+// ── Birleşik kaydet ────────────────────────────────────────────────────────
+
+async function saveAll() {
+  if (!isDirty.value) return
+  saving.value = true
+  saveError.value = ''
   iconUploadPct.value = 0
 
   try {
-    const presignRes = await guildsApi.iconPresign(props.guild.id, file.type)
-    const { uploadUrl, storageKey } = presignRes.data
+    // 1. Ad / adultsOnly / rules değiştiyse tek PATCH
+    const patch: { name?: string; adultsOnly?: boolean; rules?: string } = {}
+    const trimmedName = draftName.value.trim()
+    if (trimmedName && trimmedName !== props.guild.name) patch.name = trimmedName
+    if (draftAdultsOnly.value !== props.guild.adultsOnly) patch.adultsOnly = draftAdultsOnly.value
+    if (draftRules.value !== (props.guild.rules ?? '')) patch.rules = draftRules.value
 
-    await attachmentsApi.uploadToS3(uploadUrl, file, (pct) => {
-      iconUploadPct.value = pct
-    })
+    let updated: GuildDto | null = null
+    if (Object.keys(patch).length > 0) {
+      updated = await guildsStore.updateGuild(props.guild.id, patch)
+    }
 
-    const updated = await guildsStore.updateGuildIcon(props.guild.id, storageKey)
-    emit('updated', updated)
+    // 2. Bekleyen ikon varsa yükle
+    if (pendingIconFile.value) {
+      const file = pendingIconFile.value
+      const presignRes = await guildsApi.iconPresign(props.guild.id, file.type)
+      const { uploadUrl, storageKey } = presignRes.data
+      await attachmentsApi.uploadToS3(uploadUrl, file, (pct) => {
+        iconUploadPct.value = pct
+      })
+      updated = await guildsStore.updateGuildIcon(props.guild.id, storageKey)
+    } else if (pendingIconRemove.value) {
+      updated = await guildsStore.updateGuildIcon(props.guild.id, null)
+    }
+
+    // 3. Başarı: object URL temizle ve kapat
+    if (pendingIconPreviewUrl.value) {
+      URL.revokeObjectURL(pendingIconPreviewUrl.value)
+      pendingIconPreviewUrl.value = null
+    }
+    pendingIconFile.value = null
+    pendingIconRemove.value = false
+
+    if (updated) emit('updated', updated)
+    emit('close')
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
-    iconError.value = err.response?.data?.message ?? t('guildSettings.iconErrorUpload')
+    saveError.value = err.response?.data?.message ?? t('guildSettings.saveError')
+    // Modal AÇIK kalır — hata gösterilir
   } finally {
-    iconUploading.value = false
+    saving.value = false
     iconUploadPct.value = 0
-    input.value = ''
   }
 }
 
-async function removeIcon() {
-  iconError.value = ''
-  iconUploading.value = true
-  try {
-    const updated = await guildsStore.updateGuildIcon(props.guild.id, null)
-    emit('updated', updated)
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } } }
-    iconError.value = err.response?.data?.message ?? t('guildSettings.iconErrorUpload')
-  } finally {
-    iconUploading.value = false
+function handleClose() {
+  // Kaydedilmemiş değişiklikleri at, object URL temizle
+  if (pendingIconPreviewUrl.value) {
+    URL.revokeObjectURL(pendingIconPreviewUrl.value)
+    pendingIconPreviewUrl.value = null
   }
+  emit('close')
 }
 
-function guildInitialForPreview(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w.charAt(0).toUpperCase())
-    .slice(0, 2)
-    .join('')
-}
+// ── Davet oluştur ──────────────────────────────────────────────────────────
 
-// ── Ad düzenle ──
-const editName = ref(props.guild.name)
-const nameError = ref('')
-const nameSaving = ref(false)
-
-async function saveName() {
-  const n = editName.value.trim()
-  if (!n || n === props.guild.name) return
-  nameSaving.value = true
-  nameError.value = ''
-  try {
-    const updated = await guildsStore.updateGuild(props.guild.id, { name: n })
-    emit('updated', updated)
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } } }
-    nameError.value = err.response?.data?.message ?? t('common.error')
-  } finally {
-    nameSaving.value = false
-  }
-}
-
-// ── adultsOnly toggle ──
-const adultsOnly = ref(props.guild.adultsOnly)
-const adultsOnlySaving = ref(false)
-const adultsOnlyError = ref('')
-
-async function toggleAdultsOnly() {
-  adultsOnlySaving.value = true
-  adultsOnlyError.value = ''
-  const next = !adultsOnly.value
-  try {
-    const updated = await guildsStore.updateGuild(props.guild.id, { adultsOnly: next })
-    adultsOnly.value = updated.adultsOnly
-    emit('updated', updated)
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } } }
-    adultsOnlyError.value = err.response?.data?.message ?? t('common.error')
-  } finally {
-    adultsOnlySaving.value = false
-  }
-}
-
-// ── Ortam kuralları ──
-const editRules = ref(props.guild.rules ?? '')
-const rulesSaving = ref(false)
-const rulesError = ref('')
-const rulesSaved = ref(false)
-
-async function saveRules() {
-  rulesSaving.value = true
-  rulesError.value = ''
-  rulesSaved.value = false
-  try {
-    const updated = await guildsStore.updateGuild(props.guild.id, { rules: editRules.value })
-    editRules.value = updated.rules ?? ''
-    rulesSaved.value = true
-    emit('updated', updated)
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { message?: string } } }
-    rulesError.value = err.response?.data?.message ?? t('common.error')
-  } finally {
-    rulesSaving.value = false
-  }
-}
-
-// ── Davet oluştur ──
 const newMaxUses = ref('')
 const newExpiresInHours = ref('')
 const creatingInvite = ref(false)
@@ -196,7 +225,8 @@ async function createInvite() {
   }
 }
 
-// ── Aktif davetler ──
+// ── Aktif davetler ─────────────────────────────────────────────────────────
+
 const invites = ref<InviteDto[]>([])
 const invitesLoading = ref(false)
 
@@ -214,7 +244,8 @@ async function loadInvites() {
 
 onMounted(loadInvites)
 
-// ── İptal ──
+// ── Davet iptal ────────────────────────────────────────────────────────────
+
 const revokeTarget = ref<InviteDto | null>(null)
 const revoking = ref(false)
 
@@ -241,7 +272,7 @@ function formatExpiry(expiresAt: string | null): string {
 </script>
 
 <template>
-  <KvModal :title="t('guildSettings.title')" @close="emit('close')">
+  <KvModal :title="t('guildSettings.title')" @close="handleClose">
     <div class="flex flex-col gap-6">
 
       <!-- ── 0. Ortam ikonu ── -->
@@ -252,7 +283,7 @@ function formatExpiry(expiresAt: string | null): string {
         <div class="flex items-center gap-4">
           <!-- Altıgen önizleme -->
           <div
-            class="shrink-0 flex items-center justify-content center"
+            class="shrink-0 flex items-center justify-center"
             style="width: 64px; height: 64px;"
           >
             <div
@@ -264,36 +295,49 @@ function formatExpiry(expiresAt: string | null): string {
               "
             >
               <img
-                v-if="guild.iconUrl"
-                :src="guild.iconUrl"
-                :alt="guild.name"
+                v-if="previewIconUrl"
+                :src="previewIconUrl"
+                :alt="draftName || guild.name"
                 class="w-full h-full object-cover"
               />
-              <span v-else>{{ guildInitialForPreview(guild.name) }}</span>
+              <span v-else>{{ guildInitial(draftName || guild.name) }}</span>
             </div>
           </div>
 
           <!-- Butonlar + hata -->
           <div class="flex flex-col gap-2">
-            <div class="flex gap-2">
-              <KvButton
-                size="sm"
-                :loading="iconUploading"
-                :disabled="iconUploading"
-                @click="triggerIconPicker"
-              >
-                {{ iconUploading ? t('guildSettings.iconUploading', { pct: iconUploadPct }) : t('guildSettings.iconUpload') }}
+            <!-- Bekleyen ikon yok -->
+            <div v-if="!pendingIconFile && !pendingIconRemove" class="flex gap-2">
+              <KvButton size="sm" :disabled="saving" @click="triggerIconPicker">
+                {{ t('guildSettings.iconUpload') }}
               </KvButton>
               <KvButton
                 v-if="guild.iconUrl"
                 size="sm"
                 variant="danger"
-                :disabled="iconUploading"
-                @click="removeIcon"
+                :disabled="saving"
+                @click="markIconForRemoval"
               >
                 {{ t('guildSettings.iconRemove') }}
               </KvButton>
             </div>
+
+            <!-- Bekleyen ikon var -->
+            <div v-else class="flex flex-col gap-1.5">
+              <p class="text-[12px]" style="color: var(--kv-text-muted);">
+                <span v-if="pendingIconFile">{{ t('guildSettings.iconPending') }}</span>
+                <span v-else>{{ t('guildSettings.iconRemovePending') }}</span>
+              </p>
+              <div class="flex gap-2">
+                <KvButton size="sm" :disabled="saving" @click="triggerIconPicker">
+                  {{ t('guildSettings.iconUpload') }}
+                </KvButton>
+                <KvButton size="sm" variant="danger" :disabled="saving" @click="cancelPendingIcon">
+                  {{ t('guildSettings.iconCancelPending') }}
+                </KvButton>
+              </div>
+            </div>
+
             <p v-if="iconError" class="text-[12px]" style="color: var(--kv-danger);">{{ iconError }}</p>
           </div>
         </div>
@@ -313,19 +357,12 @@ function formatExpiry(expiresAt: string | null): string {
         <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
           {{ t('guildSettings.nameSection') }}
         </h3>
-        <form class="flex gap-2 items-end" @submit.prevent="saveName">
-          <div class="flex-1">
-            <KvInput
-              v-model="editName"
-              :label="t('guildSettings.nameLabel')"
-              :placeholder="t('guild.namePlaceholder')"
-              :error="nameError"
-            />
-          </div>
-          <KvButton type="submit" :loading="nameSaving" :disabled="!editName.trim() || editName.trim() === guild.name">
-            {{ t('common.save') }}
-          </KvButton>
-        </form>
+        <KvInput
+          v-model="draftName"
+          :label="t('guildSettings.nameLabel')"
+          :placeholder="t('guild.namePlaceholder')"
+          :disabled="saving"
+        />
       </section>
 
       <!-- ── 2. adultsOnly toggle ── -->
@@ -341,19 +378,18 @@ function formatExpiry(expiresAt: string | null): string {
             <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
               {{ t('guildSettings.adultsOnlyDesc') }}
             </p>
-            <p v-if="adultsOnlyError" class="text-[12px] mt-1" style="color: var(--kv-danger);">{{ adultsOnlyError }}</p>
           </div>
-          <!-- Toggle button -->
+          <!-- Toggle button — sadece taslak state değiştirir, kaydetmez -->
           <button
             type="button"
-            :disabled="adultsOnlySaving"
+            :disabled="saving"
             class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 disabled:opacity-50"
-            :style="adultsOnly ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'"
-            @click="toggleAdultsOnly"
+            :style="draftAdultsOnly ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'"
+            @click="draftAdultsOnly = !draftAdultsOnly"
           >
             <span
               class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200"
-              :class="adultsOnly ? 'translate-x-5' : 'translate-x-0'"
+              :class="draftAdultsOnly ? 'translate-x-5' : 'translate-x-0'"
             />
           </button>
         </div>
@@ -364,24 +400,32 @@ function formatExpiry(expiresAt: string | null): string {
         <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
           {{ t('guildSettings.rulesSection') }}
         </h3>
-        <form class="flex flex-col gap-2" @submit.prevent="saveRules">
-          <textarea
-            v-model="editRules"
-            :placeholder="t('guildSettings.rulesPlaceholder')"
-            rows="5"
-            maxlength="2000"
-            class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
-            style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
-          />
-          <p v-if="rulesError" class="text-[12px]" style="color: var(--kv-danger);">{{ rulesError }}</p>
-          <p v-if="rulesSaved" class="text-[12px]" style="color: var(--kv-success, #3DB46E);">{{ t('common.save') }} ✓</p>
-          <div class="flex justify-end">
-            <KvButton type="submit" :loading="rulesSaving">
-              {{ t('guildSettings.rulesSave') }}
-            </KvButton>
-          </div>
-        </form>
+        <textarea
+          v-model="draftRules"
+          :placeholder="t('guildSettings.rulesPlaceholder')"
+          :disabled="saving"
+          rows="5"
+          maxlength="2000"
+          class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
+          style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
+        />
       </section>
+
+      <!-- ── Birleşik kaydet / hata ── -->
+      <div class="flex items-center justify-between gap-3 pt-1 border-t" style="border-color: var(--kv-border-subtle);">
+        <p v-if="saveError" class="text-[12px] flex-1" style="color: var(--kv-danger);">{{ saveError }}</p>
+        <p v-else-if="saving && iconUploadPct > 0" class="text-[12px] flex-1" style="color: var(--kv-text-muted);">
+          {{ t('guildSettings.iconUploading', { pct: iconUploadPct }) }}
+        </p>
+        <span v-else class="flex-1" />
+        <KvButton
+          :disabled="!isDirty || saving"
+          :loading="saving"
+          @click="saveAll"
+        >
+          {{ saving ? t('guildSettings.saving') : t('guildSettings.saveAll') }}
+        </KvButton>
+      </div>
 
       <!-- ── 4. Davet yönetimi ── -->
       <section>
@@ -458,7 +502,7 @@ function formatExpiry(expiresAt: string | null): string {
     </div>
   </KvModal>
 
-  <!-- İptal onay diyaloğu -->
+  <!-- Davet iptal onay diyaloğu -->
   <ConfirmDialog
     v-if="revokeTarget"
     :title="t('invite.revokeConfirmTitle')"

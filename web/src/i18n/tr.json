@@ -267,12 +267,20 @@
     "rulesSave": "Kaydet",
     "rulesEmpty": "Henüz kural belirlenmemiş.",
     "iconSection": "Ortam İkonu",
-    "iconUpload": "Yükle",
+    "iconUpload": "Resim Seç",
     "iconRemove": "Kaldır",
+    "iconPending": "Seçildi — henüz kaydedilmedi",
+    "iconCancelPending": "Seçimi İptal Et",
+    "iconRemovePending": "İkonu kaldır (kaydedilince uygulanır)",
     "iconUploading": "Yükleniyor… {pct}%",
     "iconErrorType": "Yalnızca resim dosyası yükleyebilirsin (JPEG, PNG, GIF, WebP).",
     "iconErrorSize": "Dosya boyutu 2 MB'ı aşamaz.",
-    "iconErrorUpload": "İkon yüklenemedi. Lütfen tekrar dene."
+    "iconErrorUpload": "İkon yüklenemedi. Lütfen tekrar dene.",
+    "saveAll": "Kaydet",
+    "saving": "Kaydediliyor…",
+    "saveError": "Değişiklikler kaydedilemedi. Lütfen tekrar dene.",
+    "unsavedChanges": "Kaydedilmemiş değişiklikler var.",
+    "discardChanges": "Değişiklikleri At"
   },
   "channel": {
     "generalChat": "genel-sohbet",
