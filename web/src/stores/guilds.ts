@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { guildsApi } from '@/api/guilds'
+import { invitesApi } from '@/api/invites'
 import type { GuildDto } from '@/types'
 
 export const useGuildsStore = defineStore('guilds', () => {
@@ -20,11 +21,18 @@ export const useGuildsStore = defineStore('guilds', () => {
     return res.data
   }
 
-  async function joinGuild(id: string): Promise<GuildDto> {
-    const res = await guildsApi.join(id)
+  async function joinByInvite(code: string): Promise<GuildDto> {
+    const res = await invitesApi.join(code)
     if (!guilds.value.find((g) => g.id === res.data.id)) {
       guilds.value.push(res.data)
     }
+    return res.data
+  }
+
+  async function updateGuild(id: string, payload: { name?: string; adultsOnly?: boolean }): Promise<GuildDto> {
+    const res = await guildsApi.update(id, payload)
+    const idx = guilds.value.findIndex((g) => g.id === id)
+    if (idx !== -1) guilds.value[idx] = res.data
     return res.data
   }
 
@@ -32,5 +40,5 @@ export const useGuildsStore = defineStore('guilds', () => {
     activeGuildId.value = id
   }
 
-  return { guilds, activeGuildId, activeGuild, fetchGuilds, createGuild, joinGuild, setActiveGuild }
+  return { guilds, activeGuildId, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, setActiveGuild }
 })

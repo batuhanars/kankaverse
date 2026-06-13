@@ -8,8 +8,8 @@ export const guildsApi = {
   list() {
     return http.get<GuildDto[]>('/guilds')
   },
-  join(id: string) {
-    return http.post<GuildDto>(`/guilds/${id}/join`)
+  update(id: string, payload: { name?: string; adultsOnly?: boolean }) {
+    return http.patch<GuildDto>(`/guilds/${id}`, payload)
   },
   getChannels(guildId: string) {
     return http.get<ChannelDto[]>(`/guilds/${guildId}/channels`)

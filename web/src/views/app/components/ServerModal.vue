@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
+import { invitesApi } from '@/api/invites'
 import KvButton from '@/components/ui/KvButton.vue'
+import type { InvitePreviewDto } from '@/types'
 
 const emit = defineEmits<{ close: [] }>()
 
@@ -14,17 +16,36 @@ const channelsStore = useChannelsStore()
 type Step = 'choose' | 'create' | 'join'
 const step = ref<Step>('choose')
 const name = ref('')
-const guildId = ref('')
+const inviteCode = ref('')
 const error = ref('')
 const loading = ref(false)
+const preview = ref<InvitePreviewDto | null>(null)
+let previewTimer: ReturnType<typeof setTimeout> | null = null
 
 function reset() {
   step.value = 'choose'
   name.value = ''
-  guildId.value = ''
+  inviteCode.value = ''
   error.value = ''
   loading.value = false
+  preview.value = null
 }
+
+watch(inviteCode, (val) => {
+  preview.value = null
+  error.value = ''
+  if (previewTimer) clearTimeout(previewTimer)
+  const code = val.trim()
+  if (!code) return
+  previewTimer = setTimeout(async () => {
+    try {
+      const res = await invitesApi.preview(code)
+      preview.value = res.data
+    } catch {
+      preview.value = null
+    }
+  }, 500)
+})
 
 async function handleCreate() {
   if (!name.value.trim()) return
@@ -50,11 +71,12 @@ async function handleCreate() {
 }
 
 async function handleJoin() {
-  if (!guildId.value.trim()) return
+  const code = inviteCode.value.trim()
+  if (!code) return
   loading.value = true
   error.value = ''
   try {
-    const guild = await guildsStore.joinGuild(guildId.value.trim())
+    const guild = await guildsStore.joinByInvite(code)
     guildsStore.setActiveGuild(guild.id)
     await channelsStore.fetchChannels(guild.id)
     const channels = channelsStore.channelsForGuild(guild.id)
@@ -62,9 +84,9 @@ async function handleJoin() {
     emit('close')
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string; error?: string } } }
-    const code = err.response?.data?.error
+    const errCode = err.response?.data?.error
     error.value =
-      (code && t(`guild.errors.${code}`, '')) || err.response?.data?.message || t('common.error')
+      (errCode && t(`invite.errors.${errCode}`, '')) || err.response?.data?.message || t('common.error')
   } finally {
     loading.value = false
   }
@@ -222,17 +244,41 @@ async function handleJoin() {
 
             <form @submit.prevent="handleJoin">
               <label class="block text-[11px] font-semibold uppercase tracking-widest mb-2" style="color: var(--kv-text-muted);">
-                {{ t('guild.idLabel') }}
+                {{ t('invite.codeLabel') }}
               </label>
               <input
-                v-model="guildId"
-                :placeholder="t('guild.idPlaceholder')"
+                v-model="inviteCode"
+                :placeholder="t('invite.codePlaceholder')"
                 required
                 class="w-full px-3 py-2.5 text-[14px] rounded-[var(--kv-radius-md)] outline-none mb-1"
                 style="background-color: var(--kv-bg-rail); color: var(--kv-text-primary); border: 1px solid var(--kv-border-subtle);"
                 @focus="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-accent-500)'"
                 @blur="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-border-subtle)'"
               />
+
+              <!-- Önizleme -->
+              <div
+                v-if="preview"
+                class="flex items-center gap-3 px-3 py-2.5 mb-2 rounded-[var(--kv-radius-md)] border"
+                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="text-[14px] font-medium truncate" style="color: var(--kv-text-primary);">
+                    {{ preview.guildName }}
+                  </p>
+                  <p v-if="!preview.valid" class="text-[12px]" style="color: var(--kv-danger);">
+                    {{ t('invite.errors.INVITE_INVALID') }}
+                  </p>
+                </div>
+                <span
+                  v-if="preview.adultsOnly"
+                  class="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-[var(--kv-radius-sm)]"
+                  style="background-color: var(--kv-danger); color: #fff;"
+                >
+                  {{ t('invite.adultsOnlyBadge') }}
+                </span>
+              </div>
+
               <p v-if="error" class="text-[12px] mb-3" style="color: var(--kv-danger);">{{ error }}</p>
 
               <div class="flex justify-between items-center mt-5">

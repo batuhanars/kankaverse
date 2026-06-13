@@ -145,6 +145,22 @@ export interface MessageDto {
   createdAt: string
 }
 
+// Sprint 7A §3 — Davet DTO'ları
+export interface InviteDto {
+  code: string
+  guildId: string
+  maxUses: number | null
+  uses: number
+  expiresAt: string | null
+  createdAt: string
+}
+
+export interface InvitePreviewDto {
+  guildName: string
+  adultsOnly: boolean
+  valid: boolean
+}
+
 // Response envelope
 export interface ApiResponse<T> {
   success: boolean

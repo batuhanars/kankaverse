@@ -209,8 +209,6 @@
     "joinTitle": "Ortama Katıl",
     "nameLabel": "ORTAM ADI",
     "namePlaceholder": "Harika Ortamım",
-    "idLabel": "ORTAM ID",
-    "idPlaceholder": "Ortam ID'sini gir",
     "createButton": "Oluştur",
     "joinButton": "Katıl",
     "emptyState": "Bir ortam seç veya oluştur",
@@ -225,12 +223,44 @@
       "createTitle": "Ortamını Özelleştir",
       "createDesc": "Ortamina bir isim ver. İstediğin zaman değiştirebilirsin.",
       "joinTitle": "Ortama Katıl",
-      "joinDesc": "Ortam ID'sini girerek katılabilirsin."
+      "joinDesc": "Davet kodunu girerek katılabilirsin."
     },
     "errors": {
       "GUILD_NOT_FOUND": "Ortam bulunamadı.",
-      "ALREADY_MEMBER": "Bu ortamda zaten üyesiniz."
+      "ALREADY_MEMBER": "Bu ortama zaten üyesin."
     }
+  },
+  "invite": {
+    "codeLabel": "DAVET KODU",
+    "codePlaceholder": "Davet kodunu gir (ör: AB3XY7KZ)",
+    "adultsOnlyBadge": "18+",
+    "maxUsesLabel": "MAKSİMUM",
+    "maxUsesPlaceholder": "∞",
+    "expiresInHoursLabel": "SÜRE (SAAT)",
+    "expiresInHoursPlaceholder": "∞",
+    "createButton": "Davet Oluştur",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı!",
+    "noExpiry": "Süresiz",
+    "noActiveInvites": "Aktif davet yok.",
+    "usesCount": "{uses}/{max} kullanım",
+    "revoke": "İptal Et",
+    "revokeConfirmTitle": "Daveti İptal Et",
+    "revokeConfirmMessage": "{code} kodlu daveti iptal etmek istediğinden emin misin? Bu işlem geri alınamaz.",
+    "errors": {
+      "INVITE_INVALID": "Davet geçersiz veya süresi dolmuş.",
+      "AGE_RESTRICTED": "Bu ortam yalnızca yetişkinler içindir.",
+      "ALREADY_MEMBER": "Bu ortama zaten üyesin."
+    }
+  },
+  "guildSettings": {
+    "title": "Ortam Ayarları",
+    "nameSection": "Ortam Adı",
+    "nameLabel": "Yeni Ad",
+    "adultsOnlySection": "İçerik Yaşı",
+    "adultsOnlyLabel": "Yalnızca Yetişkinler (18+)",
+    "adultsOnlyDesc": "Bu ortama yalnızca yetişkinler katılabilir ve içeriklere erişebilir. Açıldığında minör kullanıcılar engellenir.",
+    "inviteSection": "Davet Yönetimi"
   },
   "channel": {
     "generalChat": "genel-sohbet",
