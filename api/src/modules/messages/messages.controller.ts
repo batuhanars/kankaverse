@@ -120,4 +120,57 @@ export class MessagesController {
     });
     return null;
   }
+
+  @Post(':messageId/pin')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mesajı sabitle (idempotent); guild=admin, DM=üye' })
+  async pinMessage(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Param('messageId') messageId: string,
+  ) {
+    await this.messagesService.pinMessage(user.id, channelId, messageId);
+    this.messagesGateway.broadcastPin(channelId, 'message.pinned', {
+      messageId,
+      channelId,
+      pinnedAt: new Date().toISOString(),
+    });
+    return null;
+  }
+
+  @Delete(':messageId/pin')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mesaj sabitlemesini kaldır (idempotent)' })
+  async unpinMessage(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Param('messageId') messageId: string,
+  ) {
+    await this.messagesService.unpinMessage(user.id, channelId, messageId);
+    this.messagesGateway.broadcastPin(channelId, 'message.unpinned', {
+      messageId,
+      channelId,
+    });
+    return null;
+  }
+}
+
+// Sabitlenen mesajlar listesi — /channels/:id/pins ayrı prefix; aynı modülde ikinci controller.
+@ApiTags('messages')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('channels/:id')
+export class PinsController {
+  constructor(
+    private messagesService: MessagesService,
+  ) {}
+
+  @Get('pins')
+  @ApiOperation({ summary: 'Kanaldaki sabitlenmiş mesajlar listesi (pinnedAt desc)' })
+  findPins(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+  ) {
+    return this.messagesService.findPins(user.id, channelId);
+  }
 }

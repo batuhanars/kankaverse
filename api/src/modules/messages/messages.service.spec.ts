@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 // ForbiddenException alias for reaction tests
 const FE = ForbiddenException;
 import { MessagesService } from './messages.service';
@@ -12,6 +12,7 @@ const prismaMock = {
     findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    count: jest.fn(),
   },
   channelMember: {
     findUnique: jest.fn(),
@@ -1780,5 +1781,436 @@ describe('MessagesService — resolveMentions (§3 + §4 T&S)', () => {
     const updateCall = prismaMock.message.update.mock.calls[0][0];
     expect(updateCall.data.mentions).toContain(MEMBER_A);
     expect(result.mentions).toEqual([MEMBER_A]);
+  });
+});
+
+// ── MessagesService.pinMessage / unpinMessage / findPins ─────────────────────
+
+const PIN_MSG_ID = 'msg-pin-1';
+const GUILD_ID = 'guild-xyz';
+const ADMIN_MEMBER = { role: 'ADMIN' };
+const OWNER_MEMBER = { role: 'OWNER' };
+const REGULAR_MEMBER = { role: 'MEMBER' };
+
+function makePinMsg(overrides: Partial<{ deletedAt: Date | null; pinnedAt: Date | null; channelId: string }> = {}) {
+  return {
+    id: PIN_MSG_ID,
+    channelId: overrides.channelId ?? GUILD_CHANNEL_ID,
+    authorId: USER_ID,
+    content: 'sabitlenecek mesaj',
+    replyToId: null,
+    editedAt: null,
+    deletedAt: overrides.deletedAt ?? null,
+    pinnedAt: overrides.pinnedAt ?? null,
+    pinnedById: null,
+    createdAt: new Date('2026-06-13T10:00:00Z'),
+    updatedAt: new Date('2026-06-13T10:00:00Z'),
+  };
+}
+
+describe('MessagesService.pinMessage', () => {
+  let service: MessagesService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    // Varsayılan: 0 sabitlenmiş mesaj (sınır aşılmaz)
+    prismaMock.message.count.mockResolvedValue(0);
+    prismaMock.message.update.mockResolvedValue({});
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DM kanalı: herhangi bir üye sabitleyebilir (requireChannelAccess yeterli)
+  // ─────────────────────────────────────────────────────────────────────────
+  it('DM kanalı üyesi → pin başarılı, guildMember sorgusu yapılmaz', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(makePinMsg({ channelId: CHANNEL_ID }));
+
+    const result = await service.pinMessage(USER_ID, CHANNEL_ID, PIN_MSG_ID);
+
+    expect(prismaMock.guildMember.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.message.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: PIN_MSG_ID },
+      data: expect.objectContaining({ pinnedAt: expect.any(Date), pinnedById: USER_ID }),
+    }));
+    expect(result).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Guild kanalı MEMBER → 403 FORBIDDEN
+  // ─────────────────────────────────────────────────────────────────────────
+  it('guild kanalı MEMBER → ForbiddenException FORBIDDEN', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(REGULAR_MEMBER);
+    prismaMock.message.findUnique.mockResolvedValue(makePinMsg());
+
+    let thrown: ForbiddenException | undefined;
+    try {
+      await service.pinMessage(USER_ID, GUILD_CHANNEL_ID, PIN_MSG_ID);
+    } catch (e) {
+      thrown = e as ForbiddenException;
+    }
+
+    expect(thrown).toBeInstanceOf(ForbiddenException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('FORBIDDEN');
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Guild kanalı ADMIN → pin başarılı
+  // ─────────────────────────────────────────────────────────────────────────
+  it('guild kanalı ADMIN → pin başarılı', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(ADMIN_MEMBER);
+    prismaMock.message.findUnique.mockResolvedValue(makePinMsg());
+
+    const result = await service.pinMessage(USER_ID, GUILD_CHANNEL_ID, PIN_MSG_ID);
+
+    expect(prismaMock.message.update).toHaveBeenCalledTimes(1);
+    expect(result).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Guild kanalı OWNER → pin başarılı
+  // ─────────────────────────────────────────────────────────────────────────
+  it('guild kanalı OWNER → pin başarılı', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBER);
+    prismaMock.message.findUnique.mockResolvedValue(makePinMsg());
+
+    const result = await service.pinMessage(USER_ID, GUILD_CHANNEL_ID, PIN_MSG_ID);
+
+    expect(prismaMock.message.update).toHaveBeenCalledTimes(1);
+    expect(result).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // İdempotent: zaten sabitliyse no-op (update çağrılmaz)
+  // ─────────────────────────────────────────────────────────────────────────
+  it('zaten sabitlenmiş mesaj → no-op (idempotent), update çağrılmaz', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(ADMIN_MEMBER);
+    prismaMock.message.findUnique.mockResolvedValue(makePinMsg({ pinnedAt: new Date('2026-06-01T10:00:00Z') }));
+
+    const result = await service.pinMessage(USER_ID, GUILD_CHANNEL_ID, PIN_MSG_ID);
+
+    expect(prismaMock.message.count).not.toHaveBeenCalled();
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+    expect(result).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 50 sınırı aşıldığında → 409 PIN_LIMIT
+  // ─────────────────────────────────────────────────────────────────────────
+  it('50 sınırı aşıldığında → ConflictException PIN_LIMIT', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(ADMIN_MEMBER);
+    prismaMock.message.findUnique.mockResolvedValue(makePinMsg());
+    prismaMock.message.count.mockResolvedValue(50); // tam 50 → aşıldı
+
+    let thrown: ConflictException | undefined;
+    try {
+      await service.pinMessage(USER_ID, GUILD_CHANNEL_ID, PIN_MSG_ID);
+    } catch (e) {
+      thrown = e as ConflictException;
+    }
+
+    expect(thrown).toBeInstanceOf(ConflictException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('PIN_LIMIT');
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Silinmiş mesaj → 404 INVALID_MESSAGE
+  // ─────────────────────────────────────────────────────────────────────────
+  it('silinmiş mesaj → NotFoundException INVALID_MESSAGE', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(ADMIN_MEMBER);
+    prismaMock.message.findUnique.mockResolvedValue(makePinMsg({ deletedAt: new Date() }));
+
+    let thrown: NotFoundException | undefined;
+    try {
+      await service.pinMessage(USER_ID, GUILD_CHANNEL_ID, PIN_MSG_ID);
+    } catch (e) {
+      thrown = e as NotFoundException;
+    }
+
+    expect(thrown).toBeInstanceOf(NotFoundException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('INVALID_MESSAGE');
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Yanlış kanal mesajı → 404 INVALID_MESSAGE
+  // ─────────────────────────────────────────────────────────────────────────
+  it('yanlış kanalın mesajı → NotFoundException INVALID_MESSAGE', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(ADMIN_MEMBER);
+    // Mesaj başka kanalda
+    prismaMock.message.findUnique.mockResolvedValue(makePinMsg({ channelId: 'ch-other-999' }));
+
+    let thrown: NotFoundException | undefined;
+    try {
+      await service.pinMessage(USER_ID, GUILD_CHANNEL_ID, PIN_MSG_ID);
+    } catch (e) {
+      thrown = e as NotFoundException;
+    }
+
+    expect(thrown).toBeInstanceOf(NotFoundException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('INVALID_MESSAGE');
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Mesaj DB'de yok → 404 INVALID_MESSAGE
+  // ─────────────────────────────────────────────────────────────────────────
+  it('mesaj DB\'de yok → NotFoundException INVALID_MESSAGE', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(ADMIN_MEMBER);
+    prismaMock.message.findUnique.mockResolvedValue(null);
+
+    let thrown: NotFoundException | undefined;
+    try {
+      await service.pinMessage(USER_ID, GUILD_CHANNEL_ID, PIN_MSG_ID);
+    } catch (e) {
+      thrown = e as NotFoundException;
+    }
+
+    expect(thrown).toBeInstanceOf(NotFoundException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('INVALID_MESSAGE');
+  });
+});
+
+describe('MessagesService.unpinMessage', () => {
+  let service: MessagesService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.message.update.mockResolvedValue({});
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DM kanalı: herhangi bir üye kaldırabilir
+  // ─────────────────────────────────────────────────────────────────────────
+  it('DM kanalı üyesi + sabitlenmiş mesaj → unpin başarılı', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(
+      makePinMsg({ channelId: CHANNEL_ID, pinnedAt: new Date('2026-06-01T10:00:00Z') }),
+    );
+
+    const result = await service.unpinMessage(USER_ID, CHANNEL_ID, PIN_MSG_ID);
+
+    expect(prismaMock.guildMember.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.message.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: PIN_MSG_ID },
+      data: { pinnedAt: null, pinnedById: null },
+    }));
+    expect(result).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Guild kanalı MEMBER → 403 FORBIDDEN
+  // ─────────────────────────────────────────────────────────────────────────
+  it('guild kanalı MEMBER → ForbiddenException FORBIDDEN', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(REGULAR_MEMBER);
+    prismaMock.message.findUnique.mockResolvedValue(
+      makePinMsg({ pinnedAt: new Date('2026-06-01T10:00:00Z') }),
+    );
+
+    let thrown: ForbiddenException | undefined;
+    try {
+      await service.unpinMessage(USER_ID, GUILD_CHANNEL_ID, PIN_MSG_ID);
+    } catch (e) {
+      thrown = e as ForbiddenException;
+    }
+
+    expect(thrown).toBeInstanceOf(ForbiddenException);
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // İdempotent: zaten sabit değilse no-op
+  // ─────────────────────────────────────────────────────────────────────────
+  it('zaten sabit olmayan mesaj → no-op (idempotent), update çağrılmaz', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(ADMIN_MEMBER);
+    prismaMock.message.findUnique.mockResolvedValue(makePinMsg({ pinnedAt: null }));
+
+    const result = await service.unpinMessage(USER_ID, GUILD_CHANNEL_ID, PIN_MSG_ID);
+
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+    expect(result).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Silinmiş mesaj → 404 INVALID_MESSAGE
+  // ─────────────────────────────────────────────────────────────────────────
+  it('silinmiş mesaj → NotFoundException INVALID_MESSAGE', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(ADMIN_MEMBER);
+    prismaMock.message.findUnique.mockResolvedValue(makePinMsg({ deletedAt: new Date() }));
+
+    let thrown: NotFoundException | undefined;
+    try {
+      await service.unpinMessage(USER_ID, GUILD_CHANNEL_ID, PIN_MSG_ID);
+    } catch (e) {
+      thrown = e as NotFoundException;
+    }
+
+    expect(thrown).toBeInstanceOf(NotFoundException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('INVALID_MESSAGE');
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('MessagesService.findPins', () => {
+  let service: MessagesService;
+
+  const PINNED_AT_1 = new Date('2026-06-13T12:00:00Z');
+  const PINNED_AT_2 = new Date('2026-06-12T10:00:00Z');
+
+  function makePinnedMsg(id: string, pinnedAt: Date) {
+    return {
+      id,
+      channelId: GUILD_CHANNEL_ID,
+      content: 'sabit mesaj içeriği',
+      replyToId: null,
+      replyTo: null,
+      editedAt: null,
+      deletedAt: null,
+      pinnedAt,
+      pinnedById: USER_ID,
+      createdAt: new Date('2026-06-10T10:00:00Z'),
+      updatedAt: new Date('2026-06-13T10:00:00Z'),
+      mentions: [],
+      author: { id: USER_ID, username: 'kanka', avatarUrl: null },
+      attachments: [],
+      reactions: [],
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // requireChannelAccess çağrılır (yaş kapısı dahil)
+  // ─────────────────────────────────────────────────────────────────────────
+  it('requireChannelAccess çağrılır; erişim reddi → servis hatayı propagate eder', async () => {
+    membershipMock.requireChannelAccess.mockRejectedValue(
+      new ForbiddenException({ message: 'Yaş kısıtı.', error: 'AGE_RESTRICTED' }),
+    );
+
+    await expect(service.findPins(USER_ID, GUILD_CHANNEL_ID)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Sabitlenmiş mesajlar pinnedAt desc sırasında döner
+  // ─────────────────────────────────────────────────────────────────────────
+  it('pinnedAt desc sırasında mesajlar döner; DTO pinnedAt ISO string içerir', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    // DB'den pinnedAt desc sıralı döndüğünü simüle et
+    prismaMock.message.findMany.mockResolvedValue([
+      makePinnedMsg('msg-pin-a', PINNED_AT_1), // daha yeni
+      makePinnedMsg('msg-pin-b', PINNED_AT_2), // daha eski
+    ]);
+
+    const results = await service.findPins(USER_ID, GUILD_CHANNEL_ID);
+
+    // findMany orderBy: pinnedAt desc ile çağrılmalı
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    expect(findManyCall.orderBy).toEqual({ pinnedAt: 'desc' });
+    expect(findManyCall.where.pinnedAt).toEqual({ not: null });
+    expect(findManyCall.where.deletedAt).toBeNull();
+
+    // Her DTO'da pinnedAt ISO string olmalı
+    expect(results[0].pinnedAt).toBe(PINNED_AT_1.toISOString());
+    expect(results[1].pinnedAt).toBe(PINNED_AT_2.toISOString());
+    expect(results).toHaveLength(2);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Sabitlenmiş mesaj yoksa boş dizi döner
+  // ─────────────────────────────────────────────────────────────────────────
+  it('sabitlenmiş mesaj yoksa boş dizi döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findMany.mockResolvedValue([]);
+
+    const results = await service.findPins(USER_ID, GUILD_CHANNEL_ID);
+
+    expect(results).toEqual([]);
+  });
+});
+
+// ── toMessageDto.pinnedAt ────────────────────────────────────────────────────
+
+describe('toMessageDto — pinnedAt alanı', () => {
+  let service: MessagesService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+  });
+
+  it('pinnedAt dolu mesaj → DTO\'da ISO string olarak döner', async () => {
+    const pinnedAt = new Date('2026-06-13T10:00:00Z');
+    prismaMock.message.findMany.mockResolvedValue([
+      {
+        id: 'msg-pinned-dto',
+        channelId: GUILD_CHANNEL_ID,
+        content: 'test',
+        replyToId: null,
+        replyTo: null,
+        editedAt: null,
+        pinnedAt,
+        pinnedById: USER_ID,
+        deletedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        mentions: [],
+        author: { id: USER_ID, username: 'kanka', avatarUrl: null },
+        attachments: [],
+        reactions: [],
+      },
+    ]);
+
+    const results = await service.findMessages(USER_ID, GUILD_CHANNEL_ID);
+    expect(results[0].pinnedAt).toBe(pinnedAt.toISOString());
+  });
+
+  it('pinnedAt null olan mesaj → DTO\'da null döner', async () => {
+    prismaMock.message.findMany.mockResolvedValue([
+      {
+        id: 'msg-notpinned-dto',
+        channelId: GUILD_CHANNEL_ID,
+        content: 'test',
+        replyToId: null,
+        replyTo: null,
+        editedAt: null,
+        pinnedAt: null,
+        pinnedById: null,
+        deletedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        mentions: [],
+        author: { id: USER_ID, username: 'kanka', avatarUrl: null },
+        attachments: [],
+        reactions: [],
+      },
+    ]);
+
+    const results = await service.findMessages(USER_ID, GUILD_CHANNEL_ID);
+    expect(results[0].pinnedAt).toBeNull();
   });
 });
