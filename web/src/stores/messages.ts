@@ -84,6 +84,16 @@ export const useMessagesStore = defineStore('messages', () => {
     }
   }
 
+  // Sprint V2 Pins: pinnedAt güncelle (WS message.pinned / message.unpinned)
+  function setPinned(channelId: string, messageId: string, pinnedAt: string | null) {
+    const list = messagesByChannel.value[channelId]
+    if (!list) return
+    const idx = list.findIndex((m) => m.id === messageId)
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], pinnedAt }
+    }
+  }
+
   return {
     messagesByChannel,
     hasMoreByChannel,
@@ -93,5 +103,6 @@ export const useMessagesStore = defineStore('messages', () => {
     updateMessage,
     removeMessage,
     applyReaction,
+    setPinned,
   }
 })

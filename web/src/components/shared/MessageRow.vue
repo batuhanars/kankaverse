@@ -29,6 +29,8 @@ const props = defineProps<{
   mentionResolver?: (userId: string) => string
   // Sprint V2: kendi-bahsedilme vurgusu
   isMentioned?: boolean
+  // Sprint V2 Pins: kullanıcı bu kanalda mesaj sabitleyebilir mi? (parent hesaplar)
+  canPin?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -37,6 +39,8 @@ const emit = defineEmits<{
   delete: [messageId: string]
   report: [messageId: string]
   addReaction: [messageId: string, emoji: string]
+  pin: [messageId: string]
+  unpin: [messageId: string]
 }>()
 
 const { t } = useI18n()
@@ -118,11 +122,15 @@ const hasMentions = computed(() => contentSegments.value.some((s) => s.kind === 
         :message-id="message.id"
         :is-mine="isMine"
         :has-content="!!message.content"
+        :is-pinned="!!message.pinnedAt"
+        :can-pin="canPin ?? false"
         @reply="emit('reply', message)"
         @edit="emit('edit', message)"
         @delete="emit('delete', message.id)"
         @report="emit('report', message.id)"
         @add-reaction="(emoji) => emit('addReaction', message.id, emoji)"
+        @pin="emit('pin', message.id)"
+        @unpin="emit('unpin', message.id)"
       />
     </div>
 
@@ -157,7 +165,7 @@ const hasMentions = computed(() => contentSegments.value.some((s) => s.kind === 
 
     <!-- Sağ: içerik sütunu -->
     <div class="flex-1 min-w-0">
-      <!-- Grup başı başlık: kullanıcı adı + saat + (düzenlendi) -->
+      <!-- Grup başı başlık: kullanıcı adı + saat + (düzenlendi) + pin rozeti -->
       <div v-if="isGroupStart" class="flex items-baseline gap-2 mb-0.5">
         <span
           class="text-[16px] font-semibold leading-snug"
@@ -174,6 +182,15 @@ const hasMentions = computed(() => contentSegments.value.some((s) => s.kind === 
           style="color: var(--kv-text-muted);"
         >
           {{ t('message.edited') }}
+        </span>
+        <!-- Pin rozeti: pinnedAt doluysa göster -->
+        <span
+          v-if="message.pinnedAt"
+          class="text-[11px] select-none"
+          style="color: var(--kv-text-muted);"
+          :title="t('message.pinnedMessages')"
+        >
+          📌
         </span>
       </div>
 
@@ -256,6 +273,15 @@ const hasMentions = computed(() => contentSegments.value.some((s) => s.kind === 
               style="color: var(--kv-text-muted);"
             >
               {{ t('message.edited') }}
+            </span>
+            <!-- Takip mesajında pin rozeti -->
+            <span
+              v-if="message.pinnedAt && !isGroupStart"
+              class="text-[11px] ml-1 select-none"
+              style="color: var(--kv-text-muted);"
+              :title="t('message.pinnedMessages')"
+            >
+              📌
             </span>
           </p>
           <!-- Yalnız ek (açıklamasız) -->

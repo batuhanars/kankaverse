@@ -360,12 +360,17 @@
     "edited": "(düzenlendi)",
     "deleteConfirm": "Bu mesajı silmek istediğinden emin misin? Bu işlem geri alınamaz.",
     "editHint": "Enter kaydet · Esc iptal",
+    "pin": "Sabitle",
+    "unpin": "Sabitlemeyi kaldır",
+    "pinnedMessages": "Sabitlenen Mesajlar",
+    "pinnedMessagesEmpty": "Bu kanalda henüz sabitlenmiş mesaj yok.",
     "errors": {
       "MESSAGE_BLOCKED": "Mesajınız topluluk kurallarına uygun değil.",
       "USER_BANNED": "Hesabınız askıya alındı. Mesaj gönderemezsiniz.",
       "USER_MUTED": "Şu anda mesaj gönderme yetkiniz kısıtlanmış.",
       "SLOW_MODE": "Yavaş mod açık — biraz bekleyin.",
-      "SLOW_MODE_RETRY": "Yavaş mod açık — {seconds} sn bekleyin."
+      "SLOW_MODE_RETRY": "Yavaş mod açık — {seconds} sn bekleyin.",
+      "PIN_LIMIT": "Bu kanalda en fazla 50 mesaj sabitlenebilir."
     }
   },
   "member": {

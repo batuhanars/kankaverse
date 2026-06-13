@@ -148,6 +148,15 @@ export function useSocket() {
       messagesStore.applyReaction(data.messageId, data.emoji, data.userId, authStore.user?.id ?? '', false)
     })
 
+    // Sprint V2 Pins: sabitleme WS olayları (§5)
+    socket.on('message.pinned', (data: { messageId: string; channelId: string; pinnedAt: string }) => {
+      messagesStore.setPinned(data.channelId, data.messageId, data.pinnedAt)
+    })
+
+    socket.on('message.unpinned', (data: { messageId: string; channelId: string }) => {
+      messagesStore.setPinned(data.channelId, data.messageId, null)
+    })
+
     // Sprint V2: @bahsetme bildirimi
     socket.on('mention', (payload: MentionPayload) => {
       notificationsStore.push({
