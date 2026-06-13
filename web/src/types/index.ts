@@ -34,6 +34,8 @@ export const ChannelType = {
 export type ChannelType = (typeof ChannelType)[keyof typeof ChannelType]
 
 // Sprint 1 §5 + Sprint 2A §4 + Sprint 2B §4 + Sprint 3 §5 — DTO'lar
+// Sprint 4B: isModerator eklendi (platform-seviyesi moderatör bayrağı)
+// NOT: backend toUserDto'da isModerator dönmüyorsa optional kalır, yönlendirme çalışmaz.
 export interface UserDto {
   id: string
   username: string
@@ -45,6 +47,7 @@ export interface UserDto {
   emailVerified: boolean
   twoFactorEnabled: boolean // Sprint 2B
   friendCode: string // Sprint 3
+  isModerator?: boolean // Sprint 4B — backend toUserDto'da eklenmesi gerekir
 }
 
 // Sprint 3 §5 — sosyal katman DTO'ları

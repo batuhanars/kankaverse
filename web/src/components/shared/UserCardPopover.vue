@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '@/stores/auth'
 import { usersApi } from '@/api/users'
 import { friendsApi } from '@/api/friends'
+import ReportModal from './ReportModal.vue'
 import type { UserProfileCardDto } from '@/types'
 
 const props = defineProps<{
@@ -13,13 +15,18 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
+const authStore = useAuthStore()
 const popoverEl = ref<HTMLElement | null>(null)
 const card = ref<UserProfileCardDto | null>(null)
 const loading = ref(true)
 const adding = ref(false)
 const added = ref(false)
 const errorMsg = ref('')
+const showReportModal = ref(false)
 let errorTimer: ReturnType<typeof setTimeout> | null = null
+
+// Kendi profilini şikayet etme
+const isSelf = computed(() => props.userId === authStore.user?.id)
 
 const posStyle = computed(() => {
   const left = Math.min(props.x, window.innerWidth - 248)
@@ -150,8 +157,26 @@ async function addFriend() {
           <p v-if="errorMsg" class="text-[12px] mt-2 text-center" style="color:var(--kv-danger);">
             {{ errorMsg }}
           </p>
+
+          <!-- Kullanıcıyı şikâyet et (kendi profili değilse) -->
+          <button
+            v-if="!isSelf"
+            class="w-full mt-2 py-1.5 rounded-[var(--kv-radius-md)] text-[13px] transition-opacity hover:opacity-80 cursor-pointer"
+            style="background-color: transparent; color: var(--kv-danger); border: 1px solid var(--kv-danger);"
+            @click="showReportModal = true"
+          >
+            {{ t('report.reportUser') }}
+          </button>
         </div>
       </template>
     </div>
   </Teleport>
+
+  <!-- Kullanıcı şikâyet modalı -->
+  <ReportModal
+    v-if="showReportModal && card"
+    target-type="USER"
+    :target-id="card.id"
+    @close="showReportModal = false; emit('close')"
+  />
 </template>
