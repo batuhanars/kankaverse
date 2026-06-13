@@ -102,6 +102,15 @@ export const useDmStore = defineStore('dm', () => {
     await fetchChannels()
   }
 
+  async function removeGroupMember(groupId: string, userId: string) {
+    await dmApi.removeGroupMember(groupId, userId)
+    // Optimistik: üyeyi local listeden düşür
+    const ch = channels.value.find((c) => c.id === groupId)
+    if (ch && ch.type === 'GROUP_DM') {
+      ch.members = ch.members.filter((m) => m.id !== userId)
+    }
+  }
+
   async function leaveGroup(groupId: string) {
     await dmApi.leaveGroup(groupId)
     removeChannel(groupId)
@@ -139,6 +148,7 @@ export const useDmStore = defineStore('dm', () => {
     applyActivity,
     createGroup,
     addGroupMember,
+    removeGroupMember,
     leaveGroup,
     deleteGroup,
     renameGroup,
