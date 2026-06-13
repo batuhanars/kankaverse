@@ -438,18 +438,35 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
                 </span>
               </div>
               <!-- Baloncuk + ekler (aynı flex col içinde) -->
-              <div
-                v-if="msg.content"
-                class="px-4 py-2.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap rounded-2xl rounded-bl-[4px]"
-                style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
-              >
-                {{ msg.content }}
-              </div>
-              <AttachmentView
-                v-for="att in msg.attachments"
-                :key="att.id"
-                :attachment="att"
-              />
+              <!-- Ek+açıklama → tek birim; yalnız ek → sadece ek; yalnız metin → baloncuk -->
+              <template v-if="msg.attachments?.length && msg.content">
+                <!-- Birleşik: ek üstte, açıklama altında, tek kapsayıcı -->
+                <div class="overflow-hidden rounded-2xl rounded-bl-[4px]" style="max-width: 320px; background-color: var(--kv-bg-elevated);">
+                  <AttachmentView
+                    v-for="att in msg.attachments"
+                    :key="att.id"
+                    :attachment="att"
+                    class="!mt-0"
+                  />
+                  <p class="px-4 pb-3 pt-1.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap" style="color: var(--kv-text-primary);">
+                    {{ msg.content }}
+                  </p>
+                </div>
+              </template>
+              <template v-else>
+                <div
+                  v-if="msg.content"
+                  class="px-4 py-2.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap rounded-2xl rounded-bl-[4px]"
+                  style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
+                >
+                  {{ msg.content }}
+                </div>
+                <AttachmentView
+                  v-for="att in msg.attachments"
+                  :key="att.id"
+                  :attachment="att"
+                />
+              </template>
               <div class="flex items-center gap-2 px-1 mt-1">
                 <span class="text-[11px]" style="color: var(--kv-text-muted);">
                   {{ formatTime(msg.createdAt) }}
@@ -509,24 +526,50 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
               </div>
             </template>
             <template v-else>
-              <div
-                v-if="msg.content"
-                class="px-4 py-2.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
-                :class="isMine(msg)
-                  ? 'rounded-2xl rounded-br-[4px]'
-                  : 'rounded-2xl rounded-bl-[4px]'"
-                :style="isMine(msg)
-                  ? 'background-color: var(--kv-accent-500); color: #fff;'
-                  : 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);'"
-              >
-                {{ msg.content }}
-              </div>
-              <!-- Sprint 5 §7: Attachment'lar -->
-              <AttachmentView
-                v-for="att in msg.attachments"
-                :key="att.id"
-                :attachment="att"
-              />
+              <!-- Ek+açıklama → tek birim; yalnız ek → sadece ek; yalnız metin → baloncuk -->
+              <template v-if="msg.attachments?.length && msg.content">
+                <!-- Birleşik: ek üstte, açıklama altında, tek kapsayıcı -->
+                <div
+                  class="overflow-hidden"
+                  :class="isMine(msg) ? 'rounded-2xl rounded-br-[4px]' : 'rounded-2xl rounded-bl-[4px]'"
+                  :style="isMine(msg)
+                    ? 'max-width: 320px; background-color: var(--kv-accent-500);'
+                    : 'max-width: 320px; background-color: var(--kv-bg-elevated);'"
+                >
+                  <AttachmentView
+                    v-for="att in msg.attachments"
+                    :key="att.id"
+                    :attachment="att"
+                    class="!mt-0"
+                  />
+                  <p
+                    class="px-4 pb-3 pt-1.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
+                    :style="isMine(msg) ? 'color: #fff;' : 'color: var(--kv-text-primary);'"
+                  >
+                    {{ msg.content }}
+                  </p>
+                </div>
+              </template>
+              <template v-else>
+                <div
+                  v-if="msg.content"
+                  class="px-4 py-2.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
+                  :class="isMine(msg)
+                    ? 'rounded-2xl rounded-br-[4px]'
+                    : 'rounded-2xl rounded-bl-[4px]'"
+                  :style="isMine(msg)
+                    ? 'background-color: var(--kv-accent-500); color: #fff;'
+                    : 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);'"
+                >
+                  {{ msg.content }}
+                </div>
+                <!-- Yalnız ek (açıklamasız) -->
+                <AttachmentView
+                  v-for="att in msg.attachments"
+                  :key="att.id"
+                  :attachment="att"
+                />
+              </template>
               <div class="flex items-center gap-2 px-1 mt-1">
                 <span class="text-[11px]" style="color: var(--kv-text-muted);">
                   {{ formatTime(msg.createdAt) }}
@@ -534,9 +577,10 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
                 <span v-if="msg.editedAt" class="text-[11px]" style="color: var(--kv-text-muted);">
                   {{ t('message.edited') }}
                 </span>
-                <!-- Kendi mesajı: düzenle + sil hover butonları -->
+                <!-- Kendi mesajı: düzenle (metin varsa) + sil hover butonları -->
                 <template v-if="isMine(msg)">
                   <button
+                    v-if="msg.content"
                     class="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] cursor-pointer"
                     style="color: var(--kv-text-muted);"
                     :title="t('message.edit')"
