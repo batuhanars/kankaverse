@@ -21,26 +21,23 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const open = ref(false)
+// Hızlı reaksiyon seti (hover toolbar'da gösterilecek 3 emoji)
+const QUICK_EMOJIS = ['👍', '❤️', '😂']
+
+// ⋯ daha-fazla açılır
+const showMore = ref(false)
+// 🙂 tam emoji picker
 const showEmojiPicker = ref(false)
-const showFullEmojiPicker = ref(false)
-const menuEl = ref<HTMLElement | null>(null)
+// hızlı emoji seti (⋯ içinde)
+const showQuickEmoji = ref(false)
 
-const EMOJI_SET = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '👀']
-
-function toggleMenu(e: MouseEvent) {
-  e.stopPropagation()
-  open.value = !open.value
-  if (!open.value) {
-    showEmojiPicker.value = false
-    showFullEmojiPicker.value = false
-  }
-}
+const moreEl = ref<HTMLElement | null>(null)
+const emojiEl = ref<HTMLElement | null>(null)
 
 function closeAll() {
-  open.value = false
+  showMore.value = false
   showEmojiPicker.value = false
-  showFullEmojiPicker.value = false
+  showQuickEmoji.value = false
 }
 
 function onReply() {
@@ -63,16 +60,17 @@ function onReport() {
   emit('report')
 }
 
-function openEmojiPicker(e: MouseEvent) {
-  e.stopPropagation()
-  showFullEmojiPicker.value = false
-  showEmojiPicker.value = !showEmojiPicker.value
-}
-
-function openFullEmojiPicker(e: MouseEvent) {
+function toggleMore(e: MouseEvent) {
   e.stopPropagation()
   showEmojiPicker.value = false
-  showFullEmojiPicker.value = !showFullEmojiPicker.value
+  showQuickEmoji.value = false
+  showMore.value = !showMore.value
+}
+
+function toggleEmojiPicker(e: MouseEvent) {
+  e.stopPropagation()
+  showMore.value = false
+  showEmojiPicker.value = !showEmojiPicker.value
 }
 
 function pickEmoji(emoji: string) {
@@ -81,7 +79,9 @@ function pickEmoji(emoji: string) {
 }
 
 function onDocClick(e: MouseEvent) {
-  if (menuEl.value && !menuEl.value.contains(e.target as Node)) {
+  const moreOpen = moreEl.value && moreEl.value.contains(e.target as Node)
+  const emojiOpen = emojiEl.value && emojiEl.value.contains(e.target as Node)
+  if (!moreOpen && !emojiOpen) {
     closeAll()
   }
 }
@@ -101,129 +101,113 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="menuEl" class="relative" @click.stop>
-    <!-- ⋯ Kebab butonu -->
+  <!--
+    Yatay hover araç çubuğu (Discord stili).
+    Konum: üst bileşen tarafından absolute -top-3 right-4 ile konumlandırılır.
+    Kap: kv-bg-elevated + 1px kv-border-subtle kenarlık + kv-radius-md, gölge yok.
+  -->
+  <div
+    class="flex items-center rounded-[var(--kv-radius-md)] border"
+    style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+    @click.stop
+  >
+    <!-- Hızlı reaksiyon emoji'leri -->
     <button
-      class="w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-colors text-[16px] font-bold leading-none hover:text-[var(--kv-text-primary)]"
-      style="color: var(--kv-text-secondary);"
-      :class="open ? 'bg-[var(--kv-bg-sidebar)]' : 'hover:bg-[var(--kv-bg-sidebar)]'"
-      :title="t('message.actions')"
-      @click="toggleMenu"
+      v-for="emoji in QUICK_EMOJIS"
+      :key="emoji"
+      class="w-8 h-8 flex items-center justify-center text-[16px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+      :title="emoji"
+      @click="pickEmoji(emoji)"
     >
-      ⋯
+      {{ emoji }}
     </button>
 
-    <!-- Dropdown menü -->
-    <div
-      v-if="open"
-      class="absolute top-full right-0 mt-1 z-50 rounded-[var(--kv-radius-md)] py-1 min-w-[168px]"
-      style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
-    >
-      <!-- Yanıtla -->
+    <!-- 🙂 Reaksiyon ekle (tam picker) -->
+    <div ref="emojiEl" class="relative">
       <button
-        class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
-        style="color: var(--kv-text-primary);"
-        @mouseenter="($event.target as HTMLElement).closest('button')!.style.backgroundColor = 'var(--kv-accent-subtle)'"
-        @mouseleave="($event.target as HTMLElement).closest('button')!.style.backgroundColor = ''"
-        @click="onReply"
+        class="w-8 h-8 flex items-center justify-center text-[15px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+        :class="showEmojiPicker ? 'bg-[var(--kv-bg-sidebar)]' : ''"
+        :title="t('reaction.addReaction')"
+        @click="toggleEmojiPicker"
       >
-        <span class="text-[15px] shrink-0">↩</span>
-        <span>{{ t('reply.button') }}</span>
+        🙂
+      </button>
+      <!-- Tam emoji picker -->
+      <div
+        v-if="showEmojiPicker"
+        class="absolute bottom-full right-0 mb-2 z-50"
+        @click.stop
+      >
+        <EmojiPicker @select="pickEmoji" />
+      </div>
+    </div>
+
+    <!-- ↩ Yanıtla -->
+    <button
+      class="w-8 h-8 flex items-center justify-center text-[15px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+      :title="t('reply.button')"
+      @click="onReply"
+    >
+      ↩
+    </button>
+
+    <!-- ⋯ Daha fazla -->
+    <div ref="moreEl" class="relative">
+      <button
+        class="w-8 h-8 flex items-center justify-center text-[16px] font-bold cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+        :class="showMore ? 'bg-[var(--kv-bg-sidebar)]' : ''"
+        style="color: var(--kv-text-secondary); line-height: 1;"
+        :title="t('message.actions')"
+        @click="toggleMore"
+      >
+        ⋯
       </button>
 
-      <!-- Reaksiyon ekle -->
-      <div class="relative">
+      <!-- Daha fazla açılır menüsü -->
+      <div
+        v-if="showMore"
+        class="absolute top-full right-0 mt-1 z-50 rounded-[var(--kv-radius-md)] py-1 min-w-[160px]"
+        style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
+      >
+        <!-- Düzenle (yalnız kendi + içerik varsa) -->
         <button
+          v-if="isMine && hasContent"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
           style="color: var(--kv-text-primary);"
-          @mouseenter="($event.target as HTMLElement).closest('button')!.style.backgroundColor = 'var(--kv-accent-subtle)'"
-          @mouseleave="($event.target as HTMLElement).closest('button')!.style.backgroundColor = ''"
-          @click="openEmojiPicker"
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
+          @click="onEdit"
         >
-          <span class="text-[15px] shrink-0">🙂</span>
-          <span>{{ t('reaction.addReaction') }}</span>
+          <span class="text-[15px] shrink-0">✏️</span>
+          <span>{{ t('message.edit') }}</span>
         </button>
 
-        <!-- Hızlı emoji seti (quick picker) -->
-        <div
-          v-if="showEmojiPicker"
-          class="absolute left-full top-0 ml-1 z-50 flex flex-wrap gap-1 p-1.5 rounded-[var(--kv-radius-md)]"
-          style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle); width: 188px;"
-          @click.stop
+        <!-- Sil (yalnız kendi mesajı) -->
+        <button
+          v-if="isMine"
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
+          style="color: var(--kv-danger);"
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
+          @click="onDelete"
         >
-          <button
-            v-for="emoji in EMOJI_SET"
-            :key="emoji"
-            class="text-[18px] w-8 h-8 flex items-center justify-center rounded cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)]"
-            @click="pickEmoji(emoji)"
-          >
-            {{ emoji }}
-          </button>
-          <!-- Daha fazla: tam picker -->
-          <button
-            class="text-[12px] w-8 h-8 flex items-center justify-center rounded cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)] font-bold"
-            style="color: var(--kv-text-muted);"
-            :title="t('reaction.morePicker')"
-            @click.stop="openFullEmojiPicker"
-          >
-            ⋯
-          </button>
-          <!-- Tam emoji picker -->
-          <div
-            v-if="showFullEmojiPicker"
-            class="absolute left-full top-0 ml-1 z-50"
-            @click.stop
-          >
-            <EmojiPicker @select="pickEmoji" />
-          </div>
-        </div>
+          <span class="text-[15px] shrink-0">🗑</span>
+          <span>{{ t('message.delete') }}</span>
+        </button>
+
+        <!-- Şikâyet (yalnız başkasının mesajı) -->
+        <button
+          v-if="!isMine"
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
+          style="color: var(--kv-danger);"
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
+          @click="onReport"
+        >
+          <span class="text-[15px] shrink-0">🚩</span>
+          <span>{{ t('report.reportMessage') }}</span>
+        </button>
       </div>
-
-      <!-- Divider (kendi mesajı için aksiyon varsa) -->
-      <div
-        v-if="isMine"
-        class="my-1 mx-2"
-        style="height: 1px; background-color: var(--kv-border-subtle);"
-      />
-
-      <!-- Düzenle (yalnız kendi + içerik varsa) -->
-      <button
-        v-if="isMine && hasContent"
-        class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
-        style="color: var(--kv-text-primary);"
-        @mouseenter="($event.target as HTMLElement).closest('button')!.style.backgroundColor = 'var(--kv-accent-subtle)'"
-        @mouseleave="($event.target as HTMLElement).closest('button')!.style.backgroundColor = ''"
-        @click="onEdit"
-      >
-        <span class="text-[15px] shrink-0">✏️</span>
-        <span>{{ t('message.edit') }}</span>
-      </button>
-
-      <!-- Sil (yalnız kendi mesajı) -->
-      <button
-        v-if="isMine"
-        class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
-        style="color: var(--kv-danger);"
-        @mouseenter="($event.target as HTMLElement).closest('button')!.style.backgroundColor = 'rgba(242,59,75,0.1)'"
-        @mouseleave="($event.target as HTMLElement).closest('button')!.style.backgroundColor = ''"
-        @click="onDelete"
-      >
-        <span class="text-[15px] shrink-0">🗑</span>
-        <span>{{ t('message.delete') }}</span>
-      </button>
-
-      <!-- Şikâyet (yalnız başkasının mesajı) -->
-      <button
-        v-if="!isMine"
-        class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
-        style="color: var(--kv-danger);"
-        @mouseenter="($event.target as HTMLElement).closest('button')!.style.backgroundColor = 'rgba(242,59,75,0.1)'"
-        @mouseleave="($event.target as HTMLElement).closest('button')!.style.backgroundColor = ''"
-        @click="onReport"
-      >
-        <span class="text-[15px] shrink-0">🚩</span>
-        <span>{{ t('report.reportMessage') }}</span>
-      </button>
     </div>
   </div>
 </template>
