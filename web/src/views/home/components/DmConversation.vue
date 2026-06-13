@@ -9,9 +9,9 @@ import { useSocket } from '@/composables/useSocket'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { messagesApi } from '@/api/messages'
 import { dmApi } from '@/api/dm'
-import { attachmentsApi } from '@/api/attachments'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import AttachmentView from '@/components/shared/AttachmentView.vue'
+import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import type { FriendCodeUserDto, MessageDto } from '@/types'
 
 const props = defineProps<{
@@ -40,18 +40,8 @@ const showClearConfirm = ref(false)
 const clearing = ref(false)
 const unblocking = ref(false)
 
-// Sprint 5 §7 — bekleyen ek
-interface PendingAttachment {
-  attachmentId: string
-  filename: string
-  size: number
-  contentType: string
-  uploadProgress: number
-  uploading: boolean
-  error: string | null
-}
-const pendingAttachments = ref<PendingAttachment[]>([])
-const uploadError = ref('')
+// Sprint 5 R1 — modal akışı (inline çentik kaldırıldı)
+const composeFile = ref<File | null>(null)
 
 const messages = computed(() => messagesStore.messagesForChannel(props.channelId))
 const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channelId] ?? false)
@@ -84,83 +74,40 @@ async function loadMore() {
   await messagesStore.fetchMessages(props.channelId, messages.value[0].id)
 }
 
-// Sprint 5 §7 — dosya seçimi
+// Dosya seçimi → modal aç
 function openFilePicker() {
   fileInputEl.value?.click()
 }
 
-async function onFileSelected(e: Event) {
+function onFileSelected(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!input) return
   input.value = ''
   if (!file) return
+  composeFile.value = file
+}
 
-  uploadError.value = ''
-
-  let presignResult: { attachmentId: string; uploadUrl: string; storageKey: string }
+// Modal'dan gelen sent event'i → mesaj gönder
+async function onAttachmentSent({ attachmentId, caption }: { attachmentId: string; caption: string }) {
+  composeFile.value = null
   try {
-    const res = await attachmentsApi.presign({
-      filename: file.name,
-      contentType: file.type,
-      size: file.size,
-    })
-    presignResult = res.data
-  } catch (err: unknown) {
-    const code = (err as { response?: { data?: { error?: string } } }).response?.data?.error
-    uploadError.value = code
-      ? t(`attachment.errors.${code}`, t('attachment.errors.default'))
-      : t('attachment.errors.default')
-    return
-  }
-
-  const pending: PendingAttachment = {
-    attachmentId: presignResult.attachmentId,
-    filename: file.name,
-    size: file.size,
-    contentType: file.type,
-    uploadProgress: 0,
-    uploading: true,
-    error: null,
-  }
-  pendingAttachments.value.push(pending)
-
-  try {
-    await attachmentsApi.uploadToS3(presignResult.uploadUrl, file, (pct) => {
-      pending.uploadProgress = pct
-    })
-    pending.uploading = false
-    pending.uploadProgress = 100
+    const { data } = await messagesApi.send(props.channelId, caption, undefined, [attachmentId])
+    messagesStore.appendMessage(data)
   } catch {
-    pending.uploading = false
-    pending.error = t('attachment.uploadFailed')
+    // hata sessizce yutulur — modal zaten kapandı
   }
-}
-
-function removePending(attachmentId: string) {
-  pendingAttachments.value = pendingAttachments.value.filter(
-    (a) => a.attachmentId !== attachmentId,
-  )
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 async function send() {
   const hasText = content.value.trim()
-  const readyAttachments = pendingAttachments.value.filter((a) => !a.uploading && !a.error)
-  if ((!hasText && !readyAttachments.length) || sending.value || !props.canMessage) return
+  if (!hasText || sending.value || !props.canMessage) return
   stopTyping()
   sending.value = true
   const text = content.value.trim()
   content.value = ''
-  const attachmentIds = readyAttachments.map((a) => a.attachmentId)
-  pendingAttachments.value = pendingAttachments.value.filter((a) => a.uploading || a.error)
   try {
-    const { data } = await messagesApi.send(props.channelId, text, undefined, attachmentIds)
+    const { data } = await messagesApi.send(props.channelId, text)
     messagesStore.appendMessage(data)
   } catch {
     content.value = text
@@ -322,14 +269,6 @@ async function unblockUser() {
 
     <!-- Mesaj input / Engel bandı -->
     <div class="px-4 pb-4 pt-2 shrink-0">
-      <!-- Yükleme hatası -->
-      <div
-        v-if="uploadError"
-        class="px-1 mb-1 text-[13px]"
-        style="color: var(--kv-danger);"
-      >
-        {{ uploadError }}
-      </div>
       <!-- Yazıyor göstergesi -->
       <div
         v-if="typingLabel"
@@ -360,42 +299,6 @@ async function unblockUser() {
 
       <!-- Normal input -->
       <div v-else>
-        <!-- Bekleyen ekler -->
-        <div
-          v-if="pendingAttachments.length"
-          class="flex flex-wrap gap-2 mb-2"
-        >
-          <div
-            v-for="att in pendingAttachments"
-            :key="att.attachmentId"
-            class="flex items-center gap-2 px-2 py-1 rounded-[var(--kv-radius-sm)] text-[12px]"
-            style="background-color: var(--kv-bg-elevated);"
-          >
-            <span
-              class="truncate max-w-[140px]"
-              :style="att.error ? 'color: var(--kv-danger);' : 'color: var(--kv-text-secondary);'"
-            >
-              {{ att.filename }}
-            </span>
-            <span style="color: var(--kv-text-muted);">{{ formatBytes(att.size) }}</span>
-            <span v-if="att.uploading" style="color: var(--kv-text-muted);">
-              {{ att.uploadProgress }}%
-            </span>
-            <span v-else-if="att.error" style="color: var(--kv-danger);">
-              {{ t('attachment.uploadFailed') }}
-            </span>
-            <span v-else style="color: var(--kv-success);">✓</span>
-            <button
-              class="ml-1 cursor-pointer hover:opacity-80"
-              style="color: var(--kv-text-muted);"
-              :aria-label="t('attachment.remove')"
-              @click="removePending(att.attachmentId)"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
         <!-- Gizli dosya input -->
         <input
           ref="fileInputEl"
@@ -442,5 +345,14 @@ async function unblockUser() {
     :loading="clearing"
     @confirm="clearConversation"
     @cancel="showClearConfirm = false"
+  />
+
+  <!-- Dosya compose modal -->
+  <AttachmentComposeModal
+    v-if="composeFile"
+    :file="composeFile"
+    :channel-id="channelId"
+    @sent="onAttachmentSent"
+    @close="composeFile = null"
   />
 </template>

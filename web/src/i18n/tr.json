@@ -426,11 +426,19 @@
     "blocked": "Bu içerik kaldırıldı.",
     "notReady": "Dosya henüz hazır değil.",
     "download": "İndir",
+    "open": "Aç",
     "uploadFailed": "Yükleme başarısız.",
     "errors": {
       "UNSUPPORTED_TYPE": "Desteklenmeyen dosya türü.",
       "FILE_TOO_LARGE": "Dosya boyutu çok büyük (max 25 MB).",
       "default": "Dosya eklenemedi."
+    },
+    "compose": {
+      "title": "Dosya Gönder",
+      "captionPlaceholder": "Açıklama ekle (opsiyonel)",
+      "send": "Gönder",
+      "wait": "Yükleniyor…",
+      "uploading": "Yükleniyor… {pct}%"
     }
   }
 }
