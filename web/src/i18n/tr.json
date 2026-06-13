@@ -538,7 +538,8 @@
     "placeholder": "Nereye gitmek istersin?",
     "topbarPlaceholder": "Kanka veya ortam ara",
     "sectionGuilds": "Ortamlar",
-    "sectionDms": "Direkt Mesajlar",
+    "sectionDms": "Kankalar",
+    "sectionGroups": "Gruplar",
     "empty": "Sonuç bulunamadı.",
     "tip": "TÜYO: Ortamlar için ortam adını, DM için @ ile başlayın."
   },
