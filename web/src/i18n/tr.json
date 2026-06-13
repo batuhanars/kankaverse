@@ -415,5 +415,19 @@
     "one": "{user} yazıyor…",
     "two": "{user1} ve {user2} yazıyor…",
     "many": "Birkaç kişi yazıyor…"
+  },
+  "attachment": {
+    "addFile": "Dosya ekle",
+    "remove": "Eki kaldır",
+    "processing": "İşleniyor…",
+    "blocked": "Bu içerik kaldırıldı.",
+    "notReady": "Dosya henüz hazır değil.",
+    "download": "İndir",
+    "uploadFailed": "Yükleme başarısız.",
+    "errors": {
+      "UNSUPPORTED_TYPE": "Desteklenmeyen dosya türü.",
+      "FILE_TOO_LARGE": "Dosya boyutu çok büyük (max 25 MB).",
+      "default": "Dosya eklenemedi."
+    }
   }
 }

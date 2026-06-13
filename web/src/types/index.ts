@@ -132,6 +132,22 @@ export interface ChannelDto {
   position: number
 }
 
+// Sprint 5 §4 — Attachment DTO
+export const ScanStatus = {
+  PENDING: 'PENDING',
+  CLEAN: 'CLEAN',
+  FLAGGED: 'FLAGGED',
+} as const
+export type ScanStatus = (typeof ScanStatus)[keyof typeof ScanStatus]
+
+export interface AttachmentDto {
+  id: string
+  filename: string
+  contentType: string
+  size: number
+  scanStatus: ScanStatus
+}
+
 export interface MessageDto {
   id: string
   channelId: string
@@ -143,6 +159,7 @@ export interface MessageDto {
     avatarUrl: string | null
   }
   createdAt: string
+  attachments?: AttachmentDto[]
 }
 
 // Sprint 7A §3 — Davet DTO'ları

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import UserAvatar from './UserAvatar.vue'
 import UserCardPopover from './UserCardPopover.vue'
+import AttachmentView from './AttachmentView.vue'
 import type { MessageDto } from '@/types'
 
 const props = defineProps<{ message: MessageDto }>()
@@ -46,9 +47,18 @@ onUnmounted(() => window.removeEventListener('kv:close-user-cards', closeCard))
         </button>
         <span class="text-[11px] text-[var(--kv-text-muted)]">{{ timeStr }}</span>
       </div>
-      <p class="text-[14px] text-[var(--kv-text-body)] break-words whitespace-pre-wrap">
+      <p
+        v-if="message.content"
+        class="text-[14px] text-[var(--kv-text-body)] break-words whitespace-pre-wrap"
+      >
         {{ message.content }}
       </p>
+      <!-- Sprint 5 §7: Attachment'lar -->
+      <AttachmentView
+        v-for="att in message.attachments"
+        :key="att.id"
+        :attachment="att"
+      />
     </div>
   </div>
 

@@ -9,7 +9,9 @@ import { useSocket } from '@/composables/useSocket'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { messagesApi } from '@/api/messages'
 import { dmApi } from '@/api/dm'
+import { attachmentsApi } from '@/api/attachments'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import AttachmentView from '@/components/shared/AttachmentView.vue'
 import type { FriendCodeUserDto, MessageDto } from '@/types'
 
 const props = defineProps<{
@@ -32,10 +34,24 @@ const { label: typingLabel } = useTypingLabel(() => props.channelId, t, { named:
 const content = ref('')
 const sending = ref(false)
 const listEl = ref<HTMLElement | null>(null)
+const fileInputEl = ref<HTMLInputElement | null>(null)
 const realtimeError = ref(false)
 const showClearConfirm = ref(false)
 const clearing = ref(false)
 const unblocking = ref(false)
+
+// Sprint 5 §7 — bekleyen ek
+interface PendingAttachment {
+  attachmentId: string
+  filename: string
+  size: number
+  contentType: string
+  uploadProgress: number
+  uploading: boolean
+  error: string | null
+}
+const pendingAttachments = ref<PendingAttachment[]>([])
+const uploadError = ref('')
 
 const messages = computed(() => messagesStore.messagesForChannel(props.channelId))
 const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channelId] ?? false)
@@ -68,14 +84,83 @@ async function loadMore() {
   await messagesStore.fetchMessages(props.channelId, messages.value[0].id)
 }
 
+// Sprint 5 §7 — dosya seçimi
+function openFilePicker() {
+  fileInputEl.value?.click()
+}
+
+async function onFileSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!input) return
+  input.value = ''
+  if (!file) return
+
+  uploadError.value = ''
+
+  let presignResult: { attachmentId: string; uploadUrl: string; storageKey: string }
+  try {
+    const res = await attachmentsApi.presign({
+      filename: file.name,
+      contentType: file.type,
+      size: file.size,
+    })
+    presignResult = res.data
+  } catch (err: unknown) {
+    const code = (err as { response?: { data?: { error?: string } } }).response?.data?.error
+    uploadError.value = code
+      ? t(`attachment.errors.${code}`, t('attachment.errors.default'))
+      : t('attachment.errors.default')
+    return
+  }
+
+  const pending: PendingAttachment = {
+    attachmentId: presignResult.attachmentId,
+    filename: file.name,
+    size: file.size,
+    contentType: file.type,
+    uploadProgress: 0,
+    uploading: true,
+    error: null,
+  }
+  pendingAttachments.value.push(pending)
+
+  try {
+    await attachmentsApi.uploadToS3(presignResult.uploadUrl, file, (pct) => {
+      pending.uploadProgress = pct
+    })
+    pending.uploading = false
+    pending.uploadProgress = 100
+  } catch {
+    pending.uploading = false
+    pending.error = t('attachment.uploadFailed')
+  }
+}
+
+function removePending(attachmentId: string) {
+  pendingAttachments.value = pendingAttachments.value.filter(
+    (a) => a.attachmentId !== attachmentId,
+  )
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 async function send() {
-  if (!content.value.trim() || sending.value || !props.canMessage) return
+  const hasText = content.value.trim()
+  const readyAttachments = pendingAttachments.value.filter((a) => !a.uploading && !a.error)
+  if ((!hasText && !readyAttachments.length) || sending.value || !props.canMessage) return
   stopTyping()
   sending.value = true
   const text = content.value.trim()
   content.value = ''
+  const attachmentIds = readyAttachments.map((a) => a.attachmentId)
+  pendingAttachments.value = pendingAttachments.value.filter((a) => a.uploading || a.error)
   try {
-    const { data } = await messagesApi.send(props.channelId, text)
+    const { data } = await messagesApi.send(props.channelId, text, undefined, attachmentIds)
     messagesStore.appendMessage(data)
   } catch {
     content.value = text
@@ -208,9 +293,10 @@ async function unblockUser() {
           <span v-else>{{ msg.author.username[0].toUpperCase() }}</span>
         </div>
 
-        <!-- Baloncuk -->
+        <!-- Baloncuk + ekler -->
         <div class="flex flex-col max-w-[70%]" :class="isMine(msg) ? 'items-end' : 'items-start'">
           <div
+            v-if="msg.content"
             class="px-4 py-2.5 text-[14px] leading-relaxed break-words whitespace-pre-wrap"
             :class="isMine(msg)
               ? 'rounded-2xl rounded-br-[4px]'
@@ -221,6 +307,12 @@ async function unblockUser() {
           >
             {{ msg.content }}
           </div>
+          <!-- Sprint 5 §7: Attachment'lar -->
+          <AttachmentView
+            v-for="att in msg.attachments"
+            :key="att.id"
+            :attachment="att"
+          />
           <span class="text-[11px] mt-1 px-1" style="color: var(--kv-text-muted);">
             {{ formatTime(msg.createdAt) }}
           </span>
@@ -230,6 +322,14 @@ async function unblockUser() {
 
     <!-- Mesaj input / Engel bandı -->
     <div class="px-4 pb-4 pt-2 shrink-0">
+      <!-- Yükleme hatası -->
+      <div
+        v-if="uploadError"
+        class="px-1 mb-1 text-[13px]"
+        style="color: var(--kv-danger);"
+      >
+        {{ uploadError }}
+      </div>
       <!-- Yazıyor göstergesi -->
       <div
         v-if="typingLabel"
@@ -259,21 +359,77 @@ async function unblockUser() {
       </div>
 
       <!-- Normal input -->
-      <div
-        v-else
-        class="flex items-end gap-2 px-4 rounded-[var(--kv-radius-md)] border"
-        style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
-      >
-        <textarea
-          v-model="content"
-          rows="1"
-          :placeholder="t('dm.placeholder', { user: otherUser.username })"
-          class="flex-1 py-3 bg-transparent text-[15px] resize-none outline-none"
-          style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
-          @keydown="onKeydown"
-          @input="onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
-          @blur="stopTyping"
+      <div v-else>
+        <!-- Bekleyen ekler -->
+        <div
+          v-if="pendingAttachments.length"
+          class="flex flex-wrap gap-2 mb-2"
+        >
+          <div
+            v-for="att in pendingAttachments"
+            :key="att.attachmentId"
+            class="flex items-center gap-2 px-2 py-1 rounded-[var(--kv-radius-sm)] text-[12px]"
+            style="background-color: var(--kv-bg-elevated);"
+          >
+            <span
+              class="truncate max-w-[140px]"
+              :style="att.error ? 'color: var(--kv-danger);' : 'color: var(--kv-text-secondary);'"
+            >
+              {{ att.filename }}
+            </span>
+            <span style="color: var(--kv-text-muted);">{{ formatBytes(att.size) }}</span>
+            <span v-if="att.uploading" style="color: var(--kv-text-muted);">
+              {{ att.uploadProgress }}%
+            </span>
+            <span v-else-if="att.error" style="color: var(--kv-danger);">
+              {{ t('attachment.uploadFailed') }}
+            </span>
+            <span v-else style="color: var(--kv-success);">✓</span>
+            <button
+              class="ml-1 cursor-pointer hover:opacity-80"
+              style="color: var(--kv-text-muted);"
+              :aria-label="t('attachment.remove')"
+              @click="removePending(att.attachmentId)"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <!-- Gizli dosya input -->
+        <input
+          ref="fileInputEl"
+          type="file"
+          class="hidden"
+          accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain"
+          @change="onFileSelected"
         />
+
+        <div
+          class="flex items-end gap-2 px-4 rounded-[var(--kv-radius-md)] border"
+          style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
+        >
+          <!-- Ek (📎) butonu — Sprint 4A'da gizliydi, Sprint 5'te açıldı -->
+          <button
+            type="button"
+            class="shrink-0 py-3 cursor-pointer hover:opacity-80 transition-opacity"
+            style="color: var(--kv-text-muted);"
+            :aria-label="t('attachment.addFile')"
+            @click="openFilePicker"
+          >
+            📎
+          </button>
+          <textarea
+            v-model="content"
+            rows="1"
+            :placeholder="t('dm.placeholder', { user: otherUser.username })"
+            class="flex-1 py-3 bg-transparent text-[15px] resize-none outline-none"
+            style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
+            @keydown="onKeydown"
+            @input="onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
+            @blur="stopTyping"
+          />
+        </div>
       </div>
     </div>
   </div>
