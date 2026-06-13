@@ -280,7 +280,14 @@
     "saving": "Kaydediliyor…",
     "saveError": "Değişiklikler kaydedilemedi. Lütfen tekrar dene.",
     "unsavedChanges": "Kaydedilmemiş değişiklikler var.",
-    "discardChanges": "Değişiklikleri At"
+    "discardChanges": "Değişiklikleri At",
+    "deleteSection": "Tehlikeli Bölge",
+    "deleteLabel": "Ortamı Sil",
+    "deleteDesc": "Bu işlem geri alınamaz. Ortam ve tüm içeriği kalıcı olarak silinir.",
+    "deleteButton": "Ortamı Sil",
+    "deleteConfirmTitle": "Ortamı Sil",
+    "deleteConfirmMessage": "\"{name}\" ortamını silmek istediğinden emin misin? Bu işlem geri alınamaz.",
+    "deleteConfirmButton": "Evet, Sil"
   },
   "channel": {
     "generalChat": "genel-sohbet",
@@ -408,6 +415,21 @@
     "role": {
       "OWNER": "Sahip",
       "ADMIN": "Yönetici"
+    },
+    "actions": {
+      "makeAdmin": "Yönetici Yap",
+      "makeMember": "Üye Yap",
+      "kick": "At",
+      "kickConfirmTitle": "Üyeyi At",
+      "kickConfirmMessage": "{username} adlı üyeyi ortamdan atmak istediğinden emin misin?",
+      "kickConfirmButton": "At"
+    },
+    "errors": {
+      "CANNOT_KICK_OWNER": "Ortam sahibi atılamaz.",
+      "CANNOT_KICK_SELF": "Kendinizi atamazsınız.",
+      "CANNOT_MODIFY_OWNER": "Ortam sahibinin rolü değiştirilemez.",
+      "NOT_GUILD_MEMBER": "Kullanıcı bu ortamın üyesi değil.",
+      "FORBIDDEN": "Bu işlem için yetkiniz yok."
     }
   },
   "friends": {

@@ -46,6 +46,15 @@ export const useGuildsStore = defineStore('guilds', () => {
     return res.data
   }
 
+  async function deleteGuild(id: string): Promise<void> {
+    await guildsApi.deleteGuild(id)
+    guilds.value = guilds.value.filter((g) => g.id !== id)
+    if (activeGuildId.value === id) {
+      activeGuildId.value = null
+    }
+    delete myRoleByGuild.value[id]
+  }
+
   function setActiveGuild(id: string | null) {
     activeGuildId.value = id
   }
@@ -83,5 +92,5 @@ export const useGuildsStore = defineStore('guilds', () => {
     }
   }
 
-  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread }
+  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, deleteGuild, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread }
 })

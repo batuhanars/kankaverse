@@ -38,4 +38,16 @@ export const guildsApi = {
   createCategory(guildId: string, name: string) {
     return http.post<CategoryDto>(`/guilds/${guildId}/categories`, { name })
   },
+  // Sprint V2 Guild Admin — Ortam sil (OWNER)
+  deleteGuild(guildId: string) {
+    return http.delete<null>(`/guilds/${guildId}`)
+  },
+  // Sprint V2 Guild Admin — Üye rol değiştir (OWNER)
+  updateMemberRole(guildId: string, userId: string, role: 'ADMIN' | 'MEMBER') {
+    return http.patch<GuildMemberDto>(`/guilds/${guildId}/members/${userId}/role`, { role })
+  },
+  // Sprint V2 Guild Admin — Üye at / kick (OWNER veya ADMIN)
+  kickMember(guildId: string, userId: string) {
+    return http.delete<null>(`/guilds/${guildId}/members/${userId}`)
+  },
 }
