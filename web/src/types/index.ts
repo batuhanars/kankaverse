@@ -183,6 +183,7 @@ export interface MessageDto {
     avatarUrl: string | null
   }
   createdAt: string
+  editedAt: string | null
   attachments?: AttachmentDto[]
 }
 

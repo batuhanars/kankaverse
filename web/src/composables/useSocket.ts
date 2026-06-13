@@ -77,6 +77,15 @@ export function useSocket() {
       clearTypingForChannel(message.channelId)
     })
 
+    // Sprint 6.2: mesaj düzenleme / silme WS olayları
+    socket.on('message.updated', (message: MessageDto) => {
+      messagesStore.updateMessage(message)
+    })
+
+    socket.on('message.deleted', (data: { messageId: string; channelId: string }) => {
+      messagesStore.removeMessage(data.channelId, data.messageId)
+    })
+
     socket.on('dm.message', (data: { channelId: string; lastMessage: { content: string; createdAt: string }; senderId: string }) => {
       dmStore.applyActivity(data)
     })

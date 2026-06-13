@@ -15,4 +15,12 @@ export const messagesApi = {
       attachmentIds: attachmentIds?.length ? attachmentIds : undefined,
     })
   },
+  // Sprint 6.2: mesaj düzenleme (kendi mesajı)
+  editMessage(channelId: string, messageId: string, content: string) {
+    return http.patch<MessageDto>(`/channels/${channelId}/messages/${messageId}`, { content })
+  },
+  // Sprint 6.2: mesaj silme (kendi mesajı)
+  deleteMessage(channelId: string, messageId: string) {
+    return http.delete<null>(`/channels/${channelId}/messages/${messageId}`)
+  },
 }
