@@ -480,6 +480,22 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 ---
 
+## Sprint 11 — Ortam Derinleştirme V1 (PM compose 2026-06-13; kurul kapsam ŞARTLI)
+
+> Sözleşme: `contracts/SPRINT_11_CONTRACT.md`. **DEFER:** özel kanal/rol (V3), ses (V2), forum/kategori/etkinlik.
+> R7-hafif (kanal yetki + ageGated işaretleme; enforcement zaten var). Dev checkbox işaretler.
+
+### Bitti
+- [x] **Üye listesi + presence** (`GET /guilds/:id/members` + MemberPanel çevrimiçi/çevrimdışı grupla; minör görünürlük süzülü)
+- [x] **Kanal CRUD** (`POST/PATCH/DELETE`, OWNER/ADMIN, son-kanal `LAST_CHANNEL` guard) + UI (+ oluştur/adlandır/sil)
+- [x] **Yaş-kapılı kanal** işareti (`Channel.ageGated` toggle + 18+ rozet; minör erişemez — mevcut enforcement)
+- [x] **Ortam kuralları** (`Guild.rules` + migration + PATCH + GuildSettingsModal textarea + üye gösterim)
+- [x] **Ortam ikonu altıgen** (MinIO `icons/` public-read; `POST .../icon/presign` + `PATCH .../icon` storageKey-prefix güvenli; GuildSettingsModal yükle/kaldır + altıgen önizleme; rail otomatik altıgen)
+- [x] `nest build`+`vue-tsc` temiz; **245 test**; migration uygulandı
+- [ ] **Borç D14:** ikon scan-gate'siz public → lansman öncesi R5 scan (PLAN)
+
+---
+
 ## Sprint 1 DoD — PM reconcile (2026-06-13)
 
 > Fonksiyonel olarak Sprint 2A/2B/3/4A boyunca doğrulandı (uygulama uçtan uca çalışıyor); checkbox'lar bayattı.
