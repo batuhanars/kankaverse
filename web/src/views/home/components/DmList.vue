@@ -2,8 +2,10 @@
 import { useI18n } from 'vue-i18n'
 import { useDmStore } from '@/stores/dm'
 import { usePresenceStore } from '@/stores/presence'
+import { useAuthStore } from '@/stores/auth'
 import { useTyping } from '@/composables/useTyping'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
+import { formatMentionsPlain } from '@/utils/mentions'
 import type { DmChannelDto } from '@/types'
 
 defineProps<{ activeChannelId: string | null }>()
@@ -12,10 +14,29 @@ const emit = defineEmits<{ select: [channelId: string] }>()
 const { t } = useI18n()
 const dmStore = useDmStore()
 const presenceStore = usePresenceStore()
+const authStore = useAuthStore()
 const { typingUsersForChannel } = useTyping(() => null)
 
 function truncate(text: string, max = 40) {
   return text.length > max ? text.slice(0, max) + '…' : text
+}
+
+// Son-mesaj önizlemesi için mention resolver: kanalın bilinen katılımcıları + giriş yapan kullanıcı
+function lastMsgResolver(ch: DmChannelDto) {
+  return (id: string): string | undefined => {
+    if (id === authStore.user?.id) return authStore.user.username
+    if (ch.type === 'DM') {
+      if (id === ch.otherUser.id) return ch.otherUser.username
+    } else {
+      const member = ch.members.find((m) => m.id === id)
+      if (member) return member.username
+    }
+    return undefined
+  }
+}
+
+function formatLastMessage(ch: DmChannelDto, content: string): string {
+  return truncate(formatMentionsPlain(content, lastMsgResolver(ch), t('mention.unknown')))
 }
 
 // Grup için görüntü adı: ad varsa onu, yoksa üye adlarını birleştir
@@ -134,7 +155,7 @@ function groupDisplayName(ch: Extract<DmChannelDto, { type: 'GROUP_DM' }>): stri
           {{ t('typing.simple') }}
         </p>
         <p v-else-if="ch.lastMessage" class="text-[12px] truncate" style="color: var(--kv-text-muted);">
-          {{ truncate(ch.lastMessage.content) }}
+          {{ formatLastMessage(ch, ch.lastMessage.content) }}
         </p>
       </div>
     </button>

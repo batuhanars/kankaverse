@@ -10,6 +10,7 @@ import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
 import { messagesApi } from '@/api/messages'
 import { dmApi } from '@/api/dm'
+import { formatMentionsPlain } from '@/utils/mentions'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import ReportModal from '@/components/shared/ReportModal.vue'
@@ -733,7 +734,7 @@ function isGroupStart(index: number): boolean {
           >
             <span class="shrink-0" style="color: var(--kv-text-muted);">↩</span>
             <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">{{ t('reply.to', { author: replyingTo.author.username }) }}</span>
-            <span class="truncate" style="color: var(--kv-text-muted);">— {{ replyingTo.content }}</span>
+            <span class="truncate" style="color: var(--kv-text-muted);">— {{ formatMentionsPlain(replyingTo.content, dmMentionResolver, t('mention.unknown')) }}</span>
             <button
               class="shrink-0 ml-auto cursor-pointer hover:opacity-80 transition-opacity"
               style="color: var(--kv-text-muted);"
