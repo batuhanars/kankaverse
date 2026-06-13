@@ -36,9 +36,16 @@ export const useGuildsStore = defineStore('guilds', () => {
     return res.data
   }
 
+  async function updateGuildIcon(id: string, storageKey: string | null): Promise<GuildDto> {
+    const res = await guildsApi.setIcon(id, storageKey)
+    const idx = guilds.value.findIndex((g) => g.id === id)
+    if (idx !== -1) guilds.value[idx] = res.data
+    return res.data
+  }
+
   function setActiveGuild(id: string | null) {
     activeGuildId.value = id
   }
 
-  return { guilds, activeGuildId, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, setActiveGuild }
+  return { guilds, activeGuildId, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, setActiveGuild }
 })
