@@ -414,6 +414,37 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 ---
 
+## Sprint 5 — Dosya Paylaşımı (S3-uyumlu upload + presigned + Attachment) (PM onaylı 2026-06-13)
+
+> Aktif sözleşme: `contracts/SPRINT_5_CONTRACT.md`. **🔴 CSAM tarama GATED** (R5+hukuk; gerçek tarayıcı lansman-öncesi
+> zorunlu). **R7: dosya servis erişimi `requireChannelAccess` yeniden kullanım.** Dev checkbox işaretler, item EKLEMEZ.
+
+### Backend (`api/`)
+- [ ] Bağımlılık: `@aws-sdk/client-s3` + `@aws-sdk/s3-request-presigner` (PM onaylı). `StorageService` (SharedModule, S3-uyumlu presign PUT/GET/delete)
+- [ ] MinIO dev: kök `docker-compose.yml` servis + `.env.example` (`S3_ENDPOINT/BUCKET/ACCESS_KEY/SECRET_KEY/REGION/PUBLIC_URL`); config fail-fast
+- [ ] Prisma: `Attachment` modeli + `ScanStatus` enum + `Message.attachments` + migration (additive)
+- [ ] `POST /attachments/presign` (doğrula: boyut/`MAX_UPLOAD_MB` + contentType allowlist → Attachment PENDING + presigned PUT)
+- [ ] Mesaj oluşturma genişler (`channels` + `dm`): `attachmentIds?` → mesaja bağla + scan tetikle; boş içerik+attachment geçerli
+- [ ] **`GET /attachments/:id` (R7):** `requireChannelAccess` (minör/adultsOnly/üyelik) → CLEAN ise presigned GET, değilse `403 ATTACHMENT_NOT_READY`/`ATTACHMENT_BLOCKED`
+- [ ] **Scan gated hook:** `ATTACHMENT_SCAN_ENABLED` (default false → auto-CLEAN); CLEAN değilse servis edilmez; **gerçek tarama YAZILMAZ** (R5 hook hazır, loud yorum)
+- [ ] Hata kodları (`UNSUPPORTED_TYPE`/`ATTACHMENT_NOT_READY`/`ATTACHMENT_BLOCKED`); Swagger; testler (presign doğrulama + erişim + scan-gate, S3 mock)
+
+### Frontend (`web/`)
+- [ ] Mesaj input ek (📎) butonu (4A'da gizlenmişti → açılır): seç → presign → S3'e PUT (ilerleme) → `attachmentIds` ile gönder
+- [ ] Görsel inline önizleme (`MessageItem` + DM baloncuğu); dosya → ikon+ad+indir (`GET /attachments/:id`)
+- [ ] Boyut/tip + `ATTACHMENT_NOT_READY/BLOCKED` UX; i18n + `--kv-*` token
+
+### Sprint 5 DoD (contract §9)
+- [ ] StorageService + MinIO dev; presign PUT/GET çalışır
+- [ ] Attachment + migration; iliştirme (guild + DM); görsel inline + dosya indirme
+- [ ] Erişim kontrollü indirme; minör/adultsOnly kapıları dosyaya uygulanır
+- [ ] scanStatus gated: dev auto-CLEAN; CLEAN değilse servis yok; gerçek tarama R5 (hook hazır)
+- [ ] `nest build` + `vue-tsc` temiz; testler geçer
+- [ ] **R7:** dosya erişim kapısı + scan-gate incelendi (sahip imzası)
+- [ ] **Lansman notu:** `ATTACHMENT_SCAN_ENABLED=true` + gerçek CSAM tarayıcı olmadan canlıya alınmaz (PLAN R5)
+
+---
+
 ## Sprint 1 DoD — PM reconcile (2026-06-13)
 
 > Fonksiyonel olarak Sprint 2A/2B/3/4A boyunca doğrulandı (uygulama uçtan uca çalışıyor); checkbox'lar bayattı.
