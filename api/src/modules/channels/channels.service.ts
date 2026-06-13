@@ -10,7 +10,7 @@ import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { Channel } from '@prisma/client';
 
-function toChannelDto(channel: Channel) {
+function toChannelDto(channel: Channel, hasUnread = false) {
   return {
     id: channel.id,
     type: channel.type,
@@ -19,6 +19,7 @@ function toChannelDto(channel: Channel) {
     ageGated: channel.ageGated,
     position: channel.position,
     slowModeSeconds: channel.slowModeSeconds,
+    hasUnread,
   };
 }
 
@@ -62,12 +63,56 @@ export class ChannelsService {
   async findByGuild(userId: string, guildId: string) {
     await this.membership.requireGuildMembership(userId, guildId);
 
+    // Kanalları, her kanalın son mesajını ve kullanıcının okuma kaydını tek sorguda çek
     const channels = await this.prisma.channel.findMany({
       where: { guildId, deletedAt: null },
       orderBy: { position: 'asc' },
+      include: {
+        messages: {
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { authorId: true, createdAt: true },
+        },
+        channelReads: {
+          where: { userId },
+          select: { lastReadAt: true },
+        },
+      },
     });
 
-    return channels.map(toChannelDto);
+    return channels.map((ch) => {
+      const lastMsg = ch.messages[0] ?? null;
+      const lastRead = ch.channelReads[0]?.lastReadAt ?? null;
+
+      let hasUnread = false;
+      if (lastMsg) {
+        // Kendi son mesajın okunmamış sayılmaz
+        if (lastMsg.authorId === userId) {
+          hasUnread = false;
+        } else if (lastRead === null) {
+          // Hiç okuma kaydı yok + mesaj var → okunmamış
+          hasUnread = true;
+        } else {
+          hasUnread = lastMsg.createdAt > lastRead;
+        }
+      }
+
+      return toChannelDto(ch, hasUnread);
+    });
+  }
+
+  /** POST /channels/:id/read — kanaldaki son mesajı okundu işaretle */
+  async markRead(userId: string, channelId: string) {
+    await this.membership.requireChannelAccess(userId, channelId);
+
+    await this.prisma.channelRead.upsert({
+      where: { userId_channelId: { userId, channelId } },
+      update: { lastReadAt: new Date() },
+      create: { userId, channelId, lastReadAt: new Date() },
+    });
+
+    return null;
   }
 
   async update(userId: string, channelId: string, dto: UpdateChannelDto) {

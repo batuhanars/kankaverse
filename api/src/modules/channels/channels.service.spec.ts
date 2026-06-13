@@ -12,10 +12,14 @@ const prismaMock = {
     update: jest.fn(),
     count: jest.fn(),
   },
+  channelRead: {
+    upsert: jest.fn(),
+  },
 };
 
 const membershipMock = {
   requireGuildMembership: jest.fn(),
+  requireChannelAccess: jest.fn(),
 };
 
 function makeService() {
@@ -333,5 +337,123 @@ describe('ChannelsService — yavaş mod create/update', () => {
     const result = await service.update(USER_ID, CHANNEL_ID, { slowModeSeconds: 15 });
 
     expect(result).toHaveProperty('slowModeSeconds', 15);
+  });
+});
+
+// ── ChannelsService.markRead ──────────────────────────────────────────────────
+
+describe('ChannelsService.markRead', () => {
+  let service: ChannelsService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('erişim yoksa exception fırlatır (requireChannelAccess)', async () => {
+    membershipMock.requireChannelAccess.mockRejectedValue(new Error('FORBIDDEN'));
+
+    await expect(service.markRead(USER_ID, CHANNEL_ID)).rejects.toThrow('FORBIDDEN');
+    expect(prismaMock.channelRead.upsert).not.toHaveBeenCalled();
+  });
+
+  it('erişim varsa channelRead upsert çağrılır → null döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue({ id: CHANNEL_ID });
+    prismaMock.channelRead.upsert.mockResolvedValue({});
+
+    const result = await service.markRead(USER_ID, CHANNEL_ID);
+
+    expect(prismaMock.channelRead.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId_channelId: { userId: USER_ID, channelId: CHANNEL_ID } },
+        update: expect.objectContaining({ lastReadAt: expect.any(Date) }),
+        create: expect.objectContaining({ userId: USER_ID, channelId: CHANNEL_ID }),
+      }),
+    );
+    expect(result).toBeNull();
+  });
+});
+
+// ── ChannelsService.findByGuild — hasUnread ───────────────────────────────────
+
+describe('ChannelsService.findByGuild — hasUnread', () => {
+  let service: ChannelsService;
+
+  const NOW = new Date('2026-06-13T12:00:00Z');
+  const BEFORE = new Date('2026-06-13T11:00:00Z');
+  const AFTER = new Date('2026-06-13T13:00:00Z');
+
+  function makeChannelWithUnread(overrides: {
+    lastMsgAuthorId?: string;
+    lastMsgCreatedAt?: Date | null;
+    lastReadAt?: Date | null;
+  }) {
+    return {
+      ...makeChannel(),
+      messages: overrides.lastMsgCreatedAt
+        ? [{ authorId: overrides.lastMsgAuthorId ?? 'other-user', createdAt: overrides.lastMsgCreatedAt }]
+        : [],
+      channelReads: overrides.lastReadAt ? [{ lastReadAt: overrides.lastReadAt }] : [],
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+  });
+
+  it('kanal mesajsız → hasUnread false', async () => {
+    prismaMock.channel.findMany.mockResolvedValue([
+      makeChannelWithUnread({ lastMsgCreatedAt: null }),
+    ]);
+
+    const result = await service.findByGuild(USER_ID, GUILD_ID);
+    expect(result[0].hasUnread).toBe(false);
+  });
+
+  it('son mesaj kullanıcının kendisinden → hasUnread false', async () => {
+    prismaMock.channel.findMany.mockResolvedValue([
+      makeChannelWithUnread({ lastMsgAuthorId: USER_ID, lastMsgCreatedAt: AFTER, lastReadAt: BEFORE }),
+    ]);
+
+    const result = await service.findByGuild(USER_ID, GUILD_ID);
+    expect(result[0].hasUnread).toBe(false);
+  });
+
+  it('okuma kaydı yok + başkasından mesaj var → hasUnread true', async () => {
+    prismaMock.channel.findMany.mockResolvedValue([
+      makeChannelWithUnread({ lastMsgCreatedAt: NOW, lastReadAt: null }),
+    ]);
+
+    const result = await service.findByGuild(USER_ID, GUILD_ID);
+    expect(result[0].hasUnread).toBe(true);
+  });
+
+  it('son mesaj lastReadAt\'den sonra → hasUnread true', async () => {
+    prismaMock.channel.findMany.mockResolvedValue([
+      makeChannelWithUnread({ lastMsgCreatedAt: AFTER, lastReadAt: BEFORE }),
+    ]);
+
+    const result = await service.findByGuild(USER_ID, GUILD_ID);
+    expect(result[0].hasUnread).toBe(true);
+  });
+
+  it('son mesaj lastReadAt\'den önce → hasUnread false', async () => {
+    prismaMock.channel.findMany.mockResolvedValue([
+      makeChannelWithUnread({ lastMsgCreatedAt: BEFORE, lastReadAt: NOW }),
+    ]);
+
+    const result = await service.findByGuild(USER_ID, GUILD_ID);
+    expect(result[0].hasUnread).toBe(false);
+  });
+
+  it('markRead sonrası (lastReadAt=NOW, son mesaj=BEFORE) → hasUnread false', async () => {
+    prismaMock.channel.findMany.mockResolvedValue([
+      makeChannelWithUnread({ lastMsgCreatedAt: BEFORE, lastReadAt: NOW }),
+    ]);
+
+    const result = await service.findByGuild(USER_ID, GUILD_ID);
+    expect(result[0].hasUnread).toBe(false);
   });
 });

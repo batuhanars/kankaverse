@@ -279,4 +279,36 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.realtime.emitToUser(member.userId, 'dm.message', payload);
     }
   }
+
+  /**
+   * Guild kanalında mesaj gönderildiğinde tüm guild üyelerinin user:<id> odalarına
+   * `channel.activity` eventi yayar (yazar hariç). Frontend rail'de ve kanal listesinde
+   * okunmamış rozeti güncellemek için bu eventi dinler.
+   * DM kanalıysa (guildId null) hiçbir şey yapmaz — notifyDmActivity zaten var.
+   */
+  async notifyChannelActivity(channelId: string, messageDto: Record<string, unknown>) {
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { guildId: true },
+    });
+
+    // DM kanalı → çık
+    if (!channel || channel.guildId === null) return;
+
+    const guildId = channel.guildId;
+    const authorId = (messageDto['author'] as Record<string, string>)['id'];
+
+    const guildMembers = await this.prisma.guildMember.findMany({
+      where: { guildId },
+      select: { userId: true },
+    });
+
+    const payload = { channelId, guildId, authorId };
+
+    for (const member of guildMembers) {
+      // Yazarın kendisine gönderme
+      if (member.userId === authorId) continue;
+      this.realtime.emitToUser(member.userId, 'channel.activity', payload);
+    }
+  }
 }

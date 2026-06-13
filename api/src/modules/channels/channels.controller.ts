@@ -64,4 +64,14 @@ export class ChannelsController {
   ) {
     return this.channelsService.remove(user.id, channelId);
   }
+
+  @Post('channels/:id/read')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Kanalı okundu işaretle — lastReadAt=now upsert' })
+  markRead(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+  ) {
+    return this.channelsService.markRead(user.id, channelId);
+  }
 }

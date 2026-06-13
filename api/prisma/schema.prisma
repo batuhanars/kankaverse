@@ -94,6 +94,7 @@ model User {
   moderationActions   ModerationAction[] @relation("ModeratorActions")
   moderationTargets   ModerationAction[] @relation("ModerationTargets")
   auditLogs           AuditLog[]         @relation("AuditActor")
+  channelReads        ChannelRead[]
 }
 
 model AuthToken {
@@ -181,6 +182,7 @@ model Channel {
   createdAt       DateTime    @default(now())
   messages        Message[]
   members         ChannelMember[]
+  channelReads    ChannelRead[]
 
   @@index([guildId])
 }
@@ -360,4 +362,18 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([actorId])
+}
+
+// ─── Sprint 6.2: Guild Kanal Okunmamış Takibi ────────────────────────────────
+
+model ChannelRead {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  channelId  String
+  channel    Channel  @relation(fields: [channelId], references: [id])
+  lastReadAt DateTime @default(now())
+
+  @@unique([userId, channelId])
+  @@index([userId])
 }

@@ -26,7 +26,7 @@ const ICON_EXT: Record<string, string> = {
   'image/webp': 'webp',
 };
 
-export function toGuildDto(guild: Guild) {
+export function toGuildDto(guild: Guild, hasUnread = false) {
   return {
     id: guild.id,
     name: guild.name,
@@ -35,6 +35,7 @@ export function toGuildDto(guild: Guild) {
     iconUrl: guild.iconUrl,
     rules: guild.rules ?? null,
     createdAt: guild.createdAt.toISOString(),
+    hasUnread,
   };
 }
 
@@ -88,11 +89,42 @@ export class GuildsService {
   async findMyGuilds(userId: string) {
     const memberships = await this.prisma.guildMember.findMany({
       where: { userId },
-      include: { guild: true },
+      include: {
+        guild: {
+          include: {
+            channels: {
+              where: { deletedAt: null },
+              include: {
+                messages: {
+                  where: { deletedAt: null },
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                  select: { authorId: true, createdAt: true },
+                },
+                channelReads: {
+                  where: { userId },
+                  select: { lastReadAt: true },
+                },
+              },
+            },
+          },
+        },
+      },
     });
+
     return memberships
       .filter((m) => m.guild.deletedAt === null)
-      .map((m) => toGuildDto(m.guild));
+      .map((m) => {
+        const guildHasUnread = m.guild.channels.some((ch) => {
+          const lastMsg = ch.messages[0] ?? null;
+          if (!lastMsg) return false;
+          if (lastMsg.authorId === userId) return false;
+          const lastRead = ch.channelReads[0]?.lastReadAt ?? null;
+          if (lastRead === null) return true;
+          return lastMsg.createdAt > lastRead;
+        });
+        return toGuildDto(m.guild, guildHasUnread);
+      });
   }
 
   /** PATCH /guilds/:id — yalnız OWNER */
