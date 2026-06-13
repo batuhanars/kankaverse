@@ -10,7 +10,7 @@ import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { Channel } from '@prisma/client';
 
-function toChannelDto(channel: Channel, hasUnread = false) {
+function toChannelDto(channel: Channel, unreadCount = 0) {
   return {
     id: channel.id,
     type: channel.type,
@@ -19,7 +19,7 @@ function toChannelDto(channel: Channel, hasUnread = false) {
     ageGated: channel.ageGated,
     position: channel.position,
     slowModeSeconds: channel.slowModeSeconds,
-    hasUnread,
+    unreadCount,
   };
 }
 
@@ -63,17 +63,11 @@ export class ChannelsService {
   async findByGuild(userId: string, guildId: string) {
     await this.membership.requireGuildMembership(userId, guildId);
 
-    // Kanalları, her kanalın son mesajını ve kullanıcının okuma kaydını tek sorguda çek
+    // Kanalları ve kullanıcının okuma kayıtlarını çek
     const channels = await this.prisma.channel.findMany({
       where: { guildId, deletedAt: null },
       orderBy: { position: 'asc' },
       include: {
-        messages: {
-          where: { deletedAt: null },
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { authorId: true, createdAt: true },
-        },
         channelReads: {
           where: { userId },
           select: { lastReadAt: true },
@@ -81,25 +75,22 @@ export class ChannelsService {
       },
     });
 
-    return channels.map((ch) => {
-      const lastMsg = ch.messages[0] ?? null;
-      const lastRead = ch.channelReads[0]?.lastReadAt ?? null;
+    // Her kanal için okunmamış mesaj sayısını paralel olarak hesapla
+    const unreadCounts = await Promise.all(
+      channels.map((ch) => {
+        const lastRead = ch.channelReads[0]?.lastReadAt ?? null;
+        return this.prisma.message.count({
+          where: {
+            channelId: ch.id,
+            deletedAt: null,
+            authorId: { not: userId }, // kendi mesajları sayma
+            ...(lastRead !== null && { createdAt: { gt: lastRead } }),
+          },
+        });
+      }),
+    );
 
-      let hasUnread = false;
-      if (lastMsg) {
-        // Kendi son mesajın okunmamış sayılmaz
-        if (lastMsg.authorId === userId) {
-          hasUnread = false;
-        } else if (lastRead === null) {
-          // Hiç okuma kaydı yok + mesaj var → okunmamış
-          hasUnread = true;
-        } else {
-          hasUnread = lastMsg.createdAt > lastRead;
-        }
-      }
-
-      return toChannelDto(ch, hasUnread);
-    });
+    return channels.map((ch, i) => toChannelDto(ch, unreadCounts[i]));
   }
 
   /** POST /channels/:id/read — kanaldaki son mesajı okundu işaretle */
