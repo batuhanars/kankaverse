@@ -435,6 +435,18 @@
     "renameError": "Grup adı değiştirilemedi.",
     "noName": "Grup"
   },
+  "startChat": {
+    "title": "Sohbet Başlat",
+    "openChatButton": "Sohbet Başlat",
+    "groupNameLabel": "Grup Adı (opsiyonel)",
+    "groupNamePlaceholder": "Grup adı gir…",
+    "selectFriends": "Kanka seç",
+    "noFriends": "Ekleyebileceğin kanka yok.",
+    "openChat": "Sohbeti Aç",
+    "createGroup": "Grup Oluştur",
+    "submitting": "Açılıyor…",
+    "error": "Sohbet açılamadı."
+  },
   "sidebar": {
     "searchPlaceholder": "Sohbet bul ya da başlat",
     "messageRequests": "Mesaj İstekleri",
