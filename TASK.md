@@ -444,6 +444,13 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Lansman notu PLAN'a işlendi:** `ATTACHMENT_SCAN_ENABLED=true` + gerçek CSAM tarayıcı olmadan canlıya alınmaz (PLAN R5)
 - [ ] **Manuel test:** `docker compose up` (MinIO) → görsel/dosya yükle-gör (sahip) — ortam testi
 
+### Sprint 5 — Revizyon R1 (sahip feedback 2026-06-13, PM onaylı; bug fix + UX)
+- [x] **Upload reaktivite bug → kökten çözüldü:** inline pending-çentik akışı kaldırıldı (dizi-proxy mutasyon tuzağı)
+- [x] **AttachmentComposeModal (WhatsApp-tarzı):** seç → büyük önizleme (görsel anında `createObjectURL`) + progress + caption + gönder; DM+ortam (shared, düz ref reaktivite)
+- [x] **Tipli dosya ikonu** (`AttachmentView`): pdf/doc/docx/txt/genel SVG; **PDF "Aç"** (tarayıcı görüntüleyici) + indir. Belge içerik-thumbnail = V2 (sunucu-tarafı dönüştürme)
+- [x] **Global temalı scrollbar** (`styles/main.css`): tüm chat/scroll alanları `--kv` token, ince
+- [x] Tarayıcı presigned PUT (checksum fix) + DM realtime (`dm.message`) + ServerModal direkt-adım + rail title "Ortam Ekle" *(bu turda doğrulandı/çalışıyor)*
+
 ---
 
 ## Sprint 1 DoD — PM reconcile (2026-06-13)

@@ -57,3 +57,33 @@ html, body, #app {
 code, pre, .font-mono {
   font-family: var(--kv-font-mono);
 }
+
+/* Global scrollbar — koyu tema, ince, token tabanlı */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--kv-border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--kv-border-strong);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--kv-bg-elevated);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

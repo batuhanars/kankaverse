@@ -6,8 +6,8 @@ import { useChannelsStore } from '@/stores/channels'
 import { useSocket } from '@/composables/useSocket'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { messagesApi } from '@/api/messages'
-import { attachmentsApi } from '@/api/attachments'
 import MessageItem from '@/components/shared/MessageItem.vue'
+import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 
 const { t } = useI18n()
 const messagesStore = useMessagesStore()
@@ -24,18 +24,8 @@ const fileInputEl = ref<HTMLInputElement | null>(null)
 const realtimeError = ref(false)
 const sendError = ref('')
 
-// Sprint 5 §7 — bekleyen ek
-interface PendingAttachment {
-  attachmentId: string
-  filename: string
-  size: number
-  contentType: string
-  uploadProgress: number // 0-100
-  uploading: boolean
-  error: string | null
-}
-const pendingAttachments = ref<PendingAttachment[]>([])
-const uploadError = ref('')
+// Sprint 5 R1 — modal akışı (inline çentik kaldırıldı)
+const composeFile = ref<File | null>(null)
 
 const channelId = computed(() => channelsStore.activeChannelId)
 const messages = computed(() =>
@@ -85,86 +75,46 @@ async function loadMore() {
   await messagesStore.fetchMessages(channelId.value, oldest)
 }
 
-// Sprint 5 §7 — dosya seçimi
+// Dosya seçimi → modal aç
 function openFilePicker() {
   fileInputEl.value?.click()
 }
 
-async function onFileSelected(e: Event) {
+function onFileSelected(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!input) return
   input.value = '' // sıfırla, aynı dosyayı tekrar seçmeye izin ver
   if (!file) return
-
-  uploadError.value = ''
-
-  // 1. Presign
-  let presignResult: { attachmentId: string; uploadUrl: string; storageKey: string }
-  try {
-    const res = await attachmentsApi.presign({
-      filename: file.name,
-      contentType: file.type,
-      size: file.size,
-    })
-    presignResult = res.data
-  } catch (err: unknown) {
-    const code = (err as { response?: { data?: { error?: string } } }).response?.data?.error
-    uploadError.value = code
-      ? t(`attachment.errors.${code}`, t('attachment.errors.default'))
-      : t('attachment.errors.default')
-    return
-  }
-
-  const pending: PendingAttachment = {
-    attachmentId: presignResult.attachmentId,
-    filename: file.name,
-    size: file.size,
-    contentType: file.type,
-    uploadProgress: 0,
-    uploading: true,
-    error: null,
-  }
-  pendingAttachments.value.push(pending)
-
-  // 2. S3'e ham PUT
-  try {
-    await attachmentsApi.uploadToS3(presignResult.uploadUrl, file, (pct) => {
-      pending.uploadProgress = pct
-    })
-    pending.uploading = false
-    pending.uploadProgress = 100
-  } catch {
-    pending.uploading = false
-    pending.error = t('attachment.uploadFailed')
-  }
+  composeFile.value = file
 }
 
-function removePending(attachmentId: string) {
-  pendingAttachments.value = pendingAttachments.value.filter(
-    (a) => a.attachmentId !== attachmentId,
-  )
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+// Modal'dan gelen sent event'i → mesaj gönder
+async function onAttachmentSent({ attachmentId, caption }: { attachmentId: string; caption: string }) {
+  if (!channelId.value) return
+  composeFile.value = null
+  try {
+    const { data } = await messagesApi.send(channelId.value, caption, undefined, [attachmentId])
+    messagesStore.appendMessage(data)
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { error?: string; message?: string } } }
+    const errCode = err.response?.data?.error
+    sendError.value = errCode
+      ? (t(`message.errors.${errCode}`) || err.response?.data?.message || t('common.error'))
+      : t('common.error')
+  }
 }
 
 async function send() {
   const hasText = content.value.trim()
-  const readyAttachments = pendingAttachments.value.filter((a) => !a.uploading && !a.error)
-  if ((!hasText && !readyAttachments.length) || !channelId.value || sending.value) return
+  if (!hasText || !channelId.value || sending.value) return
   stopTyping()
   sendError.value = ''
   sending.value = true
   const text = content.value.trim()
   content.value = ''
-  const attachmentIds = readyAttachments.map((a) => a.attachmentId)
-  pendingAttachments.value = pendingAttachments.value.filter((a) => a.uploading || a.error)
   try {
-    const { data } = await messagesApi.send(channelId.value, text, undefined, attachmentIds)
+    const { data } = await messagesApi.send(channelId.value, text)
     // Yerel eko: WS broadcast'i beklemeden gönderenin ekranına yaz. appendMessage
     // id'ye göre dedup yapar (messages.ts:35) → broadcast geldiğinde çiftlemez.
     messagesStore.appendMessage(data)
@@ -226,14 +176,6 @@ function onKeydown(e: KeyboardEvent) {
     </div>
 
     <div v-if="channelId" class="px-4 pb-6 pt-2">
-      <!-- Yükleme hatası -->
-      <div
-        v-if="uploadError"
-        class="px-1 mb-1 text-[13px]"
-        style="color: var(--kv-danger);"
-      >
-        {{ uploadError }}
-      </div>
       <!-- Gönderme hatası (örn. MESSAGE_BLOCKED) -->
       <div
         v-if="sendError"
@@ -251,44 +193,6 @@ function onKeydown(e: KeyboardEvent) {
         {{ typingLabel }}
       </div>
 
-      <!-- Bekleyen ekler -->
-      <div
-        v-if="pendingAttachments.length"
-        class="flex flex-wrap gap-2 mb-2"
-      >
-        <div
-          v-for="att in pendingAttachments"
-          :key="att.attachmentId"
-          class="flex items-center gap-2 px-2 py-1 rounded-[var(--kv-radius-sm)] text-[12px]"
-          style="background-color: var(--kv-bg-elevated);"
-        >
-          <span
-            class="truncate max-w-[140px]"
-            :style="att.error ? 'color: var(--kv-danger);' : 'color: var(--kv-text-secondary);'"
-          >
-            {{ att.filename }}
-          </span>
-          <span style="color: var(--kv-text-muted);">{{ formatBytes(att.size) }}</span>
-          <!-- Yükleme ilerleme -->
-          <span v-if="att.uploading" style="color: var(--kv-text-muted);">
-            {{ att.uploadProgress }}%
-          </span>
-          <span v-else-if="att.error" style="color: var(--kv-danger);">
-            {{ t('attachment.uploadFailed') }}
-          </span>
-          <span v-else style="color: var(--kv-success);">✓</span>
-          <!-- Kaldır -->
-          <button
-            class="ml-1 cursor-pointer hover:opacity-80"
-            style="color: var(--kv-text-muted);"
-            :aria-label="t('attachment.remove')"
-            @click="removePending(att.attachmentId)"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-
       <div
         class="flex items-end gap-2 px-4 rounded-[var(--kv-radius-md)] border"
         style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
@@ -301,7 +205,7 @@ function onKeydown(e: KeyboardEvent) {
           accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain"
           @change="onFileSelected"
         />
-        <!-- Ek (📎) butonu — Sprint 4A'da gizliydi, Sprint 5'te açıldı -->
+        <!-- Ek (📎) butonu -->
         <button
           type="button"
           class="shrink-0 py-3 cursor-pointer hover:opacity-80 transition-opacity"
@@ -324,4 +228,13 @@ function onKeydown(e: KeyboardEvent) {
       </div>
     </div>
   </div>
+
+  <!-- Dosya compose modal -->
+  <AttachmentComposeModal
+    v-if="composeFile && channelId"
+    :file="composeFile"
+    :channel-id="channelId"
+    @sent="onAttachmentSent"
+    @close="composeFile = null"
+  />
 </template>
