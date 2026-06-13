@@ -369,6 +369,43 @@ export class DmService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // DELETE /dm/groups/:id/members/:userId — yalnız owner; hedef üyeyi çıkar
+  // ─────────────────────────────────────────────────────────────────────────────
+  async removeGroupMember(callerId: string, groupId: string, targetUserId: string) {
+    const channel = await this.requireGroupChannel(groupId);
+
+    if (channel.ownerId !== callerId) {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+    }
+
+    if (targetUserId === callerId) {
+      throw new BadRequestException({
+        message: 'Kendinizi gruptan çıkaramazsınız. Gruptan ayrılmak için ayrılma seçeneğini kullanın.',
+        error: 'CANNOT_REMOVE_SELF',
+      });
+    }
+
+    const membership = await this.prisma.channelMember.findUnique({
+      where: { channelId_userId: { channelId: groupId, userId: targetUserId } },
+    });
+    if (!membership) {
+      throw new NotFoundException({ message: 'Kullanıcı bu grubun üyesi değil.', error: 'MEMBER_NOT_FOUND' });
+    }
+
+    await this.prisma.channelMember.delete({ where: { id: membership.id } });
+
+    const remaining = await this.prisma.channelMember.count({ where: { channelId: groupId } });
+    if (remaining < 2) {
+      await this.prisma.channel.update({
+        where: { id: groupId },
+        data: { deletedAt: new Date() },
+      });
+    }
+
+    return null;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // DELETE /dm/groups/:id — yalnız owner
   // ─────────────────────────────────────────────────────────────────────────────
   async deleteGroupDm(userId: string, groupId: string) {

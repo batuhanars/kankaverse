@@ -83,6 +83,17 @@ export class DmController {
     return this.dmService.leaveGroupDm(user.id, groupId);
   }
 
+  @Delete('groups/:id/members/:userId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Gruptan üye çıkar — yalnız owner; owner kendini çıkaramaz' })
+  removeGroupMember(
+    @CurrentUser() user: { id: string },
+    @Param('id') groupId: string,
+    @Param('userId') targetUserId: string,
+  ) {
+    return this.dmService.removeGroupMember(user.id, groupId, targetUserId);
+  }
+
   @Delete('groups/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Grubu sil — yalnız owner' })

@@ -350,6 +350,87 @@ describe('DmService.deleteGroupDm', () => {
   });
 });
 
+// ── removeGroupMember ─────────────────────────────────────────────────────────
+
+describe('DmService.removeGroupMember', () => {
+  let service: DmService;
+
+  const TARGET_ID = 'target-user-1';
+  const TARGET_MEMBER = { id: TARGET_ID, isMinor: false, username: 'target', avatarUrl: null };
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.channel.findUnique.mockResolvedValue(GROUP_CHANNEL);
+  });
+
+  it('owner hedef üyeyi çıkarır → üye silindi, null döner', async () => {
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm-target' });
+    prismaMock.channelMember.delete.mockResolvedValue({});
+    prismaMock.channelMember.count.mockResolvedValue(2);
+
+    const result = await service.removeGroupMember(CREATOR_ID, GROUP_ID, TARGET_ID);
+
+    expect(prismaMock.channelMember.delete).toHaveBeenCalledTimes(1);
+    expect(result).toBeNull();
+  });
+
+  it('owner değil → ForbiddenException FORBIDDEN', async () => {
+    await expect(
+      service.removeGroupMember('non-owner', GROUP_ID, TARGET_ID),
+    ).rejects.toThrow(ForbiddenException);
+
+    try {
+      await service.removeGroupMember('non-owner', GROUP_ID, TARGET_ID);
+    } catch (e) {
+      const resp = (e as ForbiddenException).getResponse() as { error: string };
+      expect(resp.error).toBe('FORBIDDEN');
+    }
+  });
+
+  it('owner kendini çıkarmaya çalışır → BadRequestException CANNOT_REMOVE_SELF', async () => {
+    await expect(
+      service.removeGroupMember(CREATOR_ID, GROUP_ID, CREATOR_ID),
+    ).rejects.toThrow(BadRequestException);
+
+    try {
+      await service.removeGroupMember(CREATOR_ID, GROUP_ID, CREATOR_ID);
+    } catch (e) {
+      const resp = (e as BadRequestException).getResponse() as { error: string };
+      expect(resp.error).toBe('CANNOT_REMOVE_SELF');
+    }
+  });
+
+  it('hedef grup üyesi değil → NotFoundException MEMBER_NOT_FOUND', async () => {
+    prismaMock.channelMember.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.removeGroupMember(CREATOR_ID, GROUP_ID, TARGET_ID),
+    ).rejects.toThrow(NotFoundException);
+
+    try {
+      await service.removeGroupMember(CREATOR_ID, GROUP_ID, TARGET_ID);
+    } catch (e) {
+      const resp = (e as NotFoundException).getResponse() as { error: string };
+      expect(resp.error).toBe('MEMBER_NOT_FOUND');
+    }
+  });
+
+  it('üye çıkınca kalan < 2 → kanal soft-delete', async () => {
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm-target' });
+    prismaMock.channelMember.delete.mockResolvedValue({});
+    prismaMock.channelMember.count.mockResolvedValue(1);
+    prismaMock.channel.update.mockResolvedValue({});
+
+    await service.removeGroupMember(CREATOR_ID, GROUP_ID, TARGET_ID);
+
+    expect(prismaMock.channel.update).toHaveBeenCalledWith({
+      where: { id: GROUP_ID },
+      data: { deletedAt: expect.any(Date) },
+    });
+  });
+});
+
 // ── GROUP_DM mesajında requireNoDmBlock atlanır ───────────────────────────────
 // Not: Bu test messages.service.spec.ts'de daha net bir şekilde kapsamalı.
 // Burada DmService.isMutualFriend'in GROUP_DM güvenlik garantisini doğruluyoruz.
