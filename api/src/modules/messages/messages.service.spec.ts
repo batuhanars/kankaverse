@@ -15,9 +15,11 @@ const prismaMock = {
   },
   channelMember: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
   },
   guildMember: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
   },
   attachment: {
     findMany: jest.fn(),
@@ -73,9 +75,9 @@ const USER_ID = 'user-abc';
 const CHANNEL_ID = 'ch-dm-1';
 const GUILD_CHANNEL_ID = 'ch-guild-1';
 
-const DM_CHANNEL = { id: CHANNEL_ID, guildId: null, slowModeSeconds: 0 };
-const GUILD_CHANNEL = { id: GUILD_CHANNEL_ID, guildId: 'guild-xyz', slowModeSeconds: 0 };
-const SLOW_GUILD_CHANNEL = { id: GUILD_CHANNEL_ID, guildId: 'guild-xyz', slowModeSeconds: 10 };
+const DM_CHANNEL = { id: CHANNEL_ID, guildId: null, slowModeSeconds: 0, ageGated: false, guild: null };
+const GUILD_CHANNEL = { id: GUILD_CHANNEL_ID, guildId: 'guild-xyz', slowModeSeconds: 0, ageGated: false, guild: { adultsOnly: false } };
+const SLOW_GUILD_CHANNEL = { id: GUILD_CHANNEL_ID, guildId: 'guild-xyz', slowModeSeconds: 10, ageGated: false, guild: { adultsOnly: false } };
 
 // Mesaj fixture — createdAt Date nesnesi (toISOString çağrısı için)
 function makeMsg(id: string, createdAt: Date) {
@@ -1468,5 +1470,315 @@ describe('MessagesService.create — reply doğrulama + replyTo DTO', () => {
     // doğrulama için findUnique çağrılmamalı
     expect(prismaMock.message.findUnique).not.toHaveBeenCalled();
     expect(result.replyTo).toBeNull();
+  });
+});
+
+// ── MessagesService — resolveMentions (§3 + §4) ──────────────────────────────
+//
+// resolveMentions private metodu create/editMessage içinden dolaylı test edilir.
+// Guild kanalı ve DM kanalı senaryoları ayrı ayrı kapsanır.
+
+describe('MessagesService — resolveMentions (§3 + §4 T&S)', () => {
+  let service: MessagesService;
+
+  // Basit bir mesaj fixture — mentions alanı dinamik olarak ayarlanır
+  function makeCreatedMsgWithMentions(mentions: string[]) {
+    return {
+      id: 'msg-m-1',
+      channelId: GUILD_CHANNEL_ID,
+      content: 'test',
+      replyToId: null,
+      replyTo: null,
+      editedAt: null,
+      deletedAt: null,
+      createdAt: new Date('2026-06-13T12:00:00Z'),
+      author: { id: USER_ID, username: 'kanka', avatarUrl: null },
+      attachments: [],
+      reactions: [],
+      mentions,
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    automodMock.check.mockReturnValue({ blocked: false });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Token parse: içerik mention içermiyorsa DB sorgusu yapılmaz
+  // ─────────────────────────────────────────────────────────────────────────
+  it('content mention içermiyorsa erken [] dön, DB sorgusu yapılmaz', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.create.mockResolvedValue(makeCreatedMsgWithMentions([]));
+
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, { content: 'sade mesaj' });
+
+    // resolveMentions erken dönmeli — guildMember.findMany veya channelMember.findMany çağrılmaz
+    expect(prismaMock.guildMember.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.channelMember.findMany).not.toHaveBeenCalled();
+    // create'e mentions:[] iletilmeli
+    const createCall = prismaMock.message.create.mock.calls[0][0];
+    expect(createCall.data.mentions).toEqual([]);
+    expect(result.mentions).toEqual([]);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Token parse: çoklu + tekrarlı → tekilleştirilir
+  // ─────────────────────────────────────────────────────────────────────────
+  it('tekrar eden token → tekilleştirilir, her userId bir kez gönderilir', async () => {
+    const MEMBER_A = 'user-aaa';
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    // guildMember: MEMBER_A üye (isMinor: false — reşit)
+    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: MEMBER_A, user: { isMinor: false } }]);
+    prismaMock.message.create.mockResolvedValue(makeCreatedMsgWithMentions([MEMBER_A]));
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: `<@${MEMBER_A}> tekrar <@${MEMBER_A}> tekrar <@${MEMBER_A}>`,
+    });
+
+    // guildMember.findMany tek userId ile çağrılmalı (tekilleştirilmiş)
+    const findManyCall = prismaMock.guildMember.findMany.mock.calls[0][0];
+    expect(findManyCall.where.userId.in).toEqual([MEMBER_A]);
+    expect(findManyCall.where.userId.in.length).toBe(1);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // §4 T&S: guild kanalı — erişimsiz userId filtrelenir
+  // ─────────────────────────────────────────────────────────────────────────
+  it('guild kanalı: erişimi olmayan userId mention filtrelenir (sessizce)', async () => {
+    const VALID_MEMBER = 'user-valid';
+    const OUTSIDER = 'user-outsider';
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    // guildMember: yalnız VALID_MEMBER döner (OUTSIDER guild üyesi değil)
+    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: VALID_MEMBER, user: { isMinor: false } }]);
+    prismaMock.message.create.mockResolvedValue(makeCreatedMsgWithMentions([VALID_MEMBER]));
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: `<@${VALID_MEMBER}> ve <@${OUTSIDER}>`,
+    });
+
+    const createCall = prismaMock.message.create.mock.calls[0][0];
+    // OUTSIDER filtrelenmiş olmalı
+    expect(createCall.data.mentions).toContain(VALID_MEMBER);
+    expect(createCall.data.mentions).not.toContain(OUTSIDER);
+    // Exception fırlatılmaz — exception olmadığından test zaten geçer
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // §4 T&S: DM kanalı — ChannelMember kontrolü kullanılır, erişimsiz filtrelenir
+  // ─────────────────────────────────────────────────────────────────────────
+  it('DM kanalı: channelMember kontrolü yapılır; erişimsiz userId filtrelenir', async () => {
+    const VALID_DM_MEMBER = 'user-dm-valid';
+    const OUTSIDER_DM = 'user-dm-outsider';
+    const DM_CHANNEL_OBJ = { id: CHANNEL_ID, guildId: null, slowModeSeconds: 0, type: 'DM', ageGated: false, guild: null };
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL_OBJ);
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    // channelMember: yalnız VALID_DM_MEMBER döner (isMinor: false)
+    prismaMock.channelMember.findMany.mockResolvedValue([{ userId: VALID_DM_MEMBER, user: { isMinor: false } }]);
+
+    const dmCreatedMsg = {
+      id: 'msg-dm-m',
+      channelId: CHANNEL_ID,
+      content: `<@${VALID_DM_MEMBER}> ve <@${OUTSIDER_DM}>`,
+      replyToId: null,
+      replyTo: null,
+      editedAt: null,
+      deletedAt: null,
+      createdAt: new Date(),
+      author: { id: USER_ID, username: 'kanka', avatarUrl: null },
+      attachments: [],
+      reactions: [],
+      mentions: [VALID_DM_MEMBER],
+    };
+    prismaMock.message.create.mockResolvedValue(dmCreatedMsg);
+
+    await service.create(USER_ID, CHANNEL_ID, {
+      content: `<@${VALID_DM_MEMBER}> ve <@${OUTSIDER_DM}>`,
+    });
+
+    // channelMember.findMany çağrılmalı (DM yolu)
+    expect(prismaMock.channelMember.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          channelId: CHANNEL_ID,
+        }),
+      }),
+    );
+    // guildMember.findMany çağrılmamalı
+    expect(prismaMock.guildMember.findMany).not.toHaveBeenCalled();
+
+    const createCall = prismaMock.message.create.mock.calls[0][0];
+    expect(createCall.data.mentions).toContain(VALID_DM_MEMBER);
+    expect(createCall.data.mentions).not.toContain(OUTSIDER_DM);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // §3: ≤10 sınırı — 12 mention varsa ilk 10 alınır, fazlası sessizce düşer
+  // ─────────────────────────────────────────────────────────────────────────
+  it('≤10 cap: 12 benzersiz mention → yalnız 10 saklanır, hata fırlatılmaz', async () => {
+    const memberIds = Array.from({ length: 12 }, (_, i) => `user-${i.toString().padStart(3, '0')}`);
+    const content = memberIds.map((id) => `<@${id}>`).join(' ');
+
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    // guildMember: hepsi üye (tümü geçerli, hepsi reşit)
+    prismaMock.guildMember.findMany.mockResolvedValue(
+      memberIds.map((userId) => ({ userId, user: { isMinor: false } })),
+    );
+    prismaMock.message.create.mockResolvedValue(makeCreatedMsgWithMentions(memberIds.slice(0, 10)));
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, { content });
+
+    const createCall = prismaMock.message.create.mock.calls[0][0];
+    expect(createCall.data.mentions.length).toBe(10);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // §6 DTO: create sonucu mentions döner
+  // ─────────────────────────────────────────────────────────────────────────
+  it('create DTO sonucunda mentions dizisi döner', async () => {
+    const MEMBER_A = 'user-mention-dto';
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: MEMBER_A, user: { isMinor: false } }]);
+    prismaMock.message.create.mockResolvedValue(makeCreatedMsgWithMentions([MEMBER_A]));
+
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: `<@${MEMBER_A}> bakabilir misin`,
+    });
+
+    expect(result.mentions).toEqual([MEMBER_A]);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // §4 T&S R7: ageGated guild kanalı — minör bahsedilen ELENİR, reşit kalır
+  // ─────────────────────────────────────────────────────────────────────────
+  it('ageGated guild kanalı: minör bahsedilen ELENİR; reşit bahsedilen kalır', async () => {
+    const ADULT_MEMBER = 'user-adult';
+    const MINOR_MEMBER = 'user-minor';
+    const AGE_GATED_GUILD_CHANNEL = {
+      id: GUILD_CHANNEL_ID,
+      guildId: 'guild-xyz',
+      slowModeSeconds: 0,
+      ageGated: true,
+      guild: { adultsOnly: false },
+    };
+
+    membershipMock.requireChannelAccess.mockResolvedValue(AGE_GATED_GUILD_CHANNEL);
+    // guildMember: her ikisi de üye ama biri minör
+    prismaMock.guildMember.findMany.mockResolvedValue([
+      { userId: ADULT_MEMBER, user: { isMinor: false } },
+      { userId: MINOR_MEMBER, user: { isMinor: true } },
+    ]);
+    prismaMock.message.create.mockResolvedValue(makeCreatedMsgWithMentions([ADULT_MEMBER]));
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: `<@${ADULT_MEMBER}> ve <@${MINOR_MEMBER}>`,
+    });
+
+    const createCall = prismaMock.message.create.mock.calls[0][0];
+    // Reşit kalmalı, minör elenmeli
+    expect(createCall.data.mentions).toContain(ADULT_MEMBER);
+    expect(createCall.data.mentions).not.toContain(MINOR_MEMBER);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // §4 T&S R7: adultsOnly guild — minör bahsedilen ELENİR
+  // ─────────────────────────────────────────────────────────────────────────
+  it('adultsOnly guild: minör bahsedilen ELENİR', async () => {
+    const ADULT_MEMBER = 'user-adult-2';
+    const MINOR_MEMBER = 'user-minor-2';
+    const ADULTS_ONLY_GUILD_CHANNEL = {
+      id: GUILD_CHANNEL_ID,
+      guildId: 'guild-xyz',
+      slowModeSeconds: 0,
+      ageGated: false,
+      guild: { adultsOnly: true },  // guild seviyesinde kısıtlı
+    };
+
+    membershipMock.requireChannelAccess.mockResolvedValue(ADULTS_ONLY_GUILD_CHANNEL);
+    prismaMock.guildMember.findMany.mockResolvedValue([
+      { userId: ADULT_MEMBER, user: { isMinor: false } },
+      { userId: MINOR_MEMBER, user: { isMinor: true } },
+    ]);
+    prismaMock.message.create.mockResolvedValue(makeCreatedMsgWithMentions([ADULT_MEMBER]));
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: `<@${ADULT_MEMBER}> ve <@${MINOR_MEMBER}>`,
+    });
+
+    const createCall = prismaMock.message.create.mock.calls[0][0];
+    expect(createCall.data.mentions).toContain(ADULT_MEMBER);
+    expect(createCall.data.mentions).not.toContain(MINOR_MEMBER);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // §4 T&S R7: Normal (yaş-kapısız) guild kanalı — minör bahsedilen KALIR
+  // Gereksiz eleme yapılmamalı — yalnız yaş-kapılı alanda filtrele.
+  // ─────────────────────────────────────────────────────────────────────────
+  it('yaş-kapısız normal guild kanalı: minör bahsedilen KALIR (gereksiz eleme yok)', async () => {
+    const ADULT_MEMBER = 'user-adult-3';
+    const MINOR_MEMBER = 'user-minor-3';
+    // ageGated: false, adultsOnly: false → normal kanal
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.guildMember.findMany.mockResolvedValue([
+      { userId: ADULT_MEMBER, user: { isMinor: false } },
+      { userId: MINOR_MEMBER, user: { isMinor: true } },
+    ]);
+    prismaMock.message.create.mockResolvedValue(
+      makeCreatedMsgWithMentions([ADULT_MEMBER, MINOR_MEMBER]),
+    );
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: `<@${ADULT_MEMBER}> ve <@${MINOR_MEMBER}>`,
+    });
+
+    const createCall = prismaMock.message.create.mock.calls[0][0];
+    // Yaş kapısı yok → minör de dahil edilmeli
+    expect(createCall.data.mentions).toContain(ADULT_MEMBER);
+    expect(createCall.data.mentions).toContain(MINOR_MEMBER);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // editMessage: mentions yeniden hesaplanır
+  // ─────────────────────────────────────────────────────────────────────────
+  it('editMessage: mentions yeniden hesaplanır, update\'e iletilir', async () => {
+    const MEMBER_A = 'user-edit-mention';
+    const MSG_ID = 'msg-edit-m-1';
+
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue({
+      id: MSG_ID,
+      channelId: GUILD_CHANNEL_ID,
+      authorId: USER_ID,
+      content: 'eski içerik',
+      editedAt: null,
+      deletedAt: null,
+    });
+    automodMock.check.mockReturnValue({ blocked: false });
+    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: MEMBER_A, user: { isMinor: false } }]);
+
+    const updatedMsg = {
+      id: MSG_ID,
+      channelId: GUILD_CHANNEL_ID,
+      content: `<@${MEMBER_A}> yeni içerik`,
+      replyToId: null,
+      replyTo: null,
+      editedAt: new Date(),
+      deletedAt: null,
+      createdAt: new Date(),
+      author: { id: USER_ID, username: 'kanka', avatarUrl: null },
+      attachments: [],
+      reactions: [],
+      mentions: [MEMBER_A],
+    };
+    prismaMock.message.update.mockResolvedValue(updatedMsg);
+
+    const result = await service.editMessage(USER_ID, GUILD_CHANNEL_ID, MSG_ID, {
+      content: `<@${MEMBER_A}> yeni içerik`,
+    });
+
+    const updateCall = prismaMock.message.update.mock.calls[0][0];
+    expect(updateCall.data.mentions).toContain(MEMBER_A);
+    expect(result.mentions).toEqual([MEMBER_A]);
   });
 });

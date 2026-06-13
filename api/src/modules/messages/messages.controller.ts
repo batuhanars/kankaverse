@@ -53,6 +53,7 @@ export class MessagesController {
     this.messagesGateway.broadcastMessage(channelId, message);
     await this.messagesGateway.notifyDmActivity(channelId, message);
     await this.messagesGateway.notifyChannelActivity(channelId, message);
+    await this.messagesGateway.notifyMentions(channelId, message);
     return message;
   }
 

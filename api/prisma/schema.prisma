@@ -194,6 +194,7 @@ model Message {
   authorId    String
   author      User              @relation(fields: [authorId], references: [id])
   content     String
+  mentions    String[]          @default([])   // §2: bahsedilen + doğrulanmış userId listesi (tekilleştirilmiş, ≤10)
   replyToId   String?
   replyTo     Message?          @relation("MessageReply", fields: [replyToId], references: [id])
   replies     Message[]         @relation("MessageReply")

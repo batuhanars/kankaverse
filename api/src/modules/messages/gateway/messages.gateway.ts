@@ -321,4 +321,58 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.realtime.emitToUser(member.userId, 'channel.activity', payload);
     }
   }
+
+  /**
+   * §5 — Bahsedilen kullanıcılara `mention` WS eventi gönder.
+   *
+   * messageDto.mentions (string[]) boşsa erken çık.
+   * Her bahsedilen kullanıcıya (yazar hariç) user:<id> odasına §5 payload yayılır.
+   * preview: content içindeki <@id> token'ları @username'e çözülür; ≤100 karakter.
+   * Çözülemeyen token → @bilinmeyen.
+   */
+  async notifyMentions(channelId: string, messageDto: Record<string, unknown>) {
+    const mentions = messageDto['mentions'] as string[] | undefined;
+    if (!mentions || mentions.length === 0) return;
+
+    const authorId = (messageDto['author'] as Record<string, string>)['id'];
+
+    // Kanalın guildId'sini çek (DM ise null)
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { guildId: true },
+    });
+    const guildId = channel?.guildId ?? null;
+
+    // Bahsedilen kullanıcıların username'lerini tek sorguda çek (preview + payload için)
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: mentions } },
+      select: { id: true, username: true },
+    });
+    const usernameById = new Map<string, string>(users.map((u) => [u.id, u.username]));
+
+    // preview: content içindeki <@id> token'larını @username'e çevir, ≤100 karakter
+    const content = (messageDto['content'] as string) ?? '';
+    const preview = content
+      .replace(/<@([a-zA-Z0-9_-]+)>/g, (_match, id: string) => {
+        const username = usernameById.get(id);
+        return username ? `@${username}` : '@bilinmeyen';
+      })
+      .slice(0, 100);
+
+    const author = messageDto['author'] as { id: string; username: string; avatarUrl: string | null };
+
+    const eventPayload = {
+      messageId: messageDto['id'] as string,
+      channelId,
+      guildId,
+      author: { id: author.id, username: author.username, avatarUrl: author.avatarUrl ?? null },
+      preview,
+    };
+
+    for (const mentionedUserId of mentions) {
+      // Yazara kendi bahsetmesi için event gönderme
+      if (mentionedUserId === authorId) continue;
+      this.realtime.emitToUser(mentionedUserId, 'mention', eventPayload);
+    }
+  }
 }
