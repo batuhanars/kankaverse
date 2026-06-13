@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { dmApi } from '@/api/dm'
 import { useAuthStore } from '@/stores/auth'
-import type { DmChannelDto } from '@/types'
+import type { DmChannelDto, GroupDmMemberDto } from '@/types'
 
 export const useDmStore = defineStore('dm', () => {
   const channels = ref<DmChannelDto[]>([])
@@ -81,8 +81,49 @@ export const useDmStore = defineStore('dm', () => {
         ch.unread = true
       }
     } else {
-      // Alıcının listesinde henüz yok (yeni DM) — listeyi tazele
+      // Alıcının listesinde henüz yok (yeni DM / grup) — listeyi tazele
       await fetchChannels()
+    }
+  }
+
+  // Sprint 12 — Grup DM aksiyonları
+
+  async function createGroup(memberIds: string[], name?: string): Promise<DmChannelDto> {
+    const res = await dmApi.createGroup(memberIds, name)
+    const channel = res.data
+    channels.value.unshift(channel)
+    activeDmChannelId.value = channel.id
+    return channel
+  }
+
+  async function addGroupMember(groupId: string, userId: string) {
+    await dmApi.addGroupMember(groupId, userId)
+    // Üye eklenince kanal listesini tazele (members dizisi güncellensin)
+    await fetchChannels()
+  }
+
+  async function leaveGroup(groupId: string) {
+    await dmApi.leaveGroup(groupId)
+    removeChannel(groupId)
+  }
+
+  async function deleteGroup(groupId: string) {
+    await dmApi.deleteGroup(groupId)
+    removeChannel(groupId)
+  }
+
+  async function renameGroup(groupId: string, name: string) {
+    const res = await dmApi.renameGroup(groupId, name)
+    const updated = res.data
+    const idx = channels.value.findIndex((c) => c.id === groupId)
+    if (idx !== -1) channels.value[idx] = updated
+  }
+
+  // Grup üyesi listesini store'da güncelle (WS veya optimistik güncelleme için)
+  function updateGroupMembers(groupId: string, members: GroupDmMemberDto[]) {
+    const ch = channels.value.find((c) => c.id === groupId)
+    if (ch && ch.type === 'GROUP_DM') {
+      ch.members = members
     }
   }
 
@@ -96,5 +137,11 @@ export const useDmStore = defineStore('dm', () => {
     setActiveChannel,
     activeChannel,
     applyActivity,
+    createGroup,
+    addGroupMember,
+    leaveGroup,
+    deleteGroup,
+    renameGroup,
+    updateGroupMembers,
   }
 })

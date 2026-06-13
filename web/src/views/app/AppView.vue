@@ -244,13 +244,13 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
         </template>
         <div v-else-if="homeView === 'dm' && activeDmChannel" class="flex flex-1 min-w-0 overflow-hidden gap-4">
           <DmConversation
-            :channel-id="activeDmChannel.id"
-            :other-user="activeDmChannel.otherUser"
-            :can-message="activeDmChannel.canMessage"
-            :self-blocked="activeDmChannel.selfBlocked"
+            :channel="activeDmChannel"
             @cleared="selectFriends"
+            @left="selectFriends"
+            @deleted="selectFriends"
           />
-          <div class="hidden xl:flex">
+          <!-- Profil paneli yalnızca 1-1 DM için gösterilir -->
+          <div v-if="activeDmChannel.type === 'DM'" class="hidden xl:flex">
             <DmProfilePanel :other-user="activeDmChannel.otherUser" />
           </div>
         </div>

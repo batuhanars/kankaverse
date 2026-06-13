@@ -30,8 +30,33 @@ const filteredGuilds = computed(() => {
 const filteredDms = computed(() => {
   const q = query.value.toLowerCase()
   if (!q) return dmStore.channels
-  return dmStore.channels.filter((ch) => ch.otherUser.username.toLowerCase().includes(q))
+  return dmStore.channels.filter((ch) => {
+    if (ch.type === 'DM') return ch.otherUser.username.toLowerCase().includes(q)
+    // GROUP_DM: ada veya üye adlarına göre filtrele
+    const nameMatch = ch.name?.toLowerCase().includes(q) ?? false
+    const memberMatch = ch.members.some((m) => m.username.toLowerCase().includes(q))
+    return nameMatch || memberMatch
+  })
 })
+
+// DM kanalı için görüntü adı + avatar yardımcıları
+function dmDisplayName(ch: (typeof dmStore.channels)[number]): string {
+  if (ch.type === 'DM') return ch.otherUser.username
+  if (ch.name) return ch.name
+  const names = ch.members.map((m) => m.username)
+  if (names.length <= 2) return names.join(', ')
+  return names.slice(0, 2).join(', ') + ` +${names.length - 2}`
+}
+
+function dmAvatarUrl(ch: (typeof dmStore.channels)[number]): string | null {
+  if (ch.type === 'DM') return ch.otherUser.avatarUrl
+  return ch.members[0]?.avatarUrl ?? null
+}
+
+function dmAvatarInitial(ch: (typeof dmStore.channels)[number]): string {
+  if (ch.type === 'DM') return ch.otherUser.username[0].toUpperCase()
+  return (ch.members[0]?.username ?? '?')[0].toUpperCase()
+}
 
 const hasResults = computed(() => filteredGuilds.value.length > 0 || filteredDms.value.length > 0)
 
@@ -131,19 +156,19 @@ function selectDm(channelId: string) {
             >
               <div class="w-8 h-8 rounded-full overflow-hidden shrink-0" style="background-color: var(--kv-bg-content);">
                 <img
-                  v-if="ch.otherUser.avatarUrl"
-                  :src="ch.otherUser.avatarUrl"
-                  :alt="ch.otherUser.username"
+                  v-if="dmAvatarUrl(ch)"
+                  :src="dmAvatarUrl(ch)!"
+                  :alt="dmDisplayName(ch)"
                   class="w-full h-full object-cover"
                 />
                 <span
                   v-else
                   class="w-full h-full flex items-center justify-center text-[12px] font-semibold"
                   style="color: var(--kv-text-secondary);"
-                >{{ ch.otherUser.username[0].toUpperCase() }}</span>
+                >{{ dmAvatarInitial(ch) }}</span>
               </div>
               <span class="text-[14px] font-medium truncate" style="color: var(--kv-text-primary);">
-                {{ ch.otherUser.username }}
+                {{ dmDisplayName(ch) }}
               </span>
             </button>
           </template>

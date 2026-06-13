@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DmList from './DmList.vue'
+import CreateGroupModal from './CreateGroupModal.vue'
 
 defineProps<{ activeView: 'friends' | 'message-requests' | 'dm'; activeDmChannelId: string | null }>()
 const emit = defineEmits<{
@@ -10,6 +12,12 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const showCreateGroup = ref(false)
+
+function onGroupCreated(channelId: string) {
+  showCreateGroup.value = false
+  emit('selectDm', channelId)
+}
 </script>
 
 <template>
@@ -54,11 +62,23 @@ const { t } = useI18n()
       </button>
     </div>
 
-    <!-- DM bölüm başlığı -->
-    <p
-      class="px-4 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-widest shrink-0"
-      style="color: var(--kv-text-muted);"
-    >{{ t('sidebar.dmSection') }}</p>
+    <!-- DM bölüm başlığı + Grup Oluştur -->
+    <div class="flex items-center justify-between px-4 pt-4 pb-1 shrink-0">
+      <p
+        class="text-[11px] font-semibold uppercase tracking-widest"
+        style="color: var(--kv-text-muted);"
+      >{{ t('sidebar.dmSection') }}</p>
+      <button
+        class="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+        style="color: var(--kv-text-muted);"
+        :title="t('group.createButton')"
+        @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-text-primary)'"
+        @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
+        @click="showCreateGroup = true"
+      >
+        +
+      </button>
+    </div>
 
     <!-- DM listesi -->
     <DmList
@@ -66,4 +86,11 @@ const { t } = useI18n()
       @select="(id) => emit('selectDm', id)"
     />
   </aside>
+
+  <!-- Grup oluştur modal -->
+  <CreateGroupModal
+    v-if="showCreateGroup"
+    @close="showCreateGroup = false"
+    @created="onGroupCreated"
+  />
 </template>
