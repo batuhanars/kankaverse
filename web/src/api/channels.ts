@@ -8,4 +8,7 @@ export const channelsApi = {
   delete(channelId: string) {
     return http.delete<null>(`/channels/${channelId}`)
   },
+  markRead(channelId: string) {
+    return http.post<null>(`/channels/${channelId}/read`)
+  },
 }

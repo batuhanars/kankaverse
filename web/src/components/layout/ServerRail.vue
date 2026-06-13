@@ -46,54 +46,88 @@ function guildInitial(name: string) {
 
 <template>
   <nav class="rail">
-    <!-- Marka / home — guild'lerin üstünde sabit (prototip) -->
-    <button class="guild-btn" :title="t('brand.name')" @click="goHome">
-      <span :class="['hex-home', { 'hex-home--active': guildsStore.activeGuildId === null }]">
-        <img :src="hexagonLogo" :alt="t('brand.name')" class="home-img" />
-      </span>
-    </button>
+    <!-- Marka / home — guild'lerin üstünde sabit -->
+    <div class="rail-item">
+      <button class="guild-btn" @click="goHome">
+        <span :class="['hex-home', { 'hex-home--active': guildsStore.activeGuildId === null }]">
+          <img :src="hexagonLogo" :alt="t('brand.name')" class="home-img" />
+        </span>
+      </button>
+      <!-- Özel tooltip -->
+      <div class="rail-tooltip" role="tooltip">
+        <span class="rail-tooltip__arrow" />
+        <span class="rail-tooltip__text">{{ t('brand.name') }}</span>
+      </div>
+    </div>
+
     <div class="divider" />
 
     <!-- Guild ikonları -->
-    <button
+    <div
       v-for="guild in guildsStore.guilds"
       :key="guild.id"
-      :title="guild.name"
-      class="guild-btn"
-      @click="selectGuild(guild)"
+      class="rail-item"
     >
-      <span :class="['hex', guildsStore.activeGuildId === guild.id ? 'hex--active' : 'hex--idle']">
-        <img
-          v-if="guild.iconUrl"
-          :src="guild.iconUrl"
-          :alt="guild.name"
-          class="hex-img"
-        />
-        <span v-else class="hex-label">{{ guildInitial(guild.name) }}</span>
-      </span>
-    </button>
+      <!-- Okunmamış sol pill (aktif guild'de gösterme) -->
+      <span
+        class="unread-pill"
+        :class="[
+          guild.hasUnread && guildsStore.activeGuildId !== guild.id
+            ? 'unread-pill--visible'
+            : 'unread-pill--hidden',
+        ]"
+      />
+
+      <button
+        class="guild-btn"
+        @click="selectGuild(guild)"
+      >
+        <span :class="['hex', guildsStore.activeGuildId === guild.id ? 'hex--active' : 'hex--idle']">
+          <img
+            v-if="guild.iconUrl"
+            :src="guild.iconUrl"
+            :alt="guild.name"
+            class="hex-img"
+          />
+          <span v-else class="hex-label">{{ guildInitial(guild.name) }}</span>
+        </span>
+      </button>
+
+      <!-- Özel tooltip -->
+      <div class="rail-tooltip" role="tooltip">
+        <span class="rail-tooltip__arrow" />
+        <span class="rail-tooltip__text">{{ guild.name }}</span>
+      </div>
+    </div>
 
     <!-- Ayraç -->
     <div v-if="guildsStore.guilds.length" class="divider" />
 
-    <!-- Ortam ekle — hexagonal, accent-subtle → hover accent-500 -->
-    <button class="guild-btn add-btn" :title="t('server.addOrtam')" @click="onCreateGuild">
-      <span class="hex hex--add">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </span>
-    </button>
+    <!-- Ortam ekle -->
+    <div class="rail-item">
+      <button class="guild-btn add-btn" @click="onCreateGuild">
+        <span class="hex hex--add">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </span>
+      </button>
+      <!-- Özel tooltip -->
+      <div class="rail-tooltip" role="tooltip">
+        <span class="rail-tooltip__arrow" />
+        <span class="rail-tooltip__text">{{ t('server.addOrtam') }}</span>
+      </div>
+    </div>
   </nav>
 </template>
 
@@ -106,9 +140,20 @@ function guildInitial(name: string) {
   gap: 8px;
   padding: 12px 0;
   overflow-y: auto;
+  overflow-x: visible;
   flex-shrink: 0;
   width: 72px;
   background-color: var(--kv-bg-rail);
+}
+
+/* rail-item: tooltip'in konumlanacağı referans kutusu */
+.rail-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  flex-shrink: 0;
 }
 
 .guild-btn {
@@ -210,5 +255,68 @@ function guildInitial(name: string) {
   height: 1px;
   background-color: var(--kv-border-strong);
   margin: 4px 0;
+}
+
+/* ── Okunmamış sol pill ── */
+.unread-pill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  border-radius: 0 3px 3px 0;
+  background-color: var(--kv-text-primary);
+  transition: height 0.15s, opacity 0.15s;
+}
+
+.unread-pill--visible {
+  height: 8px;
+  opacity: 1;
+}
+
+.unread-pill--hidden {
+  height: 0;
+  opacity: 0;
+}
+
+/* ── Özel tooltip (CSS-only, gecikme yok) ── */
+.rail-tooltip {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s;
+  white-space: nowrap;
+  z-index: 9999;
+}
+
+.rail-item:hover .rail-tooltip {
+  opacity: 1;
+}
+
+/* Sol-bakan ok (üçgen) */
+.rail-tooltip__arrow {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 6px solid var(--kv-bg-elevated);
+  flex-shrink: 0;
+}
+
+.rail-tooltip__text {
+  display: block;
+  padding: 5px 10px;
+  background-color: var(--kv-bg-elevated);
+  color: var(--kv-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--kv-radius-md);
+  line-height: 1.4;
 }
 </style>

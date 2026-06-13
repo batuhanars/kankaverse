@@ -54,6 +54,35 @@ export const useChannelsStore = defineStore('channels', () => {
     activeChannelId.value = id
   }
 
+  /** Kanalı okundu işaretle: POST /channels/:id/read → hasUnread=false + guild unread'i güncelle */
+  async function markChannelRead(channelId: string): Promise<void> {
+    // Optimistik: önce local'i güncelle, sonra backend'e bildir
+    for (const [guildId, channels] of Object.entries(channelsByGuild.value)) {
+      const idx = channels.findIndex((c) => c.id === channelId)
+      if (idx !== -1 && channels[idx].hasUnread) {
+        channels[idx] = { ...channels[idx], hasUnread: false }
+        // Guild unread'ini yeniden hesapla — import döngüsünden kaçın, event yayınla
+        window.dispatchEvent(new CustomEvent('kv:guild:recheck-unread', { detail: { guildId } }))
+        break
+      }
+    }
+    try {
+      await channelsApi.markRead(channelId)
+    } catch {
+      // Sessizce yut — okundu işaretleme kritik değil, UI'ı geri alma
+    }
+  }
+
+  /** WS channel.activity: kanal aktif değilse hasUnread=true yap */
+  function markChannelUnread(channelId: string, guildId: string): void {
+    const channels = channelsByGuild.value[guildId]
+    if (!channels) return
+    const idx = channels.findIndex((c) => c.id === channelId)
+    if (idx !== -1 && !channels[idx].hasUnread) {
+      channels[idx] = { ...channels[idx], hasUnread: true }
+    }
+  }
+
   return {
     channelsByGuild,
     activeChannelId,
@@ -64,5 +93,7 @@ export const useChannelsStore = defineStore('channels', () => {
     updateChannel,
     deleteChannel,
     setActiveChannel,
+    markChannelRead,
+    markChannelUnread,
   }
 })

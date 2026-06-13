@@ -202,20 +202,38 @@ async function confirmDelete() {
       <div
         v-for="channel in channelsStore.channelsForGuild(guildsStore.activeGuildId ?? '')"
         :key="channel.id"
-        class="group relative w-full flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
+        class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
         :class="[
           channelsStore.activeChannelId === channel.id
             ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-text-primary)]'
             : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
         ]"
       >
+        <!-- Okunmamış sol gösterge (aktif kanal hariç) -->
+        <span
+          class="absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full transition-all"
+          :class="[
+            channel.hasUnread && channelsStore.activeChannelId !== channel.id
+              ? 'h-2 opacity-100'
+              : 'h-0 opacity-0',
+          ]"
+          style="background-color: var(--kv-text-primary);"
+        />
+
         <!-- Kanal adına tıklama -->
         <button
-          class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer"
+          class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-2 pr-2"
           @click="selectChannel(channel)"
         >
           <span style="color: var(--kv-text-muted);">#</span>
-          <span class="truncate">{{ channel.name }}</span>
+          <span
+            class="truncate"
+            :class="[
+              channel.hasUnread && channelsStore.activeChannelId !== channel.id
+                ? 'font-semibold text-[var(--kv-text-primary)]'
+                : '',
+            ]"
+          >{{ channel.name }}</span>
           <!-- 18+ rozet -->
           <span
             v-if="channel.ageGated"
@@ -241,7 +259,7 @@ async function confirmDelete() {
         <!-- OWNER: yönetim ikonları (hover'da görünür) -->
         <div
           v-if="isOwner"
-          class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+          class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pr-2"
         >
           <!-- Kanal ayarları -->
           <button
