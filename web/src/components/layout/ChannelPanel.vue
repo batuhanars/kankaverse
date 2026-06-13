@@ -491,7 +491,7 @@ function closeCategoryMenu() {
           </button>
 
           <!-- ADMIN: kategori menü butonu + kanal ekle -->
-          <div v-if="isAdmin" class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover/cat:opacity-100 transition-opacity">
+          <div v-if="isAdmin" class="shrink-0 flex items-center gap-0.5">
             <!-- Bu kategoriye kanal ekle -->
             <button
               class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
