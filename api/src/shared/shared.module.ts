@@ -7,9 +7,10 @@ import { RealtimeService } from './realtime/realtime.service';
 import { PresenceService } from './presence/presence.service';
 import { AutomodService } from './automod/automod.service';
 import { StorageService } from './storage/storage.service';
+import { ModerationService } from './moderation/moderation.service';
 
 @Module({
-  providers: [EmailService, MembershipService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService],
-  exports: [EmailService, MembershipService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService],
+  providers: [EmailService, MembershipService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService],
+  exports: [EmailService, MembershipService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService],
 })
 export class SharedModule {}

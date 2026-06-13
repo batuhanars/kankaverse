@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ModerationService } from '../moderation/moderation.service';
 
 export interface CanDmResult {
   allowed: boolean;
@@ -33,12 +34,19 @@ export class DmPermissionService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private moderation: ModerationService,
   ) {}
 
   async canDm(senderId: string, targetId: string): Promise<CanDmResult> {
     // Kural 1: kendi kendine DM
     if (senderId === targetId) {
       return { allowed: false, reason: 'CANNOT_DM_SELF' };
+    }
+
+    // R7 Enforcement: sender aktif global BAN → DM başlatma yasak
+    const hasBan = await this.moderation.hasActiveBan(senderId);
+    if (hasBan) {
+      return { allowed: false, reason: 'DM_NOT_ALLOWED' };
     }
 
     const [sender, target] = await Promise.all([

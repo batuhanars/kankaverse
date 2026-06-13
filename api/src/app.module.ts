@@ -15,6 +15,8 @@ import { UsersModule } from './modules/users/users.module';
 import { JobsModule } from './common/jobs/jobs.module';
 import { InvitesModule } from './modules/invites/invites.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { ModerationModule } from './modules/moderation/moderation.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -34,6 +36,8 @@ import configuration from './config/configuration';
     JobsModule,
     InvitesModule,
     AttachmentsModule,
+    ReportsModule,
+    ModerationModule,
   ],
   providers: [
     {

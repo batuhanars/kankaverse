@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ModerationService } from '../moderation/moderation.service';
 
 export type FriendRequestMethod = 'CODE' | 'USER_CLICK';
 
@@ -35,6 +36,7 @@ export class FriendPermissionService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private moderation: ModerationService,
   ) {}
 
   async canSendFriendRequest(
@@ -45,6 +47,12 @@ export class FriendPermissionService {
     // Kural 1: kendi kendine istek
     if (senderId === targetId) {
       return { allowed: false, reason: 'CANNOT_FRIEND_SELF' };
+    }
+
+    // R7 Enforcement: sender aktif global BAN → arkadaş isteği yasak (jenerik ret)
+    const hasBan = await this.moderation.hasActiveBan(senderId);
+    if (hasBan) {
+      return { allowed: false, reason: 'USER_NOT_FOUND' };
     }
 
     // Kural 2: kullanıcı varlığı
