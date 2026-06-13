@@ -395,21 +395,22 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > insan incelemesi. Automod = R7-hafif (PM incelemesi). Dev checkbox işaretler, item EKLEMEZ.
 
 ### Backend (`api/`)
-- [ ] `AutomodService.check(content)` (SharedModule) + config yasak-kelime listesi; basit TR normalize (küçük harf/TR karakter/tekrar daralt)
-- [ ] `messages.service.create` automod kapısı → eşleşme `MESSAGE_BLOCKED` (**DM hariç**, sıfır DB/kayıt)
-- [ ] `isQuarantinedInGuild(userId, guildId)` (joinedAt + `QUARANTINE_HOURS`; config default 24, 0=kapalı)
-- [ ] **Karantina entegrasyonu (R7):** `canDm` 4c ortak-sunucu + `canSendFriendRequest` 6a ortak-ortam → ortak guild yalnız sender o guild'de karantinada DEĞİLSE sayılır; jenerik retler
-- [ ] Hata kodu `MESSAGE_BLOCKED`; Swagger; birim test (automod check + karantina entegrasyonu + **minör kalkanı 4a/G1 regresyonu**)
+- [x] `AutomodService.check(content)` (SharedModule) + config yasak-kelime listesi (`automod-words.ts`, 27 kelime); TR normalize (küçük harf/TR→ASCII/tekrar daralt)
+- [x] `messages.service.create` automod kapısı → eşleşme `MESSAGE_BLOCKED` (**DM hariç** `if guildId`, sıfır DB/kayıt)
+- [x] Karantina = `joinedAt: { lt: cutoff }` cutoff-in-query (config `quarantineHours` default 24, 0=kapalı; ayrı helper'a gerek kalmadı — DRY)
+- [x] **Karantina entegrasyonu (R7):** `canDm` 4c + `canSendFriendRequest` 6a ortak-ortam → yalnız sender karantinada değilse sayılır; jenerik retler
+- [x] Hata kodu `MESSAGE_BLOCKED`; birim test (automod 38 + karantina + **minör kalkanı 4a/G1 regresyonu**); 168 test geçti
+- [x] **İçerik-politikası (PM):** kimlik adı (yahudi/ermeni) + yanlış-pozitif (mal/oğlak) + normalleşmiş kısaltma (amk/aq) + hafif hakaret çıkarıldı; kutsal-değer kategorisi eklendi (block-on-send; ban→4B). Bkz. memory `tr-automod-lokalizasyon`
 
 ### Frontend (`web/`)
-- [ ] `MESSAGE_BLOCKED` → mesaj alanında jenerik Türkçe uyarı (toast/satır); `tr.json`. **Karantina UI YOK** (sessiz)
+- [x] `MESSAGE_BLOCKED` → MessageArea inline jenerik uyarı (input temizlenmez, yazınca kaybolur); `tr.json`. **Karantina UI YOK** (sessiz)
 
 ### Sprint 7B DoD (contract §6)
-- [ ] Automod guild kanalında çalışır, DM etkilenmez, sıfır kayıt; liste config'ten
-- [ ] Karantina yeni üyeyi ortak-ortam basamağıyla DM/friend başlatmaktan alıkoyar; süre dolunca normal; 0=kapalı
-- [ ] Minör kalkanı bozulmadı (4a/G1 testleri geçer); karantina yalnız ekledi
-- [ ] `nest build` + `vue-tsc` temiz; testler geçer
-- [ ] **R7:** karantina entegrasyonu satır-satır incelendi (sahip imzası)
+- [x] Automod guild kanalında çalışır, DM etkilenmez, sıfır kayıt; liste config'ten
+- [x] Karantina yeni üyeyi ortak-ortam basamağıyla DM/friend başlatmaktan alıkoyar; süre dolunca normal; 0=kapalı
+- [x] Minör kalkanı bozulmadı (4a/G1 testleri geçer); karantina yalnız ekledi
+- [x] `nest build` + `vue-tsc` temiz; 168 test geçer
+- [x] **R7:** karantina entegrasyonu — PM satır-satır inceledi (canDm 4c + friend 6a temiz, initiator-only, minör kalkanı korundu); **sahip güven-temelli onay** (automod içerik-politikası sahip yönlendirdi)
 
 ---
 
