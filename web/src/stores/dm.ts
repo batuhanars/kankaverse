@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { dmApi } from '@/api/dm'
+import { useAuthStore } from '@/stores/auth'
 import type { DmChannelDto } from '@/types'
 
 export const useDmStore = defineStore('dm', () => {
@@ -44,6 +45,47 @@ export const useDmStore = defineStore('dm', () => {
     return channels.value.find((c) => c.id === activeDmChannelId.value) ?? null
   }
 
+  async function applyActivity(payload: {
+    channelId: string
+    lastMessage: { content: string; createdAt: string }
+    senderId: string
+  }) {
+    const authStore = useAuthStore()
+    const idx = channels.value.findIndex((c) => c.id === payload.channelId)
+
+    if (idx !== -1) {
+      const ch = channels.value[idx]
+      // lastMessage alanlarını güncelle (MessageDto uyumlu — eksik alanlar korunur)
+      if (ch.lastMessage) {
+        ch.lastMessage.content = payload.lastMessage.content
+        ch.lastMessage.createdAt = payload.lastMessage.createdAt
+      } else {
+        // Önceki lastMessage null idi — minimal şekle yaz
+        ch.lastMessage = {
+          id: '',
+          channelId: payload.channelId,
+          content: payload.lastMessage.content,
+          replyToId: null,
+          author: { id: payload.senderId, username: '', avatarUrl: null },
+          createdAt: payload.lastMessage.createdAt,
+        }
+      }
+
+      // Kanalı listenin başına taşı (en güncel üste)
+      channels.value.splice(idx, 1)
+      channels.value.unshift(ch)
+
+      // Unread: kendi mesajım DEĞİLSE ve aktif DM DEĞİLSE set et
+      const myId = authStore.user?.id
+      if (payload.senderId !== myId && payload.channelId !== activeDmChannelId.value) {
+        ch.unread = true
+      }
+    } else {
+      // Alıcının listesinde henüz yok (yeni DM) — listeyi tazele
+      await fetchChannels()
+    }
+  }
+
   return {
     channels,
     activeDmChannelId,
@@ -53,5 +95,6 @@ export const useDmStore = defineStore('dm', () => {
     removeChannel,
     setActiveChannel,
     activeChannel,
+    applyActivity,
   }
 })

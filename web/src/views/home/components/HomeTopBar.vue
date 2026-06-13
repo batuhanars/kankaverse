@@ -30,7 +30,7 @@ function openNotifications() {
 </script>
 
 <template>
-  <div class="h-16 shrink-0 flex items-center">
+  <div class="h-20 shrink-0 flex items-center">
     <!-- Rail spacer (aligns search with sidebar area) -->
 
     <!-- Search pill — flex-1, centered -->
