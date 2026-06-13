@@ -20,6 +20,7 @@ const sending = ref(false)
 const listEl = ref<HTMLElement | null>(null)
 // Room'a join başarısızsa realtime çalışmaz; kullanıcıyı sessiz bırakmıyoruz
 const realtimeError = ref(false)
+const sendError = ref('')
 
 const channelId = computed(() => channelsStore.activeChannelId)
 const messages = computed(() =>
@@ -72,6 +73,7 @@ async function loadMore() {
 async function send() {
   if (!content.value.trim() || !channelId.value || sending.value) return
   stopTyping()
+  sendError.value = ''
   sending.value = true
   const text = content.value.trim()
   content.value = ''
@@ -81,8 +83,13 @@ async function send() {
     // id'ye göre dedup yapar (messages.ts:35) → broadcast geldiğinde çiftlemez.
     // WS kopukken bile gönderen kendi mesajını görür.
     messagesStore.appendMessage(data)
-  } catch {
+  } catch (e: unknown) {
     content.value = text
+    const err = e as { response?: { data?: { error?: string; message?: string } } }
+    const errCode = err.response?.data?.error
+    sendError.value = errCode
+      ? (t(`message.errors.${errCode}`) || err.response?.data?.message || t('common.error'))
+      : t('common.error')
   } finally {
     sending.value = false
   }
@@ -134,6 +141,14 @@ function onKeydown(e: KeyboardEvent) {
     </div>
 
     <div v-if="channelId" class="px-4 pb-6 pt-2">
+      <!-- Gönderme hatası (örn. MESSAGE_BLOCKED) -->
+      <div
+        v-if="sendError"
+        class="px-1 mb-1 text-[13px]"
+        style="color: var(--kv-danger);"
+      >
+        {{ sendError }}
+      </div>
       <!-- Yazıyor göstergesi -->
       <div
         v-if="typingLabel"
@@ -153,7 +168,7 @@ function onKeydown(e: KeyboardEvent) {
           class="flex-1 py-3 bg-transparent text-[15px] resize-none outline-none"
           style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
           @keydown="onKeydown"
-          @input="onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
+          @input="sendError = ''; onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
           @blur="stopTyping"
         />
       </div>

@@ -273,7 +273,10 @@
     "send": "Gönder",
     "loadMore": "Daha fazla yükle",
     "noMessages": "Henüz mesaj yok. İlk mesajı sen gönder!",
-    "realtimeError": "Gerçek zamanlı bağlantı kurulamadı — yeni mesajlar anlık görünmeyebilir."
+    "realtimeError": "Gerçek zamanlı bağlantı kurulamadı — yeni mesajlar anlık görünmeyebilir.",
+    "errors": {
+      "MESSAGE_BLOCKED": "Mesajınız topluluk kurallarına uygun değil."
+    }
   },
   "member": {
     "panel": "Üyeler",
