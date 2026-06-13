@@ -496,6 +496,11 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 ### Sistem cilası (PM compose, önizleme yolu)
 - [x] **Yavaş mod** (kanal başına anti-spam): `Channel.slowModeSeconds` + migration; `PATCH /channels` ayar (OWNER/ADMIN); `messages.create` enforcement (OWNER/ADMIN muaf, DM hariç, `SLOW_MODE` + retryAfter); UI select + saat rozeti + hata gösterimi. 257 test
+- [x] **Kanka kodu 6 hane** (8→6, ezberlenebilirlik) + mevcut kullanıcı backfill
+- [x] **URL-tabanlı navigasyon** (kanal/DM derin-link + yenileme koruması)
+- [x] **DM/grup oluşturma birleşik** ("Sohbet Başlat": 1=DM `canDm`, 2+=grup; iki T&S kapısı ayrı)
+- [x] **Grup üye paneli yüzen + üye çıkar (owner) + yöneticiler daima üstte (ortam+grup) + sahip tacı**
+- [x] **Mesaj düzenle/sil (kendi mesajı)** — `PATCH`/`DELETE /channels/:id/messages/:messageId` (yazar-only, automod, soft-delete); WS `message.updated`/`message.deleted`; guild+DM+grup UI + "(düzenlendi)". 290 test
 
 ---
 
