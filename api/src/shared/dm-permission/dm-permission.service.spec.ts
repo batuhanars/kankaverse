@@ -404,4 +404,85 @@ describe('DmPermissionService.canDm — §13 karar matrisi', () => {
       expect(r).toEqual({ allowed: false, reason: 'DM_NOT_ALLOWED' });
     });
   });
+
+  // ── Kural 4c: Karantina (R7) — FRIENDS dmPolicy ortak-ortam basamağı ────
+  describe('Kural 4c karantina (R7): sender yeni üye → ortak-ortam basamağı geçmez', () => {
+    // quarantineHours=24, configMock.get çağrıları sırayla: newAccountDmLockDays, quarantineHours
+    // DmPermissionService: get('newAccountDmLockDays') → 7 (4b), get('quarantineHours') → 24 (4c)
+    // configMock.get mock'u her çağrıda aynı değer dönüyor; quarantineHours için ayrıca ayarlanır.
+
+    // Sender'ın o guild'deki joinedAt: karantinada = NOW - 1 saat (24 saatlik karantina içinde)
+    const ONE_HOUR_AGO = new Date(NOW - 1 * 60 * 60 * 1000);
+    // Yerleşik: 48 saat önce katılmış (24 saatlik karantina dışında)
+    const TWO_DAYS_AGO_GUILD = new Date(NOW - 48 * 60 * 60 * 1000);
+
+    const TARGET_FRIENDS = { ...ADULT_B, id: 'adult-b-friends-q', dmPolicy: 'FRIENDS' };
+
+    beforeEach(() => {
+      prismaMock.userBlock.findFirst.mockResolvedValue(null);
+      prismaMock.friendship.findFirst.mockResolvedValue(null);
+    });
+
+    it('sender karantinada (joinedAt 1 saat önce, quarantine 24s) → ortak-ortam null → DM_NOT_ALLOWED', async () => {
+      // newAccountDmLockDays=0 (4b geçsin), quarantineHours=24
+      configMock.get.mockImplementation((key: string) => {
+        if (key === 'newAccountDmLockDays') return 0;
+        if (key === 'quarantineHours') return 24;
+        return undefined;
+      });
+      prismaMock.user.findUnique
+        .mockResolvedValueOnce(ADULT_A)
+        .mockResolvedValueOnce(TARGET_FRIENDS);
+      // guildMember karantina filtresi eşleşmez → null döner
+      prismaMock.guildMember.findFirst.mockResolvedValue(null);
+      const r = await service.canDm(ADULT_A.id, TARGET_FRIENDS.id);
+      expect(r).toEqual({ allowed: false, reason: 'DM_NOT_ALLOWED' });
+    });
+
+    it('sender yerleşik (joinedAt 48 saat önce, quarantine 24s) → ortak-ortam var → allowed', async () => {
+      configMock.get.mockImplementation((key: string) => {
+        if (key === 'newAccountDmLockDays') return 0;
+        if (key === 'quarantineHours') return 24;
+        return undefined;
+      });
+      prismaMock.user.findUnique
+        .mockResolvedValueOnce(ADULT_A)
+        .mockResolvedValueOnce(TARGET_FRIENDS);
+      // guildMember karantina filtresi eşleşir (joinedAt cutoff'tan önce) → kayıt döner
+      prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm-settled', joinedAt: TWO_DAYS_AGO_GUILD });
+      const r = await service.canDm(ADULT_A.id, TARGET_FRIENDS.id);
+      expect(r).toEqual({ allowed: true });
+    });
+
+    it('quarantineHours=0 → karantina kapalı → ortak-ortam var → allowed', async () => {
+      configMock.get.mockImplementation((key: string) => {
+        if (key === 'newAccountDmLockDays') return 0;
+        if (key === 'quarantineHours') return 0; // kapalı
+        return undefined;
+      });
+      prismaMock.user.findUnique
+        .mockResolvedValueOnce(ADULT_A)
+        .mockResolvedValueOnce(TARGET_FRIENDS);
+      // quarantineHours=0: cutoff=now → joinedAt { lt: now } → yeni katılmış dahil geçer
+      prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm-any', joinedAt: ONE_HOUR_AGO });
+      const r = await service.canDm(ADULT_A.id, TARGET_FRIENDS.id);
+      expect(r).toEqual({ allowed: true });
+    });
+
+    it('karantina yalnız 4c FRIENDS basamağını etkiler — 4a minör kalkanı bozulmaz', async () => {
+      // Minör sender → 4a devreye girmeli, karantinaya ulaşılmamalı
+      configMock.get.mockImplementation((key: string) => {
+        if (key === 'newAccountDmLockDays') return 0;
+        if (key === 'quarantineHours') return 24;
+        return undefined;
+      });
+      prismaMock.user.findUnique
+        .mockResolvedValueOnce(MINOR_A) // sender minör
+        .mockResolvedValueOnce(TARGET_FRIENDS);
+      const r = await service.canDm(MINOR_A.id, TARGET_FRIENDS.id);
+      // 4a devreye girmeli → guildMember sorgulanmamalı
+      expect(r).toEqual({ allowed: false, reason: 'DM_NOT_ALLOWED' });
+      expect(prismaMock.guildMember.findFirst).not.toHaveBeenCalled();
+    });
+  });
 });
