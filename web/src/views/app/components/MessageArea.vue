@@ -33,6 +33,8 @@ const listEl = ref<HTMLElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
 const textareaEl = ref<HTMLTextAreaElement | null>(null)
 const showEmojiPicker = ref(false)
+// Compose emoji picker tetikleyici butonu (Teleport konumlandırması için)
+const composeEmojiTriggerEl = ref<HTMLElement | null>(null)
 // Room'a join başarısızsa realtime çalışmaz; kullanıcıyı sessiz bırakmıyoruz
 const realtimeError = ref(false)
 const sendError = ref('')
@@ -108,9 +110,13 @@ function onComposeEmojiSelect(emoji: string) {
 }
 
 function onComposePickerDocClick(e: MouseEvent) {
-  const picker = document.getElementById('kv-compose-emoji-picker')
-  if (picker && !picker.contains(e.target as Node)) {
-    showEmojiPicker.value = false
+  // Tetikleyici buton veya picker'ın içine tıklanmadıysa kapat.
+  // Picker body'e Teleport edildiği için DOM'da .v3-emoji-picker sınıfından tanıyoruz.
+  if (!composeEmojiTriggerEl.value?.contains(e.target as Node)) {
+    const pickerInDom = (e.target as Element)?.closest?.('.v3-emoji-picker')
+    if (!pickerInDom) {
+      showEmojiPicker.value = false
+    }
   }
 }
 
@@ -436,6 +442,7 @@ function onTextareaInput() {
         <!-- Emoji (😊) butonu -->
         <div class="relative shrink-0 self-center">
           <button
+            ref="composeEmojiTriggerEl"
             type="button"
             class="py-1 px-1 cursor-pointer hover:opacity-80 transition-opacity"
             style="color: var(--kv-text-muted); font-size: 18px; line-height: 1;"
@@ -444,14 +451,12 @@ function onTextareaInput() {
           >
             😊
           </button>
-          <div
+          <!-- Teleport to body ile viewport-farkındalıklı konumlandırma -->
+          <EmojiPicker
             v-if="showEmojiPicker"
-            id="kv-compose-emoji-picker"
-            class="absolute bottom-full right-0 mb-2 z-50"
-            @click.stop
-          >
-            <EmojiPicker @select="onComposeEmojiSelect" />
-          </div>
+            :anchor-el="composeEmojiTriggerEl"
+            @select="onComposeEmojiSelect"
+          />
         </div>
       </div>
     </div>

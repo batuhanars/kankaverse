@@ -50,6 +50,8 @@ const deleteLoading = ref(false)
 // Compose picker
 const showComposeEmojiPicker = ref(false)
 const dmTextareaEl = ref<HTMLTextAreaElement | null>(null)
+// Compose emoji picker tetikleyici butonu (Teleport konumlandırması için)
+const dmComposeEmojiTriggerEl = ref<HTMLElement | null>(null)
 
 async function pickDmEmoji(msg: MessageDto, emoji: string) {
   try {
@@ -442,10 +444,13 @@ function onDmComposeEmojiSelect(emoji: string) {
 }
 
 // Compose emoji picker dışı tıklamada kapat
+// Picker body'e Teleport edildiği için DOM'da .v3-emoji-picker sınıfından tanıyoruz.
 function onDmPickerDocClick(e: MouseEvent) {
-  const composePicker = document.getElementById('kv-dm-compose-emoji-picker')
-  if (composePicker && composePicker.contains(e.target as Node)) return
-  showComposeEmojiPicker.value = false
+  if (dmComposeEmojiTriggerEl.value?.contains(e.target as Node)) return
+  const pickerInDom = (e.target as Element)?.closest?.('.v3-emoji-picker')
+  if (!pickerInDom) {
+    showComposeEmojiPicker.value = false
+  }
 }
 
 onMounted(() => {
@@ -860,6 +865,7 @@ function isGroupStart(index: number): boolean {
             <!-- Emoji (😊) butonu -->
             <div class="relative shrink-0 self-center">
               <button
+                ref="dmComposeEmojiTriggerEl"
                 type="button"
                 class="py-1 px-1 cursor-pointer hover:opacity-80 transition-opacity"
                 style="color: var(--kv-text-muted); font-size: 18px; line-height: 1;"
@@ -868,14 +874,12 @@ function isGroupStart(index: number): boolean {
               >
                 😊
               </button>
-              <div
+              <!-- Teleport to body ile viewport-farkındalıklı konumlandırma -->
+              <EmojiPicker
                 v-if="showComposeEmojiPicker"
-                id="kv-dm-compose-emoji-picker"
-                class="absolute bottom-full right-0 mb-2 z-50"
-                @click.stop
-              >
-                <EmojiPicker @select="onDmComposeEmojiSelect" />
-              </div>
+                :anchor-el="dmComposeEmojiTriggerEl"
+                @select="onDmComposeEmojiSelect"
+              />
             </div>
           </div>
         </div>
