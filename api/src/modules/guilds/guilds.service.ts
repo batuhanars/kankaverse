@@ -14,6 +14,7 @@ import { UpdateGuildDto } from './dto/update-guild.dto';
 import { PresignIconDto } from './dto/presign-icon.dto';
 import { SetIconDto } from './dto/set-icon.dto';
 import { GuildMemberDto } from './dto/guild-member.dto';
+import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { Guild, GuildRole } from '@prisma/client';
 
 // İkon yüklemesi için izin verilen görsel tipler (allowlist)
@@ -261,5 +262,195 @@ export class GuildsService {
         avatarUrl: m.user.avatarUrl,
         role: m.role,
       }));
+  }
+
+  // ─── §A: Ortam silme — yalnız OWNER, soft-delete ──────────────────────────
+
+  /** DELETE /guilds/:id — yalnız OWNER; soft-delete (deletedAt = now). Dönüş null. */
+  async deleteGuild(userId: string, guildId: string): Promise<null> {
+    await this.requireOwner(userId, guildId);
+
+    await this.prisma.guild.update({
+      where: { id: guildId },
+      data: { deletedAt: new Date() },
+    });
+
+    return null;
+  }
+
+  // ─── §B: Rol değiştir — yalnız OWNER (R7) ─────────────────────────────────
+
+  /**
+   * PATCH /guilds/:id/members/:userId/role — yalnız OWNER.
+   *
+   * R7 yetki hiyerarşisi (satır satır incelenecek):
+   *  1. Actor OWNER kontrolü — ADMIN/MEMBER → 403 FORBIDDEN.
+   *  2. Hedef guild üyesi mi? → 404 NOT_GUILD_MEMBER.
+   *  3. Hedef OWNER mı? (kendi dahil) → 400 CANNOT_MODIFY_OWNER.
+   *  4. GuildMember.role güncelle (idempotent). AuditLog yaz. Dönüş: güncel üye DTO.
+   */
+  async updateMemberRole(
+    actorId: string,
+    guildId: string,
+    targetUserId: string,
+    dto: UpdateMemberRoleDto,
+  ): Promise<GuildMemberDto> {
+    // 1. Actor OWNER kontrolü (requireOwner guild var mı + OWNER rolü garantiler)
+    await this.requireOwner(actorId, guildId);
+
+    // 2. Hedef guild üyesi mi?
+    const targetMembership = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId: targetUserId } },
+      include: { user: { select: { id: true, username: true, avatarUrl: true } } },
+    });
+    if (!targetMembership) {
+      throw new NotFoundException({
+        message: 'Kullanıcı bu sunucunun üyesi değil.',
+        error: 'NOT_GUILD_MEMBER',
+      });
+    }
+
+    // 3. Hedef OWNER mı? (actor=OWNER, targetUserId=actor ya da başka OWNER)
+    if (targetMembership.role === GuildRole.OWNER) {
+      throw new BadRequestException({
+        message: "Ortam sahibinin rolü değiştirilemez.",
+        error: 'CANNOT_MODIFY_OWNER',
+      });
+    }
+
+    // 4. Güncelle (idempotent — zaten o rolse no-op, update çalışır ama fark yok)
+    const updated = await this.prisma.guildMember.update({
+      where: { guildId_userId: { guildId, userId: targetUserId } },
+      data: { role: dto.role as GuildRole },
+      include: { user: { select: { id: true, username: true, avatarUrl: true } } },
+    });
+
+    // AuditLog
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: 'guild.member_role_updated',
+        entityType: 'GuildMember',
+        entityId: updated.id,
+        metadata: {
+          guildId,
+          targetUserId,
+          newRole: dto.role,
+        },
+      },
+    });
+
+    return {
+      userId: updated.user.id,
+      username: updated.user.username,
+      avatarUrl: updated.user.avatarUrl,
+      role: updated.role,
+    };
+  }
+
+  // ─── §C: Üye at (kick) — OWNER/ADMIN hiyerarşi (R7) ──────────────────────
+
+  /**
+   * DELETE /guilds/:id/members/:userId — OWNER veya ADMIN at yetkisi (R7).
+   *
+   * R7 yetki hiyerarşisi — yetki sızıntısı önlemek için sıra ÖNEMLİ:
+   *  1. Actor guild üyesi mi + rolü ne? (requireGuildMembership → {guild, membership})
+   *     Actor OWNER veya ADMIN değilse → 403 FORBIDDEN.
+   *  2. Actor kendini mi atmaya çalışıyor? → 400 CANNOT_KICK_SELF.
+   *  3. Hedef GuildMember kaydı var mı? → 404 NOT_GUILD_MEMBER.
+   *  4. Hedef OWNER mı? → 400 CANNOT_KICK_OWNER.
+   *  5. Actor ADMIN ise ve hedef ADMIN → 403 FORBIDDEN
+   *     (ADMIN yalnız MEMBER atabilir; OWNER her rolü atabilir).
+   *  6. Tx: GuildMember sil + bu guild kanallarındaki ChannelMember kayıtlarını sil.
+   *     AuditLog yaz. Dönüş null.
+   */
+  async kickMember(
+    actorId: string,
+    guildId: string,
+    targetUserId: string,
+  ): Promise<null> {
+    // 1. Actor erişim + rol kontrolü — ÖNCE yetki (sızıntı önleme)
+    const { membership: actorMembership } = await this.membership.requireGuildMembership(actorId, guildId);
+
+    if (actorMembership.role !== GuildRole.OWNER && actorMembership.role !== GuildRole.ADMIN) {
+      throw new ForbiddenException({
+        message: 'Bu işlem için yetkiniz yok.',
+        error: 'FORBIDDEN',
+      });
+    }
+
+    // 2. Kendini atma reddi
+    if (actorId === targetUserId) {
+      throw new BadRequestException({
+        message: 'Kendinizi ortamdan atamazsınız.',
+        error: 'CANNOT_KICK_SELF',
+      });
+    }
+
+    // 3. Hedef GuildMember kaydı var mı?
+    const targetMembership = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId: targetUserId } },
+    });
+    if (!targetMembership) {
+      throw new NotFoundException({
+        message: 'Kullanıcı bu sunucunun üyesi değil.',
+        error: 'NOT_GUILD_MEMBER',
+      });
+    }
+
+    // 4. Hedef OWNER mı? Hiçbir aktör owner'ı atamaz
+    if (targetMembership.role === GuildRole.OWNER) {
+      throw new BadRequestException({
+        message: 'Ortam sahibi sunucudan atılamaz.',
+        error: 'CANNOT_KICK_OWNER',
+      });
+    }
+
+    // 5. ADMIN yalnız MEMBER atabilir — hedef ADMIN ise FORBIDDEN
+    if (actorMembership.role === GuildRole.ADMIN && targetMembership.role === GuildRole.ADMIN) {
+      throw new ForbiddenException({
+        message: 'Yöneticiler başka yöneticileri atamaz.',
+        error: 'FORBIDDEN',
+      });
+    }
+
+    // 6. Tx: GuildMember sil + bu guild'in kanallarındaki ChannelMember kayıtlarını sil
+    //    (özel kanal erişimi atılanın üzerinde kalmasın)
+    const guildChannels = await this.prisma.channel.findMany({
+      where: { guildId, deletedAt: null },
+      select: { id: true },
+    });
+    const channelIds = guildChannels.map((ch) => ch.id);
+
+    const kickedMemberId = targetMembership.id;
+
+    await this.prisma.$transaction([
+      this.prisma.channelMember.deleteMany({
+        where: {
+          userId: targetUserId,
+          channelId: { in: channelIds },
+        },
+      }),
+      this.prisma.guildMember.delete({
+        where: { guildId_userId: { guildId, userId: targetUserId } },
+      }),
+    ]);
+
+    // AuditLog (tx dışı — başarılı tx'ten sonra)
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: 'guild.member_kicked',
+        entityType: 'GuildMember',
+        entityId: kickedMemberId,
+        metadata: {
+          guildId,
+          targetUserId,
+          actorRole: actorMembership.role,
+        },
+      },
+    });
+
+    return null;
   }
 }
