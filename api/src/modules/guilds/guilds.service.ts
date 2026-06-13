@@ -71,12 +71,23 @@ export class GuildsService {
         },
       });
 
+      // Varsayılan kategori: "Metin Kanalları" (yalnız tek kategori; "Ses Kanalları" LiveKit gelince)
+      const defaultCategory = await tx.channelCategory.create({
+        data: {
+          guildId: guild.id,
+          name: 'Metin Kanalları',
+          position: 0,
+        },
+      });
+
+      // Varsayılan kanal, oluşturulan kategoriye bağlı
       await tx.channel.create({
         data: {
           guildId: guild.id,
           type: 'GUILD_TEXT',
           name: 'genel-sohbet',
           position: 0,
+          categoryId: defaultCategory.id,
         },
       });
 

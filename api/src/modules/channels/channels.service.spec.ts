@@ -15,6 +15,9 @@ const prismaMock = {
   channelRead: {
     upsert: jest.fn(),
   },
+  channelMember: {
+    findMany: jest.fn(),
+  },
   message: {
     count: jest.fn(),
   },
@@ -51,6 +54,7 @@ function makeChannel(overrides: Partial<Record<string, unknown>> = {}) {
     guildId: GUILD_ID,
     name: 'genel-sohbet',
     ageGated: false,
+    isPrivate: false,
     position: 0,
     slowModeSeconds: 0,
     deletedAt: null,
@@ -485,5 +489,182 @@ describe('ChannelsService.findByGuild — unreadCount', () => {
     expect(result[0].unreadCount).toBe(4);
     expect(result[1].unreadCount).toBe(1);
     expect(prismaMock.message.count).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ── ChannelsService.create — isPrivate ───────────────────────────────────────
+
+describe('ChannelsService.create — isPrivate', () => {
+  let service: ChannelsService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('isPrivate: true → kanalda isPrivate=true set edilir', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.channel.aggregate.mockResolvedValue({ _max: { position: 0 } });
+    const created = makeChannel({ name: 'gizli-kanal', isPrivate: true });
+    prismaMock.channel.create.mockResolvedValue(created);
+
+    const result = await service.create(USER_ID, GUILD_ID, { name: 'gizli-kanal', isPrivate: true });
+
+    expect(prismaMock.channel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ isPrivate: true }),
+      }),
+    );
+    expect(result.isPrivate).toBe(true);
+  });
+
+  it('isPrivate verilmezse default false set edilir', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.channel.aggregate.mockResolvedValue({ _max: { position: 0 } });
+    const created = makeChannel({ isPrivate: false });
+    prismaMock.channel.create.mockResolvedValue(created);
+
+    await service.create(USER_ID, GUILD_ID, { name: 'acik-kanal' });
+
+    expect(prismaMock.channel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ isPrivate: false }),
+      }),
+    );
+  });
+
+  it('toChannelDto → isPrivate alanı response\'a dahil edilir', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.channel.aggregate.mockResolvedValue({ _max: { position: 0 } });
+    const created = makeChannel({ isPrivate: true });
+    prismaMock.channel.create.mockResolvedValue(created);
+
+    const result = await service.create(USER_ID, GUILD_ID, { name: 'gizli', isPrivate: true });
+    expect(result).toHaveProperty('isPrivate', true);
+  });
+});
+
+// ── ChannelsService.update — isPrivate ───────────────────────────────────────
+
+describe('ChannelsService.update — isPrivate', () => {
+  let service: ChannelsService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('isPrivate: true → güncellenir', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ isPrivate: false }));
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    const updated = makeChannel({ isPrivate: true });
+    prismaMock.channel.update.mockResolvedValue(updated);
+
+    const result = await service.update(USER_ID, CHANNEL_ID, { isPrivate: true });
+
+    expect(prismaMock.channel.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ isPrivate: true }) }),
+    );
+    expect(result.isPrivate).toBe(true);
+  });
+
+  it('isPrivate undefined → update data\'ya eklenmez', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ isPrivate: true }));
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    const updated = makeChannel({ isPrivate: true });
+    prismaMock.channel.update.mockResolvedValue(updated);
+
+    await service.update(USER_ID, CHANNEL_ID, { name: 'yeni-ad' });
+
+    const callData = prismaMock.channel.update.mock.calls[0][0].data;
+    expect(callData).not.toHaveProperty('isPrivate');
+  });
+});
+
+// ── ChannelsService.findByGuild — isPrivate filtresi (Sprint V2 B4/B5 R7) ───
+
+describe('ChannelsService.findByGuild — isPrivate filtresi', () => {
+  let service: ChannelsService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('OWNER → özel dahil tüm kanalları görür', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    const publicCh = { ...makeChannel(), id: 'ch-pub', isPrivate: false, channelReads: [] };
+    const privateCh = { ...makeChannel(), id: 'ch-priv', isPrivate: true, channelReads: [] };
+    prismaMock.channel.findMany.mockResolvedValue([publicCh, privateCh]);
+    prismaMock.message.count.mockResolvedValue(0);
+
+    const result = await service.findByGuild(USER_ID, GUILD_ID);
+
+    expect(result).toHaveLength(2);
+    expect(result.map((c: { id: string }) => c.id)).toContain('ch-priv');
+    // OWNER path'te channelMember.findMany çağrılmamalı
+    expect(prismaMock.channelMember.findMany).not.toHaveBeenCalled();
+  });
+
+  it('ADMIN → özel dahil tüm kanalları görür', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: ADMIN_MEMBERSHIP });
+    const publicCh = { ...makeChannel(), id: 'ch-pub', isPrivate: false, channelReads: [] };
+    const privateCh = { ...makeChannel(), id: 'ch-priv', isPrivate: true, channelReads: [] };
+    prismaMock.channel.findMany.mockResolvedValue([publicCh, privateCh]);
+    prismaMock.message.count.mockResolvedValue(0);
+
+    const result = await service.findByGuild('admin-1', GUILD_ID);
+
+    expect(result).toHaveLength(2);
+    expect(prismaMock.channelMember.findMany).not.toHaveBeenCalled();
+  });
+
+  it('MEMBER + özel kanala üye değil → özel kanal listede görünmez', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    const publicCh = { ...makeChannel(), id: 'ch-pub', isPrivate: false, channelReads: [] };
+    const privateCh = { ...makeChannel(), id: 'ch-priv', isPrivate: true, channelReads: [] };
+    prismaMock.channel.findMany.mockResolvedValue([publicCh, privateCh]);
+    // Kullanıcı hiçbir özel kanala üye değil
+    prismaMock.channelMember.findMany.mockResolvedValue([]);
+    prismaMock.message.count.mockResolvedValue(0);
+
+    const result = await service.findByGuild('member-1', GUILD_ID);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('ch-pub');
+  });
+
+  it('MEMBER + özel kanala ChannelMember kaydı var → görür', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    const publicCh = { ...makeChannel(), id: 'ch-pub', isPrivate: false, channelReads: [] };
+    const privateCh = { ...makeChannel(), id: 'ch-priv', isPrivate: true, channelReads: [] };
+    prismaMock.channel.findMany.mockResolvedValue([publicCh, privateCh]);
+    // Kullanıcı özel kanala üye
+    prismaMock.channelMember.findMany.mockResolvedValue([{ channelId: 'ch-priv' }]);
+    prismaMock.message.count.mockResolvedValue(0);
+
+    const result = await service.findByGuild('member-1', GUILD_ID);
+
+    expect(result).toHaveLength(2);
+    expect(result.map((c: { id: string }) => c.id)).toContain('ch-priv');
+  });
+
+  it('MEMBER + birden fazla özel kanal; yalnız üyesi olduğu görünür', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    const publicCh = { ...makeChannel(), id: 'ch-pub', isPrivate: false, channelReads: [] };
+    const priv1 = { ...makeChannel(), id: 'ch-priv-1', isPrivate: true, channelReads: [] };
+    const priv2 = { ...makeChannel(), id: 'ch-priv-2', isPrivate: true, channelReads: [] };
+    prismaMock.channel.findMany.mockResolvedValue([publicCh, priv1, priv2]);
+    // Yalnız priv1'e üye
+    prismaMock.channelMember.findMany.mockResolvedValue([{ channelId: 'ch-priv-1' }]);
+    prismaMock.message.count.mockResolvedValue(0);
+
+    const result = await service.findByGuild('member-1', GUILD_ID);
+
+    expect(result).toHaveLength(2);
+    const ids = result.map((c: { id: string }) => c.id);
+    expect(ids).toContain('ch-pub');
+    expect(ids).toContain('ch-priv-1');
+    expect(ids).not.toContain('ch-priv-2');
   });
 });

@@ -19,6 +19,9 @@ const prismaMock = {
   channel: {
     create: jest.fn(),
   },
+  channelCategory: {
+    create: jest.fn(),
+  },
   message: {
     count: jest.fn(),
   },
@@ -391,5 +394,85 @@ describe('GuildsService.findMyGuilds — unreadCount', () => {
     const result = await service.findMyGuilds(OWNER_ID);
     expect(result[0].unreadCount).toBe(1);
     expect(result[1].unreadCount).toBe(7);
+  });
+});
+
+// ── GuildsService.create — varsayılan kategori (Sprint V2 A) ─────────────────
+
+describe('GuildsService.create — varsayılan kategori', () => {
+  let service: GuildsService;
+
+  const CATEGORY_ID = 'cat-default';
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('guild oluşturulunca "Metin Kanalları" kategorisi ve genel-sohbet kanalı o kategoride yaratılır', async () => {
+    // $transaction çağrısını gerçek tx objesi simüle ederek tetikle
+    const txMock = {
+      guild: { create: jest.fn().mockResolvedValue(GUILD_FIXTURE) },
+      guildMember: { create: jest.fn().mockResolvedValue({}) },
+      channelCategory: {
+        create: jest.fn().mockResolvedValue({ id: CATEGORY_ID, name: 'Metin Kanalları', position: 0, guildId: GUILD_ID }),
+      },
+      channel: { create: jest.fn().mockResolvedValue({}) },
+    };
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock));
+
+    await service.create(OWNER_ID, { name: 'Test Ortamı' });
+
+    // Kategori oluşturuldu
+    expect(txMock.channelCategory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        guildId: GUILD_FIXTURE.id,
+        name: 'Metin Kanalları',
+        position: 0,
+      }),
+    });
+
+    // Kanal bu kategoriye bağlı oluşturuldu
+    expect(txMock.channel.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        guildId: GUILD_FIXTURE.id,
+        name: 'genel-sohbet',
+        categoryId: CATEGORY_ID,
+      }),
+    });
+  });
+
+  it('guild create → toGuildDto sonucu döner (id, name, ownerId)', async () => {
+    const txMock = {
+      guild: { create: jest.fn().mockResolvedValue(GUILD_FIXTURE) },
+      guildMember: { create: jest.fn().mockResolvedValue({}) },
+      channelCategory: { create: jest.fn().mockResolvedValue({ id: CATEGORY_ID }) },
+      channel: { create: jest.fn().mockResolvedValue({}) },
+    };
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock));
+
+    const result = await service.create(OWNER_ID, { name: 'Test Ortamı' });
+
+    expect(result).toMatchObject({
+      id: GUILD_ID,
+      name: 'Test Ortamı',
+      ownerId: OWNER_ID,
+    });
+  });
+
+  it('varsayılan kanal categoryId = oluşturulan kategorinin id\'si', async () => {
+    const dynamicCatId = 'dyn-cat-999';
+    const txMock = {
+      guild: { create: jest.fn().mockResolvedValue(GUILD_FIXTURE) },
+      guildMember: { create: jest.fn().mockResolvedValue({}) },
+      channelCategory: { create: jest.fn().mockResolvedValue({ id: dynamicCatId }) },
+      channel: { create: jest.fn().mockResolvedValue({}) },
+    };
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock));
+
+    await service.create(OWNER_ID, { name: 'Yeni Ortam' });
+
+    const channelCall = txMock.channel.create.mock.calls[0][0];
+    expect(channelCall.data.categoryId).toBe(dynamicCatId);
   });
 });

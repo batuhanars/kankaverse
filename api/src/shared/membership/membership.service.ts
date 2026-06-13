@@ -13,6 +13,10 @@ import { PrismaService } from '../../prisma/prisma.service';
  *
  * R7 (Sprint 7A): guild.adultsOnly enforce edildi — guild kanalı dalında tek
  * isMinor sorgusuyla hem ageGated hem adultsOnly kapısı kontrol edilir (DRY).
+ *
+ * R7 (Sprint V2): isPrivate kanal erişim kapısı — yaş kapısından SONRA kontrol
+ * edilir. isPrivate=true ise: (OWNER/ADMIN) VEYA ChannelMember kaydı olmak şart.
+ * Aksi hâlde jenerik NOT_CHANNEL_MEMBER (durum sızıntısı yok).
  */
 @Injectable()
 export class MembershipService {
@@ -56,7 +60,7 @@ export class MembershipService {
     }
 
     if (channel.guildId) {
-      // Guild kanalı: yaş kapısı (ageGated + adultsOnly) + guild üyeliği
+      // Guild kanalı: yaş kapısı (ageGated + adultsOnly) → guild üyeliği → özel kanal kapısı
       const needsAgeCheck = channel.ageGated || (channel.guild?.adultsOnly ?? false);
       if (needsAgeCheck) {
         const user = await this.prisma.user.findUnique({
@@ -73,6 +77,20 @@ export class MembershipService {
       });
       if (!membership) {
         throw new ForbiddenException({ message: 'Bu kanala erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+      }
+
+      // R7 (Sprint V2): özel kanal kapısı — yaş kapısından SONRA uygulanır.
+      // OWNER/ADMIN her özel kanala erişir; MEMBER ancak ChannelMember kaydı varsa erişir.
+      if (channel.isPrivate) {
+        const isPrivileged = membership.role === 'OWNER' || membership.role === 'ADMIN';
+        if (!isPrivileged) {
+          const channelMember = await this.prisma.channelMember.findUnique({
+            where: { channelId_userId: { channelId: channel.id, userId } },
+          });
+          if (!channelMember) {
+            throw new ForbiddenException({ message: 'Bu kanala erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+          }
+        }
       }
     } else {
       // DM kanalı: ChannelMember kaydı — R7 §7 Sprint 3 açık kapanışı

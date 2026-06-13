@@ -192,6 +192,7 @@ model Channel {
   ownerId         String?          // GROUP_DM: oluşturan kullanıcı; 1-1 DM + guild kanallarında null
   owner           User?            @relation("ChannelOwner", fields: [ownerId], references: [id])
   ageGated        Boolean          @default(false)
+  isPrivate       Boolean          @default(false)
   position        Int              @default(0)
   slowModeSeconds Int              @default(0)
   deletedAt       DateTime?
