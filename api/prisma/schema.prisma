@@ -195,6 +195,8 @@ model Message {
   author      User              @relation(fields: [authorId], references: [id])
   content     String
   replyToId   String?
+  replyTo     Message?          @relation("MessageReply", fields: [replyToId], references: [id])
+  replies     Message[]         @relation("MessageReply")
   editedAt    DateTime?
   deletedAt   DateTime?
   createdAt   DateTime          @default(now())
