@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Channel" ADD COLUMN     "slowModeSeconds" INTEGER NOT NULL DEFAULT 0;
