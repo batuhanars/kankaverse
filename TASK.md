@@ -389,6 +389,30 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 ---
 
+## Sprint 7B — Türkçe Automod + Yeni Üye Karantinası (PM onaylı 2026-06-13)
+
+> Aktif sözleşme: `contracts/SPRINT_7B_CONTRACT.md`. **R7: karantina entegrasyonu (`canDm`/`canSendFriendRequest`)**
+> insan incelemesi. Automod = R7-hafif (PM incelemesi). Dev checkbox işaretler, item EKLEMEZ.
+
+### Backend (`api/`)
+- [ ] `AutomodService.check(content)` (SharedModule) + config yasak-kelime listesi; basit TR normalize (küçük harf/TR karakter/tekrar daralt)
+- [ ] `messages.service.create` automod kapısı → eşleşme `MESSAGE_BLOCKED` (**DM hariç**, sıfır DB/kayıt)
+- [ ] `isQuarantinedInGuild(userId, guildId)` (joinedAt + `QUARANTINE_HOURS`; config default 24, 0=kapalı)
+- [ ] **Karantina entegrasyonu (R7):** `canDm` 4c ortak-sunucu + `canSendFriendRequest` 6a ortak-ortam → ortak guild yalnız sender o guild'de karantinada DEĞİLSE sayılır; jenerik retler
+- [ ] Hata kodu `MESSAGE_BLOCKED`; Swagger; birim test (automod check + karantina entegrasyonu + **minör kalkanı 4a/G1 regresyonu**)
+
+### Frontend (`web/`)
+- [ ] `MESSAGE_BLOCKED` → mesaj alanında jenerik Türkçe uyarı (toast/satır); `tr.json`. **Karantina UI YOK** (sessiz)
+
+### Sprint 7B DoD (contract §6)
+- [ ] Automod guild kanalında çalışır, DM etkilenmez, sıfır kayıt; liste config'ten
+- [ ] Karantina yeni üyeyi ortak-ortam basamağıyla DM/friend başlatmaktan alıkoyar; süre dolunca normal; 0=kapalı
+- [ ] Minör kalkanı bozulmadı (4a/G1 testleri geçer); karantina yalnız ekledi
+- [ ] `nest build` + `vue-tsc` temiz; testler geçer
+- [ ] **R7:** karantina entegrasyonu satır-satır incelendi (sahip imzası)
+
+---
+
 ## Sprint 1 DoD — PM reconcile (2026-06-13)
 
 > Fonksiyonel olarak Sprint 2A/2B/3/4A boyunca doğrulandı (uygulama uçtan uca çalışıyor); checkbox'lar bayattı.
