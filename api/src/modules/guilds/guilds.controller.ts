@@ -13,6 +13,8 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GuildsService } from './guilds.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { UpdateGuildDto } from './dto/update-guild.dto';
+import { PresignIconDto } from './dto/presign-icon.dto';
+import { SetIconDto } from './dto/set-icon.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from '../../common/guards/verified-email.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -53,5 +55,28 @@ export class GuildsController {
     @Body() dto: UpdateGuildDto,
   ) {
     return this.guildsService.update(user.id, guildId, dto);
+  }
+
+  @Post(':id/icon/presign')
+  @UseGuards(VerifiedEmailGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Ortam ikonu yüklemek için presigned PUT URL al (yalnız OWNER)' })
+  presignIcon(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Body() dto: PresignIconDto,
+  ) {
+    return this.guildsService.presignIcon(user.id, guildId, dto);
+  }
+
+  @Patch(':id/icon')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Ortam ikonunu güncelle veya kaldır (yalnız OWNER). storageKey: null → ikon siler.' })
+  setIcon(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Body() dto: SetIconDto,
+  ) {
+    return this.guildsService.setIcon(user.id, guildId, dto);
   }
 }
