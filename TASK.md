@@ -499,6 +499,22 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 ---
 
+## Sprint 12 — Grup DM (yetişkin-only, arkadaş-tabanlı) (PM compose 2026-06-13)
+
+> Sözleşme: `contracts/SPRINT_12_CONTRACT.md`. **T&S: minör grupta YOK + arkadaş-only ekleme.** R7 incelendi.
+
+### Backend (`api/`)
+- [x] `ChannelType.GROUP_DM` + `Channel.ownerId` + migration; `isMutualFriend` helper
+- [x] `POST /dm/groups` (R7 kapı: creator-minör → `GROUP_MINOR_FORBIDDEN`; üye minör/arkadaş-değil → **jenerik `NOT_FRIEND`**) + add/leave/delete(owner)/rename
+- [x] `requireNoDmBlock` GROUP_DM'de atlanır (1-1'de korunur); `GET /dm/channels` discriminated (DM | GROUP_DM members[])
+- [x] **R7 fix:** hedef-minör `GROUP_MINOR_FORBIDDEN` sızdırıyordu → jenerik `NOT_FRIEND` (minör ≡ non-friend, G1 korundu); 276 test
+
+### Frontend (`web/`)
+- [x] `CreateGroupModal` (kanka çoklu-seç + ad); `DmList` çoklu-avatar; `DmConversation` grup başlığı + gönderen adı + `GroupManagePanel` (üye/ekle/ayrıl/owner sil-rename)
+- [x] `DmChannelDto` discriminated union; jenerik ret toast (statü sızdırma yok)
+
+---
+
 ## Sprint 1 DoD — PM reconcile (2026-06-13)
 
 > Fonksiyonel olarak Sprint 2A/2B/3/4A boyunca doğrulandı (uygulama uçtan uca çalışıyor); checkbox'lar bayattı.
