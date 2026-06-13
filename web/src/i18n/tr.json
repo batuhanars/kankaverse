@@ -317,6 +317,10 @@
       "LAST_CHANNEL": "Son kanal silinemez. Ortamda en az bir kanal olmalıdır."
     }
   },
+  "reaction": {
+    "addReaction": "Reaksiyon ekle",
+    "toggleTitle": "Reaksiyonu değiştir"
+  },
   "message": {
     "inputPlaceholder": "#{channel} kanalına mesaj yaz",
     "send": "Gönder",

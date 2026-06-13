@@ -44,6 +44,49 @@ const deleteLoading = ref(false)
 // Kendi mesajını şikayet etme
 const isMine = computed(() => props.message.author.id === authStore.user?.id)
 
+// Reaksiyon emoji seti (küratörlü)
+const EMOJI_SET = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '👀']
+
+// Emoji picker görünürlüğü
+const showEmojiPicker = ref(false)
+
+function toggleEmojiPicker(e: MouseEvent) {
+  e.stopPropagation()
+  showEmojiPicker.value = !showEmojiPicker.value
+}
+
+async function pickEmoji(emoji: string) {
+  showEmojiPicker.value = false
+  try {
+    await messagesApi.addReaction(props.message.channelId, props.message.id, emoji)
+    // Optimistik güncelleme WS olmasa da çalışsın
+    messagesStore.applyReaction(props.message.id, emoji, authStore.user!.id, authStore.user!.id, true)
+  } catch {
+    // sessizce yut — WS zaten senkronize eder
+  }
+}
+
+async function toggleReaction(emoji: string, reactedByMe: boolean) {
+  try {
+    if (reactedByMe) {
+      await messagesApi.removeReaction(props.message.channelId, props.message.id, emoji)
+      messagesStore.applyReaction(props.message.id, emoji, authStore.user!.id, authStore.user!.id, false)
+    } else {
+      await messagesApi.addReaction(props.message.channelId, props.message.id, emoji)
+      messagesStore.applyReaction(props.message.id, emoji, authStore.user!.id, authStore.user!.id, true)
+    }
+  } catch {
+    // sessizce yut
+  }
+}
+
+function onPickerDocClick(e: MouseEvent) {
+  const picker = document.getElementById(`kv-emoji-picker-${props.message.id}`)
+  if (picker && !picker.contains(e.target as Node)) {
+    showEmojiPicker.value = false
+  }
+}
+
 function closeCard() {
   showCard.value = false
 }
@@ -144,10 +187,12 @@ function onDocClick(e: MouseEvent) {
 onMounted(() => {
   window.addEventListener('kv:close-user-cards', closeCard)
   document.addEventListener('click', onDocClick)
+  document.addEventListener('click', onPickerDocClick)
 })
 onUnmounted(() => {
   window.removeEventListener('kv:close-user-cards', closeCard)
   document.removeEventListener('click', onDocClick)
+  document.removeEventListener('click', onPickerDocClick)
 })
 </script>
 
@@ -177,10 +222,38 @@ onUnmounted(() => {
         >
           {{ t('message.edited') }}
         </span>
+        <!-- Reaksiyon ekle hover butonu (her mesajda) -->
+        <div class="relative ml-auto">
+          <button
+            class="opacity-0 group-hover:opacity-100 transition-opacity text-[14px] cursor-pointer px-1.5 py-0.5 rounded"
+            style="color: var(--kv-text-muted);"
+            :title="t('reaction.addReaction')"
+            @click.stop="toggleEmojiPicker"
+          >
+            🙂
+          </button>
+          <!-- Emoji picker popover -->
+          <div
+            v-if="showEmojiPicker"
+            :id="`kv-emoji-picker-${message.id}`"
+            class="absolute bottom-full right-0 mb-1 z-50 flex gap-1 p-1.5 rounded-[var(--kv-radius-md)]"
+            style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
+            @click.stop
+          >
+            <button
+              v-for="emoji in EMOJI_SET"
+              :key="emoji"
+              class="text-[18px] w-8 h-8 flex items-center justify-center rounded cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+              @click="pickEmoji(emoji)"
+            >
+              {{ emoji }}
+            </button>
+          </div>
+        </div>
         <!-- Şikâyet hover butonu (kendi mesajı değilse) -->
         <button
           v-if="!isMine"
-          class="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-[12px] cursor-pointer px-2 py-0.5 rounded"
+          class="opacity-0 group-hover:opacity-100 transition-opacity text-[12px] cursor-pointer px-2 py-0.5 rounded"
           style="color: var(--kv-text-muted);"
           :title="t('report.reportMessage')"
           @click.stop="openReportModal"
@@ -192,7 +265,7 @@ onUnmounted(() => {
           <!-- Düzenle: yalnız metin içeren mesajda görünür -->
           <button
             v-if="message.content"
-            class="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-[12px] cursor-pointer px-2 py-0.5 rounded"
+            class="opacity-0 group-hover:opacity-100 transition-opacity text-[12px] cursor-pointer px-2 py-0.5 rounded"
             style="color: var(--kv-text-muted);"
             :title="t('message.edit')"
             @click.stop="startEdit"
@@ -201,7 +274,6 @@ onUnmounted(() => {
           </button>
           <button
             class="opacity-0 group-hover:opacity-100 transition-opacity text-[12px] cursor-pointer px-2 py-0.5 rounded"
-            :class="message.content ? '' : 'ml-auto'"
             style="color: var(--kv-danger);"
             :title="t('message.delete')"
             @click.stop="openDeleteConfirm"
@@ -268,6 +340,22 @@ onUnmounted(() => {
             :attachment="att"
           />
         </template>
+        <!-- Reaksiyon pill'leri -->
+        <div v-if="message.reactions?.length" class="flex flex-wrap gap-1 mt-1">
+          <button
+            v-for="reaction in message.reactions"
+            :key="reaction.emoji"
+            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[13px] cursor-pointer transition-colors border"
+            :style="reaction.reactedByMe
+              ? 'background-color: var(--kv-accent-subtle); border-color: var(--kv-accent-500); color: var(--kv-accent-500);'
+              : 'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'"
+            :title="t('reaction.toggleTitle')"
+            @click.stop="toggleReaction(reaction.emoji, reaction.reactedByMe)"
+          >
+            <span>{{ reaction.emoji }}</span>
+            <span class="text-[12px] font-medium">{{ reaction.count }}</span>
+          </button>
+        </div>
       </template>
     </div>
   </div>

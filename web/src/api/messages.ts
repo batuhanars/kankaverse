@@ -23,4 +23,12 @@ export const messagesApi = {
   deleteMessage(channelId: string, messageId: string) {
     return http.delete<null>(`/channels/${channelId}/messages/${messageId}`)
   },
+  // Sprint V2: reaksiyon ekle
+  addReaction(channelId: string, messageId: string, emoji: string) {
+    return http.post<null>(`/channels/${channelId}/messages/${messageId}/reactions`, { emoji })
+  },
+  // Sprint V2: reaksiyon kaldır
+  removeReaction(channelId: string, messageId: string, emoji: string) {
+    return http.delete<null>(`/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`)
+  },
 }

@@ -536,6 +536,14 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 ---
 
+## V2 — Özellikler (PM compose, otonom 2026-06-13+)
+
+> V1 kapsamlı bitti; V2 özelliklerine geçildi. (Ertelenenler: ses/video LiveKit, göç+Discord-OAuth, rol/izin matrisi.)
+
+- [x] **Mesaj reaksiyonları (emoji)** — `MessageReaction` + migration; `POST`/`DELETE /channels/:id/messages/:messageId/reactions` (idempotent); MessageDto `reactions[{emoji,count,reactedByMe}]`; WS `reaction.added`/`removed`; emoji popover (8'li, kütüphanesiz) + toggle pill; guild+DM+grup. 320 test
+
+---
+
 ## Sprint 1 DoD — PM reconcile (2026-06-13)
 
 > Fonksiyonel olarak Sprint 2A/2B/3/4A boyunca doğrulandı (uygulama uçtan uca çalışıyor); checkbox'lar bayattı.
