@@ -9,7 +9,7 @@ import UserCardPopover from './UserCardPopover.vue'
 import AttachmentView from './AttachmentView.vue'
 import ReportModal from './ReportModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
-import EmojiPicker from './EmojiPicker.vue'
+import MessageActionsMenu from './MessageActionsMenu.vue'
 import type { MessageDto } from '@/types'
 
 const props = defineProps<{ message: MessageDto }>()
@@ -46,29 +46,7 @@ const deleteLoading = ref(false)
 // Kendi mesajını şikayet etme
 const isMine = computed(() => props.message.author.id === authStore.user?.id)
 
-// Reaksiyon emoji seti (küratörlü)
-const EMOJI_SET = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '👀']
-
-// Emoji picker görünürlüğü
-const showEmojiPicker = ref(false)
-// Tam emoji picker (vue3-emoji-picker) görünürlüğü
-const showFullEmojiPicker = ref(false)
-
-function toggleEmojiPicker(e: MouseEvent) {
-  e.stopPropagation()
-  showEmojiPicker.value = !showEmojiPicker.value
-  showFullEmojiPicker.value = false
-}
-
-function openFullEmojiPicker(e: MouseEvent) {
-  e.stopPropagation()
-  showFullEmojiPicker.value = !showFullEmojiPicker.value
-  showEmojiPicker.value = false
-}
-
 async function pickEmoji(emoji: string) {
-  showEmojiPicker.value = false
-  showFullEmojiPicker.value = false
   try {
     await messagesApi.addReaction(props.message.channelId, props.message.id, emoji)
     // Store güncellemesi useSocket reaction.added handler'ından gelir (çift-sayım önleme)
@@ -90,16 +68,6 @@ async function toggleReaction(emoji: string, reactedByMe: boolean) {
   }
 }
 
-function onPickerDocClick(e: MouseEvent) {
-  const picker = document.getElementById(`kv-emoji-picker-${props.message.id}`)
-  if (picker && !picker.contains(e.target as Node)) {
-    showEmojiPicker.value = false
-  }
-  const fullPicker = document.getElementById(`kv-full-emoji-picker-${props.message.id}`)
-  if (fullPicker && !fullPicker.contains(e.target as Node)) {
-    showFullEmojiPicker.value = false
-  }
-}
 
 function closeCard() {
   showCard.value = false
@@ -201,12 +169,10 @@ function onDocClick(e: MouseEvent) {
 onMounted(() => {
   window.addEventListener('kv:close-user-cards', closeCard)
   document.addEventListener('click', onDocClick)
-  document.addEventListener('click', onPickerDocClick)
 })
 onUnmounted(() => {
   window.removeEventListener('kv:close-user-cards', closeCard)
   document.removeEventListener('click', onDocClick)
-  document.removeEventListener('click', onPickerDocClick)
 })
 </script>
 
@@ -215,98 +181,21 @@ onUnmounted(() => {
     class="relative flex gap-3 px-4 py-1 hover:bg-[var(--kv-bg-elevated)] rounded group"
     @contextmenu="onContextMenu"
   >
-    <!-- Hover toolbar: yüzen overlay, sağ-üst — layout'u itmez -->
+    <!-- Kebab menü: yüzen overlay, sağ-üst — layout'u itmez -->
     <div
       v-if="!editing"
-      class="absolute top-0 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--kv-radius-sm)] z-10"
-      style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
-      @click.stop
+      class="absolute top-0.5 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
     >
-      <!-- Reaksiyon ekle -->
-      <div class="relative">
-        <button
-          class="text-[14px] cursor-pointer w-6 h-6 flex items-center justify-center rounded transition-colors hover:bg-[var(--kv-bg-sidebar)]"
-          style="color: var(--kv-text-muted);"
-          :title="t('reaction.addReaction')"
-          @click.stop="toggleEmojiPicker"
-        >
-          🙂
-        </button>
-        <!-- Hızlı emoji picker popover (8'li set + daha fazla butonu) -->
-        <div
-          v-if="showEmojiPicker"
-          :id="`kv-emoji-picker-${message.id}`"
-          class="absolute top-full right-0 mt-1 z-50 flex gap-1 p-1.5 rounded-[var(--kv-radius-md)]"
-          style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
-          @click.stop
-        >
-          <button
-            v-for="emoji in EMOJI_SET"
-            :key="emoji"
-            class="text-[18px] w-8 h-8 flex items-center justify-center rounded cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)]"
-            @click="pickEmoji(emoji)"
-          >
-            {{ emoji }}
-          </button>
-          <!-- Daha fazla: tam picker aç -->
-          <button
-            class="text-[13px] w-8 h-8 flex items-center justify-center rounded cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)] font-medium"
-            style="color: var(--kv-text-muted);"
-            :title="t('reaction.morePicker')"
-            @click.stop="openFullEmojiPicker"
-          >
-            ⋯
-          </button>
-        </div>
-        <!-- Tam emoji picker (vue3-emoji-picker) -->
-        <div
-          v-if="showFullEmojiPicker"
-          :id="`kv-full-emoji-picker-${message.id}`"
-          class="absolute top-full right-0 mt-1 z-50"
-          @click.stop
-        >
-          <EmojiPicker @select="pickEmoji" />
-        </div>
-      </div>
-      <!-- Yanıtla -->
-      <button
-        class="text-[12px] cursor-pointer px-1 py-0.5 rounded transition-colors hover:bg-[var(--kv-bg-sidebar)]"
-        style="color: var(--kv-text-muted);"
-        :title="t('reply.button')"
-        @click.stop="emit('reply', message)"
-      >
-        ↩ {{ t('reply.button') }}
-      </button>
-      <!-- Şikâyet (kendi mesajı değilse) -->
-      <button
-        v-if="!isMine"
-        class="text-[12px] cursor-pointer px-1 py-0.5 rounded transition-colors hover:bg-[var(--kv-bg-sidebar)]"
-        style="color: var(--kv-text-muted);"
-        :title="t('report.reportMessage')"
-        @click.stop="openReportModal"
-      >
-        {{ t('report.reportMessage') }}
-      </button>
-      <!-- Düzenle / Sil (kendi mesajı) -->
-      <template v-if="isMine">
-        <button
-          v-if="message.content"
-          class="text-[12px] cursor-pointer px-1 py-0.5 rounded transition-colors hover:bg-[var(--kv-bg-sidebar)]"
-          style="color: var(--kv-text-muted);"
-          :title="t('message.edit')"
-          @click.stop="startEdit"
-        >
-          {{ t('message.edit') }}
-        </button>
-        <button
-          class="text-[12px] cursor-pointer px-1 py-0.5 rounded transition-colors hover:bg-[var(--kv-bg-sidebar)]"
-          style="color: var(--kv-danger);"
-          :title="t('message.delete')"
-          @click.stop="openDeleteConfirm"
-        >
-          {{ t('message.delete') }}
-        </button>
-      </template>
+      <MessageActionsMenu
+        :message-id="message.id"
+        :is-mine="isMine"
+        :has-content="!!message.content"
+        @reply="emit('reply', message)"
+        @edit="startEdit"
+        @delete="openDeleteConfirm"
+        @report="openReportModal"
+        @add-reaction="pickEmoji"
+      />
     </div>
     <button class="shrink-0 cursor-pointer" @click="onAuthorClick">
       <UserAvatar :username="message.author.username" :avatar-url="message.author.avatarUrl" />
