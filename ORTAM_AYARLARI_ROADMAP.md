@@ -32,11 +32,19 @@
 
 ---
 
+## V1 — Sprint 11 (Ortam Derinleştirme — kurul 2026-06-13)
+
+| Ayar | Kapsam | Not |
+|---|---|---|
+| **Kanal yönetimi** | kanal ekle / yeniden adlandır / sil + UI | Backend `POST channel` **var** (Sprint 1, OWNER/ADMIN); eksik rename/delete + UI. V1 çekirdek boşluğu |
+| **Ortam ikonu yükleme** | `Guild.iconUrl` (şemada var) → presign/upload (Sprint 5) → PATCH guild | **V2'den öne çekildi** — upload altyapısı geldi. Banner V2 kalır |
+| **Ortam kuralları** | guild `rules` metni + üyeye gösterim | Basit; ayarlara fold edilebilir |
+
 ## V2 (file-sharing + temel izin sonrası)
 
 | Özellik | Bağımlılık / Neden ertelendi |
 |---|---|
-| **Sunucu ikonu / banner yükleme** | **Upload altyapısı (Sprint 5: S3/presigned)** gerekir — onsuz yapılamaz |
+| **Sunucu banner yükleme** | İkon Sprint 11'e taşındı (V1); banner ikincil → V2 |
 | **Özel emoji ekleme** | Upload altyapısı + emoji picker + mesajda render. Discord-hissi nice-to-have, çekirdek değil |
 | **Üye davet yetkisi** (`whoCanInvite: OWNER_ADMIN \| ALL_MEMBERS` toggle) | Basit hali V2'de mümkün; **kontrollü büyüme** duruşu gereği V1'de OWNER/ADMIN'de tutuldu |
 | **Moderatör onaylı üye daveti** | Sahibin fikri (2026-06-13): üye davet eder → mod onayından geçer. **Onay kuyruğu** = moderasyon katmanı (roller + 4B). İzin matrisi + onay akışı gerektirir |

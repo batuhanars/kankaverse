@@ -7,6 +7,27 @@
 
 ---
 
+## 0. KURUL KARARI (2026-06-13) — Aktif iskelet kapsamı
+
+> Hukukçu sessiz/deneyimi belirsiz. Kurul: **iskeleti şimdi kur, hukuk-bayraklı kısımları stub bırak, deneyimli görüş
+> gelince revize et.** Aşağıdaki ayrım **bağlayıcı.** §3'teki hukuki sorular `contracts/SPRINT_4B_HUKUK_BRIEF.md`'de.
+
+**✅ ŞİMDİ KURULUR (R7 — insan incelemesi):**
+- Prisma: `Report` · `ModerationAction` · `AuditLog` modelleri + enumlar (additive).
+- **`POST /reports`** (auth, rate-limit) — temel şikâyet **CANLI** (kapalı önizlemede kullanıcı taciz bildirebilsin). priority hesaplanır (minör/CSAM en yüksek).
+- **`GET /moderation/queue`** (mod-only) — öncelik sırası. **CSAM raporu içeriği RENDER EDİLMEZ** (sadece flag + "manuel escalate").
+- **`POST /moderation/actions`** (mod-only) — WARN/MUTE/KICK/BAN → **erişim kontrolüne bağla** (`canDm`/`canSendFriendRequest`/mesaj-gönderme aktif MUTE/BAN okur) + `AuditLog` yaz.
+- **`GET /audit`** (admin).
+- **Moderatör rolü:** platform-seviyesi basit `User.isModerator` (veya `role`) bayrağı — global T&S kuyruğu için (seed/manuel set). Guild-içi mod = mevcut OWNER/ADMIN.
+
+**🔴 STUB / KURULMAZ (deneyimli hukuk görüşüne dek):**
+- **`contextSnapshot` = yalnız minimal referans** (`{ targetType, targetId, reason, reportedAt }`) — **kullanıcı içeriği/kanıt YAKALANMAZ/SAKLANMAZ.** Alan dursun, gerçek kanıt-yakalama hukuk sonrası (KVKK dayanak + retention).
+- **CSAM akışı** — hash-eşleme, yetkili bildirimi, kanıt koruma, kısıtlı erişim: **TASARLANMAZ/KURULMAZ.** CSAM raporu yalnız en yüksek öncelik + "render etme, manuel escalate" flag'i alır.
+- **Retention/purge politikaları, 5651 ifşa akışı, legal-hold etkileşimi** — kurulmaz; hukuk tanımlar.
+- **Kurul gerekçesi:** yanlış CSAM/kanıt-saklama = "bedava revize" değil, **cezai/KVKK sorumluluk** (geri alınamaz). Bu yüzden iyi-niyetle tahmin yürütülmez.
+
+---
+
 ## 1. Hedef
 
 T&S çekirdeğinin "tespit et → hızlı müdahale et → mağdura çıkış" ayağı (brief §5; 4A "ulaşımı zorlaştır"ı tamamlar).
