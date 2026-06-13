@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
@@ -15,6 +16,25 @@ const { t } = useI18n()
 const router = useRouter()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
+
+// ── Tooltip state ──
+const tooltipVisible = ref(false)
+const tooltipText = ref('')
+const tooltipTop = ref(0)
+const tooltipLeft = ref(0)
+
+function showTooltip(event: MouseEvent, text: string) {
+  const el = event.currentTarget as HTMLElement
+  const rect = el.getBoundingClientRect()
+  tooltipText.value = text
+  tooltipLeft.value = rect.right + 12
+  tooltipTop.value = rect.top + rect.height / 2
+  tooltipVisible.value = true
+}
+
+function hideTooltip() {
+  tooltipVisible.value = false
+}
 
 function goHome() {
   router.push({ name: 'app' })
@@ -48,16 +68,16 @@ function guildInitial(name: string) {
   <nav class="rail">
     <!-- Marka / home — guild'lerin üstünde sabit -->
     <div class="rail-item">
-      <button class="guild-btn" @click="goHome">
+      <button
+        class="guild-btn"
+        @click="goHome"
+        @mouseenter="showTooltip($event, t('brand.name'))"
+        @mouseleave="hideTooltip"
+      >
         <span :class="['hex-home', { 'hex-home--active': guildsStore.activeGuildId === null }]">
           <img :src="hexagonLogo" :alt="t('brand.name')" class="home-img" />
         </span>
       </button>
-      <!-- Özel tooltip -->
-      <div class="rail-tooltip" role="tooltip">
-        <span class="rail-tooltip__arrow" />
-        <span class="rail-tooltip__text">{{ t('brand.name') }}</span>
-      </div>
     </div>
 
     <div class="divider" />
@@ -81,6 +101,8 @@ function guildInitial(name: string) {
       <button
         class="guild-btn"
         @click="selectGuild(guild)"
+        @mouseenter="showTooltip($event, guild.name)"
+        @mouseleave="hideTooltip"
       >
         <span :class="['hex', guildsStore.activeGuildId === guild.id ? 'hex--active' : 'hex--idle']">
           <img
@@ -92,12 +114,6 @@ function guildInitial(name: string) {
           <span v-else class="hex-label">{{ guildInitial(guild.name) }}</span>
         </span>
       </button>
-
-      <!-- Özel tooltip -->
-      <div class="rail-tooltip" role="tooltip">
-        <span class="rail-tooltip__arrow" />
-        <span class="rail-tooltip__text">{{ guild.name }}</span>
-      </div>
     </div>
 
     <!-- Ayraç -->
@@ -105,7 +121,12 @@ function guildInitial(name: string) {
 
     <!-- Ortam ekle -->
     <div class="rail-item">
-      <button class="guild-btn add-btn" @click="onCreateGuild">
+      <button
+        class="guild-btn add-btn"
+        @click="onCreateGuild"
+        @mouseenter="showTooltip($event, t('server.addOrtam'))"
+        @mouseleave="hideTooltip"
+      >
         <span class="hex hex--add">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -122,13 +143,24 @@ function guildInitial(name: string) {
           </svg>
         </span>
       </button>
-      <!-- Özel tooltip -->
-      <div class="rail-tooltip" role="tooltip">
-        <span class="rail-tooltip__arrow" />
-        <span class="rail-tooltip__text">{{ t('server.addOrtam') }}</span>
-      </div>
     </div>
   </nav>
+
+  <!-- Tooltip — body'ye teleport, overflow kırpılmaz -->
+  <Teleport to="body">
+    <div
+      v-if="tooltipVisible"
+      class="rail-tooltip"
+      role="tooltip"
+      :style="{
+        top: tooltipTop + 'px',
+        left: tooltipLeft + 'px',
+      }"
+    >
+      <span class="rail-tooltip__arrow" />
+      <span class="rail-tooltip__text">{{ tooltipText }}</span>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -140,13 +172,13 @@ function guildInitial(name: string) {
   gap: 8px;
   padding: 12px 0;
   overflow-y: auto;
-  overflow-x: visible;
+  overflow-x: hidden;
   flex-shrink: 0;
   width: 72px;
   background-color: var(--kv-bg-rail);
 }
 
-/* rail-item: tooltip'in konumlanacağı referans kutusu */
+/* rail-item: konumlanma referansı */
 .rail-item {
   position: relative;
   display: flex;
@@ -257,7 +289,7 @@ function guildInitial(name: string) {
   margin: 4px 0;
 }
 
-/* ── Okunmamış sol pill ── */
+/* ── Okunmamış sol pill — rail içinde kalır (left: 0, taşma yok) ── */
 .unread-pill {
   position: absolute;
   left: 0;
@@ -278,25 +310,19 @@ function guildInitial(name: string) {
   height: 0;
   opacity: 0;
 }
+</style>
 
-/* ── Özel tooltip (CSS-only, gecikme yok) ── */
+<!-- Teleport hedefi body olduğu için scoped class çalışmaz — global stil -->
+<style>
+/* ── Rail tooltip (Teleport → body, fixed konumlama) ── */
 .rail-tooltip {
-  position: absolute;
-  left: calc(100% + 12px);
-  top: 50%;
+  position: fixed;
   transform: translateY(-50%);
   display: flex;
   align-items: center;
-  gap: 0;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.1s;
   white-space: nowrap;
   z-index: 9999;
-}
-
-.rail-item:hover .rail-tooltip {
-  opacity: 1;
 }
 
 /* Sol-bakan ok (üçgen) */
