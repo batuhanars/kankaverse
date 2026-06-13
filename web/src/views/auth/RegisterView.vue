@@ -128,6 +128,13 @@ function getError(field: string): string | undefined {
           {{ t('auth.login') }}
         </RouterLink>
       </p>
+
+      <p class="mt-4 text-center text-[12px]" style="color: var(--kv-text-muted);">
+        {{ t('legal.privacy.registerNote') }}
+        <RouterLink to="/gizlilik" style="color: var(--kv-text-muted); text-decoration: underline; text-underline-offset: 2px;">
+          {{ t('legal.privacy.linkLabel') }}
+        </RouterLink>
+      </p>
     </div>
   </div>
 </template>
