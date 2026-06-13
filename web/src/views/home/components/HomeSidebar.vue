@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DmList from './DmList.vue'
-import CreateGroupModal from './CreateGroupModal.vue'
+import StartChatModal from './StartChatModal.vue'
 
 defineProps<{ activeView: 'friends' | 'message-requests' | 'dm'; activeDmChannelId: string | null }>()
 const emit = defineEmits<{
@@ -12,10 +12,10 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const showCreateGroup = ref(false)
+const showStartChat = ref(false)
 
-function onGroupCreated(channelId: string) {
-  showCreateGroup.value = false
+function onChatCreated(channelId: string) {
+  showStartChat.value = false
   emit('selectDm', channelId)
 }
 </script>
@@ -62,19 +62,19 @@ function onGroupCreated(channelId: string) {
       </button>
     </div>
 
-    <!-- DM bölüm başlığı + Grup Oluştur -->
+    <!-- DM bölüm başlığı + Sohbet Başlat -->
     <div class="flex items-center justify-between px-4 pt-4 pb-1 shrink-0">
       <p
         class="text-[11px] font-semibold uppercase tracking-widest"
         style="color: var(--kv-text-muted);"
       >{{ t('sidebar.dmSection') }}</p>
       <button
-        class="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-        style="color: var(--kv-text-muted);"
-        :title="t('group.createButton')"
-        @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-text-primary)'"
-        @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
-        @click="showCreateGroup = true"
+        class="w-6 h-6 flex items-center justify-center rounded-[var(--kv-radius-sm)] text-[16px] font-semibold leading-none cursor-pointer transition-colors"
+        style="color: var(--kv-text-secondary); background-color: transparent;"
+        :title="t('startChat.openChatButton')"
+        @mouseenter="($event.target as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'; ($event.target as HTMLElement).style.color = 'var(--kv-accent-500)'"
+        @mouseleave="($event.target as HTMLElement).style.backgroundColor = 'transparent'; ($event.target as HTMLElement).style.color = 'var(--kv-text-secondary)'"
+        @click="showStartChat = true"
       >
         +
       </button>
@@ -87,10 +87,10 @@ function onGroupCreated(channelId: string) {
     />
   </aside>
 
-  <!-- Grup oluştur modal -->
-  <CreateGroupModal
-    v-if="showCreateGroup"
-    @close="showCreateGroup = false"
-    @created="onGroupCreated"
+  <!-- Sohbet başlat modal (1-1 DM veya grup) -->
+  <StartChatModal
+    v-if="showStartChat"
+    @close="showStartChat = false"
+    @created="onChatCreated"
   />
 </template>
