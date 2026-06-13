@@ -54,22 +54,33 @@ export const useChannelsStore = defineStore('channels', () => {
     activeChannelId.value = id
   }
 
-  /** Kanalı okundu işaretle: POST /channels/:id/read → unreadCount=0 + guild unread'ini düş */
-  async function markChannelRead(channelId: string): Promise<void> {
-    // Optimistik: önce local'i güncelle, sonra backend'e bildir
-    for (const [guildId, channels] of Object.entries(channelsByGuild.value)) {
+  /** Kanalı okundu işaretle: POST /channels/:id/read → optimistik 0 + sunucudan otoritatif tazele */
+  async function markChannelRead(channelId: string, guildId?: string): Promise<void> {
+    // Optimistik: önce local'i sıfırla (anlık his)
+    let resolvedGuildId = guildId
+    for (const [loopGuildId, channels] of Object.entries(channelsByGuild.value)) {
       const idx = channels.findIndex((c) => c.id === channelId)
-      if (idx !== -1 && channels[idx].unreadCount > 0) {
-        channels[idx] = { ...channels[idx], unreadCount: 0 }
-        // Guild unread sayacını kanallardan yeniden topla — import döngüsünden kaçın, event yayınla
-        window.dispatchEvent(new CustomEvent('kv:guild:recheck-unread', { detail: { guildId } }))
+      if (idx !== -1) {
+        if (channels[idx].unreadCount > 0) {
+          channels[idx] = { ...channels[idx], unreadCount: 0 }
+        }
+        if (!resolvedGuildId) resolvedGuildId = loopGuildId
         break
       }
     }
+    // Optimistik guild sayacı — event yolu kalıyor (fallback)
+    if (resolvedGuildId) {
+      window.dispatchEvent(new CustomEvent('kv:guild:recheck-unread', { detail: { guildId: resolvedGuildId } }))
+    }
     try {
       await channelsApi.markRead(channelId)
+      // Sunucu-otoritesi: POST başarılı → kanalları sunucudan tazele; guild sayacını gerçek toplamdan güncelle
+      if (resolvedGuildId) {
+        await fetchChannels(resolvedGuildId)
+        window.dispatchEvent(new CustomEvent('kv:guild:recheck-unread', { detail: { guildId: resolvedGuildId } }))
+      }
     } catch {
-      // Sessizce yut — okundu işaretleme kritik değil, UI'ı geri alma
+      // Sessizce yut — okundu işaretleme kritik değil
     }
   }
 
