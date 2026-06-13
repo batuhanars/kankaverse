@@ -4,32 +4,30 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useMessagesStore } from '@/stores/messages'
 import { messagesApi } from '@/api/messages'
-import UserAvatar from './UserAvatar.vue'
+import MessageRow from './MessageRow.vue'
 import UserCardPopover from './UserCardPopover.vue'
-import AttachmentView from './AttachmentView.vue'
 import ReportModal from './ReportModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
-import MessageActionsMenu from './MessageActionsMenu.vue'
 import type { MessageDto } from '@/types'
 
-const props = defineProps<{ message: MessageDto }>()
+const props = defineProps<{
+  message: MessageDto
+  isGroupStart: boolean
+}>()
 const emit = defineEmits<{ reply: [message: MessageDto] }>()
 
 const { t } = useI18n()
 const authStore = useAuthStore()
 const messagesStore = useMessagesStore()
 
-const timeStr = computed(() => {
-  const d = new Date(props.message.createdAt)
-  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }).replace(':', '.')
-})
+const isMine = computed(() => props.message.author.id === authStore.user?.id)
 
+// Kullanıcı kartı popover (yazar adına tıklama — MessageRow gelecekte emit ile bağlanabilir)
 const showCard = ref(false)
 const cardX = ref(0)
 const cardY = ref(0)
-const showMenu = ref(false)
-const menuX = ref(0)
-const menuY = ref(0)
+
+// Şikâyet modalı
 const showReportModal = ref(false)
 
 // Düzenleme durumu
@@ -43,15 +41,13 @@ const editTextareaEl = ref<HTMLTextAreaElement | null>(null)
 const showDeleteConfirm = ref(false)
 const deleteLoading = ref(false)
 
-// Kendi mesajını şikayet etme
-const isMine = computed(() => props.message.author.id === authStore.user?.id)
-
-async function pickEmoji(emoji: string) {
+// Reaksiyon
+async function addReaction(_msgId: string, emoji: string) {
   try {
     await messagesApi.addReaction(props.message.channelId, props.message.id, emoji)
-    // Store güncellemesi useSocket reaction.added handler'ından gelir (çift-sayım önleme)
+    // Store güncellemesi useSocket reaction.added handler'ından gelir
   } catch {
-    // sessizce yut — WS zaten senkronize eder
+    // sessizce yut
   }
 }
 
@@ -62,38 +58,19 @@ async function toggleReaction(emoji: string, reactedByMe: boolean) {
     } else {
       await messagesApi.addReaction(props.message.channelId, props.message.id, emoji)
     }
-    // Store güncellemesi useSocket reaction.added/reaction.removed handler'ından gelir (çift-sayım önleme)
+    // Store güncellemesi useSocket reaction.added/reaction.removed handler'ından gelir
   } catch {
     // sessizce yut
   }
 }
 
-
+// Kullanıcı kartı
 function closeCard() {
   showCard.value = false
 }
 
-function onAuthorClick(e: MouseEvent) {
-  window.dispatchEvent(new CustomEvent('kv:close-user-cards'))
-  cardX.value = e.clientX
-  cardY.value = e.clientY
-  showCard.value = true
-}
-
-function onContextMenu(e: MouseEvent) {
-  e.preventDefault()
-  showMenu.value = true
-  menuX.value = e.clientX
-  menuY.value = e.clientY
-}
-
-function openReportModal() {
-  showMenu.value = false
-  showReportModal.value = true
-}
-
+// Düzenleme
 function startEdit() {
-  showMenu.value = false
   editContent.value = props.message.content
   editError.value = ''
   editing.value = true
@@ -117,15 +94,18 @@ async function saveEdit() {
   editLoading.value = true
   editError.value = ''
   try {
-    const { data } = await messagesApi.editMessage(props.message.channelId, props.message.id, trimmed)
+    const { data } = await messagesApi.editMessage(
+      props.message.channelId,
+      props.message.id,
+      trimmed,
+    )
     messagesStore.updateMessage(data)
     editing.value = false
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string } } }
     const code = err.response?.data?.error
-    editError.value = code === 'MESSAGE_BLOCKED'
-      ? t('message.errors.MESSAGE_BLOCKED')
-      : t('common.error')
+    editError.value =
+      code === 'MESSAGE_BLOCKED' ? t('message.errors.MESSAGE_BLOCKED') : t('common.error')
   } finally {
     editLoading.value = false
   }
@@ -141,8 +121,8 @@ function onEditKeydown(e: KeyboardEvent) {
   }
 }
 
+// Silme
 function openDeleteConfirm() {
-  showMenu.value = false
   showDeleteConfirm.value = true
 }
 
@@ -152,91 +132,35 @@ async function confirmDelete() {
     await messagesApi.deleteMessage(props.message.channelId, props.message.id)
     messagesStore.removeMessage(props.message.channelId, props.message.id)
   } catch {
-    // Sunucu hatası — WS zaten kaldıracak; sessizce yut
+    // Sunucu hatası — WS zaten kaldıracak
   } finally {
     deleteLoading.value = false
     showDeleteConfirm.value = false
   }
 }
 
-function onDocClick(e: MouseEvent) {
-  const menu = document.getElementById('kv-msg-ctx-menu')
-  if (menu && !menu.contains(e.target as Node)) {
-    showMenu.value = false
-  }
-}
-
 onMounted(() => {
   window.addEventListener('kv:close-user-cards', closeCard)
-  document.addEventListener('click', onDocClick)
 })
 onUnmounted(() => {
   window.removeEventListener('kv:close-user-cards', closeCard)
-  document.removeEventListener('click', onDocClick)
 })
 </script>
 
 <template>
-  <div
-    class="relative flex gap-3 px-4 py-1 hover:bg-[var(--kv-bg-elevated)] rounded group"
-    @contextmenu="onContextMenu"
+  <MessageRow
+    :message="message"
+    :is-mine="isMine"
+    :is-group-start="isGroupStart"
+    :is-editing="editing"
+    @reply="emit('reply', $event)"
+    @edit="startEdit"
+    @delete="openDeleteConfirm"
+    @report="showReportModal = true"
+    @add-reaction="addReaction"
   >
-    <button class="shrink-0 cursor-pointer" @click="onAuthorClick">
-      <UserAvatar :username="message.author.username" :avatar-url="message.author.avatarUrl" />
-    </button>
-    <div class="relative flex flex-col min-w-0 flex-1">
-      <!-- Kebab menü: içerik alanının sağ-üst köşesi — layout'u itmez -->
-      <div
-        v-if="!editing"
-        class="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-      >
-        <MessageActionsMenu
-          :message-id="message.id"
-          :is-mine="isMine"
-          :has-content="!!message.content"
-          @reply="emit('reply', message)"
-          @edit="startEdit"
-          @delete="openDeleteConfirm"
-          @report="openReportModal"
-          @add-reaction="pickEmoji"
-        />
-      </div>
-      <div class="flex items-baseline gap-2">
-        <button
-          class="text-[14px] font-semibold hover:underline cursor-pointer text-left"
-          style="color:var(--kv-text-primary);"
-          @click="onAuthorClick"
-        >
-          {{ message.author.username }}
-        </button>
-        <span class="text-[11px] text-[var(--kv-text-muted)]">{{ timeStr }}</span>
-        <!-- "(düzenlendi)" etiketi -->
-        <span
-          v-if="message.editedAt"
-          class="text-[11px]"
-          style="color: var(--kv-text-muted);"
-        >
-          {{ t('message.edited') }}
-        </span>
-      </div>
-
-      <!-- Yanıt alıntısı (replyToId doluysa mesajın üstünde) -->
-      <div
-        v-if="message.replyToId"
-        class="flex items-center gap-1.5 mt-0.5 mb-0.5 pl-2 text-[12px] rounded-[var(--kv-radius-sm)] max-w-[480px] truncate cursor-default"
-        style="border-left: 2px solid var(--kv-text-muted); color: var(--kv-text-muted);"
-      >
-        <span class="shrink-0">↩</span>
-        <template v-if="message.replyTo">
-          <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">{{ message.replyTo.authorUsername }}</span>
-          <span class="truncate">{{ message.replyTo.content }}</span>
-        </template>
-        <template v-else>
-          <span class="italic">{{ t('reply.deleted') }}</span>
-        </template>
-      </div>
-
-      <!-- Inline düzenleme modu -->
+    <!-- Düzenleme modu -->
+    <template #editing>
       <div v-if="editing" class="mt-1">
         <textarea
           ref="editTextareaEl"
@@ -260,96 +184,27 @@ onUnmounted(() => {
           </button>
         </div>
       </div>
+    </template>
 
-      <!-- Normal mesaj içeriği -->
-      <template v-else>
-        <!-- Ek+açıklama → tek birim; yalnız ek → sadece ek; yalnız metin → metin -->
-        <template v-if="message.attachments?.length && message.content">
-          <!-- Birleşik: görsel/ek üstte, açıklama altında, tek kapsayıcı -->
-          <div class="mt-1 rounded-[var(--kv-radius-sm)] overflow-hidden" style="max-width: 360px; background-color: var(--kv-bg-elevated);">
-            <AttachmentView
-              v-for="att in message.attachments"
-              :key="att.id"
-              :attachment="att"
-              class="!mt-0"
-            />
-            <p class="px-3 pb-3 pt-1.5 text-[14px] break-words whitespace-pre-wrap" style="color: var(--kv-text-body);">
-              {{ message.content }}
-            </p>
-          </div>
-        </template>
-        <template v-else>
-          <!-- Yalnız metin -->
-          <p
-            v-if="message.content"
-            class="text-[14px] text-[var(--kv-text-body)] break-words whitespace-pre-wrap"
-          >
-            {{ message.content }}
-          </p>
-          <!-- Yalnız ek (açıklamasız) -->
-          <AttachmentView
-            v-for="att in message.attachments"
-            :key="att.id"
-            :attachment="att"
-          />
-        </template>
-        <!-- Reaksiyon pill'leri -->
-        <div v-if="message.reactions?.length" class="flex flex-wrap gap-1 mt-1">
-          <button
-            v-for="reaction in message.reactions"
-            :key="reaction.emoji"
-            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[13px] cursor-pointer transition-colors border"
-            :style="reaction.reactedByMe
-              ? 'background-color: var(--kv-accent-subtle); border-color: var(--kv-accent-500); color: var(--kv-accent-500);'
-              : 'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'"
-            :title="t('reaction.toggleTitle')"
-            @click.stop="toggleReaction(reaction.emoji, reaction.reactedByMe)"
-          >
-            <span>{{ reaction.emoji }}</span>
-            <span class="text-[12px] font-medium">{{ reaction.count }}</span>
-          </button>
-        </div>
-      </template>
-    </div>
-  </div>
-
-  <!-- Sağ tık bağlam menüsü -->
-  <Teleport v-if="showMenu" to="body">
-    <div
-      id="kv-msg-ctx-menu"
-      class="fixed z-50 rounded-[var(--kv-radius-md)] py-1 min-w-[160px]"
-      :style="`top:${menuY}px;left:${menuX}px;background-color:var(--kv-bg-elevated);border:1px solid var(--kv-border-subtle);`"
-    >
-      <!-- Kendi mesajı: düzenle (metin varsa) + sil -->
-      <template v-if="isMine">
-        <button
-          v-if="message.content"
-          class="w-full text-left px-3 py-2 text-[13px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)]"
-          style="color: var(--kv-text-primary);"
-          @click="startEdit"
-        >
-          {{ t('message.edit') }}
-        </button>
-        <button
-          class="w-full text-left px-3 py-2 text-[13px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)]"
-          style="color: var(--kv-danger);"
-          @click="openDeleteConfirm"
-        >
-          {{ t('message.delete') }}
-        </button>
-      </template>
-      <!-- Başkasının mesajı: şikâyet -->
+    <!-- Reaksiyon pill'leri (guild kanalı) -->
+    <template #reactions>
       <button
-        v-else
-        class="w-full text-left px-3 py-2 text-[13px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)]"
-        style="color: var(--kv-danger);"
-        @click="openReportModal"
+        v-for="reaction in message.reactions"
+        :key="reaction.emoji"
+        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[13px] cursor-pointer transition-colors border"
+        :style="reaction.reactedByMe
+          ? 'background-color: var(--kv-accent-subtle); border-color: var(--kv-accent-500); color: var(--kv-accent-500);'
+          : 'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'"
+        :title="t('reaction.toggleTitle')"
+        @click.stop="toggleReaction(reaction.emoji, reaction.reactedByMe)"
       >
-        {{ t('report.reportMessage') }}
+        <span>{{ reaction.emoji }}</span>
+        <span class="text-[12px] font-medium">{{ reaction.count }}</span>
       </button>
-    </div>
-  </Teleport>
+    </template>
+  </MessageRow>
 
+  <!-- Kullanıcı kartı (yazar adına tıklama — yalnız grup başında görünür) -->
   <UserCardPopover
     v-if="showCard"
     :user-id="message.author.id"

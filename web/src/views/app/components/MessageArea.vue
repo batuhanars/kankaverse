@@ -48,6 +48,17 @@ const channelId = computed(() => channelsStore.activeChannelId)
 const messages = computed(() =>
   channelId.value ? messagesStore.messagesForChannel(channelId.value) : [],
 )
+
+// Gruplama: mesaj grup başı mı?
+// Kural: ilk mesaj VEYA önceki yazarı farklı VEYA öncekinden > 7 dakika geçmişse → grup başı.
+function isGroupStart(index: number): boolean {
+  if (index === 0) return true
+  const cur = messages.value[index]
+  const prev = messages.value[index - 1]
+  if (cur.author.id !== prev.author.id) return true
+  const diffMs = new Date(cur.createdAt).getTime() - new Date(prev.createdAt).getTime()
+  return diffMs > 7 * 60 * 1000
+}
 const hasMore = computed(() =>
   channelId.value ? (messagesStore.hasMoreByChannel[channelId.value] ?? false) : false,
 )
@@ -251,7 +262,13 @@ function onKeydown(e: KeyboardEvent) {
           {{ t('message.noMessages') }}
         </p>
 
-        <MessageItem v-for="msg in messages" :key="msg.id" :message="msg" @reply="setReplyingTo" />
+        <MessageItem
+          v-for="(msg, index) in messages"
+          :key="msg.id"
+          :message="msg"
+          :is-group-start="isGroupStart(index)"
+          @reply="setReplyingTo"
+        />
       </template>
     </div>
 

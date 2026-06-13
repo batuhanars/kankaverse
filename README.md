@@ -1,8 +1,8 @@
 # Kankaverse
 
-Yerli, topluluk odaklı gerçek zamanlı iletişim platformu (Discord alternatifi) — Türkiye pazarı için
-sıfırdan tasarlanıyor. Öne çıkan ilkeler: Türkçe moderasyon, yerel ödeme, KVKK uyumu ve **çocuk
-güvenliğinin mimariye gömülü olması**.
+**Yerli ve milli** topluluk odaklı gerçek zamanlı iletişim platformu — Türkiye pazarı için sıfırdan
+tasarlanıyor. Öne çıkan ilkeler: Türkçe moderasyon, yerel ödeme, KVKK uyumu ve **çocuk güvenliğinin
+mimariye gömülü olması**.
 
 > Durum: **erken geliştirme** (V1 — walking skeleton aşaması).
 
