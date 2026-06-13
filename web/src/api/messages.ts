@@ -31,4 +31,16 @@ export const messagesApi = {
   removeReaction(channelId: string, messageId: string, emoji: string) {
     return http.delete<null>(`/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`)
   },
+  // Sprint V2 Pins: mesajı sabitle (§4 POST)
+  pinMessage(channelId: string, messageId: string) {
+    return http.post<null>(`/channels/${channelId}/messages/${messageId}/pin`)
+  },
+  // Sprint V2 Pins: sabitlemeyi kaldır (§4 DELETE)
+  unpinMessage(channelId: string, messageId: string) {
+    return http.delete<null>(`/channels/${channelId}/messages/${messageId}/pin`)
+  },
+  // Sprint V2 Pins: kanal sabit mesajları (§4 GET)
+  fetchPins(channelId: string) {
+    return http.get<MessageDto[]>(`/channels/${channelId}/pins`)
+  },
 }

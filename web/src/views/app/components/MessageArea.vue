@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useMessagesStore } from '@/stores/messages'
 import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
+import { useAuthStore } from '@/stores/auth'
 import { useSocket } from '@/composables/useSocket'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
@@ -18,7 +19,11 @@ const { t } = useI18n()
 const messagesStore = useMessagesStore()
 const channelsStore = useChannelsStore()
 const guildsStore = useGuildsStore()
+const authStore = useAuthStore()
 const { joinChannel, leaveChannel } = useSocket()
+
+// Sprint V2 Pins: guild kanalında yalnız OWNER/ADMIN sabitleyebilir (§2)
+const canPin = computed(() => guildsStore.isAdminInActiveGuild(authStore.user?.id ?? ''))
 const { onInput: onTypingInput, stopTyping } = useTyping(() => channelId.value)
 const { label: typingLabel } = useTypingLabel(() => channelId.value, t)
 
@@ -317,6 +322,7 @@ function onTextareaInput() {
           :message="msg"
           :is-group-start="isGroupStart(index)"
           :guild-members="guildMembers"
+          :can-pin="canPin"
           @reply="setReplyingTo"
         />
       </template>

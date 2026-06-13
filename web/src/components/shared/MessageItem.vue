@@ -15,6 +15,8 @@ const props = defineProps<{
   isGroupStart: boolean
   // Sprint V2: guild üyeleri (MessageArea'dan aktarılır; mention çözümü için)
   guildMembers?: GuildMemberDto[]
+  // Sprint V2 Pins: kullanıcı bu kanalda mesaj sabitleyebilir mi?
+  canPin?: boolean
 }>()
 const emit = defineEmits<{ reply: [message: MessageDto] }>()
 
@@ -53,6 +55,23 @@ const editTextareaEl = ref<HTMLTextAreaElement | null>(null)
 // Silme durumu
 const showDeleteConfirm = ref(false)
 const deleteLoading = ref(false)
+
+// Sprint V2 Pins: sabitleme / kaldırma (WS echo ile state güncellenir)
+async function pinMessage() {
+  try {
+    await messagesApi.pinMessage(props.message.channelId, props.message.id)
+  } catch {
+    // sessizce yut — WS echo gelmezse state değişmez
+  }
+}
+
+async function unpinMessage() {
+  try {
+    await messagesApi.unpinMessage(props.message.channelId, props.message.id)
+  } catch {
+    // sessizce yut
+  }
+}
 
 // Reaksiyon
 async function addReaction(_msgId: string, emoji: string) {
@@ -168,11 +187,14 @@ onUnmounted(() => {
     :is-editing="editing"
     :mention-resolver="mentionResolver"
     :is-mentioned="isMentioned"
+    :can-pin="canPin ?? false"
     @reply="emit('reply', $event)"
     @edit="startEdit"
     @delete="openDeleteConfirm"
     @report="showReportModal = true"
     @add-reaction="addReaction"
+    @pin="pinMessage"
+    @unpin="unpinMessage"
   >
     <!-- Düzenleme modu -->
     <template #editing>

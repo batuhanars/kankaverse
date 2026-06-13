@@ -211,6 +211,7 @@ export interface MessageDto {
   attachments?: AttachmentDto[]
   reactions?: ReactionDto[]
   mentions?: string[]  // Sprint V2 — doğrulanmış bahsedilen userId'ler (boşsa [])
+  pinnedAt: string | null  // Sprint V2 Pins — dolu ise sabitlenen mesaj
 }
 
 // Sprint 7B — Ortam üye DTO

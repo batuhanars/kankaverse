@@ -15,6 +15,7 @@ import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.v
 import ReportModal from '@/components/shared/ReportModal.vue'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import MessageRow from '@/components/shared/MessageRow.vue'
+import PinsPopover from '@/components/shared/PinsPopover.vue'
 import GroupManagePanel from './GroupManagePanel.vue'
 import type { DmChannelDto, MessageDto } from '@/types'
 
@@ -334,6 +335,36 @@ function isMine(msg: MessageDto): boolean {
   return msg.author.id === authStore.user?.id
 }
 
+// Sprint V2 Pins: DM/grup DM'de herkes sabitleyebilir (§2)
+const showDmPins = ref(false)
+
+function toggleDmPins(e: MouseEvent) {
+  e.stopPropagation()
+  showDmPins.value = !showDmPins.value
+}
+
+async function onPinMessage(messageId: string) {
+  try {
+    await messagesApi.pinMessage(props.channel.id, messageId)
+    // State güncellemesi WS message.pinned ile gelir; popover da WS refresh ile tazelenir
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { error?: string } } }
+    if (err.response?.data?.error === 'PIN_LIMIT') {
+      // PIN_LIMIT hatasını kullanıcıya gösterecek bir mekanizma yok şimdi;
+      // WS echo gelmediği için store değişmez — kullanıcı zaten menüyü açar ve sabitleme olmaz.
+      // Geliştirme notu: sonraki dalga — toast/snackbar ile göster.
+    }
+  }
+}
+
+async function onUnpinMessage(messageId: string) {
+  try {
+    await messagesApi.unpinMessage(props.channel.id, messageId)
+  } catch {
+    // sessizce yut — WS echo gelmezse state değişmez
+  }
+}
+
 // formatTime: DM input bandında hâlâ kullanılmıyor ama MessageRow içinde kendi formatTime'ı var.
 // Silmek yerine kullanılmayan olarak işaretle — TypeScript strict modunda kaldır.
 // function formatTime(iso: string): string {
@@ -455,6 +486,25 @@ function isGroupStart(index: number): boolean {
           <span class="flex-1 text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
             {{ dmChannel.otherUser.username }}
           </span>
+          <!-- Sabitlenen mesajlar butonu -->
+          <div class="relative">
+            <button
+              class="w-8 h-8 flex items-center justify-center text-[16px] rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+              :class="showDmPins ? 'bg-[var(--kv-accent-subtle)]' : ''"
+              :style="showDmPins ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
+              :title="t('message.pinnedMessages')"
+              @mouseenter="!showDmPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
+              @mouseleave="!showDmPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
+              @click="toggleDmPins"
+            >
+              📌
+            </button>
+            <PinsPopover
+              :channel-id="channel.id"
+              :open="showDmPins"
+              @close="showDmPins = false"
+            />
+          </div>
           <!-- Kullanıcıyı şikâyet et -->
           <button
             class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
@@ -504,6 +554,25 @@ function isGroupStart(index: number): boolean {
             <p class="text-[12px]" style="color: var(--kv-text-muted);">
               {{ t('group.memberCount', { n: groupChannel.members.length }) }}
             </p>
+          </div>
+          <!-- Sabitlenen mesajlar butonu (GROUP_DM) -->
+          <div class="relative">
+            <button
+              class="w-8 h-8 flex items-center justify-center text-[16px] rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+              :class="showDmPins ? 'bg-[var(--kv-accent-subtle)]' : ''"
+              :style="showDmPins ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
+              :title="t('message.pinnedMessages')"
+              @mouseenter="!showDmPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
+              @mouseleave="!showDmPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
+              @click="toggleDmPins"
+            >
+              📌
+            </button>
+            <PinsPopover
+              :channel-id="channel.id"
+              :open="showDmPins"
+              @close="showDmPins = false"
+            />
           </div>
           <!-- Üye panelini aç/kapat -->
           <button
@@ -556,11 +625,14 @@ function isGroupStart(index: number): boolean {
           :is-editing="isMine(msg) && editState?.messageId === msg.id"
           :mention-resolver="dmMentionResolver"
           :is-mentioned="isDmMentioned(msg)"
+          :can-pin="true"
           @reply="startReply"
           @edit="startEdit"
           @delete="openDeleteConfirm"
           @report="openReportMessage"
           @add-reaction="(_msgId, emoji) => pickDmEmoji(msg, emoji)"
+          @pin="onPinMessage"
+          @unpin="onUnpinMessage"
         >
           <!-- Inline düzenleme modu (kendi mesajı) -->
           <template #editing>
