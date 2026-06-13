@@ -524,6 +524,15 @@
     "empty": "Sonuç bulunamadı.",
     "tip": "TÜYO: Ortamlar için ortam adını, DM için @ ile başlayın."
   },
+  "messageSearch": {
+    "buttonTitle": "Mesajlarda Ara",
+    "panelTitle": "Mesajlarda Ara",
+    "inputPlaceholder": "Mesajlarda ara…",
+    "minChars": "En az 2 karakter girin",
+    "loading": "Aranıyor…",
+    "empty": "Sonuç bulunamadı.",
+    "error": "Arama sırasında bir hata oluştu."
+  },
   "notifications": {
     "title": "Bildirimler",
     "empty": "Henüz bildirim yok.",
