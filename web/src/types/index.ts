@@ -165,6 +165,21 @@ export interface MessageDto {
   attachments?: AttachmentDto[]
 }
 
+// Sprint 7B — Ortam üye DTO
+export const GuildMemberRole = {
+  OWNER: 'OWNER',
+  ADMIN: 'ADMIN',
+  MEMBER: 'MEMBER',
+} as const
+export type GuildMemberRole = (typeof GuildMemberRole)[keyof typeof GuildMemberRole]
+
+export interface GuildMemberDto {
+  userId: string
+  username: string
+  avatarUrl: string | null
+  role: GuildMemberRole
+}
+
 // Sprint 7A §3 — Davet DTO'ları
 export interface InviteDto {
   code: string

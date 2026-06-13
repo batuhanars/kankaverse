@@ -1,5 +1,5 @@
 import http from './axios'
-import type { GuildDto, ChannelDto } from '@/types'
+import type { GuildDto, ChannelDto, GuildMemberDto } from '@/types'
 
 export const guildsApi = {
   create(name: string) {
@@ -16,5 +16,8 @@ export const guildsApi = {
   },
   createChannel(guildId: string, name: string) {
     return http.post<ChannelDto>(`/guilds/${guildId}/channels`, { name })
+  },
+  getMembers(guildId: string) {
+    return http.get<GuildMemberDto[]>(`/guilds/${guildId}/members`)
   },
 }

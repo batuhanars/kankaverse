@@ -282,9 +282,13 @@
   },
   "member": {
     "panel": "Üyeler",
-    "online": "Çevrimiçi",
-    "offline": "Çevrimdışı",
-    "comingSoon": "Üye listesi çok yakında."
+    "online": "Çevrimiçi — {n}",
+    "offline": "Çevrimdışı — {n}",
+    "comingSoon": "Üye listesi çok yakında.",
+    "role": {
+      "OWNER": "Sahip",
+      "ADMIN": "Yönetici"
+    }
   },
   "friends": {
     "title": "Kankalar",
