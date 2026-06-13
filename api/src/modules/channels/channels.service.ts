@@ -1,7 +1,13 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
+import { UpdateChannelDto } from './dto/update-channel.dto';
 import { Channel } from '@prisma/client';
 
 function toChannelDto(channel: Channel) {
@@ -15,6 +21,13 @@ function toChannelDto(channel: Channel) {
   };
 }
 
+/** OWNER veya ADMIN rolü gerektirir, aksi hâlde 403 FORBIDDEN */
+function requireAdminRole(role: string) {
+  if (role !== 'OWNER' && role !== 'ADMIN') {
+    throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+  }
+}
+
 @Injectable()
 export class ChannelsService {
   constructor(
@@ -24,10 +37,7 @@ export class ChannelsService {
 
   async create(userId: string, guildId: string, dto: CreateChannelDto) {
     const { membership } = await this.membership.requireGuildMembership(userId, guildId);
-
-    if (membership.role === 'MEMBER') {
-      throw new ForbiddenException({ message: 'Kanal oluşturmak için yetkiniz yok.', error: 'FORBIDDEN' });
-    }
+    requireAdminRole(membership.role);
 
     const maxPosition = await this.prisma.channel.aggregate({
       where: { guildId, deletedAt: null },
@@ -39,6 +49,7 @@ export class ChannelsService {
         guildId,
         type: 'GUILD_TEXT',
         name: dto.name,
+        ageGated: dto.ageGated ?? false,
         position: (maxPosition._max.position ?? -1) + 1,
       },
     });
@@ -55,5 +66,54 @@ export class ChannelsService {
     });
 
     return channels.map(toChannelDto);
+  }
+
+  async update(userId: string, channelId: string, dto: UpdateChannelDto) {
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId, deletedAt: null },
+    });
+    if (!channel) {
+      throw new NotFoundException({ message: 'Kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
+    }
+
+    const { membership } = await this.membership.requireGuildMembership(userId, channel.guildId!);
+    requireAdminRole(membership.role);
+
+    const updated = await this.prisma.channel.update({
+      where: { id: channelId },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.ageGated !== undefined && { ageGated: dto.ageGated }),
+      },
+    });
+
+    return toChannelDto(updated);
+  }
+
+  async remove(userId: string, channelId: string) {
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId, deletedAt: null },
+    });
+    if (!channel) {
+      throw new NotFoundException({ message: 'Kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
+    }
+
+    const { membership } = await this.membership.requireGuildMembership(userId, channel.guildId!);
+    requireAdminRole(membership.role);
+
+    // Son kanal koruması: guild'in en az 1 aktif kanalı kalmalı
+    const activeCount = await this.prisma.channel.count({
+      where: { guildId: channel.guildId!, deletedAt: null },
+    });
+    if (activeCount <= 1) {
+      throw new ConflictException({ message: 'Son kanal silinemez; ortamda en az bir kanal olmalıdır.', error: 'LAST_CHANNEL' });
+    }
+
+    await this.prisma.channel.update({
+      where: { id: channelId },
+      data: { deletedAt: new Date() },
+    });
+
+    return null;
   }
 }

@@ -17,6 +17,7 @@ export function toGuildDto(guild: Guild) {
     ownerId: guild.ownerId,
     adultsOnly: guild.adultsOnly,
     iconUrl: guild.iconUrl,
+    rules: guild.rules ?? null,
     createdAt: guild.createdAt.toISOString(),
   };
 }
@@ -97,6 +98,7 @@ export class GuildsService {
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.adultsOnly !== undefined && { adultsOnly: dto.adultsOnly }),
+        ...(dto.rules !== undefined && { rules: dto.rules }),
       },
     });
 
