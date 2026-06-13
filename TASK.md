@@ -325,9 +325,37 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Typing emit (debounce 3sn) + dinleme (timeout 5sn + çoklu kullanıcı) DM+guild; i18n `typing.*` *(c5ac63c — PM incelendi: `useTyping` ephemeral, sızıntı yok, vue-tsc+vite build temiz)*
 - [x] **Yan-düzeltme:** Sprint 4A `d6ed6ab` HomeView'da `DmConversation`'a `canMessage`/`selfBlocked`/`@cleared` bağlanmamıştı (TS hatası → G3 blok-UX + G4 temizle wire değildi) → düzeltildi *(Sprint 4A frontend incelememde web build çalıştırılmamıştı; açık not edildi)*
 
-### 6.2 / 6.3 — SABAH KARARI (gece yapılmadı)
-- [ ] **6.2 presence görünürlük politikası** (A: arkadaş+yetişkin-ortak / B: Discord-benzeri / C: yalnız arkadaş) — **minör çevrimiçiliği kime görünür? (çocuk güvenliği)**
-- [ ] **6.3 bildirim kapsamı + kalıcılık** (Notification modeli mi, anlık mı; hangi olaylar)
+### 6.2 — Presence (✅ politika KİLİTLİ: Seçenek A, 2026-06-13 — uygulama bekliyor)
+
+> Karar: **minör presence yalnız karşılıklı arkadaşlara; yetişkin gizlemesiz (arkadaş + ortak-ortam).** Contract §3.
+> **R7:** görünürlük filtresi (minör hedef-listesi) satır-satır insan incelemesi. Dev checkbox işaretler, item EKLEMEZ.
+
+**Backend (`api/`):**
+- [x] Gateway bağlantı→`online` / disconnect→`offline` (away idle eşiği); `PresenceService` (bellek-içi, şemasız)
+- [x] `dnd`/online kullanıcı-seçimi set yolu (`presence:set` WS event)
+- [x] **Görünürlük filtresi (R7):** minör→yalnız arkadaş; yetişkin→arkadaş+ortak-ortam; hedef kümesi sunucuda, fail-closed — `canSeePresence` + `audienceFor`
+- [x] İlk bağlanışta görülebilir kişilerin presence snapshot'ı (`presence:snapshot`)
+
+**Frontend (`web/`):**
+- [x] Durum noktası (arkadaş/DM/üye listesi) gelen veriden; `dnd`/online seçimi (UserCard popover); presence dinleme
+
+### 6.3 — Bildirimler (✅ KİLİTLİ: Minimal/anlık, 2026-06-13)
+
+> Karar: bell yalnız **mevcut** `friend.*` event'lerini **anlık** gösterir. Kalıcılık/Notification modeli/şema/
+> mention/DM-bildirimi YOK → V1 sonrası. **Sıfır backend, R7-nötr.** Contract §4. Dev checkbox işaretler, item EKLEMEZ.
+
+**Frontend (`web/`) — backend dokunulmaz:**
+- [x] `notifications` store: oturum-içi `friend.request`/`accept`/`remove` biriktir + okunmamış sayaç
+- [x] Bell stub → panel (event listesi); açınca okunmuş; sayaç rozeti; metin `tr.json`
+
+### Sprint 6 — Revizyon R1 (sahip feedback 2026-06-13, PM onaylı; contract §4.5)
+
+> Sahip uygulama testi sonrası 3 düzeltme. Scope creep DEĞİL (sahip talebi). R7-nötr. Dev checkbox işaretler.
+
+- [x] **R1-a** (`web`): `FriendsRightPanel` presence'a bağlandı (PresenceDot + dinamik durum; çevrimiçi/çevrimdışı grupla) — sabit "çevrimdışı" bug'ı kapandı
+- [x] **R1-b** (`api`): DM typing karşı üyenin `user:<id>` odasına yayılır (guild room-yayını korunur) → DM'e bakmasan da kutucukta görünür
+- [x] **R1-b** (`web`): `DmList` kutucuğunda yazan varsa son-mesaj yerine vurgu renkli "yazıyor…"
+- [x] **R1-c** (`web`): 1-1 DM sade "yazıyor…" (`useTypingLabel { named:false }`); guild isimli "X yazıyor…" korunur; `typing.simple` i18n
 
 ---
 
