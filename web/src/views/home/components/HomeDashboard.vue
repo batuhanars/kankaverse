@@ -7,6 +7,7 @@ const emit = defineEmits<{
   addFriend: []
   createOrtam: []
   joinOrtam: []
+  openGuild: [guildId: string]
 }>()
 
 const { t } = useI18n()
@@ -96,7 +97,7 @@ const guildsStore = useGuildsStore()
             v-for="guild in guildsStore.guilds"
             :key="guild.id"
             class="guild-btn"
-            @click="guildsStore.setActiveGuild(guild.id)"
+            @click="emit('openGuild', guild.id)"
           >
             <div
               class="w-11 h-11 shrink-0 flex items-center justify-center text-[15px] font-bold text-white overflow-hidden"

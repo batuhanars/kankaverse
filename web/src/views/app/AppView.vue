@@ -169,6 +169,19 @@ async function logout() {
   await router.push({ name: 'login' })
 }
 
+async function selectGuild(guildId: string) {
+  if (!channelsStore.channelsForGuild(guildId).length) {
+    await channelsStore.fetchChannels(guildId)
+  }
+  const channels = channelsStore.channelsForGuild(guildId)
+  if (channels.length > 0) {
+    router.push({ name: 'channel', params: { guildId, channelId: channels[0].id } })
+  } else {
+    guildsStore.setActiveGuild(guildId)
+    channelsStore.setActiveChannel(null)
+  }
+}
+
 function selectFriends() {
   router.push({ name: 'app' })
 }
@@ -249,6 +262,7 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
             @add-friend="showAddFriendModal = true"
             @create-ortam="openServerModal('create')"
             @join-ortam="openServerModal('join')"
+            @open-guild="selectGuild"
           />
           <FriendsRightPanel
             :key="homeView === 'message-requests' ? 'pending' : 'all'"
