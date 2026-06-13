@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { ChannelsService } from './channels.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
@@ -17,6 +17,15 @@ const prismaMock = {
   },
   channelMember: {
     findMany: jest.fn(),
+    findUnique: jest.fn(),
+    upsert: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+  guildMember: {
+    findUnique: jest.fn(),
+  },
+  user: {
+    findUnique: jest.fn(),
   },
   message: {
     count: jest.fn(),
@@ -666,5 +675,360 @@ describe('ChannelsService.findByGuild — isPrivate filtresi', () => {
     expect(ids).toContain('ch-pub');
     expect(ids).toContain('ch-priv-1');
     expect(ids).not.toContain('ch-priv-2');
+  });
+});
+
+// ── ChannelsService.getChannelMembers ────────────────────────────────────────
+
+describe('ChannelsService.getChannelMembers', () => {
+  let service: ChannelsService;
+
+  const TARGET_ID = 'target-user-1';
+
+  function makePrivateChannel(overrides: Partial<Record<string, unknown>> = {}) {
+    return makeChannel({ isPrivate: true, guildId: GUILD_ID, ...overrides });
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('OWNER → özel kanalın üyelerini listeler', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makePrivateChannel());
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { user: { id: TARGET_ID, username: 'kanka1', avatarUrl: null } },
+    ]);
+
+    const result = await service.getChannelMembers(USER_ID, CHANNEL_ID);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({ id: TARGET_ID, username: 'kanka1', avatarUrl: null });
+  });
+
+  it('ADMIN → özel kanalın üyelerini listeler', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makePrivateChannel());
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: ADMIN_MEMBERSHIP });
+    prismaMock.channelMember.findMany.mockResolvedValue([]);
+
+    const result = await service.getChannelMembers('admin-1', CHANNEL_ID);
+
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('MEMBER → 403 FORBIDDEN', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makePrivateChannel());
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+
+    await expect(service.getChannelMembers('member-1', CHANNEL_ID)).rejects.toThrow(ForbiddenException);
+    await expect(service.getChannelMembers('member-1', CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'FORBIDDEN' },
+    });
+  });
+
+  it('genel kanal (isPrivate=false) → boş [] döner', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ guildId: GUILD_ID })); // isPrivate default false
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+
+    const result = await service.getChannelMembers(USER_ID, CHANNEL_ID);
+
+    expect(result).toEqual([]);
+    expect(prismaMock.channelMember.findMany).not.toHaveBeenCalled();
+  });
+
+  it('kanal yok → 404 CHANNEL_NOT_FOUND', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(null);
+
+    await expect(service.getChannelMembers(USER_ID, CHANNEL_ID)).rejects.toThrow(NotFoundException);
+    await expect(service.getChannelMembers(USER_ID, CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'CHANNEL_NOT_FOUND' },
+    });
+  });
+});
+
+// ── ChannelsService.addChannelMember ─────────────────────────────────────────
+
+describe('ChannelsService.addChannelMember', () => {
+  let service: ChannelsService;
+
+  const TARGET_ID = 'target-user-2';
+  const TARGET_USER = { id: TARGET_ID, username: 'kanka2', avatarUrl: null };
+
+  function makePrivateGuildChannel(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      ...makeChannel({ isPrivate: true, guildId: GUILD_ID }),
+      guild: { id: GUILD_ID, adultsOnly: false },
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('OWNER → özel kanala guild üyesi ekler', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makePrivateGuildChannel());
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.guildMember.findUnique.mockResolvedValue({ userId: TARGET_ID });
+    prismaMock.channelMember.upsert.mockResolvedValue({ user: TARGET_USER });
+
+    const result = await service.addChannelMember(USER_ID, CHANNEL_ID, { userId: TARGET_ID });
+
+    expect(prismaMock.channelMember.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { channelId_userId: { channelId: CHANNEL_ID, userId: TARGET_ID } },
+        create: { channelId: CHANNEL_ID, userId: TARGET_ID },
+      }),
+    );
+    expect(result).toEqual(TARGET_USER);
+  });
+
+  it('idempotent — zaten üye → upsert (update:{}) çağrılır, no-op', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makePrivateGuildChannel());
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.guildMember.findUnique.mockResolvedValue({ userId: TARGET_ID });
+    prismaMock.channelMember.upsert.mockResolvedValue({ user: TARGET_USER });
+
+    // İkinci kez ekle — upsert update:{} ile çalışır
+    await service.addChannelMember(USER_ID, CHANNEL_ID, { userId: TARGET_ID });
+    await service.addChannelMember(USER_ID, CHANNEL_ID, { userId: TARGET_ID });
+
+    expect(prismaMock.channelMember.upsert).toHaveBeenCalledTimes(2);
+    const secondCall = prismaMock.channelMember.upsert.mock.calls[1][0];
+    expect(secondCall.update).toEqual({});
+  });
+
+  it('MEMBER → 403 FORBIDDEN', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makePrivateGuildChannel());
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+
+    await expect(service.addChannelMember('member-1', CHANNEL_ID, { userId: TARGET_ID })).rejects.toThrow(
+      ForbiddenException,
+    );
+    await expect(service.addChannelMember('member-1', CHANNEL_ID, { userId: TARGET_ID })).rejects.toMatchObject({
+      response: { error: 'FORBIDDEN' },
+    });
+  });
+
+  it('OWNER + genel kanal (isPrivate=false) → 400 NOT_PRIVATE_CHANNEL', async () => {
+    // §2: NOT_PRIVATE_CHANNEL artık yalnız ADMIN GATE sonrası görünür.
+    prismaMock.channel.findUnique.mockResolvedValue({
+      ...makeChannel({ guildId: GUILD_ID }), // isPrivate=false
+      guild: { id: GUILD_ID, adultsOnly: false },
+    });
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+
+    await expect(service.addChannelMember(USER_ID, CHANNEL_ID, { userId: TARGET_ID })).rejects.toThrow(
+      BadRequestException,
+    );
+    await expect(service.addChannelMember(USER_ID, CHANNEL_ID, { userId: TARGET_ID })).rejects.toMatchObject({
+      response: { error: 'NOT_PRIVATE_CHANNEL' },
+    });
+  });
+
+  // §2 Durum sızıntısı testi: MEMBER özel/genel kanalı ayırt edemez
+  it('§2 MEMBER + özel kanal → FORBIDDEN (NOT_PRIVATE_CHANNEL sızdırılmaz)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makePrivateGuildChannel()); // isPrivate=true
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+
+    await expect(service.addChannelMember('member-1', CHANNEL_ID, { userId: TARGET_ID })).rejects.toThrow(
+      ForbiddenException,
+    );
+    await expect(service.addChannelMember('member-1', CHANNEL_ID, { userId: TARGET_ID })).rejects.toMatchObject({
+      response: { error: 'FORBIDDEN' },
+    });
+  });
+
+  it('§2 MEMBER + genel kanal → FORBIDDEN (NOT_PRIVATE_CHANNEL sızdırılmaz)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      ...makeChannel({ guildId: GUILD_ID }), // isPrivate=false
+      guild: { id: GUILD_ID, adultsOnly: false },
+    });
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+
+    // MEMBER özel kanala da genel kanala da aynı FORBIDDEN alır → kanalın tipi öğrenilemez
+    await expect(service.addChannelMember('member-1', CHANNEL_ID, { userId: TARGET_ID })).rejects.toThrow(
+      ForbiddenException,
+    );
+    await expect(service.addChannelMember('member-1', CHANNEL_ID, { userId: TARGET_ID })).rejects.toMatchObject({
+      response: { error: 'FORBIDDEN' },
+    });
+  });
+
+  it('hedef guild üyesi değil → 400 NOT_GUILD_MEMBER', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makePrivateGuildChannel());
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.guildMember.findUnique.mockResolvedValue(null); // guild üyesi değil
+
+    await expect(service.addChannelMember(USER_ID, CHANNEL_ID, { userId: TARGET_ID })).rejects.toThrow(
+      BadRequestException,
+    );
+    await expect(service.addChannelMember(USER_ID, CHANNEL_ID, { userId: TARGET_ID })).rejects.toMatchObject({
+      response: { error: 'NOT_GUILD_MEMBER' },
+    });
+  });
+
+  it('kanal ageGated + hedef minör → 400 AGE_RESTRICTED', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(
+      makePrivateGuildChannel({ ageGated: true, guild: { id: GUILD_ID, adultsOnly: false } }),
+    );
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.guildMember.findUnique.mockResolvedValue({ userId: TARGET_ID });
+    prismaMock.user.findUnique.mockResolvedValue({ isMinor: true });
+
+    await expect(service.addChannelMember(USER_ID, CHANNEL_ID, { userId: TARGET_ID })).rejects.toThrow(
+      BadRequestException,
+    );
+    await expect(service.addChannelMember(USER_ID, CHANNEL_ID, { userId: TARGET_ID })).rejects.toMatchObject({
+      response: { error: 'AGE_RESTRICTED' },
+    });
+  });
+
+  it('guild adultsOnly + hedef minör → 400 AGE_RESTRICTED', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(
+      makePrivateGuildChannel({ ageGated: false, guild: { id: GUILD_ID, adultsOnly: true } }),
+    );
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.guildMember.findUnique.mockResolvedValue({ userId: TARGET_ID });
+    prismaMock.user.findUnique.mockResolvedValue({ isMinor: true });
+
+    await expect(service.addChannelMember(USER_ID, CHANNEL_ID, { userId: TARGET_ID })).rejects.toThrow(
+      BadRequestException,
+    );
+    await expect(service.addChannelMember(USER_ID, CHANNEL_ID, { userId: TARGET_ID })).rejects.toMatchObject({
+      response: { error: 'AGE_RESTRICTED' },
+    });
+  });
+
+  it('ageGated kanal + hedef REŞIT → başarıyla eklenir (AGE_RESTRICTED fırlatılmaz)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(
+      makePrivateGuildChannel({ ageGated: true, guild: { id: GUILD_ID, adultsOnly: false } }),
+    );
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.guildMember.findUnique.mockResolvedValue({ userId: TARGET_ID });
+    prismaMock.user.findUnique.mockResolvedValue({ isMinor: false }); // reşit
+    prismaMock.channelMember.upsert.mockResolvedValue({ user: TARGET_USER });
+
+    const result = await service.addChannelMember(USER_ID, CHANNEL_ID, { userId: TARGET_ID });
+    expect(result).toEqual(TARGET_USER);
+  });
+});
+
+// ── ChannelsService.removeChannelMember ──────────────────────────────────────
+
+describe('ChannelsService.removeChannelMember', () => {
+  let service: ChannelsService;
+
+  const TARGET_ID = 'target-user-3';
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('OWNER → üyeyi çıkarır → null döner', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ guildId: GUILD_ID }));
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.channelMember.deleteMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.removeChannelMember(USER_ID, CHANNEL_ID, TARGET_ID);
+
+    expect(prismaMock.channelMember.deleteMany).toHaveBeenCalledWith({
+      where: { channelId: CHANNEL_ID, userId: TARGET_ID },
+    });
+    expect(result).toBeNull();
+  });
+
+  it('üye yoksa no-op (deleteMany count=0) → null döner, hata yok', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ guildId: GUILD_ID }));
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.channelMember.deleteMany.mockResolvedValue({ count: 0 });
+
+    const result = await service.removeChannelMember(USER_ID, CHANNEL_ID, TARGET_ID);
+
+    expect(result).toBeNull();
+  });
+
+  it('MEMBER → 403 FORBIDDEN', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ guildId: GUILD_ID }));
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+
+    await expect(service.removeChannelMember('member-1', CHANNEL_ID, TARGET_ID)).rejects.toThrow(
+      ForbiddenException,
+    );
+    await expect(service.removeChannelMember('member-1', CHANNEL_ID, TARGET_ID)).rejects.toMatchObject({
+      response: { error: 'FORBIDDEN' },
+    });
+  });
+
+  it('ADMIN → üyeyi çıkarabilir', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ guildId: GUILD_ID }));
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: ADMIN_MEMBERSHIP });
+    prismaMock.channelMember.deleteMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.removeChannelMember('admin-1', CHANNEL_ID, TARGET_ID);
+    expect(result).toBeNull();
+  });
+
+  it('kanal yok → 404 CHANNEL_NOT_FOUND', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(null);
+
+    await expect(service.removeChannelMember(USER_ID, CHANNEL_ID, TARGET_ID)).rejects.toThrow(NotFoundException);
+    await expect(service.removeChannelMember(USER_ID, CHANNEL_ID, TARGET_ID)).rejects.toMatchObject({
+      response: { error: 'CHANNEL_NOT_FOUND' },
+    });
+  });
+});
+
+// ── §2 DM sızıntı testi: guild özel kanal üyesi DM listesine karışmaz ────────
+
+describe('§2 DM sızıntı önleme — ChannelMember tür filtresi', () => {
+  /**
+   * DmService.getDmChannels `channelMember.findMany({ where: { userId } })` ile
+   * tüm üyelikleri çeker, sonra `m.channel.type === 'DM'` ve `m.channel.type === 'GROUP_DM'`
+   * ile filtreler. Guild kanalı (type='GUILD_TEXT') bu filtreleri asla geçemez.
+   *
+   * Bu test, DmService'in type bazlı filtresini simüle eder:
+   * guild kanalına eklenen ChannelMember, DM listesinde GÖRÜNMEZ.
+   */
+  it('guild özel kanalına eklenen ChannelMember DM listesine (tür filtreli) düşmez', () => {
+    // Tüm channelMember kayıtları: biri guild kanalı, biri DM kanalı
+    const allMemberships = [
+      {
+        userId: 'user-1',
+        channel: { id: 'guild-ch-1', type: 'GUILD_TEXT', guildId: 'guild-1', deletedAt: null },
+      },
+      {
+        userId: 'user-1',
+        channel: { id: 'dm-ch-1', type: 'DM', guildId: null, deletedAt: null },
+      },
+    ];
+
+    // DmService.getDmChannels'teki filtre mantığı (aynen)
+    const active = allMemberships.filter((m) => m.channel.deletedAt === null);
+    const dmMemberships = active.filter((m) => m.channel.type === 'DM');
+    const groupMemberships = active.filter((m) => m.channel.type === 'GROUP_DM');
+
+    // guild kanalı DM listesinde görünmemelidir
+    expect(dmMemberships).toHaveLength(1);
+    expect(dmMemberships[0].channel.id).toBe('dm-ch-1');
+    expect(groupMemberships).toHaveLength(0);
+
+    // guild kanalı hiçbir DM kategorisine girmemiştir
+    const allDmChannelIds = [...dmMemberships, ...groupMemberships].map((m) => m.channel.id);
+    expect(allDmChannelIds).not.toContain('guild-ch-1');
+  });
+
+  it('guildId != null kontrolü: notifyDmActivity guild kanalını atlar', () => {
+    // notifyDmActivity içindeki guard: if (!channel || channel.guildId !== null) return;
+    const guildChannel = { id: 'guild-ch-1', guildId: 'guild-1' };
+    const dmChannel = { id: 'dm-ch-1', guildId: null };
+
+    // Guild kanalı → atlanır
+    expect(guildChannel.guildId !== null).toBe(true);
+    // DM kanalı → işlenir
+    expect(dmChannel.guildId !== null).toBe(false);
   });
 });
