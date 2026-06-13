@@ -1,4 +1,4 @@
-import { IsString, IsBoolean, IsOptional, IsInt, Min, Max, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsString, IsBoolean, IsOptional, IsInt, Min, Max, MinLength, MaxLength, Matches, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateChannelDto {
@@ -21,4 +21,10 @@ export class UpdateChannelDto {
   @Min(0, { message: 'Yavaş mod değeri 0 veya daha büyük olmalıdır.' })
   @Max(21600, { message: 'Yavaş mod değeri en fazla 21600 saniye (6 saat) olabilir.' })
   slowModeSeconds?: number;
+
+  @ApiPropertyOptional({ example: 'cat-id', description: 'Kategori ID (null = kategorisiz)' })
+  @IsOptional()
+  @ValidateIf((o) => o.categoryId !== null)
+  @IsString()
+  categoryId?: string | null;
 }

@@ -17,6 +17,7 @@ import { InvitesModule } from './modules/invites/invites.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
+import { CategoriesModule } from './modules/categories/categories.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -38,6 +39,7 @@ import configuration from './config/configuration';
     AttachmentsModule,
     ReportsModule,
     ModerationModule,
+    CategoriesModule,
   ],
   providers: [
     {

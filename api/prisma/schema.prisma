@@ -152,6 +152,7 @@ model Guild {
   members   GuildMember[]
   channels  Channel[]
   invites   Invite[]
+  categories ChannelCategory[]
 }
 
 model GuildMember {
@@ -167,19 +168,34 @@ model GuildMember {
   @@index([userId])
 }
 
+model ChannelCategory {
+  id        String    @id @default(cuid())
+  guildId   String
+  guild     Guild     @relation(fields: [guildId], references: [id])
+  name      String
+  position  Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  channels  Channel[]
+
+  @@index([guildId])
+}
+
 model Channel {
-  id              String      @id @default(cuid())
-  type            ChannelType @default(GUILD_TEXT)
+  id              String           @id @default(cuid())
+  type            ChannelType      @default(GUILD_TEXT)
   guildId         String?
-  guild           Guild?      @relation(fields: [guildId], references: [id])
+  guild           Guild?           @relation(fields: [guildId], references: [id])
+  categoryId      String?
+  category        ChannelCategory? @relation(fields: [categoryId], references: [id])
   name            String?
-  ownerId         String?     // GROUP_DM: oluşturan kullanıcı; 1-1 DM + guild kanallarında null
-  owner           User?       @relation("ChannelOwner", fields: [ownerId], references: [id])
-  ageGated        Boolean     @default(false)
-  position        Int         @default(0)
-  slowModeSeconds Int         @default(0)
+  ownerId         String?          // GROUP_DM: oluşturan kullanıcı; 1-1 DM + guild kanallarında null
+  owner           User?            @relation("ChannelOwner", fields: [ownerId], references: [id])
+  ageGated        Boolean          @default(false)
+  position        Int              @default(0)
+  slowModeSeconds Int              @default(0)
   deletedAt       DateTime?
-  createdAt       DateTime    @default(now())
+  createdAt       DateTime         @default(now())
   messages        Message[]
   members         ChannelMember[]
   channelReads    ChannelRead[]
