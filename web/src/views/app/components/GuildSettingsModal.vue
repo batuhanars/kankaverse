@@ -58,6 +58,29 @@ async function toggleAdultsOnly() {
   }
 }
 
+// ── Ortam kuralları ──
+const editRules = ref(props.guild.rules ?? '')
+const rulesSaving = ref(false)
+const rulesError = ref('')
+const rulesSaved = ref(false)
+
+async function saveRules() {
+  rulesSaving.value = true
+  rulesError.value = ''
+  rulesSaved.value = false
+  try {
+    const updated = await guildsStore.updateGuild(props.guild.id, { rules: editRules.value })
+    editRules.value = updated.rules ?? ''
+    rulesSaved.value = true
+    emit('updated', updated)
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    rulesError.value = err.response?.data?.message ?? t('common.error')
+  } finally {
+    rulesSaving.value = false
+  }
+}
+
 // ── Davet oluştur ──
 const newMaxUses = ref('')
 const newExpiresInHours = ref('')
@@ -194,7 +217,31 @@ function formatExpiry(expiresAt: string | null): string {
         </div>
       </section>
 
-      <!-- ── 3. Davet yönetimi ── -->
+      <!-- ── 3. Ortam kuralları ── -->
+      <section>
+        <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
+          {{ t('guildSettings.rulesSection') }}
+        </h3>
+        <form class="flex flex-col gap-2" @submit.prevent="saveRules">
+          <textarea
+            v-model="editRules"
+            :placeholder="t('guildSettings.rulesPlaceholder')"
+            rows="5"
+            maxlength="2000"
+            class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
+            style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
+          />
+          <p v-if="rulesError" class="text-[12px]" style="color: var(--kv-danger);">{{ rulesError }}</p>
+          <p v-if="rulesSaved" class="text-[12px]" style="color: var(--kv-success, #3DB46E);">{{ t('common.save') }} ✓</p>
+          <div class="flex justify-end">
+            <KvButton type="submit" :loading="rulesSaving">
+              {{ t('guildSettings.rulesSave') }}
+            </KvButton>
+          </div>
+        </form>
+      </section>
+
+      <!-- ── 4. Davet yönetimi ── -->
       <section>
         <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
           {{ t('guildSettings.inviteSection') }}
