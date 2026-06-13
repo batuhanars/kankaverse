@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@vueuse/core'
+import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { guildsApi } from '@/api/guilds'
 import { attachmentsApi } from '@/api/attachments'
@@ -17,6 +18,7 @@ const emit = defineEmits<{ close: []; updated: [guild: GuildDto] }>()
 
 const { t } = useI18n()
 const guildsStore = useGuildsStore()
+const router = useRouter()
 
 // ── Birleşik taslak state ──────────────────────────────────────────────────
 
@@ -269,6 +271,28 @@ function formatExpiry(expiresAt: string | null): string {
   const d = new Date(expiresAt)
   return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
+
+// ── Ortamı sil ─────────────────────────────────────────────────────────────
+
+const showDeleteGuild = ref(false)
+const deletingGuild = ref(false)
+const deleteGuildError = ref('')
+
+async function confirmDeleteGuild() {
+  deletingGuild.value = true
+  deleteGuildError.value = ''
+  try {
+    await guildsStore.deleteGuild(props.guild.id)
+    emit('close')
+    router.push({ name: 'app' })
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    deleteGuildError.value = err.response?.data?.message ?? t('common.error')
+    showDeleteGuild.value = false
+  } finally {
+    deletingGuild.value = false
+  }
+}
 </script>
 
 <template>
@@ -499,6 +523,30 @@ function formatExpiry(expiresAt: string | null): string {
         </ul>
       </section>
 
+      <!-- ── 5. Ortamı Sil ── -->
+      <section>
+        <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-danger);">
+          {{ t('guildSettings.deleteSection') }}
+        </h3>
+        <div
+          class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+          style="border-color: var(--kv-danger); background-color: var(--kv-bg-elevated);"
+        >
+          <div class="flex-1 min-w-0">
+            <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
+              {{ t('guildSettings.deleteLabel') }}
+            </p>
+            <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+              {{ t('guildSettings.deleteDesc') }}
+            </p>
+          </div>
+          <KvButton variant="danger" :disabled="saving" @click="showDeleteGuild = true">
+            {{ t('guildSettings.deleteButton') }}
+          </KvButton>
+        </div>
+        <p v-if="deleteGuildError" class="text-[12px] mt-2" style="color: var(--kv-danger);">{{ deleteGuildError }}</p>
+      </section>
+
     </div>
   </KvModal>
 
@@ -511,5 +559,16 @@ function formatExpiry(expiresAt: string | null): string {
     :loading="revoking"
     @confirm="confirmRevoke"
     @cancel="revokeTarget = null"
+  />
+
+  <!-- Ortamı sil onay diyaloğu -->
+  <ConfirmDialog
+    v-if="showDeleteGuild"
+    :title="t('guildSettings.deleteConfirmTitle')"
+    :message="t('guildSettings.deleteConfirmMessage', { name: guild.name })"
+    :confirm-label="t('guildSettings.deleteConfirmButton')"
+    :loading="deletingGuild"
+    @confirm="confirmDeleteGuild"
+    @cancel="showDeleteGuild = false"
   />
 </template>
