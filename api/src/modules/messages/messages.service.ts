@@ -1,9 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { AutomodService } from '../../shared/automod/automod.service';
 import { ModerationService } from '../../shared/moderation/moderation.service';
+import { requireAdminRole } from '../../common/utils/guild-role.utils';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { Attachment, Message, MessageReaction, ScanStatus, User } from '@prisma/client';
@@ -24,6 +25,7 @@ type MessageWithAuthor = Message & {
   reactions?: Pick<MessageReaction, 'userId' | 'emoji'>[];
   replyTo?: ReplyToRaw;
   mentions: string[];
+  pinnedAt: Date | null;
 };
 
 // replyTo snippet: ≤100 karakter; dosya ekli + boş içerik → "[dosya]"; silinmişse null
@@ -64,6 +66,7 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
     replyToId: msg.replyToId,
     replyTo: buildReplyToDto(msg.replyTo ?? null),
     editedAt: msg.editedAt ? msg.editedAt.toISOString() : null,
+    pinnedAt: msg.pinnedAt ? msg.pinnedAt.toISOString() : null,
     author: {
       id: msg.author.id,
       username: msg.author.username,
@@ -479,5 +482,99 @@ export class MessagesService {
     });
 
     return null;
+  }
+
+  // ── PIN ortak yetki yardımcısı ──────────────────────────────────────────────
+  // Guild kanalı → OWNER/ADMIN; DM/grup DM → requireChannelAccess üyeliği yeterli.
+  private async requirePinAccess(
+    userId: string,
+    channel: Awaited<ReturnType<typeof this.membership.requireChannelAccess>>,
+  ): Promise<void> {
+    if (channel.guildId) {
+      // Guild kanalı: üyeliği zaten requireChannelAccess doğruladı; rol kontrolü ek
+      const membership = await this.prisma.guildMember.findUnique({
+        where: { guildId_userId: { guildId: channel.guildId, userId } },
+        select: { role: true },
+      });
+      // requireGuildMembership zaten çağrıldı (requireChannelAccess içinde) → membership null olamaz
+      requireAdminRole(membership!.role);
+    }
+    // DM/grup DM: requireChannelAccess üyeliği yeterli — ek kontrol yok
+  }
+
+  async pinMessage(userId: string, channelId: string, messageId: string): Promise<null> {
+    const channel = await this.membership.requireChannelAccess(userId, channelId);
+    await this.requirePinAccess(userId, channel);
+
+    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
+    if (!message || message.deletedAt !== null || message.channelId !== channelId) {
+      throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'INVALID_MESSAGE' });
+    }
+
+    // İdempotent: zaten sabitliyse no-op
+    if (message.pinnedAt !== null) {
+      return null;
+    }
+
+    // 50 sınırı: kanal başına en fazla 50 sabit mesaj
+    const pinCount = await this.prisma.message.count({
+      where: { channelId, pinnedAt: { not: null }, deletedAt: null },
+    });
+    if (pinCount >= 50) {
+      throw new ConflictException({ message: 'Bu kanalda en fazla 50 mesaj sabitlenebilir.', error: 'PIN_LIMIT' });
+    }
+
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { pinnedAt: new Date(), pinnedById: userId },
+    });
+
+    return null;
+  }
+
+  async unpinMessage(userId: string, channelId: string, messageId: string): Promise<null> {
+    const channel = await this.membership.requireChannelAccess(userId, channelId);
+    await this.requirePinAccess(userId, channel);
+
+    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
+    if (!message || message.deletedAt !== null || message.channelId !== channelId) {
+      throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'INVALID_MESSAGE' });
+    }
+
+    // İdempotent: zaten sabit değilse no-op
+    if (message.pinnedAt === null) {
+      return null;
+    }
+
+    await this.prisma.message.update({
+      where: { id: messageId },
+      data: { pinnedAt: null, pinnedById: null },
+    });
+
+    return null;
+  }
+
+  async findPins(userId: string, channelId: string) {
+    // requireChannelAccess: üyelik + yaş kapısı dahil
+    await this.membership.requireChannelAccess(userId, channelId);
+
+    const messages = await this.prisma.message.findMany({
+      where: {
+        channelId,
+        pinnedAt: { not: null },
+        deletedAt: null,
+      },
+      include: {
+        author: { select: { id: true, username: true, avatarUrl: true } },
+        attachments: {
+          select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+        },
+        reactions: { select: { userId: true, emoji: true } },
+        replyTo: REPLY_TO_INCLUDE,
+      },
+      orderBy: { pinnedAt: 'desc' },
+    });
+
+    return messages.map((msg) => toMessageDto(msg, userId));
   }
 }

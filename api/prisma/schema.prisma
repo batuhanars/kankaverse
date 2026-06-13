@@ -216,12 +216,15 @@ model Message {
   replies     Message[]         @relation("MessageReply")
   editedAt    DateTime?
   deletedAt   DateTime?
+  pinnedAt    DateTime?         // null = sabit değil; dolu = sabitlenme zamanı
+  pinnedById  String?           // sabitleyen userId (scalar — FK/relation YOK, audit/görünüm için)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   attachments Attachment[]
   reactions   MessageReaction[]
 
   @@index([channelId, createdAt])
+  @@index([channelId, pinnedAt])
 }
 
 model MessageReaction {
