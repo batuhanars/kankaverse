@@ -12,6 +12,7 @@ export function toUserDto(user: User) {
     createdAt: user.createdAt.toISOString(),
     emailVerified: user.emailVerifiedAt !== null,
     twoFactorEnabled: user.twoFactorEnabled,
+    isModerator: user.isModerator,
     friendCode: user.friendCode,
   };
 }

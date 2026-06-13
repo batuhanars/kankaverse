@@ -5,6 +5,7 @@ import { MessagesController } from './messages.controller';
 import { MessagesService } from './messages.service';
 import { MessagesGateway } from './gateway/messages.gateway';
 
+// SharedModule ModerationService'i export eder — enforcement bağlantısı buradan gelir
 @Module({
   imports: [JwtModule.register({}), SharedModule],
   controllers: [MessagesController],

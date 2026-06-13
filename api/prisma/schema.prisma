@@ -61,6 +61,7 @@ model User {
   passwordHash        String
   birthDate           DateTime
   isMinor             Boolean
+  isModerator         Boolean            @default(false)
   verificationStatus  VerificationStatus @default(NONE)
   dmPolicy            DmPolicy           @default(FRIENDS)
   mediaPolicy         MediaPolicy        @default(FRIENDS)
@@ -87,6 +88,11 @@ model User {
   channelMemberships  ChannelMember[]
   createdInvites      Invite[]           @relation("InviteCreator")
   attachments         Attachment[]
+  reportsFiled        Report[]           @relation("Reporter")
+  reportResolutions   Report[]           @relation("ReportResolver")
+  moderationActions   ModerationAction[] @relation("ModeratorActions")
+  moderationTargets   ModerationAction[] @relation("ModerationTargets")
+  auditLogs           AuditLog[]         @relation("AuditActor")
 }
 
 model AuthToken {
@@ -260,4 +266,92 @@ model Invite {
   createdAt DateTime  @default(now())
 
   @@index([guildId])
+}
+
+// ─── Sprint 4B: Moderasyon Çekirdeği ──────────────────────────────────────────
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  MINOR_SAFETY
+  VIOLENCE
+  CSAM
+  SELF_HARM
+  OTHER
+}
+
+enum ReportTarget {
+  MESSAGE
+  USER
+  CHANNEL
+  GUILD
+}
+
+enum ReportStatus {
+  OPEN
+  TRIAGED
+  RESOLVED
+  DISMISSED
+  ESCALATED
+}
+
+enum ModActionType {
+  WARN
+  MUTE
+  KICK
+  BAN
+  CONTENT_REMOVE
+  SHADOW_LIMIT
+}
+
+model Report {
+  id              String       @id @default(cuid())
+  reporterId      String
+  reporter        User         @relation("Reporter", fields: [reporterId], references: [id])
+  targetType      ReportTarget
+  targetId        String
+  reason          ReportReason
+  description     String?
+  status          ReportStatus @default(OPEN)
+  priority        Int          @default(0)
+  // 🔴 KURUL §0: contextSnapshot = yalnız minimal referans — kullanıcı içeriği/kanıt YAKALANMAZ
+  // Gerçek kanıt-yakalama hukuk görüşü sonrası (KVKK dayanak + retention)
+  contextSnapshot Json
+  resolvedById    String?
+  resolvedBy      User?        @relation("ReportResolver", fields: [resolvedById], references: [id])
+  resolvedAt      DateTime?
+  createdAt       DateTime     @default(now())
+
+  @@index([status, priority])
+  @@index([targetType, targetId])
+}
+
+model ModerationAction {
+  id              String        @id @default(cuid())
+  moderatorId     String
+  moderator       User          @relation("ModeratorActions", fields: [moderatorId], references: [id])
+  targetUserId    String
+  targetUser      User          @relation("ModerationTargets", fields: [targetUserId], references: [id])
+  type            ModActionType
+  scope           String?       // guildId | null = global
+  reason          String
+  relatedReportId String?
+  expiresAt       DateTime?
+  createdAt       DateTime      @default(now())
+
+  @@index([targetUserId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actor      User     @relation("AuditActor", fields: [actorId], references: [id])
+  action     String   // "moderation.ban", "moderation.mute", "report.resolve", ...
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
 }

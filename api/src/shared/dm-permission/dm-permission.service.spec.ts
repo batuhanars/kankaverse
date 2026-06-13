@@ -13,8 +13,14 @@ const configMock = {
   get: jest.fn(),
 };
 
+// ── Mock ModerationService (Sprint 4B) ──────────────────────────────────────
+// Varsayilan: BAN yok (enforcement geçirir) — BAN testleri moderation.service.spec.ts'te
+const moderationMock = {
+  hasActiveBan: jest.fn().mockResolvedValue(false),
+};
+
 function makeService() {
-  return new DmPermissionService(prismaMock as any, configMock as any);
+  return new DmPermissionService(prismaMock as any, configMock as any, moderationMock as any);
 }
 
 // ── Zaman sabitleri ──────────────────────────────────────────────────────────
@@ -32,6 +38,8 @@ function resetMocks() {
   prismaMock.guildMember.findFirst.mockResolvedValue(null);
   // Varsayılan lock: 7 gün
   configMock.get.mockReturnValue(7);
+  // Sprint 4B: BAN yok (varsayılan — enforcement geçirir)
+  moderationMock.hasActiveBan.mockResolvedValue(false);
 }
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────

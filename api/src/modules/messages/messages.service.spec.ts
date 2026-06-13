@@ -37,14 +37,23 @@ const configMock = {
   }),
 };
 
+// Sprint 4B: ModerationService mock — varsayılan BAN/MUTE yok (enforcement geçirir)
+const moderationMock = {
+  hasActiveBan: jest.fn().mockResolvedValue(false),
+  hasActiveMute: jest.fn().mockResolvedValue(false),
+};
+
 function makeService() {
-  return new MessagesService(prismaMock as any, membershipMock as any, automodMock as any, configMock as any);
+  return new MessagesService(prismaMock as any, membershipMock as any, automodMock as any, configMock as any, moderationMock as any);
 }
 
 function resetMocks() {
   jest.resetAllMocks();
   // Varsayılan: automod geçirir
   automodMock.check.mockReturnValue({ blocked: false });
+  // Sprint 4B: BAN/MUTE yok (varsayılan — enforcement geçirir)
+  moderationMock.hasActiveBan.mockResolvedValue(false);
+  moderationMock.hasActiveMute.mockResolvedValue(false);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────

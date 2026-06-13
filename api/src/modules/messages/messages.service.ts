@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { AutomodService } from '../../shared/automod/automod.service';
+import { ModerationService } from '../../shared/moderation/moderation.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { Attachment, Message, ScanStatus, User } from '@prisma/client';
 
@@ -44,6 +45,7 @@ export class MessagesService {
     private membership: MembershipService,
     private automod: AutomodService,
     private config: ConfigService,
+    private moderation: ModerationService,
   ) {
     this.scanEnabled = config.get<boolean>('attachmentScanEnabled') ?? false;
   }
@@ -94,6 +96,18 @@ export class MessagesService {
 
   async create(userId: string, channelId: string, dto: CreateMessageDto) {
     const channel = await this.membership.requireChannelAccess(userId, channelId);
+
+    // R7 Enforcement: BAN (global) → mesaj gönderme yasak
+    const hasBan = await this.moderation.hasActiveBan(userId);
+    if (hasBan) {
+      throw new ForbiddenException({ message: 'Hesabınız kısıtlandığı için mesaj gönderemezsiniz.', error: 'USER_BANNED' });
+    }
+
+    // R7 Enforcement: MUTE (scope-aware) → bu kanalda mesaj gönderme yasak
+    const hasMute = await this.moderation.hasActiveMute(userId, channel.guildId ?? null);
+    if (hasMute) {
+      throw new ForbiddenException({ message: 'Bu kanalda mesaj gönderme yetkiniz kısıtlandı.', error: 'USER_MUTED' });
+    }
 
     // İçerik + ek doğrulama: ikisi de boş olamaz
     const hasContent = dto.content && dto.content.trim().length > 0;
