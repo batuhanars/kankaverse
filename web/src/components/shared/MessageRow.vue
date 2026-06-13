@@ -21,6 +21,9 @@ import { formatMentionsPlain } from '@/utils/mentions'
 import { renderMessageHtml } from '@/utils/markdown'
 import type { MessageDto } from '@/types'
 
+// MessageActionsMenu instance ref — menuOpen'ı okumak için
+const actionsMenuRef = ref<InstanceType<typeof MessageActionsMenu> | null>(null)
+
 const props = defineProps<{
   message: MessageDto
   isMine: boolean
@@ -95,12 +98,15 @@ const renderedContent = computed<string>(() => {
     @mouseenter="onRowEnter"
     @mouseleave="onRowLeave"
   >
-    <!-- Hover araç çubuğu: -top-3 right-4, yalnız düzenleme modunda gizli -->
+    <!-- Hover araç çubuğu: -top-3 right-4, yalnız düzenleme modunda gizli.
+         Menü açıkken (emoji picker / ⋯) grup-hover'dan bağımsız olarak görünür kalır. -->
     <div
       v-if="!isEditing"
-      class="absolute -top-3 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+      class="absolute -top-3 right-4 transition-opacity z-10"
+      :class="actionsMenuRef?.menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
     >
       <MessageActionsMenu
+        ref="actionsMenuRef"
         :message-id="message.id"
         :is-mine="isMine"
         :has-content="!!message.content"

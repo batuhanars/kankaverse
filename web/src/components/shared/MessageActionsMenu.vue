@@ -1,5 +1,14 @@
+<script lang="ts">
+/**
+ * Modül-seviyesi singleton: hangi mesajın emoji picker'ı açık?
+ * Tüm MessageActionsMenu örnekleri bu ref'i paylaşır → aynı anda yalnız BİR picker açık olur.
+ */
+import { ref as moduleRef } from 'vue'
+const openPickerMessageId = moduleRef<string | null>(null)
+</script>
+
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import EmojiPicker from './EmojiPicker.vue'
 
@@ -30,20 +39,28 @@ const QUICK_EMOJIS = ['👍', '❤️', '😂']
 
 // ⋯ daha-fazla açılır
 const showMore = ref(false)
-// 🙂 tam emoji picker
-const showEmojiPicker = ref(false)
 // hızlı emoji seti (⋯ içinde)
 const showQuickEmoji = ref(false)
+
+// Emoji picker açık mı? — modül singleton'a göre türetilir
+const showEmojiPicker = computed(() => openPickerMessageId.value === props.messageId)
 
 const moreEl = ref<HTMLElement | null>(null)
 const emojiEl = ref<HTMLElement | null>(null)
 // Emoji picker tetikleyici butonu (Teleport konumlandırması için)
 const emojiTriggerEl = ref<HTMLElement | null>(null)
 
+// Parent'ın araç çubuğunu görünür tutması için: herhangi bir menü açıkken true
+const menuOpen = computed(() => showEmojiPicker.value || showMore.value)
+defineExpose({ menuOpen })
+
 function closeAll() {
   showMore.value = false
-  showEmojiPicker.value = false
   showQuickEmoji.value = false
+  // Yalnız kendi picker'ımızı kapat (diğer mesajların picker'ına dokunma)
+  if (openPickerMessageId.value === props.messageId) {
+    openPickerMessageId.value = null
+  }
 }
 
 function onReply() {
@@ -78,7 +95,10 @@ function onUnpin() {
 
 function toggleMore(e: MouseEvent) {
   e.stopPropagation()
-  showEmojiPicker.value = false
+  // Kendi picker'ımızı kapat (singleton)
+  if (openPickerMessageId.value === props.messageId) {
+    openPickerMessageId.value = null
+  }
   showQuickEmoji.value = false
   showMore.value = !showMore.value
 }
@@ -86,7 +106,12 @@ function toggleMore(e: MouseEvent) {
 function toggleEmojiPicker(e: MouseEvent) {
   e.stopPropagation()
   showMore.value = false
-  showEmojiPicker.value = !showEmojiPicker.value
+  // Singleton: açıksa kapat, kapalıysa bu mesajı aktif yap (önceki otomatik kapanır)
+  if (openPickerMessageId.value === props.messageId) {
+    openPickerMessageId.value = null
+  } else {
+    openPickerMessageId.value = props.messageId
+  }
 }
 
 function pickEmoji(emoji: string) {
@@ -141,16 +166,32 @@ onUnmounted(() => {
       {{ emoji }}
     </button>
 
-    <!-- 🙂 Reaksiyon ekle (tam picker) -->
+    <!-- Reaksiyon ekle (tam picker) — gri outline SVG ikon, renkli emojilerle karışmaz -->
     <div ref="emojiEl" class="relative">
       <button
         ref="emojiTriggerEl"
-        class="w-8 h-8 flex items-center justify-center text-[15px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+        class="w-8 h-8 flex items-center justify-center cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
         :class="showEmojiPicker ? 'bg-[var(--kv-bg-sidebar)]' : ''"
+        :style="showEmojiPicker ? 'color: var(--kv-text-secondary)' : 'color: var(--kv-text-muted)'"
         :title="t('reaction.addReaction')"
         @click="toggleEmojiPicker"
       >
-        🙂
+        <!-- Gri outline yüz ikonu (SVG) — hover'da text-secondary'ye geçer -->
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.75"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+          <line x1="9" y1="9" x2="9.01" y2="9" stroke-width="2.5" stroke-linecap="round" />
+          <line x1="15" y1="9" x2="15.01" y2="9" stroke-width="2.5" stroke-linecap="round" />
+        </svg>
       </button>
       <!-- Tam emoji picker — Teleport to body ile viewport-farkındalıklı konumlandırma -->
       <EmojiPicker
