@@ -67,10 +67,10 @@ async function syncFromRoute() {
     }
 
     guildsStore.setActiveGuild(guildId)
-    // Kanallar yüklü değilse fetch et
+    // Kanallar yüklü değilse fetch et (kategorilerle birlikte)
     if (!channelsStore.channelsForGuild(guildId).length) {
       try {
-        await channelsStore.fetchChannels(guildId)
+        await channelsStore.fetchChannelsAndCategories(guildId, authStore.user?.id)
       } catch {
         // Erişim hatası — home'a düş
         await router.replace({ name: 'app' })
@@ -171,7 +171,7 @@ async function logout() {
 
 async function selectGuild(guildId: string) {
   if (!channelsStore.channelsForGuild(guildId).length) {
-    await channelsStore.fetchChannels(guildId)
+    await channelsStore.fetchChannelsAndCategories(guildId, authStore.user?.id)
   }
   const channels = channelsStore.channelsForGuild(guildId)
   if (channels.length > 0) {

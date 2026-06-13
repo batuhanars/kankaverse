@@ -1,5 +1,5 @@
 import http from './axios'
-import type { GuildDto, ChannelDto, GuildMemberDto } from '@/types'
+import type { GuildDto, ChannelDto, GuildMemberDto, CategoryDto } from '@/types'
 
 export interface IconPresignResult {
   uploadUrl: string
@@ -19,7 +19,7 @@ export const guildsApi = {
   getChannels(guildId: string) {
     return http.get<ChannelDto[]>(`/guilds/${guildId}/channels`)
   },
-  createChannel(guildId: string, payload: { name: string; ageGated?: boolean }) {
+  createChannel(guildId: string, payload: { name: string; ageGated?: boolean; categoryId?: string | null }) {
     return http.post<ChannelDto>(`/guilds/${guildId}/channels`, payload)
   },
   getMembers(guildId: string) {
@@ -30,5 +30,12 @@ export const guildsApi = {
   },
   setIcon(guildId: string, storageKey: string | null) {
     return http.patch<GuildDto>(`/guilds/${guildId}/icon`, { storageKey })
+  },
+  // Sprint V2 — Kategori endpoint'leri (§4)
+  getCategories(guildId: string) {
+    return http.get<CategoryDto[]>(`/guilds/${guildId}/categories`)
+  },
+  createCategory(guildId: string, name: string) {
+    return http.post<CategoryDto>(`/guilds/${guildId}/categories`, { name })
   },
 }

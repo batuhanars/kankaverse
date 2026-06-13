@@ -313,9 +313,26 @@
     "slowMode5m": "5 dakika",
     "slowMode15m": "15 dakika",
     "slowModeHint": "Yavaş mod açık — {seconds} sn bekleyin",
+    "categoryLabel": "KATEGORİ",
+    "categoryNone": "Kategorisiz",
     "errors": {
       "LAST_CHANNEL": "Son kanal silinemez. Ortamda en az bir kanal olmalıdır."
     }
+  },
+  "category": {
+    "createTitle": "Kategori Oluştur",
+    "createButton": "Oluştur",
+    "nameLabel": "KATEGORİ ADI",
+    "namePlaceholder": "yeni-kategori",
+    "renameTitle": "Kategoriyi Yeniden Adlandır",
+    "renameButton": "Kaydet",
+    "deleteTitle": "Kategoriyi Sil",
+    "deleteConfirm": "{name} kategorisini silmek istediğinden emin misin? Kanallar silinmez, kategorisiz olur.",
+    "deleteButton": "Sil",
+    "rename": "Yeniden Adlandır",
+    "delete": "Sil",
+    "addChannel": "Bu kategoriye kanal ekle",
+    "createCategory": "Kategori Oluştur"
   },
   "reaction": {
     "addReaction": "Reaksiyon ekle",
