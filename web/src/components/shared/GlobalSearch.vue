@@ -27,12 +27,20 @@ const filteredGuilds = computed(() => {
   return guildsStore.guilds.filter((g) => g.name.toLowerCase().includes(q))
 })
 
-const filteredDms = computed(() => {
+const filteredDirectDms = computed(() => {
   const q = query.value.toLowerCase()
-  if (!q) return dmStore.channels
   return dmStore.channels.filter((ch) => {
-    if (ch.type === 'DM') return ch.otherUser.username.toLowerCase().includes(q)
-    // GROUP_DM: ada veya üye adlarına göre filtrele
+    if (ch.type !== 'DM') return false
+    if (!q) return true
+    return ch.otherUser.username.toLowerCase().includes(q)
+  })
+})
+
+const filteredGroupDms = computed(() => {
+  const q = query.value.toLowerCase()
+  return dmStore.channels.filter((ch) => {
+    if (ch.type !== 'GROUP_DM') return false
+    if (!q) return true
     const nameMatch = ch.name?.toLowerCase().includes(q) ?? false
     const memberMatch = ch.members.some((m) => m.username.toLowerCase().includes(q))
     return nameMatch || memberMatch
@@ -58,7 +66,12 @@ function dmAvatarInitial(ch: (typeof dmStore.channels)[number]): string {
   return (ch.members[0]?.username ?? '?')[0].toUpperCase()
 }
 
-const hasResults = computed(() => filteredGuilds.value.length > 0 || filteredDms.value.length > 0)
+const hasResults = computed(
+  () =>
+    filteredGuilds.value.length > 0 ||
+    filteredDirectDms.value.length > 0 ||
+    filteredGroupDms.value.length > 0,
+)
 
 async function selectGuild(guildId: string) {
   if (!channelsStore.channelsForGuild(guildId).length) {
@@ -143,13 +156,43 @@ function selectDm(channelId: string) {
             </button>
           </template>
 
-          <!-- Direkt Mesajlar -->
-          <template v-if="filteredDms.length">
+          <!-- Kankalar (DM) -->
+          <template v-if="filteredDirectDms.length">
             <p class="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
               {{ t('search.sectionDms') }}
             </p>
             <button
-              v-for="ch in filteredDms"
+              v-for="ch in filteredDirectDms"
+              :key="ch.id"
+              class="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
+              @click="selectDm(ch.id)"
+            >
+              <div class="w-8 h-8 rounded-full overflow-hidden shrink-0" style="background-color: var(--kv-bg-content);">
+                <img
+                  v-if="dmAvatarUrl(ch)"
+                  :src="dmAvatarUrl(ch)!"
+                  :alt="dmDisplayName(ch)"
+                  class="w-full h-full object-cover"
+                />
+                <span
+                  v-else
+                  class="w-full h-full flex items-center justify-center text-[12px] font-semibold"
+                  style="color: var(--kv-text-secondary);"
+                >{{ dmAvatarInitial(ch) }}</span>
+              </div>
+              <span class="text-[14px] font-medium truncate" style="color: var(--kv-text-primary);">
+                {{ dmDisplayName(ch) }}
+              </span>
+            </button>
+          </template>
+
+          <!-- Gruplar (GROUP_DM) -->
+          <template v-if="filteredGroupDms.length">
+            <p class="px-4 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+              {{ t('search.sectionGroups') }}
+            </p>
+            <button
+              v-for="ch in filteredGroupDms"
               :key="ch.id"
               class="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
               @click="selectDm(ch.id)"
