@@ -68,13 +68,18 @@ const router = createRouter({
       name: 'app',
       component: () => import('@/views/app/AppView.vue'),
       meta: { requiresAuth: true },
-      children: [
-        {
-          path: 'channels/:guildId/:channelId',
-          name: 'channel',
-          component: () => import('@/views/app/AppView.vue'),
-        },
-      ],
+    },
+    {
+      path: '/channels/:guildId/:channelId',
+      name: 'channel',
+      component: () => import('@/views/app/AppView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/dm/:channelId',
+      name: 'dm',
+      component: () => import('@/views/app/AppView.vue'),
+      meta: { requiresAuth: true },
     },
     {
       path: '/:pathMatch(.*)*',

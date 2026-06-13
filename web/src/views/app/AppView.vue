@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useGuildsStore } from '@/stores/guilds'
+import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
 import { useSocket } from '@/composables/useSocket'
 import ServerRail from '@/components/layout/ServerRail.vue'
@@ -22,10 +23,12 @@ import DmProfilePanel from '@/views/home/components/DmProfilePanel.vue'
 import HomeTopBar from '../home/components/HomeTopBar.vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const guildsStore = useGuildsStore()
+const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
-const { connect, disconnect } = useSocket()
+const { connect, disconnect, joinChannel, leaveChannel } = useSocket()
 
 const showMemberPanel = ref(true)
 const showServerModal = ref(false)
@@ -38,11 +41,97 @@ function openServerModal(step: 'choose' | 'create' | 'join') {
 }
 const homeView = ref<'friends' | 'message-requests' | 'dm'>('friends')
 
+// Route → store senkronizasyonu
+async function syncFromRoute() {
+  const name = route.name as string | null | undefined
+
+  if (name === 'channel') {
+    const guildId = route.params.guildId as string
+    const channelId = route.params.channelId as string
+
+    // Geçersiz parametre koruması
+    if (!guildId || !channelId) {
+      await router.replace({ name: 'app' })
+      return
+    }
+
+    guildsStore.setActiveGuild(guildId)
+    // Kanallar yüklü değilse fetch et
+    if (!channelsStore.channelsForGuild(guildId).length) {
+      try {
+        await channelsStore.fetchChannels(guildId)
+      } catch {
+        // Erişim hatası — home'a düş
+        await router.replace({ name: 'app' })
+        return
+      }
+    }
+
+    // Kanal geçerli mi?
+    const channels = channelsStore.channelsForGuild(guildId)
+    const exists = channels.some((c) => c.id === channelId)
+    if (!exists && channels.length > 0) {
+      // Geçersiz channelId — ilk kanala yönlendir
+      await router.replace({ name: 'channel', params: { guildId, channelId: channels[0].id } })
+      return
+    }
+
+    const prev = channelsStore.activeChannelId
+    if (prev && prev !== channelId) leaveChannel(prev)
+    channelsStore.setActiveChannel(channelId)
+    await joinChannel(channelId)
+    dmStore.setActiveChannel(null)
+    homeView.value = 'friends'
+
+  } else if (name === 'dm') {
+    const channelId = route.params.channelId as string
+
+    if (!channelId) {
+      await router.replace({ name: 'app' })
+      return
+    }
+
+    // DM kanalı listede yoksa tazele
+    if (!dmStore.channels.find((c) => c.id === channelId)) {
+      try {
+        await dmStore.fetchChannels()
+      } catch {
+        await router.replace({ name: 'app' })
+        return
+      }
+    }
+
+    // Hâlâ bulunamadıysa home'a düş
+    if (!dmStore.channels.find((c) => c.id === channelId)) {
+      await router.replace({ name: 'app' })
+      return
+    }
+
+    guildsStore.setActiveGuild(null)
+    const prev = channelsStore.activeChannelId
+    if (prev) leaveChannel(prev)
+    channelsStore.setActiveChannel(null)
+    dmStore.setActiveChannel(channelId)
+    homeView.value = 'dm'
+
+  } else {
+    // app (/)
+    guildsStore.setActiveGuild(null)
+    const prev = channelsStore.activeChannelId
+    if (prev) leaveChannel(prev)
+    channelsStore.setActiveChannel(null)
+    dmStore.setActiveChannel(null)
+    homeView.value = 'friends'
+  }
+}
+
 onMounted(async () => {
   const token = sessionStorage.getItem('kv_access_token')
   if (token) connect()
   await guildsStore.fetchGuilds()
-  dmStore.fetchChannels()
+  await dmStore.fetchChannels()
+  // Veriler yüklendikten sonra route'u senkronize et (derin-link + yenileme)
+  await syncFromRoute()
   window.addEventListener('kv:auth:expired', onAuthExpired)
 })
 
@@ -50,6 +139,9 @@ onUnmounted(() => {
   disconnect()
   window.removeEventListener('kv:auth:expired', onAuthExpired)
 })
+
+// Sonraki gezinmelerde route değişince store'u senkronize et
+watch(() => route.fullPath, syncFromRoute)
 
 async function onAuthExpired() {
   await router.push({ name: 'login' })
@@ -62,23 +154,30 @@ async function logout() {
 }
 
 function selectFriends() {
-  homeView.value = 'friends'
-  dmStore.setActiveChannel(null)
+  router.push({ name: 'app' })
 }
 
 function selectMessageRequests() {
-  homeView.value = 'message-requests'
+  // message-requests için ayrı route yok — homeView'ı doğrudan set et
+  // Eğer guild/DM view'ındaysak önce home'a geç
+  if (route.name !== 'app') {
+    // syncFromRoute homeView'ı 'friends' yapacak; ondan sonra set et
+    router.push({ name: 'app' }).then(() => {
+      homeView.value = 'message-requests'
+    })
+  } else {
+    homeView.value = 'message-requests'
+  }
   dmStore.setActiveChannel(null)
+  guildsStore.setActiveGuild(null)
 }
 
 function selectDm(channelId: string) {
-  homeView.value = 'dm'
-  dmStore.setActiveChannel(channelId)
+  router.push({ name: 'dm', params: { channelId } })
 }
 
 function openDm(channelId: string) {
-  homeView.value = 'dm'
-  dmStore.setActiveChannel(channelId)
+  router.push({ name: 'dm', params: { channelId } })
 }
 
 const activeDmChannel = computed(() => dmStore.activeChannel())

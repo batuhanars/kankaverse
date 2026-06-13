@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
@@ -8,6 +9,7 @@ import { useDmStore } from '@/stores/dm'
 const emit = defineEmits<{ close: []; selectDm: [channelId: string] }>()
 
 const { t } = useI18n()
+const router = useRouter()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
@@ -34,16 +36,21 @@ const filteredDms = computed(() => {
 const hasResults = computed(() => filteredGuilds.value.length > 0 || filteredDms.value.length > 0)
 
 async function selectGuild(guildId: string) {
-  guildsStore.setActiveGuild(guildId)
-  await channelsStore.fetchChannels(guildId)
+  if (!channelsStore.channelsForGuild(guildId).length) {
+    await channelsStore.fetchChannels(guildId)
+  }
   const channels = channelsStore.channelsForGuild(guildId)
-  if (channels.length) channelsStore.setActiveChannel(channels[0].id)
+  if (channels.length) {
+    router.push({ name: 'channel', params: { guildId, channelId: channels[0].id } })
+  } else {
+    guildsStore.setActiveGuild(guildId)
+    channelsStore.setActiveChannel(null)
+  }
   emit('close')
 }
 
 function selectDm(channelId: string) {
-  dmStore.setActiveChannel(channelId)
-  emit('selectDm', channelId)
+  router.push({ name: 'dm', params: { channelId } })
   emit('close')
 }
 </script>
