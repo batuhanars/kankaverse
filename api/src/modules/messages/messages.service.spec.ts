@@ -2152,6 +2152,282 @@ describe('MessagesService.findPins', () => {
   });
 });
 
+// ── MessagesService.searchMessages ───────────────────────────────────────────
+
+describe('MessagesService.searchMessages', () => {
+  let service: MessagesService;
+
+  // Tek bir arama sonucu döndürmek için kullanılan fixture
+  function makeSearchMsg(id: string, content: string, createdAt: Date) {
+    return {
+      id,
+      channelId: GUILD_CHANNEL_ID,
+      content,
+      replyToId: null,
+      replyTo: null,
+      editedAt: null,
+      pinnedAt: null,
+      pinnedById: null,
+      deletedAt: null,
+      createdAt,
+      mentions: [],
+      author: { id: 'author-1', username: 'kanka', avatarUrl: null },
+      attachments: [],
+      reactions: [],
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.message.findMany.mockResolvedValue([]);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TEST 1 — erişim hatası propagate edilir
+  // ─────────────────────────────────────────────────────────────────────────
+  it('requireChannelAccess hata fırlatırsa → propagate edilir, findMany çağrılmaz', async () => {
+    membershipMock.requireChannelAccess.mockRejectedValue(
+      new ForbiddenException({ message: 'Erişim yok.', error: 'CHANNEL_FORBIDDEN' }),
+    );
+
+    await expect(service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'arama')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TEST 2 — q < 2 karakter → QUERY_TOO_SHORT
+  // ─────────────────────────────────────────────────────────────────────────
+  it('q boş string → BadRequestException QUERY_TOO_SHORT', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, '');
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string; message: string };
+    expect(response.error).toBe('QUERY_TOO_SHORT');
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
+  });
+
+  it('q tek karakter (trim sonrası) → BadRequestException QUERY_TOO_SHORT', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'a');
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('QUERY_TOO_SHORT');
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
+  });
+
+  it('q yalnız boşluk (trim sonrası 0 karakter) → QUERY_TOO_SHORT', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, '   ');
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('QUERY_TOO_SHORT');
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TEST 3 — case-insensitive eşleşme: findMany'e mode: 'insensitive' gönderilir
+  // ─────────────────────────────────────────────────────────────────────────
+  it('geçerli q → findMany content contains + insensitive ile çağrılır', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'Merhaba');
+
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    expect(findManyCall.where.content).toEqual({ contains: 'Merhaba', mode: 'insensitive' });
+  });
+
+  it('case-insensitive: "MERHABA" q → where.content.mode insensitive olarak ayarlanır', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    const msg = makeSearchMsg('msg-s-1', 'merhaba dünya', new Date('2026-06-13T10:00:00Z'));
+    prismaMock.message.findMany.mockResolvedValue([msg]);
+
+    const results = await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'MERHABA');
+
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    expect(findManyCall.where.content.mode).toBe('insensitive');
+    expect(results).toHaveLength(1);
+    expect(results[0].id).toBe('msg-s-1');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TEST 4 — silinmiş mesajlar hariç: where.deletedAt: null
+  // ─────────────────────────────────────────────────────────────────────────
+  it('silinmiş mesajlar hariç tutulur: where.deletedAt null olarak ayarlanır', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'arama');
+
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    expect(findManyCall.where.deletedAt).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TEST 5 — DM clearedAt sınırı (B1 dersi)
+  // clearedAt SET + before SET → where.createdAt { gt, lt } TEK objede birleşir
+  // ─────────────────────────────────────────────────────────────────────────
+  it('DM + clearedAt SET + before SET → createdAt { gt: clearedAt, lt: beforeCreatedAt } TEK objede', async () => {
+    const clearedAt = new Date('2024-01-10T10:00:00Z');
+    const beforeMsgCreatedAt = new Date('2024-01-15T12:00:00Z');
+    const beforeMsgId = 'msg-before-search';
+
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(
+      makeSearchMsg(beforeMsgId, 'before msg', beforeMsgCreatedAt),
+    );
+    prismaMock.channelMember.findUnique.mockResolvedValue({ clearedAt });
+
+    await service.searchMessages(USER_ID, CHANNEL_ID, 'arama', beforeMsgId);
+
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    const createdAtArg = findManyCall.where.createdAt;
+
+    expect(createdAtArg).toBeDefined();
+    expect(createdAtArg.gt).toEqual(clearedAt);
+    expect(createdAtArg.lt).toEqual(beforeMsgCreatedAt);
+  });
+
+  it('DM + clearedAt SET + before YOK → createdAt yalnız { gt: clearedAt }', async () => {
+    const clearedAt = new Date('2024-01-10T10:00:00Z');
+
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    prismaMock.channelMember.findUnique.mockResolvedValue({ clearedAt });
+
+    await service.searchMessages(USER_ID, CHANNEL_ID, 'arama');
+
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    const createdAtArg = findManyCall.where.createdAt;
+
+    expect(createdAtArg).toBeDefined();
+    expect(createdAtArg.gt).toEqual(clearedAt);
+    expect(createdAtArg.lt).toBeUndefined();
+    expect(prismaMock.message.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('DM + clearedAt NULL → createdAt filtresi uygulanmaz', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    prismaMock.channelMember.findUnique.mockResolvedValue({ clearedAt: null });
+
+    await service.searchMessages(USER_ID, CHANNEL_ID, 'arama');
+
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    expect(findManyCall.where.createdAt).toBeUndefined();
+  });
+
+  it('guild kanalı → channelMember.findUnique çağrılmaz (clearedAt kontrolü yapılmaz)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'arama');
+
+    expect(prismaMock.channelMember.findUnique).not.toHaveBeenCalled();
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    expect(findManyCall.where.createdAt).toBeUndefined();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TEST 6 — before cursor
+  // ─────────────────────────────────────────────────────────────────────────
+  it('before cursor verildiğinde → createdAt.lt cursor mesajının createdAt\'ine eşit', async () => {
+    const beforeMsgCreatedAt = new Date('2026-06-10T10:00:00Z');
+    const beforeMsgId = 'msg-cursor-search';
+
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(
+      makeSearchMsg(beforeMsgId, 'cursor msg', beforeMsgCreatedAt),
+    );
+
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'arama', beforeMsgId);
+
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    expect(findManyCall.where.createdAt).toEqual({ lt: beforeMsgCreatedAt });
+  });
+
+  it('before cursor mesajı DB\'de yoksa → createdAt filtresi uygulanmaz', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue(null);
+
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'arama', 'ghost-msg');
+
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    expect(findManyCall.where.createdAt).toBeUndefined();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TEST 7 — take ≤ 30
+  // ─────────────────────────────────────────────────────────────────────────
+  it('take=30 ile çağrılır (sabit limit)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'arama');
+
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    expect(findManyCall.take).toBe(30);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EK — orderBy createdAt desc
+  // ─────────────────────────────────────────────────────────────────────────
+  it('orderBy createdAt desc ile çağrılır', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'arama');
+
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    expect(findManyCall.orderBy).toEqual({ createdAt: 'desc' });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EK — q 100 karakterden uzunsa kesilir
+  // ─────────────────────────────────────────────────────────────────────────
+  it('q 100 karakterden uzunsa → 100 karaktere kesilir, DB\'ye 100 karakter gönderilir', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    const longQ = 'a'.repeat(150);
+
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, longQ);
+
+    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
+    expect(findManyCall.where.content.contains.length).toBe(100);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EK — MessageDto[] döner (toMessageDto şekli)
+  // ─────────────────────────────────────────────────────────────────────────
+  it('eşleşen mesajlar MessageDto[] olarak döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    const msg = makeSearchMsg('msg-result-1', 'arama metni burada', new Date('2026-06-13T12:00:00Z'));
+    prismaMock.message.findMany.mockResolvedValue([msg]);
+
+    const results = await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'arama');
+
+    expect(results).toHaveLength(1);
+    expect(results[0].id).toBe('msg-result-1');
+    expect(results[0].content).toBe('arama metni burada');
+    expect(results[0].author.username).toBe('kanka');
+    expect(typeof results[0].createdAt).toBe('string'); // ISO string
+  });
+});
+
 // ── toMessageDto.pinnedAt ────────────────────────────────────────────────────
 
 describe('toMessageDto — pinnedAt alanı', () => {
