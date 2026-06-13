@@ -589,6 +589,7 @@
     "errors": {
       "UNSUPPORTED_TYPE": "Desteklenmeyen dosya türü.",
       "FILE_TOO_LARGE": "Dosya boyutu çok büyük (max 25 MB).",
+      "UPLOADS_DISABLED": "Dosya yükleme şu an kapalı.",
       "default": "Dosya eklenemedi."
     },
     "compose": {
@@ -597,6 +598,43 @@
       "send": "Gönder",
       "wait": "Yükleniyor…",
       "uploading": "Yükleniyor… {pct}%"
+    }
+  },
+  "legal": {
+    "privacy": {
+      "title": "Gizlilik & Şeffaflık Bildirimi",
+      "linkLabel": "Gizlilik & Şeffaflık",
+      "registerNote": "Kaydolarak platformun gizlilik bildirimini okuduğunu onaylarsın:",
+      "betaNote": "Kankaverse kapalı/davetli beta aşamasındadır — özellikler gelişmektedir, veriler test amaçlıdır.",
+      "draftBanner": "TASLAK — nihai hukuki metin değildir. Deneyimli hukuk danışmanı onayı bekliyor.",
+      "draftFooter": "Bu metin taslaktır. Hukuki kesinlik avukat onayıyla gelir; KVKK/5651 atıfları teyide tabidir.",
+      "backToLogin": "← Giriş sayfasına dön",
+      "s1Title": "1. Bu nedir",
+      "s1Body": "Kankaverse, Türkiye için topluluk tabanlı bir mesajlaşma platformudur. Şu an kapalı/davetli beta (önizleme) aşamasındadır — özellikler gelişmektedir, veriler test amaçlıdır.",
+      "s2Title": "2. Hangi verileri işliyoruz",
+      "s2Item1Label": "Hesap:",
+      "s2Item1": "e-posta, kullanıcı adı, doğum tarihi (yaş/çocuk-güvenliği kapıları için), şifre (argon2id ile şifreli).",
+      "s2Item2Label": "İçerik:",
+      "s2Item2": "gönderdiğin mesajlar, paylaştığın dosyalar/görseller, ortam/kanal/DM katılımların.",
+      "s2Item3Label": "Kullanım/güvenlik:",
+      "s2Item3": "oturum bilgisi, cihaz/bağlantı verisi (kötüye kullanım önleme + güvenlik).",
+      "s3Title": "3. Şifreleme ve erişim (ŞEFFAFLIK)",
+      "s3Item1": "Uçtan-uca şifreleme (E2EE) YOKTUR. İçerik, moderasyon ve güvenlik (özellikle çocuk güvenliği) amacıyla sunucu tarafında erişilebilir. Bunu açıkça beyan ediyoruz.",
+      "s3Item2": "İçeriğe erişim yetkili moderasyon süreçleriyle sınırlıdır.",
+      "s4Title": "4. Çocuk güvenliği",
+      "s4Item1": "Reşit olmayan (18 yaş altı) kullanıcılar için mimariye gömülü korumalar vardır (yabancıyla iletişim kısıtları, yaş-kapılı alanlar, grup kısıtları). Minör verisi özel hassasiyetle işlenir.",
+      "s4Item2": "İstismar içeriği (CSAM) için ayrı, sıfır-tolerans süreç hedeflenmektedir (hukuk + uzman tasarımı bekleniyor).",
+      "s5Title": "5. Moderasyon",
+      "s5Body": "Kullanıcılar kötüye kullanımı şikâyet edebilir. Ekip içeriği inceleyip uyarı / susturma / yasaklama / içerik kaldırma uygulayabilir. Moderasyon kayıtları hesap verebilirlik için tutulur.",
+      "s6Title": "6. Haklarınız (KVKK çerçevesinde — avukat teyidine tabi)",
+      "s6Item1": "Verilerinize erişme, düzeltme, silinmesini talep etme, işlemeye itiraz etme.",
+      "s6Item2": "Hesap silme uygulama içinden mümkündür (yasal saklama/kanıt yükümlülükleri saklıdır).",
+      "s7Title": "7. Veri konumu",
+      "s7Body": "Hedef: verilerin Türkiye'de barındırılması (KVKK/yerel barındırma değeri). Önizleme aşamasında geçici altyapı kullanılabilir; bu durum kesinleşince güncellenecektir.",
+      "s8Title": "8. İletişim",
+      "s8Body": "Gizlilik ve veri talepleri için kurucuyla iletişime geç (iletişim bilgisi yakında).",
+      "s9Title": "9. Değişiklikler",
+      "s9Body": "Bu ara taslaktır. Deneyimli hukuk danışmanının görüşüyle (KVKK aydınlatma metni, açık rıza, 5651, VERBİS, saklama politikası) nihai hale getirilecektir. Önemli değişiklikler kullanıcılara bildirilecektir."
     }
   }
 }

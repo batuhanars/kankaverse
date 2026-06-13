@@ -56,6 +56,12 @@ const router = createRouter({
       component: () => import('@/views/settings/SecurityView.vue'),
       meta: { requiresAuth: true },
     },
+    // Yasal — auth gerektirmez
+    {
+      path: '/gizlilik',
+      name: 'gizlilik',
+      component: () => import('@/views/legal/GizlilikView.vue'),
+    },
     // Sprint 4B — moderasyon kuyruğu (mod-only, guard view içinde)
     {
       path: '/moderation',
