@@ -100,7 +100,7 @@ const guildsStore = useGuildsStore()
           >
             <div
               class="w-11 h-11 shrink-0 flex items-center justify-center text-[15px] font-bold text-white overflow-hidden"
-              style="background-color: var(--kv-accent-500); clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);"
+              :style="`clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);${guild.iconUrl ? '' : ' background-color: var(--kv-accent-500);'}`"
             >
               <img
                 v-if="guild.iconUrl"
