@@ -12,6 +12,7 @@ import { dmApi } from '@/api/dm'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import AttachmentView from '@/components/shared/AttachmentView.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
+import ReportModal from '@/components/shared/ReportModal.vue'
 import type { FriendCodeUserDto, MessageDto } from '@/types'
 
 const props = defineProps<{
@@ -33,15 +34,28 @@ const { label: typingLabel } = useTypingLabel(() => props.channelId, t, { named:
 
 const content = ref('')
 const sending = ref(false)
+const sendError = ref('')
 const listEl = ref<HTMLElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
 const realtimeError = ref(false)
 const showClearConfirm = ref(false)
 const clearing = ref(false)
 const unblocking = ref(false)
+const reportTargetId = ref<string | null>(null)
+const reportTargetType = ref<'MESSAGE' | 'USER'>('MESSAGE')
 
 // Sprint 5 R1 — modal akışı (inline çentik kaldırıldı)
 const composeFile = ref<File | null>(null)
+
+function openReportMessage(msgId: string) {
+  reportTargetType.value = 'MESSAGE'
+  reportTargetId.value = msgId
+}
+
+function openReportUser() {
+  reportTargetType.value = 'USER'
+  reportTargetId.value = props.otherUser.id
+}
 
 const messages = computed(() => messagesStore.messagesForChannel(props.channelId))
 const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channelId] ?? false)
@@ -103,14 +117,20 @@ async function send() {
   const hasText = content.value.trim()
   if (!hasText || sending.value || !props.canMessage) return
   stopTyping()
+  sendError.value = ''
   sending.value = true
   const text = content.value.trim()
   content.value = ''
   try {
     const { data } = await messagesApi.send(props.channelId, text)
     messagesStore.appendMessage(data)
-  } catch {
+  } catch (e: unknown) {
     content.value = text
+    const err = e as { response?: { data?: { error?: string; message?: string } } }
+    const errCode = err.response?.data?.error
+    sendError.value = errCode
+      ? (t(`message.errors.${errCode}`) !== `message.errors.${errCode}` ? t(`message.errors.${errCode}`) : (err.response?.data?.message ?? t('common.error')))
+      : t('common.error')
   } finally {
     sending.value = false
   }
@@ -179,6 +199,16 @@ async function unblockUser() {
       <span class="flex-1 text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
         {{ otherUser.username }}
       </span>
+      <!-- Kullanıcıyı şikâyet et -->
+      <button
+        class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+        style="color: var(--kv-text-muted);"
+        @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-danger)'"
+        @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
+        @click="openReportUser"
+      >
+        {{ t('report.reportUser') }}
+      </button>
       <!-- Sohbeti temizle -->
       <button
         class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
@@ -222,7 +252,7 @@ async function unblockUser() {
       <div
         v-for="msg in messages"
         :key="msg.id"
-        class="flex items-end gap-2 px-4 py-0.5"
+        class="flex items-end gap-2 px-4 py-0.5 group"
         :class="isMine(msg) ? 'flex-row-reverse' : 'flex-row'"
       >
         <!-- Karşı tarafın küçük avatarı -->
@@ -260,15 +290,35 @@ async function unblockUser() {
             :key="att.id"
             :attachment="att"
           />
-          <span class="text-[11px] mt-1 px-1" style="color: var(--kv-text-muted);">
-            {{ formatTime(msg.createdAt) }}
-          </span>
+          <div class="flex items-center gap-2 px-1 mt-1">
+            <span class="text-[11px]" style="color: var(--kv-text-muted);">
+              {{ formatTime(msg.createdAt) }}
+            </span>
+            <!-- Mesaj şikâyet butonu — kendi mesajı değilse hover'da görünür -->
+            <button
+              v-if="!isMine(msg)"
+              class="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] cursor-pointer"
+              style="color: var(--kv-text-muted);"
+              :title="t('report.reportMessage')"
+              @click="openReportMessage(msg.id)"
+            >
+              {{ t('report.reportMessage') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Mesaj input / Engel bandı -->
     <div class="px-4 pb-4 pt-2 shrink-0">
+      <!-- Gönderme hatası (USER_BANNED / USER_MUTED vb.) -->
+      <div
+        v-if="sendError"
+        class="px-1 mb-1 text-[13px]"
+        style="color: var(--kv-danger);"
+      >
+        {{ sendError }}
+      </div>
       <!-- Yazıyor göstergesi -->
       <div
         v-if="typingLabel"
@@ -329,7 +379,7 @@ async function unblockUser() {
             class="flex-1 py-3 bg-transparent text-[15px] resize-none outline-none"
             style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
             @keydown="onKeydown"
-            @input="onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
+            @input="sendError = ''; onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
             @blur="stopTyping"
           />
         </div>
@@ -354,5 +404,13 @@ async function unblockUser() {
     :channel-id="channelId"
     @sent="onAttachmentSent"
     @close="composeFile = null"
+  />
+
+  <!-- Şikâyet modalı (mesaj veya kullanıcı) -->
+  <ReportModal
+    v-if="reportTargetId"
+    :target-type="reportTargetType"
+    :target-id="reportTargetId"
+    @close="reportTargetId = null"
   />
 </template>

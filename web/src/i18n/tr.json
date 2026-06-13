@@ -275,7 +275,9 @@
     "noMessages": "Henüz mesaj yok. İlk mesajı sen gönder!",
     "realtimeError": "Gerçek zamanlı bağlantı kurulamadı — yeni mesajlar anlık görünmeyebilir.",
     "errors": {
-      "MESSAGE_BLOCKED": "Mesajınız topluluk kurallarına uygun değil."
+      "MESSAGE_BLOCKED": "Mesajınız topluluk kurallarına uygun değil.",
+      "USER_BANNED": "Hesabınız askıya alındı. Mesaj gönderemezsiniz.",
+      "USER_MUTED": "Şu anda mesaj gönderme yetkiniz kısıtlanmış."
     }
   },
   "member": {
@@ -418,6 +420,52 @@
     "one": "{user} yazıyor…",
     "two": "{user1} ve {user2} yazıyor…",
     "many": "Birkaç kişi yazıyor…"
+  },
+  "report": {
+    "title": "Şikâyet Et",
+    "subtitle": "Lütfen bir sebep seçin. Şikâyetler gizli tutulur.",
+    "descriptionLabel": "Ek Açıklama (opsiyonel)",
+    "descriptionPlaceholder": "Daha fazla bilgi vermek istersen buraya yazabilirsin.",
+    "submitButton": "Şikâyet Gönder",
+    "successMessage": "Bildirimin alındı, teşekkürler.",
+    "submitError": "Şikâyet gönderilemedi. Lütfen tekrar dene.",
+    "reportMessage": "Şikâyet et",
+    "reportUser": "Kullanıcıyı şikâyet et"
+  },
+  "reason": {
+    "SPAM": "Spam",
+    "HARASSMENT": "Taciz / Zorbalık",
+    "MINOR_SAFETY": "Çocuk Güvenliği",
+    "VIOLENCE": "Şiddet / Tehdit",
+    "CSAM": "CSAM (Çocuk İstismarı)",
+    "SELF_HARM": "Kendine Zarar Verme",
+    "OTHER": "Diğer"
+  },
+  "moderation": {
+    "title": "Moderasyon Kuyruğu",
+    "backToApp": "Uygulamaya Dön",
+    "loadError": "Kuyruk yüklenemedi.",
+    "emptyQueue": "Bekleyen rapor yok.",
+    "targetId": "Hedef ID",
+    "csamWarning": "CSAM raporu — içerik görüntülenmez. Manuel escalate gerekli.",
+    "reasonRequired": "Aksiyon sebebi zorunludur.",
+    "reasonPlaceholder": "Aksiyon sebebi gir...",
+    "expiresPlaceholder": "Saat (opsiyonel)",
+    "applyAction": "Uygula",
+    "actionSuccess": "Aksiyon başarıyla uygulandı.",
+    "actionError": "Aksiyon uygulanamadı. Lütfen tekrar dene.",
+    "targetType": {
+      "MESSAGE": "Mesaj",
+      "USER": "Kullanıcı",
+      "CHANNEL": "Kanal",
+      "GUILD": "Ortam"
+    },
+    "action": {
+      "WARN": "Uyar",
+      "MUTE": "Sustur",
+      "KICK": "At",
+      "BAN": "Yasakla"
+    }
   },
   "attachment": {
     "addFile": "Dosya ekle",

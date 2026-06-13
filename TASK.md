@@ -453,6 +453,33 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 ---
 
+## Sprint 4B — Moderasyon Çekirdeği İSKELET (kurul 2026-06-13, CSAM/snapshot stub)
+
+> Sözleşme: `contracts/SPRINT_4B_CONTRACT_DRAFT.md` §0. **R7: moderasyon→erişim enforcement** insan incelemesi.
+> Kurul: iskelet kurulur; CSAM akışı + contextSnapshot içerik = STUB (deneyimli hukuk gelince §3 doldurulup revize).
+
+### Backend (`api/`)
+- [x] Prisma: `Report`/`ModerationAction`/`AuditLog` + enumlar + `User.isModerator` + migration (uygulandı)
+- [x] `POST /reports` (auth, throttle 5/60s) — priority (CSAM/MINOR_SAFETY→100); **contextSnapshot minimal 4 alan** (içerik yok)
+- [x] `ModeratorGuard` (`isModerator`); `GET /moderation/queue` (priority sıralı, CSAM içerik render yok); `POST /moderation/actions` (+AuditLog +report RESOLVED); `GET /audit`
+- [x] **Enforcement (R7):** `ModerationService` (hasActiveBan/Mute, scope+expiry). BAN→mesaj/canDm/friend; MUTE→mesaj (scope-aware); KICK→GuildMember sil; CONTENT_REMOVE→soft-delete; WARN/SHADOW_LIMIT kayıt
+- [x] `toUserDto.isModerator`; 218 test geçti
+- [x] **STUB teyit:** CSAM akışı kurulmadı (yalnız priority+flag); retention/5651/legal-hold yok
+
+### Frontend (`web/`)
+- [x] `ReportModal` (sebep+açıklama→`POST /reports`, jenerik onay); giriş: mesaj hover/sağ-tık + kullanıcı kartı/DM başlık
+- [x] `ModerationView` (`/moderation`, `isModerator` gated): priority-sıralı kuyruk + WARN/MUTE/KICK/BAN aksiyon; CSAM içerik render yok
+- [x] `USER_BANNED`/`USER_MUTED` mesaj alanı uyarısı; `UserDto.isModerator`; i18n `report.*`/`moderation.*`/`reason.*`
+
+### Sprint 4B DoD
+- [x] Temel şikâyet CANLI; mod kuyruğu + aksiyon; AuditLog; BAN/MUTE erişime bağlı (fail-closed)
+- [x] contextSnapshot minimal + CSAM stub (kurul kısıtı korundu); `nest build`+`vue-tsc` temiz, 218 test
+- [x] **R7:** moderasyon→erişim enforcement PM satır-satır inceledi (BAN/MUTE doğru, jenerik sızıntısız); **sahip güven-temelli onay**
+- [ ] **Deneyimli hukuk görüşü** → §3 doldur + CSAM/retention revize (beklemede; `SPRINT_4B_HUKUK_BRIEF.md`)
+- [ ] **Mod yetkisi** şimdilik manuel (`isModerator` DB'den set; UI yok) — kurucu kendi hesabını mod yapar
+
+---
+
 ## Sprint 1 DoD — PM reconcile (2026-06-13)
 
 > Fonksiyonel olarak Sprint 2A/2B/3/4A boyunca doğrulandı (uygulama uçtan uca çalışıyor); checkbox'lar bayattı.

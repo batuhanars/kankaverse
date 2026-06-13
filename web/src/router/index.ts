@@ -56,6 +56,13 @@ const router = createRouter({
       component: () => import('@/views/settings/SecurityView.vue'),
       meta: { requiresAuth: true },
     },
+    // Sprint 4B — moderasyon kuyruğu (mod-only, guard view içinde)
+    {
+      path: '/moderation',
+      name: 'moderation',
+      component: () => import('@/views/moderation/ModerationView.vue'),
+      meta: { requiresAuth: true },
+    },
     {
       path: '/',
       name: 'app',
