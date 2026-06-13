@@ -745,18 +745,23 @@ function isGroupStart(index: number): boolean {
           </div>
 
           <div
-            class="flex items-end gap-2 px-4 border"
+            class="flex items-center gap-2 px-4 border"
             :class="replyingTo ? 'rounded-b-[var(--kv-radius-md)]' : 'rounded-[var(--kv-radius-md)]'"
             style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
           >
             <button
               type="button"
-              class="shrink-0 py-3 cursor-pointer hover:opacity-80 transition-opacity"
-              style="color: var(--kv-text-muted);"
+              class="shrink-0 w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
+              style="color: var(--kv-text-secondary);"
               :aria-label="t('attachment.addFile')"
+              :title="t('attachment.addFile')"
+              @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'"
               @click="openFilePicker"
             >
-              📎
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+              </svg>
             </button>
             <!-- Sprint V2: mention autocomplete — relative sarmalayıcı popover için -->
             <div class="relative flex-1 min-w-0">
@@ -790,8 +795,8 @@ function isGroupStart(index: number): boolean {
                 v-model="content"
                 rows="1"
                 :placeholder="inputPlaceholder"
-                class="w-full py-3 bg-transparent text-[15px] resize-none outline-none"
-                style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
+                class="w-full bg-transparent text-[15px] resize-none outline-none"
+                style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary); line-height: 1.5; padding-top: 10px; padding-bottom: 10px;"
                 @keydown="onKeydown"
                 @input="onDmTextareaInput"
                 @blur="stopTyping"
