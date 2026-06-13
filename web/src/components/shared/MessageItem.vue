@@ -189,7 +189,9 @@ onUnmounted(() => {
         </button>
         <!-- Düzenle / Sil hover butonları (kendi mesajı) -->
         <template v-if="isMine && !editing">
+          <!-- Düzenle: yalnız metin içeren mesajda görünür -->
           <button
+            v-if="message.content"
             class="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-[12px] cursor-pointer px-2 py-0.5 rounded"
             style="color: var(--kv-text-muted);"
             :title="t('message.edit')"
@@ -199,6 +201,7 @@ onUnmounted(() => {
           </button>
           <button
             class="opacity-0 group-hover:opacity-100 transition-opacity text-[12px] cursor-pointer px-2 py-0.5 rounded"
+            :class="message.content ? '' : 'ml-auto'"
             style="color: var(--kv-danger);"
             :title="t('message.delete')"
             @click.stop="openDeleteConfirm"
@@ -235,18 +238,36 @@ onUnmounted(() => {
 
       <!-- Normal mesaj içeriği -->
       <template v-else>
-        <p
-          v-if="message.content"
-          class="text-[14px] text-[var(--kv-text-body)] break-words whitespace-pre-wrap"
-        >
-          {{ message.content }}
-        </p>
-        <!-- Sprint 5 §7: Attachment'lar -->
-        <AttachmentView
-          v-for="att in message.attachments"
-          :key="att.id"
-          :attachment="att"
-        />
+        <!-- Ek+açıklama → tek birim; yalnız ek → sadece ek; yalnız metin → metin -->
+        <template v-if="message.attachments?.length && message.content">
+          <!-- Birleşik: görsel/ek üstte, açıklama altında, tek kapsayıcı -->
+          <div class="mt-1 rounded-[var(--kv-radius-sm)] overflow-hidden" style="max-width: 360px; background-color: var(--kv-bg-elevated);">
+            <AttachmentView
+              v-for="att in message.attachments"
+              :key="att.id"
+              :attachment="att"
+              class="!mt-0"
+            />
+            <p class="px-3 pb-3 pt-1.5 text-[14px] break-words whitespace-pre-wrap" style="color: var(--kv-text-body);">
+              {{ message.content }}
+            </p>
+          </div>
+        </template>
+        <template v-else>
+          <!-- Yalnız metin -->
+          <p
+            v-if="message.content"
+            class="text-[14px] text-[var(--kv-text-body)] break-words whitespace-pre-wrap"
+          >
+            {{ message.content }}
+          </p>
+          <!-- Yalnız ek (açıklamasız) -->
+          <AttachmentView
+            v-for="att in message.attachments"
+            :key="att.id"
+            :attachment="att"
+          />
+        </template>
       </template>
     </div>
   </div>
@@ -258,9 +279,10 @@ onUnmounted(() => {
       class="fixed z-50 rounded-[var(--kv-radius-md)] py-1 min-w-[160px]"
       :style="`top:${menuY}px;left:${menuX}px;background-color:var(--kv-bg-elevated);border:1px solid var(--kv-border-subtle);`"
     >
-      <!-- Kendi mesajı: düzenle + sil -->
+      <!-- Kendi mesajı: düzenle (metin varsa) + sil -->
       <template v-if="isMine">
         <button
+          v-if="message.content"
           class="w-full text-left px-3 py-2 text-[13px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)]"
           style="color: var(--kv-text-primary);"
           @click="startEdit"

@@ -1,11 +1,12 @@
 <!-- Sprint 5 §7: Attachment render — görsel inline önizleme + dosya indirme.
      Sprint 5 R1: tipli dosya ikonu (pdf/doc/txt/genel) + PDF "Aç" butonu.
-     Rule of Three: guild MessageItem + DM baloncuk = 2 kullanım → bu component'a promote edildi. -->
+     Sprint 6.x: Görsel tıkla → uygulama-içi lightbox (yeni sekme YOK). -->
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { attachmentsApi } from '@/api/attachments'
 import { ScanStatus, type AttachmentDto } from '@/types'
+import ImageLightbox from './ImageLightbox.vue'
 
 const props = defineProps<{
   attachment: AttachmentDto
@@ -17,6 +18,7 @@ const imageUrl = ref<string | null>(null)
 const imageLoading = ref(false)
 const imageError = ref<string | null>(null)
 const downloading = ref(false)
+const lightboxOpen = ref(false)
 
 const isImage = props.attachment.contentType.startsWith('image/')
 const isPdf = props.attachment.contentType === 'application/pdf'
@@ -52,6 +54,7 @@ if (isImage && props.attachment.scanStatus === ScanStatus.CLEAN) {
     })
 }
 
+// Dosya (PDF vb.) → yeni sekme (tarayıcı görüntüleyici)
 async function openUrl() {
   if (isActionDisabled.value) return
   downloading.value = true
@@ -61,6 +64,11 @@ async function openUrl() {
   } finally {
     downloading.value = false
   }
+}
+
+// Görsel → lightbox
+function openLightbox() {
+  if (imageUrl.value) lightboxOpen.value = true
 }
 
 function formatBytes(bytes: number): string {
@@ -111,7 +119,7 @@ function formatBytes(bytes: number): string {
       <span>{{ t('attachment.notReady') }}</span>
     </div>
 
-    <!-- Görsel -->
+    <!-- Görsel — tıklayınca lightbox -->
     <img
       v-else-if="imageUrl"
       :src="imageUrl"
@@ -119,7 +127,7 @@ function formatBytes(bytes: number): string {
       class="max-w-full rounded-[var(--kv-radius-sm)] cursor-pointer object-contain"
       style="max-width: 360px; max-height: 240px;"
       loading="lazy"
-      @click="openUrl"
+      @click="openLightbox"
     />
   </div>
 
@@ -199,4 +207,12 @@ function formatBytes(bytes: number): string {
       </button>
     </div>
   </div>
+
+  <!-- Görsel lightbox -->
+  <ImageLightbox
+    v-if="lightboxOpen && imageUrl"
+    :url="imageUrl"
+    :filename="attachment.filename"
+    @close="lightboxOpen = false"
+  />
 </template>
