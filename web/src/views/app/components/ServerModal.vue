@@ -7,6 +7,9 @@ import { invitesApi } from '@/api/invites'
 import KvButton from '@/components/ui/KvButton.vue'
 import type { InvitePreviewDto } from '@/types'
 
+const props = withDefaults(defineProps<{ initialStep?: 'choose' | 'create' | 'join' }>(), {
+  initialStep: 'choose',
+})
 const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
@@ -14,7 +17,7 @@ const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 
 type Step = 'choose' | 'create' | 'join'
-const step = ref<Step>('choose')
+const step = ref<Step>(props.initialStep)
 const name = ref('')
 const inviteCode = ref('')
 const error = ref('')
