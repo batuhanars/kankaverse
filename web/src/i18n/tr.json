@@ -293,6 +293,18 @@
     "deleteButton": "Sil",
     "rename": "Yeniden Adlandır",
     "delete": "Sil",
+    "settingsTitle": "Kanal Ayarları",
+    "settingsButton": "Kaydet",
+    "slowModeLabel": "Yavaş Mod",
+    "slowModeDesc": "Üyeler arasında art arda mesaj göndermek için bekleme süresi.",
+    "slowModeOff": "Kapalı",
+    "slowMode5s": "5 saniye",
+    "slowMode10s": "10 saniye",
+    "slowMode30s": "30 saniye",
+    "slowMode1m": "1 dakika",
+    "slowMode5m": "5 dakika",
+    "slowMode15m": "15 dakika",
+    "slowModeHint": "Yavaş mod açık — {seconds} sn bekleyin",
     "errors": {
       "LAST_CHANNEL": "Son kanal silinemez. Ortamda en az bir kanal olmalıdır."
     }
@@ -306,7 +318,9 @@
     "errors": {
       "MESSAGE_BLOCKED": "Mesajınız topluluk kurallarına uygun değil.",
       "USER_BANNED": "Hesabınız askıya alındı. Mesaj gönderemezsiniz.",
-      "USER_MUTED": "Şu anda mesaj gönderme yetkiniz kısıtlanmış."
+      "USER_MUTED": "Şu anda mesaj gönderme yetkiniz kısıtlanmış.",
+      "SLOW_MODE": "Yavaş mod açık — biraz bekleyin.",
+      "SLOW_MODE_RETRY": "Yavaş mod açık — {seconds} sn bekleyin."
     }
   },
   "member": {

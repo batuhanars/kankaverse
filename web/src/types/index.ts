@@ -134,6 +134,7 @@ export interface ChannelDto {
   name: string | null
   ageGated: boolean
   position: number
+  slowModeSeconds: number
 }
 
 // Sprint 5 §4 — Attachment DTO

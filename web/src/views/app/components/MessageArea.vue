@@ -23,6 +23,7 @@ const fileInputEl = ref<HTMLInputElement | null>(null)
 // Room'a join başarısızsa realtime çalışmaz; kullanıcıyı sessiz bırakmıyoruz
 const realtimeError = ref(false)
 const sendError = ref('')
+const slowModeSeconds = ref<number | null>(null)
 
 // Sprint 5 R1 — modal akışı (inline çentik kaldırıldı)
 const composeFile = ref<File | null>(null)
@@ -35,6 +36,14 @@ const hasMore = computed(() =>
   channelId.value ? (messagesStore.hasMoreByChannel[channelId.value] ?? false) : false,
 )
 const channelName = computed(() => channelsStore.activeChannel()?.name ?? '')
+const channelSlowMode = computed(() => channelsStore.activeChannel()?.slowModeSeconds ?? 0)
+
+function inputPlaceholder() {
+  if (channelSlowMode.value > 0) {
+    return t('channel.slowModeHint', { seconds: channelSlowMode.value })
+  }
+  return t('message.inputPlaceholder', { channel: channelName.value })
+}
 
 watch(
   channelId,
@@ -93,15 +102,24 @@ function onFileSelected(e: Event) {
 async function onAttachmentSent({ attachmentId, caption }: { attachmentId: string; caption: string }) {
   if (!channelId.value) return
   composeFile.value = null
+  slowModeSeconds.value = null
   try {
     const { data } = await messagesApi.send(channelId.value, caption, undefined, [attachmentId])
     messagesStore.appendMessage(data)
   } catch (e: unknown) {
-    const err = e as { response?: { data?: { error?: string; message?: string } } }
+    const err = e as { response?: { data?: { error?: string; message?: string; retryAfter?: number } } }
     const errCode = err.response?.data?.error
-    sendError.value = errCode
-      ? (t(`message.errors.${errCode}`) || err.response?.data?.message || t('common.error'))
-      : t('common.error')
+    if (errCode === 'SLOW_MODE') {
+      const retry = err.response?.data?.retryAfter
+      slowModeSeconds.value = typeof retry === 'number' ? retry : null
+      sendError.value = slowModeSeconds.value !== null
+        ? t('message.errors.SLOW_MODE_RETRY', { seconds: slowModeSeconds.value })
+        : t('message.errors.SLOW_MODE')
+    } else {
+      sendError.value = errCode
+        ? (t(`message.errors.${errCode}`) || err.response?.data?.message || t('common.error'))
+        : t('common.error')
+    }
   }
 }
 
@@ -110,6 +128,7 @@ async function send() {
   if (!hasText || !channelId.value || sending.value) return
   stopTyping()
   sendError.value = ''
+  slowModeSeconds.value = null
   sending.value = true
   const text = content.value.trim()
   content.value = ''
@@ -120,11 +139,19 @@ async function send() {
     messagesStore.appendMessage(data)
   } catch (e: unknown) {
     content.value = text
-    const err = e as { response?: { data?: { error?: string; message?: string } } }
+    const err = e as { response?: { data?: { error?: string; message?: string; retryAfter?: number } } }
     const errCode = err.response?.data?.error
-    sendError.value = errCode
-      ? (t(`message.errors.${errCode}`) || err.response?.data?.message || t('common.error'))
-      : t('common.error')
+    if (errCode === 'SLOW_MODE') {
+      const retry = err.response?.data?.retryAfter
+      slowModeSeconds.value = typeof retry === 'number' ? retry : null
+      sendError.value = slowModeSeconds.value !== null
+        ? t('message.errors.SLOW_MODE_RETRY', { seconds: slowModeSeconds.value })
+        : t('message.errors.SLOW_MODE')
+    } else {
+      sendError.value = errCode
+        ? (t(`message.errors.${errCode}`) || err.response?.data?.message || t('common.error'))
+        : t('common.error')
+    }
   } finally {
     sending.value = false
   }
@@ -218,11 +245,11 @@ function onKeydown(e: KeyboardEvent) {
         <textarea
           v-model="content"
           rows="1"
-          :placeholder="t('message.inputPlaceholder', { channel: channelName })"
+          :placeholder="inputPlaceholder()"
           class="flex-1 py-3 bg-transparent text-[15px] resize-none outline-none"
           style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary);"
           @keydown="onKeydown"
-          @input="sendError = ''; onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
+          @input="sendError = ''; slowModeSeconds = null; onTypingInput(); ($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
           @blur="stopTyping"
         />
       </div>
