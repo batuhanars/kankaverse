@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, computed } from 'vue'
+import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMessagesStore } from '@/stores/messages'
 import { useDmStore } from '@/stores/dm'
@@ -29,6 +29,39 @@ const editTextareaEl = ref<HTMLTextAreaElement | null>(null)
 const showDeleteConfirm = ref(false)
 const deleteTargetId = ref<string | null>(null)
 const deleteLoading = ref(false)
+
+// Sprint V2: reaksiyon emoji seti + picker state
+const EMOJI_SET = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '👀']
+const activeEmojiPickerId = ref<string | null>(null)
+
+function toggleDmEmojiPicker(msgId: string, e: MouseEvent) {
+  e.stopPropagation()
+  activeEmojiPickerId.value = activeEmojiPickerId.value === msgId ? null : msgId
+}
+
+async function pickDmEmoji(msg: MessageDto, emoji: string) {
+  activeEmojiPickerId.value = null
+  try {
+    await messagesApi.addReaction(props.channel.id, msg.id, emoji)
+    messagesStore.applyReaction(msg.id, emoji, authStore.user!.id, authStore.user!.id, true)
+  } catch {
+    // sessizce yut
+  }
+}
+
+async function toggleDmReaction(msg: MessageDto, emoji: string, reactedByMe: boolean) {
+  try {
+    if (reactedByMe) {
+      await messagesApi.removeReaction(props.channel.id, msg.id, emoji)
+      messagesStore.applyReaction(msg.id, emoji, authStore.user!.id, authStore.user!.id, false)
+    } else {
+      await messagesApi.addReaction(props.channel.id, msg.id, emoji)
+      messagesStore.applyReaction(msg.id, emoji, authStore.user!.id, authStore.user!.id, true)
+    }
+  } catch {
+    // sessizce yut
+  }
+}
 
 const props = defineProps<{
   channel: DmChannelDto
@@ -284,6 +317,18 @@ const inputPlaceholder = computed(() => {
 // 1-1 DM: mesaj gönderme aktif mi?
 const canMessage = computed(() => isGroup.value || (dmChannel.value?.canMessage ?? false))
 const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
+
+// Emoji picker dışı tıklamada kapat
+function onDmPickerDocClick() {
+  activeEmojiPickerId.value = null
+}
+
+onMounted(() => {
+  document.addEventListener('click', onDmPickerDocClick)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', onDmPickerDocClick)
+})
 </script>
 
 <template>
@@ -467,6 +512,22 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
                   :attachment="att"
                 />
               </template>
+              <!-- Reaksiyon pill'leri (grup) -->
+              <div v-if="msg.reactions?.length" class="flex flex-wrap gap-1 mt-1 px-1">
+                <button
+                  v-for="reaction in msg.reactions"
+                  :key="reaction.emoji"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] cursor-pointer transition-colors border"
+                  :style="reaction.reactedByMe
+                    ? 'background-color: var(--kv-accent-subtle); border-color: var(--kv-accent-500); color: var(--kv-accent-500);'
+                    : 'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'"
+                  :title="t('reaction.toggleTitle')"
+                  @click.stop="toggleDmReaction(msg, reaction.emoji, reaction.reactedByMe)"
+                >
+                  <span>{{ reaction.emoji }}</span>
+                  <span class="font-medium">{{ reaction.count }}</span>
+                </button>
+              </div>
               <div class="flex items-center gap-2 px-1 mt-1">
                 <span class="text-[11px]" style="color: var(--kv-text-muted);">
                   {{ formatTime(msg.createdAt) }}
@@ -474,6 +535,32 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
                 <span v-if="msg.editedAt" class="text-[11px]" style="color: var(--kv-text-muted);">
                   {{ t('message.edited') }}
                 </span>
+                <!-- Reaksiyon ekle butonu (grup) -->
+                <div class="relative">
+                  <button
+                    class="opacity-0 group-hover:opacity-100 transition-opacity text-[13px] cursor-pointer"
+                    style="color: var(--kv-text-muted);"
+                    :title="t('reaction.addReaction')"
+                    @click.stop="toggleDmEmojiPicker(msg.id, $event)"
+                  >
+                    🙂
+                  </button>
+                  <div
+                    v-if="activeEmojiPickerId === msg.id"
+                    class="absolute bottom-full left-0 mb-1 z-50 flex gap-1 p-1.5 rounded-[var(--kv-radius-md)]"
+                    style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
+                    @click.stop
+                  >
+                    <button
+                      v-for="emoji in EMOJI_SET"
+                      :key="emoji"
+                      class="text-[16px] w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+                      @click="pickDmEmoji(msg, emoji)"
+                    >
+                      {{ emoji }}
+                    </button>
+                  </div>
+                </div>
                 <button
                   class="opacity-0 group-hover:opacity-100 transition-opacity text-[11px] cursor-pointer"
                   style="color: var(--kv-text-muted);"
@@ -570,6 +657,22 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
                   :attachment="att"
                 />
               </template>
+              <!-- Reaksiyon pill'leri (DM / kendi mesajı) -->
+              <div v-if="msg.reactions?.length" class="flex flex-wrap gap-1 mt-1 px-1">
+                <button
+                  v-for="reaction in msg.reactions"
+                  :key="reaction.emoji"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] cursor-pointer transition-colors border"
+                  :style="reaction.reactedByMe
+                    ? 'background-color: var(--kv-accent-subtle); border-color: var(--kv-accent-500); color: var(--kv-accent-500);'
+                    : 'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'"
+                  :title="t('reaction.toggleTitle')"
+                  @click.stop="toggleDmReaction(msg, reaction.emoji, reaction.reactedByMe)"
+                >
+                  <span>{{ reaction.emoji }}</span>
+                  <span class="font-medium">{{ reaction.count }}</span>
+                </button>
+              </div>
               <div class="flex items-center gap-2 px-1 mt-1">
                 <span class="text-[11px]" style="color: var(--kv-text-muted);">
                   {{ formatTime(msg.createdAt) }}
@@ -577,6 +680,33 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
                 <span v-if="msg.editedAt" class="text-[11px]" style="color: var(--kv-text-muted);">
                   {{ t('message.edited') }}
                 </span>
+                <!-- Reaksiyon ekle butonu (DM) -->
+                <div class="relative">
+                  <button
+                    class="opacity-0 group-hover:opacity-100 transition-opacity text-[13px] cursor-pointer"
+                    style="color: var(--kv-text-muted);"
+                    :title="t('reaction.addReaction')"
+                    @click.stop="toggleDmEmojiPicker(msg.id, $event)"
+                  >
+                    🙂
+                  </button>
+                  <div
+                    v-if="activeEmojiPickerId === msg.id"
+                    class="absolute bottom-full mb-1 z-50 flex gap-1 p-1.5 rounded-[var(--kv-radius-md)]"
+                    :class="isMine(msg) ? 'right-0' : 'left-0'"
+                    style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
+                    @click.stop
+                  >
+                    <button
+                      v-for="emoji in EMOJI_SET"
+                      :key="emoji"
+                      class="text-[16px] w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+                      @click="pickDmEmoji(msg, emoji)"
+                    >
+                      {{ emoji }}
+                    </button>
+                  </div>
+                </div>
                 <!-- Kendi mesajı: düzenle (metin varsa) + sil hover butonları -->
                 <template v-if="isMine(msg)">
                   <button

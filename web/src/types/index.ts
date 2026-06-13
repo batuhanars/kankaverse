@@ -174,6 +174,12 @@ export interface AttachmentDto {
   scanStatus: ScanStatus
 }
 
+export interface ReactionDto {
+  emoji: string
+  count: number
+  reactedByMe: boolean
+}
+
 export interface MessageDto {
   id: string
   channelId: string
@@ -187,6 +193,7 @@ export interface MessageDto {
   createdAt: string
   editedAt: string | null
   attachments?: AttachmentDto[]
+  reactions?: ReactionDto[]
 }
 
 // Sprint 7B — Ortam üye DTO

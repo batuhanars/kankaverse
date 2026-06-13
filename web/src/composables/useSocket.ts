@@ -7,6 +7,7 @@ import { useNotificationsStore } from '@/stores/notifications'
 import { useDmStore } from '@/stores/dm'
 import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
+import { useAuthStore } from '@/stores/auth'
 import { getAccessToken } from '@/api/axios'
 import {
   _bindTypingEmitters,
@@ -30,6 +31,7 @@ export function useSocket() {
   const dmStore = useDmStore()
   const channelsStore = useChannelsStore()
   const guildsStore = useGuildsStore()
+  const authStore = useAuthStore()
 
   function _joinRoom(channelId: string) {
     socket?.emit('channel:join', { channelId }, (ack: { ok: boolean; error?: string }) => {
@@ -135,6 +137,15 @@ export function useSocket() {
 
     socket.on('typing:clear', (data: { userId: string; username: string; channelId: string }) => {
       handleTypingClear(data.userId, data.channelId)
+    })
+
+    // Sprint V2: reaksiyon WS olayları
+    socket.on('reaction.added', (data: { messageId: string; channelId: string; emoji: string; userId: string }) => {
+      messagesStore.applyReaction(data.messageId, data.emoji, data.userId, authStore.user?.id ?? '', true)
+    })
+
+    socket.on('reaction.removed', (data: { messageId: string; channelId: string; emoji: string; userId: string }) => {
+      messagesStore.applyReaction(data.messageId, data.emoji, data.userId, authStore.user?.id ?? '', false)
     })
 
     // Kanal aktivitesi — başka üyenin mesajı: aktif değilse unread sayacını artır

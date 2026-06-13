@@ -56,6 +56,33 @@ export const useMessagesStore = defineStore('messages', () => {
     if (idx !== -1) list.splice(idx, 1)
   }
 
+  // Sprint V2: reaksiyon güncelle (WS veya optimistik)
+  function applyReaction(messageId: string, emoji: string, userId: string, meId: string, added: boolean) {
+    for (const list of Object.values(messagesByChannel.value)) {
+      const msg = list.find((m) => m.id === messageId)
+      if (!msg) continue
+      if (!msg.reactions) msg.reactions = []
+      const existing = msg.reactions.find((r) => r.emoji === emoji)
+      if (added) {
+        if (existing) {
+          existing.count++
+          if (userId === meId) existing.reactedByMe = true
+        } else {
+          msg.reactions.push({ emoji, count: 1, reactedByMe: userId === meId })
+        }
+      } else {
+        if (existing) {
+          existing.count--
+          if (userId === meId) existing.reactedByMe = false
+          if (existing.count <= 0) {
+            msg.reactions = msg.reactions.filter((r) => r.emoji !== emoji)
+          }
+        }
+      }
+      break
+    }
+  }
+
   return {
     messagesByChannel,
     hasMoreByChannel,
@@ -64,5 +91,6 @@ export const useMessagesStore = defineStore('messages', () => {
     appendMessage,
     updateMessage,
     removeMessage,
+    applyReaction,
   }
 })
