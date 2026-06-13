@@ -146,8 +146,10 @@ export class MessagesService {
       });
     }
 
-    // DM kanalında blok kontrolü: blok sonradan konuşmayı keser
-    if (!channel.guildId) {
+    // DM kanalında blok kontrolü: blok sonradan konuşmayı keser.
+    // GROUP_DM'de ATLA — grup arkadaş-tabanlı (oluşturma/ekleme kapısında garanti edilir).
+    // Yalnız tam 2 üyeli 1-1 DM'de uygula.
+    if (!channel.guildId && channel.type !== 'GROUP_DM') {
       await this.membership.requireNoDmBlock(userId, channelId);
     }
 

@@ -86,6 +86,7 @@ model User {
   blocksMade          UserBlock[]        @relation("Blocker")
   blocksReceived      UserBlock[]        @relation("Blocked")
   channelMemberships  ChannelMember[]
+  ownedChannels       Channel[]          @relation("ChannelOwner")
   createdInvites      Invite[]           @relation("InviteCreator")
   attachments         Attachment[]
   reportsFiled        Report[]           @relation("Reporter")
@@ -171,6 +172,8 @@ model Channel {
   guildId         String?
   guild           Guild?      @relation(fields: [guildId], references: [id])
   name            String?
+  ownerId         String?     // GROUP_DM: oluşturan kullanıcı; 1-1 DM + guild kanallarında null
+  owner           User?       @relation("ChannelOwner", fields: [ownerId], references: [id])
   ageGated        Boolean     @default(false)
   position        Int         @default(0)
   slowModeSeconds Int         @default(0)
