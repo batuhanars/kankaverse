@@ -206,7 +206,7 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
 </script>
 
 <template>
-  <div class="flex flex-1 min-w-0 overflow-hidden">
+  <div class="flex flex-1 min-w-0 overflow-hidden gap-4">
     <!-- Ana sohbet alanı -->
     <div
       class="flex flex-col flex-1 min-w-0 overflow-hidden mb-4 rounded-[var(--kv-radius-lg)]"

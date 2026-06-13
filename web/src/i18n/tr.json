@@ -325,6 +325,7 @@
   },
   "member": {
     "panel": "Üyeler",
+    "admins": "Yöneticiler — {n}",
     "online": "Çevrimiçi — {n}",
     "offline": "Çevrimdışı — {n}",
     "comingSoon": "Üye listesi çok yakında.",
