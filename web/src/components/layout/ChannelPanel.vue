@@ -315,7 +315,7 @@ function closeCategoryMenu() {
 
 <template>
   <aside
-    class="flex flex-col h-full shrink-0 rounded-r-[var(--kv-radius-lg)] overflow-hidden"
+    class="flex flex-col h-full shrink-0 rounded-r-[var(--kv-radius-lg)] overflow-hidden mt-4"
     style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
     @click="closeCategoryMenu"
   >
@@ -325,6 +325,23 @@ function closeCategoryMenu() {
       style="height: var(--kv-header-height); border-color: var(--kv-border-subtle); color: var(--kv-text-primary);"
     >
       <span class="flex-1 truncate">{{ guildsStore.activeGuild()?.name ?? '' }}</span>
+
+      <!-- Kategori oluştur — OWNER veya ADMIN -->
+      <button
+        v-if="isAdmin"
+        class="shrink-0 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
+        style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
+        :title="t('category.createCategory')"
+        @click.stop="openCreateCategory"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <line x1="17" y1="14" x2="17" y2="20"/>
+          <line x1="14" y1="17" x2="20" y2="17"/>
+        </svg>
+      </button>
 
       <!-- Ayarlar dişlisi — yalnız OWNER -->
       <button
@@ -344,7 +361,7 @@ function closeCategoryMenu() {
     <!-- Kanal listesi -->
     <div class="flex-1 overflow-y-auto pt-4 pb-20 px-2">
 
-      <!-- ── Başlık satırı: "METİN KANALLARI" + "+" menüsü (ADMIN) ── -->
+      <!-- ── Başlık satırı: "METİN KANALLARI" + kanal-oluştur "+" (ADMIN) ── -->
       <div class="mb-1 px-2 flex items-center justify-between">
         <span
           class="text-[11px] font-semibold uppercase tracking-widest"
@@ -352,36 +369,19 @@ function closeCategoryMenu() {
         >
           {{ t('channel.textChannels') }}
         </span>
-        <!-- ADMIN: kanal + kategori oluştur menüsü -->
-        <div v-if="isAdmin" class="flex items-center gap-0.5">
-          <!-- Kategori oluştur -->
-          <button
-            class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-            style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
-            :title="t('category.createCategory')"
-            @click.stop="openCreateCategory"
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1"/>
-              <rect x="14" y="3" width="7" height="7" rx="1"/>
-              <rect x="3" y="14" width="7" height="7" rx="1"/>
-              <line x1="17" y1="14" x2="17" y2="20"/>
-              <line x1="14" y1="17" x2="20" y2="17"/>
-            </svg>
-          </button>
-          <!-- Kanal oluştur -->
-          <button
-            class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-            style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
-            :title="t('channel.createTitle')"
-            @click.stop="openCreate(null)"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-          </button>
-        </div>
+        <!-- ADMIN: kanal oluştur -->
+        <button
+          v-if="isAdmin"
+          class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
+          style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
+          :title="t('channel.createTitle')"
+          @click.stop="openCreate(null)"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
       </div>
 
       <!-- ── (1) Kategorisiz kanallar — en üstte ── -->

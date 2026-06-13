@@ -577,14 +577,15 @@ function isGroupStart(index: number): boolean {
           </div>
           <!-- Üye panelini aç/kapat -->
           <button
-            class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-            style="color: var(--kv-text-muted);"
-            :style="showGroupPanel ? 'color: var(--kv-text-primary);' : ''"
-            @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-text-primary)'"
-            @mouseleave="!showGroupPanel && (($event.target as HTMLElement).style.color = 'var(--kv-text-muted)')"
+            :class="[
+              'px-3 py-1 text-[13px] rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer',
+              showGroupPanel
+                ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-accent-500)]'
+                : 'text-[var(--kv-text-secondary)] hover:text-[var(--kv-text-body)]',
+            ]"
             @click="showGroupPanel = !showGroupPanel"
           >
-            👥 {{ t('group.members') }}
+            {{ t('group.members') }}
           </button>
         </template>
       </div>
