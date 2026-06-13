@@ -43,7 +43,7 @@ async function pickDmEmoji(msg: MessageDto, emoji: string) {
   activeEmojiPickerId.value = null
   try {
     await messagesApi.addReaction(props.channel.id, msg.id, emoji)
-    messagesStore.applyReaction(msg.id, emoji, authStore.user!.id, authStore.user!.id, true)
+    // Store güncellemesi useSocket reaction.added handler'ından gelir (çift-sayım önleme)
   } catch {
     // sessizce yut
   }
@@ -53,11 +53,10 @@ async function toggleDmReaction(msg: MessageDto, emoji: string, reactedByMe: boo
   try {
     if (reactedByMe) {
       await messagesApi.removeReaction(props.channel.id, msg.id, emoji)
-      messagesStore.applyReaction(msg.id, emoji, authStore.user!.id, authStore.user!.id, false)
     } else {
       await messagesApi.addReaction(props.channel.id, msg.id, emoji)
-      messagesStore.applyReaction(msg.id, emoji, authStore.user!.id, authStore.user!.id, true)
     }
+    // Store güncellemesi useSocket reaction.added/reaction.removed handler'ından gelir (çift-sayım önleme)
   } catch {
     // sessizce yut
   }
