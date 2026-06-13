@@ -104,8 +104,8 @@ onUnmounted(() => {
   <div ref="menuEl" class="relative" @click.stop>
     <!-- ⋯ Kebab butonu -->
     <button
-      class="w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-colors text-[16px] font-bold leading-none"
-      style="color: var(--kv-text-muted);"
+      class="w-7 h-7 flex items-center justify-center rounded cursor-pointer transition-colors text-[16px] font-bold leading-none hover:text-[var(--kv-text-primary)]"
+      style="color: var(--kv-text-secondary);"
       :class="open ? 'bg-[var(--kv-bg-sidebar)]' : 'hover:bg-[var(--kv-bg-sidebar)]'"
       :title="t('message.actions')"
       @click="toggleMenu"

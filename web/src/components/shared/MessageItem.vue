@@ -181,26 +181,26 @@ onUnmounted(() => {
     class="relative flex gap-3 px-4 py-1 hover:bg-[var(--kv-bg-elevated)] rounded group"
     @contextmenu="onContextMenu"
   >
-    <!-- Kebab menü: yüzen overlay, sağ-üst — layout'u itmez -->
-    <div
-      v-if="!editing"
-      class="absolute top-0.5 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-    >
-      <MessageActionsMenu
-        :message-id="message.id"
-        :is-mine="isMine"
-        :has-content="!!message.content"
-        @reply="emit('reply', message)"
-        @edit="startEdit"
-        @delete="openDeleteConfirm"
-        @report="openReportModal"
-        @add-reaction="pickEmoji"
-      />
-    </div>
     <button class="shrink-0 cursor-pointer" @click="onAuthorClick">
       <UserAvatar :username="message.author.username" :avatar-url="message.author.avatarUrl" />
     </button>
-    <div class="flex flex-col min-w-0 flex-1">
+    <div class="relative flex flex-col min-w-0 flex-1">
+      <!-- Kebab menü: içerik alanının sağ-üst köşesi — layout'u itmez -->
+      <div
+        v-if="!editing"
+        class="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+      >
+        <MessageActionsMenu
+          :message-id="message.id"
+          :is-mine="isMine"
+          :has-content="!!message.content"
+          @reply="emit('reply', message)"
+          @edit="startEdit"
+          @delete="openDeleteConfirm"
+          @report="openReportModal"
+          @add-reaction="pickEmoji"
+        />
+      </div>
       <div class="flex items-baseline gap-2">
         <button
           class="text-[14px] font-semibold hover:underline cursor-pointer text-left"
