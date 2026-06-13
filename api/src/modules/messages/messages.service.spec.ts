@@ -7,9 +7,13 @@ const prismaMock = {
   message: {
     findMany: jest.fn(),
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
     create: jest.fn(),
   },
   channelMember: {
+    findUnique: jest.fn(),
+  },
+  guildMember: {
     findUnique: jest.fn(),
   },
   attachment: {
@@ -62,8 +66,9 @@ const USER_ID = 'user-abc';
 const CHANNEL_ID = 'ch-dm-1';
 const GUILD_CHANNEL_ID = 'ch-guild-1';
 
-const DM_CHANNEL = { id: CHANNEL_ID, guildId: null };
-const GUILD_CHANNEL = { id: GUILD_CHANNEL_ID, guildId: 'guild-xyz' };
+const DM_CHANNEL = { id: CHANNEL_ID, guildId: null, slowModeSeconds: 0 };
+const GUILD_CHANNEL = { id: GUILD_CHANNEL_ID, guildId: 'guild-xyz', slowModeSeconds: 0 };
+const SLOW_GUILD_CHANNEL = { id: GUILD_CHANNEL_ID, guildId: 'guild-xyz', slowModeSeconds: 10 };
 
 // Mesaj fixture — createdAt Date nesnesi (toISOString çağrısı için)
 function makeMsg(id: string, createdAt: Date) {
@@ -498,5 +503,148 @@ describe('MessagesService.create — attachment linking + scan-gate', () => {
     const response = thrown!.getResponse() as { error: string };
     expect(response.error).toBe('ATTACHMENT_ALREADY_LINKED');
     expect(prismaMock.message.create).not.toHaveBeenCalled();
+  });
+});
+
+// ── MessagesService.create — yavaş mod (slow mode) ──────────────────────────
+
+describe('MessagesService.create — yavaş mod', () => {
+  let service: MessagesService;
+
+  const DTO = { content: 'merhaba' };
+
+  const CREATED_MSG = {
+    id: 'msg-slow-1',
+    channelId: GUILD_CHANNEL_ID,
+    content: 'merhaba',
+    replyToId: null,
+    createdAt: new Date('2026-06-13T12:00:00Z'),
+    author: { id: USER_ID, username: 'kanka', avatarUrl: null },
+    attachments: [],
+  };
+
+  const MEMBER_ROLE = { role: 'MEMBER' };
+  const OWNER_ROLE = { role: 'OWNER' };
+  const ADMIN_ROLE = { role: 'ADMIN' };
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // slowModeSeconds=0 → yavaş mod kapalı, her zaman geçer
+  // ─────────────────────────────────────────────────────────────────────────
+  it('slowModeSeconds=0 → yavaş mod kontrolü yapılmaz, mesaj oluşturulur', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL); // slowModeSeconds: 0
+    prismaMock.message.create.mockResolvedValue(CREATED_MSG);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
+
+    expect(prismaMock.guildMember.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.message.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // slowMode açık + son mesaj YENİ → SLOW_MODE (429)
+  // ─────────────────────────────────────────────────────────────────────────
+  it('slowMode açık + son mesaj yeni (5 sn önce, limit 10 sn) → 429 SLOW_MODE + retryAfter', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(SLOW_GUILD_CHANNEL); // slowModeSeconds: 10
+    prismaMock.guildMember.findUnique.mockResolvedValue(MEMBER_ROLE);
+    // Son mesaj 5 saniye önce gönderilmiş → 5 saniye daha beklenmeli
+    const recentDate = new Date(Date.now() - 5000);
+    prismaMock.message.findFirst.mockResolvedValue({ createdAt: recentDate });
+
+    let thrown: any;
+    try {
+      await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
+    } catch (e) {
+      thrown = e;
+    }
+
+    expect(thrown).toBeDefined();
+    const response = thrown.getResponse();
+    expect(response.error).toBe('SLOW_MODE');
+    expect(response.retryAfter).toBeGreaterThan(0);
+    expect(response.retryAfter).toBeLessThanOrEqual(10);
+    expect(prismaMock.message.create).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // slowMode açık + son mesaj ESKİ → geçer
+  // ─────────────────────────────────────────────────────────────────────────
+  it('slowMode açık + son mesaj eski (20 sn önce, limit 10 sn) → geçer, mesaj oluşturulur', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(SLOW_GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(MEMBER_ROLE);
+    // Son mesaj 20 saniye önce → limit 10 sn → geçer
+    const oldDate = new Date(Date.now() - 20000);
+    prismaMock.message.findFirst.mockResolvedValue({ createdAt: oldDate });
+    prismaMock.message.create.mockResolvedValue(CREATED_MSG);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
+
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // slowMode açık + son mesaj YOK (ilk mesaj) → geçer
+  // ─────────────────────────────────────────────────────────────────────────
+  it('slowMode açık + kullanıcının bu kanalda hiç mesajı yok → geçer', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(SLOW_GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(MEMBER_ROLE);
+    prismaMock.message.findFirst.mockResolvedValue(null); // hiç mesaj yok
+    prismaMock.message.create.mockResolvedValue(CREATED_MSG);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
+
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // slowMode açık + OWNER → muaf
+  // ─────────────────────────────────────────────────────────────────────────
+  it('slowMode açık + OWNER → yavaş mod bypass edilir, mesaj oluşturulur', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(SLOW_GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_ROLE);
+    prismaMock.message.create.mockResolvedValue(CREATED_MSG);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
+
+    expect(prismaMock.message.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // slowMode açık + ADMIN → muaf
+  // ─────────────────────────────────────────────────────────────────────────
+  it('slowMode açık + ADMIN → yavaş mod bypass edilir, mesaj oluşturulur', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(SLOW_GUILD_CHANNEL);
+    prismaMock.guildMember.findUnique.mockResolvedValue(ADMIN_ROLE);
+    prismaMock.message.create.mockResolvedValue(CREATED_MSG);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
+
+    expect(prismaMock.message.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DM kanalı + slowMode > 0 (teorik) → yavaş mod uygulanmaz
+  // ─────────────────────────────────────────────────────────────────────────
+  it('DM kanalı (guildId=null) → slowMode kontrolü hiç yapılmaz', async () => {
+    const dmChannelWithSlowMode = { id: CHANNEL_ID, guildId: null, slowModeSeconds: 10 };
+    membershipMock.requireChannelAccess.mockResolvedValue(dmChannelWithSlowMode);
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    prismaMock.message.create.mockResolvedValue({
+      ...CREATED_MSG,
+      channelId: CHANNEL_ID,
+    });
+
+    await service.create(USER_ID, CHANNEL_ID, DTO);
+
+    expect(prismaMock.guildMember.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.message.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
   });
 });

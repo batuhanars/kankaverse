@@ -18,6 +18,7 @@ function toChannelDto(channel: Channel) {
     name: channel.name,
     ageGated: channel.ageGated,
     position: channel.position,
+    slowModeSeconds: channel.slowModeSeconds,
   };
 }
 
@@ -51,6 +52,7 @@ export class ChannelsService {
         name: dto.name,
         ageGated: dto.ageGated ?? false,
         position: (maxPosition._max.position ?? -1) + 1,
+        slowModeSeconds: dto.slowModeSeconds ?? 0,
       },
     });
 
@@ -84,6 +86,7 @@ export class ChannelsService {
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.ageGated !== undefined && { ageGated: dto.ageGated }),
+        ...(dto.slowModeSeconds !== undefined && { slowModeSeconds: dto.slowModeSeconds }),
       },
     });
 

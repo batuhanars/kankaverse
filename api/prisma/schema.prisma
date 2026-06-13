@@ -166,17 +166,18 @@ model GuildMember {
 }
 
 model Channel {
-  id        String      @id @default(cuid())
-  type      ChannelType @default(GUILD_TEXT)
-  guildId   String?
-  guild     Guild?      @relation(fields: [guildId], references: [id])
-  name      String?
-  ageGated  Boolean     @default(false)
-  position  Int         @default(0)
-  deletedAt DateTime?
-  createdAt DateTime    @default(now())
-  messages  Message[]
-  members   ChannelMember[]
+  id              String      @id @default(cuid())
+  type            ChannelType @default(GUILD_TEXT)
+  guildId         String?
+  guild           Guild?      @relation(fields: [guildId], references: [id])
+  name            String?
+  ageGated        Boolean     @default(false)
+  position        Int         @default(0)
+  slowModeSeconds Int         @default(0)
+  deletedAt       DateTime?
+  createdAt       DateTime    @default(now())
+  messages        Message[]
+  members         ChannelMember[]
 
   @@index([guildId])
 }

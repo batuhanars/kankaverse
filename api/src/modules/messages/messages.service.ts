@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
@@ -107,6 +107,33 @@ export class MessagesService {
     const hasMute = await this.moderation.hasActiveMute(userId, channel.guildId ?? null);
     if (hasMute) {
       throw new ForbiddenException({ message: 'Bu kanalda mesaj gönderme yetkiniz kısıtlandı.', error: 'USER_MUTED' });
+    }
+
+    // Yavaş mod (slow mode): yalnızca guild kanallarında; OWNER/ADMIN muaf
+    if (channel.guildId && channel.slowModeSeconds > 0) {
+      const membership = await this.prisma.guildMember.findUnique({
+        where: { guildId_userId: { guildId: channel.guildId, userId } },
+        select: { role: true },
+      });
+      const isPrivileged = membership?.role === 'OWNER' || membership?.role === 'ADMIN';
+      if (!isPrivileged) {
+        const lastMessage = await this.prisma.message.findFirst({
+          where: { channelId, authorId: userId, deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        });
+        if (lastMessage) {
+          const elapsedMs = Date.now() - lastMessage.createdAt.getTime();
+          const requiredMs = channel.slowModeSeconds * 1000;
+          if (elapsedMs < requiredMs) {
+            const retryAfter = Math.ceil((requiredMs - elapsedMs) / 1000);
+            throw new HttpException(
+              { message: `Yavaş mod aktif. Lütfen ${retryAfter} saniye bekleyin.`, error: 'SLOW_MODE', retryAfter },
+              HttpStatus.TOO_MANY_REQUESTS,
+            );
+          }
+        }
+      }
     }
 
     // İçerik + ek doğrulama: ikisi de boş olamaz

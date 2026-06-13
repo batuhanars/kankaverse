@@ -45,6 +45,7 @@ function makeChannel(overrides: Partial<Record<string, unknown>> = {}) {
     name: 'genel-sohbet',
     ageGated: false,
     position: 0,
+    slowModeSeconds: 0,
     deletedAt: null,
     createdAt: new Date(),
     ...overrides,
@@ -254,5 +255,83 @@ describe('ChannelsService.remove', () => {
 
     const result = await service.remove('admin-1', CHANNEL_ID);
     expect(result).toBeNull();
+  });
+});
+
+// ── ChannelsService — yavaş mod (slowModeSeconds) ────────────────────────────
+
+describe('ChannelsService — yavaş mod create/update', () => {
+  let service: ChannelsService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('create: slowModeSeconds verilmezse 0 set edilir', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.channel.aggregate.mockResolvedValue({ _max: { position: 0 } });
+    const created = makeChannel({ slowModeSeconds: 0 });
+    prismaMock.channel.create.mockResolvedValue(created);
+
+    const result = await service.create(USER_ID, GUILD_ID, { name: 'genel' });
+
+    expect(prismaMock.channel.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ slowModeSeconds: 0 }) }),
+    );
+    expect(result.slowModeSeconds).toBe(0);
+  });
+
+  it('create: slowModeSeconds=30 verilirse kaydedilir', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.channel.aggregate.mockResolvedValue({ _max: { position: 0 } });
+    const created = makeChannel({ slowModeSeconds: 30 });
+    prismaMock.channel.create.mockResolvedValue(created);
+
+    const result = await service.create(USER_ID, GUILD_ID, { name: 'yavaz-kanal', slowModeSeconds: 30 });
+
+    expect(prismaMock.channel.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ slowModeSeconds: 30 }) }),
+    );
+    expect(result.slowModeSeconds).toBe(30);
+  });
+
+  it('update: slowModeSeconds güncellenir', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ slowModeSeconds: 0 }));
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    const updated = makeChannel({ slowModeSeconds: 60 });
+    prismaMock.channel.update.mockResolvedValue(updated);
+
+    const result = await service.update(USER_ID, CHANNEL_ID, { slowModeSeconds: 60 });
+
+    expect(prismaMock.channel.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ slowModeSeconds: 60 }) }),
+    );
+    expect(result.slowModeSeconds).toBe(60);
+  });
+
+  it('update: slowModeSeconds=0 ile kapatılır', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ slowModeSeconds: 30 }));
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    const updated = makeChannel({ slowModeSeconds: 0 });
+    prismaMock.channel.update.mockResolvedValue(updated);
+
+    const result = await service.update(USER_ID, CHANNEL_ID, { slowModeSeconds: 0 });
+
+    expect(prismaMock.channel.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ slowModeSeconds: 0 }) }),
+    );
+    expect(result.slowModeSeconds).toBe(0);
+  });
+
+  it('toChannelDto: slowModeSeconds response\'a dahil edilir', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ slowModeSeconds: 15 }));
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    const updated = makeChannel({ slowModeSeconds: 15 });
+    prismaMock.channel.update.mockResolvedValue(updated);
+
+    const result = await service.update(USER_ID, CHANNEL_ID, { slowModeSeconds: 15 });
+
+    expect(result).toHaveProperty('slowModeSeconds', 15);
   });
 });

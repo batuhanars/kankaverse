@@ -1,4 +1,4 @@
-import { IsString, IsBoolean, IsOptional, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsString, IsBoolean, IsOptional, IsInt, Min, Max, MinLength, MaxLength, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateChannelDto {
@@ -13,4 +13,11 @@ export class CreateChannelDto {
   @IsOptional()
   @IsBoolean()
   ageGated?: boolean;
+
+  @ApiPropertyOptional({ example: 5, description: 'Yavaş mod gecikmesi (saniye, 0=kapalı, maks 21600)' })
+  @IsOptional()
+  @IsInt({ message: 'Yavaş mod değeri tam sayı olmalıdır.' })
+  @Min(0, { message: 'Yavaş mod değeri 0 veya daha büyük olmalıdır.' })
+  @Max(21600, { message: 'Yavaş mod değeri en fazla 21600 saniye (6 saat) olabilir.' })
+  slowModeSeconds?: number;
 }
