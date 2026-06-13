@@ -359,6 +359,36 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 ---
 
+## Sprint 7A — Davet Sistemi + adultsOnly Kapısı + Ortam Ayarları (PM onaylı 2026-06-13)
+
+> Aktif sözleşme: `contracts/SPRINT_7A_CONTRACT.md`. **R7: davet-join adultsOnly/minör kapısı + adultsOnly erişim
+> enforcement** satır satır insan incelemesi. Dev checkbox işaretler, item EKLEMEZ.
+
+### Backend (`api/`)
+- [x] Prisma: `Invite` modeli + `Guild.invites`/`User.createdInvites` ilişki + migration (additive, uygulandı); `generateInviteCode` (8-char, çakışma-retry)
+- [x] Invites modülü: `POST /guilds/:id/invites` (OWNER/ADMIN), `GET /guilds/:id/invites`, `DELETE /invites/:code`, `GET /invites/:code` (önizleme)
+- [x] **`POST /invites/:code/join` (R7):** davet-geçerlilik → `adultsOnly && isMinor → 403 AGE_RESTRICTED` → zaten-üye → transaction (üye + uses atomik). Minör statüsü sızmıyor
+- [x] **Ham-ID `POST /guilds/:id/join` KALDIRILDI** — T1 borcu kapandı (tek katılım yolu davet)
+- [x] `PATCH /guilds/:id` (yalnız OWNER) — name/adultsOnly
+- [x] **`requireChannelAccess` adultsOnly erişim kapısı (R7):** guild kanalı `ageGated || adultsOnly` tek isMinor sorgusu (DRY) → minör 403
+- [x] Hata kodu `INVITE_INVALID`; Swagger güncel; 117 test geçti (yeni invites + adultsOnly testleri)
+
+### Frontend (`web/`)
+- [x] `api/invites.ts` + `guildsStore.joinByInvite` (ham-ID `join` kaldırıldı); katıl modalı davet kodu input + önizleme + hata eşlemesi (AGE_RESTRICTED/INVITE_INVALID/ALREADY_MEMBER)
+- [x] `GuildSettingsModal` (yalnız OWNER, ChannelPanel dişli): ad düzenle + adultsOnly toggle + davet yönetimi (oluştur/kopyala/listele/iptal)
+- [x] Yeni metin/hata kodları `tr.json`; `--kv-*` token; placeholder özellik (ikon/rol/emoji) gösterilmedi
+
+### Sprint 7A DoD (contract §7)
+- [x] Invite modeli + migration; davet oluştur/listele/iptal/önizleme; expiry + maxUses uygulanıyor
+- [x] Davet ile katılım tek yol; ham-ID join kaldırıldı (**T1 kapandı**)
+- [x] Minör adultsOnly ortama join olamaz **VE** kanallara erişemez (iki katman); minör statüsü sızmıyor
+- [x] Ortam ayarları: ad + adultsOnly (OWNER) + davet yönetimi
+- [x] `nest build` + `vue-tsc` temiz; 117 test geçti
+- [x] **2-hesap uçtan-uca** — **sahip test etti 2026-06-13** (2 tarayıcı: davet kopyala → kodla katıl → aynı ortam + mesaj çalışıyor). Minör/adultsOnly reddi ayrıca T&S matris testinde denenecek
+- [x] **R7:** davet-join kapısı + adultsOnly enforcement — PM satır-satır inceledi (temiz, fail-closed, minör statüsü sızmıyor); **sahip güven-temelli onay verdi 2026-06-13** (kendi satır-incelemesi yerine PM incelemesine güven beyanı — kayda dürüstçe işlendi)
+
+---
+
 ## Sprint 1 DoD — PM reconcile (2026-06-13)
 
 > Fonksiyonel olarak Sprint 2A/2B/3/4A boyunca doğrulandı (uygulama uçtan uca çalışıyor); checkbox'lar bayattı.
