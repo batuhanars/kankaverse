@@ -17,29 +17,32 @@ function onSelectDm(channelId: string) {
 
 <template>
   <div class="h-20 shrink-0 flex items-center">
-    <!-- Search pill — flex-1, centered -->
-    <div class="flex-1 flex items-center px-6">
+    <!-- Sol boşluk eşiti — bildirim çanı ile simetri -->
+    <div class="w-14 shrink-0" />
+
+    <!-- Arama butonu — yatay ortalanmış, kompakt buton görünümü -->
+    <div class="flex-1 flex justify-center">
       <button
-        class="flex items-center gap-2.5 h-9 px-4 rounded-full text-[13px] cursor-pointer w-full transition-all"
-        style="max-width: 440px; background-color: var(--kv-bg-elevated); color: var(--kv-text-muted); border: 1px solid var(--kv-border-subtle);"
-        @mouseenter="($event.currentTarget as HTMLElement).style.borderColor = 'var(--kv-border-strong)'"
-        @mouseleave="($event.currentTarget as HTMLElement).style.borderColor = 'var(--kv-border-subtle)'"
+        class="flex items-center gap-2 h-8 px-3 rounded-[var(--kv-radius-md)] text-[13px] cursor-pointer transition-colors shrink-0"
+        style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted); border: 1px solid var(--kv-border-subtle);"
+        @mouseenter="(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--kv-border-strong)'; (e.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)' }"
+        @mouseleave="(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--kv-border-subtle)'; (e.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)' }"
         @click="showSearch = true"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
           <circle cx="11" cy="11" r="8"/>
           <line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <span class="flex-1 text-left truncate">{{ t('search.topbarPlaceholder') }}</span>
+        <span class="truncate">{{ t('search.topbarPlaceholder') }}</span>
         <kbd
-          class="hidden sm:block text-[11px] font-mono px-1.5 py-0.5 rounded shrink-0"
+          class="hidden sm:block text-[11px] font-mono px-1.5 py-0.5 rounded shrink-0 ml-1"
           style="background-color: var(--kv-bg-content); color: var(--kv-text-muted);"
         >Ctrl K</kbd>
       </button>
     </div>
 
     <!-- Bildirim çanı -->
-    <div class="mr-4">
+    <div class="mr-4 shrink-0">
       <NotificationBell />
     </div>
   </div>
