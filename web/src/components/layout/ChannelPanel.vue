@@ -347,6 +347,20 @@ function closeCategoryMenu() {
         </svg>
       </button>
 
+      <!-- Kategorisiz kanal oluştur — OWNER veya ADMIN -->
+      <button
+        v-if="isAdmin"
+        class="shrink-0 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
+        style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
+        :title="t('channel.addUncategorized')"
+        @click.stop="openCreate(null)"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+
       <!-- Ayarlar dişlisi — yalnız OWNER -->
       <button
         v-if="isOwner"
@@ -365,22 +379,7 @@ function closeCategoryMenu() {
     <!-- Kanal listesi -->
     <div class="flex-1 overflow-y-auto pt-4 pb-20 px-2">
 
-      <!-- ── (1) Kategorisiz kanallar — en üstte; ADMIN için üst-seviye "+" (D/E) ── -->
-      <!-- E: Sabit "METİN KANALLARI" başlığı KALDIRILDI. Yalnız üst-seviye "+" kalır (ADMIN). -->
-      <div v-if="isAdmin" class="mb-1 px-2 flex items-center justify-end">
-        <button
-          class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-          style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
-          :title="t('channel.addUncategorized')"
-          @click.stop="openCreate(null)"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </button>
-      </div>
-
+      <!-- ── (1) Kategorisiz kanallar — en üstte ── -->
       <div
         v-for="channel in uncategorizedChannels"
         :key="channel.id"
