@@ -30,8 +30,10 @@ async function bootstrap() {
   });
 
   // Redis adapter — Socket.IO ilk günden
+  // WS CORS origin config'ten okunur (FRONTEND_URL); dev'de localhost:5173 (Vite proxy), prod'da daraltılır
   const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
-  const redisIoAdapter = new RedisIoAdapter(app);
+  const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+  const redisIoAdapter = new RedisIoAdapter(app, frontendUrl);
   await redisIoAdapter.connectToRedis(redisUrl);
   app.useWebSocketAdapter(redisIoAdapter);
 

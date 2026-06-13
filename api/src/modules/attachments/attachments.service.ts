@@ -52,6 +52,13 @@ export class AttachmentsService {
    * Attachment (PENDING, messageId=null) oluşturur → { attachmentId, uploadUrl, storageKey }.
    */
   async presign(userId: string, dto: PresignAttachmentDto) {
+    if (!this.config.get<boolean>('uploadsEnabled')) {
+      throw new ForbiddenException({
+        message: 'Dosya yükleme şu an kapalı.',
+        error: 'UPLOADS_DISABLED',
+      });
+    }
+
     if (dto.size > this.maxUploadBytes) {
       throw new BadRequestException({
         message: `Dosya boyutu ${this.config.get<number>('maxUploadMb') ?? 25} MB sınırını aşıyor.`,

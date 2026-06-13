@@ -161,6 +161,13 @@ export class GuildsService {
 
   /** POST /guilds/:id/icon/presign — yalnız OWNER */
   async presignIcon(userId: string, guildId: string, dto: PresignIconDto) {
+    if (!this.config.get<boolean>('uploadsEnabled')) {
+      throw new ForbiddenException({
+        message: 'Dosya yükleme şu an kapalı.',
+        error: 'UPLOADS_DISABLED',
+      });
+    }
+
     if (!ALLOWED_ICON_TYPES.has(dto.contentType)) {
       throw new BadRequestException({
         message: 'Bu dosya türü ikon olarak desteklenmiyor. PNG, JPEG, GIF veya WebP kullanın.',

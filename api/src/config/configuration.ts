@@ -79,5 +79,10 @@ export default () => {
     maxUploadMb: parseInt(process.env.MAX_UPLOAD_MB ?? '25', 10),
     // LANSMAN: ATTACHMENT_SCAN_ENABLED=true + gerçek CSAM tarayıcı olmadan canlıya ALINMAZ (R5)
     attachmentScanEnabled: process.env.ATTACHMENT_SCAN_ENABLED === 'true',
+    // Dosya yükleme feature-flag: CSAM tarayıcı yokken kapalı önizlemede false yapılabilir (D14)
+    // Dev'de ve varsayılan: true (açık). Kapalı önizleme: UPLOADS_ENABLED=false
+    uploadsEnabled: process.env.UPLOADS_ENABLED !== 'false',
+    // WebSocket CORS origin: prod'da frontend URL'yi daraltır
+    frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
   };
 };
