@@ -63,10 +63,11 @@ function guildInitial(name: string) {
     .join('')
 }
 
-/** Pill CSS sınıfını hesapla — yalnızca aktiflik/hover, unread İLE İLGİSİ YOK */
+/** Pill CSS sınıfını hesapla — öncelik: aktif > (hover CSS'de) > unread-dot > gizli */
 function pillClass(guild: GuildDto): string {
   const isActive = guildsStore.activeGuildId === guild.id
   if (isActive) return 'pill--active'
+  if (guild.unreadCount > 0) return 'pill--unread'
   return 'pill--hidden'
 }
 
@@ -249,9 +250,18 @@ function badgeLabel(count: number): string {
   opacity: 1;
 }
 
-/* Hover'da pill orta boya çık (yalnızca gizli pill için) */
-.rail-item:hover .pill--hidden {
+/* Unread varsa küçük yuvarlak dot — aktif değil, hover değil */
+.pill--unread {
+  height: 8px;
+  border-radius: 50%;
+  opacity: 1;
+}
+
+/* Hover'da pill orta boya çık — gizli veya unread-dot üzerinde */
+.rail-item:hover .pill--hidden,
+.rail-item:hover .pill--unread {
   height: 20px;
+  border-radius: 0 3px 3px 0;
   opacity: 1;
 }
 
