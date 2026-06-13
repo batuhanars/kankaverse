@@ -551,9 +551,13 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Bahsetme bildirim fix** — vue-i18n `@` literal kaçışı (`{'@'}`) → `{username}` doğru interpolasyon
 - [x] **Ortam kanal yapısı yenileme** — guild create varsayılan "Metin Kanalları" kategorisi (tx); `Channel.isPrivate` + migration; **R7** özel kanal erişimi (OWNER/ADMIN ∨ ChannelMember, jenerik `NOT_CHANNEL_MEMBER`) + `findByGuild` gizleme. Frontend: hardcoded başlık kaldırıldı (DB kategori), kanal-oluştur modal (kategori dropdown yok + üst-seviye + kategorisiz), kanal türü seçici (Metin etkin / Ses-Forum "yakında" devre dışı), özel kanal toggle + kilit rozeti, sidebar 4 köşe radius. 408 test. Sözleşme `contracts/SPRINT_V2_CHANNEL_STRUCTURE_CONTRACT.md`. **Ertelendi:** ses/forum işlevi (LiveKit/forum), "Ses Kanalları" varsayılan kategori, özel kanal üye-ekleme UI
 - [x] **Header/layout cilası** — global bildirim çanı (NotificationBell ortak), grup DM Üyeler butonu, sidebar üst boşluk, kategori-oluştur üst başlıkta, kategori aksiyon butonları sabit; compose placeholder hizası + ataç ikonu; DM önizleme `<@id>`→@kullanıcı
-- [ ] **Mesaj arama** (sıradaki — metin tarafı son küçük özellik)
-- [ ] **LiveKit ses/video kanalları** — V2 en büyük kalem; ayrı altyapı (mini-sprint). Geldiğinde: "Ses Kanalları" varsayılan kategori + ses türü etkinleşir
-- [ ] **Özel kanal üye-ekleme** (ertelendi — şu an özel kanal yönetici-erişimli; belirli üye ekleme bir sonraki dalga)
+- [x] **Mesaj arama** — `GET /channels/:id/messages/search` (requireChannelAccess gated, QUERY_TOO_SHORT, case-insensitive, DM clearedAt, cursor); frontend başlık arama ikonu + SearchPopover (debounce, durumlar). 425 test. `contracts/SPRINT_V2_SEARCH_CONTRACT.md`
+- [x] **Markdown biçimlendirme** — markdown-it (html:false) + dompurify allowlist (PM onaylı dep); kalın/italik/kod/alıntı/liste/link güvenli; `<@id>` mention birleşik; XSS vektörleri bloklu; önizlemeler düz kalır. `contracts/SPRINT_V2_MARKDOWN_CONTRACT.md`
+- [x] **Özel kanal üye-ekleme** — `GET/POST/DELETE /channels/:id/members` (OWNER/ADMIN; NOT_PRIVATE/NOT_GUILD_MEMBER/AGE_RESTRICTED; **R7** yetki-önce sıralama→özel-mi sızıntısı yok; ChannelMember DM'e sızmıyor doğrulandı); frontend kanal ayarları Üyeler bölümü. 447 test. `contracts/SPRINT_V2_PRIVATE_MEMBERS_CONTRACT.md`
+- [x] **Ortam ayarları + üye yönetimi** — `DELETE /guilds/:id` (OWNER); `PATCH .../members/:id/role` (OWNER); `DELETE .../members/:id` (kick, **R7** hiyerarşi: OWNER korumalı, ADMIN→yalnız MEMBER, yetki-önce, ChannelMember temizliği tx). Frontend: ortam sil + MemberPanel rol/at (yetki gizleme). 468 test. `contracts/SPRINT_V2_GUILD_ADMIN_CONTRACT.md`
+- [x] **UI cila turu** — emoji picker viewport-clamp/Teleport (kırpılma) + tek-örnek/kalıcı araç çubuğu + gri reaksiyon-ekle ikonu; ortam home-stili üst header (GuildTopBar: sunucu adı + çan); Mesaj İstekleri nav kaldırıldı; home arama butonu ortala/buton stili; ortam mesaj alanı min-h-0 scroll fix; global aramada Gruplar ayrı başlık; bahsetme bildirim @ fix
+- [ ] **LiveKit ses/video kanalları** — V2 en büyük kalem; ayrı altyapı (mini-sprint). Geldiğinde: "Ses Kanalları" varsayılan kategori + ses türü etkinleşir. **YARIN.**
+- [ ] **Ertelenenler:** özel emoji (CSAM-kapısı) · kategori/kanal drag-reorder · sahiplik devri/ortam-ban/ayrılma · mesaja zıpla (pins/arama) · sunucu-geneli arama
 
 ---
 
