@@ -23,6 +23,7 @@ type MessageWithAuthor = Message & {
   attachments: AttachmentDto[];
   reactions?: Pick<MessageReaction, 'userId' | 'emoji'>[];
   replyTo?: ReplyToRaw;
+  mentions: string[];
 };
 
 // replyTo snippet: ≤100 karakter; dosya ekli + boş içerik → "[dosya]"; silinmişse null
@@ -76,6 +77,7 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
       scanStatus: a.scanStatus,
     })),
     reactions: reactionsAgg,
+    mentions: msg.mentions ?? [],
     createdAt: msg.createdAt.toISOString(),
   };
 }
@@ -102,6 +104,67 @@ export class MessagesService {
     private moderation: ModerationService,
   ) {
     this.scanEnabled = config.get<boolean>('attachmentScanEnabled') ?? false;
+  }
+
+  /**
+   * §3 + §4 — Mention token parse + erişim doğrulaması (T&S / R7 incelemesi)
+   *
+   * 1. content içinden <@userId> token'larını regex ile topla, tekilleştir.
+   *    Eşleşme yoksa erken [] dön — ekstra sorgu yok.
+   * 2. Erişim doğrulaması (T&S KRİTİK — requireChannelAccess kapılarını birebir aynalar):
+   *    - Guild kanalı → GuildMember + isMinor TEK sorguda; needsAgeCheck ise minörler elenir.
+   *    - DM/grup DM → ChannelMember + isMinor TEK sorguda; channel.ageGated ise minörler elenir.
+   *    Yalnız dönen set geçerlidir; geçersiz/erişimsiz token sessizce düşer.
+   *    Ayrı hata kodu YOK, durum sızıntısı YOK (taciz/spam vektörü + minör/varlık).
+   * 3. ≤10 sınırı: fazlası sessizce kesilir (anti-spam, hata değil).
+   *
+   * @param channel — requireChannelAccess'in döndürdüğü guild-include'lu kanal objesi.
+   *   Çağıranlar (create, editMessage) bu objeyi zaten elde ediyor; ayrı bayrak sorgusu yapılmaz.
+   */
+  private async resolveMentions(
+    channel: { id: string; guildId: string | null; ageGated: boolean; guild?: { adultsOnly: boolean } | null },
+    content: string,
+  ): Promise<string[]> {
+    // Adım 1: token parse + tekilleştir
+    const MENTION_REGEX = /<@([a-zA-Z0-9_-]+)>/g;
+    const tokenIds = new Set<string>();
+    let match: RegExpExecArray | null;
+    while ((match = MENTION_REGEX.exec(content)) !== null) {
+      tokenIds.add(match[1]);
+    }
+
+    // Erken çıkış: token yoksa sorgu yapma
+    if (tokenIds.size === 0) return [];
+
+    const ids = Array.from(tokenIds);
+
+    // Adım 2: erişim doğrulaması — TEK toplu sorgu (N+1 yok)
+    let validIds: string[];
+
+    if (channel.guildId !== null) {
+      // Guild kanalı: üyelik + isMinor TEK sorguda (requireChannelAccess satır 58-69 ile birebir)
+      const needsAgeCheck = channel.ageGated || (channel.guild?.adultsOnly ?? false);
+      const members = await this.prisma.guildMember.findMany({
+        where: { guildId: channel.guildId, userId: { in: ids } },
+        select: { userId: true, user: { select: { isMinor: true } } },
+      });
+      const valid = needsAgeCheck ? members.filter((m) => !m.user.isMinor) : members;
+      const validSet = new Set(valid.map((m) => m.userId));
+      validIds = ids.filter((id) => validSet.has(id));
+    } else {
+      // DM / grup DM: ChannelMember kontrolü + isMinor (tutarlılık için)
+      const needsAgeCheck = channel.ageGated;
+      const members = await this.prisma.channelMember.findMany({
+        where: { channelId: channel.id, userId: { in: ids } },
+        select: { userId: true, user: { select: { isMinor: true } } },
+      });
+      const valid = needsAgeCheck ? members.filter((m) => !m.user.isMinor) : members;
+      const validSet = new Set(valid.map((m) => m.userId));
+      validIds = ids.filter((id) => validSet.has(id));
+    }
+
+    // Adım 3: ≤10 sınırı (fazlası sessizce düşer)
+    return validIds.slice(0, 10);
   }
 
   async findMessages(userId: string, channelId: string, before?: string, limit = 50) {
@@ -263,12 +326,16 @@ export class MessagesService {
       }
     }
 
+    // §3: mention token parse + erişim doğrulaması (§4 T&S) — create'ten önce
+    const mentions = await this.resolveMentions(channel, dto.content ?? '');
+
     const message = await this.prisma.message.create({
       data: {
         channelId,
         authorId: userId,
         content: dto.content ?? '',
         replyToId: dto.replyToId ?? null,
+        mentions,
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
@@ -338,9 +405,12 @@ export class MessagesService {
       }
     }
 
+    // §3: mention token parse + erişim doğrulaması (§4 T&S) — edit'te yeniden hesapla
+    const mentions = await this.resolveMentions(channel, dto.content);
+
     const updated = await this.prisma.message.update({
       where: { id: messageId },
-      data: { content: dto.content, editedAt: new Date() },
+      data: { content: dto.content, editedAt: new Date(), mentions },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
         attachments: {
