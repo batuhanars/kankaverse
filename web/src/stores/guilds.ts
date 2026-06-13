@@ -2,11 +2,14 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { guildsApi } from '@/api/guilds'
 import { invitesApi } from '@/api/invites'
-import type { GuildDto } from '@/types'
+import type { GuildDto, GuildMemberRole } from '@/types'
 
 export const useGuildsStore = defineStore('guilds', () => {
   const guilds = ref<GuildDto[]>([])
   const activeGuildId = ref<string | null>(null)
+
+  // Sprint V2 — kullanıcının guild'lerdeki rol önbelleği { guildId: role }
+  const myRoleByGuild = ref<Record<string, GuildMemberRole>>({})
 
   const activeGuild = () => guilds.value.find((g) => g.id === activeGuildId.value) ?? null
 
@@ -47,6 +50,23 @@ export const useGuildsStore = defineStore('guilds', () => {
     activeGuildId.value = id
   }
 
+  /** Sprint V2 — kullanıcının guild'deki rolünü önbellekle (channels store fetch sonrası çağrılır) */
+  function setMyRole(guildId: string, role: GuildMemberRole): void {
+    myRoleByGuild.value[guildId] = role
+  }
+
+  /** Sprint V2 — mevcut aktif guild'de kullanıcı OWNER veya ADMIN mi? */
+  function isAdminInActiveGuild(userId: string): boolean {
+    const guildId = activeGuildId.value
+    if (!guildId) return false
+    // Önce ownerId kontrolü (hızlı yol — üye listesi gelmeden önce çalışır)
+    const guild = activeGuild()
+    if (guild && guild.ownerId === userId) return true
+    // Önbellekteki rol
+    const role = myRoleByGuild.value[guildId]
+    return role === 'OWNER' || role === 'ADMIN'
+  }
+
   /** Guild'in unreadCount'unu güncelle (WS channel.activity veya kanal okundu sonrası) */
   function setGuildUnreadCount(guildId: string, count: number): void {
     const idx = guilds.value.findIndex((g) => g.id === guildId)
@@ -63,5 +83,5 @@ export const useGuildsStore = defineStore('guilds', () => {
     }
   }
 
-  return { guilds, activeGuildId, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, setActiveGuild, setGuildUnreadCount, incrementGuildUnread }
+  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread }
 })

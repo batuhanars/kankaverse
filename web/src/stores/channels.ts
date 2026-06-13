@@ -1,12 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { guildsApi } from '@/api/guilds'
-import { channelsApi } from '@/api/channels'
-import type { ChannelDto } from '@/types'
+import { channelsApi, categoriesApi } from '@/api/channels'
+import { useGuildsStore } from '@/stores/guilds'
+import type { ChannelDto, CategoryDto, GuildMemberRole } from '@/types'
 
 export const useChannelsStore = defineStore('channels', () => {
   const channelsByGuild = ref<Record<string, ChannelDto[]>>({})
   const activeChannelId = ref<string | null>(null)
+
+  // Sprint V2 — Kategori state: { guildId: CategoryDto[] }
+  const categoriesByGuild = ref<Record<string, CategoryDto[]>>({})
 
   const activeChannel = () => {
     if (!activeChannelId.value) return null
@@ -19,19 +23,41 @@ export const useChannelsStore = defineStore('channels', () => {
 
   const channelsForGuild = (guildId: string) => channelsByGuild.value[guildId] ?? []
 
+  const categoriesForGuild = (guildId: string) => categoriesByGuild.value[guildId] ?? []
+
   async function fetchChannels(guildId: string) {
     const res = await guildsApi.getChannels(guildId)
     channelsByGuild.value[guildId] = res.data
   }
 
-  async function createChannel(guildId: string, payload: { name: string; ageGated?: boolean }): Promise<ChannelDto> {
+  // Sprint V2 — Kanallar + kategoriler birlikte çek; kullanıcı rolünü guilds store'a yaz
+  async function fetchChannelsAndCategories(guildId: string, userId?: string): Promise<void> {
+    const [channelsRes, catsRes] = await Promise.all([
+      guildsApi.getChannels(guildId),
+      guildsApi.getCategories(guildId),
+    ])
+    channelsByGuild.value[guildId] = channelsRes.data
+    categoriesByGuild.value[guildId] = catsRes.data
+
+    // Kullanıcının rolünü üye listesinden öğren (arka planda, hata sessiz)
+    if (userId) {
+      guildsApi.getMembers(guildId).then((res) => {
+        const me = res.data.find((m) => m.userId === userId)
+        if (me) {
+          useGuildsStore().setMyRole(guildId, me.role as GuildMemberRole)
+        }
+      }).catch(() => { /* sessiz */ })
+    }
+  }
+
+  async function createChannel(guildId: string, payload: { name: string; ageGated?: boolean; categoryId?: string | null }): Promise<ChannelDto> {
     const res = await guildsApi.createChannel(guildId, payload)
     if (!channelsByGuild.value[guildId]) channelsByGuild.value[guildId] = []
     channelsByGuild.value[guildId].push(res.data)
     return res.data
   }
 
-  async function updateChannel(channelId: string, guildId: string, payload: { name?: string; ageGated?: boolean; slowModeSeconds?: number }): Promise<ChannelDto> {
+  async function updateChannel(channelId: string, guildId: string, payload: { name?: string; ageGated?: boolean; slowModeSeconds?: number; categoryId?: string | null }): Promise<ChannelDto> {
     const res = await channelsApi.update(channelId, payload)
     const list = channelsByGuild.value[guildId]
     if (list) {
@@ -48,6 +74,47 @@ export const useChannelsStore = defineStore('channels', () => {
       channelsByGuild.value[guildId] = list.filter((c) => c.id !== channelId)
     }
     if (activeChannelId.value === channelId) activeChannelId.value = null
+  }
+
+  // Sprint V2 — Kategori aksiyonları
+
+  async function createCategory(guildId: string, name: string): Promise<CategoryDto> {
+    const res = await guildsApi.createCategory(guildId, name)
+    if (!categoriesByGuild.value[guildId]) categoriesByGuild.value[guildId] = []
+    categoriesByGuild.value[guildId].push(res.data)
+    // Otoritatif tazele
+    const fresh = await guildsApi.getCategories(guildId)
+    categoriesByGuild.value[guildId] = fresh.data
+    return res.data
+  }
+
+  async function renameCategory(categoryId: string, guildId: string, name: string): Promise<CategoryDto> {
+    const res = await categoriesApi.rename(categoryId, name)
+    // Otoritatif tazele
+    const fresh = await guildsApi.getCategories(guildId)
+    categoriesByGuild.value[guildId] = fresh.data
+    return res.data
+  }
+
+  async function deleteCategory(categoryId: string, guildId: string): Promise<void> {
+    await categoriesApi.delete(categoryId)
+    // Kanallar kategorisiz oldu — her ikisini de tazele
+    const [channelsRes, catsRes] = await Promise.all([
+      guildsApi.getChannels(guildId),
+      guildsApi.getCategories(guildId),
+    ])
+    channelsByGuild.value[guildId] = channelsRes.data
+    categoriesByGuild.value[guildId] = catsRes.data
+  }
+
+  async function assignChannelCategory(channelId: string, guildId: string, categoryId: string | null): Promise<ChannelDto> {
+    const res = await channelsApi.update(channelId, { categoryId })
+    const list = channelsByGuild.value[guildId]
+    if (list) {
+      const idx = list.findIndex((c) => c.id === channelId)
+      if (idx !== -1) list[idx] = res.data
+    }
+    return res.data
   }
 
   function setActiveChannel(id: string | null) {
@@ -102,12 +169,19 @@ export const useChannelsStore = defineStore('channels', () => {
   return {
     channelsByGuild,
     activeChannelId,
+    categoriesByGuild,
     activeChannel,
     channelsForGuild,
+    categoriesForGuild,
     fetchChannels,
+    fetchChannelsAndCategories,
     createChannel,
     updateChannel,
     deleteChannel,
+    createCategory,
+    renameCategory,
+    deleteCategory,
+    assignChannelCategory,
     setActiveChannel,
     markChannelRead,
     markChannelUnread,

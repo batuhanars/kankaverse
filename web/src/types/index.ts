@@ -156,6 +156,15 @@ export interface ChannelDto {
   position: number
   slowModeSeconds: number
   unreadCount: number
+  categoryId: string | null
+}
+
+// Sprint V2 — Kategori DTO (§3 toCategoryDto)
+export interface CategoryDto {
+  id: string
+  guildId: string
+  name: string
+  position: number
 }
 
 // Sprint 5 §4 — Attachment DTO

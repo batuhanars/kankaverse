@@ -10,7 +10,7 @@ import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
-import type { ChannelDto } from '@/types'
+import type { ChannelDto, CategoryDto } from '@/types'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -20,16 +20,73 @@ const authStore = useAuthStore()
 
 const showSettings = ref(false)
 
+// Kategori + kanal yönetimi: OWNER veya ADMIN
+const isAdmin = computed(() => {
+  if (!authStore.user) return false
+  return guildsStore.isAdminInActiveGuild(authStore.user.id)
+})
+
+// Ortam ayarları (ad, ikon, vb.): yalnız OWNER (önceki davranış korunur)
 const isOwner = computed(() => {
   const guild = guildsStore.activeGuild()
   if (!guild || !authStore.user) return false
   return guild.ownerId === authStore.user.id
 })
 
+// ── Katlama state (localStorage) ──
+function collapseKey(guildId: string, categoryId: string) {
+  return `kv:cat-collapsed:${guildId}:${categoryId}`
+}
+
+function isCategoryCollapsed(guildId: string, categoryId: string): boolean {
+  return localStorage.getItem(collapseKey(guildId, categoryId)) === '1'
+}
+
+function toggleCollapse(guildId: string, categoryId: string) {
+  const key = collapseKey(guildId, categoryId)
+  if (localStorage.getItem(key) === '1') {
+    localStorage.removeItem(key)
+  } else {
+    localStorage.setItem(key, '1')
+  }
+  // Reaktiflik için sayacı tetikle
+  collapseToggleTick.value++
+}
+
+// localStorage reaktif değil — toggle sonrası computed yeniden hesaplanması için tick
+const collapseToggleTick = ref(0)
+
+// ── Gruplanmış kanal listesi ──
+const activeGuildId = computed(() => guildsStore.activeGuildId ?? '')
+
+const uncategorizedChannels = computed(() => {
+  void collapseToggleTick.value
+  return channelsStore.channelsForGuild(activeGuildId.value)
+    .filter((c) => !c.categoryId)
+    .sort((a, b) => a.position - b.position)
+})
+
+const sortedCategories = computed(() => {
+  return channelsStore.categoriesForGuild(activeGuildId.value)
+    .slice()
+    .sort((a, b) => a.position - b.position)
+})
+
+function channelsForCategory(categoryId: string): ChannelDto[] {
+  return channelsStore.channelsForGuild(activeGuildId.value)
+    .filter((c) => c.categoryId === categoryId)
+    .sort((a, b) => a.position - b.position)
+}
+
+function categoryIsCollapsed(categoryId: string): boolean {
+  void collapseToggleTick.value
+  return isCategoryCollapsed(activeGuildId.value, categoryId)
+}
+
+// ── Kanal seçme ──
 function selectChannel(channel: ChannelDto) {
   const guildId = guildsStore.activeGuildId
   if (!guildId) return
-  // AppView'daki syncFromRoute join/leave socket işlemlerini yapar
   router.push({ name: 'channel', params: { guildId, channelId: channel.id } })
 }
 
@@ -37,12 +94,14 @@ function selectChannel(channel: ChannelDto) {
 const showCreate = ref(false)
 const createName = ref('')
 const createAgeGated = ref(false)
+const createCategoryId = ref<string | null>(null)
 const creating = ref(false)
 const createError = ref('')
 
-function openCreate() {
+function openCreate(categoryId?: string | null) {
   createName.value = ''
   createAgeGated.value = false
+  createCategoryId.value = categoryId ?? null
   createError.value = ''
   showCreate.value = true
 }
@@ -55,7 +114,11 @@ async function submitCreate() {
   creating.value = true
   createError.value = ''
   try {
-    await channelsStore.createChannel(guildId, { name, ageGated: createAgeGated.value })
+    await channelsStore.createChannel(guildId, {
+      name,
+      ageGated: createAgeGated.value,
+      categoryId: createCategoryId.value,
+    })
     showCreate.value = false
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
@@ -65,10 +128,11 @@ async function submitCreate() {
   }
 }
 
-// ── Kanal ayarları (yeniden adlandır + yavaş mod) ──
+// ── Kanal ayarları (yeniden adlandır + yavaş mod + kategori) ──
 const settingsTarget = ref<ChannelDto | null>(null)
 const settingsName = ref('')
 const settingsSlowMode = ref(0)
+const settingsCategoryId = ref<string | null>(null)
 const settingsSaving = ref(false)
 const settingsError = ref('')
 
@@ -86,6 +150,7 @@ function openSettings(channel: ChannelDto) {
   settingsTarget.value = channel
   settingsName.value = channel.name ?? ''
   settingsSlowMode.value = channel.slowModeSeconds ?? 0
+  settingsCategoryId.value = channel.categoryId ?? null
   settingsError.value = ''
 }
 
@@ -99,9 +164,10 @@ async function submitSettings() {
   settingsSaving.value = true
   settingsError.value = ''
   try {
-    const payload: { name?: string; slowModeSeconds?: number } = {}
+    const payload: { name?: string; slowModeSeconds?: number; categoryId?: string | null } = {}
     if (name !== target.name) payload.name = name
     if (settingsSlowMode.value !== (target.slowModeSeconds ?? 0)) payload.slowModeSeconds = settingsSlowMode.value
+    if (settingsCategoryId.value !== (target.categoryId ?? null)) payload.categoryId = settingsCategoryId.value
     if (Object.keys(payload).length > 0) {
       await channelsStore.updateChannel(target.id, guildId, payload)
     }
@@ -140,10 +206,110 @@ async function confirmDelete() {
     deleteError.value = code === 'LAST_CHANNEL'
       ? t('channel.errors.LAST_CHANNEL')
       : (err.response?.data?.message ?? t('common.error'))
-    // Hata varsa diyaloğu kapatma — kullanıcı mesajı görsün
   } finally {
     deleting.value = false
   }
+}
+
+// ── Kategori oluştur ──
+const showCreateCategory = ref(false)
+const createCategoryName = ref('')
+const creatingCategory = ref(false)
+const createCategoryError = ref('')
+
+function openCreateCategory() {
+  createCategoryName.value = ''
+  createCategoryError.value = ''
+  showCreateCategory.value = true
+}
+
+async function submitCreateCategory() {
+  const name = createCategoryName.value.trim()
+  if (!name) return
+  const guildId = guildsStore.activeGuildId
+  if (!guildId) return
+  creatingCategory.value = true
+  createCategoryError.value = ''
+  try {
+    await channelsStore.createCategory(guildId, name)
+    showCreateCategory.value = false
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    createCategoryError.value = err.response?.data?.message ?? t('common.error')
+  } finally {
+    creatingCategory.value = false
+  }
+}
+
+// ── Kategori yeniden adlandır ──
+const renameTarget = ref<CategoryDto | null>(null)
+const renameName = ref('')
+const renaming = ref(false)
+const renameError = ref('')
+
+function openRenameCategory(cat: CategoryDto) {
+  renameTarget.value = cat
+  renameName.value = cat.name
+  renameError.value = ''
+}
+
+async function submitRenameCategory() {
+  const target = renameTarget.value
+  if (!target) return
+  const name = renameName.value.trim()
+  if (!name) return
+  const guildId = guildsStore.activeGuildId
+  if (!guildId) return
+  renaming.value = true
+  renameError.value = ''
+  try {
+    await channelsStore.renameCategory(target.id, guildId, name)
+    renameTarget.value = null
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    renameError.value = err.response?.data?.message ?? t('common.error')
+  } finally {
+    renaming.value = false
+  }
+}
+
+// ── Kategori sil ──
+const deleteCategoryTarget = ref<CategoryDto | null>(null)
+const deletingCategory = ref(false)
+const deleteCategoryError = ref('')
+
+function openDeleteCategory(cat: CategoryDto) {
+  deleteCategoryTarget.value = cat
+  deleteCategoryError.value = ''
+}
+
+async function confirmDeleteCategory() {
+  const target = deleteCategoryTarget.value
+  if (!target) return
+  const guildId = guildsStore.activeGuildId
+  if (!guildId) return
+  deletingCategory.value = true
+  deleteCategoryError.value = ''
+  try {
+    await channelsStore.deleteCategory(target.id, guildId)
+    deleteCategoryTarget.value = null
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    deleteCategoryError.value = err.response?.data?.message ?? t('common.error')
+  } finally {
+    deletingCategory.value = false
+  }
+}
+
+// Kategori menüsü görünürlüğü
+const openCategoryMenuId = ref<string | null>(null)
+
+function toggleCategoryMenu(categoryId: string) {
+  openCategoryMenuId.value = openCategoryMenuId.value === categoryId ? null : categoryId
+}
+
+function closeCategoryMenu() {
+  openCategoryMenuId.value = null
 }
 </script>
 
@@ -151,6 +317,7 @@ async function confirmDelete() {
   <aside
     class="flex flex-col h-full shrink-0 rounded-r-[var(--kv-radius-lg)] overflow-hidden"
     style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
+    @click="closeCategoryMenu"
   >
     <!-- Ortam adı başlığı -->
     <div
@@ -176,7 +343,8 @@ async function confirmDelete() {
 
     <!-- Kanal listesi -->
     <div class="flex-1 overflow-y-auto pt-4 pb-20 px-2">
-      <!-- Başlık satırı: "METİN KANALLARI" + "+" butonu (OWNER) -->
+
+      <!-- ── Başlık satırı: "METİN KANALLARI" + "+" menüsü (ADMIN) ── -->
       <div class="mb-1 px-2 flex items-center justify-between">
         <span
           class="text-[11px] font-semibold uppercase tracking-widest"
@@ -184,23 +352,41 @@ async function confirmDelete() {
         >
           {{ t('channel.textChannels') }}
         </span>
-        <button
-          v-if="isOwner"
-          class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-          style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
-          :title="t('channel.createTitle')"
-          @click="openCreate"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </button>
+        <!-- ADMIN: kanal + kategori oluştur menüsü -->
+        <div v-if="isAdmin" class="flex items-center gap-0.5">
+          <!-- Kategori oluştur -->
+          <button
+            class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
+            style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
+            :title="t('category.createCategory')"
+            @click.stop="openCreateCategory"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+              <line x1="17" y1="14" x2="17" y2="20"/>
+              <line x1="14" y1="17" x2="20" y2="17"/>
+            </svg>
+          </button>
+          <!-- Kanal oluştur -->
+          <button
+            class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
+            style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
+            :title="t('channel.createTitle')"
+            @click.stop="openCreate(null)"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
-      <!-- Kanal satırları -->
+      <!-- ── (1) Kategorisiz kanallar — en üstte ── -->
       <div
-        v-for="channel in channelsStore.channelsForGuild(guildsStore.activeGuildId ?? '')"
+        v-for="channel in uncategorizedChannels"
         :key="channel.id"
         class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
         :class="[
@@ -209,7 +395,6 @@ async function confirmDelete() {
             : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
         ]"
       >
-        <!-- Kanal adına tıklama -->
         <button
           class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-2 pr-2"
           @click="selectChannel(channel)"
@@ -223,15 +408,11 @@ async function confirmDelete() {
                 : '',
             ]"
           >{{ channel.name }}</span>
-          <!-- 18+ rozet -->
           <span
             v-if="channel.ageGated"
             class="shrink-0 text-[10px] font-bold px-1 rounded"
             style="color: var(--kv-danger); border: 1px solid var(--kv-danger); line-height: 1.4;"
-          >
-            {{ t('channel.ageGatedBadge') }}
-          </span>
-          <!-- Yavaş mod rozeti -->
+          >{{ t('channel.ageGatedBadge') }}</span>
           <span
             v-if="channel.slowModeSeconds > 0"
             class="shrink-0"
@@ -245,7 +426,6 @@ async function confirmDelete() {
           </span>
         </button>
 
-        <!-- Kırmızı okunmamış sayaç rozeti (sağ taraf, aktif kanal hariç) -->
         <span
           v-if="channel.unreadCount > 0 && channelsStore.activeChannelId !== channel.id"
           class="shrink-0 channel-unread-badge"
@@ -253,12 +433,10 @@ async function confirmDelete() {
           {{ channel.unreadCount > 99 ? '99+' : channel.unreadCount }}
         </span>
 
-        <!-- OWNER: yönetim ikonları (hover'da görünür) -->
         <div
-          v-if="isOwner"
+          v-if="isAdmin"
           class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pr-2"
         >
-          <!-- Kanal ayarları -->
           <button
             class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
             style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
@@ -270,7 +448,6 @@ async function confirmDelete() {
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
           </button>
-          <!-- Sil -->
           <button
             class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
             style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
@@ -287,8 +464,173 @@ async function confirmDelete() {
         </div>
       </div>
 
+      <!-- ── (2) Kategoriler — position asc ── -->
+      <template v-for="cat in sortedCategories" :key="cat.id">
+        <!-- Kategori başlığı -->
+        <div class="group/cat mt-3 mb-0.5 px-1 flex items-center gap-1">
+          <!-- Katla/aç butonu + ad -->
+          <button
+            class="flex-1 flex items-center gap-1 min-w-0 cursor-pointer"
+            :aria-label="categoryIsCollapsed(cat.id) ? cat.name + ' — aç' : cat.name + ' — katla'"
+            @click="toggleCollapse(activeGuildId, cat.id)"
+          >
+            <!-- Ok ikonu -->
+            <svg
+              width="10" height="10" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+              :class="categoryIsCollapsed(cat.id) ? '' : 'rotate-90'"
+              class="shrink-0 transition-transform"
+              style="color: var(--kv-text-muted);"
+            >
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+            <span
+              class="text-[11px] font-semibold uppercase tracking-widest truncate"
+              style="color: var(--kv-text-muted);"
+            >{{ cat.name }}</span>
+          </button>
+
+          <!-- ADMIN: kategori menü butonu + kanal ekle -->
+          <div v-if="isAdmin" class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover/cat:opacity-100 transition-opacity">
+            <!-- Bu kategoriye kanal ekle -->
+            <button
+              class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
+              style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
+              :title="t('category.addChannel')"
+              @click.stop="openCreate(cat.id)"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+
+            <!-- Üç nokta menü -->
+            <div class="relative">
+              <button
+                class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
+                style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
+                :title="t('common.settings')"
+                @click.stop="toggleCategoryMenu(cat.id)"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                  <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                  <circle cx="12" cy="19" r="1" fill="currentColor"/>
+                </svg>
+              </button>
+
+              <!-- Menü paneli -->
+              <div
+                v-if="openCategoryMenuId === cat.id"
+                class="absolute right-0 top-full mt-1 z-20 rounded-[var(--kv-radius-md)] border overflow-hidden"
+                style="min-width: 148px; background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+                @click.stop
+              >
+                <button
+                  class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                  style="color: var(--kv-text-secondary);"
+                  @click="closeCategoryMenu(); openRenameCategory(cat)"
+                >
+                  {{ t('category.rename') }}
+                </button>
+                <button
+                  class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                  style="color: var(--kv-danger);"
+                  @click="closeCategoryMenu(); openDeleteCategory(cat)"
+                >
+                  {{ t('category.delete') }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kategorinin kanalları (katlanmışsa gizli) -->
+        <template v-if="!categoryIsCollapsed(cat.id)">
+          <div
+            v-for="channel in channelsForCategory(cat.id)"
+            :key="channel.id"
+            class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
+            :class="[
+              channelsStore.activeChannelId === channel.id
+                ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-text-primary)]'
+                : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
+            ]"
+          >
+            <button
+              class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-4 pr-2"
+              @click="selectChannel(channel)"
+            >
+              <span style="color: var(--kv-text-muted);">#</span>
+              <span
+                class="truncate"
+                :class="[
+                  channel.unreadCount > 0 && channelsStore.activeChannelId !== channel.id
+                    ? 'font-semibold text-[var(--kv-text-primary)]'
+                    : '',
+                ]"
+              >{{ channel.name }}</span>
+              <span
+                v-if="channel.ageGated"
+                class="shrink-0 text-[10px] font-bold px-1 rounded"
+                style="color: var(--kv-danger); border: 1px solid var(--kv-danger); line-height: 1.4;"
+              >{{ t('channel.ageGatedBadge') }}</span>
+              <span
+                v-if="channel.slowModeSeconds > 0"
+                class="shrink-0"
+                :title="t('channel.slowModeLabel')"
+                style="color: var(--kv-text-muted);"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </span>
+            </button>
+
+            <span
+              v-if="channel.unreadCount > 0 && channelsStore.activeChannelId !== channel.id"
+              class="shrink-0 channel-unread-badge"
+            >
+              {{ channel.unreadCount > 99 ? '99+' : channel.unreadCount }}
+            </span>
+
+            <div
+              v-if="isAdmin"
+              class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pr-2"
+            >
+              <button
+                class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
+                style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
+                :title="t('channel.settingsTitle')"
+                @click.stop="openSettings(channel)"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              <button
+                class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
+                style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
+                :title="t('channel.delete')"
+                @click.stop="openDelete(channel)"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6M14 11v6"/>
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </template>
+      </template>
+
       <p
-        v-if="!channelsStore.channelsForGuild(guildsStore.activeGuildId ?? '').length"
+        v-if="!uncategorizedChannels.length && !sortedCategories.length"
         class="px-2 text-[13px]"
         style="color: var(--kv-text-muted);"
       >
@@ -346,6 +688,25 @@ async function confirmDelete() {
         </button>
       </div>
 
+      <!-- Kategori seçimi -->
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+          {{ t('channel.categoryLabel') }}
+        </label>
+        <select
+          v-model="createCategoryId"
+          class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] outline-none border cursor-pointer"
+          style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
+        >
+          <option :value="null">{{ t('channel.categoryNone') }}</option>
+          <option
+            v-for="cat in sortedCategories"
+            :key="cat.id"
+            :value="cat.id"
+          >{{ cat.name }}</option>
+        </select>
+      </div>
+
       <div class="flex justify-end gap-3 pt-1">
         <KvButton type="button" variant="ghost" @click="showCreate = false">
           {{ t('common.cancel') }}
@@ -357,7 +718,7 @@ async function confirmDelete() {
     </form>
   </KvModal>
 
-  <!-- Kanal ayarları modalı (yeniden adlandır + yavaş mod) -->
+  <!-- Kanal ayarları modalı (yeniden adlandır + yavaş mod + kategori) -->
   <KvModal
     v-if="settingsTarget"
     :title="t('channel.settingsTitle')"
@@ -389,9 +750,26 @@ async function confirmDelete() {
             v-for="opt in SLOW_MODE_OPTIONS"
             :key="opt.value"
             :value="opt.value"
-          >
-            {{ opt.label }}
-          </option>
+          >{{ opt.label }}</option>
+        </select>
+      </div>
+
+      <!-- Kategori seçimi -->
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+          {{ t('channel.categoryLabel') }}
+        </label>
+        <select
+          v-model="settingsCategoryId"
+          class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] outline-none border cursor-pointer"
+          style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
+        >
+          <option :value="null">{{ t('channel.categoryNone') }}</option>
+          <option
+            v-for="cat in sortedCategories"
+            :key="cat.id"
+            :value="cat.id"
+          >{{ cat.name }}</option>
         </select>
       </div>
 
@@ -428,6 +806,67 @@ async function confirmDelete() {
     :loading="deleting"
     @confirm="confirmDelete"
     @cancel="deleteTarget = null"
+  />
+
+  <!-- Kategori oluştur modalı -->
+  <KvModal
+    v-if="showCreateCategory"
+    :title="t('category.createTitle')"
+    @close="showCreateCategory = false"
+  >
+    <form class="flex flex-col gap-4" @submit.prevent="submitCreateCategory">
+      <KvInput
+        v-model="createCategoryName"
+        :label="t('category.nameLabel')"
+        :placeholder="t('category.namePlaceholder')"
+        :error="createCategoryError"
+        autofocus
+      />
+      <div class="flex justify-end gap-3 pt-1">
+        <KvButton type="button" variant="ghost" @click="showCreateCategory = false">
+          {{ t('common.cancel') }}
+        </KvButton>
+        <KvButton type="submit" :loading="creatingCategory" :disabled="!createCategoryName.trim()">
+          {{ t('category.createButton') }}
+        </KvButton>
+      </div>
+    </form>
+  </KvModal>
+
+  <!-- Kategori yeniden adlandır modalı -->
+  <KvModal
+    v-if="renameTarget"
+    :title="t('category.renameTitle')"
+    @close="renameTarget = null"
+  >
+    <form class="flex flex-col gap-4" @submit.prevent="submitRenameCategory">
+      <KvInput
+        v-model="renameName"
+        :label="t('category.nameLabel')"
+        :placeholder="t('category.namePlaceholder')"
+        :error="renameError"
+        autofocus
+      />
+      <div class="flex justify-end gap-3 pt-1">
+        <KvButton type="button" variant="ghost" @click="renameTarget = null">
+          {{ t('common.cancel') }}
+        </KvButton>
+        <KvButton type="submit" :loading="renaming" :disabled="!renameName.trim()">
+          {{ t('category.renameButton') }}
+        </KvButton>
+      </div>
+    </form>
+  </KvModal>
+
+  <!-- Kategori sil onay diyaloğu -->
+  <ConfirmDialog
+    v-if="deleteCategoryTarget"
+    :title="t('category.deleteTitle')"
+    :message="t('category.deleteConfirm', { name: deleteCategoryTarget.name })"
+    :confirm-label="t('category.deleteButton')"
+    :loading="deletingCategory"
+    @confirm="confirmDeleteCategory"
+    @cancel="deleteCategoryTarget = null"
   />
 </template>
 

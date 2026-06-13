@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
+import { useAuthStore } from '@/stores/auth'
 import type { GuildDto } from '@/types'
 import hexagonLogo from '@/assets/brand/kankaverse-hexagon.png'
 
@@ -16,6 +17,7 @@ const { t } = useI18n()
 const router = useRouter()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
+const authStore = useAuthStore()
 
 // ── Tooltip state ──
 const tooltipVisible = ref(false)
@@ -41,9 +43,9 @@ function goHome() {
 }
 
 async function selectGuild(guild: GuildDto) {
-  // Kanallar yüklü değilse önce fetch et
+  // Kanallar yüklü değilse önce fetch et (kategorilerle birlikte)
   if (!channelsStore.channelsForGuild(guild.id).length) {
-    await channelsStore.fetchChannels(guild.id)
+    await channelsStore.fetchChannelsAndCategories(guild.id, authStore.user?.id)
   }
   const channels = channelsStore.channelsForGuild(guild.id)
   if (channels.length > 0) {
