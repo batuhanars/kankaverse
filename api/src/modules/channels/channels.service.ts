@@ -1,33 +1,28 @@
 import {
   Injectable,
-  ForbiddenException,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { Channel } from '@prisma/client';
+import { requireAdminRole } from '../../common/utils/guild-role.utils';
 
-function toChannelDto(channel: Channel, unreadCount = 0) {
+export function toChannelDto(channel: Channel, unreadCount = 0) {
   return {
     id: channel.id,
     type: channel.type,
     guildId: channel.guildId,
+    categoryId: channel.categoryId,
     name: channel.name,
     ageGated: channel.ageGated,
     position: channel.position,
     slowModeSeconds: channel.slowModeSeconds,
     unreadCount,
   };
-}
-
-/** OWNER veya ADMIN rolü gerektirir, aksi hâlde 403 FORBIDDEN */
-function requireAdminRole(role: string) {
-  if (role !== 'OWNER' && role !== 'ADMIN') {
-    throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
-  }
 }
 
 @Injectable()
@@ -40,6 +35,10 @@ export class ChannelsService {
   async create(userId: string, guildId: string, dto: CreateChannelDto) {
     const { membership } = await this.membership.requireGuildMembership(userId, guildId);
     requireAdminRole(membership.role);
+
+    if (dto.categoryId) {
+      await this.validateCategoryBelongsToGuild(dto.categoryId, guildId);
+    }
 
     const maxPosition = await this.prisma.channel.aggregate({
       where: { guildId, deletedAt: null },
@@ -54,6 +53,7 @@ export class ChannelsService {
         ageGated: dto.ageGated ?? false,
         position: (maxPosition._max.position ?? -1) + 1,
         slowModeSeconds: dto.slowModeSeconds ?? 0,
+        categoryId: dto.categoryId ?? null,
       },
     });
 
@@ -117,16 +117,32 @@ export class ChannelsService {
     const { membership } = await this.membership.requireGuildMembership(userId, channel.guildId!);
     requireAdminRole(membership.role);
 
+    // categoryId: null → kategorisiz; string → doğrula; undefined → dokunma
+    if (dto.categoryId !== undefined && dto.categoryId !== null) {
+      await this.validateCategoryBelongsToGuild(dto.categoryId, channel.guildId!);
+    }
+
     const updated = await this.prisma.channel.update({
       where: { id: channelId },
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.ageGated !== undefined && { ageGated: dto.ageGated }),
         ...(dto.slowModeSeconds !== undefined && { slowModeSeconds: dto.slowModeSeconds }),
+        ...('categoryId' in dto && { categoryId: dto.categoryId ?? null }),
       },
     });
 
     return toChannelDto(updated);
+  }
+
+  /** Kategori var mı, aynı guild'e ait mi, silinmemiş mi — değilse 400 INVALID_CATEGORY */
+  private async validateCategoryBelongsToGuild(categoryId: string, guildId: string) {
+    const category = await this.prisma.channelCategory.findUnique({
+      where: { id: categoryId },
+    });
+    if (!category || category.deletedAt !== null || category.guildId !== guildId) {
+      throw new BadRequestException({ message: 'Geçersiz kategori.', error: 'INVALID_CATEGORY' });
+    }
   }
 
   async remove(userId: string, channelId: string) {
