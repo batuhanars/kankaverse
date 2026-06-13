@@ -65,38 +65,52 @@ async function submitCreate() {
   }
 }
 
-// ── Kanal yeniden adlandır ──
-const renameTarget = ref<ChannelDto | null>(null)
-const renameName = ref('')
-const renaming = ref(false)
-const renameError = ref('')
+// ── Kanal ayarları (yeniden adlandır + yavaş mod) ──
+const settingsTarget = ref<ChannelDto | null>(null)
+const settingsName = ref('')
+const settingsSlowMode = ref(0)
+const settingsSaving = ref(false)
+const settingsError = ref('')
 
-function openRename(channel: ChannelDto) {
-  renameTarget.value = channel
-  renameName.value = channel.name ?? ''
-  renameError.value = ''
+const SLOW_MODE_OPTIONS = [
+  { label: t('channel.slowModeOff'), value: 0 },
+  { label: t('channel.slowMode5s'), value: 5 },
+  { label: t('channel.slowMode10s'), value: 10 },
+  { label: t('channel.slowMode30s'), value: 30 },
+  { label: t('channel.slowMode1m'), value: 60 },
+  { label: t('channel.slowMode5m'), value: 300 },
+  { label: t('channel.slowMode15m'), value: 900 },
+]
+
+function openSettings(channel: ChannelDto) {
+  settingsTarget.value = channel
+  settingsName.value = channel.name ?? ''
+  settingsSlowMode.value = channel.slowModeSeconds ?? 0
+  settingsError.value = ''
 }
 
-async function submitRename() {
-  const target = renameTarget.value
+async function submitSettings() {
+  const target = settingsTarget.value
   if (!target) return
-  const name = renameName.value.trim()
-  if (!name || name === target.name) {
-    renameTarget.value = null
-    return
-  }
+  const name = settingsName.value.trim()
+  if (!name) return
   const guildId = guildsStore.activeGuildId
   if (!guildId) return
-  renaming.value = true
-  renameError.value = ''
+  settingsSaving.value = true
+  settingsError.value = ''
   try {
-    await channelsStore.updateChannel(target.id, guildId, { name })
-    renameTarget.value = null
+    const payload: { name?: string; slowModeSeconds?: number } = {}
+    if (name !== target.name) payload.name = name
+    if (settingsSlowMode.value !== (target.slowModeSeconds ?? 0)) payload.slowModeSeconds = settingsSlowMode.value
+    if (Object.keys(payload).length > 0) {
+      await channelsStore.updateChannel(target.id, guildId, payload)
+    }
+    settingsTarget.value = null
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
-    renameError.value = err.response?.data?.message ?? t('common.error')
+    settingsError.value = err.response?.data?.message ?? t('common.error')
   } finally {
-    renaming.value = false
+    settingsSaving.value = false
   }
 }
 
@@ -210,6 +224,18 @@ async function confirmDelete() {
           >
             {{ t('channel.ageGatedBadge') }}
           </span>
+          <!-- Yavaş mod rozeti -->
+          <span
+            v-if="channel.slowModeSeconds > 0"
+            class="shrink-0"
+            :title="t('channel.slowModeLabel')"
+            style="color: var(--kv-text-muted);"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </span>
         </button>
 
         <!-- OWNER: yönetim ikonları (hover'da görünür) -->
@@ -217,12 +243,12 @@ async function confirmDelete() {
           v-if="isOwner"
           class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
         >
-          <!-- Yeniden adlandır -->
+          <!-- Kanal ayarları -->
           <button
             class="w-5 h-5 flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
             style="color: var(--kv-text-muted);"
-            :title="t('channel.rename')"
-            @click.stop="openRename(channel)"
+            :title="t('channel.settingsTitle')"
+            @click.stop="openSettings(channel)"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -316,26 +342,50 @@ async function confirmDelete() {
     </form>
   </KvModal>
 
-  <!-- Kanal yeniden adlandır modalı -->
+  <!-- Kanal ayarları modalı (yeniden adlandır + yavaş mod) -->
   <KvModal
-    v-if="renameTarget"
-    :title="t('channel.renameTitle')"
-    @close="renameTarget = null"
+    v-if="settingsTarget"
+    :title="t('channel.settingsTitle')"
+    @close="settingsTarget = null"
   >
-    <form class="flex flex-col gap-4" @submit.prevent="submitRename">
+    <form class="flex flex-col gap-4" @submit.prevent="submitSettings">
       <KvInput
-        v-model="renameName"
+        v-model="settingsName"
         :label="t('channel.nameLabel')"
         :placeholder="t('channel.namePlaceholder')"
-        :error="renameError"
+        :error="settingsError"
         autofocus
       />
+
+      <!-- Yavaş mod seçimi -->
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+          {{ t('channel.slowModeLabel') }}
+        </label>
+        <p class="text-[12px]" style="color: var(--kv-text-muted);">
+          {{ t('channel.slowModeDesc') }}
+        </p>
+        <select
+          v-model.number="settingsSlowMode"
+          class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] outline-none border cursor-pointer"
+          style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
+        >
+          <option
+            v-for="opt in SLOW_MODE_OPTIONS"
+            :key="opt.value"
+            :value="opt.value"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+
       <div class="flex justify-end gap-3 pt-1">
-        <KvButton type="button" variant="ghost" @click="renameTarget = null">
+        <KvButton type="button" variant="ghost" @click="settingsTarget = null">
           {{ t('common.cancel') }}
         </KvButton>
-        <KvButton type="submit" :loading="renaming" :disabled="!renameName.trim() || renameName.trim() === renameTarget.name">
-          {{ t('channel.renameButton') }}
+        <KvButton type="submit" :loading="settingsSaving" :disabled="!settingsName.trim()">
+          {{ t('channel.settingsButton') }}
         </KvButton>
       </div>
     </form>
