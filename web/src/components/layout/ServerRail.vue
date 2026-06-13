@@ -62,6 +62,18 @@ function guildInitial(name: string) {
     .slice(0, 2)
     .join('')
 }
+
+/** Pill CSS sınıfını hesapla — yalnızca aktiflik/hover, unread İLE İLGİSİ YOK */
+function pillClass(guild: GuildDto): string {
+  const isActive = guildsStore.activeGuildId === guild.id
+  if (isActive) return 'pill--active'
+  return 'pill--hidden'
+}
+
+/** Sayaç metnini formatla (>99 → "99+") */
+function badgeLabel(count: number): string {
+  return count > 99 ? '99+' : String(count)
+}
 </script>
 
 <template>
@@ -88,15 +100,8 @@ function guildInitial(name: string) {
       :key="guild.id"
       class="rail-item"
     >
-      <!-- Okunmamış sol pill (aktif guild'de gösterme) -->
-      <span
-        class="unread-pill"
-        :class="[
-          guild.hasUnread && guildsStore.activeGuildId !== guild.id
-            ? 'unread-pill--visible'
-            : 'unread-pill--hidden',
-        ]"
-      />
+      <!-- Discord tarzı sol pill (animasyonlu: gizli / kısa / orta / uzun) -->
+      <span :class="['pill', pillClass(guild)]" />
 
       <button
         class="guild-btn"
@@ -104,14 +109,31 @@ function guildInitial(name: string) {
         @mouseenter="showTooltip($event, guild.name)"
         @mouseleave="hideTooltip"
       >
-        <span :class="['hex', guildsStore.activeGuildId === guild.id ? 'hex--active' : 'hex--idle']">
-          <img
-            v-if="guild.iconUrl"
-            :src="guild.iconUrl"
-            :alt="guild.name"
-            class="hex-img"
-          />
-          <span v-else class="hex-label">{{ guildInitial(guild.name) }}</span>
+        <!-- guild-icon-wrap: hover sınıfı eklemek için sarmalayıcı -->
+        <span
+          :class="[
+            'hex-wrap',
+            guildsStore.activeGuildId === guild.id ? 'hex-wrap--active' : 'hex-wrap--idle',
+            guild.iconUrl ? 'hex-wrap--has-icon' : '',
+          ]"
+        >
+          <span class="hex">
+            <img
+              v-if="guild.iconUrl"
+              :src="guild.iconUrl"
+              :alt="guild.name"
+              class="hex-img"
+            />
+            <span v-else class="hex-label">{{ guildInitial(guild.name) }}</span>
+          </span>
+
+          <!-- Kırmızı sayaç rozeti — sağ-alt; aktif guild'de de gösterilir, yalnız 0'da gizlenir -->
+          <span
+            v-if="guild.unreadCount > 0"
+            class="badge"
+          >
+            {{ badgeLabel(guild.unreadCount) }}
+          </span>
         </span>
       </button>
     </div>
@@ -178,7 +200,7 @@ function guildInitial(name: string) {
   background-color: var(--kv-bg-rail);
 }
 
-/* rail-item: konumlanma referansı */
+/* rail-item: konumlanma referansı (pill + ikon + rozet için) */
 .rail-item {
   position: relative;
   display: flex;
@@ -201,6 +223,50 @@ function guildInitial(name: string) {
   flex-shrink: 0;
 }
 
+/* ── Discord tarzı sol pill ──
+   rail-item'ın soluna yapışık; taşma yok (overflow-x: hidden rail'de var).
+   YALNIZCA hover + aktiflik göstergesi — unread ile İLGİSİ YOK.
+   Yükseklik: gizli→0 / hover→20px / aktif→40px */
+.pill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  border-radius: 0 3px 3px 0;
+  background-color: var(--kv-text-primary);
+  transition: height 0.15s ease, opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.pill--hidden {
+  height: 0;
+  opacity: 0;
+}
+
+.pill--active {
+  height: 40px;
+  opacity: 1;
+}
+
+/* Hover'da pill orta boya çık (yalnızca gizli pill için) */
+.rail-item:hover .pill--hidden {
+  height: 20px;
+  opacity: 1;
+}
+
+/* ── Hexagon sarmalayıcı (pozisyon referansı rozet için) ── */
+.hex-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+/* ── Hexagon ── */
 .hex {
   display: flex;
   align-items: center;
@@ -210,7 +276,7 @@ function guildInitial(name: string) {
   overflow: hidden;
   font-size: 13px;
   font-weight: 600;
-  transition: background-color 0.15s, color 0.15s;
+  transition: background-color 0.15s, color 0.15s, border-radius 0.15s;
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
 }
 
@@ -222,6 +288,34 @@ function guildInitial(name: string) {
 
 .hex-label {
   pointer-events: none;
+}
+
+/* Aktif guild (harf-baş-harfi): hex arka planı accent */
+.hex-wrap--active:not(.hex-wrap--has-icon) .hex {
+  background-color: var(--kv-accent-500);
+  color: #ffffff;
+}
+
+/* Aktif guild (görsel ikon): arka plan yok — aktiflik sol pill ile gösterilir */
+.hex-wrap--active.hex-wrap--has-icon .hex {
+  background-color: transparent;
+}
+
+/* Pasif guild (harf-baş-harfi): arka plan + hover (yumuşatılmış — border-radius geçişiyle) */
+.hex-wrap--idle:not(.hex-wrap--has-icon) .hex {
+  background-color: var(--kv-bg-elevated);
+  color: var(--kv-text-secondary);
+}
+
+.guild-btn:hover .hex-wrap--idle:not(.hex-wrap--has-icon) .hex {
+  background-color: var(--kv-accent-500);
+  color: #ffffff;
+  border-radius: 30%;
+}
+
+/* Görsel ikonlu guild: arka plan yok (ikon dolduruyor), hover accent de yok */
+.hex-wrap--idle.hex-wrap--has-icon .hex {
+  background-color: transparent;
 }
 
 /* Marka/home hexagon — logo zaten hexagon şeklinde, clip-path gerekmez */
@@ -250,27 +344,20 @@ function guildInitial(name: string) {
   filter: drop-shadow(0 0 6px var(--kv-accent-500));
 }
 
-/* Aktif guild */
-.hex--active {
-  background-color: var(--kv-accent-500);
-  color: #ffffff;
-}
-
-/* Pasif guild */
-.hex--idle {
-  background-color: var(--kv-bg-elevated);
-  color: var(--kv-text-secondary);
-}
-
-.guild-btn:hover .hex--idle {
-  background-color: var(--kv-accent-500);
-  color: #ffffff;
-}
-
-/* "+" ekle butonu — marka rengi, şeffaf zemin → hover'da opak */
+/* "+" ekle butonu */
 .hex--add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   background-color: var(--kv-accent-subtle);
   color: var(--kv-accent-500);
+  transition: background-color 0.15s, color 0.15s;
 }
 
 .add-btn:hover .hex--add {
@@ -289,26 +376,25 @@ function guildInitial(name: string) {
   margin: 4px 0;
 }
 
-/* ── Okunmamış sol pill — rail içinde kalır (left: 0, taşma yok) ── */
-.unread-pill {
+/* ── Kırmızı sayaç rozeti — sağ-alt köşe ── */
+.badge {
   position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  border-radius: 0 3px 3px 0;
-  background-color: var(--kv-text-primary);
-  transition: height 0.15s, opacity 0.15s;
-}
-
-.unread-pill--visible {
-  height: 8px;
-  opacity: 1;
-}
-
-.unread-pill--hidden {
-  height: 0;
-  opacity: 0;
+  bottom: -2px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background-color: var(--kv-danger);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  /* Rozet kırpılmasın — rail'in overflow-x: hidden'ından korunmak için
+     badge hex-wrap içinde (rail dışına taşmaz, 48px + 4px sağda = ikon sınırı içinde) */
 }
 </style>
 

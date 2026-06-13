@@ -54,14 +54,14 @@ export const useChannelsStore = defineStore('channels', () => {
     activeChannelId.value = id
   }
 
-  /** Kanalı okundu işaretle: POST /channels/:id/read → hasUnread=false + guild unread'i güncelle */
+  /** Kanalı okundu işaretle: POST /channels/:id/read → unreadCount=0 + guild unread'ini düş */
   async function markChannelRead(channelId: string): Promise<void> {
     // Optimistik: önce local'i güncelle, sonra backend'e bildir
     for (const [guildId, channels] of Object.entries(channelsByGuild.value)) {
       const idx = channels.findIndex((c) => c.id === channelId)
-      if (idx !== -1 && channels[idx].hasUnread) {
-        channels[idx] = { ...channels[idx], hasUnread: false }
-        // Guild unread'ini yeniden hesapla — import döngüsünden kaçın, event yayınla
+      if (idx !== -1 && channels[idx].unreadCount > 0) {
+        channels[idx] = { ...channels[idx], unreadCount: 0 }
+        // Guild unread sayacını kanallardan yeniden topla — import döngüsünden kaçın, event yayınla
         window.dispatchEvent(new CustomEvent('kv:guild:recheck-unread', { detail: { guildId } }))
         break
       }
@@ -73,14 +73,19 @@ export const useChannelsStore = defineStore('channels', () => {
     }
   }
 
-  /** WS channel.activity: kanal aktif değilse hasUnread=true yap */
+  /** WS channel.activity: kanal aktif değilse unreadCount++ */
   function markChannelUnread(channelId: string, guildId: string): void {
     const channels = channelsByGuild.value[guildId]
     if (!channels) return
     const idx = channels.findIndex((c) => c.id === channelId)
-    if (idx !== -1 && !channels[idx].hasUnread) {
-      channels[idx] = { ...channels[idx], hasUnread: true }
+    if (idx !== -1) {
+      channels[idx] = { ...channels[idx], unreadCount: channels[idx].unreadCount + 1 }
     }
+  }
+
+  /** Guild'in tüm kanallarının unreadCount toplamını döner (guild sayacı güncellemek için) */
+  function totalUnreadForGuild(guildId: string): number {
+    return (channelsByGuild.value[guildId] ?? []).reduce((sum, c) => sum + c.unreadCount, 0)
   }
 
   return {
@@ -95,5 +100,6 @@ export const useChannelsStore = defineStore('channels', () => {
     setActiveChannel,
     markChannelRead,
     markChannelUnread,
+    totalUnreadForGuild,
   }
 })

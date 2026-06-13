@@ -47,13 +47,21 @@ export const useGuildsStore = defineStore('guilds', () => {
     activeGuildId.value = id
   }
 
-  /** Guild'in hasUnread'ini doğrudan set et (WS channel.activity → true) */
-  function setGuildUnread(guildId: string, value: boolean): void {
+  /** Guild'in unreadCount'unu güncelle (WS channel.activity veya kanal okundu sonrası) */
+  function setGuildUnreadCount(guildId: string, count: number): void {
     const idx = guilds.value.findIndex((g) => g.id === guildId)
-    if (idx !== -1 && guilds.value[idx].hasUnread !== value) {
-      guilds.value[idx] = { ...guilds.value[idx], hasUnread: value }
+    if (idx !== -1 && guilds.value[idx].unreadCount !== count) {
+      guilds.value[idx] = { ...guilds.value[idx], unreadCount: count }
     }
   }
 
-  return { guilds, activeGuildId, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, setActiveGuild, setGuildUnread }
+  /** Guild unreadCount'unu 1 artır (WS channel.activity için) */
+  function incrementGuildUnread(guildId: string): void {
+    const idx = guilds.value.findIndex((g) => g.id === guildId)
+    if (idx !== -1) {
+      guilds.value[idx] = { ...guilds.value[idx], unreadCount: guilds.value[idx].unreadCount + 1 }
+    }
+  }
+
+  return { guilds, activeGuildId, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, setActiveGuild, setGuildUnreadCount, incrementGuildUnread }
 })

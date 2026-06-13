@@ -137,12 +137,12 @@ export function useSocket() {
       handleTypingClear(data.userId, data.channelId)
     })
 
-    // Kanal aktivitesi — başka üyenin mesajı: aktif değilse unread işaretle
+    // Kanal aktivitesi — başka üyenin mesajı: aktif değilse unread sayacını artır
     socket.on('channel.activity', (data: { channelId: string; guildId: string; authorId: string }) => {
       // Kullanıcı o kanalı şu an izliyorsa unread saymıyoruz
       if (activeChannelId === data.channelId) return
       channelsStore.markChannelUnread(data.channelId, data.guildId)
-      guildsStore.setGuildUnread(data.guildId, true)
+      guildsStore.incrementGuildUnread(data.guildId)
     })
 
     // Typing emit fonksiyonlarını useTyping composable'ına bağla

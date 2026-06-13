@@ -30,11 +30,10 @@ const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
 const { connect, disconnect, joinChannel, leaveChannel } = useSocket()
 
-/** Guild'in tüm kanallarından hesaplanan unread: herhangi biri unread → guild unread */
+/** Guild'in tüm kanallarından hesaplanan unread sayacını güncelle */
 function recheckGuildUnread(guildId: string) {
-  const channels = channelsStore.channelsForGuild(guildId)
-  const anyUnread = channels.some((c) => c.hasUnread)
-  guildsStore.setGuildUnread(guildId, anyUnread)
+  const total = channelsStore.totalUnreadForGuild(guildId)
+  guildsStore.setGuildUnreadCount(guildId, total)
 }
 
 function onRecheckUnread(e: Event) {
