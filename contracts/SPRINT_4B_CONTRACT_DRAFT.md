@@ -19,6 +19,11 @@ T&S çekirdeğinin "tespit et → hızlı müdahale et → mağdura çıkış" a
 
 ---
 
+> **7B'den devreden yükseltme (kutsal-değer hakareti):** Sprint 7B automod kutsal değerlere hakareti (Allah/Peygamber/
+> Kitap) yalnız **block-on-send** ediyor. Sahip talebi: bu kategori kullanıcı uzaklaştırma sebebi. 4B'de **en yüksek
+> öncelikli, İNSAN-ONAYLI ban**'a yükseltilir (otomatik geri-dönülmez ban YOK — yanlış-pozitif/alıntı bağlamı/KVKK/itiraz).
+> Bkz. memory `tr-automod-lokalizasyon`.
+
 ## 2. Prisma Modelleri (TASLAK — retention alanları LEGAL-FLAGGED)
 
 ```prisma

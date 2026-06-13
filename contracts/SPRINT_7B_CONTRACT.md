@@ -31,6 +31,16 @@ geciktiren anti-spam/anti-raid sertleştirme (mevcut `canDm`/`canSendFriendReque
 - **Davranış:** eşleşme → `messages.service.create` mesajı oluşturmadan `BadRequestException` jenerik `{ error: 'MESSAGE_BLOCKED' }` ("Mesajınız topluluk kurallarına uygun değil"). **Sıfır DB, sıfır report, sıfır kayıt** (kayıtsız — 4B/hukuk bölgesine girmez).
 - **WS yolu:** mesaj yalnız REST `POST` ile oluşturuluyorsa (mevcut mimari) tek nokta yeterli; gateway'de ayrı send yoksa orada kontrol gerekmez (doğrula).
 
+### 2.1. TR lokalizasyon + kutsal-değer kategorisi (sahip girdisi 2026-06-13)
+- **Normalleşmiş kısaltmalar bloklanmaz:** `amk`/`aq` (amına koyayım kısaltması), `lan`/`la` — TR konuşma dilinde
+  cümle-sonu doldurucu, normal algılanıyor → **liste DIŞI.** **Açık yazılı** ağır küfür (örn. `aminakoyayim`) bloklanır.
+- **Liste DIŞI (içerik-politikası, PM kararı — pazarlık yok):** etnik/dini **kimlik adları** (`yahudi`/`ermeni`) — hakaret
+  değil, bloklamak yanlış + ayrımcılık. Yanlış-pozitifler (`mal`=eşya, `oğlak`=keçi). Hafif hakaretler (`aptal`/`salak`/
+  `gerzek`/`dangalak`) — Option A: block-on-send agresif, liste dışı.
+- **Kutsal değerlere hakaret (Allah/Peygamber/Kitap) = en ağır kategori:** ayrı etiketli grup; **7B'de block-on-send**
+  (mesaj gitmez). **Otomatik perma-ban DEĞİL** — ban mekanizması 4B (hukuk beklemede) + insan-incelemesiz geri-dönülmez
+  ban yanlış-pozitif/alıntı/KVKK riski. → **4B'de en yüksek öncelikle insan-onaylı ban'a yükseltilir** (PLAN/4B notu).
+
 ## 3. Yeni Üye Karantinası (R7)
 
 - **Veri:** `GuildMember.joinedAt` **zaten var** — yeni alan/migration GEREKMEZ. "Yeni üye" = `joinedAt + QUARANTINE_HOURS > now`.
