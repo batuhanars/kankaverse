@@ -39,6 +39,7 @@ const configMock = {
   get: jest.fn((key: string) => {
     const values: Record<string, unknown> = {
       's3.publicUrl': 'http://localhost:9000/kankaverse',
+      uploadsEnabled: true,
     };
     return values[key];
   }),
@@ -58,6 +59,7 @@ function resetMocks() {
   configMock.get.mockImplementation((key: string) => {
     const values: Record<string, unknown> = {
       's3.publicUrl': 'http://localhost:9000/kankaverse',
+      uploadsEnabled: true,
     };
     return values[key];
   });

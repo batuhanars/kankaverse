@@ -21,7 +21,9 @@ interface AuthSocket extends Socket {
   data: { userId: string; sessionId: string; username?: string };
 }
 
-@WebSocketGateway({ cors: { origin: '*' } })
+// CORS origin, main.ts'teki RedisIoAdapter üzerinden config'ten okunur (FRONTEND_URL).
+// Dekoratörde sabit origin yazılmaz — adapter seviyesinde dinamik olarak ayarlanır.
+@WebSocketGateway()
 export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit {
   @WebSocketServer()
   server: Server;

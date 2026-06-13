@@ -28,6 +28,7 @@ const configMock = {
     const values: Record<string, unknown> = {
       maxUploadMb: 25,
       attachmentScanEnabled: false,
+      uploadsEnabled: true,
     };
     return values[key];
   }),
@@ -48,6 +49,7 @@ function resetMocks() {
     const values: Record<string, unknown> = {
       maxUploadMb: 25,
       attachmentScanEnabled: false,
+      uploadsEnabled: true,
     };
     return values[key];
   });
