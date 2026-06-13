@@ -11,8 +11,8 @@ const channelsStore = useChannelsStore()
 
 <template>
   <header
-    class="h-16 flex items-center px-4 gap-3 shrink-0 border-b"
-    style="background-color: var(--kv-bg-content); border-color: var(--kv-border-subtle);"
+    class="flex items-center px-4 gap-3 shrink-0 border-b"
+    style="height: var(--kv-header-height); background-color: var(--kv-bg-content); border-color: var(--kv-border-subtle);"
   >
     <span class="text-[var(--kv-text-muted)] font-medium">#</span>
     <span class="text-[15px] font-semibold text-[var(--kv-text-primary)]">

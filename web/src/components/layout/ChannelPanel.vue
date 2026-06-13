@@ -150,20 +150,20 @@ async function confirmDelete() {
 <template>
   <aside
     class="flex flex-col h-full shrink-0 rounded-r-[var(--kv-radius-lg)] overflow-hidden"
-    style="width: 264px; background-color: var(--kv-bg-sidebar);"
+    style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
   >
-    <!-- Ortam adı başlığı: 64px -->
+    <!-- Ortam adı başlığı -->
     <div
-      class="h-16 flex items-center px-4 shrink-0 border-b font-semibold text-[15px] gap-2"
-      style="border-color: var(--kv-border-subtle); color: var(--kv-text-primary);"
+      class="flex items-center px-4 shrink-0 border-b font-semibold text-[15px] gap-2"
+      style="height: var(--kv-header-height); border-color: var(--kv-border-subtle); color: var(--kv-text-primary);"
     >
       <span class="flex-1 truncate">{{ guildsStore.activeGuild()?.name ?? '' }}</span>
 
       <!-- Ayarlar dişlisi — yalnız OWNER -->
       <button
         v-if="isOwner"
-        class="shrink-0 w-7 h-7 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-        style="color: var(--kv-text-muted);"
+        class="shrink-0 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
+        style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
         :title="t('common.settings')"
         @click="showSettings = true"
       >
@@ -186,8 +186,8 @@ async function confirmDelete() {
         </span>
         <button
           v-if="isOwner"
-          class="w-5 h-5 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-          style="color: var(--kv-text-muted);"
+          class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
+          style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
           :title="t('channel.createTitle')"
           @click="openCreate"
         >
@@ -245,8 +245,8 @@ async function confirmDelete() {
         >
           <!-- Kanal ayarları -->
           <button
-            class="w-5 h-5 flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
-            style="color: var(--kv-text-muted);"
+            class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
+            style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
             :title="t('channel.settingsTitle')"
             @click.stop="openSettings(channel)"
           >
@@ -257,8 +257,8 @@ async function confirmDelete() {
           </button>
           <!-- Sil -->
           <button
-            class="w-5 h-5 flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
-            style="color: var(--kv-text-muted);"
+            class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
+            style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
             :title="t('channel.delete')"
             @click.stop="openDelete(channel)"
           >

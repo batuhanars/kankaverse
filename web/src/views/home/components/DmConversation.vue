@@ -293,10 +293,10 @@ const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
       class="flex flex-col flex-1 min-w-0 overflow-hidden mb-4 rounded-[var(--kv-radius-lg)]"
       style="background-color: var(--kv-bg-content);"
     >
-      <!-- Başlık çubuğu: 64px -->
+      <!-- Başlık çubuğu -->
       <div
-        class="h-16 flex items-center px-4 gap-3 shrink-0 border-b rounded-t-[var(--kv-radius-lg)]"
-        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-content);"
+        class="flex items-center px-4 gap-3 shrink-0 border-b rounded-t-[var(--kv-radius-lg)]"
+        style="height: var(--kv-header-height); border-color: var(--kv-border-subtle); background-color: var(--kv-bg-content);"
       >
         <!-- 1-1 DM başlığı -->
         <template v-if="dmChannel">

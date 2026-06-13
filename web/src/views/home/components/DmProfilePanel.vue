@@ -38,8 +38,8 @@ async function runConfirm() {
 
 <template>
   <aside
-    class="w-[264px] shrink-0 flex flex-col mb-4 mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
-    style="background-color: var(--kv-bg-sidebar);"
+    class="shrink-0 flex flex-col mb-4 mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
+    style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
   >
     <!-- Avatar + ad -->
     <div

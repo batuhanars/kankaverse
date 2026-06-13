@@ -62,12 +62,12 @@ function avatarInitial(username: string) {
 <template>
   <aside
     class="flex flex-col shrink-0 mb-4 mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
-    style="width: 248px; background-color: var(--kv-bg-sidebar);"
+    style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
   >
     <!-- Başlık -->
     <div
-      class="h-16 flex items-center px-4 shrink-0 border-b text-[13px] font-semibold uppercase tracking-widest"
-      style="border-color: var(--kv-border-subtle); color: var(--kv-text-muted);"
+      class="flex items-center px-4 shrink-0 border-b text-[13px] font-semibold uppercase tracking-widest"
+      style="height: var(--kv-header-height); border-color: var(--kv-border-subtle); color: var(--kv-text-muted);"
     >
       {{ t('member.panel') }}
     </div>
