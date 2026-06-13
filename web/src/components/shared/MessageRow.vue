@@ -18,6 +18,7 @@ import { useI18n } from 'vue-i18n'
 import AttachmentView from './AttachmentView.vue'
 import MessageActionsMenu from './MessageActionsMenu.vue'
 import { formatMentionsPlain } from '@/utils/mentions'
+import { renderMessageHtml } from '@/utils/markdown'
 import type { MessageDto } from '@/types'
 
 const props = defineProps<{
@@ -64,38 +65,18 @@ function onRowLeave(e: MouseEvent) {
   showFollowTime.value = false
 }
 
-// Sprint V2: mesaj içeriğini segmentlere ayır (metin | mention token)
-// Güvenli parça-render: string injection YOK — v-for segment ile render edilir.
-interface TextSegment { kind: 'text'; text: string }
-interface MentionSegment { kind: 'mention'; userId: string; username: string }
-type Segment = TextSegment | MentionSegment
-
-const MENTION_RE = /<@([a-zA-Z0-9_-]+)>/g
-
-const contentSegments = computed<Segment[]>(() => {
+// Sprint V2 (Markdown): mesaj içeriğini güvenli HTML'e dönüştür.
+// renderMessageHtml: markdown-it render + DOMPurify sanitize + mention span.
+// v-html yalnız bu sanitize edilmiş string'i alır — ham içerik asla doğrudan girmez.
+const renderedContent = computed<string>(() => {
   const content = props.message.content
-  if (!content) return []
-  const segments: Segment[] = []
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-  MENTION_RE.lastIndex = 0
-  while ((match = MENTION_RE.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      segments.push({ kind: 'text', text: content.slice(lastIndex, match.index) })
-    }
-    const userId = match[1]
-    const username = props.mentionResolver ? props.mentionResolver(userId) : t('mention.unknown')
-    segments.push({ kind: 'mention', userId, username })
-    lastIndex = match.index + match[0].length
-  }
-  if (lastIndex < content.length) {
-    segments.push({ kind: 'text', text: content.slice(lastIndex) })
-  }
-  return segments
+  if (!content) return ''
+  return renderMessageHtml(
+    content,
+    (id) => props.mentionResolver?.(id),
+    t('mention.unknown'),
+  )
 })
-
-// Mention token olmayan sade metin mi? → eski <p>{{ content }}</p> yolu (whitespace/break korunur)
-const hasMentions = computed(() => contentSegments.value.some((s) => s.kind === 'mention'))
 </script>
 
 <template>
@@ -230,61 +211,43 @@ const hasMentions = computed(() => contentSegments.value.some((s) => s.kind === 
               :attachment="att"
               class="!mt-0"
             />
-            <p
-              class="px-3 pb-3 pt-1.5 text-[16px] break-words whitespace-pre-wrap"
+            <!--
+              Sprint V2 Markdown: v-html yalnız DOMPurify sanitize edilmiş HTML alır.
+              Ham içerik asla doğrudan v-html'e girmez (renderMessageHtml bunu garantiler).
+            -->
+            <div
+              class="kv-md px-3 pb-3 pt-1.5 text-[16px] break-words"
               style="color: var(--kv-text-primary);"
-            >
-              <template v-if="hasMentions">
-                <template v-for="(seg, i) in contentSegments" :key="i">
-                  <span v-if="seg.kind === 'text'">{{ seg.text }}</span>
-                  <span
-                    v-else
-                    class="inline-flex items-center px-1 rounded text-[14px] font-medium cursor-default"
-                    style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
-                  >@{{ seg.username }}</span>
-                </template>
-              </template>
-              <template v-else>{{ message.content }}</template>
-            </p>
+              v-html="renderedContent"
+            />
           </div>
         </template>
         <template v-else>
-          <!-- Yalnız metin (mention token'ı varsa segmentli render; yoksa sade) -->
-          <p
+          <!-- Yalnız metin: markdown render (güvenli v-html) -->
+          <div
             v-if="message.content"
-            class="text-[16px] break-words whitespace-pre-wrap"
+            class="kv-md text-[16px] break-words"
             style="color: var(--kv-text-primary);"
-          >
-            <!-- Sprint V2: mention token içeriyorsa parça-render (XSS güvenli: v-for, v-text, innerHTML yok) -->
-            <template v-if="hasMentions">
-              <template v-for="(seg, i) in contentSegments" :key="i">
-                <span v-if="seg.kind === 'text'">{{ seg.text }}</span>
-                <span
-                  v-else
-                  class="inline-flex items-center px-1 rounded text-[14px] font-medium cursor-default"
-                  style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
-                >@{{ seg.username }}</span>
-              </template>
-            </template>
-            <template v-else>{{ message.content }}</template>
-            <!-- Takip mesajında (başlık yok) "(düzenlendi)" metni gövde sonrasında -->
+            v-html="renderedContent"
+          />
+          <!-- Takip mesajında (başlık yok) "(düzenlendi)" metni + pin rozeti gövde dışında -->
+          <template v-if="!isGroupStart && message.content">
             <span
-              v-if="message.editedAt && !isGroupStart"
+              v-if="message.editedAt"
               class="text-[11px] ml-1"
               style="color: var(--kv-text-muted);"
             >
               {{ t('message.edited') }}
             </span>
-            <!-- Takip mesajında pin rozeti -->
             <span
-              v-if="message.pinnedAt && !isGroupStart"
+              v-if="message.pinnedAt"
               class="text-[11px] ml-1 select-none"
               style="color: var(--kv-text-muted);"
               :title="t('message.pinnedMessages')"
             >
               📌
             </span>
-          </p>
+          </template>
           <!-- Yalnız ek (açıklamasız) -->
           <AttachmentView
             v-for="att in message.attachments"
