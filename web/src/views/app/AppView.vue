@@ -21,6 +21,7 @@ import FriendAddModal from '@/views/home/components/FriendAddModal.vue'
 import DmConversation from '@/views/home/components/DmConversation.vue'
 import DmProfilePanel from '@/views/home/components/DmProfilePanel.vue'
 import HomeTopBar from '../home/components/HomeTopBar.vue'
+import GuildTopBar from './components/GuildTopBar.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -243,14 +244,21 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
       
       <!-- ANA İÇERİK ALANI -->
       <template v-if="guildsStore.activeGuildId">
-        <div class="flex flex-col flex-1 min-w-0 overflow-hidden mb-4 rounded-[var(--kv-radius-lg)]">
-          <TopBar
-            :show-member-panel="showMemberPanel"
-            @toggle-members="showMemberPanel = !showMemberPanel"
-          />
-          <MessageArea />
+        <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
+          <!-- Tam genişlik üst header (sunucu adı + bildirim çanı) -->
+          <GuildTopBar />
+          <!-- Kanal bar + mesaj alanı + üye paneli yan yana -->
+          <div class="flex flex-1 min-w-0 overflow-hidden gap-4 mb-4">
+            <div class="flex flex-col flex-1 min-w-0 overflow-hidden rounded-[var(--kv-radius-lg)]">
+              <TopBar
+                :show-member-panel="showMemberPanel"
+                @toggle-members="showMemberPanel = !showMemberPanel"
+              />
+              <MessageArea />
+            </div>
+            <MemberPanel v-if="showMemberPanel" class="hidden xl:flex" />
+          </div>
         </div>
-        <MemberPanel v-if="showMemberPanel" class="hidden xl:flex" />
       </template>
 
       <template v-else>

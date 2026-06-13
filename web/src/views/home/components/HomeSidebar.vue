@@ -45,21 +45,6 @@ function onChatCreated(channelId: string) {
         {{ t('friends.title') }}
       </button>
 
-      <!-- Mesaj İstekleri -->
-      <button
-        class="w-full flex items-center gap-3 px-3 py-3 rounded-[var(--kv-radius-md)] text-[14px] font-medium transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-        :class="activeView === 'message-requests'
-          ? 'text-[var(--kv-text-primary)]'
-          : 'text-[var(--kv-text-secondary)] hover:text-[var(--kv-text-primary)]'"
-        :style="activeView === 'message-requests' ? 'background-color: var(--kv-accent-subtle);' : ''"
-        @click="emit('selectMessageRequests')"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
-          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-          <polyline points="22,6 12,13 2,6"/>
-        </svg>
-        {{ t('sidebar.messageRequests') }}
-      </button>
     </div>
 
     <!-- DM bölüm başlığı + Sohbet Başlat -->
