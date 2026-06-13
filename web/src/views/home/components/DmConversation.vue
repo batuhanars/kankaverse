@@ -17,6 +17,18 @@ import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import GroupManagePanel from './GroupManagePanel.vue'
 import type { DmChannelDto, MessageDto } from '@/types'
 
+// Yanıt state
+const replyingTo = ref<MessageDto | null>(null)
+
+function startReply(msg: MessageDto) {
+  replyingTo.value = msg
+  nextTick(() => dmTextareaEl.value?.focus())
+}
+
+function cancelReply() {
+  replyingTo.value = null
+}
+
 // Sprint 6.2: mesaj düzenleme / silme state
 interface EditState {
   messageId: string
@@ -246,8 +258,10 @@ function onFileSelected(e: Event) {
 
 async function onAttachmentSent({ attachmentId, caption }: { attachmentId: string; caption: string }) {
   composeFile.value = null
+  const replyId = replyingTo.value?.id
+  replyingTo.value = null
   try {
-    const { data } = await messagesApi.send(props.channel.id, caption, undefined, [attachmentId])
+    const { data } = await messagesApi.send(props.channel.id, caption, replyId, [attachmentId])
     messagesStore.appendMessage(data)
   } catch {
     // hata sessizce yutulur — modal zaten kapandı
@@ -264,8 +278,10 @@ async function send() {
   sending.value = true
   const text = content.value.trim()
   content.value = ''
+  const replyId = replyingTo.value?.id
+  replyingTo.value = null
   try {
-    const { data } = await messagesApi.send(props.channel.id, text)
+    const { data } = await messagesApi.send(props.channel.id, text, replyId)
     messagesStore.appendMessage(data)
   } catch (e: unknown) {
     content.value = text
@@ -522,6 +538,21 @@ onUnmounted(() => {
                   {{ msg.author.username }}
                 </span>
               </div>
+              <!-- Yanıt alıntısı (grup başkasının mesajı) -->
+              <div
+                v-if="msg.replyToId"
+                class="flex items-center gap-1.5 mb-1 pl-2 text-[12px] max-w-[280px] truncate cursor-default"
+                style="border-left: 2px solid var(--kv-text-muted); color: var(--kv-text-muted);"
+              >
+                <span class="shrink-0">↩</span>
+                <template v-if="msg.replyTo">
+                  <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">{{ msg.replyTo.authorUsername }}</span>
+                  <span class="truncate">{{ msg.replyTo.content }}</span>
+                </template>
+                <template v-else>
+                  <span class="italic">{{ t('reply.deleted') }}</span>
+                </template>
+              </div>
               <!-- Baloncuk + ekler (aynı flex col içinde) -->
               <!-- Ek+açıklama → tek birim; yalnız ek → sadece ek; yalnız metin → baloncuk -->
               <template v-if="msg.attachments?.length && msg.content">
@@ -639,6 +670,14 @@ onUnmounted(() => {
               <button
                 class="text-[11px] cursor-pointer px-1 py-0.5 rounded transition-colors hover:bg-[var(--kv-bg-sidebar)]"
                 style="color: var(--kv-text-muted);"
+                :title="t('reply.button')"
+                @click.stop="startReply(msg)"
+              >
+                ↩ {{ t('reply.button') }}
+              </button>
+              <button
+                class="text-[11px] cursor-pointer px-1 py-0.5 rounded transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+                style="color: var(--kv-text-muted);"
                 :title="t('report.reportMessage')"
                 @click="openReportMessage(msg.id)"
               >
@@ -687,6 +726,22 @@ onUnmounted(() => {
               </div>
             </template>
             <template v-else>
+              <!-- Yanıt alıntısı (DM / kendi mesajı) -->
+              <div
+                v-if="msg.replyToId"
+                class="flex items-center gap-1.5 mb-1 pl-2 text-[12px] max-w-[280px] truncate cursor-default"
+                :class="isMine(msg) ? 'self-end' : 'self-start'"
+                style="border-left: 2px solid var(--kv-text-muted); color: var(--kv-text-muted);"
+              >
+                <span class="shrink-0">↩</span>
+                <template v-if="msg.replyTo">
+                  <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">{{ msg.replyTo.authorUsername }}</span>
+                  <span class="truncate">{{ msg.replyTo.content }}</span>
+                </template>
+                <template v-else>
+                  <span class="italic">{{ t('reply.deleted') }}</span>
+                </template>
+              </div>
               <!-- Ek+açıklama → tek birim; yalnız ek → sadece ek; yalnız metin → baloncuk -->
               <template v-if="msg.attachments?.length && msg.content">
                 <!-- Birleşik: ek üstte, açıklama altında, tek kapsayıcı — saat baloncuk içinde sağ-alt -->
@@ -819,6 +874,15 @@ onUnmounted(() => {
                 <EmojiPicker @select="(emoji) => pickDmEmoji(msg, emoji)" />
               </div>
             </div>
+            <!-- Yanıtla (tüm mesajlar) -->
+            <button
+              class="text-[11px] cursor-pointer px-1 py-0.5 rounded transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+              style="color: var(--kv-text-muted);"
+              :title="t('reply.button')"
+              @click.stop="startReply(msg)"
+            >
+              ↩ {{ t('reply.button') }}
+            </button>
             <!-- Kendi mesajı: düzenle (metin varsa) + sil -->
             <template v-if="isMine(msg)">
               <button
@@ -903,8 +967,28 @@ onUnmounted(() => {
             @change="onFileSelected"
           />
 
+          <!-- Yanıt önizleme bandı -->
           <div
-            class="flex items-end gap-2 px-4 rounded-[var(--kv-radius-md)] border"
+            v-if="replyingTo"
+            class="flex items-center gap-2 px-3 py-1.5 rounded-t-[var(--kv-radius-sm)] text-[12px] truncate"
+            style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle); border-bottom: none;"
+          >
+            <span class="shrink-0" style="color: var(--kv-text-muted);">↩</span>
+            <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">{{ t('reply.to', { author: replyingTo.author.username }) }}</span>
+            <span class="truncate" style="color: var(--kv-text-muted);">— {{ replyingTo.content }}</span>
+            <button
+              class="shrink-0 ml-auto cursor-pointer hover:opacity-80 transition-opacity"
+              style="color: var(--kv-text-muted);"
+              :title="t('reply.cancel')"
+              @click="cancelReply"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div
+            class="flex items-end gap-2 px-4 border"
+            :class="replyingTo ? 'rounded-b-[var(--kv-radius-md)]' : 'rounded-[var(--kv-radius-md)]'"
             style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
           >
             <button

@@ -180,11 +180,18 @@ export interface ReactionDto {
   reactedByMe: boolean
 }
 
+export interface ReplyPreviewDto {
+  id: string
+  content: string
+  authorUsername: string
+}
+
 export interface MessageDto {
   id: string
   channelId: string
   content: string
   replyToId: string | null
+  replyTo?: ReplyPreviewDto | null
   author: {
     id: string
     username: string

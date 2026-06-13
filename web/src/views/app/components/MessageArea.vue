@@ -9,6 +9,7 @@ import { messagesApi } from '@/api/messages'
 import MessageItem from '@/components/shared/MessageItem.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
+import type { MessageDto } from '@/types'
 
 const { t } = useI18n()
 const messagesStore = useMessagesStore()
@@ -30,6 +31,18 @@ const slowModeSeconds = ref<number | null>(null)
 
 // Sprint 5 R1 — modal akışı (inline çentik kaldırıldı)
 const composeFile = ref<File | null>(null)
+
+// Yanıt state
+const replyingTo = ref<MessageDto | null>(null)
+
+function setReplyingTo(msg: MessageDto) {
+  replyingTo.value = msg
+  nextTick(() => textareaEl.value?.focus())
+}
+
+function cancelReply() {
+  replyingTo.value = null
+}
 
 const channelId = computed(() => channelsStore.activeChannelId)
 const messages = computed(() =>
@@ -139,8 +152,10 @@ async function onAttachmentSent({ attachmentId, caption }: { attachmentId: strin
   if (!channelId.value) return
   composeFile.value = null
   slowModeSeconds.value = null
+  const replyId = replyingTo.value?.id
+  replyingTo.value = null
   try {
-    const { data } = await messagesApi.send(channelId.value, caption, undefined, [attachmentId])
+    const { data } = await messagesApi.send(channelId.value, caption, replyId, [attachmentId])
     messagesStore.appendMessage(data)
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string; message?: string; retryAfter?: number } } }
@@ -168,8 +183,10 @@ async function send() {
   sending.value = true
   const text = content.value.trim()
   content.value = ''
+  const replyId = replyingTo.value?.id
+  replyingTo.value = null
   try {
-    const { data } = await messagesApi.send(channelId.value, text)
+    const { data } = await messagesApi.send(channelId.value, text, replyId)
     // Yerel eko: WS broadcast'i beklemeden gönderenin ekranına yaz. appendMessage
     // id'ye göre dedup yapar (messages.ts:35) → broadcast geldiğinde çiftlemez.
     messagesStore.appendMessage(data)
@@ -234,7 +251,7 @@ function onKeydown(e: KeyboardEvent) {
           {{ t('message.noMessages') }}
         </p>
 
-        <MessageItem v-for="msg in messages" :key="msg.id" :message="msg" />
+        <MessageItem v-for="msg in messages" :key="msg.id" :message="msg" @reply="setReplyingTo" />
       </template>
     </div>
 
@@ -256,8 +273,28 @@ function onKeydown(e: KeyboardEvent) {
         {{ typingLabel }}
       </div>
 
+      <!-- Yanıt önizleme bandı -->
       <div
-        class="flex items-end gap-2 px-4 rounded-[var(--kv-radius-md)] border"
+        v-if="replyingTo"
+        class="flex items-center gap-2 px-3 py-1.5 mb-1 rounded-t-[var(--kv-radius-sm)] text-[12px] truncate"
+        style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle); border-bottom: none;"
+      >
+        <span class="shrink-0" style="color: var(--kv-text-muted);">↩</span>
+        <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">{{ t('reply.to', { author: replyingTo.author.username }) }}</span>
+        <span class="truncate" style="color: var(--kv-text-muted);">— {{ replyingTo.content }}</span>
+        <button
+          class="shrink-0 ml-auto cursor-pointer hover:opacity-80 transition-opacity"
+          style="color: var(--kv-text-muted);"
+          :title="t('reply.cancel')"
+          @click="cancelReply"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div
+        class="flex items-end gap-2 px-4 border"
+        :class="replyingTo ? 'rounded-b-[var(--kv-radius-md)]' : 'rounded-[var(--kv-radius-md)]'"
         style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
       >
         <!-- Gizli dosya input -->

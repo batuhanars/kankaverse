@@ -322,6 +322,14 @@
     "toggleTitle": "Reaksiyonu değiştir",
     "morePicker": "Daha fazla emoji"
   },
+  "reply": {
+    "button": "Yanıtla",
+    "previewLabel": "yanıt",
+    "to": "{author}'a yanıt",
+    "snippet": "{author}'a yanıt — {snippet}",
+    "cancel": "İptal",
+    "deleted": "Silinen mesaj"
+  },
   "message": {
     "inputPlaceholder": "#{channel} kanalına mesaj yaz",
     "emojiButton": "Emoji ekle",
