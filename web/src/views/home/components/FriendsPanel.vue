@@ -7,6 +7,8 @@ import { useFriendsStore } from '@/stores/friends'
 import { useDmStore } from '@/stores/dm'
 import KvButton from '@/components/ui/KvButton.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import PresenceDot from '@/components/shared/PresenceDot.vue'
+import { usePresenceStore } from '@/stores/presence'
 
 const props = defineProps<{ initialTab?: 'all' | 'pending' | 'blocked' | 'add' }>()
 const emit = defineEmits<{ openDm: [channelId: string]; logout: [] }>()
@@ -15,6 +17,7 @@ const { t } = useI18n()
 const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
 const dmStore = useDmStore()
+const presenceStore = usePresenceStore()
 
 type Tab = 'all' | 'pending' | 'blocked' | 'add'
 const activeTab = ref<Tab>(props.initialTab ?? 'all')
@@ -214,12 +217,19 @@ async function openDm(userId: string) {
           <div
             class="group relative flex items-center gap-3 mx-2 px-3 py-3 rounded-[var(--kv-radius-md)] hover:bg-[var(--kv-bg-elevated)]"
           >
-            <!-- Avatar -->
-            <div class="w-10 h-10 rounded-full shrink-0 overflow-hidden" style="background-color: var(--kv-bg-elevated);">
-              <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
-              <span v-else class="w-full h-full flex items-center justify-center text-[14px] font-semibold" style="color: var(--kv-text-secondary);">
-                {{ f.user.username[0].toUpperCase() }}
-              </span>
+            <!-- Avatar + presence noktası -->
+            <div class="relative shrink-0">
+              <div class="w-10 h-10 rounded-full overflow-hidden" style="background-color: var(--kv-bg-elevated);">
+                <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
+                <span v-else class="w-full h-full flex items-center justify-center text-[14px] font-semibold" style="color: var(--kv-text-secondary);">
+                  {{ f.user.username[0].toUpperCase() }}
+                </span>
+              </div>
+              <PresenceDot
+                :status="presenceStore.getStatus(f.user.id)"
+                border-color="var(--kv-bg-content)"
+                class="absolute bottom-0 right-0 w-3 h-3"
+              />
             </div>
 
             <!-- Ad + durum -->
@@ -227,8 +237,13 @@ async function openDm(userId: string) {
               <p class="text-[14px] font-semibold truncate" style="color: var(--kv-text-primary);">
                 {{ f.user.username }}
               </p>
-              <p class="text-[12px]" style="color: var(--kv-text-muted);">
-                {{ t('friends.statusOffline') }}
+              <p class="text-[12px]" :style="`color: ${
+                presenceStore.getStatus(f.user.id) === 'online'  ? 'var(--kv-online)'  :
+                presenceStore.getStatus(f.user.id) === 'away'    ? 'var(--kv-idle)'    :
+                presenceStore.getStatus(f.user.id) === 'dnd'     ? 'var(--kv-dnd)'     :
+                                                                    'var(--kv-text-muted)'
+              };`">
+                {{ t(`presence.${presenceStore.getStatus(f.user.id) === 'offline' ? 'offline' : presenceStore.getStatus(f.user.id)}`) }}
               </p>
             </div>
 

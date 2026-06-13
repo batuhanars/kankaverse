@@ -3,6 +3,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFriendsStore } from '@/stores/friends'
 import { useDmStore } from '@/stores/dm'
+import { usePresenceStore } from '@/stores/presence'
+import PresenceDot from '@/components/shared/PresenceDot.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 
 const props = defineProps<{ initialTab?: 'all' | 'pending' | 'blocked' }>()
@@ -11,6 +13,7 @@ const emit = defineEmits<{ addFriend: []; openDm: [channelId: string] }>()
 const { t } = useI18n()
 const friendsStore = useFriendsStore()
 const dmStore = useDmStore()
+const presenceStore = usePresenceStore()
 
 type Tab = 'all' | 'pending' | 'blocked'
 const activeTab = ref<Tab>(props.initialTab ?? 'all')
@@ -28,6 +31,26 @@ onMounted(() =>
 const incomingRequests = computed(() => friendsStore.requests.filter((r) => r.direction === 'incoming'))
 const outgoingRequests = computed(() => friendsStore.requests.filter((r) => r.direction === 'outgoing'))
 const pendingCount = computed(() => incomingRequests.value.length)
+
+const onlineFriends = computed(() =>
+  friendsStore.friends.filter((f) => presenceStore.getStatus(f.user.id) !== 'offline'),
+)
+const offlineFriends = computed(() =>
+  friendsStore.friends.filter((f) => presenceStore.getStatus(f.user.id) === 'offline'),
+)
+
+function presenceStatusLabel(userId: string): string {
+  const status = presenceStore.getStatus(userId)
+  return t(`presence.${status}`)
+}
+
+function presenceStatusColor(userId: string): string {
+  const status = presenceStore.getStatus(userId)
+  if (status === 'online') return 'var(--kv-online)'
+  if (status === 'away') return 'var(--kv-idle)'
+  if (status === 'dnd') return 'var(--kv-dnd)'
+  return 'var(--kv-text-muted)'
+}
 
 async function openDm(userId: string) {
   openMenuId.value = null
@@ -102,82 +125,177 @@ async function runConfirm() {
         >{{ t('friends.noFriends') }}</p>
 
         <template v-else>
-          <p
-            class="px-4 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-widest"
-            style="color: var(--kv-text-muted);"
-          >
-            {{ t('home.offlineSection', { count: friendsStore.friends.length }) }}
-          </p>
-
-          <div
-            v-for="f in friendsStore.friends"
-            :key="f.friendshipId"
-            class="group relative flex items-center gap-2.5 px-3 mx-1 py-2.5 rounded-[var(--kv-radius-md)] hover:bg-[var(--kv-bg-elevated)]"
-          >
-            <!-- Avatar -->
-            <div
-              class="w-8 h-8 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-bold text-white"
-              style="background-color: var(--kv-accent-500);"
+          <!-- Çevrimiçi grup -->
+          <template v-if="onlineFriends.length">
+            <p
+              class="px-4 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-widest"
+              style="color: var(--kv-text-muted);"
             >
-              <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
-              <span v-else>{{ f.user.username[0].toUpperCase() }}</span>
-            </div>
-
-            <!-- Ad + durum -->
-            <div class="flex-1 min-w-0 cursor-pointer" @click="openDm(f.user.id)">
-              <p class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</p>
-              <p class="text-[11px]" style="color: var(--kv-text-muted);">{{ t('friends.statusOffline') }}</p>
-            </div>
-
-            <!-- Hover aksiyonlar -->
+              {{ t('home.onlineSection', { count: onlineFriends.length }) }}
+            </p>
             <div
-              class="flex items-center gap-1 shrink-0 transition-opacity"
-              :class="openMenuId === f.friendshipId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
+              v-for="f in onlineFriends"
+              :key="f.friendshipId"
+              class="group relative flex items-center gap-2.5 px-3 mx-1 py-2.5 rounded-[var(--kv-radius-md)] hover:bg-[var(--kv-bg-elevated)]"
             >
-              <button
-                class="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer hover:bg-[var(--kv-bg-content)]"
-                style="color: var(--kv-text-secondary);"
-                :disabled="dmLoading === f.user.id"
-                @click.stop="openDm(f.user.id)"
+              <!-- Avatar + presence noktası -->
+              <div class="relative shrink-0">
+                <div
+                  class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-[12px] font-bold text-white"
+                  style="background-color: var(--kv-accent-500);"
+                >
+                  <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
+                  <span v-else>{{ f.user.username[0].toUpperCase() }}</span>
+                </div>
+                <PresenceDot
+                  :status="presenceStore.getStatus(f.user.id)"
+                  border-color="var(--kv-bg-sidebar)"
+                  class="absolute bottom-0 right-0 w-2.5 h-2.5"
+                />
+              </div>
+
+              <!-- Ad + durum -->
+              <div class="flex-1 min-w-0 cursor-pointer" @click="openDm(f.user.id)">
+                <p class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</p>
+                <p class="text-[11px]" :style="{ color: presenceStatusColor(f.user.id) }">{{ presenceStatusLabel(f.user.id) }}</p>
+              </div>
+
+              <!-- Hover aksiyonlar -->
+              <div
+                class="flex items-center gap-1 shrink-0 transition-opacity"
+                :class="openMenuId === f.friendshipId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
-              </button>
-              <div class="relative">
                 <button
                   class="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer hover:bg-[var(--kv-bg-content)]"
                   style="color: var(--kv-text-secondary);"
-                  @click.stop="openMenuId = openMenuId === f.friendshipId ? null : f.friendshipId"
+                  :disabled="dmLoading === f.user.id"
+                  @click.stop="openDm(f.user.id)"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                   </svg>
                 </button>
-                <div
-                  v-if="openMenuId === f.friendshipId"
-                  class="absolute right-0 top-full mt-1 w-44 rounded-[var(--kv-radius-md)] border py-1 z-20"
-                  style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle); box-shadow: 0 4px 16px rgba(0,0,0,0.3);"
-                >
+                <div class="relative">
                   <button
-                    class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
-                    style="color: var(--kv-text-primary);"
-                    @click.stop="openDm(f.user.id)"
-                  >{{ t('friends.dm') }}</button>
-                  <button
-                    class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
-                    style="color: var(--kv-text-primary);"
-                    @click.stop="openConfirm(t('friends.confirmRemove'), () => friendsStore.removeFriend(f.user.id))"
-                  >{{ t('friends.remove') }}</button>
-                  <button
-                    class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
-                    style="color: var(--kv-danger);"
-                    @click.stop="openConfirm(t('friends.confirmBlock'), () => friendsStore.blockUser(f.user.id))"
-                  >{{ t('friends.block') }}</button>
+                    class="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer hover:bg-[var(--kv-bg-content)]"
+                    style="color: var(--kv-text-secondary);"
+                    @click.stop="openMenuId = openMenuId === f.friendshipId ? null : f.friendshipId"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
+                    </svg>
+                  </button>
+                  <div
+                    v-if="openMenuId === f.friendshipId"
+                    class="absolute right-0 top-full mt-1 w-44 rounded-[var(--kv-radius-md)] border py-1 z-20"
+                    style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle); box-shadow: 0 4px 16px rgba(0,0,0,0.3);"
+                  >
+                    <button
+                      class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
+                      style="color: var(--kv-text-primary);"
+                      @click.stop="openDm(f.user.id)"
+                    >{{ t('friends.dm') }}</button>
+                    <button
+                      class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
+                      style="color: var(--kv-text-primary);"
+                      @click.stop="openConfirm(t('friends.confirmRemove'), () => friendsStore.removeFriend(f.user.id))"
+                    >{{ t('friends.remove') }}</button>
+                    <button
+                      class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
+                      style="color: var(--kv-danger);"
+                      @click.stop="openConfirm(t('friends.confirmBlock'), () => friendsStore.blockUser(f.user.id))"
+                    >{{ t('friends.block') }}</button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </template>
+
+          <!-- Çevrimdışı grup -->
+          <template v-if="offlineFriends.length">
+            <p
+              class="px-4 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-widest"
+              style="color: var(--kv-text-muted);"
+            >
+              {{ t('home.offlineSection', { count: offlineFriends.length }) }}
+            </p>
+            <div
+              v-for="f in offlineFriends"
+              :key="f.friendshipId"
+              class="group relative flex items-center gap-2.5 px-3 mx-1 py-2.5 rounded-[var(--kv-radius-md)] hover:bg-[var(--kv-bg-elevated)]"
+            >
+              <!-- Avatar + presence noktası -->
+              <div class="relative shrink-0">
+                <div
+                  class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-[12px] font-bold text-white"
+                  style="background-color: var(--kv-accent-500);"
+                >
+                  <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
+                  <span v-else>{{ f.user.username[0].toUpperCase() }}</span>
+                </div>
+                <PresenceDot
+                  :status="presenceStore.getStatus(f.user.id)"
+                  border-color="var(--kv-bg-sidebar)"
+                  class="absolute bottom-0 right-0 w-2.5 h-2.5"
+                />
+              </div>
+
+              <!-- Ad + durum -->
+              <div class="flex-1 min-w-0 cursor-pointer" @click="openDm(f.user.id)">
+                <p class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</p>
+                <p class="text-[11px]" style="color: var(--kv-text-muted);">{{ presenceStatusLabel(f.user.id) }}</p>
+              </div>
+
+              <!-- Hover aksiyonlar -->
+              <div
+                class="flex items-center gap-1 shrink-0 transition-opacity"
+                :class="openMenuId === f.friendshipId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
+              >
+                <button
+                  class="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer hover:bg-[var(--kv-bg-content)]"
+                  style="color: var(--kv-text-secondary);"
+                  :disabled="dmLoading === f.user.id"
+                  @click.stop="openDm(f.user.id)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </button>
+                <div class="relative">
+                  <button
+                    class="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer hover:bg-[var(--kv-bg-content)]"
+                    style="color: var(--kv-text-secondary);"
+                    @click.stop="openMenuId = openMenuId === f.friendshipId ? null : f.friendshipId"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
+                    </svg>
+                  </button>
+                  <div
+                    v-if="openMenuId === f.friendshipId"
+                    class="absolute right-0 top-full mt-1 w-44 rounded-[var(--kv-radius-md)] border py-1 z-20"
+                    style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle); box-shadow: 0 4px 16px rgba(0,0,0,0.3);"
+                  >
+                    <button
+                      class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
+                      style="color: var(--kv-text-primary);"
+                      @click.stop="openDm(f.user.id)"
+                    >{{ t('friends.dm') }}</button>
+                    <button
+                      class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
+                      style="color: var(--kv-text-primary);"
+                      @click.stop="openConfirm(t('friends.confirmRemove'), () => friendsStore.removeFriend(f.user.id))"
+                    >{{ t('friends.remove') }}</button>
+                    <button
+                      class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
+                      style="color: var(--kv-danger);"
+                      @click.stop="openConfirm(t('friends.confirmBlock'), () => friendsStore.blockUser(f.user.id))"
+                    >{{ t('friends.block') }}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
         </template>
       </template>
 

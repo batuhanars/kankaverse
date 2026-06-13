@@ -305,6 +305,7 @@
     "myOrtamlar": "Ortamların",
     "noOrtam": "Henüz bir ortamda değilsin.",
     "addFriendBtn": "+ Yeni Kanka Ekle",
+    "onlineSection": "Çevrimiçi — {count}",
     "offlineSection": "Çevrimdışı — {count}"
   },
   "dm": {
@@ -335,7 +336,10 @@
   },
   "notifications": {
     "title": "Bildirimler",
-    "empty": "Henüz bildirim yok."
+    "empty": "Henüz bildirim yok.",
+    "friend_request": "{username} sana kankalık isteği gönderdi.",
+    "friend_accept": "{username} kankalık isteğini kabul etti.",
+    "friend_remove": "Bir kullanıcı seni kanka listesinden çıkardı."
   },
   "common": {
     "cancel": "İptal",
@@ -350,9 +354,11 @@
     "logout": "Çıkış Yap"
   },
   "presence": {
-    "online": "çevrimiçi",
+    "online": "Çevrimiçi",
+    "away": "Boşta",
+    "dnd": "Rahatsız Etme",
+    "offline": "Çevrimdışı",
     "idle": "boşta",
-    "dnd": "rahatsız etme",
     "invisible": "görünmez"
   },
   "userCard": {
@@ -372,6 +378,7 @@
     "yesterday": "Dün"
   },
   "typing": {
+    "simple": "yazıyor…",
     "one": "{user} yazıyor…",
     "two": "{user1} ve {user2} yazıyor…",
     "many": "Birkaç kişi yazıyor…"

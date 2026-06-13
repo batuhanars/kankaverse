@@ -1,36 +1,48 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
+import { useSocket } from '@/composables/useSocket'
 import { onClickOutside } from '@vueuse/core'
 
 const emit = defineEmits<{ logout: [] }>()
 const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
+const presenceStore = usePresenceStore()
+const { setPresence } = useSocket()
 
 const cardRef = ref<HTMLElement | null>(null)
 const showPopover = ref(false)
 
 onClickOutside(cardRef, () => { showPopover.value = false })
 
-type Presence = 'online' | 'idle' | 'dnd' | 'invisible'
-const currentPresence = ref<Presence>('online')
+// Seçilebilir durumlar (offline/invisible → yalnız disconnect ile; kullanıcı seçemez)
+type SelectableStatus = 'online' | 'away' | 'dnd'
 
-const presenceOptions: { key: Presence; color: string }[] = [
-  { key: 'online',    color: '#3DB46E' },
-  { key: 'idle',      color: '#E8A33D' },
-  { key: 'dnd',       color: '#F23B4B' },
-  { key: 'invisible', color: '#6E675E' },
+const presenceOptions: { key: SelectableStatus; color: string }[] = [
+  { key: 'online', color: '#3DB46E' },
+  { key: 'away',   color: '#E8A33D' },
+  { key: 'dnd',    color: '#F23B4B' },
 ]
 
-function presenceColor(p: Presence) {
-  return presenceOptions.find(o => o.key === p)?.color ?? '#6E675E'
+// Mevcut durum: presenceStore'dan okunur (backend snapshot/update gelince güncellenir)
+const currentPresence = computed<PresenceStatus>(() => presenceStore.myStatus)
+
+function presenceColor(p: PresenceStatus) {
+  if (p === 'online')  return '#3DB46E'
+  if (p === 'away')    return '#E8A33D'
+  if (p === 'dnd')     return '#F23B4B'
+  return '#6E675E'
 }
 
-function selectPresence(p: Presence) {
-  currentPresence.value = p
+function selectPresence(p: SelectableStatus) {
+  setPresence(p)
+  // Optimistik güncelleme: backend event gelmeden önce UI'ı anında göster
+  const myId = authStore.user?.id
+  if (myId) presenceStore.applyUpdate(myId, p)
 }
 
 function goToSettings() {
@@ -94,6 +106,7 @@ function onLogout() {
           <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="`background-color: ${opt.color};`" />
           <span class="text-[13px]" style="color: var(--kv-text-primary);">{{ t(`presence.${opt.key}`) }}</span>
         </button>
+
       </div>
 
       <!-- V2 ses kontrolleri (devre dışı) -->

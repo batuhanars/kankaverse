@@ -2,6 +2,8 @@ import { ref, onUnmounted } from 'vue'
 import { io, type Socket } from 'socket.io-client'
 import { useMessagesStore } from '@/stores/messages'
 import { useFriendsStore } from '@/stores/friends'
+import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
+import { useNotificationsStore } from '@/stores/notifications'
 import { getAccessToken } from '@/api/axios'
 import {
   _bindTypingEmitters,
@@ -20,6 +22,8 @@ export function useSocket() {
   const connected = ref(false)
   const messagesStore = useMessagesStore()
   const friendsStore = useFriendsStore()
+  const presenceStore = usePresenceStore()
+  const notificationsStore = useNotificationsStore()
 
   function _joinRoom(channelId: string) {
     socket?.emit('channel:join', { channelId }, (ack: { ok: boolean; error?: string }) => {
@@ -73,14 +77,37 @@ export function useSocket() {
 
     socket.on('friend.request', (request: FriendRequestDto) => {
       friendsStore.wsAddIncomingRequest(request)
+      notificationsStore.push({
+        type: 'friend_request',
+        user: request.user,
+        at: new Date().toISOString(),
+      })
     })
 
     socket.on('friend.accept', (friend: FriendDto) => {
       friendsStore.wsHandleAccepted(friend)
+      notificationsStore.push({
+        type: 'friend_accept',
+        user: friend.user,
+        at: new Date().toISOString(),
+      })
     })
 
     socket.on('friend.remove', (data: { userId: string }) => {
       friendsStore.wsHandleRemoved(data.userId)
+      notificationsStore.push({
+        type: 'friend_remove',
+        user: undefined,
+        at: new Date().toISOString(),
+      })
+    })
+
+    socket.on('presence:snapshot', (payload: { states: Array<{ userId: string; status: PresenceStatus }> }) => {
+      presenceStore.applySnapshot(payload.states)
+    })
+
+    socket.on('presence:update', (payload: { userId: string; status: PresenceStatus }) => {
+      presenceStore.applyUpdate(payload.userId, payload.status)
     })
 
     socket.on('typing:update', (data: { userId: string; username: string; channelId: string }) => {
@@ -137,9 +164,13 @@ export function useSocket() {
     clearTypingForChannel(channelId)
   }
 
+  function setPresence(status: PresenceStatus) {
+    socket?.emit('presence:set', { status })
+  }
+
   onUnmounted(() => {
     // intentionally empty — disconnect AppView'dan yönetiliyor
   })
 
-  return { connected, connect, disconnect, joinChannel, leaveChannel }
+  return { connected, connect, disconnect, joinChannel, leaveChannel, setPresence }
 }

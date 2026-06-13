@@ -126,17 +126,22 @@ export function useTyping(getChannelId: () => string | null | undefined) {
 
 /**
  * Yazıyor metni oluşturur (i18n key'lerini dışarıdan alır).
+ * opts.named = false → isim/sayı kullanılmaz, her zaman t('typing.simple') döner (DM modu).
+ * opts.named = true (varsayılan) → guild davranışı: isimli etiketler.
  * Dönen değer: null | string
  */
 export function useTypingLabel(
   getChannelId: () => string | null | undefined,
   t: (key: string, params?: Record<string, string>) => string,
+  opts?: { named?: boolean },
 ) {
+  const named = opts?.named !== false // varsayılan true
   const label = computed(() => {
     const channelId = getChannelId()
     if (!channelId) return null
     const users = typingByChannel.value[channelId] ?? []
     if (users.length === 0) return null
+    if (!named) return t('typing.simple')
     if (users.length === 1) return t('typing.one', { user: users[0].username })
     if (users.length === 2) return t('typing.two', { user1: users[0].username, user2: users[1].username })
     return t('typing.many')

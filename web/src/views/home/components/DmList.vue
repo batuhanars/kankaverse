@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useDmStore } from '@/stores/dm'
+import { usePresenceStore } from '@/stores/presence'
+import { useTyping } from '@/composables/useTyping'
+import PresenceDot from '@/components/shared/PresenceDot.vue'
 
 defineProps<{ activeChannelId: string | null }>()
 const emit = defineEmits<{ select: [channelId: string] }>()
 
 const { t } = useI18n()
 const dmStore = useDmStore()
+const presenceStore = usePresenceStore()
+const { typingUsersForChannel } = useTyping(() => null)
 
 function truncate(text: string, max = 40) {
   return text.length > max ? text.slice(0, max) + '…' : text
@@ -41,10 +46,18 @@ function truncate(text: string, max = 40) {
             {{ ch.otherUser.username[0].toUpperCase() }}
           </span>
         </div>
+        <!-- Okunmamış rozet -->
         <span
           v-if="ch.unread"
           class="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2"
           style="background-color: var(--kv-accent-500); border-color: var(--kv-bg-sidebar);"
+        />
+        <!-- Presence noktası (okunmamış rozet yoksa) -->
+        <PresenceDot
+          v-else
+          :status="presenceStore.getStatus(ch.otherUser.id)"
+          border-color="var(--kv-bg-sidebar)"
+          class="absolute bottom-0 right-0 w-2.5 h-2.5"
         />
       </div>
 
@@ -55,7 +68,14 @@ function truncate(text: string, max = 40) {
         >
           {{ ch.otherUser.username }}
         </p>
-        <p v-if="ch.lastMessage" class="text-[12px] truncate" style="color: var(--kv-text-muted);">
+        <p
+          v-if="typingUsersForChannel(ch.id).length > 0"
+          class="text-[12px] truncate italic"
+          style="color: var(--kv-accent-500);"
+        >
+          {{ t('typing.simple') }}
+        </p>
+        <p v-else-if="ch.lastMessage" class="text-[12px] truncate" style="color: var(--kv-text-muted);">
           {{ truncate(ch.lastMessage.content) }}
         </p>
       </div>

@@ -27,7 +27,7 @@ const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
 const { joinChannel, leaveChannel } = useSocket()
 const { onInput: onTypingInput, stopTyping } = useTyping(() => props.channelId)
-const { label: typingLabel } = useTypingLabel(() => props.channelId, t)
+const { label: typingLabel } = useTypingLabel(() => props.channelId, t, { named: false })
 
 const content = ref('')
 const sending = ref(false)
