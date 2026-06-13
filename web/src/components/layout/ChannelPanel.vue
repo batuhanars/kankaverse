@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useAuthStore } from '@/stores/auth'
-import { useSocket } from '@/composables/useSocket'
 import GuildSettingsModal from '@/views/app/components/GuildSettingsModal.vue'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
@@ -13,10 +13,10 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import type { ChannelDto } from '@/types'
 
 const { t } = useI18n()
+const router = useRouter()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const authStore = useAuthStore()
-const { joinChannel, leaveChannel } = useSocket()
 
 const showSettings = ref(false)
 
@@ -26,13 +26,11 @@ const isOwner = computed(() => {
   return guild.ownerId === authStore.user.id
 })
 
-async function selectChannel(channel: ChannelDto) {
-  const prev = channelsStore.activeChannelId
-  if (prev && prev !== channel.id) {
-    leaveChannel(prev)
-  }
-  channelsStore.setActiveChannel(channel.id)
-  await joinChannel(channel.id)
+function selectChannel(channel: ChannelDto) {
+  const guildId = guildsStore.activeGuildId
+  if (!guildId) return
+  // AppView'daki syncFromRoute join/leave socket işlemlerini yapar
+  router.push({ name: 'channel', params: { guildId, channelId: channel.id } })
 }
 
 // ── Kanal oluştur ──

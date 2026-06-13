@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import type { GuildDto } from '@/types'
@@ -11,21 +12,26 @@ defineProps<{
 }>()
 
 const { t } = useI18n()
+const router = useRouter()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 
-// Marka/home: guild seçimini temizle → boş landing'e dön (Sprint 3+ DM/home girişi olacak)
 function goHome() {
-  guildsStore.setActiveGuild(null)
-  channelsStore.setActiveChannel(null)
+  router.push({ name: 'app' })
 }
 
 async function selectGuild(guild: GuildDto) {
-  guildsStore.setActiveGuild(guild.id)
-  await channelsStore.fetchChannels(guild.id)
+  // Kanallar yüklü değilse önce fetch et
+  if (!channelsStore.channelsForGuild(guild.id).length) {
+    await channelsStore.fetchChannels(guild.id)
+  }
   const channels = channelsStore.channelsForGuild(guild.id)
   if (channels.length > 0) {
-    channelsStore.setActiveChannel(channels[0].id)
+    router.push({ name: 'channel', params: { guildId: guild.id, channelId: channels[0].id } })
+  } else {
+    // Kanal yok — guild'i aktif yap ama kanal route'u açma
+    guildsStore.setActiveGuild(guild.id)
+    channelsStore.setActiveChannel(null)
   }
 }
 
