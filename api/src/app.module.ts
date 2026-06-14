@@ -18,6 +18,7 @@ import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { CategoriesModule } from './modules/categories/categories.module';
+import { VoiceModule } from './modules/voice/voice.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -40,6 +41,7 @@ import configuration from './config/configuration';
     ReportsModule,
     ModerationModule,
     CategoriesModule,
+    VoiceModule,
   ],
   providers: [
     {

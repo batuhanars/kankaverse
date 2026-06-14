@@ -43,6 +43,17 @@ export default () => {
     throw new Error(`FATAL: Production ortamında 'TOTP_ENC_KEY' zorunludur.`);
   }
 
+  // LiveKit (ses kanalları): prod'da üçü de zorunlu (fail-fast); dev'de yoksa ses devre dışı (503).
+  if (process.env.NODE_ENV === 'production') {
+    for (const key of ['LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET', 'LIVEKIT_URL'] as const) {
+      if (!process.env[key]) {
+        throw new Error(
+          `FATAL: Production ortamında LiveKit değişkeni '${key}' zorunludur. Ses kanalları çalışmaz.`,
+        );
+      }
+    }
+  }
+
   return {
     port: parseInt(process.env.PORT ?? '3001', 10),
     database: {
@@ -63,6 +74,12 @@ export default () => {
     totp: {
       encKey: process.env.TOTP_ENC_KEY,
       appName: process.env.APP_NAME ?? 'Kankaverse',
+    },
+    // LiveKit ses kanalları — üçü de tanımlı değilse ses devre dışı (service 503 döner)
+    livekit: {
+      apiKey: process.env.LIVEKIT_API_KEY,
+      apiSecret: process.env.LIVEKIT_API_SECRET,
+      url: process.env.LIVEKIT_URL,
     },
     purgeEnabled: process.env.PURGE_ENABLED === 'true',
     newAccountDmLockDays: parseInt(process.env.NEW_ACCOUNT_DM_LOCK_DAYS ?? '7', 10),
