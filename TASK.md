@@ -564,8 +564,10 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   - [ ] **R7 İNCELEMESİ:** `/voice/token` grant + webhook imza yolu — sahip onayına sunuldu, onay bekliyor
 - [x] **Frontend refactor — AppView god-component → AppShell + nested routed views** — URL=ekranın tek doğruluk kaynağı (vault `stack/frontend/component-organization` v0.2 standardı). HomeView/GuildChannelView/DmView nested; HomeSidebar self-route; useAppModals; TextChannelView + `<component :is>` (veri-varyantı). Vault pattern notu yazıldı.
 - [ ] **DM sesli arama (1-1 + grup, audio-only)** — kurul + sahip onaylı (davet-anı gate · minör=arkadaş+audit · grup="sese katıl" · kayıt/video yok). Sözleşme `contracts/SPRINT_V2_DM_CALL_CONTRACT.md`; verdikt `kurul/verdicts/2026-06-14-dm-sesli-arama.md`. **UYGULAMADA.**
-  - [ ] Backend: token endpoint DM/GROUP_DM'e aç (canDm + block gate) · WS davet sinyalleri (ring 1-1 + grup start, gate sunucuda) · **R7**
-  - [ ] Frontend: telefon butonu · giden/gelen çağrı UI · kabul→katıl · grup "sese katıl" · i18n
+  - [x] Backend: token endpoint DM/GROUP_DM'e açıldı (`requireNoDmBlock` + 1-1 `canDm` re-check; GROUP_DM block) · WS davet sinyalleri (`voice:call_invite` **davet gate'i canDm**, accept/reject/cancel, `group_call_start`) · 5 yeni test (485 toplam yeşil)
+  - [x] Frontend: `stores/call` + `useCall` (ring/timeout 30sn) · useSocket sinyalleri · IncomingCallModal (global) + nötr bilgi şeridi · DmConversation 1-1 telefon + grup "Sese Katıl" · VoiceConnectedBar DM/grup adı · i18n `call.*`
+  - [ ] **R7 İNCELEMESİ:** davet gate'i (`voice:call_invite` canDm) + DM token kapısı — sahip onayına sunuldu
+  - [ ] **Cila (sonraki):** DM call katılımcı şeridi (sohbet alanında avatar+halka) · giden çağrı global bar (DM'den çıkınca da görünür)
 - [ ] **Ertelenenler (hepsi sprint-boyu: backend + contract + R7):** özel emoji (CSAM-kapısı) · kategori/kanal drag-reorder (batch reorder endpoint) · sahiplik devri/ortam-ban/ayrılma · sunucu-geneli arama
 
 ---
