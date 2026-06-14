@@ -13,7 +13,7 @@
     "birthDateDay": "Gün",
     "birthDateMonth": "Ay",
     "birthDateYear": "Yıl",
-    "emailPlaceholder": "ornek@mail.com",
+    "emailPlaceholder": "ornek{'@'}mail.com",
     "passwordPlaceholder": "En az 8 karakter",
     "usernamePlaceholder": "ornek_kullanici",
     "birthDateHelp": "Güvenli bir platform için doğum tarihiniz zorunludur.",
@@ -592,7 +592,7 @@
     "sectionDms": "Kankalar",
     "sectionGroups": "Gruplar",
     "empty": "Sonuç bulunamadı.",
-    "tip": "TÜYO: Ortamlar için ortam adını, DM için @ ile başlayın."
+    "tip": "TÜYO: Ortamlar için ortam adını, DM için {'@'} ile başlayın."
   },
   "messageSearch": {
     "buttonTitle": "Mesajlarda Ara",
