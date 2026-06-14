@@ -560,8 +560,12 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] **LiveKit ses kanalları (audio-only v1)** — V2 en büyük kalem. Kurul + sahip onaylı sınırlar (kayıt YOK · video ertelendi · karantina→konuşma kapalı). Sözleşme `contracts/SPRINT_V2_LIVEKIT_CONTRACT.md`; verdikt vault `kurul/verdicts/2026-06-14-livekit-ses-cocuk-guvenligi.md`. **KOD BİTTİ — R7 incelemesi + canlı test bekliyor.**
   - [x] Backend: dep (`livekit-server-sdk`) · `GUILD_VOICE` enum + `VoiceSession` + migration (uygulandı) · `modules/voice/` (token · webhook · participants) · `RealtimeService.emitToRoom` · main.ts raw-body · config fail-fast · 12 test (480 toplam yeşil)
   - [x] Frontend: dep (`livekit-client`) · `stores/voice.ts` · ses türü etkin + hoparlör ikonu · katıl/ayrıl/sustur kalıcı bar · katılımcı listesi · i18n · create `type` (DTO+servis+store) · vue-tsc+build temiz
+  - [x] **Canlı test edildi (sahip):** sese bağlan/konuş/sustur/sağırlaştır çalışıyor. **Bug fix:** `@CurrentUser` obje döndürüyordu → `user.id` (500 giderildi). Discord-tarzı **VoiceRoomView** (merkez katılımcı kartları + animasyonlu konuşma halkası + kontrol barı), ses barı UserCard'a bitişik, mute/unmute-dayanıklı konuşma algısı (per-participant IsSpeakingChanged), sidebar canlı katılımcı listesi.
   - [ ] **R7 İNCELEMESİ:** `/voice/token` grant + webhook imza yolu — sahip onayına sunuldu, onay bekliyor
-  - [ ] **Canlı test (sahip):** LiveKit Cloud webhook URL'i backend'e yönlendir (local için tünel) · iki kullanıcı uçtan uca ses · minör yaş-kapılı sese giremez · kayıt/video yok
+- [x] **Frontend refactor — AppView god-component → AppShell + nested routed views** — URL=ekranın tek doğruluk kaynağı (vault `stack/frontend/component-organization` v0.2 standardı). HomeView/GuildChannelView/DmView nested; HomeSidebar self-route; useAppModals; TextChannelView + `<component :is>` (veri-varyantı). Vault pattern notu yazıldı.
+- [ ] **DM sesli arama (1-1 + grup, audio-only)** — kurul + sahip onaylı (davet-anı gate · minör=arkadaş+audit · grup="sese katıl" · kayıt/video yok). Sözleşme `contracts/SPRINT_V2_DM_CALL_CONTRACT.md`; verdikt `kurul/verdicts/2026-06-14-dm-sesli-arama.md`. **UYGULAMADA.**
+  - [ ] Backend: token endpoint DM/GROUP_DM'e aç (canDm + block gate) · WS davet sinyalleri (ring 1-1 + grup start, gate sunucuda) · **R7**
+  - [ ] Frontend: telefon butonu · giden/gelen çağrı UI · kabul→katıl · grup "sese katıl" · i18n
 - [ ] **Ertelenenler (hepsi sprint-boyu: backend + contract + R7):** özel emoji (CSAM-kapısı) · kategori/kanal drag-reorder (batch reorder endpoint) · sahiplik devri/ortam-ban/ayrılma · sunucu-geneli arama
 
 ---
