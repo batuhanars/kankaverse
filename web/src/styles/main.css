@@ -191,3 +191,18 @@ code, pre, .font-mono {
   animation: kv-jump-flash 1.8s ease-out;
   border-radius: var(--kv-radius-sm);
 }
+
+/* ─────────────────────────────────────────────────────
+   Ses: konuşma halkası (Discord-tarzı yeşil, nabız atışı)
+───────────────────────────────────────────────────── */
+@keyframes kv-speaking-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(61, 180, 110, 0.55); }
+  70%  { box-shadow: 0 0 0 8px rgba(61, 180, 110, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(61, 180, 110, 0); }
+}
+
+.kv-speaking {
+  outline: 2px solid var(--kv-online, #3db46e);
+  outline-offset: 1px;
+  animation: kv-speaking-pulse 1.4s ease-out infinite;
+}

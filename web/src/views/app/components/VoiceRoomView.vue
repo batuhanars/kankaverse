@@ -67,13 +67,11 @@ function isMutedFor(m: RoomMember): boolean {
           class="flex flex-col items-center gap-2 w-[160px] py-6 rounded-[var(--kv-radius-lg)]"
           style="background-color: var(--kv-bg-elevated);"
         >
-          <!-- Avatar + konuşma halkası -->
+          <!-- Avatar + konuşma halkası (animasyonlu) -->
           <div
-            class="w-20 h-20 rounded-full flex items-center justify-center text-[28px] font-bold text-white overflow-hidden transition-shadow"
-            :style="{
-              backgroundColor: 'var(--kv-accent-500)',
-              boxShadow: isSpeaking(m) ? '0 0 0 3px var(--kv-online, #3DB46E)' : 'none',
-            }"
+            class="w-20 h-20 rounded-full flex items-center justify-center text-[28px] font-bold text-white overflow-hidden"
+            :class="{ 'kv-speaking': isSpeaking(m) }"
+            style="background-color: var(--kv-accent-500);"
           >
             <img v-if="m.avatarUrl" :src="m.avatarUrl" :alt="m.username" class="w-full h-full object-cover" />
             <span v-else>{{ m.username[0]?.toUpperCase() }}</span>
