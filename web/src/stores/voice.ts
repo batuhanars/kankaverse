@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import {
   Room,
   RoomEvent,
+  ParticipantEvent,
   Track,
   type RemoteTrack,
   type Participant,
@@ -107,6 +108,9 @@ export const useVoiceStore = defineStore('voice', () => {
 
       connectedChannelId.value = channelId
       refreshRoomParticipants()
+      // Konuşma dinleyicilerini bağla (yerel + mevcut uzaklar)
+      attachSpeaking(room.localParticipant)
+      for (const p of room.remoteParticipants.values()) attachSpeaking(p)
 
       if (data.canPublish) {
         try {
@@ -163,6 +167,21 @@ export const useVoiceStore = defineStore('voice', () => {
     roomParticipants.value = list
   }
 
+  // Konuşan setini tüm katılımcıların isSpeaking'inden yeniden kur (mute/unmute dayanıklı)
+  function recomputeSpeaking() {
+    if (!room) { speakingUserIds.value = new Set(); return }
+    const s = new Set<string>()
+    if (room.localParticipant?.isSpeaking) s.add(room.localParticipant.identity)
+    for (const p of room.remoteParticipants.values()) if (p.isSpeaking) s.add(p.identity)
+    speakingUserIds.value = s
+  }
+
+  // Bir katılımcının konuşma değişimini dinle (çift bağlamayı önlemek için önce kaldır)
+  function attachSpeaking(p: Participant) {
+    p.off(ParticipantEvent.IsSpeakingChanged, recomputeSpeaking)
+    p.on(ParticipantEvent.IsSpeakingChanged, recomputeSpeaking)
+  }
+
   async function toggleMute() {
     if (!room || !canPublish.value) return
     const next = !isMuted.value
@@ -217,12 +236,19 @@ export const useVoiceStore = defineStore('voice', () => {
         el.remove()
       })
     })
-    r.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
-      speakingUserIds.value = new Set(speakers.map((s) => s.identity))
-    })
+    // Konuşma algısı: per-participant IsSpeakingChanged (mute/unmute'a dayanıklı).
+    // ActiveSpeakersChanged aggregate'ı mute/unmute döngüsünde kaçabiliyor; her
+    // katılımcının isSpeaking'ini tarayıp seti yeniden kuruyoruz.
+    r.on(RoomEvent.ActiveSpeakersChanged, recomputeSpeaking)
     // Odadaki canlı katılımcılar (bağlı kullanıcı için güvenilir kaynak)
-    r.on(RoomEvent.ParticipantConnected, () => refreshRoomParticipants())
-    r.on(RoomEvent.ParticipantDisconnected, () => refreshRoomParticipants())
+    r.on(RoomEvent.ParticipantConnected, (p: Participant) => {
+      attachSpeaking(p)
+      refreshRoomParticipants()
+    })
+    r.on(RoomEvent.ParticipantDisconnected, () => {
+      refreshRoomParticipants()
+      recomputeSpeaking()
+    })
     // Uzak katılımcı mikrofon aç/kapa göstergesi
     r.on(RoomEvent.TrackMuted, (_pub, p: Participant) => {
       const s = new Set(mutedUserIds.value); s.add(p.identity); mutedUserIds.value = s

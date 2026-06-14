@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
 import { useVoiceStore } from '@/stores/voice'
+import VoiceConnectedBar from '@/components/layout/VoiceConnectedBar.vue'
 import { useSocket } from '@/composables/useSocket'
 import { onClickOutside } from '@vueuse/core'
 
@@ -140,13 +141,18 @@ function onLogout() {
       </div>
     </div>
 
-    <!-- Kompakt pill — DIŞ KAPSAYICI DIV (iç içe buton geçersiz HTML; mic/kulaklık ayrı buton) -->
+    <!-- Birleşik panel: aktif ses barı (varsa) + kullanıcı pill — Discord-tarzı tek kart, arada tek border -->
     <div
-      class="pill-btn w-full flex items-center gap-2.5 px-3 py-3 rounded-[var(--kv-radius-lg)] transition-colors"
+      class="overflow-hidden rounded-[var(--kv-radius-lg)] transition-colors"
       :style="showPopover
         ? 'background-color: var(--kv-bg-content); border: 1px solid var(--kv-border-strong);'
         : 'background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);'"
     >
+      <!-- Aktif ses oturumu (bağlıyken üstte; altında divider) -->
+      <VoiceConnectedBar />
+
+      <!-- Kullanıcı pill satırı (kendi border/rounding'i yok; kapsayıcı sağlıyor) -->
+      <div class="w-full flex items-center gap-2.5 px-3 py-3">
       <!-- Menü tetikleyici: avatar + ad (kendi hover'ı; kart geneli hover yok) -->
       <button
         class="flex items-center gap-2.5 flex-1 min-w-0 overflow-hidden cursor-pointer text-left rounded-[var(--kv-radius-md)] px-1.5 py-1 -mx-1.5 -my-1 transition-colors hover:bg-[var(--kv-bg-content)]"
@@ -219,6 +225,7 @@ function onLogout() {
             <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
           </svg>
         </button>
+      </div>
       </div>
     </div>
 

@@ -28,7 +28,7 @@ const channelName = computed(() => {
   <!-- Hata: bağlanılamadı (sessiz başarısızlık yerine görünür) -->
   <div
     v-if="voiceStore.error && !voiceStore.connectedChannelId"
-    class="flex items-center gap-2 px-3 py-2 border-t"
+    class="flex items-center gap-2 px-3 py-2 border-b"
     style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
   >
     <span class="flex-1 text-[12px]" style="color: var(--kv-danger);">{{ voiceStore.error }}</span>
@@ -38,7 +38,7 @@ const channelName = computed(() => {
   <!-- Bağlanılıyor -->
   <div
     v-else-if="voiceStore.connecting"
-    class="flex items-center gap-2 px-3 py-2 border-t"
+    class="flex items-center gap-2 px-3 py-2 border-b"
     style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
   >
     <span class="text-[13px]" style="color: var(--kv-text-secondary);">{{ t('voice.joining') }}</span>
@@ -46,7 +46,7 @@ const channelName = computed(() => {
 
   <div
     v-else-if="voiceStore.connectedChannelId"
-    class="flex items-center gap-2 px-3 py-2 border-t"
+    class="flex items-center gap-2 px-3 py-2 border-b"
     style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
   >
     <!-- Bağlı durum ikonu (yeşil) -->
