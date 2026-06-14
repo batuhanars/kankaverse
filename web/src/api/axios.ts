@@ -1,9 +1,11 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse } from '@/types'
 
+// Prod: VITE_API_URL = https://api.<domain> (api kök'ten servis eder: /auth, /channels …).
+// Dev: tanımsız → '/api' (vite proxy 127.0.0.1:3001'e rewrite eder). Tek değişken iki ortamı kapsar.
 const http: AxiosInstance = axios.create({
-  baseURL: '/api',
-  withCredentials: true, // refresh httpOnly cookie için
+  baseURL: import.meta.env.VITE_API_URL || '/api',
+  withCredentials: true, // refresh httpOnly cookie için (alt-domain → sameSite:'lax' yeterli)
 })
 
 // In-flight refresh promise — eş zamanlı 401'lerde tek refresh
