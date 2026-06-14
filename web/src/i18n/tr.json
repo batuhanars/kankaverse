@@ -397,6 +397,7 @@
     "unpin": "Sabitlemeyi kaldır",
     "pinnedMessages": "Sabitlenen Mesajlar",
     "pinnedMessagesEmpty": "Bu kanalda henüz sabitlenmiş mesaj yok.",
+    "jumpToMessage": "Mesaja git",
     "errors": {
       "MESSAGE_BLOCKED": "Mesajınız topluluk kurallarına uygun değil.",
       "USER_BANNED": "Hesabınız askıya alındı. Mesaj gönderemezsiniz.",

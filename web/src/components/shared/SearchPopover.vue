@@ -9,6 +9,7 @@
 import { ref, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { messagesApi } from '@/api/messages'
+import { useMessageJump } from '@/composables/useMessageJump'
 import { formatMentionsPlain } from '@/utils/mentions'
 import type { MessageDto } from '@/types'
 
@@ -22,6 +23,13 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
+const { requestJump } = useMessageJump()
+
+// Arama sonucuna tıkla → listede o mesaja zıpla, popover'ı kapat
+function onJump(messageId: string) {
+  requestJump(props.channelId, messageId)
+  emit('close')
+}
 
 const query = ref('')
 const results = ref<MessageDto[]>([])
@@ -187,8 +195,11 @@ function onDocKeydown(e: KeyboardEvent) {
         <div
           v-for="msg in results"
           :key="msg.id"
-          class="flex gap-3 px-4 py-2.5 border-b last:border-b-0"
+          class="flex gap-3 px-4 py-2.5 border-b last:border-b-0 cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
           style="border-color: var(--kv-border-subtle);"
+          role="button"
+          :title="t('message.jumpToMessage')"
+          @click="onJump(msg.id)"
         >
           <!-- Yazar avatarı (daire) -->
           <div
