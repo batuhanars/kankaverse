@@ -140,46 +140,51 @@ function onLogout() {
       </div>
     </div>
 
-    <!-- Kompakt pill -->
-    <button
-      class="pill-btn w-full flex items-center gap-2.5 px-3 py-3 rounded-[var(--kv-radius-lg)] cursor-pointer transition-colors"
+    <!-- Kompakt pill — DIŞ KAPSAYICI DIV (iç içe buton geçersiz HTML; mic/kulaklık ayrı buton) -->
+    <div
+      class="pill-btn w-full flex items-center gap-2.5 px-3 py-3 rounded-[var(--kv-radius-lg)] transition-colors"
       :style="showPopover
         ? 'background-color: var(--kv-bg-content); border: 1px solid var(--kv-border-strong);'
         : 'background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);'"
-      @click="showPopover = !showPopover"
     >
-      <!-- Avatar + presence dot -->
-      <div class="relative shrink-0">
-        <div
-          class="w-9 h-9 rounded-full flex items-center justify-center text-[14px] font-bold text-white overflow-hidden"
-          style="background-color: var(--kv-accent-500);"
-        >
-          {{ authStore.user?.username.charAt(0).toUpperCase() }}
+      <!-- Menü tetikleyici: avatar + ad (tıkla → popover) -->
+      <button
+        class="flex items-center gap-2.5 flex-1 min-w-0 overflow-hidden cursor-pointer text-left"
+        @click="showPopover = !showPopover"
+      >
+        <!-- Avatar + presence dot -->
+        <div class="relative shrink-0">
+          <div
+            class="w-9 h-9 rounded-full flex items-center justify-center text-[14px] font-bold text-white overflow-hidden"
+            style="background-color: var(--kv-accent-500);"
+          >
+            {{ authStore.user?.username.charAt(0).toUpperCase() }}
+          </div>
+          <span
+            class="absolute bottom-0 right-0 w-[11px] h-[11px] rounded-full border-2 block"
+            :style="`background-color: ${presenceColor(currentPresence)}; border-color: var(--kv-bg-elevated);`"
+          />
         </div>
-        <span
-          class="absolute bottom-0 right-0 w-[11px] h-[11px] rounded-full border-2 block"
-          :style="`background-color: ${presenceColor(currentPresence)}; border-color: var(--kv-bg-elevated);`"
-        />
-      </div>
 
-      <!-- Kullanıcı adı + durum -->
-      <div class="flex flex-col min-w-0 flex-1 overflow-hidden">
-        <span class="text-[14px] font-semibold truncate leading-[1.3]" style="color: var(--kv-text-primary);">
-          {{ authStore.user?.username }}
-        </span>
-        <span class="text-[12px] truncate leading-[1.2]" :style="`color: ${presenceColor(currentPresence)};`">
-          {{ t(`presence.${currentPresence}`) }}
-        </span>
-      </div>
+        <!-- Kullanıcı adı + durum -->
+        <div class="flex flex-col min-w-0 flex-1 overflow-hidden">
+          <span class="text-[14px] font-semibold truncate leading-[1.3]" style="color: var(--kv-text-primary);">
+            {{ authStore.user?.username }}
+          </span>
+          <span class="text-[12px] truncate leading-[1.2]" :style="`color: ${presenceColor(currentPresence)};`">
+            {{ t(`presence.${currentPresence}`) }}
+          </span>
+        </div>
+      </button>
 
-      <!-- V2 ses kontrolleri — yalnız sesli kanala bağlıyken etkin -->
+      <!-- V2 ses kontrolleri — yalnız sesli kanala bağlıyken etkin (renk: açık=beyaz, kapalı=kırmızı) -->
       <div class="flex items-center gap-1 shrink-0" :class="inVoice ? '' : 'opacity-20 pointer-events-none'">
-        <!-- Kendini sustur (yalnız konuşma izni varsa anlamlı) -->
+        <!-- Kendini sustur -->
         <button
           class="w-7 h-7 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
           :title="voiceStore.isMuted ? t('voice.unmute') : t('voice.mute')"
-          :style="{ color: voiceStore.isMuted ? 'var(--kv-danger)' : 'var(--kv-text-muted)' }"
-          @click.stop="voiceStore.toggleMute()"
+          :style="{ color: voiceStore.isMuted ? 'var(--kv-danger)' : 'var(--kv-text-primary)' }"
+          @click="voiceStore.toggleMute()"
         >
           <!-- Açık mikrofon -->
           <svg v-if="!voiceStore.isMuted" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -199,8 +204,8 @@ function onLogout() {
         <button
           class="w-7 h-7 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
           :title="voiceStore.isDeafened ? t('voice.undeafen') : t('voice.deafen')"
-          :style="{ color: voiceStore.isDeafened ? 'var(--kv-danger)' : 'var(--kv-text-muted)' }"
-          @click.stop="voiceStore.toggleDeafen()"
+          :style="{ color: voiceStore.isDeafened ? 'var(--kv-danger)' : 'var(--kv-text-primary)' }"
+          @click="voiceStore.toggleDeafen()"
         >
           <!-- Açık kulaklık -->
           <svg v-if="!voiceStore.isDeafened" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -215,7 +220,7 @@ function onLogout() {
           </svg>
         </button>
       </div>
-    </button>
+    </div>
 
   </div>
 </template>
