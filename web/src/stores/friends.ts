@@ -28,6 +28,12 @@ export const useFriendsStore = defineStore('friends', () => {
     await Promise.all([fetchRequests(), fetchFriends()])
   }
 
+  // REV-5: DM ekranından userId ile arkadaş isteği (Sprint 4A by-user; T&S kapısı backend'de)
+  async function sendRequestByUser(userId: string) {
+    await friendsApi.sendRequestByUser(userId)
+    await Promise.all([fetchRequests(), fetchFriends()])
+  }
+
   async function acceptRequest(requestId: string) {
     await friendsApi.acceptRequest(requestId)
     await Promise.all([fetchRequests(), fetchFriends()])
@@ -82,6 +88,7 @@ export const useFriendsStore = defineStore('friends', () => {
     fetchRequests,
     fetchBlocked,
     sendRequest,
+    sendRequestByUser,
     acceptRequest,
     declineRequest,
     removeFriend,
