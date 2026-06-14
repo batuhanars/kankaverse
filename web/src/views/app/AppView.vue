@@ -13,6 +13,7 @@ import MemberPanel from '@/components/layout/MemberPanel.vue'
 import UserCard from '@/components/layout/UserCard.vue'
 import VoiceConnectedBar from '@/components/layout/VoiceConnectedBar.vue'
 import MessageArea from './components/MessageArea.vue'
+import VoiceRoomView from './components/VoiceRoomView.vue'
 import ServerModal from './components/ServerModal.vue'
 import EmailVerificationBanner from '@/components/shared/EmailVerificationBanner.vue'
 import HomeSidebar from '@/views/home/components/HomeSidebar.vue'
@@ -31,6 +32,9 @@ const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
 const { connect, disconnect, joinChannel, leaveChannel } = useSocket()
+
+// Aktif kanal ses kanalı mı? → merkez alanda sohbet yerine VoiceRoomView göster
+const activeChannelIsVoice = computed(() => channelsStore.activeChannel()?.type === 'GUILD_VOICE')
 
 /** Guild'in tüm kanallarından hesaplanan unread sayacını güncelle */
 function recheckGuildUnread(guildId: string) {
@@ -250,16 +254,23 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
         <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
           <!-- Tam genişlik üst header (sunucu adı + bildirim çanı) -->
           <GuildTopBar />
-          <!-- Kanal bar + mesaj alanı + üye paneli yan yana -->
+          <!-- Kanal bar + mesaj alanı + üye paneli yan yana (ses kanalında merkez = VoiceRoomView) -->
           <div class="flex flex-1 min-w-0 overflow-hidden gap-4 mb-4">
-            <div class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden rounded-[var(--kv-radius-lg)]">
-              <TopBar
-                :show-member-panel="showMemberPanel"
-                @toggle-members="showMemberPanel = !showMemberPanel"
-              />
-              <MessageArea class="flex-1 min-h-0" />
-            </div>
-            <MemberPanel v-if="showMemberPanel" class="hidden xl:flex" />
+            <VoiceRoomView
+              v-if="activeChannelIsVoice && channelsStore.activeChannelId"
+              :channel-id="channelsStore.activeChannelId"
+              class="flex-1 min-w-0"
+            />
+            <template v-else>
+              <div class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden rounded-[var(--kv-radius-lg)]">
+                <TopBar
+                  :show-member-panel="showMemberPanel"
+                  @toggle-members="showMemberPanel = !showMemberPanel"
+                />
+                <MessageArea class="flex-1 min-h-0" />
+              </div>
+              <MemberPanel v-if="showMemberPanel" class="hidden xl:flex" />
+            </template>
           </div>
         </div>
       </template>

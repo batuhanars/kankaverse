@@ -15,6 +15,10 @@ export interface VoiceParticipant {
   avatarUrl: string | null
 }
 
+export interface RoomMember extends VoiceParticipant {
+  isLocal: boolean
+}
+
 /**
  * Voice store — LiveKit ses kanalları (audio-only v1).
  * İki katman:
@@ -36,6 +40,10 @@ export const useVoiceStore = defineStore('voice', () => {
   const speakingUserIds = ref<Set<string>>(new Set())
   // Kendini sağırlaştır: tüm gelen sesi + kendi mikrofonunu kapatır
   const isDeafened = ref(false)
+  // Bağlı odanın CANLI katılımcıları (LiveKit Room'dan; webhook'tan bağımsız, güvenilir)
+  const roomParticipants = ref<RoomMember[]>([])
+  // Mikrofonu kapalı uzak katılımcılar (TrackMuted/Unmuted)
+  const mutedUserIds = ref<Set<string>>(new Set())
 
   // LiveKit Room — reaktif değil (kompleks nesne)
   let room: Room | null = null
@@ -98,6 +106,7 @@ export const useVoiceStore = defineStore('voice', () => {
       try { await room.startAudio() } catch { /* jest gerektirebilir; ses ilk etkileşimde açılır */ }
 
       connectedChannelId.value = channelId
+      refreshRoomParticipants()
 
       if (data.canPublish) {
         try {
@@ -134,7 +143,24 @@ export const useVoiceStore = defineStore('voice', () => {
     canPublish.value = false
     isDeafened.value = false
     speakingUserIds.value = new Set()
+    roomParticipants.value = []
+    mutedUserIds.value = new Set()
     remoteAudioEls.clear()
+  }
+
+  // LiveKit Participant → RoomMember (metadata'dan avatar)
+  function toRoomMember(p: Participant, localId: string | undefined): RoomMember {
+    let avatarUrl: string | null = null
+    try { if (p.metadata) avatarUrl = (JSON.parse(p.metadata)?.avatarUrl ?? null) } catch { /* yoksay */ }
+    return { userId: p.identity, username: p.name || p.identity, avatarUrl, isLocal: p.identity === localId }
+  }
+
+  function refreshRoomParticipants() {
+    if (!room) { roomParticipants.value = []; return }
+    const localId = room.localParticipant?.identity
+    const list: RoomMember[] = [toRoomMember(room.localParticipant, localId)]
+    for (const p of room.remoteParticipants.values()) list.push(toRoomMember(p, localId))
+    roomParticipants.value = list
   }
 
   async function toggleMute() {
@@ -194,13 +220,21 @@ export const useVoiceStore = defineStore('voice', () => {
     r.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
       speakingUserIds.value = new Set(speakers.map((s) => s.identity))
     })
+    // Odadaki canlı katılımcılar (bağlı kullanıcı için güvenilir kaynak)
+    r.on(RoomEvent.ParticipantConnected, () => refreshRoomParticipants())
+    r.on(RoomEvent.ParticipantDisconnected, () => refreshRoomParticipants())
+    // Uzak katılımcı mikrofon aç/kapa göstergesi
+    r.on(RoomEvent.TrackMuted, (_pub, p: Participant) => {
+      const s = new Set(mutedUserIds.value); s.add(p.identity); mutedUserIds.value = s
+    })
+    r.on(RoomEvent.TrackUnmuted, (_pub, p: Participant) => {
+      const s = new Set(mutedUserIds.value); s.delete(p.identity); mutedUserIds.value = s
+    })
     r.on(RoomEvent.Disconnected, () => {
       // Sunucu/ağ kaynaklı kopma → yerel durumu temizle (UI tutarlı kalsın)
       room = null
       resetLocalState()
     })
-    // Not: katılımcı listesi (panel) backend WS'inden beslenir; client room event'i
-    // güven kaynağı değil (sözleşme §5). Burada yalnız ses + konuşan göstergesi.
   }
 
   return {
@@ -212,6 +246,8 @@ export const useVoiceStore = defineStore('voice', () => {
     error,
     speakingUserIds,
     isDeafened,
+    roomParticipants,
+    mutedUserIds,
     isConnectedTo,
     clearError,
     participantsFor,
