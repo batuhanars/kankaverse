@@ -23,6 +23,7 @@ jest.mock('livekit-server-sdk', () => ({
 const prismaMock = {
   user: { findUnique: jest.fn() },
   guildMember: { findUnique: jest.fn() },
+  channelMember: { findFirst: jest.fn() },
   voiceSession: {
     findFirst: jest.fn(),
     create: jest.fn(),
@@ -31,8 +32,9 @@ const prismaMock = {
   },
 };
 
-const membershipMock = { requireChannelAccess: jest.fn() };
+const membershipMock = { requireChannelAccess: jest.fn(), requireNoDmBlock: jest.fn() };
 const realtimeMock = { emitToRoom: jest.fn() };
+const dmPermissionMock = { canDm: jest.fn() };
 
 function makeConfig(overrides: Record<string, unknown> = {}) {
   const values: Record<string, unknown> = {
@@ -51,6 +53,7 @@ function makeService(config = makeConfig()) {
     prismaMock as any,
     membershipMock as any,
     realtimeMock as any,
+    dmPermissionMock as any,
   );
 }
 
@@ -134,6 +137,55 @@ describe('VoiceService.mintToken', () => {
 
     const svc = makeService(makeConfig({ quarantineHours: 0 }));
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
+    expect(res.canPublish).toBe(true);
+  });
+});
+
+// ── DM/grup sesli arama kapısı (Sprint V2 DM call) ────────────────────────────
+describe('VoiceService.mintToken — DM/grup', () => {
+  it('1-1 DM, arkadaş (canDm allowed) → token + canPublish=true', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'DM', guildId: null }));
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    prismaMock.channelMember.findFirst.mockResolvedValue({ userId: 'other-1' });
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
+
+    const svc = makeService();
+    const res = await svc.mintToken(USER_ID, CHANNEL_ID);
+
+    expect(dmPermissionMock.canDm).toHaveBeenCalledWith(USER_ID, 'other-1');
+    expect(res.canPublish).toBe(true);
+    expect(res.token).toBe('jwt-token');
+  });
+
+  it('1-1 DM, canDm reddederse → DM_NOT_ALLOWED (token üretilmez)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'DM', guildId: null }));
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    prismaMock.channelMember.findFirst.mockResolvedValue({ userId: 'other-1' });
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: false, reason: 'DM_NOT_ALLOWED' });
+
+    const svc = makeService();
+    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({ response: { error: 'DM_NOT_ALLOWED' } });
+  });
+
+  it('1-1 DM, block (requireNoDmBlock fırlatır) → yayılır, canDm çağrılmaz', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'DM', guildId: null }));
+    membershipMock.requireNoDmBlock.mockRejectedValue(
+      Object.assign(new Error('block'), { response: { error: 'DM_NOT_ALLOWED' } }),
+    );
+
+    const svc = makeService();
+    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({ response: { error: 'DM_NOT_ALLOWED' } });
+    expect(dmPermissionMock.canDm).not.toHaveBeenCalled();
+  });
+
+  it('GROUP_DM → block kontrolü yeter, per-pair canDm YOK → canPublish=true', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'GROUP_DM', guildId: null }));
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+
+    const svc = makeService();
+    const res = await svc.mintToken(USER_ID, CHANNEL_ID);
+
+    expect(dmPermissionMock.canDm).not.toHaveBeenCalled();
     expect(res.canPublish).toBe(true);
   });
 });

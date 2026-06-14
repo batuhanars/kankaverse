@@ -16,6 +16,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { MembershipService } from '../../../shared/membership/membership.service';
 import { RealtimeService } from '../../../shared/realtime/realtime.service';
 import { PresenceService, ActiveStatus } from '../../../shared/presence/presence.service';
+import { DmPermissionService } from '../../../shared/dm-permission/dm-permission.service';
 
 interface AuthSocket extends Socket {
   data: { userId: string; sessionId: string; username?: string };
@@ -35,6 +36,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private membership: MembershipService,
     private realtime: RealtimeService,
     private presence: PresenceService,
+    private dmPermission: DmPermissionService,
   ) {}
 
   afterInit(server: Server) {
@@ -229,6 +231,108 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       });
     }
 
+    return { ok: true };
+  }
+
+  // ── Sprint V2 — DM sesli arama sinyalizasyonu (gate SUNUCUDA; sözleşme SPRINT_V2_DM_CALL_CONTRACT.md) ──
+  // R7: davet gate'i ring YAYILMADAN ÖNCE; jenerik DM_NOT_ALLOWED (engellenme/ilişki sızmaz).
+
+  private async otherDmMember(channelId: string, userId: string): Promise<string | null> {
+    const other = await this.prisma.channelMember.findFirst({
+      where: { channelId, userId: { not: userId } },
+      select: { userId: true },
+    });
+    return other?.userId ?? null;
+  }
+
+  @SubscribeMessage('voice:call_invite')
+  async handleCallInvite(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { channelId: string },
+  ) {
+    const userId = socket.data.userId;
+    const { channelId } = payload;
+
+    const channel = await this.prisma.channel.findUnique({ where: { id: channelId }, select: { type: true } });
+    if (!channel || channel.type !== 'DM') return { ok: false, error: 'NOT_DM' };
+
+    const calleeId = await this.otherDmMember(channelId, userId);
+    if (!calleeId) return { ok: false, error: 'DM_NOT_ALLOWED' };
+
+    // DAVET GATE'İ — ring callee'ye ULAŞMADAN ÖNCE (yabancı/block/yeni-hesap/minör-yabancı elenir)
+    const gate = await this.dmPermission.canDm(userId, calleeId);
+    if (!gate.allowed) return { ok: false, error: 'DM_NOT_ALLOWED' };
+
+    const caller = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true, avatarUrl: true },
+    });
+    this.realtime.emitToUser(calleeId, 'voice.incoming_call', {
+      channelId,
+      caller: { id: userId, username: caller?.username ?? userId, avatarUrl: caller?.avatarUrl ?? null },
+    });
+    return { ok: true };
+  }
+
+  @SubscribeMessage('voice:call_accept')
+  async handleCallAccept(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { channelId: string },
+  ) {
+    const other = await this.otherDmMember(payload.channelId, socket.data.userId);
+    if (other) this.realtime.emitToUser(other, 'voice.call_accepted', { channelId: payload.channelId });
+    return { ok: true };
+  }
+
+  @SubscribeMessage('voice:call_reject')
+  async handleCallReject(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { channelId: string },
+  ) {
+    const other = await this.otherDmMember(payload.channelId, socket.data.userId);
+    if (other) this.realtime.emitToUser(other, 'voice.call_rejected', { channelId: payload.channelId });
+    return { ok: true };
+  }
+
+  @SubscribeMessage('voice:call_cancel')
+  async handleCallCancel(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { channelId: string },
+  ) {
+    const other = await this.otherDmMember(payload.channelId, socket.data.userId);
+    if (other) this.realtime.emitToUser(other, 'voice.call_canceled', { channelId: payload.channelId });
+    return { ok: true };
+  }
+
+  @SubscribeMessage('voice:group_call_start')
+  async handleGroupCallStart(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { channelId: string },
+  ) {
+    const userId = socket.data.userId;
+    const { channelId } = payload;
+
+    const channel = await this.prisma.channel.findUnique({ where: { id: channelId }, select: { type: true } });
+    if (!channel || channel.type !== 'GROUP_DM') return { ok: false, error: 'NOT_GROUP' };
+
+    try {
+      await this.membership.requireChannelAccess(userId, channelId);
+      await this.membership.requireNoDmBlock(userId, channelId);
+    } catch {
+      return { ok: false, error: 'FORBIDDEN' };
+    }
+
+    const username = socket.data.username ?? userId;
+    const members = await this.prisma.channelMember.findMany({
+      where: { channelId, userId: { not: userId } },
+      select: { userId: true },
+    });
+    for (const m of members) {
+      this.realtime.emitToUser(m.userId, 'voice.group_call_started', {
+        channelId,
+        by: { id: userId, username },
+      });
+    }
     return { ok: true };
   }
 

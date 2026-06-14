@@ -2,6 +2,7 @@ import {
   Injectable,
   Logger,
   BadRequestException,
+  ForbiddenException,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
+import { DmPermissionService } from '../../shared/dm-permission/dm-permission.service';
 
 interface ParticipantMeta {
   avatarUrl?: string | null;
@@ -39,6 +41,7 @@ export class VoiceService {
     private prisma: PrismaService,
     private membership: MembershipService,
     private realtime: RealtimeService,
+    private dmPermission: DmPermissionService,
   ) {
     this.apiKey = this.config.get<string>('livekit.apiKey') ?? '';
     this.apiSecret = this.config.get<string>('livekit.apiSecret') ?? '';
@@ -70,17 +73,23 @@ export class VoiceService {
   async mintToken(userId: string, channelId: string) {
     this.assertEnabled();
 
-    // Erişim + yaş + özel kanal kapısı — mevcut helper, hata kodları sapmadan yayılır
+    // Erişim + yaş + özel kanal/üyelik kapısı — mevcut helper, hata kodları sapmadan yayılır
     const channel = await this.membership.requireChannelAccess(userId, channelId);
 
-    if (channel.type !== 'GUILD_VOICE') {
+    // Tür kapısı + konuşma izni (kurul: davet gate'i sinyalde, mint'te tekrar)
+    let canPublish: boolean;
+    if (channel.type === 'GUILD_VOICE') {
+      canPublish = await this.resolveCanPublish(userId, channel.guildId);
+    } else if (channel.type === 'DM' || channel.type === 'GROUP_DM') {
+      // DM/grup sesli arama: block + (1-1 için) ilişki re-check; guild-karantinası yok → konuşabilir
+      await this.requireDmCallGate(userId, channelId, channel.type);
+      canPublish = true;
+    } else {
       throw new BadRequestException({
         message: 'Bu bir ses kanalı değil.',
         error: 'NOT_VOICE_CHANNEL',
       });
     }
-
-    const canPublish = await this.resolveCanPublish(userId, channel.guildId);
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -124,6 +133,33 @@ export class VoiceService {
 
     const cutoff = new Date(Date.now() - quarantineHours * 60 * 60 * 1000);
     return member.joinedAt < cutoff; // cutoff'tan önce katıldıysa yerleşik → konuşabilir
+  }
+
+  /**
+   * DM/grup sesli arama kapısı (R7). Block her zaman; 1-1'de ilişki re-check (canDm).
+   * Kurul: token mint'te gate tekrar (block/ilişki değişmiş olabilir). Jenerik DM_NOT_ALLOWED (sızıntı yok).
+   */
+  private async requireDmCallGate(userId: string, channelId: string, type: 'DM' | 'GROUP_DM') {
+    await this.membership.requireNoDmBlock(userId, channelId);
+    if (type === 'DM') {
+      const other = await this.otherDmMember(channelId, userId);
+      if (other) {
+        const res = await this.dmPermission.canDm(userId, other);
+        if (!res.allowed) {
+          throw new ForbiddenException({ message: 'Bu kişiyle sesli görüşemezsin.', error: 'DM_NOT_ALLOWED' });
+        }
+      }
+    }
+    // GROUP_DM: üyelik (requireChannelAccess) + block yeterli — grup arkadaş-tabanlı/yetişkin-only.
+  }
+
+  /** 1-1 DM kanalındaki diğer üyenin userId'si (yoksa null). */
+  private async otherDmMember(channelId: string, userId: string): Promise<string | null> {
+    const other = await this.prisma.channelMember.findFirst({
+      where: { channelId, userId: { not: userId } },
+      select: { userId: true },
+    });
+    return other?.userId ?? null;
   }
 
   /**
