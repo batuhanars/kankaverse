@@ -3,8 +3,11 @@ import type { ApiResponse } from '@/types'
 
 // Prod: VITE_API_URL = https://api.<domain> (api kök'ten servis eder: /auth, /channels …).
 // Dev: tanımsız → '/api' (vite proxy 127.0.0.1:3001'e rewrite eder). Tek değişken iki ortamı kapsar.
+// Tek base: hem ana instance hem refresh çağrısı bunu kullanır (refresh'in baseURL'i atlayıp
+// /api'ye düşmesi prod'da Vercel origin'ine gidip 405 veriyordu — çapraz-site bug'ı).
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
 const http: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: API_BASE,
   withCredentials: true, // refresh httpOnly cookie (alt-domain→sameSite:'lax'; çapraz-site→api COOKIE_SAMESITE=none)
 })
 
@@ -25,7 +28,7 @@ export function clearAccessToken(): void {
 
 async function doRefresh(): Promise<string> {
   const res = await axios.post<ApiResponse<{ accessToken: string }>>(
-    '/api/auth/refresh',
+    `${API_BASE}/auth/refresh`,
     {},
     { withCredentials: true },
   )
