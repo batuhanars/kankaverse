@@ -593,10 +593,10 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **REV-2 — Textarea reset:** gönderim sonrası büyüyen textarea tek satıra dönmüyordu → `resetComposerHeight` (content temizlenince `height:auto`). İki composer.
 - [x] **REV-5 — DM "Kanka Ekle":** 1-1 DM'de karşı taraf arkadaş değilse başlıkta "Kanka Ekle" butonu (Sprint 4A `by-user`; T&S kapısı backend, ret jenerik, statü sızmaz). Engelliyken/arkadaşken/istek-sonrası gizli. `friends.add/addFailed` i18n.
 
-**Ses bug'ları (kritik, sıradaki — teşhis gerektirir):**
-- [ ] **REV-6 — Mikrofon kilitleniyor:** durduk yere mic kırmızı, açılamıyor, ses ekranında mic görünmüyor (ekran görüntüsü: "Çevrimdışı" + çizili mic)
-- [ ] **REV-7 — Sesten kendiliğinden düşme:** 1-1 DM seste konuşurken tekrar tekrar düşüyor
-- [ ] **REV-8 — Ses ekranı gecikmesi:** arama kabul sonrası ses ekranı gelmiyor/geç geliyor
+**Ses bug'ları (kritik):**
+- [x] **REV-6 — Mikrofon kilitleniyor → ÇÖZÜLDÜ:** kök neden `resolveCanPublish` ses karantinasını OWNER/ADMIN dahil herkese uyguluyordu → sahip kendi yeni ortamında `canPublish=false` → mic kırmızı + toggle erken-return + kontrol barında mic gizli ("görünmüyor"). **Fix:** OWNER/ADMIN karantinadan muaf (anti-spam yalnız yeni MEMBER; minör/erişim kapıları bozulmadı). + Frontend `canPublish=false` iken "Dinleyici modu" pill (sessiz kafa-karışıklığı yerine). 485 test geçti
+- [~] **REV-8 — Ses ekranı gecikmesi → İYİLEŞTİRİLDİ:** kabul sonrası `join` async (~1-2sn) bağlanır; o sırada DM'de hiçbir şey yoktu. `connectingChannelId` + DmCallPanel "Bağlanılıyor…" kartı → anında geri bildirim. (Bağlanma süresi inherent; "gelmedi" durumu join hatasıysa `error` görünür.)
+- [ ] **REV-7 — Sesten kendiliğinden düşme:** 1-1 DM seste tekrar tekrar düşüyor. **Kök neden runtime'da** (kod-tek-başına teşhis edilemedi; unmount-leave değil). `RoomEvent.Disconnected` reason'ı konsola loglanıyor → **sahip tekrar üretip konsoldaki `[voice] LiveKit Disconnected — reason:` çıktısını paylaşacak** (DUPLICATE_IDENTITY / SERVER_SHUTDOWN / ağ ayrımı için)
 
 **Bildirim yeniden-kurgu (büyük, backend+FE):**
 - [ ] **REV-4:** rail kırmızı sayaç = generic unread DEĞİL → **bahsetme (mention)** sayısı. Beyaz pill (sol) = generic aktivite KALIR. Bahsetme olan ortama girince kanal sidebar'ı ALTINDA sidebar-genişliğinde kırmızı bant "yeni bahsetmeleriniz var"; >1 bahsetme okunana dek kalır; tıkla→ilk bahsetme kanalına zıpla (otomatik girme), tekrar tıkla→sonraki…

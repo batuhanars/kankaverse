@@ -24,8 +24,18 @@ function isMutedFor(m: RoomMember): boolean {
 </script>
 
 <template>
+  <!-- REV-8: kabul sonrası bağlanırken anında "bağlanıyor" kartı (ses ekranı geç gelmiş hissi yerine) -->
   <div
-    v-if="voiceStore.isConnectedTo(channelId)"
+    v-if="voiceStore.connectingChannelId === channelId && !voiceStore.isConnectedTo(channelId)"
+    class="shrink-0 mx-4 mt-3 rounded-[var(--kv-radius-lg)] overflow-hidden flex items-center gap-2 px-4 py-3"
+    style="background-color: var(--kv-bg-content); border: 1px solid var(--kv-border-subtle);"
+  >
+    <span class="w-2 h-2 rounded-full shrink-0 animate-pulse" style="background-color: var(--kv-accent-500);" />
+    <span class="text-[13px]" style="color: var(--kv-text-secondary);">{{ t('voice.joining') }}</span>
+  </div>
+
+  <div
+    v-else-if="voiceStore.isConnectedTo(channelId)"
     class="shrink-0 mx-4 mt-3 rounded-[var(--kv-radius-lg)] overflow-hidden"
     style="background-color: var(--kv-bg-content); border: 1px solid var(--kv-border-subtle);"
   >
