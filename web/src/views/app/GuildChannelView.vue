@@ -3,17 +3,15 @@
  * GuildChannelView — guild kanalı ekranı (/channels/:guildId/:channelId).
  * Kendi route param'ını okur (merkezi syncFromRoute YOK). Metin → MessageArea, ses → VoiceRoomView.
  */
-import { ref, computed, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
 import { useSocket } from '@/composables/useSocket'
-import TopBar from '@/components/layout/TopBar.vue'
-import MemberPanel from '@/components/layout/MemberPanel.vue'
 import GuildTopBar from './components/GuildTopBar.vue'
-import MessageArea from './components/MessageArea.vue'
+import TextChannelView from './components/TextChannelView.vue'
 import VoiceRoomView from './components/VoiceRoomView.vue'
 
 const props = defineProps<{ guildId: string; channelId: string }>()
@@ -25,8 +23,10 @@ const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
 const { joinChannel, leaveChannel } = useSocket()
 
-const showMemberPanel = ref(true)
-const activeChannelIsVoice = computed(() => channelsStore.activeChannel()?.type === 'GUILD_VOICE')
+// Kanal türü VERİdir (channel.type), URL değil → RouterView değil, veri-sürümlü <component :is>
+const channelComponent = computed(() =>
+  channelsStore.activeChannel()?.type === 'GUILD_VOICE' ? VoiceRoomView : TextChannelView,
+)
 
 async function sync(guildId: string, channelId: string) {
   if (!guildId || !channelId) {
@@ -74,23 +74,9 @@ watch(
 <template>
   <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
     <GuildTopBar />
-    <!-- Ses kanalında merkez = VoiceRoomView; metin kanalında TopBar + MessageArea + üye paneli -->
-    <div class="flex flex-1 min-w-0 overflow-hidden gap-4 mb-4">
-      <VoiceRoomView
-        v-if="activeChannelIsVoice && channelsStore.activeChannelId"
-        :channel-id="channelsStore.activeChannelId"
-        class="flex-1 min-w-0"
-      />
-      <template v-else>
-        <div class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden rounded-[var(--kv-radius-lg)]">
-          <TopBar
-            :show-member-panel="showMemberPanel"
-            @toggle-members="showMemberPanel = !showMemberPanel"
-          />
-          <MessageArea class="flex-1 min-h-0" />
-        </div>
-        <MemberPanel v-if="showMemberPanel" class="hidden xl:flex" />
-      </template>
+    <!-- Kanal türüne (veri) göre varyant: ses → VoiceRoomView, metin → TextChannelView -->
+    <div class="flex flex-1 min-w-0 overflow-hidden mb-4">
+      <component :is="channelComponent" class="flex-1 min-w-0" />
     </div>
   </div>
 </template>
