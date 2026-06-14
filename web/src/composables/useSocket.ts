@@ -9,6 +9,7 @@ import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
 import { useAuthStore } from '@/stores/auth'
 import { useVoiceStore, type VoiceParticipant } from '@/stores/voice'
+import { useCallStore, type IncomingCall } from '@/stores/call'
 import { getAccessToken } from '@/api/axios'
 import {
   _bindTypingEmitters,
@@ -34,6 +35,7 @@ export function useSocket() {
   const guildsStore = useGuildsStore()
   const authStore = useAuthStore()
   const voiceStore = useVoiceStore()
+  const callStore = useCallStore()
 
   function _joinRoom(channelId: string) {
     socket?.emit('channel:join', { channelId }, (ack: { ok: boolean; error?: string }) => {
@@ -186,6 +188,27 @@ export function useSocket() {
       voiceStore.removeParticipant(data.channelId, data.userId)
     })
 
+    // Sprint V2 DM sesli arama — sinyalizasyon (gate sunucuda; sözleşme SPRINT_V2_DM_CALL_CONTRACT.md)
+    socket.on('voice.incoming_call', (data: IncomingCall) => {
+      callStore.setIncoming(data)
+    })
+    socket.on('voice.call_accepted', (data: { channelId: string }) => {
+      // Karşı taraf kabul etti → odaya katıl, çalma durumunu temizle
+      callStore.clearOutgoing()
+      voiceStore.join(data.channelId)
+    })
+    socket.on('voice.call_rejected', () => {
+      callStore.clearOutgoing()
+      callStore.setNotice('rejected')
+    })
+    socket.on('voice.call_canceled', () => {
+      callStore.clearIncoming()
+    })
+    socket.on('voice.group_call_started', (data: { channelId: string; by: { id: string; username: string } }) => {
+      // v1: bilgilendirme (grup DM'de "Sese Katıl" zaten her zaman görünür)
+      callStore.setNotice(`group:${data.by.username}`)
+    })
+
     // Typing emit fonksiyonlarını useTyping composable'ına bağla
     _bindTypingEmitters(
       (channelId: string) => socket?.emit('typing:start', { channelId }),
@@ -236,9 +259,28 @@ export function useSocket() {
     socket?.emit('presence:set', { status })
   }
 
+  // ── DM sesli arama emitter'ları (ack'li olanlar 5sn timeout) ──
+  function _emitAck(event: string, channelId: string): Promise<{ ok: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      if (!socket) return resolve({ ok: false, error: 'NOT_CONNECTED' })
+      let settled = false
+      const done = (ack: { ok: boolean; error?: string }) => { if (!settled) { settled = true; resolve(ack) } }
+      const timer = setTimeout(() => done({ ok: false, error: 'TIMEOUT' }), 5000)
+      socket.emit(event, { channelId }, (ack: { ok: boolean; error?: string }) => { clearTimeout(timer); done(ack ?? { ok: false }) })
+    })
+  }
+  function callInvite(channelId: string) { return _emitAck('voice:call_invite', channelId) }
+  function groupCallStart(channelId: string) { return _emitAck('voice:group_call_start', channelId) }
+  function callAccept(channelId: string) { socket?.emit('voice:call_accept', { channelId }) }
+  function callReject(channelId: string) { socket?.emit('voice:call_reject', { channelId }) }
+  function callCancel(channelId: string) { socket?.emit('voice:call_cancel', { channelId }) }
+
   onUnmounted(() => {
     // intentionally empty — disconnect AppShell (layout) tarafından yönetiliyor
   })
 
-  return { connected, connect, disconnect, joinChannel, leaveChannel, setPresence }
+  return {
+    connected, connect, disconnect, joinChannel, leaveChannel, setPresence,
+    callInvite, groupCallStart, callAccept, callReject, callCancel,
+  }
 }

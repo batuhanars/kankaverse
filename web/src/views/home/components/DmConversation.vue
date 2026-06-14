@@ -9,6 +9,9 @@ import { useSocket } from '@/composables/useSocket'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
 import { useJumpToMessage } from '@/composables/useMessageJump'
+import { useCall } from '@/composables/useCall'
+import { useCallStore } from '@/stores/call'
+import { useVoiceStore } from '@/stores/voice'
 import { messagesApi } from '@/api/messages'
 import { dmApi } from '@/api/dm'
 import { formatMentionsPlain } from '@/utils/mentions'
@@ -86,6 +89,9 @@ const messagesStore = useMessagesStore()
 const dmStore = useDmStore()
 const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
+const callStore = useCallStore()
+const voiceStore = useVoiceStore()
+const { startCall, cancelCall, startGroupCall } = useCall()
 const { joinChannel, leaveChannel } = useSocket()
 const { onInput: onTypingInput, stopTyping } = useTyping(() => props.channel.id)
 const { label: typingLabel } = useTypingLabel(() => props.channel.id, t, { named: false })
@@ -506,6 +512,29 @@ function isGroupStart(index: number): boolean {
           <span class="flex-1 text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
             {{ dmChannel.otherUser.username }}
           </span>
+          <!-- Sesli arama (1-1) — çalıyorsa İptal, değilse telefon -->
+          <button
+            v-if="callStore.isRinging(channel.id)"
+            class="flex items-center gap-1.5 text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] cursor-pointer"
+            style="color: var(--kv-danger);"
+            :title="t('call.cancel')"
+            @click="cancelCall(channel.id)"
+          >
+            <span class="italic">{{ t('call.calling') }}</span> ✕
+          </button>
+          <button
+            v-else
+            class="w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+            style="color: var(--kv-text-muted);"
+            :title="t('call.callButton')"
+            @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-online, #3DB46E)'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)'"
+            @click="startCall(channel.id)"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+          </button>
           <!-- Sabitlenen mesajlar butonu -->
           <div class="relative">
             <button
@@ -597,6 +626,23 @@ function isGroupStart(index: number): boolean {
               {{ t('group.memberCount', { n: groupChannel.members.length }) }}
             </p>
           </div>
+          <!-- Grup sesli sohbet: sese katıl (zaten bağlıysa gizli — kontrol barda) -->
+          <button
+            v-if="!voiceStore.isConnectedTo(channel.id)"
+            class="flex items-center gap-1.5 text-[13px] px-2.5 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
+            style="color: var(--kv-online, #3DB46E);"
+            :title="t('call.joinGroup')"
+            @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-content)'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
+            @click="startGroupCall(channel.id)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+            </svg>
+            {{ t('call.joinGroup') }}
+          </button>
           <!-- Sabitlenen mesajlar butonu (GROUP_DM) -->
           <div class="relative">
             <button

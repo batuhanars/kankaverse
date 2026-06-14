@@ -7,18 +7,26 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useVoiceStore } from '@/stores/voice'
 import { useChannelsStore } from '@/stores/channels'
+import { useDmStore } from '@/stores/dm'
 
 const { t } = useI18n()
 const voiceStore = useVoiceStore()
 const channelsStore = useChannelsStore()
+const dmStore = useDmStore()
 
 const channelName = computed(() => {
   const id = voiceStore.connectedChannelId
   if (!id) return ''
-  // Tüm guild'lerin kanallarında ara (oturum guild değişse de sürer)
+  // Guild kanalları (oturum guild değişse de sürer)
   for (const list of Object.values(channelsStore.channelsByGuild)) {
     const ch = list.find((c) => c.id === id)
     if (ch) return ch.name ?? ''
+  }
+  // DM/grup araması: 1-1 → karşı kullanıcı, grup → grup adı/üyeler
+  const dm = dmStore.channels.find((c) => c.id === id)
+  if (dm) {
+    if (dm.type === 'DM') return dm.otherUser.username
+    return dm.name ?? dm.members.map((m) => m.username).join(', ')
   }
   return ''
 })
