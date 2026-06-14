@@ -12,6 +12,7 @@ import { useJumpToMessage } from '@/composables/useMessageJump'
 import { useCall } from '@/composables/useCall'
 import { useCallStore } from '@/stores/call'
 import { useVoiceStore } from '@/stores/voice'
+import DmCallPanel from './DmCallPanel.vue'
 import { messagesApi } from '@/api/messages'
 import { dmApi } from '@/api/dm'
 import { formatMentionsPlain } from '@/utils/mentions'
@@ -707,6 +708,9 @@ function isGroupStart(index: number): boolean {
       >
         {{ t('message.realtimeError') }}
       </div>
+
+      <!-- Aktif sesli arama kartı (kabul edilince mesajların üstünde) -->
+      <DmCallPanel :channel-id="channel.id" />
 
       <!-- Mesaj listesi (Discord stili — baloncuk yok, sola yaslı düz liste) -->
       <div ref="listEl" class="flex-1 overflow-y-auto py-4 flex flex-col">
