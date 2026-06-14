@@ -32,10 +32,15 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 const REFRESH_COOKIE = 'refresh_token';
+// Cookie SameSite stratejisi deploy topolojisine bağlı (R7 — auth/oturum yüzeyi):
+//  - Aynı-site (subdomain: app./api.kankaverse.com) → 'lax' (varsayılan), Secure yalnız prod.
+//  - Çapraz-site (düz *.vercel.app + *.railway.app) → COOKIE_SAMESITE=none; tarayıcı 'none' için Secure ZORUNLU kılar.
+// Topoloji değişince (subdomain'e geçiş) yalnız env kaldırılır — kod değişmez.
+const COOKIE_SAMESITE = (process.env.COOKIE_SAMESITE as 'lax' | 'none' | 'strict' | undefined) ?? 'lax';
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
+  secure: process.env.NODE_ENV === 'production' || COOKIE_SAMESITE === 'none',
+  sameSite: COOKIE_SAMESITE,
   maxAge: 30 * 24 * 60 * 60 * 1000,
   path: '/',
 };

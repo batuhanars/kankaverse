@@ -33,7 +33,8 @@
   JWT_ACCESS_SECRET=...      JWT_REFRESH_SECRET=...   (uzun rastgele)
   TOTP_ENC_KEY=...           (openssl rand -base64 32 → tam 32 byte)
   RESEND_API_KEY=...         EMAIL_FROM=noreply@kankaverse.app
-  FRONTEND_URL=https://app.kankaverse.com   (CORS + WS origin + e-posta linkleri)
+  FRONTEND_URL=https://<proje>.vercel.app   (CORS + WS origin + e-posta linkleri; custom domain varsa app.kankaverse.com)
+  COOKIE_SAMESITE=none   (ÇAPRAZ-SİTE deploy: web *.vercel.app + api *.railway.app farklı site → refresh cookie 'none'+Secure şart. Subdomain'e geçince bu satırı KALDIR → 'lax')
   LIVEKIT_API_KEY=...  LIVEKIT_API_SECRET=...  LIVEKIT_URL=wss://...livekit.cloud
   S3_ENDPOINT=...  S3_REGION=...  S3_BUCKET=...  S3_ACCESS_KEY=...  S3_SECRET_KEY=...  S3_PUBLIC_URL=...
   PORT=  (Railway otomatik verir; main.ts process.env.PORT okur)
@@ -44,8 +45,8 @@
 ## 3. Frontend — Vercel (`web/`)
 
 - **Root directory:** `web` · **Framework:** Vite · `vercel.json` SPA rewrite + build hazır.
-- **Env:** `VITE_API_URL=https://api.kankaverse.com` (Production). Dev'de tanımsız → vite proxy.
-- **Custom domain:** `app.kankaverse.com`.
+- **Env:** `VITE_API_URL=https://kankaverse-production.up.railway.app` (Production; custom domain varsa api.kankaverse.com). Dev'de tanımsız → vite proxy.
+- **Custom domain (opsiyonel):** `app.kankaverse.com`. Şimdilik düz `*.vercel.app` (çapraz-site → api'de `COOKIE_SAMESITE=none`).
 
 ## 4. LiveKit webhook (artık çalışır — public URL var)
 
