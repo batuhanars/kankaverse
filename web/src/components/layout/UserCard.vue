@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
+import { useVoiceStore } from '@/stores/voice'
 import { useSocket } from '@/composables/useSocket'
 import { onClickOutside } from '@vueuse/core'
 
@@ -12,7 +13,11 @@ const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
 const presenceStore = usePresenceStore()
+const voiceStore = useVoiceStore()
 const { setPresence } = useSocket()
+
+// Ses kontrolleri yalnız sesli kanala bağlıyken etkin
+const inVoice = computed(() => !!voiceStore.connectedChannelId)
 
 const cardRef = ref<HTMLElement | null>(null)
 const showPopover = ref(false)
@@ -179,23 +184,48 @@ function onLogout() {
         </span>
       </div>
 
-      <!-- V2 ses ikonları (rezerve, devre dışı) -->
-      <div class="flex items-center gap-1 shrink-0 opacity-20 pointer-events-none">
-        <span class="w-7 h-7 flex items-center justify-center" style="color: var(--kv-text-muted);">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- V2 ses kontrolleri — yalnız sesli kanala bağlıyken etkin -->
+      <div class="flex items-center gap-1 shrink-0" :class="inVoice ? '' : 'opacity-20 pointer-events-none'">
+        <!-- Kendini sustur (yalnız konuşma izni varsa anlamlı) -->
+        <button
+          class="w-7 h-7 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
+          :title="voiceStore.isMuted ? t('voice.unmute') : t('voice.mute')"
+          :style="{ color: voiceStore.isMuted ? 'var(--kv-danger)' : 'var(--kv-text-muted)' }"
+          @click.stop="voiceStore.toggleMute()"
+        >
+          <!-- Açık mikrofon -->
+          <svg v-if="!voiceStore.isMuted" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+          </svg>
+          <!-- Susturulmuş mikrofon (çizgili) -->
+          <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="1" y1="1" x2="23" y2="23"/>
             <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
             <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
             <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
           </svg>
-        </span>
-        <span class="w-7 h-7 flex items-center justify-center" style="color: var(--kv-text-muted);">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        </button>
+        <!-- Kendini sağırlaştır -->
+        <button
+          class="w-7 h-7 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
+          :title="voiceStore.isDeafened ? t('voice.undeafen') : t('voice.deafen')"
+          :style="{ color: voiceStore.isDeafened ? 'var(--kv-danger)' : 'var(--kv-text-muted)' }"
+          @click.stop="voiceStore.toggleDeafen()"
+        >
+          <!-- Açık kulaklık -->
+          <svg v-if="!voiceStore.isDeafened" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
             <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
           </svg>
-        </span>
+          <!-- Sağırlaştırılmış kulaklık (çizgili) -->
+          <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="1" y1="1" x2="23" y2="23"/>
+            <path d="M3 18v-6a9 9 0 0 1 9-9M21 12v6"/>
+            <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+          </svg>
+        </button>
       </div>
     </button>
 
