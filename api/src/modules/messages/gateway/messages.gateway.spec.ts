@@ -42,6 +42,8 @@ const presenceMock = {
   setStatus: jest.fn(),
 };
 
+const dmPermissionMock = { canDm: jest.fn() };
+
 function makeGateway() {
   return new MessagesGateway(
     jwtMock as any,
@@ -50,6 +52,7 @@ function makeGateway() {
     membershipMock as any,
     realtimeMock as any,
     presenceMock as any,
+    dmPermissionMock as any,
   );
 }
 
