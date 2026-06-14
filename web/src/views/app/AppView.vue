@@ -11,7 +11,6 @@ import ChannelPanel from '@/components/layout/ChannelPanel.vue'
 import TopBar from '@/components/layout/TopBar.vue'
 import MemberPanel from '@/components/layout/MemberPanel.vue'
 import UserCard from '@/components/layout/UserCard.vue'
-import VoiceConnectedBar from '@/components/layout/VoiceConnectedBar.vue'
 import MessageArea from './components/MessageArea.vue'
 import VoiceRoomView from './components/VoiceRoomView.vue'
 import ServerModal from './components/ServerModal.vue'
@@ -241,9 +240,7 @@ const activeDmChannel = computed(() => dmStore.activeChannel())
             @select-dm="selectDm"
           />
         </div>
-        <!-- Aktif ses oturumu barı (UserCard üstünde; kanal değişse de sürer) -->
-        <VoiceConnectedBar />
-        <!-- UserCard: ServerRail + sidebar genişliğini kaplar -->
+        <!-- UserCard: ServerRail + sidebar genişliğini kaplar (aktif ses barı UserCard içinde, bitişik) -->
         <UserCard @logout="logout" />
       </div>
 
