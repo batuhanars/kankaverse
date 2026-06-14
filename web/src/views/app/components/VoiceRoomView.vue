@@ -9,17 +9,14 @@ import { useI18n } from 'vue-i18n'
 import { useVoiceStore, type RoomMember } from '@/stores/voice'
 import { useChannelsStore } from '@/stores/channels'
 
-const props = defineProps<{ channelId: string }>()
 const { t } = useI18n()
 const voiceStore = useVoiceStore()
 const channelsStore = useChannelsStore()
 
-const channelName = computed(
-  () => channelsStore.channelsForGuild(channelsStore.activeChannel()?.guildId ?? '').find((c) => c.id === props.channelId)?.name
-    ?? channelsStore.activeChannel()?.name
-    ?? '',
-)
-const connectedHere = computed(() => voiceStore.connectedChannelId === props.channelId)
+// Aktif kanal (ses) store'dan — prop'suz; <component :is> ile metin varyantıyla simetrik
+const channelId = computed(() => channelsStore.activeChannelId ?? '')
+const channelName = computed(() => channelsStore.activeChannel()?.name ?? '')
+const connectedHere = computed(() => voiceStore.connectedChannelId === channelId.value)
 const members = computed<RoomMember[]>(() => (connectedHere.value ? voiceStore.roomParticipants : []))
 
 function isSpeaking(m: RoomMember): boolean {
