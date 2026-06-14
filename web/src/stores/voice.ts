@@ -41,6 +41,8 @@ export const useVoiceStore = defineStore('voice', () => {
   const speakingUserIds = ref<Set<string>>(new Set())
   // Kendini sağırlaştır: tüm gelen sesi + kendi mikrofonunu kapatır
   const isDeafened = ref(false)
+  // Mikrofon açılamadı nedeni: 'insecure' (güvenli olmayan bağlam, getUserMedia yok) | 'denied' (izin/cihaz) | ''
+  const micError = ref<'' | 'insecure' | 'denied'>('')
   // Bağlı odanın CANLI katılımcıları (LiveKit Room'dan; webhook'tan bağımsız, güvenilir)
   const roomParticipants = ref<RoomMember[]>([])
   // Mikrofonu kapalı uzak katılımcılar (TrackMuted/Unmuted)
@@ -114,11 +116,15 @@ export const useVoiceStore = defineStore('voice', () => {
 
       if (data.canPublish) {
         try {
+          // getUserMedia yalnız güvenli bağlamda (localhost/HTTPS) var; yoksa Firefox hiç sormaz
+          if (!navigator.mediaDevices?.getUserMedia) throw new Error('insecure')
           await room.localParticipant.setMicrophoneEnabled(true)
           isMuted.value = false
-        } catch {
-          // Mikrofon izni reddi → dinleyici kal, sustur durumunda göster
+          micError.value = ''
+        } catch (e) {
+          // Mikrofon açılamadı → dinleyici kal + NEDENİ görünür yap (sessiz yutma yok)
           isMuted.value = true
+          micError.value = !window.isSecureContext || (e as Error)?.message === 'insecure' ? 'insecure' : 'denied'
         }
       } else {
         // Karantina: dinleyici modu
@@ -146,6 +152,7 @@ export const useVoiceStore = defineStore('voice', () => {
     isMuted.value = false
     canPublish.value = false
     isDeafened.value = false
+    micError.value = ''
     speakingUserIds.value = new Set()
     roomParticipants.value = []
     mutedUserIds.value = new Set()
@@ -272,6 +279,7 @@ export const useVoiceStore = defineStore('voice', () => {
     error,
     speakingUserIds,
     isDeafened,
+    micError,
     roomParticipants,
     mutedUserIds,
     isConnectedTo,
