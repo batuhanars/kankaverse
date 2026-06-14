@@ -567,7 +567,7 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   - [x] Backend: token endpoint DM/GROUP_DM'e açıldı (`requireNoDmBlock` + 1-1 `canDm` re-check; GROUP_DM block) · WS davet sinyalleri (`voice:call_invite` **davet gate'i canDm**, accept/reject/cancel, `group_call_start`) · 5 yeni test (485 toplam yeşil)
   - [x] Frontend: `stores/call` + `useCall` (ring/timeout 30sn) · useSocket sinyalleri · IncomingCallModal (global) + nötr bilgi şeridi · DmConversation 1-1 telefon + grup "Sese Katıl" · VoiceConnectedBar DM/grup adı · i18n `call.*`
   - [x] **R7 İNCELEMESİ:** davet gate'i (`voice:call_invite` canDm) + DM token kapısı — **PM satır-satır inceledi + sahip onayladı 2026-06-14** (canDm ring callee'ye ulaşmadan önce/jenerik DM_NOT_ALLOWED-statü sızmıyor; token mint requireDmCallGate+canDm re-check+requireNoDmBlock+requireChannelAccess ile fail-closed). **Bulgu DM-1 düzeltildi:** accept/reject/cancel relay'i artık `otherDmMember`'da çağıran-üyelik kontrollü (sahte sinyal engellendi); 485 test geçti
-  - [ ] **Cila (sonraki):** DM call katılımcı şeridi (sohbet alanında avatar+halka) · giden çağrı global bar (DM'den çıkınca da görünür)
+  - [x] **Cila:** DM call katılımcı şeridi (sohbet alanında avatar+halka) — `DmCallPanel` (8012a87) · **giden çağrı global bar** — `OutgoingCallBar` UserCard'da (VoiceConnectedBar üstü); DM'den çıksan da "Aranıyor… {ad}" + iptal görünür, kabul edilince VoiceConnectedBar devralır (2026-06-14)
 - [ ] **Ertelenenler (hepsi sprint-boyu: backend + contract + R7):** özel emoji (CSAM-kapısı) · kategori/kanal drag-reorder (batch reorder endpoint) · sahiplik devri/ortam-ban/ayrılma · sunucu-geneli arama
 
 ---
