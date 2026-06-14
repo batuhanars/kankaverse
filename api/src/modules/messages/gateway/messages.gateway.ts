@@ -237,11 +237,15 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   // ── Sprint V2 — DM sesli arama sinyalizasyonu (gate SUNUCUDA; sözleşme SPRINT_V2_DM_CALL_CONTRACT.md) ──
   // R7: davet gate'i ring YAYILMADAN ÖNCE; jenerik DM_NOT_ALLOWED (engellenme/ilişki sızmaz).
 
+  // R7 (DM-1): çağıran kanalın üyesi DEĞİLSE null → sahte accept/reject/cancel relay'i engellenir.
+  // Tek sorgu hem üyelik doğrular hem karşı tarafı bulur (DRY; dört handler de kapı kazanır).
   private async otherDmMember(channelId: string, userId: string): Promise<string | null> {
-    const other = await this.prisma.channelMember.findFirst({
-      where: { channelId, userId: { not: userId } },
+    const members = await this.prisma.channelMember.findMany({
+      where: { channelId },
       select: { userId: true },
     });
+    if (!members.some((m) => m.userId === userId)) return null; // çağıran üye değil
+    const other = members.find((m) => m.userId !== userId);
     return other?.userId ?? null;
   }
 
