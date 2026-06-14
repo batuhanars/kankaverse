@@ -13,12 +13,14 @@ export default () => {
     }
   }
 
-  if (process.env.NODE_ENV === 'production') {
+  // S3 yalnızca dosya yükleme AÇIKSA prod'da zorunlu. UPLOADS_ENABLED=false → S3 gerekmez
+  // (CSAM tarayıcı/R5 hazır olana dek yüklemeyi kapalı tutmak ayrıca güvenli taraf).
+  if (process.env.NODE_ENV === 'production' && process.env.UPLOADS_ENABLED !== 'false') {
     for (const key of S3_REQUIRED_PROD_ENVS) {
       if (!process.env[key]) {
         throw new Error(
-          `FATAL: Production ortamında S3 değişkeni '${key}' zorunludur. ` +
-          `Dosya paylaşımı çalışmaz.`,
+          `FATAL: Production ortamında (UPLOADS_ENABLED!=false iken) S3 değişkeni '${key}' zorunludur. ` +
+          `Yüklemeyi kapatmak için UPLOADS_ENABLED=false ver.`,
         );
       }
     }
