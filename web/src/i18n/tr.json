@@ -494,7 +494,7 @@
     "sectionHeader": "MESAJLAR",
     "noDms": "Henüz mesaj yok.",
     "empty": "Henüz mesaj yok. İlk mesajı sen gönder!",
-    "placeholder": "@{user} kullanıcısına mesaj yaz",
+    "placeholder": "{'@'}{user} kullanıcısına mesaj yaz",
     "groupPlaceholder": "{name} grubuna mesaj yaz",
     "cannotMessage": "Bu kullanıcıya mesaj gönderemezsiniz.",
     "selfBlocked": "Bu kullanıcıyı engellediniz.",
