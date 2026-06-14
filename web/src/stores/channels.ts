@@ -50,7 +50,7 @@ export const useChannelsStore = defineStore('channels', () => {
     }
   }
 
-  async function createChannel(guildId: string, payload: { name: string; ageGated?: boolean; isPrivate?: boolean; categoryId?: string | null }): Promise<ChannelDto> {
+  async function createChannel(guildId: string, payload: { name: string; type?: 'GUILD_TEXT' | 'GUILD_VOICE'; ageGated?: boolean; isPrivate?: boolean; categoryId?: string | null }): Promise<ChannelDto> {
     const res = await guildsApi.createChannel(guildId, payload)
     if (!channelsByGuild.value[guildId]) channelsByGuild.value[guildId] = []
     channelsByGuild.value[guildId].push(res.data)

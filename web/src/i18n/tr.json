@@ -490,6 +490,16 @@
     "onlineSection": "Çevrimiçi — {count}",
     "offlineSection": "Çevrimdışı — {count}"
   },
+  "voice": {
+    "connected": "SESE BAĞLISIN",
+    "leave": "Sesten ayrıl",
+    "mute": "Kendini sustur",
+    "unmute": "Susturmayı kaldır",
+    "joining": "Bağlanılıyor…",
+    "listenerOnly": "Karantinada olduğun için dinleyebilir ama konuşamazsın.",
+    "micDenied": "Mikrofon izni verilmedi; dinleyici olarak bağlısın.",
+    "noParticipants": "Kanalda kimse yok"
+  },
   "dm": {
     "sectionHeader": "MESAJLAR",
     "noDms": "Henüz mesaj yok.",

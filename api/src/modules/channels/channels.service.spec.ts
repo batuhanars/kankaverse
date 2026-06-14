@@ -109,6 +109,19 @@ describe('ChannelsService.create', () => {
     expect(result).toMatchObject({ name: 'yeni-kanal', ageGated: false, position: 3 });
   });
 
+  it('type: GUILD_VOICE → kanal ses türünde oluşturulur', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.channel.aggregate.mockResolvedValue({ _max: { position: 0 } });
+    const created = makeChannel({ name: 'sohbet-sesi', position: 1, type: 'GUILD_VOICE' });
+    prismaMock.channel.create.mockResolvedValue(created);
+
+    await service.create(USER_ID, GUILD_ID, { name: 'sohbet-sesi', type: 'GUILD_VOICE' });
+
+    expect(prismaMock.channel.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ type: 'GUILD_VOICE' }) }),
+    );
+  });
+
   it('ADMIN → kanal oluşturur', async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: ADMIN_MEMBERSHIP });
     prismaMock.channel.aggregate.mockResolvedValue({ _max: { position: null } });

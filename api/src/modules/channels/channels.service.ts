@@ -50,7 +50,7 @@ export class ChannelsService {
     const channel = await this.prisma.channel.create({
       data: {
         guildId,
-        type: 'GUILD_TEXT',
+        type: dto.type ?? 'GUILD_TEXT',
         name: dto.name,
         ageGated: dto.ageGated ?? false,
         isPrivate: dto.isPrivate ?? false,
