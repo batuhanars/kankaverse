@@ -147,9 +147,9 @@ function onLogout() {
         ? 'background-color: var(--kv-bg-content); border: 1px solid var(--kv-border-strong);'
         : 'background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);'"
     >
-      <!-- Menü tetikleyici: avatar + ad (tıkla → popover) -->
+      <!-- Menü tetikleyici: avatar + ad (kendi hover'ı; kart geneli hover yok) -->
       <button
-        class="flex items-center gap-2.5 flex-1 min-w-0 overflow-hidden cursor-pointer text-left"
+        class="flex items-center gap-2.5 flex-1 min-w-0 overflow-hidden cursor-pointer text-left rounded-[var(--kv-radius-md)] px-1.5 py-1 -mx-1.5 -my-1 transition-colors hover:bg-[var(--kv-bg-content)]"
         @click="showPopover = !showPopover"
       >
         <!-- Avatar + presence dot -->
@@ -226,7 +226,5 @@ function onLogout() {
 </template>
 
 <style scoped>
-.pill-btn:not([data-open]):hover {
-  background-color: var(--kv-bg-content) !important;
-}
+/* Kart geneli hover kaldırıldı — hover/tıklama artık iç butonlarda (tetikleyici + mic + kulaklık). */
 </style>
