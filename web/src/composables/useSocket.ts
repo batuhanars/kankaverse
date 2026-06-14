@@ -8,6 +8,7 @@ import { useDmStore } from '@/stores/dm'
 import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
 import { useAuthStore } from '@/stores/auth'
+import { useVoiceStore, type VoiceParticipant } from '@/stores/voice'
 import { getAccessToken } from '@/api/axios'
 import {
   _bindTypingEmitters,
@@ -32,6 +33,7 @@ export function useSocket() {
   const channelsStore = useChannelsStore()
   const guildsStore = useGuildsStore()
   const authStore = useAuthStore()
+  const voiceStore = useVoiceStore()
 
   function _joinRoom(channelId: string) {
     socket?.emit('channel:join', { channelId }, (ack: { ok: boolean; error?: string }) => {
@@ -173,6 +175,15 @@ export function useSocket() {
       if (activeChannelId === data.channelId) return
       channelsStore.markChannelUnread(data.channelId, data.guildId)
       guildsStore.incrementGuildUnread(data.guildId)
+    })
+
+    // Sprint V2 LiveKit: ses kanalı presence (backend webhook → WS; sözleşme §5)
+    socket.on('voice.participant_joined', (data: { channelId: string; participant: VoiceParticipant }) => {
+      voiceStore.addParticipant(data.channelId, data.participant)
+    })
+
+    socket.on('voice.participant_left', (data: { channelId: string; userId: string }) => {
+      voiceStore.removeParticipant(data.channelId, data.userId)
     })
 
     // Typing emit fonksiyonlarını useTyping composable'ına bağla

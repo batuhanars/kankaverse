@@ -28,6 +28,7 @@ export type GuildRole = (typeof GuildRole)[keyof typeof GuildRole]
 
 export const ChannelType = {
   GUILD_TEXT: 'GUILD_TEXT',
+  GUILD_VOICE: 'GUILD_VOICE',
   DM: 'DM',
   GROUP_DM: 'GROUP_DM',
 } as const

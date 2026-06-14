@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useAuthStore } from '@/stores/auth'
+import { useVoiceStore } from '@/stores/voice'
 import { guildsApi } from '@/api/guilds'
 import { channelsApi } from '@/api/channels'
 import GuildSettingsModal from '@/views/app/components/GuildSettingsModal.vue'
@@ -12,6 +13,7 @@ import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import VoiceParticipantList from '@/components/shared/VoiceParticipantList.vue'
 import type { ChannelDto, CategoryDto, ChannelMemberDto, GuildMemberDto } from '@/types'
 
 const { t } = useI18n()
@@ -19,6 +21,7 @@ const router = useRouter()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const authStore = useAuthStore()
+const voiceStore = useVoiceStore()
 
 const showSettings = ref(false)
 
@@ -89,12 +92,18 @@ function categoryIsCollapsed(categoryId: string): boolean {
 function selectChannel(channel: ChannelDto) {
   const guildId = guildsStore.activeGuildId
   if (!guildId) return
+  // Ses kanalı: route'lamak yerine ses oturumuna katıl (oturum kanal değişse de sürer)
+  if (channel.type === 'GUILD_VOICE') {
+    voiceStore.join(channel.id)
+    return
+  }
   router.push({ name: 'channel', params: { guildId, channelId: channel.id } })
 }
 
 // ── Kanal oluştur ──
 const showCreate = ref(false)
 const createName = ref('')
+const createType = ref<'GUILD_TEXT' | 'GUILD_VOICE'>('GUILD_TEXT')
 const createAgeGated = ref(false)
 const createIsPrivate = ref(false)
 const createCategoryId = ref<string | null>(null)
@@ -103,6 +112,7 @@ const createError = ref('')
 
 function openCreate(categoryId?: string | null) {
   createName.value = ''
+  createType.value = 'GUILD_TEXT'
   createAgeGated.value = false
   createIsPrivate.value = false
   createCategoryId.value = categoryId ?? null
@@ -120,6 +130,7 @@ async function submitCreate() {
   try {
     await channelsStore.createChannel(guildId, {
       name,
+      type: createType.value,
       ageGated: createAgeGated.value,
       isPrivate: createIsPrivate.value,
       categoryId: createCategoryId.value,
@@ -484,9 +495,8 @@ function closeCategoryMenu() {
     <div class="flex-1 overflow-y-auto pt-4 pb-20 px-2">
 
       <!-- ── (1) Kategorisiz kanallar — en üstte ── -->
+      <template v-for="channel in uncategorizedChannels" :key="channel.id">
       <div
-        v-for="channel in uncategorizedChannels"
-        :key="channel.id"
         class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
         :class="[
           channelsStore.activeChannelId === channel.id
@@ -498,8 +508,13 @@ function closeCategoryMenu() {
           class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-2 pr-2"
           @click="selectChannel(channel)"
         >
-          <!-- C: kanal türü ikonu (şimdi hep #; ileride genişletilebilir) -->
-          <span style="color: var(--kv-text-muted);">#</span>
+          <!-- C: kanal türü ikonu — ses kanalı hoparlör, metin # -->
+          <svg v-if="channel.type === 'GUILD_VOICE'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+          </svg>
+          <span v-else style="color: var(--kv-text-muted);">#</span>
           <span
             class="truncate"
             :class="[
@@ -575,6 +590,9 @@ function closeCategoryMenu() {
           </button>
         </div>
       </div>
+      <!-- Ses kanalı → katılımcı alt-listesi -->
+      <VoiceParticipantList v-if="channel.type === 'GUILD_VOICE'" :channel-id="channel.id" />
+      </template>
 
       <!-- ── (2) Kategoriler — position asc; E: başlıklar DB'den gelir ── -->
       <template v-for="cat in sortedCategories" :key="cat.id">
@@ -660,9 +678,8 @@ function closeCategoryMenu() {
 
         <!-- Kategorinin kanalları (katlanmışsa gizli) -->
         <template v-if="!categoryIsCollapsed(cat.id)">
+          <template v-for="channel in channelsForCategory(cat.id)" :key="channel.id">
           <div
-            v-for="channel in channelsForCategory(cat.id)"
-            :key="channel.id"
             class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
             :class="[
               channelsStore.activeChannelId === channel.id
@@ -674,8 +691,13 @@ function closeCategoryMenu() {
               class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-4 pr-2"
               @click="selectChannel(channel)"
             >
-              <!-- C: kanal türü ikonu -->
-              <span style="color: var(--kv-text-muted);">#</span>
+              <!-- C: kanal türü ikonu — ses kanalı hoparlör, metin # -->
+              <svg v-if="channel.type === 'GUILD_VOICE'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              </svg>
+              <span v-else style="color: var(--kv-text-muted);">#</span>
               <span
                 class="truncate"
                 :class="[
@@ -751,6 +773,9 @@ function closeCategoryMenu() {
               </button>
             </div>
           </div>
+          <!-- Ses kanalı → katılımcı alt-listesi -->
+          <VoiceParticipantList v-if="channel.type === 'GUILD_VOICE'" :channel-id="channel.id" />
+          </template>
         </template>
       </template>
 
@@ -793,30 +818,36 @@ function closeCategoryMenu() {
           {{ t('channel.channelTypeLabel') }}
         </p>
         <div class="flex gap-2">
-          <!-- Metin — etkin/seçili -->
-          <div
-            class="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-[var(--kv-radius-md)] border-2 cursor-default"
-            style="border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);"
+          <!-- Metin — seçilebilir -->
+          <button
+            type="button"
+            class="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-[var(--kv-radius-md)] cursor-pointer transition-colors"
+            :class="createType === 'GUILD_TEXT' ? 'border-2' : 'border'"
+            :style="createType === 'GUILD_TEXT'
+              ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
+              : 'border-color: var(--kv-border-subtle);'"
+            @click="createType = 'GUILD_TEXT'"
           >
-            <span class="text-[18px] font-bold leading-none" style="color: var(--kv-accent-500);">#</span>
-            <span class="text-[12px] font-medium" style="color: var(--kv-text-primary);">{{ t('channel.channelTypeText') }}</span>
-          </div>
-          <!-- Ses — devre dışı -->
-          <div
-            class="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-[var(--kv-radius-md)] border cursor-not-allowed opacity-50"
-            style="border-color: var(--kv-border-subtle);"
+            <span class="text-[18px] font-bold leading-none" :style="{ color: createType === 'GUILD_TEXT' ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)' }">#</span>
+            <span class="text-[12px] font-medium" :style="{ color: createType === 'GUILD_TEXT' ? 'var(--kv-text-primary)' : 'var(--kv-text-muted)' }">{{ t('channel.channelTypeText') }}</span>
+          </button>
+          <!-- Ses — seçilebilir (audio-only) -->
+          <button
+            type="button"
+            class="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-[var(--kv-radius-md)] cursor-pointer transition-colors"
+            :class="createType === 'GUILD_VOICE' ? 'border-2' : 'border'"
+            :style="createType === 'GUILD_VOICE'
+              ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
+              : 'border-color: var(--kv-border-subtle);'"
+            @click="createType = 'GUILD_VOICE'"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ color: createType === 'GUILD_VOICE' ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)' }">
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
               <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
               <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
             </svg>
-            <span class="text-[12px] font-medium" style="color: var(--kv-text-muted);">{{ t('channel.channelTypeVoice') }}</span>
-            <span
-              class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
-              style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
-            >{{ t('channel.channelTypeSoon') }}</span>
-          </div>
+            <span class="text-[12px] font-medium" :style="{ color: createType === 'GUILD_VOICE' ? 'var(--kv-text-primary)' : 'var(--kv-text-muted)' }">{{ t('channel.channelTypeVoice') }}</span>
+          </button>
           <!-- Forum — devre dışı -->
           <div
             class="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-[var(--kv-radius-md)] border cursor-not-allowed opacity-50"

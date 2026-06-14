@@ -1,4 +1,4 @@
-import { IsString, IsBoolean, IsOptional, IsInt, Min, Max, MinLength, MaxLength, Matches, ValidateIf } from 'class-validator';
+import { IsString, IsBoolean, IsOptional, IsInt, IsIn, Min, Max, MinLength, MaxLength, Matches, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateChannelDto {
@@ -8,6 +8,11 @@ export class CreateChannelDto {
   @MaxLength(50, { message: 'Kanal adı en fazla 50 karakter olabilir.' })
   @Matches(/^[a-z0-9-]+$/, { message: 'Kanal adı yalnızca küçük harf, rakam ve tire içerebilir.' })
   name: string;
+
+  @ApiPropertyOptional({ example: 'GUILD_VOICE', enum: ['GUILD_TEXT', 'GUILD_VOICE'], description: 'Kanal türü (varsayılan GUILD_TEXT)' })
+  @IsOptional()
+  @IsIn(['GUILD_TEXT', 'GUILD_VOICE'], { message: 'Geçersiz kanal türü.' })
+  type?: 'GUILD_TEXT' | 'GUILD_VOICE';
 
   @ApiPropertyOptional({ example: false, description: '18+ yaş-kapılı kanal (varsayılan false)' })
   @IsOptional()
