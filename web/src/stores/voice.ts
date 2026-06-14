@@ -34,9 +34,15 @@ export const useVoiceStore = defineStore('voice', () => {
   const error = ref('')
   // ActiveSpeakers (yalnız bağlı oda) — userId seti
   const speakingUserIds = ref<Set<string>>(new Set())
+  // Kendini sağırlaştır: tüm gelen sesi + kendi mikrofonunu kapatır
+  const isDeafened = ref(false)
 
   // LiveKit Room — reaktif değil (kompleks nesne)
   let room: Room | null = null
+  // Bağlı uzak ses elementleri (sağırlaştırma için muted toggle'lanır)
+  const remoteAudioEls = new Set<HTMLMediaElement>()
+  // Sağırlaştırma öncesi mute durumu (kaldırınca geri yükle)
+  let muteBeforeDeafen = false
 
   function isConnectedTo(channelId: string): boolean {
     return connectedChannelId.value === channelId
@@ -115,10 +121,16 @@ export const useVoiceStore = defineStore('voice', () => {
       try { await room.disconnect() } catch { /* yoksay */ }
       room = null
     }
+    resetLocalState()
+  }
+
+  function resetLocalState() {
     connectedChannelId.value = null
     isMuted.value = false
     canPublish.value = false
+    isDeafened.value = false
     speakingUserIds.value = new Set()
+    remoteAudioEls.clear()
   }
 
   async function toggleMute() {
@@ -127,8 +139,34 @@ export const useVoiceStore = defineStore('voice', () => {
     try {
       await room.localParticipant.setMicrophoneEnabled(!next)
       isMuted.value = next
+      // Sağırken mikrofonu açmak sağırlığı da kaldırır (Discord deseni)
+      if (!next && isDeafened.value) applyDeafen(false)
     } catch {
       // izin yoksa değiştirme
+    }
+  }
+
+  // Kendini sağırlaştır: gelen tüm sesi sustur + mikrofonu kapat
+  async function toggleDeafen() {
+    if (!room) return
+    await applyDeafen(!isDeafened.value)
+  }
+
+  async function applyDeafen(next: boolean) {
+    isDeafened.value = next
+    for (const el of remoteAudioEls) el.muted = next
+    if (!room) return
+    if (next) {
+      // Sağırlaştır → mikrofonu kapat (önceki durumu hatırla)
+      muteBeforeDeafen = isMuted.value
+      if (canPublish.value && !isMuted.value) {
+        try { await room.localParticipant.setMicrophoneEnabled(false); isMuted.value = true } catch { /* yoksay */ }
+      }
+    } else {
+      // Sağırlığı kaldır → mikrofonu sağırlık öncesi haline getir
+      if (canPublish.value && !muteBeforeDeafen && isMuted.value) {
+        try { await room.localParticipant.setMicrophoneEnabled(true); isMuted.value = false } catch { /* yoksay */ }
+      }
     }
   }
 
@@ -138,22 +176,24 @@ export const useVoiceStore = defineStore('voice', () => {
       if (track.kind === Track.Kind.Audio) {
         const el = track.attach() // <audio autoplay>
         el.style.display = 'none'
+        el.muted = isDeafened.value // sağırsa yeni gelen sesi de sustur
         document.body.appendChild(el)
+        remoteAudioEls.add(el)
       }
     })
     r.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
-      track.detach().forEach((el) => el.remove())
+      track.detach().forEach((el) => {
+        remoteAudioEls.delete(el)
+        el.remove()
+      })
     })
     r.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
       speakingUserIds.value = new Set(speakers.map((s) => s.identity))
     })
     r.on(RoomEvent.Disconnected, () => {
       // Sunucu/ağ kaynaklı kopma → yerel durumu temizle (UI tutarlı kalsın)
-      connectedChannelId.value = null
-      isMuted.value = false
-      canPublish.value = false
-      speakingUserIds.value = new Set()
       room = null
+      resetLocalState()
     })
     // Not: katılımcı listesi (panel) backend WS'inden beslenir; client room event'i
     // güven kaynağı değil (sözleşme §5). Burada yalnız ses + konuşan göstergesi.
@@ -167,6 +207,7 @@ export const useVoiceStore = defineStore('voice', () => {
     canPublish,
     error,
     speakingUserIds,
+    isDeafened,
     isConnectedTo,
     participantsFor,
     loadParticipants,
@@ -175,6 +216,7 @@ export const useVoiceStore = defineStore('voice', () => {
     join,
     leave,
     toggleMute,
+    toggleDeafen,
   }
 })
 
