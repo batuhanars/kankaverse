@@ -18,6 +18,7 @@ import UserCard from '@/components/layout/UserCard.vue'
 import EmailVerificationBanner from '@/components/shared/EmailVerificationBanner.vue'
 import ServerModal from './components/ServerModal.vue'
 import FriendAddModal from '@/views/home/components/FriendAddModal.vue'
+import IncomingCallModal from '@/components/shared/IncomingCallModal.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -88,5 +89,7 @@ onUnmounted(() => {
 
     <ServerModal v-if="showServerModal" :initial-step="serverModalStep" @close="closeServerModal" />
     <FriendAddModal v-if="showAddFriendModal" @close="closeAddFriend" />
+    <!-- Gelen DM sesli arama (global) -->
+    <IncomingCallModal />
   </div>
 </template>

@@ -505,6 +505,18 @@
     "micDenied": "Mikrofon izni verilmedi; dinleyici olarak bağlısın.",
     "noParticipants": "Kanalda kimse yok"
   },
+  "call": {
+    "incoming": "Gelen sesli arama",
+    "accept": "Kabul et",
+    "reject": "Reddet",
+    "calling": "Aranıyor…",
+    "cancel": "İptal",
+    "callButton": "Sesli ara",
+    "joinGroup": "Sese katıl",
+    "unreachable": "Kullanıcıya ulaşılamadı.",
+    "rejected": "Arama reddedildi.",
+    "groupStarted": "{user} sesli sohbet başlattı"
+  },
   "dm": {
     "sectionHeader": "MESAJLAR",
     "noDms": "Henüz mesaj yok.",
