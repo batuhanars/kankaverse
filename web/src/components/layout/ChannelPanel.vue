@@ -92,10 +92,9 @@ function categoryIsCollapsed(categoryId: string): boolean {
 function selectChannel(channel: ChannelDto) {
   const guildId = guildsStore.activeGuildId
   if (!guildId) return
-  // Ses kanalı: route'lamak yerine ses oturumuna katıl (oturum kanal değişse de sürer)
+  // Ses kanalı: oturuma katıl + kanalı aktif yap (merkez VoiceRoomView'a geçer)
   if (channel.type === 'GUILD_VOICE') {
     voiceStore.join(channel.id)
-    return
   }
   router.push({ name: 'channel', params: { guildId, channelId: channel.id } })
 }

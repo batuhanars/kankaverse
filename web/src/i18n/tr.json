@@ -498,6 +498,9 @@
     "deafen": "Kendini sağırlaştır",
     "undeafen": "Sağırlaştırmayı kaldır",
     "joining": "Bağlanılıyor…",
+    "notConnected": "Bu ses kanalına bağlı değilsin.",
+    "joinAction": "Sese Katıl",
+    "you": "sen",
     "listenerOnly": "Karantinada olduğun için dinleyebilir ama konuşamazsın.",
     "micDenied": "Mikrofon izni verilmedi; dinleyici olarak bağlısın.",
     "noParticipants": "Kanalda kimse yok"
