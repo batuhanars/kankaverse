@@ -44,6 +44,7 @@ enum GuildRole {
 
 enum ChannelType {
   GUILD_TEXT
+  GUILD_VOICE
   DM
   GROUP_DM
 }
@@ -95,6 +96,7 @@ model User {
   moderationTargets   ModerationAction[] @relation("ModerationTargets")
   auditLogs           AuditLog[]         @relation("AuditActor")
   channelReads        ChannelRead[]
+  voiceSessions       VoiceSession[]
 }
 
 model AuthToken {
@@ -200,8 +202,27 @@ model Channel {
   messages        Message[]
   members         ChannelMember[]
   channelReads    ChannelRead[]
+  voiceSessions   VoiceSession[]
 
   @@index([guildId])
+}
+
+// Ses kanalı T&S audit — append-only (presence DEĞİL, geçmiş).
+// §4 davranış örüntüsü tespiti: yetişkin→çok sayıda minör teması sinyali.
+// Anlık "şu an kim var" LiveKit room state + WS ile; bu tablo kalıcı geçmiş.
+// Sözleşme: contracts/SPRINT_V2_LIVEKIT_CONTRACT.md §B2.
+model VoiceSession {
+  id        String    @id @default(cuid())
+  channelId String
+  channel   Channel   @relation(fields: [channelId], references: [id])
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  joinedAt  DateTime  @default(now())
+  leftAt    DateTime? // webhook participant_left ile set; null = (kayda göre) hâlâ içeride
+  createdAt DateTime  @default(now())
+
+  @@index([userId, joinedAt])
+  @@index([channelId, leftAt])
 }
 
 model Message {

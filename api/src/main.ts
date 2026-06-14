@@ -3,6 +3,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const cookieParser = require('cookie-parser');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const express = require('express');
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -12,6 +14,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.use(cookieParser());
+
+  // LiveKit webhook ham gövde ister (imza doğrulaması) → bu route'ta JSON parse etme, Buffer bırak.
+  // Nest'in JSON parser'ı application/webhook+json'ı zaten ayrıştırmaz; burada her tipi Buffer'a alıyoruz.
+  app.use('/voice/webhook', express.raw({ type: () => true }));
 
   app.useGlobalPipes(
     new ValidationPipe({
