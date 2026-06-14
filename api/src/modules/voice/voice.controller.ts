@@ -26,15 +26,15 @@ export class VoiceController {
   @Post(':id/voice/token')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Ses kanalına katılım tokeni (LiveKit, audio-only)' })
-  mintToken(@CurrentUser() userId: string, @Param('id') channelId: string) {
-    return this.voiceService.mintToken(userId, channelId);
+  mintToken(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
+    return this.voiceService.mintToken(user.id, channelId);
   }
 
   // C3 — Anlık katılımcılar (LiveKit room state)
   @Get(':id/voice/participants')
   @ApiOperation({ summary: 'Ses kanalındaki anlık katılımcılar' })
-  listParticipants(@CurrentUser() userId: string, @Param('id') channelId: string) {
-    return this.voiceService.listParticipants(userId, channelId);
+  listParticipants(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
+    return this.voiceService.listParticipants(user.id, channelId);
   }
 }
 
