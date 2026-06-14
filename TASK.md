@@ -580,3 +580,26 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Tüm UI metni i18n'den *(tr.json; gömülü string denetimi Faz 3'te yapıldı)*
 - [x] Envelope tutarlı + Swagger üretiyor + Redis adapter bağlı
 - [~] İki kullanıcı uçtan uca gerçek zamanlı mesajlaşma — kod yolu çalışıyor; **2-hesap manuel e2e** PLAN açık kalemi (ortam join UI ile birlikte)
+
+---
+
+## Revizeler — Sahip saha testi (Notion "Kankaverse Revizeler", 2026-06-14)
+
+> Canlı deploy sonrası sahip + arkadaş 2-hesap testinden çıkan eksikler. PM-onaylı (sahip talebi, scope creep değil).
+> Sıra: hızlı FE → ses bug'ları → bildirim yeniden-kurgu → arama genişletme. Dev checkbox işaretler.
+
+**Hızlı FE batch (düşük risk):**
+- [x] **REV-1 — Oto-scroll:** yeni mesajda otomatik dibe kayma çalışmıyordu (kök: `appendMessage` in-place push → dizi referansı değişmiyor → `watch(messages)` tetiklenmiyor). `length` izle + "dipteyse yapış" (near-bottom 120px) → loadMore/geçmiş-okuma yakalanmıyor, kendi mesajım her zaman kayıyor. MessageArea + DmConversation. *(vue-tsc+build temiz)*
+- [x] **REV-2 — Textarea reset:** gönderim sonrası büyüyen textarea tek satıra dönmüyordu → `resetComposerHeight` (content temizlenince `height:auto`). İki composer.
+- [x] **REV-5 — DM "Kanka Ekle":** 1-1 DM'de karşı taraf arkadaş değilse başlıkta "Kanka Ekle" butonu (Sprint 4A `by-user`; T&S kapısı backend, ret jenerik, statü sızmaz). Engelliyken/arkadaşken/istek-sonrası gizli. `friends.add/addFailed` i18n.
+
+**Ses bug'ları (kritik, sıradaki — teşhis gerektirir):**
+- [ ] **REV-6 — Mikrofon kilitleniyor:** durduk yere mic kırmızı, açılamıyor, ses ekranında mic görünmüyor (ekran görüntüsü: "Çevrimdışı" + çizili mic)
+- [ ] **REV-7 — Sesten kendiliğinden düşme:** 1-1 DM seste konuşurken tekrar tekrar düşüyor
+- [ ] **REV-8 — Ses ekranı gecikmesi:** arama kabul sonrası ses ekranı gelmiyor/geç geliyor
+
+**Bildirim yeniden-kurgu (büyük, backend+FE):**
+- [ ] **REV-4:** rail kırmızı sayaç = generic unread DEĞİL → **bahsetme (mention)** sayısı. Beyaz pill (sol) = generic aktivite KALIR. Bahsetme olan ortama girince kanal sidebar'ı ALTINDA sidebar-genişliğinde kırmızı bant "yeni bahsetmeleriniz var"; >1 bahsetme okunana dek kalır; tıkla→ilk bahsetme kanalına zıpla (otomatik girme), tekrar tıkla→sonraki…
+
+**Arama genişletme:**
+- [ ] **REV-3 — Ortam araması:** sağ-üst arama metin kelime-kelime göstersin + kullanıcı adı + bahsetmelerde arasın (Discord-benzeri sonuç görünümü; Notion'da örnek görsel)

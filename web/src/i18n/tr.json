@@ -440,6 +440,8 @@
     "copied": "Kopyalandı!",
     "codePlaceholder": "Kanka kodunu gir (ör: K7M2QX)",
     "addButton": "Kankalık İsteği Gönder",
+    "add": "Kanka Ekle",
+    "addFailed": "Kankalık isteği gönderilemedi.",
     "addTitle": "Kanka Ekle",
     "addDescription": "Kankanın 6 haneli kanka kodunu girerek istek gönder.",
     "tabAdd": "Kanka Ekle",

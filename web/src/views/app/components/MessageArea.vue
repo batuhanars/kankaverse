@@ -165,6 +165,7 @@ watch(
     realtimeError.value = !ack.ok
     // Sonra REST'ten geçmiş yükle
     await messagesStore.fetchMessages(id)
+    stickToBottom = true
     scrollToBottom()
   },
   { immediate: true },
@@ -173,10 +174,21 @@ watch(
 // Mesaja zıpla (pins/arama) — zıplama sırasında alta kaymayı bastır
 const { isJumping } = useJumpToMessage(listEl, () => channelId.value)
 
+// REV-1: yeni mesajda dipteyse otomatik kay; kullanıcı yukarı kaydırıp geçmiş
+// okuyorsa yakalamaya çalışma. length izlenir (appendMessage in-place push → referans
+// değişmez, eski watch(messages) tetiklenmezdi) + prepend/loadMore'da stick=false ⇒ kaymaz.
+let stickToBottom = true
+function onListScroll() {
+  const el = listEl.value
+  if (!el) return
+  stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+}
+
 watch(
-  messages,
-  async () => {
-    if (isJumping.value) return
+  () => messages.value.length,
+  async (n, o) => {
+    if (isJumping.value || n <= o) return
+    if (!stickToBottom) return
     await nextTick()
     scrollToBottom()
   },
@@ -218,6 +230,7 @@ async function onAttachmentSent({ attachmentId, caption }: { attachmentId: strin
   replyingTo.value = null
   try {
     const { data } = await messagesApi.send(channelId.value, caption, replyId, [attachmentId])
+    stickToBottom = true // kendi eki gönderdim → dibe kay
     messagesStore.appendMessage(data)
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string; message?: string; retryAfter?: number } } }
@@ -247,12 +260,14 @@ async function send() {
   const text = mention.applyMentionTokens(content.value.trim())
   mention.clearPending()
   content.value = ''
+  nextTick(resetComposerHeight) // REV-2: gönderince büyüyen textarea normale dönsün
   const replyId = replyingTo.value?.id
   replyingTo.value = null
   try {
     const { data } = await messagesApi.send(channelId.value, text, replyId)
     // Yerel eko: WS broadcast'i beklemeden gönderenin ekranına yaz. appendMessage
     // id'ye göre dedup yapar (messages.ts:35) → broadcast geldiğinde çiftlemez.
+    stickToBottom = true // kendi mesajım → her zaman dibe kay
     messagesStore.appendMessage(data)
   } catch (e: unknown) {
     content.value = text
@@ -292,6 +307,11 @@ function onTextareaInput() {
   // Sprint V2: mention autocomplete tetikle
   mention.onInput()
 }
+
+// REV-2: gönderim sonrası textarea'yı tek satıra döndür (büyümüş yükseklik kalmasın)
+function resetComposerHeight() {
+  if (textareaEl.value) textareaEl.value.style.height = 'auto'
+}
 </script>
 
 <template>
@@ -303,7 +323,7 @@ function onTextareaInput() {
     >
       {{ t('message.realtimeError') }}
     </div>
-    <div ref="listEl" class="flex-1 min-h-0 overflow-y-auto py-4 flex flex-col gap-0.5">
+    <div ref="listEl" class="flex-1 min-h-0 overflow-y-auto py-4 flex flex-col gap-0.5" @scroll="onListScroll">
       <div v-if="!channelId" class="flex-1 flex items-center justify-center">
         <p style="color: var(--kv-text-muted);">{{ t('channel.selectChannel') }}</p>
       </div>

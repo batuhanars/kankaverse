@@ -135,6 +135,36 @@ const isGroup = computed(() => props.channel.type === 'GROUP_DM')
 const dmChannel = computed(() => props.channel.type === 'DM' ? props.channel : null)
 const groupChannel = computed(() => props.channel.type === 'GROUP_DM' ? props.channel : null)
 
+// REV-5: 1-1 DM'de karşı taraf arkadaş değilse "Arkadaş ekle" göster.
+// Engelliyken veya zaten arkadaşken/istek gönderildikten sonra gizlenir.
+// Buton minöre göre gizlenMEZ (Sprint 4A G2 deseni); ret jenerik, statü sızmaz.
+const otherUserId = computed(() => dmChannel.value?.otherUser.id ?? null)
+const isFriendInDm = computed(
+  () => !!otherUserId.value && friendsStore.friends.some((f) => f.user.id === otherUserId.value),
+)
+const addFriendSent = ref(false)
+const addingFriend = ref(false)
+const showAddFriend = computed(
+  () => !!dmChannel.value && !dmChannel.value.selfBlocked && !isFriendInDm.value && !addFriendSent.value,
+)
+
+async function addFriendInDm() {
+  if (!otherUserId.value || addingFriend.value) return
+  addingFriend.value = true
+  try {
+    await friendsStore.sendRequestByUser(otherUserId.value)
+    addFriendSent.value = true // jenerik başarı; mutual ise zaten arkadaş olur
+  } catch {
+    // jenerik — sebep/statü gösterme (T&S); kullanıcı kod ile de ekleyebilir
+    sendError.value = t('friends.addFailed')
+  } finally {
+    addingFriend.value = false
+  }
+}
+
+// Kanal değişince ekle-durumunu sıfırla (yeni DM açılınca buton tekrar değerlendirilsin)
+watch(() => props.channel.id, () => { addFriendSent.value = false })
+
 // Grup adı: verilen ad yoksa üye adlarından üretilir
 const groupDisplayName = computed(() => {
   const g = groupChannel.value
@@ -252,6 +282,7 @@ watch(
     realtimeError.value = !ack.ok
     await messagesStore.fetchMessages(id)
     await dmStore.markRead(id)
+    stickToBottom = true
     scrollToBottom()
   },
   { immediate: true },
@@ -260,8 +291,19 @@ watch(
 // Mesaja zıpla (pins/arama) — zıplama sırasında alta kaymayı bastır
 const { isJumping } = useJumpToMessage(listEl, () => props.channel.id)
 
-watch(messages, async () => {
-  if (isJumping.value) return
+// REV-1: yeni mesajda dipteyse otomatik kay; geçmiş okurken/loadMore'da yakalamaya
+// çalışma. length izlenir (appendMessage in-place push → referans değişmez, eski
+// watch(messages) tetiklenmezdi).
+let stickToBottom = true
+function onListScroll() {
+  const el = listEl.value
+  if (!el) return
+  stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+}
+
+watch(() => messages.value.length, async (n, o) => {
+  if (isJumping.value || n <= o) return
+  if (!stickToBottom) return
   await nextTick()
   scrollToBottom()
 }, { flush: 'post' })
@@ -294,6 +336,7 @@ async function onAttachmentSent({ attachmentId, caption }: { attachmentId: strin
   replyingTo.value = null
   try {
     const { data } = await messagesApi.send(props.channel.id, caption, replyId, [attachmentId])
+    stickToBottom = true // kendi eki gönderdim → dibe kay
     messagesStore.appendMessage(data)
   } catch {
     // hata sessizce yutulur — modal zaten kapandı
@@ -312,10 +355,12 @@ async function send() {
   const text = mention.applyMentionTokens(content.value.trim())
   mention.clearPending()
   content.value = ''
+  nextTick(resetComposerHeight) // REV-2: gönderince büyüyen textarea normale dönsün
   const replyId = replyingTo.value?.id
   replyingTo.value = null
   try {
     const { data } = await messagesApi.send(props.channel.id, text, replyId)
+    stickToBottom = true // kendi mesajım → her zaman dibe kay
     messagesStore.appendMessage(data)
   } catch (e: unknown) {
     content.value = text
@@ -345,6 +390,11 @@ function onDmTextareaInput() {
   if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }
   // Sprint V2: mention autocomplete tetikle
   mention.onInput()
+}
+
+// REV-2: gönderim sonrası textarea'yı tek satıra döndür
+function resetComposerHeight() {
+  if (dmTextareaEl.value) dmTextareaEl.value.style.height = 'auto'
 }
 
 function isMine(msg: MessageDto): boolean {
@@ -513,6 +563,25 @@ function isGroupStart(index: number): boolean {
           <span class="flex-1 text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
             {{ dmChannel.otherUser.username }}
           </span>
+          <!-- REV-5: arkadaş değilse "Arkadaş ekle" (Sprint 4A by-user; ret jenerik) -->
+          <button
+            v-if="showAddFriend"
+            class="flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors disabled:opacity-60"
+            style="color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);"
+            :title="t('friends.add')"
+            :disabled="addingFriend"
+            @click="addFriendInDm"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+            </svg>
+            <span>{{ t('friends.add') }}</span>
+          </button>
+          <span
+            v-else-if="dmChannel && addFriendSent && !isFriendInDm"
+            class="text-[12px] px-1"
+            style="color: var(--kv-text-muted);"
+          >{{ t('friends.requestSent') }}</span>
           <!-- Sesli arama (1-1) — çalıyorsa İptal, değilse telefon -->
           <button
             v-if="callStore.isRinging(channel.id)"
@@ -713,7 +782,7 @@ function isGroupStart(index: number): boolean {
       <DmCallPanel :channel-id="channel.id" />
 
       <!-- Mesaj listesi (Discord stili — baloncuk yok, sola yaslı düz liste) -->
-      <div ref="listEl" class="flex-1 overflow-y-auto py-4 flex flex-col">
+      <div ref="listEl" class="flex-1 overflow-y-auto py-4 flex flex-col" @scroll="onListScroll">
         <div v-if="hasMore" class="flex justify-center py-2">
           <button
             class="text-[13px] hover:underline cursor-pointer"
