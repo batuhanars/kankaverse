@@ -433,7 +433,7 @@ function closeCategoryMenu() {
 <template>
   <!-- F: 4 köşe radius — HomeSidebar ile tutarlı -->
   <aside
-    class="flex flex-col h-full shrink-0 rounded-[var(--kv-radius-lg)] overflow-hidden mt-4"
+    class="flex flex-col h-full shrink-0 rounded-[var(--kv-radius-lg)] overflow-hidden mt-4 mb-4"
     style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
     @click="closeCategoryMenu"
   >
