@@ -556,8 +556,9 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Özel kanal üye-ekleme** — `GET/POST/DELETE /channels/:id/members` (OWNER/ADMIN; NOT_PRIVATE/NOT_GUILD_MEMBER/AGE_RESTRICTED; **R7** yetki-önce sıralama→özel-mi sızıntısı yok; ChannelMember DM'e sızmıyor doğrulandı); frontend kanal ayarları Üyeler bölümü. 447 test. `contracts/SPRINT_V2_PRIVATE_MEMBERS_CONTRACT.md`
 - [x] **Ortam ayarları + üye yönetimi** — `DELETE /guilds/:id` (OWNER); `PATCH .../members/:id/role` (OWNER); `DELETE .../members/:id` (kick, **R7** hiyerarşi: OWNER korumalı, ADMIN→yalnız MEMBER, yetki-önce, ChannelMember temizliği tx). Frontend: ortam sil + MemberPanel rol/at (yetki gizleme). 468 test. `contracts/SPRINT_V2_GUILD_ADMIN_CONTRACT.md`
 - [x] **UI cila turu** — emoji picker viewport-clamp/Teleport (kırpılma) + tek-örnek/kalıcı araç çubuğu + gri reaksiyon-ekle ikonu; ortam home-stili üst header (GuildTopBar: sunucu adı + çan); Mesaj İstekleri nav kaldırıldı; home arama butonu ortala/buton stili; ortam mesaj alanı min-h-0 scroll fix; global aramada Gruplar ayrı başlık; bahsetme bildirim @ fix
-- [ ] **LiveKit ses/video kanalları** — V2 en büyük kalem; ayrı altyapı (mini-sprint). Geldiğinde: "Ses Kanalları" varsayılan kategori + ses türü etkinleşir. **YARIN.**
-- [ ] **Ertelenenler:** özel emoji (CSAM-kapısı) · kategori/kanal drag-reorder · sahiplik devri/ortam-ban/ayrılma · mesaja zıpla (pins/arama) · sunucu-geneli arama
+- [x] **Mesaja zıpla (scroll-to-message)** — pins/arama sonucuna tıkla → listede o mesaja kaydır + aksan-subtle vurgu flaşı. `useMessageJump` (singleton istek yolu + liste tarafı tüketici), `MessageRow data-message-id`, hedef yüklü değilse sınırlı geriye sayfalama (≤20 sayfa), zıplama sırasında alta-kaydırma guard'ı (MessageArea + DmConversation). Yalnız-frontend, backend değişmedi.
+- [ ] **LiveKit ses/video kanalları** — V2 en büyük kalem; ayrı altyapı (mini-sprint). Geldiğinde: "Ses Kanalları" varsayılan kategori + ses türü etkinleşir. `.env` hazır (LIVEKIT_API_KEY/SECRET/URL). **SIRADAKİ.**
+- [ ] **Ertelenenler (hepsi sprint-boyu: backend + contract + R7):** özel emoji (CSAM-kapısı) · kategori/kanal drag-reorder (batch reorder endpoint) · sahiplik devri/ortam-ban/ayrılma · sunucu-geneli arama
 
 ---
 
