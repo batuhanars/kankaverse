@@ -10,6 +10,7 @@ import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { messagesApi } from '@/api/messages'
 import { useMessagesStore } from '@/stores/messages'
+import { useMessageJump } from '@/composables/useMessageJump'
 import { formatMentionsPlain } from '@/utils/mentions'
 import type { MessageDto } from '@/types'
 
@@ -24,6 +25,13 @@ const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 const messagesStore = useMessagesStore()
+const { requestJump } = useMessageJump()
+
+// Sabit mesaja tıkla → listede o mesaja zıpla, popover'ı kapat
+function onJump(messageId: string) {
+  requestJump(props.channelId, messageId)
+  emit('close')
+}
 
 const pins = ref<MessageDto[]>([])
 const loading = ref(false)
@@ -167,8 +175,11 @@ defineExpose({ refresh })
         <div
           v-for="pin in pins"
           :key="pin.id"
-          class="flex gap-3 px-4 py-2.5 border-b last:border-b-0"
+          class="flex gap-3 px-4 py-2.5 border-b last:border-b-0 cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
           style="border-color: var(--kv-border-subtle);"
+          role="button"
+          :title="t('message.jumpToMessage')"
+          @click="onJump(pin.id)"
         >
           <!-- Yazar avatarı (daire) -->
           <div

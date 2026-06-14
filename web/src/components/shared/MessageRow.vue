@@ -92,6 +92,7 @@ const renderedContent = computed<string>(() => {
     Sprint V2: isMentioned → sol-aksan border + accent-subtle zemin
   -->
   <div
+    :data-message-id="message.id"
     class="relative flex gap-3 px-4 rounded group"
     :class="[isGroupStart ? 'mt-4 py-0.5' : 'py-0.5', isMentioned ? 'border-l-2' : '']"
     :style="isMentioned ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);' : ''"

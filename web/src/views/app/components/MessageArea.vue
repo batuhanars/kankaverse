@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSocket } from '@/composables/useSocket'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
+import { useJumpToMessage } from '@/composables/useMessageJump'
 import { messagesApi } from '@/api/messages'
 import { guildsApi } from '@/api/guilds'
 import MessageItem from '@/components/shared/MessageItem.vue'
@@ -169,9 +170,13 @@ watch(
   { immediate: true },
 )
 
+// Mesaja zıpla (pins/arama) — zıplama sırasında alta kaymayı bastır
+const { isJumping } = useJumpToMessage(listEl, () => channelId.value)
+
 watch(
   messages,
   async () => {
+    if (isJumping.value) return
     await nextTick()
     scrollToBottom()
   },

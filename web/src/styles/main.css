@@ -176,3 +176,18 @@ code, pre, .font-mono {
 .kv-md a:hover {
   text-decoration: underline;
 }
+
+/* ─────────────────────────────────────────────────────
+   Mesaja zıpla vurgusu (pins/arama → scroll-to-message)
+   Aksan-subtle zemin yanıp söner. Gölge YOK, token tabanlı.
+───────────────────────────────────────────────────── */
+@keyframes kv-jump-flash {
+  0%   { background-color: var(--kv-accent-subtle); }
+  70%  { background-color: var(--kv-accent-subtle); }
+  100% { background-color: transparent; }
+}
+
+.kv-jump-highlight {
+  animation: kv-jump-flash 1.8s ease-out;
+  border-radius: var(--kv-radius-sm);
+}
