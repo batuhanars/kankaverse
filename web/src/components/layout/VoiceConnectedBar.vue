@@ -54,9 +54,10 @@ const channelName = computed(() => {
 
   <div
     v-else-if="voiceStore.connectedChannelId"
-    class="flex items-center gap-2 px-3 py-2 border-b"
+    class="flex flex-col border-b"
     style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
   >
+    <div class="flex items-center gap-2 px-3 py-2">
     <!-- Bağlı durum ikonu (yeşil) -->
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-online, #3DB46E);" class="shrink-0">
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
@@ -86,5 +87,14 @@ const channelName = computed(() => {
         <line x1="21" y1="12" x2="9" y2="12"/>
       </svg>
     </button>
+    </div>
+    <!-- Mikrofon açılamadı uyarısı (sessiz yutma yerine görünür) -->
+    <div
+      v-if="voiceStore.micError"
+      class="px-3 pb-2 text-[11px] leading-snug"
+      style="color: var(--kv-danger);"
+    >
+      {{ voiceStore.micError === 'insecure' ? t('voice.micInsecure') : t('voice.micDenied') }}
+    </div>
   </div>
 </template>
