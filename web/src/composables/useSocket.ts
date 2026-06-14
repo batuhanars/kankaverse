@@ -237,7 +237,7 @@ export function useSocket() {
   }
 
   onUnmounted(() => {
-    // intentionally empty — disconnect AppView'dan yönetiliyor
+    // intentionally empty — disconnect AppShell (layout) tarafından yönetiliyor
   })
 
   return { connected, connect, disconnect, joinChannel, leaveChannel, setPresence }

@@ -1,22 +1,29 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+/**
+ * HomeSidebar — home/dm ekranlarının sol sidebar'ı (named router-view: sidebar).
+ * Aktif DM'i route'tan okur, seçimde kendi navigasyonunu yapar (parent prop/emit yok).
+ */
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import DmList from './DmList.vue'
 import StartChatModal from './StartChatModal.vue'
 
-defineProps<{ activeView: 'friends' | 'message-requests' | 'dm'; activeDmChannelId: string | null }>()
-const emit = defineEmits<{
-  selectFriends: []
-  selectMessageRequests: []
-  selectDm: [channelId: string]
-}>()
-
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 const showStartChat = ref(false)
+
+// Aktif DM = /dm/:channelId route'undaki param
+const activeDmChannelId = computed(() => (route.name === 'dm' ? (route.params.channelId as string) : null))
+
+function selectDm(channelId: string) {
+  router.push({ name: 'dm', params: { channelId } })
+}
 
 function onChatCreated(channelId: string) {
   showStartChat.value = false
-  emit('selectDm', channelId)
+  selectDm(channelId)
 }
 </script>
 
@@ -46,7 +53,7 @@ function onChatCreated(channelId: string) {
     <!-- DM listesi -->
     <DmList
       :active-channel-id="activeDmChannelId"
-      @select="(id) => emit('selectDm', id)"
+      @select="selectDm"
     />
   </aside>
 
