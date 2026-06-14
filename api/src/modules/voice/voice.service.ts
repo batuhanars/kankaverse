@@ -127,9 +127,14 @@ export class VoiceService {
 
     const member = await this.prisma.guildMember.findUnique({
       where: { guildId_userId: { guildId, userId } },
-      select: { joinedAt: true },
+      select: { joinedAt: true, role: true },
     });
     if (!member) return false; // erişim kapısı geçti ama üyelik yoksa güvenli taraf
+
+    // OWNER/ADMIN ses karantinasından MUAF — ortamın güvenilir operatörleri (REV-6:
+    // sahibin kendi yeni kurduğu ortamda konuşamaması bug'ı). Karantina yalnız yeni
+    // MEMBER'ı broadcast'ten alıkoyar (anti-spam); minör/erişim kapıları ayrı + bozulmaz.
+    if (member.role === 'OWNER' || member.role === 'ADMIN') return true;
 
     const cutoff = new Date(Date.now() - quarantineHours * 60 * 60 * 1000);
     return member.joinedAt < cutoff; // cutoff'tan önce katıldıysa yerleşik → konuşabilir

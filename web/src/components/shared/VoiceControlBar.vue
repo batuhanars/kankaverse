@@ -11,6 +11,18 @@ const voiceStore = useVoiceStore()
 </script>
 
 <template>
+  <div class="flex flex-col items-center gap-2">
+  <!-- Dinleyici modu: konuşma izni yok (yeni üye karantinası) → neden görünür, sessiz değil -->
+  <div
+    v-if="!voiceStore.canPublish"
+    class="flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full"
+    style="color: var(--kv-text-muted); background-color: var(--kv-bg-elevated);"
+  >
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/>
+    </svg>
+    {{ t('voice.listenerMode') }}
+  </div>
   <div class="flex items-center justify-center gap-3">
     <!-- Sustur (yalnız konuşma izni varsa) -->
     <button
@@ -52,5 +64,6 @@ const voiceStore = useVoiceStore()
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
       </svg>
     </button>
+  </div>
   </div>
 </template>

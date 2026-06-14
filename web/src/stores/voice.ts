@@ -34,6 +34,8 @@ export const useVoiceStore = defineStore('voice', () => {
   // Yerel bağlantı durumu
   const connectedChannelId = ref<string | null>(null)
   const connecting = ref(false)
+  // REV-8: bağlanılan kanal (connect tamamlanana dek UI "bağlanıyor" kartı göstersin)
+  const connectingChannelId = ref<string | null>(null)
   const isMuted = ref(false)
   const canPublish = ref(false)
   const error = ref('')
@@ -97,6 +99,7 @@ export const useVoiceStore = defineStore('voice', () => {
     if (room) await leave()
 
     connecting.value = true
+    connectingChannelId.value = channelId
     error.value = ''
     try {
       const { data } = await voiceApi.getToken(channelId)
@@ -136,6 +139,7 @@ export const useVoiceStore = defineStore('voice', () => {
       await leave()
     } finally {
       connecting.value = false
+      connectingChannelId.value = null
     }
   }
 
@@ -263,7 +267,10 @@ export const useVoiceStore = defineStore('voice', () => {
     r.on(RoomEvent.TrackUnmuted, (_pub, p: Participant) => {
       const s = new Set(mutedUserIds.value); s.delete(p.identity); mutedUserIds.value = s
     })
-    r.on(RoomEvent.Disconnected, () => {
+    r.on(RoomEvent.Disconnected, (reason?: unknown) => {
+      // REV-7 teşhisi: kendiliğinden düşmenin NEDENİ konsola (DUPLICATE_IDENTITY,
+      // SERVER_SHUTDOWN, ağ vb. — runtime'da görünür). Tekrar üreten kullanıcı paylaşır.
+      console.warn('[voice] LiveKit Disconnected — reason:', reason)
       // Sunucu/ağ kaynaklı kopma → yerel durumu temizle (UI tutarlı kalsın)
       room = null
       resetLocalState()
@@ -274,6 +281,7 @@ export const useVoiceStore = defineStore('voice', () => {
     participantsByChannel,
     connectedChannelId,
     connecting,
+    connectingChannelId,
     isMuted,
     canPublish,
     error,
