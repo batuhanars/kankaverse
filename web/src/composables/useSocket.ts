@@ -53,7 +53,9 @@ export function useSocket() {
       return
     }
 
-    socket = io('/', {
+    // Prod: VITE_API_URL host'una bağlan (socket.io /socket.io yolunu o host'ta arar).
+    // Dev: '/' → vite proxy (ws:true) 127.0.0.1:3001'e taşır.
+    socket = io(import.meta.env.VITE_API_URL || '/', {
       // auth fonksiyon formu: her (yeniden) bağlantıda sessionStorage'dan EN GÜNCEL access token okunur.
       // Sabit token verilseydi (denetim #4) 15dk sonra reconnect bayat token'la el sıkışıp auth'ta düşerdi.
       auth: (cb: (data: { token: string }) => void) => cb({ token: getAccessToken() ?? '' }),
