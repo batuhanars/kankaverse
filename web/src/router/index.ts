@@ -69,23 +69,40 @@ const router = createRouter({
       component: () => import('@/views/moderation/ModerationView.vue'),
       meta: { requiresAuth: true },
     },
+    // Uygulama kabuğu (kalıcı çerçeve) + nested ekran view'ları.
+    // Standart: stack/frontend/component-organization §Routing — URL = ekranın tek doğruluk kaynağı.
     {
       path: '/',
-      name: 'app',
-      component: () => import('@/views/app/AppView.vue'),
+      component: () => import('@/views/app/AppShell.vue'),
       meta: { requiresAuth: true },
-    },
-    {
-      path: '/channels/:guildId/:channelId',
-      name: 'channel',
-      component: () => import('@/views/app/AppView.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/dm/:channelId',
-      name: 'dm',
-      component: () => import('@/views/app/AppView.vue'),
-      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'app',
+          components: {
+            default: () => import('@/views/home/HomeView.vue'),
+            sidebar: () => import('@/views/home/components/HomeSidebar.vue'),
+          },
+        },
+        {
+          path: 'channels/:guildId/:channelId',
+          name: 'channel',
+          components: {
+            default: () => import('@/views/app/GuildChannelView.vue'),
+            sidebar: () => import('@/components/layout/ChannelPanel.vue'),
+          },
+          props: { default: true },
+        },
+        {
+          path: 'dm/:channelId',
+          name: 'dm',
+          components: {
+            default: () => import('@/views/home/DmView.vue'),
+            sidebar: () => import('@/views/home/components/HomeSidebar.vue'),
+          },
+          props: { default: true },
+        },
+      ],
     },
     {
       path: '/:pathMatch(.*)*',
