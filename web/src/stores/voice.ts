@@ -48,6 +48,10 @@ export const useVoiceStore = defineStore('voice', () => {
     return connectedChannelId.value === channelId
   }
 
+  function clearError() {
+    error.value = ''
+  }
+
   function participantsFor(channelId: string): VoiceParticipant[] {
     return participantsByChannel.value[channelId] ?? []
   }
@@ -209,6 +213,7 @@ export const useVoiceStore = defineStore('voice', () => {
     speakingUserIds,
     isDeafened,
     isConnectedTo,
+    clearError,
     participantsFor,
     loadParticipants,
     addParticipant,

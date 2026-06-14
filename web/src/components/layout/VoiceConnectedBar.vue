@@ -25,8 +25,27 @@ const channelName = computed(() => {
 </script>
 
 <template>
+  <!-- Hata: bağlanılamadı (sessiz başarısızlık yerine görünür) -->
   <div
-    v-if="voiceStore.connectedChannelId"
+    v-if="voiceStore.error && !voiceStore.connectedChannelId"
+    class="flex items-center gap-2 px-3 py-2 border-t"
+    style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+  >
+    <span class="flex-1 text-[12px]" style="color: var(--kv-danger);">{{ voiceStore.error }}</span>
+    <button class="text-[12px] cursor-pointer" style="color: var(--kv-text-muted);" @click="voiceStore.clearError()">✕</button>
+  </div>
+
+  <!-- Bağlanılıyor -->
+  <div
+    v-else-if="voiceStore.connecting"
+    class="flex items-center gap-2 px-3 py-2 border-t"
+    style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+  >
+    <span class="text-[13px]" style="color: var(--kv-text-secondary);">{{ t('voice.joining') }}</span>
+  </div>
+
+  <div
+    v-else-if="voiceStore.connectedChannelId"
     class="flex items-center gap-2 px-3 py-2 border-t"
     style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
   >
