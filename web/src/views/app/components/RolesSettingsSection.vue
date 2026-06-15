@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRolesStore } from '@/stores/roles'
 import { useMembersStore } from '@/stores/members'
 import { rolesApi } from '@/api/roles'
+import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
@@ -239,8 +240,9 @@ const deletingList = ref(false)
 const dragRoleId = ref<string | null>(null)
 const dragOverRoleId = ref<string | null>(null)
 
-// ── Yetki ─────────────────────────────────────────────────────────────────
-const canEdit = computed(() => props.isOwner || props.isAdmin)
+// ── Yetki (izin-tabanlı; backend MANAGE_ROLES + hiyerarşiyi zorlar) ─────────
+const { can } = useGuildPermissions(() => guildId.value)
+const canEdit = computed(() => props.isOwner || can('MANAGE_ROLES'))
 
 // ── Rol oluştur ───────────────────────────────────────────────────────────
 async function createRole() {

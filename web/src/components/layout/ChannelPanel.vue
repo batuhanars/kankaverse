@@ -6,6 +6,9 @@ import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useAuthStore } from '@/stores/auth'
 import { useVoiceStore } from '@/stores/voice'
+import { useRolesStore } from '@/stores/roles'
+import { useMembersStore } from '@/stores/members'
+import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { guildsApi } from '@/api/guilds'
 import { channelsApi } from '@/api/channels'
 import GuildSettingsView from '@/views/app/components/GuildSettingsView.vue'
@@ -22,8 +25,13 @@ const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const authStore = useAuthStore()
 const voiceStore = useVoiceStore()
+const rolesStore = useRolesStore()
+const membersStore = useMembersStore()
 
 const showSettings = ref(false)
+
+// Efektif izin (UX gating) — backend otorite kalır. İnce dilim: settings erişimi.
+const { canOpenSettings } = useGuildPermissions(() => guildsStore.activeGuildId ?? '')
 
 // Kategori + kanal yönetimi: OWNER veya ADMIN
 const isAdmin = computed(() => {
@@ -119,6 +127,18 @@ watch(activeGuildId, () => {
   mentionCycleIndex = 0
   highlightedChannelId.value = null
 })
+
+// Efektif izin çözümü için roller + üyeler yüklü olmalı (granular yetki UI gating).
+// OWNER/enum-ADMIN yolu bunlar olmadan da çalışır; granular roller için gerekir.
+watch(
+  activeGuildId,
+  (id) => {
+    if (!id) return
+    rolesStore.fetchRoles(id).catch(() => {})
+    membersStore.fetchMembers(id).catch(() => {})
+  },
+  { immediate: true },
+)
 
 // REV-13b: ses kanalı aktif-süresi (sidebar, yeşil) — saniyede bir tik
 const voiceNow = ref(Date.now())
@@ -643,9 +663,9 @@ async function doLeave() {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><line x1="17" y1="14" x2="17" y2="20"/><line x1="14" y1="17" x2="20" y2="17"/></svg>
           <span>{{ t('category.createCategory') }}</span>
         </button>
-        <!-- Ortam Ayarları (owner) -->
+        <!-- Ortam Ayarları (settings'te yapabileceği bir şey olan herkes) -->
         <button
-          v-if="isOwner"
+          v-if="canOpenSettings"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
           style="color: var(--kv-text-primary);"
           @click="closeGuildMenu(); showSettings = true"
