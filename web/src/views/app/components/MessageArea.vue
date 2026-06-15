@@ -178,19 +178,28 @@ const { isJumping } = useJumpToMessage(listEl, () => channelId.value)
 // okuyorsa yakalamaya çalışma. length izlenir (appendMessage in-place push → referans
 // değişmez, eski watch(messages) tetiklenmezdi) + prepend/loadMore'da stick=false ⇒ kaymaz.
 let stickToBottom = true
+// REV-9: yukarıda geçmiş okurken gelen yeni mesaj sayısı → sağ-alt "aşağı in" butonu rozeti
+const newMessageCount = ref(0)
 function onListScroll() {
   const el = listEl.value
   if (!el) return
   stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+  if (stickToBottom) newMessageCount.value = 0
 }
 
 watch(
   () => messages.value.length,
   async (n, o) => {
     if (isJumping.value || n <= o) return
-    if (!stickToBottom) return
-    await nextTick()
-    scrollToBottom()
+    if (stickToBottom) {
+      // Dipteyim → otomatik kay (kendi mesajım veya yeni mesaj)
+      newMessageCount.value = 0
+      await nextTick()
+      scrollToBottom()
+    } else {
+      // REV-9: yukarıda okuyorum → kaydırma, okuduğumu bölme; gelenleri say
+      newMessageCount.value += n - o
+    }
   },
   { flush: 'post' },
 )
@@ -199,6 +208,13 @@ function scrollToBottom() {
   if (listEl.value) {
     listEl.value.scrollTop = listEl.value.scrollHeight
   }
+}
+
+// REV-9: aşağı-in butonu → dibe kay + sayacı sıfırla
+function jumpToBottom() {
+  stickToBottom = true
+  newMessageCount.value = 0
+  scrollToBottom()
 }
 
 async function loadMore() {
@@ -323,6 +339,7 @@ function resetComposerHeight() {
     >
       {{ t('message.realtimeError') }}
     </div>
+    <div class="relative flex-1 min-h-0 flex flex-col">
     <div ref="listEl" class="flex-1 min-h-0 overflow-y-auto py-4 flex flex-col gap-0.5" @scroll="onListScroll">
       <div v-if="!channelId" class="flex-1 flex items-center justify-center">
         <p style="color: var(--kv-text-muted);">{{ t('channel.selectChannel') }}</p>
@@ -357,6 +374,23 @@ function resetComposerHeight() {
           @reply="setReplyingTo"
         />
       </template>
+    </div>
+
+    <!-- REV-9: yeni mesaj geldiğinde (yukarıdayken) aşağı-in butonu + gelen mesaj sayısı -->
+    <button
+      v-if="newMessageCount > 0"
+      class="absolute right-4 bottom-3 z-10 flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full cursor-pointer transition-opacity hover:opacity-90 shadow-lg"
+      style="background-color: var(--kv-accent-500); color: #ffffff;"
+      @click="jumpToBottom"
+    >
+      <span class="flex items-center justify-center text-[11px] font-bold rounded-full" style="min-width: 18px; height: 18px; background-color: var(--kv-danger);">
+        {{ newMessageCount > 99 ? '99+' : newMessageCount }}
+      </span>
+      <span class="text-[12px] font-semibold">{{ t('message.newMessages') }}</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </button>
     </div>
 
     <div v-if="channelId" class="shrink-0 px-4 pb-6 pt-2">
