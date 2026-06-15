@@ -183,6 +183,39 @@ export const useChannelsStore = defineStore('channels', () => {
   }
 
   /** REV-4: o guild'de okunmamış bahsetmesi olan kanallar (position sırasında) — bant zıplama döngüsü */
+  // ── Realtime (WS guild kanal/kategori olayları — diğer üyelerde anlık) ──
+  function upsertChannelLocal(guildId: string, channel: ChannelDto): void {
+    const list = channelsByGuild.value[guildId]
+    if (!list) return // bu guild henüz yüklenmedi → girince fetch eder
+    const idx = list.findIndex((c) => c.id === channel.id)
+    if (idx === -1) {
+      channelsByGuild.value[guildId] = [...list, channel]
+    } else {
+      // Güncelleme: unread sayaçları korunur (WS DTO'sunda 0 gelir)
+      const next = [...list]
+      next[idx] = { ...channel, unreadCount: next[idx].unreadCount, unreadMentionCount: next[idx].unreadMentionCount }
+      channelsByGuild.value[guildId] = next
+    }
+  }
+  function removeChannelLocal(guildId: string, channelId: string): void {
+    const list = channelsByGuild.value[guildId]
+    if (list) channelsByGuild.value[guildId] = list.filter((c) => c.id !== channelId)
+  }
+  function upsertCategoryLocal(guildId: string, category: CategoryDto): void {
+    const list = categoriesByGuild.value[guildId]
+    if (!list) return
+    const idx = list.findIndex((c) => c.id === category.id)
+    if (idx === -1) categoriesByGuild.value[guildId] = [...list, category]
+    else { const next = [...list]; next[idx] = category; categoriesByGuild.value[guildId] = next }
+  }
+  function removeCategoryLocal(guildId: string, categoryId: string): void {
+    const cats = categoriesByGuild.value[guildId]
+    if (cats) categoriesByGuild.value[guildId] = cats.filter((c) => c.id !== categoryId)
+    // Kategorinin kanalları kategorisize düşer (backend de böyle yapar)
+    const chans = channelsByGuild.value[guildId]
+    if (chans) channelsByGuild.value[guildId] = chans.map((c) => (c.categoryId === categoryId ? { ...c, categoryId: null } : c))
+  }
+
   function channelsWithMentions(guildId: string) {
     return (channelsByGuild.value[guildId] ?? [])
       .filter((c) => c.unreadMentionCount > 0)
@@ -212,5 +245,9 @@ export const useChannelsStore = defineStore('channels', () => {
     markChannelMentioned,
     totalMentionsForGuild,
     channelsWithMentions,
+    upsertChannelLocal,
+    removeChannelLocal,
+    upsertCategoryLocal,
+    removeCategoryLocal,
   }
 })

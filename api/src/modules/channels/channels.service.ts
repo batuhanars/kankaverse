@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
+import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { AddChannelMemberDto } from './dto/add-channel-member.dto';
@@ -33,7 +34,26 @@ export class ChannelsService {
   constructor(
     private prisma: PrismaService,
     private membership: MembershipService,
+    private realtime: RealtimeService,
   ) {}
+
+  /**
+   * Realtime kanal-olayı alıcıları (sızıntı-güvenli):
+   *  - Public kanal → tüm guild üyeleri.
+   *  - Özel kanal → yalnız OWNER/ADMIN + ChannelMember'lar (findByGuild görünürlüğüyle aynı).
+   */
+  private async channelEventRecipients(channelId: string, guildId: string, isPrivate: boolean): Promise<string[]> {
+    const members = await this.prisma.guildMember.findMany({
+      where: { guildId },
+      select: { userId: true, role: true },
+    });
+    if (!isPrivate) return members.map((m) => m.userId);
+    const privileged = members.filter((m) => m.role === 'OWNER' || m.role === 'ADMIN').map((m) => m.userId);
+    const channelMembers = (
+      await this.prisma.channelMember.findMany({ where: { channelId }, select: { userId: true } })
+    ).map((m) => m.userId);
+    return [...new Set([...privileged, ...channelMembers])];
+  }
 
   async create(userId: string, guildId: string, dto: CreateChannelDto) {
     const { membership } = await this.membership.requireGuildMembership(userId, guildId);
@@ -61,7 +81,12 @@ export class ChannelsService {
       },
     });
 
-    return toChannelDto(channel);
+    // Realtime: kanal oluşturuldu → görebilecek üyelere yay (özel kanal sızdırmaz)
+    const dtoOut = toChannelDto(channel);
+    const recipients = await this.channelEventRecipients(channel.id, guildId, channel.isPrivate);
+    this.realtime.emitToUsers(recipients, 'channel.created', { guildId, channel: dtoOut });
+
+    return dtoOut;
   }
 
   async findByGuild(userId: string, guildId: string) {
@@ -158,7 +183,11 @@ export class ChannelsService {
       },
     });
 
-    return toChannelDto(updated);
+    const dtoOut = toChannelDto(updated);
+    const recipients = await this.channelEventRecipients(updated.id, updated.guildId!, updated.isPrivate);
+    this.realtime.emitToUsers(recipients, 'channel.updated', { guildId: updated.guildId, channel: dtoOut });
+
+    return dtoOut;
   }
 
   /** Kategori var mı, aynı guild'e ait mi, silinmemiş mi — değilse 400 INVALID_CATEGORY */
@@ -330,10 +359,15 @@ export class ChannelsService {
       throw new ConflictException({ message: 'Son kanal silinemez; ortamda en az bir kanal olmalıdır.', error: 'LAST_CHANNEL' });
     }
 
+    // Alıcıları silmeden ÖNCE hesapla (özel kanal görünürlüğü)
+    const recipients = await this.channelEventRecipients(channel.id, channel.guildId!, channel.isPrivate);
+
     await this.prisma.channel.update({
       where: { id: channelId },
       data: { deletedAt: new Date() },
     });
+
+    this.realtime.emitToUsers(recipients, 'channel.deleted', { guildId: channel.guildId, channelId });
 
     return null;
   }

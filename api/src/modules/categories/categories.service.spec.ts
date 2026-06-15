@@ -14,6 +14,9 @@ const prismaMock = {
   channel: {
     updateMany: jest.fn(),
   },
+  guildMember: {
+    findMany: jest.fn(),
+  },
   $transaction: jest.fn(),
 };
 
@@ -21,12 +24,15 @@ const membershipMock = {
   requireGuildMembership: jest.fn(),
 };
 
+const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
+
 function makeService() {
-  return new CategoriesService(prismaMock as any, membershipMock as any);
+  return new CategoriesService(prismaMock as any, membershipMock as any, realtimeMock as any);
 }
 
 function resetMocks() {
   jest.resetAllMocks();
+  prismaMock.guildMember.findMany.mockResolvedValue([]);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -304,6 +310,8 @@ describe('ChannelsService — categoryId cross-guild guard (INVALID_CATEGORY)', 
     channelRead: { upsert: jest.fn() },
     message: { count: jest.fn() },
     channelCategory: { findUnique: jest.fn() },
+    guildMember: { findMany: jest.fn() },
+    channelMember: { findMany: jest.fn() },
   };
 
   const channelMembershipMock = {
@@ -311,13 +319,17 @@ describe('ChannelsService — categoryId cross-guild guard (INVALID_CATEGORY)', 
     requireChannelAccess: jest.fn(),
   };
 
+  const channelRealtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
+
   let channelService: ChannelsService;
 
   const OWNER_MS = { guildId: GUILD_ID, userId: USER_ID, role: 'OWNER' };
 
   beforeEach(() => {
     jest.resetAllMocks();
-    channelService = new ChannelsService(channelPrismaMock as any, channelMembershipMock as any);
+    channelPrismaMock.guildMember.findMany.mockResolvedValue([]);
+    channelPrismaMock.channelMember.findMany.mockResolvedValue([]);
+    channelService = new ChannelsService(channelPrismaMock as any, channelMembershipMock as any, channelRealtimeMock as any);
   });
 
   it('create: başka guild kategorisi → 400 INVALID_CATEGORY', async () => {
