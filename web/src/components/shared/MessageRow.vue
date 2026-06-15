@@ -103,8 +103,8 @@ const renderedContent = computed<string>(() => {
          Menü açıkken (emoji picker / ⋯) grup-hover'dan bağımsız olarak görünür kalır. -->
     <div
       v-if="!isEditing"
-      class="absolute -top-3 right-4 transition-opacity z-10"
-      :class="actionsMenuRef?.menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
+      class="absolute -top-3 right-4 transition-opacity"
+      :class="actionsMenuRef?.menuOpen ? 'opacity-100 z-40' : 'opacity-0 group-hover:opacity-100 z-10'"
     >
       <MessageActionsMenu
         ref="actionsMenuRef"
