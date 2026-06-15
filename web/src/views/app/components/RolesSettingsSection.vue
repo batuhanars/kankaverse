@@ -53,8 +53,16 @@ function backToList() {
 }
 
 // ── Aktif sekme (detay modunda) ───────────────────────────────────────────
-type Tab = 'appearance' | 'members'
+type Tab = 'appearance' | 'permissions' | 'members'
 const activeTab = ref<Tab>('appearance')
+
+// ── İzin bayrakları (Faz 3) — gruplu; ADMINISTRATOR ayrıca en üstte ─────────
+const PERMISSION_GROUPS: { key: string; flags: string[] }[] = [
+  { key: 'general', flags: ['VIEW_CHANNELS', 'MANAGE_CHANNELS', 'MANAGE_ROLES', 'MANAGE_GUILD', 'MANAGE_EMOJIS', 'CREATE_INVITE'] },
+  { key: 'membership', flags: ['KICK_MEMBERS', 'BAN_MEMBERS', 'CHANGE_NICKNAME', 'MANAGE_NICKNAMES'] },
+  { key: 'message', flags: ['MANAGE_MESSAGES', 'MENTION_EVERYONE'] },
+  { key: 'voice', flags: ['MUTE_MEMBERS', 'MOVE_MEMBERS', 'PRIORITY_SPEAKER'] },
+]
 
 // ── Üye arama filtresi ────────────────────────────────────────────────────
 const memberSearch = ref('')
@@ -79,6 +87,7 @@ const draftName = ref('')
 const draftColor = ref('#99aab5')
 const draftHoist = ref(false)
 const draftMentionable = ref(false)
+const draftPermissions = ref<string[]>([])
 
 watch(selectedRole, (role) => {
   if (!role) return
@@ -86,6 +95,15 @@ watch(selectedRole, (role) => {
   draftColor.value = role.color
   draftHoist.value = role.hoist
   draftMentionable.value = role.mentionable
+  draftPermissions.value = [...role.permissions]
+})
+
+// İzin bayrağı seti değişti mi (sıra-bağımsız küme karşılaştırması)
+const permsDirty = computed(() => {
+  if (!selectedRole.value) return false
+  const a = [...draftPermissions.value].sort()
+  const b = [...selectedRole.value.permissions].sort()
+  return a.length !== b.length || a.some((f, i) => f !== b[i])
 })
 
 const isDirty = computed(() =>
@@ -93,8 +111,21 @@ const isDirty = computed(() =>
   (draftName.value !== selectedRole.value.name ||
     draftColor.value !== selectedRole.value.color ||
     draftHoist.value !== selectedRole.value.hoist ||
-    draftMentionable.value !== selectedRole.value.mentionable),
+    draftMentionable.value !== selectedRole.value.mentionable ||
+    permsDirty.value),
 )
+
+// ── İzin toggle yardımcıları ────────────────────────────────────────────────
+const hasAdmin = computed(() => draftPermissions.value.includes('ADMINISTRATOR'))
+function hasPerm(flag: string): boolean {
+  return draftPermissions.value.includes(flag)
+}
+function setPerm(flag: string, on: boolean) {
+  if (!canEdit.value) return
+  const i = draftPermissions.value.indexOf(flag)
+  if (on && i === -1) draftPermissions.value.push(flag)
+  else if (!on && i !== -1) draftPermissions.value.splice(i, 1)
+}
 
 // ── Renk ──────────────────────────────────────────────────────────────────
 const COLOR_PRESETS = [
@@ -161,6 +192,7 @@ async function saveRole() {
       color: draftColor.value,
       hoist: draftHoist.value,
       mentionable: draftMentionable.value,
+      permissions: draftPermissions.value,
     }
     if (!selectedRole.value.isEveryone) {
       payload.name = draftName.value
@@ -570,6 +602,16 @@ const membersWithRole = computed(() => {
             {{ t('guildSettings.roles.tabAppearance') }}
           </button>
           <button
+            type="button"
+            class="px-4 py-2 text-[14px] font-medium transition-colors cursor-pointer border-b-2"
+            :style="activeTab === 'permissions'
+              ? 'color: var(--kv-text-primary); border-color: var(--kv-accent-500);'
+              : 'color: var(--kv-text-secondary); border-color: transparent;'"
+            @click="activeTab = 'permissions'"
+          >
+            {{ t('guildSettings.roles.tabPermissions') }}
+          </button>
+          <button
             v-if="!selectedRole?.isEveryone"
             type="button"
             class="px-4 py-2 text-[14px] font-medium transition-colors cursor-pointer border-b-2"
@@ -695,27 +737,96 @@ const membersWithRole = computed(() => {
             </div>
           </section>
 
-          <!-- Kaydet / Sil -->
-          <div v-if="canEdit" class="flex items-center gap-3 mt-2 pt-4 border-t" style="border-color: var(--kv-border-subtle);">
-            <KvButton
-              :disabled="!isDirty || saving || !hexValid"
-              :loading="saving"
-              @click="saveRole"
+        </template>
+
+        <!-- ══ İZİNLER SEKMESİ ══ -->
+        <template v-if="activeTab === 'permissions'">
+
+          <!-- ADMINISTRATOR — en üstte, uyarılı -->
+          <section>
+            <div
+              class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+              :style="hasAdmin
+                ? 'border-color: var(--kv-danger); background-color: var(--kv-danger-subtle);'
+                : 'border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);'"
             >
-              {{ saving ? t('guildSettings.roles.saving') : t('guildSettings.roles.saveButton') }}
-            </KvButton>
-            <KvButton
-              v-if="!selectedRole?.isEveryone"
-              variant="danger"
-              :disabled="deleting"
-              :loading="deleting"
-              @click="showDeleteConfirm = true"
+              <div class="flex-1 min-w-0">
+                <p class="text-[14px] font-semibold" style="color: var(--kv-text-primary);">
+                  {{ t('guildSettings.roles.permsAdminLabel') }}
+                </p>
+                <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+                  {{ t('guildSettings.roles.permsAdminDesc') }}
+                </p>
+              </div>
+              <KvSwitch
+                :model-value="hasAdmin"
+                :disabled="!canEdit"
+                @update:model-value="(v: boolean) => setPerm('ADMINISTRATOR', v)"
+              />
+            </div>
+            <p
+              v-if="hasAdmin"
+              class="mt-2 px-3 py-2 text-[12px] rounded-[var(--kv-radius-sm)]"
+              style="background-color: var(--kv-danger-subtle); color: var(--kv-danger);"
             >
-              {{ deleting ? t('guildSettings.roles.deleting') : t('guildSettings.roles.deleteButton') }}
-            </KvButton>
-          </div>
+              {{ t('guildSettings.roles.permsAdminWarning') }}
+            </p>
+          </section>
+
+          <!-- Bayrak grupları -->
+          <section v-for="group in PERMISSION_GROUPS" :key="group.key">
+            <label class="block text-[11px] font-semibold uppercase tracking-widest mb-1.5" style="color: var(--kv-text-muted);">
+              {{ t(`guildSettings.roles.permsGroups.${group.key}`) }}
+            </label>
+            <div class="flex flex-col gap-2">
+              <div
+                v-for="flag in group.flags"
+                :key="flag"
+                class="flex items-center justify-between gap-4 px-3 py-2.5 rounded-[var(--kv-radius-md)] border transition-opacity"
+                :style="`border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);${hasAdmin ? ' opacity: 0.55;' : ''}`"
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
+                    {{ t(`guildSettings.roles.permsFlags.${flag}.label`) }}
+                  </p>
+                  <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+                    {{ t(`guildSettings.roles.permsFlags.${flag}.desc`) }}
+                  </p>
+                </div>
+                <KvSwitch
+                  :model-value="hasAdmin || hasPerm(flag)"
+                  :disabled="!canEdit || hasAdmin"
+                  @update:model-value="(v: boolean) => setPerm(flag, v)"
+                />
+              </div>
+            </div>
+          </section>
 
         </template>
+
+        <!-- ══ KAYDET / SİL (Görünüm + İzinler sekmelerinde) ══ -->
+        <div
+          v-if="canEdit && activeTab !== 'members'"
+          class="flex items-center gap-3 mt-2 pt-4 border-t"
+          style="border-color: var(--kv-border-subtle);"
+        >
+          <KvButton
+            :disabled="!isDirty || saving || !hexValid"
+            :loading="saving"
+            @click="saveRole"
+          >
+            {{ saving ? t('guildSettings.roles.saving') : t('guildSettings.roles.saveButton') }}
+          </KvButton>
+          <KvButton
+            v-if="!selectedRole?.isEveryone"
+            variant="danger"
+            :disabled="deleting"
+            :loading="deleting"
+            @click="showDeleteConfirm = true"
+          >
+            {{ deleting ? t('guildSettings.roles.deleting') : t('guildSettings.roles.deleteButton') }}
+          </KvButton>
+        </div>
 
         <!-- ══ ÜYELERİ YÖNET SEKMESİ ══ -->
         <template v-if="activeTab === 'members' && !selectedRole?.isEveryone">
