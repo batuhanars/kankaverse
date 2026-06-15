@@ -345,12 +345,13 @@ const dangerItem = computed(() => props.isOwner)
 <template>
   <Teleport to="body">
     <div
-      class="fixed inset-0 z-50 flex"
+      class="fixed inset-0 z-50 flex items-stretch justify-center"
       style="background-color: var(--kv-bg-overlay);"
       role="dialog"
       aria-modal="true"
       :aria-label="t('guildSettings.title')"
     >
+      <div class="flex h-full w-full" style="max-width: 1100px;">
       <!-- Sol nav kolonu -->
       <div
         class="shrink-0 flex flex-col py-8 px-3 border-r"
@@ -583,7 +584,7 @@ const dangerItem = computed(() => props.isOwner)
           </div>
 
           <!-- ── Roller bölümü ── -->
-          <div v-else-if="activeSection === 'roller'">
+          <div v-else-if="activeSection === 'roller'" class="h-full">
             <RolesSettingsSection
               :guild="guild"
               :is-owner="isOwner"
@@ -702,6 +703,7 @@ const dangerItem = computed(() => props.isOwner)
           </div>
 
         </div>
+      </div>
       </div>
     </div>
 
