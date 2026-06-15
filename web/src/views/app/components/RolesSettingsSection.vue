@@ -409,6 +409,9 @@ const membersWithRole = computed(() => {
     <!-- Ana alan: editör -->
     <div class="flex-1 min-w-0 flex flex-col overflow-hidden" style="background-color: var(--kv-bg-content);">
 
+      <!-- Dar iç kolon (max 720px, sola yaslı) -->
+      <div class="flex flex-col min-h-0 flex-1 overflow-hidden" style="max-width: 720px; width: 100%;">
+
       <!-- Editör başlık -->
       <div
         class="shrink-0 px-8 pt-6 pb-0"
@@ -633,6 +636,7 @@ const membersWithRole = computed(() => {
         </template>
 
       </div>
+      </div><!-- /dar iç kolon -->
     </div>
   </div>
 
