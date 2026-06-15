@@ -41,5 +41,14 @@ export const useRolesStore = defineStore('roles', () => {
     return undefined
   }
 
-  return { rolesByGuild, rolesFor, fetchRoles, upsertRole, removeRoleLocal, findGuildIdByRole }
+  /** Optimistik sıralama: item'lardaki position'ları güncelle, sonra DESC sırala. */
+  function applyReorder(guildId: string, items: { id: string; position: number }[]): void {
+    const list = rolesByGuild.value[guildId]
+    if (!list) return
+    const posMap = new Map(items.map((i) => [i.id, i.position]))
+    const updated = list.map((r) => (posMap.has(r.id) ? { ...r, position: posMap.get(r.id)! } : r))
+    rolesByGuild.value[guildId] = updated.sort((a, b) => b.position - a.position)
+  }
+
+  return { rolesByGuild, rolesFor, fetchRoles, upsertRole, removeRoleLocal, findGuildIdByRole, applyReorder }
 })
