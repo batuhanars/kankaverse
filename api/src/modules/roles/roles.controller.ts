@@ -14,6 +14,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { ReorderRolesDto } from './dto/reorder-roles.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -46,6 +47,19 @@ export class RolesController {
     @Body() dto: CreateRoleDto,
   ) {
     return this.rolesService.createRole(user.id, guildId, dto);
+  }
+
+  // ─── PATCH /guilds/:id/roles/reorder ─────────────────────────────────────
+
+  @Patch('guilds/:id/roles/reorder')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Rolleri toplu sırala (drag-reorder; OWNER/ADMIN; @everyone hariç). Dönüş null.' })
+  reorderRoles(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: ReorderRolesDto,
+  ) {
+    return this.rolesService.reorderRoles(user.id, id, dto.items);
   }
 
   // ─── PATCH /roles/:id ─────────────────────────────────────────────────────

@@ -320,6 +320,54 @@ export class RolesService {
     return memberDto;
   }
 
+  // ─── PATCH /guilds/:id/roles/reorder ────────────────────────────────────────
+
+  /**
+   * Toplu sıralama (drag-reorder): rollerin position'ını güncelle (OWNER/ADMIN).
+   * @everyone rolü asla taşınmaz — items içinde gelse bile filtrelenir.
+   * Geçerli rol yoksa null döner.
+   */
+  async reorderRoles(
+    actorId: string,
+    guildId: string,
+    items: { id: string; position: number }[],
+  ): Promise<null> {
+    await this.requireOwnerOrAdmin(actorId, guildId);
+
+    const ids = items.map((i) => i.id);
+
+    // @everyone filtrelenir (isEveryone: false şartı)
+    const validRoles = await this.prisma.role.findMany({
+      where: { id: { in: ids }, guildId, isEveryone: false },
+      select: { id: true },
+    });
+    if (validRoles.length === 0) return null;
+
+    const validIdSet = new Set(validRoles.map((r) => r.id));
+    const validItems = items.filter((i) => validIdSet.has(i.id));
+
+    await this.prisma.$transaction(
+      validItems.map((i) =>
+        this.prisma.role.update({
+          where: { id: i.id },
+          data: { position: i.position },
+        }),
+      ),
+    );
+
+    // Realtime: güncel rolleri tüm guild üyelerine yay
+    const updatedRoles = await this.prisma.role.findMany({
+      where: { id: { in: validItems.map((i) => i.id) } },
+    });
+    const memberIds = await this.guildMemberIds(guildId);
+    for (const role of updatedRoles) {
+      const memberCount = await this.roleMemberCount(role.id);
+      this.realtime.emitToUsers(memberIds, 'guild.role_updated', toRoleDto(role, memberCount));
+    }
+
+    return null;
+  }
+
   /** GuildMember kaydını genişletilmiş DTO'ya dönüştürür (role enum + atanmış roller[]). */
   private toExtendedMemberDto(member: {
     user: { id: string; username: string; avatarUrl: string | null };
