@@ -9,8 +9,8 @@ import { useMessagesStore } from '@/stores/messages'
  *  - `useJumpToMessage()` → mesaj listesi component'ı (MessageArea / DmConversation) kurar;
  *    isteği dinler, gerekiyorsa hedef yüklenene dek geriye sayfalar, kaydırır + vurgular.
  *
- * Pins/arama yalnız aktif kanalı hedefler (popover'ın channelId'si = açık kanal),
- * bu yüzden kanal-içi kalır; cross-kanal navigasyon gerekmez.
+ * Pins/arama aktif kanalı hedefler; sunucu-geneli arama BAŞKA kanalı hedefler →
+ * navigasyon sonrası hedef kanalın listesi mount olunca bekleyen istek tüketilir.
  */
 
 // ── Singleton istek yolu ──────────────────────────────────────────────
@@ -77,11 +77,20 @@ export function useJumpToMessage(
     }
   }
 
-  watch(jumpNonce, () => {
+  // Bekleyen isteği tüket: bu liste hedef kanalsa zıpla + isteği temizle (remount'ta tekrar etmesin)
+  function maybeJump() {
     if (!targetMessageId.value) return
     if (targetChannelId.value !== channelId()) return
-    performJump(targetMessageId.value)
-  })
+    const msgId = targetMessageId.value
+    targetMessageId.value = null
+    targetChannelId.value = null
+    performJump(msgId)
+  }
+
+  // Aynı kanal (pins/arama): istek nonce'u değişince.
+  watch(jumpNonce, maybeJump)
+  // Çapraz kanal (sunucu-geneli arama): bu liste hedef kanala geçince/mount olunca.
+  watch(channelId, () => nextTick(maybeJump), { immediate: true })
 
   return { isJumping }
 }

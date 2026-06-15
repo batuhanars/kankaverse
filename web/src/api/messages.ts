@@ -49,4 +49,14 @@ export const messagesApi = {
     if (before) params.before = before
     return http.get<MessageDto[]>(`/channels/${channelId}/messages/search`, { params })
   },
+  // Sunucu-geneli arama: erişilebilir kanallarda, kanal-gruplu sonuç
+  searchGuildMessages(guildId: string, q: string) {
+    return http.get<GuildSearchGroup[]>(`/guilds/${guildId}/messages/search`, { params: { q } })
+  },
+}
+
+export interface GuildSearchGroup {
+  channelId: string
+  channelName: string
+  messages: MessageDto[]
 }
