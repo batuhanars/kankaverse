@@ -46,7 +46,7 @@ function goNext() {
   >
     <div
       class="w-full max-w-sm rounded-[var(--kv-radius-lg)] p-8 text-center"
-      style="background-color: var(--kv-bg-sidebar);"
+      style="background-color: var(--kv-bg-sidebar); border: 1px solid var(--kv-border-subtle); border-top: 3px solid var(--kv-accent-500);"
     >
       <img
         :src="logoDikey"

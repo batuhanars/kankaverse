@@ -266,11 +266,8 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Responsive:** üye paneli `<1280` gizli (mevcut `xl:flex` korunur); kanal paneli `<768` drawer *(shell breakpoint sistemi — tam drawer UX sprint-bağımsız, şimdi visual-only; kanal paneli masaüstünde her zaman görünür)*.
 - [x] **i18n + token:** `member.comingSoon` + `channel.selectChannel` `tr.json`'a taşındı; renk/şekil `--kv-*`. Regresyon: kanal seç/mesaj gönder-al çalışıyor.
 
-**Faz 4 — Auth cila (`web/`):** *(kullanıcı 2026-06-12: ortam son ekran, sonra sprint'lere dönülüyor → **ERTELENDİ**)*
-- [ ] Auth ekranlarına yeni görsel dil (kart/buton/input); akış değişmez. **Düşük öncelik** — feature sprint'leri arası fırsat işi.
-
-**Faz 4 — Auth (`web/`):**
-- [ ] Auth ekranlarına yeni görsel dil (kart/buton/input); akış değişmez
+**Faz 4 — Auth cila (`web/`):** → **TAMAMLANDI (2026-06-15)**
+- [x] Auth ekranları görsel cila: 8 ekran (login/kayıt/şifre/2FA/doğrulama/e-posta-değişim) kartına **ince kenarlık + üstte Kor aksan şeridi** (tasarım dili: katman-ayrımı + marka aksanı; gölge yok). Zaten token+Kv* hizalıydı; akış değişmedi. web build temiz.
 
 **DoD:** sıfır backend; §3 özellikleri yapılmadı; tüm ekranlar primitive kullanıyor; metin i18n + renk/şekil token; regresyon yok.
 

@@ -65,7 +65,7 @@ function getError(field: string): string | undefined {
   >
     <div
       class="w-full max-w-sm rounded-[var(--kv-radius-lg)] p-8"
-      style="background-color: var(--kv-bg-sidebar);"
+      style="background-color: var(--kv-bg-sidebar); border: 1px solid var(--kv-border-subtle); border-top: 3px solid var(--kv-accent-500);"
     >
       <div class="mb-6 text-center">
         <img
