@@ -63,5 +63,13 @@ Rol sürükle-sırala (hiyerarşi/position), rol mention (`@rol`), rol simgesi y
   - "Çevrimiçi" grubu boşalırsa **başlık kaybolur** (Discord davranışı; sahip ekran görüntüsüyle doğruladı).
   - Bir üye birden çok hoist'li role sahipse → **en yüksek (position)** hoist'li rolün grubunda görünür.
 
+## Durum (PM kaydı)
+
+- **Faz 1.1 — TAMAM** (`48ef947`): ayarlar overlay'i `max-w-[1100px]` ortalanmış panel.
+- **Faz 2 backend — TAMAM** (`3cbebed`, `05b5df4`): Role + GuildMemberRole modeli, migration `20260615102358_roles` (uygulandı, status temiz) + @everyone backfill, rol CRUD + üye atama (`roles` modülü, OWNER/ADMIN kapısı), `getMembers` `roles[]`, realtime `guild.role_*`/`member_updated`. 524 test ✓.
+- **Faz 2 web — TAMAM** (`9ce6ac3`): üye listesi hoist-rol gruplama (sahip kuralları), RolesSettingsSection (görünüm+üye, izin sekmesi YOK), roles store/api/realtime, GuildMemberRow refactor (DRY). tsc+build ✓.
+- **PM kararı (üye gruplama):** sahip "rol yoksa yalnız Çevrimiçi" kuralı gereği **enum-tabanlı otomatik "Yöneticiler" grubu KALDIRILDI**; gruplama tamamen hoist'li rollere dayanır. Sahip görünürlüğü için 👑 (OWNER) + ADMIN rozeti üye satırında **satır-içi** korundu. Sahip onayına sunuldu (geri bildirim beklenir).
+- **Faz 3 — BEKLEMEDE:** izin enforcement R7-AĞIR; merge öncesi **sahip satır-satır inceleme + imza** zorunlu (kök CLAUDE.md). Başlamadan sahibe danışılacak.
+
 ## Çalışma modeli (bu sprint)
 PM (Opus) bu sözleşmeyi + her faz görevini composer; **Sonnet dev session** tier'a iner (`web/` veya `api/`), kodu yazar, build/test çalıştırır, commit eder. PM Faz 3'ü (izin enforcement) R7 satır-satır inceler. Sapma → dev DURUR, PM contract'ı revize eder.
