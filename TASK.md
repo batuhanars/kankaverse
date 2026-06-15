@@ -619,3 +619,12 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **REV-14 — Realtime üye olayları → TAMAMLANDI (çekirdek):** Backend `RealtimeService.emitToUsers` + invite-join→`guild.member_joined`, kick→`guild.member_left`, rol→`guild.member_updated` (guild üyelerine yayın). Frontend: **yeni `members` store** (tek kaynak); MemberPanel + MessageArea mention autocomplete ona bağlandı (ayrı local fetch'ler kaldı); useSocket 3 event→store anlık güncelleme; atılan kişi ortamı yerel düşürür (`removeGuildLocal`), kendi rolü değişen `setMyRole`. Artık ortama katılan/atılan/rolü değişen **sayfa yenilemeden** üye listesinde+mention'da görünür. 485 test + web build temiz.
   - [ ] **Kalan realtime tarama (sonraki):** kanal/kategori CRUD, ortam ayar/ikon değişimi diğer üyelerde anlık mı — diğer açık kalanları sonraki turda tara/düzelt
 - [ ] **REV-6 (uzun-süre):** mic kilitlenme tek seferde gitmiş görünüyor; uzun-soluklu kullanımda tekrar çıkarsa yeniden bakılacak (sahip notu)
+
+---
+
+## Revizeler — Sahip saha testi 3. tur (2026-06-15)
+
+- [x] **R3-2 — Ortama katılınca otomatik gir:** ServerModal join/create `enterGuild()` ile `router.push` (kanal route'una) → AppShell refactor sonrası `setActiveChannel` store'u güncelliyordu ama route değişmediği için ekran boştu ("rail aktif/ekran boş"). Karar: **otomatik gir** (Discord gibi); kanal yoksa yalnız aktif yap. (`5828a0c..f6c8264`)
+- [x] **R3-3 — Reaksiyon ⋯ menü tıklanamıyor:** açık-menülü `MessageRow` hover-toolbar'ı `z-10`'du; sonraki mesajın toolbar'ı (DOM'da sonra, aynı z) üste boyanıp Sabitle/Şikayet tıklamasını çalıyordu → menü açıkken toolbar **z-40**. Tek fix DM+grup+ortam (hepsi MessageRow).
+- [~] **R3-1 — REV-9 ortam kanalında:** kod doğrulandı — MessageArea'da REV-9 zaten **var ve DM ile özdeş** (d90f3e1'den canlı). Sahip hard-reload sonrası teyit edecek; hâlâ sorunsa spesifik repro istenecek.
+- [~] **REV-7 (sesten düşme):** sahip 3. tur testinde **tekrarlanmadı**; konsol sağlıklı (LiveKit connected + publishing track), yalnız zararsız `/auth/me 401` (normal ilk-yük refresh). Muhtemelen REV-6 ile çözüldü / transient. Disconnect log'u izlemede kalır.
