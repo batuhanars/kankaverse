@@ -503,14 +503,19 @@ describe('ChannelsService.findByGuild — unreadCount', () => {
     const ch1 = { ...makeChannel(), id: 'ch-1', channelReads: [] };
     const ch2 = { ...makeChannel(), id: 'ch-2', channelReads: [{ lastReadAt: NOW }] };
     prismaMock.channel.findMany.mockResolvedValue([ch1, ch2]);
+    // REV-4: kanal başına 2 count → unread, mention sırasıyla (ch1.unread, ch1.mention, ch2.unread, ch2.mention)
     prismaMock.message.count
-      .mockResolvedValueOnce(4)  // ch-1
-      .mockResolvedValueOnce(1); // ch-2
+      .mockResolvedValueOnce(4) // ch-1 unread
+      .mockResolvedValueOnce(2) // ch-1 mention
+      .mockResolvedValueOnce(1) // ch-2 unread
+      .mockResolvedValueOnce(0); // ch-2 mention
 
     const result = await service.findByGuild(USER_ID, GUILD_ID);
     expect(result[0].unreadCount).toBe(4);
+    expect(result[0].unreadMentionCount).toBe(2);
     expect(result[1].unreadCount).toBe(1);
-    expect(prismaMock.message.count).toHaveBeenCalledTimes(2);
+    expect(result[1].unreadMentionCount).toBe(0);
+    expect(prismaMock.message.count).toHaveBeenCalledTimes(4);
   });
 });
 

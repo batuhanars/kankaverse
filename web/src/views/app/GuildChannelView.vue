@@ -62,6 +62,7 @@ async function sync(guildId: string, channelId: string) {
 
 function recheckGuildUnread(guildId: string) {
   guildsStore.setGuildUnreadCount(guildId, channelsStore.totalUnreadForGuild(guildId))
+  guildsStore.setGuildMentionCount(guildId, channelsStore.totalMentionsForGuild(guildId)) // REV-4
 }
 
 watch(

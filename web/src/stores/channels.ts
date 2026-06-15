@@ -128,8 +128,9 @@ export const useChannelsStore = defineStore('channels', () => {
     for (const [loopGuildId, channels] of Object.entries(channelsByGuild.value)) {
       const idx = channels.findIndex((c) => c.id === channelId)
       if (idx !== -1) {
-        if (channels[idx].unreadCount > 0) {
-          channels[idx] = { ...channels[idx], unreadCount: 0 }
+        // REV-4: okundu → unread + okunmamış-bahsetme ikisini de sıfırla (optimistik)
+        if (channels[idx].unreadCount > 0 || channels[idx].unreadMentionCount > 0) {
+          channels[idx] = { ...channels[idx], unreadCount: 0, unreadMentionCount: 0 }
         }
         if (!resolvedGuildId) resolvedGuildId = loopGuildId
         break
@@ -166,6 +167,28 @@ export const useChannelsStore = defineStore('channels', () => {
     return (channelsByGuild.value[guildId] ?? []).reduce((sum, c) => sum + c.unreadCount, 0)
   }
 
+  // REV-4: WS mention → kanal aktif değilse unreadMentionCount++ (+ generic unread de zaten artar)
+  function markChannelMentioned(channelId: string, guildId: string): void {
+    const channels = channelsByGuild.value[guildId]
+    if (!channels) return
+    const idx = channels.findIndex((c) => c.id === channelId)
+    if (idx !== -1) {
+      channels[idx] = { ...channels[idx], unreadMentionCount: channels[idx].unreadMentionCount + 1 }
+    }
+  }
+
+  /** Guild'in okunmamış-bahsetme toplamı (rail kırmızı rozeti) */
+  function totalMentionsForGuild(guildId: string): number {
+    return (channelsByGuild.value[guildId] ?? []).reduce((sum, c) => sum + c.unreadMentionCount, 0)
+  }
+
+  /** REV-4: o guild'de okunmamış bahsetmesi olan kanallar (position sırasında) — bant zıplama döngüsü */
+  function channelsWithMentions(guildId: string) {
+    return (channelsByGuild.value[guildId] ?? [])
+      .filter((c) => c.unreadMentionCount > 0)
+      .sort((a, b) => a.position - b.position)
+  }
+
   return {
     channelsByGuild,
     activeChannelId,
@@ -186,5 +209,8 @@ export const useChannelsStore = defineStore('channels', () => {
     markChannelRead,
     markChannelUnread,
     totalUnreadForGuild,
+    markChannelMentioned,
+    totalMentionsForGuild,
+    channelsWithMentions,
   }
 })

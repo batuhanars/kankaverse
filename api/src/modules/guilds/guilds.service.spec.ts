@@ -368,9 +368,12 @@ describe('GuildsService.findMyGuilds — unreadCount', () => {
     prismaMock.guildMember.findMany.mockResolvedValue([
       makeGuildWithChannels([{ lastReadAt: NOW }, { lastReadAt: null }]),
     ]);
+    // REV-4: kanal başına unread + mention sırasıyla
     prismaMock.message.count
-      .mockResolvedValueOnce(2)  // ch-1
-      .mockResolvedValueOnce(3); // ch-2
+      .mockResolvedValueOnce(2) // ch-1 unread
+      .mockResolvedValueOnce(0) // ch-1 mention
+      .mockResolvedValueOnce(3) // ch-2 unread
+      .mockResolvedValueOnce(0); // ch-2 mention
 
     const result = await service.findMyGuilds(OWNER_ID);
     expect(result[0].unreadCount).toBe(5);
@@ -397,9 +400,12 @@ describe('GuildsService.findMyGuilds — unreadCount', () => {
         },
       },
     ]);
+    // REV-4: kanal başına unread + mention sırasıyla (guild1.unread, guild1.mention, guild2.unread, guild2.mention)
     prismaMock.message.count
-      .mockResolvedValueOnce(1)  // guild-1 ch
-      .mockResolvedValueOnce(7); // guild-2 ch
+      .mockResolvedValueOnce(1) // guild-1 ch unread
+      .mockResolvedValueOnce(0) // guild-1 ch mention
+      .mockResolvedValueOnce(7) // guild-2 ch unread
+      .mockResolvedValueOnce(0); // guild-2 ch mention
 
     const result = await service.findMyGuilds(OWNER_ID);
     expect(result[0].unreadCount).toBe(1);

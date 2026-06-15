@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
@@ -87,6 +87,38 @@ function categoryIsCollapsed(categoryId: string): boolean {
   void collapseToggleTick.value
   return isCategoryCollapsed(activeGuildId.value, categoryId)
 }
+
+// ── REV-4: Bahsetme bandı — okunmamış bahsetmesi olan kanallar arası zıplama döngüsü ──
+// Bant tıklandıkça sıradaki bahsetme kanalına sidebar'da KAYAR + vurgular; kanalın
+// İÇİNE GİRMEZ (kullanıcı manuel tıklar). Hepsi okununca bant kaybolur.
+const mentionChannels = computed(() => channelsStore.channelsWithMentions(activeGuildId.value))
+const totalMentions = computed(() => channelsStore.totalMentionsForGuild(activeGuildId.value))
+const highlightedChannelId = ref<string | null>(null)
+let mentionCycleIndex = 0
+
+function jumpToNextMention() {
+  const list = mentionChannels.value
+  if (!list.length) return
+  if (mentionCycleIndex >= list.length) mentionCycleIndex = 0
+  const target = list[mentionCycleIndex]
+  mentionCycleIndex++
+  // Katlanmış kategorideyse aç (kanal DOM'da görünür olsun)
+  if (target.categoryId && isCategoryCollapsed(activeGuildId.value, target.categoryId)) {
+    toggleCollapse(activeGuildId.value, target.categoryId)
+  }
+  highlightedChannelId.value = target.id
+  nextTick(() => {
+    document
+      .querySelector(`[data-channel-row="${target.id}"]`)
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  })
+}
+
+// Ortam değişince döngü + vurgu sıfırlanır
+watch(activeGuildId, () => {
+  mentionCycleIndex = 0
+  highlightedChannelId.value = null
+})
 
 // ── Kanal seçme ──
 function selectChannel(channel: ChannelDto) {
@@ -496,11 +528,13 @@ function closeCategoryMenu() {
       <!-- ── (1) Kategorisiz kanallar — en üstte ── -->
       <template v-for="channel in uncategorizedChannels" :key="channel.id">
       <div
+        :data-channel-row="channel.id"
         class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
         :class="[
           channelsStore.activeChannelId === channel.id
             ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-text-primary)]'
             : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
+          highlightedChannelId === channel.id ? 'kv-mention-highlight' : '',
         ]"
       >
         <button
@@ -786,6 +820,26 @@ function closeCategoryMenu() {
         {{ t('channel.noChannels') }}
       </p>
     </div>
+
+    <!-- REV-4: bahsetme bandı — sidebar altında, tam genişlik, kırmızı; tıkla → sıradaki
+         bahsetme kanalına zıpla+vurgula (içine girmez). Hepsi okununca kaybolur. -->
+    <button
+      v-if="totalMentions > 0"
+      type="button"
+      class="shrink-0 flex items-center gap-2 px-4 py-2.5 text-left transition-opacity cursor-pointer hover:opacity-90"
+      style="background-color: var(--kv-danger); color: #ffffff;"
+      :title="t('mention.bannerHint')"
+      @click="jumpToNextMention"
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+      <span class="flex-1 text-[13px] font-semibold leading-tight">{{ t('mention.banner') }}</span>
+      <span class="shrink-0 text-[12px] font-bold px-1.5 rounded-full" style="background-color: rgba(255,255,255,0.25);">
+        {{ totalMentions > 99 ? '99+' : totalMentions }}
+      </span>
+    </button>
   </aside>
 
   <!-- Ortam Ayarları Modalı -->
@@ -1218,6 +1272,17 @@ function closeCategoryMenu() {
 </template>
 
 <style scoped>
+/* REV-4: bahsetme bandı zıplama vurgusu — kanal satırına geçici aksan halkası */
+.kv-mention-highlight {
+  outline: 2px solid var(--kv-danger);
+  outline-offset: -2px;
+  animation: kv-mention-pulse 1.2s ease-in-out;
+}
+@keyframes kv-mention-pulse {
+  0%, 100% { background-color: transparent; }
+  30% { background-color: var(--kv-accent-subtle); }
+}
+
 /* Kırmızı okunmamış sayaç rozeti — kanal satırı sağında */
 .channel-unread-badge {
   min-width: 18px;

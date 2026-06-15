@@ -130,12 +130,13 @@ function badgeLabel(count: number): string {
             <span v-else class="hex-label">{{ guildInitial(guild.name) }}</span>
           </span>
 
-          <!-- Kırmızı sayaç rozeti — sağ-alt; aktif guild'de de gösterilir, yalnız 0'da gizlenir -->
+          <!-- REV-4: kırmızı sayaç = okunmamış BAHSETME (generic unread değil; o beyaz pill'de).
+               Sağ-alt; aktif guild'de de gösterilir, yalnız 0'da gizlenir -->
           <span
-            v-if="guild.unreadCount > 0"
+            v-if="guild.unreadMentionCount > 0"
             class="badge"
           >
-            {{ badgeLabel(guild.unreadCount) }}
+            {{ badgeLabel(guild.unreadMentionCount) }}
           </span>
         </span>
       </button>
