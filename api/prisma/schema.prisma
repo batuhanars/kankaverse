@@ -155,6 +155,7 @@ model Guild {
   channels  Channel[]
   invites   Invite[]
   categories ChannelCategory[]
+  bans      GuildBan[]
 }
 
 model GuildMember {
@@ -168,6 +169,21 @@ model GuildMember {
 
   @@unique([guildId, userId])
   @@index([userId])
+}
+
+// Ortam-ban: kalıcı yasak (kick + tekrar davetle giremez). Davet-join'de kontrol edilir.
+// userId/bannedById Prisma ilişkisi değil (User şemasını şişirmemek için); username ayrı sorgulanır.
+model GuildBan {
+  id         String   @id @default(cuid())
+  guildId    String
+  guild      Guild    @relation(fields: [guildId], references: [id])
+  userId     String
+  bannedById String
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@unique([guildId, userId])
+  @@index([guildId])
 }
 
 model ChannelCategory {

@@ -488,4 +488,164 @@ export class GuildsService {
 
     return null;
   }
+
+  // ─── §D: Ortamdan ayrıl (kendi) ──────────────────────────────────────────
+  /** POST /guilds/:id/leave — OWNER ayrılamaz (önce devret/sil). Üyelik + ChannelMember temizlenir. */
+  async leaveGuild(userId: string, guildId: string): Promise<null> {
+    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
+    if (membership.role === GuildRole.OWNER) {
+      throw new BadRequestException({
+        message: 'Ortam sahibi ayrılamaz; önce sahipliği devredin veya ortamı silin.',
+        error: 'OWNER_CANNOT_LEAVE',
+      });
+    }
+    const recipients = await this.guildMemberIds(guildId);
+    const channelIds = (
+      await this.prisma.channel.findMany({ where: { guildId, deletedAt: null }, select: { id: true } })
+    ).map((c) => c.id);
+    await this.prisma.$transaction([
+      this.prisma.channelMember.deleteMany({ where: { userId, channelId: { in: channelIds } } }),
+      this.prisma.guildMember.delete({ where: { guildId_userId: { guildId, userId } } }),
+    ]);
+    this.realtime.emitToUsers(recipients, 'guild.member_left', { guildId, userId });
+    return null;
+  }
+
+  // ─── §E: Sahiplik devri (R7 — yalnız OWNER) ──────────────────────────────
+  /** POST /guilds/:id/members/:userId/transfer — hedef OWNER, eski sahip ADMIN olur (atomik). */
+  async transferOwnership(actorId: string, guildId: string, targetUserId: string): Promise<null> {
+    await this.requireOwner(actorId, guildId);
+    if (actorId === targetUserId) {
+      throw new BadRequestException({ message: 'Zaten ortam sahibisiniz.', error: 'ALREADY_OWNER' });
+    }
+    const target = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId: targetUserId } },
+    });
+    if (!target) {
+      throw new NotFoundException({ message: 'Kullanıcı bu sunucunun üyesi değil.', error: 'NOT_GUILD_MEMBER' });
+    }
+
+    const result = await this.prisma.$transaction([
+      this.prisma.guild.update({ where: { id: guildId }, data: { ownerId: targetUserId } }),
+      this.prisma.guildMember.update({
+        where: { guildId_userId: { guildId, userId: targetUserId } },
+        data: { role: GuildRole.OWNER },
+        include: { user: { select: { id: true, username: true, avatarUrl: true } } },
+      }),
+      this.prisma.guildMember.update({
+        where: { guildId_userId: { guildId, userId: actorId } },
+        data: { role: GuildRole.ADMIN },
+        include: { user: { select: { id: true, username: true, avatarUrl: true } } },
+      }),
+    ]);
+    const newOwner = result[1];
+    const oldOwner = result[2];
+
+    const recipients = await this.guildMemberIds(guildId);
+    for (const m of [newOwner, oldOwner]) {
+      this.realtime.emitToUsers(recipients, 'guild.member_updated', {
+        guildId,
+        member: { userId: m.user.id, username: m.user.username, avatarUrl: m.user.avatarUrl, role: m.role },
+      });
+    }
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: 'guild.ownership_transferred',
+        entityType: 'Guild',
+        entityId: guildId,
+        metadata: { guildId, targetUserId },
+      },
+    });
+    return null;
+  }
+
+  // ─── §F: Ortam-ban (kalıcı; kick + tekrar davetle giremez) ───────────────
+  /** POST /guilds/:id/members/:userId/ban — hiyerarşi kick'le aynı + GuildBan kaydı. */
+  async banMember(actorId: string, guildId: string, targetUserId: string, reason?: string): Promise<null> {
+    const { membership: actorMembership } = await this.membership.requireGuildMembership(actorId, guildId);
+    if (actorMembership.role !== GuildRole.OWNER && actorMembership.role !== GuildRole.ADMIN) {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+    }
+    if (actorId === targetUserId) {
+      throw new BadRequestException({ message: 'Kendinizi yasaklayamazsınız.', error: 'CANNOT_BAN_SELF' });
+    }
+    const target = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId: targetUserId } },
+    });
+    if (!target) {
+      throw new NotFoundException({ message: 'Kullanıcı bu sunucunun üyesi değil.', error: 'NOT_GUILD_MEMBER' });
+    }
+    if (target.role === GuildRole.OWNER) {
+      throw new BadRequestException({ message: 'Ortam sahibi yasaklanamaz.', error: 'CANNOT_BAN_OWNER' });
+    }
+    if (actorMembership.role === GuildRole.ADMIN && target.role === GuildRole.ADMIN) {
+      throw new ForbiddenException({ message: 'Yöneticiler başka yöneticileri yasaklayamaz.', error: 'FORBIDDEN' });
+    }
+
+    const recipients = await this.guildMemberIds(guildId);
+    const channelIds = (
+      await this.prisma.channel.findMany({ where: { guildId, deletedAt: null }, select: { id: true } })
+    ).map((c) => c.id);
+    await this.prisma.$transaction([
+      this.prisma.channelMember.deleteMany({ where: { userId: targetUserId, channelId: { in: channelIds } } }),
+      this.prisma.guildMember.delete({ where: { guildId_userId: { guildId, userId: targetUserId } } }),
+      this.prisma.guildBan.upsert({
+        where: { guildId_userId: { guildId, userId: targetUserId } },
+        update: { bannedById: actorId, reason: reason ?? null },
+        create: { guildId, userId: targetUserId, bannedById: actorId, reason: reason ?? null },
+      }),
+    ]);
+    this.realtime.emitToUsers(recipients, 'guild.member_left', { guildId, userId: targetUserId });
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: 'guild.member_banned',
+        entityType: 'GuildMember',
+        entityId: target.id,
+        metadata: { guildId, targetUserId, reason: reason ?? null },
+      },
+    });
+    return null;
+  }
+
+  /** GET /guilds/:id/bans — OWNER/ADMIN; yasaklı kullanıcılar (username çözülerek). */
+  async listBans(userId: string, guildId: string) {
+    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
+    if (membership.role !== GuildRole.OWNER && membership.role !== GuildRole.ADMIN) {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+    }
+    const bans = await this.prisma.guildBan.findMany({ where: { guildId }, orderBy: { createdAt: 'desc' } });
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: bans.map((b) => b.userId) } },
+      select: { id: true, username: true, avatarUrl: true },
+    });
+    const byId = new Map(users.map((u) => [u.id, u]));
+    return bans.map((b) => ({
+      userId: b.userId,
+      username: byId.get(b.userId)?.username ?? b.userId,
+      avatarUrl: byId.get(b.userId)?.avatarUrl ?? null,
+      reason: b.reason,
+      bannedAt: b.createdAt.toISOString(),
+    }));
+  }
+
+  /** DELETE /guilds/:id/bans/:userId — OWNER/ADMIN; yasağı kaldır. */
+  async unbanMember(actorId: string, guildId: string, targetUserId: string): Promise<null> {
+    const { membership } = await this.membership.requireGuildMembership(actorId, guildId);
+    if (membership.role !== GuildRole.OWNER && membership.role !== GuildRole.ADMIN) {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+    }
+    await this.prisma.guildBan.deleteMany({ where: { guildId, userId: targetUserId } });
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: 'guild.member_unbanned',
+        entityType: 'GuildBan',
+        entityId: `${guildId}:${targetUserId}`,
+        metadata: { guildId, targetUserId },
+      },
+    });
+    return null;
+  }
 }

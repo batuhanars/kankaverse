@@ -12,6 +12,10 @@ const prismaMock = {
   guildMember: {
     findUnique: jest.fn(),
     create: jest.fn(),
+    findMany: jest.fn(),
+  },
+  guildBan: {
+    findUnique: jest.fn(),
   },
   user: {
     findUnique: jest.fn(),
@@ -32,6 +36,8 @@ function makeService() {
 
 function resetMocks() {
   jest.resetAllMocks();
+  // Varsayılan: kullanıcı yasaklı değil (join testlerinin çoğu için)
+  prismaMock.guildBan.findUnique.mockResolvedValue(null);
 }
 
 // ── Fixture helpers ──────────────────────────────────────────────────────────
@@ -172,6 +178,15 @@ describe('InvitesService.joinByInvite — [R7] kapı sırası', () => {
     } catch (e: any) {
       expect(e.response?.error).toBe('AGE_RESTRICTED');
     }
+  });
+
+  it('[ban] yasaklı kullanıcı davetle giremez → 403 GUILD_BANNED', async () => {
+    prismaMock.invite.findUnique.mockResolvedValue(makeInvite());
+    prismaMock.guildBan.findUnique.mockResolvedValue({
+      guildId: GUILD_NORMAL.id, userId: 'user1', bannedById: 'owner1', reason: null,
+    });
+    await expect(service.joinByInvite('user1', 'ABCD1234'))
+      .rejects.toMatchObject({ response: { error: 'GUILD_BANNED' } });
   });
 
   it('[R7] adultsOnly ortam + minör → isMinor sızdırılmaz (sadece AGE_RESTRICTED)', async () => {

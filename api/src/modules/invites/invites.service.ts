@@ -187,6 +187,14 @@ export class InvitesService {
       }
     }
 
+    // 2.5. Ortam-ban kontrolü — yasaklı kullanıcı davetle giremez (kendi yasağı; açık mesaj)
+    const ban = await this.prisma.guildBan.findUnique({
+      where: { guildId_userId: { guildId: guild.id, userId } },
+    });
+    if (ban) {
+      throw new ForbiddenException({ message: 'Bu ortamdan yasaklandınız.', error: 'GUILD_BANNED' });
+    }
+
     // 3. Zaten üye kontrolü
     const existing = await this.prisma.guildMember.findUnique({
       where: { guildId_userId: { guildId: guild.id, userId } },

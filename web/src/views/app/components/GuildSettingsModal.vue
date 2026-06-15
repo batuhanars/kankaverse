@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
-import { guildsApi } from '@/api/guilds'
+import { guildsApi, type GuildBanDto } from '@/api/guilds'
 import { attachmentsApi } from '@/api/attachments'
 import { invitesApi } from '@/api/invites'
 import KvModal from '@/components/ui/KvModal.vue'
@@ -244,7 +244,40 @@ async function loadInvites() {
   }
 }
 
-onMounted(loadInvites)
+// ── Yasaklılar ─────────────────────────────────────────────────────────────
+
+const bans = ref<GuildBanDto[]>([])
+const bansLoading = ref(false)
+const unbanningId = ref<string | null>(null)
+
+async function loadBans() {
+  bansLoading.value = true
+  try {
+    const res = await guildsApi.getBans(props.guild.id)
+    bans.value = res.data
+  } catch {
+    // sessizce geç (yetki yoksa veya hata)
+  } finally {
+    bansLoading.value = false
+  }
+}
+
+async function unban(userId: string) {
+  unbanningId.value = userId
+  try {
+    await guildsApi.unbanMember(props.guild.id, userId)
+    bans.value = bans.value.filter((b) => b.userId !== userId)
+  } catch {
+    // sessizce geç
+  } finally {
+    unbanningId.value = null
+  }
+}
+
+onMounted(() => {
+  loadInvites()
+  loadBans()
+})
 
 // ── Davet iptal ────────────────────────────────────────────────────────────
 
@@ -518,6 +551,37 @@ async function confirmDeleteGuild() {
             </span>
             <KvButton size="sm" variant="danger" @click="revokeTarget = inv">
               {{ t('invite.revoke') }}
+            </KvButton>
+          </li>
+        </ul>
+      </section>
+
+      <!-- ── 4.5 Yasaklılar ── -->
+      <section>
+        <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
+          {{ t('guildSettings.bansSection') }}
+        </h3>
+        <p v-if="bansLoading" class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('common.loading') }}</p>
+        <p v-else-if="bans.length === 0" class="text-[13px]" style="color: var(--kv-text-muted);">
+          {{ t('guildSettings.bansEmpty') }}
+        </p>
+        <ul v-else class="flex flex-col gap-1.5">
+          <li
+            v-for="b in bans"
+            :key="b.userId"
+            class="flex items-center gap-2.5 px-3 py-2 rounded-[var(--kv-radius-md)] border"
+            style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+          >
+            <div class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-semibold text-white" style="background-color: var(--kv-accent-500);">
+              <img v-if="b.avatarUrl" :src="b.avatarUrl" :alt="b.username" class="w-full h-full object-cover" />
+              <span v-else>{{ b.username[0]?.toUpperCase() }}</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-[14px] truncate" style="color: var(--kv-text-primary);">{{ b.username }}</p>
+              <p v-if="b.reason" class="text-[12px] truncate" style="color: var(--kv-text-muted);">{{ b.reason }}</p>
+            </div>
+            <KvButton variant="ghost" :loading="unbanningId === b.userId" @click="unban(b.userId)">
+              {{ t('guildSettings.unban') }}
             </KvButton>
           </li>
         </ul>

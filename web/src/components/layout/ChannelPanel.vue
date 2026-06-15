@@ -476,6 +476,33 @@ function toggleCategoryMenu(categoryId: string) {
 function closeCategoryMenu() {
   openCategoryMenuId.value = null
 }
+
+// ── Ortam menüsü (başlık tek-buton → Discord-tarzı dropdown) ──
+const showGuildMenu = ref(false)
+function toggleGuildMenu() { showGuildMenu.value = !showGuildMenu.value }
+function closeGuildMenu() { showGuildMenu.value = false }
+
+// ── Ortamdan ayrıl ──
+const showLeaveConfirm = ref(false)
+const leaving = ref(false)
+const leaveError = ref('')
+async function doLeave() {
+  const guildId = guildsStore.activeGuildId
+  if (!guildId) return
+  leaving.value = true
+  leaveError.value = ''
+  try {
+    await guildsApi.leaveGuild(guildId)
+    guildsStore.removeGuildLocal(guildId)
+    showLeaveConfirm.value = false
+    router.push({ name: 'app' }) // anasayfaya dön
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    leaveError.value = err.response?.data?.message ?? t('common.error')
+  } finally {
+    leaving.value = false
+  }
+}
 </script>
 
 <template>
@@ -483,59 +510,78 @@ function closeCategoryMenu() {
   <aside
     class="flex flex-col shrink-0 rounded-[var(--kv-radius-lg)] overflow-hidden mt-4"
     style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
-    @click="closeCategoryMenu"
+    @click="closeCategoryMenu(); closeGuildMenu()"
   >
-    <!-- Ortam adı başlığı -->
-    <div
-      class="flex items-center px-4 shrink-0 border-b font-semibold text-[15px] gap-2"
-      style="height: var(--kv-header-height); border-color: var(--kv-border-subtle); color: var(--kv-text-primary);"
-    >
-      <span class="flex-1 truncate">{{ guildsStore.activeGuild()?.name ?? '' }}</span>
-
-      <!-- Kategori oluştur — OWNER veya ADMIN -->
+    <!-- Ortam adı başlığı — tek buton, tıkla → Discord-tarzı menü -->
+    <div class="relative shrink-0 border-b" style="border-color: var(--kv-border-subtle);">
       <button
-        v-if="isAdmin"
-        class="shrink-0 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-        style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
-        :title="t('category.createCategory')"
-        @click.stop="openCreateCategory"
+        class="w-full flex items-center px-4 gap-2 font-semibold text-[15px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
+        style="height: var(--kv-header-height); color: var(--kv-text-primary);"
+        @click.stop="toggleGuildMenu"
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="7" height="7" rx="1"/>
-          <rect x="14" y="3" width="7" height="7" rx="1"/>
-          <rect x="3" y="14" width="7" height="7" rx="1"/>
-          <line x1="17" y1="14" x2="17" y2="20"/>
-          <line x1="14" y1="17" x2="20" y2="17"/>
+        <span class="flex-1 truncate text-left">{{ guildsStore.activeGuild()?.name ?? '' }}</span>
+        <svg
+          width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+          class="shrink-0 transition-transform" :class="showGuildMenu ? 'rotate-180' : ''"
+          style="color: var(--kv-text-muted);"
+        >
+          <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
 
-      <!-- Kategorisiz kanal oluştur — OWNER veya ADMIN -->
-      <button
-        v-if="isAdmin"
-        class="shrink-0 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-        style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
-        :title="t('channel.addUncategorized')"
-        @click.stop="openCreate(null)"
+      <!-- Dropdown menü (başlık + ikon satırları) -->
+      <div
+        v-if="showGuildMenu"
+        class="absolute left-2 right-2 top-full mt-1 z-50 rounded-[var(--kv-radius-md)] py-1 border overflow-hidden"
+        style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+        @click.stop
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19"/>
-          <line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-      </button>
-
-      <!-- Ayarlar dişlisi — yalnız OWNER -->
-      <button
-        v-if="isOwner"
-        class="shrink-0 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-        style="width: var(--kv-control); height: var(--kv-control); color: var(--kv-text-muted);"
-        :title="t('common.settings')"
-        @click="showSettings = true"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-      </button>
+        <!-- Kanal Oluştur (admin) -->
+        <button
+          v-if="isAdmin"
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+          style="color: var(--kv-text-primary);"
+          @click="closeGuildMenu(); openCreate(null)"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>{{ t('channel.addUncategorized') }}</span>
+        </button>
+        <!-- Kategori Oluştur (admin) -->
+        <button
+          v-if="isAdmin"
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+          style="color: var(--kv-text-primary);"
+          @click="closeGuildMenu(); openCreateCategory()"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><line x1="17" y1="14" x2="17" y2="20"/><line x1="14" y1="17" x2="20" y2="17"/></svg>
+          <span>{{ t('category.createCategory') }}</span>
+        </button>
+        <!-- Ortam Ayarları (owner) -->
+        <button
+          v-if="isOwner"
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+          style="color: var(--kv-text-primary);"
+          @click="closeGuildMenu(); showSettings = true"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>{{ t('common.settings') }}</span>
+        </button>
+        <!-- Ayraç + Ortamdan Ayrıl (OWNER hariç) -->
+        <template v-if="!isOwner">
+          <div v-if="isAdmin" class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
+          <button
+            class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors"
+            style="color: var(--kv-danger);"
+            @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
+            @click="closeGuildMenu(); showLeaveConfirm = true"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span>{{ t('guild.leave') }}</span>
+          </button>
+        </template>
+      </div>
     </div>
 
     <!-- Kanal listesi -->
@@ -1296,6 +1342,17 @@ function closeCategoryMenu() {
     :loading="deletingCategory"
     @confirm="confirmDeleteCategory"
     @cancel="deleteCategoryTarget = null"
+  />
+
+  <!-- Ortamdan ayrıl onay diyaloğu -->
+  <ConfirmDialog
+    v-if="showLeaveConfirm"
+    :title="t('guild.leaveTitle')"
+    :message="leaveError || t('guild.leaveConfirm', { name: guildsStore.activeGuild()?.name ?? '' })"
+    :confirm-label="t('guild.leave')"
+    :loading="leaving"
+    @confirm="doLeave"
+    @cancel="showLeaveConfirm = false; leaveError = ''"
   />
 </template>
 

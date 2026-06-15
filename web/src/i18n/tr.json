@@ -205,6 +205,9 @@
   "guild": {
     "create": "Ortam Oluştur",
     "join": "Ortama Katıl",
+    "leave": "Ortamdan Ayrıl",
+    "leaveTitle": "Ortamdan ayrıl",
+    "leaveConfirm": "{name} ortamından ayrılmak istediğine emin misin? Tekrar katılmak için davet gerekir.",
     "createTitle": "Yeni Ortam",
     "joinTitle": "Ortama Katıl",
     "nameLabel": "ORTAM ADI",
@@ -250,7 +253,8 @@
     "errors": {
       "INVITE_INVALID": "Davet geçersiz veya süresi dolmuş.",
       "AGE_RESTRICTED": "Bu ortam yalnızca yetişkinler içindir.",
-      "ALREADY_MEMBER": "Bu ortama zaten üyesin."
+      "ALREADY_MEMBER": "Bu ortama zaten üyesin.",
+      "GUILD_BANNED": "Bu ortamdan yasaklandın."
     }
   },
   "guildSettings": {
@@ -281,6 +285,9 @@
     "saveError": "Değişiklikler kaydedilemedi. Lütfen tekrar dene.",
     "unsavedChanges": "Kaydedilmemiş değişiklikler var.",
     "discardChanges": "Değişiklikleri At",
+    "bansSection": "Yasaklılar",
+    "bansEmpty": "Yasaklı kullanıcı yok.",
+    "unban": "Yasağı Kaldır",
     "deleteSection": "Tehlikeli Bölge",
     "deleteLabel": "Ortamı Sil",
     "deleteDesc": "Bu işlem geri alınamaz. Ortam ve tüm içeriği kalıcı olarak silinir.",
@@ -424,11 +431,19 @@
       "kick": "At",
       "kickConfirmTitle": "Üyeyi At",
       "kickConfirmMessage": "{username} adlı üyeyi ortamdan atmak istediğinden emin misin?",
-      "kickConfirmButton": "At"
+      "kickConfirmButton": "At",
+      "ban": "Yasakla",
+      "banConfirmTitle": "Üyeyi Yasakla",
+      "banConfirmMessage": "{username} adlı üyeyi kalıcı olarak yasaklamak istediğinden emin misin? Tekrar davetle bile giremez.",
+      "transferOwnership": "Sahipliği Devret",
+      "transferConfirmTitle": "Sahipliği Devret",
+      "transferConfirmMessage": "Ortam sahipliğini {username} adlı üyeye devretmek istediğinden emin misin? Sen yönetici olursun, bu geri alınamaz."
     },
     "errors": {
       "CANNOT_KICK_OWNER": "Ortam sahibi atılamaz.",
       "CANNOT_KICK_SELF": "Kendinizi atamazsınız.",
+      "CANNOT_BAN_OWNER": "Ortam sahibi yasaklanamaz.",
+      "CANNOT_BAN_SELF": "Kendinizi yasaklayamazsınız.",
       "CANNOT_MODIFY_OWNER": "Ortam sahibinin rolü değiştirilemez.",
       "NOT_GUILD_MEMBER": "Kullanıcı bu ortamın üyesi değil.",
       "FORBIDDEN": "Bu işlem için yetkiniz yok."
