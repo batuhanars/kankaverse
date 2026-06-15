@@ -12,6 +12,7 @@ import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
 import { useSocket } from '@/composables/useSocket'
+import { useIdlePresence } from '@/composables/useIdlePresence'
 import { useAppModals } from '@/composables/useAppModals'
 import ServerRail from '@/components/layout/ServerRail.vue'
 import UserCard from '@/components/layout/UserCard.vue'
@@ -32,6 +33,9 @@ const { showServerModal, serverModalStep, showAddFriendModal, openServerModal, c
 // Socket'i setup'ta bağla (child view'lar mount olup joinChannel çağırmadan ÖNCE soket var olsun).
 // Child mounted, parent mounted'tan önce koşar; bu yüzden connect()'i onMounted'a bırakamayız.
 if (sessionStorage.getItem('kv_access_token')) connect()
+
+// Auto-boşta: hareketsizlikte 'away', etkileşimde 'online' (manuel DND/away'a saygılı)
+useIdlePresence()
 
 function recheckGuildUnread(guildId: string) {
   guildsStore.setGuildUnreadCount(guildId, channelsStore.totalUnreadForGuild(guildId))

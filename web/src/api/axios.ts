@@ -37,6 +37,19 @@ async function doRefresh(): Promise<string> {
   return token
 }
 
+/**
+ * Access token'ı tazele (in-flight dedup'lı). Hem 401 interceptor'ı hem de WS
+ * reconnect (useSocket auth_error) bunu kullanır → tek refresh çağrısı paylaşılır.
+ */
+export function refreshAccessToken(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = doRefresh().finally(() => {
+      refreshPromise = null
+    })
+  }
+  return refreshPromise
+}
+
 // Request interceptor — Bearer token ekle
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = getAccessToken()
@@ -60,12 +73,7 @@ http.interceptors.response.use(
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true
       try {
-        if (!refreshPromise) {
-          refreshPromise = doRefresh().finally(() => {
-            refreshPromise = null
-          })
-        }
-        const newToken = await refreshPromise
+        const newToken = await refreshAccessToken()
         original.headers.Authorization = `Bearer ${newToken}`
         return http(original)
       } catch {

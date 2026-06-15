@@ -13,7 +13,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useRolesStore } from '@/stores/roles'
 import { useVoiceStore, type VoiceParticipant } from '@/stores/voice'
 import { useCallStore, type IncomingCall } from '@/stores/call'
-import { getAccessToken } from '@/api/axios'
+import { getAccessToken, refreshAccessToken } from '@/api/axios'
 import {
   _bindTypingEmitters,
   handleTypingUpdate,
@@ -26,6 +26,8 @@ let socket: Socket | null = null
 let refCount = 0
 // Reconnect sonrası yeniden join için aktif kanalı modül seviyesinde sakla
 let activeChannelId: string | null = null
+// auth_error sonrası art arda tazele-dene sayacı (sonsuz döngü koruması; başarılı connect'te sıfırlanır)
+let authRetryCount = 0
 
 export function useSocket() {
   const connected = ref(false)
@@ -69,9 +71,16 @@ export function useSocket() {
 
     socket.on('connect', () => {
       connected.value = true
+      authRetryCount = 0 // başarılı el sıkışma → tazele-dene sayacını sıfırla
       // Reconnect durumunda aktif kanala yeniden join et
       if (activeChannelId) {
         _joinRoom(activeChannelId)
+      }
+      // Reconnect sonrası sunucu bellek-içi presence'ı sıfırladı (online döner).
+      // Kullanıcının manuel seçimini (DND/away) koru → sunucuya geri uygula.
+      const manual = presenceStore.manualStatus
+      if (manual !== 'online') {
+        socket?.emit('presence:set', { status: manual })
       }
     })
 
@@ -83,9 +92,24 @@ export function useSocket() {
       console.error('[WS] connect_error', err.message)
     })
 
-    socket.on('auth_error', (data: { error: string }) => {
-      console.error('[WS] auth hatası, bağlantı kesiliyor:', data.error)
-      socket?.disconnect()
+    // Bayat access token (~15dk) reconnect el sıkışmasında reddedilir. Kalıcı kapatma
+    // YERİNE token'ı tazele + yeniden bağlan → kullanıcı çevrimdışı takılmaz.
+    // Refresh de başarısızsa (refresh token da geçersiz) → gerçekten yetkisiz → login.
+    socket.on('auth_error', async (data: { error: string }) => {
+      if (authRetryCount >= 3) {
+        console.error('[WS] auth tazelemeye rağmen reddedildi, bağlantı kapatılıyor:', data.error)
+        socket?.disconnect()
+        window.dispatchEvent(new CustomEvent('kv:auth:expired'))
+        return
+      }
+      authRetryCount++
+      try {
+        await refreshAccessToken()
+        socket?.connect() // auth callback taze token'ı okur (sunucu io disconnect'inden sonra manuel reconnect gerekir)
+      } catch {
+        socket?.disconnect()
+        window.dispatchEvent(new CustomEvent('kv:auth:expired'))
+      }
     })
 
     socket.on('message.created', (message: MessageDto) => {
