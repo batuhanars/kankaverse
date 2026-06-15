@@ -140,7 +140,8 @@ async function createRole() {
       name: t('guildSettings.roles.newRoleName'),
     })
     rolesStore.upsertRole(guildId.value, res.data)
-    selectRole(res.data.id)
+    // Yeni rol listeye düşer; detaya geçiş manuel (kullanıcı kartından girer).
+    roleSearch.value = '' // filtre aktifse yeni rol gizlenmesin
   } catch (err: unknown) {
     const e = err as { response?: { data?: { error?: string } } }
     const code = e?.response?.data?.error ?? ''
@@ -449,8 +450,8 @@ const membersWithRole = computed(() => {
             class="flex items-center justify-center w-9 h-9 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
             style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
             :title="t('guildSettings.roles.deleteTooltip')"
-            @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-danger)'; ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
-            @mouseleave="($event.currentTarget as HTMLElement).style.color = ''; ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
+            @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-danger-subtle)'; ($event.currentTarget as HTMLElement).style.color = 'var(--kv-danger)'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'; ($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'"
             @click.stop="pendingDeleteRole = role"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
