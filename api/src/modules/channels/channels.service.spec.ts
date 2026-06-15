@@ -23,6 +23,7 @@ const prismaMock = {
   },
   guildMember: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
   },
   user: {
     findUnique: jest.fn(),
@@ -37,12 +38,17 @@ const membershipMock = {
   requireChannelAccess: jest.fn(),
 };
 
+const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
+
 function makeService() {
-  return new ChannelsService(prismaMock as any, membershipMock as any);
+  return new ChannelsService(prismaMock as any, membershipMock as any, realtimeMock as any);
 }
 
 function resetMocks() {
   jest.resetAllMocks();
+  // Realtime alıcı sorguları (varsayılan boş — emit no-op)
+  prismaMock.guildMember.findMany.mockResolvedValue([]);
+  prismaMock.channelMember.findMany.mockResolvedValue([]);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────

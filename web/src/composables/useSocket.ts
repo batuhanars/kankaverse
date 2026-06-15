@@ -8,7 +8,7 @@ import { useDmStore } from '@/stores/dm'
 import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
 import { useMembersStore } from '@/stores/members'
-import type { GuildMemberDto } from '@/types'
+import type { GuildMemberDto, ChannelDto, CategoryDto } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useVoiceStore, type VoiceParticipant } from '@/stores/voice'
 import { useCallStore, type IncomingCall } from '@/stores/call'
@@ -207,6 +207,26 @@ export function useSocket() {
       if (data.member.userId === authStore.user?.id) {
         guildsStore.setMyRole(data.guildId, data.member.role)
       }
+    })
+
+    // Realtime: kanal/kategori CRUD → diğer üyelerde anlık (sayfa yenileme yok)
+    socket.on('channel.created', (data: { guildId: string; channel: ChannelDto }) => {
+      channelsStore.upsertChannelLocal(data.guildId, data.channel)
+    })
+    socket.on('channel.updated', (data: { guildId: string; channel: ChannelDto }) => {
+      channelsStore.upsertChannelLocal(data.guildId, data.channel)
+    })
+    socket.on('channel.deleted', (data: { guildId: string; channelId: string }) => {
+      channelsStore.removeChannelLocal(data.guildId, data.channelId)
+    })
+    socket.on('category.created', (data: { guildId: string; category: CategoryDto }) => {
+      channelsStore.upsertCategoryLocal(data.guildId, data.category)
+    })
+    socket.on('category.updated', (data: { guildId: string; category: CategoryDto }) => {
+      channelsStore.upsertCategoryLocal(data.guildId, data.category)
+    })
+    socket.on('category.deleted', (data: { guildId: string; categoryId: string }) => {
+      channelsStore.removeCategoryLocal(data.guildId, data.categoryId)
     })
 
     // Sprint V2 LiveKit: ses kanalı presence (backend webhook → WS; sözleşme §5)
