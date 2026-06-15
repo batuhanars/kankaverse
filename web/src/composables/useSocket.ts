@@ -225,7 +225,7 @@ export function useSocket() {
     socket.on('voice.call_accepted', (data: { channelId: string }) => {
       // Karşı taraf kabul etti → odaya katıl, çalma durumunu temizle
       callStore.clearOutgoing()
-      voiceStore.join(data.channelId)
+      voiceStore.join(data.channelId, { autoEndWhenAlone: true }) // REV-12: DM çağrısı
     })
     socket.on('voice.call_rejected', () => {
       callStore.clearOutgoing()

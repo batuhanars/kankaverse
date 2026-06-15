@@ -35,7 +35,7 @@ export function useCall() {
   async function acceptCall(channelId: string) {
     callAccept(channelId)
     callStore.clearIncoming()
-    await voiceStore.join(channelId)
+    await voiceStore.join(channelId, { autoEndWhenAlone: true }) // REV-12: DM çağrısı
   }
 
   function rejectCall(channelId: string) {
@@ -47,7 +47,7 @@ export function useCall() {
   async function startGroupCall(channelId: string) {
     if (voiceStore.isConnectedTo(channelId)) return
     await groupCallStart(channelId)
-    await voiceStore.join(channelId)
+    await voiceStore.join(channelId, { autoEndWhenAlone: true }) // REV-12: grup çağrısı
   }
 
   return { startCall, cancelCall, acceptCall, rejectCall, startGroupCall }
