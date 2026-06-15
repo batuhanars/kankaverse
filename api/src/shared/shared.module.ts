@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { EmailService } from './email/email.service';
 import { MembershipService } from './membership/membership.service';
+import { PermissionsService } from './permissions/permissions.service';
 import { DmPermissionService } from './dm-permission/dm-permission.service';
 import { FriendPermissionService } from './friend-permission/friend-permission.service';
 import { RealtimeService } from './realtime/realtime.service';
@@ -10,7 +11,7 @@ import { StorageService } from './storage/storage.service';
 import { ModerationService } from './moderation/moderation.service';
 
 @Module({
-  providers: [EmailService, MembershipService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService],
-  exports: [EmailService, MembershipService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService],
+  providers: [EmailService, MembershipService, PermissionsService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService],
+  exports: [EmailService, MembershipService, PermissionsService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService],
 })
 export class SharedModule {}

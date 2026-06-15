@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
+import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { InviteDto, InvitePreviewDto } from './dto/invite.dto';
@@ -47,13 +48,15 @@ export class InvitesService {
   constructor(
     private prisma: PrismaService,
     private membershipService: MembershipService,
+    private permissions: PermissionsService,
     private realtime: RealtimeService,
   ) {}
 
-  /** POST /guilds/:id/invites — OWNER/ADMIN */
+  /** POST /guilds/:id/invites — CREATE_INVITE izni */
   async createInvite(userId: string, guildId: string, dto: CreateInviteDto): Promise<InviteDto> {
-    const { membership } = await this.membershipService.requireGuildMembership(userId, guildId);
-    if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
+    await this.membershipService.requireGuildMembership(userId, guildId);
+    const canCreate = await this.permissions.hasGuildPermission(userId, guildId, 'CREATE_INVITE');
+    if (!canCreate) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
 
@@ -86,10 +89,11 @@ export class InvitesService {
     return toInviteDto(invite);
   }
 
-  /** GET /guilds/:id/invites — OWNER/ADMIN: aktif davetler */
+  /** GET /guilds/:id/invites — MANAGE_GUILD izni: aktif davetler */
   async listInvites(userId: string, guildId: string): Promise<InviteDto[]> {
-    const { membership } = await this.membershipService.requireGuildMembership(userId, guildId);
-    if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
+    await this.membershipService.requireGuildMembership(userId, guildId);
+    const canManage = await this.permissions.hasGuildPermission(userId, guildId, 'MANAGE_GUILD');
+    if (!canManage) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
 
@@ -118,11 +122,10 @@ export class InvitesService {
       throw new NotFoundException({ message: 'Davet bulunamadı.', error: 'INVITE_INVALID' });
     }
 
-    // Yetki: o ortamın OWNER/ADMIN'i olmalı
-    const membership = await this.prisma.guildMember.findUnique({
-      where: { guildId_userId: { guildId: invite.guildId, userId } },
-    });
-    if (!membership || (membership.role !== 'OWNER' && membership.role !== 'ADMIN')) {
+    // Yetki: MANAGE_GUILD izni olmalı
+    await this.membershipService.requireGuildMembership(userId, invite.guildId);
+    const canManage = await this.permissions.hasGuildPermission(userId, invite.guildId, 'MANAGE_GUILD');
+    if (!canManage) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
 

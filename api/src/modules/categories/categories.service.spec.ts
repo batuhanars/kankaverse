@@ -24,14 +24,23 @@ const membershipMock = {
   requireGuildMembership: jest.fn(),
 };
 
+const permissionsMock = {
+  hasGuildPermission: jest.fn().mockResolvedValue(true),
+  requireMemberHierarchy: jest.fn().mockResolvedValue(undefined),
+  requireRoleHierarchy: jest.fn().mockResolvedValue(undefined),
+};
+
 const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
 
 function makeService() {
-  return new CategoriesService(prismaMock as any, membershipMock as any, realtimeMock as any);
+  return new CategoriesService(prismaMock as any, membershipMock as any, permissionsMock as any, realtimeMock as any);
 }
 
 function resetMocks() {
   jest.resetAllMocks();
+  permissionsMock.hasGuildPermission.mockResolvedValue(true);
+  permissionsMock.requireMemberHierarchy.mockResolvedValue(undefined);
+  permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
   prismaMock.guildMember.findMany.mockResolvedValue([]);
 }
 
@@ -71,6 +80,7 @@ describe('CategoriesService.create', () => {
 
   it('MEMBER → 403 FORBIDDEN fırlatır', async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.create('member-1', GUILD_ID, { name: 'Yeni' })).rejects.toThrow(ForbiddenException);
     await expect(service.create('member-1', GUILD_ID, { name: 'Yeni' })).rejects.toMatchObject({
@@ -203,6 +213,7 @@ describe('CategoriesService.update', () => {
   it('MEMBER → 403 FORBIDDEN', async () => {
     prismaMock.channelCategory.findUnique.mockResolvedValue(makeCategory());
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.update('member-1', CATEGORY_ID, { name: 'Yeni' })).rejects.toThrow(ForbiddenException);
   });
@@ -253,6 +264,7 @@ describe('CategoriesService.remove', () => {
   it('MEMBER → 403 FORBIDDEN', async () => {
     prismaMock.channelCategory.findUnique.mockResolvedValue(makeCategory());
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.remove('member-1', CATEGORY_ID)).rejects.toThrow(ForbiddenException);
   });
@@ -321,15 +333,20 @@ describe('ChannelsService — categoryId cross-guild guard (INVALID_CATEGORY)', 
 
   const channelRealtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
 
+  const channelPermissionsMock = {
+    hasGuildPermission: jest.fn().mockResolvedValue(true),
+  };
+
   let channelService: ChannelsService;
 
   const OWNER_MS = { guildId: GUILD_ID, userId: USER_ID, role: 'OWNER' };
 
   beforeEach(() => {
     jest.resetAllMocks();
+    channelPermissionsMock.hasGuildPermission.mockResolvedValue(true);
     channelPrismaMock.guildMember.findMany.mockResolvedValue([]);
     channelPrismaMock.channelMember.findMany.mockResolvedValue([]);
-    channelService = new ChannelsService(channelPrismaMock as any, channelMembershipMock as any, channelRealtimeMock as any);
+    channelService = new ChannelsService(channelPrismaMock as any, channelMembershipMock as any, channelPermissionsMock as any, channelRealtimeMock as any);
   });
 
   it('create: başka guild kategorisi → 400 INVALID_CATEGORY', async () => {

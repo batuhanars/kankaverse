@@ -35,16 +35,28 @@ const realtimeMock = {
   emitToRoom: jest.fn(),
 };
 
+const permissionsMock = {
+  hasGuildPermission: jest.fn().mockResolvedValue(true),
+  effectivePermissions: jest.fn().mockResolvedValue({ all: true, flags: new Set() }),
+  requireMemberHierarchy: jest.fn().mockResolvedValue(undefined),
+  requireRoleHierarchy: jest.fn().mockResolvedValue(undefined),
+};
+
 function makeService() {
   return new RolesService(
     prismaMock as any,
     membershipMock as any,
+    permissionsMock as any,
     realtimeMock as any,
   );
 }
 
 function resetMocks() {
   jest.resetAllMocks();
+  permissionsMock.hasGuildPermission.mockResolvedValue(true);
+  permissionsMock.effectivePermissions.mockResolvedValue({ all: true, flags: new Set() });
+  permissionsMock.requireMemberHierarchy.mockResolvedValue(undefined);
+  permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -139,11 +151,50 @@ describe('RolesService.createRole', () => {
       guild: GUILD_FIXTURE,
       membership: MEMBER_MEMBERSHIP,
     });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.createRole(MEMBER_ID, GUILD_ID, { name: 'Deneme' })).rejects.toMatchObject({
       response: expect.objectContaining({ error: 'FORBIDDEN' }),
     });
     expect(prismaMock.role.create).not.toHaveBeenCalled();
+  });
+
+  // ── F1 (R7): "sahip olmadığın izni veremezsin" (Discord kuralı) ──────────────
+  it('MANAGE_ROLES olan MEMBER sahip olmadığı ADMINISTRATOR\'ı veremez → 403 CANNOT_GRANT_PERMISSION', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: MEMBER_MEMBERSHIP,
+    });
+    permissionsMock.hasGuildPermission.mockResolvedValue(true); // MANAGE_ROLES var
+    permissionsMock.effectivePermissions.mockResolvedValue({
+      all: false,
+      flags: new Set(['MANAGE_ROLES', 'KICK_MEMBERS']),
+    });
+    prismaMock.role.aggregate.mockResolvedValue({ _max: { position: 1 } });
+
+    await expect(
+      service.createRole(MEMBER_ID, GUILD_ID, { name: 'Sahte Admin', permissions: ['ADMINISTRATOR'] }),
+    ).rejects.toMatchObject({ response: expect.objectContaining({ error: 'CANNOT_GRANT_PERMISSION' }) });
+    expect(prismaMock.role.create).not.toHaveBeenCalled();
+  });
+
+  it('MANAGE_ROLES olan MEMBER yalnız KENDİ sahip olduğu bayrağı verebilir → geçer', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: MEMBER_MEMBERSHIP,
+    });
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    permissionsMock.effectivePermissions.mockResolvedValue({
+      all: false,
+      flags: new Set(['MANAGE_ROLES', 'KICK_MEMBERS']),
+    });
+    prismaMock.role.aggregate.mockResolvedValue({ _max: { position: 1 } });
+    prismaMock.role.create.mockResolvedValue({ ...ROLE_FIXTURE, position: 2, permissions: ['KICK_MEMBERS'] });
+    prismaMock.guildMemberRole.count.mockResolvedValue(0);
+
+    const result = await service.createRole(MEMBER_ID, GUILD_ID, { name: 'Atıcı', permissions: ['KICK_MEMBERS'] });
+    expect(result.position).toBe(2);
+    expect(prismaMock.role.create).toHaveBeenCalledTimes(1);
   });
 
   it('bilinmeyen permissions bayrakları filtrelenir', async () => {
@@ -247,6 +298,7 @@ describe('RolesService.deleteRole', () => {
       guild: GUILD_FIXTURE,
       membership: MEMBER_MEMBERSHIP,
     });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.deleteRole(MEMBER_ID, ROLE_ID)).rejects.toMatchObject({
       response: expect.objectContaining({ error: 'FORBIDDEN' }),
@@ -380,6 +432,25 @@ describe('RolesService.assignRole', () => {
       expect.objectContaining({ guildId: GUILD_ID }),
     );
   });
+
+  it('üye hiyerarşisi ihlali → 403 MEMBER_HIERARCHY (aktör hedeften düşük)', async () => {
+    prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE);
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: ADMIN_MEMBERSHIP,
+    });
+    // roleHierarchy geçer, memberHierarchy ihlal eder
+    permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
+    permissionsMock.requireMemberHierarchy.mockRejectedValueOnce(
+      new ForbiddenException({ message: 'Üye hiyerarşisi ihlali.', error: 'MEMBER_HIERARCHY' }),
+    );
+    prismaMock.guildMember.findUnique.mockResolvedValueOnce(MEMBER_GM);
+
+    await expect(service.assignRole(ADMIN_ID, ROLE_ID, MEMBER_ID)).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'MEMBER_HIERARCHY' }),
+    });
+    expect(prismaMock.guildMemberRole.upsert).not.toHaveBeenCalled();
+  });
 });
 
 // ── RolesService.removeRole ───────────────────────────────────────────────────
@@ -496,10 +567,35 @@ describe('RolesService.removeRole', () => {
       guild: GUILD_FIXTURE,
       membership: MEMBER_MEMBERSHIP,
     });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.removeRole(MEMBER_ID, ROLE_ID, OWNER_ID)).rejects.toMatchObject({
       response: expect.objectContaining({ error: 'FORBIDDEN' }),
     });
+  });
+
+  it('üye hiyerarşisi ihlali → 403 MEMBER_HIERARCHY (aktör hedeften düşük)', async () => {
+    prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE);
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: ADMIN_MEMBERSHIP,
+    });
+    // roleHierarchy geçer, memberHierarchy ihlal eder
+    permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
+    permissionsMock.requireMemberHierarchy.mockRejectedValueOnce(
+      new ForbiddenException({ message: 'Üye hiyerarşisi ihlali.', error: 'MEMBER_HIERARCHY' }),
+    );
+    prismaMock.guildMember.findUnique.mockResolvedValueOnce({
+      id: MEMBER_GM.id,
+      guildId: GUILD_ID,
+      userId: MEMBER_ID,
+      role: GuildRole.MEMBER,
+    });
+
+    await expect(service.removeRole(ADMIN_ID, ROLE_ID, MEMBER_ID)).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'MEMBER_HIERARCHY' }),
+    });
+    expect(prismaMock.guildMemberRole.deleteMany).not.toHaveBeenCalled();
   });
 });
 
@@ -687,6 +783,7 @@ describe('RolesService.reorderRoles', () => {
       guild: GUILD_FIXTURE,
       membership: MEMBER_MEMBERSHIP,
     });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(
       service.reorderRoles(MEMBER_ID, GUILD_ID, [{ id: ROLE_ID, position: 1 }]),

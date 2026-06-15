@@ -37,6 +37,12 @@ const membershipMock = {
   requireNoDmBlock: jest.fn(),
 };
 
+const permissionsMock = {
+  hasGuildPermission: jest.fn().mockResolvedValue(true),
+  requireMemberHierarchy: jest.fn().mockResolvedValue(undefined),
+  requireRoleHierarchy: jest.fn().mockResolvedValue(undefined),
+};
+
 const automodMock = {
   check: jest.fn(),
 };
@@ -58,11 +64,14 @@ const moderationMock = {
 };
 
 function makeService() {
-  return new MessagesService(prismaMock as any, membershipMock as any, automodMock as any, configMock as any, moderationMock as any);
+  return new MessagesService(prismaMock as any, membershipMock as any, permissionsMock as any, automodMock as any, configMock as any, moderationMock as any);
 }
 
 function resetMocks() {
   jest.resetAllMocks();
+  permissionsMock.hasGuildPermission.mockResolvedValue(true);
+  permissionsMock.requireMemberHierarchy.mockResolvedValue(undefined);
+  permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
   // Varsayılan: automod geçirir
   automodMock.check.mockReturnValue({ blocked: false });
   // Sprint 4B: BAN/MUTE yok (varsayılan — enforcement geçirir)
@@ -917,11 +926,12 @@ describe('MessagesService.deleteMessage', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Yazar değilse → 403 NOT_MESSAGE_AUTHOR
+  // Yazar değilse ve MANAGE_MESSAGES izni yoksa → 403 NOT_MESSAGE_AUTHOR
   // ─────────────────────────────────────────────────────────────────────────
-  it('yazar değil → ForbiddenException NOT_MESSAGE_AUTHOR', async () => {
+  it('yazar değil ve MANAGE_MESSAGES yok → ForbiddenException NOT_MESSAGE_AUTHOR', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
     prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg({ authorId: OTHER_USER_ID }));
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     let thrown: ForbiddenException | undefined;
     try {
@@ -1843,6 +1853,7 @@ describe('MessagesService.pinMessage', () => {
     membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
     prismaMock.guildMember.findUnique.mockResolvedValue(REGULAR_MEMBER);
     prismaMock.message.findUnique.mockResolvedValue(makePinMsg());
+    permissionsMock.hasGuildPermission.mockResolvedValue(false); // MANAGE_MESSAGES yok
 
     let thrown: ForbiddenException | undefined;
     try {
@@ -2023,6 +2034,7 @@ describe('MessagesService.unpinMessage', () => {
     prismaMock.message.findUnique.mockResolvedValue(
       makePinMsg({ pinnedAt: new Date('2026-06-01T10:00:00Z') }),
     );
+    permissionsMock.hasGuildPermission.mockResolvedValue(false); // MANAGE_MESSAGES yok
 
     let thrown: ForbiddenException | undefined;
     try {

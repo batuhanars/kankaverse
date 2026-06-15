@@ -2,9 +2,9 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
+import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { AutomodService } from '../../shared/automod/automod.service';
 import { ModerationService } from '../../shared/moderation/moderation.service';
-import { requireAdminRole } from '../../common/utils/guild-role.utils';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { Attachment, Message, MessageReaction, ScanStatus, User } from '@prisma/client';
@@ -102,6 +102,7 @@ export class MessagesService {
   constructor(
     private prisma: PrismaService,
     private membership: MembershipService,
+    private permissions: PermissionsService,
     private automod: AutomodService,
     private config: ConfigService,
     private moderation: ModerationService,
@@ -428,7 +429,7 @@ export class MessagesService {
   }
 
   async deleteMessage(userId: string, channelId: string, messageId: string) {
-    await this.membership.requireChannelAccess(userId, channelId);
+    const channel = await this.membership.requireChannelAccess(userId, channelId);
 
     const message = await this.prisma.message.findUnique({
       where: { id: messageId },
@@ -438,8 +439,17 @@ export class MessagesService {
       throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'MESSAGE_NOT_FOUND' });
     }
 
+    // Kendi mesajını silmek her zaman serbest.
+    // Başkasının mesajını silmek: guild kanalında MANAGE_MESSAGES izni gerekir.
     if (message.authorId !== userId) {
-      throw new ForbiddenException({ message: 'Bu mesajı silme yetkiniz yok.', error: 'NOT_MESSAGE_AUTHOR' });
+      if (!channel.guildId) {
+        // DM/grup DM kanalında başkasının mesajını silemezsin
+        throw new ForbiddenException({ message: 'Bu mesajı silme yetkiniz yok.', error: 'NOT_MESSAGE_AUTHOR' });
+      }
+      const canManage = await this.permissions.hasGuildPermission(userId, channel.guildId, 'MANAGE_MESSAGES');
+      if (!canManage) {
+        throw new ForbiddenException({ message: 'Bu mesajı silme yetkiniz yok.', error: 'NOT_MESSAGE_AUTHOR' });
+      }
     }
 
     await this.prisma.message.update({
@@ -485,19 +495,17 @@ export class MessagesService {
   }
 
   // ── PIN ortak yetki yardımcısı ──────────────────────────────────────────────
-  // Guild kanalı → OWNER/ADMIN; DM/grup DM → requireChannelAccess üyeliği yeterli.
+  // Guild kanalı → MANAGE_MESSAGES; DM/grup DM → requireChannelAccess üyeliği yeterli.
   private async requirePinAccess(
     userId: string,
     channel: Awaited<ReturnType<typeof this.membership.requireChannelAccess>>,
   ): Promise<void> {
     if (channel.guildId) {
-      // Guild kanalı: üyeliği zaten requireChannelAccess doğruladı; rol kontrolü ek
-      const membership = await this.prisma.guildMember.findUnique({
-        where: { guildId_userId: { guildId: channel.guildId, userId } },
-        select: { role: true },
-      });
-      // requireGuildMembership zaten çağrıldı (requireChannelAccess içinde) → membership null olamaz
-      requireAdminRole(membership!.role);
+      // Guild kanalı: üyeliği zaten requireChannelAccess doğruladı; MANAGE_MESSAGES kontrolü ek
+      const canManage = await this.permissions.hasGuildPermission(userId, channel.guildId, 'MANAGE_MESSAGES');
+      if (!canManage) {
+        throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+      }
     }
     // DM/grup DM: requireChannelAccess üyeliği yeterli — ek kontrol yok
   }

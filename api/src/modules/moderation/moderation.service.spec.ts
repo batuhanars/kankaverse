@@ -342,10 +342,15 @@ describe('MessagesService enforcement — BAN/MUTE', () => {
   const GUILD_CHANNEL = { id: 'ch-g', guildId: 'guild-1' };
   const DM_CHANNEL = { id: 'ch-dm', guildId: null };
 
+  const msgPermissionsMock = {
+    hasGuildPermission: jest.fn().mockResolvedValue(true),
+  };
+
   function makeService() {
     return new MessagesService(
       msgPrisma as any,
       membershipMock as any,
+      msgPermissionsMock as any,
       automodMock as any,
       configMock as any,
       moderationMock as any,
