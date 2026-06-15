@@ -48,6 +48,37 @@ Modal (`GuildSettingsModal.vue`) → Discord-tarzı **tam-ekran overlay** (`Guil
 - **Hiyerarşi:** rol yönet/üye-aksiyon yalnız aktörün en yüksek rolünden düşük hedefe; OWNER muaf. Minör/yaş kapıları + adultsOnly **DOKUNULMAZ** (izin sisteminin üstünde, ayrı katman).
 - **DoD + R7:** fail-closed; izinsiz aksiyon 403; OWNER/ADMIN geriye-uyum bozulmadı; mevcut tüm T&S testleri yeşil; PM satır-satır inceler + sahip imzası.
 
+#### Faz 3 — DETAYLI PLAN (kilitli; sahip 2026-06-15 onayı)
+**1) İzin bayrağı seti'ne `ADMINISTRATOR` eklenir** (sahip onayı). Bir rolde ADMINISTRATOR → o rol TÜM izinlere sahip kabul edilir (Ortam Sil + Sahiplik Devri HARİÇ — onlar yalnız OWNER). Tek-toggle tam-yetkili özel rol kurma imkânı.
+
+**2) `hasGuildPermission(userId, guildId, flag)` — efektif izin çözümü (shared servis):**
+   1. Üye değil → `false`.
+   2. `guild.ownerId === userId` veya `membership.role === OWNER` → `true` (her şey).
+   3. `membership.role === ADMIN` (enum, geçiş-uyum) → `true` (her şey).
+   4. Efektif izinler = `@everyone rolü izinleri` ∪ `üyenin atanmış rollerinin izinleri`. Eğer `ADMINISTRATOR` içeriyorsa → `true`. Aksi halde `flag ∈ efektif`.
+   - Konum: `shared/permissions/permissions.service.ts` (SharedModule export; guilds/channels/roles/messages enjekte eder). `membership` ve `prisma` kullanır.
+
+**3) Enforcement noktaları (mevcut OWNER/ADMIN enum kontrolleri → `hasGuildPermission`):**
+   - Kanal CRUD + reorder → `MANAGE_CHANNELS`. Kategori CRUD + reorder → `MANAGE_CHANNELS`.
+   - Rol create/update/delete/assign/remove/reorder → `MANAGE_ROLES` (+ hiyerarşi).
+   - Kick → `KICK_MEMBERS` (+ hiyerarşi). Ban/unban → `BAN_MEMBERS` (+ hiyerarşi). Ban listesi görüntüle → `BAN_MEMBERS`.
+   - Ortam ayar (ad/ikon/kurallar) → `MANAGE_GUILD`. **`adultsOnly` (18+) toggle → YALNIZ OWNER** (sahip kararı; MANAGE_GUILD yetmez — guild update'te adultsOnly değişiyorsa ve aktör OWNER değilse 403).
+   - Davet oluştur → `CREATE_INVITE`. Davet listele/iptal → `MANAGE_GUILD`.
+   - Başkasının mesajını sil / pin → `MANAGE_MESSAGES` (kendi mesajını silme her zaman serbest).
+   - **OWNER-only (bayrakla verilemez):** Ortam Sil (deleteGuild), Sahiplik Devri (transferOwnership), enum rol değiştir (updateMemberRole — ADMIN/MEMBER ataması geçiş-dönemi, OWNER-only kalır).
+
+**4) Hiyerarşi (Discord modeli; OWNER muaf, ADMIN-enum geçiş-uyum muaf):**
+   - "En yüksek rol position'ı" = üyenin atanmış rollerinin max position (yoksa 0/@everyone). OWNER = sonsuz.
+   - **Rol yönet** (belirli bir rolü düzenle/sil/ata/sırala): hedef rolün position'ı < aktörün en yüksek position'ı olmalı. ADMINISTRATOR bayrağı hiyerarşiyi DELMEZ (izni verir ama üstündeki rolü yönetemezsin) — yalnız OWNER muaf.
+   - **Üye aksiyonu** (kick/ban/rol-ata): hedef üyenin en yüksek position'ı < aktörünki olmalı. OWNER asla hedef alınamaz; OWNER muaf.
+   - İhlal → 403 `ROLE_HIERARCHY` / `MEMBER_HIERARCHY`.
+
+**5) Web — rol detayında "İzinler" sekmesi** (Görünüm | İzinler | Üyeleri Yönet): bayraklar gruplanmış (Genel/Üyelik/Mesaj/Ses) KvSwitch'lerle; ADMINISTRATOR en üstte, "tüm izinleri verir" uyarısıyla. `MANAGE_ROLES`/OWNER düzenler. Kaydet → `PATCH /roles/:id { permissions }`. @everyone izinleri düzenlenebilir. Türkçe etiketler `tr.json`.
+
+**6) Dokunulmaz:** minör/yaş join kapıları + adultsOnly erişim enforcement'ı + CSAM kapıları izin sisteminin ÜSTÜNDE, ayrı katman — hiçbir bayrak (ADMINISTRATOR dahil) reşit-olmayan korumasını delemez.
+
+**7) Geriye-uyum:** mevcut OWNER/ADMIN enum üyeler hep tam yetkili kalır (adım 2.2/2.3). Mevcut T&S testleri yeşil kalmalı. Fail-closed.
+
 ### Faz 4 — Cila
 Rol sürükle-sırala (hiyerarşi/position), rol mention (`@rol`), rol simgesi yükleme (CSAM-kapısına bağlı → ikon scan gelince), kanal-bazlı izin override (opsiyonel, sonraya).
 
