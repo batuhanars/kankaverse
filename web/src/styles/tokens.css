@@ -19,6 +19,7 @@
   --kv-accent-subtle: rgba(255, 107, 61, 0.12);
   /* semantik */
   --kv-danger: #F23B4B;
+  --kv-danger-subtle: rgba(242, 59, 75, 0.12);
   --kv-success: #3DB46E;
   --kv-warning: #E8A33D;
   --kv-info: #4E9CF5;
