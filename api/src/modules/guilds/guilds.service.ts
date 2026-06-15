@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
+import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { StorageService } from '../../shared/storage/storage.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
@@ -54,6 +55,7 @@ export class GuildsService {
   constructor(
     private prisma: PrismaService,
     private membership: MembershipService,
+    private permissions: PermissionsService,
     private storage: StorageService,
     private config: ConfigService,
     private realtime: RealtimeService,
@@ -176,7 +178,10 @@ export class GuildsService {
     return activeGuilds.map((m, i) => toGuildDto(m.guild, guildCounts[i].unread, guildCounts[i].mentions));
   }
 
-  /** PATCH /guilds/:id — yalnız OWNER */
+  /**
+   * PATCH /guilds/:id — MANAGE_GUILD izni gerekir.
+   * adultsOnly değişiyorsa YALNIZ OWNER (sözleşme §65 — sahip kararı).
+   */
   async update(userId: string, guildId: string, dto: UpdateGuildDto) {
     const guild = await this.prisma.guild.findUnique({
       where: { id: guildId, deletedAt: null },
@@ -185,10 +190,21 @@ export class GuildsService {
       throw new NotFoundException({ message: 'Sunucu bulunamadı.', error: 'GUILD_NOT_FOUND' });
     }
 
-    const membership = await this.prisma.guildMember.findUnique({
-      where: { guildId_userId: { guildId, userId } },
-    });
-    if (!membership || membership.role !== 'OWNER') {
+    // adultsOnly GERÇEKTEN değişiyorsa → yalnız OWNER (MANAGE_GUILD yetmez).
+    // Aynı değer gönderilirse kapı tetiklenmez (MANAGE_GUILD yöneticisi ad/kural düzenleyebilsin).
+    if (dto.adultsOnly !== undefined && dto.adultsOnly !== guild.adultsOnly) {
+      const membership = await this.prisma.guildMember.findUnique({
+        where: { guildId_userId: { guildId, userId } },
+      });
+      if (!membership || membership.role !== 'OWNER') {
+        throw new ForbiddenException({ message: 'Bu ayarı yalnız ortam sahibi değiştirebilir.', error: 'FORBIDDEN' });
+      }
+    }
+
+    // Genel guild ayar (ad/ikon/kurallar) → MANAGE_GUILD
+    await this.membership.requireGuildMembership(userId, guildId);
+    const canManage = await this.permissions.hasGuildPermission(userId, guildId, 'MANAGE_GUILD');
+    if (!canManage) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
 
@@ -423,10 +439,10 @@ export class GuildsService {
     guildId: string,
     targetUserId: string,
   ): Promise<null> {
-    // 1. Actor erişim + rol kontrolü — ÖNCE yetki (sızıntı önleme)
-    const { membership: actorMembership } = await this.membership.requireGuildMembership(actorId, guildId);
-
-    if (actorMembership.role !== GuildRole.OWNER && actorMembership.role !== GuildRole.ADMIN) {
+    // 1. Actor erişim + KICK_MEMBERS izin kontrolü — ÖNCE yetki (sızıntı önleme)
+    await this.membership.requireGuildMembership(actorId, guildId);
+    const canKick = await this.permissions.hasGuildPermission(actorId, guildId, 'KICK_MEMBERS');
+    if (!canKick) {
       throw new ForbiddenException({
         message: 'Bu işlem için yetkiniz yok.',
         error: 'FORBIDDEN',
@@ -460,13 +476,8 @@ export class GuildsService {
       });
     }
 
-    // 5. ADMIN yalnız MEMBER atabilir — hedef ADMIN ise FORBIDDEN
-    if (actorMembership.role === GuildRole.ADMIN && targetMembership.role === GuildRole.ADMIN) {
-      throw new ForbiddenException({
-        message: 'Yöneticiler başka yöneticileri atamaz.',
-        error: 'FORBIDDEN',
-      });
-    }
+    // 5. Üye hiyerarşisi: hedef üyenin en yüksek position < aktörünki (OWNER muaf)
+    await this.permissions.requireMemberHierarchy(actorId, guildId, targetUserId);
 
     // 6. Tx: GuildMember sil + bu guild'in kanallarındaki ChannelMember kayıtlarını sil
     //    (özel kanal erişimi atılanın üzerinde kalmasın)
@@ -509,7 +520,6 @@ export class GuildsService {
         metadata: {
           guildId,
           targetUserId,
-          actorRole: actorMembership.role,
         },
       },
     });
@@ -589,10 +599,11 @@ export class GuildsService {
   }
 
   // ─── §F: Ortam-ban (kalıcı; kick + tekrar davetle giremez) ───────────────
-  /** POST /guilds/:id/members/:userId/ban — hiyerarşi kick'le aynı + GuildBan kaydı. */
+  /** POST /guilds/:id/members/:userId/ban — BAN_MEMBERS izni + üye hiyerarşisi + GuildBan kaydı. */
   async banMember(actorId: string, guildId: string, targetUserId: string, reason?: string): Promise<null> {
-    const { membership: actorMembership } = await this.membership.requireGuildMembership(actorId, guildId);
-    if (actorMembership.role !== GuildRole.OWNER && actorMembership.role !== GuildRole.ADMIN) {
+    await this.membership.requireGuildMembership(actorId, guildId);
+    const canBan = await this.permissions.hasGuildPermission(actorId, guildId, 'BAN_MEMBERS');
+    if (!canBan) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
     if (actorId === targetUserId) {
@@ -607,9 +618,8 @@ export class GuildsService {
     if (target.role === GuildRole.OWNER) {
       throw new BadRequestException({ message: 'Ortam sahibi yasaklanamaz.', error: 'CANNOT_BAN_OWNER' });
     }
-    if (actorMembership.role === GuildRole.ADMIN && target.role === GuildRole.ADMIN) {
-      throw new ForbiddenException({ message: 'Yöneticiler başka yöneticileri yasaklayamaz.', error: 'FORBIDDEN' });
-    }
+    // Üye hiyerarşisi: hedef üyenin en yüksek position < aktörünki (OWNER muaf)
+    await this.permissions.requireMemberHierarchy(actorId, guildId, targetUserId);
 
     const recipients = await this.guildMemberIds(guildId);
     const channelIds = (
@@ -637,10 +647,11 @@ export class GuildsService {
     return null;
   }
 
-  /** GET /guilds/:id/bans — OWNER/ADMIN; yasaklı kullanıcılar (username çözülerek). */
+  /** GET /guilds/:id/bans — BAN_MEMBERS izni; yasaklı kullanıcılar (username çözülerek). */
   async listBans(userId: string, guildId: string) {
-    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
-    if (membership.role !== GuildRole.OWNER && membership.role !== GuildRole.ADMIN) {
+    await this.membership.requireGuildMembership(userId, guildId);
+    const canBan = await this.permissions.hasGuildPermission(userId, guildId, 'BAN_MEMBERS');
+    if (!canBan) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
     const bans = await this.prisma.guildBan.findMany({ where: { guildId }, orderBy: { createdAt: 'desc' } });
@@ -658,10 +669,11 @@ export class GuildsService {
     }));
   }
 
-  /** DELETE /guilds/:id/bans/:userId — OWNER/ADMIN; yasağı kaldır. */
+  /** DELETE /guilds/:id/bans/:userId — BAN_MEMBERS izni; yasağı kaldır. */
   async unbanMember(actorId: string, guildId: string, targetUserId: string): Promise<null> {
-    const { membership } = await this.membership.requireGuildMembership(actorId, guildId);
-    if (membership.role !== GuildRole.OWNER && membership.role !== GuildRole.ADMIN) {
+    await this.membership.requireGuildMembership(actorId, guildId);
+    const canBan = await this.permissions.hasGuildPermission(actorId, guildId, 'BAN_MEMBERS');
+    if (!canBan) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
     await this.prisma.guildBan.deleteMany({ where: { guildId, userId: targetUserId } });

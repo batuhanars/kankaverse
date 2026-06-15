@@ -28,14 +28,23 @@ const membershipMock = {
   requireGuildMembership: jest.fn(),
 };
 
+const permissionsMock = {
+  hasGuildPermission: jest.fn().mockResolvedValue(true),
+  requireMemberHierarchy: jest.fn().mockResolvedValue(undefined),
+  requireRoleHierarchy: jest.fn().mockResolvedValue(undefined),
+};
+
 const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
 
 function makeService() {
-  return new InvitesService(prismaMock as any, membershipMock as any, realtimeMock as any);
+  return new InvitesService(prismaMock as any, membershipMock as any, permissionsMock as any, realtimeMock as any);
 }
 
 function resetMocks() {
   jest.resetAllMocks();
+  permissionsMock.hasGuildPermission.mockResolvedValue(true);
+  permissionsMock.requireMemberHierarchy.mockResolvedValue(undefined);
+  permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
   // Varsayılan: kullanıcı yasaklı değil (join testlerinin çoğu için)
   prismaMock.guildBan.findUnique.mockResolvedValue(null);
 }
@@ -103,6 +112,7 @@ describe('InvitesService.createInvite', () => {
       guild: GUILD_NORMAL,
       membership: { role: 'MEMBER' },
     });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.createInvite('member1', GUILD_NORMAL.id, {}))
       .rejects.toBeInstanceOf(ForbiddenException);
@@ -286,7 +296,8 @@ describe('InvitesService.revokeInvite', () => {
 
   it('MEMBER rolüyle → 403 FORBIDDEN', async () => {
     prismaMock.invite.findUnique.mockResolvedValue(makeInvite());
-    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD_NORMAL, membership: { role: 'MEMBER' } });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.revokeInvite('member1', 'ABCD1234'))
       .rejects.toBeInstanceOf(ForbiddenException);

@@ -640,3 +640,36 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **R3-3 — Reaksiyon ⋯ menü tıklanamıyor:** açık-menülü `MessageRow` hover-toolbar'ı `z-10`'du; sonraki mesajın toolbar'ı (DOM'da sonra, aynı z) üste boyanıp Sabitle/Şikayet tıklamasını çalıyordu → menü açıkken toolbar **z-40**. Tek fix DM+grup+ortam (hepsi MessageRow).
 - [~] **R3-1 — REV-9 ortam kanalında:** kod doğrulandı — MessageArea'da REV-9 zaten **var ve DM ile özdeş** (d90f3e1'den canlı). Sahip hard-reload sonrası teyit edecek; hâlâ sorunsa spesifik repro istenecek.
 - [~] **REV-7 (sesten düşme):** sahip 3. tur testinde **tekrarlanmadı**; konsol sağlıklı (LiveKit connected + publishing track), yalnız zararsız `/auth/me 401` (normal ilk-yük refresh). Muhtemelen REV-6 ile çözüldü / transient. Disconnect log'u izlemede kalır.
+
+---
+
+## Sprint V3 — Rol/İzin Sistemi · Faz 3 (İzin ENFORCEMENT, R7-AĞIR)
+
+> Aktif sözleşme: `contracts/SPRINT_V3_ROLES_CONTRACT.md` §44-81 (Faz 3 detaylı plan, sahip onaylı 2026-06-15).
+> **R7-AĞIR: merge öncesi PM satır-satır inceleme + sahip imzası ZORUNLU** (kök CLAUDE.md). Dev checkbox işaretler, item EKLEMEZ.
+> **Dokunulmaz (madde 6):** minör/yaş join kapıları + adultsOnly erişim enforcement'ı + CSAM kapıları izin sisteminin ÜSTÜNDE — hiçbir bayrak (ADMINISTRATOR dahil) reşit-olmayan korumasını DELMEZ.
+
+### Backend (`api/`)
+- [x] **ADMINISTRATOR bayrağı:** `common/permissions.ts` `PERMISSION_FLAGS`'a `ADMINISTRATOR` ekle (en üst). Bir rolde varsa → o rol TÜM izinlere sahip (Ortam Sil + Sahiplik Devri HARİÇ — yalnız OWNER).
+- [x] **`PermissionsService` (shared):** `shared/permissions/permissions.service.ts` + `hasGuildPermission(userId, guildId, flag)` + `effectivePermissions` (DRY):
+  1. üye değil → `false`
+  2. `guild.ownerId === userId` veya `membership.role === OWNER` → `true`
+  3. `membership.role === ADMIN` (enum, geçiş-uyum) → `true`
+  4. efektif = `@everyone izinleri` ∪ `üyenin atanmış rollerinin izinleri`; `ADMINISTRATOR` içeriyorsa → `true`; aksi `flag ∈ efektif`
+  - SharedModule provider + export; fail-closed.
+- [x] **Hiyerarşi helper'ları:** `actorHighestPosition` (OWNER=∞, **enum-ADMIN=MAX_SAFE_INTEGER [F2]**, MEMBER=max rol position / 0).
+  - Rol yönet (düzenle/sil/ata/sırala): hedef rol position < aktör; ADMINISTRATOR muaf DEĞİL; OWNER muaf. İhlal → 403 `ROLE_HIERARCHY`.
+  - Üye aksiyonu (kick/ban/rol-ata): hedef üye position < aktör; OWNER asla hedef alınamaz; OWNER muaf; ADMIN-vs-ADMIN beraberlik bloklanır. İhlal → 403 `MEMBER_HIERARCHY`.
+- [x] **F1 (R7, sahip onaylı):** `createRole`/`updateRole` "sahip olmadığın izni veremezsin" → `requireCanGrant` (yalnız aktörün efektif izinleri; OWNER/ADMIN/ADMINISTRATOR muaf). İhlal → 403 `CANNOT_GRANT_PERMISSION`.
+- [x] **Enforcement geçişi (`requireAdminRole`/`requireOwnerOrAdmin`/inline OWNER → `hasGuildPermission`):**
+  - [x] channels: kanal CRUD + reorder + özel-kanal üye → `MANAGE_CHANNELS`
+  - [x] categories: kategori CRUD + reorder → `MANAGE_CHANNELS`
+  - [x] roles: create/update/delete/assign/remove/reorder → `MANAGE_ROLES` + hiyerarşi
+  - [x] guilds kick → `KICK_MEMBERS` + hiyerarşi; ban/unban + ban listesi → `BAN_MEMBERS` + hiyerarşi
+  - [x] guilds ortam ayar (ad/ikon/kurallar) → `MANAGE_GUILD`; **`adultsOnly` GERÇEK değişim → YALNIZ OWNER [F3]**
+  - [x] invites: oluştur → `CREATE_INVITE`; listele/iptal → `MANAGE_GUILD`
+  - [x] messages: başkasının mesajını sil / pin → `MANAGE_MESSAGES` (kendi mesajını silme her zaman serbest)
+- [x] **OWNER-only KORUNUR (bayrakla verilemez):** deleteGuild · transferOwnership · updateMemberRole (enum ADMIN/MEMBER ataması)
+- [x] **Testler:** `hasGuildPermission` + `effectivePermissions` matrisi + hiyerarşi (F2 ADMIN dahil) + F1 `CANNOT_GRANT_PERMISSION` + enforcement noktaları; geriye-uyum testleri yeşil. **562 test geçti.**
+- [x] **DoD:** fail-closed; izinsiz aksiyon 403; OWNER/ADMIN geriye-uyum korundu; `nest build` temiz; `prisma migrate status` temiz (şema değişikliği YOK).
+- [x] **R7:** PM satır-satır inceledi (F1-F4/F6 bulundu + düzeltildi) → **sahip imzaladı 2026-06-15** (effectivePermissions fail-closed; ADMINISTRATOR `requireChannelAccess` minör/adultsOnly kapısını DELMİYOR [madde 6 korundu]; hiyerarşi OWNER'ı her durumda koruyor; sızıntı-güvenli sıra korundu). `nest build` temiz, **562 test geçti**. Ölü `requireAdminRole` util'i temizlendi.

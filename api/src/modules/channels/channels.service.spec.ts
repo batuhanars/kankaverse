@@ -38,14 +38,23 @@ const membershipMock = {
   requireChannelAccess: jest.fn(),
 };
 
+const permissionsMock = {
+  hasGuildPermission: jest.fn().mockResolvedValue(true),
+  requireMemberHierarchy: jest.fn().mockResolvedValue(undefined),
+  requireRoleHierarchy: jest.fn().mockResolvedValue(undefined),
+};
+
 const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
 
 function makeService() {
-  return new ChannelsService(prismaMock as any, membershipMock as any, realtimeMock as any);
+  return new ChannelsService(prismaMock as any, membershipMock as any, permissionsMock as any, realtimeMock as any);
 }
 
 function resetMocks() {
   jest.resetAllMocks();
+  permissionsMock.hasGuildPermission.mockResolvedValue(true);
+  permissionsMock.requireMemberHierarchy.mockResolvedValue(undefined);
+  permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
   // Realtime alıcı sorguları (varsayılan boş — emit no-op)
   prismaMock.guildMember.findMany.mockResolvedValue([]);
   prismaMock.channelMember.findMany.mockResolvedValue([]);
@@ -90,6 +99,7 @@ describe('ChannelsService.create', () => {
 
   it('MEMBER → 403 FORBIDDEN fırlatır', async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.create('member-1', GUILD_ID, { name: 'yeni-kanal' })).rejects.toThrow(
       ForbiddenException,
@@ -192,6 +202,7 @@ describe('ChannelsService.update', () => {
   it('MEMBER → 403 FORBIDDEN', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(makeChannel());
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.update('member-1', CHANNEL_ID, { name: 'yeni' })).rejects.toThrow(
       ForbiddenException,
@@ -254,6 +265,7 @@ describe('ChannelsService.remove', () => {
   it('MEMBER → 403 FORBIDDEN', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(makeChannel());
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.remove('member-1', CHANNEL_ID)).rejects.toThrow(ForbiddenException);
   });
@@ -744,6 +756,7 @@ describe('ChannelsService.getChannelMembers', () => {
   it('MEMBER → 403 FORBIDDEN', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(makePrivateChannel());
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.getChannelMembers('member-1', CHANNEL_ID)).rejects.toThrow(ForbiddenException);
     await expect(service.getChannelMembers('member-1', CHANNEL_ID)).rejects.toMatchObject({
@@ -827,6 +840,7 @@ describe('ChannelsService.addChannelMember', () => {
   it('MEMBER → 403 FORBIDDEN', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(makePrivateGuildChannel());
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.addChannelMember('member-1', CHANNEL_ID, { userId: TARGET_ID })).rejects.toThrow(
       ForbiddenException,
@@ -856,6 +870,7 @@ describe('ChannelsService.addChannelMember', () => {
   it('§2 MEMBER + özel kanal → FORBIDDEN (NOT_PRIVATE_CHANNEL sızdırılmaz)', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(makePrivateGuildChannel()); // isPrivate=true
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.addChannelMember('member-1', CHANNEL_ID, { userId: TARGET_ID })).rejects.toThrow(
       ForbiddenException,
@@ -871,6 +886,7 @@ describe('ChannelsService.addChannelMember', () => {
       guild: { id: GUILD_ID, adultsOnly: false },
     });
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     // MEMBER özel kanala da genel kanala da aynı FORBIDDEN alır → kanalın tipi öğrenilemez
     await expect(service.addChannelMember('member-1', CHANNEL_ID, { userId: TARGET_ID })).rejects.toThrow(
@@ -978,6 +994,7 @@ describe('ChannelsService.removeChannelMember', () => {
   it('MEMBER → 403 FORBIDDEN', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ guildId: GUILD_ID }));
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.removeChannelMember('member-1', CHANNEL_ID, TARGET_ID)).rejects.toThrow(
       ForbiddenException,

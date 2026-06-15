@@ -1,11 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
+import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { ChannelCategory } from '@prisma/client';
-import { requireAdminRole } from '../../common/utils/guild-role.utils';
 
 export function toCategoryDto(cat: ChannelCategory) {
   return {
@@ -21,8 +21,17 @@ export class CategoriesService {
   constructor(
     private prisma: PrismaService,
     private membership: MembershipService,
+    private permissions: PermissionsService,
     private realtime: RealtimeService,
   ) {}
+
+  /** MANAGE_CHANNELS iznini kontrol et; yoksa 403 FORBIDDEN */
+  private async requireManageChannels(userId: string, guildId: string): Promise<void> {
+    const allowed = await this.permissions.hasGuildPermission(userId, guildId, 'MANAGE_CHANNELS');
+    if (!allowed) {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+    }
+  }
 
   /** Guild'in tüm üye id'leri (kategori olayı yayını — kategori özel değildir). */
   private async guildMemberIds(guildId: string): Promise<string[]> {
@@ -31,8 +40,8 @@ export class CategoriesService {
   }
 
   async create(userId: string, guildId: string, dto: CreateCategoryDto) {
-    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
-    requireAdminRole(membership.role);
+    await this.membership.requireGuildMembership(userId, guildId);
+    await this.requireManageChannels(userId, guildId);
 
     const maxAgg = await this.prisma.channelCategory.aggregate({
       where: { guildId, deletedAt: null },
@@ -71,8 +80,8 @@ export class CategoriesService {
       throw new NotFoundException({ message: 'Kategori bulunamadı.', error: 'CATEGORY_NOT_FOUND' });
     }
 
-    const { membership } = await this.membership.requireGuildMembership(userId, category.guildId);
-    requireAdminRole(membership.role);
+    await this.membership.requireGuildMembership(userId, category.guildId);
+    await this.requireManageChannels(userId, category.guildId);
 
     const updated = await this.prisma.channelCategory.update({
       where: { id: categoryId },
@@ -89,8 +98,8 @@ export class CategoriesService {
 
   /** Toplu kategori sıralama (drag-reorder): position güncelle (OWNER/ADMIN) + category.updated yayını. */
   async reorder(userId: string, guildId: string, items: { id: string; position: number }[]): Promise<null> {
-    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
-    requireAdminRole(membership.role);
+    await this.membership.requireGuildMembership(userId, guildId);
+    await this.requireManageChannels(userId, guildId);
 
     const cats = await this.prisma.channelCategory.findMany({
       where: { id: { in: items.map((i) => i.id) }, guildId, deletedAt: null },
@@ -120,8 +129,8 @@ export class CategoriesService {
       throw new NotFoundException({ message: 'Kategori bulunamadı.', error: 'CATEGORY_NOT_FOUND' });
     }
 
-    const { membership } = await this.membership.requireGuildMembership(userId, category.guildId);
-    requireAdminRole(membership.role);
+    await this.membership.requireGuildMembership(userId, category.guildId);
+    await this.requireManageChannels(userId, category.guildId);
 
     // Transaction: kanalları kategorisiz yap + kategoriyi soft-delete et
     await this.prisma.$transaction([

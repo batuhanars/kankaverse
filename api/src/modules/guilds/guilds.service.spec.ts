@@ -63,6 +63,14 @@ const membershipMock = {
   requireGuildMembership: jest.fn(),
 };
 
+// PermissionsService mock — varsayılan: hasGuildPermission → true (yetkili);
+// requireMemberHierarchy → undefined (geçer). Bireysel testler override eder.
+const permissionsMock = {
+  hasGuildPermission: jest.fn().mockResolvedValue(true),
+  requireMemberHierarchy: jest.fn().mockResolvedValue(undefined),
+  requireRoleHierarchy: jest.fn().mockResolvedValue(undefined),
+};
+
 const storageMock = {
   presignPut: jest.fn(),
   presignGet: jest.fn(),
@@ -85,6 +93,7 @@ function makeService() {
   return new GuildsService(
     prismaMock as any,
     membershipMock as any,
+    permissionsMock as any,
     storageMock as any,
     configMock as any,
     realtimeMock as any,
@@ -93,6 +102,9 @@ function makeService() {
 
 function resetMocks() {
   jest.resetAllMocks();
+  permissionsMock.hasGuildPermission.mockResolvedValue(true);
+  permissionsMock.requireMemberHierarchy.mockResolvedValue(undefined);
+  permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
   configMock.get.mockImplementation((key: string) => {
     const values: Record<string, unknown> = {
       's3.publicUrl': 'http://localhost:9000/kankaverse',
@@ -776,12 +788,17 @@ describe('GuildsService.kickMember — §C (R7)', () => {
 
   // ── Hata senaryoları — R7 yetki hiyerarşisi ──────────────────────────────
 
-  it('ADMIN → ADMIN üyeyi atamaz: ForbiddenException FORBIDDEN (R7)', async () => {
+  it('ADMIN → ADMIN üyeyi atamaz: hiyerarşi eşit → ForbiddenException MEMBER_HIERARCHY (Faz 3)', async () => {
     const actorId = mockActorRole('ADMIN');
     mockTargetMember(ANOTHER_MEMBER_ID, 'ADMIN'); // hedef de ADMIN
+    permissionsMock.requireMemberHierarchy.mockRejectedValueOnce(
+      Object.assign(new (require('@nestjs/common').ForbiddenException)(), {
+        response: { error: 'MEMBER_HIERARCHY' },
+      }),
+    );
 
     await expect(service.kickMember(actorId, GUILD_ID, ANOTHER_MEMBER_ID)).rejects.toMatchObject({
-      response: expect.objectContaining({ error: 'FORBIDDEN' }),
+      response: expect.objectContaining({ error: 'MEMBER_HIERARCHY' }),
     });
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
@@ -808,6 +825,8 @@ describe('GuildsService.kickMember — §C (R7)', () => {
 
   it('MEMBER aktör → ForbiddenException FORBIDDEN — yetki önce kontrol edilir (R7 sızıntı yok)', async () => {
     const actorId = mockActorRole('MEMBER');
+    // KICK_MEMBERS izni yok → hasGuildPermission false döner
+    permissionsMock.hasGuildPermission.mockResolvedValueOnce(false);
     // Not: targetMember findUnique çağrılmaz çünkü FORBIDDEN önce fırlatılır
 
     await expect(service.kickMember(actorId, GUILD_ID, ADMIN_ID)).rejects.toMatchObject({
@@ -943,10 +962,22 @@ describe('GuildsService — ortam yönetimi (leave/transfer/ban)', () => {
   });
 
   // banMember
-  it('banMember: ADMIN, hedef ADMIN → FORBIDDEN', async () => {
+  it('banMember: BAN_MEMBERS izni yok → FORBIDDEN', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD_FIXTURE, membership: { role: 'MEMBER', userId: MEMBER_ID } });
+    permissionsMock.hasGuildPermission.mockResolvedValueOnce(false);
+    await expect(service.banMember(MEMBER_ID, GUILD_ID, 'other-user')).rejects.toMatchObject({ response: { error: 'FORBIDDEN' } });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('banMember: ADMIN, hedef ADMIN → hiyerarşi eşit → MEMBER_HIERARCHY (Faz 3)', async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD_FIXTURE, membership: { role: 'ADMIN', userId: ADMIN_ID } });
     prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'ADMIN', userId: 'other-admin', id: 'gm-x' });
-    await expect(service.banMember(ADMIN_ID, GUILD_ID, 'other-admin')).rejects.toMatchObject({ response: { error: 'FORBIDDEN' } });
+    permissionsMock.requireMemberHierarchy.mockRejectedValueOnce(
+      Object.assign(new (require('@nestjs/common').ForbiddenException)(), {
+        response: { error: 'MEMBER_HIERARCHY' },
+      }),
+    );
+    await expect(service.banMember(ADMIN_ID, GUILD_ID, 'other-admin')).rejects.toMatchObject({ response: { error: 'MEMBER_HIERARCHY' } });
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 

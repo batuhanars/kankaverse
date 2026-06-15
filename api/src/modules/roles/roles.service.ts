@@ -7,8 +7,9 @@ import {
 import { GuildRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
+import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
-import { filterKnownPermissions, DEFAULT_EVERYONE_PERMISSIONS } from '../../common/permissions';
+import { filterKnownPermissions, DEFAULT_EVERYONE_PERMISSIONS, PermissionFlag } from '../../common/permissions';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { RoleDto } from './dto/role.dto';
@@ -46,6 +47,7 @@ export class RolesService {
   constructor(
     private prisma: PrismaService,
     private membership: MembershipService,
+    private permissions: PermissionsService,
     private realtime: RealtimeService,
   ) {}
 
@@ -58,11 +60,40 @@ export class RolesService {
     return members.map((m) => m.userId);
   }
 
-  /** Aktör OWNER veya ADMIN değilse 403 fırlatır. Guild üyeliği de doğrulanır. */
-  private async requireOwnerOrAdmin(actorId: string, guildId: string): Promise<void> {
-    const { membership } = await this.membership.requireGuildMembership(actorId, guildId);
-    if (membership.role !== GuildRole.OWNER && membership.role !== GuildRole.ADMIN) {
+  /**
+   * MANAGE_ROLES iznini kontrol et; yoksa 403 FORBIDDEN.
+   * Guild üyeliği requireGuildMembership ile ayrıca doğrulanır (sızıntı-güvenli sıra).
+   */
+  private async requireManageRoles(actorId: string, guildId: string): Promise<void> {
+    await this.membership.requireGuildMembership(actorId, guildId);
+    const allowed = await this.permissions.hasGuildPermission(actorId, guildId, 'MANAGE_ROLES');
+    if (!allowed) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+    }
+  }
+
+  /**
+   * F1 (R7, sahip kararı 2026-06-15) — "sahip olmadığın izni veremezsin" (Discord kuralı).
+   * Aktör yalnız KENDİ efektif izinlerini bir role ekleyebilir. OWNER + enum-ADMIN +
+   * ADMINISTRATOR-sahibi muaf (effectivePermissions.all). Yalnız YENİ eklenen bayraklar
+   * denetlenir (mevcut bayrağı koruyan güncelleme serbest). İhlal → 403 CANNOT_GRANT_PERMISSION.
+   */
+  private async requireCanGrant(
+    actorId: string,
+    guildId: string,
+    requested: PermissionFlag[],
+    current: PermissionFlag[] = [],
+  ): Promise<void> {
+    const { all, flags } = await this.permissions.effectivePermissions(actorId, guildId);
+    if (all) return;
+
+    const currentSet = new Set(current);
+    const lacking = requested.filter((f) => !currentSet.has(f) && !flags.has(f));
+    if (lacking.length > 0) {
+      throw new ForbiddenException({
+        message: 'Sahip olmadığınız bir izni veremezsiniz.',
+        error: 'CANNOT_GRANT_PERMISSION',
+      });
     }
   }
 
@@ -105,7 +136,7 @@ export class RolesService {
   // ─── POST /guilds/:id/roles ────────────────────────────────────────────────
 
   async createRole(actorId: string, guildId: string, dto: CreateRoleDto): Promise<RoleDto> {
-    await this.requireOwnerOrAdmin(actorId, guildId);
+    await this.requireManageRoles(actorId, guildId);
 
     // Yeni rol pozisyonu = mevcut max + 1
     const maxPos = await this.prisma.role.aggregate({
@@ -115,6 +146,8 @@ export class RolesService {
     const position = (maxPos._max.position ?? 0) + 1;
 
     const permissions = dto.permissions ? filterKnownPermissions(dto.permissions) : [];
+    // F1: aktör yalnız kendi sahip olduğu izinleri yeni role verebilir (yeni rol → current boş)
+    await this.requireCanGrant(actorId, guildId, permissions, []);
 
     const role = await this.prisma.role.create({
       data: {
@@ -142,7 +175,11 @@ export class RolesService {
 
   async updateRole(actorId: string, roleId: string, dto: UpdateRoleDto): Promise<RoleDto> {
     const role = await this.findRoleOrFail(roleId);
-    await this.requireOwnerOrAdmin(actorId, role.guildId);
+    await this.requireManageRoles(actorId, role.guildId);
+    // Hiyerarşi: @everyone'ı düzenlemek hiyerarşi kontrolünden muaf (position=0, taban).
+    if (!role.isEveryone) {
+      await this.permissions.requireRoleHierarchy(actorId, role.guildId, role.position);
+    }
 
     // @everyone kısıtlamaları: name ve hoist değiştirilemez
     if (role.isEveryone) {
@@ -164,6 +201,10 @@ export class RolesService {
     const permissions = dto.permissions !== undefined
       ? filterKnownPermissions(dto.permissions)
       : undefined;
+    // F1: izin değişiyorsa aktör yalnız kendi sahip olduğu yeni bayrakları ekleyebilir
+    if (permissions !== undefined) {
+      await this.requireCanGrant(actorId, role.guildId, permissions, filterKnownPermissions(role.permissions));
+    }
 
     const updated = await this.prisma.role.update({
       where: { id: roleId },
@@ -189,7 +230,11 @@ export class RolesService {
 
   async deleteRole(actorId: string, roleId: string): Promise<null> {
     const role = await this.findRoleOrFail(roleId);
-    await this.requireOwnerOrAdmin(actorId, role.guildId);
+    await this.requireManageRoles(actorId, role.guildId);
+    // @everyone silinemez (aşağıda kontrol) — hiyerarşiyi sadece silinebilir rollere uygula
+    if (!role.isEveryone) {
+      await this.permissions.requireRoleHierarchy(actorId, role.guildId, role.position);
+    }
 
     if (role.isEveryone) {
       throw new BadRequestException({
@@ -216,15 +261,16 @@ export class RolesService {
     targetUserId: string,
   ): Promise<import('../guilds/dto/guild-member.dto').GuildMemberDto & { roles: { id: string; name: string; color: string; position: number; hoist: boolean }[] }> {
     const role = await this.findRoleOrFail(roleId);
-    await this.requireOwnerOrAdmin(actorId, role.guildId);
-
-    // @everyone örtük — atama/çıkarma yasak
+    await this.requireManageRoles(actorId, role.guildId);
+    // @everyone örtük — atama/çıkarma yasak (hiyerarşi kontrolünden önce fırlatır)
     if (role.isEveryone) {
       throw new BadRequestException({
         message: '@everyone rolü atanamaz veya çıkarılamaz.',
         error: 'CANNOT_ASSIGN_EVERYONE',
       });
     }
+    // Hiyerarşi (1/2): hedef rolün position'ı < aktörün en yükseği (OWNER muaf)
+    await this.permissions.requireRoleHierarchy(actorId, role.guildId, role.position);
 
     // Hedef bu guild'in üyesi mi?
     const targetMember = await this.prisma.guildMember.findUnique({
@@ -240,6 +286,10 @@ export class RolesService {
         error: 'NOT_GUILD_MEMBER',
       });
     }
+
+    // Hiyerarşi (2/2): üye aksiyonu — hedef üyenin en yüksek position'ı < aktörünki (OWNER muaf).
+    // §74: rol-ata "üye aksiyonu" kapsamında; OWNER asla hedef alınamaz.
+    await this.permissions.requireMemberHierarchy(actorId, role.guildId, targetUserId);
 
     // Upsert (idempotent)
     await this.prisma.guildMemberRole.upsert({
@@ -276,14 +326,15 @@ export class RolesService {
     targetUserId: string,
   ): Promise<import('../guilds/dto/guild-member.dto').GuildMemberDto & { roles: { id: string; name: string; color: string; position: number; hoist: boolean }[] }> {
     const role = await this.findRoleOrFail(roleId);
-    await this.requireOwnerOrAdmin(actorId, role.guildId);
-
+    await this.requireManageRoles(actorId, role.guildId);
     if (role.isEveryone) {
       throw new BadRequestException({
         message: '@everyone rolü atanamaz veya çıkarılamaz.',
         error: 'CANNOT_ASSIGN_EVERYONE',
       });
     }
+    // Hiyerarşi (1/2): hedef rolün position'ı < aktörün en yükseği (OWNER muaf)
+    await this.permissions.requireRoleHierarchy(actorId, role.guildId, role.position);
 
     const targetMember = await this.prisma.guildMember.findUnique({
       where: { guildId_userId: { guildId: role.guildId, userId: targetUserId } },
@@ -294,6 +345,10 @@ export class RolesService {
         error: 'NOT_GUILD_MEMBER',
       });
     }
+
+    // Hiyerarşi (2/2): üye aksiyonu — hedef üyenin en yüksek position'ı < aktörünki (OWNER muaf).
+    // §74: rol-çıkar "üye aksiyonu" kapsamında; OWNER asla hedef alınamaz.
+    await this.permissions.requireMemberHierarchy(actorId, role.guildId, targetUserId);
 
     // Idempotent: kayıt yoksa hata fırlatma, deleteMany kullan
     await this.prisma.guildMemberRole.deleteMany({
@@ -332,16 +387,21 @@ export class RolesService {
     guildId: string,
     items: { id: string; position: number }[],
   ): Promise<null> {
-    await this.requireOwnerOrAdmin(actorId, guildId);
+    await this.requireManageRoles(actorId, guildId);
 
     const ids = items.map((i) => i.id);
 
-    // @everyone filtrelenir (isEveryone: false şartı)
+    // @everyone filtrelenir (isEveryone: false şartı); hiyerarşi kontrolü de burada yapılır
     const validRoles = await this.prisma.role.findMany({
       where: { id: { in: ids }, guildId, isEveryone: false },
-      select: { id: true },
+      select: { id: true, position: true },
     });
     if (validRoles.length === 0) return null;
+
+    // Reorder: yalnız aktörün altındaki rolleri taşıyabilir (OWNER muaf)
+    for (const r of validRoles) {
+      await this.permissions.requireRoleHierarchy(actorId, guildId, r.position);
+    }
 
     const validIdSet = new Set(validRoles.map((r) => r.id));
     const validItems = items.filter((i) => validIdSet.has(i.id));

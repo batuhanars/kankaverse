@@ -3,15 +3,16 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
+import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { AddChannelMemberDto } from './dto/add-channel-member.dto';
 import { Channel } from '@prisma/client';
-import { requireAdminRole } from '../../common/utils/guild-role.utils';
 
 export function toChannelDto(channel: Channel, unreadCount = 0, unreadMentionCount = 0) {
   return {
@@ -34,8 +35,17 @@ export class ChannelsService {
   constructor(
     private prisma: PrismaService,
     private membership: MembershipService,
+    private permissions: PermissionsService,
     private realtime: RealtimeService,
   ) {}
+
+  /** MANAGE_CHANNELS iznini kontrol et; yoksa 403 FORBIDDEN */
+  private async requireManageChannels(userId: string, guildId: string): Promise<void> {
+    const allowed = await this.permissions.hasGuildPermission(userId, guildId, 'MANAGE_CHANNELS');
+    if (!allowed) {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+    }
+  }
 
   /**
    * Realtime kanal-olayı alıcıları (sızıntı-güvenli):
@@ -56,8 +66,8 @@ export class ChannelsService {
   }
 
   async create(userId: string, guildId: string, dto: CreateChannelDto) {
-    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
-    requireAdminRole(membership.role);
+    await this.membership.requireGuildMembership(userId, guildId);
+    await this.requireManageChannels(userId, guildId);
 
     if (dto.categoryId) {
       await this.validateCategoryBelongsToGuild(dto.categoryId, guildId);
@@ -164,8 +174,8 @@ export class ChannelsService {
       throw new NotFoundException({ message: 'Kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
     }
 
-    const { membership } = await this.membership.requireGuildMembership(userId, channel.guildId!);
-    requireAdminRole(membership.role);
+    await this.membership.requireGuildMembership(userId, channel.guildId!);
+    await this.requireManageChannels(userId, channel.guildId!);
 
     // categoryId: null → kategorisiz; string → doğrula; undefined → dokunma
     if (dto.categoryId !== undefined && dto.categoryId !== null) {
@@ -199,8 +209,8 @@ export class ChannelsService {
     guildId: string,
     items: { id: string; position: number; categoryId?: string | null }[],
   ): Promise<null> {
-    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
-    requireAdminRole(membership.role);
+    await this.membership.requireGuildMembership(userId, guildId);
+    await this.requireManageChannels(userId, guildId);
 
     // Bu guild'e ait geçerli kanallar
     const ids = items.map((i) => i.id);
@@ -258,7 +268,7 @@ export class ChannelsService {
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Özel kanal üye yönetimi (Sprint V2)
-  // Hepsi OWNER/ADMIN: requireGuildMembership + requireAdminRole
+  // Hepsi MANAGE_CHANNELS: requireGuildMembership + requireManageChannels
   // ─────────────────────────────────────────────────────────────────────────────
 
   /**
@@ -279,8 +289,8 @@ export class ChannelsService {
     // Yalnız guild kanallarında anlamlı
     if (!channel.guildId) return [];
 
-    const { membership } = await this.membership.requireGuildMembership(userId, channel.guildId);
-    requireAdminRole(membership.role);
+    await this.membership.requireGuildMembership(userId, channel.guildId);
+    await this.requireManageChannels(userId, channel.guildId);
 
     // Genel kanal → boş dön (işlem başarılı ama anlamsız)
     if (!channel.isPrivate) return [];
@@ -321,9 +331,9 @@ export class ChannelsService {
       throw new BadRequestException({ message: 'Bu işlem yalnızca özel guild kanallarında kullanılabilir.', error: 'NOT_PRIVATE_CHANNEL' });
     }
 
-    // §2 ADMIN GATE — önce yetki; yetkisiz kullanıcı bundan ötesini göremez.
-    const { membership } = await this.membership.requireGuildMembership(userId, channel.guildId);
-    requireAdminRole(membership.role);
+    // §2 MANAGE_CHANNELS GATE — önce yetki; yetkisiz kullanıcı bundan ötesini göremez.
+    await this.membership.requireGuildMembership(userId, channel.guildId);
+    await this.requireManageChannels(userId, channel.guildId);
 
     // Domain doğrulaması: kanal özel değilse işlem anlamsız (GATE sonrası — sızıntı yok).
     if (!channel.isPrivate) {
@@ -384,9 +394,9 @@ export class ChannelsService {
       throw new BadRequestException({ message: 'Bu işlem yalnızca guild kanallarında kullanılabilir.', error: 'NOT_PRIVATE_CHANNEL' });
     }
 
-    // §2 ADMIN GATE — önce yetki.
-    const { membership } = await this.membership.requireGuildMembership(userId, channel.guildId);
-    requireAdminRole(membership.role);
+    // §2 MANAGE_CHANNELS GATE — önce yetki.
+    await this.membership.requireGuildMembership(userId, channel.guildId);
+    await this.requireManageChannels(userId, channel.guildId);
 
     // deleteMany: kayıt yoksa no-op (count=0 — hata fırlatma)
     await this.prisma.channelMember.deleteMany({
@@ -404,8 +414,8 @@ export class ChannelsService {
       throw new NotFoundException({ message: 'Kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
     }
 
-    const { membership } = await this.membership.requireGuildMembership(userId, channel.guildId!);
-    requireAdminRole(membership.role);
+    await this.membership.requireGuildMembership(userId, channel.guildId!);
+    await this.requireManageChannels(userId, channel.guildId!);
 
     // Son kanal koruması: guild'in en az 1 aktif kanalı kalmalı
     const activeCount = await this.prisma.channel.count({
