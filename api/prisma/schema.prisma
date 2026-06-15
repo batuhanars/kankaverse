@@ -156,19 +156,52 @@ model Guild {
   invites   Invite[]
   categories ChannelCategory[]
   bans      GuildBan[]
+  roles     Role[]
 }
 
 model GuildMember {
-  id       String    @id @default(cuid())
-  guildId  String
-  guild    Guild     @relation(fields: [guildId], references: [id])
-  userId   String
-  user     User      @relation(fields: [userId], references: [id])
-  role     GuildRole @default(MEMBER)
-  joinedAt DateTime  @default(now())
+  id        String            @id @default(cuid())
+  guildId   String
+  guild     Guild             @relation(fields: [guildId], references: [id])
+  userId    String
+  user      User              @relation(fields: [userId], references: [id])
+  role      GuildRole         @default(MEMBER)
+  joinedAt  DateTime          @default(now())
+  roleLinks GuildMemberRole[]
 
   @@unique([guildId, userId])
   @@index([userId])
+}
+
+model Role {
+  id          String            @id @default(cuid())
+  guildId     String
+  guild       Guild             @relation(fields: [guildId], references: [id])
+  name        String
+  color       String            @default("#99AAB5")
+  position    Int               @default(0)
+  hoist       Boolean           @default(false)
+  mentionable Boolean           @default(false)
+  permissions String[]          @default([])
+  iconUrl     String?
+  isEveryone  Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  memberLinks GuildMemberRole[]
+
+  @@index([guildId])
+}
+
+model GuildMemberRole {
+  id         String      @id @default(cuid())
+  memberId   String
+  member     GuildMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  roleId     String
+  role       Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedAt DateTime    @default(now())
+
+  @@unique([memberId, roleId])
+  @@index([roleId])
 }
 
 // Ortam-ban: kalıcı yasak (kick + tekrar davetle giremez). Davet-join'de kontrol edilir.

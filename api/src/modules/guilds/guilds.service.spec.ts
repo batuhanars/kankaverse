@@ -19,6 +19,21 @@ const prismaMock = {
     update: jest.fn(),
     delete: jest.fn(),
   },
+  guildMemberRole: {
+    findMany: jest.fn(),
+    create: jest.fn(),
+    upsert: jest.fn(),
+    deleteMany: jest.fn(),
+    count: jest.fn(),
+  },
+  role: {
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    aggregate: jest.fn(),
+  },
   channel: {
     create: jest.fn(),
     findMany: jest.fn(),
@@ -443,6 +458,7 @@ describe('GuildsService.create — varsayılan kategori', () => {
         create: jest.fn().mockResolvedValue({ id: CATEGORY_ID, name: 'Metin Kanalları', position: 0, guildId: GUILD_ID }),
       },
       channel: { create: jest.fn().mockResolvedValue({}) },
+      role: { create: jest.fn().mockResolvedValue({}) },
     };
     prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock));
 
@@ -473,6 +489,7 @@ describe('GuildsService.create — varsayılan kategori', () => {
       guildMember: { create: jest.fn().mockResolvedValue({}) },
       channelCategory: { create: jest.fn().mockResolvedValue({ id: CATEGORY_ID }) },
       channel: { create: jest.fn().mockResolvedValue({}) },
+      role: { create: jest.fn().mockResolvedValue({}) },
     };
     prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock));
 
@@ -492,6 +509,7 @@ describe('GuildsService.create — varsayılan kategori', () => {
       guildMember: { create: jest.fn().mockResolvedValue({}) },
       channelCategory: { create: jest.fn().mockResolvedValue({ id: dynamicCatId }) },
       channel: { create: jest.fn().mockResolvedValue({}) },
+      role: { create: jest.fn().mockResolvedValue({}) },
     };
     prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock));
 
