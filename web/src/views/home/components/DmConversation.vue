@@ -150,6 +150,9 @@ const showAddFriend = computed(
 
 async function addFriendInDm() {
   if (!otherUserId.value || addingFriend.value) return
+  // REV-10b güvenlik: ben engellediysem önce engel kaldırılmalı (buton zaten gizli; defansif).
+  // Karşı taraf engellediyse backend zaten jenerik reddeder (sızıntı yok).
+  if (dmChannel.value?.selfBlocked) return
   addingFriend.value = true
   try {
     await friendsStore.sendRequestByUser(otherUserId.value)
