@@ -15,6 +15,7 @@ import { ChannelsService } from './channels.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { AddChannelMemberDto } from './dto/add-channel-member.dto';
+import { ReorderChannelsDto } from './dto/reorder-channels.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -43,6 +44,17 @@ export class ChannelsController {
     @Param('id') guildId: string,
   ) {
     return this.channelsService.findByGuild(user.id, guildId);
+  }
+
+  @Patch('guilds/:id/channels/reorder')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Kanalları toplu sırala/taşı (drag-reorder; OWNER/ADMIN). Dönüş null.' })
+  reorderChannels(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Body() dto: ReorderChannelsDto,
+  ) {
+    return this.channelsService.reorderChannels(user.id, guildId, dto.items);
   }
 
   @Patch('channels/:id')

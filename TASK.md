@@ -582,7 +582,8 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   - [x] **Cila:** DM call katılımcı şeridi (sohbet alanında avatar+halka) — `DmCallPanel` (8012a87) · **giden çağrı global bar** — `OutgoingCallBar` UserCard'da (VoiceConnectedBar üstü); DM'den çıksan da "Aranıyor… {ad}" + iptal görünür, kabul edilince VoiceConnectedBar devralır (2026-06-14)
 - [x] **Sahiplik devri/ortam-ban/ayrılma → TAMAMLANDI** (2026-06-15, ortam-yönetimi turu)
 - [x] **Sunucu-geneli arama → TAMAMLANDI** (2026-06-15): `GET /guilds/:id/messages/search` (erişilebilir kanallarda — yaş-kapısı/özel-kanal sızıntı-güvenli; kanal-gruplu sonuç). Frontend `GuildSearchPopover` (GuildTopBar büyüteç) + eşleşen kelime highlight + **çapraz-kanal zıplama** (`useMessageJump` mount'ta bekleyen isteği tüketir). 497 test + web build temiz
-- [ ] **Ertelenen (V3/CSAM-kapısı):** özel emoji (CSAM) · kategori/kanal drag-reorder (batch reorder endpoint)
+- [x] **Kanal/kategori drag-reorder → TAMAMLANDI** (2026-06-15): backend toplu sıralama (`PATCH /guilds/:id/channels/reorder` + `.../categories/reorder`, OWNER/ADMIN, realtime channel/category.updated yayını); frontend **native HTML5 DnD** (yeni dep yok) — kanalı sürükle-sırala + kategoriler arası taşı + kategori başlığı sürükle-sırala; optimistik + hata→tazele; drop-hedef aksan göstergesi. **Yan-düzeltme:** kategorili kanallarda eksik `data-channel-row`/mention-highlight (REV-4 replace_all'ı tek bloğu tutmuş) eklendi. 497 test + web build temiz
+- [ ] **Ertelenen (V3/CSAM-kapısı):** özel emoji (CSAM tarayıcı gelene dek)
 
 ---
 

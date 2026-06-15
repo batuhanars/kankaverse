@@ -136,6 +136,92 @@ function voiceDuration(channelId: string): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
+// ── Drag-reorder (native HTML5 DnD; yalnız OWNER/ADMIN) ──
+const dragChannelId = ref<string | null>(null)
+const dragCategoryId = ref<string | null>(null)
+const dragOverChannelId = ref<string | null>(null)
+const dragOverCategoryId = ref<string | null>(null)
+
+function onChannelDragStart(e: DragEvent, channel: ChannelDto) {
+  if (!isAdmin.value) return
+  dragChannelId.value = channel.id
+  dragCategoryId.value = null
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+}
+function onCategoryDragStart(e: DragEvent, cat: CategoryDto) {
+  if (!isAdmin.value) return
+  dragCategoryId.value = cat.id
+  dragChannelId.value = null
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+}
+function onDragEnd() {
+  dragChannelId.value = null
+  dragCategoryId.value = null
+  dragOverChannelId.value = null
+  dragOverCategoryId.value = null
+}
+
+// Bir grubun (kategori veya kategorisiz) kanalları, position sırasında
+function groupChannels(categoryId: string | null): ChannelDto[] {
+  return channelsStore.channelsForGuild(activeGuildId.value)
+    .filter((c) => (c.categoryId ?? null) === categoryId)
+    .sort((a, b) => a.position - b.position)
+}
+
+async function dropChannelInto(targetCategoryId: string | null, beforeChannelId: string | null) {
+  const draggedId = dragChannelId.value
+  onDragEnd()
+  if (!draggedId || !isAdmin.value) return
+  const dragged = channelsStore.channelsForGuild(activeGuildId.value).find((c) => c.id === draggedId)
+  if (!dragged || draggedId === beforeChannelId) return
+
+  const group = groupChannels(targetCategoryId).filter((c) => c.id !== draggedId)
+  let insertIdx = group.length
+  if (beforeChannelId) {
+    const i = group.findIndex((c) => c.id === beforeChannelId)
+    if (i !== -1) insertIdx = i
+  }
+  group.splice(insertIdx, 0, dragged)
+  const items = group.map((c, idx) => ({ id: c.id, position: idx, categoryId: targetCategoryId }))
+
+  channelsStore.applyChannelReorder(activeGuildId.value, items) // optimistik
+  try {
+    await guildsApi.reorderChannels(activeGuildId.value, items)
+  } catch {
+    await channelsStore.fetchChannels(activeGuildId.value) // hata → sunucudan tazele
+  }
+}
+
+async function dropCategoryBefore(beforeCategoryId: string | null) {
+  const draggedId = dragCategoryId.value
+  onDragEnd()
+  if (!draggedId || !isAdmin.value) return
+  const all = channelsStore.categoriesForGuild(activeGuildId.value).slice().sort((a, b) => a.position - b.position)
+  const dragged = all.find((c) => c.id === draggedId)
+  if (!dragged || draggedId === beforeCategoryId) return
+  const rest = all.filter((c) => c.id !== draggedId)
+  let idx = rest.length
+  if (beforeCategoryId) {
+    const i = rest.findIndex((c) => c.id === beforeCategoryId)
+    if (i !== -1) idx = i
+  }
+  rest.splice(idx, 0, dragged)
+  const items = rest.map((c, i) => ({ id: c.id, position: i }))
+
+  channelsStore.applyCategoryReorder(activeGuildId.value, items) // optimistik
+  try {
+    await guildsApi.reorderCategories(activeGuildId.value, items)
+  } catch {
+    await channelsStore.fetchChannelsAndCategories(activeGuildId.value, authStore.user?.id)
+  }
+}
+
+// Kategori başlığına bırak: kanal sürükleniyorsa o kategoriye taşı (sona); kategori ise sırala
+function onCategoryHeaderDrop(cat: CategoryDto) {
+  if (dragChannelId.value) dropChannelInto(cat.id, null)
+  else if (dragCategoryId.value) dropCategoryBefore(cat.id)
+}
+
 // ── Kanal seçme ──
 function selectChannel(channel: ChannelDto) {
   const guildId = guildsStore.activeGuildId
@@ -591,13 +677,20 @@ async function doLeave() {
       <template v-for="channel in uncategorizedChannels" :key="channel.id">
       <div
         :data-channel-row="channel.id"
+        :draggable="isAdmin"
         class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
         :class="[
           channelsStore.activeChannelId === channel.id
             ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-text-primary)]'
             : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
           highlightedChannelId === channel.id ? 'kv-mention-highlight' : '',
+          dragOverChannelId === channel.id ? 'kv-drop-target' : '',
         ]"
+        @dragstart="onChannelDragStart($event, channel)"
+        @dragend="onDragEnd"
+        @dragover.prevent="dragOverChannelId = channel.id"
+        @dragleave="dragOverChannelId === channel.id ? (dragOverChannelId = null) : null"
+        @drop="dropChannelInto(channel.categoryId ?? null, channel.id)"
       >
         <button
           class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-2 pr-2"
@@ -697,8 +790,17 @@ async function doLeave() {
 
       <!-- ── (2) Kategoriler — position asc; E: başlıklar DB'den gelir ── -->
       <template v-for="cat in sortedCategories" :key="cat.id">
-        <!-- Kategori başlığı -->
-        <div class="group/cat mt-3 mb-0.5 px-1 flex items-center gap-1">
+        <!-- Kategori başlığı (sürüklenebilir; kanal/kategori drop hedefi) -->
+        <div
+          class="group/cat mt-3 mb-0.5 px-1 flex items-center gap-1 transition-colors"
+          :class="dragOverCategoryId === cat.id ? 'kv-drop-target' : ''"
+          :draggable="isAdmin"
+          @dragstart="onCategoryDragStart($event, cat)"
+          @dragend="onDragEnd"
+          @dragover.prevent="dragOverCategoryId = cat.id"
+          @dragleave="dragOverCategoryId === cat.id ? (dragOverCategoryId = null) : null"
+          @drop="onCategoryHeaderDrop(cat)"
+        >
           <!-- Katla/aç butonu + ad -->
           <button
             class="flex-1 flex items-center gap-1 min-w-0 cursor-pointer"
@@ -781,12 +883,21 @@ async function doLeave() {
         <template v-if="!categoryIsCollapsed(cat.id)">
           <template v-for="channel in channelsForCategory(cat.id)" :key="channel.id">
           <div
+            :data-channel-row="channel.id"
+            :draggable="isAdmin"
             class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
             :class="[
               channelsStore.activeChannelId === channel.id
                 ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-text-primary)]'
                 : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
+              highlightedChannelId === channel.id ? 'kv-mention-highlight' : '',
+              dragOverChannelId === channel.id ? 'kv-drop-target' : '',
             ]"
+            @dragstart="onChannelDragStart($event, channel)"
+            @dragend="onDragEnd"
+            @dragover.prevent="dragOverChannelId = channel.id"
+            @dragleave="dragOverChannelId === channel.id ? (dragOverChannelId = null) : null"
+            @drop="dropChannelInto(channel.categoryId ?? null, channel.id)"
           >
             <button
               class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-4 pr-2"
@@ -1366,6 +1477,11 @@ async function doLeave() {
 @keyframes kv-mention-pulse {
   0%, 100% { background-color: transparent; }
   30% { background-color: var(--kv-accent-subtle); }
+}
+
+/* Drag-reorder: üzerine bırakılacak hedef göstergesi (üst aksan çizgisi) */
+.kv-drop-target {
+  box-shadow: inset 0 2px 0 0 var(--kv-accent-500);
 }
 
 /* Kırmızı okunmamış sayaç rozeti — kanal satırı sağında */

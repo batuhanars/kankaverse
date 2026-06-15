@@ -87,6 +87,31 @@ export class CategoriesService {
     return dtoOut;
   }
 
+  /** Toplu kategori sıralama (drag-reorder): position güncelle (OWNER/ADMIN) + category.updated yayını. */
+  async reorder(userId: string, guildId: string, items: { id: string; position: number }[]): Promise<null> {
+    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
+    requireAdminRole(membership.role);
+
+    const cats = await this.prisma.channelCategory.findMany({
+      where: { id: { in: items.map((i) => i.id) }, guildId, deletedAt: null },
+      select: { id: true },
+    });
+    const validIds = new Set(cats.map((c) => c.id));
+    const valid = items.filter((i) => validIds.has(i.id));
+    if (valid.length === 0) return null;
+
+    const updated = await this.prisma.$transaction(
+      valid.map((i) =>
+        this.prisma.channelCategory.update({ where: { id: i.id }, data: { position: i.position } }),
+      ),
+    );
+    const recipients = await this.guildMemberIds(guildId);
+    for (const cat of updated) {
+      this.realtime.emitToUsers(recipients, 'category.updated', { guildId, category: toCategoryDto(cat) });
+    }
+    return null;
+  }
+
   async remove(userId: string, categoryId: string) {
     const category = await this.prisma.channelCategory.findUnique({
       where: { id: categoryId, deletedAt: null },
