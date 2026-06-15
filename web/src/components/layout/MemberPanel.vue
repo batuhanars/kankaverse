@@ -76,7 +76,7 @@ const groups = computed((): MemberGroup[] => {
   const noHoistOnline: GuildMemberDto[] = []
 
   for (const member of online) {
-    const hoistRoles = member.roles.filter((r) => r.hoist)
+    const hoistRoles = (member.roles ?? []).filter((r) => r.hoist)
     if (hoistRoles.length === 0) {
       noHoistOnline.push(member)
       continue
