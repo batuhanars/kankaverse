@@ -31,7 +31,7 @@ const activeSection = ref<NavSection>('genel')
 
 // ── ESC tuşu ile kapat ───────────────────────────────────────────────────
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key === 'Escape') handleClose()
+  if (e.key === 'Escape') requestClose()
 }
 onMounted(() => {
   document.addEventListener('keydown', onKeyDown)
@@ -344,6 +344,41 @@ const dangerItem = computed(() => props.isOwner)
 
 // ── Roller detay modu (nav gizleme + full-width) ──────────────────────────
 const rolesDetailMode = ref(false)
+
+// ── Roller kaydedilmemiş değişiklik guard'ı ───────────────────────────────
+const rolesDirty = ref(false)
+const rolesSectionRef = ref<{ reset: () => void } | null>(null)
+const pendingNav = ref<NavSection | 'close' | null>(null)
+const showNavConfirm = ref(false)
+
+/** Nav bölümü değiştir; roller dirty ise önce onay iste. */
+function requestNav(key: NavSection) {
+  if (key === activeSection.value) return
+  if (activeSection.value === 'roller' && rolesDirty.value) {
+    pendingNav.value = key
+    showNavConfirm.value = true
+    return
+  }
+  activeSection.value = key
+}
+/** Kapat; roller dirty ise önce onay iste. */
+function requestClose() {
+  if (activeSection.value === 'roller' && rolesDirty.value) {
+    pendingNav.value = 'close'
+    showNavConfirm.value = true
+    return
+  }
+  handleClose()
+}
+function confirmNavDiscard() {
+  showNavConfirm.value = false
+  rolesSectionRef.value?.reset()
+  rolesDirty.value = false
+  const target = pendingNav.value
+  pendingNav.value = null
+  if (target === 'close') handleClose()
+  else if (target) activeSection.value = target
+}
 </script>
 
 <template>
@@ -382,7 +417,7 @@ const rolesDetailMode = ref(false)
               :class="activeSection === item.key
                 ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-text-primary)]'
                 : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-bg-elevated)] hover:text-[var(--kv-text-primary)]'"
-              @click="activeSection = item.key"
+              @click="requestNav(item.key)"
             >
               {{ t(item.labelKey) }}
             </button>
@@ -430,7 +465,7 @@ const rolesDetailMode = ref(false)
                 class="flex items-center justify-center rounded-full transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
                 style="width: 32px; height: 32px; color: var(--kv-text-muted);"
                 :aria-label="t('common.close')"
-                @click="handleClose"
+                @click="requestClose"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18"/>
@@ -453,10 +488,12 @@ const rolesDetailMode = ref(false)
             :style="rolesDetailMode ? '' : 'max-width: 1000px; width: 100%;'"
           >
             <RolesSettingsSection
+              ref="rolesSectionRef"
               :guild="guild"
               :is-owner="isOwner"
               :is-admin="isAdmin"
               @update:detail-mode="rolesDetailMode = $event"
+              @update:dirty="rolesDirty = $event"
             />
           </div>
         </div>
@@ -571,14 +608,17 @@ const rolesDetailMode = ref(false)
               </div>
             </section>
 
-            <!-- Ortam kuralları -->
+            <!-- Ortam açıklaması -->
             <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.rulesSection') }}
+              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.descriptionSection') }}
               </h3>
+              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.descriptionSubtitle') }}
+              </p>
               <textarea
                 v-model="draftRules"
-                :placeholder="t('guildSettings.rulesPlaceholder')"
+                :placeholder="t('guildSettings.descriptionPlaceholder')"
                 :disabled="saving"
                 rows="5"
                 maxlength="2000"
@@ -740,6 +780,16 @@ const rolesDetailMode = ref(false)
       :loading="deletingGuild"
       @confirm="confirmDeleteGuild"
       @cancel="showDeleteGuild = false"
+    />
+
+    <!-- Roller: kaydedilmemiş değişiklikle nav/kapat onayı -->
+    <ConfirmDialog
+      v-if="showNavConfirm"
+      :title="t('guildSettings.roles.unsavedTitle')"
+      :message="t('guildSettings.roles.unsavedMessage')"
+      :confirm-label="t('guildSettings.roles.discardButton')"
+      @confirm="confirmNavDiscard"
+      @cancel="showNavConfirm = false; pendingNav = null"
     />
   </Teleport>
 </template>

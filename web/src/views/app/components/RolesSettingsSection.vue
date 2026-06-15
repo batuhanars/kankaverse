@@ -8,7 +8,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
 import KvSwitch from '@/components/ui/KvSwitch.vue'
-import type { GuildDto, GuildMemberDto, RoleDto } from '@/types'
+import type { GuildDto, RoleDto } from '@/types'
 
 const props = defineProps<{
   guild: GuildDto
@@ -18,6 +18,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:detailMode': [value: boolean]
+  'update:dirty': [value: boolean]
 }>()
 
 const { t } = useI18n()
@@ -30,6 +31,8 @@ const allMembers = computed(() => membersStore.membersFor(guildId.value))
 
 onMounted(() => {
   rolesStore.fetchRoles(guildId.value).catch(() => {})
+  // Üye yönetimi sekmesi için üye listesi (zaten yüklüyse no-op)
+  membersStore.fetchMembers(guildId.value).catch(() => {})
 })
 
 // ── Mod: liste (null) ya da detay (rol ID) ───────────────────────────────
@@ -47,7 +50,18 @@ function selectRole(id: string) {
   activeTab.value = 'appearance'
 }
 
+// Listeye dön. Kaydedilmemiş değişiklik varsa önce onay iste.
+const showLeaveConfirm = ref(false)
 function backToList() {
+  if (isDirty.value) {
+    showLeaveConfirm.value = true
+    return
+  }
+  selectedRoleId.value = null
+  errorMsg.value = ''
+}
+function confirmLeave() {
+  showLeaveConfirm.value = false
   selectedRoleId.value = null
   errorMsg.value = ''
 }
@@ -64,12 +78,67 @@ const PERMISSION_GROUPS: { key: string; flags: string[] }[] = [
   { key: 'voice', flags: ['MUTE_MEMBERS', 'MOVE_MEMBERS', 'PRIORITY_SPEAKER'] },
 ]
 
-// ── Üye arama filtresi ────────────────────────────────────────────────────
+// ── Üye yönetimi (batch: pendingAdd/pendingRemove diff) ─────────────────────
+// Üye değişiklikleri anında değil, "Değişiklikleri Kaydet" ile uygulanır.
+// Diff modeli geç-yüklenen üye listesine dayanıklıdır (initial reaktif).
 const memberSearch = ref('')
-const filteredMembers = computed(() => {
+const pendingAdd = ref<Set<string>>(new Set())
+const pendingRemove = ref<Set<string>>(new Set())
+
+// Rolün sunucudaki mevcut üyeleri (reaktif — kaydedince güncellenir)
+const initialMemberIds = computed<Set<string>>(() => {
+  const role = selectedRole.value
+  if (!role) return new Set()
+  return new Set(allMembers.value.filter((m) => m.roles.some((r) => r.id === role.id)).map((m) => m.userId))
+})
+
+// Kaydedildiğinde role sahip olacak üye kümesi (initial + bekleyen ekle − bekleyen çıkar)
+const effectiveMemberIds = computed<Set<string>>(() => {
+  const s = new Set(initialMemberIds.value)
+  for (const id of pendingAdd.value) s.add(id)
+  for (const id of pendingRemove.value) s.delete(id)
+  return s
+})
+
+// Üyeleri Yönet sekmesinde gösterilen liste: yalnız role sahip (efektif) üyeler + arama
+const roleMembers = computed(() => {
   const q = memberSearch.value.trim().toLowerCase()
-  if (!q) return allMembers.value
-  return allMembers.value.filter((m) => m.username.toLowerCase().includes(q))
+  const list = allMembers.value.filter((m) => effectiveMemberIds.value.has(m.userId))
+  if (!q) return list
+  return list.filter((m) => m.username.toLowerCase().includes(q))
+})
+
+function removeMemberFromRole(userId: string) {
+  if (!canEdit.value) return
+  if (initialMemberIds.value.has(userId)) {
+    pendingRemove.value = new Set(pendingRemove.value).add(userId)
+  } else {
+    const next = new Set(pendingAdd.value)
+    next.delete(userId)
+    pendingAdd.value = next
+  }
+}
+function addMemberToRole(userId: string) {
+  if (!canEdit.value) return
+  if (initialMemberIds.value.has(userId)) {
+    const next = new Set(pendingRemove.value)
+    next.delete(userId)
+    pendingRemove.value = next
+  } else {
+    pendingAdd.value = new Set(pendingAdd.value).add(userId)
+  }
+}
+
+const membersDirty = computed(() => pendingAdd.value.size > 0 || pendingRemove.value.size > 0)
+
+// ── Üye Ekle modalı ─────────────────────────────────────────────────────────
+const showAddMember = ref(false)
+const addMemberSearch = ref('')
+const addableMembers = computed(() => {
+  const q = addMemberSearch.value.trim().toLowerCase()
+  const list = allMembers.value.filter((m) => !effectiveMemberIds.value.has(m.userId))
+  if (!q) return list
+  return list.filter((m) => m.username.toLowerCase().includes(q))
 })
 
 // ── Liste mod: rol arama ──────────────────────────────────────────────────
@@ -89,7 +158,12 @@ const draftHoist = ref(false)
 const draftMentionable = ref(false)
 const draftPermissions = ref<string[]>([])
 
-watch(selectedRole, (role) => {
+// Seçili rol değişince taslakları sıfırla (bekleyen üye değişikliklerini de)
+watch(selectedRoleId, () => {
+  const role = selectedRole.value
+  pendingAdd.value = new Set()
+  pendingRemove.value = new Set()
+  memberSearch.value = ''
   if (!role) return
   draftName.value = role.name
   draftColor.value = role.color
@@ -106,14 +180,20 @@ const permsDirty = computed(() => {
   return a.length !== b.length || a.some((f, i) => f !== b[i])
 })
 
-const isDirty = computed(() =>
+const appearanceDirty = computed(() =>
   selectedRole.value !== null &&
   (draftName.value !== selectedRole.value.name ||
     draftColor.value !== selectedRole.value.color ||
     draftHoist.value !== selectedRole.value.hoist ||
-    draftMentionable.value !== selectedRole.value.mentionable ||
-    permsDirty.value),
+    draftMentionable.value !== selectedRole.value.mentionable),
 )
+
+const isDirty = computed(() =>
+  selectedRole.value !== null && (appearanceDirty.value || permsDirty.value || membersDirty.value),
+)
+
+// Üst bileşene (GuildSettingsView) dirty durumunu bildir → nav/kapat guard'ı
+watch(isDirty, (v) => emit('update:dirty', v))
 
 // ── İzin toggle yardımcıları ────────────────────────────────────────────────
 const hasAdmin = computed(() => draftPermissions.value.includes('ADMINISTRATOR'))
@@ -171,8 +251,7 @@ async function createRole() {
       name: t('guildSettings.roles.newRoleName'),
     })
     rolesStore.upsertRole(guildId.value, res.data)
-    // Yeni rol listeye düşer; detaya geçiş manuel (kullanıcı kartından girer).
-    roleSearch.value = '' // filtre aktifse yeni rol gizlenmesin
+    selectRole(res.data.id) // yeni rolün detayına gir (düzenlemeye hazır)
   } catch (err: unknown) {
     const e = err as { response?: { data?: { error?: string } } }
     const code = e?.response?.data?.error ?? ''
@@ -182,23 +261,36 @@ async function createRole() {
   }
 }
 
-// ── Rol kaydet ────────────────────────────────────────────────────────────
-async function saveRole() {
-  if (!selectedRole.value || !isDirty.value) return
+// ── Birleşik kaydet (görünüm + izinler + üye diff, tek butondan) ────────────
+async function saveAll() {
+  const role = selectedRole.value
+  if (!role || !isDirty.value) return
   errorMsg.value = ''
   saving.value = true
   try {
-    const payload: Record<string, unknown> = {
-      color: draftColor.value,
-      hoist: draftHoist.value,
-      mentionable: draftMentionable.value,
-      permissions: draftPermissions.value,
+    // 1) Rol alanları (görünüm + izinler) değiştiyse PATCH
+    if (appearanceDirty.value || permsDirty.value) {
+      const payload: Record<string, unknown> = {
+        color: draftColor.value,
+        hoist: draftHoist.value,
+        mentionable: draftMentionable.value,
+        permissions: draftPermissions.value,
+      }
+      if (!role.isEveryone) payload.name = draftName.value
+      const res = await rolesApi.updateRole(role.id, payload)
+      rolesStore.upsertRole(guildId.value, res.data)
     }
-    if (!selectedRole.value.isEveryone) {
-      payload.name = draftName.value
+    // 2) Üye diff: önce çıkarılanlar, sonra eklenenler (hiyerarşi backend'de zorlanır)
+    for (const userId of pendingRemove.value) {
+      const res = await rolesApi.removeRole(role.id, userId)
+      membersStore.updateMember(guildId.value, res.data)
     }
-    const res = await rolesApi.updateRole(selectedRole.value.id, payload)
-    rolesStore.upsertRole(guildId.value, res.data)
+    for (const userId of pendingAdd.value) {
+      const res = await rolesApi.assignRole(role.id, userId)
+      membersStore.updateMember(guildId.value, res.data)
+    }
+    pendingAdd.value = new Set()
+    pendingRemove.value = new Set()
   } catch (err: unknown) {
     const e = err as { response?: { data?: { error?: string } } }
     const code = e?.response?.data?.error ?? ''
@@ -207,6 +299,23 @@ async function saveRole() {
     saving.value = false
   }
 }
+
+// ── Sıfırla (tüm taslakları sunucu durumuna döndür) ────────────────────────
+function reset() {
+  const role = selectedRole.value
+  pendingAdd.value = new Set()
+  pendingRemove.value = new Set()
+  errorMsg.value = ''
+  if (!role) return
+  draftName.value = role.name
+  draftColor.value = role.color
+  draftHoist.value = role.hoist
+  draftMentionable.value = role.mentionable
+  draftPermissions.value = [...role.permissions]
+}
+
+// Üst bileşenin nav/kapat guard'ında çağırabilmesi için
+defineExpose({ reset, discardAndLeave: confirmLeave })
 
 // ── Rol sil (detay modu — selectedRole'a bağlı) ───────────────────────────
 async function deleteRole() {
@@ -288,34 +397,8 @@ async function dropRoleBefore(beforeRoleId: string | null) {
   }
 }
 
-// ── Üye rol toggle ────────────────────────────────────────────────────────
-function hasRole(member: GuildMemberDto): boolean {
-  return member.roles.some((r) => r.id === selectedRoleId.value)
-}
-
-async function toggleMemberRole(member: GuildMemberDto) {
-  if (!selectedRoleId.value) return
-  errorMsg.value = ''
-  try {
-    if (hasRole(member)) {
-      const res = await rolesApi.removeRole(selectedRoleId.value, member.userId)
-      membersStore.updateMember(guildId.value, res.data)
-    } else {
-      const res = await rolesApi.assignRole(selectedRoleId.value, member.userId)
-      membersStore.updateMember(guildId.value, res.data)
-    }
-  } catch (err: unknown) {
-    const e = err as { response?: { data?: { error?: string } } }
-    const code = e?.response?.data?.error ?? ''
-    errorMsg.value = t(`guildSettings.roles.errors.${code}`) || t('guildSettings.roles.assignError')
-  }
-}
-
-// Üyeleri Yönet sekmesindeki üye sayısı
-const membersWithRole = computed(() => {
-  if (!selectedRoleId.value) return 0
-  return allMembers.value.filter((m) => hasRole(m)).length
-})
+// Üyeleri Yönet sekmesindeki üye sayısı (efektif = initial + bekleyen diff)
+const membersWithRole = computed(() => effectiveMemberIds.value.size)
 </script>
 
 <template>
@@ -737,6 +820,17 @@ const membersWithRole = computed(() => {
             </div>
           </section>
 
+          <!-- Rolü Sil — destructive, taslak-kaydından bağımsız -->
+          <section
+            v-if="canEdit && !selectedRole?.isEveryone"
+            class="pt-4 mt-2 border-t"
+            style="border-color: var(--kv-border-subtle);"
+          >
+            <KvButton variant="danger" :disabled="deleting" :loading="deleting" @click="showDeleteConfirm = true">
+              {{ deleting ? t('guildSettings.roles.deleting') : t('guildSettings.roles.deleteButton') }}
+            </KvButton>
+          </section>
+
         </template>
 
         <!-- ══ İZİNLER SEKMESİ ══ -->
@@ -804,48 +898,31 @@ const membersWithRole = computed(() => {
 
         </template>
 
-        <!-- ══ KAYDET / SİL (Görünüm + İzinler sekmelerinde) ══ -->
-        <div
-          v-if="canEdit && activeTab !== 'members'"
-          class="flex items-center gap-3 mt-2 pt-4 border-t"
-          style="border-color: var(--kv-border-subtle);"
-        >
-          <KvButton
-            :disabled="!isDirty || saving || !hexValid"
-            :loading="saving"
-            @click="saveRole"
-          >
-            {{ saving ? t('guildSettings.roles.saving') : t('guildSettings.roles.saveButton') }}
-          </KvButton>
-          <KvButton
-            v-if="!selectedRole?.isEveryone"
-            variant="danger"
-            :disabled="deleting"
-            :loading="deleting"
-            @click="showDeleteConfirm = true"
-          >
-            {{ deleting ? t('guildSettings.roles.deleting') : t('guildSettings.roles.deleteButton') }}
-          </KvButton>
-        </div>
-
         <!-- ══ ÜYELERİ YÖNET SEKMESİ ══ -->
         <template v-if="activeTab === 'members' && !selectedRole?.isEveryone">
 
-          <!-- Üye arama -->
-          <KvInput
-            v-model="memberSearch"
-            :placeholder="t('guildSettings.roles.memberSearchPlaceholder')"
-          />
+          <!-- Arama + Üye Ekle -->
+          <div class="flex items-center gap-3">
+            <div class="flex-1">
+              <KvInput
+                v-model="memberSearch"
+                :placeholder="t('guildSettings.roles.memberSearchPlaceholder')"
+              />
+            </div>
+            <KvButton v-if="canEdit" @click="addMemberSearch = ''; showAddMember = true">
+              {{ t('guildSettings.roles.addMemberButton') }}
+            </KvButton>
+          </div>
 
-          <p v-if="filteredMembers.length === 0" class="text-[13px]" style="color: var(--kv-text-muted);">
-            {{ t('guildSettings.roles.manageMembersEmpty') }}
+          <p v-if="roleMembers.length === 0" class="text-[13px]" style="color: var(--kv-text-muted);">
+            {{ t('guildSettings.roles.roleMembersEmpty') }}
           </p>
 
           <div v-else class="flex flex-col gap-1">
             <div
-              v-for="member in filteredMembers"
+              v-for="member in roleMembers"
               :key="member.userId"
-              class="flex items-center gap-3 px-3 py-2 rounded-[var(--kv-radius-sm)] border"
+              class="group flex items-center gap-3 px-3 py-2 rounded-[var(--kv-radius-sm)] border"
               style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
             >
               <!-- Avatar -->
@@ -865,17 +942,19 @@ const membersWithRole = computed(() => {
               <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-primary);">
                 {{ member.username }}
               </span>
-              <!-- Toggle -->
+              <!-- Rolden çıkar (X) -->
               <button
-                class="shrink-0 w-5 h-5 rounded-[var(--kv-radius-sm)] border flex items-center justify-center transition-colors cursor-pointer"
-                :style="hasRole(member)
-                  ? 'background-color: var(--kv-accent-500); border-color: var(--kv-accent-500); color: #fff;'
-                  : 'background-color: transparent; border-color: var(--kv-border-subtle); color: var(--kv-text-muted);'"
-                @click="toggleMemberRole(member)"
+                v-if="canEdit"
+                type="button"
+                class="shrink-0 flex items-center justify-center w-7 h-7 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+                style="background-color: transparent; color: var(--kv-text-muted);"
+                :title="t('guildSettings.roles.removeMemberTooltip')"
+                @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-danger-subtle)'; ($event.currentTarget as HTMLElement).style.color = 'var(--kv-danger)'"
+                @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; ($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)'"
+                @click="removeMemberFromRole(member.userId)"
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                  <path v-if="hasRole(member)" d="M20 6L9 17l-5-5"/>
-                  <path v-else d="M12 5v14M5 12h14"/>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               </button>
             </div>
@@ -909,4 +988,92 @@ const membersWithRole = computed(() => {
     @confirm="deleteRoleFromList"
     @cancel="pendingDeleteRole = null"
   />
+
+  <!-- Kaydedilmemiş değişiklik onayı (listeye dönerken) -->
+  <ConfirmDialog
+    v-if="showLeaveConfirm"
+    :title="t('guildSettings.roles.unsavedTitle')"
+    :message="t('guildSettings.roles.unsavedMessage')"
+    :confirm-label="t('guildSettings.roles.discardButton')"
+    @confirm="confirmLeave"
+    @cancel="showLeaveConfirm = false"
+  />
+
+  <!-- Role Üye Ekle modalı -->
+  <Teleport to="body">
+    <div
+      v-if="showAddMember"
+      class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style="background-color: var(--kv-bg-overlay);"
+      @click.self="showAddMember = false"
+    >
+      <div
+        class="flex flex-col w-full max-w-md rounded-[var(--kv-radius-lg)] border overflow-hidden"
+        style="max-height: 70vh; background-color: var(--kv-bg-content); border-color: var(--kv-border-subtle);"
+      >
+        <div class="shrink-0 px-5 py-4 border-b" style="border-color: var(--kv-border-subtle);">
+          <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+            {{ t('guildSettings.roles.addMemberTitle') }}
+          </h3>
+        </div>
+        <div class="shrink-0 px-5 pt-3">
+          <KvInput v-model="addMemberSearch" :placeholder="t('guildSettings.roles.memberSearchPlaceholder')" />
+        </div>
+        <div class="flex-1 overflow-y-auto px-5 py-3 flex flex-col gap-1">
+          <p v-if="addableMembers.length === 0" class="text-[13px]" style="color: var(--kv-text-muted);">
+            {{ t('guildSettings.roles.addMemberEmpty') }}
+          </p>
+          <button
+            v-for="member in addableMembers"
+            :key="member.userId"
+            type="button"
+            class="flex items-center gap-3 px-3 py-2 rounded-[var(--kv-radius-sm)] text-left transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
+            @click="addMemberToRole(member.userId)"
+          >
+            <div
+              class="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold overflow-hidden shrink-0"
+              style="background-color: var(--kv-accent-500); color: #fff;"
+            >
+              <img v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.username" class="w-full h-full object-cover" />
+              <span v-else>{{ member.username.charAt(0).toUpperCase() }}</span>
+            </div>
+            <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-primary);">{{ member.username }}</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-accent-500);">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
+        </div>
+        <div class="shrink-0 px-5 py-3 border-t flex justify-end" style="border-color: var(--kv-border-subtle);">
+          <KvButton variant="ghost" @click="showAddMember = false">{{ t('common.close') }}</KvButton>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- Discord-tarzı sabit kaydet barı — 3 sekme tek kaydet/sıfırla -->
+  <Teleport to="body">
+    <div
+      v-if="selectedRoleId && canEdit && isDirty"
+      class="fixed left-1/2 -translate-x-1/2 z-[55] flex items-center gap-4 px-4 py-3 rounded-[var(--kv-radius-md)] border"
+      style="bottom: 24px; min-width: 420px; max-width: 92vw; background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+    >
+      <span class="flex-1 text-[14px] font-medium" style="color: var(--kv-text-primary);">
+        {{ t('guildSettings.roles.unsavedBar') }}
+      </span>
+      <button
+        type="button"
+        class="text-[14px] font-medium cursor-pointer transition-colors"
+        style="color: var(--kv-text-secondary);"
+        :disabled="saving"
+        @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
+        @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'"
+        @click="reset"
+      >
+        {{ t('guildSettings.roles.resetButton') }}
+      </button>
+      <KvButton :disabled="saving || !hexValid" :loading="saving" @click="saveAll">
+        {{ saving ? t('guildSettings.roles.saving') : t('guildSettings.roles.saveChanges') }}
+      </KvButton>
+    </div>
+  </Teleport>
 </template>
