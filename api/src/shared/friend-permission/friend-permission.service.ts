@@ -109,6 +109,16 @@ export class FriendPermissionService {
       // DECLINED → izin ver (FriendsService upsert eder)
     }
 
+    // REV-10: mevcut 1-1 DM kanalı = önceki rızalı temas (canDm bir noktada geçmiş).
+    // Eski-arkadaşların ortak-ortam olmadan re-add'ine izin (CODE gibi, minör dahil).
+    // Güvenli: minörün 1-1 DM'i YALNIZ arkadaşlıkla oluşur (canDm 4a yabancı-minör DM'i
+    // kapatır) → mevcut DM ⟹ önceki arkadaşlık → yabancı cold-add vektörü açılmaz.
+    // Blok zaten Kural 3'te jenerik reddedildi (engelliyken bu noktaya gelinmez).
+    const hasDm = await this.hasExistingDmChannel(senderId, targetId);
+    if (hasDm) {
+      return { allowed: true };
+    }
+
     // Kural 6: USER_CLICK — kod istemeden, karttan
     if (method === 'USER_CLICK') {
       // 6a. Ortak ortam zorunlu — karantina: sender o guild'de yeni üyeyse basamak geçmez (R7)
@@ -142,4 +152,19 @@ export class FriendPermissionService {
     // Kural 7: CODE — bilinçli paylaşım, minör dahil herkes
     return { allowed: true };
   }
+
+  /** REV-10: iki kullanıcı arasında aktif 1-1 DM kanalı var mı (önceki rızalı temas kanıtı). */
+  private async hasExistingDmChannel(a: string, b: string): Promise<boolean> {
+    const aDmChannels = await this.prisma.channelMember.findMany({
+      where: { userId: a, channel: { type: 'DM', deletedAt: null } },
+      select: { channelId: true },
+    });
+    if (!aDmChannels?.length) return false;
+    const shared = await this.prisma.channelMember.findFirst({
+      where: { userId: b, channelId: { in: aDmChannels.map((c) => c.channelId) } },
+      select: { channelId: true },
+    });
+    return shared !== null;
+  }
 }
+

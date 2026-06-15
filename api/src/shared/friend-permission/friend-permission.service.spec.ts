@@ -6,6 +6,8 @@ const prismaMock = {
   userBlock: { findFirst: jest.fn() },
   friendship: { findFirst: jest.fn() },
   guildMember: { findFirst: jest.fn() },
+  // REV-10: mevcut DM kontrolü (varsayılan: DM yok)
+  channelMember: { findMany: jest.fn(), findFirst: jest.fn() },
 };
 
 // ── Mock ConfigService ───────────────────────────────────────────────────────
@@ -29,6 +31,9 @@ function resetMocks() {
   prismaMock.userBlock.findFirst.mockResolvedValue(null);
   prismaMock.friendship.findFirst.mockResolvedValue(null);
   prismaMock.guildMember.findFirst.mockResolvedValue(null);
+  // REV-10: varsayılan DM yok (mevcut testlerin USER_CLICK/CODE davranışı değişmez)
+  prismaMock.channelMember.findMany.mockResolvedValue([]);
+  prismaMock.channelMember.findFirst.mockResolvedValue(null);
   // Varsayılan: quarantineHours=24
   configMock.get.mockReturnValue(24);
   // Sprint 4B: BAN yok (varsayılan — enforcement geçirir)
@@ -260,6 +265,35 @@ describe('FriendPermissionService.canSendFriendRequest — §3 matrisi', () => {
       // Ortak ortam var ama sender minör → 6b engellenmeli
       prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm1', joinedAt: TWO_DAYS_AGO });
       const r = await service.canSendFriendRequest(MINOR.id, ADULT2.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: false, reason: 'USER_NOT_FOUND' });
+    });
+  });
+
+  // ── REV-10: mevcut DM kanalı → re-add izni (ortak ortam gerekmez) ─────────
+  describe('REV-10: mevcut 1-1 DM kanalı → ortak ortam olmadan re-add', () => {
+    it('USER_CLICK, ortak ortam YOK ama mevcut DM var → allowed (eski-arkadaş re-add)', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(ADULT).mockResolvedValueOnce(ADULT2);
+      prismaMock.guildMember.findFirst.mockResolvedValue(null); // ortak ortam yok
+      prismaMock.channelMember.findMany.mockResolvedValue([{ channelId: 'dm-1' }]);
+      prismaMock.channelMember.findFirst.mockResolvedValue({ channelId: 'dm-1' }); // ikisi de DM üyesi
+      const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: true });
+    });
+
+    it('blok varsa mevcut DM olsa bile JENERİK USER_NOT_FOUND (DM yolu blok-sonrası)', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(ADULT).mockResolvedValueOnce(ADULT2);
+      prismaMock.userBlock.findFirst.mockResolvedValue({ id: 'b1' }); // blok var
+      prismaMock.channelMember.findMany.mockResolvedValue([{ channelId: 'dm-1' }]);
+      prismaMock.channelMember.findFirst.mockResolvedValue({ channelId: 'dm-1' });
+      const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: false, reason: 'USER_NOT_FOUND' });
+    });
+
+    it('DM yoksa USER_CLICK ortak-ortam kuralına düşer (USER_NOT_FOUND)', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(ADULT).mockResolvedValueOnce(ADULT2);
+      prismaMock.guildMember.findFirst.mockResolvedValue(null); // ortak ortam yok
+      prismaMock.channelMember.findMany.mockResolvedValue([]); // DM yok
+      const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'USER_CLICK');
       expect(r).toEqual({ allowed: false, reason: 'USER_NOT_FOUND' });
     });
   });
