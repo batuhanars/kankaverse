@@ -8,8 +8,9 @@ import { useDmStore } from '@/stores/dm'
 import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
 import { useMembersStore } from '@/stores/members'
-import type { GuildMemberDto, ChannelDto, CategoryDto } from '@/types'
+import type { GuildMemberDto, ChannelDto, CategoryDto, RoleDto } from '@/types'
 import { useAuthStore } from '@/stores/auth'
+import { useRolesStore } from '@/stores/roles'
 import { useVoiceStore, type VoiceParticipant } from '@/stores/voice'
 import { useCallStore, type IncomingCall } from '@/stores/call'
 import { getAccessToken } from '@/api/axios'
@@ -37,6 +38,7 @@ export function useSocket() {
   const guildsStore = useGuildsStore()
   const membersStore = useMembersStore()
   const authStore = useAuthStore()
+  const rolesStore = useRolesStore()
   const voiceStore = useVoiceStore()
   const callStore = useCallStore()
 
@@ -207,6 +209,18 @@ export function useSocket() {
       if (data.member.userId === authStore.user?.id) {
         guildsStore.setMyRole(data.guildId, data.member.role)
       }
+    })
+
+    // Sprint V3: rol CRUD WS olayları
+    socket.on('guild.role_created', (role: RoleDto) => {
+      rolesStore.upsertRole(role.guildId, role)
+    })
+    socket.on('guild.role_updated', (role: RoleDto) => {
+      rolesStore.upsertRole(role.guildId, role)
+    })
+    socket.on('guild.role_deleted', (data: { roleId: string }) => {
+      const guildId = rolesStore.findGuildIdByRole(data.roleId)
+      if (guildId) rolesStore.removeRoleLocal(guildId, data.roleId)
     })
 
     // Realtime: kanal/kategori CRUD → diğer üyelerde anlık (sayfa yenileme yok)
