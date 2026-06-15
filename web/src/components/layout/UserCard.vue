@@ -46,6 +46,7 @@ function presenceColor(p: PresenceStatus) {
 }
 
 function selectPresence(p: SelectableStatus) {
+  presenceStore.setManualStatus(p) // bilerek seçim → auto-boşta bunu ezmez
   setPresence(p)
   // Optimistik güncelleme: backend event gelmeden önce UI'ı anında göster
   const myId = authStore.user?.id

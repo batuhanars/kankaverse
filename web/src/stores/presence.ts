@@ -1,12 +1,22 @@
 import { defineStore } from 'pinia'
-import { reactive, computed } from 'vue'
+import { reactive, ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 
 export type PresenceStatus = 'online' | 'away' | 'dnd' | 'offline'
+/** Kullanıcının elle seçebildiği durumlar (offline = yalnız disconnect). */
+export type SelectableStatus = 'online' | 'away' | 'dnd'
 
 export const usePresenceStore = defineStore('presence', () => {
   // userId → status haritası (reaktif)
   const statusMap = reactive<Record<string, PresenceStatus>>({})
+
+  // Kullanıcının BİLEREK seçtiği durum (UserCard). Auto-boşta yalnız 'online' iken
+  // devreye girer; 'dnd'/'away' seçimi otomatik değiştirilmez. Reconnect sonrası
+  // sunucuya geri uygulanır (bellek-içi presence sıfırlanınca durum korunur).
+  const manualStatus = ref<SelectableStatus>('online')
+  function setManualStatus(status: SelectableStatus) {
+    manualStatus.value = status
+  }
 
   function applySnapshot(states: Array<{ userId: string; status: PresenceStatus }>) {
     for (const { userId, status } of states) {
@@ -30,5 +40,5 @@ export const usePresenceStore = defineStore('presence', () => {
     return statusMap[myId] ?? 'offline'
   })
 
-  return { statusMap, applySnapshot, applyUpdate, getStatus, myStatus }
+  return { statusMap, applySnapshot, applyUpdate, getStatus, myStatus, manualStatus, setManualStatus }
 })
