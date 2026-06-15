@@ -356,9 +356,7 @@ const rolesDetailMode = ref(false)
       :aria-label="t('guildSettings.title')"
     >
       <!-- Sol bölge: sidebar rengi tam yükseklik, nav sağa yaslı -->
-      <!-- Roller detay modunda sol nav tamamen gizlenir -->
       <div
-        v-if="!(activeSection === 'roller' && rolesDetailMode)"
         class="shrink-0 flex justify-end"
         style="width: 36%; min-width: 240px; max-width: 440px; background-color: var(--kv-bg-sidebar);"
       >
@@ -410,45 +408,22 @@ const rolesDetailMode = ref(false)
 
       <!-- Sağ içerik alanı -->
       <div class="flex-1 flex flex-col overflow-hidden" style="background-color: var(--kv-bg-content);">
-        <!-- İçerik header: detay modunda sağ üstte kapat butonu görünür kalır -->
+        <!-- İçerik header -->
         <div
-          class="shrink-0 flex items-center border-b"
+          class="shrink-0 flex items-center justify-between border-b"
           style="height: var(--kv-header-height); border-color: var(--kv-border-subtle);"
-          :class="activeSection === 'roller' && rolesDetailMode ? 'justify-end px-6' : 'justify-between'"
         >
-          <!-- Normal başlık (detay değilse iç-kolon içinde) -->
-          <template v-if="!(activeSection === 'roller' && rolesDetailMode)">
-            <!-- İç kolon max-width sarıcısı -->
-            <div class="flex items-center justify-between flex-1" style="max-width: 1000px;">
-              <h2 class="text-[18px] font-semibold px-8" style="color: var(--kv-text-primary);">
-                <span v-if="activeSection === 'genel'">{{ t('guildSettings.nav.genel') }}</span>
-                <span v-else-if="activeSection === 'roller'">{{ t('guildSettings.nav.roller') }}</span>
-                <span v-else-if="activeSection === 'davetler'">{{ t('guildSettings.nav.davetler') }}</span>
-                <span v-else-if="activeSection === 'yasaklar'">{{ t('guildSettings.nav.yasaklar') }}</span>
-              </h2>
+          <!-- İç kolon max-width sarıcısı -->
+          <div class="flex items-center justify-between flex-1" style="max-width: 1000px;">
+            <h2 class="text-[18px] font-semibold px-8" style="color: var(--kv-text-primary);">
+              <span v-if="activeSection === 'genel'">{{ t('guildSettings.nav.genel') }}</span>
+              <span v-else-if="activeSection === 'roller'">{{ t('guildSettings.nav.roller') }}</span>
+              <span v-else-if="activeSection === 'davetler'">{{ t('guildSettings.nav.davetler') }}</span>
+              <span v-else-if="activeSection === 'yasaklar'">{{ t('guildSettings.nav.yasaklar') }}</span>
+            </h2>
 
-              <!-- Kapat butonu + ESC göstergesi -->
-              <div class="flex items-center gap-3 px-8">
-                <span class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">ESC</span>
-                <button
-                  type="button"
-                  class="flex items-center justify-center rounded-full transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-                  style="width: 32px; height: 32px; color: var(--kv-text-muted);"
-                  :aria-label="t('common.close')"
-                  @click="handleClose"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </template>
-
-          <!-- Detay modunda sadece kapat butonu -->
-          <template v-else>
-            <div class="flex items-center gap-3">
+            <!-- Kapat butonu + ESC göstergesi -->
+            <div class="flex items-center gap-3 px-8">
               <span class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">ESC</span>
               <button
                 type="button"
@@ -463,7 +438,7 @@ const rolesDetailMode = ref(false)
                 </svg>
               </button>
             </div>
-          </template>
+          </div>
         </div>
 
         <!-- Roller bölümü: tek instance, detay modunda full-width, liste modunda iç-kolon içinde -->
