@@ -602,7 +602,7 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **REV-4 → TAMAMLANDI:** Backend: `unreadMentionCount` (kanal+guild DTO) `mentions: { has: userId }` + lastReadAt sorgusu. Frontend: rail kırmızı sayaç → `unreadMentionCount` (beyaz pill generic aktivite KALDI); WS `mention` → kanal+guild mention sayacı anlık artış; kanal okununca sıfırlanır. **Bahsetme bandı** (`ChannelPanel` altı, tam genişlik kırmızı): tıkla→sıradaki bahsetme kanalına sidebar'da zıpla+vurgula (katlanmış kategori açılır, içine GİRMEZ), tekrar tıkla→sonraki, hepsi okununca bant kaybolur. 485 test (spec'ler 2-count'a güncellendi) + web build temiz
 
 **Arama genişletme:**
-- [ ] **REV-3 — Ortam araması:** mesaj sonuçlarında **eşleşen kelimeyi highlight** (Discord görseli: sarı/vurgu zemin) + aynı arama kutusunda **ortam üyelerini (kullanıcı) ara**
+- [x] **REV-3 — Ortam araması → TAMAMLANDI:** (1) mesaj sonuçlarında **eşleşen kelime highlight** (XSS-güvenli `<mark>`, Kor tonu — görsel karşılığı). (2) **aynı kutuda ortam üyesi arama** (`guildId` prop + members store client-side filtre, "ÜYELER" bölümü; tıkla→DM aç `canDm` kapılı + DM'e git). TopBar guildId geçer; DM bağlamında üye-arama yok. Placeholder "Mesaj veya kişi ara". web build temiz
 
 ---
 
