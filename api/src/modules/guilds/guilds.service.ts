@@ -17,6 +17,7 @@ import { SetIconDto } from './dto/set-icon.dto';
 import { GuildMemberDto } from './dto/guild-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { Guild, GuildRole } from '@prisma/client';
+import { DEFAULT_EVERYONE_PERMISSIONS } from '../../common/permissions';
 
 // İkon yüklemesi için izin verilen görsel tipler (allowlist)
 const ALLOWED_ICON_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
@@ -101,6 +102,20 @@ export class GuildsService {
           name: 'genel-sohbet',
           position: 0,
           categoryId: defaultCategory.id,
+        },
+      });
+
+      // @everyone taban rolü: tüm üyelere örtük uygulanır (GuildMemberRole bağı gerekmez)
+      await tx.role.create({
+        data: {
+          guildId: guild.id,
+          name: '@everyone',
+          color: '#99AAB5',
+          position: 0,
+          hoist: false,
+          mentionable: false,
+          permissions: DEFAULT_EVERYONE_PERMISSIONS,
+          isEveryone: true,
         },
       });
 
@@ -265,6 +280,10 @@ export class GuildsService {
       where: { guildId },
       include: {
         user: { select: { id: true, username: true, avatarUrl: true } },
+        roleLinks: {
+          include: { role: true },
+          orderBy: { role: { position: 'desc' } },
+        },
       },
     });
 
@@ -279,6 +298,14 @@ export class GuildsService {
         username: m.user.username,
         avatarUrl: m.user.avatarUrl,
         role: m.role,
+        // @everyone örtük — roleLinks'te isEveryone=true olanlar çıkar (örtük olduğundan atanmaz zaten)
+        roles: m.roleLinks.map((rl) => ({
+          id: rl.role.id,
+          name: rl.role.name,
+          color: rl.role.color,
+          position: rl.role.position,
+          hoist: rl.role.hoist,
+        })),
       }));
   }
 
@@ -363,6 +390,7 @@ export class GuildsService {
       username: updated.user.username,
       avatarUrl: updated.user.avatarUrl,
       role: updated.role,
+      roles: [], // rol enum değişimi — role links burada ayrıca çekilmez (genel-amaç event)
     };
 
     // REV-14 realtime: rol değişimini tüm üyelere yay (üye listesi anlık güncellensin)
@@ -545,7 +573,7 @@ export class GuildsService {
     for (const m of [newOwner, oldOwner]) {
       this.realtime.emitToUsers(recipients, 'guild.member_updated', {
         guildId,
-        member: { userId: m.user.id, username: m.user.username, avatarUrl: m.user.avatarUrl, role: m.role },
+        member: { userId: m.user.id, username: m.user.username, avatarUrl: m.user.avatarUrl, role: m.role, roles: [] },
       });
     }
     await this.prisma.auditLog.create({
