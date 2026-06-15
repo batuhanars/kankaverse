@@ -90,7 +90,7 @@ export class RolesController {
 
   @Delete('roles/:id/members/:userId')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Üyeden rol çıkar (OWNER/ADMIN; idempotent). Dönüş null.' })
+  @ApiOperation({ summary: 'Üyeden rol çıkar (OWNER/ADMIN; idempotent). Dönüş: güncel üye DTO (roles dahil).' })
   removeRole(
     @CurrentUser() user: { id: string },
     @Param('id') roleId: string,

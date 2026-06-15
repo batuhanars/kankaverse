@@ -274,7 +274,7 @@ export class RolesService {
     actorId: string,
     roleId: string,
     targetUserId: string,
-  ): Promise<null> {
+  ): Promise<import('../guilds/dto/guild-member.dto').GuildMemberDto & { roles: { id: string; name: string; color: string; position: number; hoist: boolean }[] }> {
     const role = await this.findRoleOrFail(roleId);
     await this.requireOwnerOrAdmin(actorId, role.guildId);
 
@@ -300,13 +300,24 @@ export class RolesService {
       where: { memberId: targetMember.id, roleId },
     });
 
+    // Güncel üye DTO'su için role links'i yeniden çek (assignRole ile tutarlı)
+    const updatedMember = await this.prisma.guildMember.findUnique({
+      where: { id: targetMember.id },
+      include: {
+        user: { select: { id: true, username: true, avatarUrl: true } },
+        roleLinks: { include: { role: true }, orderBy: { role: { position: 'desc' } } },
+      },
+    });
+
+    const memberDto = this.toExtendedMemberDto(updatedMember!);
+
     const memberIds = await this.guildMemberIds(role.guildId);
     this.realtime.emitToUsers(memberIds, 'guild.member_updated', {
       guildId: role.guildId,
-      member: { userId: targetUserId },
+      member: memberDto,
     });
 
-    return null;
+    return memberDto;
   }
 
   /** GuildMember kaydını genişletilmiş DTO'ya dönüştürür (role enum + atanmış roller[]). */

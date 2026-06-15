@@ -381,6 +381,127 @@ describe('RolesService.assignRole', () => {
   });
 });
 
+// ── RolesService.removeRole ───────────────────────────────────────────────────
+
+describe('RolesService.removeRole', () => {
+  let service: RolesService;
+
+  const MEMBER_GM = {
+    id: 'gm-member',
+    guildId: GUILD_ID,
+    userId: MEMBER_ID,
+    role: GuildRole.MEMBER,
+    user: { id: MEMBER_ID, username: 'kanka42', avatarUrl: null },
+    roleLinks: [{ role: ROLE_FIXTURE }],
+  };
+
+  const MEMBER_GM_AFTER_REMOVE = {
+    ...MEMBER_GM,
+    roleLinks: [],
+  };
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.guildMember.findMany.mockResolvedValue([]);
+  });
+
+  it('OWNER → rolü çıkarır; güncel üye DTO döner (roles boş)', async () => {
+    prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE);
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: OWNER_MEMBERSHIP,
+    });
+    prismaMock.guildMember.findUnique
+      .mockResolvedValueOnce({ id: MEMBER_GM.id, guildId: GUILD_ID, userId: MEMBER_ID, role: GuildRole.MEMBER })
+      .mockResolvedValueOnce(MEMBER_GM_AFTER_REMOVE);
+    prismaMock.guildMemberRole.deleteMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.removeRole(OWNER_ID, ROLE_ID, MEMBER_ID);
+
+    expect(result.userId).toBe(MEMBER_ID);
+    expect(result.username).toBe('kanka42');
+    expect(result.roles).toHaveLength(0);
+  });
+
+  it('realtime guild.member_updated — tam DTO (username dahil) yayılır', async () => {
+    prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE);
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: OWNER_MEMBERSHIP,
+    });
+    prismaMock.guildMember.findUnique
+      .mockResolvedValueOnce({ id: MEMBER_GM.id, guildId: GUILD_ID, userId: MEMBER_ID, role: GuildRole.MEMBER })
+      .mockResolvedValueOnce(MEMBER_GM_AFTER_REMOVE);
+    prismaMock.guildMemberRole.deleteMany.mockResolvedValue({ count: 1 });
+    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: OWNER_ID }, { userId: MEMBER_ID }]);
+
+    await service.removeRole(OWNER_ID, ROLE_ID, MEMBER_ID);
+
+    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith(
+      expect.arrayContaining([OWNER_ID, MEMBER_ID]),
+      'guild.member_updated',
+      expect.objectContaining({
+        guildId: GUILD_ID,
+        member: expect.objectContaining({ username: 'kanka42' }),
+      }),
+    );
+  });
+
+  it('@everyone rolü çıkarılamaz → BadRequestException CANNOT_ASSIGN_EVERYONE', async () => {
+    prismaMock.role.findUnique.mockResolvedValue(EVERYONE_ROLE_FIXTURE);
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: OWNER_MEMBERSHIP,
+    });
+
+    await expect(service.removeRole(OWNER_ID, 'role-everyone', MEMBER_ID)).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'CANNOT_ASSIGN_EVERYONE' }),
+    });
+    expect(prismaMock.guildMemberRole.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('hedef guild üyesi değil → NotFoundException NOT_GUILD_MEMBER', async () => {
+    prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE);
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: OWNER_MEMBERSHIP,
+    });
+    prismaMock.guildMember.findUnique.mockResolvedValue(null);
+
+    await expect(service.removeRole(OWNER_ID, ROLE_ID, 'ghost')).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'NOT_GUILD_MEMBER' }),
+    });
+  });
+
+  it('deleteMany idempotent — kayıt yoksa hata fırlatılmaz', async () => {
+    prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE);
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: OWNER_MEMBERSHIP,
+    });
+    prismaMock.guildMember.findUnique
+      .mockResolvedValueOnce({ id: MEMBER_GM.id, guildId: GUILD_ID, userId: MEMBER_ID, role: GuildRole.MEMBER })
+      .mockResolvedValueOnce(MEMBER_GM_AFTER_REMOVE);
+    prismaMock.guildMemberRole.deleteMany.mockResolvedValue({ count: 0 }); // zaten yoktu
+
+    await expect(service.removeRole(OWNER_ID, ROLE_ID, MEMBER_ID)).resolves.toBeDefined();
+    expect(prismaMock.guildMemberRole.deleteMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('MEMBER aktör → ForbiddenException FORBIDDEN', async () => {
+    prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE);
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: MEMBER_MEMBERSHIP,
+    });
+
+    await expect(service.removeRole(MEMBER_ID, ROLE_ID, OWNER_ID)).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'FORBIDDEN' }),
+    });
+  });
+});
+
 // ── RolesService.listRoles — getMembers roles[] entegrasyon ──────────────────
 
 describe('RolesService.listRoles', () => {
