@@ -58,12 +58,15 @@ const configMock = {
   }),
 };
 
+const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
+
 function makeService() {
   return new GuildsService(
     prismaMock as any,
     membershipMock as any,
     storageMock as any,
     configMock as any,
+    realtimeMock as any,
   );
 }
 

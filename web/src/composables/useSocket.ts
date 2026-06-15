@@ -7,6 +7,8 @@ import { useNotificationsStore, type MentionPayload } from '@/stores/notificatio
 import { useDmStore } from '@/stores/dm'
 import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
+import { useMembersStore } from '@/stores/members'
+import type { GuildMemberDto } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useVoiceStore, type VoiceParticipant } from '@/stores/voice'
 import { useCallStore, type IncomingCall } from '@/stores/call'
@@ -33,6 +35,7 @@ export function useSocket() {
   const dmStore = useDmStore()
   const channelsStore = useChannelsStore()
   const guildsStore = useGuildsStore()
+  const membersStore = useMembersStore()
   const authStore = useAuthStore()
   const voiceStore = useVoiceStore()
   const callStore = useCallStore()
@@ -185,6 +188,25 @@ export function useSocket() {
       if (activeChannelId === data.channelId) return
       channelsStore.markChannelUnread(data.channelId, data.guildId)
       guildsStore.incrementGuildUnread(data.guildId)
+    })
+
+    // REV-14: ortam üye olayları — üye listesi + mention autocomplete anlık (yenileme yok)
+    socket.on('guild.member_joined', (data: { guildId: string; member: GuildMemberDto }) => {
+      membersStore.addMember(data.guildId, data.member)
+    })
+    socket.on('guild.member_left', (data: { guildId: string; userId: string }) => {
+      membersStore.removeMember(data.guildId, data.userId)
+      // Atılan bensem ortamı listeden düşür (rail anlık güncellenir)
+      if (data.userId === authStore.user?.id) {
+        guildsStore.removeGuildLocal(data.guildId)
+      }
+    })
+    socket.on('guild.member_updated', (data: { guildId: string; member: GuildMemberDto }) => {
+      membersStore.updateMember(data.guildId, data.member)
+      // Kendi rolüm değiştiyse guild role önbelleğini güncelle (yetki UI anlık)
+      if (data.member.userId === authStore.user?.id) {
+        guildsStore.setMyRole(data.guildId, data.member.role)
+      }
     })
 
     // Sprint V2 LiveKit: ses kanalı presence (backend webhook → WS; sözleşme §5)

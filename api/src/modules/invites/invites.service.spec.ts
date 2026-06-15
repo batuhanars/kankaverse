@@ -24,8 +24,10 @@ const membershipMock = {
   requireGuildMembership: jest.fn(),
 };
 
+const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
+
 function makeService() {
-  return new InvitesService(prismaMock as any, membershipMock as any);
+  return new InvitesService(prismaMock as any, membershipMock as any, realtimeMock as any);
 }
 
 function resetMocks() {
