@@ -689,5 +689,20 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   - **F1 UX:** Rol İzinler sekmesinde aktörün veremeyeceği bayrak toggle'ı **gri** (`canToggleFlag` = hasAll ∨ can(flag) ∨ rolde-zaten-var); başta "yalnız sahip olduğun izni verebilirsin" notu. Backend F1'i zaten zorluyordu; bu UX katmanı.
   - **rules→description rename ERTELENDİ (PM kararı):** deploy'da otomatik `migrate deploy` yok + canlı veri var → kolon rename'i riskli/sıfır-işlevsel-değer. "Sunucu açıklaması + ilgi-alanı etiketleri" özelliğiyle birlikte şema düzgün kurulacak. **Açık borç.**
   - 562 api testi + vue-tsc + build temiz.
+
+---
+
+## Sprint V3 — Ortam Etkinlikleri (TASARIM KİLİTLİ 2026-06-15, uygulama 2026-06-16)
+
+> Sözleşme: `contracts/SPRINT_V3_EVENTS_CONTRACT.md`. Sahip onaylı kapsam (3 karar). **R7-hafif:** ses-kanalı görünürlük (minör/yaş) süzme PM incelemesi.
+> Ortam serüveninin **son** kalemi — etkinlik bitince ortamlar için planlı iş kalmıyor (sonra V3 yol haritası).
+
+**Kapsam (MVP):** oluştur (3-adım sihirbaz) · listele (sidebar "Etkinlikler" sekmesi → modal kartlar) · "İlgileniyor" toggle · ses-kanalı/dış-konum · `MANAGE_EVENTS` izni · görünürlük `requireChannelAccess` mirası.
+
+**Ertelendi (şemaya baştan düşünüldü → yarın additive):** tekrarlama motoru (`recurrence` enum hazır) · hatırlatma/otomatik başlatma/bildirim (`status` enum hazır) · kapak görseli (`coverImageId` kolon hazır; CSAM tarayıcı gelene dek kapalı) · davet-event paylaş linki · takvim görünümü.
+
+- [ ] Backend: model+enum+migration · `MANAGE_EVENTS` · CRUD+interest endpoint'leri · görünürlük choke-point · WS event_* · testler
+- [ ] Frontend: CreateEventWizard (3 adım) · Etkinlikler sidebar sekmesi + liste modalı · "İlgileniyor" · events store/api/realtime · i18n
+- [ ] R7-hafif inceleme + sahip 2-hesap canlı test
 - [x] **Rol yönetimi UX (sahip saha-testi):** (1) rol oluşturunca **detaya gider** (geri alındı). (2) **Discord-tarzı sabit alt kaydet barı** (Teleport, `position:fixed`) — Görünüm+İzinler+Üyeler **tek "Değişiklikleri Kaydet" + "Sıfırla"**; sekme değiştirince bar kalır. (3) **Üye değişiklikleri batch'lendi** (pendingAdd/pendingRemove diff, kaydet'te uygulanır — anlık değil). (4) Üyeleri Yönet: **yalnız role sahip üyeler** + arama yanında **"Üye Ekle" modalı** (ortam üyelerinden seç). (5) **Kaydedilmemiş değişiklik guard'ı**: rol detayında dirty iken nav bölümü değiştir / kapat / listeye dön → onay (`ConfirmDialog`); "Sıfırla" sunucu durumuna döner. Rolü Sil → Görünüm sekmesi altı (kaydet'ten bağımsız). `vue-tsc`+build temiz.
 - [x] **Ortam ayarları cilası (sahip):** "Ortam Kuralları" → **"Açıklama"** (Discord-tarzı alt-başlık + placeholder; backend `rules` alanı açıklama olarak yeniden kullanılır — **isim borcu**, ileride `description` rename). "Ortam İkonu" → **"Ortam Simgesi"**, "Resim Seç" → "Simge Seç". *(Gelecek vizyon — sahip notu: sunucu profili ilgi-alanı etiketleri (max 5), oynanan oyunlar, Steam/Spotify bağlama → ileride, şimdi YOK.)*
