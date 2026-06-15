@@ -8,7 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useVoiceStore } from '@/stores/voice'
 import { guildsApi } from '@/api/guilds'
 import { channelsApi } from '@/api/channels'
-import GuildSettingsModal from '@/views/app/components/GuildSettingsModal.vue'
+import GuildSettingsView from '@/views/app/components/GuildSettingsView.vue'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
@@ -1027,10 +1027,12 @@ async function doLeave() {
     </button>
   </aside>
 
-  <!-- Ortam Ayarları Modalı -->
-  <GuildSettingsModal
+  <!-- Ortam Ayarları Tam-Ekran -->
+  <GuildSettingsView
     v-if="showSettings && guildsStore.activeGuild()"
     :guild="guildsStore.activeGuild()!"
+    :is-owner="isOwner"
+    :is-admin="isAdmin"
     @close="showSettings = false"
     @updated="showSettings = false"
   />

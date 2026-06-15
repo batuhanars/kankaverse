@@ -259,6 +259,13 @@
   },
   "guildSettings": {
     "title": "Ortam Ayarları",
+    "nav": {
+      "genel": "Genel",
+      "roller": "Roller",
+      "davetler": "Davetler",
+      "yasaklar": "Yasaklar",
+      "ortamiSil": "Ortamı Sil"
+    },
     "nameSection": "Ortam Adı",
     "nameLabel": "Yeni Ad",
     "adultsOnlySection": "İçerik Yaşı",
