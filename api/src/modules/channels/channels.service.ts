@@ -190,6 +190,62 @@ export class ChannelsService {
     return dtoOut;
   }
 
+  /**
+   * Toplu sıralama (drag-reorder): kanalların position + categoryId'sini güncelle (OWNER/ADMIN).
+   * Yalnız bu guild'e ait kanallar; geçersiz categoryId atılır. Her güncel kanal için channel.updated yayını.
+   */
+  async reorderChannels(
+    userId: string,
+    guildId: string,
+    items: { id: string; position: number; categoryId?: string | null }[],
+  ): Promise<null> {
+    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
+    requireAdminRole(membership.role);
+
+    // Bu guild'e ait geçerli kanallar
+    const ids = items.map((i) => i.id);
+    const guildChannels = await this.prisma.channel.findMany({
+      where: { id: { in: ids }, guildId, deletedAt: null },
+      select: { id: true },
+    });
+    const validIds = new Set(guildChannels.map((c) => c.id));
+
+    // Geçerli categoryId kümesi (bu guild'in kategorileri)
+    const cats = await this.prisma.channelCategory.findMany({
+      where: { guildId, deletedAt: null },
+      select: { id: true },
+    });
+    const validCatIds = new Set(cats.map((c) => c.id));
+
+    const valid = items.filter((i) => validIds.has(i.id));
+    if (valid.length === 0) return null;
+
+    await this.prisma.$transaction(
+      valid.map((i) =>
+        this.prisma.channel.update({
+          where: { id: i.id },
+          data: {
+            position: i.position,
+            // categoryId verildiyse: null→kategorisiz, geçerli kategori→ata, geçersiz→dokunma
+            ...(i.categoryId === null
+              ? { categoryId: null }
+              : i.categoryId && validCatIds.has(i.categoryId)
+                ? { categoryId: i.categoryId }
+                : {}),
+          },
+        }),
+      ),
+    );
+
+    // Realtime: güncel kanalları görebilecek üyelere yay (özel kanal sızdırmaz)
+    const updated = await this.prisma.channel.findMany({ where: { id: { in: valid.map((v) => v.id) } } });
+    for (const ch of updated) {
+      const recipients = await this.channelEventRecipients(ch.id, guildId, ch.isPrivate);
+      this.realtime.emitToUsers(recipients, 'channel.updated', { guildId, channel: toChannelDto(ch) });
+    }
+    return null;
+  }
+
   /** Kategori var mı, aynı guild'e ait mi, silinmemiş mi — değilse 400 INVALID_CATEGORY */
   private async validateCategoryBelongsToGuild(categoryId: string, guildId: string) {
     const category = await this.prisma.channelCategory.findUnique({

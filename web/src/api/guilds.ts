@@ -66,6 +66,13 @@ export const guildsApi = {
   unbanMember(guildId: string, userId: string) {
     return http.delete<null>(`/guilds/${guildId}/bans/${userId}`)
   },
+  // Drag-reorder: kanal/kategori toplu sıralama
+  reorderChannels(guildId: string, items: { id: string; position: number; categoryId?: string | null }[]) {
+    return http.patch<null>(`/guilds/${guildId}/channels/reorder`, { items })
+  },
+  reorderCategories(guildId: string, items: { id: string; position: number }[]) {
+    return http.patch<null>(`/guilds/${guildId}/categories/reorder`, { items })
+  },
 }
 
 export interface GuildBanDto {

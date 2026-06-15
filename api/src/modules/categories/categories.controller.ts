@@ -14,6 +14,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { ReorderCategoriesDto } from './dto/reorder-categories.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -42,6 +43,17 @@ export class CategoriesController {
     @Param('id') guildId: string,
   ) {
     return this.categoriesService.findByGuild(user.id, guildId);
+  }
+
+  @Patch('guilds/:id/categories/reorder')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Kategorileri toplu sırala (drag-reorder; OWNER/ADMIN). Dönüş null.' })
+  reorder(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Body() dto: ReorderCategoriesDto,
+  ) {
+    return this.categoriesService.reorder(user.id, guildId, dto.items);
   }
 
   @Patch('categories/:id')

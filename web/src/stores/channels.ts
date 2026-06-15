@@ -216,6 +216,24 @@ export const useChannelsStore = defineStore('channels', () => {
     if (chans) channelsByGuild.value[guildId] = chans.map((c) => (c.categoryId === categoryId ? { ...c, categoryId: null } : c))
   }
 
+  // Drag-reorder optimistik uygulama (API + WS ile reconcile)
+  function applyChannelReorder(guildId: string, items: { id: string; position: number; categoryId?: string | null }[]): void {
+    const list = channelsByGuild.value[guildId]
+    if (!list) return
+    const byId = new Map(items.map((i) => [i.id, i]))
+    channelsByGuild.value[guildId] = list.map((c) => {
+      const it = byId.get(c.id)
+      if (!it) return c
+      return { ...c, position: it.position, ...(it.categoryId !== undefined ? { categoryId: it.categoryId } : {}) }
+    })
+  }
+  function applyCategoryReorder(guildId: string, items: { id: string; position: number }[]): void {
+    const list = categoriesByGuild.value[guildId]
+    if (!list) return
+    const byId = new Map(items.map((i) => [i.id, i.position]))
+    categoriesByGuild.value[guildId] = list.map((c) => (byId.has(c.id) ? { ...c, position: byId.get(c.id)! } : c))
+  }
+
   function channelsWithMentions(guildId: string) {
     return (channelsByGuild.value[guildId] ?? [])
       .filter((c) => c.unreadMentionCount > 0)
@@ -249,5 +267,7 @@ export const useChannelsStore = defineStore('channels', () => {
     removeChannelLocal,
     upsertCategoryLocal,
     removeCategoryLocal,
+    applyChannelReorder,
+    applyCategoryReorder,
   }
 })
