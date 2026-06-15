@@ -321,12 +321,15 @@ function onListScroll() {
 
 watch(() => messages.value.length, async (n, o) => {
   if (isJumping.value || n <= o) return
-  if (stickToBottom) {
+  // REV-9 fix: kendi mesajım (HTTP yanıtı VEYA WS eko) → her zaman dibe kay, bildirim sayma.
+  const last = messages.value[messages.value.length - 1]
+  const mine = last?.author.id === authStore.user?.id
+  if (stickToBottom || mine) {
     newMessageCount.value = 0
     await nextTick()
     scrollToBottom()
   } else {
-    // REV-9: yukarıda okuyorum → kaydırma; gelenleri say
+    // Yukarıda okuyorum + başkasının mesajı → kaydırma; gelenleri say
     newMessageCount.value += n - o
   }
 }, { flush: 'post' })

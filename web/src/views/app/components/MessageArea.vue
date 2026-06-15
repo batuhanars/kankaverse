@@ -192,13 +192,17 @@ watch(
   () => messages.value.length,
   async (n, o) => {
     if (isJumping.value || n <= o) return
-    if (stickToBottom) {
-      // Dipteyim → otomatik kay (kendi mesajım veya yeni mesaj)
+    // REV-9 fix: kendi mesajım (HTTP yanıtı VEYA WS eko ile gelsin) → her zaman dibe kay,
+    // bildirim SAYMA. WS eko await'ten önce gelip stickToBottom henüz false iken bildirim
+    // sayıyordu → son mesajın yazarına bakıp düzelt.
+    const last = messages.value[messages.value.length - 1]
+    const mine = last?.author.id === authStore.user?.id
+    if (stickToBottom || mine) {
       newMessageCount.value = 0
       await nextTick()
       scrollToBottom()
     } else {
-      // REV-9: yukarıda okuyorum → kaydırma, okuduğumu bölme; gelenleri say
+      // Yukarıda okuyorum + başkasının mesajı → kaydırma, gelenleri say
       newMessageCount.value += n - o
     }
   },
