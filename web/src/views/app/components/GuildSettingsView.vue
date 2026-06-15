@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@vueuse/core'
 import { useRouter } from 'vue-router'
@@ -12,6 +12,7 @@ import KvInput from '@/components/ui/KvInput.vue'
 import KvSwitch from '@/components/ui/KvSwitch.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import RolesSettingsSection from './RolesSettingsSection.vue'
+import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import type { InviteDto, GuildDto } from '@/types'
 
 const props = defineProps<{
@@ -24,6 +25,7 @@ const emit = defineEmits<{ close: []; updated: [guild: GuildDto] }>()
 const { t } = useI18n()
 const guildsStore = useGuildsStore()
 const router = useRouter()
+const { can } = useGuildPermissions(() => props.guild.id)
 
 // ── Aktif nav bölümü ──────────────────────────────────────────────────────
 type NavSection = 'genel' | 'roller' | 'davetler' | 'yasaklar'
@@ -335,12 +337,25 @@ interface NavItem {
 
 const navItems = computed<NavItem[]>(() => [
   { key: 'genel',    labelKey: 'guildSettings.nav.genel',    visible: props.isOwner },
-  { key: 'roller',   labelKey: 'guildSettings.nav.roller',   visible: props.isOwner || props.isAdmin },
+  { key: 'roller',   labelKey: 'guildSettings.nav.roller',   visible: props.isOwner || props.isAdmin || can('MANAGE_ROLES') },
   { key: 'davetler', labelKey: 'guildSettings.nav.davetler', visible: props.isOwner || props.isAdmin },
   { key: 'yasaklar', labelKey: 'guildSettings.nav.yasaklar', visible: props.isOwner || props.isAdmin },
 ])
 
 const dangerItem = computed(() => props.isOwner)
+
+// Görünmeyen bir bölümde kalma (örn. genel yalnız OWNER) → ilk görünür bölüme düş.
+// Roller async yüklenince navItems yeniden hesaplanır; reaktif olarak düzeltilir.
+watch(
+  navItems,
+  (items) => {
+    if (!items.some((i) => i.visible && i.key === activeSection.value)) {
+      const first = items.find((i) => i.visible)
+      if (first) activeSection.value = first.key
+    }
+  },
+  { immediate: true },
+)
 
 // ── Roller detay modu (nav gizleme + full-width) ──────────────────────────
 const rolesDetailMode = ref(false)
