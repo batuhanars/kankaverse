@@ -51,6 +51,24 @@ function contentPlain(content: string): string {
   return formatMentionsPlain(content, () => undefined, t('mention.unknown'))
 }
 
+// REV-3: eşleşen kelimeyi vurgula. XSS-güvenli: önce HTML kaçışı, sonra kaçışlı
+// terimi case-insensitive <mark> ile sar (yalnız <mark> enjekte edilir).
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
+  )
+}
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+function highlight(content: string): string {
+  const safe = escapeHtml(contentPlain(content))
+  const term = query.value.trim()
+  if (!term) return safe
+  const re = new RegExp(`(${escapeRegex(escapeHtml(term))})`, 'gi')
+  return safe.replace(re, '<mark class="kv-hl">$1</mark>')
+}
+
 async function doSearch(q: string) {
   if (!props.channelId || q.trim().length < 2) return
   loading.value = true
@@ -225,13 +243,13 @@ function onDocKeydown(e: KeyboardEvent) {
                 {{ formatTime(msg.createdAt) }}
               </span>
             </div>
+            <!-- REV-3: eşleşen kelime highlight (v-html güvenli — highlight() kaçışlı) -->
             <p
               v-if="msg.content"
               class="text-[13px] break-words line-clamp-3"
               style="color: var(--kv-text-body);"
-            >
-              {{ contentPlain(msg.content) }}
-            </p>
+              v-html="highlight(msg.content)"
+            />
             <p
               v-else-if="msg.attachments?.length"
               class="text-[13px] italic"
@@ -245,3 +263,14 @@ function onDocKeydown(e: KeyboardEvent) {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* REV-3: arama eşleşme vurgusu (Kor tonu, görseldeki gibi belirgin) */
+:deep(.kv-hl) {
+  background-color: rgba(255, 107, 61, 0.28);
+  color: var(--kv-text-primary);
+  border-radius: 3px;
+  padding: 0 1px;
+  font-weight: 600;
+}
+</style>
