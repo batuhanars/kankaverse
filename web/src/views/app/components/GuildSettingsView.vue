@@ -9,6 +9,7 @@ import { attachmentsApi } from '@/api/attachments'
 import { invitesApi } from '@/api/invites'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
+import KvSwitch from '@/components/ui/KvSwitch.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import RolesSettingsSection from './RolesSettingsSection.vue'
 import type { InviteDto, GuildDto } from '@/types'
@@ -345,13 +346,14 @@ const dangerItem = computed(() => props.isOwner)
 <template>
   <Teleport to="body">
     <div
-      class="fixed inset-0 z-50 flex items-stretch justify-center"
+      class="fixed inset-0 z-50 flex"
       style="background-color: var(--kv-bg-overlay);"
       role="dialog"
       aria-modal="true"
       :aria-label="t('guildSettings.title')"
     >
-      <div class="flex h-full w-full" style="max-width: 1100px;">
+      <!-- Sol bölge: sidebar rengi tam yükseklik, nav sağa yaslı -->
+      <div class="shrink-0 flex justify-end" style="width: 36%; min-width: 240px; max-width: 440px; background-color: var(--kv-bg-sidebar);">
       <!-- Sol nav kolonu -->
       <div
         class="shrink-0 flex flex-col py-8 px-3 border-r"
@@ -396,6 +398,7 @@ const dangerItem = computed(() => props.isOwner)
             </button>
           </template>
         </nav>
+      </div>
       </div>
 
       <!-- Sağ içerik alanı -->
@@ -535,18 +538,7 @@ const dangerItem = computed(() => props.isOwner)
                     {{ t('guildSettings.adultsOnlyDesc') }}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  :disabled="saving"
-                  class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 disabled:opacity-50"
-                  :style="draftAdultsOnly ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'"
-                  @click="draftAdultsOnly = !draftAdultsOnly"
-                >
-                  <span
-                    class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200"
-                    :class="draftAdultsOnly ? 'translate-x-5' : 'translate-x-0'"
-                  />
-                </button>
+                <KvSwitch v-model="draftAdultsOnly" :disabled="saving" />
               </div>
             </section>
 
@@ -703,7 +695,6 @@ const dangerItem = computed(() => props.isOwner)
           </div>
 
         </div>
-      </div>
       </div>
     </div>
 

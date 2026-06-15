@@ -6,6 +6,7 @@ import { useMembersStore } from '@/stores/members'
 import { rolesApi } from '@/api/roles'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import KvButton from '@/components/ui/KvButton.vue'
+import KvSwitch from '@/components/ui/KvSwitch.vue'
 import type { GuildDto, GuildMemberDto } from '@/types'
 
 const props = defineProps<{
@@ -322,44 +323,38 @@ async function toggleMemberRole(member: GuildMemberDto) {
 
         <!-- HOIST -->
         <section v-if="!selectedRole.isEveryone">
-          <label class="flex items-center gap-3 cursor-pointer">
-            <input
-              v-model="draftHoist"
-              type="checkbox"
-              :disabled="!canEdit"
-              class="w-4 h-4 rounded cursor-pointer"
-              style="accent-color: var(--kv-accent-500);"
-            />
-            <div>
+          <div
+            class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+            style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+          >
+            <div class="flex-1 min-w-0">
               <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
                 {{ t('guildSettings.roles.hoistLabel') }}
               </p>
-              <p class="text-[12px]" style="color: var(--kv-text-muted);">
+              <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
                 {{ t('guildSettings.roles.hoistDesc') }}
               </p>
             </div>
-          </label>
+            <KvSwitch v-model="draftHoist" :disabled="!canEdit" />
+          </div>
         </section>
 
         <!-- MENTIONABLE -->
         <section>
-          <label class="flex items-center gap-3 cursor-pointer">
-            <input
-              v-model="draftMentionable"
-              type="checkbox"
-              :disabled="!canEdit"
-              class="w-4 h-4 rounded cursor-pointer"
-              style="accent-color: var(--kv-accent-500);"
-            />
-            <div>
+          <div
+            class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+            style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+          >
+            <div class="flex-1 min-w-0">
               <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
                 {{ t('guildSettings.roles.mentionableLabel') }}
               </p>
-              <p class="text-[12px]" style="color: var(--kv-text-muted);">
+              <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
                 {{ t('guildSettings.roles.mentionableDesc') }}
               </p>
             </div>
-          </label>
+            <KvSwitch v-model="draftMentionable" :disabled="!canEdit" />
+          </div>
         </section>
 
         <!-- Kaydet / Sil butonları -->
