@@ -146,6 +146,7 @@ export interface GuildDto {
   rules: string | null
   createdAt: string
   unreadCount: number
+  unreadMentionCount: number
 }
 
 export interface ChannelDto {
@@ -158,6 +159,7 @@ export interface ChannelDto {
   position: number
   slowModeSeconds: number
   unreadCount: number
+  unreadMentionCount: number
   categoryId: string | null
 }
 

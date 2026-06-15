@@ -599,7 +599,7 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] **REV-7 — Sesten kendiliğinden düşme:** 1-1 DM seste tekrar tekrar düşüyor. **Kök neden runtime'da** (kod-tek-başına teşhis edilemedi; unmount-leave değil). `RoomEvent.Disconnected` reason'ı konsola loglanıyor → **sahip tekrar üretip konsoldaki `[voice] LiveKit Disconnected — reason:` çıktısını paylaşacak** (DUPLICATE_IDENTITY / SERVER_SHUTDOWN / ağ ayrımı için)
 
 **Bildirim yeniden-kurgu (büyük, backend+FE):**
-- [ ] **REV-4:** rail kırmızı sayaç = generic unread DEĞİL → **bahsetme (mention)** sayısı. Beyaz pill (sol) = generic aktivite KALIR. Bahsetme olan ortama girince kanal sidebar'ı ALTINDA sidebar-genişliğinde kırmızı bant "yeni bahsetmeleriniz var"; >1 bahsetme okunana dek kalır; tıkla→ilk bahsetme kanalına zıpla (otomatik girme), tekrar tıkla→sonraki…
+- [x] **REV-4 → TAMAMLANDI:** Backend: `unreadMentionCount` (kanal+guild DTO) `mentions: { has: userId }` + lastReadAt sorgusu. Frontend: rail kırmızı sayaç → `unreadMentionCount` (beyaz pill generic aktivite KALDI); WS `mention` → kanal+guild mention sayacı anlık artış; kanal okununca sıfırlanır. **Bahsetme bandı** (`ChannelPanel` altı, tam genişlik kırmızı): tıkla→sıradaki bahsetme kanalına sidebar'da zıpla+vurgula (katlanmış kategori açılır, içine GİRMEZ), tekrar tıkla→sonraki, hepsi okununca bant kaybolur. 485 test (spec'ler 2-count'a güncellendi) + web build temiz
 
 **Arama genişletme:**
 - [ ] **REV-3 — Ortam araması:** sağ-üst arama metin kelime-kelime göstersin + kullanıcı adı + bahsetmelerde arasın (Discord-benzeri sonuç görünümü; Notion'da örnek görsel)

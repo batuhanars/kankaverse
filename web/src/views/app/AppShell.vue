@@ -35,6 +35,8 @@ if (sessionStorage.getItem('kv_access_token')) connect()
 
 function recheckGuildUnread(guildId: string) {
   guildsStore.setGuildUnreadCount(guildId, channelsStore.totalUnreadForGuild(guildId))
+  // REV-4: rail kırmızı rozeti = mention toplamı; kanal okunduğunda/senkronda tazele
+  guildsStore.setGuildMentionCount(guildId, channelsStore.totalMentionsForGuild(guildId))
 }
 function onRecheckUnread(e: Event) {
   const { guildId } = (e as CustomEvent<{ guildId: string }>).detail

@@ -12,7 +12,7 @@ import { AddChannelMemberDto } from './dto/add-channel-member.dto';
 import { Channel } from '@prisma/client';
 import { requireAdminRole } from '../../common/utils/guild-role.utils';
 
-export function toChannelDto(channel: Channel, unreadCount = 0) {
+export function toChannelDto(channel: Channel, unreadCount = 0, unreadMentionCount = 0) {
   return {
     id: channel.id,
     type: channel.type,
@@ -24,6 +24,7 @@ export function toChannelDto(channel: Channel, unreadCount = 0) {
     position: channel.position,
     slowModeSeconds: channel.slowModeSeconds,
     unreadCount,
+    unreadMentionCount, // REV-4: okunmamış bahsetme (kendimi @işaret eden, lastReadAt sonrası)
   };
 }
 
@@ -95,22 +96,26 @@ export class ChannelsService {
       );
     }
 
-    // Her görünür kanal için okunmamış mesaj sayısını paralel olarak hesapla
-    const unreadCounts = await Promise.all(
-      visibleChannels.map((ch) => {
+    // Her görünür kanal için okunmamış mesaj + okunmamış bahsetme sayısını paralel hesapla
+    const counts = await Promise.all(
+      visibleChannels.map(async (ch) => {
         const lastRead = ch.channelReads[0]?.lastReadAt ?? null;
-        return this.prisma.message.count({
-          where: {
-            channelId: ch.id,
-            deletedAt: null,
-            authorId: { not: userId }, // kendi mesajları sayma
-            ...(lastRead !== null && { createdAt: { gt: lastRead } }),
-          },
-        });
+        const base = {
+          channelId: ch.id,
+          deletedAt: null,
+          authorId: { not: userId }, // kendi mesajları sayma
+          ...(lastRead !== null && { createdAt: { gt: lastRead } }),
+        };
+        const [unread, mentions] = await Promise.all([
+          this.prisma.message.count({ where: base }),
+          // REV-4: okunmamış bahsetme — mentions dizisi beni içeriyor
+          this.prisma.message.count({ where: { ...base, mentions: { has: userId } } }),
+        ]);
+        return { unread, mentions };
       }),
     );
 
-    return visibleChannels.map((ch, i) => toChannelDto(ch, unreadCounts[i]));
+    return visibleChannels.map((ch, i) => toChannelDto(ch, counts[i].unread, counts[i].mentions));
   }
 
   /** POST /channels/:id/read — kanaldaki son mesajı okundu işaretle */

@@ -616,7 +616,9 @@
   },
   "mention": {
     "unknown": "bilinmeyen",
-    "autocompleteEmpty": "Eşleşen üye bulunamadı."
+    "autocompleteEmpty": "Eşleşen üye bulunamadı.",
+    "banner": "Yeni bahsetmelerin var",
+    "bannerHint": "Sıradaki bahsetmenin olduğu kanala git"
   },
   "server": {
     "addOrtam": "Ortam Ekle"

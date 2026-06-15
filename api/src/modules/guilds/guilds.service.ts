@@ -27,7 +27,7 @@ const ICON_EXT: Record<string, string> = {
   'image/webp': 'webp',
 };
 
-export function toGuildDto(guild: Guild, unreadCount = 0) {
+export function toGuildDto(guild: Guild, unreadCount = 0, unreadMentionCount = 0) {
   return {
     id: guild.id,
     name: guild.name,
@@ -37,6 +37,7 @@ export function toGuildDto(guild: Guild, unreadCount = 0) {
     rules: guild.rules ?? null,
     createdAt: guild.createdAt.toISOString(),
     unreadCount,
+    unreadMentionCount, // REV-4: rail kırmızı rozeti bunu gösterir (generic unread değil)
   };
 }
 
@@ -120,27 +121,33 @@ export class GuildsService {
 
     const activeGuilds = memberships.filter((m) => m.guild.deletedAt === null);
 
-    // Her guild'in kanalları için okunmamış sayılarını paralel hesapla
-    const guildUnreadCounts = await Promise.all(
+    // Her guild'in kanalları için okunmamış mesaj + okunmamış bahsetme sayılarını paralel hesapla
+    const guildCounts = await Promise.all(
       activeGuilds.map(async (m) => {
         const channelCounts = await Promise.all(
-          m.guild.channels.map((ch) => {
+          m.guild.channels.map(async (ch) => {
             const lastRead = ch.channelReads[0]?.lastReadAt ?? null;
-            return this.prisma.message.count({
-              where: {
-                channelId: ch.id,
-                deletedAt: null,
-                authorId: { not: userId }, // kendi mesajları sayma
-                ...(lastRead !== null && { createdAt: { gt: lastRead } }),
-              },
-            });
+            const base = {
+              channelId: ch.id,
+              deletedAt: null,
+              authorId: { not: userId }, // kendi mesajları sayma
+              ...(lastRead !== null && { createdAt: { gt: lastRead } }),
+            };
+            const [unread, mentions] = await Promise.all([
+              this.prisma.message.count({ where: base }),
+              this.prisma.message.count({ where: { ...base, mentions: { has: userId } } }),
+            ]);
+            return { unread, mentions };
           }),
         );
-        return channelCounts.reduce((sum, n) => sum + n, 0);
+        return {
+          unread: channelCounts.reduce((s, c) => s + c.unread, 0),
+          mentions: channelCounts.reduce((s, c) => s + c.mentions, 0),
+        };
       }),
     );
 
-    return activeGuilds.map((m, i) => toGuildDto(m.guild, guildUnreadCounts[i]));
+    return activeGuilds.map((m, i) => toGuildDto(m.guild, guildCounts[i].unread, guildCounts[i].mentions));
   }
 
   /** PATCH /guilds/:id — yalnız OWNER */

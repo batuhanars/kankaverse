@@ -171,6 +171,12 @@ export function useSocket() {
         mention: payload,
         at: new Date().toISOString(),
       })
+      // REV-4: guild kanalında bahsetme → o kanalı izlemiyorsam mention rozetini artır
+      // (rail kırmızı sayaç + kanal sidebar bandı). DM (guildId null) → bu sistem dışı.
+      if (payload.guildId && activeChannelId !== payload.channelId) {
+        channelsStore.markChannelMentioned(payload.channelId, payload.guildId)
+        guildsStore.incrementGuildMention(payload.guildId)
+      }
     })
 
     // Kanal aktivitesi — başka üyenin mesajı: aktif değilse unread sayacını artır

@@ -92,5 +92,22 @@ export const useGuildsStore = defineStore('guilds', () => {
     }
   }
 
-  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, deleteGuild, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread }
+  // REV-4: rail kırmızı rozeti = okunmamış BAHSETME sayısı (generic unread değil)
+  /** Guild'in unreadMentionCount'unu set et (kanal listesi senkronu / kanal okundu sonrası) */
+  function setGuildMentionCount(guildId: string, count: number): void {
+    const idx = guilds.value.findIndex((g) => g.id === guildId)
+    if (idx !== -1 && guilds.value[idx].unreadMentionCount !== count) {
+      guilds.value[idx] = { ...guilds.value[idx], unreadMentionCount: count }
+    }
+  }
+
+  /** Guild unreadMentionCount'unu 1 artır (WS mention için) */
+  function incrementGuildMention(guildId: string): void {
+    const idx = guilds.value.findIndex((g) => g.id === guildId)
+    if (idx !== -1) {
+      guilds.value[idx] = { ...guilds.value[idx], unreadMentionCount: guilds.value[idx].unreadMentionCount + 1 }
+    }
+  }
+
+  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, deleteGuild, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread, setGuildMentionCount, incrementGuildMention }
 })
