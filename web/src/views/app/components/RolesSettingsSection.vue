@@ -431,13 +431,13 @@ const membersWithRole = computed(() => {
           <button
             type="button"
             class="flex items-center justify-center w-9 h-9 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-            style="background-color: var(--kv-bg-elevated);"
+            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
             :title="t('guildSettings.roles.editTooltip')"
             @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
             @click.stop="selectRole(role.id)"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-secondary);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
@@ -447,13 +447,13 @@ const membersWithRole = computed(() => {
             v-if="!role.isEveryone"
             type="button"
             class="flex items-center justify-center w-9 h-9 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-            style="background-color: var(--kv-bg-elevated);"
+            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
             :title="t('guildSettings.roles.deleteTooltip')"
             @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-danger)'; ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.color = ''; ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
             @click.stop="pendingDeleteRole = role"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-secondary);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"/>
               <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
               <path d="M10 11v6M14 11v6"/>
