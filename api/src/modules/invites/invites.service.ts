@@ -245,6 +245,7 @@ export class InvitesService {
         username: newMember.user.username,
         avatarUrl: newMember.user.avatarUrl,
         role: newMember.role,
+        roles: [], // yeni üyenin atanmış özel rolü yok (hoist gruplaması bu diziyi bekler)
       },
     });
   }
