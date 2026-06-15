@@ -361,6 +361,7 @@
       "permsAdminLabel": "Yönetici",
       "permsAdminDesc": "Bu role TÜM izinleri verir. Sahip üyeler ortamda her şeyi yapabilir — Ortam Silme ve Sahiplik Devri hariç (onlar yalnız ortam sahibinde). Dikkatli ver.",
       "permsAdminWarning": "Yönetici izni açık: bu rol aşağıdaki tüm izinlere otomatik sahiptir.",
+      "permsGrantHint": "Yalnızca kendi sahip olduğun izinleri bir role verebilirsin; sahip olmadıkların gri görünür.",
       "permsGroups": {
         "general": "GENEL",
         "membership": "ÜYELİK",

@@ -50,6 +50,19 @@ const ROLE_ORDER: Record<GuildRole, number> = {
   MEMBER: 2,
 };
 
+/** GuildMember.roleLinks → GuildMemberDto.roles şekli (tek kaynak; @everyone örtük, atanmaz). */
+function mapRoleLinks(
+  roleLinks?: { role: { id: string; name: string; color: string; position: number; hoist: boolean } }[],
+): { id: string; name: string; color: string; position: number; hoist: boolean }[] {
+  return (roleLinks ?? []).map((rl) => ({
+    id: rl.role.id,
+    name: rl.role.name,
+    color: rl.role.color,
+    position: rl.role.position,
+    hoist: rl.role.hoist,
+  }));
+}
+
 @Injectable()
 export class GuildsService {
   constructor(
@@ -315,13 +328,7 @@ export class GuildsService {
         avatarUrl: m.user.avatarUrl,
         role: m.role,
         // @everyone örtük — roleLinks'te isEveryone=true olanlar çıkar (örtük olduğundan atanmaz zaten)
-        roles: m.roleLinks.map((rl) => ({
-          id: rl.role.id,
-          name: rl.role.name,
-          color: rl.role.color,
-          position: rl.role.position,
-          hoist: rl.role.hoist,
-        })),
+        roles: mapRoleLinks(m.roleLinks),
       }));
   }
 
@@ -383,7 +390,10 @@ export class GuildsService {
     const updated = await this.prisma.guildMember.update({
       where: { guildId_userId: { guildId, userId: targetUserId } },
       data: { role: dto.role as GuildRole },
-      include: { user: { select: { id: true, username: true, avatarUrl: true } } },
+      include: {
+        user: { select: { id: true, username: true, avatarUrl: true } },
+        roleLinks: { include: { role: true } },
+      },
     });
 
     // AuditLog
@@ -406,7 +416,7 @@ export class GuildsService {
       username: updated.user.username,
       avatarUrl: updated.user.avatarUrl,
       role: updated.role,
-      roles: [], // rol enum değişimi — role links burada ayrıca çekilmez (genel-amaç event)
+      roles: mapRoleLinks(updated.roleLinks),
     };
 
     // REV-14 realtime: rol değişimini tüm üyelere yay (üye listesi anlık güncellensin)
@@ -568,12 +578,18 @@ export class GuildsService {
       this.prisma.guildMember.update({
         where: { guildId_userId: { guildId, userId: targetUserId } },
         data: { role: GuildRole.OWNER },
-        include: { user: { select: { id: true, username: true, avatarUrl: true } } },
+        include: {
+          user: { select: { id: true, username: true, avatarUrl: true } },
+          roleLinks: { include: { role: true } },
+        },
       }),
       this.prisma.guildMember.update({
         where: { guildId_userId: { guildId, userId: actorId } },
         data: { role: GuildRole.ADMIN },
-        include: { user: { select: { id: true, username: true, avatarUrl: true } } },
+        include: {
+          user: { select: { id: true, username: true, avatarUrl: true } },
+          roleLinks: { include: { role: true } },
+        },
       }),
     ]);
     const newOwner = result[1];
@@ -583,7 +599,7 @@ export class GuildsService {
     for (const m of [newOwner, oldOwner]) {
       this.realtime.emitToUsers(recipients, 'guild.member_updated', {
         guildId,
-        member: { userId: m.user.id, username: m.user.username, avatarUrl: m.user.avatarUrl, role: m.role, roles: [] },
+        member: { userId: m.user.id, username: m.user.username, avatarUrl: m.user.avatarUrl, role: m.role, roles: mapRoleLinks(m.roleLinks) },
       });
     }
     await this.prisma.auditLog.create({

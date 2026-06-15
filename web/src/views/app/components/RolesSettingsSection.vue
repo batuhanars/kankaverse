@@ -241,8 +241,17 @@ const dragRoleId = ref<string | null>(null)
 const dragOverRoleId = ref<string | null>(null)
 
 // ── Yetki (izin-tabanlı; backend MANAGE_ROLES + hiyerarşiyi zorlar) ─────────
-const { can } = useGuildPermissions(() => guildId.value)
+const { can, hasAll } = useGuildPermissions(() => guildId.value)
 const canEdit = computed(() => props.isOwner || can('MANAGE_ROLES'))
+
+// F1 UX: aktör yalnız KENDİ sahip olduğu izinleri verebilir (backend CANNOT_GRANT_PERMISSION).
+// Zaten role atanmış bir bayrağı (kaldırma için) toggle'lamak serbest; yeni eklemek izin ister.
+function canToggleFlag(flag: string): boolean {
+  if (!canEdit.value) return false
+  if (hasAll.value) return true // owner / enum-admin / ADMINISTRATOR-sahibi → her izni verebilir
+  if (can(flag)) return true // aktör bu izne sahip → verebilir
+  return selectedRole.value?.permissions.includes(flag) ?? false // yoksa yalnız mevcut bayrağı kaldırabilir
+}
 
 // ── Rol oluştur ───────────────────────────────────────────────────────────
 async function createRole() {
@@ -838,6 +847,15 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
         <!-- ══ İZİNLER SEKMESİ ══ -->
         <template v-if="activeTab === 'permissions'">
 
+          <!-- F1: aktör tüm izinlere sahip değilse "veremezsin" notu -->
+          <p
+            v-if="canEdit && !hasAll"
+            class="px-3 py-2 text-[12px] rounded-[var(--kv-radius-sm)]"
+            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+          >
+            {{ t('guildSettings.roles.permsGrantHint') }}
+          </p>
+
           <!-- ADMINISTRATOR — en üstte, uyarılı -->
           <section>
             <div
@@ -856,7 +874,7 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
               </div>
               <KvSwitch
                 :model-value="hasAdmin"
-                :disabled="!canEdit"
+                :disabled="!canToggleFlag('ADMINISTRATOR')"
                 @update:model-value="(v: boolean) => setPerm('ADMINISTRATOR', v)"
               />
             </div>
@@ -891,7 +909,7 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
                 </div>
                 <KvSwitch
                   :model-value="hasAdmin || hasPerm(flag)"
-                  :disabled="!canEdit || hasAdmin"
+                  :disabled="hasAdmin || !canToggleFlag(flag)"
                   @update:model-value="(v: boolean) => setPerm(flag, v)"
                 />
               </div>
