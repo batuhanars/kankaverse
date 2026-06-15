@@ -10,6 +10,7 @@ import { invitesApi } from '@/api/invites'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import RolesSettingsSection from './RolesSettingsSection.vue'
 import type { InviteDto, GuildDto } from '@/types'
 
 const props = defineProps<{
@@ -344,15 +345,12 @@ const dangerItem = computed(() => props.isOwner)
 <template>
   <Teleport to="body">
     <div
-      class="fixed inset-0 z-50 flex items-stretch justify-center"
+      class="fixed inset-0 z-50 flex"
       style="background-color: var(--kv-bg-overlay);"
       role="dialog"
       aria-modal="true"
       :aria-label="t('guildSettings.title')"
     >
-      <!-- Ortalanmış panel (nav + içerik) -->
-      <div class="flex h-full w-full max-w-[1100px]">
-
       <!-- Sol nav kolonu -->
       <div
         class="shrink-0 flex flex-col py-8 px-3 border-r"
@@ -584,19 +582,13 @@ const dangerItem = computed(() => props.isOwner)
             </div>
           </div>
 
-          <!-- ── Roller bölümü (Faz 2'de dolacak) ── -->
-          <div v-else-if="activeSection === 'roller'" class="flex flex-col gap-4 max-w-xl">
-            <div
-              class="flex items-center justify-center py-16"
-              style="color: var(--kv-text-muted);"
-            >
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mb-0 mr-3 shrink-0">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-            </div>
+          <!-- ── Roller bölümü ── -->
+          <div v-else-if="activeSection === 'roller'">
+            <RolesSettingsSection
+              :guild="guild"
+              :is-owner="isOwner"
+              :is-admin="isAdmin"
+            />
           </div>
 
           <!-- ── Davetler bölümü ── -->
@@ -711,8 +703,6 @@ const dangerItem = computed(() => props.isOwner)
 
         </div>
       </div>
-
-      </div><!-- /ortalanmış panel -->
     </div>
 
     <!-- Davet iptal onay diyaloğu -->

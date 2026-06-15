@@ -238,6 +238,22 @@ export interface GuildMemberDto {
   username: string
   avatarUrl: string | null
   role: GuildMemberRole
+  roles: { id: string; name: string; color: string; position: number; hoist: boolean }[]
+}
+
+// Sprint V3 — Rol DTO
+export interface RoleDto {
+  id: string
+  guildId: string
+  name: string
+  color: string
+  position: number
+  hoist: boolean
+  mentionable: boolean
+  permissions: string[]
+  iconUrl: string | null
+  isEveryone: boolean
+  memberCount: number
 }
 
 // Sprint 7A §3 — Davet DTO'ları
