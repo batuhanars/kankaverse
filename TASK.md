@@ -536,6 +536,18 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 ---
 
+## Ortam Yönetimi — ayrıl/devret/ban + menü (sahip onaylı 2026-06-15)
+
+> Rol/izin sistemi (granular) V3'e ertelendi (sahip kararı). Bu tur: temel ortam-yönetimi boşlukları + başlık menüsü.
+
+- [x] **Ayrılma:** `POST /guilds/:id/leave` (OWNER ayrılamaz → `OWNER_CANNOT_LEAVE`); ChannelMember temizlik + `guild.member_left` realtime. Frontend: başlık menüsünde "Ortamdan Ayrıl" (OWNER hariç) + ConfirmDialog + anasayfaya dön.
+- [x] **Sahiplik devri (R7):** `POST /guilds/:id/members/:userId/transfer` (OWNER-only; hedef OWNER, eski sahip ADMIN — atomik tx); iki `member_updated` yayını + AuditLog. Frontend: üye menüsünde "Sahipliği Devret" + onay.
+- [x] **Ortam-ban (R7):** `GuildBan` modeli + migration (`20260615082326_guild_ban`); `POST .../ban` (kick hiyerarşisi + GuildBan kaydı), `GET .../bans`, `DELETE .../bans/:userId`. **Davet-join ban kontrolü** (`GUILD_BANNED`). Frontend: üye menüsünde "Yasakla" + GuildSettingsModal "Yasaklılar" bölümü (unban).
+- [x] **Başlık menüsü (sahip ek-talebi):** ChannelPanel başlığındaki 3 ikon (kanal+/kategori/ayarlar) → **tek buton + Discord-tarzı dropdown** (ikon+başlık satırları): Kanal Oluştur · Kategori Oluştur · Ortam Ayarları · Ortamdan Ayrıl (role göre).
+- [x] **R7 + test:** leave/transfer/ban hiyerarşi + ban-join testleri (9 yeni); **497 test** + web build temiz. *Sahip canlı test + R7 imza bekliyor.*
+
+---
+
 ## V2 — Özellikler (PM compose, otonom 2026-06-13+)
 
 > V1 kapsamlı bitti; V2 özelliklerine geçildi. (Ertelenenler: ses/video LiveKit, göç+Discord-OAuth, rol/izin matrisi.)

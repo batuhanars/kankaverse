@@ -50,4 +50,28 @@ export const guildsApi = {
   kickMember(guildId: string, userId: string) {
     return http.delete<null>(`/guilds/${guildId}/members/${userId}`)
   },
+  // Ortam yönetimi — ayrıl / sahiplik devri / ban
+  leaveGuild(guildId: string) {
+    return http.post<null>(`/guilds/${guildId}/leave`)
+  },
+  transferOwnership(guildId: string, userId: string) {
+    return http.post<null>(`/guilds/${guildId}/members/${userId}/transfer`)
+  },
+  banMember(guildId: string, userId: string, reason?: string) {
+    return http.post<null>(`/guilds/${guildId}/members/${userId}/ban`, { reason })
+  },
+  getBans(guildId: string) {
+    return http.get<GuildBanDto[]>(`/guilds/${guildId}/bans`)
+  },
+  unbanMember(guildId: string, userId: string) {
+    return http.delete<null>(`/guilds/${guildId}/bans/${userId}`)
+  },
+}
+
+export interface GuildBanDto {
+  userId: string
+  username: string
+  avatarUrl: string | null
+  reason: string | null
+  bannedAt: string
 }

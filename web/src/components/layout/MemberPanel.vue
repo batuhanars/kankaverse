@@ -123,6 +123,14 @@ function canKick(member: GuildMemberDto): boolean {
   return false
 }
 
+// Ban: kick ile aynı hiyerarşi (kalıcı yasak)
+const canBan = canKick
+
+// Sahiplik devri: yalnız OWNER, hedef başka bir üye (OWNER kendisi hariç)
+function canTransfer(member: GuildMemberDto): boolean {
+  return isOwner.value && member.userId !== myUserId.value && member.role !== 'OWNER'
+}
+
 // ── Rol değiştir ──────────────────────────────────────────────────────────
 
 const roleLoading = ref<string | null>(null) // loading olan userId
@@ -180,6 +188,69 @@ async function confirmKick() {
     kickTarget.value = null
   } finally {
     kicking.value = false
+  }
+}
+
+// ── Yasakla (ban) ───────────────────────────────────────────────────────────
+const banTarget = ref<GuildMemberDto | null>(null)
+const banning = ref(false)
+
+function openBan(member: GuildMemberDto) {
+  banTarget.value = member
+  kickError.value = ''
+  closeMenu()
+}
+
+async function confirmBan() {
+  const target = banTarget.value
+  if (!target) return
+  const guildId = guildsStore.activeGuildId
+  if (!guildId) return
+  banning.value = true
+  kickError.value = ''
+  try {
+    await guildsApi.banMember(guildId, target.userId)
+    membersStore.removeMember(guildId, target.userId)
+    banTarget.value = null
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { error?: string; message?: string } } }
+    const code = err.response?.data?.error
+    kickError.value = code && ['CANNOT_BAN_OWNER', 'CANNOT_BAN_SELF', 'NOT_GUILD_MEMBER', 'FORBIDDEN'].includes(code)
+      ? t(`member.errors.${code}`)
+      : (err.response?.data?.message ?? t('common.error'))
+    banTarget.value = null
+  } finally {
+    banning.value = false
+  }
+}
+
+// ── Sahiplik devri ────────────────────────────────────────────────────────
+const transferTarget = ref<GuildMemberDto | null>(null)
+const transferring = ref(false)
+
+function openTransfer(member: GuildMemberDto) {
+  transferTarget.value = member
+  roleError.value = ''
+  closeMenu()
+}
+
+async function confirmTransfer() {
+  const target = transferTarget.value
+  if (!target) return
+  const guildId = guildsStore.activeGuildId
+  if (!guildId) return
+  transferring.value = true
+  roleError.value = ''
+  try {
+    await guildsApi.transferOwnership(guildId, target.userId)
+    // Roller WS guild.member_updated ile güncellenir; kendi rolüm setMyRole ile
+    transferTarget.value = null
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { error?: string; message?: string } } }
+    roleError.value = err.response?.data?.message ?? t('common.error')
+    transferTarget.value = null
+  } finally {
+    transferring.value = false
   }
 }
 </script>
@@ -327,6 +398,22 @@ async function confirmKick() {
               >
                 {{ t('member.actions.kick') }}
               </button>
+              <button
+                v-if="canBan(member)"
+                class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                style="color: var(--kv-danger);"
+                @click="openBan(member)"
+              >
+                {{ t('member.actions.ban') }}
+              </button>
+              <button
+                v-if="canTransfer(member)"
+                class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                style="color: var(--kv-text-secondary);"
+                @click="openTransfer(member)"
+              >
+                {{ t('member.actions.transferOwnership') }}
+              </button>
             </div>
           </div>
         </div>
@@ -423,6 +510,22 @@ async function confirmKick() {
                 @click="openKick(member)"
               >
                 {{ t('member.actions.kick') }}
+              </button>
+              <button
+                v-if="canBan(member)"
+                class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                style="color: var(--kv-danger);"
+                @click="openBan(member)"
+              >
+                {{ t('member.actions.ban') }}
+              </button>
+              <button
+                v-if="canTransfer(member)"
+                class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                style="color: var(--kv-text-secondary);"
+                @click="openTransfer(member)"
+              >
+                {{ t('member.actions.transferOwnership') }}
               </button>
             </div>
           </div>
@@ -521,6 +624,22 @@ async function confirmKick() {
               >
                 {{ t('member.actions.kick') }}
               </button>
+              <button
+                v-if="canBan(member)"
+                class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                style="color: var(--kv-danger);"
+                @click="openBan(member)"
+              >
+                {{ t('member.actions.ban') }}
+              </button>
+              <button
+                v-if="canTransfer(member)"
+                class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                style="color: var(--kv-text-secondary);"
+                @click="openTransfer(member)"
+              >
+                {{ t('member.actions.transferOwnership') }}
+              </button>
             </div>
           </div>
         </div>
@@ -537,5 +656,27 @@ async function confirmKick() {
     :loading="kicking"
     @confirm="confirmKick"
     @cancel="kickTarget = null"
+  />
+
+  <!-- Ban onay diyaloğu -->
+  <ConfirmDialog
+    v-if="banTarget"
+    :title="t('member.actions.banConfirmTitle')"
+    :message="t('member.actions.banConfirmMessage', { username: banTarget.username })"
+    :confirm-label="t('member.actions.ban')"
+    :loading="banning"
+    @confirm="confirmBan"
+    @cancel="banTarget = null"
+  />
+
+  <!-- Sahiplik devri onay diyaloğu -->
+  <ConfirmDialog
+    v-if="transferTarget"
+    :title="t('member.actions.transferConfirmTitle')"
+    :message="t('member.actions.transferConfirmMessage', { username: transferTarget.username })"
+    :confirm-label="t('member.actions.transferOwnership')"
+    :loading="transferring"
+    @confirm="confirmTransfer"
+    @cancel="transferTarget = null"
   />
 </template>

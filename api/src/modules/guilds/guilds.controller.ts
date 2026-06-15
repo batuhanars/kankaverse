@@ -17,6 +17,7 @@ import { UpdateGuildDto } from './dto/update-guild.dto';
 import { PresignIconDto } from './dto/presign-icon.dto';
 import { SetIconDto } from './dto/set-icon.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
+import { BanMemberDto } from './dto/ban-member.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from '../../common/guards/verified-email.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -119,5 +120,58 @@ export class GuildsController {
     @Param('userId') targetUserId: string,
   ) {
     return this.guildsService.kickMember(user.id, guildId, targetUserId);
+  }
+
+  // ─── §D: Ortamdan ayrıl ───────────────────────────────────────────────────
+
+  @Post(':id/leave')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Ortamdan ayrıl (OWNER ayrılamaz; önce devret/sil). Dönüş null.' })
+  leaveGuild(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
+    return this.guildsService.leaveGuild(user.id, guildId);
+  }
+
+  // ─── §E: Sahiplik devri ───────────────────────────────────────────────────
+
+  @Post(':id/members/:userId/transfer')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Ortam sahipliğini devret (yalnız OWNER; hedef OWNER, eski sahip ADMIN olur). Dönüş null.' })
+  transferOwnership(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Param('userId') targetUserId: string,
+  ) {
+    return this.guildsService.transferOwnership(user.id, guildId, targetUserId);
+  }
+
+  // ─── §F: Ortam-ban ────────────────────────────────────────────────────────
+
+  @Post(':id/members/:userId/ban')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Üyeyi kalıcı yasakla (kick + tekrar davetle giremez). Hiyerarşi kick ile aynı. Dönüş null.' })
+  banMember(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Param('userId') targetUserId: string,
+    @Body() dto: BanMemberDto,
+  ) {
+    return this.guildsService.banMember(user.id, guildId, targetUserId, dto.reason);
+  }
+
+  @Get(':id/bans')
+  @ApiOperation({ summary: 'Yasaklı kullanıcılar listesi (OWNER/ADMIN).' })
+  listBans(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
+    return this.guildsService.listBans(user.id, guildId);
+  }
+
+  @Delete(':id/bans/:userId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Yasağı kaldır (OWNER/ADMIN). Dönüş null.' })
+  unbanMember(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Param('userId') targetUserId: string,
+  ) {
+    return this.guildsService.unbanMember(user.id, guildId, targetUserId);
   }
 }
