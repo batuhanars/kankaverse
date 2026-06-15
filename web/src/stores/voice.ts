@@ -75,13 +75,21 @@ export const useVoiceStore = defineStore('voice', () => {
     return participantsByChannel.value[channelId] ?? []
   }
 
+  // REV-13b: kanal aktif-başlangıcı (ms epoch) → sidebar süre sayacı
+  const channelStartedAt = ref<Record<string, number | null>>({})
+  function startedAtFor(channelId: string): number | null {
+    return channelStartedAt.value[channelId] ?? null
+  }
+
   // ── Panel listesi (WS + ilk yük) ────────────────────────────────────────────
   async function loadParticipants(channelId: string) {
     try {
       const res = await voiceApi.getParticipants(channelId)
-      participantsByChannel.value[channelId] = res.data.map(toParticipant)
+      participantsByChannel.value[channelId] = res.data.participants.map(toParticipant)
+      channelStartedAt.value[channelId] = res.data.startedAt // REV-13b
     } catch {
       participantsByChannel.value[channelId] = []
+      channelStartedAt.value[channelId] = null
     }
   }
 
@@ -90,12 +98,18 @@ export const useVoiceStore = defineStore('voice', () => {
     if (!list.some((x) => x.userId === p.userId)) {
       participantsByChannel.value[channelId] = [...list, p]
     }
+    // REV-13b: ilk katılımcı gözlemlendiğinde başlangıç yoksa şimdi (yaklaşık)
+    if (!channelStartedAt.value[channelId]) {
+      channelStartedAt.value[channelId] = Date.now()
+    }
   }
 
   function removeParticipant(channelId: string, userId: string) {
     const list = participantsByChannel.value[channelId]
     if (list) {
-      participantsByChannel.value[channelId] = list.filter((x) => x.userId !== userId)
+      const next = list.filter((x) => x.userId !== userId)
+      participantsByChannel.value[channelId] = next
+      if (next.length === 0) channelStartedAt.value[channelId] = null // REV-13b: boş → sıfırla
     }
   }
 
@@ -320,6 +334,7 @@ export const useVoiceStore = defineStore('voice', () => {
     isConnectedTo,
     clearError,
     participantsFor,
+    startedAtFor,
     loadParticipants,
     addParticipant,
     removeParticipant,
