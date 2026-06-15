@@ -364,18 +364,18 @@ const membersWithRole = computed(() => {
     </div>
 
     <!-- Rol satırları -->
-    <div class="flex flex-col gap-0.5">
+    <div class="flex flex-col gap-2">
       <div
         v-for="role in filteredRoles"
         :key="role.id"
         role="button"
         tabindex="0"
-        class="group w-full flex items-center gap-3 px-3 py-2.5 rounded-[var(--kv-radius-md)] text-left transition-colors cursor-pointer relative"
+        class="group w-full flex items-center gap-3 px-4 py-3 rounded-[var(--kv-radius-md)] border text-left transition-colors cursor-pointer relative"
         :class="dragOverRoleId === role.id ? 'kv-drop-target' : ''"
-        :style="`color: var(--kv-text-secondary);${dragRoleId === role.id ? ' opacity: 0.4;' : ''}`"
+        :style="`color: var(--kv-text-secondary); border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);${dragRoleId === role.id ? ' opacity: 0.4;' : ''}`"
         :draggable="canEdit && !roleSearch ? 'true' : 'false'"
-        @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
-        @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
+        @mouseenter="($event.currentTarget as HTMLElement).style.borderColor = 'var(--kv-accent-subtle)'"
+        @mouseleave="($event.currentTarget as HTMLElement).style.borderColor = 'var(--kv-border-subtle)'"
         @click="selectRole(role.id)"
         @keydown.enter="selectRole(role.id)"
         @dragstart="onRoleDragStart($event, role)"
@@ -695,7 +695,7 @@ const membersWithRole = computed(() => {
           </section>
 
           <!-- Kaydet / Sil -->
-          <div v-if="canEdit" class="flex items-center gap-3 pt-1 border-t" style="border-color: var(--kv-border-subtle);">
+          <div v-if="canEdit" class="flex items-center gap-3 mt-2 pt-4 border-t" style="border-color: var(--kv-border-subtle);">
             <KvButton
               :disabled="!isDirty || saving || !hexValid"
               :loading="saving"

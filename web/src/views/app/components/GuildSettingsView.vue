@@ -588,7 +588,7 @@ const rolesDetailMode = ref(false)
             </section>
 
             <!-- Kaydet / hata -->
-            <div class="flex items-center justify-between gap-3 pt-1 border-t" style="border-color: var(--kv-border-subtle);">
+            <div class="flex items-center justify-between gap-3 mt-2 pt-4 border-t" style="border-color: var(--kv-border-subtle);">
               <p v-if="saveError" class="text-[12px] flex-1" style="color: var(--kv-danger);">{{ saveError }}</p>
               <p v-else-if="saving && iconUploadPct > 0" class="text-[12px] flex-1" style="color: var(--kv-text-muted);">
                 {{ t('guildSettings.iconUploading', { pct: iconUploadPct }) }}
