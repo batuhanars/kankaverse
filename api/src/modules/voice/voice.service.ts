@@ -185,14 +185,22 @@ export class VoiceService {
 
     try {
       const participants = await this.roomService!.listParticipants(channelId);
-      return participants.map((p) => ({
-        userId: p.identity,
-        username: p.name || p.identity,
-        avatarUrl: this.parseAvatar(p.metadata),
-      }));
+      // REV-13b: kanal aktif-süresi = en erken katılımcı joinedAt (LiveKit saniye → ms).
+      const joinTimes = participants
+        .map((p) => Number(p.joinedAt) * 1000)
+        .filter((t) => Number.isFinite(t) && t > 0);
+      const startedAt = joinTimes.length ? Math.min(...joinTimes) : null;
+      return {
+        startedAt,
+        participants: participants.map((p) => ({
+          userId: p.identity,
+          username: p.name || p.identity,
+          avatarUrl: this.parseAvatar(p.metadata),
+        })),
+      };
     } catch {
-      // Oda henüz açılmadıysa LiveKit hata döndürür → boş liste
-      return [];
+      // Oda henüz açılmadıysa LiveKit hata döndürür → boş
+      return { startedAt: null, participants: [] };
     }
   }
 

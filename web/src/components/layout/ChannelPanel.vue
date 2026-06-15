@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
@@ -119,6 +119,22 @@ watch(activeGuildId, () => {
   mentionCycleIndex = 0
   highlightedChannelId.value = null
 })
+
+// REV-13b: ses kanalı aktif-süresi (sidebar, yeşil) — saniyede bir tik
+const voiceNow = ref(Date.now())
+let voiceTick: ReturnType<typeof setInterval> | null = null
+onMounted(() => { voiceTick = setInterval(() => { voiceNow.value = Date.now() }, 1000) })
+onUnmounted(() => { if (voiceTick) clearInterval(voiceTick) })
+
+function voiceDuration(channelId: string): string {
+  const startedAt = voiceStore.startedAtFor(channelId)
+  if (!startedAt) return ''
+  const sec = Math.max(0, Math.floor((voiceNow.value - startedAt) / 1000))
+  const h = Math.floor(sec / 3600)
+  const mm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0')
+  const ss = String(sec % 60).padStart(2, '0')
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
+}
 
 // ── Kanal seçme ──
 function selectChannel(channel: ChannelDto) {
@@ -587,6 +603,12 @@ function closeCategoryMenu() {
         </button>
 
         <span
+          v-if="channel.type === 'GUILD_VOICE' && voiceDuration(channel.id)"
+          class="shrink-0 text-[11px] font-semibold mr-1.5"
+          style="color: var(--kv-online, #3DB46E); font-variant-numeric: tabular-nums;"
+        >{{ voiceDuration(channel.id) }}</span>
+
+        <span
           v-if="channel.unreadCount > 0 && channelsStore.activeChannelId !== channel.id"
           class="shrink-0 channel-unread-badge"
         >
@@ -768,6 +790,12 @@ function closeCategoryMenu() {
                 </svg>
               </span>
             </button>
+
+            <span
+              v-if="channel.type === 'GUILD_VOICE' && voiceDuration(channel.id)"
+              class="shrink-0 text-[11px] font-semibold mr-1.5"
+              style="color: var(--kv-online, #3DB46E); font-variant-numeric: tabular-nums;"
+            >{{ voiceDuration(channel.id) }}</span>
 
             <span
               v-if="channel.unreadCount > 0 && channelsStore.activeChannelId !== channel.id"
