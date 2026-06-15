@@ -48,7 +48,7 @@ async function submit() {
   >
     <div
       class="w-full max-w-sm rounded-[var(--kv-radius-lg)] p-8"
-      style="background-color: var(--kv-bg-sidebar);"
+      style="background-color: var(--kv-bg-sidebar); border: 1px solid var(--kv-border-subtle); border-top: 3px solid var(--kv-accent-500);"
     >
       <div class="mb-6 text-center">
         <img :src="logoDikey" :alt="t('brand.name')" class="mx-auto mb-5" style="width: 120px;" />
