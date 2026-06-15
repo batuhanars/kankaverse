@@ -341,6 +341,9 @@ const navItems = computed<NavItem[]>(() => [
 ])
 
 const dangerItem = computed(() => props.isOwner)
+
+// ── Roller detay modu (nav gizleme + full-width) ──────────────────────────
+const rolesDetailMode = ref(false)
 </script>
 
 <template>
@@ -353,7 +356,12 @@ const dangerItem = computed(() => props.isOwner)
       :aria-label="t('guildSettings.title')"
     >
       <!-- Sol bölge: sidebar rengi tam yükseklik, nav sağa yaslı -->
-      <div class="shrink-0 flex justify-end" style="width: 36%; min-width: 240px; max-width: 440px; background-color: var(--kv-bg-sidebar);">
+      <!-- Roller detay modunda sol nav tamamen gizlenir -->
+      <div
+        v-if="!(activeSection === 'roller' && rolesDetailMode)"
+        class="shrink-0 flex justify-end"
+        style="width: 36%; min-width: 240px; max-width: 440px; background-color: var(--kv-bg-sidebar);"
+      >
       <!-- Sol nav kolonu -->
       <div
         class="shrink-0 flex flex-col py-8 px-3 border-r"
@@ -388,7 +396,6 @@ const dangerItem = computed(() => props.isOwner)
             <button
               type="button"
               class="w-full flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] font-medium text-left cursor-pointer transition-colors"
-              :class="activeSection === 'yasaklar' && false ? '' : ''"
               style="color: var(--kv-danger);"
               @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'"
               @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
@@ -403,38 +410,85 @@ const dangerItem = computed(() => props.isOwner)
 
       <!-- Sağ içerik alanı -->
       <div class="flex-1 flex flex-col overflow-hidden" style="background-color: var(--kv-bg-content);">
-        <!-- İçerik header -->
+        <!-- İçerik header: detay modunda sağ üstte kapat butonu görünür kalır -->
         <div
-          class="shrink-0 flex items-center justify-between px-8 border-b"
+          class="shrink-0 flex items-center border-b"
           style="height: var(--kv-header-height); border-color: var(--kv-border-subtle);"
+          :class="activeSection === 'roller' && rolesDetailMode ? 'justify-end px-6' : 'justify-between'"
         >
-          <h2 class="text-[18px] font-semibold" style="color: var(--kv-text-primary);">
-            <span v-if="activeSection === 'genel'">{{ t('guildSettings.nav.genel') }}</span>
-            <span v-else-if="activeSection === 'roller'">{{ t('guildSettings.nav.roller') }}</span>
-            <span v-else-if="activeSection === 'davetler'">{{ t('guildSettings.nav.davetler') }}</span>
-            <span v-else-if="activeSection === 'yasaklar'">{{ t('guildSettings.nav.yasaklar') }}</span>
-          </h2>
+          <!-- Normal başlık (detay değilse iç-kolon içinde) -->
+          <template v-if="!(activeSection === 'roller' && rolesDetailMode)">
+            <!-- İç kolon max-width sarıcısı -->
+            <div class="flex items-center justify-between flex-1" style="max-width: 1000px;">
+              <h2 class="text-[18px] font-semibold px-8" style="color: var(--kv-text-primary);">
+                <span v-if="activeSection === 'genel'">{{ t('guildSettings.nav.genel') }}</span>
+                <span v-else-if="activeSection === 'roller'">{{ t('guildSettings.nav.roller') }}</span>
+                <span v-else-if="activeSection === 'davetler'">{{ t('guildSettings.nav.davetler') }}</span>
+                <span v-else-if="activeSection === 'yasaklar'">{{ t('guildSettings.nav.yasaklar') }}</span>
+              </h2>
 
-          <!-- Kapat butonu + ESC göstergesi -->
-          <div class="flex items-center gap-3">
-            <span class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">ESC</span>
-            <button
-              type="button"
-              class="flex items-center justify-center rounded-full transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-              style="width: 32px; height: 32px; color: var(--kv-text-muted);"
-              :aria-label="t('common.close')"
-              @click="handleClose"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
+              <!-- Kapat butonu + ESC göstergesi -->
+              <div class="flex items-center gap-3 px-8">
+                <span class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">ESC</span>
+                <button
+                  type="button"
+                  class="flex items-center justify-center rounded-full transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
+                  style="width: 32px; height: 32px; color: var(--kv-text-muted);"
+                  :aria-label="t('common.close')"
+                  @click="handleClose"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <!-- Detay modunda sadece kapat butonu -->
+          <template v-else>
+            <div class="flex items-center gap-3">
+              <span class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">ESC</span>
+              <button
+                type="button"
+                class="flex items-center justify-center rounded-full transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
+                style="width: 32px; height: 32px; color: var(--kv-text-muted);"
+                :aria-label="t('common.close')"
+                @click="handleClose"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+          </template>
+        </div>
+
+        <!-- Roller bölümü: tek instance, detay modunda full-width, liste modunda iç-kolon içinde -->
+        <div
+          v-if="activeSection === 'roller'"
+          class="flex-1 flex flex-col min-h-0"
+          :class="rolesDetailMode ? 'overflow-hidden' : 'overflow-y-auto'"
+        >
+          <!-- Sarıcı: liste modunda padding+max-width; detay modunda kaldırılır -->
+          <div
+            :class="rolesDetailMode ? 'flex-1 flex flex-col min-h-0' : 'px-8 py-6'"
+            :style="rolesDetailMode ? '' : 'max-width: 1000px; width: 100%;'"
+          >
+            <RolesSettingsSection
+              :guild="guild"
+              :is-owner="isOwner"
+              :is-admin="isAdmin"
+              @update:detail-mode="rolesDetailMode = $event"
+            />
           </div>
         </div>
 
-        <!-- Kaydırılabilir içerik -->
-        <div class="flex-1 overflow-y-auto px-8 py-6">
+        <div v-else class="flex-1 overflow-y-auto">
+          <div style="max-width: 1000px; width: 100%;">
+            <div class="px-8 py-6">
 
           <!-- ── Genel bölümü ── -->
           <div v-if="activeSection === 'genel'" class="flex flex-col gap-6 max-w-xl">
@@ -575,15 +629,6 @@ const dangerItem = computed(() => props.isOwner)
             </div>
           </div>
 
-          <!-- ── Roller bölümü ── -->
-          <div v-else-if="activeSection === 'roller'" class="h-full">
-            <RolesSettingsSection
-              :guild="guild"
-              :is-owner="isOwner"
-              :is-admin="isAdmin"
-            />
-          </div>
-
           <!-- ── Davetler bölümü ── -->
           <div v-else-if="activeSection === 'davetler'" class="flex flex-col gap-6 max-w-xl">
             <section>
@@ -694,9 +739,11 @@ const dangerItem = computed(() => props.isOwner)
             </section>
           </div>
 
-        </div>
-      </div>
-    </div>
+            </div><!-- /px-8 py-6 -->
+          </div><!-- /max-width kolon -->
+        </div><!-- /flex-1 overflow-y-auto (else) -->
+      </div><!-- /sağ içerik alanı -->
+    </div><!-- /fixed dialog -->
 
     <!-- Davet iptal onay diyaloğu -->
     <ConfirmDialog
