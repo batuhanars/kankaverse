@@ -295,21 +295,36 @@ const { isJumping } = useJumpToMessage(listEl, () => props.channel.id)
 // çalışma. length izlenir (appendMessage in-place push → referans değişmez, eski
 // watch(messages) tetiklenmezdi).
 let stickToBottom = true
+// REV-9: yukarıda geçmiş okurken gelen yeni mesaj sayısı → sağ-alt "aşağı in" butonu rozeti
+const newMessageCount = ref(0)
 function onListScroll() {
   const el = listEl.value
   if (!el) return
   stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+  if (stickToBottom) newMessageCount.value = 0
 }
 
 watch(() => messages.value.length, async (n, o) => {
   if (isJumping.value || n <= o) return
-  if (!stickToBottom) return
-  await nextTick()
-  scrollToBottom()
+  if (stickToBottom) {
+    newMessageCount.value = 0
+    await nextTick()
+    scrollToBottom()
+  } else {
+    // REV-9: yukarıda okuyorum → kaydırma; gelenleri say
+    newMessageCount.value += n - o
+  }
 }, { flush: 'post' })
 
 function scrollToBottom() {
   if (listEl.value) listEl.value.scrollTop = listEl.value.scrollHeight
+}
+
+// REV-9: aşağı-in butonu → dibe kay + sayacı sıfırla
+function jumpToBottom() {
+  stickToBottom = true
+  newMessageCount.value = 0
+  scrollToBottom()
 }
 
 async function loadMore() {
@@ -782,6 +797,7 @@ function isGroupStart(index: number): boolean {
       <DmCallPanel :channel-id="channel.id" />
 
       <!-- Mesaj listesi (Discord stili — baloncuk yok, sola yaslı düz liste) -->
+      <div class="relative flex-1 min-h-0 flex flex-col">
       <div ref="listEl" class="flex-1 overflow-y-auto py-4 flex flex-col" @scroll="onListScroll">
         <div v-if="hasMore" class="flex justify-center py-2">
           <button
@@ -858,6 +874,23 @@ function isGroupStart(index: number): boolean {
             </button>
           </template>
         </MessageRow>
+      </div>
+
+      <!-- REV-9: yeni mesaj geldiğinde (yukarıdayken) aşağı-in butonu + gelen mesaj sayısı -->
+      <button
+        v-if="newMessageCount > 0"
+        class="absolute right-4 bottom-3 z-10 flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full cursor-pointer transition-opacity hover:opacity-90 shadow-lg"
+        style="background-color: var(--kv-accent-500); color: #ffffff;"
+        @click="jumpToBottom"
+      >
+        <span class="flex items-center justify-center text-[11px] font-bold rounded-full" style="min-width: 18px; height: 18px; background-color: var(--kv-danger);">
+          {{ newMessageCount > 99 ? '99+' : newMessageCount }}
+        </span>
+        <span class="text-[12px] font-semibold">{{ t('message.newMessages') }}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
       </div>
 
       <!-- Mesaj input / Engel bandı -->

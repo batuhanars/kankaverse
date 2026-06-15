@@ -385,6 +385,7 @@
     "emojiButton": "Emoji ekle",
     "send": "Gönder",
     "loadMore": "Daha fazla yükle",
+    "newMessages": "Yeni mesaj",
     "noMessages": "Henüz mesaj yok. İlk mesajı sen gönder!",
     "realtimeError": "Gerçek zamanlı bağlantı kurulamadı — yeni mesajlar anlık görünmeyebilir.",
     "actions": "Mesaj aksiyonları",

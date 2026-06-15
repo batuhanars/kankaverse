@@ -602,4 +602,18 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **REV-4 → TAMAMLANDI:** Backend: `unreadMentionCount` (kanal+guild DTO) `mentions: { has: userId }` + lastReadAt sorgusu. Frontend: rail kırmızı sayaç → `unreadMentionCount` (beyaz pill generic aktivite KALDI); WS `mention` → kanal+guild mention sayacı anlık artış; kanal okununca sıfırlanır. **Bahsetme bandı** (`ChannelPanel` altı, tam genişlik kırmızı): tıkla→sıradaki bahsetme kanalına sidebar'da zıpla+vurgula (katlanmış kategori açılır, içine GİRMEZ), tekrar tıkla→sonraki, hepsi okununca bant kaybolur. 485 test (spec'ler 2-count'a güncellendi) + web build temiz
 
 **Arama genişletme:**
-- [ ] **REV-3 — Ortam araması:** sağ-üst arama metin kelime-kelime göstersin + kullanıcı adı + bahsetmelerde arasın (Discord-benzeri sonuç görünümü; Notion'da örnek görsel)
+- [ ] **REV-3 — Ortam araması:** mesaj sonuçlarında **eşleşen kelimeyi highlight** (Discord görseli: sarı/vurgu zemin) + aynı arama kutusunda **ortam üyelerini (kullanıcı) ara**
+
+---
+
+## Revizeler — Sahip saha testi 2. tur (2026-06-15)
+
+> İkinci kullanım turundan. PM-onaylı (sahip talebi). Dev checkbox işaretler.
+
+- [ ] **REV-9 — Scroll "yeni mesaj" butonu (REV-1 evrimi):** kullanıcı yukarıda geçmiş okurken yeni mesaj gelince **otomatik kaydırma** okuduğunu böler → onun yerine sohbet sağ-altında **aşağı-ok butonu + kırmızı baloncukta gelen yeni mesaj sayısı**; tıkla→dibe in+sıfırla. Dipteyken davranış aynı (otomatik kayar). MessageArea + DmConversation. (Yan: "ilk mesajda kaymıyor 2.'de kayıyor" bug'ı da bu yapıyla biter.)
+- [ ] **REV-10 — Kanka Ekle re-add (R7):** DM'de "Kanka Ekle" `by-user` (USER_CLICK) **ortak-ortam ŞART** koşuyor → eski-arkadaşlar ortak ortam yoksa "gönderilemedi". Mevcut 1-1 DM kanalı varsa (önceki canDm geçmiş = kurulu temas) `canSendFriendRequest` izin versin. **R7 — incele.** (Engellide buton zaten gizli; sadece çıkarma sonrası re-add)
+- [ ] **REV-11 — Devam eden çağrıya "Sese Katıl":** DM/grup-DM'de ses sürerken (ben çıktım, karşı taraf konuşuyor) telefon-ara (ring+kabul bekle) yerine **doğrudan "Sese Katıl"** butonu. Kanalda aktif katılımcı varsa join, yoksa ring.
+- [ ] **REV-12 — Tek kişi → otomatik bitir:** 1-1 DM veya grup ses'te yalnız 1 kişi kalınca belli süre sonra sistem oturumu otomatik kapatsın.
+- [ ] **REV-13 — Görüşme süresi sayacı:** "Sese bağlısın" barına **anlık artan süre**; AYNISI ortam ses kanalına → sol sidebar'da kanal karşısında aktif-süre sayacı (belirgin renk, yeşil).
+- [ ] **REV-14 — Realtime denetimi (KAPSAMLI):** ortama **yeni katılan üye anlık görünmüyor** (üye listesi + mention autocomplete) → sayfa yenileme gerekiyor. Masaüstünde yenileme olmayacak → **her şey anlık olmalı.** Guild member-join WS event'i + frontend wiring; ayrıca tüm akışları tara (üye çıkış/kick, kanal/kategori CRUD, rol, ortam ayar/ikon, kanal oluştur) anlık mı — değilse düzelt.
+- [ ] **REV-6 (uzun-süre):** mic kilitlenme tek seferde gitmiş görünüyor; uzun-soluklu kullanımda tekrar çıkarsa yeniden bakılacak (sahip notu)
