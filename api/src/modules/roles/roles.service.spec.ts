@@ -22,6 +22,7 @@ const prismaMock = {
     upsert: jest.fn(),
     deleteMany: jest.fn(),
   },
+  $transaction: jest.fn(),
 };
 
 const membershipMock = {
@@ -596,5 +597,104 @@ describe('RolesService.updateRole — @everyone kısıtlamaları', () => {
 
     expect(result.color).toBe('#FFFFFF');
     expect(prismaMock.role.update).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── RolesService.reorderRoles ────────────────────────────────────────────────
+
+describe('RolesService.reorderRoles', () => {
+  let service: RolesService;
+
+  const ROLE_FIXTURE_2 = {
+    ...ROLE_FIXTURE,
+    id: 'role-two',
+    name: 'Yardımcı',
+    position: 2,
+  };
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    // guildMemberIds için varsayılan
+    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: OWNER_ID }, { userId: MEMBER_ID }]);
+    // $transaction: gelen array'deki promise'leri çalıştırır
+    prismaMock.$transaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
+    // role.update: güncel role fixture döndür
+    prismaMock.role.update.mockImplementation(({ where }: { where: { id: string } }) => {
+      if (where.id === ROLE_ID) return Promise.resolve(ROLE_FIXTURE);
+      return Promise.resolve(ROLE_FIXTURE_2);
+    });
+    prismaMock.guildMemberRole.count.mockResolvedValue(0);
+  });
+
+  it('(a) OWNER → pozisyonlar güncellenir, null döner', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: OWNER_MEMBERSHIP,
+    });
+    // findMany (geçerli roller — isEveryone: false)
+    prismaMock.role.findMany
+      .mockResolvedValueOnce([{ id: ROLE_ID }, { id: ROLE_FIXTURE_2.id }]) // validRoles (select: { id })
+      .mockResolvedValueOnce([ROLE_FIXTURE, ROLE_FIXTURE_2]); // re-fetch for realtime
+
+    const items = [
+      { id: ROLE_ID, position: 0 },
+      { id: ROLE_FIXTURE_2.id, position: 1 },
+    ];
+
+    const result = await service.reorderRoles(OWNER_ID, GUILD_ID, items);
+
+    expect(result).toBeNull();
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.role.update).toHaveBeenCalledTimes(2);
+    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith(
+      expect.arrayContaining([OWNER_ID, MEMBER_ID]),
+      'guild.role_updated',
+      expect.objectContaining({ id: ROLE_ID }),
+    );
+  });
+
+  it('(b) @everyone item geçilse bile filtrelenir — pozisyonu DEĞİŞMEZ', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: OWNER_MEMBERSHIP,
+    });
+    // findMany ile geçerli roller — @everyone hariç yalnız ROLE_ID döndü
+    prismaMock.role.findMany
+      .mockResolvedValueOnce([{ id: ROLE_ID }]) // validRoles: @everyone ID yok
+      .mockResolvedValueOnce([ROLE_FIXTURE]); // re-fetch
+
+    const items = [
+      { id: ROLE_ID, position: 3 },
+      { id: EVERYONE_ROLE_FIXTURE.id, position: 0 }, // @everyone — filtrelenmeli
+    ];
+
+    const result = await service.reorderRoles(OWNER_ID, GUILD_ID, items);
+
+    expect(result).toBeNull();
+    // Yalnız ROLE_ID güncellendi, @everyone için update çağrılmadı
+    expect(prismaMock.role.update).toHaveBeenCalledTimes(1);
+    expect(prismaMock.role.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: ROLE_ID }, data: { position: 3 } }),
+    );
+    expect(prismaMock.role.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: EVERYONE_ROLE_FIXTURE.id } }),
+    );
+  });
+
+  it('(c) MEMBER aktör → ForbiddenException FORBIDDEN fırlatır', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: MEMBER_MEMBERSHIP,
+    });
+
+    await expect(
+      service.reorderRoles(MEMBER_ID, GUILD_ID, [{ id: ROLE_ID, position: 1 }]),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'FORBIDDEN' }),
+    });
+
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.role.update).not.toHaveBeenCalled();
   });
 });
