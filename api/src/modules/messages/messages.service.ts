@@ -632,4 +632,76 @@ export class MessagesService {
 
     return messages.map((msg) => toMessageDto(msg, userId));
   }
+
+  /**
+   * Sunucu-geneli mesaj arama — kullanıcının ERİŞEBİLDİĞİ guild metin kanallarında.
+   * Sızıntı-güvenli: yaş-kapılı/adultsOnly minöre kapalı; özel kanal yalnız OWNER/ADMIN
+   * veya ChannelMember'a. Sonuç kanal-gruplu döner (Discord-tarzı).
+   */
+  async searchGuildMessages(userId: string, guildId: string, q: string) {
+    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
+
+    const trimmedQ = q.trim();
+    if (trimmedQ.length < 2) {
+      throw new BadRequestException({ error: 'QUERY_TOO_SHORT', message: 'Arama için en az 2 karakter girin.' });
+    }
+    const safeQ = trimmedQ.slice(0, 100);
+
+    const guild = await this.prisma.guild.findUnique({ where: { id: guildId }, select: { adultsOnly: true } });
+    const channels = await this.prisma.channel.findMany({
+      where: { guildId, deletedAt: null, type: 'GUILD_TEXT' },
+      select: { id: true, name: true, ageGated: true, isPrivate: true },
+    });
+
+    const privileged = membership.role === 'OWNER' || membership.role === 'ADMIN';
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { isMinor: true } });
+    const isMinor = user?.isMinor ?? false;
+
+    // Özel kanal üyeliği (yalnız ayrıcalıklı değilse gerekir)
+    let memberChannelIds = new Set<string>();
+    const privateIds = channels.filter((c) => c.isPrivate).map((c) => c.id);
+    if (privateIds.length && !privileged) {
+      const cms = await this.prisma.channelMember.findMany({
+        where: { userId, channelId: { in: privateIds } },
+        select: { channelId: true },
+      });
+      memberChannelIds = new Set(cms.map((c) => c.channelId));
+    }
+
+    const accessible = channels.filter((c) => {
+      if ((c.ageGated || guild?.adultsOnly) && isMinor) return false; // yaş kapısı
+      if (c.isPrivate && !privileged && !memberChannelIds.has(c.id)) return false; // özel kanal
+      return true;
+    });
+    if (accessible.length === 0) return [];
+
+    const nameById = new Map(accessible.map((c) => [c.id, c.name]));
+    const messages = await this.prisma.message.findMany({
+      where: {
+        channelId: { in: accessible.map((c) => c.id) },
+        deletedAt: null,
+        content: { contains: safeQ, mode: 'insensitive' },
+      },
+      include: {
+        author: { select: { id: true, username: true, avatarUrl: true } },
+        attachments: { select: { id: true, filename: true, contentType: true, size: true, scanStatus: true } },
+        reactions: { select: { userId: true, emoji: true } },
+        replyTo: REPLY_TO_INCLUDE,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    // Kanal-gruplu sonuç (kanal sırası: ilk eşleşmenin geldiği sıra)
+    const grouped = new Map<string, ReturnType<typeof toMessageDto>[]>();
+    for (const m of messages) {
+      if (!grouped.has(m.channelId)) grouped.set(m.channelId, []);
+      grouped.get(m.channelId)!.push(toMessageDto(m, userId));
+    }
+    return [...grouped.entries()].map(([channelId, msgs]) => ({
+      channelId,
+      channelName: nameById.get(channelId) ?? '',
+      messages: msgs,
+    }));
+  }
 }

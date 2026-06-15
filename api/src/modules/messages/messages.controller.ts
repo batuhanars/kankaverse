@@ -189,3 +189,26 @@ export class PinsController {
     return this.messagesService.findPins(user.id, channelId);
   }
 }
+
+/**
+ * Sunucu-geneli mesaj arama — guild-scoped route.
+ * GET /guilds/:id/messages/search?q= → erişilebilir kanallarda, kanal-gruplu.
+ */
+@ApiTags('messages')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('guilds/:id/messages')
+export class GuildSearchController {
+  constructor(private messagesService: MessagesService) {}
+
+  @Get('search')
+  @ApiOperation({ summary: 'Sunucu-geneli mesaj arama (erişilebilir kanallarda, kanal-gruplu)' })
+  @ApiQuery({ name: 'q', required: true, description: 'Arama sorgusu (min 2, max 100 karakter)' })
+  searchGuild(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Query('q') q: string,
+  ) {
+    return this.messagesService.searchGuildMessages(user.id, guildId, q ?? '');
+  }
+}

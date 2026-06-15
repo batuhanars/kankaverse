@@ -624,6 +624,10 @@
     "membersSection": "ÜYELER",
     "userOpenFailed": "Bu kullanıcıyla sohbet başlatılamadı."
   },
+  "guildSearch": {
+    "title": "Ortamda Ara",
+    "placeholder": "Tüm kanallarda ara…"
+  },
   "notifications": {
     "title": "Bildirimler",
     "empty": "Henüz bildirim yok.",
