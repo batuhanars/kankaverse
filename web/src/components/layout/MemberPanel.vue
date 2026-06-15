@@ -5,6 +5,7 @@ import { useGuildsStore } from '@/stores/guilds'
 import { usePresenceStore } from '@/stores/presence'
 import { useAuthStore } from '@/stores/auth'
 import { useMembersStore } from '@/stores/members'
+import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { guildsApi } from '@/api/guilds'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import GuildMemberRow from '@/components/layout/GuildMemberRow.vue'
@@ -50,11 +51,11 @@ const isOwner = computed(() => {
   return guild.ownerId === myUserId.value
 })
 
-// Aktif guild'de ADMIN mi? (store önbellekten)
-const isAdminOrOwner = computed(() => {
-  if (!myUserId.value) return false
-  return guildsStore.isAdminInActiveGuild(myUserId.value)
-})
+// Efektif izin (UX gating) — backend hiyerarşi + izni zorlar
+const { can } = useGuildPermissions(() => guildsStore.activeGuildId ?? '')
+
+// Üye üzerinde herhangi bir aksiyon yapabilir mi (menüyü göster)
+const canActOnMembers = computed(() => isOwner.value || can('KICK_MEMBERS') || can('BAN_MEMBERS'))
 
 // ── Gruplar computed — hoist rollere göre ───────────────────────────────────
 
@@ -120,14 +121,16 @@ function closeMenu() {
 
 // Üye satırında menü gösterilip gösterilmeyeceği
 function shouldShowMenu(member: GuildMemberDto): boolean {
-  if (!isAdminOrOwner.value) return false
+  if (!canActOnMembers.value) return false
   if (member.userId === myUserId.value) return false
   if (member.role === 'OWNER') return false
+  // Enum-ADMIN hedefe yalnız OWNER aksiyon alabilir (backend hiyerarşisiyle uyumlu UI yaklaşığı)
   if (!isOwner.value && member.role === 'ADMIN') return false
   return true
 }
 
 function canChangeRole(member: GuildMemberDto): boolean {
+  // Enum rol ataması (ADMIN/MEMBER) yalnız OWNER (backend: updateMemberRole OWNER-only)
   return isOwner.value && member.userId !== myUserId.value && member.role !== 'OWNER'
 }
 
@@ -135,11 +138,17 @@ function canKick(member: GuildMemberDto): boolean {
   if (member.userId === myUserId.value) return false
   if (member.role === 'OWNER') return false
   if (isOwner.value) return true
-  if (isAdminOrOwner.value && member.role === 'MEMBER') return true
-  return false
+  if (member.role === 'ADMIN') return false // enum-admin'i yalnız owner atabilir
+  return can('KICK_MEMBERS')
 }
 
-const canBan = canKick
+function canBan(member: GuildMemberDto): boolean {
+  if (member.userId === myUserId.value) return false
+  if (member.role === 'OWNER') return false
+  if (isOwner.value) return true
+  if (member.role === 'ADMIN') return false
+  return can('BAN_MEMBERS')
+}
 
 function canTransfer(member: GuildMemberDto): boolean {
   return isOwner.value && member.userId !== myUserId.value && member.role !== 'OWNER'

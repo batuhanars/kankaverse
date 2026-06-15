@@ -271,6 +271,7 @@
     "adultsOnlySection": "İçerik Yaşı",
     "adultsOnlyLabel": "Yalnızca Yetişkinler (18+)",
     "adultsOnlyDesc": "Bu ortama yalnızca yetişkinler katılabilir ve içeriklere erişebilir. Açıldığında minör kullanıcılar engellenir.",
+    "adultsOnlyOwnerOnly": "Bu ayarı yalnızca ortam sahibi değiştirebilir.",
     "inviteSection": "Davet Yönetimi",
     "descriptionSection": "Açıklama",
     "descriptionSubtitle": "Ortamın nasıl başladı? İnsanlar neden katılmalı?",

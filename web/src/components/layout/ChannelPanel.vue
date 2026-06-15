@@ -30,14 +30,12 @@ const membersStore = useMembersStore()
 
 const showSettings = ref(false)
 
-// Efektif izin (UX gating) — backend otorite kalır. İnce dilim: settings erişimi.
-const { canOpenSettings } = useGuildPermissions(() => guildsStore.activeGuildId ?? '')
+// Efektif izin (UX gating) — backend otorite kalır.
+const { can, canOpenSettings } = useGuildPermissions(() => guildsStore.activeGuildId ?? '')
 
-// Kategori + kanal yönetimi: OWNER veya ADMIN
-const isAdmin = computed(() => {
-  if (!authStore.user) return false
-  return guildsStore.isAdminInActiveGuild(authStore.user.id)
-})
+// Kategori + kanal yönetimi → MANAGE_CHANNELS (owner / enum-admin / ADMINISTRATOR dahil).
+// İsim "isAdmin" geriye-uyum için korunur; tüm kanal-yönetimi ref'leri buradan beslenir.
+const isAdmin = computed(() => can('MANAGE_CHANNELS'))
 
 // Ortam ayarları (ad, ikon, vb.): yalnız OWNER (önceki davranış korunur)
 const isOwner = computed(() => {

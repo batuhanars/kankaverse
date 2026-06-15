@@ -10,6 +10,7 @@ import { useSocket } from '@/composables/useSocket'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
 import { useJumpToMessage } from '@/composables/useMessageJump'
+import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { messagesApi } from '@/api/messages'
 import MessageItem from '@/components/shared/MessageItem.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
@@ -24,8 +25,10 @@ const authStore = useAuthStore()
 const membersStore = useMembersStore()
 const { joinChannel, leaveChannel } = useSocket()
 
-// Sprint V2 Pins: guild kanalında yalnız OWNER/ADMIN sabitleyebilir (§2)
-const canPin = computed(() => guildsStore.isAdminInActiveGuild(authStore.user?.id ?? ''))
+// Mesaj yönetimi (pin + başkasının mesajını silme) → MANAGE_MESSAGES (owner/admin/ADMINISTRATOR dahil)
+const { can } = useGuildPermissions(() => guildsStore.activeGuildId ?? '')
+const canManageMessages = computed(() => can('MANAGE_MESSAGES'))
+const canPin = canManageMessages
 const { onInput: onTypingInput, stopTyping } = useTyping(() => channelId.value)
 const { label: typingLabel } = useTypingLabel(() => channelId.value, t)
 
@@ -376,6 +379,7 @@ function resetComposerHeight() {
           :is-group-start="isGroupStart(index)"
           :guild-members="guildMembers"
           :can-pin="canPin"
+          :can-manage-messages="canManageMessages"
           @reply="setReplyingTo"
         />
       </template>
