@@ -53,5 +53,15 @@ Rol sürükle-sırala (hiyerarşi/position), rol mention (`@rol`), rol simgesi y
 
 ---
 
+## Sahip netleştirmeleri (2026-06-15, Faz 1 sonrası)
+
+- **Faz 1.1 hızlı-fix (web):** `GuildSettingsView` sol-nav + içerik **ekranın ortasına** hizalansın (Discord gibi — sabit max-genişlikli merkez kolon; şu an çok solda duruyor). Tam-ekran overlay zemini ortada bir konteyner sarar (örn. nav+içerik birlikte `max-w-[1100px] mx-auto` benzeri), iki yanda boşluk.
+- **Rol özgürlüğü (Faz 3 mimari pekiştirme):** Discord'da admin "rolü" diye sabit bir şey YOK — sahip **kendi rolünü oluşturur, tüm izinleri verir, adını istediği gibi koyar** ("Yönetici" zorunlu değil). Bizde de gerçek yetki **rol izin bayraklarından** gelir, rol ADINDAN değil. Mevcut `ADMIN` enum **yalnız geçiş-uyumu** (ileride ADMIN üyeler için varsayılan tam-izinli bir role migrate edilebilir); kalıcı mekanizma rol-izinleridir. `hasGuildPermission` bayrak setine bakar, isme değil.
+- **Üye listesi gruplama kuralları (Faz 2 kesinleştirme):**
+  - Ortamda hiç (hoist'li) rol yoksa → sağ panelde **yalnız "Çevrimiçi"** (mevcut davranış) + "Çevrimdışı".
+  - Hoist'li bir rol varsa → o rol **ayrı başlık** (rol rengi) + üyeleri; bu üyeler **"Çevrimiçi" grubundan ÇIKARILIR**.
+  - "Çevrimiçi" grubu boşalırsa **başlık kaybolur** (Discord davranışı; sahip ekran görüntüsüyle doğruladı).
+  - Bir üye birden çok hoist'li role sahipse → **en yüksek (position)** hoist'li rolün grubunda görünür.
+
 ## Çalışma modeli (bu sprint)
 PM (Opus) bu sözleşmeyi + her faz görevini composer; **Sonnet dev session** tier'a iner (`web/` veya `api/`), kodu yazar, build/test çalıştırır, commit eder. PM Faz 3'ü (izin enforcement) R7 satır-satır inceler. Sapma → dev DURUR, PM contract'ı revize eder.
