@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { invitesApi } from '@/api/invites'
@@ -13,8 +14,22 @@ const props = withDefaults(defineProps<{ initialStep?: 'choose' | 'create' | 'jo
 const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
+const router = useRouter()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
+
+// Ortama gir: ilk kanal varsa route'a git (URL=tek doğruluk kaynağı → ekran açılır),
+// yoksa yalnız aktif yap (rail'de görünür, kanal yok). REV: katılınca otomatik gir.
+async function enterGuild(guildId: string) {
+  guildsStore.setActiveGuild(guildId)
+  await channelsStore.fetchChannels(guildId)
+  const channels = channelsStore.channelsForGuild(guildId)
+  if (channels.length) {
+    await router.push({ name: 'channel', params: { guildId, channelId: channels[0].id } })
+  } else {
+    channelsStore.setActiveChannel(null)
+  }
+}
 
 type Step = 'choose' | 'create' | 'join'
 const step = ref<Step>(props.initialStep)
@@ -56,10 +71,7 @@ async function handleCreate() {
   error.value = ''
   try {
     const guild = await guildsStore.createGuild(name.value.trim())
-    guildsStore.setActiveGuild(guild.id)
-    await channelsStore.fetchChannels(guild.id)
-    const channels = channelsStore.channelsForGuild(guild.id)
-    if (channels.length) channelsStore.setActiveChannel(channels[0].id)
+    await enterGuild(guild.id)
     emit('close')
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string; message?: string } } }
@@ -80,10 +92,7 @@ async function handleJoin() {
   error.value = ''
   try {
     const guild = await guildsStore.joinByInvite(code)
-    guildsStore.setActiveGuild(guild.id)
-    await channelsStore.fetchChannels(guild.id)
-    const channels = channelsStore.channelsForGuild(guild.id)
-    if (channels.length) channelsStore.setActiveChannel(channels[0].id)
+    await enterGuild(guild.id)
     emit('close')
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string; error?: string } } }
