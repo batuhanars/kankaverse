@@ -5,22 +5,23 @@ import { useMessagesStore } from '@/stores/messages'
 import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
 import { useAuthStore } from '@/stores/auth'
+import { useMembersStore } from '@/stores/members'
 import { useSocket } from '@/composables/useSocket'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
 import { useJumpToMessage } from '@/composables/useMessageJump'
 import { messagesApi } from '@/api/messages'
-import { guildsApi } from '@/api/guilds'
 import MessageItem from '@/components/shared/MessageItem.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
-import type { MessageDto, GuildMemberDto } from '@/types'
+import type { MessageDto } from '@/types'
 
 const { t } = useI18n()
 const messagesStore = useMessagesStore()
 const channelsStore = useChannelsStore()
 const guildsStore = useGuildsStore()
 const authStore = useAuthStore()
+const membersStore = useMembersStore()
 const { joinChannel, leaveChannel } = useSocket()
 
 // Sprint V2 Pins: guild kanalında yalnız OWNER/ADMIN sabitleyebilir (§2)
@@ -47,8 +48,8 @@ const composeFile = ref<File | null>(null)
 // Yanıt state
 const replyingTo = ref<MessageDto | null>(null)
 
-// Sprint V2: guild üyeleri (mention autocomplete + resolver için)
-const guildMembers = ref<GuildMemberDto[]>([])
+// Sprint V2: guild üyeleri (mention autocomplete + resolver için) — REV-14: members store (WS anlık)
+const guildMembers = computed(() => membersStore.membersFor(guildsStore.activeGuildId ?? ''))
 
 function setReplyingTo(msg: MessageDto) {
   replyingTo.value = msg
@@ -124,16 +125,16 @@ function onComposePickerDocClick(e: MouseEvent) {
 onMounted(() => document.addEventListener('click', onComposePickerDocClick))
 onUnmounted(() => document.removeEventListener('click', onComposePickerDocClick))
 
-// Sprint V2: guild değişince üyeleri yükle (mention autocomplete için)
+// Sprint V2: guild değişince üyeleri yükle (mention autocomplete için) — store paylaşımlı
 watch(
   () => guildsStore.activeGuildId,
   async (guildId) => {
-    if (!guildId) { guildMembers.value = []; return }
-    try {
-      const res = await guildsApi.getMembers(guildId)
-      guildMembers.value = res.data
-    } catch {
-      guildMembers.value = []
+    if (guildId && !membersStore.membersByGuild[guildId]) {
+      try {
+        await membersStore.fetchMembers(guildId)
+      } catch {
+        // sessiz
+      }
     }
   },
   { immediate: true },

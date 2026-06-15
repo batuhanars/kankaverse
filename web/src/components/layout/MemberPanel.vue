@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useGuildsStore } from '@/stores/guilds'
 import { usePresenceStore } from '@/stores/presence'
 import { useAuthStore } from '@/stores/auth'
+import { useMembersStore } from '@/stores/members'
 import { guildsApi } from '@/api/guilds'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
@@ -13,8 +14,10 @@ const { t } = useI18n()
 const guildsStore = useGuildsStore()
 const presenceStore = usePresenceStore()
 const authStore = useAuthStore()
+const membersStore = useMembersStore()
 
-const members = ref<GuildMemberDto[]>([])
+// REV-14: üye listesi store'dan (WS guild.member_* ile anlık güncellenir)
+const members = computed(() => membersStore.membersFor(guildsStore.activeGuildId ?? ''))
 
 // İşlem menüsü ve hata state'leri — watch'tan önce tanımla (immediate callback erişir)
 const openMenuUserId = ref<string | null>(null)
@@ -27,15 +30,11 @@ watch(
     roleError.value = ''
     kickError.value = ''
     openMenuUserId.value = null
-    if (!guildId) {
-      members.value = []
-      return
-    }
+    if (!guildId) return
     try {
-      const res = await guildsApi.getMembers(guildId)
-      members.value = res.data
+      await membersStore.fetchMembers(guildId)
     } catch {
-      members.value = []
+      // sessiz — boş kalır
     }
   },
   { immediate: true },
@@ -136,9 +135,8 @@ async function changeRole(member: GuildMemberDto, newRole: 'ADMIN' | 'MEMBER') {
   closeMenu()
   try {
     const res = await guildsApi.updateMemberRole(guildId, member.userId, newRole)
-    // Listedeki üyeyi güncelle
-    const idx = members.value.findIndex((m) => m.userId === member.userId)
-    if (idx !== -1) members.value[idx] = res.data
+    // Optimistik güncelle (WS guild.member_updated da gelir — idempotent)
+    membersStore.updateMember(guildId, res.data)
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string; message?: string } } }
     const code = err.response?.data?.error
@@ -170,7 +168,8 @@ async function confirmKick() {
   kickError.value = ''
   try {
     await guildsApi.kickMember(guildId, target.userId)
-    members.value = members.value.filter((m) => m.userId !== target.userId)
+    // Optimistik (WS guild.member_left da gelir — idempotent)
+    membersStore.removeMember(guildId, target.userId)
     kickTarget.value = null
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string; message?: string } } }

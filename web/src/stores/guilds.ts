@@ -59,6 +59,13 @@ export const useGuildsStore = defineStore('guilds', () => {
     activeGuildId.value = id
   }
 
+  /** REV-14: yerel kaldırma (atıldım/ayrıldım — WS guild.member_left) */
+  function removeGuildLocal(id: string): void {
+    guilds.value = guilds.value.filter((g) => g.id !== id)
+    if (activeGuildId.value === id) activeGuildId.value = null
+    delete myRoleByGuild.value[id]
+  }
+
   /** Sprint V2 — kullanıcının guild'deki rolünü önbellekle (channels store fetch sonrası çağrılır) */
   function setMyRole(guildId: string, role: GuildMemberRole): void {
     myRoleByGuild.value[guildId] = role
@@ -109,5 +116,5 @@ export const useGuildsStore = defineStore('guilds', () => {
     }
   }
 
-  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, deleteGuild, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread, setGuildMentionCount, incrementGuildMention }
+  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, deleteGuild, removeGuildLocal, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread, setGuildMentionCount, incrementGuildMention }
 })

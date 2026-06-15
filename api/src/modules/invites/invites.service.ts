@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
+import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { InviteDto, InvitePreviewDto } from './dto/invite.dto';
 import { generateInviteCode } from './utils/invite-code.util';
@@ -46,6 +47,7 @@ export class InvitesService {
   constructor(
     private prisma: PrismaService,
     private membershipService: MembershipService,
+    private realtime: RealtimeService,
   ) {}
 
   /** POST /guilds/:id/invites — OWNER/ADMIN */
@@ -204,6 +206,35 @@ export class InvitesService {
       }),
     ]);
 
+    // REV-14 realtime: mevcut üyelere yeni katılanı anlık bildir (üye listesi +
+    // mention autocomplete sayfa yenilemeden güncellensin). Transaction SONRASI.
+    await this.notifyMemberJoined(guild.id, userId);
+
     return toGuildDto(guild);
+  }
+
+  /** REV-14: yeni üyeyi guild'in diğer üyelerine `guild.member_joined` ile yay. */
+  private async notifyMemberJoined(guildId: string, newUserId: string) {
+    const newMember = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId: newUserId } },
+      include: { user: { select: { id: true, username: true, avatarUrl: true } } },
+    });
+    if (!newMember) return;
+
+    const members = await this.prisma.guildMember.findMany({
+      where: { guildId },
+      select: { userId: true },
+    });
+    const recipients = (members ?? []).map((m) => m.userId).filter((id) => id !== newUserId);
+
+    this.realtime.emitToUsers(recipients, 'guild.member_joined', {
+      guildId,
+      member: {
+        userId: newMember.user.id,
+        username: newMember.user.username,
+        avatarUrl: newMember.user.avatarUrl,
+        role: newMember.role,
+      },
+    });
   }
 }

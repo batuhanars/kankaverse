@@ -9,6 +9,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { StorageService } from '../../shared/storage/storage.service';
+import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { UpdateGuildDto } from './dto/update-guild.dto';
 import { PresignIconDto } from './dto/presign-icon.dto';
@@ -54,7 +55,17 @@ export class GuildsService {
     private membership: MembershipService,
     private storage: StorageService,
     private config: ConfigService,
+    private realtime: RealtimeService,
   ) {}
+
+  /** REV-14: guild'in tüm üyelerinin userId'lerini döner (realtime broadcast hedefi). */
+  private async guildMemberIds(guildId: string): Promise<string[]> {
+    const members = await this.prisma.guildMember.findMany({
+      where: { guildId },
+      select: { userId: true },
+    });
+    return (members ?? []).map((m) => m.userId);
+  }
 
   async create(userId: string, dto: CreateGuildDto) {
     const result = await this.prisma.$transaction(async (tx) => {
@@ -347,12 +358,20 @@ export class GuildsService {
       },
     });
 
-    return {
+    const dto2: GuildMemberDto = {
       userId: updated.user.id,
       username: updated.user.username,
       avatarUrl: updated.user.avatarUrl,
       role: updated.role,
     };
+
+    // REV-14 realtime: rol değişimini tüm üyelere yay (üye listesi anlık güncellensin)
+    this.realtime.emitToUsers(await this.guildMemberIds(guildId), 'guild.member_updated', {
+      guildId,
+      member: dto2,
+    });
+
+    return dto2;
   }
 
   // ─── §C: Üye at (kick) — OWNER/ADMIN hiyerarşi (R7) ──────────────────────
@@ -431,6 +450,9 @@ export class GuildsService {
 
     const kickedMemberId = targetMembership.id;
 
+    // REV-14: silmeden ÖNCE kalan üyeleri al (atılan + mevcutlar bildirilecek)
+    const recipientsBeforeKick = await this.guildMemberIds(guildId);
+
     await this.prisma.$transaction([
       this.prisma.channelMember.deleteMany({
         where: {
@@ -442,6 +464,12 @@ export class GuildsService {
         where: { guildId_userId: { guildId, userId: targetUserId } },
       }),
     ]);
+
+    // REV-14 realtime: kalan üyeler listeden düşürsün; atılan kişi ortamı kapatsın.
+    this.realtime.emitToUsers(recipientsBeforeKick, 'guild.member_left', {
+      guildId,
+      userId: targetUserId,
+    });
 
     // AuditLog (tx dışı — başarılı tx'ten sonra)
     await this.prisma.auditLog.create({
