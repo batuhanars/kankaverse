@@ -36,4 +36,7 @@ export const rolesApi = {
   removeRole(roleId: string, userId: string) {
     return http.delete<GuildMemberDto>(`/roles/${roleId}/members/${userId}`)
   },
+  reorderRoles(guildId: string, items: { id: string; position: number }[]) {
+    return http.patch<null>(`/guilds/${guildId}/roles/reorder`, { items })
+  },
 }

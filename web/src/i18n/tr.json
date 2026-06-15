@@ -345,6 +345,8 @@
       "tabAppearance": "Görünüm",
       "tabMembers": "Üyeleri Yönet",
       "memberSearchPlaceholder": "Üyeleri Ara",
+      "editTooltip": "Düzenle",
+      "deleteTooltip": "Sil",
       "errors": {
         "CANNOT_DELETE_EVERYONE": "{'@'}everyone rolü silinemez.",
         "CANNOT_EDIT_EVERYONE_NAME": "{'@'}everyone rolünün adı değiştirilemez.",

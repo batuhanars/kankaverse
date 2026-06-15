@@ -8,7 +8,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
 import KvSwitch from '@/components/ui/KvSwitch.vue'
-import type { GuildDto, GuildMemberDto } from '@/types'
+import type { GuildDto, GuildMemberDto, RoleDto } from '@/types'
 
 const props = defineProps<{
   guild: GuildDto
@@ -117,8 +117,16 @@ const creating = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
 
-// ── Silme onay diyaloğu ───────────────────────────────────────────────────
+// ── Silme onay diyaloğu (detay modu) ─────────────────────────────────────
 const showDeleteConfirm = ref(false)
+
+// ── Liste-silme akışı ─────────────────────────────────────────────────────
+const pendingDeleteRole = ref<RoleDto | null>(null)
+const deletingList = ref(false)
+
+// ── DnD sıralama ─────────────────────────────────────────────────────────
+const dragRoleId = ref<string | null>(null)
+const dragOverRoleId = ref<string | null>(null)
 
 // ── Yetki ─────────────────────────────────────────────────────────────────
 const canEdit = computed(() => props.isOwner || props.isAdmin)
@@ -167,7 +175,7 @@ async function saveRole() {
   }
 }
 
-// ── Rol sil ───────────────────────────────────────────────────────────────
+// ── Rol sil (detay modu — selectedRole'a bağlı) ───────────────────────────
 async function deleteRole() {
   if (!selectedRole.value) return
   errorMsg.value = ''
@@ -183,6 +191,67 @@ async function deleteRole() {
     errorMsg.value = t(`guildSettings.roles.errors.${code}`) || t('guildSettings.roles.deleteError')
   } finally {
     deleting.value = false
+  }
+}
+
+// ── Rol sil (liste modu) ──────────────────────────────────────────────────
+async function deleteRoleFromList() {
+  if (!pendingDeleteRole.value) return
+  const role = pendingDeleteRole.value
+  errorMsg.value = ''
+  deletingList.value = true
+  pendingDeleteRole.value = null
+  try {
+    await rolesApi.deleteRole(role.id)
+    rolesStore.removeRoleLocal(guildId.value, role.id)
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { error?: string } } }
+    const code = e?.response?.data?.error ?? ''
+    errorMsg.value = t(`guildSettings.roles.errors.${code}`) || t('guildSettings.roles.deleteError')
+  } finally {
+    deletingList.value = false
+  }
+}
+
+// ── DnD sıralama (liste modu) ─────────────────────────────────────────────
+function onRoleDragStart(e: DragEvent, role: RoleDto) {
+  if (!canEdit.value) return
+  dragRoleId.value = role.id
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+}
+
+function onRoleDragEnd() {
+  dragRoleId.value = null
+  dragOverRoleId.value = null
+}
+
+async function dropRoleBefore(beforeRoleId: string | null) {
+  const draggedId = dragRoleId.value
+  onRoleDragEnd()
+  if (!draggedId || !canEdit.value) return
+  if (draggedId === beforeRoleId) return
+
+  // Mevcut sıra (position DESC = görünüm sırası, üst = yüksek position)
+  const list = filteredRoles.value // non-everyone, zaten DESC sıralı
+  const dragged = list.find((r) => r.id === draggedId)
+  if (!dragged) return
+
+  const rest = list.filter((r) => r.id !== draggedId)
+  let insertIdx = rest.length // sona ekle (en alta)
+  if (beforeRoleId) {
+    const i = rest.findIndex((r) => r.id === beforeRoleId)
+    if (i !== -1) insertIdx = i
+  }
+  rest.splice(insertIdx, 0, dragged)
+
+  // Üst = en yüksek position; toplam uzunluk - idx → üst=length, alt=1
+  const items = rest.map((r, idx) => ({ id: r.id, position: rest.length - idx }))
+
+  rolesStore.applyReorder(guildId.value, items) // optimistik
+  try {
+    await rolesApi.reorderRoles(guildId.value, items)
+  } catch {
+    await rolesStore.fetchRoles(guildId.value) // hata → sunucudan tazele
   }
 }
 
@@ -296,16 +365,44 @@ const membersWithRole = computed(() => {
 
     <!-- Rol satırları -->
     <div class="flex flex-col gap-0.5">
-      <button
+      <div
         v-for="role in filteredRoles"
         :key="role.id"
-        type="button"
-        class="w-full flex items-center gap-3 px-3 py-2.5 rounded-[var(--kv-radius-md)] text-left transition-colors cursor-pointer"
-        style="color: var(--kv-text-secondary);"
+        role="button"
+        tabindex="0"
+        class="group w-full flex items-center gap-3 px-3 py-2.5 rounded-[var(--kv-radius-md)] text-left transition-colors cursor-pointer relative"
+        :class="dragOverRoleId === role.id ? 'kv-drop-target' : ''"
+        :style="`color: var(--kv-text-secondary);${dragRoleId === role.id ? ' opacity: 0.4;' : ''}`"
+        :draggable="canEdit && !roleSearch ? 'true' : 'false'"
         @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
         @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
         @click="selectRole(role.id)"
+        @keydown.enter="selectRole(role.id)"
+        @dragstart="onRoleDragStart($event, role)"
+        @dragend="onRoleDragEnd"
+        @dragover.prevent="dragOverRoleId = role.id"
+        @dragleave="dragOverRoleId = null"
+        @drop.prevent="dropRoleBefore(role.id)"
       >
+        <!-- Drop indicator: üst kenar çizgisi -->
+        <div
+          v-if="dragOverRoleId === role.id"
+          class="absolute inset-x-0 top-0 h-0.5 rounded-full pointer-events-none"
+          style="background-color: var(--kv-accent-500);"
+        />
+        <!-- Sürükleme tutacağı (canEdit + arama yok) -->
+        <span
+          v-if="canEdit && !roleSearch"
+          class="shrink-0 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity"
+          style="color: var(--kv-text-muted);"
+          @click.stop
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="5" r="1"/><circle cx="15" cy="5" r="1"/>
+            <circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/>
+            <circle cx="9" cy="19" r="1"/><circle cx="15" cy="19" r="1"/>
+          </svg>
+        </span>
         <!-- Renk noktası -->
         <span
           class="shrink-0 w-3 h-3 rounded-full"
@@ -325,11 +422,50 @@ const membersWithRole = computed(() => {
             <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
           </svg>
         </div>
+        <!-- Aksiyon butonları (canEdit, hover'da görünür) -->
+        <div
+          v-if="canEdit"
+          class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <!-- Düzenle -->
+          <button
+            type="button"
+            class="flex items-center justify-center w-7 h-7 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+            style="background-color: var(--kv-bg-elevated);"
+            :title="t('guildSettings.roles.editTooltip')"
+            @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
+            @click.stop="selectRole(role.id)"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-secondary);">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+          <!-- Sil (isEveryone değilse) -->
+          <button
+            v-if="!role.isEveryone"
+            type="button"
+            class="flex items-center justify-center w-7 h-7 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+            style="background-color: var(--kv-bg-elevated);"
+            :title="t('guildSettings.roles.deleteTooltip')"
+            @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-danger)'; ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.color = ''; ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
+            @click.stop="pendingDeleteRole = role"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-secondary);">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </button>
+        </div>
         <!-- Chevron -->
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="color: var(--kv-text-muted);">
           <path d="M9 18l6-6-6-6"/>
         </svg>
-      </button>
+      </div>
 
       <!-- Boş durum -->
       <p
@@ -640,7 +776,7 @@ const membersWithRole = computed(() => {
     </div>
   </div>
 
-  <!-- Silme onay diyaloğu -->
+  <!-- Silme onay diyaloğu (detay modu) -->
   <ConfirmDialog
     v-if="showDeleteConfirm && selectedRole"
     :title="t('guildSettings.roles.deleteConfirmTitle')"
@@ -649,5 +785,16 @@ const membersWithRole = computed(() => {
     :loading="deleting"
     @confirm="deleteRole"
     @cancel="showDeleteConfirm = false"
+  />
+
+  <!-- Silme onay diyaloğu (liste modu) -->
+  <ConfirmDialog
+    v-if="pendingDeleteRole"
+    :title="t('guildSettings.roles.deleteConfirmTitle')"
+    :message="t('guildSettings.roles.deleteConfirmMessage', { name: pendingDeleteRole.name })"
+    :confirm-label="t('guildSettings.roles.deleteConfirmButton')"
+    :loading="deletingList"
+    @confirm="deleteRoleFromList"
+    @cancel="pendingDeleteRole = null"
   />
 </template>
