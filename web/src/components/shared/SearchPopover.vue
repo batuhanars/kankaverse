@@ -6,10 +6,14 @@
  * Gölge yok, --kv-bg-elevated + ince kenarlık + --kv-radius-md.
  * Dışına tıkla / Esc kapat.
  */
-import { ref, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { messagesApi } from '@/api/messages'
 import { useMessageJump } from '@/composables/useMessageJump'
+import { useMembersStore } from '@/stores/members'
+import { useAuthStore } from '@/stores/auth'
+import { useDmStore } from '@/stores/dm'
 import { formatMentionsPlain } from '@/utils/mentions'
 import type { MessageDto } from '@/types'
 
@@ -18,12 +22,39 @@ defineOptions({ name: 'SearchPopover' })
 const props = defineProps<{
   channelId: string
   open: boolean
+  guildId?: string
 }>()
 
 const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
+const router = useRouter()
 const { requestJump } = useMessageJump()
+const membersStore = useMembersStore()
+const authStore = useAuthStore()
+const dmStore = useDmStore()
+
+// REV-3 part2: aynı kutuda ortam üyelerini ara (client-side, anlık). Yalnız guild bağlamında.
+const memberResults = computed(() => {
+  if (!props.guildId) return []
+  const q = query.value.trim().toLocaleLowerCase('tr')
+  if (q.length < 1) return []
+  return membersStore
+    .membersFor(props.guildId)
+    .filter((m) => m.userId !== authStore.user?.id && m.username.toLocaleLowerCase('tr').includes(q))
+    .slice(0, 8)
+})
+
+// Üyeye tıkla → onunla DM aç (canDm kapısı backend'de) + DM'e git
+async function onMemberClick(userId: string) {
+  try {
+    const ch = await dmStore.openChannel(userId)
+    emit('close')
+    router.push({ name: 'dm', params: { channelId: ch.id } })
+  } catch {
+    error.value = t('messageSearch.userOpenFailed')
+  }
+}
 
 // Arama sonucuna tıkla → listede o mesaja zıpla, popover'ı kapat
 function onJump(messageId: string) {
@@ -172,6 +203,26 @@ function onDocKeydown(e: KeyboardEvent) {
 
     <!-- İçerik -->
     <div class="flex-1 overflow-y-auto py-2">
+      <!-- REV-3 part2: ortam üyeleri (anlık, client-side; ≥1 karakter) -->
+      <template v-if="memberResults.length">
+        <p class="px-4 pt-1 pb-1 text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+          {{ t('messageSearch.membersSection') }}
+        </p>
+        <button
+          v-for="m in memberResults"
+          :key="m.userId"
+          class="w-full flex items-center gap-2.5 px-4 py-2 text-left cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
+          @click="onMemberClick(m.userId)"
+        >
+          <div class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[11px] font-semibold text-white" style="background-color: var(--kv-accent-500);">
+            <img v-if="m.avatarUrl" :src="m.avatarUrl" :alt="m.username" class="w-full h-full object-cover" />
+            <span v-else>{{ m.username[0].toUpperCase() }}</span>
+          </div>
+          <span class="text-[13px] truncate" style="color: var(--kv-text-primary);">{{ m.username }}</span>
+        </button>
+        <div class="mx-4 my-1.5 border-t" style="border-color: var(--kv-border-subtle);" />
+      </template>
+
       <!-- <2 karakter ipucu -->
       <p
         v-if="query.length > 0 && query.trim().length < 2"

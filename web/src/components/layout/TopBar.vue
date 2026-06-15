@@ -55,6 +55,7 @@ function toggleSearch(e: MouseEvent) {
         <SearchPopover
           v-if="channelsStore.activeChannel()"
           :channel-id="channelsStore.activeChannel()!.id"
+          :guild-id="channelsStore.activeChannel()!.guildId ?? undefined"
           :open="showSearch"
           @close="showSearch = false"
         />

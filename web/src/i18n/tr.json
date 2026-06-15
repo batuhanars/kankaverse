@@ -601,11 +601,13 @@
   "messageSearch": {
     "buttonTitle": "Mesajlarda Ara",
     "panelTitle": "Mesajlarda Ara",
-    "inputPlaceholder": "Mesajlarda ara…",
+    "inputPlaceholder": "Mesaj veya kişi ara…",
     "minChars": "En az 2 karakter girin",
     "loading": "Aranıyor…",
     "empty": "Sonuç bulunamadı.",
-    "error": "Arama sırasında bir hata oluştu."
+    "error": "Arama sırasında bir hata oluştu.",
+    "membersSection": "ÜYELER",
+    "userOpenFailed": "Bu kullanıcıyla sohbet başlatılamadı."
   },
   "notifications": {
     "title": "Bildirimler",
