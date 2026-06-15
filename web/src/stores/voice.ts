@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import {
   Room,
   RoomEvent,
@@ -36,6 +36,12 @@ export const useVoiceStore = defineStore('voice', () => {
   const connecting = ref(false)
   // REV-8: bağlanılan kanal (connect tamamlanana dek UI "bağlanıyor" kartı göstersin)
   const connectingChannelId = ref<string | null>(null)
+  // REV-13: bağlanma anı (görüşme süresi sayacı için)
+  const connectedAt = ref<number | null>(null)
+  // REV-12: DM/grup çağrısında tek kişi kalınca otomatik bitir
+  let autoEndWhenAlone = false
+  let aloneTimer: ReturnType<typeof setTimeout> | null = null
+  const ALONE_TIMEOUT_MS = 60_000
   const isMuted = ref(false)
   const canPublish = ref(false)
   const error = ref('')
@@ -94,10 +100,11 @@ export const useVoiceStore = defineStore('voice', () => {
   }
 
   // ── Yerel bağlantı ──────────────────────────────────────────────────────────
-  async function join(channelId: string) {
+  async function join(channelId: string, opts?: { autoEndWhenAlone?: boolean }) {
     if (connectedChannelId.value === channelId || connecting.value) return
     if (room) await leave()
 
+    autoEndWhenAlone = opts?.autoEndWhenAlone ?? false
     connecting.value = true
     connectingChannelId.value = channelId
     error.value = ''
@@ -112,6 +119,7 @@ export const useVoiceStore = defineStore('voice', () => {
       try { await room.startAudio() } catch { /* jest gerektirebilir; ses ilk etkileşimde açılır */ }
 
       connectedChannelId.value = channelId
+      connectedAt.value = Date.now() // REV-13: süre sayacı başlangıcı
       refreshRoomParticipants()
       // Konuşma dinleyicilerini bağla (yerel + mevcut uzaklar)
       attachSpeaking(room.localParticipant)
@@ -153,6 +161,9 @@ export const useVoiceStore = defineStore('voice', () => {
 
   function resetLocalState() {
     connectedChannelId.value = null
+    connectedAt.value = null // REV-13
+    autoEndWhenAlone = false // REV-12
+    if (aloneTimer) { clearTimeout(aloneTimer); aloneTimer = null }
     isMuted.value = false
     canPublish.value = false
     isDeafened.value = false
@@ -277,11 +288,27 @@ export const useVoiceStore = defineStore('voice', () => {
     })
   }
 
+  // REV-12: DM/grup çağrısında tek kişi (yalnız ben) kalınca ALONE_TIMEOUT_MS sonra otomatik bitir.
+  // Biri katılırsa (length>1) sayaç iptal. Guild ses kanalında uygulanmaz (autoEndWhenAlone=false).
+  watch(
+    () => roomParticipants.value.length,
+    (len) => {
+      if (aloneTimer) { clearTimeout(aloneTimer); aloneTimer = null }
+      if (!autoEndWhenAlone || !connectedChannelId.value) return
+      if (len === 1) {
+        aloneTimer = setTimeout(() => {
+          if (autoEndWhenAlone && roomParticipants.value.length === 1) leave()
+        }, ALONE_TIMEOUT_MS)
+      }
+    },
+  )
+
   return {
     participantsByChannel,
     connectedChannelId,
     connecting,
     connectingChannelId,
+    connectedAt,
     isMuted,
     canPublish,
     error,

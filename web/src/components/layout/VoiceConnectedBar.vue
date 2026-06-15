@@ -3,7 +3,7 @@
  * VoiceConnectedBar — aktif ses oturumu için kalıcı bar (UserCard üstünde).
  * Bağlı kanal adı + kendini sustur (canPublish ise) + ayrıl. Kanal değişse de oturum kopmaz.
  */
-import { computed } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useVoiceStore } from '@/stores/voice'
 import { useChannelsStore } from '@/stores/channels'
@@ -13,6 +13,31 @@ const { t } = useI18n()
 const voiceStore = useVoiceStore()
 const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
+
+// REV-13: görüşme süresi — connectedAt'ten anlık artan sayaç (mm:ss / h:mm:ss)
+const now = ref(Date.now())
+let durationTimer: ReturnType<typeof setInterval> | null = null
+watch(
+  () => voiceStore.connectedAt,
+  (at) => {
+    if (durationTimer) { clearInterval(durationTimer); durationTimer = null }
+    if (at) {
+      now.value = Date.now()
+      durationTimer = setInterval(() => { now.value = Date.now() }, 1000)
+    }
+  },
+  { immediate: true },
+)
+onUnmounted(() => { if (durationTimer) clearInterval(durationTimer) })
+
+const callDuration = computed(() => {
+  if (!voiceStore.connectedAt) return ''
+  const sec = Math.max(0, Math.floor((now.value - voiceStore.connectedAt) / 1000))
+  const h = Math.floor(sec / 3600)
+  const mm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0')
+  const ss = String(sec % 60).padStart(2, '0')
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
+})
 
 const channelName = computed(() => {
   const id = voiceStore.connectedChannelId
@@ -67,7 +92,7 @@ const channelName = computed(() => {
 
     <div class="flex-1 min-w-0">
       <p class="text-[11px] font-semibold truncate" style="color: var(--kv-online, #3DB46E);">
-        {{ t('voice.connected') }}
+        {{ t('voice.connected') }}<span v-if="callDuration" style="font-variant-numeric: tabular-nums;"> · {{ callDuration }}</span>
       </p>
       <p class="text-[13px] truncate" style="color: var(--kv-text-primary);">{{ channelName }}</p>
     </div>
