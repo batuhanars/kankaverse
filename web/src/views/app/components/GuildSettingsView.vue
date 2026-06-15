@@ -344,12 +344,15 @@ const dangerItem = computed(() => props.isOwner)
 <template>
   <Teleport to="body">
     <div
-      class="fixed inset-0 z-50 flex"
+      class="fixed inset-0 z-50 flex items-stretch justify-center"
       style="background-color: var(--kv-bg-overlay);"
       role="dialog"
       aria-modal="true"
       :aria-label="t('guildSettings.title')"
     >
+      <!-- Ortalanmış panel (nav + içerik) -->
+      <div class="flex h-full w-full max-w-[1100px]">
+
       <!-- Sol nav kolonu -->
       <div
         class="shrink-0 flex flex-col py-8 px-3 border-r"
@@ -708,6 +711,8 @@ const dangerItem = computed(() => props.isOwner)
 
         </div>
       </div>
+
+      </div><!-- /ortalanmış panel -->
     </div>
 
     <!-- Davet iptal onay diyaloğu -->
