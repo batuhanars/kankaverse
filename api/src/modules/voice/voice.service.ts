@@ -173,7 +173,10 @@ export class VoiceService {
   async listParticipants(userId: string, channelId: string) {
     this.assertEnabled();
     const channel = await this.membership.requireChannelAccess(userId, channelId);
-    if (channel.type !== 'GUILD_VOICE') {
+    // REV-11: ses GUILD_VOICE + DM + GROUP_DM'de olabilir (devam eden çağrı tespiti).
+    // GUILD_TEXT vb. ses barındırmaz → NOT_VOICE_CHANNEL.
+    const voiceCapable = channel.type === 'GUILD_VOICE' || channel.type === 'DM' || channel.type === 'GROUP_DM';
+    if (!voiceCapable) {
       throw new BadRequestException({
         message: 'Bu bir ses kanalı değil.',
         error: 'NOT_VOICE_CHANNEL',
