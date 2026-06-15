@@ -358,7 +358,7 @@ const rolesDetailMode = ref(false)
       <!-- Sol bölge: sidebar rengi tam yükseklik, nav sağa yaslı -->
       <div
         class="shrink-0 flex justify-end"
-        style="width: 36%; min-width: 240px; max-width: 440px; background-color: var(--kv-bg-sidebar);"
+        style="width: 42%; min-width: 280px; max-width: 560px; background-color: var(--kv-bg-sidebar);"
       >
       <!-- Sol nav kolonu -->
       <div
