@@ -20,6 +20,8 @@ const props = defineProps<{
   hasContent: boolean
   isPinned: boolean
   canPin: boolean
+  // Faz 3: MANAGE_MESSAGES — başkasının mesajını da silebilir
+  canManageMessages?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -241,9 +243,9 @@ onUnmounted(() => {
           <span>{{ t('message.edit') }}</span>
         </button>
 
-        <!-- Sil (yalnız kendi mesajı) -->
+        <!-- Sil (kendi mesajı VEYA MANAGE_MESSAGES) -->
         <button
-          v-if="isMine"
+          v-if="isMine || canManageMessages"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
           style="color: var(--kv-danger);"
           @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'"

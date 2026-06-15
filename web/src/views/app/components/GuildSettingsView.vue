@@ -336,10 +336,10 @@ interface NavItem {
 }
 
 const navItems = computed<NavItem[]>(() => [
-  { key: 'genel',    labelKey: 'guildSettings.nav.genel',    visible: props.isOwner },
-  { key: 'roller',   labelKey: 'guildSettings.nav.roller',   visible: props.isOwner || props.isAdmin || can('MANAGE_ROLES') },
-  { key: 'davetler', labelKey: 'guildSettings.nav.davetler', visible: props.isOwner || props.isAdmin },
-  { key: 'yasaklar', labelKey: 'guildSettings.nav.yasaklar', visible: props.isOwner || props.isAdmin },
+  { key: 'genel',    labelKey: 'guildSettings.nav.genel',    visible: props.isOwner || can('MANAGE_GUILD') },
+  { key: 'roller',   labelKey: 'guildSettings.nav.roller',   visible: props.isOwner || can('MANAGE_ROLES') },
+  { key: 'davetler', labelKey: 'guildSettings.nav.davetler', visible: props.isOwner || can('CREATE_INVITE') || can('MANAGE_GUILD') },
+  { key: 'yasaklar', labelKey: 'guildSettings.nav.yasaklar', visible: props.isOwner || can('BAN_MEMBERS') },
 ])
 
 const dangerItem = computed(() => props.isOwner)
@@ -618,8 +618,11 @@ function confirmNavDiscard() {
                   <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
                     {{ t('guildSettings.adultsOnlyDesc') }}
                   </p>
+                  <p v-if="!isOwner" class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
+                    {{ t('guildSettings.adultsOnlyOwnerOnly') }}
+                  </p>
                 </div>
-                <KvSwitch v-model="draftAdultsOnly" :disabled="saving" />
+                <KvSwitch v-model="draftAdultsOnly" :disabled="saving || !isOwner" />
               </div>
             </section>
 
@@ -666,8 +669,8 @@ function confirmNavDiscard() {
                 {{ t('guildSettings.inviteSection') }}
               </h3>
 
-              <!-- Davet oluştur formu -->
-              <form class="flex flex-wrap gap-2 items-end mb-4" @submit.prevent="createInvite">
+              <!-- Davet oluştur formu (CREATE_INVITE) -->
+              <form v-if="isOwner || can('CREATE_INVITE')" class="flex flex-wrap gap-2 items-end mb-4" @submit.prevent="createInvite">
                 <div style="width: 100px;">
                   <KvInput
                     v-model="newMaxUses"
@@ -704,7 +707,8 @@ function confirmNavDiscard() {
                 </KvButton>
               </div>
 
-              <!-- Aktif davetler -->
+              <!-- Aktif davetler (listele/iptal → MANAGE_GUILD) -->
+              <template v-if="isOwner || can('MANAGE_GUILD')">
               <div v-if="invitesLoading" class="text-[13px]" style="color: var(--kv-text-muted);">
                 {{ t('common.loading') }}
               </div>
@@ -730,6 +734,7 @@ function confirmNavDiscard() {
                   </KvButton>
                 </li>
               </ul>
+              </template>
             </section>
           </div>
 

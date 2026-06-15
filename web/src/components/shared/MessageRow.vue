@@ -36,6 +36,8 @@ const props = defineProps<{
   isMentioned?: boolean
   // Sprint V2 Pins: kullanıcı bu kanalda mesaj sabitleyebilir mi? (parent hesaplar)
   canPin?: boolean
+  // Faz 3: MANAGE_MESSAGES — başkasının mesajını silebilir mi?
+  canManageMessages?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -113,6 +115,7 @@ const renderedContent = computed<string>(() => {
         :has-content="!!message.content"
         :is-pinned="!!message.pinnedAt"
         :can-pin="canPin ?? false"
+        :can-manage-messages="canManageMessages ?? false"
         @reply="emit('reply', message)"
         @edit="emit('edit', message)"
         @delete="emit('delete', message.id)"
