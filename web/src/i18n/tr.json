@@ -324,7 +324,7 @@
       "hoistLabel": "Üyeleri ayrı göster",
       "hoistDesc": "Bu role sahip üyeler üye listesinde ayrı bir grupta görünür.",
       "mentionableLabel": "Bahsedilebilir",
-      "mentionableDesc": "Bu rolü @bahset ile etiketlemek mümkün olsun.",
+      "mentionableDesc": "Bu rolü {'@'}bahset ile etiketlemek mümkün olsun.",
       "manageMembersTitle": "Üyeleri Yönet",
       "manageMembersEmpty": "Bu ortamda üye yok.",
       "memberCount": "{n} üye",
@@ -334,10 +334,10 @@
       "deleteError": "Rol silinemedi.",
       "assignError": "Rol ataması başarısız.",
       "errors": {
-        "CANNOT_DELETE_EVERYONE": "@everyone rolü silinemez.",
-        "CANNOT_EDIT_EVERYONE_NAME": "@everyone rolünün adı değiştirilemez.",
-        "CANNOT_EDIT_EVERYONE_HOIST": "@everyone rolünün hoist ayarı değiştirilemez.",
-        "CANNOT_ASSIGN_EVERYONE": "@everyone rolü manuel atanamazdı.",
+        "CANNOT_DELETE_EVERYONE": "{'@'}everyone rolü silinemez.",
+        "CANNOT_EDIT_EVERYONE_NAME": "{'@'}everyone rolünün adı değiştirilemez.",
+        "CANNOT_EDIT_EVERYONE_HOIST": "{'@'}everyone rolünün hoist ayarı değiştirilemez.",
+        "CANNOT_ASSIGN_EVERYONE": "{'@'}everyone rolü manuel atanamaz.",
         "ROLE_NOT_FOUND": "Rol bulunamadı.",
         "NOT_GUILD_MEMBER": "Kullanıcı bu ortamın üyesi değil.",
         "FORBIDDEN": "Bu işlem için yetkiniz yok."
