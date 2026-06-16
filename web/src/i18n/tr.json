@@ -293,6 +293,8 @@
     "title": "Üye Davet Et",
     "linkLabel": "Davet Linki",
     "friendsLabel": "Kankaların",
+    "searchPlaceholder": "Arkadaşlarını ara",
+    "noResults": "Sonuç yok.",
     "inviteButton": "Davet Et",
     "invited": "Davet Edildi ✓",
     "noFriends": "Henüz kankan yok. Önce birini kanka ekle, sonra ortamına davet et.",

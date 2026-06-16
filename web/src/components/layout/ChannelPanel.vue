@@ -654,14 +654,15 @@ async function doLeave() {
     style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
     @click="closeCategoryMenu(); closeGuildMenu()"
   >
-    <!-- Ortam adı başlığı — tek buton, tıkla → Discord-tarzı menü -->
-    <div class="relative shrink-0 border-b" style="border-color: var(--kv-border-subtle);">
+    <!-- Ortam adı başlığı — sol: ad + chevron (menü tetikler), sağ: üye davet ikonu -->
+    <div class="relative shrink-0 border-b flex items-center px-2 gap-1" style="border-color: var(--kv-border-subtle); height: var(--kv-header-height);">
+      <!-- Ad + chevron grubu — tıkla → Discord-tarzı menü -->
       <button
-        class="w-full flex items-center px-4 gap-2 font-semibold text-[15px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-        style="height: var(--kv-header-height); color: var(--kv-text-primary);"
+        class="flex-1 min-w-0 flex items-center px-2 gap-1.5 h-9 rounded-[var(--kv-radius-sm)] font-semibold text-[15px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
+        style="color: var(--kv-text-primary);"
         @click.stop="toggleGuildMenu"
       >
-        <span class="flex-1 truncate text-left">{{ guildsStore.activeGuild()?.name ?? '' }}</span>
+        <span class="truncate text-left">{{ guildsStore.activeGuild()?.name ?? '' }}</span>
         <svg
           width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
@@ -669,6 +670,20 @@ async function doLeave() {
           style="color: var(--kv-text-muted);"
         >
           <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      <!-- Üye davet ikon-butonu (en sağ) — mevcut davet modalını açar -->
+      <button
+        v-if="can('CREATE_INVITE')"
+        class="shrink-0 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
+        style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
+        :title="t('invitePeople.title')"
+        :aria-label="t('invitePeople.title')"
+        @click.stop="showInvitePeople = true"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
         </svg>
       </button>
 
