@@ -495,6 +495,7 @@ export class GuildsService {
     actorId: string,
     guildId: string,
     targetUserId: string,
+    reason?: string,
   ): Promise<null> {
     // 1. Actor erişim + KICK_MEMBERS izin kontrolü — ÖNCE yetki (sızıntı önleme)
     await this.membership.requireGuildMembership(actorId, guildId);
@@ -577,6 +578,7 @@ export class GuildsService {
         metadata: {
           guildId,
           targetUserId,
+          reason: reason ?? null,
         },
       },
     });

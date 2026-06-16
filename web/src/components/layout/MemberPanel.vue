@@ -12,6 +12,8 @@ import { useActiveMenu } from '@/composables/useActiveMenu'
 import { guildsApi } from '@/api/guilds'
 import { rolesApi } from '@/api/roles'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import KvModal from '@/components/ui/KvModal.vue'
+import KvButton from '@/components/ui/KvButton.vue'
 import UserCardPopover from '@/components/shared/UserCardPopover.vue'
 import GuildMemberRow from '@/components/layout/GuildMemberRow.vue'
 import type { GuildMemberDto, RoleDto } from '@/types'
@@ -260,11 +262,19 @@ async function toggleRole(member: GuildMemberDto, role: RoleDto) {
 
 const kickTarget = ref<GuildMemberDto | null>(null)
 const kicking = ref(false)
+// R2: opsiyonel kick sebebi (max 512, boş bırakılabilir)
+const kickReason = ref('')
 
 function openKick(member: GuildMemberDto) {
   kickTarget.value = member
+  kickReason.value = ''
   kickError.value = ''
   closeMenu()
+}
+
+function closeKick() {
+  kickTarget.value = null
+  kickReason.value = ''
 }
 
 async function confirmKick() {
@@ -275,16 +285,16 @@ async function confirmKick() {
   kicking.value = true
   kickError.value = ''
   try {
-    await guildsApi.kickMember(guildId, target.userId)
+    await guildsApi.kickMember(guildId, target.userId, kickReason.value.trim() || undefined)
     membersStore.removeMember(guildId, target.userId)
-    kickTarget.value = null
+    closeKick()
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string; message?: string } } }
     const code = err.response?.data?.error
     kickError.value = code && ['CANNOT_KICK_OWNER', 'CANNOT_KICK_SELF', 'NOT_GUILD_MEMBER', 'FORBIDDEN'].includes(code)
       ? t(`member.errors.${code}`)
       : (err.response?.data?.message ?? t('common.error'))
-    kickTarget.value = null
+    closeKick()
   } finally {
     kicking.value = false
   }
@@ -422,16 +432,31 @@ async function confirmTransfer() {
     </div>
   </aside>
 
-  <!-- Kick onay diyaloğu -->
-  <ConfirmDialog
-    v-if="kickTarget"
-    :title="t('member.actions.kickConfirmTitle')"
-    :message="t('member.actions.kickConfirmMessage', { username: kickTarget.username })"
-    :confirm-label="t('member.actions.kickConfirmButton')"
-    :loading="kicking"
-    @confirm="confirmKick"
-    @cancel="kickTarget = null"
-  />
+  <!-- Kick modalı — opsiyonel sebep alanı (R2) -->
+  <KvModal v-if="kickTarget" :title="t('member.actions.kickTitle')" @close="closeKick">
+    <p class="text-[14px] mb-5" style="color: var(--kv-text-body);">
+      {{ t('member.actions.kickConfirmMessage', { username: kickTarget.username }) }}
+    </p>
+
+    <label class="block text-[12px] font-semibold mb-1.5" style="color: var(--kv-text-muted);">
+      {{ t('member.actions.kickReasonLabel') }}
+    </label>
+    <textarea
+      v-model="kickReason"
+      :placeholder="t('member.actions.kickReasonPlaceholder')"
+      maxlength="500"
+      rows="3"
+      class="w-full resize-none px-3 py-2 text-[14px] rounded-[var(--kv-radius-md)] border outline-none mb-6"
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-body); border-color: var(--kv-border-subtle);"
+    />
+
+    <div class="flex gap-3 justify-end">
+      <KvButton variant="ghost" :disabled="kicking" @click="closeKick">{{ t('common.cancel') }}</KvButton>
+      <KvButton variant="danger" :loading="kicking" @click="confirmKick">
+        {{ t('member.actions.kickConfirmButton') }}
+      </KvButton>
+    </div>
+  </KvModal>
 
   <!-- Ban onay diyaloğu -->
   <ConfirmDialog
