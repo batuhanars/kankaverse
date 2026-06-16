@@ -495,6 +495,17 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       // Yazara kendi bahsetmesi için event gönderme
       if (mentionedUserId === authorId) continue;
       this.realtime.emitToUser(mentionedUserId, 'mention', eventPayload);
+
+      // R12 — Suppression: alıcının kanal/guild bildirim tercihi sustur/NONE ise
+      // kalıcı bildirim üretilmez (ne persist ne emit). `mention` WS eventi anlık
+      // — tercih sustur/seviye kalıcı bildirimi süzer.
+      const shouldNotify = await this.notifications.shouldNotifyChannel(
+        mentionedUserId,
+        guildId,
+        channelId,
+      );
+      if (!shouldNotify) continue;
+
       // §2 — MENTION kalıcı bildirimi (mevcut `mention` emit'ine PARALEL).
       // Kaynak resolveMentions çıktısı (zaten minör/yaş/erişim süzülü) — yeni erişim sorgusu YOK.
       await this.notifications.create(mentionedUserId, {

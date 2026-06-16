@@ -45,8 +45,10 @@ const presenceMock = {
 const dmPermissionMock = { canDm: jest.fn() };
 
 const notificationsCreateMock = jest.fn();
+const notificationsShouldNotifyMock = jest.fn();
 const notificationsMock = {
   create: notificationsCreateMock,
+  shouldNotifyChannel: notificationsShouldNotifyMock,
   snapshot: jest.fn().mockResolvedValue({ notifications: [], unreadCount: 0 }),
 };
 
@@ -68,6 +70,8 @@ function resetMocks() {
   presenceMock.audienceFor.mockResolvedValue([]);
   presenceMock.visibleOnlineFor.mockResolvedValue([]);
   notificationsMock.snapshot.mockResolvedValue({ notifications: [], unreadCount: 0 });
+  // R12 — varsayılan: suppression yok (bildirim üretilir); süzme testleri override eder.
+  notificationsShouldNotifyMock.mockResolvedValue(true);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -398,5 +402,25 @@ describe('MessagesGateway.notifyMentions', () => {
     await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({ mentions: [] }));
 
     expect(notificationsCreateMock).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // R12 — Suppression: shouldNotifyChannel false → create çağrılmaz (ne persist ne emit)
+  // ─────────────────────────────────────────────────────────────────────────
+  it('shouldNotifyChannel false (muted/NONE) → notifications.create çağrılmaz', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID });
+    prismaMock.user.findMany.mockResolvedValue([{ id: MENTIONED_USER_1, username: 'kanka1' }]);
+    notificationsShouldNotifyMock.mockResolvedValue(false);
+
+    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({
+      mentions: [MENTIONED_USER_1],
+      authorId: AUTHOR_ID,
+      content: `<@${MENTIONED_USER_1}> selam`,
+    }));
+
+    expect(notificationsShouldNotifyMock).toHaveBeenCalledWith(MENTIONED_USER_1, GUILD_ID, CHANNEL_ID);
+    expect(notificationsCreateMock).not.toHaveBeenCalled();
+    // anlık `mention` WS eventi yine de gider (tercih yalnız kalıcı bildirimi süzer)
+    expect(emitToUserMock).toHaveBeenCalledTimes(1);
   });
 });

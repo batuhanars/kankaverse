@@ -12,6 +12,10 @@ const prismaMock = {
     updateMany: jest.fn(),
     count: jest.fn(),
   },
+  notificationPref: {
+    findMany: jest.fn(),
+    upsert: jest.fn(),
+  },
   user: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
@@ -21,14 +25,20 @@ const prismaMock = {
 const emitToUserMock = jest.fn();
 const realtimeMock = { emitToUser: emitToUserMock };
 
+const membershipMock = {
+  requireGuildMembership: jest.fn(),
+  requireChannelAccess: jest.fn(),
+};
+
 function makeService() {
-  return new NotificationsService(prismaMock as any, realtimeMock as any);
+  return new NotificationsService(prismaMock as any, realtimeMock as any, membershipMock as any);
 }
 
 function resetMocks() {
   jest.resetAllMocks();
   prismaMock.user.findUnique.mockResolvedValue(null);
   prismaMock.user.findMany.mockResolvedValue([]);
+  prismaMock.notificationPref.findMany.mockResolvedValue([]);
 }
 
 const USER_ID = 'user-recipient';
@@ -249,6 +259,100 @@ describe('NotificationsService', () => {
       expect(call.orderBy).toEqual({ createdAt: 'desc' });
       expect(result.notifications).toHaveLength(1);
       expect(result.unreadCount).toBe(1);
+    });
+  });
+
+  // ── R12 — setPref erişim + upsert ───────────────────────────────────────────
+  describe('setPref', () => {
+    it('GUILD hedefi → requireGuildMembership çağrılır, upsert yapılır', async () => {
+      prismaMock.notificationPref.upsert.mockResolvedValue({
+        targetType: 'GUILD',
+        targetId: 'guild-1',
+        muted: true,
+        level: 'ALL',
+      });
+
+      const dto = await service.setPref(USER_ID, {
+        targetType: 'GUILD' as any,
+        targetId: 'guild-1',
+        muted: true,
+      });
+
+      expect(membershipMock.requireGuildMembership).toHaveBeenCalledWith(USER_ID, 'guild-1');
+      expect(membershipMock.requireChannelAccess).not.toHaveBeenCalled();
+      expect(dto).toEqual({ targetType: 'GUILD', targetId: 'guild-1', muted: true, level: 'ALL' });
+    });
+
+    it('CHANNEL hedefi → requireChannelAccess çağrılır', async () => {
+      prismaMock.notificationPref.upsert.mockResolvedValue({
+        targetType: 'CHANNEL',
+        targetId: 'ch-1',
+        muted: false,
+        level: 'NONE',
+      });
+
+      await service.setPref(USER_ID, { targetType: 'CHANNEL' as any, targetId: 'ch-1', level: 'NONE' as any });
+
+      expect(membershipMock.requireChannelAccess).toHaveBeenCalledWith(USER_ID, 'ch-1');
+    });
+
+    it('kısmi update: verilmeyen alan update payload\'ına girmez', async () => {
+      prismaMock.notificationPref.upsert.mockResolvedValue({
+        targetType: 'CHANNEL',
+        targetId: 'ch-1',
+        muted: true,
+        level: 'ALL',
+      });
+
+      await service.setPref(USER_ID, { targetType: 'CHANNEL' as any, targetId: 'ch-1', muted: true });
+
+      const call = prismaMock.notificationPref.upsert.mock.calls[0][0];
+      expect(call.update).toEqual({ muted: true }); // level yok
+      expect(call.create).toEqual({ userId: USER_ID, targetType: 'CHANNEL', targetId: 'ch-1', muted: true });
+    });
+  });
+
+  // ── R12 — shouldNotifyChannel suppression ───────────────────────────────────
+  describe('shouldNotifyChannel', () => {
+    it('tercih yoksa varsayılan → true', async () => {
+      prismaMock.notificationPref.findMany.mockResolvedValue([]);
+      expect(await service.shouldNotifyChannel(USER_ID, 'guild-1', 'ch-1')).toBe(true);
+    });
+
+    it('kanal muted → false (kanal guild\'i geçersiz kılar)', async () => {
+      prismaMock.notificationPref.findMany.mockResolvedValue([
+        { targetType: 'CHANNEL', targetId: 'ch-1', muted: true, level: 'ALL' },
+        { targetType: 'GUILD', targetId: 'guild-1', muted: false, level: 'ALL' },
+      ]);
+      expect(await service.shouldNotifyChannel(USER_ID, 'guild-1', 'ch-1')).toBe(false);
+    });
+
+    it('kanal level NONE → false', async () => {
+      prismaMock.notificationPref.findMany.mockResolvedValue([
+        { targetType: 'CHANNEL', targetId: 'ch-1', muted: false, level: 'NONE' },
+      ]);
+      expect(await service.shouldNotifyChannel(USER_ID, 'guild-1', 'ch-1')).toBe(false);
+    });
+
+    it('kanal tercihi yoksa guild tercihine düşer (guild muted → false)', async () => {
+      prismaMock.notificationPref.findMany.mockResolvedValue([
+        { targetType: 'GUILD', targetId: 'guild-1', muted: true, level: 'ALL' },
+      ]);
+      expect(await service.shouldNotifyChannel(USER_ID, 'guild-1', 'ch-1')).toBe(false);
+    });
+
+    it('etkin tercih ALL/unmuted → true', async () => {
+      prismaMock.notificationPref.findMany.mockResolvedValue([
+        { targetType: 'GUILD', targetId: 'guild-1', muted: false, level: 'ALL' },
+      ]);
+      expect(await service.shouldNotifyChannel(USER_ID, 'guild-1', 'ch-1')).toBe(true);
+    });
+
+    it('guildId null (DM-benzeri) → yalnız kanal tercihi sorgulanır', async () => {
+      prismaMock.notificationPref.findMany.mockResolvedValue([]);
+      await service.shouldNotifyChannel(USER_ID, null, 'ch-1');
+      const call = prismaMock.notificationPref.findMany.mock.calls[0][0];
+      expect(call.where.OR).toEqual([{ targetType: 'CHANNEL', targetId: 'ch-1' }]);
     });
   });
 });
