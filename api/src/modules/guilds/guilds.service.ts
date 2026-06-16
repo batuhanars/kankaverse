@@ -37,7 +37,7 @@ export function toGuildDto(guild: Guild, unreadCount = 0, unreadMentionCount = 0
     ownerId: guild.ownerId,
     adultsOnly: guild.adultsOnly,
     iconUrl: guild.iconUrl,
-    rules: guild.rules ?? null,
+    description: guild.description ?? null,
     createdAt: guild.createdAt.toISOString(),
     unreadCount,
     unreadMentionCount, // REV-4: rail kırmızı rozeti bunu gösterir (generic unread değil)
@@ -226,7 +226,7 @@ export class GuildsService {
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.adultsOnly !== undefined && { adultsOnly: dto.adultsOnly }),
-        ...(dto.rules !== undefined && { rules: dto.rules }),
+        ...(dto.description !== undefined && { description: dto.description }),
       },
     });
 

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@vueuse/core'
 import { useEventsStore } from '@/stores/events'
 import { useEventDateFormat } from '@/composables/useEventDateFormat'
+import { renderMessageHtml } from '@/utils/markdown'
 import KvButton from '@/components/ui/KvButton.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import CreateEventWizard from '@/views/app/components/CreateEventWizard.vue'
@@ -20,6 +21,12 @@ const eventsStore = useEventsStore()
 const { formatEventDate } = useEventDateFormat()
 
 const events = computed(() => eventsStore.eventsFor(props.guildId))
+
+// Açıklama markdown render: mesajlarla aynı güvenli boru hattı (markdown-it + DOMPurify).
+// Etkinlikte mention yok → no-op resolver. v-html yalnız sanitize edilmiş HTML alır.
+function renderDescription(desc: string): string {
+  return renderMessageHtml(desc, () => undefined, '')
+}
 
 // ── Oluştur / Düzenle sihirbazı ──
 const showWizard = ref(false)
@@ -161,7 +168,9 @@ function locationLabel(ev: EventDto): string {
               </div>
             </div>
 
-            <p v-if="ev.description" class="text-[13px] whitespace-pre-wrap break-words" style="color: var(--kv-text-body);">{{ ev.description }}</p>
+            <!-- Açıklama: güvenli markdown render (renderMessageHtml → DOMPurify sanitize; v-html güvenli) -->
+            <div v-if="ev.description" class="kv-md text-[13px] break-words" style="color: var(--kv-text-body);" v-html="renderDescription(ev.description)" />
+
 
             <!-- Aksiyon satırı -->
             <div class="flex items-center gap-2 mt-1">

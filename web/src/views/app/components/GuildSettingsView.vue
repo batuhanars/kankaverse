@@ -50,7 +50,7 @@ onUnmounted(() => {
 // ── Birleşik taslak state ─────────────────────────────────────────────────
 const draftName = ref(props.guild.name)
 const draftAdultsOnly = ref(props.guild.adultsOnly)
-const draftRules = ref(props.guild.rules ?? '')
+const draftDescription = ref(props.guild.description ?? '')
 
 const pendingIconFile = ref<File | null>(null)
 const pendingIconRemove = ref(false)
@@ -60,7 +60,7 @@ const pendingIconPreviewUrl = ref<string | null>(null)
 const isDirty = computed(() => {
   if (draftName.value.trim() !== props.guild.name) return true
   if (draftAdultsOnly.value !== props.guild.adultsOnly) return true
-  if (draftRules.value !== (props.guild.rules ?? '')) return true
+  if (draftDescription.value !== (props.guild.description ?? '')) return true
   if (pendingIconFile.value !== null) return true
   if (pendingIconRemove.value) return true
   return false
@@ -145,11 +145,11 @@ async function saveAll() {
   iconUploadPct.value = 0
 
   try {
-    const patch: { name?: string; adultsOnly?: boolean; rules?: string } = {}
+    const patch: { name?: string; adultsOnly?: boolean; description?: string } = {}
     const trimmedName = draftName.value.trim()
     if (trimmedName && trimmedName !== props.guild.name) patch.name = trimmedName
     if (draftAdultsOnly.value !== props.guild.adultsOnly) patch.adultsOnly = draftAdultsOnly.value
-    if (draftRules.value !== (props.guild.rules ?? '')) patch.rules = draftRules.value
+    if (draftDescription.value !== (props.guild.description ?? '')) patch.description = draftDescription.value
 
     let updated: GuildDto | null = null
     if (Object.keys(patch).length > 0) {
@@ -635,7 +635,7 @@ function confirmNavDiscard() {
                 {{ t('guildSettings.descriptionSubtitle') }}
               </p>
               <textarea
-                v-model="draftRules"
+                v-model="draftDescription"
                 :placeholder="t('guildSettings.descriptionPlaceholder')"
                 :disabled="saving"
                 rows="5"
