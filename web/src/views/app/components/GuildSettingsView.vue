@@ -608,76 +608,7 @@ function confirmNavDiscard() {
             <!-- ── SOL kolon: form ── -->
             <div class="flex-1 min-w-0 flex flex-col gap-6 max-w-xl">
 
-            <!-- Ortam ikonu -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.iconSection') }}
-              </h3>
-              <div class="flex items-center gap-4">
-                <div class="shrink-0 flex items-center justify-center" style="width: 64px; height: 64px;">
-                  <div
-                    class="w-full h-full flex items-center justify-center overflow-hidden text-[18px] font-semibold"
-                    style="
-                      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-                      background-color: var(--kv-bg-elevated);
-                      color: var(--kv-text-secondary);
-                    "
-                  >
-                    <img
-                      v-if="previewIconUrl"
-                      :src="previewIconUrl"
-                      :alt="draftName || guild.name"
-                      class="w-full h-full object-cover"
-                    />
-                    <span v-else>{{ guildInitial(draftName || guild.name) }}</span>
-                  </div>
-                </div>
-
-                <div class="flex flex-col gap-2">
-                  <div v-if="!pendingIconFile && !pendingIconRemove" class="flex gap-2">
-                    <KvButton size="sm" :disabled="saving" @click="triggerIconPicker">
-                      {{ t('guildSettings.iconUpload') }}
-                    </KvButton>
-                    <KvButton
-                      v-if="guild.iconUrl"
-                      size="sm"
-                      variant="danger"
-                      :disabled="saving"
-                      @click="markIconForRemoval"
-                    >
-                      {{ t('guildSettings.iconRemove') }}
-                    </KvButton>
-                  </div>
-
-                  <div v-else class="flex flex-col gap-1.5">
-                    <p class="text-[12px]" style="color: var(--kv-text-muted);">
-                      <span v-if="pendingIconFile">{{ t('guildSettings.iconPending') }}</span>
-                      <span v-else>{{ t('guildSettings.iconRemovePending') }}</span>
-                    </p>
-                    <div class="flex gap-2">
-                      <KvButton size="sm" :disabled="saving" @click="triggerIconPicker">
-                        {{ t('guildSettings.iconUpload') }}
-                      </KvButton>
-                      <KvButton size="sm" variant="danger" :disabled="saving" @click="cancelPendingIcon">
-                        {{ t('guildSettings.iconCancelPending') }}
-                      </KvButton>
-                    </div>
-                  </div>
-
-                  <p v-if="iconError" class="text-[12px]" style="color: var(--kv-danger);">{{ iconError }}</p>
-                </div>
-              </div>
-
-              <input
-                ref="iconFileInput"
-                type="file"
-                accept="image/*"
-                class="hidden"
-                @change="onIconFileChange"
-              />
-            </section>
-
-            <!-- Ad düzenle -->
+            <!-- Ad düzenle (Simge'nin üstüne alındı — sahip) -->
             <section>
               <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
                 {{ t('guildSettings.nameSection') }}
@@ -687,6 +618,57 @@ function confirmNavDiscard() {
                 :label="t('guildSettings.nameLabel')"
                 :placeholder="t('guild.namePlaceholder')"
                 :disabled="saving"
+              />
+            </section>
+
+            <!-- Ortam simgesi (inline önizleme kaldırıldı — sağ önizleme kartı gösteriyor) -->
+            <section>
+              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.iconSection') }}
+              </h3>
+              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.iconHint') }}
+              </p>
+              <div class="flex flex-col gap-2">
+                <div v-if="!pendingIconFile && !pendingIconRemove" class="flex gap-2">
+                  <KvButton size="sm" :disabled="saving" @click="triggerIconPicker">
+                    {{ t('guildSettings.iconUpload') }}
+                  </KvButton>
+                  <KvButton
+                    v-if="guild.iconUrl"
+                    size="sm"
+                    variant="danger"
+                    :disabled="saving"
+                    @click="markIconForRemoval"
+                  >
+                    {{ t('guildSettings.iconRemove') }}
+                  </KvButton>
+                </div>
+
+                <div v-else class="flex flex-col gap-1.5">
+                  <p class="text-[12px]" style="color: var(--kv-text-muted);">
+                    <span v-if="pendingIconFile">{{ t('guildSettings.iconPending') }}</span>
+                    <span v-else>{{ t('guildSettings.iconRemovePending') }}</span>
+                  </p>
+                  <div class="flex gap-2">
+                    <KvButton size="sm" :disabled="saving" @click="triggerIconPicker">
+                      {{ t('guildSettings.iconUpload') }}
+                    </KvButton>
+                    <KvButton size="sm" variant="danger" :disabled="saving" @click="cancelPendingIcon">
+                      {{ t('guildSettings.iconCancelPending') }}
+                    </KvButton>
+                  </div>
+                </div>
+
+                <p v-if="iconError" class="text-[12px]" style="color: var(--kv-danger);">{{ iconError }}</p>
+              </div>
+
+              <input
+                ref="iconFileInput"
+                type="file"
+                accept="image/*"
+                class="hidden"
+                @change="onIconFileChange"
               />
             </section>
 

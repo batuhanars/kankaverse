@@ -328,6 +328,7 @@
     "discoverableLabel": "Keşfet'te listele",
     "discoverableHint": "Açıkken ortamın Keşfet'te herkese görünür ve davet kodu olmadan katılınabilir.",
     "iconSection": "Ortam Simgesi",
+    "iconHint": "En az 512×512 boyutlarında bir görsel kullanmanı öneririz.",
     "iconUpload": "Simge Seç",
     "iconRemove": "Kaldır",
     "iconPending": "Seçildi — henüz kaydedilmedi",
