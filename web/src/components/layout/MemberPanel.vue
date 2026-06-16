@@ -5,25 +5,32 @@ import { useGuildsStore } from '@/stores/guilds'
 import { usePresenceStore } from '@/stores/presence'
 import { useAuthStore } from '@/stores/auth'
 import { useMembersStore } from '@/stores/members'
+import { useRolesStore } from '@/stores/roles'
+import { useToastStore } from '@/stores/toast'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { useActiveMenu } from '@/composables/useActiveMenu'
 import { guildsApi } from '@/api/guilds'
+import { rolesApi } from '@/api/roles'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import UserCardPopover from '@/components/shared/UserCardPopover.vue'
 import GuildMemberRow from '@/components/layout/GuildMemberRow.vue'
-import type { GuildMemberDto } from '@/types'
+import type { GuildMemberDto, RoleDto } from '@/types'
 
 const { t } = useI18n()
 const guildsStore = useGuildsStore()
 const presenceStore = usePresenceStore()
 const authStore = useAuthStore()
 const membersStore = useMembersStore()
+const rolesStore = useRolesStore()
+const toast = useToastStore()
 
 // REV-14: üye listesi store'dan (WS guild.member_* ile anlık güncellenir)
 const members = computed(() => membersStore.membersFor(guildsStore.activeGuildId ?? ''))
 
 // İşlem menüsü ve hata state'leri — watch'tan önce tanımla (immediate callback erişir)
 const openMenuUserId = ref<string | null>(null)
+// R1: hangi üyenin "Rolleri Yönet" alt-menüsü açık
+const roleSubmenuUserId = ref<string | null>(null)
 const roleError = ref('')
 const kickError = ref('')
 
@@ -33,9 +40,12 @@ watch(
     roleError.value = ''
     kickError.value = ''
     openMenuUserId.value = null
+    roleSubmenuUserId.value = null
     if (!guildId) return
     try {
       await membersStore.fetchMembers(guildId)
+      // R1: rol-seçici için ortamın rolleri (zaten yüklüyse no-op)
+      await rolesStore.fetchRoles(guildId)
     } catch {
       // sessiz — boş kalır
     }
@@ -57,7 +67,14 @@ const isOwner = computed(() => {
 const { can } = useGuildPermissions(() => guildsStore.activeGuildId ?? '')
 
 // Üye üzerinde herhangi bir aksiyon yapabilir mi (menüyü göster)
-const canActOnMembers = computed(() => isOwner.value || can('KICK_MEMBERS') || can('BAN_MEMBERS'))
+const canActOnMembers = computed(
+  () => isOwner.value || can('KICK_MEMBERS') || can('BAN_MEMBERS') || can('MANAGE_ROLES'),
+)
+
+// R1: rol-seçicide gösterilecek atanabilir roller (ortamın rolleri, @everyone hariç)
+const assignableRoles = computed<RoleDto[]>(() =>
+  rolesStore.rolesFor(guildsStore.activeGuildId ?? '').filter((r) => !r.isEveryone),
+)
 
 // ── Gruplar computed — hoist rollere göre ───────────────────────────────────
 
@@ -116,11 +133,13 @@ const groups = computed((): MemberGroup[] => {
 function toggleMenu(userId: string) {
   // Bug 1: ⋯ ↔ profil kartı birbirini dışlar. ⋯'a tıklayınca açık profil kartı kapansın.
   showCard.value = false
+  roleSubmenuUserId.value = null
   openMenuUserId.value = openMenuUserId.value === userId ? null : userId
 }
 
 function closeMenu() {
   openMenuUserId.value = null
+  roleSubmenuUserId.value = null
 }
 
 // ── Kullanıcı kartı popover (üye satırına sol-tık — mesaj-yazarı deseni) ─────
@@ -181,9 +200,11 @@ function shouldShowMenu(member: GuildMemberDto): boolean {
   return true
 }
 
-function canChangeRole(member: GuildMemberDto): boolean {
-  // Enum rol ataması (ADMIN/MEMBER) yalnız OWNER (backend: updateMemberRole OWNER-only)
-  return isOwner.value && member.userId !== myUserId.value && member.role !== 'OWNER'
+// R1: bu üyenin rolleri yönetilebilir mi (MANAGE_ROLES + owner). Backend hiyerarşiyi zorlar.
+function canManageRoles(member: GuildMemberDto): boolean {
+  if (member.userId === myUserId.value) return false
+  if (member.role === 'OWNER') return false
+  return isOwner.value || can('MANAGE_ROLES')
 }
 
 function canKick(member: GuildMemberDto): boolean {
@@ -206,25 +227,30 @@ function canTransfer(member: GuildMemberDto): boolean {
   return isOwner.value && member.userId !== myUserId.value && member.role !== 'OWNER'
 }
 
-// ── Rol değiştir ──────────────────────────────────────────────────────────
+// ── R1: Rolleri Yönet (rol ata/kaldır — RolesSettingsSection ile aynı api/roles) ──────
 
 const roleLoading = ref<string | null>(null)
 
-async function changeRole(member: GuildMemberDto, newRole: 'ADMIN' | 'MEMBER') {
+// "Rolleri Yönet" alt-menüsünü aç/kapat (aynı üyeye tekrar → kapat)
+function toggleRoleSubmenu(userId: string) {
+  roleSubmenuUserId.value = roleSubmenuUserId.value === userId ? null : userId
+}
+
+// Bir rolü üyede aç/kapat: atanmışsa kaldır, değilse ata. Backend hiyerarşi + MANAGE_ROLES zorlar.
+async function toggleRole(member: GuildMemberDto, role: RoleDto) {
   const guildId = guildsStore.activeGuildId
-  if (!guildId) return
+  if (!guildId || roleLoading.value) return
+  const hasRole = (member.roles ?? []).some((r) => r.id === role.id)
   roleLoading.value = member.userId
-  roleError.value = ''
-  closeMenu()
   try {
-    const res = await guildsApi.updateMemberRole(guildId, member.userId, newRole)
+    const res = hasRole
+      ? await rolesApi.removeRole(role.id, member.userId)
+      : await rolesApi.assignRole(role.id, member.userId)
+    // Üye listesi rolleri anlık yansısın (WS guild.member_updated de gelir; bu optimistik)
     membersStore.updateMember(guildId, res.data)
   } catch (e: unknown) {
-    const err = e as { response?: { data?: { error?: string; message?: string } } }
-    const code = err.response?.data?.error
-    roleError.value = code && ['CANNOT_MODIFY_OWNER', 'NOT_GUILD_MEMBER', 'FORBIDDEN'].includes(code)
-      ? t(`member.errors.${code}`)
-      : (err.response?.data?.message ?? t('common.error'))
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message ?? t('common.error'))
   } finally {
     roleLoading.value = null
   }
@@ -373,17 +399,20 @@ async function confirmTransfer() {
           :is-offline="group.key === 'offline'"
           :open-menu-user-id="openMenuUserId"
           :role-loading="roleLoading"
-          :can-change-role-fn="canChangeRole"
+          :can-manage-roles-fn="canManageRoles"
           :can-kick-fn="canKick"
           :can-ban-fn="canBan"
           :can-transfer-fn="canTransfer"
           :should-show-menu-fn="shouldShowMenu"
+          :assignable-roles="assignableRoles"
+          :role-submenu-user-id="roleSubmenuUserId"
           :role-color="group.color"
           :hover-suppressed="isRowSuppressed(member.userId)"
           :owner-active="activeMemberUserId === member.userId"
           @toggle-menu="toggleMenu"
           @close-menu="closeMenu"
-          @change-role="changeRole"
+          @toggle-role-submenu="toggleRoleSubmenu"
+          @toggle-role="toggleRole"
           @open-kick="openKick"
           @open-ban="openBan"
           @open-transfer="openTransfer"
