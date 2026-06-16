@@ -20,6 +20,7 @@ import { ModerationModule } from './modules/moderation/moderation.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { VoiceModule } from './modules/voice/voice.module';
 import { RolesModule } from './modules/roles/roles.module';
+import { EventsModule } from './modules/events/events.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -44,6 +45,7 @@ import configuration from './config/configuration';
     CategoriesModule,
     VoiceModule,
     RolesModule,
+    EventsModule,
   ],
   providers: [
     {

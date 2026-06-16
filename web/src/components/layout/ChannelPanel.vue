@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useVoiceStore } from '@/stores/voice'
 import { useRolesStore } from '@/stores/roles'
 import { useMembersStore } from '@/stores/members'
+import { useEventsStore } from '@/stores/events'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { guildsApi } from '@/api/guilds'
 import { channelsApi } from '@/api/channels'
@@ -17,6 +18,8 @@ import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import VoiceParticipantList from '@/components/shared/VoiceParticipantList.vue'
+import EventsModal from '@/views/app/components/EventsModal.vue'
+import CreateEventWizard from '@/views/app/components/CreateEventWizard.vue'
 import type { ChannelDto, CategoryDto, ChannelMemberDto, GuildMemberDto } from '@/types'
 
 const { t } = useI18n()
@@ -27,6 +30,7 @@ const authStore = useAuthStore()
 const voiceStore = useVoiceStore()
 const rolesStore = useRolesStore()
 const membersStore = useMembersStore()
+const eventsStore = useEventsStore()
 
 const showSettings = ref(false)
 
@@ -36,6 +40,9 @@ const { can, canOpenSettings } = useGuildPermissions(() => guildsStore.activeGui
 // Kategori + kanal yönetimi → MANAGE_CHANNELS (owner / enum-admin / ADMINISTRATOR dahil).
 // İsim "isAdmin" geriye-uyum için korunur; tüm kanal-yönetimi ref'leri buradan beslenir.
 const isAdmin = computed(() => can('MANAGE_CHANNELS'))
+
+// Sprint V3 — Etkinlik yönetimi izni (oluştur/düzenle/sil). Listeleme/ilgi her üyeye açık.
+const canManageEvents = computed(() => can('MANAGE_EVENTS'))
 
 // Ortam ayarları (ad, ikon, vb.): yalnız OWNER (önceki davranış korunur)
 const isOwner = computed(() => {
@@ -134,9 +141,15 @@ watch(
     if (!id) return
     rolesStore.fetchRoles(id).catch(() => {})
     membersStore.fetchMembers(id).catch(() => {})
+    eventsStore.fetchEvents(id).catch(() => {})
   },
   { immediate: true },
 )
+
+// ── Etkinlikler (Sprint V3) ──
+const showEventsModal = ref(false)
+const showCreateEventWizard = ref(false)
+const eventCount = computed(() => eventsStore.countFor(activeGuildId.value))
 
 // REV-13b: ses kanalı aktif-süresi (sidebar, yeşil) — saniyede bir tik
 const voiceNow = ref(Date.now())
@@ -661,6 +674,16 @@ async function doLeave() {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><line x1="17" y1="14" x2="17" y2="20"/><line x1="14" y1="17" x2="20" y2="17"/></svg>
           <span>{{ t('category.createCategory') }}</span>
         </button>
+        <!-- Etkinlik Oluştur (MANAGE_EVENTS) -->
+        <button
+          v-if="canManageEvents"
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+          style="color: var(--kv-text-primary);"
+          @click="closeGuildMenu(); showCreateEventWizard = true"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span>{{ t('event.menuCreate') }}</span>
+        </button>
         <!-- Ortam Ayarları (settings'te yapabileceği bir şey olan herkes) -->
         <button
           v-if="canOpenSettings"
@@ -690,6 +713,24 @@ async function doLeave() {
 
     <!-- Kanal listesi -->
     <div class="flex-1 overflow-y-auto pt-4 pb-20 px-2">
+
+      <!-- ── (0) Etkinlikler satırı — kanal listesinin üstünde, border ile ayrılmış ── -->
+      <button
+        type="button"
+        class="w-full flex items-center gap-2 py-1.5 px-2 mb-3 pb-3 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors border-b"
+        style="border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);"
+        @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
+        @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'"
+        @click="showEventsModal = true"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span class="flex-1 truncate">{{ t('event.sidebarLabel') }}</span>
+        <span
+          v-if="eventCount > 0"
+          class="shrink-0 text-[11px] font-bold px-1.5 rounded-full"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary); line-height: 1.5;"
+        >{{ eventCount > 99 ? '99+' : eventCount }}</span>
+      </button>
 
       <!-- ── (1) Kategorisiz kanallar — en üstte ── -->
       <template v-for="channel in uncategorizedChannels" :key="channel.id">
@@ -1484,6 +1525,22 @@ async function doLeave() {
     :loading="leaving"
     @confirm="doLeave"
     @cancel="showLeaveConfirm = false; leaveError = ''"
+  />
+
+  <!-- Etkinlikler modalı -->
+  <EventsModal
+    v-if="showEventsModal && activeGuildId"
+    :guild-id="activeGuildId"
+    :can-manage="canManageEvents"
+    @close="showEventsModal = false"
+  />
+
+  <!-- Etkinlik oluştur sihirbazı (ortam menüsünden) -->
+  <CreateEventWizard
+    v-if="showCreateEventWizard && activeGuildId"
+    :guild-id="activeGuildId"
+    @close="showCreateEventWizard = false"
+    @created="showCreateEventWizard = false"
   />
 </template>
 

@@ -11,6 +11,7 @@ import { useMembersStore } from '@/stores/members'
 import type { GuildMemberDto, ChannelDto, CategoryDto, RoleDto } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useRolesStore } from '@/stores/roles'
+import { useEventsStore } from '@/stores/events'
 import { useVoiceStore, type VoiceParticipant } from '@/stores/voice'
 import { useCallStore, type IncomingCall } from '@/stores/call'
 import { getAccessToken, refreshAccessToken } from '@/api/axios'
@@ -20,7 +21,7 @@ import {
   handleTypingClear,
   clearTypingForChannel,
 } from '@/composables/useTyping'
-import type { MessageDto, FriendRequestDto, FriendDto } from '@/types'
+import type { MessageDto, FriendRequestDto, FriendDto, EventDto } from '@/types'
 
 let socket: Socket | null = null
 let refCount = 0
@@ -41,6 +42,7 @@ export function useSocket() {
   const membersStore = useMembersStore()
   const authStore = useAuthStore()
   const rolesStore = useRolesStore()
+  const eventsStore = useEventsStore()
   const voiceStore = useVoiceStore()
   const callStore = useCallStore()
 
@@ -245,6 +247,17 @@ export function useSocket() {
     socket.on('guild.role_deleted', (data: { roleId: string }) => {
       const guildId = rolesStore.findGuildIdByRole(data.roleId)
       if (guildId) rolesStore.removeRoleLocal(guildId, data.roleId)
+    })
+
+    // Sprint V3: Ortam etkinliği WS olayları (yalnız görünür üyelere yayınlanır — §7)
+    socket.on('guild.event_created', (event: EventDto) => {
+      eventsStore.upsertEvent(event)
+    })
+    socket.on('guild.event_updated', (event: EventDto) => {
+      eventsStore.upsertEvent(event)
+    })
+    socket.on('guild.event_deleted', (data: { guildId: string; eventId: string }) => {
+      eventsStore.removeEventLocal(data.guildId, data.eventId)
     })
 
     // Realtime: kanal/kategori CRUD → diğer üyelerde anlık (sayfa yenileme yok)

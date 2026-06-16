@@ -256,6 +256,46 @@ export interface RoleDto {
   memberCount: number
 }
 
+// Sprint V3 — Etkinlik (Event) DTO'ları
+export const EventLocationType = {
+  VOICE_CHANNEL: 'VOICE_CHANNEL',
+  EXTERNAL: 'EXTERNAL',
+} as const
+export type EventLocationType = (typeof EventLocationType)[keyof typeof EventLocationType]
+
+export const EventRecurrence = {
+  NONE: 'NONE',
+  DAILY: 'DAILY',
+  WEEKLY: 'WEEKLY',
+  MONTHLY: 'MONTHLY',
+} as const
+export type EventRecurrence = (typeof EventRecurrence)[keyof typeof EventRecurrence]
+
+export const EventStatus = {
+  SCHEDULED: 'SCHEDULED',
+  COMPLETED: 'COMPLETED',
+} as const
+export type EventStatus = (typeof EventStatus)[keyof typeof EventStatus]
+
+export interface EventDto {
+  id: string
+  guildId: string
+  creatorId: string
+  name: string
+  description: string | null
+  locationType: EventLocationType
+  channelId: string | null
+  channelName: string | null
+  externalLocation: string | null
+  startAt: string
+  endAt: string | null
+  recurrence: EventRecurrence
+  status: EventStatus
+  interestedCount: number
+  interestedByMe: boolean
+  createdAt: string
+}
+
 // Sprint 7A §3 — Davet DTO'ları
 export interface InviteDto {
   code: string
