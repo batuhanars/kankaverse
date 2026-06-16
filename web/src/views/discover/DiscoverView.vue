@@ -10,6 +10,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
 import { discoveryApi } from '@/api/discovery'
 import DiscoverGuildCard from './components/DiscoverGuildCard.vue'
 import type { DiscoveryGuildDto, DiscoveryTagDto } from '@/types'
@@ -19,6 +20,7 @@ const router = useRouter()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const authStore = useAuthStore()
+const toast = useToastStore()
 
 const search = ref('')
 const activeTag = ref<string | null>(null)
@@ -104,7 +106,6 @@ async function goToGuild(guildId: string) {
 
 async function joinGuild(guild: DiscoveryGuildDto) {
   joiningId.value = guild.id
-  loadError.value = ''
   try {
     await guildsStore.joinDiscovery(guild.id)
     await goToGuild(guild.id)
@@ -115,7 +116,7 @@ async function joinGuild(guild: DiscoveryGuildDto) {
       await goToGuild(guild.id)
       return
     }
-    loadError.value = err.response?.data?.message ?? t('discover.joinError')
+    toast.error(err.response?.data?.message ?? t('toast.joinError'))
   } finally {
     joiningId.value = null
   }

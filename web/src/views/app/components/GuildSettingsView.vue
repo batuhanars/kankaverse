@@ -5,6 +5,7 @@ import { useClipboard } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { useMembersStore } from '@/stores/members'
+import { useToastStore } from '@/stores/toast'
 import { guildsApi, type GuildBanDto } from '@/api/guilds'
 import { attachmentsApi } from '@/api/attachments'
 import { invitesApi } from '@/api/invites'
@@ -27,6 +28,7 @@ const emit = defineEmits<{ close: []; updated: [guild: GuildDto] }>()
 const { t } = useI18n()
 const guildsStore = useGuildsStore()
 const membersStore = useMembersStore()
+const toast = useToastStore()
 const router = useRouter()
 const { can } = useGuildPermissions(() => props.guild.id)
 
@@ -111,7 +113,6 @@ const isDirty = computed(() => {
 // ── İkon yükleme ──────────────────────────────────────────────────────────
 const iconFileInput = ref<HTMLInputElement | null>(null)
 const iconError = ref('')
-const saveError = ref('')
 const saving = ref(false)
 const iconUploadPct = ref(0)
 
@@ -178,7 +179,6 @@ function onIconFileChange(event: Event) {
   }
 
   iconError.value = ''
-  saveError.value = ''
   pendingIconFile.value = file
   pendingIconRemove.value = false
   pendingIconPreviewUrl.value = URL.createObjectURL(file)
@@ -204,7 +204,6 @@ function markIconForRemoval() {
 async function saveAll() {
   if (!isDirty.value) return
   saving.value = true
-  saveError.value = ''
   iconUploadPct.value = 0
 
   try {
@@ -249,9 +248,10 @@ async function saveAll() {
     pendingIconRemove.value = false
 
     if (updated) emit('updated', updated)
+    toast.success(t('toast.guildSaved'))
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
-    saveError.value = err.response?.data?.message ?? t('guildSettings.saveError')
+    toast.error(err.response?.data?.message ?? t('toast.saveError'))
   } finally {
     saving.value = false
     iconUploadPct.value = 0
@@ -268,7 +268,6 @@ function resetDrafts() {
   draftDiscoverable.value = props.guild.discoverable
   newTagInput.value = ''
   cancelPendingIcon()
-  saveError.value = ''
 }
 
 function handleClose() {
@@ -885,14 +884,13 @@ function confirmNavDiscard() {
               </div>
             </section>
 
-            <!-- Hata / yükleme durumu (kaydet aksiyonu artık sabit alt barda) -->
+            <!-- İkon yükleme ilerleme durumu (hata/başarı artık toast'ta) -->
             <div
-              v-if="saveError || (saving && iconUploadPct > 0)"
+              v-if="saving && iconUploadPct > 0"
               class="mt-2 pt-4 border-t"
               style="border-color: var(--kv-border-subtle);"
             >
-              <p v-if="saveError" class="text-[12px]" style="color: var(--kv-danger);">{{ saveError }}</p>
-              <p v-else class="text-[12px]" style="color: var(--kv-text-muted);">
+              <p class="text-[12px]" style="color: var(--kv-text-muted);">
                 {{ t('guildSettings.iconUploading', { pct: iconUploadPct }) }}
               </p>
             </div>
