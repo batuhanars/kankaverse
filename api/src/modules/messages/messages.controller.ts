@@ -203,12 +203,16 @@ export class GuildSearchController {
 
   @Get('search')
   @ApiOperation({ summary: 'Sunucu-geneli mesaj arama (erişilebilir kanallarda, kanal-gruplu)' })
-  @ApiQuery({ name: 'q', required: true, description: 'Arama sorgusu (min 2, max 100 karakter)' })
+  @ApiQuery({ name: 'q', required: false, description: 'Arama sorgusu (min 2, max 100 karakter)' })
+  @ApiQuery({ name: 'from', required: false, description: 'Yazar (authorId) — yalnız o kullanıcının mesajları' })
+  @ApiQuery({ name: 'mentions', required: false, description: 'Bahsedilen (userId) — o kullanıcıyı @bahseden mesajlar' })
   searchGuild(
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,
-    @Query('q') q: string,
+    @Query('q') q?: string,
+    @Query('from') from?: string,
+    @Query('mentions') mentions?: string,
   ) {
-    return this.messagesService.searchGuildMessages(user.id, guildId, q ?? '');
+    return this.messagesService.searchGuildMessages(user.id, guildId, q ?? '', { from, mentions });
   }
 }

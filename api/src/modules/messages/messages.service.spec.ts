@@ -30,11 +30,21 @@ const prismaMock = {
     upsert: jest.fn(),
     deleteMany: jest.fn(),
   },
+  guild: {
+    findUnique: jest.fn(),
+  },
+  channel: {
+    findMany: jest.fn(),
+  },
+  user: {
+    findUnique: jest.fn(),
+  },
 };
 
 const membershipMock = {
   requireChannelAccess: jest.fn(),
   requireNoDmBlock: jest.fn(),
+  requireGuildMembership: jest.fn(),
 };
 
 const permissionsMock = {
@@ -2437,6 +2447,174 @@ describe('MessagesService.searchMessages', () => {
     expect(results[0].content).toBe('arama metni burada');
     expect(results[0].author.username).toBe('kanka');
     expect(typeof results[0].createdAt).toBe('string'); // ISO string
+  });
+});
+
+// ── MessagesService.searchGuildMessages — from / mentions filtreleri ──────────
+
+describe('MessagesService.searchGuildMessages — from/mentions filtreleri', () => {
+  let service: MessagesService;
+
+  const GUILD_ID = 'guild-xyz';
+  const ACCESSIBLE_CHANNEL = { id: 'ch-guild-1', name: 'genel', ageGated: false, isPrivate: false };
+
+  function makeGuildMsg(id: string, channelId: string, content: string, createdAt: Date) {
+    return {
+      id,
+      channelId,
+      content,
+      replyToId: null,
+      replyTo: null,
+      editedAt: null,
+      pinnedAt: null,
+      pinnedById: null,
+      deletedAt: null,
+      createdAt,
+      mentions: [],
+      author: { id: 'author-1', username: 'kanka', avatarUrl: null },
+      attachments: [],
+      reactions: [],
+    };
+  }
+
+  // Varsayılan: ayrıcalıklı olmayan üye, reşit, tek erişilebilir kamu kanalı
+  function setupAccess() {
+    membershipMock.requireGuildMembership.mockResolvedValue({ membership: { role: 'MEMBER' } });
+    prismaMock.guild.findUnique.mockResolvedValue({ adultsOnly: false });
+    prismaMock.channel.findMany.mockResolvedValue([ACCESSIBLE_CHANNEL]);
+    prismaMock.user.findUnique.mockResolvedValue({ isMinor: false });
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.message.findMany.mockResolvedValue([]);
+  });
+
+  // ── En-az-biri kuralı ───────────────────────────────────────────────────────
+  it('q/from/mentions hepsi boş → boş dizi döner, findMany çağrılmaz (hata atmaz)', async () => {
+    setupAccess();
+
+    const results = await service.searchGuildMessages(USER_ID, GUILD_ID, '', { from: '', mentions: '' });
+
+    expect(results).toEqual([]);
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
+  });
+
+  it('opts hiç verilmedi + q boş → boş dizi döner', async () => {
+    setupAccess();
+
+    const results = await service.searchGuildMessages(USER_ID, GUILD_ID, '');
+
+    expect(results).toEqual([]);
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
+  });
+
+  // ── q opsiyonel: q yok ama from var → arama çalışır ──────────────────────────
+  it('q boş + from dolu → where.authorId set, content filtresi yok', async () => {
+    setupAccess();
+
+    await service.searchGuildMessages(USER_ID, GUILD_ID, '', { from: 'author-1' });
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.authorId).toBe('author-1');
+    expect(call.where.content).toBeUndefined();
+  });
+
+  // ── q opsiyonel: q yok ama mentions var → arama çalışır ──────────────────────
+  it('q boş + mentions dolu → where.mentions.has set, content filtresi yok', async () => {
+    setupAccess();
+
+    await service.searchGuildMessages(USER_ID, GUILD_ID, '', { mentions: 'user-mentioned' });
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.mentions).toEqual({ has: 'user-mentioned' });
+    expect(call.where.content).toBeUndefined();
+  });
+
+  // ── q hâlâ ≥2 karakter şartı (dolu ise) ──────────────────────────────────────
+  it('q tek karakter (dolu ama <2) → QUERY_TOO_SHORT', async () => {
+    setupAccess();
+
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.searchGuildMessages(USER_ID, GUILD_ID, 'a');
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    const response = thrown!.getResponse() as { error: string };
+    expect(response.error).toBe('QUERY_TOO_SHORT');
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
+  });
+
+  // ── Kombinasyon: üç filtre AND'lenir ─────────────────────────────────────────
+  it('q + from + mentions → üçü de where içinde AND\'lenir', async () => {
+    setupAccess();
+
+    await service.searchGuildMessages(USER_ID, GUILD_ID, 'merhaba', {
+      from: 'author-1',
+      mentions: 'user-mentioned',
+    });
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.content).toEqual({ contains: 'merhaba', mode: 'insensitive' });
+    expect(call.where.authorId).toBe('author-1');
+    expect(call.where.mentions).toEqual({ has: 'user-mentioned' });
+  });
+
+  // ── q-only mevcut davranış bozulmaz ──────────────────────────────────────────
+  it('yalnız q (eski davranış) → content filtresi var, authorId/mentions yok', async () => {
+    setupAccess();
+
+    await service.searchGuildMessages(USER_ID, GUILD_ID, 'merhaba');
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.content).toEqual({ contains: 'merhaba', mode: 'insensitive' });
+    expect(call.where.authorId).toBeUndefined();
+    expect(call.where.mentions).toBeUndefined();
+  });
+
+  // ── Boş-string filtreler yok sayılır ─────────────────────────────────────────
+  it('from/mentions boş string → where\'e girmez (yok sayılır)', async () => {
+    setupAccess();
+
+    await service.searchGuildMessages(USER_ID, GUILD_ID, 'merhaba', { from: '   ', mentions: '' });
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.authorId).toBeUndefined();
+    expect(call.where.mentions).toBeUndefined();
+    expect(call.where.content).toEqual({ contains: 'merhaba', mode: 'insensitive' });
+  });
+
+  // ── Erişim/sızıntı deseni korunur: erişilebilir kanal yoksa boş döner ─────────
+  it('erişilebilir kanal yok → boş döner, findMany çağrılmaz (filtre dolu olsa bile)', async () => {
+    membershipMock.requireGuildMembership.mockResolvedValue({ membership: { role: 'MEMBER' } });
+    prismaMock.guild.findUnique.mockResolvedValue({ adultsOnly: false });
+    prismaMock.channel.findMany.mockResolvedValue([]); // hiç kanal yok
+    prismaMock.user.findUnique.mockResolvedValue({ isMinor: false });
+
+    const results = await service.searchGuildMessages(USER_ID, GUILD_ID, '', { from: 'author-1' });
+
+    expect(results).toEqual([]);
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
+  });
+
+  // ── Dönüş şekli korunur: kanal-gruplu ────────────────────────────────────────
+  it('sonuç kanal-gruplu döner (channelId/channelName/messages şekli korunur)', async () => {
+    setupAccess();
+    const msg = makeGuildMsg('msg-g-1', 'ch-guild-1', 'merhaba dünya', new Date('2026-06-14T10:00:00Z'));
+    prismaMock.message.findMany.mockResolvedValue([msg]);
+
+    const results = await service.searchGuildMessages(USER_ID, GUILD_ID, '', { from: 'author-1' });
+
+    expect(results).toHaveLength(1);
+    expect(results[0].channelId).toBe('ch-guild-1');
+    expect(results[0].channelName).toBe('genel');
+    expect(results[0].messages).toHaveLength(1);
+    expect(results[0].messages[0].id).toBe('msg-g-1');
+    expect(results[0].messages[0].content).toBe('merhaba dünya'); // content korunur
   });
 });
 

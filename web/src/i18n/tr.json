@@ -945,7 +945,13 @@
   },
   "guildSearch": {
     "title": "Ortamda Ara",
-    "placeholder": "Tüm kanallarda ara…"
+    "placeholder": "Tüm kanallarda ara…",
+    "hint": "Aramak için yaz ve Enter'a bas.",
+    "filters": "Filtreler",
+    "fromLabel": "Gönderen",
+    "mentionsLabel": "Bahsedilen",
+    "selectMember": "Üye seç…",
+    "resultCount": "{n} Sonuç"
   },
   "notification": {
     "title": "Bildirimler",
@@ -1021,7 +1027,8 @@
     "error": "Bir hata oluştu.",
     "retry": "Tekrar dene",
     "settings": "Ayarlar",
-    "search": "Ara", 
+    "search": "Ara",
+    "clear": "Temizle",
     "logout": "Çıkış Yap"
   },
   "presence": {

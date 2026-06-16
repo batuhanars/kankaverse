@@ -646,14 +646,28 @@ export class MessagesService {
    * Sızıntı-güvenli: yaş-kapılı/adultsOnly minöre kapalı; özel kanal yalnız OWNER/ADMIN
    * veya ChannelMember'a. Sonuç kanal-gruplu döner (Discord-tarzı).
    */
-  async searchGuildMessages(userId: string, guildId: string, q: string) {
+  async searchGuildMessages(
+    userId: string,
+    guildId: string,
+    q: string,
+    opts?: { from?: string; mentions?: string },
+  ) {
     const { membership } = await this.membership.requireGuildMembership(userId, guildId);
 
-    const trimmedQ = q.trim();
-    if (trimmedQ.length < 2) {
+    // q opsiyonel: dolu ise ≥2 karakter şartı korunur, boşsa metin filtresi uygulanmaz.
+    const trimmedQ = (q ?? '').trim();
+    const hasQ = trimmedQ.length > 0;
+    if (hasQ && trimmedQ.length < 2) {
       throw new BadRequestException({ error: 'QUERY_TOO_SHORT', message: 'Arama için en az 2 karakter girin.' });
     }
     const safeQ = trimmedQ.slice(0, 100);
+
+    // from / mentions opsiyonel filtreler (boş string = yok say)
+    const from = opts?.from?.trim() || undefined;
+    const mentions = opts?.mentions?.trim() || undefined;
+
+    // En az biri (q | from | mentions) dolu olmalı; hiçbiri yoksa hata değil → boş sonuç.
+    if (!hasQ && !from && !mentions) return [];
 
     const guild = await this.prisma.guild.findUnique({ where: { id: guildId }, select: { adultsOnly: true } });
     const channels = await this.prisma.channel.findMany({
@@ -688,7 +702,10 @@ export class MessagesService {
       where: {
         channelId: { in: accessible.map((c) => c.id) },
         deletedAt: null,
-        content: { contains: safeQ, mode: 'insensitive' },
+        // Dolu filtreler AND'lenir; boş olanlar where'e hiç girmez (mevcut q-only davranış korunur).
+        ...(hasQ ? { content: { contains: safeQ, mode: 'insensitive' as const } } : {}),
+        ...(from ? { authorId: from } : {}),
+        ...(mentions ? { mentions: { has: mentions } } : {}),
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },

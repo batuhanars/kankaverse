@@ -49,9 +49,14 @@ export const messagesApi = {
     if (before) params.before = before
     return http.get<MessageDto[]>(`/channels/${channelId}/messages/search`, { params })
   },
-  // Sunucu-geneli arama: erişilebilir kanallarda, kanal-gruplu sonuç
-  searchGuildMessages(guildId: string, q: string) {
-    return http.get<GuildSearchGroup[]>(`/guilds/${guildId}/messages/search`, { params: { q } })
+  // Sunucu-geneli arama: erişilebilir kanallarda, kanal-gruplu sonuç.
+  // R13: q/from/mentions opsiyonel — en az biri dolu olmalı (from=authorId, mentions=userId).
+  searchGuildMessages(guildId: string, opts: { q?: string; from?: string; mentions?: string }) {
+    const params: Record<string, string> = {}
+    if (opts.q) params.q = opts.q
+    if (opts.from) params.from = opts.from
+    if (opts.mentions) params.mentions = opts.mentions
+    return http.get<GuildSearchGroup[]>(`/guilds/${guildId}/messages/search`, { params })
   },
 }
 
