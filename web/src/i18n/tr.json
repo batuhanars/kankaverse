@@ -681,8 +681,8 @@
       "ADMIN": "Yönetici"
     },
     "actions": {
-      "makeAdmin": "Yönetici Yap",
-      "makeMember": "Üye Yap",
+      "manageRoles": "Rolleri Yönet",
+      "noAssignableRoles": "Atanabilir rol yok.",
       "kick": "At",
       "kickConfirmTitle": "Üyeyi At",
       "kickConfirmMessage": "{username} adlı üyeyi ortamdan atmak istediğinden emin misin?",

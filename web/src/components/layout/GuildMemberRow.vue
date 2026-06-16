@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
-import type { GuildMemberDto } from '@/types'
+import type { GuildMemberDto, RoleDto } from '@/types'
 import type { PresenceStatus } from '@/stores/presence'
 
 const { t } = useI18n()
@@ -12,11 +12,15 @@ const props = defineProps<{
   isOffline: boolean
   openMenuUserId: string | null
   roleLoading: string | null
-  canChangeRoleFn: (m: GuildMemberDto) => boolean
+  canManageRolesFn: (m: GuildMemberDto) => boolean
   canKickFn: (m: GuildMemberDto) => boolean
   canBanFn: (m: GuildMemberDto) => boolean
   canTransferFn: (m: GuildMemberDto) => boolean
   shouldShowMenuFn: (m: GuildMemberDto) => boolean
+  // R1: atanabilir roller (ortamın rolleri, @everyone hariç) — rol-seçici alt-menüsü için
+  assignableRoles?: RoleDto[]
+  // R1: bu üyenin hangi rol-seçici alt-menüsü açık (member.userId eşleşirse açık)
+  roleSubmenuUserId?: string | null
   roleColor?: string | null
   // R8/R13: başka bir üyenin overlay'i (menü/kart) açık → bu satırın hover'ı bastırılsın
   hoverSuppressed?: boolean
@@ -27,13 +31,21 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggleMenu: [userId: string]
   closeMenu: []
-  changeRole: [member: GuildMemberDto, newRole: 'ADMIN' | 'MEMBER']
   openKick: [member: GuildMemberDto]
   openBan: [member: GuildMemberDto]
   openTransfer: [member: GuildMemberDto]
+  // R1: "Rolleri Yönet" alt-menüsünü aç/kapat
+  toggleRoleSubmenu: [userId: string]
+  // R1: bir rolü üyede aç/kapat (atanmışsa kaldır, değilse ata)
+  toggleRole: [member: GuildMemberDto, role: RoleDto]
   // C5 follow-up: üye satırına sol-tık → kullanıcı kartı popover (mesaj-yazarı deseni)
   selectMember: [userId: string, x: number, y: number]
 }>()
+
+// R1: üyede bu rol atalı mı? (rol-seçici işaret durumu)
+function memberHasRole(roleId: string): boolean {
+  return (props.member.roles ?? []).some((r) => r.id === roleId)
+}
 
 function avatarInitial(username: string) {
   return username.charAt(0).toUpperCase()
@@ -152,24 +164,64 @@ function onRowLeave(e: MouseEvent) {
         style="min-width: 152px; background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
         @click.stop
       >
-        <!-- Rol değiştir (yalnız OWNER) -->
-        <template v-if="canChangeRoleFn(member)">
+        <!-- R1: Rolleri Yönet (MANAGE_ROLES) — alt-menüde rol-seçici -->
+        <template v-if="canManageRolesFn(member)">
           <button
-            v-if="member.role === 'MEMBER'"
-            class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+            class="w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
             style="color: var(--kv-text-secondary);"
-            @click="emit('changeRole', member, 'ADMIN')"
+            @click.stop="emit('toggleRoleSubmenu', member.userId)"
           >
-            {{ t('member.actions.makeAdmin') }}
+            <span>{{ t('member.actions.manageRoles') }}</span>
+            <svg
+              width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+              class="shrink-0 transition-transform" :class="roleSubmenuUserId === member.userId ? 'rotate-90' : ''"
+            >
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
           </button>
-          <button
-            v-else-if="member.role === 'ADMIN'"
-            class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-text-secondary);"
-            @click="emit('changeRole', member, 'MEMBER')"
+
+          <!-- Rol-seçici listesi (açıkken) -->
+          <div
+            v-if="roleSubmenuUserId === member.userId"
+            class="max-h-56 overflow-y-auto border-t"
+            style="border-color: var(--kv-border-subtle);"
           >
-            {{ t('member.actions.makeMember') }}
-          </button>
+            <p
+              v-if="!assignableRoles || assignableRoles.length === 0"
+              class="px-3 py-2 text-[12px]"
+              style="color: var(--kv-text-muted);"
+            >
+              {{ t('member.actions.noAssignableRoles') }}
+            </p>
+            <button
+              v-for="role in assignableRoles"
+              :key="role.id"
+              class="w-full flex items-center gap-2 px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+              style="color: var(--kv-text-secondary);"
+              :disabled="roleLoading === member.userId"
+              @click.stop="emit('toggleRole', member, role)"
+            >
+              <!-- Onay kutusu: atanmışsa dolu -->
+              <span
+                class="shrink-0 w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center"
+                :style="memberHasRole(role.id)
+                  ? 'background-color: var(--kv-accent-500); border-color: var(--kv-accent-500);'
+                  : 'border-color: var(--kv-border-strong);'"
+              >
+                <svg
+                  v-if="memberHasRole(role.id)"
+                  width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff"
+                  stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"
+                >
+                  <path d="M20 6L9 17l-5-5"/>
+                </svg>
+              </span>
+              <!-- Rol renk noktası -->
+              <span class="shrink-0 w-2 h-2 rounded-full" :style="`background-color: ${role.color};`" />
+              <span class="flex-1 min-w-0 truncate">{{ role.name }}</span>
+            </button>
+          </div>
         </template>
         <!-- At (kick) -->
         <button
