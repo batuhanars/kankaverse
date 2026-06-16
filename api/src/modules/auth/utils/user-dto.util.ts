@@ -7,6 +7,8 @@ export function toUserDto(user: User) {
     username: user.username,
     email: user.email,
     avatarUrl: user.avatarUrl,
+    bio: user.bio,
+    dmPolicy: user.dmPolicy,
     isMinor: user.isMinor,
     verificationStatus: user.verificationStatus,
     createdAt: user.createdAt.toISOString(),

@@ -94,6 +94,7 @@ model User {
   profileDiscoverable Boolean            @default(true)
   emailVerifiedAt     DateTime?
   avatarUrl           String?
+  bio                 String?
   deletedAt           DateTime?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
