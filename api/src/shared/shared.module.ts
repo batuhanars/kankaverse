@@ -9,9 +9,10 @@ import { PresenceService } from './presence/presence.service';
 import { AutomodService } from './automod/automod.service';
 import { StorageService } from './storage/storage.service';
 import { ModerationService } from './moderation/moderation.service';
+import { GuildJoinService } from './guild-join/guild-join.service';
 
 @Module({
-  providers: [EmailService, MembershipService, PermissionsService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService],
-  exports: [EmailService, MembershipService, PermissionsService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService],
+  providers: [EmailService, MembershipService, PermissionsService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService, GuildJoinService],
+  exports: [EmailService, MembershipService, PermissionsService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService, GuildJoinService],
 })
 export class SharedModule {}

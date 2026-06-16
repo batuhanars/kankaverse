@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { guildsApi } from '@/api/guilds'
 import { invitesApi } from '@/api/invites'
+import { discoveryApi } from '@/api/discovery'
 import type { GuildDto, GuildMemberRole } from '@/types'
 
 export const useGuildsStore = defineStore('guilds', () => {
@@ -32,10 +33,29 @@ export const useGuildsStore = defineStore('guilds', () => {
     return res.data
   }
 
-  async function updateGuild(id: string, payload: { name?: string; adultsOnly?: boolean; description?: string }): Promise<GuildDto> {
+  async function updateGuild(
+    id: string,
+    payload: {
+      name?: string
+      adultsOnly?: boolean
+      description?: string
+      discoverable?: boolean
+      tags?: string[]
+      bannerColor?: string | null
+    },
+  ): Promise<GuildDto> {
     const res = await guildsApi.update(id, payload)
     const idx = guilds.value.findIndex((g) => g.id === id)
     if (idx !== -1) guilds.value[idx] = res.data
+    return res.data
+  }
+
+  /** Sprint C6 — Keşfet'ten katıl: discoverable kontrolü + Sprint 7A join gate'leri backend'de. */
+  async function joinDiscovery(guildId: string): Promise<GuildDto> {
+    const res = await discoveryApi.joinDiscovery(guildId)
+    if (!guilds.value.find((g) => g.id === res.data.id)) {
+      guilds.value.push(res.data)
+    }
     return res.data
   }
 
@@ -116,5 +136,5 @@ export const useGuildsStore = defineStore('guilds', () => {
     }
   }
 
-  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, joinByInvite, updateGuild, updateGuildIcon, deleteGuild, removeGuildLocal, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread, setGuildMentionCount, incrementGuildMention }
+  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, joinByInvite, joinDiscovery, updateGuild, updateGuildIcon, deleteGuild, removeGuildLocal, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread, setGuildMentionCount, incrementGuildMention }
 })

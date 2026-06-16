@@ -13,6 +13,7 @@ import KvSwitch from '@/components/ui/KvSwitch.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import RolesSettingsSection from './RolesSettingsSection.vue'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
+import { BANNER_PRESET_KEYS, bannerBackground } from '@/utils/bannerColor'
 import type { InviteDto, GuildDto } from '@/types'
 
 const props = defineProps<{
@@ -52,6 +53,42 @@ const draftName = ref(props.guild.name)
 const draftAdultsOnly = ref(props.guild.adultsOnly)
 const draftDescription = ref(props.guild.description ?? '')
 
+// ── Sprint C6 — Keşfet taslakları (afiş / etiketler / discoverable) ────────
+const MAX_TAGS = 5
+const TAG_MAX_LEN = 30
+const draftBannerColor = ref<string | null>(props.guild.bannerColor)
+const draftTags = ref<string[]>([...props.guild.tags])
+const draftDiscoverable = ref(props.guild.discoverable)
+const newTagInput = ref('')
+const bannerPresetKeys = BANNER_PRESET_KEYS
+
+function tagsEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((t, i) => t === b[i])
+}
+
+function selectBanner(key: string) {
+  // Tekrar tıkla → seçimi kaldır (nötr afiş)
+  draftBannerColor.value = draftBannerColor.value === key ? null : key
+}
+
+function addTag() {
+  const tag = newTagInput.value.trim().toLowerCase()
+  if (!tag) return
+  if (tag.length > TAG_MAX_LEN) return
+  if (draftTags.value.length >= MAX_TAGS) return
+  if (draftTags.value.includes(tag)) {
+    newTagInput.value = ''
+    return
+  }
+  draftTags.value.push(tag)
+  newTagInput.value = ''
+}
+
+function removeTag(tag: string) {
+  draftTags.value = draftTags.value.filter((t) => t !== tag)
+}
+
 const pendingIconFile = ref<File | null>(null)
 const pendingIconRemove = ref(false)
 const pendingIconPreviewUrl = ref<string | null>(null)
@@ -61,6 +98,9 @@ const isDirty = computed(() => {
   if (draftName.value.trim() !== props.guild.name) return true
   if (draftAdultsOnly.value !== props.guild.adultsOnly) return true
   if (draftDescription.value !== (props.guild.description ?? '')) return true
+  if (draftBannerColor.value !== props.guild.bannerColor) return true
+  if (!tagsEqual(draftTags.value, props.guild.tags)) return true
+  if (draftDiscoverable.value !== props.guild.discoverable) return true
   if (pendingIconFile.value !== null) return true
   if (pendingIconRemove.value) return true
   return false
@@ -145,11 +185,21 @@ async function saveAll() {
   iconUploadPct.value = 0
 
   try {
-    const patch: { name?: string; adultsOnly?: boolean; description?: string } = {}
+    const patch: {
+      name?: string
+      adultsOnly?: boolean
+      description?: string
+      discoverable?: boolean
+      tags?: string[]
+      bannerColor?: string | null
+    } = {}
     const trimmedName = draftName.value.trim()
     if (trimmedName && trimmedName !== props.guild.name) patch.name = trimmedName
     if (draftAdultsOnly.value !== props.guild.adultsOnly) patch.adultsOnly = draftAdultsOnly.value
     if (draftDescription.value !== (props.guild.description ?? '')) patch.description = draftDescription.value
+    if (draftBannerColor.value !== props.guild.bannerColor) patch.bannerColor = draftBannerColor.value
+    if (!tagsEqual(draftTags.value, props.guild.tags)) patch.tags = draftTags.value
+    if (draftDiscoverable.value !== props.guild.discoverable) patch.discoverable = draftDiscoverable.value
 
     let updated: GuildDto | null = null
     if (Object.keys(patch).length > 0) {
@@ -583,7 +633,7 @@ function confirmNavDiscard() {
               <input
                 ref="iconFileInput"
                 type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
+                accept="image/*"
                 class="hidden"
                 @change="onIconFileChange"
               />
@@ -643,6 +693,111 @@ function confirmNavDiscard() {
                 class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
                 style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
               />
+            </section>
+
+            <!-- ── Sprint C6: Afiş (renk/gradient preset swatch) ── -->
+            <section>
+              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.bannerLabel') }}
+              </h3>
+              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.bannerHint') }}
+              </p>
+              <div class="flex flex-wrap gap-2.5">
+                <button
+                  v-for="key in bannerPresetKeys"
+                  :key="key"
+                  type="button"
+                  class="rounded-[var(--kv-radius-md)] border-2 transition-transform cursor-pointer"
+                  style="width: 48px; height: 48px;"
+                  :style="{
+                    background: bannerBackground(key),
+                    borderColor: draftBannerColor === key ? 'var(--kv-accent-500)' : 'transparent',
+                    transform: draftBannerColor === key ? 'scale(1.06)' : 'none',
+                  }"
+                  :aria-pressed="draftBannerColor === key"
+                  :aria-label="key"
+                  :disabled="saving"
+                  @click="selectBanner(key)"
+                />
+              </div>
+            </section>
+
+            <!-- ── Sprint C6: Özellikler (max 5 etiket) ── -->
+            <section>
+              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.featuresLabel') }}
+              </h3>
+              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.featuresHint', { max: MAX_TAGS }) }}
+              </p>
+
+              <!-- Mevcut çipler -->
+              <div v-if="draftTags.length" class="flex flex-wrap gap-2 mb-3">
+                <span
+                  v-for="tag in draftTags"
+                  :key="tag"
+                  class="flex items-center gap-1.5 text-[13px] pl-3 pr-1.5 py-1 rounded-full"
+                  style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+                >
+                  {{ tag }}
+                  <button
+                    type="button"
+                    class="flex items-center justify-center rounded-full transition-colors cursor-pointer hover:bg-[var(--kv-bg-content)]"
+                    style="width: 18px; height: 18px; color: var(--kv-text-muted);"
+                    :aria-label="t('guildSettings.featureRemove', { tag })"
+                    :disabled="saving"
+                    @click="removeTag(tag)"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </span>
+              </div>
+
+              <!-- Ekleme satırı -->
+              <form class="flex gap-2 items-end" @submit.prevent="addTag">
+                <div class="flex-1">
+                  <KvInput
+                    v-model="newTagInput"
+                    :placeholder="t('guildSettings.featurePlaceholder')"
+                    :disabled="saving || draftTags.length >= MAX_TAGS"
+                  />
+                </div>
+                <KvButton
+                  size="sm"
+                  type="submit"
+                  :disabled="saving || draftTags.length >= MAX_TAGS || !newTagInput.trim()"
+                >
+                  {{ t('guildSettings.featureAdd') }}
+                </KvButton>
+              </form>
+              <p v-if="draftTags.length >= MAX_TAGS" class="text-[12px] mt-2" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.featuresFull', { max: MAX_TAGS }) }}
+              </p>
+            </section>
+
+            <!-- ── Sprint C6: Keşfet'te Göster (discoverable) ── -->
+            <section>
+              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.discoverableSection') }}
+              </h3>
+              <div
+                class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
+                    {{ t('guildSettings.discoverableLabel') }}
+                  </p>
+                  <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+                    {{ t('guildSettings.discoverableHint') }}
+                  </p>
+                </div>
+                <KvSwitch v-model="draftDiscoverable" :disabled="saving" />
+              </div>
             </section>
 
             <!-- Kaydet / hata -->

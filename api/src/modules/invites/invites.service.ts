@@ -2,12 +2,11 @@ import {
   Injectable,
   ForbiddenException,
   NotFoundException,
-  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { PermissionsService } from '../../shared/permissions/permissions.service';
-import { RealtimeService } from '../../shared/realtime/realtime.service';
+import { GuildJoinService } from '../../shared/guild-join/guild-join.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { InviteDto, InvitePreviewDto } from './dto/invite.dto';
 import { generateInviteCode } from './utils/invite-code.util';
@@ -49,7 +48,7 @@ export class InvitesService {
     private prisma: PrismaService,
     private membershipService: MembershipService,
     private permissions: PermissionsService,
-    private realtime: RealtimeService,
+    private guildJoin: GuildJoinService,
   ) {}
 
   /** POST /guilds/:id/invites — CREATE_INVITE izni */
@@ -162,12 +161,11 @@ export class InvitesService {
    *
    * [R7] Kapı sırası (fail-closed):
    *   1. Davet geçerli mi → değilse 404 INVITE_INVALID
-   *   2. guild.adultsOnly && user.isMinor → 403 AGE_RESTRICTED (minör statüsü sızdırılmaz)
-   *   3. Zaten üye → 409 ALREADY_MEMBER
-   *   4. Transaction: GuildMember oluştur (MEMBER) + invite.uses atomik artır → GuildDto
+   *   2. Sprint 7A yaş/ban/üyelik kapısı + üye create + realtime → GuildJoinService (TEK kaynak)
+   *      + invite.uses atomik artımı aynı transaction'da (extra tx op).
    */
   async joinByInvite(userId: string, code: string) {
-    // 1. Davet geçerliliği
+    // 1. Davet geçerliliği (Keşfet'in discoverable kapısının davet karşılığı)
     const invite = await this.prisma.invite.findUnique({
       where: { code },
       include: { guild: true },
@@ -179,74 +177,15 @@ export class InvitesService {
 
     const guild = invite.guild;
 
-    // 2. [R7] adultsOnly kapısı: minör statüsü yalnız jenerik AGE_RESTRICTED ile döner
-    if (guild.adultsOnly) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { isMinor: true },
-      });
-      if (user?.isMinor) {
-        throw new ForbiddenException({ message: 'Bu ortama erişim yaşınız nedeniyle kısıtlanmıştır.', error: 'AGE_RESTRICTED' });
-      }
-    }
-
-    // 2.5. Ortam-ban kontrolü — yasaklı kullanıcı davetle giremez (kendi yasağı; açık mesaj)
-    const ban = await this.prisma.guildBan.findUnique({
-      where: { guildId_userId: { guildId: guild.id, userId } },
-    });
-    if (ban) {
-      throw new ForbiddenException({ message: 'Bu ortamdan yasaklandınız.', error: 'GUILD_BANNED' });
-    }
-
-    // 3. Zaten üye kontrolü
-    const existing = await this.prisma.guildMember.findUnique({
-      where: { guildId_userId: { guildId: guild.id, userId } },
-    });
-    if (existing) {
-      throw new ConflictException({ message: 'Bu sunucuya zaten üyesiniz.', error: 'ALREADY_MEMBER' });
-    }
-
-    // 4. Transaction: üye oluştur + uses atomik artır
-    await this.prisma.$transaction([
-      this.prisma.guildMember.create({
-        data: { guildId: guild.id, userId, role: 'MEMBER' },
-      }),
+    // 2. Ortak Sprint 7A gate: adultsOnly&&minör→403, ban→403, zaten-üye→409,
+    //    atomik üye create + invite.uses artımı + realtime member_joined.
+    await this.guildJoin.joinGuild(userId, guild, [
       this.prisma.invite.update({
         where: { id: invite.id },
         data: { uses: { increment: 1 } },
       }),
     ]);
 
-    // REV-14 realtime: mevcut üyelere yeni katılanı anlık bildir (üye listesi +
-    // mention autocomplete sayfa yenilemeden güncellensin). Transaction SONRASI.
-    await this.notifyMemberJoined(guild.id, userId);
-
     return toGuildDto(guild);
-  }
-
-  /** REV-14: yeni üyeyi guild'in diğer üyelerine `guild.member_joined` ile yay. */
-  private async notifyMemberJoined(guildId: string, newUserId: string) {
-    const newMember = await this.prisma.guildMember.findUnique({
-      where: { guildId_userId: { guildId, userId: newUserId } },
-      include: { user: { select: { id: true, username: true, avatarUrl: true } } },
-    });
-    if (!newMember) return;
-
-    const members = await this.prisma.guildMember.findMany({
-      where: { guildId },
-      select: { userId: true },
-    });
-    const recipients = (members ?? []).map((m) => m.userId).filter((id) => id !== newUserId);
-
-    this.realtime.emitToUsers(recipients, 'guild.member_joined', {
-      guildId,
-      member: {
-        userId: newMember.user.id,
-        username: newMember.user.username,
-        avatarUrl: newMember.user.avatarUrl,
-        role: newMember.role,
-        roles: [], // yeni üyenin atanmış özel rolü yok (hoist gruplaması bu diziyi bekler)
-      },
-    });
   }
 }

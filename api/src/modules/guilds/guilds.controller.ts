@@ -83,6 +83,13 @@ export class GuildsController {
     return this.guildsService.setIcon(user.id, guildId, dto);
   }
 
+  @Post(':id/join-discovery')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Keşfet üzerinden ortama katıl (discoverable zorunlu + Sprint 7A yaş/ban/üyelik kapısı).' })
+  joinDiscovery(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
+    return this.guildsService.joinDiscovery(user.id, guildId);
+  }
+
   // ─── §A: Ortam silme ──────────────────────────────────────────────────────
 
   @Delete(':id')

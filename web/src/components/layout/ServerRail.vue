@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useAuthStore } from '@/stores/auth'
@@ -15,6 +15,7 @@ defineProps<{
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const authStore = useAuthStore()
@@ -40,6 +41,10 @@ function hideTooltip() {
 
 function goHome() {
   router.push({ name: 'app' })
+}
+
+function goDiscover() {
+  router.push({ name: 'discover' })
 }
 
 async function selectGuild(guild: GuildDto) {
@@ -91,6 +96,34 @@ function badgeLabel(count: number): string {
       >
         <span :class="['hex-home', { 'hex-home--active': guildsStore.activeGuildId === null }]">
           <img :src="hexagonLogo" :alt="t('brand.name')" class="home-img" />
+        </span>
+      </button>
+    </div>
+
+    <!-- Keşfet / pusula girişi -->
+    <div class="rail-item">
+      <span :class="['pill', route.name === 'discover' ? 'pill--active' : 'pill--hidden']" />
+      <button
+        class="guild-btn"
+        @click="goDiscover"
+        @mouseenter="showTooltip($event, t('discover.railTooltip'))"
+        @mouseleave="hideTooltip"
+      >
+        <span :class="['hex', 'hex--discover', { 'hex--discover-active': route.name === 'discover' }]">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+          </svg>
         </span>
       </button>
     </div>
@@ -380,6 +413,31 @@ function badgeLabel(count: number): string {
 
 .add-btn:active .hex--add {
   background-color: var(--kv-accent-600);
+}
+
+/* Keşfet / pusula hexagon — idle nötr, hover/aktif accent */
+.hex--discover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background-color: var(--kv-bg-elevated);
+  color: var(--kv-text-secondary);
+  transition: background-color 0.15s, color 0.15s, border-radius 0.15s;
+}
+
+.guild-btn:hover .hex--discover {
+  background-color: var(--kv-accent-500);
+  color: #ffffff;
+  border-radius: 30%;
+}
+
+.hex--discover-active {
+  background-color: var(--kv-accent-500);
+  color: #ffffff;
 }
 
 .divider {

@@ -308,6 +308,17 @@
     "descriptionSection": "Açıklama",
     "descriptionSubtitle": "Ortamın nasıl başladı? İnsanlar neden katılmalı?",
     "descriptionPlaceholder": "Dünyaya bu ortam hakkında bir şeyler söyle.",
+    "bannerLabel": "Afiş Rengi",
+    "bannerHint": "Keşfet kartının üstünde görünen renk afişini seç. Tekrar tıklayınca kaldırılır.",
+    "featuresLabel": "Özellikler",
+    "featuresHint": "Ortamını anlatan en fazla {max} etiket ekle. Keşfet'te bunlara göre filtrelenir.",
+    "featurePlaceholder": "Etiket ekle (örn: oyun, müzik)",
+    "featureAdd": "Ekle",
+    "featureRemove": "{tag} etiketini kaldır",
+    "featuresFull": "En fazla {max} etiket ekleyebilirsin.",
+    "discoverableSection": "Keşfet'te Göster",
+    "discoverableLabel": "Keşfet'te listele",
+    "discoverableHint": "Açıkken ortamın Keşfet'te herkese görünür ve davet kodu olmadan katılınabilir.",
     "iconSection": "Ortam Simgesi",
     "iconUpload": "Simge Seç",
     "iconRemove": "Kaldır",
@@ -885,6 +896,19 @@
   },
   "server": {
     "addOrtam": "Ortam Ekle"
+  },
+  "discover": {
+    "railTooltip": "Keşfet",
+    "title": "Topluluğunu Keşfet",
+    "subtitle": "İlgi alanlarına uygun ortamları bul ve katıl.",
+    "search": "Ortam ara…",
+    "join": "Katıl",
+    "memberCount": "{count} üye",
+    "empty": "Henüz keşfedilecek ortam yok.",
+    "emptyHint": "Aramanı değiştir ya da bir etiket filtresini kaldır.",
+    "loadMore": "Daha Fazla Göster",
+    "loadError": "Ortamlar yüklenemedi. Lütfen tekrar dene.",
+    "joinError": "Ortama katılınamadı. Lütfen tekrar dene."
   },
   "common": {
     "cancel": "İptal",
