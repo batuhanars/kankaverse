@@ -2,7 +2,7 @@ import http from './axios'
 import type { ChannelDto, CategoryDto, ChannelMemberDto } from '@/types'
 
 export const channelsApi = {
-  update(channelId: string, payload: { name?: string; ageGated?: boolean; slowModeSeconds?: number; categoryId?: string | null }) {
+  update(channelId: string, payload: { name?: string; ageGated?: boolean; slowModeSeconds?: number; categoryId?: string | null; userLimit?: number }) {
     return http.patch<ChannelDto>(`/channels/${channelId}`, payload)
   },
   delete(channelId: string) {

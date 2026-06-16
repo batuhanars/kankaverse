@@ -33,6 +33,7 @@ const prismaMock = {
 };
 
 const membershipMock = { requireChannelAccess: jest.fn(), requireNoDmBlock: jest.fn() };
+const permissionsMock = { hasGuildPermission: jest.fn() };
 const realtimeMock = { emitToRoom: jest.fn() };
 const dmPermissionMock = { canDm: jest.fn() };
 
@@ -52,6 +53,7 @@ function makeService(config = makeConfig()) {
     config as any,
     prismaMock as any,
     membershipMock as any,
+    permissionsMock as any,
     realtimeMock as any,
     dmPermissionMock as any,
   );

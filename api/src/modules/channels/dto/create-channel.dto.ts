@@ -36,4 +36,11 @@ export class CreateChannelDto {
   @IsOptional()
   @IsBoolean()
   isPrivate?: boolean;
+
+  @ApiPropertyOptional({ example: 10, description: 'Ses kanalı kullanıcı limiti (yalnız GUILD_VOICE; 0=sınırsız, maks 99)' })
+  @IsOptional()
+  @IsInt({ message: 'Kullanıcı limiti tam sayı olmalıdır.' })
+  @Min(0, { message: 'Kullanıcı limiti 0 veya daha büyük olmalıdır.' })
+  @Max(99, { message: 'Kullanıcı limiti en fazla 99 olabilir.' })
+  userLimit?: number;
 }

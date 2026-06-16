@@ -25,6 +25,7 @@ export function toChannelDto(channel: Channel, unreadCount = 0, unreadMentionCou
     isPrivate: channel.isPrivate,
     position: channel.position,
     slowModeSeconds: channel.slowModeSeconds,
+    userLimit: channel.userLimit,
     unreadCount,
     unreadMentionCount, // REV-4: okunmamış bahsetme (kendimi @işaret eden, lastReadAt sonrası)
   };
@@ -87,6 +88,7 @@ export class ChannelsService {
         isPrivate: dto.isPrivate ?? false,
         position: (maxPosition._max.position ?? -1) + 1,
         slowModeSeconds: dto.slowModeSeconds ?? 0,
+        userLimit: dto.userLimit ?? 0,
         categoryId: dto.categoryId ?? null,
       },
     });
@@ -189,6 +191,7 @@ export class ChannelsService {
         ...(dto.ageGated !== undefined && { ageGated: dto.ageGated }),
         ...(dto.isPrivate !== undefined && { isPrivate: dto.isPrivate }),
         ...(dto.slowModeSeconds !== undefined && { slowModeSeconds: dto.slowModeSeconds }),
+        ...(dto.userLimit !== undefined && { userLimit: dto.userLimit }),
         ...('categoryId' in dto && { categoryId: dto.categoryId ?? null }),
       },
     });

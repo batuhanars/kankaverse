@@ -493,6 +493,8 @@
     "slowMode5m": "5 dakika",
     "slowMode15m": "15 dakika",
     "slowModeHint": "Yavaş mod açık — {seconds} sn bekleyin",
+    "userLimitLabel": "Kullanıcı Limiti",
+    "userLimitHint": "0 = sınırsız",
     "categoryLabel": "KATEGORİ",
     "categoryNone": "Kategorisiz",
     "channelTypeLabel": "KANAL TÜRÜ",
@@ -793,7 +795,8 @@
     "listenerMode": "Dinleyici modu",
     "micDenied": "Mikrofon izni verilmedi; dinleyici olarak bağlısın.",
     "micInsecure": "Mikrofon yalnız güvenli bağlamda (localhost veya HTTPS) çalışır; dinleyici moddasın.",
-    "noParticipants": "Kanalda kimse yok"
+    "noParticipants": "Kanalda kimse yok",
+    "channelFull": "Bu ses kanalı dolu."
   },
   "call": {
     "incoming": "Gelen sesli arama",

@@ -9,6 +9,8 @@ import {
   type Participant,
 } from 'livekit-client'
 import { voiceApi, type VoiceParticipantDto } from '@/api/voice'
+import { useToastStore } from '@/stores/toast'
+import { i18n } from '@/i18n'
 
 export interface VoiceParticipant {
   userId: string
@@ -156,7 +158,12 @@ export const useVoiceStore = defineStore('voice', () => {
         isMuted.value = true
       }
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { message?: string } } }
+      const err = e as { response?: { data?: { message?: string; error?: string } } }
+      const code = err.response?.data?.error
+      // R10 — ses kanalı dolu: toast ile bildir (token-mint 403 CHANNEL_FULL).
+      if (code === 'CHANNEL_FULL') {
+        useToastStore().error(err.response?.data?.message ?? i18n.global.t('voice.channelFull'))
+      }
       error.value = err.response?.data?.message ?? 'Ses kanalına bağlanılamadı.'
       await leave()
     } finally {
