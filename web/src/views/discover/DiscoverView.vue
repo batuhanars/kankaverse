@@ -129,9 +129,9 @@ onMounted(() => {
 
 <template>
   <div class="flex flex-1 min-w-0 h-full overflow-hidden">
-    <!-- Keşfet nav sidebar — ortam ızgarası tutarlılığı (rail | sidebar | içerik) -->
+    <!-- Keşfet nav sidebar — rail'e + üste bitişik (flush, yüzen değil) -->
     <aside
-      class="flex flex-col shrink-0 rounded-[var(--kv-radius-lg)] overflow-hidden mt-4 ml-4"
+      class="flex flex-col shrink-0 overflow-hidden"
       style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
     >
       <div class="flex items-center px-4 shrink-0 border-b" style="height: 64px; border-color: var(--kv-border-subtle);">
