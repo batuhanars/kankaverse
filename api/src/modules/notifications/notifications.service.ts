@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Notification } from '@prisma/client';
+import { Notification, NotifTargetType, NotificationLevel } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
+import { MembershipService } from '../../shared/membership/membership.service';
 import { CreateNotificationData, NotificationDto } from './dto/notification.dto';
+import { NotificationPrefDto, SetNotificationPrefDto } from './dto/notification-pref.dto';
 
 const MAX_LIMIT = 50;
 
@@ -11,6 +13,7 @@ export class NotificationsService {
   constructor(
     private prisma: PrismaService,
     private realtime: RealtimeService,
+    private membership: MembershipService,
   ) {}
 
   /**
@@ -114,6 +117,95 @@ export class NotificationsService {
         });
 
     return this.toNotificationDto(updated);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // R12 — Bildirim tercihleri (sustur + seviye)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** R12 — Kullanıcının TÜM tercih kayıtları (varsayılandan sapanlar). Boş olabilir. */
+  async getPrefs(userId: string): Promise<NotificationPrefDto[]> {
+    const rows = await this.prisma.notificationPref.findMany({ where: { userId } });
+    return rows.map((r) => ({
+      targetType: r.targetType,
+      targetId: r.targetId,
+      muted: r.muted,
+      level: r.level,
+    }));
+  }
+
+  /**
+   * R12 — Tercihi upsert et (kısmi update: verilmeyen alan korunur).
+   * Hafif erişim: GUILD → üyelik; CHANNEL → requireChannelAccess (sızıntı yok).
+   */
+  async setPref(userId: string, dto: SetNotificationPrefDto): Promise<NotificationPrefDto> {
+    if (dto.targetType === NotifTargetType.GUILD) {
+      await this.membership.requireGuildMembership(userId, dto.targetId);
+    } else {
+      await this.membership.requireChannelAccess(userId, dto.targetId);
+    }
+
+    const pref = await this.prisma.notificationPref.upsert({
+      where: {
+        userId_targetType_targetId: {
+          userId,
+          targetType: dto.targetType,
+          targetId: dto.targetId,
+        },
+      },
+      create: {
+        userId,
+        targetType: dto.targetType,
+        targetId: dto.targetId,
+        ...(dto.muted !== undefined ? { muted: dto.muted } : {}),
+        ...(dto.level !== undefined ? { level: dto.level } : {}),
+      },
+      update: {
+        ...(dto.muted !== undefined ? { muted: dto.muted } : {}),
+        ...(dto.level !== undefined ? { level: dto.level } : {}),
+      },
+    });
+
+    return {
+      targetType: pref.targetType,
+      targetId: pref.targetId,
+      muted: pref.muted,
+      level: pref.level,
+    };
+  }
+
+  /**
+   * R12 — Suppression çözümü: kanal tercihi → guild tercihi → varsayılan(ALL, unmuted).
+   * Etkin `muted===true` veya `level==='NONE'` → false (bildirim yok). Aksi → true.
+   * DM/friend bildirimleri guild/kanal-kapsamlı değil → bu helper ile süzülmez.
+   */
+  async shouldNotifyChannel(
+    userId: string,
+    guildId: string | null,
+    channelId: string,
+  ): Promise<boolean> {
+    // Etkin tercih: kanal varsa onu, yoksa guild'i kullan.
+    const targets: { targetType: NotifTargetType; targetId: string }[] = [
+      { targetType: NotifTargetType.CHANNEL, targetId: channelId },
+    ];
+    if (guildId) {
+      targets.push({ targetType: NotifTargetType.GUILD, targetId: guildId });
+    }
+
+    const prefs = await this.prisma.notificationPref.findMany({
+      where: { userId, OR: targets },
+    });
+
+    const channelPref = prefs.find((p) => p.targetType === NotifTargetType.CHANNEL);
+    const guildPref = prefs.find((p) => p.targetType === NotifTargetType.GUILD);
+    const effective = channelPref ?? guildPref;
+
+    // Varsayılan: kayıt yok → muted=false, level=ALL → bildir.
+    if (!effective) return true;
+
+    if (effective.muted) return false;
+    if (effective.level === NotificationLevel.NONE) return false;
+    return true;
   }
 
   /**

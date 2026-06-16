@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Body,
   Param,
   Query,
   UseGuards,
@@ -11,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
+import { SetNotificationPrefDto } from './dto/notification-pref.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -35,6 +38,18 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Okunmamış bildirim sayısı' })
   unreadCount(@CurrentUser() user: { id: string }) {
     return this.notificationsService.unreadCount(user.id);
+  }
+
+  @Get('prefs')
+  @ApiOperation({ summary: 'Bildirim tercihleri (kullanıcının tüm kayıtları; varsayılandan sapanlar)' })
+  getPrefs(@CurrentUser() user: { id: string }) {
+    return this.notificationsService.getPrefs(user.id);
+  }
+
+  @Put('prefs')
+  @ApiOperation({ summary: 'Bildirim tercihi upsert (sustur + seviye; kısmi update)' })
+  setPref(@CurrentUser() user: { id: string }, @Body() dto: SetNotificationPrefDto) {
+    return this.notificationsService.setPref(user.id, dto);
   }
 
   @Post('read')

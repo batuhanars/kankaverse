@@ -80,6 +80,17 @@ enum NotificationType {
   FRIEND_ACCEPT
 }
 
+enum NotificationLevel {
+  ALL
+  MENTIONS
+  NONE
+}
+
+enum NotifTargetType {
+  GUILD
+  CHANNEL
+}
+
 model User {
   id                  String             @id @default(cuid())
   username            String             @unique
@@ -127,6 +138,7 @@ model User {
   eventInterests      GuildEventInterest[]
   notifications       Notification[]     @relation("UserNotifications")
   notificationsActed  Notification[]     @relation("NotificationActor")
+  notificationPrefs   NotificationPref[] @relation("UserNotificationPrefs")
 }
 
 model AuthToken {
@@ -600,4 +612,18 @@ model Notification {
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
+}
+
+model NotificationPref {
+  id         String            @id @default(cuid())
+  userId     String
+  user       User              @relation("UserNotificationPrefs", fields: [userId], references: [id], onDelete: Cascade)
+  targetType NotifTargetType
+  targetId   String            // GUILD → guildId, CHANNEL → channelId
+  muted      Boolean           @default(false)
+  level      NotificationLevel @default(ALL)
+  updatedAt  DateTime          @updatedAt
+
+  @@unique([userId, targetType, targetId])
+  @@index([userId])
 }
