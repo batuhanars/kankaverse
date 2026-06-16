@@ -100,34 +100,6 @@ function badgeLabel(count: number): string {
       </button>
     </div>
 
-    <!-- Keşfet / pusula girişi -->
-    <div class="rail-item">
-      <span :class="['pill', route.name === 'discover' ? 'pill--active' : 'pill--hidden']" />
-      <button
-        class="guild-btn"
-        @click="goDiscover"
-        @mouseenter="showTooltip($event, t('discover.railTooltip'))"
-        @mouseleave="hideTooltip"
-      >
-        <span :class="['hex', 'hex--discover', { 'hex--discover-active': route.name === 'discover' }]">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
-          </svg>
-        </span>
-      </button>
-    </div>
-
     <div class="divider" />
 
     <!-- Guild ikonları -->
@@ -199,6 +171,34 @@ function badgeLabel(count: number): string {
             stroke-linejoin="round"
           >
             <path d="M12 5v14M5 12h14" />
+          </svg>
+        </span>
+      </button>
+    </div>
+
+    <!-- Keşfet / pusula girişi — Ortam Ekle'nin altında -->
+    <div class="rail-item">
+      <span :class="['pill', route.name === 'discover' ? 'pill--active' : 'pill--hidden']" />
+      <button
+        class="guild-btn"
+        @click="goDiscover"
+        @mouseenter="showTooltip($event, t('discover.railTooltip'))"
+        @mouseleave="hideTooltip"
+      >
+        <span :class="['hex', 'hex--discover', { 'hex--discover-active': route.name === 'discover' }]">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
           </svg>
         </span>
       </button>
