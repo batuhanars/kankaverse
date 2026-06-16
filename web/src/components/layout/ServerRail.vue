@@ -47,7 +47,10 @@ const ctxPosStyle = computed(() => {
 })
 
 function openGuildContext(event: MouseEvent, guild: GuildDto) {
-  // Başka menü/modal açıksa kapat, yeni hedefe geç
+  // Bu sağ-tık document'taki 'contextmenu' kapatıcısına ULAŞMASIN — yoksa menü
+  // açıldığı anda aynı event onu kapatır (açılmıyor görünür). Başka ortama sağ-tık
+  // yine geçer (stop yalnız bu event'i document'tan korur, menüyü kapatmaz).
+  event.stopPropagation()
   ctxX.value = event.clientX
   ctxY.value = event.clientY
   contextGuild.value = guild
