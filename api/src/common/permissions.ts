@@ -23,6 +23,7 @@ export const PERMISSION_FLAGS = [
   'MUTE_MEMBERS',
   'MOVE_MEMBERS',
   'PRIORITY_SPEAKER',
+  'MANAGE_EVENTS',
 ] as const;
 
 export type PermissionFlag = (typeof PERMISSION_FLAGS)[number];
