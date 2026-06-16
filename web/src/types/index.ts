@@ -195,6 +195,7 @@ export interface ChannelDto {
   unreadCount: number
   unreadMentionCount: number
   categoryId: string | null
+  userLimit: number // R10 — ses kanalı kullanıcı limiti (0 = sınırsız, 0–99); metin kanallarında 0
 }
 
 // Sprint V2 — Kategori DTO (§3 toCategoryDto)

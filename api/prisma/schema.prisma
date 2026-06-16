@@ -282,6 +282,7 @@ model Channel {
   isPrivate       Boolean          @default(false)
   position        Int              @default(0)
   slowModeSeconds Int              @default(0)
+  userLimit       Int              @default(0) // GUILD_VOICE kullanıcı limiti; 0 = sınırsız
   deletedAt       DateTime?
   createdAt       DateTime         @default(now())
   messages        Message[]

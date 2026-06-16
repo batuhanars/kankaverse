@@ -330,6 +330,7 @@ async function submitCreate() {
 const settingsTarget = ref<ChannelDto | null>(null)
 const settingsName = ref('')
 const settingsSlowMode = ref(0)
+const settingsUserLimit = ref(0) // R10 — ses kanalı kullanıcı limiti (0 = sınırsız)
 const settingsCategoryId = ref<string | null>(null)
 const settingsSaving = ref(false)
 const settingsError = ref('')
@@ -348,6 +349,7 @@ function openSettings(channel: ChannelDto) {
   settingsTarget.value = channel
   settingsName.value = channel.name ?? ''
   settingsSlowMode.value = channel.slowModeSeconds ?? 0
+  settingsUserLimit.value = channel.userLimit ?? 0
   settingsCategoryId.value = channel.categoryId ?? null
   settingsError.value = ''
   // Özel kanal ise üye listesini ve guild üyelerini çek
@@ -464,10 +466,15 @@ async function submitSettings() {
   settingsSaving.value = true
   settingsError.value = ''
   try {
-    const payload: { name?: string; slowModeSeconds?: number; categoryId?: string | null } = {}
+    const payload: { name?: string; slowModeSeconds?: number; categoryId?: string | null; userLimit?: number } = {}
     if (name !== target.name) payload.name = name
     if (settingsSlowMode.value !== (target.slowModeSeconds ?? 0)) payload.slowModeSeconds = settingsSlowMode.value
     if (settingsCategoryId.value !== (target.categoryId ?? null)) payload.categoryId = settingsCategoryId.value
+    // R10 — ses kanalı kullanıcı limiti (yalnız GUILD_VOICE; 0–99 sınırla)
+    if (target.type === 'GUILD_VOICE') {
+      const limit = Math.min(99, Math.max(0, Math.floor(settingsUserLimit.value || 0)))
+      if (limit !== (target.userLimit ?? 0)) payload.userLimit = limit
+    }
     if (Object.keys(payload).length > 0) {
       await channelsStore.updateChannel(target.id, guildId, payload)
     }
@@ -1297,6 +1304,24 @@ async function doLeave() {
             :value="opt.value"
           >{{ opt.label }}</option>
         </select>
+      </div>
+
+      <!-- Kullanıcı limiti (R10 — yalnız ses kanalları) -->
+      <div v-if="settingsTarget.type === 'GUILD_VOICE'" class="flex flex-col gap-1.5">
+        <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+          {{ t('channel.userLimitLabel') }}
+        </label>
+        <p class="text-[12px]" style="color: var(--kv-text-muted);">
+          {{ t('channel.userLimitHint') }}
+        </p>
+        <input
+          v-model.number="settingsUserLimit"
+          type="number"
+          min="0"
+          max="99"
+          class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] outline-none border"
+          style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
+        />
       </div>
 
       <!-- Kategori seçimi (settings modalında kategori değiştirme korunur) -->

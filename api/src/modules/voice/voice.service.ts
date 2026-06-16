@@ -15,6 +15,7 @@ import {
 } from 'livekit-server-sdk';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
+import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { DmPermissionService } from '../../shared/dm-permission/dm-permission.service';
 
@@ -40,6 +41,7 @@ export class VoiceService {
     private config: ConfigService,
     private prisma: PrismaService,
     private membership: MembershipService,
+    private permissions: PermissionsService,
     private realtime: RealtimeService,
     private dmPermission: DmPermissionService,
   ) {
@@ -79,6 +81,8 @@ export class VoiceService {
     // Tür kapısı + konuşma izni (kurul: davet gate'i sinyalde, mint'te tekrar)
     let canPublish: boolean;
     if (channel.type === 'GUILD_VOICE') {
+      // R10: kullanıcı limiti — erişim kapısından SONRA, mint'ten ÖNCE.
+      await this.enforceUserLimit(userId, channel.id, channel.userLimit, channel.guildId);
       canPublish = await this.resolveCanPublish(userId, channel.guildId);
     } else if (channel.type === 'DM' || channel.type === 'GROUP_DM') {
       // DM/grup sesli arama: block + (1-1 için) ilişki re-check; guild-karantinası yok → konuşabilir
@@ -138,6 +142,41 @@ export class VoiceService {
 
     const cutoff = new Date(Date.now() - quarantineHours * 60 * 60 * 1000);
     return member.joinedAt < cutoff; // cutoff'tan önce katıldıysa yerleşik → konuşabilir
+  }
+
+  /**
+   * R10 — GUILD_VOICE kullanıcı limiti. userLimit=0 → sınırsız (kontrol yok).
+   * Sıra: zaten-katılımcı (yeniden bağlanma) → bypass (MANAGE_CHANNELS, owner/admin örtük) → doluluk.
+   * LiveKit erişilemezse (roomService null / hata) join'i engelleme — ses zaten çalışmaz.
+   */
+  private async enforceUserLimit(
+    userId: string,
+    channelId: string,
+    userLimit: number,
+    guildId: string | null,
+  ): Promise<void> {
+    if (!(userLimit > 0) || !this.roomService) return;
+
+    let participants;
+    try {
+      participants = await this.roomService.listParticipants(channelId);
+    } catch {
+      // Oda henüz açılmadı / LiveKit erişilemez → güvenli taraf: limiti uygulama
+      return;
+    }
+
+    // Yeniden bağlanma / token tazeleme: zaten içeride olan kullanıcı limitten muaf
+    if (participants.some((p) => p.identity === userId)) return;
+
+    // Yetkili bypass (owner/admin örtük geçer)
+    if (guildId) {
+      const bypass = await this.permissions.hasGuildPermission(userId, guildId, 'MANAGE_CHANNELS');
+      if (bypass) return;
+    }
+
+    if (participants.length >= userLimit) {
+      throw new ForbiddenException({ message: 'Bu ses kanalı dolu.', error: 'CHANNEL_FULL' });
+    }
   }
 
   /**
