@@ -168,7 +168,7 @@ model Guild {
   owner     User        @relation("GuildOwner", fields: [ownerId], references: [id])
   adultsOnly Boolean    @default(false)
   iconUrl   String?
-  rules     String?
+  description String?
   deletedAt DateTime?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt

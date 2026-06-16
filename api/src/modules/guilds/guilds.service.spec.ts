@@ -126,7 +126,7 @@ const GUILD_FIXTURE = {
   ownerId: OWNER_ID,
   adultsOnly: false,
   iconUrl: null,
-  rules: null,
+  description: null,
   deletedAt: null,
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),

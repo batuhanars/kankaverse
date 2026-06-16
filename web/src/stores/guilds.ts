@@ -32,7 +32,7 @@ export const useGuildsStore = defineStore('guilds', () => {
     return res.data
   }
 
-  async function updateGuild(id: string, payload: { name?: string; adultsOnly?: boolean; rules?: string }): Promise<GuildDto> {
+  async function updateGuild(id: string, payload: { name?: string; adultsOnly?: boolean; description?: string }): Promise<GuildDto> {
     const res = await guildsApi.update(id, payload)
     const idx = guilds.value.findIndex((g) => g.id === id)
     if (idx !== -1) guilds.value[idx] = res.data

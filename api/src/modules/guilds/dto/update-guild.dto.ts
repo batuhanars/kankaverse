@@ -14,9 +14,9 @@ export class UpdateGuildDto {
   @IsBoolean()
   adultsOnly?: boolean;
 
-  @ApiPropertyOptional({ example: 'Sunucumuza hoş geldiniz! Lütfen kurallara uyun.' })
+  @ApiPropertyOptional({ example: 'Ortamımıza hoş geldiniz! Burası ne hakkında, kısaca anlat.' })
   @IsOptional()
   @IsString()
-  @MaxLength(2000, { message: 'Ortam kuralları en fazla 2000 karakter olabilir.' })
-  rules?: string;
+  @MaxLength(2000, { message: 'Ortam açıklaması en fazla 2000 karakter olabilir.' })
+  description?: string;
 }

@@ -143,7 +143,7 @@ export interface GuildDto {
   ownerId: string
   adultsOnly: boolean
   iconUrl: string | null
-  rules: string | null
+  description: string | null
   createdAt: string
   unreadCount: number
   unreadMentionCount: number
