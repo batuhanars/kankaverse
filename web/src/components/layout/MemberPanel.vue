@@ -6,6 +6,7 @@ import { usePresenceStore } from '@/stores/presence'
 import { useAuthStore } from '@/stores/auth'
 import { useMembersStore } from '@/stores/members'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
+import { useActiveMenu } from '@/composables/useActiveMenu'
 import { guildsApi } from '@/api/guilds'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import UserCardPopover from '@/components/shared/UserCardPopover.vue'
@@ -113,6 +114,8 @@ const groups = computed((): MemberGroup[] => {
 // ── İşlem menüsü ──────────────────────────────────────────────────────────
 
 function toggleMenu(userId: string) {
+  // Bug 1: ⋯ ↔ profil kartı birbirini dışlar. ⋯'a tıklayınca açık profil kartı kapansın.
+  showCard.value = false
   openMenuUserId.value = openMenuUserId.value === userId ? null : userId
 }
 
@@ -139,7 +142,34 @@ function closeCard() {
 }
 
 onMounted(() => window.addEventListener('kv:close-user-cards', closeCard))
-onUnmounted(() => window.removeEventListener('kv:close-user-cards', closeCard))
+onUnmounted(() => {
+  window.removeEventListener('kv:close-user-cards', closeCard)
+  // Panel sökülürken açık overlay sahipliğini bırak (sızıntıyı önle).
+  if (activeMemberUserId.value) clearActive(`member:${activeMemberUserId.value}`)
+})
+
+// ── R8/R13: paylaşılan aktif-overlay durumu ────────────────────────────────
+// Bir üyenin ⋯ menüsü VEYA profil kartı açıkken, o üyenin satırı "aktif sahip"tir.
+// Diğer satırlar buna bakar (isSuppressed) → hover-vurgu/⋯-görünürlüğünü bastırır.
+const { setActive, clearActive, isSuppressed } = useActiveMenu()
+
+// Hangi üyenin overlay'i açık? (menü veya kart) — ikisi de mutual-exclusive.
+const activeMemberUserId = computed<string | null>(() => {
+  if (openMenuUserId.value) return openMenuUserId.value
+  if (showCard.value) return cardUserId.value
+  return null
+})
+
+watch(activeMemberUserId, (userId, prev) => {
+  if (prev && prev !== userId) clearActive(`member:${prev}`)
+  if (userId) setActive(`member:${userId}`)
+  else if (prev) clearActive(`member:${prev}`)
+})
+
+// Bir satırın hover'ı bastırılmalı mı? (başka üyenin overlay'i açık)
+function isRowSuppressed(userId: string): boolean {
+  return isSuppressed(`member:${userId}`)
+}
 
 // Üye satırında menü gösterilip gösterilmeyeceği
 function shouldShowMenu(member: GuildMemberDto): boolean {
@@ -349,6 +379,8 @@ async function confirmTransfer() {
           :can-transfer-fn="canTransfer"
           :should-show-menu-fn="shouldShowMenu"
           :role-color="group.color"
+          :hover-suppressed="isRowSuppressed(member.userId)"
+          :owner-active="activeMemberUserId === member.userId"
           @toggle-menu="toggleMenu"
           @close-menu="closeMenu"
           @change-role="changeRole"

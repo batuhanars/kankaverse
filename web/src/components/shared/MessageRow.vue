@@ -13,12 +13,13 @@
  * Sprint V2: mentionResolver prop — userId → username çözümleyici (guild/DM bağlamı sağlar).
  *            isMentioned prop — kendi-bahsedilme sol-aksan vurgusu.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AttachmentView from './AttachmentView.vue'
 import MessageActionsMenu from './MessageActionsMenu.vue'
 import { formatMentionsPlain } from '@/utils/mentions'
 import { renderMessageHtml } from '@/utils/markdown'
+import { useActiveMenu } from '@/composables/useActiveMenu'
 import type { MessageDto } from '@/types'
 
 // MessageActionsMenu instance ref — menuOpen'ı okumak için
@@ -52,6 +53,26 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+// R8/R13: paylaşılan aktif-overlay durumu. Bu satırın overlay-anahtarı.
+const overlayKey = computed(() => `msg:${props.message.id}`)
+const { setActive, clearActive, isSuppressed } = useActiveMenu()
+
+// Bu mesajın ⋯ menüsü / emoji picker'ı açık mı? (MessageActionsMenu.menuOpen expose eder)
+const isMenuOpen = computed(() => !!actionsMenuRef.value?.menuOpen)
+
+// Menü açıldı/kapandı → paylaşılan aktif-overlay durumunu güncelle.
+watch(isMenuOpen, (open) => {
+  if (open) setActive(overlayKey.value)
+  else clearActive(overlayKey.value)
+})
+
+// Hover araç çubuğu bastırılsın mı? Başka bir mesajın menüsü açıkken bu satırın
+// toolbar'ı (hover ile bile) görünmemeli. Kendi menüm açıksa görünür kalır.
+const toolbarSuppressed = computed(() => isSuppressed(overlayKey.value))
+
+// Satır sökülürken (örn. mesaj silindi) açık overlay sahipliğini bırak.
+onUnmounted(() => clearActive(overlayKey.value))
+
 // Takip mesajına hover'da saat gösterimi
 const showFollowTime = ref(false)
 
@@ -61,6 +82,8 @@ function formatTime(iso: string): string {
 
 // Satır arka plan hover (inline style ile — Tailwind arbitrary değeri token taşımaz)
 function onRowEnter(e: MouseEvent) {
+  // Başka bir mesajın menüsü açıkken bu satır hover-vurgusu göstermesin.
+  if (toolbarSuppressed.value) return
   ;(e.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'
   showFollowTime.value = true
 }
@@ -102,11 +125,17 @@ const renderedContent = computed<string>(() => {
     @mouseleave="onRowLeave"
   >
     <!-- Hover araç çubuğu: -top-3 right-4, yalnız düzenleme modunda gizli.
-         Menü açıkken (emoji picker / ⋯) grup-hover'dan bağımsız olarak görünür kalır. -->
+         - Bu mesajın menüsü açıksa (emoji picker / ⋯) → grup-hover'dan bağımsız görünür kalır (z-40).
+         - BAŞKA mesajın menüsü açıksa (toolbarSuppressed) → hover ile bile gizli kalır.
+         - Aksi halde → normal hover davranışı. -->
     <div
       v-if="!isEditing"
       class="absolute -top-3 right-4 transition-opacity"
-      :class="actionsMenuRef?.menuOpen ? 'opacity-100 z-40' : 'opacity-0 group-hover:opacity-100 z-10'"
+      :class="isMenuOpen
+        ? 'opacity-100 z-40'
+        : toolbarSuppressed
+          ? 'opacity-0 pointer-events-none z-10'
+          : 'opacity-0 group-hover:opacity-100 z-10'"
     >
       <MessageActionsMenu
         ref="actionsMenuRef"
