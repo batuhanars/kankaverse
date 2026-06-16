@@ -920,6 +920,15 @@
     "loadError": "Ortamlar yüklenemedi. Lütfen tekrar dene.",
     "joinError": "Ortama katılınamadı. Lütfen tekrar dene."
   },
+  "toast": {
+    "close": "Kapat",
+    "guildSaved": "Değişiklikler kaydedildi.",
+    "profileSaved": "Profil güncellendi.",
+    "privacySaved": "Gizlilik tercihin güncellendi.",
+    "rolesSaved": "Rol kaydedildi.",
+    "saveError": "Kaydedilemedi, tekrar dene.",
+    "joinError": "Ortama katılınamadı, tekrar dene."
+  },
   "common": {
     "cancel": "İptal",
     "close": "Kapat",

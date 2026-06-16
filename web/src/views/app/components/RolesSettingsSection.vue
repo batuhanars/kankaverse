@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRolesStore } from '@/stores/roles'
 import { useMembersStore } from '@/stores/members'
+import { useToastStore } from '@/stores/toast'
 import { rolesApi } from '@/api/roles'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
@@ -25,6 +26,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const rolesStore = useRolesStore()
 const membersStore = useMembersStore()
+const toast = useToastStore()
 
 const guildId = computed(() => props.guild.id)
 const roles = computed(() => rolesStore.rolesFor(guildId.value))
@@ -302,10 +304,12 @@ async function saveAll() {
     }
     pendingAdd.value = new Set()
     pendingRemove.value = new Set()
+    toast.success(t('toast.rolesSaved'))
   } catch (err: unknown) {
     const e = err as { response?: { data?: { error?: string } } }
     const code = e?.response?.data?.error ?? ''
     errorMsg.value = t(`guildSettings.roles.errors.${code}`) || t('guildSettings.roles.saveError')
+    toast.error(errorMsg.value)
   } finally {
     saving.value = false
   }

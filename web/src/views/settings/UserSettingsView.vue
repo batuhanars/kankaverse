@@ -8,6 +8,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
 import { usersApi } from '@/api/users'
 import { DmPolicy } from '@/types'
 import KvButton from '@/components/ui/KvButton.vue'
@@ -21,6 +22,7 @@ const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 const authStore = useAuthStore()
+const toast = useToastStore()
 
 type NavSection = 'hesap' | 'profil' | 'gizlilik'
 const activeSection = ref<NavSection>('hesap')
@@ -57,9 +59,11 @@ async function saveBio() {
     authStore.updateUser(data)
     draftBio.value = data.bio ?? ''
     bioSaved.value = true
+    toast.success(t('toast.profileSaved'))
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
     bioError.value = err.response?.data?.message ?? t('settings.saveError')
+    toast.error(err.response?.data?.message ?? t('toast.saveError'))
   } finally {
     savingBio.value = false
   }
@@ -88,9 +92,11 @@ async function selectPolicy(p: DmPolicy) {
     const { data } = await usersApi.updateProfile({ dmPolicy: p })
     authStore.updateUser(data)
     policySaved.value = true
+    toast.success(t('toast.privacySaved'))
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
     policyError.value = err.response?.data?.message ?? t('settings.saveError')
+    toast.error(err.response?.data?.message ?? t('toast.saveError'))
   } finally {
     savingPolicy.value = false
   }
