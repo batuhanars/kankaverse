@@ -7,6 +7,10 @@
     "register": "Kayıt Ol",
     "logout": "Çıkış Yap",
     "email": "E-posta",
+    "identifier": "Kullanıcı adı veya e-posta",
+    "identifierPlaceholder": "kullanıcı adın veya e-postan",
+    "loginSuccess": "Giriş başarılı, hoş geldin!",
+    "registerSuccess": "Hesabın oluşturuldu, Kankaverse'e hoş geldin!",
     "password": "Şifre",
     "username": "Kullanıcı Adı",
     "birthDate": "Doğum Tarihi",
@@ -52,6 +56,7 @@
     "validation": {
       "emailRequired": "E-posta adresi zorunludur.",
       "emailInvalid": "Geçerli bir e-posta adresi girin.",
+      "identifierRequired": "Kullanıcı adı veya e-posta zorunludur.",
       "passwordRequired": "Şifre zorunludur.",
       "passwordMin": "Şifre en az 8 karakter olmalıdır.",
       "usernameRequired": "Kullanıcı adı zorunludur.",

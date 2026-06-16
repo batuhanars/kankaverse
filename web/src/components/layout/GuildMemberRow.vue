@@ -73,7 +73,7 @@ function onRowLeave(e: MouseEvent) {
   <div
     class="group relative flex items-center gap-2 px-3 py-1.5 mx-1 rounded-[var(--kv-radius-sm)] cursor-pointer"
     :class="{
-      'opacity-50': props.isOffline,
+      'opacity-50': props.isOffline && props.openMenuUserId !== props.member.userId,
       'z-30': props.openMenuUserId === props.member.userId,
     }"
     :style="`transition: background-color 0.1s; background-color: ${props.ownerActive ? 'var(--kv-bg-elevated)' : 'transparent'};`"

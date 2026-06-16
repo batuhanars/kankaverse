@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
 import KvInput from '@/components/ui/KvInput.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import logoDikey from '@/assets/brand/kankaverse-logo-dikey.png'
@@ -10,6 +11,7 @@ import logoDikey from '@/assets/brand/kankaverse-logo-dikey.png'
 const { t } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
+const toast = useToastStore()
 
 const challengeToken = ref('')
 const code = ref('')
@@ -35,6 +37,7 @@ async function submit() {
     sessionStorage.removeItem('kv_login_redirect')
     // GÜVENLİK: yalnız iç yol (open-redirect önle — LoginView ile aynı kural)
     const redirectTo = stored && /^\/(?!\/)/.test(stored) ? stored : null
+    toast.success(t('auth.loginSuccess'))
     await router.push(redirectTo ?? { name: 'app' })
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }

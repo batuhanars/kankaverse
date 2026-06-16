@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
 import { registerSchema } from '@/lib/validation/auth'
 import KvInput from '@/components/ui/KvInput.vue'
 import KvButton from '@/components/ui/KvButton.vue'
@@ -14,6 +15,7 @@ import logoDikey from '@/assets/brand/kankaverse-logo-dikey.png'
 const router = useRouter()
 const { t, te } = useI18n()
 const auth = useAuthStore()
+const toast = useToastStore()
 
 const apiError = ref('')
 const loading = ref(false)
@@ -35,6 +37,7 @@ const onSubmit = handleSubmit(async (values) => {
       ...values,
       birthDate: new Date(values.birthDate).toISOString(),
     })
+    toast.success(t('auth.registerSuccess'))
     await router.push({ name: 'app' })
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string; error?: string } } }
