@@ -292,6 +292,7 @@
     "idCopied": "Kanal ID'si kopyalandı"
   },
   "invite": {
+    "unknownGuild": "bir",
     "codeLabel": "DAVET KODU",
     "codePlaceholder": "Davet kodunu gir (ör: AB3XY7KZ)",
     "adultsOnlyBadge": "18+",
@@ -953,6 +954,7 @@
     "mention": "{actor} seni bir mesajda etiketledi.",
     "friendRequest": "{actor} sana kanka isteği gönderdi.",
     "friendAccept": "{actor} kanka isteğini kabul etti.",
+    "guildInvite": "{actor} seni {guild} ortamına davet etti.",
     "markAllRead": "Tümünü okundu işaretle",
     "loadMore": "Yükleniyor…",
     "now": "az önce",

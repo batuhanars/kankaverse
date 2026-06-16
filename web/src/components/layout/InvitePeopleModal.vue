@@ -4,8 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@vueuse/core'
 import { invitesApi } from '@/api/invites'
 import { friendsApi } from '@/api/friends'
-import { dmApi } from '@/api/dm'
-import { messagesApi } from '@/api/messages'
+import { guildsApi } from '@/api/guilds'
 import { useToastStore } from '@/stores/toast'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
@@ -68,15 +67,17 @@ async function loadFriends() {
 
 async function inviteFriend(friend: FriendDto) {
   const userId = friend.user.id
-  if (sendState.value[userId] || !inviteLink.value) return
+  if (sendState.value[userId]) return
   sendState.value[userId] = 'sending'
   try {
-    const channelRes = await dmApi.openChannel(userId)
-    await messagesApi.send(channelRes.data.id, inviteLink.value)
+    // Hedef kankaya GUILD_INVITE bildirimi düşer (kabul/reddet InviteAcceptView'da)
+    await guildsApi.inviteFriend(props.guildId, userId)
     sendState.value[userId] = 'sent'
-  } catch {
+  } catch (e: unknown) {
     delete sendState.value[userId]
-    toast.error(t('invitePeople.sendError'))
+    // Backend Türkçe mesaj döner (NOT_FRIENDS / ALREADY_MEMBER vб.)
+    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
+    toast.error(msg ?? t('invitePeople.sendError'))
   }
 }
 
@@ -168,7 +169,7 @@ onMounted(() => {
             <KvButton
               size="sm"
               :variant="sendState[friend.user.id] === 'sent' ? 'ghost' : 'primary'"
-              :disabled="!!sendState[friend.user.id] || creating"
+              :disabled="!!sendState[friend.user.id]"
               :loading="sendState[friend.user.id] === 'sending'"
               @click="inviteFriend(friend)"
             >

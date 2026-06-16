@@ -93,6 +93,9 @@ const configMock = {
 
 const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
 
+const notificationsMock = { create: jest.fn() };
+const invitesMock = { createInvite: jest.fn() };
+
 function makeService() {
   const guildJoin = new GuildJoinService(prismaMock as any, realtimeMock as any);
   return new GuildsService(
@@ -103,6 +106,8 @@ function makeService() {
     configMock as any,
     realtimeMock as any,
     guildJoin,
+    notificationsMock as any,
+    invitesMock as any,
   );
 }
 

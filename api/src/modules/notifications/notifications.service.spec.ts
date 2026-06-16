@@ -20,6 +20,10 @@ const prismaMock = {
     findUnique: jest.fn(),
     findMany: jest.fn(),
   },
+  guild: {
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+  },
 };
 
 const emitToUserMock = jest.fn();
@@ -38,6 +42,8 @@ function resetMocks() {
   jest.resetAllMocks();
   prismaMock.user.findUnique.mockResolvedValue(null);
   prismaMock.user.findMany.mockResolvedValue([]);
+  prismaMock.guild.findUnique.mockResolvedValue(null);
+  prismaMock.guild.findMany.mockResolvedValue([]);
   prismaMock.notificationPref.findMany.mockResolvedValue([]);
 }
 

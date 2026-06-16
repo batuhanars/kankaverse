@@ -359,6 +359,7 @@ export const NotificationType = {
   MENTION: 'MENTION',
   FRIEND_REQUEST: 'FRIEND_REQUEST',
   FRIEND_ACCEPT: 'FRIEND_ACCEPT',
+  GUILD_INVITE: 'GUILD_INVITE',
 } as const
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType]
 
@@ -367,6 +368,7 @@ export interface NotificationDto {
   type: NotificationType
   actor: { id: string; username: string; avatarUrl: string | null } | null
   guildId: string | null
+  guildName?: string | null
   channelId: string | null
   messageId: string | null
   preview: string | null

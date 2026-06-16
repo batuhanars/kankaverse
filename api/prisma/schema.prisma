@@ -78,6 +78,7 @@ enum NotificationType {
   MENTION
   FRIEND_REQUEST
   FRIEND_ACCEPT
+  GUILD_INVITE
 }
 
 enum NotificationLevel {

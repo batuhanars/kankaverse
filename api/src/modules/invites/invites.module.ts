@@ -7,5 +7,6 @@ import { SharedModule } from '../../shared/shared.module';
   imports: [SharedModule],
   controllers: [InvitesController],
   providers: [InvitesService],
+  exports: [InvitesService], // guilds (kankayı ortama davet) bu servisi kullanır
 })
 export class InvitesModule {}
