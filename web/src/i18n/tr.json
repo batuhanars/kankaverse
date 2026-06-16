@@ -899,6 +899,8 @@
   },
   "discover": {
     "railTooltip": "Keşfet",
+    "navTitle": "Keşfet",
+    "navServers": "Sunucular",
     "title": "Topluluğunu Keşfet",
     "subtitle": "İlgi alanlarına uygun ortamları bul ve katıl.",
     "search": "Ortam ara…",

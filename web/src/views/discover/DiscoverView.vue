@@ -128,8 +128,33 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col flex-1 min-w-0 h-full overflow-hidden" style="background-color: var(--kv-bg-content);">
-    <div class="flex-1 overflow-y-auto">
+  <div class="flex flex-1 min-w-0 h-full overflow-hidden">
+    <!-- Keşfet nav sidebar — ortam ızgarası tutarlılığı (rail | sidebar | içerik) -->
+    <aside
+      class="flex flex-col shrink-0 rounded-[var(--kv-radius-lg)] overflow-hidden mt-4 ml-4"
+      style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
+    >
+      <div class="flex items-center px-4 shrink-0 border-b" style="height: 64px; border-color: var(--kv-border-subtle);">
+        <h2 class="text-[18px] font-bold" style="color: var(--kv-text-primary);">{{ t('discover.navTitle') }}</h2>
+      </div>
+      <nav class="flex-1 overflow-y-auto p-2">
+        <!-- Tek gerçek bölüm: Sunucular (aktif). Uygulamalar/Görevler henüz yok → eklenmez. -->
+        <span
+          class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[var(--kv-radius-md)] text-[14px] font-semibold"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="7" rx="1.5" />
+            <rect x="3" y="13" width="18" height="7" rx="1.5" />
+          </svg>
+          {{ t('discover.navServers') }}
+        </span>
+      </nav>
+    </aside>
+
+    <!-- İçerik -->
+    <div class="flex flex-col flex-1 min-w-0 h-full overflow-hidden" style="background-color: var(--kv-bg-content);">
+      <div class="flex-1 overflow-y-auto">
       <div class="mx-auto w-full px-8 py-8" style="max-width: 1100px;">
         <!-- Başlık -->
         <header class="mb-6">
@@ -222,6 +247,7 @@ onMounted(() => {
             </button>
           </div>
         </template>
+        </div>
       </div>
     </div>
   </div>
