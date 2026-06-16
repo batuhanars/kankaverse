@@ -1,5 +1,5 @@
 import http from './axios'
-import type { EventDto } from '@/types'
+import type { EventDto, EventRecurrence } from '@/types'
 
 // Sprint V3 Etkinlikler Sözleşmesi §6 — CreateEventDto (frontend payload eşi).
 // channelId yalnız VOICE_CHANNEL'da, externalLocation yalnız EXTERNAL'da gönderilir.
@@ -11,7 +11,8 @@ export interface CreateEventPayload {
   externalLocation?: string
   startAt: string // ISO
   endAt?: string // ISO
-  recurrence?: 'NONE'
+  // Motor fazı: backend artık NONE|DAILY|WEEKLY|MONTHLY kabul ediyor.
+  recurrence?: EventRecurrence
 }
 
 // UpdateEventDto = PartialType(CreateEventDto)

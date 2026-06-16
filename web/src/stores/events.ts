@@ -3,10 +3,11 @@ import { ref } from 'vue'
 import { eventsApi, type CreateEventPayload, type UpdateEventPayload } from '@/api/events'
 import type { EventDto } from '@/types'
 
-// Sprint V3 Etkinlikler §8 — guild başına etkinlik listesi.
-// Liste daima startAt ARTAN sırada tutulur (backend de böyle döner; WS upsert sonrası yeniden sıralanır).
+// Sprint V3 Etkinlikler §8 / Motor §4 — guild başına etkinlik listesi.
+// Liste daima occurrenceStartAt ARTAN sırada tutulur (backend de böyle döner; ilgili örneğe göre
+// sıralama → tekrarlayan seriler bir sonraki örneğiyle doğru konumlanır). WS upsert sonrası yeniden sıralanır.
 function byStartAsc(a: EventDto, b: EventDto): number {
-  return new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+  return new Date(a.occurrenceStartAt).getTime() - new Date(b.occurrenceStartAt).getTime()
 }
 
 export const useEventsStore = defineStore('events', () => {

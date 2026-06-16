@@ -2,12 +2,12 @@ import {
   IsString,
   IsOptional,
   IsEnum,
-  IsIn,
   IsDateString,
   Length,
   MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EventRecurrence } from '@prisma/client';
 
 /**
  * CreateEventDto — Sprint V3 §6 (sözleşme birebir).
@@ -16,7 +16,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
  * zorunlu) ve geçmiş-tarih / kanal-tür kontrolleri SERVİSTE yapılır (EVENT_LOCATION_REQUIRED,
  * EVENT_START_IN_PAST, INVALID_EVENT_CHANNEL) — DTO yalnız şekil/tip doğrular.
  *
- * recurrence: MVP yalnız 'NONE' kabul (@IsIn ile). Diğer enum değerleri yarın açılır.
+ * recurrence: NONE/DAILY/WEEKLY/MONTHLY kabul (@IsEnum). Örnekler READ-TIME
+ * türetilir (sıfır-job); seri tek satır kalır.
  */
 export class CreateEventDto {
   @ApiProperty({ example: 'Pazar Akşamı Oyun Gecesi', description: 'Etkinlik konusu (zorunlu)' })
@@ -54,8 +55,12 @@ export class CreateEventDto {
   @IsDateString({}, { message: 'Geçerli bir bitiş tarihi girin.' })
   endAt?: string;
 
-  @ApiPropertyOptional({ enum: ['NONE'], example: 'NONE', description: 'Tekrarlama — MVP yalnız NONE' })
+  @ApiPropertyOptional({
+    enum: EventRecurrence,
+    example: 'WEEKLY',
+    description: 'Tekrarlama — NONE | DAILY | WEEKLY | MONTHLY',
+  })
   @IsOptional()
-  @IsIn(['NONE'], { message: 'Şu an yalnızca tek seferlik etkinlik oluşturulabilir.' })
-  recurrence?: 'NONE';
+  @IsEnum(EventRecurrence, { message: 'Geçersiz tekrarlama değeri.' })
+  recurrence?: EventRecurrence;
 }

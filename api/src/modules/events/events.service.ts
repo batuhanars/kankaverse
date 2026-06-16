@@ -11,18 +11,24 @@ import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { GuildEvent } from '@prisma/client';
+import { computeOccurrence } from './occurrence.util';
 
 /**
- * EventDto (Sözleşme §6). status TÜRETİLİR (startAt>now ? SCHEDULED : COMPLETED);
- * DB status kolonu güvenli default kalır (motor yarın). coverImageId MVP'de dönmez.
+ * EventDto (Sözleşme §3 — Etkinlik Motoru). status + occurrence TÜRETİLİR
+ * (computeOccurrence saf util; tek kaynak). startAt/endAt ÇAPA olarak korunur;
+ * occurrenceStartAt/occurrenceEndAt ilgili (şu an süren / sonraki) örneği taşır.
+ * status artık ACTIVE'i de türetir. DB status kolonu okunmaz/yazılmaz (forward-compat).
+ * coverImageId MVP'de dönmez.
  */
 export function toEventDto(
   event: GuildEvent & { channel?: { name: string | null } | null },
   interestedCount: number,
   interestedByMe: boolean,
 ) {
-  const derivedStatus =
-    event.startAt.getTime() > Date.now() ? 'SCHEDULED' : 'COMPLETED';
+  const occ = computeOccurrence(
+    { startAt: event.startAt, endAt: event.endAt, recurrence: event.recurrence },
+    new Date(),
+  );
   return {
     id: event.id,
     guildId: event.guildId,
@@ -33,10 +39,12 @@ export function toEventDto(
     channelId: event.channelId,
     channelName: event.channel?.name ?? null, // voice ise çözülür
     externalLocation: event.externalLocation,
-    startAt: event.startAt,
-    endAt: event.endAt,
+    startAt: event.startAt, // ÇAPA
+    endAt: event.endAt, // ÇAPA (tek örnek süresi)
+    occurrenceStartAt: occ.occurrenceStartAt, // ilgili örnek
+    occurrenceEndAt: occ.occurrenceEndAt,
     recurrence: event.recurrence,
-    status: derivedStatus,
+    status: occ.status,
     interestedCount,
     interestedByMe,
     createdAt: event.createdAt,
@@ -232,7 +240,7 @@ export class EventsService {
         externalLocation,
         startAt,
         endAt,
-        recurrence: 'NONE', // MVP: motor yarın
+        recurrence: dto.recurrence ?? 'NONE', // motor: NONE/DAILY/WEEKLY/MONTHLY
       },
       include: { channel: { select: { name: true } } },
     })) as EventWithChannel;
@@ -244,13 +252,24 @@ export class EventsService {
     return dtoOut;
   }
 
-  /** GET /guilds/:id/events — üye + görünürlük (§5). startAt artan. */
+  /**
+   * GET /guilds/:id/events — üye + görünürlük (§4).
+   * Görünürlük süzme ÖNCE; sonra **occurrenceStartAt artan** sıralama (çapa değil —
+   * tekrarlayan seriler ilgili örnek zamanına göre dizilir). computeOccurrence tek kaynak.
+   */
   async findByGuild(userId: string, guildId: string) {
     await this.membership.requireGuildMembership(userId, guildId);
     const events = await this.findVisibleEvents(userId, guildId);
 
-    const infos = await Promise.all(events.map((e) => this.interestInfo(e.id, userId)));
-    return events.map((e, i) => toEventDto(e, infos[i].count, infos[i].byMe));
+    const now = new Date();
+    const sorted = [...events].sort((a, b) => {
+      const oa = computeOccurrence({ startAt: a.startAt, endAt: a.endAt, recurrence: a.recurrence }, now);
+      const ob = computeOccurrence({ startAt: b.startAt, endAt: b.endAt, recurrence: b.recurrence }, now);
+      return oa.occurrenceStartAt.getTime() - ob.occurrenceStartAt.getTime();
+    });
+
+    const infos = await Promise.all(sorted.map((e) => this.interestInfo(e.id, userId)));
+    return sorted.map((e, i) => toEventDto(e, infos[i].count, infos[i].byMe));
   }
 
   /** GET /events/:id — üye + görünürlük. Görünmüyorsa jenerik 404. */
@@ -278,6 +297,7 @@ export class EventsService {
     const data: Record<string, unknown> = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.description !== undefined) data.description = dto.description;
+    if (dto.recurrence !== undefined) data.recurrence = dto.recurrence;
 
     // startAt değişiyorsa geçmiş kontrolü
     let startAt = existing.startAt;

@@ -478,6 +478,15 @@
     "deleteButton": "Sil",
     "statusScheduled": "Yaklaşıyor",
     "statusCompleted": "Tamamlandı",
+    "recurrence": {
+      "daily": "Her gün",
+      "weekly": "Her hafta",
+      "monthly": "Her ay"
+    },
+    "card": {
+      "active": "Şu an sürüyor",
+      "recurringBadge": "Tekrarlayan"
+    },
     "date": {
       "today": "bugün saat {time}",
       "tomorrow": "yarın saat {time}",
@@ -498,7 +507,7 @@
       "voiceChannelPlaceholder": "Bir ses kanalı seç",
       "noVoiceChannels": "Bu ortamda ses kanalı yok. Önce bir ses kanalı oluştur.",
       "externalLabel": "KONUM / BAĞLANTI",
-      "externalPlaceholder": "Örn. Park girişi ya da https://...",
+      "externalPlaceholder": "Bir konum veya bağlantı girin",
       "nameLabel": "KONU",
       "namePlaceholder": "Etkinliğin adı",
       "startDateLabel": "BAŞLANGIÇ TARİHİ",

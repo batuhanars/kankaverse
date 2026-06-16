@@ -151,6 +151,21 @@ const showEventsModal = ref(false)
 const showCreateEventWizard = ref(false)
 const eventCount = computed(() => eventsStore.countFor(activeGuildId.value))
 
+// ── Deep-link: ?event=<id> → etkinlik modalını aç + kartı vurgula (Motor §6) ──
+// MVP'de paylaş linki kopyalanıyordu ama açılmıyordu — bu açık kalemi kapatır.
+// Aktif guild yeterli: link aynı ortamda paylaşılıyor, kart vurgusu modalda yapılır.
+const highlightEventId = ref<string | null>(null)
+onMounted(() => {
+  const raw = router.currentRoute.value.query.event
+  const eventId = Array.isArray(raw) ? raw[0] : raw
+  if (!eventId) return
+  highlightEventId.value = eventId
+  showEventsModal.value = true
+  // Query'yi tüket — geri/yenile derin linki tekrar tetiklemesin.
+  const { event: _consumed, ...rest } = router.currentRoute.value.query
+  router.replace({ query: rest }).catch(() => {})
+})
+
 // REV-13b: ses kanalı aktif-süresi (sidebar, yeşil) — saniyede bir tik
 const voiceNow = ref(Date.now())
 let voiceTick: ReturnType<typeof setInterval> | null = null
@@ -1532,7 +1547,8 @@ async function doLeave() {
     v-if="showEventsModal && activeGuildId"
     :guild-id="activeGuildId"
     :can-manage="canManageEvents"
-    @close="showEventsModal = false"
+    :highlight-event-id="highlightEventId"
+    @close="showEventsModal = false; highlightEventId = null"
   />
 
   <!-- Etkinlik oluştur sihirbazı (ortam menüsünden) -->

@@ -273,6 +273,7 @@ export type EventRecurrence = (typeof EventRecurrence)[keyof typeof EventRecurre
 
 export const EventStatus = {
   SCHEDULED: 'SCHEDULED',
+  ACTIVE: 'ACTIVE',
   COMPLETED: 'COMPLETED',
 } as const
 export type EventStatus = (typeof EventStatus)[keyof typeof EventStatus]
@@ -289,6 +290,10 @@ export interface EventDto {
   externalLocation: string | null
   startAt: string
   endAt: string | null
+  // Sprint V3 Etkinlik Motoru §3 — ilgili örnek (occurrence) zamanları (backend türetir; FE yeniden hesaplamaz).
+  // Görüntülemede startAt/endAt ÇAPA değil, BUNLAR kullanılır. NONE'da occurrenceStartAt = startAt.
+  occurrenceStartAt: string
+  occurrenceEndAt: string | null
   recurrence: EventRecurrence
   status: EventStatus
   interestedCount: number
