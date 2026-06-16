@@ -27,21 +27,28 @@ const emit = defineEmits<{
   openKick: [member: GuildMemberDto]
   openBan: [member: GuildMemberDto]
   openTransfer: [member: GuildMemberDto]
+  // C5 follow-up: üye satırına sol-tık → kullanıcı kartı popover (mesaj-yazarı deseni)
+  selectMember: [userId: string, x: number, y: number]
 }>()
 
 function avatarInitial(username: string) {
   return username.charAt(0).toUpperCase()
 }
+
+// Satıra sol-tık → kullanıcı kartı (⋯ menü butonu @click.stop ile çakışmaz)
+function onRowClick(e: MouseEvent) {
+  emit('selectMember', props.member.userId, e.clientX, e.clientY)
+}
 </script>
 
 <template>
   <div
-    class="group relative flex items-center gap-2 px-3 py-1.5 mx-1 rounded-[var(--kv-radius-sm)] cursor-default"
+    class="group relative flex items-center gap-2 px-3 py-1.5 mx-1 rounded-[var(--kv-radius-sm)] cursor-pointer"
     :class="{ 'opacity-50': props.isOffline }"
     style="transition: background-color 0.1s;"
     @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
     @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
-    @click.stop
+    @click.stop="onRowClick"
   >
     <!-- Avatar + presence dot -->
     <div class="relative shrink-0">
