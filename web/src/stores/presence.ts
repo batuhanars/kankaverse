@@ -28,16 +28,29 @@ export const usePresenceStore = defineStore('presence', () => {
     statusMap[userId] = status
   }
 
+  /**
+   * Kendi efektif durumumuz. Kendi presence'ımız sunucudan GELMEZ (presence yalnız
+   * kitleye yayılır, kullanıcının kendisine değil) → statusMap[myId] ilk yüklemede boş
+   * kalır. O yüzden kendimiz için ASLA 'offline' dönmeyiz (bağlıyız):
+   *  - manuel dnd/away → doğrudan o (bilinçli seçim, idle'ı ezer)
+   *  - manuel online → auto-idle güncellemesi (statusMap) varsa o, yoksa 'online'
+   */
+  function selfStatus(myId: string): PresenceStatus {
+    if (manualStatus.value !== 'online') return manualStatus.value
+    return statusMap[myId] ?? 'online'
+  }
+
   function getStatus(userId: string): PresenceStatus {
+    const myId = useAuthStore().user?.id
+    if (myId && userId === myId) return selfStatus(myId)
     return statusMap[userId] ?? 'offline'
   }
 
   // Kendi kullanıcımızın durumu (UserCard için)
   const myStatus = computed<PresenceStatus>(() => {
-    const authStore = useAuthStore()
-    const myId = authStore.user?.id
+    const myId = useAuthStore().user?.id
     if (!myId) return 'offline'
-    return statusMap[myId] ?? 'offline'
+    return selfStatus(myId)
   })
 
   return { statusMap, applySnapshot, applyUpdate, getStatus, myStatus, manualStatus, setManualStatus }
