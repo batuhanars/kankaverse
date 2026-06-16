@@ -102,11 +102,14 @@ const router = createRouter({
           },
           props: { default: true },
         },
-        // Sprint C6 — Keşfet (Sunucu Keşfi). Sidebar yok; ana içerik tam genişlik.
+        // Sprint C6 — Keşfet (Ortam Keşfi). Sidebar slot = DiscoverSidebar (canonical rail|sidebar|içerik ızgarası).
         {
           path: 'discover',
           name: 'discover',
-          component: () => import('@/views/discover/DiscoverView.vue'),
+          components: {
+            default: () => import('@/views/discover/DiscoverView.vue'),
+            sidebar: () => import('@/views/discover/components/DiscoverSidebar.vue'),
+          },
         },
       ],
     },
