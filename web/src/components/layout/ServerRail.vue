@@ -7,11 +7,13 @@ import { useChannelsStore } from '@/stores/channels'
 import { useAuthStore } from '@/stores/auth'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { useGuildMenuActions } from '@/composables/useGuildMenuActions'
+import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { guildsApi } from '@/api/guilds'
 import GuildSettingsView from '@/views/app/components/GuildSettingsView.vue'
 import InvitePeopleModal from '@/components/layout/InvitePeopleModal.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
-import { NotificationLevel, type GuildDto } from '@/types'
+import NotifLevelFlyout from '@/components/shared/NotifLevelFlyout.vue'
+import { NotificationLevel, NotifTargetType, type GuildDto } from '@/types'
 import hexagonLogo from '@/assets/brand/kankaverse-hexagon.png'
 
 defineProps<{
@@ -25,6 +27,26 @@ const route = useRoute()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const authStore = useAuthStore()
+const prefsStore = useNotificationPrefsStore()
+
+// ── İş A: ortam okunmamış göstergelerini bildirim tercihine göre filtrele ──
+// GÖSTERİM katmanı — okunmamış HESABINI bozmaz; yalnız pip/badge görünürlüğü.
+//   muted veya level NONE → her iki gösterge gizli (ortam sönük)
+//   MENTIONS              → genel unread pip gizli, mention rozeti kalır
+//   ALL (varsayılan)      → mevcut davranış
+function guildMuted(guildId: string): boolean {
+  return prefsStore.isMuted(NotifTargetType.GUILD, guildId)
+}
+/** Genel okunmamış pip (beyaz) gösterilsin mi — muted/NONE/MENTIONS gizler */
+function showUnreadPip(guildId: string): boolean {
+  if (guildMuted(guildId)) return false
+  return prefsStore.effectiveLevel(NotifTargetType.GUILD, guildId) === NotificationLevel.ALL
+}
+/** Mention rozeti (kırmızı) gösterilsin mi — yalnız muted/NONE gizler */
+function showMentionBadge(guildId: string): boolean {
+  if (guildMuted(guildId)) return false
+  return prefsStore.effectiveLevel(NotifTargetType.GUILD, guildId) !== NotificationLevel.NONE
+}
 
 // ── Sağ-tık context menüsü (cursor-konumlu; UserCardPopover deseni) ──
 // contextGuild: hangi ortama sağ-tıklandı (aktif ortam DEĞİL; hedef ortam).
@@ -46,13 +68,6 @@ const {
   setGuildLevel,
   copyGuildId,
 } = useGuildMenuActions(() => contextGuild.value?.id ?? '')
-
-// Bildirim Ayarları alt-menüsü (GuildMemberRow "Rolleri Yönet" deseni — chevron + inline liste)
-const notifSubmenuOpen = ref(false)
-function toggleNotifSubmenu() { notifSubmenuOpen.value = !notifSubmenuOpen.value }
-
-// Menü kapanınca alt-menü de kapansın
-function onContextClosed() { notifSubmenuOpen.value = false }
 
 // Okundu işaretle → menüyü kapat (aksiyon arka planda sürer)
 function doMarkRead() {
@@ -82,7 +97,6 @@ function openGuildContext(event: MouseEvent, guild: GuildDto) {
 
 function closeGuildContext() {
   contextGuild.value = null
-  onContextClosed()
 }
 
 // Dışarı-tık / Esc / scroll ile kapan (UserCardPopover: setTimeout ile aynı-tık çakışmasını önle)
@@ -223,7 +237,8 @@ function guildInitial(name: string) {
 function pillClass(guild: GuildDto): string {
   const isActive = guildsStore.activeGuildId === guild.id
   if (isActive) return 'pill--active'
-  if (guild.unreadCount > 0) return 'pill--unread'
+  // İş A: genel okunmamış pip yalnız ALL seviyesinde (muted/NONE/MENTIONS gizler)
+  if (guild.unreadCount > 0 && showUnreadPip(guild.id)) return 'pill--unread'
   return 'pill--hidden'
 }
 
@@ -288,7 +303,7 @@ function badgeLabel(count: number): string {
           <!-- REV-4: kırmızı sayaç = okunmamış BAHSETME (generic unread değil; o beyaz pill'de).
                Sağ-alt; aktif guild'de de gösterilir, yalnız 0'da gizlenir -->
           <span
-            v-if="guild.unreadMentionCount > 0"
+            v-if="guild.unreadMentionCount > 0 && showMentionBadge(guild.id)"
             class="badge"
           >
             {{ badgeLabel(guild.unreadMentionCount) }}
@@ -416,33 +431,8 @@ function badgeLabel(count: number): string {
         <svg v-if="isGuildMuted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__check"><path d="M20 6 9 17l-5-5"/></svg>
       </button>
 
-      <!-- 4. Bildirim Ayarları — alt-menü (chevron + inline liste) -->
-      <button
-        class="rail-ctx__item"
-        role="menuitem"
-        @click="toggleNotifSubmenu"
-      >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        <span class="rail-ctx__label">{{ t('guildMenu.notifications') }}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__chevron" :class="notifSubmenuOpen ? 'rail-ctx__chevron--open' : ''"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
-      <div v-if="notifSubmenuOpen" class="rail-ctx__submenu">
-        <button
-          v-for="opt in [
-            { level: NotificationLevel.ALL, label: t('guildMenu.notificationsAll') },
-            { level: NotificationLevel.MENTIONS, label: t('guildMenu.notificationsMentions') },
-            { level: NotificationLevel.NONE, label: t('guildMenu.notificationsNone') },
-          ]"
-          :key="opt.level"
-          class="rail-ctx__item rail-ctx__item--sub"
-          role="menuitemradio"
-          :aria-checked="guildLevel === opt.level"
-          @click="setGuildLevel(opt.level)"
-        >
-          <span class="rail-ctx__label">{{ opt.label }}</span>
-          <svg v-if="guildLevel === opt.level" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__check"><path d="M20 6 9 17l-5-5"/></svg>
-        </button>
-      </div>
+      <!-- 4. Bildirim Ayarları — yana açılan flyout (NotifLevelFlyout) -->
+      <NotifLevelFlyout :level="guildLevel" @select="setGuildLevel" />
 
       <!-- 5. Sunucu Ayarları — canOpenSettings -->
       <template v-if="ctxCanOpenSettings">
@@ -862,29 +852,6 @@ function badgeLabel(count: number): string {
 .rail-ctx__check {
   flex-shrink: 0;
   color: var(--kv-accent-500);
-}
-
-/* Alt-menü chevron (Bildirim Ayarları) */
-.rail-ctx__chevron {
-  flex-shrink: 0;
-  color: var(--kv-text-muted);
-  transition: transform 0.12s;
-}
-
-.rail-ctx__chevron--open {
-  transform: rotate(90deg);
-}
-
-/* Bildirim Ayarları inline alt-menüsü (GuildMemberRow deseni) */
-.rail-ctx__submenu {
-  margin: 2px 0 2px 14px;
-  padding-left: 4px;
-  border-left: 1px solid var(--kv-border-subtle);
-}
-
-.rail-ctx__item--sub {
-  padding: 6px 10px;
-  font-size: 13px;
 }
 
 /* Sunucu ID rozeti */

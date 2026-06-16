@@ -56,6 +56,13 @@ const router = createRouter({
       component: () => import('@/views/settings/SecurityView.vue'),
       meta: { requiresAuth: true },
     },
+    // Davet linki — giriş yapılmamışsa login'e (redirect ile) yönlendirilir
+    {
+      path: '/invite/:code',
+      name: 'invite',
+      component: () => import('@/views/invite/InviteAcceptView.vue'),
+      meta: { requiresAuth: true },
+    },
     // Yasal — auth gerektirmez
     {
       path: '/gizlilik',
@@ -128,7 +135,8 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated()) {
-    return { name: 'login' }
+    // Korumalı hedefe (örn. /invite/:code) giriş sonrası geri dönebilmek için redirect taşı
+    return { name: 'login', query: { redirect: to.fullPath } }
   }
 
   if (to.meta.requiresGuest && auth.isAuthenticated()) {
