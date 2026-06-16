@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useAuthStore } from '@/stores/auth'
+import { useGuildPermissions } from '@/composables/useGuildPermissions'
+import { guildsApi } from '@/api/guilds'
+import GuildSettingsView from '@/views/app/components/GuildSettingsView.vue'
+import InvitePeopleModal from '@/components/layout/InvitePeopleModal.vue'
+import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import type { GuildDto } from '@/types'
 import hexagonLogo from '@/assets/brand/kankaverse-hexagon.png'
 
@@ -19,6 +24,122 @@ const route = useRoute()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const authStore = useAuthStore()
+
+// ── Sağ-tık context menüsü (cursor-konumlu; UserCardPopover deseni) ──
+// contextGuild: hangi ortama sağ-tıklandı (aktif ortam DEĞİL; hedef ortam).
+const contextGuild = ref<GuildDto | null>(null)
+const ctxX = ref(0)
+const ctxY = ref(0)
+
+// Hedef ortamın izinleri (aktif ortam değil — sağ-tıklanan).
+// reaktif: contextGuild değişince yeni guild.id'ye çözülür.
+const { can: ctxCan, canOpenSettings: ctxCanOpenSettings, isOwner: ctxIsOwner } =
+  useGuildPermissions(() => contextGuild.value?.id ?? '')
+
+// Menü panel ölçüleri (kenar-taşma clamp'i için)
+const CTX_MENU_W = 200
+const CTX_MENU_H = 160
+
+const ctxPosStyle = computed(() => {
+  const left = Math.min(ctxX.value, window.innerWidth - CTX_MENU_W - 8)
+  const top = Math.min(ctxY.value, window.innerHeight - CTX_MENU_H - 8)
+  return `top:${Math.max(8, top)}px;left:${Math.max(8, left)}px;`
+})
+
+function openGuildContext(event: MouseEvent, guild: GuildDto) {
+  // Başka menü/modal açıksa kapat, yeni hedefe geç
+  ctxX.value = event.clientX
+  ctxY.value = event.clientY
+  contextGuild.value = guild
+}
+
+function closeGuildContext() {
+  contextGuild.value = null
+}
+
+// Dışarı-tık / Esc / scroll ile kapan (UserCardPopover: setTimeout ile aynı-tık çakışmasını önle)
+function onDocPointer() {
+  // Modal açıkken (davet/ayarlar/ayrıl) menü zaten kapanmış olur; yine de güvenli.
+  closeGuildContext()
+}
+function onKey(e: KeyboardEvent) {
+  if (e.key === 'Escape') closeGuildContext()
+}
+function onScroll() {
+  closeGuildContext()
+}
+onMounted(() => {
+  document.addEventListener('click', onDocPointer)
+  document.addEventListener('contextmenu', onDocPointer)
+  document.addEventListener('keydown', onKey)
+  // capture: rail kendi içinde scroll edebilir → yakala
+  window.addEventListener('scroll', onScroll, true)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', onDocPointer)
+  document.removeEventListener('contextmenu', onDocPointer)
+  document.removeEventListener('keydown', onKey)
+  window.removeEventListener('scroll', onScroll, true)
+})
+
+// ── Menü aksiyonları (hedef = contextGuild) → menü kapanır, modal açılır ──
+const showInvite = ref(false)
+const showSettings = ref(false)
+const showLeaveConfirm = ref(false)
+const leaving = ref(false)
+const leaveError = ref('')
+
+// Modallar contextGuild snapshot'ına bağlanır; menü kapanırken contextGuild
+// sıfırlanmasın diye aksiyon anında ayrı bir actionGuild'e kopyalıyoruz.
+const actionGuild = ref<GuildDto | null>(null)
+
+function openInvite() {
+  actionGuild.value = contextGuild.value
+  closeGuildContext()
+  showInvite.value = true
+}
+function openSettings() {
+  actionGuild.value = contextGuild.value
+  closeGuildContext()
+  showSettings.value = true
+}
+function openLeave() {
+  actionGuild.value = contextGuild.value
+  leaveError.value = ''
+  closeGuildContext()
+  showLeaveConfirm.value = true
+}
+
+// Ortam ayarları penceresi OWNER bayrağı (ChannelPanel ile aynı: ownerId === ben)
+const settingsIsOwner = computed(() => {
+  const g = actionGuild.value
+  return !!g && !!authStore.user && g.ownerId === authStore.user.id
+})
+// MANAGE_CHANNELS = ChannelPanel'deki "isAdmin" (kanal yönetimi) — settings içi gating
+const settingsCan = useGuildPermissions(() => actionGuild.value?.id ?? '')
+const settingsIsAdmin = computed(() => settingsCan.can('MANAGE_CHANNELS'))
+
+// ── Ortamdan ayrıl (ChannelPanel.doLeave akışının aynası) ──
+async function doLeave() {
+  const guild = actionGuild.value
+  if (!guild) return
+  leaving.value = true
+  leaveError.value = ''
+  try {
+    await guildsApi.leaveGuild(guild.id)
+    guildsStore.removeGuildLocal(guild.id)
+    showLeaveConfirm.value = false
+    // Ayrılınan ortam aktifse anasayfaya dön; değilse mevcut görünüm korunur
+    if (guildsStore.activeGuildId === guild.id || route.params.guildId === guild.id) {
+      router.push({ name: 'app' })
+    }
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    leaveError.value = err.response?.data?.message ?? t('common.error')
+  } finally {
+    leaving.value = false
+  }
+}
 
 // ── Tooltip state ──
 const tooltipVisible = ref(false)
@@ -114,6 +235,7 @@ function badgeLabel(count: number): string {
       <button
         class="guild-btn"
         @click="selectGuild(guild)"
+        @contextmenu.prevent="openGuildContext($event, guild)"
         @mouseenter="showTooltip($event, guild.name)"
         @mouseleave="hideTooltip"
       >
@@ -220,6 +342,84 @@ function badgeLabel(count: number): string {
       <span class="rail-tooltip__text">{{ tooltipText }}</span>
     </div>
   </Teleport>
+
+  <!-- ── Ortam sağ-tık context menüsü (cursor-konumlu; body'ye teleport) ── -->
+  <Teleport to="body">
+    <div
+      v-if="contextGuild"
+      class="rail-ctx"
+      role="menu"
+      :style="ctxPosStyle"
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <!-- Üye Davet Et — CREATE_INVITE -->
+      <button
+        v-if="ctxCan('CREATE_INVITE')"
+        class="rail-ctx__item"
+        role="menuitem"
+        @click="openInvite"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        <span>{{ t('invitePeople.title') }}</span>
+      </button>
+
+      <!-- Ortam Ayarları — canOpenSettings -->
+      <button
+        v-if="ctxCanOpenSettings"
+        class="rail-ctx__item"
+        role="menuitem"
+        @click="openSettings"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>{{ t('guildSettings.title') }}</span>
+      </button>
+
+      <!-- Ayraç + Ortamdan Ayrıl — OWNER hariç (owner ayrılamaz) -->
+      <template v-if="!ctxIsOwner">
+        <div
+          v-if="ctxCan('CREATE_INVITE') || ctxCanOpenSettings"
+          class="rail-ctx__divider"
+        />
+        <button
+          class="rail-ctx__item rail-ctx__item--danger"
+          role="menuitem"
+          @click="openLeave"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>{{ t('guild.leave') }}</span>
+        </button>
+      </template>
+    </div>
+  </Teleport>
+
+  <!-- ── Sağ-tıklanan ortam için barındırılan modallar (actionGuild) ── -->
+  <!-- Üye Davet Et -->
+  <InvitePeopleModal
+    v-if="showInvite && actionGuild"
+    :guild-id="actionGuild.id"
+    @close="showInvite = false"
+  />
+
+  <!-- Ortam Ayarları (tam-ekran) -->
+  <GuildSettingsView
+    v-if="showSettings && actionGuild"
+    :guild="actionGuild"
+    :is-owner="settingsIsOwner"
+    :is-admin="settingsIsAdmin"
+    @close="showSettings = false"
+  />
+
+  <!-- Ortamdan Ayrıl onayı -->
+  <ConfirmDialog
+    v-if="showLeaveConfirm && actionGuild"
+    :title="t('guild.leaveTitle')"
+    :message="leaveError || t('guild.leaveConfirm', { name: actionGuild.name })"
+    :confirm-label="t('guild.leave')"
+    :loading="leaving"
+    @confirm="doLeave"
+    @cancel="showLeaveConfirm = false; leaveError = ''"
+  />
 </template>
 
 <style scoped>
@@ -501,5 +701,62 @@ function badgeLabel(count: number): string {
   font-weight: 600;
   border-radius: var(--kv-radius-md);
   line-height: 1.4;
+}
+
+/* ── Ortam sağ-tık context menüsü (Teleport → body, fixed konumlama) ──
+   GuildMemberRow/ChannelPanel dropdown'larıyla görsel tutarlı: elevated bg,
+   ince subtle kenarlık, gölge YOK. */
+.rail-ctx {
+  position: fixed;
+  z-index: 9999;
+  min-width: 200px;
+  padding: 4px;
+  background-color: var(--kv-bg-elevated);
+  border: 1px solid var(--kv-border-subtle);
+  border-radius: var(--kv-radius-md);
+  overflow: hidden;
+}
+
+.rail-ctx__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--kv-radius-sm);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--kv-text-primary);
+  background: transparent;
+  border: none;
+  transition: background-color 0.12s;
+}
+
+.rail-ctx__item:hover {
+  background-color: var(--kv-accent-subtle);
+}
+
+.rail-ctx__icon {
+  flex-shrink: 0;
+  color: var(--kv-text-muted);
+}
+
+.rail-ctx__item--danger {
+  color: var(--kv-danger);
+}
+
+.rail-ctx__item--danger .rail-ctx__icon {
+  color: var(--kv-danger);
+}
+
+.rail-ctx__item--danger:hover {
+  background-color: rgba(242, 59, 75, 0.1);
+}
+
+.rail-ctx__divider {
+  height: 1px;
+  margin: 4px 6px;
+  background-color: var(--kv-border-subtle);
 }
 </style>
