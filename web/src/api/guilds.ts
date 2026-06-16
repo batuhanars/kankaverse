@@ -1,5 +1,5 @@
 import http from './axios'
-import type { GuildDto, ChannelDto, GuildMemberDto, CategoryDto } from '@/types'
+import type { GuildDto, ChannelDto, GuildMemberDto, CategoryDto, AuditLogEntryDto } from '@/types'
 
 export interface IconPresignResult {
   uploadUrl: string
@@ -72,6 +72,12 @@ export const guildsApi = {
   },
   unbanMember(guildId: string, userId: string) {
     return http.delete<null>(`/guilds/${guildId}/bans/${userId}`)
+  },
+  // Sprint R5 — Denetim kaydı (MANAGE_GUILD); imleç tabanlı sayfalama (before = son kaydın id'si)
+  getAuditLogs(guildId: string, before?: string) {
+    return http.get<AuditLogEntryDto[]>(`/guilds/${guildId}/audit-logs`, {
+      params: { limit: 50, before },
+    })
   },
   // Drag-reorder: kanal/kategori toplu sıralama
   reorderChannels(guildId: string, items: { id: string; position: number; categoryId?: string | null }[]) {

@@ -6,9 +6,11 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GuildsService } from './guilds.service';
@@ -182,5 +184,18 @@ export class GuildsController {
     @Param('userId') targetUserId: string,
   ) {
     return this.guildsService.unbanMember(user.id, guildId, targetUserId);
+  }
+
+  // ─── §G: Denetim kaydı okuma ──────────────────────────────────────────────
+
+  @Get(':id/audit-logs')
+  @ApiOperation({ summary: 'Ortam denetim kaydını getir (owner veya MANAGE_GUILD). limit varsayılan 50, max 100; before = cursor (auditLog id).' })
+  getAuditLogs(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('before') before?: string,
+  ) {
+    return this.guildsService.getAuditLogs(user.id, guildId, { limit, before });
   }
 }
