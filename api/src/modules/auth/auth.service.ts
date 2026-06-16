@@ -121,20 +121,26 @@ export class AuthService implements OnModuleInit {
   }
 
   async login(dto: LoginDto, ip?: string): Promise<LoginResult> {
-    const email = dto.email.toLowerCase().trim();
-
-    const user = await this.prisma.user.findUnique({
-      where: { email, deletedAt: null },
+    // Tek alan: kullanıcı adı VEYA e-posta. E-posta '@' içerir (kullanıcı adı
+    // pattern'i '@' içermez) → e-posta lowercase eşleşir, kullanıcı adı birebir.
+    // Her ikisi de unique → findFirst OR güvenli (çakışma yok). Jenerik hata + dummy
+    // hash timing savunması korunur (kullanıcı/e-posta var mı sızdırma).
+    const id = dto.identifier.trim();
+    const user = await this.prisma.user.findFirst({
+      where: {
+        deletedAt: null,
+        OR: [{ email: id.toLowerCase() }, { username: id }],
+      },
     });
 
     if (!user) {
       await argon2.verify(this.dummyHash, dto.password).catch(() => {});
-      throw new UnauthorizedException({ message: 'E-posta veya şifre hatalı.', error: 'INVALID_CREDENTIALS' });
+      throw new UnauthorizedException({ message: 'Kullanıcı adı/e-posta veya şifre hatalı.', error: 'INVALID_CREDENTIALS' });
     }
 
     const valid = await argon2.verify(user.passwordHash, dto.password);
     if (!valid) {
-      throw new UnauthorizedException({ message: 'E-posta veya şifre hatalı.', error: 'INVALID_CREDENTIALS' });
+      throw new UnauthorizedException({ message: 'Kullanıcı adı/e-posta veya şifre hatalı.', error: 'INVALID_CREDENTIALS' });
     }
 
     // 2FA etkinse challenge döndür, session açma. Silme iptali ancak tam giriş

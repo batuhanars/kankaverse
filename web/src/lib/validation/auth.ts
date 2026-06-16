@@ -5,10 +5,10 @@ import { z } from 'zod'
 // `.min(1, 'key')` ise boş string için gerekli. Her iki durumu da i18n anahtarıyla yakala.
 
 export const loginSchema = z.object({
-  email: z
-    .string({ error: 'auth.validation.emailRequired' })
-    .min(1, 'auth.validation.emailRequired')
-    .email('auth.validation.emailInvalid'),
+  // Tek alan: kullanıcı adı VEYA e-posta (format zorunlu değil — backend ayırır)
+  identifier: z
+    .string({ error: 'auth.validation.identifierRequired' })
+    .min(1, 'auth.validation.identifierRequired'),
   password: z
     .string({ error: 'auth.validation.passwordRequired' })
     .min(1, 'auth.validation.passwordRequired')

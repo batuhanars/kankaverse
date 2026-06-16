@@ -9,7 +9,7 @@ export interface RegisterPayload {
 }
 
 export interface LoginPayload {
-  email: string
+  identifier: string // kullanıcı adı veya e-posta
   password: string
 }
 

@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
 import { loginSchema } from '@/lib/validation/auth'
 import KvInput from '@/components/ui/KvInput.vue'
 import KvButton from '@/components/ui/KvButton.vue'
@@ -22,6 +23,7 @@ function safeInternalPath(v: unknown): string | null {
 }
 const redirectTo = safeInternalPath(route.query.redirect)
 const auth = useAuthStore()
+const toast = useToastStore()
 
 const apiError = ref('')
 const loading = ref(false)
@@ -30,7 +32,7 @@ const { handleSubmit, defineField, errors } = useForm({
   validationSchema: toTypedSchema(loginSchema),
 })
 
-const [email, emailAttrs] = defineField('email')
+const [identifier, identifierAttrs] = defineField('identifier')
 const [password, passwordAttrs] = defineField('password')
 
 const onSubmit = handleSubmit(async (values) => {
@@ -43,6 +45,7 @@ const onSubmit = handleSubmit(async (values) => {
       if (redirectTo) sessionStorage.setItem('kv_login_redirect', redirectTo)
       await router.push({ name: 'login-2fa' })
     } else {
+      toast.success(t('auth.loginSuccess'))
       await router.push(redirectTo ?? { name: 'app' })
     }
   } catch (e: unknown) {
@@ -88,12 +91,14 @@ function getError(field: string): string | undefined {
 
       <form class="flex flex-col gap-4" @submit.prevent="onSubmit">
         <KvInput
-          v-model="email"
-          v-bind="emailAttrs"
-          :label="t('auth.email')"
-          type="email"
-          :placeholder="t('auth.emailPlaceholder')"
-          :error="getError('email')"
+          v-model="identifier"
+          v-bind="identifierAttrs"
+          :label="t('auth.identifier')"
+          type="text"
+          autocapitalize="none"
+          autocomplete="username"
+          :placeholder="t('auth.identifierPlaceholder')"
+          :error="getError('identifier')"
           :required="true"
         />
         <KvInput
