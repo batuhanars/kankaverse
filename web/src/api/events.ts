@@ -13,6 +13,9 @@ export interface CreateEventPayload {
   endAt?: string // ISO
   // Motor fazı: backend artık NONE|DAILY|WEEKLY|MONTHLY kabul ediyor.
   recurrence?: EventRecurrence
+  // Sprint V3 Etkinlik Kapak Görseli §4 — presign sonrası attachmentId.
+  // Update: undefined → değişmez · null → kaldır · string → yeni kapak.
+  coverImageId?: string | null
 }
 
 // UpdateEventDto = PartialType(CreateEventDto)

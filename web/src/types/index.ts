@@ -299,6 +299,8 @@ export interface EventDto {
   interestedCount: number
   interestedByMe: boolean
   createdAt: string
+  // Sprint V3 Etkinlik Kapak Görseli §4 — yalnız tarama-CLEAN'de dolu presigned GET URL; aksi null.
+  coverImageUrl: string | null
 }
 
 // Sprint 7A §3 — Davet DTO'ları

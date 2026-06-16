@@ -521,6 +521,18 @@
       "descriptionLabel": "AÇIKLAMA",
       "descriptionPlaceholder": "İnsanlara etkinliğinden biraz daha bahset — ne yapacaksınız, kimler katılmalı, neler getirmeli?",
       "descriptionHint": "Markdown, yeni satırlar ve bağlantılar desteklenir.",
+      "coverLabel": "Kapak Görseli",
+      "coverUpload": "Görsel Seç",
+      "coverRemove": "Kaldır",
+      "coverUploading": "Yükleniyor…",
+      "coverErrors": {
+        "INVALID_COVER_IMAGE": "Bu görsel kapak olarak kullanılamaz.",
+        "INVALID_COVER_TYPE": "Kapak yalnızca görsel olabilir.",
+        "UNSUPPORTED_TYPE": "Desteklenmeyen dosya türü.",
+        "FILE_TOO_LARGE": "Dosya boyutu çok büyük (max 25 MB).",
+        "UPLOADS_DISABLED": "Dosya yükleme şu an kapalı.",
+        "default": "Kapak yüklenemedi."
+      },
       "reviewTitle": "Her şey yolunda mı?",
       "reviewInterested": "0 ilgilenen",
       "cancel": "İptal",
