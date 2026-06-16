@@ -125,7 +125,39 @@
   },
   "settings": {
     "title": "Ayarlar",
-    "security": "Güvenlik"
+    "security": "Güvenlik",
+    "tabAccount": "Hesap",
+    "tabProfile": "Profil",
+    "tabPrivacy": "Gizlilik",
+    "usernameLabel": "Kullanıcı Adı",
+    "usernameReadonlyHint": "Kullanıcı adı şu an değiştirilemez.",
+    "emailLabel": "E-posta",
+    "bioLabel": "Hakkımda",
+    "bioPlaceholder": "Kendinden bahset… (bağlantı ekleyebilirsin)",
+    "bioCounter": "{count}/512",
+    "bioSaved": "Profil güncellendi.",
+    "saveError": "Kaydedilemedi. Lütfen tekrar dene.",
+    "dmPolicy": {
+      "label": "Direkt Mesaj İzni",
+      "description": "Sana kimlerin direkt mesaj gönderebileceğini seç.",
+      "everyone": "Herkes",
+      "friends": "Sadece Kankalar",
+      "none": "Kimse",
+      "saved": "Gizlilik tercihin güncellendi."
+    }
+  },
+  "profile": {
+    "bio": "Biyografi",
+    "noBio": "Henüz bir şey yazmamış.",
+    "memberSince": "Üyelik tarihi",
+    "mutualFriends": "Ortak Kankalar",
+    "mutualGuilds": "Ortak Ortamlar",
+    "mutualFriendsCount": "Ortak Kankalar — {count}",
+    "mutualGuildsCount": "Ortak Ortamlar — {count}",
+    "noMutualFriends": "Ortak kanka yok.",
+    "noMutualGuilds": "Ortak ortam yok.",
+    "viewFull": "Profilin Tamamını Gör",
+    "message": "Mesaj"
   },
   "security": {
     "title": "Güvenlik Ayarları",

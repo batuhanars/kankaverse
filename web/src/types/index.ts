@@ -49,6 +49,8 @@ export interface UserDto {
   twoFactorEnabled: boolean // Sprint 2B
   friendCode: string // Sprint 3
   isModerator?: boolean // Sprint 4B — backend toUserDto'da eklenmesi gerekir
+  bio: string | null // Sprint C5 — profil metni
+  dmPolicy: DmPolicy // Sprint C5 — Gizlilik sekmesi okur
 }
 
 // Sprint 3 §5 — sosyal katman DTO'ları
@@ -104,13 +106,17 @@ export type DmChannelDto =
       unread: boolean
     }
 
-// Sprint 4A §3 — kullanıcı profil kartı DTO
+// Sprint 4A §3 + Sprint C5 §3 — kullanıcı profil kartı DTO (genişletildi)
 export interface UserProfileCardDto {
   id: string
   username: string
   avatarUrl: string | null
   friendStatus: 'none' | 'friends' | 'pending_in' | 'pending_out' | 'self'
   selfBlocked: boolean
+  bio: string | null // Sprint C5
+  memberSince: string // Sprint C5 — createdAt ISO
+  mutualFriends: { id: string; username: string; avatarUrl: string | null }[] // Sprint C5
+  mutualGuilds: { id: string; name: string; iconUrl: string | null }[] // Sprint C5
 }
 
 export interface SessionDto {

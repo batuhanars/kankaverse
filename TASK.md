@@ -747,3 +747,16 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Frontend: store kalıcı-destekli yeniden-kurgu · bell navigasyon/zıplama (`useMessageJump`: mention→mesaja zıpla, friend→ilgili görünüm) · i18n · yenilemede durur · `vue-tsc`+`vite build` temiz
 - [x] R7-hafif inceleme (PM): üretim noktaları teyit — MENTION `resolveMentions` çıktısı kaynak (yeni sorgu yok, author atlanır), FRIEND_REQUEST/ACCEPT mevcut hedeflere paralel, **friend.remove→create YOK** (sessiz korundu); sızıntı yolu yok
 - [ ] **Ertelenen:** sahip 2-hesap canlı test (mention→bell→zıpla; kanka isteği→bell; yenile→durur; minör 18+ kanal mention'ı almaz)
+
+---
+
+## Sprint C5 — Kullanıcı Profilleri + Birleşik Ayarlar Modalı — TASARIM KİLİTLİ 2026-06-16
+
+> Sözleşme: `contracts/SPRINT_C5_PROFILES_CONTRACT.md`. V3+ Track C5 (masaüstü-öncesi). **Var olan veri/özellikle** (Discord boş sekmeleri YOK — anti-placeholder). **R7-hafif:** card erişim + minör koruma korunur, dmPolicy minör korumayı delmez.
+> Sahip kararları: avatar ERTELENDİ (D14 public-borç sınıfı genişletmemek için); kapsam = bio + dmPolicy-gizlilik + profil-görüntüleme + ayarlar modalı.
+> **Ertelendi:** avatar/banner upload · bildirim-toggle (Electron) · Bağlantılar OAuth · Faturalandırma · aktivite · username değişimi · not · profileDiscoverable/mediaPolicy toggle (enforcement yok).
+
+- [x] Backend: `User.bio`+migration (uygulı, temiz) · `PATCH /users/me` (bio≤512/dmPolicy doğrulama) · `GET /users/:id/card` genişletildi (bio/memberSince/mutualFriends/mutualGuilds, **erişim kapısı + minör koruma KORUNDU**) · `toUserDto` bio/dmPolicy · 650 test
+- [x] Frontend: birleşik ayarlar modalı (`UserSettingsView`; Hesap=mevcut Section'lar taşındı/akış bozulmadı · Profil=bio · Gizlilik=dmPolicy; UserCard popover'dan; **boş sekme yok**) · profil görüntüleme (DmProfilePanel genişletildi + `FullProfileModal`, bio `renderMessageHtml` güvenli+link, ortak kanka/ortam, mevcut aksiyonlar) · i18n · `vue-tsc`+`vite build` temiz
+- [x] R7-hafif inceleme (PM): card erişim kapısı (satır 100-103 `hasRelation`→404) AYNEN korundu, ek veri kapıdan SONRA; `select`'te minör/yaş alanı yok; `selfBlocked` yalnız callerBlock; dmPolicy değişimi `canDm` minör-gate'ten bağımsız (dokunulmadı)
+- [ ] **Ertelenen:** sahip canlı test (profil+bio/link → başka hesaptan tam-profil; dmPolicy; minör sızmaz)

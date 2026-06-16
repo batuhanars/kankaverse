@@ -5,7 +5,7 @@
  * (ServerRail + sidebar router-view + UserCard + modallar). Değişen ekranlar <RouterView/> ile gelir.
  * Üst-seviye ekran state'i URL'dedir; burada v-if ile ekran değiştirme YOK.
  */
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useGuildsStore } from '@/stores/guilds'
@@ -20,6 +20,7 @@ import EmailVerificationBanner from '@/components/shared/EmailVerificationBanner
 import ServerModal from './components/ServerModal.vue'
 import FriendAddModal from '@/views/home/components/FriendAddModal.vue'
 import IncomingCallModal from '@/components/shared/IncomingCallModal.vue'
+import UserSettingsView from '@/views/settings/UserSettingsView.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -29,6 +30,9 @@ const dmStore = useDmStore()
 const { connect, disconnect } = useSocket()
 const { showServerModal, serverModalStep, showAddFriendModal, openServerModal, closeServerModal, closeAddFriend } =
   useAppModals()
+
+// Birleşik kullanıcı ayarları modalı (UserCard popover → ayarlar girişi açar)
+const showUserSettings = ref(false)
 
 // Socket'i setup'ta bağla (child view'lar mount olup joinChannel çağırmadan ÖNCE soket var olsun).
 // Child mounted, parent mounted'tan önce koşar; bu yüzden connect()'i onMounted'a bırakamayız.
@@ -86,7 +90,7 @@ onUnmounted(() => {
           <!-- Sidebar: ChannelPanel (guild) | HomeSidebar (home/dm) — route'tan gelir -->
           <RouterView name="sidebar" />
         </div>
-        <UserCard @logout="logout" />
+        <UserCard @logout="logout" @open-settings="showUserSettings = true" />
       </div>
 
       <!-- ANA İÇERİK: HomeView | GuildChannelView | DmView -->
@@ -95,6 +99,8 @@ onUnmounted(() => {
 
     <ServerModal v-if="showServerModal" :initial-step="serverModalStep" @close="closeServerModal" />
     <FriendAddModal v-if="showAddFriendModal" @close="closeAddFriend" />
+    <!-- Birleşik kullanıcı ayarları modalı -->
+    <UserSettingsView v-if="showUserSettings" @close="showUserSettings = false" />
     <!-- Gelen DM sesli arama (global) -->
     <IncomingCallModal />
   </div>

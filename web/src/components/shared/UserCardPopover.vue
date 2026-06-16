@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usersApi } from '@/api/users'
 import { friendsApi } from '@/api/friends'
 import ReportModal from './ReportModal.vue'
+import FullProfileModal from './FullProfileModal.vue'
 import type { UserProfileCardDto } from '@/types'
 
 const props = defineProps<{
@@ -15,6 +17,7 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
+const router = useRouter()
 const authStore = useAuthStore()
 const popoverEl = ref<HTMLElement | null>(null)
 const card = ref<UserProfileCardDto | null>(null)
@@ -23,6 +26,7 @@ const adding = ref(false)
 const added = ref(false)
 const errorMsg = ref('')
 const showReportModal = ref(false)
+const showFullProfile = ref(false)
 let errorTimer: ReturnType<typeof setTimeout> | null = null
 
 // Kendi profilini şikayet etme
@@ -62,6 +66,12 @@ onUnmounted(() => {
   document.removeEventListener('click', onDocClick)
   if (errorTimer) clearTimeout(errorTimer)
 })
+
+function onOpenDm(channelId: string) {
+  showFullProfile.value = false
+  emit('close')
+  router.push({ name: 'dm', params: { channelId } })
+}
 
 async function addFriend() {
   if (!card.value || adding.value || added.value) return
@@ -158,6 +168,16 @@ async function addFriend() {
             {{ errorMsg }}
           </p>
 
+          <!-- Profilin tamamını gör (Sprint C5 — tam profil modalı) -->
+          <button
+            v-if="!isSelf"
+            class="w-full mt-2 py-1.5 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity hover:opacity-80 cursor-pointer"
+            style="background-color: var(--kv-bg-content); color: var(--kv-text-primary);"
+            @click="showFullProfile = true"
+          >
+            {{ t('profile.viewFull') }}
+          </button>
+
           <!-- Kullanıcıyı şikâyet et (kendi profili değilse) -->
           <button
             v-if="!isSelf"
@@ -178,5 +198,13 @@ async function addFriend() {
     target-type="USER"
     :target-id="card.id"
     @close="showReportModal = false; emit('close')"
+  />
+
+  <!-- Tam profil modalı -->
+  <FullProfileModal
+    v-if="showFullProfile && card"
+    :card="card"
+    @close="showFullProfile = false"
+    @open-dm="onOpenDm"
   />
 </template>

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
 import { useVoiceStore } from '@/stores/voice'
@@ -10,9 +9,8 @@ import OutgoingCallBar from '@/components/layout/OutgoingCallBar.vue'
 import { useSocket } from '@/composables/useSocket'
 import { onClickOutside } from '@vueuse/core'
 
-const emit = defineEmits<{ logout: [] }>()
+const emit = defineEmits<{ logout: []; openSettings: [] }>()
 const { t } = useI18n()
-const router = useRouter()
 const authStore = useAuthStore()
 const presenceStore = usePresenceStore()
 const voiceStore = useVoiceStore()
@@ -55,7 +53,7 @@ function selectPresence(p: SelectableStatus) {
 
 function goToSettings() {
   showPopover.value = false
-  router.push({ name: 'settings-security' })
+  emit('openSettings')
 }
 
 function onLogout() {
