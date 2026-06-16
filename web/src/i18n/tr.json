@@ -278,6 +278,19 @@
     "muteError": "Sustur tercihi güncellenemedi.",
     "levelError": "Bildirim seviyesi güncellenemedi."
   },
+  "channelMenu": {
+    "inviteText": "Kanala Davet Et",
+    "inviteVoice": "Sesli Sohbete Davet Et",
+    "copyLink": "Bağlantıyı Kopyala",
+    "linkCopied": "Bağlantı kopyalandı",
+    "mute": "Kanalı Sustur",
+    "edit": "Kanalı Düzenle",
+    "createText": "Metin Kanalı Oluştur",
+    "createVoice": "Ses Kanalı Oluştur",
+    "delete": "Kanalı Sil",
+    "copyId": "Kanal ID'sini Kopyala",
+    "idCopied": "Kanal ID'si kopyalandı"
+  },
   "invite": {
     "codeLabel": "DAVET KODU",
     "codePlaceholder": "Davet kodunu gir (ör: AB3XY7KZ)",
