@@ -1108,7 +1108,6 @@ async function doLeave() {
     :is-owner="isOwner"
     :is-admin="isAdmin"
     @close="showSettings = false"
-    @updated="showSettings = false"
   />
 
   <!-- Kanal oluştur modalı -->
