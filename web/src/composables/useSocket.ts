@@ -3,7 +3,7 @@ import { io, type Socket } from 'socket.io-client'
 import { useMessagesStore } from '@/stores/messages'
 import { useFriendsStore } from '@/stores/friends'
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
-import { useNotificationsStore, type MentionPayload } from '@/stores/notifications'
+import { useNotificationsStore } from '@/stores/notifications'
 import { useDmStore } from '@/stores/dm'
 import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
@@ -21,7 +21,7 @@ import {
   handleTypingClear,
   clearTypingForChannel,
 } from '@/composables/useTyping'
-import type { MessageDto, FriendRequestDto, FriendDto, EventDto } from '@/types'
+import type { MessageDto, FriendRequestDto, FriendDto, EventDto, NotificationDto } from '@/types'
 
 let socket: Socket | null = null
 let refCount = 0
@@ -133,31 +133,28 @@ export function useSocket() {
       dmStore.applyActivity(data)
     })
 
+    // friend.* event'leri YALNIZ friends store senkronu için kalır (arkadaş listesi).
+    // Bell artık bunlardan beslenmiyor → kalıcı `notification` event'i kullanır (Sprint C1).
     socket.on('friend.request', (request: FriendRequestDto) => {
       friendsStore.wsAddIncomingRequest(request)
-      notificationsStore.push({
-        type: 'friend_request',
-        user: request.user,
-        at: new Date().toISOString(),
-      })
     })
 
     socket.on('friend.accept', (friend: FriendDto) => {
       friendsStore.wsHandleAccepted(friend)
-      notificationsStore.push({
-        type: 'friend_accept',
-        user: friend.user,
-        at: new Date().toISOString(),
-      })
     })
 
     socket.on('friend.remove', (data: { userId: string }) => {
       friendsStore.wsHandleRemoved(data.userId)
-      notificationsStore.push({
-        type: 'friend_remove',
-        user: undefined,
-        at: new Date().toISOString(),
-      })
+    })
+
+    // Sprint C1: kalıcı bildirim — anlık teslim + handshake snapshot (§3).
+    // Bell'in TEK kaynağı; friend.*/mention'a paralel, T&S-süzülmüş tetikleyicilerden doğar.
+    socket.on('notification', (dto: NotificationDto) => {
+      notificationsStore.handleIncoming(dto)
+    })
+
+    socket.on('notification:snapshot', (payload: { notifications: NotificationDto[]; unreadCount: number }) => {
+      notificationsStore.applySnapshot(payload)
     })
 
     socket.on('presence:snapshot', (payload: { states: Array<{ userId: string; status: PresenceStatus }> }) => {
@@ -194,14 +191,10 @@ export function useSocket() {
       messagesStore.setPinned(data.channelId, data.messageId, null)
     })
 
-    // Sprint V2: @bahsetme bildirimi
-    socket.on('mention', (payload: MentionPayload) => {
-      notificationsStore.push({
-        type: 'mention',
-        user: payload.author,
-        mention: payload,
-        at: new Date().toISOString(),
-      })
+    // Sprint V2: @bahsetme — kanal/guild `unreadMentionCount` rozetini sürer.
+    // Bell ARTIK bunu tüketmez (Sprint C1 → kalıcı `notification` event'i); bu event
+    // yalnız rozet sistemi için korunur (başka tüketicisi var).
+    socket.on('mention', (payload: { messageId: string; channelId: string; guildId: string | null }) => {
       // REV-4: guild kanalında bahsetme → o kanalı izlemiyorsam mention rozetini artır
       // (rail kırmızı sayaç + kanal sidebar bandı). DM (guildId null) → bu sistem dışı.
       if (payload.guildId && activeChannelId !== payload.channelId) {

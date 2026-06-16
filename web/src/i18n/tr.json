@@ -831,13 +831,19 @@
     "title": "Ortamda Ara",
     "placeholder": "Tüm kanallarda ara…"
   },
-  "notifications": {
+  "notification": {
     "title": "Bildirimler",
-    "empty": "Henüz bildirim yok.",
-    "friend_request": "{username} sana kankalık isteği gönderdi.",
-    "friend_accept": "{username} kankalık isteğini kabul etti.",
-    "friend_remove": "Bir kullanıcı seni kanka listesinden çıkardı.",
-    "mention": "{'@'}{username} seni bir mesajda andı."
+    "empty": "Henüz bildirimin yok.",
+    "someone": "Biri",
+    "mention": "{actor} seni bir mesajda etiketledi.",
+    "friendRequest": "{actor} sana kanka isteği gönderdi.",
+    "friendAccept": "{actor} kanka isteğini kabul etti.",
+    "markAllRead": "Tümünü okundu işaretle",
+    "loadMore": "Yükleniyor…",
+    "now": "az önce",
+    "minutesAgo": "{n} dk önce",
+    "hoursAgo": "{n} sa önce",
+    "daysAgo": "{n} gün önce"
   },
   "mention": {
     "unknown": "bilinmeyen",

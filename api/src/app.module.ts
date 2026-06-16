@@ -21,6 +21,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { VoiceModule } from './modules/voice/voice.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { EventsModule } from './modules/events/events.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -46,6 +47,7 @@ import configuration from './config/configuration';
     VoiceModule,
     RolesModule,
     EventsModule,
+    NotificationsModule,
   ],
   providers: [
     {
