@@ -22,6 +22,7 @@ import { VoiceModule } from './modules/voice/voice.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { EventsModule } from './modules/events/events.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { DiscoveryModule } from './modules/discovery/discovery.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -48,6 +49,7 @@ import configuration from './config/configuration';
     RolesModule,
     EventsModule,
     NotificationsModule,
+    DiscoveryModule,
   ],
   providers: [
     {

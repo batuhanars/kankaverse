@@ -760,3 +760,16 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Frontend: birleşik ayarlar modalı (`UserSettingsView`; Hesap=mevcut Section'lar taşındı/akış bozulmadı · Profil=bio · Gizlilik=dmPolicy; UserCard popover'dan; **boş sekme yok**) · profil görüntüleme (DmProfilePanel genişletildi + `FullProfileModal`, bio `renderMessageHtml` güvenli+link, ortak kanka/ortam, mevcut aksiyonlar) · i18n · `vue-tsc`+`vite build` temiz
 - [x] R7-hafif inceleme (PM): card erişim kapısı (satır 100-103 `hasRelation`→404) AYNEN korundu, ek veri kapıdan SONRA; `select`'te minör/yaş alanı yok; `selfBlocked` yalnız callerBlock; dmPolicy değişimi `canDm` minör-gate'ten bağımsız (dokunulmadı)
 - [ ] **Ertelenen:** sahip canlı test (profil+bio/link → başka hesaptan tam-profil; dmPolicy; minör sızmaz)
+
+---
+
+## Sprint C6 — Keşfet (Sunucu Keşfi) + İlgi Etiketleri + Renk Afişi — TASARIM KİLİTLİ 2026-06-16
+
+> Sözleşme: `contracts/SPRINT_C6_DISCOVERY_CONTRACT.md`. V3+ Track C6 (masaüstü-öncesi). **R7-hafif:** Keşfet temas-genişletme → adultsOnly minöre süzülür + discoverable opt-in + Sprint 7A join gate'leri.
+> Sahip kararları: minör adultsOnly görmez/gerisi görünür · max 5 ilgi etiketi (Özellikler) · afiş = **renk/gradient** (görsel afiş CSAM/ikon-scan bundle'a ertelendi) · ikon `accept="image/*"`.
+> **Ertelendi:** görsel afiş · sabit-taksonomi · online sayısı · öneri algoritması.
+
+- [x] Backend: `Guild.discoverable/tags/bannerColor`+migration (uygulı) · PATCH genişletildi · `GET /discovery/guilds` (adultsOnly minöre süzülü, **fail-closed**, memberCount) · `GET /discovery/tags` · `POST /guilds/:id/join-discovery` (**`GuildJoinService` ortak gate — Sprint 7A duplikasyonsuz reuse**; joinByInvite de ona delege) · 666 test
+- [x] Frontend: Keşfet görünümü (ray pusula girişi, arama, etiket-filtre, renk-afişli kartlar, Katıl) · ayarlar Afiş(swatch)/Özellikler(5 etiket)/Keşfet-Göster · ikon `accept="image/*"` · i18n · `vue-tsc`+`vite build` temiz
+- [x] R7-hafif inceleme (PM): discovery süzme `isMinor ?? true` (fail-closed) + `where adultsOnly:false`; GuildJoinService tek-kaynak gate (AGE_RESTRICTED jenerik/GUILD_BANNED); discoverable opt-in default false
+- [ ] **Ertelenen:** sahip canlı test (discoverable+etiket+afiş → Keşfet görünür/filtre/katıl; minör adultsOnly görmez)

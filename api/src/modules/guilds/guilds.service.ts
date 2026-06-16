@@ -11,6 +11,7 @@ import { MembershipService } from '../../shared/membership/membership.service';
 import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { StorageService } from '../../shared/storage/storage.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
+import { GuildJoinService } from '../../shared/guild-join/guild-join.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { UpdateGuildDto } from './dto/update-guild.dto';
 import { PresignIconDto } from './dto/presign-icon.dto';
@@ -38,10 +39,26 @@ export function toGuildDto(guild: Guild, unreadCount = 0, unreadMentionCount = 0
     adultsOnly: guild.adultsOnly,
     iconUrl: guild.iconUrl,
     description: guild.description ?? null,
+    discoverable: guild.discoverable, // C6
+    tags: guild.tags, // C6
+    bannerColor: guild.bannerColor ?? null, // C6
     createdAt: guild.createdAt.toISOString(),
     unreadCount,
     unreadMentionCount, // REV-4: rail kırmızı rozeti bunu gösterir (generic unread değil)
   };
+}
+
+/** C6: tags normalize — trim + lowercase + boş-ele + tekilleştir (sıra korunur). */
+export function normalizeTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of tags) {
+    const t = raw.trim().toLowerCase();
+    if (t.length === 0 || seen.has(t)) continue;
+    seen.add(t);
+    result.push(t);
+  }
+  return result;
 }
 
 const ROLE_ORDER: Record<GuildRole, number> = {
@@ -72,6 +89,7 @@ export class GuildsService {
     private storage: StorageService,
     private config: ConfigService,
     private realtime: RealtimeService,
+    private guildJoin: GuildJoinService,
   ) {}
 
   /** REV-14: guild'in tüm üyelerinin userId'lerini döner (realtime broadcast hedefi). */
@@ -227,10 +245,39 @@ export class GuildsService {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.adultsOnly !== undefined && { adultsOnly: dto.adultsOnly }),
         ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.discoverable !== undefined && { discoverable: dto.discoverable }),
+        ...(dto.tags !== undefined && { tags: normalizeTags(dto.tags) }),
+        ...(dto.bannerColor !== undefined && { bannerColor: dto.bannerColor }),
       },
     });
 
     return toGuildDto(updated);
+  }
+
+  /**
+   * POST /guilds/:id/join-discovery — Keşfet'ten katıl (davet kodu olmadan).
+   *
+   * Giriş kapısı = `discoverable === true` (davet karşılığı). Sonrasında Sprint 7A
+   * yaş/ban/üyelik gate'i + atomik member create + realtime → GuildJoinService (TEK kaynak).
+   *
+   * [R7] discoverable değilse 403 NOT_DISCOVERABLE (minör listede görmese de doğrudan
+   * id ile deneme yapsa bile yaş/ban kapısı GuildJoinService'te fail-closed tutar).
+   */
+  async joinDiscovery(userId: string, guildId: string) {
+    const guild = await this.prisma.guild.findUnique({
+      where: { id: guildId, deletedAt: null },
+    });
+    if (!guild || !guild.discoverable) {
+      throw new ForbiddenException({
+        message: 'Bu ortam Keşfet üzerinden katılıma kapalı.',
+        error: 'NOT_DISCOVERABLE',
+      });
+    }
+
+    // Sprint 7A gate (adultsOnly&&minör→403, ban→403, zaten-üye→409) + üye create + realtime
+    await this.guildJoin.joinGuild(userId, guild);
+
+    return toGuildDto(guild);
   }
 
   /** POST /guilds/:id/icon/presign — yalnız OWNER */

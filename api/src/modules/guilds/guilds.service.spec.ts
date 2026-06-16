@@ -3,6 +3,7 @@ import { GuildsService } from './guilds.service';
 import { PresignIconDto } from './dto/presign-icon.dto';
 import { SetIconDto } from './dto/set-icon.dto';
 import { AssignableGuildRole } from './dto/update-member-role.dto';
+import { GuildJoinService } from '../../shared/guild-join/guild-join.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
 
@@ -53,6 +54,9 @@ const prismaMock = {
   message: {
     count: jest.fn(),
   },
+  user: {
+    findUnique: jest.fn(),
+  },
   auditLog: {
     create: jest.fn(),
   },
@@ -90,6 +94,7 @@ const configMock = {
 const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
 
 function makeService() {
+  const guildJoin = new GuildJoinService(prismaMock as any, realtimeMock as any);
   return new GuildsService(
     prismaMock as any,
     membershipMock as any,
@@ -97,6 +102,7 @@ function makeService() {
     storageMock as any,
     configMock as any,
     realtimeMock as any,
+    guildJoin,
   );
 }
 
@@ -127,6 +133,9 @@ const GUILD_FIXTURE = {
   adultsOnly: false,
   iconUrl: null,
   description: null,
+  discoverable: false,
+  tags: [] as string[],
+  bannerColor: null,
   deletedAt: null,
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),
@@ -992,6 +1001,102 @@ describe('GuildsService — ortam yönetimi (leave/transfer/ban)', () => {
     prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER', userId: MEMBER_ID, id: 'gm-m' });
     const r = await service.banMember(OWNER_ID, GUILD_ID, MEMBER_ID, 'spam');
     expect(r).toBeNull();
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── C6: PATCH /guilds — discoverable/tags/bannerColor ─────────────────────────
+describe('GuildsService.update — C6 (discoverable/tags/bannerColor)', () => {
+  let service: GuildsService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD_FIXTURE, membership: { role: 'OWNER', userId: OWNER_ID } });
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+  });
+
+  it('tags normalize: trim + lowercase + boş-ele + tekilleştir', async () => {
+    prismaMock.guild.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({ ...GUILD_FIXTURE, ...data }),
+    );
+    const result = await service.update(OWNER_ID, GUILD_ID, {
+      tags: ['  Oyun ', 'oyun', 'MUZIK', '', '   ', 'Sohbet'],
+    });
+    // 'Oyun'→'oyun' (tekil), 'muzik', 'sohbet'; boşlar atılır
+    expect(result.tags).toEqual(['oyun', 'muzik', 'sohbet']);
+    expect(prismaMock.guild.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tags: ['oyun', 'muzik', 'sohbet'] }) }),
+    );
+  });
+
+  it('discoverable + bannerColor güncellenir, yalnız verilen alanlar yazılır', async () => {
+    prismaMock.guild.update.mockImplementation(({ data }: any) =>
+      Promise.resolve({ ...GUILD_FIXTURE, ...data }),
+    );
+    const result = await service.update(OWNER_ID, GUILD_ID, { discoverable: true, bannerColor: 'blue' });
+    expect(result.discoverable).toBe(true);
+    expect(result.bannerColor).toBe('blue');
+    const callData = prismaMock.guild.update.mock.calls[0][0].data;
+    // name/adultsOnly/description verilmedi → data'da yok (yalnız verilen alanlar)
+    expect(callData).toEqual({ discoverable: true, bannerColor: 'blue' });
+  });
+});
+
+// ── C6: POST /guilds/:id/join-discovery — Sprint 7A gate reuse ────────────────
+describe('GuildsService.joinDiscovery — C6 (discoverable + Sprint 7A gate)', () => {
+  let service: GuildsService;
+  const DISCOVERABLE_GUILD = { ...GUILD_FIXTURE, discoverable: true };
+  const DISCOVERABLE_ADULTS = { ...DISCOVERABLE_GUILD, id: 'guild-adults', adultsOnly: true };
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.guildBan.findUnique.mockResolvedValue(null);
+  });
+
+  it('discoverable değil → 403 NOT_DISCOVERABLE', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue({ ...GUILD_FIXTURE, discoverable: false });
+    await expect(service.joinDiscovery('user1', GUILD_ID)).rejects.toMatchObject({ response: { error: 'NOT_DISCOVERABLE' } });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('guild yok → 403 NOT_DISCOVERABLE', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(null);
+    await expect(service.joinDiscovery('user1', GUILD_ID)).rejects.toMatchObject({ response: { error: 'NOT_DISCOVERABLE' } });
+  });
+
+  it('[R7] adultsOnly + minör → 403 AGE_RESTRICTED (Sprint 7A gate miras)', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(DISCOVERABLE_ADULTS);
+    prismaMock.user.findUnique.mockResolvedValue({ isMinor: true });
+    await expect(service.joinDiscovery('minor1', 'guild-adults')).rejects.toMatchObject({ response: { error: 'AGE_RESTRICTED' } });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('[ban] yasaklı kullanıcı → 403 GUILD_BANNED (Sprint 7A gate miras)', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(DISCOVERABLE_GUILD);
+    prismaMock.guildBan.findUnique.mockResolvedValue({ guildId: GUILD_ID, userId: 'user1' });
+    await expect(service.joinDiscovery('user1', GUILD_ID)).rejects.toMatchObject({ response: { error: 'GUILD_BANNED' } });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('zaten üye → 409 ALREADY_MEMBER', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(DISCOVERABLE_GUILD);
+    prismaMock.guildMember.findUnique.mockResolvedValue({ id: 'gm1' });
+    await expect(service.joinDiscovery('user1', GUILD_ID)).rejects.toMatchObject({ response: { error: 'ALREADY_MEMBER' } });
+  });
+
+  it('başarılı join → GuildDto + tx (üye create) + realtime member_joined', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(DISCOVERABLE_GUILD);
+    prismaMock.guildMember.findUnique
+      .mockResolvedValueOnce(null) // gate: zaten-üye kontrolü → değil
+      .mockResolvedValueOnce(null); // notifyMemberJoined: yeni üye okuması (erken çıkış)
+    prismaMock.$transaction.mockResolvedValue([{ id: 'gm-new' }]);
+
+    const result = await service.joinDiscovery('newuser', GUILD_ID);
+    expect(result.id).toBe(GUILD_ID);
+    expect(result.discoverable).toBe(true);
     expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
   });
 });

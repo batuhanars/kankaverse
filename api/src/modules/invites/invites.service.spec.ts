@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException, ConflictException } from '@nestjs/common';
 import { InvitesService } from './invites.service';
+import { GuildJoinService } from '../../shared/guild-join/guild-join.service';
 
 // ── Mock PrismaService ───────────────────────────────────────────────────────
 const prismaMock = {
@@ -37,7 +38,10 @@ const permissionsMock = {
 const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
 
 function makeService() {
-  return new InvitesService(prismaMock as any, membershipMock as any, permissionsMock as any, realtimeMock as any);
+  // GuildJoinService gerçek örnek — Sprint 7A gate'i tek kaynaktan paylaşılır (duplike değil).
+  // Aynı prismaMock + realtimeMock ile wire edilir; mevcut kapı testleri aynen geçer.
+  const guildJoin = new GuildJoinService(prismaMock as any, realtimeMock as any);
+  return new InvitesService(prismaMock as any, membershipMock as any, permissionsMock as any, guildJoin);
 }
 
 function resetMocks() {

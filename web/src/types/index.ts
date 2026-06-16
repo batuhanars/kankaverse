@@ -153,6 +153,34 @@ export interface GuildDto {
   createdAt: string
   unreadCount: number
   unreadMentionCount: number
+  // Sprint C6 — Keşfet
+  discoverable: boolean
+  tags: string[]
+  bannerColor: string | null
+}
+
+// Sprint C6 §4 — Keşfet kart DTO (discoverable guild'ler; herkes erişir, adultsOnly minöre backend'de süzülür)
+export interface DiscoveryGuildDto {
+  id: string
+  name: string
+  iconUrl: string | null
+  bannerColor: string | null
+  description: string | null
+  memberCount: number
+  tags: string[]
+  adultsOnly: boolean
+}
+
+// Sprint C6 §2 — Popüler etiket agregatı (GET /discovery/tags)
+export interface DiscoveryTagDto {
+  tag: string
+  count: number
+}
+
+// Sprint C6 §2 — Keşfet listesi sayfalama zarfı
+export interface DiscoveryListDto {
+  items: DiscoveryGuildDto[]
+  nextCursor: string | null
 }
 
 export interface ChannelDto {

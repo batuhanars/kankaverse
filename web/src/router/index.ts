@@ -102,6 +102,12 @@ const router = createRouter({
           },
           props: { default: true },
         },
+        // Sprint C6 — Keşfet (Sunucu Keşfi). Sidebar yok; ana içerik tam genişlik.
+        {
+          path: 'discover',
+          name: 'discover',
+          component: () => import('@/views/discover/DiscoverView.vue'),
+        },
       ],
     },
     {

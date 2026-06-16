@@ -13,7 +13,18 @@ export const guildsApi = {
   list() {
     return http.get<GuildDto[]>('/guilds')
   },
-  update(id: string, payload: { name?: string; adultsOnly?: boolean; description?: string }) {
+  update(
+    id: string,
+    payload: {
+      name?: string
+      adultsOnly?: boolean
+      description?: string
+      // Sprint C6 — Keşfet alanları (MANAGE_GUILD)
+      discoverable?: boolean
+      tags?: string[]
+      bannerColor?: string | null
+    },
+  ) {
     return http.patch<GuildDto>(`/guilds/${id}`, payload)
   },
   getChannels(guildId: string) {
