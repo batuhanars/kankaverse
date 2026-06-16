@@ -12,9 +12,11 @@ import { useEventsStore } from '@/stores/events'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { useGuildMenuActions } from '@/composables/useGuildMenuActions'
 import { useChannelMenuActions } from '@/composables/useChannelMenuActions'
+import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { guildsApi } from '@/api/guilds'
 import { channelsApi } from '@/api/channels'
-import { NotificationLevel } from '@/types'
+import { NotificationLevel, NotifTargetType } from '@/types'
+import NotifLevelFlyout from '@/components/shared/NotifLevelFlyout.vue'
 import GuildSettingsView from '@/views/app/components/GuildSettingsView.vue'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
@@ -35,6 +37,47 @@ const voiceStore = useVoiceStore()
 const rolesStore = useRolesStore()
 const membersStore = useMembersStore()
 const eventsStore = useEventsStore()
+const prefsStore = useNotificationPrefsStore()
+
+// ── İş A: kanal okunmamış göstergelerini bildirim tercihine göre filtrele ──
+// GÖSTERİM katmanı — okunmamış HESABINI bozmaz; yalnız badge/dim görünürlüğü.
+// Efektif değer kanal pref'i yoksa guild'e düşer (effectiveLevel + isMuted GUILD fallback).
+//   muted veya NONE  → genel okunmamış + mention rozeti İKİSİ de gizli (kanal sönük)
+//   MENTIONS         → genel okunmamış gizli, mention rozeti kalır
+//   ALL (varsayılan) → mevcut davranış
+function channelMuted(channel: ChannelDto): boolean {
+  return (
+    prefsStore.isMuted(NotifTargetType.CHANNEL, channel.id) ||
+    (channel.guildId ? prefsStore.isMuted(NotifTargetType.GUILD, channel.guildId) : false)
+  )
+}
+function channelLevelFor(channel: ChannelDto): string {
+  return prefsStore.effectiveLevel(
+    NotifTargetType.CHANNEL,
+    channel.id,
+    channel.guildId ?? undefined,
+  )
+}
+/** Genel okunmamış göstergesi (sayaç + kalın ad) — muted/NONE/MENTIONS gizler */
+function channelShowGenericUnread(channel: ChannelDto): boolean {
+  if (channel.unreadCount <= 0) return false
+  if (channelMuted(channel)) return false
+  return channelLevelFor(channel) === NotificationLevel.ALL
+}
+/** Mention rozeti — muted/NONE gizler; MENTIONS/ALL'da bahsetme varsa gösterir */
+function channelShowMention(channel: ChannelDto): boolean {
+  if (channel.unreadMentionCount <= 0) return false
+  if (channelMuted(channel)) return false
+  return channelLevelFor(channel) !== NotificationLevel.NONE
+}
+/** Kanal satırında okunmamış göstergesi (badge/kalın ad) görünür mü? */
+function channelHasVisibleUnread(channel: ChannelDto): boolean {
+  return channelShowGenericUnread(channel) || channelShowMention(channel)
+}
+/** Sönük (muted/NONE → okunmamışken bile vurgusuz) — hafif opaklık */
+function channelDimmed(channel: ChannelDto): boolean {
+  return channel.unreadCount > 0 && !channelHasVisibleUnread(channel)
+}
 
 const showSettings = ref(false)
 // R12: Ayarlar-dışı hızlı "Üye Davet Et" modalı (CREATE_INVITE ile gated)
@@ -625,7 +668,6 @@ const showGuildMenu = ref(false)
 function toggleGuildMenu() { showGuildMenu.value = !showGuildMenu.value }
 function closeGuildMenu() {
   showGuildMenu.value = false
-  notifSubmenuOpen.value = false
 }
 
 // ── Ortam menü aksiyonları (ServerRail ile paylaşılan composable) ──
@@ -637,10 +679,6 @@ const {
   setGuildLevel,
   copyGuildId,
 } = useGuildMenuActions(() => guildsStore.activeGuildId ?? '')
-
-// Bildirim Ayarları alt-menüsü (GuildMemberRow "Rolleri Yönet" deseni)
-const notifSubmenuOpen = ref(false)
-function toggleNotifSubmenu() { notifSubmenuOpen.value = !notifSubmenuOpen.value }
 
 // Okundu işaretle → menüyü kapat (aksiyon arka planda)
 function doMarkRead() {
@@ -699,7 +737,6 @@ function openChannelContext(event: MouseEvent, channel: ChannelDto) {
 
 function closeChannelContext() {
   contextChannel.value = null
-  chNotifSubmenuOpen.value = false
 }
 
 // Kanal context aksiyonları (paylaşılan composable; hedef = contextChannel)
@@ -712,10 +749,6 @@ const {
   copyChannelId,
   copyChannelLink,
 } = useChannelMenuActions(() => contextChannel.value)
-
-// Bildirim Ayarları alt-menüsü (guild menüsüyle tutarlı: chevron + inline liste)
-const chNotifSubmenuOpen = ref(false)
-function toggleChNotifSubmenu() { chNotifSubmenuOpen.value = !chNotifSubmenuOpen.value }
 
 // Okundu işaretle → menüyü kapat (aksiyon arka planda sürer)
 function doChannelMarkRead() {
@@ -889,38 +922,8 @@ onUnmounted(() => {
           <svg v-if="isGuildMuted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="color: var(--kv-accent-500);"><path d="M20 6 9 17l-5-5"/></svg>
         </button>
 
-        <!-- Bildirim Ayarları — alt-menü (chevron + inline liste) -->
-        <button
-          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-text-primary);"
-          @click="toggleNotifSubmenu"
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          <span class="flex-1 min-w-0">{{ t('guildMenu.notifications') }}</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 transition-transform" :class="notifSubmenuOpen ? 'rotate-90' : ''" style="color: var(--kv-text-muted);"><path d="M9 18l6-6-6-6"/></svg>
-        </button>
-        <div
-          v-if="notifSubmenuOpen"
-          class="ml-3.5 pl-1 border-l"
-          style="border-color: var(--kv-border-subtle);"
-        >
-          <button
-            v-for="opt in [
-              { level: NotificationLevel.ALL, label: t('guildMenu.notificationsAll') },
-              { level: NotificationLevel.MENTIONS, label: t('guildMenu.notificationsMentions') },
-              { level: NotificationLevel.NONE, label: t('guildMenu.notificationsNone') },
-            ]"
-            :key="opt.level"
-            class="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-text-secondary);"
-            role="menuitemradio"
-            :aria-checked="guildLevel === opt.level"
-            @click="setGuildLevel(opt.level)"
-          >
-            <span class="flex-1 min-w-0">{{ opt.label }}</span>
-            <svg v-if="guildLevel === opt.level" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="color: var(--kv-accent-500);"><path d="M20 6 9 17l-5-5"/></svg>
-          </button>
-        </div>
+        <!-- Bildirim Ayarları — yana açılan flyout (NotifLevelFlyout) -->
+        <NotifLevelFlyout :level="guildLevel" @select="setGuildLevel" />
 
         <!-- Ortam Ayarları (settings'te yapabileceği bir şey olan herkes) -->
         <button
@@ -1226,8 +1229,11 @@ onUnmounted(() => {
               <span
                 class="truncate"
                 :class="[
-                  channel.unreadCount > 0 && channelsStore.activeChannelId !== channel.id
+                  channelHasVisibleUnread(channel) && channelsStore.activeChannelId !== channel.id
                     ? 'font-semibold text-[var(--kv-text-primary)]'
+                    : '',
+                  channelDimmed(channel) && channelsStore.activeChannelId !== channel.id
+                    ? 'opacity-60'
                     : '',
                 ]"
               >{{ channel.name }}</span>
@@ -1268,10 +1274,14 @@ onUnmounted(() => {
             >{{ voiceDuration(channel.id) }}</span>
 
             <span
-              v-if="channel.unreadCount > 0 && channelsStore.activeChannelId !== channel.id"
+              v-if="channelHasVisibleUnread(channel) && channelsStore.activeChannelId !== channel.id"
               class="shrink-0 channel-unread-badge"
             >
-              {{ channel.unreadCount > 99 ? '99+' : channel.unreadCount }}
+              {{
+                (channelShowGenericUnread(channel) ? channel.unreadCount : channel.unreadMentionCount) > 99
+                  ? '99+'
+                  : (channelShowGenericUnread(channel) ? channel.unreadCount : channel.unreadMentionCount)
+              }}
             </span>
 
             <div
@@ -1861,33 +1871,8 @@ onUnmounted(() => {
         <svg v-if="isChannelMuted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__check"><path d="M20 6 9 17l-5-5"/></svg>
       </button>
 
-      <!-- 5. Bildirim Ayarları — alt-menü (chevron + inline liste) -->
-      <button
-        class="ch-ctx__item"
-        role="menuitem"
-        @click="toggleChNotifSubmenu"
-      >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        <span class="ch-ctx__label">{{ t('guildMenu.notifications') }}</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__chevron" :class="chNotifSubmenuOpen ? 'ch-ctx__chevron--open' : ''"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
-      <div v-if="chNotifSubmenuOpen" class="ch-ctx__submenu">
-        <button
-          v-for="opt in [
-            { level: NotificationLevel.ALL, label: t('guildMenu.notificationsAll') },
-            { level: NotificationLevel.MENTIONS, label: t('guildMenu.notificationsMentions') },
-            { level: NotificationLevel.NONE, label: t('guildMenu.notificationsNone') },
-          ]"
-          :key="opt.level"
-          class="ch-ctx__item ch-ctx__item--sub"
-          role="menuitemradio"
-          :aria-checked="channelLevel === opt.level"
-          @click="setChannelLevel(opt.level)"
-        >
-          <span class="ch-ctx__label">{{ opt.label }}</span>
-          <svg v-if="channelLevel === opt.level" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__check"><path d="M20 6 9 17l-5-5"/></svg>
-        </button>
-      </div>
+      <!-- 5. Bildirim Ayarları — yana açılan flyout (NotifLevelFlyout) -->
+      <NotifLevelFlyout :level="channelLevel" @select="setChannelLevel" />
 
       <!-- 6-8. Yönetim öğeleri — MANAGE_CHANNELS (isAdmin) -->
       <template v-if="isAdmin">
@@ -2038,27 +2023,6 @@ onUnmounted(() => {
 .ch-ctx__check {
   flex-shrink: 0;
   color: var(--kv-accent-500);
-}
-
-.ch-ctx__chevron {
-  flex-shrink: 0;
-  color: var(--kv-text-muted);
-  transition: transform 0.12s;
-}
-
-.ch-ctx__chevron--open {
-  transform: rotate(90deg);
-}
-
-.ch-ctx__submenu {
-  margin: 2px 0 2px 14px;
-  padding-left: 4px;
-  border-left: 1px solid var(--kv-border-subtle);
-}
-
-.ch-ctx__item--sub {
-  padding: 6px 10px;
-  font-size: 13px;
 }
 
 .ch-ctx__id-badge {

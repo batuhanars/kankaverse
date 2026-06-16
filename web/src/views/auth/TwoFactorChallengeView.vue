@@ -31,7 +31,11 @@ async function submit() {
   try {
     await auth.loginTwoFa(challengeToken.value, code.value.trim())
     sessionStorage.removeItem('kv_2fa_challenge')
-    await router.push({ name: 'app' })
+    const stored = sessionStorage.getItem('kv_login_redirect')
+    sessionStorage.removeItem('kv_login_redirect')
+    // GÜVENLİK: yalnız iç yol (open-redirect önle — LoginView ile aynı kural)
+    const redirectTo = stored && /^\/(?!\/)/.test(stored) ? stored : null
+    await router.push(redirectTo ?? { name: 'app' })
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
     apiError.value = err.response?.data?.message ?? t('common.error')

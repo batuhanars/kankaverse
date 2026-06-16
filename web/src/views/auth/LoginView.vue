@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -11,7 +11,16 @@ import KvButton from '@/components/ui/KvButton.vue'
 import logoDikey from '@/assets/brand/kankaverse-logo-dikey.png'
 
 const router = useRouter()
+const route = useRoute()
 const { t, te } = useI18n()
+
+// Korumalı hedefe (örn. davet linki) giriş sonrası geri dönüş.
+// GÜVENLİK: yalnız tek '/' ile başlayan İÇ yollar (open-redirect/phishing önle —
+// '//evil.com', 'https://…' gibi protokol-göreceli/dış hedefler reddedilir).
+function safeInternalPath(v: unknown): string | null {
+  return typeof v === 'string' && /^\/(?!\/)/.test(v) ? v : null
+}
+const redirectTo = safeInternalPath(route.query.redirect)
 const auth = useAuthStore()
 
 const apiError = ref('')
@@ -31,9 +40,10 @@ const onSubmit = handleSubmit(async (values) => {
     const challenge = await auth.login(values)
     if (challenge) {
       sessionStorage.setItem('kv_2fa_challenge', challenge.challengeToken)
+      if (redirectTo) sessionStorage.setItem('kv_login_redirect', redirectTo)
       await router.push({ name: 'login-2fa' })
     } else {
-      await router.push({ name: 'app' })
+      await router.push(redirectTo ?? { name: 'app' })
     }
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string; error?: string } } }

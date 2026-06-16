@@ -71,18 +71,18 @@ async function send() {
       </div>
       <p class="text-[14px] mb-6" style="color: var(--kv-text-muted);">{{ t('friends.addDescription') }}</p>
 
-      <!-- Input -->
-      <form class="flex gap-2 mb-2" @submit.prevent="send">
+      <!-- Input + buton (dikey: taşmaz) -->
+      <form class="flex flex-col gap-3 mb-2" @submit.prevent="send">
         <input
           v-model="codeInput"
           :placeholder="t('friends.codePlaceholder')"
           maxlength="6"
-          class="flex-1 px-4 py-3 text-[14px] rounded-[var(--kv-radius-md)] outline-none uppercase tracking-widest"
+          class="w-full px-4 py-3 text-[14px] rounded-[var(--kv-radius-md)] outline-none uppercase tracking-widest"
           style="background-color: var(--kv-bg-rail); color: var(--kv-text-primary); border: 2px solid var(--kv-border-subtle);"
           @focus="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-accent-500)'"
           @blur="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-border-subtle)'"
         />
-        <KvButton type="submit" :loading="loading" class="shrink-0">
+        <KvButton type="submit" :loading="loading" class="w-full justify-center whitespace-nowrap">
           {{ t('friends.addButton') }}
         </KvButton>
       </form>

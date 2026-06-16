@@ -315,6 +315,14 @@
       "GUILD_BANNED": "Bu ortamdan yasaklandın."
     }
   },
+  "inviteAccept": {
+    "loading": "Davet yükleniyor…",
+    "invalidTitle": "Davet geçersiz",
+    "invalidDesc": "Davet geçersiz veya süresi dolmuş.",
+    "youInvited": "Bir ortama davet edildin",
+    "join": "Katıl",
+    "goHome": "Anasayfaya dön"
+  },
   "invitePeople": {
     "title": "Üye Davet Et",
     "linkLabel": "Davet Linki",
