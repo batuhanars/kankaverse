@@ -605,8 +605,8 @@ function confirmNavDiscard() {
           <!-- ── Genel bölümü ── -->
           <div v-if="activeSection === 'genel'" class="flex flex-col lg:flex-row gap-8 items-start">
 
-            <!-- ── SOL kolon: form ── -->
-            <div class="flex-1 min-w-0 flex flex-col gap-6 max-w-xl">
+            <!-- ── SOL kolon: form (bölümler arası border ayraç + boşluk) ── -->
+            <div class="flex-1 min-w-0 flex flex-col max-w-xl [&>section]:py-7 [&>section]:border-b [&>section]:border-[color:var(--kv-border-subtle)] [&>section:first-of-type]:pt-0 [&>section:last-of-type]:border-b-0">
 
             <!-- Ad düzenle (Simge'nin üstüne alındı — sahip) -->
             <section>
@@ -700,26 +700,7 @@ function confirmNavDiscard() {
               </div>
             </section>
 
-            <!-- Ortam açıklaması -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.descriptionSection') }}
-              </h3>
-              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.descriptionSubtitle') }}
-              </p>
-              <textarea
-                v-model="draftDescription"
-                :placeholder="t('guildSettings.descriptionPlaceholder')"
-                :disabled="saving"
-                rows="5"
-                maxlength="2000"
-                class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
-                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
-              />
-            </section>
-
-            <!-- ── Sprint C6: Özellikler (max 5 etiket) ── -->
+            <!-- ── Sprint C6: Özellikler (max 5 etiket) — Açıklama'nın üstüne alındı (sahip) ── -->
             <section>
               <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
                 {{ t('guildSettings.featuresLabel') }}
@@ -773,6 +754,25 @@ function confirmNavDiscard() {
               <p v-if="draftTags.length >= MAX_TAGS" class="text-[12px] mt-2" style="color: var(--kv-text-muted);">
                 {{ t('guildSettings.featuresFull', { max: MAX_TAGS }) }}
               </p>
+            </section>
+
+            <!-- Ortam açıklaması (Özellikler'in altına alındı — sahip) -->
+            <section>
+              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.descriptionSection') }}
+              </h3>
+              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.descriptionSubtitle') }}
+              </p>
+              <textarea
+                v-model="draftDescription"
+                :placeholder="t('guildSettings.descriptionPlaceholder')"
+                :disabled="saving"
+                rows="5"
+                maxlength="2000"
+                class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
+                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
+              />
             </section>
 
             <!-- ── Sprint C6: Keşfet'te Göster (discoverable) ── -->
