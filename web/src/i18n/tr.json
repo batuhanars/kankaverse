@@ -265,6 +265,19 @@
       "ALREADY_MEMBER": "Bu ortama zaten üyesin."
     }
   },
+  "guildMenu": {
+    "markRead": "Okunmuş Olarak İşaretle",
+    "mute": "Sunucuyu Sustur",
+    "notifications": "Bildirim Ayarları",
+    "notificationsAll": "Tümü",
+    "notificationsMentions": "Yalnız bahsetmeler",
+    "notificationsNone": "Hiçbiri",
+    "copyId": "Sunucu ID'sini Kopyala",
+    "idBadge": "ID",
+    "idCopied": "Sunucu ID'si kopyalandı",
+    "muteError": "Sustur tercihi güncellenemedi.",
+    "levelError": "Bildirim seviyesi güncellenemedi."
+  },
   "invite": {
     "codeLabel": "DAVET KODU",
     "codePlaceholder": "Davet kodunu gir (ör: AB3XY7KZ)",

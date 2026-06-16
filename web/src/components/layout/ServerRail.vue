@@ -6,11 +6,12 @@ import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useAuthStore } from '@/stores/auth'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
+import { useGuildMenuActions } from '@/composables/useGuildMenuActions'
 import { guildsApi } from '@/api/guilds'
 import GuildSettingsView from '@/views/app/components/GuildSettingsView.vue'
 import InvitePeopleModal from '@/components/layout/InvitePeopleModal.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
-import type { GuildDto } from '@/types'
+import { NotificationLevel, type GuildDto } from '@/types'
 import hexagonLogo from '@/assets/brand/kankaverse-hexagon.png'
 
 defineProps<{
@@ -36,9 +37,32 @@ const ctxY = ref(0)
 const { can: ctxCan, canOpenSettings: ctxCanOpenSettings, isOwner: ctxIsOwner } =
   useGuildPermissions(() => contextGuild.value?.id ?? '')
 
+// Sustur/bildirim/okundu/ID — herkese açık aksiyonlar (paylaşılan composable)
+const {
+  markGuildRead,
+  isGuildMuted,
+  toggleGuildMute,
+  guildLevel,
+  setGuildLevel,
+  copyGuildId,
+} = useGuildMenuActions(() => contextGuild.value?.id ?? '')
+
+// Bildirim Ayarları alt-menüsü (GuildMemberRow "Rolleri Yönet" deseni — chevron + inline liste)
+const notifSubmenuOpen = ref(false)
+function toggleNotifSubmenu() { notifSubmenuOpen.value = !notifSubmenuOpen.value }
+
+// Menü kapanınca alt-menü de kapansın
+function onContextClosed() { notifSubmenuOpen.value = false }
+
+// Okundu işaretle → menüyü kapat (aksiyon arka planda sürer)
+function doMarkRead() {
+  markGuildRead()
+  closeGuildContext()
+}
+
 // Menü panel ölçüleri (kenar-taşma clamp'i için)
-const CTX_MENU_W = 200
-const CTX_MENU_H = 160
+const CTX_MENU_W = 220
+const CTX_MENU_H = 320
 
 const ctxPosStyle = computed(() => {
   const left = Math.min(ctxX.value, window.innerWidth - CTX_MENU_W - 8)
@@ -58,6 +82,7 @@ function openGuildContext(event: MouseEvent, guild: GuildDto) {
 
 function closeGuildContext() {
   contextGuild.value = null
+  onContextClosed()
 }
 
 // Dışarı-tık / Esc / scroll ile kapan (UserCardPopover: setTimeout ile aynı-tık çakışmasını önle)
@@ -356,7 +381,17 @@ function badgeLabel(count: number): string {
       @click.stop
       @contextmenu.prevent.stop
     >
-      <!-- Üye Davet Et — CREATE_INVITE -->
+      <!-- 1. Okunmuş Olarak İşaretle — herkese -->
+      <button
+        class="rail-ctx__item"
+        role="menuitem"
+        @click="doMarkRead"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><path d="M20 6 9 17l-5-5"/></svg>
+        <span>{{ t('guildMenu.markRead') }}</span>
+      </button>
+
+      <!-- 2. Sunucuya Davet Et — CREATE_INVITE -->
       <button
         v-if="ctxCan('CREATE_INVITE')"
         class="rail-ctx__item"
@@ -367,23 +402,77 @@ function badgeLabel(count: number): string {
         <span>{{ t('invitePeople.title') }}</span>
       </button>
 
-      <!-- Ortam Ayarları — canOpenSettings -->
+      <div class="rail-ctx__divider" />
+
+      <!-- 3. Sunucuyu Sustur — sağda işaret (✓) muted ise -->
       <button
-        v-if="ctxCanOpenSettings"
         class="rail-ctx__item"
-        role="menuitem"
-        @click="openSettings"
+        role="menuitemcheckbox"
+        :aria-checked="isGuildMuted"
+        @click="toggleGuildMute"
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        <span>{{ t('guildSettings.title') }}</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+        <span class="rail-ctx__label">{{ t('guildMenu.mute') }}</span>
+        <svg v-if="isGuildMuted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__check"><path d="M20 6 9 17l-5-5"/></svg>
       </button>
 
-      <!-- Ayraç + Ortamdan Ayrıl — OWNER hariç (owner ayrılamaz) -->
+      <!-- 4. Bildirim Ayarları — alt-menü (chevron + inline liste) -->
+      <button
+        class="rail-ctx__item"
+        role="menuitem"
+        @click="toggleNotifSubmenu"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="rail-ctx__label">{{ t('guildMenu.notifications') }}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__chevron" :class="notifSubmenuOpen ? 'rail-ctx__chevron--open' : ''"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+      <div v-if="notifSubmenuOpen" class="rail-ctx__submenu">
+        <button
+          v-for="opt in [
+            { level: NotificationLevel.ALL, label: t('guildMenu.notificationsAll') },
+            { level: NotificationLevel.MENTIONS, label: t('guildMenu.notificationsMentions') },
+            { level: NotificationLevel.NONE, label: t('guildMenu.notificationsNone') },
+          ]"
+          :key="opt.level"
+          class="rail-ctx__item rail-ctx__item--sub"
+          role="menuitemradio"
+          :aria-checked="guildLevel === opt.level"
+          @click="setGuildLevel(opt.level)"
+        >
+          <span class="rail-ctx__label">{{ opt.label }}</span>
+          <svg v-if="guildLevel === opt.level" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__check"><path d="M20 6 9 17l-5-5"/></svg>
+        </button>
+      </div>
+
+      <!-- 5. Sunucu Ayarları — canOpenSettings -->
+      <template v-if="ctxCanOpenSettings">
+        <div class="rail-ctx__divider" />
+        <button
+          class="rail-ctx__item"
+          role="menuitem"
+          @click="openSettings"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>{{ t('guildSettings.title') }}</span>
+        </button>
+      </template>
+
+      <div class="rail-ctx__divider" />
+
+      <!-- 7. Sunucu ID'sini Kopyala — herkese -->
+      <button
+        class="rail-ctx__item"
+        role="menuitem"
+        @click="copyGuildId"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span class="rail-ctx__label">{{ t('guildMenu.copyId') }}</span>
+        <span class="rail-ctx__id-badge">{{ t('guildMenu.idBadge') }}</span>
+      </button>
+
+      <!-- 8. Ortamdan Ayrıl — OWNER hariç (owner ayrılamaz) -->
       <template v-if="!ctxIsOwner">
-        <div
-          v-if="ctxCan('CREATE_INVITE') || ctxCanOpenSettings"
-          class="rail-ctx__divider"
-        />
+        <div class="rail-ctx__divider" />
         <button
           class="rail-ctx__item rail-ctx__item--danger"
           role="menuitem"
@@ -761,5 +850,51 @@ function badgeLabel(count: number): string {
   height: 1px;
   margin: 4px 6px;
   background-color: var(--kv-border-subtle);
+}
+
+/* Etiket esner → sağdaki işaret/rozet/chevron sağa yapışır */
+.rail-ctx__label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Sağdaki onay işareti (sustur/seviye) */
+.rail-ctx__check {
+  flex-shrink: 0;
+  color: var(--kv-accent-500);
+}
+
+/* Alt-menü chevron (Bildirim Ayarları) */
+.rail-ctx__chevron {
+  flex-shrink: 0;
+  color: var(--kv-text-muted);
+  transition: transform 0.12s;
+}
+
+.rail-ctx__chevron--open {
+  transform: rotate(90deg);
+}
+
+/* Bildirim Ayarları inline alt-menüsü (GuildMemberRow deseni) */
+.rail-ctx__submenu {
+  margin: 2px 0 2px 14px;
+  padding-left: 4px;
+  border-left: 1px solid var(--kv-border-subtle);
+}
+
+.rail-ctx__item--sub {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* Sunucu ID rozeti */
+.rail-ctx__id-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: var(--kv-radius-sm);
+  background-color: var(--kv-bg-rail);
+  color: var(--kv-text-muted);
 }
 </style>

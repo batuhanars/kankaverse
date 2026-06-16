@@ -10,8 +10,10 @@ import { useRolesStore } from '@/stores/roles'
 import { useMembersStore } from '@/stores/members'
 import { useEventsStore } from '@/stores/events'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
+import { useGuildMenuActions } from '@/composables/useGuildMenuActions'
 import { guildsApi } from '@/api/guilds'
 import { channelsApi } from '@/api/channels'
+import { NotificationLevel } from '@/types'
 import GuildSettingsView from '@/views/app/components/GuildSettingsView.vue'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
@@ -620,7 +622,30 @@ function closeCategoryMenu() {
 // ── Ortam menüsü (başlık tek-buton → Discord-tarzı dropdown) ──
 const showGuildMenu = ref(false)
 function toggleGuildMenu() { showGuildMenu.value = !showGuildMenu.value }
-function closeGuildMenu() { showGuildMenu.value = false }
+function closeGuildMenu() {
+  showGuildMenu.value = false
+  notifSubmenuOpen.value = false
+}
+
+// ── Ortam menü aksiyonları (ServerRail ile paylaşılan composable) ──
+const {
+  markGuildRead,
+  isGuildMuted,
+  toggleGuildMute,
+  guildLevel,
+  setGuildLevel,
+  copyGuildId,
+} = useGuildMenuActions(() => guildsStore.activeGuildId ?? '')
+
+// Bildirim Ayarları alt-menüsü (GuildMemberRow "Rolleri Yönet" deseni)
+const notifSubmenuOpen = ref(false)
+function toggleNotifSubmenu() { notifSubmenuOpen.value = !notifSubmenuOpen.value }
+
+// Okundu işaretle → menüyü kapat (aksiyon arka planda)
+function doMarkRead() {
+  markGuildRead()
+  closeGuildMenu()
+}
 
 // ── Ortamdan ayrıl ──
 const showLeaveConfirm = ref(false)
@@ -692,6 +717,18 @@ async function doLeave() {
         style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
         @click.stop
       >
+        <!-- Okunmuş Olarak İşaretle — herkese -->
+        <button
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+          style="color: var(--kv-text-primary);"
+          @click="doMarkRead"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><path d="M20 6 9 17l-5-5"/></svg>
+          <span>{{ t('guildMenu.markRead') }}</span>
+        </button>
+
+        <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
+
         <!-- Kanal Oluştur (admin) -->
         <button
           v-if="isAdmin"
@@ -732,6 +769,55 @@ async function doLeave() {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
           <span>{{ t('invitePeople.title') }}</span>
         </button>
+
+        <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
+
+        <!-- Sunucuyu Sustur — sağda işaret muted ise -->
+        <button
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+          style="color: var(--kv-text-primary);"
+          role="menuitemcheckbox"
+          :aria-checked="isGuildMuted"
+          @click="toggleGuildMute"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+          <span class="flex-1 min-w-0">{{ t('guildMenu.mute') }}</span>
+          <svg v-if="isGuildMuted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="color: var(--kv-accent-500);"><path d="M20 6 9 17l-5-5"/></svg>
+        </button>
+
+        <!-- Bildirim Ayarları — alt-menü (chevron + inline liste) -->
+        <button
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+          style="color: var(--kv-text-primary);"
+          @click="toggleNotifSubmenu"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="flex-1 min-w-0">{{ t('guildMenu.notifications') }}</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 transition-transform" :class="notifSubmenuOpen ? 'rotate-90' : ''" style="color: var(--kv-text-muted);"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+        <div
+          v-if="notifSubmenuOpen"
+          class="ml-3.5 pl-1 border-l"
+          style="border-color: var(--kv-border-subtle);"
+        >
+          <button
+            v-for="opt in [
+              { level: NotificationLevel.ALL, label: t('guildMenu.notificationsAll') },
+              { level: NotificationLevel.MENTIONS, label: t('guildMenu.notificationsMentions') },
+              { level: NotificationLevel.NONE, label: t('guildMenu.notificationsNone') },
+            ]"
+            :key="opt.level"
+            class="w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+            style="color: var(--kv-text-secondary);"
+            role="menuitemradio"
+            :aria-checked="guildLevel === opt.level"
+            @click="setGuildLevel(opt.level)"
+          >
+            <span class="flex-1 min-w-0">{{ opt.label }}</span>
+            <svg v-if="guildLevel === opt.level" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="color: var(--kv-accent-500);"><path d="M20 6 9 17l-5-5"/></svg>
+          </button>
+        </div>
+
         <!-- Ortam Ayarları (settings'te yapabileceği bir şey olan herkes) -->
         <button
           v-if="canOpenSettings"
@@ -742,9 +828,23 @@ async function doLeave() {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span>{{ t('common.settings') }}</span>
         </button>
+
+        <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
+
+        <!-- Sunucu ID'sini Kopyala — herkese -->
+        <button
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+          style="color: var(--kv-text-primary);"
+          @click="copyGuildId"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span class="flex-1 min-w-0">{{ t('guildMenu.copyId') }}</span>
+          <span class="shrink-0 text-[10px] font-bold px-1.5 rounded-[var(--kv-radius-sm)]" style="background-color: var(--kv-bg-rail); color: var(--kv-text-muted);">{{ t('guildMenu.idBadge') }}</span>
+        </button>
+
         <!-- Ayraç + Ortamdan Ayrıl (OWNER hariç) -->
         <template v-if="!isOwner">
-          <div v-if="isAdmin" class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
+          <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
           <button
             class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors"
             style="color: var(--kv-danger);"
