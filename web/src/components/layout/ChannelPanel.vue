@@ -20,6 +20,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import VoiceParticipantList from '@/components/shared/VoiceParticipantList.vue'
 import EventsModal from '@/views/app/components/EventsModal.vue'
 import CreateEventWizard from '@/views/app/components/CreateEventWizard.vue'
+import InvitePeopleModal from '@/components/layout/InvitePeopleModal.vue'
 import type { ChannelDto, CategoryDto, ChannelMemberDto, GuildMemberDto } from '@/types'
 
 const { t } = useI18n()
@@ -33,6 +34,8 @@ const membersStore = useMembersStore()
 const eventsStore = useEventsStore()
 
 const showSettings = ref(false)
+// R12: Ayarlar-dışı hızlı "Üye Davet Et" modalı (CREATE_INVITE ile gated)
+const showInvitePeople = ref(false)
 
 // Efektif izin (UX gating) — backend otorite kalır.
 const { can, canOpenSettings } = useGuildPermissions(() => guildsStore.activeGuildId ?? '')
@@ -699,6 +702,16 @@ async function doLeave() {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span>{{ t('event.menuCreate') }}</span>
         </button>
+        <!-- Üye Davet Et (CREATE_INVITE — @everyone'da var → pratikte herkes) -->
+        <button
+          v-if="can('CREATE_INVITE')"
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+          style="color: var(--kv-text-primary);"
+          @click="closeGuildMenu(); showInvitePeople = true"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+          <span>{{ t('invitePeople.title') }}</span>
+        </button>
         <!-- Ortam Ayarları (settings'te yapabileceği bir şey olan herkes) -->
         <button
           v-if="canOpenSettings"
@@ -1108,6 +1121,13 @@ async function doLeave() {
     :is-owner="isOwner"
     :is-admin="isAdmin"
     @close="showSettings = false"
+  />
+
+  <!-- R12: Üye Davet Et modalı (davet linki + kanka listesi) -->
+  <InvitePeopleModal
+    v-if="showInvitePeople && activeGuildId"
+    :guild-id="activeGuildId"
+    @close="showInvitePeople = false"
   />
 
   <!-- Kanal oluştur modalı -->

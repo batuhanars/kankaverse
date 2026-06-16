@@ -289,6 +289,17 @@
       "GUILD_BANNED": "Bu ortamdan yasaklandın."
     }
   },
+  "invitePeople": {
+    "title": "Üye Davet Et",
+    "linkLabel": "Davet Linki",
+    "friendsLabel": "Kankaların",
+    "inviteButton": "Davet Et",
+    "invited": "Davet Edildi ✓",
+    "noFriends": "Henüz kankan yok. Önce birini kanka ekle, sonra ortamına davet et.",
+    "createError": "Davet linki oluşturulamadı.",
+    "friendsError": "Kanka listesi yüklenemedi.",
+    "sendError": "Davet gönderilemedi."
+  },
   "guildSettings": {
     "title": "Ortam Ayarları",
     "nav": {
