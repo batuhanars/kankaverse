@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@vueuse/core'
 import { useChannelsStore } from '@/stores/channels'
 import { useEventsStore } from '@/stores/events'
 import { useEventDateFormat } from '@/composables/useEventDateFormat'
+import { attachmentsApi } from '@/api/attachments'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
 import type { EventDto, EventRecurrence } from '@/types'
@@ -57,6 +58,106 @@ const startDate = ref<string>(initialStart.date)
 const startTime = ref<string>(initialStart.time)
 // Motor fazı: 4 sıklık etkin (backend computed occurrence ile çözer).
 const recurrence = ref<EventRecurrence>(props.event?.recurrence ?? 'NONE')
+
+// ── Kapak görseli (Sprint V3 §5) ──
+// Mevcut attachment akışını tekrar kullan (presign + uploadToS3, AttachmentComposeModal deseni).
+// coverImageId semantiği submit'te: undefined → değişmez · null → kaldır · string → yeni kapak.
+const fileInputEl = ref<HTMLInputElement | null>(null)
+// Yeni seçilen kapağın attachment id'si (presign sonrası). Boş = bu oturumda yeni seçim yapılmadı.
+const coverImageId = ref<string>('')
+// Edit modunda mevcut kapak kaldırıldı mı? (null gönderilmesi gerekir)
+const coverRemoved = ref(false)
+const coverUploading = ref(false)
+const coverProgress = ref(0)
+const coverError = ref('')
+// Yükleme kapalıysa (presign UPLOADS_DISABLED 403) alanı gizle — mesaj composer'ın reaktif
+// gating deseniyle aynı sinyal: ayrı feature-flag store yok, presign 403'ü otorite.
+const coverUploadsDisabled = ref(false)
+// Yeni seçilen dosyanın anlık önizlemesi (createObjectURL).
+const coverObjectUrl = ref<string | null>(null)
+// Edit modunda backend'den gelen mevcut kapak URL'i (yeni seçim/kaldırma yoksa gösterilir).
+const existingCoverUrl = props.event?.coverImageUrl ?? null
+
+// Gösterilecek önizleme: yeni seçim varsa onu, yoksa (kaldırılmadıysa) mevcut kapağı.
+const coverPreviewUrl = computed(() => {
+  if (coverObjectUrl.value) return coverObjectUrl.value
+  if (!coverRemoved.value && existingCoverUrl) return existingCoverUrl
+  return null
+})
+
+onUnmounted(() => {
+  if (coverObjectUrl.value) URL.revokeObjectURL(coverObjectUrl.value)
+})
+
+function openCoverPicker() {
+  if (coverUploading.value) return
+  fileInputEl.value?.click()
+}
+
+async function onCoverSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // aynı dosyayı tekrar seçmeye izin ver
+  if (!file) return
+
+  coverError.value = ''
+  // Eski object URL'i temizle
+  if (coverObjectUrl.value) {
+    URL.revokeObjectURL(coverObjectUrl.value)
+    coverObjectUrl.value = null
+  }
+  coverObjectUrl.value = URL.createObjectURL(file)
+  coverRemoved.value = false
+  coverUploading.value = true
+  coverProgress.value = 0
+
+  try {
+    const { data: presigned } = await attachmentsApi.presign({
+      filename: file.name,
+      contentType: file.type,
+      size: file.size,
+    })
+    await attachmentsApi.uploadToS3(presigned.uploadUrl, file, (pct) => {
+      coverProgress.value = pct
+    })
+    coverImageId.value = presigned.attachmentId
+    coverUploading.value = false
+  } catch (err: unknown) {
+    const code = (err as { response?: { data?: { error?: string } } }).response?.data?.error
+    // Yükleme kapalıysa alanı tamamen gizle (composer gating deseni).
+    if (code === 'UPLOADS_DISABLED') {
+      coverUploadsDisabled.value = true
+    }
+    coverImageId.value = ''
+    coverUploading.value = false
+    if (coverObjectUrl.value) {
+      URL.revokeObjectURL(coverObjectUrl.value)
+      coverObjectUrl.value = null
+    }
+    const known = ['UNSUPPORTED_TYPE', 'FILE_TOO_LARGE', 'UPLOADS_DISABLED', 'INVALID_COVER_IMAGE', 'INVALID_COVER_TYPE']
+    coverError.value = code && known.includes(code)
+      ? t(`event.wizard.coverErrors.${code}`)
+      : t('event.wizard.coverErrors.default')
+  }
+}
+
+function removeCover() {
+  if (coverObjectUrl.value) {
+    URL.revokeObjectURL(coverObjectUrl.value)
+    coverObjectUrl.value = null
+  }
+  coverImageId.value = ''
+  coverError.value = ''
+  // Edit modunda mevcut kapağı kaldır → submit'te null gönderilir.
+  coverRemoved.value = true
+}
+
+// Submit'e eklenecek coverImageId değeri: undefined (gönderme) | null (kaldır) | string (yeni).
+function resolveCoverPayload(): string | null | undefined {
+  if (coverImageId.value) return coverImageId.value // yeni yüklendi
+  if (coverRemoved.value) return null // mevcut kapak kaldırıldı
+  return undefined // değişmez (yeni seçim yok)
+}
 
 // Bu guild'in ses kanalları (wizard select)
 const voiceChannels = computed(() =>
@@ -160,6 +261,7 @@ async function submit() {
   const iso = startAtIso()!
   // validateStep1 sonrası locationType boş olamaz — daralt.
   const locType = locationType.value as 'VOICE_CHANNEL' | 'EXTERNAL'
+  const cover = resolveCoverPayload()
   try {
     if (isEdit.value && props.event) {
       const payload: UpdateEventPayload = {
@@ -171,6 +273,8 @@ async function submit() {
         startAt: iso,
         recurrence: recurrence.value,
       }
+      // undefined → kapağa dokunma; null → kaldır; string → yeni kapak.
+      if (cover !== undefined) payload.coverImageId = cover
       const updated = await eventsStore.updateEvent(props.event.id, payload)
       emit('created', updated)
       emit('close')
@@ -185,6 +289,8 @@ async function submit() {
       startAt: iso,
       recurrence: recurrence.value,
     }
+    // Create: yalnız yeni kapak yüklendiyse gönder (string). undefined/null → alan yok.
+    if (cover) payload.coverImageId = cover
     const created = await eventsStore.createEvent(props.guildId, payload)
     createdEvent.value = created
     emit('created', created)
@@ -394,6 +500,77 @@ const stepperLabels = computed(() => [
               />
               <span class="text-[11px]" style="color: var(--kv-text-muted);">{{ t('event.wizard.descriptionHint') }}</span>
             </div>
+
+            <!-- Kapak Görseli (Sprint V3 §5) — UPLOADS_DISABLED'da gizlenir -->
+            <div v-if="!coverUploadsDisabled" class="flex flex-col gap-1.5">
+              <label class="text-[11px] font-semibold uppercase tracking-wide" style="color: var(--kv-text-secondary);">
+                {{ t('event.wizard.coverLabel') }}
+              </label>
+
+              <!-- Gizli dosya input -->
+              <input
+                ref="fileInputEl"
+                type="file"
+                class="hidden"
+                accept="image/*"
+                @change="onCoverSelected"
+              />
+
+              <!-- Önizleme varsa: görsel + kaldır -->
+              <div
+                v-if="coverPreviewUrl"
+                class="relative w-full rounded-[var(--kv-radius-md)] overflow-hidden border"
+                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+              >
+                <img
+                  :src="coverPreviewUrl"
+                  :alt="t('event.wizard.coverLabel')"
+                  class="w-full object-cover"
+                  style="height: 140px;"
+                />
+                <!-- Yükleme ilerleme örtüsü -->
+                <div
+                  v-if="coverUploading"
+                  class="absolute inset-0 flex flex-col items-center justify-center gap-2"
+                  style="background-color: var(--kv-bg-overlay);"
+                >
+                  <div class="w-3/4 h-1 rounded-full overflow-hidden" style="background-color: var(--kv-bg-elevated);">
+                    <div
+                      class="h-full rounded-full transition-all duration-200"
+                      style="background-color: var(--kv-accent-500);"
+                      :style="{ width: `${coverProgress}%` }"
+                    />
+                  </div>
+                  <span class="text-[12px]" style="color: var(--kv-text-primary);">{{ t('event.wizard.coverUploading') }}</span>
+                </div>
+                <!-- Kaldır butonu (yükleme bitince) -->
+                <button
+                  v-else
+                  type="button"
+                  class="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-full cursor-pointer"
+                  style="background-color: var(--kv-bg-sidebar); color: var(--kv-text-secondary);"
+                  :aria-label="t('event.wizard.coverRemove')"
+                  :title="t('event.wizard.coverRemove')"
+                  @click="removeCover"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+
+              <!-- Önizleme yoksa: seç butonu -->
+              <button
+                v-else
+                type="button"
+                class="flex items-center justify-center gap-2 px-4 py-3 rounded-[var(--kv-radius-md)] border border-dashed cursor-pointer transition-colors"
+                style="border-color: var(--kv-border-subtle); color: var(--kv-text-secondary); background-color: var(--kv-bg-elevated);"
+                @click="openCoverPicker"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span class="text-[13px] font-medium">{{ t('event.wizard.coverUpload') }}</span>
+              </button>
+
+              <p v-if="coverError" class="text-[12px]" style="color: var(--kv-danger);">{{ coverError }}</p>
+            </div>
           </div>
 
           <!-- ── Adım 3: İncele ── -->
@@ -402,9 +579,18 @@ const stepperLabels = computed(() => [
               {{ t('event.wizard.reviewTitle') }}
             </p>
             <div
-              class="rounded-[var(--kv-radius-md)] border p-4 flex flex-col gap-2"
+              class="rounded-[var(--kv-radius-md)] border overflow-hidden flex flex-col"
               style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
             >
+              <!-- Kapak banner (varsa) -->
+              <img
+                v-if="coverPreviewUrl"
+                :src="coverPreviewUrl"
+                :alt="t('event.wizard.coverLabel')"
+                class="w-full object-cover"
+                style="height: 120px;"
+              />
+              <div class="p-4 flex flex-col gap-2">
               <p class="text-[12px] font-semibold uppercase tracking-wide" style="color: var(--kv-accent-500);">{{ previewDate }}</p>
               <p class="text-[16px] font-semibold" style="color: var(--kv-text-primary);">{{ name }}</p>
               <p class="text-[13px]" style="color: var(--kv-text-secondary);">{{ previewLocation }}</p>
@@ -414,6 +600,7 @@ const stepperLabels = computed(() => [
                 style="color: var(--kv-text-secondary);"
               >🔁 {{ t(`event.recurrence.${recurrenceKey}`) }}</p>
               <p class="text-[12px] mt-1" style="color: var(--kv-text-muted);">{{ t('event.wizard.reviewInterested') }}</p>
+              </div>
             </div>
           </div>
 
@@ -449,13 +636,13 @@ const stepperLabels = computed(() => [
           </template>
           <template v-else-if="step === 2">
             <KvButton variant="ghost" @click="goBack">{{ t('event.wizard.back') }}</KvButton>
-            <KvButton @click="goNext">{{ t('event.wizard.next') }}</KvButton>
+            <KvButton :disabled="coverUploading" @click="goNext">{{ t('event.wizard.next') }}</KvButton>
           </template>
           <template v-else-if="step === 3">
             <KvButton variant="ghost" @click="goBack">{{ t('event.wizard.back') }}</KvButton>
             <div class="flex gap-3">
               <KvButton variant="ghost" @click="emit('close')">{{ t('event.wizard.cancel') }}</KvButton>
-              <KvButton :loading="submitting" @click="submit">
+              <KvButton :loading="submitting" :disabled="coverUploading" @click="submit">
                 {{ isEdit ? t('event.wizard.save') : t('event.wizard.submit') }}
               </KvButton>
             </div>

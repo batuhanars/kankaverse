@@ -152,12 +152,21 @@ function recurrenceKey(ev: EventDto): string {
             v-for="ev in events"
             :key="ev.id"
             :data-event-card="ev.id"
-            class="rounded-[var(--kv-radius-md)] border p-4 flex flex-col gap-2"
+            class="rounded-[var(--kv-radius-md)] border overflow-hidden flex flex-col"
             :class="highlightedId === ev.id ? 'kv-event-highlight' : ''"
             :style="highlightedId === ev.id
               ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
               : 'border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);'"
           >
+            <!-- Kapak banner (Sprint V3 §5) — yalnız coverImageUrl dolu (tarama-CLEAN) ise; lightbox yok -->
+            <img
+              v-if="ev.coverImageUrl"
+              :src="ev.coverImageUrl"
+              :alt="ev.name"
+              class="w-full object-cover"
+              style="height: 130px;"
+            />
+            <div class="p-4 flex flex-col gap-2">
             <div class="flex items-start gap-2">
               <div class="flex-1 min-w-0">
                 <!-- Tarih = ilgili örnek (occurrence), çapa startAt değil -->
@@ -240,6 +249,7 @@ function recurrenceKey(ev: EventDto): string {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                 {{ copied && shareSource.includes(ev.id) ? t('event.shareCopied') : t('event.share') }}
               </button>
+            </div>
             </div>
           </div>
         </div>

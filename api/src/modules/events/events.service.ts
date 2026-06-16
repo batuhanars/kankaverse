@@ -4,13 +4,15 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
+import { StorageService } from '../../shared/storage/storage.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
-import { GuildEvent } from '@prisma/client';
+import { GuildEvent, ScanStatus } from '@prisma/client';
 import { computeOccurrence } from './occurrence.util';
 
 /**
@@ -18,12 +20,14 @@ import { computeOccurrence } from './occurrence.util';
  * (computeOccurrence saf util; tek kaynak). startAt/endAt ÇAPA olarak korunur;
  * occurrenceStartAt/occurrenceEndAt ilgili (şu an süren / sonraki) örneği taşır.
  * status artık ACTIVE'i de türetir. DB status kolonu okunmaz/yazılmaz (forward-compat).
- * coverImageId MVP'de dönmez.
+ * coverImageUrl: kapak görselinin kısa-ömürlü presigned GET URL'i (yalnız CLEAN; aksi null).
+ * SYNC kalır (occurrence sync) — URL servis tarafında ÖNCEDEN çözülüp param olarak geçilir.
  */
 export function toEventDto(
   event: GuildEvent & { channel?: { name: string | null } | null },
   interestedCount: number,
   interestedByMe: boolean,
+  coverImageUrl: string | null = null,
 ) {
   const occ = computeOccurrence(
     { startAt: event.startAt, endAt: event.endAt, recurrence: event.recurrence },
@@ -47,6 +51,7 @@ export function toEventDto(
     status: occ.status,
     interestedCount,
     interestedByMe,
+    coverImageUrl, // yalnız CLEAN'de dolu (resolveCoverUrl); aksi null
     createdAt: event.createdAt,
   };
 }
@@ -55,12 +60,20 @@ type EventWithChannel = GuildEvent & { channel: { name: string | null } | null }
 
 @Injectable()
 export class EventsService {
+  // ATTACHMENT_SCAN_ENABLED=false (dev) → kapak iliştirmede CLEAN; true (prod, R5) → PENDING.
+  // messages.service deseniyle birebir (T&S: kapak = mesaj-eki ile aynı scan hattı).
+  private readonly scanEnabled: boolean;
+
   constructor(
     private prisma: PrismaService,
     private membership: MembershipService,
     private permissions: PermissionsService,
     private realtime: RealtimeService,
-  ) {}
+    private config: ConfigService,
+    private storage: StorageService,
+  ) {
+    this.scanEnabled = config.get<boolean>('attachmentScanEnabled') ?? false;
+  }
 
   /** MANAGE_EVENTS iznini kontrol et; yoksa 403 FORBIDDEN. */
   private async requireManageEvents(userId: string, guildId: string): Promise<void> {
@@ -68,6 +81,60 @@ export class EventsService {
     if (!allowed) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // KAPAK GÖRSELİ — mevcut scan-gated Attachment hattı (T&S kilitli §2-§3)
+  // Yeni public/baypas yol AÇILMAZ — mesaj-eki ile birebir aynı seviye/kural.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Kapak iliştirme doğrulaması + scan-gate (messages.service attach deseni birebir).
+   *  - Attachment var mı (yoksa INVALID_COVER_IMAGE 400)
+   *  - uploaderId === userId (başkasının ek'i değil → INVALID_COVER_IMAGE)
+   *  - contentType image/* (değilse INVALID_COVER_TYPE 400)
+   *  - messageId === null (başka mesaja bağlanmamış → INVALID_COVER_IMAGE)
+   * Sonra scanStatus = scanEnabled ? PENDING : CLEAN (messageId NULL kalır; claim = event.coverImageId).
+   */
+  private async attachCover(coverImageId: string, userId: string): Promise<void> {
+    const attachment = await this.prisma.attachment.findUnique({
+      where: { id: coverImageId },
+      select: { id: true, uploaderId: true, contentType: true, messageId: true },
+    });
+
+    if (!attachment) {
+      throw new BadRequestException({ message: 'Geçersiz kapak görseli.', error: 'INVALID_COVER_IMAGE' });
+    }
+    if (attachment.uploaderId !== userId) {
+      throw new BadRequestException({ message: 'Geçersiz kapak görseli.', error: 'INVALID_COVER_IMAGE' });
+    }
+    if (!attachment.contentType.startsWith('image/')) {
+      throw new BadRequestException({ message: 'Kapak görseli bir resim olmalıdır.', error: 'INVALID_COVER_TYPE' });
+    }
+    if (attachment.messageId !== null) {
+      throw new BadRequestException({ message: 'Geçersiz kapak görseli.', error: 'INVALID_COVER_IMAGE' });
+    }
+
+    // scan-gate: dev (false) → CLEAN; prod/gelecek (true) → PENDING → tarama servisi (R5)
+    const newScanStatus: ScanStatus = this.scanEnabled ? ScanStatus.PENDING : ScanStatus.CLEAN;
+    await this.prisma.attachment.update({
+      where: { id: coverImageId },
+      data: { scanStatus: newScanStatus }, // messageId null kalır (kapak mesaj değil)
+    });
+  }
+
+  /**
+   * Kapak görseli URL'ini çöz (§3): yalnız scanStatus === CLEAN ise presigned GET (300s).
+   * PENDING/FLAGGED/yok → null (taranmamış görsel servis edilmez — serve kapısıyla aynı kural).
+   */
+  private async resolveCoverUrl(coverImageId: string | null): Promise<string | null> {
+    if (!coverImageId) return null;
+    const attachment = await this.prisma.attachment.findUnique({
+      where: { id: coverImageId },
+      select: { storageKey: true, scanStatus: true },
+    });
+    if (!attachment || attachment.scanStatus !== ScanStatus.CLEAN) return null;
+    return this.storage.presignGet(attachment.storageKey);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -229,6 +296,13 @@ export class EventsService {
       externalLocation = dto.externalLocation;
     }
 
+    // Kapak: verildiyse scan-gated Attachment hattıyla iliştir (doğrula + scanStatus)
+    let coverImageId: string | null = null;
+    if (dto.coverImageId) {
+      await this.attachCover(dto.coverImageId, userId);
+      coverImageId = dto.coverImageId;
+    }
+
     const event = (await this.prisma.guildEvent.create({
       data: {
         guildId,
@@ -241,11 +315,13 @@ export class EventsService {
         startAt,
         endAt,
         recurrence: dto.recurrence ?? 'NONE', // motor: NONE/DAILY/WEEKLY/MONTHLY
+        coverImageId,
       },
       include: { channel: { select: { name: true } } },
     })) as EventWithChannel;
 
-    const dtoOut = toEventDto(event, 0, false);
+    const coverImageUrl = await this.resolveCoverUrl(event.coverImageId);
+    const dtoOut = toEventDto(event, 0, false, coverImageUrl);
     const recipients = await this.eventRecipients(event);
     this.realtime.emitToUsers(recipients, 'guild.event_created', dtoOut);
 
@@ -268,15 +344,19 @@ export class EventsService {
       return oa.occurrenceStartAt.getTime() - ob.occurrenceStartAt.getTime();
     });
 
-    const infos = await Promise.all(sorted.map((e) => this.interestInfo(e.id, userId)));
-    return sorted.map((e, i) => toEventDto(e, infos[i].count, infos[i].byMe));
+    const [infos, coverUrls] = await Promise.all([
+      Promise.all(sorted.map((e) => this.interestInfo(e.id, userId))),
+      Promise.all(sorted.map((e) => this.resolveCoverUrl(e.coverImageId))),
+    ]);
+    return sorted.map((e, i) => toEventDto(e, infos[i].count, infos[i].byMe, coverUrls[i]));
   }
 
   /** GET /events/:id — üye + görünürlük. Görünmüyorsa jenerik 404. */
   async findOne(userId: string, eventId: string) {
     const event = await this.requireEventAccess(userId, eventId);
     const info = await this.interestInfo(event.id, userId);
-    return toEventDto(event, info.count, info.byMe);
+    const coverImageUrl = await this.resolveCoverUrl(event.coverImageId);
+    return toEventDto(event, info.count, info.byMe, coverImageUrl);
   }
 
   /** PATCH /events/:id — MANAGE_EVENTS. */
@@ -298,6 +378,17 @@ export class EventsService {
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.recurrence !== undefined) data.recurrence = dto.recurrence;
+
+    // Kapak semantiği (engine endAt deseni): undefined → değişmez · null → kaldır
+    // (eski attachment'a dokunma, D13 temizliği ayrı) · string → attachCover + ata.
+    if (dto.coverImageId !== undefined) {
+      if (dto.coverImageId === null) {
+        data.coverImageId = null;
+      } else {
+        await this.attachCover(dto.coverImageId, userId);
+        data.coverImageId = dto.coverImageId;
+      }
+    }
 
     // startAt değişiyorsa geçmiş kontrolü
     let startAt = existing.startAt;
@@ -358,7 +449,8 @@ export class EventsService {
     })) as EventWithChannel;
 
     const info = await this.interestInfo(updated.id, userId);
-    const dtoOut = toEventDto(updated, info.count, info.byMe);
+    const coverImageUrl = await this.resolveCoverUrl(updated.coverImageId);
+    const dtoOut = toEventDto(updated, info.count, info.byMe, coverImageUrl);
 
     const recipients = await this.eventRecipients(updated);
     this.realtime.emitToUsers(recipients, 'guild.event_updated', dtoOut);
@@ -409,7 +501,8 @@ export class EventsService {
     });
 
     const info = await this.interestInfo(eventId, userId);
-    return toEventDto(event, info.count, info.byMe);
+    const coverImageUrl = await this.resolveCoverUrl(event.coverImageId);
+    return toEventDto(event, info.count, info.byMe, coverImageUrl);
   }
 
   /**
@@ -433,7 +526,8 @@ export class EventsService {
     });
 
     const info = await this.interestInfo(eventId, userId);
-    return toEventDto(event, info.count, info.byMe);
+    const coverImageUrl = await this.resolveCoverUrl(event.coverImageId);
+    return toEventDto(event, info.count, info.byMe, coverImageUrl);
   }
 
   // ───────────────────────────────────────────────────────────────────────────

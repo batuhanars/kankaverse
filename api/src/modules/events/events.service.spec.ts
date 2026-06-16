@@ -23,6 +23,10 @@ const prismaMock = {
   channel: {
     findUnique: jest.fn(),
   },
+  attachment: {
+    findUnique: jest.fn(),
+    update: jest.fn(),
+  },
 };
 
 const membershipMock = {
@@ -36,8 +40,21 @@ const permissionsMock = {
 
 const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
 
+// ConfigService mock — attachmentScanEnabled bayrağı (her testte override edilebilir)
+const configMock = { get: jest.fn() };
+
+// StorageService mock — presignGet (kapak URL çözümü)
+const storageMock = { presignGet: jest.fn() };
+
 function makeService() {
-  return new EventsService(prismaMock as any, membershipMock as any, permissionsMock as any, realtimeMock as any);
+  return new EventsService(
+    prismaMock as any,
+    membershipMock as any,
+    permissionsMock as any,
+    realtimeMock as any,
+    configMock as any,
+    storageMock as any,
+  );
 }
 
 function resetMocks() {
@@ -50,6 +67,9 @@ function resetMocks() {
   prismaMock.guildEventInterest.findUnique.mockResolvedValue(null);
   // WS alıcı sorgusu (varsayılan boş)
   prismaMock.guildMember.findMany.mockResolvedValue([]);
+  // Kapak: varsayılan scan KAPALI; presignGet sabit URL döner
+  configMock.get.mockReturnValue(false);
+  storageMock.presignGet.mockResolvedValue('https://cdn.example/presigned-cover');
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -645,5 +665,211 @@ describe('EventsService motor (recurrence + occurrence sıralama)', () => {
     expect(result.occurrenceStartAt.getTime()).toBe(start.getTime());
     expect(result.occurrenceEndAt.getTime()).toBe(end.getTime());
     expect(result.status).toBe('SCHEDULED');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// KAPAK GÖRSELİ (cover) — scan-gated Attachment hattı (T&S kilitli §2-§3)
+// ────────────────────────────────────────────────────────────────────────────
+
+const COVER_ID = 'attachment-cover-1';
+
+function imageAttachment(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: COVER_ID,
+    uploaderId: USER_ID,
+    contentType: 'image/png',
+    messageId: null,
+    storageKey: 'cover-key.png',
+    scanStatus: 'CLEAN',
+    ...overrides,
+  };
+}
+
+describe('EventsService kapak — attachCover (create/update iliştirme)', () => {
+  let service: EventsService;
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  function createWithCover(coverImageId: string) {
+    return service.create(USER_ID, GUILD_ID, {
+      name: 'Kapaklı Etkinlik',
+      locationType: 'EXTERNAL',
+      externalLocation: 'Yer',
+      startAt: FUTURE.toISOString(),
+      coverImageId,
+    });
+  }
+
+  it('attachment yok → INVALID_COVER_IMAGE (400), event oluşmaz', async () => {
+    prismaMock.attachment.findUnique.mockResolvedValue(null);
+    await expect(createWithCover(COVER_ID)).rejects.toMatchObject({
+      response: { error: 'INVALID_COVER_IMAGE' },
+    });
+    expect(prismaMock.guildEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('başkasının attachment’ı (uploaderId !== userId) → INVALID_COVER_IMAGE', async () => {
+    prismaMock.attachment.findUnique.mockResolvedValue(imageAttachment({ uploaderId: 'other-user' }));
+    await expect(createWithCover(COVER_ID)).rejects.toMatchObject({
+      response: { error: 'INVALID_COVER_IMAGE' },
+    });
+    expect(prismaMock.guildEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('image/* olmayan tip → INVALID_COVER_TYPE (400)', async () => {
+    prismaMock.attachment.findUnique.mockResolvedValue(imageAttachment({ contentType: 'application/pdf' }));
+    await expect(createWithCover(COVER_ID)).rejects.toMatchObject({
+      response: { error: 'INVALID_COVER_TYPE' },
+    });
+    expect(prismaMock.guildEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('messageId dolu (başka mesaja bağlı) → INVALID_COVER_IMAGE', async () => {
+    prismaMock.attachment.findUnique.mockResolvedValue(imageAttachment({ messageId: 'msg-1' }));
+    await expect(createWithCover(COVER_ID)).rejects.toMatchObject({
+      response: { error: 'INVALID_COVER_IMAGE' },
+    });
+    expect(prismaMock.guildEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('scanEnabled=false (dev) → attachment CLEAN ile güncellenir, coverImageId event’e yazılır', async () => {
+    configMock.get.mockReturnValue(false);
+    service = makeService(); // scanEnabled constructor’da false okunur
+    prismaMock.attachment.findUnique.mockResolvedValue(imageAttachment());
+    prismaMock.guildEvent.create.mockResolvedValue(makeEvent({ coverImageId: COVER_ID }));
+
+    await createWithCover(COVER_ID);
+
+    expect(prismaMock.attachment.update).toHaveBeenCalledWith({
+      where: { id: COVER_ID },
+      data: { scanStatus: 'CLEAN' },
+    });
+    expect(prismaMock.guildEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ coverImageId: COVER_ID }) }),
+    );
+  });
+
+  it('scanEnabled=true (prod/gelecek) → attachment PENDING ile güncellenir', async () => {
+    configMock.get.mockReturnValue(true);
+    service = makeService(); // scanEnabled constructor’da true okunur
+    prismaMock.attachment.findUnique.mockResolvedValue(imageAttachment());
+    prismaMock.guildEvent.create.mockResolvedValue(makeEvent({ coverImageId: COVER_ID }));
+
+    await createWithCover(COVER_ID);
+
+    expect(prismaMock.attachment.update).toHaveBeenCalledWith({
+      where: { id: COVER_ID },
+      data: { scanStatus: 'PENDING' },
+    });
+  });
+
+  it('coverImageId verilmezse → attachCover çağrılmaz, coverImageId null', async () => {
+    prismaMock.guildEvent.create.mockResolvedValue(makeEvent());
+    await service.create(USER_ID, GUILD_ID, {
+      name: 'Kapaksız',
+      locationType: 'EXTERNAL',
+      externalLocation: 'Yer',
+      startAt: FUTURE.toISOString(),
+    });
+    expect(prismaMock.attachment.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.guildEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ coverImageId: null }) }),
+    );
+  });
+});
+
+describe('EventsService kapak — resolveCoverUrl (EventDto.coverImageUrl)', () => {
+  let service: EventsService;
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('coverImageId null → coverImageUrl null, presignGet çağrılmaz', async () => {
+    prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ coverImageId: null }));
+    const result = await service.findOne(USER_ID, EVENT_ID);
+    expect(result.coverImageUrl).toBeNull();
+    expect(storageMock.presignGet).not.toHaveBeenCalled();
+  });
+
+  it('attachment CLEAN → coverImageUrl presigned GET döner', async () => {
+    prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ coverImageId: COVER_ID }));
+    prismaMock.attachment.findUnique.mockResolvedValue(imageAttachment({ scanStatus: 'CLEAN' }));
+    const result = await service.findOne(USER_ID, EVENT_ID);
+    expect(storageMock.presignGet).toHaveBeenCalledWith('cover-key.png');
+    expect(result.coverImageUrl).toBe('https://cdn.example/presigned-cover');
+  });
+
+  it('attachment PENDING → coverImageUrl null (taranmamış görsel servis edilmez)', async () => {
+    prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ coverImageId: COVER_ID }));
+    prismaMock.attachment.findUnique.mockResolvedValue(imageAttachment({ scanStatus: 'PENDING' }));
+    const result = await service.findOne(USER_ID, EVENT_ID);
+    expect(result.coverImageUrl).toBeNull();
+    expect(storageMock.presignGet).not.toHaveBeenCalled();
+  });
+
+  it('attachment FLAGGED → coverImageUrl null', async () => {
+    prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ coverImageId: COVER_ID }));
+    prismaMock.attachment.findUnique.mockResolvedValue(imageAttachment({ scanStatus: 'FLAGGED' }));
+    const result = await service.findOne(USER_ID, EVENT_ID);
+    expect(result.coverImageUrl).toBeNull();
+    expect(storageMock.presignGet).not.toHaveBeenCalled();
+  });
+
+  it('attachment yok (silinmiş) → coverImageUrl null', async () => {
+    prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ coverImageId: COVER_ID }));
+    prismaMock.attachment.findUnique.mockResolvedValue(null);
+    const result = await service.findOne(USER_ID, EVENT_ID);
+    expect(result.coverImageUrl).toBeNull();
+  });
+});
+
+describe('EventsService kapak — update semantiği (null/undefined/string)', () => {
+  let service: EventsService;
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('coverImageId undefined → data.coverImageId dokunulmaz', async () => {
+    prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ coverImageId: COVER_ID }));
+    prismaMock.guildEvent.update.mockResolvedValue(makeEvent({ coverImageId: COVER_ID, channel: null }));
+
+    await service.update(USER_ID, EVENT_ID, { name: 'Yeni Ad' });
+
+    const updateArg = prismaMock.guildEvent.update.mock.calls[0][0];
+    expect(updateArg.data).not.toHaveProperty('coverImageId');
+    expect(prismaMock.attachment.update).not.toHaveBeenCalled();
+  });
+
+  it('coverImageId null → kaldırılır (data.coverImageId = null), eski attachment’a dokunulmaz', async () => {
+    prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ coverImageId: COVER_ID }));
+    prismaMock.guildEvent.update.mockResolvedValue(makeEvent({ coverImageId: null, channel: null }));
+
+    await service.update(USER_ID, EVENT_ID, { coverImageId: null } as any);
+
+    const updateArg = prismaMock.guildEvent.update.mock.calls[0][0];
+    expect(updateArg.data).toMatchObject({ coverImageId: null });
+    // kaldırmada attachCover çalışmaz → attachment dokunulmaz
+    expect(prismaMock.attachment.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.attachment.update).not.toHaveBeenCalled();
+  });
+
+  it('coverImageId string → attachCover + data.coverImageId ata', async () => {
+    prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ coverImageId: null }));
+    prismaMock.attachment.findUnique.mockResolvedValue(imageAttachment());
+    prismaMock.guildEvent.update.mockResolvedValue(makeEvent({ coverImageId: COVER_ID, channel: null }));
+
+    await service.update(USER_ID, EVENT_ID, { coverImageId: COVER_ID });
+
+    expect(prismaMock.attachment.update).toHaveBeenCalledWith({
+      where: { id: COVER_ID },
+      data: { scanStatus: 'CLEAN' },
+    });
+    const updateArg = prismaMock.guildEvent.update.mock.calls[0][0];
+    expect(updateArg.data).toMatchObject({ coverImageId: COVER_ID });
   });
 });

@@ -63,4 +63,13 @@ export class CreateEventDto {
   @IsOptional()
   @IsEnum(EventRecurrence, { message: 'Geçersiz tekrarlama değeri.' })
   recurrence?: EventRecurrence;
+
+  @ApiPropertyOptional({
+    example: 'attachment-id',
+    description:
+      'Kapak görseli — mevcut /attachments/presign akışıyla yüklenen Attachment.id (image/*, sahip, mesaja bağlanmamış)',
+  })
+  @IsOptional()
+  @IsString()
+  coverImageId?: string;
 }

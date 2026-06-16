@@ -722,3 +722,15 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Backend: `computeOccurrence` saf util + birim test (40/40) · CreateEventDto recurrence kilidi kaldırıldı · EventDto computed alanlar (occurrenceStartAt/EndAt + ACTIVE status) · GET listesi occurrenceStartAt sıralı · görünürlük/WS/T&S choke-point **değişmedi** (diff'te kanıtlı)
 - [x] Frontend: sihirbaz sıklık seçenekleri etkin · kart occurrence tarihi + 🔁 tekrar rozeti + ACTIVE "şu an sürüyor" rozeti · `?event=` deep-link modalı açar (MVP açık kalemi kapandı) · i18n · occurrence backend'den (FE yeniden hesaplamaz); external placeholder cilası
 - [x] DoD: SIFIR job · SIFIR migration · build'ler temiz (`nest build`+`vue-tsc`+`vite build`). **Sahip testi: tekrarlama girilebiliyor ✓** (kalan canlı doğrulamalar — ACTIVE rozeti/deep-link/minör görünürlük — sahip rutininde)
+
+---
+
+## Sprint V3 — Etkinlik Kapak Görseli (gated) — TASARIM KİLİTLİ 2026-06-16
+
+> Sözleşme: `contracts/SPRINT_V3_EVENTS_COVER_CONTRACT.md`. **Strateji (sahip):** kapalı/ekip-içi test için gated upload; gerçek CSAM tarayıcı = lansman paketi (şirket+hukuk). **R7-hafif:** yeni baypas YOK — mevcut scan-gated Attachment hattı (mesaj-eki ile aynı seviye).
+> **Karar zinciri:** Cloudflare CSAM aracı bu mimariye uymaz (serve-time/cache, presigned erişim-kontrolünü deler) → gerçek tarama = upload-anı PhotoDNA/Safer (şirket+hukuk gerektirir, R5/A2/R6). Kapak şimdi gated yapılır, `UPLOADS_ENABLED` ile gerçek kitleye kapalı.
+
+- [ ] Backend: `CreateEventDto.coverImageId` · `attachCover` (mesaj-eki deseni birebir: sahiplik+messageId-null+`scanEnabled?PENDING:CLEAN`) · `EventDto.coverImageUrl` (yalnız CLEAN presignGet, liste paralel) · update null/undefined/string semantiği · `INVALID_COVER_IMAGE`/`INVALID_COVER_TYPE` · SIFIR migration/scan-motoru · birim test
+- [ ] Frontend: sihirbaz kapak yükleme (mevcut presign+uploadToS3) + önizleme/kaldır · `UPLOADS_ENABLED` kapalıyken alan gizli · kart kapak render · i18n + token
+- [ ] DoD: build'ler temiz · sahip canlı test (UPLOADS_ENABLED=true dev MinIO → yükle/gör; false → alan yok)
+- [ ] **Sahip paralel görevi:** Cloudflare R2 storage kurulumu (bucket + S3 API token → Railway `S3_*` env) — prod depolama (tarama değil)
