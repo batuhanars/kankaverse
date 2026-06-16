@@ -310,6 +310,14 @@
     "descriptionPlaceholder": "Dünyaya bu ortam hakkında bir şeyler söyle.",
     "bannerLabel": "Afiş Rengi",
     "bannerHint": "Keşfet kartının üstünde görünen renk afişini seç. Tekrar tıklayınca kaldırılır.",
+    "previewTitle": "Ortam Profili Önizlemesi",
+    "previewCreatedAt": "Oluşturulma: {date}",
+    "previewMembers": "{n} üye",
+    "unsavedBar": {
+      "title": "Dikkat — kaydetmediğin değişiklikler var!",
+      "reset": "Sıfırla",
+      "save": "Değişiklikleri Kaydet"
+    },
     "featuresLabel": "Özellikler",
     "featuresHint": "Ortamını anlatan en fazla {max} etiket ekle. Keşfet'te bunlara göre filtrelenir.",
     "featurePlaceholder": "Etiket ekle (örn: oyun, müzik)",

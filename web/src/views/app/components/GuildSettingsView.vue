@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
+import { useMembersStore } from '@/stores/members'
 import { guildsApi, type GuildBanDto } from '@/api/guilds'
 import { attachmentsApi } from '@/api/attachments'
 import { invitesApi } from '@/api/invites'
@@ -25,6 +26,7 @@ const emit = defineEmits<{ close: []; updated: [guild: GuildDto] }>()
 
 const { t } = useI18n()
 const guildsStore = useGuildsStore()
+const membersStore = useMembersStore()
 const router = useRouter()
 const { can } = useGuildPermissions(() => props.guild.id)
 
@@ -130,6 +132,27 @@ function guildInitial(name: string): string {
     .join('')
 }
 
+// ── Afiş önizleme kartı (yalnız gösterim — draft'lardan okur) ──────────────
+const previewName = computed(() => draftName.value.trim() || props.guild.name)
+
+const previewBannerStyle = computed(() =>
+  draftBannerColor.value
+    ? bannerBackground(draftBannerColor.value)
+    : 'var(--kv-bg-elevated)',
+)
+
+const previewCreatedAt = computed(() => {
+  const d = new Date(props.guild.createdAt)
+  const formatted = d.toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })
+  return t('guildSettings.previewCreatedAt', { date: formatted })
+})
+
+// Üye sayısı yalnız bu ortam zaten yüklüyse gösterilir (zorlamadan)
+const previewMemberCount = computed(() => {
+  const list = membersStore.membersFor(props.guild.id)
+  return list.length > 0 ? list.length : null
+})
+
 function triggerIconPicker() {
   iconFileInput.value?.click()
 }
@@ -233,6 +256,19 @@ async function saveAll() {
     saving.value = false
     iconUploadPct.value = 0
   }
+}
+
+// ── Sıfırla (tüm taslakları guild değerlerine döndür) ─────────────────────
+function resetDrafts() {
+  draftName.value = props.guild.name
+  draftAdultsOnly.value = props.guild.adultsOnly
+  draftDescription.value = props.guild.description ?? ''
+  draftBannerColor.value = props.guild.bannerColor
+  draftTags.value = [...props.guild.tags]
+  draftDiscoverable.value = props.guild.discoverable
+  newTagInput.value = ''
+  cancelPendingIcon()
+  saveError.value = ''
 }
 
 function handleClose() {
@@ -570,6 +606,55 @@ function confirmNavDiscard() {
           <!-- ── Genel bölümü ── -->
           <div v-if="activeSection === 'genel'" class="flex flex-col gap-6 max-w-xl">
 
+            <!-- ── Ortam Profili önizleme kartı (Discord deseni — canlı draft) ── -->
+            <section>
+              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.previewTitle') }}
+              </h3>
+              <div
+                class="overflow-hidden rounded-[var(--kv-radius-lg)] border"
+                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-sidebar);"
+              >
+                <!-- Afiş şeridi -->
+                <div
+                  class="relative"
+                  style="height: 100px;"
+                  :style="{ background: previewBannerStyle }"
+                >
+                  <!-- Afişin alt kenarına binen simge (altıgen) -->
+                  <div
+                    class="absolute flex items-center justify-center"
+                    style="left: 16px; bottom: -28px; width: 72px; height: 72px; background-color: var(--kv-bg-sidebar); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);"
+                  >
+                    <div
+                      class="flex items-center justify-center overflow-hidden text-[20px] font-semibold"
+                      style="width: 64px; height: 64px; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+                    >
+                      <img
+                        v-if="previewIconUrl"
+                        :src="previewIconUrl"
+                        :alt="previewName"
+                        class="w-full h-full object-cover"
+                      />
+                      <span v-else>{{ guildInitial(previewName) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Ad + meta (simge için sol boşluk) -->
+                <div class="pt-9 pb-4 px-4">
+                  <p class="text-[16px] font-semibold truncate" style="color: var(--kv-text-primary);">
+                    {{ previewName }}
+                  </p>
+                  <p class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
+                    {{ previewCreatedAt }}
+                    <span v-if="previewMemberCount !== null">
+                      · {{ t('guildSettings.previewMembers', { n: previewMemberCount }) }}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </section>
+
             <!-- Ortam ikonu -->
             <section>
               <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
@@ -800,20 +885,16 @@ function confirmNavDiscard() {
               </div>
             </section>
 
-            <!-- Kaydet / hata -->
-            <div class="flex items-center justify-between gap-3 mt-2 pt-4 border-t" style="border-color: var(--kv-border-subtle);">
-              <p v-if="saveError" class="text-[12px] flex-1" style="color: var(--kv-danger);">{{ saveError }}</p>
-              <p v-else-if="saving && iconUploadPct > 0" class="text-[12px] flex-1" style="color: var(--kv-text-muted);">
+            <!-- Hata / yükleme durumu (kaydet aksiyonu artık sabit alt barda) -->
+            <div
+              v-if="saveError || (saving && iconUploadPct > 0)"
+              class="mt-2 pt-4 border-t"
+              style="border-color: var(--kv-border-subtle);"
+            >
+              <p v-if="saveError" class="text-[12px]" style="color: var(--kv-danger);">{{ saveError }}</p>
+              <p v-else class="text-[12px]" style="color: var(--kv-text-muted);">
                 {{ t('guildSettings.iconUploading', { pct: iconUploadPct }) }}
               </p>
-              <span v-else class="flex-1" />
-              <KvButton
-                :disabled="!isDirty || saving"
-                :loading="saving"
-                @click="saveAll"
-              >
-                {{ saving ? t('guildSettings.saving') : t('guildSettings.saveAll') }}
-              </KvButton>
             </div>
           </div>
 
@@ -966,5 +1047,32 @@ function confirmNavDiscard() {
       @confirm="confirmNavDiscard"
       @cancel="showNavConfirm = false; pendingNav = null"
     />
+
+    <!-- Genel ayarlar: Discord-tarzı sabit alt kaydet barı (Roller deseni) -->
+    <Teleport to="body">
+      <div
+        v-if="activeSection === 'genel' && isDirty"
+        class="fixed left-1/2 -translate-x-1/2 z-[55] flex items-center gap-4 px-4 py-3 rounded-[var(--kv-radius-md)] border"
+        style="bottom: 24px; min-width: 420px; max-width: 92vw; background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+      >
+        <span class="flex-1 text-[14px] font-medium" style="color: var(--kv-text-primary);">
+          {{ t('guildSettings.unsavedBar.title') }}
+        </span>
+        <button
+          type="button"
+          class="text-[14px] font-medium cursor-pointer transition-colors"
+          style="color: var(--kv-text-secondary);"
+          :disabled="saving"
+          @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'"
+          @click="resetDrafts"
+        >
+          {{ t('guildSettings.unsavedBar.reset') }}
+        </button>
+        <KvButton :disabled="saving" :loading="saving" @click="saveAll">
+          {{ saving ? t('guildSettings.saving') : t('guildSettings.unsavedBar.save') }}
+        </KvButton>
+      </div>
+    </Teleport>
   </Teleport>
 </template>
