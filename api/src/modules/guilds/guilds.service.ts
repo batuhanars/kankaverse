@@ -18,6 +18,7 @@ import { PresignIconDto } from './dto/presign-icon.dto';
 import { SetIconDto } from './dto/set-icon.dto';
 import { GuildMemberDto } from './dto/guild-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
+import { AuditLogEntryDto } from './dto/audit-log-entry.dto';
 import { Guild, GuildRole } from '@prisma/client';
 import { DEFAULT_EVERYONE_PERMISSIONS } from '../../common/permissions';
 
@@ -752,5 +753,84 @@ export class GuildsService {
       },
     });
     return null;
+  }
+
+  // ─── §G: Denetim kaydı okuma (R5) ────────────────────────────────────────
+  /**
+   * GET /guilds/:id/audit-logs — owner VEYA MANAGE_GUILD izni.
+   *
+   * Sorgu: metadata.guildId == guildId (tüm guild aksiyonları bu path'i set eder),
+   * orderBy createdAt desc, take = limit (varsayılan 50, max 100 clamp).
+   * Cursor: `before` (auditLog id) verilirse o kaydın createdAt'inden eskiler
+   * (messages.service `before` cursor deseni — kaydı bul → createdAt'inden lt).
+   * targetUser: metadata.targetUserId'ler toplanır → tek findMany ile çözülür (N+1 yok).
+   */
+  async getAuditLogs(
+    actorId: string,
+    guildId: string,
+    opts: { limit?: number; before?: string },
+  ): Promise<AuditLogEntryDto[]> {
+    // Yetki kapısı (sızıntı önle): üyelik + MANAGE_GUILD izni. OWNER izni örtük taşır.
+    await this.membership.requireGuildMembership(actorId, guildId);
+    const canManage = await this.permissions.hasGuildPermission(actorId, guildId, 'MANAGE_GUILD');
+    if (!canManage) {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+    }
+
+    const take = Math.min(opts.limit ?? 50, 100);
+
+    // Cursor: before kaydının createdAt'inden eskiler (messages.service ile birebir)
+    let createdAtFilter: { lt: Date } | undefined;
+    if (opts.before) {
+      const beforeLog = await this.prisma.auditLog.findUnique({ where: { id: opts.before } });
+      if (beforeLog) createdAtFilter = { lt: beforeLog.createdAt };
+    }
+
+    const logs = await this.prisma.auditLog.findMany({
+      where: {
+        metadata: { path: ['guildId'], equals: guildId },
+        ...(createdAtFilter ? { createdAt: createdAtFilter } : {}),
+      },
+      include: {
+        actor: { select: { id: true, username: true, avatarUrl: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+    });
+
+    // targetUser batch çöz: sayfadaki tüm targetUserId'leri topla → tek findMany (N+1 yok)
+    const targetIds = new Set<string>();
+    for (const log of logs) {
+      const meta = log.metadata as Record<string, unknown> | null;
+      const tid = meta?.targetUserId;
+      if (typeof tid === 'string') targetIds.add(tid);
+    }
+    const targetUsers = targetIds.size
+      ? await this.prisma.user.findMany({
+          where: { id: { in: Array.from(targetIds) } },
+          select: { id: true, username: true, avatarUrl: true },
+        })
+      : [];
+    const targetById = new Map(targetUsers.map((u) => [u.id, u]));
+
+    return logs.map((log) => {
+      const meta = log.metadata as Record<string, unknown> | null;
+      const tid = typeof meta?.targetUserId === 'string' ? meta.targetUserId : null;
+      const reason = typeof meta?.reason === 'string' ? meta.reason : null;
+      return {
+        id: log.id,
+        action: log.action,
+        entityType: log.entityType,
+        entityId: log.entityId,
+        createdAt: log.createdAt.toISOString(),
+        actor: {
+          id: log.actor.id,
+          username: log.actor.username,
+          avatarUrl: log.actor.avatarUrl,
+        },
+        targetUser: tid ? targetById.get(tid) ?? null : null,
+        reason,
+      };
+    });
   }
 }

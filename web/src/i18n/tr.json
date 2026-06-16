@@ -307,6 +307,7 @@
       "roller": "Roller",
       "davetler": "Davetler",
       "yasaklar": "Yasaklar",
+      "denetim": "Denetim Kaydı",
       "ortamiSil": "Ortamı Sil"
     },
     "nameSection": "Ortam Adı",
@@ -934,6 +935,23 @@
     "loadMore": "Daha Fazla Göster",
     "loadError": "Ortamlar yüklenemedi. Lütfen tekrar dene.",
     "joinError": "Ortama katılınamadı. Lütfen tekrar dene."
+  },
+  "audit": {
+    "title": "Denetim Kaydı",
+    "subtitle": "Bu ortamdaki moderasyon aksiyonlarının kaydı.",
+    "loading": "Kayıtlar yükleniyor…",
+    "error": "Denetim kaydı yüklenemedi. Lütfen tekrar dene.",
+    "empty": "Henüz bir moderasyon aksiyonu kaydedilmedi.",
+    "loadMore": "Daha fazla",
+    "reason": "Sebep: {reason}",
+    "action": {
+      "member_kicked": "{actor}, {target} adlı üyeyi attı",
+      "member_banned": "{actor}, {target} adlı üyeyi yasakladı",
+      "member_unbanned": "{actor}, {target} adlı kullanıcının yasağını kaldırdı",
+      "member_role_updated": "{actor}, {target} adlı üyenin rollerini güncelledi",
+      "ownership_transferred": "{actor}, sahipliği {target} adlı kullanıcıya devretti",
+      "fallback": "{actor} bir işlem yaptı"
+    }
   },
   "toast": {
     "close": "Kapat",

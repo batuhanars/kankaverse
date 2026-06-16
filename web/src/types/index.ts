@@ -373,6 +373,18 @@ export interface NotificationDto {
   createdAt: string
 }
 
+// Sprint R5 — Ortam denetim kaydı (moderasyon aksiyon logları)
+export interface AuditLogEntryDto {
+  id: string
+  action: string
+  entityType: string
+  entityId: string
+  createdAt: string
+  actor: { id: string; username: string; avatarUrl: string | null }
+  targetUser: { id: string; username: string; avatarUrl: string | null } | null
+  reason: string | null
+}
+
 // Response envelope
 export interface ApiResponse<T> {
   success: boolean

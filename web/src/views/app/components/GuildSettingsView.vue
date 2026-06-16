@@ -14,6 +14,7 @@ import KvInput from '@/components/ui/KvInput.vue'
 import KvSwitch from '@/components/ui/KvSwitch.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import RolesSettingsSection from './RolesSettingsSection.vue'
+import AuditLogSection from './AuditLogSection.vue'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { BANNER_PRESET_KEYS, bannerBackground } from '@/utils/bannerColor'
 import type { InviteDto, GuildDto } from '@/types'
@@ -33,7 +34,7 @@ const router = useRouter()
 const { can } = useGuildPermissions(() => props.guild.id)
 
 // ── Aktif nav bölümü ──────────────────────────────────────────────────────
-type NavSection = 'genel' | 'roller' | 'davetler' | 'yasaklar'
+type NavSection = 'genel' | 'roller' | 'davetler' | 'yasaklar' | 'denetim'
 const activeSection = ref<NavSection>('genel')
 
 // ── ESC tuşu ile kapat ───────────────────────────────────────────────────
@@ -425,6 +426,7 @@ const navItems = computed<NavItem[]>(() => [
   { key: 'roller',   labelKey: 'guildSettings.nav.roller',   visible: props.isOwner || can('MANAGE_ROLES') },
   { key: 'davetler', labelKey: 'guildSettings.nav.davetler', visible: props.isOwner || can('CREATE_INVITE') || can('MANAGE_GUILD') },
   { key: 'yasaklar', labelKey: 'guildSettings.nav.yasaklar', visible: props.isOwner || can('BAN_MEMBERS') },
+  { key: 'denetim',  labelKey: 'guildSettings.nav.denetim',  visible: props.isOwner || can('MANAGE_GUILD') },
 ])
 
 const dangerItem = computed(() => props.isOwner)
@@ -555,6 +557,7 @@ function confirmNavDiscard() {
               <span v-else-if="activeSection === 'roller'">{{ t('guildSettings.nav.roller') }}</span>
               <span v-else-if="activeSection === 'davetler'">{{ t('guildSettings.nav.davetler') }}</span>
               <span v-else-if="activeSection === 'yasaklar'">{{ t('guildSettings.nav.yasaklar') }}</span>
+              <span v-else-if="activeSection === 'denetim'">{{ t('guildSettings.nav.denetim') }}</span>
             </h2>
 
             <!-- Kapat butonu + ESC göstergesi -->
@@ -995,6 +998,11 @@ function confirmNavDiscard() {
                 </li>
               </ul>
             </section>
+          </div>
+
+          <!-- ── Denetim Kaydı bölümü ── -->
+          <div v-else-if="activeSection === 'denetim'">
+            <AuditLogSection :guild-id="guild.id" />
           </div>
 
             </div><!-- /px-8 py-6 -->
