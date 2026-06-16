@@ -221,11 +221,22 @@ export class NotificationsService {
       actor = user ? { id: user.id, username: user.username, avatarUrl: user.avatarUrl } : null;
     }
 
+    // GUILD_INVITE vb. guildId taşıyan bildirimde guild.name read-time çözülür.
+    let guildName: string | null = null;
+    if (n.guildId) {
+      const guild = await this.prisma.guild.findUnique({
+        where: { id: n.guildId },
+        select: { name: true },
+      });
+      guildName = guild?.name ?? null;
+    }
+
     return {
       id: n.id,
       type: n.type,
       actor,
       guildId: n.guildId,
+      guildName,
       channelId: n.channelId,
       messageId: n.messageId,
       preview: n.preview,
@@ -245,6 +256,16 @@ export class NotificationsService {
       : [];
     const actorById = new Map(actors.map((a) => [a.id, a]));
 
+    // guildId taşıyan bildirimler (GUILD_INVITE) için guild.name'leri TEK sorguda çöz (N+1 yok).
+    const guildIds = [...new Set(rows.map((r) => r.guildId).filter((id): id is string => !!id))];
+    const guilds = guildIds.length
+      ? await this.prisma.guild.findMany({
+          where: { id: { in: guildIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const guildNameById = new Map(guilds.map((g) => [g.id, g.name]));
+
     return rows.map((n) => {
       const actor = n.actorId ? actorById.get(n.actorId) ?? null : null;
       return {
@@ -252,6 +273,7 @@ export class NotificationsService {
         type: n.type,
         actor: actor ? { id: actor.id, username: actor.username, avatarUrl: actor.avatarUrl } : null,
         guildId: n.guildId,
+        guildName: n.guildId ? guildNameById.get(n.guildId) ?? null : null,
         channelId: n.channelId,
         messageId: n.messageId,
         preview: n.preview,

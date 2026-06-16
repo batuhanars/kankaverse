@@ -21,6 +21,7 @@ import { SetIconDto } from './dto/set-icon.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { BanMemberDto } from './dto/ban-member.dto';
 import { KickMemberDto } from './dto/kick-member.dto';
+import { InviteFriendDto } from './dto/invite-friend.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from '../../common/guards/verified-email.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -184,6 +185,19 @@ export class GuildsController {
     @Param('userId') targetUserId: string,
   ) {
     return this.guildsService.unbanMember(user.id, guildId, targetUserId);
+  }
+
+  // ─── §H: Kankayı ortama davet (kalıcı GUILD_INVITE bildirimi) ─────────────
+
+  @Post(':id/invite-friend')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Kankayı ortama davet et: hedefe kalıcı GUILD_INVITE bildirimi düşer (CREATE_INVITE + arkadaşlık şart). Dönüş null.' })
+  inviteFriend(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Body() dto: InviteFriendDto,
+  ) {
+    return this.guildsService.inviteFriend(user.id, guildId, dto);
   }
 
   // ─── §G: Denetim kaydı okuma ──────────────────────────────────────────────

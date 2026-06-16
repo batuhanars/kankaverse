@@ -12,12 +12,15 @@ import { PermissionsService } from '../../shared/permissions/permissions.service
 import { StorageService } from '../../shared/storage/storage.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { GuildJoinService } from '../../shared/guild-join/guild-join.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { InvitesService } from '../invites/invites.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { UpdateGuildDto } from './dto/update-guild.dto';
 import { PresignIconDto } from './dto/presign-icon.dto';
 import { SetIconDto } from './dto/set-icon.dto';
 import { GuildMemberDto } from './dto/guild-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
+import { InviteFriendDto } from './dto/invite-friend.dto';
 import { AuditLogEntryDto } from './dto/audit-log-entry.dto';
 import { Guild, GuildRole } from '@prisma/client';
 import { DEFAULT_EVERYONE_PERMISSIONS } from '../../common/permissions';
@@ -91,6 +94,8 @@ export class GuildsService {
     private config: ConfigService,
     private realtime: RealtimeService,
     private guildJoin: GuildJoinService,
+    private notifications: NotificationsService,
+    private invites: InvitesService,
   ) {}
 
   /** REV-14: guild'in tüm üyelerinin userId'lerini döner (realtime broadcast hedefi). */
@@ -832,5 +837,89 @@ export class GuildsService {
         reason,
       };
     });
+  }
+
+  // ─── §H: Kankayı ortama davet (kalıcı GUILD_INVITE bildirimi) ──────────────
+
+  /**
+   * POST /guilds/:id/invite-friend — kankayı ortama davet et.
+   * DM mesajı yerine hedefin çanına KALICI GUILD_INVITE bildirimi düşürür
+   * (tıklayınca /invite/:code → Katıl/İptal). Dönüş null.
+   *
+   * Kapı sırası (fail-closed):
+   *  1. Caller guild üyesi + CREATE_INVITE izni → yoksa 403 FORBIDDEN.
+   *  2. Hedef self ise → 400 CANNOT_INVITE_SELF.
+   *  3. Caller ile hedef ACCEPTED arkadaş (kanka) → değilse 403 NOT_FRIENDS.
+   *  4. Hedef zaten guild üyesi → 400 ALREADY_MEMBER (sızıntı değil, kanka zaten üye).
+   *
+   * Etki: caller adına aktif davet kodu yeniden kullan / üret → hedefe GUILD_INVITE
+   * bildirimi (preview = davet kodu; emit WS otomatik).
+   */
+  async inviteFriend(callerId: string, guildId: string, dto: InviteFriendDto): Promise<null> {
+    const targetUserId = dto.userId;
+
+    // 1. Caller üyelik + CREATE_INVITE izni (mevcut tek yetki kaynağı).
+    await this.membership.requireGuildMembership(callerId, guildId);
+    const canInvite = await this.permissions.hasGuildPermission(callerId, guildId, 'CREATE_INVITE');
+    if (!canInvite) {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+    }
+
+    // 2. Self davet reddi.
+    if (targetUserId === callerId) {
+      throw new BadRequestException({ message: 'Kendini ortama davet edemezsin.', error: 'CANNOT_INVITE_SELF' });
+    }
+
+    // 3. Arkadaşlık (kanka) kontrolü — doğrudan prisma ile (circular yok; removeFriend deseni).
+    const friendship = await this.prisma.friendship.findFirst({
+      where: {
+        status: 'ACCEPTED',
+        OR: [
+          { requesterId: callerId, addresseeId: targetUserId },
+          { requesterId: targetUserId, addresseeId: callerId },
+        ],
+      },
+      select: { id: true },
+    });
+    if (!friendship) {
+      throw new ForbiddenException({ message: 'Yalnız kankalarını davet edebilirsin.', error: 'NOT_FRIENDS' });
+    }
+
+    // 4. Hedef zaten üye mi (kanka zaten ortamda — sızıntı değil).
+    const existingMember = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId: targetUserId } },
+      select: { userId: true },
+    });
+    if (existingMember) {
+      throw new BadRequestException({ message: 'Bu kanka zaten ortamda.', error: 'ALREADY_MEMBER' });
+    }
+
+    // Etki: caller'ın aktif (süresiz/süresi dolmamış, maxUses dolmamış) davet kodunu
+    // yeniden kullan; yoksa caller adına yeni süresiz kod üret (kod spam'ini önler).
+    const now = new Date();
+    const reusable = await this.prisma.invite.findFirst({
+      where: {
+        guildId,
+        creatorId: callerId,
+        deletedAt: null,
+        expiresAt: null,
+        maxUses: null,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { code: true },
+    });
+    const inviteCode =
+      reusable?.code ?? (await this.invites.createInvite(callerId, guildId, {})).code;
+
+    // GUILD_INVITE bildirimi: preview = davet kodu (frontend /invite/${preview} kurar).
+    // Persist sonrası WS 'notification' emit'i NotificationsService içinde otomatik.
+    await this.notifications.create(targetUserId, {
+      type: 'GUILD_INVITE',
+      actorId: callerId,
+      guildId,
+      preview: inviteCode,
+    });
+
+    return null;
   }
 }

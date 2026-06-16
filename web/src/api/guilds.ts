@@ -86,6 +86,10 @@ export const guildsApi = {
   reorderCategories(guildId: string, items: { id: string; position: number }[]) {
     return http.patch<null>(`/guilds/${guildId}/categories/reorder`, { items })
   },
+  // Kankayı ortama davet et → hedefe GUILD_INVITE bildirimi düşer (DM değil)
+  inviteFriend(guildId: string, userId: string) {
+    return http.post<null>(`/guilds/${guildId}/invite-friend`, { userId })
+  },
 }
 
 export interface GuildBanDto {

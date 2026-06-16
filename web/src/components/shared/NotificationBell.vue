@@ -44,6 +44,8 @@ function notificationText(n: NotificationDto): string {
       return t('notification.friendRequest', { actor })
     case 'FRIEND_ACCEPT':
       return t('notification.friendAccept', { actor })
+    case 'GUILD_INVITE':
+      return t('notification.guildInvite', { actor, guild: n.guildName ?? t('invite.unknownGuild') })
     default:
       return actor
   }
@@ -82,6 +84,9 @@ async function onItemClick(n: NotificationDto) {
   } else if (n.type === 'FRIEND_ACCEPT') {
     // Arkadaşlar görünümü
     router.push({ name: 'app' })
+  } else if (n.type === 'GUILD_INVITE' && n.preview) {
+    // preview = davet kodu → kabul/reddet görünümü
+    router.push(`/invite/${n.preview}`)
   }
 }
 </script>
@@ -171,9 +176,9 @@ async function onItemClick(n: NotificationDto) {
             <p class="text-[13px] leading-snug" style="color: var(--kv-text-body);">
               {{ notificationText(item) }}
             </p>
-            <!-- Mention önizlemesi (varsa) -->
+            <!-- Mention önizlemesi (varsa) — GUILD_INVITE'ta preview davet kodudur, gösterilmez -->
             <p
-              v-if="item.preview"
+              v-if="item.preview && item.type !== 'GUILD_INVITE'"
               class="text-[12px] leading-snug mt-0.5 truncate"
               style="color: var(--kv-text-muted);"
             >
