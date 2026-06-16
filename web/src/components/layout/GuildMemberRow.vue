@@ -18,6 +18,10 @@ const props = defineProps<{
   canTransferFn: (m: GuildMemberDto) => boolean
   shouldShowMenuFn: (m: GuildMemberDto) => boolean
   roleColor?: string | null
+  // R8/R13: başka bir üyenin overlay'i (menü/kart) açık → bu satırın hover'ı bastırılsın
+  hoverSuppressed?: boolean
+  // R8/R13: bu satırın kendi overlay'i (menü/kart) açık → ⋯ butonu görünür/tıklanabilir kalsın
+  ownerActive?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -39,15 +43,27 @@ function avatarInitial(username: string) {
 function onRowClick(e: MouseEvent) {
   emit('selectMember', props.member.userId, e.clientX, e.clientY)
 }
+
+// Hover-vurgu: başka üyenin overlay'i açıkken bastır; kendi overlay'i açıkken sabit kal.
+function onRowEnter(e: MouseEvent) {
+  if (props.hoverSuppressed) return
+  ;(e.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'
+}
+
+function onRowLeave(e: MouseEvent) {
+  // Kendi overlay'i açıkken vurgu kalsın (kart/menü bu satıra çapalı).
+  if (props.ownerActive) return
+  ;(e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
+}
 </script>
 
 <template>
   <div
     class="group relative flex items-center gap-2 px-3 py-1.5 mx-1 rounded-[var(--kv-radius-sm)] cursor-pointer"
     :class="{ 'opacity-50': props.isOffline }"
-    style="transition: background-color 0.1s;"
-    @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
-    @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
+    :style="`transition: background-color 0.1s; background-color: ${props.ownerActive ? 'var(--kv-bg-elevated)' : 'transparent'};`"
+    @mouseenter="onRowEnter"
+    @mouseleave="onRowLeave"
     @click.stop="onRowClick"
   >
     <!-- Avatar + presence dot -->
@@ -103,10 +119,18 @@ function onRowClick(e: MouseEvent) {
       {{ t('member.role.ADMIN') }}
     </span>
 
-    <!-- İşlem menüsü butonu -->
+    <!-- İşlem menüsü butonu.
+         - ownerActive (kendi menü/kart açık) → görünür ve tıklanabilir kalır (Bug 1).
+         - hoverSuppressed (başka satırın overlay'i açık) → gizli ve tıklanamaz.
+         - aksi halde → normal hover ile görünür. -->
     <div
       v-if="shouldShowMenuFn(member)"
-      class="relative shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+      class="relative shrink-0 transition-opacity"
+      :class="props.ownerActive
+        ? 'opacity-100'
+        : props.hoverSuppressed
+          ? 'opacity-0 pointer-events-none'
+          : 'opacity-0 group-hover:opacity-100'"
     >
       <button
         class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-rail)]"
