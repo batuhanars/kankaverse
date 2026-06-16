@@ -3,28 +3,112 @@
  * VoiceRoomView — ses kanalına girildiğinde merkez alanda gösterilir (sohbet yerine).
  * Üstte kanal başlığı, ortada Discord-tarzı katılımcı kartları (avatar + konuşma halkası + mute),
  * altta kontrol barı (sustur / sağırlaştır / ayrıl). Katılımcılar LiveKit Room'dan canlı gelir.
+ *
+ * R11 — ses moderasyonu: izinli kullanıcı, kendi+owner DIŞINDAKİ katılımcıya hover ⋯ menüsünden
+ * "Sustur/Susturmayı Kaldır" (MUTE_MEMBERS) ve "Taşı" (MOVE_MEMBERS) uygular. Moderatör-mute göstergesi
+ * self-mute ikonundan görsel ayrışır.
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { onClickOutside } from '@vueuse/core'
 import { useVoiceStore, type RoomMember } from '@/stores/voice'
 import { useChannelsStore } from '@/stores/channels'
+import { useGuildsStore } from '@/stores/guilds'
+import { useToastStore } from '@/stores/toast'
+import { useGuildPermissions } from '@/composables/useGuildPermissions'
+import { voiceApi } from '@/api/voice'
+import type { ChannelDto } from '@/types'
 import VoiceControlBar from '@/components/shared/VoiceControlBar.vue'
 
 const { t } = useI18n()
 const voiceStore = useVoiceStore()
 const channelsStore = useChannelsStore()
+const guildsStore = useGuildsStore()
+const toast = useToastStore()
 
 // Aktif kanal (ses) store'dan — prop'suz; <component :is> ile metin varyantıyla simetrik
 const channelId = computed(() => channelsStore.activeChannelId ?? '')
 const channelName = computed(() => channelsStore.activeChannel()?.name ?? '')
+const guildId = computed(() => channelsStore.activeChannel()?.guildId ?? '')
 const connectedHere = computed(() => voiceStore.connectedChannelId === channelId.value)
 const members = computed<RoomMember[]>(() => (connectedHere.value ? voiceStore.roomParticipants : []))
+
+// R11 izinler (UX kapısı — otorite backend)
+const { can } = useGuildPermissions(() => guildId.value)
+const canMute = computed(() => can('MUTE_MEMBERS'))
+const canMove = computed(() => can('MOVE_MEMBERS'))
+
+// Hedef owner mı? (owner hedeflenemez)
+const ownerId = computed(() => guildsStore.guilds.find((g) => g.id === guildId.value)?.ownerId ?? null)
+function isOwner(m: RoomMember): boolean {
+  return !!ownerId.value && m.userId === ownerId.value
+}
+
+// Bu katılımcıda moderasyon menüsü gösterilsin mi (kendi/owner hariç + en az bir izin)
+function canModerate(m: RoomMember): boolean {
+  if (m.isLocal || isOwner(m)) return false
+  return canMute.value || canMove.value
+}
+
+// Taşınabilecek diğer ses kanalları (aynı guild, mevcut kanal hariç)
+const moveTargets = computed<ChannelDto[]>(() =>
+  channelsStore
+    .channelsForGuild(guildId.value)
+    .filter((c) => c.type === 'GUILD_VOICE' && c.id !== channelId.value),
+)
 
 function isSpeaking(m: RoomMember): boolean {
   return voiceStore.speakingUserIds.has(m.userId) && !isMutedFor(m)
 }
 function isMutedFor(m: RoomMember): boolean {
   return m.isLocal ? voiceStore.isMuted : voiceStore.mutedUserIds.has(m.userId)
+}
+function isServerMutedFor(m: RoomMember): boolean {
+  return !m.isLocal && voiceStore.serverMutedUserIds.has(m.userId)
+}
+
+// ── Aksiyon menüsü (hover ⋯ → küçük dropdown) ────────────────────────────────
+const openMenuUserId = ref<string | null>(null)
+const moveSubmenuOpen = ref(false)
+const menuRef = ref<HTMLElement | null>(null)
+onClickOutside(menuRef, () => { openMenuUserId.value = null; moveSubmenuOpen.value = false })
+
+function toggleMenu(userId: string) {
+  if (openMenuUserId.value === userId) {
+    openMenuUserId.value = null
+  } else {
+    openMenuUserId.value = userId
+  }
+  moveSubmenuOpen.value = false
+}
+function closeMenu() {
+  openMenuUserId.value = null
+  moveSubmenuOpen.value = false
+}
+
+async function toggleServerMute(m: RoomMember) {
+  closeMenu()
+  try {
+    if (isServerMutedFor(m)) await voiceApi.unmute(channelId.value, m.userId)
+    else await voiceApi.mute(channelId.value, m.userId)
+    // Set güncellemesi WS (voice.participant_muted/unmuted) ile gelir.
+  } catch (e: unknown) {
+    toast.error(errMessage(e, 'voice.muteFailed'))
+  }
+}
+
+async function moveTo(m: RoomMember, target: ChannelDto) {
+  closeMenu()
+  try {
+    await voiceApi.move(channelId.value, m.userId, target.id)
+  } catch (e: unknown) {
+    toast.error(errMessage(e, 'voice.moveFailed'))
+  }
+}
+
+function errMessage(e: unknown, fallbackKey: string): string {
+  const err = e as { response?: { data?: { message?: string } } }
+  return err.response?.data?.message ?? t(fallbackKey)
 }
 </script>
 
@@ -62,9 +146,87 @@ function isMutedFor(m: RoomMember): boolean {
         <div
           v-for="m in members"
           :key="m.userId"
-          class="flex flex-col items-center gap-2 w-[160px] py-6 rounded-[var(--kv-radius-lg)]"
+          class="group relative flex flex-col items-center gap-2 w-[160px] py-6 rounded-[var(--kv-radius-lg)]"
           style="background-color: var(--kv-bg-elevated);"
         >
+          <!-- R11: moderasyon menüsü (kendi+owner hariç, izinli kullanıcı) -->
+          <div
+            v-if="canModerate(m)"
+            class="absolute top-2 right-2 transition-opacity"
+            :class="openMenuUserId === m.userId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
+          >
+            <button
+              class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-rail)]"
+              style="width: 24px; height: 24px; color: var(--kv-text-muted);"
+              :aria-label="t('voice.moderationMenu')"
+              @click.stop="toggleMenu(m.userId)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                <circle cx="12" cy="19" r="1" fill="currentColor"/>
+              </svg>
+            </button>
+
+            <!-- Dropdown -->
+            <div
+              v-if="openMenuUserId === m.userId"
+              ref="menuRef"
+              class="absolute right-0 top-full mt-1 z-20 rounded-[var(--kv-radius-md)] border overflow-hidden"
+              style="min-width: 180px; background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+              @click.stop
+            >
+              <!-- Sustur / Susturmayı kaldır -->
+              <button
+                v-if="canMute"
+                class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                style="color: var(--kv-text-secondary);"
+                @click="toggleServerMute(m)"
+              >
+                {{ isServerMutedFor(m) ? t('voice.serverUnmute') : t('voice.serverMute') }}
+              </button>
+              <!-- Taşı (alt-liste) -->
+              <template v-if="canMove">
+                <button
+                  class="w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                  style="color: var(--kv-text-secondary);"
+                  @click.stop="moveSubmenuOpen = !moveSubmenuOpen"
+                >
+                  <span>{{ t('voice.moveTo') }}</span>
+                  <svg
+                    width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                    class="shrink-0 transition-transform" :class="moveSubmenuOpen ? 'rotate-90' : ''"
+                  >
+                    <path d="M9 18l6-6-6-6"/>
+                  </svg>
+                </button>
+                <div
+                  v-if="moveSubmenuOpen"
+                  class="max-h-56 overflow-y-auto border-t"
+                  style="border-color: var(--kv-border-subtle);"
+                >
+                  <p
+                    v-if="moveTargets.length === 0"
+                    class="px-3 py-2 text-[12px]"
+                    style="color: var(--kv-text-muted);"
+                  >
+                    {{ t('voice.noMoveTargets') }}
+                  </p>
+                  <button
+                    v-for="target in moveTargets"
+                    :key="target.id"
+                    class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)] truncate"
+                    style="color: var(--kv-text-secondary);"
+                    @click="moveTo(m, target)"
+                  >
+                    {{ target.name }}
+                  </button>
+                </div>
+              </template>
+            </div>
+          </div>
+
           <!-- Avatar + konuşma halkası (animasyonlu) -->
           <div
             class="w-20 h-20 rounded-full flex items-center justify-center text-[28px] font-bold text-white overflow-hidden"
@@ -74,9 +236,17 @@ function isMutedFor(m: RoomMember): boolean {
             <img v-if="m.avatarUrl" :src="m.avatarUrl" :alt="m.username" class="w-full h-full object-cover" />
             <span v-else>{{ m.username[0]?.toUpperCase() }}</span>
           </div>
-          <!-- Ad + mute göstergesi -->
+          <!-- Ad + mute göstergeleri -->
           <div class="flex items-center gap-1.5 max-w-full">
-            <svg v-if="isMutedFor(m)" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-danger);" class="shrink-0">
+            <!-- R11: moderatör (server) susturması — self-mute ikonundan ayrışan kalkan ikonu -->
+            <svg v-if="isServerMutedFor(m)" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-danger);" class="shrink-0" :aria-label="t('voice.serverMuted')">
+              <title>{{ t('voice.serverMuted') }}</title>
+              <path d="M12 2L4 5v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V5l-8-3z"/>
+              <line x1="9" y1="9" x2="15" y2="15"/>
+              <line x1="15" y1="9" x2="9" y2="15"/>
+            </svg>
+            <!-- Self / track mute (mevcut) -->
+            <svg v-else-if="isMutedFor(m)" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-danger);" class="shrink-0">
               <line x1="1" y1="1" x2="23" y2="23"/>
               <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
               <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>

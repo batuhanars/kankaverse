@@ -796,7 +796,16 @@
     "micDenied": "Mikrofon izni verilmedi; dinleyici olarak bağlısın.",
     "micInsecure": "Mikrofon yalnız güvenli bağlamda (localhost veya HTTPS) çalışır; dinleyici moddasın.",
     "noParticipants": "Kanalda kimse yok",
-    "channelFull": "Bu ses kanalı dolu."
+    "channelFull": "Bu ses kanalı dolu.",
+    "moderationMenu": "Moderasyon menüsü",
+    "serverMute": "Sustur",
+    "serverUnmute": "Susturmayı kaldır",
+    "serverMuted": "Yetkili susturdu",
+    "moveTo": "Taşı",
+    "noMoveTargets": "Taşınacak başka ses kanalı yok",
+    "movedToast": "Bir yetkili seni başka bir ses kanalına taşıdı.",
+    "muteFailed": "Susturma işlemi başarısız oldu.",
+    "moveFailed": "Taşıma işlemi başarısız oldu."
   },
   "call": {
     "incoming": "Gelen sesli arama",

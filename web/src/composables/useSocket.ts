@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { io, type Socket } from 'socket.io-client'
 import { useMessagesStore } from '@/stores/messages'
 import { useFriendsStore } from '@/stores/friends'
@@ -14,6 +15,8 @@ import { useRolesStore } from '@/stores/roles'
 import { useEventsStore } from '@/stores/events'
 import { useVoiceStore, type VoiceParticipant } from '@/stores/voice'
 import { useCallStore, type IncomingCall } from '@/stores/call'
+import { useToastStore } from '@/stores/toast'
+import { i18n } from '@/i18n'
 import { getAccessToken, refreshAccessToken } from '@/api/axios'
 import {
   _bindTypingEmitters,
@@ -32,6 +35,7 @@ let authRetryCount = 0
 
 export function useSocket() {
   const connected = ref(false)
+  const router = useRouter()
   const messagesStore = useMessagesStore()
   const friendsStore = useFriendsStore()
   const presenceStore = usePresenceStore()
@@ -280,6 +284,27 @@ export function useSocket() {
 
     socket.on('voice.participant_left', (data: { channelId: string; userId: string }) => {
       voiceStore.removeParticipant(data.channelId, data.userId)
+    })
+
+    // R11 ses moderasyonu — moderatör (server) susturma göstergesi (room'a yayın)
+    socket.on('voice.participant_muted', (data: { channelId: string; userId: string }) => {
+      voiceStore.addServerMute(data.channelId, data.userId)
+    })
+    socket.on('voice.participant_unmuted', (data: { channelId: string; userId: string }) => {
+      voiceStore.removeServerMute(data.channelId, data.userId)
+    })
+
+    // R11 — yetkili taşıdı (yalnız taşınan kullanıcıya gelir): mevcut sesten ayrıl,
+    // hedef kanala mevcut join akışıyla katıl, o kanala yönlen, bilgilendir.
+    socket.on('voice.moved', async (data: { fromChannelId: string; toChannelId: string }) => {
+      await voiceStore.leave()
+      await voiceStore.join(data.toChannelId)
+      // Hedef kanalın guild'ine yönlen (kanal store'dan guildId bul)
+      const target = channelsStore.findChannelById(data.toChannelId)
+      if (target?.guildId) {
+        router.push({ name: 'channel', params: { guildId: target.guildId, channelId: data.toChannelId } })
+      }
+      useToastStore().info(i18n.global.t('voice.movedToast'))
     })
 
     // Sprint V2 DM sesli arama — sinyalizasyon (gate sunucuda; sözleşme SPRINT_V2_DM_CALL_CONTRACT.md)

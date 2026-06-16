@@ -23,6 +23,15 @@ export const useChannelsStore = defineStore('channels', () => {
 
   const channelsForGuild = (guildId: string) => channelsByGuild.value[guildId] ?? []
 
+  // R11: id ile kanal bul (guildId çözümü için — voice.moved yönlendirmesi)
+  const findChannelById = (channelId: string): ChannelDto | null => {
+    for (const channels of Object.values(channelsByGuild.value)) {
+      const found = channels.find((c) => c.id === channelId)
+      if (found) return found
+    }
+    return null
+  }
+
   const categoriesForGuild = (guildId: string) => categoriesByGuild.value[guildId] ?? []
 
   async function fetchChannels(guildId: string) {
@@ -246,6 +255,7 @@ export const useChannelsStore = defineStore('channels', () => {
     categoriesByGuild,
     activeChannel,
     channelsForGuild,
+    findChannelById,
     categoriesForGuild,
     fetchChannels,
     fetchChannelsAndCategories,
