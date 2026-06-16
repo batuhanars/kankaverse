@@ -66,13 +66,23 @@ export class UsersService {
     });
     if (!target) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
 
-    // Erişim kontrolü: ortak ortam VEYA ilişki (arkadaş/bekleyen/blok herhangi yönde)
-    const [sharedGuild, friendship, callerBlock, targetBlock] = await Promise.all([
+    // Erişim kontrolü: ortak ortam VEYA ortak GROUP_DM üyeliği VEYA ilişki (arkadaş/bekleyen/blok herhangi yönde)
+    const [sharedGuild, sharedGroupDm, friendship, callerBlock, targetBlock] = await Promise.all([
       this.prisma.guildMember.findFirst({
         where: {
           userId: callerId,
           guild: {
             deletedAt: null,
+            members: { some: { userId: targetId } },
+          },
+        },
+        select: { id: true },
+      }),
+      this.prisma.channelMember.findFirst({
+        where: {
+          userId: callerId,
+          channel: {
+            type: 'GROUP_DM',
             members: { some: { userId: targetId } },
           },
         },
@@ -97,7 +107,7 @@ export class UsersService {
       }),
     ]);
 
-    const hasRelation = sharedGuild || friendship || callerBlock || targetBlock;
+    const hasRelation = sharedGuild || sharedGroupDm || friendship || callerBlock || targetBlock;
     if (!hasRelation) {
       throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
     }

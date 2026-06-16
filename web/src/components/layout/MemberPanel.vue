@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGuildsStore } from '@/stores/guilds'
 import { usePresenceStore } from '@/stores/presence'
@@ -8,6 +8,7 @@ import { useMembersStore } from '@/stores/members'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { guildsApi } from '@/api/guilds'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import UserCardPopover from '@/components/shared/UserCardPopover.vue'
 import GuildMemberRow from '@/components/layout/GuildMemberRow.vue'
 import type { GuildMemberDto } from '@/types'
 
@@ -118,6 +119,27 @@ function toggleMenu(userId: string) {
 function closeMenu() {
   openMenuUserId.value = null
 }
+
+// ── Kullanıcı kartı popover (üye satırına sol-tık — mesaj-yazarı deseni) ─────
+const showCard = ref(false)
+const cardUserId = ref('')
+const cardX = ref(0)
+const cardY = ref(0)
+
+function openCard(userId: string, x: number, y: number) {
+  closeMenu()
+  cardUserId.value = userId
+  cardX.value = x
+  cardY.value = y
+  showCard.value = true
+}
+
+function closeCard() {
+  showCard.value = false
+}
+
+onMounted(() => window.addEventListener('kv:close-user-cards', closeCard))
+onUnmounted(() => window.removeEventListener('kv:close-user-cards', closeCard))
 
 // Üye satırında menü gösterilip gösterilmeyeceği
 function shouldShowMenu(member: GuildMemberDto): boolean {
@@ -333,6 +355,7 @@ async function confirmTransfer() {
           @open-kick="openKick"
           @open-ban="openBan"
           @open-transfer="openTransfer"
+          @select-member="openCard"
         />
       </template>
     </div>
@@ -369,5 +392,14 @@ async function confirmTransfer() {
     :loading="transferring"
     @confirm="confirmTransfer"
     @cancel="transferTarget = null"
+  />
+
+  <!-- Kullanıcı kartı (üye satırına sol-tık — mesaj-yazarı deseni) -->
+  <UserCardPopover
+    v-if="showCard"
+    :user-id="cardUserId"
+    :x="cardX"
+    :y="cardY"
+    @close="closeCard"
   />
 </template>

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDmStore } from '@/stores/dm'
 import { useFriendsStore } from '@/stores/friends'
 import { useAuthStore } from '@/stores/auth'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import UserCardPopover from '@/components/shared/UserCardPopover.vue'
 import type { GroupDmMemberDto } from '@/types'
 
 const props = defineProps<{
@@ -21,6 +22,26 @@ const friendsStore = useFriendsStore()
 const authStore = useAuthStore()
 
 const isOwner = computed(() => authStore.user?.id === props.ownerId)
+
+// ── Kullanıcı kartı popover (üyeye sol-tık — mesaj-yazarı deseni) ───────────
+const showCard = ref(false)
+const cardUserId = ref('')
+const cardX = ref(0)
+const cardY = ref(0)
+
+function openCard(userId: string, e: MouseEvent) {
+  cardUserId.value = userId
+  cardX.value = e.clientX
+  cardY.value = e.clientY
+  showCard.value = true
+}
+
+function closeCard() {
+  showCard.value = false
+}
+
+onMounted(() => window.addEventListener('kv:close-user-cards', closeCard))
+onUnmounted(() => window.removeEventListener('kv:close-user-cards', closeCard))
 
 // Owner daima listenin en üstünde
 const sortedMembers = computed(() => {
@@ -157,7 +178,10 @@ async function renameGroup() {
       <div
         v-for="member in sortedMembers"
         :key="member.id"
-        class="group flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)]"
+        class="group flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
+        @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
+        @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
+        @click="openCard(member.id, $event)"
       >
         <div
           class="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-semibold text-white"
@@ -188,7 +212,7 @@ async function renameGroup() {
           class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 w-5 h-5 flex items-center justify-center rounded cursor-pointer"
           style="color: var(--kv-danger);"
           :title="t('group.removeMember')"
-          @click="removeMemberTarget = member"
+          @click.stop="removeMemberTarget = member"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -365,5 +389,14 @@ async function renameGroup() {
     :loading="removing"
     @confirm="removeMember"
     @cancel="removeMemberTarget = null"
+  />
+
+  <!-- Kullanıcı kartı (üyeye sol-tık — mesaj-yazarı deseni) -->
+  <UserCardPopover
+    v-if="showCard"
+    :user-id="cardUserId"
+    :x="cardX"
+    :y="cardY"
+    @close="closeCard"
   />
 </template>

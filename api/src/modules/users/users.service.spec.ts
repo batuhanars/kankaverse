@@ -5,6 +5,7 @@ import { UsersService } from './users.service';
 const prismaMock = {
   user: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
   guildMember: { findFirst: jest.fn() },
+  channelMember: { findFirst: jest.fn() },
   guild: { findMany: jest.fn() },
   friendship: { findFirst: jest.fn(), findMany: jest.fn() },
   userBlock: { findUnique: jest.fn() },
@@ -20,6 +21,7 @@ const CREATED_AT = new Date(NOW_ISO);
 function resetMocks() {
   jest.resetAllMocks();
   prismaMock.guildMember.findFirst.mockResolvedValue(null);
+  prismaMock.channelMember.findFirst.mockResolvedValue(null);
   prismaMock.guild.findMany.mockResolvedValue([]);
   prismaMock.friendship.findFirst.mockResolvedValue(null);
   prismaMock.friendship.findMany.mockResolvedValue([]);
@@ -140,10 +142,24 @@ describe('UsersService', () => {
       await expect(service.getUserCard(CALLER, TARGET)).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('ortak ortam YOK + ilişki YOK → 404 (o-beni-engelledi sızmaz)', async () => {
+    it('ortak ortam YOK + ilişki YOK + ortak GROUP_DM YOK → 404 (o-beni-engelledi sızmaz)', async () => {
       mockTargetExists();
-      // sharedGuild null, friendship null, callerBlock null, targetBlock null (resetMocks)
+      // sharedGuild null, sharedGroupDm null, friendship null, callerBlock null, targetBlock null (resetMocks)
       await expect(service.getUserCard(CALLER, TARGET)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('ortak GROUP_DM üyeliği tek başına ilişki sayılır → kart döner (404 değil)', async () => {
+      mockTargetExists({ bio: 'grup selam' });
+      // ortak ortam/arkadaşlık/blok YOK; yalnız ortak GROUP_DM üyeliği var
+      prismaMock.channelMember.findFirst.mockResolvedValue({ id: 'cm1' });
+      const card = await service.getUserCard(CALLER, TARGET);
+      expect(card.id).toBe(TARGET);
+      expect(card.bio).toBe('grup selam');
+      // GROUP_DM kapısı sorgusu doğru tipte
+      const cmArg = prismaMock.channelMember.findFirst.mock.calls[0][0];
+      expect(cmArg.where.userId).toBe(CALLER);
+      expect(cmArg.where.channel.type).toBe('GROUP_DM');
+      expect(cmArg.where.channel.members.some.userId).toBe(TARGET);
     });
 
     it('"o beni engelledi" (targetBlock) tek başına ilişki sayılır AMA selfBlocked sızmaz', async () => {
