@@ -116,10 +116,19 @@ async function onItemClick(n: NotificationDto) {
       class="absolute top-full right-0 mt-2 w-[320px] rounded-[var(--kv-radius-lg)] overflow-hidden"
       style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle); box-shadow: 0 8px 32px rgba(0,0,0,0.4); z-index: 50;"
     >
-      <div class="px-4 py-3 border-b" style="border-color: var(--kv-border-subtle);">
+      <div class="px-4 py-3 border-b flex items-center justify-between gap-2" style="border-color: var(--kv-border-subtle);">
         <p class="text-[14px] font-bold" style="color: var(--kv-text-primary);">
           {{ t('notification.title') }}
         </p>
+        <button
+          type="button"
+          class="text-[12px] font-medium shrink-0 transition-colors disabled:opacity-40 disabled:cursor-default cursor-pointer hover:underline"
+          :style="`color: var(--kv-accent-500);`"
+          :disabled="notificationsStore.unreadCount === 0"
+          @click="notificationsStore.markAllRead()"
+        >
+          {{ t('notification.markAllRead') }}
+        </button>
       </div>
 
       <!-- Boş durum -->

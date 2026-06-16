@@ -326,12 +326,12 @@ async function submitCreate() {
   }
 }
 
-// ── Kanal ayarları (yeniden adlandır + yavaş mod + kategori) ──
+// ── Kanal ayarları (yeniden adlandır + yavaş mod + kullanıcı limiti) ──
+// Kategori taşıma sürükle-bırakla yapılır → settings modalında kategori select yok.
 const settingsTarget = ref<ChannelDto | null>(null)
 const settingsName = ref('')
 const settingsSlowMode = ref(0)
 const settingsUserLimit = ref(0) // R10 — ses kanalı kullanıcı limiti (0 = sınırsız)
-const settingsCategoryId = ref<string | null>(null)
 const settingsSaving = ref(false)
 const settingsError = ref('')
 
@@ -350,7 +350,6 @@ function openSettings(channel: ChannelDto) {
   settingsName.value = channel.name ?? ''
   settingsSlowMode.value = channel.slowModeSeconds ?? 0
   settingsUserLimit.value = channel.userLimit ?? 0
-  settingsCategoryId.value = channel.categoryId ?? null
   settingsError.value = ''
   // Özel kanal ise üye listesini ve guild üyelerini çek
   if (channel.isPrivate) {
@@ -466,10 +465,9 @@ async function submitSettings() {
   settingsSaving.value = true
   settingsError.value = ''
   try {
-    const payload: { name?: string; slowModeSeconds?: number; categoryId?: string | null; userLimit?: number } = {}
+    const payload: { name?: string; slowModeSeconds?: number; userLimit?: number } = {}
     if (name !== target.name) payload.name = name
     if (settingsSlowMode.value !== (target.slowModeSeconds ?? 0)) payload.slowModeSeconds = settingsSlowMode.value
-    if (settingsCategoryId.value !== (target.categoryId ?? null)) payload.categoryId = settingsCategoryId.value
     // R10 — ses kanalı kullanıcı limiti (yalnız GUILD_VOICE; 0–99 sınırla)
     if (target.type === 'GUILD_VOICE') {
       const limit = Math.min(99, Math.max(0, Math.floor(settingsUserLimit.value || 0)))
@@ -1337,25 +1335,6 @@ async function doLeave() {
           class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] outline-none border"
           style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
         />
-      </div>
-
-      <!-- Kategori seçimi (settings modalında kategori değiştirme korunur) -->
-      <div class="flex flex-col gap-1.5">
-        <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
-          {{ t('channel.categoryLabel') }}
-        </label>
-        <select
-          v-model="settingsCategoryId"
-          class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] outline-none border cursor-pointer"
-          style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
-        >
-          <option :value="null">{{ t('channel.categoryNone') }}</option>
-          <option
-            v-for="cat in sortedCategories"
-            :key="cat.id"
-            :value="cat.id"
-          >{{ cat.name }}</option>
-        </select>
       </div>
 
       <!-- ── Özel kanal üye yönetimi (yalnız isPrivate + OWNER/ADMIN) ── -->
