@@ -1,5 +1,5 @@
 import http from './axios'
-import type { NotificationDto } from '@/types'
+import type { NotificationDto, NotificationPrefDto } from '@/types'
 
 // Sprint C1 Bildirim Sözleşmesi §4 — REST endpoint'leri (envelope-aware http instance;
 // response.data = unwrap edilmiş payload).
@@ -22,5 +22,17 @@ export const notificationsApi = {
   },
   markRead(id: string) {
     return http.post<NotificationDto>(`/notifications/${id}/read`)
+  },
+  // Bildirim tercihleri (guild/kanal sustur + seviye)
+  getPrefs() {
+    return http.get<NotificationPrefDto[]>('/notifications/prefs')
+  },
+  setPref(body: {
+    targetType: NotificationPrefDto['targetType']
+    targetId: string
+    muted?: boolean
+    level?: NotificationPrefDto['level']
+  }) {
+    return http.put<NotificationPrefDto>('/notifications/prefs', body)
   },
 }

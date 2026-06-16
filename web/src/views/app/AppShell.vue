@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
+import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { useSocket } from '@/composables/useSocket'
 import { useIdlePresence } from '@/composables/useIdlePresence'
 import { useAppModals } from '@/composables/useAppModals'
@@ -27,6 +28,7 @@ const authStore = useAuthStore()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
+const notificationPrefsStore = useNotificationPrefsStore()
 const { connect, disconnect } = useSocket()
 const { showServerModal, serverModalStep, showAddFriendModal, openServerModal, closeServerModal, closeAddFriend } =
   useAppModals()
@@ -64,6 +66,8 @@ onMounted(async () => {
   // İlk veri yükü: rail + DM listesi (her view kendi derin-verisini ayrıca kurar)
   await guildsStore.fetchGuilds()
   await dmStore.fetchChannels()
+  // Bildirim tercihlerini bir kez hidrate et (sustur/seviye menüleri için temel)
+  void notificationPrefsStore.load()
   window.addEventListener('kv:auth:expired', onAuthExpired)
   window.addEventListener('kv:guild:recheck-unread', onRecheckUnread)
 })

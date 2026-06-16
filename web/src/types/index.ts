@@ -374,6 +374,27 @@ export interface NotificationDto {
   createdAt: string
 }
 
+// Bildirim tercihleri (GET/PUT /notifications/prefs) — guild/kanal sustur + seviye.
+export const NotifTargetType = {
+  GUILD: 'GUILD',
+  CHANNEL: 'CHANNEL',
+} as const
+export type NotifTargetType = (typeof NotifTargetType)[keyof typeof NotifTargetType]
+
+export const NotificationLevel = {
+  ALL: 'ALL',
+  MENTIONS: 'MENTIONS',
+  NONE: 'NONE',
+} as const
+export type NotificationLevel = (typeof NotificationLevel)[keyof typeof NotificationLevel]
+
+export interface NotificationPrefDto {
+  targetType: NotifTargetType
+  targetId: string
+  muted: boolean
+  level: NotificationLevel
+}
+
 // Sprint R5 — Ortam denetim kaydı (moderasyon aksiyon logları)
 export interface AuditLogEntryDto {
   id: string
