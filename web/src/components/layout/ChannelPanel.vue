@@ -11,6 +11,7 @@ import { useMembersStore } from '@/stores/members'
 import { useEventsStore } from '@/stores/events'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { useGuildMenuActions } from '@/composables/useGuildMenuActions'
+import { useChannelMenuActions } from '@/composables/useChannelMenuActions'
 import { guildsApi } from '@/api/guilds'
 import { channelsApi } from '@/api/channels'
 import { NotificationLevel } from '@/types'
@@ -668,6 +669,109 @@ async function doLeave() {
     leaving.value = false
   }
 }
+
+// ── Kanal sağ-tık context menüsü (cursor-konumlu; ServerRail deseni) ──
+// contextChannel: hangi kanala sağ-tıklandı (aktif kanal DEĞİL; hedef kanal).
+const contextChannel = ref<ChannelDto | null>(null)
+const chCtxX = ref(0)
+const chCtxY = ref(0)
+
+// Menü panel ölçüleri (kenar-taşma clamp'i)
+const CH_CTX_MENU_W = 224
+const CH_CTX_MENU_H = 380
+
+const chCtxPosStyle = computed(() => {
+  const left = Math.min(chCtxX.value, window.innerWidth - CH_CTX_MENU_W - 8)
+  const top = Math.min(chCtxY.value, window.innerHeight - CH_CTX_MENU_H - 8)
+  return `top:${Math.max(8, top)}px;left:${Math.max(8, left)}px;`
+})
+
+function openChannelContext(event: MouseEvent, channel: ChannelDto) {
+  // Bu sağ-tık document'taki kapatıcıya ULAŞMASIN (yoksa açıldığı anda kapanır).
+  event.stopPropagation()
+  // Tek anda tek menü: guild/kategori menülerini kapat.
+  closeGuildMenu()
+  closeCategoryMenu()
+  chCtxX.value = event.clientX
+  chCtxY.value = event.clientY
+  contextChannel.value = channel
+}
+
+function closeChannelContext() {
+  contextChannel.value = null
+  chNotifSubmenuOpen.value = false
+}
+
+// Kanal context aksiyonları (paylaşılan composable; hedef = contextChannel)
+const {
+  markChannelRead,
+  isChannelMuted,
+  toggleChannelMute,
+  channelLevel,
+  setChannelLevel,
+  copyChannelId,
+  copyChannelLink,
+} = useChannelMenuActions(() => contextChannel.value)
+
+// Bildirim Ayarları alt-menüsü (guild menüsüyle tutarlı: chevron + inline liste)
+const chNotifSubmenuOpen = ref(false)
+function toggleChNotifSubmenu() { chNotifSubmenuOpen.value = !chNotifSubmenuOpen.value }
+
+// Okundu işaretle → menüyü kapat (aksiyon arka planda sürer)
+function doChannelMarkRead() {
+  markChannelRead()
+  closeChannelContext()
+}
+
+// Davet et → mevcut hızlı davet modalı
+function openChannelInvite() {
+  closeChannelContext()
+  showInvitePeople.value = true
+}
+
+// Düzenle / Sil / Oluştur → mevcut akışlar (snapshot al; menü kapanınca contextChannel sıfırlanır)
+function openChannelSettings() {
+  const ch = contextChannel.value
+  closeChannelContext()
+  if (ch) openSettings(ch)
+}
+function openChannelDelete() {
+  const ch = contextChannel.value
+  closeChannelContext()
+  if (ch) openDelete(ch)
+}
+function openChannelCreate() {
+  const categoryId = contextChannel.value?.categoryId ?? null
+  closeChannelContext()
+  openCreate(categoryId)
+}
+
+// Kopyala aksiyonları → çalıştır + menüyü kapat
+function doCopyChannelLink() {
+  copyChannelLink()
+  closeChannelContext()
+}
+function doCopyChannelId() {
+  copyChannelId()
+  closeChannelContext()
+}
+
+// Dışarı-tık / Esc / scroll ile kapan (ServerRail deseni)
+function onChCtxDocPointer() { closeChannelContext() }
+function onChCtxKey(e: KeyboardEvent) { if (e.key === 'Escape') closeChannelContext() }
+function onChCtxScroll() { closeChannelContext() }
+onMounted(() => {
+  document.addEventListener('click', onChCtxDocPointer)
+  document.addEventListener('contextmenu', onChCtxDocPointer)
+  document.addEventListener('keydown', onChCtxKey)
+  window.addEventListener('scroll', onChCtxScroll, true)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', onChCtxDocPointer)
+  document.removeEventListener('contextmenu', onChCtxDocPointer)
+  document.removeEventListener('keydown', onChCtxKey)
+  window.removeEventListener('scroll', onChCtxScroll, true)
+})
 </script>
 
 <template>
@@ -898,6 +1002,7 @@ async function doLeave() {
         @dragover.prevent="dragOverChannelId = channel.id"
         @dragleave="dragOverChannelId === channel.id ? (dragOverChannelId = null) : null"
         @drop="dropChannelInto(channel.categoryId ?? null, channel.id)"
+        @contextmenu.prevent="openChannelContext($event, channel)"
       >
         <button
           class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-2 pr-2"
@@ -1105,6 +1210,7 @@ async function doLeave() {
             @dragover.prevent="dragOverChannelId = channel.id"
             @dragleave="dragOverChannelId === channel.id ? (dragOverChannelId = null) : null"
             @drop="dropChannelInto(channel.categoryId ?? null, channel.id)"
+            @contextmenu.prevent="openChannelContext($event, channel)"
           >
             <button
               class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-4 pr-2"
@@ -1696,6 +1802,139 @@ async function doLeave() {
     @close="showCreateEventWizard = false"
     @created="showCreateEventWizard = false"
   />
+
+  <!-- ── Kanal sağ-tık context menüsü (cursor-konumlu; body'ye teleport) ──
+       Metin (GUILD_TEXT) vs ses (GUILD_VOICE) farklı öğe seti. Görsel ServerRail
+       ortam menüsüyle tutarlı: elevated bg, ince subtle kenarlık, gölge YOK. -->
+  <Teleport to="body">
+    <div
+      v-if="contextChannel"
+      class="ch-ctx"
+      role="menu"
+      :style="chCtxPosStyle"
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <!-- 1. Okunmuş Olarak İşaretle — yalnız metin (ses kanalında okunmamış yok) -->
+      <button
+        v-if="contextChannel.type === 'GUILD_TEXT'"
+        class="ch-ctx__item"
+        role="menuitem"
+        @click="doChannelMarkRead"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><path d="M20 6 9 17l-5-5"/></svg>
+        <span>{{ t('guildMenu.markRead') }}</span>
+      </button>
+
+      <!-- 2. Davet Et — CREATE_INVITE (etiket türe göre) -->
+      <button
+        v-if="can('CREATE_INVITE')"
+        class="ch-ctx__item"
+        role="menuitem"
+        @click="openChannelInvite"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        <span>{{ contextChannel.type === 'GUILD_VOICE' ? t('channelMenu.inviteVoice') : t('channelMenu.inviteText') }}</span>
+      </button>
+
+      <!-- 3. Bağlantıyı Kopyala — herkese -->
+      <button
+        class="ch-ctx__item"
+        role="menuitem"
+        @click="doCopyChannelLink"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <span>{{ t('channelMenu.copyLink') }}</span>
+      </button>
+
+      <div class="ch-ctx__divider" />
+
+      <!-- 4. Kanalı Sustur — sağda işaret (✓) muted ise -->
+      <button
+        class="ch-ctx__item"
+        role="menuitemcheckbox"
+        :aria-checked="isChannelMuted"
+        @click="toggleChannelMute"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+        <span class="ch-ctx__label">{{ t('channelMenu.mute') }}</span>
+        <svg v-if="isChannelMuted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__check"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+
+      <!-- 5. Bildirim Ayarları — alt-menü (chevron + inline liste) -->
+      <button
+        class="ch-ctx__item"
+        role="menuitem"
+        @click="toggleChNotifSubmenu"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="ch-ctx__label">{{ t('guildMenu.notifications') }}</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__chevron" :class="chNotifSubmenuOpen ? 'ch-ctx__chevron--open' : ''"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+      <div v-if="chNotifSubmenuOpen" class="ch-ctx__submenu">
+        <button
+          v-for="opt in [
+            { level: NotificationLevel.ALL, label: t('guildMenu.notificationsAll') },
+            { level: NotificationLevel.MENTIONS, label: t('guildMenu.notificationsMentions') },
+            { level: NotificationLevel.NONE, label: t('guildMenu.notificationsNone') },
+          ]"
+          :key="opt.level"
+          class="ch-ctx__item ch-ctx__item--sub"
+          role="menuitemradio"
+          :aria-checked="channelLevel === opt.level"
+          @click="setChannelLevel(opt.level)"
+        >
+          <span class="ch-ctx__label">{{ opt.label }}</span>
+          <svg v-if="channelLevel === opt.level" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__check"><path d="M20 6 9 17l-5-5"/></svg>
+        </button>
+      </div>
+
+      <!-- 6-8. Yönetim öğeleri — MANAGE_CHANNELS (isAdmin) -->
+      <template v-if="isAdmin">
+        <div class="ch-ctx__divider" />
+        <!-- 6. Kanalı Düzenle -->
+        <button
+          class="ch-ctx__item"
+          role="menuitem"
+          @click="openChannelSettings"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          <span>{{ t('channelMenu.edit') }}</span>
+        </button>
+        <!-- 7. Kanal Oluştur (türe göre: metin → metin, ses → ses; o kategoride) -->
+        <button
+          class="ch-ctx__item"
+          role="menuitem"
+          @click="openChannelCreate"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>{{ contextChannel.type === 'GUILD_VOICE' ? t('channelMenu.createVoice') : t('channelMenu.createText') }}</span>
+        </button>
+        <!-- 8. Kanalı Sil (danger) -->
+        <button
+          class="ch-ctx__item ch-ctx__item--danger"
+          role="menuitem"
+          @click="openChannelDelete"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          <span>{{ t('channelMenu.delete') }}</span>
+        </button>
+      </template>
+
+      <div class="ch-ctx__divider" />
+
+      <!-- 9. Kanal ID'sini Kopyala — herkese -->
+      <button
+        class="ch-ctx__item"
+        role="menuitem"
+        @click="doCopyChannelId"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span class="ch-ctx__label">{{ t('channelMenu.copyId') }}</span>
+        <span class="ch-ctx__id-badge">{{ t('guildMenu.idBadge') }}</span>
+      </button>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -1730,5 +1969,105 @@ async function doLeave() {
   white-space: nowrap;
   margin-right: 6px;
   flex-shrink: 0;
+}
+</style>
+
+<!-- Teleport hedefi body olduğu için scoped class çalışmaz — global stil (ServerRail .rail-ctx ile aynı) -->
+<style>
+/* ── Kanal sağ-tık context menüsü (Teleport → body, fixed konumlama) ── */
+.ch-ctx {
+  position: fixed;
+  z-index: 9999;
+  min-width: 216px;
+  padding: 4px;
+  background-color: var(--kv-bg-elevated);
+  border: 1px solid var(--kv-border-subtle);
+  border-radius: var(--kv-radius-md);
+  overflow: hidden;
+}
+
+.ch-ctx__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--kv-radius-sm);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--kv-text-primary);
+  background: transparent;
+  border: none;
+  transition: background-color 0.12s;
+}
+
+.ch-ctx__item:hover {
+  background-color: var(--kv-accent-subtle);
+}
+
+.ch-ctx__icon {
+  flex-shrink: 0;
+  color: var(--kv-text-muted);
+}
+
+.ch-ctx__item--danger {
+  color: var(--kv-danger);
+}
+
+.ch-ctx__item--danger .ch-ctx__icon {
+  color: var(--kv-danger);
+}
+
+.ch-ctx__item--danger:hover {
+  background-color: rgba(242, 59, 75, 0.1);
+}
+
+.ch-ctx__divider {
+  height: 1px;
+  margin: 4px 6px;
+  background-color: var(--kv-border-subtle);
+}
+
+/* Etiket esner → sağdaki işaret/rozet/chevron sağa yapışır */
+.ch-ctx__label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ch-ctx__check {
+  flex-shrink: 0;
+  color: var(--kv-accent-500);
+}
+
+.ch-ctx__chevron {
+  flex-shrink: 0;
+  color: var(--kv-text-muted);
+  transition: transform 0.12s;
+}
+
+.ch-ctx__chevron--open {
+  transform: rotate(90deg);
+}
+
+.ch-ctx__submenu {
+  margin: 2px 0 2px 14px;
+  padding-left: 4px;
+  border-left: 1px solid var(--kv-border-subtle);
+}
+
+.ch-ctx__item--sub {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.ch-ctx__id-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: var(--kv-radius-sm);
+  background-color: var(--kv-bg-rail);
+  color: var(--kv-text-muted);
 }
 </style>
