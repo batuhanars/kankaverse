@@ -18,6 +18,7 @@ import { PresignIconDto } from './dto/presign-icon.dto';
 import { SetIconDto } from './dto/set-icon.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { BanMemberDto } from './dto/ban-member.dto';
+import { KickMemberDto } from './dto/kick-member.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from '../../common/guards/verified-email.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -125,8 +126,9 @@ export class GuildsController {
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,
     @Param('userId') targetUserId: string,
+    @Body() dto: KickMemberDto,
   ) {
-    return this.guildsService.kickMember(user.id, guildId, targetUserId);
+    return this.guildsService.kickMember(user.id, guildId, targetUserId, dto.reason);
   }
 
   // ─── §D: Ortamdan ayrıl ───────────────────────────────────────────────────
