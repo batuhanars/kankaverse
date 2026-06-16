@@ -56,6 +56,10 @@ watch(
 )
 
 function onDocClick(e: MouseEvent) {
+  // Tam profil / rapor modalı açıkken popover dışı-tıklama ile kapanmamalı:
+  // bu modaller Teleport ile popoverEl DIŞINDA render olur; içlerine tıklama
+  // yanlışlıkla popover'ı (ve child modalı) kapatırdı. Modal kendi kapanışını yönetir.
+  if (showFullProfile.value || showReportModal.value) return
   if (popoverEl.value && !popoverEl.value.contains(e.target as Node)) {
     emit('close')
   }
