@@ -603,56 +603,10 @@ function confirmNavDiscard() {
             <div class="px-8 py-6">
 
           <!-- ── Genel bölümü ── -->
-          <div v-if="activeSection === 'genel'" class="flex flex-col gap-6 max-w-xl">
+          <div v-if="activeSection === 'genel'" class="flex flex-col lg:flex-row gap-8 items-start">
 
-            <!-- ── Ortam Profili önizleme kartı (Discord deseni — canlı draft) ── -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.previewTitle') }}
-              </h3>
-              <div
-                class="overflow-hidden rounded-[var(--kv-radius-lg)] border"
-                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-sidebar);"
-              >
-                <!-- Afiş şeridi -->
-                <div
-                  class="relative"
-                  style="height: 100px;"
-                  :style="{ background: previewBannerStyle }"
-                >
-                  <!-- Afişin alt kenarına binen simge (altıgen) -->
-                  <div
-                    class="absolute flex items-center justify-center"
-                    style="left: 16px; bottom: -28px; width: 72px; height: 72px; background-color: var(--kv-bg-sidebar); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);"
-                  >
-                    <div
-                      class="flex items-center justify-center overflow-hidden text-[20px] font-semibold"
-                      style="width: 64px; height: 64px; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
-                    >
-                      <img
-                        v-if="previewIconUrl"
-                        :src="previewIconUrl"
-                        :alt="previewName"
-                        class="w-full h-full object-cover"
-                      />
-                      <span v-else>{{ guildInitial(previewName) }}</span>
-                    </div>
-                  </div>
-                </div>
-                <!-- Ad + meta (simge için sol boşluk) -->
-                <div class="pt-9 pb-4 px-4">
-                  <p class="text-[16px] font-semibold truncate" style="color: var(--kv-text-primary);">
-                    {{ previewName }}
-                  </p>
-                  <p class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
-                    {{ previewCreatedAt }}
-                    <span v-if="previewMemberCount !== null">
-                      · {{ t('guildSettings.previewMembers', { n: previewMemberCount }) }}
-                    </span>
-                  </p>
-                </div>
-              </div>
-            </section>
+            <!-- ── SOL kolon: form ── -->
+            <div class="flex-1 min-w-0 flex flex-col gap-6 max-w-xl">
 
             <!-- Ortam ikonu -->
             <section>
@@ -736,49 +690,6 @@ function confirmNavDiscard() {
               />
             </section>
 
-            <!-- adultsOnly toggle -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.adultsOnlySection') }}
-              </h3>
-              <div
-                class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
-                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
-              >
-                <div class="flex-1 min-w-0">
-                  <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
-                    {{ t('guildSettings.adultsOnlyLabel') }}
-                  </p>
-                  <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
-                    {{ t('guildSettings.adultsOnlyDesc') }}
-                  </p>
-                  <p v-if="!isOwner" class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
-                    {{ t('guildSettings.adultsOnlyOwnerOnly') }}
-                  </p>
-                </div>
-                <KvSwitch v-model="draftAdultsOnly" :disabled="saving || !isOwner" />
-              </div>
-            </section>
-
-            <!-- Ortam açıklaması -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.descriptionSection') }}
-              </h3>
-              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.descriptionSubtitle') }}
-              </p>
-              <textarea
-                v-model="draftDescription"
-                :placeholder="t('guildSettings.descriptionPlaceholder')"
-                :disabled="saving"
-                rows="5"
-                maxlength="2000"
-                class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
-                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
-              />
-            </section>
-
             <!-- ── Sprint C6: Afiş (renk/gradient preset swatch) ── -->
             <section>
               <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
@@ -805,6 +716,25 @@ function confirmNavDiscard() {
                   @click="selectBanner(key)"
                 />
               </div>
+            </section>
+
+            <!-- Ortam açıklaması -->
+            <section>
+              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.descriptionSection') }}
+              </h3>
+              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.descriptionSubtitle') }}
+              </p>
+              <textarea
+                v-model="draftDescription"
+                :placeholder="t('guildSettings.descriptionPlaceholder')"
+                :disabled="saving"
+                rows="5"
+                maxlength="2000"
+                class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
+                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
+              />
             </section>
 
             <!-- ── Sprint C6: Özellikler (max 5 etiket) ── -->
@@ -884,6 +814,30 @@ function confirmNavDiscard() {
               </div>
             </section>
 
+            <!-- adultsOnly toggle (18+ — en altta) -->
+            <section>
+              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.adultsOnlySection') }}
+              </h3>
+              <div
+                class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
+                    {{ t('guildSettings.adultsOnlyLabel') }}
+                  </p>
+                  <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+                    {{ t('guildSettings.adultsOnlyDesc') }}
+                  </p>
+                  <p v-if="!isOwner" class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
+                    {{ t('guildSettings.adultsOnlyOwnerOnly') }}
+                  </p>
+                </div>
+                <KvSwitch v-model="draftAdultsOnly" :disabled="saving || !isOwner" />
+              </div>
+            </section>
+
             <!-- İkon yükleme ilerleme durumu (hata/başarı artık toast'ta) -->
             <div
               v-if="saving && iconUploadPct > 0"
@@ -894,6 +848,59 @@ function confirmNavDiscard() {
                 {{ t('guildSettings.iconUploading', { pct: iconUploadPct }) }}
               </p>
             </div>
+            </div><!-- /SOL kolon -->
+
+            <!-- ── SAĞ kolon: Ortam profil önizleme kartı (sticky, canlı draft) ── -->
+            <div
+              class="hidden lg:block shrink-0 self-start sticky top-0"
+              style="width: 320px;"
+            >
+              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
+                {{ t('guildSettings.previewTitle') }}
+              </h3>
+              <div
+                class="overflow-hidden rounded-[var(--kv-radius-lg)] border"
+                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-sidebar);"
+              >
+                <!-- Afiş şeridi -->
+                <div
+                  class="relative"
+                  style="height: 100px;"
+                  :style="{ background: previewBannerStyle }"
+                >
+                  <!-- Afişin alt kenarına binen simge (altıgen) -->
+                  <div
+                    class="absolute flex items-center justify-center"
+                    style="left: 16px; bottom: -28px; width: 72px; height: 72px; background-color: var(--kv-bg-sidebar); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);"
+                  >
+                    <div
+                      class="flex items-center justify-center overflow-hidden text-[20px] font-semibold"
+                      style="width: 64px; height: 64px; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+                    >
+                      <img
+                        v-if="previewIconUrl"
+                        :src="previewIconUrl"
+                        :alt="previewName"
+                        class="w-full h-full object-cover"
+                      />
+                      <span v-else>{{ guildInitial(previewName) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Ad + meta (simge için sol boşluk) -->
+                <div class="pt-9 pb-4 px-4">
+                  <p class="text-[16px] font-semibold truncate" style="color: var(--kv-text-primary);">
+                    {{ previewName }}
+                  </p>
+                  <p class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
+                    {{ previewCreatedAt }}
+                    <span v-if="previewMemberCount !== null">
+                      · {{ t('guildSettings.previewMembers', { n: previewMemberCount }) }}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div><!-- /SAĞ kolon -->
           </div>
 
           <!-- ── Davetler bölümü ── -->
