@@ -27,4 +27,15 @@ export const voiceApi = {
   getParticipants(channelId: string) {
     return http.get<VoiceParticipantsResponse>(`/channels/${channelId}/voice/participants`)
   },
+  // R11 — moderasyon: server-mute (kalıcı). Envelope data: null.
+  mute(channelId: string, userId: string) {
+    return http.post<null>(`/voice/${channelId}/mute/${userId}`)
+  },
+  unmute(channelId: string, userId: string) {
+    return http.delete<null>(`/voice/${channelId}/mute/${userId}`)
+  },
+  // R11 — moderasyon: başka ses kanalına taşı. Envelope data: null.
+  move(channelId: string, userId: string, targetChannelId: string) {
+    return http.post<null>(`/voice/${channelId}/move/${userId}`, { targetChannelId })
+  },
 }

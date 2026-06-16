@@ -312,6 +312,20 @@ model VoiceSession {
   @@index([channelId, leftAt])
 }
 
+// R11 — Ses kanalı kalıcı sustur (server-mute). Per-kanal kayıt; mintToken bunu kontrol eder
+// → kullanıcı çıkıp tekrar katılsa da susturulmuş kalır. Sözleşme: SPRINT_R11_VOICE_MODERATION_CONTRACT.md.
+model VoiceMute {
+  id         String   @id @default(cuid())
+  channelId  String
+  userId     String
+  guildId    String
+  mutedById  String
+  createdAt  DateTime @default(now())
+
+  @@unique([channelId, userId])
+  @@index([channelId])
+}
+
 model Message {
   id          String            @id @default(cuid())
   channelId   String

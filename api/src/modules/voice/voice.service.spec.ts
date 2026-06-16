@@ -7,6 +7,8 @@ const mockAddGrant = jest.fn();
 const mockToJwt = jest.fn().mockResolvedValue('jwt-token');
 const mockReceive = jest.fn();
 const mockListParticipants = jest.fn();
+const mockUpdateParticipant = jest.fn();
+const mockRemoveParticipant = jest.fn();
 let lastAccessTokenOpts: any = null;
 
 jest.mock('livekit-server-sdk', () => ({
@@ -15,7 +17,11 @@ jest.mock('livekit-server-sdk', () => ({
     return { addGrant: mockAddGrant, toJwt: mockToJwt };
   }),
   WebhookReceiver: jest.fn().mockImplementation(() => ({ receive: mockReceive })),
-  RoomServiceClient: jest.fn().mockImplementation(() => ({ listParticipants: mockListParticipants })),
+  RoomServiceClient: jest.fn().mockImplementation(() => ({
+    listParticipants: mockListParticipants,
+    updateParticipant: mockUpdateParticipant,
+    removeParticipant: mockRemoveParticipant,
+  })),
   TrackSource: { MICROPHONE: 'MICROPHONE' },
 }));
 
@@ -23,6 +29,7 @@ jest.mock('livekit-server-sdk', () => ({
 const prismaMock = {
   user: { findUnique: jest.fn() },
   guildMember: { findUnique: jest.fn() },
+  channel: { findFirst: jest.fn() },
   channelMember: { findFirst: jest.fn() },
   voiceSession: {
     findFirst: jest.fn(),
@@ -30,11 +37,16 @@ const prismaMock = {
     update: jest.fn(),
     updateMany: jest.fn(),
   },
+  voiceMute: {
+    findUnique: jest.fn(),
+    upsert: jest.fn(),
+    deleteMany: jest.fn(),
+  },
 };
 
 const membershipMock = { requireChannelAccess: jest.fn(), requireNoDmBlock: jest.fn() };
 const permissionsMock = { hasGuildPermission: jest.fn() };
-const realtimeMock = { emitToRoom: jest.fn() };
+const realtimeMock = { emitToRoom: jest.fn(), emitToUsers: jest.fn() };
 const dmPermissionMock = { canDm: jest.fn() };
 
 function makeConfig(overrides: Record<string, unknown> = {}) {
@@ -276,5 +288,278 @@ describe('VoiceService.handleWebhook', () => {
 
     const svc = makeService();
     await expect(svc.handleWebhook('{}', 'auth')).resolves.toBeUndefined();
+  });
+});
+
+// ── R11: mintToken mute-check ─────────────────────────────────────────────────
+describe('VoiceService.mintToken — R11 server-mute', () => {
+  it('VoiceMute kaydı varsa → canPublish=false (karantina değil, kalıcı mute)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel());
+    // Yerleşik üye (yoksa zaten false dönerdi) ama mute var → false
+    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(Date.now() - 48 * 3600 * 1000) });
+    prismaMock.voiceMute.findUnique.mockResolvedValue({ id: 'vm-1' });
+
+    const svc = makeService();
+    const res = await svc.mintToken(USER_ID, CHANNEL_ID);
+    expect(res.canPublish).toBe(false);
+  });
+
+  it('VoiceMute yoksa → resolveCanPublish ile karantinaya saygı', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel());
+    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(Date.now() - 48 * 3600 * 1000) });
+    prismaMock.voiceMute.findUnique.mockResolvedValue(null);
+
+    const svc = makeService();
+    const res = await svc.mintToken(USER_ID, CHANNEL_ID);
+    expect(res.canPublish).toBe(true);
+  });
+});
+
+// ── R11: Sustur ───────────────────────────────────────────────────────────────
+const TARGET_ID = 'target-9';
+function gvChannel(overrides: Record<string, unknown> = {}) {
+  return { id: CHANNEL_ID, type: 'GUILD_VOICE', guildId: GUILD_ID, ...overrides };
+}
+
+describe('VoiceService.muteParticipant', () => {
+  beforeEach(() => {
+    prismaMock.channel.findFirst.mockResolvedValue(gvChannel());
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+  });
+
+  it('GUILD_VOICE değilse → NOT_VOICE_CHANNEL', async () => {
+    prismaMock.channel.findFirst.mockResolvedValue(gvChannel({ type: 'GUILD_TEXT' }));
+    const svc = makeService();
+    await expect(svc.muteParticipant(USER_ID, CHANNEL_ID, TARGET_ID)).rejects.toMatchObject({
+      response: { error: 'NOT_VOICE_CHANNEL' },
+    });
+  });
+
+  it('kanal yoksa → CHANNEL_NOT_FOUND', async () => {
+    prismaMock.channel.findFirst.mockResolvedValue(null);
+    const svc = makeService();
+    await expect(svc.muteParticipant(USER_ID, CHANNEL_ID, TARGET_ID)).rejects.toMatchObject({
+      response: { error: 'CHANNEL_NOT_FOUND' },
+    });
+  });
+
+  it('yetki yoksa → 403 FORBIDDEN', async () => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
+    const svc = makeService();
+    await expect(svc.muteParticipant(USER_ID, CHANNEL_ID, TARGET_ID)).rejects.toMatchObject({
+      response: { error: 'FORBIDDEN' },
+    });
+    expect(permissionsMock.hasGuildPermission).toHaveBeenCalledWith(USER_ID, GUILD_ID, 'MUTE_MEMBERS');
+  });
+
+  it('hedef = actor → CANNOT_MUTE_SELF', async () => {
+    const svc = makeService();
+    await expect(svc.muteParticipant(USER_ID, CHANNEL_ID, USER_ID)).rejects.toMatchObject({
+      response: { error: 'CANNOT_MUTE_SELF' },
+    });
+  });
+
+  it('hedef OWNER → CANNOT_MUTE_OWNER', async () => {
+    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'OWNER' });
+    const svc = makeService();
+    await expect(svc.muteParticipant(USER_ID, CHANNEL_ID, TARGET_ID)).rejects.toMatchObject({
+      response: { error: 'CANNOT_MUTE_OWNER' },
+    });
+  });
+
+  it('başarı → upsert + LiveKit canPublish=false + socket voice.participant_muted', async () => {
+    const svc = makeService();
+    await svc.muteParticipant(USER_ID, CHANNEL_ID, TARGET_ID);
+
+    expect(prismaMock.voiceMute.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { channelId_userId: { channelId: CHANNEL_ID, userId: TARGET_ID } },
+        create: { channelId: CHANNEL_ID, userId: TARGET_ID, guildId: GUILD_ID, mutedById: USER_ID },
+      }),
+    );
+    expect(mockUpdateParticipant).toHaveBeenCalledWith(
+      CHANNEL_ID,
+      TARGET_ID,
+      undefined,
+      expect.objectContaining({ canPublish: false, canSubscribe: true, canPublishData: false }),
+    );
+    expect(realtimeMock.emitToRoom).toHaveBeenCalledWith(CHANNEL_ID, 'voice.participant_muted', {
+      channelId: CHANNEL_ID,
+      userId: TARGET_ID,
+    });
+  });
+
+  it('LiveKit updateParticipant hatası yutulur (best-effort) — kayıt yine de yazılır', async () => {
+    mockUpdateParticipant.mockRejectedValue(new Error('not connected'));
+    const svc = makeService();
+    await expect(svc.muteParticipant(USER_ID, CHANNEL_ID, TARGET_ID)).resolves.toBeUndefined();
+    expect(prismaMock.voiceMute.upsert).toHaveBeenCalled();
+    expect(realtimeMock.emitToRoom).toHaveBeenCalled();
+  });
+});
+
+// ── R11: Susturmayı kaldır ──────────────────────────────────────────────────────
+describe('VoiceService.unmuteParticipant', () => {
+  beforeEach(() => {
+    prismaMock.channel.findFirst.mockResolvedValue(gvChannel());
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+  });
+
+  it('yetki yoksa → 403 FORBIDDEN, kayıt silinmez', async () => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
+    const svc = makeService();
+    await expect(svc.unmuteParticipant(USER_ID, CHANNEL_ID, TARGET_ID)).rejects.toMatchObject({
+      response: { error: 'FORBIDDEN' },
+    });
+    expect(prismaMock.voiceMute.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('başarı → kayıt silinir + canPublish=resolveCanPublish (karantinaya saygı, kör true DEĞİL)', async () => {
+    // Hedef yeni katılmış (karantinada) → resolveCanPublish false döner
+    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(), role: 'MEMBER' });
+    const svc = makeService();
+    await svc.unmuteParticipant(USER_ID, CHANNEL_ID, TARGET_ID);
+
+    expect(prismaMock.voiceMute.deleteMany).toHaveBeenCalledWith({
+      where: { channelId: CHANNEL_ID, userId: TARGET_ID },
+    });
+    expect(mockUpdateParticipant).toHaveBeenCalledWith(
+      CHANNEL_ID,
+      TARGET_ID,
+      undefined,
+      expect.objectContaining({ canPublish: false, canSubscribe: true }),
+    );
+    expect(realtimeMock.emitToRoom).toHaveBeenCalledWith(CHANNEL_ID, 'voice.participant_unmuted', {
+      channelId: CHANNEL_ID,
+      userId: TARGET_ID,
+    });
+  });
+
+  it('yerleşik üye → unmute sonrası canPublish=true', async () => {
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      joinedAt: new Date(Date.now() - 48 * 3600 * 1000),
+      role: 'MEMBER',
+    });
+    const svc = makeService();
+    await svc.unmuteParticipant(USER_ID, CHANNEL_ID, TARGET_ID);
+    expect(mockUpdateParticipant).toHaveBeenCalledWith(
+      CHANNEL_ID,
+      TARGET_ID,
+      undefined,
+      expect.objectContaining({ canPublish: true }),
+    );
+  });
+});
+
+// ── R11: Taşı ───────────────────────────────────────────────────────────────────
+const TARGET_CHANNEL_ID = 'chan-2';
+describe('VoiceService.moveParticipant', () => {
+  function targetChannel(overrides: Record<string, unknown> = {}) {
+    return { id: TARGET_CHANNEL_ID, type: 'GUILD_VOICE', guildId: GUILD_ID, userLimit: 0, ...overrides };
+  }
+  beforeEach(() => {
+    // 1. çağrı: kaynak (requireGuildVoiceChannel), 2. çağrı: hedef
+    prismaMock.channel.findFirst
+      .mockResolvedValueOnce(gvChannel())
+      .mockResolvedValueOnce(targetChannel());
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+    mockListParticipants.mockResolvedValue([]);
+  });
+
+  it('yetki yoksa → 403 FORBIDDEN', async () => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
+    const svc = makeService();
+    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'FORBIDDEN' },
+    });
+    expect(permissionsMock.hasGuildPermission).toHaveBeenCalledWith(USER_ID, GUILD_ID, 'MOVE_MEMBERS');
+  });
+
+  it('hedef = kaynak → SAME_CHANNEL', async () => {
+    const svc = makeService();
+    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'SAME_CHANNEL' },
+    });
+  });
+
+  it('hedef = actor → CANNOT_MOVE_SELF', async () => {
+    const svc = makeService();
+    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, USER_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'CANNOT_MOVE_SELF' },
+    });
+  });
+
+  it('hedef kanal yok → CHANNEL_NOT_FOUND', async () => {
+    prismaMock.channel.findFirst.mockReset();
+    prismaMock.channel.findFirst.mockResolvedValueOnce(gvChannel()).mockResolvedValueOnce(null);
+    const svc = makeService();
+    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'CHANNEL_NOT_FOUND' },
+    });
+  });
+
+  it('hedef başka guild → CHANNEL_NOT_FOUND (sızıntı yok)', async () => {
+    prismaMock.channel.findFirst.mockReset();
+    prismaMock.channel.findFirst
+      .mockResolvedValueOnce(gvChannel())
+      .mockResolvedValueOnce(targetChannel({ guildId: 'other-guild' }));
+    const svc = makeService();
+    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'CHANNEL_NOT_FOUND' },
+    });
+  });
+
+  it('hedef GUILD_VOICE değil → NOT_VOICE_CHANNEL', async () => {
+    prismaMock.channel.findFirst.mockReset();
+    prismaMock.channel.findFirst
+      .mockResolvedValueOnce(gvChannel())
+      .mockResolvedValueOnce(targetChannel({ type: 'GUILD_TEXT' }));
+    const svc = makeService();
+    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'NOT_VOICE_CHANNEL' },
+    });
+  });
+
+  it('hedef OWNER → CANNOT_MOVE_OWNER', async () => {
+    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'OWNER' });
+    const svc = makeService();
+    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'CANNOT_MOVE_OWNER' },
+    });
+  });
+
+  it('hedef dolu (userLimit) → CHANNEL_FULL', async () => {
+    prismaMock.channel.findFirst.mockReset();
+    prismaMock.channel.findFirst
+      .mockResolvedValueOnce(gvChannel())
+      .mockResolvedValueOnce(targetChannel({ userLimit: 2 }));
+    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+    mockListParticipants.mockResolvedValue([{ identity: 'a' }, { identity: 'b' }]);
+    const svc = makeService();
+    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'CHANNEL_FULL' },
+    });
+  });
+
+  it('başarı → removeParticipant(kaynak) + socket voice.moved YALNIZ taşınan kullanıcıya', async () => {
+    const svc = makeService();
+    await svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID);
+
+    expect(mockRemoveParticipant).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID);
+    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith([TARGET_ID], 'voice.moved', {
+      fromChannelId: CHANNEL_ID,
+      toChannelId: TARGET_CHANNEL_ID,
+    });
+    // kitleye gitmez
+    expect(realtimeMock.emitToRoom).not.toHaveBeenCalled();
+  });
+
+  it('removeParticipant hatası yutulur (best-effort) — yönlendirme event yine gider', async () => {
+    mockRemoveParticipant.mockRejectedValue(new Error('not connected'));
+    const svc = makeService();
+    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).resolves.toBeUndefined();
+    expect(realtimeMock.emitToUsers).toHaveBeenCalled();
   });
 });

@@ -57,6 +57,8 @@ export const useVoiceStore = defineStore('voice', () => {
   const roomParticipants = ref<RoomMember[]>([])
   // Mikrofonu kapalı uzak katılımcılar (TrackMuted/Unmuted)
   const mutedUserIds = ref<Set<string>>(new Set())
+  // R11: moderatör (server) susturması — self/track mute'tan AYRI. WS ile beslenir.
+  const serverMutedUserIds = ref<Set<string>>(new Set())
 
   // LiveKit Room — reaktif değil (kompleks nesne)
   let room: Room | null = null
@@ -104,6 +106,21 @@ export const useVoiceStore = defineStore('voice', () => {
     if (!channelStartedAt.value[channelId]) {
       channelStartedAt.value[channelId] = Date.now()
     }
+  }
+
+  // ── R11: moderatör (server) susturması ────────────────────────────────────
+  // WS voice.participant_muted/unmuted — yalnız o an bağlı olduğumuz kanal için
+  // göstergeyi sürdürmemiz yeterli (set bağlı oda kapsamında anlamlı).
+  function addServerMute(channelId: string, userId: string) {
+    if (connectedChannelId.value !== channelId) return
+    const s = new Set(serverMutedUserIds.value); s.add(userId); serverMutedUserIds.value = s
+  }
+  function removeServerMute(channelId: string, userId: string) {
+    if (connectedChannelId.value !== channelId) return
+    const s = new Set(serverMutedUserIds.value); s.delete(userId); serverMutedUserIds.value = s
+  }
+  function isServerMuted(userId: string): boolean {
+    return serverMutedUserIds.value.has(userId)
   }
 
   function removeParticipant(channelId: string, userId: string) {
@@ -192,6 +209,7 @@ export const useVoiceStore = defineStore('voice', () => {
     speakingUserIds.value = new Set()
     roomParticipants.value = []
     mutedUserIds.value = new Set()
+    serverMutedUserIds.value = new Set() // R11: oda kapsamlı moderatör-mute göstergesi
     remoteAudioEls.clear()
   }
 
@@ -338,6 +356,7 @@ export const useVoiceStore = defineStore('voice', () => {
     micError,
     roomParticipants,
     mutedUserIds,
+    serverMutedUserIds,
     isConnectedTo,
     clearError,
     participantsFor,
@@ -345,6 +364,9 @@ export const useVoiceStore = defineStore('voice', () => {
     loadParticipants,
     addParticipant,
     removeParticipant,
+    addServerMute,
+    removeServerMute,
+    isServerMuted,
     join,
     leave,
     toggleMute,

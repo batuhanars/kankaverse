@@ -83,7 +83,9 @@ export class VoiceService {
     if (channel.type === 'GUILD_VOICE') {
       // R10: kullanıcı limiti — erişim kapısından SONRA, mint'ten ÖNCE.
       await this.enforceUserLimit(userId, channel.id, channel.userLimit, channel.guildId);
-      canPublish = await this.resolveCanPublish(userId, channel.guildId);
+      // R11: kalıcı server-mute → konuşamaz (yeniden katılsa da). Mute yoksa karantinaya saygı.
+      const muted = await this.isVoiceMuted(channel.id, userId);
+      canPublish = muted ? false : await this.resolveCanPublish(userId, channel.guildId);
     } else if (channel.type === 'DM' || channel.type === 'GROUP_DM') {
       // DM/grup sesli arama: block + (1-1 için) ilişki re-check; guild-karantinası yok → konuşabilir
       await this.requireDmCallGate(userId, channelId, channel.type);
@@ -118,6 +120,189 @@ export class VoiceService {
 
     const token = await at.toJwt();
     return { token, url: this.url, canPublish };
+  }
+
+  /** R11 — bu kanalda kullanıcı için kalıcı (server) mute kaydı var mı. mintToken bunu zorlar. */
+  private async isVoiceMuted(channelId: string, userId: string): Promise<boolean> {
+    const mute = await this.prisma.voiceMute.findUnique({
+      where: { channelId_userId: { channelId, userId } },
+      select: { id: true },
+    });
+    return !!mute;
+  }
+
+  /**
+   * R11 — Sustur (kalıcı/server-mute). Yetki: MUTE_MEMBERS. GUILD_VOICE + owner/self bloğu.
+   * Kayıt kalıcıdır (mintToken zorlar); LiveKit updateParticipant best-effort (bağlı değilse sessiz geç).
+   */
+  async muteParticipant(actorId: string, channelId: string, targetUserId: string): Promise<void> {
+    this.assertEnabled();
+    const channel = await this.requireGuildVoiceChannel(channelId);
+    await this.requireGuildPermission(actorId, channel.guildId, 'MUTE_MEMBERS');
+
+    if (targetUserId === actorId) {
+      throw new BadRequestException({ message: 'Kendini susturamazsın.', error: 'CANNOT_MUTE_SELF' });
+    }
+    await this.requireTargetNotOwner(channel.guildId, targetUserId, 'CANNOT_MUTE_OWNER', 'Ortam sahibi susturulamaz.');
+
+    await this.prisma.voiceMute.upsert({
+      where: { channelId_userId: { channelId, userId: targetUserId } },
+      create: { channelId, userId: targetUserId, guildId: channel.guildId, mutedById: actorId },
+      update: { mutedById: actorId },
+    });
+
+    // LiveKit best-effort — katılımcı bağlı değilse / LiveKit yoksa sessiz geç (kayıt kaynak-of-truth).
+    if (this.roomService) {
+      try {
+        await this.roomService.updateParticipant(channelId, targetUserId, undefined, {
+          canPublish: false,
+          canSubscribe: true,
+          canPublishData: false,
+        });
+      } catch {
+        // bağlı değil / oda yok → kalıcı kayıt mintToken'da zorlanır
+      }
+    }
+
+    this.realtime.emitToRoom(channelId, 'voice.participant_muted', { channelId, userId: targetUserId });
+  }
+
+  /**
+   * R11 — Susturmayı kaldır. Yetki: MUTE_MEMBERS. Kayıt silinir; LiveKit canPublish GERİ VERİLİR
+   * ama karantinaya saygı: resolveCanPublish (kör true DEĞİL).
+   */
+  async unmuteParticipant(actorId: string, channelId: string, targetUserId: string): Promise<void> {
+    this.assertEnabled();
+    const channel = await this.requireGuildVoiceChannel(channelId);
+    await this.requireGuildPermission(actorId, channel.guildId, 'MUTE_MEMBERS');
+
+    await this.prisma.voiceMute.deleteMany({ where: { channelId, userId: targetUserId } });
+
+    if (this.roomService) {
+      try {
+        const canPublish = await this.resolveCanPublish(targetUserId, channel.guildId);
+        await this.roomService.updateParticipant(channelId, targetUserId, undefined, {
+          canPublish,
+          canSubscribe: true,
+          canPublishData: false,
+        });
+      } catch {
+        // bağlı değil / oda yok → bir sonraki mintToken doğru canPublish verir
+      }
+    }
+
+    this.realtime.emitToRoom(channelId, 'voice.participant_unmuted', { channelId, userId: targetUserId });
+  }
+
+  /**
+   * R11 — Taşı (tam taşı). Yetki: MOVE_MEMBERS. Kaynak+hedef aynı guild GUILD_VOICE; hedef doluysa
+   * CHANNEL_FULL (R10 deseni); same/owner/self bloğu. Sunucu kaynaktan çıkarır + yalnız taşınan kullanıcıya
+   * socket → istemci hedefe katılır.
+   */
+  async moveParticipant(
+    actorId: string,
+    channelId: string,
+    targetUserId: string,
+    targetChannelId: string,
+  ): Promise<void> {
+    this.assertEnabled();
+    const source = await this.requireGuildVoiceChannel(channelId);
+    await this.requireGuildPermission(actorId, source.guildId, 'MOVE_MEMBERS');
+
+    if (targetChannelId === channelId) {
+      throw new BadRequestException({ message: 'Kullanıcı zaten bu kanalda.', error: 'SAME_CHANNEL' });
+    }
+    if (targetUserId === actorId) {
+      throw new BadRequestException({ message: 'Kendini taşıyamazsın.', error: 'CANNOT_MOVE_SELF' });
+    }
+
+    // Hedef kanal: var mı + aynı guild + GUILD_VOICE
+    const target = await this.prisma.channel.findFirst({
+      where: { id: targetChannelId, deletedAt: null },
+      select: { id: true, type: true, guildId: true, userLimit: true },
+    });
+    if (!target || target.guildId !== source.guildId) {
+      throw new BadRequestException({ message: 'Hedef kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
+    }
+    if (target.type !== 'GUILD_VOICE') {
+      throw new BadRequestException({ message: 'Hedef bir ses kanalı değil.', error: 'NOT_VOICE_CHANNEL' });
+    }
+
+    await this.requireTargetNotOwner(source.guildId, targetUserId, 'CANNOT_MOVE_OWNER', 'Ortam sahibi taşınamaz.');
+
+    // R10 deseni — hedef doluluk (taşınan kullanıcı hedefte zaten yoksa sayılır). LiveKit erişilemezse geç.
+    if (target.userLimit > 0 && this.roomService) {
+      let participants: Awaited<ReturnType<RoomServiceClient['listParticipants']>> | null = null;
+      try {
+        participants = await this.roomService.listParticipants(targetChannelId);
+      } catch {
+        participants = null; // oda yok / LiveKit erişilemez → güvenli taraf: limiti uygulama
+      }
+      if (participants && !participants.some((p) => p.identity === targetUserId)) {
+        if (participants.length >= target.userLimit) {
+          throw new ForbiddenException({ message: 'Hedef ses kanalı dolu.', error: 'CHANNEL_FULL' });
+        }
+      }
+    }
+
+    // Kaynaktan çıkar — best-effort. İstemci socket ile hedefe katılır (yeni token mint → mute/karantina yeniden uygulanır).
+    if (this.roomService) {
+      try {
+        await this.roomService.removeParticipant(channelId, targetUserId);
+      } catch {
+        // bağlı değil / oda yok → yine de yönlendirme event'i gider
+      }
+    }
+
+    this.realtime.emitToUsers([targetUserId], 'voice.moved', {
+      fromChannelId: channelId,
+      toChannelId: targetChannelId,
+    });
+  }
+
+  /** R11 — kanal GUILD_VOICE mı + guildId güvence. Değilse NOT_VOICE_CHANNEL/CHANNEL_NOT_FOUND. */
+  private async requireGuildVoiceChannel(
+    channelId: string,
+  ): Promise<{ id: string; guildId: string }> {
+    const channel = await this.prisma.channel.findFirst({
+      where: { id: channelId, deletedAt: null },
+      select: { id: true, type: true, guildId: true },
+    });
+    if (!channel) {
+      throw new BadRequestException({ message: 'Kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
+    }
+    if (channel.type !== 'GUILD_VOICE' || !channel.guildId) {
+      throw new BadRequestException({ message: 'Bu bir ses kanalı değil.', error: 'NOT_VOICE_CHANNEL' });
+    }
+    return { id: channel.id, guildId: channel.guildId };
+  }
+
+  /** R11 — yetki kapısı (owner/ADMIN örtük geçer). Yetkisiz → 403 FORBIDDEN. */
+  private async requireGuildPermission(
+    actorId: string,
+    guildId: string,
+    permission: 'MUTE_MEMBERS' | 'MOVE_MEMBERS',
+  ): Promise<void> {
+    const allowed = await this.permissions.hasGuildPermission(actorId, guildId, permission);
+    if (!allowed) {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkin yok.', error: 'FORBIDDEN' });
+    }
+  }
+
+  /** R11 — hedef kullanıcı OWNER ise blok (GuildMember.role === 'OWNER'). */
+  private async requireTargetNotOwner(
+    guildId: string,
+    targetUserId: string,
+    errorCode: string,
+    message: string,
+  ): Promise<void> {
+    const member = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId: targetUserId } },
+      select: { role: true },
+    });
+    if (member?.role === 'OWNER') {
+      throw new ForbiddenException({ message, error: errorCode });
+    }
   }
 
   /**
