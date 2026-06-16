@@ -707,3 +707,18 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Sahip canlı test geçti** (2026-06-16): oluştur→listele→İlgileniyor çalışıyor. Cila turu: sihirbaz varsayılanları (konum seçimsiz, ilk-kanal otomatik, bugün+1 saat) + konum butonları cursor-pointer + zengin placeholder + **kart açıklaması markdown+link render** (`renderMessageHtml`, DOMPurify-güvenli; hint "Markdown, yeni satırlar ve bağlantılar desteklenir" artık gerçek). Açık kalem: derin link `?event=` açan handler yok (sözleşmede ertelenmiş)
 - [x] **Rol yönetimi UX (sahip saha-testi):** (1) rol oluşturunca **detaya gider** (geri alındı). (2) **Discord-tarzı sabit alt kaydet barı** (Teleport, `position:fixed`) — Görünüm+İzinler+Üyeler **tek "Değişiklikleri Kaydet" + "Sıfırla"**; sekme değiştirince bar kalır. (3) **Üye değişiklikleri batch'lendi** (pendingAdd/pendingRemove diff, kaydet'te uygulanır — anlık değil). (4) Üyeleri Yönet: **yalnız role sahip üyeler** + arama yanında **"Üye Ekle" modalı** (ortam üyelerinden seç). (5) **Kaydedilmemiş değişiklik guard'ı**: rol detayında dirty iken nav bölümü değiştir / kapat / listeye dön → onay (`ConfirmDialog`); "Sıfırla" sunucu durumuna döner. Rolü Sil → Görünüm sekmesi altı (kaydet'ten bağımsız). `vue-tsc`+build temiz.
 - [x] **Ortam ayarları cilası (sahip):** "Ortam Kuralları" → **"Açıklama"** (Discord-tarzı alt-başlık + placeholder; backend `rules` alanı açıklama olarak yeniden kullanılır — **isim borcu**, ileride `description` rename). "Ortam İkonu" → **"Ortam Simgesi"**, "Resim Seç" → "Simge Seç". *(Gelecek vizyon — sahip notu: sunucu profili ilgi-alanı etiketleri (max 5), oynanan oyunlar, Steam/Spotify bağlama → ileride, şimdi YOK.)*
+
+---
+
+## Sprint V3 — Etkinlik Motoru (Track B, Faz 2) — TASARIM KİLİTLİ 2026-06-16
+
+> Sözleşme: `contracts/SPRINT_V3_EVENTS_ENGINE_CONTRACT.md`. **Kurul budaması: SIFIR-job tasarım** (3-job motor reddedildi).
+> Sahip kararları: (1) ilgi **seri üzerinde** → sanal occurrence; (2) status-job sil + reminder C1'e ertele.
+> V3+ yol haritası Track B. **R7-nötr** (görünürlük/T&S choke-point değişmiyor; occurrence channelId'yi etkilemez).
+
+**Kapsam (IN):** tekrarlama (sanal/computed occurrence, DAILY/WEEKLY/MONTHLY) · status türetme genişletmesi (ACTIVE) · `?event=` deep-link handler.
+**Kapsam DIŞI:** hatırlatma/bildirim (C1) · kapak görseli (CSAM/A1) · CANCELED aksiyonu · örnek-başı ilgi/tek-örnek iptali · takvim görünümü · `recurrenceEndAt` · **yeni job · yeni migration** (her ikisi de YOK).
+
+- [x] Backend: `computeOccurrence` saf util + birim test (40/40) · CreateEventDto recurrence kilidi kaldırıldı · EventDto computed alanlar (occurrenceStartAt/EndAt + ACTIVE status) · GET listesi occurrenceStartAt sıralı · görünürlük/WS/T&S choke-point **değişmedi** (diff'te kanıtlı)
+- [x] Frontend: sihirbaz sıklık seçenekleri etkin · kart occurrence tarihi + 🔁 tekrar rozeti + ACTIVE "şu an sürüyor" rozeti · `?event=` deep-link modalı açar (MVP açık kalemi kapandı) · i18n · occurrence backend'den (FE yeniden hesaplamaz); external placeholder cilası
+- [x] DoD: SIFIR job · SIFIR migration · build'ler temiz (`nest build`+`vue-tsc`+`vite build`). **Sahip testi: tekrarlama girilebiliyor ✓** (kalan canlı doğrulamalar — ACTIVE rozeti/deep-link/minör görünürlük — sahip rutininde)

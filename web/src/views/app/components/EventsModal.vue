@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@vueuse/core'
 import { useEventsStore } from '@/stores/events'
@@ -13,6 +13,8 @@ import type { EventDto } from '@/types'
 const props = defineProps<{
   guildId: string
   canManage: boolean
+  // Deep-link (?event=<id>) ile açıldıysa vurgulanacak/kaydırılacak kart.
+  highlightEventId?: string | null
 }>()
 const emit = defineEmits<{ close: [] }>()
 
@@ -21,6 +23,22 @@ const eventsStore = useEventsStore()
 const { formatEventDate } = useEventDateFormat()
 
 const events = computed(() => eventsStore.eventsFor(props.guildId))
+
+// ── Deep-link vurgusu: açılışta hedef kartı bul → kaydır + geçici vurgu ──
+const highlightedId = ref<string | null>(null)
+onMounted(async () => {
+  const target = props.highlightEventId
+  if (!target) return
+  highlightedId.value = target
+  await nextTick()
+  document
+    .querySelector(`[data-event-card="${target}"]`)
+    ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  // Vurguyu birkaç saniye sonra söndür (kalıcı stil bırakma).
+  setTimeout(() => {
+    if (highlightedId.value === target) highlightedId.value = null
+  }, 2400)
+})
 
 // Açıklama markdown render: mesajlarla aynı güvenli boru hattı (markdown-it + DOMPurify).
 // Etkinlikte mention yok → no-op resolver. v-html yalnız sanitize edilmiş HTML alır.
@@ -89,6 +107,11 @@ function locationLabel(ev: EventDto): string {
   if (ev.locationType === 'VOICE_CHANNEL') return `🔊 ${ev.channelName ?? ''}`
   return `📍 ${ev.externalLocation ?? ''}`
 }
+
+// Tekrar etiketi anahtarı (event.recurrence.daily/weekly/monthly).
+function recurrenceKey(ev: EventDto): string {
+  return ev.recurrence.toLowerCase()
+}
 </script>
 
 <template>
@@ -128,14 +151,36 @@ function locationLabel(ev: EventDto): string {
           <div
             v-for="ev in events"
             :key="ev.id"
+            :data-event-card="ev.id"
             class="rounded-[var(--kv-radius-md)] border p-4 flex flex-col gap-2"
-            style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+            :class="highlightedId === ev.id ? 'kv-event-highlight' : ''"
+            :style="highlightedId === ev.id
+              ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
+              : 'border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);'"
           >
             <div class="flex items-start gap-2">
               <div class="flex-1 min-w-0">
-                <p class="text-[12px] font-semibold uppercase tracking-wide" style="color: var(--kv-accent-500);">{{ formatEventDate(ev.startAt) }}</p>
+                <!-- Tarih = ilgili örnek (occurrence), çapa startAt değil -->
+                <p class="text-[12px] font-semibold uppercase tracking-wide" style="color: var(--kv-accent-500);">{{ formatEventDate(ev.occurrenceStartAt) }}</p>
                 <p class="text-[16px] font-semibold mt-0.5 truncate" style="color: var(--kv-text-primary);">{{ ev.name }}</p>
                 <p class="text-[13px] mt-0.5 truncate" style="color: var(--kv-text-secondary);">{{ locationLabel(ev) }}</p>
+
+                <!-- Rozetler: şu an sürüyor (ACTIVE) + tekrar -->
+                <div v-if="ev.status === 'ACTIVE' || ev.recurrence !== 'NONE'" class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  <span
+                    v-if="ev.status === 'ACTIVE'"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                    style="background-color: rgba(61,180,110,0.15); color: var(--kv-online, #3DB46E);"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full" style="background-color: var(--kv-online, #3DB46E);" />
+                    {{ t('event.card.active') }}
+                  </span>
+                  <span
+                    v-if="ev.recurrence !== 'NONE'"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                    style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
+                  >🔁 {{ t(`event.recurrence.${recurrenceKey(ev)}`) }}</span>
+                </div>
               </div>
 
               <!-- ⋯ menü (yetkili) -->
@@ -222,3 +267,16 @@ function locationLabel(ev: EventDto): string {
     @cancel="deleteTarget = null"
   />
 </template>
+
+<style scoped>
+/* Deep-link vurgusu: aksan outline + kısa nabız (ChannelPanel kanal-vurgusu deseniyle aynı; gölge yok). */
+.kv-event-highlight {
+  outline: 2px solid var(--kv-accent-500);
+  outline-offset: -2px;
+  animation: kv-event-pulse 1.2s ease-in-out;
+}
+@keyframes kv-event-pulse {
+  0%, 100% { background-color: var(--kv-accent-subtle); }
+  30% { background-color: var(--kv-bg-elevated); }
+}
+</style>

@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { EventsService } from './events.service';
+import { computeOccurrence } from './occurrence.util';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
 
@@ -435,5 +436,214 @@ describe('EventDto status türetimi', () => {
     prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ startAt: PAST }));
     const result = await service.findOne(USER_ID, EVENT_ID);
     expect(result.status).toBe('COMPLETED');
+  });
+
+  it('NONE + şu an süren (occStart<=now<=occEnd) → status ACTIVE + occurrence çapaya eşit', async () => {
+    const startAt = new Date(Date.now() - 60_000); // 1 dk önce başladı
+    const endAt = new Date(Date.now() + 60 * 60_000); // 1 saat sürer
+    prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ startAt, endAt }));
+    const result = await service.findOne(USER_ID, EVENT_ID);
+    expect(result.status).toBe('ACTIVE');
+    expect(result.occurrenceStartAt.getTime()).toBe(startAt.getTime());
+    expect(result.occurrenceEndAt.getTime()).toBe(endAt.getTime());
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// computeOccurrence — saf util birim testleri (§2)
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('computeOccurrence (saf util)', () => {
+  const HOUR = 3_600_000;
+  const DAY = 86_400_000;
+
+  it('NONE gelecek → k=0, SCHEDULED, occurrence = çapa', () => {
+    const start = new Date('2026-07-01T19:00:00.000Z');
+    const now = new Date('2026-06-16T12:00:00.000Z');
+    const r = computeOccurrence({ startAt: start, endAt: null, recurrence: 'NONE' }, now);
+    expect(r.status).toBe('SCHEDULED');
+    expect(r.occurrenceStartAt.getTime()).toBe(start.getTime());
+    expect(r.occurrenceEndAt.getTime()).toBe(start.getTime()); // noktasal
+  });
+
+  it('NONE geçmiş + bitti → COMPLETED', () => {
+    const start = new Date('2026-01-01T19:00:00.000Z');
+    const end = new Date('2026-01-01T21:00:00.000Z');
+    const now = new Date('2026-06-16T12:00:00.000Z');
+    const r = computeOccurrence({ startAt: start, endAt: end, recurrence: 'NONE' }, now);
+    expect(r.status).toBe('COMPLETED');
+  });
+
+  it('NONE süren pencere → ACTIVE (occStart<=now<=occEnd)', () => {
+    const start = new Date('2026-06-16T12:00:00.000Z');
+    const end = new Date('2026-06-16T14:00:00.000Z');
+    const now = new Date('2026-06-16T13:00:00.000Z');
+    const r = computeOccurrence({ startAt: start, endAt: end, recurrence: 'NONE' }, now);
+    expect(r.status).toBe('ACTIVE');
+  });
+
+  it('DAILY: geçmiş çapa → bir sonraki günlük örnek hesaplanır (SCHEDULED)', () => {
+    const start = new Date('2026-06-10T18:00:00.000Z'); // 6 gün önce başladı
+    const now = new Date('2026-06-16T12:00:00.000Z'); // bugün 12:00, bugünün 18:00'ı henüz gelmedi
+    const r = computeOccurrence({ startAt: start, endAt: null, recurrence: 'DAILY' }, now);
+    // ilgili örnek = bugün 18:00 (occEnd>=now, noktasal)
+    expect(r.occurrenceStartAt.toISOString()).toBe('2026-06-16T18:00:00.000Z');
+    expect(r.status).toBe('SCHEDULED');
+  });
+
+  it('DAILY: süre içeren örnek şu an sürüyorsa → ACTIVE', () => {
+    const start = new Date('2026-06-10T11:00:00.000Z'); // her gün 11:00, 2 saat
+    const end = new Date('2026-06-10T13:00:00.000Z');
+    const now = new Date('2026-06-16T12:00:00.000Z'); // bugün 12:00 → 11-13 penceresi içinde
+    const r = computeOccurrence({ startAt: start, endAt: end, recurrence: 'DAILY' }, now);
+    expect(r.occurrenceStartAt.toISOString()).toBe('2026-06-16T11:00:00.000Z');
+    expect(r.occurrenceEndAt.toISOString()).toBe('2026-06-16T13:00:00.000Z');
+    expect(r.status).toBe('ACTIVE');
+  });
+
+  it('WEEKLY: +7 gün adımı; geçmiş çapadan sonraki haftalık örnek', () => {
+    const start = new Date('2026-06-01T20:00:00.000Z'); // Pazartesi
+    const now = new Date('2026-06-16T12:00:00.000Z');
+    const r = computeOccurrence({ startAt: start, endAt: null, recurrence: 'WEEKLY' }, now);
+    // 06-01, 06-08, 06-15 geçti; sonraki = 06-22
+    expect(r.occurrenceStartAt.toISOString()).toBe('2026-06-22T20:00:00.000Z');
+    expect(r.status).toBe('SCHEDULED');
+  });
+
+  it('MONTHLY: aynı gün-of-month sonraki ay', () => {
+    const start = new Date('2026-01-15T19:00:00.000Z');
+    const now = new Date('2026-06-16T12:00:00.000Z'); // 06-15 geçti
+    const r = computeOccurrence({ startAt: start, endAt: null, recurrence: 'MONTHLY' }, now);
+    expect(r.occurrenceStartAt.toISOString()).toBe('2026-07-15T19:00:00.000Z');
+    expect(r.status).toBe('SCHEDULED');
+  });
+
+  it('MONTHLY ay-sonu kıstırma: 31 Ocak aylık → Şubat son günü (28, 2026)', () => {
+    const start = new Date('2026-01-31T19:00:00.000Z');
+    const now = new Date('2026-02-01T00:00:00.000Z'); // Şubat örneğini hesapla
+    const r = computeOccurrence({ startAt: start, endAt: null, recurrence: 'MONTHLY' }, now);
+    // 2026 Şubat 28 gün (artık yıl değil) → 28 Şubat'a kıstırılır
+    expect(r.occurrenceStartAt.toISOString()).toBe('2026-02-28T19:00:00.000Z');
+  });
+
+  it('MONTHLY ay-sonu kıstırma artık yıl: 31 Ocak 2028 aylık → 29 Şubat 2028', () => {
+    const start = new Date('2028-01-31T19:00:00.000Z');
+    const now = new Date('2028-02-01T00:00:00.000Z');
+    const r = computeOccurrence({ startAt: start, endAt: null, recurrence: 'MONTHLY' }, now);
+    expect(r.occurrenceStartAt.toISOString()).toBe('2028-02-29T19:00:00.000Z');
+  });
+
+  it('tekrarlayan açık-uçlu seri → çok eski çapaya rağmen COMPLETED OLMAZ', () => {
+    const start = new Date('2020-01-01T10:00:00.000Z'); // çok eski
+    const now = new Date('2026-06-16T12:00:00.000Z');
+    for (const recurrence of ['DAILY', 'WEEKLY', 'MONTHLY'] as const) {
+      const r = computeOccurrence({ startAt: start, endAt: null, recurrence }, now);
+      expect(r.status).not.toBe('COMPLETED');
+      expect(['SCHEDULED', 'ACTIVE']).toContain(r.status);
+      // ilgili örnek geleceğe/şimdiye düşmeli (occEnd >= now)
+      expect(r.occurrenceEndAt.getTime()).toBeGreaterThanOrEqual(now.getTime());
+    }
+  });
+
+  it('fail-safe: geçersiz tarih → occurrence = çapa, MVP status türetmesi', () => {
+    const bad = new Date('not-a-date');
+    const now = new Date('2026-06-16T12:00:00.000Z');
+    const r = computeOccurrence({ startAt: bad, endAt: null, recurrence: 'DAILY' }, now);
+    expect(Number.isNaN(r.occurrenceStartAt.getTime())).toBe(true);
+    expect(r.status).toBe('COMPLETED'); // startMs NaN → güvenli COMPLETED
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Motor: recurrence kabulü + occurrence sıralama
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('EventsService motor (recurrence + occurrence sıralama)', () => {
+  let service: EventsService;
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('create: DAILY recurrence dto’dan alınır (artık NONE hardcoded değil)', async () => {
+    const created = makeEvent({ recurrence: 'DAILY' });
+    prismaMock.guildEvent.create.mockResolvedValue(created);
+    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: USER_ID }]);
+
+    const result = await service.create(USER_ID, GUILD_ID, {
+      name: 'Günlük',
+      locationType: 'EXTERNAL',
+      externalLocation: 'Yer',
+      startAt: FUTURE.toISOString(),
+      recurrence: 'DAILY' as any,
+    });
+
+    expect(prismaMock.guildEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ recurrence: 'DAILY' }) }),
+    );
+    expect(result.recurrence).toBe('DAILY');
+  });
+
+  it('create: recurrence verilmezse → NONE varsayılan', async () => {
+    prismaMock.guildEvent.create.mockResolvedValue(makeEvent());
+    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: USER_ID }]);
+    await service.create(USER_ID, GUILD_ID, {
+      name: 'Tek',
+      locationType: 'EXTERNAL',
+      externalLocation: 'Yer',
+      startAt: FUTURE.toISOString(),
+    });
+    expect(prismaMock.guildEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ recurrence: 'NONE' }) }),
+    );
+  });
+
+  it('findByGuild: occurrenceStartAt artan sıralar (çapa startAt değil)', async () => {
+    const now = Date.now();
+    // A: çapa daha erken ama tek-seferlik geçmiş → occurrence geçmişte (COMPLETED) → en başta
+    // B: DAILY çapa eski ama ilgili örnek bugün/yakın → occurrence yakın gelecek
+    // C: tek-seferlik uzak gelecek
+    const completedPast = makeEvent({
+      id: 'A-past',
+      startAt: new Date(now - 10 * 86_400_000),
+      endAt: new Date(now - 10 * 86_400_000 + 3_600_000),
+      recurrence: 'NONE',
+    });
+    const dailySoon = makeEvent({
+      id: 'B-daily',
+      startAt: new Date(now - 5 * 86_400_000 + 2 * 3_600_000), // ilgili örnek ~2 saat sonra
+      endAt: null,
+      recurrence: 'DAILY',
+    });
+    const futureFar = makeEvent({
+      id: 'C-future',
+      startAt: new Date(now + 30 * 86_400_000),
+      endAt: null,
+      recurrence: 'NONE',
+    });
+    // DB döndürme sırası kasıtlı karışık
+    prismaMock.guildEvent.findMany.mockResolvedValue([futureFar, completedPast, dailySoon]);
+    membershipMock.requireChannelAccess.mockResolvedValue(undefined);
+
+    const result = await service.findByGuild(USER_ID, GUILD_ID);
+    const ids = result.map((e) => e.id);
+    // occurrenceStartAt artan: geçmiş tek-seferlik < bugünkü daily örnek < uzak gelecek
+    expect(ids).toEqual(['A-past', 'B-daily', 'C-future']);
+    // ayrıca occurrenceStartAt monoton artan
+    for (let i = 1; i < result.length; i++) {
+      expect(result[i].occurrenceStartAt.getTime()).toBeGreaterThanOrEqual(
+        result[i - 1].occurrenceStartAt.getTime(),
+      );
+    }
+  });
+
+  it('DTO: occurrenceStartAt/EndAt computed alanları döner', async () => {
+    const start = new Date(Date.now() + 86_400_000);
+    const end = new Date(Date.now() + 86_400_000 + 3_600_000);
+    prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ startAt: start, endAt: end, recurrence: 'NONE' }));
+    const result = await service.findOne(USER_ID, EVENT_ID);
+    expect(result.occurrenceStartAt.getTime()).toBe(start.getTime());
+    expect(result.occurrenceEndAt.getTime()).toBe(end.getTime());
+    expect(result.status).toBe('SCHEDULED');
   });
 });

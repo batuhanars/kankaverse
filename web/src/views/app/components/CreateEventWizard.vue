@@ -7,7 +7,7 @@ import { useEventsStore } from '@/stores/events'
 import { useEventDateFormat } from '@/composables/useEventDateFormat'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
-import type { EventDto } from '@/types'
+import type { EventDto, EventRecurrence } from '@/types'
 import type { CreateEventPayload, UpdateEventPayload } from '@/api/events'
 
 const props = defineProps<{
@@ -55,7 +55,8 @@ function nowPlusOneHourIso(): string {
 const initialStart = splitIso(props.event?.startAt ?? nowPlusOneHourIso())
 const startDate = ref<string>(initialStart.date)
 const startTime = ref<string>(initialStart.time)
-const recurrence = ref<'NONE'>('NONE') // MVP yalnız NONE etkin
+// Motor fazı: 4 sıklık etkin (backend computed occurrence ile çözer).
+const recurrence = ref<EventRecurrence>(props.event?.recurrence ?? 'NONE')
 
 // Bu guild'in ses kanalları (wizard select)
 const voiceChannels = computed(() =>
@@ -141,6 +142,8 @@ const previewDate = computed(() => {
   const iso = startAtIso()
   return iso ? formatEventDate(iso) : ''
 })
+// Tekrar etiketi anahtarı (event.recurrence.daily/weekly/monthly).
+const recurrenceKey = computed(() => recurrence.value.toLowerCase())
 
 // ── Submit ──
 const createdEvent = ref<EventDto | null>(null)
@@ -166,7 +169,7 @@ async function submit() {
         channelId: locType === 'VOICE_CHANNEL' ? channelId.value : undefined,
         externalLocation: locType === 'EXTERNAL' ? externalLocation.value.trim() : undefined,
         startAt: iso,
-        recurrence: 'NONE',
+        recurrence: recurrence.value,
       }
       const updated = await eventsStore.updateEvent(props.event.id, payload)
       emit('created', updated)
@@ -180,7 +183,7 @@ async function submit() {
       channelId: locType === 'VOICE_CHANNEL' ? channelId.value : undefined,
       externalLocation: locType === 'EXTERNAL' ? externalLocation.value.trim() : undefined,
       startAt: iso,
-      recurrence: 'NONE',
+      recurrence: recurrence.value,
     }
     const created = await eventsStore.createEvent(props.guildId, payload)
     createdEvent.value = created
@@ -370,9 +373,9 @@ const stepperLabels = computed(() => [
                 style="background-color: var(--kv-bg-input, var(--kv-bg-elevated)); border-color: var(--kv-border-subtle); color: var(--kv-text-primary);"
               >
                 <option value="NONE">{{ t('event.wizard.recurrenceNone') }}</option>
-                <option value="DAILY" disabled>{{ t('event.wizard.recurrenceDaily') }} — {{ t('event.wizard.recurrenceSoon') }}</option>
-                <option value="WEEKLY" disabled>{{ t('event.wizard.recurrenceWeekly') }} — {{ t('event.wizard.recurrenceSoon') }}</option>
-                <option value="MONTHLY" disabled>{{ t('event.wizard.recurrenceMonthly') }} — {{ t('event.wizard.recurrenceSoon') }}</option>
+                <option value="DAILY">{{ t('event.wizard.recurrenceDaily') }}</option>
+                <option value="WEEKLY">{{ t('event.wizard.recurrenceWeekly') }}</option>
+                <option value="MONTHLY">{{ t('event.wizard.recurrenceMonthly') }}</option>
               </select>
             </div>
 
@@ -405,6 +408,11 @@ const stepperLabels = computed(() => [
               <p class="text-[12px] font-semibold uppercase tracking-wide" style="color: var(--kv-accent-500);">{{ previewDate }}</p>
               <p class="text-[16px] font-semibold" style="color: var(--kv-text-primary);">{{ name }}</p>
               <p class="text-[13px]" style="color: var(--kv-text-secondary);">{{ previewLocation }}</p>
+              <p
+                v-if="recurrence !== 'NONE'"
+                class="text-[12px]"
+                style="color: var(--kv-text-secondary);"
+              >🔁 {{ t(`event.recurrence.${recurrenceKey}`) }}</p>
               <p class="text-[12px] mt-1" style="color: var(--kv-text-muted);">{{ t('event.wizard.reviewInterested') }}</p>
             </div>
           </div>
