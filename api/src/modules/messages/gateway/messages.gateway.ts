@@ -17,6 +17,7 @@ import { MembershipService } from '../../../shared/membership/membership.service
 import { RealtimeService } from '../../../shared/realtime/realtime.service';
 import { PresenceService, ActiveStatus } from '../../../shared/presence/presence.service';
 import { DmPermissionService } from '../../../shared/dm-permission/dm-permission.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 interface AuthSocket extends Socket {
   data: { userId: string; sessionId: string; username?: string };
@@ -37,6 +38,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private realtime: RealtimeService,
     private presence: PresenceService,
     private dmPermission: DmPermissionService,
+    private notifications: NotificationsService,
   ) {}
 
   afterInit(server: Server) {
@@ -83,6 +85,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       // visibleOnlineFor(userId) doğru yönü kullanır: canSeePresence(userId, aday)
       const states = await this.presence.visibleOnlineFor(userId);
       socket.emit('presence:snapshot', { states });
+
+      // §3 — Bildirim snapshot'ı: son okunmamışlar (take 50) + unreadCount
+      const notificationSnapshot = await this.notifications.snapshot(userId);
+      socket.emit('notification:snapshot', notificationSnapshot);
     } catch {
       socket.emit('auth_error', { error: 'UNAUTHORIZED' });
       socket.disconnect(true);
@@ -489,6 +495,17 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       // Yazara kendi bahsetmesi için event gönderme
       if (mentionedUserId === authorId) continue;
       this.realtime.emitToUser(mentionedUserId, 'mention', eventPayload);
+      // §2 — MENTION kalıcı bildirimi (mevcut `mention` emit'ine PARALEL).
+      // Kaynak resolveMentions çıktısı (zaten minör/yaş/erişim süzülü) — yeni erişim sorgusu YOK.
+      await this.notifications.create(mentionedUserId, {
+        type: 'MENTION',
+        actorId: author.id,
+        guildId: guildId ?? undefined,
+        channelId,
+        messageId: messageDto['id'] as string,
+        preview,
+      });
     }
   }
+
 }

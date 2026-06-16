@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { FriendPermissionService } from '../../shared/friend-permission/friend-permission.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SendFriendRequestDto } from './dto/send-friend-request.dto';
 import { SendFriendRequestByUserDto } from './dto/send-friend-request-by-user.dto';
 
@@ -21,6 +22,7 @@ export class FriendsService {
     private prisma: PrismaService,
     private realtime: RealtimeService,
     private friendPermission: FriendPermissionService,
+    private notifications: NotificationsService,
   ) {}
 
   async getFriends(userId: string) {
@@ -117,6 +119,11 @@ export class FriendsService {
         user: toFriendCodeUserDto(accepted.addressee),
         since: accepted.updatedAt.toISOString(),
       });
+      // §2 — FRIEND_ACCEPT bildirimi (paralel): istek sahibine, kabul eden = senderId
+      await this.notifications.create(accepted.requesterId, {
+        type: 'FRIEND_ACCEPT',
+        actorId: senderId,
+      });
       return {
         type: 'accepted' as const,
         friendshipId: accepted.id,
@@ -141,6 +148,11 @@ export class FriendsService {
         user: toFriendCodeUserDto(updated.requester),
         createdAt: updated.createdAt.toISOString(),
       });
+      // §2 — FRIEND_REQUEST bildirimi (paralel): hedefe, gönderen = senderId
+      await this.notifications.create(target.id, {
+        type: 'FRIEND_REQUEST',
+        actorId: senderId,
+      });
       return {
         type: 'requested' as const,
         id: updated.id,
@@ -163,6 +175,11 @@ export class FriendsService {
       direction: 'incoming',
       user: toFriendCodeUserDto(request.requester),
       createdAt: request.createdAt.toISOString(),
+    });
+    // §2 — FRIEND_REQUEST bildirimi (paralel): hedefe, gönderen = senderId
+    await this.notifications.create(target.id, {
+      type: 'FRIEND_REQUEST',
+      actorId: senderId,
     });
     return {
       type: 'requested' as const,
@@ -238,6 +255,11 @@ export class FriendsService {
       friendshipId: accepted.id,
       user: toFriendCodeUserDto(accepted.addressee),
       since: accepted.updatedAt.toISOString(),
+    });
+    // §2 — FRIEND_ACCEPT bildirimi (paralel): istek sahibine, kabul eden = userId
+    await this.notifications.create(accepted.requesterId, {
+      type: 'FRIEND_ACCEPT',
+      actorId: userId,
     });
     return result;
   }

@@ -734,3 +734,16 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] Frontend: sihirbaz kapak yükleme (mevcut presign+uploadToS3) + önizleme/kaldır · `UPLOADS_ENABLED` kapalıyken alan gizli · kart kapak render · i18n + token
 - [ ] DoD: build'ler temiz · sahip canlı test (UPLOADS_ENABLED=true dev MinIO → yükle/gör; false → alan yok)
 - [ ] **Sahip paralel görevi:** Cloudflare R2 storage kurulumu (bucket + S3 API token → Railway `S3_*` env) — prod depolama (tarama değil)
+
+---
+
+## Sprint C1 — Kalıcı Bildirim Sistemi — TASARIM KİLİTLİ 2026-06-16
+
+> Sözleşme: `contracts/SPRINT_C1_NOTIFICATIONS_CONTRACT.md`. V3+ yol haritası Track C1. **R7-hafif:** üretim yalnız T&S-süzülmüş tetikleyicilerden (resolveMentions çıktısı, friend hedefleri); friend_remove sessiz → bildirim yok.
+> Sprint 6.3 oturum-içi bildirimi → kalıcı modele yükseltir. Türler: MENTION · FRIEND_REQUEST · FRIEND_ACCEPT.
+> **Ertelendi:** DM mesaj bildirimi · web push · etkinlik hatırlatma (zaman-tabanlı job, ayrı follow-up) · friend_remove (T&S sessiz) · retention temizlik (D-listesi).
+
+- [x] Backend: `Notification` model+enum+`User` ilişki+migration (uygulandı, `migrate status` temiz) · `NotificationsService`+controller (liste-cursor/okundu/sayaç) · üretim (MENTION notifyMentions paralel · FRIEND_REQUEST/ACCEPT friends.service paralel · **FRIEND_REMOVE üretmez** ✓) · WS `notification`+`notification:snapshot` (mevcut mention/friend.* DEĞİŞMEDİ) · 638 test
+- [x] Frontend: store kalıcı-destekli yeniden-kurgu · bell navigasyon/zıplama (`useMessageJump`: mention→mesaja zıpla, friend→ilgili görünüm) · i18n · yenilemede durur · `vue-tsc`+`vite build` temiz
+- [x] R7-hafif inceleme (PM): üretim noktaları teyit — MENTION `resolveMentions` çıktısı kaynak (yeni sorgu yok, author atlanır), FRIEND_REQUEST/ACCEPT mevcut hedeflere paralel, **friend.remove→create YOK** (sessiz korundu); sızıntı yolu yok
+- [ ] **Ertelenen:** sahip 2-hesap canlı test (mention→bell→zıpla; kanka isteği→bell; yenile→durur; minör 18+ kanal mention'ı almaz)

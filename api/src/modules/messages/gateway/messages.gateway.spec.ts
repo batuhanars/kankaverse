@@ -44,6 +44,12 @@ const presenceMock = {
 
 const dmPermissionMock = { canDm: jest.fn() };
 
+const notificationsCreateMock = jest.fn();
+const notificationsMock = {
+  create: notificationsCreateMock,
+  snapshot: jest.fn().mockResolvedValue({ notifications: [], unreadCount: 0 }),
+};
+
 function makeGateway() {
   return new MessagesGateway(
     jwtMock as any,
@@ -53,6 +59,7 @@ function makeGateway() {
     realtimeMock as any,
     presenceMock as any,
     dmPermissionMock as any,
+    notificationsMock as any,
   );
 }
 
@@ -60,6 +67,7 @@ function resetMocks() {
   jest.resetAllMocks();
   presenceMock.audienceFor.mockResolvedValue([]);
   presenceMock.visibleOnlineFor.mockResolvedValue([]);
+  notificationsMock.snapshot.mockResolvedValue({ notifications: [], unreadCount: 0 });
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -342,5 +350,53 @@ describe('MessagesGateway.notifyMentions', () => {
     expect(targets).toContain(MENTIONED_USER_1);
     expect(targets).toContain(MENTIONED_USER_2);
     expect(targets).not.toContain(AUTHOR_ID);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // §2 — MENTION kalıcı bildirim üretimi (resolveMentions çıktısı kaynak)
+  // ─────────────────────────────────────────────────────────────────────────
+  it('her bahsedilen için notifications.create(MENTION) çağrılır — resolveMentions çıktısı aynen', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID });
+    prismaMock.user.findMany.mockResolvedValue([
+      { id: MENTIONED_USER_1, username: 'kanka1' },
+      { id: MENTIONED_USER_2, username: 'kanka2' },
+    ]);
+
+    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({
+      mentions: [MENTIONED_USER_1, MENTIONED_USER_2],
+      authorId: AUTHOR_ID,
+      content: `<@${MENTIONED_USER_1}> ve <@${MENTIONED_USER_2}>`,
+    }));
+
+    expect(notificationsCreateMock).toHaveBeenCalledTimes(2);
+    const recipients = notificationsCreateMock.mock.calls.map((c) => c[0]);
+    expect(recipients).toEqual(expect.arrayContaining([MENTIONED_USER_1, MENTIONED_USER_2]));
+    // §2 şekli: type MENTION + actor=author + navigasyon alanları
+    const [, data] = notificationsCreateMock.mock.calls[0];
+    expect(data.type).toBe('MENTION');
+    expect(data.actorId).toBe(AUTHOR_ID);
+    expect(data.channelId).toBe(CHANNEL_ID);
+    expect(data.guildId).toBe(GUILD_ID);
+    expect(data.messageId).toBe('msg-mention-1');
+    expect(typeof data.preview).toBe('string');
+  });
+
+  it('author === mentioned → notifications.create çağrılmaz (mevcut atlama kuralı miras)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID });
+    prismaMock.user.findMany.mockResolvedValue([{ id: AUTHOR_ID, username: 'author' }]);
+
+    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({
+      mentions: [AUTHOR_ID],
+      authorId: AUTHOR_ID,
+      content: `<@${AUTHOR_ID}> bla`,
+    }));
+
+    expect(notificationsCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('mentions boş → notifications.create çağrılmaz (resolveMentions kaynağı boş)', async () => {
+    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({ mentions: [] }));
+
+    expect(notificationsCreateMock).not.toHaveBeenCalled();
   });
 });

@@ -319,6 +319,26 @@ export interface InvitePreviewDto {
   valid: boolean
 }
 
+// Sprint C1 — Kalıcı bildirim sistemi (SPRINT_C1_NOTIFICATIONS_CONTRACT.md §5)
+export const NotificationType = {
+  MENTION: 'MENTION',
+  FRIEND_REQUEST: 'FRIEND_REQUEST',
+  FRIEND_ACCEPT: 'FRIEND_ACCEPT',
+} as const
+export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType]
+
+export interface NotificationDto {
+  id: string
+  type: NotificationType
+  actor: { id: string; username: string; avatarUrl: string | null } | null
+  guildId: string | null
+  channelId: string | null
+  messageId: string | null
+  preview: string | null
+  readAt: string | null
+  createdAt: string
+}
+
 // Response envelope
 export interface ApiResponse<T> {
   success: boolean
