@@ -103,5 +103,10 @@ export default () => {
     uploadsEnabled: process.env.UPLOADS_ENABLED !== 'false',
     // WebSocket CORS origin: prod'da frontend URL'yi daraltır
     frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+    // ── Video/Ekran paylaşımı feature-flag'leri (BUILD-DARK) ──────────────────
+    // Sprint C4. Default false → bayrak false iken mintToken yalnız MICROPHONE grant'i.
+    // Prod fail-fast YOK: default false güvenli taraf. Açma önkoşulları §0.1'de.
+    cameraEnabled: process.env.CAMERA_ENABLED === 'true',
+    screenEnabled: process.env.SCREEN_ENABLED === 'true',
   };
 };
