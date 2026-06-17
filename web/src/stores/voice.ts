@@ -191,6 +191,20 @@ export const useVoiceStore = defineStore('voice', () => {
 
       connectedChannelId.value = channelId
       connectedAt.value = Date.now() // REV-13: süre sayacı başlangıcı
+
+      // İyimser self-add: sunucu mintToken'da emit yapar ama WS gecikmesi veya
+      // dev'de webhook eksikliği olsa da panel listesi anında güncellenir.
+      // addParticipant idempotent — sunucu emiti ile çakışmaz.
+      const authStore = useAuthStore()
+      const selfUser = authStore.user
+      if (selfUser) {
+        addParticipant(channelId, {
+          userId: selfUser.id,
+          username: selfUser.username ?? selfUser.id,
+          avatarUrl: selfUser.avatarUrl ?? null,
+        })
+      }
+
       refreshRoomParticipants()
       // Konuşma dinleyicilerini bağla (yerel + mevcut uzaklar)
       attachSpeaking(room.localParticipant)
@@ -259,6 +273,13 @@ export const useVoiceStore = defineStore('voice', () => {
       try { await room.disconnect() } catch { /* yoksay */ }
       room = null
     }
+
+    // Dev-fix: LiveKit webhook localhost'a ulaşamadığında diğer istemcilerin presence
+    // listelerini günceller. Best-effort — hata yutulur (bağlantı zaten kesildi).
+    if (leftChannelId) {
+      voiceApi.leave(leftChannelId).catch(() => {})
+    }
+
     resetLocalState()
   }
 
