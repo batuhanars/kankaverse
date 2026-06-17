@@ -92,6 +92,8 @@ export const useVoiceStore = defineStore('voice', () => {
 
   // LiveKit Room — reaktif değil (kompleks nesne)
   let room: Room | null = null
+  // Görüntülü arama niyeti: join() sonrası kamera açılacaksa true (tek seferlik)
+  let pendingCameraStart = false
   // Bağlı uzak ses elementleri (sağırlaştırma için muted toggle'lanır)
   const remoteAudioEls = new Set<HTMLMediaElement>()
   // Sağırlaştırma öncesi mute durumu (kaldırınca geri yükle)
@@ -163,11 +165,12 @@ export const useVoiceStore = defineStore('voice', () => {
   }
 
   // ── Yerel bağlantı ──────────────────────────────────────────────────────────
-  async function join(channelId: string, opts?: { autoEndWhenAlone?: boolean }) {
+  async function join(channelId: string, opts?: { autoEndWhenAlone?: boolean; startWithCamera?: boolean }) {
     if (connectedChannelId.value === channelId || connecting.value) return
     if (room) await leave()
 
     autoEndWhenAlone = opts?.autoEndWhenAlone ?? false
+    pendingCameraStart = opts?.startWithCamera ?? false
     connecting.value = true
     connectingChannelId.value = channelId
     error.value = ''
@@ -215,6 +218,20 @@ export const useVoiceStore = defineStore('voice', () => {
       if (preferDeafened.value) {
         await applyDeafen(true)
       }
+
+      // Görüntülü arama niyeti: kamera yetkisi varsa kamerayı aç (cihaz yoksa sessizce atla)
+      if (pendingCameraStart && canPublishCamera.value && room) {
+        pendingCameraStart = false
+        try {
+          const pub = await room.localParticipant.setCameraEnabled(true)
+          isCameraOn.value = true
+          if (pub?.track) _addVideoTrack(room.localParticipant, pub.track as LocalVideoTrack)
+        } catch {
+          // Kamera cihazı yok veya izin reddedildi — sessizce atla
+        }
+      } else {
+        pendingCameraStart = false
+      }
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string; error?: string } } }
       const code = err.response?.data?.error
@@ -249,6 +266,7 @@ export const useVoiceStore = defineStore('voice', () => {
     connectedChannelId.value = null
     connectedAt.value = null // REV-13
     autoEndWhenAlone = false // REV-12
+    pendingCameraStart = false
     if (aloneTimer) { clearTimeout(aloneTimer); aloneTimer = null }
     isMuted.value = false
     canPublish.value = false

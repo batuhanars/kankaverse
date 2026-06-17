@@ -18,10 +18,20 @@ export const useCallStore = defineStore('call', () => {
   const incoming = ref<IncomingCall | null>(null)
   // Nötr bilgi (ulaşılamadı / reddedildi) — engellenme/ilişki sızdırmaz
   const notice = ref<string>('')
+  // Görüntülü arama niyeti: arayan kabul sonrası kamerayı otomatik açmak istiyorsa true (tek seferlik)
+  const pendingVideoCall = ref(false)
 
   function setOutgoing(channelId: string) { outgoing.value = { channelId } }
-  function clearOutgoing() { outgoing.value = null }
+  // Ring biter (reddet/iptal/zaman-aşımı/accept sonrası) → bekleyen kamera-niyetini de temizle.
+  // accept yolu join'den ÖNCE consume eder; burada sıfırlama idempotent + reddet yolunda bayat flag'i önler.
+  function clearOutgoing() { outgoing.value = null; pendingVideoCall.value = false }
   function isRinging(channelId: string) { return outgoing.value?.channelId === channelId }
+  function setPendingVideoCall(v: boolean) { pendingVideoCall.value = v }
+  function consumePendingVideoCall(): boolean {
+    const v = pendingVideoCall.value
+    pendingVideoCall.value = false
+    return v
+  }
 
   function setIncoming(call: IncomingCall) { incoming.value = call }
   function clearIncoming() { incoming.value = null }
@@ -30,8 +40,9 @@ export const useCallStore = defineStore('call', () => {
   function clearNotice() { notice.value = '' }
 
   return {
-    outgoing, incoming, notice,
+    outgoing, incoming, notice, pendingVideoCall,
     setOutgoing, clearOutgoing, isRinging,
+    setPendingVideoCall, consumePendingVideoCall,
     setIncoming, clearIncoming,
     setNotice, clearNotice,
   }
