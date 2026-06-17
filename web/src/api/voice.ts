@@ -41,4 +41,8 @@ export const voiceApi = {
   move(channelId: string, userId: string, targetChannelId: string) {
     return http.post<null>(`/voice/${channelId}/move/${userId}`, { targetChannelId })
   },
+  // Dev-fix: ayrılış sinyali — LiveKit webhook localhost'a ulaşamadığında presence günceller.
+  leave(channelId: string) {
+    return http.post<null>(`/channels/${channelId}/voice/leave`)
+  },
 }
