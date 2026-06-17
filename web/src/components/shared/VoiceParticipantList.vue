@@ -18,10 +18,12 @@ import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { useGuildsStore } from '@/stores/guilds'
 import { useToastStore } from '@/stores/toast'
 import { useChannelsStore } from '@/stores/channels'
+import { useFriendsStore } from '@/stores/friends'
 import { voiceSubscribe, voiceUnsubscribe } from '@/composables/useSocket'
 import { voiceApi } from '@/api/voice'
 import { dmApi } from '@/api/dm'
 import { friendsApi } from '@/api/friends'
+import type { ChannelDto } from '@/types'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import UserCardPopover from '@/components/shared/UserCardPopover.vue'
 
@@ -37,6 +39,7 @@ const authStore = useAuthStore()
 const guildsStore = useGuildsStore()
 const toast = useToastStore()
 const channelsStore = useChannelsStore()
+const friendsStore = useFriendsStore()
 
 const connectedHere = computed(() => voiceStore.connectedChannelId === props.channelId)
 
@@ -85,7 +88,8 @@ async function watchStream() {
 // ── #3 — Sağ-tık context menüsü ──────────────────────────────────────────────
 const ctxMenu = ref<{ userId: string; x: number; y: number } | null>(null)
 const ctxMenuRef = ref<HTMLElement | null>(null)
-onClickOutside(ctxMenuRef, () => { ctxMenu.value = null })
+const ctxMoveSubmenuOpen = ref(false)
+onClickOutside(ctxMenuRef, () => { ctxMenu.value = null; ctxMoveSubmenuOpen.value = false })
 
 const selfId = computed(() => authStore.user?.id ?? '')
 const guildIdResolved = computed(() => props.guildId ?? channelsStore.findChannelById(props.channelId)?.guildId ?? '')
@@ -96,6 +100,7 @@ const canMove = computed(() => can('MOVE_MEMBERS'))
 const ownerId = computed(() => guildsStore.guilds.find((g) => g.id === guildIdResolved.value)?.ownerId ?? null)
 
 function openContextMenu(e: MouseEvent, userId: string) {
+  ctxMoveSubmenuOpen.value = false
   ctxMenu.value = { userId, x: e.clientX, y: e.clientY }
 }
 
@@ -120,6 +125,29 @@ function isCtxBroadcasting(): boolean {
 // Server mute durumu (sadece bağlı olduğumuz kanalda anlamlı)
 function isCtxServerMuted(): boolean {
   return ctxMenu.value ? voiceStore.serverMutedUserIds.has(ctxMenu.value.userId) : false
+}
+
+// Zaten arkadaş mı → "Kanka Ekle" gizlenir (friends AppShell'de hidrate edilir)
+function isCtxFriend(): boolean {
+  return ctxMenu.value ? friendsStore.friends.some((f) => f.user.id === ctxMenu.value!.userId) : false
+}
+
+// Taşı: aynı guild'in diğer ses kanalları (mevcut hariç)
+const ctxMoveTargets = computed<ChannelDto[]>(() =>
+  channelsStore
+    .channelsForGuild(guildIdResolved.value)
+    .filter((c) => c.type === 'GUILD_VOICE' && c.id !== props.channelId),
+)
+async function ctxMoveTo(targetChannelId: string) {
+  const userId = ctxMenu.value!.userId
+  ctxMenu.value = null
+  ctxMoveSubmenuOpen.value = false
+  try {
+    await voiceApi.move(props.channelId, userId, targetChannelId)
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message ?? t('voice.moveFailed'))
+  }
 }
 
 // ── Kullanıcı kartı (UserCardPopover) ────────────────────────────────────────
@@ -339,8 +367,9 @@ async function doDisconnect() {
         >
           {{ t('voice.sendMessage') }}
         </button>
-        <!-- Kanka Ekle -->
+        <!-- Kanka Ekle (zaten arkadaşsa gizli) -->
         <button
+          v-if="!isCtxFriend()"
           class="w-full text-left px-3 py-1.5 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
           style="color: var(--kv-text-secondary);"
           @click="ctxAddFriend"
@@ -377,6 +406,31 @@ async function doDisconnect() {
           >
             {{ t('voice.stopBroadcast') }}
           </button>
+          <!-- Taşı (MOVE_MEMBERS) — alt liste -->
+          <template v-if="canMove">
+            <button
+              class="w-full text-left px-3 py-1.5 text-[13px] flex items-center justify-between transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+              style="color: var(--kv-text-secondary);"
+              @click.stop="ctxMoveSubmenuOpen = !ctxMoveSubmenuOpen"
+            >
+              <span>{{ t('voice.moveTo') }}</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 transition-transform" :class="ctxMoveSubmenuOpen ? 'rotate-90' : ''"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div v-if="ctxMoveSubmenuOpen" class="max-h-44 overflow-y-auto">
+              <p v-if="ctxMoveTargets.length === 0" class="px-5 py-1.5 text-[12px]" style="color: var(--kv-text-muted);">
+                {{ t('voice.noMoveTargets') }}
+              </p>
+              <button
+                v-for="target in ctxMoveTargets"
+                :key="target.id"
+                class="w-full text-left px-5 py-1.5 text-[12px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)] truncate"
+                style="color: var(--kv-text-secondary);"
+                @click="ctxMoveTo(target.id)"
+              >
+                {{ target.name }}
+              </button>
+            </div>
+          </template>
           <!-- Odadan Çıkar (MOVE_MEMBERS) -->
           <button
             v-if="canMove"
