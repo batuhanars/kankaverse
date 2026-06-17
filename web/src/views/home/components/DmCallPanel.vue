@@ -8,6 +8,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useVoiceStore, type RoomMember } from '@/stores/voice'
 import VoiceControlBar from '@/components/shared/VoiceControlBar.vue'
+import VoiceVideoGrid from '@/components/shared/VoiceVideoGrid.vue'
 
 const props = defineProps<{ channelId: string }>()
 const { t } = useI18n()
@@ -48,7 +49,12 @@ function isMutedFor(m: RoomMember): boolean {
       <span class="text-[12px]" style="color: var(--kv-text-muted);">· {{ members.length }}</span>
     </div>
 
-    <!-- Katılımcı avatarları -->
+    <!-- C4: Video grid (yalnız aktif video track varsa) -->
+    <div v-if="voiceStore.videoTracks.length" class="px-4 pt-3 pb-1">
+      <VoiceVideoGrid />
+    </div>
+
+    <!-- Katılımcı avatarları (video yoksa veya video olmayan katılımcılar) -->
     <div class="flex flex-wrap items-start justify-center gap-6 px-4 py-5">
       <div v-for="m in members" :key="m.userId" class="flex flex-col items-center gap-2 w-[88px]">
         <div

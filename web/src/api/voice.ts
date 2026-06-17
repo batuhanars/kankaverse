@@ -5,6 +5,8 @@ export interface VoiceTokenDto {
   url: string
   canPublish: boolean
   bitrate?: number // ses bit hızı (kbps) — istemci publish'te uygular
+  canPublishCamera?: boolean // C4 — kamera grant (build-dark: default false)
+  canPublishScreen?: boolean // C4 — ekran paylaşımı grant (build-dark: default false)
 }
 
 export interface VoiceParticipantDto {
