@@ -39,4 +39,11 @@ export class UpdateChannelDto {
   @Min(0, { message: 'Kullanıcı limiti 0 veya daha büyük olmalıdır.' })
   @Max(99, { message: 'Kullanıcı limiti en fazla 99 olabilir.' })
   userLimit?: number;
+
+  @ApiPropertyOptional({ example: 64, description: 'Ses kanalı bit hızı (yalnız GUILD_VOICE; kbps, 8–96)' })
+  @IsOptional()
+  @IsInt({ message: 'Bit hızı tam sayı olmalıdır.' })
+  @Min(8, { message: 'Bit hızı en az 8 kbps olmalıdır.' })
+  @Max(96, { message: 'Bit hızı en fazla 96 kbps olabilir.' })
+  bitrate?: number;
 }

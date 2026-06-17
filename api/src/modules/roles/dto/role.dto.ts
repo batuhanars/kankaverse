@@ -31,6 +31,9 @@ export class RoleDto {
   @ApiProperty({ example: false })
   isEveryone: boolean;
 
+  @ApiProperty({ example: false, description: 'Yeni katılan üyelere otomatik atanan varsayılan rol' })
+  isDefault: boolean;
+
   @ApiProperty({ example: 5 })
   memberCount: number;
 }

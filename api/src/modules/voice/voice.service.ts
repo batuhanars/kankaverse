@@ -119,7 +119,8 @@ export class VoiceService {
     });
 
     const token = await at.toJwt();
-    return { token, url: this.url, canPublish };
+    // bitrate: GUILD_VOICE kanal ayarı; DM/grup çağrısında varsayılan 64. İstemci publish'te uygular.
+    return { token, url: this.url, canPublish, bitrate: channel.bitrate ?? 64 };
   }
 
   /** R11 — bu kanalda kullanıcı için kalıcı (server) mute kaydı var mı. mintToken bunu zorlar. */
@@ -488,14 +489,17 @@ export class VoiceService {
       await this.prisma.voiceSession.create({ data: { channelId, userId } });
     }
 
-    this.realtime.emitToRoom(channelId, 'voice.participant_joined', {
+    const payload = {
       channelId,
       participant: {
         userId,
         username: name || userId,
         avatarUrl: this.parseAvatar(metadata),
       },
-    });
+    };
+    // room: bağlı oda üyeleri · voice: sidebar gözlemcileri (canlı gir/çık)
+    this.realtime.emitToRoom(channelId, 'voice.participant_joined', payload);
+    this.realtime.emitToVoicePresence(channelId, 'voice.participant_joined', payload);
   }
 
   private async onParticipantLeft(channelId: string, userId: string) {
@@ -513,6 +517,7 @@ export class VoiceService {
     }
 
     this.realtime.emitToRoom(channelId, 'voice.participant_left', { channelId, userId });
+    this.realtime.emitToVoicePresence(channelId, 'voice.participant_left', { channelId, userId });
   }
 
   private async onRoomFinished(channelId: string) {

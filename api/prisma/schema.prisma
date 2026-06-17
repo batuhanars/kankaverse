@@ -107,6 +107,7 @@ model User {
   emailVerifiedAt     DateTime?
   avatarUrl           String?
   bio                 String?
+  bannerColor         String?            // profil afiş rengi (preset anahtar; allowlist). Görsel afiş ileride.
   deletedAt           DateTime?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
@@ -234,6 +235,7 @@ model Role {
   permissions String[]          @default([])
   iconUrl     String?
   isEveryone  Boolean           @default(false)
+  isDefault   Boolean           @default(false) // yeni katılan üyelere otomatik atanır (guild başına tek)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   memberLinks GuildMemberRole[]
@@ -296,6 +298,7 @@ model Channel {
   position        Int              @default(0)
   slowModeSeconds Int              @default(0)
   userLimit       Int              @default(0) // GUILD_VOICE kullanıcı limiti; 0 = sınırsız
+  bitrate         Int              @default(64) // GUILD_VOICE ses bit hızı (kbps, 8–96); istemci publish'te uygular
   deletedAt       DateTime?
   createdAt       DateTime         @default(now())
   messages        Message[]
@@ -347,6 +350,7 @@ model Message {
   author      User              @relation(fields: [authorId], references: [id])
   content     String
   mentions    String[]          @default([])   // §2: bahsedilen + doğrulanmış userId listesi (tekilleştirilmiş, ≤10)
+  mentionsEveryone Boolean       @default(false) // @everyone toplu bahsetme (everyone rolü mentionable ise tüm üyelere bildirir)
   replyToId   String?
   replyTo     Message?          @relation("MessageReply", fields: [replyToId], references: [id])
   replies     Message[]         @relation("MessageReply")
@@ -622,6 +626,7 @@ model NotificationPref {
   targetType NotifTargetType
   targetId   String            // GUILD → guildId, CHANNEL → channelId
   muted      Boolean           @default(false)
+  mutedUntil DateTime?         // null + muted=true → süresiz; geçmişse mute sona ermiş (bildir)
   level      NotificationLevel @default(ALL)
   updatedAt  DateTime          @updatedAt
 

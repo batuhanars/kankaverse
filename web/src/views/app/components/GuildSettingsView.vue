@@ -11,6 +11,7 @@ import { attachmentsApi } from '@/api/attachments'
 import { invitesApi } from '@/api/invites'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
+import KvNumberInput from '@/components/ui/KvNumberInput.vue'
 import KvSwitch from '@/components/ui/KvSwitch.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import RolesSettingsSection from './RolesSettingsSection.vue'
@@ -280,8 +281,8 @@ function handleClose() {
 }
 
 // ── Davet oluştur ─────────────────────────────────────────────────────────
-const newMaxUses = ref('')
-const newExpiresInHours = ref('')
+const newMaxUses = ref<number | null>(null)
+const newExpiresInHours = ref<number | null>(null)
 const creatingInvite = ref(false)
 const createError = ref('')
 const createdInvite = ref<InviteDto | null>(null)
@@ -299,14 +300,12 @@ async function createInvite() {
   createdInvite.value = null
   try {
     const payload: { maxUses?: number; expiresInHours?: number } = {}
-    const mu = parseInt(newMaxUses.value)
-    if (!isNaN(mu) && mu > 0) payload.maxUses = mu
-    const eh = parseInt(newExpiresInHours.value)
-    if (!isNaN(eh) && eh > 0) payload.expiresInHours = eh
+    if (newMaxUses.value && newMaxUses.value > 0) payload.maxUses = newMaxUses.value
+    if (newExpiresInHours.value && newExpiresInHours.value > 0) payload.expiresInHours = newExpiresInHours.value
     const res = await invitesApi.create(props.guild.id, payload)
     createdInvite.value = res.data
-    newMaxUses.value = ''
-    newExpiresInHours.value = ''
+    newMaxUses.value = null
+    newExpiresInHours.value = null
     await loadInvites()
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
@@ -897,20 +896,22 @@ function confirmNavDiscard() {
 
               <!-- Davet oluştur formu (CREATE_INVITE) -->
               <form v-if="isOwner || can('CREATE_INVITE')" class="flex flex-wrap gap-2 items-end mb-4" @submit.prevent="createInvite">
-                <div style="width: 100px;">
-                  <KvInput
+                <div style="width: 116px;">
+                  <KvNumberInput
                     v-model="newMaxUses"
                     :label="t('invite.maxUsesLabel')"
                     :placeholder="t('invite.maxUsesPlaceholder')"
-                    type="number"
+                    :min="1"
+                    :max="999"
                   />
                 </div>
-                <div style="width: 120px;">
-                  <KvInput
+                <div style="width: 132px;">
+                  <KvNumberInput
                     v-model="newExpiresInHours"
                     :label="t('invite.expiresInHoursLabel')"
                     :placeholder="t('invite.expiresInHoursPlaceholder')"
-                    type="number"
+                    :min="1"
+                    :max="168"
                   />
                 </div>
                 <KvButton type="submit" :loading="creatingInvite">

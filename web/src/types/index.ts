@@ -50,6 +50,7 @@ export interface UserDto {
   friendCode: string // Sprint 3
   isModerator?: boolean // Sprint 4B — backend toUserDto'da eklenmesi gerekir
   bio: string | null // Sprint C5 — profil metni
+  bannerColor: string | null // profil afiş rengi (preset anahtar veya null=varsayılan)
   dmPolicy: DmPolicy // Sprint C5 — Gizlilik sekmesi okur
 }
 
@@ -114,6 +115,7 @@ export interface UserProfileCardDto {
   friendStatus: 'none' | 'friends' | 'pending_in' | 'pending_out' | 'self'
   selfBlocked: boolean
   bio: string | null // Sprint C5
+  bannerColor: string | null // profil afiş rengi (preset veya null=varsayılan)
   memberSince: string // Sprint C5 — createdAt ISO
   mutualFriends: { id: string; username: string; avatarUrl: string | null }[] // Sprint C5
   mutualGuilds: { id: string; name: string; iconUrl: string | null }[] // Sprint C5
@@ -157,6 +159,7 @@ export interface GuildDto {
   discoverable: boolean
   tags: string[]
   bannerColor: string | null
+  memberCount?: number // yalnız findMyGuilds doldurur (Ortamların kartı)
 }
 
 // Sprint C6 §4 — Keşfet kart DTO (discoverable guild'ler; herkes erişir, adultsOnly minöre backend'de süzülür)
@@ -190,12 +193,15 @@ export interface ChannelDto {
   name: string | null
   ageGated: boolean
   isPrivate: boolean
+  // item 6: özel kanal herkese görünür; locked=true ise kullanıcı görür ama GİREMEZ (üye değil)
+  locked?: boolean
   position: number
   slowModeSeconds: number
   unreadCount: number
   unreadMentionCount: number
   categoryId: string | null
   userLimit: number // R10 — ses kanalı kullanıcı limiti (0 = sınırsız, 0–99); metin kanallarında 0
+  bitrate?: number // R10 — ses kanalı bit hızı (kbps, 8–96); metin kanallarında anlamsız
 }
 
 // Sprint V2 — Kategori DTO (§3 toCategoryDto)
@@ -250,6 +256,7 @@ export interface MessageDto {
   attachments?: AttachmentDto[]
   reactions?: ReactionDto[]
   mentions?: string[]  // Sprint V2 — doğrulanmış bahsedilen userId'ler (boşsa [])
+  mentionsEveryone?: boolean  // @everyone toplu bahsetme (everyone rolü mentionable iken)
   pinnedAt: string | null  // Sprint V2 Pins — dolu ise sabitlenen mesaj
 }
 
@@ -288,6 +295,7 @@ export interface RoleDto {
   permissions: string[]
   iconUrl: string | null
   isEveryone: boolean
+  isDefault: boolean // yeni katılan üyelere otomatik atanan varsayılan rol (guild başına tek)
   memberCount: number
 }
 
@@ -394,6 +402,7 @@ export interface NotificationPrefDto {
   targetType: NotifTargetType
   targetId: string
   muted: boolean
+  mutedUntil: string | null // ISO; null = süresiz (muted true ise). Geçmişse mute bitmiş.
   level: NotificationLevel
 }
 

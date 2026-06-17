@@ -9,14 +9,18 @@ import { useVoiceStore } from '@/stores/voice'
 import { useRolesStore } from '@/stores/roles'
 import { useMembersStore } from '@/stores/members'
 import { useEventsStore } from '@/stores/events'
+import { useToastStore } from '@/stores/toast'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { useGuildMenuActions } from '@/composables/useGuildMenuActions'
+import { useMenuCoordinator } from '@/composables/useMenuCoordinator'
+import { useGuildQuickAction } from '@/composables/useGuildQuickAction'
 import { useChannelMenuActions } from '@/composables/useChannelMenuActions'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { guildsApi } from '@/api/guilds'
 import { channelsApi } from '@/api/channels'
 import { NotificationLevel, NotifTargetType } from '@/types'
 import NotifLevelFlyout from '@/components/shared/NotifLevelFlyout.vue'
+import MuteDurationFlyout from '@/components/shared/MuteDurationFlyout.vue'
 import GuildSettingsView from '@/views/app/components/GuildSettingsView.vue'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
@@ -37,6 +41,7 @@ const voiceStore = useVoiceStore()
 const rolesStore = useRolesStore()
 const membersStore = useMembersStore()
 const eventsStore = useEventsStore()
+const toastStore = useToastStore()
 const prefsStore = useNotificationPrefsStore()
 
 // ── İş A: kanal okunmamış göstergelerini bildirim tercihine göre filtrele ──
@@ -231,6 +236,13 @@ function voiceDuration(channelId: string): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
+// Ses kanalındaki canlı kişi sayısı — bağlı kanalda LiveKit odası (güvenilir),
+// diğerlerinde WS-beslemeli panel listesi. "00 / limit" rozeti için.
+function voiceCount(channelId: string): number {
+  if (voiceStore.connectedChannelId === channelId) return voiceStore.roomParticipants.length
+  return voiceStore.participantsFor(channelId).length
+}
+
 // ── Drag-reorder (native HTML5 DnD; yalnız OWNER/ADMIN) ──
 const dragChannelId = ref<string | null>(null)
 const dragCategoryId = ref<string | null>(null)
@@ -321,6 +333,12 @@ function onCategoryHeaderDrop(cat: CategoryDto) {
 function selectChannel(channel: ChannelDto) {
   const guildId = guildsStore.activeGuildId
   if (!guildId) return
+  // item 6: kilitli özel kanal → görünür ama giriş yok. Yetkili içerideyse seni
+  // ekleyebilir; o zaman locked=false olur (channel.updated ile anında açılır).
+  if (channel.locked) {
+    toastStore.info(t('channel.lockedToast'))
+    return
+  }
   // Ses kanalı: oturuma katıl + kanalı aktif yap (merkez VoiceRoomView'a geçer)
   if (channel.type === 'GUILD_VOICE') {
     voiceStore.join(channel.id)
@@ -377,7 +395,8 @@ async function submitCreate() {
 const settingsTarget = ref<ChannelDto | null>(null)
 const settingsName = ref('')
 const settingsSlowMode = ref(0)
-const settingsUserLimit = ref(0) // R10 — ses kanalı kullanıcı limiti (0 = sınırsız)
+const settingsUserLimit = ref<number | null>(0) // R10 — ses kanalı kullanıcı limiti (0 = sınırsız)
+const settingsBitrate = ref(64) // R10 — ses kanalı bit hızı (kbps, 8–96)
 const settingsSaving = ref(false)
 const settingsError = ref('')
 
@@ -396,6 +415,7 @@ function openSettings(channel: ChannelDto) {
   settingsName.value = channel.name ?? ''
   settingsSlowMode.value = channel.slowModeSeconds ?? 0
   settingsUserLimit.value = channel.userLimit ?? 0
+  settingsBitrate.value = channel.bitrate ?? 64
   settingsError.value = ''
   // Özel kanal ise üye listesini ve guild üyelerini çek
   if (channel.isPrivate) {
@@ -511,13 +531,15 @@ async function submitSettings() {
   settingsSaving.value = true
   settingsError.value = ''
   try {
-    const payload: { name?: string; slowModeSeconds?: number; userLimit?: number } = {}
+    const payload: { name?: string; slowModeSeconds?: number; userLimit?: number; bitrate?: number } = {}
     if (name !== target.name) payload.name = name
     if (settingsSlowMode.value !== (target.slowModeSeconds ?? 0)) payload.slowModeSeconds = settingsSlowMode.value
-    // R10 — ses kanalı kullanıcı limiti (yalnız GUILD_VOICE; 0–99 sınırla)
+    // R10 — ses kanalı kullanıcı limiti + bit hızı (yalnız GUILD_VOICE)
     if (target.type === 'GUILD_VOICE') {
       const limit = Math.min(99, Math.max(0, Math.floor(settingsUserLimit.value || 0)))
       if (limit !== (target.userLimit ?? 0)) payload.userLimit = limit
+      const bitrate = Math.min(96, Math.max(8, Math.floor(settingsBitrate.value || 64)))
+      if (bitrate !== (target.bitrate ?? 64)) payload.bitrate = bitrate
     }
     if (Object.keys(payload).length > 0) {
       await channelsStore.updateChannel(target.id, guildId, payload)
@@ -539,6 +561,13 @@ const deleteError = ref('')
 function openDelete(channel: ChannelDto) {
   deleteTarget.value = channel
   deleteError.value = ''
+}
+
+// Düzenleme modalından sil → ayarlar kapanır, silme onayı açılır (her yerden sil)
+function deleteFromSettings() {
+  const ch = settingsTarget.value
+  settingsTarget.value = null
+  if (ch) openDelete(ch)
 }
 
 async function confirmDelete() {
@@ -573,6 +602,21 @@ function openCreateCategory() {
   createCategoryError.value = ''
   showCreateCategory.value = true
 }
+
+// ServerRail sağ-tık menüsünden gelen hızlı-aksiyonlar (Kanal/Kategori/Etkinlik oluştur):
+// hedef ortama geçince burada tüketilip ilgili modal açılır.
+const { pending: quickActionPending, consume: consumeQuickAction } = useGuildQuickAction()
+watch(
+  [quickActionPending, activeGuildId],
+  () => {
+    if (!quickActionPending.value) return
+    const action = consumeQuickAction(activeGuildId.value)
+    if (action === 'create-channel') openCreate(null)
+    else if (action === 'create-category') openCreateCategory()
+    else if (action === 'create-event') showCreateEventWizard.value = true
+  },
+  { immediate: true, flush: 'post' },
+)
 
 async function submitCreateCategory() {
   const name = createCategoryName.value.trim()
@@ -664,17 +708,28 @@ function closeCategoryMenu() {
 }
 
 // ── Ortam menüsü (başlık tek-buton → Discord-tarzı dropdown) ──
+// Menü koordinatörü: aynı anda tek menü (Görsel #14 — rail menüsüyle üst üste binmesin)
+const { openExclusive, releaseIfOwner, closeOnOther } = useMenuCoordinator()
 const showGuildMenu = ref(false)
-function toggleGuildMenu() { showGuildMenu.value = !showGuildMenu.value }
+function toggleGuildMenu() {
+  showGuildMenu.value = !showGuildMenu.value
+  if (showGuildMenu.value) openExclusive('cp-guild')
+  else releaseIfOwner('cp-guild')
+}
 function closeGuildMenu() {
   showGuildMenu.value = false
+  releaseIfOwner('cp-guild')
 }
+closeOnOther('cp-guild', () => { showGuildMenu.value = false })
+closeOnOther('cp-channel', () => { contextChannel.value = null })
 
 // ── Ortam menü aksiyonları (ServerRail ile paylaşılan composable) ──
 const {
   markGuildRead,
   isGuildMuted,
-  toggleGuildMute,
+  guildMutedUntil,
+  muteGuildFor,
+  unmuteGuild,
   guildLevel,
   setGuildLevel,
   copyGuildId,
@@ -727,9 +782,10 @@ const chCtxPosStyle = computed(() => {
 function openChannelContext(event: MouseEvent, channel: ChannelDto) {
   // Bu sağ-tık document'taki kapatıcıya ULAŞMASIN (yoksa açıldığı anda kapanır).
   event.stopPropagation()
-  // Tek anda tek menü: guild/kategori menülerini kapat.
+  // Tek anda tek menü: guild/kategori menülerini + diğer component menülerini kapat.
   closeGuildMenu()
   closeCategoryMenu()
+  openExclusive('cp-channel')
   chCtxX.value = event.clientX
   chCtxY.value = event.clientY
   contextChannel.value = channel
@@ -737,6 +793,7 @@ function openChannelContext(event: MouseEvent, channel: ChannelDto) {
 
 function closeChannelContext() {
   contextChannel.value = null
+  releaseIfOwner('cp-channel')
 }
 
 // Kanal context aksiyonları (paylaşılan composable; hedef = contextChannel)
@@ -909,18 +966,13 @@ onUnmounted(() => {
 
         <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
 
-        <!-- Sunucuyu Sustur — sağda işaret muted ise -->
-        <button
-          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-text-primary);"
-          role="menuitemcheckbox"
-          :aria-checked="isGuildMuted"
-          @click="toggleGuildMute"
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-          <span class="flex-1 min-w-0">{{ t('guildMenu.mute') }}</span>
-          <svg v-if="isGuildMuted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="color: var(--kv-accent-500);"><path d="M20 6 9 17l-5-5"/></svg>
-        </button>
+        <!-- Sunucuyu Sustur — süre menüsü (Görsel #15) -->
+        <MuteDurationFlyout
+          :muted="isGuildMuted"
+          :muted-until="guildMutedUntil"
+          @mute="muteGuildFor"
+          @unmute="unmuteGuild"
+        />
 
         <!-- Bildirim Ayarları — yana açılan flyout (NotifLevelFlyout) -->
         <NotifLevelFlyout :level="guildLevel" @select="setGuildLevel" />
@@ -1057,6 +1109,13 @@ onUnmounted(() => {
         </button>
 
         <span
+          v-if="channel.type === 'GUILD_VOICE' && channel.userLimit > 0"
+          class="shrink-0 text-[11px] font-semibold px-1.5 rounded-full mr-1 group-hover:hidden"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary); line-height: 1.5; font-variant-numeric: tabular-nums;"
+          :title="t('channel.voiceCountLabel')"
+        >{{ String(voiceCount(channel.id)).padStart(2, '0') }} / {{ channel.userLimit }}</span>
+
+        <span
           v-if="channel.type === 'GUILD_VOICE' && voiceDuration(channel.id)"
           class="shrink-0 text-[11px] font-semibold mr-1.5"
           style="color: var(--kv-online, #3DB46E); font-variant-numeric: tabular-nums;"
@@ -1073,28 +1132,30 @@ onUnmounted(() => {
           v-if="isAdmin"
           class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pr-2"
         >
+          <!-- Davet et (solda) -->
           <button
-            class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
-            style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
+            class="kv-chan-action flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer transition-colors"
+            style="width: var(--kv-control-sm); height: var(--kv-control-sm);"
+            :title="t('channel.invite')"
+            @click.stop="showInvitePeople = true"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <line x1="19" y1="8" x2="19" y2="14"/>
+              <line x1="22" y1="11" x2="16" y2="11"/>
+            </svg>
+          </button>
+          <!-- Düzenle / dişli (sağda) -->
+          <button
+            class="kv-chan-action flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer transition-colors"
+            style="width: var(--kv-control-sm); height: var(--kv-control-sm);"
             :title="t('channel.settingsTitle')"
             @click.stop="openSettings(channel)"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-          </button>
-          <button
-            class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
-            style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
-            :title="t('channel.delete')"
-            @click.stop="openDelete(channel)"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-              <path d="M10 11v6M14 11v6"/>
-              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
           </button>
         </div>
@@ -1288,28 +1349,30 @@ onUnmounted(() => {
               v-if="isAdmin"
               class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pr-2"
             >
+              <!-- Davet et (solda) -->
               <button
-                class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
-                style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
+                class="kv-chan-action flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer transition-colors"
+                style="width: var(--kv-control-sm); height: var(--kv-control-sm);"
+                :title="t('channel.invite')"
+                @click.stop="showInvitePeople = true"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <line x1="19" y1="8" x2="19" y2="14"/>
+                  <line x1="22" y1="11" x2="16" y2="11"/>
+                </svg>
+              </button>
+              <!-- Düzenle / dişli (sağda) -->
+              <button
+                class="kv-chan-action flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer transition-colors"
+                style="width: var(--kv-control-sm); height: var(--kv-control-sm);"
                 :title="t('channel.settingsTitle')"
                 @click.stop="openSettings(channel)"
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
-              </button>
-              <button
-                class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
-                style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
-                :title="t('channel.delete')"
-                @click.stop="openDelete(channel)"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="3 6 5 6 21 6"/>
-                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                  <path d="M10 11v6M14 11v6"/>
-                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
               </button>
             </div>
@@ -1535,22 +1598,60 @@ onUnmounted(() => {
         </select>
       </div>
 
-      <!-- Kullanıcı limiti (R10 — yalnız ses kanalları) -->
+      <!-- Kullanıcı limiti (R10 — yalnız ses kanalları; Discord-tarzı kaydırıcı: ∞ … 99) -->
       <div v-if="settingsTarget.type === 'GUILD_VOICE'" class="flex flex-col gap-1.5">
-        <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
-          {{ t('channel.userLimitLabel') }}
-        </label>
+        <div class="flex items-center justify-between">
+          <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+            {{ t('channel.userLimitLabel') }}
+          </label>
+          <span class="text-[13px] font-semibold" style="color: var(--kv-text-primary); font-variant-numeric: tabular-nums;">
+            {{ (settingsUserLimit ?? 0) > 0 ? settingsUserLimit : '∞' }}
+          </span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="99"
+          step="1"
+          :value="settingsUserLimit ?? 0"
+          class="kv-range w-full"
+          :style="`background: linear-gradient(to right, var(--kv-accent-500) ${((settingsUserLimit ?? 0) / 99) * 100}%, var(--kv-bg-elevated) ${((settingsUserLimit ?? 0) / 99) * 100}%);`"
+          @input="settingsUserLimit = Number(($event.target as HTMLInputElement).value)"
+        />
+        <div class="flex justify-between text-[11px]" style="color: var(--kv-text-muted);">
+          <span>∞</span><span>99</span>
+        </div>
         <p class="text-[12px]" style="color: var(--kv-text-muted);">
           {{ t('channel.userLimitHint') }}
         </p>
+      </div>
+
+      <!-- Bit hızı (R10 — yalnız ses kanalları; Discord-tarzı kaydırıcı: 8 … 96 kbps) -->
+      <div v-if="settingsTarget.type === 'GUILD_VOICE'" class="flex flex-col gap-1.5">
+        <div class="flex items-center justify-between">
+          <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+            {{ t('channel.bitrateLabel') }}
+          </label>
+          <span class="text-[13px] font-semibold" style="color: var(--kv-text-primary); font-variant-numeric: tabular-nums;">
+            {{ settingsBitrate }} kbps
+          </span>
+        </div>
         <input
-          v-model.number="settingsUserLimit"
-          type="number"
-          min="0"
-          max="99"
-          class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] outline-none border"
-          style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
+          type="range"
+          min="8"
+          max="96"
+          step="8"
+          :value="settingsBitrate"
+          class="kv-range w-full"
+          :style="`background: linear-gradient(to right, var(--kv-accent-500) ${((settingsBitrate - 8) / 88) * 100}%, var(--kv-bg-elevated) ${((settingsBitrate - 8) / 88) * 100}%);`"
+          @input="settingsBitrate = Number(($event.target as HTMLInputElement).value)"
         />
+        <div class="flex justify-between text-[11px]" style="color: var(--kv-text-muted);">
+          <span>8 kbps</span><span>96 kbps</span>
+        </div>
+        <p class="text-[12px]" style="color: var(--kv-text-muted);">
+          {{ t('channel.bitrateHint') }}
+        </p>
       </div>
 
       <!-- ── Özel kanal üye yönetimi (yalnız isPrivate + OWNER/ADMIN) ── -->
@@ -1689,13 +1790,19 @@ onUnmounted(() => {
         </div>
       </template>
 
-      <div class="flex justify-end gap-3 pt-1">
-        <KvButton type="button" variant="ghost" @click="settingsTarget = null">
-          {{ t('common.cancel') }}
+      <div class="flex items-center justify-between gap-3 pt-1">
+        <!-- Her yerden sil: düzenleme ekranından da kanal silinebilir (Görsel #5/#6) -->
+        <KvButton type="button" variant="danger" @click="deleteFromSettings">
+          {{ t('channel.delete') }}
         </KvButton>
-        <KvButton type="submit" :loading="settingsSaving" :disabled="!settingsName.trim()">
-          {{ t('channel.settingsButton') }}
-        </KvButton>
+        <div class="flex gap-3">
+          <KvButton type="button" variant="ghost" @click="settingsTarget = null">
+            {{ t('common.cancel') }}
+          </KvButton>
+          <KvButton type="submit" :loading="settingsSaving" :disabled="!settingsName.trim()">
+            {{ t('channel.settingsButton') }}
+          </KvButton>
+        </div>
       </div>
     </form>
   </KvModal>
@@ -1937,6 +2044,43 @@ onUnmounted(() => {
 /* Drag-reorder: üzerine bırakılacak hedef göstergesi (üst aksan çizgisi) */
 .kv-drop-target {
   box-shadow: inset 0 2px 0 0 var(--kv-accent-500);
+}
+
+/* Ses kanalı kullanıcı-limiti kaydırıcısı (Discord-tarzı: accent dolgu + beyaz thumb) */
+.kv-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+.kv-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  cursor: pointer;
+}
+.kv-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+/* Kanal satırı hover aksiyon butonları (davet/dişli) — Discord gibi belirgin,
+   sönük değil (Görsel #7→#8). Muted yerine secondary; hover'da primary. */
+.kv-chan-action {
+  color: var(--kv-text-secondary);
+}
+.kv-chan-action:hover {
+  color: var(--kv-text-primary);
 }
 
 /* Kırmızı okunmamış sayaç rozeti — kanal satırı sağında */

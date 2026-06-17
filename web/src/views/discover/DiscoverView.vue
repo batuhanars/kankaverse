@@ -3,7 +3,7 @@
  * DiscoverView — Keşfet (Sunucu Keşfi). Arama + etiket filtre + renk-afişli sunucu kartları + Katıl.
  * adultsOnly süzme + join gate'leri BACKEND'de (frontend ekstra süzme yapmaz). Sözleşme C6 §5.
  */
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDebounceFn } from '@vueuse/core'
@@ -21,6 +21,9 @@ const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const authStore = useAuthStore()
 const toast = useToastStore()
+
+// Zaten üyesi olduğum ortamlar → keşfette "Katıl" yerine "Sunucuya Git" (Görsel #35)
+const myGuildIds = computed(() => new Set(guildsStore.guilds.map((g) => g.id)))
 
 const search = ref('')
 const activeTag = ref<string | null>(null)
@@ -210,7 +213,9 @@ onMounted(() => {
               :key="g.id"
               :guild="g"
               :joining="joiningId === g.id"
+              :is-member="myGuildIds.has(g.id)"
               @join="joinGuild(g)"
+              @open="goToGuild(g.id)"
             />
           </div>
 

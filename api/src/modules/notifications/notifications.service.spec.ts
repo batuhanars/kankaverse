@@ -275,6 +275,7 @@ describe('NotificationsService', () => {
         targetType: 'GUILD',
         targetId: 'guild-1',
         muted: true,
+        mutedUntil: null,
         level: 'ALL',
       });
 
@@ -286,7 +287,7 @@ describe('NotificationsService', () => {
 
       expect(membershipMock.requireGuildMembership).toHaveBeenCalledWith(USER_ID, 'guild-1');
       expect(membershipMock.requireChannelAccess).not.toHaveBeenCalled();
-      expect(dto).toEqual({ targetType: 'GUILD', targetId: 'guild-1', muted: true, level: 'ALL' });
+      expect(dto).toEqual({ targetType: 'GUILD', targetId: 'guild-1', muted: true, mutedUntil: null, level: 'ALL' });
     });
 
     it('CHANNEL hedefi → requireChannelAccess çağrılır', async () => {

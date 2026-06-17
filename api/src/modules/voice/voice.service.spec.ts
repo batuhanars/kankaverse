@@ -46,7 +46,7 @@ const prismaMock = {
 
 const membershipMock = { requireChannelAccess: jest.fn(), requireNoDmBlock: jest.fn() };
 const permissionsMock = { hasGuildPermission: jest.fn() };
-const realtimeMock = { emitToRoom: jest.fn(), emitToUsers: jest.fn() };
+const realtimeMock = { emitToRoom: jest.fn(), emitToUsers: jest.fn(), emitToVoicePresence: jest.fn() };
 const dmPermissionMock = { canDm: jest.fn() };
 
 function makeConfig(overrides: Record<string, unknown> = {}) {
@@ -120,7 +120,7 @@ describe('VoiceService.mintToken', () => {
     const svc = makeService();
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
 
-    expect(res).toEqual({ token: 'jwt-token', url: 'wss://test.livekit.cloud', canPublish: true });
+    expect(res).toEqual({ token: 'jwt-token', url: 'wss://test.livekit.cloud', canPublish: true, bitrate: 64 });
     expect(mockAddGrant).toHaveBeenCalledWith(
       expect.objectContaining({
         roomJoin: true,

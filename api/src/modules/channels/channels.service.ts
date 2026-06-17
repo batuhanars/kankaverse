@@ -14,7 +14,12 @@ import { UpdateChannelDto } from './dto/update-channel.dto';
 import { AddChannelMemberDto } from './dto/add-channel-member.dto';
 import { Channel } from '@prisma/client';
 
-export function toChannelDto(channel: Channel, unreadCount = 0, unreadMentionCount = 0) {
+export function toChannelDto(
+  channel: Channel,
+  unreadCount = 0,
+  unreadMentionCount = 0,
+  locked = false,
+) {
   return {
     id: channel.id,
     type: channel.type,
@@ -23,9 +28,13 @@ export function toChannelDto(channel: Channel, unreadCount = 0, unreadMentionCou
     name: channel.name,
     ageGated: channel.ageGated,
     isPrivate: channel.isPrivate,
+    // item 6: özel kanal HERKESE görünür; locked=true ise kullanıcı giremez (üye değil).
+    // Kullanıcıya göre hesaplanır — broadcast'lerde per-user emit edilir.
+    locked,
     position: channel.position,
     slowModeSeconds: channel.slowModeSeconds,
     userLimit: channel.userLimit,
+    bitrate: channel.bitrate, // R10 — ses kanalı bit hızı (kbps)
     unreadCount,
     unreadMentionCount, // REV-4: okunmamış bahsetme (kendimi @işaret eden, lastReadAt sonrası)
   };
@@ -49,21 +58,45 @@ export class ChannelsService {
   }
 
   /**
-   * Realtime kanal-olayı alıcıları (sızıntı-güvenli):
-   *  - Public kanal → tüm guild üyeleri.
-   *  - Özel kanal → yalnız OWNER/ADMIN + ChannelMember'lar (findByGuild görünürlüğüyle aynı).
+   * item 6 — kanal created/updated olayını TÜM guild üyelerine yayınla.
+   * Özel kanal artık herkese GÖRÜNÜR (locked), yalnız giriş kapalı. `locked` kullanıcıya
+   * göre değiştiğinden (üye/yetkili → false, diğer → true) tek DTO ile broadcast edilemez;
+   * per-user emit edilir. Public kanalda locked her zaman false.
    */
-  private async channelEventRecipients(channelId: string, guildId: string, isPrivate: boolean): Promise<string[]> {
+  private async emitChannelEventToGuild(
+    event: 'channel.created' | 'channel.updated',
+    guildId: string,
+    channel: Channel,
+  ): Promise<void> {
     const members = await this.prisma.guildMember.findMany({
       where: { guildId },
       select: { userId: true, role: true },
     });
-    if (!isPrivate) return members.map((m) => m.userId);
-    const privileged = members.filter((m) => m.role === 'OWNER' || m.role === 'ADMIN').map((m) => m.userId);
-    const channelMembers = (
-      await this.prisma.channelMember.findMany({ where: { channelId }, select: { userId: true } })
-    ).map((m) => m.userId);
-    return [...new Set([...privileged, ...channelMembers])];
+    let channelMemberIds = new Set<string>();
+    if (channel.isPrivate) {
+      const cms = await this.prisma.channelMember.findMany({
+        where: { channelId: channel.id },
+        select: { userId: true },
+      });
+      channelMemberIds = new Set(cms.map((m) => m.userId));
+    }
+    for (const m of members) {
+      const privileged = m.role === 'OWNER' || m.role === 'ADMIN';
+      const locked = channel.isPrivate && !privileged && !channelMemberIds.has(m.userId);
+      this.realtime.emitToUser(m.userId, event, {
+        guildId,
+        channel: toChannelDto(channel, 0, 0, locked),
+      });
+    }
+  }
+
+  /** Guild'in tüm üye id'leri — silme/görünürlük olaylarında (locked'a gerek yok). */
+  private async allGuildMemberIds(guildId: string): Promise<string[]> {
+    const members = await this.prisma.guildMember.findMany({
+      where: { guildId },
+      select: { userId: true },
+    });
+    return members.map((m) => m.userId);
   }
 
   async create(userId: string, guildId: string, dto: CreateChannelDto) {
@@ -93,10 +126,9 @@ export class ChannelsService {
       },
     });
 
-    // Realtime: kanal oluşturuldu → görebilecek üyelere yay (özel kanal sızdırmaz)
+    // Realtime: kanal oluşturuldu → TÜM guild üyelerine (özel kanal görünür ama locked)
     const dtoOut = toChannelDto(channel);
-    const recipients = await this.channelEventRecipients(channel.id, guildId, channel.isPrivate);
-    this.realtime.emitToUsers(recipients, 'channel.created', { guildId, channel: dtoOut });
+    await this.emitChannelEventToGuild('channel.created', guildId, channel);
 
     return dtoOut;
   }
@@ -116,26 +148,25 @@ export class ChannelsService {
       },
     });
 
-    // B4/B5 (R7): özel kanal filtresi — OWNER/ADMIN tüm kanalları görür;
-    // MEMBER yalnız genel kanallar + üyesi olduğu özel kanalları görür.
+    // item 6: özel kanallar artık HERKESE görünür (locked). OWNER/ADMIN ve ChannelMember
+    // için locked=false (girebilir); diğer üyeler için locked=true (görür, giremez).
     const isPrivileged = membership.role === 'OWNER' || membership.role === 'ADMIN';
-    let visibleChannels = channels;
+    let memberChannelIds = new Set<string>();
     if (!isPrivileged) {
-      // Kullanıcının ChannelMember olduğu kanalların id kümesini tek sorguyla al
       const channelMemberships = await this.prisma.channelMember.findMany({
         where: { userId, channelId: { in: channels.map((ch) => ch.id) } },
         select: { channelId: true },
       });
-      const memberChannelIds = new Set(channelMemberships.map((cm) => cm.channelId));
-
-      visibleChannels = channels.filter(
-        (ch) => !ch.isPrivate || memberChannelIds.has(ch.id),
-      );
+      memberChannelIds = new Set(channelMemberships.map((cm) => cm.channelId));
     }
+    const lockedFor = (ch: (typeof channels)[number]): boolean =>
+      ch.isPrivate && !isPrivileged && !memberChannelIds.has(ch.id);
 
-    // Her görünür kanal için okunmamış mesaj + okunmamış bahsetme sayısını paralel hesapla
+    // Her kanal için okunmamış mesaj + okunmamış bahsetme sayısını paralel hesapla.
+    // Locked (girilemez) kanalda okunmamış sayısı sızdırmamak için 0 bırakılır.
     const counts = await Promise.all(
-      visibleChannels.map(async (ch) => {
+      channels.map(async (ch) => {
+        if (lockedFor(ch)) return { unread: 0, mentions: 0 };
         const lastRead = ch.channelReads[0]?.lastReadAt ?? null;
         const base = {
           channelId: ch.id,
@@ -145,14 +176,16 @@ export class ChannelsService {
         };
         const [unread, mentions] = await Promise.all([
           this.prisma.message.count({ where: base }),
-          // REV-4: okunmamış bahsetme — mentions dizisi beni içeriyor
-          this.prisma.message.count({ where: { ...base, mentions: { has: userId } } }),
+          // REV-4: okunmamış bahsetme — beni içeren mention VEYA @everyone toplu bahsetme
+          this.prisma.message.count({
+            where: { ...base, OR: [{ mentions: { has: userId } }, { mentionsEveryone: true }] },
+          }),
         ]);
         return { unread, mentions };
       }),
     );
 
-    return visibleChannels.map((ch, i) => toChannelDto(ch, counts[i].unread, counts[i].mentions));
+    return channels.map((ch, i) => toChannelDto(ch, counts[i].unread, counts[i].mentions, lockedFor(ch)));
   }
 
   /** POST /channels/:id/read — kanaldaki son mesajı okundu işaretle */
@@ -192,13 +225,13 @@ export class ChannelsService {
         ...(dto.isPrivate !== undefined && { isPrivate: dto.isPrivate }),
         ...(dto.slowModeSeconds !== undefined && { slowModeSeconds: dto.slowModeSeconds }),
         ...(dto.userLimit !== undefined && { userLimit: dto.userLimit }),
+        ...(dto.bitrate !== undefined && { bitrate: dto.bitrate }),
         ...('categoryId' in dto && { categoryId: dto.categoryId ?? null }),
       },
     });
 
     const dtoOut = toChannelDto(updated);
-    const recipients = await this.channelEventRecipients(updated.id, updated.guildId!, updated.isPrivate);
-    this.realtime.emitToUsers(recipients, 'channel.updated', { guildId: updated.guildId, channel: dtoOut });
+    await this.emitChannelEventToGuild('channel.updated', updated.guildId!, updated);
 
     return dtoOut;
   }
@@ -250,11 +283,10 @@ export class ChannelsService {
       ),
     );
 
-    // Realtime: güncel kanalları görebilecek üyelere yay (özel kanal sızdırmaz)
+    // Realtime: güncel kanalları TÜM guild üyelerine yay (özel kanal görünür ama locked)
     const updated = await this.prisma.channel.findMany({ where: { id: { in: valid.map((v) => v.id) } } });
     for (const ch of updated) {
-      const recipients = await this.channelEventRecipients(ch.id, guildId, ch.isPrivate);
-      this.realtime.emitToUsers(recipients, 'channel.updated', { guildId, channel: toChannelDto(ch) });
+      await this.emitChannelEventToGuild('channel.updated', guildId, ch);
     }
     return null;
   }
@@ -371,6 +403,12 @@ export class ChannelsService {
       include: { user: { select: { id: true, username: true, avatarUrl: true } } },
     });
 
+    // item 6: eklenen kullanıcının kilidi anında açılsın (locked=false) → kanala girebilir.
+    this.realtime.emitToUser(dto.userId, 'channel.updated', {
+      guildId: channel.guildId,
+      channel: toChannelDto(channel, 0, 0, false),
+    });
+
     return {
       id: member.user.id,
       username: member.user.username,
@@ -406,6 +444,19 @@ export class ChannelsService {
       where: { channelId, userId: targetUserId },
     });
 
+    // item 6: çıkarılan kullanıcının kilidi yeniden kapansın (özel kanal + yetkisizse).
+    if (channel.isPrivate) {
+      const target = await this.prisma.guildMember.findUnique({
+        where: { guildId_userId: { guildId: channel.guildId, userId: targetUserId } },
+        select: { role: true },
+      });
+      const privileged = target?.role === 'OWNER' || target?.role === 'ADMIN';
+      this.realtime.emitToUser(targetUserId, 'channel.updated', {
+        guildId: channel.guildId,
+        channel: toChannelDto(channel, 0, 0, !privileged),
+      });
+    }
+
     return null;
   }
 
@@ -428,8 +479,8 @@ export class ChannelsService {
       throw new ConflictException({ message: 'Son kanal silinemez; ortamda en az bir kanal olmalıdır.', error: 'LAST_CHANNEL' });
     }
 
-    // Alıcıları silmeden ÖNCE hesapla (özel kanal görünürlüğü)
-    const recipients = await this.channelEventRecipients(channel.id, channel.guildId!, channel.isPrivate);
+    // item 6: özel kanal herkese görünür → silme de TÜM guild üyelerine (ghost kanal kalmasın)
+    const recipients = await this.allGuildMemberIds(channel.guildId!);
 
     await this.prisma.channel.update({
       where: { id: channelId },

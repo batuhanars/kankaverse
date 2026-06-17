@@ -7,6 +7,7 @@ import { messagesApi } from '@/api/messages'
 import MessageRow from './MessageRow.vue'
 import UserCardPopover from './UserCardPopover.vue'
 import ReportModal from './ReportModal.vue'
+import ForwardMessageModal from './ForwardMessageModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import type { MessageDto, GuildMemberDto } from '@/types'
 
@@ -36,7 +37,9 @@ function mentionResolver(userId: string): string {
 
 // Sprint V2: kendi bahsedilme vurgusu
 const isMentioned = computed(
-  () => !!(props.message.mentions?.includes(authStore.user?.id ?? ''))
+  () =>
+    props.message.mentionsEveryone === true ||
+    !!props.message.mentions?.includes(authStore.user?.id ?? ''),
 )
 
 // Kullanıcı kartı popover (yazar adına tıklama — MessageRow gelecekte emit ile bağlanabilir)
@@ -46,6 +49,8 @@ const cardY = ref(0)
 
 // Şikâyet modalı
 const showReportModal = ref(false)
+// İlet (forward) modalı
+const showForward = ref(false)
 
 // Düzenleme durumu
 const editing = ref(false)
@@ -192,6 +197,7 @@ onUnmounted(() => {
     :can-pin="canPin ?? false"
     :can-manage-messages="canManageMessages ?? false"
     @reply="emit('reply', $event)"
+    @forward="showForward = true"
     @edit="startEdit"
     @delete="openDeleteConfirm"
     @report="showReportModal = true"
@@ -259,6 +265,13 @@ onUnmounted(() => {
     target-type="MESSAGE"
     :target-id="message.id"
     @close="showReportModal = false"
+  />
+
+  <!-- Mesaj ilet (forward) modalı -->
+  <ForwardMessageModal
+    v-if="showForward"
+    :message="message"
+    @close="showForward = false"
   />
 
   <!-- Mesaj silme onayı -->

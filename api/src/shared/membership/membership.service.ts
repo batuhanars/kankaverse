@@ -119,6 +119,52 @@ export class MembershipService {
   }
 
   /**
+   * Kanal GÖRÜNÜR mü (erişebilir değil) — "görünür ama girişi kapalı" özel kanal modeli.
+   * requireChannelAccess'ten farkı: özel kanal üye-bloğu YOK (private kanal tüm guild
+   * üyelerine görünür; giriş `requireChannelAccess` ile ayrıca kapılır). Yaş kapısı KORUNUR
+   * (minör ageGated/adultsOnly kanalın presence'ını dahi görmez). Ses presence aboneliği
+   * (voice:subscribe) bu kapıyı kullanır.
+   */
+  async requireChannelVisible(userId: string, channelId: string) {
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId, deletedAt: null },
+      include: { guild: true },
+    });
+    if (!channel) {
+      throw new NotFoundException({ message: 'Kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
+    }
+
+    if (channel.guildId) {
+      const needsAgeCheck = channel.ageGated || (channel.guild?.adultsOnly ?? false);
+      if (needsAgeCheck) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { isMinor: true },
+        });
+        if (user?.isMinor) {
+          throw new ForbiddenException({ message: 'Bu kanala yaşınız nedeniyle erişemezsiniz.', error: 'AGE_RESTRICTED' });
+        }
+      }
+      const membership = await this.prisma.guildMember.findUnique({
+        where: { guildId_userId: { guildId: channel.guildId, userId } },
+      });
+      if (!membership) {
+        throw new ForbiddenException({ message: 'Bu kanala erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+      }
+      // Özel kanal bloğu YOK — görünürlük herkese (item 6).
+    } else {
+      const member = await this.prisma.channelMember.findUnique({
+        where: { channelId_userId: { channelId, userId } },
+      });
+      if (!member) {
+        throw new ForbiddenException({ message: 'Bu kanala erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+      }
+    }
+
+    return channel;
+  }
+
+  /**
    * DM kanalında aktif blok kontrolü.
    * DM mesajı GÖNDERİMİNDE çağrılır: blok sonradan konuşmayı keser.
    * G3: BLOCKED yerine JENERİK DM_NOT_ALLOWED — engellenme bilgisi sızdırılmaz.

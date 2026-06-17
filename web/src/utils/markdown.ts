@@ -90,6 +90,10 @@ const PURIFY_CONFIG: DOMPurifyConfig = {
 //    \x02 (STX) ve \x03 (ETX) — kullanıcı girişinde imkânsız
 // ────────────────────────────────────────────────────────────
 const MENTION_RE = /<@([a-zA-Z0-9_-]+)>/g
+// @everyone rol token'ı: <@&roleId> (& kullanıcı regex'ine takılmaz). Yalnız everyone önerilir.
+const ROLE_MENTION_RE = /<@&[a-zA-Z0-9_-]+>/g
+const EVERYONE_PLACEHOLDER = '\x02EVERYONE\x03'
+const EVERYONE_PLACEHOLDER_RE = /\x02EVERYONE\x03/g
 const PLACEHOLDER_PREFIX = '\x02MENTION:'
 const PLACEHOLDER_SUFFIX = '\x03'
 
@@ -138,9 +142,12 @@ export function renderMessageHtml(
 ): string {
   if (!content) return ''
 
-  // Adım 1: <@id> token'larını yer-tutucuyla değiştir (markdown'dan ÖNCE)
+  // Adım 1: token'ları yer-tutucuyla değiştir (markdown'dan ÖNCE)
+  // 1a: @everyone rol token'ı (<@&id>) → everyone yer-tutucu (id çözümüne gerek yok)
+  const withEveryone = content.replace(ROLE_MENTION_RE, () => EVERYONE_PLACEHOLDER)
+  // 1b: <@id> kullanıcı token'ları
   const mentionMap = new Map<string, string>()
-  const withPlaceholders = content.replace(MENTION_RE, (_match, id: string) => {
+  const withPlaceholders = withEveryone.replace(MENTION_RE, (_match, id: string) => {
     mentionMap.set(id, resolve(id) ?? fallback)
     return toPlaceholder(id)
   })
@@ -153,10 +160,12 @@ export function renderMessageHtml(
 
   // Adım 4: yer-tutucuları stilli mention span'lerine çevir
   // (Sanitize sonrasında — span ve class allowlist'te olduğu için hayatta kalır)
-  const finalHtml = cleanHtml.replace(PLACEHOLDER_RE, (_match, id: string) => {
-    const username = mentionMap.get(id) ?? fallback
-    return mentionSpanHtml(username)
-  })
+  const finalHtml = cleanHtml
+    .replace(EVERYONE_PLACEHOLDER_RE, () => '<span class="kv-mention kv-mention--everyone">@everyone</span>')
+    .replace(PLACEHOLDER_RE, (_match, id: string) => {
+      const username = mentionMap.get(id) ?? fallback
+      return mentionSpanHtml(username)
+    })
 
   return finalHtml
 }

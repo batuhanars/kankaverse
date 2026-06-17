@@ -6,6 +6,7 @@ import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
 import { useAuthStore } from '@/stores/auth'
 import { useMembersStore } from '@/stores/members'
+import { useRolesStore } from '@/stores/roles'
 import { useSocket } from '@/composables/useSocket'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
@@ -23,6 +24,7 @@ const channelsStore = useChannelsStore()
 const guildsStore = useGuildsStore()
 const authStore = useAuthStore()
 const membersStore = useMembersStore()
+const rolesStore = useRolesStore()
 const { joinChannel, leaveChannel } = useSocket()
 
 // Mesaj yönetimi (pin + başkasının mesajını silme) → MANAGE_MESSAGES (owner/admin/ADMINISTRATOR dahil)
@@ -148,12 +150,21 @@ const mentionMembers = computed(() =>
   guildMembers.value.map((m) => ({ id: m.userId, username: m.username, avatarUrl: m.avatarUrl }))
 )
 
+// @everyone: yalnız everyone rolü mentionable ise id döner (aksi → null → öneri yok)
+const everyoneMentionRoleId = computed<string | null>(() => {
+  const gid = guildsStore.activeGuildId
+  if (!gid) return null
+  const everyone = rolesStore.rolesFor(gid).find((r) => r.isEveryone)
+  return everyone?.mentionable ? everyone.id : null
+})
+
 const mention = useMentionAutocomplete(
   mentionMembers,
   () => content.value,
   (v) => { content.value = v },
   () => textareaEl.value?.selectionStart ?? 0,
   (pos) => { nextTick(() => { textareaEl.value?.setSelectionRange(pos, pos) }) },
+  () => everyoneMentionRoleId.value,
 )
 
 watch(
@@ -484,15 +495,25 @@ function resetComposerHeight() {
                 : 'color: var(--kv-text-secondary);'"
               @click="mention.selectSuggestion(member)"
             >
-              <!-- Daire avatar -->
-              <div
-                class="w-6 h-6 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-white"
-                style="background-color: var(--kv-accent-500);"
-              >
-                <img v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.username" class="w-full h-full object-cover" />
-                <span v-else>{{ member.username[0].toUpperCase() }}</span>
-              </div>
-              <span class="font-medium">@{{ member.username }}</span>
+              <!-- @everyone → grup ikonu + açıklama -->
+              <template v-if="member.isEveryone">
+                <div class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center" style="background-color: var(--kv-bg-content);">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-secondary);"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+                <span class="font-semibold">@everyone</span>
+                <span class="text-[12px] truncate" style="color: var(--kv-text-muted);">{{ t('mention.everyoneHint') }}</span>
+              </template>
+              <!-- Gerçek üye → daire avatar -->
+              <template v-else>
+                <div
+                  class="w-6 h-6 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-white"
+                  style="background-color: var(--kv-accent-500);"
+                >
+                  <img v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.username" class="w-full h-full object-cover" />
+                  <span v-else>{{ member.username[0].toUpperCase() }}</span>
+                </div>
+                <span class="font-medium">@{{ member.username }}</span>
+              </template>
             </div>
           </div>
           <textarea

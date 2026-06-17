@@ -11,31 +11,56 @@ import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { usersApi } from '@/api/users'
 import { DmPolicy } from '@/types'
+import { BANNER_PRESET_KEYS, bannerBackground } from '@/utils/bannerColor'
 import KvButton from '@/components/ui/KvButton.vue'
+import KvModal from '@/components/ui/KvModal.vue'
 import TwoFactorSection from './components/TwoFactorSection.vue'
 import SessionsSection from './components/SessionsSection.vue'
 import ChangePasswordSection from './components/ChangePasswordSection.vue'
 import ChangeEmailSection from './components/ChangeEmailSection.vue'
+import ChangeUsernameSection from './components/ChangeUsernameSection.vue'
 import DeleteAccountSection from './components/DeleteAccountSection.vue'
+import VoiceDevicesSection from './components/VoiceDevicesSection.vue'
 
+const props = defineProps<{ initialSection?: string }>()
 const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 const authStore = useAuthStore()
 const toast = useToastStore()
 
-type NavSection = 'hesap' | 'profil' | 'gizlilik'
-const activeSection = ref<NavSection>('hesap')
+type NavSection = 'hesap' | 'profil' | 'ses' | 'gizlilik'
+const VALID_SECTIONS: NavSection[] = ['profil', 'hesap', 'ses', 'gizlilik']
+const activeSection = ref<NavSection>(
+  VALID_SECTIONS.includes(props.initialSection as NavSection) ? (props.initialSection as NavSection) : 'profil',
+)
 
+// Profil en üstte — profil görünümü düzenlemeleri buradan başlar (sahip tercihi).
 const navItems: { key: NavSection; labelKey: string }[] = [
-  { key: 'hesap', labelKey: 'settings.tabAccount' },
   { key: 'profil', labelKey: 'settings.tabProfile' },
+  { key: 'hesap', labelKey: 'settings.tabAccount' },
+  { key: 'ses', labelKey: 'settings.tabVoice' },
   { key: 'gizlilik', labelKey: 'settings.tabPrivacy' },
 ]
 
-// ── ESC ile kapat ──────────────────────────────────────────────────────────
+// ── Hesap düzenleme modalları (Discord-tarzı: satır + "Düzenle" → modal) ──
+type EditModal = null | 'username' | 'password' | 'email' | '2fa' | 'sessions' | 'delete'
+const editModal = ref<EditModal>(null)
+const revealEmail = ref(false)
+
+const maskedEmail = computed(() => {
+  const e = authStore.user?.email ?? ''
+  if (revealEmail.value) return e
+  const [local, domain] = e.split('@')
+  if (!domain) return e ? '••••••' : ''
+  return '•'.repeat(Math.min(local.length, 12)) + '@' + domain
+})
+
+// ── ESC ile kapat — alt modal açıksa önce onu kapat ──────────────────────────
 function onKeyDown(e: KeyboardEvent) {
-  if (e.key === 'Escape') emit('close')
+  if (e.key !== 'Escape') return
+  if (editModal.value) editModal.value = null
+  else emit('close')
 }
 onMounted(() => document.addEventListener('keydown', onKeyDown))
 onUnmounted(() => document.removeEventListener('keydown', onKeyDown))
@@ -66,6 +91,26 @@ async function saveBio() {
     toast.error(err.response?.data?.message ?? t('toast.saveError'))
   } finally {
     savingBio.value = false
+  }
+}
+
+// ── Profil: afiş rengi (preset; null = marka varsayılanı). Tıklayınca anında kaydeder. ──
+const bannerPresetKeys = BANNER_PRESET_KEYS
+const draftBannerColor = computed(() => authStore.user?.bannerColor ?? null)
+const profileMemberSince = computed(() =>
+  authStore.user
+    ? new Date(authStore.user.createdAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+    : '',
+)
+async function setBannerColor(key: string | null) {
+  if (draftBannerColor.value === key) return
+  try {
+    const { data } = await usersApi.updateProfile({ bannerColor: key })
+    authStore.updateUser(data)
+    toast.success(t('toast.profileSaved'))
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message ?? t('toast.saveError'))
   }
 }
 
@@ -179,72 +224,196 @@ async function selectPolicy(p: DmPolicy) {
           <div style="max-width: 1000px; width: 100%;">
             <div class="px-8 py-6">
 
-              <!-- ── Hesap ── (mevcut Security Section'ları yeniden kullanılır — akış/reauth değişmez) -->
-              <div v-if="activeSection === 'hesap'" class="flex flex-col gap-4 max-w-xl">
-                <!-- Kullanıcı adı / e-posta read-only -->
-                <section class="rounded-[var(--kv-radius-lg)] p-6" style="background-color: var(--kv-bg-sidebar);">
-                  <div class="flex flex-col gap-1">
-                    <p class="text-[12px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
-                      {{ t('settings.usernameLabel') }}
-                    </p>
-                    <p class="text-[15px] font-medium" style="color: var(--kv-text-primary);">
-                      {{ authStore.user?.username }}
-                    </p>
-                    <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
-                      {{ t('settings.usernameReadonlyHint') }}
-                    </p>
+              <!-- ── Hesap ── (Discord-tarzı satırlar; "Düzenle" → modal) -->
+              <div v-if="activeSection === 'hesap'" class="flex flex-col gap-8 max-w-2xl">
+                <!-- Hesap Bilgileri -->
+                <section>
+                  <h3 class="text-[18px] font-bold mb-2" style="color: var(--kv-text-primary);">
+                    {{ t('settings.account.infoTitle') }}
+                  </h3>
+                  <div class="rounded-[var(--kv-radius-lg)] divide-y divide-[color:var(--kv-border-subtle)]" style="background-color: var(--kv-bg-sidebar);">
+                    <!-- Kullanıcı Adı -->
+                    <div class="flex items-center justify-between gap-4 px-5 py-4">
+                      <p class="text-[14px] font-medium shrink-0" style="color: var(--kv-text-secondary);">
+                        {{ t('settings.account.username') }}
+                      </p>
+                      <div class="flex items-center gap-3 min-w-0">
+                        <span class="text-[14px] truncate" style="color: var(--kv-text-primary);">{{ authStore.user?.username }}</span>
+                        <button class="kv-row-btn" @click="editModal = 'username'">{{ t('settings.account.edit') }}</button>
+                      </div>
+                    </div>
+                    <!-- E-posta -->
+                    <div class="flex items-center justify-between gap-4 px-5 py-4" style="border-color: var(--kv-border-subtle);">
+                      <p class="text-[14px] font-medium shrink-0" style="color: var(--kv-text-secondary);">
+                        {{ t('settings.account.email') }}
+                      </p>
+                      <div class="flex items-center gap-3 min-w-0">
+                        <span class="text-[14px] truncate" style="color: var(--kv-text-primary); font-variant-numeric: tabular-nums;">{{ maskedEmail }}</span>
+                        <button
+                          class="text-[13px] cursor-pointer shrink-0 hover:underline"
+                          style="color: var(--kv-accent-500);"
+                          @click="revealEmail = !revealEmail"
+                        >{{ revealEmail ? t('settings.account.hide') : t('settings.account.show') }}</button>
+                        <button class="kv-row-btn" @click="editModal = 'email'">{{ t('settings.account.edit') }}</button>
+                      </div>
+                    </div>
                   </div>
                 </section>
 
-                <section class="rounded-[var(--kv-radius-lg)] p-6" style="background-color: var(--kv-bg-sidebar);">
-                  <TwoFactorSection />
+                <!-- Şifre ve Güvenlik -->
+                <section>
+                  <h3 class="text-[18px] font-bold mb-2" style="color: var(--kv-text-primary);">
+                    {{ t('settings.account.securityTitle') }}
+                  </h3>
+                  <div class="rounded-[var(--kv-radius-lg)] divide-y divide-[color:var(--kv-border-subtle)]" style="background-color: var(--kv-bg-sidebar);">
+                    <!-- Şifre -->
+                    <div class="flex items-center justify-between gap-4 px-5 py-4" style="border-color: var(--kv-border-subtle);">
+                      <p class="text-[14px] font-medium" style="color: var(--kv-text-secondary);">
+                        {{ t('settings.account.password') }}
+                      </p>
+                      <button class="kv-row-btn" @click="editModal = 'password'">{{ t('settings.account.edit') }}</button>
+                    </div>
+                    <!-- 2FA -->
+                    <button
+                      class="w-full flex items-center justify-between gap-4 px-5 py-4 text-left cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
+                      style="border-color: var(--kv-border-subtle);"
+                      @click="editModal = '2fa'"
+                    >
+                      <p class="text-[14px] font-medium" style="color: var(--kv-text-secondary);">
+                        {{ t('settings.account.twoFactor') }}
+                      </p>
+                      <span class="flex items-center gap-2 shrink-0">
+                        <span class="text-[13px]" :style="`color: ${authStore.user?.twoFactorEnabled ? 'var(--kv-online, #3DB46E)' : 'var(--kv-text-muted)'};`">
+                          {{ authStore.user?.twoFactorEnabled ? t('settings.account.twoFactorOn') : t('settings.account.twoFactorSetup') }}
+                        </span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);"><polyline points="9 18 15 12 9 6"/></svg>
+                      </span>
+                    </button>
+                    <!-- Oturumlar -->
+                    <button
+                      class="w-full flex items-center justify-between gap-4 px-5 py-4 text-left cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
+                      style="border-color: var(--kv-border-subtle);"
+                      @click="editModal = 'sessions'"
+                    >
+                      <p class="text-[14px] font-medium" style="color: var(--kv-text-secondary);">
+                        {{ t('settings.account.sessions') }}
+                      </p>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  </div>
                 </section>
-                <section class="rounded-[var(--kv-radius-lg)] p-6" style="background-color: var(--kv-bg-sidebar);">
-                  <SessionsSection />
-                </section>
-                <section class="rounded-[var(--kv-radius-lg)] p-6" style="background-color: var(--kv-bg-sidebar);">
-                  <ChangePasswordSection />
-                </section>
-                <section class="rounded-[var(--kv-radius-lg)] p-6" style="background-color: var(--kv-bg-sidebar);">
-                  <ChangeEmailSection />
-                </section>
-                <section class="rounded-[var(--kv-radius-lg)] p-6" style="background-color: var(--kv-bg-sidebar);">
-                  <DeleteAccountSection />
+
+                <!-- Hesabı Sil -->
+                <section>
+                  <button
+                    class="w-full flex items-center justify-between gap-4 px-5 py-4 rounded-[var(--kv-radius-lg)] text-left cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
+                    style="background-color: var(--kv-bg-sidebar);"
+                    @click="editModal = 'delete'"
+                  >
+                    <p class="text-[14px] font-medium" style="color: var(--kv-danger);">
+                      {{ t('settings.account.delete') }}
+                    </p>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
                 </section>
               </div>
 
-              <!-- ── Profil ── (bio) -->
-              <div v-else-if="activeSection === 'profil'" class="flex flex-col gap-6 max-w-xl">
-                <section>
-                  <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-[13px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
-                      {{ t('settings.bioLabel') }}
-                    </h3>
-                    <span class="text-[12px]" :style="`color: ${draftBio.length > BIO_MAX ? 'var(--kv-danger)' : 'var(--kv-text-muted)'};`">
-                      {{ t('settings.bioCounter', { count: draftBio.length }) }}
-                    </span>
-                  </div>
-                  <textarea
-                    v-model="draftBio"
-                    :placeholder="t('settings.bioPlaceholder')"
-                    :disabled="savingBio"
-                    rows="5"
-                    :maxlength="BIO_MAX"
-                    class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
-                    style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
-                  />
+              <!-- ── Profil ── (bio + afiş rengi · sağda canlı önizleme kartı) -->
+              <div v-else-if="activeSection === 'profil'" class="flex gap-8">
+                <!-- SOL: bio + afiş rengi swatch'ları -->
+                <div class="flex-1 min-w-0 max-w-xl flex flex-col gap-6">
+                  <section>
+                    <div class="flex items-center justify-between mb-3">
+                      <h3 class="text-[13px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+                        {{ t('settings.bioLabel') }}
+                      </h3>
+                      <span class="text-[12px]" :style="`color: ${draftBio.length > BIO_MAX ? 'var(--kv-danger)' : 'var(--kv-text-muted)'};`">
+                        {{ t('settings.bioCounter', { count: draftBio.length }) }}
+                      </span>
+                    </div>
+                    <textarea
+                      v-model="draftBio"
+                      :placeholder="t('settings.bioPlaceholder')"
+                      :disabled="savingBio"
+                      rows="5"
+                      :maxlength="BIO_MAX"
+                      class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
+                      style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
+                    />
+                    <div class="flex items-center justify-between gap-3 mt-3">
+                      <p v-if="bioError" class="text-[12px] flex-1" style="color: var(--kv-danger);">{{ bioError }}</p>
+                      <p v-else-if="bioSaved && !bioDirty" class="text-[12px] flex-1" style="color: var(--kv-success);">
+                        {{ t('settings.bioSaved') }}
+                      </p>
+                      <span v-else class="flex-1" />
+                      <KvButton :disabled="!bioDirty || savingBio" :loading="savingBio" @click="saveBio">
+                        {{ t('common.save') }}
+                      </KvButton>
+                    </div>
+                  </section>
 
-                  <div class="flex items-center justify-between gap-3 mt-3">
-                    <p v-if="bioError" class="text-[12px] flex-1" style="color: var(--kv-danger);">{{ bioError }}</p>
-                    <p v-else-if="bioSaved && !bioDirty" class="text-[12px] flex-1" style="color: var(--kv-success);">
-                      {{ t('settings.bioSaved') }}
-                    </p>
-                    <span v-else class="flex-1" />
-                    <KvButton :disabled="!bioDirty || savingBio" :loading="savingBio" @click="saveBio">
-                      {{ t('common.save') }}
-                    </KvButton>
+                  <!-- Afiş rengi swatch'ları (görsel afiş ileride; şimdilik preset renk) -->
+                  <section>
+                    <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
+                      {{ t('settings.banner.label') }}
+                    </h3>
+                    <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">{{ t('settings.banner.hint') }}</p>
+                    <div class="flex flex-wrap gap-2.5">
+                      <button
+                        class="rounded-[var(--kv-radius-md)] border-2 cursor-pointer transition-transform flex items-center justify-center"
+                        style="width: 48px; height: 48px;"
+                        :style="`background: ${bannerBackground(null)}; border-color: ${draftBannerColor === null ? 'var(--kv-accent-500)' : 'transparent'}; transform: ${draftBannerColor === null ? 'scale(1.06)' : 'none'};`"
+                        :title="t('settings.banner.default')"
+                        @click="setBannerColor(null)"
+                      >
+                        <svg v-if="draftBannerColor === null" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      </button>
+                      <button
+                        v-for="key in bannerPresetKeys"
+                        :key="key"
+                        class="rounded-[var(--kv-radius-md)] border-2 cursor-pointer transition-transform flex items-center justify-center"
+                        style="width: 48px; height: 48px;"
+                        :style="`background: ${bannerBackground(key)}; border-color: ${draftBannerColor === key ? 'var(--kv-accent-500)' : 'transparent'}; transform: ${draftBannerColor === key ? 'scale(1.06)' : 'none'};`"
+                        @click="setBannerColor(key)"
+                      >
+                        <svg v-if="draftBannerColor === key" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      </button>
+                    </div>
+                  </section>
+                </div>
+
+                <!-- SAĞ: profil önizleme kartı (canlı draft; ortam ayarlarındaki gibi) -->
+                <div class="hidden lg:block shrink-0 self-start" style="width: 320px;">
+                  <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
+                    {{ t('settings.banner.previewTitle') }}
+                  </h3>
+                  <div class="overflow-hidden rounded-[var(--kv-radius-lg)] border" style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-sidebar);">
+                    <!-- Afiş + banner'a binen avatar -->
+                    <div class="relative" style="height: 100px;" :style="{ background: bannerBackground(draftBannerColor) }">
+                      <div
+                        class="absolute w-[72px] h-[72px] rounded-full border-4 overflow-hidden flex items-center justify-center text-[24px] font-bold text-white"
+                        style="left: 16px; bottom: -28px; border-color: var(--kv-bg-sidebar); background-color: var(--kv-accent-500);"
+                      >
+                        <img v-if="authStore.user?.avatarUrl" :src="authStore.user.avatarUrl" class="w-full h-full object-cover" />
+                        <span v-else>{{ (authStore.user?.username ?? '?')[0].toUpperCase() }}</span>
+                      </div>
+                    </div>
+                    <!-- Ad + üyelik tarihi -->
+                    <div class="pt-9 pb-4 px-4">
+                      <p class="text-[16px] font-semibold truncate" style="color: var(--kv-text-primary);">
+                        {{ authStore.user?.username }}
+                      </p>
+                      <p class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
+                        {{ t('settings.banner.previewMemberSince', { date: profileMemberSince }) }}
+                      </p>
+                    </div>
                   </div>
-                </section>
+                </div>
+              </div>
+
+              <!-- ── Ses ── (cihaz seçimi + çıkış sesi) -->
+              <div v-else-if="activeSection === 'ses'">
+                <VoiceDevicesSection />
               </div>
 
               <!-- ── Gizlilik ── (dmPolicy) -->
@@ -295,5 +464,44 @@ async function selectPolicy(p: DmPolicy) {
         </div>
       </div>
     </div>
+
+    <!-- ── Hesap düzenleme modalları (Düzenle → modal) ── -->
+    <KvModal v-if="editModal === 'username'" :title="t('security.username.title')" @close="editModal = null">
+      <ChangeUsernameSection :in-modal="true" @saved="editModal = null" />
+    </KvModal>
+    <KvModal v-if="editModal === 'password'" :title="t('security.password.title')" @close="editModal = null">
+      <ChangePasswordSection :in-modal="true" @saved="editModal = null" />
+    </KvModal>
+    <KvModal v-if="editModal === 'email'" :title="t('security.email.title')" @close="editModal = null">
+      <ChangeEmailSection :in-modal="true" />
+    </KvModal>
+    <!-- 2FA / Oturumlar / Sil → kendi başlıklarını gösterir (KvModal title'sız) -->
+    <KvModal v-if="editModal === '2fa'" @close="editModal = null">
+      <TwoFactorSection />
+    </KvModal>
+    <KvModal v-if="editModal === 'sessions'" @close="editModal = null">
+      <SessionsSection />
+    </KvModal>
+    <KvModal v-if="editModal === 'delete'" @close="editModal = null">
+      <DeleteAccountSection />
+    </KvModal>
   </Teleport>
 </template>
+
+<style scoped>
+/* Discord-tarzı satır "Düzenle" butonu */
+.kv-row-btn {
+  flex-shrink: 0;
+  padding: 6px 16px;
+  border-radius: var(--kv-radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--kv-text-primary);
+  background-color: var(--kv-bg-elevated);
+  transition: background-color 0.12s;
+}
+.kv-row-btn:hover {
+  background-color: var(--kv-bg-content);
+}
+</style>

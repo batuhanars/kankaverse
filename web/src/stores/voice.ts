@@ -10,6 +10,7 @@ import {
 } from 'livekit-client'
 import { voiceApi, type VoiceParticipantDto } from '@/api/voice'
 import { useToastStore } from '@/stores/toast'
+import { useAuthStore } from '@/stores/auth'
 import { i18n } from '@/i18n'
 
 export interface VoiceParticipant {
@@ -47,6 +48,14 @@ export const useVoiceStore = defineStore('voice', () => {
   const isMuted = ref(false)
   const canPublish = ref(false)
   const error = ref('')
+  // Varsayılan tercih: seste olmasak da mikrofon/sağırlık durumu (kalıcı). Bir kanala/aramaya
+  // katılınca uygulanır; seste değilken alt bardaki düğmeler bu tercihi değiştirir.
+  const preferMuted = ref(localStorage.getItem('kv.voice.preferMuted') === '1')
+  const preferDeafened = ref(localStorage.getItem('kv.voice.preferDeafened') === '1')
+  // Cihaz tercihleri (kalıcı): giriş (mikrofon) + çıkış (hoparlör) deviceId + çıkış sesi (0–1).
+  const inputDeviceId = ref(localStorage.getItem('kv.voice.inputDevice') || 'default')
+  const outputDeviceId = ref(localStorage.getItem('kv.voice.outputDevice') || 'default')
+  const outputVolume = ref(clampVol(Number(localStorage.getItem('kv.voice.outputVolume') ?? '1')))
   // ActiveSpeakers (yalnız bağlı oda) — userId seti
   const speakingUserIds = ref<Set<string>>(new Set())
   // Kendini sağırlaştır: tüm gelen sesi + kendi mikrofonunu kapatır
@@ -145,7 +154,10 @@ export const useVoiceStore = defineStore('voice', () => {
       const { data } = await voiceApi.getToken(channelId)
       canPublish.value = data.canPublish
 
-      room = new Room()
+      // Bit hızı: kanal ayarı publish varsayılanına uygulanır (audio-only maxBitrate, kbps→bps)
+      room = new Room({
+        publishDefaults: { audioPreset: { maxBitrate: (data.bitrate ?? 64) * 1000 } },
+      })
       wireRoom(room)
       await room.connect(data.url, data.token)
       // Tarayıcı autoplay kilidini katılım jesti açar; yine de garantiye al
@@ -158,11 +170,12 @@ export const useVoiceStore = defineStore('voice', () => {
       attachSpeaking(room.localParticipant)
       for (const p of room.remoteParticipants.values()) attachSpeaking(p)
 
-      if (data.canPublish) {
+      // Varsayılan susturulmuş tercih → mikrofonu açma (sustur ile katıl)
+      if (data.canPublish && !preferMuted.value) {
         try {
           // getUserMedia yalnız güvenli bağlamda (localhost/HTTPS) var; yoksa Firefox hiç sormaz
           if (!navigator.mediaDevices?.getUserMedia) throw new Error('insecure')
-          await room.localParticipant.setMicrophoneEnabled(true)
+          await room.localParticipant.setMicrophoneEnabled(true, micCaptureOpts())
           isMuted.value = false
           micError.value = ''
         } catch (e) {
@@ -171,8 +184,13 @@ export const useVoiceStore = defineStore('voice', () => {
           micError.value = !window.isSecureContext || (e as Error)?.message === 'insecure' ? 'insecure' : 'denied'
         }
       } else {
-        // Karantina: dinleyici modu
+        // Karantina VEYA varsayılan-sustur: dinleyici modu
         isMuted.value = true
+      }
+
+      // Varsayılan sağırlık tercihi → katılınca uygula (gelen sesi de sustur)
+      if (preferDeafened.value) {
+        await applyDeafen(true)
       }
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string; error?: string } } }
@@ -190,6 +208,13 @@ export const useVoiceStore = defineStore('voice', () => {
   }
 
   async function leave() {
+    // İyimser: kendini panel listesinden hemen çıkar — webhook participant_left
+    // gecikse de çıkan kişinin KENDİ sidebar'ı + süre sayacı anında düzelir.
+    // Gözlemciler webhook → voice:<id> ile (presence aboneliği) canlı güncellenir.
+    const leftChannelId = connectedChannelId.value
+    const selfId = useAuthStore().user?.id
+    if (leftChannelId && selfId) removeParticipant(leftChannelId, selfId)
+
     if (room) {
       try { await room.disconnect() } catch { /* yoksay */ }
       room = null
@@ -243,12 +268,27 @@ export const useVoiceStore = defineStore('voice', () => {
     p.on(ParticipantEvent.IsSpeakingChanged, recomputeSpeaking)
   }
 
+  function setPreferMuted(v: boolean) {
+    preferMuted.value = v
+    localStorage.setItem('kv.voice.preferMuted', v ? '1' : '0')
+  }
+  function setPreferDeafened(v: boolean) {
+    preferDeafened.value = v
+    localStorage.setItem('kv.voice.preferDeafened', v ? '1' : '0')
+  }
+
   async function toggleMute() {
-    if (!room || !canPublish.value) return
+    // Seste değilken: yalnız varsayılan tercihi çevir (sonraki katılışta uygulanır)
+    if (!room) {
+      setPreferMuted(!preferMuted.value)
+      return
+    }
+    if (!canPublish.value) return
     const next = !isMuted.value
     try {
-      await room.localParticipant.setMicrophoneEnabled(!next)
+      await room.localParticipant.setMicrophoneEnabled(!next, next ? undefined : micCaptureOpts())
       isMuted.value = next
+      setPreferMuted(next) // tercih son seçimi izler
       // Sağırken mikrofonu açmak sağırlığı da kaldırır (Discord deseni)
       if (!next && isDeafened.value) applyDeafen(false)
     } catch {
@@ -258,8 +298,44 @@ export const useVoiceStore = defineStore('voice', () => {
 
   // Kendini sağırlaştır: gelen tüm sesi sustur + mikrofonu kapat
   async function toggleDeafen() {
-    if (!room) return
+    // Seste değilken: yalnız varsayılan tercihi çevir
+    if (!room) {
+      setPreferDeafened(!preferDeafened.value)
+      return
+    }
     await applyDeafen(!isDeafened.value)
+    setPreferDeafened(isDeafened.value)
+  }
+
+  // ── Cihaz seçimi (mikrofon/hoparlör) + çıkış sesi ──
+  function micCaptureOpts(): { deviceId: string } | undefined {
+    return inputDeviceId.value && inputDeviceId.value !== 'default'
+      ? { deviceId: inputDeviceId.value }
+      : undefined
+  }
+  function applySinkId(el: HTMLMediaElement) {
+    const anyEl = el as HTMLMediaElement & { setSinkId?: (id: string) => Promise<void> }
+    if (typeof anyEl.setSinkId !== 'function') return
+    anyEl.setSinkId(outputDeviceId.value === 'default' ? '' : outputDeviceId.value).catch(() => {})
+  }
+  async function setInputDevice(id: string) {
+    inputDeviceId.value = id
+    localStorage.setItem('kv.voice.inputDevice', id)
+    // Canlı: bağlı + mikrofon açıksa cihazı anında değiştir
+    if (room && canPublish.value && !isMuted.value) {
+      try { await room.switchActiveDevice('audioinput', id) } catch { /* yoksay */ }
+    }
+  }
+  function setOutputDevice(id: string) {
+    outputDeviceId.value = id
+    localStorage.setItem('kv.voice.outputDevice', id)
+    for (const el of remoteAudioEls) applySinkId(el)
+  }
+  function setOutputVolume(v: number) {
+    const vol = clampVol(v)
+    outputVolume.value = vol
+    localStorage.setItem('kv.voice.outputVolume', String(vol))
+    for (const el of remoteAudioEls) el.volume = vol
   }
 
   async function applyDeafen(next: boolean) {
@@ -287,6 +363,9 @@ export const useVoiceStore = defineStore('voice', () => {
         const el = track.attach() // <audio autoplay>
         el.style.display = 'none'
         el.muted = isDeafened.value // sağırsa yeni gelen sesi de sustur
+        el.volume = outputVolume.value // çıkış sesi tercihi
+        // Çıkış cihazı (hoparlör) tercihi — setSinkId destekleyen tarayıcılarda
+        applySinkId(el)
         document.body.appendChild(el)
         remoteAudioEls.add(el)
       }
@@ -351,6 +430,14 @@ export const useVoiceStore = defineStore('voice', () => {
     isMuted,
     canPublish,
     error,
+    preferMuted,
+    preferDeafened,
+    inputDeviceId,
+    outputDeviceId,
+    outputVolume,
+    setInputDevice,
+    setOutputDevice,
+    setOutputVolume,
     speakingUserIds,
     isDeafened,
     micError,
@@ -376,4 +463,10 @@ export const useVoiceStore = defineStore('voice', () => {
 
 function toParticipant(p: VoiceParticipantDto): VoiceParticipant {
   return { userId: p.userId, username: p.username, avatarUrl: p.avatarUrl }
+}
+
+// Çıkış sesi 0–1 aralığına sıkıştır (geçersiz/NaN → 1).
+function clampVol(v: number): number {
+  if (!Number.isFinite(v)) return 1
+  return Math.min(1, Math.max(0, v))
 }

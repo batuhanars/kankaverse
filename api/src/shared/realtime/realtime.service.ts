@@ -20,8 +20,15 @@ export class RealtimeService {
     }
   }
 
-  // Kanal room'una yay (room:<channelId>) — ses presence olayları için.
+  // Kanal room'una yay (room:<channelId>) — mesaj/typing + bağlı oda olayları için.
   emitToRoom(channelId: string, event: string, payload: unknown) {
     this.server?.to(`room:${channelId}`).emit(event, payload);
+  }
+
+  // Ses presence room'una yay (voice:<channelId>) — kanala bağlı olmasa da sidebar'da
+  // "kim var" listesini izleyen herkes (VoiceParticipantList aboneliği). room:<id>'den
+  // AYRI: aktif kanal join'i ile çakışmaz; gözlemci girip/çıkışı canlı görür.
+  emitToVoicePresence(channelId: string, event: string, payload: unknown) {
+    this.server?.to(`voice:${channelId}`).emit(event, payload);
   }
 }

@@ -44,8 +44,8 @@ export const useMessagesStore = defineStore('messages', () => {
     if (!list) return
     const idx = list.findIndex((m) => m.id === dto.id)
     if (idx !== -1) {
-      // Sprint V2: mentions alanı da güncellenir (edit → backend yeniden hesaplar)
-      list[idx] = { ...list[idx], content: dto.content, editedAt: dto.editedAt, mentions: dto.mentions }
+      // Sprint V2: mentions + mentionsEveryone da güncellenir (edit → backend yeniden hesaplar)
+      list[idx] = { ...list[idx], content: dto.content, editedAt: dto.editedAt, mentions: dto.mentions, mentionsEveryone: dto.mentionsEveryone }
     }
   }
 

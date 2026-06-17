@@ -159,6 +159,7 @@ const draftName = ref('')
 const draftColor = ref('#99aab5')
 const draftHoist = ref(false)
 const draftMentionable = ref(false)
+const draftIsDefault = ref(false)
 const draftPermissions = ref<string[]>([])
 
 // Seçili rol değişince taslakları sıfırla (bekleyen üye değişikliklerini de)
@@ -172,6 +173,7 @@ watch(selectedRoleId, () => {
   draftColor.value = role.color
   draftHoist.value = role.hoist
   draftMentionable.value = role.mentionable
+  draftIsDefault.value = role.isDefault
   draftPermissions.value = [...role.permissions]
 })
 
@@ -188,7 +190,8 @@ const appearanceDirty = computed(() =>
   (draftName.value !== selectedRole.value.name ||
     draftColor.value !== selectedRole.value.color ||
     draftHoist.value !== selectedRole.value.hoist ||
-    draftMentionable.value !== selectedRole.value.mentionable),
+    draftMentionable.value !== selectedRole.value.mentionable ||
+    draftIsDefault.value !== selectedRole.value.isDefault),
 )
 
 const isDirty = computed(() =>
@@ -285,11 +288,16 @@ async function saveAll() {
     if (appearanceDirty.value || permsDirty.value) {
       const payload: Record<string, unknown> = {
         color: draftColor.value,
-        hoist: draftHoist.value,
         mentionable: draftMentionable.value,
         permissions: draftPermissions.value,
       }
-      if (!role.isEveryone) payload.name = draftName.value
+      // @everyone: name/hoist/isDefault GÖNDERİLMEZ — backend bunları @everyone'da reddeder
+      // (payload'da hoist olması mentionable kaydını da düşürüyordu — Görsel #36 bug'ı).
+      if (!role.isEveryone) {
+        payload.name = draftName.value
+        payload.hoist = draftHoist.value
+        payload.isDefault = draftIsDefault.value
+      }
       const res = await rolesApi.updateRole(role.id, payload)
       rolesStore.upsertRole(guildId.value, res.data)
     }
@@ -326,6 +334,7 @@ function reset() {
   draftColor.value = role.color
   draftHoist.value = role.hoist
   draftMentionable.value = role.mentionable
+  draftIsDefault.value = role.isDefault
   draftPermissions.value = [...role.permissions]
 }
 
@@ -543,6 +552,12 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
         <span class="flex-1 text-[14px] font-medium truncate" style="color: var(--kv-text-primary);">
           {{ role.name }}
         </span>
+        <!-- Varsayılan rol rozeti -->
+        <span
+          v-if="role.isDefault"
+          class="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+          style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
+        >{{ t('guildSettings.roles.defaultBadge') }}</span>
         <!-- Üye sayısı + ikon -->
         <div class="shrink-0 flex items-center gap-1" style="color: var(--kv-text-muted);">
           <span class="text-[13px]">{{ role.memberCount }}</span>
@@ -723,8 +738,8 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
         </div>
       </div>
 
-      <!-- İçerik alanı -->
-      <div class="flex-1 overflow-y-auto px-8 py-5 flex flex-col gap-5">
+      <!-- İçerik alanı — alt boşluk: yüzen kaydet barı son satırı kapatmasın (Görsel #31) -->
+      <div class="flex-1 overflow-y-auto px-8 pt-5 pb-28 flex flex-col gap-5">
 
         <!-- Hata -->
         <p
@@ -832,6 +847,24 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
                 </p>
               </div>
               <KvSwitch v-model="draftMentionable" :disabled="!canEdit" />
+            </div>
+          </section>
+
+          <!-- VARSAYILAN ROL — yeni katılan üyelere otomatik atanır (@everyone hariç) -->
+          <section v-if="!selectedRole?.isEveryone">
+            <div
+              class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+              style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+            >
+              <div class="flex-1 min-w-0">
+                <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
+                  {{ t('guildSettings.roles.defaultLabel') }}
+                </p>
+                <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+                  {{ t('guildSettings.roles.defaultDesc') }}
+                </p>
+              </div>
+              <KvSwitch v-model="draftIsDefault" :disabled="!canEdit" />
             </div>
           </section>
 

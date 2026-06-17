@@ -9,6 +9,9 @@ import { changePasswordSchema } from '@/lib/validation/auth'
 import KvInput from '@/components/ui/KvInput.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 
+defineProps<{ inModal?: boolean }>()
+const emit = defineEmits<{ (e: 'saved'): void }>()
+
 const { t, te } = useI18n()
 const auth = useAuthStore()
 
@@ -36,6 +39,7 @@ const onSubmit = handleSubmit(async (values) => {
     })
     success.value = true
     resetForm()
+    emit('saved')
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
     apiError.value = err.response?.data?.message ?? t('common.error')
@@ -53,7 +57,7 @@ function getError(field: string): string | undefined {
 
 <template>
   <div>
-    <h3 class="text-[15px] font-semibold mb-3" style="color: var(--kv-text-primary);">
+    <h3 v-if="!inModal" class="text-[15px] font-semibold mb-3" style="color: var(--kv-text-primary);">
       {{ t('security.password.title') }}
     </h3>
     <form class="flex flex-col gap-3" @submit.prevent="onSubmit">

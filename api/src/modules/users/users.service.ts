@@ -23,6 +23,7 @@ export interface UserProfileCardDto {
   friendStatus: 'none' | 'friends' | 'pending_in' | 'pending_out' | 'self';
   selfBlocked: boolean;
   bio: string | null;
+  bannerColor: string | null;
   memberSince: string;
   mutualFriends: MutualFriendDto[];
   mutualGuilds: MutualGuildDto[];
@@ -44,7 +45,7 @@ export class UsersService {
     if (callerId === targetId) {
       const me = await this.prisma.user.findUnique({
         where: { id: callerId, deletedAt: null },
-        select: { id: true, username: true, avatarUrl: true, bio: true, createdAt: true },
+        select: { id: true, username: true, avatarUrl: true, bio: true, bannerColor: true, createdAt: true },
       });
       if (!me) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
       return {
@@ -54,6 +55,7 @@ export class UsersService {
         friendStatus: 'self',
         selfBlocked: false,
         bio: me.bio,
+        bannerColor: me.bannerColor,
         memberSince: me.createdAt.toISOString(),
         mutualFriends: [],
         mutualGuilds: [],
@@ -62,7 +64,7 @@ export class UsersService {
 
     const target = await this.prisma.user.findUnique({
       where: { id: targetId, deletedAt: null },
-      select: { id: true, username: true, avatarUrl: true, bio: true, createdAt: true },
+      select: { id: true, username: true, avatarUrl: true, bio: true, bannerColor: true, createdAt: true },
     });
     if (!target) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
 
@@ -135,6 +137,7 @@ export class UsersService {
       friendStatus,
       selfBlocked: !!callerBlock,
       bio: target.bio,
+      bannerColor: target.bannerColor,
       memberSince: target.createdAt.toISOString(),
       mutualFriends,
       mutualGuilds,
@@ -145,9 +148,10 @@ export class UsersService {
    * PATCH /users/me — kendi profil/gizlilik güncelle. Yalnız verilen alanlar değişir.
    */
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    const data: { bio?: string; dmPolicy?: DmPolicy } = {};
+    const data: { bio?: string; dmPolicy?: DmPolicy; bannerColor?: string | null } = {};
     if (dto.bio !== undefined) data.bio = dto.bio;
     if (dto.dmPolicy !== undefined) data.dmPolicy = dto.dmPolicy;
+    if (dto.bannerColor !== undefined) data.bannerColor = dto.bannerColor;
 
     const user = await this.prisma.user.update({
       where: { id: userId },

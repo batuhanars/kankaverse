@@ -130,6 +130,7 @@ export class NotificationsService {
       targetType: r.targetType,
       targetId: r.targetId,
       muted: r.muted,
+      mutedUntil: r.mutedUntil ? r.mutedUntil.toISOString() : null,
       level: r.level,
     }));
   }
@@ -158,10 +159,12 @@ export class NotificationsService {
         targetType: dto.targetType,
         targetId: dto.targetId,
         ...(dto.muted !== undefined ? { muted: dto.muted } : {}),
+        ...(dto.mutedUntil !== undefined ? { mutedUntil: dto.mutedUntil ? new Date(dto.mutedUntil) : null } : {}),
         ...(dto.level !== undefined ? { level: dto.level } : {}),
       },
       update: {
         ...(dto.muted !== undefined ? { muted: dto.muted } : {}),
+        ...(dto.mutedUntil !== undefined ? { mutedUntil: dto.mutedUntil ? new Date(dto.mutedUntil) : null } : {}),
         ...(dto.level !== undefined ? { level: dto.level } : {}),
       },
     });
@@ -170,6 +173,7 @@ export class NotificationsService {
       targetType: pref.targetType,
       targetId: pref.targetId,
       muted: pref.muted,
+      mutedUntil: pref.mutedUntil ? pref.mutedUntil.toISOString() : null,
       level: pref.level,
     };
   }
@@ -203,7 +207,9 @@ export class NotificationsService {
     // Varsayılan: kayıt yok → muted=false, level=ALL → bildir.
     if (!effective) return true;
 
-    if (effective.muted) return false;
+    // Süreli sustur: mutedUntil null → süresiz; geçmişse mute sona ermiş (bildir).
+    const muteActive = effective.muted && (!effective.mutedUntil || effective.mutedUntil > new Date());
+    if (muteActive) return false;
     if (effective.level === NotificationLevel.NONE) return false;
     return true;
   }

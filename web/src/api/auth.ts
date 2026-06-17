@@ -73,6 +73,9 @@ export const authApi = {
   changeEmail(body: { currentPassword: string; newEmail: string; totpCode?: string }) {
     return http.post<null>('/auth/email/change', body)
   },
+  changeUsername(body: { currentPassword: string; newUsername: string; totpCode?: string }) {
+    return http.post<{ user: UserDto }>('/auth/username/change', body)
+  },
   confirmEmailChange(token: string) {
     return http.post<{ user: UserDto }>('/auth/email/change/confirm', { token })
   },

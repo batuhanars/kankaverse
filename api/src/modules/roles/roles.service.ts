@@ -26,6 +26,7 @@ function toRoleDto(role: {
   permissions: string[];
   iconUrl: string | null;
   isEveryone: boolean;
+  isDefault: boolean;
 }, memberCount: number): RoleDto {
   return {
     id: role.id,
@@ -38,6 +39,7 @@ function toRoleDto(role: {
     permissions: role.permissions,
     iconUrl: role.iconUrl,
     isEveryone: role.isEveryone,
+    isDefault: role.isDefault,
     memberCount,
   };
 }
@@ -206,6 +208,29 @@ export class RolesService {
       await this.requireCanGrant(actorId, role.guildId, permissions, filterKnownPermissions(role.permissions));
     }
 
+    // Varsayılan rol (yeni üyelere otomatik): @everyone olamaz; guild başına TEK.
+    // true yapılıyorsa önceki default'ları sıfırla (ve onları da yay).
+    let clearedRoleIds: string[] = [];
+    if (dto.isDefault === true) {
+      if (role.isEveryone) {
+        throw new BadRequestException({
+          message: '@everyone varsayılan rol yapılamaz (zaten herkese uygulanır).',
+          error: 'CANNOT_DEFAULT_EVERYONE',
+        });
+      }
+      const prev = await this.prisma.role.findMany({
+        where: { guildId: role.guildId, isDefault: true, id: { not: roleId } },
+        select: { id: true },
+      });
+      clearedRoleIds = prev.map((r) => r.id);
+      if (clearedRoleIds.length) {
+        await this.prisma.role.updateMany({
+          where: { id: { in: clearedRoleIds } },
+          data: { isDefault: false },
+        });
+      }
+    }
+
     const updated = await this.prisma.role.update({
       where: { id: roleId },
       data: {
@@ -213,6 +238,7 @@ export class RolesService {
         ...(dto.color !== undefined && { color: dto.color }),
         ...(dto.hoist !== undefined && { hoist: dto.hoist }),
         ...(dto.mentionable !== undefined && { mentionable: dto.mentionable }),
+        ...(dto.isDefault !== undefined && { isDefault: dto.isDefault }),
         ...(permissions !== undefined && { permissions }),
       },
     });
@@ -222,6 +248,14 @@ export class RolesService {
 
     const memberIds = await this.guildMemberIds(role.guildId);
     this.realtime.emitToUsers(memberIds, 'guild.role_updated', roleDto);
+
+    // Sıfırlanan önceki default rolleri de yay (UI rozetini güncellesin).
+    for (const id of clearedRoleIds) {
+      const r = await this.prisma.role.findUnique({ where: { id } });
+      if (r) {
+        this.realtime.emitToUsers(memberIds, 'guild.role_updated', toRoleDto(r, await this.roleMemberCount(id)));
+      }
+    }
 
     return roleDto;
   }

@@ -664,7 +664,7 @@ describe('ChannelsService.findByGuild — isPrivate filtresi', () => {
     expect(prismaMock.channelMember.findMany).not.toHaveBeenCalled();
   });
 
-  it('MEMBER + özel kanala üye değil → özel kanal listede görünmez', async () => {
+  it('MEMBER + özel kanala üye değil → kanal GÖRÜNÜR ama locked=true (item 6)', async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
     const publicCh = { ...makeChannel(), id: 'ch-pub', isPrivate: false, channelReads: [] };
     const privateCh = { ...makeChannel(), id: 'ch-priv', isPrivate: true, channelReads: [] };
@@ -675,11 +675,15 @@ describe('ChannelsService.findByGuild — isPrivate filtresi', () => {
 
     const result = await service.findByGuild('member-1', GUILD_ID);
 
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('ch-pub');
+    // item 6: özel kanal artık listede görünür (gizlenmez), yalnız giriş kapalı
+    expect(result).toHaveLength(2);
+    const priv = result.find((c: { id: string }) => c.id === 'ch-priv');
+    const pub = result.find((c: { id: string }) => c.id === 'ch-pub');
+    expect(priv?.locked).toBe(true);
+    expect(pub?.locked).toBe(false);
   });
 
-  it('MEMBER + özel kanala ChannelMember kaydı var → görür', async () => {
+  it('MEMBER + özel kanala ChannelMember kaydı var → görür + locked=false', async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
     const publicCh = { ...makeChannel(), id: 'ch-pub', isPrivate: false, channelReads: [] };
     const privateCh = { ...makeChannel(), id: 'ch-priv', isPrivate: true, channelReads: [] };
@@ -691,10 +695,11 @@ describe('ChannelsService.findByGuild — isPrivate filtresi', () => {
     const result = await service.findByGuild('member-1', GUILD_ID);
 
     expect(result).toHaveLength(2);
-    expect(result.map((c: { id: string }) => c.id)).toContain('ch-priv');
+    const priv = result.find((c: { id: string }) => c.id === 'ch-priv');
+    expect(priv?.locked).toBe(false);
   });
 
-  it('MEMBER + birden fazla özel kanal; yalnız üyesi olduğu görünür', async () => {
+  it('MEMBER + birden fazla özel kanal; hepsi görünür, yalnız üyesi olmayan locked', async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
     const publicCh = { ...makeChannel(), id: 'ch-pub', isPrivate: false, channelReads: [] };
     const priv1 = { ...makeChannel(), id: 'ch-priv-1', isPrivate: true, channelReads: [] };
@@ -706,11 +711,12 @@ describe('ChannelsService.findByGuild — isPrivate filtresi', () => {
 
     const result = await service.findByGuild('member-1', GUILD_ID);
 
-    expect(result).toHaveLength(2);
-    const ids = result.map((c: { id: string }) => c.id);
-    expect(ids).toContain('ch-pub');
-    expect(ids).toContain('ch-priv-1');
-    expect(ids).not.toContain('ch-priv-2');
+    // item 6: 3 kanal da görünür; priv1 açık (üye), priv2 kilitli (üye değil)
+    expect(result).toHaveLength(3);
+    const byId = Object.fromEntries(result.map((c: { id: string; locked?: boolean }) => [c.id, c.locked]));
+    expect(byId['ch-pub']).toBe(false);
+    expect(byId['ch-priv-1']).toBe(false);
+    expect(byId['ch-priv-2']).toBe(true);
   });
 });
 

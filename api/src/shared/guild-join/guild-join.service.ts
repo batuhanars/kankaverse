@@ -79,15 +79,40 @@ export class GuildJoinService {
       ...extraTxOps,
     ] as Prisma.PrismaPromise<unknown>[]);
 
+    // 4b. Varsayılan rol: yetkililer ayardan belirlediyse yeni üyeye otomatik ata.
+    await this.assignDefaultRole(guild.id, userId);
+
     // REV-14 realtime: mevcut üyelere yeni katılanı anlık bildir. Transaction SONRASI.
     await this.notifyMemberJoined(guild.id, userId);
+  }
+
+  /** Yeni üyeye guild'in varsayılan rolünü (Role.isDefault) bağla. Yoksa no-op. */
+  private async assignDefaultRole(guildId: string, userId: string) {
+    const role = await this.prisma.role.findFirst({
+      where: { guildId, isDefault: true, isEveryone: false },
+      select: { id: true },
+    });
+    if (!role) return;
+    const member = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId } },
+      select: { id: true },
+    });
+    if (!member) return;
+    // İdempotent: zaten bağlıysa (teorik) yok say.
+    await this.prisma.guildMemberRole
+      .create({ data: { memberId: member.id, roleId: role.id } })
+      .catch(() => undefined);
   }
 
   /** REV-14: yeni üyeyi guild'in diğer üyelerine `guild.member_joined` ile yay. */
   private async notifyMemberJoined(guildId: string, newUserId: string) {
     const newMember = await this.prisma.guildMember.findUnique({
       where: { guildId_userId: { guildId, userId: newUserId } },
-      include: { user: { select: { id: true, username: true, avatarUrl: true } } },
+      include: {
+        user: { select: { id: true, username: true, avatarUrl: true } },
+        // Varsayılan rol atandıysa üye doğru rol başlığı altında ANLIK görünsün.
+        roleLinks: { include: { role: { select: { id: true, name: true, color: true, position: true, hoist: true, isEveryone: true } } } },
+      },
     });
     if (!newMember) return;
 
@@ -104,7 +129,15 @@ export class GuildJoinService {
         username: newMember.user.username,
         avatarUrl: newMember.user.avatarUrl,
         role: newMember.role,
-        roles: [], // yeni üyenin atanmış özel rolü yok
+        roles: (newMember.roleLinks ?? [])
+          .filter((rl) => !rl.role.isEveryone)
+          .map((rl) => ({
+            id: rl.role.id,
+            name: rl.role.name,
+            color: rl.role.color,
+            position: rl.role.position,
+            hoist: rl.role.hoist,
+          })),
       },
     });
   }

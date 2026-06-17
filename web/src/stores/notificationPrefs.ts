@@ -38,7 +38,16 @@ export const useNotificationPrefsStore = defineStore('notificationPrefs', () => 
   }
 
   function isMuted(type: NotifTargetType, id: string): boolean {
-    return prefs.get(key(type, id))?.muted ?? false
+    const pref = prefs.get(key(type, id))
+    if (!pref?.muted) return false
+    // Süreli sustur: bitiş geçmişse artık susturulmuş sayılmaz.
+    if (pref.mutedUntil && new Date(pref.mutedUntil).getTime() <= Date.now()) return false
+    return true
+  }
+
+  /** Susturma bitiş zamanı (ISO) — null = süresiz veya susturulmamış. UI etiketi için. */
+  function mutedUntilFor(type: NotifTargetType, id: string): string | null {
+    return prefs.get(key(type, id))?.mutedUntil ?? null
   }
 
   /**
@@ -64,6 +73,7 @@ export const useNotificationPrefsStore = defineStore('notificationPrefs', () => 
     targetType: NotifTargetType
     targetId: string
     muted?: boolean
+    mutedUntil?: string | null
     level?: NotificationLevelType
   }) {
     const res = await notificationsApi.setPref(body)
@@ -72,5 +82,5 @@ export const useNotificationPrefsStore = defineStore('notificationPrefs', () => 
     return pref
   }
 
-  return { prefs, load, prefFor, isMuted, effectiveLevel, setPref }
+  return { prefs, load, prefFor, isMuted, mutedUntilFor, effectiveLevel, setPref }
 })
