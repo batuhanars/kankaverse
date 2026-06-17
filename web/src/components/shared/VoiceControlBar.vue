@@ -5,9 +5,25 @@
  */
 import { useI18n } from 'vue-i18n'
 import { useVoiceStore } from '@/stores/voice'
+import { voiceBroadcast } from '@/composables/useSocket'
 
 const { t } = useI18n()
 const voiceStore = useVoiceStore()
+
+// #1 — Ekran paylaşımı aç/kapa → yayın durumu sinyali (YAYINDA rozeti)
+async function handleToggleScreen() {
+  const wasBroadcasting = voiceStore.isScreenSharing
+  await voiceStore.toggleScreen()
+  const isBroadcastingNow = voiceStore.isScreenSharing
+  const channelId = voiceStore.connectedChannelId
+  if (!channelId) return
+  // Durum değiştiyse sinyal gönder
+  if (!wasBroadcasting && isBroadcastingNow) {
+    voiceBroadcast(channelId, true)
+  } else if (wasBroadcasting && !isBroadcastingNow) {
+    voiceBroadcast(channelId, false)
+  }
+}
 </script>
 
 <template>
@@ -77,7 +93,7 @@ const voiceStore = useVoiceStore()
       class="w-11 h-11 flex items-center justify-center rounded-full cursor-pointer transition-colors"
       :title="voiceStore.isScreenSharing ? t('voice.screenStop') : t('voice.screenShare')"
       :style="{ backgroundColor: voiceStore.isScreenSharing ? 'var(--kv-accent-500)' : 'var(--kv-bg-elevated)', color: voiceStore.isScreenSharing ? '#fff' : 'var(--kv-text-primary)' }"
-      @click="voiceStore.toggleScreen()"
+      @click="handleToggleScreen()"
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>

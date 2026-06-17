@@ -1164,7 +1164,7 @@ onUnmounted(() => {
         </div>
       </div>
       <!-- Ses kanalı → katılımcı alt-listesi -->
-      <VoiceParticipantList v-if="channel.type === 'GUILD_VOICE'" :channel-id="channel.id" />
+      <VoiceParticipantList v-if="channel.type === 'GUILD_VOICE'" :channel-id="channel.id" :guild-id="channel.guildId ?? ''" />
       </template>
 
       <!-- ── (2) Kategoriler — position asc; E: başlıklar DB'den gelir ── -->
@@ -1381,7 +1381,7 @@ onUnmounted(() => {
             </div>
           </div>
           <!-- Ses kanalı → katılımcı alt-listesi -->
-          <VoiceParticipantList v-if="channel.type === 'GUILD_VOICE'" :channel-id="channel.id" />
+          <VoiceParticipantList v-if="channel.type === 'GUILD_VOICE'" :channel-id="channel.id" :guild-id="channel.guildId ?? ''" />
           </template>
         </template>
       </template>

@@ -490,6 +490,7 @@ export class VoiceService {
     });
 
     this.realtime.emitToRoom(channelId, 'voice.broadcast_stopped', { channelId, userId: targetUserId });
+    this.realtime.emitToVoicePresence(channelId, 'voice.broadcast_stopped', { channelId, userId: targetUserId });
   }
 
   /**

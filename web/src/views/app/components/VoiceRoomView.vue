@@ -20,6 +20,7 @@ import { voiceApi } from '@/api/voice'
 import type { ChannelDto } from '@/types'
 import VoiceControlBar from '@/components/shared/VoiceControlBar.vue'
 import VoiceVideoGrid from '@/components/shared/VoiceVideoGrid.vue'
+import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 
 const { t } = useI18n()
 const voiceStore = useVoiceStore()
@@ -107,6 +108,36 @@ async function moveTo(m: RoomMember, target: ChannelDto) {
   }
 }
 
+async function stopBroadcast(m: RoomMember) {
+  closeMenu()
+  try {
+    await voiceApi.stopBroadcast(channelId.value, m.userId)
+  } catch (e: unknown) {
+    toast.error(errMessage(e, 'voice.stopBroadcastFailed'))
+  }
+}
+
+// Odadan çıkar — onaylı
+const disconnectTarget = ref<RoomMember | null>(null)
+function askDisconnect(m: RoomMember) {
+  closeMenu()
+  disconnectTarget.value = m
+}
+async function doDisconnect() {
+  if (!disconnectTarget.value) return
+  const target = disconnectTarget.value
+  disconnectTarget.value = null
+  try {
+    await voiceApi.disconnect(channelId.value, target.userId)
+  } catch (e: unknown) {
+    toast.error(errMessage(e, 'voice.disconnectFailed'))
+  }
+}
+
+function isBroadcastingFor(m: RoomMember): boolean {
+  return voiceStore.isBroadcasting(channelId.value, m.userId)
+}
+
 function errMessage(e: unknown, fallbackKey: string): string {
   const err = e as { response?: { data?: { message?: string } } }
   return err.response?.data?.message ?? t(fallbackKey)
@@ -174,6 +205,14 @@ function errMessage(e: unknown, fallbackKey: string): string {
               </svg>
               <span class="text-[14px] truncate" style="color: var(--kv-text-primary);">
                 {{ m.username }}<template v-if="m.isLocal"> ({{ t('voice.you') }})</template>
+              </span>
+              <!-- #1 YAYINDA rozeti (video ızgarasında video-dışı kartlar) -->
+              <span
+                v-if="isBroadcastingFor(m)"
+                class="text-[10px] font-bold px-1.5 py-0.5 rounded-sm leading-none shrink-0"
+                style="background-color: var(--kv-accent-500); color: #fff;"
+              >
+                {{ t('voice.live') }}
               </span>
             </div>
           </div>
@@ -263,6 +302,24 @@ function errMessage(e: unknown, fallbackKey: string): string {
                   </button>
                 </div>
               </template>
+              <!-- Yayını Durdur (MUTE_MEMBERS, yalnız yayın yapıyorsa) -->
+              <button
+                v-if="canMute && isBroadcastingFor(m)"
+                class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                style="color: var(--kv-text-secondary);"
+                @click="stopBroadcast(m)"
+              >
+                {{ t('voice.stopBroadcast') }}
+              </button>
+              <!-- Odadan Çıkar (MOVE_MEMBERS) -->
+              <button
+                v-if="canMove"
+                class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                style="color: var(--kv-danger);"
+                @click="askDisconnect(m)"
+              >
+                {{ t('voice.disconnectUser') }}
+              </button>
             </div>
           </div>
 
@@ -275,7 +332,7 @@ function errMessage(e: unknown, fallbackKey: string): string {
             <img v-if="m.avatarUrl" :src="m.avatarUrl" :alt="m.username" class="w-full h-full object-cover" />
             <span v-else>{{ m.username[0]?.toUpperCase() }}</span>
           </div>
-          <!-- Ad + mute göstergeleri -->
+          <!-- Ad + mute göstergeleri + YAYINDA rozeti -->
           <div class="flex items-center gap-1.5 max-w-full">
             <!-- R11: moderatör (server) susturması — self-mute ikonundan ayrışan kalkan ikonu -->
             <svg v-if="isServerMutedFor(m)" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-danger);" class="shrink-0" :aria-label="t('voice.serverMuted')">
@@ -294,6 +351,14 @@ function errMessage(e: unknown, fallbackKey: string): string {
             <span class="text-[14px] truncate" style="color: var(--kv-text-primary);">
               {{ m.username }}<template v-if="m.isLocal"> ({{ t('voice.you') }})</template>
             </span>
+            <!-- #1 YAYINDA rozeti (ses odasında da göster) -->
+            <span
+              v-if="isBroadcastingFor(m)"
+              class="text-[10px] font-bold px-1.5 py-0.5 rounded-sm leading-none shrink-0"
+              style="background-color: var(--kv-accent-500); color: #fff;"
+            >
+              {{ t('voice.live') }}
+            </span>
           </div>
         </div>
       </div>
@@ -304,4 +369,13 @@ function errMessage(e: unknown, fallbackKey: string): string {
       <VoiceControlBar />
     </div>
   </div>
+
+  <!-- Odadan çıkar onay dialog -->
+  <ConfirmDialog
+    v-if="disconnectTarget"
+    :message="t('voice.disconnectConfirm', { username: disconnectTarget.username })"
+    :confirm-label="t('voice.disconnectUser')"
+    @confirm="doDisconnect"
+    @cancel="disconnectTarget = null"
+  />
 </template>

@@ -46,6 +46,10 @@ export function voiceUnsubscribe(channelId: string) {
   voiceSubscriptions.delete(channelId)
   socket?.emit('voice:unsubscribe', { channelId })
 }
+// #1 — Yayın durumu sinyali: ekran paylaşımı aç/kapa → tüm abonelere YAYINDA rozeti
+export function voiceBroadcast(channelId: string, active: boolean) {
+  socket?.emit('voice:broadcast', { channelId, active })
+}
 // auth_error sonrası art arda tazele-dene sayacı (sonsuz döngü koruması; başarılı connect'te sıfırlanır)
 let authRetryCount = 0
 
@@ -312,6 +316,22 @@ export function useSocket() {
     })
     socket.on('voice.participant_unmuted', (data: { channelId: string; userId: string }) => {
       voiceStore.removeServerMute(data.channelId, data.userId)
+    })
+
+    // #1 — Yayın durumu rozeti: ekran paylaşımı aç/kapa (hem room hem voice aboneleri)
+    socket.on('voice.broadcast_started', (data: { channelId: string; userId: string }) => {
+      voiceStore.addBroadcast(data.channelId, data.userId)
+    })
+    socket.on('voice.broadcast_stopped', (data: { channelId: string; userId: string }) => {
+      voiceStore.removeBroadcast(data.channelId, data.userId)
+    })
+
+    // R11B — odadan çıkarıldı (yalnız çıkarılan kullanıcıya gelir → leave + bildir)
+    socket.on('voice.kicked', async (data: { channelId: string; userId: string }) => {
+      if (voiceStore.connectedChannelId === data.channelId) {
+        await voiceStore.leave()
+        useToastStore().info(i18n.global.t('voice.kickedToast'))
+      }
     })
 
     // R11 — yetkili taşıdı (yalnız taşınan kullanıcıya gelir): mevcut sesten ayrıl,

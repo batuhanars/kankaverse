@@ -45,4 +45,12 @@ export const voiceApi = {
   leave(channelId: string) {
     return http.post<null>(`/channels/${channelId}/voice/leave`)
   },
+  // R11B — mod: yayını durdur (MUTE_MEMBERS). Hedefin video/ekran kaynakları düşer, ses kalır.
+  stopBroadcast(channelId: string, targetUserId: string) {
+    return http.post<null>(`/channels/${channelId}/voice/stop-broadcast`, { targetUserId })
+  },
+  // R11B — mod: odadan çıkar (MOVE_MEMBERS). Ortam üyeliği korunur; hedef yeniden katılabilir.
+  disconnect(channelId: string, targetUserId: string) {
+    return http.post<null>(`/channels/${channelId}/voice/disconnect`, { targetUserId })
+  },
 }

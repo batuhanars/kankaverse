@@ -928,7 +928,20 @@
     "screenStop": "Ekran paylaşımını durdur",
     "screenShareActive": "Ekran paylaşımı",
     "enterFullscreen": "Tam ekran",
-    "exitFullscreen": "Tam ekrandan çık"
+    "exitFullscreen": "Tam ekrandan çık",
+    "live": "YAYINDA",
+    "nowStreaming": "Şimdi Yayın Yapıyor",
+    "watchStream": "Yayını İzle",
+    "stopBroadcast": "Yayını Durdur",
+    "stopBroadcastFailed": "Yayın durdurma işlemi başarısız oldu.",
+    "disconnectUser": "Odadan Çıkar",
+    "disconnectFailed": "Odadan çıkarma işlemi başarısız oldu.",
+    "disconnectConfirm": "{username} adlı kullanıcıyı ses kanalından çıkarmak istediğinden emin misin?",
+    "kickedToast": "Bir yetkili seni ses kanalından çıkardı.",
+    "viewProfile": "Profili Gör",
+    "sendMessage": "Mesaj Gönder",
+    "addFriend": "Kanka Ekle",
+    "blockUser": "Engelle"
   },
   "call": {
     "incoming": "Gelen sesli arama",

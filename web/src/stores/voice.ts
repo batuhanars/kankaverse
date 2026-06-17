@@ -89,6 +89,8 @@ export const useVoiceStore = defineStore('voice', () => {
   const mutedUserIds = ref<Set<string>>(new Set())
   // R11: moderatör (server) susturması — self/track mute'tan AYRI. WS ile beslenir.
   const serverMutedUserIds = ref<Set<string>>(new Set())
+  // #1 — Yayın durumu: kanal → yayın yapan userId'ler (WS voice.broadcast_started/stopped ile beslenir)
+  const broadcastingByChannel = ref<Record<string, Set<string>>>({})
 
   // LiveKit Room — reaktif değil (kompleks nesne)
   let room: Room | null = null
@@ -153,6 +155,29 @@ export const useVoiceStore = defineStore('voice', () => {
   }
   function isServerMuted(userId: string): boolean {
     return serverMutedUserIds.value.has(userId)
+  }
+
+  // ── #1: Yayın durumu (WS voice.broadcast_started/stopped) ───────────────────
+  function addBroadcast(channelId: string, userId: string) {
+    const existing = broadcastingByChannel.value[channelId] ?? new Set<string>()
+    const next = new Set(existing)
+    next.add(userId)
+    broadcastingByChannel.value = { ...broadcastingByChannel.value, [channelId]: next }
+  }
+  function removeBroadcast(channelId: string, userId: string) {
+    const existing = broadcastingByChannel.value[channelId]
+    if (!existing) return
+    const next = new Set(existing)
+    next.delete(userId)
+    broadcastingByChannel.value = { ...broadcastingByChannel.value, [channelId]: next }
+  }
+  function isBroadcasting(channelId: string, userId: string): boolean {
+    return broadcastingByChannel.value[channelId]?.has(userId) ?? false
+  }
+  function clearBroadcasts(channelId: string) {
+    const copy = { ...broadcastingByChannel.value }
+    delete copy[channelId]
+    broadcastingByChannel.value = copy
   }
 
   function removeParticipant(channelId: string, userId: string) {
@@ -267,7 +292,11 @@ export const useVoiceStore = defineStore('voice', () => {
     // Gözlemciler webhook → voice:<id> ile (presence aboneliği) canlı güncellenir.
     const leftChannelId = connectedChannelId.value
     const selfId = useAuthStore().user?.id
-    if (leftChannelId && selfId) removeParticipant(leftChannelId, selfId)
+    if (leftChannelId && selfId) {
+      removeParticipant(leftChannelId, selfId)
+      // #1: ayrılınca kendi yayın rozeti düşsün
+      removeBroadcast(leftChannelId, selfId)
+    }
 
     if (room) {
       try { await room.disconnect() } catch { /* yoksay */ }
@@ -595,6 +624,7 @@ export const useVoiceStore = defineStore('voice', () => {
     roomParticipants,
     mutedUserIds,
     serverMutedUserIds,
+    broadcastingByChannel,
     isConnectedTo,
     clearError,
     participantsFor,
@@ -605,6 +635,9 @@ export const useVoiceStore = defineStore('voice', () => {
     addServerMute,
     removeServerMute,
     isServerMuted,
+    addBroadcast,
+    removeBroadcast,
+    isBroadcasting,
     join,
     leave,
     toggleMute,
