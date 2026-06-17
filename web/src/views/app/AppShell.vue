@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
+import { useFriendsStore } from '@/stores/friends'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { useSocket } from '@/composables/useSocket'
 import { useIdlePresence } from '@/composables/useIdlePresence'
@@ -28,6 +29,7 @@ const authStore = useAuthStore()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
+const friendsStore = useFriendsStore()
 const notificationPrefsStore = useNotificationPrefsStore()
 const { connect, disconnect } = useSocket()
 const { showServerModal, serverModalStep, showAddFriendModal, openServerModal, closeServerModal, closeAddFriend } =
@@ -71,6 +73,9 @@ onMounted(async () => {
   // İlk veri yükü: rail + DM listesi (her view kendi derin-verisini ayrıca kurar)
   await guildsStore.fetchGuilds()
   await dmStore.fetchChannels()
+  // Arkadaş listesi temel state (DM "Kanka Ekle" görünürlüğü, presence gruplama) — DM'e
+  // doğrudan girişte de yüklü olsun diye shell seviyesinde bir kez hidrate et.
+  void friendsStore.fetchFriends()
   // Bildirim tercihlerini bir kez hidrate et (sustur/seviye menüleri için temel)
   void notificationPrefsStore.load()
   window.addEventListener('kv:auth:expired', onAuthExpired)
