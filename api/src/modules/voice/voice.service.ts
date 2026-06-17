@@ -24,9 +24,11 @@ interface ParticipantMeta {
 }
 
 /**
- * VoiceService — LiveKit ses kanalları (audio-only v1).
- * Sözleşme: contracts/SPRINT_V2_LIVEKIT_CONTRACT.md.
- * KURAL: ses kaydı/egress YOK · video grant YOK · karantina → konuşma kapalı.
+ * VoiceService — LiveKit ses + video/ekran kanalları.
+ * Sözleşme: contracts/SPRINT_V2_LIVEKIT_CONTRACT.md (audio) +
+ *            contracts/SPRINT_C4_VIDEO_SCREEN_CONTRACT.md (video, BUILD-DARK).
+ * KURAL: ses/video kaydı/egress YOK · video grant yalnız yetişkin-yalıtılmış bağlamda ·
+ *        karantina → konuşma+video kapalı · minör → video ASLA.
  */
 @Injectable()
 export class VoiceService {
@@ -69,8 +71,8 @@ export class VoiceService {
   }
 
   /**
-   * C1 — Katılım token'ı (R7). Erişim kapısı mint'ten ÖNCE; audio-only grant;
-   * karantinadaki üye dinler ama konuşamaz.
+   * C1 — Katılım token'ı (R7). Erişim kapısı mint'ten ÖNCE; audio-only + koşullu video grant;
+   * karantinadaki üye dinler ama konuşamaz/video açamaz. Sprint C4: video BUILD-DARK.
    */
   async mintToken(userId: string, channelId: string) {
     this.assertEnabled();
@@ -80,6 +82,7 @@ export class VoiceService {
 
     // Tür kapısı + konuşma izni (kurul: davet gate'i sinyalde, mint'te tekrar)
     let canPublish: boolean;
+    let otherDmUserId: string | null = null;
     if (channel.type === 'GUILD_VOICE') {
       // R10: kullanıcı limiti — erişim kapısından SONRA, mint'ten ÖNCE.
       await this.enforceUserLimit(userId, channel.id, channel.userLimit, channel.guildId);
@@ -90,6 +93,10 @@ export class VoiceService {
       // DM/grup sesli arama: block + (1-1 için) ilişki re-check; guild-karantinası yok → konuşabilir
       await this.requireDmCallGate(userId, channelId, channel.type);
       canPublish = true;
+      // DM: video kapısı için diğer üyeyi şimdiden bul (resolveVideoSources'a geçer)
+      if (channel.type === 'DM') {
+        otherDmUserId = await this.otherDmMember(channelId, userId);
+      }
     } else {
       throw new BadRequestException({
         message: 'Bu bir ses kanalı değil.',
@@ -97,9 +104,13 @@ export class VoiceService {
       });
     }
 
+    // Sprint C4 — video/ekran kaynak kararı (T&S, R7). BUILD-DARK: bayraklar false → []
+    const videoSources = await this.resolveVideoSources(userId, channel, otherDmUserId);
+    const canPublishSources = [TrackSource.MICROPHONE, ...videoSources];
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { username: true, avatarUrl: true },
+      select: { username: true, avatarUrl: true, isMinor: true },
     });
 
     const at = new AccessToken(this.apiKey, this.apiSecret, {
@@ -114,13 +125,20 @@ export class VoiceService {
       canSubscribe: true,
       canPublish,
       canPublishData: false,
-      // audio-only: yalnız mikrofon — video/ekran grant'i HİÇBİR yolda açılmaz
-      canPublishSources: [TrackSource.MICROPHONE],
+      canPublishSources,
     });
 
     const token = await at.toJwt();
     // bitrate: GUILD_VOICE kanal ayarı; DM/grup çağrısında varsayılan 64. İstemci publish'te uygular.
-    return { token, url: this.url, canPublish, bitrate: channel.bitrate ?? 64 };
+    // canPublishCamera/canPublishScreen: istemci bu bayraklarla UI butonlarını gösterir/gizler.
+    return {
+      token,
+      url: this.url,
+      canPublish,
+      bitrate: channel.bitrate ?? 64,
+      canPublishCamera: videoSources.includes(TrackSource.CAMERA),
+      canPublishScreen: videoSources.includes(TrackSource.SCREEN_SHARE),
+    };
   }
 
   /** R11 — bu kanalda kullanıcı için kalıcı (server) mute kaydı var mı. mintToken bunu zorlar. */
@@ -130,6 +148,97 @@ export class VoiceService {
       select: { id: true },
     });
     return !!mute;
+  }
+
+  /**
+   * Sprint C4 — T&S video/ekran kaynak kararı (R7, ÇEKIRDEK).
+   * Fail-closed: kuşkuda boş dizi (video yok). mintToken'a `[TrackSource.MICROPHONE, ...sonuç]` olarak eklenir.
+   *
+   * Sıralı kapılar:
+   *  1. Bayrak (BUILD-DARK): CAMERA_ENABLED/SCREEN_ENABLED false → ilgili kaynak aday-dışı; ikisi de false → erken [].
+   *  2. Minör mutlak ret: user.isMinor → []. (Çift-kilit; access-gate'e tek-katmana güvenme.)
+   *  3. Karantina: GUILD_VOICE'ta resolveCanPublish false → []. (Video, audio'dan ağır kısıt.)
+   *  4. Server-mute: isVoiceMuted → []. (Her yayını keser, video dahil.)
+   *  5. Bağlam kapısı (çekirdek invariant):
+   *     - GUILD_VOICE: yalnız channel.ageGated || guild.adultsOnly ise video. Normal kanal → [].
+   *     - DM (1-1): iki taraf da !isMinor ise video. Minör↔yetişkin → audio var, video [].
+   *     - GROUP_DM: TÜM üyeler !isMinor ise video; bir minör bile → []. (fail-closed fiili kontrol)
+   *
+   * SCREEN_SHARE_AUDIO: yalnız SCREEN_SHARE izinliyse eklenir.
+   * EgressClient/kayıt: YOK — bu fonksiyon yalnız grant kararı verir.
+   */
+  private async resolveVideoSources(
+    userId: string,
+    channel: { id: string; type: string; guildId: string | null; ageGated?: boolean; guild?: { adultsOnly: boolean } | null },
+    otherDmUserId: string | null,
+  ): Promise<TrackSource[]> {
+    const cameraEnabled = this.config.get<boolean>('cameraEnabled') ?? false;
+    const screenEnabled = this.config.get<boolean>('screenEnabled') ?? false;
+
+    // Kapı 1: Bayrak (BUILD-DARK) — ikisi de kapalıysa erken çık (audio-only davranış birebir)
+    if (!cameraEnabled && !screenEnabled) return [];
+
+    // Adaylar: yalnız açık bayrağa sahip kaynaklar
+    const cameraCandidate = cameraEnabled;
+    const screenCandidate = screenEnabled;
+
+    // Kapı 2: Minör mutlak ret — erişim kapısından bağımsız ikinci kilit
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isMinor: true },
+    });
+    if (!user || user.isMinor) return [];
+
+    // Kapı 3: Karantina (yalnız GUILD_VOICE) — video audio'dan ağır; karantinada video da kapalı
+    if (channel.type === 'GUILD_VOICE' && channel.guildId) {
+      const canPublish = await this.resolveCanPublish(userId, channel.guildId);
+      if (!canPublish) return [];
+    }
+
+    // Kapı 4: Server-mute — her yayını keser (video dahil)
+    const muted = await this.isVoiceMuted(channel.id, userId);
+    if (muted) return [];
+
+    // Kapı 5: Bağlam kapısı (çekirdek invariant — yetişkin-yalıtılmış bağlam zorunlu)
+    if (channel.type === 'GUILD_VOICE') {
+      // ageGated veya adultsOnly olmayan normal kanal → video YOK (minör erişebilir)
+      // channel.guild requireChannelAccess tarafından include: { guild: true } ile hazır gelir — ayrı sorgu gereksiz
+      const contextOk = channel.ageGated || channel.guild?.adultsOnly === true;
+      if (!contextOk) return [];
+    } else if (channel.type === 'DM') {
+      // 1-1 DM: iki taraf da yetişkin olmalı
+      if (!otherDmUserId) return []; // diğer üye bulunamazsa fail-closed
+      const otherUser = await this.prisma.user.findUnique({
+        where: { id: otherDmUserId },
+        select: { isMinor: true },
+      });
+      if (otherUser?.isMinor === true) return []; // karşı taraf minörse video yok
+    } else if (channel.type === 'GROUP_DM') {
+      // GROUP_DM: TÜM üyeler yetişkin olmalı — varsayıma güvenme, fiilen kontrol et
+      const members = await this.prisma.channelMember.findMany({
+        where: { channelId: channel.id },
+        select: { userId: true },
+      });
+      if (members.length === 0) return []; // fail-closed: üye listesi boşsa
+
+      const memberIds = members.map((m) => m.userId);
+      const minorCount = await this.prisma.user.count({
+        where: { id: { in: memberIds }, isMinor: true },
+      });
+      if (minorCount > 0) return []; // bir minör bile → tüm video kapalı
+    } else {
+      // Bilinmeyen bağlam → fail-closed
+      return [];
+    }
+
+    // Tüm kapılar geçildi → izin verilen kaynakları derle
+    const sources: TrackSource[] = [];
+    if (cameraCandidate) sources.push(TrackSource.CAMERA);
+    if (screenCandidate) {
+      sources.push(TrackSource.SCREEN_SHARE);
+      sources.push(TrackSource.SCREEN_SHARE_AUDIO); // ekran sesi yalnız ekran paylaşımıyla
+    }
+    return sources;
   }
 
   /**

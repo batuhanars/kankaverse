@@ -25,10 +25,11 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class VoiceController {
   constructor(private voiceService: VoiceService) {}
 
-  // C1 — Katılım token'ı (R7: erişim+yaş+karantina → audio-only grant)
+  // C1 — Katılım token'ı (R7: erişim+yaş+karantina → audio + koşullu video grant)
+  // Sprint C4: dönüşe canPublishCamera + canPublishScreen eklendi (BUILD-DARK: bayraklar false → false).
   @Post(':id/voice/token')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Ses kanalına katılım tokeni (LiveKit, audio-only)' })
+  @ApiOperation({ summary: 'Ses kanalına katılım tokeni (LiveKit; audio + koşullu video/ekran, BUILD-DARK)' })
   mintToken(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
     return this.voiceService.mintToken(user.id, channelId);
   }
