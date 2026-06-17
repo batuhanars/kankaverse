@@ -86,10 +86,14 @@ function detachVideo(el: Element | null, entry: VideoTrackEntry | null) {
     v-if="tracks.length"
     ref="containerRef"
     class="relative flex flex-col overflow-hidden rounded-[var(--kv-radius-lg)]"
+    :class="isFullscreen ? 'w-full h-full' : 'mx-auto w-full max-w-[960px]'"
     style="background-color: #000;"
   >
-    <!-- Büyük alan: odak track -->
-    <div class="relative flex-1 min-h-0 flex items-center justify-center overflow-hidden">
+    <!-- Büyük alan: odak track (Discord: sınırlı 16:9, full-bleed DEĞİL; tam-ekranda doldur) -->
+    <div
+      class="relative flex items-center justify-center overflow-hidden"
+      :class="isFullscreen ? 'flex-1 min-h-0' : 'aspect-video'"
+    >
       <video
         v-if="focusedTrack"
         :key="trackKey(focusedTrack)"
