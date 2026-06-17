@@ -19,49 +19,42 @@ function togglePins(e: MouseEvent) {
 </script>
 
 <template>
+  <!-- Alt aksiyon barı: pins + üye paneli toggle — kanal adı GuildTopBar'da, buraya tekrarlanmaz -->
   <header
-    class="flex items-center px-4 gap-3 shrink-0 border-b"
+    class="flex items-center justify-end px-4 gap-1 shrink-0 border-b"
     style="height: var(--kv-header-height); background-color: var(--kv-bg-content); border-color: var(--kv-border-subtle);"
   >
-    <span class="text-[var(--kv-text-muted)] font-medium">#</span>
-    <span class="text-[15px] font-semibold text-[var(--kv-text-primary)]">
-      {{ channelsStore.activeChannel()?.name ?? '' }}
-    </span>
-
-    <div class="ml-auto flex items-center gap-1">
-      <!-- Sabitlenen Mesajlar butonu -->
-      <div class="relative">
-        <button
-          class="w-8 h-8 flex items-center justify-center text-[16px] rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-          :class="showPins ? 'bg-[var(--kv-accent-subtle)]' : ''"
-          :style="showPins ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
-          :title="t('message.pinnedMessages')"
-          @mouseenter="!showPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
-          @mouseleave="!showPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
-          @click="togglePins"
-        >
-          📌
-        </button>
-        <PinsPopover
-          v-if="channelsStore.activeChannel()"
-          :channel-id="channelsStore.activeChannel()!.id"
-          :open="showPins"
-          @close="showPins = false"
-        />
-      </div>
-
+    <!-- Sabitlenen Mesajlar butonu -->
+    <div class="relative">
       <button
-        :class="[
-          'px-3 py-1 text-[13px] rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer',
-          showMemberPanel
-            ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-accent-500)]'
-            : 'text-[var(--kv-text-secondary)] hover:text-[var(--kv-text-body)]',
-        ]"
-        @click="emit('toggleMembers')"
+        class="w-8 h-8 flex items-center justify-center text-[16px] rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+        :class="showPins ? 'bg-[var(--kv-accent-subtle)]' : ''"
+        :style="showPins ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
+        :title="t('message.pinnedMessages')"
+        @mouseenter="!showPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
+        @mouseleave="!showPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
+        @click="togglePins"
       >
-        {{ t('member.panel') }}
+        📌
       </button>
-
+      <PinsPopover
+        v-if="channelsStore.activeChannel()"
+        :channel-id="channelsStore.activeChannel()!.id"
+        :open="showPins"
+        @close="showPins = false"
+      />
     </div>
+
+    <button
+      :class="[
+        'px-3 py-1 text-[13px] rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer',
+        showMemberPanel
+          ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-accent-500)]'
+          : 'text-[var(--kv-text-secondary)] hover:text-[var(--kv-text-body)]',
+      ]"
+      @click="emit('toggleMembers')"
+    >
+      {{ t('member.panel') }}
+    </button>
   </header>
 </template>
