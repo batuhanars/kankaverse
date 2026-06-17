@@ -162,6 +162,28 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     return { ok: true };
   }
 
+  /**
+   * Ekran paylaşımı yayın durumu — sidebar "YAYINDA" rozeti için.
+   * Payload: { channelId, active: boolean }
+   * active=true  → voice.broadcast_started  { channelId, userId }
+   * active=false → voice.broadcast_stopped  { channelId, userId }
+   * Her iki event hem room:<channelId> hem voice:<channelId> odasına gider.
+   * Light doğrulama: gönderen socket auth'tan userId alınır (spoofing yalnız kozmetik).
+   */
+  @SubscribeMessage('voice:broadcast')
+  async handleVoiceBroadcast(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { channelId: string; active: boolean },
+  ) {
+    const userId = socket.data.userId;
+    if (!userId || !payload?.channelId) return { ok: false };
+    const event = payload.active ? 'voice.broadcast_started' : 'voice.broadcast_stopped';
+    const data = { channelId: payload.channelId, userId };
+    this.realtime.emitToRoom(payload.channelId, event, data);
+    this.realtime.emitToVoicePresence(payload.channelId, event, data);
+    return { ok: true };
+  }
+
   @SubscribeMessage('voice:unsubscribe')
   handleVoiceUnsubscribe(
     @ConnectedSocket() socket: AuthSocket,
