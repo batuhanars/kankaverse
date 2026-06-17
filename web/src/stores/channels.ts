@@ -62,7 +62,9 @@ export const useChannelsStore = defineStore('channels', () => {
   async function createChannel(guildId: string, payload: { name: string; type?: 'GUILD_TEXT' | 'GUILD_VOICE'; ageGated?: boolean; isPrivate?: boolean; categoryId?: string | null }): Promise<ChannelDto> {
     const res = await guildsApi.createChannel(guildId, payload)
     if (!channelsByGuild.value[guildId]) channelsByGuild.value[guildId] = []
-    channelsByGuild.value[guildId].push(res.data)
+    // upsert (ham push DEĞİL): backend `channel.created` WS olayını yaratıcıya da yayınlar;
+    // olay bu yanıttan önce işlenirse ham push çiftler. İki yol da id'ye göre idempotent olsun.
+    upsertChannelLocal(guildId, res.data)
     return res.data
   }
 
