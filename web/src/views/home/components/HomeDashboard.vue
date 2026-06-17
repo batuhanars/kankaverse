@@ -2,6 +2,7 @@
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useGuildsStore } from '@/stores/guilds'
+import { bannerBackground } from '@/utils/bannerColor'
 
 const emit = defineEmits<{
   addFriend: []
@@ -13,6 +14,11 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const authStore = useAuthStore()
 const guildsStore = useGuildsStore()
+
+// "Ağu 2025" — kuruluş tarihi kısa etiketi
+function createdLabel(iso: string): string {
+  return new Date(iso).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })
+}
 </script>
 
 <template>
@@ -96,24 +102,30 @@ const guildsStore = useGuildsStore()
           <button
             v-for="guild in guildsStore.guilds"
             :key="guild.id"
-            class="guild-btn"
+            class="ortam-card"
             @click="emit('openGuild', guild.id)"
           >
-            <div
-              class="w-11 h-11 shrink-0 flex items-center justify-center text-[15px] font-bold text-white overflow-hidden"
-              :style="`clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);${guild.iconUrl ? '' : ' background-color: var(--kv-accent-500);'}`"
-            >
-              <img
-                v-if="guild.iconUrl"
-                :src="guild.iconUrl"
-                :alt="guild.name"
-                class="w-full h-full object-cover"
-              />
-              <span v-else>{{ guild.name.charAt(0).toUpperCase() }}</span>
+            <!-- Afiş + altıgen simge -->
+            <div class="ortam-card__banner" :style="{ background: bannerBackground(guild.bannerColor) }">
+              <div class="ortam-card__icon">
+                <img
+                  v-if="guild.iconUrl"
+                  :src="guild.iconUrl"
+                  :alt="guild.name"
+                  class="w-full h-full object-cover"
+                />
+                <span v-else>{{ guild.name.charAt(0).toUpperCase() }}</span>
+              </div>
             </div>
-            <p class="min-w-0 flex-1 text-[14px] font-semibold truncate" style="color: var(--kv-text-primary);">
-              {{ guild.name }}
-            </p>
+            <!-- Gövde: ad + üye sayısı · kuruluş -->
+            <div class="px-4 pt-7 pb-4">
+              <p class="text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
+                {{ guild.name }}
+              </p>
+              <p class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
+                <template v-if="guild.memberCount !== undefined">{{ t('discover.memberCount', { count: guild.memberCount }) }} · </template>{{ t('home.createdAt', { date: createdLabel(guild.createdAt) }) }}
+              </p>
+            </div>
           </button>
         </div>
       </div>
@@ -191,6 +203,44 @@ const guildsStore = useGuildsStore()
 
 .guild-btn:hover {
   border-color: var(--kv-accent-500);
+}
+
+/* Ortamların — tombul kart (afiş + altıgen simge + ad + üye/kuruluş) */
+.ortam-card {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  border-radius: var(--kv-radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--kv-border-subtle);
+  background-color: var(--kv-bg-elevated);
+  transition: border-color 150ms ease;
+}
+.ortam-card:hover {
+  border-color: var(--kv-accent-500);
+}
+.ortam-card__banner {
+  position: relative;
+  height: 64px;
+  flex-shrink: 0;
+}
+.ortam-card__icon {
+  position: absolute;
+  left: 16px;
+  bottom: -20px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background-color: var(--kv-accent-500);
 }
 
 .empty-text {

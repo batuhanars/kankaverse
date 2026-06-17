@@ -33,13 +33,15 @@ const BANNER_GRADIENTS: Record<BannerPresetKey, string> = {
   dark: 'linear-gradient(135deg, #3A3633 0%, #1A1817 100%)',
 }
 
-// Nötr afiş (bannerColor null / geçersiz) — elevated yüzey tonu.
-const NEUTRAL_BANNER = 'var(--kv-bg-elevated)'
+// Varsayılan afiş (bannerColor null / geçersiz) — Kankaverse markasının KARARTILMIŞ Kor tonu.
+// Parlak accent DEĞİL: aksi halde aynı renkteki Kor hexagon simge afişe karışıp seçilmiyor
+// (Görsel #46). Koyu ember gradyanı → marka sıcaklığı kalır, simge net öne çıkar.
+const DEFAULT_BANNER = 'linear-gradient(135deg, #6E3A28 0%, #3A1E16 100%)'
 
-/** Preset anahtarını CSS background değerine çevir. null/geçersiz → nötr yüzey. */
+/** Preset anahtarını CSS background değerine çevir. null/geçersiz → marka Kor gradyanı. */
 export function bannerBackground(key: string | null): string {
   if (key && key in BANNER_GRADIENTS) {
     return BANNER_GRADIENTS[key as BannerPresetKey]
   }
-  return NEUTRAL_BANNER
+  return DEFAULT_BANNER
 }

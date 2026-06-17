@@ -4,8 +4,9 @@
  * Bağlı olduğun kanal → LiveKit Room'dan CANLI (webhook gerekmez); diğer kanallar → WS/GET snapshot.
  * Konuşan göstergesi yalnız bağlı kanalda (animasyonlu yeşil halka).
  */
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useVoiceStore, type VoiceParticipant } from '@/stores/voice'
+import { voiceSubscribe, voiceUnsubscribe } from '@/composables/useSocket'
 
 const props = defineProps<{ channelId: string }>()
 const voiceStore = useVoiceStore()
@@ -28,7 +29,20 @@ function isMuted(userId: string, isLocal?: boolean): boolean {
 onMounted(() => {
   // Bağlı değilsek mevcut katılımcıları çek (snapshot); bağlıysak canlı liste zaten var
   if (!connectedHere.value) voiceStore.loadParticipants(props.channelId)
+  // Canlı gir/çık için presence room'una abone ol (webhook → voice:<id> → bu socket)
+  voiceSubscribe(props.channelId)
 })
+onUnmounted(() => voiceUnsubscribe(props.channelId))
+
+// channelId değişirse (component yeniden kullanılırsa) aboneliği taşı
+watch(
+  () => props.channelId,
+  (next, prev) => {
+    if (prev) voiceUnsubscribe(prev)
+    voiceSubscribe(next)
+    if (voiceStore.connectedChannelId !== next) voiceStore.loadParticipants(next)
+  },
+)
 </script>
 
 <template>

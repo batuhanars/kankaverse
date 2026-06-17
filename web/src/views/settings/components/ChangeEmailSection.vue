@@ -9,6 +9,10 @@ import { changeEmailSchema } from '@/lib/validation/auth'
 import KvInput from '@/components/ui/KvInput.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 
+// inModal: KvModal içinde başlığını gizler. E-posta değişimi doğrulama linki gönderir;
+// başarı mesajı modalda kalsın diye 'saved' ile otomatik kapanma YAPILMAZ (kullanıcı X ile kapatır).
+defineProps<{ inModal?: boolean }>()
+
 const { t, te } = useI18n()
 const auth = useAuthStore()
 
@@ -53,7 +57,7 @@ function getError(field: string): string | undefined {
 
 <template>
   <div>
-    <h3 class="text-[15px] font-semibold mb-1" style="color: var(--kv-text-primary);">
+    <h3 v-if="!inModal" class="text-[15px] font-semibold mb-1" style="color: var(--kv-text-primary);">
       {{ t('security.email.title') }}
     </h3>
     <p class="text-[13px] mb-3" style="color: var(--kv-text-muted);">

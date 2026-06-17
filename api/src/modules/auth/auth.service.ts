@@ -30,6 +30,7 @@ import { Enable2faDto } from './dto/enable-2fa.dto';
 import { Disable2faDto } from './dto/disable-2fa.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangeEmailDto } from './dto/change-email.dto';
+import { ChangeUsernameDto } from './dto/change-username.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { User } from '@prisma/client';
 import { randomUUID } from 'crypto';
@@ -465,6 +466,36 @@ export class AuthService implements OnModuleInit {
       }),
     ]);
     return null;
+  }
+
+  /**
+   * R7 — Kullanıcı adı değiştir. Kimlik değişimi → re-auth (mevcut şifre + opsiyonel TOTP).
+   * Benzersizlik DB unique ile zorlanır; aynı ad/değişmemiş → 400. Anlık (token onayı yok),
+   * e-posta gibi geri-al akışı GEREKMEZ (kullanıcı adı gizli/güvenlik-kritik tanımlayıcı değil).
+   */
+  async changeUsername(userId: string, dto: ChangeUsernameDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId, deletedAt: null } });
+    if (!user) throw new UnauthorizedException('Kullanıcı bulunamadı.');
+
+    await this.verifyReauth(user, dto.currentPassword, dto.totpCode);
+
+    const newUsername = dto.newUsername.trim();
+    if (newUsername === user.username) {
+      throw new BadRequestException({
+        message: 'Yeni kullanıcı adı mevcut adınızla aynı.',
+        error: 'USERNAME_UNCHANGED',
+      });
+    }
+    const taken = await this.prisma.user.findUnique({ where: { username: newUsername } });
+    if (taken) {
+      throw new ConflictException({ message: 'Bu kullanıcı adı zaten kullanımda.', error: 'USERNAME_TAKEN' });
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { username: newUsername },
+    });
+    return { user: toUserDto(updated) };
   }
 
   async changeEmail(userId: string, dto: ChangeEmailDto) {

@@ -30,6 +30,22 @@ let socket: Socket | null = null
 let refCount = 0
 // Reconnect sonrası yeniden join için aktif kanalı modül seviyesinde sakla
 let activeChannelId: string | null = null
+// Ses presence abonelikleri (sidebar "kim var" canlı) — reconnect'te yeniden abone
+const voiceSubscriptions = new Set<string>()
+
+// Ses presence aboneliği — VoiceParticipantList mount'ta abone, unmount'ta bırakır.
+// Modül-seviyesi (useSocket'in ağır store kurulumu olmadan doğrudan import edilir).
+// Set reconnect'te yeniden aboneyi sağlar (bkz. connect handler). İdempotent.
+export function voiceSubscribe(channelId: string) {
+  if (voiceSubscriptions.has(channelId)) return
+  voiceSubscriptions.add(channelId)
+  socket?.emit('voice:subscribe', { channelId })
+}
+export function voiceUnsubscribe(channelId: string) {
+  if (!voiceSubscriptions.has(channelId)) return
+  voiceSubscriptions.delete(channelId)
+  socket?.emit('voice:unsubscribe', { channelId })
+}
 // auth_error sonrası art arda tazele-dene sayacı (sonsuz döngü koruması; başarılı connect'te sıfırlanır)
 let authRetryCount = 0
 
@@ -81,6 +97,10 @@ export function useSocket() {
       // Reconnect durumunda aktif kanala yeniden join et
       if (activeChannelId) {
         _joinRoom(activeChannelId)
+      }
+      // Reconnect: ses presence aboneliklerini yeniden kur (sidebar canlı kalsın)
+      for (const channelId of voiceSubscriptions) {
+        socket?.emit('voice:subscribe', { channelId })
       }
       // Reconnect sonrası sunucu bellek-içi presence'ı sıfırladı (online döner).
       // Kullanıcının manuel seçimini (DND/away) koru → sunucuya geri uygula.

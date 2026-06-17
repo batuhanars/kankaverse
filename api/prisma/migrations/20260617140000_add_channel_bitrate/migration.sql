@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Channel" ADD COLUMN "bitrate" INTEGER NOT NULL DEFAULT 64;

@@ -15,6 +15,7 @@ export interface UpdateRolePayload {
   hoist?: boolean
   mentionable?: boolean
   permissions?: string[]
+  isDefault?: boolean // yeni üyelere otomatik atanan varsayılan rol (guild başına tek)
 }
 
 export const rolesApi = {

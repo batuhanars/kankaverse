@@ -15,6 +15,12 @@ const prismaMock = {
     create: jest.fn(),
     findMany: jest.fn(),
   },
+  guildMemberRole: {
+    create: jest.fn(),
+  },
+  role: {
+    findFirst: jest.fn(),
+  },
   guildBan: {
     findUnique: jest.fn(),
   },

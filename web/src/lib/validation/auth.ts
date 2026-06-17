@@ -74,6 +74,18 @@ export const changeEmailSchema = z.object({
   totpCode: z.string().optional(),
 })
 
+export const changeUsernameSchema = z.object({
+  currentPassword: z
+    .string({ error: 'reauth.validation.passwordRequired' })
+    .min(1, 'reauth.validation.passwordRequired'),
+  newUsername: z
+    .string({ error: 'security.username.validation.required' })
+    .min(3, 'security.username.validation.min')
+    .max(32, 'security.username.validation.max')
+    .regex(/^[a-zA-Z0-9_]+$/, 'security.username.validation.pattern'),
+  totpCode: z.string().optional(),
+})
+
 export type LoginFormValues = z.infer<typeof loginSchema>
 export type RegisterFormValues = z.infer<typeof registerSchema>
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>

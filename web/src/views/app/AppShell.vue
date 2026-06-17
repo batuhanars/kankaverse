@@ -35,6 +35,11 @@ const { showServerModal, serverModalStep, showAddFriendModal, openServerModal, c
 
 // Birleşik kullanıcı ayarları modalı (UserCard popover → ayarlar girişi açar)
 const showUserSettings = ref(false)
+const userSettingsSection = ref<string | undefined>(undefined)
+function openUserSettings(section?: string) {
+  userSettingsSection.value = section
+  showUserSettings.value = true
+}
 
 // Socket'i setup'ta bağla (child view'lar mount olup joinChannel çağırmadan ÖNCE soket var olsun).
 // Child mounted, parent mounted'tan önce koşar; bu yüzden connect()'i onMounted'a bırakamayız.
@@ -94,7 +99,7 @@ onUnmounted(() => {
           <!-- Sidebar: ChannelPanel (guild) | HomeSidebar (home/dm) — route'tan gelir -->
           <RouterView name="sidebar" />
         </div>
-        <UserCard @logout="logout" @open-settings="showUserSettings = true" />
+        <UserCard @logout="logout" @open-settings="openUserSettings" />
       </div>
 
       <!-- ANA İÇERİK: HomeView | GuildChannelView | DmView -->
@@ -104,7 +109,7 @@ onUnmounted(() => {
     <ServerModal v-if="showServerModal" :initial-step="serverModalStep" @close="closeServerModal" />
     <FriendAddModal v-if="showAddFriendModal" @close="closeAddFriend" />
     <!-- Birleşik kullanıcı ayarları modalı -->
-    <UserSettingsView v-if="showUserSettings" @close="showUserSettings = false" />
+    <UserSettingsView v-if="showUserSettings" :initial-section="userSettingsSection" @close="showUserSettings = false" />
     <!-- Gelen DM sesli arama (global) -->
     <IncomingCallModal />
   </div>

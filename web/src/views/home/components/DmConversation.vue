@@ -21,6 +21,7 @@ import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.v
 import ReportModal from '@/components/shared/ReportModal.vue'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import MessageRow from '@/components/shared/MessageRow.vue'
+import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
 import PinsPopover from '@/components/shared/PinsPopover.vue'
 import SearchPopover from '@/components/shared/SearchPopover.vue'
 import GroupManagePanel from './GroupManagePanel.vue'
@@ -28,6 +29,10 @@ import type { DmChannelDto, MessageDto } from '@/types'
 
 // Yanıt state
 const replyingTo = ref<MessageDto | null>(null)
+
+// İlet (forward) modalı
+const showForward = ref(false)
+const forwardMsg = ref<MessageDto | null>(null)
 
 function startReply(msg: MessageDto) {
   replyingTo.value = msg
@@ -861,6 +866,7 @@ function isGroupStart(index: number): boolean {
           :is-mentioned="isDmMentioned(msg)"
           :can-pin="true"
           @reply="startReply"
+          @forward="(m) => { forwardMsg = m; showForward = true }"
           @edit="startEdit"
           @delete="openDeleteConfirm"
           @report="openReportMessage"
@@ -1125,5 +1131,11 @@ function isGroupStart(index: number): boolean {
     :target-type="reportTargetType"
     :target-id="reportTargetId"
     @close="reportTargetId = null"
+  />
+
+  <ForwardMessageModal
+    v-if="showForward && forwardMsg"
+    :message="forwardMsg"
+    @close="showForward = false"
   />
 </template>

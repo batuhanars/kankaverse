@@ -31,6 +31,7 @@ export const notificationsApi = {
     targetType: NotificationPrefDto['targetType']
     targetId: string
     muted?: boolean
+    mutedUntil?: string | null
     level?: NotificationPrefDto['level']
   }) {
     return http.put<NotificationPrefDto>('/notifications/prefs', body)

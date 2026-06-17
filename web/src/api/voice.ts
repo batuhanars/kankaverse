@@ -4,6 +4,7 @@ export interface VoiceTokenDto {
   token: string
   url: string
   canPublish: boolean
+  bitrate?: number // ses bit hızı (kbps) — istemci publish'te uygular
 }
 
 export interface VoiceParticipantDto {

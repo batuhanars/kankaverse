@@ -43,17 +43,41 @@ export function useGuildMenuActions(guildId: Ref<string> | (() => string)) {
     window.dispatchEvent(new CustomEvent('kv:guild:recheck-unread', { detail: { guildId: id } }))
   }
 
-  // ── Sustur (guild seviyesi) ──
+  // ── Sustur (guild seviyesi; süreli — Görsel #15) ──
   const isGuildMuted = computed(() => prefsStore.isMuted(NotifTargetType.GUILD, gid.value))
+  const guildMutedUntil = computed(() => prefsStore.mutedUntilFor(NotifTargetType.GUILD, gid.value))
 
   async function toggleGuildMute() {
+    if (isGuildMuted.value) await unmuteGuild()
+    else await muteGuildFor(null)
+  }
+
+  // minutes=null → süresiz; aksi → şimdi + dakika.
+  async function muteGuildFor(minutes: number | null) {
+    const id = gid.value
+    if (!id) return
+    const mutedUntil = minutes === null ? null : new Date(Date.now() + minutes * 60_000).toISOString()
+    try {
+      await prefsStore.setPref({
+        targetType: NotifTargetType.GUILD,
+        targetId: id,
+        muted: true,
+        mutedUntil,
+      })
+    } catch {
+      toast.error(t('guildMenu.muteError'))
+    }
+  }
+
+  async function unmuteGuild() {
     const id = gid.value
     if (!id) return
     try {
       await prefsStore.setPref({
         targetType: NotifTargetType.GUILD,
         targetId: id,
-        muted: !isGuildMuted.value,
+        muted: false,
+        mutedUntil: null,
       })
     } catch {
       toast.error(t('guildMenu.muteError'))
@@ -92,7 +116,10 @@ export function useGuildMenuActions(guildId: Ref<string> | (() => string)) {
   return {
     markGuildRead,
     isGuildMuted,
+    guildMutedUntil,
     toggleGuildMute,
+    muteGuildFor,
+    unmuteGuild,
     guildLevel,
     setGuildLevel,
     copyGuildId,

@@ -26,6 +26,7 @@ import { Enable2faDto } from './dto/enable-2fa.dto';
 import { Disable2faDto } from './dto/disable-2fa.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangeEmailDto } from './dto/change-email.dto';
+import { ChangeUsernameDto } from './dto/change-username.dto';
 import { ConfirmTokenDto } from './dto/confirm-token.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -250,6 +251,16 @@ export class AuthController {
   @ApiOperation({ summary: 'E-posta değiştir — reauth; yeni adrese doğrulama + eski adrese geri-al (5/saat)' })
   async changeEmail(@CurrentUser() user: AuthUser, @Body() dto: ChangeEmailDto) {
     return this.authService.changeEmail(user.id, dto);
+  }
+
+  @Post('username/change')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 3600000 } })
+  @ApiOperation({ summary: 'Kullanıcı adı değiştir — reauth (mevcut şifre + opsiyonel TOTP) (5/saat)' })
+  async changeUsername(@CurrentUser() user: AuthUser, @Body() dto: ChangeUsernameDto) {
+    return this.authService.changeUsername(user.id, dto);
   }
 
   @Post('email/change/confirm')

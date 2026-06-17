@@ -81,6 +81,7 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
     })),
     reactions: reactionsAgg,
     mentions: msg.mentions ?? [],
+    mentionsEveryone: msg.mentionsEveryone ?? false,
     createdAt: msg.createdAt.toISOString(),
   };
 }
@@ -128,8 +129,28 @@ export class MessagesService {
   private async resolveMentions(
     channel: { id: string; guildId: string | null; ageGated: boolean; guild?: { adultsOnly: boolean } | null },
     content: string,
-  ): Promise<string[]> {
-    // Adım 1: token parse + tekilleştir
+  ): Promise<{ mentions: string[]; mentionsEveryone: boolean }> {
+    // Adım 0: @everyone (rol) token'ı — <@&roleId>. Yalnız guild kanalında + everyone
+    // rolü mentionable ise geçerli (anti-spam kapısı = mentionable toggle). Üye id'leri
+    // mentions dizisine YAZILMAZ (şişme yok); notify/unread `mentionsEveryone` bayrağı ile.
+    let mentionsEveryone = false;
+    const ROLE_MENTION_REGEX = /<@&([a-zA-Z0-9_-]+)>/g;
+    const roleTokenIds = new Set<string>();
+    let roleMatch: RegExpExecArray | null;
+    while ((roleMatch = ROLE_MENTION_REGEX.exec(content)) !== null) {
+      roleTokenIds.add(roleMatch[1]);
+    }
+    if (roleTokenIds.size > 0 && channel.guildId !== null) {
+      const everyoneRole = await this.prisma.role.findFirst({
+        where: { guildId: channel.guildId, isEveryone: true },
+        select: { id: true, mentionable: true },
+      });
+      if (everyoneRole?.mentionable && roleTokenIds.has(everyoneRole.id)) {
+        mentionsEveryone = true;
+      }
+    }
+
+    // Adım 1: kullanıcı token parse + tekilleştir (<@&...> bu regex'e takılmaz: & sınıfta yok)
     const MENTION_REGEX = /<@([a-zA-Z0-9_-]+)>/g;
     const tokenIds = new Set<string>();
     let match: RegExpExecArray | null;
@@ -137,8 +158,8 @@ export class MessagesService {
       tokenIds.add(match[1]);
     }
 
-    // Erken çıkış: token yoksa sorgu yapma
-    if (tokenIds.size === 0) return [];
+    // Erken çıkış: kullanıcı token'ı yoksa yalnız everyone sonucu
+    if (tokenIds.size === 0) return { mentions: [], mentionsEveryone };
 
     const ids = Array.from(tokenIds);
 
@@ -168,7 +189,7 @@ export class MessagesService {
     }
 
     // Adım 3: ≤10 sınırı (fazlası sessizce düşer)
-    return validIds.slice(0, 10);
+    return { mentions: validIds.slice(0, 10), mentionsEveryone };
   }
 
   async findMessages(userId: string, channelId: string, before?: string, limit = 50) {
@@ -331,7 +352,7 @@ export class MessagesService {
     }
 
     // §3: mention token parse + erişim doğrulaması (§4 T&S) — create'ten önce
-    const mentions = await this.resolveMentions(channel, dto.content ?? '');
+    const { mentions, mentionsEveryone } = await this.resolveMentions(channel, dto.content ?? '');
 
     const message = await this.prisma.message.create({
       data: {
@@ -340,6 +361,7 @@ export class MessagesService {
         content: dto.content ?? '',
         replyToId: dto.replyToId ?? null,
         mentions,
+        mentionsEveryone,
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
@@ -410,11 +432,11 @@ export class MessagesService {
     }
 
     // §3: mention token parse + erişim doğrulaması (§4 T&S) — edit'te yeniden hesapla
-    const mentions = await this.resolveMentions(channel, dto.content);
+    const { mentions, mentionsEveryone } = await this.resolveMentions(channel, dto.content);
 
     const updated = await this.prisma.message.update({
       where: { id: messageId },
-      data: { content: dto.content, editedAt: new Date(), mentions },
+      data: { content: dto.content, editedAt: new Date(), mentions, mentionsEveryone },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
         attachments: {
@@ -650,7 +672,7 @@ export class MessagesService {
     userId: string,
     guildId: string,
     q: string,
-    opts?: { from?: string; mentions?: string },
+    opts?: { from?: string; mentions?: string; in?: string; has?: string },
   ) {
     const { membership } = await this.membership.requireGuildMembership(userId, guildId);
 
@@ -662,12 +684,14 @@ export class MessagesService {
     }
     const safeQ = trimmedQ.slice(0, 100);
 
-    // from / mentions opsiyonel filtreler (boş string = yok say)
+    // from / mentions / in / has opsiyonel filtreler (boş string = yok say)
     const from = opts?.from?.trim() || undefined;
     const mentions = opts?.mentions?.trim() || undefined;
+    const inChannel = opts?.in?.trim() || undefined;
+    const has = opts?.has?.trim() || undefined; // 'link' | 'file'
 
-    // En az biri (q | from | mentions) dolu olmalı; hiçbiri yoksa hata değil → boş sonuç.
-    if (!hasQ && !from && !mentions) return [];
+    // En az biri (q | from | mentions | in | has) dolu olmalı; hiçbiri yoksa boş sonuç.
+    if (!hasQ && !from && !mentions && !inChannel && !has) return [];
 
     const guild = await this.prisma.guild.findUnique({ where: { id: guildId }, select: { adultsOnly: true } });
     const channels = await this.prisma.channel.findMany({
@@ -690,22 +714,39 @@ export class MessagesService {
       memberChannelIds = new Set(cms.map((c) => c.channelId));
     }
 
-    const accessible = channels.filter((c) => {
+    let accessible = channels.filter((c) => {
       if ((c.ageGated || guild?.adultsOnly) && isMinor) return false; // yaş kapısı
       if (c.isPrivate && !privileged && !memberChannelIds.has(c.id)) return false; // özel kanal
       return true;
     });
+    // `in` filtresi: yalnız o kanal — erişilebilir değilse boş sonuç (sızıntı yok)
+    if (inChannel) accessible = accessible.filter((c) => c.id === inChannel);
     if (accessible.length === 0) return [];
 
     const nameById = new Map(accessible.map((c) => [c.id, c.name]));
+    const qCond = { content: { contains: safeQ, mode: 'insensitive' as const } };
+    const linkCond = { content: { contains: 'http', mode: 'insensitive' as const } };
+    // q + has=link aynı `content` anahtarını ezmesin → AND ile birleştir; tekil
+    // durumlarda content doğrudan kalır (mevcut q-only davranış korunur).
+    const contentWhere =
+      hasQ && has === 'link'
+        ? { AND: [qCond, linkCond] }
+        : hasQ
+          ? qCond
+          : has === 'link'
+            ? linkCond
+            : {};
+
     const messages = await this.prisma.message.findMany({
       where: {
         channelId: { in: accessible.map((c) => c.id) },
         deletedAt: null,
-        // Dolu filtreler AND'lenir; boş olanlar where'e hiç girmez (mevcut q-only davranış korunur).
-        ...(hasQ ? { content: { contains: safeQ, mode: 'insensitive' as const } } : {}),
+        // Dolu filtreler AND'lenir; boş olanlar where'e hiç girmez.
+        ...contentWhere,
         ...(from ? { authorId: from } : {}),
         ...(mentions ? { mentions: { has: mentions } } : {}),
+        // `has=file` → en az bir ek
+        ...(has === 'file' ? { attachments: { some: {} } } : {}),
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },

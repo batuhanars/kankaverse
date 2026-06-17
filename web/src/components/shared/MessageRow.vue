@@ -43,6 +43,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   reply: [message: MessageDto]
+  forward: [message: MessageDto]
   edit: [message: MessageDto]
   delete: [messageId: string]
   report: [messageId: string]
@@ -146,6 +147,7 @@ const renderedContent = computed<string>(() => {
         :can-pin="canPin ?? false"
         :can-manage-messages="canManageMessages ?? false"
         @reply="emit('reply', message)"
+        @forward="emit('forward', message)"
         @edit="emit('edit', message)"
         @delete="emit('delete', message.id)"
         @report="emit('report', message.id)"

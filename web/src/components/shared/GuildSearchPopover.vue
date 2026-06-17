@@ -55,7 +55,7 @@ async function doSearch(q: string) {
   loading.value = true
   error.value = ''
   try {
-    const res = await messagesApi.searchGuildMessages(props.guildId, q.trim())
+    const res = await messagesApi.searchGuildMessages(props.guildId, { q: q.trim() })
     groups.value = res.data
   } catch {
     error.value = t('messageSearch.error')

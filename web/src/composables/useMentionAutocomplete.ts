@@ -22,7 +22,11 @@ export interface MentionMember {
   id: string
   username: string
   avatarUrl?: string | null
+  isEveryone?: boolean // @everyone özel önerisi (gerçek üye değil)
 }
+
+// @everyone özel önerisi için sabit sentinel id
+const EVERYONE_ID = '@everyone'
 
 // @sorgu tespiti: imlecin solundaki @kelime bloğu
 function findMentionQuery(text: string, cursorPos: number): { query: string; start: number } | null {
@@ -44,6 +48,8 @@ export function useMentionAutocomplete(
   setContent: (v: string) => void,
   getCursor: () => number,
   setCursor: (pos: number) => void,
+  // @everyone rol id'si — yalnız everyone rolü mentionable ise dolu döner; null → @everyone önerisi yok
+  everyoneRoleId?: () => string | null,
 ) {
   const showPopover = ref(false)
   const suggestions = ref<MentionMember[]>([])
@@ -51,6 +57,8 @@ export function useMentionAutocomplete(
 
   // username → userId: picker'dan seçilen bahsetmeler (gönderimde token'a çevrilir)
   const pendingMentions = ref<Map<string, string>>(new Map())
+  // @everyone seçildi mi (gönderimde <@&roleId> token'ına çevrilir)
+  const pendingEveryone = ref(false)
 
   // Aktif sorgu bilgisi (seçim sırasında değiştirmek için)
   const _currentQuery = ref<{ query: string; start: number } | null>(null)
@@ -73,12 +81,20 @@ export function useMentionAutocomplete(
     const filtered = _getMembers()
       .filter((m) => m.username.toLowerCase().includes(q))
       .slice(0, MAX_SUGGESTIONS)
-    if (!filtered.length) {
+
+    // @everyone önerisi: rol mentionable ise + "everyone" sorguyla eşleşiyorsa en üste
+    const list: MentionMember[] = []
+    if (everyoneRoleId?.() && 'everyone'.startsWith(q)) {
+      list.push({ id: EVERYONE_ID, username: 'everyone', isEveryone: true })
+    }
+    list.push(...filtered)
+
+    if (!list.length) {
       showPopover.value = false
       suggestions.value = []
       return
     }
-    suggestions.value = filtered
+    suggestions.value = list.slice(0, MAX_SUGGESTIONS)
     activeIndex.value = 0
     showPopover.value = true
   }
@@ -93,8 +109,9 @@ export function useMentionAutocomplete(
     const newText = before + replacement + after
     setContent(newText)
     const newCursor = before.length + replacement.length
-    // username → userId haritasına ekle
-    pendingMentions.value.set(member.username, member.id)
+    // @everyone → ayrı bayrak; gerçek üye → username→userId haritası
+    if (member.isEveryone) pendingEveryone.value = true
+    else pendingMentions.value.set(member.username, member.id)
     showPopover.value = false
     suggestions.value = []
     _currentQuery.value = null
@@ -135,8 +152,12 @@ export function useMentionAutocomplete(
    * Kelime-sınırı: @username'in ardından boşluk, satır sonu veya metin sonu.
    */
   function applyMentionTokens(text: string): string {
-    if (!pendingMentions.value.size) return text
     let result = text
+    // @everyone → <@&roleId> (rol hâlâ mentionable ise)
+    const roleId = pendingEveryone.value ? everyoneRoleId?.() : null
+    if (roleId) {
+      result = result.replace(/@everyone(?=\s|$)/g, `<@&${roleId}>`)
+    }
     for (const [username, userId] of pendingMentions.value.entries()) {
       // Tam kelime eşleşmesi: @username arkasında kelime-sınırı (boşluk, satır sonu, metin sonu)
       const regex = new RegExp(`@${escapeRegex(username)}(?=\\s|$)`, 'g')
@@ -151,6 +172,7 @@ export function useMentionAutocomplete(
 
   function clearPending() {
     pendingMentions.value = new Map()
+    pendingEveryone.value = false
     showPopover.value = false
   }
 

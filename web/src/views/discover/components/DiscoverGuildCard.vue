@@ -12,8 +12,9 @@ import type { DiscoveryGuildDto } from '@/types'
 const props = defineProps<{
   guild: DiscoveryGuildDto
   joining: boolean
+  isMember?: boolean // zaten üyeyim → "Katıl" yerine "Sunucuya Git" (Görsel #35)
 }>()
-defineEmits<{ join: [] }>()
+defineEmits<{ join: []; open: [] }>()
 
 const { t } = useI18n()
 
@@ -98,7 +99,11 @@ function guildInitial(name: string): string {
         <span class="text-[12px] font-medium" style="color: var(--kv-text-muted);">
           {{ t('discover.memberCount', { count: guild.memberCount }) }}
         </span>
-        <KvButton size="sm" :loading="joining" @click="$emit('join')">
+        <!-- Zaten üye → Sunucuya Git; değilse Katıl -->
+        <KvButton v-if="isMember" size="sm" variant="ghost" @click="$emit('open')">
+          {{ t('discover.goToServer') }}
+        </KvButton>
+        <KvButton v-else size="sm" :loading="joining" @click="$emit('join')">
           {{ t('discover.join') }}
         </KvButton>
       </div>

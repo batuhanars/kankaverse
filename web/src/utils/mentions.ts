@@ -8,13 +8,17 @@
  * - Saf string dönüşümü: XSS riski yok (innerHTML kullanılmaz)
  */
 const MENTION_RE = /<@([a-zA-Z0-9_-]+)>/g
+// @everyone rol token'ı (<@&id>) — düz metinde "@everyone"
+const ROLE_MENTION_RE = /<@&[a-zA-Z0-9_-]+>/g
 
 export function formatMentionsPlain(
   content: string,
   resolve: (id: string) => string | undefined,
   fallback: string,
 ): string {
-  return content.replace(MENTION_RE, (_match, id: string) => {
-    return '@' + (resolve(id) ?? fallback)
-  })
+  return content
+    .replace(ROLE_MENTION_RE, '@everyone')
+    .replace(MENTION_RE, (_match, id: string) => {
+      return '@' + (resolve(id) ?? fallback)
+    })
 }

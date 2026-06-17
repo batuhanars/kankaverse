@@ -139,6 +139,37 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     socket.leave(`room:${payload.channelId}`);
   }
 
+  /**
+   * Ses presence aboneliği — sidebar'da bir ses kanalının "kim var" listesini canlı
+   * izlemek için (kanala bağlı olmasa da). voice:<channelId> room'u; room:<channelId>
+   * (aktif kanal) ile ÇAKIŞMAZ. Görünürlük kapısı: özel kanal dahil tüm guild üyeleri
+   * (item 6 — görünür ama girişi kapalı), yaş kapısı korunur.
+   */
+  @SubscribeMessage('voice:subscribe')
+  async handleVoiceSubscribe(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { channelId: string },
+  ) {
+    const userId = socket.data.userId;
+    const { channelId } = payload;
+    try {
+      await this.membership.requireChannelVisible(userId, channelId);
+    } catch (e) {
+      const res = e instanceof HttpException ? (e.getResponse() as { error?: string }) : null;
+      return { ok: false, error: res?.error ?? 'FORBIDDEN' };
+    }
+    socket.join(`voice:${channelId}`);
+    return { ok: true };
+  }
+
+  @SubscribeMessage('voice:unsubscribe')
+  handleVoiceUnsubscribe(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { channelId: string },
+  ) {
+    socket.leave(`voice:${payload.channelId}`);
+  }
+
   @SubscribeMessage('typing:start')
   async handleTypingStart(
     @ConnectedSocket() socket: AuthSocket,
@@ -453,17 +484,19 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
    * Çözülemeyen token → @bilinmeyen.
    */
   async notifyMentions(channelId: string, messageDto: Record<string, unknown>) {
-    const mentions = messageDto['mentions'] as string[] | undefined;
-    if (!mentions || mentions.length === 0) return;
+    const mentions = (messageDto['mentions'] as string[] | undefined) ?? [];
+    const mentionsEveryone = (messageDto['mentionsEveryone'] as boolean | undefined) ?? false;
+    if (mentions.length === 0 && !mentionsEveryone) return;
 
     const authorId = (messageDto['author'] as Record<string, string>)['id'];
 
-    // Kanalın guildId'sini çek (DM ise null)
+    // Kanal: guildId + özel mi + yaş kapısı (DM ise guildId null)
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId },
-      select: { guildId: true },
+      select: { guildId: true, isPrivate: true, ageGated: true, guild: { select: { adultsOnly: true } } },
     });
     const guildId = channel?.guildId ?? null;
+    const needsAgeCheck = !!channel && (channel.ageGated || (channel.guild?.adultsOnly ?? false));
 
     // Bahsedilen kullanıcıların username'lerini tek sorguda çek (preview + payload için)
     const users = await this.prisma.user.findMany({
@@ -472,9 +505,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     });
     const usernameById = new Map<string, string>(users.map((u) => [u.id, u.username]));
 
-    // preview: content içindeki <@id> token'larını @username'e çevir, ≤100 karakter
+    // preview: rol token'ları (<@&...>) → @everyone; kullanıcı token'ları → @username; ≤100 karakter
     const content = (messageDto['content'] as string) ?? '';
     const preview = content
+      .replace(/<@&[a-zA-Z0-9_-]+>/g, '@everyone')
       .replace(/<@([a-zA-Z0-9_-]+)>/g, (_match, id: string) => {
         const username = usernameById.get(id);
         return username ? `@${username}` : '@bilinmeyen';
@@ -491,7 +525,35 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       preview,
     };
 
-    for (const mentionedUserId of mentions) {
+    // Alıcı kümesi: doğrudan bahsedilenler + (everyone ise) kanalı GÖREBİLEN üyeler.
+    // T&S: (a) özel kanalda everyone yalnız kanal üyeleri + owner/admin'e gider (genel guild'e DEĞİL —
+    // sızıntı yok); (b) yaş-kapılı kanalda minörler hariç (özel kanal üyeleri ekleme anında zaten gated).
+    let recipients: string[];
+    if (mentionsEveryone && guildId) {
+      let everyoneIds: string[];
+      if (channel?.isPrivate) {
+        const [cms, privileged] = await Promise.all([
+          this.prisma.channelMember.findMany({ where: { channelId }, select: { userId: true } }),
+          this.prisma.guildMember.findMany({
+            where: { guildId, role: { in: ['OWNER', 'ADMIN'] } },
+            select: { userId: true },
+          }),
+        ]);
+        everyoneIds = [...cms.map((m) => m.userId), ...privileged.map((m) => m.userId)];
+      } else {
+        const members = await this.prisma.guildMember.findMany({
+          where: { guildId },
+          select: { userId: true, user: { select: { isMinor: true } } },
+        });
+        const eligible = needsAgeCheck ? members.filter((m) => !m.user.isMinor) : members;
+        everyoneIds = eligible.map((m) => m.userId);
+      }
+      recipients = [...new Set([...mentions, ...everyoneIds])];
+    } else {
+      recipients = [...new Set(mentions)];
+    }
+
+    for (const mentionedUserId of recipients) {
       // Yazara kendi bahsetmesi için event gönderme
       if (mentionedUserId === authorId) continue;
       this.realtime.emitToUser(mentionedUserId, 'mention', eventPayload);

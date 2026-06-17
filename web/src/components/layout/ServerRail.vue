@@ -7,12 +7,15 @@ import { useChannelsStore } from '@/stores/channels'
 import { useAuthStore } from '@/stores/auth'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { useGuildMenuActions } from '@/composables/useGuildMenuActions'
+import { useMenuCoordinator } from '@/composables/useMenuCoordinator'
+import { useGuildQuickAction, type GuildQuickAction } from '@/composables/useGuildQuickAction'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { guildsApi } from '@/api/guilds'
 import GuildSettingsView from '@/views/app/components/GuildSettingsView.vue'
 import InvitePeopleModal from '@/components/layout/InvitePeopleModal.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import NotifLevelFlyout from '@/components/shared/NotifLevelFlyout.vue'
+import MuteDurationFlyout from '@/components/shared/MuteDurationFlyout.vue'
 import { NotificationLevel, NotifTargetType, type GuildDto } from '@/types'
 import hexagonLogo from '@/assets/brand/kankaverse-hexagon.png'
 
@@ -54,6 +57,10 @@ const contextGuild = ref<GuildDto | null>(null)
 const ctxX = ref(0)
 const ctxY = ref(0)
 
+// Menü koordinatörü: başka bir menü (ChannelPanel) açılınca rail menüsü kapanır (Görsel #14)
+const { openExclusive, releaseIfOwner, closeOnOther } = useMenuCoordinator()
+closeOnOther('rail-ctx', () => { contextGuild.value = null })
+
 // Hedef ortamın izinleri (aktif ortam değil — sağ-tıklanan).
 // reaktif: contextGuild değişince yeni guild.id'ye çözülür.
 const { can: ctxCan, canOpenSettings: ctxCanOpenSettings, isOwner: ctxIsOwner } =
@@ -63,7 +70,9 @@ const { can: ctxCan, canOpenSettings: ctxCanOpenSettings, isOwner: ctxIsOwner } 
 const {
   markGuildRead,
   isGuildMuted,
-  toggleGuildMute,
+  guildMutedUntil,
+  muteGuildFor,
+  unmuteGuild,
   guildLevel,
   setGuildLevel,
   copyGuildId,
@@ -93,10 +102,22 @@ function openGuildContext(event: MouseEvent, guild: GuildDto) {
   ctxX.value = event.clientX
   ctxY.value = event.clientY
   contextGuild.value = guild
+  openExclusive('rail-ctx') // Görsel #14 — diğer menüler (ChannelPanel) kapansın
 }
 
 function closeGuildContext() {
   contextGuild.value = null
+  releaseIfOwner('rail-ctx')
+}
+
+// Rail menüsünden hızlı oluştur (Kanal/Kategori/Etkinlik) — hedef ortama geç + ChannelPanel'de aç.
+const { request: requestQuickAction } = useGuildQuickAction()
+async function ctxQuickCreate(action: GuildQuickAction) {
+  const g = contextGuild.value
+  if (!g) return
+  requestQuickAction(g.id, action) // selectGuild'den ÖNCE — aktif ortam değişince ChannelPanel tüketir
+  closeGuildContext()
+  await selectGuild(g)
 }
 
 // Dışarı-tık / Esc / scroll ile kapan (UserCardPopover: setTimeout ile aynı-tık çakışmasını önle)
@@ -417,19 +438,47 @@ function badgeLabel(count: number): string {
         <span>{{ t('invitePeople.title') }}</span>
       </button>
 
+      <!-- Kanal / Kategori / Etkinlik Oluştur — ortam dropdown'undaki gibi (hedef ortama geçer) -->
+      <template v-if="ctxCan('MANAGE_CHANNELS') || ctxCan('MANAGE_EVENTS')">
+        <div class="rail-ctx__divider" />
+        <button
+          v-if="ctxCan('MANAGE_CHANNELS')"
+          class="rail-ctx__item"
+          role="menuitem"
+          @click="ctxQuickCreate('create-channel')"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>{{ t('channel.addUncategorized') }}</span>
+        </button>
+        <button
+          v-if="ctxCan('MANAGE_CHANNELS')"
+          class="rail-ctx__item"
+          role="menuitem"
+          @click="ctxQuickCreate('create-category')"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><line x1="17" y1="14" x2="17" y2="20"/><line x1="14" y1="17" x2="20" y2="17"/></svg>
+          <span>{{ t('category.createCategory') }}</span>
+        </button>
+        <button
+          v-if="ctxCan('MANAGE_EVENTS')"
+          class="rail-ctx__item"
+          role="menuitem"
+          @click="ctxQuickCreate('create-event')"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span>{{ t('event.menuCreate') }}</span>
+        </button>
+      </template>
+
       <div class="rail-ctx__divider" />
 
-      <!-- 3. Sunucuyu Sustur — sağda işaret (✓) muted ise -->
-      <button
-        class="rail-ctx__item"
-        role="menuitemcheckbox"
-        :aria-checked="isGuildMuted"
-        @click="toggleGuildMute"
-      >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-        <span class="rail-ctx__label">{{ t('guildMenu.mute') }}</span>
-        <svg v-if="isGuildMuted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__check"><path d="M20 6 9 17l-5-5"/></svg>
-      </button>
+      <!-- 3. Sunucuyu Sustur — süre menüsü (Görsel #15) -->
+      <MuteDurationFlyout
+        :muted="isGuildMuted"
+        :muted-until="guildMutedUntil"
+        @mute="muteGuildFor"
+        @unmute="unmuteGuild"
+      />
 
       <!-- 4. Bildirim Ayarları — yana açılan flyout (NotifLevelFlyout) -->
       <NotifLevelFlyout :level="guildLevel" @select="setGuildLevel" />

@@ -5,6 +5,7 @@ import type { UserProfileCardDto, UserDto, DmPolicy } from '@/types'
 export interface UpdateProfilePayload {
   bio?: string
   dmPolicy?: DmPolicy
+  bannerColor?: string | null // profil afiş rengi preset anahtarı (veya null=varsayılan)
 }
 
 export const usersApi = {

@@ -133,7 +133,34 @@
     "security": "Güvenlik",
     "tabAccount": "Hesap",
     "tabProfile": "Profil",
+    "tabVoice": "Ses",
     "tabPrivacy": "Gizlilik",
+    "voice": {
+      "inputDevice": "Giriş Cihazı (Mikrofon)",
+      "outputDevice": "Çıkış Cihazı (Hoparlör)",
+      "outputVolume": "Çıkış Sesi",
+      "systemDefault": "Sistem Varsayılanı",
+      "deviceFallback": "Cihaz {n}",
+      "outputUnsupported": "Tarayıcın çıkış cihazı seçimini desteklemiyor; sistem varsayılanı kullanılır.",
+      "permissionHint": "Cihaz adlarını görmek için mikrofon iznini ver.",
+      "grant": "İzin Ver",
+      "openSettings": "Ses Ayarları"
+    },
+    "account": {
+      "infoTitle": "Hesap Bilgileri",
+      "securityTitle": "Şifre ve Güvenlik",
+      "username": "Kullanıcı Adı",
+      "email": "E-posta",
+      "password": "Şifre",
+      "twoFactor": "Çok Aşamalı Doğrulama",
+      "sessions": "Giriş Yapılan Cihazlar",
+      "edit": "Düzenle",
+      "show": "Göster",
+      "hide": "Gizle",
+      "delete": "Hesabı Sil",
+      "twoFactorOn": "Açık",
+      "twoFactorSetup": "Kur"
+    },
     "usernameLabel": "Kullanıcı Adı",
     "usernameReadonlyHint": "Kullanıcı adı şu an değiştirilemez.",
     "emailLabel": "E-posta",
@@ -141,6 +168,13 @@
     "bioPlaceholder": "Kendinden bahset… (bağlantı ekleyebilirsin)",
     "bioCounter": "{count}/512",
     "bioSaved": "Profil güncellendi.",
+    "banner": {
+      "label": "Afiş Rengi",
+      "default": "Varsayılan (marka)",
+      "hint": "Profilinin üstünde görünen renk afişini seç. Görsel afiş yükleme ileride gelecek.",
+      "previewTitle": "Profil Önizlemesi",
+      "previewMemberSince": "Üyelik tarihi: {date}"
+    },
     "saveError": "Kaydedilemedi. Lütfen tekrar dene.",
     "dmPolicy": {
       "label": "Direkt Mesaj İzni",
@@ -218,6 +252,19 @@
         "newEmailInvalid": "Geçerli bir e-posta adresi girin."
       }
     },
+    "username": {
+      "title": "Kullanıcı Adı Değiştir",
+      "current": "Mevcut Kullanıcı Adı",
+      "newUsername": "Yeni Kullanıcı Adı",
+      "submit": "Kullanıcı Adını Değiştir",
+      "success": "Kullanıcı adın güncellendi.",
+      "validation": {
+        "required": "Yeni kullanıcı adı zorunludur.",
+        "min": "Kullanıcı adı en az 3 karakter olmalıdır.",
+        "max": "Kullanıcı adı en fazla 32 karakter olabilir.",
+        "pattern": "Yalnızca harf, rakam ve alt çizgi kullanılabilir."
+      }
+    },
     "deleteAccount": {
       "title": "Hesabı Sil",
       "warning": "Hesabın 30 gün içinde kalıcı olarak silinecek. 30 gün içinde tekrar giriş yaparsan talep iptal edilir.",
@@ -273,6 +320,15 @@
   "guildMenu": {
     "markRead": "Okunmuş Olarak İşaretle",
     "mute": "Sunucuyu Sustur",
+    "unmute": "Sunucunun Sesini Aç",
+    "mute15m": "15 Dakika",
+    "mute1h": "1 Saat",
+    "mute3h": "3 Saat",
+    "mute8h": "8 Saat",
+    "mute24h": "24 Saat",
+    "muteForever": "Ben tekrar açana kadar",
+    "muteUntil": "{when} tarihine kadar",
+    "muteUntilForever": "Sen tekrar açana kadar",
     "notifications": "Bildirim Ayarları",
     "notificationsAll": "Tümü",
     "notificationsMentions": "Yalnız bahsetmeler",
@@ -363,7 +419,7 @@
     "descriptionSubtitle": "Ortamın nasıl başladı? İnsanlar neden katılmalı?",
     "descriptionPlaceholder": "Dünyaya bu ortam hakkında bir şeyler söyle.",
     "bannerLabel": "Afiş Rengi",
-    "bannerHint": "Keşfet kartının üstünde görünen renk afişini seç. Tekrar tıklayınca kaldırılır.",
+    "bannerHint": "Keşfet kartının üstünde görünen renk afişini seç. Tekrar tıklayınca kaldırılır. Görsel afiş yükleme ileride gelecek.",
     "previewTitle": "Ortam Profili Önizlemesi",
     "previewCreatedAt": "Oluşturulma: {date}",
     "previewMembers": "{n} üye",
@@ -430,6 +486,9 @@
       "hoistDesc": "Bu role sahip üyeler üye listesinde ayrı bir grupta görünür.",
       "mentionableLabel": "Bahsedilebilir",
       "mentionableDesc": "Bu rolü {'@'}bahset ile etiketlemek mümkün olsun.",
+      "defaultLabel": "Varsayılan rol",
+      "defaultDesc": "Ortama yeni katılan üyelere bu rol otomatik atanır. Ortam başına yalnız bir rol varsayılan olabilir.",
+      "defaultBadge": "Varsayılan",
       "manageMembersTitle": "Üyeleri Yönet",
       "manageMembersEmpty": "Bu ortamda üye yok.",
       "memberCount": "{n} üye",
@@ -523,6 +582,9 @@
     "deleteButton": "Sil",
     "rename": "Yeniden Adlandır",
     "delete": "Sil",
+    "invite": "Davet Et",
+    "voiceCountLabel": "Kanaldaki kişi / sınır",
+    "lockedToast": "Bu özel kanala erişimin yok. Bir yetkili seni ekleyebilir.",
     "settingsTitle": "Kanal Ayarları",
     "settingsButton": "Kaydet",
     "slowModeLabel": "Yavaş Mod",
@@ -537,6 +599,9 @@
     "slowModeHint": "Yavaş mod açık — {seconds} sn bekleyin",
     "userLimitLabel": "Kullanıcı Limiti",
     "userLimitHint": "0 = sınırsız",
+    "userLimitPlaceholder": "0 = sınırsız",
+    "bitrateLabel": "Bit Hızı",
+    "bitrateHint": "Ses kalitesi (kbps). Yüksek değer daha net ses; bağlantısı zayıf kişileri olumsuz etkileyebilir.",
     "categoryLabel": "KATEGORİ",
     "categoryNone": "Kategorisiz",
     "channelTypeLabel": "KANAL TÜRÜ",
@@ -716,6 +781,13 @@
     "pinnedMessages": "Sabitlenen Mesajlar",
     "pinnedMessagesEmpty": "Bu kanalda henüz sabitlenmiş mesaj yok.",
     "jumpToMessage": "Mesaja git",
+    "forward": "İlet",
+    "forwardTitle": "Mesajı İlet",
+    "forwardSearch": "Kanka veya grup ara…",
+    "forwarded": "Mesaj iletildi.",
+    "forwardedShort": "İletildi ✓",
+    "forwardEmpty": "(boş mesaj)",
+    "forwardNoChannels": "İletecek bir DM yok. Önce bir kankayla sohbet başlat.",
     "errors": {
       "MESSAGE_BLOCKED": "Mesajınız topluluk kurallarına uygun değil.",
       "USER_BANNED": "Hesabınız askıya alındı. Mesaj gönderemezsiniz.",
@@ -818,6 +890,7 @@
     "joinOrtamDesc": "Davet koduyla katıl",
     "myOrtamlar": "Ortamların",
     "noOrtam": "Henüz bir ortamda değilsin.",
+    "createdAt": "Oluşturuldu: {date}",
     "addFriendBtn": "+ Yeni Kanka Ekle",
     "onlineSection": "Çevrimiçi — {count}",
     "offlineSection": "Çevrimdışı — {count}"
@@ -956,7 +1029,30 @@
     "fromLabel": "Gönderen",
     "mentionsLabel": "Bahsedilen",
     "selectMember": "Üye seç…",
-    "resultCount": "{n} Sonuç"
+    "selectChannel": "Kanal ara…",
+    "noChannels": "Kanal bulunamadı.",
+    "noMembers": "Üye bulunamadı.",
+    "resultCount": "{n} Sonuç",
+    "token": {
+      "from": "şu kullanıcıdan:",
+      "mentions": "şundan bahseden:",
+      "in": "şu kanalda:",
+      "has": "şunu içeren:"
+    },
+    "cat": {
+      "from": "Belirli bir kullanıcıdan",
+      "fromHint": "şu kullanıcıdan: kullanıcı",
+      "in": "Belirli bir kanalda gönderilen",
+      "inHint": "şu kanalda: kanal",
+      "has": "Belirli bir tür veri içeren",
+      "hasHint": "şunu içeren: bağlantı ya da dosya",
+      "mentions": "Belirli bir kullanıcıdan bahseden",
+      "mentionsHint": "şundan bahseden: kullanıcı"
+    },
+    "has": {
+      "link": "Bağlantı",
+      "file": "Dosya"
+    }
   },
   "notification": {
     "title": "Bildirimler",
@@ -975,6 +1071,7 @@
   },
   "mention": {
     "unknown": "bilinmeyen",
+    "everyoneHint": "Bu ortamdaki herkese bildir",
     "autocompleteEmpty": "Eşleşen üye bulunamadı.",
     "banner": "Yeni bahsetmelerin var",
     "bannerHint": "Sıradaki bahsetmenin olduğu kanala git"
@@ -990,6 +1087,7 @@
     "subtitle": "İlgi alanlarına uygun ortamları bul ve katıl.",
     "search": "Ortam ara…",
     "join": "Katıl",
+    "goToServer": "Sunucuya Git",
     "memberCount": "{count} üye",
     "empty": "Henüz keşfedilecek ortam yok.",
     "emptyHint": "Aramanı değiştir ya da bir etiket filtresini kaldır.",

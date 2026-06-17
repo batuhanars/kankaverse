@@ -35,7 +35,7 @@ const ICON_EXT: Record<string, string> = {
   'image/webp': 'webp',
 };
 
-export function toGuildDto(guild: Guild, unreadCount = 0, unreadMentionCount = 0) {
+export function toGuildDto(guild: Guild, unreadCount = 0, unreadMentionCount = 0, memberCount?: number) {
   return {
     id: guild.id,
     name: guild.name,
@@ -49,6 +49,8 @@ export function toGuildDto(guild: Guild, unreadCount = 0, unreadMentionCount = 0
     createdAt: guild.createdAt.toISOString(),
     unreadCount,
     unreadMentionCount, // REV-4: rail kırmızı rozeti bunu gösterir (generic unread değil)
+    // Ortamların kartı (HomeDashboard) üye sayısını gösterir; yalnız findMyGuilds doldurur.
+    ...(memberCount !== undefined && { memberCount }),
   };
 }
 
@@ -170,6 +172,7 @@ export class GuildsService {
       include: {
         guild: {
           include: {
+            _count: { select: { members: true } }, // Ortamların kartı üye sayısı
             channels: {
               where: { deletedAt: null },
               include: {
@@ -198,9 +201,14 @@ export class GuildsService {
               authorId: { not: userId }, // kendi mesajları sayma
               ...(lastRead !== null && { createdAt: { gt: lastRead } }),
             };
+            // @everyone yalnız genel kanallarda rail-rozetine sayılır; özel kanalda üye-olmayana
+            // sızdırmamak için flag eklenmez (özel kanal sayımı guild açılınca channels.service'te
+            // erişim-süzgeçli yapılır).
+            const mentionOr: object[] = [{ mentions: { has: userId } }];
+            if (!ch.isPrivate) mentionOr.push({ mentionsEveryone: true });
             const [unread, mentions] = await Promise.all([
               this.prisma.message.count({ where: base }),
-              this.prisma.message.count({ where: { ...base, mentions: { has: userId } } }),
+              this.prisma.message.count({ where: { ...base, OR: mentionOr } }),
             ]);
             return { unread, mentions };
           }),
@@ -212,7 +220,9 @@ export class GuildsService {
       }),
     );
 
-    return activeGuilds.map((m, i) => toGuildDto(m.guild, guildCounts[i].unread, guildCounts[i].mentions));
+    return activeGuilds.map((m, i) =>
+      toGuildDto(m.guild, guildCounts[i].unread, guildCounts[i].mentions, m.guild._count?.members),
+    );
   }
 
   /**

@@ -26,6 +26,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   reply: []
+  forward: []
   edit: []
   delete: []
   report: []
@@ -68,6 +69,11 @@ function closeAll() {
 function onReply() {
   closeAll()
   emit('reply')
+}
+
+function onForward() {
+  closeAll()
+  emit('forward')
 }
 
 function onEdit() {
@@ -206,10 +212,21 @@ onUnmounted(() => {
     <!-- ↩ Yanıtla -->
     <button
       class="w-8 h-8 flex items-center justify-center text-[15px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+      style="color: var(--kv-text-muted);"
       :title="t('reply.button')"
       @click="onReply"
     >
-      ↩
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+    </button>
+
+    <!-- ↪ İlet (forward — başka bir DM'e gönder) -->
+    <button
+      class="w-8 h-8 flex items-center justify-center text-[15px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
+      style="color: var(--kv-text-muted);"
+      :title="t('message.forward')"
+      @click="onForward"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
     </button>
 
     <!-- ⋯ Daha fazla -->
