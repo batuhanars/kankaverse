@@ -65,11 +65,10 @@ const voiceStore = useVoiceStore()
       <svg v-if="voiceStore.isCameraOn" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
       </svg>
-      <!-- Kamera kapalı -->
+      <!-- Kamera kapalı: camcorder üzerine çapraz çizgi -->
       <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="1" y1="1" x2="23" y2="23"/>
-        <path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3m3-3h6l2 3h4a2 2 0 0 1 2 2v9.34"/>
-        <path d="M16 11.37A4 4 0 1 1 12.63 8"/>
+        <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
       </svg>
     </button>
     <!-- C4: Ekran paylaş/durdur (yalnız canPublishScreen ise) -->
