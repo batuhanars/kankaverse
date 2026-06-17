@@ -73,12 +73,55 @@ export class VoiceService {
   /**
    * C1 — Katılım token'ı (R7). Erişim kapısı mint'ten ÖNCE; audio-only + koşullu video grant;
    * karantinadaki üye dinler ama konuşamaz/video açamaz. Sprint C4: video BUILD-DARK.
+   *
+   * B1 (R11B) — Teftiş-girişi (R7 ÇEKİRDEK):
+   *   requireChannelAccess NOT_CHANNEL_MEMBER fırlattığında MUTE_MEMBERS sahibi bypass edebilir.
+   *   AGE_RESTRICTED her zaman fırlatılır — yaş kapısı moda da kapalı, bypass ASLA.
+   *   Bypass-giriş AuditLog'a yazılır (voice.inspect). requireChannelAccess helper DEĞİŞTİRİLMEDİ.
    */
   async mintToken(userId: string, channelId: string) {
     this.assertEnabled();
 
     // Erişim + yaş + özel kanal/üyelik kapısı — mevcut helper, hata kodları sapmadan yayılır
-    const channel = await this.membership.requireChannelAccess(userId, channelId);
+    let channel: Awaited<ReturnType<typeof this.membership.requireChannelAccess>>;
+    let isInspectEntry = false; // bypass-giriş bayrağı — audit kararı için
+
+    try {
+      channel = await this.membership.requireChannelAccess(userId, channelId);
+    } catch (err: unknown) {
+      // B1: yalnız NOT_CHANNEL_MEMBER bypass'lanabilir (özel kanal üyeliği eksik).
+      // AGE_RESTRICTED ve diğer tüm hatalar ASLA bypass edilmez — her zaman fırlat.
+      const errorCode = (err as { response?: { error?: string } })?.response?.error;
+      if (errorCode !== 'NOT_CHANNEL_MEMBER') {
+        // AGE_RESTRICTED dahil tüm diğer hatalar — yaş kapısı moda da kapalı.
+        throw err;
+      }
+
+      // NOT_CHANNEL_MEMBER: aktörün MUTE_MEMBERS izni varsa teftiş-girişi olarak devam.
+      // Önce kanal varlığını doğrudan çek (requireChannelAccess yerine) — guildId lazım.
+      const rawChannel = await this.prisma.channel.findFirst({
+        where: { id: channelId, deletedAt: null },
+        include: { guild: true },
+      });
+      if (!rawChannel || !rawChannel.guildId) {
+        // Kanal yoksa veya DM kanalıysa (guildId null) — orijinal hatayı fırlat.
+        throw err;
+      }
+
+      const hasMutePermission = await this.permissions.hasGuildPermission(
+        userId,
+        rawChannel.guildId,
+        'MUTE_MEMBERS',
+      );
+      if (!hasMutePermission) {
+        // Yetki yok → orijinal NOT_CHANNEL_MEMBER hatasını fırlat.
+        throw err;
+      }
+
+      // Yetki onaylandı → teftiş-girişi. channel normal akışa girecek.
+      channel = rawChannel as typeof channel;
+      isInspectEntry = true;
+    }
 
     // Tür kapısı + konuşma izni (kurul: davet gate'i sinyalde, mint'te tekrar)
     let canPublish: boolean;
@@ -129,6 +172,40 @@ export class VoiceService {
     });
 
     const token = await at.toJwt();
+
+    // Presence yayını (dev-fix): LiveKit webhook localhost'a ulaşamadığında
+    // mintToken'dan güvenilir katılım sinyali gönderir. Webhook onParticipantJoined ile
+    // aynı payload şekli — frontend addParticipant idempotent olduğu için çift-yayın zararsız.
+    if (channel.type === 'GUILD_VOICE') {
+      const joinedPayload = {
+        channelId,
+        participant: {
+          userId,
+          username: user?.username ?? userId,
+          avatarUrl: user?.avatarUrl ?? null,
+        },
+      };
+      this.realtime.emitToRoom(channelId, 'voice.participant_joined', joinedPayload);
+      this.realtime.emitToVoicePresence(channelId, 'voice.participant_joined', joinedPayload);
+    }
+
+    // B1 — Teftiş-girişi audit: mod normal-üye olmadığı kanala bypass ile girdiğinde.
+    // Normal üyenin kendi kanalına girişi audit'lenmez — yalnız bypass-giriş kaydedilir.
+    if (isInspectEntry && channel.guildId) {
+      await this.prisma.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'voice.inspect',
+          entityType: 'channel',
+          entityId: channelId,
+          metadata: {
+            guildId: channel.guildId,
+            targetChannelPrivate: channel.isPrivate ?? false,
+          },
+        },
+      });
+    }
+
     // bitrate: GUILD_VOICE kanal ayarı; DM/grup çağrısında varsayılan 64. İstemci publish'te uygular.
     // canPublishCamera/canPublishScreen: istemci bu bayraklarla UI butonlarını gösterir/gizler.
     return {
@@ -370,6 +447,90 @@ export class VoiceService {
     });
   }
 
+  /**
+   * B2 (R11B) — Yayın-durdur. Yetki: MUTE_MEMBERS. GUILD_VOICE + owner/self bloğu. (R7)
+   * Etki: video/ekran kaynakları düşer, SES KALIR (canPublish false YAPILMAZ — sustur'dan farkı bu).
+   * Kalıcılık YOK — tek-seferlik. Hedef yeniden yayın açabilir; tekrar sorunsa mod sustur'a yükseltir.
+   * Re-mint davranışı: hedefin sonraki token mint'inde (TTL≤10dk / reconnect) resolveVideoSources yeniden
+   * değerlendirir → bağlam hâlâ izinliyse video geri gelebilir. Yani yayın-durdur anlık + ≤TTL pencere;
+   * kalıcı engel = sustur.
+   */
+  async stopBroadcast(actorId: string, channelId: string, targetUserId: string): Promise<void> {
+    this.assertEnabled();
+    const channel = await this.requireGuildVoiceChannel(channelId);
+    await this.requireGuildPermission(actorId, channel.guildId, 'MUTE_MEMBERS');
+
+    if (targetUserId === actorId) {
+      throw new BadRequestException({ message: 'Kendi yayınını bu komutla durduramazsın.', error: 'CANNOT_STOP_SELF' });
+    }
+    await this.requireTargetNotOwner(channel.guildId, targetUserId, 'CANNOT_STOP_OWNER', 'Ortam sahibinin yayını durdurulamaz.');
+
+    // LiveKit: yalnız video/ekran kaynakları düşür — ses (microphone) KALIR.
+    // canPublish false YAPILMAZ; bu sustur'dan temel fark.
+    if (this.roomService) {
+      try {
+        await this.roomService.updateParticipant(channelId, targetUserId, undefined, {
+          canPublishSources: [TrackSource.MICROPHONE],
+          canSubscribe: true,
+          canPublishData: false,
+        });
+      } catch {
+        // Katılımcı bağlı değil / LiveKit erişilemez → best-effort (R11 deseni)
+      }
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: 'voice.stop_broadcast',
+        entityType: 'channel',
+        entityId: channelId,
+        metadata: { guildId: channel.guildId, targetUserId },
+      },
+    });
+
+    this.realtime.emitToRoom(channelId, 'voice.broadcast_stopped', { channelId, userId: targetUserId });
+  }
+
+  /**
+   * B3 (R11B) — Odadan-çıkar. Yetki: MOVE_MEMBERS. GUILD_VOICE + owner/self bloğu. (R7)
+   * Etki: hedef ses oturumundan düşer. Ortam üyeliğine DOKUNULMAZ (rejoin edebilir).
+   * Kalıcı = guild kick/ban ayrı aksiyon. Best-effort (R11 deseni).
+   */
+  async disconnectParticipant(actorId: string, channelId: string, targetUserId: string): Promise<void> {
+    this.assertEnabled();
+    const channel = await this.requireGuildVoiceChannel(channelId);
+    await this.requireGuildPermission(actorId, channel.guildId, 'MOVE_MEMBERS');
+
+    if (targetUserId === actorId) {
+      throw new BadRequestException({ message: 'Kendini odadan çıkaramazsın.', error: 'CANNOT_DISCONNECT_SELF' });
+    }
+    await this.requireTargetNotOwner(channel.guildId, targetUserId, 'CANNOT_DISCONNECT_OWNER', 'Ortam sahibi odadan çıkarılamaz.');
+
+    // LiveKit: katılımcıyı oturumdan düşür — best-effort.
+    if (this.roomService) {
+      try {
+        await this.roomService.removeParticipant(channelId, targetUserId);
+      } catch {
+        // Bağlı değil / LiveKit erişilemez → sessiz geç
+      }
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: 'voice.disconnect',
+        entityType: 'channel',
+        entityId: channelId,
+        metadata: { guildId: channel.guildId, targetUserId },
+      },
+    });
+
+    // voice.participant_left webhook LiveKit tarafından otomatik yayılır.
+    // Ek olarak istemciye "moderatör tarafından çıkarıldın" sinyali gönderilir.
+    this.realtime.emitToRoom(channelId, 'voice.kicked', { channelId, userId: targetUserId });
+  }
+
   /** R11 — kanal GUILD_VOICE mı + guildId güvence. Değilse NOT_VOICE_CHANNEL/CHANNEL_NOT_FOUND. */
   private async requireGuildVoiceChannel(
     channelId: string,
@@ -463,10 +624,13 @@ export class VoiceService {
     // Yeniden bağlanma / token tazeleme: zaten içeride olan kullanıcı limitten muaf
     if (participants.some((p) => p.identity === userId)) return;
 
-    // Yetkili bypass (owner/admin örtük geçer)
+    // Yetkili bypass (owner/admin örtük geçer).
+    // B1 (R11B): MUTE_MEMBERS de bypass yapar — mod dolu kanala teftiş için girebilir.
     if (guildId) {
-      const bypass = await this.permissions.hasGuildPermission(userId, guildId, 'MANAGE_CHANNELS');
-      if (bypass) return;
+      const bypassManage = await this.permissions.hasGuildPermission(userId, guildId, 'MANAGE_CHANNELS');
+      if (bypassManage) return;
+      const bypassMute = await this.permissions.hasGuildPermission(userId, guildId, 'MUTE_MEMBERS');
+      if (bypassMute) return;
     }
 
     if (participants.length >= userLimit) {
@@ -627,6 +791,25 @@ export class VoiceService {
 
     this.realtime.emitToRoom(channelId, 'voice.participant_left', { channelId, userId });
     this.realtime.emitToVoicePresence(channelId, 'voice.participant_left', { channelId, userId });
+  }
+
+  /**
+   * Dev-fix: istemci tarafından tetiklenen ayrılış sinyali.
+   * LiveKit webhook localhost'a ulaşamadığında frontend mintToken'dan sonra bu endpoint'i çağırır.
+   * VoiceSession'a DOKUNMAZ — webhook/room_finished kayıt kaynağı olarak kalır.
+   * Idempotent: üye yoksa bile zararsızca yayar.
+   */
+  async announceLeave(userId: string, channelId: string): Promise<void> {
+    // Yalnız GUILD_VOICE için; DM/GROUP_DM kanalları bu akışa dahil değil.
+    const channel = await this.prisma.channel.findFirst({
+      where: { id: channelId, deletedAt: null },
+      select: { type: true },
+    });
+    if (!channel || channel.type !== 'GUILD_VOICE') return;
+
+    const payload = { channelId, userId };
+    this.realtime.emitToRoom(channelId, 'voice.participant_left', payload);
+    this.realtime.emitToVoicePresence(channelId, 'voice.participant_left', payload);
   }
 
   private async onRoomFinished(channelId: string) {

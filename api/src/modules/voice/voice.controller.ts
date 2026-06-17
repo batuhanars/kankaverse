@@ -15,6 +15,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { VoiceService } from './voice.service';
 import { MoveParticipantDto } from './dto/move-participant.dto';
+import { TargetUserDto } from './dto/target-user.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -39,6 +40,17 @@ export class VoiceController {
   @ApiOperation({ summary: 'Ses kanalındaki anlık katılımcılar' })
   listParticipants(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
     return this.voiceService.listParticipants(user.id, channelId);
+  }
+
+  // Dev-fix: istemci ayrılış sinyali — LiveKit webhook localhost'a ulaşamadığında
+  // frontend bu endpoint'i çağırarak presence yayınını tetikler.
+  // VoiceSession'a dokunmaz; idempotent (üye değilse de zararsız).
+  @Post(':id/voice/leave')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Ses kanalı ayrılış sinyali (dev presence fix; idempotent)' })
+  async leave(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
+    await this.voiceService.announceLeave(user.id, channelId);
+    return null;
   }
 }
 
@@ -90,6 +102,44 @@ export class VoiceModerationController {
     @Body() dto: MoveParticipantDto,
   ) {
     await this.voiceService.moveParticipant(user.id, channelId, userId, dto.targetChannelId);
+    return null;
+  }
+}
+
+/**
+ * R11B — Ses kanalı moderasyonu II (yayın-durdur + odadan-çıkar). T&S → R7 incelemesi.
+ * Yetki kapıları service'te (MUTE_MEMBERS / MOVE_MEMBERS). Envelope otomatik, data: null.
+ */
+@ApiTags('voice')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('channels')
+export class VoiceInspectController {
+  constructor(private voiceService: VoiceService) {}
+
+  // B2 — Yayın-durdur (video/ekran düşer, ses kalır) — MUTE_MEMBERS
+  @Post(':id/voice/stop-broadcast')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Katılımcının video/ekran yayınını durdur, ses kalır (MUTE_MEMBERS)' })
+  async stopBroadcast(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Body() dto: TargetUserDto,
+  ) {
+    await this.voiceService.stopBroadcast(user.id, channelId, dto.targetUserId);
+    return null;
+  }
+
+  // B3 — Odadan-çıkar (ses oturumundan düşür, üyelik korunur) — MOVE_MEMBERS
+  @Post(':id/voice/disconnect')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Katılımcıyı ses oturumundan çıkar, ortam üyeliği korunur (MOVE_MEMBERS)' })
+  async disconnect(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Body() dto: TargetUserDto,
+  ) {
+    await this.voiceService.disconnectParticipant(user.id, channelId, dto.targetUserId);
     return null;
   }
 }
