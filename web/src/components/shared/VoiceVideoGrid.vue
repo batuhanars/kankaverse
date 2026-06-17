@@ -139,13 +139,12 @@ function detachVideo(el: Element | null, entry: VideoTrackEntry | null) {
       </div>
     </div>
 
-    <!-- Alt şerit: odak dışı katılımcılar (video tile veya avatar) -->
+    <!-- Alt şerit: yalnız odak dışı VIDEO tile'ları (avatar yok — katılımcılar dışarıda kart olarak gösterilir) -->
     <div
-      v-if="stripTracks.length || voiceStore.roomParticipants.length > 1"
+      v-if="stripTracks.length"
       class="shrink-0 flex items-center gap-2 px-3 py-2 overflow-x-auto"
       style="background-color: rgba(0,0,0,0.7);"
     >
-      <!-- Video track'i olan katılımcı → küçük video tile -->
       <div
         v-for="entry in stripTracks"
         :key="trackKey(entry)"
@@ -165,24 +164,6 @@ function detachVideo(el: Element | null, entry: VideoTrackEntry | null) {
           style="background-color: rgba(0,0,0,0.55); color: #fff;"
         >{{ entry.username }}</span>
       </div>
-      <!-- Video track'i olmayan katılımcılar → avatar -->
-      <template v-for="m in voiceStore.roomParticipants" :key="m.userId">
-        <div
-          v-if="!tracks.some((e) => e.participantId === m.userId)"
-          class="shrink-0 flex flex-col items-center gap-1"
-          :title="m.username"
-        >
-          <div
-            class="w-10 h-10 rounded-full flex items-center justify-center text-[14px] font-bold text-white overflow-hidden"
-            :class="{ 'kv-speaking': voiceStore.speakingUserIds.has(m.userId) }"
-            style="background-color: var(--kv-accent-500);"
-          >
-            <img v-if="m.avatarUrl" :src="m.avatarUrl" :alt="m.username" class="w-full h-full object-cover" />
-            <span v-else>{{ m.username[0]?.toUpperCase() }}</span>
-          </div>
-          <span class="text-[10px] truncate max-w-[48px]" style="color: rgba(255,255,255,0.7);">{{ m.username }}</span>
-        </div>
-      </template>
     </div>
   </div>
 </template>
