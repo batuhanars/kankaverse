@@ -154,7 +154,7 @@ function errMessage(e: unknown, fallbackKey: string): string {
 </script>
 
 <template>
-  <div class="flex flex-col flex-1 min-h-0 overflow-hidden rounded-[var(--kv-radius-lg)]" style="background-color: var(--kv-bg-content);">
+  <div class="flex flex-col flex-1 min-h-0 overflow-hidden mr-4 rounded-[var(--kv-radius-lg)]" style="background-color: var(--kv-bg-content);">
     <!-- Üst başlık: ses kanalı adı -->
     <div class="shrink-0 flex items-center gap-2 px-4 h-14 border-b" style="border-color: var(--kv-border-subtle);">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);">
