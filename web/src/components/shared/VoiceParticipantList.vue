@@ -48,6 +48,15 @@ const members = computed<(VoiceParticipant & { isLocal?: boolean })[]>(() =>
   connectedHere.value ? voiceStore.roomParticipants : voiceStore.participantsFor(props.channelId),
 )
 
+// FIX 2 — yayın yapanlar üstte (stable sort)
+const sortedMembers = computed(() =>
+  [...members.value].sort((a, b) => {
+    const aLive = isBroadcasting(a.userId) ? 0 : 1
+    const bLive = isBroadcasting(b.userId) ? 0 : 1
+    return aLive - bLive
+  }),
+)
+
 function isSpeaking(userId: string): boolean {
   return connectedHere.value && voiceStore.speakingUserIds.has(userId)
 }
@@ -74,9 +83,37 @@ watch(
   },
 )
 
-// ── #2 — YAYINDA rozet popup ──────────────────────────────────────────────────
+// ── #2 — YAYINDA rozet popup (hover + Teleport/fixed) ────────────────────────
 const livePopupUserId = ref<string | null>(null)
 const livePopupRef = ref<HTMLElement | null>(null)
+const livePopupPos = ref({ x: 0, y: 0 })
+let closeTimer: ReturnType<typeof setTimeout> | null = null
+
+function openLivePopup(e: MouseEvent, userId: string) {
+  if (closeTimer) { clearTimeout(closeTimer); closeTimer = null }
+  const badge = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  // Rozet sağına/altına konumlandır; sağdan taşarsa sola kaydır (viewport clamp)
+  let x = badge.right + 6
+  let y = badge.top
+  const popupW = 176 // min-w tahmini
+  const popupH = 100
+  if (x + popupW > window.innerWidth - 8) x = badge.left - popupW - 6
+  if (y + popupH > window.innerHeight - 8) y = window.innerHeight - popupH - 8
+  livePopupPos.value = { x, y }
+  livePopupUserId.value = userId
+}
+
+function scheduleLivePopupClose() {
+  closeTimer = setTimeout(() => {
+    livePopupUserId.value = null
+    closeTimer = null
+  }, 120)
+}
+
+function cancelLivePopupClose() {
+  if (closeTimer) { clearTimeout(closeTimer); closeTimer = null }
+}
+
 onClickOutside(livePopupRef, () => { livePopupUserId.value = null })
 
 async function watchStream() {
@@ -269,9 +306,9 @@ async function doDisconnect() {
 </script>
 
 <template>
-  <div v-if="members.length" class="flex flex-col gap-0.5 pl-8 pr-2 pb-1">
+  <div v-if="sortedMembers.length" class="flex flex-col gap-0.5 pl-8 pr-2 pb-1">
     <div
-      v-for="p in members"
+      v-for="p in sortedMembers"
       :key="p.userId"
       class="flex items-center gap-2 py-0.5 text-[13px] group/row"
       style="color: var(--kv-text-secondary);"
@@ -288,42 +325,16 @@ async function doDisconnect() {
       </div>
       <span class="truncate flex-1">{{ p.username }}</span>
 
-      <!-- #1 — YAYINDA rozeti + #2 popup -->
-      <div v-if="isBroadcasting(p.userId)" class="relative shrink-0">
-        <button
-          class="text-[10px] font-bold px-1.5 py-0.5 rounded-sm leading-none cursor-pointer"
-          style="background-color: var(--kv-accent-500); color: #fff;"
-          @click.stop="livePopupUserId = livePopupUserId === p.userId ? null : p.userId"
-        >
-          {{ t('voice.live') }}
-        </button>
-
-        <!-- #2 — Popup: "Yayını İzle" -->
-        <div
-          v-if="livePopupUserId === p.userId"
-          ref="livePopupRef"
-          class="absolute left-0 top-full mt-1 z-30 rounded-[var(--kv-radius-md)] border p-3 min-w-[160px]"
-          style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
-          @click.stop
-        >
-          <p class="text-[12px] font-semibold mb-1" style="color: var(--kv-text-primary);">
-            {{ t('voice.nowStreaming') }}
-          </p>
-          <span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-sm mb-2 leading-none" style="background-color: var(--kv-accent-500); color: #fff;">
-            {{ t('voice.live') }}
-          </span>
-          <button
-            class="flex items-center gap-1.5 w-full py-1.5 px-2 rounded-[var(--kv-radius-sm)] text-[12px] font-medium text-white cursor-pointer transition-opacity hover:opacity-90"
-            style="background-color: var(--kv-success, #3DB46E);"
-            @click="watchStream"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
-            {{ t('voice.watchStream') }}
-          </button>
-        </div>
-      </div>
+      <!-- #1 — YAYINDA rozeti (hover → FIX 1 popup Teleport ile açılır) -->
+      <button
+        v-if="isBroadcasting(p.userId)"
+        class="text-[10px] font-bold px-1.5 py-0.5 rounded-sm leading-none cursor-pointer shrink-0"
+        style="background-color: var(--kv-accent-500); color: #fff;"
+        @mouseenter="openLivePopup($event, p.userId)"
+        @mouseleave="scheduleLivePopupClose"
+      >
+        {{ t('voice.live') }}
+      </button>
 
       <!-- Mute göstergesi -->
       <svg
@@ -338,6 +349,36 @@ async function doDisconnect() {
       </svg>
     </div>
   </div>
+
+  <!-- #2 — YAYINDA popup: Teleport body + fixed (sidebar overflow'dan bağımsız) -->
+  <Teleport to="body">
+    <div
+      v-if="livePopupUserId"
+      ref="livePopupRef"
+      class="fixed z-50 rounded-[var(--kv-radius-md)] border p-3 min-w-[176px]"
+      :style="`top:${livePopupPos.y}px;left:${livePopupPos.x}px;background-color:var(--kv-bg-elevated);border-color:var(--kv-border-subtle);`"
+      @mouseenter="cancelLivePopupClose"
+      @mouseleave="scheduleLivePopupClose"
+      @click.stop
+    >
+      <p class="text-[12px] font-semibold mb-1" style="color: var(--kv-text-primary);">
+        {{ t('voice.nowStreaming') }}
+      </p>
+      <span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-sm mb-2 leading-none" style="background-color: var(--kv-accent-500); color: #fff;">
+        {{ t('voice.live') }}
+      </span>
+      <button
+        class="flex items-center gap-1.5 w-full py-1.5 px-2 rounded-[var(--kv-radius-sm)] text-[12px] font-medium text-white cursor-pointer transition-opacity hover:opacity-90"
+        style="background-color: var(--kv-success, #3DB46E);"
+        @click="watchStream"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        {{ t('voice.watchStream') }}
+      </button>
+    </div>
+  </Teleport>
 
   <!-- #3 — Sağ-tık context menüsü -->
   <Teleport to="body">

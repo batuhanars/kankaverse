@@ -35,6 +35,15 @@ const guildId = computed(() => channelsStore.activeChannel()?.guildId ?? '')
 const connectedHere = computed(() => voiceStore.connectedChannelId === channelId.value)
 const members = computed<RoomMember[]>(() => (connectedHere.value ? voiceStore.roomParticipants : []))
 
+// FIX 2 — yayın yapanlar üstte (stable sort)
+const sortedMembers = computed<RoomMember[]>(() =>
+  [...members.value].sort((a, b) => {
+    const aLive = isBroadcastingFor(a) ? 0 : 1
+    const bLive = isBroadcastingFor(b) ? 0 : 1
+    return aLive - bLive
+  }),
+)
+
 // R11 izinler (UX kapısı — otorite backend)
 const { can } = useGuildPermissions(() => guildId.value)
 const canMute = computed(() => can('MUTE_MEMBERS'))
@@ -179,7 +188,7 @@ function errMessage(e: unknown, fallbackKey: string): string {
         <!-- Katılımcı ızgarası — video varken küçük görünür (video-dışı katılımcılar) -->
         <div class="flex flex-wrap gap-4 justify-center content-start">
           <div
-            v-for="m in members.filter(m => !voiceStore.videoTracks.some(e => e.participantId === m.userId))"
+            v-for="m in sortedMembers.filter(m => !voiceStore.videoTracks.some(e => e.participantId === m.userId))"
             :key="m.userId"
             class="group relative flex flex-col items-center gap-2 w-[160px] py-6 rounded-[var(--kv-radius-lg)]"
             style="background-color: var(--kv-bg-elevated);"
@@ -222,7 +231,7 @@ function errMessage(e: unknown, fallbackKey: string): string {
       <!-- Katılımcı ızgarası — video track yok, ses-only -->
       <div v-else class="flex flex-wrap gap-4 justify-center content-start">
         <div
-          v-for="m in members"
+          v-for="m in sortedMembers"
           :key="m.userId"
           class="group relative flex flex-col items-center gap-2 w-[160px] py-6 rounded-[var(--kv-radius-lg)]"
           style="background-color: var(--kv-bg-elevated);"
