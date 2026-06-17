@@ -920,7 +920,15 @@
     "noMoveTargets": "Taşınacak başka ses kanalı yok",
     "movedToast": "Bir yetkili seni başka bir ses kanalına taşıdı.",
     "muteFailed": "Susturma işlemi başarısız oldu.",
-    "moveFailed": "Taşıma işlemi başarısız oldu."
+    "moveFailed": "Taşıma işlemi başarısız oldu.",
+    "cameraOn": "Kamerayı aç",
+    "cameraOff": "Kamerayı kapat",
+    "cameraActive": "Kamera yayını",
+    "screenShare": "Ekranı paylaş",
+    "screenStop": "Ekran paylaşımını durdur",
+    "screenShareActive": "Ekran paylaşımı",
+    "enterFullscreen": "Tam ekran",
+    "exitFullscreen": "Tam ekrandan çık"
   },
   "call": {
     "incoming": "Gelen sesli arama",

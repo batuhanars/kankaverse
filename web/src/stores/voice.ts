@@ -6,7 +6,10 @@ import {
   ParticipantEvent,
   Track,
   type RemoteTrack,
+  type LocalVideoTrack,
+  type RemoteTrackPublication,
   type Participant,
+  type RemoteParticipant,
 } from 'livekit-client'
 import { voiceApi, type VoiceParticipantDto } from '@/api/voice'
 import { useToastStore } from '@/stores/toast'
@@ -21,6 +24,16 @@ export interface VoiceParticipant {
 
 export interface RoomMember extends VoiceParticipant {
   isLocal: boolean
+}
+
+// C4 — aktif video track girişi (kamera veya ekran; bir katılımcı her ikisine de sahip olabilir)
+export interface VideoTrackEntry {
+  participantId: string
+  username: string
+  avatarUrl: string | null
+  isLocal: boolean
+  trackKind: 'camera' | 'screen'
+  track: RemoteTrack | LocalVideoTrack
 }
 
 /**
@@ -47,6 +60,14 @@ export const useVoiceStore = defineStore('voice', () => {
   const ALONE_TIMEOUT_MS = 60_000
   const isMuted = ref(false)
   const canPublish = ref(false)
+  // C4 — video yetenek bayrakları (build-dark: false; sunucu açınca true olur → UI belirir)
+  const canPublishCamera = ref(false)
+  const canPublishScreen = ref(false)
+  // C4 — yerel video yayın durumları
+  const isCameraOn = ref(false)
+  const isScreenSharing = ref(false)
+  // C4 — aktif video track'leri (kamera + ekran); her giriş bir katılımcı × track-tipi satırı
+  const videoTracks = ref<VideoTrackEntry[]>([])
   const error = ref('')
   // Varsayılan tercih: seste olmasak da mikrofon/sağırlık durumu (kalıcı). Bir kanala/aramaya
   // katılınca uygulanır; seste değilken alt bardaki düğmeler bu tercihi değiştirir.
@@ -153,6 +174,8 @@ export const useVoiceStore = defineStore('voice', () => {
     try {
       const { data } = await voiceApi.getToken(channelId)
       canPublish.value = data.canPublish
+      canPublishCamera.value = data.canPublishCamera ?? false
+      canPublishScreen.value = data.canPublishScreen ?? false
 
       // Bit hızı: kanal ayarı publish varsayılanına uygulanır (audio-only maxBitrate, kbps→bps)
       room = new Room({
@@ -229,6 +252,11 @@ export const useVoiceStore = defineStore('voice', () => {
     if (aloneTimer) { clearTimeout(aloneTimer); aloneTimer = null }
     isMuted.value = false
     canPublish.value = false
+    canPublishCamera.value = false
+    canPublishScreen.value = false
+    isCameraOn.value = false
+    isScreenSharing.value = false
+    videoTracks.value = []
     isDeafened.value = false
     micError.value = ''
     speakingUserIds.value = new Set()
@@ -356,9 +384,39 @@ export const useVoiceStore = defineStore('voice', () => {
     }
   }
 
+  // ── C4: video track listesi güncelleme yardımcıları ──────────────────────────
+  function _participantMeta(p: Participant): { username: string; avatarUrl: string | null } {
+    let avatarUrl: string | null = null
+    try { if (p.metadata) avatarUrl = (JSON.parse(p.metadata)?.avatarUrl ?? null) } catch { /* yoksay */ }
+    return { username: p.name || p.identity, avatarUrl }
+  }
+
+  function _addVideoTrack(p: Participant, track: RemoteTrack | LocalVideoTrack) {
+    const isLocal = p.identity === room?.localParticipant?.identity
+    const trackKind: 'camera' | 'screen' =
+      track.source === Track.Source.Camera ? 'camera' : 'screen'
+    const { username, avatarUrl } = _participantMeta(p)
+    // Aynı katılımcı + kind zaten varsa güncelle, yoksa ekle
+    const existing = videoTracks.value.findIndex(
+      (e) => e.participantId === p.identity && e.trackKind === trackKind,
+    )
+    const entry: VideoTrackEntry = { participantId: p.identity, username, avatarUrl, isLocal, trackKind, track }
+    if (existing >= 0) {
+      videoTracks.value = videoTracks.value.map((e, i) => (i === existing ? entry : e))
+    } else {
+      videoTracks.value = [...videoTracks.value, entry]
+    }
+  }
+
+  function _removeVideoTrack(participantId: string, trackKind: 'camera' | 'screen') {
+    videoTracks.value = videoTracks.value.filter(
+      (e) => !(e.participantId === participantId && e.trackKind === trackKind),
+    )
+  }
+
   // ── LiveKit Room olayları ─────────────────────────────────────────────────────
   function wireRoom(r: Room) {
-    r.on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
+    r.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _pub: RemoteTrackPublication, p: RemoteParticipant) => {
       if (track.kind === Track.Kind.Audio) {
         const el = track.attach() // <audio autoplay>
         el.style.display = 'none'
@@ -368,13 +426,22 @@ export const useVoiceStore = defineStore('voice', () => {
         applySinkId(el)
         document.body.appendChild(el)
         remoteAudioEls.add(el)
+      } else if (track.kind === Track.Kind.Video) {
+        // C4: uzak video track geldi → listeye ekle
+        _addVideoTrack(p, track)
       }
     })
-    r.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
-      track.detach().forEach((el) => {
-        remoteAudioEls.delete(el)
-        el.remove()
-      })
+    r.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, _pub: RemoteTrackPublication, p: RemoteParticipant) => {
+      if (track.kind === Track.Kind.Audio) {
+        track.detach().forEach((el) => {
+          remoteAudioEls.delete(el)
+          el.remove()
+        })
+      } else if (track.kind === Track.Kind.Video) {
+        // C4: uzak video track düştü
+        const trackKind = track.source === Track.Source.Camera ? 'camera' : 'screen'
+        _removeVideoTrack(p.identity, trackKind)
+      }
     })
     // Konuşma algısı: per-participant IsSpeakingChanged (mute/unmute'a dayanıklı).
     // ActiveSpeakersChanged aggregate'ı mute/unmute döngüsünde kaçabiliyor; her
@@ -385,7 +452,10 @@ export const useVoiceStore = defineStore('voice', () => {
       attachSpeaking(p)
       refreshRoomParticipants()
     })
-    r.on(RoomEvent.ParticipantDisconnected, () => {
+    r.on(RoomEvent.ParticipantDisconnected, (p: Participant) => {
+      // C4: ayrılan katılımcının video track'lerini temizle
+      _removeVideoTrack(p.identity, 'camera')
+      _removeVideoTrack(p.identity, 'screen')
       refreshRoomParticipants()
       recomputeSpeaking()
     })
@@ -404,6 +474,43 @@ export const useVoiceStore = defineStore('voice', () => {
       room = null
       resetLocalState()
     })
+  }
+
+  // ── C4: kamera / ekran paylaşımı toggle ──────────────────────────────────────
+  async function toggleCamera() {
+    if (!room || !canPublishCamera.value) return
+    const next = !isCameraOn.value
+    try {
+      const pub = await room.localParticipant.setCameraEnabled(next)
+      isCameraOn.value = next
+      // Yerel kamera track'ini de listeye yansıt
+      if (next && pub?.track) {
+        _addVideoTrack(room.localParticipant, pub.track as LocalVideoTrack)
+      } else {
+        _removeVideoTrack(room.localParticipant.identity, 'camera')
+      }
+    } catch {
+      // izin reddedildi veya cihaz yok; durumu değiştirme
+    }
+  }
+
+  async function toggleScreen() {
+    if (!room || !canPublishScreen.value) return
+    const next = !isScreenSharing.value
+    try {
+      const pub = await room.localParticipant.setScreenShareEnabled(next)
+      isScreenSharing.value = next
+      // Yerel ekran track'ini de listeye yansıt
+      if (next && pub?.track) {
+        _addVideoTrack(room.localParticipant, pub.track as LocalVideoTrack)
+      } else {
+        _removeVideoTrack(room.localParticipant.identity, 'screen')
+      }
+    } catch {
+      // Kullanıcı ekran seçimi iptal etti; durumu değiştirme
+      isScreenSharing.value = false
+      _removeVideoTrack(room?.localParticipant?.identity ?? '', 'screen')
+    }
   }
 
   // REV-12: DM/grup çağrısında tek kişi (yalnız ben) kalınca ALONE_TIMEOUT_MS sonra otomatik bitir.
@@ -429,6 +536,11 @@ export const useVoiceStore = defineStore('voice', () => {
     connectedAt,
     isMuted,
     canPublish,
+    canPublishCamera,
+    canPublishScreen,
+    isCameraOn,
+    isScreenSharing,
+    videoTracks,
     error,
     preferMuted,
     preferDeafened,
@@ -458,6 +570,8 @@ export const useVoiceStore = defineStore('voice', () => {
     leave,
     toggleMute,
     toggleDeafen,
+    toggleCamera,
+    toggleScreen,
   }
 })
 

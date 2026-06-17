@@ -19,6 +19,7 @@ import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { voiceApi } from '@/api/voice'
 import type { ChannelDto } from '@/types'
 import VoiceControlBar from '@/components/shared/VoiceControlBar.vue'
+import VoiceVideoGrid from '@/components/shared/VoiceVideoGrid.vue'
 
 const { t } = useI18n()
 const voiceStore = useVoiceStore()
@@ -141,7 +142,45 @@ function errMessage(e: unknown, fallbackKey: string): string {
         >{{ t('voice.joinAction') }}</button>
         <p v-if="voiceStore.error" class="text-[13px]" style="color: var(--kv-danger);">{{ voiceStore.error }}</p>
       </div>
-      <!-- Katılımcı ızgarası -->
+      <!-- C4: Video grid (yalnız aktif video track varsa görünür) -->
+      <div v-else-if="voiceStore.videoTracks.length" class="flex flex-col gap-4">
+        <VoiceVideoGrid />
+        <!-- Katılımcı ızgarası — video varken küçük görünür (video-dışı katılımcılar) -->
+        <div class="flex flex-wrap gap-4 justify-center content-start">
+          <div
+            v-for="m in members.filter(m => !voiceStore.videoTracks.some(e => e.participantId === m.userId))"
+            :key="m.userId"
+            class="group relative flex flex-col items-center gap-2 w-[160px] py-6 rounded-[var(--kv-radius-lg)]"
+            style="background-color: var(--kv-bg-elevated);"
+          >
+            <div
+              class="w-20 h-20 rounded-full flex items-center justify-center text-[28px] font-bold text-white overflow-hidden"
+              :class="{ 'kv-speaking': isSpeaking(m) }"
+              style="background-color: var(--kv-accent-500);"
+            >
+              <img v-if="m.avatarUrl" :src="m.avatarUrl" :alt="m.username" class="w-full h-full object-cover" />
+              <span v-else>{{ m.username[0]?.toUpperCase() }}</span>
+            </div>
+            <div class="flex items-center gap-1.5 max-w-full">
+              <svg v-if="isServerMutedFor(m)" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-danger);" class="shrink-0">
+                <path d="M12 2L4 5v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V5l-8-3z"/>
+                <line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/>
+              </svg>
+              <svg v-else-if="isMutedFor(m)" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-danger);" class="shrink-0">
+                <line x1="1" y1="1" x2="23" y2="23"/>
+                <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
+                <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+              </svg>
+              <span class="text-[14px] truncate" style="color: var(--kv-text-primary);">
+                {{ m.username }}<template v-if="m.isLocal"> ({{ t('voice.you') }})</template>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Katılımcı ızgarası — video track yok, ses-only -->
       <div v-else class="flex flex-wrap gap-4 justify-center content-start">
         <div
           v-for="m in members"
