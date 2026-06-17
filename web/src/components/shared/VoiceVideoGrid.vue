@@ -101,9 +101,9 @@ function detachVideo(el: Element | null, entry: VideoTrackEntry | null) {
         :aria-label="focusedTrack.trackKind === 'screen' ? t('voice.screenShareActive') : t('voice.cameraActive')"
       />
 
-      <!-- Tam-ekran düğmesi -->
+      <!-- Tam-ekran düğmesi (sağ-alt: video oynatıcı konvansiyonu — kullanıcının baktığı yer) -->
       <button
-        class="absolute top-2 right-2 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
+        class="absolute bottom-2 right-2 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
         style="width: 32px; height: 32px; background-color: rgba(0,0,0,0.55); color: #fff;"
         :title="isFullscreen ? t('voice.exitFullscreen') : t('voice.enterFullscreen')"
         @click="toggleFullscreen"
