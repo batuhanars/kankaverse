@@ -146,25 +146,28 @@ function errMessage(e: unknown, fallbackKey: string): string {
 
 <template>
   <div class="flex flex-col flex-1 min-h-0 overflow-hidden rounded-[var(--kv-radius-lg)]" style="background-color: var(--kv-bg-content);">
-    <!-- Orta: katılımcı kartları — üst başlık GuildTopBar'a taşındı -->
+    <!-- Üst başlık: ses kanalı adı -->
+    <div class="shrink-0 flex items-center gap-2 px-4 h-14 border-b" style="border-color: var(--kv-border-subtle);">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+      </svg>
+      <span class="text-[16px] font-semibold" style="color: var(--kv-text-primary);">{{ channelName }}</span>
+      <span v-if="connectedHere" class="text-[13px]" style="color: var(--kv-text-muted);">· {{ members.length }}</span>
+    </div>
+
+    <!-- Orta: katılımcı kartları -->
     <div class="flex-1 min-h-0 overflow-y-auto p-6">
       <!-- Bağlanılıyor -->
       <div v-if="!connectedHere && voiceStore.connecting" class="h-full flex items-center justify-center">
         <p class="text-[15px]" style="color: var(--kv-text-muted);">{{ t('voice.joining') }}</p>
       </div>
-      <!-- Bağlı değil → Discord-benzeri ortalanmış çağrı -->
-      <div v-else-if="!connectedHere" class="h-full flex flex-col items-center justify-center gap-4">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-        </svg>
-        <div class="flex flex-col items-center gap-1.5">
-          <span class="text-[22px] font-semibold" style="color: var(--kv-text-primary);">{{ channelName }}</span>
-          <p class="text-[14px]" style="color: var(--kv-text-muted);">{{ t('voice.notConnected') }}</p>
-        </div>
+      <!-- Bağlı değil → katıl -->
+      <div v-else-if="!connectedHere" class="h-full flex flex-col items-center justify-center gap-3">
+        <p class="text-[15px]" style="color: var(--kv-text-muted);">{{ t('voice.notConnected') }}</p>
         <button
-          class="px-6 py-2.5 rounded-[var(--kv-radius-md)] text-[15px] font-semibold text-white cursor-pointer transition-opacity hover:opacity-90"
+          class="px-4 py-2 rounded-[var(--kv-radius-md)] text-[14px] font-semibold text-white cursor-pointer transition-opacity hover:opacity-90"
           style="background-color: var(--kv-accent-500);"
           @click="voiceStore.join(channelId)"
         >{{ t('voice.joinAction') }}</button>
@@ -217,15 +220,6 @@ function errMessage(e: unknown, fallbackKey: string): string {
       </div>
 
       <!-- Katılımcı ızgarası — video track yok, ses-only -->
-      <!-- Kimse yok durumu (bağlı ama oda boş) -->
-      <div v-else-if="!members.length" class="h-full flex flex-col items-center justify-center gap-3">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-        </svg>
-        <p class="text-[15px]" style="color: var(--kv-text-muted);">{{ t('voice.emptyRoom') }}</p>
-      </div>
       <div v-else class="flex flex-wrap gap-4 justify-center content-start">
         <div
           v-for="m in members"
