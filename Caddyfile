@@ -9,6 +9,7 @@
 }
 
 kankaverse.com, www.kankaverse.com {
+	encode zstd gzip
 	# Masaüstü installer indirme: /indir/* → VPS'teki downloads klasörü (statik dosya)
 	handle_path /indir/* {
 		root * /srv/downloads
@@ -20,5 +21,6 @@ kankaverse.com, www.kankaverse.com {
 }
 
 api.kankaverse.com {
+	encode zstd gzip
 	reverse_proxy api:3000
 }
