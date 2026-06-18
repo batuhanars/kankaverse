@@ -5,8 +5,10 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
-# prisma şeması npm ci'den ÖNCE kopyalanmalı: postinstall = `prisma generate` şemaya ihtiyaç duyar.
+# prisma şeması + config npm ci'den ÖNCE: postinstall = `prisma generate` bunlara ihtiyaç duyar.
+# Prisma 7: datasource url schema'da değil prisma.config.ts'te (process.env.DATABASE_URL).
 COPY prisma ./prisma
+COPY prisma.config.ts ./
 RUN npm ci
 COPY . .
 RUN npm run build
@@ -19,6 +21,8 @@ ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
+# Prisma 7: migrate deploy datasource url'i prisma.config.ts'ten okur — runtime'a ŞART.
+COPY --from=build /app/prisma.config.ts ./
 COPY package*.json ./
 EXPOSE 3000
 # Her başlangıçta migration'ı uygula (idempotent), sonra prod sunucuyu başlat.
