@@ -157,6 +157,19 @@ function createWindow() {
   // Dev'de (npm start) DevTools otomatik açılır — paketli üründe (installer) açılmaz.
   if (!app.isPackaged) win.webContents.openDevTools({ mode: 'detach' })
 
+  // Menü kaldırıldığı için yenile/devtools kısayolları elle bağlanır (Ctrl+R / F5 / Ctrl+Shift+R / Ctrl+Shift+I / F12).
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+    const mod = input.control || input.meta
+    const key = (input.key || '').toLowerCase()
+    if ((mod && key === 'r') || input.key === 'F5') {
+      if (input.shift) win.webContents.reloadIgnoringCache()
+      else win.webContents.reload()
+    } else if ((mod && input.shift && key === 'i') || input.key === 'F12') {
+      win.webContents.toggleDevTools()
+    }
+  })
+
   // Harici linkleri (rel="external", target="_blank" vb.) sistem tarayıcısında aç.
   // Uygulama içinde rastgele site açılmasını engeller.
   win.webContents.setWindowOpenHandler(({ url }) => {
