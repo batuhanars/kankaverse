@@ -1154,7 +1154,7 @@
   },
   "download": {
     "modalTitle": "Uygulamayı İndir",
-    "modalSubtitle": "Kankaverse'i masaüstünde kullan",
+    "modalSubtitle": "Kankaverse'yi masaüstünde kullan",
     "windows": "Windows",
     "linux": "Linux",
     "macos": "macOS",
