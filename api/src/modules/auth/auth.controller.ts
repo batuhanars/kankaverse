@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -51,7 +52,19 @@ type AuthUser = { id: string; sessionId: string; emailVerifiedAt: Date | null };
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private config: ConfigService,
+  ) {}
+
+  // ── Public meta ────────────────────────────────────────────────────────────
+
+  @Get('registration-mode')
+  @ApiOperation({ summary: 'Kayıt modunu sorgula (auth yok — frontend davet alanını buna göre gösterir)' })
+  registrationMode() {
+    const mode = this.config.get<'open' | 'invite' | 'closed'>('registrationMode') ?? 'open';
+    return { mode };
+  }
 
   // ── Temel auth ─────────────────────────────────────────────────────────────
 

@@ -115,6 +115,10 @@ model User {
   totpSecret          String?
   deletionRequestedAt DateTime?
   friendCode          String          @unique
+  // Platform davet sistemi (kapalı-kayıt fazı — Sprint Closed-Registration)
+  platformInviteId    String?            // hangi davetle kaydoldu (audit / güven grafiği); null = open-mode kaydı
+  platformInvite      PlatformInvite?    @relation("RedeemedPlatformInvite", fields: [platformInviteId], references: [id])
+  createdPlatformInvites PlatformInvite[] @relation("PlatformInviteCreator")
   sessions            Session[]
   memberships         GuildMember[]
   ownedGuilds         Guild[]            @relation("GuildOwner")
@@ -632,4 +636,24 @@ model NotificationPref {
 
   @@unique([userId, targetType, targetId])
   @@index([userId])
+}
+
+// ─── Sprint Closed-Registration: Platform Davet Sistemi ──────────────────────
+// KAVRAM: Bu model platform kaydını kapılar (yeni hesap açma).
+// Sprint 7A Invite modeli guild/ortam davetidir — iki model birbirinden tamamen bağımsız.
+
+model PlatformInvite {
+  id         String    @id @default(cuid())
+  code       String    @unique          // 8-char URL-safe base32 (short-code.util)
+  note       String?                    // admin memo: kime/niçin verildi (opsiyonel)
+  maxUses    Int?                       // null = sınırsız
+  uses       Int       @default(0)
+  expiresAt  DateTime?                  // null = süresiz
+  disabledAt DateTime?                  // soft-iptal (revoke)
+  creatorId  String
+  creator    User      @relation("PlatformInviteCreator", fields: [creatorId], references: [id])
+  redeemers  User[]    @relation("RedeemedPlatformInvite")
+  createdAt  DateTime  @default(now())
+
+  @@index([creatorId])
 }

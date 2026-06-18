@@ -1,5 +1,5 @@
-import { IsEmail, IsString, MinLength, MaxLength, Matches, IsISO8601 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
   @ApiProperty({ example: 'batuhan_42' })
@@ -22,4 +22,10 @@ export class RegisterDto {
   @ApiProperty({ example: '2000-05-15', description: 'ISO 8601 tarih (YYYY-MM-DD)' })
   @IsISO8601({}, { message: 'Doğum tarihi geçerli bir ISO tarih formatında olmalıdır.' })
   birthDate: string;
+
+  @ApiPropertyOptional({ example: 'ABCD1234', description: '8 karakterlik davet kodu (invite modunda zorunlu).' })
+  @IsOptional()
+  @IsString()
+  @Length(8, 8)
+  inviteCode?: string;
 }
