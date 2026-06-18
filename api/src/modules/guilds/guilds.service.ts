@@ -126,8 +126,8 @@ export class GuildsService {
         },
       });
 
-      // Varsayılan kategori: "Metin Kanalları" (yalnız tek kategori; "Ses Kanalları" LiveKit gelince)
-      const defaultCategory = await tx.channelCategory.create({
+      // Varsayılan metin kategorisi: "Metin Kanalları" + #genel-sohbet
+      const textCategory = await tx.channelCategory.create({
         data: {
           guildId: guild.id,
           name: 'Metin Kanalları',
@@ -135,14 +135,32 @@ export class GuildsService {
         },
       });
 
-      // Varsayılan kanal, oluşturulan kategoriye bağlı
       await tx.channel.create({
         data: {
           guildId: guild.id,
           type: 'GUILD_TEXT',
           name: 'genel-sohbet',
           position: 0,
-          categoryId: defaultCategory.id,
+          categoryId: textCategory.id,
+        },
+      });
+
+      // Varsayılan ses kategorisi: "Ses Kanalları" + ses-kanalı (LiveKit ses sistemi aktif)
+      const voiceCategory = await tx.channelCategory.create({
+        data: {
+          guildId: guild.id,
+          name: 'Ses Kanalları',
+          position: 1,
+        },
+      });
+
+      await tx.channel.create({
+        data: {
+          guildId: guild.id,
+          type: 'GUILD_VOICE',
+          name: 'ses-kanalı',
+          position: 1,
+          categoryId: voiceCategory.id,
         },
       });
 
