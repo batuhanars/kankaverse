@@ -6,6 +6,11 @@ export interface RegisterPayload {
   email: string
   password: string
   birthDate: string // ISO
+  inviteCode?: string // Sprint Kapalı-Kayıt: invite modda zorunlu, open'da görmezden gelinir
+}
+
+export interface RegistrationModeDto {
+  mode: 'open' | 'invite' | 'closed'
 }
 
 export interface LoginPayload {
@@ -14,6 +19,9 @@ export interface LoginPayload {
 }
 
 export const authApi = {
+  getRegistrationMode() {
+    return http.get<RegistrationModeDto>('/auth/registration-mode')
+  },
   register(payload: RegisterPayload) {
     return http.post<{ user: UserDto; accessToken: string }>('/auth/register', payload)
   },

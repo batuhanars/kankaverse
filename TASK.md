@@ -773,3 +773,36 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Frontend: Keşfet görünümü (ray pusula girişi, arama, etiket-filtre, renk-afişli kartlar, Katıl) · ayarlar Afiş(swatch)/Özellikler(5 etiket)/Keşfet-Göster · ikon `accept="image/*"` · i18n · `vue-tsc`+`vite build` temiz
 - [x] R7-hafif inceleme (PM): discovery süzme `isMinor ?? true` (fail-closed) + `where adultsOnly:false`; GuildJoinService tek-kaynak gate (AGE_RESTRICTED jenerik/GUILD_BANNED); discoverable opt-in default false
 - [ ] **Ertelenen:** sahip canlı test (discoverable+etiket+afiş → Keşfet görünür/filtre/katıl; minör adultsOnly görmez)
+
+---
+
+## Sprint Kapalı-Kayıt — Davet-Kodlu Platform Kaydı + Açık-Kayıt Anahtarı (PM compose 2026-06-18)
+
+> Sözleşme: `contracts/SPRINT_CLOSED_REGISTRATION_CONTRACT.md`. PLAN Track G1 (kapalı-test/yayıncı-demosu fazı).
+> **R7 ZORUNLU:** register mod-kapısı + atomik davet-claim + admin guard = auth/kayıt yüzeyi, satır-satır insan incelemesi.
+> **KAVRAM AYRIMI:** `PlatformInvite` (hesap kaydı daveti) ≠ Sprint 7A `Invite` (guild/ortam daveti) — ayrı model, `Invite`'a dokunma.
+> **T&S ORTOGONAL:** davet ≠ yaş doğrulaması; isMinor + tüm minör kısıtları aynen kalır. Dev checkbox işaretler, item EKLEMEZ.
+
+### Backend (`api/`)
+- [x] Prisma: `PlatformInvite` modeli + `User.platformInviteId`(nullable) + ilişkiler + migration (additive); **`migrate status` temiz (uygulı)**
+- [x] `generateInviteCode` (8-char, çakışmada yenile; guild üreteciyle birebir aynıysa ortak util'e çıkar — Rule of Three, değilse ayrı)
+- [x] `REGISTRATION_MODE` config (`open`/`invite`/`closed`, default `open`, geçersiz→`closed`) + `.env.example`
+- [x] `PlatformAdminGuard` (`user.isModerator` → değilse `403 FORBIDDEN` jenerik)
+- [x] **Admin:** `POST /admin/platform-invites` (maxUses/expiresInHours/note ops.) · `GET /admin/platform-invites` (durum türetilir) · `DELETE /admin/platform-invites/:id` (soft `disabledAt`)
+- [x] **Public:** `GET /auth/registration-mode` → `{ mode }` (sızıntı yok)
+- [x] **`register()` mod-kapısı [R7]:** `closed`→`REGISTRATION_CLOSED` · `invite`→kodsuz `INVITE_CODE_REQUIRED`, **atomik claim** (`updateMany` disabled/expiry/maxUses koşullu; null-maxUses dalı; affected!==1→`INVITE_CODE_INVALID` jenerik) + user-create aynı `$transaction` + `platformInviteId` set + rollback claim'i geri alır · `open`→kod yok sayılır
+- [x] `RegisterDto.inviteCode?` (`@IsOptional @Length(8,8)`); yeni hata kodları; Swagger güncel
+- [x] **D11 tekrarı YOK** — kayıt kapısı baştan atomik
+
+### Frontend (`web/`)
+- [x] `RegisterView`: mount'ta `GET /auth/registration-mode` → `open` mevcut form · `invite` davet-kodu input (zod zorunlu) · `closed` kapalı-kart; hata→Türkçe mesaj
+- [x] `RegisterPayload.inviteCode?` + `api/auth.ts` + zod `lib/validation/auth.ts`
+- [x] Admin davet paneli (yalnız `isModerator`): oluştur (maxUses/süre/not) → kod+kopyala · liste (uses/durum) · iptal (ConfirmDialog); non-admin giriş gizli; **placeholder/boş bölüm YOK**
+- [x] i18n (`register.invite.*`, `admin.platformInvite.*`, hata kodları); `--kv-*` token; `vue-tsc`(bilinen hata hariç)+`vite build` temiz
+
+### DoD (contract §8)
+- [ ] Model+migration uygulı · bayrak 3 mod (geçersiz→closed) · admin CRUD (non-admin 403) · public mode endpoint sızıntısız
+- [ ] `invite`: kodsuz→required, geçersiz→invalid (jenerik), geçerli→kayıt+uses atomik+platformInviteId · `closed`: hep kapalı · `open`: regresyon yok
+- [ ] Atomik claim eşzamanlıda maxUses aşmaz; user-create hatası claim rollback; minör kodla kaydolur ama isMinor+kısıtlar aynen
+- [x] **R7 (BACKEND):** mod-kapısı + atomik claim + admin guard incelendi (sahip imzası 2026-06-18) — PM satır-satır temiz; SAPMA (`$executeRaw` vs `updateMany`, Prisma kolon-kolon compare desteklemiyor) onaylandı, atomik TOCTOU-güvenli ruh korundu; fail-closed (geçersiz mode→closed) + jenerik INVITE_CODE_INVALID + T&S ortogonallik doğrulandı
+- [ ] Regresyon: kayıt/giriş/guild/DM bozulmadı; `nest build`+`vue-tsc`+`vite build` temiz; testler geçer
