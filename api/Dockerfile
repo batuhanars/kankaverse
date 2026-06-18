@@ -5,9 +5,9 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+# prisma şeması npm ci'den ÖNCE kopyalanmalı: postinstall = `prisma generate` şemaya ihtiyaç duyar.
 COPY prisma ./prisma
-RUN npx prisma generate
+RUN npm ci
 COPY . .
 RUN npm run build
 
