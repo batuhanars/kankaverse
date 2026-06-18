@@ -16,6 +16,7 @@ import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { useSocket } from '@/composables/useSocket'
 import { useIdlePresence } from '@/composables/useIdlePresence'
 import { useAppModals } from '@/composables/useAppModals'
+import { useNativeNotifications } from '@/composables/useNativeNotifications'
 import ServerRail from '@/components/layout/ServerRail.vue'
 import UserCard from '@/components/layout/UserCard.vue'
 import EmailVerificationBanner from '@/components/shared/EmailVerificationBanner.vue'
@@ -49,6 +50,10 @@ if (sessionStorage.getItem('kv_access_token')) connect()
 
 // Auto-boşta: hareketsizlikte 'away', etkileşimde 'online' (manuel DND/away'a saygılı)
 useIdlePresence()
+
+// Electron native bildirim katmanı: görünür-değilken yeni bildirim → OS toast.
+// Yalnız window.kankaverse?.isElectron=true iken aktif; tarayıcıda no-op.
+useNativeNotifications()
 
 function recheckGuildUnread(guildId: string) {
   guildsStore.setGuildUnreadCount(guildId, channelsStore.totalUnreadForGuild(guildId))
