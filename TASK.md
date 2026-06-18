@@ -806,3 +806,35 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] Atomik claim eşzamanlıda maxUses aşmaz; user-create hatası claim rollback; minör kodla kaydolur ama isMinor+kısıtlar aynen
 - [x] **R7 (BACKEND):** mod-kapısı + atomik claim + admin guard incelendi (sahip imzası 2026-06-18) — PM satır-satır temiz; SAPMA (`$executeRaw` vs `updateMany`, Prisma kolon-kolon compare desteklemiyor) onaylandı, atomik TOCTOU-güvenli ruh korundu; fail-closed (geçersiz mode→closed) + jenerik INVITE_CODE_INVALID + T&S ortogonallik doğrulandı
 - [ ] Regresyon: kayıt/giriş/guild/DM bozulmadı; `nest build`+`vue-tsc`+`vite build` temiz; testler geçer
+
+---
+
+## Sprint Electron — Masaüstü İstemci v1 (PM compose 2026-06-18)
+
+> Sözleşme: `contracts/SPRINT_ELECTRON_CONTRACT.md`. PLAN Track F1. **R7-NÖTR** (istemci kabuğu; auth/T&S'e dokunmaz).
+> **Mimari (sahip onaylı):** load-remote — pencere `https://kankaverse.com` yükler, bundle YOK (cookie sameSite=lax korunur).
+> Dev checkbox işaretler, item EKLEMEZ.
+
+### Yeni tier `desktop/`
+- [x] `desktop/` iskelet: package.json (electron + electron-builder), src/main.js, src/preload.js, build/ ikon
+- [x] **main:** BrowserWindow `loadURL(KANKAVERSE_URL ?? https://kankaverse.com)`; güvenlik (contextIsolation+sandbox açık, nodeIntegration kapalı, preload); min boyut/başlık/ikon; harici link → sistem tarayıcısı
+- [x] **Tray:** ikon + menü (Aç/Çıkış); kapatma(X) → tepsiye gizle (arka planda çalış); tek-instance lock (2. başlatma öne getir); isQuitting ayrımı
+- [x] **Opsiyonel:** açılışta-başlat toggle (tray, default kapalı — basit tut)
+- [x] **preload:** `window.kankaverse` dar API (isElectron / focusWindow / setBadge) — IPC köprüsü
+
+### Web (`web/`) — native bildirim katmanı (mevcut mantığı değiştirmeden)
+- [x] `notifications` store yeni olayında + `document.hidden` + `window.kankaverse?.isElectron` → `new Notification(...)` (i18n metin)
+- [x] `notification.onclick` → `window.kankaverse.focusWindow()` + ilgili görünüme yönlendir (mevcut router/hedef)
+- [x] (opsiyonel) okunmamış sayısı → `window.kankaverse?.setBadge?.(count)`
+- [x] Backend'e DOKUNMA; over-engineering yok (ses/ayar paneli yok, sadece toast); `vite build` temiz
+
+### Paketleme
+- [x] electron-builder: Windows NSIS installer (appId, productName "Kankaverse", build/icon.ico marka logodan); `npm run dist` → desktop/dist
+- [x] Mac(dmg)/Linux(AppImage) config yazılı ama build edilmedi (v1 Windows)
+
+### DoD (contract §7)
+- [x] Electron canlı siteyi güvenli pencerede yükler; tray+kapat-tepsiye+tek-instance çalışır
+- [x] Native toast: görünür-değilken yeni bildirim → OS toast (yalnız Electron); tıkla → pencere öne + görünüm
+- [ ] Auth sürer: giriş→kapat-aç→oturum açık (cookie kavanozu kalıcı, sameSite=lax)
+- [x] `npm run dist` çalışan Windows installer üretir; kurulum sonrası açılıp giriş yapılabiliyor
+- [x] i18n + web build temiz; R7-nötr (auth/T&S kodu değişmedi)

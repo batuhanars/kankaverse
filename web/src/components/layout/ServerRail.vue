@@ -17,6 +17,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import NotifLevelFlyout from '@/components/shared/NotifLevelFlyout.vue'
 import MuteDurationFlyout from '@/components/shared/MuteDurationFlyout.vue'
 import { NotificationLevel, NotifTargetType, type GuildDto } from '@/types'
+import DownloadAppModal from '@/components/shared/DownloadAppModal.vue'
 import hexagonLogo from '@/assets/brand/kankaverse-hexagon.png'
 
 defineProps<{
@@ -246,6 +247,9 @@ async function selectGuild(guild: GuildDto) {
   }
 }
 
+const isElectron = window.kankaverse?.isElectron === true
+const showDownloadModal = ref(false)
+
 function guildInitial(name: string) {
   return name
     .split(' ')
@@ -385,6 +389,35 @@ function badgeLabel(count: number): string {
           >
             <circle cx="12" cy="12" r="10" />
             <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+          </svg>
+        </span>
+      </button>
+    </div>
+
+    <!-- Masaüstü uygulamasını indir — yalnız web'te görünür (Electron'da gizli) -->
+    <div v-if="!isElectron" class="rail-item">
+      <button
+        class="guild-btn download-btn"
+        :aria-label="t('rail.downloadDesktop')"
+        @click="showDownloadModal = true"
+        @mouseenter="showTooltip($event, t('rail.downloadDesktop'))"
+        @mouseleave="hideTooltip"
+      >
+        <span class="hex hex--download">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 3v13" />
+            <path d="m7 11 5 5 5-5" />
+            <line x1="5" y1="21" x2="19" y2="21" />
           </svg>
         </span>
       </button>
@@ -550,6 +583,12 @@ function badgeLabel(count: number): string {
     :loading="leaving"
     @confirm="doLeave"
     @cancel="showLeaveConfirm = false; leaveError = ''"
+  />
+
+  <!-- Uygulamayı İndir modalı -->
+  <DownloadAppModal
+    v-if="showDownloadModal"
+    @close="showDownloadModal = false"
   />
 </template>
 
@@ -769,6 +808,26 @@ function badgeLabel(count: number): string {
 .hex--discover-active {
   background-color: var(--kv-accent-500);
   color: #ffffff;
+}
+
+/* İndir butonu — keşfet ile aynı stil/boyut/hover deseni */
+.hex--download {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  background-color: var(--kv-bg-elevated);
+  color: var(--kv-text-secondary);
+  transition: background-color 0.15s, color 0.15s, border-radius 0.15s;
+}
+
+.download-btn:hover .hex--download {
+  background-color: var(--kv-accent-500);
+  color: #ffffff;
+  border-radius: 30%;
 }
 
 .divider {

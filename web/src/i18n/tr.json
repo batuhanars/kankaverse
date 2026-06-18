@@ -1136,7 +1136,8 @@
     "now": "az önce",
     "minutesAgo": "{n} dk önce",
     "hoursAgo": "{n} sa önce",
-    "daysAgo": "{n} gün önce"
+    "daysAgo": "{n} gün önce",
+    "nativeTitle": "Kankaverse"
   },
   "mention": {
     "unknown": "bilinmeyen",
@@ -1147,6 +1148,19 @@
   },
   "server": {
     "addOrtam": "Ortam Ekle"
+  },
+  "rail": {
+    "downloadDesktop": "Uygulamayı İndir"
+  },
+  "download": {
+    "modalTitle": "Uygulamayı İndir",
+    "modalSubtitle": "Kankaverse'i masaüstünde kullan",
+    "windows": "Windows",
+    "linux": "Linux",
+    "macos": "macOS",
+    "downloadBtn": "İndir",
+    "comingSoon": "Yakında",
+    "footerNote": "macOS uygulaması yakında — şimdilik tarayıcıdan tam erişebilirsiniz."
   },
   "discover": {
     "railTooltip": "Keşfet",

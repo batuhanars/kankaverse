@@ -9,7 +9,14 @@
 }
 
 kankaverse.com, www.kankaverse.com {
-	reverse_proxy web:80
+	# Masaüstü installer indirme: /indir/* → VPS'teki downloads klasörü (statik dosya)
+	handle_path /indir/* {
+		root * /srv/downloads
+		file_server
+	}
+	handle {
+		reverse_proxy web:80
+	}
 }
 
 api.kankaverse.com {

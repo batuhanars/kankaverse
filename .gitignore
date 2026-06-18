@@ -9,6 +9,13 @@ build/
 coverage/
 .nyc_output/
 
+# Masaüstü installer (VPS'te Caddy serve eder; repo'ya/dist'e girmez — büyük binary)
+downloads/
+
+# Electron marka ikonu build/ kuralının istisnası (commit edilmeli)
+!desktop/build/
+!desktop/build/**
+
 # Ortam değişkenleri / sırlar
 .env
 .env.*
