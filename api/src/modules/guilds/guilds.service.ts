@@ -181,6 +181,9 @@ export class GuildsService {
       return guild;
     });
 
+    // Oluşturanın diğer oturumlarına (masaüstü + tarayıcı) yeni ortamı anlık ekle → rail güncellenir.
+    this.realtime.emitToUser(userId, 'guild.joined', { guildId: result.id });
+
     return toGuildDto(result);
   }
 

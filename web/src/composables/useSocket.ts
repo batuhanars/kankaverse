@@ -243,6 +243,11 @@ export function useSocket() {
     socket.on('guild.member_joined', (data: { guildId: string; member: GuildMemberDto }) => {
       membersStore.addMember(data.guildId, data.member)
     })
+    // Ben yeni bir ortama katıldığımda/oluşturduğumda (başka oturum dahil) rail anlık güncellensin.
+    // Simetri: ayrılma/kick zaten guild.member_left ile düşürülüyor (removeGuildLocal).
+    socket.on('guild.joined', () => {
+      guildsStore.fetchGuilds()
+    })
     socket.on('guild.member_left', (data: { guildId: string; userId: string }) => {
       membersStore.removeMember(data.guildId, data.userId)
       // Atılan bensem ortamı listeden düşür (rail anlık güncellenir)
