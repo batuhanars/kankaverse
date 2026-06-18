@@ -34,7 +34,23 @@ export const registerSchema = z.object({
     .string({ error: 'auth.validation.birthDateRequired' })
     .min(1, 'auth.validation.birthDateRequired')
     .refine((val) => !isNaN(new Date(val).getTime()), 'auth.validation.birthDateInvalid'),
+  // Sprint Kapalı-Kayıt: invite modda 8-char zorunlu, open/diğer modlarda opsiyonel.
+  // Zorunluluk RegisterView'da mode bilgisine göre dinamik Zod şemasıyla kontrol edilir.
+  inviteCode: z.string().optional(),
 })
+
+// invite modunda inviteCode zorunlu (8 karakter), diğer modlarda opsiyonel
+export function makeRegisterSchema(mode: 'open' | 'invite' | 'closed') {
+  if (mode === 'invite') {
+    return registerSchema.extend({
+      inviteCode: z
+        .string({ error: 'register.invite.validation.required' })
+        .min(1, 'register.invite.validation.required')
+        .length(8, 'register.invite.validation.length'),
+    })
+  }
+  return registerSchema
+}
 
 // Sprint 2A — şifre sıfırlama şemaları
 export const forgotPasswordSchema = z.object({

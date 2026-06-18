@@ -34,6 +34,9 @@
     "errors": {
       "USERNAME_TAKEN": "Bu kullanıcı adı zaten kullanılıyor.",
       "EMAIL_TAKEN": "Bu e-posta adresi zaten kayıtlı.",
+      "REGISTRATION_CLOSED": "Yeni kayıtlar şu anda kapalı.",
+      "INVITE_CODE_REQUIRED": "Geçerli bir davet kodu gerekli.",
+      "INVITE_CODE_INVALID": "Davet kodu geçersiz veya süresi dolmuş.",
       "INVALID_CREDENTIALS": "E-posta veya şifre hatalı.",
       "VALIDATION_FAILED": "Lütfen tüm alanları doğru doldurun.",
       "EMAIL_NOT_VERIFIED": "Ortam oluşturmak için e-postanı doğrulamalısın.",
@@ -128,6 +131,49 @@
     "totpCodePlaceholder": "6 haneli kod",
     "confirm": "Devam Et"
   },
+  "register": {
+    "invite": {
+      "codeLabel": "DAVET KODU",
+      "codePlaceholder": "8 haneli kod (ör: AB3XY7KZ)",
+      "closedTitle": "Kayıtlar Kapalı",
+      "closedDesc": "Yeni kayıtlar şu anda kapalı. Erişim için bir davet kodu edinin.",
+      "validation": {
+        "required": "Davet kodu zorunludur.",
+        "length": "Davet kodu 8 karakter olmalıdır."
+      }
+    }
+  },
+  "admin": {
+    "platformInvite": {
+      "createTitle": "Davet Oluştur",
+      "maxUsesLabel": "MAKSİMUM KULLANIM",
+      "maxUsesPlaceholder": "∞ (sınırsız)",
+      "expiresHoursLabel": "SÜRE (SAAT)",
+      "expiresHoursPlaceholder": "∞ (süresiz)",
+      "noteLabel": "NOT (opsiyonel)",
+      "notePlaceholder": "Bu daveti kime / niçin verdiğini not düş",
+      "createButton": "Davet Oluştur",
+      "createError": "Davet oluşturulamadı.",
+      "newCodeLabel": "YENİ DAVET KODU",
+      "copy": "Kopyala",
+      "copied": "Kopyalandı!",
+      "listTitle": "Tüm Davetler",
+      "empty": "Henüz platform daveti yok.",
+      "loadError": "Davetler yüklenemedi.",
+      "usesCount": "{uses} / {max} kullanım",
+      "revoke": "İptal Et",
+      "revokeConfirmTitle": "Daveti İptal Et",
+      "revokeConfirmMessage": "{code} kodlu daveti iptal etmek istediğinden emin misin?",
+      "revokeSuccess": "Davet iptal edildi.",
+      "revokeError": "Davet iptal edilemedi.",
+      "status": {
+        "active": "Aktif",
+        "revoked": "İptal",
+        "expired": "Süresi Geçmiş",
+        "full": "Dolmuş"
+      }
+    }
+  },
   "settings": {
     "title": "Ayarlar",
     "security": "Güvenlik",
@@ -135,6 +181,7 @@
     "tabProfile": "Profil",
     "tabVoice": "Ses",
     "tabPrivacy": "Gizlilik",
+    "tabAdmin": "Admin",
     "voice": {
       "inputDevice": "Giriş Cihazı (Mikrofon)",
       "outputDevice": "Çıkış Cihazı (Hoparlör)",

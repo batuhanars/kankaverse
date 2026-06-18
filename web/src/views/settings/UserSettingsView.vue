@@ -21,6 +21,7 @@ import ChangeEmailSection from './components/ChangeEmailSection.vue'
 import ChangeUsernameSection from './components/ChangeUsernameSection.vue'
 import DeleteAccountSection from './components/DeleteAccountSection.vue'
 import VoiceDevicesSection from './components/VoiceDevicesSection.vue'
+import PlatformInviteSection from './components/PlatformInviteSection.vue'
 
 const props = defineProps<{ initialSection?: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -29,19 +30,27 @@ const { t } = useI18n()
 const authStore = useAuthStore()
 const toast = useToastStore()
 
-type NavSection = 'hesap' | 'profil' | 'ses' | 'gizlilik'
-const VALID_SECTIONS: NavSection[] = ['profil', 'hesap', 'ses', 'gizlilik']
+type NavSection = 'hesap' | 'profil' | 'ses' | 'gizlilik' | 'admin'
+const VALID_SECTIONS: NavSection[] = ['profil', 'hesap', 'ses', 'gizlilik', 'admin']
 const activeSection = ref<NavSection>(
   VALID_SECTIONS.includes(props.initialSection as NavSection) ? (props.initialSection as NavSection) : 'profil',
 )
 
 // Profil en üstte — profil görünümü düzenlemeleri buradan başlar (sahip tercihi).
-const navItems: { key: NavSection; labelKey: string }[] = [
+const baseNavItems: { key: NavSection; labelKey: string }[] = [
   { key: 'profil', labelKey: 'settings.tabProfile' },
   { key: 'hesap', labelKey: 'settings.tabAccount' },
   { key: 'ses', labelKey: 'settings.tabVoice' },
   { key: 'gizlilik', labelKey: 'settings.tabPrivacy' },
 ]
+
+// Admin sekmesi: yalnız isModerator kullanıcıya göster
+const navItems = computed(() => {
+  if (authStore.user?.isModerator) {
+    return [...baseNavItems, { key: 'admin' as NavSection, labelKey: 'settings.tabAdmin' }]
+  }
+  return baseNavItems
+})
 
 // ── Hesap düzenleme modalları (Discord-tarzı: satır + "Düzenle" → modal) ──
 type EditModal = null | 'username' | 'password' | 'email' | '2fa' | 'sessions' | 'delete'
@@ -457,6 +466,11 @@ async function selectPolicy(p: DmPolicy) {
                     {{ t('settings.dmPolicy.saved') }}
                   </p>
                 </section>
+              </div>
+
+              <!-- ── Admin — Platform Davetleri ── (yalnız isModerator) -->
+              <div v-else-if="activeSection === 'admin' && authStore.user?.isModerator">
+                <PlatformInviteSection />
               </div>
 
             </div>
