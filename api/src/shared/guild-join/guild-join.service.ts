@@ -84,6 +84,9 @@ export class GuildJoinService {
 
     // REV-14 realtime: mevcut üyelere yeni katılanı anlık bildir. Transaction SONRASI.
     await this.notifyMemberJoined(guild.id, userId);
+
+    // Çağıranın diğer oturumlarına (masaüstü + tarayıcı) yeni ortamı anlık ekle → rail güncellenir.
+    this.realtime.emitToUser(userId, 'guild.joined', { guildId: guild.id });
   }
 
   /** Yeni üyeye guild'in varsayılan rolünü (Role.isDefault) bağla. Yoksa no-op. */
