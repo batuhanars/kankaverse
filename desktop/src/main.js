@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage } = require('electron')
+const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, session, desktopCapturer } = require('electron')
 const path = require('path')
 
 // Uygulama URL'si: geliştirmede KANKAVERSE_URL env değişkeni ile override edilebilir.
@@ -31,6 +31,26 @@ if (!gotLock) {
 
     createWindow()
     createTray()
+
+    // Ekran paylaşımı (getDisplayMedia) — Electron'da tarayıcıdaki gibi otomatik DEĞİL;
+    // main process'te kaynağı handler ile vermek gerekir. macOS 15+ sistem seçicisini kullanır
+    // (useSystemPicker); Windows/Linux'ta birincil ekran otomatik seçilir (picker v2'ye).
+    session.defaultSession.setDisplayMediaRequestHandler(
+      (request, callback) => {
+        desktopCapturer
+          .getSources({ types: ['screen', 'window'] })
+          .then((sources) => {
+            const primary = sources.find((s) => s.id.startsWith('screen:')) ?? sources[0]
+            if (primary) {
+              callback({ video: primary, audio: 'loopback' }) // ekran + sistem sesi (Windows)
+            } else {
+              callback({}) // kaynak yok → iptal
+            }
+          })
+          .catch(() => callback({}))
+      },
+      { useSystemPicker: true },
+    )
 
     // macOS: Dock'tan uygulamaya tıklanınca (pencere yoksa veya gizliyse) göster
     app.on('activate', () => {
