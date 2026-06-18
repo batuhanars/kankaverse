@@ -1,0 +1,17 @@
+# Kankaverse — Caddy edge (otomatik HTTPS / Let's Encrypt)
+# web → kankaverse.com · api → api.kankaverse.com  (aynı kök domain → cookie sameSite=lax çalışır)
+# Caddy, Socket.IO WebSocket upgrade'ini otomatik proxy'ler — ekstra config gerekmez.
+# ÖN KOŞUL: DNS A kayıtları VPS IP'sine işaret etmeli + 80/443 açık olmalı (ACME challenge).
+
+{
+	# Let's Encrypt bildirim e-postası — kendi e-postanla değiştir.
+	email batuhan.ars@yahoo.com
+}
+
+kankaverse.com, www.kankaverse.com {
+	reverse_proxy web:80
+}
+
+api.kankaverse.com {
+	reverse_proxy api:3000
+}
