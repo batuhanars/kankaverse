@@ -54,6 +54,7 @@ function createWindow() {
     minHeight: 600,
     title: 'Kankaverse',
     icon: appIcon,
+    autoHideMenuBar: true, // menü çubuğu hiç görünmesin (Menu.setApplicationMenu(null) ile birlikte)
     backgroundColor: '#1a1916', // --kv-bg-rail (koyu başlangıç; beyaz flash yok)
     webPreferences: {
       contextIsolation: true,
