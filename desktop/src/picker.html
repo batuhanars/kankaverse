@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:;" />
+  <title>Ekran Paylaş</title>
+  <style>
+    /* ── Reset & temel ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-base:    #1a1916;
+      --bg-card:    #232220;
+      --bg-card-hover: #2c2b28;
+      --bg-bar:     #1e1d1b;
+      --border:     #3a3834;
+      --accent:     #FF6B3D;
+      --accent-dim: rgba(255, 107, 61, 0.18);
+      --text-pri:   #f0ede8;
+      --text-sec:   #9e9a94;
+      --text-dis:   #5a5750;
+      --radius-card: 8px;
+      --radius-btn:  6px;
+    }
+
+    body {
+      background: var(--bg-base);
+      color: var(--text-pri);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ── Başlık ── */
+    header {
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-pri);
+    }
+    header p {
+      font-size: 12px;
+      color: var(--text-sec);
+      margin-top: 2px;
+    }
+
+    /* ── Kaydırılabilir içerik ── */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 20px;
+    }
+    .content::-webkit-scrollbar { width: 6px; }
+    .content::-webkit-scrollbar-track { background: transparent; }
+    .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── Grup başlığı ── */
+    .group-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-sec);
+      margin-bottom: 8px;
+    }
+    .group + .group { margin-top: 16px; }
+
+    /* ── Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 8px;
+    }
+
+    /* ── Kaynak kartı ── */
+    .card {
+      background: var(--bg-card);
+      border: 2px solid transparent;
+      border-radius: var(--radius-card);
+      cursor: pointer;
+      overflow: hidden;
+      transition: border-color 0.12s, background 0.12s;
+      display: flex;
+      flex-direction: column;
+    }
+    .card:hover { background: var(--bg-card-hover); }
+    .card.selected {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .thumb-wrap {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .thumb-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .thumb-wrap .no-thumb {
+      color: var(--text-dis);
+      font-size: 28px;
+    }
+
+    .card-name {
+      padding: 6px 8px;
+      font-size: 12px;
+      color: var(--text-pri);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Boş durum ── */
+    .empty {
+      color: var(--text-dis);
+      font-size: 12px;
+      padding: 8px 0;
+    }
+
+    /* ── Yükleniyor ── */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-sec);
+      font-size: 13px;
+    }
+
+    /* ── Alt bar ── */
+    .bottom-bar {
+      border-top: 1px solid var(--border);
+      background: var(--bg-bar);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    /* Ses checkbox */
+    .audio-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: var(--text-sec);
+      font-size: 12px;
+      margin-right: auto;
+    }
+    .audio-toggle input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+    }
+
+    /* Butonlar */
+    .btn {
+      padding: 7px 18px;
+      border-radius: var(--radius-btn);
+      border: none;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.12s, background 0.12s;
+    }
+    .btn:disabled { opacity: 0.38; cursor: not-allowed; }
+
+    .btn-cancel {
+      background: transparent;
+      color: var(--text-sec);
+      border: 1px solid var(--border);
+    }
+    .btn-cancel:hover:not(:disabled) { background: var(--bg-card); }
+
+    .btn-share {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-share:hover:not(:disabled) { opacity: 0.88; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Ekran Paylaş</h1>
+    <p>Paylaşmak istediğin ekranı veya pencereyi seç.</p>
+  </header>
+
+  <div class="content" id="content">
+    <div class="loading" id="loading">Kaynaklar yükleniyor…</div>
+  </div>
+
+  <div class="bottom-bar">
+    <label class="audio-toggle">
+      <input type="checkbox" id="audioCheck" checked />
+      Sistem sesini paylaş
+    </label>
+    <button class="btn btn-cancel" id="btnCancel">İptal</button>
+    <button class="btn btn-share" id="btnShare" disabled>Paylaş</button>
+  </div>
+
+  <script src="picker.js"></script>
+</body>
+</html>

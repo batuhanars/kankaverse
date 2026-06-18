@@ -1,6 +1,9 @@
 const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, session, desktopCapturer } = require('electron')
 const path = require('path')
 
+// Şu an açık olan picker penceresi (eşzamanlı isteği engeller)
+let pickerWin = null
+
 // Uygulama URL'si: geliştirmede KANKAVERSE_URL env değişkeni ile override edilebilir.
 const APP_URL = process.env.KANKAVERSE_URL ?? 'https://kankaverse.com'
 
@@ -32,25 +35,90 @@ if (!gotLock) {
     createWindow()
     createTray()
 
-    // Ekran paylaşımı (getDisplayMedia) — Electron'da tarayıcıdaki gibi otomatik DEĞİL;
-    // main process'te kaynağı handler ile vermek gerekir. macOS 15+ sistem seçicisini kullanır
-    // (useSystemPicker); Windows/Linux'ta birincil ekran otomatik seçilir (picker v2'ye).
-    session.defaultSession.setDisplayMediaRequestHandler(
-      (request, callback) => {
-        desktopCapturer
-          .getSources({ types: ['screen', 'window'] })
-          .then((sources) => {
-            const primary = sources.find((s) => s.id.startsWith('screen:')) ?? sources[0]
-            if (primary) {
-              callback({ video: primary, audio: 'loopback' }) // ekran + sistem sesi (Windows)
-            } else {
-              callback({}) // kaynak yok → iptal
+    // Ekran paylaşımı (getDisplayMedia) — kullanıcı picker penceresiyle kaynak seçer.
+    session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+      // Eşzamanlı istek: önceki picker açıksa kapat, yeni isteği işle.
+      if (pickerWin && !pickerWin.isDestroyed()) {
+        pickerWin.destroy()
+        pickerWin = null
+      }
+
+      desktopCapturer
+        .getSources({ types: ['screen', 'window'], thumbnailSize: { width: 320, height: 180 } })
+        .then((sources) => {
+          // Picker BrowserWindow
+          const iconPath = path.join(__dirname, '..', 'build', 'icon.png')
+          pickerWin = new BrowserWindow({
+            width: 760,
+            height: 560,
+            minWidth: 600,
+            minHeight: 440,
+            title: 'Ekran Paylaş',
+            icon: nativeImage.createFromPath(iconPath),
+            parent: win ?? undefined,
+            modal: false,
+            resizable: true,
+            autoHideMenuBar: true,
+            backgroundColor: '#1a1916',
+            webPreferences: {
+              contextIsolation: true,
+              nodeIntegration: false,
+              sandbox: true,
+              preload: path.join(__dirname, 'picker-preload.js'),
+            },
+          })
+
+          pickerWin.loadFile(path.join(__dirname, 'picker.html'))
+
+          // Pencere hazır olduğunda kaynak listesini gönder
+          pickerWin.webContents.once('did-finish-load', () => {
+            if (pickerWin && !pickerWin.isDestroyed()) {
+              const payload = sources.map((s) => ({
+                id: s.id,
+                name: s.name,
+                thumbnail: s.thumbnail?.toDataURL() ?? null,
+              }))
+              pickerWin.webContents.send('picker:sources', payload)
             }
           })
-          .catch(() => callback({}))
-      },
-      { useSystemPicker: true },
-    )
+
+          // Callback yalnız bir kez çağrılır (select, cancel veya pencere kapanma)
+          let resolved = false
+          const resolve = (result) => {
+            if (resolved) return
+            resolved = true
+            ipcMain.removeAllListeners('picker:select')
+            ipcMain.removeAllListeners('picker:cancel')
+            if (pickerWin && !pickerWin.isDestroyed()) {
+              pickerWin.destroy()
+            }
+            pickerWin = null
+            callback(result)
+          }
+
+          // Kullanıcı bir kaynak seçti
+          ipcMain.once('picker:select', (_event, { id, withAudio }) => {
+            const chosen = sources.find((s) => s.id === id)
+            resolve({
+              video: chosen ?? sources[0],
+              audio: withAudio ? 'loopback' : undefined,
+            })
+          })
+
+          // Kullanıcı iptal etti (buton)
+          ipcMain.once('picker:cancel', () => resolve({}))
+
+          // Pencere dışarıdan (X tuşu) kapatıldıysa iptal say
+          pickerWin.once('closed', () => {
+            pickerWin = null
+            resolve({})
+          })
+        })
+        .catch((err) => {
+          console.error('[ekran-paylaşım] desktopCapturer HATASI:', err)
+          callback({})
+        })
+    })
 
     // macOS: Dock'tan uygulamaya tıklanınca (pencere yoksa veya gizliyse) göster
     app.on('activate', () => {
@@ -85,6 +153,9 @@ function createWindow() {
   })
 
   win.loadURL(APP_URL)
+
+  // Dev'de (npm start) DevTools otomatik açılır — paketli üründe (installer) açılmaz.
+  if (!app.isPackaged) win.webContents.openDevTools({ mode: 'detach' })
 
   // Harici linkleri (rel="external", target="_blank" vb.) sistem tarayıcısında aç.
   // Uygulama içinde rastgele site açılmasını engeller.
