@@ -108,5 +108,21 @@ export default () => {
     // Prod fail-fast YOK: default false güvenli taraf. Açma önkoşulları §0.1'de.
     cameraEnabled: process.env.CAMERA_ENABLED === 'true',
     screenEnabled: process.env.SCREEN_ENABLED === 'true',
+    // Kayıt modu — kapalı-test fazı (Sprint Closed-Registration)
+    // 'open' (default): kayıt açık, davet kodu yok sayılır.
+    // 'invite': yalnız geçerli davet koduyla kayıt.
+    // 'closed': kayıt tamamen kapalı.
+    // Geçersiz değer → fail-closed ('closed'): kayıt açık-kalmasındansa kapalı kalsın (T&S prensibi).
+    registrationMode: (() => {
+      const raw = process.env.REGISTRATION_MODE ?? 'open';
+      if (raw === 'open' || raw === 'invite' || raw === 'closed') {
+        return raw as 'open' | 'invite' | 'closed';
+      }
+      // Bilinmeyen değer → fail-closed + uyarı
+      console.warn(
+        `[config] REGISTRATION_MODE geçersiz değer: '${raw}'. Güvenli taraf için 'closed' kullanılıyor.`,
+      );
+      return 'closed' as const;
+    })(),
   };
 };

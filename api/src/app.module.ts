@@ -23,6 +23,7 @@ import { RolesModule } from './modules/roles/roles.module';
 import { EventsModule } from './modules/events/events.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
+import { PlatformInvitesModule } from './modules/platform-invites/platform-invites.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -50,6 +51,7 @@ import configuration from './config/configuration';
     EventsModule,
     NotificationsModule,
     DiscoveryModule,
+    PlatformInvitesModule,
   ],
   providers: [
     {

@@ -86,6 +86,27 @@ export class AuthService implements OnModuleInit {
     const email = dto.email.toLowerCase().trim();
     const birthDate = validateBirthDate(dto.birthDate);
 
+    // ── [R7] Kayıt modu kapısı — kullanıcı yaratmadan ÖNCE ───────────────────
+    // Sıra: closed → invite-claim → open (fail-closed)
+    const registrationMode = this.config.get<'open' | 'invite' | 'closed'>('registrationMode') ?? 'open';
+
+    if (registrationMode === 'closed') {
+      throw new ForbiddenException({
+        message: 'Yeni kayıt şu anda kapalı.',
+        error: 'REGISTRATION_CLOSED',
+      });
+    }
+
+    // invite modunda geçerli davet kodu gerekli; open modunda yok sayılır
+    if (registrationMode === 'invite' && !dto.inviteCode) {
+      throw new BadRequestException({
+        message: 'Davet kodu gerekli.',
+        error: 'INVITE_CODE_REQUIRED',
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     const [existingUsername, existingEmail] = await Promise.all([
       this.prisma.user.findUnique({ where: { username: dto.username } }),
       this.prisma.user.findUnique({ where: { email } }),
@@ -100,25 +121,116 @@ export class AuthService implements OnModuleInit {
 
     const passwordHash = await argon2.hash(dto.password, ARGON2_OPTIONS);
     const isMinor = calculateIsMinor(birthDate);
+    const friendCode = generateFriendCode();
 
-    const user = await this.prisma.user.create({
-      data: {
-        username: dto.username,
-        email,
-        passwordHash,
-        birthDate,
-        isMinor,
-        friendCode: generateFriendCode(),
-        dmPolicy: isMinor ? 'NONE' : 'FRIENDS',
-        mediaPolicy: isMinor ? 'NONE' : 'FRIENDS',
-        profileDiscoverable: !isMinor,
-      },
-    });
+    // ── [R7] User create — invite modunda atomik claim, open modunda standart ─
+    let user: Awaited<ReturnType<typeof this.prisma.user.create>>;
+
+    if (registrationMode === 'invite') {
+      const code = dto.inviteCode!;
+
+      // Davet kaydını önceden bul (id için); kod yoksa erken geçersiz-kodu at
+      const invite = await this.prisma.platformInvite.findUnique({
+        where: { code },
+        select: { id: true },
+      });
+      if (!invite) {
+        throw new BadRequestException({
+          message: 'Davet kodu geçersiz veya süresi dolmuş.',
+          error: 'INVITE_CODE_INVALID',
+        });
+      }
+
+      // Atomik claim + user-create (TOCTOU-güvenli, D11 tekrarı yok)
+      user = await this.registerWithInviteClaim(
+        { dto, email, birthDate, passwordHash, isMinor, friendCode },
+        invite.id,
+      );
+    } else {
+      // open modu — standart user create (davet kodu yok sayılır)
+      user = await this.prisma.user.create({
+        data: {
+          username: dto.username,
+          email,
+          passwordHash,
+          birthDate,
+          isMinor,
+          friendCode,
+          dmPolicy: isMinor ? 'NONE' : 'FRIENDS',
+          mediaPolicy: isMinor ? 'NONE' : 'FRIENDS',
+          profileDiscoverable: !isMinor,
+        },
+      });
+    }
 
     this.sendVerificationEmailSilent(user.id, user.email);
 
     const { accessToken, refreshToken } = await this.createSession(user.id, ip, undefined, user.email);
     return { user: toUserDto(user), accessToken, refreshToken };
+  }
+
+  /**
+   * [R7] Atomik davet-claim + user-create.
+   *
+   * $executeRawUnsafe yerine $executeRaw ile parametreli sorgu kullanılır (SQL-injection güvenli).
+   * Prisma'nın column-column compare desteği olmaması nedeniyle raw UPDATE tercih edildi:
+   *   UPDATE "PlatformInvite" SET uses = uses + 1
+   *   WHERE id = $1 AND "disabledAt" IS NULL
+   *     AND ("expiresAt" IS NULL OR "expiresAt" > now())
+   *     AND ("maxUses" IS NULL OR uses < "maxUses")
+   * Affected count !== 1 → INVITE_CODE_INVALID (jenerik).
+   * User create hatası (dup) → Prisma transaction rollback → uses artışı geri alınır.
+   */
+  private async registerWithInviteClaim(
+    params: {
+      dto: RegisterDto;
+      email: string;
+      birthDate: Date;
+      passwordHash: string;
+      isMinor: boolean;
+      friendCode: string;
+    },
+    inviteId: string,
+  ) {
+    const { dto, email, birthDate, passwordHash, isMinor, friendCode } = params;
+
+    return this.prisma.$transaction(async (tx) => {
+      // Atomik koşullu artım — uses < maxUses column-column compare için raw SQL
+      const affected = await tx.$executeRaw`
+        UPDATE "PlatformInvite"
+        SET uses = uses + 1
+        WHERE id = ${inviteId}
+          AND "disabledAt" IS NULL
+          AND ("expiresAt" IS NULL OR "expiresAt" > NOW())
+          AND ("maxUses" IS NULL OR uses < "maxUses")
+      `;
+
+      if (affected !== 1) {
+        // geçersiz / dolmuş / iptal / süre-geçmiş — jenerik (hangisi olduğunu sızdırma)
+        throw new BadRequestException({
+          message: 'Davet kodu geçersiz veya süresi dolmuş.',
+          error: 'INVITE_CODE_INVALID',
+        });
+      }
+
+      // Aynı transaction'da user create + platformInviteId set
+      const newUser = await tx.user.create({
+        data: {
+          username: dto.username,
+          email,
+          passwordHash,
+          birthDate,
+          isMinor,
+          friendCode,
+          platformInviteId: inviteId,
+          dmPolicy: isMinor ? 'NONE' : 'FRIENDS',
+          mediaPolicy: isMinor ? 'NONE' : 'FRIENDS',
+          profileDiscoverable: !isMinor,
+        },
+      });
+
+      return newUser;
+    });
   }
 
   async login(dto: LoginDto, ip?: string): Promise<LoginResult> {
