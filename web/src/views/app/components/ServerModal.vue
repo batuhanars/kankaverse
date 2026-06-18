@@ -22,7 +22,9 @@ const channelsStore = useChannelsStore()
 // yoksa yalnız aktif yap (rail'de görünür, kanal yok). REV: katılınca otomatik gir.
 async function enterGuild(guildId: string) {
   guildsStore.setActiveGuild(guildId)
-  await channelsStore.fetchChannels(guildId)
+  // Kanal + kategorileri birlikte çek; yalnız fetchChannels kategorisiz bırakıp
+  // yeni ortamda kanalların render olmamasına yol açıyordu (kanal kategoriye bağlı).
+  await channelsStore.fetchChannelsAndCategories(guildId)
   const channels = channelsStore.channelsForGuild(guildId)
   if (channels.length) {
     await router.push({ name: 'channel', params: { guildId, channelId: channels[0].id } })
