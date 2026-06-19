@@ -9,8 +9,18 @@ type ServerModalStep = 'choose' | 'create' | 'join'
 const showServerModal = ref(false)
 const serverModalStep = ref<ServerModalStep>('choose')
 const showAddFriendModal = ref(false)
+// Birleşik kullanıcı ayarları modalı — UserCard + UserCardPopover (kendi profili) açar.
+const showUserSettings = ref(false)
+const userSettingsSection = ref<string | undefined>(undefined)
 
 export function useAppModals() {
+  function openUserSettings(section?: string) {
+    userSettingsSection.value = section
+    showUserSettings.value = true
+  }
+  function closeUserSettings() {
+    showUserSettings.value = false
+  }
   function openServerModal(step: ServerModalStep) {
     serverModalStep.value = step
     showServerModal.value = true
@@ -28,9 +38,13 @@ export function useAppModals() {
     showServerModal,
     serverModalStep,
     showAddFriendModal,
+    showUserSettings,
+    userSettingsSection,
     openServerModal,
     closeServerModal,
     openAddFriend,
     closeAddFriend,
+    openUserSettings,
+    closeUserSettings,
   }
 }

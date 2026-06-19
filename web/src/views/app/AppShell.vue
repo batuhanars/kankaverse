@@ -33,16 +33,11 @@ const dmStore = useDmStore()
 const friendsStore = useFriendsStore()
 const notificationPrefsStore = useNotificationPrefsStore()
 const { connect, disconnect } = useSocket()
-const { showServerModal, serverModalStep, showAddFriendModal, openServerModal, closeServerModal, closeAddFriend } =
-  useAppModals()
-
-// Birleşik kullanıcı ayarları modalı (UserCard popover → ayarlar girişi açar)
-const showUserSettings = ref(false)
-const userSettingsSection = ref<string | undefined>(undefined)
-function openUserSettings(section?: string) {
-  userSettingsSection.value = section
-  showUserSettings.value = true
-}
+const {
+  showServerModal, serverModalStep, showAddFriendModal, openServerModal, closeServerModal, closeAddFriend,
+  // Birleşik kullanıcı ayarları modalı (UserCard + UserCardPopover "kendi profili" açar)
+  showUserSettings, userSettingsSection, openUserSettings,
+} = useAppModals()
 
 // Socket'i setup'ta bağla (child view'lar mount olup joinChannel çağırmadan ÖNCE soket var olsun).
 // Child mounted, parent mounted'tan önce koşar; bu yüzden connect()'i onMounted'a bırakamayız.

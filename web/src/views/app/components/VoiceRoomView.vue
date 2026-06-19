@@ -262,8 +262,7 @@ function errMessage(e: unknown, fallbackKey: string): string {
             :ref="(el) => attachVideo(el as Element, tile.entry)"
             autoplay
             playsinline
-            class="w-full h-full"
-            :class="tile.entry.trackKind === 'screen' ? 'object-contain' : 'object-cover'"
+            class="w-full h-full object-cover"
             :aria-label="tile.entry.trackKind === 'screen' ? t('voice.screenShareActive') : t('voice.cameraActive')"
           />
           <!-- Avatar (video yok) -->
@@ -280,12 +279,12 @@ function errMessage(e: unknown, fallbackKey: string): string {
           <!-- Tam-ekran (yalnız video tile): sağ-alt, belirgin boyut, yarı-opak (hover'da tam) -->
           <button
             v-if="tile.kind === 'video'"
-            class="absolute bottom-2 right-2 flex items-center justify-center rounded-[var(--kv-radius-md)] cursor-pointer opacity-80 group-hover:opacity-100 transition-opacity"
-            style="width: 36px; height: 36px; background-color: rgba(0,0,0,0.6); color: #fff;"
+            class="absolute bottom-2 right-2 flex items-center justify-center rounded-full cursor-pointer transition-opacity hover:opacity-90"
+            style="width: 40px; height: 40px; background-color: rgba(0,0,0,0.65); color: #fff;"
             :title="t('voice.enterFullscreen')"
             @click.stop="toggleTileFullscreen"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
               <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
             </svg>
@@ -431,3 +430,11 @@ function errMessage(e: unknown, fallbackKey: string): string {
     @cancel="disconnectTarget = null"
   />
 </template>
+
+<style scoped>
+/* Kart ızgarasında video kartı doldurur (object-cover); tam-ekranda her şeyi göster (contain). */
+.kv-video-tile:fullscreen video {
+  object-fit: contain;
+  background-color: #000;
+}
+</style>

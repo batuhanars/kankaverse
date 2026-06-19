@@ -3,6 +3,7 @@ import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useAppModals } from '@/composables/useAppModals'
 import { usersApi } from '@/api/users'
 import { friendsApi } from '@/api/friends'
 import ReportModal from './ReportModal.vue'
@@ -19,6 +20,13 @@ const emit = defineEmits<{ close: [] }>()
 const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
+const { openUserSettings } = useAppModals()
+
+// Kendi kartında "Profilime git" → profil ayarları modalını aç
+function goToMyProfile() {
+  openUserSettings('profil')
+  emit('close')
+}
 const popoverEl = ref<HTMLElement | null>(null)
 const card = ref<UserProfileCardDto | null>(null)
 const loading = ref(true)
@@ -155,9 +163,19 @@ async function addFriend() {
           </p>
           <div v-else class="mb-3"></div>
 
-          <!-- +Kanka butonu: sadece none'da — T&S: minöre göre gizlenmez, karar sunucuda -->
+          <!-- Kendi kartım: profil ayarlarına git (başkasının profiline bakar gibi açılır, altta buton) -->
           <button
-            v-if="card.friendStatus === 'none'"
+            v-if="isSelf"
+            class="w-full py-1.5 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity hover:opacity-90 cursor-pointer"
+            style="background-color: var(--kv-accent-500); color: #fff;"
+            @click="goToMyProfile"
+          >
+            {{ t('userCard.goToMyProfile') }}
+          </button>
+
+          <!-- +Kanka butonu: sadece none'da + kendi kartım değilse — T&S: minöre göre gizlenmez, karar sunucuda -->
+          <button
+            v-if="card.friendStatus === 'none' && !isSelf"
             class="w-full py-1.5 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity"
             :class="added || adding ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-90 cursor-pointer'"
             style="background-color:var(--kv-accent-500);color:#fff;"

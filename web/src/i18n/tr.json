@@ -1236,7 +1236,8 @@
     "requestFailed": "İstek gönderilemedi.",
     "statusFriend": "Kanka",
     "statusPending": "İstek Beklemede",
-    "statusPendingIn": "Gelen İstek"
+    "statusPendingIn": "Gelen İstek",
+    "goToMyProfile": "Profilime git"
   },
   "time": {
     "today": "Bugün",
