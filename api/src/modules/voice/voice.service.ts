@@ -578,27 +578,20 @@ export class VoiceService {
   }
 
   /**
-   * Karantina: bu guild'e yeni katılan üye (joinedAt > now - quarantineHours) konuşamaz.
-   * quarantineHours=0 → karantina kapalı. Guild dışı (teorik) → uygulanmaz.
+   * Ses yayını izni. Ses-mic karantinası KALDIRILDI (2026-06-19): davetle gelen meşru üye
+   * sese girince ANINDA konuşabilsin (24s susturma kötü ilk-deneyim yaratıyordu). İstismar
+   * TEPKİSEL araçlarla yönetilir (server-mute / kick / MUTE_MEMBERS — R11). Çocuk-güvenliği
+   * kapıları BAĞIMSIZ korunur: kamera/ekran → resolveVideoSources (adultsOnly/ageGated/bayrak/minör);
+   * yabancıya DM/arkadaşlık → quarantineHours (orada proaktif koruma haklı). Kalan tek kısıt:
+   * üyelik var olmalı (erişim kapısı geçti ama üyelik yoksa güvenli taraf — server-mute call-site'ta).
    */
   private async resolveCanPublish(userId: string, guildId: string | null): Promise<boolean> {
-    if (!guildId) return true;
-    const quarantineHours = this.config.get<number>('quarantineHours') ?? 24;
-    if (quarantineHours <= 0) return true;
-
+    if (!guildId) return true; // DM/grup — guild karantinası yok
     const member = await this.prisma.guildMember.findUnique({
       where: { guildId_userId: { guildId, userId } },
-      select: { joinedAt: true, role: true },
+      select: { userId: true },
     });
-    if (!member) return false; // erişim kapısı geçti ama üyelik yoksa güvenli taraf
-
-    // OWNER/ADMIN ses karantinasından MUAF — ortamın güvenilir operatörleri (REV-6:
-    // sahibin kendi yeni kurduğu ortamda konuşamaması bug'ı). Karantina yalnız yeni
-    // MEMBER'ı broadcast'ten alıkoyar (anti-spam); minör/erişim kapıları ayrı + bozulmaz.
-    if (member.role === 'OWNER' || member.role === 'ADMIN') return true;
-
-    const cutoff = new Date(Date.now() - quarantineHours * 60 * 60 * 1000);
-    return member.joinedAt < cutoff; // cutoff'tan önce katıldıysa yerleşik → konuşabilir
+    return !!member;
   }
 
   /**
