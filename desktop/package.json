@@ -28,7 +28,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "kankaverse-setup.${ext}"
     },
     "mac": {
       "target": "dmg",
