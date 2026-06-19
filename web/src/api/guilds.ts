@@ -10,6 +10,13 @@ export const guildsApi = {
   create(name: string) {
     return http.post<GuildDto>('/guilds', { name })
   },
+  // Discord şablon göçü (yapı-only) — bayrak arkasında
+  importDiscordTemplate(template: string, name?: string) {
+    return http.post<GuildDto>('/guilds/import/discord-template', { template, ...(name ? { name } : {}) })
+  },
+  discordImportStatus() {
+    return http.get<{ enabled: boolean }>('/guilds/import/discord-template')
+  },
   list() {
     return http.get<GuildDto[]>('/guilds')
   },

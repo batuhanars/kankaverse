@@ -25,6 +25,12 @@ export const useGuildsStore = defineStore('guilds', () => {
     return res.data
   }
 
+  async function importDiscordTemplate(template: string, name?: string): Promise<GuildDto> {
+    const res = await guildsApi.importDiscordTemplate(template, name)
+    guilds.value.push(res.data)
+    return res.data
+  }
+
   async function joinByInvite(code: string): Promise<GuildDto> {
     const res = await invitesApi.join(code)
     if (!guilds.value.find((g) => g.id === res.data.id)) {
@@ -136,5 +142,5 @@ export const useGuildsStore = defineStore('guilds', () => {
     }
   }
 
-  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, joinByInvite, joinDiscovery, updateGuild, updateGuildIcon, deleteGuild, removeGuildLocal, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread, setGuildMentionCount, incrementGuildMention }
+  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, importDiscordTemplate, joinByInvite, joinDiscovery, updateGuild, updateGuildIcon, deleteGuild, removeGuildLocal, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread, setGuildMentionCount, incrementGuildMention }
 })

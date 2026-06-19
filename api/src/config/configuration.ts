@@ -108,6 +108,8 @@ export default () => {
     // Prod fail-fast YOK: default false güvenli taraf. Açma önkoşulları §0.1'de.
     cameraEnabled: process.env.CAMERA_ENABLED === 'true',
     screenEnabled: process.env.SCREEN_ENABLED === 'true',
+    // Discord şablon göçü (yapı-only) feature-flag — default KAPALI. Açma: DISCORD_IMPORT_ENABLED=true
+    discordImportEnabled: process.env.DISCORD_IMPORT_ENABLED === 'true',
     // Kayıt modu — kapalı-test fazı (Sprint Closed-Registration)
     // 'open' (default): kayıt açık, davet kodu yok sayılır.
     // 'invite': yalnız geçerli davet koduyla kayıt.

@@ -368,7 +368,15 @@
       "createTitle": "Ortamını Özelleştir",
       "createDesc": "Ortamina bir isim ver. İstediğin zaman değiştirebilirsin.",
       "joinTitle": "Ortama Katıl",
-      "joinDesc": "Davet kodunu girerek katılabilirsin."
+      "joinDesc": "Davet kodunu girerek katılabilirsin.",
+      "importOption": "Discord'dan İçe Aktar",
+      "importOptionDesc": "Discord sunucunun kanal ve rol yapısını buraya taşı.",
+      "importTitle": "Discord Sunucusunu İçe Aktar",
+      "importDesc": "Discord'da Sunucu Ayarları → Şablon'dan bir şablon oluştur, linkini buraya yapıştır.",
+      "importLabel": "Şablon linki veya kodu",
+      "importPlaceholder": "https://discord.new/...",
+      "importNote": "Yalnızca kategori, kanal ve rol yapısı taşınır. Üyeler, mesajlar ve emojiler taşınmaz.",
+      "importButton": "İçe Aktar"
     },
     "errors": {
       "GUILD_NOT_FOUND": "Ortam bulunamadı.",
