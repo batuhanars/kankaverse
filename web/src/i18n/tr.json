@@ -37,7 +37,7 @@
       "REGISTRATION_CLOSED": "Yeni kayıtlar şu anda kapalı.",
       "INVITE_CODE_REQUIRED": "Geçerli bir davet kodu gerekli.",
       "INVITE_CODE_INVALID": "Davet kodu geçersiz veya süresi dolmuş.",
-      "INVALID_CREDENTIALS": "E-posta veya şifre hatalı.",
+      "INVALID_CREDENTIALS": "Kullanıcı adı/e-posta veya şifre hatalı.",
       "VALIDATION_FAILED": "Lütfen tüm alanları doğru doldurun.",
       "EMAIL_NOT_VERIFIED": "Ortam oluşturmak için e-postanı doğrulamalısın.",
       "INVALID_TOKEN": "Link geçersiz veya süresi dolmuş.",

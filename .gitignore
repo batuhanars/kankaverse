@@ -49,3 +49,5 @@ Thumbs.db
 *.seed
 
 design-refs/
+# Claude Code agent worktrees / yerel oturum dosyaları
+.claude/
