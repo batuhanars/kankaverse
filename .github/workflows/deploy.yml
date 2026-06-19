@@ -1,34 +1,28 @@
 name: Deploy to VPS
 
-# main'e her push'ta (ve elle tetiklemeyle) VPS'e SSH ile bağlanıp
-# kodu çeker, imajları yeniden derler ve servisleri günceller.
-# Secret'lar: VPS_HOST, VPS_PORT, VPS_USER, VPS_SSH_KEY (repo → Settings → Secrets → Actions)
+# main'e her push'ta (ve elle tetiklemeyle) VPS'teki self-hosted runner deploy eder.
+# Runner VPS'te çalışır → GitHub'a DIŞARI bağlanır (inbound SSH YOK; yurtdışı IP'lerden
+# SSH'ın düşürülmesi / fail2ban-geo sorunu bu modelde yaşanmaz).
 on:
   push:
     branches: [main]
   workflow_dispatch: {}
 
-# Aynı anda tek deploy çalışsın; yeni push gelirse öncekini iptal et.
+# Aynı anda tek deploy çalışsın.
 concurrency:
   group: vps-deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted]
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          port: ${{ secrets.VPS_PORT }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          # Komut başarısız olursa (pull/build) job da başarısız olsun.
-          script_stop: true
-          command_timeout: 20m
-          script: |
-            cd ~/kankaverse
-            git pull origin main
-            docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
-            docker image prune -f
+      # actions/checkout YOK — mevcut /root/kankaverse klonu üzerinde çalışıyoruz
+      # (.env.production orada; runner'ın _work klasörüne checkout istemiyoruz).
+      - name: Deploy (yerel — git pull + compose up)
+        run: |
+          set -e
+          cd /home/deploy/kankaverse
+          git pull origin main
+          docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+          docker image prune -f
