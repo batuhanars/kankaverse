@@ -11,9 +11,13 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
+  ForbiddenException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GuildsService } from './guilds.service';
+import { DiscordImportService } from './discord-import.service';
+import { ImportDiscordTemplateDto } from './dto/import-discord-template.dto';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { UpdateGuildDto } from './dto/update-guild.dto';
 import { PresignIconDto } from './dto/presign-icon.dto';
@@ -31,7 +35,11 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard)
 @Controller('guilds')
 export class GuildsController {
-  constructor(private guildsService: GuildsService) {}
+  constructor(
+    private guildsService: GuildsService,
+    private discordImport: DiscordImportService,
+    private config: ConfigService,
+  ) {}
 
   @Post()
   @UseGuards(VerifiedEmailGuard)
@@ -39,6 +47,24 @@ export class GuildsController {
   @ApiOperation({ summary: 'Yeni sunucu oluştur (guild + owner member + #genel-sohbet); e-posta doğrulanmış gerekir' })
   create(@CurrentUser() user: { id: string }, @Body() dto: CreateGuildDto) {
     return this.guildsService.create(user.id, dto);
+  }
+
+  // Statik yol — :id param route'larından ÖNCE (çakışmaması için)
+  @Get('import/discord-template')
+  @ApiOperation({ summary: 'Discord şablon göçü açık mı (UI gating)' })
+  discordImportStatus() {
+    return { enabled: this.config.get<boolean>('discordImportEnabled') === true };
+  }
+
+  @Post('import/discord-template')
+  @UseGuards(VerifiedEmailGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Discord sunucu şablonundan Ortam oluştur (yalnız yapı; bayrak arkasında)' })
+  importDiscordTemplate(@CurrentUser() user: { id: string }, @Body() dto: ImportDiscordTemplateDto) {
+    if (this.config.get<boolean>('discordImportEnabled') !== true) {
+      throw new ForbiddenException({ message: 'Discord göçü şu anda kapalı.', error: 'FEATURE_DISABLED' });
+    }
+    return this.discordImport.importTemplate(user.id, dto.template, dto.name);
   }
 
   @Get()
