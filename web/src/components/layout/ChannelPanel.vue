@@ -339,6 +339,11 @@ function selectChannel(channel: ChannelDto) {
     toastStore.info(t('channel.lockedToast'))
     return
   }
+  // Yaş-kapılı kanal + minör → giriş yok, sakin/dürüst mesaj (backend de otoriter engeller).
+  if (channel.ageGated && authStore.user?.isMinor) {
+    toastStore.info(t('channel.ageRestrictedToast'))
+    return
+  }
   // Ses kanalı: oturuma katıl + kanalı aktif yap (merkez VoiceRoomView'a geçer)
   if (channel.type === 'GUILD_VOICE') {
     voiceStore.join(channel.id)
@@ -1093,11 +1098,18 @@ onUnmounted(() => {
               <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
           </span>
+          <!-- Yaş-kapılı kanal: nötr kilit ikonu (özel kanalla aynı dil); "18+" yazısı yerine tooltip -->
           <span
             v-if="channel.ageGated"
-            class="shrink-0 text-[10px] font-bold px-1 rounded"
-            style="color: var(--kv-danger); border: 1px solid var(--kv-danger); line-height: 1.4;"
-          >{{ t('channel.ageGatedBadge') }}</span>
+            class="shrink-0"
+            :title="t('channel.ageRestrictedLockTitle')"
+            style="color: var(--kv-text-muted);"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </span>
           <span
             v-if="channel.slowModeSeconds > 0"
             class="shrink-0"
@@ -1313,11 +1325,18 @@ onUnmounted(() => {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
               </span>
+              <!-- Yaş-kapılı kanal: nötr kilit ikonu (özel kanalla aynı dil); "18+" yazısı yerine tooltip -->
               <span
                 v-if="channel.ageGated"
-                class="shrink-0 text-[10px] font-bold px-1 rounded"
-                style="color: var(--kv-danger); border: 1px solid var(--kv-danger); line-height: 1.4;"
-              >{{ t('channel.ageGatedBadge') }}</span>
+                class="shrink-0"
+                :title="t('channel.ageRestrictedLockTitle')"
+                style="color: var(--kv-text-muted);"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </span>
               <span
                 v-if="channel.slowModeSeconds > 0"
                 class="shrink-0"
