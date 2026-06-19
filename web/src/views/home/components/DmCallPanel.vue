@@ -145,15 +145,15 @@ async function toggleTileFullscreen(e: Event) {
           <span v-else>{{ tile.member.username[0]?.toUpperCase() }}</span>
         </div>
 
-        <!-- Tam-ekran (yalnız video tile, hover'da) -->
+        <!-- Tam-ekran (yalnız video tile): sağ-alt, belirgin boyut, yarı-opak (hover'da tam) -->
         <button
           v-if="tile.kind === 'video'"
-          class="absolute top-2 left-2 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-          style="width: 28px; height: 28px; background-color: rgba(0,0,0,0.5); color: #fff;"
+          class="absolute bottom-2 right-2 flex items-center justify-center rounded-[var(--kv-radius-md)] cursor-pointer opacity-80 group-hover:opacity-100 transition-opacity"
+          style="width: 36px; height: 36px; background-color: rgba(0,0,0,0.6); color: #fff;"
           :title="t('voice.enterFullscreen')"
           @click.stop="toggleTileFullscreen"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
             <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
           </svg>

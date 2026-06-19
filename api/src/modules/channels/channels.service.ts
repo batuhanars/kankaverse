@@ -226,7 +226,10 @@ export class ChannelsService {
         ...(dto.slowModeSeconds !== undefined && { slowModeSeconds: dto.slowModeSeconds }),
         ...(dto.userLimit !== undefined && { userLimit: dto.userLimit }),
         ...(dto.bitrate !== undefined && { bitrate: dto.bitrate }),
-        ...('categoryId' in dto && { categoryId: dto.categoryId ?? null }),
+        // categoryId: undefined → dokunma; null → kategorisiz; string → ata.
+        // ('in dto' KULLANMA: class-transformer gönderilmeyen alanı undefined anahtar olarak
+        //  ekler → her güncellemede kanalı yanlışlıkla kategoriden çıkarırdı.)
+        ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
       },
     });
 
