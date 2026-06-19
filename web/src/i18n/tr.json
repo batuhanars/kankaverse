@@ -622,6 +622,8 @@
     "ageGatedLabel": "18+ yaş-kapılı kanal",
     "ageGatedDesc": "Bu kanala yalnızca yetişkin üyeler erişebilir.",
     "ageGatedBadge": "18+",
+    "ageRestrictedLockTitle": "Yaş kısıtlı (18+)",
+    "ageRestrictedToast": "Bu kanal 18 yaş ve üzeri içindir. Erişimin yok.",
     "renameTitle": "Kanalı Yeniden Adlandır",
     "renameButton": "Kaydet",
     "deleteTitle": "Kanalı Sil",
