@@ -204,8 +204,8 @@ async function toggleTileFullscreen(e: Event) {
       </div>
     </div>
 
-    <!-- Kontrol barı -->
-    <div class="pb-4">
+    <!-- Kontrol barı (kartlarla araya boşluk: butonlar ekranlara yapışmasın) -->
+    <div class="pt-4 pb-4">
       <VoiceControlBar />
     </div>
   </div>
