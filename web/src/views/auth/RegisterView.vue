@@ -168,12 +168,14 @@ function getError(field: string): string | undefined {
           @update:model-value="(val) => setFieldValue('birthDate', val)"
         />
 
-        <!-- Davet kodu alanı: yalnız invite modunda göster -->
+        <!-- Davet kodu alanı: yalnız invite modunda göster.
+             type=password → varsayılan gizli (yayında ekrana düşse kod sızmaz); göz ikonuyla görülebilir. -->
         <KvInput
           v-if="registrationMode === 'invite'"
           v-model="inviteCode"
           v-bind="inviteCodeAttrs"
           :label="t('register.invite.codeLabel')"
+          type="password"
           :placeholder="t('register.invite.codePlaceholder')"
           :error="getError('inviteCode')"
           :required="true"
