@@ -1072,12 +1072,12 @@ onUnmounted(() => {
           @click="selectChannel(channel)"
         >
           <!-- C: kanal türü ikonu — ses kanalı hoparlör, metin # -->
-          <svg v-if="channel.type === 'GUILD_VOICE'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0">
+          <svg v-if="channel.type === 'GUILD_VOICE'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
           </svg>
-          <span v-else style="color: var(--kv-text-muted);">#</span>
+          <span v-else class="text-[16px] font-semibold leading-none" style="color: var(--kv-text-muted);">#</span>
           <span
             class="truncate"
             :class="[
@@ -1093,7 +1093,7 @@ onUnmounted(() => {
             :title="t('channel.privateLabel')"
             style="color: var(--kv-text-muted);"
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
@@ -1105,7 +1105,7 @@ onUnmounted(() => {
             :title="t('channel.ageRestrictedLockTitle')"
             style="color: var(--kv-text-muted);"
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
@@ -1116,7 +1116,7 @@ onUnmounted(() => {
             :title="t('channel.slowModeLabel')"
             style="color: var(--kv-text-muted);"
           >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <polyline points="12 6 12 12 16 14"/>
             </svg>
@@ -1296,12 +1296,12 @@ onUnmounted(() => {
               @click="selectChannel(channel)"
             >
               <!-- C: kanal türü ikonu — ses kanalı hoparlör, metin # -->
-              <svg v-if="channel.type === 'GUILD_VOICE'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0">
+              <svg v-if="channel.type === 'GUILD_VOICE'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0">
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
                 <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
               </svg>
-              <span v-else style="color: var(--kv-text-muted);">#</span>
+              <span v-else class="text-[16px] font-semibold leading-none" style="color: var(--kv-text-muted);">#</span>
               <span
                 class="truncate"
                 :class="[
@@ -1320,7 +1320,7 @@ onUnmounted(() => {
                 :title="t('channel.privateLabel')"
                 style="color: var(--kv-text-muted);"
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
@@ -1332,7 +1332,7 @@ onUnmounted(() => {
                 :title="t('channel.ageRestrictedLockTitle')"
                 style="color: var(--kv-text-muted);"
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
@@ -1343,7 +1343,7 @@ onUnmounted(() => {
                 :title="t('channel.slowModeLabel')"
                 style="color: var(--kv-text-muted);"
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="12" cy="12" r="10"/>
                   <polyline points="12 6 12 12 16 14"/>
                 </svg>
