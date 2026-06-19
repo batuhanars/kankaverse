@@ -16,4 +16,10 @@ contextBridge.exposeInMainWorld('kankaverse', {
    * @param {number} count 0 rozeti kaldırır.
    */
   setBadge: (count) => ipcRenderer.send('set-badge', count),
+
+  /** Masaüstü ayarlarını oku (openAtLogin, startMinimized, closeToTray). */
+  getDesktopSettings: () => ipcRenderer.invoke('desktop:get-settings'),
+
+  /** Tek bir masaüstü ayarını değiştir; güncel ayar nesnesini döndürür. */
+  setDesktopSetting: (key, value) => ipcRenderer.invoke('desktop:set-setting', key, value),
 })

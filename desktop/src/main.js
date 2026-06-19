@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, session, desktopCapturer } = require('electron')
 const path = require('path')
+const fs = require('fs')
 
 // Şu an açık olan picker penceresi (eşzamanlı isteği engeller)
 let pickerWin = null
@@ -9,8 +10,36 @@ const APP_URL = process.env.KANKAVERSE_URL ?? 'https://kankaverse.com'
 
 let win = null
 let tray = null
-// Tepsi "Çıkış" veya app.quit() → gerçek kapanma; pencere X tuşu → sadece gizle.
+// Tepsi "Çıkış" veya app.quit() → gerçek kapanma; pencere X tuşu → ayara göre gizle/kapat.
 let isQuitting = false
+
+// ── Masaüstü ayarları (userData/settings.json) ───────────────────────────────
+// openAtLogin: bilgisayar açıldığında başlat · startMinimized: açılışta tepside (arka planda)
+// closeToTray: X ile kapatınca tepside çalışmaya devam et (false → tamamen çık)
+const SETTINGS_DEFAULTS = { openAtLogin: false, startMinimized: false, closeToTray: true }
+let settings = { ...SETTINGS_DEFAULTS }
+
+function settingsPath() {
+  return path.join(app.getPath('userData'), 'settings.json')
+}
+function loadSettings() {
+  try {
+    settings = { ...SETTINGS_DEFAULTS, ...JSON.parse(fs.readFileSync(settingsPath(), 'utf-8')) }
+  } catch {
+    settings = { ...SETTINGS_DEFAULTS }
+  }
+}
+function saveSettings() {
+  try {
+    fs.writeFileSync(settingsPath(), JSON.stringify(settings, null, 2))
+  } catch (e) {
+    console.error('[ayarlar] yazılamadı:', e)
+  }
+}
+function applyOpenAtLogin() {
+  // OS'i ayarla senkronla; openAsHidden (Windows/macOS) açılışta tepsiye düşürür.
+  app.setLoginItemSettings({ openAtLogin: settings.openAtLogin, openAsHidden: settings.startMinimized })
+}
 
 // ── Tek-instance kilidi ──────────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock()
@@ -32,6 +61,8 @@ if (!gotLock) {
     // Kopyala/yapıştır editable alanlarda Chromium tarafından zaten çalışır.
     Menu.setApplicationMenu(null)
 
+    loadSettings()
+    applyOpenAtLogin()
     createWindow()
     createTray()
 
@@ -144,6 +175,7 @@ function createWindow() {
     icon: appIcon,
     autoHideMenuBar: true, // menü çubuğu hiç görünmesin (Menu.setApplicationMenu(null) ile birlikte)
     backgroundColor: '#1a1916', // --kv-bg-rail (koyu başlangıç; beyaz flash yok)
+    show: false, // ready-to-show'da göster (flash yok); startMinimized ise gizli başla
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -153,6 +185,11 @@ function createWindow() {
   })
 
   win.loadURL(APP_URL)
+
+  // startMinimized kapalıysa hazır olunca göster; açıksa tepside (arka planda) başla.
+  win.once('ready-to-show', () => {
+    if (!settings.startMinimized) win.show()
+  })
 
   // Dev'de (npm start) DevTools otomatik açılır — paketli üründe (installer) açılmaz.
   if (!app.isPackaged) win.webContents.openDevTools({ mode: 'detach' })
@@ -181,13 +218,44 @@ function createWindow() {
     return { action: 'deny' }
   })
 
-  // Pencere X tuşuyla kapatılınca → tepsiye gizle (WS bağlı kalsın, bildirim gelsin)
+  // Pencere X tuşuyla kapatılınca: closeToTray ise tepsiye gizle (WS bağlı kalsın,
+  // bildirim gelsin); kapalıysa normal kapanış → window-all-closed → uygulama tamamen kapanır.
   win.on('close', (event) => {
-    if (!isQuitting) {
+    if (!isQuitting && settings.closeToTray) {
       event.preventDefault()
       win.hide()
     }
   })
+}
+
+// ── Ayar uygula + tray menü (paylaşılan; hem tray hem IPC kullanır) ───────────
+function applySetting(key, value) {
+  if (!(key in SETTINGS_DEFAULTS)) return
+  settings[key] = !!value
+  saveSettings()
+  if (key === 'openAtLogin' || key === 'startMinimized') applyOpenAtLogin()
+  if (tray && !tray.isDestroyed()) tray.setContextMenu(buildTrayMenu())
+}
+
+function buildTrayMenu() {
+  return Menu.buildFromTemplate([
+    { label: 'Aç / Göster', click: () => { if (win) { win.show(); win.focus() } } },
+    { type: 'separator' },
+    {
+      label: 'Başlangıçta Başlat',
+      type: 'checkbox',
+      checked: settings.openAtLogin,
+      click: (mi) => applySetting('openAtLogin', mi.checked),
+    },
+    {
+      label: 'Kapatınca tepside çalış (X)',
+      type: 'checkbox',
+      checked: settings.closeToTray,
+      click: (mi) => applySetting('closeToTray', mi.checked),
+    },
+    { type: 'separator' },
+    { label: 'Çıkış', click: () => { isQuitting = true; app.quit() } },
+  ])
 }
 
 // ── Sistem tepsisi ────────────────────────────────────────────────────────────
@@ -207,41 +275,7 @@ function createTray() {
   tray = new Tray(trayIcon)
   tray.setToolTip('Kankaverse')
 
-  // Opsiyonel: açılışta başlat toggle (default KAPALI)
-  const loginSettings = app.getLoginItemSettings()
-
-  const buildMenu = () => Menu.buildFromTemplate([
-    {
-      label: 'Aç / Göster',
-      click: () => {
-        if (win) {
-          win.show()
-          win.focus()
-        }
-      },
-    },
-    { type: 'separator' },
-    {
-      label: 'Başlangıçta Başlat',
-      type: 'checkbox',
-      checked: app.getLoginItemSettings().openAtLogin,
-      click: (menuItem) => {
-        app.setLoginItemSettings({ openAtLogin: menuItem.checked })
-        // Menüyü yeniden oluştur (checkbox durumu güncellensin)
-        tray.setContextMenu(buildMenu())
-      },
-    },
-    { type: 'separator' },
-    {
-      label: 'Çıkış',
-      click: () => {
-        isQuitting = true
-        app.quit()
-      },
-    },
-  ])
-
-  tray.setContextMenu(buildMenu())
+  tray.setContextMenu(buildTrayMenu())
 
   // Windows/Linux: tray ikonuna sol tıklayınca pencereyi göster/gizle
   tray.on('click', () => {
@@ -263,6 +297,13 @@ ipcMain.on('focus-window', () => {
     win.show()
     win.focus()
   }
+})
+
+// Masaüstü ayarları — renderer (web ayarlar UI) okur/yazar
+ipcMain.handle('desktop:get-settings', () => settings)
+ipcMain.handle('desktop:set-setting', (_event, key, value) => {
+  applySetting(key, value)
+  return settings
 })
 
 // Preload → renderer: görev çubuğu / dock rozeti (okunmamış sayısı)

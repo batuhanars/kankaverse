@@ -181,7 +181,18 @@
     "tabProfile": "Profil",
     "tabVoice": "Ses",
     "tabPrivacy": "Gizlilik",
+    "tabDesktop": "Masaüstü",
     "tabAdmin": "Admin",
+    "desktop": {
+      "title": "MASAÜSTÜ UYGULAMASI",
+      "intro": "Bu ayarlar yalnızca masaüstü uygulamasını etkiler.",
+      "openAtLoginLabel": "Bilgisayar açıldığında başlat",
+      "openAtLoginDesc": "Windows/macOS açılışında Kankaverse otomatik çalışır.",
+      "startMinimizedLabel": "Arka planda (tepside) başlat",
+      "startMinimizedDesc": "Açılışta pencere açılmaz; uygulama sistem tepsisinde çalışmaya başlar.",
+      "closeToTrayLabel": "Kapatınca tepside çalışmaya devam et",
+      "closeToTrayDesc": "Pencereyi (X) kapatınca uygulama tepside açık kalır, bildirimler gelmeye devam eder. Kapalıyken X butonu uygulamayı tamamen kapatır."
+    },
     "voice": {
       "inputDevice": "Giriş Cihazı (Mikrofon)",
       "outputDevice": "Çıkış Cihazı (Hoparlör)",

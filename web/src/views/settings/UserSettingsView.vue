@@ -22,6 +22,7 @@ import ChangeUsernameSection from './components/ChangeUsernameSection.vue'
 import DeleteAccountSection from './components/DeleteAccountSection.vue'
 import VoiceDevicesSection from './components/VoiceDevicesSection.vue'
 import PlatformInviteSection from './components/PlatformInviteSection.vue'
+import MasaustuSection from './components/MasaustuSection.vue'
 
 const props = defineProps<{ initialSection?: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -30,8 +31,10 @@ const { t } = useI18n()
 const authStore = useAuthStore()
 const toast = useToastStore()
 
-type NavSection = 'hesap' | 'profil' | 'ses' | 'gizlilik' | 'admin'
-const VALID_SECTIONS: NavSection[] = ['profil', 'hesap', 'ses', 'gizlilik', 'admin']
+type NavSection = 'hesap' | 'profil' | 'ses' | 'gizlilik' | 'masaustu' | 'admin'
+const VALID_SECTIONS: NavSection[] = ['profil', 'hesap', 'ses', 'gizlilik', 'masaustu', 'admin']
+// Masaüstü (Electron) istemcisinde ek sekme — tarayıcıda gizli.
+const isElectron = window.kankaverse?.isElectron === true
 const activeSection = ref<NavSection>(
   VALID_SECTIONS.includes(props.initialSection as NavSection) ? (props.initialSection as NavSection) : 'profil',
 )
@@ -46,10 +49,10 @@ const baseNavItems: { key: NavSection; labelKey: string }[] = [
 
 // Admin sekmesi: yalnız isModerator kullanıcıya göster
 const navItems = computed(() => {
-  if (authStore.user?.isModerator) {
-    return [...baseNavItems, { key: 'admin' as NavSection, labelKey: 'settings.tabAdmin' }]
-  }
-  return baseNavItems
+  const items = [...baseNavItems]
+  if (isElectron) items.push({ key: 'masaustu' as NavSection, labelKey: 'settings.tabDesktop' })
+  if (authStore.user?.isModerator) items.push({ key: 'admin' as NavSection, labelKey: 'settings.tabAdmin' })
+  return items
 })
 
 // ── Hesap düzenleme modalları (Discord-tarzı: satır + "Düzenle" → modal) ──
@@ -423,6 +426,11 @@ async function selectPolicy(p: DmPolicy) {
               <!-- ── Ses ── (cihaz seçimi + çıkış sesi) -->
               <div v-else-if="activeSection === 'ses'">
                 <VoiceDevicesSection />
+              </div>
+
+              <!-- ── Masaüstü ── (yalnız Electron istemcisi) -->
+              <div v-else-if="activeSection === 'masaustu' && isElectron">
+                <MasaustuSection />
               </div>
 
               <!-- ── Gizlilik ── (dmPolicy) -->
