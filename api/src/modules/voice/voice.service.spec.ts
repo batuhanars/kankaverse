@@ -171,24 +171,24 @@ describe('VoiceService.mintToken', () => {
     expect(lastAccessTokenOpts).toMatchObject({ identity: USER_ID, name: 'ali' });
   });
 
-  it('karantinadaki üye (yeni katıldı) → canPublish=false', async () => {
+  it('yeni katılan üye → ses-mic karantinası KALDIRILDI → canPublish=true', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel());
-    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(Date.now() - 1 * 3600 * 1000) }); // 1 saat önce
+    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date() }); // az önce katıldı
 
     const svc = makeService();
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
 
-    expect(res.canPublish).toBe(false);
-    expect(mockAddGrant).toHaveBeenCalledWith(expect.objectContaining({ canPublish: false, canSubscribe: true }));
+    expect(res.canPublish).toBe(true);
+    expect(mockAddGrant).toHaveBeenCalledWith(expect.objectContaining({ canPublish: true, canSubscribe: true }));
   });
 
-  it('quarantineHours=0 → karantina kapalı → yeni üye bile canPublish=true', async () => {
+  it('üyelik yoksa (guildMember null) → canPublish=false (güvenli taraf)', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel());
-    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date() });
+    prismaMock.guildMember.findUnique.mockResolvedValue(null);
 
-    const svc = makeService(makeConfig({ quarantineHours: 0 }));
+    const svc = makeService();
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
-    expect(res.canPublish).toBe(true);
+    expect(res.canPublish).toBe(false);
   });
 });
 
@@ -332,20 +332,21 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
     );
   });
 
-  // §F: karantina → video düşer (audio mantığına saygı — canPublish=false + video=[])
-  it('GUILD_VOICE ageGated=true, karantinadaki üye → video düşer (canPublish=false)', async () => {
+  // §F: ses-mic karantinası kaldırıldı → YENİ üye de ageGated yetişkin bağlamında video açabilir
+  it('GUILD_VOICE ageGated=true, YENİ üye (karantina yok) → canPublish=true + video açık', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ ageGated: true }));
-    // Yeni katılmış → karantinada → resolveCanPublish false → video de kapalı
-    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(), role: 'MEMBER' });
+    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(), role: 'MEMBER' }); // az önce katıldı
 
     const svc = makeService(videoConfig());
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
 
-    expect(res.canPublish).toBe(false);
-    expect(res.canPublishCamera).toBe(false);
-    expect(res.canPublishScreen).toBe(false);
+    expect(res.canPublish).toBe(true);
+    expect(res.canPublishCamera).toBe(true);
+    expect(res.canPublishScreen).toBe(true);
     expect(mockAddGrant).toHaveBeenCalledWith(
-      expect.objectContaining({ canPublishSources: ['MICROPHONE'] }),
+      expect.objectContaining({
+        canPublishSources: expect.arrayContaining(['MICROPHONE', 'CAMERA', 'SCREEN_SHARE']),
+      }),
     );
   });
 
@@ -672,8 +673,8 @@ describe('VoiceService.unmuteParticipant', () => {
     expect(prismaMock.voiceMute.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('başarı → kayıt silinir + canPublish=resolveCanPublish (karantinaya saygı, kör true DEĞİL)', async () => {
-    // Hedef yeni katılmış (karantinada) → resolveCanPublish false döner
+  it('başarı → kayıt silinir + canPublish=resolveCanPublish (üyelik var → true)', async () => {
+    // Karantina kaldırıldı: üye (yeni de olsa) → resolveCanPublish true → unmute sonrası konuşabilir
     prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(), role: 'MEMBER' });
     const svc = makeService();
     await svc.unmuteParticipant(USER_ID, CHANNEL_ID, TARGET_ID);
@@ -685,7 +686,7 @@ describe('VoiceService.unmuteParticipant', () => {
       CHANNEL_ID,
       TARGET_ID,
       undefined,
-      expect.objectContaining({ canPublish: false, canSubscribe: true }),
+      expect.objectContaining({ canPublish: true, canSubscribe: true }),
     );
     expect(realtimeMock.emitToRoom).toHaveBeenCalledWith(CHANNEL_ID, 'voice.participant_unmuted', {
       channelId: CHANNEL_ID,
