@@ -997,6 +997,8 @@
     "screenShareActive": "Ekran paylaşımı",
     "enterFullscreen": "Tam ekran",
     "exitFullscreen": "Tam ekrandan çık",
+    "fitContain": "Tüm kareyi göster",
+    "fitCover": "Kutuyu doldur",
     "live": "YAYINDA",
     "nowStreaming": "Şimdi Yayın Yapıyor",
     "watchStream": "Yayını İzle",
