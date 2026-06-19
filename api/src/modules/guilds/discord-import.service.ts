@@ -116,11 +116,19 @@ export class DiscordImportService {
 
   /** Discord template API'sinden serialized_source_guild getir. */
   private async fetchTemplate(code: string): Promise<{ name: string; roles: SerializedRole[]; channels: SerializedChannel[] }> {
+    // TR'de Discord DPI ile engelli → TR sunucusu discord.com'a çıkamaz. Ayarlıysa TR-dışı
+    // bir proxy (örn. Cloudflare Worker) üzerinden geç; yoksa doğrudan (dev/TR-dışı).
+    const proxy = process.env.DISCORD_TEMPLATE_PROXY?.trim();
+    const secret = process.env.DISCORD_TEMPLATE_PROXY_SECRET?.trim();
+    const url = proxy
+      ? `${proxy}${proxy.includes('?') ? '&' : '?'}code=${encodeURIComponent(code)}`
+      : `https://discord.com/api/v10/guilds/templates/${code}`;
+    const headers: Record<string, string> = { 'User-Agent': 'Kankaverse (https://kankaverse.com, 1.0)' };
+    if (proxy && secret) headers['x-proxy-secret'] = secret;
+
     let res: Response;
     try {
-      res = await fetch(`https://discord.com/api/v10/guilds/templates/${code}`, {
-        headers: { 'User-Agent': 'Kankaverse (https://kankaverse.com, 1.0)' },
-      });
+      res = await fetch(url, { headers });
     } catch {
       throw new BadRequestException({ message: 'Discord şablonu alınamadı (ağ hatası).', error: 'TEMPLATE_FETCH_FAILED' });
     }
