@@ -227,12 +227,12 @@ function onLogout() {
             </svg>
           </button>
           <button
-            class="w-3.5 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
+            class="w-5 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
             :style="{ color: devicePopover === 'input' ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)' }"
             :title="t('settings.voice.inputDevice')"
             @click.stop="toggleDevicePopover('input')"
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-150" :class="devicePopover === 'input' ? 'rotate-180' : ''"><polyline points="6 15 12 9 18 15"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-150" :class="devicePopover === 'input' ? 'rotate-180' : ''"><polyline points="6 15 12 9 18 15"/></svg>
           </button>
         </div>
         <!-- Kulaklık grubu (buton + ok bitişik) -->
@@ -254,12 +254,12 @@ function onLogout() {
             </svg>
           </button>
           <button
-            class="w-3.5 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
+            class="w-5 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
             :style="{ color: devicePopover === 'output' ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)' }"
             :title="t('settings.voice.outputDevice')"
             @click.stop="toggleDevicePopover('output')"
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-150" :class="devicePopover === 'output' ? 'rotate-180' : ''"><polyline points="6 15 12 9 18 15"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-150" :class="devicePopover === 'output' ? 'rotate-180' : ''"><polyline points="6 15 12 9 18 15"/></svg>
           </button>
         </div>
         <!-- Ses ayarları (gear) — diğerleri gibi belirgin -->
