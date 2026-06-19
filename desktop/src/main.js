@@ -41,6 +41,14 @@ function applyOpenAtLogin() {
   app.setLoginItemSettings({ openAtLogin: settings.openAtLogin, openAsHidden: settings.startMinimized })
 }
 
+// Çalışma-zamanı ikon yolu: pakette extraResources (resources/icon.png), dev'de build/icon.png.
+// ('files' yalnız src/'i paketlediği için build/ asar'a girmez → pakette resourcesPath kullanılır.)
+function resolveIconPath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'icon.png')
+    : path.join(__dirname, '..', 'build', 'icon.png')
+}
+
 // ── Tek-instance kilidi ──────────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
@@ -78,7 +86,7 @@ if (!gotLock) {
         .getSources({ types: ['screen', 'window'], thumbnailSize: { width: 320, height: 180 } })
         .then((sources) => {
           // Picker BrowserWindow
-          const iconPath = path.join(__dirname, '..', 'build', 'icon.png')
+          const iconPath = resolveIconPath()
           pickerWin = new BrowserWindow({
             width: 760,
             height: 560,
@@ -163,7 +171,7 @@ if (!gotLock) {
 
 // ── Ana pencere ──────────────────────────────────────────────────────────────
 function createWindow() {
-  const iconPath = path.join(__dirname, '..', 'build', 'icon.png')
+  const iconPath = resolveIconPath()
   const appIcon = nativeImage.createFromPath(iconPath)
 
   win = new BrowserWindow({
@@ -260,7 +268,7 @@ function buildTrayMenu() {
 
 // ── Sistem tepsisi ────────────────────────────────────────────────────────────
 function createTray() {
-  const iconPath = path.join(__dirname, '..', 'build', 'icon.png')
+  const iconPath = resolveIconPath()
   let trayIcon = nativeImage.createFromPath(iconPath)
 
   // Windows tray ikonu küçük olur; 16x16 veya 32x32 resize
