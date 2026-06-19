@@ -122,6 +122,16 @@ function tileIsLocal(tile: VoiceTile): boolean {
   return tile.member?.isLocal ?? tile.entry?.isLocal ?? false
 }
 
+// Kutucuk başına sığdır/doldur (fit/fill). Varsayılan 'cover' (doldur); kafa kırpılırsa
+// kullanıcı 'contain'e (tüm kareyi göster) çevirir.
+const tileFit = ref<Record<string, 'cover' | 'contain'>>({})
+function fitOf(key: string): 'cover' | 'contain' {
+  return tileFit.value[key] ?? 'cover'
+}
+function toggleFit(key: string) {
+  tileFit.value = { ...tileFit.value, [key]: fitOf(key) === 'cover' ? 'contain' : 'cover' }
+}
+
 // Video track → <video> bağlama (function ref; el null'da no-op)
 function attachVideo(el: Element | null, entry?: VideoTrackEntry) {
   if (!el || !entry) return
@@ -262,7 +272,8 @@ function errMessage(e: unknown, fallbackKey: string): string {
             :ref="(el) => attachVideo(el as Element, tile.entry)"
             autoplay
             playsinline
-            class="w-full h-full object-cover"
+            class="w-full h-full"
+            :class="fitOf(tile.key) === 'contain' ? 'object-contain' : 'object-cover'"
             :aria-label="tile.entry.trackKind === 'screen' ? t('voice.screenShareActive') : t('voice.cameraActive')"
           />
           <!-- Avatar (video yok) -->
@@ -276,19 +287,35 @@ function errMessage(e: unknown, fallbackKey: string): string {
             <span v-else>{{ tile.member.username[0]?.toUpperCase() }}</span>
           </div>
 
-          <!-- Tam-ekran (yalnız video tile): sağ-alt, belirgin boyut, yarı-opak (hover'da tam) -->
-          <button
-            v-if="tile.kind === 'video'"
-            class="absolute bottom-2 right-2 flex items-center justify-center rounded-full cursor-pointer transition-opacity hover:opacity-90"
-            style="width: 40px; height: 40px; background-color: rgba(0,0,0,0.65); color: #fff;"
-            :title="t('voice.enterFullscreen')"
-            @click.stop="toggleTileFullscreen"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
-              <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
-            </svg>
-          </button>
+          <!-- Video kontrolleri (sağ-alt): sığdır/doldur + tam-ekran -->
+          <div v-if="tile.kind === 'video'" class="absolute bottom-2 right-2 flex items-center gap-1.5">
+            <!-- Sığdır/Doldur toggle -->
+            <button
+              class="flex items-center justify-center rounded-full cursor-pointer transition-opacity hover:opacity-90"
+              style="width: 40px; height: 40px; background-color: rgba(0,0,0,0.65); color: #fff;"
+              :title="fitOf(tile.key) === 'cover' ? t('voice.fitContain') : t('voice.fitCover')"
+              @click.stop="toggleFit(tile.key)"
+            >
+              <svg v-if="fitOf(tile.key) === 'cover'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>
+              </svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+              </svg>
+            </button>
+            <!-- Tam-ekran -->
+            <button
+              class="flex items-center justify-center rounded-full cursor-pointer transition-opacity hover:opacity-90"
+              style="width: 40px; height: 40px; background-color: rgba(0,0,0,0.65); color: #fff;"
+              :title="t('voice.enterFullscreen')"
+              @click.stop="toggleTileFullscreen"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+                <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+              </svg>
+            </button>
+          </div>
 
           <!-- R11: moderasyon menüsü (kendi+owner hariç, izinli kullanıcı) -->
           <div
