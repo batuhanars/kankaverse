@@ -94,9 +94,7 @@ export const authApi = {
   deleteAccount(body: { currentPassword: string; totpCode?: string }) {
     return http.post<null>('/auth/account/delete', body)
   },
-  cancelDeleteAccount() {
-    return http.post<null>('/auth/account/delete/cancel')
-  },
+  // Not: hesap silme iptali ayrı endpoint DEĞİL — re-login silme talebini iptal eder (backend: cancelPendingDeletionOnLogin).
   // Sprint 2B — login (union dönüşü: normal | 2FA challenge)
   loginWithChallenge(payload: { email: string; password: string }) {
     return http.post<{ user: UserDto; accessToken: string } | LoginChallengeDto>('/auth/login', payload)
