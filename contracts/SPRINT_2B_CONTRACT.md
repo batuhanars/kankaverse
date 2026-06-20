@@ -144,7 +144,7 @@ interface LoginChallengeDto { twoFactorRequired: true; challengeToken: string; }
   `200 { data: null }`. Hesap deaktive: `deletionRequestedAt != null` iken `me`/korumalı uçlar `403 ACCOUNT_DELETION_PENDING`.
 - **Grace'te giriş = iptal:** `deletionRequestedAt != null` kullanıcı başarılı login yaparsa `deletionRequestedAt=null`
   (reaktivasyon) ve normal session açılır (brief §8).
-- **POST `/auth/account/delete/cancel`** — (auth, deaktif oturum istisnası) → `deletionRequestedAt=null` → `200 { data: null }`.
+- ~~**POST `/auth/account/delete/cancel`**~~ — **KALDIRILDI (D6, 2026-06-20).** `deleteAccount` tüm session'ları revoke ettiğinden JwtAuthGuard'lı bu uç ulaşılamazdı (ölü kod). "Deaktif oturum istisnası" hiç implemente edilmemişti. Gerçek iptal yolu = **re-login** (`cancelPendingDeletionOnLogin`, yukarıdaki "Grace'te giriş = iptal").
 
 ---
 

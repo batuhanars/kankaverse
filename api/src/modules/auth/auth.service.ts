@@ -367,6 +367,8 @@ export class AuthService implements OnModuleInit {
   async me(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId, deletedAt: null } });
     if (!user) throw new UnauthorizedException('Kullanıcı bulunamadı.');
+    // Savunma-derinliği: normalde ulaşılamaz (deleteAccount tüm session'ları revoke eder + login
+    // silme talebini login'den ÖNCE temizler) — yine de silinmeye-işaretli hesap normal görünmesin.
     if (user.deletionRequestedAt) {
       throw new ForbiddenException({ message: 'Hesap silme talebi bekliyor.', error: 'ACCOUNT_DELETION_PENDING' });
     }
@@ -690,14 +692,6 @@ export class AuthService implements OnModuleInit {
         data: { revokedAt: new Date() },
       }),
     ]);
-    return null;
-  }
-
-  async cancelAccountDeletion(userId: string) {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { deletionRequestedAt: null },
-    });
     return null;
   }
 

@@ -303,13 +303,6 @@ export class AuthController {
   async deleteAccount(@CurrentUser() user: AuthUser, @Body() dto: DeleteAccountDto) {
     return this.authService.deleteAccount(user.id, dto);
   }
-
-  @Post('account/delete/cancel')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Hesap silme talebini iptal et (deaktif oturum istisnası)' })
-  async cancelAccountDeletion(@CurrentUser() user: AuthUser) {
-    return this.authService.cancelAccountDeletion(user.id);
-  }
+  // Not: silme iptali için ayrı endpoint YOK — deleteAccount tüm session'ları revoke eder,
+  // gerçek iptal = re-login (cancelPendingDeletionOnLogin). Eski /account/delete/cancel ölüydü, kaldırıldı.
 }
