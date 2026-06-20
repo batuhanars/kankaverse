@@ -349,6 +349,14 @@ export class GuildsService {
     let iconUrl: string | null = null;
 
     if (dto.storageKey != null) {
+      // Savunma-derinliği (D14): yükleme kapalıyken yeni ikon SET edilemez (presign zaten kapalı,
+      // ama "set" yolu da reddetmeli). İkon KALDIRMA (storageKey null) bu kapının dışında — serbest.
+      if (!this.config.get<boolean>('uploadsEnabled')) {
+        throw new ForbiddenException({
+          message: 'Dosya yükleme şu an kapalı.',
+          error: 'UPLOADS_DISABLED',
+        });
+      }
       // Güvenlik: yalnız bu guild'e ait icons/ prefix'i kabul edilir
       if (!dto.storageKey.startsWith(`icons/${guildId}/`)) {
         throw new BadRequestException({
