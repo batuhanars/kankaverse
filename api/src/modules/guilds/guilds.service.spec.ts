@@ -321,6 +321,38 @@ describe('GuildsService.setIcon', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
+  // D14 savunma-derinliği: UPLOADS_ENABLED=false iken yeni ikon SET edilemez
+  // ─────────────────────────────────────────────────────────────────────────
+  it('UPLOADS_ENABLED=false iken storageKey ile ikon SET → ForbiddenException UPLOADS_DISABLED (D14)', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
+    configMock.get.mockImplementation((key: string) =>
+      key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse',
+    );
+
+    const dto: SetIconDto = { storageKey: `icons/${GUILD_ID}/abc.png` };
+
+    await expect(service.setIcon(OWNER_ID, GUILD_ID, dto)).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'UPLOADS_DISABLED' }),
+    });
+    expect(prismaMock.guild.update).not.toHaveBeenCalled();
+  });
+
+  it('UPLOADS_ENABLED=false iken storageKey null → ikon KALDIRMA yine çalışır (kapı yalnız set yolunda)', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
+    prismaMock.guild.update.mockResolvedValue({ ...GUILD_FIXTURE, iconUrl: null });
+    configMock.get.mockImplementation((key: string) =>
+      key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse',
+    );
+
+    const dto: SetIconDto = { storageKey: null };
+
+    const result = (await service.setIcon(OWNER_ID, GUILD_ID, dto)) as { iconUrl: string | null };
+    expect(result.iconUrl).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
   // storageKey null → iconUrl null (ikon kaldırma)
   // ─────────────────────────────────────────────────────────────────────────
   it('storageKey null → iconUrl null olarak güncellenir (ikon kaldırma)', async () => {
