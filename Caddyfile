@@ -1,5 +1,7 @@
 # Kankaverse — Caddy edge (otomatik HTTPS / Let's Encrypt)
-# web → kankaverse.com · api → api.kankaverse.com  (aynı kök domain → cookie sameSite=lax çalışır)
+# web + api AYNI ORIGIN → kankaverse.com (api: /api/* · WS: /socket.io/*). Çapraz-origin CORS preflight YOK.
+#   → Frontend build'inde VITE_API_URL BOŞ bırakılır: axios→'/api', socket→'/' (dev vite-proxy ile birebir).
+# api.kankaverse.com bloğu KORUNUR: LiveKit webhook'u (https://api.kankaverse.com/voice/webhook) oraya kayıtlı.
 # Caddy, Socket.IO WebSocket upgrade'ini otomatik proxy'ler — ekstra config gerekmez.
 # ÖN KOŞUL: DNS A kayıtları VPS IP'sine işaret etmeli + 80/443 açık olmalı (ACME challenge).
 
@@ -15,11 +17,21 @@ kankaverse.com, www.kankaverse.com {
 		root * /srv/downloads
 		file_server
 	}
+	# Same-origin API: /api/* → api:3000 (handle_path /api önekini SOYAR → backend kökten servis eder, dev'le aynı)
+	handle_path /api/* {
+		reverse_proxy api:3000
+	}
+	# Socket.IO same-origin: /socket.io/* → api:3000 (önek SOYULMAZ — socket.io yolu /socket.io kalır)
+	handle /socket.io/* {
+		reverse_proxy api:3000
+	}
+	# Geri kalan her şey → statik web SPA
 	handle {
 		reverse_proxy web:80
 	}
 }
 
+# api.kankaverse.com KORUNDU — LiveKit webhook adresi (kullanıcı trafiği artık apex same-origin'den akar).
 api.kankaverse.com {
 	encode zstd gzip
 	reverse_proxy api:3000
