@@ -192,10 +192,11 @@ export class MessagesService {
     return { mentions: validIds.slice(0, 10), mentionsEveryone };
   }
 
-  async findMessages(userId: string, channelId: string, before?: string, limit = 50) {
+  async findMessages(userId: string, channelId: string, before?: string) {
     const channel = await this.membership.requireChannelAccess(userId, channelId);
 
-    const take = Math.min(limit, 50);
+    // Sabit sayfa boyutu (cursor tabanlı). HTTP yüzeyinde ayarlanabilir limit YOK (controller before-only).
+    const take = 50;
 
     // createdAt filtresi: G4 clearedAt (gt) + cursor before (lt) TEK objede birleşir.
     // (Ayrı spread'lerde ikisi de `createdAt` anahtarını yazıp üzerine binerdi → load-more'da
@@ -204,7 +205,10 @@ export class MessagesService {
 
     if (before) {
       const beforeMsg = await this.prisma.message.findUnique({ where: { id: before } });
-      if (beforeMsg) createdAtFilter.lt = beforeMsg.createdAt;
+      // Bayat/geçersiz cursor (mesaj yok) → "daha eski yok"; en son 50'yi DÖNDÜRME — yoksa
+      // frontend `hasMore` (gelen.length===50) "daha var" sanıp aynı cursor'la döngüye girer. D5.
+      if (!beforeMsg) return [];
+      createdAtFilter.lt = beforeMsg.createdAt;
     }
 
     // G4: DM kanalında çağıranın clearedAt'inden SONRASINI döndür (kendi temizlediği geçmiş kapanır).
@@ -605,7 +609,10 @@ export class MessagesService {
 
     if (before) {
       const beforeMsg = await this.prisma.message.findUnique({ where: { id: before } });
-      if (beforeMsg) createdAtFilter.lt = beforeMsg.createdAt;
+      // Bayat/geçersiz cursor (mesaj yok) → "daha eski yok"; en son 50'yi DÖNDÜRME — yoksa
+      // frontend `hasMore` (gelen.length===50) "daha var" sanıp aynı cursor'la döngüye girer. D5.
+      if (!beforeMsg) return [];
+      createdAtFilter.lt = beforeMsg.createdAt;
     }
 
     // G4: DM kanalında clearedAt filtrelemesi (findMessages ile birebir)

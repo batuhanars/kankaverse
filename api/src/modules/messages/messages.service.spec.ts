@@ -246,30 +246,29 @@ describe('MessagesService.findMessages', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // TEST 6 — limit > 50 → take 50'ye kırpılır
+  // TEST 6 — sabit sayfa boyutu: findMany her zaman take=50 ile çağrılır
   // ─────────────────────────────────────────────────────────────────────────
-  it('limit > 50 → findMany take=50 ile çağrılır', async () => {
+  it('sabit sayfa boyutu → findMany take=50 ile çağrılır', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
     prismaMock.channelMember.findUnique.mockResolvedValue({ clearedAt: null });
 
-    await service.findMessages(USER_ID, CHANNEL_ID, undefined, 999);
+    await service.findMessages(USER_ID, CHANNEL_ID);
 
     const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
     expect(findManyCall.take).toBe(50);
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // EK — before mesajı DB'de yoksa lt uygulanmaz (defensive)
+  // EK — bayat/geçersiz before cursor → boş döner, findMany çağrılmaz (D5)
   // ─────────────────────────────────────────────────────────────────────────
-  it('before ID verildi ama mesaj DB\'de yok → lt uygulanmaz', async () => {
+  it('before ID verildi ama mesaj DB\'de yok → boş döner, findMany çağrılmaz', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
-    prismaMock.message.findUnique.mockResolvedValue(null); // mesaj bulunamadı
-    prismaMock.channelMember.findUnique.mockResolvedValue({ clearedAt: null });
+    prismaMock.message.findUnique.mockResolvedValue(null); // mesaj bulunamadı (bayat cursor)
 
-    await service.findMessages(USER_ID, CHANNEL_ID, 'ghost-msg-id');
+    const result = await service.findMessages(USER_ID, CHANNEL_ID, 'ghost-msg-id');
 
-    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
-    expect(findManyCall.where.createdAt).toBeUndefined();
+    expect(result).toEqual([]);
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
   });
 });
 
@@ -2385,14 +2384,14 @@ describe('MessagesService.searchMessages', () => {
     expect(findManyCall.where.createdAt).toEqual({ lt: beforeMsgCreatedAt });
   });
 
-  it('before cursor mesajı DB\'de yoksa → createdAt filtresi uygulanmaz', async () => {
+  it('before cursor mesajı DB\'de yoksa → boş döner, findMany çağrılmaz (bayat cursor, D5)', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
     prismaMock.message.findUnique.mockResolvedValue(null);
 
-    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'arama', 'ghost-msg');
+    const result = await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'arama', 'ghost-msg');
 
-    const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
-    expect(findManyCall.where.createdAt).toBeUndefined();
+    expect(result).toEqual([]);
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
   });
 
   // ─────────────────────────────────────────────────────────────────────────
