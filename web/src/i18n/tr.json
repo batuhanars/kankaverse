@@ -326,8 +326,7 @@
     "deleteAccount": {
       "title": "Hesabı Sil",
       "warning": "Hesabın 30 gün içinde kalıcı olarak silinecek. 30 gün içinde tekrar giriş yaparsan talep iptal edilir.",
-      "confirm": "Hesabımı Silmek İstiyorum",
-      "grace": "Hesabın silinmek üzere. Geri dönmek için 30 gün içinde tekrar giriş yap."
+      "confirm": "Hesabımı Silmek İstiyorum"
     }
   },
   "months": {
