@@ -16,7 +16,7 @@ function onSelectDm(channelId: string) {
 </script>
 
 <template>
-  <div class="h-20 shrink-0 flex items-center">
+  <div class="h-14 shrink-0 flex items-center">
     <!-- Sol boşluk eşiti — bildirim çanı ile simetri -->
     <div class="w-14 shrink-0" />
 

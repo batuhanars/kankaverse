@@ -10,7 +10,7 @@ const { isOpen: searchOpen, toggle: toggleSearch } = useGuildSearchPanel()
 </script>
 
 <template>
-  <div class="h-20 shrink-0 flex items-center">
+  <div class="h-14 shrink-0 flex items-center">
     <!-- Sunucu adı — flex-1, ortada -->
     <div class="flex-1 flex items-center justify-center px-6">
       <span
