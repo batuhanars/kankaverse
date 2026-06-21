@@ -176,7 +176,8 @@ export class VoiceService {
     // Presence yayını (dev-fix): LiveKit webhook localhost'a ulaşamadığında
     // mintToken'dan güvenilir katılım sinyali gönderir. Webhook onParticipantJoined ile
     // aynı payload şekli — frontend addParticipant idempotent olduğu için çift-yayın zararsız.
-    if (channel.type === 'GUILD_VOICE') {
+    // GUILD_VOICE + DM + GROUP_DM (ayrılış simetriği announceLeave'de).
+    if (this.isVoiceCapable(channel.type)) {
       const joinedPayload = {
         channelId,
         participant: {
@@ -667,7 +668,7 @@ export class VoiceService {
     const channel = await this.membership.requireChannelAccess(userId, channelId);
     // REV-11: ses GUILD_VOICE + DM + GROUP_DM'de olabilir (devam eden çağrı tespiti).
     // GUILD_TEXT vb. ses barındırmaz → NOT_VOICE_CHANNEL.
-    const voiceCapable = channel.type === 'GUILD_VOICE' || channel.type === 'DM' || channel.type === 'GROUP_DM';
+    const voiceCapable = this.isVoiceCapable(channel.type);
     if (!voiceCapable) {
       throw new BadRequestException({
         message: 'Bu bir ses kanalı değil.',
@@ -787,6 +788,11 @@ export class VoiceService {
     this.realtime.emitToVoicePresence(channelId, 'voice.participant_left', { channelId, userId });
   }
 
+  /** Ses barındırabilen kanal türü mü (GUILD_VOICE + DM + GROUP_DM). */
+  private isVoiceCapable(type: string): boolean {
+    return type === 'GUILD_VOICE' || type === 'DM' || type === 'GROUP_DM';
+  }
+
   /**
    * Dev-fix: istemci tarafından tetiklenen ayrılış sinyali.
    * LiveKit webhook localhost'a ulaşamadığında frontend mintToken'dan sonra bu endpoint'i çağırır.
@@ -794,12 +800,13 @@ export class VoiceService {
    * Idempotent: üye yoksa bile zararsızca yayar.
    */
   async announceLeave(userId: string, channelId: string): Promise<void> {
-    // Yalnız GUILD_VOICE için; DM/GROUP_DM kanalları bu akışa dahil değil.
+    // GUILD_VOICE + DM + GROUP_DM: DM/grup çağrı presence'ı da yayılır (localhost; REV-11 —
+    // aksi halde "Sese katıl" herkes çıktıktan sonra takılı kalır).
     const channel = await this.prisma.channel.findFirst({
       where: { id: channelId, deletedAt: null },
       select: { type: true },
     });
-    if (!channel || channel.type !== 'GUILD_VOICE') return;
+    if (!channel || !this.isVoiceCapable(channel.type)) return;
 
     const payload = { channelId, userId };
     this.realtime.emitToRoom(channelId, 'voice.participant_left', payload);

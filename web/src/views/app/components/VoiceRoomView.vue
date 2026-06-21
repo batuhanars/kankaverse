@@ -1,19 +1,23 @@
 <script setup lang="ts">
 /**
  * VoiceRoomView — ses kanalına girildiğinde merkez alanda gösterilir (sohbet yerine).
- * Üstte kanal başlığı, ortada Discord-tarzı katılımcı kartları, altta kontrol barı.
+ * Üstte kanal başlığı (+ tüm-oda tam ekran), ortada katılımcı kutucukları, altta kontrol barı.
  *
- * Kart ızgarası (C4 §D2): her katılımcı TEK kart. Kamera/ekran yayınlıyorsa kartta o video,
- * yoksa avatar görünür. Kartlar katılımcı sayısına göre ekranı böler (1→tam, 2→yan yana, …);
- * ızgara `flex-1 min-h-0`, kontrol barı `shrink-0` → alt butonlar HER ZAMAN görünür.
+ * İki düzen (Discord-tarzı):
+ *  - IZGARA: kimse ekran paylaşmıyor ve manuel odak yok → eşit ızgara (her katılımcı eşit kutu).
+ *  - SAHNE : biri ekran paylaşıyor VEYA bir kutucuğa tıklandı → odaktaki kişi büyük "sahne",
+ *            diğerleri altta yatay "şerit". Varsayılan odak = ekran paylaşan; tıklama odağı değiştirir
+ *            (yalnız yerel — başkasını etkilemez). Konuşana göre otomatik geçiş YOK.
+ *
+ * Tam ekran: oda-seviyesi (başlık + sahne + kontrol barı tam ekran) — kutucuk-başına değil.
  *
  * R11 — ses moderasyonu: izinli kullanıcı, kendi+owner DIŞINDAKİ katılımcıya hover ⋯ menüsünden
- * "Sustur/Susturmayı Kaldır" (MUTE_MEMBERS) ve "Taşı" (MOVE_MEMBERS) uygular.
+ * "Sustur/Susturmayı Kaldır" (MUTE_MEMBERS) ve "Taşı" (MOVE_MEMBERS) uygular. (Menü VoiceTile içinde;
+ * aksiyonlar buraya emit edilir — API çağrısı parent'ta.)
  */
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { onClickOutside } from '@vueuse/core'
-import { useVoiceStore, type RoomMember, type VideoTrackEntry } from '@/stores/voice'
+import { useVoiceStore, type RoomMember, type VoiceTileData } from '@/stores/voice'
 import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
 import { useToastStore } from '@/stores/toast'
@@ -21,6 +25,7 @@ import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { voiceApi } from '@/api/voice'
 import type { ChannelDto } from '@/types'
 import VoiceControlBar from '@/components/shared/VoiceControlBar.vue'
+import VoiceTile from '@/components/shared/VoiceTile.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -79,33 +84,28 @@ function isServerMutedFor(m: RoomMember): boolean {
   return !m.isLocal && voiceStore.serverMutedUserIds.has(m.userId)
 }
 
-// ── Kart ızgarası (Discord-tarzı) ────────────────────────────────────────────
-// Her katılımcı bir kart. Video track'i (kamera/ekran) olan tile video; olmayan avatar.
+// ── Kutucuklar ────────────────────────────────────────────────────────────────
+// Her katılımcı bir kutucuk. Video track'i (kamera/ekran) olan tile video; olmayan avatar.
 // Bir katılımcı hem kamera hem ekran paylaşırsa iki ayrı video tile olur (Discord gibi).
-type VoiceTile =
-  | { key: string; kind: 'video'; member: RoomMember | null; entry: VideoTrackEntry }
-  | { key: string; kind: 'avatar'; member: RoomMember; entry?: undefined }
-
 function memberById(id: string): RoomMember | null {
   return members.value.find((m) => m.userId === id) ?? null
 }
 
-const tiles = computed<VoiceTile[]>(() => {
-  const videoTiles: VoiceTile[] = voiceStore.videoTracks.map((e) => ({
+const tiles = computed<VoiceTileData[]>(() => {
+  const videoTiles: VoiceTileData[] = voiceStore.videoTracks.map((e) => ({
     key: `${e.participantId}:${e.trackKind}`,
     kind: 'video',
     member: memberById(e.participantId),
     entry: e,
   }))
   const withVideo = new Set(voiceStore.videoTracks.map((e) => e.participantId))
-  const avatarTiles: VoiceTile[] = sortedMembers.value
+  const avatarTiles: VoiceTileData[] = sortedMembers.value
     .filter((m) => !withVideo.has(m.userId))
     .map((m) => ({ key: m.userId, kind: 'avatar', member: m }))
   return [...videoTiles, ...avatarTiles]
 })
 
-// Kolon sayısı katılımcı sayısına göre: 1→1, 2-4→2, 5-9→3, 10+→4.
-// grid-auto-rows 1fr → satırlar yüksekliği eşit böler (kartlar ekranı doldurur).
+// Kolon sayısı katılımcı sayısına göre: 1→1, 2-4→2, 5-9→3, 10+→4 (yalnız IZGARA düzeninde).
 const gridStyle = computed(() => {
   const n = Math.max(tiles.value.length, 1)
   const cols = n === 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4
@@ -115,66 +115,84 @@ const gridStyle = computed(() => {
   }
 })
 
-function tileName(tile: VoiceTile): string {
-  return tile.member?.username ?? tile.entry?.username ?? ''
+// ── Odak (sahne) düzeni ─────────────────────────────────────────────────────────
+// Manuel odak yerel; ekran paylaşımı varsa varsayılan odak odur. Stale anahtar → fallback.
+const focusedKey = ref<string | null>(null)
+const screenFocusKey = computed<string | null>(() => {
+  const screen = tiles.value.find((t) => t.kind === 'video' && t.entry.trackKind === 'screen')
+  return screen?.key ?? null
+})
+const effectiveFocusKey = computed<string | null>(() => {
+  if (focusedKey.value && tiles.value.some((t) => t.key === focusedKey.value)) return focusedKey.value
+  return screenFocusKey.value
+})
+const isStageMode = computed(() => effectiveFocusKey.value !== null)
+const focusedTile = computed<VoiceTileData | null>(
+  () => tiles.value.find((t) => t.key === effectiveFocusKey.value) ?? null,
+)
+// "Izgara görünümü"ne dönüş yalnız manuel odak sebebiyle sahnedeyken (ekran paylaşımı yokken) anlamlı.
+const showGridButton = computed(() => focusedKey.value !== null && screenFocusKey.value === null)
+
+function setFocus(key: string) {
+  focusedKey.value = key
 }
-function tileIsLocal(tile: VoiceTile): boolean {
-  return tile.member?.isLocal ?? tile.entry?.isLocal ?? false
+function clearFocus() {
+  focusedKey.value = null
 }
 
-// Kutucuk başına sığdır/doldur (fit/fill). Varsayılan 'cover' (doldur); kafa kırpılırsa
-// kullanıcı 'contain'e (tüm kareyi göster) çevirir.
+// Kutucuk başına sığdır/doldur (fit/fill). Ekran paylaşımı varsayılan 'contain' (tüm ekranı göster,
+// kırpma yok); kamera 'cover' (kutuyu doldur). Kullanıcı kutucuk başına geçiş yapabilir.
 const tileFit = ref<Record<string, 'cover' | 'contain'>>({})
-function fitOf(key: string): 'cover' | 'contain' {
-  return tileFit.value[key] ?? 'cover'
+function defaultFit(tile: VoiceTileData): 'cover' | 'contain' {
+  return tile.kind === 'video' && tile.entry.trackKind === 'screen' ? 'contain' : 'cover'
 }
-function toggleFit(key: string) {
-  tileFit.value = { ...tileFit.value, [key]: fitOf(key) === 'cover' ? 'contain' : 'cover' }
+function fitOf(tile: VoiceTileData): 'cover' | 'contain' {
+  return tileFit.value[tile.key] ?? defaultFit(tile)
+}
+function toggleFit(tile: VoiceTileData) {
+  tileFit.value = { ...tileFit.value, [tile.key]: fitOf(tile) === 'cover' ? 'contain' : 'cover' }
 }
 
-// Video track → <video> bağlama (function ref; el null'da no-op)
-function attachVideo(el: Element | null, entry?: VideoTrackEntry) {
-  if (!el || !entry) return
-  try {
-    entry.track.attach(el as HTMLVideoElement)
-  } catch {
-    /* track zaten detach edilmiş olabilir — yoksay */
+// VoiceTile'a geçen prop demeti (ızgara/sahne/şerit ortak).
+function tileProps(tile: VoiceTileData, variant: 'grid' | 'stage' | 'strip') {
+  const m = tile.member
+  return {
+    tile,
+    variant,
+    speaking: m ? isSpeaking(m) : false,
+    muted: m ? isMutedFor(m) : false,
+    serverMuted: m ? isServerMutedFor(m) : false,
+    fit: fitOf(tile),
+    canModerate: m ? canModerate(m) : false,
+    canMute: canMute.value,
+    canMove: canMove.value,
+    moveTargets: moveTargets.value,
+    broadcasting: m ? isBroadcastingFor(m) : false,
+    focused: variant === 'stage' ? true : variant === 'strip' && tile.key === effectiveFocusKey.value,
   }
 }
 
-// Tek kartı tam-ekran yap (video oynatıcı konvansiyonu)
-async function toggleTileFullscreen(e: Event) {
-  const el = (e.currentTarget as HTMLElement).closest('.kv-video-tile') as HTMLElement | null
-  if (!el) return
+// ── Tüm-oda tam ekranı ──────────────────────────────────────────────────────────
+const roomRef = ref<HTMLElement | null>(null)
+const isFullscreen = ref(false)
+function onFsChange() {
+  isFullscreen.value = !!document.fullscreenElement
+}
+onMounted(() => document.addEventListener('fullscreenchange', onFsChange))
+onUnmounted(() => document.removeEventListener('fullscreenchange', onFsChange))
+async function toggleRoomFullscreen() {
   try {
     if (document.fullscreenElement) await document.exitFullscreen()
-    else await el.requestFullscreen()
+    else if (roomRef.value) await roomRef.value.requestFullscreen()
   } catch {
     /* yoksay */
   }
 }
 
-// ── Aksiyon menüsü (hover ⋯ → küçük dropdown) ────────────────────────────────
-const openMenuUserId = ref<string | null>(null)
-const moveSubmenuOpen = ref(false)
-const menuRef = ref<HTMLElement | null>(null)
-onClickOutside(menuRef, () => { openMenuUserId.value = null; moveSubmenuOpen.value = false })
-
-function toggleMenu(userId: string) {
-  if (openMenuUserId.value === userId) {
-    openMenuUserId.value = null
-  } else {
-    openMenuUserId.value = userId
-  }
-  moveSubmenuOpen.value = false
-}
-function closeMenu() {
-  openMenuUserId.value = null
-  moveSubmenuOpen.value = false
-}
-
-async function toggleServerMute(m: RoomMember) {
-  closeMenu()
+// ── Moderasyon aksiyonları (VoiceTile emit'lerine bağlanır; API burada) ───────────
+async function onTileServerMute(tile: VoiceTileData) {
+  const m = tile.member
+  if (!m) return
   try {
     if (isServerMutedFor(m)) await voiceApi.unmute(channelId.value, m.userId)
     else await voiceApi.mute(channelId.value, m.userId)
@@ -184,8 +202,9 @@ async function toggleServerMute(m: RoomMember) {
   }
 }
 
-async function moveTo(m: RoomMember, target: ChannelDto) {
-  closeMenu()
+async function onTileMove(tile: VoiceTileData, target: ChannelDto) {
+  const m = tile.member
+  if (!m) return
   try {
     await voiceApi.move(channelId.value, m.userId, target.id)
   } catch (e: unknown) {
@@ -193,8 +212,9 @@ async function moveTo(m: RoomMember, target: ChannelDto) {
   }
 }
 
-async function stopBroadcast(m: RoomMember) {
-  closeMenu()
+async function onTileStopBroadcast(tile: VoiceTileData) {
+  const m = tile.member
+  if (!m) return
   try {
     await voiceApi.stopBroadcast(channelId.value, m.userId)
   } catch (e: unknown) {
@@ -204,9 +224,8 @@ async function stopBroadcast(m: RoomMember) {
 
 // Odadan çıkar — onaylı
 const disconnectTarget = ref<RoomMember | null>(null)
-function askDisconnect(m: RoomMember) {
-  closeMenu()
-  disconnectTarget.value = m
+function onTileDisconnect(tile: VoiceTileData) {
+  if (tile.member) disconnectTarget.value = tile.member
 }
 async function doDisconnect() {
   if (!disconnectTarget.value) return
@@ -230,7 +249,7 @@ function errMessage(e: unknown, fallbackKey: string): string {
 </script>
 
 <template>
-  <div class="flex flex-col flex-1 min-h-0 overflow-hidden mr-4 rounded-[var(--kv-radius-lg)]" style="background-color: var(--kv-bg-content);">
+  <div ref="roomRef" class="flex flex-col flex-1 min-h-0 overflow-hidden mr-4 rounded-[var(--kv-radius-lg)]" style="background-color: var(--kv-bg-content);">
     <!-- Üst başlık: ses kanalı adı -->
     <div class="shrink-0 flex items-center gap-2 px-4 h-14 border-b" style="border-color: var(--kv-border-subtle);">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);">
@@ -238,11 +257,11 @@ function errMessage(e: unknown, fallbackKey: string): string {
         <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
         <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
       </svg>
-      <span class="text-[16px] font-semibold" style="color: var(--kv-text-primary);">{{ channelName }}</span>
-      <span v-if="connectedHere" class="text-[13px]" style="color: var(--kv-text-muted);">· {{ members.length }}</span>
+      <span class="text-[16px] font-semibold truncate" style="color: var(--kv-text-primary);">{{ channelName }}</span>
+      <span v-if="connectedHere" class="text-[13px] shrink-0" style="color: var(--kv-text-muted);">· {{ members.length }}</span>
     </div>
 
-    <!-- Orta: katılımcı kart ızgarası -->
+    <!-- Orta -->
     <div class="flex-1 min-h-0 overflow-hidden p-4">
       <!-- Bağlanılıyor -->
       <div v-if="!connectedHere && voiceStore.connecting" class="h-full flex items-center justify-center">
@@ -258,193 +277,92 @@ function errMessage(e: unknown, fallbackKey: string): string {
         >{{ t('voice.joinAction') }}</button>
         <p v-if="voiceStore.error" class="text-[13px]" style="color: var(--kv-danger);">{{ voiceStore.error }}</p>
       </div>
-      <!-- Bağlı: kart ızgarası — video varsa video, yoksa avatar; sayıya göre ekranı böler -->
-      <div v-else class="grid gap-3 w-full h-full" :style="gridStyle">
-        <div
-          v-for="tile in tiles"
-          :key="tile.key"
-          class="kv-video-tile group relative flex items-center justify-center min-h-0 min-w-0 overflow-hidden rounded-[var(--kv-radius-lg)]"
-          :style="`background-color: ${tile.kind === 'video' ? '#000' : 'var(--kv-bg-elevated)'};${tile.member && isSpeaking(tile.member) ? ' box-shadow: inset 0 0 0 2px var(--kv-accent-500);' : ''}`"
-        >
-          <!-- Video (kamera = cover; ekran = contain, kırpma yok) -->
-          <video
-            v-if="tile.kind === 'video'"
-            :ref="(el) => attachVideo(el as Element, tile.entry)"
-            autoplay
-            playsinline
-            class="w-full h-full"
-            :class="fitOf(tile.key) === 'contain' ? 'object-contain' : 'object-cover'"
-            :aria-label="tile.entry.trackKind === 'screen' ? t('voice.screenShareActive') : t('voice.cameraActive')"
+
+      <!-- Bağlı: SAHNE düzeni (odak varsa) -->
+      <div v-else-if="isStageMode" class="w-full h-full flex flex-col gap-3">
+        <!-- Sahne (büyük odak kutucuğu) -->
+        <div class="flex-1 min-h-0">
+          <VoiceTile
+            v-if="focusedTile"
+            v-bind="tileProps(focusedTile, 'stage')"
+            @toggle-fit="toggleFit(focusedTile)"
+            @focus="setFocus(focusedTile.key)"
+            @server-mute="onTileServerMute(focusedTile)"
+            @move="(target: ChannelDto) => onTileMove(focusedTile!, target)"
+            @stop-broadcast="onTileStopBroadcast(focusedTile)"
+            @disconnect="onTileDisconnect(focusedTile)"
           />
-          <!-- Avatar (video yok) -->
-          <div
-            v-else
-            class="w-24 h-24 rounded-full flex items-center justify-center text-[32px] font-bold text-white overflow-hidden"
-            :class="{ 'kv-speaking': isSpeaking(tile.member) }"
-            style="background-color: var(--kv-accent-500);"
+        </div>
+        <!-- Şerit (diğerleri küçük + ızgaraya dön) -->
+        <div class="shrink-0 flex items-center gap-2">
+          <button
+            v-if="showGridButton"
+            class="shrink-0 flex items-center gap-1.5 px-3 h-[72px] rounded-[var(--kv-radius-md)] text-[12px] cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+            style="color: var(--kv-text-secondary); background-color: var(--kv-bg-elevated);"
+            @click="clearFocus"
           >
-            <img v-if="tile.member.avatarUrl" :src="tile.member.avatarUrl" :alt="tile.member.username" class="w-full h-full object-cover" />
-            <span v-else>{{ tile.member.username[0]?.toUpperCase() }}</span>
-          </div>
-
-          <!-- Video kontrolleri (sağ-alt): sığdır/doldur + tam-ekran -->
-          <div v-if="tile.kind === 'video'" class="absolute bottom-2 right-2 flex items-center gap-1.5">
-            <!-- Sığdır/Doldur toggle -->
-            <button
-              class="flex items-center justify-center rounded-full cursor-pointer transition-opacity hover:opacity-90"
-              style="width: 40px; height: 40px; background-color: rgba(0,0,0,0.65); color: #fff;"
-              :title="fitOf(tile.key) === 'cover' ? t('voice.fitContain') : t('voice.fitCover')"
-              @click.stop="toggleFit(tile.key)"
-            >
-              <svg v-if="fitOf(tile.key) === 'cover'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>
-              </svg>
-              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
-              </svg>
-            </button>
-            <!-- Tam-ekran -->
-            <button
-              class="flex items-center justify-center rounded-full cursor-pointer transition-opacity hover:opacity-90"
-              style="width: 40px; height: 40px; background-color: rgba(0,0,0,0.65); color: #fff;"
-              :title="t('voice.enterFullscreen')"
-              @click.stop="toggleTileFullscreen"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
-                <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
-              </svg>
-            </button>
-          </div>
-
-          <!-- R11: moderasyon menüsü (kendi+owner hariç, izinli kullanıcı) -->
-          <div
-            v-if="tile.member && canModerate(tile.member)"
-            class="absolute top-2 right-2 transition-opacity"
-            :class="openMenuUserId === tile.member.userId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
-          >
-            <button
-              class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-              style="width: 26px; height: 26px; color: #fff; background-color: rgba(0,0,0,0.5);"
-              :aria-label="t('voice.moderationMenu')"
-              @click.stop="toggleMenu(tile.member.userId)"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="5" r="1" fill="currentColor"/>
-                <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                <circle cx="12" cy="19" r="1" fill="currentColor"/>
-              </svg>
-            </button>
-
-            <!-- Dropdown -->
-            <div
-              v-if="openMenuUserId === tile.member.userId"
-              ref="menuRef"
-              class="absolute right-0 top-full mt-1 z-20 rounded-[var(--kv-radius-md)] border overflow-hidden"
-              style="min-width: 180px; background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
-              @click.stop
-            >
-              <!-- Sustur / Susturmayı kaldır -->
-              <button
-                v-if="canMute"
-                class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-                style="color: var(--kv-text-secondary);"
-                @click="toggleServerMute(tile.member)"
-              >
-                {{ isServerMutedFor(tile.member) ? t('voice.serverUnmute') : t('voice.serverMute') }}
-              </button>
-              <!-- Taşı (alt-liste) -->
-              <template v-if="canMove">
-                <button
-                  class="w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-                  style="color: var(--kv-text-secondary);"
-                  @click.stop="moveSubmenuOpen = !moveSubmenuOpen"
-                >
-                  <span>{{ t('voice.moveTo') }}</span>
-                  <svg
-                    width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                    class="shrink-0 transition-transform" :class="moveSubmenuOpen ? 'rotate-90' : ''"
-                  >
-                    <path d="M9 18l6-6-6-6"/>
-                  </svg>
-                </button>
-                <div
-                  v-if="moveSubmenuOpen"
-                  class="max-h-56 overflow-y-auto border-t"
-                  style="border-color: var(--kv-border-subtle);"
-                >
-                  <p
-                    v-if="moveTargets.length === 0"
-                    class="px-3 py-2 text-[12px]"
-                    style="color: var(--kv-text-muted);"
-                  >
-                    {{ t('voice.noMoveTargets') }}
-                  </p>
-                  <button
-                    v-for="target in moveTargets"
-                    :key="target.id"
-                    class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)] truncate"
-                    style="color: var(--kv-text-secondary);"
-                    @click="moveTo(tile.member, target)"
-                  >
-                    {{ target.name }}
-                  </button>
-                </div>
-              </template>
-              <!-- Yayını Durdur (MUTE_MEMBERS, yalnız yayın yapıyorsa) -->
-              <button
-                v-if="canMute && isBroadcastingFor(tile.member)"
-                class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-                style="color: var(--kv-text-secondary);"
-                @click="stopBroadcast(tile.member)"
-              >
-                {{ t('voice.stopBroadcast') }}
-              </button>
-              <!-- Odadan Çıkar (MOVE_MEMBERS) -->
-              <button
-                v-if="canMove"
-                class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-                style="color: var(--kv-danger);"
-                @click="askDisconnect(tile.member)"
-              >
-                {{ t('voice.disconnectUser') }}
-              </button>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            {{ t('voice.gridView') }}
+          </button>
+          <div class="flex-1 min-w-0 flex gap-2 overflow-x-auto py-0.5">
+            <div v-for="tile in tiles" :key="tile.key" class="shrink-0" style="width: 128px; height: 72px;">
+              <VoiceTile
+                v-bind="tileProps(tile, 'strip')"
+                @toggle-fit="toggleFit(tile)"
+                @focus="setFocus(tile.key)"
+                @server-mute="onTileServerMute(tile)"
+                @move="(target: ChannelDto) => onTileMove(tile, target)"
+                @stop-broadcast="onTileStopBroadcast(tile)"
+                @disconnect="onTileDisconnect(tile)"
+              />
             </div>
-          </div>
-
-          <!-- Alt etiket: ad + mute/yayın göstergesi -->
-          <div
-            class="absolute bottom-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-full pointer-events-none"
-            style="background-color: rgba(0,0,0,0.5); max-width: calc(100% - 16px);"
-          >
-            <!-- Moderatör (server) susturması -->
-            <svg v-if="tile.member && isServerMutedFor(tile.member)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-danger);" class="shrink-0">
-              <path d="M12 2L4 5v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V5l-8-3z"/>
-              <line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/>
-            </svg>
-            <!-- Self / track mute -->
-            <svg v-else-if="tile.member && isMutedFor(tile.member)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-danger);" class="shrink-0">
-              <line x1="1" y1="1" x2="23" y2="23"/>
-              <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
-              <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-            </svg>
-            <!-- Ekran paylaşımı ikonu (mute yokken, ekran tile'ı) -->
-            <svg v-else-if="tile.kind === 'video' && tile.entry.trackKind === 'screen'" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #fff;" class="shrink-0">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-            </svg>
-            <span class="text-[12px] truncate" style="color: #fff;">
-              {{ tileName(tile) }}<template v-if="tileIsLocal(tile)"> ({{ t('voice.you') }})</template>
-            </span>
           </div>
         </div>
       </div>
+
+      <!-- Bağlı: IZGARA düzeni (odak yok) -->
+      <div v-else class="grid gap-3 w-full h-full" :style="gridStyle">
+        <VoiceTile
+          v-for="tile in tiles"
+          :key="tile.key"
+          v-bind="tileProps(tile, 'grid')"
+          @toggle-fit="toggleFit(tile)"
+          @focus="setFocus(tile.key)"
+          @server-mute="onTileServerMute(tile)"
+          @move="(target: ChannelDto) => onTileMove(tile, target)"
+          @stop-broadcast="onTileStopBroadcast(tile)"
+          @disconnect="onTileDisconnect(tile)"
+        />
+      </div>
     </div>
 
-    <!-- Alt kontrol barı (paylaşılan) -->
-    <div v-if="connectedHere" class="shrink-0 py-4 border-t" style="border-color: var(--kv-border-subtle);">
-      <VoiceControlBar />
+    <!-- Alt kontrol barı: kontroller ortada, tam ekran en sağda aynı hizada (Discord-tarzı) -->
+    <div v-if="connectedHere" class="shrink-0 grid grid-cols-3 items-end px-4 py-4 border-t" style="border-color: var(--kv-border-subtle);">
+      <div></div>
+      <div class="justify-self-center">
+        <VoiceControlBar />
+      </div>
+      <div class="justify-self-end">
+        <button
+          class="w-11 h-11 flex items-center justify-center rounded-full cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
+          :title="isFullscreen ? t('voice.exitFullscreen') : t('voice.enterFullscreen')"
+          :aria-label="isFullscreen ? t('voice.exitFullscreen') : t('voice.enterFullscreen')"
+          @click="toggleRoomFullscreen"
+        >
+          <svg v-if="!isFullscreen" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+            <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+          </svg>
+          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 14h3a2 2 0 0 1 2 2v3"/><path d="M20 10h-3a2 2 0 0 1-2-2V5"/>
+            <path d="M14 20v-3a2 2 0 0 1 2-2h3"/><path d="M10 4v3a2 2 0 0 1-2 2H5"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -457,11 +375,3 @@ function errMessage(e: unknown, fallbackKey: string): string {
     @cancel="disconnectTarget = null"
   />
 </template>
-
-<style scoped>
-/* Kart ızgarasında video kartı doldurur (object-cover); tam-ekranda her şeyi göster (contain). */
-.kv-video-tile:fullscreen video {
-  object-fit: contain;
-  background-color: #000;
-}
-</style>

@@ -5,7 +5,7 @@ import { useMessagesStore } from '@/stores/messages'
 import { useDmStore } from '@/stores/dm'
 import { useAuthStore } from '@/stores/auth'
 import { useFriendsStore } from '@/stores/friends'
-import { useSocket } from '@/composables/useSocket'
+import { useSocket, voiceSubscribe, voiceUnsubscribe } from '@/composables/useSocket'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
 import { useJumpToMessage } from '@/composables/useMessageJump'
@@ -284,14 +284,17 @@ const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channel.id] 
 watch(
   () => props.channel.id,
   async (id, oldId) => {
-    if (oldId) leaveChannel(oldId)
+    if (oldId) { leaveChannel(oldId); voiceUnsubscribe(oldId) }
     if (!id) return
     const ack = await joinChannel(id)
     realtimeError.value = !ack.ok
     await messagesStore.fetchMessages(id)
     await dmStore.markRead(id)
-    // REV-11: bu kanalda devam eden çağrı var mı (snapshot) → "Sese Katıl" göster
+    // REV-11: bu kanalda devam eden çağrı var mı (snapshot) → "Sese Katıl" göster.
+    // Ayrıca canlı presence'a abone ol → biri çıkınca voice.participant_left ile liste
+    // güncellenir ("Sese katıl" takılı kalmaz). Guild'de VoiceParticipantList yapar; DM'de burada.
     voiceStore.loadParticipants(id)
+    voiceSubscribe(id)
     stickToBottom = true
     scrollToBottom()
   },
@@ -568,6 +571,7 @@ onMounted(() => {
 })
 onUnmounted(() => {
   document.removeEventListener('click', onDmPickerDocClick)
+  voiceUnsubscribe(props.channel.id)
 })
 
 // Gruplama: mesaj grup başı mı?

@@ -36,6 +36,12 @@ export interface VideoTrackEntry {
   track: RemoteTrack | LocalVideoTrack
 }
 
+// Kart ızgarası/sahnesi için kutucuk: video track'i olan tile video, olmayan avatar.
+// VoiceRoomView (ızgara/sahne/şerit) ve VoiceTile arasında paylaşılan tip.
+export type VoiceTileData =
+  | { key: string; kind: 'video'; member: RoomMember | null; entry: VideoTrackEntry }
+  | { key: string; kind: 'avatar'; member: RoomMember; entry?: undefined }
+
 /**
  * Voice store — LiveKit ses kanalları (audio-only v1).
  * İki katman:
@@ -527,11 +533,21 @@ export const useVoiceStore = defineStore('voice', () => {
       refreshRoomParticipants()
       recomputeSpeaking()
     })
-    // Uzak katılımcı mikrofon aç/kapa göstergesi
-    r.on(RoomEvent.TrackMuted, (_pub, p: Participant) => {
+    // Track mute/unmute. Mikrofon (audio) → mute göstergesi. Kamera/ekran (video) → LiveKit
+    // bazı yollarda track'i unpublish etmek yerine MUTE eder (TrackUnsubscribed gelmez); o
+    // durumda tile siyah kalmasın diye video girişini listeden çıkar/geri ekle (avatar dönsün).
+    r.on(RoomEvent.TrackMuted, (pub, p: Participant) => {
+      if (pub.kind === Track.Kind.Video) {
+        _removeVideoTrack(p.identity, pub.source === Track.Source.Camera ? 'camera' : 'screen')
+        return
+      }
       const s = new Set(mutedUserIds.value); s.add(p.identity); mutedUserIds.value = s
     })
-    r.on(RoomEvent.TrackUnmuted, (_pub, p: Participant) => {
+    r.on(RoomEvent.TrackUnmuted, (pub, p: Participant) => {
+      if (pub.kind === Track.Kind.Video) {
+        if (pub.track) _addVideoTrack(p, pub.track as RemoteTrack | LocalVideoTrack)
+        return
+      }
       const s = new Set(mutedUserIds.value); s.delete(p.identity); mutedUserIds.value = s
     })
     r.on(RoomEvent.Disconnected, (reason?: unknown) => {
