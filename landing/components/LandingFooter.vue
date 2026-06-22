@@ -6,7 +6,7 @@
   <footer class="footer">
     <div class="kv-container footer-inner">
       <a href="/" class="brand" aria-label="Kankaverse ana sayfa">
-        <img src="/kankaverse-logo.png" alt="Kankaverse" class="logo" width="202" height="38" />
+        <img src="/kankaverse-logo.png" alt="Kankaverse" class="logo" width="256" height="48" />
       </a>
       <nav class="links">
         <a :href="PRIVACY_URL">Gizlilik</a>
@@ -36,7 +36,7 @@
   align-items: center;
 }
 .logo {
-  height: 38px;
+  height: 48px;
   width: auto;
 }
 .links {
