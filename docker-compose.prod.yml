@@ -53,6 +53,13 @@ services:
     restart: unless-stopped
     # ports YOK — Caddy iç ağdan web:80'e proxy'ler
 
+  landing:
+    # Tanıtım sitesi (Nuxt SSG → statik nginx). API'ye konuşmaz; CTA'lar absolute URL → build-arg yok.
+    build:
+      context: ./landing
+    restart: unless-stopped
+    # ports YOK — Caddy iç ağdan landing:80'e proxy'ler ('/' + bilinmeyen yollar)
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -68,6 +75,7 @@ services:
     depends_on:
       - web
       - api
+      - landing
 
 volumes:
   pgdata:

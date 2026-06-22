@@ -6,7 +6,9 @@ const fs = require('fs')
 let pickerWin = null
 
 // Uygulama URL'si: geliştirmede KANKAVERSE_URL env değişkeni ile override edilebilir.
-const APP_URL = process.env.KANKAVERSE_URL ?? 'https://kankaverse.com'
+// NOT: kök '/' artık tanıtım sitesi (landing tier). Masaüstü doğrudan app ana ekranını yükler;
+// giriş yapılmamışsa SPA /login'e yönlendirir. Kökü yüklersek landing açılırdı.
+const APP_URL = process.env.KANKAVERSE_URL ?? 'https://kankaverse.com/channels/@me'
 
 let win = null
 let tray = null
