@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // Tanıtım tek-sayfası — bölümleri compose eder. SEO/OG meta burada.
 // NOT: og:image şimdilik apple-touch-icon (kare). Lansman öncesi 1200x630 /og.png eklenmeli.
-const title = 'Kankaverse — Türkiye’nin sohbet evreni'
+const title = 'Kankaverse — Türkiye’nin topluluk ve sohbet platformu'
 const description =
-  'Toplulukların, oyuncuların ve arkadaş gruplarının sesli ve yazılı buluştuğu güvenli sohbet platformu. Türkçe, yerli ve güvenli.'
+  'Kankaverse — Türkiye için topluluk tabanlı sesli ve yazılı sohbet platformu. Sunucular, kanallar, arkadaş grupları; Türkçe arayüz, KVKK uyumlu, yerli ve güvenli.'
 const url = 'https://kankaverse.com/'
 const image = 'https://kankaverse.com/apple-touch-icon.png'
 
@@ -23,8 +23,29 @@ useSeoMeta({
   twitterImage: image,
 })
 
+// Structured data — Google markayı/sitesi anlasın (snippet/sitelink, ileride knowledge panel).
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      name: 'Kankaverse',
+      url: 'https://kankaverse.com',
+      logo: 'https://kankaverse.com/kankaverse-logo.png',
+      description: 'Türkiye için topluluk tabanlı sesli ve yazılı sohbet platformu.',
+    },
+    {
+      '@type': 'WebSite',
+      name: 'Kankaverse',
+      url: 'https://kankaverse.com',
+      inLanguage: 'tr-TR',
+    },
+  ],
+}
+
 useHead({
   link: [{ rel: 'canonical', href: url }],
+  script: [{ type: 'application/ld+json', innerHTML: JSON.stringify(jsonLd) }],
 })
 </script>
 
