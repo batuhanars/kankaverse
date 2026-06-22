@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Tanıtım tek-sayfası — bölümleri compose eder. SEO/OG meta burada.
-// NOT: og:image şimdilik apple-touch-icon (kare). Lansman öncesi 1200x630 /og.png eklenmeli.
+// og:image: 1200x630 marka kartı (public/og.png — gen-og.mjs ile üretildi).
 const title = 'Kankaverse — Türkiye’nin topluluk ve sohbet platformu'
 const description =
   'Kankaverse — Türkiye için topluluk tabanlı sesli ve yazılı sohbet platformu. Sunucular, kanallar, arkadaş grupları; Türkçe arayüz, KVKK uyumlu, yerli ve güvenli.'
 const url = 'https://kankaverse.com/'
-const image = 'https://kankaverse.com/apple-touch-icon.png'
+const image = 'https://kankaverse.com/og.png'
 
 useSeoMeta({
   title,
@@ -15,6 +15,9 @@ useSeoMeta({
   ogType: 'website',
   ogUrl: url,
   ogImage: image,
+  ogImageWidth: 1200,
+  ogImageHeight: 630,
+  ogImageType: 'image/png',
   ogLocale: 'tr_TR',
   ogSiteName: 'Kankaverse',
   twitterCard: 'summary_large_image',
