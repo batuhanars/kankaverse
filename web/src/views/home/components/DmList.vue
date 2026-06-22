@@ -60,7 +60,7 @@ function groupDisplayName(ch: Extract<DmChannelDto, { type: 'GROUP_DM' }>): stri
       :key="ch.id"
       class="w-full flex items-center gap-3 px-2 py-2 rounded-[var(--kv-radius-md)] transition-colors cursor-pointer text-left"
       :style="activeChannelId === ch.id
-        ? 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);'
+        ? 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary); box-shadow: inset 2px 0 0 var(--kv-accent-500);'
         : 'color: var(--kv-text-secondary);'"
       @click="emit('select', ch.id)"
     >

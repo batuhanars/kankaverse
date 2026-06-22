@@ -1055,7 +1055,7 @@ onUnmounted(() => {
         class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
         :class="[
           channelsStore.activeChannelId === channel.id
-            ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-text-primary)]'
+            ? 'bg-[var(--kv-bg-elevated)] text-[var(--kv-accent-400)] shadow-[inset_2px_0_0_var(--kv-accent-500)]'
             : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
           highlightedChannelId === channel.id ? 'kv-mention-highlight' : '',
           dragOverChannelId === channel.id ? 'kv-drop-target' : '',
@@ -1077,7 +1077,7 @@ onUnmounted(() => {
             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
           </svg>
-          <span v-else class="text-[16px] font-semibold leading-none" style="color: var(--kv-text-muted);">#</span>
+          <span v-else class="text-[16px] font-semibold leading-none" :style="{ color: channelsStore.activeChannelId === channel.id ? 'var(--kv-accent-400)' : 'var(--kv-text-muted)' }">#</span>
           <span
             class="truncate"
             :class="[
@@ -1279,7 +1279,7 @@ onUnmounted(() => {
             class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
             :class="[
               channelsStore.activeChannelId === channel.id
-                ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-text-primary)]'
+                ? 'bg-[var(--kv-bg-elevated)] text-[var(--kv-accent-400)] shadow-[inset_2px_0_0_var(--kv-accent-500)]'
                 : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
               highlightedChannelId === channel.id ? 'kv-mention-highlight' : '',
               dragOverChannelId === channel.id ? 'kv-drop-target' : '',
@@ -1301,7 +1301,7 @@ onUnmounted(() => {
                 <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
                 <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
               </svg>
-              <span v-else class="text-[16px] font-semibold leading-none" style="color: var(--kv-text-muted);">#</span>
+              <span v-else class="text-[16px] font-semibold leading-none" :style="{ color: channelsStore.activeChannelId === channel.id ? 'var(--kv-accent-400)' : 'var(--kv-text-muted)' }">#</span>
               <span
                 class="truncate"
                 :class="[

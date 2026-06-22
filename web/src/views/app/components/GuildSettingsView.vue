@@ -516,7 +516,7 @@ function confirmNavDiscard() {
               type="button"
               class="w-full flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] font-medium text-left cursor-pointer transition-colors"
               :class="activeSection === item.key
-                ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-text-primary)]'
+                ? 'bg-[var(--kv-bg-elevated)] text-[var(--kv-accent-400)] shadow-[inset_2px_0_0_var(--kv-accent-500)]'
                 : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-bg-elevated)] hover:text-[var(--kv-text-primary)]'"
               @click="requestNav(item.key)"
             >

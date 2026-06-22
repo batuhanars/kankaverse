@@ -771,7 +771,7 @@ function badgeLabel(count: number): string {
   font-size: 13px;
   font-weight: 600;
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-  background-color: var(--kv-accent-subtle);
+  background-color: var(--kv-bg-elevated);
   color: var(--kv-accent-500);
   transition: background-color 0.15s, color 0.15s;
 }
