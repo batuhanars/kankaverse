@@ -76,18 +76,18 @@ const router = createRouter({
       component: () => import('@/views/moderation/ModerationView.vue'),
       meta: { requiresAuth: true },
     },
-    // Uygulama kabuğu (kalıcı çerçeve) + nested ekran view'ları.
-    // PATHLESS parent: kendi URL'i yok (yalnız layout + auth guard taşır) → '/' artık
-    // landing tier'ına (Nuxt) ait; app ekranları MUTLAK path'lerle kabuğun altında.
+    // Uygulama kabuğu (kalıcı çerçeve) + nested ekran view'ları. Parent path '/' (kanıtlanmış nested
+    // desen); ana ekran '/channels/@me'ye taşındı (eski ''). '/' kullanıcıya Caddy'de landing'e gider,
+    // SPA'ya ulaşmaz; ulaşırsa catch-all app'e yönlendirir.
     // Standart: stack/frontend/component-organization §Routing — URL = ekranın tek doğruluk kaynağı.
     {
-      path: '',
+      path: '/',
       component: () => import('@/views/app/AppShell.vue'),
       meta: { requiresAuth: true },
       children: [
         {
-          // Discord-tarzı app ana ekranı (eski '/'). name değişmez → tüm { name: 'app' } nav'ı korunur.
-          path: '/channels/@me',
+          // Discord-tarzı app ana ekranı (eski ''). name değişmez → tüm { name: 'app' } nav'ı korunur.
+          path: 'channels/@me',
           name: 'app',
           components: {
             default: () => import('@/views/home/HomeView.vue'),
@@ -95,7 +95,7 @@ const router = createRouter({
           },
         },
         {
-          path: '/channels/:guildId/:channelId',
+          path: 'channels/:guildId/:channelId',
           name: 'channel',
           components: {
             default: () => import('@/views/app/GuildChannelView.vue'),
@@ -104,7 +104,7 @@ const router = createRouter({
           props: { default: true },
         },
         {
-          path: '/dm/:channelId',
+          path: 'dm/:channelId',
           name: 'dm',
           components: {
             default: () => import('@/views/home/DmView.vue'),
@@ -114,7 +114,7 @@ const router = createRouter({
         },
         // Sprint C6 — Keşfet (Ortam Keşfi). Sidebar slot = DiscoverSidebar (canonical rail|sidebar|içerik ızgarası).
         {
-          path: '/discover',
+          path: 'discover',
           name: 'discover',
           components: {
             default: () => import('@/views/discover/DiscoverView.vue'),
