@@ -14,6 +14,7 @@ import {
 import { voiceApi, type VoiceParticipantDto } from '@/api/voice'
 import { useToastStore } from '@/stores/toast'
 import { useAuthStore } from '@/stores/auth'
+import { useCallSounds } from '@/composables/useCallSounds'
 import { i18n } from '@/i18n'
 
 export interface VoiceParticipant {
@@ -222,6 +223,7 @@ export const useVoiceStore = defineStore('voice', () => {
 
       connectedChannelId.value = channelId
       connectedAt.value = Date.now() // REV-13: süre sayacı başlangıcı
+      useCallSounds().playConnect() // bağlandı blibi (her ses kanalına katılımda — Discord gibi)
 
       // İyimser self-add: sunucu mintToken'da emit yapar ama WS gecikmesi veya
       // dev'de webhook eksikliği olsa da panel listesi anında güncellenir.
@@ -303,6 +305,8 @@ export const useVoiceStore = defineStore('voice', () => {
       // #1: ayrılınca kendi yayın rozeti düşsün
       removeBroadcast(leftChannelId, selfId)
     }
+    // Ayrıldı blibi — yalnız gerçekten bağlıydıysak (başarısız join'in catch→leave'inde çalmaz)
+    if (leftChannelId) useCallSounds().playDisconnect()
 
     if (room) {
       try { await room.disconnect() } catch { /* yoksay */ }
