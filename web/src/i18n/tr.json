@@ -955,6 +955,8 @@
     "createOrtamDesc": "Kendi topluluğunu kur",
     "joinOrtam": "Ortama Katıl",
     "joinOrtamDesc": "Davet koduyla katıl",
+    "importOrtam": "Discord'tan İçeri Aktar",
+    "importOrtamDesc": "Sunucu şablonunu taşı",
     "myOrtamlar": "Ortamların",
     "noOrtam": "Henüz bir ortamda değilsin.",
     "createdAt": "Oluşturuldu: {date}",

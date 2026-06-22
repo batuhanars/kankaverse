@@ -61,6 +61,7 @@ async function openGuild(guildId: string) {
         @add-friend="openAddFriend"
         @create-ortam="openServerModal('create')"
         @join-ortam="openServerModal('join')"
+        @import-ortam="openServerModal('import')"
         @open-guild="openGuild"
       />
       <FriendsRightPanel
