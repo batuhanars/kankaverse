@@ -4,7 +4,7 @@ import { ref } from 'vue'
  * Uygulama-geneli modal durumu (singleton). AppShell modalları render eder;
  * herhangi bir view/sidebar açıcıları çağırır. Cross-view modal için event yerine paylaşılan state.
  */
-type ServerModalStep = 'choose' | 'create' | 'join'
+type ServerModalStep = 'choose' | 'create' | 'join' | 'import'
 
 const showServerModal = ref(false)
 const serverModalStep = ref<ServerModalStep>('choose')

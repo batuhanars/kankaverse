@@ -1,19 +1,33 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useGuildsStore } from '@/stores/guilds'
+import { guildsApi } from '@/api/guilds'
 import { bannerBackground } from '@/utils/bannerColor'
 
 const emit = defineEmits<{
   addFriend: []
   createOrtam: []
   joinOrtam: []
+  importOrtam: []
   openGuild: [guildId: string]
 }>()
 
 const { t } = useI18n()
 const authStore = useAuthStore()
 const guildsStore = useGuildsStore()
+
+// Discord göçü bayrağı — yalnız açıkken "Discord'tan İçeri Aktar" hızlı aksiyonu görünür (ServerModal ile aynı kapı).
+const discordImportEnabled = ref(false)
+onMounted(async () => {
+  try {
+    const res = await guildsApi.discordImportStatus()
+    discordImportEnabled.value = res.data.enabled === true
+  } catch {
+    discordImportEnabled.value = false
+  }
+})
 
 // "Ağu 2025" — kuruluş tarihi kısa etiketi
 function createdLabel(iso: string): string {
@@ -25,7 +39,7 @@ function createdLabel(iso: string): string {
   <div class="flex-1 min-w-0 flex flex-col mb-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
        style="background-color: var(--kv-bg-content);">
     <div class="flex-1 min-h-0 overflow-y-auto">
-    <div class="max-w-2xl mx-auto px-6 py-8 space-y-8">
+    <div class="max-w-4xl mx-auto px-6 py-8 space-y-8">
 
       <!-- Karşılama -->
       <div class="px-1">
@@ -40,7 +54,7 @@ function createdLabel(iso: string): string {
       <!-- Hızlı Aksiyonlar -->
       <div>
         <p class="section-label">{{ t('home.quickActions') }}</p>
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid gap-3" :class="discordImportEnabled ? 'grid-cols-4' : 'grid-cols-3'">
 
           <!-- Kanka Ekle -->
           <button class="tile-btn" @click="emit('addFriend')">
@@ -87,6 +101,21 @@ function createdLabel(iso: string): string {
             </div>
           </button>
 
+          <!-- Discord'tan İçeri Aktar (yalnız göç bayrağı açıkken) -->
+          <button v-if="discordImportEnabled" class="tile-btn" @click="emit('importOrtam')">
+            <div class="tile-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--kv-accent-500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </div>
+            <div>
+              <p class="tile-title">{{ t('home.importOrtam') }}</p>
+              <p class="tile-desc">{{ t('home.importOrtamDesc') }}</p>
+            </div>
+          </button>
+
         </div>
       </div>
 
@@ -98,7 +127,7 @@ function createdLabel(iso: string): string {
           {{ t('home.noOrtam') }}
         </p>
 
-        <div v-else class="grid grid-cols-2 gap-3">
+        <div v-else class="grid grid-cols-3 gap-3">
           <button
             v-for="guild in guildsStore.guilds"
             :key="guild.id"
