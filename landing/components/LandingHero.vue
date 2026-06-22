@@ -7,7 +7,7 @@
     <!-- Üst bar -->
     <nav class="nav kv-container">
       <a href="/" class="brand" aria-label="Kankaverse ana sayfa">
-        <img src="/kankaverse-logo.png" alt="Kankaverse" class="logo" width="244" height="46" />
+        <img src="/kankaverse-logo.png" alt="Kankaverse" class="logo" width="171" height="46" />
       </a>
       <a :href="LOGIN_URL" class="kv-btn kv-btn--ghost nav-login">Giriş yap</a>
     </nav>
