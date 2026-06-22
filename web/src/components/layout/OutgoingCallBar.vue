@@ -4,16 +4,25 @@
  * DM sohbetinden çıksan da görünür kalır → ringing'i her yerden görebilir/iptal edebilirsin.
  * Kabul edilince callStore.outgoing temizlenir (useSocket) → bar kaybolur, VoiceConnectedBar devralır.
  */
-import { computed } from 'vue'
+import { computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCallStore } from '@/stores/call'
 import { useCall } from '@/composables/useCall'
+import { useCallSounds } from '@/composables/useCallSounds'
 import { useDmStore } from '@/stores/dm'
 
 const { t } = useI18n()
 const callStore = useCallStore()
 const { cancelCall } = useCall()
+const { startRingback, stopRingback } = useCallSounds()
 const dmStore = useDmStore()
+
+// Aranıyor durumu boyunca geri-zil (loop) — kabul/iptal/timeout/ulaşılamadı durdurur
+watch(
+  () => callStore.outgoing?.channelId,
+  (id) => { if (id) startRingback(); else stopRingback() },
+)
+onUnmounted(() => stopRingback())
 
 const calleeName = computed(() => {
   const id = callStore.outgoing?.channelId

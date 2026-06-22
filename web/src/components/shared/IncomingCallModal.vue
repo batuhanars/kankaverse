@@ -7,10 +7,12 @@ import { watch, computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCallStore } from '@/stores/call'
 import { useCall } from '@/composables/useCall'
+import { useCallSounds } from '@/composables/useCallSounds'
 
 const { t } = useI18n()
 const callStore = useCallStore()
 const { acceptCall, rejectCall } = useCall()
+const { startRingtone, stopRingtone } = useCallSounds()
 
 let timer: ReturnType<typeof setTimeout> | null = null
 
@@ -32,13 +34,16 @@ watch(
   (id) => {
     if (timer) { clearTimeout(timer); timer = null }
     if (id) {
+      startRingtone() // telefon çalıyormuş gibi (loop) — accept/reject/cancel/timeout durdurur
       timer = setTimeout(() => {
         if (callStore.incoming?.channelId === id) rejectCall(id)
       }, 30_000)
+    } else {
+      stopRingtone()
     }
   },
 )
-onUnmounted(() => { if (timer) clearTimeout(timer) })
+onUnmounted(() => { if (timer) clearTimeout(timer); stopRingtone() })
 </script>
 
 <template>
