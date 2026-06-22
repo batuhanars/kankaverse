@@ -16,12 +16,12 @@ function onSelectDm(channelId: string) {
 </script>
 
 <template>
-  <div class="h-14 shrink-0 flex items-center">
-    <!-- Sol boşluk eşiti — bildirim çanı ile simetri -->
-    <div class="w-14 shrink-0" />
+  <div class="h-14 shrink-0 flex items-center px-4">
+    <!-- Sol eşit alan — sağ (bildirim çanı) ile aynı flex payı → buton gerçek ortada -->
+    <div class="flex-1" />
 
     <!-- Arama butonu — yatay ortalanmış, kompakt buton görünümü -->
-    <div class="flex-1 flex justify-center">
+    <div class="shrink-0">
       <button
         class="flex items-center gap-2 h-8 px-3 rounded-[var(--kv-radius-md)] text-[13px] cursor-pointer transition-colors shrink-0"
         style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted); border: 1px solid var(--kv-border-subtle);"
@@ -41,8 +41,9 @@ function onSelectDm(channelId: string) {
       </button>
     </div>
 
-    <!-- Bildirim çanı -->
-    <div class="mr-4 shrink-0">
+    <!-- Sağ alan: çan sağ uçta + panel kadar rezerv (basis) → arama dashboard ortasına hizalanır.
+         Kankalar paneli (var(--kv-panel-width)) + gap-4 + mr-4 = panel-width + 2rem. -->
+    <div class="flex justify-end items-center" style="flex: 1 1 calc(var(--kv-panel-width) + 2rem);">
       <NotificationBell />
     </div>
   </div>
