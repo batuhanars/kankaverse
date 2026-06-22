@@ -1,5 +1,6 @@
 # Kankaverse — Caddy edge (otomatik HTTPS / Let's Encrypt)
-# web + api AYNI ORIGIN → kankaverse.com (api: /api/* · WS: /socket.io/*). Çapraz-origin CORS preflight YOK.
+# Yönlendirme: '/' + bilinmeyen yollar → landing (Nuxt SSG tanıtım sitesi);
+#   app yolları (@app matcher) → web (Vue SPA); /api · /socket.io → api (aynı origin, CORS preflight YOK).
 #   → Frontend build'inde VITE_API_URL BOŞ bırakılır: axios→'/api', socket→'/' (dev vite-proxy ile birebir).
 # api.kankaverse.com bloğu KORUNUR: LiveKit webhook'u (https://api.kankaverse.com/voice/webhook) oraya kayıtlı.
 # Caddy, Socket.IO WebSocket upgrade'ini otomatik proxy'ler — ekstra config gerekmez.
@@ -25,9 +26,14 @@ kankaverse.com, www.kankaverse.com {
 	handle /socket.io/* {
 		reverse_proxy api:3000
 	}
-	# Geri kalan her şey → statik web SPA
-	handle {
+	# Uygulama (Vue SPA) yolları → web:80. Liste sonlu/sabit; yeni app yolu eklenince buraya da ekle.
+	@app path /channels/* /dm/* /discover /discover/* /login /login/* /register /invite/* /settings/* /moderation /verify-email /forgot-password /reset-password /email/* /gizlilik
+	handle @app {
 		reverse_proxy web:80
+	}
+	# Geri kalan her şey (/ + bilinmeyen yollar) → statik landing (Nuxt SSG tanıtım sitesi)
+	handle {
+		reverse_proxy landing:80
 	}
 }
 

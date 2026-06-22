@@ -1,0 +1,49 @@
+/* KAYNAK: web/src/styles/tokens.css — BİREBİR KOPYA. Burada DEĞİŞTİRME; web kaynağını
+   değiştir, sonra buraya senkronla (diff boş olmalı). Tek kaynak:
+   knowledge/projects/kankaverse/kankaverse-design-tokens.md */
+:root {
+  /* nötr */
+  --kv-bg-rail: #131110;
+  --kv-bg-sidebar: #1A1817;
+  --kv-bg-content: #211E1C;
+  --kv-bg-elevated: #2A2724;
+  --kv-bg-overlay: rgba(0, 0, 0, 0.6);
+  --kv-border-subtle: rgba(255, 255, 255, 0.06);
+  --kv-border-strong: rgba(255, 255, 255, 0.12);
+  /* metin */
+  --kv-text-primary: #F4F1ED;
+  --kv-text-body: #D6D0C8;
+  --kv-text-secondary: #B6AFA6;
+  --kv-text-muted: #847C71;
+  /* aksan: kor */
+  --kv-accent-400: #FF845E;
+  --kv-accent-500: #FF6B3D;
+  --kv-accent-600: #E5552A;
+  --kv-accent-subtle: rgba(255, 107, 61, 0.12);
+  /* semantik */
+  --kv-danger: #F23B4B;
+  --kv-danger-subtle: rgba(242, 59, 75, 0.12);
+  --kv-success: #3DB46E;
+  --kv-warning: #E8A33D;
+  --kv-info: #4E9CF5;
+  /* presence */
+  --kv-online: #3DB46E;
+  --kv-idle: #E8A33D;
+  --kv-dnd: #F23B4B;
+  --kv-offline: #6E675E;
+  /* şekil */
+  --kv-radius-sm: 6px;
+  --kv-radius-md: 10px;
+  --kv-radius-lg: 14px;
+  /* tipografi */
+  --kv-font-ui: 'Figtree', system-ui, -apple-system, sans-serif;
+  --kv-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  /* ölçü / layout */
+  --kv-rail-width: 72px;
+  --kv-panel-width: 264px;
+  --kv-header-height: 64px;
+  --kv-panel-gap: 16px;
+  --kv-input-min-height: 44px;
+  --kv-control: 32px;
+  --kv-control-sm: 28px;
+}
