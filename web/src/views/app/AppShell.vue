@@ -146,11 +146,11 @@ onUnmounted(() => {
       <div
         ref="drawerRef"
         :class="[
-          'flex flex-col h-full relative z-30',
+          'flex flex-col h-full',
           'transition-transform duration-300 ease-in-out',
           isMobile
-            ? ['absolute inset-y-0 left-0', leftDrawerOpen ? 'translate-x-0' : '-translate-x-full']
-            : 'shrink-0 translate-x-0',
+            ? ['absolute inset-y-0 left-0 z-30', leftDrawerOpen ? 'translate-x-0' : '-translate-x-full']
+            : 'relative shrink-0 translate-x-0',
         ]"
         :role="isMobile ? 'dialog' : 'navigation'"
         :aria-modal="isMobile ? 'true' : undefined"
