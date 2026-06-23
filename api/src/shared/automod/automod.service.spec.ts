@@ -45,13 +45,63 @@ describe('AutomodService.check', () => {
     });
   });
 
+  // ── Token başı (prefix): Türkçe ekli biçimler de yakalanır ──────────────────
+  describe('ek almış biçim → prefix → blocked', () => {
+    it('"orospusun" (ek) → blocked', () => {
+      expect(service.check('sen bir orospusun').blocked).toBe(true);
+    });
+
+    it('"şerefsizsin" (ek) → blocked', () => {
+      expect(service.check('şerefsizsin sen').blocked).toBe(true);
+    });
+
+    it('"siktir" (sik prefix) → blocked', () => {
+      expect(service.check('siktir git').blocked).toBe(true);
+    });
+
+    it('"sikiyorum" (sik çekim, prefix) → blocked', () => {
+      expect(service.check('sikiyorum seni').blocked).toBe(true);
+    });
+  });
+
+  // ── Eklenen kelimeler (2026-06-23) — blok + çakışma güvenliği ──────────────
+  describe('eklenen kelimeler → blocked, masum komşular → geçer', () => {
+    it('"yarak" → blocked', () => {
+      expect(service.check('seni gidi yarak').blocked).toBe(true);
+    });
+    it('"yaralı"/"yaratık"/"yaramaz" → geçer (yarak prefix yakalamaz)', () => {
+      expect(service.check('yaralı bir yaratık çok yaramaz').blocked).toBe(false);
+    });
+    it('"amcık" / "amcik" → blocked', () => {
+      expect(service.check('amcık').blocked).toBe(true);
+      expect(service.check('amcik').blocked).toBe(true);
+    });
+    it('"amca"/"amcam"/"amaç" → geçer', () => {
+      expect(service.check('amcam ile amaç konuştuk').blocked).toBe(false);
+    });
+    it('"ipne" → blocked, "ipek"/"iplik" → geçer', () => {
+      expect(service.check('ipne').blocked).toBe(true);
+      expect(service.check('ipek iplik aldım').blocked).toBe(false);
+    });
+    it('"godoş" → blocked', () => {
+      expect(service.check('godoş herif').blocked).toBe(true);
+    });
+    it('"götveren" + "göt veren" (boşluklu) → blocked', () => {
+      expect(service.check('götveren').blocked).toBe(true);
+      expect(service.check('göt veren').blocked).toBe(true);
+    });
+    it('"götlek" → blocked', () => {
+      expect(service.check('götlek').blocked).toBe(true);
+    });
+  });
+
   // ── Normalize varyantları: büyük harf ─────────────────────────────────────
   describe('büyük harf varyantları → normalize → blocked', () => {
     it('"OROSPU" → blocked', () => {
       expect(service.check('OROSPU').blocked).toBe(true);
     });
 
-    it('"SİK" (Türkçe büyük İ) → blocked', () => {
+    it('"SİK" (Türkçe büyük İ → i) → blocked', () => {
       expect(service.check('SİK').blocked).toBe(true);
     });
 
@@ -85,22 +135,17 @@ describe('AutomodService.check', () => {
       expect(service.check('siikkk').blocked).toBe(true);
     });
 
-    it('"oooorosspuu" → "orosp" + normalize → blocked', () => {
-      // orospu → normalize: tekrarlı daralt → "orospu"
+    it('"oooorooosspu" → "orospu" → blocked', () => {
       expect(service.check('oooorooosspu').blocked).toBe(true);
     });
 
     it('"piiiiç" → "pic" → blocked', () => {
       expect(service.check('piiiiç').blocked).toBe(true);
     });
-
-    it('"SSIIKK" → normalize → blocked', () => {
-      expect(service.check('SSIIKK').blocked).toBe(true);
-    });
   });
 
-  // ── Cümle içi gömülü eşleşme ─────────────────────────────────────────────
-  describe('cümle içi gömülü yasak kelime → blocked', () => {
+  // ── Cümle içi (kelime sınırında) yasak kelime → blocked ──────────────────
+  describe('cümle içi yasak kelime (token sınırı) → blocked', () => {
     it('başta yasak kelime → blocked', () => {
       expect(service.check('ibne sen kimsin').blocked).toBe(true);
     });
@@ -111,6 +156,41 @@ describe('AutomodService.check', () => {
 
     it('ortada yasak kelime → blocked', () => {
       expect(service.check('bu adamın kahpe biri olduğunu').blocked).toBe(true);
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // ── YANLIŞ-POZİTİF REGRESYON KİLİDİ (B1/B2 düzeltmesi, 2026-06-23) ──────────
+  //    ı≠i ayrımı + token-başı eşleşme: masum kelimeler GEÇMELİ.
+  //    Bu testler bozulursa automod tekrar günlük Türkçeyi yiyor demektir.
+  // ════════════════════════════════════════════════════════════════════════════
+  describe('YANLIŞ-POZİTİF KİLİDİ: masum kelime → geçer (blocked: false)', () => {
+    it('"sıkıntı yok" (ı≠i) → geçer', () => {
+      expect(service.check('bugün hiç sıkıntı yok').blocked).toBe(false);
+    });
+
+    it('"sık sık" (ı≠i) → geçer', () => {
+      expect(service.check('buraya sık sık geliyorum').blocked).toBe(false);
+    });
+
+    it('"sıkışık / sıkıcı" (ı≠i) → geçer', () => {
+      expect(service.check('program çok sıkışık ve sıkıcı').blocked).toBe(false);
+    });
+
+    it('"şık" giyim (ş→s ama ı korunur) → geçer', () => {
+      expect(service.check('çok şık giyinmişsin').blocked).toBe(false);
+    });
+
+    it('"klasik" (kelime-ortası sik, prefix yakalamaz) → geçer', () => {
+      expect(service.check('klasik müzik dinliyorum').blocked).toBe(false);
+    });
+
+    it('"kapıcı" (kelime-ortası pic, prefix yakalamaz) → geçer', () => {
+      expect(service.check('kapıcı geldi mi').blocked).toBe(false);
+    });
+
+    it('"bisiklet" (kelime-ortası sik) → geçer', () => {
+      expect(service.check('yeni bisiklet aldım').blocked).toBe(false);
     });
   });
 
@@ -157,15 +237,33 @@ describe('AutomodService.check', () => {
     });
   });
 
-  // ── Açık yazılı ağır küfür → blocked ────────────────────────────────────────
-  describe('açık yazılı ağır küfür → blocked', () => {
-    it('"aminakoyayim" normalize varyantı (büyük harf + TR) → blocked', () => {
-      // AMİNAKOYAYIM → normalize → aminakoyayim
-      expect(service.check('AMİNAKOYAYIM').blocked).toBe(true);
+  // ── Büyük-harf ı/i ayrımı (caps belirsizliği — bilinçli davranış) ───────────
+  describe('caps ı/i ayrımı (bilinçli)', () => {
+    it('"SIK" (ascii I → ı → sık) → geçer (frekans anlamı, küfür değil)', () => {
+      // ascii büyük I, Türkçe locale\'de ı olur → "sık" → masum
+      expect(service.check('SIK SIK').blocked).toBe(false);
     });
 
-    it('"aminakoyayim" tekrarlı harf varyantı → blocked', () => {
-      // amiiinakoyaayim → daralt → aminakoyayim
+    it('"SİK" (dotted İ → i) → blocked (küfür)', () => {
+      expect(service.check('SİK').blocked).toBe(true);
+    });
+  });
+
+  // ── Açık yazılı ağır küfür → blocked ────────────────────────────────────────
+  describe('açık yazılı ağır küfür → blocked', () => {
+    it('"amınakoyayım" (ı yazımı) → blocked', () => {
+      expect(service.check('amınakoyayım').blocked).toBe(true);
+    });
+
+    it('"aminakoyayim" (tembel i yazımı) → blocked', () => {
+      expect(service.check('aminakoyayim').blocked).toBe(true);
+    });
+
+    it('"AMINAKOYAYIM" (ascii caps → ı) → blocked', () => {
+      expect(service.check('AMINAKOYAYIM').blocked).toBe(true);
+    });
+
+    it('"amiiinakoyaayim" tekrarlı harf → daralt → blocked', () => {
       expect(service.check('amiiinakoyaayim').blocked).toBe(true);
     });
   });
@@ -173,13 +271,15 @@ describe('AutomodService.check', () => {
   // ── Kutsal değerlere hakaret → blocked ──────────────────────────────────────
   // 4B'de insan-onaylı ban'a yükseltilecek; şimdi block-on-send
   describe('kutsal değerlere hakaret → blocked', () => {
-    it('"allahını satayım" → blocked', () => {
-      // normalize: alahini satayim
+    it('"allahını satayım" (ı yazımı) → blocked', () => {
       expect(service.check('allahını satayım').blocked).toBe(true);
     });
 
+    it('"allahini satayim" (tembel i yazımı) → blocked', () => {
+      expect(service.check('allahini satayim').blocked).toBe(true);
+    });
+
     it('"allahına koyayım" → blocked', () => {
-      // normalize: alahina koyayim
       expect(service.check('allahına koyayım').blocked).toBe(true);
     });
 
@@ -192,8 +292,22 @@ describe('AutomodService.check', () => {
     });
 
     it('büyük harf kutsal-değer ifadesi → normalize → blocked', () => {
-      // ALLAHINI SATAYIM → normalize → alahini satayim
-      expect(service.check('ALLAHINI SATAYIM').blocked).toBe(true);
+      expect(service.check('ALLAHINA KOYAYIM').blocked).toBe(true);
+    });
+  });
+
+  // ── Ülke/kimlik isimleri bloklanmaz (kimlik adı politikası) ─────────────────
+  describe('ülke/kimlik ismi → serbest (geçer)', () => {
+    it('"israil soykırım yapıyor" (eleştiri) → geçer', () => {
+      expect(service.check('israil soykırım yapıyor').blocked).toBe(false);
+    });
+
+    it('Kur\'an "Beni İsrail" → geçer', () => {
+      expect(service.check('Beni İsrail').blocked).toBe(false);
+    });
+
+    it('"kürdistan" → geçer', () => {
+      expect(service.check('kürdistan').blocked).toBe(false);
     });
   });
 });
