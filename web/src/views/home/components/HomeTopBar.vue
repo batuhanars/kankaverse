@@ -2,13 +2,13 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppShellNav } from '@/composables/useAppShellNav'
-import { isMobile } from '@/composables/useResponsive'
+import { isMobile, isWide } from '@/composables/useResponsive'
 import GlobalSearch from '@/components/shared/GlobalSearch.vue'
 import NotificationBell from '@/components/shared/NotificationBell.vue'
 
 const emit = defineEmits<{ selectDm: [channelId: string] }>()
 const { t } = useI18n()
-const { toggleLeftDrawer } = useAppShellNav()
+const { toggleLeftDrawer, toggleRightPanel, rightPanelVisible } = useAppShellNav()
 
 const showSearch = ref(false)
 
@@ -59,10 +59,32 @@ function onSelectDm(channelId: string) {
       </button>
     </div>
 
-    <!-- Sağ alan: çan sağ uçta + panel kadar rezerv (basis) → arama dashboard ortasına hizalanır.
-         Kankalar paneli (var(--kv-panel-width)) + gap-4 + mr-4 = panel-width + 2rem. -->
-    <div class="flex justify-end items-center" style="flex: 1 1 calc(var(--kv-panel-width) + 2rem);">
+    <!-- Sağ alan: ≥1280'de panel kadar basis rezervi (arama dashboard ortasına hizalanır).
+         <1280'de basis rezervi yok — çan + toggle sağda, arama normal ortalanır. -->
+    <div
+      class="flex justify-end items-center gap-1"
+      :style="isWide ? 'flex: 1 1 calc(var(--kv-panel-width) + 2rem);' : 'flex: 1;'"
+    >
       <NotificationBell />
+      <!-- Kankalar toggle — panel <1280'de overlay, ≥1280'de inline (gösterse de çalışır) -->
+      <button
+        class="w-9 h-9 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer shrink-0"
+        :style="rightPanelVisible
+          ? 'color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
+          : 'color: var(--kv-text-muted);'"
+        :aria-label="t('nav.toggleFriends')"
+        @click="toggleRightPanel"
+        @mouseenter="(e) => { if (!rightPanelVisible) (e.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)' }"
+        @mouseleave="(e) => { if (!rightPanelVisible) (e.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)' }"
+      >
+        <!-- Kişiler ikonu -->
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </button>
     </div>
   </div>
 
