@@ -62,11 +62,22 @@ geciktiren anti-spam/anti-raid sertleştirme (mevcut `canDm`/`canSendFriendReque
 - **Karantina:** **UI YOK** (sessiz). Jenerik retler zaten mevcut akışlarda gösteriliyor (DM/friend hata mesajları). Yeni ekran/gösterge ekleme.
 
 ## 6. DoD
-- [ ] Automod: guild kanalında yasak-kelime içeren mesaj `MESSAGE_BLOCKED` ile reddedilir; **DM etkilenmez**; sıfır DB/kayıt; liste config'ten.
-- [ ] Karantina: yeni üye (joinedAt < QUARANTINE_HOURS) ortak-ortam basamağıyla DM/friend başlatamaz; süre dolunca normal çalışır; `QUARANTINE_HOURS=0` kapatır.
-- [ ] Minör kalkanı bozulmadı (canDm 4a / friend G1 testleri hâlâ geçer); karantina yalnız ekledi.
-- [ ] `nest build` + `vue-tsc` temiz; birim testler (automod check + karantina entegrasyonu) geçer.
-- [ ] **R7:** karantina entegrasyonu satır-satır incelendi (sahip onayı).
+- [x] Automod: guild kanalında yasak-kelime içeren mesaj `MESSAGE_BLOCKED` ile reddedilir; **DM etkilenmez**; sıfır DB/kayıt; liste config'ten.
+- [x] Karantina: yeni üye (joinedAt < QUARANTINE_HOURS) ortak-ortam basamağıyla DM/friend başlatamaz; süre dolunca normal çalışır; `QUARANTINE_HOURS=0` kapatır.
+- [x] Minör kalkanı bozulmadı (canDm 4a / friend G1 testleri hâlâ geçer); karantina yalnız ekledi.
+- [x] `nest build` + `vue-tsc` temiz; birim testler (automod check + karantina entegrasyonu) geçer.
+- [x] **R7:** karantina entegrasyonu satır-satır incelendi (sahip onayı).
+
+## 6.1. Revizyon — Automod yanlış-pozitif sertleştirme (PM denetim, 2026-06-23)
+
+> Açık kayıt öncesi denetim. §2'deki "kelime-sınırı eşleşme" sözleşmesi koda yanlış (interior substring)
+> + `ı→i` katlaması olarak yansımıştı → günlük Türkçe yanlış bloklanıyordu. Düzeltildi (R7-nötr içerik filtresi):
+> - **B1:** interior substring → **token-başı (prefix)** eşleşmesi (sözleşme §2'ye uyumlu). `klasik`/`kapıcı`/`bisiklet` geçer; ek'li biçim (`orospusun`) yakalanır.
+> - **B2:** `ı→i` katlaması kaldırıldı (`ı`≠`i` ayrı harf). `sıkıntı`/`sık sık`/`şık` geçer; `sik`≠`sık`. Profanite `ı` içerenler config'te hem `ı` hem `i` yazımıyla (tembel-yazım kaçışı kapandı). Apostrof temizliği.
+> - **Kabul edilen artık:** `sik` prefix'i `siklet`/`siklon`/`sikke` gibi seyrek kelimeleri yakalar (düşük frekans).
+> - Automod spec 53 test (yanlış-pozitif regresyon kilidi dahil) + api suite 758/758 + build temiz.
+> - **Geniş liste genişletmesi → sistem mimarı vetlenmiş DB'si (sonraki tur), aynı ı/i disiplini.**
+> - **Liste eklendi (sahip onayı):** `yarak`, `amcık`/`amcik`, `ipne`, `godoş`, `götveren`/`göt veren`, `götlek`.
 
 ## 7. Notlar
 - Per-ortam karantina süresi/ayarı + DM automod + per-ortam özel kelime listesi → **V2** (`ORTAM_AYARLARI_ROADMAP.md`).
