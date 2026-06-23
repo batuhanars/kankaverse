@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAppShellNav } from '@/composables/useAppShellNav'
+import { isMobile } from '@/composables/useResponsive'
 import GlobalSearch from '@/components/shared/GlobalSearch.vue'
 import NotificationBell from '@/components/shared/NotificationBell.vue'
 
 const emit = defineEmits<{ selectDm: [channelId: string] }>()
 const { t } = useI18n()
+const { toggleLeftDrawer } = useAppShellNav()
 
 const showSearch = ref(false)
 
@@ -17,6 +20,21 @@ function onSelectDm(channelId: string) {
 
 <template>
   <div class="h-14 shrink-0 flex items-center px-4">
+    <!-- Hamburger: yalnız <768 -->
+    <button
+      v-if="isMobile"
+      class="w-9 h-9 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer shrink-0 mr-2"
+      style="color: var(--kv-text-muted);"
+      :aria-label="t('nav.openMenu')"
+      @click="toggleLeftDrawer"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="18" x2="21" y2="18" />
+      </svg>
+    </button>
+
     <!-- Sol eşit alan — sağ (bildirim çanı) ile aynı flex payı → buton gerçek ortada -->
     <div class="flex-1" />
 
