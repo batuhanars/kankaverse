@@ -66,8 +66,9 @@ function onSelectDm(channelId: string) {
       :style="isWide ? 'flex: 1 1 calc(var(--kv-panel-width) + 2rem);' : 'flex: 1;'"
     >
       <NotificationBell />
-      <!-- Kankalar toggle — panel <1280'de overlay, ≥1280'de inline (gösterse de çalışır) -->
+      <!-- Kankalar toggle — yalnız <1280: panel overlay olduğunda açmak için. ≥1280'de panel zaten inline → toggle gizli. -->
       <button
+        v-if="!isWide"
         class="w-9 h-9 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer shrink-0"
         :style="rightPanelVisible
           ? 'color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
