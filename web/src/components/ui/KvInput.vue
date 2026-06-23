@@ -64,3 +64,17 @@ const resolvedType = computed(() => {
     <span v-if="error" class="text-[12px] text-[var(--kv-danger)]">{{ error }}</span>
   </div>
 </template>
+
+<style scoped>
+/* Native sayı spinner'ını gizle — tarayıcının gri yukarı/aşağı okları tasarım diline yabancı,
+   yuvarlak köşeyle çakışıp bozuk görünüyor. Değer elle yazılır (boş = sınırsız). */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+</style>
