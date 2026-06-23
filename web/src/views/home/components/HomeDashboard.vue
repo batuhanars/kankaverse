@@ -39,7 +39,7 @@ function createdLabel(iso: string): string {
   <div class="flex-1 min-w-0 flex flex-col mb-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
        style="background-color: var(--kv-bg-content);">
     <div class="flex-1 min-h-0 overflow-y-auto">
-    <div class="max-w-4xl mx-auto px-6 py-8 space-y-8">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
 
       <!-- Karşılama -->
       <div class="px-1">
@@ -54,7 +54,10 @@ function createdLabel(iso: string): string {
       <!-- Hızlı Aksiyonlar -->
       <div>
         <p class="section-label">{{ t('home.quickActions') }}</p>
-        <div class="grid gap-3" :class="discordImportEnabled ? 'grid-cols-4' : 'grid-cols-3'">
+        <div
+          class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+          :class="discordImportEnabled ? 'xl:grid-cols-4' : ''"
+        >
 
           <!-- Kanka Ekle -->
           <button class="tile-btn" @click="emit('addFriend')">
@@ -127,7 +130,7 @@ function createdLabel(iso: string): string {
           {{ t('home.noOrtam') }}
         </p>
 
-        <div v-else class="grid grid-cols-3 gap-3">
+        <div v-else class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           <button
             v-for="guild in guildsStore.guilds"
             :key="guild.id"
