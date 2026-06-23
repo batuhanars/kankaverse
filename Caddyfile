@@ -28,8 +28,9 @@ kankaverse.com, www.kankaverse.com {
 	}
 	# Uygulama (Vue SPA) yolları + statik asset'leri → web:80. /assets/* KRİTİK: web'in JS/CSS'i
 	# buradan gelir; unutulursa landing'e düşer, SPA boot edemez (beyaz ekran). Landing kendi
-	# asset'lerini /_nuxt/'ta tutar → çakışma yok. Yeni app yolu eklenince buraya da ekle.
-	@app path /assets/* /channels/* /dm/* /discover /discover/* /login /login/* /register /invite/* /settings/* /moderation /verify-email /forgot-password /reset-password /email/* /gizlilik
+	# asset'lerini /_nuxt/'ta tutar → çakışma yok. Yeni app yolu VEYA web kök statik dosyası
+	# (ör. /splash-hexagon.png — açılış splash logosu) eklenince buraya da ekle, yoksa landing'e düşer.
+	@app path /assets/* /splash-hexagon.png /channels/* /dm/* /discover /discover/* /login /login/* /register /invite/* /settings/* /moderation /verify-email /forgot-password /reset-password /email/* /gizlilik
 	handle @app {
 		reverse_proxy web:80
 	}
