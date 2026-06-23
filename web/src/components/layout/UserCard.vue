@@ -81,7 +81,7 @@ function onLogout() {
 </script>
 
 <template>
-  <div ref="cardRef" class="relative z-10 px-2 pb-4 pt-4 shrink-0">
+  <div ref="cardRef" class="relative z-10 p-0 md:px-2 md:pb-4 md:pt-4 shrink-0">
 
     <!-- Upward popover -->
     <div
@@ -161,7 +161,7 @@ function onLogout() {
 
     <!-- Birleşik panel: aktif ses barı (varsa) + kullanıcı pill — Discord-tarzı tek kart, arada tek border -->
     <div
-      class="overflow-hidden rounded-[var(--kv-radius-lg)] transition-colors"
+      class="overflow-hidden rounded-none md:rounded-[var(--kv-radius-lg)] transition-colors"
       :style="showPopover
         ? 'background-color: var(--kv-bg-content); border: 1px solid var(--kv-border-strong);'
         : 'background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);'"
