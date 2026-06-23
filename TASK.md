@@ -409,6 +409,19 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] `nest build` + `vue-tsc` temiz; 168 test geçer
 - [x] **R7:** karantina entegrasyonu — PM satır-satır inceledi (canDm 4c + friend 6a temiz, initiator-only, minör kalkanı korundu); **sahip güven-temelli onay** (automod içerik-politikası sahip yönlendirdi)
 
+### Sprint 7B — Revizyon: Automod yanlış-pozitif sertleştirme (PM denetim, 2026-06-23)
+
+> Açık kayıt öncesi automod denetimi. **Scope creep DEĞİL** — mevcut automod'un eşleşme mantığı
+> günlük Türkçeyi yanlış bloklayan iki sistemik kusur taşıyordu (sözleşme §2 "kelime-sınırı"na da aykırı).
+> R7-nötr (içerik filtresi, T&S karar yüzeyi değil). Dev checkbox işaretler.
+
+- [x] **B1 — interior substring → token-başı (prefix) eşleşmesi:** `klasik`(→`sik`)/`kapıcı`(→`pic`)/`bisiklet` artık GEÇER; ek'li biçim (`orospusun`/`şerefsizsin`) prefix ile yakalanır
+- [x] **B2 — `ı→i` katlaması kaldırıldı:** `ı`≠`i` (ayrı harf) → `sıkıntı`/`sık sık`/`sıkışık`/`şık` GEÇER, `sik`(küfür) ile `sık`(sık) ayrışır. Yan-etki: profanite `ı` içerenler (`amına…`, kutsal-değer ifadeleri) hem `ı` hem `i` yazımıyla listelendi (tembel yazım kaçışı kapandı); apostrof temizliği (`Kur'an`→`kuran`)
+- [x] **Bilinen artık (kabul):** `sik` prefix'i `siklet`/`siklon`/`sikke` gibi seyrek kelimeleri yakalar — düşük frekans, `sıkıntı` kurtarmaya değer (config yorumunda belgelendi)
+- [x] **Yanlış-pozitif regresyon kilidi:** automod spec 53 test (sıkıntı/sık sık/şık/klasik/kapıcı/bisiklet GEÇMELİ kilitleri); tüm api suite **758/758** + `nest build` temiz
+- [x] **Liste eklendi (sahip onayı):** `yarak`/`amcık`/`ipne`/`godoş`/`götveren`/`göt veren`/`götlek` — her biri prefix-çakışma kontrollü
+- [x] **Geniş liste genişletmesi → sistem mimarı (vetlenmiş küfür/argo DB'si), sonraki tur** — aynı ı/i disiplini uygulanacak; eşleşme altyapısı hazır
+
 ---
 
 ## Sprint 5 — Dosya Paylaşımı (S3-uyumlu upload + presigned + Attachment) (PM onaylı 2026-06-13)
