@@ -12,6 +12,7 @@ import type { PlatformInviteDto } from '@/api/admin'
 import { useToastStore } from '@/stores/toast'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
+import KvNumberInput from '@/components/ui/KvNumberInput.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -22,9 +23,9 @@ const creating = ref(false)
 const createError = ref('')
 const newCode = ref<string | null>(null)
 
-// Form alanları (hepsi opsiyonel)
-const formMaxUses = ref('')
-const formExpiresHours = ref('')
+// Form alanları (hepsi opsiyonel). Sayısal alanlar number | null (null = boş → sınırsız/süresiz).
+const formMaxUses = ref<number | null>(null)
+const formExpiresHours = ref<number | null>(null)
 const formNote = ref('')
 
 const codeSource = computed(() => newCode.value ?? '')
@@ -36,13 +37,11 @@ async function createInvite() {
   newCode.value = null
   try {
     const payload: { maxUses?: number; expiresInHours?: number; note?: string } = {}
-    const maxUsesNum = parseInt(formMaxUses.value)
-    if (formMaxUses.value && !isNaN(maxUsesNum) && maxUsesNum >= 1) {
-      payload.maxUses = maxUsesNum
+    if (formMaxUses.value && formMaxUses.value >= 1) {
+      payload.maxUses = formMaxUses.value
     }
-    const expiresNum = parseInt(formExpiresHours.value)
-    if (formExpiresHours.value && !isNaN(expiresNum) && expiresNum >= 1) {
-      payload.expiresInHours = expiresNum
+    if (formExpiresHours.value && formExpiresHours.value >= 1) {
+      payload.expiresInHours = formExpiresHours.value
     }
     if (formNote.value.trim()) {
       payload.note = formNote.value.trim().slice(0, 200)
@@ -50,8 +49,8 @@ async function createInvite() {
     const res = await adminApi.createPlatformInvite(payload)
     newCode.value = res.data.code
     // Formu temizle ve listeyi yenile
-    formMaxUses.value = ''
-    formExpiresHours.value = ''
+    formMaxUses.value = null
+    formExpiresHours.value = null
     formNote.value = ''
     await loadInvites()
   } catch (e: unknown) {
@@ -139,19 +138,21 @@ async function confirmRevoke() {
       <div class="flex flex-col gap-3 rounded-[var(--kv-radius-lg)] p-4" style="background-color: var(--kv-bg-sidebar);">
         <div class="flex gap-3">
           <div class="flex-1">
-            <KvInput
+            <KvNumberInput
               v-model="formMaxUses"
               :label="t('admin.platformInvite.maxUsesLabel')"
               :placeholder="t('admin.platformInvite.maxUsesPlaceholder')"
-              type="number"
+              :min="1"
+              :max="10000"
             />
           </div>
           <div class="flex-1">
-            <KvInput
+            <KvNumberInput
               v-model="formExpiresHours"
               :label="t('admin.platformInvite.expiresHoursLabel')"
               :placeholder="t('admin.platformInvite.expiresHoursPlaceholder')"
-              type="number"
+              :min="1"
+              :max="8760"
             />
           </div>
         </div>
