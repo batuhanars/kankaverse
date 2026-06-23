@@ -56,12 +56,13 @@ async function submit() {
 
 <template>
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center"
+    class="fixed inset-0 z-50 flex items-end justify-stretch md:items-center md:justify-center"
     style="background-color: rgba(0,0,0,0.6);"
     @click.self="emit('close')"
   >
     <div
-      class="w-[420px] max-h-[80vh] flex flex-col rounded-[var(--kv-radius-lg)] overflow-hidden"
+      class="w-full h-full flex flex-col rounded-none overflow-hidden
+             md:w-[420px] md:h-auto md:max-h-[80vh] md:rounded-[var(--kv-radius-lg)]"
       style="background-color: var(--kv-bg-sidebar);"
     >
       <!-- Başlık -->

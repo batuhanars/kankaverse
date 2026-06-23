@@ -141,12 +141,13 @@ async function handleImport() {
 <template>
   <Teleport to="body">
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center"
+      class="fixed inset-0 z-50 flex items-end justify-stretch md:items-center md:justify-center"
       style="background-color: var(--kv-bg-overlay);"
       @click.self="emit('close')"
     >
       <div
-        class="relative w-full rounded-[var(--kv-radius-lg)] overflow-hidden"
+        class="relative w-full h-full rounded-none overflow-hidden
+               md:h-auto md:rounded-[var(--kv-radius-lg)]"
         style="max-width: 440px; background-color: var(--kv-bg-sidebar);"
         role="dialog"
         aria-modal="true"

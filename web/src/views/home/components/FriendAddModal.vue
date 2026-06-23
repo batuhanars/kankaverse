@@ -46,12 +46,13 @@ async function send() {
 
 <template>
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center"
+    class="fixed inset-0 z-50 flex items-end justify-stretch md:items-center md:justify-center"
     style="background-color: rgba(0,0,0,0.6);"
     @click.self="emit('close')"
   >
     <div
-      class="w-full max-w-md rounded-[var(--kv-radius-lg)] p-8"
+      class="w-full h-full rounded-none p-6
+             md:h-auto md:max-w-md md:rounded-[var(--kv-radius-lg)] md:p-8"
       style="background-color: var(--kv-bg-sidebar);"
     >
       <!-- Başlık -->
