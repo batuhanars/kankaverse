@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { isMobile } from '@/composables/useResponsive'
 import { useClipboard } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
@@ -491,8 +492,9 @@ function confirmNavDiscard() {
       aria-modal="true"
       :aria-label="t('guildSettings.title')"
     >
-      <!-- Sol bölge: sidebar rengi tam yükseklik, nav sağa yaslı -->
+      <!-- ── MASAÜSTÜ (≥768): Sol sidebar nav ── -->
       <div
+        v-if="!isMobile"
         class="shrink-0 flex justify-end"
         style="width: 42%; min-width: 280px; max-width: 560px; background-color: var(--kv-bg-sidebar);"
       >
@@ -542,10 +544,59 @@ function confirmNavDiscard() {
       </div>
       </div>
 
-      <!-- Sağ içerik alanı -->
-      <div class="flex-1 flex flex-col overflow-hidden" style="background-color: var(--kv-bg-content);">
-        <!-- İçerik header -->
+      <!-- ── İçerik alanı (hem mobil hem masaüstü) ── -->
+      <div class="flex-1 flex flex-col overflow-hidden min-w-0" style="background-color: var(--kv-bg-content);">
+
+        <!-- ── MOBİL (<768): Üst sekme şeridi ── -->
         <div
+          v-if="isMobile"
+          class="shrink-0 flex items-center border-b overflow-x-auto"
+          style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle); scrollbar-width: none;"
+        >
+          <template v-for="item in navItems" :key="item.key">
+            <button
+              v-if="item.visible"
+              type="button"
+              class="shrink-0 px-4 py-3 text-[13px] font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2"
+              :style="activeSection === item.key
+                ? 'color: var(--kv-accent-400); border-color: var(--kv-accent-500);'
+                : 'color: var(--kv-text-secondary); border-color: transparent;'"
+              @click="requestNav(item.key)"
+            >
+              {{ t(item.labelKey) }}
+            </button>
+          </template>
+
+          <!-- Ortamı sil (tehlikeli) — mobil sekme şeridinde de göster (OWNER) -->
+          <template v-if="dangerItem">
+            <button
+              type="button"
+              class="shrink-0 px-4 py-3 text-[13px] font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2"
+              style="color: var(--kv-danger); border-color: transparent;"
+              @click="showDeleteGuild = true"
+            >
+              {{ t('guildSettings.nav.ortamiSil') }}
+            </button>
+          </template>
+
+          <!-- Kapat — sekme şeridinin sağında -->
+          <button
+            type="button"
+            class="shrink-0 ml-auto flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
+            style="width: 44px; height: 44px; color: var(--kv-text-muted);"
+            :aria-label="t('common.close')"
+            @click="requestClose"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- ── MASAÜSTÜ: İçerik header (başlık + kapat) ── -->
+        <div
+          v-if="!isMobile"
           class="shrink-0 flex items-center justify-between border-b"
           style="height: var(--kv-header-height); border-color: var(--kv-border-subtle);"
         >
@@ -586,7 +637,7 @@ function confirmNavDiscard() {
         >
           <!-- Sarıcı: liste modunda padding+max-width; detay modunda kaldırılır -->
           <div
-            :class="rolesDetailMode ? 'flex-1 flex flex-col min-h-0' : 'px-8 py-6'"
+            :class="rolesDetailMode ? 'flex-1 flex flex-col min-h-0' : 'px-4 py-4 md:px-8 md:py-6'"
             :style="rolesDetailMode ? '' : 'max-width: 1000px; width: 100%;'"
           >
             <RolesSettingsSection
@@ -602,7 +653,7 @@ function confirmNavDiscard() {
 
         <div v-else class="flex-1 overflow-y-auto">
           <div style="max-width: 1000px; width: 100%;">
-            <div class="px-8 py-6">
+            <div class="px-4 py-4 md:px-8 md:py-6">
 
           <!-- ── Genel bölümü ── -->
           <div v-if="activeSection === 'genel'" class="flex flex-col lg:flex-row gap-8 items-start">

@@ -12,6 +12,7 @@ import { useToastStore } from '@/stores/toast'
 import { usersApi } from '@/api/users'
 import { DmPolicy } from '@/types'
 import { BANNER_PRESET_KEYS, bannerBackground } from '@/utils/bannerColor'
+import { isMobile } from '@/composables/useResponsive'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvModal from '@/components/ui/KvModal.vue'
 import TwoFactorSection from './components/TwoFactorSection.vue'
@@ -169,8 +170,9 @@ async function selectPolicy(p: DmPolicy) {
       aria-modal="true"
       :aria-label="t('settings.title')"
     >
-      <!-- Sol bölge: sidebar rengi tam yükseklik, nav sağa yaslı -->
+      <!-- ── MASAÜSTÜ (≥768): Sol sidebar nav ── -->
       <div
+        v-if="!isMobile"
         class="shrink-0 flex justify-end"
         style="width: 42%; min-width: 280px; max-width: 560px; background-color: var(--kv-bg-sidebar);"
       >
@@ -202,10 +204,46 @@ async function selectPolicy(p: DmPolicy) {
         </div>
       </div>
 
-      <!-- Sağ içerik alanı -->
-      <div class="flex-1 flex flex-col overflow-hidden" style="background-color: var(--kv-bg-content);">
-        <!-- İçerik header -->
+      <!-- ── İçerik alanı (hem mobil hem masaüstü) ── -->
+      <div class="flex-1 flex flex-col overflow-hidden min-w-0" style="background-color: var(--kv-bg-content);">
+
+        <!-- ── MOBİL (<768): Üst sekme şeridi ── -->
         <div
+          v-if="isMobile"
+          class="shrink-0 flex items-center border-b overflow-x-auto"
+          style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle); scrollbar-width: none;"
+        >
+          <button
+            v-for="item in navItems"
+            :key="item.key"
+            type="button"
+            class="shrink-0 px-4 py-3 text-[13px] font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2"
+            :style="activeSection === item.key
+              ? 'color: var(--kv-accent-400); border-color: var(--kv-accent-500);'
+              : 'color: var(--kv-text-secondary); border-color: transparent;'"
+            @click="activeSection = item.key"
+          >
+            {{ t(item.labelKey) }}
+          </button>
+
+          <!-- Kapat — sekme şeridinin sağında -->
+          <button
+            type="button"
+            class="shrink-0 ml-auto flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
+            style="width: 44px; height: 44px; color: var(--kv-text-muted);"
+            :aria-label="t('common.close')"
+            @click="emit('close')"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- ── MASAÜSTÜ: İçerik header (başlık + kapat) ── -->
+        <div
+          v-if="!isMobile"
           class="shrink-0 flex items-center justify-between border-b"
           style="height: var(--kv-header-height); border-color: var(--kv-border-subtle);"
         >
@@ -234,7 +272,7 @@ async function selectPolicy(p: DmPolicy) {
         <!-- İçerik gövde -->
         <div class="flex-1 overflow-y-auto">
           <div style="max-width: 1000px; width: 100%;">
-            <div class="px-8 py-6">
+            <div class="px-4 py-4 md:px-8 md:py-6">
 
               <!-- ── Hesap ── (Discord-tarzı satırlar; "Düzenle" → modal) -->
               <div v-if="activeSection === 'hesap'" class="flex flex-col gap-8 max-w-2xl">

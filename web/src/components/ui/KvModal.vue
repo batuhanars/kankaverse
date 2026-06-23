@@ -5,12 +5,22 @@ const emit = defineEmits<{ close: [] }>()
 
 <template>
   <Teleport to="body">
+    <!-- Backdrop: mobilde tıkla-kapat yok (tam-ekran), md+'da tıkla-kapat -->
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--kv-bg-overlay)]"
+      class="fixed inset-0 z-50 flex bg-[var(--kv-bg-overlay)]
+             items-end justify-stretch
+             md:items-center md:justify-center"
       @click.self="emit('close')"
     >
+      <!--
+        Mobil (<768): tam yükseklik, tam genişlik, radius sadece üstte
+        md+ (≥768): ortalı kart, max-w-md, max-h-[85vh], tam radius
+      -->
       <div
-        class="relative w-full max-w-md max-h-[85vh] flex flex-col rounded-[var(--kv-radius-lg)] bg-[var(--kv-bg-sidebar)] border border-[var(--kv-border-subtle)] p-6"
+        class="relative w-full flex flex-col
+               h-full rounded-none
+               md:h-auto md:max-w-md md:max-h-[85vh] md:rounded-[var(--kv-radius-lg)]
+               bg-[var(--kv-bg-sidebar)] border border-[var(--kv-border-subtle)] p-6"
         role="dialog"
         aria-modal="true"
       >
