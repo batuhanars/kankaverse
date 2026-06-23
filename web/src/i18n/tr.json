@@ -1242,6 +1242,12 @@
     "clear": "Temizle",
     "logout": "Çıkış Yap"
   },
+  "nav": {
+    "openMenu": "Menüyü aç",
+    "closeMenu": "Menüyü kapat",
+    "openMemberPanel": "Üye listesini aç",
+    "closeMemberPanel": "Üye listesini kapat"
+  },
   "presence": {
     "online": "Çevrimiçi",
     "away": "Boşta",

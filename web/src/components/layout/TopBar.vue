@@ -2,6 +2,8 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChannelsStore } from '@/stores/channels'
+import { useAppShellNav } from '@/composables/useAppShellNav'
+import { isMobile } from '@/composables/useResponsive'
 import PinsPopover from '@/components/shared/PinsPopover.vue'
 
 defineProps<{ showMemberPanel: boolean }>()
@@ -9,6 +11,7 @@ const emit = defineEmits<{ toggleMembers: [] }>()
 
 const { t } = useI18n()
 const channelsStore = useChannelsStore()
+const { toggleLeftDrawer } = useAppShellNav()
 
 const showPins = ref(false)
 
@@ -23,6 +26,21 @@ function togglePins(e: MouseEvent) {
     class="flex items-center px-4 gap-3 shrink-0 border-b"
     style="height: var(--kv-header-height); background-color: var(--kv-bg-content); border-color: var(--kv-border-subtle);"
   >
+    <!-- Hamburger: yalnız <768 -->
+    <button
+      v-if="isMobile"
+      class="w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer shrink-0"
+      style="color: var(--kv-text-muted);"
+      :aria-label="t('nav.openMenu')"
+      @click="toggleLeftDrawer"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="18" x2="21" y2="18" />
+      </svg>
+    </button>
+
     <span class="text-[var(--kv-text-muted)] font-medium">#</span>
     <span class="text-[15px] font-semibold text-[var(--kv-text-primary)]">
       {{ channelsStore.activeChannel()?.name ?? '' }}
