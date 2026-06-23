@@ -1246,7 +1246,8 @@
     "openMenu": "Menüyü aç",
     "closeMenu": "Menüyü kapat",
     "openMemberPanel": "Üye listesini aç",
-    "closeMemberPanel": "Üye listesini kapat"
+    "closeMemberPanel": "Üye listesini kapat",
+    "toggleFriends": "Kankalar"
   },
   "presence": {
     "online": "Çevrimiçi",
