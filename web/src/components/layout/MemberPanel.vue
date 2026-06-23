@@ -367,7 +367,7 @@ async function confirmTransfer() {
 
 <template>
   <aside
-    class="flex flex-col shrink-0 mb-4 mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
+    class="flex flex-col shrink-0 overflow-hidden rounded-none mb-0 mr-0 xl:rounded-[var(--kv-radius-lg)] xl:mb-4 xl:mr-4"
     style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
     @click="closeMenu"
   >

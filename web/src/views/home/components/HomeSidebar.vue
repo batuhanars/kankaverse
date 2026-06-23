@@ -29,7 +29,7 @@ function onChatCreated(channelId: string) {
 
 <template>
   <aside
-    class="flex flex-col shrink-0 rounded-[var(--kv-radius-lg)] overflow-hidden mt-4"
+    class="flex flex-col shrink-0 overflow-hidden rounded-none mt-0 md:rounded-[var(--kv-radius-lg)] md:mt-4"
     style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
   >
     <!-- DM bölüm başlığı + Sohbet Başlat -->

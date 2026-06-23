@@ -85,7 +85,7 @@ async function runConfirm() {
   <div v-if="openMenuId" class="fixed inset-0 z-10" @click="openMenuId = null" />
 
   <aside
-    class="shrink-0 flex flex-col mb-4 mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden relative"
+    class="shrink-0 flex flex-col overflow-hidden relative rounded-none mb-0 mr-0 xl:rounded-[var(--kv-radius-lg)] xl:mb-4 xl:mr-4"
     style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
   >
     <!-- Başlık + sekmeler -->

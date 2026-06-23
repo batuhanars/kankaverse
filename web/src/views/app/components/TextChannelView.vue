@@ -67,7 +67,7 @@ const showMemberPanel = computed(() => rightPanelVisible.value)
       <Transition name="kv-slide-right">
         <div
           v-if="rightPanelVisible"
-          class="absolute right-0 inset-y-0 z-30 flex overflow-hidden rounded-[var(--kv-radius-lg)]"
+          class="absolute right-0 inset-y-0 z-30 flex overflow-hidden"
           :style="{ width: 'var(--kv-panel-width)' }"
           role="dialog"
           :aria-label="t('member.panel')"
