@@ -13,6 +13,10 @@ concurrency:
   group: vps-deploy
   cancel-in-progress: false
 
+# Repo private → git pull GITHUB_TOKEN ile kimlik doğrular (aşağıda extraheader).
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: [self-hosted]
@@ -20,11 +24,16 @@ jobs:
       # actions/checkout YOK — mevcut /root/kankaverse klonu üzerinde çalışıyoruz
       # (.env.production orada; runner'ın _work klasörüne checkout istemiyoruz).
       - name: Deploy (yerel — git pull + compose up)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           cd /home/deploy/kankaverse
           BEFORE=$(git rev-parse HEAD)
-          git pull origin main
+          # Repo private: https remote anonim pull edemiyor. Token'ı geçici Authorization
+          # header'ı ile ver (URL'e gömme → ps/reflog sızıntısı yok). actions/checkout deseni.
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c http.extraheader="$AUTH_HEADER" pull origin main
           AFTER=$(git rev-parse HEAD)
           docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
           # Caddyfile bind-mount: up -d caddy'yi yeniden YARATMAZ + `caddy reload` çalışan sürece
