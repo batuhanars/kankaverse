@@ -6,9 +6,55 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kankaverse</title>
+    <!--
+      Açılış splash'ı — Vue mount olmadan ANINDA boyanır (ilk giriş + sayfa yenileme'de
+      beyaz/boş flash olmaz). main.ts router.isReady()'de gizlenir (auth /me kontrolü bitince).
+      Renk pre-app olduğu için elle yazılır; --kv-bg-content (#211E1C) ile EŞLİ (token kaynak).
+    -->
+    <style>
+      #app-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #211e1c; /* = --kv-bg-content; gövdeyle eşli → fade'de sıçrama yok */
+        transition: opacity 0.35s ease, visibility 0.35s ease;
+      }
+      #app-splash img {
+        width: 112px;
+        height: 112px;
+        animation: splash-pulse 1.4s ease-in-out infinite;
+        filter: drop-shadow(0 0 18px rgba(255, 107, 61, 0.35)); /* Kor (--kv-accent-500) ışıma */
+      }
+      #app-splash.is-hidden {
+        opacity: 0;
+        visibility: hidden;
+      }
+      @keyframes splash-pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 0.85;
+        }
+        50% {
+          transform: scale(1.08);
+          opacity: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-splash img {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>
+    <div id="app-splash" aria-hidden="true">
+      <img src="/splash-hexagon.png" alt="Kankaverse" width="112" height="112" />
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
