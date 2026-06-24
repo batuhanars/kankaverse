@@ -140,17 +140,10 @@ function clearFocus() {
   focusedKey.value = null
 }
 
-// Kutucuk başına sığdır/doldur (fit/fill). Ekran paylaşımı varsayılan 'contain' (tüm ekranı göster,
-// kırpma yok); kamera 'cover' (kutuyu doldur). Kullanıcı kutucuk başına geçiş yapabilir.
-const tileFit = ref<Record<string, 'cover' | 'contain'>>({})
-function defaultFit(tile: VoiceTileData): 'cover' | 'contain' {
-  return tile.kind === 'video' && tile.entry.trackKind === 'screen' ? 'contain' : 'cover'
-}
+// Sığdır/doldur: ekran paylaşımı 'contain' (tüm ekran görünür, kırpma yok); kamera 'cover'
+// (kutuyu doldur). Manuel geçiş butonu kaldırıldı — bu varsayılanlar yeterli.
 function fitOf(tile: VoiceTileData): 'cover' | 'contain' {
-  return tileFit.value[tile.key] ?? defaultFit(tile)
-}
-function toggleFit(tile: VoiceTileData) {
-  tileFit.value = { ...tileFit.value, [tile.key]: fitOf(tile) === 'cover' ? 'contain' : 'cover' }
+  return tile.kind === 'video' && tile.entry.trackKind === 'screen' ? 'contain' : 'cover'
 }
 
 // VoiceTile'a geçen prop demeti (ızgara/sahne/şerit ortak).
@@ -285,7 +278,6 @@ function errMessage(e: unknown, fallbackKey: string): string {
           <VoiceTile
             v-if="focusedTile"
             v-bind="tileProps(focusedTile, 'stage')"
-            @toggle-fit="toggleFit(focusedTile)"
             @focus="setFocus(focusedTile.key)"
             @server-mute="onTileServerMute(focusedTile)"
             @move="(target: ChannelDto) => onTileMove(focusedTile!, target)"
@@ -311,7 +303,6 @@ function errMessage(e: unknown, fallbackKey: string): string {
             <div v-for="tile in tiles" :key="tile.key" class="shrink-0" style="width: 128px; height: 72px;">
               <VoiceTile
                 v-bind="tileProps(tile, 'strip')"
-                @toggle-fit="toggleFit(tile)"
                 @focus="setFocus(tile.key)"
                 @server-mute="onTileServerMute(tile)"
                 @move="(target: ChannelDto) => onTileMove(tile, target)"
@@ -329,7 +320,6 @@ function errMessage(e: unknown, fallbackKey: string): string {
           v-for="tile in tiles"
           :key="tile.key"
           v-bind="tileProps(tile, 'grid')"
-          @toggle-fit="toggleFit(tile)"
           @focus="setFocus(tile.key)"
           @server-mute="onTileServerMute(tile)"
           @move="(target: ChannelDto) => onTileMove(tile, target)"
