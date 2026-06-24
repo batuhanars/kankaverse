@@ -137,7 +137,15 @@ onUnmounted(() => {
   <div class="flex flex-col h-full overflow-hidden" style="background-color: var(--kv-bg-rail);">
     <EmailVerificationBanner v-if="authStore.user && !authStore.user.emailVerified" />
 
-    <div class="flex flex-1 overflow-hidden relative gap-4">
+    <!--
+      Yatay floating boşluk: orta kolon kendi margin'ini taşımaz; gap-4 + komşu panellerin
+      margin'lerine (ChannelPanel md:mt-4 · MemberPanel xl:mr-4) güvenir. Komşu kaybolunca
+      kenara yapışıyordu. Tam o breakpoint'lerde padding ekle:
+        <768  (sol kolon off-canvas drawer'a kaçar)  → pl-4  ile sol kenardan ayır
+        <1280 (sağ panel overlay'e geçer, layout'tan çıkar) → pr-4 ile sağ kenardan ayır
+      ≥768/≥1280'de komşu panel zaten boşluğu verdiği için padding kapalı (çift boşluk olmaz).
+    -->
+    <div class="flex flex-1 overflow-hidden relative gap-4 max-md:pl-4 max-xl:pr-4">
       <!--
         SOL KOLON: ServerRail + sidebar (route'a göre) + UserCard
         <768:  off-canvas drawer — translate-x ile gizlenir; açıkken translate-x-0
