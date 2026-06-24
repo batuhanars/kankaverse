@@ -31,7 +31,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'toggle-fit'): void
   (e: 'focus'): void
   (e: 'server-mute'): void
   (e: 'move', target: ChannelDto): void
@@ -125,23 +124,6 @@ function onDisconnect() {
     >
       <img v-if="tile.member.avatarUrl" :src="tile.member.avatarUrl" :alt="tile.member.username" class="w-full h-full object-cover" />
       <span v-else>{{ tile.member.username[0]?.toUpperCase() }}</span>
-    </div>
-
-    <!-- Video kontrolü: sığdır/doldur (şeritte gizli; tam ekran butonu artık oda-seviyesinde) -->
-    <div v-if="tile.kind === 'video' && !isStrip" class="absolute bottom-2 right-2 flex items-center gap-1.5">
-      <button
-        class="flex items-center justify-center rounded-full cursor-pointer transition-opacity hover:opacity-90"
-        style="width: 40px; height: 40px; background-color: rgba(0,0,0,0.65); color: #fff;"
-        :title="fit === 'cover' ? t('voice.fitContain') : t('voice.fitCover')"
-        @click.stop="emit('toggle-fit')"
-      >
-        <svg v-if="fit === 'cover'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>
-        </svg>
-        <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
-        </svg>
-      </button>
     </div>
 
     <!-- R11: moderasyon menüsü (şeritte gizli) -->
