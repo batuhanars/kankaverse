@@ -162,6 +162,9 @@ const mentionChannels = computed(() => channelsStore.channelsWithMentions(active
 const totalMentions = computed(() => channelsStore.totalMentionsForGuild(activeGuildId.value))
 const highlightedChannelId = ref<string | null>(null)
 let mentionCycleIndex = 0
+// Vurgu animasyonunun sonunda işareti kaldıran zamanlayıcı (yavaşça kaybolma).
+let mentionHighlightTimer: ReturnType<typeof setTimeout> | null = null
+const MENTION_HIGHLIGHT_MS = 2600
 
 function jumpToNextMention() {
   const list = mentionChannels.value
@@ -173,13 +176,24 @@ function jumpToNextMention() {
   if (target.categoryId && isCategoryCollapsed(activeGuildId.value, target.categoryId)) {
     toggleCollapse(activeGuildId.value, target.categoryId)
   }
-  highlightedChannelId.value = target.id
+  // Animasyonu her tıklamada (aynı kanal olsa bile) baştan oynat: sınıfı sıfırla → nextTick'te ekle.
+  if (mentionHighlightTimer) clearTimeout(mentionHighlightTimer)
+  highlightedChannelId.value = null
   nextTick(() => {
+    highlightedChannelId.value = target.id
     document
       .querySelector(`[data-channel-row="${target.id}"]`)
       ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    // Yavaşça kaybol: animasyon süresi dolunca işareti kaldır (giriş/okundu daha erken temizler).
+    mentionHighlightTimer = setTimeout(() => {
+      if (highlightedChannelId.value === target.id) highlightedChannelId.value = null
+    }, MENTION_HIGHLIGHT_MS)
   })
 }
+
+onUnmounted(() => {
+  if (mentionHighlightTimer) clearTimeout(mentionHighlightTimer)
+})
 
 // Ortam değişince döngü + vurgu sıfırlanır
 watch(activeGuildId, () => {
@@ -2102,15 +2116,19 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* REV-4: bahsetme bandı zıplama vurgusu — kanal satırına geçici aksan halkası */
+/* REV-4: bahsetme bandı zıplama vurgusu — animasyonlu giriş + yavaşça kaybolma.
+   Kırmızı halka hızlıca belirir (pop-in), kısa süre durur, sonra yumuşakça solar. */
 .kv-mention-highlight {
   outline: 2px solid var(--kv-danger);
   outline-offset: -2px;
-  animation: kv-mention-pulse 1.2s ease-in-out;
+  border-radius: var(--kv-radius-sm);
+  animation: kv-mention-fade 2.6s ease-out forwards;
 }
-@keyframes kv-mention-pulse {
-  0%, 100% { background-color: transparent; }
-  30% { background-color: var(--kv-accent-subtle); }
+@keyframes kv-mention-fade {
+  0%   { outline-color: rgba(242, 59, 75, 0); background-color: transparent; }
+  10%  { outline-color: rgba(242, 59, 75, 1); background-color: var(--kv-accent-subtle); }
+  45%  { outline-color: rgba(242, 59, 75, 1); background-color: transparent; }
+  100% { outline-color: rgba(242, 59, 75, 0); background-color: transparent; }
 }
 
 /* Drag-reorder: üzerine bırakılacak hedef göstergesi (üst aksan çizgisi) */
