@@ -1135,16 +1135,17 @@ onUnmounted(() => {
               <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
           </span>
-          <!-- Yaş-kapılı kanal: nötr kilit ikonu (özel kanalla aynı dil); "18+" yazısı yerine tooltip -->
+          <!-- Yaş-kapılı kanal: amber uyarı üçgeni (özel kanal kilidinden ayrı; "giremezsin" değil "dikkat" der); "18+" yazısı yerine tooltip -->
           <span
             v-if="channel.ageGated"
             class="shrink-0"
             :title="t('channel.ageRestrictedLockTitle')"
-            style="color: var(--kv-text-muted);"
+            style="color: var(--kv-warning);"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
           </span>
           <span
@@ -1369,16 +1370,17 @@ onUnmounted(() => {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
               </span>
-              <!-- Yaş-kapılı kanal: nötr kilit ikonu (özel kanalla aynı dil); "18+" yazısı yerine tooltip -->
+              <!-- Yaş-kapılı kanal: amber uyarı üçgeni (özel kanal kilidinden ayrı; "giremezsin" değil "dikkat" der); "18+" yazısı yerine tooltip -->
               <span
                 v-if="channel.ageGated"
                 class="shrink-0"
                 :title="t('channel.ageRestrictedLockTitle')"
-                style="color: var(--kv-text-muted);"
+                style="color: var(--kv-warning);"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
               </span>
               <span
