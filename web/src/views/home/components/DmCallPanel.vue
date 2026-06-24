@@ -47,12 +47,8 @@ const tiles = computed<VoiceTileData[]>(() => {
   return [...videoTiles, ...avatarTiles]
 })
 
-// Kolon sayısı: 1→1, 2-4→2, 5-9→3, 10+→4 (yalnız IZGARA).
-const gridStyle = computed(() => {
-  const n = Math.max(tiles.value.length, 1)
-  const cols = n === 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4
-  return { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: 'minmax(0, 1fr)' }
-})
+// Video var mı? Yoksa kompakt avatar şeridi; varsa sahne (büyük odak + şerit).
+const hasVideo = computed(() => tiles.value.some((tl) => tl.kind === 'video'))
 
 // ── Odak (sahne) ─────────────────────────────────────────────────────────────────
 const focusedKey = ref<string | null>(null)
@@ -60,17 +56,25 @@ const screenFocusKey = computed<string | null>(() => {
   const s = tiles.value.find((tl) => tl.kind === 'video' && tl.entry.trackKind === 'screen')
   return s?.key ?? null
 })
+// Kendi video kutucuğum (kamera/ekran) — açtığımda varsayılan odak BEN olurum.
+const localVideoKey = computed<string | null>(() => {
+  const mine = tiles.value.find((tl) => tl.kind === 'video' && tl.entry.isLocal)
+  return mine?.key ?? null
+})
+const firstVideoKey = computed<string | null>(() => {
+  const v = tiles.value.find((tl) => tl.kind === 'video')
+  return v?.key ?? null
+})
+// Öncelik: kullanıcı tıkladıysa o; yoksa kendi videom; yoksa ekran paylaşımı; yoksa ilk video.
 const effectiveFocusKey = computed<string | null>(() => {
   if (focusedKey.value && tiles.value.some((tl) => tl.key === focusedKey.value)) return focusedKey.value
-  return screenFocusKey.value
+  return localVideoKey.value ?? screenFocusKey.value ?? firstVideoKey.value
 })
 const isStageMode = computed(() => effectiveFocusKey.value !== null)
 const focusedTile = computed<VoiceTileData | null>(
   () => tiles.value.find((tl) => tl.key === effectiveFocusKey.value) ?? null,
 )
-const showGridButton = computed(() => focusedKey.value !== null && screenFocusKey.value === null)
 function setFocus(key: string) { focusedKey.value = key }
-function clearFocus() { focusedKey.value = null }
 
 // Sığdır/doldur: ekran paylaşımı varsayılan 'contain', kamera 'cover'.
 const tileFit = ref<Record<string, 'cover' | 'contain'>>({})
@@ -148,52 +152,73 @@ async function toggleFullscreen() {
       <span class="text-[12px]" style="color: var(--kv-text-muted);">· {{ members.length }}</span>
     </div>
 
-    <!-- Orta: sahne (odak varsa) veya ızgara -->
-    <div class="kv-dm-voice-stage px-4 pt-3 overflow-hidden">
-      <!-- SAHNE -->
+    <!-- Orta: video varsa sahne (ortada, dar) + altta şerit · yoksa kompakt avatar şeridi -->
+    <div class="px-4 pt-3 overflow-hidden" :class="hasVideo ? 'kv-dm-voice-stage' : 'kv-dm-voice-avatars'">
+      <!-- VIDEO: büyük odak ortada (yatayda paneli kaplamaz) + altta küçük şerit -->
       <div v-if="isStageMode" class="w-full h-full flex flex-col gap-3">
-        <div class="flex-1 min-h-0">
-          <VoiceTile
-            v-if="focusedTile"
-            v-bind="tileProps(focusedTile, 'stage')"
-            @toggle-fit="toggleFit(focusedTile)"
-            @focus="setFocus(focusedTile.key)"
-          />
+        <div class="flex-1 min-h-0 flex items-center justify-center">
+          <div class="kv-dm-stage-frame h-full">
+            <VoiceTile
+              v-if="focusedTile"
+              v-bind="tileProps(focusedTile, 'stage')"
+              @toggle-fit="toggleFit(focusedTile)"
+              @focus="setFocus(focusedTile.key)"
+            />
+          </div>
         </div>
-        <div class="shrink-0 flex items-center gap-2">
-          <button
-            v-if="showGridButton"
-            class="shrink-0 flex items-center gap-1.5 px-3 h-[72px] rounded-[var(--kv-radius-md)] text-[12px] cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-text-secondary); background-color: var(--kv-bg-elevated);"
-            @click="clearFocus"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-            </svg>
-            {{ t('voice.gridView') }}
-          </button>
-          <div class="flex-1 min-w-0 flex gap-2 overflow-x-auto py-0.5">
-            <div v-for="tile in tiles" :key="tile.key" class="shrink-0" style="width: 128px; height: 72px;">
-              <VoiceTile
-                v-bind="tileProps(tile, 'strip')"
-                @toggle-fit="toggleFit(tile)"
-                @focus="setFocus(tile.key)"
-              />
-            </div>
+        <!-- Şerit: tüm kutucuklar — tıklanan öne (sahneye) çıkar. Taşınca güvenli-ortalama
+             (az kutucukta ortalı, çok kutucukta baştan kaydırılabilir). -->
+        <div class="shrink-0 flex items-center gap-2 overflow-x-auto py-0.5" style="justify-content: safe center;">
+          <div v-for="tile in tiles" :key="tile.key" class="shrink-0" style="width: 128px; height: 72px;">
+            <VoiceTile
+              v-bind="tileProps(tile, 'strip')"
+              @toggle-fit="toggleFit(tile)"
+              @focus="setFocus(tile.key)"
+            />
           </div>
         </div>
       </div>
 
-      <!-- IZGARA -->
-      <div v-else class="grid gap-3 w-full h-full" :style="gridStyle">
-        <VoiceTile
+      <!-- AVATAR: video yok → kart yapısı yerine yan yana avatarlar (kompakt) -->
+      <div v-else class="flex items-center justify-center gap-6 flex-wrap py-4">
+        <div
           v-for="tile in tiles"
           :key="tile.key"
-          v-bind="tileProps(tile, 'grid')"
-          @toggle-fit="toggleFit(tile)"
-          @focus="setFocus(tile.key)"
-        />
+          class="flex flex-col items-center gap-2"
+          style="width: 92px;"
+        >
+          <div class="relative shrink-0">
+            <div
+              class="w-16 h-16 rounded-full flex items-center justify-center font-bold text-white overflow-hidden"
+              :class="tile.member && isSpeaking(tile.member) ? 'kv-speaking' : ''"
+              style="background-color: var(--kv-accent-500);"
+            >
+              <img
+                v-if="tile.member?.avatarUrl"
+                :src="tile.member.avatarUrl"
+                :alt="tile.member.username"
+                class="w-full h-full object-cover"
+              />
+              <span v-else class="text-[24px]">{{ tile.member?.username[0]?.toUpperCase() }}</span>
+            </div>
+            <!-- Mute rozeti (sağ-alt) -->
+            <div
+              v-if="tile.member && isMutedFor(tile.member)"
+              class="absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] rounded-full flex items-center justify-center"
+              style="background-color: var(--kv-bg-content);"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-danger);">
+                <line x1="1" y1="1" x2="23" y2="23"/>
+                <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
+                <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+              </svg>
+            </div>
+          </div>
+          <span class="text-[12px] truncate max-w-full text-center" style="color: var(--kv-text-secondary);">
+            {{ tile.member?.username }}<template v-if="tile.member?.isLocal"> ({{ t('voice.you') }})</template>
+          </span>
+        </div>
       </div>
     </div>
 
@@ -226,9 +251,21 @@ async function toggleFullscreen() {
 </template>
 
 <style scoped>
-/* Ses alanı yüksekliği — sohbet altta görünür kalsın diye sınırlı; büyük ama taşmaz. */
+/* Video sahne yüksekliği — eskisinden alçak; alttaki sohbete nefes alanı bırakır. */
 .kv-dm-voice-stage {
-  height: clamp(280px, 46vh, 540px);
+  height: clamp(220px, 38vh, 440px);
+}
+/* Sahne çerçevesi: 16:9 orana oturur, yatayda paneli kaplamaz (yükseklikten genişlik türetilir,
+   en fazla %100). Parent justify-center ile ortalanır → video panelin ortasında durur. */
+.kv-dm-stage-frame {
+  aspect-ratio: 16 / 9;
+  max-width: 100%;
+  border-radius: var(--kv-radius-lg);
+  overflow: hidden;
+}
+/* Avatar şeridi (video yok): kompakt — kart yok, yalnız yan yana avatarlar. */
+.kv-dm-voice-avatars {
+  min-height: 120px;
 }
 /* Panel tam ekranı: tüm ekranı kapla, orta alan esnesin (kutucuklar büyük). */
 .kv-dm-voice:fullscreen {
