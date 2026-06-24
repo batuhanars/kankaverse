@@ -187,6 +187,14 @@ watch(activeGuildId, () => {
   highlightedChannelId.value = null
 })
 
+// Vurgulanan kanal artık bahsetme içermiyorsa (kanala girildi VEYA sağ-tık "okundu")
+// kırmızı vurgu çerçevesini kaldır — bahsetme temizlenince işaret de kaybolmalı.
+watch(mentionChannels, (list) => {
+  if (highlightedChannelId.value && !list.some((c) => c.id === highlightedChannelId.value)) {
+    highlightedChannelId.value = null
+  }
+})
+
 // Efektif izin çözümü için roller + üyeler yüklü olmalı (granular yetki UI gating).
 // OWNER/enum-ADMIN yolu bunlar olmadan da çalışır; granular roller için gerekir.
 watch(
@@ -343,6 +351,11 @@ function selectChannel(channel: ChannelDto) {
   if (channel.ageGated && authStore.user?.isMinor) {
     toastStore.info(t('channel.ageRestrictedToast'))
     return
+  }
+  // Bu kanal bahsetme-zıplamasıyla vurgulandıysa, girer girmez çerçeveyi kaldır
+  // (markRead sunucu turunu beklemeden anında geri bildirim).
+  if (highlightedChannelId.value === channel.id) {
+    highlightedChannelId.value = null
   }
   // Ses kanalı: oturuma katıl + kanalı aktif yap (merkez VoiceRoomView'a geçer)
   if (channel.type === 'GUILD_VOICE') {
