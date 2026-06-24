@@ -78,6 +78,13 @@ export class ChannelsController {
     return this.channelsService.remove(user.id, channelId);
   }
 
+  @Post('channels/read-all')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Üyesi olunan tüm guild kanallarını okundu işaretle (toplu). Dönüş null.' })
+  markAllRead(@CurrentUser() user: { id: string }) {
+    return this.channelsService.markAllRead(user.id);
+  }
+
   @Post('channels/:id/read')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Kanalı okundu işaretle — lastReadAt=now upsert' })

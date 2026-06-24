@@ -163,6 +163,31 @@ export const useChannelsStore = defineStore('channels', () => {
     }
   }
 
+  /**
+   * Tüm guild kanallarını okundu işaretle (bildirim çanı "Tümünü okundu işaretle").
+   * Backend lastReadAt=now (yetkili). Local: yüklü tüm kanalları + TÜM guild rozetlerini
+   * (yüklenmemiş guild'ler dahil) sıfırlar → ortam/kanal kırmızı bildirimleri kalkar.
+   */
+  async function markAllRead(): Promise<void> {
+    try {
+      await channelsApi.markAllRead()
+    } catch {
+      return // başarısızsa optimistik sıfırlama yapma
+    }
+    // Yüklü tüm kanalları sıfırla
+    for (const gid of Object.keys(channelsByGuild.value)) {
+      channelsByGuild.value[gid] = channelsByGuild.value[gid].map((c) =>
+        c.unreadCount > 0 || c.unreadMentionCount > 0 ? { ...c, unreadCount: 0, unreadMentionCount: 0 } : c,
+      )
+    }
+    // Tüm guild rozetlerini sıfırla (yüklenmemiş guild'ler de dahil)
+    const guildsStore = useGuildsStore()
+    for (const g of guildsStore.guilds) {
+      guildsStore.setGuildUnreadCount(g.id, 0)
+      guildsStore.setGuildMentionCount(g.id, 0)
+    }
+  }
+
   /** WS channel.activity: kanal aktif değilse unreadCount++ */
   function markChannelUnread(channelId: string, guildId: string): void {
     const channels = channelsByGuild.value[guildId]
@@ -270,6 +295,7 @@ export const useChannelsStore = defineStore('channels', () => {
     assignChannelCategory,
     setActiveChannel,
     markChannelRead,
+    markAllRead,
     markChannelUnread,
     totalUnreadForGuild,
     markChannelMentioned,

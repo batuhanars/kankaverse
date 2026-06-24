@@ -11,6 +11,10 @@ export const channelsApi = {
   markRead(channelId: string) {
     return http.post<null>(`/channels/${channelId}/read`)
   },
+  /** Üyesi olunan tüm guild kanallarını okundu işaretle (toplu) */
+  markAllRead() {
+    return http.post<null>('/channels/read-all')
+  },
   // Sprint V2 — Özel kanal üye yönetimi (§1)
   getMembers(channelId: string) {
     return http.get<ChannelMemberDto[]>(`/channels/${channelId}/members`)

@@ -1,16 +1,33 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 import { useNotificationsStore } from '@/stores/notifications'
+import { useGuildsStore } from '@/stores/guilds'
+import { useChannelsStore } from '@/stores/channels'
 import { useMessageJump } from '@/composables/useMessageJump'
 import type { NotificationDto } from '@/types'
 
 const { t } = useI18n()
 const router = useRouter()
 const notificationsStore = useNotificationsStore()
+const guildsStore = useGuildsStore()
+const channelsStore = useChannelsStore()
 const { requestJump } = useMessageJump()
+
+// "Tümünü okundu işaretle" — çan bildirimleri OKUNDU + ortam/kanal kırmızı rozetleri varsa aktif.
+// (Çan, açılışta kendi bildirimlerini okur; bu yüzden buton guild/kanal rozetlerini de gözetir.)
+const hasAnyUnread = computed(
+  () =>
+    notificationsStore.unreadCount > 0 ||
+    guildsStore.guilds.some((g) => g.unreadCount > 0 || g.unreadMentionCount > 0),
+)
+
+// Tıkla → hem çan bildirimlerini hem TÜM ortam/kanal okunmamışlarını okundu işaretle.
+async function markEverythingRead() {
+  await Promise.allSettled([notificationsStore.markAllRead(), channelsStore.markAllRead()])
+}
 
 const showNotifications = ref(false)
 const bellRef = ref<HTMLElement | null>(null)
@@ -129,8 +146,8 @@ async function onItemClick(n: NotificationDto) {
           type="button"
           class="text-[12px] font-medium shrink-0 transition-colors disabled:opacity-40 disabled:cursor-default cursor-pointer hover:underline"
           :style="`color: var(--kv-accent-500);`"
-          :disabled="notificationsStore.unreadCount === 0"
-          @click="notificationsStore.markAllRead()"
+          :disabled="!hasAnyUnread"
+          @click="markEverythingRead()"
         >
           {{ t('notification.markAllRead') }}
         </button>
