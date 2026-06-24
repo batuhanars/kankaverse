@@ -201,6 +201,47 @@ export class ChannelsService {
     return null;
   }
 
+  /**
+   * POST /channels/read-all — kullanıcının üyesi olduğu TÜM guild kanallarını okundu işaretle.
+   * Bildirim çanı "Tümünü okundu işaretle" → ortam/kanal kırmızı rozetlerini topluca temizler.
+   * lastReadAt=now (yetkili). Var olanları updateMany, eksikleri createMany (yarış-güvenli).
+   */
+  async markAllRead(userId: string) {
+    const memberships = await this.prisma.guildMember.findMany({
+      where: { userId },
+      select: { guildId: true },
+    });
+    const guildIds = memberships.map((m) => m.guildId);
+    if (guildIds.length === 0) return null;
+
+    const channels = await this.prisma.channel.findMany({
+      where: { guildId: { in: guildIds }, deletedAt: null },
+      select: { id: true },
+    });
+    const channelIds = channels.map((c) => c.id);
+    if (channelIds.length === 0) return null;
+
+    const now = new Date();
+    await this.prisma.channelRead.updateMany({
+      where: { userId, channelId: { in: channelIds } },
+      data: { lastReadAt: now },
+    });
+    const existing = await this.prisma.channelRead.findMany({
+      where: { userId, channelId: { in: channelIds } },
+      select: { channelId: true },
+    });
+    const existingIds = new Set(existing.map((e) => e.channelId));
+    const missing = channelIds.filter((id) => !existingIds.has(id));
+    if (missing.length > 0) {
+      await this.prisma.channelRead.createMany({
+        data: missing.map((channelId) => ({ userId, channelId, lastReadAt: now })),
+        skipDuplicates: true,
+      });
+    }
+
+    return null;
+  }
+
   async update(userId: string, channelId: string, dto: UpdateChannelDto) {
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId, deletedAt: null },
