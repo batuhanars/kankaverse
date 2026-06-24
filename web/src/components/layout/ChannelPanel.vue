@@ -1094,9 +1094,10 @@ onUnmounted(() => {
         @drop="dropChannelInto(channel.categoryId ?? null, channel.id)"
         @contextmenu.prevent="openChannelContext($event, channel)"
       >
-        <!-- Sola yaslı beyaz okunmamış baloncuğu — yalnız bahsetme YOKKEN (mention varsa sağdaki kırmızı sayaç) -->
+        <!-- Sola yaslı beyaz okunmamış noktası — okunmamış varsa hep görünür (ServerRail gibi).
+             Bahsetme de varsa sağdaki kırmızı sayaçla BİRLİKTE durur; rozet pip'i ezmez. -->
         <span
-          v-if="channelShowGenericUnread(channel) && !channelShowMention(channel) && channelsStore.activeChannelId !== channel.id"
+          v-if="channelShowGenericUnread(channel) && channelsStore.activeChannelId !== channel.id"
           class="channel-unread-pip"
           aria-hidden="true"
         />
@@ -1327,9 +1328,10 @@ onUnmounted(() => {
             @drop="dropChannelInto(channel.categoryId ?? null, channel.id)"
             @contextmenu.prevent="openChannelContext($event, channel)"
           >
-            <!-- Sola yaslı beyaz okunmamış baloncuğu — yalnız bahsetme YOKKEN (mention varsa sağdaki kırmızı sayaç) -->
+            <!-- Sola yaslı beyaz okunmamış noktası — okunmamış varsa hep görünür (ServerRail gibi).
+             Bahsetme de varsa sağdaki kırmızı sayaçla BİRLİKTE durur; rozet pip'i ezmez. -->
             <span
-              v-if="channelShowGenericUnread(channel) && !channelShowMention(channel) && channelsStore.activeChannelId !== channel.id"
+              v-if="channelShowGenericUnread(channel) && channelsStore.activeChannelId !== channel.id"
               class="channel-unread-pip"
               aria-hidden="true"
             />
@@ -2173,10 +2175,10 @@ onUnmounted(() => {
   color: var(--kv-text-primary);
 }
 
-/* Sola yaslı SABİT beyaz okunmamış noktası — bahsetme YOKKEN.
-   ServerRail pill'inden farklı: hover/aktif animasyonu YOK, hep aynı yuvarlak.
-   Kanala girince (activeChannelId) veya mesajlar okununca (unreadCount→0) kaybolur.
-   Mention olunca sağdaki kırmızı sayaç devreye girer; ikisi aynı anda gösterilmez. */
+/* Sola yaslı SABİT beyaz okunmamış noktası. ServerRail pill'iyle tutarlı:
+   okunmamış varken hep görünür; bahsetme de varsa sağdaki kırmızı sayaçla
+   BİRLİKTE durur (rozet pip'i ezmez). hover/aktif animasyonu YOK, hep aynı yuvarlak.
+   Kanala girince (activeChannelId) veya okununca (unreadCount→0) kaybolur. */
 .channel-unread-pip {
   position: absolute;
   left: 0;
