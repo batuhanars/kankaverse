@@ -1067,6 +1067,12 @@ onUnmounted(() => {
         @drop="dropChannelInto(channel.categoryId ?? null, channel.id)"
         @contextmenu.prevent="openChannelContext($event, channel)"
       >
+        <!-- Sola yaslı beyaz okunmamış baloncuğu — yalnız bahsetme YOKKEN (mention varsa sağdaki kırmızı sayaç) -->
+        <span
+          v-if="channelShowGenericUnread(channel) && !channelShowMention(channel) && channelsStore.activeChannelId !== channel.id"
+          class="channel-unread-pip"
+          aria-hidden="true"
+        />
         <button
           class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-2 pr-2"
           @click="selectChannel(channel)"
@@ -1081,8 +1087,11 @@ onUnmounted(() => {
           <span
             class="truncate"
             :class="[
-              channel.unreadCount > 0 && channelsStore.activeChannelId !== channel.id
+              channelHasVisibleUnread(channel) && channelsStore.activeChannelId !== channel.id
                 ? 'font-semibold text-[var(--kv-text-primary)]'
+                : '',
+              channelDimmed(channel) && channelsStore.activeChannelId !== channel.id
+                ? 'opacity-60'
                 : '',
             ]"
           >{{ channel.name }}</span>
@@ -1137,10 +1146,10 @@ onUnmounted(() => {
         >{{ voiceDuration(channel.id) }}</span>
 
         <span
-          v-if="channel.unreadCount > 0 && channelsStore.activeChannelId !== channel.id"
+          v-if="channelShowMention(channel) && channelsStore.activeChannelId !== channel.id"
           class="shrink-0 channel-unread-badge"
         >
-          {{ channel.unreadCount > 99 ? '99+' : channel.unreadCount }}
+          {{ channel.unreadMentionCount > 99 ? '99+' : channel.unreadMentionCount }}
         </span>
 
         <div
@@ -1291,6 +1300,12 @@ onUnmounted(() => {
             @drop="dropChannelInto(channel.categoryId ?? null, channel.id)"
             @contextmenu.prevent="openChannelContext($event, channel)"
           >
+            <!-- Sola yaslı beyaz okunmamış baloncuğu — yalnız bahsetme YOKKEN (mention varsa sağdaki kırmızı sayaç) -->
+            <span
+              v-if="channelShowGenericUnread(channel) && !channelShowMention(channel) && channelsStore.activeChannelId !== channel.id"
+              class="channel-unread-pip"
+              aria-hidden="true"
+            />
             <button
               class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-4 pr-2"
               @click="selectChannel(channel)"
@@ -1357,14 +1372,10 @@ onUnmounted(() => {
             >{{ voiceDuration(channel.id) }}</span>
 
             <span
-              v-if="channelHasVisibleUnread(channel) && channelsStore.activeChannelId !== channel.id"
+              v-if="channelShowMention(channel) && channelsStore.activeChannelId !== channel.id"
               class="shrink-0 channel-unread-badge"
             >
-              {{
-                (channelShowGenericUnread(channel) ? channel.unreadCount : channel.unreadMentionCount) > 99
-                  ? '99+'
-                  : (channelShowGenericUnread(channel) ? channel.unreadCount : channel.unreadMentionCount)
-              }}
+              {{ channel.unreadMentionCount > 99 ? '99+' : channel.unreadMentionCount }}
             </span>
 
             <div
@@ -2129,6 +2140,22 @@ onUnmounted(() => {
 }
 .kv-chan-action:hover {
   color: var(--kv-text-primary);
+}
+
+/* Sola yaslı SABİT beyaz okunmamış noktası — bahsetme YOKKEN.
+   ServerRail pill'inden farklı: hover/aktif animasyonu YOK, hep aynı yuvarlak.
+   Kanala girince (activeChannelId) veya mesajlar okununca (unreadCount→0) kaybolur.
+   Mention olunca sağdaki kırmızı sayaç devreye girer; ikisi aynı anda gösterilmez. */
+.channel-unread-pip {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--kv-text-primary);
+  pointer-events: none;
 }
 
 /* Kırmızı okunmamış sayaç rozeti — kanal satırı sağında */
