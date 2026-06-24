@@ -71,6 +71,14 @@ if (!gotLock) {
     // Kopyala/yapıştır editable alanlarda Chromium tarafından zaten çalışır.
     Menu.setApplicationMenu(null)
 
+    // DNS-over-HTTPS: ad çözümlemesini (Chrome gibi) HTTPS/443 üzerinden yap. TR'de Discord
+    // engelini aşmak için yaygın kullanılan GoodbyeDPI/DPI-aşma araçları makinenin UDP 53 DNS'ini
+    // kesip/yönlendirip ERR_NAME_NOT_RESOLVED'e yol açıyor; DoH bunu atlar → uygulama yine bağlanır.
+    app.configureHostResolver({
+      secureDnsMode: 'secure',
+      secureDnsServers: ['https://cloudflare-dns.com/dns-query', 'https://dns.google/dns-query'],
+    })
+
     loadSettings()
     applyOpenAtLogin()
     createWindow()
