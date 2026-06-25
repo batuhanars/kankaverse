@@ -22,10 +22,9 @@
           güvenli sohbet platformu. Türkçe, yerli ve sana göre.
         </p>
         <div class="cta-row">
-          <a :href="INVITE_MAILTO" class="kv-btn kv-btn--primary">Davet iste</a>
+          <a :href="REGISTER_URL" class="kv-btn kv-btn--primary">Hemen katıl</a>
           <a :href="LOGIN_URL" class="kv-btn kv-btn--ghost">Giriş yap</a>
         </div>
-        <p class="note">Kankaverse şu an davetli üyelikte.</p>
       </div>
 
       <!-- App görünümü maketi (CSS/HTML) -->
@@ -96,12 +95,6 @@
   gap: 12px;
   margin-top: 32px;
 }
-.note {
-  margin-top: 16px;
-  font-size: 13px;
-  color: var(--kv-text-muted);
-}
-
 @media (max-width: 860px) {
   .hero-inner {
     grid-template-columns: 1fr;
