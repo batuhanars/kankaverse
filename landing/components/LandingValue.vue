@@ -7,7 +7,7 @@ const items = [
   },
   {
     title: 'Topluluğunu kur',
-    body: 'Sunucular, kanallar ve roller — kendi düzenini kur, ekibini topla, kurallarını sen belirle.',
+    body: 'Sunucular, kanallar ve roller. Kendi düzenini kur, ekibini topla, kurallarını sen belirle.',
   },
   {
     title: 'Yerli ve sana yakın',
