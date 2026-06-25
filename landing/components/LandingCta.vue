@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Kapanış CTA — davet iste / giriş yap.
+// Kapanış CTA — hemen kaydol / giriş yap. (Davet modu geri gelince INVITE_MAILTO'ya çevir.)
 </script>
 
 <template>
@@ -7,10 +7,10 @@
     <div class="kv-container cta-inner">
       <h2 class="title">Kankaverse'e katıl</h2>
       <p class="sub">
-        Şu an davetli üyelikteyiz. Erken erişim için davet iste; davetin varsa giriş yap.
+        Birkaç dakikada hesabını oluştur, kendi sohbet evrenini kurmaya başla.
       </p>
       <div class="cta-row">
-        <a :href="INVITE_MAILTO" class="kv-btn kv-btn--primary">Davet iste</a>
+        <a :href="REGISTER_URL" class="kv-btn kv-btn--primary">Hemen katıl</a>
         <a :href="LOGIN_URL" class="kv-btn kv-btn--ghost">Zaten hesabım var</a>
       </div>
     </div>
