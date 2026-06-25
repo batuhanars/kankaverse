@@ -18,7 +18,7 @@
         <span class="eyebrow">Türkiye'nin sohbet evreni</span>
         <h1 class="title">Arkadaşlarınla buluştuğun<br />kendi sohbet evrenin.</h1>
         <p class="lede">
-          Kankaverse — toplulukların, oyuncuların ve arkadaş gruplarının sesli ve yazılı buluştuğu
+          Kankaverse, toplulukların, oyuncuların ve arkadaş gruplarının sesli ve yazılı buluştuğu
           güvenli sohbet platformu. Türkçe, yerli ve sana göre.
         </p>
         <div class="cta-row">

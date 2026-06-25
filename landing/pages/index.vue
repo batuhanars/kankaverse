@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // Tanıtım tek-sayfası — bölümleri compose eder. SEO/OG meta burada.
 // og:image: 1200x630 marka kartı (public/og.png — gen-og.mjs ile üretildi).
-const title = 'Kankaverse — Türkiye’nin topluluk ve sohbet platformu'
+const title = 'Kankaverse: Türkiye’nin topluluk ve sohbet platformu'
 const description =
-  'Kankaverse — Türkiye için topluluk tabanlı sesli ve yazılı sohbet platformu. Sunucular, kanallar, arkadaş grupları; Türkçe arayüz, KVKK uyumlu, yerli ve güvenli.'
+  'Kankaverse, Türkiye için topluluk tabanlı sesli ve yazılı sohbet platformu. Sunucular, kanallar, arkadaş grupları; Türkçe arayüz, KVKK uyumlu, yerli ve güvenli.'
 const url = 'https://kankaverse.com/'
 const image = 'https://kankaverse.com/og.png'
 

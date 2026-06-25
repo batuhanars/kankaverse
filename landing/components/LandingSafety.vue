@@ -3,7 +3,7 @@
 const items = [
   {
     title: 'Çocuk güvenliği',
-    body: 'Platformun temelinde. Yaşa uygun deneyim, sıkı içerik kontrolü ve istismara karşı tasarımla koruma — sonradan eklenen bir özellik değil.',
+    body: 'Platformun temelinde. Yaşa uygun deneyim, sıkı içerik kontrolü ve istismara karşı tasarımla koruma. Sonradan eklenen bir özellik değil.',
   },
   {
     title: 'KVKK uyumu',
@@ -21,7 +21,7 @@ const items = [
     <div class="kv-container">
       <div class="head">
         <span class="eyebrow">Güven &amp; güvenlik</span>
-        <h2 class="section-title">Güvenlik sonradan eklenmedi —<br />mimariye gömülü.</h2>
+        <h2 class="section-title">Güvenlik sonradan eklenmedi.<br />Mimariye gömülü.</h2>
         <p class="sub">
           Kankaverse, Türkiye için sıfırdan tasarlandı. Güvenlik, gizlilik ve çocuk koruması
           ürünün temelinde; bir eklenti değil.
