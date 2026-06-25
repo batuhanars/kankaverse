@@ -210,3 +210,72 @@ Artık yalnız davet koduyla kayıt olunur. DB zaten temiz (fresh) → ayrı pur
 - Birkaç gün VPS'i izle; stabilse Railway api servisini ve Vercel projesini durdur/sil.
 - DNS'te eski Vercel/Railway custom domain kayıtları kaldıysa temizle (yalnız VPS A kayıtları kalsın).
 - Eski managed Postgres'te veri varsa (kapalı test öncesi) — fresh başlangıç istediğimiz için taşıma yok.
+
+---
+
+## 13. Dosya yükleme açma (Cloudflare R2)
+
+> Kod hazır: backend presign akışı (`api` attachments modülü) + web yükleme arayüzü + scan-gate.
+> Açmak tamamen ops/config işi; kod değişmez. Depolama = R2 (VPS diski değil — "ağır yük dışarıda").
+>
+> ⚠️ **CSAM notu (2026-06-25 sahip kararı):** Gerçek CSAM tarayıcı (PhotoDNA/Safer) henüz yok.
+> Bu yüzden `ATTACHMENT_SCAN_ENABLED=false` ile her dosya otomatik CLEAN damgalanır ve TARANMADAN
+> servis edilir. Bilinçli, tanınırlık fazı için geçici kabul. **Kitle görünür olmaya başlayınca
+> tekrar masaya yatır** (tarayıcı entegrasyonu / whitelist'e daralt). Kill-switch: `UPLOADS_ENABLED=false` + api restart.
+
+### 13.1 R2 bucket + API token (Cloudflare panel)
+1. Cloudflare → R2 → **Create bucket** (ör. `kankaverse-uploads`). Lokasyon otomatik.
+2. R2 → **Manage API Tokens** → **Create API Token** → izin **Object Read & Write**, yalnız bu bucket.
+3. Çıktıyı not et: **Access Key ID**, **Secret Access Key**, ve **endpoint** (`https://<accountid>.r2.cloudflarestorage.com`).
+
+### 13.2 Bucket CORS politikası (KRİTİK — atlanırsa yükleme sessizce patlar)
+Tarayıcı presigned URL'ye **doğrudan PUT** yapar; bucket origin'imize izin vermezse PUT CORS hatası alır.
+R2 → bucket → **Settings → CORS Policy** → şunu ekle:
+```json
+[
+  {
+    "AllowedOrigins": ["https://kankaverse.com"],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedHeaders": ["content-type"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+> İndirme `<img>`/lightbox ile yapılır (cross-origin GET, CORS gerektirmez) ama HEAD/GET'i de ekledik — zararı yok.
+
+### 13.3 Env'i doldur + bayrağı çevir (VPS'te)
+`.env.production` **repo kökünde değil**, çalışan stack'in dizininde: `/home/deploy/kankaverse/.env.production`.
+```bash
+# nano /home/deploy/kankaverse/.env.production
+```
+S3 bloğunu doldur ve yüklemeyi aç (ikisini AYNI kaydetmede yap — `UPLOADS_ENABLED=true` iken
+S3 değişkenleri eksikse api fail-fast ile açılmaz, `configuration.ts` §16):
+```
+UPLOADS_ENABLED=true
+ATTACHMENT_SCAN_ENABLED=false      # tarayıcı yok → false (true olursa dosyalar sonsuza dek PENDING kalır)
+S3_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com
+S3_REGION=auto
+S3_BUCKET=kankaverse-uploads
+S3_ACCESS_KEY=<R2 Access Key ID>
+S3_SECRET_KEY=<R2 Secret Access Key>
+S3_PUBLIC_URL=https://<accountid>.r2.cloudflarestorage.com/kankaverse-uploads
+# MAX_UPLOAD_MB=25   # opsiyonel, varsayılan 25
+```
+> İzinli tipler allowlist'te sabit (png/jpeg/gif/webp/pdf/txt) — genişletme kod değişikliğiyle (`attachments.service.ts`).
+
+### 13.4 Uygula + duman testi
+```bash
+# docker compose --env-file .env.production -f docker-compose.prod.yml up -d api
+# docker compose -f docker-compose.prod.yml logs -f api    # fail-fast hatası YOKsa "Nest started"
+```
+- [ ] Bir kanalda mesaja görsel iliştir → yükleniyor (CORS hatası yoksa) + önizleme görünüyor.
+- [ ] Sayfa yenile → görsel hâlâ açılıyor (presigned GET 300s; her açılışta yeniden imzalanır).
+- [ ] Kötü senaryo testi: 25MB üstü / izinsiz tip reddediliyor (`FILE_TOO_LARGE` / `UNSUPPORTED_TYPE`).
+
+### 13.5 Geri alma
+```bash
+# nano .env.production    → UPLOADS_ENABLED=false
+# docker compose --env-file .env.production -f docker-compose.prod.yml up -d api
+```
+Yüklü dosyalar R2'de kalır; yeni yükleme/erişim kapanır (`UPLOADS_DISABLED`).
