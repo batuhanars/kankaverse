@@ -23,6 +23,7 @@ import ChangeUsernameSection from './components/ChangeUsernameSection.vue'
 import DeleteAccountSection from './components/DeleteAccountSection.vue'
 import VoiceDevicesSection from './components/VoiceDevicesSection.vue'
 import PlatformInviteSection from './components/PlatformInviteSection.vue'
+import PlatformUsersSection from './components/PlatformUsersSection.vue'
 import MasaustuSection from './components/MasaustuSection.vue'
 
 const props = defineProps<{ initialSection?: string }>()
@@ -55,6 +56,10 @@ const navItems = computed(() => {
   if (authStore.user?.isModerator) items.push({ key: 'admin' as NavSection, labelKey: 'settings.tabAdmin' })
   return items
 })
+
+// ── Admin alt-geçişi: kullanıcılar (varsayılan) / davetler ──
+type AdminSub = 'kullanicilar' | 'davetler'
+const adminSub = ref<AdminSub>('kullanicilar')
 
 // ── Hesap düzenleme modalları (Discord-tarzı: satır + "Düzenle" → modal) ──
 type EditModal = null | 'username' | 'password' | 'email' | '2fa' | 'sessions' | 'delete'
@@ -514,9 +519,26 @@ async function selectPolicy(p: DmPolicy) {
                 </section>
               </div>
 
-              <!-- ── Admin — Platform Davetleri ── (yalnız isModerator) -->
-              <div v-else-if="activeSection === 'admin' && authStore.user?.isModerator">
-                <PlatformInviteSection />
+              <!-- ── Admin — Kullanıcılar + Platform Davetleri ── (yalnız isModerator) -->
+              <div v-else-if="activeSection === 'admin' && authStore.user?.isModerator" class="flex flex-col gap-6">
+                <!-- Alt-geçiş: kullanıcılar / davetler -->
+                <div class="flex items-center gap-1 self-start rounded-[var(--kv-radius-md)] p-1" style="background-color: var(--kv-bg-sidebar);">
+                  <button
+                    v-for="sub in (['kullanicilar', 'davetler'] as const)"
+                    :key="sub"
+                    type="button"
+                    class="px-3 py-1.5 rounded-[var(--kv-radius-sm)] text-[13px] font-medium cursor-pointer transition-colors"
+                    :style="adminSub === sub
+                      ? 'color: var(--kv-accent-400); background-color: var(--kv-bg-elevated);'
+                      : 'color: var(--kv-text-secondary); background-color: transparent;'"
+                    @click="adminSub = sub"
+                  >
+                    {{ sub === 'kullanicilar' ? t('admin.users.title') : t('admin.platformInvite.listTitle') }}
+                  </button>
+                </div>
+
+                <PlatformUsersSection v-if="adminSub === 'kullanicilar'" />
+                <PlatformInviteSection v-else />
               </div>
 
             </div>

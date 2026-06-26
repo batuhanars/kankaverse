@@ -24,6 +24,7 @@ import { EventsModule } from './modules/events/events.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
 import { PlatformInvitesModule } from './modules/platform-invites/platform-invites.module';
+import { PlatformUsersModule } from './modules/platform-users/platform-users.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -52,6 +53,7 @@ import configuration from './config/configuration';
     NotificationsModule,
     DiscoveryModule,
     PlatformInvitesModule,
+    PlatformUsersModule,
   ],
   providers: [
     {

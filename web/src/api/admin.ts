@@ -18,6 +18,19 @@ export interface CreatePlatformInvitePayload {
   note?: string        // ≤200 karakter; admin notu
 }
 
+// Admin kullanıcı genel-bakış satırı (yalnız isModerator). Hassas alanlar backend'de saklı.
+export interface AdminUserDto {
+  id: string
+  username: string
+  email: string
+  emailVerified: boolean
+  isMinor: boolean
+  isModerator: boolean
+  verificationStatus: string
+  invitedViaCode: string | null
+  createdAt: string
+}
+
 export const adminApi = {
   createPlatformInvite(payload: CreatePlatformInvitePayload) {
     return http.post<PlatformInviteDto>('/admin/platform-invites', payload)
@@ -27,5 +40,8 @@ export const adminApi = {
   },
   deletePlatformInvite(id: string) {
     return http.delete<null>(`/admin/platform-invites/${id}`)
+  },
+  listUsers() {
+    return http.get<AdminUserDto[]>('/admin/users')
   },
 }
