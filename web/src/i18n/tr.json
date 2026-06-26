@@ -172,6 +172,21 @@
         "expired": "Süresi Geçmiş",
         "full": "Dolmuş"
       }
+    },
+    "users": {
+      "title": "Kullanıcılar",
+      "count": "{count} kayıt",
+      "refresh": "Yenile",
+      "empty": "Henüz kayıtlı kullanıcı yok.",
+      "loadError": "Kullanıcılar yüklenemedi.",
+      "colUser": "Kullanıcı",
+      "colEmail": "E-posta",
+      "colInvite": "Davet",
+      "colJoined": "Kayıt",
+      "badgeAdmin": "Admin",
+      "badgeMinor": "Reşit değil",
+      "badgeVerified": "Doğrulandı",
+      "badgeUnverified": "Doğrulanmadı"
     }
   },
   "settings": {
