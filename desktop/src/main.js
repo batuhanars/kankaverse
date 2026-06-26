@@ -39,6 +39,9 @@ function saveSettings() {
   }
 }
 function applyOpenAtLogin() {
+  // Dev'de (paketsiz) login-item kaydı yazma: kayit ciplak electron.exe'ye dusup
+  // acilista uygulamasiz Electron karsilama ekrani olarak geri gelir.
+  if (!app.isPackaged) return
   // OS'i ayarla senkronla; openAsHidden (Windows/macOS) açılışta tepsiye düşürür.
   app.setLoginItemSettings({ openAtLogin: settings.openAtLogin, openAsHidden: settings.startMinimized })
 }
