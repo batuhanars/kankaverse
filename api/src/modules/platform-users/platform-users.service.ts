@@ -31,6 +31,7 @@ export class PlatformUsersService {
         isMinor: true,
         isModerator: true,
         verificationStatus: true,
+        deletionRequestedAt: true,
         createdAt: true,
         platformInvite: { select: { code: true } },
         _count: { select: { ownedGuilds: true, memberships: true, messages: true } },
@@ -52,6 +53,7 @@ export class PlatformUsersService {
       membershipCount: u._count.memberships,
       messageCount: u._count.messages,
       lastActiveAt: u.sessions[0]?.lastActiveAt?.toISOString() ?? null,
+      deletionRequestedAt: u.deletionRequestedAt?.toISOString() ?? null,
       createdAt: u.createdAt.toISOString(),
     }));
   }

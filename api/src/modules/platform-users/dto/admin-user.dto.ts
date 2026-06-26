@@ -22,5 +22,7 @@ export class AdminUserDto {
   @ApiProperty({ description: 'Gönderdiği mesaj sayısı' }) messageCount: number;
   @ApiPropertyOptional({ nullable: true, description: 'Son oturum aktivitesi (son görülme, ISO)' })
   lastActiveAt: string | null;
+  @ApiPropertyOptional({ nullable: true, description: 'Hesap silme talebi tarihi (ISO); null = talep yok. 30 gün sonra purge.' })
+  deletionRequestedAt: string | null;
   @ApiProperty({ description: 'Kayıt tarihi (ISO)' }) createdAt: string;
 }
