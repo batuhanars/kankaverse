@@ -28,6 +28,11 @@ export interface AdminUserDto {
   isModerator: boolean
   verificationStatus: string
   invitedViaCode: string | null
+  presence: 'online' | 'away' | 'dnd' | 'offline'
+  ownedGuildCount: number
+  membershipCount: number
+  messageCount: number
+  lastActiveAt: string | null
   createdAt: string
 }
 

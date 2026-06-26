@@ -181,12 +181,22 @@
       "loadError": "Kullanıcılar yüklenemedi.",
       "colUser": "Kullanıcı",
       "colEmail": "E-posta",
-      "colInvite": "Davet",
+      "colGuilds": "Ortam",
+      "colMessages": "Mesaj",
+      "colLastSeen": "Son görülme",
       "colJoined": "Kayıt",
+      "guildsOwned": "{count} açtı",
+      "guildsMember": "{count} üye",
       "badgeAdmin": "Admin",
       "badgeMinor": "Reşit değil",
       "badgeVerified": "Doğrulandı",
-      "badgeUnverified": "Doğrulanmadı"
+      "badgeUnverified": "Doğrulanmadı",
+      "presence": {
+        "online": "Çevrimiçi",
+        "away": "Boşta",
+        "dnd": "Rahatsız etmeyin",
+        "offline": "Çevrimdışı"
+      }
     }
   },
   "settings": {
