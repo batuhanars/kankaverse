@@ -133,6 +133,12 @@ function lastSeen(u: AdminUserDto): string {
               class="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
               :style="`color: ${u.emailVerified ? 'var(--kv-online, #3DB46E)' : 'var(--kv-text-muted)'}; background-color: var(--kv-bg-elevated);`"
             >{{ u.emailVerified ? t('admin.users.badgeVerified') : t('admin.users.badgeUnverified') }}</span>
+            <span
+              v-if="u.deletionRequestedAt"
+              class="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+              style="color: #fff; background-color: var(--kv-danger);"
+              :title="t('admin.users.deletionRequestedAt', { date: formatDate(u.deletionRequestedAt) })"
+            >{{ t('admin.users.badgeDeletion') }}</span>
           </div>
         </div>
 

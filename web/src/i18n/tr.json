@@ -191,6 +191,8 @@
       "badgeMinor": "Reşit değil",
       "badgeVerified": "Doğrulandı",
       "badgeUnverified": "Doğrulanmadı",
+      "badgeDeletion": "Silme talebi",
+      "deletionRequestedAt": "Silme talebi: {date} (30 gün sonra otomatik silinir)",
       "presence": {
         "online": "Çevrimiçi",
         "away": "Boşta",

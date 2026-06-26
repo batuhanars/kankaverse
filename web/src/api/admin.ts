@@ -33,6 +33,7 @@ export interface AdminUserDto {
   membershipCount: number
   messageCount: number
   lastActiveAt: string | null
+  deletionRequestedAt: string | null
   createdAt: string
 }
 
