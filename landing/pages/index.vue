@@ -55,6 +55,7 @@ useHead({
 <template>
   <div>
     <LandingHero />
+    <LandingDownload />
     <main>
       <LandingValue />
       <LandingSafety />
