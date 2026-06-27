@@ -5,6 +5,15 @@ const fs = require('fs')
 // Şu an açık olan picker penceresi (eşzamanlı isteği engeller)
 let pickerWin = null
 
+// Windows bildirim kimliği (AppUserModelID). Ayarlanmazsa Windows toast başlığı
+// Electron varsayılanını gösterir: "electron.app.Kankaverse". electron-builder NSIS
+// installer'ı Başlat Menüsü kısayoluna build.appId'yi (electron-builder.yml) AUMID
+// olarak damgalar; burada aynı kimliği vererek bildirimler kısayolun adını
+// ("Kankaverse") ve ikonunu kullanır. Diğer platformlarda etkisizdir.
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.kankaverse.desktop')
+}
+
 // Uygulama URL'si: geliştirmede KANKAVERSE_URL env değişkeni ile override edilebilir.
 // NOT: kök '/' artık tanıtım sitesi (landing tier). Masaüstü doğrudan app ana ekranını yükler;
 // giriş yapılmamışsa SPA /login'e yönlendirir. Kökü yüklersek landing açılırdı.
