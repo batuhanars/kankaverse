@@ -470,30 +470,77 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
    * `channel.activity` eventi yayar (yazar hariç). Frontend rail'de ve kanal listesinde
    * okunmamış rozeti güncellemek için bu eventi dinler.
    * DM kanalıysa (guildId null) hiçbir şey yapmaz — notifyDmActivity zaten var.
+   *
+   * T&S — masaüstü bildirimi için yazar adı + içerik önizlemesi EKLENİR; ama yalnız kanalı
+   * GÖREBİLEN üyelere (özel kanalda üyeler + owner/admin; yaş-kapılı kanalda minörler hariç).
+   * Okuyamayan üyeler eski "çıplak" payload'ı alır (yalnız ID'ler) → okunmamış rozeti çalışır,
+   * içerik sızmaz. Süzme mantığı `notifyMentions`'taki @everyone kapısıyla aynı.
    */
   async notifyChannelActivity(channelId: string, messageDto: Record<string, unknown>) {
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId },
-      select: { guildId: true },
+      select: {
+        guildId: true,
+        isPrivate: true,
+        ageGated: true,
+        guild: { select: { adultsOnly: true } },
+      },
     });
 
     // DM kanalı → çık
     if (!channel || channel.guildId === null) return;
 
     const guildId = channel.guildId;
-    const authorId = (messageDto['author'] as Record<string, string>)['id'];
+    const author = messageDto['author'] as { id: string; username: string };
+    const authorId = author.id;
+    const needsAgeCheck = channel.ageGated || (channel.guild?.adultsOnly ?? false);
 
     const guildMembers = await this.prisma.guildMember.findMany({
       where: { guildId },
-      select: { userId: true },
+      select: { userId: true, user: { select: { isMinor: true } } },
     });
 
-    const payload = { channelId, guildId, authorId };
+    // İçerik önizlemesini görmeye yetkili üye kümesi (okuma erişimi + yaş kapısı).
+    let eligible: Set<string>;
+    if (channel.isPrivate) {
+      const [cms, privileged] = await Promise.all([
+        this.prisma.channelMember.findMany({ where: { channelId }, select: { userId: true } }),
+        this.prisma.guildMember.findMany({
+          where: { guildId, role: { in: ['OWNER', 'ADMIN'] } },
+          select: { userId: true },
+        }),
+      ]);
+      let ids = [...cms.map((m) => m.userId), ...privileged.map((m) => m.userId)];
+      if (needsAgeCheck) {
+        const minors = new Set(guildMembers.filter((m) => m.user.isMinor).map((m) => m.userId));
+        ids = ids.filter((id) => !minors.has(id));
+      }
+      eligible = new Set(ids);
+    } else {
+      const readers = needsAgeCheck ? guildMembers.filter((m) => !m.user.isMinor) : guildMembers;
+      eligible = new Set(readers.map((m) => m.userId));
+    }
+
+    // Önizleme: mention token'larını temizle (<@&..>→@everyone, <@..>→@birisi), ≤100 karakter.
+    // Boş içerik (yalnız ek) → [dosya].
+    const rawContent = typeof messageDto['content'] === 'string' ? (messageDto['content'] as string) : '';
+    const preview = (rawContent.trim().length > 0 ? rawContent : '[dosya]')
+      .replace(/<@&[a-zA-Z0-9_-]+>/g, '@everyone')
+      .replace(/<@[a-zA-Z0-9_-]+>/g, '@birisi')
+      .slice(0, 100);
+
+    const basePayload = { channelId, guildId, authorId };
+    const richPayload = { ...basePayload, author: { id: author.id, username: author.username }, preview };
 
     for (const member of guildMembers) {
       // Yazarın kendisine gönderme
       if (member.userId === authorId) continue;
-      this.realtime.emitToUser(member.userId, 'channel.activity', payload);
+      // Okuyabilen → yazar adı + önizleme; okuyamayan → çıplak (yalnız rozet).
+      this.realtime.emitToUser(
+        member.userId,
+        'channel.activity',
+        eligible.has(member.userId) ? richPayload : basePayload,
+      );
     }
   }
 

@@ -1189,6 +1189,9 @@
     "minutesAgo": "{n} dk önce",
     "hoursAgo": "{n} sa önce",
     "daysAgo": "{n} gün önce",
+    "channelMessage": "{actor}: {text}",
+    "groupFallback": "Grup sohbeti",
+    "channelFallback": "kanal",
     "nativeTitle": "Kankaverse"
   },
   "mention": {
