@@ -24,6 +24,7 @@ import {
   handleTypingClear,
   clearTypingForChannel,
 } from '@/composables/useTyping'
+import { maybeFireDmToast, maybeFireChannelToast } from '@/composables/useMessageToasts'
 import type { MessageDto, FriendRequestDto, FriendDto, EventDto, NotificationDto } from '@/types'
 
 let socket: Socket | null = null
@@ -159,6 +160,8 @@ export function useSocket() {
 
     socket.on('dm.message', (data: { channelId: string; lastMessage: { content: string; createdAt: string }; senderId: string }) => {
       dmStore.applyActivity(data)
+      // Masaüstü toast (DM/grup) — pencere arkada VEYA bu DM açık değilse
+      maybeFireDmToast(data, dmStore.activeDmChannelId === data.channelId)
     })
 
     // friend.* event'leri YALNIZ friends store senkronu için kalır (arkadaş listesi).
@@ -231,10 +234,14 @@ export function useSocket() {
       }
     })
 
-    // Kanal aktivitesi — başka üyenin mesajı: aktif değilse unread sayacını artır
-    socket.on('channel.activity', (data: { channelId: string; guildId: string; authorId: string }) => {
+    // Kanal aktivitesi — başka üyenin mesajı. Zengin payload (author + preview) yalnız
+    // kanalı okuyabilen üyeye gelir (backend T&S kapısı); masaüstü toast onu kullanır.
+    socket.on('channel.activity', (data: { channelId: string; guildId: string; authorId: string; author?: { id: string; username: string }; preview?: string }) => {
+      const isActive = activeChannelId === data.channelId
+      // Masaüstü toast — pencere arkada VEYA bu kanal açık değilse
+      maybeFireChannelToast(data, isActive)
       // Kullanıcı o kanalı şu an izliyorsa unread saymıyoruz
-      if (activeChannelId === data.channelId) return
+      if (isActive) return
       channelsStore.markChannelUnread(data.channelId, data.guildId)
       guildsStore.incrementGuildUnread(data.guildId)
     })
