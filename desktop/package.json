@@ -42,7 +42,8 @@
     "linux": {
       "target": "AppImage",
       "icon": "build/icon.png",
-      "category": "Network"
+      "category": "Network",
+      "artifactName": "kankaverse.${ext}"
     }
   }
 }

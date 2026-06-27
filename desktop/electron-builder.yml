@@ -41,3 +41,5 @@ linux:
   target: AppImage
   icon: build/icon.png
   category: Network
+  # Sabit ad → landing indirme linki (kankaverse.AppImage) sürümden bağımsız kalır.
+  artifactName: kankaverse.${ext}
