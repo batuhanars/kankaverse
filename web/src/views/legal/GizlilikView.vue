@@ -10,16 +10,6 @@ const { t } = useI18n()
     style="background-color: var(--kv-bg-rail);"
   >
     <div class="max-w-2xl mx-auto px-6 py-10">
-      <!-- TASLAK Uyarı Bandı -->
-      <div
-        class="flex items-start gap-3 px-4 py-3 rounded-[var(--kv-radius-md)] mb-8 text-[13px] font-medium"
-        style="background-color: var(--kv-warning); color: var(--kv-bg-rail);"
-        role="alert"
-      >
-        <span class="text-[16px] shrink-0" aria-hidden="true">⚠️</span>
-        <span>{{ t('legal.privacy.draftBanner') }}</span>
-      </div>
-
       <!-- Başlık -->
       <h1
         class="text-[22px] font-semibold mb-2"
@@ -152,14 +142,6 @@ const { t } = useI18n()
           {{ t('legal.privacy.s9Body') }}
         </p>
       </section>
-
-      <!-- Alt TASLAK tekrarı -->
-      <div
-        class="px-4 py-3 rounded-[var(--kv-radius-md)] text-[13px] text-center"
-        style="border: 1px solid var(--kv-warning); color: var(--kv-warning);"
-      >
-        {{ t('legal.privacy.draftFooter') }}
-      </div>
 
       <!-- Geri linki -->
       <div class="mt-8 text-center">

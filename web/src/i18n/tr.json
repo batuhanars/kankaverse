@@ -1425,8 +1425,7 @@
       "linkLabel": "Gizlilik & Şeffaflık",
       "registerNote": "Kaydolarak platformun gizlilik bildirimini okuduğunu onaylarsın:",
       "boxTitle": "Mesajların ve gizliliğin",
-      "boxAccess": "Mesajların rutin olarak okunmaz. İçeriğe yalnızca şikâyet, güvenlik olayı veya yasal zorunluluk durumunda yetkili kişiler erişir ve her erişim kayıt altına alınır.",
-      "boxScanning": "Mesajların uçtan uca şifreli değildir. Güvenlik ve moderasyon, özellikle çocuk güvenliği için içerik sunucu tarafında erişilebilir ve otomatik sistemlerce kötüye kullanıma karşı denetlenebilir. Bunu açıkça söylüyoruz.",
+      "boxSummary": "Mesajların rutin okunmaz; içeriğe yalnızca şikâyet, güvenlik veya yasal zorunlulukta yetkili kişiler erişir ve her erişim kaydedilir. Mesajların uçtan uca şifreli değildir; güvenlik ve çocuk güvenliği için içerik sunucuda denetlenebilir.",
       "betaNote": "Kankaverse erken aşamadadır ve özellikleri gelişmeye devam etmektedir.",
       "draftBanner": "TASLAK: nihai hukuki metin değildir. Deneyimli hukuk danışmanı onayı bekliyor.",
       "draftFooter": "Bu metin taslaktır. Hukuki kesinlik avukat onayıyla gelir; KVKK/5651 atıfları teyide tabidir.",
@@ -1448,7 +1447,7 @@
       "s4Item2": "İstismar içeriği (CSAM) için ayrı, sıfır-tolerans süreç hedeflenmektedir (hukuk + uzman tasarımı bekleniyor).",
       "s5Title": "5. Moderasyon",
       "s5Body": "Kullanıcılar kötüye kullanımı şikâyet edebilir. Ekip içeriği inceleyip uyarı / susturma / yasaklama / içerik kaldırma uygulayabilir. Moderasyon kayıtları hesap verebilirlik için tutulur.",
-      "s6Title": "6. Haklarınız (KVKK çerçevesinde, avukat teyidine tabi)",
+      "s6Title": "6. Haklarınız (KVKK çerçevesinde)",
       "s6Item1": "Verilerinize erişme, düzeltme, silinmesini talep etme, işlemeye itiraz etme.",
       "s6Item2": "Hesap silme uygulama içinden mümkündür (yasal saklama/kanıt yükümlülükleri saklıdır).",
       "s7Title": "7. Veri konumu",
@@ -1456,7 +1455,7 @@
       "s8Title": "8. İletişim",
       "s8Body": "Gizlilik ve veri talepleri için kurucuyla iletişime geç (iletişim bilgisi yakında).",
       "s9Title": "9. Değişiklikler",
-      "s9Body": "Bu ara taslaktır. Deneyimli hukuk danışmanının görüşüyle (KVKK aydınlatma metni, açık rıza, 5651, VERBİS, saklama politikası) nihai hale getirilecektir. Önemli değişiklikler kullanıcılara bildirilecektir."
+      "s9Body": "Bu metni zaman zaman güncelleyebiliriz; önemli değişiklikleri kullanıcılara bildiririz."
     },
     "rules": {
       "title": "Topluluk Kuralları",
