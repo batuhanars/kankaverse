@@ -20,6 +20,7 @@ const toast = useToastStore()
 
 const apiError = ref('')
 const loading = ref(false)
+const agreedToTerms = ref(false)
 
 // ── Kayıt modu: mount'ta çek, moduna göre form davranışı ──────────────────
 type RegistrationMode = 'open' | 'invite' | 'closed'
@@ -51,6 +52,11 @@ onMounted(async () => {
 })
 
 const onSubmit = handleSubmit(async (values) => {
+  // Onay kutucuğu güvencesi (buton zaten pasif; Enter ile gönderime karşı ek koruma)
+  if (!agreedToTerms.value) {
+    apiError.value = t('legal.mustAgree')
+    return
+  }
   loading.value = true
   apiError.value = ''
   try {
@@ -181,11 +187,49 @@ function getError(field: string): string | undefined {
           :required="true"
         />
 
+        <!-- Gizlilik kutusu + onay kutucuğu (form içinde, butonun üstünde — akış: oku → onayla → Kayıt Ol).
+             Checkbox işaretlenmeden Kayıt Ol pasif → açık onay, "görmedim duymadım" savunması kapanır. -->
+        <div
+          class="mt-2 rounded-[var(--kv-radius-md)] p-4"
+          style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
+        >
+          <div class="flex items-center gap-2 mb-2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-secondary); flex-shrink: 0;">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <span class="text-[13px] font-semibold" style="color: var(--kv-text-primary);">
+              {{ t('legal.privacy.boxTitle') }}
+            </span>
+          </div>
+          <p class="text-[12px] leading-relaxed" style="color: var(--kv-text-muted);">
+            {{ t('legal.privacy.boxSummary') }}
+          </p>
+          <label class="mt-3 flex items-start gap-2 cursor-pointer">
+            <input
+              v-model="agreedToTerms"
+              type="checkbox"
+              class="mt-0.5 shrink-0 cursor-pointer"
+              style="accent-color: var(--kv-accent-500);"
+            />
+            <span class="text-[12px]" style="color: var(--kv-text-muted);">
+              <RouterLink to="/kurallar" @click.stop style="color: var(--kv-text-secondary); text-decoration: underline; text-underline-offset: 2px;">
+                {{ t('legal.rules.linkLabel') }}
+              </RouterLink>
+              {{ t('legal.and') }}
+              <RouterLink to="/gizlilik" @click.stop style="color: var(--kv-text-secondary); text-decoration: underline; text-underline-offset: 2px;">
+                {{ t('legal.privacy.linkLabel') }}
+              </RouterLink>
+              {{ t('legal.registerCheckbox') }}
+            </span>
+          </label>
+        </div>
+
         <p v-if="apiError" class="text-[13px] text-center" style="color: var(--kv-danger);">
           {{ apiError }}
         </p>
 
-        <KvButton type="submit" :loading="loading" class="w-full mt-1">
+        <KvButton type="submit" :loading="loading" :disabled="!agreedToTerms" class="w-full mt-1">
           {{ t('auth.register') }}
         </KvButton>
       </form>
@@ -196,37 +240,6 @@ function getError(field: string): string | undefined {
           {{ t('auth.login') }}
         </RouterLink>
       </p>
-
-      <!-- Gizlilik kutusu: kayıt mümkünken göster (closed modda kayıt yok).
-           Çoğu kullanıcı tam bildirimi okumaz; en kritik iki gerçeği (erişim + tarama) burada dürüstçe söyle. -->
-      <div
-        v-if="!modeLoading && registrationMode !== 'closed'"
-        class="mt-6 rounded-[var(--kv-radius-md)] p-4"
-        style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
-      >
-        <div class="flex items-center gap-2 mb-2">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-secondary); flex-shrink: 0;">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          <span class="text-[13px] font-semibold" style="color: var(--kv-text-primary);">
-            {{ t('legal.privacy.boxTitle') }}
-          </span>
-        </div>
-        <p class="text-[12px] leading-relaxed" style="color: var(--kv-text-muted);">
-          {{ t('legal.privacy.boxSummary') }}
-        </p>
-        <p class="mt-3 text-[12px]" style="color: var(--kv-text-muted);">
-          {{ t('legal.registerAgree') }}
-          <RouterLink to="/kurallar" style="color: var(--kv-text-secondary); text-decoration: underline; text-underline-offset: 2px;">
-            {{ t('legal.rules.linkLabel') }}
-          </RouterLink>
-          {{ t('legal.and') }}
-          <RouterLink to="/gizlilik" style="color: var(--kv-text-secondary); text-decoration: underline; text-underline-offset: 2px;">
-            {{ t('legal.privacy.linkLabel') }}
-          </RouterLink>
-        </p>
-      </div>
     </div>
   </div>
 </template>
