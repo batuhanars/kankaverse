@@ -214,10 +214,7 @@ function getError(field: string): string | undefined {
           </span>
         </div>
         <p class="text-[12px] leading-relaxed" style="color: var(--kv-text-muted);">
-          {{ t('legal.privacy.boxAccess') }}
-        </p>
-        <p class="mt-2 text-[12px] leading-relaxed" style="color: var(--kv-text-muted);">
-          {{ t('legal.privacy.boxScanning') }}
+          {{ t('legal.privacy.boxSummary') }}
         </p>
         <p class="mt-3 text-[12px]" style="color: var(--kv-text-muted);">
           {{ t('legal.registerAgree') }}

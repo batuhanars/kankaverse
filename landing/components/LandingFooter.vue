@@ -9,6 +9,7 @@
         <img src="/kankaverse-logo.png" alt="Kankaverse" class="logo" width="178" height="48" />
       </a>
       <nav class="links">
+        <a :href="RULES_URL">Topluluk Kuralları</a>
         <a :href="PRIVACY_URL">Gizlilik</a>
         <a :href="LOGIN_URL">Giriş yap</a>
         <a :href="CONTACT_MAILTO">İletişim</a>

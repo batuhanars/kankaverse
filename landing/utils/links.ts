@@ -3,6 +3,7 @@
 export const LOGIN_URL = 'https://kankaverse.com/login'
 export const REGISTER_URL = 'https://kankaverse.com/register'
 export const INVITE_MAILTO = 'mailto:kankaverse@gmail.com?subject=Kankaverse%20davet%20talebi'
+export const RULES_URL = 'https://kankaverse.com/kurallar'
 export const PRIVACY_URL = 'https://kankaverse.com/gizlilik'
 export const CONTACT_MAILTO = 'mailto:kankaverse@gmail.com'
 
