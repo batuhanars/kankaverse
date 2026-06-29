@@ -49,8 +49,7 @@ async function handleConfirm() {
 <template>
   <!-- Belirgin, etiketli pill — kaza önlemek için Ayrıl'dan (kırmızı daire) görsel olarak ayrı. -->
   <button
-    class="h-11 px-3 flex items-center gap-1.5 rounded-full cursor-pointer transition-colors"
-    style="border: 1.5px solid var(--kv-danger); color: var(--kv-danger); background-color: transparent;"
+    class="emergency-pill h-11 px-3 flex items-center gap-1.5 rounded-full cursor-pointer transition-colors"
     :title="t('emergency.button')"
     @click="showConfirm = true"
   >
@@ -72,3 +71,16 @@ async function handleConfirm() {
     @cancel="showConfirm = false"
   />
 </template>
+
+<style scoped>
+/* Temel: şeffaf zemin, danger kenarlık + yazı. Hover: içi dolar (danger zemin + beyaz yazı). */
+.emergency-pill {
+  border: 1.5px solid var(--kv-danger);
+  color: var(--kv-danger);
+  background-color: transparent;
+}
+.emergency-pill:hover {
+  background-color: var(--kv-danger);
+  color: #fff;
+}
+</style>
