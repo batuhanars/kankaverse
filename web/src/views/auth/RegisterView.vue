@@ -10,6 +10,7 @@ import { makeRegisterSchema } from '@/lib/validation/auth'
 import { authApi } from '@/api/auth'
 import KvInput from '@/components/ui/KvInput.vue'
 import KvButton from '@/components/ui/KvButton.vue'
+import KvModal from '@/components/ui/KvModal.vue'
 import BirthDateSelect from './components/BirthDateSelect.vue'
 import logoDikey from '@/assets/brand/kankaverse-logo-dikey.png'
 
@@ -20,7 +21,9 @@ const toast = useToastStore()
 
 const apiError = ref('')
 const loading = ref(false)
-const agreedToTerms = ref(false)
+const showConsent = ref(false)
+type RegisterValues = { email: string; username: string; password: string; birthDate: string; inviteCode?: string }
+const pendingValues = ref<RegisterValues | null>(null)
 
 // ── Kayıt modu: mount'ta çek, moduna göre form davranışı ──────────────────
 type RegistrationMode = 'open' | 'invite' | 'closed'
@@ -51,12 +54,17 @@ onMounted(async () => {
   }
 })
 
-const onSubmit = handleSubmit(async (values) => {
-  // Onay kutucuğu güvencesi (buton zaten pasif; Enter ile gönderime karşı ek koruma)
-  if (!agreedToTerms.value) {
-    apiError.value = t('legal.mustAgree')
-    return
-  }
+// Kayıt Ol → form doğrula → geçerliyse onay modalını aç (asıl kayıt modal onayında olur).
+const onSubmit = handleSubmit((values) => {
+  pendingValues.value = values as RegisterValues
+  apiError.value = ''
+  showConsent.value = true
+})
+
+// Modal "Okudum, kabul ediyorum" → asıl kayıt.
+async function confirmRegister() {
+  const values = pendingValues.value
+  if (!values) return
   loading.value = true
   apiError.value = ''
   try {
@@ -83,10 +91,11 @@ const onSubmit = handleSubmit(async (values) => {
     } else {
       apiError.value = err.response?.data?.message ?? t('common.error')
     }
+    showConsent.value = false // hata → modalı kapat, kullanıcı formdaki hatayı görsün
   } finally {
     loading.value = false
   }
-})
+}
 
 function getError(field: string): string | undefined {
   const msg = errors.value[field as keyof typeof errors.value]
@@ -187,49 +196,11 @@ function getError(field: string): string | undefined {
           :required="true"
         />
 
-        <!-- Gizlilik kutusu + onay kutucuğu (form içinde, butonun üstünde — akış: oku → onayla → Kayıt Ol).
-             Checkbox işaretlenmeden Kayıt Ol pasif → açık onay, "görmedim duymadım" savunması kapanır. -->
-        <div
-          class="mt-2 rounded-[var(--kv-radius-md)] p-4"
-          style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
-        >
-          <div class="flex items-center gap-2 mb-2">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-secondary); flex-shrink: 0;">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-            <span class="text-[13px] font-semibold" style="color: var(--kv-text-primary);">
-              {{ t('legal.privacy.boxTitle') }}
-            </span>
-          </div>
-          <p class="text-[12px] leading-relaxed" style="color: var(--kv-text-muted);">
-            {{ t('legal.privacy.boxSummary') }}
-          </p>
-          <label class="mt-3 flex items-start gap-2 cursor-pointer">
-            <input
-              v-model="agreedToTerms"
-              type="checkbox"
-              class="mt-0.5 shrink-0 cursor-pointer"
-              style="accent-color: var(--kv-accent-500);"
-            />
-            <span class="text-[12px]" style="color: var(--kv-text-muted);">
-              <RouterLink to="/kurallar" @click.stop style="color: var(--kv-text-secondary); text-decoration: underline; text-underline-offset: 2px;">
-                {{ t('legal.rules.linkLabel') }}
-              </RouterLink>
-              {{ t('legal.and') }}
-              <RouterLink to="/gizlilik" @click.stop style="color: var(--kv-text-secondary); text-decoration: underline; text-underline-offset: 2px;">
-                {{ t('legal.privacy.linkLabel') }}
-              </RouterLink>
-              {{ t('legal.registerCheckbox') }}
-            </span>
-          </label>
-        </div>
-
         <p v-if="apiError" class="text-[13px] text-center" style="color: var(--kv-danger);">
           {{ apiError }}
         </p>
 
-        <KvButton type="submit" :loading="loading" :disabled="!agreedToTerms" class="w-full mt-1">
+        <KvButton type="submit" :loading="loading" class="w-full mt-1">
           {{ t('auth.register') }}
         </KvButton>
       </form>
@@ -241,5 +212,27 @@ function getError(field: string): string | undefined {
         </RouterLink>
       </p>
     </div>
+
+    <!-- Onay modalı: Kayıt Ol (form geçerli) → açılır; "Okudum, kabul ediyorum" asıl kaydı yapar.
+         Form kısa kalır, onay tam karar anında + açık → "görmedim duymadım" savunması kapanır. -->
+    <KvModal v-if="showConsent" :title="t('legal.consentTitle')" @close="showConsent = false">
+      <p class="text-[13px] leading-relaxed mb-3" style="color: var(--kv-text-body);">
+        {{ t('legal.consentAccess') }}
+      </p>
+      <p class="text-[13px] leading-relaxed mb-4" style="color: var(--kv-text-body);">
+        {{ t('legal.consentScanning') }}
+      </p>
+      <p class="text-[13px] leading-relaxed mb-5" style="color: var(--kv-text-secondary);">
+        {{ t('legal.consentAgreePre') }}
+        <RouterLink to="/kurallar" style="color: var(--kv-accent-500); text-decoration: underline;">{{ t('legal.rules.linkLabel') }}</RouterLink>
+        {{ t('legal.and') }}
+        <RouterLink to="/gizlilik" style="color: var(--kv-accent-500); text-decoration: underline;">{{ t('legal.privacy.linkLabel') }}</RouterLink>
+        {{ t('legal.consentAgreePost') }}
+      </p>
+      <div class="flex gap-3 justify-end">
+        <KvButton variant="ghost" @click="showConsent = false">{{ t('common.cancel') }}</KvButton>
+        <KvButton variant="primary" :loading="loading" @click="confirmRegister">{{ t('legal.consentConfirm') }}</KvButton>
+      </div>
+    </KvModal>
   </div>
 </template>
