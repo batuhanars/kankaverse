@@ -302,10 +302,12 @@ $ age-keygen -o kankaverse-backup-key.txt
 > 🔴 `kankaverse-backup-key.txt`'i (private key) **güvenli sakla** (parola yöneticisi / şifreli USB / 2 ayrı yer).
 > **Bunu kaybedersen yedekleri ÇÖZEMEZSİN.** Sunucuya yalnız `age1...` public key gider.
 
-**(b) R2 backups bucket + retention:** Cloudflare R2 → **Create bucket** (`kankaverse-backups`).
+**(b) R2 backups bucket + retention + DEDICATED token:** Cloudflare R2 → **Create bucket** (`kankaverse-backups`).
 Bucket → **Settings → Object lifecycle rules** → "delete after N days" (örn. 14) → retention otomatik (script silmez).
-> R2 API token: mevcut upload token'ı yalnız `kankaverse-uploads`'a kapılıysa, **her iki bucket'a** erişen
-> yeni bir token üret (veya account-level) ve `.env.production` `S3_ACCESS_KEY/S3_SECRET_KEY`'i güncelle.
+> 🔑 **Dedicated token (uploads'a dokunma):** R2 → Manage API Tokens → **Create** → izin **Object Read & Write**,
+> yalnız `kankaverse-backups`. Çıktıyı not et: Access Key ID + Secret + endpoint. Bunlar `.env`'de **`BACKUP_S3_*`**
+> olarak girilir → çalışan uploads token'ı (`S3_*`) hiç değişmez. (Verilmezse script `S3_*`'a düşer ama o token
+> genelde yalnız uploads bucket'ına kapılıdır → backup yazamaz; o yüzden dedicated token gir.)
 
 **(c) VPS'te bağımlılıklar:**
 ```bash
@@ -315,8 +317,11 @@ Bucket → **Settings → Object lifecycle rules** → "delete after N days" (ö
 
 **(d) `.env.production`'a ekle** (`/home/deploy/kankaverse/.env.production`):
 ```
-AGE_RECIPIENT=age1xxxxx...        # (a)'daki PUBLIC key
+AGE_RECIPIENT=age1xxxxx...                 # (a)'daki PUBLIC key
 BACKUP_BUCKET=kankaverse-backups
+BACKUP_S3_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com   # (b)'deki dedicated token endpoint
+BACKUP_S3_ACCESS_KEY=<backups token Access Key ID>
+BACKUP_S3_SECRET_KEY=<backups token Secret>
 ```
 
 **(e) Çalıştırılabilir yap:**
