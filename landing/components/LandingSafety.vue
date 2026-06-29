@@ -6,8 +6,8 @@ const items = [
     body: 'Platformun temelinde. Yaşa uygun deneyim, sıkı içerik kontrolü ve istismara karşı tasarımla koruma. Sonradan eklenen bir özellik değil.',
   },
   {
-    title: 'KVKK uyumu',
-    body: 'Verilerin KVKK’ya uygun, şeffaf biçimde işlenir. Hangi verinin nerede olduğu senin kontrolünde.',
+    title: 'Veri koruma',
+    body: 'Verilerini KVKK çerçevesinde, şeffaf biçimde işliyoruz; hangi verinin nerede olduğu senin kontrolünde.',
   },
   {
     title: 'Türkçe moderasyon',
