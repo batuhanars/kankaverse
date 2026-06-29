@@ -1,0 +1,2 @@
+# Shell script'leri her zaman LF ile checkout et (Linux'ta CRLF = "bad interpreter: bash^M").
+*.sh text eol=lf
