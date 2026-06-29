@@ -49,6 +49,7 @@ const prismaMock = {
     deleteMany: jest.fn(),
   },
   auditLog: { create: jest.fn() },
+  report: { count: jest.fn() },
 };
 
 const membershipMock = { requireChannelAccess: jest.fn(), requireNoDmBlock: jest.fn() };
@@ -892,6 +893,47 @@ describe('VoiceService.mintToken — B1 teftiş-girişi bypass matrisi (R7)', ()
         }),
       }),
     );
+  });
+
+  // ── A4-7b — Platform güvenliği (isModerator) acil-yanıt teftiş-girişi ─────────
+  it('NOT_CHANNEL_MEMBER + MUTE_MEMBERS YOK + platform isModerator + AÇIK EMERGENCY → bypass (voice.emergency_inspect)', async () => {
+    mockNotChannelMember();
+    mockRawChannel();
+    permissionsMock.hasGuildPermission.mockResolvedValue(false); // guild rolü YOK
+    prismaMock.user.findUnique.mockResolvedValue({ username: 'mod', avatarUrl: null, isMinor: false, isModerator: true });
+    prismaMock.report.count.mockResolvedValue(1); // bu kanalda açık acil var
+    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(Date.now() - 48 * 3600 * 1000), role: 'MEMBER' });
+
+    const svc = makeService();
+    const res = await svc.mintToken(USER_ID, CHANNEL_ID);
+    expect(res.token).toBe('jwt-token');
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ actorId: USER_ID, action: 'voice.emergency_inspect', entityId: CHANNEL_ID }),
+      }),
+    );
+  });
+
+  it('NOT_CHANNEL_MEMBER + isModerator ama AÇIK EMERGENCY YOK → hata fırlatılır (yetki amaca bağlı)', async () => {
+    mockNotChannelMember();
+    mockRawChannel();
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
+    prismaMock.user.findUnique.mockResolvedValue({ username: 'mod', avatarUrl: null, isMinor: false, isModerator: true });
+    prismaMock.report.count.mockResolvedValue(0); // acil YOK → mod rastgele kanala sızamaz
+
+    const svc = makeService();
+    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({ response: { error: 'NOT_CHANNEL_MEMBER' } });
+  });
+
+  it('NOT_CHANNEL_MEMBER + AÇIK EMERGENCY ama isModerator DEĞİL → hata fırlatılır (yalnız platform mod)', async () => {
+    mockNotChannelMember();
+    mockRawChannel();
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
+    prismaMock.user.findUnique.mockResolvedValue({ username: 'normal', avatarUrl: null, isMinor: false, isModerator: false });
+    prismaMock.report.count.mockResolvedValue(1);
+
+    const svc = makeService();
+    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({ response: { error: 'NOT_CHANNEL_MEMBER' } });
   });
 
   it('NOT_CHANNEL_MEMBER + MUTE_MEMBERS VAR + kanal doluysa → enforceUserLimit MUTE_MEMBERS bypass ile aşılır', async () => {

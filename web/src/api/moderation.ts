@@ -19,6 +19,21 @@ export const ModActionType = {
 } as const
 export type ModActionType = (typeof ModActionType)[keyof typeof ModActionType]
 
+/**
+ * A4 — Acil rapor bağlam snapshot'ı (metadata-only). Yalnız EMERGENCY raporlarında zengin gelir;
+ * normal raporlarda minimal referans. İçerik/AV YOK.
+ */
+export interface EmergencySnapshot {
+  presserId?: string
+  isMinor?: boolean
+  triggeredAt?: string
+  channelId?: string
+  channelName?: string | null
+  guildId?: string | null
+  participants?: string[]
+  broadcasters?: { userId: string; sources: string[] }[]
+}
+
 export interface ReportDto {
   id: string
   targetType: ReportTargetType
@@ -28,6 +43,7 @@ export interface ReportDto {
   status: ReportStatus
   priority: number
   createdAt: string
+  contextSnapshot?: EmergencySnapshot
 }
 
 export interface CreateActionPayload {
