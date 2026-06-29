@@ -558,7 +558,16 @@ export const useVoiceStore = defineStore('voice', () => {
       // REV-7 teşhisi: kendiliğinden düşmenin NEDENİ konsola (DUPLICATE_IDENTITY,
       // SERVER_SHUTDOWN, ağ vb. — runtime'da görünür). Tekrar üreten kullanıcı paylaşır.
       console.warn('[voice] LiveKit Disconnected — reason:', reason)
-      // Sunucu/ağ kaynaklı kopma → yerel durumu temizle (UI tutarlı kalsın)
+      // Sunucu/ağ kaynaklı kopma (A4 acil pull dahil) → SİDEBAR presence'ı da temizle.
+      // Yoksa removeParticipant ile atılan kullanıcı kanalda hayalet + sayaç olarak kalır
+      // (resetLocalState yalnız bağlı-oda görünümünü temizler, kanal-presence map'ini DEĞİL).
+      const leftChannelId = connectedChannelId.value
+      const selfId = useAuthStore().user?.id
+      if (leftChannelId && selfId) {
+        removeParticipant(leftChannelId, selfId)
+        removeBroadcast(leftChannelId, selfId)
+        voiceApi.leave(leftChannelId).catch(() => {}) // diğer istemcilere participant_left
+      }
       room = null
       resetLocalState()
     })

@@ -1014,7 +1014,9 @@
     "title": "ACİL YARDIM ÇAĞRISI",
     "minor": "MİNÖR",
     "subtitle": "Bir kullanıcı acil yardım istedi · {time}",
-    "goToChannel": "Odaya git",
+    "goToChannel": "Odaya gir",
+    "joined": "Acil odaya sese bağlandın.",
+    "joinError": "Odaya bağlanılamadı. Kanal hâlâ açıksa tekrar dene.",
     "dismiss": "Kapat"
   },
   "voice": {
@@ -1353,11 +1355,22 @@
     "VIOLENCE": "Şiddet / Tehdit",
     "CSAM": "CSAM (Çocuk İstismarı)",
     "SELF_HARM": "Kendine Zarar Verme",
-    "OTHER": "Diğer"
+    "OTHER": "Diğer",
+    "EMERGENCY": "Acil Yardım"
   },
   "moderation": {
     "title": "Moderasyon Kuyruğu",
     "backToApp": "Uygulamaya Dön",
+    "emTitle": "Acil bağlam (metadata)",
+    "emChannel": "Kanal",
+    "emTime": "Tetiklenme",
+    "emMinor": "Minör kullanıcı",
+    "emBroadcasters": "Tetik anında yayında olanlar",
+    "emParticipants": "Odadakiler",
+    "emNone": "Kanal bağlamı yok (kullanıcı görüşme dışında tetikledi).",
+    "emCamera": "kamera",
+    "emScreen": "ekran",
+    "emNoBroadcasters": "Yayında kimse yoktu",
     "loadError": "Kuyruk yüklenemedi.",
     "emptyQueue": "Bekleyen rapor yok.",
     "targetId": "Hedef ID",

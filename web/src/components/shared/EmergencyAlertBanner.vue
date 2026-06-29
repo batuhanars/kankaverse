@@ -9,10 +9,14 @@
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useEmergencyAlertsStore } from '@/stores/emergencyAlerts'
+import { useVoiceStore } from '@/stores/voice'
+import { useToastStore } from '@/stores/toast'
 
 const { t } = useI18n()
 const router = useRouter()
 const store = useEmergencyAlertsStore()
+const voiceStore = useVoiceStore()
+const toast = useToastStore()
 
 function timeLabel(iso: string): string {
   try {
@@ -22,10 +26,20 @@ function timeLabel(iso: string): string {
   }
 }
 
-function goToChannel(channelId: string | null, guildId: string | null) {
-  if (!channelId) return
-  if (guildId) router.push({ name: 'channel', params: { guildId, channelId } })
-  else router.push({ name: 'dm', params: { channelId } })
+async function enterRoom(alert: { reportId: string; channelId: string | null; guildId: string | null }) {
+  if (!alert.channelId) return
+  // Kanala git (mod o Ortamın üyesiyse oda görünür; değilse görünüm render olmaz ama sese bağlanır).
+  if (alert.guildId) await router.push({ name: 'channel', params: { guildId: alert.guildId, channelId: alert.channelId } })
+  else await router.push({ name: 'dm', params: { channelId: alert.channelId } })
+  try {
+    await voiceStore.join(alert.channelId)
+    // Başarılı bağlanma → net geri-bildirim ("oda gelmedi" karışıklığını giderir) + alarmı kaldır (sahip isteği).
+    toast.success(t('emergencyAlert.joined'))
+    store.dismiss(alert.reportId)
+  } catch {
+    // Başarısızsa alarm KALIR (tekrar dene); kaldırmıyoruz.
+    toast.error(t('emergencyAlert.joinError'))
+  }
 }
 </script>
 
@@ -69,7 +83,7 @@ function goToChannel(channelId: string | null, guildId: string | null) {
           v-if="alert.channelId"
           class="text-[12px] font-semibold px-2.5 py-1 rounded-full cursor-pointer"
           style="background-color: #fff; color: var(--kv-danger);"
-          @click="goToChannel(alert.channelId, alert.guildId)"
+          @click="enterRoom(alert)"
         >
           {{ t('emergencyAlert.goToChannel') }}
         </button>

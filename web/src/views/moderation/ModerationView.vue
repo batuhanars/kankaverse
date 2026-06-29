@@ -93,6 +93,11 @@ function formatDate(iso: string): string {
     hour: '2-digit', minute: '2-digit',
   })
 }
+
+// A4 — yayıncı track kaynaklarını (camera/screen) Türkçe etikete çevir.
+function broadcasterSources(sources: string[]): string {
+  return sources.map((s) => (s === 'camera' ? t('moderation.emCamera') : t('moderation.emScreen'))).join(', ')
+}
 </script>
 
 <template>
@@ -182,6 +187,50 @@ function formatDate(iso: string): string {
             <!-- Açıklama -->
             <div v-if="report.description" class="mb-3 text-[13px] italic" style="color: var(--kv-text-secondary);">
               "{{ report.description }}"
+            </div>
+
+            <!-- A4 — Acil bağlam (metadata-only): yalnız EMERGENCY raporları. İçerik/AV yok. -->
+            <div
+              v-if="report.reason === 'EMERGENCY'"
+              class="mb-3 p-3 rounded-[var(--kv-radius-sm)] flex flex-col gap-1.5"
+              style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-danger);"
+            >
+              <span class="text-[12px] font-semibold" style="color: var(--kv-danger);">{{ t('moderation.emTitle') }}</span>
+              <template v-if="report.contextSnapshot?.channelId">
+                <div class="text-[12px]" style="color: var(--kv-text-body);">
+                  <span style="color: var(--kv-text-muted);">{{ t('moderation.emChannel') }}: </span>
+                  <strong>{{ report.contextSnapshot.channelName || report.contextSnapshot.channelId }}</strong>
+                  <span
+                    v-if="report.contextSnapshot.isMinor"
+                    class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                    style="background-color: var(--kv-danger); color: #fff;"
+                  >{{ t('moderation.emMinor') }}</span>
+                </div>
+                <div class="text-[12px]" style="color: var(--kv-text-body);">
+                  <span style="color: var(--kv-text-muted);">{{ t('moderation.emTime') }}: </span>
+                  {{ report.contextSnapshot.triggeredAt ? formatDate(report.contextSnapshot.triggeredAt) : '—' }}
+                </div>
+                <div class="text-[12px]" style="color: var(--kv-text-body);">
+                  <span style="color: var(--kv-text-muted);">{{ t('moderation.emBroadcasters') }}: </span>
+                  <template v-if="report.contextSnapshot.broadcasters?.length">
+                    <span v-for="b in report.contextSnapshot.broadcasters" :key="b.userId" class="inline-block mr-2">
+                      <code class="text-[11px]" style="font-family: var(--kv-font-mono);">{{ b.userId }}</code>
+                      <span style="color: var(--kv-text-muted);"> ({{ broadcasterSources(b.sources) }})</span>
+                    </span>
+                  </template>
+                  <span v-else style="color: var(--kv-text-muted);">{{ t('moderation.emNoBroadcasters') }}</span>
+                </div>
+                <div v-if="report.contextSnapshot.participants?.length" class="text-[12px]" style="color: var(--kv-text-body);">
+                  <span style="color: var(--kv-text-muted);">{{ t('moderation.emParticipants') }} ({{ report.contextSnapshot.participants.length }}): </span>
+                  <code
+                    v-for="p in report.contextSnapshot.participants"
+                    :key="p"
+                    class="mr-2 text-[11px]"
+                    style="font-family: var(--kv-font-mono); color: var(--kv-text-secondary);"
+                  >{{ p }}</code>
+                </div>
+              </template>
+              <span v-else class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('moderation.emNone') }}</span>
             </div>
 
             <!-- CSAM uyarısı — içerik render edilmez -->

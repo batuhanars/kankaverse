@@ -85,6 +85,7 @@ export class VoiceService {
     // Erişim + yaş + özel kanal/üyelik kapısı — mevcut helper, hata kodları sapmadan yayılır
     let channel: Awaited<ReturnType<typeof this.membership.requireChannelAccess>>;
     let isInspectEntry = false; // bypass-giriş bayrağı — audit kararı için
+    let isEmergencyInspect = false; // A4-7b: platform-mod acil-yanıt teftiş-girişi (ayrı audit aksiyonu)
 
     try {
       channel = await this.membership.requireChannelAccess(userId, channelId);
@@ -114,11 +115,33 @@ export class VoiceService {
         'MUTE_MEMBERS',
       );
       if (!hasMutePermission) {
-        // Yetki yok → orijinal NOT_CHANNEL_MEMBER hatasını fırlat.
-        throw err;
+        // A4-7b — Platform güvenliği (isModerator) acil-yanıtı: guild rolü olmasa da, bu kanalda
+        // AÇIK bir EMERGENCY raporu varsa teftiş-girişi yapabilir. Yetki MİNİMAL ve amaca bağlı:
+        // yalnız platform mod + yalnız aktif acil → mod'lar rastgele ses kanalına SIZAMAZ.
+        // Görünür (LiveKit participant) + ayrı audit (voice.emergency_inspect). Yaş kapısı yine aşılmaz
+        // (yalnız NOT_CHANNEL_MEMBER bypass'lanıyor; AGE_RESTRICTED yukarıda fırlatıldı).
+        const actor = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { isModerator: true },
+        });
+        const hasOpenEmergency =
+          actor?.isModerator === true &&
+          (await this.prisma.report.count({
+            where: {
+              reason: 'EMERGENCY',
+              targetType: 'CHANNEL',
+              targetId: channelId,
+              status: { in: ['OPEN', 'TRIAGED'] },
+            },
+          })) > 0;
+        if (!hasOpenEmergency) {
+          // Ne guild MUTE_MEMBERS ne platform-acil-yanıt → orijinal NOT_CHANNEL_MEMBER hatası.
+          throw err;
+        }
+        isEmergencyInspect = true;
       }
 
-      // Yetki onaylandı → teftiş-girişi. channel normal akışa girecek.
+      // Yetki onaylandı (guild MUTE_MEMBERS veya platform acil-yanıt) → teftiş-girişi.
       channel = rawChannel as typeof channel;
       isInspectEntry = true;
     }
@@ -178,6 +201,16 @@ export class VoiceService {
     // aynı payload şekli — frontend addParticipant idempotent olduğu için çift-yayın zararsız.
     // GUILD_VOICE + DM + GROUP_DM (ayrılış simetriği announceLeave'de).
     if (this.isVoiceCapable(channel.type)) {
+      // VoiceSession kaydını katılım anında oluştur (idempotent). Eskiden yalnız webhook yapardı;
+      // dev'de webhook localhost'a ulaşamadığından kayıt hiç oluşmuyordu → acil bağlam (channelId)
+      // çözülemiyordu. Mint'te oluşturmak dev'i çalıştırır + prod'u webhook gecikmesine dayanıklı yapar.
+      // Best-effort: kayıt patlasa da katılım engellenmez (webhook + onRoomFinished yedek).
+      try {
+        await this.ensureOpenVoiceSession(channelId, userId);
+      } catch {
+        /* best-effort — webhook/room_finished yedek */
+      }
+
       const joinedPayload = {
         channelId,
         participant: {
@@ -196,7 +229,7 @@ export class VoiceService {
       await this.prisma.auditLog.create({
         data: {
           actorId: userId,
-          action: 'voice.inspect',
+          action: isEmergencyInspect ? 'voice.emergency_inspect' : 'voice.inspect',
           entityType: 'channel',
           entityId: channelId,
           metadata: {
@@ -792,13 +825,12 @@ export class VoiceService {
     }
   }
 
-  private async onParticipantJoined(
-    channelId: string,
-    userId: string,
-    name: string | undefined,
-    metadata: string | undefined,
-  ) {
-    // İdempotent: açık session zaten varsa çift joined'i yok say
+  /**
+   * İdempotent açık VoiceSession kaydı. mintToken (katılım anı) + webhook (onParticipantJoined) ORTAK kullanır.
+   * Webhook localhost'a ulaşamasa da (dev) kayıt mint'te oluşur → acil bağlam (channelId) çözümü güvenilir,
+   * prod'da webhook gecikmesine dayanıklı. Açık session zaten varsa no-op (çift kayıt yok).
+   */
+  private async ensureOpenVoiceSession(channelId: string, userId: string): Promise<void> {
     const open = await this.prisma.voiceSession.findFirst({
       where: { channelId, userId, leftAt: null },
       select: { id: true },
@@ -806,6 +838,16 @@ export class VoiceService {
     if (!open) {
       await this.prisma.voiceSession.create({ data: { channelId, userId } });
     }
+  }
+
+  private async onParticipantJoined(
+    channelId: string,
+    userId: string,
+    name: string | undefined,
+    metadata: string | undefined,
+  ) {
+    // İdempotent kayıt — mintToken (katılım anı) ile ortak; çift joined'i yok sayar.
+    await this.ensureOpenVoiceSession(channelId, userId);
 
     const payload = {
       channelId,
