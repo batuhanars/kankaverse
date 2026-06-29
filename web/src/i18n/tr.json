@@ -1419,6 +1419,8 @@
   },
   "legal": {
     "registerAgree": "Kaydolarak şunları okuduğunu ve kabul ettiğini onaylarsın:",
+    "registerCheckbox": "metinlerini okudum ve kabul ediyorum.",
+    "mustAgree": "Devam etmek için Topluluk Kuralları ve Gizlilik & Şeffaflık'ı kabul etmelisin.",
     "and": "ve",
     "privacy": {
       "title": "Gizlilik & Şeffaflık Bildirimi",
