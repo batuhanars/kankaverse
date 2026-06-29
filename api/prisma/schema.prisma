@@ -465,6 +465,7 @@ enum ReportReason {
   CSAM
   SELF_HARM
   OTHER
+  EMERGENCY // A4: kullanıcı-başlatımlı acil yardım/panik
 }
 
 enum ReportTarget {

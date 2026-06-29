@@ -991,6 +991,32 @@
     "onlineSection": "Çevrimiçi — {count}",
     "offlineSection": "Çevrimdışı — {count}"
   },
+  "emergency": {
+    "button": "Acil Yardım",
+    "confirmTitle": "Acil durum bildir",
+    "confirmMessage": "Seni görüşmeden hemen çıkaracağız ve durumu güvenlik ekibimize ileteceğiz. Devam edilsin mi?",
+    "confirmAction": "Acil durum bildir",
+    "feedbackTitle": "Güvenliğin için çıkarıldın",
+    "feedbackPulled": "Görüşmeden çıkarıldın.",
+    "feedbackReported": "Durum güvenlik ekibimize iletildi. Bu olay incelenecek.",
+    "feedbackError": "Bildirim gönderilemedi. İnternet bağlantını kontrol edip tekrar deneyebilirsin.",
+    "resourcesTitle": "Yardım kaynakları",
+    "resourceEmergency": "Acil tehlikedeysen: 112",
+    "resourceSupport": "Sosyal/çocuk destek: ALO 183",
+    "statementLabel": "İstersen ne olduğunu anlat (zorunlu değil)",
+    "statementPlaceholder": "Ses odasında ne yaşandığını birkaç kelimeyle yazabilirsin…",
+    "statementSubmit": "Gönder",
+    "statementSent": "Beyanın iletildi, teşekkürler.",
+    "statementError": "Beyan gönderilemedi, tekrar deneyebilirsin.",
+    "close": "Kapat"
+  },
+  "emergencyAlert": {
+    "title": "ACİL YARDIM ÇAĞRISI",
+    "minor": "MİNÖR",
+    "subtitle": "Bir kullanıcı acil yardım istedi · {time}",
+    "goToChannel": "Odaya git",
+    "dismiss": "Kapat"
+  },
   "voice": {
     "connected": "SESE BAĞLISIN",
     "leave": "Sesten ayrıl",

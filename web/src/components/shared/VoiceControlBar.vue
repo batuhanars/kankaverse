@@ -6,6 +6,7 @@
 import { useI18n } from 'vue-i18n'
 import { useVoiceStore } from '@/stores/voice'
 import { voiceBroadcast } from '@/composables/useSocket'
+import EmergencyButton from '@/components/shared/EmergencyButton.vue'
 
 const { t } = useI18n()
 const voiceStore = useVoiceStore()
@@ -109,6 +110,8 @@ async function handleToggleScreen() {
         </svg>
       </button>
     </div>
+    <!-- A4: Acil Yardım (mağdura çıkış yolu — anında-çek + platform eskalasyon) -->
+    <EmergencyButton />
     <!-- Ayrıl (ayrı durur — Discord gibi) -->
     <button
       class="w-11 h-11 flex items-center justify-center rounded-full cursor-pointer transition-opacity hover:opacity-90"
