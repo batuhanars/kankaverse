@@ -279,3 +279,76 @@ S3_PUBLIC_URL=https://<accountid>.r2.cloudflarestorage.com/kankaverse-uploads
 # docker compose --env-file .env.production -f docker-compose.prod.yml up -d api
 ```
 Yüklü dosyalar R2'de kalır; yeni yükleme/erişim kapanır (`UPLOADS_DISABLED`).
+
+---
+
+## 14. Şifreli off-site DB yedeği (felaket kurtarma + sızıntı koruması)
+
+> Script: `infra/backup/backup-db.sh`. **Model:** `pg_dump → age (public-key şifrele) → R2`.
+> **Çözme (private) anahtarı SUNUCUDA OLMAZ** — sunucu yalnız şifreler. Sunucu tamamen ele geçse de
+> yedekler okunamaz. Düz-metin dump diske yazılmaz (uçtan uca pipe). R2 = off-site (VPS ölse de ayrı yerde).
+>
+> Bu **felaket kurtarmanın** (disk arızası / DB bozulması / yanlış silme = her şeyi kaybetme) birinci sınıf
+> korumasıdır; şifreleme onun küçük ek katmanı. **Gerçek kullanıcı varken ertelenmez.**
+
+### 14.1 Tek seferlik kurulum
+
+**(a) age anahtar çifti — KENDİ MAKİNENDE üret (sunucuda DEĞİL):**
+```bash
+$ age-keygen -o kankaverse-backup-key.txt
+#   → "Public key: age1xxxxx..." (bunu sunucuya koyacaksın)
+#   → dosya içinde "AGE-SECRET-KEY-1..." (ÇÖZME anahtarı — SUNUCUYA ASLA KOYMA)
+```
+> 🔴 `kankaverse-backup-key.txt`'i (private key) **güvenli sakla** (parola yöneticisi / şifreli USB / 2 ayrı yer).
+> **Bunu kaybedersen yedekleri ÇÖZEMEZSİN.** Sunucuya yalnız `age1...` public key gider.
+
+**(b) R2 backups bucket + retention:** Cloudflare R2 → **Create bucket** (`kankaverse-backups`).
+Bucket → **Settings → Object lifecycle rules** → "delete after N days" (örn. 14) → retention otomatik (script silmez).
+> R2 API token: mevcut upload token'ı yalnız `kankaverse-uploads`'a kapılıysa, **her iki bucket'a** erişen
+> yeni bir token üret (veya account-level) ve `.env.production` `S3_ACCESS_KEY/S3_SECRET_KEY`'i güncelle.
+
+**(c) VPS'te bağımlılıklar:**
+```bash
+# sudo apt update && sudo apt install -y age awscli
+# (Ubuntu 24.04'te ikisi de apt'te. aws-cli yoksa: pipx install awscli)
+```
+
+**(d) `.env.production`'a ekle** (`/home/deploy/kankaverse/.env.production`):
+```
+AGE_RECIPIENT=age1xxxxx...        # (a)'daki PUBLIC key
+BACKUP_BUCKET=kankaverse-backups
+```
+
+**(e) Çalıştırılabilir yap:**
+```bash
+# chmod +x /home/deploy/kankaverse/infra/backup/backup-db.sh
+```
+
+**(f) Cron (deploy kullanıcısı — docker erişimi olan):**
+```bash
+# crontab -e   (deploy kullanıcısıyla)
+0 3 * * * /home/deploy/kankaverse/infra/backup/backup-db.sh >> /home/deploy/kankaverse-backup.log 2>&1
+```
+Her gece 03:00 UTC. Log: `~/kankaverse-backup.log`.
+
+### 14.2 Test (kurulumdan hemen sonra)
+```bash
+# /home/deploy/kankaverse/infra/backup/backup-db.sh        # elle çalıştır → "tamam → s3://..." görmeli
+# aws s3 ls s3://kankaverse-backups/db/ --endpoint-url "$S3_ENDPOINT"   # obje görünmeli
+```
+
+### 14.3 Geri yükleme (RESTORE — mutlaka bir kez test et!)
+> Yedek **test edilmeden** işe yaramaz. Kurulumdan sonra bir kez restore-test yap (boş/geçici DB'ye).
+```bash
+# 1) Yedeği indir (KENDİ makinende, private key burada):
+$ aws s3 cp s3://kankaverse-backups/db/kankaverse-YYYY...Z.sql.age ./yedek.sql.age --endpoint-url <R2_ENDPOINT>
+# 2) age ile çöz (private key dosyası):
+$ age -d -i kankaverse-backup-key.txt yedek.sql.age > yedek.sql
+# 3) Hedef DB'ye yükle:
+$ psql -U kankaverse -d <hedef_db> -f yedek.sql      # (sunucuda: docker compose exec -T postgres psql ... < yedek.sql)
+```
+
+### 14.4 İzleme
+- `~/kankaverse-backup.log`'u ara sıra kontrol et (veya logwatch/cron-MAILTO).
+- R2'de son yedeğin **bugünün tarihiyle** durduğunu doğrula (sessiz başarısızlık en tehlikelisi).
+- Anahtar rotasyonu: private key'i değiştirirsen yeni public key'i `.env.production`'a koy; eski yedekler eski key'le çözülür.
