@@ -197,12 +197,35 @@ function getError(field: string): string | undefined {
         </RouterLink>
       </p>
 
-      <p class="mt-4 text-center text-[12px]" style="color: var(--kv-text-muted);">
-        {{ t('legal.privacy.registerNote') }}
-        <RouterLink to="/gizlilik" style="color: var(--kv-text-muted); text-decoration: underline; text-underline-offset: 2px;">
-          {{ t('legal.privacy.linkLabel') }}
-        </RouterLink>
-      </p>
+      <!-- Gizlilik kutusu: kayıt mümkünken göster (closed modda kayıt yok).
+           Çoğu kullanıcı tam bildirimi okumaz; en kritik iki gerçeği (erişim + tarama) burada dürüstçe söyle. -->
+      <div
+        v-if="!modeLoading && registrationMode !== 'closed'"
+        class="mt-6 rounded-[var(--kv-radius-md)] p-4"
+        style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
+      >
+        <div class="flex items-center gap-2 mb-2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-secondary); flex-shrink: 0;">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span class="text-[13px] font-semibold" style="color: var(--kv-text-primary);">
+            {{ t('legal.privacy.boxTitle') }}
+          </span>
+        </div>
+        <p class="text-[12px] leading-relaxed" style="color: var(--kv-text-muted);">
+          {{ t('legal.privacy.boxAccess') }}
+        </p>
+        <p class="mt-2 text-[12px] leading-relaxed" style="color: var(--kv-text-muted);">
+          {{ t('legal.privacy.boxScanning') }}
+        </p>
+        <p class="mt-3 text-[12px]" style="color: var(--kv-text-muted);">
+          {{ t('legal.privacy.registerNote') }}
+          <RouterLink to="/gizlilik" style="color: var(--kv-text-secondary); text-decoration: underline; text-underline-offset: 2px;">
+            {{ t('legal.privacy.linkLabel') }}
+          </RouterLink>
+        </p>
+      </div>
     </div>
   </div>
 </template>
