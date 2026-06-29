@@ -224,9 +224,9 @@ function getError(field: string): string | undefined {
       </p>
       <p class="text-[13px] leading-relaxed mb-5" style="color: var(--kv-text-secondary);">
         {{ t('legal.consentAgreePre') }}
-        <RouterLink to="/kurallar" style="color: var(--kv-accent-500); text-decoration: underline;">{{ t('legal.rules.linkLabel') }}</RouterLink>
+        <a href="/kurallar" target="_blank" rel="noopener" style="color: var(--kv-accent-500); text-decoration: underline;">{{ t('legal.rules.linkLabel') }}</a>
         {{ t('legal.and') }}
-        <RouterLink to="/gizlilik" style="color: var(--kv-accent-500); text-decoration: underline;">{{ t('legal.privacy.linkLabel') }}</RouterLink>
+        <a href="/gizlilik" target="_blank" rel="noopener" style="color: var(--kv-accent-500); text-decoration: underline;">{{ t('legal.privacy.linkLabel') }}</a>
         {{ t('legal.consentAgreePost') }}
       </p>
       <div class="flex gap-3 justify-end">
