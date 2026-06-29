@@ -113,6 +113,16 @@ function playDisconnect() {
   tone(380, t + 0.09, 0.14, 0.14)
 }
 
+/** A4 acil alarm: dikkat çeken üç hızlı yüksek bip (moderatöre acil çağrı geldi). */
+function playAlert() {
+  const c = audioCtx()
+  if (!c) return
+  const t = c.currentTime
+  tone(880, t, 0.1, 0.2)
+  tone(880, t + 0.16, 0.1, 0.2)
+  tone(1175, t + 0.32, 0.18, 0.2)
+}
+
 export function useCallSounds() {
-  return { startRingtone, stopRingtone, startRingback, stopRingback, playConnect, playDisconnect }
+  return { startRingtone, stopRingtone, startRingback, stopRingback, playConnect, playDisconnect, playAlert }
 }

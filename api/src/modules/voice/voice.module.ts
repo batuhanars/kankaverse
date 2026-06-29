@@ -9,5 +9,6 @@ import { VoiceService } from './voice.service';
   imports: [JwtModule.register({}), SharedModule],
   controllers: [VoiceController, VoiceModerationController, VoiceWebhookController, VoiceInspectController],
   providers: [VoiceService],
+  exports: [VoiceService], // A4: EmergencyModule self-pull + bağlam yakalama için VoiceService'i kullanır
 })
 export class VoiceModule {}

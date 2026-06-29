@@ -15,6 +15,8 @@ import { useRolesStore } from '@/stores/roles'
 import { useEventsStore } from '@/stores/events'
 import { useVoiceStore, type VoiceParticipant } from '@/stores/voice'
 import { useCallStore, type IncomingCall } from '@/stores/call'
+import { useEmergencyAlertsStore, type EmergencyAlert } from '@/stores/emergencyAlerts'
+import { useCallSounds } from '@/composables/useCallSounds'
 import { useToastStore } from '@/stores/toast'
 import { i18n } from '@/i18n'
 import { getAccessToken, refreshAccessToken } from '@/api/axios'
@@ -70,6 +72,7 @@ export function useSocket() {
   const eventsStore = useEventsStore()
   const voiceStore = useVoiceStore()
   const callStore = useCallStore()
+  const emergencyAlertsStore = useEmergencyAlertsStore()
 
   function _joinRoom(channelId: string) {
     socket?.emit('channel:join', { channelId }, (ack: { ok: boolean; error?: string }) => {
@@ -186,6 +189,12 @@ export function useSocket() {
 
     socket.on('notification:snapshot', (payload: { notifications: NotificationDto[]; unreadCount: number }) => {
       notificationsStore.applySnapshot(payload)
+    })
+
+    // A4 — Acil alarm (yalnız platform isModerator alır; sunucu otorite). Kalıcı alarm + dikkat sesi.
+    socket.on('emergency.alert', (data: EmergencyAlert) => {
+      emergencyAlertsStore.add(data)
+      useCallSounds().playAlert()
     })
 
     socket.on('presence:snapshot', (payload: { states: Array<{ userId: string; status: PresenceStatus }> }) => {

@@ -533,6 +533,56 @@ export class VoiceService {
     this.realtime.emitToRoom(channelId, 'voice.kicked', { channelId, userId: targetUserId });
   }
 
+  /**
+   * A4 — Acil çıkış: kullanıcıyı KENDİ isteğiyle LiveKit odasından çeker. **Yetki kontrolü YOK**
+   * (self-initiated; panik butonu). Best-effort: roomService yoksa / bağlı değilse sessiz geç.
+   * VoiceSession kaydı LiveKit `participant_left` webhook'uyla temizlenir (mevcut akış). (A4 — R7)
+   */
+  async pullSelfFromVoice(channelId: string, userId: string): Promise<void> {
+    if (!this.roomService) return;
+    try {
+      await this.roomService.removeParticipant(channelId, userId);
+    } catch {
+      // bağlı değil / oda yok → best-effort (rapor pull'a bağlı DEĞİL — emergency.service sırası)
+    }
+  }
+
+  /**
+   * A4 — Acil snapshot bağlamı: kanaldaki aktif katılımcılar + yayıncılar (kamera/ekran). **METADATA-only**
+   * (kimlik listesi + yayın durumu; canlı AV/içerik DEĞİL). LiveKit erişilemezse VoiceSession'a (leftAt null)
+   * düşer, yayıncı = []. İnceleyenin bağlamı görmesi için; hukuk-gated içerik-kanıtı DEĞİL (A4 §0.4).
+   */
+  async captureVoiceContext(
+    channelId: string,
+  ): Promise<{ participants: string[]; broadcasters: { userId: string; sources: string[] }[] }> {
+    if (this.roomService) {
+      try {
+        const parts = await this.roomService.listParticipants(channelId);
+        // Yayıncı = kamera veya ekran track'i olan katılımcı; hangi track(ler) açık → inceleyene "kime bak".
+        const broadcasters = parts
+          .map((p) => {
+            const sources = [
+              ...new Set(
+                (p.tracks ?? [])
+                  .filter((t) => t.source === TrackSource.CAMERA || t.source === TrackSource.SCREEN_SHARE)
+                  .map((t) => (t.source === TrackSource.CAMERA ? 'camera' : 'screen')),
+              ),
+            ];
+            return { userId: p.identity, sources };
+          })
+          .filter((b) => b.sources.length > 0);
+        return { participants: parts.map((p) => p.identity), broadcasters };
+      } catch {
+        // LiveKit erişilemez → VoiceSession'a düş
+      }
+    }
+    const sessions = await this.prisma.voiceSession.findMany({
+      where: { channelId, leftAt: null },
+      select: { userId: true },
+    });
+    return { participants: sessions.map((s) => s.userId), broadcasters: [] };
+  }
+
   /** R11 — kanal GUILD_VOICE mı + guildId güvence. Değilse NOT_VOICE_CHANNEL/CHANNEL_NOT_FOUND. */
   private async requireGuildVoiceChannel(
     channelId: string,
