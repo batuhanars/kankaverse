@@ -21,10 +21,16 @@ if [ -f "$ENV_FILE" ]; then
   set -a; . "$ENV_FILE"; set +a
 fi
 
-# ── Zorunlu config ───────────────────────────────────────────────────────────────
-: "${S3_ENDPOINT:?S3_ENDPOINT gerekli (.env.production)}"
-: "${S3_ACCESS_KEY:?S3_ACCESS_KEY gerekli}"
-: "${S3_SECRET_KEY:?S3_SECRET_KEY gerekli}"
+# ── R2 kimlik bilgileri ──────────────────────────────────────────────────────────
+# Backup için AYRI token verilebilir (BACKUP_S3_*) → çalışan uploads token'ına dokunmadan.
+# Verilmezse uploads token'ına (S3_*) düşer. Not: uploads token'ı çoğu zaman yalnız uploads
+# bucket'ına kapılıdır → backups bucket'ı için DEDICATED token (BACKUP_S3_*) önerilir (§14).
+R2_ENDPOINT="${BACKUP_S3_ENDPOINT:-${S3_ENDPOINT:-}}"
+R2_ACCESS="${BACKUP_S3_ACCESS_KEY:-${S3_ACCESS_KEY:-}}"
+R2_SECRET="${BACKUP_S3_SECRET_KEY:-${S3_SECRET_KEY:-}}"
+: "${R2_ENDPOINT:?BACKUP_S3_ENDPOINT veya S3_ENDPOINT gerekli (.env.production)}"
+: "${R2_ACCESS:?BACKUP_S3_ACCESS_KEY veya S3_ACCESS_KEY gerekli}"
+: "${R2_SECRET:?BACKUP_S3_SECRET_KEY veya S3_SECRET_KEY gerekli}"
 : "${AGE_RECIPIENT:?AGE_RECIPIENT gerekli — age PUBLIC key (age1...). Private key SUNUCUDA OLMAMALI}"
 
 # ── Opsiyonel config (varsayılanlı) ──────────────────────────────────────────────
@@ -44,10 +50,10 @@ echo "[backup] başlıyor: ${OBJECT}"
 docker compose -f "$COMPOSE_FILE" exec -T postgres \
     pg_dump -U "$PG_USER" "$PG_DB" \
   | age -r "$AGE_RECIPIENT" \
-  | AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY" \
-    AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY" \
+  | AWS_ACCESS_KEY_ID="$R2_ACCESS" \
+    AWS_SECRET_ACCESS_KEY="$R2_SECRET" \
     aws s3 cp - "s3://${BACKUP_BUCKET}/${OBJECT}" \
-      --endpoint-url "$S3_ENDPOINT" \
+      --endpoint-url "$R2_ENDPOINT" \
       --only-show-errors
 
 echo "[backup] tamam → s3://${BACKUP_BUCKET}/${OBJECT}"
