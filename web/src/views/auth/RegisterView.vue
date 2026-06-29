@@ -220,7 +220,11 @@ function getError(field: string): string | undefined {
           {{ t('legal.privacy.boxScanning') }}
         </p>
         <p class="mt-3 text-[12px]" style="color: var(--kv-text-muted);">
-          {{ t('legal.privacy.registerNote') }}
+          {{ t('legal.registerAgree') }}
+          <RouterLink to="/kurallar" style="color: var(--kv-text-secondary); text-decoration: underline; text-underline-offset: 2px;">
+            {{ t('legal.rules.linkLabel') }}
+          </RouterLink>
+          {{ t('legal.and') }}
           <RouterLink to="/gizlilik" style="color: var(--kv-text-secondary); text-decoration: underline; text-underline-offset: 2px;">
             {{ t('legal.privacy.linkLabel') }}
           </RouterLink>

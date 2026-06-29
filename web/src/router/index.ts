@@ -69,6 +69,11 @@ const router = createRouter({
       name: 'gizlilik',
       component: () => import('@/views/legal/GizlilikView.vue'),
     },
+    {
+      path: '/kurallar',
+      name: 'kurallar',
+      component: () => import('@/views/legal/KurallarView.vue'),
+    },
     // Sprint 4B — moderasyon kuyruğu (mod-only, guard view içinde)
     {
       path: '/moderation',
