@@ -518,7 +518,8 @@
     "unsavedBar": {
       "title": "Dikkat — kaydetmediğin değişiklikler var!",
       "reset": "Sıfırla",
-      "save": "Değişiklikleri Kaydet"
+      "save": "Değişiklikleri Kaydet",
+      "discardMessage": "Kaydetmediğin değişiklikler var. Çıkarsan kaybolacaklar."
     },
     "featuresLabel": "Özellikler",
     "featuresHint": "Ortamını anlatan en fazla {max} etiket ekle. Keşfet'te bunlara göre filtrelenir.",
