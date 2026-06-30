@@ -446,6 +446,12 @@ watch(
 
 // ── Roller detay modu (nav gizleme + full-width) ──────────────────────────
 const rolesDetailMode = ref(false)
+// Roller bölümünden çıkınca detay modunu sıfırla: aksi halde RolesSettingsSection
+// unmount olurken parent bayrağı true kalır, sekmeye geri dönünce liste detay-layout'unda
+// (max-width'siz, full-width) render olup "yayılır". Child geri dönüşte liste modunda mount olur.
+watch(activeSection, (section) => {
+  if (section !== 'roller') rolesDetailMode.value = false
+})
 
 // ── Kaydedilmemiş değişiklik guard'ı (roller + genel ayarlar) ──────────────
 const rolesDirty = ref(false)
