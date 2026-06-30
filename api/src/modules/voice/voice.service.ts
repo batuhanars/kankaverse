@@ -316,16 +316,13 @@ export class VoiceService {
     const muted = await this.isVoiceMuted(channel.id, userId);
     if (muted) return [];
 
-    // Kapı 5: Bağlam kapısı (revize — C7)
+    // Kapı 5: Bağlam kapısı (C7.1 — tam ayrıştırma, sahip kararı 2026-06-30)
     if (channel.type === 'GUILD_VOICE') {
-      // C7: mediaEnabled || ageGated || adultsOnly → video; üçü de false (genel kanal, kapalı) → [].
-      // channel.guild requireChannelAccess tarafından include: { guild: true } ile hazır gelir — ayrı sorgu gereksiz.
-      // adultsOnly/ageGated bağlamı mediaEnabled'dan BAĞIMSIZ medya alır (C4 regresyon yok).
-      const contextOk =
-        channel.mediaEnabled === true ||
-        channel.ageGated === true ||
-        channel.guild?.adultsOnly === true;
-      if (!contextOk) return [];
+      // Medya YALNIZ admin mediaEnabled toggle'ına bağlı. 18+ (ageGated/adultsOnly) bir YAŞ-ERİŞİM
+      // ayarıdır, medya ayarı DEĞİL → tek başına medya AÇMAZ (önceki C7 auto-grant kaldırıldı).
+      // adultsOnly/ageGated kanalda da kamera/ekran için admin mediaEnabled açmalı; minör tarafı
+      // değişmez (minör 18+'a zaten giremez; genel kanalda medya yine toggle'a bağlı).
+      if (channel.mediaEnabled !== true) return [];
     } else if (channel.type === 'DM') {
       // C7: DM minör reti KORUNUR — self-minör kontrolü kapı 2'den buraya taşındı.
       // 1-1 DM: iki taraf da yetişkin olmalı (self + other).
