@@ -262,43 +262,49 @@ export class VoiceService {
   }
 
   /**
-   * Sprint C4 — T&S video/ekran kaynak kararı (R7, ÇEKIRDEK).
+   * Sprint C7 (C4 revizyonu) — T&S video/ekran kaynak kararı (R7, ÇEKIRDEK).
    * Fail-closed: kuşkuda boş dizi (video yok). mintToken'a `[TrackSource.MICROPHONE, ...sonuç]` olarak eklenir.
    *
+   * C7 DEĞİŞİKLİKLERİ:
+   *  - Kapı 2 (minör mutlak ret) GUILD_VOICE'tan KALDIRILDI. Minör artık genel + mediaEnabled=true kanalda video alabilir.
+   *  - DM dalında minör reti KORUNDU (kapı 5 DM bölümüne taşındı: self-minör + other-minör kontrolü).
+   *  - Kapı 5 GUILD_VOICE: yalnız mediaEnabled || ageGated || adultsOnly ise grant; değilse [].
+   *  - adultsOnly/ageGated kanallar mediaEnabled'dan BAĞIMSIZ medya almaya devam eder (C4 regresyon yok).
+   *
    * Sıralı kapılar:
-   *  1. Bayrak (BUILD-DARK): CAMERA_ENABLED/SCREEN_ENABLED false → ilgili kaynak aday-dışı; ikisi de false → erken [].
-   *  2. Minör mutlak ret: user.isMinor → []. (Çift-kilit; access-gate'e tek-katmana güvenme.)
+   *  1. Bayrak: CAMERA_ENABLED/SCREEN_ENABLED false → ilgili kaynak aday-dışı; ikisi de false → erken [].
+   *  2. ~~Minör mutlak ret~~ GUILD_VOICE için KALDIRILDI. DM reti kapı 5 DM dalına taşındı.
    *  3. Karantina: GUILD_VOICE'ta resolveCanPublish false → []. (Video, audio'dan ağır kısıt.)
    *  4. Server-mute: isVoiceMuted → []. (Her yayını keser, video dahil.)
-   *  5. Bağlam kapısı (çekirdek invariant):
-   *     - GUILD_VOICE: yalnız channel.ageGated || guild.adultsOnly ise video. Normal kanal → [].
-   *     - DM (1-1): iki taraf da !isMinor ise video. Minör↔yetişkin → audio var, video [].
-   *     - GROUP_DM: TÜM üyeler !isMinor ise video; bir minör bile → []. (fail-closed fiili kontrol)
+   *  5. Bağlam kapısı (revize):
+   *     - GUILD_VOICE: channel.mediaEnabled || channel.ageGated || guild.adultsOnly ise video; değilse [].
+   *       mediaEnabled=false + ageGated=false + adultsOnly=false (genel kanal) → [].
+   *       mediaEnabled=true → minör dahil herkese video (erişim kapısı zaten ageGated/adultsOnly'ye minörü sokmaz).
+   *     - DM (1-1): self veya other minörse → []. İki taraf da yetişkinse video.
+   *     - GROUP_DM: TÜM üyeler (self dahil) yetişkinse video; bir minör bile → [].
    *
    * SCREEN_SHARE_AUDIO: yalnız SCREEN_SHARE izinliyse eklenir.
    * EgressClient/kayıt: YOK — bu fonksiyon yalnız grant kararı verir.
+   * Re-mint tetikleyicisi: mediaEnabled değişiminde istemci channel.updated WS olayıyla re-mint yapar (C4-C3 deseni).
    */
   private async resolveVideoSources(
     userId: string,
-    channel: { id: string; type: string; guildId: string | null; ageGated?: boolean; guild?: { adultsOnly: boolean } | null },
+    channel: { id: string; type: string; guildId: string | null; ageGated?: boolean; mediaEnabled?: boolean; guild?: { adultsOnly: boolean } | null },
     otherDmUserId: string | null,
   ): Promise<TrackSource[]> {
     const cameraEnabled = this.config.get<boolean>('cameraEnabled') ?? false;
     const screenEnabled = this.config.get<boolean>('screenEnabled') ?? false;
 
-    // Kapı 1: Bayrak (BUILD-DARK) — ikisi de kapalıysa erken çık (audio-only davranış birebir)
+    // Kapı 1: Bayrak — ikisi de kapalıysa erken çık (audio-only davranış birebir)
     if (!cameraEnabled && !screenEnabled) return [];
 
     // Adaylar: yalnız açık bayrağa sahip kaynaklar
     const cameraCandidate = cameraEnabled;
     const screenCandidate = screenEnabled;
 
-    // Kapı 2: Minör mutlak ret — erişim kapısından bağımsız ikinci kilit
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { isMinor: true },
-    });
-    if (!user || user.isMinor) return [];
+    // Kapı 2: GUILD_VOICE için KALDIRILDI (C7). DM minör reti kapı 5 DM dalına taşındı.
+    // Açıklama: minör artık mediaEnabled=true genel kanalda video alabilir (sahip kararı 2026-06-30).
+    // Savunma derinliği: ageGated/adultsOnly kanallar erişim kapısında (requireChannelAccess) zaten AGE_RESTRICTED fırlatır.
 
     // Kapı 3: Karantina (yalnız GUILD_VOICE) — video audio'dan ağır; karantinada video da kapalı
     if (channel.type === 'GUILD_VOICE' && channel.guildId) {
@@ -310,22 +316,34 @@ export class VoiceService {
     const muted = await this.isVoiceMuted(channel.id, userId);
     if (muted) return [];
 
-    // Kapı 5: Bağlam kapısı (çekirdek invariant — yetişkin-yalıtılmış bağlam zorunlu)
+    // Kapı 5: Bağlam kapısı (revize — C7)
     if (channel.type === 'GUILD_VOICE') {
-      // ageGated veya adultsOnly olmayan normal kanal → video YOK (minör erişebilir)
-      // channel.guild requireChannelAccess tarafından include: { guild: true } ile hazır gelir — ayrı sorgu gereksiz
-      const contextOk = channel.ageGated || channel.guild?.adultsOnly === true;
+      // C7: mediaEnabled || ageGated || adultsOnly → video; üçü de false (genel kanal, kapalı) → [].
+      // channel.guild requireChannelAccess tarafından include: { guild: true } ile hazır gelir — ayrı sorgu gereksiz.
+      // adultsOnly/ageGated bağlamı mediaEnabled'dan BAĞIMSIZ medya alır (C4 regresyon yok).
+      const contextOk =
+        channel.mediaEnabled === true ||
+        channel.ageGated === true ||
+        channel.guild?.adultsOnly === true;
       if (!contextOk) return [];
     } else if (channel.type === 'DM') {
-      // 1-1 DM: iki taraf da yetişkin olmalı
+      // C7: DM minör reti KORUNUR — self-minör kontrolü kapı 2'den buraya taşındı.
+      // 1-1 DM: iki taraf da yetişkin olmalı (self + other).
+      const selfUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { isMinor: true },
+      });
+      if (!selfUser || selfUser.isMinor) return []; // self minörse → video []
+
       if (!otherDmUserId) return []; // diğer üye bulunamazsa fail-closed
       const otherUser = await this.prisma.user.findUnique({
         where: { id: otherDmUserId },
         select: { isMinor: true },
       });
-      if (otherUser?.isMinor === true) return []; // karşı taraf minörse video yok
+      if (otherUser?.isMinor === true) return []; // karşı taraf minörse → video []
     } else if (channel.type === 'GROUP_DM') {
-      // GROUP_DM: TÜM üyeler yetişkin olmalı — varsayıma güvenme, fiilen kontrol et
+      // GROUP_DM: TÜM üyeler yetişkin olmalı — varsayıma güvenme, fiilen kontrol et.
+      // Self userId de ChannelMember olduğundan self-minör bu sayımda kapsanır.
       const members = await this.prisma.channelMember.findMany({
         where: { channelId: channel.id },
         select: { userId: true },
@@ -437,16 +455,39 @@ export class VoiceService {
       throw new BadRequestException({ message: 'Kendini taşıyamazsın.', error: 'CANNOT_MOVE_SELF' });
     }
 
-    // Hedef kanal: var mı + aynı guild + GUILD_VOICE
+    // Hedef kanal: var mı + aynı guild + GUILD_VOICE (ageGated + guild.adultsOnly invariant için de fetch et)
     const target = await this.prisma.channel.findFirst({
       where: { id: targetChannelId, deletedAt: null },
-      select: { id: true, type: true, guildId: true, userLimit: true },
+      select: {
+        id: true,
+        type: true,
+        guildId: true,
+        userLimit: true,
+        ageGated: true,
+        guild: { select: { adultsOnly: true } },
+      },
     });
     if (!target || target.guildId !== source.guildId) {
       throw new BadRequestException({ message: 'Hedef kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
     }
     if (target.type !== 'GUILD_VOICE') {
       throw new BadRequestException({ message: 'Hedef bir ses kanalı değil.', error: 'NOT_VOICE_CHANNEL' });
+    }
+
+    // C7 §D — Yetki-baypas invariant'ı: minör → 18+ hedef bağlam → ret (koşulsuz kemer).
+    // R11 moveParticipant hiçbir yetkiyle bir minörü ageGated/adultsOnly bağlama yerleştiremez.
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { isMinor: true },
+    });
+    if (targetUser?.isMinor) {
+      const isAgeRestricted = target.ageGated || target.guild?.adultsOnly === true;
+      if (isAgeRestricted) {
+        throw new ForbiddenException({
+          message: 'Minör kullanıcı 18+ bağlama taşınamaz.',
+          error: 'AGE_RESTRICTED',
+        });
+      }
     }
 
     await this.requireTargetNotOwner(source.guildId, targetUserId, 'CANNOT_MOVE_OWNER', 'Ortam sahibi taşınamaz.');

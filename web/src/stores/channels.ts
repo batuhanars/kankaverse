@@ -68,7 +68,7 @@ export const useChannelsStore = defineStore('channels', () => {
     return res.data
   }
 
-  async function updateChannel(channelId: string, guildId: string, payload: { name?: string; ageGated?: boolean; slowModeSeconds?: number; categoryId?: string | null; userLimit?: number }): Promise<ChannelDto> {
+  async function updateChannel(channelId: string, guildId: string, payload: { name?: string; ageGated?: boolean; slowModeSeconds?: number; categoryId?: string | null; userLimit?: number; bitrate?: number; mediaEnabled?: boolean }): Promise<ChannelDto> {
     const res = await channelsApi.update(channelId, payload)
     const list = channelsByGuild.value[guildId]
     if (list) {

@@ -202,6 +202,7 @@ export interface ChannelDto {
   categoryId: string | null
   userLimit: number // R10 — ses kanalı kullanıcı limiti (0 = sınırsız, 0–99); metin kanallarında 0
   bitrate?: number // R10 — ses kanalı bit hızı (kbps, 8–96); metin kanallarında anlamsız
+  mediaEnabled?: boolean // C7 — GUILD_VOICE kanalında kamera/ekran grant'i (admin toggle; default false)
 }
 
 // Sprint V2 — Kategori DTO (§3 toCategoryDto)

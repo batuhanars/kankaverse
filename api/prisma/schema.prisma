@@ -303,6 +303,7 @@ model Channel {
   slowModeSeconds Int              @default(0)
   userLimit       Int              @default(0) // GUILD_VOICE kullanıcı limiti; 0 = sınırsız
   bitrate         Int              @default(64) // GUILD_VOICE ses bit hızı (kbps, 8–96); istemci publish'te uygular
+  mediaEnabled    Boolean          @default(false) // C7: admin per-channel kamera/ekran toggle (GUILD_VOICE); default OFF
   deletedAt       DateTime?
   createdAt       DateTime         @default(now())
   messages        Message[]

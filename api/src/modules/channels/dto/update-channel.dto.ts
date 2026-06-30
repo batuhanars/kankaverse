@@ -46,4 +46,9 @@ export class UpdateChannelDto {
   @Min(8, { message: 'Bit hızı en az 8 kbps olmalıdır.' })
   @Max(96, { message: 'Bit hızı en fazla 96 kbps olabilir.' })
   bitrate?: number;
+
+  @ApiPropertyOptional({ example: false, description: 'Ses kanalında kamera/ekran yayını açık mı (GUILD_VOICE; varsayılan: kapalı — admin bilinçle açar)' })
+  @IsOptional()
+  @IsBoolean()
+  mediaEnabled?: boolean;
 }

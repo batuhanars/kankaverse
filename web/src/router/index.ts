@@ -74,6 +74,12 @@ const router = createRouter({
       name: 'kurallar',
       component: () => import('@/views/legal/KurallarView.vue'),
     },
+    // C7 — ekran paylaşımı güvenlik ipuçları (§E3 nudge'dan yeni sekmede açılır; auth gerektirmez)
+    {
+      path: '/guvenlik-ipuclari',
+      name: 'guvenlik-ipuclari',
+      component: () => import('@/views/app/SecurityTipsView.vue'),
+    },
     // Sprint 4B — moderasyon kuyruğu (mod-only, guard view içinde)
     {
       path: '/moderation',
