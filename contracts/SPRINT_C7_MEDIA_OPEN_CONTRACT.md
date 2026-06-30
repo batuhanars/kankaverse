@@ -40,7 +40,7 @@
 
 - Anlamı: bu GUILD_VOICE kanalında kamera/ekran yayını grant edilebilir mi (admin kontrolü). Default `false` (genel kanalda medya kapalı gelir).
 - **Migration ZORUNLU + DB'ye uygulanır** (`prisma migrate dev` → prod `migrate deploy`; `migrate status` temiz). Mock-Prisma build/test bunu yakalamaz — DoD'da `migrate status` temiz şartı var.
-- `adultsOnly`/`ageGated` davranışı bu alana **bağlı değil** (regresyon yok — bkz. §C kapı 5): yetişkin bağlamı medyayı `mediaEnabled`'dan bağımsız almaya devam eder.
+- **C7.1 (sahip 2026-06-30):** medya **tek başına** `mediaEnabled` toggle'ına bağlı. `adultsOnly`/`ageGated` (18+) bir yaş-erişim ayarıdır, medya ayarı DEĞİL → tek başına medya **AÇMAZ**. 18+ kanalda da kamera/ekran için admin `mediaEnabled` açmalı. (Önceki C7 "yetişkin bağlamı bağımsız medya alır" auto-grant'ı kaldırıldı — daha az grant, T&S açısından güvenli/nötr.)
 
 ---
 
@@ -65,8 +65,8 @@
 3. **Karantina:** (değişmez) `resolveCanPublish === false` → `[]`. OWNER/ADMIN muafiyeti aynı.
 4. **Server-mute:** (değişmez) `isVoiceMuted` → `[]`.
 5. **BAĞLAM kapısı (revize):**
-   - **`GUILD_VOICE`:** video grant'i = **`channel.mediaEnabled === true` VEYA `channel.ageGated === true` VEYA `guild.adultsOnly === true`** ise verilir, değilse `[]`.
-     - Yetişkin bağlamı (`ageGated`/`adultsOnly`) `mediaEnabled`'dan **bağımsız** medya alır (C4 davranışı korunur, regresyon yok).
+   - **`GUILD_VOICE` (C7.1):** video grant'i = **`channel.mediaEnabled === true`** ise verilir, değilse `[]`. `ageGated`/`adultsOnly` artık medya açmaz (tam ayrıştırma).
+     - 18+ kanalda medya istiyorsa admin `mediaEnabled` açar; minör tarafı değişmez (minör 18+'a giremez; genel kanalda medya yine toggle'a bağlı).
      - Genel kanal (üçü de false) → **video YOK** (medya admin tarafından açılmamış). `mediaEnabled=true` genel kanal → **minör dahil herkese** medya açık.
      - **Minör yalnız burada medya alır:** genel + `mediaEnabled` kanal. `adultsOnly`/`ageGated`'a zaten giremez (§D + erişim kapısı).
    - **`DM` (1-1):** (değişmez) video yalnız iki taraf da yetişkinse. Minör↔yetişkin DM → audio var, video `[]`.
@@ -119,11 +119,11 @@
 
 - [ ] `Channel.mediaEnabled` (default false) + **migration uygulanmış** (`migrate status` temiz; [[migration-uygulanmali]]).
 - [ ] `mediaEnabled` toggle endpoint'i (OWNER/ADMIN, GUILD_VOICE); `ChannelDto.mediaEnabled`.
-- [ ] `resolveVideoSources` revize: kapı 2 GUILD_VOICE'tan kalktı (DM minör reti korundu); kapı 5 GUILD_VOICE = `mediaEnabled || ageGated || adultsOnly`. **R7 geçti.**
+- [x] `resolveVideoSources` revize: kapı 2 GUILD_VOICE'tan kalktı (DM minör reti korundu); kapı 5 GUILD_VOICE = **`mediaEnabled` (yalnız)** — C7.1 tam ayrıştırma, ageGated/adultsOnly medya açmaz. **R7 geçti (sahip imzası 2026-06-30).**
 - [ ] Yetki-baypas invariant'ı (§D): move + erişim + rol yollarında "minör + 18+ hedef → ret"; testleri yeşil.
 - [ ] Re-mint tetikleyicisine `mediaEnabled` değişimi eklendi (bağlam bayatlaması).
 - [ ] Frontend: admin `mediaEnabled` toggle UI · yetenek-kapılı kamera/ekran kontrolleri (C4 deseni) · kamera nudge'ı (E2) · ekran nudge'ı (E3) · "Güvenlik ipuçları" sayfası/linki · hepsi bağlama-bağlı-bir-kez.
-- [ ] Backend testleri yeşil — **özellikle:** genel kanal `mediaEnabled=false` → video yok · genel `mediaEnabled=true` → **minör dahil** medya var · `adultsOnly`/`ageGated` → `mediaEnabled`'dan bağımsız medya (regresyon yok) · minör → adultsOnly/ageGated move/erişim/rol = ret · DM minör↔yetişkin → video `[]` (değişmedi) · bayrak kapalı → audio-only birebir.
+- [x] Backend testleri yeşil — **özellikle:** genel kanal `mediaEnabled=false` → video yok · genel `mediaEnabled=true` → **minör dahil** medya var · **C7.1: `adultsOnly`/`ageGated` + `mediaEnabled=false` → video YOK** (18+ tek başına medya açmaz) · 18+ + `mediaEnabled=true` → video var · minör → adultsOnly/ageGated move/erişim/rol = ret · DM minör↔yetişkin → video `[]` (değişmedi) · bayrak kapalı → audio-only birebir.
 - [ ] `nest build` + `vue-tsc`/`vite build` temiz; envelope tutarlı; Swagger güncel.
 - [ ] Tüm yeni metin i18n; yaş-bandı UI'da hiçbir yerde ifşa edilmiyor.
 
