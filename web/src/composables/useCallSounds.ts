@@ -113,6 +113,24 @@ function playDisconnect() {
   tone(380, t + 0.09, 0.14, 0.14)
 }
 
+/** Başkası kanala girdi: kısık, yumuşak yükselen blip (self-connect'ten daha hafif → ayırt edilir). */
+function playPeerJoin() {
+  const c = audioCtx()
+  if (!c) return
+  const t = c.currentTime
+  tone(523, t, 0.07, 0.08)
+  tone(784, t + 0.07, 0.09, 0.08)
+}
+
+/** Başkası kanaldan çıktı: kısık, yumuşak alçalan blip. */
+function playPeerLeave() {
+  const c = audioCtx()
+  if (!c) return
+  const t = c.currentTime
+  tone(523, t, 0.07, 0.07)
+  tone(349, t + 0.07, 0.1, 0.07)
+}
+
 /** A4 acil alarm: dikkat çeken üç hızlı yüksek bip (moderatöre acil çağrı geldi). */
 function playAlert() {
   const c = audioCtx()
@@ -124,5 +142,5 @@ function playAlert() {
 }
 
 export function useCallSounds() {
-  return { startRingtone, stopRingtone, startRingback, stopRingback, playConnect, playDisconnect, playAlert }
+  return { startRingtone, stopRingtone, startRingback, stopRingback, playConnect, playDisconnect, playPeerJoin, playPeerLeave, playAlert }
 }
