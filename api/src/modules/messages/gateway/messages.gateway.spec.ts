@@ -131,12 +131,38 @@ describe('MessagesGateway.notifyChannelActivity', () => {
 
     await gateway.notifyChannelActivity(CHANNEL_ID, makeMessageDto());
 
-    // MEMBER_1 ve MEMBER_2 alır
+    // Yaş kapısı yok → okuyabilen üyeye zengin payload (yazar adı + önizleme).
+    const richPayload = {
+      channelId: CHANNEL_ID,
+      guildId: GUILD_ID,
+      authorId: AUTHOR_ID,
+      author: { id: AUTHOR_ID, username: 'author' },
+      preview: 'Merhaba!',
+    };
+    expect(emitToUserMock).toHaveBeenCalledWith(MEMBER_1_ID, 'channel.activity', richPayload);
+    expect(emitToUserMock).toHaveBeenCalledWith(MEMBER_2_ID, 'channel.activity', richPayload);
+  });
+
+  it('yaş-kapılı kanal → minör üye önizleme/içerik almaz (yalnız çıplak rozet)', async () => {
+    // T&S: ageGated kanalda minör okuyamaz → basePayload (preview + author SIZMAZ); yetişkin richPayload alır.
+    prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID, ageGated: true });
+    prismaMock.guildMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID, user: { isMinor: false } },
+      { userId: MEMBER_1_ID, user: { isMinor: false } }, // yetişkin → zengin
+      { userId: MEMBER_2_ID, user: { isMinor: true } }, // minör → çıplak
+    ]);
+
+    await gateway.notifyChannelActivity(CHANNEL_ID, makeMessageDto());
+
+    // Yetişkin: önizleme + yazar adı
     expect(emitToUserMock).toHaveBeenCalledWith(MEMBER_1_ID, 'channel.activity', {
       channelId: CHANNEL_ID,
       guildId: GUILD_ID,
       authorId: AUTHOR_ID,
+      author: { id: AUTHOR_ID, username: 'author' },
+      preview: 'Merhaba!',
     });
+    // Minör: çıplak — preview/author ANAHTARLARI bulunmamalı (içerik sızıntısı yok)
     expect(emitToUserMock).toHaveBeenCalledWith(MEMBER_2_ID, 'channel.activity', {
       channelId: CHANNEL_ID,
       guildId: GUILD_ID,
