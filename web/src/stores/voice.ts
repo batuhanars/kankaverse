@@ -529,6 +529,7 @@ export const useVoiceStore = defineStore('voice', () => {
     r.on(RoomEvent.ParticipantConnected, (p: Participant) => {
       attachSpeaking(p)
       refreshRoomParticipants()
+      useCallSounds().playPeerJoin() // başkası kanala girdi (Discord gibi); self-join'de tetiklenmez
     })
     r.on(RoomEvent.ParticipantDisconnected, (p: Participant) => {
       // C4: ayrılan katılımcının video track'lerini temizle
@@ -536,6 +537,7 @@ export const useVoiceStore = defineStore('voice', () => {
       _removeVideoTrack(p.identity, 'screen')
       refreshRoomParticipants()
       recomputeSpeaking()
+      useCallSounds().playPeerLeave() // başkası kanaldan çıktı
     })
     // Track mute/unmute. Mikrofon (audio) → mute göstergesi. Kamera/ekran (video) → LiveKit
     // bazı yollarda track'i unpublish etmek yerine MUTE eder (TrackUnsubscribed gelmez); o
