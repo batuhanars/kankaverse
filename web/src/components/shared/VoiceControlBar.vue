@@ -165,7 +165,6 @@ async function doToggleScreen() {
   <CameraNudgeModal
     v-if="nudge.showCameraNudge.value"
     @confirm="onCameraNudgeConfirm"
-    @leave="voiceStore.leave(); nudge.dismissCameraNudge()"
     @close="nudge.dismissCameraNudge()"
   />
 
