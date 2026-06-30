@@ -447,25 +447,47 @@ watch(
 // ── Roller detay modu (nav gizleme + full-width) ──────────────────────────
 const rolesDetailMode = ref(false)
 
-// ── Roller kaydedilmemiş değişiklik guard'ı ───────────────────────────────
+// ── Kaydedilmemiş değişiklik guard'ı (roller + genel ayarlar) ──────────────
 const rolesDirty = ref(false)
 const rolesSectionRef = ref<{ reset: () => void } | null>(null)
 const pendingNav = ref<NavSection | 'close' | null>(null)
 const showNavConfirm = ref(false)
 
-/** Nav bölümü değiştir; roller dirty ise önce onay iste. */
+/** Aktif bölümün kaydedilmemiş değişikliği var mı? (roller: rolesDirty, genel: isDirty) */
+function currentSectionDirty(): boolean {
+  if (activeSection.value === 'roller') return rolesDirty.value
+  if (activeSection.value === 'genel') return isDirty.value
+  return false
+}
+/** Aktif bölümün taslaklarını sıfırla (onay sonrası vazgeç). */
+function resetCurrentSection() {
+  if (activeSection.value === 'roller') {
+    rolesSectionRef.value?.reset()
+    rolesDirty.value = false
+  } else if (activeSection.value === 'genel') {
+    resetDrafts()
+  }
+}
+/** Onay dialog mesajı — bölüme göre (roller bağlam metni / genel jenerik). */
+const navConfirmMessage = computed(() =>
+  activeSection.value === 'roller'
+    ? t('guildSettings.roles.unsavedMessage')
+    : t('guildSettings.unsavedBar.discardMessage'),
+)
+
+/** Nav bölümü değiştir; aktif bölüm dirty ise önce onay iste. */
 function requestNav(key: NavSection) {
   if (key === activeSection.value) return
-  if (activeSection.value === 'roller' && rolesDirty.value) {
+  if (currentSectionDirty()) {
     pendingNav.value = key
     showNavConfirm.value = true
     return
   }
   activeSection.value = key
 }
-/** Kapat; roller dirty ise önce onay iste. */
+/** Kapat; aktif bölüm dirty ise önce onay iste. */
 function requestClose() {
-  if (activeSection.value === 'roller' && rolesDirty.value) {
+  if (currentSectionDirty()) {
     pendingNav.value = 'close'
     showNavConfirm.value = true
     return
@@ -474,8 +496,7 @@ function requestClose() {
 }
 function confirmNavDiscard() {
   showNavConfirm.value = false
-  rolesSectionRef.value?.reset()
-  rolesDirty.value = false
+  resetCurrentSection()
   const target = pendingNav.value
   pendingNav.value = null
   if (target === 'close') handleClose()
@@ -1085,11 +1106,11 @@ function confirmNavDiscard() {
       @cancel="showDeleteGuild = false"
     />
 
-    <!-- Roller: kaydedilmemiş değişiklikle nav/kapat onayı -->
+    <!-- Roller + genel ayarlar: kaydedilmemiş değişiklikle nav/kapat onayı -->
     <ConfirmDialog
       v-if="showNavConfirm"
       :title="t('guildSettings.roles.unsavedTitle')"
-      :message="t('guildSettings.roles.unsavedMessage')"
+      :message="navConfirmMessage"
       :confirm-label="t('guildSettings.roles.discardButton')"
       @confirm="confirmNavDiscard"
       @cancel="showNavConfirm = false; pendingNav = null"
