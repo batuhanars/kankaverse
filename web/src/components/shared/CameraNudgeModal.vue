@@ -4,14 +4,13 @@
  * tek-seferlik bağlam uyarısı (§E2).
  *
  * Yaş-nötr: minöre özel metin/işaret YOK. Herkes aynı uyarıyı görür.
- * Çıkış yolu: "Kanaldan Ayrıl" butonu voiceStore.leave() çağırır.
- * Akıl: modalı "Kamerayı Aç" ile onaylamak kamera açmaz — parent action'ı tetikler.
+ * Çıkış mesajı metinde (ayrıl/bildir); aksiyonlar ses barında zaten var, modalda buton fazlalık (sahip 2026-06-30).
+ * Akıl: modalı "Kamerayı Aç" ile onaylamak kamera açmaz, parent action'ı tetikler.
  */
 import { useI18n } from 'vue-i18n'
 
 const emit = defineEmits<{
   confirm: []   // Kullanıcı "Kamerayı Aç" dedi → parent kamerayı aç
-  leave: []     // Kullanıcı "Kanaldan Ayrıl" dedi
   close: []     // Vazgeç / backdrop tıkla
 }>()
 
@@ -67,16 +66,7 @@ const { t } = useI18n()
             >
               {{ t('voice.nudge.cameraConfirm') }}
             </button>
-            <!-- İkincil: kanaldan ayrıl -->
-            <button
-              type="button"
-              class="w-full py-2.5 rounded-[var(--kv-radius-md)] text-[14px] font-medium cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-              style="color: var(--kv-danger);"
-              @click="emit('leave')"
-            >
-              {{ t('voice.nudge.cameraLeave') }}
-            </button>
-            <!-- Üçüncül: vazgeç (kamera açılmaz, hatırlanmaz) -->
+            <!-- İkincil: vazgeç (kamera açılmaz, hatırlanmaz) -->
             <button
               type="button"
               class="w-full py-2 text-[13px] cursor-pointer transition-colors"
