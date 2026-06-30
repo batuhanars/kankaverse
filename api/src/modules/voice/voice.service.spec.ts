@@ -86,13 +86,14 @@ const USER_ID = 'user-1';
 const CHANNEL_ID = 'chan-1';
 const GUILD_ID = 'guild-1';
 
-function voiceChannel(overrides: { adultsOnly?: boolean } & Record<string, unknown> = {}) {
-  const { adultsOnly, ...rest } = overrides;
+function voiceChannel(overrides: { adultsOnly?: boolean; mediaEnabled?: boolean } & Record<string, unknown> = {}) {
+  const { adultsOnly, mediaEnabled, ...rest } = overrides;
   return {
     id: CHANNEL_ID,
     type: 'GUILD_VOICE',
     guildId: GUILD_ID,
     guild: adultsOnly !== undefined ? { adultsOnly } : { adultsOnly: false },
+    mediaEnabled: mediaEnabled ?? false, // C7: default false (admin açmadan medya yok)
     ...rest,
   };
 }
@@ -316,21 +317,22 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
     expect(res.canPublishScreen).toBe(true);
   });
 
-  // §F: ageGated kanal, minör → video [] (mutlak ret)
-  it('GUILD_VOICE ageGated=true, minör → video [] (isMinor mutlak ret)', async () => {
+  // C7: kapı 2 KALDIRILDI (GUILD_VOICE için). ageGated=true → kapı 5 geçer → video VAR.
+  // Pratikte minör ageGated kanala giremez (requireChannelAccess → AGE_RESTRICTED).
+  // Bu test "resolveVideoSources artık GUILD_VOICE'ta kendi başına minörü bloklamaz; koruma erişim kapısında"
+  // gerçeğini belgeler. Savunma derinliği §D moveParticipant + requireChannelAccess'te.
+  it('GUILD_VOICE ageGated=true, minör → C7\'de video VAR (kapı 2 kaldırıldı; erişim kapısı + §D invariant korur)', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ ageGated: true }));
     prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
-    // Her iki user.findUnique çağrısı (mintToken + resolveVideoSources) minör döner
+    // mintToken metadata fetch → isMinor: true (resolveVideoSources'ta artık bu sorgu yok — GUILD_VOICE için kapı 2 kaldırıldı)
     prismaMock.user.findUnique.mockResolvedValue({ username: 'ali', avatarUrl: null, isMinor: true });
 
     const svc = makeService(videoConfig());
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
 
-    expect(res.canPublishCamera).toBe(false);
-    expect(res.canPublishScreen).toBe(false);
-    expect(mockAddGrant).toHaveBeenCalledWith(
-      expect.objectContaining({ canPublishSources: ['MICROPHONE'] }),
-    );
+    // C7: ageGated=true → kapı 5 geçer → video AÇILIR (production'da bu durum gerçekleşmez — AGE_RESTRICTED erişim kapısı)
+    expect(res.canPublishCamera).toBe(true);
+    expect(res.canPublishScreen).toBe(true);
   });
 
   // §F: ses-mic karantinası kaldırıldı → YENİ üye de ageGated yetişkin bağlamında video açabilir
@@ -384,25 +386,47 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
     expect(res.canPublishScreen).toBe(true);
   });
 
-  // §F: DM minör↔yetişkin → audio var, video yok
-  it('DM, karşı taraf minör → audio var, video []', async () => {
+  // §F / C7: DM minör↔yetişkin → audio var, video yok (değişmedi — DM reti KORUNUR)
+  it('DM, karşı taraf minör → audio var, video [] (C7: DM minör reti kapı 5 DM dalında korundu)', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'DM', guildId: null }));
     membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
     prismaMock.channelMember.findFirst.mockResolvedValue({ userId: 'other-1' });
     dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
-    // Sorgu sırası (DM, video etkin):
-    //  1. resolveVideoSources: self isMinor check → false (yetişkin)
-    //  2. resolveVideoSources: other user isMinor → true (minör) → video kapısı kapanır
+    // C7 sorgu sırası (DM, video etkin) — kapı 2 kaldırıldı, self-isMinor kapı 5 DM dalına taşındı:
+    //  1. resolveVideoSources kapı 5 DM: self isMinor check → false (yetişkin) — kapı 2'den taşındı
+    //  2. resolveVideoSources kapı 5 DM: other user isMinor → true (minör) → video kapısı kapanır
     //  3. mintToken: user metadata fetch → yetişkin
+    // Mock sırası C4 ile AYNI (kapı değil konum değişti; sıra korunuyor)
     prismaMock.user.findUnique
-      .mockResolvedValueOnce({ isMinor: false })                             // resolveVideoSources self
-      .mockResolvedValueOnce({ isMinor: true })                              // resolveVideoSources other
+      .mockResolvedValueOnce({ isMinor: false })                             // resolveVideoSources kapı5-DM self
+      .mockResolvedValueOnce({ isMinor: true })                              // resolveVideoSources kapı5-DM other
       .mockResolvedValueOnce({ username: 'ali', avatarUrl: null, isMinor: false }); // mintToken metadata
 
     const svc = makeService(videoConfig());
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
 
     expect(res.canPublish).toBe(true); // audio var
+    expect(res.canPublishCamera).toBe(false);
+    expect(res.canPublishScreen).toBe(false);
+  });
+
+  // C7: DM self minör → video [] (self-minör kontrolü kapı 5 DM dalında)
+  it('DM, self minör (karşı taraf yetişkin) → audio var, video [] (C7: DM self-minör reti korundu)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'DM', guildId: null }));
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    prismaMock.channelMember.findFirst.mockResolvedValue({ userId: 'other-1' });
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
+    // Sorgu sırası:
+    //  1. resolveVideoSources kapı5-DM: self isMinor → true → erken [] (other sorgusu yapılmaz)
+    //  2. mintToken metadata: yetişkin-görünümlü (ama isMinor=true → audio token üretilir)
+    prismaMock.user.findUnique
+      .mockResolvedValueOnce({ isMinor: true })                              // resolveVideoSources kapı5-DM self → ret
+      .mockResolvedValueOnce({ username: 'ali', avatarUrl: null, isMinor: true }); // mintToken metadata
+
+    const svc = makeService(videoConfig());
+    const res = await svc.mintToken(USER_ID, CHANNEL_ID);
+
+    expect(res.canPublish).toBe(true); // audio var (canPublish DM'de true)
     expect(res.canPublishCamera).toBe(false);
     expect(res.canPublishScreen).toBe(false);
   });
@@ -435,6 +459,83 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
       { userId: 'u2' },
     ]);
     prismaMock.user.count.mockResolvedValue(0); // minör yok
+
+    const svc = makeService(videoConfig());
+    const res = await svc.mintToken(USER_ID, CHANNEL_ID);
+
+    expect(res.canPublishCamera).toBe(true);
+    expect(res.canPublishScreen).toBe(true);
+  });
+
+  // ── Sprint C7: yeni testler ───────────────────────────────────────────────────
+
+  // C7 §G test matrisi — genel kanal mediaEnabled=false → video yok
+  it('C7: GUILD_VOICE genel kanal mediaEnabled=false → video grant yok (admin açmadan kapalı)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ mediaEnabled: false, ageGated: false }));
+    prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
+
+    const svc = makeService(videoConfig());
+    const res = await svc.mintToken(USER_ID, CHANNEL_ID);
+
+    expect(res.canPublishCamera).toBe(false);
+    expect(res.canPublishScreen).toBe(false);
+    expect(mockAddGrant).toHaveBeenCalledWith(
+      expect.objectContaining({ canPublishSources: ['MICROPHONE'] }),
+    );
+  });
+
+  // C7 §G test matrisi — genel kanal mediaEnabled=true, yetişkin → video var
+  it('C7: GUILD_VOICE mediaEnabled=true, yetişkin → video var', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ mediaEnabled: true }));
+    prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
+
+    const svc = makeService(videoConfig());
+    const res = await svc.mintToken(USER_ID, CHANNEL_ID);
+
+    expect(res.canPublishCamera).toBe(true);
+    expect(res.canPublishScreen).toBe(true);
+    expect(mockAddGrant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        canPublishSources: expect.arrayContaining(['MICROPHONE', 'CAMERA', 'SCREEN_SHARE', 'SCREEN_SHARE_AUDIO']),
+      }),
+    );
+  });
+
+  // C7 §G test matrisi — mediaEnabled=true, MİNÖR → video var (kapı 2 kaldırıldı, erişim kapısı korur)
+  it('C7: GUILD_VOICE mediaEnabled=true, MİNÖR → video VAR (temel C7 senaryo)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ mediaEnabled: true }));
+    prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
+    prismaMock.user.findUnique.mockResolvedValue({ username: 'genç', avatarUrl: null, isMinor: true });
+
+    const svc = makeService(videoConfig());
+    const res = await svc.mintToken(USER_ID, CHANNEL_ID);
+
+    // C7: kapı 2 yok → mediaEnabled=true kapı 5'i geçirir → minör dahil herkese video
+    expect(res.canPublishCamera).toBe(true);
+    expect(res.canPublishScreen).toBe(true);
+    expect(mockAddGrant).toHaveBeenCalledWith(
+      expect.objectContaining({
+        canPublishSources: expect.arrayContaining(['MICROPHONE', 'CAMERA', 'SCREEN_SHARE']),
+      }),
+    );
+  });
+
+  // C7 §G test matrisi — adultsOnly bağımsız medya (regresyon)
+  it('C7 regresyon: GUILD_VOICE adultsOnly=true, mediaEnabled=false → video var (adultsOnly bağımsız)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ adultsOnly: true, mediaEnabled: false }));
+    prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
+
+    const svc = makeService(videoConfig());
+    const res = await svc.mintToken(USER_ID, CHANNEL_ID);
+
+    expect(res.canPublishCamera).toBe(true);
+    expect(res.canPublishScreen).toBe(true);
+  });
+
+  // C7 §G test matrisi — ageGated bağımsız medya (regresyon)
+  it('C7 regresyon: GUILD_VOICE ageGated=true, mediaEnabled=false → video var (ageGated bağımsız)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ ageGated: true, mediaEnabled: false }));
+    prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
 
     const svc = makeService(videoConfig());
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
@@ -714,8 +815,17 @@ describe('VoiceService.unmuteParticipant', () => {
 // ── R11: Taşı ───────────────────────────────────────────────────────────────────
 const TARGET_CHANNEL_ID = 'chan-2';
 describe('VoiceService.moveParticipant', () => {
+  // C7 §D invariant: hedef kanal ageGated + guild.adultsOnly alanları eklendi
   function targetChannel(overrides: Record<string, unknown> = {}) {
-    return { id: TARGET_CHANNEL_ID, type: 'GUILD_VOICE', guildId: GUILD_ID, userLimit: 0, ...overrides };
+    return {
+      id: TARGET_CHANNEL_ID,
+      type: 'GUILD_VOICE',
+      guildId: GUILD_ID,
+      userLimit: 0,
+      ageGated: false, // C7: invariant için — default normal kanal
+      guild: { adultsOnly: false }, // C7: invariant için — default normal guild
+      ...overrides,
+    };
   }
   beforeEach(() => {
     // 1. çağrı: kaynak (requireGuildVoiceChannel), 2. çağrı: hedef
@@ -723,6 +833,8 @@ describe('VoiceService.moveParticipant', () => {
       .mockResolvedValueOnce(gvChannel())
       .mockResolvedValueOnce(targetChannel());
     permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    // C7 §D: targetUser isMinor=false (varsayılan — invariant yalnız isMinor=true'da tetiklenir)
+    prismaMock.user.findUnique.mockResolvedValue({ username: 'ali', avatarUrl: null, isMinor: false });
     prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
     mockListParticipants.mockResolvedValue([]);
   });
@@ -802,6 +914,50 @@ describe('VoiceService.moveParticipant', () => {
     });
   });
 
+  // ── C7 §D: Yetki-baypas invariant — minör + 18+ hedef → ret ────────────────────
+  it('C7 §D invariant: minör → ageGated hedef kanal → AGE_RESTRICTED (taşıma engellenir)', async () => {
+    prismaMock.channel.findFirst.mockReset();
+    prismaMock.channel.findFirst
+      .mockResolvedValueOnce(gvChannel())
+      .mockResolvedValueOnce(targetChannel({ ageGated: true }));
+    prismaMock.user.findUnique.mockResolvedValue({ isMinor: true }); // target user minör
+
+    const svc = makeService();
+    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'AGE_RESTRICTED' },
+    });
+    // Taşıma gerçekleşmemeli
+    expect(mockRemoveParticipant).not.toHaveBeenCalled();
+    expect(realtimeMock.emitToUsers).not.toHaveBeenCalled();
+  });
+
+  it('C7 §D invariant: minör → adultsOnly guild → AGE_RESTRICTED (taşıma engellenir)', async () => {
+    prismaMock.channel.findFirst.mockReset();
+    prismaMock.channel.findFirst
+      .mockResolvedValueOnce(gvChannel())
+      .mockResolvedValueOnce(targetChannel({ guild: { adultsOnly: true } }));
+    prismaMock.user.findUnique.mockResolvedValue({ isMinor: true }); // target user minör
+
+    const svc = makeService();
+    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'AGE_RESTRICTED' },
+    });
+    expect(mockRemoveParticipant).not.toHaveBeenCalled();
+  });
+
+  it('C7 §D invariant: yetişkin → ageGated hedef kanal → başarı (invariant yalnız minörü engeller)', async () => {
+    prismaMock.channel.findFirst.mockReset();
+    prismaMock.channel.findFirst
+      .mockResolvedValueOnce(gvChannel())
+      .mockResolvedValueOnce(targetChannel({ ageGated: true }));
+    prismaMock.user.findUnique.mockResolvedValue({ isMinor: false }); // target user yetişkin
+    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+
+    const svc = makeService();
+    await svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID);
+    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith([TARGET_ID], 'voice.moved', expect.any(Object));
+  });
+
   it('başarı → removeParticipant(kaynak) + socket voice.moved YALNIZ taşınan kullanıcıya', async () => {
     const svc = makeService();
     await svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID);
@@ -842,6 +998,7 @@ describe('VoiceService.mintToken — B1 teftiş-girişi bypass matrisi (R7)', ()
       userLimit: 0,
       bitrate: 64,
       ageGated: false,
+      mediaEnabled: false, // C7: default false
       guild: { adultsOnly: false },
       deletedAt: null,
       ...overrides,

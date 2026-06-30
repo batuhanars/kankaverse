@@ -2,23 +2,58 @@
 /**
  * VoiceControlBar — sustur / sağırlaştır / ayrıl yuvarlak kontrol barı.
  * Self-contained (voice store okur). VoiceRoomView (ortam) + DmCallPanel (DM) ortak kullanır.
+ *
+ * C7: kamera/ekran toggle'larına nudge kapısı eklendi (§E2/§E3).
  */
 import { useI18n } from 'vue-i18n'
 import { useVoiceStore } from '@/stores/voice'
 import { voiceBroadcast } from '@/composables/useSocket'
+import { useVoiceNudge } from '@/composables/useVoiceNudge'
 import EmergencyButton from '@/components/shared/EmergencyButton.vue'
+import CameraNudgeModal from '@/components/shared/CameraNudgeModal.vue'
+import ScreenNudgeModal from '@/components/shared/ScreenNudgeModal.vue'
 
 const { t } = useI18n()
 const voiceStore = useVoiceStore()
+const nudge = useVoiceNudge()
 
-// #1 — Ekran paylaşımı aç/kapa → yayın durumu sinyali (YAYINDA rozeti)
+// ── C7: Kamera toggle (nudge kapılı) ─────────────────────────────────────────
+async function handleToggleCamera() {
+  // Sadece kamera açılırken nudge kontrol et; kapatırken direkt geç
+  if (!voiceStore.isCameraOn && nudge.shouldShowCameraNudge()) {
+    nudge.triggerCameraNudge()
+    return
+  }
+  await voiceStore.toggleCamera()
+}
+
+async function onCameraNudgeConfirm() {
+  nudge.confirmCameraNudge()
+  await voiceStore.toggleCamera()
+}
+
+// ── C7: Ekran toggle (nudge kapılı) ──────────────────────────────────────────
 async function handleToggleScreen() {
+  // Sadece ekran paylaşımı başlatılırken nudge kontrol et
+  if (!voiceStore.isScreenSharing && nudge.shouldShowScreenNudge()) {
+    nudge.triggerScreenNudge()
+    return
+  }
+  await doToggleScreen()
+}
+
+async function onScreenNudgeConfirm() {
+  nudge.confirmScreenNudge()
+  await doToggleScreen()
+}
+
+/** Gerçek ekran paylaşım toggle + yayın sinyali (#1). */
+async function doToggleScreen() {
   const wasBroadcasting = voiceStore.isScreenSharing
   await voiceStore.toggleScreen()
   const isBroadcastingNow = voiceStore.isScreenSharing
   const channelId = voiceStore.connectedChannelId
   if (!channelId) return
-  // Durum değiştiyse sinyal gönder
   if (!wasBroadcasting && isBroadcastingNow) {
     voiceBroadcast(channelId, true)
   } else if (wasBroadcasting && !isBroadcastingNow) {
@@ -78,7 +113,7 @@ async function handleToggleScreen() {
         class="w-10 h-10 flex items-center justify-center rounded-full cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
         :title="voiceStore.isCameraOn ? t('voice.cameraOff') : t('voice.cameraOn')"
         :style="voiceStore.isCameraOn ? { backgroundColor: 'var(--kv-accent-500)', color: '#fff' } : { color: 'var(--kv-text-primary)' }"
-        @click="voiceStore.toggleCamera()"
+        @click="handleToggleCamera()"
       >
         <!-- Kamera açık -->
         <svg v-if="voiceStore.isCameraOn" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -125,4 +160,19 @@ async function handleToggleScreen() {
     </button>
   </div>
   </div>
+
+  <!-- C7 §E2 — Kamera nudge modalı (genel/açık GUILD_VOICE, ilk açış) -->
+  <CameraNudgeModal
+    v-if="nudge.showCameraNudge.value"
+    @confirm="onCameraNudgeConfirm"
+    @leave="voiceStore.leave(); nudge.dismissCameraNudge()"
+    @close="nudge.dismissCameraNudge()"
+  />
+
+  <!-- C7 §E3 — Ekran nudge modalı (ilk ekran paylaşımı, per-session) -->
+  <ScreenNudgeModal
+    v-if="nudge.showScreenNudge.value"
+    @confirm="onScreenNudgeConfirm"
+    @close="nudge.dismissScreenNudge()"
+  />
 </template>

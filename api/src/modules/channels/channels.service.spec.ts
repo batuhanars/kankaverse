@@ -81,6 +81,9 @@ function makeChannel(overrides: Partial<Record<string, unknown>> = {}) {
     isPrivate: false,
     position: 0,
     slowModeSeconds: 0,
+    userLimit: 0,
+    bitrate: 64,
+    mediaEnabled: false, // C7: default false
     deletedAt: null,
     createdAt: new Date(),
     ...overrides,
@@ -240,6 +243,33 @@ describe('ChannelsService.update', () => {
 
     const result = await service.update('admin-1', CHANNEL_ID, { name: 'admin-guncelledi' });
     expect(result).toMatchObject({ name: 'admin-guncelledi' });
+  });
+
+  // C7: mediaEnabled toggle
+  it('C7: mediaEnabled=true → kanalda mediaEnabled set edilir, ChannelDto\'da görünür', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ mediaEnabled: false }));
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    const updated = makeChannel({ mediaEnabled: true });
+    prismaMock.channel.update.mockResolvedValue(updated);
+
+    const result = await service.update(USER_ID, CHANNEL_ID, { mediaEnabled: true });
+
+    expect(prismaMock.channel.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ mediaEnabled: true }) }),
+    );
+    expect(result.mediaEnabled).toBe(true);
+  });
+
+  it('C7: mediaEnabled DTO\'ya geçirilmemişse (undefined) → update data\'ya eklenmez (dokunma yok)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ mediaEnabled: true }));
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    const updated = makeChannel({ mediaEnabled: true, name: 'yeni' });
+    prismaMock.channel.update.mockResolvedValue(updated);
+
+    await service.update(USER_ID, CHANNEL_ID, { name: 'yeni' }); // mediaEnabled belirtilmedi
+
+    const updateCall = prismaMock.channel.update.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(updateCall.data).not.toHaveProperty('mediaEnabled');
   });
 });
 

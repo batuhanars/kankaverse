@@ -696,6 +696,8 @@
     "userLimitPlaceholder": "0 = sınırsız",
     "bitrateLabel": "Bit Hızı",
     "bitrateHint": "Ses kalitesi (kbps). Yüksek değer daha net ses; bağlantısı zayıf kişileri olumsuz etkileyebilir.",
+    "mediaEnabledLabel": "Medya Yayını (Kamera & Ekran)",
+    "mediaEnabledDesc": "Açıksa bu ses kanalında üyeler kamera ve ekran paylaşabilir. Varsayılan kapalı.",
     "categoryLabel": "KATEGORİ",
     "categoryNone": "Kategorisiz",
     "channelTypeLabel": "KANAL TÜRÜ",
@@ -1068,7 +1070,18 @@
     "viewProfile": "Profili Gör",
     "sendMessage": "Mesaj Gönder",
     "addFriend": "Kanka Ekle",
-    "blockUser": "Engelle"
+    "blockUser": "Engelle",
+    "nudge": {
+      "cameraTitle": "Kameranı açıyorsun",
+      "cameraBody": "Bu kanaldaki herkes seni görebilir. Rahatsız eden olursa ayrıl veya bildir.",
+      "cameraConfirm": "Kamerayı Aç",
+      "cameraCancel": "Vazgeç",
+      "cameraLeave": "Kanaldan Ayrıl",
+      "screenBody": "Ekranını paylaşıyorsun. Bildirimlerini ve özel sekmelerini kapatmayı unutma.",
+      "screenConfirm": "Anladım, Devam Et",
+      "screenCancel": "Vazgeç",
+      "screenTipsLink": "Güvenlik ipuçları"
+    }
   },
   "call": {
     "incoming": "Gelen sesli arama",
@@ -1482,5 +1495,20 @@
       "closing": "Bu kurallar topluluk büyüdükçe gelişebilir, önemli değişiklikleri sana duyururuz. Amacımız seni kısıtlamak değil, herkes için güvenli bir alan tutmak.",
       "backToLogin": "← Giriş sayfasına dön"
     }
+  },
+  "securityTips": {
+    "title": "Güvenlik İpuçları",
+    "subtitle": "Ekran paylaşmadan önce bunları bilmek iyi olur.",
+    "backButton": "Sekmeyi Kapat",
+    "tip1Title": "Konum ve adres bilgileri",
+    "tip1Body": "Harita, şehir veya adres içeren sekmeleri önceden kapatmayı düşün. Yayında paylaşılan konumun sakıncalı olabilir.",
+    "tip2Title": "Finansal bilgiler",
+    "tip2Body": "Banka, ödeme ya da alışveriş sayfaları açıksa kapat. Kart numarası veya şifre ekranda görünebilir.",
+    "tip3Title": "Kişisel fotoğraflar ve belgeler",
+    "tip3Body": "Tatil fotoğrafları veya konum etiketli içerikler coğrafi bilgi sızdırabilir. Masaüstü veya galeri görünmesine dikkat et.",
+    "tip4Title": "Bildirimler ve açılır pencereler",
+    "tip4Body": "Paylaşmadan önce işletim sisteminin bildirimlerini sessize al. İstenmedik mesajlar ya da uyarılar ekranda belirebilir.",
+    "tip5Title": "Özel sekmeler ve gizli pencereler",
+    "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
   }
 }

@@ -851,3 +851,35 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] Auth sürer: giriş→kapat-aç→oturum açık (cookie kavanozu kalıcı, sameSite=lax)
 - [x] `npm run dist` çalışan Windows installer üretir; kurulum sonrası açılıp giriş yapılabiliyor
 - [x] i18n + web build temiz; R7-nötr (auth/T&S kodu değişmedi)
+
+---
+
+## Sprint C7 — Medya Genel Kanallara Açılım (PM compose 2026-06-30)
+
+> Sözleşme: `contracts/SPRINT_C7_MEDIA_OPEN_CONTRACT.md` (**tek doğruluk kaynağı**). PLAN brief §4 gevşetme + D23.
+> **🔴 R7 ZORUNLU:** `resolveVideoSources` revizyonu + yetki-baypas invariant'ı T&S karar fonksiyonu — diff sahip onayına
+> sunulmadan merge EDİLMEZ ("AI yazdı geçti" yok). Dev checkbox işaretler, **item EKLEMEZ** (sapma → DUR, PM'e dön).
+
+### Backend (`api/`)
+- [x] **Şema:** `Channel.mediaEnabled Boolean @default(false)`; migration üret + **DB'ye uygula** (`migrate dev`→prod `migrate deploy`; `migrate status` temiz) — `20260630160812_add_channel_media_enabled` uygulandı, status temiz
+- [x] **Toggle endpoint:** mevcut kanal-güncelleme yolu `mediaEnabled?: boolean` kabul eder (OWNER/ADMIN, mevcut yetki kontrolü reuse; yeni RBAC YOK); `ChannelDto.mediaEnabled` eklenir
+- [x] **`resolveVideoSources` revizyon (R7 çekirdek):** kapı 2 (minör mutlak ret) GUILD_VOICE'tan KALK (DM minör reti KORUN); kapı 5 GUILD_VOICE = `mediaEnabled || ageGated || adultsOnly` ise grant, değilse `[]`; fail-closed korunur
+- [x] **Yetki-baypas invariant (R7):** R11 `moveParticipant` + erişim/join + rol-grant yollarında "minör + (`ageGated` kanal | `adultsOnly` guild) → ret"; tek-katmana güvenme (savunma derinliği)
+- [x] **Re-mint:** bağlam-bayatlama tetikleyicisine `mediaEnabled` değişimi eklenir (C4-C3 deseni korunur) — `channel.updated` payload'ı `mediaEnabled` taşır
+- [x] **Metadata kanıt:** video oturumu metadata'sı (kim/kiminle/kanal/zaman) loglanır — mevcut `VoiceSession` + A4 snapshot reuse; ayrı tablo YAGNI
+- [x] Envelope tutarlı; Swagger güncel; `nest build` temiz
+
+### Frontend (`web/`)
+- [x] **Admin toggle UI:** mevcut kanal-ayar yüzeyine `mediaEnabled` aç/kapa (GUILD_VOICE); yeni ekran açma — `ChannelPanel` ayar bölümü
+- [x] **Medya kontrolleri:** kamera/ekran butonları `canPublishCamera/Screen` token bayraklarına bağlı (C4-D1 deseni); grant yoksa buton YOK (disabled placeholder bile değil)
+- [x] **Kamera nudge (E2):** genel/açık kanalda ilk kamera açışta, yaş-nötr, sakin ton + çıkış-yolu eşli, bir kez (hatırla); DM/kapalı-küçük/minör-yok bağlamda çıkmaz
+- [x] **Ekran nudge (E3):** ilk ekran paylaşımda tek-satır gizlilik uyarısı; detaylar ayrı "Güvenlik ipuçları" sayfasına link (modal vaaz değil) — `/guvenlik-ipuclari`
+- [x] **Sade tut (E4):** yalnız 2 nudge yüzeyi; yapılandırılabilir motor KURMA; hatırlama state'i istemci-taraf basit; tüm metin i18n (`voice.nudge.*`, `--kv-*`)
+- [x] **Yaş-bandı ifşa YOK:** katılımcı minör/yetişkin durumu UI'da hiçbir yerde gösterilmez; `vue-tsc`(bilinen hata hariç)+`vite build` temiz
+
+### DoD (contract §G)
+- [x] `mediaEnabled` model+migration uygulı; toggle endpoint (non-admin 403); `ChannelDto.mediaEnabled`
+- [x] **Testler yeşil:** genel `mediaEnabled=false`→video yok · genel `=true`→**minör dahil** medya · `adultsOnly`/`ageGated`→`mediaEnabled`'dan bağımsız (regresyon yok) · minör→18+ move/erişim/rol=ret · DM minör↔yetişkin→video `[]` (değişmedi) · bayrak kapalı→audio-only birebir (147 test yeşil, 11 yeni C7)
+- [x] Frontend: toggle UI · yetenek-kapılı kontroller · 2 nudge · güvenlik-ipuçları linki · yaş-bandı gizli
+- [x] `nest build`+`vue-tsc`+`vite build` temiz; envelope+Swagger; tüm yeni metin i18n
+- [x] **R7 (SAHİP İMZASI 2026-06-30):** `resolveVideoSources` (kapı 5 = `mediaEnabled||ageGated||adultsOnly`, DM minör reti korundu, fail-closed) + yetki-baypas invariant'ı (`moveParticipant` owner-muafiyetinden ÖNCE, tüm aktörlere) PM satır-satır incelendi + sahip onayladı; `requireChannelAccess` include→`mediaEnabled` dolu (sessiz-off bug yok); rol-baypas isMinor kapısıyla yapısal kapalı
