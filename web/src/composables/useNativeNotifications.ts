@@ -1,6 +1,7 @@
-import { watch, ref } from 'vue'
+import { computed, watch, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotificationsStore } from '@/stores/notifications'
+import { useDmStore } from '@/stores/dm'
 import { i18n } from '@/i18n'
 import type { NotificationDto } from '@/types'
 
@@ -18,6 +19,7 @@ import type { NotificationDto } from '@/types'
  */
 export function useNativeNotifications() {
   const notificationsStore = useNotificationsStore()
+  const dmStore = useDmStore()
   const router = useRouter()
   const { t } = i18n.global
 
@@ -43,12 +45,19 @@ export function useNativeNotifications() {
     },
   )
 
-  // Okunmamış sayısı değişince rozeti güncelle (opsiyonel)
+  // Simge rozeti = "sana yönelik" okunmamışlar: bildirim sayısı (bahsetme + arkadaş
+  // isteği + davet) + okunmamış DM sayısı. Genel kanal mesajları BİLİNÇLİ olarak dahil
+  // değil — aktif toplulukta rozetin sürekli yanıp anlamsızlaşmasını önler (Discord/Slack
+  // modeli). Kanal okunmamışlığı uygulama içi rail rozetlerinde kalır.
+  const badgeCount = computed(
+    () => notificationsStore.unreadCount + dmStore.channels.filter((c) => c.unread).length,
+  )
   watch(
-    () => notificationsStore.unreadCount,
+    badgeCount,
     (count) => {
       window.kankaverse?.setBadge?.(count)
     },
+    { immediate: true },
   )
 
   function _fireToast(dto: NotificationDto) {

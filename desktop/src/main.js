@@ -290,19 +290,7 @@ function buildTrayMenu() {
 
 // ── Sistem tepsisi ────────────────────────────────────────────────────────────
 function createTray() {
-  const iconPath = resolveIconPath()
-  let trayIcon = nativeImage.createFromPath(iconPath)
-
-  // Windows tray ikonu küçük olur; 16x16 veya 32x32 resize
-  if (process.platform === 'win32') {
-    trayIcon = trayIcon.resize({ width: 16, height: 16 })
-  } else if (process.platform === 'darwin') {
-    trayIcon = trayIcon.resize({ width: 22, height: 22 })
-  } else {
-    trayIcon = trayIcon.resize({ width: 22, height: 22 })
-  }
-
-  tray = new Tray(trayIcon)
+  tray = new Tray(_trayBaseIcon())
   tray.setToolTip('Kankaverse')
 
   tray.setContextMenu(buildTrayMenu())
@@ -345,31 +333,91 @@ ipcMain.on('set-badge', (_event, count) => {
   } else if (process.platform === 'win32') {
     // Windows görev çubuğu overlay ikonu (sıfırsa kaldır)
     if (n > 0) {
-      const badgeIcon = _makeBadgeIcon(n)
-      win?.setOverlayIcon(badgeIcon, `${n} okunmamış bildirim`)
+      win?.setOverlayIcon(_makeBadgeIcon(), `${n} okunmamış bildirim`)
     } else {
       win?.setOverlayIcon(null, '')
     }
   }
-  // Linux: resmi AppImage/deb dağıtımlarında standart API yok; atla
+  // Linux: resmi AppImage/deb dağıtımlarında standart görev çubuğu API'si yok; atla.
+  // Sistem tepsisi (tray) rozeti tüm platformlarda: okunmamış varken ikona kırmızı nokta.
+  _updateTrayBadge(n > 0)
 })
 
 /**
- * Windows görev çubuğu overlay için küçük bir sayı ikonu üretir.
- * NativeImage canvas benzeri işlem gerektirdiğinden basit bir PNG buffer kullanılır.
- * electron-builder paketlerken node canvas bağımlılığı olmaması için
- * basit sabit 20x20 kırmızı daire + sayı (1–9, 9+ için "9+") SVG → nativeImage.
+ * Kırmızı bildirim noktası (Discord-tarzı) — ham BGRA bitmap ile çizilir.
+ * ÖNEMLİ: Electron nativeImage SVG data URL'lerini bu platformda RASTERIZE ETMEZ
+ * (createFromDataURL → boş 0x0 resim; test edildi). Bu yüzden SVG değil,
+ * createFromBitmap + elle piksel kullanılır. Sayı yerine sade nokta: ham piksele
+ * rakam çizmek font atlası gerektirir, kullanıcı da "nokta/işaret" istedi.
  */
-function _makeBadgeIcon(count) {
-  const label = count > 9 ? '9+' : String(count)
-  // SVG → PNG; Electron nativeImage.createFromDataURL kabul eder (base64 data URI)
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
-    <circle cx="10" cy="10" r="10" fill="#F23B4B"/>
-    <text x="10" y="14" font-family="Arial" font-size="${label.length > 1 ? 7 : 10}"
-      font-weight="bold" fill="white" text-anchor="middle">${label}</text>
-  </svg>`
-  const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
-  return nativeImage.createFromDataURL(dataUrl)
+function _drawDot(buf, imgW, imgH, cx, cy, r) {
+  const R = 242, G = 59, B = 75 // #F23B4B (danger token)
+  const ring = r + Math.max(1, Math.round(r * 0.2)) // ince beyaz halka (kontrast)
+  for (let y = Math.max(0, cy - ring); y <= Math.min(imgH - 1, cy + ring); y++) {
+    for (let x = Math.max(0, cx - ring); x <= Math.min(imgW - 1, cx + ring); x++) {
+      const d = Math.hypot(x - cx, y - cy)
+      const i = (y * imgW + x) * 4
+      if (d <= r) {
+        buf[i] = B; buf[i + 1] = G; buf[i + 2] = R; buf[i + 3] = 255
+      } else if (d <= ring) {
+        buf[i] = 255; buf[i + 1] = 255; buf[i + 2] = 255; buf[i + 3] = 255
+      }
+    }
+  }
+}
+
+// Windows görev çubuğu overlay ikonu: saydam zemin üzerine küçük kırmızı nokta
+// (Discord-tarzı). Windows overlay'i simgenin sağ-alt köşesine yerleştirir; nokta
+// saydam boşlukla küçük tutulur. r küçüldükçe nokta küçülür.
+function _makeBadgeIcon() {
+  const size = 32
+  const buf = Buffer.alloc(size * size * 4) // tümü saydam (BGRA 0,0,0,0)
+  _drawDot(buf, size, size, size / 2, size / 2, 8)
+  return nativeImage.createFromBitmap(buf, { width: size, height: size })
+}
+
+// ── Tray ikonu (sade + okunmamış rozetli varyant) ──────────────────────────────
+// Tray'de native "badge" yoktur; okunmamış durumunu ikonu değiştirerek gösteririz.
+// İki varyant cache'lenir: sade logo, ve logonun köşesine kırmızı nokta bindirilmiş hali.
+
+// Tray ikonunu platforma göre boyutlandırır. Windows tepsi yuvası DPI'ya göre
+// 16/20/24px olabilir; daha yüksek çözünürlük vermek ikonu büyük ve net gösterir.
+// (size düğmesi: küçük 16, orta 24, büyük 32.)
+function _resizeTray(img) {
+  const size = process.platform === 'win32' ? 24 : 22
+  return img.resize({ width: size, height: size })
+}
+
+let _trayBaseCache = null
+function _trayBaseIcon() {
+  if (!_trayBaseCache) {
+    _trayBaseCache = _resizeTray(nativeImage.createFromPath(resolveIconPath()))
+  }
+  return _trayBaseCache
+}
+
+// Logoyu 32x32 ham BGRA'ya çevirip sağ-alt köşesine kırmızı nokta bindirir
+// (SVG rasterize edilemediği için piksel-piksel kompozisyon). Başarısızsa sade ikona düşer.
+let _trayBadgeCache = null
+function _trayBadgeIcon() {
+  if (_trayBadgeCache) return _trayBadgeCache
+  try {
+    const base = nativeImage.createFromPath(resolveIconPath()).resize({ width: 32, height: 32 })
+    const buf = base.toBitmap() // ham BGRA (32*32*4), değiştirilebilir
+    _drawDot(buf, 32, 32, 25, 7, 5) // sağ-üst köşede küçük nokta
+    const composed = nativeImage.createFromBitmap(buf, { width: 32, height: 32 })
+    _trayBadgeCache = composed.isEmpty() ? _trayBaseIcon() : _resizeTray(composed)
+  } catch (e) {
+    console.error('[tray] rozetli ikon üretilemedi, sade ikona düşülüyor:', e)
+    _trayBadgeCache = _trayBaseIcon()
+  }
+  return _trayBadgeCache
+}
+
+// set-badge → tray ikonunu okunmamış durumuna göre değiştir.
+function _updateTrayBadge(hasUnread) {
+  if (!tray) return
+  tray.setImage(hasUnread ? _trayBadgeIcon() : _trayBaseIcon())
 }
 
 // macOS: tüm pencereler kapandığında çıkma (load-remote'da tek pencere; close→hide sayesinde buraya normal düşmez)
