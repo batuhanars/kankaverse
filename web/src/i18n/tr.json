@@ -939,6 +939,9 @@
       "ADMIN": "Yönetici"
     },
     "actions": {
+      "profile": "Profil",
+      "sendMessage": "Mesaj Gönder",
+      "copyId": "Kullanıcı ID'sini Kopyala",
       "manageRoles": "Rolleri Yönet",
       "noAssignableRoles": "Atanabilir rol yok.",
       "kick": "At",
@@ -1398,7 +1401,14 @@
     "copyId": "Kullanıcı ID'sini Kopyala",
     "idCopied": "Kullanıcı ID kopyalandı.",
     "memberSincePrefix": "Üyelik",
-    "selfBlockedNote": "Bu kullanıcıyı engelledin."
+    "selfBlockedNote": "Bu kullanıcıyı engelledin.",
+    "messagePlaceholder": "{'@'}{username} kullanıcısına mesaj gönder",
+    "messageRequestHint": "İlk mesajın istek olarak iletilir; karşı taraf görüp kabul veya reddedebilir.",
+    "cannotMessage": "Bu kullanıcıya mesaj gönderemezsin.",
+    "rolesTitle": "Roller",
+    "voiceInCall": "Sesli aramada",
+    "voiceVideo": "Görüntülü aramada",
+    "voiceStreaming": "Yayında"
   },
   "time": {
     "today": "Bugün",

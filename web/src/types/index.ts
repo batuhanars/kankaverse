@@ -120,7 +120,22 @@ export interface MessageRequestDto {
   createdAt: string
 }
 
-// Sprint 4A §3 + Sprint C5 §3 — kullanıcı profil kartı DTO (genişletildi)
+// C10 — kart rol rozeti / ses durumu
+export interface UserCardRoleDto {
+  id: string
+  name: string
+  color: string
+}
+export interface UserCardVoiceDto {
+  channelId: string
+  channelName: string
+  guildId: string
+  guildName: string
+  streaming: boolean // ekran paylaşımı
+  video: boolean // kamera
+}
+
+// Sprint 4A §3 + Sprint C5 §3 + C10 — kullanıcı profil kartı DTO (genişletildi)
 export interface UserProfileCardDto {
   id: string
   username: string
@@ -133,6 +148,9 @@ export interface UserProfileCardDto {
   memberSince: string // Sprint C5 — createdAt ISO
   mutualFriends: { id: string; username: string; avatarUrl: string | null }[] // Sprint C5
   mutualGuilds: { id: string; name: string; iconUrl: string | null }[] // Sprint C5
+  canMessage: boolean // C10 — inline mesaj kutusu kapısı (canDm)
+  roles: UserCardRoleDto[] // C10 — yalnız guildId bağlamında dolu
+  voiceStatus: UserCardVoiceDto | null // C10 — hedef aktif seste + erişim varsa
 }
 
 export interface SessionDto {

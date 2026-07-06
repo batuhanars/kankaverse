@@ -5,12 +5,17 @@ import { ImageUploadService } from '../../shared/media/image-upload.service';
 // ── Mock PrismaService ───────────────────────────────────────────────────────
 const prismaMock = {
   user: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
-  guildMember: { findFirst: jest.fn() },
+  guildMember: { findFirst: jest.fn(), findUnique: jest.fn() },
   channelMember: { findFirst: jest.fn() },
   guild: { findMany: jest.fn() },
   friendship: { findFirst: jest.fn(), findMany: jest.fn() },
   userBlock: { findUnique: jest.fn() },
+  voiceSession: { findFirst: jest.fn() }, // C10 — kart ses durumu
 };
+
+// C10 — canDm (inline mesaj kutusu kapısı) + VoiceService (ses durumu) mock'ları
+const dmPermissionMock = { canDm: jest.fn() };
+const voiceMock = { getLiveParticipation: jest.fn() };
 
 // C8: ImageUploadService — StorageService/ConfigService mock üzerinden gerçek örnek
 // (presignAvatar/setAvatar/presignBanner/setBanner testleri bunun üzerinden geçer).
@@ -26,7 +31,12 @@ const configMock = {
 };
 
 function makeService() {
-  return new UsersService(prismaMock as any, new ImageUploadService(storageMock as any, configMock as any));
+  return new UsersService(
+    prismaMock as any,
+    new ImageUploadService(storageMock as any, configMock as any),
+    dmPermissionMock as any,
+    voiceMock as any,
+  );
 }
 
 function resetMediaMocks() {
@@ -46,12 +56,16 @@ const CREATED_AT = new Date(NOW_ISO);
 function resetMocks() {
   jest.resetAllMocks();
   prismaMock.guildMember.findFirst.mockResolvedValue(null);
+  prismaMock.guildMember.findUnique.mockResolvedValue(null);
   prismaMock.channelMember.findFirst.mockResolvedValue(null);
   prismaMock.guild.findMany.mockResolvedValue([]);
   prismaMock.friendship.findFirst.mockResolvedValue(null);
   prismaMock.friendship.findMany.mockResolvedValue([]);
   prismaMock.userBlock.findUnique.mockResolvedValue(null);
   prismaMock.user.findMany.mockResolvedValue([]);
+  prismaMock.voiceSession.findFirst.mockResolvedValue(null);
+  dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
+  voiceMock.getLiveParticipation.mockResolvedValue({ present: false, streaming: false, video: false });
   resetMediaMocks();
 }
 
@@ -238,6 +252,114 @@ describe('UsersService', () => {
       expect(card.memberSince).toBe(NOW_ISO);
       expect(card.mutualFriends).toEqual([]);
       expect(card.mutualGuilds).toEqual([]);
+    });
+  });
+
+  // ── C10 kart zenginleştirme: canMessage + rol/ses ifşa kapıları ───────────────
+  describe('getUserCard — C10 (canMessage / roller / ses durumu)', () => {
+    const CALLER = 'caller-1';
+    const TARGET = 'target-1';
+    const GUILD = 'guild-1';
+
+    function mockTargetExists() {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: TARGET,
+        username: 'hedef',
+        avatarUrl: null,
+        bio: null,
+        createdAt: CREATED_AT,
+      });
+      // erişim kapısı: ortak ortam var
+      prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm-access' });
+    }
+
+    it('canMessage = canDm.allowed (izin yok → false, kutu gösterilmez)', async () => {
+      mockTargetExists();
+      dmPermissionMock.canDm.mockResolvedValue({ allowed: false, reason: 'DM_NOT_ALLOWED' });
+      const card = await service.getUserCard(CALLER, TARGET);
+      expect(card.canMessage).toBe(false);
+    });
+
+    it('guildId verilmezse roller boş (findUnique çağrılmaz)', async () => {
+      mockTargetExists();
+      const card = await service.getUserCard(CALLER, TARGET);
+      expect(card.roles).toEqual([]);
+      expect(prismaMock.guildMember.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('rol kapısı: caller o ortamın üyesi DEĞİL → roller boş (ifşa yok)', async () => {
+      mockTargetExists();
+      prismaMock.guildMember.findUnique.mockResolvedValueOnce(null); // callerMember yok
+      const card = await service.getUserCard(CALLER, TARGET, GUILD);
+      expect(card.roles).toEqual([]);
+    });
+
+    it('rol kapısı geçti → @everyone hariç, pozisyona göre yüksekten alçağa', async () => {
+      mockTargetExists();
+      prismaMock.guildMember.findUnique
+        .mockResolvedValueOnce({ id: 'caller-member' }) // callerMember var
+        .mockResolvedValueOnce({
+          roleLinks: [
+            { role: { id: 'r-low', name: 'Üye', color: '#aaa', position: 1, isEveryone: false } },
+            { role: { id: 'r-everyone', name: '@everyone', color: '#000', position: 0, isEveryone: true } },
+            { role: { id: 'r-high', name: 'Admin', color: '#f00', position: 5, isEveryone: false } },
+          ],
+        });
+      const card = await service.getUserCard(CALLER, TARGET, GUILD);
+      expect(card.roles.map((r) => r.id)).toEqual(['r-high', 'r-low']);
+      expect(card.roles.find((r) => r.name === '@everyone')).toBeUndefined();
+    });
+
+    // Ortak kurulum: hedef aktif VoiceSession + caller ortam üyesi (LiveKit doğrulaması kalır)
+    function mockActiveSession() {
+      prismaMock.voiceSession.findFirst.mockResolvedValue({
+        channelId: 'vc-1',
+        channel: { name: 'Lounge', guildId: GUILD, guild: { name: 'Ortam' } },
+      });
+      prismaMock.guildMember.findUnique.mockResolvedValueOnce({ id: 'caller-member' });
+    }
+
+    it('ses durumu: aktif oturum yok → null (LiveKit sorgulanmaz)', async () => {
+      mockTargetExists();
+      const card = await service.getUserCard(CALLER, TARGET);
+      expect(card.voiceStatus).toBeNull();
+      expect(voiceMock.getLiveParticipation).not.toHaveBeenCalled();
+    });
+
+    it('ses kapısı: caller o ortamın üyesi DEĞİL → null (konum ifşası yok, LiveKit sorgulanmaz)', async () => {
+      mockTargetExists();
+      prismaMock.voiceSession.findFirst.mockResolvedValue({
+        channelId: 'vc-1',
+        channel: { name: 'Lounge', guildId: GUILD, guild: { name: 'Ortam' } },
+      });
+      prismaMock.guildMember.findUnique.mockResolvedValueOnce(null); // callerMember yok
+      const card = await service.getUserCard(CALLER, TARGET);
+      expect(card.voiceStatus).toBeNull();
+      expect(voiceMock.getLiveParticipation).not.toHaveBeenCalled();
+    });
+
+    it('LiveKit CANLI doğrular + ekran yayını → streaming true', async () => {
+      mockTargetExists();
+      mockActiveSession();
+      voiceMock.getLiveParticipation.mockResolvedValue({ present: true, streaming: true, video: false });
+      const card = await service.getUserCard(CALLER, TARGET);
+      expect(card.voiceStatus).toMatchObject({ channelId: 'vc-1', channelName: 'Lounge', guildName: 'Ortam', streaming: true, video: false });
+    });
+
+    it('bayat oturum: LiveKit hedefi içermiyor (present=false) → null', async () => {
+      mockTargetExists();
+      mockActiveSession();
+      voiceMock.getLiveParticipation.mockResolvedValue({ present: false, streaming: false, video: false });
+      const card = await service.getUserCard(CALLER, TARGET);
+      expect(card.voiceStatus).toBeNull();
+    });
+
+    it('LiveKit erişilemez (null) → null (fail-closed, bayat kayda düşülmez)', async () => {
+      mockTargetExists();
+      mockActiveSession();
+      voiceMock.getLiveParticipation.mockResolvedValue(null);
+      const card = await service.getUserCard(CALLER, TARGET);
+      expect(card.voiceStatus).toBeNull();
     });
   });
 

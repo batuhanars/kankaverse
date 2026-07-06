@@ -654,6 +654,32 @@ export class VoiceService {
     return { participants: sessions.map((s) => s.userId), broadcasters: [] };
   }
 
+  /**
+   * C10 — Kart ses durumu için CANLI katılım doğrulaması. **Yalnız LiveKit**; VoiceSession'a DÜŞMEZ.
+   * LiveKit erişilemez/hatalıysa `null` → çağıran "doğrulanamadı" kabul eder ve ifşa etmez (fail-closed).
+   * Bu ayrım kritik: VoiceSession dev'de (webhook localhost'a ulaşmaz) ve prod'da (kaçan webhook) bayat
+   * kalabilir → ona dayanıp "sesli aramada" göstermek yanlış-pozitif konum ifşasıdır.
+   */
+  async getLiveParticipation(
+    channelId: string,
+    userId: string,
+  ): Promise<{ present: boolean; streaming: boolean; video: boolean } | null> {
+    if (!this.roomService) return null;
+    try {
+      const parts = await this.roomService.listParticipants(channelId);
+      const p = parts.find((x) => x.identity === userId);
+      if (!p) return { present: false, streaming: false, video: false };
+      const sources = new Set((p.tracks ?? []).map((t) => t.source));
+      return {
+        present: true,
+        streaming: sources.has(TrackSource.SCREEN_SHARE),
+        video: sources.has(TrackSource.CAMERA),
+      };
+    } catch {
+      return null; // LiveKit erişilemez → doğrulanamadı (bayat kayda düşme)
+    }
+  }
+
   /** R11 — kanal GUILD_VOICE mı + guildId güvence. Değilse NOT_VOICE_CHANNEL/CHANNEL_NOT_FOUND. */
   private async requireGuildVoiceChannel(
     channelId: string,

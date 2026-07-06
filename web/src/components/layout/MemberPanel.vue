@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { usePresenceStore } from '@/stores/presence'
 import { useAuthStore } from '@/stores/auth'
 import { useMembersStore } from '@/stores/members'
 import { useRolesStore } from '@/stores/roles'
 import { useToastStore } from '@/stores/toast'
+import { useDmStore } from '@/stores/dm'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { useActiveMenu } from '@/composables/useActiveMenu'
 import { guildsApi } from '@/api/guilds'
@@ -25,6 +27,8 @@ const authStore = useAuthStore()
 const membersStore = useMembersStore()
 const rolesStore = useRolesStore()
 const toast = useToastStore()
+const dmStore = useDmStore()
+const router = useRouter()
 
 // REV-14: üye listesi store'dan (WS guild.member_* ile anlık güncellenir)
 const members = computed(() => membersStore.membersFor(guildsStore.activeGuildId ?? ''))
@@ -139,9 +143,39 @@ function toggleMenu(userId: string) {
   openMenuUserId.value = openMenuUserId.value === userId ? null : userId
 }
 
+// C10: sağ-tık → menüyü doğrudan aç (toggle değil; yeni satıra sağ-tıklayınca hep açılsın)
+function openMenu(userId: string) {
+  showCard.value = false
+  roleSubmenuUserId.value = null
+  openMenuUserId.value = userId
+}
+
 function closeMenu() {
   openMenuUserId.value = null
   roleSubmenuUserId.value = null
+}
+
+// C10: menüden "Mesaj Gönder" → DM kanalı aç + geç (backend canDm zorlar; hata → toast)
+async function messageMember(member: GuildMemberDto) {
+  closeMenu()
+  try {
+    const channel = await dmStore.openChannel(member.userId)
+    router.push({ name: 'dm', params: { channelId: channel.id } })
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message ?? t('common.error'))
+  }
+}
+
+// C10: menüden "Kullanıcı ID'sini Kopyala"
+async function copyMemberId(userId: string) {
+  closeMenu()
+  try {
+    await navigator.clipboard.writeText(userId)
+    toast.success(t('userCard.idCopied'))
+  } catch {
+    // sessizce geç
+  }
 }
 
 // ── Kullanıcı kartı popover (üye satırına sol-tık — mesaj-yazarı deseni) ─────
@@ -414,12 +448,14 @@ async function confirmTransfer() {
           :can-ban-fn="canBan"
           :can-transfer-fn="canTransfer"
           :should-show-menu-fn="shouldShowMenu"
+          :is-self="member.userId === myUserId"
           :assignable-roles="assignableRoles"
           :role-submenu-user-id="roleSubmenuUserId"
           :role-color="group.color"
           :hover-suppressed="isRowSuppressed(member.userId)"
           :owner-active="activeMemberUserId === member.userId"
           @toggle-menu="toggleMenu"
+          @open-menu="openMenu"
           @close-menu="closeMenu"
           @toggle-role-submenu="toggleRoleSubmenu"
           @toggle-role="toggleRole"
@@ -427,6 +463,8 @@ async function confirmTransfer() {
           @open-ban="openBan"
           @open-transfer="openTransfer"
           @select-member="openCard"
+          @message-member="messageMember"
+          @copy-member-id="copyMemberId"
         />
       </template>
     </div>
@@ -480,12 +518,13 @@ async function confirmTransfer() {
     @cancel="transferTarget = null"
   />
 
-  <!-- Kullanıcı kartı (üye satırına sol-tık — mesaj-yazarı deseni) -->
+  <!-- Kullanıcı kartı (üye satırına sol-tık — mesaj-yazarı deseni). guildId → rol rozetleri. -->
   <UserCardPopover
     v-if="showCard"
     :user-id="cardUserId"
     :x="cardX"
     :y="cardY"
+    :guild-id="guildsStore.activeGuildId ?? undefined"
     @close="closeCard"
   />
 </template>
