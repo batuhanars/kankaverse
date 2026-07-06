@@ -8,8 +8,22 @@ export interface UpdateProfilePayload {
   bannerColor?: string | null // profil afiş rengi preset anahtarı (veya null=varsayılan)
 }
 
+// Sprint C8 §5 — avatar/profil-afişi presign sonucu (ikon deseniyle aynı şekil)
+export interface MediaPresignResult {
+  uploadUrl: string
+  storageKey: string
+}
+
 export const usersApi = {
   getCard: (userId: string) => http.get<UserProfileCardDto>(`/users/${userId}/card`),
   // Sprint C5 §2 — kendi profil/gizlilik güncelle → güncel UserDto
   updateProfile: (payload: UpdateProfilePayload) => http.patch<UserDto>('/users/me', payload),
+  // Sprint C8 §5 — avatar (self, VerifiedEmail)
+  avatarPresign: (contentType: string) =>
+    http.post<MediaPresignResult>('/users/me/avatar/presign', { contentType }),
+  setAvatar: (storageKey: string | null) => http.patch<UserDto>('/users/me/avatar', { storageKey }),
+  // Sprint C8 §5 — profil afişi (self, VerifiedEmail)
+  bannerPresign: (contentType: string) =>
+    http.post<MediaPresignResult>('/users/me/banner/presign', { contentType }),
+  setBanner: (storageKey: string | null) => http.patch<UserDto>('/users/me/banner', { storageKey }),
 }

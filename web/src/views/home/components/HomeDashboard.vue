@@ -137,8 +137,14 @@ function createdLabel(iso: string): string {
             class="ortam-card"
             @click="emit('openGuild', guild.id)"
           >
-            <!-- Afiş + altıgen simge -->
+            <!-- Afiş (görsel varsa üstte; yoksa renk/gradient) + altıgen simge -->
             <div class="ortam-card__banner" :style="{ background: bannerBackground(guild.bannerColor) }">
+              <img
+                v-if="guild.bannerUrl"
+                :src="guild.bannerUrl"
+                alt=""
+                class="absolute inset-0 w-full h-full object-cover"
+              />
               <div class="ortam-card__icon">
                 <img
                   v-if="guild.iconUrl"

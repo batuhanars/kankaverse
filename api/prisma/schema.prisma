@@ -107,7 +107,8 @@ model User {
   emailVerifiedAt     DateTime?
   avatarUrl           String?
   bio                 String?
-  bannerColor         String?            // profil afiş rengi (preset anahtar; allowlist). Görsel afiş ileride.
+  bannerColor         String?            // profil afiş rengi (preset anahtar; allowlist).
+  bannerUrl           String?            // C8: profil afişi görseli (public URL; ikon deseni)
   deletedAt           DateTime?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
@@ -199,6 +200,7 @@ model Guild {
   discoverable Boolean  @default(false)   // C6: Keşfet opt-in (default kapalı)
   tags        String[]  @default([])       // C6: ilgi etiketleri (max 5; servis doğrular)
   bannerColor String?                      // C6: preset renk anahtarı (allowlist; görsel değil)
+  bannerUrl   String?                      // C8: ortam afişi görseli (public URL; ikon deseni)
   deletedAt DateTime?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -491,6 +493,7 @@ enum ModActionType {
   BAN
   CONTENT_REMOVE
   SHADOW_LIMIT
+  MEDIA_REMOVE
 }
 
 model Report {

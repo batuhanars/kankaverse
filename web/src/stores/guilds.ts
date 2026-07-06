@@ -72,6 +72,14 @@ export const useGuildsStore = defineStore('guilds', () => {
     return res.data
   }
 
+  // Sprint C8 — ortam afişi (görsel) güncelle/kaldır
+  async function updateGuildBanner(id: string, storageKey: string | null): Promise<GuildDto> {
+    const res = await guildsApi.setBanner(id, storageKey)
+    const idx = guilds.value.findIndex((g) => g.id === id)
+    if (idx !== -1) guilds.value[idx] = res.data
+    return res.data
+  }
+
   async function deleteGuild(id: string): Promise<void> {
     await guildsApi.deleteGuild(id)
     guilds.value = guilds.value.filter((g) => g.id !== id)
@@ -142,5 +150,5 @@ export const useGuildsStore = defineStore('guilds', () => {
     }
   }
 
-  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, importDiscordTemplate, joinByInvite, joinDiscovery, updateGuild, updateGuildIcon, deleteGuild, removeGuildLocal, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread, setGuildMentionCount, incrementGuildMention }
+  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, importDiscordTemplate, joinByInvite, joinDiscovery, updateGuild, updateGuildIcon, updateGuildBanner, deleteGuild, removeGuildLocal, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread, setGuildMentionCount, incrementGuildMention }
 })

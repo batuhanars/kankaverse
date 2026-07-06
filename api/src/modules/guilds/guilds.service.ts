@@ -12,12 +12,15 @@ import { PermissionsService } from '../../shared/permissions/permissions.service
 import { StorageService } from '../../shared/storage/storage.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { GuildJoinService } from '../../shared/guild-join/guild-join.service';
+import { ImageUploadService } from '../../shared/media/image-upload.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { InvitesService } from '../invites/invites.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { UpdateGuildDto } from './dto/update-guild.dto';
 import { PresignIconDto } from './dto/presign-icon.dto';
 import { SetIconDto } from './dto/set-icon.dto';
+import { SetMediaDto } from '../../shared/media/dto/set-media.dto';
+import { PresignBannerDto } from '../../shared/media/dto/presign-banner.dto';
 import { GuildMemberDto } from './dto/guild-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { InviteFriendDto } from './dto/invite-friend.dto';
@@ -42,6 +45,7 @@ export function toGuildDto(guild: Guild, unreadCount = 0, unreadMentionCount = 0
     ownerId: guild.ownerId,
     adultsOnly: guild.adultsOnly,
     iconUrl: guild.iconUrl,
+    bannerUrl: guild.bannerUrl ?? null,
     description: guild.description ?? null,
     discoverable: guild.discoverable, // C6
     tags: guild.tags, // C6
@@ -98,6 +102,7 @@ export class GuildsService {
     private guildJoin: GuildJoinService,
     private notifications: NotificationsService,
     private invites: InvitesService,
+    private imageUpload: ImageUploadService,
   ) {}
 
   /** REV-14: guild'in tüm üyelerinin userId'lerini döner (realtime broadcast hedefi). */
@@ -377,6 +382,34 @@ export class GuildsService {
     return toGuildDto(updated);
   }
 
+  // ─── C8: Ortam afişi (banner) — yalnız OWNER, ImageUploadService üzerinden ──
+
+  /** POST /guilds/:id/banner/presign — yalnız OWNER; prefix `guild-banners/${guildId}`. */
+  async presignBanner(userId: string, guildId: string, dto: PresignBannerDto) {
+    await this.requireOwner(userId, guildId);
+    return this.imageUpload.presign('guild-banners', guildId, dto.contentType);
+  }
+
+  /** PATCH /guilds/:id/banner — yalnız OWNER. storageKey: null → afiş kaldır. */
+  async setBanner(userId: string, guildId: string, dto: SetMediaDto) {
+    await this.requireOwner(userId, guildId);
+
+    let bannerUrl: string | null = null;
+    if (dto.storageKey != null) {
+      // Savunma-derinliği (D14 dersi): yükleme kapalıyken yeni afiş SET edilemez; kaldırma serbest.
+      this.imageUpload.assertUploadsEnabled();
+      this.imageUpload.assertKeyPrefix(dto.storageKey, `guild-banners/${guildId}`);
+      bannerUrl = this.imageUpload.publicUrl(dto.storageKey);
+    }
+
+    const updated = await this.prisma.guild.update({
+      where: { id: guildId },
+      data: { bannerUrl },
+    });
+
+    return toGuildDto(updated);
+  }
+
   /** Ortak yardımcı: guild var mı + OWNER mı doğrular; değilse exception fırlatır */
   private async requireOwner(userId: string, guildId: string) {
     const guild = await this.prisma.guild.findUnique({
@@ -400,7 +433,7 @@ export class GuildsService {
     const members = await this.prisma.guildMember.findMany({
       where: { guildId },
       include: {
-        user: { select: { id: true, username: true, avatarUrl: true } },
+        user: { select: { id: true, username: true, avatarUrl: true, bannerUrl: true } },
         roleLinks: {
           include: { role: true },
           orderBy: { role: { position: 'desc' } },
@@ -418,6 +451,7 @@ export class GuildsService {
         userId: m.user.id,
         username: m.user.username,
         avatarUrl: m.user.avatarUrl,
+        bannerUrl: m.user.bannerUrl,
         role: m.role,
         // @everyone örtük — roleLinks'te isEveryone=true olanlar çıkar (örtük olduğundan atanmaz zaten)
         roles: mapRoleLinks(m.roleLinks),
@@ -461,7 +495,7 @@ export class GuildsService {
     // 2. Hedef guild üyesi mi?
     const targetMembership = await this.prisma.guildMember.findUnique({
       where: { guildId_userId: { guildId, userId: targetUserId } },
-      include: { user: { select: { id: true, username: true, avatarUrl: true } } },
+      include: { user: { select: { id: true, username: true, avatarUrl: true, bannerUrl: true } } },
     });
     if (!targetMembership) {
       throw new NotFoundException({
@@ -483,7 +517,7 @@ export class GuildsService {
       where: { guildId_userId: { guildId, userId: targetUserId } },
       data: { role: dto.role as GuildRole },
       include: {
-        user: { select: { id: true, username: true, avatarUrl: true } },
+        user: { select: { id: true, username: true, avatarUrl: true, bannerUrl: true } },
         roleLinks: { include: { role: true } },
       },
     });
@@ -507,6 +541,7 @@ export class GuildsService {
       userId: updated.user.id,
       username: updated.user.username,
       avatarUrl: updated.user.avatarUrl,
+      bannerUrl: updated.user.bannerUrl,
       role: updated.role,
       roles: mapRoleLinks(updated.roleLinks),
     };

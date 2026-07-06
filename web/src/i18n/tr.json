@@ -253,10 +253,30 @@
     "bioPlaceholder": "Kendinden bahset… (bağlantı ekleyebilirsin)",
     "bioCounter": "{count}/512",
     "bioSaved": "Profil güncellendi.",
+    "avatar": {
+      "label": "Avatar",
+      "upload": "Değiştir",
+      "remove": "Kaldır",
+      "uploading": "Yükleniyor… {pct}%",
+      "errorType": "Yalnızca resim dosyası yükleyebilirsin (JPEG, PNG, WebP).",
+      "errorSize": "Dosya boyutu 2 MB'ı aşamaz.",
+      "errorUpload": "Avatar yüklenemedi. Lütfen tekrar dene."
+    },
+    "bannerImage": {
+      "label": "Profil Afişi",
+      "hint": "En az 960×320 boyutlarında bir görsel kullanmanı öneririz. Yüklemezsen aşağıdaki afiş rengi kullanılır.",
+      "upload": "Değiştir",
+      "remove": "Kaldır",
+      "uploading": "Yükleniyor… {pct}%",
+      "errorType": "Yalnızca resim dosyası yükleyebilirsin (JPEG, PNG, WebP).",
+      "errorSize": "Dosya boyutu 2 MB'ı aşamaz.",
+      "errorUpload": "Afiş yüklenemedi. Lütfen tekrar dene."
+    },
+    "mediaUploadsDisabled": "Görsel yükleme şu anda kapalı.",
     "banner": {
       "label": "Afiş Rengi",
       "default": "Varsayılan (marka)",
-      "hint": "Profilinin üstünde görünen renk afişini seç. Görsel afiş yükleme ileride gelecek.",
+      "hint": "Görsel bir afiş yüklemezsen profilinde bu renk/gradient kullanılır.",
       "previewTitle": "Profil Önizlemesi",
       "previewMemberSince": "Üyelik tarihi: {date}"
     },
@@ -511,7 +531,17 @@
     "descriptionSubtitle": "Ortamın nasıl başladı? İnsanlar neden katılmalı?",
     "descriptionPlaceholder": "Dünyaya bu ortam hakkında bir şeyler söyle.",
     "bannerLabel": "Afiş Rengi",
-    "bannerHint": "Keşfet kartının üstünde görünen renk afişini seç. Tekrar tıklayınca kaldırılır. Görsel afiş yükleme ileride gelecek.",
+    "bannerHint": "Görsel bir afiş yüklemezsen Keşfet kartında ve profilde bu renk/gradient kullanılır. Tekrar tıklayınca kaldırılır.",
+    "bannerImageSection": "Ortam Afişi",
+    "bannerImageHint": "En az 960×320 boyutlarında bir görsel kullanmanı öneririz. Yüklemezsen yukarıdaki afiş rengi kullanılır.",
+    "bannerImageUpload": "Afiş Seç",
+    "bannerImageRemove": "Kaldır",
+    "bannerImagePending": "Seçildi — henüz kaydedilmedi",
+    "bannerImageCancelPending": "Seçimi İptal Et",
+    "bannerImageRemovePending": "Afişi kaldır (kaydedilince uygulanır)",
+    "bannerImageUploading": "Yükleniyor… {pct}%",
+    "bannerImageErrorType": "Yalnızca resim dosyası yükleyebilirsin (JPEG, PNG, WebP).",
+    "bannerImageErrorSize": "Dosya boyutu 2 MB'ı aşamaz.",
     "previewTitle": "Ortam Profili Önizlemesi",
     "previewCreatedAt": "Oluşturulma: {date}",
     "previewMembers": "{n} üye",
@@ -1359,7 +1389,8 @@
     "successMessage": "Bildirimin alındı, teşekkürler.",
     "submitError": "Şikâyet gönderilemedi. Lütfen tekrar dene.",
     "reportMessage": "Şikâyet et",
-    "reportUser": "Kullanıcıyı şikâyet et"
+    "reportUser": "Kullanıcıyı şikâyet et",
+    "reportGuild": "Ortamı şikâyet et"
   },
   "reason": {
     "SPAM": "Spam",

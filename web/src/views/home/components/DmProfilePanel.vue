@@ -58,8 +58,15 @@ function onOpenDm(channelId: string) {
     class="shrink-0 flex flex-col mb-4 mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
     style="width: 340px; background-color: var(--kv-bg-sidebar);"
   >
-    <!-- Banner (afiş rengi; yoksa marka varsayılanı) -->
-    <div class="h-[96px] shrink-0" :style="{ background: bannerBackground(card?.bannerColor ?? null) }" />
+    <!-- Banner (görsel afiş varsa üstte; yoksa afiş rengi/marka varsayılanı) -->
+    <div class="h-[96px] shrink-0 relative overflow-hidden" :style="{ background: bannerBackground(card?.bannerColor ?? null) }">
+      <img
+        v-if="card?.bannerUrl"
+        :src="card.bannerUrl"
+        alt=""
+        class="absolute inset-0 w-full h-full object-cover"
+      />
+    </div>
 
     <!-- Avatar (banner'a binen) + ad -->
     <div class="px-5 -mt-10">

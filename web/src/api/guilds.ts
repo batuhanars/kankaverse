@@ -49,6 +49,13 @@ export const guildsApi = {
   setIcon(guildId: string, storageKey: string | null) {
     return http.patch<GuildDto>(`/guilds/${guildId}/icon`, { storageKey })
   },
+  // Sprint C8 §5 — ortam afişi (owner), ikon deseninin aynısı
+  bannerPresign(guildId: string, contentType: string) {
+    return http.post<IconPresignResult>(`/guilds/${guildId}/banner/presign`, { contentType })
+  },
+  setBanner(guildId: string, storageKey: string | null) {
+    return http.patch<GuildDto>(`/guilds/${guildId}/banner`, { storageKey })
+  },
   // Sprint V2 — Kategori endpoint'leri (§4)
   getCategories(guildId: string) {
     return http.get<CategoryDto[]>(`/guilds/${guildId}/categories`)

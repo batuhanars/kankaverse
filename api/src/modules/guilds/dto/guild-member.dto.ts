@@ -28,6 +28,9 @@ export class GuildMemberDto {
   @ApiProperty({ example: 'https://cdn.example.com/avatar.png', nullable: true })
   avatarUrl: string | null;
 
+  @ApiProperty({ example: 'https://cdn.example.com/banner.png', nullable: true })
+  bannerUrl: string | null;
+
   @ApiProperty({ enum: GuildRole, example: GuildRole.MEMBER })
   role: GuildRole;
 

@@ -7,6 +7,7 @@ export function toUserDto(user: User) {
     username: user.username,
     email: user.email,
     avatarUrl: user.avatarUrl,
+    bannerUrl: user.bannerUrl ?? null,
     bio: user.bio,
     bannerColor: user.bannerColor ?? null,
     dmPolicy: user.dmPolicy,

@@ -72,7 +72,10 @@ services:
         mc mb --ignore-existing local/${MINIO_BUCKET:-kankaverse};
         echo 'Bucket hazir: ${MINIO_BUCKET:-kankaverse}';
         mc anonymous set download local/${MINIO_BUCKET:-kankaverse}/icons;
-        echo 'icons/ public-read; ikon servis için';
+        mc anonymous set download local/${MINIO_BUCKET:-kankaverse}/guild-banners;
+        mc anonymous set download local/${MINIO_BUCKET:-kankaverse}/avatars;
+        mc anonymous set download local/${MINIO_BUCKET:-kankaverse}/banners;
+        echo 'icons/ guild-banners/ avatars/ banners/ public-read; ikon+avatar+afis servis için (C8)';
       "
 
 volumes:

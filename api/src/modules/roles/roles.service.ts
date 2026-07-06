@@ -310,7 +310,7 @@ export class RolesService {
     const targetMember = await this.prisma.guildMember.findUnique({
       where: { guildId_userId: { guildId: role.guildId, userId: targetUserId } },
       include: {
-        user: { select: { id: true, username: true, avatarUrl: true } },
+        user: { select: { id: true, username: true, avatarUrl: true, bannerUrl: true } },
         roleLinks: { include: { role: true } },
       },
     });
@@ -336,7 +336,7 @@ export class RolesService {
     const updatedMember = await this.prisma.guildMember.findUnique({
       where: { id: targetMember.id },
       include: {
-        user: { select: { id: true, username: true, avatarUrl: true } },
+        user: { select: { id: true, username: true, avatarUrl: true, bannerUrl: true } },
         roleLinks: { include: { role: true }, orderBy: { role: { position: 'desc' } } },
       },
     });
@@ -393,7 +393,7 @@ export class RolesService {
     const updatedMember = await this.prisma.guildMember.findUnique({
       where: { id: targetMember.id },
       include: {
-        user: { select: { id: true, username: true, avatarUrl: true } },
+        user: { select: { id: true, username: true, avatarUrl: true, bannerUrl: true } },
         roleLinks: { include: { role: true }, orderBy: { role: { position: 'desc' } } },
       },
     });
@@ -464,7 +464,7 @@ export class RolesService {
 
   /** GuildMember kaydını genişletilmiş DTO'ya dönüştürür (role enum + atanmış roller[]). */
   private toExtendedMemberDto(member: {
-    user: { id: string; username: string; avatarUrl: string | null };
+    user: { id: string; username: string; avatarUrl: string | null; bannerUrl: string | null };
     role: GuildRole;
     roleLinks: { role: { id: string; name: string; color: string; position: number; hoist: boolean } }[];
   }) {
@@ -472,6 +472,7 @@ export class RolesService {
       userId: member.user.id,
       username: member.user.username,
       avatarUrl: member.user.avatarUrl,
+      bannerUrl: member.user.bannerUrl,
       role: member.role,
       roles: member.roleLinks.map((rl) => ({
         id: rl.role.id,
