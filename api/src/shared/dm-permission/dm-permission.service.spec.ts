@@ -303,13 +303,13 @@ describe('DmPermissionService.canDm — §13 karar matrisi', () => {
       expect(r).toEqual({ allowed: false, reason: 'DM_NOT_ALLOWED' });
     });
 
-    it('sender 30 günlük (lock 7 gün) → lock geçer, dmPolicy EVERYONE → allowed', async () => {
+    it('sender 30 günlük (lock 7 gün) → lock geçer, dmPolicy EVERYONE → allowed + asRequest (C9 istek)', async () => {
       configMock.get.mockReturnValue(7);
       prismaMock.user.findUnique
         .mockResolvedValueOnce(ADULT_A)
         .mockResolvedValueOnce(ADULT_B);
       const r = await service.canDm(ADULT_A.id, ADULT_B.id);
-      expect(r).toEqual({ allowed: true });
+      expect(r).toEqual({ allowed: true, asRequest: true });
     });
 
     it('sender tam sınırda (7. gün, eşikten genç) → DM_NOT_ALLOWED', async () => {
@@ -335,7 +335,7 @@ describe('DmPermissionService.canDm — §13 karar matrisi', () => {
         .mockResolvedValueOnce(settledSender)
         .mockResolvedValueOnce(ADULT_B);
       const r = await service.canDm(settledSender.id, ADULT_B.id);
-      expect(r).toEqual({ allowed: true });
+      expect(r).toEqual({ allowed: true, asRequest: true });
     });
 
     it('config newAccountDmLockDays tanımsızsa 7 gün default uygulanır', async () => {
@@ -356,33 +356,26 @@ describe('DmPermissionService.canDm — §13 karar matrisi', () => {
       configMock.get.mockReturnValue(7);
     });
 
-    it('target.dmPolicy = EVERYONE → allowed', async () => {
+    it('target.dmPolicy = EVERYONE → allowed + asRequest (C9: direkt değil, mesaj isteği)', async () => {
       const targetEveryone = { ...ADULT_B, dmPolicy: 'EVERYONE' };
       prismaMock.user.findUnique
         .mockResolvedValueOnce(ADULT_A)
         .mockResolvedValueOnce(targetEveryone);
       const r = await service.canDm(ADULT_A.id, targetEveryone.id);
-      expect(r).toEqual({ allowed: true });
+      expect(r).toEqual({ allowed: true, asRequest: true });
     });
 
-    it('target.dmPolicy = FRIENDS + ortak sunucu var → allowed', async () => {
+    it('C9: target.dmPolicy = FRIENDS + yabancı → DM_NOT_ALLOWED (ortak sunucu OLSA DA — yol kaldırıldı)', async () => {
       const targetFriends = { ...ADULT_B, id: 'adult-b-friends', dmPolicy: 'FRIENDS' };
       prismaMock.user.findUnique
         .mockResolvedValueOnce(ADULT_A)
         .mockResolvedValueOnce(targetFriends);
+      // Ortak sunucu VAR gibi mock'lansa bile artık bakılmıyor → yine deny.
       prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm1' });
       const r = await service.canDm(ADULT_A.id, targetFriends.id);
-      expect(r).toEqual({ allowed: true });
-    });
-
-    it('target.dmPolicy = FRIENDS + ortak sunucu yok → DM_NOT_ALLOWED', async () => {
-      const targetFriends = { ...ADULT_B, id: 'adult-b-friends2', dmPolicy: 'FRIENDS' };
-      prismaMock.user.findUnique
-        .mockResolvedValueOnce(ADULT_A)
-        .mockResolvedValueOnce(targetFriends);
-      prismaMock.guildMember.findFirst.mockResolvedValue(null);
-      const r = await service.canDm(ADULT_A.id, targetFriends.id);
       expect(r).toEqual({ allowed: false, reason: 'DM_NOT_ALLOWED' });
+      // C9: FRIENDS artık ortak-sunucu sorgusu yapmaz (yalnız kanka).
+      expect(prismaMock.guildMember.findFirst).not.toHaveBeenCalled();
     });
 
     it('target.dmPolicy = NONE → DM_NOT_ALLOWED', async () => {
@@ -413,84 +406,70 @@ describe('DmPermissionService.canDm — §13 karar matrisi', () => {
     });
   });
 
-  // ── Kural 4c: Karantina (R7) — FRIENDS dmPolicy ortak-ortam basamağı ────
-  describe('Kural 4c karantina (R7): sender yeni üye → ortak-ortam basamağı geçmez', () => {
-    // quarantineHours=24, configMock.get çağrıları sırayla: newAccountDmLockDays, quarantineHours
-    // DmPermissionService: get('newAccountDmLockDays') → 7 (4b), get('quarantineHours') → 24 (4c)
-    // configMock.get mock'u her çağrıda aynı değer dönüyor; quarantineHours için ayrıca ayarlanır.
+  // ── C9: NONE arkadaşlığı ezer (Kural 3, arkadaştan önce) ──────────────────
+  describe('C9 Kural 3: target NONE → kanka DAHİL herkesi keser', () => {
+    beforeEach(() => {
+      prismaMock.userBlock.findFirst.mockResolvedValue(null);
+      configMock.get.mockReturnValue(7);
+    });
 
-    // Sender'ın o guild'deki joinedAt: karantinada = NOW - 1 saat (24 saatlik karantina içinde)
-    const ONE_HOUR_AGO = new Date(NOW - 1 * 60 * 60 * 1000);
-    // Yerleşik: 48 saat önce katılmış (24 saatlik karantina dışında)
-    const TWO_DAYS_AGO_GUILD = new Date(NOW - 48 * 60 * 60 * 1000);
+    it('target NONE + ACCEPTED arkadaş → DM_NOT_ALLOWED (NONE arkadaşlığı ezer; friendship sorgulanmaz)', async () => {
+      const targetNone = { ...ADULT_B, id: 'adult-b-none-friend', dmPolicy: 'NONE' };
+      // Arkadaşlık VAR gibi mock'lansa bile NONE önce gelir → deny + friendship sorgusu yapılmaz.
+      prismaMock.friendship.findFirst.mockResolvedValue({ status: 'ACCEPTED' });
+      prismaMock.user.findUnique
+        .mockResolvedValueOnce(ADULT_A)
+        .mockResolvedValueOnce(targetNone);
+      const r = await service.canDm(ADULT_A.id, targetNone.id);
+      expect(r).toEqual({ allowed: false, reason: 'DM_NOT_ALLOWED' });
+      expect(prismaMock.friendship.findFirst).not.toHaveBeenCalled();
+    });
 
-    const TARGET_FRIENDS = { ...ADULT_B, id: 'adult-b-friends-q', dmPolicy: 'FRIENDS' };
+    it('target NONE + minör sender → DM_NOT_ALLOWED (blok hariç mutlak sessizlik)', async () => {
+      const targetNone = { ...ADULT_B, id: 'adult-b-none-minor', dmPolicy: 'NONE' };
+      prismaMock.friendship.findFirst.mockResolvedValue(null);
+      prismaMock.user.findUnique
+        .mockResolvedValueOnce(MINOR_A)
+        .mockResolvedValueOnce(targetNone);
+      const r = await service.canDm(MINOR_A.id, targetNone.id);
+      expect(r).toEqual({ allowed: false, reason: 'DM_NOT_ALLOWED' });
+    });
+  });
 
+  // ── C9: asRequest yalnız yetişkin↔yetişkin EVERYONE yolunda ──────────────
+  describe('C9: asRequest bayrağı yalnız izinli EVERYONE-yabancı yolunda set edilir', () => {
     beforeEach(() => {
       prismaMock.userBlock.findFirst.mockResolvedValue(null);
       prismaMock.friendship.findFirst.mockResolvedValue(null);
+      configMock.get.mockReturnValue(7);
     });
 
-    it('sender karantinada (joinedAt 1 saat önce, quarantine 24s) → ortak-ortam null → DM_NOT_ALLOWED', async () => {
-      // newAccountDmLockDays=0 (4b geçsin), quarantineHours=24
-      configMock.get.mockImplementation((key: string) => {
-        if (key === 'newAccountDmLockDays') return 0;
-        if (key === 'quarantineHours') return 24;
-        return undefined;
-      });
+    it('minör yabancı (EVERYONE) → deny, asRequest YOK (istek yolu minöre kapalı)', async () => {
       prismaMock.user.findUnique
         .mockResolvedValueOnce(ADULT_A)
-        .mockResolvedValueOnce(TARGET_FRIENDS);
-      // guildMember karantina filtresi eşleşmez → null döner
-      prismaMock.guildMember.findFirst.mockResolvedValue(null);
-      const r = await service.canDm(ADULT_A.id, TARGET_FRIENDS.id);
+        .mockResolvedValueOnce(MINOR_B);
+      const r = await service.canDm(ADULT_A.id, MINOR_B.id);
       expect(r).toEqual({ allowed: false, reason: 'DM_NOT_ALLOWED' });
+      expect(r.asRequest).toBeUndefined();
     });
 
-    it('sender yerleşik (joinedAt 48 saat önce, quarantine 24s) → ortak-ortam var → allowed', async () => {
-      configMock.get.mockImplementation((key: string) => {
-        if (key === 'newAccountDmLockDays') return 0;
-        if (key === 'quarantineHours') return 24;
-        return undefined;
-      });
+    it('yeni hesap yabancı (EVERYONE) → deny, asRequest YOK', async () => {
       prismaMock.user.findUnique
-        .mockResolvedValueOnce(ADULT_A)
-        .mockResolvedValueOnce(TARGET_FRIENDS);
-      // guildMember karantina filtresi eşleşir (joinedAt cutoff'tan önce) → kayıt döner
-      prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm-settled', joinedAt: TWO_DAYS_AGO_GUILD });
-      const r = await service.canDm(ADULT_A.id, TARGET_FRIENDS.id);
-      expect(r).toEqual({ allowed: true });
-    });
-
-    it('quarantineHours=0 → karantina kapalı → ortak-ortam var → allowed', async () => {
-      configMock.get.mockImplementation((key: string) => {
-        if (key === 'newAccountDmLockDays') return 0;
-        if (key === 'quarantineHours') return 0; // kapalı
-        return undefined;
-      });
-      prismaMock.user.findUnique
-        .mockResolvedValueOnce(ADULT_A)
-        .mockResolvedValueOnce(TARGET_FRIENDS);
-      // quarantineHours=0: cutoff=now → joinedAt { lt: now } → yeni katılmış dahil geçer
-      prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm-any', joinedAt: ONE_HOUR_AGO });
-      const r = await service.canDm(ADULT_A.id, TARGET_FRIENDS.id);
-      expect(r).toEqual({ allowed: true });
-    });
-
-    it('karantina yalnız 4c FRIENDS basamağını etkiler — 4a minör kalkanı bozulmaz', async () => {
-      // Minör sender → 4a devreye girmeli, karantinaya ulaşılmamalı
-      configMock.get.mockImplementation((key: string) => {
-        if (key === 'newAccountDmLockDays') return 0;
-        if (key === 'quarantineHours') return 24;
-        return undefined;
-      });
-      prismaMock.user.findUnique
-        .mockResolvedValueOnce(MINOR_A) // sender minör
-        .mockResolvedValueOnce(TARGET_FRIENDS);
-      const r = await service.canDm(MINOR_A.id, TARGET_FRIENDS.id);
-      // 4a devreye girmeli → guildMember sorgulanmamalı
+        .mockResolvedValueOnce(NEW_ADULT_A)
+        .mockResolvedValueOnce(ADULT_B);
+      const r = await service.canDm(NEW_ADULT_A.id, ADULT_B.id);
       expect(r).toEqual({ allowed: false, reason: 'DM_NOT_ALLOWED' });
-      expect(prismaMock.guildMember.findFirst).not.toHaveBeenCalled();
+      expect(r.asRequest).toBeUndefined();
+    });
+
+    it('ACCEPTED arkadaş (EVERYONE) → allowed direkt, asRequest YOK (istek değil)', async () => {
+      prismaMock.friendship.findFirst.mockResolvedValue({ status: 'ACCEPTED', requesterId: ADULT_A.id, addresseeId: ADULT_B.id });
+      prismaMock.user.findUnique
+        .mockResolvedValueOnce(ADULT_A)
+        .mockResolvedValueOnce(ADULT_B);
+      const r = await service.canDm(ADULT_A.id, ADULT_B.id);
+      expect(r).toEqual({ allowed: true });
+      expect(r.asRequest).toBeUndefined();
     });
   });
 });

@@ -156,7 +156,17 @@ export class FriendPermissionService {
   /** REV-10: iki kullanıcı arasında aktif 1-1 DM kanalı var mı (önceki rızalı temas kanıtı). */
   private async hasExistingDmChannel(a: string, b: string): Promise<boolean> {
     const aDmChannels = await this.prisma.channelMember.findMany({
-      where: { userId: a, channel: { type: 'DM', deletedAt: null } },
+      where: {
+        userId: a,
+        channel: {
+          type: 'DM',
+          deletedAt: null,
+          // C9 (R7): PENDING mesaj isteği kanalı "önceki rızalı temas" DEĞİL — hariç tut.
+          // null (legacy) + ACCEPTED = rıza sayılır; yalnız PENDING dışlanır. (not+null
+          // muğlaklığına düşmemek için açık OR — yanlışlıkla legacy DM'leri elemeyelim.)
+          OR: [{ dmRequestStatus: null }, { dmRequestStatus: 'ACCEPTED' }],
+        },
+      },
       select: { channelId: true },
     });
     if (!aDmChannels?.length) return false;
