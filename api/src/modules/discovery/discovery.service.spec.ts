@@ -20,6 +20,7 @@ function makeGuild(over: Partial<any> = {}) {
     name: 'Ortam',
     iconUrl: null,
     bannerColor: null,
+    bannerUrl: null,
     description: null,
     adultsOnly: false,
     tags: [],

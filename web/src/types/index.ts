@@ -201,6 +201,7 @@ export interface DiscoveryGuildDto {
   name: string
   iconUrl: string | null
   bannerColor: string | null
+  bannerUrl: string | null // C8 — yüklenmiş afiş görseli (varsa gösterilir, yoksa bannerColor gradient)
   description: string | null
   memberCount: number
   tags: string[]

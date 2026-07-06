@@ -61,6 +61,7 @@ export class DiscoveryService {
       name: g.name,
       iconUrl: g.iconUrl,
       bannerColor: g.bannerColor ?? null,
+      bannerUrl: g.bannerUrl ?? null,
       description: g.description ?? null,
       memberCount: g._count.members,
       tags: g.tags,
