@@ -1391,7 +1391,14 @@
     "statusFriend": "Kanka",
     "statusPending": "İstek Beklemede",
     "statusPendingIn": "Gelen İstek",
-    "goToMyProfile": "Profilime git"
+    "goToMyProfile": "Profilime git",
+    "mutualFriendsShort": "{n} Ortak Kanka",
+    "mutualGuildsShort": "{n} Ortak Ortam",
+    "moreActions": "Daha fazla",
+    "copyId": "Kullanıcı ID'sini Kopyala",
+    "idCopied": "Kullanıcı ID kopyalandı.",
+    "memberSincePrefix": "Üyelik",
+    "selfBlockedNote": "Bu kullanıcıyı engelledin."
   },
   "time": {
     "today": "Bugün",
