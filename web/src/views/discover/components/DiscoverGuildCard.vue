@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * DiscoverGuildCard — Keşfet grid kartı. Renk afişi (bannerColor→gradient) + altıgen ikon +
- * ad + açıklama + üye sayısı + etiket çipleri + Katıl. Görsel afiş YOK (yalnız renk preset).
+ * DiscoverGuildCard — Keşfet grid kartı. Afiş (yüklenmiş görsel varsa o, yoksa bannerColor→gradient) +
+ * altıgen ikon + ad + açıklama + üye sayısı + etiket çipleri + Katıl.
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -34,8 +34,14 @@ function guildInitial(name: string): string {
     class="flex flex-col rounded-[var(--kv-radius-lg)] border overflow-hidden"
     style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-sidebar);"
   >
-    <!-- Renk afişi -->
+    <!-- Afiş: yüklenmiş görsel varsa o, yoksa renk gradient -->
     <div class="relative h-20 shrink-0" :style="bannerStyle">
+      <img
+        v-if="guild.bannerUrl"
+        :src="guild.bannerUrl"
+        :alt="guild.name"
+        class="absolute inset-0 w-full h-full object-cover"
+      />
       <!-- Afişe binen altıgen ikon -->
       <div class="absolute -bottom-5 left-4">
         <div

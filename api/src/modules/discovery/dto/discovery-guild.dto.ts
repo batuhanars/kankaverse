@@ -15,6 +15,9 @@ export class DiscoveryGuildDto {
   bannerColor: string | null;
 
   @ApiProperty({ nullable: true })
+  bannerUrl: string | null; // C8 — yüklenmiş afiş görseli (varsa kartta gösterilir, yoksa bannerColor gradient)
+
+  @ApiProperty({ nullable: true })
   description: string | null;
 
   @ApiProperty()
