@@ -23,12 +23,19 @@ const activeDmChannelId = computed(() => (route.name === 'dm' ? (route.params.ch
 const requestCount = computed(() => dmStore.requestCount)
 const requestsActive = computed(() => route.name === 'dm-requests')
 
+// Ana Sayfa (karşılama/arkadaşlar ekranı) — logo dışında net bir dönüş yolu.
+const homeActive = computed(() => route.name === 'app')
+
 function selectDm(channelId: string) {
   router.push({ name: 'dm', params: { channelId } })
 }
 
 function openRequests() {
   router.push({ name: 'dm-requests' })
+}
+
+function openHome() {
+  router.push({ name: 'app' })
 }
 
 function onChatCreated(channelId: string) {
@@ -42,8 +49,23 @@ function onChatCreated(channelId: string) {
     class="flex flex-col shrink-0 overflow-hidden rounded-none mt-0 md:rounded-[var(--kv-radius-lg)] md:mt-4"
     style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
   >
-    <!-- C9 — Mesaj İstekleri satırı (DM başlığının ÜSTÜNDE; kanka isteğinden ayrı) -->
-    <div class="px-2 pt-3 shrink-0">
+    <!-- Ana Sayfa + Mesaj İstekleri navigasyonu (DM başlığının ÜSTÜNDE) -->
+    <div class="px-2 pt-3 shrink-0 flex flex-col gap-0.5">
+      <!-- Ana Sayfa (karşılama/arkadaşlar) -->
+      <button
+        class="w-full flex items-center gap-2.5 px-2 py-2 rounded-[var(--kv-radius-sm)] text-[14px] font-medium text-left cursor-pointer transition-colors"
+        :class="homeActive
+          ? 'bg-[var(--kv-bg-elevated)] text-[var(--kv-accent-400)]'
+          : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-bg-elevated)] hover:text-[var(--kv-text-primary)]'"
+        @click="openHome"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+          <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+        </svg>
+        <span class="flex-1 min-w-0 truncate">{{ t('sidebar.home') }}</span>
+      </button>
+
+      <!-- C9 — Mesaj İstekleri (kanka isteğinden AYRI) -->
       <button
         class="w-full flex items-center gap-2.5 px-2 py-2 rounded-[var(--kv-radius-sm)] text-[14px] font-medium text-left cursor-pointer transition-colors"
         :class="requestsActive

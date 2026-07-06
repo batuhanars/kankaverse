@@ -12,6 +12,7 @@ import { useDmStore } from '@/stores/dm'
 import { useToastStore } from '@/stores/toast'
 import KvButton from '@/components/ui/KvButton.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import HomeTopBar from './components/HomeTopBar.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -79,7 +80,14 @@ async function reject(block: boolean) {
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col min-w-0 overflow-hidden" style="background-color: var(--kv-bg-content);">
+  <div class="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
+    <HomeTopBar @select-dm="(id: string) => router.push({ name: 'dm', params: { channelId: id } })" />
+    <div class="flex flex-1 min-w-0 overflow-hidden">
+      <!-- Yüzen içerik kartı (DmConversation deseni: mb-4 + rounded + ≥1280 sağ boşluk) -->
+      <div
+        class="flex-1 min-w-0 flex flex-col mb-4 xl:mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
+        style="background-color: var(--kv-bg-content);"
+      >
     <!-- Başlık -->
     <div class="shrink-0 flex items-center px-6 border-b" style="height: var(--kv-header-height); border-color: var(--kv-border-subtle);">
       <h1 class="text-[16px] font-semibold" style="color: var(--kv-text-primary);">{{ t('messageRequests.title') }}</h1>
@@ -170,6 +178,9 @@ async function reject(block: boolean) {
         <p class="text-[12px] mt-4" style="color: var(--kv-text-muted);">{{ t('messageRequests.privacyNote') }}</p>
       </div>
     </div>
+
+      </div><!-- /yüzen kart -->
+    </div><!-- /iç flex -->
 
     <!-- Reddet + Engelle onayı -->
     <ConfirmDialog
