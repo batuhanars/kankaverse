@@ -19,11 +19,12 @@ const voiceMock = { getLiveParticipation: jest.fn() };
 
 // C8: ImageUploadService — StorageService/ConfigService mock üzerinden gerçek örnek
 // (presignAvatar/setAvatar/presignBanner/setBanner testleri bunun üzerinden geçer).
-const storageMock = { presignPut: jest.fn(), presignGet: jest.fn(), delete: jest.fn() };
+const storageMock = { presignPut: jest.fn(), presignPutPublic: jest.fn(), presignGet: jest.fn(), delete: jest.fn() };
 const configMock = {
   get: jest.fn((key: string) => {
     const values: Record<string, unknown> = {
       's3.publicUrl': 'http://localhost:9000/kankaverse',
+      's3.publicBaseUrl': 'http://localhost:9000/kankaverse',
       uploadsEnabled: true,
     };
     return values[key];
@@ -41,9 +42,11 @@ function makeService() {
 
 function resetMediaMocks() {
   storageMock.presignPut.mockReset();
+  storageMock.presignPutPublic.mockReset();
   configMock.get.mockImplementation((key: string) => {
     const values: Record<string, unknown> = {
       's3.publicUrl': 'http://localhost:9000/kankaverse',
+      's3.publicBaseUrl': 'http://localhost:9000/kankaverse',
       uploadsEnabled: true,
     };
     return values[key];
@@ -461,14 +464,15 @@ describe('UsersService.presignAvatar / presignBanner', () => {
   beforeEach(() => {
     resetMocks();
     service = makeService();
-    storageMock.presignPut.mockResolvedValue('https://minio/presigned-put-url');
+    // C8-fix: profil görselleri public bucket'a → presignPutPublic
+    storageMock.presignPutPublic.mockResolvedValue('https://minio/presigned-put-url');
   });
 
   it('desteklenmeyen contentType (gif) → BadRequestException UNSUPPORTED_TYPE', async () => {
     await expect(service.presignAvatar('u1', 'image/gif')).rejects.toMatchObject({
       response: expect.objectContaining({ error: 'UNSUPPORTED_TYPE' }),
     });
-    expect(storageMock.presignPut).not.toHaveBeenCalled();
+    expect(storageMock.presignPutPublic).not.toHaveBeenCalled();
   });
 
   it('UPLOADS_ENABLED=false → ForbiddenException UPLOADS_DISABLED', async () => {
@@ -477,7 +481,7 @@ describe('UsersService.presignAvatar / presignBanner', () => {
     await expect(service.presignAvatar('u1', 'image/png')).rejects.toMatchObject({
       response: expect.objectContaining({ error: 'UPLOADS_DISABLED' }),
     });
-    expect(storageMock.presignPut).not.toHaveBeenCalled();
+    expect(storageMock.presignPutPublic).not.toHaveBeenCalled();
   });
 
   it('geçerli istek → storageKey avatars/${userId}/ prefix taşır', async () => {

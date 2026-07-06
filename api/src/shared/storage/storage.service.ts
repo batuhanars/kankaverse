@@ -21,6 +21,8 @@ export class StorageService {
   private readonly logger = new Logger(StorageService.name);
   private readonly client: S3Client;
   private readonly bucket: string;
+  // C8-fix: profil görselleri (avatar/afiş) için public bucket. Dev'de ana bucket'a düşer.
+  private readonly publicBucket: string;
 
   constructor(private config: ConfigService) {
     const endpoint = config.get<string>('s3.endpoint')!;
@@ -28,6 +30,7 @@ export class StorageService {
     const accessKeyId = config.get<string>('s3.accessKey')!;
     const secretAccessKey = config.get<string>('s3.secretKey')!;
     this.bucket = config.get<string>('s3.bucket')!;
+    this.publicBucket = config.get<string>('s3.publicBucket') ?? this.bucket;
 
     this.client = new S3Client({
       endpoint,
@@ -56,6 +59,23 @@ export class StorageService {
       expiresIn: PRESIGN_EXPIRES_SECONDS,
     });
     this.logger.debug(`presignPut: key=${key} contentType=${contentType}`);
+    return url;
+  }
+
+  /**
+   * C8-fix: PUBLIC bucket'a presigned PUT (avatar/afiş). Nesne public bucket'a yazılır → özel alan adından
+   * imzasız <img> GET ile sunulur. Mesaj ekleri bunun DIŞINDA (private bucket, presignPut/presignGet).
+   */
+  async presignPutPublic(key: string, contentType: string): Promise<string> {
+    const command = new PutObjectCommand({
+      Bucket: this.publicBucket,
+      Key: key,
+      ContentType: contentType,
+    });
+    const url = await getSignedUrl(this.client, command, {
+      expiresIn: PRESIGN_EXPIRES_SECONDS,
+    });
+    this.logger.debug(`presignPutPublic: bucket=${this.publicBucket} key=${key}`);
     return url;
   }
 

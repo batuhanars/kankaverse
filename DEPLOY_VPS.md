@@ -223,14 +223,23 @@ Artık yalnız davet koduyla kayıt olunur. DB zaten temiz (fresh) → ayrı pur
 > servis edilir. Bilinçli, tanınırlık fazı için geçici kabul. **Kitle görünür olmaya başlayınca
 > tekrar masaya yatır** (tarayıcı entegrasyonu / whitelist'e daralt). Kill-switch: `UPLOADS_ENABLED=false` + api restart.
 
-### 13.1 R2 bucket + API token (Cloudflare panel)
-1. Cloudflare → R2 → **Create bucket** (ör. `kankaverse-uploads`). Lokasyon otomatik.
-2. R2 → **Manage API Tokens** → **Create API Token** → izin **Object Read & Write**, yalnız bu bucket.
-3. Çıktıyı not et: **Access Key ID**, **Secret Access Key**, ve **endpoint** (`https://<accountid>.r2.cloudflarestorage.com`).
+### 13.1 R2 bucket'lar + API token (Cloudflare panel)
+
+> **İKİ bucket (bilinçli ayrım — C8-fix):**
+> - `kankaverse-uploads` → **PRIVATE**. Mesaj/DM ekleri. Backend imzalı presigned GET + üyelik/scan kapısı ile sunar. Public erişim YOK.
+> - `kankaverse-public` → **PUBLIC**. Avatar / profil-afişi / ortam-afişi / ortam-ikonu. `<img>` ile imzasız sunulur.
+>
+> Neden ayrı: ek gizliliği (URL=erişim değil, üyelik=erişim) korunur; profil görselleri zaten herkese açık. Aynı bucket'ı public yapmak DM görsellerini de URL ile herkese açardı (iptal edilemez) — çocuk güvenliği için kabul edilmez.
+
+1. Cloudflare → R2 → **Create bucket** → `kankaverse-uploads` (private kalır) **ve** `kankaverse-public`.
+2. **Public bucket'ı public yap:** `kankaverse-public` → **Settings → Public access → Custom Domains** → `cdn.kankaverse.com` bağla (DNS Cloudflare'de → otomatik). *(r2.dev dev URL'i hızlı testte iş görür ama Cloudflare prod'da önermez — özel alan adı kullan.)* Private bucket'a public erişim AÇMA.
+3. R2 → **Manage API Tokens** → **Create API Token** → izin **Object Read & Write**, kapsam **her iki bucket** (backend ikisine de presigned PUT üretir).
+4. Çıktıyı not et: **Access Key ID**, **Secret Access Key**, **endpoint** (`https://<accountid>.r2.cloudflarestorage.com`).
 
 ### 13.2 Bucket CORS politikası (KRİTİK — atlanırsa yükleme sessizce patlar)
 Tarayıcı presigned URL'ye **doğrudan PUT** yapar; bucket origin'imize izin vermezse PUT CORS hatası alır.
-R2 → bucket → **Settings → CORS Policy** → şunu ekle:
+**HER İKİ bucket'a** (`kankaverse-uploads` + `kankaverse-public`) aynı politikayı ekle — avatar/afiş PUT public bucket'a gider.
+R2 → bucket → **Settings → CORS Policy**:
 ```json
 [
   {
@@ -256,12 +265,18 @@ UPLOADS_ENABLED=true
 ATTACHMENT_SCAN_ENABLED=false      # tarayıcı yok → false (true olursa dosyalar sonsuza dek PENDING kalır)
 S3_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com
 S3_REGION=auto
-S3_BUCKET=kankaverse-uploads
-S3_ACCESS_KEY=<R2 Access Key ID>
+S3_BUCKET=kankaverse-uploads       # PRIVATE — mesaj/DM ekleri (presigned GET)
+S3_ACCESS_KEY=<R2 Access Key ID>   # token her iki bucket'a Read&Write olmalı
 S3_SECRET_KEY=<R2 Secret Access Key>
-S3_PUBLIC_URL=https://<accountid>.r2.cloudflarestorage.com/kankaverse-uploads
+# Profil görselleri (avatar/afiş/ikon) için PUBLIC bucket + özel alan adı (C8-fix):
+S3_PUBLIC_BUCKET=kankaverse-public
+S3_PUBLIC_BASE_URL=https://cdn.kankaverse.com   # public bucket'a bağlı özel alan adı (r2.cloudflarestorage.com DEĞİL)
 # MAX_UPLOAD_MB=25   # opsiyonel, varsayılan 25
 ```
+> ⚠️ **Eski/yanlış kurulum uyarısı:** `S3_PUBLIC_URL`'i R2'nin S3 endpoint'ine (`...r2.cloudflarestorage.com/...`)
+> ayarlama — o endpoint her GET için imza ister, imzasız `<img>` GET'i **401/403** döner → kırık avatar/afiş.
+> Public sunum yalnız public bucket + özel alan adı (`S3_PUBLIC_BASE_URL`) ile olur. `S3_PUBLIC_URL` artık
+> yalnız geriye-dönük varsayılan (verilmezse `S3_PUBLIC_BASE_URL` ona düşer) — prod'da `S3_PUBLIC_BASE_URL` gir.
 > İzinli tipler allowlist'te sabit (png/jpeg/gif/webp/pdf/txt) — genişletme kod değişikliğiyle (`attachments.service.ts`).
 
 ### 13.4 Uygula + duman testi

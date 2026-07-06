@@ -79,6 +79,7 @@ const permissionsMock = {
 
 const storageMock = {
   presignPut: jest.fn(),
+  presignPutPublic: jest.fn(),
   presignGet: jest.fn(),
   delete: jest.fn(),
 };
@@ -87,6 +88,7 @@ const configMock = {
   get: jest.fn((key: string) => {
     const values: Record<string, unknown> = {
       's3.publicUrl': 'http://localhost:9000/kankaverse',
+      's3.publicBaseUrl': 'http://localhost:9000/kankaverse',
       uploadsEnabled: true,
     };
     return values[key];
@@ -128,6 +130,7 @@ function resetMocks() {
   configMock.get.mockImplementation((key: string) => {
     const values: Record<string, unknown> = {
       's3.publicUrl': 'http://localhost:9000/kankaverse',
+      's3.publicBaseUrl': 'http://localhost:9000/kankaverse',
       uploadsEnabled: true,
     };
     return values[key];
@@ -166,7 +169,7 @@ describe('GuildsService.presignIcon', () => {
   beforeEach(() => {
     resetMocks();
     service = makeService();
-    storageMock.presignPut.mockResolvedValue('https://minio/presigned-put-url');
+    storageMock.presignPutPublic.mockResolvedValue('https://minio/presigned-put-url');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -181,7 +184,7 @@ describe('GuildsService.presignIcon', () => {
 
     // Guild kontrolüne bile gitmemeli
     expect(prismaMock.guild.findUnique).not.toHaveBeenCalled();
-    expect(storageMock.presignPut).not.toHaveBeenCalled();
+    expect(storageMock.presignPutPublic).not.toHaveBeenCalled();
   });
 
   it('video/mp4 → UNSUPPORTED_TYPE', async () => {
@@ -204,7 +207,7 @@ describe('GuildsService.presignIcon', () => {
       response: expect.objectContaining({ error: 'FORBIDDEN' }),
     });
 
-    expect(storageMock.presignPut).not.toHaveBeenCalled();
+    expect(storageMock.presignPutPublic).not.toHaveBeenCalled();
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -219,7 +222,7 @@ describe('GuildsService.presignIcon', () => {
       NotFoundException,
     );
 
-    expect(storageMock.presignPut).not.toHaveBeenCalled();
+    expect(storageMock.presignPutPublic).not.toHaveBeenCalled();
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -233,7 +236,7 @@ describe('GuildsService.presignIcon', () => {
 
     const result = await service.presignIcon(OWNER_ID, GUILD_ID, dto);
 
-    expect(storageMock.presignPut).toHaveBeenCalledTimes(1);
+    expect(storageMock.presignPutPublic).toHaveBeenCalledTimes(1);
     expect(result).toHaveProperty('uploadUrl', 'https://minio/presigned-put-url');
     expect(result).toHaveProperty('storageKey');
     // storageKey bu guild'in icons/ prefix'ini içermeli
@@ -404,7 +407,7 @@ describe('GuildsService.presignBanner', () => {
   beforeEach(() => {
     resetMocks();
     service = makeService();
-    storageMock.presignPut.mockResolvedValue('https://minio/presigned-put-url');
+    storageMock.presignPutPublic.mockResolvedValue('https://minio/presigned-put-url');
   });
 
   it('desteklenmeyen contentType → BadRequestException UNSUPPORTED_TYPE', async () => {
@@ -417,7 +420,7 @@ describe('GuildsService.presignBanner', () => {
       response: expect.objectContaining({ error: 'UNSUPPORTED_TYPE' }),
     });
     // GIF statik yükleme kararında YOK (sözleşme §0) — presign S3'e gitmemeli
-    expect(storageMock.presignPut).not.toHaveBeenCalled();
+    expect(storageMock.presignPutPublic).not.toHaveBeenCalled();
   });
 
   it('UPLOADS_ENABLED=false → ForbiddenException UPLOADS_DISABLED', async () => {
@@ -432,7 +435,7 @@ describe('GuildsService.presignBanner', () => {
     ).rejects.toMatchObject({
       response: expect.objectContaining({ error: 'UPLOADS_DISABLED' }),
     });
-    expect(storageMock.presignPut).not.toHaveBeenCalled();
+    expect(storageMock.presignPutPublic).not.toHaveBeenCalled();
   });
 
   it('OWNER olmayan üye → ForbiddenException FORBIDDEN', async () => {
