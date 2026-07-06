@@ -58,20 +58,18 @@ function onOpenDm(channelId: string) {
     class="shrink-0 flex flex-col mb-4 mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
     style="width: 340px; background-color: var(--kv-bg-sidebar);"
   >
-    <!-- Banner (görsel afiş varsa üstte; yoksa afiş rengi/marka varsayılanı) -->
-    <div class="h-[96px] shrink-0 relative overflow-hidden" :style="{ background: bannerBackground(card?.bannerColor ?? null) }">
-      <img
-        v-if="card?.bannerUrl"
-        :src="card.bannerUrl"
-        alt=""
-        class="absolute inset-0 w-full h-full object-cover"
-      />
-    </div>
-
-    <!-- Avatar (banner'a binen) + ad -->
-    <div class="px-5 -mt-10">
+    <!-- Başlık: banner + banner'a binen avatar (absolute, overflow DIŞI → kırpılmaz; FullProfileModal deseni) -->
+    <div class="relative shrink-0">
+      <div class="h-[96px] relative overflow-hidden" :style="{ background: bannerBackground(card?.bannerColor ?? null) }">
+        <img
+          v-if="card?.bannerUrl"
+          :src="card.bannerUrl"
+          alt=""
+          class="absolute inset-0 w-full h-full object-cover"
+        />
+      </div>
       <div
-        class="w-[76px] h-[76px] rounded-full border-4 shrink-0 overflow-hidden flex items-center justify-center text-[26px] font-bold text-white"
+        class="absolute left-5 -bottom-9 z-10 w-[76px] h-[76px] rounded-full border-4 overflow-hidden flex items-center justify-center text-[26px] font-bold text-white"
         style="border-color: var(--kv-bg-sidebar); background-color: var(--kv-accent-500);"
       >
         <img
@@ -82,7 +80,11 @@ function onOpenDm(channelId: string) {
         />
         <span v-else>{{ otherUser.username[0].toUpperCase() }}</span>
       </div>
-      <p class="mt-2.5 text-[19px] font-bold leading-tight" style="color: var(--kv-text-primary);">
+    </div>
+
+    <!-- Ad (banner'a binen avatar için üst boşluk) -->
+    <div class="px-5 pt-11 shrink-0">
+      <p class="text-[19px] font-bold leading-tight" style="color: var(--kv-text-primary);">
         {{ otherUser.username }}
       </p>
     </div>

@@ -3,6 +3,7 @@ import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useDmStore } from '@/stores/dm'
 import { useAppModals } from '@/composables/useAppModals'
 import { usersApi } from '@/api/users'
 import { friendsApi } from '@/api/friends'
@@ -20,7 +21,27 @@ const emit = defineEmits<{ close: [] }>()
 const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
+const dmStore = useDmStore()
 const { openUserSettings } = useAppModals()
+
+// Mesaj Gönder → DM aç. Arkadaş değilse + karşı taraf izin veriyorsa DM "mesaj isteği" olarak
+// açılır (ilk mesaj gönderilince alıcının Mesaj İstekleri kutusuna düşer). İzin yoksa jenerik hata.
+const dmLoading = ref(false)
+async function openDm() {
+  if (dmLoading.value || isSelf.value) return
+  dmLoading.value = true
+  errorMsg.value = ''
+  try {
+    const channel = await dmStore.openChannel(props.userId)
+    router.push({ name: 'dm', params: { channelId: channel.id } })
+    emit('close')
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    errorMsg.value = err.response?.data?.message ?? t('common.error')
+  } finally {
+    dmLoading.value = false
+  }
+}
 
 // Kendi kartında "Profilime git" → profil ayarları modalını aç
 function goToMyProfile() {
@@ -163,6 +184,17 @@ async function addFriend() {
           </p>
           <div v-else class="mb-3"></div>
 
+          <!-- Mesaj Gönder — kendisi değil + engellemedim. Arkadaş değilse mesaj isteği olarak gider. -->
+          <button
+            v-if="!isSelf && !card.selfBlocked"
+            class="w-full py-1.5 mb-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity hover:opacity-90 cursor-pointer disabled:opacity-60"
+            style="background-color: var(--kv-accent-500); color: #fff;"
+            :disabled="dmLoading"
+            @click="openDm"
+          >
+            {{ t('profile.message') }}
+          </button>
+
           <!-- Kendi kartım: profil ayarlarına git (başkasının profiline bakar gibi açılır, altta buton) -->
           <button
             v-if="isSelf"
@@ -177,8 +209,8 @@ async function addFriend() {
           <button
             v-if="card.friendStatus === 'none' && !isSelf"
             class="w-full py-1.5 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity"
-            :class="added || adding ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-90 cursor-pointer'"
-            style="background-color:var(--kv-accent-500);color:#fff;"
+            :class="added || adding ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'"
+            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
             :disabled="added || adding"
             @click="addFriend"
           >
