@@ -110,8 +110,11 @@ cold-friend-add vektörünü kapatır.
 
 ## §4 — Frontend (`web/`)
 
-1. **Ana ekran DM listesi üstünde "Mesaj İstekleri" satırı/sekmesi** (`HomeDashboard`/DM sidebar) — sessiz rozet
-   (PENDING sayısı; kırmızı-ping DEĞİL, nötr sayaç). 0 ise satır gizli/pasif (placeholder şişirme yok).
+1. **Ana ekran DM listesi üstünde "Mesaj İstekleri" satırı/sekmesi** (`HomeDashboard`/DM sidebar, "DİREKT
+   MESAJLAR" başlığının ÜSTÜNDE) — sessiz rozet (PENDING sayısı; kırmızı-ping DEĞİL, nötr sayaç). 0 ise satır
+   gizli/pasif (placeholder şişirme yok). Tıklayınca **orta panelde** istek gönderen kişilerin listesi açılır.
+   **🔴 Kanka isteğinden AYRIDIR** — sağ sidebar'daki kankalar panelinin "Bekleyen" sekmesiyle KARIŞTIRILMAZ,
+   oraya KONMAZ (farklı olay: DM isteği ≠ arkadaşlık isteği).
 2. **İstek listesi görünümü:** gönderen kartı (avatar + kullanıcı adı) + ilk mesaj önizleme + zaman.
 3. **İstek detayı:** ilk mesajı gör → **Kabul Et** / **Reddet** / **Reddet + Engelle**. Kabul → normal DM'e geçer
    (route DM'e). Reddet → listeden düşer.

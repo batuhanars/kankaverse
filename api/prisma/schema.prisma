@@ -36,6 +36,13 @@ enum FriendshipStatus {
   DECLINED
 }
 
+// C9 — 1-1 DM mesaj isteği durumu (yalnız type=DM için anlamlı).
+// null = normal/legacy kanal (geriye uyum: mevcut tüm DM'ler kabul edilmiş sayılır).
+enum DmRequestStatus {
+  PENDING
+  ACCEPTED
+}
+
 enum GuildRole {
   OWNER
   ADMIN
@@ -132,6 +139,7 @@ model User {
   blocksReceived      UserBlock[]        @relation("Blocked")
   channelMemberships  ChannelMember[]
   ownedChannels       Channel[]          @relation("ChannelOwner")
+  dmRequestChannels   Channel[]          @relation("DmRequester") // C9: başlattığı mesaj isteği kanalları
   createdInvites      Invite[]           @relation("InviteCreator")
   attachments         Attachment[]
   reportsFiled        Report[]           @relation("Reporter")
@@ -306,6 +314,10 @@ model Channel {
   userLimit       Int              @default(0) // GUILD_VOICE kullanıcı limiti; 0 = sınırsız
   bitrate         Int              @default(64) // GUILD_VOICE ses bit hızı (kbps, 8–96); istemci publish'te uygular
   mediaEnabled    Boolean          @default(false) // C7: admin per-channel kamera/ekran toggle (GUILD_VOICE); default OFF
+  // C9 — 1-1 DM mesaj isteği: null = normal/legacy (kabul edilmiş sayılır); PENDING = istek bekliyor.
+  dmRequestStatus DmRequestStatus? // yalnız type=DM
+  dmRequesterId   String?          // isteği başlatan (PENDING/ACCEPTED-via-request'te dolu)
+  dmRequester     User?            @relation("DmRequester", fields: [dmRequesterId], references: [id])
   deletedAt       DateTime?
   createdAt       DateTime         @default(now())
   messages        Message[]
