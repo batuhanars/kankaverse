@@ -740,7 +740,7 @@
     "channelTypeForum": "Forum",
     "channelTypeSoon": "yakında",
     "privateLabel": "Özel Kanal",
-    "privateDesc": "Özel kanalı yalnızca seçili kişiler ve yöneticiler görür.",
+    "privateDesc": "Özel kanalı herkes görür ama yalnızca seçili kişiler ve yöneticiler girebilir.",
     "privateSaveHint": "Kanalı özel yaptıktan sonra kaydet; üyeleri sonra bu ekrandan yönetebilirsin.",
     "addUncategorized": "Kategorisiz kanal ekle",
     "errors": {
