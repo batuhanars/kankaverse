@@ -313,6 +313,12 @@ function policyLabel(p: DmPolicy): string {
   return t('settings.dmPolicy.none')
 }
 
+function policyDesc(p: DmPolicy): string {
+  if (p === DmPolicy.EVERYONE) return t('settings.dmPolicy.everyoneDesc')
+  if (p === DmPolicy.FRIENDS) return t('settings.dmPolicy.friendsDesc')
+  return t('settings.dmPolicy.noneDesc')
+}
+
 async function selectPolicy(p: DmPolicy) {
   if (p === currentPolicy.value || savingPolicy.value) return
   savingPolicy.value = true
@@ -763,8 +769,13 @@ async function selectPolicy(p: DmPolicy) {
                       :disabled="savingPolicy"
                       @click="selectPolicy(opt)"
                     >
-                      <span class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
-                        {{ policyLabel(opt) }}
+                      <span class="flex-1 min-w-0">
+                        <span class="block text-[14px] font-medium" style="color: var(--kv-text-primary);">
+                          {{ policyLabel(opt) }}
+                        </span>
+                        <span class="block text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+                          {{ policyDesc(opt) }}
+                        </span>
                       </span>
                       <span
                         v-if="opt === currentPolicy"

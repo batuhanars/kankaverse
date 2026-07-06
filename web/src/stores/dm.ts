@@ -1,12 +1,38 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { dmApi } from '@/api/dm'
 import { useAuthStore } from '@/stores/auth'
-import type { DmChannelDto, GroupDmMemberDto } from '@/types'
+import type { DmChannelDto, GroupDmMemberDto, MessageRequestDto } from '@/types'
 
 export const useDmStore = defineStore('dm', () => {
   const channels = ref<DmChannelDto[]>([])
   const activeDmChannelId = ref<string | null>(null)
+
+  // C9 — Mesaj İstekleri (bana gelen bekleyen istekler)
+  const requests = ref<MessageRequestDto[]>([])
+  const requestCount = computed(() => requests.value.length)
+
+  async function fetchRequests() {
+    const res = await dmApi.getRequests()
+    requests.value = res.data
+  }
+
+  /** İsteği kabul et → ACCEPTED DM kanalı; listeden düş, kanal listesine ekle. */
+  async function acceptRequest(channelId: string): Promise<DmChannelDto> {
+    const res = await dmApi.acceptRequest(channelId)
+    const channel = res.data
+    requests.value = requests.value.filter((r) => r.channelId !== channelId)
+    const idx = channels.value.findIndex((c) => c.id === channel.id)
+    if (idx === -1) channels.value.unshift(channel)
+    else channels.value[idx] = channel
+    return channel
+  }
+
+  /** İsteği reddet (opsiyonel engelle) → listeden düş. */
+  async function rejectRequest(channelId: string, block: boolean) {
+    await dmApi.rejectRequest(channelId, block)
+    requests.value = requests.value.filter((r) => r.channelId !== channelId)
+  }
 
   async function fetchChannels() {
     const res = await dmApi.getChannels()
@@ -141,6 +167,11 @@ export const useDmStore = defineStore('dm', () => {
   return {
     channels,
     activeDmChannelId,
+    requests,
+    requestCount,
+    fetchRequests,
+    acceptRequest,
+    rejectRequest,
     fetchChannels,
     openChannel,
     markRead,

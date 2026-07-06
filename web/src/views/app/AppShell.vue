@@ -114,6 +114,8 @@ onMounted(async () => {
   // İlk veri yükü: rail + DM listesi (her view kendi derin-verisini ayrıca kurar)
   await guildsStore.fetchGuilds()
   await dmStore.fetchChannels()
+  // C9 — bekleyen mesaj isteklerini bir kez hidrate et ("Mesaj İstekleri" rozeti)
+  void dmStore.fetchRequests()
   // Arkadaş listesi temel state (DM "Kanka Ekle" görünürlüğü, presence gruplama) — DM'e
   // doğrudan girişte de yüklü olsun diye shell seviyesinde bir kez hidrate et.
   void friendsStore.fetchFriends()

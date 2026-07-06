@@ -167,6 +167,11 @@ export function useSocket() {
       maybeFireDmToast(data, dmStore.activeDmChannelId === data.channelId)
     })
 
+    // C9 — bana yeni mesaj isteği geldi (sessiz: masaüstü toast YOK, yalnız "Mesaj İstekleri" rozeti güncellenir)
+    socket.on('dm.request', () => {
+      dmStore.fetchRequests().catch(() => {})
+    })
+
     // friend.* event'leri YALNIZ friends store senkronu için kalır (arkadaş listesi).
     // Bell artık bunlardan beslenmiyor → kalıcı `notification` event'i kullanır (Sprint C1).
     socket.on('friend.request', (request: FriendRequestDto) => {
