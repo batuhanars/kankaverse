@@ -391,6 +391,7 @@ function resetComposerHeight() {
           :guild-members="guildMembers"
           :can-pin="canPin"
           :can-manage-messages="canManageMessages"
+          :guild-id="guildsStore.activeGuildId ?? undefined"
           @reply="setReplyingTo"
         />
       </template>

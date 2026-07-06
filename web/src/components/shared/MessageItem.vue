@@ -20,6 +20,8 @@ const props = defineProps<{
   canPin?: boolean
   // Faz 3: MANAGE_MESSAGES — başkasının mesajını silebilir mi?
   canManageMessages?: boolean
+  // C10: guild kanalında ise → kullanıcı kartı rol rozetlerini bu ortam bağlamında gösterir
+  guildId?: string
 }>()
 const emit = defineEmits<{ reply: [message: MessageDto] }>()
 
@@ -256,6 +258,7 @@ onUnmounted(() => {
     :user-id="message.author.id"
     :x="cardX"
     :y="cardY"
+    :guild-id="guildId"
     @close="showCard = false"
   />
 

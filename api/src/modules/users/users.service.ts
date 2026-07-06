@@ -5,6 +5,8 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { toUserDto } from '../auth/utils/user-dto.util';
 import { ImageUploadService, PresignResult } from '../../shared/media/image-upload.service';
 import { SetMediaDto } from '../../shared/media/dto/set-media.dto';
+import { DmPermissionService } from '../../shared/dm-permission/dm-permission.service';
+import { VoiceService } from '../voice/voice.service';
 
 export interface MutualFriendDto {
   id: string;
@@ -16,6 +18,24 @@ export interface MutualGuildDto {
   id: string;
   name: string;
   iconUrl: string | null;
+}
+
+// C10 — kart zenginleştirme: rol rozetleri (yalnız guildId bağlamı verildiğinde)
+export interface UserCardRoleDto {
+  id: string;
+  name: string;
+  color: string;
+}
+
+// C10 — kart zenginleştirme: ses durumu (hedef aktif bir GUILD_VOICE kanalındaysa + caller erişebiliyorsa).
+// Ses katılımcı listesi zaten ortam üyelerine görünür → burada YENİ ifşa yok, aynı kapı (guild üyeliği).
+export interface UserCardVoiceDto {
+  channelId: string;
+  channelName: string;
+  guildId: string;
+  guildName: string;
+  streaming: boolean; // ekran paylaşımı açık
+  video: boolean; // kamera açık
 }
 
 export interface UserProfileCardDto {
@@ -30,6 +50,12 @@ export interface UserProfileCardDto {
   memberSince: string;
   mutualFriends: MutualFriendDto[];
   mutualGuilds: MutualGuildDto[];
+  // C10 — inline mesaj kutusu için: DM/istek gönderilebilir mi (canDm otoritesi, jenerik boolean).
+  canMessage: boolean;
+  // C10 — yalnız guildId bağlamı + ortak üyelik varsa dolu; aksi hâlde [].
+  roles: UserCardRoleDto[];
+  // C10 — hedef aktif seste + caller erişebiliyorsa; aksi hâlde null.
+  voiceStatus: UserCardVoiceDto | null;
 }
 
 @Injectable()
@@ -37,6 +63,8 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private imageUpload: ImageUploadService,
+    private dmPermission: DmPermissionService,
+    private voice: VoiceService,
   ) {}
 
   /**
@@ -47,7 +75,7 @@ export class UsersService {
    *
    * selfBlocked = yalnız "ben onu engelledim" (güvenli). "O beni engelledi" ASLA dönmez (G3).
    */
-  async getUserCard(callerId: string, targetId: string): Promise<UserProfileCardDto> {
+  async getUserCard(callerId: string, targetId: string, guildId?: string): Promise<UserProfileCardDto> {
     if (callerId === targetId) {
       const me = await this.prisma.user.findUnique({
         where: { id: callerId, deletedAt: null },
@@ -66,6 +94,9 @@ export class UsersService {
         memberSince: me.createdAt.toISOString(),
         mutualFriends: [],
         mutualGuilds: [],
+        canMessage: false, // kendine mesaj yok
+        roles: guildId ? await this.getGuildRoles(guildId, callerId, callerId) : [],
+        voiceStatus: null, // kendi ses durumunu kartta göstermeyiz
       };
     }
 
@@ -132,9 +163,13 @@ export class UsersService {
 
     // Erişim kapısı geçti → ek profil verisi (yeni sızıntı yok: yalnız viewer'ın KENDİ
     // arkadaş/sunucularıyla kesişim; minör/yaş alanı hiçbir şekilde dönmez).
-    const [mutualFriends, mutualGuilds] = await Promise.all([
+    // C10: canMessage (inline kutu kapısı), roller (guild bağlamında) ve ses durumu paralel toplanır.
+    const [mutualFriends, mutualGuilds, canDm, roles, voiceStatus] = await Promise.all([
       this.getMutualFriends(callerId, targetId),
       this.getMutualGuilds(callerId, targetId),
+      this.dmPermission.canDm(callerId, targetId),
+      guildId ? this.getGuildRoles(guildId, targetId, callerId) : Promise.resolve<UserCardRoleDto[]>([]),
+      this.getVoiceStatus(callerId, targetId),
     ]);
 
     return {
@@ -149,6 +184,75 @@ export class UsersService {
       memberSince: target.createdAt.toISOString(),
       mutualFriends,
       mutualGuilds,
+      canMessage: canDm.allowed,
+      roles,
+      voiceStatus,
+    };
+  }
+
+  /**
+   * C10 — Hedefin `guildId` ortamındaki rolleri (rozet listesi). @everyone hariç, pozisyona göre
+   * yüksekten alçağa. Erişim kapısı: caller o ortamın ÜYESİ değilse [] (rol ifşası yalnız üyelere).
+   * Hedef üye değilse (kart başka bağlamdan açıldıysa) []. Yeni sızıntı yok — üye listesi rolleri zaten görünür.
+   */
+  private async getGuildRoles(guildId: string, targetId: string, callerId: string): Promise<UserCardRoleDto[]> {
+    const callerMember = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId: callerId } },
+      select: { id: true },
+    });
+    if (!callerMember) return [];
+
+    const targetMember = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId, userId: targetId } },
+      select: {
+        roleLinks: {
+          select: { role: { select: { id: true, name: true, color: true, position: true, isEveryone: true } } },
+        },
+      },
+    });
+    if (!targetMember) return [];
+
+    return targetMember.roleLinks
+      .map((l) => l.role)
+      .filter((r) => !r.isEveryone)
+      .sort((a, b) => b.position - a.position)
+      .map((r) => ({ id: r.id, name: r.name, color: r.color }));
+  }
+
+  /**
+   * C10 — Hedefin aktif ses durumu (yalnız GUILD_VOICE). Kaynak: VoiceSession(leftAt=null) aday kanal →
+   * LiveKit `captureVoiceContext` ile GERÇEKTEN içeride mi + yayın (ekran/kamera) doğrulanır (bayat oturum düzeltilir).
+   * Erişim kapısı: caller o ortamın üyesi değilse null. Ses katılımcı listesi zaten üyelere görünür → yeni ifşa yok.
+   */
+  private async getVoiceStatus(callerId: string, targetId: string): Promise<UserCardVoiceDto | null> {
+    const session = await this.prisma.voiceSession.findFirst({
+      where: { userId: targetId, leftAt: null, channel: { guildId: { not: null }, deletedAt: null } },
+      orderBy: { joinedAt: 'desc' },
+      select: {
+        channelId: true,
+        channel: { select: { name: true, guildId: true, guild: { select: { name: true } } } },
+      },
+    });
+    if (!session || !session.channel.guildId) return null;
+
+    const callerMember = await this.prisma.guildMember.findUnique({
+      where: { guildId_userId: { guildId: session.channel.guildId, userId: callerId } },
+      select: { id: true },
+    });
+    if (!callerMember) return null;
+
+    // CANLI doğrulama (yalnız LiveKit). VoiceSession bayat olabilir (dev'de webhook yok, prod'da kaçan
+    // webhook) → doğrulanamayan/ayrılmış kullanıcı için null (fail-closed: yanlış "sesli aramada" gösterme).
+    const live = await this.voice.getLiveParticipation(session.channelId, targetId);
+    if (!live || !live.present) return null;
+
+    return {
+      channelId: session.channelId,
+      channelName: session.channel.name ?? 'Ses',
+      guildId: session.channel.guildId,
+      guildName: session.channel.guild?.name ?? '',
+      streaming: live.streaming,
+      video: live.video,
     };
   }
 

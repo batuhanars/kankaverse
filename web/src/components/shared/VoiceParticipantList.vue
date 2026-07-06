@@ -504,12 +504,13 @@ async function doDisconnect() {
     @cancel="showDisconnectConfirm = false; disconnectingUserId = null"
   />
 
-  <!-- Kullanıcı kartı -->
+  <!-- Kullanıcı kartı (guildId → rol rozetleri) -->
   <UserCardPopover
     v-if="showCard"
     :user-id="cardUserId"
     :x="cardX"
     :y="cardY"
+    :guild-id="guildIdResolved || undefined"
     @close="showCard = false"
   />
 </template>

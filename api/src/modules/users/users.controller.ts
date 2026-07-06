@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -23,9 +23,13 @@ export class UsersController {
   }
 
   @Get(':id/card')
-  @ApiOperation({ summary: 'Kullanıcı detay kartı (ortak ortam veya ilişki zorunlu, aksi hâlde 404)' })
-  getUserCard(@CurrentUser() user: { id: string }, @Param('id') targetId: string) {
-    return this.usersService.getUserCard(user.id, targetId);
+  @ApiOperation({ summary: 'Kullanıcı detay kartı (ortak ortam veya ilişki zorunlu, aksi hâlde 404). guildId → rol rozetleri.' })
+  getUserCard(
+    @CurrentUser() user: { id: string },
+    @Param('id') targetId: string,
+    @Query('guildId') guildId?: string,
+  ) {
+    return this.usersService.getUserCard(user.id, targetId, guildId);
   }
 
   // ─── C8: Avatar (self) ────────────────────────────────────────────────────

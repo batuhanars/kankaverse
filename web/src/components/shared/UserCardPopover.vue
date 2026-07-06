@@ -8,6 +8,7 @@ import { useToastStore } from '@/stores/toast'
 import { useAppModals } from '@/composables/useAppModals'
 import { usersApi } from '@/api/users'
 import { friendsApi } from '@/api/friends'
+import { messagesApi } from '@/api/messages'
 import { bannerBackground } from '@/utils/bannerColor'
 import ReportModal from './ReportModal.vue'
 import FullProfileModal from './FullProfileModal.vue'
@@ -17,6 +18,7 @@ const props = defineProps<{
   userId: string
   x: number
   y: number
+  guildId?: string // C10 — verilirse kart rol rozetlerini bu ortam bağlamında gösterir
 }>()
 const emit = defineEmits<{ close: [] }>()
 
@@ -44,6 +46,15 @@ const mutualText = computed(() => {
   return parts.join(' • ')
 })
 
+// C10 — ses durumu etiketi: yayın (ekran) > görüntülü (kamera) > sesli aramada
+const voiceStatusLabel = computed(() => {
+  const v = card.value?.voiceStatus
+  if (!v) return ''
+  if (v.streaming) return t('userCard.voiceStreaming')
+  if (v.video) return t('userCard.voiceVideo')
+  return t('userCard.voiceInCall')
+})
+
 async function copyId() {
   menuOpen.value = false
   if (!card.value) return
@@ -55,23 +66,36 @@ async function copyId() {
   }
 }
 
-// Mesaj Gönder → DM aç. Arkadaş değilse + karşı taraf izin veriyorsa DM "mesaj isteği" olarak
-// açılır (ilk mesaj gönderilince alıcının Mesaj İstekleri kutusuna düşer). İzin yoksa jenerik hata.
-const dmLoading = ref(false)
-async function openDm() {
-  if (dmLoading.value || isSelf.value) return
-  dmLoading.value = true
+// C10 — Inline mesaj kutusu. Kullanıcı mesajını kartın içinde yazar; gönderince DM kanalı açılır
+// (arkadaş değilse "mesaj isteği" PENDING olarak) + ilk mesaj gönderilir + DM'e geçilir. Alıcı içeriği
+// görüp kabul/reddeder. İzin yoksa (canMessage=false) kutu hiç gösterilmez, jenerik not çıkar.
+const draft = ref('')
+const sending = ref(false)
+async function sendInline() {
+  const text = draft.value.trim()
+  if (!text || sending.value || isSelf.value) return
+  sending.value = true
   errorMsg.value = ''
   try {
     const channel = await dmStore.openChannel(props.userId)
+    await messagesApi.send(channel.id, text)
+    draft.value = ''
     router.push({ name: 'dm', params: { channelId: channel.id } })
     emit('close')
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
     errorMsg.value = err.response?.data?.message ?? t('common.error')
   } finally {
-    dmLoading.value = false
+    sending.value = false
   }
+}
+
+// C10 — ses durumu rozetine tıkla → o ortam ses kanalına git
+function goToVoice() {
+  if (!card.value?.voiceStatus) return
+  const v = card.value.voiceStatus
+  router.push({ name: 'channel', params: { guildId: v.guildId, channelId: v.channelId } })
+  emit('close')
 }
 
 // Kendi kartında "Profilime git" → profil ayarları modalını aç
@@ -107,7 +131,7 @@ watch(
     added.value = false
     errorMsg.value = ''
     try {
-      const { data } = await usersApi.getCard(id)
+      const { data } = await usersApi.getCard(id, props.guildId)
       card.value = data
     } finally {
       loading.value = false
@@ -158,8 +182,8 @@ async function addFriend() {
   <Teleport to="body">
     <div
       ref="popoverEl"
-      class="fixed z-50 w-[300px] rounded-[var(--kv-radius-lg)] overflow-hidden"
-      :style="posStyle + 'background-color:var(--kv-bg-elevated);border:1px solid var(--kv-border-subtle);'"
+      class="fixed z-50 w-[300px] rounded-[var(--kv-radius-lg)] overflow-y-auto overflow-x-hidden"
+      :style="posStyle + 'max-height:calc(100vh - 16px);background-color:var(--kv-bg-elevated);border:1px solid var(--kv-border-subtle);'"
       @click="menuOpen = false"
     >
       <!-- Yüklenme -->
@@ -171,7 +195,7 @@ async function addFriend() {
       <template v-else-if="card">
         <!-- Banner + üstteki ikon aksiyonlar + banner'a binen avatar -->
         <div class="relative">
-          <div class="h-[80px] relative overflow-hidden" :style="{ background: bannerBackground(card.bannerColor) }">
+          <div class="h-[106px] relative overflow-hidden" :style="{ background: bannerBackground(card.bannerColor) }">
             <img v-if="card.bannerUrl" :src="card.bannerUrl" alt="" class="absolute inset-0 w-full h-full object-cover" />
           </div>
 
@@ -267,16 +291,61 @@ async function addFriend() {
             </div>
           </div>
 
-          <!-- Birincil aksiyon: Mesaj (kendisi değil + engellemedim) -->
+          <!-- C10: Ses durumu (tıkla → o ortam ses kanalına git) -->
           <button
-            v-if="!isSelf && !card.selfBlocked"
-            class="w-full mt-3 py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity hover:opacity-90 cursor-pointer disabled:opacity-60"
-            style="background-color: var(--kv-accent-500); color: #fff;"
-            :disabled="dmLoading"
-            @click="openDm"
+            v-if="card.voiceStatus"
+            class="w-full mt-3 rounded-[var(--kv-radius-md)] p-3 flex items-center gap-3 text-left transition-opacity hover:opacity-90 cursor-pointer"
+            style="background-color: var(--kv-bg-content);"
+            @click="goToVoice"
           >
-            {{ t('profile.message') }}
+            <span class="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style="background-color: var(--kv-accent-500); color: #fff;">
+              <svg v-if="card.voiceStatus.streaming" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block text-[11px] font-bold uppercase tracking-wide" style="color: var(--kv-accent-400);">{{ voiceStatusLabel }}</span>
+              <span class="block text-[13px] truncate" style="color: var(--kv-text-primary);">{{ card.voiceStatus.channelName }}</span>
+              <span v-if="card.voiceStatus.guildName" class="block text-[11px] truncate" style="color: var(--kv-text-muted);">{{ card.voiceStatus.guildName }}</span>
+            </span>
           </button>
+
+          <!-- C10: Roller (yalnız ortam bağlamında dolu) -->
+          <div v-if="card.roles.length" class="mt-3">
+            <h3 class="text-[10px] font-bold uppercase tracking-widest mb-1.5" style="color: var(--kv-text-muted);">{{ t('userCard.rolesTitle') }}</h3>
+            <div class="flex flex-wrap gap-1.5">
+              <span
+                v-for="r in card.roles"
+                :key="r.id"
+                class="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--kv-radius-sm)] text-[12px]"
+                style="background-color: var(--kv-bg-content); color: var(--kv-text-body);"
+              >
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: r.color }" />
+                {{ r.name }}
+              </span>
+            </div>
+          </div>
+
+          <!-- C10: Inline mesaj kutusu (mesaj gönderilebiliyorsa). Enter → gönder + DM'e geç. -->
+          <div v-if="!isSelf && !card.selfBlocked && card.canMessage" class="mt-3">
+            <input
+              v-model="draft"
+              type="text"
+              :placeholder="t('userCard.messagePlaceholder', { username: card.username })"
+              :disabled="sending"
+              maxlength="2000"
+              class="w-full px-3 py-2.5 rounded-[var(--kv-radius-md)] text-[13px] outline-none disabled:opacity-60"
+              style="background-color: var(--kv-bg-content); color: var(--kv-text-primary); border: 1px solid var(--kv-border-subtle);"
+              @keydown.enter.prevent="sendInline"
+            />
+            <p v-if="card.friendStatus !== 'friends'" class="text-[11px] mt-1.5" style="color: var(--kv-text-muted);">
+              {{ t('userCard.messageRequestHint') }}
+            </p>
+          </div>
+
+          <!-- Mesaj gönderilemiyor (izin yok) → jenerik not -->
+          <p v-else-if="!isSelf && !card.selfBlocked && !card.canMessage" class="text-[12px] mt-3 text-center" style="color: var(--kv-text-muted);">
+            {{ t('userCard.cannotMessage') }}
+          </p>
 
           <!-- Kendi kartım → profil ayarları -->
           <button
