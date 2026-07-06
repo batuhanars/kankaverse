@@ -6,6 +6,7 @@ import { onClickOutside } from '@vueuse/core'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
+import { useDmStore } from '@/stores/dm'
 import { useMessageJump } from '@/composables/useMessageJump'
 import type { NotificationDto } from '@/types'
 
@@ -14,7 +15,17 @@ const router = useRouter()
 const notificationsStore = useNotificationsStore()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
+const dmStore = useDmStore()
 const { requestJump } = useMessageJump()
+
+// C9 — bekleyen mesaj istekleri çanda da görünür (rozete dahil + panelde üstte satır).
+const requestCount = computed(() => dmStore.requestCount)
+const bellBadge = computed(() => notificationsStore.unreadCount + requestCount.value)
+
+function openRequests() {
+  showNotifications.value = false
+  router.push({ name: 'dm-requests' })
+}
 
 // "Tümünü okundu işaretle" — çan bildirimleri OKUNDU + ortam/kanal kırmızı rozetleri varsa aktif.
 // (Çan, açılışta kendi bildirimlerini okur; bu yüzden buton guild/kanal rozetlerini de gözetir.)
@@ -122,13 +133,13 @@ async function onItemClick(n: NotificationDto) {
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
         <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
       </svg>
-      <!-- Okunmamış rozet -->
+      <!-- Okunmamış rozet (bildirim + bekleyen mesaj isteği) -->
       <span
-        v-if="notificationsStore.unreadCount > 0"
+        v-if="bellBadge > 0"
         class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center text-white pointer-events-none"
         style="background-color: var(--kv-danger); line-height: 1;"
       >
-        {{ notificationsStore.unreadCount > 99 ? '99+' : notificationsStore.unreadCount }}
+        {{ bellBadge > 99 ? '99+' : bellBadge }}
       </span>
     </button>
 
@@ -153,8 +164,29 @@ async function onItemClick(n: NotificationDto) {
         </button>
       </div>
 
-      <!-- Boş durum -->
-      <div v-if="!notificationsStore.items.length" class="py-10 text-center">
+      <!-- C9 — Mesaj isteği satırı (bildirim listesinin üstünde sabit; varsa) -->
+      <button
+        v-if="requestCount > 0"
+        type="button"
+        class="w-full text-left flex items-center gap-3 px-4 py-3 border-b cursor-pointer transition-colors hover:brightness-110"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-accent-subtle);"
+        @click="openRequests"
+      >
+        <div class="w-8 h-8 rounded-full shrink-0 flex items-center justify-center" style="background-color: var(--kv-accent-500);">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-[13px] font-medium leading-snug" style="color: var(--kv-text-primary);">
+            {{ t('notification.messageRequests', { n: requestCount }) }}
+          </p>
+        </div>
+        <span class="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[11px] font-bold text-white shrink-0" style="background-color: var(--kv-accent-500);">{{ requestCount }}</span>
+      </button>
+
+      <!-- Boş durum (bildirim yok VE bekleyen istek yok) -->
+      <div v-if="!notificationsStore.items.length && requestCount === 0" class="py-10 text-center">
         <p class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('notification.empty') }}</p>
       </div>
 
