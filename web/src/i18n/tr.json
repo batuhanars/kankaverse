@@ -1210,6 +1210,7 @@
   },
   "sidebar": {
     "searchPlaceholder": "Sohbet bul ya da başlat",
+    "home": "Ana Sayfa",
     "messageRequests": "Mesaj İstekleri",
     "dmSection": "Direkt Mesajlar"
   },
