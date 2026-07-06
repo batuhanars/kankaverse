@@ -283,10 +283,13 @@
     "saveError": "Kaydedilemedi. Lütfen tekrar dene.",
     "dmPolicy": {
       "label": "Direkt Mesaj İzni",
-      "description": "Sana kimlerin direkt mesaj gönderebileceğini seç.",
+      "description": "Sana kimlerin mesaj gönderebileceğini seç.",
       "everyone": "Herkes",
+      "everyoneDesc": "Kankan olmayanlar direkt mesaj atamaz; önce Mesaj İstekleri kutuna düşer, sen onaylarsan sohbet başlar.",
       "friends": "Sadece Kankalar",
+      "friendsDesc": "Yalnız kankaların mesaj atabilir. Kankan olmayanlar istek bile gönderemez.",
       "none": "Kimse",
+      "noneDesc": "Kankaların dahil kimse mesaj atamaz. Bir süre mesaj almak istemediğinde kullan.",
       "saved": "Gizlilik tercihin güncellendi."
     }
   },
@@ -1186,6 +1189,24 @@
     "createGroup": "Grup Oluştur",
     "submitting": "Açılıyor…",
     "error": "Sohbet açılamadı."
+  },
+  "messageRequests": {
+    "title": "Mesaj İstekleri",
+    "subtitle": "Kankan olmayan kişilerin sana gönderdiği mesajlar burada birikir. Niyetini anla, istersen kabul et istersen reddet.",
+    "emptyTitle": "Bekleyen mesaj isteğin yok",
+    "emptyHint": "Kankan olmayan biri sana mesaj gönderdiğinde burada görünür; onaylamadan sohbet başlamaz.",
+    "messageLabel": "Mesaj",
+    "accept": "Kabul Et",
+    "reject": "Reddet",
+    "rejectBlock": "Reddet ve Engelle",
+    "accepted": "İstek kabul edildi, sohbet başladı.",
+    "rejected": "İstek reddedildi.",
+    "blocked": "İstek reddedildi ve kişi engellendi.",
+    "privacyNote": "Reddettiğinde karşı taraf bilgilendirilmez.",
+    "blockConfirmTitle": "Reddet ve engelle?",
+    "blockConfirmMessage": "{name} adlı kişinin isteği reddedilecek ve engellenecek. Sana tekrar mesaj isteği gönderemez.",
+    "sentBanner": "Mesaj isteğin gönderildi. Karşı taraf kabul edene kadar tek mesaj gönderebilirsin.",
+    "pendingError": "Mesaj isteğin kabul edilene kadar tek mesaj gönderebilirsin."
   },
   "sidebar": {
     "searchPlaceholder": "Sohbet bul ya da başlat",

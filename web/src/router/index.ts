@@ -115,6 +115,15 @@ const router = createRouter({
           props: { default: true },
         },
         {
+          // C9 — Mesaj İstekleri (dm/:channelId'den ÖNCE tanımlanır, yoksa channelId='requests' yakalar).
+          path: 'dm/requests',
+          name: 'dm-requests',
+          components: {
+            default: () => import('@/views/home/MessageRequestsView.vue'),
+            sidebar: () => import('@/views/home/components/HomeSidebar.vue'),
+          },
+        },
+        {
           path: 'dm/:channelId',
           name: 'dm',
           components: {

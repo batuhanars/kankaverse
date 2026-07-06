@@ -97,6 +97,10 @@ export type DmChannelDto =
       unread: boolean
       canMessage: boolean
       selfBlocked: boolean
+      // C9 — mesaj isteği: null = normal DM · 'PENDING'/'ACCEPTED' = istek.
+      // requestOutgoing = bu isteği ben mi başlattım (gönderen tarafı).
+      requestStatus?: 'PENDING' | 'ACCEPTED' | null
+      requestOutgoing?: boolean
     }
   | {
       type: 'GROUP_DM'
@@ -107,6 +111,14 @@ export type DmChannelDto =
       lastMessage: MessageDto | null
       unread: boolean
     }
+
+// C9 — Mesaj İsteği (arkadaş olmayan birinin gönderdiği bekleyen DM isteği)
+export interface MessageRequestDto {
+  channelId: string
+  requester: { id: string; username: string; avatarUrl: string | null } | null
+  preview: string
+  createdAt: string
+}
 
 // Sprint 4A §3 + Sprint C5 §3 — kullanıcı profil kartı DTO (genişletildi)
 export interface UserProfileCardDto {

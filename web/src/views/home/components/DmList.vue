@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDmStore } from '@/stores/dm'
 import { usePresenceStore } from '@/stores/presence'
@@ -16,6 +17,12 @@ const dmStore = useDmStore()
 const presenceStore = usePresenceStore()
 const authStore = useAuthStore()
 const { typingUsersForChannel } = useTyping(() => null)
+
+// C9: bekleyen mesaj isteği kanalları normal DM listesinde GÖRÜNMEZ (istek kutusuna gider).
+// Gönderenin giden PENDING isteği optimistik eklenmiş olabilir → burada elenir.
+const visibleChannels = computed(() =>
+  dmStore.channels.filter((ch) => !(ch.type === 'DM' && ch.requestStatus === 'PENDING')),
+)
 
 function truncate(text: string, max = 40) {
   return text.length > max ? text.slice(0, max) + '…' : text
@@ -51,12 +58,12 @@ function groupDisplayName(ch: Extract<DmChannelDto, { type: 'GROUP_DM' }>): stri
 <template>
   <div class="flex-1 overflow-y-auto px-2 pt-2 pb-20">
 
-    <p v-if="!dmStore.channels.length" class="px-2 py-3 text-[13px]" style="color: var(--kv-text-muted);">
+    <p v-if="!visibleChannels.length" class="px-2 py-3 text-[13px]" style="color: var(--kv-text-muted);">
       {{ t('dm.noDms') }}
     </p>
 
     <button
-      v-for="ch in dmStore.channels"
+      v-for="ch in visibleChannels"
       :key="ch.id"
       class="w-full flex items-center gap-3 px-2 py-2 rounded-[var(--kv-radius-md)] transition-colors cursor-pointer text-left"
       :style="activeChannelId === ch.id
