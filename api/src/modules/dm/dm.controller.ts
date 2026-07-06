@@ -17,6 +17,7 @@ import { CreateDmChannelDto } from './dto/create-dm-channel.dto';
 import { CreateGroupDmDto } from './dto/create-group-dm.dto';
 import { AddGroupMemberDto } from './dto/add-group-member.dto';
 import { RenameGroupDmDto } from './dto/rename-group-dm.dto';
+import { RejectRequestDto } from './dto/reject-request.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -53,6 +54,32 @@ export class DmController {
   @ApiOperation({ summary: 'DM kanalını okundu işaretle (lastReadAt = now)' })
   markRead(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
     return this.dmService.markRead(user.id, channelId);
+  }
+
+  // ─── C9 Mesaj İstekleri (arkadaş-olmayan DM onay süzgeci) ───────────────────
+
+  @Get('requests')
+  @ApiOperation({ summary: 'C9: bana gelen bekleyen mesaj istekleri (gönderen + ilk mesaj önizleme)' })
+  getMessageRequests(@CurrentUser() user: { id: string }) {
+    return this.dmService.getMessageRequests(user.id);
+  }
+
+  @Post('requests/:id/accept')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'C9: mesaj isteğini kabul et → mesajlaşma başlar (güncel DM kanalı)' })
+  acceptMessageRequest(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
+    return this.dmService.acceptMessageRequest(user.id, channelId);
+  }
+
+  @Post('requests/:id/reject')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'C9: mesaj isteğini reddet (opsiyonel engelle)' })
+  rejectMessageRequest(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Body() dto: RejectRequestDto,
+  ) {
+    return this.dmService.rejectMessageRequest(user.id, channelId, dto.block ?? false);
   }
 
   // ─── Grup DM ───────────────────────────────────────────────────────────────

@@ -35,6 +35,7 @@ const prismaMock = {
   },
   channel: {
     findMany: jest.fn(),
+    update: jest.fn(),
   },
   user: {
     findUnique: jest.fn(),
@@ -2677,5 +2678,65 @@ describe('toMessageDto — pinnedAt alanı', () => {
 
     const results = await service.findMessages(USER_ID, GUILD_CHANNEL_ID);
     expect(results[0].pinnedAt).toBeNull();
+  });
+});
+
+// ── C9: Mesaj isteği (PENDING kanal) mesaj kapısı ────────────────────────────
+describe('MessagesService.create — C9 mesaj isteği kapısı', () => {
+  let service: MessagesService;
+  const REQUESTER = 'req-1';
+  const RECIPIENT = 'rcp-1';
+  const PENDING_CH = 'ch-pending-1';
+  const DTO = { content: 'merhaba' };
+  const CREATED = {
+    id: 'm1', channelId: PENDING_CH, content: 'merhaba', replyToId: null, replyTo: null,
+    createdAt: new Date('2026-07-06T10:00:00Z'), author: { id: REQUESTER, username: 'req', avatarUrl: null },
+    attachments: [], reactions: [],
+  };
+  const PENDING_AS_REQUESTER = { id: PENDING_CH, guildId: null, type: 'DM', slowModeSeconds: 0, ageGated: false, guild: null, dmRequestStatus: 'PENDING', dmRequesterId: REQUESTER };
+  const PENDING_AS_RECIPIENT = { ...PENDING_AS_REQUESTER, dmRequesterId: REQUESTER }; // requester = REQUESTER; alıcı RECIPIENT gönderir
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+  });
+
+  it('istek sahibi 2. mesaj (zaten 1 mesaj var) → MESSAGE_REQUEST_PENDING; mesaj oluşturulmaz', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(PENDING_AS_REQUESTER);
+    prismaMock.message.count.mockResolvedValue(1); // ilk mesaj zaten gönderilmiş
+
+    let thrown: any;
+    try {
+      await service.create(REQUESTER, PENDING_CH, DTO);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(ForbiddenException);
+    expect((thrown.getResponse() as { error: string }).error).toBe('MESSAGE_REQUEST_PENDING');
+    expect(prismaMock.message.create).not.toHaveBeenCalled();
+  });
+
+  it('istek sahibi ilk mesaj (henüz mesaj yok) → izin verilir', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(PENDING_AS_REQUESTER);
+    prismaMock.message.count.mockResolvedValue(0);
+    prismaMock.message.create.mockResolvedValue(CREATED);
+
+    await service.create(REQUESTER, PENDING_CH, DTO);
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.channel.update).not.toHaveBeenCalled(); // örtük kabul YOK (gönderen = istek sahibi)
+  });
+
+  it('ALICI cevap yazar → örtük kabul (channel ACCEPTED) + mesaj oluşturulur', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(PENDING_AS_RECIPIENT);
+    prismaMock.channel.update.mockResolvedValue({ id: PENDING_CH });
+    prismaMock.message.create.mockResolvedValue(CREATED);
+
+    await service.create(RECIPIENT, PENDING_CH, DTO);
+
+    expect(prismaMock.channel.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: PENDING_CH }, data: { dmRequestStatus: 'ACCEPTED' } }),
+    );
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
   });
 });

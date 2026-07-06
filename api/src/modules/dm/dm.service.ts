@@ -70,7 +70,11 @@ export class DmService {
     // Silinmiş kanalları filtrele (kanal silinmişse üyelik hâlâ olabilir)
     const activeMemberships = memberships.filter((m) => m.channel.deletedAt === null);
 
-    const dmMemberships = activeMemberships.filter((m) => m.channel.type === 'DM');
+    // C9: PENDING mesaj isteği kanalları normal DM listesinde GÖRÜNMEZ (istek kutusuna gider —
+    // hem alıcıda hem gönderende). Kabul edilince (ACCEPTED) listeye girer.
+    const dmMemberships = activeMemberships.filter(
+      (m) => m.channel.type === 'DM' && m.channel.dmRequestStatus !== 'PENDING',
+    );
     const groupMemberships = activeMemberships.filter((m) => m.channel.type === 'GROUP_DM');
 
     // G3: 1-1 DM blok kontrolü (batch)
@@ -180,12 +184,14 @@ export class DmService {
     });
     if (!target) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
 
-    // Mevcut DM kanalını ara
+    // Mevcut DM kanalını ara (soft-delete HARİÇ — reddedilen istek kanalı yeniden dönmesin).
+    // Mevcut PENDING/ACCEPTED/legacy kanal varsa onu döner: yeni istek oluşturmaz.
     const existingMembership = await this.prisma.channelMember.findFirst({
       where: {
         userId: senderId,
         channel: {
           type: 'DM',
+          deletedAt: null,
           members: { some: { userId: targetId } },
         },
       },
@@ -196,10 +202,15 @@ export class DmService {
       return this.toDmChannelDto(existingMembership.channel.id, target, senderId);
     }
 
-    // Yeni DM kanalı oluştur (atomik transaction)
+    // Yeni DM kanalı oluştur (atomik transaction).
+    // C9: canDm asRequest ise DİREKT değil PENDING istek kanalı (dmRequesterId = başlatan).
     const channel = await this.prisma.$transaction(async (tx) => {
       const ch = await tx.channel.create({
-        data: { type: 'DM', guildId: null },
+        data: {
+          type: 'DM',
+          guildId: null,
+          ...(result.asRequest ? { dmRequestStatus: 'PENDING' as const, dmRequesterId: senderId } : {}),
+        },
       });
       await tx.channelMember.createMany({
         data: [
@@ -511,7 +522,7 @@ export class DmService {
     otherUser: { id: string; username: string; avatarUrl: string | null },
     userId: string,
   ) {
-    const [membership, lastMsg, selfBlockRecord, otherBlockRecord] = await Promise.all([
+    const [membership, lastMsg, selfBlockRecord, otherBlockRecord, channelRow] = await Promise.all([
       this.prisma.channelMember.findUnique({
         where: { channelId_userId: { channelId, userId } },
       }),
@@ -529,6 +540,11 @@ export class DmService {
       this.prisma.userBlock.findUnique({
         where: { blockerId_blockedId: { blockerId: otherUser.id, blockedId: userId } },
         select: { id: true },
+      }),
+      // C9: istek durumu (frontend "istek gönderildi/bekliyor" ayrımı için)
+      this.prisma.channel.findUnique({
+        where: { id: channelId },
+        select: { dmRequestStatus: true, dmRequesterId: true },
       }),
     ]);
 
@@ -555,6 +571,104 @@ export class DmService {
       unread,
       canMessage,
       selfBlocked,
+      // C9: null = normal DM · 'PENDING'/'ACCEPTED' = istek. requestOutgoing = bu isteği ben mi başlattım.
+      requestStatus: channelRow?.dmRequestStatus ?? null,
+      requestOutgoing: channelRow?.dmRequesterId === userId,
     };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // C9 — Mesaj İstekleri (arkadaş-olmayan DM onay süzgeci)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** GET /dm/requests — bana gelen (ben başlatmadığım) PENDING mesaj istekleri. */
+  async getMessageRequests(userId: string) {
+    const channels = await this.prisma.channel.findMany({
+      where: {
+        type: 'DM',
+        deletedAt: null,
+        dmRequestStatus: 'PENDING',
+        dmRequesterId: { not: userId }, // bana gelen (ben başlatan değilim)
+        members: { some: { userId } }, // ben üyeyim
+      },
+      include: {
+        dmRequester: { select: { id: true, username: true, avatarUrl: true } },
+        messages: {
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { content: true, createdAt: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return channels.map((c) => ({
+      channelId: c.id,
+      requester: c.dmRequester
+        ? { id: c.dmRequester.id, username: c.dmRequester.username, avatarUrl: c.dmRequester.avatarUrl }
+        : null,
+      preview: c.messages[0]?.content ?? '',
+      createdAt: c.createdAt.toISOString(),
+    }));
+  }
+
+  /** Bekleyen isteği doğrula + alıcı-kapısı (yalnız alıcı işlem yapabilir, istek sahibi değil). */
+  private async requirePendingRequestForRecipient(userId: string, channelId: string) {
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId, deletedAt: null },
+    });
+    if (!channel || channel.type !== 'DM' || channel.dmRequestStatus !== 'PENDING') {
+      throw new NotFoundException({ message: 'İstek bulunamadı.', error: 'REQUEST_NOT_FOUND' });
+    }
+    // İstek sahibi kendi isteğini kabul/reddedemez; yalnız alıcı.
+    if (channel.dmRequesterId === userId) {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+    }
+    const member = await this.prisma.channelMember.findUnique({
+      where: { channelId_userId: { channelId, userId } },
+    });
+    if (!member) {
+      throw new ForbiddenException({ message: 'Bu isteğe erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+    }
+    return channel;
+  }
+
+  /** POST /dm/requests/:channelId/accept — ACCEPTED yap; güncel DM kanalı DTO'su. */
+  async acceptMessageRequest(userId: string, channelId: string) {
+    const channel = await this.requirePendingRequestForRecipient(userId, channelId);
+    await this.prisma.channel.update({
+      where: { id: channelId },
+      data: { dmRequestStatus: 'ACCEPTED' },
+    });
+    const other = await this.prisma.user.findUnique({
+      where: { id: channel.dmRequesterId! },
+      select: { id: true, username: true, avatarUrl: true },
+    });
+    if (!other) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+    return this.toDmChannelDto(channelId, other, userId);
+  }
+
+  /**
+   * POST /dm/requests/:channelId/reject — kanalı soft-delete (mesajlar T&S kanıtı olarak kalır,
+   * hiçbir yerde servis edilmez); block=true ise istek sahibini engelle (idempotent).
+   */
+  async rejectMessageRequest(userId: string, channelId: string, block: boolean) {
+    const channel = await this.requirePendingRequestForRecipient(userId, channelId);
+    const requesterId = channel.dmRequesterId!;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.channel.update({
+        where: { id: channelId },
+        data: { deletedAt: new Date() },
+      });
+      if (block) {
+        await tx.userBlock.upsert({
+          where: { blockerId_blockedId: { blockerId: userId, blockedId: requesterId } },
+          create: { blockerId: userId, blockedId: requesterId },
+          update: {},
+        });
+      }
+    });
+    return null;
   }
 }

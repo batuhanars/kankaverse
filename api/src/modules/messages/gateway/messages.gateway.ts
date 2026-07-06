@@ -316,8 +316,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const userId = socket.data.userId;
     const { channelId } = payload;
 
-    const channel = await this.prisma.channel.findUnique({ where: { id: channelId }, select: { type: true } });
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { type: true, dmRequestStatus: true },
+    });
     if (!channel || channel.type !== 'DM') return { ok: false, error: 'NOT_DM' };
+    // C9: bekleyen mesaj isteği kanalında arama yok (kabul edilene dek).
+    if (channel.dmRequestStatus === 'PENDING') return { ok: false, error: 'DM_NOT_ALLOWED' };
 
     const calleeId = await this.otherDmMember(channelId, userId);
     if (!calleeId) return { ok: false, error: 'DM_NOT_ALLOWED' };
@@ -435,7 +440,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   async notifyDmActivity(channelId: string, messageDto: Record<string, unknown>) {
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId },
-      select: { guildId: true },
+      select: { guildId: true, dmRequestStatus: true, dmRequesterId: true },
     });
 
     // Guild kanalı → çık
@@ -445,6 +450,14 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       where: { channelId },
       select: { userId: true },
     });
+
+    // C9: PENDING mesaj isteği → normal dm.message YOK (sessiz: liste/masaüstü bildirimi tetiklemez).
+    // Alıcıya (istek sahibi olmayan) yalnız sessiz 'dm.request' → "Mesaj İstekleri" rozeti güncellensin.
+    if (channel.dmRequestStatus === 'PENDING') {
+      const recipient = members.find((m) => m.userId !== channel.dmRequesterId);
+      if (recipient) this.realtime.emitToUser(recipient.userId, 'dm.request', { channelId });
+      return;
+    }
 
     const content =
       typeof messageDto['content'] === 'string' && messageDto['content'].trim().length > 0

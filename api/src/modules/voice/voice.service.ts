@@ -761,6 +761,14 @@ export class VoiceService {
   private async requireDmCallGate(userId: string, channelId: string, type: 'DM' | 'GROUP_DM') {
     await this.membership.requireNoDmBlock(userId, channelId);
     if (type === 'DM') {
+      // C9: bekleyen mesaj isteği kanalında arama yok (kabul edilene dek).
+      const ch = await this.prisma.channel.findUnique({
+        where: { id: channelId },
+        select: { dmRequestStatus: true },
+      });
+      if (ch?.dmRequestStatus === 'PENDING') {
+        throw new ForbiddenException({ message: 'Bu kişiyle sesli görüşemezsin.', error: 'DM_NOT_ALLOWED' });
+      }
       const other = await this.otherDmMember(channelId, userId);
       if (other) {
         const res = await this.dmPermission.canDm(userId, other);

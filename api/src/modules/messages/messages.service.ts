@@ -302,6 +302,26 @@ export class MessagesService {
       await this.membership.requireNoDmBlock(userId, channelId);
     }
 
+    // C9: 1-1 DM mesaj isteği kapısı (PENDING kanal)
+    if (!channel.guildId && channel.type === 'DM' && channel.dmRequestStatus === 'PENDING') {
+      if (channel.dmRequesterId === userId) {
+        // İstek sahibi: kabule dek YALNIZ ilk mesaj (önizleme = saldırı yüzeyi, sınırla).
+        const existing = await this.prisma.message.count({ where: { channelId, deletedAt: null } });
+        if (existing >= 1) {
+          throw new ForbiddenException({
+            message: 'Mesaj isteğiniz kabul edilene kadar tek mesaj gönderebilirsiniz.',
+            error: 'MESSAGE_REQUEST_PENDING',
+          });
+        }
+      } else {
+        // Alıcı cevap yazıyor → örtük kabul (kabul endpoint'iyle aynı sonuç).
+        await this.prisma.channel.update({
+          where: { id: channelId },
+          data: { dmRequestStatus: 'ACCEPTED' },
+        });
+      }
+    }
+
     // Automod: guild kanalı mesajlarında içerik filtresi (DM hariç — özel alan)
     // Sıfır DB, sıfır kayıt — sadece block-on-send.
     if (channel.guildId && hasContent) {
