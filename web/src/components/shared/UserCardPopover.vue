@@ -184,63 +184,66 @@ async function addFriend() {
           </p>
           <div v-else class="mb-3"></div>
 
-          <!-- Mesaj Gönder — kendisi değil + engellemedim. Arkadaş değilse mesaj isteği olarak gider. -->
-          <button
-            v-if="!isSelf && !card.selfBlocked"
-            class="w-full py-1.5 mb-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity hover:opacity-90 cursor-pointer disabled:opacity-60"
-            style="background-color: var(--kv-accent-500); color: #fff;"
-            :disabled="dmLoading"
-            @click="openDm"
-          >
-            {{ t('profile.message') }}
-          </button>
+          <!-- Aksiyonlar — tutarlı boşluk (gap-2) -->
+          <div class="flex flex-col gap-2">
+            <!-- Mesaj Gönder — kendisi değil + engellemedim. Arkadaş değilse mesaj isteği olarak gider. -->
+            <button
+              v-if="!isSelf && !card.selfBlocked"
+              class="w-full py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity hover:opacity-90 cursor-pointer disabled:opacity-60"
+              style="background-color: var(--kv-accent-500); color: #fff;"
+              :disabled="dmLoading"
+              @click="openDm"
+            >
+              {{ t('profile.message') }}
+            </button>
 
-          <!-- Kendi kartım: profil ayarlarına git (başkasının profiline bakar gibi açılır, altta buton) -->
-          <button
-            v-if="isSelf"
-            class="w-full py-1.5 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity hover:opacity-90 cursor-pointer"
-            style="background-color: var(--kv-accent-500); color: #fff;"
-            @click="goToMyProfile"
-          >
-            {{ t('userCard.goToMyProfile') }}
-          </button>
+            <!-- Kendi kartım → profil ayarları -->
+            <button
+              v-if="isSelf"
+              class="w-full py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity hover:opacity-90 cursor-pointer"
+              style="background-color: var(--kv-accent-500); color: #fff;"
+              @click="goToMyProfile"
+            >
+              {{ t('userCard.goToMyProfile') }}
+            </button>
 
-          <!-- +Kanka butonu: sadece none'da + kendi kartım değilse — T&S: minöre göre gizlenmez, karar sunucuda -->
-          <button
-            v-if="card.friendStatus === 'none' && !isSelf"
-            class="w-full py-1.5 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity"
-            :class="added || adding ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'"
-            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
-            :disabled="added || adding"
-            @click="addFriend"
-          >
-            {{ added ? t('userCard.requestSent') : t('userCard.addFriend') }}
-          </button>
+            <!-- +Kanka (none'da) — T&S: minöre göre gizlenmez, karar sunucuda -->
+            <button
+              v-if="card.friendStatus === 'none' && !isSelf"
+              class="w-full py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity"
+              :class="added || adding ? 'opacity-60 cursor-not-allowed' : 'hover:opacity-80 cursor-pointer'"
+              style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+              :disabled="added || adding"
+              @click="addFriend"
+            >
+              {{ added ? t('userCard.requestSent') : t('userCard.addFriend') }}
+            </button>
 
-          <!-- Jenerik hata — sebep gösterilmez -->
-          <p v-if="errorMsg" class="text-[12px] mt-2 text-center" style="color:var(--kv-danger);">
+            <!-- Profilin tamamını gör -->
+            <button
+              v-if="!isSelf"
+              class="w-full py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity hover:opacity-80 cursor-pointer"
+              style="background-color: var(--kv-bg-content); color: var(--kv-text-primary);"
+              @click="showFullProfile = true"
+            >
+              {{ t('profile.viewFull') }}
+            </button>
+
+            <!-- Kullanıcıyı şikâyet et -->
+            <button
+              v-if="!isSelf"
+              class="w-full py-2 rounded-[var(--kv-radius-md)] text-[13px] transition-opacity hover:opacity-80 cursor-pointer"
+              style="background-color: transparent; color: var(--kv-danger); border: 1px solid var(--kv-danger);"
+              @click="showReportModal = true"
+            >
+              {{ t('report.reportUser') }}
+            </button>
+          </div>
+
+          <!-- Jenerik hata — en altta, sebep gösterilmez -->
+          <p v-if="errorMsg" class="text-[12px] mt-3 text-center" style="color:var(--kv-danger);">
             {{ errorMsg }}
           </p>
-
-          <!-- Profilin tamamını gör (Sprint C5 — tam profil modalı) -->
-          <button
-            v-if="!isSelf"
-            class="w-full mt-2 py-1.5 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity hover:opacity-80 cursor-pointer"
-            style="background-color: var(--kv-bg-content); color: var(--kv-text-primary);"
-            @click="showFullProfile = true"
-          >
-            {{ t('profile.viewFull') }}
-          </button>
-
-          <!-- Kullanıcıyı şikâyet et (kendi profili değilse) -->
-          <button
-            v-if="!isSelf"
-            class="w-full mt-2 py-1.5 rounded-[var(--kv-radius-md)] text-[13px] transition-opacity hover:opacity-80 cursor-pointer"
-            style="background-color: transparent; color: var(--kv-danger); border: 1px solid var(--kv-danger);"
-            @click="showReportModal = true"
-          >
-            {{ t('report.reportUser') }}
-          </button>
         </div>
       </template>
     </div>
