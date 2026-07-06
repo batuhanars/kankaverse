@@ -10,6 +10,7 @@ const prismaMock = {
   },
   channel: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
   },
@@ -27,6 +28,8 @@ const prismaMock = {
   },
   userBlock: {
     findMany: jest.fn(),
+    findUnique: jest.fn(),
+    upsert: jest.fn(),
   },
   message: {
     findFirst: jest.fn(),
@@ -447,5 +450,156 @@ describe('DmService — GROUP_DM mesaj T&S semantiği', () => {
     // ACCEPTED friendship → true
     prismaMock.friendship.findFirst.mockResolvedValue({ id: 'f-accepted' });
     expect(await service.isMutualFriend('a', 'b')).toBe(true);
+  });
+});
+
+// ── C9: Mesaj İstekleri ─────────────────────────────────────────────────────
+describe('DmService — C9 Mesaj İstekleri', () => {
+  const SENDER = 'sender-1';
+  const TARGET = 'target-1';
+  const CH = 'ch-req-1';
+
+  /** toDmChannelDto'nun ihtiyaç duyduğu yan sorguları nötrle (blok yok, mesaj yok). */
+  function stubToDmChannelDto(status: 'PENDING' | 'ACCEPTED' | null, requesterId: string | null) {
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm', lastReadAt: null });
+    prismaMock.message.findFirst.mockResolvedValue(null);
+    prismaMock.userBlock.findUnique.mockResolvedValue(null);
+    prismaMock.channel.findUnique.mockResolvedValue({ dmRequestStatus: status, dmRequesterId: requesterId });
+  }
+
+  it('getOrCreateDmChannel: canDm asRequest → PENDING kanal + dmRequesterId (direkt DM değil)', async () => {
+    resetMocks();
+    const service = makeService();
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: true, asRequest: true });
+    prismaMock.user.findUnique.mockResolvedValue({ id: TARGET, username: 'hedef', avatarUrl: null });
+    prismaMock.channelMember.findFirst.mockResolvedValue(null); // mevcut kanal yok
+    prismaMock.channel.create.mockResolvedValue({ id: CH });
+    prismaMock.channelMember.createMany.mockResolvedValue({ count: 2 });
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock));
+    stubToDmChannelDto('PENDING', SENDER);
+
+    await service.getOrCreateDmChannel(SENDER, { userId: TARGET } as any);
+
+    expect(prismaMock.channel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ type: 'DM', dmRequestStatus: 'PENDING', dmRequesterId: SENDER }),
+      }),
+    );
+  });
+
+  it('getOrCreateDmChannel: canDm allowed ama asRequest yok → normal DM (dmRequestStatus set edilmez)', async () => {
+    resetMocks();
+    const service = makeService();
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: true }); // arkadaş → direkt
+    prismaMock.user.findUnique.mockResolvedValue({ id: TARGET, username: 'hedef', avatarUrl: null });
+    prismaMock.channelMember.findFirst.mockResolvedValue(null);
+    prismaMock.channel.create.mockResolvedValue({ id: CH });
+    prismaMock.channelMember.createMany.mockResolvedValue({ count: 2 });
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock));
+    stubToDmChannelDto(null, null);
+
+    await service.getOrCreateDmChannel(SENDER, { userId: TARGET } as any);
+
+    const callArg = prismaMock.channel.create.mock.calls[0][0];
+    expect(callArg.data.dmRequestStatus).toBeUndefined();
+    expect(callArg.data.dmRequesterId).toBeUndefined();
+  });
+
+  it('acceptMessageRequest: alıcı kabul → ACCEPTED', async () => {
+    resetMocks();
+    const service = makeService();
+    // requirePendingRequestForRecipient: PENDING, requester = TARGET (alıcı = SENDER değil)
+    prismaMock.channel.findUnique.mockResolvedValue({ id: CH, type: 'DM', dmRequestStatus: 'PENDING', dmRequesterId: TARGET });
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm', lastReadAt: null });
+    prismaMock.channel.update.mockResolvedValue({ id: CH });
+    prismaMock.user.findUnique.mockResolvedValue({ id: TARGET, username: 'isteyen', avatarUrl: null });
+    prismaMock.message.findFirst.mockResolvedValue(null);
+    prismaMock.userBlock.findUnique.mockResolvedValue(null);
+
+    await service.acceptMessageRequest(SENDER, CH);
+
+    expect(prismaMock.channel.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: CH }, data: { dmRequestStatus: 'ACCEPTED' } }),
+    );
+  });
+
+  it('acceptMessageRequest: istek SAHİBİ kendi isteğini kabul edemez → FORBIDDEN', async () => {
+    resetMocks();
+    const service = makeService();
+    // requester = SENDER (işlemi yapan) → yasak
+    prismaMock.channel.findUnique.mockResolvedValue({ id: CH, type: 'DM', dmRequestStatus: 'PENDING', dmRequesterId: SENDER });
+    await expect(service.acceptMessageRequest(SENDER, CH)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prismaMock.channel.update).not.toHaveBeenCalled();
+  });
+
+  it('acceptMessageRequest: PENDING değilse → REQUEST_NOT_FOUND', async () => {
+    resetMocks();
+    const service = makeService();
+    prismaMock.channel.findUnique.mockResolvedValue({ id: CH, type: 'DM', dmRequestStatus: 'ACCEPTED', dmRequesterId: TARGET });
+    await expect(service.acceptMessageRequest(SENDER, CH)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rejectMessageRequest block=true: kanal soft-delete + istek sahibini engelle', async () => {
+    resetMocks();
+    const service = makeService();
+    prismaMock.channel.findUnique.mockResolvedValue({ id: CH, type: 'DM', dmRequestStatus: 'PENDING', dmRequesterId: TARGET });
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm' });
+    prismaMock.channel.update.mockResolvedValue({ id: CH });
+    prismaMock.userBlock.upsert.mockResolvedValue({ id: 'blk' });
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock));
+
+    await service.rejectMessageRequest(SENDER, CH, true);
+
+    expect(prismaMock.channel.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: CH }, data: expect.objectContaining({ deletedAt: expect.any(Date) }) }),
+    );
+    expect(prismaMock.userBlock.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: { blockerId: SENDER, blockedId: TARGET } }),
+    );
+  });
+
+  it('rejectMessageRequest block=false: kanal soft-delete, engelleme YOK', async () => {
+    resetMocks();
+    const service = makeService();
+    prismaMock.channel.findUnique.mockResolvedValue({ id: CH, type: 'DM', dmRequestStatus: 'PENDING', dmRequesterId: TARGET });
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm' });
+    prismaMock.channel.update.mockResolvedValue({ id: CH });
+    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock));
+
+    await service.rejectMessageRequest(SENDER, CH, false);
+
+    expect(prismaMock.channel.update).toHaveBeenCalled();
+    expect(prismaMock.userBlock.upsert).not.toHaveBeenCalled();
+  });
+
+  it('getMessageRequests: bana gelen PENDING istekleri gönderen + önizleme ile döner', async () => {
+    resetMocks();
+    const service = makeService();
+    const now = new Date('2026-07-06T10:00:00.000Z');
+    prismaMock.channel.findMany.mockResolvedValue([
+      {
+        id: CH,
+        createdAt: now,
+        dmRequester: { id: TARGET, username: 'isteyen', avatarUrl: null },
+        messages: [{ content: 'selam olur mu', createdAt: now }],
+      },
+    ]);
+
+    const res = await service.getMessageRequests(SENDER);
+
+    expect(res).toEqual([
+      {
+        channelId: CH,
+        requester: { id: TARGET, username: 'isteyen', avatarUrl: null },
+        preview: 'selam olur mu',
+        createdAt: now.toISOString(),
+      },
+    ]);
+    // Yalnız bana gelen (dmRequesterId != me) + PENDING sorgulanmalı
+    expect(prismaMock.channel.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ dmRequestStatus: 'PENDING', dmRequesterId: { not: SENDER } }),
+      }),
+    );
   });
 });
