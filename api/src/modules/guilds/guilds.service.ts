@@ -342,7 +342,8 @@ export class GuildsService {
 
     const ext = ICON_EXT[dto.contentType];
     const storageKey = `icons/${guildId}/${randomUUID()}.${ext}`;
-    const uploadUrl = await this.storage.presignPut(storageKey, dto.contentType);
+    // C8-fix: ortam ikonu da PUBLIC bucket'a (avatar/afiş ile aynı — imzasız <img> ile sunulur).
+    const uploadUrl = await this.storage.presignPutPublic(storageKey, dto.contentType);
 
     return { uploadUrl, storageKey };
   }
@@ -370,7 +371,7 @@ export class GuildsService {
         });
       }
 
-      const publicBase = this.config.get<string>('s3.publicUrl')!;
+      const publicBase = this.config.get<string>('s3.publicBaseUrl')!;
       iconUrl = `${publicBase}/${dto.storageKey}`;
     }
 

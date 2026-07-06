@@ -94,6 +94,11 @@ export default () => {
       accessKey: process.env.S3_ACCESS_KEY ?? 'minioadmin',
       secretKey: process.env.S3_SECRET_KEY ?? 'minioadmin',
       publicUrl: process.env.S3_PUBLIC_URL ?? 'http://localhost:9000/kankaverse',
+      // C8-fix: Avatar/afiş gibi profil görselleri AYRI public bucket + özel alan adından sunulur
+      // (imzasız <img> GET). Mesaj/DM ekleri private bucket + presigned GET'te kalır (üyelik/scan kapısı).
+      // Dev/MinIO'da varsayılan olarak ana bucket'a düşer (mevcut davranış korunur).
+      publicBucket: process.env.S3_PUBLIC_BUCKET ?? process.env.S3_BUCKET ?? 'kankaverse',
+      publicBaseUrl: process.env.S3_PUBLIC_BASE_URL ?? process.env.S3_PUBLIC_URL ?? 'http://localhost:9000/kankaverse',
     },
     maxUploadMb: parseInt(process.env.MAX_UPLOAD_MB ?? '25', 10),
     // LANSMAN: ATTACHMENT_SCAN_ENABLED=true + gerçek CSAM tarayıcı olmadan canlıya ALINMAZ (R5)

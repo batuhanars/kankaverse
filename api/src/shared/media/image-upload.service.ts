@@ -51,7 +51,8 @@ export class ImageUploadService {
 
     const ext = IMAGE_EXT[contentType as AllowedImageType];
     const storageKey = `${prefix}/${ownerId}/${randomUUID()}.${ext}`;
-    const uploadUrl = await this.storage.presignPut(storageKey, contentType);
+    // C8-fix: profil görselleri PUBLIC bucket'a yüklenir (imzasız <img> ile sunulacak).
+    const uploadUrl = await this.storage.presignPutPublic(storageKey, contentType);
 
     return { uploadUrl, storageKey };
   }
@@ -79,9 +80,9 @@ export class ImageUploadService {
     }
   }
 
-  /** storageKey → public URL (S3 public base + key). */
+  /** storageKey → public URL (public bucket'ın özel alan adı + key). C8-fix: publicBaseUrl kullanılır. */
   publicUrl(storageKey: string): string {
-    const publicBase = this.config.get<string>('s3.publicUrl')!;
+    const publicBase = this.config.get<string>('s3.publicBaseUrl')!;
     return `${publicBase}/${storageKey}`;
   }
 }
