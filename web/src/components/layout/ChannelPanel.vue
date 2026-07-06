@@ -434,6 +434,7 @@ async function submitCreate() {
 const settingsTarget = ref<ChannelDto | null>(null)
 const settingsName = ref('')
 const settingsAgeGated = ref(false)
+const settingsIsPrivate = ref(false) // sonradan özel yap/kaldır
 const settingsMediaEnabled = ref(false) // C7 — GUILD_VOICE medya toggle
 const settingsSlowMode = ref(0)
 const settingsUserLimit = ref<number | null>(0) // R10 — ses kanalı kullanıcı limiti (0 = sınırsız)
@@ -455,6 +456,7 @@ function openSettings(channel: ChannelDto) {
   settingsTarget.value = channel
   settingsName.value = channel.name ?? ''
   settingsAgeGated.value = channel.ageGated ?? false
+  settingsIsPrivate.value = channel.isPrivate ?? false
   settingsMediaEnabled.value = channel.mediaEnabled ?? false
   settingsSlowMode.value = channel.slowModeSeconds ?? 0
   settingsUserLimit.value = channel.userLimit ?? 0
@@ -574,9 +576,10 @@ async function submitSettings() {
   settingsSaving.value = true
   settingsError.value = ''
   try {
-    const payload: { name?: string; ageGated?: boolean; slowModeSeconds?: number; userLimit?: number; bitrate?: number; mediaEnabled?: boolean } = {}
+    const payload: { name?: string; ageGated?: boolean; isPrivate?: boolean; slowModeSeconds?: number; userLimit?: number; bitrate?: number; mediaEnabled?: boolean } = {}
     if (name !== target.name) payload.name = name
     if (settingsAgeGated.value !== (target.ageGated ?? false)) payload.ageGated = settingsAgeGated.value
+    if (settingsIsPrivate.value !== (target.isPrivate ?? false)) payload.isPrivate = settingsIsPrivate.value
     if (settingsSlowMode.value !== (target.slowModeSeconds ?? 0)) payload.slowModeSeconds = settingsSlowMode.value
     // R10 + C7 — ses kanalı ayarları (yalnız GUILD_VOICE)
     if (target.type === 'GUILD_VOICE') {
@@ -1716,6 +1719,41 @@ onUnmounted(() => {
         </select>
       </div>
 
+      <!-- Özel kanal toggle (sonradan özel yap/kaldır) -->
+      <div
+        class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+      >
+        <div class="flex-1 min-w-0">
+          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
+            {{ t('channel.privateLabel') }}
+          </p>
+          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+            {{ t('channel.privateDesc') }}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+          :style="settingsIsPrivate ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'"
+          @click="settingsIsPrivate = !settingsIsPrivate"
+        >
+          <span
+            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200"
+            :class="settingsIsPrivate ? 'translate-x-5' : 'translate-x-0'"
+          />
+        </button>
+      </div>
+
+      <!-- Özel yapıldı ama henüz kaydedilmedi → üye yönetimi kaydettikten sonra -->
+      <p
+        v-if="settingsIsPrivate && !settingsTarget.isPrivate"
+        class="text-[12px] -mt-1"
+        style="color: var(--kv-text-muted);"
+      >
+        {{ t('channel.privateSaveHint') }}
+      </p>
+
       <!-- 18+ yaş-kapılı toggle -->
       <div
         class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
@@ -1825,8 +1863,8 @@ onUnmounted(() => {
         </p>
       </div>
 
-      <!-- ── Özel kanal üye yönetimi (yalnız isPrivate + OWNER/ADMIN) ── -->
-      <template v-if="settingsTarget.isPrivate && isAdmin">
+      <!-- ── Özel kanal üye yönetimi (kaydedilmiş özel + toggle açık + OWNER/ADMIN) ── -->
+      <template v-if="settingsTarget.isPrivate && settingsIsPrivate && isAdmin">
         <div class="flex flex-col gap-3 pt-1">
           <!-- Bölüm başlığı -->
           <div>
