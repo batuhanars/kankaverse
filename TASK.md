@@ -883,3 +883,38 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Frontend: toggle UI · yetenek-kapılı kontroller · 2 nudge · güvenlik-ipuçları linki · yaş-bandı gizli
 - [x] `nest build`+`vue-tsc`+`vite build` temiz; envelope+Swagger; tüm yeni metin i18n
 - [x] **R7 (SAHİP İMZASI 2026-06-30):** `resolveVideoSources` (kapı 5 = `mediaEnabled||ageGated||adultsOnly`, DM minör reti korundu, fail-closed) + yetki-baypas invariant'ı (`moveParticipant` owner-muafiyetinden ÖNCE, tüm aktörlere) PM satır-satır incelendi + sahip onayladı; `requireChannelAccess` include→`mediaEnabled` dolu (sessiz-off bug yok); rol-baypas isMinor kapısıyla yapısal kapalı
+
+---
+
+## Sprint C8 — Avatar + Profil Afişi + Ortam Afişi (PM compose 2026-07-05)
+
+> Sözleşme: `contracts/SPRINT_C8_AVATAR_BANNER_CONTRACT.md` (**tek doğruluk kaynağı**). Statik görsel yükleme; GIF ertelendi (premium faz).
+> **🔴 R7:** `MEDIA_REMOVE` takedown + T&S DTO-yayılımı diff'i sahip onayına sunulmadan merge EDİLMEZ. Dev checkbox işaretler, **item EKLEMEZ** (sapma → DUR, PM'e dön).
+> **KİLİTLİ KARAR:** minör-görünür ilk kullanıcı-upload yüzeyi; public-URL deseni (ikon/D14) + rapor+takedown (A1 tarayıcı geldiğinde bağlanır). Bkz. sözleşme §0.
+
+### Backend (`api/`)
+- [x] **Şema:** `User.bannerUrl String?` + `Guild.bannerUrl String?` + `enum ModActionType += MEDIA_REMOVE`; migration üret + **DB'ye uygula** (`migrate status` temiz)
+- [x] **`ImageUploadService`** (SharedModule, exported): allowlist png/jpeg/webp (**gif yok**)+ext map · `presign(prefix,ownerId,contentType)` (uploadsEnabled/type/key) · `assertKeyPrefix` · `publicUrl` — **ikon kodu yeniden yazılmaz**
+- [x] **Avatar (self):** `POST /users/me/avatar/presign` + `PATCH /users/me/avatar` (`JwtAuthGuard`+`VerifiedEmailGuard`); prefix `avatars/${userId}`; set→prefix doğrula+uploadsEnabled savunma; null→kaldır
+- [x] **Profil afişi (self):** `POST /users/me/banner/presign` + `PATCH /users/me/banner`; prefix `banners/${userId}`; alan `bannerUrl`
+- [x] **Ortam afişi (owner):** `POST /guilds/:id/banner/presign` + `PATCH /guilds/:id/banner` (`requireOwner`, ikon deseni); prefix `guild-banners/${guildId}`; `GuildDto.bannerUrl`
+- [x] **DTO yayılımı:** `avatarUrl`+`bannerUrl` (user) → auth me · profil/kart select · üye-listesi DTO; guild `bannerUrl` → GuildDto+select
+- [x] **R7 — `MEDIA_REMOVE`:** `CreateActionDto += mediaTarget` (USER_AVATAR/USER_BANNER/GUILD_BANNER/GUILD_ICON; MEDIA_REMOVE'da zorunlu); `applyInstantEnforcement` 4 hedefi null'lar (**S3 obje silmez** — referans düşer); ModeratorGuard; mesaj `CONTENT_REMOVE` yolu değişmez; audit
+- [x] Envelope+Swagger; `nest build` temiz; birim test (presign type/uploadsEnabled ret · set prefix ret · MEDIA_REMOVE 4 hedef · mediaTarget-zorunlu · VerifiedEmail kapısı)
+  - [x] **R7 (SAHİP İMZASI 2026-07-05):** PM satır-satır inceledi + sahip onayladı. Değişmezler: avatar/afiş set prefix'i oturum-userId'ye bağlı (kaçırma yok, `users.service.ts:209-215`) · ortam afişi requireOwner+guildId-prefix (`guilds.service.ts:388-403`) · 4 endpoint VerifiedEmailGuard · uploadsEnabled presign+set · `MEDIA_REMOVE` ModeratorGuard-gated, doğru alan null, S3 obje silmez, mesaj `CONTENT_REMOVE` yolu değişmedi, mediaTarget kayıt-öncesi zorunlu (`moderation.service.ts:66-73,189-237`). Açık küçük not: guild-hedef `MEDIA_REMOVE` yine geçerli targetUserId ister (semantik, güvenlik değil).
+
+### Frontend (`web/`)
+- [x] **API client:** `usersApi.avatarPresign/setAvatar/bannerPresign/setBanner` + `guildsApi.bannerPresign/setBanner` (mevcut `uploadToS3` reuse)
+- [x] **Profil (`UserSettingsView`, Profil sekmesi):** avatar + profil afişi yükle/kaldır (progress+önizleme, tip+boyut istemci kontrolü); gating kapalıysa alan gizli
+- [x] **Ortam (`GuildSettingsView`):** afiş yükle/kaldır (yalnız owner), ikon alanı yanına
+- [x] **Gösterim:** avatar `UserAvatar` (mevcut) · profil afişi profil kartı üst-banner · ortam afişi ortam başlığı (`object-cover`, `--kv-radius`, `bannerColor` fallback); **placeholder şişirme yok**
+- [x] **Rapor girişi:** profil→USER, ortam→GUILD `ReportModal` mevcutsa dokunma, yoksa bağla (yeni modal yok)
+- [x] i18n (`profile.*`/`guild.banner*`/hata kodları) + `--kv-*`; `vue-tsc`(bilinen auth.ts hariç)+`vite build` temiz
+
+### DoD (contract §6)
+- [x] Şema+migration uygulı (`migrate status` temiz); `ImageUploadService` gif-siz; ikon kodu değişmedi
+- [x] 3 yüzey presign+set (prefix+uploadsEnabled+VerifiedEmail kapıları); null→kaldır; DTO yayılımı
+- [x] **R7:** `MEDIA_REMOVE` 4 hedef null (obje silmez) + mesaj yolu değişmedi + audit; rapor mevcut USER/GUILD hedefleri
+- [x] Web: profil/ortam yükleme+kaldır+önizleme; gating gizleme; afiş gösterim; rapor; i18n
+- [ ] `UPLOADS_ENABLED=false`→yüzeyler karanlık; build'ler temiz; sahip canlı test (canlı doğrulama sahibe kalır)
+- [x] **R7 insan incelemesi:** takedown+T&S diff'i sahip imzası (2026-07-05)

@@ -42,6 +42,7 @@ export interface UserDto {
   username: string
   email: string
   avatarUrl: string | null
+  bannerUrl: string | null // Sprint C8 — profil afişi (görsel), bannerColor'ın üstünde gösterilir
   isMinor: boolean
   verificationStatus: VerificationStatus
   createdAt: string
@@ -112,6 +113,7 @@ export interface UserProfileCardDto {
   id: string
   username: string
   avatarUrl: string | null
+  bannerUrl: string | null // Sprint C8 — profil afişi (görsel)
   friendStatus: 'none' | 'friends' | 'pending_in' | 'pending_out' | 'self'
   selfBlocked: boolean
   bio: string | null // Sprint C5
@@ -151,6 +153,7 @@ export interface GuildDto {
   ownerId: string
   adultsOnly: boolean
   iconUrl: string | null
+  bannerUrl: string | null // Sprint C8 — ortam afişi (görsel), bannerColor'ın üstünde gösterilir
   description: string | null
   createdAt: string
   unreadCount: number
@@ -280,6 +283,7 @@ export interface GuildMemberDto {
   userId: string
   username: string
   avatarUrl: string | null
+  bannerUrl: string | null // Sprint C8 — profil afişi (görsel); üye listesinde şu an gösterilmiyor
   role: GuildMemberRole
   roles: { id: string; name: string; color: string; position: number; hoist: boolean }[]
 }

@@ -165,7 +165,14 @@ async function runConfirm() {
         <div class="w-[360px] shrink-0 flex flex-col border-r min-h-0" style="border-color: var(--kv-border-subtle);">
           <!-- Başlık: afiş + banner'a binen avatar (scroll DIŞI — kırpılmaz) -->
           <div class="relative shrink-0">
-            <div class="h-36" :style="{ background: bannerBackground(card.bannerColor) }" />
+            <div class="h-36 relative overflow-hidden" :style="{ background: bannerBackground(card.bannerColor) }">
+              <img
+                v-if="card.bannerUrl"
+                :src="card.bannerUrl"
+                alt=""
+                class="absolute inset-0 w-full h-full object-cover"
+              />
+            </div>
             <div class="absolute left-6 -bottom-12 z-10">
               <div
                 class="w-[104px] h-[104px] rounded-full border-4 overflow-hidden flex items-center justify-center text-[34px] font-bold text-white"

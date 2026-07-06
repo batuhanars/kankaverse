@@ -22,6 +22,8 @@ import { CreateGuildDto } from './dto/create-guild.dto';
 import { UpdateGuildDto } from './dto/update-guild.dto';
 import { PresignIconDto } from './dto/presign-icon.dto';
 import { SetIconDto } from './dto/set-icon.dto';
+import { PresignBannerDto } from '../../shared/media/dto/presign-banner.dto';
+import { SetMediaDto } from '../../shared/media/dto/set-media.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { BanMemberDto } from './dto/ban-member.dto';
 import { KickMemberDto } from './dto/kick-member.dto';
@@ -111,6 +113,31 @@ export class GuildsController {
     @Body() dto: SetIconDto,
   ) {
     return this.guildsService.setIcon(user.id, guildId, dto);
+  }
+
+  // ─── C8: Ortam afişi (banner) ─────────────────────────────────────────────
+
+  @Post(':id/banner/presign')
+  @UseGuards(VerifiedEmailGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Ortam afişi yüklemek için presigned PUT URL al (yalnız OWNER)' })
+  presignBanner(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Body() dto: PresignBannerDto,
+  ) {
+    return this.guildsService.presignBanner(user.id, guildId, dto);
+  }
+
+  @Patch(':id/banner')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Ortam afişini güncelle veya kaldır (yalnız OWNER). storageKey: null → afiş siler.' })
+  setBanner(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Body() dto: SetMediaDto,
+  ) {
+    return this.guildsService.setBanner(user.id, guildId, dto);
   }
 
   @Post(':id/join-discovery')

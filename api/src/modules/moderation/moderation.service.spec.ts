@@ -24,6 +24,7 @@ const prismaMock = {
   },
   user: {
     findUnique: jest.fn(),
+    update: jest.fn(),
   },
   guildMember: {
     findUnique: jest.fn(),
@@ -31,6 +32,9 @@ const prismaMock = {
   },
   message: {
     findUnique: jest.fn(),
+    update: jest.fn(),
+  },
+  guild: {
     update: jest.fn(),
   },
 };
@@ -257,6 +261,126 @@ describe('ModerationModuleService.createAction', () => {
         reason: 'Yok',
       }),
     ).rejects.toThrow(NotFoundException);
+  });
+});
+
+// ── Test: ModerationModuleService.createAction — MEDIA_REMOVE (C8/R7) ────────
+
+describe('ModerationModuleService.createAction — MEDIA_REMOVE (C8/R7)', () => {
+  let service: ModerationModuleService;
+  const MOD_ID = 'mod-user-1';
+  const TARGET_ID = 'target-user-1';
+  const GUILD_ID = 'guild-abc';
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    service = new ModerationModuleService(prismaMock as any);
+    prismaMock.user.findUnique.mockResolvedValue({ id: TARGET_ID, deletedAt: null });
+    prismaMock.moderationAction.create.mockResolvedValue({ id: 'action-media', type: 'MEDIA_REMOVE' });
+    prismaMock.auditLog.create.mockResolvedValue({});
+  });
+
+  it('mediaTarget verilmeden MEDIA_REMOVE → BadRequestException MEDIA_TARGET_REQUIRED (action/audit kaydı OLUŞMAZ)', async () => {
+    await expect(
+      service.createAction(MOD_ID, {
+        targetUserId: TARGET_ID,
+        type: 'MEDIA_REMOVE',
+        reason: 'Uygunsuz avatar',
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'MEDIA_TARGET_REQUIRED' }),
+    });
+
+    // Erken red — ModerationAction/AuditLog kaydı hiç oluşturulmamalı (orphan kayıt yok)
+    expect(prismaMock.moderationAction.create).not.toHaveBeenCalled();
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('mediaTarget=USER_AVATAR → hedef kullanıcının avatarUrl alanı null yapılır (S3 objesi silinmez)', async () => {
+    await service.createAction(MOD_ID, {
+      targetUserId: TARGET_ID,
+      type: 'MEDIA_REMOVE',
+      mediaTarget: 'USER_AVATAR' as any,
+      reason: 'Uygunsuz avatar',
+    });
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: TARGET_ID },
+      data: { avatarUrl: null },
+    });
+    expect(prismaMock.guild.update).not.toHaveBeenCalled();
+  });
+
+  it('mediaTarget=USER_BANNER → hedef kullanıcının bannerUrl alanı null yapılır', async () => {
+    await service.createAction(MOD_ID, {
+      targetUserId: TARGET_ID,
+      type: 'MEDIA_REMOVE',
+      mediaTarget: 'USER_BANNER' as any,
+      reason: 'Uygunsuz afiş',
+    });
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: TARGET_ID },
+      data: { bannerUrl: null },
+    });
+  });
+
+  it('mediaTarget=GUILD_BANNER → dto.scope=guildId; guild.bannerUrl null yapılır (targetUser alanı DOKUNULMAZ)', async () => {
+    await service.createAction(MOD_ID, {
+      targetUserId: TARGET_ID,
+      type: 'MEDIA_REMOVE',
+      mediaTarget: 'GUILD_BANNER' as any,
+      scope: GUILD_ID,
+      reason: 'Uygunsuz ortam afişi',
+    });
+
+    expect(prismaMock.guild.update).toHaveBeenCalledWith({
+      where: { id: GUILD_ID },
+      data: { bannerUrl: null },
+    });
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it('mediaTarget=GUILD_ICON → dto.scope=guildId; guild.iconUrl null yapılır (ikon takedown da bu yoldan)', async () => {
+    await service.createAction(MOD_ID, {
+      targetUserId: TARGET_ID,
+      type: 'MEDIA_REMOVE',
+      mediaTarget: 'GUILD_ICON' as any,
+      scope: GUILD_ID,
+      reason: 'Uygunsuz ortam ikonu',
+    });
+
+    expect(prismaMock.guild.update).toHaveBeenCalledWith({
+      where: { id: GUILD_ID },
+      data: { iconUrl: null },
+    });
+  });
+
+  it('GUILD_BANNER için scope verilmezse → BadRequestException SCOPE_REQUIRED', async () => {
+    await expect(
+      service.createAction(MOD_ID, {
+        targetUserId: TARGET_ID,
+        type: 'MEDIA_REMOVE',
+        mediaTarget: 'GUILD_BANNER' as any,
+        reason: 'scope yok',
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'SCOPE_REQUIRED' }),
+    });
+  });
+
+  it('MEDIA_REMOVE → AuditLog yazılır (diğer aksiyonlar gibi; mesaj CONTENT_REMOVE yolu etkilenmez)', async () => {
+    await service.createAction(MOD_ID, {
+      targetUserId: TARGET_ID,
+      type: 'MEDIA_REMOVE',
+      mediaTarget: 'USER_AVATAR' as any,
+      reason: 'Uygunsuz avatar',
+    });
+
+    expect(prismaMock.moderationAction.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.auditLog.create).toHaveBeenCalledTimes(1);
+    const auditCall = prismaMock.auditLog.create.mock.calls[0][0];
+    expect(auditCall.data.action).toBe('moderation.media_remove');
   });
 });
 

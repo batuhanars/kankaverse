@@ -10,9 +10,10 @@ import { AutomodService } from './automod/automod.service';
 import { StorageService } from './storage/storage.service';
 import { ModerationService } from './moderation/moderation.service';
 import { GuildJoinService } from './guild-join/guild-join.service';
+import { ImageUploadService } from './media/image-upload.service';
 
 @Module({
-  providers: [EmailService, MembershipService, PermissionsService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService, GuildJoinService],
-  exports: [EmailService, MembershipService, PermissionsService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService, GuildJoinService],
+  providers: [EmailService, MembershipService, PermissionsService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService, GuildJoinService, ImageUploadService],
+  exports: [EmailService, MembershipService, PermissionsService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService, GuildJoinService, ImageUploadService],
 })
 export class SharedModule {}

@@ -4,6 +4,7 @@ import { PresignIconDto } from './dto/presign-icon.dto';
 import { SetIconDto } from './dto/set-icon.dto';
 import { AssignableGuildRole } from './dto/update-member-role.dto';
 import { GuildJoinService } from '../../shared/guild-join/guild-join.service';
+import { ImageUploadService } from '../../shared/media/image-upload.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
 
@@ -97,6 +98,12 @@ const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom
 const notificationsMock = { create: jest.fn() };
 const invitesMock = { createInvite: jest.fn() };
 
+// C8: ImageUploadService gerçek örneği — storageMock/configMock ile aynı davranışı taşır
+// (guild banner presign/set testleri bunun üzerinden geçer; icon kodu bundan bağımsız kalır).
+function makeImageUploadService() {
+  return new ImageUploadService(storageMock as any, configMock as any);
+}
+
 function makeService() {
   const guildJoin = new GuildJoinService(prismaMock as any, realtimeMock as any);
   return new GuildsService(
@@ -109,6 +116,7 @@ function makeService() {
     guildJoin,
     notificationsMock as any,
     invitesMock as any,
+    makeImageUploadService(),
   );
 }
 
@@ -385,6 +393,158 @@ describe('GuildsService.setIcon', () => {
       data: { iconUrl: null },
     });
     expect(result.iconUrl).toBeNull();
+  });
+});
+
+// ── GuildsService.presignBanner / setBanner — C8 (ImageUploadService üzerinden) ──
+
+describe('GuildsService.presignBanner', () => {
+  let service: GuildsService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    storageMock.presignPut.mockResolvedValue('https://minio/presigned-put-url');
+  });
+
+  it('desteklenmeyen contentType → BadRequestException UNSUPPORTED_TYPE', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
+
+    await expect(
+      service.presignBanner(OWNER_ID, GUILD_ID, { contentType: 'image/gif' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'UNSUPPORTED_TYPE' }),
+    });
+    // GIF statik yükleme kararında YOK (sözleşme §0) — presign S3'e gitmemeli
+    expect(storageMock.presignPut).not.toHaveBeenCalled();
+  });
+
+  it('UPLOADS_ENABLED=false → ForbiddenException UPLOADS_DISABLED', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
+    configMock.get.mockImplementation((key: string) =>
+      key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse',
+    );
+
+    await expect(
+      service.presignBanner(OWNER_ID, GUILD_ID, { contentType: 'image/png' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'UPLOADS_DISABLED' }),
+    });
+    expect(storageMock.presignPut).not.toHaveBeenCalled();
+  });
+
+  it('OWNER olmayan üye → ForbiddenException FORBIDDEN', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    prismaMock.guildMember.findUnique.mockResolvedValue(MEMBER_MEMBERSHIP);
+
+    await expect(
+      service.presignBanner(MEMBER_ID, GUILD_ID, { contentType: 'image/png' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'FORBIDDEN' }),
+    });
+  });
+
+  it('geçerli istek → storageKey guild-banners/ prefix taşır', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
+
+    const result = await service.presignBanner(OWNER_ID, GUILD_ID, { contentType: 'image/png' });
+
+    expect(result.storageKey.startsWith(`guild-banners/${GUILD_ID}/`)).toBe(true);
+    expect(result.uploadUrl).toBe('https://minio/presigned-put-url');
+  });
+});
+
+describe('GuildsService.setBanner', () => {
+  let service: GuildsService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('OWNER olmayan üye → ForbiddenException FORBIDDEN', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    prismaMock.guildMember.findUnique.mockResolvedValue(MEMBER_MEMBERSHIP);
+
+    await expect(
+      service.setBanner(MEMBER_ID, GUILD_ID, { storageKey: `guild-banners/${GUILD_ID}/abc.png` }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'FORBIDDEN' }),
+    });
+    expect(prismaMock.guild.update).not.toHaveBeenCalled();
+  });
+
+  it('yanlış guild prefix → BadRequestException INVALID_STORAGE_KEY', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
+
+    await expect(
+      service.setBanner(OWNER_ID, GUILD_ID, { storageKey: 'guild-banners/other-guild/abc.png' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'INVALID_STORAGE_KEY' }),
+    });
+    expect(prismaMock.guild.update).not.toHaveBeenCalled();
+  });
+
+  it('UPLOADS_ENABLED=false iken storageKey ile afiş SET → ForbiddenException UPLOADS_DISABLED (D14 savunma-derinliği)', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
+    configMock.get.mockImplementation((key: string) =>
+      key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse',
+    );
+
+    await expect(
+      service.setBanner(OWNER_ID, GUILD_ID, { storageKey: `guild-banners/${GUILD_ID}/abc.png` }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'UPLOADS_DISABLED' }),
+    });
+    expect(prismaMock.guild.update).not.toHaveBeenCalled();
+  });
+
+  it('UPLOADS_ENABLED=false iken storageKey null → afiş KALDIRMA yine çalışır', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
+    prismaMock.guild.update.mockResolvedValue({ ...GUILD_FIXTURE, bannerUrl: null });
+    configMock.get.mockImplementation((key: string) =>
+      key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse',
+    );
+
+    const result = (await service.setBanner(OWNER_ID, GUILD_ID, { storageKey: null })) as { bannerUrl: string | null };
+    expect(result.bannerUrl).toBeNull();
+  });
+
+  it('geçerli storageKey → bannerUrl publicUrl + "/" + storageKey olarak kaydedilir', async () => {
+    const storageKey = `guild-banners/${GUILD_ID}/550e8400.png`;
+    const expectedBannerUrl = `http://localhost:9000/kankaverse/${storageKey}`;
+
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
+    prismaMock.guild.update.mockResolvedValue({ ...GUILD_FIXTURE, bannerUrl: expectedBannerUrl });
+
+    const result = await service.setBanner(OWNER_ID, GUILD_ID, { storageKey }) as { bannerUrl: string | null };
+
+    expect(prismaMock.guild.update).toHaveBeenCalledWith({
+      where: { id: GUILD_ID },
+      data: { bannerUrl: expectedBannerUrl },
+    });
+    expect(result.bannerUrl).toBe(expectedBannerUrl);
+  });
+
+  it('storageKey null → bannerUrl null olarak güncellenir (afiş kaldırma)', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
+    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
+    prismaMock.guild.update.mockResolvedValue({ ...GUILD_FIXTURE, bannerUrl: null });
+
+    const result = await service.setBanner(OWNER_ID, GUILD_ID, { storageKey: null }) as { bannerUrl: string | null };
+
+    expect(prismaMock.guild.update).toHaveBeenCalledWith({
+      where: { id: GUILD_ID },
+      data: { bannerUrl: null },
+    });
+    expect(result.bannerUrl).toBeNull();
   });
 });
 

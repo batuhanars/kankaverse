@@ -30,6 +30,7 @@ import VoiceParticipantList from '@/components/shared/VoiceParticipantList.vue'
 import EventsModal from '@/views/app/components/EventsModal.vue'
 import CreateEventWizard from '@/views/app/components/CreateEventWizard.vue'
 import InvitePeopleModal from '@/components/layout/InvitePeopleModal.vue'
+import ReportModal from '@/components/shared/ReportModal.vue'
 import type { ChannelDto, CategoryDto, ChannelMemberDto, GuildMemberDto } from '@/types'
 
 const { t } = useI18n()
@@ -87,6 +88,8 @@ function channelDimmed(channel: ChannelDto): boolean {
 const showSettings = ref(false)
 // R12: Ayarlar-dışı hızlı "Üye Davet Et" modalı (CREATE_INVITE ile gated)
 const showInvitePeople = ref(false)
+// Sprint C8 §5 — Ortamı şikâyet et (mevcut GUILD rapor hedefi; yeni ReportTargetType yok)
+const showReportGuild = ref(false)
 
 // Efektif izin (UX gating) — backend otorite kalır.
 const { can, canOpenSettings } = useGuildPermissions(() => guildsStore.activeGuildId ?? '')
@@ -104,6 +107,10 @@ const isOwner = computed(() => {
   if (!guild || !authStore.user) return false
   return guild.ownerId === authStore.user.id
 })
+
+// Sprint C8 — Ortam afişi (görsel): varsa kanal panelinin üstünde Discord-tarzı banner,
+// ortam adı afişin altına bindirilir. Afiş yoksa düz başlık barı kalır (placeholder yok).
+const activeGuildBannerUrl = computed(() => guildsStore.activeGuild()?.bannerUrl ?? null)
 
 // ── Katlama state (localStorage) ──
 function collapseKey(guildId: string, categoryId: string) {
@@ -911,37 +918,62 @@ onUnmounted(() => {
     @click="closeCategoryMenu(); closeGuildMenu()"
   >
     <!-- Ortam adı başlığı — sol: ad + chevron (menü tetikler), sağ: üye davet ikonu -->
-    <div class="relative shrink-0 border-b flex items-center px-2 gap-1" style="border-color: var(--kv-border-subtle); height: var(--kv-header-height);">
-      <!-- Ad + chevron grubu — tıkla → Discord-tarzı menü -->
-      <button
-        class="flex-1 min-w-0 flex items-center px-2 gap-1.5 h-9 rounded-[var(--kv-radius-sm)] font-semibold text-[15px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-        style="color: var(--kv-text-primary);"
-        @click.stop="toggleGuildMenu"
-      >
-        <span class="truncate text-left">{{ guildsStore.activeGuild()?.name ?? '' }}</span>
-        <svg
-          width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-          class="shrink-0 transition-transform" :class="showGuildMenu ? 'rotate-180' : ''"
-          style="color: var(--kv-text-muted);"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
+    <!-- C8: ortam afişi varsa üstte Discord-tarzı banner; ad + davet satırı afişin altına bindirilir. -->
+    <div
+      class="relative shrink-0 border-b"
+      :class="activeGuildBannerUrl ? '' : 'flex items-center px-2 gap-1'"
+      :style="activeGuildBannerUrl
+        ? 'border-color: var(--kv-border-subtle);'
+        : 'border-color: var(--kv-border-subtle); height: var(--kv-header-height);'"
+    >
+      <!-- Afiş görseli (yalnız afiş varsa) + okunabilirlik için alt gradient scrim -->
+      <div v-if="activeGuildBannerUrl" class="relative w-full" style="height: 120px;">
+        <img :src="activeGuildBannerUrl" alt="" class="absolute inset-0 w-full h-full object-cover" />
+        <div class="absolute inset-0" style="background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.12) 55%, rgba(0,0,0,0) 100%);" />
+      </div>
 
-      <!-- Üye davet ikon-butonu (en sağ) — mevcut davet modalını açar -->
-      <button
-        v-if="can('CREATE_INVITE')"
-        class="shrink-0 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-        style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
-        :title="t('invitePeople.title')"
-        :aria-label="t('invitePeople.title')"
-        @click.stop="showInvitePeople = true"
+      <!-- Ad + davet satırı — afiş varsa afişin altına absolute bindirilir, yoksa barın içinde -->
+      <div
+        class="flex items-center gap-1 px-2"
+        :class="activeGuildBannerUrl ? 'absolute inset-x-0 bottom-0 z-10 h-11' : 'w-full h-full'"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
-        </svg>
-      </button>
+        <!-- Ad + chevron grubu — tıkla → Discord-tarzı menü -->
+        <button
+          class="flex-1 min-w-0 flex items-center px-2 gap-1.5 h-9 rounded-[var(--kv-radius-sm)] font-semibold text-[15px] cursor-pointer transition-colors"
+          :class="activeGuildBannerUrl ? 'hover:bg-white/10' : 'hover:bg-[var(--kv-bg-elevated)]'"
+          :style="activeGuildBannerUrl
+            ? 'color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.6);'
+            : 'color: var(--kv-text-primary);'"
+          @click.stop="toggleGuildMenu"
+        >
+          <span class="truncate text-left">{{ guildsStore.activeGuild()?.name ?? '' }}</span>
+          <svg
+            width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+            class="shrink-0 transition-transform" :class="showGuildMenu ? 'rotate-180' : ''"
+            :style="activeGuildBannerUrl ? 'color: #fff;' : 'color: var(--kv-text-muted);'"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        <!-- Üye davet ikon-butonu (en sağ) — mevcut davet modalını açar -->
+        <button
+          v-if="can('CREATE_INVITE')"
+          class="shrink-0 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
+          :class="activeGuildBannerUrl ? 'hover:bg-white/10' : 'hover:bg-[var(--kv-bg-elevated)]'"
+          :style="activeGuildBannerUrl
+            ? 'width: var(--kv-control-sm); height: var(--kv-control-sm); color: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));'
+            : 'width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);'"
+          :title="t('invitePeople.title')"
+          :aria-label="t('invitePeople.title')"
+          @click.stop="showInvitePeople = true"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+          </svg>
+        </button>
+      </div>
 
       <!-- Dropdown menü (başlık + ikon satırları) -->
       <div
@@ -1040,9 +1072,19 @@ onUnmounted(() => {
           <span class="shrink-0 text-[10px] font-bold px-1.5 rounded-[var(--kv-radius-sm)]" style="background-color: var(--kv-bg-rail); color: var(--kv-text-muted);">{{ t('guildMenu.idBadge') }}</span>
         </button>
 
-        <!-- Ayraç + Ortamdan Ayrıl (OWNER hariç) -->
+        <!-- Ayraç + Ortamı Şikâyet Et + Ortamdan Ayrıl (OWNER hariç — kendi ortamını şikâyet edemez) -->
         <template v-if="!isOwner">
           <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
+          <button
+            class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors"
+            style="color: var(--kv-danger);"
+            @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
+            @click="closeGuildMenu(); showReportGuild = true"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+            <span>{{ t('report.reportGuild') }}</span>
+          </button>
           <button
             class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors"
             style="color: var(--kv-danger);"
@@ -1495,6 +1537,14 @@ onUnmounted(() => {
     v-if="showInvitePeople && activeGuildId"
     :guild-id="activeGuildId"
     @close="showInvitePeople = false"
+  />
+
+  <!-- Sprint C8 §5 — Ortamı şikâyet et (mevcut GUILD rapor hedefi) -->
+  <ReportModal
+    v-if="showReportGuild && activeGuildId"
+    target-type="GUILD"
+    :target-id="activeGuildId"
+    @close="showReportGuild = false"
   />
 
   <!-- Kanal oluştur modalı -->

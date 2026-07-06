@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateActionDto } from './dto/create-action.dto';
+import { CreateActionDto, MediaTarget } from './dto/create-action.dto';
 
 /**
  * Moderasyon kuyruk + aksiyon servisi (R7 — insan incelemesi zorunlu).
@@ -10,6 +10,7 @@ import { CreateActionDto } from './dto/create-action.dto';
  *  MUTE (scope)  → mesaj gönderme → shared/ModerationService
  *  KICK          → GuildMember sil (scope = guildId)
  *  CONTENT_REMOVE → hedef mesajı soft-delete (deletedAt)
+ *  MEDIA_REMOVE  → avatar/afiş/ikon takedown (C8/R7); yalnız referans null (S3 objesi SİLİNMEZ)
  *  WARN / SHADOW_LIMIT → kayıt yaz, enforcement yok (SHADOW_LIMIT stub)
  */
 @Injectable()
@@ -62,6 +63,15 @@ export class ModerationModuleService {
    * relatedReportId varsa report RESOLVED olarak işaretle.
    */
   async createAction(moderatorId: string, dto: CreateActionDto) {
+    // C8/R7: MEDIA_REMOVE için mediaTarget zorunlu — kayıt/audit oluşturulmadan ÖNCE doğrula
+    // (orphan ModerationAction/AuditLog kaydı bırakmamak için erken red).
+    if (dto.type === 'MEDIA_REMOVE' && !dto.mediaTarget) {
+      throw new BadRequestException({
+        message: 'Medya kaldırma aksiyonu için hedef (mediaTarget) belirtilmelidir.',
+        error: 'MEDIA_TARGET_REQUIRED',
+      });
+    }
+
     const expiresAt = dto.expiresInHours
       ? new Date(Date.now() + dto.expiresInHours * 60 * 60 * 1000)
       : null;
@@ -171,6 +181,56 @@ export class ModerationModuleService {
               where: { id: dto.scope },
               data: { deletedAt: new Date() },
             });
+          }
+        }
+        break;
+      }
+
+      // C8/R7: MEDIA_REMOVE — avatar/afiş/ikon takedown. Yalnız REFERANSI düşürür;
+      // S3 objesi SİLİNMEZ (fiziksel silme/kanıt-saklama A2/hukuk kapsamında; obje D13 orphan
+      // temizliğine kalır). mediaTarget zorunluluğu createAction başında doğrulandı.
+      case 'MEDIA_REMOVE': {
+        switch (dto.mediaTarget) {
+          case MediaTarget.USER_AVATAR:
+            await this.prisma.user.update({
+              where: { id: dto.targetUserId },
+              data: { avatarUrl: null },
+            });
+            break;
+
+          case MediaTarget.USER_BANNER:
+            await this.prisma.user.update({
+              where: { id: dto.targetUserId },
+              data: { bannerUrl: null },
+            });
+            break;
+
+          case MediaTarget.GUILD_BANNER: {
+            if (!dto.scope) {
+              throw new BadRequestException({
+                message: 'GUILD_BANNER hedefi için scope (guildId) gereklidir.',
+                error: 'SCOPE_REQUIRED',
+              });
+            }
+            await this.prisma.guild.update({
+              where: { id: dto.scope },
+              data: { bannerUrl: null },
+            });
+            break;
+          }
+
+          case MediaTarget.GUILD_ICON: {
+            if (!dto.scope) {
+              throw new BadRequestException({
+                message: 'GUILD_ICON hedefi için scope (guildId) gereklidir.',
+                error: 'SCOPE_REQUIRED',
+              });
+            }
+            await this.prisma.guild.update({
+              where: { id: dto.scope },
+              data: { iconUrl: null },
+            });
+            break;
           }
         }
         break;

@@ -31,7 +31,7 @@ export class ModerationController {
   /** POST /moderation/actions — aksiyon uygula + AuditLog yaz */
   @Post('moderation/actions')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Moderasyon aksiyonu (WARN/MUTE/KICK/BAN/CONTENT_REMOVE/SHADOW_LIMIT)' })
+  @ApiOperation({ summary: 'Moderasyon aksiyonu (WARN/MUTE/KICK/BAN/CONTENT_REMOVE/SHADOW_LIMIT/MEDIA_REMOVE)' })
   createAction(
     @CurrentUser() user: { id: string },
     @Body() dto: CreateActionDto,

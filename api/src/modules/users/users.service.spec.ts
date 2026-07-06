@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { ImageUploadService } from '../../shared/media/image-upload.service';
 
 // ── Mock PrismaService ───────────────────────────────────────────────────────
 const prismaMock = {
@@ -11,8 +12,32 @@ const prismaMock = {
   userBlock: { findUnique: jest.fn() },
 };
 
+// C8: ImageUploadService — StorageService/ConfigService mock üzerinden gerçek örnek
+// (presignAvatar/setAvatar/presignBanner/setBanner testleri bunun üzerinden geçer).
+const storageMock = { presignPut: jest.fn(), presignGet: jest.fn(), delete: jest.fn() };
+const configMock = {
+  get: jest.fn((key: string) => {
+    const values: Record<string, unknown> = {
+      's3.publicUrl': 'http://localhost:9000/kankaverse',
+      uploadsEnabled: true,
+    };
+    return values[key];
+  }),
+};
+
 function makeService() {
-  return new UsersService(prismaMock as any);
+  return new UsersService(prismaMock as any, new ImageUploadService(storageMock as any, configMock as any));
+}
+
+function resetMediaMocks() {
+  storageMock.presignPut.mockReset();
+  configMock.get.mockImplementation((key: string) => {
+    const values: Record<string, unknown> = {
+      's3.publicUrl': 'http://localhost:9000/kankaverse',
+      uploadsEnabled: true,
+    };
+    return values[key];
+  });
 }
 
 const NOW_ISO = '2026-01-02T03:04:05.000Z';
@@ -27,6 +52,7 @@ function resetMocks() {
   prismaMock.friendship.findMany.mockResolvedValue([]);
   prismaMock.userBlock.findUnique.mockResolvedValue(null);
   prismaMock.user.findMany.mockResolvedValue([]);
+  resetMediaMocks();
 }
 
 describe('UsersService', () => {
@@ -284,5 +310,159 @@ describe('UsersService', () => {
         { id: 'g2', name: 'Ortam 2', iconUrl: 'i.png' },
       ]);
     });
+  });
+});
+
+// ── C8: Avatar/Profil-afişi (self) — presign + set ──────────────────────────
+
+const USER_FIXTURE_BASE = {
+  id: 'u1',
+  username: 'kanka',
+  email: 'k@x.tr',
+  avatarUrl: null,
+  bannerUrl: null,
+  bio: null,
+  bannerColor: null,
+  dmPolicy: 'FRIENDS',
+  isMinor: false,
+  verificationStatus: 'NONE',
+  createdAt: CREATED_AT,
+  emailVerifiedAt: null,
+  twoFactorEnabled: false,
+  isModerator: false,
+  friendCode: 'ABC123',
+};
+
+describe('UsersService.presignAvatar / presignBanner', () => {
+  let service: UsersService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    storageMock.presignPut.mockResolvedValue('https://minio/presigned-put-url');
+  });
+
+  it('desteklenmeyen contentType (gif) → BadRequestException UNSUPPORTED_TYPE', async () => {
+    await expect(service.presignAvatar('u1', 'image/gif')).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'UNSUPPORTED_TYPE' }),
+    });
+    expect(storageMock.presignPut).not.toHaveBeenCalled();
+  });
+
+  it('UPLOADS_ENABLED=false → ForbiddenException UPLOADS_DISABLED', async () => {
+    configMock.get.mockImplementation((key: string) => (key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse'));
+
+    await expect(service.presignAvatar('u1', 'image/png')).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'UPLOADS_DISABLED' }),
+    });
+    expect(storageMock.presignPut).not.toHaveBeenCalled();
+  });
+
+  it('geçerli istek → storageKey avatars/${userId}/ prefix taşır', async () => {
+    const result = await service.presignAvatar('u1', 'image/png');
+    expect(result.storageKey.startsWith('avatars/u1/')).toBe(true);
+    expect(result.uploadUrl).toBe('https://minio/presigned-put-url');
+  });
+
+  it('profil afişi: geçerli istek → storageKey banners/${userId}/ prefix taşır', async () => {
+    const result = await service.presignBanner('u1', 'image/webp');
+    expect(result.storageKey.startsWith('banners/u1/')).toBe(true);
+  });
+
+  it('profil afişi: UPLOADS_ENABLED=false → ForbiddenException UPLOADS_DISABLED', async () => {
+    configMock.get.mockImplementation((key: string) => (key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse'));
+
+    await expect(service.presignBanner('u1', 'image/png')).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'UPLOADS_DISABLED' }),
+    });
+  });
+});
+
+describe('UsersService.setAvatar / setBanner', () => {
+  let service: UsersService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('yanlış prefix (başka kullanıcının anahtarı) → BadRequestException INVALID_STORAGE_KEY', async () => {
+    await expect(
+      service.setAvatar('u1', { storageKey: 'avatars/other-user/abc.png' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'INVALID_STORAGE_KEY' }),
+    });
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it('UPLOADS_ENABLED=false iken storageKey ile avatar SET → ForbiddenException UPLOADS_DISABLED (D14 savunma-derinliği)', async () => {
+    configMock.get.mockImplementation((key: string) => (key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse'));
+
+    await expect(
+      service.setAvatar('u1', { storageKey: 'avatars/u1/abc.png' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'UPLOADS_DISABLED' }),
+    });
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it('UPLOADS_ENABLED=false iken storageKey null → avatar KALDIRMA yine çalışır (kapı yalnız set yolunda)', async () => {
+    configMock.get.mockImplementation((key: string) => (key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse'));
+    prismaMock.user.update.mockResolvedValue({ ...USER_FIXTURE_BASE, avatarUrl: null });
+
+    const result = await service.setAvatar('u1', { storageKey: null });
+    expect(result.avatarUrl).toBeNull();
+    expect(prismaMock.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { avatarUrl: null } });
+  });
+
+  it('geçerli storageKey → avatarUrl publicUrl + "/" + storageKey olarak kaydedilir', async () => {
+    const storageKey = 'avatars/u1/550e8400.png';
+    const expectedUrl = `http://localhost:9000/kankaverse/${storageKey}`;
+    prismaMock.user.update.mockResolvedValue({ ...USER_FIXTURE_BASE, avatarUrl: expectedUrl });
+
+    const result = await service.setAvatar('u1', { storageKey });
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { avatarUrl: expectedUrl } });
+    expect(result.avatarUrl).toBe(expectedUrl);
+  });
+
+  it('storageKey null → avatarUrl null olarak güncellenir (avatar kaldırma)', async () => {
+    prismaMock.user.update.mockResolvedValue({ ...USER_FIXTURE_BASE, avatarUrl: null });
+
+    const result = await service.setAvatar('u1', { storageKey: null });
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { avatarUrl: null } });
+    expect(result.avatarUrl).toBeNull();
+  });
+
+  // ── Profil afişi (banner) — aynı desen, ayrı alan ──────────────────────────
+
+  it('profil afişi: yanlış prefix → BadRequestException INVALID_STORAGE_KEY', async () => {
+    await expect(
+      service.setBanner('u1', { storageKey: 'banners/other-user/abc.png' }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'INVALID_STORAGE_KEY' }),
+    });
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it('profil afişi: geçerli storageKey → bannerUrl doğru kaydedilir', async () => {
+    const storageKey = 'banners/u1/550e8400.png';
+    const expectedUrl = `http://localhost:9000/kankaverse/${storageKey}`;
+    prismaMock.user.update.mockResolvedValue({ ...USER_FIXTURE_BASE, bannerUrl: expectedUrl });
+
+    const result = await service.setBanner('u1', { storageKey });
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { bannerUrl: expectedUrl } });
+    expect(result.bannerUrl).toBe(expectedUrl);
+  });
+
+  it('profil afişi: storageKey null → bannerUrl null olarak güncellenir (kaldırma)', async () => {
+    prismaMock.user.update.mockResolvedValue({ ...USER_FIXTURE_BASE, bannerUrl: null });
+
+    const result = await service.setBanner('u1', { storageKey: null });
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { bannerUrl: null } });
+    expect(result.bannerUrl).toBeNull();
   });
 });

@@ -3,6 +3,8 @@ import { DmPolicy } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { toUserDto } from '../auth/utils/user-dto.util';
+import { ImageUploadService, PresignResult } from '../../shared/media/image-upload.service';
+import { SetMediaDto } from '../../shared/media/dto/set-media.dto';
 
 export interface MutualFriendDto {
   id: string;
@@ -20,6 +22,7 @@ export interface UserProfileCardDto {
   id: string;
   username: string;
   avatarUrl: string | null;
+  bannerUrl: string | null;
   friendStatus: 'none' | 'friends' | 'pending_in' | 'pending_out' | 'self';
   selfBlocked: boolean;
   bio: string | null;
@@ -31,7 +34,10 @@ export interface UserProfileCardDto {
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private imageUpload: ImageUploadService,
+  ) {}
 
   /**
    * GET /users/:id/card — Kullanıcı detay kartı (mesaj yazarına/avatarına tıkla → popover).
@@ -45,13 +51,14 @@ export class UsersService {
     if (callerId === targetId) {
       const me = await this.prisma.user.findUnique({
         where: { id: callerId, deletedAt: null },
-        select: { id: true, username: true, avatarUrl: true, bio: true, bannerColor: true, createdAt: true },
+        select: { id: true, username: true, avatarUrl: true, bannerUrl: true, bio: true, bannerColor: true, createdAt: true },
       });
       if (!me) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
       return {
         id: me.id,
         username: me.username,
         avatarUrl: me.avatarUrl,
+        bannerUrl: me.bannerUrl,
         friendStatus: 'self',
         selfBlocked: false,
         bio: me.bio,
@@ -64,7 +71,7 @@ export class UsersService {
 
     const target = await this.prisma.user.findUnique({
       where: { id: targetId, deletedAt: null },
-      select: { id: true, username: true, avatarUrl: true, bio: true, bannerColor: true, createdAt: true },
+      select: { id: true, username: true, avatarUrl: true, bannerUrl: true, bio: true, bannerColor: true, createdAt: true },
     });
     if (!target) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
 
@@ -134,6 +141,7 @@ export class UsersService {
       id: target.id,
       username: target.username,
       avatarUrl: target.avatarUrl,
+      bannerUrl: target.bannerUrl,
       friendStatus,
       selfBlocked: !!callerBlock,
       bio: target.bio,
@@ -158,6 +166,52 @@ export class UsersService {
       data,
     });
     return toUserDto(user);
+  }
+
+  // ─── C8: Avatar (self) ────────────────────────────────────────────────────
+
+  /** POST /users/me/avatar/presign — prefix `avatars/${userId}`. */
+  presignAvatar(userId: string, contentType: string): Promise<PresignResult> {
+    return this.imageUpload.presign('avatars', userId, contentType);
+  }
+
+  /** PATCH /users/me/avatar — storageKey null → avatar kaldır. */
+  async setAvatar(userId: string, dto: SetMediaDto) {
+    const avatarUrl = this.resolveMediaUrl(userId, dto, 'avatars');
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl },
+    });
+    return toUserDto(user);
+  }
+
+  // ─── C8: Profil afişi (self) ──────────────────────────────────────────────
+
+  /** POST /users/me/banner/presign — prefix `banners/${userId}`. */
+  presignBanner(userId: string, contentType: string): Promise<PresignResult> {
+    return this.imageUpload.presign('banners', userId, contentType);
+  }
+
+  /** PATCH /users/me/banner — storageKey null → afiş kaldır. */
+  async setBanner(userId: string, dto: SetMediaDto) {
+    const bannerUrl = this.resolveMediaUrl(userId, dto, 'banners');
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { bannerUrl },
+    });
+    return toUserDto(user);
+  }
+
+  /**
+   * set-endpoint ortak mantığı (avatar/banner): storageKey null → kaldır (null döner).
+   * storageKey verilmişse → uploadsEnabled savunma-derinliği + prefix doğrulaması + public URL.
+   */
+  private resolveMediaUrl(userId: string, dto: SetMediaDto, prefix: 'avatars' | 'banners'): string | null {
+    if (dto.storageKey == null) return null;
+    // Savunma-derinliği (D14 dersi): yükleme kapalıyken yeni görsel SET edilemez; kaldırma serbest.
+    this.imageUpload.assertUploadsEnabled();
+    this.imageUpload.assertKeyPrefix(dto.storageKey, `${prefix}/${userId}`);
+    return this.imageUpload.publicUrl(dto.storageKey);
   }
 
   /**

@@ -10,6 +10,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { usersApi } from '@/api/users'
+import { attachmentsApi } from '@/api/attachments'
 import { DmPolicy } from '@/types'
 import { BANNER_PRESET_KEYS, bannerBackground } from '@/utils/bannerColor'
 import { isMobile } from '@/composables/useResponsive'
@@ -81,7 +82,11 @@ function onKeyDown(e: KeyboardEvent) {
   else emit('close')
 }
 onMounted(() => document.addEventListener('keydown', onKeyDown))
-onUnmounted(() => document.removeEventListener('keydown', onKeyDown))
+onUnmounted(() => {
+  document.removeEventListener('keydown', onKeyDown)
+  if (avatarPreviewUrl.value) URL.revokeObjectURL(avatarPreviewUrl.value)
+  if (bannerImagePreviewUrl.value) URL.revokeObjectURL(bannerImagePreviewUrl.value)
+})
 
 // ── Profil: bio ──────────────────────────────────────────────────────────--
 const BIO_MAX = 512
@@ -109,6 +114,168 @@ async function saveBio() {
     toast.error(err.response?.data?.message ?? t('toast.saveError'))
   } finally {
     savingBio.value = false
+  }
+}
+
+// ── Sprint C8 §5 — Avatar + Profil Afişi (görsel) ──────────────────────────
+// Immediate-action deseni (bio/afiş rengi gibi bu view'da her alan kendi başına kaydeder;
+// GuildSettingsView'ın toplu saveAll'ı burada YOK — dosya seçilince direkt presign+upload+set).
+const MEDIA_MAX_BYTES = 2 * 1024 * 1024 // ikon deseniyle hizalı (2 MB)
+const MEDIA_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'] // GIF YOK — sözleşme §0
+
+// Presign 403 UPLOADS_DISABLED → paylaşılan gating sinyali (avatar+afiş aynı bayrağa tabi;
+// CreateEventWizard'ın coverUploadsDisabled reaktif-gizleme deseniyle aynı sinyal).
+const mediaUploadsDisabled = ref(false)
+
+const avatarFileInput = ref<HTMLInputElement | null>(null)
+const avatarPreviewUrl = ref<string | null>(null)
+const avatarUploading = ref(false)
+const avatarUploadPct = ref(0)
+const avatarError = ref('')
+
+const avatarDisplayUrl = computed(() => avatarPreviewUrl.value ?? authStore.user?.avatarUrl ?? null)
+
+function triggerAvatarPicker() {
+  if (avatarUploading.value) return
+  avatarFileInput.value?.click()
+}
+
+async function onAvatarFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  avatarError.value = ''
+  if (!MEDIA_ACCEPTED_TYPES.includes(file.type)) {
+    avatarError.value = t('settings.avatar.errorType')
+    return
+  }
+  if (file.size > MEDIA_MAX_BYTES) {
+    avatarError.value = t('settings.avatar.errorSize')
+    return
+  }
+
+  if (avatarPreviewUrl.value) URL.revokeObjectURL(avatarPreviewUrl.value)
+  avatarPreviewUrl.value = URL.createObjectURL(file)
+  avatarUploading.value = true
+  avatarUploadPct.value = 0
+
+  try {
+    const { data: presigned } = await usersApi.avatarPresign(file.type)
+    await attachmentsApi.uploadToS3(presigned.uploadUrl, file, (pct) => {
+      avatarUploadPct.value = pct
+    })
+    const { data } = await usersApi.setAvatar(presigned.storageKey)
+    authStore.updateUser(data)
+    toast.success(t('toast.profileSaved'))
+  } catch (err: unknown) {
+    const e2 = err as { response?: { data?: { error?: string; message?: string } } }
+    const code = e2.response?.data?.error
+    if (code === 'UPLOADS_DISABLED') {
+      mediaUploadsDisabled.value = true
+    } else {
+      avatarError.value = e2.response?.data?.message ?? t('settings.avatar.errorUpload')
+    }
+  } finally {
+    avatarUploading.value = false
+    avatarUploadPct.value = 0
+    if (avatarPreviewUrl.value) {
+      URL.revokeObjectURL(avatarPreviewUrl.value)
+      avatarPreviewUrl.value = null
+    }
+  }
+}
+
+async function removeAvatar() {
+  if (avatarUploading.value) return
+  avatarUploading.value = true
+  avatarError.value = ''
+  try {
+    const { data } = await usersApi.setAvatar(null)
+    authStore.updateUser(data)
+    toast.success(t('toast.profileSaved'))
+  } catch (err: unknown) {
+    const e2 = err as { response?: { data?: { message?: string } } }
+    avatarError.value = e2.response?.data?.message ?? t('settings.avatar.errorUpload')
+  } finally {
+    avatarUploading.value = false
+  }
+}
+
+const bannerImageFileInput = ref<HTMLInputElement | null>(null)
+const bannerImagePreviewUrl = ref<string | null>(null)
+const bannerImageUploading = ref(false)
+const bannerImageUploadPct = ref(0)
+const bannerImageError = ref('')
+
+const bannerImageDisplayUrl = computed(() => bannerImagePreviewUrl.value ?? authStore.user?.bannerUrl ?? null)
+
+function triggerBannerImagePicker() {
+  if (bannerImageUploading.value) return
+  bannerImageFileInput.value?.click()
+}
+
+async function onBannerImageFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  bannerImageError.value = ''
+  if (!MEDIA_ACCEPTED_TYPES.includes(file.type)) {
+    bannerImageError.value = t('settings.bannerImage.errorType')
+    return
+  }
+  if (file.size > MEDIA_MAX_BYTES) {
+    bannerImageError.value = t('settings.bannerImage.errorSize')
+    return
+  }
+
+  if (bannerImagePreviewUrl.value) URL.revokeObjectURL(bannerImagePreviewUrl.value)
+  bannerImagePreviewUrl.value = URL.createObjectURL(file)
+  bannerImageUploading.value = true
+  bannerImageUploadPct.value = 0
+
+  try {
+    const { data: presigned } = await usersApi.bannerPresign(file.type)
+    await attachmentsApi.uploadToS3(presigned.uploadUrl, file, (pct) => {
+      bannerImageUploadPct.value = pct
+    })
+    const { data } = await usersApi.setBanner(presigned.storageKey)
+    authStore.updateUser(data)
+    toast.success(t('toast.profileSaved'))
+  } catch (err: unknown) {
+    const e2 = err as { response?: { data?: { error?: string; message?: string } } }
+    const code = e2.response?.data?.error
+    if (code === 'UPLOADS_DISABLED') {
+      mediaUploadsDisabled.value = true
+    } else {
+      bannerImageError.value = e2.response?.data?.message ?? t('settings.bannerImage.errorUpload')
+    }
+  } finally {
+    bannerImageUploading.value = false
+    bannerImageUploadPct.value = 0
+    if (bannerImagePreviewUrl.value) {
+      URL.revokeObjectURL(bannerImagePreviewUrl.value)
+      bannerImagePreviewUrl.value = null
+    }
+  }
+}
+
+async function removeBannerImage() {
+  if (bannerImageUploading.value) return
+  bannerImageUploading.value = true
+  bannerImageError.value = ''
+  try {
+    const { data } = await usersApi.setBanner(null)
+    authStore.updateUser(data)
+    toast.success(t('toast.profileSaved'))
+  } catch (err: unknown) {
+    const e2 = err as { response?: { data?: { message?: string } } }
+    bannerImageError.value = e2.response?.data?.message ?? t('settings.bannerImage.errorUpload')
+  } finally {
+    bannerImageUploading.value = false
   }
 }
 
@@ -373,10 +540,59 @@ async function selectPolicy(p: DmPolicy) {
                 </section>
               </div>
 
-              <!-- ── Profil ── (bio + afiş rengi · sağda canlı önizleme kartı) -->
+              <!-- ── Profil ── (avatar + bio + afiş · sağda canlı önizleme kartı) -->
               <div v-else-if="activeSection === 'profil'" class="flex gap-8">
-                <!-- SOL: bio + afiş rengi swatch'ları -->
+                <!-- SOL: avatar + bio + afiş görsel/renk swatch'ları -->
                 <div class="flex-1 min-w-0 max-w-xl flex flex-col gap-6">
+
+                  <!-- Sprint C8 — Avatar -->
+                  <section v-if="!mediaUploadsDisabled">
+                    <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
+                      {{ t('settings.avatar.label') }}
+                    </h3>
+                    <div class="flex items-center gap-4">
+                      <div
+                        class="w-16 h-16 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[22px] font-bold text-white"
+                        style="background-color: var(--kv-accent-500);"
+                      >
+                        <img v-if="avatarDisplayUrl" :src="avatarDisplayUrl" class="w-full h-full object-cover" />
+                        <span v-else>{{ (authStore.user?.username ?? '?')[0].toUpperCase() }}</span>
+                      </div>
+                      <div class="flex flex-col gap-1.5 min-w-0">
+                        <div class="flex gap-2">
+                          <KvButton size="sm" :disabled="avatarUploading" :loading="avatarUploading" @click="triggerAvatarPicker">
+                            {{ t('settings.avatar.upload') }}
+                          </KvButton>
+                          <KvButton
+                            v-if="authStore.user?.avatarUrl"
+                            size="sm"
+                            variant="danger"
+                            :disabled="avatarUploading"
+                            @click="removeAvatar"
+                          >
+                            {{ t('settings.avatar.remove') }}
+                          </KvButton>
+                        </div>
+                        <p v-if="avatarUploading && avatarUploadPct > 0" class="text-[12px]" style="color: var(--kv-text-muted);">
+                          {{ t('settings.avatar.uploading', { pct: avatarUploadPct }) }}
+                        </p>
+                        <p v-if="avatarError" class="text-[12px]" style="color: var(--kv-danger);">{{ avatarError }}</p>
+                      </div>
+                    </div>
+                    <input
+                      ref="avatarFileInput"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      class="hidden"
+                      @change="onAvatarFileChange"
+                    />
+                  </section>
+
+                  <!-- Görsel yükleme kapalıysa tek bir bilgi notu (avatar + afiş ortak bayrak) -->
+                  <p v-if="mediaUploadsDisabled" class="text-[12px]" style="color: var(--kv-text-muted);">
+                    {{ t('settings.mediaUploadsDisabled') }}
+                  </p>
+
                   <section>
                     <div class="flex items-center justify-between mb-3">
                       <h3 class="text-[13px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
@@ -407,7 +623,49 @@ async function selectPolicy(p: DmPolicy) {
                     </div>
                   </section>
 
-                  <!-- Afiş rengi swatch'ları (görsel afiş ileride; şimdilik preset renk) -->
+                  <!-- Sprint C8 — Profil Afişi (görsel) -->
+                  <section v-if="!mediaUploadsDisabled">
+                    <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
+                      {{ t('settings.bannerImage.label') }}
+                    </h3>
+                    <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
+                      {{ t('settings.bannerImage.hint') }}
+                    </p>
+                    <div
+                      class="rounded-[var(--kv-radius-md)] overflow-hidden mb-3"
+                      style="height: 80px;"
+                      :style="{ background: bannerBackground(draftBannerColor) }"
+                    >
+                      <img v-if="bannerImageDisplayUrl" :src="bannerImageDisplayUrl" class="w-full h-full object-cover" />
+                    </div>
+                    <div class="flex gap-2">
+                      <KvButton size="sm" :disabled="bannerImageUploading" :loading="bannerImageUploading" @click="triggerBannerImagePicker">
+                        {{ t('settings.bannerImage.upload') }}
+                      </KvButton>
+                      <KvButton
+                        v-if="authStore.user?.bannerUrl"
+                        size="sm"
+                        variant="danger"
+                        :disabled="bannerImageUploading"
+                        @click="removeBannerImage"
+                      >
+                        {{ t('settings.bannerImage.remove') }}
+                      </KvButton>
+                    </div>
+                    <p v-if="bannerImageUploading && bannerImageUploadPct > 0" class="text-[12px] mt-1.5" style="color: var(--kv-text-muted);">
+                      {{ t('settings.bannerImage.uploading', { pct: bannerImageUploadPct }) }}
+                    </p>
+                    <p v-if="bannerImageError" class="text-[12px] mt-1.5" style="color: var(--kv-danger);">{{ bannerImageError }}</p>
+                    <input
+                      ref="bannerImageFileInput"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      class="hidden"
+                      @change="onBannerImageFileChange"
+                    />
+                  </section>
+
+                  <!-- Afiş rengi swatch'ları (görsel afiş yoksa fallback olarak kullanılır) -->
                   <section>
                     <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
                       {{ t('settings.banner.label') }}
@@ -443,13 +701,21 @@ async function selectPolicy(p: DmPolicy) {
                     {{ t('settings.banner.previewTitle') }}
                   </h3>
                   <div class="overflow-hidden rounded-[var(--kv-radius-lg)] border" style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-sidebar);">
-                    <!-- Afiş + banner'a binen avatar -->
+                    <!-- Afiş (görsel varsa üstte; yoksa renk/gradient) + banner'a binen avatar -->
+                    <!-- overflow-hidden YOK: avatar bottom:-28px ile alta taşar; dış kart (rounded+overflow-hidden)
+                         zaten afişin üst köşelerini kırpar, iç div'e gerek yok (GuildSettingsView deseni). -->
                     <div class="relative" style="height: 100px;" :style="{ background: bannerBackground(draftBannerColor) }">
+                      <img
+                        v-if="bannerImageDisplayUrl"
+                        :src="bannerImageDisplayUrl"
+                        alt=""
+                        class="absolute inset-0 w-full h-full object-cover"
+                      />
                       <div
                         class="absolute w-[72px] h-[72px] rounded-full border-4 overflow-hidden flex items-center justify-center text-[24px] font-bold text-white"
                         style="left: 16px; bottom: -28px; border-color: var(--kv-bg-sidebar); background-color: var(--kv-accent-500);"
                       >
-                        <img v-if="authStore.user?.avatarUrl" :src="authStore.user.avatarUrl" class="w-full h-full object-cover" />
+                        <img v-if="avatarDisplayUrl" :src="avatarDisplayUrl" class="w-full h-full object-cover" />
                         <span v-else>{{ (authStore.user?.username ?? '?')[0].toUpperCase() }}</span>
                       </div>
                     </div>
