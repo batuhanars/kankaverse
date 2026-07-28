@@ -83,8 +83,12 @@ watch(() => props.channelId, (id) => sync(id), { immediate: true })
         @left="toHome"
         @deleted="toHome"
       />
-      <!-- Profil paneli yalnızca 1-1 DM için -->
-      <div v-if="activeDmChannel.type === 'DM'" class="hidden xl:flex">
+      <!-- Profil paneli yalnızca 1-1 DM için.
+           `hidden xl:flex` DEĞİL: bazı tarayıcı eklentileri her sayfaya katmansız
+           `.hidden{display:none}` enjekte ediyor ve Tailwind'in katmanlı varyantını
+           eziyor → panel geniş ekranda da gizli kalıyordu. `hidden` sınıf adını hiç
+           kullanmayan bu kalıp aynı işi yapar ve dış CSS'e bağışıklıdır. -->
+      <div v-if="activeDmChannel.type === 'DM'" class="flex max-xl:hidden">
         <DmProfilePanel :other-user="activeDmChannel.otherUser" />
       </div>
     </div>

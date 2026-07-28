@@ -53,7 +53,7 @@ function onSelectDm(channelId: string) {
         </svg>
         <span class="truncate">{{ t('search.topbarPlaceholder') }}</span>
         <kbd
-          class="hidden sm:block text-[11px] font-mono px-1.5 py-0.5 rounded shrink-0 ml-1"
+          class="block max-sm:hidden text-[11px] font-mono px-1.5 py-0.5 rounded shrink-0 ml-1"
           style="background-color: var(--kv-bg-content); color: var(--kv-text-muted);"
         >Ctrl K</kbd>
       </button>

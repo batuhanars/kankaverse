@@ -91,7 +91,7 @@ function lastSeen(u: AdminUserDto): string {
     >
       <!-- Başlık satırı (yalnız masaüstü) -->
       <div
-        class="hidden md:flex items-center gap-3 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-widest"
+        class="flex max-md:hidden items-center gap-3 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-widest"
         style="color: var(--kv-text-muted); background-color: var(--kv-bg-elevated);"
       >
         <span class="flex-1 min-w-0">{{ t('admin.users.colUser') }}</span>

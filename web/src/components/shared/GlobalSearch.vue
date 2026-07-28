@@ -126,7 +126,7 @@ function selectDm(channelId: string) {
             @keydown.escape.stop="emit('close')"
           />
           <kbd
-            class="text-[11px] px-1.5 py-0.5 rounded hidden sm:block"
+            class="text-[11px] px-1.5 py-0.5 rounded block max-sm:hidden"
             style="color: var(--kv-text-muted); background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
           >ESC</kbd>
         </div>
