@@ -702,7 +702,7 @@ async function selectPolicy(p: DmPolicy) {
                 </div>
 
                 <!-- SAĞ: profil önizleme kartı (canlı draft; ortam ayarlarındaki gibi) -->
-                <div class="hidden lg:block shrink-0 self-start" style="width: 320px;">
+                <div class="block max-lg:hidden shrink-0 self-start" style="width: 320px;">
                   <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
                     {{ t('settings.banner.previewTitle') }}
                   </h3>

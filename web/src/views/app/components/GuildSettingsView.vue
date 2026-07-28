@@ -1066,7 +1066,7 @@ function confirmNavDiscard() {
 
             <!-- ── SAĞ kolon: Ortam profil önizleme kartı (sticky, canlı draft) ── -->
             <div
-              class="hidden lg:block shrink-0 self-start sticky top-0"
+              class="block max-lg:hidden shrink-0 self-start sticky top-0"
               style="width: 320px;"
             >
               <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
