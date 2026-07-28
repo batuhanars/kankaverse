@@ -128,6 +128,19 @@ Turhost DNS yönetiminde, hepsi **VPS IP**'ye:
 # dig +short api.kankaverse.com → VPS_IP dönmeli
 ```
 
+### 5.1 DNS artık Cloudflare'de (2026-07-28)
+
+Zone `kankaverse.com` Turhost nameserver'larından **Cloudflare'e taşındı** (`carla`/`jeff.ns.cloudflare.com`).
+Sebep: R2 public bucket'a özel alan adı (`cdn.kankaverse.com`) bağlanabilmesi için zone'un Cloudflare'de
+olması şart. Alt alanı tek başına delege etmek Enterprise, partial CNAME kurulumu Business planı istiyor.
+
+**KURAL — kök, `www`, `api`, `mail`, `ftp` kayıtları `DNS only` (GRİ bulut) kalır.** Turuncuya (proxied)
+çevirmek iki şeyi bozar: (1) Caddy'nin ACME sertifika yenilemesi, (2) TR trafiğinin doğrudan Turhost IP'sine
+gitmesi (ana siteyi Cloudflare edge'ine sokmak, `r2.dev`'de yaşadığımız DPI riskini ana siteye taşır).
+Cloudflare kurulumda "korumasız" diye uyarır, bu bilinçli tercih. Yalnız `cdn` proxy'li (R2 zorunlu kılar).
+
+Ayrıca DNSSEC kapalı olmalı (NS değişimi sırasında açık olsa alan adı komple çözülemez hale gelirdi).
+
 ---
 
 ## 6. Build + ayağa kaldır
@@ -232,7 +245,7 @@ Artık yalnız davet koduyla kayıt olunur. DB zaten temiz (fresh) → ayrı pur
 > Neden ayrı: ek gizliliği (URL=erişim değil, üyelik=erişim) korunur; profil görselleri zaten herkese açık. Aynı bucket'ı public yapmak DM görsellerini de URL ile herkese açardı (iptal edilemez) — çocuk güvenliği için kabul edilmez.
 
 1. Cloudflare → R2 → **Create bucket** → `kankaverse-uploads` (private kalır) **ve** `kankaverse-public`.
-2. **Public bucket'ı public yap:** `kankaverse-public` → **Settings → Public access → Custom Domains** → `cdn.kankaverse.com` bağla (DNS Cloudflare'de → otomatik). *(r2.dev dev URL'i hızlı testte iş görür ama Cloudflare prod'da önermez — özel alan adı kullan.)* Private bucket'a public erişim AÇMA.
+2. **Public bucket'ı public yap:** `kankaverse-public` → **Settings → Public access → Custom Domains** → `cdn.kankaverse.com` bağla (DNS Cloudflare'de → CNAME otomatik açılır). *(r2.dev dev URL'i hızlı testte iş görür ama üretimde KULLANMA: rate-limit'li, Cloudflare garanti vermiyor ve `*.r2.dev` TR'de DPI ile engellenip görselleri kırıyor — bkz §5.1.)* Private bucket'a public erişim AÇMA.
 3. R2 → **Manage API Tokens** → **Create API Token** → izin **Object Read & Write**, kapsam **her iki bucket** (backend ikisine de presigned PUT üretir).
 4. Çıktıyı not et: **Access Key ID**, **Secret Access Key**, **endpoint** (`https://<accountid>.r2.cloudflarestorage.com`).
 
