@@ -25,7 +25,7 @@ kapsam yeniden tartışılır).
 T&S temel katmanı, presence/yazıyor göstergesi/bildirimler, opsiyonel e-Devlet doğrulama. Göç aracı V1 adayı.
 
 **Bilinçli ertelemeler (brief §9):** mesaj arama → V2. Ses/video/ekran paylaşımı → V2 (LiveKit). Bot API'si,
-gelişmiş izin matrisi, sunucu keşfet → V3. Electron masaüstü → V2 ile. Flutter mobil → V4. Türkçe toksisite
+gelişmiş izin matrisi, sunucu keşfet → V3. Electron masaüstü → V2 ile. RN mobil → V4. Türkçe toksisite
 filtresi V1'de kelime-listesi tabanlı başlar (özel model yap/al kararı V2 açık sorusu).
 
 **Veri modeli kaynağı:** brief §7. Prisma şeması sprint sprint bu haritadan büyür; T&S alanları (yaş durumu,
@@ -89,7 +89,7 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
 - Auth: argon2id + JWT access ~15dk + rotasyonlu refresh (Session'a bağlı, aile-iptal).
 - Gerçek zamanlı: Socket.IO + **Redis adapter ilk günden**.
 - i18n gün 1 (vue-i18n, UI Türkçe). Tasarım sistemi: design-tokens dosyası tek kaynak.
-- **Stack KİLİTLİ:** Vue/Nuxt + Flutter + NestJS (brief §3 — React/RN değerlendirildi, reddedildi).
+- **Stack KİLİTLİ:** Vue/Nuxt + **RN/Expo (mobil)** + NestJS (brief §3 — mobil leg Flutter→RN revize, ADR 2026-07-02 + mutabakat 2026-07-22).
 - Ölçek hazırlığı: Message tablosu `(channelId, createdAt)` indeksi; partitioning büyüme eşiğinde.
 
 ---
@@ -149,6 +149,9 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
 | D23 | **Medya-açık genel kanal × A5 public link kesişimi** — C7 (`contracts/SPRINT_C7_MEDIA_OPEN_CONTRACT.md`) genel kanalda kamera/ekranı `mediaEnabled` toggle ile **minör dahil** açtı. A5 public davet linki canlıya gelince "medya-açık genel kanal + public keşif" = keşfedilebilir yetişkin→minör kamera yüzeyi (kurulun en-riskli vektörü, 2026-06-19 minör-İZLEME politikası) | api (R7) | C7 sahip kararı / 2026-06-30 | **lansman-kritik** (çocuk güvenliği; bugün **inert** — A5 build edilmedi + `REGISTRATION_MODE=invite` → public keşif yok) | **A5 sprint'i kapatır:** public-link'li ortamda medya-açık genel kanal → kurulun önceki kapısına tabi (**vetlenmiş/karşılıklı-arkadaş kapalı bağlam; açık/keşfedilebilir sunucuda medya minöre açık DEĞİL**). A5 bu kapıyı yazmadan public link açılmaz. Bkz. C7 §0.1 + Track A A5 |
 | D24 | **Görsel takedown hash-blocklist yok** — C8'de moderatör bir avatar/afiş kaldırınca (`MEDIA_REMOVE`) aynı görsel yeniden yüklenebilir; kaldırılan içeriğin hash'i bloklanmıyor | api (R7) | C8 sözleşmesi / 2026-07-05 | T&S (kitle sıfırken düşük; büyümede orta) | **fast-follow** — takedown'da storageKey/perceptual-hash sakla + presign/set'te kontrol; A1 CSAM tarayıcısıyla birleşebilir (aynı hash altyapısı) |
 | D25 | **Avatar/afiş kırpma (crop) UI yok** — C8 yüklemeyi ham PUT eder; kullanıcı çerçeveleyemiyor, gösterim `object-cover`'a bağlı | web | C8 sözleşmesi / 2026-07-05 | UX (kozmetik) | ertelendi → cropper (vue-advanced-cropper vb.) fast-follow; `object-cover` MVP'de yeterli, over-engineering yapma |
+| D26 | **DB'ye tam medya URL'i yazılıyor** — `avatarUrl`/`bannerUrl`/`iconUrl` hostname dahil saklanıyor (`image-upload.service.ts:84`, `guilds.service.ts:374`); public alan adı değişince kayıtlar elle güncellenmek zorunda | api | cdn.kankaverse.com geçişi / 2026-07-28 | düşük (bir kerelik göç maliyeti) | ertelendi → yalnız `storageKey` sakla, URL'i okuma anında `publicUrl()` ile üret. Bir kez yaşandı (8 satır DB update); ikinci alan adı değişiminde yap |
+| D27 | **Kaldırılan medya bucket'ta kalıyor** — avatar/afiş "kaldır" DB kolonunu null yapar, `storage.delete()` çağrılmaz (`users.service.ts` resolveMediaUrl, guilds eşleniği) → public bucket'ta erişilebilir yetim nesne birikir | api | cdn geçişi incelemesi / 2026-07-28 | düşük-orta (depolama çöpü + kaldırılan görsel URL'i bilenlerce erişilebilir kalır) | ertelendi → set/remove yolunda eski storageKey'i sil; D24 hash-blocklist ile aynı turda yapılabilir |
+| D28 | **Yüklenen görsel boyutlandırılmıyor/sıkıştırılmıyor** — ham PUT; canlıdaki bir avatar 1.9 MB, her yeni ziyaretçiye tam boy iniyor (Cloudflare edge cache hafifletir, çözmez) | api + web | cdn geçişi ölçümü / 2026-07-28 | perf (kitle büyüdükçe artar; mobil veri) | ertelendi → istemcide canvas ile yeniden boyutlandır (D25 cropper ile aynı iş) veya sunucuda sharp; boyut tavanı `MAX_UPLOAD_MB` dışında piksel tavanı yok |
 
 ---
 
@@ -199,9 +202,12 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
 - **G1 Davet-kodlu kapalı kayıt** — 🟡 **AKTİF (sözleşme yazıldı 2026-06-18):** `contracts/SPRINT_CLOSED_REGISTRATION_CONTRACT.md`. Platform kaydını davet koduyla kapıla (`PlatformInvite`) + `REGISTRATION_MODE` bayrağı (`open`/`invite`/`closed`) + admin davet paneli (`isModerator`). **R7** (auth/kayıt yüzeyi). T&S ortogonal — davet ≠ yaş doğrulaması. **Sıra:** bu biter → mode=`invite` (açık-kayıt kapat) → DB purge → C4 bayrakları aç.
 - **G2 Açık-kayıt kapat + DB purge** — prod `REGISTRATION_MODE=invite` + temiz DB (test verisi temizliği). G1 sonrası, bayraklar açılmadan önce.
 
-### Track F — İstemciler (sahip sırası: Electron masaüstü → Flutter mobil)
+### Track F — İstemciler (sahip sırası: Electron masaüstü → RN mobil)
 - **F1 Electron masaüstü** — 🟡 **AKTİF (sözleşme yazıldı 2026-06-18):** `contracts/SPRINT_ELECTRON_CONTRACT.md`. **Load-remote** (pencere `https://kankaverse.com` yükler — bundle YOK; cookie `sameSite=lax` korunur, sahip onaylı). v1: tray+kapat-tepsiye + tek-instance + **native OS bildirimi** (web `Notification` API → Electron toast, görünür-değilken) + Windows installer. **R7-nötr** (istemci kabuğu). **v2'ye ertelendi:** B2 etkinlik hatırlatması (önce sunucu reminder job), electron-updater, Mac/Linux build, PWA bildirim.
-- **F2 Flutter mobil** — en son (zahmetli); aynı OpenAPI sözleşmesinden Dart istemci. Native push (FCM/APNs) burada.
+- **F2 RN mobil** — 🟢 **KOD BAŞLADI (sahip kararı 2026-07-28).** Brief: `knowledge/projects/kankaverse/kankaverse-mobil-brief.md`. Stack **React Native + Expo** (Flutter kararı ADR 2026-07-02 ile revize; dooit kanıtıyla kesin). Aynı OpenAPI hattından TS client (Dart codegen düştü). Faz haritası M0-M5 (iskele → metin → push → ses → medya → mağaza); Android-first, mevcut bireysel Play hesabı, Apple ertelendi.
+  - **M0 iskele** — 🟡 AKTİF: `contracts/SPRINT_M0_MOBILE_CONTRACT.md`. Yeni `mobile/` tier + giriş/2FA/oturum kalıcılığı + ortam listesi. Backend dokunuşu: **bearer refresh teslimi** (`Session.clientType` kapısı) — **R7**. DoD: cihazda giriş yapıp ortam listesini gören uygulama.
+  - **M1-M5** — sözleşmeleri sırası gelince yazılır. **M2 (push) = Play kapalı testinin başladığı faz.** **M1 kapsamına kayıt + şifre sıfırlama ekranı dahil** (M0'dan çıkarıldı, M5'e bırakılamaz: kayıt ekranı olmayan uygulama Play incelemesinden geçmez, kapalı testte 12 testçiyi web'e mecbur eder).
+  - **Testçi/yayın zamanlaması — sahip kararı 2026-07-28:** testçi toplama **öne çekilmiyor**. Gerekçe: kitle içerik üretimiyle oluşturuluyor; mobil tanıtımı içerik senaryolarına girdiğinde 12 testçi o kitleden çıkar. Hedef "uygulama bitmiş halde cepte dursun", takvimli yayın değil. **Kabul edilen bedel:** Play kapalı testi 12 testçi × 14 gün **kesintisiz** ister ve bu takvim beklemesidir, kodla kısaltılamaz → kitle geldiği gün bile yayına en az 2 hafta vardır. M5 planlanırken bu süre baştan takvime yazılır, sürpriz sayılmaz.
 
 ### Track D — Büyük Bahisler (V3/V4 — strateji/kurul kararı)
 - **D1 Göç aracı + Discord-OAuth** (eski Sprint 9) — Discord sunucu yapısı + hesap/rol içe aktarma; GTM'in en değerli teknik yatırımı (brief §10.2). Büyük dış-entegrasyon.

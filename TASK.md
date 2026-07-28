@@ -918,3 +918,41 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Web: profil/ortam yükleme+kaldır+önizleme; gating gizleme; afiş gösterim; rapor; i18n
 - [ ] `UPLOADS_ENABLED=false`→yüzeyler karanlık; build'ler temiz; sahip canlı test (canlı doğrulama sahibe kalır)
 - [x] **R7 insan incelemesi:** takedown+T&S diff'i sahip imzası (2026-07-05)
+
+---
+
+## Sprint M0 — Mobil İskele (Track F2, PM compose 2026-07-28)
+
+> Sözleşme: `contracts/SPRINT_M0_MOBILE_CONTRACT.md` (**tek doğruluk kaynağı**). Yeni `mobile/` tier (RN + Expo).
+> **🔴 R7:** `api/` auth diff'i (bearer refresh teslimi + `Session.clientType`) sahip onayına sunulmadan merge EDİLMEZ.
+> Dev checkbox işaretler, **item EKLEMEZ** (sapma → DUR, PM'e dön).
+> **KİLİTLİ KARAR:** teslim kanalı oturum tipine bağlı — web session'ının refresh token'ı gövdede ASLA dönmez (sözleşme §2).
+
+### Backend (`api/`) — R7
+- [ ] **Şema:** `Session.clientType String?` (`'web'|'mobile'|'desktop'`, null=web); additive migration üret + DB'ye uygula (`migrate status` temiz)
+- [ ] **Session açan uçlar** (`login`, `login/2fa`, `register`): `X-Client-Type` başlığı allowlist'ten (**yalnız `mobile`**) okunur → session o tiple açılır + yanıt gövdesine `refreshToken` eklenir; **başlık yoksa davranış birebir eski** (cookie, gövdede token YOK)
+- [ ] `POST /auth/logout` **değişmedi** (bearer + token'daki `sessionId` ile zaten çalışıyor — dokunma)
+- [ ] **`POST /auth/refresh`:** cookie yoksa gövdeden `{ refreshToken }` kabul; **kapı:** session `clientType !== 'mobile'` → `401 REFRESH_CHANNEL_MISMATCH`; mobil akışta yeni refresh gövdede döner
+- [ ] Rotasyon / `tokenFamily` / reuse-detection / revoke mantığı **değişmedi**; access ömrü (~15dk) mobilde de aynı
+- [ ] Envelope + Swagger (yeni gövde alanları + `X-Client-Type`); `nest build` temiz
+- [ ] Birim test: başlıksız istek eski davranış · web token'ı gövdeden → 401 · mobil rotasyon · reuse → aile revoke
+- [ ] **R7 insan incelemesi:** diff sahibe sunuldu, sahip imzası alındı
+
+### Mobil (`mobile/`)
+- [ ] Expo (TS) projesi + Expo Router iskeleti; `mobile/CLAUDE.md` yazıldı (sözleşme §9); `EXPO_PUBLIC_API_URL` + README (LAN IP notu)
+- [ ] **axios envelope client:** `Bearer` + `X-Client-Type: mobile` request interceptor · `response.data.data` unwrap · 401 → tek-uçuş refresh dedup (web pattern'i)
+- [ ] **Token saklama:** refresh → `expo-secure-store`; access **yalnız bellekte** (diske yazılmaz); AsyncStorage kullanılmadı
+- [ ] **Auth store (zustand):** bootstrap (**refresh → `/auth/me`**, iki adım) · login · 2FA challenge · logout (sunucu hatasında da yerel temizlik); **her refresh yanıtındaki yeni token secure store'a yazılır** (yazılmazsa reuse-detection kullanıcıyı atar)
+- [ ] **i18n:** metro `watchFolders` + `@i18n` alias → `web/src/i18n/tr.json` **import edilir, kopyalanmaz**; `t(path, params)` helper (nokta yolu + `{key}` interpolasyon)
+- [ ] **Tema:** design-token → `src/theme/tokens.ts`; renk/ölçü bileşene gömülmedi
+- [ ] **Ekranlar (üç):** Açılış (bootstrap yönlendirme) · Giriş + 2FA kod · Ortam listesi (read-only, başlıkta **çıkış yap**) + boş durum + hata durumu
+- [ ] Ön koşullar README'de: LAN IP + **Windows güvenlik duvarı 3000 izni** + 2FA'lı test hesabı
+
+### DoD (sözleşme §1)
+- [ ] Giriş yapılıyor; 2FA'lı hesapta challenge akışı çalışıyor
+- [ ] Ortam listesi sunucudan geliyor ve görünüyor
+- [ ] Uygulama kapatılıp açılınca oturum korunuyor (secure store bootstrap)
+- [ ] Access süresi dolunca sessiz yenileme oluyor, kullanıcı fark etmiyor
+- [ ] Çıkışta sunucu session'ı revoke + yerel temizlik
+- [ ] **Web regresyon yok:** web'de giriş/yenileme/çıkış eskisi gibi (sahip canlı doğrular)
+- [ ] `mobile/` içinde gömülü kullanıcı-görünür string yok; `tr.json` kopyası yok
