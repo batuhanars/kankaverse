@@ -18,8 +18,9 @@ mimariye gömülü olması**. Detaylı brief: `knowledge/projects/kankaverse/kan
 **Repo yapısı (monorepo, düz):**
 - `api/` — NestJS + Prisma + PostgreSQL backend
 - `web/` — Vue 3 + Vite SPA (V1 birincil istemci)
+- `landing/` — Nuxt tanıtım sayfası · `desktop/` — Electron kabuk (load-remote)
+- `mobile/` — **React Native + Expo** istemci (Track F2; stack ADR 2026-07-02 ile Flutter'dan RN'e revize edildi)
 - AI moderasyon ön-triyaj/automod servisi (R1) → gerektiğinde (Sprint 4+) ayrı bir tier olarak eklenecek; şimdi yok
-- Landing page / Electron masaüstü / Flutter mobil → en sona ertelendi
 
 ---
 
@@ -32,7 +33,7 @@ Vault pattern: `knowledge/stack/claude-code/multi-session-pm-dev-contract.md`. E
 - **Opus (software manager / proje yönetimi):** **proje-seviyesi dosyalar** — `PLAN.md`, `TASK.md`,
   `contracts/SPRINT_X_CONTRACT.md` — ve bunlar üzerindeki kararlar. Plan→görev ayrıştırma, contract yazımı/revizyonu,
   R7 incelemesi. Genelde kod yazmaz (kararı verir, dev'e delege eder).
-- **Sonnet (developer):** `cd api/` veya `cd web/` ile açılır, sadece o tier'a dokunur. `SPRINT_X_CONTRACT.md`'i
+- **Sonnet (developer):** `cd api/`, `cd web/` veya `cd mobile/` ile açılır, sadece o tier'a dokunur. `SPRINT_X_CONTRACT.md`'i
   **tek doğruluk kaynağı** kabul eder; endpoint imzası, DTO şekli, enum değeri contract'tan **sapamaz**.
 - **Sapma ihtiyacı doğarsa:** dev DURUR, kullanıcıya bildirir, Opus contract'ı revize eder, sonra devam.
 - **`TASK.md`:** dev checkbox işaretler, **item EKLEMEZ** (yeni item = scope creep = Opus onayı).
@@ -62,7 +63,8 @@ Yeniden kullanım: `knowledge/decisions-log/2026-05-11-v1-response-envelope.md`.
 ## API Sözleşmesi = Tek Doğruluk Kaynağı
 
 OpenAPI spec (`@nestjs/swagger` ile üretilir) backend ↔ istemci sözleşmesidir. Web'in tip/clientları bundan
-türetilir (sonraki istemciler — Flutter — aynı spec'ten Dart üretir). Sözleşme paylaşılır, dil paylaşılmaz.
+türetilir; `mobile/` (RN + Expo) **aynı spec'ten aynı TS hattıyla** üretir — Dart codegen ihtiyacı stack revizyonuyla
+düştü. Sözleşme tek, istemci çok.
 
 ---
 
