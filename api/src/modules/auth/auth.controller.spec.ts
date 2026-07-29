@@ -165,6 +165,68 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
     expect(authServiceMock.refresh).toHaveBeenCalledWith('', '127.0.0.1', false);
   });
 
+  // ── refresh: 2026-07-29 revizyonu — mobil + gövde token → cookie yok sayılır ──
+  // Kanıtlanmış bug'ın regresyon testi: RN'in okhttp cookie kavanozu login yanıtındaki
+  // Set-Cookie'yi saklar, /auth/refresh isteğine otomatik ekler. Kanal artık clientType'a
+  // bakar, taşıma sinyaline (cookie var mı) değil.
+
+  it('refresh: X-Client-Type: mobile + HEM cookie HEM gövde token → gövde kanalı seçilir, yanıtta refreshToken VAR', async () => {
+    authServiceMock.refresh.mockResolvedValue({ accessToken: 'access-4', refreshToken: 'refresh-4' });
+    const res = makeRes();
+
+    const body = await controller.refresh(
+      makeReq({ refresh_token: 'cookie-token' }),
+      res,
+      { refreshToken: 'body-token' } as any,
+      'mobile',
+    );
+
+    // Cookie mevcut olsa bile yok sayılır: service'e giden ham token gövdedekidir, usingCookie=false.
+    expect(authServiceMock.refresh).toHaveBeenCalledWith('body-token', '127.0.0.1', false);
+    expect(body).toEqual({ accessToken: 'access-4', refreshToken: 'refresh-4' });
+    expect(Object.keys(body)).toEqual(['accessToken', 'refreshToken']);
+  });
+
+  it('refresh: X-Client-Type: mobile + yalnız gövde token (cookie yok) → yanıtta refreshToken VAR', async () => {
+    authServiceMock.refresh.mockResolvedValue({ accessToken: 'access-5', refreshToken: 'refresh-5' });
+    const res = makeRes();
+
+    const body = await controller.refresh(makeReq(), res, { refreshToken: 'body-token' } as any, 'mobile');
+
+    expect(authServiceMock.refresh).toHaveBeenCalledWith('body-token', '127.0.0.1', false);
+    expect(body).toEqual({ accessToken: 'access-5', refreshToken: 'refresh-5' });
+  });
+
+  it('refresh: Başlıksız + cookie → yanıt yalnız { accessToken } (web birebir eski, mobil revizyonundan etkilenmez)', async () => {
+    authServiceMock.refresh.mockResolvedValue({ accessToken: 'access-6', refreshToken: 'refresh-6' });
+    const res = makeRes();
+
+    const body = await controller.refresh(makeReq({ refresh_token: 'cookie-token' }), res, {} as any, undefined);
+
+    expect(authServiceMock.refresh).toHaveBeenCalledWith('cookie-token', '127.0.0.1', true);
+    expect(body).toEqual({ accessToken: 'access-6' });
+    expect(Object.keys(body)).toEqual(['accessToken']);
+  });
+
+  it('refresh: Başlıksız + yalnız gövde token → service usingCookie=false ile çağrılır (kapı devrede)', async () => {
+    authServiceMock.refresh.mockResolvedValue({ accessToken: 'access-7', refreshToken: 'refresh-7' });
+    const res = makeRes();
+
+    await controller.refresh(makeReq(), res, { refreshToken: 'body-token' } as any, undefined);
+
+    expect(authServiceMock.refresh).toHaveBeenCalledWith('body-token', '127.0.0.1', false);
+  });
+
+  it("refresh: X-Client-Type: desktop (allowlist dışı) + gövde token + cookie yok → mobil ayrıcalığı almaz, usingCookie=false", async () => {
+    authServiceMock.refresh.mockResolvedValue({ accessToken: 'access-8', refreshToken: 'refresh-8' });
+    const res = makeRes();
+
+    const body = await controller.refresh(makeReq(), res, { refreshToken: 'body-token' } as any, 'desktop');
+
+    expect(authServiceMock.refresh).toHaveBeenCalledWith('body-token', '127.0.0.1', false);
+    expect(body).toEqual({ accessToken: 'access-8', refreshToken: 'refresh-8' });
+  });
+
   // ── normalizeClientType: case/whitespace tuzağı (PM düzeltmesi) ────────────
   // Büyük/küçük harf veya baştan/sondan boşluklu 'mobile' sessizce null'a düşüp
   // istemciyi web gibi davranmaya zorlarsa, M1'de ilk /auth/refresh'te kullanıcı

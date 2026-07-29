@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# i18n — üretilmiş kopya (contract §6 kaçış yolu). Tek doğruluk kaynağı: ../web/src/i18n/tr.json
+src/i18n/tr.generated.json

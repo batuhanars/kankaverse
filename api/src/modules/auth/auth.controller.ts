@@ -137,15 +137,23 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Access token yenileme (cookie varsa cookie; yoksa gövdeden mobil bearer akışı)' })
+  @ApiOperation({ summary: "Access token yenileme (mobil + gövde token → gövde kanalı; aksi hâlde cookie varsa cookie, yoksa gövdeden mobil bearer akışı)" })
+  @ApiHeader(CLIENT_TYPE_HEADER)
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
     @Body() body: RefreshDto,
+    @Headers('x-client-type') clientTypeHeader?: string,
   ) {
+    const clientType = normalizeClientType(clientTypeHeader);
     const cookieToken: string | undefined = req.cookies?.[REFRESH_COOKIE];
-    const usingCookie = Boolean(cookieToken);
-    const rawToken = cookieToken ?? body?.refreshToken ?? '';
+    // [Sprint M0 — R7, 2026-07-29 revizyon] RN'in okhttp katmanı kendi cookie kavanozunu tutar; mobil
+    // istek cookie'li gelse bile clientType==='mobile' + gövdede token varsa gövde kanalı seçilir
+    // (cookie yok sayılır). Aksi hâlde bugünkü davranış birebir korunur. Kapı (auth.service.ts REFRESH_
+    // CHANNEL_MISMATCH) değişmedi — yalnız kanal seçim sinyali taşımadan istemci tipine kaydı.
+    const preferBody = clientType === 'mobile' && Boolean(body?.refreshToken);
+    const usingCookie = !preferBody && Boolean(cookieToken);
+    const rawToken = usingCookie ? cookieToken! : (body?.refreshToken ?? '');
     const { accessToken, refreshToken } = await this.authService.refresh(rawToken, req.ip, usingCookie);
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
     return usingCookie ? { accessToken } : { accessToken, refreshToken };
