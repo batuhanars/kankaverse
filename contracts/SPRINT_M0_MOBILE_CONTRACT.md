@@ -26,7 +26,17 @@
 Çalışan bir Android uygulaması iskelesi: **giriş yap, oturumu koru, ortam listeni gör.** Ürün özelliği yok;
 bu sprintin çıktısı sonraki tüm mobil fazların üstüne oturacağı auth + istemci + tema + i18n zemini.
 
-### DoD (fiziksel Android cihazda, dev build ile doğrulanır)
+### DoD (**Android emülatöründe**, **Expo Go** ile doğrulanır)
+
+> **Revizyon 2026-07-29 (PM), cihaz:** "fiziksel cihaz" → **emülatör** (`Pixel_9a` AVD mevcut, sahip kararı).
+> M0'ın doğruladığı her şey (giriş, 2FA, secure store kalıcılığı, sessiz yenileme) emülatörde birebir çalışır;
+> fiziksel cihaz bu fazda ek bilgi vermiyor. **Fiziksel cihaz M2'de şart olur** (push bildirimi) ve M4/M5'te
+> (mikrofon/kamera izinleri, gerçek ağ koşulları). O fazlarda tekrar masaya gelir, M0'da gerekmiyor.
+
+> **Revizyon 2026-07-29 (PM):** "dev build" → **Expo Go**. M0'ın tüm bağımlılıkları (`expo-router`,
+> `expo-secure-store`) Expo Go çalışma zamanında var; dev build bugün fayda getirmiyor, yalnız ilk gradle
+> kurulumu maliyeti getiriyor. Dev build **M2'de zorunlu olacak** (Android'de uzaktan push Expo Go'da çalışmaz),
+> o fazda kurulur. Makinede JDK (Android Studio JBR) + Android SDK **zaten mevcut**, M2'de yeni kurulum yok.
 
 1. Kullanıcı adı/e-posta + şifre ile giriş yapılır.
 2. Hesapta 2FA varsa challenge ekranı gelir, TOTP kodu ile giriş tamamlanır.
@@ -121,22 +131,32 @@ Monorepo köküne `mobile/` (Expo, TypeScript). Kendi `package.json`'ı, kendi b
 
 ```
 mobile/
-├── CLAUDE.md              # tier kuralları (bu sprintte yazılır — §9)
-├── app/                   # Expo Router
-│   ├── _layout.tsx        # tema + auth bootstrap kapısı
-│   ├── index.tsx          # açılış/splash: bootstrap sonucu login'e mi ana ekrana mı
-│   ├── (auth)/login.tsx
-│   ├── (auth)/two-factor.tsx
-│   └── (app)/guilds.tsx   # ortam listesi
+├── CLAUDE.md              # tier kuralları (§9)
 ├── src/
+│   ├── app/               # Expo Router (SDK 57 şablonu rotaları BURAYA koyar, kökteki app/'e değil)
+│   │   ├── _layout.tsx    # tema + auth bootstrap kapısı
+│   │   ├── index.tsx      # açılış/splash: bootstrap sonucu login'e mi ana ekrana mı
+│   │   ├── (auth)/login.tsx
+│   │   ├── (auth)/two-factor.tsx
+│   │   └── (app)/guilds.tsx   # ortam listesi
 │   ├── api/               # axios instance + envelope interceptor + auth çağrıları
 │   ├── stores/            # zustand (auth)
 │   ├── i18n/              # t() helper (tr.json'u web'den okur)
 │   ├── theme/             # design token → RN tema objesi
 │   └── components/        # ortak küçük UI parçaları
 ├── metro.config.js        # watchFolders: ../web/src/i18n
-└── app.json / app.config.ts
+└── app.json
 ```
+
+> **Revizyon 2026-07-29 (PM):** rota klasörü `app/` değil **`src/app/`**. Expo SDK 57 varsayılan şablonu
+> böyle üretiyor ve `tsconfig` `@/*` alias'ı `./src/*`'a bakıyor. Şablonla kavga etme.
+>
+> **İskele kuruldu (PM, 2026-07-29):** Expo SDK 57 / RN 0.86 / React 19.2, `create-expo-app` default şablonu.
+> Örnek ekranlar + yalnız demoya ait bağımlılıklar (`@expo/ui`, `expo-glass-effect`, `expo-symbols`,
+> `expo-web-browser`, `expo-device`, `expo-image`) temizlendi; `expo-secure-store` + `zustand` + `axios` kuruldu.
+> `tsc --noEmit` ve `expo export --platform android` temiz. Uygulama kimliği: name `Kankaverse`, slug/scheme
+> `kankaverse`. **`android.package` bilinçli olarak boş** — Play'de yayımlandıktan sonra değiştirilemez,
+> M2/M5'te sahiple birlikte kararlaştırılır; Expo Go bunu istemez.
 
 **Bağımlılıklar (bu liste dışına çıkmak = PM onayı):**
 `expo`, `expo-router`, `expo-secure-store`, `react-native-safe-area-context`, `react-native-screens`,
@@ -150,10 +170,25 @@ Bu liste **doğrudan bağımlılıkları** bağlar. `npx expo install` bunların
 session bunu README'ye yazsın).
 
 **Dev ortamı ön koşulları (README'ye yazılır, ilk saatte patlayan şeyler):**
-- API `0.0.0.0`'a bind olmalı ve **Windows Güvenlik Duvarı 3000 portuna gelen bağlantıya izin vermeli** —
-  varsayılan olarak engeller, telefon "bağlanılamadı" der ve kod suçlu sanılır.
-- Telefon ile geliştirme makinesi **aynı ağda** olmalı.
-- DoD §2 (2FA) için **2FA'sı açık bir test hesabı** gerekir; yoksa web'den bir hesapta 2FA açılarak hazırlanır.
+- **`EXPO_PUBLIC_API_URL` hedefe göre değişir — en sık kaybedilen saat burada:**
+  | Çalıştırma ortamı | Değer |
+  |---|---|
+  | **Android emülatörü (M0 varsayılanı)** | `http://10.0.2.2:3000` — emülatörde host makine budur |
+  | Fiziksel cihaz (M2+) | `http://192.168.1.50:3000` (makinenin LAN IP'si, aynı ağ şartı) |
+  | Her ikisinde de yanlış | `http://localhost:3000` — emülatörün/telefonun kendisini gösterir |
+- **2FA test hesabı yerel veritabanında olmalı**, canlıdaki (kankaverse.com) hesap **değil**: `api/.env`
+  yerel postgres'e bakıyor, canlı hesabın yerelde yok. **Mevcut:** yerel DB'de `Azeroth` kullanıcısının
+  2FA'sı açık (2026-07-06). Authenticator kaydı kaybolduysa yerel arayüzden kapat-aç.
+- Yerel altyapı için **Docker Desktop çalışıyor olmalı** (pg + redis + minio) **ve `api` ayakta olmalı**
+  (`cd api && npm run start:dev`). Emülatör açık olmadan `npx expo start` sonrası `a` tuşu iş görmez.
+
+**PM doğrulaması 2026-07-29 (dev bunlarla vakit kaybetmesin):**
+- `api/src/main.ts:57` `app.listen(port)` zaten tüm arayüzlere bağlanıyor → **ayrı `0.0.0.0` bind işi yok.**
+- Güvenlik duvarında **3000 portu için Allow kuralı zaten var** + `node.exe` gelen izinleri mevcut (Metro 8081).
+  Telefon bağlanamazsa önce **aynı ağ** ve **API ayakta mı** kontrol edilir, duvara dokunulmaz.
+- ⚠️ **CORS'a DOKUNMA.** `api` CORS'u yalnız `FRONTEND_URL`'e açık ama **native istemcide CORS diye bir şey
+  yoktur** (tarayıcı origin'i yok). "Telefondan bağlanamıyorum" belirtisinin çaresi CORS gevşetmek **değildir**;
+  o değişiklik web için güvenlik regresyonudur ve bu sözleşmenin dışındadır.
 
 ---
 
