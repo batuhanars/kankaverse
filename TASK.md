@@ -949,7 +949,7 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Ekranlar (üç):** Açılış (bootstrap yönlendirme) · Giriş + 2FA kod · Ortam listesi (read-only, başlıkta **çıkış yap**) + boş durum + hata durumu
 - [x] Ön koşullar README'de: **emülatörde `EXPO_PUBLIC_API_URL=http://10.0.2.2:3001`** (port **3001**, fiziksel cihazda LAN IP `192.168.1.50`; `localhost` ikisinde de yanlış) + yerel DB'de 2FA'lı hesap (`Azeroth`, canlıdaki hesap değil) + Docker + `api` ayakta. **Güvenlik duvarı işi yok** (`node.exe` izni mevcut, PM doğruladı). ⚠️ **`api` CORS'una dokunma** (native'de CORS yok)
 
-### DoD (sözleşme §1) — emülatörde doğrulandı 2026-07-29
+### DoD (sözleşme §1) — M0, emülatörde doğrulandı 2026-07-29
 - [x] Giriş yapılıyor; **2FA'lı hesapta challenge akışı çalışıyor** (sahip `Azeroth` ile TOTP girip tamamladı)
 - [x] Ortam listesi sunucudan geliyor ve görünüyor (PM doğruladı, ekran görüntülü)
 - [x] Uygulama kapatılıp açılınca oturum korunuyor (PM doğruladı: `force-stop` → yeniden açılış → giriş sormadan ortam listesi; DB'de rotasyon kaydı)
@@ -957,3 +957,40 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Çıkışta sunucu session'ı revoke + yerel temizlik (sahip çıkış yaptı, PM DB'den doğruladı: tüm mobil session'lar iptal)
 - [ ] **Web regresyon yok:** birim testler + gerçek sunucu curl'ü ile kanıtlandı; **sahibin canlıda gözle doğrulaması kalıyor**
 - [x] `mobile/` içinde gömülü kullanıcı-görünür string yok; `tr.json` kopyası yok (üretilmiş dosya gitignore'da)
+
+---
+
+## Sprint M1a — Mobil Gezinme Kabuğu + Mesajlaşma (Track F2, PM compose 2026-07-29)
+
+> Sözleşme: `contracts/SPRINT_M1A_MOBILE_SHELL_CONTRACT.md` (**tek doğruluk kaynağı**).
+> **R7-nötr olmalı:** kapılar backend'de, mobil yalnız sonucu gösterir. `api/`'ye dokunma ihtiyacı → **DUR**.
+> Dev checkbox işaretler, **item EKLEMEZ**. Sapma → DUR, PM'e dön.
+> **M0 dersi sözleşmeye gömüldü:** endpoint tablosu yol listesidir; DTO alan adları **dosyadan** okunur.
+
+### Kabuk
+- [ ] **Rail + sidebar** ana ekranı (ortam ikonları altıgen · seçili ortamın kanal listesi VEYA DM listesi); M0'ın "Ortamların" ekranı **kaldırılır**
+- [ ] **Alt tab çubuğu (3):** Ana Sayfa · Bildirimler · Sen (adlar `tr.json` → `mobile.tabs.*`)
+- [ ] İçerik **ayrı tam ekran** + geri oku; sağ üye paneli **YOK**
+
+### Mesajlaşma
+- [ ] **Mesaj ekranı:** cursor'lu geçmiş (yukarı kaydır → eskisi), gönderme, boş/hata durumu
+- [ ] **WebSocket** (`socket.io-client`): token **callback ile** verilir (sabit token reconnect'te bayat kalır — web denetim bulgusu) · `channel:join/leave` · `typing:start/stop` · `message.created/updated/deleted` · `typing:update/clear`
+- [ ] **Arka plan/ön plan:** arka planda soket kapanır; dönüşte yeniden bağlan + **açık kanalın mesajlarını yeniden çek** (boşluk bırakma) + `channel:join` tekrar
+- [ ] **Mention gösterimi:** `<@id>` → `@kullanıcıadı`, `<@&id>` → `@everyone` (ham token ekrana basılmaz)
+- [ ] **Ekler (🔴 T&S):** `GET /attachments/:id` ile adres alınır; `CLEAN` → görsel önizleme / dosya rozeti · `PENDING` → **yüklenmez**, "taranıyor" · `FLAGGED` → engellendi. Yükleme kapsam dışı (ataş düğmesi konmaz)
+
+### DM
+- [ ] DM listesi (son mesaj önizleme + okunmamış) · DM mesaj ekranı · başlıkta karşı taraf → salt okunur profil kartı
+- [ ] **DM istekleri:** liste + kabul/ret (mobilde görünmezse kullanıcı isteği hiç göremez — dilsizlik kabul edilemez)
+
+### Diğer ekranlar
+- [ ] **Bildirimler sekmesi:** liste + okunmamış vurgusu + dokunuşta ilgili kanala git
+- [ ] **Sen sekmesi:** salt okunur profil + çıkış yap (ayarlar M1b — boş iskele konmaz)
+
+### DoD (sözleşme §1 — 11 madde; **görülerek** kapatılır)
+- [ ] Emülatörde doğrulandı
+- [ ] **Fiziksel cihazda doğrulandı** (arka plan/ön plan davranışı emülatörde gerçeği yansıtmaz — doze/pil optimizasyonu)
+- [ ] İki istemci testi: web ↔ mobil anlık mesaj akışı çift yönlü
+- [ ] **Kasıtlı boşluk testi:** mobil arka plandayken web'den 3 mesaj at → ön plana dönünce üçü de görünüyor
+- [ ] Reconnect bayat token'la düşmüyor (access ömrü dolduktan sonra da toparlıyor)
+- [ ] `typecheck` + `lint` temiz; gömülü string yok; `api/`'ye dokunulmadı
