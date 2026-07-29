@@ -177,8 +177,11 @@ session bunu README'ye yazsın).
   | Fiziksel cihaz (M2+) | `http://192.168.1.50:3000` (makinenin LAN IP'si, aynı ağ şartı) |
   | Her ikisinde de yanlış | `http://localhost:3000` — emülatörün/telefonun kendisini gösterir |
 - **2FA test hesabı yerel veritabanında olmalı**, canlıdaki (kankaverse.com) hesap **değil**: `api/.env`
-  yerel postgres'e bakıyor, canlı hesabın yerelde yok. **Mevcut:** yerel DB'de `Azeroth` kullanıcısının
-  2FA'sı açık (2026-07-06). Authenticator kaydı kaybolduysa yerel arayüzden kapat-aç.
+  yerel postgres'e bakıyor, canlı hesabın yerelde yok. **Durum 2026-07-29:** yerel `Azeroth` hesabının
+  authenticator kaydı silindiği için 2FA **sıfırlandı** (secret + kurtarma kodları temizlendi); sahip yerel
+  arayüzden yeniden açacak. Dev DoD §2'ye gelmeden önce bu hesapta 2FA'nın açık olduğunu **doğrulasın**.
+  Not: giriş akışı TOTP yerine **kurtarma kodu** da kabul ediyor (`verifyTotpOrRecoveryCode`) — 2FA açılırken
+  verilen kodlar saklanırsa authenticator kaybı DB'ye dokunmadan çözülür.
 - Yerel altyapı için **Docker Desktop çalışıyor olmalı** (pg + redis + minio) **ve `api` ayakta olmalı**
   (`cd api && npm run start:dev`). Emülatör açık olmadan `npx expo start` sonrası `a` tuşu iş görmez.
 
