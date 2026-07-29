@@ -5,13 +5,14 @@ import {
   Delete,
   Body,
   Param,
+  Headers,
   Req,
   Res,
   UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
@@ -19,6 +20,8 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { Login2faDto } from './dto/login-2fa.dto';
+import { RefreshDto } from './dto/refresh.dto';
+import { normalizeClientType } from './utils/client-type.util';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -49,6 +52,14 @@ const COOKIE_OPTIONS = {
 
 type AuthUser = { id: string; sessionId: string; emailVerifiedAt: Date | null };
 
+// Sprint M0 — bearer refresh teslimi (contract §2). 4 session-açan/yenileyen uçta
+// aynı Swagger belgesi tekrarlanıyor → tek kaynak (Rule of Three).
+const CLIENT_TYPE_HEADER = {
+  name: 'X-Client-Type',
+  required: false,
+  description: "Yalnız 'mobile' allowlist'te; varsa yanıt gövdesine refreshToken eklenir. Yoksa/başka değerde davranış web ile birebir aynı (cookie, gövdede token yok).",
+} as const;
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -72,58 +83,72 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @ApiOperation({ summary: 'Yeni kullanıcı kaydı (3/dk/IP)' })
+  @ApiHeader(CLIENT_TYPE_HEADER)
   async register(
     @Body() dto: RegisterDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
+    @Headers('x-client-type') clientTypeHeader?: string,
   ) {
-    const { user, accessToken, refreshToken } = await this.authService.register(dto, req.ip);
+    const clientType = normalizeClientType(clientTypeHeader);
+    const { user, accessToken, refreshToken } = await this.authService.register(dto, req.ip, clientType);
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
-    return { user, accessToken };
+    return clientType === 'mobile' ? { user, accessToken, refreshToken } : { user, accessToken };
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Kullanıcı girişi; 2FA etkinse challenge döner (5/dk/IP)' })
+  @ApiHeader(CLIENT_TYPE_HEADER)
   async login(
     @Body() dto: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
+    @Headers('x-client-type') clientTypeHeader?: string,
   ) {
-    const result = await this.authService.login(dto, req.ip);
+    const clientType = normalizeClientType(clientTypeHeader);
+    const result = await this.authService.login(dto, req.ip, clientType);
     if (result.type === 'challenge') {
       return { twoFactorRequired: true, challengeToken: result.challengeToken };
     }
     res.cookie(REFRESH_COOKIE, result.refreshToken, COOKIE_OPTIONS);
-    return { user: result.user, accessToken: result.accessToken };
+    return clientType === 'mobile'
+      ? { user: result.user, accessToken: result.accessToken, refreshToken: result.refreshToken }
+      : { user: result.user, accessToken: result.accessToken };
   }
 
   @Post('login/2fa')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: '2FA doğrulama (TOTP veya kurtarma kodu) (5/dk/IP)' })
+  @ApiHeader(CLIENT_TYPE_HEADER)
   async login2fa(
     @Body() dto: Login2faDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
+    @Headers('x-client-type') clientTypeHeader?: string,
   ) {
-    const { user, accessToken, refreshToken } = await this.authService.login2fa(dto, req.ip);
+    const clientType = normalizeClientType(clientTypeHeader);
+    const { user, accessToken, refreshToken } = await this.authService.login2fa(dto, req.ip, clientType);
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
-    return { user, accessToken };
+    return clientType === 'mobile' ? { user, accessToken, refreshToken } : { user, accessToken };
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Access token yenileme (refresh cookie)' })
+  @ApiOperation({ summary: 'Access token yenileme (cookie varsa cookie; yoksa gövdeden mobil bearer akışı)' })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
+    @Body() body: RefreshDto,
   ) {
-    const rawToken: string = req.cookies?.[REFRESH_COOKIE];
-    const { accessToken, refreshToken } = await this.authService.refresh(rawToken, req.ip);
+    const cookieToken: string | undefined = req.cookies?.[REFRESH_COOKIE];
+    const usingCookie = Boolean(cookieToken);
+    const rawToken = cookieToken ?? body?.refreshToken ?? '';
+    const { accessToken, refreshToken } = await this.authService.refresh(rawToken, req.ip, usingCookie);
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
-    return { accessToken };
+    return usingCookie ? { accessToken } : { accessToken, refreshToken };
   }
 
   @Post('logout')

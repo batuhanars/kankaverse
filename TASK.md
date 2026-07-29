@@ -929,14 +929,14 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > **KİLİTLİ KARAR:** teslim kanalı oturum tipine bağlı — web session'ının refresh token'ı gövdede ASLA dönmez (sözleşme §2).
 
 ### Backend (`api/`) — R7
-- [ ] **Şema:** `Session.clientType String?` (`'web'|'mobile'|'desktop'`, null=web); additive migration üret + DB'ye uygula (`migrate status` temiz)
-- [ ] **Session açan uçlar** (`login`, `login/2fa`, `register`): `X-Client-Type` başlığı allowlist'ten (**yalnız `mobile`**) okunur → session o tiple açılır + yanıt gövdesine `refreshToken` eklenir; **başlık yoksa davranış birebir eski** (cookie, gövdede token YOK)
-- [ ] `POST /auth/logout` **değişmedi** (bearer + token'daki `sessionId` ile zaten çalışıyor — dokunma)
-- [ ] **`POST /auth/refresh`:** cookie yoksa gövdeden `{ refreshToken }` kabul; **kapı:** session `clientType !== 'mobile'` → `401 REFRESH_CHANNEL_MISMATCH`; mobil akışta yeni refresh gövdede döner
-- [ ] Rotasyon / `tokenFamily` / reuse-detection / revoke mantığı **değişmedi**; access ömrü (~15dk) mobilde de aynı
-- [ ] Envelope + Swagger (yeni gövde alanları + `X-Client-Type`); `nest build` temiz
-- [ ] Birim test: başlıksız istek eski davranış · web token'ı gövdeden → 401 · mobil rotasyon · reuse → aile revoke
-- [ ] **R7 insan incelemesi:** diff sahibe sunuldu, sahip imzası alındı
+- [x] **Şema:** `Session.clientType String?` (null=web); additive migration üretildi + DB'ye uygulandı (`migrate status` temiz, kolon `information_schema`'da doğrulandı)
+- [x] **Session açan uçlar** (`login`, `login/2fa`, `register`): `X-Client-Type` allowlist'ten (**yalnız `mobile`**, trim+lowercase) okunuyor → session o tiple açılıyor + gövdeye `refreshToken` ekleniyor; **başlıksız davranış birebir eski** (gerçek sunucuda doğrulandı)
+- [x] `POST /auth/logout` **değişmedi** (dokunulmadı)
+- [x] **`POST /auth/refresh`:** cookie yoksa gövdeden `{ refreshToken }` kabul; kapı çalışıyor → web token'ı gövdeden `401 REFRESH_CHANNEL_MISMATCH` (canlı doğrulandı); mobil akışta yeni refresh gövdede dönüyor + rotasyonda `clientType` devralınıyor
+- [x] Rotasyon / `tokenFamily` / reuse-detection / revoke mantığı **değişmedi**; mobil akışta reuse → aile revoke canlı doğrulandı; access ömrü mobilde de aynı
+- [x] Envelope + Swagger (`X-Client-Type` başlığı + yeni gövde alanları); `nest build` temiz
+- [x] Birim test: 26 suite / **876 test** yeşil (auth modülü ilk kez test altında: controller + service spec)
+- [x] **R7 insan incelemesi:** PM satır satır inceledi + ayrı portta gerçek sunucu/gerçek DB ile uçtan uca doğruladı; **sahip diff'i onayladı (2026-07-29)**
 
 ### Mobil (`mobile/`)
 - [x] ~~Expo (TS) projesi + Expo Router iskeleti~~ + ~~`mobile/CLAUDE.md`~~ **PM kurdu 2026-07-29** (SDK 57 / RN 0.86; demo ekran+bağımlılık temizliği; `tsc` + android bundle temiz). Dev'e kalan: `EXPO_PUBLIC_API_URL` + README
@@ -947,7 +947,7 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] **i18n:** metro `watchFolders` + `@i18n` alias → `web/src/i18n/tr.json` **import edilir, kopyalanmaz**; `t(path, params)` helper (nokta yolu + `{key}` interpolasyon)
 - [ ] **Tema:** design-token → `src/theme/tokens.ts`; renk/ölçü bileşene gömülmedi
 - [ ] **Ekranlar (üç):** Açılış (bootstrap yönlendirme) · Giriş + 2FA kod · Ortam listesi (read-only, başlıkta **çıkış yap**) + boş durum + hata durumu
-- [ ] Ön koşullar README'de: **emülatörde `EXPO_PUBLIC_API_URL=http://10.0.2.2:3000`** (fiziksel cihazda LAN IP `192.168.1.50`; `localhost` ikisinde de yanlış) + yerel DB'de 2FA'lı hesap (`Azeroth`, canlıdaki hesap değil) + Docker + `api` ayakta. **Güvenlik duvarı işi yok** (3000 kuralı + `node.exe` izni mevcut, PM doğruladı). ⚠️ **`api` CORS'una dokunma** (native'de CORS yok)
+- [ ] Ön koşullar README'de: **emülatörde `EXPO_PUBLIC_API_URL=http://10.0.2.2:3001`** (port **3001**, fiziksel cihazda LAN IP `192.168.1.50`; `localhost` ikisinde de yanlış) + yerel DB'de 2FA'lı hesap (`Azeroth`, canlıdaki hesap değil) + Docker + `api` ayakta. **Güvenlik duvarı işi yok** (`node.exe` izni mevcut, PM doğruladı). ⚠️ **`api` CORS'una dokunma** (native'de CORS yok)
 
 ### DoD (sözleşme §1)
 - [ ] Giriş yapılıyor; 2FA'lı hesapta challenge akışı çalışıyor

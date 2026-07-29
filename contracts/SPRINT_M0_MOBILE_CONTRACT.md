@@ -173,9 +173,12 @@ session bunu README'ye yazsın).
 - **`EXPO_PUBLIC_API_URL` hedefe göre değişir — en sık kaybedilen saat burada:**
   | Çalıştırma ortamı | Değer |
   |---|---|
-  | **Android emülatörü (M0 varsayılanı)** | `http://10.0.2.2:3000` — emülatörde host makine budur |
-  | Fiziksel cihaz (M2+) | `http://192.168.1.50:3000` (makinenin LAN IP'si, aynı ağ şartı) |
-  | Her ikisinde de yanlış | `http://localhost:3000` — emülatörün/telefonun kendisini gösterir |
+  | **Android emülatörü (M0 varsayılanı)** | `http://10.0.2.2:3001` — emülatörde host makine budur |
+  | Fiziksel cihaz (M2+) | `http://192.168.1.50:3001` (makinenin LAN IP'si, aynı ağ şartı) |
+  | Her ikisinde de yanlış | `http://localhost:3001` — emülatörün/telefonun kendisini gösterir |
+
+  **Port 3001'dir, 3000 değil** (`configuration.ts:60` + `main.ts:56` varsayılanı; bu sözleşmenin ilk
+  sürümündeki 3000 yanlıştı, 2026-07-29 düzeltildi).
 - **2FA test hesabı yerel veritabanında olmalı**, canlıdaki (kankaverse.com) hesap **değil**: `api/.env`
   yerel postgres'e bakıyor, canlı hesabın yerelde yok. **Durum 2026-07-29: HAZIR** — yerel `Azeroth` hesabında
   2FA açık, secret ve 10 kurtarma kodu yerinde (authenticator kaydı silinmişti, sıfırlanıp yeniden kuruldu).
@@ -186,7 +189,7 @@ session bunu README'ye yazsın).
 
 **PM doğrulaması 2026-07-29 (dev bunlarla vakit kaybetmesin):**
 - `api/src/main.ts:57` `app.listen(port)` zaten tüm arayüzlere bağlanıyor → **ayrı `0.0.0.0` bind işi yok.**
-- Güvenlik duvarında **3000 portu için Allow kuralı zaten var** + `node.exe` gelen izinleri mevcut (Metro 8081).
+- Güvenlik duvarında `node.exe` için gelen bağlantı izinleri mevcut (Metro 8081 + API 3001 bunun altında).
   Telefon bağlanamazsa önce **aynı ağ** ve **API ayakta mı** kontrol edilir, duvara dokunulmaz.
 - ⚠️ **CORS'a DOKUNMA.** `api` CORS'u yalnız `FRONTEND_URL`'e açık ama **native istemcide CORS diye bir şey
   yoktur** (tarayıcı origin'i yok). "Telefondan bağlanamıyorum" belirtisinin çaresi CORS gevşetmek **değildir**;

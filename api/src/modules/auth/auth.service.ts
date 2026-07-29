@@ -82,7 +82,7 @@ export class AuthService implements OnModuleInit {
 
   // ── Temel auth ─────────────────────────────────────────────────────────────
 
-  async register(dto: RegisterDto, ip?: string) {
+  async register(dto: RegisterDto, ip?: string, clientType?: 'mobile' | null) {
     const email = dto.email.toLowerCase().trim();
     const birthDate = validateBirthDate(dto.birthDate);
 
@@ -165,7 +165,7 @@ export class AuthService implements OnModuleInit {
 
     this.sendVerificationEmailSilent(user.id, user.email);
 
-    const { accessToken, refreshToken } = await this.createSession(user.id, ip, undefined, user.email);
+    const { accessToken, refreshToken } = await this.createSession(user.id, ip, undefined, user.email, clientType);
     return { user: toUserDto(user), accessToken, refreshToken };
   }
 
@@ -233,7 +233,7 @@ export class AuthService implements OnModuleInit {
     });
   }
 
-  async login(dto: LoginDto, ip?: string): Promise<LoginResult> {
+  async login(dto: LoginDto, ip?: string, clientType?: 'mobile' | null): Promise<LoginResult> {
     // Tek alan: kullanıcı adı VEYA e-posta. E-posta '@' içerir (kullanıcı adı
     // pattern'i '@' içermez) → e-posta lowercase eşleşir, kullanıcı adı birebir.
     // Her ikisi de unique → findFirst OR güvenli (çakışma yok). Jenerik hata + dummy
@@ -269,11 +269,11 @@ export class AuthService implements OnModuleInit {
     // Tam giriş (2FA'sız) tamamlandı → bekleyen silme talebini iptal et
     await this.cancelPendingDeletionOnLogin(user);
 
-    const { accessToken, refreshToken } = await this.createSession(user.id, ip, undefined, user.email);
+    const { accessToken, refreshToken } = await this.createSession(user.id, ip, undefined, user.email, clientType);
     return { type: 'session', user: toUserDto(user), accessToken, refreshToken };
   }
 
-  async login2fa(dto: Login2faDto, ip?: string) {
+  async login2fa(dto: Login2faDto, ip?: string, clientType?: 'mobile' | null) {
     let payload: { sub: string; twoFactorChallenge: boolean };
     try {
       payload = this.jwtService.verify(dto.challengeToken, {
@@ -301,11 +301,18 @@ export class AuthService implements OnModuleInit {
     // Tam giriş tamamlandı (şifre + 2FA) → bekleyen silme talebini iptal et
     await this.cancelPendingDeletionOnLogin(user);
 
-    const { accessToken, refreshToken } = await this.createSession(user.id, ip, undefined, user.email);
+    const { accessToken, refreshToken } = await this.createSession(user.id, ip, undefined, user.email, clientType);
     return { user: toUserDto(user), accessToken, refreshToken };
   }
 
-  async refresh(rawRefreshToken: string, ip?: string) {
+  /**
+   * [R7] `usingCookie` teslim kanalını bildirir (kontrolcü kararı: cookie var mı).
+   * Cookie'liyken davranış birebir eskisi gibidir. Cookie yoksa (native istemci,
+   * gövdeden gelen token) yalnız `clientType='mobile'` session'lar kabul edilir —
+   * bir web session'ının refresh token'ı hiçbir koşulda gövdeden kabul edilmez
+   * (Sprint M0 contract §2.3). Diğer tüm rotasyon/reuse-detection mantığı değişmez.
+   */
+  async refresh(rawRefreshToken: string, ip?: string, usingCookie = true) {
     if (!rawRefreshToken) {
       throw new UnauthorizedException({ message: 'Yenileme tokeni bulunamadı.', error: 'INVALID_REFRESH' });
     }
@@ -327,6 +334,11 @@ export class AuthService implements OnModuleInit {
         data: { revokedAt: new Date() },
       });
       throw new UnauthorizedException({ message: 'Yenileme tokeni yeniden kullanımı tespit edildi.', error: 'REFRESH_REUSE_DETECTED' });
+    }
+
+    // [R7] Bearer teslim kapısı — cookie yoksa yalnız mobile session gövdeden kabul edilir.
+    if (!usingCookie && session.clientType !== 'mobile') {
+      throw new UnauthorizedException({ message: 'Bu oturum türü için yenileme kanalı geçersiz.', error: 'REFRESH_CHANNEL_MISMATCH' });
     }
 
     const tokenValid = await argon2.verify(session.refreshTokenHash, rawRefreshToken);
@@ -356,7 +368,13 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException({ message: 'Oturum az önce yenilendi, tekrar dene.', error: 'INVALID_REFRESH' });
     }
 
-    const { accessToken, refreshToken } = await this.createSession(session.userId, ip, session.tokenFamily);
+    const { accessToken, refreshToken } = await this.createSession(
+      session.userId,
+      ip,
+      session.tokenFamily,
+      undefined,
+      session.clientType as 'mobile' | null,
+    );
     return { accessToken, refreshToken };
   }
 
@@ -794,7 +812,13 @@ export class AuthService implements OnModuleInit {
     return token;
   }
 
-  private async createSession(userId: string, ip?: string, existingFamily?: string, userEmail?: string) {
+  private async createSession(
+    userId: string,
+    ip?: string,
+    existingFamily?: string,
+    userEmail?: string,
+    clientType?: 'mobile' | null,
+  ) {
     // Yeni cihaz tespiti: kullanıcının ilk oturumu değilse ve bu IP daha önce görülmemişse bildir
     if (ip && userEmail) {
       const existingSessions = await this.prisma.session.findMany({
@@ -825,7 +849,15 @@ export class AuthService implements OnModuleInit {
     const refreshTokenHash = await argon2.hash(refreshToken, ARGON2_OPTIONS);
 
     await this.prisma.session.create({
-      data: { id: sessionId, userId, refreshTokenHash, tokenFamily: family, ip, lastActiveAt: new Date() },
+      data: {
+        id: sessionId,
+        userId,
+        refreshTokenHash,
+        tokenFamily: family,
+        ip,
+        clientType: clientType ?? null,
+        lastActiveAt: new Date(),
+      },
     });
 
     return { accessToken, refreshToken };
