@@ -1,4 +1,4 @@
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
 import { t } from '@/i18n';
@@ -19,7 +19,12 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.brand}>{t('brand.name')}</Text>
+      <Image
+        source={require('@/assets/brand/kankaverse-hexagon.png')}
+        style={styles.brand}
+        resizeMode="contain"
+        accessibilityLabel={t('brand.name')}
+      />
       <ActivityIndicator color={theme.colors.accent500} style={styles.spinner} />
     </View>
   );
@@ -32,10 +37,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: theme.colors.bgRail,
   },
+  // Yazısız altıgen (marka imzası). Kaynak: web/src/assets/brand — mobil kopyası assets/brand altında.
   brand: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.xxl,
-    fontWeight: '700',
+    width: 96,
+    height: 96,
   },
   spinner: {
     marginTop: theme.layout.panelGap,

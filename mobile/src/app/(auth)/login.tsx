@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -46,7 +47,12 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.container}>
-        <Text style={styles.brand}>{t('brand.name')}</Text>
+        <Image
+          source={require('@/assets/brand/kankaverse-logo-dikey.png')}
+          style={styles.brand}
+          resizeMode="contain"
+          accessibilityLabel={t('brand.name')}
+        />
         <Text style={styles.title}>{t('auth.loginTitle')}</Text>
         <Text style={styles.subtitle}>{t('auth.loginSubtitle')}</Text>
 
@@ -105,11 +111,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: theme.layout.panelGap * 1.5,
   },
+  // Dikey marka kilidi (altıgen + kelime işareti). Kaynak: web/src/assets/brand — mobil kopyası
+  // assets/brand altında; marka değişirse iki yerde de güncellenir.
   brand: {
-    color: theme.colors.accent500,
-    fontSize: theme.fontSize.md,
-    fontWeight: '700',
-    textAlign: 'center',
+    width: 200,
+    height: 120,
+    alignSelf: 'center',
     marginBottom: theme.layout.panelGap,
   },
   title: {
