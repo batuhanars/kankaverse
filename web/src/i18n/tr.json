@@ -1582,5 +1582,12 @@
     "tip4Body": "Paylaşmadan önce işletim sisteminin bildirimlerini sessize al. İstenmedik mesajlar ya da uyarılar ekranda belirebilir.",
     "tip5Title": "Özel sekmeler ve gizli pencereler",
     "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
+  },
+  "mobile": {
+    "guilds": {
+      "title": "Ortamların",
+      "empty": "Henüz bir ortamın yok.",
+      "error": "Ortamlar yüklenemedi. Bağlanılamadı, tekrar dene."
+    }
   }
 }

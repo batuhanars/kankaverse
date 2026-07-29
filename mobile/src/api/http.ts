@@ -1,0 +1,141 @@
+import axios, { create as createAxios, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
+import * as SecureStore from 'expo-secure-store';
+
+// Sprint M0 contract §3 — hedefe göre değişir (README "Ortam Kurulumu"). Emülatör varsayılanı
+// 10.0.2.2 (host makine); .env / .env.example bunu belgeler.
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:3001';
+
+const REFRESH_TOKEN_KEY = 'kv_refresh_token';
+
+// Access token contract §4 — YALNIZ bellekte. Diske asla yazılmaz; uygulama kapanınca gider,
+// bootstrap (refresh → /auth/me) tazeler.
+let accessToken: string | null = null;
+
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+}
+
+export function clearAccessToken(): void {
+  accessToken = null;
+}
+
+// Refresh token contract §4 — YALNIZ expo-secure-store. AsyncStorage'a asla yazılmaz.
+export function getRefreshToken(): Promise<string | null> {
+  return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+}
+
+export function setRefreshToken(token: string): Promise<void> {
+  return SecureStore.setItemAsync(REFRESH_TOKEN_KEY, token);
+}
+
+export function clearRefreshToken(): Promise<void> {
+  return SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+}
+
+const http: AxiosInstance = createAxios({ baseURL: API_BASE });
+
+// Eş zamanlı 401'lerde tek refresh çağrısı — web/src/api/axios.ts refreshPromise dedup pattern'i.
+let refreshPromise: Promise<string> | null = null;
+
+// stores/auth.ts bu dosyayı zaten import ediyor; tersine bir import (http.ts -> stores/auth.ts)
+// döngü kurar. Bunun yerine store kendini burada bir callback olarak kaydeder — 401 sonrası
+// refresh de başarısız olursa (contract §4: "refresh de başarısızsa oturum düşer") store'un
+// `status`'ünü 'unauthenticated'a çekmek için tetiklenir. Yalnız bu dosyanın 401 handler'ı
+// çağırır; bootstrap kendi başarısızlığını doğrudan zustand state'inde yönetir (bkz. stores/auth.ts).
+type SessionExpiredHandler = () => void;
+let onSessionExpired: SessionExpiredHandler | null = null;
+
+export function setSessionExpiredHandler(handler: SessionExpiredHandler | null): void {
+  onSessionExpired = handler;
+}
+
+interface RawEnvelope<T> {
+  success: boolean;
+  statusCode: number;
+  data: T;
+}
+
+async function doRefresh(): Promise<string> {
+  const refreshToken = await getRefreshToken();
+  if (!refreshToken) {
+    // Secure store'da hiç token yoksa ağ çağrısına gerek yok — bootstrap/401 handler'ı bunu
+    // "oturum yok" olarak işler.
+    throw new Error('NO_REFRESH_TOKEN');
+  }
+  // Çıplak axios (http instance değil) — X-Client-Type başlığı olmadan sunucu gövdede token vermez.
+  const res = await axios.post<RawEnvelope<{ accessToken: string; refreshToken: string }>>(
+    `${API_BASE}/auth/refresh`,
+    { refreshToken },
+    { headers: { 'X-Client-Type': 'mobile' } },
+  );
+  const data = res.data?.data;
+  // Savunmacı kontrol (PM bulgusu 2026-07-29): sunucu beklenmedik bir gövde dönerse (ör. cookie
+  // kanalına düşüp yalnız accessToken içeren bir yanıt), `undefined` SecureStore'a gitmesin —
+  // "Values must be strings" gibi anlaşılmaz bir native hatasıyla oturum sessizce düşmesin.
+  if (typeof data?.accessToken !== 'string' || typeof data?.refreshToken !== 'string') {
+    if (__DEV__) {
+      console.warn('[doRefresh] beklenmeyen /auth/refresh gövdesi (mobil kanal alanları eksik):', res.data);
+    }
+    throw new Error('REFRESH_RESPONSE_INVALID');
+  }
+  const { accessToken: newAccessToken, refreshToken: newRefreshToken } = data;
+  setAccessToken(newAccessToken);
+  // KRİTİK (contract §4): rotasyon gereği HER refresh yanıtındaki yeni refresh token secure
+  // store'un üstüne yazılır. Yazılmazsa bir sonraki açılışta kullanılmış token gönderilir →
+  // reuse-detection tüm aileyi iptal eder → kullanıcı sebepsiz atılır.
+  await setRefreshToken(newRefreshToken);
+  return newAccessToken;
+}
+
+/** Access token'ı tazele (in-flight dedup'lı). Bootstrap ve 401 interceptor'ı bunu paylaşır. */
+export function refreshAccessToken(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = doRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+// Request interceptor — Bearer + X-Client-Type: mobile (bu başlık olmadan sunucu gövdede
+// refresh token vermez, mobil akış hiç çalışmaz — contract §2.2).
+http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  config.headers.set('X-Client-Type', 'mobile');
+  if (accessToken) {
+    config.headers.set('Authorization', `Bearer ${accessToken}`);
+  }
+  return config;
+});
+
+// Response interceptor — envelope unwrap + 401 → tek-uçuş refresh.
+http.interceptors.response.use(
+  (response) => {
+    if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+      response.data = (response.data as RawEnvelope<unknown>).data;
+    }
+    return response;
+  },
+  async (error) => {
+    const original = error.config;
+    if (error.response?.status === 401 && original && !original._retry) {
+      original._retry = true;
+      try {
+        const newToken = await refreshAccessToken();
+        original.headers = original.headers ?? {};
+        original.headers.Authorization = `Bearer ${newToken}`;
+        return http(original);
+      } catch {
+        clearAccessToken();
+        await clearRefreshToken();
+        onSessionExpired?.();
+      }
+    }
+    return Promise.reject(error);
+  },
+);
+
+export default http;

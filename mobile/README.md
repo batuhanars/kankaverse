@@ -1,56 +1,86 @@
-# Welcome to your Expo app 👋
+# Kankaverse — Mobil (React Native + Expo)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Sprint M0 iskele: giriş yap, oturumu koru (secure-store + sessiz yenileme), ortam listeni gör.
+Tek doğruluk kaynağı: `../contracts/SPRINT_M0_MOBILE_CONTRACT.md`. Tier kuralları: `./CLAUDE.md`.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Ortam Kurulumu
 
 ```bash
-npm run reset-project
+npm install
+cp .env.example .env   # değeri hedefe göre düzenle, aşağıya bak
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### `EXPO_PUBLIC_API_URL` — en sık kaybedilen saat burada
 
-### Other setup steps
+| Çalıştırma ortamı | Değer |
+|---|---|
+| **Android emülatörü (M0 varsayılanı)** | `http://10.0.2.2:3001` — emülatörde host makine budur |
+| Fiziksel cihaz (M2+) | `http://192.168.1.50:3001` (makinenin LAN IP'si, aynı Wi-Fi ağı şartı) |
+| Her ikisinde de **yanlış** | `http://localhost:3001` — emülatörün/telefonun **kendisini** gösterir, host makineyi değil |
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+**Port 3001'dir, 3000 değil.**
 
-## Learn more
+### Diğer ön koşullar (ilk saatte patlayan şeyler)
 
-To learn more about developing your project with Expo, look at the following resources:
+- **Docker Desktop çalışıyor olmalı** (pg + redis + minio) **ve `api` ayakta olmalı**:
+  ```bash
+  cd ../api && npm run start:dev
+  ```
+  Emülatör açık olmadan `npx expo start` sonrası `a` tuşu iş görmez.
+- **2FA test hesabı yerel veritabanında olmalı**, canlıdaki (kankaverse.com) hesap **değil** —
+  `api/.env` yerel postgres'e bakıyor.
+- **`api` CORS'una dokunma.** Native istemcide CORS diye bir şey yoktur (tarayıcı origin'i yok).
+  "Telefondan/emülatörden bağlanamıyorum" belirtisinin çaresi CORS gevşetmek **değildir** — önce
+  aynı ağ + API ayakta mı kontrol et.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Çalıştırma
 
-## Join the community
+```bash
+npx expo start
+```
 
-Join our community of developers creating universal apps.
+Sonra `a` (Android emülatör). Cihaz doğrulaması M0'da **Expo Go** ile yapılır (dev build M2'de gelir).
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## i18n — `tr.json` tek kaynak, ama üretilmiş kopya üzerinden okunur
+
+Tek doğruluk kaynağı **`../web/src/i18n/tr.json`**. Mobil bunu **import eder, elle kopyalamaz.**
+
+**Metro'nun proje kökü dışındaki bu dosyayı Windows'ta çözmesi denendi ve başarısız oldu** (3 yöntem:
+`extraNodeModules` alias, özel `resolver.resolveRequest`, düz relative import + `watchFolders` —
+üçü de "None of these files exist" hatasıyla patladı; Node'un kendi `path.resolve`'u aynı yolu
+doğru çözdüğü halde). Contract §6'nın öngördüğü kaçış yoluna geçildi:
+
+- `npm run i18n:sync` (`scripts/sync-i18n.js`) `web/src/i18n/tr.json`'u okuyup
+  `src/i18n/tr.generated.json`'a yazar (başında `__GENERATED__` uyarı alanıyla).
+- Bu dosya **gitignore'lı** ve **elle düzenlenmez** — her `start`/`android`/`ios`/`web`/`typecheck`/
+  `lint` öncesi (`pre*` npm script'leri) otomatik yeniden üretilir.
+- `src/i18n/index.ts`'teki `t(path, params)` helper'ı bu üretilmiş dosyayı okur.
+
+Yeni mobil-özel metin gerekiyorsa **`web/src/i18n/tr.json`'daki `mobile.*` bölümüne** eklenir,
+üretilmiş kopyaya değil (bir sonraki `i18n:sync` zaten senkronlar).
+
+## Test hesabı oluşturma / temizleme (dev amaçlı)
+
+```bash
+# Oluştur
+curl -X POST http://localhost:3001/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"test_mobil","email":"test_mobil@example.com","password":"TestSifre123","birthDate":"1995-01-01"}'
+
+# Temizle (Session/AuthToken/RecoveryCode önce, sonra User)
+docker exec kankaverse-postgres psql -U kankaverse -d kankaverse -c \
+  "DELETE FROM \"Session\" WHERE \"userId\" = (SELECT id FROM \"User\" WHERE username = 'test_mobil');"
+docker exec kankaverse-postgres psql -U kankaverse -d kankaverse -c \
+  "DELETE FROM \"User\" WHERE username = 'test_mobil';"
+```
+
+## Mimari kısa özet
+
+- `src/api/http.ts` — axios instance: `Bearer` + `X-Client-Type: mobile` request interceptor,
+  envelope unwrap, 401 → tek-uçuş refresh (dedup). Access token yalnız bellekte; refresh token
+  yalnız `expo-secure-store`.
+- `src/stores/auth.ts` — zustand: bootstrap (refresh → `/auth/me`), login, 2FA challenge, logout.
+- `src/i18n/index.ts` — `t()` helper (yukarıya bak).
+- `src/theme/` — design token → RN stil objesi (`../web/src/styles/tokens.css` tek kaynak).
+- `src/app/` — Expo Router: `index.tsx` (açılış/bootstrap yönlendirme), `(auth)/login.tsx`,
+  `(auth)/two-factor.tsx`, `(app)/guilds.tsx`.

@@ -26,9 +26,18 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~57.0.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "i18n:sync": "node scripts/sync-i18n.js",
+    "prestart": "npm run i18n:sync",
+    "preandroid": "npm run i18n:sync",
+    "preios": "npm run i18n:sync",
+    "preweb": "npm run i18n:sync",
+    "pretypecheck": "npm run i18n:sync",
+    "prelint": "npm run i18n:sync",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",

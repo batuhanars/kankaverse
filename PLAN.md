@@ -207,6 +207,14 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
 - **F2 RN mobil** — 🟢 **KOD BAŞLADI (sahip kararı 2026-07-28).** Brief: `knowledge/projects/kankaverse/kankaverse-mobil-brief.md`. Stack **React Native + Expo** (Flutter kararı ADR 2026-07-02 ile revize; dooit kanıtıyla kesin). Aynı OpenAPI hattından TS client (Dart codegen düştü). Faz haritası M0-M5 (iskele → metin → push → ses → medya → mağaza); Android-first, mevcut bireysel Play hesabı, Apple ertelendi.
   - **M0 iskele** — 🟡 AKTİF: `contracts/SPRINT_M0_MOBILE_CONTRACT.md`. Yeni `mobile/` tier + giriş/2FA/oturum kalıcılığı + ortam listesi. Backend dokunuşu: **bearer refresh teslimi** (`Session.clientType` kapısı) — **R7**. DoD: cihazda giriş yapıp ortam listesini gören uygulama.
   - **M1-M5** — sözleşmeleri sırası gelince yazılır. **M2 (push) = Play kapalı testinin başladığı faz.** **M1 kapsamına kayıt + şifre sıfırlama ekranı dahil** (M0'dan çıkarıldı, M5'e bırakılamaz: kayıt ekranı olmayan uygulama Play incelemesinden geçmez, kapalı testte 12 testçiyi web'e mecbur eder).
+  - **Mobil gezinme mimarisi — sahip kararı 2026-07-29 (M1'de inşa edilir):** web'in responsive deseninden (tek drawer + sabit orta panel) **bilinçli olarak ayrışır.
+    (1) Alt **tab çubuğu, 3 eleman:** Ana Sayfa · Bildirimler · Sen (adlar `tr.json` → `mobile.tabs.*`; "Sen" marka sesine uyduğu için korunur).
+    (2) **Ana Sayfa = rail (ortamlar) + sidebar** (DM kutuları / seçili ortamın kanal listesi) aynı ekranda, kalıcı.
+    (3) Kanal veya DM'e dokunuş → içerik **ayrı tam ekran**, üstte geri oku ile rail+sidebar'a dönüş.
+    (4) **Sağ üye/profil paneli mobilde YOK.** Profil, DM'de karşı tarafın adına/avatarına dokununca açılır.
+    M0'ın "Ortamların" ekranı bu mimarinin yerine geçen **geçici bir iskeledir**, M1'de yerini rail+sidebar'a bırakır.
+    **Bildirimler sekmesi ucuz:** `notifications` modülü hazır (liste + unread-count + read). Ama sekme asıl değerini **M2 push** ile kazanır; M1'de yapılır (sonradan tab sayısı değiştirmemek için), iş sırasında sona konur.
+    **Bilinçli boşluk:** üye listesi mobilde olmayınca ortam yönetimi (kick/ban/rol) mobilde girişsiz kalır; M1-M3 için kabul, ihtiyaç doğunca ortam ayarları içinden ayrı yol açılır (yeni panel değil).
   - **Testçi/yayın zamanlaması — sahip kararı 2026-07-28:** testçi toplama **öne çekilmiyor**. Gerekçe: kitle içerik üretimiyle oluşturuluyor; mobil tanıtımı içerik senaryolarına girdiğinde 12 testçi o kitleden çıkar. Hedef "uygulama bitmiş halde cepte dursun", takvimli yayın değil. **Kabul edilen bedel:** Play kapalı testi 12 testçi × 14 gün **kesintisiz** ister ve bu takvim beklemesidir, kodla kısaltılamaz → kitle geldiği gün bile yayına en az 2 hafta vardır. M5 planlanırken bu süre baştan takvime yazılır, sürpriz sayılmaz.
 
 ### Track D — Büyük Bahisler (V3/V4 — strateji/kurul kararı)

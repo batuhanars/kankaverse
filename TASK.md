@@ -940,20 +940,20 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 ### Mobil (`mobile/`)
 - [x] ~~Expo (TS) projesi + Expo Router iskeleti~~ + ~~`mobile/CLAUDE.md`~~ **PM kurdu 2026-07-29** (SDK 57 / RN 0.86; demo ekran+bağımlılık temizliği; `tsc` + android bundle temiz). Dev'e kalan: `EXPO_PUBLIC_API_URL` + README
-- [ ] README (ön koşullar aşağıdaki maddede) + `.env` örneği
-- [ ] **axios envelope client:** `Bearer` + `X-Client-Type: mobile` request interceptor · `response.data.data` unwrap · 401 → tek-uçuş refresh dedup (web pattern'i)
-- [ ] **Token saklama:** refresh → `expo-secure-store`; access **yalnız bellekte** (diske yazılmaz); AsyncStorage kullanılmadı
-- [ ] **Auth store (zustand):** bootstrap (**refresh → `/auth/me`**, iki adım) · login · 2FA challenge · logout (sunucu hatasında da yerel temizlik); **her refresh yanıtındaki yeni token secure store'a yazılır** (yazılmazsa reuse-detection kullanıcıyı atar)
-- [ ] **i18n:** metro `watchFolders` + `@i18n` alias → `web/src/i18n/tr.json` **import edilir, kopyalanmaz**; `t(path, params)` helper (nokta yolu + `{key}` interpolasyon)
-- [ ] **Tema:** design-token → `src/theme/tokens.ts`; renk/ölçü bileşene gömülmedi
-- [ ] **Ekranlar (üç):** Açılış (bootstrap yönlendirme) · Giriş + 2FA kod · Ortam listesi (read-only, başlıkta **çıkış yap**) + boş durum + hata durumu
-- [ ] Ön koşullar README'de: **emülatörde `EXPO_PUBLIC_API_URL=http://10.0.2.2:3001`** (port **3001**, fiziksel cihazda LAN IP `192.168.1.50`; `localhost` ikisinde de yanlış) + yerel DB'de 2FA'lı hesap (`Azeroth`, canlıdaki hesap değil) + Docker + `api` ayakta. **Güvenlik duvarı işi yok** (`node.exe` izni mevcut, PM doğruladı). ⚠️ **`api` CORS'una dokunma** (native'de CORS yok)
+- [x] README + `.env.example` (API adresi tablosu, ön koşullar, CORS uyarısı, test hesabı reçetesi)
+- [x] **axios envelope client:** `Bearer` + `X-Client-Type: mobile` · `response.data.data` unwrap · 401 → tek-uçuş refresh dedup + yanıt tip doğrulaması (bozuk yanıtta `undefined` secure store'a gitmez)
+- [x] **Token saklama:** refresh → `expo-secure-store`; access **yalnız bellekte**; AsyncStorage kullanılmadı
+- [x] **Auth store (zustand):** iki adımlı bootstrap (tek-uçuş guard'lı) · login · 2FA challenge · logout (sunucu hatasında da yerel temizlik) · oturum-düştü geri çağrısı → `(app)` guard girişe yollar; her refresh yanıtındaki yeni token secure store'a yazılıyor
+- [x] **i18n:** metro `watchFolders` çözülemedi → sözleşme §6'daki **önceden onaylı kaçış yolu** (`prestart`/`pretypecheck` kancalarıyla `tr.generated.json` üretimi, gitignore'da). Tek kaynak yine `web/src/i18n/tr.json`; kopya yok, elle bakım yok
+- [x] **Tema:** design-token → `src/theme/tokens.ts`; renk/ölçü bileşene gömülmedi
+- [x] **Ekranlar (üç):** Açılış (bootstrap yönlendirme) · Giriş + 2FA kod · Ortam listesi (read-only, başlıkta **çıkış yap**) + boş durum + hata durumu
+- [x] Ön koşullar README'de: **emülatörde `EXPO_PUBLIC_API_URL=http://10.0.2.2:3001`** (port **3001**, fiziksel cihazda LAN IP `192.168.1.50`; `localhost` ikisinde de yanlış) + yerel DB'de 2FA'lı hesap (`Azeroth`, canlıdaki hesap değil) + Docker + `api` ayakta. **Güvenlik duvarı işi yok** (`node.exe` izni mevcut, PM doğruladı). ⚠️ **`api` CORS'una dokunma** (native'de CORS yok)
 
-### DoD (sözleşme §1)
-- [ ] Giriş yapılıyor; 2FA'lı hesapta challenge akışı çalışıyor
-- [ ] Ortam listesi sunucudan geliyor ve görünüyor
-- [ ] Uygulama kapatılıp açılınca oturum korunuyor (secure store bootstrap)
-- [ ] Access süresi dolunca sessiz yenileme oluyor, kullanıcı fark etmiyor
-- [ ] Çıkışta sunucu session'ı revoke + yerel temizlik
-- [ ] **Web regresyon yok:** web'de giriş/yenileme/çıkış eskisi gibi (sahip canlı doğrular)
-- [ ] `mobile/` içinde gömülü kullanıcı-görünür string yok; `tr.json` kopyası yok
+### DoD (sözleşme §1) — emülatörde doğrulandı 2026-07-29
+- [x] Giriş yapılıyor; **2FA'lı hesapta challenge akışı çalışıyor** (sahip `Azeroth` ile TOTP girip tamamladı)
+- [x] Ortam listesi sunucudan geliyor ve görünüyor (PM doğruladı, ekran görüntülü)
+- [x] Uygulama kapatılıp açılınca oturum korunuyor (PM doğruladı: `force-stop` → yeniden açılış → giriş sormadan ortam listesi; DB'de rotasyon kaydı)
+- [ ] Access süresi dolunca sessiz yenileme — **kısmen doğrulandı.** Refresh + rotasyon cihazda çalışıyor (bootstrap yolu, DB'de kanıtlı) ama **401 → yeniden dene yolu zorlanarak test edilmedi.** Kapatmak için yerelde access TTL'i kısaltıp bir istek tekrarı gözlenmeli (5 dk'lık iş, M1 başında yapılabilir)
+- [x] Çıkışta sunucu session'ı revoke + yerel temizlik (sahip çıkış yaptı, PM DB'den doğruladı: tüm mobil session'lar iptal)
+- [ ] **Web regresyon yok:** birim testler + gerçek sunucu curl'ü ile kanıtlandı; **sahibin canlıda gözle doğrulaması kalıyor**
+- [x] `mobile/` içinde gömülü kullanıcı-görünür string yok; `tr.json` kopyası yok (üretilmiş dosya gitignore'da)

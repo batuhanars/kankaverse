@@ -86,13 +86,24 @@ Mevcut satırlara dokunulmaz; `null` web gibi davranır.
   istemez). Gövdede token alıp §2.3 kapısından geçemeyen ölü bir istemci tipi tanımlamak anlamsız yüzeydir.
   Gerçek bir native masaüstü istemcisi doğduğu gün allowlist tek satırla genişler.
 
-**2.3 `POST /auth/refresh`:**
-- Cookie varsa → bugünkü akış (değişmez).
-- Cookie yoksa → gövdedeki `{ refreshToken }` kabul edilir.
-- **Kapı (R7'nin özü):** gövdeden gelen token'ın ait olduğu session `clientType !== 'mobile'` ise **401**
-  (`error: 'REFRESH_CHANNEL_MISMATCH'`). Yani bir web oturumunun refresh token'ı hiçbir koşulda gövdede dönmez
-  ve gövdeden kabul edilmez.
-- Mobil akışta yeni refresh token **gövdede** döner (`{ accessToken, refreshToken }`).
+**2.3 `POST /auth/refresh` — kanal seçimi (REVİZE 2026-07-29, cihaz testinden sonra):**
+
+- **`X-Client-Type: mobile` VE gövdede `refreshToken` varsa → gövde kanalı.** Cookie gelmiş olsa bile
+  yok sayılır; yanıt `{ accessToken, refreshToken }` döner.
+- **Aksi hâlde → bugünkü davranışın birebir aynısı:** cookie varsa cookie kanalı (yanıt yalnız
+  `{ accessToken }`), cookie yoksa gövdeki token §2.3 kapısına tabi tutulur.
+- **Kapı (R7'nin özü, DEĞİŞMEDİ):** gövdeden gelen token'ın ait olduğu session `clientType !== 'mobile'` ise
+  **401** (`error: 'REFRESH_CHANNEL_MISMATCH'`). Bir web oturumunun refresh token'ı hiçbir koşulda gövdede
+  dönmez ve gövdeden kabul edilmez. Bu revizyon kapıyı **gevşetmez**; yalnız kanalın hangi sinyale bakarak
+  seçileceğini değiştirir.
+
+> **Neden revize edildi (kanıtlı):** ilk sürüm kanalı "cookie var mı" ile seçiyordu, çünkü §2'de "native
+> istemcide tarayıcı cookie kavanozu yok" varsayılmıştı. **Bu varsayım yanlış.** React Native'in ağ katmanı
+> (okhttp) kendi çerez kavanozunu tutar: giriş yanıtındaki `Set-Cookie` saklanır ve sonraki isteklere
+> otomatik eklenir. Sonuç: mobil `/auth/refresh` isteği cookie'li geldi, sunucu cookie kanalını seçti,
+> gövdede `refreshToken` dönmedi, istemci `undefined`'ı secure store'a yazmaya çalışıp patladı ve oturum
+> düştü. Emülatörde DoD §4 (oturum kalıcılığı) bu yüzden başarısızdı; birim testler ve kod incelemesi
+> bunu yakalayamadı, yalnız cihazda görüldü. Kanal artık **istemci tipine** bakar, taşımaya değil.
 
 **2.4 Değişmeyen, dokunulmayacak yerler:**
 - Rotasyon, `tokenFamily`, reuse-detection, revoke mantığı **aynen** geçerli. Mobil ayrıcalık almaz.
@@ -111,7 +122,7 @@ Hepsi kök `CLAUDE.md` envelope'ıyla sarılır; istemci gerçek veriyi `respons
 
 | Endpoint | Auth | Gövde / dönen |
 |---|---|---|
-| `POST /auth/login` | yok | `{ emailOrUsername, password }` → `{ user, accessToken, refreshToken? }` **veya** `{ twoFactorRequired: true, challengeToken }` |
+| `POST /auth/login` | yok | `{ identifier, password }` → `{ user, accessToken, refreshToken? }` **veya** `{ twoFactorRequired: true, challengeToken }` |
 | `POST /auth/login/2fa` | yok | `{ challengeToken, code }` → `{ user, accessToken, refreshToken? }` |
 | `POST /auth/refresh` | yok | mobil: `{ refreshToken }` → `{ accessToken, refreshToken }` |
 | `GET /auth/me` | bearer | → `user` |
@@ -119,7 +130,12 @@ Hepsi kök `CLAUDE.md` envelope'ıyla sarılır; istemci gerçek veriyi `respons
 | `GET /guilds` | bearer | → kullanıcının ortam listesi (`guilds.controller.ts:72`) |
 
 `refreshToken?` = yalnız `X-Client-Type: mobile` başlığıyla gelen istekte var. DTO alan adları mevcut
-`LoginDto` / `Login2faDto`'dan **birebir okunur**; dev tahmin etmez, dosyaya bakar. Bu tabloda olmayan bir
+`LoginDto` / `Login2faDto`'dan **birebir okunur**; dev tahmin etmez, dosyaya bakar.
+
+> **Düzeltme 2026-07-29 (PM):** Bu tabloda `login` gövdesi önce `emailOrUsername` yazıyordu; gerçek alan
+> `identifier` (`api/src/modules/auth/dto/login.dto.ts`). Dev kuralı uygulayıp dosyaya baktığı için hata
+> koda geçmedi, tablo düzeltildi. **Bu satırın neden orada olduğunun kanıtı:** sözleşme de yanılabilir,
+> DTO'nun doğruluk kaynağı dosyanın kendisidir. Bu tabloda olmayan bir
 endpoint'e M0'da ihtiyaç duyulursa → **DUR, PM'e dön**.
 
 ---
