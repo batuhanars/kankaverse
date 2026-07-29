@@ -1,0 +1,203 @@
+# Sprint M1a Contract — Mobil Gezinme Kabuğu + Mesajlaşma (Track F2)
+
+> **Tek doğruluk kaynağı.** Dev session'lar buradan sapamaz. Sapma → dur, kullanıcıya bildir, PM revize eder.
+> Kök `CLAUDE.md` + `mobile/CLAUDE.md` geçerli. Önceki faz: `SPRINT_M0_MOBILE_CONTRACT.md` (tamamlandı).
+>
+> **R7 durumu:** Bu sprint **R7-nötr olmalıdır.** Tüm erişim/yaş/DM kapıları backend'de zaten kurulu;
+> mobil yalnız sonucu gösterir. `api/` tier'ına dokunma ihtiyacı doğarsa **DUR** — o an sprint R7'ye girer.
+
+---
+
+## 0. Bu sözleşmeyle kapanan kararlar
+
+| Konu | Karar |
+|---|---|
+| Faz bölünmesi | M1 ikiye bölündü (sahip onayı 2026-07-29). **M1a = kabuk + mesajlaşma** (bu dosya). **M1b = hesap yüzeyleri** (kayıt, şifre sıfırlama, profil, bildirimler ekranı) |
+| Gezinme mimarisi | PLAN Track F2'deki sahip kararı bağlayıcı: rail + sidebar kalıcı, içerik ayrı tam ekran, sağ üye paneli **yok**, alt tab çubuğu 3 eleman |
+| M0'ın "Ortamların" ekranı | **Kaldırılır.** Geçici iskeleydi; yerini rail + sidebar alır |
+| Ses/görüntü | **Kapsam dışı** (M3). Ses kanalı satırları listede görünür ama girilemez — dokunulunca hiçbir şey olmaz **denmez**, kanal listesi yalnız metin kanallarını gösterir |
+| Mesaj düzenleme / silme / tepki / pin / arama | **Kapsam dışı.** M1a okuma + gönderme + gerçek zamanlı alma ile sınırlı |
+| Mention **yazma** (autocomplete) | Kapsam dışı. Ama **mention gösterimi zorunlu** (§5.4) |
+| DM istekleri | **Dahil.** Backend uçları hazır (`/dm/requests` + accept/reject). Mobilde görünmezse kullanıcı kendisine gelen isteği hiç göremez — bu "dilsizlik" T&S açısından kabul edilemez |
+| Grup DM | Liste + okuma + gönderme dahil; **grup kurma/üye ekleme kapsam dışı** |
+| Mesaj ekleri | **Gösterim dahil, yükleme kapsam dışı** (sahip onayı). Görsel → küçük önizleme, diğer dosyalar → dosya adı rozeti. Ayrıntı ve **T&S kapısı** §5.5 |
+
+---
+
+## 1. Hedef
+
+Mobil uygulamanın **kullanılabilir** hâle geldiği faz: kullanıcı ortamlarını ve DM'lerini geziyor,
+mesajları okuyor, mesaj gönderiyor, karşı taraf yazınca anında görüyor.
+
+### DoD (emülatörde **ve** en az bir kez fiziksel cihazda doğrulanır)
+
+> M0'ın dersi: kod incelemesi ve birim testler yeterli değil. Her madde **görülerek** kapatılır.
+
+1. Giriş sonrası **rail + sidebar** ekranı açılır; ortamlar rail'de, seçili ortamın kanalları sidebar'da.
+2. Sidebar'da **DM listesi** görünür (son mesaj önizlemesi + okunmamış göstergesi).
+3. Kanala dokununca **mesaj ekranı ayrı tam ekran** açılır; geçmiş yüklenir, yukarı kaydırınca eskisi gelir.
+4. Mesaj yazılıp gönderilir; kendi ekranında **anında** belirir.
+5. **İkinci bir istemciden** (web) gönderilen mesaj, mobil ekranda **yenileme yapmadan** belirir.
+6. Karşı taraf yazarken **"yazıyor" göstergesi** görünür.
+7. Uygulama arka plana alınıp geri dönülünce bağlantı **kendini toparlar** ve **kaçırılan mesajlar gelir**
+   (ekranda boşluk kalmaz).
+8. Alt tab çubuğu çalışır; **Bildirimler** sekmesi okunmamış bildirimleri listeler.
+9. DM isteği gelen kullanıcı bunu mobilde görür, kabul/ret edebilir.
+10. Mention içeren mesaj `<@cms...>` gibi ham token göstermez, `@kullanıcıadı` olarak render olur.
+11. Görsel ekli mesaj önizleme gösterir; **taranmamış (`PENDING`) ek görsel olarak yüklenmez** (§5.5).
+
+### Kapsam DIŞI
+
+Ses/görüntü, medya yükleme, mesaj düzenleme/silme/tepki/pin/arama, mention yazma, kayıt/şifre sıfırlama,
+profil düzenleme, ortam/kanal yönetimi (oluşturma, ayar, üye yönetimi), keşfet, etkinlikler, tablet düzeni, iOS.
+
+---
+
+## 2. Gezinme mimarisi (bağlayıcı)
+
+```
+Alt tab çubuğu (3):  [Ana Sayfa]      [Bildirimler]      [Sen]
+                          │
+                    rail + sidebar (tek ekran, kalıcı)
+                    ├── rail:    ortam ikonları (altıgen) + DM/ana sayfa girişi
+                    └── sidebar: seçili ortamın kanal listesi  VEYA  DM listesi
+                          │
+                    dokunuş → içerik AYRI TAM EKRAN (üstte geri oku)
+                    ├── kanal mesaj ekranı
+                    └── DM mesaj ekranı
+```
+
+- **Sağ üye/profil paneli YOK.** Profil, DM başlığında karşı tarafın adına/avatarına dokununca açılır
+  (M1a'da **salt okunur** profil kartı; düzenleme M1b).
+- "Sen" sekmesi M1a'da kendi profilini **salt okunur** gösterir (avatar, kullanıcı adı, çıkış yap).
+  Ayarlar yüzeyi M1b'de gelir — **boş iskele koyma.**
+- Web'in responsive deseni (tek drawer + sabit orta panel) **taşınmaz**; mobil bu dosyadaki desendir.
+
+---
+
+## 3. Endpoint'ler (imza = dosya, bu tablo yalnız yol listesidir)
+
+> **M0'ın en pahalı dersi:** sözleşme `login` gövdesini `emailOrUsername` yazmıştı, gerçek alan `identifier`'dı.
+> **DTO alan adları, sorgu parametreleri ve dönen şekiller ilgili `*.controller.ts` / `dto/*.ts` dosyasından
+> BİREBİR okunur.** Aşağıdaki tablo "hangi uç var" sorusunu cevaplar, "alan adı ne" sorusunu **cevaplamaz.**
+
+| Amaç | Uç |
+|---|---|
+| Ortam listesi | `GET /guilds` |
+| Kanal listesi | `GET /guilds/:id/channels` |
+| Mesaj geçmişi (cursor, 50) | `GET /channels/:id/messages?before=` |
+| Mesaj gönder | `POST /channels/:id/messages` |
+| Kanal okundu | `POST /channels/:id/read` |
+| DM listesi | `GET /dm/channels` |
+| DM aç | `POST /dm/channels` |
+| DM okundu | `POST /dm/channels/:id/read` |
+| DM istekleri | `GET /dm/requests` · `POST /dm/requests/:id/accept` · `POST /dm/requests/:id/reject` |
+| Bildirimler | `GET /notifications` · `GET /notifications/unread-count` · `POST /notifications/read` |
+| Kullanıcı | `GET /auth/me` |
+| Ek indirme adresi (tarama kapılı) | `GET /attachments/:id` |
+
+Bu tabloda olmayan bir uca ihtiyaç doğarsa → **DUR, PM'e dön.**
+
+---
+
+## 4. WebSocket (`socket.io-client`)
+
+Bağımlılık eklenir: **`socket.io-client`** (PM onaylı, bu sözleşme kapsamında).
+
+**4.1 Bağlantı — web'deki `useSocket` deseni birebir taşınır** (`web/src/composables/useSocket.ts`):
+
+- Token **sabit verilmez, callback ile verilir:** `auth: (cb) => cb({ token: getAccessToken() })`.
+  **Neden kritik:** sabit token verilirse yeniden bağlanma ~15 dk sonra **bayat** token'la el sıkışır ve
+  auth'ta düşer. Web'de bu bir denetim bulgusuydu, aynı hatayı tekrarlama.
+- Access token yenilendiğinde bağlantı taze token'ı kullanır; `auth_error` gelirse bir kez refresh dene,
+  yine olmuyorsa oturumu düşür (M0'daki `setSessionExpiredHandler` yoluna bağlan).
+
+**4.2 Olaylar**
+
+| Yön | Olay |
+|---|---|
+| istemci → sunucu | `channel:join` · `channel:leave` · `typing:start` · `typing:stop` · `presence:set` |
+| sunucu → istemci | `message.created` · `message.updated` · `message.deleted` · `typing:update` · `typing:clear` · `presence:snapshot` · `notification:snapshot` |
+
+`message.updated` / `message.deleted` **gelirse işlenir** (mesaj güncellenir/kaldırılır) — düzenleme/silme
+arayüzü yok ama web'den yapılan değişiklik mobilde yansımalı, yoksa iki istemci ayrışır.
+
+**4.3 Arka plan / ön plan politikası (mobilin en sinsi kısmı)**
+
+- Uygulama arka plana düşünce (`AppState` → `background`) **soket kapatılır.** Gerekçe: pil ve veri; kapalıyken
+  haber verme işi **push'un** işidir (M2).
+- Ön plana dönünce: **(1)** soket yeniden bağlanır, **(2)** açık olan kanalın mesajları **yeniden çekilir**
+  (kaçırılan mesaj boşluğu kapanır), **(3)** `channel:join` tekrar gönderilir.
+- **Boşluk bırakma yasağı:** yeniden bağlanma sonrası ekrandaki liste ile sunucudaki gerçek arasında fark
+  kalmamalı. "Sadece yeni gelenleri dinle" yetmez, arada kaçanlar gelmez.
+
+**4.4 Mention gösterimi (zorunlu)**
+
+
+Mesaj içeriği `<@userId>` ve `<@&roleId>` token'ları içerir. Ham gösterilirse kullanıcı `<@cms67...>` görür.
+Mobil bunları `@kullanıcıadı` / `@everyone` olarak render eder (web'deki çözüm okunur, kopyalanmaz —
+aynı kurallar). **Tıklanabilir değil** (profil açma M1b).
+
+**5.5 Mesaj ekleri — gösterim + T&S kapısı (🔴 dikkat)**
+
+Mesaj nesnesindeki ek kaydı **URL içermez**; yalnız `id`, dosya adı, `contentType`, boyut ve `scanStatus`
+taşır (`messages.service.ts` DTO eşlemesi — alan adları dosyadan okunur). Gerçek indirme adresi ayrı uçtan
+alınır: **`GET /attachments/:id`** (erişim kontrolü + tarama kapısı sunucuda, presigned URL gövdede döner).
+
+**Kural — web'deki `AttachmentView` ile birebir aynı olmak zorunda:**
+
+| `scanStatus` | Mobil davranışı |
+|---|---|
+| `CLEAN` | Görselse (`contentType` `image/` ile başlıyor) küçük önizleme yüklenir; değilse dosya adı rozeti |
+| `PENDING` | **Görsel YÜKLENMEZ.** "Taranıyor" durumu gösterilir |
+| `FLAGGED` | **Engellendi** durumu gösterilir; indirme adresi istenmez |
+
+> **Bu bir T&S kapısıdır, kozmetik değil.** Taranmamış veya işaretlenmiş bir görseli ekrana basmak, web'de
+> kapalı olan bir yüzeyi mobilde açmak demektir (brief §4 — çocuk güvenliği). Kapıyı istemcide gevşetme;
+> `scanStatus` sunucudan ne geldiyse odur. Emin olmadığın durumda **gösterme**, PM'e sor.
+
+Yükleme (ek gönderme) **kapsam dışı** — mesaj kutusuna ataş/kamera düğmesi konmaz.
+
+---
+
+## 5. Ekranlar
+
+1. **Ana Sayfa (rail + sidebar)** — ortam rail'i, kanal listesi / DM listesi, DM istekleri girişi (sayaçlı).
+2. **Kanal mesaj ekranı** — geçmiş (cursor'lu sonsuz kaydırma), mesaj kutusu, yazıyor göstergesi, boş/hata durumu.
+3. **DM mesaj ekranı** — aynısı + başlıkta karşı tarafın adı/avatarı (dokunuş → salt okunur profil kartı).
+4. **DM istekleri** — liste + kabul/ret.
+5. **Bildirimler sekmesi** — liste, okunmamış vurgusu, dokunuşta ilgili kanala git.
+6. **Sen sekmesi** — salt okunur profil + çıkış yap.
+
+Her listede **boş durum** ve **hata + tekrar dene** durumu zorunlu (M0'daki desen).
+
+---
+
+## 6. Kurallar (M0'dan devam)
+
+- Kullanıcıya görünen tek bir string koda gömülmez; kaynak `web/src/i18n/tr.json`, mobil-özel metinler `mobile.*`.
+- Renk/ölçü bileşene gömülmez, `src/theme`'den gelir. Marka görselleri `assets/brand` (kopya; kaynak web).
+- Envelope: gerçek veri `response.data.data`; hata mesajı `message` (Türkçe) gösterilir, `error` loglanır.
+- **Olmayan özelliğe kapı açma:** ses kanalı, mesaj düzenleme, ortam kurma gibi M1a dışı şeyler için
+  buton/menü/iskele konmaz.
+- **T&S:** kapılar backend'de. Bir kullanıcıya DM atılamıyorsa sunucu 403 döner; mobil bunu **sessizce
+  gizlemez**, sunucunun Türkçe mesajını gösterir.
+
+---
+
+## 7. Kabul kriterleri
+
+- [ ] DoD'deki 10 madde emülatörde **ve** bir fiziksel cihazda görülerek doğrulandı (ekran görüntüsü/kayıt)
+- [ ] İki istemci (web + mobil) aynı kanalda: her iki yönde anlık mesaj akışı çalışıyor
+- [ ] Arka plan → ön plan dönüşünde mesaj boşluğu **oluşmuyor** (kasıtlı test: arka plandayken web'den 3 mesaj at)
+- [ ] Reconnect bayat token'la düşmüyor (access ömrü dolduktan sonra da bağlantı toparlanıyor)
+- [ ] `mobile/` içinde gömülü string yok; `tr.json` kopyası yok
+- [ ] `npm run typecheck` + `npm run lint` temiz
+- [ ] `api/` tier'ına dokunulmadı (dokunulduysa sprint R7'ye girer, sahip imzası şart)
+
+---
+
+## 8. Sapma kuralı
+
+Endpoint yolu, ekran sayısı, gezinme deseni bu dosyadan **sapamaz**. İhtiyaç doğarsa dev **durur**,
+kullanıcıya bildirir, PM revize eder. `TASK.md`'ye item eklemek dev'in işi değildir.
