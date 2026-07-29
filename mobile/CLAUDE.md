@@ -28,6 +28,9 @@ API'yi hatırdan yazma, `AGENTS.md`'deki sürümlü dokümana bak.
   **import edilir, KOPYALANMAZ.** Mobil-özel metinler `mobile.*` altına, o dosyaya eklenir.
 - **Tema:** renk/ölçü/yarıçap bileşen içine gömülmez, `src/theme` üzerinden gelir. Kaynak
   `knowledge/projects/kankaverse/kankaverse-design-tokens.md`. Web'de olmayan token uydurma.
+- **Marka görselleri:** `assets/brand/` altındaki dosyalar `web/src/assets/brand`'in **kopyasıdır**
+  (Metro proje kökü dışını çözemiyor; i18n'deki aynı sınır). Kaynak orası — marka değişirse iki yerde de
+  güncellenir. Dikey kilit (altıgen + kelime işareti) giriş ekranında, yazısız altıgen açılış ekranında.
 - **Envelope:** her yanıt `{ success, statusCode, data }`. Gerçek veri `response.data.data`'dan çıkar.
   Kullanıcıya `message` (Türkçe) gösterilir, `error` kodu loglanır. Ham hata metni ekrana basılmaz.
 - **Token:** refresh → `expo-secure-store`. Access → **yalnız bellekte**. AsyncStorage'a token **asla** yazılmaz.
