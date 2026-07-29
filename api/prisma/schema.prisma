@@ -190,6 +190,7 @@ model Session {
   tokenFamily      String
   device           String?
   ip               String?
+  clientType       String?   // 'mobile' | null (=web/desktop, geriye dönük uyum) — M0 bearer refresh teslimi
   lastActiveAt     DateTime  @default(now())
   revokedAt        DateTime?
   createdAt        DateTime  @default(now())
