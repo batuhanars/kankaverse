@@ -939,14 +939,15 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] **R7 insan incelemesi:** diff sahibe sunuldu, sahip imzası alındı
 
 ### Mobil (`mobile/`)
-- [ ] Expo (TS) projesi + Expo Router iskeleti; `mobile/CLAUDE.md` yazıldı (sözleşme §9); `EXPO_PUBLIC_API_URL` + README (LAN IP notu)
+- [x] ~~Expo (TS) projesi + Expo Router iskeleti~~ + ~~`mobile/CLAUDE.md`~~ **PM kurdu 2026-07-29** (SDK 57 / RN 0.86; demo ekran+bağımlılık temizliği; `tsc` + android bundle temiz). Dev'e kalan: `EXPO_PUBLIC_API_URL` + README
+- [ ] README (ön koşullar aşağıdaki maddede) + `.env` örneği
 - [ ] **axios envelope client:** `Bearer` + `X-Client-Type: mobile` request interceptor · `response.data.data` unwrap · 401 → tek-uçuş refresh dedup (web pattern'i)
 - [ ] **Token saklama:** refresh → `expo-secure-store`; access **yalnız bellekte** (diske yazılmaz); AsyncStorage kullanılmadı
 - [ ] **Auth store (zustand):** bootstrap (**refresh → `/auth/me`**, iki adım) · login · 2FA challenge · logout (sunucu hatasında da yerel temizlik); **her refresh yanıtındaki yeni token secure store'a yazılır** (yazılmazsa reuse-detection kullanıcıyı atar)
 - [ ] **i18n:** metro `watchFolders` + `@i18n` alias → `web/src/i18n/tr.json` **import edilir, kopyalanmaz**; `t(path, params)` helper (nokta yolu + `{key}` interpolasyon)
 - [ ] **Tema:** design-token → `src/theme/tokens.ts`; renk/ölçü bileşene gömülmedi
 - [ ] **Ekranlar (üç):** Açılış (bootstrap yönlendirme) · Giriş + 2FA kod · Ortam listesi (read-only, başlıkta **çıkış yap**) + boş durum + hata durumu
-- [ ] Ön koşullar README'de: LAN IP + **Windows güvenlik duvarı 3000 izni** + 2FA'lı test hesabı
+- [ ] Ön koşullar README'de: **emülatörde `EXPO_PUBLIC_API_URL=http://10.0.2.2:3000`** (fiziksel cihazda LAN IP `192.168.1.50`; `localhost` ikisinde de yanlış) + yerel DB'de 2FA'lı hesap (`Azeroth`, canlıdaki hesap değil) + Docker + `api` ayakta. **Güvenlik duvarı işi yok** (3000 kuralı + `node.exe` izni mevcut, PM doğruladı). ⚠️ **`api` CORS'una dokunma** (native'de CORS yok)
 
 ### DoD (sözleşme §1)
 - [ ] Giriş yapılıyor; 2FA'lı hesapta challenge akışı çalışıyor
