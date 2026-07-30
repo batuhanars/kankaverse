@@ -1,6 +1,7 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/stores/auth';
 import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
 import { t } from '@/i18n';
@@ -11,6 +12,10 @@ import { theme } from '@/theme';
 // sprintte gerçekten var olan şey gösteriliyor.
 // Sprint M1c contract §3.4 — doğrulama bandı yalnız `emailVerified === false` iken mount edilir
 // (web `AppShell.vue` deseniyle birebir aynı gate — boş yüzey açılmaz).
+//
+// Sprint M1d-0 contract §1/§3.1 — "Sen" hesap merkezine dönüşür: mevcut içerik korunur, altına
+// Kankalar/Engellenenler satırları eklenir. Üst seviye ayrı bir "Kankalar" varış noktası AÇILMADI
+// (sahip kararı, sözleşme §0) — bu satırlar hesap merkezinin İÇİNDE, tab çubuğu hâlâ 3 eleman.
 export default function MeScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -35,11 +40,27 @@ export default function MeScreen() {
           </View>
         )}
         <Text style={styles.username}>{user.username}</Text>
+      </View>
 
-        <Pressable onPress={onLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>{t('common.logout')}</Text>
+      <View style={styles.menu}>
+        <Pressable
+          onPress={() => router.push('/friends-list')}
+          style={[styles.menuRow, styles.menuRowDivider]}
+        >
+          <Ionicons name="people-outline" size={20} color={theme.colors.textSecondary} />
+          <Text style={styles.menuLabel}>{t('friends.title')}</Text>
+          <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+        </Pressable>
+        <Pressable onPress={() => router.push('/blocked-list')} style={styles.menuRow}>
+          <Ionicons name="ban-outline" size={20} color={theme.colors.textSecondary} />
+          <Text style={styles.menuLabel}>{t('friends.tabBlocked')}</Text>
+          <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
         </Pressable>
       </View>
+
+      <Pressable onPress={onLogout} style={styles.logoutButton}>
+        <Text style={styles.logoutText}>{t('common.logout')}</Text>
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -50,10 +71,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgContent,
   },
   center: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: theme.layout.panelGap * 1.5,
+    paddingTop: theme.layout.panelGap * 1.5,
+    paddingBottom: theme.layout.panelGap,
   },
   avatar: {
     width: 88,
@@ -75,9 +96,34 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.xl,
     fontWeight: '700',
-    marginBottom: theme.layout.panelGap * 1.5,
+  },
+  menu: {
+    marginHorizontal: theme.layout.panelGap * 1.5,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.bgSidebar,
+    overflow: 'hidden',
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: theme.layout.inputMinHeight,
+    paddingHorizontal: theme.layout.panelGap,
+  },
+  menuRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.borderSubtle,
+  },
+  menuLabel: {
+    flex: 1,
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.base,
+    fontWeight: '600',
   },
   logoutButton: {
+    marginTop: 'auto',
+    marginHorizontal: theme.layout.panelGap * 1.5,
+    marginBottom: theme.layout.panelGap * 1.5,
     minHeight: theme.layout.inputMinHeight,
     paddingHorizontal: theme.layout.panelGap * 1.5,
     borderRadius: theme.radius.md,

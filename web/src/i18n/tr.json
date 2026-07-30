@@ -1599,7 +1599,8 @@
     },
     "friends": {
       "share": "Paylaş",
-      "shareMessage": "Kankaverse'de kanka kodum: {code}"
+      "shareMessage": "Kankaverse'de kanka kodum: {code}",
+      "confirmUnblock": "Bu kullanıcının engelini kaldırmak istediğinizden emin misiniz?"
     },
     "group": {
       "manage": "Grup Yönetimi"

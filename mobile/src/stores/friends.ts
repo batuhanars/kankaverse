@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { friendsApi, type FriendDto, type FriendRequestDto } from '@/api/friends';
+import { blocksApi, type BlockedUserDto } from '@/api/blocks';
 import { extractErrorMessage } from '@/api/errors';
 import { useNotificationsStore } from './notifications';
 
@@ -8,6 +9,9 @@ import { useNotificationsStore } from './notifications';
 // dersiyle aynı gerekçe (sözleşme §8.3 kanıtlı): store oturum kapsamlıdır, `reset()` (app)/_layout.tsx
 // unmount'unda çağrılır — temizlenmezse çıkıştan sonra sıradaki kullanıcı öncekinin kanka listesini
 // görür. Store auth'u İMPORT ETMEZ (aynı döngü riski, dm.ts ile aynı disiplin).
+//
+// Sprint M1d-0 contract §6 — Engellenenler listesi de BURAYA girer (ayrı bir store açılmadı):
+// aynı sızıntı sınıfı (M1b §8.3'te bir kez yaşandı), aynı `reset()` çağrısına tabi olması gerekiyor.
 type LoadState = 'loading' | 'error' | 'ready';
 
 interface FriendsState {
@@ -15,6 +19,10 @@ interface FriendsState {
   requests: FriendRequestDto[];
   state: LoadState;
   errorMessage: string;
+
+  blocked: BlockedUserDto[];
+  blockedState: LoadState;
+  blockedErrorMessage: string;
 
   fetchAll: () => Promise<void>;
   sendRequest: (friendCode: string) => Promise<void>;
@@ -28,6 +36,9 @@ interface FriendsState {
   handleIncomingRequest: (payload: FriendRequestDto) => void;
   handleAccepted: (payload: FriendDto) => void;
   handleRemoved: (userId: string) => void;
+  /** Sözleşme §3.3 — yalnız BENİM engellediklerim (`GET /blocks` zaten `blockerId` filtreli). */
+  fetchBlocked: () => Promise<void>;
+  unblock: (userId: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -47,6 +58,10 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
   requests: [],
   state: 'loading',
   errorMessage: '',
+
+  blocked: [],
+  blockedState: 'loading',
+  blockedErrorMessage: '',
 
   async fetchAll() {
     try {
@@ -104,7 +119,29 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
     }));
   },
 
+  async fetchBlocked() {
+    try {
+      const blocked = await blocksApi.list();
+      set({ blocked, blockedState: 'ready', blockedErrorMessage: '' });
+    } catch (e) {
+      set({ blockedState: 'error', blockedErrorMessage: extractErrorMessage(e) });
+    }
+  },
+
+  async unblock(userId) {
+    await blocksApi.unblock(userId);
+    set((s) => ({ blocked: s.blocked.filter((b) => b.user.id !== userId) }));
+  },
+
   reset() {
-    set({ friends: [], requests: [], state: 'loading', errorMessage: '' });
+    set({
+      friends: [],
+      requests: [],
+      state: 'loading',
+      errorMessage: '',
+      blocked: [],
+      blockedState: 'loading',
+      blockedErrorMessage: '',
+    });
   },
 }));
