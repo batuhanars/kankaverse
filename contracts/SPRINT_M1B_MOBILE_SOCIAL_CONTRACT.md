@@ -317,3 +317,40 @@ demekti. Kaynağında bir kez çözüldü.
 2 test bu yüzden düştü ve düzeltildi). Mobil `typecheck` + `lint` temiz.
 **R7 değil** (auth katmanı veya T&S karar fonksiyonu değil; bildirim okundu-durumu). **Web bu düzeltmeden
 ücretsiz faydalanır** ama web'de gözle doğrulanmadı — sahip canlıda görebilir.
+
+---
+
+## 13. Revizyon R2 — FAB + "Yeni Mesaj" akışı (sahip talebi 2026-07-30, görsel referanslı)
+
+Sahip Discord mobilde gezinip üç ekran görüntüsü verdi. **Gerekçe sağlam:** bizim mevcut `new-chat.tsx`
+grup kurmayı **örtük** yapıyor (1 kişi seç → DM, 2+ seç → grup). Kullanıcı "grup kurmak istiyorum" derken
+bunu keşfetmek zorunda. Ayrık ve adı konmuş bir giriş daha dürüst.
+
+### Yapılacak
+
+1. **FAB (sağ-altta yüzen düğme):** tab çubuğunun üstünde, daire, Kor dolgu, baloncuk+artı ikonu
+   (Ionicons). → "Yeni Mesaj" ekranını açar. **"Mesajlar" başlığının yanındaki "+" KALDIRILIR** (aynı işi
+   iki yerden yapmanın anlamı yok; FAB daha keşfedilebilir).
+2. **"Kanka Ekle" geniş butonu sidebar'da KALIR** (sahip kararı 2026-07-30): kanka eklemek yeni kullanıcının
+   en kritik ilk adımı, iki kapı zarar vermez. Yeni Mesaj ekranındaki satır ikinci kapıdır.
+3. **"Yeni Mesaj" ekranı (YENİ):** başlık + geri · üstte **arama alanı** (yalnız kanka listesinde yerel
+   süzme) · kart içinde iki satır: **"Yeni Grup"** ve **"Kanka Ekle"** (ikon + chevron) · altında
+   **alfabetik gruplu kanka listesi** (harf başlıklarıyla). Bir kankaya dokun → DM başlat (mevcut
+   `POST /dm/channels`; kanal varsa mevcut olana düşer — R2 bunu değiştirmez).
+4. **"Yeni Grup" ekranı (YENİ):** başlık + geri + **"n/9 üye"** sayacı + **"Oluştur"** eylemi · arama ·
+   aynı alfabetik liste ama **seçim kutulu**. En az 1 seçimde "Oluştur" etkinleşir.
+5. **`new-chat.tsx`'in örtük davranışı KALDIRILIR** — yerini bu iki ekran alır. Yeni sohbet başlatan tüm
+   yollar (`home`, `search`) FAB akışına bağlanır.
+
+### 🔴 Kopyalanmayacak / dikkat
+
+- **Sayaç "n/10" DEĞİL "n/9".** Discord 1/10 gösteriyor çünkü kendini sayıyor; bizim sunucu
+  `create-group-dm.dto.ts` `@ArrayMaxSize(9)` ile **9 BAŞKA üye** kabul ediyor (+ kendisi = 10 kişi).
+  Ekrandaki sayı bizim gerçek sınırımızı söyler; Discord'un sayısı kopyalanmaz. Sınır DTO'dan okunur.
+- **Alfabetik sıralama Türkçe yerelle** (`localeCompare('tr')`) — İ/I, Ö, Ş, Ü sıralaması İngilizce
+  sıralamada yanlış yere düşer. Harf başlığı da Türkçe büyük harfe göre üretilir.
+- **Kullanıcı adıyla arama YOK** (§3.1, değişmedi): buradaki arama **yalnız kendi kanka listesini** süzer,
+  sunucuya kullanıcı aramaz. Discord'un "Alıcı: Ara" alanı bizde bu anlama gelir.
+- Arama girişleri **`behavior="padding"`** sarmalayıcısı ister (§8.2/1 dersi — Android'de zorunlu).
+- Kankası olmayan kullanıcı: liste boş durumu gösterir; "Yeni Grup" satırı gezinme olduğu için kalır,
+  grup ekranında boş durum + kanka ekleme yönlendirmesi görünür. **Sahte/placeholder satır konmaz.**
