@@ -1115,7 +1115,7 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 ### Kayıt
 - [ ] **Kayıt ekranı** (giriş ekranına "Kayıt ol" bağlantısı): kullanıcı adı · e-posta · şifre · doğum tarihi
 - [ ] `GET /auth/registration-mode` → `open` davet alanı yok · `invite` zorunlu · `closed` kayıt kapalı
-- [ ] Doğum tarihi **tarih seçici** (serbest metin değil); yeni bağımlılık gerekirse **PM onayı**
+- [ ] Doğum tarihi **üç sayısal alan GG/AA/YYYY** (PM kilitli kararı — takvim seçici YOK, yeni bağımlılık YOK): `number-pad`, maxLength 2/2/4, **otomatik ilerleme + boş alanda backspace geri döner**, tek hata satırı, `YYYY-MM-DD`→ISO birleştirme
 - [ ] 🔴 **Yaş kapısı otoritesi sunucuda:** `UNDERAGE` (13 altı) / `INVALID_BIRTHDATE` mesajı **olduğu gibi** gösterilir; istemcide yaş hesabı yeniden yapılmaz, ne gevşetilir ne taklit edilir
 
 ### 🔴 Rıza adımı (R7 odağı)
