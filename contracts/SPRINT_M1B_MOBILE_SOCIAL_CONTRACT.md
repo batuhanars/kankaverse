@@ -285,3 +285,35 @@ ekranında **seçici** olarak ve Arkadaş Ekle ekranında **istekler** olarak. W
 bir panel; mobilde karşılığı yok → "kankalarımı görmek" için doğal bir yer yok, `FRIEND_ACCEPT` bildiriminin
 hedefi de bu yüzden boş. **M1b kapsamına alınmadı** (sözleşme sosyal çekirdek + temizle/engelle olarak
 kilitlendi, sahip onaylı) — **M1c/M1d kararı**, PM tarafından not edildi.
+
+---
+
+## 12. Revizyon R1 — işlem görmüş kankalık isteğinin bildirimi (sahip onaylı 2026-07-30)
+
+**🔴 Bu revizyon sözleşmenin "`api/`'ye dokunulmaz" kuralına BİLİNÇLİ istisnadır. Sahip onayı alındı.**
+
+**Belirti (sahip turu):** kullanıcı sidebar'daki kanka-isteği satırından ekrana gidip isteği **kabul etti**,
+ama Bildirimler sekmesindeki kırmızı rozet durmaya devam etti ve satır "sana kanka isteği gönderdi" diye
+okunmamış kaldı — artık var olmayan bir eylemi bekliyor gibi.
+
+**Neden istemcide değil sunucuda düzeltildi:** `friends.service.ts` bildirimi ÜRETİYOR ama isteğin
+sonuçlanmasıyla ilgilenmiyordu; **hiçbir istemci de bunu yapmıyordu → web'de de aynı kusur vardı.**
+İstemci-tarafı düzeltme aynı mantığı iki yerde tekrarlamak, ve üçüncü istemcide (masaüstü) yine unutmak
+demekti. Kaynağında bir kez çözüldü.
+
+**Değişiklik:**
+- `notifications.service.ts` → `markFriendRequestActioned(recipientId, requesterId)`: alıcının o kişiden
+  gelen **okunmamış** `FRIEND_REQUEST` bildirimlerini okundu işaretler. `updateMany` bilinçli (gönder →
+  geri çek → tekrar gönder senaryosunda birden fazla olabilir). **Silme DEĞİL, okundu işaretleme** —
+  bildirim geçmişi kullanıcının kaydıdır, sessizce yok edilmez.
+- `friends.service.ts` → **üç** yolda çağrılır: `acceptFriendRequest`, `declineFriendRequest` (ret de bir
+  işlemdir) ve **karşılıklı-istek otomatik kabul dalı** (kullanıcı hiç "kabul et"e basmadan arkadaş olur;
+  atlanırsa rozet yine bayat kalırdı).
+- Mobil: `stores/friends.ts` kabul/ret sonrası `refreshUnreadCount()` çağırır — sayı **sunucudan yeniden
+  okunur**, istemci kendi kafasına göre eksiltmez.
+
+**Doğrulama:** `nest build` temiz · **881 test / 26 suite yeşil**. `friends.service.spec.ts` mock'una
+`markFriendRequestActioned` eklendi (yoksa servis `undefined` çağırıp kabul testlerini patlatıyordu —
+2 test bu yüzden düştü ve düzeltildi). Mobil `typecheck` + `lint` temiz.
+**R7 değil** (auth katmanı veya T&S karar fonksiyonu değil; bildirim okundu-durumu). **Web bu düzeltmeden
+ücretsiz faydalanır** ama web'de gözle doğrulanmadı — sahip canlıda görebilir.
