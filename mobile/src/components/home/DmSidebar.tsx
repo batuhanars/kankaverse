@@ -16,7 +16,6 @@ interface Props {
   // Sözleşme §8.1-A/4 (M1a fast-follow, ekranlarıyla birlikte M1b'de teslim edildi) + §3.2/3.3.
   onOpenSearch: () => void;
   onOpenAddFriend: () => void;
-  onNewChat: () => void;
 }
 
 function displayName(ch: DmChannelDto): string {
@@ -34,7 +33,7 @@ function avatarSource(ch: DmChannelDto): string | null {
 // girişi (rozetli). C9 kuralı web/DmList.vue ile aynı: bekleyen giden istek (`requestStatus ===
 // 'PENDING'`) normal listede GÖRÜNMEZ, istek kutusuna gider (dev deneyimi: gönderenin ekranında
 // kendi bekleyen isteği iki kez görünmesin).
-export function DmSidebar({ onOpenDm, onOpenRequests, onOpenSearch, onOpenAddFriend, onNewChat }: Props) {
+export function DmSidebar({ onOpenDm, onOpenRequests, onOpenSearch, onOpenAddFriend }: Props) {
   const authUser = useAuthStore((s) => s.user);
   // Sözleşme §8.3 — liste artık `dm` store'undan okunur (soket katmanı oraya yazıyor). Yerel
   // state'te tutulurken canlı güncelleme tutunacak bir yer bulamıyordu.
@@ -71,21 +70,10 @@ export function DmSidebar({ onOpenDm, onOpenRequests, onOpenSearch, onOpenAddFri
       {/* Sözleşme §8.1-A/3 — web'in küçük soluk bölüm etiketi (`dm.sectionHeader` = "MESAJLAR")
           mobilde ekran başlığı işi görüyor, o yüzden büyük+kalın "Mesajlar" (`mobile.home.dmEntry`).
           Web'in kendi anahtarına dokunulmadı; orada hâlâ sidebar bölüm etiketi.
-          "+" — sözleşme §3.2/3.3'ün giriş noktası: web'de "DİREKT MESAJLAR" başlığının yanındaki
-          `+` (HomeSidebar.vue) ile aynı yer, mobilin tek "Mesajlar" başlığına taşındı (ayrı bir alt
-          etiket mobilde yok). Sözleşme bu düğmenin TAM konumunu belirtmiyor — bu bir dev kararı,
-          rapora not edildi. */}
+          Revizyon R2 (§13/1) — burada duran "+" KALDIRILDI: aynı işi artık FAB yapıyor
+          (home.tsx), iki girişin anlamı yoktu, FAB daha keşfedilebilir. */}
       <View style={styles.headerRow}>
         <Text style={styles.header}>{t('mobile.home.dmEntry')}</Text>
-        <Pressable
-          onPress={onNewChat}
-          style={styles.newChatButton}
-          accessibilityRole="button"
-          accessibilityLabel={t('startChat.openChatButton')}
-          hitSlop={8}
-        >
-          <Ionicons name="add" size={20} color={theme.colors.textSecondary} />
-        </Pressable>
       </View>
 
       {/* Sözleşme §8.1-A/4 (M1a'da yeri hazırlanmıştı, ekranlarıyla birlikte M1b'de geldi §3.1/3.4):
@@ -210,13 +198,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.xl,
     fontWeight: '700',
-  },
-  newChatButton: {
-    width: 28,
-    height: 28,
-    borderRadius: theme.radius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   actionsRow: {
     flexDirection: 'row',

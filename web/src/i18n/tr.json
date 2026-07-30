@@ -1603,6 +1603,16 @@
     },
     "group": {
       "manage": "Grup Yönetimi"
+    },
+    "newMessage": {
+      "title": "Yeni Mesaj",
+      "newGroupRow": "Yeni Grup",
+      "addFriendRow": "Kanka Ekle"
+    },
+    "newGroup": {
+      "title": "Yeni Grup",
+      "memberCount": "{n}/{max} üye",
+      "create": "Oluştur"
     }
   }
 }

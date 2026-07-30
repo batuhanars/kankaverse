@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { guildsApi, type GuildSummaryDto } from '@/api/guilds';
 import type { ChannelSummaryDto } from '@/api/channels';
 import type { DmChannelDto } from '@/api/dm';
@@ -9,6 +10,7 @@ import { GuildRail, type RailSelection } from '@/components/home/GuildRail';
 import { DmSidebar } from '@/components/home/DmSidebar';
 import { ChannelSidebar } from '@/components/home/ChannelSidebar';
 import { dmRouteParams } from '@/utils/dmRoute';
+import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 // Sprint M1a contract §2 — Ana Sayfa (rail + sidebar), tek ekran, kalıcı. Bu dosya SADECE compose
@@ -75,13 +77,31 @@ export default function HomeScreen() {
         onSelectGuild={(id) => setSelection({ type: 'guild', id })}
       />
       {selection.type === 'dm' ? (
-        <DmSidebar
-          onOpenDm={openDm}
-          onOpenRequests={() => router.push('/dm-requests')}
-          onOpenSearch={() => router.push('/search')}
-          onOpenAddFriend={() => router.push('/friends-add')}
-          onNewChat={() => router.push('/new-chat')}
-        />
+        <View style={styles.dmPane}>
+          <DmSidebar
+            onOpenDm={openDm}
+            onOpenRequests={() => router.push('/dm-requests')}
+            onOpenSearch={() => router.push('/search')}
+            onOpenAddFriend={() => router.push('/friends-add')}
+          />
+          {/* Sözleşme §13/1 — FAB, eski "Mesajlar" başlığı yanındaki "+"nın yerini alıyor (o
+              DmSidebar'dan kaldırıldı). Kor dolgu, gölge YOK (web/CLAUDE.md tasarım sistemi: katman
+              ayrımı ton+kenarlık ile, gölge yok) — daire arka planla zaten ayrışıyor. */}
+          <Pressable
+            onPress={() => router.push('/new-message')}
+            style={styles.fab}
+            accessibilityRole="button"
+            accessibilityLabel={t('mobile.newMessage.title')}
+            hitSlop={8}
+          >
+            <View style={styles.fabIconWrap}>
+              <Ionicons name="chatbubble" size={22} color={theme.colors.textPrimary} />
+              <View style={styles.fabBadge}>
+                <Ionicons name="add" size={11} color={theme.colors.accent500} />
+              </View>
+            </View>
+          </Pressable>
+        </View>
       ) : (
         // key: ortam değişince sidebar TAM yeniden mount olur (state 'loading'a resetlenir —
         // aksi halde guildId değişince önceki ortamın kanal listesi kısa süre ekranda kalırdı).
@@ -102,5 +122,36 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     backgroundColor: theme.colors.bgContent,
+  },
+  dmPane: {
+    flex: 1,
+  },
+  fab: {
+    position: 'absolute',
+    right: theme.layout.panelGap,
+    bottom: theme.layout.panelGap,
+    width: theme.layout.fabSize,
+    height: theme.layout.fabSize,
+    borderRadius: theme.layout.fabSize / 2,
+    backgroundColor: theme.colors.accent500,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fabIconWrap: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fabBadge: {
+    position: 'absolute',
+    right: -4,
+    bottom: -4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: theme.colors.textPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

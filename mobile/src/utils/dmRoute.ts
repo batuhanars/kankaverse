@@ -2,9 +2,9 @@ import type { DmChannelDto } from '@/api/dm';
 import { t } from '@/i18n';
 
 /**
- * Sözleşme §3.2/§3.3/§3.4 — bir `DmChannelDto`'dan `/dm/[id]` route param'larını üretir. 3 ekran
- * (home.tsx, new-chat.tsx, search.tsx) aynı şekli kurmak zorunda kalıyordu → Rule of Three,
- * inline'a dağılmadan tek yerde toplandı.
+ * Sözleşme §3.2/§3.3/§3.4 — bir `DmChannelDto`'dan `/dm/[id]` route param'larını üretir. Aynı şekli
+ * kuran ekranlar: home.tsx, search.tsx, new-message.tsx, new-group.tsx (R2'de new-chat.tsx'in
+ * yerini aldı) → Rule of Three, inline'a dağılmadan tek yerde toplandı.
  */
 export function dmRouteParams(channel: DmChannelDto) {
   if (channel.type === 'DM') {

@@ -1066,6 +1066,22 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Sidebar'a "kanka isteği" satırı** (`notification.friendRequests`) — mesaj-isteği satırının birebir kardeşi, yalnız **gelen** istek varken görünür; sayı oturum başında çekilip `friend.*` ile canlı kalır
 - [ ] **AÇIK YAPISAL BOŞLUK (§11):** mobilde "Kankalar" varış noktası yok — kanka listesi yalnız seçici ve istekler olarak beliriyor; `FRIEND_ACCEPT` hedefi de bu yüzden boş. **M1c/M1d kararı**, M1b kapsamına alınmadı
 
+### Revizyon R1 + R2 (sahip onaylı 2026-07-30, sözleşme §12-§13)
+
+**R1 — işlem görmüş kankalık isteği bildirimi (`api/` dokunuşu, sahip onaylı istisna):**
+- [x] `notifications.service.markFriendRequestActioned` — alıcının o kişiden gelen okunmamış `FRIEND_REQUEST` bildirimleri okundu işaretlenir (silinmez; geçmiş kullanıcının kaydı)
+- [x] `friends.service` **üç** yolda çağırır: kabul · ret · **karşılıklı-istek otomatik kabul dalı** (atlanırsa kullanıcı hiç "kabul et"e basmadan arkadaş olur, rozet bayat kalır)
+- [x] Mobil: kabul/ret sonrası `refreshUnreadCount()` — sayı **sunucudan** yeniden okunur, istemci kendi eksiltmez
+- [x] `nest build` temiz · **881 test / 26 suite yeşil** (spec mock'una yeni metot eklendi; eksikken 2 kabul testi düşüyordu). **Web de bu düzeltmeden faydalanır** ama web'de gözle doğrulanmadı
+
+**R2 — FAB + "Yeni Mesaj" akışı (mobil):**
+- [x] **FAB** sağ-altta (yalnız DM sekmesinde) → "Yeni Mesaj"; "Mesajlar" yanındaki "+" **kaldırıldı**; gölge kullanılmadı (tasarım sistemi "gölge YOK")
+- [x] Sidebar'daki geniş **"Kanka Ekle" KALDI** (sahip kararı — iki kapı: sidebar + Yeni Mesaj satırı)
+- [x] **"Yeni Mesaj" ekranı:** arama (yalnız kendi kanka listesinde yerel süzme) + "Yeni Grup"/"Kanka Ekle" satırları + alfabetik gruplu liste; kankaya dokun → DM
+- [x] **"Yeni Grup" ekranı:** **"n/9 üye"** sayacı (kaynaktan: `@ArrayMaxSize(9)`; Discord'un "1/10"u KOPYALANMADI) + Oluştur + seçim kutulu liste; 9'da kalan satırlar devre dışı
+- [x] **Türkçe yerel sıralama** (`localeCompare('tr')` + `toLocaleUpperCase('tr')`) — İ/I/Ö/Ş/Ü doğru yere düşsün
+- [x] `new-chat.tsx` örtük davranışı (1 seç→DM, 2+→grup) **kaldırıldı**; paylaşılan `FriendPickerList` iki ekranda ortak (dosyalar 147/231/195 satır — 300 eşiğinin altında)
+
 ### DoD (sözleşme §1 — 11 madde; **fiziksel cihazda görülerek** kapanır)
 > Aşağıdaki maddelerin tamamı **kod tarafında tamamlandı, hiçbiri fiziksel cihazda görülmedi** — bu
 > sprint'i devralan dev session emülatör/cihaz çalıştırmadı (talimat gereği). Sahip cihaz turu bekliyor.

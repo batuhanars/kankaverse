@@ -62,6 +62,9 @@ export const layout = {
   inputMinHeight: 44,
   control: 32,
   controlSm: 28,
+  // Sprint M1b R2 (§13) — FAB (Yeni Mesaj girişi). Web'de karşılığı yok (mobil-özel yüzen buton
+  // deseni); 56dp standart Material dokunma hedefi, uydurma bir marka ölçüsü değil.
+  fabSize: 56,
 } as const;
 
 // NOT: Figtree/JetBrains Mono font dosyaları mobile/assets'e henüz eklenmedi (yeni bağımlılık +
