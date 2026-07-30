@@ -110,7 +110,7 @@ export default function BlockedListScreen() {
 
       {unblockTarget && (
         <ConfirmDialog
-          message={t('mobile.friends.confirmUnblock')}
+          message={t('friends.confirmUnblock')}
           confirmLabel={t('friends.unblock')}
           loading={busyId === unblockTarget.user.id}
           onConfirm={onConfirmUnblock}
