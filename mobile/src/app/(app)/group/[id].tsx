@@ -1,10 +1,22 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ProfileCardModal } from '@/components/ProfileCardModal';
 import { extractErrorMessage } from '@/api/errors';
 import type { DmParticipantDto } from '@/api/dm';
 import { t } from '@/i18n';
@@ -36,6 +48,9 @@ export default function GroupManageScreen() {
   const [renameValue, setRenameValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
+  // Sahip bulgusu 2026-07-30: grup üyesine dokunup profil kartını (engelle/kankalıktan çıkar) açmanın
+  // yolu yoktu — 1-1 DM'de başlıktan açılıyor, grupta hiçbir yerden. Üye satırı artık kartı açıyor.
+  const [profileTarget, setProfileTarget] = useState<DmParticipantDto | null>(null);
 
   useEffect(() => {
     fetchFriends();
@@ -135,7 +150,12 @@ export default function GroupManageScreen() {
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
-          <View style={styles.memberRow}>
+          // Kendi satırım kartı açmaz (kendimi engelleyemem/çıkaramam) — dokunulabilirlik de verilmez.
+          <Pressable
+            onPress={() => item.id !== authUser?.id && setProfileTarget(item)}
+            disabled={item.id === authUser?.id}
+            style={styles.memberRow}
+          >
             {item.avatarUrl ? (
               <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
             ) : (
@@ -158,7 +178,7 @@ export default function GroupManageScreen() {
                 <Text style={styles.removeIcon}>✕</Text>
               </Pressable>
             ) : null}
-          </View>
+          </Pressable>
         )}
       />
 
@@ -190,6 +210,16 @@ export default function GroupManageScreen() {
         )}
       </View>
 
+      {profileTarget && (
+        <ProfileCardModal
+          userId={profileTarget.id}
+          username={profileTarget.username}
+          avatarUrl={profileTarget.avatarUrl}
+          onClose={() => setProfileTarget(null)}
+          // Engelleme/kankalıktan çıkarma sonrası kanal listesi tazelenir (üye adı/durumu güncel kalsın).
+          onChanged={() => useDmStore.getState().fetchAll()}
+        />
+      )}
       {removeTarget && (
         <ConfirmDialog
           message={t('group.removeMemberConfirm', { username: removeTarget.username })}
@@ -255,8 +285,13 @@ export default function GroupManageScreen() {
 
       {showRename && (
         <Modal transparent animationType="fade" onRequestClose={() => setShowRename(false)}>
-          <Pressable style={styles.backdrop} onPress={() => setShowRename(false)}>
-            <Pressable style={styles.sheet} onPress={() => {}}>
+          {/* Klavye (sözleşme §8.2/1 sınıfı, sahip turu 2026-07-30): alt-sayfa `flex-end` ile alta
+              yapışık, klavye açılınca giriş + butonlar klavyenin ALTINDA kalıyordu. Android'de de
+              `behavior="padding"` — edge-to-edge'de pencere küçülmüyor, sarmalayıcı olmadan hiçbir
+              şey kaymaz. Üye ekleme sayfasında metin girişi yok, oraya gerekmiyor. */}
+          <KeyboardAvoidingView style={styles.flex} behavior="padding">
+            <Pressable style={styles.backdrop} onPress={() => setShowRename(false)}>
+              <Pressable style={styles.sheet} onPress={() => {}}>
               <Text style={styles.sheetTitle}>{t('group.renameTitle')}</Text>
               <TextInput
                 value={renameValue}
@@ -282,9 +317,10 @@ export default function GroupManageScreen() {
                     <Text style={styles.saveText}>{t('group.renameAction')}</Text>
                   )}
                 </Pressable>
-              </View>
+                </View>
+              </Pressable>
             </Pressable>
-          </Pressable>
+          </KeyboardAvoidingView>
         </Modal>
       )}
     </View>
