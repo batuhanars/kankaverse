@@ -1089,17 +1089,17 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Sapma düzeltildi:** adsız grup yönetim ekranında jenerik "Grup" görünüyordu (liste ve sohbet başlığı üye adlarını birleştirirken) → mantık `utils/channelTitle.ts`'e çıkarıldı, üç çağrı yeri birleşti. *Dev, PM'in "sunucu üye adlarını varsayılan yapar" ifadesinin yanlış olduğunu kaynaktan gösterdi: sunucu `null` saklıyor, birleştiren istemci.*
 - [x] **Karar (§15):** grup yönetimi için sağ tık bağlam menüsü **eklenmedi** — yetenek üç istemcide de erişilebilir (masaüstü web'i yüklüyor); tetikleyici olmadan ikinci kapı açılmaz
 
-### DoD (sözleşme §1 — 11 madde; **fiziksel cihazda görülerek** kapanır)
-> Aşağıdaki maddelerin tamamı **kod tarafında tamamlandı, hiçbiri fiziksel cihazda görülmedi** — bu
-> sprint'i devralan dev session emülatör/cihaz çalıştırmadı (talimat gereği). Sahip cihaz turu bekliyor.
-- [ ] Kod paylaşma + kod ile istek gönderme çalışıyor
-- [ ] İstek kabul/ret anlık yansıyor
-- [ ] Sıfırdan DM başlatma çalışıyor, kopya kanal açılmıyor
-- [ ] Grup DM: yetkili işlemler çalışıyor, yetkisiz butonlar görünmüyor (403 yiyen buton yok)
-- [ ] Liste süzme + boş sonuç durumu
-- [ ] Sohbet içi mesaj arama + sonuca gitme
-- [ ] Sohbeti temizle: kutucuk düşüyor, karşı taraf etkilenmiyor, yeni mesajda geri geliyor
-- [ ] Engelle / arkadaşlıktan çıkar onaylı çalışıyor
-- [ ] Engel sonrası giriş kutusu kapanıyor
-- [x] Metin `tr.json`'dan, renk/ölçü token'dan, gömülü string yok (statik doğrulandı: yeni/değişen dosyalarda gömülü hex renk/Türkçe literal yok)
-- [x] `typecheck` + `lint` temiz; **`api/`'ye dokunulmadı** (`tsc --noEmit` + `eslint src` + `expo lint` sıfır hata/uyarı; `git status -- api` boş)
+### DoD (sözleşme §1 — 11 madde) — ✅ SAHİP CİHAZ YÜRÜYÜŞÜ 2026-07-30
+- [x] Kod paylaşma (kopyala + paylaş) + kod ile istek gönderme
+- [x] İstek kabul/ret anlık yansıyor · **bildirim rozeti kabul edince düşüyor** (R1 doğrulandı)
+- [x] Sıfırdan DM başlatma, **kopya kanal açılmıyor**
+- [x] Grup DM kur/yönet · **grup üyesinden profil kartı** (engelle/çıkar) erişilebilir
+- [x] Liste süzme · **çipli arama** ile kişi seçme
+- [x] Sohbet içi mesaj arama + **sonuca zıplama** (en kırılgan madde, çalıştı)
+- [x] Sohbeti temizle
+- [x] Adsız grup: üye adları **hem listede hem yönetim ekranında** görünüyor (R3 sapma düzeltmesinin testi)
+- [x] FAB akışı: DM başlatma + kanka ekleme; FAB ikonu tek glif olarak okunur
+- [x] Metin `tr.json`'dan, renk/ölçü token'dan, gömülü string yok *(PM bağımsız doğruladı: 162 anahtar eksiksiz, gömülü renk yok)*
+- [x] `typecheck` + `lint` temiz *(PM yeniden koştu)*; `api/`'ye yalnız **sahip onaylı R1** dokunuşu yapıldı
+- [~] **VARSAYILDI, TEST EDİLMEDİ** (yeterli yerel veri yok): çip satırının taşma davranışı · boş alanda backspace'in son çipi alması *(Android yazılım klavyelerinde `onKeyPress` garantili değil — dev açıkça işaretledi)*. Gerçek kitlede ilk fırsatta bakılır
+- [ ] **Engel sonrası giriş kutusunun kapanması** — yürüyüşte ayrıca görülmedi (profil kartı erişimi doğrulandı, engelleme sonrası input davranışı değil)
