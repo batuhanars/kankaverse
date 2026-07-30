@@ -419,7 +419,7 @@ async function openDm(userId: string) {
           <button
             class="hidden group-hover:block px-3 py-1.5 text-[13px] font-medium rounded-[var(--kv-radius-sm)] cursor-pointer shrink-0"
             style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
-            @click="friendsStore.unblockUser(b.user.id)"
+            @click="openConfirm(t('friends.confirmUnblock'), () => friendsStore.unblockUser(b.user.id))"
           >{{ t('friends.unblock') }}</button>
         </div>
       </template>

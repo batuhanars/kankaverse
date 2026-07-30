@@ -1002,6 +1002,7 @@
     "block": "Engelle",
     "unblock": "Engeli Kaldır",
     "confirmRemove": "Bu kullanıcıyı kanka listemenizden çıkarmak istediğinizden emin misiniz?",
+    "confirmUnblock": "Bu kullanıcının engelini kaldırmak istediğinizden emin misiniz?",
     "confirmBlock": "Bu kullanıcıyı engellemek istediğinizden emin misiniz? Kankalığınız silinir ve mesajlaşma durur.",
     "errors": {
       "USER_NOT_FOUND": "Kullanıcı bulunamadı.",
@@ -1599,8 +1600,7 @@
     },
     "friends": {
       "share": "Paylaş",
-      "shareMessage": "Kankaverse'de kanka kodum: {code}",
-      "confirmUnblock": "Bu kullanıcının engelini kaldırmak istediğinizden emin misiniz?"
+      "shareMessage": "Kankaverse'de kanka kodum: {code}"
     },
     "group": {
       "manage": "Grup Yönetimi"
