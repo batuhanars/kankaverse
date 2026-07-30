@@ -354,3 +354,54 @@ bunu keşfetmek zorunda. Ayrık ve adı konmuş bir giriş daha dürüst.
 - Arama girişleri **`behavior="padding"`** sarmalayıcısı ister (§8.2/1 dersi — Android'de zorunlu).
 - Kankası olmayan kullanıcı: liste boş durumu gösterir; "Yeni Grup" satırı gezinme olduğu için kalır,
   grup ekranında boş durum + kanka ekleme yönlendirmesi görünür. **Sahte/placeholder satır konmaz.**
+
+---
+
+## 14. Revizyon R3 — grup kurma cilası (sahip turu 2026-07-30, Discord referanslı)
+
+1. **FAB tek glife döndü.** R2'de Ionicons `chatbubble` üzerine `add` rozeti bindirilmişti; sahip "iki
+   ayrı ikon gibi" dedi, haklıydı. `MaterialCommunityIcons` setinde **`message-plus`** bunu tek glif
+   olarak veriyor (Ionicons'ta gerçekten yok — yalnız `chatbubble*` varyantları). `@expo/vector-icons`
+   bu seti zaten içeriyor → **yeni bağımlılık yok**; tek glif için ikinci set kullanmak kabul edildi.
+2. **Grup adı alanı kurma ekranından KALDIRILDI (PM kararı).** Grup adsız kurulur; adlandırma **grup
+   yönetim ekranında yaşamaya devam eder** (mobil `group/[id].tsx`, web `GroupManagePanel.vue`).
+   Gerekçe: aynı kişilerle birden fazla grup olabilir, ad ayırt edicidir → **yetenek kaldırılmaz**;
+   ama kurma anında sormak sürtünmedir → **soru kaldırılır**. "Oluştur"dan sonra sormak da reddedildi
+   (çoğu kullanıcının atlayacağı şey için ekstra adım). Web/masaüstü/`api` DOKUNULMADI.
+3. **Arama çubuğu "çipli" oldu:** seçilenler çubuğun içinde çip (avatar + ad + ✕), yanında yazılabilir
+   alan; yazdıkça liste süzülür, sonuca dokunulunca çipe dönüşür ve metin temizlenir; çipten çıkarma
+   ve boş alanda backspace son çipi kaldırır. `FriendPickerList` **kırılmadı** — `new-message.tsx`
+   tek-seçim akışı dosyaya hiç dokunulmadan aynen çalışıyor (git diff ile doğrulandı).
+
+### 🔴 R3'ün ortaya çıkardığı sapma — düzeltildi (PM)
+
+Dev, PM'in "sunucu adsız grupta üye adlarını varsayılan yapar" ifadesinin **yanlış** olduğunu
+kaynaktan gösterdi: `dm.service.ts` `name: dto.name ?? null` — sunucu `null` saklar, üye adlarını
+birleştiren taraf **istemcidir**. Bu doğrulama bir tutarsızlığı açığa çıkardı: aynı mantık üç yere
+kopyalanmıştı ve **üçüncüsü yanlış kopyalanmıştı** —
+
+| yüzey | adsız grup nasıl görünüyordu |
+|---|---|
+| DM listesi satırı (`DmSidebar`) | `ahmet, mehmet` ✓ |
+| Sohbet başlığı (`dmRoute`) | `ahmet, mehmet` ✓ |
+| **Yönetim ekranı başlığı** (`group/[id].tsx`) | **jenerik "Grup"** ✗ |
+
+R2/R3 ile adsız grup **istisna değil kural** olduğu için bu sapma neredeyse tüm gruplarda görünür
+hâle gelecekti. Rule of Three tam bu noktada: mantık `utils/channelTitle.ts`'e çıkarıldı, üç çağrı
+yeri ona bağlandı (yedek kural da birleşti: 3'e kadar isim yan yana, fazlası "+N").
+
+## 15. Karar — grup yönetimi için ikinci bir kapı (sağ tık) ŞİMDİ açılmıyor
+
+Sahip sordu: web/masaüstünde ortam-kanal mantığında sağ tık bağlam menüsüyle grup yönetimi olsun mu?
+
+**Tespit:** yetenek **üç istemcide de zaten erişilebilir.** Web'de `GroupManagePanel.vue` grup DM
+başlığındaki düğmeyle sağ kenardan açılıyor. **Masaüstü ayrı bir arayüz barındırmıyor** (Electron
+kabuğu uzaktaki web'i yüklüyor) → web'de olan orada da var. Mobilde grup DM başlığındaki kişiler
+ikonu yönetim ekranına götürüyor.
+
+**Karar: eklenmiyor.** Gerekçe bugünün dersi: kanka isteğinde ikinci yol açıldı çünkü sahip **gerçekten
+takıldı** — ihtiyacı kanıt gösterdi. Grup yönetimi erişilebilir ve sahip onu bulmuş durumda. Erişilebilir
+bir yeteneğe önden ikinci kapı açmak, bu sözleşmelerin baştan beri reddettiği şey.
+**Tetikleyici (ileride yapılırsa):** DM listesinden hızlı erişim ihtiyacı doğması ya da başlıktaki
+düğmeyi bulamayan bir kullanıcı. Web'de ortam/kanal satırlarında bağlam menüsü deseni **hazır**, iş
+o zaman mevcut desenin üzerine oturur.

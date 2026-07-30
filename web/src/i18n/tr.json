@@ -1612,7 +1612,8 @@
     "newGroup": {
       "title": "Yeni Grup",
       "memberCount": "{n}/{max} üye",
-      "create": "Oluştur"
+      "create": "Oluştur",
+      "removeSelected": "{username} kişisini kaldır"
     }
   }
 }

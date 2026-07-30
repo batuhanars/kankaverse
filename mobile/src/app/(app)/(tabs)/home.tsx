@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { guildsApi, type GuildSummaryDto } from '@/api/guilds';
 import type { ChannelSummaryDto } from '@/api/channels';
 import type { DmChannelDto } from '@/api/dm';
@@ -86,7 +86,12 @@ export default function HomeScreen() {
           />
           {/* Sözleşme §13/1 — FAB, eski "Mesajlar" başlığı yanındaki "+"nın yerini alıyor (o
               DmSidebar'dan kaldırıldı). Kor dolgu, gölge YOK (web/CLAUDE.md tasarım sistemi: katman
-              ayrımı ton+kenarlık ile, gölge yok) — daire arka planla zaten ayrışıyor. */}
+              ayrımı ton+kenarlık ile, gölge yok) — daire arka planla zaten ayrışıyor.
+              R3 revizyonu — sahip "iki ikon üst üste" görünümünü fark etti (chatbubble + bindirilmiş
+              add rozeti). `Ionicons`'ta baloncuk+artı BİLEŞİK glifi yok (yalnız `chatbubble*`
+              varyantları var); `MaterialCommunityIcons` setinde `message-plus` bunu TEK glif olarak
+              veriyor. `@expo/vector-icons` bu seti zaten paketliyor — yeni bağımlılık yok, yalnız
+              başka bir hazır ikon setinden tek bir isim seçildi. */}
           <Pressable
             onPress={() => router.push('/new-message')}
             style={styles.fab}
@@ -94,12 +99,7 @@ export default function HomeScreen() {
             accessibilityLabel={t('mobile.newMessage.title')}
             hitSlop={8}
           >
-            <View style={styles.fabIconWrap}>
-              <Ionicons name="chatbubble" size={22} color={theme.colors.textPrimary} />
-              <View style={styles.fabBadge}>
-                <Ionicons name="add" size={11} color={theme.colors.accent500} />
-              </View>
-            </View>
+            <MaterialCommunityIcons name="message-plus" size={24} color={theme.colors.textPrimary} />
           </Pressable>
         </View>
       ) : (
@@ -134,23 +134,6 @@ const styles = StyleSheet.create({
     height: theme.layout.fabSize,
     borderRadius: theme.layout.fabSize / 2,
     backgroundColor: theme.colors.accent500,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fabIconWrap: {
-    width: 22,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fabBadge: {
-    position: 'absolute',
-    right: -4,
-    bottom: -4,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: theme.colors.textPrimary,
     alignItems: 'center',
     justifyContent: 'center',
   },

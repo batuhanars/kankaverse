@@ -1,5 +1,5 @@
 import type { DmChannelDto } from '@/api/dm';
-import { t } from '@/i18n';
+import { channelTitle } from './channelTitle';
 
 /**
  * Sözleşme §3.2/§3.3/§3.4 — bir `DmChannelDto`'dan `/dm/[id]` route param'larını üretir. Aynı şekli
@@ -21,7 +21,7 @@ export function dmRouteParams(channel: DmChannelDto) {
       },
     };
   }
-  const name = channel.name || channel.members.map((m) => m.username).slice(0, 3).join(', ') || t('group.noName');
+  const name = channelTitle(channel);
   return {
     pathname: '/dm/[id]' as const,
     params: { id: channel.id, title: name, kind: 'group' },
