@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { dmApi } from '@/api/dm';
 import { useDmStore } from '@/stores/dm';
+import { useFriendsStore } from '@/stores/friends';
 import { extractErrorMessage } from '@/api/errors';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ProfileCardModal } from '@/components/ProfileCardModal';
@@ -35,8 +36,25 @@ export default function DmScreen() {
   const channelId = params.id;
   const isDm = params.kind !== 'group';
 
-  const [canMessageOverride, setCanMessageOverride] = useState<boolean | null>(null);
-  const [selfBlockedOverride, setSelfBlockedOverride] = useState<boolean | null>(null);
+  // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-07-30, M1d-0 turu): bayraklar ROUTE PARAMETRESİNDEN
+  // okunuyordu — yani listeden açıldığı ANDAKİ değerden. Engeli başka bir ekrandan (yeni
+  // Engellenenler ekranı) kaldırınca parametre bayat kalıyor ve giriş kutusu kapalı kalıyordu.
+  // Bugüne kadar görünmemesinin sebebi: engel kaldırmanın tek yolu bu ekrandaki profil kartıydı,
+  // oradan kaldırınca yerel bir tazeleme çalışıyordu. İkinci yol açılınca kusur ortaya çıktı.
+  // Doğru kaynak store: `dm` store'u sunucudan gelen `canMessage`/`selfBlocked`'ı taşıyor ve her
+  // `fetchAll` ile tazeleniyor. Route parametresi yalnız store'da kanal yokken (derin link) yedek.
+  const storeChannel = useDmStore((s) => s.channels.find((c) => c.id === params.id));
+
+  // Sözleşme M1d-0 fast-follow (sahip talebi 2026-07-30) — DM başlığında **ikon** kanka ekle butonu.
+  // Web `DmConversation.vue` mantığı birebir: arkadaş DEĞİLSE, ben engellememişsem ve bu oturumda
+  // henüz göndermemişsem görünür. Etiket yok, ekran dar (sahip: "kanka ekle yazmayacak, ikon olacak").
+  const isFriend = useFriendsStore((s) =>
+    s.friends.some((f) => f.user.id === params.otherUserId),
+  );
+  const sendRequestByUser = useFriendsStore((s) => s.sendRequestByUser);
+  const [friendRequestSent, setFriendRequestSent] = useState(false);
+  const [addingFriend, setAddingFriend] = useState(false);
+  const [addFriendError, setAddFriendError] = useState('');
 
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -57,23 +75,39 @@ export default function DmScreen() {
 
   const title = params.title ?? '';
 
-  /** Engelle/engel-kaldır sonrası gerçek durumu sunucudan tazele — yalnız yerel varsayım yapmaz
-   *  (T&S disiplini: canMessage backend otoritesinde, istemci gevşetmez/sıkılaştırmaz). */
+  /** Engelle/engel-kaldır sonrası gerçek durumu sunucudan tazele. Artık yerel override YOK —
+   *  store tazelenince ekran kendiliğinden yeni bayrakları okur (T&S disiplini: `canMessage`
+   *  backend otoritesinde; istemci ne gevşetir ne kendi kafasına göre hesaplar). */
   async function refreshDmStatus() {
     await useDmStore.getState().fetchAll();
-    const updated = useDmStore.getState().channels.find((c) => c.id === channelId);
-    if (updated && updated.type === 'DM') {
-      setCanMessageOverride(updated.canMessage);
-      setSelfBlockedOverride(updated.selfBlocked);
-    }
   }
 
-  const canMessage = canMessageOverride ?? params.canMessage !== 'false';
-  const selfBlocked = selfBlockedOverride ?? params.selfBlocked === 'true';
+  const canMessage =
+    storeChannel && storeChannel.type === 'DM' ? storeChannel.canMessage : params.canMessage !== 'false';
+  const selfBlocked =
+    storeChannel && storeChannel.type === 'DM' ? storeChannel.selfBlocked : params.selfBlocked === 'true';
 
   const disabledNotice = isDm && !canMessage ? (selfBlocked ? t('dm.selfBlocked') : t('dm.cannotMessage')) : null;
 
   const placeholder = isDm ? t('dm.placeholder', { user: title }) : t('dm.groupPlaceholder', { name: title });
+
+  async function onAddFriend() {
+    if (!params.otherUserId || addingFriend) return;
+    // Defansif: ben engellediysem buton zaten gizli. Karşı taraf engellediyse sunucu **jenerik**
+    // reddeder — istemci sebebi göstermez, "engellendim mi" bilgisi sızmaz (G3).
+    if (selfBlocked) return;
+    setAddingFriend(true);
+    setAddFriendError('');
+    try {
+      await sendRequestByUser(params.otherUserId);
+      setFriendRequestSent(true);
+    } catch {
+      // Jenerik hata (web ile aynı): sebep/statü gösterilmez. Kullanıcı kodla da ekleyebilir.
+      setAddFriendError(t('friends.addFailed'));
+    } finally {
+      setAddingFriend(false);
+    }
+  }
 
   async function onConfirmClear() {
     setClearing(true);
@@ -98,6 +132,17 @@ export default function DmScreen() {
           accessibilityLabel={t('mobile.group.manage')}
         >
           <Ionicons name="people-outline" size={20} color={theme.colors.textSecondary} />
+        </Pressable>
+      )}
+      {isDm && !isFriend && !friendRequestSent && !selfBlocked && (
+        <Pressable
+          onPress={onAddFriend}
+          disabled={addingFriend}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t('friends.add')}
+        >
+          <Ionicons name="person-add-outline" size={20} color={theme.colors.textSecondary} />
         </Pressable>
       )}
       <Pressable
@@ -161,9 +206,9 @@ export default function DmScreen() {
           onCancel={() => setShowClearConfirm(false)}
         />
       )}
-      {clearError ? (
+      {(clearError || addFriendError) ? (
         <View style={styles.clearErrorBar}>
-          <Text style={styles.clearErrorText}>{clearError}</Text>
+          <Text style={styles.clearErrorText}>{clearError || addFriendError}</Text>
         </View>
       ) : null}
     </>

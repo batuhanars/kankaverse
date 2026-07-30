@@ -3,6 +3,7 @@ import { friendsApi, type FriendDto, type FriendRequestDto } from '@/api/friends
 import { blocksApi, type BlockedUserDto } from '@/api/blocks';
 import { extractErrorMessage } from '@/api/errors';
 import { useNotificationsStore } from './notifications';
+import { useDmStore } from './dm';
 
 // Sprint M1b — web `stores/friends.ts` deseni taşındı: liste + bekleyen istekler (incoming +
 // outgoing) + `friend.*` WS olaylarının yazdığı tek nokta (realtime/socket.ts). M1a'nın DM store
@@ -26,6 +27,7 @@ interface FriendsState {
 
   fetchAll: () => Promise<void>;
   sendRequest: (friendCode: string) => Promise<void>;
+  sendRequestByUser: (userId: string) => Promise<void>;
   acceptRequest: (requestId: string) => Promise<void>;
   declineRequest: (requestId: string) => Promise<void>;
   removeFriend: (userId: string) => Promise<void>;
@@ -74,6 +76,11 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
 
   async sendRequest(friendCode) {
     await friendsApi.sendRequest(friendCode);
+    await get().fetchAll();
+  },
+
+  async sendRequestByUser(userId) {
+    await friendsApi.sendRequestByUser(userId);
     await get().fetchAll();
   },
 
@@ -131,6 +138,10 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
   async unblock(userId) {
     await blocksApi.unblock(userId);
     set((s) => ({ blocked: s.blocked.filter((b) => b.user.id !== userId) }));
+    // 🔴 DM store'u da tazele (sahip bulgusu 2026-07-30): engel kalkınca o kişiyle olan DM'in
+    // `canMessage`/`selfBlocked` bayrakları sunucuda değişir. Tazelenmezse kullanıcı engeli
+    // kaldırır ama DM'de hâlâ yazamaz — tam olarak yaşanan kusur buydu.
+    await useDmStore.getState().fetchAll();
   },
 
   reset() {
