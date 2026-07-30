@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { type DmChannelDto } from '@/api/dm';
 import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
@@ -11,6 +12,10 @@ import { theme } from '@/theme';
 interface Props {
   onOpenDm: (channel: DmChannelDto) => void;
   onOpenRequests: () => void;
+  // Sözleşme §8.1-A/4 (M1a fast-follow, ekranlarıyla birlikte M1b'de teslim edildi) + §3.2/3.3.
+  onOpenSearch: () => void;
+  onOpenAddFriend: () => void;
+  onNewChat: () => void;
 }
 
 function displayName(ch: DmChannelDto): string {
@@ -28,7 +33,7 @@ function avatarSource(ch: DmChannelDto): string | null {
 // girişi (rozetli). C9 kuralı web/DmList.vue ile aynı: bekleyen giden istek (`requestStatus ===
 // 'PENDING'`) normal listede GÖRÜNMEZ, istek kutusuna gider (dev deneyimi: gönderenin ekranında
 // kendi bekleyen isteği iki kez görünmesin).
-export function DmSidebar({ onOpenDm, onOpenRequests }: Props) {
+export function DmSidebar({ onOpenDm, onOpenRequests, onOpenSearch, onOpenAddFriend, onNewChat }: Props) {
   const authUser = useAuthStore((s) => s.user);
   // Sözleşme §8.3 — liste artık `dm` store'undan okunur (soket katmanı oraya yazıyor). Yerel
   // state'te tutulurken canlı güncelleme tutunacak bir yer bulamıyordu.
@@ -60,8 +65,40 @@ export function DmSidebar({ onOpenDm, onOpenRequests }: Props) {
     <View style={styles.flex}>
       {/* Sözleşme §8.1-A/3 — web'in küçük soluk bölüm etiketi (`dm.sectionHeader` = "MESAJLAR")
           mobilde ekran başlığı işi görüyor, o yüzden büyük+kalın "Mesajlar" (`mobile.home.dmEntry`).
-          Web'in kendi anahtarına dokunulmadı; orada hâlâ sidebar bölüm etiketi. */}
-      <Text style={styles.header}>{t('mobile.home.dmEntry')}</Text>
+          Web'in kendi anahtarına dokunulmadı; orada hâlâ sidebar bölüm etiketi.
+          "+" — sözleşme §3.2/3.3'ün giriş noktası: web'de "DİREKT MESAJLAR" başlığının yanındaki
+          `+` (HomeSidebar.vue) ile aynı yer, mobilin tek "Mesajlar" başlığına taşındı (ayrı bir alt
+          etiket mobilde yok). Sözleşme bu düğmenin TAM konumunu belirtmiyor — bu bir dev kararı,
+          rapora not edildi. */}
+      <View style={styles.headerRow}>
+        <Text style={styles.header}>{t('mobile.home.dmEntry')}</Text>
+        <Pressable
+          onPress={onNewChat}
+          style={styles.newChatButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('startChat.openChatButton')}
+          hitSlop={8}
+        >
+          <Ionicons name="add" size={20} color={theme.colors.textSecondary} />
+        </Pressable>
+      </View>
+
+      {/* Sözleşme §8.1-A/4 (M1a'da yeri hazırlanmıştı, ekranlarıyla birlikte M1b'de geldi §3.1/3.4):
+          dar/ikon arama + geniş "Arkadaş Ekle". */}
+      <View style={styles.actionsRow}>
+        <Pressable
+          onPress={onOpenSearch}
+          style={styles.searchButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.search')}
+          hitSlop={8}
+        >
+          <Ionicons name="search" size={18} color={theme.colors.textSecondary} />
+        </Pressable>
+        <Pressable onPress={onOpenAddFriend} style={styles.addFriendButton}>
+          <Text style={styles.addFriendButtonText}>{t('friends.add')}</Text>
+        </Pressable>
+      </View>
 
       {requestCount > 0 && (
         <Pressable onPress={onOpenRequests} style={styles.requestRow}>
@@ -143,13 +180,54 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.bgSidebar,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.layout.panelGap,
+    paddingTop: 14,
+    paddingBottom: 10,
+  },
   header: {
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.xl,
     fontWeight: '700',
+  },
+  newChatButton: {
+    width: 28,
+    height: 28,
+    borderRadius: theme.radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingHorizontal: theme.layout.panelGap,
-    paddingTop: 14,
     paddingBottom: 10,
+  },
+  searchButton: {
+    width: theme.layout.inputMinHeight,
+    height: theme.layout.inputMinHeight,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addFriendButton: {
+    flex: 1,
+    minHeight: theme.layout.inputMinHeight,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent500,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addFriendButtonText: {
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.sm,
+    fontWeight: '600',
   },
   requestRow: {
     marginHorizontal: 10,

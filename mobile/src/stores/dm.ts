@@ -2,6 +2,12 @@ import { create } from 'zustand';
 import { dmApi, type DmChannelDto } from '@/api/dm';
 import { extractErrorMessage } from '@/api/errors';
 
+/** 3 yerde aynı "id'ye göre çıkar" tekrarı (clearChannel/leaveGroup/deleteGroup) — Rule of Three,
+ *  dosya-içi özel yardımcıya çıkarıldı (dışa açılmaz, sözleşme kapsamı yalnız bu store). */
+function withoutChannel(list: DmChannelDto[], channelId: string): DmChannelDto[] {
+  return list.filter((c) => c.id !== channelId);
+}
+
 // Sözleşme §8.3 — DM listesi CANLI olmak zorunda. Önceden `DmSidebar` kendi içinde tek seferlik
 // çekiyordu: liste yalnız mount'ta doluyordu, sekmeler mount'ta kaldığı için (expo-router Tabs)
 // kullanıcı bayat bir listeye süresiz bakabiliyordu — pull-to-refresh de yok. Bu store, soket
@@ -32,6 +38,18 @@ interface DmState {
   applyActivity: (payload: DmActivity) => Promise<void>;
   setActiveDm: (channelId: string | null) => void;
   clearUnread: (channelId: string) => void;
+  /** Sözleşme §3.2 — sıfırdan DM başlat. Sunucu kanal zaten varsa mevcut olanı döner; burada id'ye
+   *  göre eşleştirilir (kopya kutucuk açılmaz). */
+  createChannel: (userId: string) => Promise<DmChannelDto>;
+  /** Sözleşme §3.6 / G4 — "Sohbeti temizle" (dil bilinçli: "sil" değil — mesaj DB'de kalır). */
+  clearChannel: (channelId: string) => Promise<void>;
+  /** Sözleşme §3.3 — Grup DM kur (1-9 üye). */
+  createGroup: (memberIds: string[], name?: string) => Promise<DmChannelDto>;
+  addGroupMember: (groupId: string, userId: string) => Promise<void>;
+  removeGroupMember: (groupId: string, userId: string) => Promise<void>;
+  leaveGroup: (groupId: string) => Promise<void>;
+  deleteGroup: (groupId: string) => Promise<void>;
+  renameGroup: (groupId: string, name: string) => Promise<void>;
   /** Oturum başlar/biter: id verilir ya da null ile TÜM DM durumu silinir. null hâli kritik —
    *  liste artık store'da yaşıyor, temizlenmezse çıkıştan sonra bir sonraki kullanıcı öncekinin
    *  DM listesini görür (bileşen yerel state'inde bu sorun kendiliğinden yoktu). */
@@ -117,6 +135,59 @@ export const useDmStore = create<DmState>((set, get) => ({
   clearUnread(channelId) {
     set((s) => ({
       channels: s.channels.map((c) => (c.id === channelId ? ({ ...c, unread: false } as DmChannelDto) : c)),
+    }));
+  },
+
+  async createChannel(userId) {
+    const channel = await dmApi.createChannel(userId);
+    const idx = get().channels.findIndex((c) => c.id === channel.id);
+    set((s) => {
+      const rest = idx === -1 ? s.channels : s.channels.filter((_, i) => i !== idx);
+      return { channels: visibleChannels([channel, ...rest]) };
+    });
+    return channel;
+  },
+
+  async clearChannel(channelId) {
+    await dmApi.clearChannel(channelId);
+    set((s) => ({ channels: withoutChannel(s.channels, channelId) }));
+  },
+
+  async createGroup(memberIds, name) {
+    const channel = await dmApi.createGroup(memberIds, name);
+    set((s) => ({ channels: [channel, ...s.channels] }));
+    return channel;
+  },
+
+  async addGroupMember(groupId, userId) {
+    await dmApi.addGroupMember(groupId, userId);
+    // Üye eklenince kanal listesi tazelenir (members dizisi güncellensin — web `fetchChannels` ile aynı).
+    await get().fetchAll();
+  },
+
+  async removeGroupMember(groupId, userId) {
+    await dmApi.removeGroupMember(groupId, userId);
+    set((s) => ({
+      channels: s.channels.map((c) =>
+        c.id === groupId && c.type === 'GROUP_DM' ? { ...c, members: c.members.filter((m) => m.id !== userId) } : c,
+      ),
+    }));
+  },
+
+  async leaveGroup(groupId) {
+    await dmApi.leaveGroup(groupId);
+    set((s) => ({ channels: withoutChannel(s.channels, groupId) }));
+  },
+
+  async deleteGroup(groupId) {
+    await dmApi.deleteGroup(groupId);
+    set((s) => ({ channels: withoutChannel(s.channels, groupId) }));
+  },
+
+  async renameGroup(groupId, name) {
+    const updated = await dmApi.renameGroup(groupId, name);
+    set((s) => ({
+      channels: s.channels.map((c) => (c.id === groupId && c.type === 'GROUP_DM' ? { ...c, name: updated.name } : c)),
     }));
   },
 

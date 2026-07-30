@@ -8,6 +8,7 @@ import type { DmChannelDto } from '@/api/dm';
 import { GuildRail, type RailSelection } from '@/components/home/GuildRail';
 import { DmSidebar } from '@/components/home/DmSidebar';
 import { ChannelSidebar } from '@/components/home/ChannelSidebar';
+import { dmRouteParams } from '@/utils/dmRoute';
 import { theme } from '@/theme';
 
 // Sprint M1a contract §2 — Ana Sayfa (rail + sidebar), tek ekran, kalıcı. Bu dosya SADECE compose
@@ -57,22 +58,7 @@ export default function HomeScreen() {
   }
 
   function openDm(channel: DmChannelDto) {
-    if (channel.type === 'DM') {
-      router.push({
-        pathname: '/dm/[id]',
-        params: {
-          id: channel.id,
-          title: channel.otherUser.username,
-          avatarUrl: channel.otherUser.avatarUrl ?? '',
-          kind: 'dm',
-          canMessage: String(channel.canMessage),
-          selfBlocked: String(channel.selfBlocked),
-        },
-      });
-      return;
-    }
-    const name = channel.name ?? channel.members.map((m) => m.username).slice(0, 3).join(', ');
-    router.push({ pathname: '/dm/[id]', params: { id: channel.id, title: name, kind: 'group' } });
+    router.push(dmRouteParams(channel));
   }
 
   return (
@@ -89,7 +75,13 @@ export default function HomeScreen() {
         onSelectGuild={(id) => setSelection({ type: 'guild', id })}
       />
       {selection.type === 'dm' ? (
-        <DmSidebar onOpenDm={openDm} onOpenRequests={() => router.push('/dm-requests')} />
+        <DmSidebar
+          onOpenDm={openDm}
+          onOpenRequests={() => router.push('/dm-requests')}
+          onOpenSearch={() => router.push('/search')}
+          onOpenAddFriend={() => router.push('/friends-add')}
+          onNewChat={() => router.push('/new-chat')}
+        />
       ) : (
         // key: ortam değişince sidebar TAM yeniden mount olur (state 'loading'a resetlenir —
         // aksi halde guildId değişince önceki ortamın kanal listesi kısa süre ekranda kalırdı).

@@ -53,6 +53,7 @@ export default function DmRequestsScreen() {
           id: item.channelId,
           title: item.requester?.username ?? t('notification.someone'),
           avatarUrl: item.requester?.avatarUrl ?? '',
+          otherUserId: item.requester?.id ?? '',
           kind: 'dm',
           canMessage: 'true',
           selfBlocked: 'false',

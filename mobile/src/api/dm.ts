@@ -39,6 +39,15 @@ export interface MessageRequestDto {
   createdAt: string;
 }
 
+// Sprint M1b contract §2 — grup üye ekleme yanıtı (`dm.service.ts` `addGroupMember` dönüşü) +
+// grup yeniden adlandırma yanıtı. Ayrı arayüzler: farklı uçların gerçek şekli farklı (Rule of Three
+// ihlali değil, iki farklı veri).
+export type AddedGroupMemberDto = DmParticipantDto;
+export interface RenameGroupResultDto {
+  id: string;
+  name: string | null;
+}
+
 export const dmApi = {
   async listChannels(): Promise<DmChannelDto[]> {
     const res = await http.get<DmChannelDto[]>('/dm/channels');
@@ -58,6 +67,42 @@ export const dmApi = {
   },
   async rejectRequest(channelId: string, block: boolean): Promise<null> {
     const res = await http.post<null>(`/dm/requests/${channelId}/reject`, { block });
+    return res.data;
+  },
+  // Sözleşme §3.2 — DM başlat. Kanal zaten varsa sunucu MEVCUT olanı döner (kopya açmaz);
+  // istemci dönen id ile store'da eşleştirir (bkz. stores/dm.ts createChannel).
+  async createChannel(userId: string): Promise<DmChannelDto> {
+    const res = await http.post<DmChannelDto>('/dm/channels', { userId });
+    return res.data;
+  },
+  // Sözleşme §3.6 / G4 — "Sohbeti temizle" (soft-delete: yalnız çağıranın clearedAt'i).
+  async clearChannel(channelId: string): Promise<null> {
+    const res = await http.delete<null>(`/dm/channels/${channelId}`);
+    return res.data;
+  },
+  // Sözleşme §3.3 — Grup DM kur. `memberIds` 1-9 arası (`create-group-dm.dto.ts` `@ArrayMaxSize(9)`).
+  async createGroup(memberIds: string[], name?: string): Promise<DmChannelDto> {
+    const res = await http.post<DmChannelDto>('/dm/groups', { memberIds, name });
+    return res.data;
+  },
+  async addGroupMember(groupId: string, userId: string): Promise<AddedGroupMemberDto> {
+    const res = await http.post<AddedGroupMemberDto>(`/dm/groups/${groupId}/members`, { userId });
+    return res.data;
+  },
+  async removeGroupMember(groupId: string, userId: string): Promise<null> {
+    const res = await http.delete<null>(`/dm/groups/${groupId}/members/${userId}`);
+    return res.data;
+  },
+  async leaveGroup(groupId: string): Promise<null> {
+    const res = await http.delete<null>(`/dm/groups/${groupId}/members/me`);
+    return res.data;
+  },
+  async deleteGroup(groupId: string): Promise<null> {
+    const res = await http.delete<null>(`/dm/groups/${groupId}`);
+    return res.data;
+  },
+  async renameGroup(groupId: string, name: string): Promise<RenameGroupResultDto> {
+    const res = await http.patch<RenameGroupResultDto>(`/dm/groups/${groupId}`, { name });
     return res.data;
   },
 };

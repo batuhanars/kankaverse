@@ -1595,6 +1595,13 @@
     },
     "home": {
       "dmEntry": "Mesajlar"
+    },
+    "friends": {
+      "share": "Paylaş",
+      "shareMessage": "Kankaverse'de kanka kodum: {code}"
+    },
+    "group": {
+      "manage": "Grup Yönetimi"
     }
   }
 }

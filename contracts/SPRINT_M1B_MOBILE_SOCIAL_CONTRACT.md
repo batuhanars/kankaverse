@@ -205,3 +205,49 @@ uydurulmaz. Terminoloji: **arkadaş → Kanka, sunucu → Ortam** (kod İngilizc
 Endpoint yolu, DTO alan adı, ekran sayısı, yetki tablosu bu dosyadan **sapamaz**. İhtiyaç doğarsa dev
 **durur**, kullanıcıya bildirir, PM revize eder. Yeni bağımlılık = **PM onayı** (istisna: `npx expo install`'un
 dayattığı peer'lar). `TASK.md`'ye item eklenmez.
+
+---
+
+## 9. PM incelemesi — dev teslimi 2026-07-30
+
+**Bağımsız doğrulama (dev raporu olduğu gibi kabul edilmedi):**
+`api/` **dokunulmamış** (git diff'te yalnız `mobile/` + `TASK.md` + izinli i18n istisnası `web/src/i18n/tr.json`).
+`typecheck` + `lint` + `expo-doctor` 18/18 PM tarafından yeniden koşuldu, temiz. Gömülü hex renk **YOK**,
+gömülü Türkçe string **YOK**, kullanılan **129** i18n anahtarının tamamı `tr.json`'da mevcut (M1a'da 65'ti).
+`tr.json`'a yalnız 7 satır eklenmiş — çünkü web'in mevcut anahtarları yeniden kullanılmış; bu **doğru**
+davranış (aynı bağlamın Türkçesi orada zaten kararlaştırılmıştı).
+
+**T&S denetimi geçti:** istemci hiçbir yerde hata koduna göre dallanmıyor (`NOT_FRIEND`,
+`GROUP_MINOR_FORBIDDEN` vb. grep'lendi — tek eşleşme politikayı açıklayan bir yorum), tüm hatalar
+`extractErrorMessage` üzerinden sunucunun Türkçe `message`'ını gösteriyor → sebep tahmin edilmiyor, statü
+sızmıyor. Grup ekranında sahiplik kapısı `isOwner && (…)` ile **hiç render etmeme** biçiminde (disabled
+değil) — §2 yetki tablosuna uygun. `stores/friends.ts` oturum kapsamlı ve `(app)/_layout.tsx` unmount'unda
+`reset()` ediliyor → M1a §8.3'te bulunan sızıntı sınıfı tekrarlanmamış.
+
+### Dispozisyonlar (dev'in durduğu 3 nokta)
+
+1. **"Kopyala" — PM ONAYLADI, eklendi.** Dev bağımlılık için doğru davranıp durdu. `expo-clipboard`
+   birinci-parti Expo modülü, **Expo Go ile birlikte geliyor** (dev build gerektirmez, `expo-secure-store`
+   ile aynı sınıf) → onaylandı. Metinler web'in mevcut `friends.copy`/`friends.copied` anahtarlarından.
+2. **Yeni sohbet TEK ekran (1 seçili → DM, 2+ → grup) — KABUL.** Sözleşme §3.2/§3.3'ü ayrı **madde** olarak
+   tanımlıyordu, ayrı **route** şart koşmuyordu. Web `StartChatModal.vue` deseniyle aynı; ayırmak kullanıcıya
+   "kiminle" sorusunu iki kez sorardı. Sözleşme bu okumayla uyumlu sayılır.
+3. **"+" giriş noktası "Mesajlar" başlığının yanında — KABUL** (sözleşme yeri belirtmiyordu, web DM
+   bölümündeki "+" ile aynı). Sahip gözle bakar, istemezse yer değişir — küçük iş.
+
+### PM'in kendi bulduğu, dev'in raporlamadığı
+
+- **Dosya boyu drift'i:** `group/[id].tsx` **456 satır** (163 stil / 293 mantık), `friends-add.tsx` 393
+  (169/224). Kök `CLAUDE.md` "dosya 300+ satır → düzelt" diyor. **Şimdi bölünmedi:** grup ekranı 5 ayrı
+  işlemi (adlandır/ekle/çıkar/ayrıl/sil) onaylarıyla taşıyor, bölmek erken soyutlama olurdu ("böl yalnız
+  gerçek acıda"). **Teknik borç olarak kaydedildi** → altıncı işlem eklenirse ya da mantık 300'ü geçerse bölünür.
+- **Zıplama motoru sağlam** (dev'in "en emin olmadığım yer" dediği): 20 denemeyle sınırlı (sonsuz döngü yok),
+  `onScrollToIndexFailed` ile değişken satır yüksekliği yedeği var, mevcut yükleme göstergesini kullandığı
+  için sessiz beklemiyor, bulamazsa kanalda kalıyor (§3.5 alternatifi). Kalan risk **gerçek cihaz** riski.
+
+### DoD durumu
+
+**11 maddenin 9'u cihazda görülmeyi bekliyor** — bu sprint'in DoD'u zaten "fiziksel cihazda görülerek kapanır"
+diye yazıldı ve dev'e emülatör/cihaz testi bilinçli olarak verilmedi (M1a'da o döngüde saatler kaybedildi).
+Statik olarak kapanan iki madde (§1/10 i18n+token, §1/11 typecheck+lint+`api/` dokunulmadı) PM tarafından
+bağımsız doğrulandı. **Sahip yürüyüşü bekleniyor**, en kırılgan madde: mesaj arama + zıplama.

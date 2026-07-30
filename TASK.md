@@ -1040,28 +1040,30 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > **İki ders gömülü:** DTO alan adları dosyadan okunur (M0) · DoD **fiziksel cihazda** kapanır (M1a).
 
 ### Arkadaşlık
-- [ ] **Arkadaş Ekle ekranı** (M1a'da yeri hazırlanan geniş butondan): kendi Kanka kodum + kopyala/paylaş · kod gir → istek gönder (**`friendCode` TAM 6 KARAKTER**) · bekleyen istekler kabul/ret
-- [ ] `friend.*` WS olayları dinlenir → arkadaş + istek listeleri anlık (M1a'da eklenmemişti)
-- [ ] Mobil `UserDto` tipine `friendCode` eklenir (sunucu zaten dönüyor — sıfır backend)
-- [ ] 🔴 **Kullanıcı adıyla arama/ekleme YOK** (uç yok + brief §4 "ulaşımı zorlaştır"); rehber senkronizasyonu kapsam dışı (KVKK)
+- [x] **Arkadaş Ekle ekranı** (M1a'da yeri hazırlanan geniş butondan): kendi Kanka kodum + **kopyala** + **paylaş** · kod gir → istek gönder (**`friendCode` TAM 6 KARAKTER**) · bekleyen istekler kabul/ret. *(Dev bağımlılık için doğru davranıp DURDU; **PM `expo-clipboard`'ı onayladı** — birinci-parti Expo modülü, Expo Go ile geliyor, dev build gerektirmiyor, `expo-secure-store` ile aynı sınıf. PM ekledi; metinler web'in mevcut `friends.copy`/`friends.copied` anahtarlarından, yeni anahtar açılmadı.)*
+- [x] `friend.*` WS olayları dinlenir → arkadaş + istek listeleri anlık (M1a'da eklenmemişti)
+- [x] Mobil `UserDto` tipine `friendCode` eklenir (sunucu zaten dönüyor — sıfır backend)
+- [x] 🔴 **Kullanıcı adıyla arama/ekleme YOK** (uç yok + brief §4 "ulaşımı zorlaştır"); rehber senkronizasyonu kapsam dışı (KVKK)
 
 ### DM
-- [ ] **Yeni DM başlat:** arkadaş seç → `POST /dm/channels { userId }`; kanal varsa mevcut olana düşer, kopya kutucuk oluşmaz
-- [ ] **"Sohbeti temizle"** (`DELETE /dm/channels/:id`) + onay; **dil "sil" değil "temizle"** (mesaj DB'de kalır, karşı taraf etkilenmez)
-- [ ] Profil kartına aksiyonlar: **engelle** (`POST /blocks`) + **arkadaşlıktan çıkar** (`DELETE /friends/:userId`), ikisi de onaylı; engel kaldır
-- [ ] Engel sonrası giriş kutusu M1a'daki `canMessage`/`selfBlocked` yolundan kapanır — **yeni kapı yazılmaz**
+- [x] **Yeni DM başlat:** arkadaş seç → `POST /dm/channels { userId }`; kanal varsa mevcut olana düşer, kopya kutucuk oluşmaz *(kod: `new-chat.tsx` + `stores/dm.ts` `createChannel` — cihazda doğrulanmadı)*
+- [x] **"Sohbeti temizle"** (`DELETE /dm/channels/:id`) + onay; **dil "sil" değil "temizle"** (mesaj DB'de kalır, karşı taraf etkilenmez) *(cihazda doğrulanmadı)*
+- [x] Profil kartına aksiyonlar: **engelle** (`POST /blocks`) + **arkadaşlıktan çıkar** (`DELETE /friends/:userId`), ikisi de onaylı; engel kaldır *(cihazda doğrulanmadı)*
+- [x] Engel sonrası giriş kutusu M1a'daki `canMessage`/`selfBlocked` yolundan kapanır — **yeni kapı yazılmadı** (route param'ları yerel override state'e alındı, engelle/kaldır sonrası `dmApi.listChannels()` ile tazelenir) *(cihazda doğrulanmadı)*
 
 ### Grup DM
-- [ ] **Kur:** arkadaşlardan çoklu seçim (**1–9 üye**) + opsiyonel ad → `POST /dm/groups`
-- [ ] **Yönet:** ad değiştir · üye ekle · üye çıkar · ayrıl · grubu sil — **yetki tablosuna göre** (ekle+ayrıl her üye; çıkar/adlandır/sil yalnız `ownerId`); yetkisiz işlem **hiç render edilmez** (disabled değil)
-- [ ] 🔴 **T&S:** minör grup kuramaz/üye olamaz (`GROUP_MINOR_FORBIDDEN`) · üyeler arkadaş olmak zorunda (`NOT_FRIEND`); retler **jenerik**, istemci sebebi tahmin edip açıklamaya ÇALIŞMAZ
+- [x] **Kur:** arkadaşlardan çoklu seçim (**1–9 üye**) + opsiyonel ad → `POST /dm/groups` *(`new-chat.tsx`, cihazda doğrulanmadı)*
+- [x] **Yönet:** ad değiştir · üye ekle · üye çıkar · ayrıl · grubu sil — **yetki tablosuna göre** (ekle+ayrıl her üye; çıkar/adlandır/sil yalnız `ownerId`); yetkisiz işlem **hiç render edilmez** (disabled değil) *(`group/[id].tsx`, cihazda doğrulanmadı)*
+- [x] 🔴 **T&S:** minör grup kuramaz/üye olamaz (`GROUP_MINOR_FORBIDDEN`) · üyeler arkadaş olmak zorunda (`NOT_FRIEND`); retler **jenerik**, istemci sebebi tahmin edip açıklamaya ÇALIŞMAZ (her mutasyon `extractErrorMessage` ile sunucunun hazır Türkçe mesajını gösterir, ek çeviri katmanı yok)
 
 ### Arama
-- [ ] **Listede yerel süzme** (M1a'da yeri hazırlanan dar/ikon buton): DM+ortam+kanal, gruplu sonuç, boş durum; ek uç yok
-- [ ] **Sohbet içinde mesaj arama:** `GET /channels/:id/messages/search?q=` (max 30) → sonuca dokun → mesaja git
-- [ ] **Ortam-geneli arama KULLANILMAZ** (`/guilds/:id/messages/search`) — ayrı ekran tasarımı, sözleşme §3.5
+- [x] **Listede yerel süzme** (M1a'da yeri hazırlanan dar/ikon buton): DM+ortam+kanal, gruplu sonuç, boş durum; ek uç yok *(`search.tsx`, cihazda doğrulanmadı)*
+- [x] **Sohbet içinde mesaj arama:** `GET /channels/:id/messages/search?q=` (max 30) → sonuca dokun → mesaja git *(`MessageSearchModal.tsx` + `MessageScreen.tsx` jump-to-message; cihazda doğrulanmadı — özellikle `scrollToIndex` değişken satır yüksekliğinde RN'in bilinen kırılganlığı taşıyor, `onScrollToIndexFailed` ile telafi edildi ama gerçek cihazda görülmedi)*
+- [x] **Ortam-geneli arama KULLANILMAZ** (`/guilds/:id/messages/search`) — ayrı ekran tasarımı, sözleşme §3.5
 
 ### DoD (sözleşme §1 — 11 madde; **fiziksel cihazda görülerek** kapanır)
+> Aşağıdaki maddelerin tamamı **kod tarafında tamamlandı, hiçbiri fiziksel cihazda görülmedi** — bu
+> sprint'i devralan dev session emülatör/cihaz çalıştırmadı (talimat gereği). Sahip cihaz turu bekliyor.
 - [ ] Kod paylaşma + kod ile istek gönderme çalışıyor
 - [ ] İstek kabul/ret anlık yansıyor
 - [ ] Sıfırdan DM başlatma çalışıyor, kopya kanal açılmıyor
@@ -1071,5 +1073,5 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] Sohbeti temizle: kutucuk düşüyor, karşı taraf etkilenmiyor, yeni mesajda geri geliyor
 - [ ] Engelle / arkadaşlıktan çıkar onaylı çalışıyor
 - [ ] Engel sonrası giriş kutusu kapanıyor
-- [ ] Metin `tr.json`'dan, renk/ölçü token'dan, gömülü string yok
-- [ ] `typecheck` + `lint` temiz; **`api/`'ye dokunulmadı**
+- [x] Metin `tr.json`'dan, renk/ölçü token'dan, gömülü string yok (statik doğrulandı: yeni/değişen dosyalarda gömülü hex renk/Türkçe literal yok)
+- [x] `typecheck` + `lint` temiz; **`api/`'ye dokunulmadı** (`tsc --noEmit` + `eslint src` + `expo lint` sıfır hata/uyarı; `git status -- api` boş)
