@@ -288,6 +288,55 @@ kaynağı orasıydı → LAN IP varsayılan oldu (ikisinde de çalışır).
 
 ---
 
+## 8.3 DM yüzeyi web-eşitlik denetimi 2026-07-30 (sahip talebi: "DM'i kapatmadan önce web'te ne var mobilde ne yok")
+
+**Kök neden tek cümle:** mobil soket katmanı yalnız **kanal-kapsamlı** olayları dinliyordu (`message.*`,
+`typing:*`), **kullanıcı-kapsamlı** olayları dinlemiyordu (`dm.message`, `dm.request`, `notification`).
+Sunucu mobili handshake'te `user:<id>` odasına zaten koyuyor — olaylar cihaza GELİYORDU, kimse kulak
+vermiyordu. Web 50+ olay dinliyor, mobil 9.
+
+### A) M1a kusuru — teslim edilmiş yüzeyler çalışmıyordu → BU TURDA KAPANDI
+
+1. **DM listesi canlı değildi.** Liste yalnız mount'ta çekiliyordu; sekmeler mount'ta kaldığı için
+   (expo-router Tabs) **yenilemenin hiçbir yolu yoktu**, pull-to-refresh de yok → kullanıcı bayat listeye
+   süresiz bakabiliyordu. → `dm.message` dinleniyor; yeni `stores/dm.ts` (web `stores/dm.ts` `applyActivity`
+   semantiği birebir: yerinde güncelle + başa taşı + okunmadı işaretle, kanal listede yoksa tam tazele).
+   **Doğrulandı:** sunucu `dm.message`'ı göndericiye DE yayıyor (`messages.gateway.ts` üye döngüsü, hariç
+   tutma yok) → "benim mesajım mı" kontrolü zorunlu, yoksa kendi gönderdiğim mesaj kendi listemi okunmadı yapar.
+2. **Mesaj isteği rozeti canlı değildi** → `dm.request` dinleniyor (web gibi sessiz: yalnız rozet tazelenir).
+3. **Bildirim sekmesi/rozeti canlı değildi** → `notification` dinleniyor.
+   **`mention` BİLİNÇLİ dinlenmiyor:** sunucu bahsetmede hem anlık `mention` hem kalıcı `notification` yayar,
+   ama kalıcı olan alıcının bildirim tercihinden SÜZÜLÜR (`shouldNotifyChannel`, R12). `mention`'ı rozete
+   bağlamak kullanıcının **susturduğu** bildirimi geri açardı. Rozetin tek kaynağı `notification`.
+4. **DM listesinde "yazıyor…"** yoktu (web Sprint 6 R1-b/R1-c: "DM'e bakmasan da kutucukta görünsün")
+   → eklendi, 1-1 DM'de sade metin.
+
+**Yeni sızıntı kapatıldı:** DM listesi bileşen yerel state'inden store'a taşındı; store çıkıştan sonra da
+yaşar → temizlenmezse **sıradaki kullanıcı öncekinin DM listesini görürdü**. `setSessionUser(null)`
+`(app)/_layout.tsx` unmount'unda tüm DM durumunu siler (oturum kapsamlı tek nokta, `useBackgroundSocket`
+ile aynı gerekçe). Store auth'u import ETMEZ — `auth.ts → socket.ts → store` yönü var, ters yön döngü kurar.
+
+### B) M1b'ye — hiç iddia edilmemiş özellikler (sahip kararı 2026-07-30)
+
+- **Yeni DM başlatma** (`POST /dm/channels`) — mobil şu an var olan sohbete cevap verebiliyor, **başlatamıyor**
+- **Grup DM yönetimi** — kur / adlandır / üye ekle-çıkar / ayrıl / sil (web'de hepsi var)
+- **"Sohbeti temizle"** (G4 soft-delete, `DELETE /dm/channels/:id`)
+- **Profil kartından engelle / arkadaşlıktan çıkar** (M1a'da kart bilinçli salt-okunurdu)
+
+Kapsam dışı (sayılmadı): sesli/görüntülü DM paneli (V2), tepkiler, sabitleme, kategori/rol/ortam olayları,
+`presence:*`, `channel.activity` (guild kanal okunmamışı — aynı sınıf boşluk, DM değil, M1b'de ele alınır).
+
+### C) Doğrulama durumu — dürüst kayıt
+
+Bu turun kodu `typecheck` + `lint` temiz ama **cihazda görülmedi.** PM emülatörde kapalı bir döngü kurmayı
+denedi (yerel `kv_devloop` hesabı + ortam + kanal): giriş, rail ikon yedeği, "Mesajlar" başlığı, kanal
+listesi `#` + ses kanalının süzülmesi, boş durumlar **görüldü ve doğru**. Ama **klavye davranışı
+emülatörde doğrulanamadı** — AVD'de donanım klavyesi açık olduğu için yazılım klavyesi hiç açılmıyor;
+ayar kapatılınca Expo Go açılmadı, döngü orada bırakıldı (AVD ayarı geri alındı). **Klavye + canlı DM
+güncellemesi sahip cihazında doğrulanacak.**
+
+---
+
 ## 8. Sapma kuralı
 
 Endpoint yolu, ekran sayısı, gezinme deseni bu dosyadan **sapamaz**. İhtiyaç doğarsa dev **durur**,

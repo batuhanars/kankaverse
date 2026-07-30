@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { Redirect, Stack } from 'expo-router';
 import { theme } from '@/theme';
 import { useAuthStore } from '@/stores/auth';
+import { useDmStore } from '@/stores/dm';
 import { useBackgroundSocket } from '@/realtime/useBackgroundSocket';
 
 // Auth guard — oturum sunucu tarafında düşerse (401 → refresh de başarısız, bkz. stores/auth.ts
@@ -12,7 +14,18 @@ import { useBackgroundSocket } from '@/realtime/useBackgroundSocket';
 // plan/ön plan politikası tüm authenticated alan için geçerli, tek bir ekrana bağlı değil.
 export default function AppLayout() {
   const status = useAuthStore((s) => s.status);
+  const userId = useAuthStore((s) => s.user?.id);
   useBackgroundSocket();
+
+  // Sözleşme §8.3 — DM store'u oturum kapsamlıdır: `useBackgroundSocket` ile aynı gerekçeyle burada
+  // bağlanır. Mount = oturum başı (id yazılır, `applyActivity` "bu mesaj benim mi"yi bilir),
+  // unmount = oturum sonu (TÜM DM durumu silinir; liste store'da yaşadığı için temizlenmezse
+  // çıkıştan sonra sıradaki kullanıcı öncekinin DM listesini görürdü).
+  useEffect(() => {
+    if (!userId) return;
+    useDmStore.getState().setSessionUser(userId);
+    return () => useDmStore.getState().setSessionUser(null);
+  }, [userId]);
 
   if (status !== 'authenticated') {
     return <Redirect href="/login" />;

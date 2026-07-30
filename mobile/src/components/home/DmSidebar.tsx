@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { dmApi, type DmChannelDto } from '@/api/dm';
-import { extractErrorMessage } from '@/api/errors';
+import { type DmChannelDto } from '@/api/dm';
 import { useAuthStore } from '@/stores/auth';
+import { useDmStore } from '@/stores/dm';
+import { useTypingStore } from '@/stores/typing';
 import { formatMentionsPlain } from '@/utils/mentions';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
-
-type LoadState = 'loading' | 'error' | 'ready';
 
 interface Props {
   onOpenDm: (channel: DmChannelDto) => void;
@@ -31,32 +30,22 @@ function avatarSource(ch: DmChannelDto): string | null {
 // kendi bekleyen isteği iki kez görünmesin).
 export function DmSidebar({ onOpenDm, onOpenRequests }: Props) {
   const authUser = useAuthStore((s) => s.user);
-  const [state, setState] = useState<LoadState>('loading');
-  const [channels, setChannels] = useState<DmChannelDto[]>([]);
-  const [requestCount, setRequestCount] = useState(0);
-  const [errorMessage, setErrorMessage] = useState('');
-
-  // react-hooks/set-state-in-effect — bkz. home.tsx fetchGuilds yorumu.
-  const fetchDms = useCallback(() => {
-    Promise.all([dmApi.listChannels(), dmApi.listRequests()])
-      .then(([list, requests]) => {
-        setChannels(list.filter((c) => !(c.type === 'DM' && c.requestStatus === 'PENDING')));
-        setRequestCount(requests.length);
-        setState('ready');
-      })
-      .catch((e) => {
-        setErrorMessage(extractErrorMessage(e));
-        setState('error');
-      });
-  }, []);
+  // Sözleşme §8.3 — liste artık `dm` store'undan okunur (soket katmanı oraya yazıyor). Yerel
+  // state'te tutulurken canlı güncelleme tutunacak bir yer bulamıyordu.
+  const channels = useDmStore((s) => s.channels);
+  const requestCount = useDmStore((s) => s.requestCount);
+  const state = useDmStore((s) => s.state);
+  const errorMessage = useDmStore((s) => s.errorMessage);
+  const fetchAll = useDmStore((s) => s.fetchAll);
+  const typingByChannel = useTypingStore((s) => s.byChannel);
 
   useEffect(() => {
-    fetchDms();
-  }, [fetchDms]);
+    fetchAll();
+  }, [fetchAll]);
 
   function retry() {
-    setState('loading');
-    fetchDms();
+    useDmStore.setState({ state: 'loading' });
+    fetchAll();
   }
 
   function resolver(ch: DmChannelDto) {
@@ -109,6 +98,7 @@ export function DmSidebar({ onOpenDm, onOpenRequests }: Props) {
           renderItem={({ item }) => {
             const avatar = avatarSource(item);
             const name = displayName(item);
+            const typing = (typingByChannel[item.id]?.length ?? 0) > 0;
             const preview = item.lastMessage
               ? formatMentionsPlain(item.lastMessage.content, resolver(item), t('mention.unknown'))
               : '';
@@ -125,7 +115,14 @@ export function DmSidebar({ onOpenDm, onOpenRequests }: Props) {
                   <Text style={[styles.name, item.unread && styles.nameUnread]} numberOfLines={1}>
                     {name}
                   </Text>
-                  {preview ? (
+                  {/* Sözleşme §8.3 — kutucukta "yazıyor…" (web Sprint 6 R1-b/R1-c karşılığı: "DM'e
+                      bakmasan da kutucukta görünsün"). Yazan varsa son mesaj önizlemesini EZER,
+                      1-1 DM'de sade metin (isim yok — web R1-c ile aynı). */}
+                  {typing ? (
+                    <Text style={styles.typing} numberOfLines={1}>
+                      {t('typing.simple')}
+                    </Text>
+                  ) : preview ? (
                     <Text style={styles.preview} numberOfLines={1}>
                       {preview}
                     </Text>
@@ -241,6 +238,12 @@ const styles = StyleSheet.create({
   preview: {
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.xs,
+    marginTop: 1,
+  },
+  typing: {
+    color: theme.colors.accent500,
+    fontSize: theme.fontSize.xs,
+    fontStyle: 'italic',
     marginTop: 1,
   },
   unreadDot: {

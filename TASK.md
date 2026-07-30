@@ -1000,7 +1000,23 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Yan kusur — sonsuz dönen tekerlek:** axios'ta timeout yoktu, ulaşılamaz adreste istek askıda kalıyordu → 15sn timeout (instance + bootstrap refresh); `.env.example` LAN IP'yi varsayılan yaptı (emülatör adresi tuzağı kapandı)
 - [~] **Gezinme çubuğu açık şerit → M2'YE ERTELENDİ** (sahip kararı 2026-07-30). `userInterfaceStyle` `automatic` → `dark` yapıldı (tek temamız var, beyan yanlıştı) ama sorun sürüyor. Sahip ölçümü: **yalnız ilk açılışta**, o anda tüm ekranlarda; bir kez gezinilince kalıcı olarak kayboluyor. Sebep Expo Go: native tema ayarları Expo Go'da uygulanmaz, ilk kare sistem temasıyla çizilir. Gerçek derlemede kalkması beklenir. **Varsayarak kapatılmadı → M2 ilk dev build'de doğrulanacak** (bkz. sözleşme §8.2/3 + PLAN M2 maddesi); test edilemeyecek düzeltme şimdi eklenmedi
 
-### M1b'ye eklenenler (sözleşme §8.1-B — sözleşmesi yazılacak)
+### Fast-follow 3 — DM canlı güncelleme boşlukları (sözleşme §8.3, sahip denetim talebi 2026-07-30)
+
+> Kök neden: mobil yalnız kanal-kapsamlı olayları dinliyordu; `user:<id>` odasına gelen olaylara kimse
+> kulak vermiyordu. Kod `typecheck`+`lint` temiz, **cihazda doğrulanmadı** (bkz. sözleşme §8.3-C).
+
+- [x] **`dm.message` → DM listesi canlı** + yeni `stores/dm.ts` (web `applyActivity` semantiği birebir); liste artık store'da, mount'a bağlı değil
+- [x] **`dm.request` → mesaj isteği rozeti canlı** (web gibi sessiz)
+- [x] **`notification` → bildirim sekmesi + rozeti canlı.** `mention` BİLİNÇLİ dinlenmiyor: kalıcı bildirim susturma tercihinden süzülüyor, `mention`'ı rozete bağlamak kullanıcının kapattığı bildirimi geri açardı
+- [x] **DM listesinde "yazıyor…"** (web Sprint 6 R1-b/R1-c karşılığı)
+- [x] **Sızıntı kapandı:** DM durumu oturum kapsamlı — çıkışta tamamen silinir (store'a taşımak, temizlenmezse sıradaki kullanıcının öncekinin listesini görmesi demekti)
+- [x] **Yerel ortam:** `S3_ENDPOINT` + `S3_PUBLIC_URL` LAN IP'sine çevrildi, kayıtlı 3 adres yeniden yazıldı → ek/ikon/afiş görselleri cihazdan yüklenebilir (yoksa M1a'nın "ekler" maddesi kanıtsız kalıyordu). Yedek `api/.env.bak-localhost9000`
+
+### M1b'ye eklenenler (sözleşme §8.1-B + §8.3-B — sözleşmesi yazılacak)
+- [ ] **Yeni DM başlatma** (`POST /dm/channels`) — mobil şu an sohbet **başlatamıyor**, yalnız cevap verebiliyor
+- [ ] **Grup DM yönetimi** (kur / adlandır / üye ekle-çıkar / ayrıl / sil)
+- [ ] **"Sohbeti temizle"** (G4 soft-delete) · **profil kartından engelle / arkadaşlıktan çıkar**
+- [ ] **`channel.activity`** — guild kanal okunmamışı canlı (DM değil, aynı sınıf boşluk)
 - [ ] **Arama ekranı** — açık karar: liste içinde yerel süzme + sohbet içinde mesaj arama (mevcut uçlar); Discord'un sekmeli arama ekranı kopyalanmaz
 - [ ] **Arkadaş Ekle ekranı** — 🔴 **Kanka kodu** ile (`friendCode`, 6 karakter); kendi kodunu paylaş. **Kullanıcı adıyla arama/ekleme YOK** (uç yok + brief §4 "ulaşımı zorlaştır"); rehber senkronizasyonu kapsam dışı (KVKK)
 

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { dmApi } from '@/api/dm';
+import { useDmStore } from '@/stores/dm';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ProfileCardModal } from '@/components/ProfileCardModal';
 import { t } from '@/i18n';
@@ -21,8 +22,20 @@ export default function DmScreen() {
     selfBlocked?: string;
   }>();
   const [showProfile, setShowProfile] = useState(false);
+  const channelId = params.id;
 
-  if (!params.id) return null;
+  // Sözleşme §8.3 — bu DM açıkken gelen mesaj listede "okunmadı" işaretlenmez (web `activeDmChannelId`
+  // ile aynı); ayrıca açılışta kutucuğun rozeti hemen düşer (sunucuya `markRead` MessageScreen'den
+  // gidiyor, bu yalnız listenin yerel yansıması — bir sonraki `fetchAll`'ı beklemeden).
+  useEffect(() => {
+    if (!channelId) return;
+    const store = useDmStore.getState();
+    store.setActiveDm(channelId);
+    store.clearUnread(channelId);
+    return () => useDmStore.getState().setActiveDm(null);
+  }, [channelId]);
+
+  if (!channelId) return null;
 
   const title = params.title ?? '';
   const isDm = params.kind !== 'group';
