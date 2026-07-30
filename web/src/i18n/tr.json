@@ -1588,6 +1588,13 @@
       "title": "Ortamların",
       "empty": "Henüz bir ortamın yok.",
       "error": "Ortamlar yüklenemedi. Bağlanılamadı, tekrar dene."
+    },
+    "tabs": {
+      "home": "Ana Sayfa",
+      "me": "Sen"
+    },
+    "home": {
+      "dmEntry": "Mesajlar"
     }
   }
 }

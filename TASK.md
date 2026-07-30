@@ -968,29 +968,39 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > **M0 dersi sözleşmeye gömüldü:** endpoint tablosu yol listesidir; DTO alan adları **dosyadan** okunur.
 
 ### Kabuk
-- [ ] **Rail + sidebar** ana ekranı (ortam ikonları altıgen · seçili ortamın kanal listesi VEYA DM listesi); M0'ın "Ortamların" ekranı **kaldırılır**
-- [ ] **Alt tab çubuğu (3):** Ana Sayfa · Bildirimler · Sen (adlar `tr.json` → `mobile.tabs.*`)
-- [ ] İçerik **ayrı tam ekran** + geri oku; sağ üye paneli **YOK**
+- [x] **Rail + sidebar** ana ekranı (ortam ikonları altıgen · seçili ortamın kanal listesi VEYA DM listesi); M0'ın "Ortamların" ekranı **kaldırılır** (not: gerçek altıgen clip-path için SVG kütüphanesi yok — rounded-square, M0 guilds.tsx emsali; raporda açıklandı)
+- [x] **Alt tab çubuğu (3):** Ana Sayfa · Bildirimler · Sen (adlar `tr.json` → `mobile.tabs.*`)
+- [x] İçerik **ayrı tam ekran** + geri oku; sağ üye paneli **YOK**
 
 ### Mesajlaşma
-- [ ] **Mesaj ekranı:** cursor'lu geçmiş (yukarı kaydır → eskisi), gönderme, boş/hata durumu
-- [ ] **WebSocket** (`socket.io-client`): token **callback ile** verilir (sabit token reconnect'te bayat kalır — web denetim bulgusu) · `channel:join/leave` · `typing:start/stop` · `message.created/updated/deleted` · `typing:update/clear`
-- [ ] **Arka plan/ön plan:** arka planda soket kapanır; dönüşte yeniden bağlan + **açık kanalın mesajlarını yeniden çek** (boşluk bırakma) + `channel:join` tekrar
-- [ ] **Mention gösterimi:** `<@id>` → `@kullanıcıadı`, `<@&id>` → `@everyone` (ham token ekrana basılmaz)
-- [ ] **Ekler (🔴 T&S):** `GET /attachments/:id` ile adres alınır; `CLEAN` → görsel önizleme / dosya rozeti · `PENDING` → **yüklenmez**, "taranıyor" · `FLAGGED` → engellendi. Yükleme kapsam dışı (ataş düğmesi konmaz)
+- [x] **Mesaj ekranı:** cursor'lu geçmiş (yukarı kaydır → eskisi), gönderme, boş/hata durumu
+- [x] **WebSocket** (`socket.io-client`): token **callback ile** verilir (sabit token reconnect'te bayat kalır — web denetim bulgusu) · `channel:join/leave` · `typing:start/stop` · `message.created/updated/deleted` · `typing:update/clear`
+- [x] **Arka plan/ön plan:** arka planda soket kapanır; dönüşte yeniden bağlan + **açık kanalın mesajlarını yeniden çek** (boşluk bırakma) + `channel:join` tekrar — emülatörde canlı doğrulandı
+- [x] **Mention gösterimi:** `<@id>` → `@kullanıcıadı`, `<@&id>` → `@everyone` (ham token ekrana basılmaz)
+- [x] **Ekler (🔴 T&S):** `GET /attachments/:id` ile adres alınır; `CLEAN` → görsel önizleme / dosya rozeti · `PENDING` → **yüklenmez**, "taranıyor" · `FLAGGED` → engellendi. Yükleme kapsam dışı (ataş düğmesi konmaz)
 
 ### DM
-- [ ] DM listesi (son mesaj önizleme + okunmamış) · DM mesaj ekranı · başlıkta karşı taraf → salt okunur profil kartı
-- [ ] **DM istekleri:** liste + kabul/ret (mobilde görünmezse kullanıcı isteği hiç göremez — dilsizlik kabul edilemez)
+- [x] DM listesi (son mesaj önizleme + okunmamış) · DM mesaj ekranı · başlıkta karşı taraf → salt okunur profil kartı
+- [x] **DM istekleri:** liste + kabul/ret (mobilde görünmezse kullanıcı isteği hiç göremez — dilsizlik kabul edilemez)
 
 ### Diğer ekranlar
-- [ ] **Bildirimler sekmesi:** liste + okunmamış vurgusu + dokunuşta ilgili kanala git
-- [ ] **Sen sekmesi:** salt okunur profil + çıkış yap (ayarlar M1b — boş iskele konmaz)
+- [x] **Bildirimler sekmesi:** liste + okunmamış vurgusu + dokunuşta ilgili kanala git (yalnız MENTION tıklanabilir — diğer tipler M1a'da hedefsiz, rapora bak)
+- [x] **Sen sekmesi:** salt okunur profil + çıkış yap (ayarlar M1b — boş iskele konmaz)
+
+### Fast-follow — sahip görsel geri bildirimi 2026-07-29 akşamı (sözleşme §8.1-A)
+- [ ] **Kanal listesi belirginleşsin:** metin kontrastı, satır ayrımı, **seçili kanal vurgusu** (renkler tema token'larından)
+- [ ] **DM rail girişi:** "M" harfi yerine **konuşma baloncuğu ikonu** (ortam ikonları altıgen kalır)
+- [ ] **"Mesajlar" başlığı** büyük + kalın (soluk büyük-harf değil)
+- [ ] Başlık altına tek satır: **dar/ikon arama** + **geniş "Arkadaş Ekle"** butonu — ⚠️ **ekranlarıyla birlikte gelir** (boş buton yasak, sözleşme §8.1-B)
+
+### M1b'ye eklenenler (sözleşme §8.1-B — sözleşmesi yazılacak)
+- [ ] **Arama ekranı** — açık karar: liste içinde yerel süzme + sohbet içinde mesaj arama (mevcut uçlar); Discord'un sekmeli arama ekranı kopyalanmaz
+- [ ] **Arkadaş Ekle ekranı** — 🔴 **Kanka kodu** ile (`friendCode`, 6 karakter); kendi kodunu paylaş. **Kullanıcı adıyla arama/ekleme YOK** (uç yok + brief §4 "ulaşımı zorlaştır"); rehber senkronizasyonu kapsam dışı (KVKK)
 
 ### DoD (sözleşme §1 — 11 madde; **görülerek** kapatılır)
-- [ ] Emülatörde doğrulandı
-- [ ] **Fiziksel cihazda doğrulandı** (arka plan/ön plan davranışı emülatörde gerçeği yansıtmaz — doze/pil optimizasyonu)
-- [ ] İki istemci testi: web ↔ mobil anlık mesaj akışı çift yönlü
-- [ ] **Kasıtlı boşluk testi:** mobil arka plandayken web'den 3 mesaj at → ön plana dönünce üçü de görünüyor
-- [ ] Reconnect bayat token'la düşmüyor (access ömrü dolduktan sonra da toparlıyor)
-- [ ] `typecheck` + `lint` temiz; gömülü string yok; `api/`'ye dokunulmadı
+- [x] Emülatörde doğrulandı
+- [ ] **Fiziksel cihazda doğrulandı** (arka plan/ön plan davranışı emülatörde gerçeği yansıtmaz — doze/pil optimizasyonu) — **sahibe ait, dev emülatörle yetindi**
+- [ ] İki istemci testi: web ↔ mobil anlık mesaj akışı çift yönlü — dev REST-simüle ikinci istemciyle doğruladı (WS broadcast aynı yol); **gerçek web sekmesiyle doğrulanmadı**, sahip teyit etsin
+- [x] **Kasıtlı boşluk testi:** mobil arka plandayken web'den 3 mesaj at → ön plana dönünce üçü de görünüyor
+- [ ] Reconnect bayat token'la düşmüyor (access ömrü dolduktan sonra da toparlıyor) — dolaylı kanıt var (~30dk kesintisiz oturum, 401 hiç görülmedi), **açık kanıt (log) yok**, raporda detay
+- [x] `typecheck` + `lint` temiz; gömülü string yok; `api/`'ye dokunulmadı

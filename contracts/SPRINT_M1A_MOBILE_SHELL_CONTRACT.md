@@ -197,6 +197,50 @@ Her listede **boş durum** ve **hata + tekrar dene** durumu zorunlu (M0'daki des
 
 ---
 
+## 8.1 Sahip geri bildirimi 2026-07-29 akşamı — görsel iyileştirmeler + yeni yüzeyler
+
+Sahip emülatör görüntülerini kendi telefonundaki Discord ile karşılaştırdı. Talepler ikiye ayrılıyor:
+
+### A) M1a fast-follow (mevcut ekranlarda görsel iş — küçük, yarın yapılır)
+
+1. **Kanal listesi belirginleşecek.** Şu an fazla soluk: metin kontrastı düşük, satırlar birbirinden ayrışmıyor,
+   seçili kanal vurgusu yok. Discord'daki karşılığı: `#` ön eki net, seçili satır dolgulu vurgu, satır yüksekliği
+   daha rahat. Renkler tema token'larından gelecek (`textPrimary`/`textSecondary` ayrımı), yeni renk uydurulmaz.
+2. **DM rail girişinde "M" harfi kalkacak, yerine konuşma baloncuğu ikonu** gelecek (`@expo/vector-icons` kurulu).
+   Discord'da rail'in en üstündeki baloncuk bu işi görüyor. Rail'deki **ortam** ikonları altıgen kalır.
+3. **"MESAJLAR" başlığı belirginleşecek:** küçük soluk büyük-harf yerine büyük ve kalın "Mesajlar" (Discord deseni).
+4. **Başlığın altına tek satırda iki buton:** solda **dar/ikon** arama butonu, sağında **geniş** "Arkadaş Ekle"
+   butonu (Discord'daki oran birebir bu).
+
+### B) M1b'ye giren yeni ekranlar (buton koymak = ekranı da yapmak)
+
+> **Kural hatırlatması:** "olmayan özelliğe kapı açma". §8.1-A'daki iki buton, açtıkları ekranlarla **aynı
+> sprint'te** gelir. Butonları önce koyup ekranları sonraya bırakmak yasak — dokununca hiçbir şey yapmayan
+> buton bu sözleşmenin açıkça reddettiği şey.
+
+5. **Arama ekranı.** Sahip "web'te arama için ne kullanıyorsak onu arayüze yediririz" dedi. Backend'de mevcut olan
+   **mesaj aramasıdır** (`messages.controller.ts` iki ayrı `@Get('search')` — imzalar dosyadan okunacak).
+   **Açık karar (yarın):** DM listesindeki arama butonu neyi arayacak? Öneri: (a) DM/ortam listesinde **yerel
+   süzme** (ucuz, dürüst, ek uç istemez) + (b) bir sohbetin içinde **mesaj arama** (mevcut uç). Discord'un
+   sekmeli arama ekranı (Kişiler/Medya/Sabitlemeler) bizde karşılığı olmayan yüzeylerdir, kopyalanmaz.
+6. **"Arkadaş Ekle" ekranı — 🔴 Discord'dan birebir kopyalanamaz.** Doğrulandı:
+   `POST /friends/requests` gövdesi **`friendCode`** (tam 6 karakter, `send-friend-request.dto.ts`).
+   `POST /friends/requests/by-user` ise `userId` ister (tıkla-ekle; kart üzerinden). **Kullanıcı adıyla arama
+   veya ekleme ucu YOK** (`users.controller.ts`'te yalnız `:id/card`).
+   Yani mobil ekran **Kanka kodu** üzerine kurulur: kodu gir → istek gönder, ve **kendi kodunu göster/paylaş**.
+   **Discord'daki "Kullanıcı adıyla ekle" eklenmez:** yeni bir uç gerektirir **ve** brief §4'ün "ulaşımı
+   zorlaştır" ilkesini gevşetir (herkesin kullanıcı adıyla bulunabilir olması, yabancıya erişimi kolaylaştırır).
+   Bu bir T&S duruşudur, UI eksikliği değil. Değişmesi gerekiyorsa **kurul + sahip kararı** ister.
+   Rehber senkronizasyonu (Discord'un "Find friends") **kapsam dışı** — kişi listesi okumak KVKK yüzeyi açar.
+
+### C) Kapsam dışı bırakılan (bilinçli)
+
+Discord'un kanal listesinde kategori başlıkları (`Metin Kanalları` / `Ses Kanalları`, katlanabilir) var; bizde
+`ChannelCategory` tablosu mevcut ama M1a **yalnız metin kanallarını düz liste** olarak gösteriyor. Kategoriler
+ayrı bir iştir, sahip "belirginleşsin" dedi, "kategori ekle" demedi → şimdilik girmiyor.
+
+---
+
 ## 8. Sapma kuralı
 
 Endpoint yolu, ekran sayısı, gezinme deseni bu dosyadan **sapamaz**. İhtiyaç doğarsa dev **durur**,

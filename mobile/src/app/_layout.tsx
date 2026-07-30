@@ -18,7 +18,10 @@ export default function RootLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bgRail }}>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }} />
+      {/* contentStyle — bkz. (app)/_layout.tsx yorumu: react-native-screens'in geçiş sırasında
+          kullandığı native yüzey varsayılan beyaz olmasın diye kök stack'te de eşleştirilir
+          (ör. login → (app) geçişi). */}
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.bgRail } }} />
     </View>
   );
 }

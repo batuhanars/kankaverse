@@ -10,6 +10,7 @@ import {
   setRefreshToken,
   setSessionExpiredHandler,
 } from '@/api/http';
+import { resetSocket } from '@/realtime/socket';
 
 export type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated';
 export type LoginResult = 'ok' | 'challenge' | 'error';
@@ -116,6 +117,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } finally {
       clearAccessToken();
       await clearRefreshToken();
+      resetSocket();
       set({ user: null, status: 'unauthenticated', challenge: null, errorMessage: null });
     }
   },
@@ -132,5 +134,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 // kalıyordu. http.ts store'u import edemez (döngü) — bunun yerine store kendini bir callback
 // olarak kaydediyor; http.ts yalnız bu callback'i tetikliyor.
 setSessionExpiredHandler(() => {
+  resetSocket();
   useAuthStore.setState({ user: null, status: 'unauthenticated', challenge: null, errorMessage: null });
 });

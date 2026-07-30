@@ -31,7 +31,7 @@ export default function TwoFactorScreen() {
     const result = await loginTwoFa(code.trim());
     setSubmitting(false);
     if (result === 'ok') {
-      router.replace('/guilds');
+      router.replace('/home');
     }
   }
 

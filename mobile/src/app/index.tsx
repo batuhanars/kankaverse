@@ -10,7 +10,7 @@ export default function Index() {
   const status = useAuthStore((s) => s.status);
 
   if (status === 'authenticated') {
-    return <Redirect href="/guilds" />;
+    return <Redirect href="/home" />;
   }
 
   if (status === 'unauthenticated') {
