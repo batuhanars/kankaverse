@@ -159,6 +159,7 @@
 **R3 — Arkadaş kimliği A modeline geri (Backend `api/`) — `rumuz#etiket` revert (PM onaylı, /kurul sonrası):** ✅ *(PM reconcile 2026-06-12: `..._friend_code_revert` migration + `friend-code.util` + DTO + `toUserDto` kodda doğrulandı)*
 - [x] Prisma: `User.friendTag` **drop** → `friendCode String @unique` **geri** + migration (friendCode backfill üret, friendTag kaldır)
 - [x] `friend-tag.util` → `friend-code.util` (`generateFriendCode` 8-char base32, çakışmada yenile); register yan etkisi geri
+  > ⚠️ **DÜZELTME (2026-07-30):** kod bugün **6 karakter** (`send-friend-request.dto.ts` `@Length(6,6)`, örnek `K7M2QX`). Yukarıdaki "8-char" satırları o günün durumu; sonradan değişmiş. **Uzunluk DTO'dan okunur, bu dosyadan değil** — M1b sözleşmesi yazılırken bu satır yanıltma noktası oldu.
 - [x] `SendFriendRequestDto`: `handle` → `friendCode` (`@Length(8,8)`); servis `findUnique({ where: { friendCode } })`; bulunamaz → `USER_NOT_FOUND`; `handle` ayrıştırma + `INVALID_HANDLE` **kaldır**
 - [x] `toUserDto`: `friendTag` → `friendCode`; Swagger + hata kodları geri
 
@@ -1028,3 +1029,47 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Kasıtlı boşluk testi:** mobil arka plandayken web'den 3 mesaj at → ön plana dönünce üçü de görünüyor
 - [ ] Reconnect bayat token'la düşmüyor (access ömrü dolduktan sonra da toparlıyor) — dolaylı kanıt var (~30dk kesintisiz oturum, 401 hiç görülmedi), **açık kanıt (log) yok**, raporda detay
 - [x] `typecheck` + `lint` temiz; gömülü string yok; `api/`'ye dokunulmadı
+
+---
+
+## Sprint M1b — Mobil Sosyal Çekirdek (Track F2, PM compose 2026-07-30)
+
+> Sözleşme: `contracts/SPRINT_M1B_MOBILE_SOCIAL_CONTRACT.md` (**tek doğruluk kaynağı**).
+> **R7-nötr olmalı:** kapılar backend'de, mobil yalnız sonucu gösterir. `api/`'ye dokunma ihtiyacı → **DUR**.
+> Kapsam sahip onaylı: sosyal çekirdek + temizle/engelle. Dev checkbox işaretler, **item EKLEMEZ**.
+> **İki ders gömülü:** DTO alan adları dosyadan okunur (M0) · DoD **fiziksel cihazda** kapanır (M1a).
+
+### Arkadaşlık
+- [ ] **Arkadaş Ekle ekranı** (M1a'da yeri hazırlanan geniş butondan): kendi Kanka kodum + kopyala/paylaş · kod gir → istek gönder (**`friendCode` TAM 6 KARAKTER**) · bekleyen istekler kabul/ret
+- [ ] `friend.*` WS olayları dinlenir → arkadaş + istek listeleri anlık (M1a'da eklenmemişti)
+- [ ] Mobil `UserDto` tipine `friendCode` eklenir (sunucu zaten dönüyor — sıfır backend)
+- [ ] 🔴 **Kullanıcı adıyla arama/ekleme YOK** (uç yok + brief §4 "ulaşımı zorlaştır"); rehber senkronizasyonu kapsam dışı (KVKK)
+
+### DM
+- [ ] **Yeni DM başlat:** arkadaş seç → `POST /dm/channels { userId }`; kanal varsa mevcut olana düşer, kopya kutucuk oluşmaz
+- [ ] **"Sohbeti temizle"** (`DELETE /dm/channels/:id`) + onay; **dil "sil" değil "temizle"** (mesaj DB'de kalır, karşı taraf etkilenmez)
+- [ ] Profil kartına aksiyonlar: **engelle** (`POST /blocks`) + **arkadaşlıktan çıkar** (`DELETE /friends/:userId`), ikisi de onaylı; engel kaldır
+- [ ] Engel sonrası giriş kutusu M1a'daki `canMessage`/`selfBlocked` yolundan kapanır — **yeni kapı yazılmaz**
+
+### Grup DM
+- [ ] **Kur:** arkadaşlardan çoklu seçim (**1–9 üye**) + opsiyonel ad → `POST /dm/groups`
+- [ ] **Yönet:** ad değiştir · üye ekle · üye çıkar · ayrıl · grubu sil — **yetki tablosuna göre** (ekle+ayrıl her üye; çıkar/adlandır/sil yalnız `ownerId`); yetkisiz işlem **hiç render edilmez** (disabled değil)
+- [ ] 🔴 **T&S:** minör grup kuramaz/üye olamaz (`GROUP_MINOR_FORBIDDEN`) · üyeler arkadaş olmak zorunda (`NOT_FRIEND`); retler **jenerik**, istemci sebebi tahmin edip açıklamaya ÇALIŞMAZ
+
+### Arama
+- [ ] **Listede yerel süzme** (M1a'da yeri hazırlanan dar/ikon buton): DM+ortam+kanal, gruplu sonuç, boş durum; ek uç yok
+- [ ] **Sohbet içinde mesaj arama:** `GET /channels/:id/messages/search?q=` (max 30) → sonuca dokun → mesaja git
+- [ ] **Ortam-geneli arama KULLANILMAZ** (`/guilds/:id/messages/search`) — ayrı ekran tasarımı, sözleşme §3.5
+
+### DoD (sözleşme §1 — 11 madde; **fiziksel cihazda görülerek** kapanır)
+- [ ] Kod paylaşma + kod ile istek gönderme çalışıyor
+- [ ] İstek kabul/ret anlık yansıyor
+- [ ] Sıfırdan DM başlatma çalışıyor, kopya kanal açılmıyor
+- [ ] Grup DM: yetkili işlemler çalışıyor, yetkisiz butonlar görünmüyor (403 yiyen buton yok)
+- [ ] Liste süzme + boş sonuç durumu
+- [ ] Sohbet içi mesaj arama + sonuca gitme
+- [ ] Sohbeti temizle: kutucuk düşüyor, karşı taraf etkilenmiyor, yeni mesajda geri geliyor
+- [ ] Engelle / arkadaşlıktan çıkar onaylı çalışıyor
+- [ ] Engel sonrası giriş kutusu kapanıyor
+- [ ] Metin `tr.json`'dan, renk/ölçü token'dan, gömülü string yok
+- [ ] `typecheck` + `lint` temiz; **`api/`'ye dokunulmadı**
