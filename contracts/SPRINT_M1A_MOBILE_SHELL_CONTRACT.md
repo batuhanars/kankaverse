@@ -335,6 +335,11 @@ Kapsam dışı (sayılmadı): sesli/görüntülü DM paneli (V2), tepkiler, sabi
 
 ### C) Doğrulama durumu — dürüst kayıt
 
+**✅ SAHİP CİHAZDA DOĞRULADI 2026-07-30 (§8.3-A'nın tamamı):** web'ten mesaj atınca DM kutucuğunda son
+mesaj güncelleniyor, okunmadı noktası çıkıyor ve kanal listenin en üstüne kayıyor — yani `dm.message` →
+`applyActivity` zinciri (yerinde güncelle + başa taşı + okunmadı) uçtan uca çalışıyor.
+
+Aşağıdaki not, doğrulama ÖNCESİ durumu kaydeder (süreç izi olarak bırakıldı):
 Bu turun kodu `typecheck` + `lint` temiz ama **cihazda görülmedi.** PM emülatörde kapalı bir döngü kurmayı
 denedi (yerel `kv_devloop` hesabı + ortam + kanal): giriş, rail ikon yedeği, "Mesajlar" başlığı, kanal
 listesi `#` + ses kanalının süzülmesi, boş durumlar **görüldü ve doğru**. Ama **klavye davranışı

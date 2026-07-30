@@ -1006,7 +1006,7 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > Kök neden: mobil yalnız kanal-kapsamlı olayları dinliyordu; `user:<id>` odasına gelen olaylara kimse
 > kulak vermiyordu. Kod `typecheck`+`lint` temiz, **cihazda doğrulanmadı** (bkz. sözleşme §8.3-C).
 
-- [x] **`dm.message` → DM listesi canlı** + yeni `stores/dm.ts` (web `applyActivity` semantiği birebir); liste artık store'da, mount'a bağlı değil
+- [x] **`dm.message` → DM listesi canlı** + yeni `stores/dm.ts` (web `applyActivity` semantiği birebir); liste artık store'da, mount'a bağlı değil. **✅ sahip cihazda doğruladı:** son mesaj güncelleniyor + okunmadı noktası çıkıyor + kutucuk en üste kayıyor
 - [x] **`dm.request` → mesaj isteği rozeti canlı** (web gibi sessiz)
 - [x] **`notification` → bildirim sekmesi + rozeti canlı.** `mention` BİLİNÇLİ dinlenmiyor: kalıcı bildirim susturma tercihinden süzülüyor, `mention`'ı rozete bağlamak kullanıcının kapattığı bildirimi geri açardı
 - [x] **DM listesinde "yazıyor…"** (web Sprint 6 R1-b/R1-c karşılığı)
@@ -1023,8 +1023,8 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 ### DoD (sözleşme §1 — 11 madde; **görülerek** kapatılır)
 - [x] Emülatörde doğrulandı
-- [ ] **Fiziksel cihazda doğrulandı** (arka plan/ön plan davranışı emülatörde gerçeği yansıtmaz — doze/pil optimizasyonu) — **sahibe ait, dev emülatörle yetindi**
-- [ ] İki istemci testi: web ↔ mobil anlık mesaj akışı çift yönlü — dev REST-simüle ikinci istemciyle doğruladı (WS broadcast aynı yol); **gerçek web sekmesiyle doğrulanmadı**, sahip teyit etsin
+- [x] **Fiziksel cihazda doğrulandı** — sahip 2026-07-30'da SDK 54 sonrası kendi telefonunda uçtan uca kullandı (giriş, kanal/DM gezinme, mesaj yazma, klavye, canlı DM listesi, ortam görselleri)
+- [~] İki istemci testi: **web → mobil çift yönlü akışın web ayağı gerçek sekmeyle doğrulandı** (sahip web'ten mesaj attı, mobilde anlık göründü: yeni-mesaj düğmesi + DM kutucuğu güncellemesi). **Mobil → web yönü açıkça gözlenmedi** (mobilde gönderim çalışıyor, web sekmesinde anlık görünmesi teyit edilmedi)
 - [x] **Kasıtlı boşluk testi:** mobil arka plandayken web'den 3 mesaj at → ön plana dönünce üçü de görünüyor
 - [ ] Reconnect bayat token'la düşmüyor (access ömrü dolduktan sonra da toparlıyor) — dolaylı kanıt var (~30dk kesintisiz oturum, 401 hiç görülmedi), **açık kanıt (log) yok**, raporda detay
 - [x] `typecheck` + `lint` temiz; gömülü string yok; `api/`'ye dokunulmadı
