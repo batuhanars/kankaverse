@@ -3,6 +3,7 @@ import { getAccessToken, refreshAccessToken } from '@/api/http';
 import { useMessagesStore } from '@/stores/messages';
 import { useTypingStore } from '@/stores/typing';
 import { useNotificationsStore } from '@/stores/notifications';
+import { useDmStore } from '@/stores/dm';
 import type { MessageDto } from '@/api/messages';
 
 // Sprint M1a contract §4 — web/src/composables/useSocket.ts deseni birebir taşındı (yalnız bu
@@ -118,6 +119,34 @@ function ensureSocket(): Socket {
   // Handshake snapshot — Bildirimler sekmesi rozeti (contract §4.2).
   socket.on('notification:snapshot', (payload: { unreadCount: number }) => {
     useNotificationsStore.getState().applySnapshotUnreadCount(payload.unreadCount);
+  });
+
+  // ---- Kullanıcı-kapsamlı olaylar (sözleşme §8.3, sahip bulgusu 2026-07-30) ----
+  // M1a ilk teslimi YALNIZ kanal-kapsamlı olayları dinliyordu (message.*, typing:*). Sunucu mobili
+  // handshake'te `user:<id>` odasına zaten koyuyor, yani aşağıdaki olaylar cihaza GELİYORDU ama
+  // kimse dinlemiyordu → DM listesi, istek rozeti ve bildirim rozeti bayat kalıyordu. Web
+  // `composables/useSocket.ts` ile aynı olay kümesi (bu sprintte kullanılan alt küme).
+
+  socket.on('dm.message', (data: { channelId: string; lastMessage: { content: string; createdAt: string }; senderId: string }) => {
+    useDmStore.getState().applyActivity(data);
+  });
+
+  // C9 — bana yeni mesaj isteği geldi. Web'de de sessiz: yalnız rozet tazelenir.
+  socket.on('dm.request', () => {
+    useDmStore.getState().refreshRequests();
+  });
+
+  // Kalıcı bildirim (Sprint C1) — rozet + liste anlık.
+  // **`mention` BİLİNÇLİ olarak dinlenmiyor.** Sunucu bir bahsetmede iki şey yayar: anlık `mention`
+  // ve kalıcı `notification`. Ama kalıcı olan, alıcının kanal/ortam bildirim tercihinden SÜZÜLÜR
+  // (api messages.gateway.ts R12 `shouldNotifyChannel` — susturulmuş kanalda kalıcı bildirim hiç
+  // üretilmez). `mention`'ı da rozete bağlamak bu susturmayı baypas eder, yani kullanıcının kapattığı
+  // bildirimi geri açardı. Rozetin tek kaynağı `notification`. (`mention` web'de anlık toast için
+  // kullanılıyor; mobilde toast yok, gelince o zaman dinlenir.)
+  socket.on('notification', () => {
+    const store = useNotificationsStore.getState();
+    store.refreshUnreadCount();
+    store.fetchFirstPage();
   });
 
   return socket;
