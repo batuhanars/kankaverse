@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authApi, type UserDto } from '@/api/auth';
+import { authApi, type RegisterPayload, type UserDto } from '@/api/auth';
 import { extractErrorMessage } from '@/api/errors';
 import {
   clearAccessToken,
@@ -27,6 +27,13 @@ interface AuthState {
   bootstrap: () => Promise<void>;
   login: (identifier: string, password: string) => Promise<LoginResult>;
   loginTwoFa: (code: string) => Promise<'ok' | 'error'>;
+  /**
+   * Sprint M1c contract §2/§4 — rıza onayından SONRA (ConsentModal "Okudum, kabul ediyorum") çağrılır.
+   * 🔴 R7: hata dallanması YOK — `UNDERAGE`/`INVALID_BIRTHDATE`/`USERNAME_TAKEN`/... hepsi
+   * `extractErrorMessage` ile sunucunun Türkçe metni olduğu gibi gösterilir (login() ile aynı desen).
+   * Yaş kararını burada yeniden yorumlamak/yumuşatmak YASAK.
+   */
+  register: (payload: RegisterPayload) => Promise<'ok' | 'error'>;
   logout: () => Promise<void>;
   /** 2FA ekranından girişe geri dönerken challenge + hata state'ini temizler. */
   clearChallenge: () => void;
@@ -96,6 +103,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ errorMessage: null });
     try {
       const result = await authApi.loginTwoFa(challenge.challengeToken, code);
+      setAccessToken(result.accessToken);
+      if (result.refreshToken) {
+        await setRefreshToken(result.refreshToken);
+      }
+      set({ user: result.user, status: 'authenticated', challenge: null });
+      return 'ok';
+    } catch (e) {
+      set({ errorMessage: extractErrorMessage(e) });
+      return 'error';
+    }
+  },
+
+  async register(payload) {
+    set({ errorMessage: null });
+    try {
+      const result = await authApi.register(payload);
       setAccessToken(result.accessToken);
       if (result.refreshToken) {
         await setRefreshToken(result.refreshToken);
