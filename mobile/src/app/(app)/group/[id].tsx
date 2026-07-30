@@ -19,6 +19,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ProfileCardModal } from '@/components/ProfileCardModal';
 import { extractErrorMessage } from '@/api/errors';
 import type { DmParticipantDto } from '@/api/dm';
+import { channelTitle } from '@/utils/channelTitle';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -142,7 +143,7 @@ export default function GroupManageScreen() {
 
   return (
     <View style={styles.flex}>
-      <Stack.Screen options={{ title: channel.name || t('group.noName') }} />
+      <Stack.Screen options={{ title: channelTitle(channel) }} />
 
       <Text style={styles.sectionLabel}>{t('group.members')}</Text>
       <FlatList

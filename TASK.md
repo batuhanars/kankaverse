@@ -1082,6 +1082,13 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Türkçe yerel sıralama** (`localeCompare('tr')` + `toLocaleUpperCase('tr')`) — İ/I/Ö/Ş/Ü doğru yere düşsün
 - [x] `new-chat.tsx` örtük davranışı (1 seç→DM, 2+→grup) **kaldırıldı**; paylaşılan `FriendPickerList` iki ekranda ortak (dosyalar 147/231/195 satır — 300 eşiğinin altında)
 
+**R3 — grup kurma cilası (sözleşme §14):**
+- [x] **FAB tek glif** (`MaterialCommunityIcons message-plus`) — bindirilmiş rozet düzeneği ve ölü stiller kaldırıldı; Ionicons'ta bu glif gerçekten yok, `@expo/vector-icons` seti zaten içeriyor (yeni bağımlılık yok)
+- [x] **Grup adı alanı kurma ekranından kaldırıldı** (PM kararı) — grup adsız kurulur; **adlandırma yönetim ekranında KALIYOR** (mobil + web), yetenek kaldırılmadı, yalnız kurma anındaki soru kaldırıldı
+- [x] **Çipli arama çubuğu** (`SelectedFriendsField`): seçilenler çip, yazdıkça süz, sonuca dokun→çip + metin temizlenir, çipten çıkar, boş alanda backspace son çipi alır. `FriendPickerList` kırılmadı, `new-message.tsx` tek-seçim akışına dokunulmadı
+- [x] **Sapma düzeltildi:** adsız grup yönetim ekranında jenerik "Grup" görünüyordu (liste ve sohbet başlığı üye adlarını birleştirirken) → mantık `utils/channelTitle.ts`'e çıkarıldı, üç çağrı yeri birleşti. *Dev, PM'in "sunucu üye adlarını varsayılan yapar" ifadesinin yanlış olduğunu kaynaktan gösterdi: sunucu `null` saklıyor, birleştiren istemci.*
+- [x] **Karar (§15):** grup yönetimi için sağ tık bağlam menüsü **eklenmedi** — yetenek üç istemcide de erişilebilir (masaüstü web'i yüklüyor); tetikleyici olmadan ikinci kapı açılmaz
+
 ### DoD (sözleşme §1 — 11 madde; **fiziksel cihazda görülerek** kapanır)
 > Aşağıdaki maddelerin tamamı **kod tarafında tamamlandı, hiçbiri fiziksel cihazda görülmedi** — bu
 > sprint'i devralan dev session emülatör/cihaz çalıştırmadı (talimat gereği). Sahip cihaz turu bekliyor.

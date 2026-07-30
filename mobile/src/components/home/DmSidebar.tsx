@@ -7,6 +7,7 @@ import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
 import { useTypingStore } from '@/stores/typing';
 import { formatMentionsPlain } from '@/utils/mentions';
+import { channelTitle } from '@/utils/channelTitle';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -16,13 +17,6 @@ interface Props {
   // Sözleşme §8.1-A/4 (M1a fast-follow, ekranlarıyla birlikte M1b'de teslim edildi) + §3.2/3.3.
   onOpenSearch: () => void;
   onOpenAddFriend: () => void;
-}
-
-function displayName(ch: DmChannelDto): string {
-  if (ch.type === 'DM') return ch.otherUser.username;
-  if (ch.name) return ch.name;
-  const names = ch.members.map((m) => m.username);
-  return names.length <= 3 ? names.join(', ') : names.slice(0, 2).join(', ') + ` +${names.length - 2}`;
 }
 
 function avatarSource(ch: DmChannelDto): string | null {
@@ -140,7 +134,7 @@ export function DmSidebar({ onOpenDm, onOpenRequests, onOpenSearch, onOpenAddFri
           contentContainerStyle={styles.list}
           renderItem={({ item }) => {
             const avatar = avatarSource(item);
-            const name = displayName(item);
+            const name = channelTitle(item);
             const typing = (typingByChannel[item.id]?.length ?? 0) > 0;
             const preview = item.lastMessage
               ? formatMentionsPlain(item.lastMessage.content, resolver(item), t('mention.unknown'))

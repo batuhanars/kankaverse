@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { useFriendsStore } from '@/stores/friends';
 import { useDmStore } from '@/stores/dm';
+import type { FriendDto } from '@/api/friends';
 import { FriendPickerList } from '@/components/FriendPickerList';
+import { SelectedFriendsField } from '@/components/SelectedFriendsField';
 import { extractErrorMessage } from '@/api/errors';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { t } from '@/i18n';
@@ -27,7 +28,6 @@ export default function NewGroupScreen() {
   const createGroup = useDmStore((s) => s.createGroup);
 
   const [query, setQuery] = useState('');
-  const [name, setName] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -45,6 +45,24 @@ export default function NewGroupScreen() {
     });
   }
 
+  // R3 — kişi seçilince (eklenirken) arama metni temizlenir, kişi çipe döner (Discord deseni).
+  // Çipten çıkarırken (zaten seçiliyken tekrar dokununca) metni temizlemeye gerek yok, o yüzden
+  // yalnız "daha önce seçili değildi" dalında çağrılır.
+  function onToggleFriend(userId: string) {
+    const wasSelected = selected.has(userId);
+    toggle(userId);
+    if (!wasSelected) setQuery('');
+  }
+
+  // Seçim sırası korunur (Set insertion order) — çip satırı kullanıcının seçtiği sırayla akar.
+  const selectedFriends = useMemo(
+    () =>
+      Array.from(selected)
+        .map((id) => friends.find((f) => f.user.id === id))
+        .filter((f): f is FriendDto => Boolean(f)),
+    [selected, friends],
+  );
+
   async function onCreate() {
     if (selected.size === 0 || submitting) return;
     setSubmitting(true);
@@ -53,7 +71,8 @@ export default function NewGroupScreen() {
       // Sözleşme §3.3 🔴 T&S — grup kurma minöre kapalı (`GROUP_MINOR_FORBIDDEN`) + üyeler kanka
       // olmak zorunda (`NOT_FRIEND`). Sunucu bu retleri jenerik verir; istemci sebebi tahmin
       // ETMEZ, extractErrorMessage sunucunun Türkçe mesajını gösterir (statü sızdırmaz).
-      const channel = await createGroup(Array.from(selected), name.trim() || undefined);
+      // R3 — grup adsız kurulur (`name` DTO'da opsiyonel); adlandırma group/[id].tsx'e taşındı.
+      const channel = await createGroup(Array.from(selected));
       router.replace(dmRouteParams(channel));
     } catch (e) {
       setError(extractErrorMessage(e));
@@ -85,27 +104,13 @@ export default function NewGroupScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.nameField}>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder={t('group.namePlaceholder')}
-          placeholderTextColor={theme.colors.textMuted}
-          maxLength={50}
-          style={styles.nameInput}
-        />
-      </View>
-
-      <View style={styles.searchRow}>
-        <Ionicons name="search" size={18} color={theme.colors.textMuted} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder={t('friends.searchFriends')}
-          placeholderTextColor={theme.colors.textMuted}
-          style={styles.searchInput}
-        />
-      </View>
+      <SelectedFriendsField
+        selectedFriends={selectedFriends}
+        query={query}
+        onChangeQuery={setQuery}
+        onRemove={onToggleFriend}
+        placeholder={t('friends.searchFriends')}
+      />
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -115,7 +120,7 @@ export default function NewGroupScreen() {
         selection={{
           mode: 'multi',
           selectedIds: selected,
-          onToggle: toggle,
+          onToggle: onToggleFriend,
           maxReached: selected.size >= GROUP_MEMBER_LIMIT,
         }}
         emptyComponent={
@@ -167,38 +172,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.sm,
     fontWeight: '600',
-  },
-  nameField: {
-    paddingHorizontal: theme.layout.panelGap,
-    marginBottom: 8,
-  },
-  nameInput: {
-    minHeight: theme.layout.inputMinHeight,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.bgSidebar,
-    color: theme.colors.textPrimary,
-    paddingHorizontal: 14,
-    fontSize: theme.fontSize.base,
-  },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginHorizontal: theme.layout.panelGap,
-    marginBottom: 8,
-    paddingHorizontal: 14,
-    minHeight: theme.layout.inputMinHeight,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.bgSidebar,
-  },
-  searchInput: {
-    flex: 1,
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.base,
   },
   error: {
     color: theme.colors.danger,
