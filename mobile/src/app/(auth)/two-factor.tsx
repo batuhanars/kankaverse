@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
 import { t } from '@/i18n';
@@ -40,8 +40,11 @@ export default function TwoFactorScreen() {
     router.replace('/login');
   }
 
+  // Klavye: login.tsx ile aynı gerekçe (sözleşme §8.2/1). Bu ekranda hiç sarmalayıcı yoktu; içerik
+  // dikeyde ortalı olduğu için küçük ekranda kod alanı klavyenin altında kalabilir. Sahip hesabı 2FA'lı,
+  // yani bu ekran her girişte kritik yolda.
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} behavior="padding">
       <Text style={styles.title}>{t('twoFactorLogin.title')}</Text>
       <Text style={styles.subtitle}>
         {useRecovery ? t('twoFactorLogin.recoverySubtitle') : t('twoFactorLogin.subtitle')}
@@ -93,7 +96,7 @@ export default function TwoFactorScreen() {
       <Pressable onPress={goBack} style={styles.linkWrap}>
         <Text style={styles.linkMuted}>{t('twoFactorLogin.back')}</Text>
       </Pressable>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

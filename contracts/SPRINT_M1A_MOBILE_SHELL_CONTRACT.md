@@ -251,6 +251,13 @@ M0'daki "en güncel kararlı SDK" dersinin aynısı: emülatör gerçeği temsil
    `behavior` Android'de `undefined` bırakılmış, yani hiçbir şey yapmıyordu. Dev, Android'in pencereyi kendi
    küçültmesine (`adjustResize`) güvenmiş; **SDK 54'te edge-to-edge varsayılan açık olduğu için pencere
    küçülmüyor**, uygulama klavyenin altına çiziyor. → Android'de de `behavior="padding"`.
+   **✅ SAHİP CİHAZDA DOĞRULADI 2026-07-30:** giriş kutusu klavyenin üstünde kalıyor, yazarken görünüyor;
+   önceden gönder tuşuna basmak için boşluğa dokunup klavyeyi kapatmak gerekiyordu, o da bitti.
+   Düzeltme kanıtlandığı için **aynı kusurun olduğu diğer ekranlara da uygulandı:** `login.tsx` (aynı
+   `undefined` behavior; belirti: şifre alanı klavyenin altında kalıyor — PM emülatörde gördü) ve
+   `two-factor.tsx` (hiç sarmalayıcı yoktu; içerik dikeyde ortalı, küçük ekranda kod alanı kapanabilir —
+   sahip hesabı 2FA'lı olduğu için bu ekran her girişte kritik yolda). Başka `KeyboardAvoidingView`
+   kullanımı kalmadı (tarandı).
 2. **Ortam ikonu görünmez.** Görseli olan ortam rail'de yer kaplıyor ama çizilmiyor → dokunulabilir görünmez
    öğe. İki ayrı mesele: **(a) yerel veri**, `Guild.iconUrl` = `http://localhost:9000/...` (MinIO); telefon
    `localhost`'u kendisi sanır, tarayıcı aynı makinede olduğu için web'de çalışıyor. Üretimde adres
