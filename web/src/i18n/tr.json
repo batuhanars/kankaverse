@@ -1280,6 +1280,7 @@
     "friendRequest": "{actor} sana kanka isteği gönderdi.",
     "friendAccept": "{actor} kanka isteğini kabul etti.",
     "messageRequests": "{n} yeni mesaj isteğin var.",
+    "friendRequests": "{n} yeni kankalık isteğin var.",
     "guildInvite": "{actor} seni {guild} ortamına davet etti.",
     "markAllRead": "Tümünü okundu işaretle",
     "loadMore": "Yükleniyor…",

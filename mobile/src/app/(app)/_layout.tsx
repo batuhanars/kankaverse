@@ -27,6 +27,10 @@ export default function AppLayout() {
   useEffect(() => {
     if (!userId) return;
     useDmStore.getState().setSessionUser(userId);
+    // Kanka isteklerini oturum başında BİR KEZ çek — sidebar'daki "kanka isteği" satırı (sahip
+    // bulgusu 2026-07-30) aksi halde "Kanka Ekle" ekranına girilmeden 0 kalırdı. Sonraki
+    // güncellemeler `friend.*` WS olaylarından geliyor, tekrar çekim gerekmiyor.
+    useFriendsStore.getState().fetchAll();
     return () => {
       useDmStore.getState().setSessionUser(null);
       useFriendsStore.getState().reset();
