@@ -25,6 +25,7 @@ import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
 import PinsPopover from '@/components/shared/PinsPopover.vue'
 import SearchPopover from '@/components/shared/SearchPopover.vue'
 import GroupManagePanel from './GroupManagePanel.vue'
+import { useResponsive } from '@/composables/useResponsive'
 import type { DmChannelDto, MessageDto } from '@/types'
 
 // Yanıt state
@@ -194,7 +195,16 @@ const clearing = ref(false)
 const unblocking = ref(false)
 const reportTargetId = ref<string | null>(null)
 const reportTargetType = ref<'MESSAGE' | 'USER'>('MESSAGE')
-const showGroupPanel = ref(false)
+// Grup üye paneli — sahip talebi 2026-07-30: "varsayılan olarak açık kalsın, sonradan kapatabilelim".
+// **Nullable-tercih deseni** (app-shell'in üye panelinde zaten kullanılan desen, icat değil):
+//   null  = kullanıcı henüz dokunmadı → genişlikten türet (≥1280 açık)
+//   true/false = kullanıcı bir kez seçti → tercihi kalıcı, pencere boyu artık ezmez
+// Doğrudan `ref(true)` YAPILMADI: dar pencerede panel sohbeti sıkıştırırdı — bugün düzelttiğimiz
+// "modal sidebar'a hapsoldu" hatasıyla aynı sınıf hata olurdu. Eşik `isWide` (xl = 1280), ortam
+// görünümündeki üye panelinin eşiğiyle aynı.
+const { isWide } = useResponsive()
+const groupPanelPref = ref<boolean | null>(null)
+const showGroupPanel = computed(() => groupPanelPref.value ?? isWide.value)
 
 // Sprint 5 R1 — modal akışı
 const composeFile = ref<File | null>(null)
@@ -844,7 +854,7 @@ function isGroupStart(index: number): boolean {
                 ? 'bg-[var(--kv-accent-subtle)] text-[var(--kv-accent-500)]'
                 : 'text-[var(--kv-text-secondary)] hover:text-[var(--kv-text-body)]',
             ]"
-            @click="showGroupPanel = !showGroupPanel"
+            @click="groupPanelPref = !showGroupPanel"
           >
             {{ t('group.members') }}
           </button>
@@ -1118,7 +1128,7 @@ function isGroupStart(index: number): boolean {
       :group-name="groupChannel.name"
       :owner-id="groupChannel.ownerId"
       :members="groupChannel.members"
-      @close="showGroupPanel = false"
+      @close="groupPanelPref = false"
       @left="emit('left')"
       @deleted="emit('deleted')"
     />
