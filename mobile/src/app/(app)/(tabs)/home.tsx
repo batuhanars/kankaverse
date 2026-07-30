@@ -17,6 +17,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const [selection, setSelection] = useState<RailSelection>({ type: 'dm' });
 
+  const [lastOpenedChannelId, setLastOpenedChannelId] = useState<string>();
+
   const [guildState, setGuildState] = useState<'loading' | 'error' | 'ready'>('loading');
   const [guilds, setGuilds] = useState<GuildSummaryDto[]>([]);
 
@@ -48,6 +50,9 @@ export default function HomeScreen() {
   }, [guilds, selection]);
 
   function openChannel(channel: ChannelSummaryDto) {
+    // Sözleşme §8.1-A/1 — vurgu için "en son açılan kanal" burada tutulur (ChannelSidebar ortam
+    // değişiminde remount olduğu için kendi içinde tutamaz; ayrıca kanal ekranı ayrı bir route).
+    setLastOpenedChannelId(channel.id);
     router.push({ pathname: '/channel/[id]', params: { id: channel.id, name: channel.name ?? '' } });
   }
 
@@ -88,7 +93,13 @@ export default function HomeScreen() {
       ) : (
         // key: ortam değişince sidebar TAM yeniden mount olur (state 'loading'a resetlenir —
         // aksi halde guildId değişince önceki ortamın kanal listesi kısa süre ekranda kalırdı).
-        <ChannelSidebar key={selection.id} guildId={selection.id} guildName={selectedGuildName} onOpenChannel={openChannel} />
+        <ChannelSidebar
+          key={selection.id}
+          guildId={selection.id}
+          guildName={selectedGuildName}
+          selectedChannelId={lastOpenedChannelId}
+          onOpenChannel={openChannel}
+        />
       )}
     </SafeAreaView>
   );

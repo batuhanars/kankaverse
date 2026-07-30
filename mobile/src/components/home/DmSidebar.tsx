@@ -69,7 +69,10 @@ export function DmSidebar({ onOpenDm, onOpenRequests }: Props) {
 
   return (
     <View style={styles.flex}>
-      <Text style={styles.header}>{t('dm.sectionHeader')}</Text>
+      {/* Sözleşme §8.1-A/3 — web'in küçük soluk bölüm etiketi (`dm.sectionHeader` = "MESAJLAR")
+          mobilde ekran başlığı işi görüyor, o yüzden büyük+kalın "Mesajlar" (`mobile.home.dmEntry`).
+          Web'in kendi anahtarına dokunulmadı; orada hâlâ sidebar bölüm etiketi. */}
+      <Text style={styles.header}>{t('mobile.home.dmEntry')}</Text>
 
       {requestCount > 0 && (
         <Pressable onPress={onOpenRequests} style={styles.requestRow}>
@@ -144,13 +147,12 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgSidebar,
   },
   header: {
-    color: theme.colors.textMuted,
-    fontSize: theme.fontSize.xs,
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.xl,
     fontWeight: '700',
-    letterSpacing: 0.5,
     paddingHorizontal: theme.layout.panelGap,
     paddingTop: 14,
-    paddingBottom: 6,
+    paddingBottom: 10,
   },
   requestRow: {
     marginHorizontal: 10,

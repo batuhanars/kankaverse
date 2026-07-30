@@ -968,7 +968,7 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > **M0 dersi sözleşmeye gömüldü:** endpoint tablosu yol listesidir; DTO alan adları **dosyadan** okunur.
 
 ### Kabuk
-- [x] **Rail + sidebar** ana ekranı (ortam ikonları altıgen · seçili ortamın kanal listesi VEYA DM listesi); M0'ın "Ortamların" ekranı **kaldırılır** (not: gerçek altıgen clip-path için SVG kütüphanesi yok — rounded-square, M0 guilds.tsx emsali; raporda açıklandı)
+- [x] **Rail + sidebar** ana ekranı (ortam ikonları altıgen · seçili ortamın kanal listesi VEYA DM listesi); M0'ın "Ortamların" ekranı **kaldırılır** (not: ilk pass rounded-square çizmişti; `react-native-svg` PM onayıyla eklendi → ortam ikonları artık web `ServerRail.vue` ile **birebir aynı 6 noktalı altıgen** maske ile çiziliyor)
 - [x] **Alt tab çubuğu (3):** Ana Sayfa · Bildirimler · Sen (adlar `tr.json` → `mobile.tabs.*`)
 - [x] İçerik **ayrı tam ekran** + geri oku; sağ üye paneli **YOK**
 
@@ -988,9 +988,9 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Sen sekmesi:** salt okunur profil + çıkış yap (ayarlar M1b — boş iskele konmaz)
 
 ### Fast-follow — sahip görsel geri bildirimi 2026-07-29 akşamı (sözleşme §8.1-A)
-- [ ] **Kanal listesi belirginleşsin:** metin kontrastı, satır ayrımı, **seçili kanal vurgusu** (renkler tema token'larından)
-- [ ] **DM rail girişi:** "M" harfi yerine **konuşma baloncuğu ikonu** (ortam ikonları altıgen kalır)
-- [ ] **"Mesajlar" başlığı** büyük + kalın (soluk büyük-harf değil)
+- [x] **Kanal listesi belirginleşsin:** metin `textSecondary`→`textBody` + `sm`→`md`, `#` ön eki `textSecondary`+`lg`, satır 40dp min yükseklik + 2dp ritim boşluğu, **seçili satır `bgElevated` dolgu + Kor `#`**. Ayırıcı çizgi konmadı (Discord ritimle ayırır). Gömülü `#fff` rozet metni token'a çevrildi. *(vurgu = **en son açılan** kanal; mobilde içerik ayrı tam ekran olduğu için "açık kanal" kalıcı değil — sözleşme okuması raporda)*
+- [x] **DM rail girişi:** "M" harfi yerine **Ionicons baloncuğu** (`chatbubble` seçili / `chatbubble-outline` değil); ortam ikonları altıgen kaldı, ikon seti alt tab çubuğuyla ortak
+- [x] **"Mesajlar" başlığı** büyük + kalın (`xl`/700/`textPrimary`, `mobile.home.dmEntry`); web'in `dm.sectionHeader` bölüm etiketine dokunulmadı
 - [ ] Başlık altına tek satır: **dar/ikon arama** + **geniş "Arkadaş Ekle"** butonu — ⚠️ **ekranlarıyla birlikte gelir** (boş buton yasak, sözleşme §8.1-B)
 
 ### M1b'ye eklenenler (sözleşme §8.1-B — sözleşmesi yazılacak)
