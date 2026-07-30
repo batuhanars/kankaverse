@@ -26,6 +26,11 @@ export const colors = {
   dangerSubtle: 'rgba(242, 59, 75, 0.12)',
   success: '#3DB46E',
   warning: '#E8A33D',
+  // Sprint M1c — e-posta doğrulama bandı için. Web'in karşılığı (`EmailVerificationBanner.vue`)
+  // token değil, o bileşene özel bir ad-hoc rgba fallback (`--kv-warning-subtle, #3D2E0E`)
+  // kullanıyor; burada uydurulmadı — `dangerSubtle`/`accentSubtle` ile AYNI formül (base rengin
+  // %12 opaklığı) `warning` rengine uygulanarak türetildi.
+  warningSubtle: 'rgba(232, 163, 61, 0.12)',
   info: '#4E9CF5',
   // presence
   online: '#3DB46E',

@@ -1614,6 +1614,12 @@
       "memberCount": "{n}/{max} üye",
       "create": "Oluştur",
       "removeSelected": "{username} kişisini kaldır"
+    },
+    "register": {
+      "birthDateDayPlaceholder": "GG",
+      "birthDateMonthPlaceholder": "AA",
+      "birthDateYearPlaceholder": "YYYY",
+      "linkOpenError": "Bağlantı açılamadı. Lütfen tekrar dene."
     }
   }
 }

@@ -15,8 +15,9 @@ import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 // Ekran 2/3 (contract §8) — Giriş: kullanıcı adı/e-posta + şifre. 2FA'lı hesapta login()
-// 'challenge' döner → two-factor ekranına yönlendirilir. Kayıt/şifre-sıfırlama linki YOK
-// (M0 kapsam dışı, contract §0 — olmayan özelliğe kapı açılmaz).
+// 'challenge' döner → two-factor ekranına yönlendirilir.
+// Sprint M1c — "Kayıt ol" + "Şifremi unuttum" linkleri eklendi (M0'da bilinçli yoktu, o sprintte
+// olmayan özelliğe kapı açılmazdı; artık her iki ekran da var — contract §3.1/§3.3).
 export default function LoginScreen() {
   const router = useRouter();
   const login = useAuthStore((s) => s.login);
@@ -83,6 +84,10 @@ export default function LoginScreen() {
           />
         </View>
 
+        <Pressable onPress={() => router.push('/forgot-password')} style={styles.forgotPasswordWrap}>
+          <Text style={styles.forgotPasswordText}>{t('auth.forgotPassword')}</Text>
+        </Pressable>
+
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 
         <Pressable
@@ -96,6 +101,13 @@ export default function LoginScreen() {
             <Text style={styles.buttonText}>{t('auth.login')}</Text>
           )}
         </Pressable>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>{t('auth.noAccount')} </Text>
+          <Pressable onPress={() => router.push('/register')}>
+            <Text style={styles.footerLink}>{t('auth.register')}</Text>
+          </Pressable>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -150,6 +162,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: theme.fontSize.base,
   },
+  forgotPasswordWrap: {
+    alignItems: 'flex-end',
+    marginBottom: theme.layout.panelGap,
+  },
+  forgotPasswordText: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+  },
   error: {
     color: theme.colors.danger,
     fontSize: theme.fontSize.sm,
@@ -170,6 +190,21 @@ const styles = StyleSheet.create({
   buttonText: {
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.base,
+    fontWeight: '600',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    marginTop: theme.layout.panelGap * 1.5,
+  },
+  footerText: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.sm,
+  },
+  footerLink: {
+    color: theme.colors.accent500,
+    fontSize: theme.fontSize.sm,
     fontWeight: '600',
   },
 });

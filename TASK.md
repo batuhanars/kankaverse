@@ -1113,37 +1113,40 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > Dev checkbox işaretler, **item EKLEMEZ**. Sapma → DUR, PM'e dön. DoD **fiziksel cihazda** kapanır.
 
 ### Kayıt
-- [ ] **Kayıt ekranı** (giriş ekranına "Kayıt ol" bağlantısı): kullanıcı adı · e-posta · şifre · doğum tarihi
-- [ ] `GET /auth/registration-mode` → `open` davet alanı yok · `invite` zorunlu · `closed` kayıt kapalı
-- [ ] Doğum tarihi **üç sayısal alan GG/AA/YYYY** (PM kilitli kararı — takvim seçici YOK, yeni bağımlılık YOK): `number-pad`, maxLength 2/2/4, **otomatik ilerleme + boş alanda backspace geri döner**, tek hata satırı, `YYYY-MM-DD`→ISO birleştirme
-- [ ] 🔴 **Yaş kapısı otoritesi sunucuda:** `UNDERAGE` (13 altı) / `INVALID_BIRTHDATE` mesajı **olduğu gibi** gösterilir; istemcide yaş hesabı yeniden yapılmaz, ne gevşetilir ne taklit edilir
+- [x] **Kayıt ekranı** (giriş ekranına "Kayıt ol" + "Şifremi unuttum" bağlantıları)
+- [~] `GET /auth/registration-mode` → kod tamam; **üç durum cihazda denenmedi** (canlıda `open`, `invite`/`closed` görülmedi)
+- [x] Doğum tarihi **üç sayısal alan GG/AA/YYYY** (PM kilitli kararı — takvim seçici YOK, yeni bağımlılık YOK): `number-pad`, maxLength 2/2/4, **otomatik ilerleme + boş alanda backspace geri döner**, tek hata satırı, `YYYY-MM-DD`→ISO birleştirme
+- [x] 🔴 **Yaş kapısı otoritesi sunucuda:** `UNDERAGE` (13 altı) / `INVALID_BIRTHDATE` mesajı **olduğu gibi** gösterilir; istemcide yaş hesabı yeniden yapılmaz, ne gevşetilir ne taklit edilir
 
 ### 🔴 Rıza adımı (R7 odağı)
-- [ ] **Onay adımı olmadan `register` çağrılmaz** — web `RegisterView` deseni birebir (buton doğrudan kaydetmez, onay ekranı açar)
-- [ ] Metinler web'in **mevcut `legal.*` anahtarlarından** (mobil için kısaltılmış sürüm YOK)
-- [ ] `/kurallar` + `/gizlilik` bağlantıları gerçekten açılıyor (`Linking.openURL`); açılamazsa kullanıcı bilgilendirilir
-- [ ] Onay formun içine gömülü checkbox olarak KONMAZ (karar anında ayrı yüzey — rıza kalitesi)
+- [x] **Onay adımı olmadan `register` çağrılmaz** — web `RegisterView` deseni birebir (buton doğrudan kaydetmez, onay ekranı açar)
+- [x] Metinler web'in **mevcut `legal.*` anahtarlarından** (mobil için kısaltılmış sürüm YOK)
+- [~] `/kurallar` + `/gizlilik` bağlantıları gerçekten açılıyor — **cihazda denenmedi**; kod tarafı (`Linking.openURL`); açılamazsa kullanıcı bilgilendirilir
+- [x] Onay formun içine gömülü checkbox olarak KONMAZ (karar anında ayrı yüzey — rıza kalitesi)
 
 ### Şifre kurtarma
-- [ ] **"Şifremi unuttum"** → `POST /auth/forgot-password`; yanıt **her koşulda aynı** (hesap varlığı sızmaz), istemci çıkarım yapmaz
-- [ ] 🔴 `reset-password` + `verify-email` ekranları **UYGULANMAZ** (bilinçli): link web'e gider, uygulamayı açması Android App Links + imzalı derleme ister → **M2 dev build**
+- [x] **"Şifremi unuttum"** → `POST /auth/forgot-password`; yanıt **her koşulda aynı** (hesap varlığı sızmaz), istemci çıkarım yapmaz
+- [x] 🔴 `reset-password` + `verify-email` ekranları **UYGULANMADI** (bilinçli): link web'e gider, uygulamayı açması Android App Links + imzalı derleme ister → **M2 dev build**
 
 ### E-posta doğrulama (mobilde hiç yoktu)
-- [ ] Mobil `UserDto`'ya `emailVerified` (sunucu zaten dönüyor — sıfır backend)
-- [ ] Doğrulanmamışta **görünür bant + "Tekrar gönder"** (`POST /auth/resend-verification`); yalnız `emailVerified === false` iken render
-- [ ] Zaten doğrulanmışta `409` → sunucu mesajı gösterilir
+- [x] Mobil `UserDto`'ya `emailVerified` (sunucu zaten dönüyor — sıfır backend)
+- [~] Doğrulanmamışta **görünür bant + "Tekrar gönder"** — kod tamam, **cihazda görülmedi**; (`POST /auth/resend-verification`); yalnız `emailVerified === false` iken render
+- [~] Zaten doğrulanmışta `409` → sunucu mesajı gösterilir
 
 ### Ortam
-- [ ] `EXPO_PUBLIC_WEB_URL` `.env.example`'a (yasal sayfaların kökü; `EXPO_PUBLIC_API_URL` ile karıştırılmaz)
+- [x] `EXPO_PUBLIC_WEB_URL` `.env.example`'a (yasal sayfaların kökü; `EXPO_PUBLIC_API_URL` ile karıştırılmaz)
 
-### DoD (sözleşme §1 — 10 madde; **fiziksel cihazda** kapanır)
-- [ ] Mobilden açılan hesap web'de de çalışıyor
-- [ ] **13 altı reddediliyor** ve kullanıcı nedenini görüyor
-- [ ] **Rıza olmadan kayıt tamamlanamıyor**; yasal metinler açılabiliyor
-- [ ] Doğrulama durumu görünür + "tekrar gönder" çalışıyor
-- [ ] Doğrulanmamış kullanıcı ortam kuramadığında **sebebi anlıyor** (sessiz 403 yok)
-- [ ] `forgot-password` hesap varlığını sızdırmıyor
-- [ ] Kayıt modu üç durumda da doğru davranıyor
-- [ ] Metin `tr.json`'dan, renk/ölçü token'dan, gömülü string yok
-- [ ] `typecheck` + `lint` temiz; **`api/`'ye dokunulmadı**
-- [ ] 🔴 **R7:** diff sahip onayından geçti
+### DoD (sözleşme §1 — 10 madde)
+- [ ] Mobilden açılan hesap **web'de de çalışıyor** — denenmedi
+- [x] **13 altı reddediliyor** ve kullanıcı nedenini görüyor — ✅ **sahip cihazda doğruladı** ("Kayıt için en az 13 yaşında olmalısın")
+- [x] **Rıza olmadan kayıt tamamlanamıyor** — ✅ **sahip cihazda doğruladı** (onaya dokunmadan hesap açılmıyor)
+- [~] Yasal metinler açılabiliyor — kod tamam, **cihazda denenmedi** (emülatörde `Linking.openURL` tarayıcı seçimi göstermiyor)
+- [ ] Doğrulama bandı + "tekrar gönder" — denenmedi
+- [ ] Doğrulanmamış kullanıcı ortam kuramadığında sebebi anlıyor — **M1d'de ortam kurma gelince** anlamlı olur
+- [x] `forgot-password` hesap varlığını sızdırmıyor — *PM kod incelemesi (try/finally, her koşulda "gönderildi"); davranış olarak sızıntı gözle ayırt edilemez, kanıt koddur*
+- [~] Kayıt modu üç durum — yalnız `open` çalışır durumda görüldü; `invite`/`closed` denenmedi
+- [x] Metin `tr.json`'dan, renk/ölçü token'dan, gömülü string yok — *PM doğruladı (210 anahtar eksiksiz, gömülü renk yok)*
+- [x] `typecheck` + `lint` temiz; **`api/`'ye dokunulmadı** — *PM yeniden koştu*
+- [x] 🔴 **R7 — ONAYLANDI 2026-07-30, ama kanıt türü kayda geçirilmiştir:**
+  **Sahip cihazda DAVRANIŞ doğrulaması yaptı** (rıza kapısı + yaş kapısı) ve **kod incelemesini bilinçle PM'e devretti** ("tek tek kodu incelemek uzun iş, cihazda çalışanı test ettim").
+  Yani bu R7, "sahip satır satır okudu" biçiminde **değildir**. Cihaz testi rıza ve yaş kapılarını kod okumaktan güçlü biçimde kanıtlar; ama **mutlu yolda görünmeyen** üç şeyi kanıtlamaz ve onlar PM incelemesine dayanır: (1) token saklama (access yalnız bellek, refresh secure store, `undefined` yazılmıyor), (2) hiçbir yerde şifre loglanmıyor, (3) `forgot-password` sızıntısızlığı. **Bu ayrım ileride "R7'den geçti" denince ne kastedildiğini bilmek için burada.**
