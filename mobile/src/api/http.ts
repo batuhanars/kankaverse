@@ -36,7 +36,14 @@ export function clearRefreshToken(): Promise<void> {
   return SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
 }
 
-const http: AxiosInstance = createAxios({ baseURL: API_BASE });
+// Timeout ZORUNLU (sahip bulgusu 2026-07-30, fiziksel cihaz): `EXPO_PUBLIC_API_URL` ulaşılamaz bir
+// adresi gösterdiğinde (ör. telefonda emülatörün 10.0.2.2'si) TCP connect dakikalarca askıda kalıyor
+// → giriş butonunda tekerlek sonsuza kadar dönüyor, kullanıcı hiçbir geri bildirim almıyor. Timeout
+// isteği dürüstçe düşürür, `extractErrorMessage` `common.error`'a çevirir. Web'de bu tuzak yok
+// (tarayıcı kendi süresini uyguluyor), o yüzden orada timeout aranmasın.
+const REQUEST_TIMEOUT_MS = 15_000;
+
+const http: AxiosInstance = createAxios({ baseURL: API_BASE, timeout: REQUEST_TIMEOUT_MS });
 
 // Eş zamanlı 401'lerde tek refresh çağrısı — web/src/api/axios.ts refreshPromise dedup pattern'i.
 let refreshPromise: Promise<string> | null = null;
@@ -70,7 +77,9 @@ async function doRefresh(): Promise<string> {
   const res = await axios.post<RawEnvelope<{ accessToken: string; refreshToken: string }>>(
     `${API_BASE}/auth/refresh`,
     { refreshToken },
-    { headers: { 'X-Client-Type': 'mobile' } },
+    // Çıplak axios olduğu için instance timeout'u geçerli değil — bootstrap yolu da askıda
+    // kalmasın diye aynı süre burada tekrar verilir (açılışta sonsuz splash olmaz).
+    { headers: { 'X-Client-Type': 'mobile' }, timeout: REQUEST_TIMEOUT_MS },
   );
   const data = res.data?.data;
   // Savunmacı kontrol (PM bulgusu 2026-07-29): sunucu beklenmedik bir gövde dönerse (ör. cookie

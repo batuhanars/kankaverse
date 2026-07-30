@@ -3,13 +3,15 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { messagesApi, type MessageDto } from '@/api/messages';
 import { extractErrorMessage } from '@/api/errors';
 import { MessageBubble } from './MessageBubble';
@@ -84,6 +86,15 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
   const isTypingRef = useRef(false);
   const typingRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Alta yapışma + "yeni mesaj" sayacı — web `MessageArea.vue` REV-1/REV-9 semantiğinin birebir
+  // karşılığı: dipten `STICK_THRESHOLD` içindeysem yeni mesajda otomatik kay; yukarıda geçmiş
+  // okuyorsam kaydırma, geleni say ve "aşağı in" düğmesinde göster. Kendi mesajım her koşulda dibe
+  // kaydırır ve SAYILMAZ. Fark: liste `inverted`, yani dip = offset 0 (web'de scrollHeight'tı).
+  const listRef = useRef<FlatList<RenderItem>>(null);
+  const atBottomRef = useRef(true);
+  const prevCountRef = useRef(0);
+  const [newMessageCount, setNewMessageCount] = useState(0);
+
   // react-hooks/set-state-in-effect — GuildsScreen (M0) deseni: effect gövdesi fetch'i DOĞRUDAN
   // (adlandırılmış bir sarmalayıcı fonksiyonu çağırmadan) inline zincirler; setState yalnız
   // .then/.catch içinde (asenkron) çalışır. `fetchMessages` yalnız effect DIŞI iki yer için var:
@@ -142,6 +153,42 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
   const items = useMemo(() => buildRenderItems(channelState?.messages ?? []), [channelState?.messages]);
   const inverted = useMemo(() => [...items].reverse(), [items]);
 
+  function scrollToBottom() {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }
+
+  function jumpToBottom() {
+    atBottomRef.current = true;
+    setNewMessageCount(0);
+    scrollToBottom();
+  }
+
+  // Kanal değişince sayaç/yapışma sıfırlanır — önceki kanalın sayacı yeni kanala taşınmasın.
+  useEffect(() => {
+    atBottomRef.current = true;
+    prevCountRef.current = 0;
+    setNewMessageCount(0);
+  }, [channelId]);
+
+  useEffect(() => {
+    const count = items.length;
+    const prev = prevCountRef.current;
+    prevCountRef.current = count;
+    // Geçmiş yükleme (prepend) sayıyı da artırır ama BAŞTAN ekler; dipteki konum değişmediği için
+    // kaydırma/sayma yapılmaz. Ayırt etme: yeni mesaj her zaman SON eleman olur ve ilk yüklemede
+    // prev=0 olur (o da sayılmaz, zaten dipteyiz).
+    if (count <= prev || prev === 0) return;
+    const last = items[count - 1].message;
+    const mine = last.author.id === authUser?.id;
+    if (loadingOlder) return;
+    if (atBottomRef.current || mine) {
+      setNewMessageCount(0);
+      scrollToBottom();
+    } else {
+      setNewMessageCount((n) => n + (count - prev));
+    }
+  }, [items, authUser?.id, loadingOlder]);
+
   function scheduleTypingRefresh() {
     if (typingRefreshTimer.current) clearTimeout(typingRefreshTimer.current);
     typingRefreshTimer.current = setTimeout(() => {
@@ -184,6 +231,14 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
     }
   }
 
+  // Web'deki 120px eşiğinin aynısı (`MessageArea.vue` onListScroll). Inverted listede dip offset 0.
+  const STICK_THRESHOLD = 120;
+
+  function onListScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    atBottomRef.current = e.nativeEvent.contentOffset.y < STICK_THRESHOLD;
+    if (atBottomRef.current && newMessageCount > 0) setNewMessageCount(0);
+  }
+
   function onEndReached() {
     if (loadState !== 'ready' || loadingOlder || !channelState?.hasMore) return;
     setLoadingOlder(true);
@@ -202,8 +257,13 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
 
   const label = typingLabel();
 
+  // Klavye: Android'de de `padding` (sahip bulgusu 2026-07-30, fiziksel cihaz). `behavior` Android'de
+  // undefined bırakılmıştı, yani KeyboardAvoidingView hiçbir şey yapmıyordu. Dev, Android'in pencereyi
+  // kendi küçültmesine (adjustResize) güvenmiş; ama SDK 54'te edge-to-edge varsayılan AÇIK olduğu için
+  // pencere küçülmüyor, uygulama klavyenin ALTINA çiziyor → giriş kutusu klavyenin arkasında kalıyor,
+  // kullanıcı ne yazdığını görmüyor.
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.flex} behavior="padding">
       {loadState === 'loading' && (
         <View style={styles.center}>
           <ActivityIndicator color={theme.colors.accent500} />
@@ -227,10 +287,13 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
 
       {loadState === 'ready' && items.length > 0 && (
         <FlatList
+          ref={listRef}
           data={inverted}
           keyExtractor={(item) => item.message.id}
           inverted
           contentContainerStyle={styles.list}
+          onScroll={onListScroll}
+          scrollEventThrottle={16}
           onEndReachedThreshold={0.4}
           onEndReached={onEndReached}
           ListFooterComponent={
@@ -245,6 +308,18 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
             />
           )}
         />
+      )}
+
+      {/* "Aşağı in" düğmesi — yalnız yukarıda geçmiş okurken yeni mesaj geldiyse görünür (web
+          MessageArea.vue REV-9 karşılığı). Boş yüzey değil: sayaç sıfırken hiç render edilmez. */}
+      {newMessageCount > 0 && (
+        <Pressable onPress={jumpToBottom} style={styles.newMessagePill}>
+          <Text style={styles.newMessagePillCount}>
+            {newMessageCount > 99 ? '99+' : newMessageCount}
+          </Text>
+          <Text style={styles.newMessagePillText}>{t('message.newMessages')}</Text>
+          <Ionicons name="arrow-down" size={14} color={theme.colors.textPrimary} />
+        </Pressable>
       )}
 
       {label && (
@@ -324,6 +399,27 @@ const styles = StyleSheet.create({
   },
   loadMore: {
     marginVertical: 10,
+  },
+  newMessagePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 6,
+    marginBottom: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: theme.colors.accent500,
+  },
+  newMessagePillCount: {
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
+  },
+  newMessagePillText: {
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.sm,
+    fontWeight: '600',
   },
   typingRow: {
     paddingHorizontal: theme.layout.panelGap,
