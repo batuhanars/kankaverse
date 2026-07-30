@@ -38,8 +38,9 @@ function notificationText(n: NotificationDto): string {
 
 // Sprint M1a contract §5 ekran 5 — liste + okunmamış vurgusu + dokunuşta ilgili kanala git.
 // M1a'da yalnız MENTION'ın hedefi vardı; M1b Arkadaş Ekle ekranını getirdiği için **FRIEND_REQUEST de
-// tıklanabilir oldu**. FRIEND_ACCEPT + GUILD_INVITE hâlâ hedefsiz (kanka listesi ekranı ve davet kabul
-// ekranı yok) → tıklanabilir DEĞİL; "boş yüzey açma" gereği hedef uydurulmaz.
+// tıklanabilir oldu**. Sprint M1d-0 contract §3.2 — Kankalar ekranı geldiği için **FRIEND_ACCEPT de
+// tıklanabilir oldu** (M1b'de hedefi yoktu, bilinçle bırakılmıştı). GUILD_INVITE hâlâ hedefsiz (davet
+// kabul ekranı yok, hedefi M1d'de gelir) → tıklanabilir DEĞİL; "boş yüzey açma" gereği hedef uydurulmaz.
 export default function NotificationsScreen() {
   const router = useRouter();
   const items = useNotificationsStore((s) => s.items);
@@ -63,8 +64,13 @@ export default function NotificationsScreen() {
       router.push('/friends-add');
       return;
     }
-    // FRIEND_ACCEPT ve GUILD_INVITE hâlâ hedefsiz: kanka listesi ekranı ve davet kabul ekranı yok.
-    // "Boş yüzey açma" gereği bu satırlar tıklanabilir YAPILMADI — uyduracak bir hedef icat edilmez.
+    // Sprint M1d-0 — Kankalar ekranı geldi, FRIEND_ACCEPT artık hedefli.
+    if (n.type === 'FRIEND_ACCEPT') {
+      router.push('/friends-list');
+      return;
+    }
+    // GUILD_INVITE hâlâ hedefsiz: davet kabul ekranı yok. "Boş yüzey açma" gereği bu satır
+    // tıklanabilir YAPILMADI — uyduracak bir hedef icat edilmez.
     if (n.type !== 'MENTION' || !n.channelId) return;
     if (n.guildId) {
       router.push({ pathname: '/channel/[id]', params: { id: n.channelId, name: '' } });
@@ -114,7 +120,9 @@ export default function NotificationsScreen() {
           }
           renderItem={({ item }) => {
             const clickable =
-              item.type === 'FRIEND_REQUEST' || (item.type === 'MENTION' && !!item.channelId);
+              item.type === 'FRIEND_REQUEST' ||
+              item.type === 'FRIEND_ACCEPT' ||
+              (item.type === 'MENTION' && !!item.channelId);
             return (
               <Pressable
                 disabled={!clickable}

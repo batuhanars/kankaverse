@@ -1161,17 +1161,17 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > engellersen arkadaşlık da silindiği için kişi hiçbir yüzeyde kalmıyor).
 
 ### Yerleşim kararı (sahip itirazıyla revize edildi)
-- [ ] **Üst seviye "Kankalar" ekranı YOK** · alt tab çubuğu **3 eleman kalır** (4. sekme eklenmez)
-- [ ] **"Sen" sekmesi hesap merkezine dönüşür:** mevcut içerik korunur + iki satır (Kankalar · Engellenenler)
-- [ ] Sidebar'daki geniş **"Kanka Ekle" KALIR** — hızlı yol sidebar'da, yönetim "Sen"de
-- [ ] 🔴 **"Kankalık istekleri" satırı EKLENMEZ** — istekler zaten iki yoldan yönetiliyor (sidebar rozetli satırı + tıklanabilir bildirim); üçüncü kapı gürültü
+- [x] **Üst seviye "Kankalar" ekranı YOK** · alt tab çubuğu **3 eleman kalır** (4. sekme eklenmez)
+- [x] **"Sen" sekmesi hesap merkezine dönüşür:** mevcut içerik korunur + iki satır (Kankalar · Engellenenler)
+- [x] Sidebar'daki geniş **"Kanka Ekle" KALIR** — hızlı yol sidebar'da, yönetim "Sen"de
+- [x] 🔴 **"Kankalık istekleri" satırı EKLENMEZ** — istekler zaten iki yoldan yönetiliyor (sidebar rozetli satırı + tıklanabilir bildirim); üçüncü kapı gürültü
 
 ### Ekranlar
-- [ ] **Kankalar** (yeni): `GET /friends`; satırda **Mesaj Gönder** (`POST /dm/channels`) + **Kankalıktan Çıkar** (onaylı); boş durum
-- [ ] **Engellenenler** (yeni): `blocksApi.list` eklenir (`GET /blocks` — **tek yeni uç bağlaması**); **Engeli Kaldır** (onaylı); boş durum
-- [ ] 🔴 Yalnız **benim engellediklerim** listelenir; "beni kim engelledi" sunucudan dönmez, istemci tahmin etmez (G3)
-- [ ] `FRIEND_ACCEPT` bildirimi **tıklanabilir olur** → Kankalar ekranı (M1b §10'da hedefi yoktu)
-- [ ] Engellenenler listesi `stores/friends.ts`'e girer → çıkışta `reset()` ile temizlenir (sızıntı sınıfı)
+- [x] **Kankalar** (yeni): `GET /friends`; satırda **Mesaj Gönder** (`POST /dm/channels`) + **Kankalıktan Çıkar** (onaylı); boş durum
+- [x] **Engellenenler** (yeni): `blocksApi.list` eklenir (`GET /blocks` — **tek yeni uç bağlaması**); **Engeli Kaldır** (onaylı); boş durum
+- [x] 🔴 Yalnız **benim engellediklerim** listelenir; "beni kim engelledi" sunucudan dönmez, istemci tahmin etmez (G3)
+- [x] `FRIEND_ACCEPT` bildirimi **tıklanabilir olur** → Kankalar ekranı (M1b §10'da hedefi yoktu)
+- [x] Engellenenler listesi `stores/friends.ts`'e girer → çıkışta `reset()` ile temizlenir (sızıntı sınıfı)
 
 ### Kapsam dışı (bilinçli sadelik — sahip gözlemleri)
 - [ ] Profil zenginleştirme (biyografi, afiş, **GIF afiş**, üyelik tarihi) — Discord mobil de göstermiyor; mobilde afiş ekranın yarısını dekorasyona verir
