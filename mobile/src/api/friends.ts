@@ -34,6 +34,12 @@ export const friendsApi = {
   },
   // Dönüş şekli 'accepted'/'requested' discriminated union'dır (friends.service.ts
   // executeFriendshipCreation); mobil bunu tüketmiyor, başarı sonrası store fetchAll ile tazelenir.
+  /** Sprint 4A G2 — tıkla-ekle. `canSendFriendRequest(..., USER_CLICK)` kapılı: ortak ortam şartı ve
+   *  taraflardan biri minörse **jenerik** ret. İstemci sebebi göstermez (T&S sızıntı disiplini). */
+  async sendRequestByUser(userId: string): Promise<unknown> {
+    const res = await http.post('/friends/requests/by-user', { userId });
+    return res.data;
+  },
   async sendRequest(friendCode: string): Promise<unknown> {
     const res = await http.post<unknown>('/friends/requests', { friendCode });
     return res.data;
