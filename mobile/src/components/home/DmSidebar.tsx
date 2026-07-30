@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { type DmChannelDto } from '@/api/dm';
 import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
+import { useFriendsStore } from '@/stores/friends';
 import { useTypingStore } from '@/stores/typing';
 import { formatMentionsPlain } from '@/utils/mentions';
 import { t } from '@/i18n';
@@ -39,6 +40,10 @@ export function DmSidebar({ onOpenDm, onOpenRequests, onOpenSearch, onOpenAddFri
   // state'te tutulurken canlı güncelleme tutunacak bir yer bulamıyordu.
   const channels = useDmStore((s) => s.channels);
   const requestCount = useDmStore((s) => s.requestCount);
+  // Gelen (incoming) istek sayısı — giden istekler kullanıcıdan eylem beklemiyor, sayılmaz.
+  const friendRequestCount = useFriendsStore(
+    (s) => s.requests.filter((r) => r.direction === 'incoming').length,
+  );
   const state = useDmStore((s) => s.state);
   const errorMessage = useDmStore((s) => s.errorMessage);
   const fetchAll = useDmStore((s) => s.fetchAll);
@@ -99,6 +104,19 @@ export function DmSidebar({ onOpenDm, onOpenRequests, onOpenSearch, onOpenAddFri
           <Text style={styles.addFriendButtonText}>{t('friends.add')}</Text>
         </Pressable>
       </View>
+
+      {/* Kanka isteği satırı — sahip bulgusu 2026-07-30: gelen istek YALNIZ "Kanka Ekle" ekranının
+          içinde görünüyordu, sahip nereden kabul edeceğini bulamadı ("ben takıldıysam kullanıcı da
+          takılır"). Rozet Bildirimler sekmesinde çıkıyor, eylem başka ekranda — kopukluk buydu.
+          Yeni desen İCAT EDİLMEDİ: hemen altındaki mesaj-isteği satırının birebir kardeşi, aynı yerde,
+          aynı görünüm. Boş yüzey yok: bekleyen istek yoksa hiç render edilmez. */}
+      {friendRequestCount > 0 && (
+        <Pressable onPress={onOpenAddFriend} style={styles.requestRow}>
+          <Text style={styles.requestText}>
+            {t('notification.friendRequests', { n: friendRequestCount })}
+          </Text>
+        </Pressable>
+      )}
 
       {requestCount > 0 && (
         <Pressable onPress={onOpenRequests} style={styles.requestRow}>

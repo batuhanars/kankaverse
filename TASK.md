@@ -1061,6 +1061,11 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Sohbet içinde mesaj arama:** `GET /channels/:id/messages/search?q=` (max 30) → sonuca dokun → mesaja git *(`MessageSearchModal.tsx` + `MessageScreen.tsx` jump-to-message; cihazda doğrulanmadı — özellikle `scrollToIndex` değişken satır yüksekliğinde RN'in bilinen kırılganlığı taşıyor, `onScrollToIndexFailed` ile telafi edildi ama gerçek cihazda görülmedi)*
 - [x] **Ortam-geneli arama KULLANILMAZ** (`/guilds/:id/messages/search`) — ayrı ekran tasarımı, sözleşme §3.5
 
+### Fast-follow — kanka isteği keşfedilebilirliği (sözleşme §10, sahip bulgusu 2026-07-30 akşamı)
+- [x] **`FRIEND_REQUEST` bildirimi tıklanabilir** → Kanka Ekle ekranına gider. M1a'da hedefi olmadığı için ölüydü, M1b hedefi getirdi. `FRIEND_ACCEPT`/`GUILD_INVITE` hâlâ tıklanamaz (hedef yok, uydurulmadı)
+- [x] **Sidebar'a "kanka isteği" satırı** (`notification.friendRequests`) — mesaj-isteği satırının birebir kardeşi, yalnız **gelen** istek varken görünür; sayı oturum başında çekilip `friend.*` ile canlı kalır
+- [ ] **AÇIK YAPISAL BOŞLUK (§11):** mobilde "Kankalar" varış noktası yok — kanka listesi yalnız seçici ve istekler olarak beliriyor; `FRIEND_ACCEPT` hedefi de bu yüzden boş. **M1c/M1d kararı**, M1b kapsamına alınmadı
+
 ### DoD (sözleşme §1 — 11 madde; **fiziksel cihazda görülerek** kapanır)
 > Aşağıdaki maddelerin tamamı **kod tarafında tamamlandı, hiçbiri fiziksel cihazda görülmedi** — bu
 > sprint'i devralan dev session emülatör/cihaz çalıştırmadı (talimat gereği). Sahip cihaz turu bekliyor.

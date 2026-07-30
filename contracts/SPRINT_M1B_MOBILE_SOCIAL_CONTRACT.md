@@ -251,3 +251,37 @@ değil) — §2 yetki tablosuna uygun. `stores/friends.ts` oturum kapsamlı ve `
 diye yazıldı ve dev'e emülatör/cihaz testi bilinçli olarak verilmedi (M1a'da o döngüde saatler kaybedildi).
 Statik olarak kapanan iki madde (§1/10 i18n+token, §1/11 typecheck+lint+`api/` dokunulmadı) PM tarafından
 bağımsız doğrulandı. **Sahip yürüyüşü bekleniyor**, en kırılgan madde: mesaj arama + zıplama.
+
+---
+
+## 10. Fast-follow — kanka isteği keşfedilebilirliği (sahip bulgusu 2026-07-30 akşamı)
+
+**Belirti:** sahip kendine kankalık isteği gönderdi. Bildirimler sekmesinde kırmızı rozet çıktı, **ama
+isteği nereden kabul edeceğini bulamadı** — kabul/ret yalnız "Kanka Ekle" ekranının içinde duruyordu.
+Sahip cümlesi: *"Ben takıldıysam kullanıcı da takılabilir."*
+
+**Kök neden (tasarım tercihi değil, kusur):** rozet bir yerde, eylem başka yerde. Üstelik `FRIEND_REQUEST`
+bildirimi listede görünüp **dokununca hiçbir şey yapmıyordu** — M1a bunu bilinçli öyle bırakmıştı çünkü o
+sprintte gidilecek bir ekran yoktu (`notifications.tsx` yorumu bunu yazıyordu). M1b o ekranı getirdi, yani
+gerekçe ortadan kalkmıştı ama bildirim ölü kaldı.
+
+**Düzeltme (ikisi de mevcut deseni kullanır, yeni yüzey icat etmez):**
+
+1. **`FRIEND_REQUEST` bildirimi tıklanabilir** → `/friends-add`. `FRIEND_ACCEPT` ve `GUILD_INVITE` **hâlâ
+   tıklanabilir DEĞİL**: kanka listesi ekranı ve davet kabul ekranı yok, "boş yüzey açma" gereği hedef
+   uydurulmadı. (Kanka listesi ekranı yokluğu ayrı bir boşluk → §11.)
+2. **Sidebar'a "kanka isteği" satırı** (`notification.friendRequests`, yeni i18n anahtarı — mesaj-isteği
+   anahtarının komşusuna kondu, web de kullanabilir). Hemen altındaki **mesaj-isteği satırının birebir
+   kardeşi**: aynı yer, aynı görünüm, yalnız **gelen** (incoming) istek varken render edilir → boş yüzey yok.
+   Sayı oturum başında bir kez çekilir (`(app)/_layout.tsx`), sonrası `friend.*` WS olaylarından gelir.
+
+**Reddedilen alternatif:** "Arkadaş Ekle" butonuna rozet koymak (daha ucuzdu). O buton bir **eylem adı**;
+üstündeki sayı "kaç kişi ekledim" gibi okunur. Satır kendi adını söylüyor.
+
+## 11. Bu sprint sonunda açık kalan yapısal boşluk
+
+**Mobilde "Kankalar" diye bir varış noktası yok.** Kanka listesi yalnız iki yerde beliriyor: yeni sohbet
+ekranında **seçici** olarak ve Arkadaş Ekle ekranında **istekler** olarak. Web'de `friends.title` = "Kankalar"
+bir panel; mobilde karşılığı yok → "kankalarımı görmek" için doğal bir yer yok, `FRIEND_ACCEPT` bildiriminin
+hedefi de bu yüzden boş. **M1b kapsamına alınmadı** (sözleşme sosyal çekirdek + temizle/engelle olarak
+kilitlendi, sahip onaylı) — **M1c/M1d kararı**, PM tarafından not edildi.

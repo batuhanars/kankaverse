@@ -37,9 +37,9 @@ function notificationText(n: NotificationDto): string {
 }
 
 // Sprint M1a contract §5 ekran 5 — liste + okunmamış vurgusu + dokunuşta ilgili kanala git.
-// Yalnız MENTION tipinin mobilde bir hedefi var (kanal/DM mesaj ekranı); FRIEND_*/GUILD_INVITE
-// hedefleri (kanka listesi, davet kabul ekranı) M1a kapsamında YOK — o satırlar bu yüzden
-// tıklanabilir değil (mobile/CLAUDE.md "boş yüzey açma": hedefsiz dokunuş eklenmez).
+// M1a'da yalnız MENTION'ın hedefi vardı; M1b Arkadaş Ekle ekranını getirdiği için **FRIEND_REQUEST de
+// tıklanabilir oldu**. FRIEND_ACCEPT + GUILD_INVITE hâlâ hedefsiz (kanka listesi ekranı ve davet kabul
+// ekranı yok) → tıklanabilir DEĞİL; "boş yüzey açma" gereği hedef uydurulmaz.
 export default function NotificationsScreen() {
   const router = useRouter();
   const items = useNotificationsStore((s) => s.items);
@@ -56,6 +56,15 @@ export default function NotificationsScreen() {
   }, []);
 
   function onItemPress(n: NotificationDto) {
+    // Kanka isteği bildirimi artık ÖLÜ DEĞİL (sahip bulgusu 2026-07-30). M1a'da tıklanamazdı çünkü
+    // gidilecek bir yer yoktu; M1b Arkadaş Ekle ekranını getirdi, hedef artık var. Sahip tam olarak
+    // burada takıldı: rozet Bildirimler'de çıkıyor, dokununca hiçbir şey olmuyordu.
+    if (n.type === 'FRIEND_REQUEST') {
+      router.push('/friends-add');
+      return;
+    }
+    // FRIEND_ACCEPT ve GUILD_INVITE hâlâ hedefsiz: kanka listesi ekranı ve davet kabul ekranı yok.
+    // "Boş yüzey açma" gereği bu satırlar tıklanabilir YAPILMADI — uyduracak bir hedef icat edilmez.
     if (n.type !== 'MENTION' || !n.channelId) return;
     if (n.guildId) {
       router.push({ pathname: '/channel/[id]', params: { id: n.channelId, name: '' } });
@@ -104,7 +113,8 @@ export default function NotificationsScreen() {
             loadingMore ? <ActivityIndicator color={theme.colors.textMuted} style={styles.loadMore} /> : null
           }
           renderItem={({ item }) => {
-            const clickable = item.type === 'MENTION' && !!item.channelId;
+            const clickable =
+              item.type === 'FRIEND_REQUEST' || (item.type === 'MENTION' && !!item.channelId);
             return (
               <Pressable
                 disabled={!clickable}
