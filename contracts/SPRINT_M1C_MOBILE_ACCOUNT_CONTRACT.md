@@ -82,9 +82,30 @@ Alanlar: kullanıcı adı · e-posta · şifre · **doğum tarihi** · (mod `inv
 Açılışta `GET /auth/registration-mode` çağrılır: `open` → davet alanı **yok** · `invite` → davet alanı
 **zorunlu** · `closed` → form yerine sunucunun "Yeni kayıt şu anda kapalı." karşılığı gösterilir.
 
-**Doğum tarihi girişi:** serbest metin DEĞİL, tarih seçici. Yeni bağımlılık gerekiyorsa **PM onayı**
-(`@react-native-community/datetimepicker` Expo Go ile gelir mi, dev **doğrular**; gelmiyorsa üç ayrı
-sayısal alan `GG / AA / YYYY` ile çözülür — uydurma kütüphane kurulmaz).
+**Doğum tarihi girişi — KİLİTLİ KARAR (PM, sahip sordu 2026-07-30): üç sayısal alan `GG / AA / YYYY`,
+otomatik ilerlemeli. Takvim/tarih seçici KULLANILMAZ, yeni bağımlılık KURULMAZ.**
+
+Gerekçe: doğum tarihi bir "yakın tarih" değildir; takvim seçicileri bugünden açılıp kullanıcıyı 20-40 yıl
+geriye kaydırmaya zorlar — takvimin en kötü kullanıldığı senaryo. Web'de bu bir kez yaşandı ve **tek
+seçiciden üç alana geçildi**; aynı ders mobilde daha da geçerli (kaydırma alanı küçük). Karşılığında
+mobilde sayısal klavye masaüstünden hızlıdır. Ayrıca bağımlılık tarafı belirleyici: native seçici Expo Go
+ile gelmezse **test döngüsü tamamen kırılır** (M1a dersi — o döngüyü kurmak bir günün önemli kısmını aldı).
+
+Tek alana maske (`GG/AA/YYYY` tek kutuda) **değerlendirildi ve reddedildi**: ayırıcı üzerinde backspace,
+yapıştırma, yarım maske gibi kenar durumlar kod ve hata yüzeyi getiriyor, kazanç marjinal.
+
+**Uygulama detayları (işi rahatlatan kısım bunlar — atlanmaz):**
+- `keyboardType="number-pad"`, `maxLength` sırasıyla **2 / 2 / 4**.
+- **Otomatik ilerleme:** alan dolunca odak kendiliğinden sonrakine geçer → kullanıcı tek bir yazma
+  hareketi yapmış gibi olur ("üç alan kaba durur" itirazı bununla düşer).
+- **Boş alanda backspace bir öncekine döner.** Karşılığı olmadan düzeltme acı verir; otomatik ilerlemenin
+  eşi budur, ikisi birlikte gelir.
+- Yer tutucular/etiketler TR konvansiyonu: **GG · AA · YYYY**.
+- Üç alan `YYYY-MM-DD` olarak birleştirilip `new Date(...).toISOString()` ile gönderilir (web deseni).
+- **Tek bir hata alanı** — üç alanın altında bir satır; her alana ayrı hata basılmaz.
+- 🔴 **İstemci yaş kontrolü YAPMAZ.** Eksik/geçersiz *format* için gönderimi engellemek serbest
+  (ağ israfı olmasın), ama **yaş kararı sunucuda**: 13 altı butonu kapatmak/uyarı vermek YASAK — yanlış
+  güven verir ve §4/1'in ihlalidir. Sunucu `UNDERAGE` derse mesajı olduğu gibi göster.
 
 ### 3.2 🔴 Rıza adımı — ZORUNLU, atlanamaz
 Web `RegisterView.vue`'da kayıt butonu **doğrudan kayıt yapmaz**: bir onay modalı açar ve gerçek kayıt
