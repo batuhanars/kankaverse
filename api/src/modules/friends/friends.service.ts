@@ -124,6 +124,10 @@ export class FriendsService {
         type: 'FRIEND_ACCEPT',
         actorId: senderId,
       });
+      // M1b R1 — bu dal da bir kabuldür (karşılıklı istek → otomatik kabul): senderId'nin elindeki,
+      // karşı taraftan gelmiş FRIEND_REQUEST bildirimi de kapanır. Atlanırsa kullanıcı hiç
+      // "kabul et"e basmadan arkadaş olur ama rozet okunmamış kalır.
+      await this.notifications.markFriendRequestActioned(senderId, accepted.requesterId);
       return {
         type: 'accepted' as const,
         friendshipId: accepted.id,
@@ -261,6 +265,8 @@ export class FriendsService {
       type: 'FRIEND_ACCEPT',
       actorId: userId,
     });
+    // M1b R1 — istek işlem gördü: kabul edenin elindeki FRIEND_REQUEST bildirimi okunmamış kalmasın.
+    await this.notifications.markFriendRequestActioned(userId, accepted.requesterId);
     return result;
   }
 
@@ -274,6 +280,9 @@ export class FriendsService {
     }
 
     await this.prisma.friendship.update({ where: { id: requestId }, data: { status: 'DECLINED' } });
+    // M1b R1 — ret de bir işlemdir: bildirim okunmamış kalıp kullanıcıyı tekrar tekrar çağırmasın.
+    // (Reddedene bildirim gönderilmiyor; yalnız kendi elindeki istek bildirimi kapanıyor.)
+    await this.notifications.markFriendRequestActioned(userId, request.requesterId);
     return null;
   }
 

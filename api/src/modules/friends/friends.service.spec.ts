@@ -21,7 +21,14 @@ const prismaMock = {
 const realtimeMock = { emitToUser: jest.fn() };
 const friendPermissionMock = { canSendFriendRequest: jest.fn() };
 const notificationsCreateMock = jest.fn();
-const notificationsMock = { create: notificationsCreateMock };
+// M1b R1 — kabul/ret/otomatik-kabul yollarında işlem görmüş FRIEND_REQUEST bildirimi okundu
+// işaretleniyor (bkz. notifications.service.ts markFriendRequestActioned). Mock'a eklenmezse
+// servis `undefined` çağırır → bu spec'in kabul testleri patlar.
+const notificationsMarkActionedMock = jest.fn();
+const notificationsMock = {
+  create: notificationsCreateMock,
+  markFriendRequestActioned: notificationsMarkActionedMock,
+};
 
 function makeService() {
   return new FriendsService(

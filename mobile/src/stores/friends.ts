@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { friendsApi, type FriendDto, type FriendRequestDto } from '@/api/friends';
 import { extractErrorMessage } from '@/api/errors';
+import { useNotificationsStore } from './notifications';
 
 // Sprint M1b — web `stores/friends.ts` deseni taşındı: liste + bekleyen istekler (incoming +
 // outgoing) + `friend.*` WS olaylarının yazdığı tek nokta (realtime/socket.ts). M1a'nın DM store
@@ -30,6 +31,17 @@ interface FriendsState {
   reset: () => void;
 }
 
+/**
+ * M1b R1 (sahip bulgusu 2026-07-30) — istek kabul/ret edilince Bildirimler rozeti tazelenir.
+ * Sunucu artık işlem görmüş `FRIEND_REQUEST` bildirimini okundu işaretliyor
+ * (`notifications.service.ts` `markFriendRequestActioned`), ama istemcinin elindeki sayı bayat
+ * kalıyordu → kullanıcı isteği kabul ettikten sonra rozet inatla duruyordu. Sayı sunucudan
+ * yeniden okunur; istemci kendi kafasına göre eksiltmez (tek doğruluk kaynağı sunucu).
+ */
+async function refreshNotificationBadge(): Promise<void> {
+  await useNotificationsStore.getState().refreshUnreadCount();
+}
+
 export const useFriendsStore = create<FriendsState>((set, get) => ({
   friends: [],
   requests: [],
@@ -53,11 +65,13 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
   async acceptRequest(requestId) {
     await friendsApi.acceptRequest(requestId);
     await get().fetchAll();
+    await refreshNotificationBadge();
   },
 
   async declineRequest(requestId) {
     await friendsApi.declineRequest(requestId);
     set((s) => ({ requests: s.requests.filter((r) => r.id !== requestId) }));
+    await refreshNotificationBadge();
   },
 
   async removeFriend(userId) {

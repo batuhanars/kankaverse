@@ -119,6 +119,27 @@ export class NotificationsService {
     return this.toNotificationDto(updated);
   }
 
+  /**
+   * M1b R1 (sahip bulgusu 2026-07-30, mobil turu) — İŞLEM GÖRMÜŞ kankalık isteğinin bildirimi
+   * okunmamış kalmıyor.
+   *
+   * Belirti: kullanıcı isteği kabul ediyor, ama Bildirimler rozeti hâlâ okunmamış sayıyor ve satır
+   * "sana kanka isteği gönderdi" diye duruyor — artık var olmayan bir eylemi bekliyor gibi.
+   * Kök neden: bu servis bildirimi ÜRETİYOR ama isteğin sonuçlanmasıyla ilgilenmiyordu; hiçbir
+   * istemci de bunu yapmıyordu. **Web'de de aynı kusur vardı** (istemci-tarafı düzeltme iki yerde
+   * tekrar demekti), o yüzden çözüm sunucuda: kaynağında bir kez.
+   *
+   * `updateMany` bilinçli: aynı kişiden gelmiş birden fazla okunmamış istek bildirimi varsa
+   * (istek gönder → geri çek → tekrar gönder) hepsi kapanır. Silme DEĞİL okundu işaretleme —
+   * bildirim geçmişi kullanıcının kaydıdır, sessizce yok edilmez.
+   */
+  async markFriendRequestActioned(recipientId: string, requesterId: string): Promise<void> {
+    await this.prisma.notification.updateMany({
+      where: { userId: recipientId, actorId: requesterId, type: 'FRIEND_REQUEST', readAt: null },
+      data: { readAt: new Date() },
+    });
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // R12 — Bildirim tercihleri (sustur + seviye)
   // ─────────────────────────────────────────────────────────────────────────
