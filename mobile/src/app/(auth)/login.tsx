@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -41,11 +40,12 @@ export default function LoginScreen() {
     }
   }
 
+  // Klavye: Android'de de `padding` — MessageScreen ile AYNI kusur, aynı düzeltme (sözleşme §8.2/1;
+  // sahip mesaj ekranında cihazda doğruladı). Buradaki belirti: klavye açılınca şifre alanı klavyenin
+  // altında kalıyor, kullanıcı ne yazdığını görmüyor. Sebep edge-to-edge: pencere küçülmüyor, o yüzden
+  // `behavior` undefined bırakıldığında KeyboardAvoidingView hiçbir şey yapmıyor.
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView style={styles.flex} behavior="padding">
       <View style={styles.container}>
         <Image
           source={require('@/assets/brand/kankaverse-logo-dikey.png')}
