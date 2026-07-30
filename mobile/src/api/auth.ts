@@ -9,6 +9,9 @@ export interface UserDto {
   id: string;
   username: string;
   email: string;
+  // Sprint M1a — "Sen" sekmesi + mesaj yazarı avatarı için eklendi (api/src/modules/auth/utils/
+  // user-dto.util.ts `toUserDto` — M0'da tiplenmemiş alt kümeye ihtiyaç doğdu, genişletildi).
+  avatarUrl: string | null;
 }
 
 export interface LoginPayload {

@@ -19,6 +19,13 @@ function resolve(path: string): string | Dict | undefined {
   }, dictionary);
 }
 
+// vue-i18n kaçış sözdizimi: `{'@'}` gibi tek-tırnaklı literaller `@` linked-message'ı ile
+// çakışmasın diye vue-i18n tarafında kullanılır (örn. `dm.placeholder`, `auth.emailPlaceholder`).
+// Bu mobil helper vue-i18n çalıştırmıyor — yalnız nokta-yolu + `{key}` çözüyor — bu yüzden
+// `{'@'}` ham basılırdı (M1a'da DM giriş kutusunda görüldü). `{key}` değişimi öncesi literal
+// kaçışlar çözülür (yoksa örn. `{'user'}` yanlışlıkla bir param anahtarıyla çakışabilirdi).
+const QUOTED_LITERAL_RE = /\{'([^']*)'\}/g;
+
 /**
  * `t('a.b.c', { name: 'Kanka' })` — nokta yolunu çözer, `{key}` yer tutucularını değiştirir.
  * Anahtar yoksa anahtarın kendisini döner ve dev'de uyarı loglar (contract §6).
@@ -31,9 +38,10 @@ export function t(path: string, params?: Record<string, string | number>): strin
     }
     return path;
   }
-  if (!params) return value;
+  const unescaped = value.replace(QUOTED_LITERAL_RE, '$1');
+  if (!params) return unescaped;
   return Object.keys(params).reduce(
     (acc, key) => acc.split(`{${key}}`).join(String(params[key])),
-    value,
+    unescaped,
   );
 }

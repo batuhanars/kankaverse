@@ -37,7 +37,7 @@ export default function LoginScreen() {
     if (result === 'challenge') {
       router.push('/two-factor');
     } else if (result === 'ok') {
-      router.replace('/guilds');
+      router.replace('/home');
     }
   }
 
