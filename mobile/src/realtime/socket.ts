@@ -4,7 +4,9 @@ import { useMessagesStore } from '@/stores/messages';
 import { useTypingStore } from '@/stores/typing';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useDmStore } from '@/stores/dm';
+import { useFriendsStore } from '@/stores/friends';
 import type { MessageDto } from '@/api/messages';
+import type { FriendDto, FriendRequestDto } from '@/api/friends';
 
 // Sprint M1a contract §4 — web/src/composables/useSocket.ts deseni birebir taşındı (yalnız bu
 // sprintte KULLANILAN olay alt kümesi — contract §4.2 tablosu). En kritik nokta (contract girişi
@@ -147,6 +149,23 @@ function ensureSocket(): Socket {
     const store = useNotificationsStore.getState();
     store.refreshUnreadCount();
     store.fetchFirstPage();
+  });
+
+  // Sprint M1b — `friend.*` HENÜZ dinlenmiyordu (M1a §8.3'ün aynı kusur sınıfı, kanka tarafı için).
+  // Web `useSocket.ts` ile aynı olay kümesi + aynı yön okuması (friends.service.ts / blocks.service.ts
+  // emitToUser çağrıları): `friend.request` her zaman `direction:'incoming'` ile ALICIYA gelir,
+  // `friend.accept` İSTEK SAHİBİNE gider (kabul edenin bilgisiyle), `friend.remove` KARŞI TARAFA
+  // gider (arkadaşlıktan çıkarma VEYA engelleme sonucu — ikisi de aynı olayı kullanır, sessiz).
+  socket.on('friend.request', (payload: FriendRequestDto) => {
+    useFriendsStore.getState().handleIncomingRequest(payload);
+  });
+
+  socket.on('friend.accept', (payload: FriendDto) => {
+    useFriendsStore.getState().handleAccepted(payload);
+  });
+
+  socket.on('friend.remove', (payload: { userId: string }) => {
+    useFriendsStore.getState().handleRemoved(payload.userId);
   });
 
   return socket;

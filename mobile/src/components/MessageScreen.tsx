@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,10 +11,12 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { messagesApi, type MessageDto } from '@/api/messages';
 import { extractErrorMessage } from '@/api/errors';
 import { MessageBubble } from './MessageBubble';
+import { MessageSearchModal } from './MessageSearchModal';
 import { useMessagesStore } from '@/stores/messages';
 import { useTypingStore } from '@/stores/typing';
 import { useAuthStore } from '@/stores/auth';
@@ -27,6 +29,10 @@ import {
 } from '@/realtime/socket';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
+
+// Aramadan "gidiyor" sonrası kaç sayfa daha eskiye gidilir — sınırsız değil (uzak/temizlenmiş
+// mesaj için sonsuz döngü olmaz), bkz. jump-to-message effect'i.
+const MAX_JUMP_FETCH_ATTEMPTS = 20;
 
 type LoadState = 'loading' | 'error' | 'ready';
 
@@ -61,12 +67,17 @@ interface Props {
   // T&S — DM engelli/izinsizse sunucu göndermede 403 döner; ama giriş kutusunu baştan devre dışı
   // bırakmak için sidebar'dan taşınan bilgi (contract §6 — sessizce gizlenmez, neden gösterilir).
   disabledNotice?: string | null;
+  // Sözleşme §3.6 — DM'e özel başlık ikonları (Sohbeti Temizle / Grup Yönetimi). Kanal ekranında
+  // yok (undefined). Arama ikonu HER İKİ ekranda ortak olduğu için burada, MessageScreen'in kendi
+  // headerRight'ına eklenir — tek `<Stack.Screen>` headerRight sahibi bu bileşen (birden fazla
+  // bileşenin aynı route için headerRight yazması güvenilmez sırayla ezilir).
+  headerActions?: ReactNode;
 }
 
 // Sprint M1a — kanal VE DM mesaj ekranı için TEK gövde (contract §5 ekran 3: "aynısı"). İkisi de
 // aynı REST/WS yüzeyini kullanır (`/channels/:id/messages` — DM kanalı da bir Channel satırıdır);
 // yalnız "okundu" ucu ve başlık farklı, onlar çağıran route'tan gelir.
-export function MessageScreen({ channelId, placeholder, markRead, typingMode, disabledNotice }: Props) {
+export function MessageScreen({ channelId, placeholder, markRead, typingMode, disabledNotice, headerActions }: Props) {
   const authUser = useAuthStore((s) => s.user);
   const channelState = useMessagesStore((s) => s.byChannel[channelId]);
   const fetchInitial = useMessagesStore((s) => s.fetchInitial);
@@ -94,6 +105,15 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
   const atBottomRef = useRef(true);
   const prevCountRef = useRef(0);
   const [newMessageCount, setNewMessageCount] = useState(0);
+
+  // Sözleşme §3.5 — sohbet içi mesaj arama + "sonuca dokununca o mesaja git". `highlightId` hedef
+  // henüz yüklü sayfada değilse `fetchOlder` ile geriye doğru arar (sınırlı deneme — bkz.
+  // MAX_JUMP_FETCH_ATTEMPTS); bulamazsa sessizce bırakır (kontrat alternatifi: "ya da o kanala düşüyor" —
+  // kullanıcı zaten bu kanalda kalır).
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const jumpAttemptsRef = useRef(0);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // react-hooks/set-state-in-effect — GuildsScreen (M0) deseni: effect gövdesi fetch'i DOĞRUDAN
   // (adlandırılmış bir sarmalayıcı fonksiyonu çağırmadan) inline zincirler; setState yalnız
@@ -189,6 +209,44 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
     }
   }, [items, authUser?.id, loadingOlder]);
 
+  function requestJump(messageId: string) {
+    setSearchVisible(false);
+    jumpAttemptsRef.current = 0;
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    setHighlightId(messageId);
+  }
+
+  // Hedef mesaj yüklü sayfada bulununca kaydır + geçici vurgu; bulunmuyorsa (henüz geçmişte)
+  // bir sayfa daha eskiye çek ve bu effect'in kendisi (inverted/hasMore/loadingOlder bağımlılıkları
+  // yeniden çalıştırır) tekrar kontrol eder — zincirleme "aranıyor" hâli budur.
+  useEffect(() => {
+    if (!highlightId) return;
+    const idx = inverted.findIndex((it) => it.message.id === highlightId);
+    if (idx !== -1) {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.4 });
+      });
+      highlightTimerRef.current = setTimeout(() => setHighlightId(null), 2500);
+      return;
+    }
+    if (loadingOlder) return;
+    if (channelState?.hasMore && jumpAttemptsRef.current < MAX_JUMP_FETCH_ATTEMPTS) {
+      jumpAttemptsRef.current += 1;
+      setLoadingOlder(true);
+      fetchOlder(channelId).finally(() => setLoadingOlder(false));
+    } else {
+      // Ulaşılamadı (temizlenmiş/çok eski) — kontrat alternatifi: kullanıcı zaten bu kanalda kalır.
+      setHighlightId(null);
+    }
+  }, [highlightId, inverted, channelState?.hasMore, loadingOlder, channelId, fetchOlder]);
+
+  useEffect(
+    () => () => {
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    },
+    [],
+  );
+
   function scheduleTypingRefresh() {
     if (typingRefreshTimer.current) clearTimeout(typingRefreshTimer.current);
     typingRefreshTimer.current = setTimeout(() => {
@@ -264,6 +322,24 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
   // kullanıcı ne yazdığını görmüyor.
   return (
     <KeyboardAvoidingView style={styles.flex} behavior="padding">
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <View style={styles.headerActionsRow}>
+              {headerActions}
+              <Pressable
+                onPress={() => setSearchVisible(true)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.search')}
+              >
+                <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
+              </Pressable>
+            </View>
+          ),
+        }}
+      />
+
       {loadState === 'loading' && (
         <View style={styles.center}>
           <ActivityIndicator color={theme.colors.accent500} />
@@ -296,6 +372,13 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
           scrollEventThrottle={16}
           onEndReachedThreshold={0.4}
           onEndReached={onEndReached}
+          onScrollToIndexFailed={(info) => {
+            // Değişken yükseklikli mesaj satırlarında scrollToIndex ilk denemede başarısız olabilir
+            // (RN bilinen sınırı) — kısa gecikmeyle tekrar dene.
+            setTimeout(() => {
+              listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.4 });
+            }, 60);
+          }}
           ListFooterComponent={
             loadingOlder ? <ActivityIndicator color={theme.colors.textMuted} style={styles.loadMore} /> : null
           }
@@ -305,6 +388,7 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
               showAuthor={item.showAuthor}
               isMine={item.message.author.id === authUser?.id}
               resolveMention={(id) => resolveUsername(channelId, id)}
+              highlighted={item.message.id === highlightId}
             />
           )}
         />
@@ -354,6 +438,10 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
           </View>
         </View>
       )}
+
+      {searchVisible && (
+        <MessageSearchModal channelId={channelId} onClose={() => setSearchVisible(false)} onJump={requestJump} />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -362,6 +450,12 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
     backgroundColor: theme.colors.bgContent,
+  },
+  headerActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginRight: 12,
   },
   center: {
     flex: 1,

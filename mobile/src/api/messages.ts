@@ -60,4 +60,13 @@ export const messagesApi = {
     const res = await http.post<MessageDto>(`/channels/${channelId}/messages`, { content });
     return res.data;
   },
+  // Sözleşme §3.5 — kanal içi mesaj arama (case-insensitive, max 30 sonuç, backend'de min 2 karakter
+  // zorunlu — `messages.controller.ts` `searchMessages`). Ortam-geneli arama (`/guilds/:id/messages/
+  // search`) bu sprintte KULLANILMIYOR (sözleşme §3.5 kapsam dışı notu).
+  async search(channelId: string, q: string, before?: string): Promise<MessageDto[]> {
+    const res = await http.get<MessageDto[]>(`/channels/${channelId}/messages/search`, {
+      params: before ? { q, before } : { q },
+    });
+    return res.data;
+  },
 };

@@ -3,6 +3,7 @@ import { Redirect, Stack } from 'expo-router';
 import { theme } from '@/theme';
 import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
+import { useFriendsStore } from '@/stores/friends';
 import { useBackgroundSocket } from '@/realtime/useBackgroundSocket';
 
 // Auth guard — oturum sunucu tarafında düşerse (401 → refresh de başarısız, bkz. stores/auth.ts
@@ -21,10 +22,15 @@ export default function AppLayout() {
   // bağlanır. Mount = oturum başı (id yazılır, `applyActivity` "bu mesaj benim mi"yi bilir),
   // unmount = oturum sonu (TÜM DM durumu silinir; liste store'da yaşadığı için temizlenmezse
   // çıkıştan sonra sıradaki kullanıcı öncekinin DM listesini görürdü).
+  // Sprint M1b — kanka store'u da aynı gerekçeyle oturum kapsamlı (dm store ile birebir aynı
+  // sızıntı riski: temizlenmezse çıkıştan sonra sıradaki kullanıcı öncekinin kanka listesini görür).
   useEffect(() => {
     if (!userId) return;
     useDmStore.getState().setSessionUser(userId);
-    return () => useDmStore.getState().setSessionUser(null);
+    return () => {
+      useDmStore.getState().setSessionUser(null);
+      useFriendsStore.getState().reset();
+    };
   }, [userId]);
 
   if (status !== 'authenticated') {

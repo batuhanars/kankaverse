@@ -18,17 +18,20 @@ interface Props {
   showAuthor: boolean;
   isMine: boolean;
   resolveMention: (userId: string) => string | undefined;
+  /** Sözleşme §3.5 — mesaj aramasından "gidiyor" (jump) sonrası geçici vurgu. Birkaç saniye sonra
+   *  otomatik söner (bkz. MessageScreen `highlightId` zamanlayıcısı). */
+  highlighted?: boolean;
 }
 
 // Sprint M1a — web/src/components/shared/MessageItem.vue'nin bu sprintteki alt kümesi: okuma +
 // mention gösterimi (contract §4.4) + ek gösterimi (§5.5). Düzenleme/silme/reaksiyon/pin UI'ı YOK
 // (kapsam dışı) — ama `message.updated`/`message.deleted` WS'ten gelirse içerik/liste güncellenir
 // (stores/messages.ts), bu bileşen yalnız güncel veriyi render eder.
-export function MessageBubble({ message, showAuthor, isMine, resolveMention }: Props) {
+export function MessageBubble({ message, showAuthor, isMine, resolveMention, highlighted }: Props) {
   const displayContent = formatMentionsPlain(message.content, resolveMention, t('mention.unknown'));
 
   return (
-    <View style={[styles.row, showAuthor && styles.rowSpaced]}>
+    <View style={[styles.row, showAuthor && styles.rowSpaced, highlighted && styles.rowHighlighted]}>
       {showAuthor && (
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{message.author.username.charAt(0).toUpperCase()}</Text>
@@ -63,6 +66,10 @@ const styles = StyleSheet.create({
   },
   rowSpaced: {
     marginTop: 10,
+  },
+  rowHighlighted: {
+    backgroundColor: theme.colors.accentSubtle,
+    borderRadius: theme.radius.md,
   },
   avatar: {
     width: 34,

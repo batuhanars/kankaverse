@@ -66,6 +66,7 @@ export default function NotificationsScreen() {
           id: n.channelId,
           title: n.actor?.username ?? t('notification.someone'),
           avatarUrl: n.actor?.avatarUrl ?? '',
+          otherUserId: n.actor?.id ?? '',
           kind: 'dm',
           canMessage: 'true',
           selfBlocked: 'false',
