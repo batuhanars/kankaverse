@@ -262,9 +262,20 @@ M0'daki "en güncel kararlı SDK" dersinin aynısı: emülatör gerçeği temsil
    gesture modu + sistem teması açık) → cihaz/OEM kabuğuna özgü. Düzeltme: `app.json` `userInterfaceStyle`
    **`automatic` → `dark`**. O beyan zaten yanlıştı: bizde tek tema var, sisteme "açık temaya da uyarım"
    demek OEM'in gezinme çubuğunu açık dekorasyonla boyamasına izin veriyor. **`navigationBarColor` KULLANILMADI:**
-   react-navigation tipinde deprecated, Android 15+/edge-to-edge'de etkisiz. **Sahip doğrulaması bekliyor** —
-   sürerse sıradaki adım `expo-navigation-bar` ile çalışma-anı ayarı (Expo Go ile geliyor, yeni bağımlılık
-   değil), ama körlemesine eklenmedi.
+   react-navigation tipinde deprecated, Android 15+/edge-to-edge'de etkisiz.
+
+   **→ M2'YE ERTELENDİ (sahip kararı 2026-07-30, PM şartlı katılım).** Sahip cihazda şu deseni ölçtü: sorun
+   **yalnız ilk açılışta** çıkıyor (o anda TÜM ekranlarda, giriş dahil), bir kez gezinildikten sonra kayboluyor
+   ve kaybolmuş kalıyor. Mekanizma bunu açıklıyor: **Expo Go'da `app.json`'ın Android native ayarları hiç
+   uygulanmaz** — uygulama Expo Go'nun kendi Activity/teması içinde açılır, pencere oluşturulduğu anda sistem
+   teması (açık) geçerlidir; bizim `dark` beyanımız JS/manifest yüklendikten sonra devreye girer → ilk kare
+   yanlış temayla çizilir. Gerçek derlemede bu katman yoktur (`styles.xml` app config'den üretilir, pencere
+   koyu doğar) → sorunun kalkması **beklenir**.
+   **🔴 Ama VARSAYILARAK KAPATILMADI:** "gerçek derlemede düzelir" cümlesi, SDK 57'de bir gün kaybettiren
+   "emülatörde çalışıyor" cümlesinin akrabası. **M2'de ilk dev build alındığında bakılacak ilk maddelerden
+   biri.** Hâlâ varsa çözüm hazır: `androidNavigationBar` (gerçek derlemede geçerli, Expo Go'da geçersiz)
+   veya `expo-navigation-bar` ile çalışma-anı ayarı. Şimdi eklenmedi, çünkü Expo Go'da **test edilemeyecek**
+   bir düzeltme eklemek olurdu.
 4. **Yeni mesaj davranışı web ile eşitlendi** (sahip talebi): yukarıda geçmiş okurken gelen mesaj sayılır ve
    "aşağı in" düğmesinde gösterilir; dipteysem veya mesaj benimse otomatik dibe kayar. `MessageArea.vue`
    REV-1/REV-9 semantiğinin birebir karşılığı (120px eşiği dahil); fark yalnız liste `inverted` olduğu için
