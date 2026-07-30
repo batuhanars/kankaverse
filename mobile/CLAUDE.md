@@ -3,7 +3,8 @@
 # Kankaverse — `mobile/` Tier CLAUDE.md
 
 > Kök `CLAUDE.md` cascade ile zaten yükleniyor. **Cross-cutting kuralları buraya kopyalama.**
-> Aktif sözleşme: `../contracts/SPRINT_M0_MOBILE_CONTRACT.md` = **tek doğruluk kaynağı**.
+> Aktif sözleşme: `../contracts/SPRINT_M1A_MOBILE_SHELL_CONTRACT.md` = **tek doğruluk kaynağı**
+> (M0 bitti, sözleşmesi arşiv değeri taşıyor).
 > Endpoint imzası, DTO şekli, ekran sayısı sözleşmeden **sapamaz**. Sapma ihtiyacı → **DUR**, kullanıcıya bildir,
 > PM revize etsin. `TASK.md`'ye item ekleme, yalnız kutu işaretle.
 
@@ -12,8 +13,14 @@
 Kankaverse'in **React Native + Expo** istemcisi (Track F2, Android-first). Stack kilitli: ADR 2026-07-02 +
 mutabakat 2026-07-22 ile Flutter'dan RN'e revize edildi. Bu tier'da stack tartışması kapalı.
 
-Kurulu taban: **Expo SDK 57 / RN 0.86 / React 19.2**, Expo Router, TypeScript strict. SDK 57 yeni —
+Kurulu taban: **Expo SDK 54 / RN 0.81 / React 19.1**, Expo Router, TypeScript strict.
 API'yi hatırdan yazma, `AGENTS.md`'deki sürümlü dokümana bak.
+
+**Sürüm kilidi (2026-07-30):** SDK, "kurulum anındaki en güncel kararlı sürüm" değil **telefondaki
+mağaza Expo Go'sunun desteklediği** sürümdür (şu an 54). SDK 57 ile kurulmuştu, emülatörde sorunsuzdu
+ama gerçek telefonda "Project is incompatible with this version of Expo Go" ile açılmadı — çünkü Expo CLI
+emülatöre projeye uyan Expo Go'yu indirir, Play Store indirmez. SDK'yı yükseltme; bu bağımlılık dev
+build (M2) ile kalkar.
 
 ## Sınırlar
 
