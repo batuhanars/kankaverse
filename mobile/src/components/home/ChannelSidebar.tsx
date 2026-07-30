@@ -10,6 +10,13 @@ type LoadState = 'loading' | 'error' | 'ready';
 interface Props {
   guildId: string;
   guildName: string;
+  /**
+   * Sözleşme §8.1-A/1 "seçili kanal vurgusu". Mobilde içerik AYRI tam ekran (contract §2), yani
+   * sidebar'da kalıcı "açık kanal" yok — vurgu **en son açılan** kanalı işaretler. Kanal ekranından
+   * geri dönen kullanıcı nerede kaldığını görür. Ortam değişince eşleşme olmaz, hiçbir satır
+   * vurgulanmaz (id'ler ortamlar arası tekil).
+   */
+  selectedChannelId?: string;
   onOpenChannel: (channel: ChannelSummaryDto) => void;
 }
 
@@ -17,7 +24,7 @@ interface Props {
 // "Ses kanalı satırları listede görünür ama girilemez" cümlesi DEĞİL geçerli — tam tersi: "kanal
 // listesi yalnız metin kanallarını gösterir". Ses satırlarını gösterip dokununca hiçbir şey
 // yapmamak "boş yüzey" (mobile/CLAUDE.md yasağı) olurdu; bu yüzden GUILD_VOICE baştan süzülür.
-export function ChannelSidebar({ guildId, guildName, onOpenChannel }: Props) {
+export function ChannelSidebar({ guildId, guildName, selectedChannelId, onOpenChannel }: Props) {
   const [state, setState] = useState<LoadState>('loading');
   const [channels, setChannels] = useState<ChannelSummaryDto[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
@@ -82,19 +89,30 @@ export function ChannelSidebar({ guildId, guildName, onOpenChannel }: Props) {
           data={channels}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
-            <Pressable onPress={() => onOpenChannel(item)} style={styles.row}>
-              <Text style={styles.hash}>#</Text>
-              <Text style={[styles.name, item.unreadCount > 0 && styles.nameUnread]} numberOfLines={1}>
-                {item.name}
-              </Text>
-              {item.unreadCount > 0 && (
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadBadgeText}>{item.unreadCount > 99 ? '99+' : item.unreadCount}</Text>
-                </View>
-              )}
-            </Pressable>
-          )}
+          renderItem={({ item }) => {
+            const selected = item.id === selectedChannelId;
+            return (
+              <Pressable
+                onPress={() => onOpenChannel(item)}
+                style={[styles.row, selected && styles.rowSelected]}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+              >
+                <Text style={[styles.hash, selected && styles.hashSelected]}>#</Text>
+                <Text
+                  style={[styles.name, item.unreadCount > 0 && styles.nameUnread, selected && styles.nameSelected]}
+                  numberOfLines={1}
+                >
+                  {item.name}
+                </Text>
+                {item.unreadCount > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>{item.unreadCount > 99 ? '99+' : item.unreadCount}</Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          }}
         />
       )}
     </View>
@@ -149,28 +167,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingBottom: 20,
   },
+  // Sözleşme §8.1-A/1 — kanal satırı belirginleşti: rahat satır yüksekliği (dokunma hedefi 40dp,
+  // aralarında 2dp ritim boşluğu) + `#` ön eki net + metin `textBody`'ye çıktı. Ayırıcı çizgi
+  // KONMADI: sözleşme "Discord'daki karşılığı" diyor, Discord ritim+dolgu ile ayırır, çizgiyle değil.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 9,
+    minHeight: 40,
+    paddingVertical: 8,
     paddingHorizontal: 10,
+    marginBottom: 2,
     borderRadius: theme.radius.md,
   },
+  rowSelected: {
+    backgroundColor: theme.colors.bgElevated,
+  },
   hash: {
-    color: theme.colors.textMuted,
-    fontSize: theme.fontSize.base,
-    marginRight: 6,
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.lg,
+    marginRight: 7,
     fontWeight: '600',
+  },
+  hashSelected: {
+    color: theme.colors.accent500,
   },
   name: {
     flex: 1,
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.sm,
+    color: theme.colors.textBody,
+    fontSize: theme.fontSize.md,
     fontWeight: '500',
   },
   nameUnread: {
     color: theme.colors.textPrimary,
     fontWeight: '700',
+  },
+  nameSelected: {
+    color: theme.colors.textPrimary,
+    fontWeight: '600',
   },
   unreadBadge: {
     minWidth: 18,
@@ -182,7 +215,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   unreadBadgeText: {
-    color: '#fff',
+    // Gömülü '#fff' idi — tema disiplini gereği token'a çevrildi (danger zemin üzerinde okunur).
+    color: theme.colors.textPrimary,
     fontSize: 10,
     fontWeight: '700',
   },

@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { ClipPath, Defs, Image as SvgImage, Polygon } from 'react-native-svg';
 import type { GuildSummaryDto } from '@/api/guilds';
 import { t } from '@/i18n';
@@ -70,11 +71,20 @@ export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSel
     // büyümüş görünüyor). Dış View genişliği kilitler, ScrollView içeride yalnız flex:1 ile doldurur.
     <View style={styles.rail}>
       <ScrollView style={styles.railScroll} contentContainerStyle={styles.railContent}>
+        {/* Sözleşme §8.1-A/2 — baş harf ("M") yerine konuşma baloncuğu. Ortam ikonları altıgen
+            KALIR (HexGuildIcon); baloncuk yalnız bu girişte, ray'in en üstünde. Aynı ikon seti
+            alt tab çubuğuyla (Ionicons) ortak — ikinci bir ikon dili girmiyor. */}
         <Pressable
           onPress={onSelectDm}
           style={[styles.icon, styles.dmIcon, selection.type === 'dm' && styles.iconActive]}
+          accessibilityRole="button"
+          accessibilityLabel={t('mobile.home.dmEntry')}
         >
-          <Text style={styles.dmIconText}>{t('mobile.home.dmEntry').charAt(0)}</Text>
+          <Ionicons
+            name={selection.type === 'dm' ? 'chatbubble' : 'chatbubble-outline'}
+            size={22}
+            color={selection.type === 'dm' ? theme.colors.accent500 : theme.colors.textSecondary}
+          />
         </Pressable>
 
         {state === 'loading' && <ActivityIndicator color={theme.colors.textMuted} style={styles.railSpinner} />}
@@ -160,10 +170,5 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgElevated,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  dmIconText: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.lg,
-    fontWeight: '700',
   },
 });
