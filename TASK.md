@@ -1103,3 +1103,47 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] `typecheck` + `lint` temiz *(PM yeniden koştu)*; `api/`'ye yalnız **sahip onaylı R1** dokunuşu yapıldı
 - [~] **VARSAYILDI, TEST EDİLMEDİ** (yeterli yerel veri yok): çip satırının taşma davranışı · boş alanda backspace'in son çipi alması *(Android yazılım klavyelerinde `onKeyPress` garantili değil — dev açıkça işaretledi)*. Gerçek kitlede ilk fırsatta bakılır
 - [ ] **Engel sonrası giriş kutusunun kapanması** — yürüyüşte ayrıca görülmedi (profil kartı erişimi doğrulandı, engelleme sonrası input davranışı değil)
+
+---
+
+## Sprint M1c — Mobil Hesap Yüzeyleri (Track F2, PM compose 2026-07-30)
+
+> Sözleşme: `contracts/SPRINT_M1C_MOBILE_ACCOUNT_CONTRACT.md` (**tek doğruluk kaynağı**).
+> **🔴 R7:** kayıt akışı yaş + rıza kapısıdır → diff **sahip onayı olmadan merge EDİLMEZ**.
+> Dev checkbox işaretler, **item EKLEMEZ**. Sapma → DUR, PM'e dön. DoD **fiziksel cihazda** kapanır.
+
+### Kayıt
+- [ ] **Kayıt ekranı** (giriş ekranına "Kayıt ol" bağlantısı): kullanıcı adı · e-posta · şifre · doğum tarihi
+- [ ] `GET /auth/registration-mode` → `open` davet alanı yok · `invite` zorunlu · `closed` kayıt kapalı
+- [ ] Doğum tarihi **tarih seçici** (serbest metin değil); yeni bağımlılık gerekirse **PM onayı**
+- [ ] 🔴 **Yaş kapısı otoritesi sunucuda:** `UNDERAGE` (13 altı) / `INVALID_BIRTHDATE` mesajı **olduğu gibi** gösterilir; istemcide yaş hesabı yeniden yapılmaz, ne gevşetilir ne taklit edilir
+
+### 🔴 Rıza adımı (R7 odağı)
+- [ ] **Onay adımı olmadan `register` çağrılmaz** — web `RegisterView` deseni birebir (buton doğrudan kaydetmez, onay ekranı açar)
+- [ ] Metinler web'in **mevcut `legal.*` anahtarlarından** (mobil için kısaltılmış sürüm YOK)
+- [ ] `/kurallar` + `/gizlilik` bağlantıları gerçekten açılıyor (`Linking.openURL`); açılamazsa kullanıcı bilgilendirilir
+- [ ] Onay formun içine gömülü checkbox olarak KONMAZ (karar anında ayrı yüzey — rıza kalitesi)
+
+### Şifre kurtarma
+- [ ] **"Şifremi unuttum"** → `POST /auth/forgot-password`; yanıt **her koşulda aynı** (hesap varlığı sızmaz), istemci çıkarım yapmaz
+- [ ] 🔴 `reset-password` + `verify-email` ekranları **UYGULANMAZ** (bilinçli): link web'e gider, uygulamayı açması Android App Links + imzalı derleme ister → **M2 dev build**
+
+### E-posta doğrulama (mobilde hiç yoktu)
+- [ ] Mobil `UserDto`'ya `emailVerified` (sunucu zaten dönüyor — sıfır backend)
+- [ ] Doğrulanmamışta **görünür bant + "Tekrar gönder"** (`POST /auth/resend-verification`); yalnız `emailVerified === false` iken render
+- [ ] Zaten doğrulanmışta `409` → sunucu mesajı gösterilir
+
+### Ortam
+- [ ] `EXPO_PUBLIC_WEB_URL` `.env.example`'a (yasal sayfaların kökü; `EXPO_PUBLIC_API_URL` ile karıştırılmaz)
+
+### DoD (sözleşme §1 — 10 madde; **fiziksel cihazda** kapanır)
+- [ ] Mobilden açılan hesap web'de de çalışıyor
+- [ ] **13 altı reddediliyor** ve kullanıcı nedenini görüyor
+- [ ] **Rıza olmadan kayıt tamamlanamıyor**; yasal metinler açılabiliyor
+- [ ] Doğrulama durumu görünür + "tekrar gönder" çalışıyor
+- [ ] Doğrulanmamış kullanıcı ortam kuramadığında **sebebi anlıyor** (sessiz 403 yok)
+- [ ] `forgot-password` hesap varlığını sızdırmıyor
+- [ ] Kayıt modu üç durumda da doğru davranıyor
+- [ ] Metin `tr.json`'dan, renk/ölçü token'dan, gömülü string yok
+- [ ] `typecheck` + `lint` temiz; **`api/`'ye dokunulmadı**
+- [ ] 🔴 **R7:** diff sahip onayından geçti
