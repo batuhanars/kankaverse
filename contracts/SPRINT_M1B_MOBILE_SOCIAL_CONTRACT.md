@@ -405,3 +405,32 @@ bir yeteneğe önden ikinci kapı açmak, bu sözleşmelerin baştan beri reddet
 **Tetikleyici (ileride yapılırsa):** DM listesinden hızlı erişim ihtiyacı doğması ya da başlıktaki
 düğmeyi bulamayan bir kullanıcı. Web'de ortam/kanal satırlarında bağlam menüsü deseni **hazır**, iş
 o zaman mevcut desenin üzerine oturur.
+
+---
+
+## 16. §11'in şiddeti yükseldi — engel kaldırma tek yönlü kapı (sahip bulgusu 2026-07-30)
+
+Sahip DoD #9'u doğrularken (engel sonrası giriş kutusu kapanıyor ✅) yeni bir şey fark etti: **mobilde
+engellenenler listesi yok**, yani engeli kaldırmak için bir ekran yok. Web'de var (`friends.tabBlocked`
+= "Engellenmiş", kanka panelinin üçüncü sekmesi).
+
+**Ölçüm (kaynaktan, PM):** engelleme arkadaşlığı **siler** (`blocks.service.ts` `friendship.deleteMany`).
+DM kanalı ise listeden düşmez — `dm.service.ts` blok kayıtlarını kanalı gizlemek için değil
+`canMessage`/`selfBlocked` bayraklarını hesaplamak için okuyor. Sonuç iki ayrı durum:
+
+| durum | engel kaldırılabilir mi |
+|---|---|
+| Engellenen kişiyle **DM'in var** | ✅ kutucuk listede kalır → aç → başlık → profil kartı → "Engeli Kaldır". **Ama sezgisel değil:** yazamadığın bir sohbeti açmayı akıl etmek gerekiyor |
+| Engellenen kişiyle **DM'in hiç olmamış** (grup üye listesinden ya da hiç yazışmadığın kankayı engelledin) | ❌ **YOL YOK** — arkadaşlık silindi, DM kutucuğu yok, kanka/engellenen listesi yok → kişi mobilde hiçbir yüzeyde görünmüyor |
+
+**Bu §11'in aynı boşluğu**, ama şiddeti farklı: eksik bir liste değil, **geri alınamayan bir işlem**.
+`DELETE /blocks/:userId` ucu ve mobil `blocksApi.unblock` **mevcut** — eksik olan tek şey o kişiye
+ulaşacak bir yüzey.
+
+**Aciliyet:** gerçek kullanıcı etkisi bugün **sıfır** (uygulama mağazada değil, sahibin web erişimi var).
+Ama "hoş olurdu" değil: **mağaza sürümünden ÖNCE kapanmak zorunda.**
+
+**Karar: M1c'ye EKLENMEDİ** — o sprint R7 kapsamında (kayıt + rıza) ve incelemeyi sulandırmamak için
+diff'i temiz tutuluyor. **Sıradaki sprintte tek ekran üç boşluğu birden kapatır** (web'in kanka paneliyle
+aynı yapı): **Tümü · Bekleyen · Engellenmiş**. §11'deki "Kankalar varış noktası yok" maddesi bununla
+birleşir; `FRIEND_ACCEPT` bildiriminin hedefsizliği de aynı ekranla çözülür.
