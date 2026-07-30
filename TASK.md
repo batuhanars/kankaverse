@@ -993,6 +993,13 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **"Mesajlar" başlığı** büyük + kalın (`xl`/700/`textPrimary`, `mobile.home.dmEntry`); web'in `dm.sectionHeader` bölüm etiketine dokunulmadı
 - [ ] Başlık altına tek satır: **dar/ikon arama** + **geniş "Arkadaş Ekle"** butonu — ⚠️ **ekranlarıyla birlikte gelir** (boş buton yasak, sözleşme §8.1-B)
 
+### Fast-follow 2 — fiziksel cihaz turu (sözleşme §8.2, sahip 2026-07-30)
+- [x] **Klavye giriş kutusunu kapatıyordu** (mesajlaşma kullanılamaz durumdaydı): `KeyboardAvoidingView` Android'de `behavior: undefined` → hiçbir şey yapmıyordu; edge-to-edge'de pencere küçülmediği için uygulama klavyenin altına çiziyordu → Android'de de `behavior="padding"`
+- [x] **Görünmez ortam ikonu:** yedek katman (altıgen + baş harf, SVG `<Text>`) artık HER ZAMAN resmin altında → resim yüklenemezse harfe düşer, görünmez-ama-dokunulabilir öğe kalmaz. *(Yerel ayaktaki sebep ayrı: `iconUrl` = `localhost:9000` MinIO, telefondan çözülemez — kod kusuru değil, üretimde `cdn.kankaverse.com`)*
+- [x] **Yeni mesaj davranışı web ile eşit:** yukarıda okurken gelen mesajlar sayılır + "aşağı in" düğmesi (`message.newMessages`); dipteysem veya mesaj benimse otomatik dibe kayar (web `MessageArea.vue` REV-1/REV-9, 120px eşiği dahil)
+- [x] **Yan kusur — sonsuz dönen tekerlek:** axios'ta timeout yoktu, ulaşılamaz adreste istek askıda kalıyordu → 15sn timeout (instance + bootstrap refresh); `.env.example` LAN IP'yi varsayılan yaptı (emülatör adresi tuzağı kapandı)
+- [~] **Giriş ekranı gezinme çubuğu açık şerit:** `userInterfaceStyle` `automatic` → `dark` (tek temamız var, beyan yanlıştı; OEM açık dekorasyon uyguluyordu). **Emülatörde üretilemedi** → cihaza özgü, **sahip doğrulaması bekliyor.** `navigationBarColor` kullanılmadı (deprecated + edge-to-edge'de etkisiz)
+
 ### M1b'ye eklenenler (sözleşme §8.1-B — sözleşmesi yazılacak)
 - [ ] **Arama ekranı** — açık karar: liste içinde yerel süzme + sohbet içinde mesaj arama (mevcut uçlar); Discord'un sekmeli arama ekranı kopyalanmaz
 - [ ] **Arkadaş Ekle ekranı** — 🔴 **Kanka kodu** ile (`friendCode`, 6 karakter); kendi kodunu paylaş. **Kullanıcı adıyla arama/ekleme YOK** (uç yok + brief §4 "ulaşımı zorlaştır"); rehber senkronizasyonu kapsam dışı (KVKK)

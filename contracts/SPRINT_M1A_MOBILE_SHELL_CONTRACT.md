@@ -241,6 +241,42 @@ ayrı bir iştir, sahip "belirginleşsin" dedi, "kategori ekle" demedi → şimd
 
 ---
 
+## 8.2 Fiziksel cihaz turu 2026-07-30 — sahip geri bildirimi (SDK 54 sonrası ilk gerçek cihaz açılışı)
+
+SDK 54'e inildikten sonra uygulama sahip telefonunda açıldı. Dört kusur çıktı, tamamı **M1a fast-follow**
+(yeni yüzey açmıyor, mevcut ekranların doğru çalışması). Ayrıca ikisi **emülatörün gizlediği** sınıftan —
+M0'daki "en güncel kararlı SDK" dersinin aynısı: emülatör gerçeği temsil etmiyor.
+
+1. **Klavye giriş kutusunu kapatıyor (🔴 en ağır — mesajlaşma kullanılamaz).** Kök neden: `KeyboardAvoidingView`
+   `behavior` Android'de `undefined` bırakılmış, yani hiçbir şey yapmıyordu. Dev, Android'in pencereyi kendi
+   küçültmesine (`adjustResize`) güvenmiş; **SDK 54'te edge-to-edge varsayılan açık olduğu için pencere
+   küçülmüyor**, uygulama klavyenin altına çiziyor. → Android'de de `behavior="padding"`.
+2. **Ortam ikonu görünmez.** Görseli olan ortam rail'de yer kaplıyor ama çizilmiyor → dokunulabilir görünmez
+   öğe. İki ayrı mesele: **(a) yerel veri**, `Guild.iconUrl` = `http://localhost:9000/...` (MinIO); telefon
+   `localhost`'u kendisi sanır, tarayıcı aynı makinede olduğu için web'de çalışıyor. Üretimde adres
+   `cdn.kankaverse.com`, sorun yok → **kod kusuru değil**. **(b) gerçek kod kusuru:** resim yüklenemediğinde
+   yedek yoktu. Yedek katman (altıgen + baş harf) artık HER ZAMAN resmin altına çizilir → en kötü durumda
+   harfe düşer. SVG `<Text>` kullanıldı; RN `<Text>` katmanı Svg'nin üstünde kalıp yüklenen resmi kapatırdı.
+3. **Giriş ekranında gezinme çubuğu açık renkli şerit.** Yalnız giriş ekranında; tab çubuğu olan ekranlarda
+   yok, çünkü tab çubuğunun kendi koyu yüzeyi alt inset'i kapatıyor. **Emülatörde üretilemedi** (aynı koşullar:
+   gesture modu + sistem teması açık) → cihaz/OEM kabuğuna özgü. Düzeltme: `app.json` `userInterfaceStyle`
+   **`automatic` → `dark`**. O beyan zaten yanlıştı: bizde tek tema var, sisteme "açık temaya da uyarım"
+   demek OEM'in gezinme çubuğunu açık dekorasyonla boyamasına izin veriyor. **`navigationBarColor` KULLANILMADI:**
+   react-navigation tipinde deprecated, Android 15+/edge-to-edge'de etkisiz. **Sahip doğrulaması bekliyor** —
+   sürerse sıradaki adım `expo-navigation-bar` ile çalışma-anı ayarı (Expo Go ile geliyor, yeni bağımlılık
+   değil), ama körlemesine eklenmedi.
+4. **Yeni mesaj davranışı web ile eşitlendi** (sahip talebi): yukarıda geçmiş okurken gelen mesaj sayılır ve
+   "aşağı in" düğmesinde gösterilir; dipteysem veya mesaj benimse otomatik dibe kayar. `MessageArea.vue`
+   REV-1/REV-9 semantiğinin birebir karşılığı (120px eşiği dahil); fark yalnız liste `inverted` olduğu için
+   dip = offset 0. Metin mevcut `message.newMessages` anahtarından.
+
+**Yan kusur (aynı turda çıktı):** axios'ta `timeout` yoktu → ulaşılamaz adreste giriş butonu sonsuza kadar
+döndü, kullanıcı hiçbir geri bildirim almadı. 15sn timeout eklendi (instance + bootstrap'ın çıplak refresh
+çağrısı). `.env.example` emülatör adresini varsayılan yapıp fiziksel cihazı "M2+" diye etiketliyordu, tuzağın
+kaynağı orasıydı → LAN IP varsayılan oldu (ikisinde de çalışır).
+
+---
+
 ## 8. Sapma kuralı
 
 Endpoint yolu, ekran sayısı, gezinme deseni bu dosyadan **sapamaz**. İhtiyaç doğarsa dev **durur**,

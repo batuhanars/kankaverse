@@ -1,6 +1,6 @@
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { ClipPath, Defs, Image as SvgImage, Polygon } from 'react-native-svg';
+import Svg, { ClipPath, Defs, Image as SvgImage, Polygon, Text as SvgText } from 'react-native-svg';
 import type { GuildSummaryDto } from '@/api/guilds';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -34,6 +34,23 @@ function HexGuildIcon({ iconUrl, fallbackLetter, active }: { iconUrl: string | n
             <Polygon points={HEX_POINTS} />
           </ClipPath>
         </Defs>
+        {/* Yedek katman HER ZAMAN çizilir, resim üstüne biner (sahip bulgusu 2026-07-30): resim
+            yüklenemezse (ulaşılamaz adres, silinmiş dosya, CDN takılması) altıgen bomboş kalıyordu
+            → rail'de görünmez ama dokunulabilir bir öğe. Artık en kötü durumda baş harfe düşer.
+            Harf RN View değil SVG <Text> — RN katmanı Svg'nin ÜSTÜNDE kalırdı, yüklenen resmi
+            kapatırdı. */}
+        <Polygon points={HEX_POINTS} fill={theme.colors.accentSubtle} />
+        <SvgText
+          x={SIZE / 2}
+          y={SIZE / 2}
+          textAnchor="middle"
+          alignmentBaseline="central"
+          fontSize={theme.fontSize.lg}
+          fontWeight="700"
+          fill={theme.colors.accent500}
+        >
+          {fallbackLetter}
+        </SvgText>
         {iconUrl ? (
           <SvgImage
             href={{ uri: iconUrl }}
@@ -44,18 +61,11 @@ function HexGuildIcon({ iconUrl, fallbackLetter, active }: { iconUrl: string | n
             preserveAspectRatio="xMidYMid slice"
             clipPath={`url(#${clipId})`}
           />
-        ) : (
-          <Polygon points={HEX_POINTS} fill={theme.colors.accentSubtle} />
-        )}
+        ) : null}
         {/* Web'in sol-kenar pil'i yerine hex kenarına doğrudan aktif vurgusu — mobilde rail dar,
             ayrı bir pil için yer yok; aynı görsel dili (accent500) hex silüetine uygulanmış hâli. */}
         <Polygon points={HEX_POINTS} fill="none" stroke={active ? theme.colors.accent500 : 'transparent'} strokeWidth={2} />
       </Svg>
-      {!iconUrl && (
-        <View pointerEvents="none" style={styles.hexFallbackTextWrap}>
-          <Text style={styles.iconFallbackText}>{fallbackLetter}</Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -151,20 +161,6 @@ const styles = StyleSheet.create({
   hexWrap: {
     width: SIZE,
     height: SIZE,
-  },
-  hexFallbackTextWrap: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: SIZE,
-    height: SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconFallbackText: {
-    color: theme.colors.accent500,
-    fontSize: theme.fontSize.lg,
-    fontWeight: '700',
   },
   dmIcon: {
     backgroundColor: theme.colors.bgElevated,
