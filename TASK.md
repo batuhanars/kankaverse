@@ -1150,3 +1150,39 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] 🔴 **R7 — ONAYLANDI 2026-07-30, ama kanıt türü kayda geçirilmiştir:**
   **Sahip cihazda DAVRANIŞ doğrulaması yaptı** (rıza kapısı + yaş kapısı) ve **kod incelemesini bilinçle PM'e devretti** ("tek tek kodu incelemek uzun iş, cihazda çalışanı test ettim").
   Yani bu R7, "sahip satır satır okudu" biçiminde **değildir**. Cihaz testi rıza ve yaş kapılarını kod okumaktan güçlü biçimde kanıtlar; ama **mutlu yolda görünmeyen** üç şeyi kanıtlamaz ve onlar PM incelemesine dayanır: (1) token saklama (access yalnız bellek, refresh secure store, `undefined` yazılmıyor), (2) hiçbir yerde şifre loglanmıyor, (3) `forgot-password` sızıntısızlığı. **Bu ayrım ileride "R7'den geçti" denince ne kastedildiğini bilmek için burada.**
+
+---
+
+## Sprint M1d-0 — Mobil Hesap Merkezi + Engellenenler (Track F2, PM compose 2026-07-30)
+
+> Sözleşme: `contracts/SPRINT_M1D0_MOBILE_FRIENDS_CONTRACT.md` (**tek doğruluk kaynağı**).
+> M1c ile M1d arasına giren küçük sprint. **R7-nötr olmalı.** Dev checkbox işaretler, **item EKLEMEZ**.
+> **Varlık sebebi:** engellemek şu an mobilde **geri alınamaz** olabiliyor (hiç DM'leşmediğin birini
+> engellersen arkadaşlık da silindiği için kişi hiçbir yüzeyde kalmıyor).
+
+### Yerleşim kararı (sahip itirazıyla revize edildi)
+- [ ] **Üst seviye "Kankalar" ekranı YOK** · alt tab çubuğu **3 eleman kalır** (4. sekme eklenmez)
+- [ ] **"Sen" sekmesi hesap merkezine dönüşür:** mevcut içerik korunur + iki satır (Kankalar · Engellenenler)
+- [ ] Sidebar'daki geniş **"Kanka Ekle" KALIR** — hızlı yol sidebar'da, yönetim "Sen"de
+- [ ] 🔴 **"Kankalık istekleri" satırı EKLENMEZ** — istekler zaten iki yoldan yönetiliyor (sidebar rozetli satırı + tıklanabilir bildirim); üçüncü kapı gürültü
+
+### Ekranlar
+- [ ] **Kankalar** (yeni): `GET /friends`; satırda **Mesaj Gönder** (`POST /dm/channels`) + **Kankalıktan Çıkar** (onaylı); boş durum
+- [ ] **Engellenenler** (yeni): `blocksApi.list` eklenir (`GET /blocks` — **tek yeni uç bağlaması**); **Engeli Kaldır** (onaylı); boş durum
+- [ ] 🔴 Yalnız **benim engellediklerim** listelenir; "beni kim engelledi" sunucudan dönmez, istemci tahmin etmez (G3)
+- [ ] `FRIEND_ACCEPT` bildirimi **tıklanabilir olur** → Kankalar ekranı (M1b §10'da hedefi yoktu)
+- [ ] Engellenenler listesi `stores/friends.ts`'e girer → çıkışta `reset()` ile temizlenir (sızıntı sınıfı)
+
+### Kapsam dışı (bilinçli sadelik — sahip gözlemleri)
+- [ ] Profil zenginleştirme (biyografi, afiş, **GIF afiş**, üyelik tarihi) — Discord mobil de göstermiyor; mobilde afiş ekranın yarısını dekorasyona verir
+- [ ] Ayarlar ekranı — sahip kuralı: "Ayarlar sekmesi sadece ayarlara özel olur, hesap merkezinden erişiriz"
+- [ ] Presence noktası (altyapı yok — sahte "çevrimdışı" gösterilmez) · kanka arama · `GUILD_INVITE` hedefi (M1d)
+
+### DoD (sözleşme §7 — **fiziksel cihazda**)
+- [ ] "Sen"de iki satır görünüyor
+- [ ] 🔴 **Hiç DM'leşmediğim birini engelleyip engeli kaldırabiliyorum** *(sprintin varlık sebebi)*
+- [ ] Kankalar listesinden DM başlatma + kankalıktan çıkarma (onaylı)
+- [ ] `FRIEND_ACCEPT` bildirimi Kankalar'a götürüyor
+- [ ] Boş durumlar doğru
+- [ ] Metin `tr.json`'dan, token'dan; gömülü string yok
+- [ ] `typecheck` + `lint` temiz; `api/`'ye dokunulmadı
