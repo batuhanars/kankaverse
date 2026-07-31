@@ -16,3 +16,17 @@ export function extractErrorMessage(err: unknown): string {
   }
   return response?.data?.message ?? t('common.error');
 }
+
+/**
+ * Envelope'tan MAKİNE kodunu çıkarır (`error` alanı) — Sprint M1d.
+ *
+ * ⚠️ Bu, "hata koduna göre metin uydur" kapısı DEĞİL. Kullanıcıya gösterilen metin her zaman
+ * sunucunun `message`'ıdır (yukarıdaki fonksiyon). Bu yalnız **davranış** dallanması gereken tek
+ * yer için var: `ALREADY_MEMBER` (409) bir hata değil, "zaten oradasın" bilgisidir — kullanıcıyı
+ * hata ekranında bırakmak yerine o ortama götürürüz (sözleşme §2.2, DoD-A/3).
+ * Yeni bir kod için dallanmadan önce sözleşmeye bak; kod-bazlı metin katmanı açılmayacak.
+ */
+export function extractErrorCode(err: unknown): string | null {
+  const response = (err as { response?: { data?: ErrorEnvelope } }).response;
+  return response?.data?.error ?? null;
+}
