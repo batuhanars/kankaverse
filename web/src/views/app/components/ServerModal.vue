@@ -69,7 +69,9 @@ watch(inviteCode, (val) => {
   preview.value = null
   error.value = ''
   if (previewTimer) clearTimeout(previewTimer)
-  const code = val.trim()
+  // Önizleme de büyük harfle sorulur — aksi hâlde kullanıcı doğru kodu yazdığı hâlde "geçersiz"
+  // önizlemesi görür, sonra Katıl çalışır; iki yüzey birbirini yalanlar.
+  const code = val.trim().toUpperCase()
   if (!code) return
   previewTimer = setTimeout(async () => {
     try {
@@ -102,7 +104,8 @@ async function handleCreate() {
 }
 
 async function handleJoin() {
-  const code = inviteCode.value.trim()
+  // Kod harf-duyarlı aranıyor (bkz. input üstündeki not) → gönderimden önce normalize et.
+  const code = inviteCode.value.trim().toUpperCase()
   if (!code) return
   loading.value = true
   error.value = ''
@@ -313,11 +316,19 @@ async function handleImport() {
               <label class="block text-[11px] font-semibold uppercase tracking-widest mb-2" style="color: var(--kv-text-muted);">
                 {{ t('invite.codeLabel') }}
               </label>
+              <!-- Sahip bulgusu 2026-07-31: kullanıcı kodu küçük harfle yazınca katılma sessizce
+                   başarısız oluyordu. Davet kodları BÜYÜK harf base32 üretiliyor
+                   (`short-code.util.ts`: ABCDEFGHJKLMNPQRSTUVWXYZ23456789) ve sunucudaki arama
+                   `findUnique({ where: { code } })` yani harf DUYARLI → küçük harfli kod eşleşmiyor,
+                   kullanıcı "davet geçersiz" görüyor ve kodun bozuk olduğunu sanıyor.
+                   `uppercase` sınıfı yalnız GÖRÜNÜMÜ değiştirir; asıl düzeltme değerin gönderilmeden
+                   önce `.toUpperCase()` edilmesidir (script tarafı — `FriendAddModal` ile aynı desen,
+                   orada da ikisi birlikte kullanılıyor). -->
               <input
                 v-model="inviteCode"
                 :placeholder="t('invite.codePlaceholder')"
                 required
-                class="w-full px-3 py-2.5 text-[14px] rounded-[var(--kv-radius-md)] outline-none mb-1"
+                class="w-full px-3 py-2.5 text-[14px] rounded-[var(--kv-radius-md)] outline-none mb-1 uppercase tracking-widest"
                 style="background-color: var(--kv-bg-rail); color: var(--kv-text-primary); border: 1px solid var(--kv-border-subtle);"
                 @focus="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-accent-500)'"
                 @blur="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-border-subtle)'"

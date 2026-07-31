@@ -28,11 +28,36 @@ const inviteLink = computed(() =>
 
 const { copy, copied } = useClipboard({ source: inviteLink })
 
-async function createInvite() {
+/**
+ * Sahip bulgusu 2026-07-31 (önce mobilde görüldü, web'de de aynısı çıktı).
+ *
+ * Modal her açıldığında `invitesApi.create` çağrılıyordu → her açılış YENİ bir davet üretiyordu.
+ * İki sonucu vardı: kullanıcı paylaştığı kodun değiştiğini görüyor (elindeki link eskimiş gibi
+ * hissettiriyor) ve her açılış veritabanına bir davet satırı daha yazıyordu — sessiz çöp birikimi.
+ * Davet kalıcı bir nesnedir; ekranı açmak onu yenilemek anlamına gelmez.
+ *
+ * Doğru akış: önce mevcut aktif daveti getir, varsa onu kullan; yoksa üret. Sunucu süresi dolmuş ve
+ * kullanım hakkı bitmiş davetleri `listInvites` içinde zaten eliyor — aynı süzgeç burada tekrar
+ * yazılmaz.
+ *
+ * NOT: `list` ucu `MANAGE_GUILD`, `create` ucu `CREATE_INVITE` istiyor → davet üretebilen ama
+ * listeleyemeyen kullanıcı mümkün. Bu yüzden liste hatası ölümcül sayılmaz, üretmeye düşülür.
+ */
+async function loadInvite() {
   creating.value = true
   try {
-    const res = await invitesApi.create(props.guildId)
-    inviteCode.value = res.data.code
+    let code: string | null = null
+    try {
+      const existing = await invitesApi.list(props.guildId)
+      code = existing.data[0]?.code ?? null
+    } catch {
+      // listeleyemedi (yetki dar) → üretmeye düş
+    }
+    if (!code) {
+      const res = await invitesApi.create(props.guildId)
+      code = res.data.code
+    }
+    inviteCode.value = code
   } catch {
     toast.error(t('invitePeople.createError'))
   } finally {
@@ -82,7 +107,7 @@ async function inviteFriend(friend: FriendDto) {
 }
 
 onMounted(() => {
-  createInvite()
+  loadInvite()
   loadFriends()
 })
 </script>
