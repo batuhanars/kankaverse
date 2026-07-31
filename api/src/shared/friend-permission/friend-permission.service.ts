@@ -22,9 +22,10 @@ export interface CanSendFriendRequestResult {
  *     - karşıdan PENDING (hedef→biz) → allow  [FriendsService otomatik kabul eder]
  *     - aynı yönde PENDING (biz→hedef) → deny REQUEST_EXISTS
  *  6. method == USER_CLICK (kart/tıkla-ekle — §3.6):
- *     a. Ortak ortam yoksa → deny USER_NOT_FOUND (jenerik)
+ *     a. Ortak ALAN yoksa → deny USER_NOT_FOUND (jenerik). Ortak alan = ortak ortam (karantina
+ *        basamaklı) VEYA ortak grup DM (M1d-0 R1; grup üyeliği zaten yetişkin + kefil kapılı)
  *     b. sender VEYA target isMinor → deny USER_NOT_FOUND (jenerik) [G1 — statü sızdırılmaz]
- *     c. İkisi yetişkin + ortak ortam → allow
+ *     c. İkisi yetişkin + ortak alan → allow
  *  7. method == CODE (bilinçli paylaşım — minör dahil herkes):
  *     → allow
  *
@@ -135,7 +136,24 @@ export class FriendPermissionService {
           },
         },
       });
-      if (!sharedGuild) {
+      // 6a-2. Ortak GRUP DM de "ortak alan" sayılır (M1d-0 R1, sahip kararı 2026-07-31) [R7].
+      //
+      // Neden güvenli — grup DM'e minör HİÇBİR yoldan giremez, iki kapı da kapalı:
+      //   · kurulum:   dm.service.ts createGroup → creator VEYA üye minörse GROUP_MINOR_FORBIDDEN
+      //   · üye ekleme: dm.service.ts addGroupMember → hedef minörse jenerik NOT_FRIEND
+      // Yani grup üyeliği ⟹ yetişkin. Üstelik gruba giriş "katılma" ile değil, yalnız BİR ÜYENİN
+      // EKLEMESİYLE olur ve ekleyen kişi eklenenle arkadaş olmak zorundadır → ortak ortamdan farklı
+      // olarak burada üçüncü bir kişinin iki tarafa da kefaleti vardır.
+      //
+      // Karantina neden UYGULANMADI: guild karantinası "büyük/açık ortama katılıp anında cold-add"
+      // sürtünmesi içindir. Grup DM'de "katılma" diye bir yol yok; giriş zaten mevcut bir arkadaşlıkla
+      // kapılı. Eklenmek için saldırganın kurbanla ZATEN arkadaş olan birine ihtiyacı var — bu durumda
+      // eklediği kişi de kendi arkadaşı olmak zorunda. Drive-by vektörü oluşmuyor, ek basamak
+      // kullanıcıya bedel yükler, korumaya bir şey katmaz.
+      //
+      // Gruptan ayrılmak/çıkarılmak bu izni GERİ ALIR (sorgu anlık üyeliğe bakar, geçmişe değil).
+      const sharedGroupDm = sharedGuild ? false : await this.hasSharedGroupDmChannel(senderId, targetId);
+      if (!sharedGuild && !sharedGroupDm) {
         return { allowed: false, reason: 'USER_NOT_FOUND' };
       }
 
@@ -172,6 +190,25 @@ export class FriendPermissionService {
     if (!aDmChannels?.length) return false;
     const shared = await this.prisma.channelMember.findFirst({
       where: { userId: b, channelId: { in: aDmChannels.map((c) => c.channelId) } },
+      select: { channelId: true },
+    });
+    return shared !== null;
+  }
+
+  /**
+   * M1d-0 R1: iki kullanıcı ŞU AN aynı aktif grup DM'inde mi (Kural 6a-2 "ortak alan" kanıtı).
+   *
+   * Anlık üyeliğe bakar — biri gruptan ayrılırsa/çıkarılırsa izin de düşer. `dmRequestStatus`
+   * süzgeci YOK: o alan 1-1 mesaj isteği akışına ait (C9), grup DM'de kullanılmıyor.
+   */
+  private async hasSharedGroupDmChannel(a: string, b: string): Promise<boolean> {
+    const aGroupChannels = await this.prisma.channelMember.findMany({
+      where: { userId: a, channel: { type: 'GROUP_DM', deletedAt: null } },
+      select: { channelId: true },
+    });
+    if (!aGroupChannels?.length) return false;
+    const shared = await this.prisma.channelMember.findFirst({
+      where: { userId: b, channelId: { in: aGroupChannels.map((c) => c.channelId) } },
       select: { channelId: true },
     });
     return shared !== null;

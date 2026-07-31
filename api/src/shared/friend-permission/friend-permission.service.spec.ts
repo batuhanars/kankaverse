@@ -180,6 +180,83 @@ describe('FriendPermissionService.canSendFriendRequest — §3 matrisi', () => {
     });
   });
 
+  // ── Kural 6a-2: ortak GRUP DM (M1d-0 R1, R7) ────────────────────────────
+  //
+  // İki ayrı kanal sorgusu aynı prisma mock'unu paylaşıyor (REV-10 önce `type:'DM'`, sonra bu
+  // basamak `type:'GROUP_DM'` sorguluyor). Testin gerçekten grup dalını ölçtüğünden emin olmak
+  // için mock sorgudaki `channel.type`e göre ayrışıyor — yoksa REV-10 dalı testi sessizce
+  // "geçirir" ve yeni kod hiç çalışmamış olur.
+  describe('Kural 6a-2: USER_CLICK — ortak grup DM ortak alan sayılır', () => {
+    function mockChannels(opts: { dm?: boolean; groupDm?: boolean }) {
+      prismaMock.channelMember.findMany.mockImplementation((args: any) => {
+        const type = args?.where?.channel?.type;
+        if (type === 'DM') return Promise.resolve(opts.dm ? [{ channelId: 'dm-1' }] : []);
+        if (type === 'GROUP_DM') return Promise.resolve(opts.groupDm ? [{ channelId: 'grp-1' }] : []);
+        return Promise.resolve([]);
+      });
+      prismaMock.channelMember.findFirst.mockImplementation((args: any) => {
+        const ids: string[] = args?.where?.channelId?.in ?? [];
+        if (ids.includes('dm-1')) return Promise.resolve(opts.dm ? { channelId: 'dm-1' } : null);
+        if (ids.includes('grp-1')) return Promise.resolve(opts.groupDm ? { channelId: 'grp-1' } : null);
+        return Promise.resolve(null);
+      });
+    }
+
+    it('ortak ortam YOK ama ortak grup DM VAR → allowed', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(ADULT).mockResolvedValueOnce(ADULT2);
+      prismaMock.guildMember.findFirst.mockResolvedValue(null);
+      mockChannels({ groupDm: true });
+      const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: true });
+    });
+
+    it('ne ortak ortam ne ortak grup DM → USER_NOT_FOUND (jenerik)', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(ADULT).mockResolvedValueOnce(ADULT2);
+      prismaMock.guildMember.findFirst.mockResolvedValue(null);
+      mockChannels({});
+      const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: false, reason: 'USER_NOT_FOUND' });
+    });
+
+    it('aynı grup DM ama farklı gruplar (kesişim yok) → USER_NOT_FOUND', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(ADULT).mockResolvedValueOnce(ADULT2);
+      prismaMock.guildMember.findFirst.mockResolvedValue(null);
+      // sender'ın grubu var, ama target o grubun üyesi değil
+      prismaMock.channelMember.findMany.mockResolvedValue([{ channelId: 'grp-1' }]);
+      prismaMock.channelMember.findFirst.mockResolvedValue(null);
+      const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: false, reason: 'USER_NOT_FOUND' });
+    });
+
+    // 🔴 Minör kapısı grup dalında da AÇIK kalmalı. Grup DM'e minör giremiyor (dm.service iki kapı),
+    // yani bu senaryo pratikte oluşmamalı; test o invaryanta GÜVENMEDİĞİMİZİ sabitler — grup
+    // tarafında bir gün sızıntı olursa istek yolu yine de kapalı kalsın (defense in depth).
+    it('ortak grup DM VAR ama target minör → USER_NOT_FOUND (G1 korunur)', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(ADULT).mockResolvedValueOnce(MINOR);
+      prismaMock.guildMember.findFirst.mockResolvedValue(null);
+      mockChannels({ groupDm: true });
+      const r = await service.canSendFriendRequest(ADULT.id, MINOR.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: false, reason: 'USER_NOT_FOUND' });
+    });
+
+    it('ortak grup DM VAR ama sender minör → USER_NOT_FOUND (G1 korunur)', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(MINOR).mockResolvedValueOnce(ADULT2);
+      prismaMock.guildMember.findFirst.mockResolvedValue(null);
+      mockChannels({ groupDm: true });
+      const r = await service.canSendFriendRequest(MINOR.id, ADULT2.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: false, reason: 'USER_NOT_FOUND' });
+    });
+
+    // Blok Kural 3'te, grup basamağından ÖNCE reddedilir — grup üyeliği bloğu ezmemeli.
+    it('ortak grup DM VAR ama blok VAR → USER_NOT_FOUND (blok önce gelir)', async () => {
+      prismaMock.user.findUnique.mockResolvedValueOnce(ADULT).mockResolvedValueOnce(ADULT2);
+      prismaMock.userBlock.findFirst.mockResolvedValue({ id: 'b1' });
+      mockChannels({ groupDm: true });
+      const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'USER_CLICK');
+      expect(r).toEqual({ allowed: false, reason: 'USER_NOT_FOUND' });
+    });
+  });
+
   // ── Kural 7: CODE — minör dahil açık ────────────────────────────────────
   describe('Kural 7: CODE — minör dahil açık', () => {
     it('sender minör + CODE → allowed', async () => {
