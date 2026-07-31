@@ -625,10 +625,18 @@ function isGroupStart(index: number): boolean {
           <span class="flex-1 text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
             {{ dmChannel.otherUser.username }}
           </span>
-          <!-- REV-5: arkadaş değilse "Arkadaş ekle" (Sprint 4A by-user; ret jenerik) -->
+          <!-- REV-5: arkadaş değilse "Arkadaş ekle" (Sprint 4A by-user; ret jenerik)
+               M1d-0 R1 (2026-07-31): `xl:hidden` — bu düğme YALNIZ sağ profil paneli gizliyken görünür.
+               Sahip "mobilde olduğu gibi web'de de ikinci kapıyı kaldıralım, profil kartından ekleniyor"
+               dedi; ölçtüm, **≥1280'de doğru ama altında DEĞİL**: `DmView` panelini `max-xl:hidden` ile
+               gizliyor ve panelin dar ekranda açılacağı bir toggle YOK. Ekleme kartı (`FullProfileModal`)
+               yalnız o panelden açılıyor, DM başlığındaki ad tıklanabilir değil, DM baloncuklarında
+               `UserCardPopover` yok → düğme kaldırılsaydı <1280'de ekleme yolu HİÇ kalmazdı (TR trafiği
+               mobil ağırlıklı, D22). Bu yüzden tamamen silinmedi, yalnız **çift göründüğü yerde** kalktı.
+               `hidden xl:*` kalıbı bilinçle kullanılmadı (eklenti `.hidden` çakışması — DmView'daki not). -->
           <button
             v-if="showAddFriend"
-            class="flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors disabled:opacity-60"
+            class="xl:hidden flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors disabled:opacity-60"
             style="color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);"
             :title="t('friends.add')"
             :disabled="addingFriend"
@@ -641,7 +649,7 @@ function isGroupStart(index: number): boolean {
           </button>
           <span
             v-else-if="dmChannel && addFriendSent && !isFriendInDm"
-            class="text-[12px] px-1"
+            class="xl:hidden text-[12px] px-1"
             style="color: var(--kv-text-muted);"
           >{{ t('friends.requestSent') }}</span>
           <!-- Sesli arama (1-1): çalıyor→İptal · aktif çağrı→Sese Katıl · yoksa→telefon (ring).
