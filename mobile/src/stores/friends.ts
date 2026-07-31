@@ -40,8 +40,27 @@ interface FriendsState {
   handleRemoved: (userId: string) => void;
   /** Sözleşme §3.3 — yalnız BENİM engellediklerim (`GET /blocks` zaten `blockerId` filtreli). */
   fetchBlocked: () => Promise<void>;
+  block: (userId: string) => Promise<void>;
   unblock: (userId: string) => Promise<void>;
   reset: () => void;
+}
+
+/**
+ * 🔴 İlişki mutasyonu → DM bayraklarını tazele (sahip bulgusu 2026-07-31, M1d-0 DoD turu).
+ *
+ * `canMessage`/`selfBlocked` SUNUCUDA türetilir (DmPermissionService.canDm) ve DM ekranı bunları
+ * dm store'dan okur. Engelle/engeli-kaldır/kankalıktan-çıkar bu türetmeyi değiştirir; tazelenmezse
+ * ekran eski cevabı göstermeye devam eder.
+ *
+ * 2026-07-30'da bu tazeleme YALNIZ `unblock`'a konmuştu, çünkü bildirilen kusur oydu. Bugünkü tur
+ * asimetriyi ortaya çıkardı: engelleme profil kartından `blocksApi.block` ile DOĞRUDAN çağrılıyordu,
+ * store'a hiç uğramıyordu → engellenen kişinin DM'inde giriş kutusu açık kalıyordu (gönderim sunucuda
+ * fail-closed reddediliyor, yani sızıntı yok; ama arayüz durumu YANLIŞ gösteriyor).
+ * Bu yüzden düzeltme dördüncü bir kopya eklemek değil, mutasyonların sahipliğini store'a toplamak:
+ * profil kartı artık `blocksApi`'yi doğrudan çağırmaz, buradan geçer.
+ */
+async function refreshDmFlags(): Promise<void> {
+  await useDmStore.getState().fetchAll();
 }
 
 /**
@@ -99,6 +118,9 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
   async removeFriend(userId) {
     await friendsApi.remove(userId);
     set((s) => ({ friends: s.friends.filter((f) => f.user.id !== userId) }));
+    // Kankalıktan çıkmak da DM bayraklarını değiştirebilir: karşı tarafın `dmPolicy` değeri FRIENDS
+    // ise arkadaşlık bitince `canMessage` false olur. Engellemeyle aynı sınıf, aynı tazeleme.
+    await refreshDmFlags();
   },
 
   removeLocal(userId) {
@@ -135,13 +157,18 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
     }
   },
 
+  async block(userId) {
+    await blocksApi.block(userId);
+    // Engelleme sunucuda arkadaşlığı da siler (blocks.service transaction'ı) ve bekleyen isteği iptal
+    // eder; WS `friend.remove` yalnız KARŞI tarafa gider, kendi listemi ben düşürürüm.
+    get().removeLocal(userId);
+    await refreshDmFlags();
+  },
+
   async unblock(userId) {
     await blocksApi.unblock(userId);
     set((s) => ({ blocked: s.blocked.filter((b) => b.user.id !== userId) }));
-    // 🔴 DM store'u da tazele (sahip bulgusu 2026-07-30): engel kalkınca o kişiyle olan DM'in
-    // `canMessage`/`selfBlocked` bayrakları sunucuda değişir. Tazelenmezse kullanıcı engeli
-    // kaldırır ama DM'de hâlâ yazamaz — tam olarak yaşanan kusur buydu.
-    await useDmStore.getState().fetchAll();
+    await refreshDmFlags();
   },
 
   reset() {

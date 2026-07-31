@@ -4,7 +4,6 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { dmApi } from '@/api/dm';
 import { useDmStore } from '@/stores/dm';
-import { useFriendsStore } from '@/stores/friends';
 import { extractErrorMessage } from '@/api/errors';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ProfileCardModal } from '@/components/ProfileCardModal';
@@ -45,17 +44,10 @@ export default function DmScreen() {
   // `fetchAll` ile tazeleniyor. Route parametresi yalnız store'da kanal yokken (derin link) yedek.
   const storeChannel = useDmStore((s) => s.channels.find((c) => c.id === params.id));
 
-  // Sözleşme M1d-0 fast-follow (sahip talebi 2026-07-30) — DM başlığında **ikon** kanka ekle butonu.
-  // Web `DmConversation.vue` mantığı birebir: arkadaş DEĞİLSE, ben engellememişsem ve bu oturumda
-  // henüz göndermemişsem görünür. Etiket yok, ekran dar (sahip: "kanka ekle yazmayacak, ikon olacak").
-  const isFriend = useFriendsStore((s) =>
-    s.friends.some((f) => f.user.id === params.otherUserId),
-  );
-  const sendRequestByUser = useFriendsStore((s) => s.sendRequestByUser);
-  const [friendRequestSent, setFriendRequestSent] = useState(false);
-  const [addingFriend, setAddingFriend] = useState(false);
-  const [addFriendError, setAddFriendError] = useState('');
-
+  // M1d-0 R1 (sahip kararı 2026-07-31) — başlıktaki kanka ekle ikonu **KALDIRILDI**. 2026-07-30'da
+  // eklenmişti çünkü o gün profil kartında ekleme yoktu; R1-d kartı eklemeyi getirince başlık ikonu
+  // ikinci kapıya dönüştü. Kart bu ekranda her zaman erişilebilir (başlıktaki ada dokunmak açıyor),
+  // yani yetenek kaybolmadı — yalnız tek kapıya indi. Yetenek kaybı olsaydı kaldırılmazdı.
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [clearError, setClearError] = useState('');
@@ -91,24 +83,6 @@ export default function DmScreen() {
 
   const placeholder = isDm ? t('dm.placeholder', { user: title }) : t('dm.groupPlaceholder', { name: title });
 
-  async function onAddFriend() {
-    if (!params.otherUserId || addingFriend) return;
-    // Defansif: ben engellediysem buton zaten gizli. Karşı taraf engellediyse sunucu **jenerik**
-    // reddeder — istemci sebebi göstermez, "engellendim mi" bilgisi sızmaz (G3).
-    if (selfBlocked) return;
-    setAddingFriend(true);
-    setAddFriendError('');
-    try {
-      await sendRequestByUser(params.otherUserId);
-      setFriendRequestSent(true);
-    } catch {
-      // Jenerik hata (web ile aynı): sebep/statü gösterilmez. Kullanıcı kodla da ekleyebilir.
-      setAddFriendError(t('friends.addFailed'));
-    } finally {
-      setAddingFriend(false);
-    }
-  }
-
   async function onConfirmClear() {
     setClearing(true);
     setClearError('');
@@ -132,17 +106,6 @@ export default function DmScreen() {
           accessibilityLabel={t('mobile.group.manage')}
         >
           <Ionicons name="people-outline" size={20} color={theme.colors.textSecondary} />
-        </Pressable>
-      )}
-      {isDm && !isFriend && !friendRequestSent && !selfBlocked && (
-        <Pressable
-          onPress={onAddFriend}
-          disabled={addingFriend}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={t('friends.add')}
-        >
-          <Ionicons name="person-add-outline" size={20} color={theme.colors.textSecondary} />
         </Pressable>
       )}
       <Pressable
@@ -206,9 +169,9 @@ export default function DmScreen() {
           onCancel={() => setShowClearConfirm(false)}
         />
       )}
-      {(clearError || addFriendError) ? (
+      {clearError ? (
         <View style={styles.clearErrorBar}>
-          <Text style={styles.clearErrorText}>{clearError || addFriendError}</Text>
+          <Text style={styles.clearErrorText}>{clearError}</Text>
         </View>
       ) : null}
     </>

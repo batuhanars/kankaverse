@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { usersApi, type UserCardDto } from '@/api/users';
-import { blocksApi } from '@/api/blocks';
-import { friendsApi } from '@/api/friends';
 import { useFriendsStore } from '@/stores/friends';
 import { extractErrorMessage } from '@/api/errors';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -23,14 +21,19 @@ interface Props {
 // SALT OKUNURDU (yalnız route'tan geçen ad/avatar gösteriliyordu, `GET /users/:id/card` hiç
 // çağrılmıyordu). Sprint M1b contract §3.6 — kart artık gerçek kartı çeker (`friendStatus` +
 // `selfBlocked` kararı belirler) ve iki aksiyon ekler: Engelle / Arkadaşlıktan Çıkar (ikisi de
-// onaylı) + Engeli Kaldır (onaysız, web ile aynı). Kullanıcı adıyla arama/tıkla-ekle YOK — sözleşme
-// §2 endpoint tablosunda `by-user` ucu yok, bu kart "arkadaş ekle" düğmesi TAŞIMAZ.
+// onaylı) + Engeli Kaldır (onaysız, web ile aynı).
+//
+// M1d-0 R1 (sahip kararı 2026-07-31) — kart artık **Kanka Ekle** de taşır (tetikleyici: grup DM'de
+// kanka olmadığın üyeye ulaşma yolu yoktu). Kapıyı açan şey düğme değil backend kuralı: USER_CLICK
+// artık ortak grup DM'i de "ortak alan" sayıyor — gerekçe `friend-permission.service.ts` Kural 6a-2
+// (R7). Kullanıcı adıyla ARAMA hâlâ YOK; ret JENERİK, sebep/statü sızmaz.
 export function ProfileCardModal({ userId, username, avatarUrl, onClose, onChanged }: Props) {
   const [card, setCard] = useState<UserCardDto | null>(null);
   const [loadError, setLoadError] = useState('');
   const [confirmAction, setConfirmAction] = useState<'block' | 'remove' | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [requestSent, setRequestSent] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,12 +50,15 @@ export function ProfileCardModal({ userId, username, avatarUrl, onClose, onChang
     };
   }, [userId]);
 
+  // Sprint M1d-0 DoD turu (2026-07-31) — üç mutasyon da artık `useFriendsStore` üzerinden gidiyor.
+  // Önceden kart `blocksApi`/`friendsApi`'yi DOĞRUDAN çağırıyordu; store'un engel/kanka mutasyonlarına
+  // bağladığı yan etki (DM `canMessage`/`selfBlocked` bayraklarının tazelenmesi) bu yüzden bu yoldan
+  // hiç çalışmıyordu. Yan etkinin tek sahibi store; kart yalnız çağırır.
   async function doBlock() {
     setBusy(true);
     setActionError('');
     try {
-      await blocksApi.block(userId);
-      useFriendsStore.getState().removeLocal(userId);
+      await useFriendsStore.getState().block(userId);
       onChanged?.();
       setConfirmAction(null);
       onClose();
@@ -66,8 +72,7 @@ export function ProfileCardModal({ userId, username, avatarUrl, onClose, onChang
     setBusy(true);
     setActionError('');
     try {
-      await friendsApi.remove(userId);
-      useFriendsStore.getState().removeLocal(userId);
+      await useFriendsStore.getState().removeFriend(userId);
       onChanged?.();
       setConfirmAction(null);
       onClose();
@@ -77,11 +82,26 @@ export function ProfileCardModal({ userId, username, avatarUrl, onClose, onChang
     }
   }
 
+  async function doSendRequest() {
+    setBusy(true);
+    setActionError('');
+    try {
+      await useFriendsStore.getState().sendRequestByUser(userId);
+      setRequestSent(true);
+    } catch {
+      // Jenerik (DM başlığındaki tıkla-ekle ile aynı): sunucunun ret sebebi GÖSTERİLMEZ. USER_NOT_FOUND
+      // "yok / blok / minör / ortak alan yok" ayrımını zaten silmiş durumda; istemci de tahmin etmez.
+      setActionError(t('friends.addFailed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function doUnblock() {
     setBusy(true);
     setActionError('');
     try {
-      await blocksApi.unblock(userId);
+      await useFriendsStore.getState().unblock(userId);
       onChanged?.();
       setCard((c) => (c ? { ...c, selfBlocked: false } : c));
     } catch (e) {
@@ -118,6 +138,19 @@ export function ProfileCardModal({ userId, username, avatarUrl, onClose, onChang
                   </Pressable>
                 ) : (
                   <>
+                    {/* Kanka Ekle yalnız `none` durumunda. `pending_in` (karşı taraf zaten istek
+                        atmış) için düğme koymadım: kabul akışı istekler ekranında, burada ikinci bir
+                        kabul yüzeyi uydurmak olurdu. Gönderim sonrası düğme yerini bilgi metnine
+                        bırakır — sunucu durumu değişti, sessizce kaybolması kullanıcıyı şüphede bırakır. */}
+                    {requestSent || card.friendStatus === 'pending_out' ? (
+                      <Text style={styles.pendingText}>{t('friends.requestSent')}</Text>
+                    ) : (
+                      card.friendStatus === 'none' && (
+                        <Pressable disabled={busy} onPress={doSendRequest} style={styles.primaryButton}>
+                          <Text style={styles.primaryButtonText}>{t('friends.add')}</Text>
+                        </Pressable>
+                      )
+                    )}
                     {card.friendStatus === 'friends' && (
                       <Pressable disabled={busy} onPress={() => setConfirmAction('remove')} style={styles.dangerButton}>
                         <Text style={styles.dangerButtonText}>{t('friends.remove')}</Text>
@@ -198,6 +231,26 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: 8,
     marginBottom: theme.layout.panelGap,
+  },
+  // Kanka Ekle olumlu/birincil aksiyon → dolu Kor düğme; engelle/çıkar yıkıcı → kenarlıklı kırmızı.
+  // Aynı görünümü paylaşmaları, yanlışlıkla yıkıcı olana basma riskini artırırdı.
+  primaryButton: {
+    minHeight: theme.layout.controlSm,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent500,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButtonText: {
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.sm,
+    fontWeight: '600',
+  },
+  pendingText: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.sm,
+    textAlign: 'center',
+    paddingVertical: 6,
   },
   dangerButton: {
     minHeight: theme.layout.controlSm,

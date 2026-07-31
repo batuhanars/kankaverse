@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useCallback } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useNotificationsStore } from '@/stores/notifications';
 import type { NotificationDto } from '@/api/notifications';
 import { t } from '@/i18n';
@@ -50,13 +50,27 @@ export default function NotificationsScreen() {
   const fetchFirstPage = useNotificationsStore((s) => s.fetchFirstPage);
   const loadMore = useNotificationsStore((s) => s.loadMore);
   const markAllRead = useNotificationsStore((s) => s.markAllRead);
+  const markRead = useNotificationsStore((s) => s.markRead);
 
-  useEffect(() => {
-    fetchFirstPage().then(() => markAllRead());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Sprint M1d-0 DoD turu (sahip bulgusu 2026-07-31) — okundu işaretleme MOUNT'ta değil, her
+  // ODAKLANMADA çalışır. Kusurun kökü: sekme ekranları Expo Router'da oturum boyunca mount'lu kalır,
+  // yani `useEffect(..., [])` bir kez çalışıp bir daha çalışmıyordu → o andan sonra gelen HİÇBİR
+  // bildirim okundu olmuyordu (uygulama yeniden açılana kadar rozet kırmızı kalıyordu). Web'de aynı
+  // iş panel her açılışında oluyor (NotificationBell.vue); mobilde panelin karşılığı sekmenin
+  // odaklanmasıdır. Liste sırayla tazelenir (`fetchFirstPage` → `markAllRead`): ters sırada
+  // markAllRead'in yerel damgası, sonradan gelen listeye yetişemez ve satırlar okunmamış görünürdü.
+  useFocusEffect(
+    useCallback(() => {
+      fetchFirstPage().then(() => markAllRead());
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
 
   function onItemPress(n: NotificationDto) {
+    // Dokunulan bildirim okundu işaretlenir (web NotificationBell.vue ile aynı semantik). Odaklanma
+    // kancası çoğu durumu zaten kapatır; bu satır sekme ZATEN odaktayken gelen bildirimi karşılar —
+    // o durumda odaklanma olayı bir daha tetiklenmez, dokunuş tek sinyaldir.
+    void markRead(n.id);
     // Kanka isteği bildirimi artık ÖLÜ DEĞİL (sahip bulgusu 2026-07-30). M1a'da tıklanamazdı çünkü
     // gidilecek bir yer yoktu; M1b Arkadaş Ekle ekranını getirdi, hedef artık var. Sahip tam olarak
     // burada takıldı: rozet Bildirimler'de çıkıyor, dokununca hiçbir şey olmuyordu.
