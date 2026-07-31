@@ -14,6 +14,8 @@ interface Props {
   onRetry: () => void;
   onSelectDm: () => void;
   onSelectGuild: (id: string) => void;
+  /** Sprint M1d §3 — ray "+" girişi: tek dokunuş → "Ortama Katıl" / "Ortam Kur" seçimi. */
+  onAddGuild: () => void;
 }
 
 const SIZE = 48;
@@ -73,7 +75,7 @@ function HexGuildIcon({ iconUrl, fallbackLetter, active }: { iconUrl: string | n
 // Sprint M1a contract §2 — rail + sidebar gezinme mimarisi, kalıcı rail. M0'ın "Ortamların" tam-
 // ekranı kaldırıldı; ortam ikonları buraya taşındı. react-native-svg PM onaylı bağımlılık (dördüncü
 // PM düzeltmesi) — ortam ikonları artık gerçek altıgen maske ile çiziliyor (bkz. HexGuildIcon).
-export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSelectGuild }: Props) {
+export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSelectGuild, onAddGuild }: Props) {
   return (
     // Sabit genişlik SARAN View'da tutulur, ScrollView'a değil — ScrollView'ın kendi `style`ına
     // verilen `width`, flex-row ebeveyn içinde çapraz eksende (yatay) güvenilir uygulanmıyor
@@ -114,6 +116,20 @@ export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSel
             </Pressable>
           );
         })}
+
+        {/* Sprint M1d — "+" ortam listesinin ALTINDA (web ServerRail'de de öyle). Tek düğme, iki
+            seçenek açar; "Katıl" ve "Kur" için ayrı ayrı iki ikon konmadı — ray 72dp, ikinci düğme
+            listeyi aşağı iter ve seçim yükünü kullanıcıya her açılışta ödetir.
+            Altıgen DEĞİL daire/kare değil: ortam ikonu olmadığı için imza altıgeni kullanılmıyor,
+            aksi hâlde "bu da bir ortam" gibi okunurdu. */}
+        <Pressable
+          onPress={onAddGuild}
+          style={styles.addButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('guild.create')}
+        >
+          <Ionicons name="add" size={26} color={theme.colors.accent500} />
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -164,6 +180,14 @@ const styles = StyleSheet.create({
   },
   dmIcon: {
     backgroundColor: theme.colors.bgElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addButton: {
+    width: SIZE,
+    height: SIZE,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accentSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },

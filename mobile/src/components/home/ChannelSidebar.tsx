@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { channelsApi, ChannelType, type ChannelSummaryDto } from '@/api/channels';
 import { extractErrorMessage } from '@/api/errors';
 import { t } from '@/i18n';
@@ -18,13 +19,19 @@ interface Props {
    */
   selectedChannelId?: string;
   onOpenChannel: (channel: ChannelSummaryDto) => void;
+  /**
+   * Sprint M1d §2.4 — "Davet Et" girişi. **Yalnız yetkiliye (OWNER/ADMIN) verilir**; çağıran
+   * (home.tsx) yetkisizde bu prop'u HİÇ geçmez, bu yüzden düğme render edilmez. Disabled düğme
+   * gösterilmiyor: yapamayacağın şeyi görmek bilgi değil gürültüdür (M1b grup yönetimi deseni).
+   */
+  onOpenInvite?: () => void;
 }
 
 // Sprint M1a contract §0 + §2 — yalnız GUILD_TEXT kanalları listelenir. Sözleşme metni:
 // "Ses kanalı satırları listede görünür ama girilemez" cümlesi DEĞİL geçerli — tam tersi: "kanal
 // listesi yalnız metin kanallarını gösterir". Ses satırlarını gösterip dokununca hiçbir şey
 // yapmamak "boş yüzey" (mobile/CLAUDE.md yasağı) olurdu; bu yüzden GUILD_VOICE baştan süzülür.
-export function ChannelSidebar({ guildId, guildName, selectedChannelId, onOpenChannel }: Props) {
+export function ChannelSidebar({ guildId, guildName, selectedChannelId, onOpenChannel, onOpenInvite }: Props) {
   const [state, setState] = useState<LoadState>('loading');
   const [channels, setChannels] = useState<ChannelSummaryDto[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
@@ -59,9 +66,21 @@ export function ChannelSidebar({ guildId, guildName, selectedChannelId, onOpenCh
 
   return (
     <View style={styles.flex}>
-      <Text style={styles.header} numberOfLines={1}>
-        {guildName}
-      </Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.header} numberOfLines={1}>
+          {guildName}
+        </Text>
+        {onOpenInvite && (
+          <Pressable
+            onPress={onOpenInvite}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('guild.join')}
+          >
+            <Ionicons name="person-add-outline" size={18} color={theme.colors.textSecondary} />
+          </Pressable>
+        )}
+      </View>
 
       {state === 'loading' && (
         <View style={styles.center}>
@@ -124,13 +143,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.bgSidebar,
   },
-  header: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.lg,
-    fontWeight: '700',
+  // Başlık + davet ikonu tek satırda. Yatay dolgu satıra taşındı ki ikon panelin sağ kenarına
+  // hizalansın; başlığın kendi dolgusu kaldırıldı (iki kez uygulanmasın).
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     paddingHorizontal: theme.layout.panelGap,
     paddingTop: 14,
     paddingBottom: 10,
+  },
+  header: {
+    flex: 1,
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.lg,
+    fontWeight: '700',
   },
   center: {
     flex: 1,
