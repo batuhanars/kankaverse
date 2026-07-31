@@ -1,8 +1,11 @@
 import http from './http';
 
-// Sprint M1a contract §3 + api/src/modules/notifications/notifications.controller.ts — yalnız bu
-// sprint'in kullandığı üç uç (GET list · GET unread-count · POST read-all). Tercih (prefs) ve
-// tekil okundu (`:id/read`) uçları contract'ın §3 tablosunda YOK — dev bunları çağırmaz.
+// Sprint M1a contract §3 + api/src/modules/notifications/notifications.controller.ts.
+// M1a'da yalnız üç uç bağlıydı (GET list · GET unread-count · POST read-all) ve tekil okundu
+// (`:id/read`) bilinçle dışarıda bırakılmıştı. Sprint M1d-0 DoD turunda (sahip bulgusu 2026-07-31)
+// tekil ucun eksikliği kusura dönüştü: bildirime dokunmak yönlendiriyor ama okundu işaretlemiyordu.
+// Web bu ucu Sprint C1'den beri kullanıyor (NotificationBell.vue → markRead(n.id)); mobil ona hizalandı.
+// Tercih (prefs) uçları hâlâ bağlı DEĞİL.
 export const NotificationType = {
   MENTION: 'MENTION',
   FRIEND_REQUEST: 'FRIEND_REQUEST',
@@ -49,6 +52,10 @@ export const notificationsApi = {
   },
   async markAllRead(): Promise<{ count: number }> {
     const res = await http.post<{ count: number }>('/notifications/read');
+    return res.data;
+  },
+  async markRead(id: string): Promise<NotificationDto> {
+    const res = await http.post<NotificationDto>(`/notifications/${id}/read`);
     return res.data;
   },
 };

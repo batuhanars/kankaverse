@@ -4,6 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useFriendsStore } from '@/stores/friends';
 import { useDmStore } from '@/stores/dm';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ProfileCardModal } from '@/components/ProfileCardModal';
 import { type FriendDto } from '@/api/friends';
 import { extractErrorMessage } from '@/api/errors';
 import { dmRouteParams } from '@/utils/dmRoute';
@@ -24,6 +25,7 @@ export default function FriendsListScreen() {
   const createChannel = useDmStore((s) => s.createChannel);
 
   const [removeTarget, setRemoveTarget] = useState<FriendDto | null>(null);
+  const [cardTarget, setCardTarget] = useState<FriendDto | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
 
@@ -100,16 +102,29 @@ export default function FriendsListScreen() {
             const busy = busyId === item.user.id;
             return (
               <View style={styles.row}>
-                {item.user.avatarUrl ? (
-                  <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarFallback]}>
-                    <Text style={styles.avatarFallbackText}>{item.user.username.charAt(0).toUpperCase()}</Text>
-                  </View>
-                )}
-                <Text style={styles.name} numberOfLines={1}>
-                  {item.user.username}
-                </Text>
+                {/* Sprint M1d-0 DoD turu (sahip kararı 2026-07-31) — ada/avatara dokunmak profil
+                    kartını açar. Sebep: engelleme mobilde YALNIZ `ProfileCardModal` üzerinden
+                    yapılabiliyor ve o kart da yalnız DM başlığı + grup üye listesinden açılıyordu;
+                    yani hiç DM'leşmediğin bir kankayı engellemenin yolu YOKTU (DoD #2'nin tam
+                    senaryosu). Satıra üçüncü bir "Engelle" düğmesi konmadı: engellemenin uygulamada
+                    zaten bir evi var, ikinci kapı açmak yerine bu ekran o eve bağlandı. Jest
+                    uygulamanın geri kalanıyla aynı (DM başlığı, grup üye listesi). */}
+                <Pressable
+                  onPress={() => setCardTarget(item)}
+                  style={styles.identity}
+                  accessibilityRole="button"
+                >
+                  {item.user.avatarUrl ? (
+                    <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} />
+                  ) : (
+                    <View style={[styles.avatar, styles.avatarFallback]}>
+                      <Text style={styles.avatarFallbackText}>{item.user.username.charAt(0).toUpperCase()}</Text>
+                    </View>
+                  )}
+                  <Text style={styles.name} numberOfLines={1}>
+                    {item.user.username}
+                  </Text>
+                </Pressable>
                 <View style={styles.actions}>
                   <Pressable disabled={busy} onPress={() => onMessage(item)} style={styles.dmButton}>
                     <Text style={styles.dmText}>{t('friends.dm')}</Text>
@@ -120,6 +135,20 @@ export default function FriendsListScreen() {
                 </View>
               </View>
             );
+          }}
+        />
+      )}
+
+      {cardTarget && (
+        <ProfileCardModal
+          userId={cardTarget.user.id}
+          username={cardTarget.user.username}
+          avatarUrl={cardTarget.user.avatarUrl}
+          onClose={() => setCardTarget(null)}
+          // Engelleme arkadaşlığı da siler (blocks.service transaction'ı) → liste sunucudan
+          // yeniden okunur; kart kendi içinde `removeLocal` çağırıyor ama tek doğruluk kaynağı sunucu.
+          onChanged={() => {
+            void fetchAll();
           }}
         />
       )}
@@ -188,6 +217,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingVertical: 10,
+  },
+  // Avatar + ad tek dokunma hedefi (profil kartı). `flex: 1` buraya taşındı: eskiden `name`
+  // satırdaki boşluğu yiyordu, şimdi sarmalayıcı yiyor ve `name` onun içinde kırpılıyor.
+  identity: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
   },
   avatar: {
     width: 40,

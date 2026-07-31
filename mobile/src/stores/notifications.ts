@@ -16,6 +16,7 @@ interface NotificationsState {
   refreshUnreadCount: () => Promise<void>;
   applySnapshotUnreadCount: (count: number) => void;
   markAllRead: () => Promise<void>;
+  markRead: (id: string) => Promise<void>;
 }
 
 export const useNotificationsStore = create<NotificationsState>((set, get) => ({
@@ -69,6 +70,23 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       }));
     } catch {
       // sessizce yut
+    }
+  },
+
+  // Sprint M1d-0 DoD turu — tek bir bildirimi okundu işaretler (dokunulan satır). Rozet sayısını
+  // istemci KENDİ eksiltmez: M1b R1'de konan kural gereği `refreshUnreadCount()` ile sunucudan
+  // yeniden okunur (istemcinin saydığı ile sunucunun saydığı ayrışırsa rozet kalıcı olarak bayatlar).
+  async markRead(id) {
+    const target = get().items.find((n) => n.id === id);
+    if (!target || target.readAt) return;
+    try {
+      await notificationsApi.markRead(id);
+      set((s) => ({
+        items: s.items.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n)),
+      }));
+      await get().refreshUnreadCount();
+    } catch {
+      // sessizce yut — satır okunmamış kalır, bir sonraki odaklanmada markAllRead toparlar
     }
   },
 }));
