@@ -1228,3 +1228,57 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   geçerli: bu **"sahip satır satır kodu okudu" DEĞİLDİR**. Mutlu yolda görünmeyen ve PM incelemesine
   dayanan üç şey: (1) minör kapısının grup dalında da çalışması, (2) blok önceliğinin bozulmaması,
   (3) gruptan ayrılınca iznin düşmesi. Üçü de **birim testle** sabitlendi (6 yeni test), kanıt orada
+
+---
+
+## Sprint M1d — Mobil Ortam Bütünlüğü (Track F2, PM compose 2026-07-31)
+
+> Sözleşme: `contracts/SPRINT_M1D_MOBILE_GUILDS_CONTRACT.md` (**tek doğruluk kaynağı**).
+> **R7-nötr olmalı:** katılma kapıları Sprint 7A'da sunucuya yazıldı ve R7'den geçti, mobil yalnız
+> sonucu gösterir. `api/`'ye dokunma ihtiyacı → **DUR** (bu sefer istisna beklenmiyor).
+> Dev checkbox işaretler, **item EKLEMEZ**. DoD **fiziksel cihazda** kapanır.
+>
+> **Varlık sebebi:** mobilde ortama katılmanın **hiçbir yolu yok** — kullanıcı üyesi olduğu ortamları
+> görüyor ama yenisine giremiyor, yeni ortam da kuramıyor.
+>
+> **Kilitli sıra (sahip kararı):** davetle katılma → ortam kurma → davet paylaşma → kategoriler.
+> Sprint **iki yarıya bölündü**; DoD-A kapanmadan DoD-B'ye geçilmez.
+
+### A yarısı — ortama girebilmek
+- [ ] `guildsApi` genişletmesi: `join` · `create` · `createInvite` · `listInvites` · `revokeInvite` ·
+  `previewInvite` (yeni uç **yazılmaz**, mevcut uçlar bağlanır)
+- [ ] **Ortama Katıl ekranı:** kod girişi (**tam link yapıştırılırsa koda indirgenir**) + önizleme
+  (`GET /invites/:code` → **yalnız `guildName`/`adultsOnly`/`valid` döner**, ikon/üye sayısı YOK)
+- [ ] `ALREADY_MEMBER` (409) **hata gibi gösterilmez** → kullanıcı o ortama götürülür
+- [ ] **Ortam Kur ekranı:** ad → `POST /guilds` → içine düş
+- [ ] 🔴 `403 EMAIL_NOT_VERIFIED` → sunucu mesajı + M1c'de yazılan doğrulama bandına çıkış
+  *(M1c'den sarkan DoD maddesi burada kapanır)*
+- [ ] **Davet üret & paylaş** (OWNER/ADMIN): kopyala + paylaş; link formatı **web ile birebir**
+  (`<web-origin>/invite/<code>`), yeni format uydurulmaz; `maxUses`/`expiresInHours` sorulmaz
+- [ ] **Rail "+" → iki seçenek** (Katıl / Kur), web `ServerModal` `choose` adımının karşılığı
+- [ ] Katılma/kurma sonrası ray tazelenir — **yeni guild store AÇILMAZ** (mevcut `fetchGuilds`
+  yeniden çalışır; birden fazla ekran tazelemek zorunda kalırsa **DUR, PM'e sor**)
+
+### B yarısı — ortamı düzenlemek
+- [ ] Kanallar **kategori başlığı altında gruplu**; kategorisiz kanallar en üstte başlıksız akar
+- [ ] **Collapse** + tercih kalıcı; anahtar şeması web ile aynı (`kv:cat-collapsed:<guildId>:<categoryId>`)
+- [ ] Kategori oluştur/adlandır/sil — **yalnız OWNER/ADMIN'e render edilir** (disabled değil);
+  silme `ConfirmDialog` ile
+- [ ] **Sürükle-sırala YOK** (`reorder` uçları bağlanmaz)
+- [ ] `ChannelSidebar` 300 satır eşiğini aşmasın → **kategori başlığı ayrı bileşene çıkar** (D29 sınıfı)
+- [ ] `GUILD_INVITE` bildirimi **tıklanabilir** → ilgili ortama gider; üye değilse **tıklanamaz kalır**
+  (davet kabul ekranı yok, hedef uydurulmaz)
+
+### DoD (sözleşme §1 — **fiziksel cihazda**)
+- [ ] Davet kodu/linki ile katılıyorum, ortam ray'da anında beliriyor
+- [ ] Geçersiz/süresi dolmuş kodda sebebi anlıyorum (sunucunun mesajı)
+- [ ] Zaten üye olduğum kodda ortama götürülüyorum, hata ekranında bırakılmıyorum
+- [ ] Yeni ortam kurabiliyorum, kurunca içine düşüyorum
+- [ ] 🔴 Doğrulanmamış e-posta ortam kuramıyor **ve sebebini görüyor**
+- [ ] Kendi ortamıma davet üretip paylaşabiliyorum
+- [ ] Kanallar kategorili görünüyor, kategorisizler kaybolmuyor
+- [ ] Kategori aç/kapa çalışıyor, tercih yeniden açılışta korunuyor
+- [ ] Yetkisizde kategori aksiyonları **hiç render edilmiyor**
+- [ ] `GUILD_INVITE` bildirimi hedefli
+- [ ] Metin `tr.json`'dan, token'dan; gömülü string yok
+- [ ] `typecheck` + `lint` temiz; **`api/`'ye dokunulmadı**
