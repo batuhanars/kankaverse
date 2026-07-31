@@ -1245,19 +1245,41 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > Sprint **iki yarıya bölündü**; DoD-A kapanmadan DoD-B'ye geçilmez.
 
 ### A yarısı — ortama girebilmek
-- [ ] `guildsApi` genişletmesi: `join` · `create` · `createInvite` · `listInvites` · `revokeInvite` ·
-  `previewInvite` (yeni uç **yazılmaz**, mevcut uçlar bağlanır)
-- [ ] **Ortama Katıl ekranı:** kod girişi (**tam link yapıştırılırsa koda indirgenir**) + önizleme
-  (`GET /invites/:code` → **yalnız `guildName`/`adultsOnly`/`valid` döner**, ikon/üye sayısı YOK)
-- [ ] `ALREADY_MEMBER` (409) **hata gibi gösterilmez** → kullanıcı o ortama götürülür
-- [ ] **Ortam Kur ekranı:** ad → `POST /guilds` → içine düş
-- [ ] 🔴 `403 EMAIL_NOT_VERIFIED` → sunucu mesajı + M1c'de yazılan doğrulama bandına çıkış
-  *(M1c'den sarkan DoD maddesi burada kapanır)*
-- [ ] **Davet üret & paylaş** (OWNER/ADMIN): kopyala + paylaş; link formatı **web ile birebir**
-  (`<web-origin>/invite/<code>`), yeni format uydurulmaz; `maxUses`/`expiresInHours` sorulmaz
-- [ ] **Rail "+" → iki seçenek** (Katıl / Kur), web `ServerModal` `choose` adımının karşılığı
-- [ ] Katılma/kurma sonrası ray tazelenir — **yeni guild store AÇILMAZ** (mevcut `fetchGuilds`
-  yeniden çalışır; birden fazla ekran tazelemek zorunda kalırsa **DUR, PM'e sor**)
+- [x] `guildsApi` genişletmesi: `create` · `previewInvite` · `joinByInvite` · `createInvite` · `listInvites` ·
+  `getMembers` (yeni uç **yazılmadı**, mevcut uçlar bağlandı). *`revokeInvite` bağlanmadı — davet
+  iptal ekranı kapsam dışı (§7), kullanılmayan uç bağlamak ölü kod olurdu.*
+- [x] **Ortama Katıl ekranı:** kod girişi (**tam link yapıştırılırsa koda indirgenir**) + önizleme
+  (`GET /invites/:code` → **yalnız `guildName`/`adultsOnly`/`valid` döner**, ikon/üye sayısı YOK).
+  Giriş büyük harfe zorlanır (`autoCapitalize="characters"`)
+- [x] `ALREADY_MEMBER` (409) **hata gibi gösterilmez** → kullanıcı ana ekrana döner, liste tazelenir.
+  Tek kod-bazlı dallanma bu; `extractErrorCode` eklendi ve "metin uydurma kapısı değildir" notuyla sınırlandı
+- [x] **Ortam Kur ekranı:** ad → `POST /guilds` → içine düş (ad 2-64, DTO sabitinin aynası)
+- [x] 🔴 `403 EMAIL_NOT_VERIFIED` → sunucu mesajı + **M1c'nin `EmailVerificationBanner` bileşeni**
+  (yeni akış/anahtar yazılmadı) *(M1c'den sarkan DoD maddesi burada kapandı)*
+- [x] **Davet üret & paylaş** (OWNER/ADMIN): kopyala + paylaş; link formatı **web ile birebir**
+  (`<web-origin>/invite/<code>`); `maxUses`/`expiresInHours` sorulmadı
+- [x] **Rail "+" → iki seçenek** (Katıl / Kur), web `ServerModal` `choose` adımının karşılığı
+- [x] Katılma/kurma sonrası ray tazelenir — **yeni guild store AÇILMADI** (route parametresiyle
+  `fetchGuilds` yeniden çalışır, parametre işlenince temizlenir)
+
+### A yarısı — DoD turu bulguları (sahip cihaz + web yürüyüşü 2026-07-31)
+
+- [x] 🔴 **Davet ekranı her açılışta YENİ kod üretiyordu** (sahip bulgusu). İki sonucu vardı:
+  kullanıcı paylaştığı kodun değiştiğini görüyor, ve her açılış veritabanına bir davet satırı daha
+  yazıyordu (sessiz çöp). Düzeltme: önce `listInvites`, aktif davet varsa onu göster, yoksa üret;
+  kod yalnız kullanıcı bilinçli "Davet Oluştur" derse değişir. **Aynı kusur web'de de vardı**
+  (`InvitePeopleModal` mount'ta `create` çağırıyordu) → web'de de düzeltildi
+- [x] 🔴 **Web: davet kodu küçük harfle çalışmıyordu** (sahip bulgusu, sahip shift'e basarak farkında
+  olmadan atlıyordu). Kozmetik DEĞİL: kodlar büyük harf base32 üretiliyor (`short-code.util.ts`,
+  I/O/0/1 yok) ve arama `findUnique({ where: { code } })` yani **harf duyarlı** → küçük harfli kod
+  "davet geçersiz" veriyordu. Düzeltme iki katman: `uppercase` sınıfı (yalnız görünüm) **+ gönderim
+  öncesi `.toUpperCase()`** — CSS tek başına konsaydı hata gizlenirdi, kod ekranda büyük görünüp
+  küçük gönderilirdi. Katılma çağrısına **ve önizleme sorgusuna** ayrı ayrı uygulandı (yoksa
+  önizleme "geçersiz" derken Katıl çalışır, iki yüzey birbirini yalanlar). Desen `FriendAddModal`
+  ile aynı
+- [ ] **Açık kalem:** davet listeleme `MANAGE_GUILD`, üretme `CREATE_INVITE` istiyor → **listeleyemeyen
+  ama üretebilen** kullanıcıda eski davranış (her açılışta yeni kod) sürüyor. Backend'e dokunmadan
+  çözülmüyor, bilinçle bırakıldı
 
 ### B yarısı — ortamı düzenlemek
 - [ ] Kanallar **kategori başlığı altında gruplu**; kategorisiz kanallar en üstte başlıksız akar
@@ -1270,12 +1292,15 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   (davet kabul ekranı yok, hedef uydurulmaz)
 
 ### DoD (sözleşme §1 — **fiziksel cihazda**)
-- [ ] Davet kodu/linki ile katılıyorum, ortam ray'da anında beliriyor
-- [ ] Geçersiz/süresi dolmuş kodda sebebi anlıyorum (sunucunun mesajı)
-- [ ] Zaten üye olduğum kodda ortama götürülüyorum, hata ekranında bırakılmıyorum
-- [ ] Yeni ortam kurabiliyorum, kurunca içine düşüyorum
-- [ ] 🔴 Doğrulanmamış e-posta ortam kuramıyor **ve sebebini görüyor**
-- [ ] Kendi ortamıma davet üretip paylaşabiliyorum
+- [x] Davet kodu/linki ile katılıyorum, ortam ray'da anında beliriyor *(düz kod + tam link ikisi de)*
+- [x] Geçersiz/süresi dolmuş kodda sebebi anlıyorum (sunucunun mesajı)
+- [x] Zaten üye olduğum kodda ortama götürülüyorum, hata ekranında bırakılmıyorum
+- [x] Yeni ortam kurabiliyorum, kurunca içine düşüyorum
+- [~] 🔴 Doğrulanmamış e-posta ortam kuramıyor **ve sebebini görüyor** — *kod tamam + bant mevcut
+  bileşenden geliyor; sahip doğrulanmamış hesapla DENEMEDİ (test hesabı doğrulanmış). M1c'deki
+  aynı sınıf açık kalemle birlikte kapatılacak.*
+- [x] Kendi ortamıma davet üretip paylaşabiliyorum *(sahip cihazda: kod üretimi + paylaşım + ikinci
+  hesapla katılma uçtan uca)*
 - [ ] Kanallar kategorili görünüyor, kategorisizler kaybolmuyor
 - [ ] Kategori aç/kapa çalışıyor, tercih yeniden açılışta korunuyor
 - [ ] Yetkisizde kategori aksiyonları **hiç render edilmiyor**
