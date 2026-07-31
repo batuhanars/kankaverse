@@ -149,3 +149,97 @@ mobil-özel bir şey gerekirse `mobile.*`. Renk/ölçü `src/theme`; **gölge yo
 
 Yerleşim kararı (üst seviye ekran yok, hesap merkezi), kapsam-dışı listesi ve "istekler satırı
 eklenmez" kuralı bu dosyadan **sapamaz**. Yeni bağımlılık = **PM onayı**. `api/`'ye dokunma → **DUR**.
+
+---
+
+## 9. Revizyon R1 — DoD turu bulguları (sahip cihaz yürüyüşü 2026-07-31)
+
+> DoD turu dört bulgu üretti. Üçü **var olan kusurları görünür yaptı** (sprint üretmedi), biri
+> **sahip kararıyla kapsam ekledi**. Sözleşme §8 "`api/`'ye dokunma" kuralı R1-d için **sahip
+> onayıyla askıya alındı**; gerekçe aşağıda.
+
+### R1-a — Engelleme yolu yoktu (DoD #2 bloke ediyordu)
+
+Bulgu: Kankalar satırında yalnız Mesaj Gönder + Kankalıktan Çıkar vardı. Engelleme mobilde yalnız
+`ProfileCardModal`'dan yapılabiliyor, o kart da yalnız DM başlığı + grup üye listesinden açılıyordu
+→ hiç DM'leşmediğin kankayı engellemenin yolu YOKTU. Yani §3.2 satır aksiyonları ile DoD #2 **kendi
+içinde çelişiyordu** (PM'in sözleşme yazarken kaçırdığı çelişki).
+
+**Karar (sahip, iki seçenek sunuldu):** satıra üçüncü "Engelle" düğmesi **eklenmedi**; ada/avatara
+dokunmak profil kartını açar. Gerekçe: engellemenin uygulamada zaten bir evi var, ikinci kapı açmak
+yerine ekran o eve bağlandı; jest uygulamanın geri kalanıyla aynı (DM başlığı, grup üye listesi).
+Bedeli kabul edildi: engelleme web'e göre bir dokunuş daha derinde.
+
+### R1-b — Bildirim okundu işaretlenmiyordu
+
+İki katmanlı kusur, **M1a'dan kalma** (M1d-0 `FRIEND_ACCEPT`'e hedef verince görünür oldu):
+
+1. Okundu işaretleme `useEffect(..., [])` ile **yalnız mount'ta bir kez** çalışıyordu. Expo Router'da
+   sekme ekranları oturum boyunca mount'lu kalır → o andan sonra gelen hiçbir bildirim okundu olmuyor,
+   uygulama yeniden açılana kadar rozet kırmızı kalıyordu.
+2. Satıra dokunmak yönlendiriyor ama o bildirimi okundu işaretlemiyordu. `POST /notifications/:id/read`
+   mobilde **hiç bağlı değildi** (M1a §3 tablosunda bilinçle yoktu); web C1'den beri kullanıyor.
+
+**Düzeltme (web paritesi):** işaretleme her **odaklanmada** çalışır (web'de panel her açılışında olan
+işin mobil karşılığı) + dokunulan bildirim tekil olarak işaretlenir. İkincisi, bildirim sekme ZATEN
+odaktayken geldiğinde tek sinyalin dokunuş olması yüzünden gerekli. Rozet sayısı **sunucudan** yeniden
+okunur (M1b R1 kuralı: istemci kendi eksiltmez).
+
+### R1-c — Engellenen kullanıcının DM'inde giriş kutusu açık kalıyordu
+
+**Dünkü düzeltmenin (153b6bb) yarım kalan yarısı.** DM bayraklarını (`canMessage`/`selfBlocked`)
+tazeleyen çağrı yalnız `friends.store.unblock`'a konmuştu, çünkü bildirilen kusur oydu. Tur, kalan üç
+yolun bayat bıraktığını gösterdi: profil kartı `blocksApi`/`friendsApi`'yi **doğrudan** çağırıyor,
+store'a hiç uğramıyordu — kartın kendi "engeli kaldır" düğmesi dahil.
+
+**Düzeltme dördüncü kopya değil, sahiplik toplama:** engelle / engeli kaldır / kankalıktan çıkar üçü de
+`useFriendsStore` üzerinden geçer, DM tazelemesi tek yerdedir (`refreshDmFlags`). Kankalıktan çıkarma da
+dahil edildi: karşı tarafın `dmPolicy` değeri FRIENDS ise arkadaşlık bitince `canMessage` yine değişir.
+
+> **T&S notu:** bu bir sızıntı değildi. Gönderim sunucuda **fail-closed** reddediliyordu; kusur
+> arayüzün yanlış durum göstermesiydi. Yine de kusur sayıldı: kullanıcıya yalan söyleyen arayüz,
+> engellemenin işe yaramadığı izlenimi verir.
+
+### R1-d — 🔴 Grup DM'de kankalık isteği (`api/` dokunuşu, R7, sahip kararı)
+
+Bulgu: grup DM'de kanka olmadığın üyenin kartında ekleme yolu yok. **Eksik olan düğme değil, arkasındaki
+kuraldı:** `canSendFriendRequest` USER_CLICK dalı **ortak ortam** şartı arıyor, grup DM ortak ortam
+sayılmıyordu; ondan önceki "mevcut 1-1 DM" basamağı da yalnız `type:'DM'`e bakıyor. Düğme tek başına
+konsaydı bu senaryoda **her seferinde** jenerik hatayla reddedilirdi → "boş yüzey açma" ihlali.
+
+**Sahip kararı:** getirilsin. Sahip gerekçesi "zaten onay süzgecinden geçiyor". PM bu gerekçeyi **yarım**
+buldu ve kayda geçirdi: 4A'daki ortak-ortam şartı kabul adımı için değil, isteğin **kendisinin bir temas
+olması** yüzündendi (brief §4 "ulaşımı zorlaştır"; istek karşı tarafa kullanıcı adını + avatarı gösterir).
+Karara yine de katılındı, çünkü asıl gerekçe başka ve daha güçlü:
+
+- **Grup DM'e minör hiçbir yoldan giremez** — kurulumda `GROUP_MINOR_FORBIDDEN`, üye eklemede jenerik
+  `NOT_FRIEND` (`dm.service.ts`). Grup üyeliği ⟹ yetişkin. **Ortak ortam bu güvenceyi vermiyor** (guild'de
+  minör olabilir), yani yeni kapı eskisinden **dar**.
+- Gruba giriş "katılma" ile değil **yalnız bir üyenin eklemesiyle** olur ve ekleyen, eklenenle arkadaş
+  olmak zorundadır → üçüncü kişinin iki tarafa da kefaleti var.
+
+**Uygulama (Kural 6a-2):** ortak alan = ortak ortam (karantina basamaklı) **VEYA** ortak grup DM.
+Korunanlar: minör kapısı (6b) grup dalında da **açık bırakıldı** (grup invaryantına güvenilmedi,
+defense-in-depth) · blok Kural 3'te **önce** reddedilir · gruptan ayrılmak izni **geri alır** (sorgu
+anlık üyeliğe bakar). **Karantina uygulanmadı:** guild karantinası "açık ortama katıl, anında cold-add"
+sürtünmesi içindir; grup DM'de katılma yolu yok, giriş zaten kankalıkla kapılı → drive-by vektörü
+oluşmuyor, ek basamak korumaya bir şey katmadan kullanıcıya bedel yükler.
+
+**Mobil:** kart `friendStatus === 'none'` iken Kanka Ekle taşır; gönderim sonrası yerini
+`friends.requestSent` metnine bırakır (sessizce kaybolmaz). `pending_in` için düğme YOK — kabul akışı
+istekler ekranında, ikinci bir kabul yüzeyi uydurulmadı. Ret **jenerik**. Kullanıcı adıyla arama YOK.
+
+**Kabul edilen fazlalık:** 1-1 DM'de artık iki ekleme kapısı var (2026-07-30'da sahip talebiyle eklenen
+başlık ikonu + kart). Sahip talebiyle gelen ikon tek taraflı kaldırılmadı; rahatsız ederse kaldırılır.
+
+### R1 doğrulama
+
+`api`: `nest build` temiz · **887 test / 26 suite yeşil** (6 yeni test: grup dalı allow, ortak alan yok,
+kesişimsiz grup, sender minör, target minör, blok önceliği). `mobile`: `typecheck` + `lint` temiz;
+yeni i18n anahtarı **gerekmedi**; dosyaların hiçbiri 300 satırı geçmiyor.
+
+**Klavye bulgusu — kusur DEĞİL:** tur sırasında giriş kutusu klavyenin arkasında kaldı, sahip "gene o
+sorun" dedi. Git geçmişi klavye düzeltmesinden (f617865) sonra yerleşimi bozan bir değişiklik olmadığını
+gösterdi → kör yama yapılmadı, ayırt edici sorular soruldu. **Uygulamanın tam kapatılıp açılmasıyla
+düzeldi:** Metro fast refresh sonrası `KeyboardAvoidingView`'ın konum ölçümü bayat kalıyor. Kalıcı kusur
+değil, geliştirme aracının artefaktı. Kayda geçirildi ki bir dahaki sefere aynı yol tekrar yürünmesin.

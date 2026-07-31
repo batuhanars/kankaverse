@@ -1178,11 +1178,53 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] Ayarlar ekranı — sahip kuralı: "Ayarlar sekmesi sadece ayarlara özel olur, hesap merkezinden erişiriz"
 - [ ] Presence noktası (altyapı yok — sahte "çevrimdışı" gösterilmez) · kanka arama · `GUILD_INVITE` hedefi (M1d)
 
-### DoD (sözleşme §7 — **fiziksel cihazda**)
-- [ ] "Sen"de iki satır görünüyor
-- [ ] 🔴 **Hiç DM'leşmediğim birini engelleyip engeli kaldırabiliyorum** *(sprintin varlık sebebi)*
-- [ ] Kankalar listesinden DM başlatma + kankalıktan çıkarma (onaylı)
-- [ ] `FRIEND_ACCEPT` bildirimi Kankalar'a götürüyor
-- [ ] Boş durumlar doğru
-- [ ] Metin `tr.json`'dan, token'dan; gömülü string yok
-- [ ] `typecheck` + `lint` temiz; `api/`'ye dokunulmadı
+### Revizyon R1 — DoD turu bulguları (sahip cihaz yürüyüşü 2026-07-31, sözleşme §9)
+
+> Tur dört bulgu üretti. **Üçü var olan kusuru görünür yaptı, sprint üretmedi** (aynı desen dünkü
+> 153b6bb'de de yaşandı). Biri sahip kararıyla kapsam ekledi. Gerekçelerin tamamı sözleşme §9'da.
+
+- [x] **R1-a — engelleme yolu açıldı:** Kankalar satırında ada/avatara dokunmak profil kartını açar.
+  Sözleşme §3.2 (satır aksiyonları) ile DoD #2 **kendi içinde çelişiyordu** — engelleme yalnız profil
+  kartından yapılabiliyor, o kart da hiç DM'leşmediğin kişi için erişilemiyordu. **Sahip kararı:**
+  satıra üçüncü düğme eklenmedi, ekran engellemenin mevcut evine bağlandı (ikinci kapı açılmadı)
+- [x] **R1-b — bildirim okundu işaretlenmiyordu** (M1a'dan kalma, `FRIEND_ACCEPT` hedef alınca görünür
+  oldu): işaretleme mount'ta bir kez çalışıyordu, sekmeler oturum boyunca mount'lu kaldığı için o andan
+  sonra gelen hiçbir bildirim okunmuyordu + dokunuş tekil işaretleme yapmıyordu (`:id/read` mobilde hiç
+  bağlı değildi). Web paritesi: **odaklanmada** + **dokunuşta**; sayı sunucudan okunur (M1b R1 kuralı)
+- [x] **R1-c — engellenenin DM'inde giriş kutusu açık kalıyordu:** dünkü düzeltmenin yarım kalan yarısı.
+  DM bayrak tazelemesi yalnız `unblock`'a konmuştu; profil kartı `blocksApi`'yi **doğrudan** çağırıp
+  store'u atlıyordu (kartın kendi "engeli kaldır"ı dahil). **Dördüncü kopya değil sahiplik toplandı:**
+  üç mutasyon da store'dan geçer, tazeleme tek yerde. *Sızıntı değildi — sunucu fail-closed reddediyordu,
+  kusur arayüzün yanlış durum göstermesiydi*
+- [x] 🔴 **R1-d — grup DM'de kankalık isteği** (`api/` dokunuşu, **R7**, sahip kararı): eksik olan düğme
+  değil kuraldı — `canSendFriendRequest` USER_CLICK dalı ortak ortam arıyordu, grup DM sayılmıyordu.
+  **Kural 6a-2:** ortak alan = ortak ortam VEYA ortak grup DM. Asıl gerekçe sahibin "onay süzgeci"
+  gerekçesi değil (PM onu yarım buldu, §9'da kayıtlı): **grup DM'e minör hiçbir yoldan giremez**, yani
+  yeni kapı ortak ortamdan **dar**. Minör kapısı grup dalında da açık bırakıldı (invaryanta güvenilmedi),
+  blok önce reddedilir, gruptan ayrılmak izni geri alır, karantina bilinçle uygulanmadı
+- [x] **R1 doğrulama:** `nest build` temiz · **887 test / 26 suite yeşil** (6 yeni) · mobil `typecheck` +
+  `lint` temiz · yeni i18n anahtarı gerekmedi · hiçbir dosya 300 satırı geçmiyor
+
+> **Klavye bulgusu kusur DEĞİLDİ:** giriş kutusu klavyenin arkasında kaldı, "gene o sorun" sanıldı.
+> Git geçmişi klavye düzeltmesinden sonra yerleşimi bozan değişiklik olmadığını gösterdi → kör yama
+> yapılmadı. **Uygulama tam kapatılıp açılınca düzeldi:** Metro fast refresh sonrası
+> `KeyboardAvoidingView` konum ölçümü bayatlıyor. Geliştirme aracının artefaktı, kod kusuru değil.
+
+### DoD (sözleşme §7 — **fiziksel cihazda**) — ✅ SAHİP CİHAZ YÜRÜYÜŞÜ 2026-07-31
+- [x] "Sen"de iki satır görünüyor
+- [x] 🔴 **Hiç DM'leşmediğim birini engelleyip engeli kaldırabiliyorum** *(sprintin varlık sebebi)* —
+  engel kaldırma onay soruyor; engellenenin DM'inde "Bu kullanıcıyı engellediniz" bandı çıkıyor, engel
+  kalkınca giriş kutusu geri geliyor (R1-c'nin testi)
+- [x] Kankalar listesinden DM başlatma + kankalıktan çıkarma (onaylı) — ikisi de doğrulandı
+- [x] `FRIEND_ACCEPT` bildirimi Kankalar'a götürüyor — **rozet de düşüyor** (R1-b doğrulandı)
+- [x] Boş durumlar doğru
+- [x] Metin `tr.json`'dan, token'dan; gömülü string yok *(PM bağımsız taradı: üç ekranda gömülü renk
+  yok, gömülü Türkçe string yok, kullanılan anahtarların hepsi mevcut)*
+- [x] `typecheck` + `lint` temiz — *PM koştu.* ⚠️ **`api/` dokunuldu:** madde "dokunulmadı" biçiminde
+  kapanamaz; R1-d **sahip kararıyla** sözleşme §8'in `api/` yasağını askıya aldı, dokunuş T&S karar
+  fonksiyonuna (`canSendFriendRequest`) yapıldı → **R7 kapsamında**
+- [x] 🔴 **R7 — grup DM tıkla-ekle:** sahip cihazda **davranış** doğrulaması yaptı (grup DM'de kanka
+  olmadığı üyeye istek gönderdi, karşı taraf kabul etti, kanka olundu). M1c'de kurulan ayrım burada da
+  geçerli: bu **"sahip satır satır kodu okudu" DEĞİLDİR**. Mutlu yolda görünmeyen ve PM incelemesine
+  dayanan üç şey: (1) minör kapısının grup dalında da çalışması, (2) blok önceliğinin bozulmaması,
+  (3) gruptan ayrılınca iznin düşmesi. Üçü de **birim testle** sabitlendi (6 yeni test), kanıt orada
