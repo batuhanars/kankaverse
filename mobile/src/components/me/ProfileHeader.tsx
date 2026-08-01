@@ -47,7 +47,14 @@ export function ProfileHeader({ username, avatarUrl, card }: Props) {
         {avatarUrl ? (
           <Image source={{ uri: avatarUrl }} style={styles.avatar} />
         ) : (
+          // 🔴 Yedek avatar İKİ KATMAN (sahip bulgusu 2026-08-01): `accentSubtle` bir token ama
+          // YARI SAYDAM (`rgba(255,107,61,0.12)`). Tek katman kullanılınca arkasındaki afiş
+          // avatarın içinden görünüyordu — üst yarıda afiş, alt yarıda sayfa zemini.
+          // Uygulamanın başka yerlerinde fark edilmiyor çünkü orada arka plan zaten düz koyu.
+          // Çözüm rengi elle karıştırmak DEĞİL (uydurma renk token dışıdır): altta opak zemin,
+          // üstünde aynı saydam vurgu → başka yerlerdeki görünümün aynısı, ama afişi geçirmiyor.
           <View style={[styles.avatar, styles.avatarFallback]}>
+            <View style={styles.avatarTint} />
             <Text style={styles.avatarFallbackText}>{username.charAt(0).toUpperCase()}</Text>
           </View>
         )}
@@ -103,9 +110,15 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.bgContent,
   },
   avatarFallback: {
-    backgroundColor: theme.colors.accentSubtle,
+    // Opak taban — arkasındaki afişi geçirmesin.
+    backgroundColor: theme.colors.bgElevated,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.colors.accentSubtle,
   },
   avatarFallbackText: {
     color: theme.colors.accent500,
