@@ -1477,11 +1477,19 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   *Not: `MessageScreen` bu sprintte üç kez bölündü; tur regresyon göstermedi.*
 
 ### B yarısı — hesap merkezi + profil
-- [ ] **"Sen" sekmesi profil görünümü:** afiş · avatar · ad · biyografi · üyelik tarihi (TR formatı).
-  Veri **`GET /users/:id/card` kendi id'mle** — yeni uç yazılmaz. **Konmaz:** durum ekle · sunucu
-  profilleri · rozetler
-- [ ] **Kankalar satırı:** avatar dizisi + sağ ok → Kankalar ekranı
-- [ ] **Sağ üstte dişli → Ayarlar** (mevcut hesap ekranları gruplu listeye toplanır, yeni ekran yok)
+- [x] **"Sen" sekmesi profil görünümü:** afiş · avatar · ad · biyografi · üyelik tarihi (TR formatı).
+  Veri **`GET /users/:id/card` kendi id'mle** — yeni uç yazılmadı. Durum ekle · sunucu profilleri ·
+  rozetler **konmadı**. Engellenenler satırı **korundu** (sahip talimatı)
+- [x] **Kankalar satırı:** en fazla 5 avatar + "+N" + sağ ok → Kankalar ekranı. Liste store'dan,
+  ayrı çekim yok (`(app)/_layout` oturum açılışında çekiyor, soket anlık güncelliyor)
+- [~] 🔴 **Sağ üstte dişli → Ayarlar — BİLİNÇLE KONMADI (PM önerisi, sahip onayladı 2026-08-01).**
+  Rotalar sayıldı: mobilde gruplanacak hesap ekranı **yok**. Kankalar + Engellenenler zaten profil
+  ekranında, Mesaj İstekleri DM listesinde. Web'deki Ayarlar'ın asıl içeriği güvenlik (2FA ·
+  oturumlarım · şifre değiştir · e-posta değiştir · hesap silme) ve **bunların hiçbiri mobilde yok**.
+  Dişli koyup içine aynı iki satırı dizmek kendi "boş yüzey açma" kuralımızı çiğnerdi.
+  → **Tetikleyici:** mobil güvenlik ekranları sprinti. O gelince dişli anlamlı olur.
+  ⚠️ **Kayda geçen eksik:** 2FA'lı hesapla mobilden GİRİLEBİLİYOR ama 2FA mobilden **kurulamıyor**,
+  oturumlar görülemiyor, şifre/e-posta değiştirilemiyor, hesap silinemiyor
 - [ ] 🔴 **Profili Düzenle: biyografi + avatar/afiş YÜKLEME — sahip istisnası (2026-08-01).**
   M1d §10.3 kuralı **daraltıldı, silinmedi**: ortam ikonu/afişi mobilde hâlâ yalnız gösterilir;
   istisna **yalnız kullanıcının kendi profili**. Akış `presign` → PUT → `PATCH storageKey`;
