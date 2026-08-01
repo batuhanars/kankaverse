@@ -95,9 +95,18 @@ export const guildsApi = {
  * Kullanıcı davet **linkini** yapıştırdıysa kodu ayıkla (sözleşme §2.2).
  * Paylaşılan şey link olduğu için kullanıcıdan link ayrıştırması beklemek gereksiz sürtünme.
  * Link değilse girdi olduğu gibi (kırpılmış) döner.
+ *
+ * 🔴 **Büyük harfe çevirme kozmetik DEĞİL** (web'de aynı kusur 97d7c44 ile düzeltildi): kodlar büyük
+ * harf base32 üretiliyor (`short-code.util.ts`) ve sunucu `findUnique({ where: { code } })` ile
+ * **harf duyarlı** arıyor → küçük harfli kod "davet geçersiz" verir. Ekrandaki
+ * `autoCapitalize="characters"` yalnız YAZARKEN çalışır, **yapıştırılan** metni dönüştürmez —
+ * paylaşılan şey link olduğu için asıl yol yapıştırmadır. Dönüşüm burada, tek çıkış noktasında:
+ * önizleme ve katılma aynı kodu kullanmalı, yoksa iki yüzey birbirini yalanlar (önizleme
+ * "geçersiz" derken Katıl çalışır). `toLocaleUpperCase` DEĞİL — TR yerelinde 'i' → 'İ' olur,
+ * base32 alfabesinde öyle bir harf yok.
  */
 export function extractInviteCode(input: string): string {
   const trimmed = input.trim();
   const match = trimmed.match(/\/invite\/([^/?#\s]+)/i);
-  return match ? match[1] : trimmed;
+  return (match ? match[1] : trimmed).toUpperCase();
 }

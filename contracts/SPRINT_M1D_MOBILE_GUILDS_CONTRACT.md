@@ -120,9 +120,28 @@
   disabled düğme gösterilmez (M1b grup yönetimi deseni).
 - **Sürükle-sırala YOK** (`reorder` ucu bağlanmaz) → §7.
 
-### 2.6 `GUILD_INVITE` bildirimi hedefi
-Bildirim `guildId` + `guildName` taşıyor. Dokununca **o ortama git**. Ortama üye değilse (davet
-kabul edilmemişse) bildirim **tıklanamaz kalır** — davet kabul ekranı yok, hedef uydurulmaz.
+### 2.6 `GUILD_INVITE` bildirimi hedefi — **REVİZE (PM, 2026-08-01)**
+
+> **Özgün metin yanlıştı, kayda geçiyorum:** *"Bildirim `guildId` + `guildName` taşıyor. Dokununca o
+> ortama git. Ortama üye değilse bildirim tıklanamaz kalır."*
+>
+> **Neden yanlış:** bu bildirim davet **kodunu** `preview` alanında taşıyor
+> (`api/src/modules/notifications/dto/notification.dto.ts`: *"GUILD_INVITE: davet KODU (frontend
+> `/invite/${preview}` kurar)"*). Alıcı da tanımı gereği **çoğunlukla üye değildir** — davet
+> edilmiştir. Yani "üye değilsen tıklanamaz" kuralı bildirimi **tam da işe yarayacağı durumda ölü
+> bırakırdı**, M1b'den beri süren hedefsizlik aynen sürerdi. Hata sınıfı, sözleşmenin §0'da kendi
+> uyardığı sınıf: **DTO hatırdan yazıldı, kaynaktan okunmadı.**
+
+Dokununca **M1d-A'da yazılan Ortama Katıl ekranı** açılır, davet kodu (`preview`) **hazır geçilir**
+ve önizleme kendiliğinden çözülür. Web ile parite: `NotificationBell.vue` aynı alanı okuyup
+`/invite/<kod>` görünümüne gidiyor.
+
+- **Yeni ekran açılmaz** — mevcut katılma ekranı kullanılır.
+- Katılma kapıları yine **sunucuda** (§4): yaş/ban/zaten-üye kararı istemcide taklit edilmez.
+  `ALREADY_MEMBER` §2.2'de zaten ele alınmış durumda, o yol bu girişte de geçerli.
+- `preview` boşsa (eski kayıt) satır **tıklanamaz kalır** — hedef uydurulmaz.
+- Bildirim ekranı ortam listesi **çekmez**: üyelik bilmesi gerekmediği için §6'daki "ikinci ekran
+  listeye muhtaç olursa DUR" eşiği tetiklenmedi.
 
 ---
 

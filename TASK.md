@@ -1286,33 +1286,45 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > Sahip Discord mobil sunucu yönetimini ekran ekran inceleyip aktardı → **dört karar kapsamı büyüttü.**
 > Ölçü kuralı değişmedi: Discord'da olup bizde olmayan özellik EKLENMEZ; web'de olan mobile gelir.
 
-- [ ] **Kategori render:** kanallar kategori başlığı altında gruplu; **kategorisiz kanallar en üstte
+> **Kod tarafı commit edildi: `a1d0ad5`** (20 dosya, typecheck + lint temiz). Aşağıdaki kutular
+> **uygulama** kutularıdır; **cihaz DoD turu ayrı** (bkz. §DoD, hâlâ açık).
+
+- [x] **Kategori render:** kanallar kategori başlığı altında gruplu; **kategorisiz kanallar en üstte
   başlıksız** akar (web `ChannelPanel` okuması)
-- [ ] **Collapse** + tercih kalıcı; anahtar şeması web ile aynı (`kv:cat-collapsed:<guildId>:<categoryId>`)
-- [ ] **Ortam adı → alt panel** (§10.2): Davet Et · Kanal Oluştur · Kategori Oluştur. A yarısındaki
-  tekil davet ikonu **kalkar** (bilinçli: doğrulanmış bir öğe değişiyor). Panelde **yalnız sahip
-  olduğumuz** aksiyonlar; Takviye/Topluluk/Entegrasyon/Emoji/İstila-Bildir/Sunucu-ID **konmaz**
-- [ ] **Kanal CRUD M1d-B'ye çekildi** (§10.1, önce M1e'deydi): oluştur · adlandır · sil.
+- [x] **Collapse** + tercih kalıcı; anahtar şeması web ile aynı (`kv:cat-collapsed:<guildId>:<categoryId>`)
+- [x] **Ortam adı → alt panel** (§10.2): Davet Et · Kanal Oluştur · Kategori Oluştur. A yarısındaki
+  tekil davet ikonu **kalktı** (bilinçli: doğrulanmış bir öğe değişti). Panelde **yalnız sahip
+  olduğumuz** aksiyonlar; Takviye/Topluluk/Entegrasyon/Emoji/İstila-Bildir/Sunucu-ID **konmadı**
+- [x] **Kanal CRUD M1d-B'ye çekildi** (§10.1, önce M1e'deydi): oluştur · adlandır · sil.
   Gerekçe: kategori ile kanal aynı yüzeyin iki yarısı; ayrılsa "kategori açabilen ama içine kanal
   koyamayan" kullanıcı çıkardı
-- [ ] 🔴 **Tuzak 1 — kanal adı deseni:** `@Matches(/^[a-z0-9çğıöşü-]+$/)` + 2-50. Mobil girdiyi
-  **yazarken normalize eder** (küçük harf · boşluk→tire · geçersizi düş). *Web'de bu normalize YOK,
-  sunucu reddediyor — davet-kodu-büyük-harf vakasıyla aynı sınıf, web'e geri taşıma ayrı karar*
-- [ ] 🔴 **Tuzak 2 — ses kanalı oluşturma YOK:** uç destekliyor ama mobil ses kanallarını listelemiyor
+- [x] 🔴 **Tuzak 1 — kanal adı deseni:** `@Matches(/^[a-z0-9çğıöşü-]+$/)` + 2-50. Mobil girdiyi
+  **yazarken normalize ediyor** (`normalizeChannelName`). *Web'de bu normalize YOK, sunucu
+  reddediyor — davet-kodu-büyük-harf vakasıyla aynı sınıf, web'e geri taşıma ayrı karar*
+- [x] 🔴 **Tuzak 2 — ses kanalı oluşturma YOK:** uç destekliyor ama mobil ses kanallarını listelemiyor
   (M1a `GUILD_TEXT` süzgeci) → oluşturulsa kullanıcı kendi yarattığını göremezdi. Tür seçici
-  **sorulmaz** (Discord'un Metin/Ses seçicisi kopyalanmaz); M4 ses fazına ertelendi
-- [ ] Kanal oluştururken **sorulan:** `isPrivate` + `ageGated` (ikisi de erişim kararı; `ageGated`
+  **sorulmuyor** (Discord'un Metin/Ses seçicisi kopyalanmadı); M4 ses fazına ertelendi
+- [x] Kanal oluştururken **sorulan:** `isPrivate` + `ageGated` (ikisi de erişim kararı; `ageGated`
   T&S kapısı). **Sorulmayan:** `slowModeSeconds` · `userLimit` · `bitrate` · `mediaEnabled`
-- [ ] **Son kanal silinemez** → `409 LAST_CHANNEL`; kullanıcı sebebi görür
-- [ ] **Ortam afişi GÖSTERİLİR** (§10.3) — `GuildDto.bannerUrl` C8'den beri var.
+- [x] **Son kanal silinemez** → `409 LAST_CHANNEL`; sunucunun mesajı `extractErrorMessage` ile gösterilir
+- [x] **Ortam afişi GÖSTERİLİR** (§10.3) — `GuildDto.bannerUrl` C8'den beri var.
   🔴 **Kalıcı kural: görsel yükleme yüzeyleri web/masaüstüne mahsus, mobil yalnız gösterir**
   (avatar · profil afişi · ortam ikonu · ortam afişi hepsi için geçerli)
-- [ ] Yetkisizde kategori/kanal aksiyonları **hiç render edilmez** (disabled değil)
-- [ ] **Sürükle-sırala YOK** (`reorder` uçları bağlanmaz)
-- [ ] `ChannelSidebar` 300 satır eşiğini aşmasın → kategori başlığı ayrı bileşene çıkar (D29 sınıfı)
-- [ ] `GUILD_INVITE` bildirimi **tıklanabilir** → ilgili ortama gider; üye değilse **tıklanamaz kalır**
+- [x] Yetkisizde kategori/kanal aksiyonları **hiç render edilmiyor** (disabled değil) — `canManage`
+- [x] **Sürükle-sırala YOK** (`reorder` uçları bağlanmadı)
+- [x] `ChannelSidebar` 300 satır eşiğinin altında (270) — kategori başlığı `CategorySection`/`ChannelRow`'a çıktı
+- [x] 🔴 `GUILD_INVITE` bildirimi **tıklanabilir** → Ortama Katıl ekranı, **davet kodu hazır geçiliyor**.
+  **Sözleşme §2.6 REVİZE EDİLDİ (PM 2026-08-01):** özgün metin "guildId'ye git, üye değilse tıklanamaz
+  kalsın" diyordu ve **yanlıştı** — bildirim davet **kodunu** `preview` alanında taşıyor ve alıcı
+  tanımı gereği çoğunlukla üye DEĞİL, davet edilmiş. O kural bildirimi tam da işe yarayacağı yerde ölü
+  bırakırdı. Hedef artık web ile birebir (`NotificationBell.vue` → `/invite/<kod>`). Yeni ekran
+  açılmadı. *Hata sınıfı sözleşmenin §0'da kendi uyardığı sınıf: DTO hatırdan yazıldı*
+- [x] 🔴 **Yan bulgu — mobilde de davet kodu küçük harfle çalışmıyordu:** dün web'de düzeltilen kusurun
+  (`97d7c44`) aynısı mobilde duruyordu. `autoCapitalize="characters"` yalnız **yazarken** çalışır,
+  **yapıştırılan** kod/link olduğu gibi gider — paylaşılan şey link olduğu için asıl yol yapıştırmadır.
+  Düzeltme `extractInviteCode` içinde, tek çıkış noktasında (önizleme + katılma aynı kodu görsün diye)
 
-### B yarısı — sahip revizeleri (2026-07-31 akşamı, cihaz turu sonrası) — **COMMIT EDİLMEDİ**
+### B yarısı — sahip revizeleri (2026-07-31 akşamı, cihaz turu sonrası) — **commit `a1d0ad5`**
 
 - [x] **Ortam paneli yeniden yazıldı** — ilk sürüm üç satırlık dar kutuydu, sahip "çok küçük" dedi.
   Discord düzeni alındı (büyük ikon + iri ad + yuvarlak aksiyon şeridi + gruplu bloklar), **içerik
