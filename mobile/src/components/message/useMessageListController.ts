@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlatList, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useMessagesStore } from '@/stores/messages';
 import type { MessageDto } from '@/api/messages';
@@ -24,14 +24,29 @@ const MAX_JUMP_FETCH_ATTEMPTS = 20;
 
 const HIGHLIGHT_MS = 2500;
 
-export function useMessageListController(
-  channelId: string,
-  items: RenderItem[],
-  inverted: RenderItem[],
-  myUserId: string | undefined,
-) {
+/**
+ * Ardışık mesajları grupla: aynı yazarın 5 dakika içindeki mesajlarında başlık (avatar + ad + saat)
+ * tekrar edilmez. Liste verisinin kendisi olduğu için bu dosyada — ekran yalnız render eder.
+ */
+function buildRenderItems(messages: MessageDto[]): RenderItem[] {
+  const FIVE_MIN = 5 * 60 * 1000;
+  return messages.map((message, idx) => {
+    const prev = messages[idx - 1];
+    const showAuthor =
+      !prev ||
+      prev.author.id !== message.author.id ||
+      new Date(message.createdAt).getTime() - new Date(prev.createdAt).getTime() > FIVE_MIN;
+    return { message, showAuthor };
+  });
+}
+
+export function useMessageListController(channelId: string, myUserId: string | undefined) {
   const channelState = useMessagesStore((s) => s.byChannel[channelId]);
   const fetchOlder = useMessagesStore((s) => s.fetchOlder);
+
+  // Liste eskiden yeniye saklanır; FlatList `inverted` olduğu için render sırası terstir.
+  const items = useMemo(() => buildRenderItems(channelState?.messages ?? []), [channelState?.messages]);
+  const inverted = useMemo(() => [...items].reverse(), [items]);
 
   const listRef = useRef<FlatList<RenderItem>>(null);
   const atBottomRef = useRef(true);
@@ -128,6 +143,8 @@ export function useMessageListController(
   }
 
   return {
+    items,
+    inverted,
     listRef,
     newMessageCount,
     jumpToBottom,

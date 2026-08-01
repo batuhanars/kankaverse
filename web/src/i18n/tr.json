@@ -905,6 +905,7 @@
     "realtimeError": "Gerçek zamanlı bağlantı kurulamadı — yeni mesajlar anlık görünmeyebilir.",
     "actions": "Mesaj aksiyonları",
     "edit": "Düzenle",
+    "copyText": "Metni Kopyala",
     "delete": "Sil",
     "edited": "(düzenlendi)",
     "deleteConfirm": "Bu mesajı silmek istediğinden emin misin? Bu işlem geri alınamaz.",

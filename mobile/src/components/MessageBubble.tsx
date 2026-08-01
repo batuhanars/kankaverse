@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AttachmentView } from './AttachmentView';
 import { formatMentionsPlain } from '@/utils/mentions';
 import type { MessageDto } from '@/api/messages';
@@ -21,17 +21,34 @@ interface Props {
   /** Sözleşme §3.5 — mesaj aramasından "gidiyor" (jump) sonrası geçici vurgu. Birkaç saniye sonra
    *  otomatik söner (bkz. MessageScreen `highlightId` zamanlayıcısı). */
   highlighted?: boolean;
+  /** M1d-C §2.4 — uzun basış mesaj panelini açar (web'deki hover şeridinin dokunmatik karşılığı). */
+  onLongPress?: () => void;
+  /** Tepki pill'ine dokunuş: kendi tepkimi kaldırır, başkasınınkine katılır (web ile aynı). */
+  onToggleReaction?: (emoji: string) => void;
 }
 
 // Sprint M1a — web/src/components/shared/MessageItem.vue'nin bu sprintteki alt kümesi: okuma +
 // mention gösterimi (contract §4.4) + ek gösterimi (§5.5). Düzenleme/silme/reaksiyon/pin UI'ı YOK
 // (kapsam dışı) — ama `message.updated`/`message.deleted` WS'ten gelirse içerik/liste güncellenir
 // (stores/messages.ts), bu bileşen yalnız güncel veriyi render eder.
-export function MessageBubble({ message, showAuthor, isMine, resolveMention, highlighted }: Props) {
+export function MessageBubble({
+  message,
+  showAuthor,
+  isMine,
+  resolveMention,
+  highlighted,
+  onLongPress,
+  onToggleReaction,
+}: Props) {
   const displayContent = formatMentionsPlain(message.content, resolveMention, t('mention.unknown'));
+  const reactions = message.reactions ?? [];
 
   return (
-    <View style={[styles.row, showAuthor && styles.rowSpaced, highlighted && styles.rowHighlighted]}>
+    <Pressable
+      onLongPress={onLongPress}
+      delayLongPress={350}
+      style={[styles.row, showAuthor && styles.rowSpaced, highlighted && styles.rowHighlighted]}
+    >
       {showAuthor && (
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{message.author.username.charAt(0).toUpperCase()}</Text>
@@ -53,12 +70,63 @@ export function MessageBubble({ message, showAuthor, isMine, resolveMention, hig
         {message.attachments?.map((a) => (
           <AttachmentView key={a.id} attachment={a} />
         ))}
+
+        {/* Tepki pill'leri — sunucu emoji bazında TOPLAYARAK dönüyor (kim verdi listesi yok), o
+            yüzden burada da yalnız emoji + sayı gösterilir. Kendi tepkim Kor kenarlıkla ayrışır. */}
+        {reactions.length > 0 && (
+          <View style={styles.reactionRow}>
+            {reactions.map((r) => (
+              <Pressable
+                key={r.emoji}
+                onPress={() => onToggleReaction?.(r.emoji)}
+                style={[styles.reactionPill, r.reactedByMe && styles.reactionPillMine]}
+              >
+                <Text style={styles.reactionEmoji}>{r.emoji}</Text>
+                <Text style={[styles.reactionCount, r.reactedByMe && styles.reactionCountMine]}>
+                  {r.count}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  reactionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  reactionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSubtle,
+    backgroundColor: theme.colors.bgElevated,
+  },
+  reactionPillMine: {
+    borderColor: theme.colors.accent500,
+    backgroundColor: theme.colors.accentSubtle,
+  },
+  reactionEmoji: {
+    fontSize: theme.fontSize.sm,
+  },
+  reactionCount: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '600',
+  },
+  reactionCountMine: {
+    color: theme.colors.accent500,
+  },
   row: {
     flexDirection: 'row',
     paddingHorizontal: theme.layout.panelGap,

@@ -32,6 +32,17 @@ export interface MessageAuthorDto {
   avatarUrl: string | null;
 }
 
+/**
+ * Sunucu tepkileri emoji bazında TOPLAYARAK döner (`messages.service.ts` `ReactionAggDto`) — kim
+ * tepki vermiş listesi gelmez, yalnız sayı ve "ben verdim mi". İstemci de bu yüzden "kimler" diye
+ * bir yüzey açmaz; olmayan veriyi bekleyen tasarım yapılmaz.
+ */
+export interface ReactionDto {
+  emoji: string;
+  count: number;
+  reactedByMe: boolean;
+}
+
 export interface MessageDto {
   id: string;
   channelId: string;
@@ -45,6 +56,7 @@ export interface MessageDto {
   mentions?: string[];
   mentionsEveryone?: boolean;
   pinnedAt: string | null;
+  reactions?: ReactionDto[];
 }
 
 export const messagesApi = {
@@ -67,6 +79,35 @@ export const messagesApi = {
     const res = await http.get<MessageDto[]>(`/channels/${channelId}/messages/search`, {
       params: before ? { q, before } : { q },
     });
+    return res.data;
+  },
+
+  // ─── M1d-C §2.4 — mesaj aksiyonları ────────────────────────────────────────
+  // 🔴 Yetki kuralları SUNUCUDA ve mobil onları taklit etmez, yalnız satırı render edip etmemeye
+  // karar verir: düzenleme ve silme **yalnız yazar** (`messages.controller.ts` "yalnız yazar"),
+  // tepki her üye, sabitleme guild'de admin / DM'de üye. Sunucu 403 dönerse mesajı gösteririz.
+
+  async edit(channelId: string, messageId: string, content: string): Promise<MessageDto> {
+    const res = await http.patch<MessageDto>(`/channels/${channelId}/messages/${messageId}`, { content });
+    return res.data;
+  },
+
+  async remove(channelId: string, messageId: string): Promise<null> {
+    const res = await http.delete<null>(`/channels/${channelId}/messages/${messageId}`);
+    return res.data;
+  },
+
+  /** Idempotent: aynı emoji ikinci kez eklenirse sunucu no-op yapar. */
+  async addReaction(channelId: string, messageId: string, emoji: string): Promise<null> {
+    const res = await http.post<null>(`/channels/${channelId}/messages/${messageId}/reactions`, { emoji });
+    return res.data;
+  },
+
+  async removeReaction(channelId: string, messageId: string, emoji: string): Promise<null> {
+    // Emoji URL segmenti — kodlanmadan gönderilirse çok baytlı karakterler yolu bozar.
+    const res = await http.delete<null>(
+      `/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
+    );
     return res.data;
   },
 };

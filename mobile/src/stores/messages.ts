@@ -21,6 +21,14 @@ interface MessagesState {
   fetchOlder: (channelId: string) => Promise<void>;
   appendMessage: (message: MessageDto) => void;
   updateMessage: (message: MessageDto) => void;
+  /** WS tepki olayının yansıması — sunucu yalnız delta yayar, toplamı istemci tutar. */
+  applyReaction: (
+    channelId: string,
+    messageId: string,
+    emoji: string,
+    added: boolean,
+    mine: boolean,
+  ) => void;
   removeMessage: (channelId: string, messageId: string) => void;
   seedKnownUser: (channelId: string, userId: string, username: string) => void;
   resolveUsername: (channelId: string, userId: string) => string | undefined;
@@ -95,6 +103,53 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
       return {
         byChannel: { ...s.byChannel, [message.channelId]: { ...s.byChannel[message.channelId], messages: next } },
       };
+    });
+  },
+
+  /**
+   * M1d-C — WS `reaction.added` / `reaction.removed` yansıması.
+   *
+   * Sunucu tepki olayında **mesajın tamamını değil**, yalnız `{ messageId, emoji, userId }` yayar
+   * (`messages.controller.ts` `broadcastReaction`) — yani toplamı istemci güncelliyor. Bu yüzden
+   * `updateMessage` kullanılamaz; sayaç burada elle artırılıp azaltılıyor.
+   *
+   * `mine` = olayın sahibi ben miyim: `reactedByMe` yalnız o zaman değişir, başkasının tepkisi
+   * benim vurgumu bozmamalı.
+   */
+  applyReaction(channelId, messageId, emoji, added, mine) {
+    set((s) => {
+      const current = s.byChannel[channelId]?.messages;
+      if (!current) return s;
+      const idx = current.findIndex((m) => m.id === messageId);
+      if (idx === -1) return s;
+
+      const message = current[idx];
+      const reactions = [...(message.reactions ?? [])];
+      const rIdx = reactions.findIndex((r) => r.emoji === emoji);
+
+      if (added) {
+        if (rIdx === -1) reactions.push({ emoji, count: 1, reactedByMe: mine });
+        else
+          reactions[rIdx] = {
+            ...reactions[rIdx],
+            count: reactions[rIdx].count + 1,
+            reactedByMe: reactions[rIdx].reactedByMe || mine,
+          };
+      } else if (rIdx !== -1) {
+        const next = reactions[rIdx].count - 1;
+        // Son tepki de kalkınca pill'i tamamen kaldır — "0" gösteren rozet bırakma.
+        if (next <= 0) reactions.splice(rIdx, 1);
+        else
+          reactions[rIdx] = {
+            ...reactions[rIdx],
+            count: next,
+            reactedByMe: mine ? false : reactions[rIdx].reactedByMe,
+          };
+      }
+
+      const messages = [...current];
+      messages[idx] = { ...message, reactions };
+      return { byChannel: { ...s.byChannel, [channelId]: { ...s.byChannel[channelId], messages } } };
     });
   },
 
