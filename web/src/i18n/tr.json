@@ -1599,7 +1599,8 @@
       "action": "Sırala",
       "hint": "Taşımak istediğin satıra basılı tut ve sürükle. Değişiklik bırakınca kaydedilir.",
       "rolesHint": "Üstteki rol daha yetkilidir. Basılı tut ve sürükle; değişiklik bırakınca kaydedilir.",
-      "categoriesSection": "Kategoriler",
+      "categoriesSection": "Kategori sırası",
+      "channelsSection": "Kanal sırası",
       "uncategorized": "Kategorisiz",
       "noCategories": "Henüz kategori yok.",
       "empty": "Sıralanacak bir şey yok."

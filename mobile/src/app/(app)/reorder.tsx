@@ -178,6 +178,13 @@ export default function ReorderScreen() {
             emptyHint={t('mobile.reorder.noCategories')}
           />
 
+          {/* 🔴 İki blok da kategori adı yazıyor ve sahip haklı olarak "ekran kendini tekrar
+              ediyor" dedi (bulgu 2026-08-01). Aslında farklı işler: yukarısı KATEGORİ sırasını,
+              burası her kategorideki KANAL sırasını değiştiriyor. Ayrımı başlıklar söylüyor;
+              kategori adları alt başlık olarak kalıyor çünkü kanalın hangi kategoride olduğu
+              bilgisi olmadan liste anlamsız. */}
+          <Text style={styles.blockTitle}>{t('mobile.reorder.channelsSection')}</Text>
+
           {uncategorized.length > 0 && (
             <ReorderSection
               title={t('mobile.reorder.uncategorized')}
@@ -213,6 +220,16 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   list: { padding: theme.layout.panelGap, gap: 8 },
+  // Blok başlığı bölüm başlıklarından DAHA belirgin: "kategori sırası" ile "kanal sırası" iki
+  // ayrı iş, kategori adları ise onların altındaki alt başlık.
+  blockTitle: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.base,
+    fontWeight: '700',
+    paddingHorizontal: theme.layout.panelGap,
+    paddingBottom: 10,
+    marginTop: 4,
+  },
   empty: {
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.sm,
