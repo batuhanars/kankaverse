@@ -78,23 +78,7 @@ export default function GuildChannelsScreen() {
       {/* Başlık "Kanallar" — "Metin Kanalları" DEĞİL (sahip kararı 2026-08-01): ses kanalları
           M4'te gelince başlık yanıltıcı olurdu. Bugün yalnız metin kanalı listeleniyor ama bu
           geçici bir durum, ad kalıcı. */}
-      {/* Sıralama girişi sağ üstte TEK ikon (sahip revizesi 2026-08-01): önce gövdeye dağıtılmıştı
-          — kategori sırası bir düğmede, kanal sırası her kategori başlığında — ve görünmüyordu.
-          Roller ekranıyla aynı dil: aynı iş, aynı yer, aynı ikon. */}
-      <Stack.Screen
-        options={{
-          title: t('mobile.guildSettings.channelsTitle'),
-          headerRight: () => (
-            <Pressable
-              onPress={() => router.push({ pathname: '/reorder', params: { guildId, kind: 'guild' } })}
-              hitSlop={10}
-              accessibilityLabel={t('mobile.reorder.action')}
-            >
-              <Ionicons name="swap-vertical" size={22} color={theme.colors.textSecondary} />
-            </Pressable>
-          ),
-        }}
-      />
+      <Stack.Screen options={{ title: t('mobile.guildSettings.channelsTitle') }} />
 
       {state === 'loading' && (
         <View style={styles.center}>
