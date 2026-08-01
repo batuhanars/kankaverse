@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -8,7 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { guildsApi, extractInviteCode, type InvitePreviewDto } from '@/api/guilds';
 import { extractErrorCode, extractErrorMessage } from '@/api/errors';
 import { t } from '@/i18n';
@@ -24,13 +24,33 @@ import { theme } from '@/theme';
 // yaş durumu tutmak yeni bir sızıntı yüzeyidir.
 export default function JoinGuildScreen() {
   const router = useRouter();
-  const [input, setInput] = useState('');
+  // Sözleşme §2.6 revizesi — `GUILD_INVITE` bildirimi bu ekrana kodu HAZIR getirir. Kod yine de
+  // düzenlenebilir bir girdi olarak durur (salt-okunur yapılmadı): kullanıcı yanlış bildirime
+  // dokunduğunda ekranı terk etmeden başka kod deneyebilmeli.
+  const params = useLocalSearchParams<{ code?: string }>();
+  const initialCode = typeof params.code === 'string' ? params.code : '';
+
+  const [input, setInput] = useState(initialCode);
   const [preview, setPreview] = useState<InvitePreviewDto | null>(null);
-  const [previewing, setPreviewing] = useState(false);
+  // Kod hazır geldiyse önizleme ANINDA başlar → spinner ilk render'da açık doğar. Bu değer effect
+  // içinde senkron set EDİLMİYOR (react-hooks/set-state-in-effect), başlangıç değeri olarak veriliyor.
+  const [previewing, setPreviewing] = useState(!!initialCode);
   const [joining, setJoining] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const code = extractInviteCode(input);
+
+  // Bildirimden gelindiyse önizlemeyi kullanıcıya tekrar dokundurtmadan çöz. Effect gövdesi
+  // setState'i senkron çağırmaz — yalnız isteği başlatır, sonuç .then/.catch'te yazılır
+  // (home.tsx'teki `fetchGuilds` ile aynı desen).
+  useEffect(() => {
+    if (!initialCode) return;
+    guildsApi
+      .previewInvite(extractInviteCode(initialCode))
+      .then(setPreview)
+      .catch((e) => setErrorMessage(extractErrorMessage(e)))
+      .finally(() => setPreviewing(false));
+  }, [initialCode]);
 
   function onChange(value: string) {
     setInput(value);

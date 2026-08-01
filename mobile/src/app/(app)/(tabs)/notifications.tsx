@@ -39,8 +39,14 @@ function notificationText(n: NotificationDto): string {
 // Sprint M1a contract §5 ekran 5 — liste + okunmamış vurgusu + dokunuşta ilgili kanala git.
 // M1a'da yalnız MENTION'ın hedefi vardı; M1b Arkadaş Ekle ekranını getirdiği için **FRIEND_REQUEST de
 // tıklanabilir oldu**. Sprint M1d-0 contract §3.2 — Kankalar ekranı geldiği için **FRIEND_ACCEPT de
-// tıklanabilir oldu** (M1b'de hedefi yoktu, bilinçle bırakılmıştı). GUILD_INVITE hâlâ hedefsiz (davet
-// kabul ekranı yok, hedefi M1d'de gelir) → tıklanabilir DEĞİL; "boş yüzey açma" gereği hedef uydurulmaz.
+// tıklanabilir oldu** (M1b'de hedefi yoktu, bilinçle bırakılmıştı).
+//
+// Sprint M1d §2.6 (**revize edildi, PM 2026-08-01**) — GUILD_INVITE artık hedefli. Sözleşme
+// "guildId'ye git, üye değilsen tıklanamaz kalsın" diyordu; DTO kaynaktan okununca yanlış olduğu
+// görüldü: bu bildirim **davet kodunu `preview` alanında taşıyor** ve alıcı zaten çoğunlukla üye
+// DEĞİL — davet edilmiş. "Üye değilsen tıklanamaz" kuralı bildirimi tam da işe yarayacağı durumda
+// ölü bırakırdı. Hedef web ile aynı (`NotificationBell.vue`: `/invite/${preview}`): mobilde bunun
+// karşılığı M1d-A'da yazılan Ortama Katıl ekranıdır, kod hazır geçilir. **Yeni ekran açılmadı.**
 export default function NotificationsScreen() {
   const router = useRouter();
   const items = useNotificationsStore((s) => s.items);
@@ -83,8 +89,13 @@ export default function NotificationsScreen() {
       router.push('/friends-list');
       return;
     }
-    // GUILD_INVITE hâlâ hedefsiz: davet kabul ekranı yok. "Boş yüzey açma" gereği bu satır
-    // tıklanabilir YAPILMADI — uyduracak bir hedef icat edilmez.
+    // GUILD_INVITE → Ortama Katıl, kod hazır. `preview` davet kodudur (sunucu `notifications.service`
+    // öyle dolduruyor, web de öyle okuyor). Kodsuz bildirim gelirse (eski kayıt) satır tıklanamaz
+    // kalır — hedef uydurulmaz.
+    if (n.type === 'GUILD_INVITE') {
+      if (n.preview) router.push({ pathname: '/join-guild', params: { code: n.preview } });
+      return;
+    }
     if (n.type !== 'MENTION' || !n.channelId) return;
     if (n.guildId) {
       router.push({ pathname: '/channel/[id]', params: { id: n.channelId, name: '' } });
@@ -136,6 +147,7 @@ export default function NotificationsScreen() {
             const clickable =
               item.type === 'FRIEND_REQUEST' ||
               item.type === 'FRIEND_ACCEPT' ||
+              (item.type === 'GUILD_INVITE' && !!item.preview) ||
               (item.type === 'MENTION' && !!item.channelId);
             return (
               <Pressable
