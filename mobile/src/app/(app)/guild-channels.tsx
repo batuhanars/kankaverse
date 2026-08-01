@@ -115,7 +115,7 @@ export default function GuildChannelsScreen() {
               sırayı kategori içinde yorumluyor; tek düz listede sürüklemek kategoriler arası
               taşıma gibi görünür ama öyle davranmazdı. */}
           <Pressable
-            style={styles.actionButton}
+            style={[styles.actionButton, styles.standaloneAction]}
             onPress={() =>
               router.push({ pathname: '/reorder', params: { guildId, kind: 'categories' } })
             }
@@ -236,6 +236,16 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.borderStrong,
     backgroundColor: theme.colors.bgSidebar,
     paddingHorizontal: 10,
+  },
+  /**
+   * Tek başına duran aksiyon düğmesi. `actionButton` yan yana İKİ düğme için yazılmış: `flex: 1`
+   * satırı paylaşmak için, alt boşluk ise satırı saran `actions` kabında. Tek başına
+   * kullanıldığında ikisi de yanlış çalışıyordu — düğme alttaki listeye yapışıyordu
+   * (sahip bulgusu 2026-08-01). Boşluk `actions` ve `group` ile aynı 14 birim.
+   */
+  standaloneAction: {
+    flex: 0,
+    marginBottom: 14,
   },
   actionText: {
     color: theme.colors.textPrimary,
