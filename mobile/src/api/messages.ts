@@ -43,6 +43,25 @@ export interface ReactionDto {
   reactedByMe: boolean;
 }
 
+/**
+ * Sprint M1g — ortam geneli arama filtreleri. Ad ve değerler `GuildSearchController` sorgu
+ * parametreleriyle **BİREBİR** (`from` = authorId, `mentions` = userId, `in` = channelId).
+ */
+export interface GuildSearchParams {
+  q?: string;
+  from?: string;
+  mentions?: string;
+  in?: string;
+  has?: 'link' | 'file';
+}
+
+/** Sunucu sonucu kanal bazında gruplayıp döner (`searchGuildMessages` dönüşü birebir). */
+export interface GuildSearchGroupDto {
+  channelId: string;
+  channelName: string;
+  messages: MessageDto[];
+}
+
 export interface MessageDto {
   id: string;
   channelId: string;
@@ -82,6 +101,26 @@ export const messagesApi = {
   async search(channelId: string, q: string, before?: string): Promise<MessageDto[]> {
     const res = await http.get<MessageDto[]>(`/channels/${channelId}/messages/search`, {
       params: before ? { q, before } : { q },
+    });
+    return res.data;
+  },
+
+  /**
+   * Sprint M1g §2.2 — **ortam geneli** mesaj arama. `GET /guilds/:id/messages/search`
+   * (`GuildSearchController`), sonuç **kanal-gruplu** döner.
+   *
+   * 🔴 Erişim kapıları SUNUCUDA: yaş kapılı kanallar minöre, özel kanallar üye olmayana hiç
+   * dönmüyor; `in` erişilemeyen bir kanalı gösterirse boş sonuç veriyor (sızıntı yok). İstemci
+   * bunları taklit ETMEZ, ne gelirse onu listeler.
+   *
+   * `q` opsiyonel: doluysa sunucu ≥2 karakter şartı koyuyor (`QUERY_TOO_SHORT`), boşsa yalnız
+   * filtrelerle arama yapılır (örn. "bu kanaldaki tüm dosyalar").
+   */
+  async searchGuild(guildId: string, params: GuildSearchParams): Promise<GuildSearchGroupDto[]> {
+    const res = await http.get<GuildSearchGroupDto[]>(`/guilds/${guildId}/messages/search`, {
+      // Boş alanlar sorguya HİÇ girmez — sunucu boş string'i "yok say" olarak ele alıyor ama
+      // gereksiz parametre göndermenin de anlamı yok.
+      params: Object.fromEntries(Object.entries(params).filter(([, v]) => v)),
     });
     return res.data;
   },

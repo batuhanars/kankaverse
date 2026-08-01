@@ -196,6 +196,17 @@ export default function HomeScreen() {
           canManage={canManage}
           onEditChannel={(c) => setMenuChannel(c)}
           onEditCategory={(c) => setMenuCategory(c)}
+          // Sprint M1g §2.1 — şerit aksiyonları. Davet MEVCUT ekrana gider (ortam panelindeki
+          // "Davet Et" ile aynı varış); şerit yeni bir yol açmıyor, kısayol veriyor.
+          onOpenSearch={() =>
+            router.push({ pathname: '/guild-search', params: { guildId: selection.id } })
+          }
+          onInvite={() =>
+            router.push({
+              pathname: '/guild-invite',
+              params: { id: selection.id, name: selectedGuildName },
+            })
+          }
         />
       )}
 

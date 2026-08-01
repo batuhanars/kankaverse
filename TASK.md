@@ -1669,3 +1669,37 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   gerçek silme talebi bir test hesabında yürütülmedi)*
 - [x] Yanlış şifre/koda sunucunun Türkçe mesajı görünüyor
 - [ ] 🔴 **R7:** reauth + oturum yönetimi sahip incelemesinden geçti — **açık, sahipte**
+
+---
+
+## Sprint M1g — Mobil Ortam İçi Arama + Aksiyon Şeridi (Track F2, PM compose 2026-08-01)
+
+> Sözleşme: `contracts/SPRINT_M1G_MOBILE_GUILD_SEARCH_CONTRACT.md`.
+> **Zaman kutulu:** sahip 20.20'de bırakmak istedi; etkinlikler bilinçli olarak yarına bırakıldı.
+> `api/`'ye dokunulmadı — uç (`GET /guilds/:id/messages/search`) zaten gelişmişti.
+
+- [x] Ortam adının altına aksiyon şeridi: geniş **Ara** + dar **davet** ikonu
+- [x] `messagesApi.searchGuild` (q · from · mentions · in · has, kanal-gruplu sonuç)
+- [x] Ortamda Ara ekranı: debounce, kanal-gruplu sonuç, sonuç sayısı, boş/hata durumları
+- [x] Filtre paneli: kanal (`in`) + tür (`has`), "Uygula" ile uygulanır
+- [x] Etkin filtre çipleri — dokununca kalkar
+- [x] `typecheck` + `lint` temiz
+
+### Bilinçli kararlar
+- [x] **Takvim düğmesi KONMADI** — etkinlik yokken dokununca hiçbir şey yapmayan düğme olurdu
+  ("boş yüzey açma"). Şeridin yeri ayrıldı, düğme ayrılmadı.
+- [x] Discord'un **sekmeli** arama ekranı kopyalanmadı (sabitleme/medya sekmelerinin arkasında
+  bizde özellik yok) — M1b §3.5 kararı sürüyor
+
+### Kapsam dışı (uç var, istemci yok — yarın)
+- [ ] `from` / `mentions` filtreleri (üye seçici gerekiyor)
+- [ ] **Mesaja atlama** — sonuç şu an kanalı açıyor, mesaja kaydırmıyor; kanallar arası atlama
+  kanal ekranında yeni bir yetenek istiyor
+- [ ] **Etkinlikler** — kendi sprinti (web'de `CreateEventWizard` + `EventsModal` var)
+
+### DoD (sözleşme §1 — **fiziksel cihazda**)
+- [ ] Şerit görünüyor; aramaya dokununca tam ekran açılıyor
+- [ ] Sonuçlar kanal başlıkları altında gruplu geliyor
+- [ ] Filtre paneli çalışıyor; çipler görünüyor ve kaldırılabiliyor
+- [ ] Sonuca dokununca ilgili kanal açılıyor
+- [ ] Metin `tr.json`'dan; `typecheck` + `lint` temiz
