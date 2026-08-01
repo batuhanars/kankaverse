@@ -18,6 +18,40 @@ export interface UserDto {
   // Sprint M1c — contract §3.4: e-posta doğrulama bandı bu alana bakar. Sunucu zaten dönüyordu
   // (`toUserDto`: `emailVerifiedAt !== null`), mobil tipte hiç yoktu (sıfır backend değişikliği).
   emailVerified: boolean;
+  // Sprint M1f — güvenlik ekranları. `toUserDto` bunu da zaten dönüyordu. **Reauth formlarının
+  // TOTP alanını göstermesi buna bakar**: 2FA kapalıyken kod alanı çizilmez (sunucu `totpCode`'u
+  // opsiyonel kabul ediyor), açıkken zorunlu gibi sunulur.
+  twoFactorEnabled: boolean;
+}
+
+/**
+ * Sprint M1f — hassas işlem kimlik doğrulaması. `api/.../dto/reauth-fields.dto.ts` ile **BİREBİR**:
+ * `currentPassword` zorunlu, `totpCode` opsiyonel. Bu iki alan şifre/e-posta değişimi, 2FA kurma/
+ * kapatma ve hesap silmede aynen tekrar ediyor — tek tip, beş uç.
+ *
+ * 🔴 Bu nesne yalnız isteğin gövdesinde yaşar. Hiçbir store'a, AsyncStorage'a veya loga yazılmaz.
+ */
+export interface ReauthFields {
+  currentPassword: string;
+  totpCode?: string;
+}
+
+/** `GET /auth/sessions` — `authService.getSessions` map'inden birebir okundu. */
+export interface SessionDto {
+  id: string;
+  device: string | null;
+  ip: string | null;
+  lastActiveAt: string;
+  createdAt: string;
+  /** Bu isteği yapan oturum. Sunucu işaretler; istemci kendi kendine tahmin etmez. */
+  current: boolean;
+}
+
+/** `POST /auth/2fa/setup` — `{ otpauthUrl, qrDataUrl, secret }`. Mobil yalnız `secret` kullanır (§2.5). */
+export interface TwoFactorSetupDto {
+  otpauthUrl: string;
+  qrDataUrl: string;
+  secret: string;
 }
 
 export interface LoginPayload {
@@ -87,6 +121,61 @@ export const authApi = {
   // contract §3.4 — auth gerekir (JwtAuthGuard); zaten doğrulanmışta sunucu 409 döner.
   async resendVerification(): Promise<null> {
     const res = await http.post<null>('/auth/resend-verification');
+    return res.data;
+  },
+
+  // ── Sprint M1f — hesap güvenliği ────────────────────────────────────────────
+  // Tüm uçlar `auth.controller.ts`ten birebir okundu (M1f sözleşmesi §0 tablosu). Hiçbiri yeni
+  // değil; mobil bugüne kadar yalnız çağırmıyordu.
+
+  async getSessions(): Promise<SessionDto[]> {
+    const res = await http.get<SessionDto[]>('/auth/sessions');
+    return res.data;
+  },
+  async revokeSession(sessionId: string): Promise<null> {
+    const res = await http.delete<null>(`/auth/sessions/${sessionId}`);
+    return res.data;
+  },
+  async revokeOtherSessions(): Promise<null> {
+    const res = await http.post<null>('/auth/sessions/revoke-others');
+    return res.data;
+  },
+
+  /** Kurulumu başlatır; sunucu gizli anahtarı üretip kullanıcıya YAZAR ama 2FA'yı AÇMAZ. */
+  async setupTwoFactor(reauth: ReauthFields): Promise<TwoFactorSetupDto> {
+    const res = await http.post<TwoFactorSetupDto>('/auth/2fa/setup', reauth);
+    return res.data;
+  },
+  /**
+   * Doğrulama kodu geçerliyse 2FA açılır ve **kurtarma kodları bir kez** döner.
+   * Alan adı `code` (`Enable2faDto`) — `totpCode` DEĞİL; iki uçta iki farklı ad var, karıştırma.
+   */
+  async enableTwoFactor(code: string): Promise<{ codes: string[] }> {
+    const res = await http.post<{ codes: string[] }>('/auth/2fa/enable', { code });
+    return res.data;
+  },
+  async disableTwoFactor(reauth: ReauthFields): Promise<null> {
+    const res = await http.post<null>('/auth/2fa/disable', reauth);
+    return res.data;
+  },
+
+  /** 🔴 Başarıda sunucu **diğer tüm oturumları düşürür** — ekran bunu kullanıcıya yazmak zorunda. */
+  async changePassword(reauth: ReauthFields, newPassword: string): Promise<null> {
+    const res = await http.post<null>('/auth/password/change', { ...reauth, newPassword });
+    return res.data;
+  },
+  /** Yeni adrese doğrulama, eskisine geri-al postası gider. E-posta HENÜZ değişmez. */
+  async changeEmail(reauth: ReauthFields, newEmail: string): Promise<null> {
+    const res = await http.post<null>('/auth/email/change', { ...reauth, newEmail });
+    return res.data;
+  },
+
+  /**
+   * Hesap silme talebi: 30 gün grace + tüm oturumlar düşer. **İptal için ayrı uç YOK** — grace
+   * içinde giriş yapmak talebi iptal eder (`cancelPendingDeletionOnLogin`).
+   */
+  async deleteAccount(reauth: ReauthFields): Promise<null> {
+    const res = await http.post<null>('/auth/account/delete', reauth);
     return res.data;
   },
 };
