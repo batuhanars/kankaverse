@@ -78,7 +78,23 @@ export default function GuildChannelsScreen() {
       {/* Başlık "Kanallar" — "Metin Kanalları" DEĞİL (sahip kararı 2026-08-01): ses kanalları
           M4'te gelince başlık yanıltıcı olurdu. Bugün yalnız metin kanalı listeleniyor ama bu
           geçici bir durum, ad kalıcı. */}
-      <Stack.Screen options={{ title: t('mobile.guildSettings.channelsTitle') }} />
+      {/* Sıralama girişi sağ üstte TEK ikon (sahip revizesi 2026-08-01): önce gövdeye dağıtılmıştı
+          — kategori sırası bir düğmede, kanal sırası her kategori başlığında — ve görünmüyordu.
+          Roller ekranıyla aynı dil: aynı iş, aynı yer, aynı ikon. */}
+      <Stack.Screen
+        options={{
+          title: t('mobile.guildSettings.channelsTitle'),
+          headerRight: () => (
+            <Pressable
+              onPress={() => router.push({ pathname: '/reorder', params: { guildId, kind: 'guild' } })}
+              hitSlop={10}
+              accessibilityLabel={t('mobile.reorder.action')}
+            >
+              <Ionicons name="swap-vertical" size={22} color={theme.colors.textSecondary} />
+            </Pressable>
+          ),
+        }}
+      />
 
       {state === 'loading' && (
         <View style={styles.center}>
@@ -111,32 +127,7 @@ export default function GuildChannelsScreen() {
             </Pressable>
           </View>
 
-          {/* Sprint M1i — kategori sırası. Kanal sırası kategori BAŞINA ayrı, çünkü sunucu
-              sırayı kategori içinde yorumluyor; tek düz listede sürüklemek kategoriler arası
-              taşıma gibi görünür ama öyle davranmazdı. */}
-          <Pressable
-            style={[styles.actionButton, styles.standaloneAction]}
-            onPress={() =>
-              router.push({ pathname: '/reorder', params: { guildId, kind: 'categories' } })
-            }
-          >
-            <Ionicons name="swap-vertical" size={18} color={theme.colors.textPrimary} />
-            <Text style={styles.actionText}>
-              {t('category.createTitle')} · {t('mobile.reorder.action')}
-            </Text>
-          </Pressable>
-
           {/* Kategorisiz kanallar en üstte, başlıksız — sidebar okumasıyla aynı. */}
-          {uncategorized.length > 1 && (
-            <Pressable
-              style={styles.reorderLink}
-              onPress={() =>
-                router.push({ pathname: '/reorder', params: { guildId, kind: 'channels' } })
-              }
-            >
-              <Text style={styles.categoryEdit}>{t('mobile.reorder.action')}</Text>
-            </Pressable>
-          )}
           {uncategorized.length > 0 && (
             <View style={styles.group}>
               {uncategorized.map((c) => (
@@ -155,28 +146,10 @@ export default function GuildChannelsScreen() {
               <View key={cat.id}>
                 {/* Dişli yerine "Düzenle" yazısı (sahip kararı): ikon ne yaptığını söylemiyordu,
                     kelime söylüyor. */}
-                <View style={styles.categoryHeader}>
-                  <Pressable style={styles.categoryTitleTap} onPress={() => openCategory(cat)}>
-                    <Text style={styles.categoryName}>{cat.name.toLocaleUpperCase('tr')}</Text>
-                  </Pressable>
-                  {/* Sıralama yalnız 2+ kanalda anlamlı — tek kanallı kategoride düğme gürültü. */}
-                  {inCat.length > 1 && (
-                    <Pressable
-                      onPress={() =>
-                        router.push({
-                          pathname: '/reorder',
-                          params: { guildId, kind: 'channels', categoryId: cat.id },
-                        })
-                      }
-                      hitSlop={8}
-                    >
-                      <Text style={styles.categoryEdit}>{t('mobile.reorder.action')}</Text>
-                    </Pressable>
-                  )}
-                  <Pressable onPress={() => openCategory(cat)} hitSlop={8}>
-                    <Text style={styles.categoryEdit}>{t('mobile.guildSettings.edit')}</Text>
-                  </Pressable>
-                </View>
+                <Pressable style={styles.categoryHeader} onPress={() => openCategory(cat)}>
+                  <Text style={styles.categoryName}>{cat.name.toLocaleUpperCase('tr')}</Text>
+                  <Text style={styles.categoryEdit}>{t('mobile.guildSettings.edit')}</Text>
+                </Pressable>
                 <View style={styles.group}>
                   {inCat.length === 0 ? (
                     <Text style={styles.emptyRow}>{t('channel.noChannels')}</Text>
@@ -237,27 +210,15 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgSidebar,
     paddingHorizontal: 10,
   },
-  /**
-   * Tek başına duran aksiyon düğmesi. `actionButton` yan yana İKİ düğme için yazılmış: `flex: 1`
-   * satırı paylaşmak için, alt boşluk ise satırı saran `actions` kabında. Tek başına
-   * kullanıldığında ikisi de yanlış çalışıyordu — düğme alttaki listeye yapışıyordu
-   * (sahip bulgusu 2026-08-01). Boşluk `actions` ve `group` ile aynı 14 birim.
-   */
-  standaloneAction: {
-    flex: 0,
-    marginBottom: 14,
-  },
   actionText: {
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.sm,
     fontWeight: '600',
   },
-  categoryTitleTap: { flex: 1 },
-  reorderLink: { alignSelf: 'flex-end', paddingHorizontal: theme.layout.panelGap, paddingBottom: 4 },
   categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    justifyContent: 'space-between',
     paddingHorizontal: 4,
     paddingVertical: 8,
   },
