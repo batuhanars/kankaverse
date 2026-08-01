@@ -1593,6 +1593,17 @@
     "profile": {
       "edit": "Profili Düzenle"
     },
+    "guildSearch": {
+      "tabMessages": "Mesajlar",
+      "tabMembers": "Üyeler",
+      "tabChannels": "Kanallar",
+      "tabMedia": "Medya",
+      "tabLinks": "Bağlantılar",
+      "tabPins": "Sabitlenenler",
+      "browseHint": "Aramak için yaz ya da filtre ekle.",
+      "pinsHint": "Sabitlenenleri görmek için bir kanal seç.",
+      "noResults": "Sonuç bulunamadı."
+    },
     "security": {
       "passwordSessionsNotice": "Şifreni değiştirdiğinde diğer cihazlardaki oturumların kapanır. Bu cihazda açık kalırsın.",
       "emailLinkNotice": "Yeni adresine bir doğrulama bağlantısı, eski adresine de değişikliği geri alma bağlantısı gönderilir. Bağlantıya tıklayana kadar e-postan değişmez.",
