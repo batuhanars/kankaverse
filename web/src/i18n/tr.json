@@ -1593,6 +1593,8 @@
       "edit": "Profili Düzenle"
     },
     "guildSettings": {
+      "channelsTitle": "Kanallar",
+      "edit": "Düzenle",
       "leaveOwnerHint": "Ortam sahibi ayrılamaz; önce sahipliği devretmen veya ortamı silmen gerekir.",
       "unbanConfirm": "{username} adlı kullanıcının yasağını kaldırmak istediğine emin misin? Ortama tekrar katılabilir."
     },
