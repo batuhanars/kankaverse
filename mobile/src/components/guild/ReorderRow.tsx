@@ -8,6 +8,8 @@ export interface ReorderRowData {
   label: string;
   /** Rol rengi — yalnız rol listesinde dolu. */
   color?: string;
+  /** Satırın altındaki bağlam (kanal listesinde: kanalın kategorisi). */
+  sublabel?: string;
 }
 
 /**
@@ -25,9 +27,18 @@ export function ReorderRow({ row }: { row: ReorderRowData }) {
     <Pressable onLongPress={drag} delayLongPress={200} style={styles.row}>
       <Ionicons name="reorder-three" size={20} color={theme.colors.textMuted} />
       {row.color ? <View style={[styles.dot, { backgroundColor: row.color }]} /> : null}
-      <Text style={styles.label} numberOfLines={1}>
-        {row.label}
-      </Text>
+      <View style={styles.texts}>
+        <Text style={styles.label} numberOfLines={1}>
+          {row.label}
+        </Text>
+        {/* Kanalın kategorisi: tek düz listede "bu kanal nerede" sorusunu satırın kendisi
+            yanıtlar; liste kategorilere bölünmek zorunda kalmaz. */}
+        {row.sublabel ? (
+          <Text style={styles.sublabel} numberOfLines={1}>
+            {row.sublabel}
+          </Text>
+        ) : null}
+      </View>
     </Pressable>
   );
 }
@@ -43,5 +54,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgSidebar,
   },
   dot: { width: 12, height: 12, borderRadius: 6 },
-  label: { flex: 1, color: theme.colors.textPrimary, fontSize: theme.fontSize.base },
+  texts: { flex: 1 },
+  label: { color: theme.colors.textPrimary, fontSize: theme.fontSize.base },
+  sublabel: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs, marginTop: 1 },
 });
