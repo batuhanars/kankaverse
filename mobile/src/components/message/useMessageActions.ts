@@ -21,6 +21,8 @@ export function useMessageActions(channelId: string) {
   // Tam emoji listesi ayrı bir modal; panel KAPANIP açılıyor (iç içe modal Android'de güvenilmez).
   // Hedef mesaj bu yüzden ayrı tutulur: panel kapanınca `target` sıfırlanıyor.
   const [pickerTarget, setPickerTarget] = useState<MessageDto | null>(null);
+  // İletme de ayrı modal, aynı sebeple ayrı hedef.
+  const [forwardTarget, setForwardTarget] = useState<MessageDto | null>(null);
 
   function open(message: MessageDto) {
     setTarget(message);
@@ -83,6 +85,12 @@ export function useMessageActions(channelId: string) {
     openPicker,
     closePicker: () => setPickerTarget(null),
     pickEmoji,
+    forwardTarget,
+    openForward: () => {
+      setForwardTarget(target);
+      setTarget(null);
+    },
+    closeForward: () => setForwardTarget(null),
     copyText,
     deleteTarget,
     setDeleteTarget,

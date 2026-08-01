@@ -1,5 +1,6 @@
 import EmojiPicker, { tr as emojiTr } from 'rn-emoji-keyboard';
 import { MessageActionSheet } from './MessageActionSheet';
+import { ForwardMessageModal } from './ForwardMessageModal';
 import type { useMessageActions } from './useMessageActions';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { t } from '@/i18n';
@@ -41,6 +42,7 @@ export function MessageActionHost({ actions, onReply, onEdit }: Props) {
           if (m) void actions.copyText(m);
         }}
         onOpenPicker={actions.openPicker}
+        onForward={actions.openForward}
         onDelete={() => {
           actions.setDeleteTarget(actions.target);
           actions.close();
@@ -79,6 +81,10 @@ export function MessageActionHost({ actions, onReply, onEdit }: Props) {
           },
         }}
       />
+
+      {actions.forwardTarget && (
+        <ForwardMessageModal message={actions.forwardTarget} onClose={actions.closeForward} />
+      )}
 
       {actions.deleteTarget && (
         <ConfirmDialog
