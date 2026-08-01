@@ -1470,6 +1470,12 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   çekildi** (`8da78d9`), iki istemci ayrışmasın
 - [ ] **Okunmuş işaretle:** okunmamış yoksa **soluk + pasif** (yetki değil DURUM kuralı)
 
+### A yarısı — DoD turu (sahip cihaz turu 2026-08-01) ✅
+- [x] **A yarısı cihazda yürünmüş durumda, sorun çıkmadı** (sahip): paneller açılıyor · emoji picker
+  açılıyor (**`rn-emoji-keyboard` React 19 uyumu böylece fiilen doğrulandı**) · yanıt veriliyor ·
+  mesaj iletiliyor · düzenleme çalışıyor.
+  *Not: `MessageScreen` bu sprintte üç kez bölündü; tur regresyon göstermedi.*
+
 ### B yarısı — hesap merkezi + profil
 - [ ] **"Sen" sekmesi profil görünümü:** afiş · avatar · ad · biyografi · üyelik tarihi (TR formatı).
   Veri **`GET /users/:id/card` kendi id'mle** — yeni uç yazılmaz. **Konmaz:** durum ekle · sunucu
