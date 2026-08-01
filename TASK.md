@@ -1435,10 +1435,8 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   **Konmadı:** Favori · Sustur/Bildirim (kendi sözleşmesi) · Kanal ID · "DM'yi Kapat" (aynı işe iki ad).
   Okunmamış yoksa "Okunmuş İşaretle" **soluk + pasif** (yetki değil DURUM kuralı).
   *Yan iş: `DmSidebar` 312 satırdı → `DmRow` ayrıldı; panelin iç akışı `DmMenuHost`ta (ana ekran 284)*
-- [~] **Mesaj alt paneli** (mesaja uzun basış): hızlı emoji şeridi (**web'in kümesi okundu:
-  👍 ❤️ 😂, uydurulmadı**) + Metni Kopyala + Sil (yalnız kendi, `ConfirmDialog`) **BAĞLANDI**.
-  *Yanıtla ve Düzenle satırları duruyor ama henüz bağlı değil — ikisi de giriş kutusuna mod
-  ekliyor, sıradaki adım.*
+- [x] **Mesaj alt paneli** (mesaja uzun basış): hızlı emoji şeridi + Yanıtla · İlet · Düzenle
+  (yalnız kendi) · Metni Kopyala · Sil (yalnız kendi, `ConfirmDialog`) — **tamamı bağlı**
   - 🔴 **Sabitle KONMADI (PM kararı, sözleşme §2.4 revizesi):** uç var ama mobilde sabitlenmiş
     mesajları GÖSTEREN yüzey yok (web'de `PinsPopover`, mobilde yok) → sabitlenen mesaj görülemezdi.
     M1d-B'deki ses kanalı kararının aynısı: **görülemeyen sonuç üretilmez**
@@ -1459,7 +1457,17 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   Sunucu mesajın tamamını değil **delta** yayıyor, toplamı istemci tutuyor (`applyReaction`).
   **İyimser güncelleme YOK** — tek yazma yolu WS olayı; yoksa kendi tepkim iki kez sayılırdı
   (M1a `message.created` echo dersi)
-- [ ] **Yanıt:** giriş kutusu üstünde alıntı şeridi + iptal; gönderimde `replyToId` (**uç zaten destekliyor**)
+- [x] **Yanıt + düzenleme:** giriş kutusunun ÜÇ modu (normal · yanıtlıyorum · düzenliyorum),
+  üstte şerit + × iptal; gönderimde `replyToId` (**uç M1a'dan beri destekliyordu, mobil
+  göndermiyordu**). Gelen mesajda alıntı gösterimi de eklendi — alıntılanan mesaj silinmişse
+  "Silinen mesaj" yazılır, satır gizlenmez (yoksa yanıt bağlamsız kalırdı).
+  *İki mod aynı kutuyu paylaşır, aynı anda ikisi birden olamaz. Düzenlerken "yazıyor" YAYINLANMAZ:
+  karşı taraf yeni mesaj bekler, oysa eski mesaj değişiyor. Web'in `message.editHint` metni
+  ("Enter kaydet · Esc iptal") mobilde KULLANILMADI — Esc yok, görünür × var.*
+- [x] **İlet** (sahip talebi, web `ForwardMessageModal` paritesi): ayrı uç DEĞİL, mesajın metni
+  seçilen DM'e yeni mesaj olarak gider. Metin boşsa ilk ekin dosya adı (web ile aynı)
+- [x] **Hızlı şerit 5 emojiye çıktı** (👍 ❤️ 😂 😮 😢) — sağ boş kalıyordu; **web de aynı beşliye
+  çekildi** (`8da78d9`), iki istemci ayrışmasın
 - [ ] **Okunmuş işaretle:** okunmamış yoksa **soluk + pasif** (yetki değil DURUM kuralı)
 
 ### B yarısı — hesap merkezi + profil

@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { AttachmentView } from './AttachmentView';
 import { formatMentionsPlain } from '@/utils/mentions';
 import type { MessageDto } from '@/api/messages';
@@ -61,6 +62,26 @@ export function MessageBubble({
             <Text style={styles.time}>{formatClock(message.createdAt)}</Text>
           </View>
         )}
+        {/* Yanıt alıntısı — gövdenin ÜSTÜNDE, web `MessageRow.vue` ile aynı yer. `replyTo` dolu
+            gelmiyorsa (alıntılanan mesaj silinmiş) sunucu yalnız `replyToId` döner; o durumda
+            "Silinen mesaj" yazılır, satır gizlenmez — yoksa yanıt bağlamsız kalırdı. */}
+        {message.replyToId && (
+          <View style={styles.replyRow}>
+            <Ionicons name="arrow-undo" size={12} color={theme.colors.textMuted} />
+            {message.replyTo ? (
+              <Text style={styles.replyText} numberOfLines={1}>
+                <Text style={styles.replyAuthor}>{message.replyTo.authorUsername}</Text>
+                {'  '}
+                {formatMentionsPlain(message.replyTo.content, resolveMention, t('mention.unknown'))}
+              </Text>
+            ) : (
+              <Text style={[styles.replyText, styles.replyDeleted]} numberOfLines={1}>
+                {t('reply.deleted')}
+              </Text>
+            )}
+          </View>
+        )}
+
         {displayContent.length > 0 && (
           <Text style={styles.content}>
             {displayContent}
@@ -95,6 +116,24 @@ export function MessageBubble({
 }
 
 const styles = StyleSheet.create({
+  replyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 2,
+  },
+  replyText: {
+    flex: 1,
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+  },
+  replyAuthor: {
+    color: theme.colors.textSecondary,
+    fontWeight: '700',
+  },
+  replyDeleted: {
+    fontStyle: 'italic',
+  },
   reactionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
