@@ -1,5 +1,7 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import type { UserCardDto } from '@/api/users';
+import { bannerColors } from '@/utils/bannerColor';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -28,7 +30,11 @@ function formatMemberSince(iso: string): string {
 }
 
 export function ProfileHeader({ username, avatarUrl, card }: Props) {
-  const bannerStyle = card?.bannerColor ? { backgroundColor: card.bannerColor } : undefined;
+  // 🔴 `bannerColor` bir CSS rengi DEĞİL, preset anahtarı ('blue', 'cream'…). Önce düz
+  // `backgroundColor` olarak veriliyordu; 'blue' gibi bazı anahtarlar CSS renk adına denk geldiği
+  // için kısmen çalışıyor, 'cream'/'dark' gibi olanlar hiç çalışmıyordu. Artık web'le aynı
+  // gradient eşlemesinden geçiyor.
+  const [from, to] = bannerColors(card?.bannerColor);
 
   return (
     <View>
@@ -38,11 +44,11 @@ export function ProfileHeader({ username, avatarUrl, card }: Props) {
           Doğru çözüm bindirmeyi taşma olmadan kurmak: kapsayıcı afiş + taşma payı kadar YÜKSEK,
           avatar onun İÇİNDE mutlak konumlu. Böylece hiçbir şey ebeveyn sınırını aşmıyor. */}
       <View style={styles.header}>
-        <View style={[styles.banner, bannerStyle]}>
-          {card?.bannerUrl ? (
-            <Image source={{ uri: card.bannerUrl }} style={styles.bannerImage} resizeMode="cover" />
-          ) : null}
-        </View>
+        {card?.bannerUrl ? (
+          <Image source={{ uri: card.bannerUrl }} style={styles.banner} resizeMode="cover" />
+        ) : (
+          <LinearGradient colors={[from, to]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner} />
+        )}
 
         {avatarUrl ? (
           <Image source={{ uri: avatarUrl }} style={styles.avatar} />
@@ -89,11 +95,7 @@ const styles = StyleSheet.create({
   },
   banner: {
     height: BANNER_H,
-    backgroundColor: theme.colors.bgElevated,
-  },
-  bannerImage: {
     width: '100%',
-    height: '100%',
   },
   body: {
     paddingHorizontal: theme.layout.panelGap * 1.5,

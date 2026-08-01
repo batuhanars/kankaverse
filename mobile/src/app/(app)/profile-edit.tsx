@@ -14,6 +14,7 @@ import { authApi } from '@/api/auth';
 import { extractErrorMessage } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth';
 import { ProfileMediaFields, type MediaSlot } from '@/components/me/ProfileMediaFields';
+import { BannerSheet } from '@/components/me/BannerSheet';
 import { MAX_IMAGE_BYTES, pickImage, putImage } from '@/utils/imageUpload';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -50,6 +51,7 @@ export default function ProfileEditScreen() {
   const [uploading, setUploading] = useState<MediaSlot | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [savedNotice, setSavedNotice] = useState('');
+  const [bannerSheet, setBannerSheet] = useState(false);
 
   const userId = user?.id;
   useFocusEffect(
@@ -117,15 +119,19 @@ export default function ProfileEditScreen() {
     }
   }
 
-  async function onRemove(slot: MediaSlot) {
-    if (uploading) return;
-    setUploading(slot);
+  /**
+   * Afiş rengi preset'i (`null` → marka varsayılanı). Renk seçilince **yüklenmiş afiş görseli
+   * kaldırılır**: görsel varsa renk zaten görünmezdi, kullanıcı seçtiği rengin işe yaramadığını
+   * sanırdı. Web'de de renk yalnız görsel yokken geçerli (`bannerImage.hint`).
+   */
+  async function onPickBannerColor(key: string | null) {
+    setBannerSheet(false);
     setErrorMessage('');
+    setUploading('banner');
     try {
-      if (slot === 'avatar') await usersApi.setAvatar(null);
-      else await usersApi.setBanner(null);
+      if (card?.bannerUrl) await usersApi.setBanner(null);
+      await usersApi.updateProfile({ bannerColor: key });
       if (userId) setCard(await usersApi.getCard(userId));
-      if (slot === 'avatar') await refreshUser().catch(() => {});
     } catch (e) {
       setErrorMessage(extractErrorMessage(e));
     } finally {
@@ -144,8 +150,9 @@ export default function ProfileEditScreen() {
           username={user.username}
           card={card}
           uploading={uploading}
-          onPick={onPickAndUpload}
-          onRemove={onRemove}
+          // Afişte önce panel açılır (renk mi görsel mi); avatarda doğrudan galeri — avatarın
+          // rengi yok, araya bir soru koymak gereksiz dokunuş olurdu.
+          onEdit={(slot) => (slot === 'banner' ? setBannerSheet(true) : onPickAndUpload('avatar'))}
         />
 
         {/* Biyografi */}
@@ -171,6 +178,17 @@ export default function ProfileEditScreen() {
           )}
         </Pressable>
       </ScrollView>
+
+      <BannerSheet
+        visible={bannerSheet}
+        currentColor={card?.bannerColor ?? null}
+        onClose={() => setBannerSheet(false)}
+        onPickColor={onPickBannerColor}
+        onPickImage={() => {
+          setBannerSheet(false);
+          void onPickAndUpload('banner');
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

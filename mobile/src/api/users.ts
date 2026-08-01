@@ -23,6 +23,11 @@ export interface UserCardDto {
 
 export interface UpdateProfileDto {
   bio?: string;
+  /**
+   * 🔴 Serbest renk DEĞİL — sunucunun allowlist'indeki **preset anahtarı** ('blue', 'cream'…) ya da
+   * `null` (marka varsayılanı). Bkz. `utils/bannerColor.ts` ve `api/src/common/banner-presets.ts`.
+   */
+  bannerColor?: string | null;
 }
 
 /** `api/src/shared/media/image-upload.service.ts` `PresignResult` — birebir iki alan. */
