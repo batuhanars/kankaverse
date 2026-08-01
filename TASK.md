@@ -1435,9 +1435,21 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   **Konmadı:** Favori · Sustur/Bildirim (kendi sözleşmesi) · Kanal ID · "DM'yi Kapat" (aynı işe iki ad).
   Okunmamış yoksa "Okunmuş İşaretle" **soluk + pasif** (yetki değil DURUM kuralı).
   *Yan iş: `DmSidebar` 312 satırdı → `DmRow` ayrıldı; panelin iç akışı `DmMenuHost`ta (ana ekran 284)*
-- [ ] **Mesaj alt paneli** (mesaja uzun basış): hızlı emoji şeridi (**web'in kümesi, uydurma yok**) +
-  Yanıtla · Düzenle (yalnız kendi) · Metni Kopyala · Sabitle (yetkiliyse) · Sil (`ConfirmDialog`)
-- [ ] **Tepki gösterimi:** `MessageDto.reactions` tiplenir, baloncuk altında pill'ler, tekrar dokun → kalkar
+- [~] **Mesaj alt paneli** (mesaja uzun basış): hızlı emoji şeridi (**web'in kümesi okundu:
+  👍 ❤️ 😂, uydurulmadı**) + Metni Kopyala + Sil (yalnız kendi, `ConfirmDialog`) **BAĞLANDI**.
+  *Yanıtla ve Düzenle satırları duruyor ama henüz bağlı değil — ikisi de giriş kutusuna mod
+  ekliyor, sıradaki adım.*
+  - 🔴 **Sabitle KONMADI (PM kararı, sözleşme §2.4 revizesi):** uç var ama mobilde sabitlenmiş
+    mesajları GÖSTEREN yüzey yok (web'de `PinsPopover`, mobilde yok) → sabitlenen mesaj görülemezdi.
+    M1d-B'deki ses kanalı kararının aynısı: **görülemeyen sonuç üretilmez**
+  - Yetki sunucudan okundu, uydurulmadı: **düzenleme ve silme yalnız YAZAR** (`messages.controller`),
+    tepki her üye. Yetkisizde satır **hiç render edilmiyor**
+- [x] **Tepki gösterimi + canlı güncelleme:** `MessageDto.reactions` tiplendi, baloncuk altında
+  pill'ler (kendi tepkim Kor kenarlıklı), tekrar dokun → kalkar.
+  🔴 **`reaction.added`/`reaction.removed` WS olayları mobilde HİÇ dinlenmiyordu** → eklendi.
+  Sunucu mesajın tamamını değil **delta** yayıyor, toplamı istemci tutuyor (`applyReaction`).
+  **İyimser güncelleme YOK** — tek yazma yolu WS olayı; yoksa kendi tepkim iki kez sayılırdı
+  (M1a `message.created` echo dersi)
 - [ ] **Yanıt:** giriş kutusu üstünde alıntı şeridi + iptal; gönderimde `replyToId` (**uç zaten destekliyor**)
 - [ ] **Okunmuş işaretle:** okunmamış yoksa **soluk + pasif** (yetki değil DURUM kuralı)
 

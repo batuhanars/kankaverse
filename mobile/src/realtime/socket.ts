@@ -5,6 +5,7 @@ import { useTypingStore } from '@/stores/typing';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
+import { useAuthStore } from '@/stores/auth';
 import type { MessageDto } from '@/api/messages';
 import type { FriendDto, FriendRequestDto } from '@/api/friends';
 
@@ -109,6 +110,19 @@ function ensureSocket(): Socket {
   socket.on('message.deleted', (data: { messageId: string; channelId: string }) => {
     useMessagesStore.getState().removeMessage(data.channelId, data.messageId);
   });
+
+  // M1d-C — tepkiler. Sunucu mesajın tamamını değil DELTA yayar (`broadcastReaction`), toplamı
+  // istemci tutar. Kendi tepkim de buradan döner: istekten sonra iyimser güncelleme YAPILMIYOR,
+  // tek yazma yolu bu olay — yoksa aynı tepki iki kez sayılırdı (M1a'daki `message.created` echo
+  // dersinin aynısı).
+  const applyReaction = (added: boolean) => (data: { messageId: string; channelId: string; emoji: string; userId: string }) => {
+    const myId = useAuthStore.getState().user?.id;
+    useMessagesStore
+      .getState()
+      .applyReaction(data.channelId, data.messageId, data.emoji, added, data.userId === myId);
+  };
+  socket.on('reaction.added', applyReaction(true));
+  socket.on('reaction.removed', applyReaction(false));
 
   socket.on('typing:update', (data: { userId: string; username: string; channelId: string }) => {
     useTypingStore.getState().handleUpdate(data.channelId, data.userId, data.username);

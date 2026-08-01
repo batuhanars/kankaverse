@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { messagesApi, type MessageDto } from '@/api/messages';
+import { messagesApi } from '@/api/messages';
 import { extractErrorMessage } from '@/api/errors';
 import { MessageBubble } from './MessageBubble';
 import { MessageSearchModal } from './MessageSearchModal';
@@ -20,6 +20,8 @@ import { MessageComposer } from './message/MessageComposer';
 import { useTypingEmitter } from './message/useTypingEmitter';
 import { useMessageListController } from './message/useMessageListController';
 import { MessageEmpty, MessageError, MessageLoading } from './message/MessageStates';
+import { MessageActionHost } from './message/MessageActionHost';
+import { useMessageActions } from './message/useMessageActions';
 import { useMessagesStore } from '@/stores/messages';
 import { useAuthStore } from '@/stores/auth';
 import { joinChannel, leaveChannel, setActiveChannel } from '@/realtime/socket';
@@ -27,23 +29,6 @@ import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 type LoadState = 'loading' | 'error' | 'ready';
-
-interface RenderItem {
-  message: MessageDto;
-  showAuthor: boolean;
-}
-
-function buildRenderItems(messages: MessageDto[]): RenderItem[] {
-  const FIVE_MIN = 5 * 60 * 1000;
-  return messages.map((message, idx) => {
-    const prev = messages[idx - 1];
-    const showAuthor =
-      !prev ||
-      prev.author.id !== message.author.id ||
-      new Date(message.createdAt).getTime() - new Date(prev.createdAt).getTime() > FIVE_MIN;
-    return { message, showAuthor };
-  });
-}
 
 interface Props {
   channelId: string;
@@ -59,10 +44,8 @@ interface Props {
   // bileşenin aynı route için headerRight yazması güvenilmez sırayla ezilir).
   headerActions?: ReactNode;
   /**
-   * 🔴 Mesaj arama gösterilsin mi (sahip kararı 2026-08-01). Varsayılan AÇIK; **1-1 DM'de kapalı**
-   * geçilir. Gerekçe: arama ortam kanallarında değerli (çok kişi, çok gün, kaybolan mesaj);
-   * 1-1 DM'de karşında tek kişi var ve konuşma doğrusal — buton yer kaplayıp iş görmüyordu.
-   * Grup DM'de ve ortam kanalında AÇIK kalır. Web'de de aynı kaldırma yapıldı (`DmConversation`).
+   * 🔴 Mesaj arama gösterilsin mi (sahip kararı 2026-08-01). Varsayılan AÇIK, **1-1 DM'de kapalı**:
+   * arama ortam kanallarında değerli, 1-1'de karşında tek kişi var. Web'de de aynısı yapıldı.
    */
   searchable?: boolean;
 }
@@ -80,7 +63,6 @@ export function MessageScreen({
   searchable = true,
 }: Props) {
   const authUser = useAuthStore((s) => s.user);
-  const channelState = useMessagesStore((s) => s.byChannel[channelId]);
   const fetchInitial = useMessagesStore((s) => s.fetchInitial);
   const appendMessage = useMessagesStore((s) => s.appendMessage);
   const seedKnownUser = useMessagesStore((s) => s.seedKnownUser);
@@ -130,9 +112,7 @@ export function MessageScreen({
 
     markRead(channelId).catch(() => {});
     // contract §4.3 — reconnect sonrası bu kanalın mesajları yeniden çekilir (boşluk bırakmaz).
-    setActiveChannel(channelId, () => {
-      fetchMessages();
-    });
+    setActiveChannel(channelId, fetchMessages);
     joinChannel(channelId).then((ack) => {
       if (__DEV__ && !ack.ok) console.warn('[MessageScreen] join başarısız:', ack.error);
     });
@@ -150,11 +130,11 @@ export function MessageScreen({
     if (authUser) seedKnownUser(channelId, authUser.id, authUser.username);
   }, [authUser, channelId, seedKnownUser]);
 
-  const items = useMemo(() => buildRenderItems(channelState?.messages ?? []), [channelState?.messages]);
-  const inverted = useMemo(() => [...items].reverse(), [items]);
-
-  // Kaydırma davranışı (dibe yapışma · yeni mesaj sayacı · mesaja zıplama) kendi kancasında.
-  const list = useMessageListController(channelId, items, inverted, authUser?.id);
+  // Liste verisi + kaydırma davranışı (gruplama · dibe yapışma · yeni mesaj sayacı · zıplama).
+  const list = useMessageListController(channelId, authUser?.id);
+  const { items, inverted } = list;
+  // Mesaj paneli akışı (uzun basış · tepki · kopyala · sil) — M1d-C §2.4.
+  const actions = useMessageActions(channelId);
 
   function onChangeInput(text: string) {
     setInput(text);
@@ -185,12 +165,9 @@ export function MessageScreen({
   // pencere klavye açılınca ZATEN küçülüyor, yani pay ikinci kez eklenmiş oldu. Üç tuşlu cihazda
   // ise tersi çıktı, eksik kaldı. Varsayım yanlıştı: "pencere küçülmez" her cihazda doğru değil.
   //
-  // Doğru olan ÖLÇMEK: `KeyboardAvoidingView` klavye yüksekliğini varsaymaz, görünümün gerçek
-  // çerçevesi ile klavyenin ekran koordinatı farkını ölçer — pencere küçüldüyse fark sıfıra yakın,
-  // küçülmediyse klavye kadar çıkar; yani cihazın davranışını cihazdan öğrenir. Geri getirildi.
-  //
-  // Gezinme çubuğu payı AYRI iştir ve yalnız klavye KAPALIYKEN gerekir: edge-to-edge'de uygulama
-  // çubuğun altına çizer, kutu tuşların arkasında kalırdı. Açıkken verilmez (KAV zaten itiyor).
+  // Doğru olan ÖLÇMEK: `KeyboardAvoidingView` yüksekliği varsaymaz, görünümün gerçek çerçevesi ile
+  // klavyenin ekran koordinatı farkını ölçer; cihazın davranışını cihazdan öğrenir. Gezinme çubuğu
+  // payı AYRI iştir, yalnız klavye KAPALIYKEN verilir (açıkken KAV zaten itiyor).
   const insets = useSafeAreaInsets();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   useEffect(() => {
@@ -257,6 +234,8 @@ export function MessageScreen({
               isMine={item.message.author.id === authUser?.id}
               resolveMention={(id) => resolveUsername(channelId, id)}
               highlighted={item.message.id === list.highlightId}
+              onLongPress={() => actions.open(item.message)}
+              onToggleReaction={(emoji) => actions.toggleReaction(item.message, emoji)}
             />
           )}
         />
@@ -285,6 +264,9 @@ export function MessageScreen({
         typingLabel={typing.label}
         bottomInset={bottomInset}
       />
+
+      {/* Yanıtla ve Düzenle giriş kutusuna mod ekliyor — sıradaki adım, henüz bağlı değil. */}
+      <MessageActionHost actions={actions} onReply={actions.close} onEdit={actions.close} />
 
       {searchVisible && (
         <MessageSearchModal
