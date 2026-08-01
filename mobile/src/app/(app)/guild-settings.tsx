@@ -1,11 +1,13 @@
 import { useCallback, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { guildsApi, type GuildSummaryDto } from '@/api/guilds';
 import { extractErrorMessage } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { SettingsRow } from '@/components/guild/SettingsRow';
+import { MAX_IMAGE_BYTES, pickImage, putImage } from '@/utils/imageUpload';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -32,6 +34,7 @@ export default function GuildSettingsScreen() {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [uploadingIcon, setUploadingIcon] = useState(false);
 
   // Ortam listesi tek kaynak: ad/ikon buradan okunur (route parametresi yalnız ilk kare için).
   useFocusEffect(
@@ -45,6 +48,31 @@ export default function GuildSettingsScreen() {
 
   const isOwner = !!guild && !!myUserId && guild.ownerId === myUserId;
   const name = guild?.name ?? params.name ?? '';
+
+  /** Seç → presign → PUT → PATCH. Profil görselleriyle birebir aynı akış, aynı yardımcılar. */
+  async function onPickIcon() {
+    if (uploadingIcon) return;
+    setErrorMessage('');
+
+    const image = await pickImage();
+    if (!image) return;
+    if (image.size > MAX_IMAGE_BYTES) {
+      setErrorMessage(t('settings.avatar.errorSize'));
+      return;
+    }
+
+    setUploadingIcon(true);
+    try {
+      const presign = await guildsApi.presignIcon(guildId, image.contentType);
+      await putImage(presign, image);
+      const updated = await guildsApi.setIcon(guildId, presign.storageKey);
+      setGuild(updated);
+    } catch (e) {
+      setErrorMessage(extractErrorMessage(e) || t('guildSettings.iconErrorUpload'));
+    } finally {
+      setUploadingIcon(false);
+    }
+  }
 
   async function onConfirmLeave() {
     setLeaving(true);
@@ -70,13 +98,30 @@ export default function GuildSettingsScreen() {
 
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.header}>
-          {guild?.iconUrl ? (
-            <Image source={{ uri: guild.iconUrl }} style={styles.icon} />
-          ) : (
-            <View style={[styles.icon, styles.iconFallback]}>
-              <Text style={styles.iconFallbackText}>{name.charAt(0).toUpperCase()}</Text>
-            </View>
-          )}
+          <View>
+            {guild?.iconUrl ? (
+              <Image source={{ uri: guild.iconUrl }} style={styles.icon} />
+            ) : (
+              <View style={[styles.icon, styles.iconFallback]}>
+                <Text style={styles.iconFallbackText}>{name.charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
+
+            {/* 🔴 Kalem YALNIZ SAHİBE (sahip kararı 2026-08-01): simge uçları `yalnız OWNER`
+                istiyor, ADMIN'e gösterilse dokunduğunda 403 alırdı.
+                Ortam AFİŞİ mobilde düzenlenmez — Discord mobilde de yok; kural yalnız simge
+                için gevşetildi (M1d §10.3 afiş kısmıyla yürürlükte). */}
+            {isOwner && (
+              <Pressable onPress={onPickIcon} style={styles.iconPencil} hitSlop={8}>
+                {uploadingIcon ? (
+                  <ActivityIndicator color={theme.colors.textPrimary} size="small" />
+                ) : (
+                  <Ionicons name="pencil" size={14} color={theme.colors.textPrimary} />
+                )}
+              </Pressable>
+            )}
+          </View>
+
           <Text style={styles.guildName} numberOfLines={2}>
             {name}
           </Text>
@@ -158,6 +203,20 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: 28,
     fontWeight: '700',
+  },
+  // Simgenin sağ alt köşesine binen kalem (Discord konumu).
+  iconPencil: {
+    position: 'absolute',
+    right: -4,
+    bottom: -4,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.accent500,
+    borderWidth: 2,
+    borderColor: theme.colors.bgContent,
   },
   guildName: {
     color: theme.colors.textPrimary,

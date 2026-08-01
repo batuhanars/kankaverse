@@ -1509,15 +1509,28 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > yasak konulamıyor, ayar değiştirilemiyor.
 
 ### A yarısı — ortamı yönet (insanlar)
-- [ ] Ortam paneline **Ortam Ayarları** girişi (yetkisizde hiç render edilmez)
-- [ ] **Ortam Ayarları ekranı** (gruplu liste). **Konmaz:** Moderasyon/AutoMod · Entegrasyonlar ·
-  Emoji · Topluluk · Güvenlik · Şablonlar. İkon/afiş **gösterilir, yüklenmez**
-- [ ] **Üyeler:** arama + rol rozetleri (rolün kendi rengiyle)
-- [ ] **Üye ekranı:** rol ata/kaldır · ortam rolü (yalnız OWNER) · At · Yasakla ·
-  **Sahipliği Devret (çift onay)**. 🔴 **Takma ad alanı YOK** — `GuildMember`de alan yok
-  (izin anahtarları i18n'de var ama özellik uygulanmamış)
-- [ ] **Yasaklar** listesi + yasağı kaldır
-- [ ] **Ortamdan Ayrıl** — OWNER'da "önce devret ya da sil" sebebi yazılır (sessiz gizleme yok)
+> **A yarısı cihazda yürüdü, sorun çıkmadı (sahip, 2026-08-01)** — commit `a7d1e15`.
+
+- [x] Ortam paneline **Ortam Ayarları** girişi (yetkisizde hiç render edilmez)
+- [x] **Ortam Ayarları ekranı** (gruplu liste). **Konmadı:** Moderasyon/AutoMod · Entegrasyonlar ·
+  Emoji · Topluluk · Güvenlik · Şablonlar · **Kanallar** (kanal CRUD zaten ortam panelinde ve kanal
+  satırında; ayarlara ikinci kapı = aynı işi iki yerden yapmak — PM kararı, sahip onayladı)
+- [x] 🔴 **Ortam simgesi mobilden değiştirilebiliyor** (sahip talebi 2026-08-01): simgeye binen
+  kalem → galeri → presign/PUT/PATCH. **Yalnız OWNER'a render edilir** (uçlar `yalnız OWNER`
+  istiyor; ADMIN'e gösterilse dokunduğunda 403 alırdı).
+  **Görsel yükleme kuralının güncel hâli:** kullanıcı avatarı ✅ · kullanıcı afişi ✅ ·
+  **ortam simgesi ✅** · **ortam afişi ❌** (Discord mobilde de yok, sahip doğruladı).
+  Yani "mobil yüklemez" artık yalnız ortam afişi için geçerli
+- [x] **Üyeler:** arama + rol rozetleri (rolün kendi rengiyle). *Rozetler `GuildMemberDto.roles`
+  içinde HAZIR geliyor — rozet için ayrıca rol ucu çağrılmadı. Arama istemci tarafında (sunucuda
+  üye arama ucu yok)*
+- [x] **Üye ekranı:** roller (gösterim) · ortam rolü (yalnız OWNER) · At · Yasakla ·
+  **Sahipliği Devret**. 🔴 **Takma ad alanı YOK** — `GuildMember`de alan yok
+  (izin anahtarları i18n'de var ama özellik uygulanmamış).
+  *Rol ATAMA B yarısında; hedefi olmayan "Rolleri Düzenle" satırı konmadı*
+- [x] **Yasaklar** listesi + yasağı kaldır (onaylı). Sebep boşsa satır yazılmaz, dolgu metin yok
+- [x] **Ortamdan Ayrıl** — OWNER'da "önce devret ya da sil" sebebi **önceden** yazılır;
+  metin sunucunun ret mesajıyla aynı şeyi söyler (iki yerde farklı cümle olmasın)
 
 ### B yarısı — ortamı yapılandır
 - [ ] **Genel:** ad · `adultsOnly` (T&S kapısı, açıklamasıyla) · **Ortamı Sil**

@@ -101,9 +101,23 @@ Discord'un "Sunucu Ayarları" düzeni; **bizim sahip olduğumuz bölümler**:
 | Kullanıcı yönetimi | **Üyeler** · **Roller** (B) · **Davetler** (B) · **Yasaklar** |
 | Tehlikeli | **Ortamdan Ayrıl** · **Ortamı Sil** (yalnız OWNER, B) |
 
-🔴 **Konmaz:** Moderasyon/AutoMod · Entegrasyonlar · Emoji · Topluluk · Güvenlik · Şablonlar.
-Üstte ortam ikonu + adı **gösterilir**; ikon/afiş **yükleme yok** (M1d §10.3 kuralı sürüyor —
-sahip istisnası yalnız kullanıcının kendi profiliydi).
+🔴 **Konmaz:** Moderasyon/AutoMod · Entegrasyonlar · Emoji · Topluluk · Güvenlik · Şablonlar ·
+**Kanallar** (kanal oluştur/düzenle/sil zaten ortam panelinde ve kanal satırında — ayarlara ikinci
+kapı açmak aynı işi iki yerden yapmak olurdu; PM kararı, sahip onayladı 2026-08-01).
+
+### 🔴 Görsel yükleme kuralının GÜNCEL hâli (sahip kararı 2026-08-01)
+
+M1d §10.3'te "görsel yükleme yüzeyleri web/masaüstüne mahsus, mobil yalnız gösterir" yazmıştı.
+Kural iki kez daraltıldı; **bugünkü tam hâli budur:**
+
+| Görsel | Mobilde yükleme | Not |
+|---|---|---|
+| Kullanıcı avatarı | ✅ var | M1d-C §3.3 istisnası |
+| Kullanıcı profil afişi | ✅ var | aynı istisna |
+| **Ortam simgesi** | ✅ **var** | **yalnız OWNER** (uç öyle istiyor); ayarlar ekranında simgeye binen kalem |
+| **Ortam afişi** | ❌ **yok** | Discord mobilde de yok (sahip doğruladı) — kural burada yürürlükte |
+
+Yani "mobil yüklemez" artık yalnız **ortam afişi** için geçerli.
 
 ### 2.3 Üyeler ekranı
 Arama + satırlar: avatar · kullanıcı adı · **rol rozetleri** (rolün kendi rengiyle).

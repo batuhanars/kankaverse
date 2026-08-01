@@ -1,4 +1,7 @@
 import http from './http';
+// Presign sonucu kullanıcı görselleriyle AYNI şekil (`{ uploadUrl, storageKey }`) — ikinci bir tip
+// tanımlanmadı, sunucuda da tek `PresignResult` var.
+import type { PresignResult } from './users';
 
 // Sprint M0 contract §8, ekran 3 — yalnız "ikon + ad" gösteriliyor; DTO'nun tamamı (web
 // GuildDto — web/src/types/index.ts) M0'da tüketilmiyor, bu yüzden yalnız kullanılan alt küme
@@ -158,6 +161,26 @@ export const guildsApi = {
   /** OWNER ayrılamaz — sunucu reddeder, mesajı gösterilir (sessiz gizleme yok). */
   async leave(guildId: string): Promise<null> {
     const res = await http.post<null>(`/guilds/${guildId}/leave`);
+    return res.data;
+  },
+
+  /**
+   * Ortam simgesi yükleme (sahip kararı 2026-08-01) — akış profil görselleriyle aynı:
+   * presign → PUT → PATCH `storageKey`.
+   *
+   * 🔴 **Yalnız OWNER** (`guilds.controller`: "yalnız OWNER"); presign ayrıca e-posta doğrulaması
+   * ister. ADMIN'e kalem gösterilmez.
+   * 🔴 **Ortam AFİŞİ mobilde düzenlenmez** — Discord mobilde de yok (sahip doğruladı), kural o
+   * yüzden yalnız simge için gevşetildi.
+   */
+  async presignIcon(guildId: string, contentType: string): Promise<PresignResult> {
+    const res = await http.post<PresignResult>(`/guilds/${guildId}/icon/presign`, { contentType });
+    return res.data;
+  },
+
+  /** `storageKey: null` → simgeyi kaldır. */
+  async setIcon(guildId: string, storageKey: string | null): Promise<GuildSummaryDto> {
+    const res = await http.patch<GuildSummaryDto>(`/guilds/${guildId}/icon`, { storageKey });
     return res.data;
   },
 };
