@@ -11,6 +11,8 @@ export interface GuildSummaryDto {
   name: string;
   iconUrl: string | null;
   ownerId: string;
+  // M1d-B §10.3 — afiş mobilde GÖSTERİLİR (yüklenmez). Sunucu `toGuildDto`'da zaten dönüyordu.
+  bannerUrl: string | null;
 }
 
 // Sprint M1d §0 — sunucu `GET /invites/:code` için YALNIZ bu üç alanı dönüyor
