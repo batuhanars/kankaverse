@@ -48,8 +48,8 @@
 ### DoD-A — sohbet aksiyonları
 1. DM başlığının sağ üstü **tamamen boş** (sahip kararı: orası sesli/görüntülü aramaya ayrıldı).
 2. DM satırına **uzun basınca alt panel** açılıyor; içindeki aksiyonlar çalışıyor.
-3. Aynı panel **sohbetin içinden de** açılabiliyor (başlıktaki ada/avatara dokun) — yoksa arama ve
-   sohbeti temizle sohbetin içinden erişilemez hâle gelirdi.
+3. 1-1 DM'de **başlıktaki ada/avatara dokununca karşı tarafın profil ekranı** açılıyor; mesaj arama
+   oradan erişilebiliyor (sahip kararı 2026-08-01 — panel değil profil).
 4. **Mesaja uzun basınca alt panel** açılıyor: hızlı emoji şeridi + aksiyonlar.
 5. Mesaja **tepki verebiliyorum**, tepkiler baloncukta görünüyor, tekrar dokununca kalkıyor.
 6. **Yanıtlayabiliyorum**; yanıt alıntısı hem yazarken hem gönderilen mesajda görünüyor.
@@ -75,17 +75,25 @@
 561 satır. Yeni panel + tepki + yanıt kodu buraya eklenirse 700'ü aşar. Önce ayrıştır (öneri:
 mesaj listesi · giriş kutusu · başlık aksiyonları). **Davranış değişmez**, saf taşıma; sonra özellik.
 
-### 2.2 DM başlığı boşaltma
-Sağ üstteki **çöp kutusu + arama** kalkar. Ada/avatara dokun → §2.3 paneli.
+### 2.2 DM başlığı boşaltma + başlığa dokunuş (sahip kararı 2026-08-01)
+Sağ üstteki **çöp kutusu + arama** kalkar; köşe **tamamen boş** kalır.
 🔴 Sesli/görüntülü için **yer tutucu ikon KONMAZ** (boş yüzey açma).
 
-### 2.3 DM alt paneli (uzun basış + başlığa dokunuş)
+**Ada/avatara dokunuş → alt panel DEĞİL, profil:**
+- **1-1 DM** → karşı tarafın profil ekranı (`GET /users/:id/card`; mevcut `ProfileCardModal`
+  yetmiyorsa tam ekran profil). Sahip referansı: Discord DM başlığı → kullanıcı profili.
+- **Grup DM** → mevcut grup ekranı (`group/[id]`, üyeler + yeniden adlandırma) korunur.
+- **Mesaj arama** bu profil/grup ekranından açılır (referanstaki "Ara" dairesi). Böylece başlık
+  boşalırken arama sohbetin içinden erişilebilir kalır — DM paneli **yalnız listeden** açılır.
+- 🔴 Referanstaki **Sustur** dairesi KONMAZ (bildirim tercihleri kendi sözleşmesinde, §7).
+
+### 2.3 DM alt paneli (**yalnız listede uzun basış**)
 Referans düzen sahip ekran görüntüsü (Discord DM paneli): grup grup bloklar, iri satırlar, ikon + metin.
 **Düzen alınır, içerik alınmaz.** Panelde **yalnız sahip olduğumuz** aksiyonlar:
 
 | Satır | Koşul | Bağlanan |
 |---|---|---|
-| Profil | her zaman | mevcut `ProfileCardModal` |
+| Profil | her zaman | §2.2'deki profil yolu (aynı hedef, iki giriş) |
 | Kanka Ekle | arkadaş değilse **ve** `canMessage`/kart izin veriyorsa | mevcut tıkla-ekle akışı |
 | Mesajlarda Ara | her zaman | mevcut `MessageSearchModal` |
 | Okunmuş Olarak İşaretle | **okunmamış yoksa soluk + pasif** | mevcut `markRead` |
