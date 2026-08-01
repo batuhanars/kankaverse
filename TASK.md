@@ -1368,9 +1368,21 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   verilmez** (`KeyboardAvoidingView` zaten itiyor, üstüne eklenirse kutu havada kalırdı).
   *Aynı kusur DÖRT alt panelde de vardı* (sabit `paddingBottom: 28` jest gezinmede kazara yetiyordu) →
   `components/home/sheetInsets.ts` ile hepsi gerçek insete bağlandı
-- [ ] **Sistem gezinme çubuğu ilk açılışta BEYAZ** (sahip bulgusu): login ekranına çıkıp dönünce
-  düzeliyor. Düzeltilmedi. Sahip varsayımı "APK/mağaza sürümünde çıkmaz" — **doğrulanmadı**, bu bir
-  Expo Go varsayımı değil `expo-system-ui` zamanlama sorunu olabilir; dev build alınınca bakılacak
+- [x] 🔴 **Sistem gezinme çubuğu ilk açılışta BEYAZ** (sahip bulgusu) — düzeltildi. Kök sebep
+  gezinme çubuğunun rengi DEĞİL: edge-to-edge'de çubuk **şeffaf** çizilir ve arkasındaki **pencere
+  zemini** görünür; Android pencere zemini varsayılan açık renk, uygulamanın koyu View'ı üstüne
+  çizilene kadar beyaz görünüyordu (login'e çıkıp dönünce düzelmesi bu yüzden). `expo-system-ui`
+  ile pencere zemini native tarafta `bgRail`e çekildi (**yeni bağımlılık değil**, zaten kuruluydu);
+  ayrıca `app.json` `androidNavigationBar.barStyle: light-content` (bu yalnız gerçek build'de etkili)
+- [x] 🔴 **Klavye açılınca mesaj kutusu doğru kaymıyordu** (üç tuşlu cihaz). `KeyboardAvoidingView`
+  Android'de yüksekliği görünüm çerçevesi ile klavyenin ekran koordinatı farkından türetiyor ve bu
+  fark edge-to-edge'de gezinme türüne göre değişiyor → **doğruluğu cihaza bağlıydı**. Kaldırıldı;
+  alt boşluk tek yerde `max(klavye yüksekliği, insets.bottom)` ile hesaplanıyor. Toplama YAPILMAZ:
+  Android'in IME inset'i klavye görünürken gezinme çubuğu alanını zaten kapsar
+- [ ] **Aynı `KeyboardAvoidingView` deseni 13 ekranda daha var** (formlar: login/register/kanal-kur/
+  kanka-ekle…). Aynı cihaz-bağımlılığı sınıfı, ama içerik üstte olduğu için etkisi küçük.
+  **Mesaj ekranındaki düzeltme üç tuşlu cihazda doğrulandıktan SONRA** süpürülecek — doğrulanmamış
+  bir formülü 13 ekrana yaymak, tek ekranda yanılmaktan pahalıya patlar
 - [ ] **Teknik borç:** `MessageScreen.tsx` **561 satır** (300 eşiği). Bugünkü inset düzeltmesi 23
   satır ekledi, dosya zaten eşiği aşmıştı. Bölme ayrı iş, PM kararı
 

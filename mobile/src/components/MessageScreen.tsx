@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   FlatList,
   Keyboard,
-  KeyboardAvoidingView,
   Pressable,
   StyleSheet,
   Text,
@@ -317,35 +316,41 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
 
   const label = typingLabel();
 
-  // 🔴 Sistem gezinme çubuğu payı (sahip bulgusu 2026-08-01, ÜÇ TUŞLU gezinmeli cihaz). SDK 54'te
-  // edge-to-edge varsayılan AÇIK: uygulama pencerenin tamamına, yani gezinme çubuğunun da ALTINA
-  // çiziyor. Jest gezinmeli cihazda (sahibin telefonu) alttaki çubuk ince olduğu için sorun
-  // görünmüyordu; üç tuşlu cihazda tuşlar doğrudan mesaj kutusunun üstüne biniyor ve "Gönder"e
-  // basılamıyor. Ekranın tamamı yerine YALNIZ alt şerit paylanır — mesaj listesi çubuğun altına
-  // akmaya devam etmeli (edge-to-edge'in istediği görünüm bu).
+  // 🔴 Alt boşluk TEK bir yerde hesaplanır: `max(klavye yüksekliği, gezinme çubuğu payı)`.
   //
-  // Klavye açıkken pay VERİLMEZ: `KeyboardAvoidingView` zaten klavye kadar itiyor, üstüne bir de
-  // gezinme payı eklenirse giriş kutusu klavyenin üstünde havada durur. Klavye açıkken gezinme
-  // çubuğu da klavyenin üstünde değil, klavyenin kendi alanında çizilir.
+  // İki ayrı sahip bulgusu (2026-08-01, ÜÇ TUŞLU gezinmeli ikinci cihaz) aynı köke çıkıyordu:
+  //  (1) klavye kapalıyken mesaj kutusu gezinme tuşlarının arkasında kalıyordu,
+  //  (2) klavye açılınca kutu klavyeyle birlikte doğru kaymıyordu.
+  // Sebep SDK 54'te edge-to-edge'in varsayılan AÇIK olması: uygulama pencerenin tamamına, gezinme
+  // çubuğunun da ALTINA çiziyor. Jest gezinmeli cihazda (sahibin telefonu) alttaki şerit ince
+  // olduğu için ikisi de görünmüyordu.
+  //
+  // `KeyboardAvoidingView` KALDIRILDI: Android'de yüksekliği görünüm çerçevesi ile klavyenin ekran
+  // koordinatının farkından türetiyor ve bu fark edge-to-edge'de cihazın gezinme türüne göre
+  // değişiyor — yani doğruluğu cihaza bağlıydı. Android'in IME inset'i klavye görünürken gezinme
+  // çubuğu alanını ZATEN kapsar (çubuk klavyenin üstüne çizilir), dolayısıyla ikisini toplamak
+  // yanlış olur; büyük olanı almak iki gezinme türünde de doğrudur:
+  //   • klavye kapalı → `insets.bottom` (jest ~24dp, üç tuşlu ~48dp)
+  //   • klavye açık   → klavye yüksekliği (gezinme payını zaten içerir)
   const insets = useSafeAreaInsets();
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    const show = Keyboard.addListener('keyboardDidShow', (e) =>
+      setKeyboardHeight(e.endCoordinates?.height ?? 0),
+    );
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
     return () => {
       show.remove();
       hide.remove();
     };
   }, []);
-  const bottomInset = keyboardVisible ? 0 : insets.bottom;
+  const bottomInset = Math.max(keyboardHeight, insets.bottom);
 
-  // Klavye: Android'de de `padding` (sahip bulgusu 2026-07-30, fiziksel cihaz). `behavior` Android'de
-  // undefined bırakılmıştı, yani KeyboardAvoidingView hiçbir şey yapmıyordu. Dev, Android'in pencereyi
-  // kendi küçültmesine (adjustResize) güvenmiş; ama SDK 54'te edge-to-edge varsayılan AÇIK olduğu için
-  // pencere küçülmüyor, uygulama klavyenin ALTINA çiziyor → giriş kutusu klavyenin arkasında kalıyor,
-  // kullanıcı ne yazdığını görmüyor.
+  // Alt boşluk KAPSAYICIDA: mesaj listesi de klavye/gezinme kadar kısalır, giriş kutusu her zaman
+  // görünür alanın en altında kalır. (Önceki `KeyboardAvoidingView behavior="padding"` aynı işi
+  // yapmaya çalışıyordu ama yüksekliği cihaza göre değişiyordu — bkz. yukarıdaki hesap.)
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior="padding">
+    <View style={[styles.flex, { paddingBottom: bottomInset }]}>
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -437,11 +442,11 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
       )}
 
       {disabledNotice ? (
-        <View style={[styles.disabledBar, { paddingBottom: theme.layout.panelGap + bottomInset }]}>
+        <View style={styles.disabledBar}>
           <Text style={styles.disabledText}>{disabledNotice}</Text>
         </View>
       ) : (
-        <View style={[styles.inputBar, { paddingBottom: theme.layout.panelGap + bottomInset }]}>
+        <View style={styles.inputBar}>
           {sendError ? <Text style={styles.sendError}>{sendError}</Text> : null}
           <View style={styles.inputRow}>
             <TextInput
@@ -466,7 +471,7 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
       {searchVisible && (
         <MessageSearchModal channelId={channelId} onClose={() => setSearchVisible(false)} onJump={requestJump} />
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

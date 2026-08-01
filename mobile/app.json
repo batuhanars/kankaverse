@@ -7,6 +7,9 @@
     "icon": "./assets/images/icon.png",
     "scheme": "kankaverse",
     "userInterfaceStyle": "dark",
+    "androidNavigationBar": {
+      "barStyle": "light-content"
+    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
