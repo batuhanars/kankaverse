@@ -180,14 +180,26 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xl,
   },
+  // 🔴 İki kritik ayrıntı (sahip bulgusu 2026-08-01, üçüncü deneme): ortam seçiliyken baloncuk
+  // ikonu HİÇ çizilmiyordu — kutu (zemin) görünüyor, glif yok.
+  //
+  // Kuvvetli hipotez: Android'de `overflow: 'hidden'` + `borderRadius` + `backgroundColor`
+  // birleşimi, kenarlık YOKKEN çocukların zeminin ALTINA çizilmesine yol açıyor (yuvarlatılmış
+  // zemin ayrı bir clip/outline yoluna düşüyor). Kenarlık eklenince çizim yolu değişiyor — aktif
+  // durumda `borderWidth: 2` olduğu için orada sorun görünmüyordu. Bütün kanıtlara uyan tek
+  // açıklama bu: kutu var, glif yok, yalnız kenarlıksız durumda, aynı ikon başka ekranlarda temiz.
+  //
+  // Bu yüzden iki şey birden yapıldı: `overflow: 'hidden'` KALDIRILDI (zaten taşan bir şey yok,
+  // 22px ikon 48px kutunun içinde) ve kenarlık HER İKİ durumda da duruyor, yalnız RENGİ değişiyor.
+  // Yan fayda: kutu artık aktif/pasif geçişinde 2px zıplamıyor (kenarlık kutu ölçüsünü büyütüyordu).
   icon: {
     width: SIZE,
     height: SIZE,
     borderRadius: theme.radius.md,
-    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   iconActive: {
-    borderWidth: 2,
     borderColor: theme.colors.accent500,
   },
   hexWrap: {
