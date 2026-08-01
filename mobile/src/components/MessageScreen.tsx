@@ -44,6 +44,12 @@ interface Props {
   // bileşenin aynı route için headerRight yazması güvenilmez sırayla ezilir).
   headerActions?: ReactNode;
   /**
+   * Sprint M1g R1 — ekran açılır açılmaz bu mesaja git ve **geçici olarak vurgula**.
+   * Ortam içi aramadan gelir. Atlama/vurgulama makinesi zaten `useMessageListController`'daydı
+   * (kanal içi arama kullanıyordu); eksik olan tek şey DIŞARIDAN tetiklenmesiydi.
+   */
+  jumpToMessageId?: string;
+  /**
    * 🔴 Mesaj arama gösterilsin mi (sahip kararı 2026-08-01). Varsayılan AÇIK, **1-1 DM'de kapalı**:
    * arama ortam kanallarında değerli, 1-1'de karşında tek kişi var. Web'de de aynısı yapıldı.
    */
@@ -61,6 +67,7 @@ export function MessageScreen({
   disabledNotice,
   headerActions,
   searchable = true,
+  jumpToMessageId,
 }: Props) {
   const authUser = useAuthStore((s) => s.user);
   const fetchInitial = useMessagesStore((s) => s.fetchInitial);
@@ -129,10 +136,11 @@ export function MessageScreen({
   }, [authUser, channelId, seedKnownUser]);
 
   // Liste verisi + kaydırma davranışı (gruplama · dibe yapışma · yeni mesaj sayacı · zıplama).
-  const list = useMessageListController(channelId, authUser?.id);
+  const list = useMessageListController(channelId, authUser?.id, jumpToMessageId);
   const { items, inverted } = list;
   // Mesaj paneli akışı (uzun basış · tepki · kopyala · sil) — M1d-C §2.4.
   const actions = useMessageActions(channelId);
+
 
   // 🔴 Klavye + gezinme çubuğu payı — bu blok İKİ KEZ yanlış kuruldu, ikisi de kayda geçiyor.
   //

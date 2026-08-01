@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { ChannelSummaryDto } from '@/api/channels';
+import type { GuildMemberDto } from '@/api/guilds';
 import type { GuildSearchParams } from '@/api/messages';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
 import { t } from '@/i18n';
@@ -10,21 +11,24 @@ import { theme } from '@/theme';
 /**
  * Sprint M1g §2.3 — ortam içi arama filtre paneli.
  *
- * İki filtre bağlı: **kanal** (`in`) ve **tür** (`has` = bağlantı/dosya). `from`/`mentions` uçta
- * duruyor ama üye seçici gerektiriyor, bu turda kapsam dışı — konmayan filtre yanlış çalışan
- * filtreden iyidir.
+ * Dört filtre de bağlı: **kanal** (`in`), **tür** (`has`), **gönderen** (`from`) ve **bahsedilen**
+ * (`mentions`). Son ikisi üye listesi gerektiriyordu; `GET /guilds/:id/members` zaten vardı.
+ *
+ * `from` ile `mentions` **aynı üye listesini** kullanıyor ama ayrı seçimler: "şu kişinin yazdığı"
+ * ile "şu kişiden bahseden" farklı sorular ve sunucu ikisini ayrı parametre olarak alıyor.
  *
  * Seçim ANINDA uygulanmaz, "Uygula" ile uygulanır: her dokunuşta arama tetiklemek panel açıkken
  * arkada sonuç değiştirir, kullanıcı ne olduğunu göremez.
  */
 interface Props {
   channels: ChannelSummaryDto[];
+  members: GuildMemberDto[];
   value: GuildSearchParams;
   onApply: (next: GuildSearchParams) => void;
   onClose: () => void;
 }
 
-export function SearchFilterSheet({ channels, value, onApply, onClose }: Props) {
+export function SearchFilterSheet({ channels, members, value, onApply, onClose }: Props) {
   const bottomInset = useSheetInsets();
   const [draft, setDraft] = useState<GuildSearchParams>(value);
 
@@ -33,6 +37,10 @@ export function SearchFilterSheet({ channels, value, onApply, onClose }: Props) 
   }
   function toggleHas(kind: 'link' | 'file') {
     setDraft((d) => ({ ...d, has: d.has === kind ? undefined : kind }));
+  }
+  /** Aynı üyeye tekrar dokunmak seçimi kaldırır — ayrı bir "temizle" düğmesi gerekmiyor. */
+  function toggleMember(field: 'from' | 'mentions', userId: string) {
+    setDraft((d) => ({ ...d, [field]: d[field] === userId ? undefined : userId }));
   }
 
   return (
@@ -68,6 +76,20 @@ export function SearchFilterSheet({ channels, value, onApply, onClose }: Props) 
               />
             </View>
 
+            <Text style={styles.label}>{t('guildSearch.fromLabel')}</Text>
+            <MemberPicker
+              members={members}
+              selected={draft.from}
+              onToggle={(id) => toggleMember('from', id)}
+            />
+
+            <Text style={styles.label}>{t('guildSearch.mentionsLabel')}</Text>
+            <MemberPicker
+              members={members}
+              selected={draft.mentions}
+              onToggle={(id) => toggleMember('mentions', id)}
+            />
+
             <Text style={styles.label}>{t('guildSearch.cat.in')}</Text>
             {channels.length === 0 ? (
               <Text style={styles.empty}>{t('guildSearch.noChannels')}</Text>
@@ -88,6 +110,43 @@ export function SearchFilterSheet({ channels, value, onApply, onClose }: Props) 
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+/**
+ * Yatay kaydırmalı üye şeridi. Ortam üyesi çok olabilir; dikey liste panelin tamamını yerdi ve
+ * kanal filtresi görünmez olurdu. Üye yoksa (liste gelmediyse) satır HİÇ çizilmez — boş bir
+ * şerit "üye yok" gibi yanlış okunur.
+ */
+function MemberPicker({
+  members,
+  selected,
+  onToggle,
+}: {
+  members: GuildMemberDto[];
+  selected?: string;
+  onToggle: (userId: string) => void;
+}) {
+  if (members.length === 0) {
+    return <Text style={styles.empty}>{t('guildSearch.noMembers')}</Text>;
+  }
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+      {members.map((m) => {
+        const active = selected === m.userId;
+        return (
+          <Pressable
+            key={m.userId}
+            onPress={() => onToggle(m.userId)}
+            style={[styles.choice, active && styles.choiceActive]}
+          >
+            <Text style={[styles.choiceText, active && styles.choiceTextActive]} numberOfLines={1}>
+              {m.username}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
   );
 }
 

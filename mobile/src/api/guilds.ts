@@ -157,6 +157,18 @@ export const guildsApi = {
    * Sunucuda "benim rolüm" diye ayrı bir uç YOK; web de bunu böyle yapıyor, mobil uç uydurmuyor.
    * Yetki kararı yine sunucunun — bu yalnız düğmeyi gösterip göstermeme (UX) kararı.
    */
+  /**
+   * Sprint M1g R1 — kankayı ortama davet: hedefe **kalıcı GUILD_INVITE bildirimi** düşer
+   * (`POST /guilds/:id/invite-friend`, `InviteFriendDto` = `{ userId }`).
+   *
+   * 🔴 Sunucu iki şey birden istiyor: `CREATE_INVITE` yetkisi **ve** aradaki arkadaşlık. Yani
+   * rastgele bir kullanıcıyı davet etmek mümkün değil, yalnız kankalar. İstemci bu kuralı taklit
+   * etmiyor; zaten yalnız kanka listesini gösterdiği için doğal olarak uyuyor.
+   */
+  async inviteFriend(guildId: string, userId: string): Promise<null> {
+    const res = await http.post<null>(`/guilds/${guildId}/invite-friend`, { userId });
+    return res.data;
+  },
   async getMembers(guildId: string): Promise<GuildMemberDto[]> {
     const res = await http.get<GuildMemberDto[]>(`/guilds/${guildId}/members`);
     return res.data;
