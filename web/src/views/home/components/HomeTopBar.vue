@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppShellNav } from '@/composables/useAppShellNav'
 import { isMobile, isWide } from '@/composables/useResponsive'
@@ -11,6 +11,23 @@ const { t } = useI18n()
 const { toggleLeftDrawer, toggleRightPanel, rightPanelVisible } = useAppShellNav()
 
 const showSearch = ref(false)
+
+/**
+ * 🔴 Ctrl/Cmd+K — kutuda YAZIYORDU ama bağlı DEĞİLDİ (sahip bulgusu 2026-08-01): tuşa basınca
+ * tarayıcının kendi arama/adres çubuğu açılıyordu. Söz verilen kısayolun çalışmaması, hiç
+ * yazmamaktan kötü.
+ *
+ * `preventDefault` şart: Chrome ve Firefox Ctrl+K'yı adres çubuğu aramasına bağlıyor, biz
+ * almazsak tarayıcı alır. Kısayol yalnız kutu KAPALIYKEN yakalanır — açıkken kullanıcı zaten
+ * arama alanının içinde, tuşu tarayıcıya bırakmak da doğru değil ama ikinci kez açmanın anlamı yok.
+ */
+function onKeydown(e: KeyboardEvent) {
+  if (e.key.toLowerCase() !== 'k' || !(e.ctrlKey || e.metaKey)) return
+  e.preventDefault()
+  showSearch.value = true
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
 function onSelectDm(channelId: string) {
   showSearch.value = false

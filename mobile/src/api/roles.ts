@@ -36,6 +36,11 @@ export interface CreateRoleBody {
 }
 
 export const rolesApi = {
+  /** Sprint M1i — `PATCH /guilds/:id/roles/reorder` (OWNER/ADMIN). **@everyone hariç** (sunucu). */
+  async reorder(guildId: string, items: { id: string; position: number }[]): Promise<null> {
+    const res = await http.patch<null>(`/guilds/${guildId}/roles/reorder`, { items });
+    return res.data;
+  },
   /** `position` DESC sırayla gelir (sunucu öyle döndürüyor) — istemci yeniden sıralamaz. */
   async listByGuild(guildId: string): Promise<RoleDto[]> {
     const res = await http.get<RoleDto[]>(`/guilds/${guildId}/roles`);

@@ -16,6 +16,11 @@ export interface CategoryDto {
 }
 
 export const categoriesApi = {
+  /** Sprint M1i — `PATCH /guilds/:id/categories/reorder` (OWNER/ADMIN). */
+  async reorder(guildId: string, items: { id: string; position: number }[]): Promise<null> {
+    const res = await http.patch<null>(`/guilds/${guildId}/categories/reorder`, { items });
+    return res.data;
+  },
   async listByGuild(guildId: string): Promise<CategoryDto[]> {
     const res = await http.get<CategoryDto[]>(`/guilds/${guildId}/categories`);
     return res.data;
