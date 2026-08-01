@@ -18,6 +18,9 @@ export function useMessageActions(channelId: string) {
   const [target, setTarget] = useState<MessageDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MessageDto | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Tam emoji listesi ayrı bir modal; panel KAPANIP açılıyor (iç içe modal Android'de güvenilmez).
+  // Hedef mesaj bu yüzden ayrı tutulur: panel kapanınca `target` sıfırlanıyor.
+  const [pickerTarget, setPickerTarget] = useState<MessageDto | null>(null);
 
   function open(message: MessageDto) {
     setTarget(message);
@@ -34,6 +37,24 @@ export function useMessageActions(channelId: string) {
       ? messagesApi.removeReaction(channelId, message.id, emoji)
       : messagesApi.addReaction(channelId, message.id, emoji);
     void call.catch(() => {});
+  }
+
+  /** Panelden tam listeye geç: paneli kapat, hedefi picker'a devret. */
+  function openPicker() {
+    setPickerTarget(target);
+    setTarget(null);
+  }
+
+  /**
+   * Picker'dan seçilen emoji **EKLENİR, toggle edilmez** (web `MessageItem.addReaction` ile aynı):
+   * listeden bilinçle emoji seçen kullanıcı tepki vermek istiyordur; zaten vermişse sunucu
+   * idempotent davranır. Toggle yalnız baloncuktaki pill'e dokununca çalışır.
+   */
+  function pickEmoji(emoji: string) {
+    const message = pickerTarget;
+    setPickerTarget(null);
+    if (!message) return;
+    void messagesApi.addReaction(channelId, message.id, emoji).catch(() => {});
   }
 
   async function copyText(message: MessageDto) {
@@ -58,6 +79,10 @@ export function useMessageActions(channelId: string) {
     open,
     close,
     toggleReaction,
+    pickerOpen: !!pickerTarget,
+    openPicker,
+    closePicker: () => setPickerTarget(null),
+    pickEmoji,
     copyText,
     deleteTarget,
     setDeleteTarget,
