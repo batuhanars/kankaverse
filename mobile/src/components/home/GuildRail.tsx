@@ -92,8 +92,15 @@ export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSel
           accessibilityRole="button"
           accessibilityLabel={t('mobile.home.dmEntry')}
         >
+          {/* 🔴 İkon ADI iki durumda da AYNI; yalnız RENK değişiyor (sahip bulgusu 2026-08-01:
+              ortam seçiliyken kutu tamamen boş kalıyordu — sönük değil, hiç çizilmiyordu).
+              Ad `chatbubble` ↔ `chatbubble-outline` arasında takas ediliyordu ve iki durum
+              arasındaki TEK değişen girdi buydu. Mekanizmayı koddan kanıtlayamadım: glif
+              haritada var (61973) ve aynı `chatbubble-outline` Kanallar ekranında sorunsuz
+              çiziliyor. Bu yüzden düzeltme ampirik: değişen tek girdi kaldırıldı.
+              Görsel olarak da kayıp yok — aktiflik zaten Kor kenarlık + Kor renkle anlatılıyor. */}
           <Ionicons
-            name={selection.type === 'dm' ? 'chatbubble' : 'chatbubble-outline'}
+            name="chatbubble"
             size={22}
             color={selection.type === 'dm' ? theme.colors.accent500 : theme.colors.textSecondary}
           />
