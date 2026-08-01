@@ -99,7 +99,11 @@ export default function RolePermissionsScreen() {
 
           {PERMISSION_GROUPS.map((group) => (
             <View key={group.key}>
-              <Text style={styles.groupLabel}>{t(`guildSettings.permsGroups.${group.key}`)}</Text>
+              {/* 🔴 Yol `guildSettings.roles.permsGroups` — `guildSettings.permsGroups` DEĞİL.
+                  İlk yazımda bir üst seviye sanılmıştı ve ekranda ham anahtarlar göründü
+                  (sahip bulgusu 2026-08-01). `t()` eksik anahtarda yolu basıyor; dev konsolunda
+                  "[i18n] eksik anahtar" uyarısı da vardı. */}
+              <Text style={styles.groupLabel}>{t(`guildSettings.roles.permsGroups.${group.key}`)}</Text>
               <View style={styles.group}>
                 {group.flags.map((flag, idx) => (
                   <View
@@ -108,10 +112,10 @@ export default function RolePermissionsScreen() {
                   >
                     <View style={styles.rowText}>
                       <Text style={styles.flagLabel}>
-                        {t(`guildSettings.permsFlags.${flag}.label`)}
+                        {t(`guildSettings.roles.permsFlags.${flag}.label`)}
                       </Text>
                       <Text style={styles.flagDesc}>
-                        {t(`guildSettings.permsFlags.${flag}.desc`)}
+                        {t(`guildSettings.roles.permsFlags.${flag}.desc`)}
                       </Text>
                     </View>
                     <Switch
