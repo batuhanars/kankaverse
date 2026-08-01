@@ -1497,6 +1497,25 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] **Yeni bağımlılık (PM onaylı, sahip bilgilendirildi):** `expo-image-picker` + `expo-file-system`
   (ikisi de SDK 54 içinde, **Expo Go'da çalışır, dev build gerekmez**)
 
+### 🔴 Açık karar — afiş rengi: preset mi, serbest hex mi (sahip 2026-08-01, ERTELENDİ)
+
+> Sahip serbest hex istedi, sonra "şimdilik böyle olsun" dedi. **Bugün preset kaldı** (10 anahtar),
+> mobil paneli de web Ayarlar'daki aynı swatch'ları gösteriyor. Karar ertelendi, kapanmadı.
+
+- [ ] **Serbest hex'e geçiş — kapsam (PM tahmini):**
+  - `api/`: `UpdateProfileDto.bannerColor` allowlist (`@IsIn(BANNER_PRESET_KEYS)`) → hex deseni
+    (`#RRGGBB`). Alan zaten `String`, **migration gerekmez**. T&S etkisi yok (kozmetik)
+  - `web/`: `bannerColor.ts` eşlemesi + Ayarlar swatch seçici → hex seçici
+  - `mobile/`: `BannerSheet` swatch paneli → hex seçici (`reanimated-color-picker` MIT, peer'ları
+    zaten kurulu: reanimated + gesture-handler). Yeni bağımlılık = PM onayı
+  - 🔴 **Asıl incelik — geriye dönük veri:** mevcut kullanıcılarda DB'de `'blue'`, `'cream'` gibi
+    ANAHTARLAR duruyor. Hex'e geçilirse `bannerColors()` **iki biçimi de tanımalı** (anahtar → eski
+    gradient, `#RRGGBB` → düz renk), yoksa eski profillerin afişi sessizce varsayılana düşer.
+    Alternatif: tek seferlik veri dönüşümü (anahtar → temsilci hex) — ama o gradient'i düz renge
+    indirger, görsel kayıp olur
+  - **Not:** gradient'ten düz renge geçiş bir tasarım kaybıdır; hex tek renk verir, bugünkü
+    presetler iki renkli gradient. Hex'e geçerken "gradient'i koru" istenirse iki hex gerekir
+
 ### Diğer açık kalemler (yarın)
 
 - [ ] **B yarısının DoD turu baştan yürünecek** — paneller/afiş/uzun-basış bugün çok değişti
