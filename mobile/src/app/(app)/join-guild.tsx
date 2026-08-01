@@ -11,6 +11,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { guildsApi, extractInviteCode, type InvitePreviewDto } from '@/api/guilds';
 import { extractErrorCode, extractErrorMessage } from '@/api/errors';
+import { InviteAcceptCard } from '@/components/InviteAcceptCard';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -24,11 +25,17 @@ import { theme } from '@/theme';
 // yaş durumu tutmak yeni bir sızıntı yüzeyidir.
 export default function JoinGuildScreen() {
   const router = useRouter();
-  // Sözleşme §2.6 revizesi — `GUILD_INVITE` bildirimi bu ekrana kodu HAZIR getirir. Kod yine de
-  // düzenlenebilir bir girdi olarak durur (salt-okunur yapılmadı): kullanıcı yanlış bildirime
-  // dokunduğunda ekranı terk etmeden başka kod deneyebilmeli.
+  // Sözleşme §2.6 revizesi — `GUILD_INVITE` bildirimi bu ekrana kodu HAZIR getirir.
+  //
+  // 🔴 Ekranın İKİ MODU var (sahip kararı 2026-08-01, web paritesi):
+  //  • **Davetiye modu** (kod parametreyle geldi): web `InviteAcceptView` düzeni — altıgen baş
+  //    harfler + ortam adı + 18+ rozeti + tek "Katıl". **Kod kutusu GÖSTERİLMEZ:** kod zaten
+  //    biliniyor, kullanıcıya bildiği bir şeyi düzenlettirmek gereksiz sürtünme. Web de bu yolda
+  //    input göstermiyor (kod URL'den gelir).
+  //  • **Kod girişi modu** (ray "+" → Katıl): eski davranış, kullanıcı kodu/linki yapıştırır.
   const params = useLocalSearchParams<{ code?: string }>();
   const initialCode = typeof params.code === 'string' ? params.code : '';
+  const inviteMode = !!initialCode;
 
   const [input, setInput] = useState(initialCode);
   const [preview, setPreview] = useState<InvitePreviewDto | null>(null);
@@ -37,6 +44,11 @@ export default function JoinGuildScreen() {
   const [previewing, setPreviewing] = useState(!!initialCode);
   const [joining, setJoining] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  // Önizleme hatası ile KATILMA hatası ayrı tutulur. Tek bayrağa bindirilseydi, davetiye
+  // geçerliyken sunucu katılmayı reddettiğinde (AGE_RESTRICTED / GUILD_BANNED) ekran "davet
+  // geçersiz"e düşerdi — sebebi yanlış anlatan bir yalan olurdu. Ret sebebi kartın içinde,
+  // sunucunun Türkçe mesajıyla gösterilir (sözleşme §4: metin uydurulmaz).
+  const [previewFailed, setPreviewFailed] = useState(false);
 
   const code = extractInviteCode(input);
 
@@ -48,7 +60,10 @@ export default function JoinGuildScreen() {
     guildsApi
       .previewInvite(extractInviteCode(initialCode))
       .then(setPreview)
-      .catch((e) => setErrorMessage(extractErrorMessage(e)))
+      .catch((e) => {
+        setPreviewFailed(true);
+        setErrorMessage(extractErrorMessage(e));
+      })
       .finally(() => setPreviewing(false));
   }, [initialCode]);
 
@@ -106,6 +121,27 @@ export default function JoinGuildScreen() {
 
   const canSubmit = code.length > 0 && !joining;
 
+  // ── Davetiye modu: web `InviteAcceptView`in mobil karşılığı ────────────────────────────────
+  if (inviteMode) {
+    return (
+      <View style={styles.flex}>
+        <Stack.Screen options={{ title: t('guild.joinTitle') }} />
+        <InviteAcceptCard
+          preview={preview}
+          loading={previewing}
+          // Geçersizlik YALNIZ önizlemeden gelir; katılma reddi (18+/yasak) buraya girmez, yoksa
+          // ekran "davet geçersiz" diyerek sebebi yanlış anlatırdı.
+          invalid={previewFailed || (preview !== null && !preview.valid)}
+          errorMessage={errorMessage}
+          joining={joining}
+          onJoin={onJoin}
+          onGoHome={goToHome}
+        />
+      </View>
+    );
+  }
+
+  // ── Kod girişi modu: ray "+" → Ortama Katıl ────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView style={styles.flex} behavior="padding">
       <Stack.Screen options={{ title: t('guild.joinTitle') }} />

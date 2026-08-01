@@ -1350,6 +1350,30 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   göstermiyor → sunucu haklı, mobildeki "son kanal" algısı farklı. Sunucuya dokunulmadı.
   *Açık: mobil "görünen son kanalı siliyorsun" uyarısı verebilir (sahip kararı bekliyor)*
 
+### B yarısı — sahip cihaz turu bulguları (2026-08-01)
+
+- [x] 🔴 **Davetiye ekranı web paritesine getirildi** (sahip talebi, hafızası doğru çıktı): bildirimden
+  ya da linkten gelindiğinde mobil **kod giriş kutusu** gösteriyordu — kullanıcıya zaten bildiği kodu
+  düzenletmek. Web (`InviteAcceptView.vue`) o yolda input göstermiyor, **davetiye kartı** gösteriyor:
+  altıgen baş harfler + ortam adı + 18+ rozeti + tek "Katıl". Mobil artık **iki modlu**: kod
+  parametreyle geldiyse kart, ray "+" → Katıl'dan gelindiyse eski kod girişi.
+  *Ayrım korundu: katılma reddi (18+/yasak) "davet geçersiz" ekranına DÜŞMEZ — kart ekranda kalır,
+  sunucunun mesajı kartın içinde görünür. Tek bayrağa bindirilseydi sebep yanlış anlatılırdı.*
+  Yeni i18n anahtarı YOK (`inviteAccept.*` web'de zaten vardı). Altıgen tanımı `components/hexShape.ts`'e
+  çıktı (ray ikonu · ray "+" · davetiye kartı = üçüncü kullanım, Rule of Three doldu)
+- [x] 🔴 **Sistem gezinme çubuğu payı yoktu** (sahip bulgusu, ÜÇ TUŞLU gezinmeli ikinci cihaz):
+  SDK 54'te edge-to-edge varsayılan açık olduğu için uygulama gezinme çubuğunun altına çiziyordu →
+  **mesaj kutusu tuşların arkasında** kalıyordu. Sahibin kendi telefonu jest gezinmeli olduğu için
+  kusur görünmüyordu. Düzeltme `MessageScreen`'de gerçek `insets.bottom` ile; **klavye açıkken pay
+  verilmez** (`KeyboardAvoidingView` zaten itiyor, üstüne eklenirse kutu havada kalırdı).
+  *Aynı kusur DÖRT alt panelde de vardı* (sabit `paddingBottom: 28` jest gezinmede kazara yetiyordu) →
+  `components/home/sheetInsets.ts` ile hepsi gerçek insete bağlandı
+- [ ] **Sistem gezinme çubuğu ilk açılışta BEYAZ** (sahip bulgusu): login ekranına çıkıp dönünce
+  düzeliyor. Düzeltilmedi. Sahip varsayımı "APK/mağaza sürümünde çıkmaz" — **doğrulanmadı**, bu bir
+  Expo Go varsayımı değil `expo-system-ui` zamanlama sorunu olabilir; dev build alınınca bakılacak
+- [ ] **Teknik borç:** `MessageScreen.tsx` **561 satır** (300 eşiği). Bugünkü inset düzeltmesi 23
+  satır ekledi, dosya zaten eşiği aşmıştı. Bölme ayrı iş, PM kararı
+
 ### 🔴 YARINA DEVİR — yeni iş: kanal/kategori bildirim ayarları (sahip talebi 2026-07-31 akşamı)
 
 > **Kendi sözleşmesiyle ele alınacak** (PM önerisi, sahip onayladı): M1d-B'nin içine sıkıştırılırsa
