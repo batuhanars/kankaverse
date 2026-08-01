@@ -33,10 +33,37 @@ export interface InviteDto {
   createdAt: string;
 }
 
-/** Ortam üyesi — yalnız kendi rolümü çözmek için kullanılıyor (bkz. `getMembers`). */
+export type GuildRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+
+/**
+ * Rol özeti — üye satırındaki rozet için. Sunucu `GuildMemberDto` içinde **hazır** dönüyor
+ * (`RoleSummaryDto`), yani rozet çizmek için ayrıca `GET /guilds/:id/roles` çağrılmaz.
+ */
+export interface RoleSummaryDto {
+  id: string;
+  name: string;
+  /** Hex (`#RRGGBB`) — rozetin rengi. */
+  color: string;
+  position: number;
+  hoist: boolean;
+}
+
+/** M1e §0 — sunucudan birebir. `nickname` alanı YOK (özellik uygulanmamış, mobil de göstermez). */
 export interface GuildMemberDto {
   userId: string;
-  role: 'OWNER' | 'ADMIN' | 'MEMBER';
+  username: string;
+  avatarUrl: string | null;
+  bannerUrl: string | null;
+  role: GuildRole;
+  roles: RoleSummaryDto[];
+}
+
+export interface GuildBanDto {
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+  reason: string | null;
+  bannedAt: string;
 }
 
 export const guildsApi = {
@@ -87,6 +114,50 @@ export const guildsApi = {
    */
   async getMembers(guildId: string): Promise<GuildMemberDto[]> {
     const res = await http.get<GuildMemberDto[]>(`/guilds/${guildId}/members`);
+    return res.data;
+  },
+
+  // ─── M1e-A — ortam yönetimi ────────────────────────────────────────────────
+  // 🔴 Yetki hiyerarşisi SUNUCUDA (OWNER > ADMIN > MEMBER + izin bayrakları). İstemci yalnız kendi
+  // yetkisine göre satır gizler; kararı hesaplamaz, gevşetmez. Ret gelirse sunucunun mesajı gösterilir.
+
+  /** Yalnız OWNER; `ADMIN | MEMBER` (OWNER rolü bu uçla atanamaz — devir ayrı uçta). */
+  async setMemberRole(guildId: string, userId: string, role: 'ADMIN' | 'MEMBER'): Promise<GuildMemberDto> {
+    const res = await http.patch<GuildMemberDto>(`/guilds/${guildId}/members/${userId}/role`, { role });
+    return res.data;
+  },
+
+  /** At (kick) — atılan kullanıcı davetle geri gelebilir. */
+  async kickMember(guildId: string, userId: string): Promise<null> {
+    const res = await http.delete<null>(`/guilds/${guildId}/members/${userId}`);
+    return res.data;
+  },
+
+  /** Kalıcı yasak: kick + davetle bile giremez. `reason` opsiyonel. */
+  async banMember(guildId: string, userId: string, reason?: string): Promise<null> {
+    const res = await http.post<null>(`/guilds/${guildId}/members/${userId}/ban`, reason ? { reason } : {});
+    return res.data;
+  },
+
+  async listBans(guildId: string): Promise<GuildBanDto[]> {
+    const res = await http.get<GuildBanDto[]>(`/guilds/${guildId}/bans`);
+    return res.data;
+  },
+
+  async unbanMember(guildId: string, userId: string): Promise<null> {
+    const res = await http.delete<null>(`/guilds/${guildId}/bans/${userId}`);
+    return res.data;
+  },
+
+  /** 🔴 Geri alınamaz: hedef OWNER olur, eski sahip ADMIN'e düşer. Çift onay ister (sözleşme §2.4). */
+  async transferOwnership(guildId: string, userId: string): Promise<null> {
+    const res = await http.post<null>(`/guilds/${guildId}/members/${userId}/transfer`);
+    return res.data;
+  },
+
+  /** OWNER ayrılamaz — sunucu reddeder, mesajı gösterilir (sessiz gizleme yok). */
+  async leave(guildId: string): Promise<null> {
+    const res = await http.post<null>(`/guilds/${guildId}/leave`);
     return res.data;
   },
 };

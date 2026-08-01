@@ -1592,6 +1592,10 @@
     "profile": {
       "edit": "Profili Düzenle"
     },
+    "guildSettings": {
+      "leaveOwnerHint": "Ortam sahibi ayrılamaz; önce sahipliği devretmen veya ortamı silmen gerekir.",
+      "unbanConfirm": "{username} adlı kullanıcının yasağını kaldırmak istediğine emin misin? Ortama tekrar katılabilir."
+    },
     "guilds": {
       "title": "Ortamların",
       "empty": "Henüz bir ortamın yok.",
