@@ -35,13 +35,22 @@ export interface ChannelSummaryDto {
 export interface ReorderItem {
   id: string;
   position: number;
+  /**
+   * `undefined` → kategori DEĞİŞMEZ · `null` → kategorisiz · string → o kategoriye taşı.
+   * Üç durumu da sunucu böyle yorumluyor (`ReorderChannelItem`); yalnız taşınan kanal için
+   * gönderilir, diğerleri sırası değişse bile kategorisini korur.
+   */
+  categoryId?: string | null;
 }
 
 export const channelsApi = {
   /**
-   * Sprint M1i — sürükle-bırak sıralama. `PATCH /guilds/:id/channels/reorder`, yetki OWNER/ADMIN
-   * (sunucuda). `categoryId` GÖNDERİLMEZ: uç "undefined → kategori değişmez" diyor, bu ekran
-   * yalnız sırayı değiştiriyor, kanalı kategoriler arasında taşımıyor.
+   * Sprint M1i — sürükle-bırak sıralama. `PATCH /guilds/:id/channels/reorder`, yetki OWNER/ADMIN.
+   *
+   * R2: taşınan kanal için `categoryId` de gönderilir — düz listede bir kanalı başka kategorinin
+   * kanallarının arasına bırakmak onu o kategoriye taşır. Aksi hâlde liste yapamayacağı bir şeyi
+   * vaat ederdi (sahip bulgusu): kenar çubuğu kanalları kategoriye göre grupladığı için, farklı
+   * kategorilerdeki iki kanalın bağıl sırası hiçbir şey ifade etmiyor.
    */
   async reorder(guildId: string, items: ReorderItem[]): Promise<null> {
     const res = await http.patch<null>(`/guilds/${guildId}/channels/reorder`, { items });

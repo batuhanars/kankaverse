@@ -1598,6 +1598,7 @@
       "title": "Sırala",
       "action": "Sırala",
       "hint": "Taşımak istediğin satıra basılı tut ve sürükle. Değişiklik bırakınca kaydedilir.",
+      "channelsHint": "Basılı tut ve sürükle. Bir kanalı başka kategorinin kanallarının arasına bırakırsan o kategoriye taşınır. Değişiklik bırakınca kaydedilir.",
       "rolesHint": "Üstteki rol daha yetkilidir. Basılı tut ve sürükle; değişiklik bırakınca kaydedilir.",
       "categoriesSection": "Kategori sırası",
       "channelsSection": "Kanal sırası",
