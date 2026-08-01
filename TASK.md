@@ -1513,8 +1513,12 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 - [x] Ortam paneline **Ortam Ayarları** girişi (yetkisizde hiç render edilmez)
 - [x] **Ortam Ayarları ekranı** (gruplu liste). **Konmadı:** Moderasyon/AutoMod · Entegrasyonlar ·
-  Emoji · Topluluk · Güvenlik · Şablonlar · **Kanallar** (kanal CRUD zaten ortam panelinde ve kanal
-  satırında; ayarlara ikinci kapı = aynı işi iki yerden yapmak — PM kararı, sahip onayladı)
+  Emoji · Topluluk · Güvenlik · Şablonlar
+- [x] 🔴 **Kanallar bölümü KONULDU (sahip kararı 2026-08-01).** PM önerisi koymamaktı (kanal CRUD
+  zaten ortam panelinde + kanal satırında); sahip *"dolu görünsün, her yerden erişilsin"* dedi.
+  **Endişe şöyle karşılandı:** ekran düzenlemeyi yeniden yazmıyor, mevcut `channel-edit` /
+  `category-edit` / `channel-new` ekranlarına yönlendiriyor → **iki giriş, tek uygulama**.
+  Çekim/sıralama sidebar ile aynı; ses kanalları burada da listelenmiyor
 - [x] 🔴 **Ortam simgesi mobilden değiştirilebiliyor** (sahip talebi 2026-08-01): simgeye binen
   kalem → galeri → presign/PUT/PATCH. **Yalnız OWNER'a render edilir** (uçlar `yalnız OWNER`
   istiyor; ADMIN'e gösterilse dokunduğunda 403 alırdı).
