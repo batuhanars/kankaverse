@@ -1,9 +1,12 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/stores/auth';
+import { usersApi, type UserCardDto } from '@/api/users';
 import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
+import { ProfileHeader } from '@/components/me/ProfileHeader';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -20,6 +23,21 @@ export default function MeScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const [card, setCard] = useState<UserCardDto | null>(null);
+
+  // Odaklanmada tazele: profil düzenleme ekranından dönünce biyografi/görsel güncel görünsün
+  // (`ChannelSidebar` ile aynı ders). Hata SESSİZ: kart gelmezse başlık yalnız ad+avatarla çizilir,
+  // ekran hata yüzünden kullanılamaz hâle gelmez.
+  const userId = user?.id;
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId) return;
+      usersApi
+        .getCard(userId)
+        .then(setCard)
+        .catch(() => {});
+    }, [userId]),
+  );
 
   async function onLogout() {
     await logout();
@@ -31,36 +49,37 @@ export default function MeScreen() {
   return (
     <SafeAreaView style={styles.flex} edges={['top']}>
       {!user.emailVerified ? <EmailVerificationBanner /> : null}
-      <View style={styles.center}>
-        {user.avatarUrl ? (
-          <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback]}>
-            <Text style={styles.avatarFallbackText}>{user.username.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
-        <Text style={styles.username}>{user.username}</Text>
-      </View>
 
-      <View style={styles.menu}>
-        <Pressable
-          onPress={() => router.push('/friends-list')}
-          style={[styles.menuRow, styles.menuRowDivider]}
-        >
-          <Ionicons name="people-outline" size={20} color={theme.colors.textSecondary} />
-          <Text style={styles.menuLabel}>{t('friends.title')}</Text>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-        </Pressable>
-        <Pressable onPress={() => router.push('/blocked-list')} style={styles.menuRow}>
-          <Ionicons name="ban-outline" size={20} color={theme.colors.textSecondary} />
-          <Text style={styles.menuLabel}>{t('friends.tabBlocked')}</Text>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-        </Pressable>
-      </View>
+      <ScrollView contentContainerStyle={styles.scrollBody}>
+        <ProfileHeader username={user.username} avatarUrl={user.avatarUrl} card={card} />
 
-      <Pressable onPress={onLogout} style={styles.logoutButton}>
-        <Text style={styles.logoutText}>{t('common.logout')}</Text>
-      </Pressable>
+        <Pressable onPress={() => router.push('/profile-edit')} style={styles.editButton}>
+          <Ionicons name="create-outline" size={18} color={theme.colors.textPrimary} />
+          <Text style={styles.editButtonText}>{t('mobile.profile.edit')}</Text>
+        </Pressable>
+
+        <View style={styles.menu}>
+          <Pressable
+            onPress={() => router.push('/friends-list')}
+            style={[styles.menuRow, styles.menuRowDivider]}
+          >
+            <Ionicons name="people-outline" size={20} color={theme.colors.textSecondary} />
+            <Text style={styles.menuLabel}>{t('friends.title')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </Pressable>
+          {/* 🔴 Engellenenler satırı KALIR (sahip talimatı 2026-08-01) — profil yeniden
+              düzenlenirken kaldırılmadı. */}
+          <Pressable onPress={() => router.push('/blocked-list')} style={styles.menuRow}>
+            <Ionicons name="ban-outline" size={20} color={theme.colors.textSecondary} />
+            <Text style={styles.menuLabel}>{t('friends.tabBlocked')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </Pressable>
+        </View>
+
+        <Pressable onPress={onLogout} style={styles.logoutButton}>
+          <Text style={styles.logoutText}>{t('common.logout')}</Text>
+        </Pressable>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -70,32 +89,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.bgContent,
   },
-  center: {
-    alignItems: 'center',
-    paddingHorizontal: theme.layout.panelGap * 1.5,
-    paddingTop: theme.layout.panelGap * 1.5,
-    paddingBottom: theme.layout.panelGap,
+  scrollBody: {
+    paddingBottom: theme.layout.panelGap * 1.5,
   },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    marginBottom: 16,
-  },
-  avatarFallback: {
-    backgroundColor: theme.colors.accentSubtle,
+  editButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: theme.layout.panelGap * 1.5,
+    marginTop: theme.layout.panelGap,
+    marginBottom: theme.layout.panelGap,
+    minHeight: theme.layout.inputMinHeight,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.bgSidebar,
   },
-  avatarFallbackText: {
-    color: theme.colors.accent500,
-    fontSize: 32,
-    fontWeight: '700',
-  },
-  username: {
+  editButtonText: {
     color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.xl,
-    fontWeight: '700',
+    fontSize: theme.fontSize.base,
+    fontWeight: '600',
   },
   menu: {
     marginHorizontal: theme.layout.panelGap * 1.5,
@@ -121,7 +135,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   logoutButton: {
-    marginTop: 'auto',
+    marginTop: theme.layout.panelGap * 1.5,
     marginHorizontal: theme.layout.panelGap * 1.5,
     marginBottom: theme.layout.panelGap * 1.5,
     minHeight: theme.layout.inputMinHeight,
