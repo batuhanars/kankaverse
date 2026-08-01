@@ -67,6 +67,25 @@ export interface GuildMemberDto {
   roles: RoleSummaryDto[];
 }
 
+/** M1e-B §3.8 — `api/src/modules/guilds/dto/audit-log-entry.dto.ts`den birebir. */
+export interface AuditLogUserDto {
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+}
+
+export interface AuditLogEntryDto {
+  id: string;
+  /** Ör. `guild.member_kicked` — metin `audit.action.<son parça>` anahtarından okunur. */
+  action: string;
+  entityType: string;
+  entityId: string;
+  createdAt: string;
+  actor: AuditLogUserDto;
+  targetUser: AuditLogUserDto | null;
+  reason: string | null;
+}
+
 export interface GuildBanDto {
   userId: string;
   username: string;
@@ -105,6 +124,23 @@ export const guildsApi = {
    */
   async listInvites(guildId: string): Promise<InviteDto[]> {
     const res = await http.get<InviteDto[]>(`/guilds/${guildId}/invites`);
+    return res.data;
+  },
+
+  /**
+   * M1e-B §3.7 — daveti iptal et. M1d-A'da "davet iptal ekranı kapsam dışı" diye bağlanmamıştı
+   * (kullanılmayan uç bağlamak ölü koddur); ekranı gelince bağlandı.
+   */
+  async revokeInvite(code: string): Promise<null> {
+    const res = await http.delete<null>(`/invites/${code}`);
+    return res.data;
+  },
+
+  /** M1e-B §3.8 — denetim kaydı; `before` cursor (auditLog id). */
+  async listAuditLogs(guildId: string, before?: string): Promise<AuditLogEntryDto[]> {
+    const res = await http.get<AuditLogEntryDto[]>(`/guilds/${guildId}/audit-logs`, {
+      params: before ? { before } : undefined,
+    });
     return res.data;
   },
 

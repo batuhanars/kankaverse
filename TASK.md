@@ -1537,21 +1537,37 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   metin sunucunun ret mesajıyla aynı şeyi söyler (iki yerde farklı cümle olmasın)
 
 ### B yarısı — ortamı yapılandır
-- [ ] **Genel:** ad · `adultsOnly` (T&S kapısı, açıklamasıyla) · **Ortamı Sil**
-- [ ] **Roller:** `@everyone` + liste (üye sayısıyla) + oluştur. **Sürükle-sırala YOK**
-- [ ] 🔴 **Rol rengi SERBEST HEX** (`@Matches(/^#[0-9a-fA-F]{6}$/)`) — afiş rengindeki preset kısıtı
-  burada YOK, backend değişikliği gerekmiyor. **Yeni bağımlılık (PM onaylı):**
-  `reanimated-color-picker` (MIT, peer'ları kurulu). Damlalık konmaz
-- [ ] **Rol ekranı:** ad · renk · ayrı göster · bahsedilebilir · izinler · üyeler · sil.
-  `@everyone`de yalnız izinler
-- [ ] **İzin matrisi:** 16 bayrak gruplu; metinler `guildSettings.permsFlags`'tan, yeni metin yok.
-  `CANNOT_GRANT_PERMISSION` sunucudan gelir, istemci taklit etmez
-- [ ] **Rol üyeleri:** ekle/çıkar
-- [ ] **Davetler (PM kararı):** Discord'daki "Davetleri Duraklat" bizde YOK, uydurulmadı →
-  ekran = aktif davet listesi (kod · kullanım · süre) + iptal + oluştur.
+- [x] **Genel Ayarlar:** ad · **açıklama** · `adultsOnly` (T&S kapısı, açıklamasıyla) ·
+  **Keşfet'te görünürlük** · **etiketler** · **Ortamı Sil**. *Sözleşme §3.1 revize: orada yalnız
+  "ad + adultsOnly + sil" yazıyordu; `UpdateGuildDto` kaynaktan okununca description/discoverable/
+  tags da çıktı, parite gereği alındı. Hepsi `toGuildDto`'da zaten dönüyordu*
+- [x] **Roller:** `@everyone` + liste (üye sayısıyla) + oluştur. **Sürükle-sırala YOK**
+- [x] 🔴 **Rol rengi SERBEST HEX** (`@Matches(/^#[0-9a-fA-F]{6}$/)`) — afiş rengindeki preset kısıtı
+  burada YOK, backend değişikliği gerekmedi. **Yeni bağımlılık (PM onaylı):**
+  `reanimated-color-picker` (MIT, peer'ları kurulu). Damlalık konmadı.
+  🔴 **Kusur ve düzeltmesi:** seçilen renk yansımıyordu → RN `Modal` ayrı native pencerede çizilir
+  ve kök gesture-handler sağlayıcısının DIŞINDA kalır; `GestureHandlerRootView` sarmalayıcısı
+  olmadan sürükleme jestleri hiç ateşlenmiyordu
+- [x] **Rol ekranı:** ad · renk · ayrı göster · bahsedilebilir · izinler · üyeler · sil.
+  `@everyone`de ad/hoist/sil hiç render edilmez, sebebi yazılır; PATCH'te de gönderilmez
+- [x] **İzin matrisi:** 16 bayrak gruplu; metinler i18n'den, mobilde izin metni yazılmadı.
+  🔴 **Kusur ve düzeltmesi:** ekranda ham anahtarlar göründü → yol `guildSettings.permsFlags` değil
+  **`guildSettings.roles.permsFlags`** imiş. *Ders: iç içe i18n yolu da kaynaktan doğrulanır.*
+  `CANNOT_GRANT_PERMISSION` sunucudan gelir; ret gelince anahtarlar kaydedilmiş hâline döner
+  (ekranda verilmemiş bir izin açık görünmesin)
+- [x] **Rol üyeleri:** tek liste + tik ile ekle/çıkar (Discord'un ayrı "Üye ekle" akışı kopyalanmadı)
+- [x] **Davetler (PM kararı):** Discord'daki "Davetleri Duraklat" bizde YOK, uydurulmadı →
+  ekran = aktif davet listesi (kod · kullanım · süre) + kopyala + iptal + oluştur.
   *M1d-A'daki "davet listeleme ekranı kapsam dışı" ve "listeleyemeyen ama üretebilen kullanıcı"
-  açık kalemleri burada kapanır*
-- [ ] **Denetim Kaydı:** cursor'lu liste. **Filtre YOK** (uç yok; istemci-tarafı filtre yanıltıcı olur)
+  açık kalemleri kapandı: liste 403 alırsa bölüm hiç render edilmiyor, oluştur duruyor*
+- [x] **Denetim Kaydı:** cursor'lu liste. **Filtre YOK** (uç yok; istemci-tarafı filtre yanıltıcı
+  olur). Bilinmeyen aksiyonda `audit.action.fallback` — yeni aksiyon eklenince ham anahtar basılmaz
+- [x] 🔴 **Ortam simgesi ray'e anlık yansımıyordu** (sahip bulgusu): ana ekran sekme olduğu için
+  oturum boyunca mount'lu kalıyor ve liste bir kez çekiliyordu → `useFocusEffect` ile odaklanmada
+  tazeleme. *Parametreyle haber vermek yetmezdi: Ayarlar ad/ikon/afiş değiştirebiliyor*
+
+> **Renk seçici yayılımı — sahip kararı 2026-08-01:** profil afiş rengi **hem web hem mobil**
+> (hex'e geçilecek); **ortam afiş rengi yalnız WEB** (mobilde ortam görseli/rengi düzenlenmez).
 
 ### 🔴 Açık karar — afiş rengi: preset mi, serbest hex mi (sahip 2026-08-01, ERTELENDİ)
 
