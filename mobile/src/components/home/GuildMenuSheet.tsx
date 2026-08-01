@@ -12,6 +12,8 @@ interface Props {
   canManage: boolean;
   onClose: () => void;
   onInvite: () => void;
+  /** M1e §2.1 — Ortam Ayarları. Yalnız `canManage` bloğunda render edilir. */
+  onSettings: () => void;
   onCreateChannel: () => void;
   onCreateCategory: () => void;
 }
@@ -40,6 +42,7 @@ export function GuildMenuSheet({
   canManage,
   onClose,
   onInvite,
+  onSettings,
   onCreateChannel,
   onCreateCategory,
 }: Props) {
@@ -70,12 +73,20 @@ export function GuildMenuSheet({
 
             {canManage && (
               <>
+                {/* Aksiyon şeridi — Discord'un daire şeridi. M1e: yanına **Ayarlar** girişi geldi;
+                    yetkisizde bütün blok zaten render edilmiyor (`canManage`). */}
                 <View style={styles.actionRow}>
                   <Pressable style={styles.action} onPress={onInvite}>
                     <View style={styles.actionCircle}>
                       <Ionicons name="person-add" size={20} color={theme.colors.textPrimary} />
                     </View>
                     <Text style={styles.actionLabel}>{t('channel.invite')}</Text>
+                  </Pressable>
+                  <Pressable style={styles.action} onPress={onSettings}>
+                    <View style={styles.actionCircle}>
+                      <Ionicons name="settings-outline" size={20} color={theme.colors.textPrimary} />
+                    </View>
+                    <Text style={styles.actionLabel}>{t('guildSettings.title')}</Text>
                   </Pressable>
                 </View>
 

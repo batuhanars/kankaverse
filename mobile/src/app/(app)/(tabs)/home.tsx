@@ -253,6 +253,14 @@ export default function HomeScreen() {
               params: { id: selection.id, name: selectedGuildName },
             });
         }}
+        onSettings={() => {
+          setGuildMenuOpen(false);
+          if (selection.type === 'guild')
+            router.push({
+              pathname: '/guild-settings',
+              params: { id: selection.id, name: selectedGuildName },
+            });
+        }}
         onCreateChannel={() => {
           setGuildMenuOpen(false);
           if (selection.type === 'guild')
