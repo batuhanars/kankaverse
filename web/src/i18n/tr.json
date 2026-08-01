@@ -1595,6 +1595,8 @@
     "guildSettings": {
       "channelsTitle": "Kanallar",
       "generalTitle": "Genel Ayarlar",
+      "invitesEmpty": "Aktif davet yok. Yeni bir davet oluşturabilirsin.",
+      "inviteRevokeConfirm": "{code} kodlu daveti iptal etmek istediğine emin misin? Bu kodla kimse katılamaz.",
       "edit": "Düzenle",
       "leaveOwnerHint": "Ortam sahibi ayrılamaz; önce sahipliği devretmen veya ortamı silmen gerekir.",
       "unbanConfirm": "{username} adlı kullanıcının yasağını kaldırmak istediğine emin misin? Ortama tekrar katılabilir."

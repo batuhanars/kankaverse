@@ -166,9 +166,19 @@ export default function GuildSettingsScreen() {
             onPress={() => router.push({ pathname: '/guild-roles', params: { id: guildId } })}
           />
           <SettingsRow
+            icon="link-outline"
+            label={t('guildSettings.nav.davetler')}
+            onPress={() => router.push({ pathname: '/guild-invites', params: { id: guildId } })}
+          />
+          <SettingsRow
             icon="ban-outline"
             label={t('guildSettings.nav.yasaklar')}
             onPress={() => router.push({ pathname: '/guild-bans', params: { id: guildId, name } })}
+          />
+          <SettingsRow
+            icon="clipboard-outline"
+            label={t('audit.title')}
+            onPress={() => router.push({ pathname: '/guild-audit', params: { id: guildId } })}
             last
           />
         </View>
