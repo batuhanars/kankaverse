@@ -135,7 +135,9 @@ export default function GuildSettingsScreen() {
               uygulama. */}
           <SettingsRow
             icon="list-outline"
-            label={t('channel.textChannels')}
+            // Ekran başlığıyla AYNI anahtar: satır "Metin Kanalları" derken açılan ekran
+            // "Kanallar" diyordu (sahip bulgusu 2026-08-01). Tek kaynak, iki yerde aynı ad.
+            label={t('mobile.guildSettings.channelsTitle')}
             onPress={() => router.push({ pathname: '/guild-channels', params: { id: guildId } })}
           />
           <SettingsRow
