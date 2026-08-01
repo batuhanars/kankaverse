@@ -30,8 +30,8 @@ import { theme } from '@/theme';
  * yelpazesi tamamlanıyor (olumlu / olumsuz / nötr karşılık). Emoji picker zaten yanında, bu şerit
  * yalnız en sık kullanılanların kısayolu.
  *
- * ⚠️ Web hâlâ ÜÇ emoji gösteriyor — orada şerit dar olduğu için bilinçli fark. Aynı beşliye
- * çekilmesi istenirse ayrı karar (sahibe soruldu).
+ * **Web de aynı beşliye çekildi** (sahip kararı, `MessageActionsMenu.vue` `QUICK_EMOJIS`) — iki
+ * istemcide farklı tepki kısayolu olması zihinsel modeli bölerdi. İki liste birlikte değişir.
  */
 export const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢'];
 

@@ -37,8 +37,11 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-// Hızlı reaksiyon seti (hover toolbar'da gösterilecek 3 emoji)
-const QUICK_EMOJIS = ['👍', '❤️', '😂']
+// Hızlı reaksiyon seti (hover toolbar'ında gösterilir).
+// Sahip kararı 2026-08-01: mobilde üç emoji şeridin sağını boş bırakıyordu, beşe çıkarıldı ve
+// web de aynı beşliye çekildi — iki istemcide farklı tepki kısayolu olması zihinsel model bölerdi.
+// Sıra: onayla · sev · gül · şaşır · üzül (olumlu/olumsuz/nötr yelpaze).
+const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢']
 
 // ⋯ daha-fazla açılır
 const showMore = ref(false)
