@@ -7,6 +7,8 @@ import { useAuthStore } from '@/stores/auth';
 import { usersApi, type UserCardDto } from '@/api/users';
 import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
 import { ProfileHeader } from '@/components/me/ProfileHeader';
+import { FriendsRow } from '@/components/me/FriendsRow';
+import { useFriendsStore } from '@/stores/friends';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -24,6 +26,9 @@ export default function MeScreen() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const [card, setCard] = useState<UserCardDto | null>(null);
+  // Kanka listesi store'dan okunur — bu ekran için AYRI bir çekim yapılmıyor; store'u soket katmanı
+  // ve Kankalar ekranı zaten güncel tutuyor (arkadaşlık olayları anlık işleniyor).
+  const friends = useFriendsStore((s) => s.friends);
 
   // Odaklanmada tazele: profil düzenleme ekranından dönünce biyografi/görsel güncel görünsün
   // (`ChannelSidebar` ile aynı ders). Hata SESSİZ: kart gelmezse başlık yalnız ad+avatarla çizilir,
@@ -59,14 +64,9 @@ export default function MeScreen() {
         </Pressable>
 
         <View style={styles.menu}>
-          <Pressable
-            onPress={() => router.push('/friends-list')}
-            style={[styles.menuRow, styles.menuRowDivider]}
-          >
-            <Ionicons name="people-outline" size={20} color={theme.colors.textSecondary} />
-            <Text style={styles.menuLabel}>{t('friends.title')}</Text>
-            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-          </Pressable>
+          <View style={styles.menuRowDivider}>
+            <FriendsRow friends={friends} onPress={() => router.push('/friends-list')} />
+          </View>
           {/* 🔴 Engellenenler satırı KALIR (sahip talimatı 2026-08-01) — profil yeniden
               düzenlenirken kaldırılmadı. */}
           <Pressable onPress={() => router.push('/blocked-list')} style={styles.menuRow}>
