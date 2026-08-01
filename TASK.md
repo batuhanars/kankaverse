@@ -1407,6 +1407,42 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   > Bu ise **DURUM** hakkında ("zaten okunmuş"), ve bu bilgi kullanıcıya lazım — gizlersek
   > okunmamış olup olmadığını anlayamaz. Yetki yoksa gizle, durum uygun değilse soluklaştır.
 
+---
+
+## Sprint M1d-C — Mobil Sohbet Aksiyonları + Hesap Merkezi (Track F2, PM compose 2026-08-01)
+
+> Sözleşme: `contracts/SPRINT_M1DC_MOBILE_CHAT_ACCOUNT_CONTRACT.md` (**tek doğruluk kaynağı**).
+> **R7-nötr olmalı:** düzenle/sil/sabitle yetkileri ve `canDm` sunucuda, mobil sonucu gösterir.
+> Sahip kararı: **ortam sistemine devam etmeden önce burası sağlam otursun.**
+> A yarısı kapanmadan B'ye geçilmez. DoD **hem jest hem üç tuşlu gezinmeli cihazda**.
+
+### A yarısı — sohbet aksiyonları
+- [ ] **ÖNCE `MessageScreen` bölünür** (561 satır; yeni panel/tepki/yanıt kodu eklenirse 700'ü aşar).
+  Saf taşıma, davranış değişmez
+- [ ] **DM başlığı sağ üst tamamen boşalır** (sahip kararı: orası sesli/görüntülü aramaya ayrıldı).
+  🔴 Yer tutucu ikon KONMAZ
+- [ ] **DM alt paneli** (satıra uzun basış **+ başlıktaki ada dokunuş** — yoksa arama/temizle sohbetin
+  içinden erişilemez kalırdı): Profil · Kanka Ekle · Mesajlarda Ara · Okunmuş İşaretle · Sohbeti Temizle.
+  **Konmaz:** Favori · Sustur/Bildirim (kendi sözleşmesi) · Kanal ID
+- [ ] **Mesaj alt paneli** (mesaja uzun basış): hızlı emoji şeridi (**web'in kümesi, uydurma yok**) +
+  Yanıtla · Düzenle (yalnız kendi) · Metni Kopyala · Sabitle (yetkiliyse) · Sil (`ConfirmDialog`)
+- [ ] **Tepki gösterimi:** `MessageDto.reactions` tiplenir, baloncuk altında pill'ler, tekrar dokun → kalkar
+- [ ] **Yanıt:** giriş kutusu üstünde alıntı şeridi + iptal; gönderimde `replyToId` (**uç zaten destekliyor**)
+- [ ] **Okunmuş işaretle:** okunmamış yoksa **soluk + pasif** (yetki değil DURUM kuralı)
+
+### B yarısı — hesap merkezi + profil
+- [ ] **"Sen" sekmesi profil görünümü:** afiş · avatar · ad · biyografi · üyelik tarihi (TR formatı).
+  Veri **`GET /users/:id/card` kendi id'mle** — yeni uç yazılmaz. **Konmaz:** durum ekle · sunucu
+  profilleri · rozetler
+- [ ] **Kankalar satırı:** avatar dizisi + sağ ok → Kankalar ekranı
+- [ ] **Sağ üstte dişli → Ayarlar** (mevcut hesap ekranları gruplu listeye toplanır, yeni ekran yok)
+- [ ] 🔴 **Profili Düzenle: biyografi + avatar/afiş YÜKLEME — sahip istisnası (2026-08-01).**
+  M1d §10.3 kuralı **daraltıldı, silinmedi**: ortam ikonu/afişi mobilde hâlâ yalnız gösterilir;
+  istisna **yalnız kullanıcının kendi profili**. Akış `presign` → PUT → `PATCH storageKey`;
+  `403 EMAIL_NOT_VERIFIED` → M1c doğrulama bandı
+- [ ] **Yeni bağımlılık (PM onaylı, sahip bilgilendirildi):** `expo-image-picker` + `expo-file-system`
+  (ikisi de SDK 54 içinde, **Expo Go'da çalışır, dev build gerekmez**)
+
 ### Diğer açık kalemler (yarın)
 
 - [ ] **B yarısının DoD turu baştan yürünecek** — paneller/afiş/uzun-basış bugün çok değişti
