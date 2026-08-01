@@ -55,20 +55,26 @@ export default function MeScreen() {
     <SafeAreaView style={styles.flex} edges={['top']}>
       {!user.emailVerified ? <EmailVerificationBanner /> : null}
 
-      {/* Sprint M1f §2.1 — güvenlik dişlisi. M1a'da bilinçle konmamıştı ("boş yüzey açma"); artık
-          arkasında beş gerçek ekran var. Afişin üstünde yüzer, çünkü başlık tam genişlikte. */}
-      <Pressable
-        onPress={() => router.push('/account-security')}
-        style={styles.gear}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel={t('settings.security')}
-      >
-        <Ionicons name="settings-outline" size={20} color={theme.colors.textPrimary} />
-      </Pressable>
-
       <ScrollView contentContainerStyle={styles.scrollBody}>
-        <ProfileHeader username={user.username} avatarUrl={user.avatarUrl} card={card} />
+        {/* Sprint M1f §2.1 — güvenlik dişlisi. M1a'da bilinçle konmamıştı ("boş yüzey açma"); artık
+            arkasında beş gerçek ekran var.
+            🔴 Dişli AFİŞE göre konumlanır, ekrana göre DEĞİL (sahip bulgusu 2026-08-01: durum
+            çubuğunun altında kalıyordu). Sebep: `SafeAreaView`'ın üst dolgusu mutlak konumlu
+            çocuğa uygulanmıyor, dolayısıyla `top: 10` ekranın fiziksel tepesinden ölçülüyordu.
+            İnset'i elle toplamak yerine sarmalayıcı kullanıldı — afiş zaten inset'in altından
+            başlıyor, dişli de tanımı gereği doğru yere düşüyor; cihazdan bağımsız. */}
+        <View style={styles.headerWrap}>
+          <ProfileHeader username={user.username} avatarUrl={user.avatarUrl} card={card} />
+          <Pressable
+            onPress={() => router.push('/account-security')}
+            style={styles.gear}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.security')}
+          >
+            <Ionicons name="settings-outline" size={20} color={theme.colors.textPrimary} />
+          </Pressable>
+        </View>
 
         <Pressable onPress={() => router.push('/profile-edit')} style={styles.editButton}>
           <Ionicons name="create-outline" size={18} color={theme.colors.textPrimary} />
@@ -103,6 +109,9 @@ const styles = StyleSheet.create({
   },
   scrollBody: {
     paddingBottom: theme.layout.panelGap * 1.5,
+  },
+  headerWrap: {
+    position: 'relative',
   },
   // Afişin üstünde yüzen dişli: yarı saydam koyu zemin, açık ya da koyu afişte de okunur kalsın.
   gear: {
