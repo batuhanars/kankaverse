@@ -101,9 +101,17 @@ Discord'un "Sunucu Ayarları" düzeni; **bizim sahip olduğumuz bölümler**:
 | Kullanıcı yönetimi | **Üyeler** · **Roller** (B) · **Davetler** (B) · **Yasaklar** |
 | Tehlikeli | **Ortamdan Ayrıl** · **Ortamı Sil** (yalnız OWNER, B) |
 
-🔴 **Konmaz:** Moderasyon/AutoMod · Entegrasyonlar · Emoji · Topluluk · Güvenlik · Şablonlar ·
-**Kanallar** (kanal oluştur/düzenle/sil zaten ortam panelinde ve kanal satırında — ayarlara ikinci
-kapı açmak aynı işi iki yerden yapmak olurdu; PM kararı, sahip onayladı 2026-08-01).
+🔴 **Konmaz:** Moderasyon/AutoMod · Entegrasyonlar · Emoji · Topluluk · Güvenlik · Şablonlar.
+
+**Kanallar bölümü — KONULDU (sahip kararı 2026-08-01).** PM önerisi koymamaktı: kanal
+oluştur/düzenle/sil zaten ortam panelinde ve kanal satırına uzun basışta var; ayarlara ikinci kapı
+açmak aynı işi iki yerden yapmak olur. Sahip *"dolu görünsün ve her yerden erişilsin, tek yere
+koyarsak erişimi kısıtlarız"* diyerek koymayı seçti — karar sahibin.
+
+> **Endişe şöyle karşılandı:** ekran düzenlemeyi **yeniden yazmıyor**. Liste gösterir, dokunulan
+> kanalı/kategoriyi mevcut `channel-edit` / `category-edit` / `channel-new` ekranlarına yollar.
+> **İki giriş, tek uygulama** → davranış ayrışamaz. Çekim ve sıralama sidebar ile aynı; ses
+> kanalları burada da listelenmez (M1d-B Tuzak 2: girilemeyen satır gösterilmez).
 
 ### 🔴 Görsel yükleme kuralının GÜNCEL hâli (sahip kararı 2026-08-01)
 

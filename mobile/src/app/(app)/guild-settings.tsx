@@ -129,6 +129,15 @@ export default function GuildSettingsScreen() {
 
         <Text style={styles.groupLabel}>{t('guildSettings.nav.genel')}</Text>
         <View style={styles.group}>
+          {/* Kanallar — sahip kararı 2026-08-01. PM önerisi koymamaktı (kanal CRUD ortam panelinde
+              ve kanal satırında zaten var); sahip "her yerden erişilsin" diyerek koymayı seçti.
+              Ekran düzenlemeyi YENİDEN YAZMIYOR, mevcut ekranlara yönlendiriyor — iki giriş, tek
+              uygulama. */}
+          <SettingsRow
+            icon="list-outline"
+            label={t('channel.textChannels')}
+            onPress={() => router.push({ pathname: '/guild-channels', params: { id: guildId } })}
+          />
           <SettingsRow
             icon="people-outline"
             label={t('member.panel')}
