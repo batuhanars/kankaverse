@@ -1589,6 +1589,9 @@
     "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
   },
   "mobile": {
+    "profile": {
+      "edit": "Profili Düzenle"
+    },
     "guilds": {
       "title": "Ortamların",
       "empty": "Henüz bir ortamın yok.",
