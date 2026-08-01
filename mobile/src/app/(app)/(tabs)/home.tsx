@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { guildsApi, type GuildSummaryDto } from '@/api/guilds';
 import { useAuthStore } from '@/stores/auth';
@@ -66,6 +66,13 @@ export default function HomeScreen() {
   useEffect(() => {
     fetchGuilds();
   }, [fetchGuilds]);
+
+  // 🔴 Odaklanmada da tazele (sahip bulgusu 2026-08-01): ortam simgesi Ayarlar'dan değiştirilince
+  // ray eski ikonu göstermeye devam ediyordu. Bu ekran bir SEKME, yani oturum boyunca mount'lu
+  // kalıyor; `useEffect(..., [])` bir kez çalışıp bir daha çalışmıyor. Ayarlar ekranı ad/ikon/afiş
+  // değiştirebildiği için parametreyle haber vermek yetmez (hangi alanın değiştiğini bilmek
+  // gerekirdi) — odaklanmada tazelemek doğru çözüm. Bildirimler sekmesindeki (M1d-0 R1-b) aynı ders.
+  useFocusEffect(fetchGuilds);
 
   // Katılma/kurma ekranları buraya parametreyle döner (sözleşme §6: ray tazelenir, yeni store yok).
   // `joinedGuildId` → listeyi tazele + o ortamı seç. `refreshGuilds` → yalnız tazele (ALREADY_MEMBER

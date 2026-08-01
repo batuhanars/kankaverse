@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import ColorPicker, { HueSlider, Panel1, Preview } from 'reanimated-color-picker';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
 import { t } from '@/i18n';
@@ -31,7 +32,13 @@ export function RoleColorSheet({ visible, initialColor, onClose, onSelect }: Pro
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      {/* 🔴 `GestureHandlerRootView` ŞART (sahip bulgusu 2026-08-01: seçilen renk yansımıyordu).
+          RN `Modal` ayrı bir native pencerede çizilir ve kökteki gesture-handler sağlayıcısının
+          DIŞINDA kalır; sarmalanmazsa seçicinin sürükleme jestleri hiç ateşlenmez, `onComplete`
+          çağrılmaz ve renk hep başlangıç değerinde kalır. Panel görünür olduğu için kusur
+          "çalışmıyor" değil "seçtiğim uygulanmıyor" gibi görünüyordu. */}
+      <GestureHandlerRootView style={styles.flex}>
+        <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
           style={[styles.sheet, { paddingBottom: sheetBottomPadding(bottomInset) }]}
           onPress={() => {}}
@@ -60,13 +67,15 @@ export function RoleColorSheet({ visible, initialColor, onClose, onSelect }: Pro
 
             <Text style={styles.hint}>{t('guildSettings.roles.colorHint')}</Text>
           </View>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
