@@ -16,6 +16,12 @@ export interface GuildSummaryDto {
   ownerId: string;
   // M1d-B §10.3 — afiş mobilde GÖSTERİLİR (yüklenmez). Sunucu `toGuildDto`'da zaten dönüyordu.
   bannerUrl: string | null;
+  // M1e-B — Genel ayarlar ekranı için. Hepsi `toGuildDto`'da ZATEN dönüyordu, tiplenmemişti.
+  adultsOnly: boolean;
+  description: string | null;
+  /** Keşfet listesinde görünsün mü (C6). */
+  discoverable: boolean;
+  tags: string[];
 }
 
 // Sprint M1d §0 — sunucu `GET /invites/:code` için YALNIZ bu üç alanı dönüyor
@@ -161,6 +167,28 @@ export const guildsApi = {
   /** OWNER ayrılamaz — sunucu reddeder, mesajı gösterilir (sessiz gizleme yok). */
   async leave(guildId: string): Promise<null> {
     const res = await http.post<null>(`/guilds/${guildId}/leave`);
+    return res.data;
+  },
+
+  /**
+   * Ortam ayarları — **yalnız OWNER** (`guilds.controller`: "yalnız OWNER").
+   *
+   * Sözleşme §3.1'de yalnız `name` + `adultsOnly` yazıyordu; `UpdateGuildDto` kaynaktan okununca
+   * `description` · `discoverable` · `tags` · `bannerColor` da çıktı. **Parite kuralı gereği
+   * (web'de olan mobile gelir) hepsi alındı** — `bannerColor` hariç: afiş rengi preset seçicisi
+   * ayrı bir açık karar (bkz. TASK.md hex tartışması).
+   */
+  async update(
+    guildId: string,
+    body: { name?: string; description?: string; adultsOnly?: boolean; discoverable?: boolean; tags?: string[] },
+  ): Promise<GuildSummaryDto> {
+    const res = await http.patch<GuildSummaryDto>(`/guilds/${guildId}`, body);
+    return res.data;
+  },
+
+  /** 🔴 Ortamı sil — soft-delete, **yalnız OWNER**. Geri alınamaz; çağıran onay ister. */
+  async remove(guildId: string): Promise<null> {
+    const res = await http.delete<null>(`/guilds/${guildId}`);
     return res.data;
   },
 

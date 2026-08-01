@@ -129,6 +129,15 @@ export default function GuildSettingsScreen() {
 
         <Text style={styles.groupLabel}>{t('guildSettings.nav.genel')}</Text>
         <View style={styles.group}>
+          {/* Genel ayarlar (ad · açıklama · 18+ · keşfet · etiketler · ortamı sil) uçları
+              **yalnız OWNER** kabul ediyor → satır ADMIN'e render edilmez. */}
+          {isOwner && (
+            <SettingsRow
+              icon="information-circle-outline"
+              label={t('guildSettings.nav.genel')}
+              onPress={() => router.push({ pathname: '/guild-general', params: { id: guildId } })}
+            />
+          )}
           {/* Kanallar — sahip kararı 2026-08-01. PM önerisi koymamaktı (kanal CRUD ortam panelinde
               ve kanal satırında zaten var); sahip "her yerden erişilsin" diyerek koymayı seçti.
               Ekran düzenlemeyi YENİDEN YAZMIYOR, mevcut ekranlara yönlendiriyor — iki giriş, tek
