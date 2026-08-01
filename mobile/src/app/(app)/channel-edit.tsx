@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -9,8 +9,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { channelsApi, normalizeChannelName } from '@/api/channels';
+import { categoriesApi, type CategoryDto } from '@/api/categories';
+import { ChipSelect } from '@/components/guild/ChipSelect';
 import { extractErrorMessage } from '@/api/errors';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { t } from '@/i18n';
@@ -18,21 +20,68 @@ import { theme } from '@/theme';
 
 const NAME_MIN = 2;
 
-// Sprint M1d-B — kanalı adlandır / 18+ kapısını değiştir / sil. Kanal satırına UZUN BASINCA açılır
-// (yalnız yetkiliye; yetkisizde uzun basış hiçbir şey yapmaz).
+/**
+ * Yavaş mod aralıkları — web'in i18n anahtarlarıyla birebir (`channel.slowMode*`). Serbest saniye
+ * girişi yok: sunucu 0-21600 kabul ediyor ama kullanıcıya saniye yazdırmak web'de de yapılmadı.
+ */
+const SLOW_MODES = [
+  { seconds: 0, key: 'channel.slowModeOff' },
+  { seconds: 5, key: 'channel.slowMode5s' },
+  { seconds: 10, key: 'channel.slowMode10s' },
+  { seconds: 30, key: 'channel.slowMode30s' },
+  { seconds: 60, key: 'channel.slowMode1m' },
+  { seconds: 300, key: 'channel.slowMode5m' },
+  { seconds: 900, key: 'channel.slowMode15m' },
+] as const;
+
+// Sprint M1d-B — kanalı adlandır / 18+ kapısını değiştir / sil.
 //
-// `PATCH /channels/:id` ad ve `ageGated` alıyor; ikisi de burada. `isPrivate` DEĞİŞTİRİLMİYOR:
-// özel kanala üye ekleme/çıkarma ayrı uçlar (`/channels/:id/members`) ve ayrı bir yüzey ister —
-// yarım bir "özel yaptım ama kimseyi ekleyemiyorum" durumu üretmemek için M1e'ye bırakıldı.
+// Sprint M1e (sahip talebi 2026-08-01, "kanal ayarlarının seçeneklerini artıralım): ekrana
+// **kategori · özel kanal · yavaş mod** eklendi. Hepsi `UpdateChannelDto`da zaten vardı, mobil
+// göndermiyordu.
+//
+// 🔴 Discord'da olup BİZDE OLMAYAN, o yüzden konmayanlar — kaynaktan doğrulandı:
+//  • **Kanal Başlığı (topic):** `Channel` modelinde alan YOK.
+//  • **Kanal İzinleri:** izin-geçersiz-kılma (permission overwrite) modeli YOK. Bizdeki karşılık
+//    `isPrivate` (görünür ama kilitli) — bu ekranda var.
+//  • **Bildirim Ayarları / Sabitlenmiş Mesajlar / Davetler / Entegrasyonlar:** ayrı yüzeyler,
+//    biri kendi sözleşmesini bekliyor (bildirim), biri hiç yok (entegrasyon).
+//  • **Etkin olmadığında gizle:** forum/alt-başlık kavramı bizde yok.
+//
+// `isPrivate` artık DEĞİŞTİRİLEBİLİYOR ama özel kanala üye ekleme/çıkarma hâlâ ayrı uçlarda
+// (`/channels/:id/members`) ve ayrı yüzey ister; ekranda bu yüzden açıklaması yazıyor.
 export default function ChannelEditScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ id: string; name?: string; ageGated?: string }>();
+  const params = useLocalSearchParams<{
+    id: string;
+    name?: string;
+    ageGated?: string;
+    isPrivate?: string;
+    slowModeSeconds?: string;
+    categoryId?: string;
+    guildId?: string;
+  }>();
 
   const [name, setName] = useState(params.name ?? '');
   const [ageGated, setAgeGated] = useState(params.ageGated === 'true');
+  const [isPrivate, setIsPrivate] = useState(params.isPrivate === 'true');
+  const [slowMode, setSlowMode] = useState(Number(params.slowModeSeconds ?? '0') || 0);
+  const [categoryId, setCategoryId] = useState<string | null>(params.categoryId || null);
+  const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Kategori seçimi için liste; ortam bilinmiyorsa (eski giriş noktası) bölüm hiç render edilmez.
+  useFocusEffect(
+    useCallback(() => {
+      if (!params.guildId) return;
+      categoriesApi
+        .listByGuild(params.guildId)
+        .then((list) => setCategories([...list].sort((a, b) => a.position - b.position)))
+        .catch(() => {});
+    }, [params.guildId]),
+  );
 
   const canSubmit = name.length >= NAME_MIN && !busy;
 
@@ -41,7 +90,13 @@ export default function ChannelEditScreen() {
     setBusy(true);
     setErrorMessage('');
     try {
-      await channelsApi.update(params.id, { name, ageGated });
+      await channelsApi.update(params.id, {
+        name,
+        ageGated,
+        isPrivate,
+        slowModeSeconds: slowMode,
+        categoryId,
+      });
       router.back();
     } catch (e) {
       setErrorMessage(extractErrorMessage(e));
@@ -87,6 +142,45 @@ export default function ChannelEditScreen() {
           returnKeyType="done"
           onSubmitEditing={onSave}
         />
+
+        {/* Kategori — kanalı taşımak `categoryId` ile; "Kategorisiz" seçeneği null gönderir. */}
+        {categories.length > 0 && (
+          <>
+            <Text style={styles.label}>{t('channel.categoryLabel')}</Text>
+            <ChipSelect
+              value={categoryId}
+              onChange={setCategoryId}
+              options={[
+                { value: null, label: t('channel.categoryNone') },
+                ...categories.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+            />
+          </>
+        )}
+
+        {/* Yavaş mod — web'deki hazır aralıklar (`channel.slowMode*`); serbest saniye girişi yok. */}
+        <Text style={styles.label}>{t('channel.slowModeLabel')}</Text>
+        <ChipSelect
+          value={slowMode}
+          onChange={setSlowMode}
+          options={SLOW_MODES.map((s) => ({ value: s.seconds, label: t(s.key) }))}
+        />
+        <Text style={styles.hint}>{t('channel.slowModeDesc')}</Text>
+
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleText}>
+            <Text style={styles.toggleLabel}>{t('channel.privateLabel')}</Text>
+            <Text style={styles.toggleDesc}>{t('channel.privateDesc')}</Text>
+          </View>
+          <Switch
+            value={isPrivate}
+            onValueChange={setIsPrivate}
+            trackColor={{ true: theme.colors.accent500, false: theme.colors.bgElevated }}
+          />
+        </View>
+        {/* Üye ekleme ayrı uçta ve ayrı yüzey ister — "özel yaptım ama kimseyi ekleyemiyorum"
+            durumunu sessiz bırakmamak için sebebi yazılıyor. */}
+        {isPrivate ? <Text style={styles.hint}>{t('channel.privateSaveHint')}</Text> : null}
 
         <View style={styles.toggleRow}>
           <View style={styles.toggleText}>
@@ -135,6 +229,11 @@ export default function ChannelEditScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: theme.colors.bgContent },
   body: { padding: theme.layout.panelGap, gap: 12 },
+  hint: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+    lineHeight: 17,
+  },
   label: {
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xs,

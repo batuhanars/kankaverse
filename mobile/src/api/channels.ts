@@ -26,6 +26,9 @@ export interface ChannelSummaryDto {
   // M1d-B: sunucu `toChannelDto`'da zaten dönüyordu (channels.service.ts), yalnız tiplenmemişti.
   // Kanal düzenleme ekranına mevcut değeri taşımak için gerekli — yeni backend alanı DEĞİL.
   ageGated: boolean;
+  // M1e: aynı durum — `toChannelDto` bunları da dönüyor, düzenleme ekranı genişleyince tiplendi.
+  isPrivate: boolean;
+  slowModeSeconds: number;
 }
 
 export const channelsApi = {
@@ -56,7 +59,24 @@ export const channelsApi = {
     return res.data;
   },
 
-  async update(channelId: string, body: { name?: string; ageGated?: boolean }): Promise<ChannelSummaryDto> {
+  /**
+   * M1e — düzenleme yüzeyi genişledi (sahip talebi 2026-08-01): kategori · özel kanal · yavaş mod.
+   *
+   * 🔴 Sunucunun `UpdateChannelDto`sunda AYRICA `userLimit` · `bitrate` · `mediaEnabled` var; bunlar
+   * **yalnız ses kanalı** alanları ve mobil ses kanallarını hiç listelemiyor → gönderilmiyor.
+   * 🔴 Kanal "başlığı"/açıklaması (Discord'daki topic) **sunucuda YOK** — `Channel` modelinde böyle
+   * bir alan yok, o yüzden ekranda da yok.
+   */
+  async update(
+    channelId: string,
+    body: {
+      name?: string;
+      ageGated?: boolean;
+      isPrivate?: boolean;
+      slowModeSeconds?: number;
+      categoryId?: string | null;
+    },
+  ): Promise<ChannelSummaryDto> {
     const res = await http.patch<ChannelSummaryDto>(`/channels/${channelId}`, body);
     return res.data;
   },

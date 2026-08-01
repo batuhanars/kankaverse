@@ -55,7 +55,15 @@ export default function GuildChannelsScreen() {
   function openChannel(c: ChannelSummaryDto) {
     router.push({
       pathname: '/channel-edit',
-      params: { id: c.id, name: c.name ?? '', ageGated: String(c.ageGated) },
+      params: {
+        id: c.id,
+        guildId,
+        name: c.name ?? '',
+        ageGated: String(c.ageGated),
+        isPrivate: String(c.isPrivate),
+        slowModeSeconds: String(c.slowModeSeconds),
+        categoryId: c.categoryId ?? '',
+      },
     });
   }
 
@@ -67,8 +75,10 @@ export default function GuildChannelsScreen() {
 
   return (
     <View style={styles.flex}>
-      {/* `channel.textChannels` web'de zaten "METİN KANALLARI" — yeni anahtar açılmadı. */}
-      <Stack.Screen options={{ title: t('channel.textChannels') }} />
+      {/* Başlık "Kanallar" — "Metin Kanalları" DEĞİL (sahip kararı 2026-08-01): ses kanalları
+          M4'te gelince başlık yanıltıcı olurdu. Bugün yalnız metin kanalı listeleniyor ama bu
+          geçici bir durum, ad kalıcı. */}
+      <Stack.Screen options={{ title: t('mobile.guildSettings.channelsTitle') }} />
 
       {state === 'loading' && (
         <View style={styles.center}>
@@ -118,9 +128,11 @@ export default function GuildChannelsScreen() {
             const inCat = channels.filter((c) => c.categoryId === cat.id);
             return (
               <View key={cat.id}>
+                {/* Dişli yerine "Düzenle" yazısı (sahip kararı): ikon ne yaptığını söylemiyordu,
+                    kelime söylüyor. */}
                 <Pressable style={styles.categoryHeader} onPress={() => openCategory(cat)}>
                   <Text style={styles.categoryName}>{cat.name.toLocaleUpperCase('tr')}</Text>
-                  <Ionicons name="settings-outline" size={16} color={theme.colors.textMuted} />
+                  <Text style={styles.categoryEdit}>{t('mobile.guildSettings.edit')}</Text>
                 </Pressable>
                 <View style={styles.group}>
                   {inCat.length === 0 ? (
@@ -196,6 +208,11 @@ const styles = StyleSheet.create({
   },
   categoryName: {
     color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
+  },
+  categoryEdit: {
+    color: theme.colors.accent500,
     fontSize: theme.fontSize.xs,
     fontWeight: '700',
   },
