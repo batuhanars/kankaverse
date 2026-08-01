@@ -1569,8 +1569,13 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   oturum boyunca mount'lu kalıyor ve liste bir kez çekiliyordu → `useFocusEffect` ile odaklanmada
   tazeleme. *Parametreyle haber vermek yetmezdi: Ayarlar ad/ikon/afiş değiştirebiliyor*
 
-> **Renk seçici yayılımı — sahip kararı 2026-08-01:** profil afiş rengi **hem web hem mobil**
-> (hex'e geçilecek); **ortam afiş rengi yalnız WEB** (mobilde ortam görseli/rengi düzenlenmez).
+> **Renk seçici yayılımı — sahip kararı 2026-08-01 (GÜNCEL: ERTELENDİ).** Önce "profil afiş rengi
+> hem web hem mobil hex olsun" denmişti; rol renginde yaşanan **kütüphane çökmesi** sonrası sahip
+> **iki afiş rengi için de hex geçişini erteledi.** Bugünkü durum korunuyor:
+> preset swatch'lar (10 anahtar) hem web hem mobilde, ortam afişi mobilde düzenlenmiyor.
+> *Not: mobilde **profil afişi** yükleme + preset renk seçme VAR (M1d-C'de yapıldı, sahip test etti);
+> olmayan ortam afişi. Ertelenen şey preset→hex geçişi, seçicinin kendisi değil.*
+> Sürükle-panelli seçici de ertelendi (aceleye gerek yok, sahip 2026-08-01).
 
 ### 🔴 Açık karar — afiş rengi: preset mi, serbest hex mi (sahip 2026-08-01, ERTELENDİ)
 
