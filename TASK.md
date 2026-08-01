@@ -1658,12 +1658,14 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] **Kullanıcı adı değişimi YOK** — uç var ama web "değiştirilemez" diyor; iki istemci çelişemez,
   🔴 **sahip kararı bekliyor**
 
-### DoD (sözleşme §1 — **fiziksel cihazda**)
-- [ ] Dişli → Hesap Güvenliği açılıyor
-- [ ] Şifre değişiyor; diğer oturumların düştüğünü görüyorum
-- [ ] Oturum listesi geliyor; tek kapatma + diğerlerini kapatma çalışıyor
-- [ ] 2FA kurulabiliyor (anahtar → kod → kurtarma kodları) ve kapatılabiliyor
-- [ ] E-posta değişim talebi gidiyor, posta geliyor
-- [ ] Hesap silme talebi çalışıyor *(🔴 test hesabıyla — sahip kendi hesabında DENEMESİN)*
-- [ ] Yanlış şifre/koda sunucunun Türkçe mesajı görünüyor
-- [ ] 🔴 **R7:** reauth + oturum yönetimi sahip incelemesinden geçti
+### DoD (sözleşme §1 — **fiziksel cihazda**, sahip turu 2026-08-01)
+- [x] Dişli → Hesap Güvenliği açılıyor *(dişli önce durum çubuğunun altında kaldı → afişe göre
+  konumlandırılarak düzeltildi; `SafeAreaView` üst dolgusu mutlak konumlu çocuğa uygulanmıyormuş)*
+- [x] Şifre değişiyor; diğer oturumların düştüğünü görüyorum
+- [x] Oturum listesi geliyor; tek kapatma + diğerlerini kapatma çalışıyor
+- [x] 2FA **kapatıldı ve tekrar kuruldu** — iki yön de yürüdü (anahtar → kod → kurtarma kodları)
+- [x] E-posta değişim talebi gidiyor, posta geliyor
+- [~] Hesap silme *(sahip uyarıyı dikkate aldı, kendi hesabında denemedi — akış kodda hazır,
+  gerçek silme talebi bir test hesabında yürütülmedi)*
+- [x] Yanlış şifre/koda sunucunun Türkçe mesajı görünüyor
+- [ ] 🔴 **R7:** reauth + oturum yönetimi sahip incelemesinden geçti — **açık, sahipte**
