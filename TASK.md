@@ -1543,11 +1543,14 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   tags da çıktı, parite gereği alındı. Hepsi `toGuildDto`'da zaten dönüyordu*
 - [x] **Roller:** `@everyone` + liste (üye sayısıyla) + oluştur. **Sürükle-sırala YOK**
 - [x] 🔴 **Rol rengi SERBEST HEX** (`@Matches(/^#[0-9a-fA-F]{6}$/)`) — afiş rengindeki preset kısıtı
-  burada YOK, backend değişikliği gerekmedi. **Yeni bağımlılık (PM onaylı):**
-  `reanimated-color-picker` (MIT, peer'ları kurulu). Damlalık konmadı.
-  🔴 **Kusur ve düzeltmesi:** seçilen renk yansımıyordu → RN `Modal` ayrı native pencerede çizilir
-  ve kök gesture-handler sağlayıcısının DIŞINDA kalır; `GestureHandlerRootView` sarmalayıcısı
-  olmadan sürükleme jestleri hiç ateşlenmiyordu
+  burada YOK, backend değişikliği gerekmedi.
+  🔴 **`reanimated-color-picker` DENENDİ ve KALDIRILDI (sahip bulgusu: uygulama renk seçerken
+  ÇÖKÜYORDU).** Kök sebep sürüm uyumsuzluğu: kütüphane `Animated.addWhitelistedNativeProps`
+  çağırıyor, o API **Reanimated 4'te kaldırılmış** (bizde ~4.1.1). Paket `reanimated >=2.0.0`
+  diyordu — **peer bildirimi uyumluluk kanıtı değil.**
+  → Yerine **bağımlılıksız** seçici: swatch ızgarası + "Özel (hex)" girişi. Jest yok, worklet yok,
+  çökme sınıfı ortadan kalktı. **Web zaten böyle yapıyor** (`RolesSettingsSection.vue`), renkler
+  web'in `COLOR_PRESETS`iyle birebir → aynı zamanda parite. Serbest hex kaybolmadı
 - [x] **Rol ekranı:** ad · renk · ayrı göster · bahsedilebilir · izinler · üyeler · sil.
   `@everyone`de ad/hoist/sil hiç render edilmez, sebebi yazılır; PATCH'te de gönderilmez
 - [x] **İzin matrisi:** 16 bayrak gruplu; metinler i18n'den, mobilde izin metni yazılmadı.

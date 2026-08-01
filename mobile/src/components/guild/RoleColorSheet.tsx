@@ -1,21 +1,22 @@
-import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import ColorPicker, { HueSlider, Panel1, Preview } from 'reanimated-color-picker';
+import { useEffect, useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 /**
- * Rol rengi seçici (M1e-B §3.3).
+ * Rol rengi seçici (M1e-B §3.3): **hazır swatch'lar + serbest hex girişi.**
  *
- * 🔴 **Burada SERBEST HEX geçerli** — afiş rengindeki preset kısıtı role uygulanmıyor:
- * `CreateRoleDto.color` sunucuda `@Matches(/^#[0-9a-fA-F]{6}$/)` ile doğrulanıyor. Yani Discord'un
- * hex seçicisi bizde backend değişikliği olmadan yapılabiliyor.
+ * 🔴 **`reanimated-color-picker` KALDIRILDI (sahip bulgusu 2026-08-01: uygulama renk seçerken
+ * çöküyordu).** Kök sebep sürüm uyumsuzluğu: kütüphane `Animated.addWhitelistedNativeProps`
+ * çağırıyor, bu API **Reanimated 4'te kaldırıldı** (bizde ~4.1.1 kurulu). Paketin peer bildirimi
+ * `reanimated >=2.0.0` diyor ama gerçek durum bu değil — **peer bildirimi uyumluluk kanıtı değildir.**
  *
- * **Yeni bağımlılık (PM onaylı):** `reanimated-color-picker` — MIT; peer'ları (`reanimated`,
- * `gesture-handler`) zaten kurulu, native modül eklemiyor → Expo Go'da çalışır.
- * **Damlalık (eyedropper) konmadı:** ekran okuma izni ister, karşılığı yok.
+ * Yerine sürükleme jesti gerektirmeyen bir seçici kondu: bağımlılık yok, worklet yok, çökme sınıfı
+ * tamamen ortadan kalktı. **Web zaten böyle yapıyor** (`RolesSettingsSection.vue`: swatch ızgarası +
+ * "Özel (hex)" girişi), yani bu aynı zamanda parite: renkler web'deki `COLOR_PRESETS` ile birebir.
+ *
+ * Serbest hex kaybolmadı — sunucu `#RRGGBB` kabul ediyor, giriş alanı onu veriyor.
  */
 interface Props {
   visible: boolean;
@@ -24,21 +25,37 @@ interface Props {
   onSelect: (hex: string) => void;
 }
 
+/** `web/src/views/app/components/RolesSettingsSection.vue` `COLOR_PRESETS` ile BİREBİR. */
+const COLOR_PRESETS = [
+  '#99aab5',
+  '#1abc9c',
+  '#2ecc71',
+  '#3498db',
+  '#9b59b6',
+  '#e91e63',
+  '#f1c40f',
+  '#e67e22',
+  '#e74c3c',
+  '#ff6b3d',
+];
+
+/** Sunucunun deseniyle aynı (`CreateRoleDto.color`) — istemci kendi kuralını uydurmuyor. */
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
 export function RoleColorSheet({ visible, initialColor, onClose, onSelect }: Props) {
   const bottomInset = useSheetInsets();
-  // Seçim onaylanana kadar dışarı yazılmaz: kaydırırken her karede sunucuya/forma yazmak
-  // gereksiz gürültü olurdu.
-  const [picked, setPicked] = useState(initialColor);
+  const [draft, setDraft] = useState(initialColor);
+
+  // Panel her açılışta mevcut renkle başlar (önceki oturumun yarım seçimi taşınmasın).
+  useEffect(() => {
+    if (visible) setDraft(initialColor);
+  }, [visible, initialColor]);
+
+  const valid = HEX_RE.test(draft);
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      {/* 🔴 `GestureHandlerRootView` ŞART (sahip bulgusu 2026-08-01: seçilen renk yansımıyordu).
-          RN `Modal` ayrı bir native pencerede çizilir ve kökteki gesture-handler sağlayıcısının
-          DIŞINDA kalır; sarmalanmazsa seçicinin sürükleme jestleri hiç ateşlenmez, `onComplete`
-          çağrılmaz ve renk hep başlangıç değerinde kalır. Panel görünür olduğu için kusur
-          "çalışmıyor" değil "seçtiğim uygulanmıyor" gibi görünüyordu. */}
-      <GestureHandlerRootView style={styles.flex}>
-        <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable
           style={[styles.sheet, { paddingBottom: sheetBottomPadding(bottomInset) }]}
           onPress={() => {}}
@@ -47,35 +64,53 @@ export function RoleColorSheet({ visible, initialColor, onClose, onSelect }: Pro
 
           <View style={styles.header}>
             <Text style={styles.title}>{t('guildSettings.roles.colorLabel')}</Text>
-            <Pressable onPress={() => onSelect(picked)} hitSlop={10}>
-              <Text style={styles.save}>{t('common.save')}</Text>
+            <Pressable onPress={() => valid && onSelect(draft.toLowerCase())} hitSlop={10} disabled={!valid}>
+              <Text style={[styles.save, !valid && styles.saveDisabled]}>{t('common.save')}</Text>
             </Pressable>
           </View>
 
           <View style={styles.content}>
-            <ColorPicker
-              value={initialColor}
-              // Kütüphane rgba/hex verebiliyor; sunucu #RRGGBB istiyor, hex'in ilk 7 karakteri
-              // alınıyor (alfa varsa atılır — sunucu 6 haneli desen dışını reddeder).
-              onComplete={({ hex }) => setPicked(hex.slice(0, 7))}
-              style={styles.picker}
-            >
-              <Preview hideInitialColor style={styles.preview} />
-              <Panel1 style={styles.panel} />
-              <HueSlider style={styles.hue} />
-            </ColorPicker>
+            <View style={[styles.preview, { backgroundColor: valid ? draft : theme.colors.bgElevated }]} />
+
+            <View style={styles.swatches}>
+              {COLOR_PRESETS.map((preset) => (
+                <Pressable
+                  key={preset}
+                  onPress={() => setDraft(preset)}
+                  style={[
+                    styles.swatchWrap,
+                    draft.toLowerCase() === preset && styles.swatchWrapActive,
+                  ]}
+                >
+                  <View style={[styles.swatch, { backgroundColor: preset }]} />
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>{t('guildSettings.roles.colorCustomLabel')}</Text>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder={t('guildSettings.roles.colorPlaceholder')}
+              placeholderTextColor={theme.colors.textMuted}
+              style={styles.input}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={7}
+            />
+            {/* Geçersiz hex'te Kaydet pasif + sebep yazılı: sunucuya gönderip 400 almak yerine
+                kullanıcıya burada söylenir (kanal adı normalize deseninin kardeşi). */}
+            {!valid ? <Text style={styles.invalid}>{t('guildSettings.roles.colorInvalid')}</Text> : null}
 
             <Text style={styles.hint}>{t('guildSettings.roles.colorHint')}</Text>
           </View>
-          </Pressable>
         </Pressable>
-      </GestureHandlerRootView>
+      </Pressable>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
@@ -112,15 +147,46 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.base,
     fontWeight: '700',
   },
+  saveDisabled: { color: theme.colors.textMuted },
   content: {
     paddingHorizontal: theme.layout.panelGap,
     paddingTop: 12,
-    gap: 12,
+    gap: 10,
   },
-  picker: { gap: 12 },
-  preview: { height: 40, borderRadius: theme.radius.md },
-  panel: { height: 200, borderRadius: theme.radius.md },
-  hue: { borderRadius: 999 },
+  preview: {
+    height: 44,
+    borderRadius: theme.radius.md,
+  },
+  swatches: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  swatchWrap: {
+    padding: 3,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  swatchWrapActive: { borderColor: theme.colors.textPrimary },
+  swatch: { width: 34, height: 34, borderRadius: 17 },
+  label: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  input: {
+    minHeight: theme.layout.inputMinHeight,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.bgElevated,
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.base,
+    paddingHorizontal: 12,
+  },
+  invalid: { color: theme.colors.danger, fontSize: theme.fontSize.xs },
   hint: {
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.xs,
