@@ -1497,6 +1497,45 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] **Yeni bağımlılık (PM onaylı, sahip bilgilendirildi):** `expo-image-picker` + `expo-file-system`
   (ikisi de SDK 54 içinde, **Expo Go'da çalışır, dev build gerekmez**)
 
+---
+
+## Sprint M1e — Mobil Ortam Yönetimi (Track F2, PM compose 2026-08-01)
+
+> Sözleşme: `contracts/SPRINT_M1E_MOBILE_GUILD_ADMIN_CONTRACT.md` (**tek doğruluk kaynağı**).
+> Referans: sahibin Discord mobil ekran görüntüleri. **Düzen alınır, içerik alınmaz.**
+> A kapanmadan B'ye geçilmez. DoD **fiziksel cihazda**.
+>
+> **Varlık sebebi:** mobilde ortamı yönetmenin hiçbir yolu yok — üye atılamıyor, rol verilemiyor,
+> yasak konulamıyor, ayar değiştirilemiyor.
+
+### A yarısı — ortamı yönet (insanlar)
+- [ ] Ortam paneline **Ortam Ayarları** girişi (yetkisizde hiç render edilmez)
+- [ ] **Ortam Ayarları ekranı** (gruplu liste). **Konmaz:** Moderasyon/AutoMod · Entegrasyonlar ·
+  Emoji · Topluluk · Güvenlik · Şablonlar. İkon/afiş **gösterilir, yüklenmez**
+- [ ] **Üyeler:** arama + rol rozetleri (rolün kendi rengiyle)
+- [ ] **Üye ekranı:** rol ata/kaldır · ortam rolü (yalnız OWNER) · At · Yasakla ·
+  **Sahipliği Devret (çift onay)**. 🔴 **Takma ad alanı YOK** — `GuildMember`de alan yok
+  (izin anahtarları i18n'de var ama özellik uygulanmamış)
+- [ ] **Yasaklar** listesi + yasağı kaldır
+- [ ] **Ortamdan Ayrıl** — OWNER'da "önce devret ya da sil" sebebi yazılır (sessiz gizleme yok)
+
+### B yarısı — ortamı yapılandır
+- [ ] **Genel:** ad · `adultsOnly` (T&S kapısı, açıklamasıyla) · **Ortamı Sil**
+- [ ] **Roller:** `@everyone` + liste (üye sayısıyla) + oluştur. **Sürükle-sırala YOK**
+- [ ] 🔴 **Rol rengi SERBEST HEX** (`@Matches(/^#[0-9a-fA-F]{6}$/)`) — afiş rengindeki preset kısıtı
+  burada YOK, backend değişikliği gerekmiyor. **Yeni bağımlılık (PM onaylı):**
+  `reanimated-color-picker` (MIT, peer'ları kurulu). Damlalık konmaz
+- [ ] **Rol ekranı:** ad · renk · ayrı göster · bahsedilebilir · izinler · üyeler · sil.
+  `@everyone`de yalnız izinler
+- [ ] **İzin matrisi:** 16 bayrak gruplu; metinler `guildSettings.permsFlags`'tan, yeni metin yok.
+  `CANNOT_GRANT_PERMISSION` sunucudan gelir, istemci taklit etmez
+- [ ] **Rol üyeleri:** ekle/çıkar
+- [ ] **Davetler (PM kararı):** Discord'daki "Davetleri Duraklat" bizde YOK, uydurulmadı →
+  ekran = aktif davet listesi (kod · kullanım · süre) + iptal + oluştur.
+  *M1d-A'daki "davet listeleme ekranı kapsam dışı" ve "listeleyemeyen ama üretebilen kullanıcı"
+  açık kalemleri burada kapanır*
+- [ ] **Denetim Kaydı:** cursor'lu liste. **Filtre YOK** (uç yok; istemci-tarafı filtre yanıltıcı olur)
+
 ### 🔴 Açık karar — afiş rengi: preset mi, serbest hex mi (sahip 2026-08-01, ERTELENDİ)
 
 > Sahip serbest hex istedi, sonra "şimdilik böyle olsun" dedi. **Bugün preset kaldı** (10 anahtar),
