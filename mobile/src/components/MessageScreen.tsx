@@ -50,6 +50,13 @@ interface Props {
    */
   jumpToMessageId?: string;
   /**
+   * Sprint M1h — sabitleme yetkisi. **DM/grup DM'de her üye** sabitleyebilir (sunucu ek kontrol
+   * yapmıyor), ortam kanalında `MANAGE_MESSAGES` gerekiyor; o hesabı kanal ekranı yapıyor.
+   */
+  canPin?: boolean;
+  /** Başlıktaki "Sabitlenenler" düğmesi — yalnız yüzey varsa (kanal/DM ekranı verir). */
+  onOpenPins?: () => void;
+  /**
    * 🔴 Mesaj arama gösterilsin mi (sahip kararı 2026-08-01). Varsayılan AÇIK, **1-1 DM'de kapalı**:
    * arama ortam kanallarında değerli, 1-1'de karşında tek kişi var. Web'de de aynısı yapıldı.
    */
@@ -68,6 +75,8 @@ export function MessageScreen({
   headerActions,
   searchable = true,
   jumpToMessageId,
+  canPin = false,
+  onOpenPins,
 }: Props) {
   const authUser = useAuthStore((s) => s.user);
   const fetchInitial = useMessagesStore((s) => s.fetchInitial);
@@ -171,6 +180,18 @@ export function MessageScreen({
           headerRight: () => (
             <View style={styles.headerActionsRow}>
               {headerActions}
+              {/* Sprint M1h — Sabitlenenler. Yalnız ekran bir yüzey verdiyse çizilir; düğme
+                  koyup hiçbir yere götürmemek "boş yüzey" olurdu. */}
+              {onOpenPins && (
+                <Pressable
+                  onPress={onOpenPins}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('message.pinnedMessages')}
+                >
+                  <Ionicons name="bookmark-outline" size={20} color={theme.colors.textSecondary} />
+                </Pressable>
+              )}
               {searchable && (
                 <Pressable
                   onPress={() => setSearchVisible(true)}
@@ -254,6 +275,7 @@ export function MessageScreen({
       />
 
       <MessageActionHost
+        canPin={canPin}
         actions={actions}
         onReply={() => {
           const m = actions.target;
