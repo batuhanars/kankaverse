@@ -15,9 +15,6 @@ import { theme } from '@/theme';
 /** `guild` = kategoriler + kanallar birlikte · `roles` = rol hiyerarşisi. */
 type Kind = 'guild' | 'roles';
 
-/** Kategorisiz kanallar bölümünün sentetik anahtarı (sidebar ile aynı kavram). */
-const UNCATEGORIZED = '__none__';
-
 /**
  * Sprint M1i — **sürükle-bırak sıralama**.
  *
@@ -111,13 +108,10 @@ export default function ReorderScreen() {
     if (!ok) setCategories(previous);
   }
 
-  async function saveChannels(categoryId: string, next: ReorderRowData[]) {
+  async function saveChannels(next: ReorderRowData[]) {
     const previous = channels;
     const byId = new Map(channels.map((c) => [c.id, c]));
-    const reordered = next.map((r) => byId.get(r.id)).filter((c): c is ChannelSummaryDto => !!c);
-    // Yalnız bu bölümün sırası değişti; diğer kanallar olduğu gibi kalır.
-    const others = channels.filter((c) => (c.categoryId ?? UNCATEGORIZED) !== categoryId);
-    setChannels([...others, ...reordered]);
+    setChannels(next.map((r) => byId.get(r.id)).filter((c): c is ChannelSummaryDto => !!c));
     const ok = await persist(() =>
       channelsApi.reorder(
         guildId,
@@ -136,12 +130,14 @@ export default function ReorderScreen() {
     if (!ok) setRoles(previous);
   }
 
-  const rowsOf = (categoryId: string): ReorderRowData[] =>
-    channels
-      .filter((c) => (c.categoryId ?? UNCATEGORIZED) === categoryId)
-      .map((c) => ({ id: c.id, label: c.name ?? '' }));
-
-  const uncategorized = rowsOf(UNCATEGORIZED);
+  /** Düz kanal listesi; her satır kendi kategorisini alt etiket olarak taşır. */
+  const categoryName = (id: string | null) =>
+    id ? (categories.find((c) => c.id === id)?.name ?? '') : t('mobile.reorder.uncategorized');
+  const channelRows: ReorderRowData[] = channels.map((c) => ({
+    id: c.id,
+    label: c.name ?? '',
+    sublabel: categoryName(c.categoryId),
+  }));
 
   return (
     <GestureHandlerRootView style={styles.flex}>
@@ -178,30 +174,21 @@ export default function ReorderScreen() {
             emptyHint={t('mobile.reorder.noCategories')}
           />
 
-          {/* 🔴 İki blok da kategori adı yazıyor ve sahip haklı olarak "ekran kendini tekrar
-              ediyor" dedi (bulgu 2026-08-01). Aslında farklı işler: yukarısı KATEGORİ sırasını,
-              burası her kategorideki KANAL sırasını değiştiriyor. Ayrımı başlıklar söylüyor;
-              kategori adları alt başlık olarak kalıyor çünkü kanalın hangi kategoride olduğu
-              bilgisi olmadan liste anlamsız. */}
-          <Text style={styles.blockTitle}>{t('mobile.reorder.channelsSection')}</Text>
+          {/* 🔴 Kanal listesi TEK ve DÜZ (sahip revizesi 2026-08-01): önce kategorilere bölünmüştü
+              ve tek bir işi (kanal sırası) üç ayrı listeye dağıtıyordu — asıl kafa karıştıran oydu.
+              Kanalın hangi kategoride olduğunu satırın kendisi söylüyor.
 
-          {uncategorized.length > 0 && (
-            <ReorderSection
-              title={t('mobile.reorder.uncategorized')}
-              rows={uncategorized}
-              onReorder={(next) => saveChannels(UNCATEGORIZED, next)}
-            />
-          )}
+              Bölmeden sıralamak GEÇERLİ: sunucu `position`ı düz bir sayı olarak tutuyor, kenar
+              çubuğu ise kanalları önce kategoriye göre grupluyor, sonra kendi içinde position'a
+              göre sıralıyor. Yani kategoriler arası mutlak değerler önemsiz, kategori İÇİNDEKİ
+              bağıl sıra önemli — düz listede sürüklerken korunan da bu. */}
+          <ReorderSection
+            title={t('mobile.reorder.channelsSection')}
+            rows={channelRows}
+            onReorder={saveChannels}
+            emptyHint={t('channel.noChannels')}
+          />
 
-          {categories.map((cat) => (
-            <ReorderSection
-              key={cat.id}
-              title={cat.name}
-              rows={rowsOf(cat.id)}
-              onReorder={(next) => saveChannels(cat.id, next)}
-              emptyHint={t('channel.noChannels')}
-            />
-          ))}
         </ScrollViewContainer>
       )}
     </GestureHandlerRootView>
@@ -220,16 +207,6 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   list: { padding: theme.layout.panelGap, gap: 8 },
-  // Blok başlığı bölüm başlıklarından DAHA belirgin: "kategori sırası" ile "kanal sırası" iki
-  // ayrı iş, kategori adları ise onların altındaki alt başlık.
-  blockTitle: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.base,
-    fontWeight: '700',
-    paddingHorizontal: theme.layout.panelGap,
-    paddingBottom: 10,
-    marginTop: 4,
-  },
   empty: {
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.sm,
