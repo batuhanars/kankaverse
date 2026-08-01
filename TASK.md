@@ -1691,10 +1691,17 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Discord'un **sekmeli** arama ekranı kopyalanmadı (sabitleme/medya sekmelerinin arkasında
   bizde özellik yok) — M1b §3.5 kararı sürüyor
 
-### Kapsam dışı (uç var, istemci yok — yarın)
-- [ ] `from` / `mentions` filtreleri (üye seçici gerekiyor)
-- [ ] **Mesaja atlama** — sonuç şu an kanalı açıyor, mesaja kaydırmıyor; kanallar arası atlama
-  kanal ekranında yeni bir yetenek istiyor
+### R1 — sahip cihaz turu sonrası (2026-08-01, aynı akşam)
+- [x] **Mesaja atlama + vurgu** — sonuç artık kanalı açıp mesaja kaydırıyor ve yanıp sönüyor.
+  *Makine zaten `useMessageListController`'daydı (kanal içi arama kullanıyordu); eksik olan tek şey
+  dışarıdan tetiklenmesiydi → `initialJumpId`.*
+- [x] **`from` / `mentions` filtreleri** — üye seçici filtre paneline eklendi (`GET /guilds/:id/members`
+  zaten vardı). Artık dört filtrenin dördü de bağlı.
+- [x] **Davet ekranına kanka listesi** — web `InvitePeopleModal` karşılığı: liste + yerel süzme +
+  kişi başına "Davet Et" → "Davet Edildi ✓" (`POST /guilds/:id/invite-friend`).
+  *Davet düğmesi yalnız kod alanına götürüyordu.*
+
+### Kapsam dışı
 - [ ] **Etkinlikler** — kendi sprinti (web'de `CreateEventWizard` + `EventsModal` var)
 
 ### DoD (sözleşme §1 — **fiziksel cihazda**)

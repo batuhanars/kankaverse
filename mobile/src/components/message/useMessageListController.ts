@@ -40,7 +40,17 @@ function buildRenderItems(messages: MessageDto[]): RenderItem[] {
   });
 }
 
-export function useMessageListController(channelId: string, myUserId: string | undefined) {
+/**
+ * @param initialJumpId Sprint M1g R1 — ekran açılır açılmaz gidilecek mesaj (ortam içi aramadan).
+ *   Atlama/vurgulama zaten burada vardı (kanal içi arama kullanıyordu); eksik olan tek şey
+ *   DIŞARIDAN tetiklenmesiydi. Yalnız BİR KEZ çalışır — her render'da tetiklense vurgu hiç sönmez
+ *   ve liste sürekli kendini kaydırırdı.
+ */
+export function useMessageListController(
+  channelId: string,
+  myUserId: string | undefined,
+  initialJumpId?: string,
+) {
   const channelState = useMessagesStore((s) => s.byChannel[channelId]);
   const fetchOlder = useMessagesStore((s) => s.fetchOlder);
 
@@ -100,6 +110,14 @@ export function useMessageListController(channelId: string, myUserId: string | u
     if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
     setHighlightId(messageId);
   }
+
+  const jumpedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!initialJumpId || jumpedRef.current === initialJumpId) return;
+    jumpedRef.current = initialJumpId;
+    jumpAttemptsRef.current = 0;
+    setHighlightId(initialJumpId);
+  }, [initialJumpId]);
 
   // Hedef yüklü sayfada bulununca kaydır + geçici vurgu; bulunmuyorsa bir sayfa daha eskiye çek —
   // bu effect bağımlılıkları üzerinden tekrar çalışır, zincirleme "aranıyor" hâli budur.

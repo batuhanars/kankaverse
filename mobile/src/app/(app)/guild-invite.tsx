@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { guildsApi } from '@/api/guilds';
 import { extractErrorMessage } from '@/api/errors';
+import { InviteFriendsSection } from '@/components/guild/InviteFriendsSection';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -136,7 +137,8 @@ export default function GuildInviteScreen() {
       )}
 
       {state === 'ready' && (
-        <View style={styles.body}>
+        /* Kanka listesi eklenince içerik ekranı aşabilir hâle geldi — sabit View kaydırmıyordu. */
+        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <Text style={styles.label}>{t('invite.codeLabel')}</Text>
           <View style={styles.codeBox}>
             <Text style={styles.code} selectable>
@@ -163,7 +165,12 @@ export default function GuildInviteScreen() {
           <Pressable onPress={regenerate} style={styles.linkButton}>
             <Text style={styles.linkButtonText}>{t('invite.createButton')}</Text>
           </Pressable>
-        </View>
+
+          {/* Sprint M1g R1 (sahip bulgusu) — davet YALNIZ kod paylaşmak değil: web'de olduğu gibi
+              kankayı doğrudan davet etme yolu da burada. İkisi aynı ekranda çünkü ikisi de aynı
+              soruya cevap: "bu ortama nasıl insan getiririm". */}
+          <InviteFriendsSection guildId={params.id} />
+        </ScrollView>
       )}
     </View>
   );

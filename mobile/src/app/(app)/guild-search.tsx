@@ -16,30 +16,22 @@ import {
   type GuildSearchParams,
 } from '@/api/messages';
 import { channelsApi, ChannelType, type ChannelSummaryDto } from '@/api/channels';
+import { guildsApi, type GuildMemberDto } from '@/api/guilds';
 import { extractErrorMessage } from '@/api/errors';
-import { formatMentionsPlain } from '@/utils/mentions';
 import { SearchFilterSheet } from '@/components/guild/SearchFilterSheet';
+import { SearchResultGroup } from '@/components/guild/SearchResultGroup';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 /** Sunucunun eşiği (`QUERY_TOO_SHORT`) — istemci aynısını önden uygular, boş istek atmaz. */
 const MIN_CHARS = 2;
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  return (
-    d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) +
-    ' ' +
-    d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }).replace(':', '.')
-  );
-}
 
 /**
  * Sprint M1g §2.2 — **Ortamda Ara** (tam ekran).
  *
- * Web'in `guildSearch.*` sözlüğü zaten vardı ve uç gelişmiş: `q` + `in` (kanal) + `has` (bağlantı/
- * dosya) + `from`/`mentions`. Mobilde bu turda `q` + `in` + `has` bağlandı; `from`/`mentions` üye
- * seçici gerektiriyor, **kapsam dışı** (uç duruyor, yarın açılır).
+ * Web'in `guildSearch.*` sözlüğü zaten vardı ve uç gelişmiş. **Dört filtrenin dördü de bağlı:**
+ * `in` (kanal) · `has` (bağlantı/dosya) · `from` (gönderen) · `mentions` (bahsedilen).
  *
  * 🔴 Discord'un **sekmeli** arama ekranı (Yeni/Üyeler/Kanallar/Medya/Sabitlemeler) kopyalanmadı:
  * o sekmelerin çoğunun arkasında bizde özellik yok (sabitleme yüzeyi yok, medya galerisi yok).
@@ -56,6 +48,7 @@ export default function GuildSearchScreen() {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<GuildSearchParams>({});
   const [channels, setChannels] = useState<ChannelSummaryDto[]>([]);
+  const [members, setMembers] = useState<GuildMemberDto[]>([]);
   const [groups, setGroups] = useState<GuildSearchGroupDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -70,6 +63,10 @@ export default function GuildSearchScreen() {
     channelsApi
       .listByGuild(guildId)
       .then((list) => setChannels(list.filter((c) => c.type === ChannelType.GUILD_TEXT)))
+      .catch(() => {});
+    guildsApi
+      .getMembers(guildId)
+      .then(setMembers)
       .catch(() => {});
   }, [guildId]);
 
@@ -109,7 +106,33 @@ export default function GuildSearchScreen() {
     };
   }, [query, filters, run]);
 
-  const activeFilterCount = [filters.in, filters.has].filter(Boolean).length;
+  const activeFilterCount = [filters.in, filters.has, filters.from, filters.mentions].filter(
+    Boolean,
+  ).length;
+  const memberName = (id?: string) => members.find((m) => m.userId === id)?.username ?? '';
+
+  /** Etkin filtreler görünür olmalı: "neden az sonuç geldi" sorusu ekrandan okunabilsin.
+   *  Dokunuş = o filtreyi kaldır. Dört filtre tek listede toplanır, JSX'te dört ayrı dal değil. */
+  const chips: { key: 'in' | 'has' | 'from' | 'mentions'; label: string }[] = [];
+  if (filters.in) {
+    const name = channels.find((c) => c.id === filters.in)?.name ?? '';
+    chips.push({ key: 'in', label: `${t('guildSearch.token.in')} ${name}` });
+  }
+  if (filters.has) {
+    chips.push({
+      key: 'has',
+      label: `${t('guildSearch.token.has')} ${t(`guildSearch.has.${filters.has}`)}`,
+    });
+  }
+  if (filters.from) {
+    chips.push({ key: 'from', label: `${t('guildSearch.token.from')} ${memberName(filters.from)}` });
+  }
+  if (filters.mentions) {
+    chips.push({
+      key: 'mentions',
+      label: `${t('guildSearch.token.mentions')} ${memberName(filters.mentions)}`,
+    });
+  }
   const total = groups.reduce((n, g) => n + g.messages.length, 0);
 
   return (
@@ -144,24 +167,15 @@ export default function GuildSearchScreen() {
         </Pressable>
       </View>
 
-      {/* Etkin filtreler görünür olmalı: kullanıcı "neden az sonuç geldi" sorusunu ekranı
-          okuyarak yanıtlayabilsin. Dokunuş = o filtreyi kaldır. */}
       {activeFilterCount > 0 ? (
         <View style={styles.chipRow}>
-          {filters.in ? (
+          {chips.map((c) => (
             <FilterChip
-              label={`${t('guildSearch.token.in')} ${
-                channels.find((c) => c.id === filters.in)?.name ?? ''
-              }`}
-              onRemove={() => setFilters((f) => ({ ...f, in: undefined }))}
+              key={c.key}
+              label={c.label}
+              onRemove={() => setFilters((f) => ({ ...f, [c.key]: undefined }))}
             />
-          ) : null}
-          {filters.has ? (
-            <FilterChip
-              label={`${t('guildSearch.token.has')} ${t(`guildSearch.has.${filters.has}`)}`}
-              onRemove={() => setFilters((f) => ({ ...f, has: undefined }))}
-            />
-          ) : null}
+          ))}
         </View>
       ) : null}
 
@@ -184,44 +198,23 @@ export default function GuildSearchScreen() {
             <Text style={styles.empty}>{t('guildSearch.hint')}</Text>
           ) : null
         }
-        renderItem={({ item: group }) => (
-          <View style={styles.group}>
-            <Text style={styles.groupTitle}>#{group.channelName}</Text>
-            {group.messages.map((m) => (
-              <Pressable
-                key={m.id}
-                // Sonuç KANALI açar, mesaja kaydırmaz. Kanallar arası "mesaja atla" kanal
-                // ekranında yeni bir yetenek gerektiriyor (şu an yalnız kanal İÇİ arama
-                // kaydırabiliyor); yarım çalışan bir atlama yerine kanalı açmak dürüst davranış.
-                // Uç tarafında eksik yok, iş istemcide — etkinlik turundan sonra eklenecek.
-                onPress={() =>
-                  router.push({
-                    pathname: '/channel/[id]',
-                    params: { id: group.channelId, name: group.channelName },
-                  })
-                }
-                style={styles.result}
-              >
-                <View style={styles.resultHead}>
-                  <Text style={styles.author} numberOfLines={1}>
-                    {m.author.username}
-                  </Text>
-                  <Text style={styles.time}>{formatTime(m.createdAt)}</Text>
-                </View>
-                <Text style={styles.content} numberOfLines={3}>
-                  {/* Bahsedilenler çözümlenmiyor (üye haritası bu ekranda yok) — kanal içi
-                      aramanın aynı deseni: ham `<@id>` yerine okunur bir yedek gösterilir. */}
-                  {formatMentionsPlain(m.content, () => undefined, t('mention.unknown'))}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+        renderItem={({ item }) => (
+          <SearchResultGroup
+            group={item}
+            onOpen={(messageId) =>
+              router.push({
+                pathname: '/channel/[id]',
+                params: { id: item.channelId, name: item.channelName, jumpTo: messageId },
+              })
+            }
+          />
         )}
       />
 
       {sheetOpen ? (
         <SearchFilterSheet
           channels={channels}
+          members={members}
           value={filters}
           onApply={(next) => {
             setFilters(next);
@@ -307,27 +300,6 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   list: { padding: theme.layout.panelGap, gap: 14 },
-  group: { gap: 6 },
-  groupTitle: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.sm,
-    fontWeight: '700',
-  },
-  result: {
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.bgSidebar,
-    padding: 10,
-    gap: 4,
-  },
-  resultHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  author: {
-    flex: 1,
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.sm,
-    fontWeight: '700',
-  },
-  time: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs },
-  content: { color: theme.colors.textBody, fontSize: theme.fontSize.sm, lineHeight: 19 },
   empty: {
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.sm,
