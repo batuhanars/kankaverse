@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { dmApi } from '@/api/dm';
 import { useDmStore } from '@/stores/dm';
-import { extractErrorMessage } from '@/api/errors';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ProfileCardModal } from '@/components/ProfileCardModal';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -48,9 +45,9 @@ export default function DmScreen() {
   // eklenmişti çünkü o gün profil kartında ekleme yoktu; R1-d kartı eklemeyi getirince başlık ikonu
   // ikinci kapıya dönüştü. Kart bu ekranda her zaman erişilebilir (başlıktaki ada dokunmak açıyor),
   // yani yetenek kaybolmadı — yalnız tek kapıya indi. Yetenek kaybı olsaydı kaldırılmazdı.
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [clearing, setClearing] = useState(false);
-  const [clearError, setClearError] = useState('');
+  // M1d-C §2.2 (sahip kararı 2026-08-01) — "Sohbeti Temizle" ve grup yönetimi başlıktan KALKTI.
+  // Başlığın sağ üstü sesli/görüntülü aramaya ayrıldı ve o gelene kadar BOŞ duruyor (yer tutucu
+  // ikon konmaz). Aksiyonlar kaybolmadı: DM listesinde satıra uzun basınca açılan panele taşındı.
 
   // Sözleşme §8.3 — bu DM açıkken gelen mesaj listede "okunmadı" işaretlenmez (web `activeDmChannelId`
   // ile aynı); ayrıca açılışta kutucuğun rozeti hemen düşer (sunucuya `markRead` MessageScreen'den
@@ -83,52 +80,18 @@ export default function DmScreen() {
 
   const placeholder = isDm ? t('dm.placeholder', { user: title }) : t('dm.groupPlaceholder', { name: title });
 
-  async function onConfirmClear() {
-    setClearing(true);
-    setClearError('');
-    try {
-      await useDmStore.getState().clearChannel(channelId);
-      setShowClearConfirm(false);
-      router.back();
-    } catch (e) {
-      setClearError(extractErrorMessage(e));
-      setClearing(false);
-    }
+  /** Başlığa dokunuş: 1-1'de profil kartı, grupta grup ekranı (sözleşme §2.2). */
+  function onTitlePress() {
+    if (isDm) setShowProfile(true);
+    else router.push({ pathname: '/group/[id]', params: { id: channelId } });
   }
-
-  const headerActions = (
-    <>
-      {!isDm && (
-        <Pressable
-          onPress={() => router.push({ pathname: '/group/[id]', params: { id: channelId } })}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={t('mobile.group.manage')}
-        >
-          <Ionicons name="people-outline" size={20} color={theme.colors.textSecondary} />
-        </Pressable>
-      )}
-      <Pressable
-        onPress={() => setShowClearConfirm(true)}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel={t('dm.clearConversation')}
-      >
-        <Ionicons name="trash-outline" size={20} color={theme.colors.textSecondary} />
-      </Pressable>
-    </>
-  );
 
   return (
     <>
       <Stack.Screen
         options={{
           headerTitle: () => (
-            <Pressable
-              onPress={() => isDm && setShowProfile(true)}
-              disabled={!isDm}
-              style={styles.headerTitle}
-            >
+            <Pressable onPress={onTitlePress} style={styles.headerTitle}>
               {params.avatarUrl ? (
                 <Image source={{ uri: params.avatarUrl }} style={styles.headerAvatar} />
               ) : (
@@ -149,7 +112,6 @@ export default function DmScreen() {
         markRead={dmApi.markRead}
         typingMode="simple"
         disabledNotice={disabledNotice}
-        headerActions={headerActions}
         // 1-1 DM'de arama YOK (sahip kararı 2026-08-01); grup DM'de kalıyor — orada birden çok
         // kişi ve daha uzun geçmiş var, aramanın işi görülüyor. Web'de de aynı ayrım yapıldı.
         searchable={!isDm}
@@ -163,20 +125,6 @@ export default function DmScreen() {
           onChanged={refreshDmStatus}
         />
       )}
-      {showClearConfirm && (
-        <ConfirmDialog
-          message={t('dm.clearConfirmMsg')}
-          confirmLabel={t('dm.clearButton')}
-          loading={clearing}
-          onConfirm={onConfirmClear}
-          onCancel={() => setShowClearConfirm(false)}
-        />
-      )}
-      {clearError ? (
-        <View style={styles.clearErrorBar}>
-          <Text style={styles.clearErrorText}>{clearError}</Text>
-        </View>
-      ) : null}
     </>
   );
 }

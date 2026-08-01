@@ -1423,13 +1423,18 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 > A yarısı kapanmadan B'ye geçilmez. DoD **hem jest hem üç tuşlu gezinmeli cihazda**.
 
 ### A yarısı — sohbet aksiyonları
-- [ ] **ÖNCE `MessageScreen` bölünür** (561 satır; yeni panel/tepki/yanıt kodu eklenirse 700'ü aşar).
-  Saf taşıma, davranış değişmez
-- [ ] **DM başlığı sağ üst tamamen boşalır** (sahip kararı: orası sesli/görüntülü aramaya ayrıldı).
-  🔴 Yer tutucu ikon KONMAZ
-- [ ] **DM alt paneli** (satıra uzun basış **+ başlıktaki ada dokunuş** — yoksa arama/temizle sohbetin
-  içinden erişilemez kalırdı): Profil · Kanka Ekle · Mesajlarda Ara · Okunmuş İşaretle · Sohbeti Temizle.
-  **Konmaz:** Favori · Sustur/Bildirim (kendi sözleşmesi) · Kanal ID
+- [x] **ÖNCE `MessageScreen` bölündü** (561 → 299): `MessageComposer` · `useTypingEmitter` ·
+  `useMessageListController` · `MessageStates`. Saf taşıma, davranış değişmedi *(e010d49)*
+- [x] 🔴 **1-1 DM'de mesaj arama KALDIRILDI — sahip kararı 2026-08-01, web + mobil.** Gerekçe: arama
+  ortam kanallarında değerli (çok kişi, çok gün, kaybolan mesaj); 1-1'de karşında tek kişi var,
+  konuşma doğrusal. **Grup DM'de ve ortam kanalında KALIYOR.** *(31b4420)*
+- [x] **DM başlığı sağ üst tamamen boşaldı** (orası sesli/görüntülü aramaya ayrıldı). Yer tutucu
+  ikon KONMADI. Ada dokunuş: 1-1 → profil kartı, grup → grup ekranı
+- [x] **DM alt paneli — yalnız listede uzun basış** (sahip kararı: sohbetin içinden açılmıyor):
+  Profil · Kanka Ekle (yalnız 1-1) · Okunmuş İşaretle · Sohbeti Temizle (`ConfirmDialog`).
+  **Konmadı:** Favori · Sustur/Bildirim (kendi sözleşmesi) · Kanal ID · "DM'yi Kapat" (aynı işe iki ad).
+  Okunmamış yoksa "Okunmuş İşaretle" **soluk + pasif** (yetki değil DURUM kuralı).
+  *Yan iş: `DmSidebar` 312 satırdı → `DmRow` ayrıldı; panelin iç akışı `DmMenuHost`ta (ana ekran 284)*
 - [ ] **Mesaj alt paneli** (mesaja uzun basış): hızlı emoji şeridi (**web'in kümesi, uydurma yok**) +
   Yanıtla · Düzenle (yalnız kendi) · Metni Kopyala · Sabitle (yetkiliyse) · Sil (`ConfirmDialog`)
 - [ ] **Tepki gösterimi:** `MessageDto.reactions` tiplenir, baloncuk altında pill'ler, tekrar dokun → kalkar

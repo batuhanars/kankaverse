@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { type DmChannelDto } from '@/api/dm';
+import { DmRow } from './DmRow';
 import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
@@ -13,6 +14,8 @@ import { theme } from '@/theme';
 
 interface Props {
   onOpenDm: (channel: DmChannelDto) => void;
+  /** Satıra uzun basış → DM paneli (sözleşme §2.3). Panel yalnız listeden açılır. */
+  onDmMenu: (channel: DmChannelDto) => void;
   onOpenRequests: () => void;
   // Sözleşme §8.1-A/4 (M1a fast-follow, ekranlarıyla birlikte M1b'de teslim edildi) + §3.2/3.3.
   onOpenSearch: () => void;
@@ -27,7 +30,7 @@ function avatarSource(ch: DmChannelDto): string | null {
 // girişi (rozetli). C9 kuralı web/DmList.vue ile aynı: bekleyen giden istek (`requestStatus ===
 // 'PENDING'`) normal listede GÖRÜNMEZ, istek kutusuna gider (dev deneyimi: gönderenin ekranında
 // kendi bekleyen isteği iki kez görünmesin).
-export function DmSidebar({ onOpenDm, onOpenRequests, onOpenSearch, onOpenAddFriend }: Props) {
+export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, onOpenAddFriend }: Props) {
   const authUser = useAuthStore((s) => s.user);
   // Sözleşme §8.3 — liste artık `dm` store'undan okunur (soket katmanı oraya yazıyor). Yerel
   // state'te tutulurken canlı güncelleme tutunacak bir yer bulamıyordu.
@@ -140,33 +143,15 @@ export function DmSidebar({ onOpenDm, onOpenRequests, onOpenSearch, onOpenAddFri
               ? formatMentionsPlain(item.lastMessage.content, resolver(item), t('mention.unknown'))
               : '';
             return (
-              <Pressable onPress={() => onOpenDm(item)} style={styles.row}>
-                {avatar ? (
-                  <Image source={{ uri: avatar }} style={styles.avatar} />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarFallback]}>
-                    <Text style={styles.avatarFallbackText}>{name.charAt(0).toUpperCase()}</Text>
-                  </View>
-                )}
-                <View style={styles.rowBody}>
-                  <Text style={[styles.name, item.unread && styles.nameUnread]} numberOfLines={1}>
-                    {name}
-                  </Text>
-                  {/* Sözleşme §8.3 — kutucukta "yazıyor…" (web Sprint 6 R1-b/R1-c karşılığı: "DM'e
-                      bakmasan da kutucukta görünsün"). Yazan varsa son mesaj önizlemesini EZER,
-                      1-1 DM'de sade metin (isim yok — web R1-c ile aynı). */}
-                  {typing ? (
-                    <Text style={styles.typing} numberOfLines={1}>
-                      {t('typing.simple')}
-                    </Text>
-                  ) : preview ? (
-                    <Text style={styles.preview} numberOfLines={1}>
-                      {preview}
-                    </Text>
-                  ) : null}
-                </View>
-                {item.unread && <View style={styles.unreadDot} />}
-              </Pressable>
+              <DmRow
+                name={name}
+                avatarUrl={avatar}
+                preview={preview}
+                typing={typing}
+                unread={item.unread}
+                onPress={() => onOpenDm(item)}
+                onLongPress={() => onDmMenu(item)}
+              />
             );
           }}
         />
@@ -269,59 +254,5 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: 8,
     paddingBottom: 20,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: theme.radius.md,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginRight: 10,
-  },
-  avatarFallback: {
-    backgroundColor: theme.colors.accentSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarFallbackText: {
-    color: theme.colors.accent500,
-    fontSize: theme.fontSize.sm,
-    fontWeight: '700',
-  },
-  rowBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  name: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.sm,
-    fontWeight: '500',
-  },
-  nameUnread: {
-    color: theme.colors.textPrimary,
-    fontWeight: '700',
-  },
-  preview: {
-    color: theme.colors.textMuted,
-    fontSize: theme.fontSize.xs,
-    marginTop: 1,
-  },
-  typing: {
-    color: theme.colors.accent500,
-    fontSize: theme.fontSize.xs,
-    fontStyle: 'italic',
-    marginTop: 1,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors.accent500,
-    marginLeft: 6,
   },
 });
