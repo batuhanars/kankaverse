@@ -21,7 +21,19 @@ import { theme } from '@/theme';
  * kavramı yok) · Uygulamalar · Mesaj Bağlantısını Kopyala (mobilde derin bağlantı yok) · Mesaj ID
  * (geliştirici modu yok).
  */
-export const QUICK_EMOJIS = ['👍', '❤️', '😂'];
+/**
+ * Hızlı tepki seti. Web'de üç emoji var (`MessageActionsMenu.vue` `QUICK_EMOJIS`) çünkü orası dar
+ * bir hover şeridi; mobilde alt panel geniş ve üç emoji sağı boş bırakıyordu (sahip bulgusu
+ * 2026-08-01) → **beşe çıkarıldı.**
+ *
+ * Eklenenler rastgele değil: onayla · sev · gül üçlüsüne **şaşır** ve **üzül** katılınca tepki
+ * yelpazesi tamamlanıyor (olumlu / olumsuz / nötr karşılık). Emoji picker zaten yanında, bu şerit
+ * yalnız en sık kullanılanların kısayolu.
+ *
+ * ⚠️ Web hâlâ ÜÇ emoji gösteriyor — orada şerit dar olduğu için bilinçli fark. Aynı beşliye
+ * çekilmesi istenirse ayrı karar (sahibe soruldu).
+ */
+export const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢'];
 
 interface Props {
   visible: boolean;
@@ -34,6 +46,7 @@ interface Props {
   /** Şeridin sonundaki "+" — tam emoji listesini açar (web'deki picker'ın karşılığı). */
   onOpenPicker: () => void;
   onReply: () => void;
+  onForward: () => void;
   onEdit: () => void;
   onCopy: () => void;
   onDelete: () => void;
@@ -47,6 +60,7 @@ export function MessageActionSheet({
   onToggleReaction,
   onOpenPicker,
   onReply,
+  onForward,
   onEdit,
   onCopy,
   onDelete,
@@ -96,6 +110,12 @@ export function MessageActionSheet({
                 <Ionicons name="arrow-undo-outline" size={20} color={theme.colors.textSecondary} />
                 {/* `reply.button` web'de zaten "Yanıtla" — yeni anahtar açılmadı. */}
                 <Text style={styles.optionText}>{t('reply.button')}</Text>
+              </Pressable>
+              {/* İlet — web'de var (`ForwardMessageModal.vue`), parite gereği mobile de geldi.
+                  Ayrı bir uç DEĞİL: mesajın metni seçilen DM'e yeni mesaj olarak gönderilir. */}
+              <Pressable style={styles.option} onPress={onForward}>
+                <Ionicons name="arrow-redo-outline" size={20} color={theme.colors.textSecondary} />
+                <Text style={styles.optionText}>{t('message.forward')}</Text>
               </Pressable>
               {isMine && (
                 <Pressable style={styles.option} onPress={onEdit}>
@@ -149,14 +169,16 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     gap: 12,
   },
+  // Beş emoji + picker girişi = altı daire. Sabit genişlik yerine `flex: 1` + `aspectRatio`:
+  // dar ekranda taşmasın, geniş ekranda şeridi doldursun (sahip bulgusu: sağ taraf boş kalıyordu).
   emojiRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   emojiButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.bgElevated,
@@ -167,7 +189,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.accent500,
   },
   emojiText: {
-    fontSize: 26,
+    fontSize: 24,
   },
   group: {
     borderRadius: theme.radius.lg,
