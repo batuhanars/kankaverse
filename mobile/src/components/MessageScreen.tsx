@@ -12,12 +12,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { messagesApi } from '@/api/messages';
 import { extractErrorMessage } from '@/api/errors';
 import { MessageBubble } from './MessageBubble';
 import { MessageSearchModal } from './MessageSearchModal';
 import { MessageComposer } from './message/MessageComposer';
 import { useTypingEmitter } from './message/useTypingEmitter';
+import { useMessageComposer } from './message/useMessageComposer';
 import { useMessageListController } from './message/useMessageListController';
 import { MessageEmpty, MessageError, MessageLoading } from './message/MessageStates';
 import { MessageActionHost } from './message/MessageActionHost';
@@ -64,19 +64,17 @@ export function MessageScreen({
 }: Props) {
   const authUser = useAuthStore((s) => s.user);
   const fetchInitial = useMessagesStore((s) => s.fetchInitial);
-  const appendMessage = useMessagesStore((s) => s.appendMessage);
   const seedKnownUser = useMessagesStore((s) => s.seedKnownUser);
   const resolveUsername = useMessagesStore((s) => s.resolveUsername);
 
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [errorMessage, setErrorMessage] = useState('');
-  const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState('');
   const [searchVisible, setSearchVisible] = useState(false);
 
   // "Yazıyor" yayını + etiketi kendi kancasında (M1d-C §2.1).
   const typing = useTypingEmitter(channelId, typingMode);
+  // Giriş kutusu: metin, gönderim, yanıt/düzenleme modları (M1d-C §2.5).
+  const composer = useMessageComposer(channelId, typing);
 
   // react-hooks/set-state-in-effect — GuildsScreen (M0) deseni: effect gövdesi fetch'i DOĞRUDAN
   // (adlandırılmış bir sarmalayıcı fonksiyonu çağırmadan) inline zincirler; setState yalnız
@@ -135,28 +133,6 @@ export function MessageScreen({
   const { items, inverted } = list;
   // Mesaj paneli akışı (uzun basış · tepki · kopyala · sil) — M1d-C §2.4.
   const actions = useMessageActions(channelId);
-
-  function onChangeInput(text: string) {
-    setInput(text);
-    typing.onInputChange(text);
-  }
-
-  async function onSend() {
-    const trimmed = input.trim();
-    if (!trimmed || sending) return;
-    setSending(true);
-    setSendError('');
-    typing.stop();
-    try {
-      const message = await messagesApi.send(channelId, trimmed);
-      appendMessage(message);
-      setInput('');
-    } catch (e) {
-      setSendError(extractErrorMessage(e));
-    } finally {
-      setSending(false);
-    }
-  }
 
   // 🔴 Klavye + gezinme çubuğu payı — bu blok İKİ KEZ yanlış kuruldu, ikisi de kayda geçiyor.
   //
@@ -254,19 +230,34 @@ export function MessageScreen({
       )}
 
       <MessageComposer
-        value={input}
-        onChangeText={onChangeInput}
-        onSend={onSend}
-        sending={sending}
-        sendError={sendError}
+        value={composer.input}
+        onChangeText={composer.onChangeInput}
+        onSend={composer.onSend}
+        sending={composer.sending}
+        sendError={composer.sendError}
         placeholder={placeholder}
         disabledNotice={disabledNotice}
         typingLabel={typing.label}
         bottomInset={bottomInset}
+        replyToAuthor={composer.replyTo?.author.username}
+        replyToSnippet={composer.replyTo?.content}
+        editing={!!composer.editing}
+        onCancelMode={composer.cancelMode}
       />
 
-      {/* Yanıtla ve Düzenle giriş kutusuna mod ekliyor — sıradaki adım, henüz bağlı değil. */}
-      <MessageActionHost actions={actions} onReply={actions.close} onEdit={actions.close} />
+      <MessageActionHost
+        actions={actions}
+        onReply={() => {
+          const m = actions.target;
+          actions.close();
+          if (m) composer.startReply(m);
+        }}
+        onEdit={() => {
+          const m = actions.target;
+          actions.close();
+          if (m) composer.startEdit(m);
+        }}
+      />
 
       {searchVisible && (
         <MessageSearchModal

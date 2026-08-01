@@ -68,8 +68,12 @@ export const messagesApi = {
     });
     return res.data;
   },
-  async send(channelId: string, content: string): Promise<MessageDto> {
-    const res = await http.post<MessageDto>(`/channels/${channelId}/messages`, { content });
+  /** `replyToId` — M1d-C §2.5. Uç bunu M1a'dan beri destekliyordu, mobil yalnız göndermiyordu. */
+  async send(channelId: string, content: string, replyToId?: string): Promise<MessageDto> {
+    const res = await http.post<MessageDto>(`/channels/${channelId}/messages`, {
+      content,
+      ...(replyToId ? { replyToId } : {}),
+    });
     return res.data;
   },
   // Sözleşme §3.5 — kanal içi mesaj arama (case-insensitive, max 30 sonuç, backend'de min 2 karakter

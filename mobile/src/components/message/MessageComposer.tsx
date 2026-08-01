@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -26,6 +27,14 @@ interface Props {
   /** "X yazıyor…" — null ise şerit hiç render edilmez. */
   typingLabel: string | null;
   bottomInset: number;
+  /** Yanıtlanan mesajın yazarı — doluysa alıntı şeridi görünür. */
+  replyToAuthor?: string | null;
+  /** Yanıtlanan mesajın metni (kısaltılmış gösterilir). */
+  replyToSnippet?: string | null;
+  /** Düzenleme modunda mıyız — şerit metni ona göre değişir. */
+  editing?: boolean;
+  /** Modu iptal et (× düğmesi). */
+  onCancelMode?: () => void;
 }
 
 export function MessageComposer({
@@ -38,11 +47,42 @@ export function MessageComposer({
   disabledNotice,
   typingLabel,
   bottomInset,
+  replyToAuthor,
+  replyToSnippet,
+  editing,
+  onCancelMode,
 }: Props) {
   const canSend = !!value.trim() && !sending;
+  const modeActive = editing || !!replyToAuthor;
 
   return (
     <>
+      {/* Mod şeridi — kutunun ÜSTÜNDE, çünkü "neye yazıyorum" bilgisi yazmadan önce görülmeli.
+          Web'de `message.editHint` "Enter kaydet · Esc iptal" diyor; mobilde Esc yok, o metin
+          KULLANILMADI — görünür × düğmesi var (olmayan tuşu tarif etmek yanlış yönlendirir). */}
+      {modeActive && (
+        <View style={styles.modeRow}>
+          <View style={styles.modeTextWrap}>
+            <Text style={styles.modeLabel} numberOfLines={1}>
+              {editing ? t('message.edit') : t('reply.to', { author: replyToAuthor ?? '' })}
+            </Text>
+            {!editing && replyToSnippet ? (
+              <Text style={styles.modeSnippet} numberOfLines={1}>
+                {replyToSnippet}
+              </Text>
+            ) : null}
+          </View>
+          <Pressable
+            onPress={onCancelMode}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('reply.cancel')}
+          >
+            <Ionicons name="close" size={20} color={theme.colors.textMuted} />
+          </Pressable>
+        </View>
+      )}
+
       {typingLabel && (
         <View style={styles.typingRow}>
           <Text style={styles.typingText}>{typingLabel}</Text>
@@ -80,6 +120,30 @@ export function MessageComposer({
 }
 
 const styles = StyleSheet.create({
+  modeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: theme.layout.panelGap,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.borderSubtle,
+    backgroundColor: theme.colors.bgElevated,
+  },
+  modeTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  modeLabel: {
+    color: theme.colors.accent500,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
+  },
+  modeSnippet: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+    marginTop: 1,
+  },
   typingRow: {
     paddingHorizontal: theme.layout.panelGap,
     paddingBottom: 4,
