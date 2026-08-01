@@ -77,15 +77,17 @@ export function MessageActionSheet({
                   </Pressable>
                 );
               })}
-              {/* Tam liste girişi — şeridin sonunda, Discord'daki gibi. Web'de picker var, mobilde
-                  de olması parite gereği; hızlı şerit yalnız üç emoji taşıyor. */}
+              {/* Tam liste girişi — şeridin sonunda. İkon **gri outline yüz**, web'deki picker
+                  tetikleyicisinin (`MessageActionsMenu.vue`: "Gri outline yüz ikonu") ve sahibin
+                  Discord referansının aynısı. Artı işareti değil: artı "ekle" der, yüz "emoji seç"
+                  der — kullanıcı neyin açılacağını ikondan anlamalı. */}
               <Pressable
                 onPress={onOpenPicker}
                 style={styles.emojiButton}
                 accessibilityRole="button"
                 accessibilityLabel={t('message.emojiButton')}
               >
-                <Ionicons name="add" size={24} color={theme.colors.textSecondary} />
+                <Ionicons name="happy-outline" size={26} color={theme.colors.textMuted} />
               </Pressable>
             </View>
 
