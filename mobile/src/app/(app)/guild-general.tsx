@@ -117,7 +117,7 @@ export default function GuildGeneralScreen() {
     <KeyboardAvoidingView style={styles.flex} behavior="padding">
       <Stack.Screen
         options={{
-          title: t('guildSettings.nav.genel'),
+          title: t('mobile.guildSettings.generalTitle'),
           headerRight: () =>
             busy && !confirmDelete ? (
               <ActivityIndicator color={theme.colors.accent500} style={styles.headerAction} />

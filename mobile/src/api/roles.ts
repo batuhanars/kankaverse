@@ -86,7 +86,8 @@ export const PERMISSION_GROUPS = [
     flags: ['CREATE_INVITE', 'KICK_MEMBERS', 'BAN_MEMBERS', 'CHANGE_NICKNAME', 'MANAGE_NICKNAMES'],
   },
   {
-    key: 'text',
+    // Anahtar web'deki `permsGroups.message` ile aynı olmalı — başlık oradan okunuyor.
+    key: 'message',
     flags: ['MANAGE_MESSAGES', 'MANAGE_EVENTS', 'MENTION_EVERYONE'],
   },
   {

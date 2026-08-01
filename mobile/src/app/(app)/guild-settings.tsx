@@ -133,8 +133,10 @@ export default function GuildSettingsScreen() {
               **yalnız OWNER** kabul ediyor → satır ADMIN'e render edilmez. */}
           {isOwner && (
             <SettingsRow
-              icon="information-circle-outline"
-              label={t('guildSettings.nav.genel')}
+              icon="settings-outline"
+              // Satır ve ekran başlığı AYNI anahtardan (sahip bulgusu: "Kanallar"da ikisi
+              // ayrışmıştı, aynı hatayı tekrarlamayalım).
+              label={t('mobile.guildSettings.generalTitle')}
               onPress={() => router.push({ pathname: '/guild-general', params: { id: guildId } })}
             />
           )}
@@ -155,6 +157,13 @@ export default function GuildSettingsScreen() {
             onPress={() =>
               router.push({ pathname: '/guild-members', params: { id: guildId, name } })
             }
+          />
+          {/* Roller — liste her üyeye açık ama oluştur/düzenle OWNER/ADMIN; ayarlara zaten
+              yalnız yetkili giriyor. */}
+          <SettingsRow
+            icon="shield-outline"
+            label={t('guildSettings.nav.roller')}
+            onPress={() => router.push({ pathname: '/guild-roles', params: { id: guildId } })}
           />
           <SettingsRow
             icon="ban-outline"
