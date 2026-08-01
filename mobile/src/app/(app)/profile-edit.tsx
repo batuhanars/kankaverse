@@ -47,6 +47,9 @@ export default function ProfileEditScreen() {
 
   const [card, setCard] = useState<UserCardDto | null>(null);
   const [bio, setBio] = useState('');
+  // Sunucudaki hâli — "değişiklik var mı" bunun karşılaştırmasıyla anlaşılır. Kaydettikten sonra
+  // da güncellenir, yoksa düğme kaydedilmiş metin için aktif kalmaya devam ederdi.
+  const [savedBio, setSavedBio] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<MediaSlot | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -62,18 +65,24 @@ export default function ProfileEditScreen() {
         .then((c) => {
           setCard(c);
           setBio(c.bio ?? '');
+          setSavedBio(c.bio ?? '');
         })
         .catch((e) => setErrorMessage(extractErrorMessage(e)));
     }, [userId]),
   );
 
+  /** Kaydedilecek bir değişiklik var mı — Kaydet düğmesinin aktifliği buna bağlı. */
+  const dirty = bio.trim() !== savedBio.trim();
+
   async function onSaveBio() {
-    if (saving) return;
+    if (saving || !dirty) return;
     setSaving(true);
     setErrorMessage('');
     setSavedNotice('');
     try {
-      await usersApi.updateProfile({ bio: bio.trim() });
+      const trimmed = bio.trim();
+      await usersApi.updateProfile({ bio: trimmed });
+      setSavedBio(trimmed);
       setSavedNotice(t('settings.bioSaved'));
     } catch (e) {
       setErrorMessage(extractErrorMessage(e));
@@ -143,7 +152,30 @@ export default function ProfileEditScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior="padding">
-      <Stack.Screen options={{ title: t('mobile.profile.edit') }} />
+      {/* Kaydet SAĞ ÜSTTE (sahip talebi 2026-08-01, Discord düzeni) — sayfanın dibinde değil.
+          Gerekçe: biyografi uzayınca düğme ekranın altına kayıyordu, kaydetmek için aşağı inmek
+          gerekiyordu. Başlıkta sabit duruyor.
+          🔴 Yalnız BİYOGRAFİYİ kaydeder: avatar/afiş/renk seçildiği anda sunucuya yazılıyor —
+          onlar için ikinci bir "kaydet" beklemek, yüklenmiş görselin kaydedilmemiş sanılmasına
+          yol açardı. */}
+      <Stack.Screen
+        options={{
+          title: t('mobile.profile.edit'),
+          headerRight: () =>
+            saving ? (
+              <ActivityIndicator color={theme.colors.accent500} style={styles.headerAction} />
+            ) : (
+              // Değişiklik yokken PASİF + soluk. Gizlenmiyor: düğmenin varlığı "buradan
+              // kaydedilir" bilgisini taşıyor, yokluğu kullanıcıyı arattırırdı. Aynı ayrım
+              // panellerdeki "Okunmuş İşaretle" satırında da uygulandı (durum ≠ yetki).
+              <Pressable onPress={onSaveBio} disabled={!dirty} hitSlop={10} style={styles.headerAction}>
+                <Text style={[styles.headerActionText, !dirty && styles.headerActionDisabled]}>
+                  {t('common.save')}
+                </Text>
+              </Pressable>
+            ),
+        }}
+      />
 
       <ScrollView contentContainerStyle={styles.body}>
         <ProfileMediaFields
@@ -159,7 +191,11 @@ export default function ProfileEditScreen() {
         <Text style={styles.label}>{t('settings.bioLabel')}</Text>
         <TextInput
           value={bio}
-          onChangeText={(text) => setBio(text.slice(0, BIO_MAX))}
+          onChangeText={(text) => {
+            setBio(text.slice(0, BIO_MAX));
+            // Yeniden yazmaya başlayınca eski "Profil güncellendi." bildirimi yanıltmasın.
+            setSavedNotice('');
+          }}
           placeholder={t('settings.bioPlaceholder')}
           placeholderTextColor={theme.colors.textMuted}
           style={styles.bioInput}
@@ -169,14 +205,6 @@ export default function ProfileEditScreen() {
 
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
         {savedNotice ? <Text style={styles.saved}>{savedNotice}</Text> : null}
-
-        <Pressable onPress={onSaveBio} disabled={saving} style={[styles.primaryButton, saving && styles.disabled]}>
-          {saving ? (
-            <ActivityIndicator color={theme.colors.textPrimary} />
-          ) : (
-            <Text style={styles.primaryButtonText}>{t('common.save')}</Text>
-          )}
-        </Pressable>
       </ScrollView>
 
       <BannerSheet
@@ -255,20 +283,15 @@ const styles = StyleSheet.create({
     color: theme.colors.accent500,
     fontSize: theme.fontSize.sm,
   },
-  primaryButton: {
-    minHeight: theme.layout.inputMinHeight,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accent500,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
+  headerAction: {
+    marginRight: 12,
   },
-  disabled: {
-    opacity: 0.5,
-  },
-  primaryButtonText: {
-    color: theme.colors.textPrimary,
+  headerActionText: {
+    color: theme.colors.accent500,
     fontSize: theme.fontSize.base,
     fontWeight: '700',
+  },
+  headerActionDisabled: {
+    color: theme.colors.textMuted,
   },
 });

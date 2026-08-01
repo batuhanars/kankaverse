@@ -1515,6 +1515,11 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
     indirger, görsel kayıp olur
   - **Not:** gradient'ten düz renge geçiş bir tasarım kaybıdır; hex tek renk verir, bugünkü
     presetler iki renkli gradient. Hex'e geçerken "gradient'i koru" istenirse iki hex gerekir
+  - 🔴 **ORTAM AFİŞİ DE DAHİL (sahip 2026-08-01):** aynı preset listesi ortam afişlerinde de
+    kullanılıyor (`Guild.bannerColor`, Keşfet kartı + ortam ayarları). Hex'e geçiş **tek iş olarak**
+    yapılır — yalnız profil değişirse iki yüzey farklı renk modeli konuşur. Yani kapsam:
+    `api/` iki DTO (kullanıcı + ortam) · `web/` iki seçici · `mobile/` profil paneli (+ ortam
+    ayarları mobile gelince o da)
 
 ### Diğer açık kalemler (yarın)
 
