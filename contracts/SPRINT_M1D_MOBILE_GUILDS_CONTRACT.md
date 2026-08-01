@@ -207,3 +207,106 @@ Uç imzaları, hata kodları, kilitli sıra (katılma → kurma → davet → ka
 render edilmez" ve §7 kapsam-dışı listesi bu dosyadan **sapamaz**. Yeni bağımlılık = **PM onayı**.
 **`api/`'ye dokunma ihtiyacı → DUR** (bu sprintte istisna beklenmiyor; M1d-0'daki gibi bir T&S
 kuralı değişimi gerekiyorsa o ayrı karardır, sessizce yapılmaz).
+
+---
+
+## 10. B yarısı kapsam revizyonu (sahip kararı 2026-07-31, Discord mobil incelemesi sonrası)
+
+> Sahip Discord mobilin sunucu yönetimini ekran ekran inceleyip aktardı. Dört karar alındı; hepsi
+> **kapsamı büyütüyor**, gerekçeleriyle birlikte aşağıda. **Ölçü kuralı değişmedi:** Discord'da olup
+> bizde olmayan özellik EKLENMEZ; web'de olan her özellik mobile de gelir (bilinçli istisnalar hariç).
+
+### 10.1 Kanal CRUD **M1d-B'ye çekildi** (önce M1e'deydi)
+
+§7'de "kanal oluştur/sil/adlandır → M1e adayı" yazıyordu. **Geri alındı.** Gerekçe: kategori ile kanal
+aynı yüzeyin iki yarısı (Discord da tek "Oluştur" sayfasında birleştiriyor). Ayrı bırakılsa mobilde
+**kategori açabilen ama içine kanal koyamayan** kullanıcı çıkardı — yarım yüzey.
+
+### 10.2 Ortam adı → **alt panel** (bottom sheet); tekil "Davet Et" ikonu kalkar
+
+A yarısında sidebar başlığına tek bir davet ikonu konmuştu. Ortam aksiyonları çoğaldıkça (kanal
+oluştur, kategori oluştur, davet, ayarlar, ayrıl) 264dp'lik başlığa ikon dizmek tıkanır. Ada dokun →
+alttan panel: Discord'un çözümü ve bizim yüzeyimize de uyuyor. **A yarısında doğrulanmış bir öğe
+değişiyor** — bilinçli, sahip onaylı.
+
+**Panelde YALNIZ sahip olduğumuz aksiyonlar:** Davet Et · Kanal Oluştur · Kategori Oluştur ·
+(yetkisizde bunların hiçbiri). **Konmayacaklar:** Takviye/boost · Topluluk · Entegrasyonlar · Emoji ·
+İstila Bildir · Sunucu ID Kopyala · Etkinlik Oluştur (web'de var ama M1d işi değil, §10.5).
+
+### 10.3 Ortam afişi: **mobil GÖSTERİR, YÜKLEMEZ** (kalıcı kural)
+
+Discord mobil sunucu afişini gösteriyor ama yükletmiyor; sahip de aynı ayrımı seçti. Bizde
+`GuildDto.bannerUrl` C8'den beri var → mobilde göstermek veri açısından bedava.
+
+> 🔴 **Kural (tekrar edecek):** görsel **yükleme** yüzeyleri web/masaüstüne mahsustur; mobil aynı
+> görselleri **gösterir**. Avatar, profil afişi, ortam ikonu ve ortam afişi için aynı ayrım geçerlidir.
+> Bir sonraki fazda "mobilde neden yükleyemiyorum" sorusu geldiğinde cevap burada.
+
+### 10.4 M1d-B / M1e sınırı
+
+- **M1d-B = ortamı KULLAN:** kategoriler · kanal CRUD · ortam adı alt paneli · afiş gösterimi ·
+  `GUILD_INVITE` hedefi.
+- **M1e = ortamı YÖNET** (ayrı sözleşme): roller · üyeler · yasaklar · denetim kaydı · ortam ayarları
+  (web `guildSettings.nav`: Genel/Roller/Davetler/Yasaklar/Denetim Kaydı/Ortamı Sil).
+
+Gerekçe M1d-0 turunun dersidir: küçük sprint yürünebiliyor, büyük sprint kusuru gizliyor.
+
+### 10.5 Etkinlikler — açık karar
+
+Web'de **var** (`CreateEventWizard.vue` + `EventsModal.vue`), yani parite kuralı gereği mobile de
+gelecek. **M1d'nin işi değil.** M1e'ye mi girer yoksa kendi küçük sprintine mi — **sahip kararı,
+henüz verilmedi.**
+
+---
+
+## 11. B yarısı — kaynaktan doğrulanmış uçlar ve **iki tuzak** (2026-07-31)
+
+| Uç | Yetki | Not |
+|---|---|---|
+| `POST /guilds/:id/channels` | OWNER/ADMIN | `CreateChannelDto` |
+| `PATCH /channels/:id` | OWNER/ADMIN | ad · `ageGated` · `categoryId` · `isPrivate` … |
+| `DELETE /channels/:id` | OWNER/ADMIN | **son kanal silinemez → `409 LAST_CHANNEL`** |
+| `POST /guilds/:id/categories` · `PATCH /categories/:id` · `DELETE /categories/:id` | OWNER/ADMIN | `CreateCategoryDto { name 1-50 }` |
+| `GET /guilds/:id/categories` | üye | |
+
+### 🔴 Tuzak 1 — kanal adı deseni
+
+`CreateChannelDto`: `@MinLength(2) @MaxLength(50)` **+ `@Matches(/^[a-z0-9çğıöşü-]+$/)`**.
+Yani **yalnız küçük harf, rakam, tire** (Türkçe küçük harfler dahil). "Genel Sohbet" yazan kullanıcı
+sunucudan ret alır.
+
+**Karar:** mobil girdiyi **yazarken normalize eder** (küçük harfe çevir · boşluk → tire · geçersiz
+karakterleri düşür), Discord'un yaptığı gibi. Kullanıcıya reddedilecek bir şey yazdırıp sonra hata
+göstermek kötü tasarım.
+
+> **Web'de bu normalize YOK** (`ChannelPanel.vue` kullanıcının yazdığını olduğu gibi gönderiyor,
+> sunucu reddediyor). Yani aynı sürtünme web'de duruyor. Bu, bugünkü davet-kodu-büyük-harf vakasıyla
+> **aynı sınıf**: mobil doğrusunu yapar, web'e geri taşınması ayrı bir karardır. **Sahibe hatırlat.**
+
+### 🔴 Tuzak 2 — ses kanalı oluşturma
+
+`type: 'GUILD_VOICE'` uç tarafından destekleniyor **ama mobil ses kanallarını LİSTELEMİYOR**
+(`ChannelSidebar` M1a'da `GUILD_TEXT` süzüyor; gerekçe: girilemeyen satır = boş yüzey).
+Ses kanalı oluşturulabilseydi kullanıcı **kendi yarattığı kanalı göremezdi.**
+
+**Karar:** M1d-B'de mobil **yalnız metin kanalı** oluşturur; tür seçimi **sorulmaz** (Discord'daki
+Metin/Ses seçicisi kopyalanmaz). Ses kanalı oluşturma, mobil sesi gerçekten kullanabildiğinde
+(M4 ses fazı) açılır. Bu bir eksiklik değil, **görülemeyen sonuç üretmeme** kararıdır.
+
+### Kanal oluşturmada sorulmayacak alanlar
+
+`slowModeSeconds` · `userLimit` · `bitrate` · `mediaEnabled` → **sorulmaz** (varsayılan gider).
+`isPrivate` ve `ageGated` → **sorulur**: ikisi de erişim kararıdır, sonradan bulunması zor bir
+ayarı kurma anında sormak doğrudur (`ageGated` T&S kapısıdır — Sprint 4A `AGE_RESTRICTED`).
+
+### DoD-B revizesi (§1'in yerine geçer)
+
+7. Kanallar kategori başlığı altında gruplu; kategorisiz kanallar başlıksız akar
+8. Kategori aç/kapa çalışıyor, tercih uygulama yeniden açılınca korunuyor
+9. Yetkisizde kategori/kanal aksiyonları **hiç render edilmiyor**
+10. `GUILD_INVITE` bildirimi hedefli
+11. **Ortam adına dokununca alt panel açılıyor**; içindeki aksiyonlar yetkiye göre
+12. **Kanal oluşturabiliyorum**; adı yazarken normalize ediliyor, reddedilmiyor
+13. **Kanal adını değiştirebiliyor / silebiliyorum**; son kanalı silmeye çalışınca sebebini görüyorum
+14. **Kategori oluştur/adlandır/sil** çalışıyor
+15. **Ortam afişi gösteriliyor** (varsa); yükleme yüzeyi **YOK**

@@ -1281,15 +1281,97 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   ama üretebilen** kullanıcıda eski davranış (her açılışta yeni kod) sürüyor. Backend'e dokunmadan
   çözülmüyor, bilinçle bırakıldı
 
-### B yarısı — ortamı düzenlemek
-- [ ] Kanallar **kategori başlığı altında gruplu**; kategorisiz kanallar en üstte başlıksız akar
+### B yarısı — ortamı düzenlemek (kapsam revize: sahip kararı 2026-07-31, sözleşme §10)
+
+> Sahip Discord mobil sunucu yönetimini ekran ekran inceleyip aktardı → **dört karar kapsamı büyüttü.**
+> Ölçü kuralı değişmedi: Discord'da olup bizde olmayan özellik EKLENMEZ; web'de olan mobile gelir.
+
+- [ ] **Kategori render:** kanallar kategori başlığı altında gruplu; **kategorisiz kanallar en üstte
+  başlıksız** akar (web `ChannelPanel` okuması)
 - [ ] **Collapse** + tercih kalıcı; anahtar şeması web ile aynı (`kv:cat-collapsed:<guildId>:<categoryId>`)
-- [ ] Kategori oluştur/adlandır/sil — **yalnız OWNER/ADMIN'e render edilir** (disabled değil);
-  silme `ConfirmDialog` ile
+- [ ] **Ortam adı → alt panel** (§10.2): Davet Et · Kanal Oluştur · Kategori Oluştur. A yarısındaki
+  tekil davet ikonu **kalkar** (bilinçli: doğrulanmış bir öğe değişiyor). Panelde **yalnız sahip
+  olduğumuz** aksiyonlar; Takviye/Topluluk/Entegrasyon/Emoji/İstila-Bildir/Sunucu-ID **konmaz**
+- [ ] **Kanal CRUD M1d-B'ye çekildi** (§10.1, önce M1e'deydi): oluştur · adlandır · sil.
+  Gerekçe: kategori ile kanal aynı yüzeyin iki yarısı; ayrılsa "kategori açabilen ama içine kanal
+  koyamayan" kullanıcı çıkardı
+- [ ] 🔴 **Tuzak 1 — kanal adı deseni:** `@Matches(/^[a-z0-9çğıöşü-]+$/)` + 2-50. Mobil girdiyi
+  **yazarken normalize eder** (küçük harf · boşluk→tire · geçersizi düş). *Web'de bu normalize YOK,
+  sunucu reddediyor — davet-kodu-büyük-harf vakasıyla aynı sınıf, web'e geri taşıma ayrı karar*
+- [ ] 🔴 **Tuzak 2 — ses kanalı oluşturma YOK:** uç destekliyor ama mobil ses kanallarını listelemiyor
+  (M1a `GUILD_TEXT` süzgeci) → oluşturulsa kullanıcı kendi yarattığını göremezdi. Tür seçici
+  **sorulmaz** (Discord'un Metin/Ses seçicisi kopyalanmaz); M4 ses fazına ertelendi
+- [ ] Kanal oluştururken **sorulan:** `isPrivate` + `ageGated` (ikisi de erişim kararı; `ageGated`
+  T&S kapısı). **Sorulmayan:** `slowModeSeconds` · `userLimit` · `bitrate` · `mediaEnabled`
+- [ ] **Son kanal silinemez** → `409 LAST_CHANNEL`; kullanıcı sebebi görür
+- [ ] **Ortam afişi GÖSTERİLİR** (§10.3) — `GuildDto.bannerUrl` C8'den beri var.
+  🔴 **Kalıcı kural: görsel yükleme yüzeyleri web/masaüstüne mahsus, mobil yalnız gösterir**
+  (avatar · profil afişi · ortam ikonu · ortam afişi hepsi için geçerli)
+- [ ] Yetkisizde kategori/kanal aksiyonları **hiç render edilmez** (disabled değil)
 - [ ] **Sürükle-sırala YOK** (`reorder` uçları bağlanmaz)
-- [ ] `ChannelSidebar` 300 satır eşiğini aşmasın → **kategori başlığı ayrı bileşene çıkar** (D29 sınıfı)
+- [ ] `ChannelSidebar` 300 satır eşiğini aşmasın → kategori başlığı ayrı bileşene çıkar (D29 sınıfı)
 - [ ] `GUILD_INVITE` bildirimi **tıklanabilir** → ilgili ortama gider; üye değilse **tıklanamaz kalır**
-  (davet kabul ekranı yok, hedef uydurulmaz)
+
+### B yarısı — sahip revizeleri (2026-07-31 akşamı, cihaz turu sonrası) — **COMMIT EDİLMEDİ**
+
+- [x] **Ortam paneli yeniden yazıldı** — ilk sürüm üç satırlık dar kutuydu, sahip "çok küçük" dedi.
+  Discord düzeni alındı (büyük ikon + iri ad + yuvarlak aksiyon şeridi + gruplu bloklar), **içerik
+  alınmadı**: Takviye/Bildirimler/Ayarlar/Etkinlik/profil-düzenle/susturma-anahtarları/ID **konmadı**
+- [x] **Kanal uzun basışı artık PANEL açıyor**, doğrudan düzenleme ekranına atlamıyor. İçinde:
+  Okunmuş İşaretle + Kanalı Düzenle. Silme **panelde YOK**, düzenleme ekranında (yıkıcı işlem bir
+  dokunuş daha derinde; Discord da böyle yapıyor — sahip onayladı)
+- [x] **Kategori uzun basışı panel açıyor:** Kategoriyi Düzenle + **Kanal Oluştur**.
+  🔴 Bu satır sprintin eksik halkasıydı: `channel-new` `categoryId` alıyordu ama geçen giriş yoktu →
+  sahip DoD-B/14'ü test edemiyordu
+- [x] **Etiket tutarlılığı:** "Yeniden Adlandır" → **"Düzenle"** (ekran ad değişiminden fazlasını
+  yapıyor: 18+ kapısı + silme). Yeni anahtarlar `channel.editTitle` + `category.editTitle`,
+  kaynak `web/src/i18n/tr.json`. *Sahip aynı hatayı iki kez yakaladı — önce kanalda, sonra kategoride*
+- [x] **Afiş** 88 → 132 px + sol üst köşe yarıçapı · **ok** ortam adının yanına alındı
+  (başlık `flex: 1` iken ok panelin en sağına itiliyordu)
+- [x] **Ray "+" düğmesi altıgen** (web `ServerRail` dili) — `HexGuildIcon` ile aynı `HEX_POINTS`,
+  ikinci şekil tanımı girmedi; nötr zemin + Kor artı
+- [x] **Bağımlılık: `@react-native-async-storage/async-storage` 2.2.0** (PM onaylı, sahip
+  bilgilendirildi). Gerekçe: collapse tercihinin kalıcılığı DoD şartı; `expo-secure-store` gizli veri
+  içindir. Expo Go'da geliyor, dev build gerektirmiyor, `expo-doctor` 18/18 temiz
+- [x] **"Son kanal silinemez" HATA DEĞİL** (sahip bulgusu, DB'den doğrulandı): koruma **tüm** kanalları
+  sayıyor, her ortam bir `genel-sohbet` + bir `ses-kanalı` ile kuruluyor ve mobil ses kanallarını
+  göstermiyor → sunucu haklı, mobildeki "son kanal" algısı farklı. Sunucuya dokunulmadı.
+  *Açık: mobil "görünen son kanalı siliyorsun" uyarısı verebilir (sahip kararı bekliyor)*
+
+### 🔴 YARINA DEVİR — yeni iş: kanal/kategori bildirim ayarları (sahip talebi 2026-07-31 akşamı)
+
+> **Kendi sözleşmesiyle ele alınacak** (PM önerisi, sahip onayladı): M1d-B'nin içine sıkıştırılırsa
+> B yarısı bir daha kapanmaz. Backend R12 bildirim tercihleri modülü VAR ama **mobilde hiç bağlı
+> değil** → uç bağlama işi de var.
+
+- [ ] **Bildirim seviyesi ekranı** (ayrı ekran): Bütün mesajlar · Sadece @bahsetmeler · Hiçbiri.
+  En üstte `#kanal-adı`. En altta "Kanalı Sustur" girişi
+- [ ] **Susturma paneli** (alt panel): 15 dk … 24 saat aralığı + **"ben tekrar açana kadar"**
+- [ ] Discord'da susturma paneli ile bildirim ekranı birbirini karşılıklı açıyor; **sahip kararı:
+  ayrı panel yerine mevcut ekrana yönlendirmek serbest** ("fark etmez")
+- [ ] **Aynı düzenek kategori için de** (Kategoriyi Sustur + Bildirim Ayarları)
+- [ ] 🔴 **Okunmuş olarak işaretle ÜÇ panelde de olacak:** kanal (**var**) · kategori (yok) ·
+  **ortam paneli (yok — sahip son anda ekledi)**. Web'de bu sistem mevcut (`guildMenu.markRead`)
+- [ ] 🔴 **Okunmamış yoksa satır PASİF + soluk** (sahip talebi 2026-07-31). **Web'de de aynısı
+  yapılacak** — orada da okundu-işaretle her zaman aktif duruyor.
+  > **Kuralımızla çelişmiyor, ayrımı kayda geçiriyorum:** "yetkisiz aksiyon hiç render edilmez,
+  > disabled gösterilmez" kuralı **YETKİ** hakkındadır ("bunu yapamazsın" bilgisi gürültüdür).
+  > Bu ise **DURUM** hakkında ("zaten okunmuş"), ve bu bilgi kullanıcıya lazım — gizlersek
+  > okunmamış olup olmadığını anlayamaz. Yetki yoksa gizle, durum uygun değilse soluklaştır.
+
+### Diğer açık kalemler (yarın)
+
+- [ ] **B yarısının DoD turu baştan yürünecek** — paneller/afiş/uzun-basış bugün çok değişti
+- [ ] **Ortam içi arama:** ayrı sözleşme (karar verildi). Ortam adının altına arama + davet +
+  etkinlik şeridi; Discord'un sekmeli arama ekranı **kopyalanmayacak** (M1b §3.5 kararı sürüyor)
+- [ ] **Etkinlikler:** M1e'ye mi ayrı sprinte mi — **PM kapsam tahmini çıkaracak**, sonra sahip karar verir
+- [ ] **M1c'den sarkan doğrulanmamış hesap turu:** sahip mail hesabı bulunca (doğrulama bandı,
+  yasal linkler, kayıt modu `invite`/`closed`)
+
+> **M1e sınırı (§10.4):** roller · üyeler · yasaklar · denetim kaydı · ortam ayarları → **ayrı
+> sözleşme**. M1d-B "ortamı KULLAN", M1e "ortamı YÖNET".
+> **Açık karar (§10.5):** etkinlikler web'de VAR (`CreateEventWizard`), mobile gelecek ama M1e'ye mi
+> yoksa kendi sprintine mi — **sahip henüz karar vermedi**.
 
 ### DoD (sözleşme §1 — **fiziksel cihazda**)
 - [x] Davet kodu/linki ile katılıyorum, ortam ray'da anında beliriyor *(düz kod + tam link ikisi de)*

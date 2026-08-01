@@ -120,15 +120,24 @@ export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSel
         {/* Sprint M1d — "+" ortam listesinin ALTINDA (web ServerRail'de de öyle). Tek düğme, iki
             seçenek açar; "Katıl" ve "Kur" için ayrı ayrı iki ikon konmadı — ray 72dp, ikinci düğme
             listeyi aşağı iter ve seçim yükünü kullanıcıya her açılışta ödetir.
-            Altıgen DEĞİL daire/kare değil: ortam ikonu olmadığı için imza altıgeni kullanılmıyor,
-            aksi hâlde "bu da bir ortam" gibi okunurdu. */}
+            Şekil ALTIGEN (sahip revizesi): ray'deki ortam ikonlarıyla aynı dil. Ortam olmadığını
+            zemin tonu ve Kor artı ayırt ettiriyor, ayrı bir şekil gerekmiyor. */}
         <Pressable
           onPress={onAddGuild}
           style={styles.addButton}
           accessibilityRole="button"
           accessibilityLabel={t('guild.create')}
         >
-          <Ionicons name="add" size={26} color={theme.colors.accent500} />
+          {/* Sahip revizesi 2026-07-31 — web `ServerRail` ile aynı dil: ALTIGEN silüet, nötr
+              zemin, Kor artı. Önce yuvarlak köşeli kareydi ve ray'deki altıgen ortam ikonlarının
+              yanında yabancı duruyordu. Altıgen `HexGuildIcon` ile AYNI `HEX_POINTS`ten çiziliyor,
+              ikinci bir şekil tanımı girmiyor. */}
+          <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+            <Polygon points={HEX_POINTS} fill={theme.colors.bgElevated} />
+          </Svg>
+          <View style={styles.addIcon}>
+            <Ionicons name="add" size={26} color={theme.colors.accent500} />
+          </View>
         </Pressable>
       </ScrollView>
     </View>
@@ -186,8 +195,13 @@ const styles = StyleSheet.create({
   addButton: {
     width: SIZE,
     height: SIZE,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accentSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Artı, altıgenin ÜSTÜNE biner (SVG içine RN ikonu koyulamaz). `pointerEvents` yok: ikon
+  // dokunuşu yutmasın diye değil, zaten sarmalayan Pressable tüm alanı kaplıyor.
+  addIcon: {
+    position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -10,6 +10,12 @@ import type { DmChannelDto } from '@/api/dm';
 import { GuildRail, type RailSelection } from '@/components/home/GuildRail';
 import { DmSidebar } from '@/components/home/DmSidebar';
 import { ChannelSidebar } from '@/components/home/ChannelSidebar';
+import { GuildMenuSheet } from '@/components/home/GuildMenuSheet';
+import { AddGuildSheet } from '@/components/home/AddGuildSheet';
+import { ChannelMenuSheet } from '@/components/home/ChannelMenuSheet';
+import { CategoryMenuSheet } from '@/components/home/CategoryMenuSheet';
+import type { CategoryDto } from '@/api/categories';
+import { channelsApi } from '@/api/channels';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -28,6 +34,11 @@ export default function HomeScreen() {
   const [guildState, setGuildState] = useState<'loading' | 'error' | 'ready'>('loading');
   const [guilds, setGuilds] = useState<GuildSummaryDto[]>([]);
   const [addOpen, setAddOpen] = useState(false);
+  const [guildMenuOpen, setGuildMenuOpen] = useState(false);
+  // Uzun basılan kanal — panel bunun üzerinden açılır (sahip revizesi: uzun basış doğrudan
+  // düzenleme ekranına atlamıyor, önce "ne yapabilirim" panelini gösteriyor).
+  const [menuChannel, setMenuChannel] = useState<ChannelSummaryDto | null>(null);
+  const [menuCategory, setMenuCategory] = useState<CategoryDto | null>(null);
 
   // Sprint M1d §6 — seçili ortamdaki kendi rolüm. Sunucuda "benim rolüm" diye ayrı bir uç YOK;
   // web de (stores/channels.ts) üye listesini çekip kendini buluyor, mobil aynı yolu izler.
@@ -92,16 +103,17 @@ export default function HomeScreen() {
     router.push(target);
   }
 
-  const selectedGuildName = useMemo(() => {
-    if (selection.type !== 'guild') return '';
-    return guilds.find((g) => g.id === selection.id)?.name ?? '';
+  const selectedGuild = useMemo(() => {
+    if (selection.type !== 'guild') return null;
+    return guilds.find((g) => g.id === selection.id) ?? null;
   }, [guilds, selection]);
+  const selectedGuildName = selectedGuild?.name ?? '';
 
   // Davet üretme yetkisi (sözleşme §2.4): OWNER veya ADMIN. OWNER `ownerId`'den anında bilinir,
   // ADMIN için üye listesinden çözülen rol gerekir. Yetkisize düğme **hiç render edilmez**
   // (disabled gösterilmez — M1b grup yönetimi deseni). Sunucu da aynı kapıyı tutuyor (403);
   // buradaki kontrol yalnız UX.
-  const canInvite = useMemo(() => {
+  const canManage = useMemo(() => {
     if (selection.type !== 'guild') return false;
     const guild = guilds.find((g) => g.id === selection.id);
     if (guild && myUserId && guild.ownerId === myUserId) return true;
@@ -145,11 +157,9 @@ export default function HomeScreen() {
           {/* Sözleşme §13/1 — FAB, eski "Mesajlar" başlığı yanındaki "+"nın yerini alıyor (o
               DmSidebar'dan kaldırıldı). Kor dolgu, gölge YOK (web/CLAUDE.md tasarım sistemi: katman
               ayrımı ton+kenarlık ile, gölge yok) — daire arka planla zaten ayrışıyor.
-              R3 revizyonu — sahip "iki ikon üst üste" görünümünü fark etti (chatbubble + bindirilmiş
-              add rozeti). `Ionicons`'ta baloncuk+artı BİLEŞİK glifi yok (yalnız `chatbubble*`
-              varyantları var); `MaterialCommunityIcons` setinde `message-plus` bunu TEK glif olarak
-              veriyor. `@expo/vector-icons` bu seti zaten paketliyor — yeni bağımlılık yok, yalnız
-              başka bir hazır ikon setinden tek bir isim seçildi. */}
+              R3 revizyonu — `Ionicons`'ta baloncuk+artı bileşik glifi yok; `MaterialCommunityIcons`
+              `message-plus` bunu tek glif veriyor ve `@expo/vector-icons` seti zaten paketliyor
+              (yeni bağımlılık yok). */}
           <Pressable
             onPress={() => router.push('/new-message')}
             style={styles.fab}
@@ -169,38 +179,93 @@ export default function HomeScreen() {
           guildName={selectedGuildName}
           selectedChannelId={lastOpenedChannelId}
           onOpenChannel={openChannel}
-          onOpenInvite={
-            canInvite
-              ? () =>
-                  router.push({
-                    pathname: '/guild-invite',
-                    params: { id: selection.id, name: selectedGuildName },
-                  })
-              : undefined
-          }
+          guildBannerUrl={selectedGuild?.bannerUrl}
+          onOpenGuildMenu={() => setGuildMenuOpen(true)}
+          canManage={canManage}
+          onEditChannel={(c) => setMenuChannel(c)}
+          onEditCategory={(c) => setMenuCategory(c)}
         />
       )}
 
-      {/* Web `ServerModal` `choose` adımının mobil karşılığı (sözleşme §3): tek "+" iki seçenek
-          açar. Ayrı iki ray düğmesi konmadı. */}
-      <Modal transparent visible={addOpen} animationType="fade" onRequestClose={() => setAddOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setAddOpen(false)}>
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={styles.sheetTitle}>{t('guild.modal.chooseTitle')}</Text>
-            <Text style={styles.sheetDesc}>{t('guild.modal.chooseDesc')}</Text>
+      <CategoryMenuSheet
+        visible={!!menuCategory}
+        categoryName={menuCategory?.name ?? ''}
+        onClose={() => setMenuCategory(null)}
+        onEdit={() => {
+          const c = menuCategory;
+          setMenuCategory(null);
+          if (c && selection.type === 'guild')
+            router.push({
+              pathname: '/category-edit',
+              params: { guildId: selection.id, id: c.id, name: c.name },
+            });
+        }}
+        onCreateChannel={() => {
+          const c = menuCategory;
+          setMenuCategory(null);
+          // Kategoriye kanal ekleme yolu BURADA açılıyor — `channel-new` bu parametreyi baştan
+          // alıyordu ama geçen bir giriş yoktu (sahip bulgusu).
+          if (c && selection.type === 'guild')
+            router.push({
+              pathname: '/channel-new',
+              params: { guildId: selection.id, categoryId: c.id },
+            });
+        }}
+      />
 
-            <Pressable style={styles.sheetOption} onPress={() => openAdd('/new-guild')}>
-              <Text style={styles.sheetOptionTitle}>{t('guild.modal.createOption')}</Text>
-              <Text style={styles.sheetOptionDesc}>{t('guild.modal.createOptionDesc')}</Text>
-            </Pressable>
+      <ChannelMenuSheet
+        visible={!!menuChannel}
+        channelName={menuChannel?.name ?? ''}
+        onClose={() => setMenuChannel(null)}
+        onMarkRead={() => {
+          const id = menuChannel?.id;
+          setMenuChannel(null);
+          // Hata sessiz: okundu işaretleme kritik değil, kullanıcıyı hata ekranıyla durdurmaya değmez.
+          if (id) void channelsApi.markRead(id).catch(() => {});
+        }}
+        onEdit={() => {
+          const c = menuChannel;
+          setMenuChannel(null);
+          if (c)
+            router.push({
+              pathname: '/channel-edit',
+              params: { id: c.id, name: c.name ?? '', ageGated: String(c.ageGated) },
+            });
+        }}
+      />
 
-            <Pressable style={styles.sheetOption} onPress={() => openAdd('/join-guild')}>
-              <Text style={styles.sheetOptionTitle}>{t('guild.modal.joinOption')}</Text>
-              <Text style={styles.sheetOptionDesc}>{t('guild.modal.joinOptionDesc')}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <GuildMenuSheet
+        visible={guildMenuOpen}
+        guildName={selectedGuildName}
+        guildIconUrl={selectedGuild?.iconUrl}
+        canManage={canManage}
+        onClose={() => setGuildMenuOpen(false)}
+        onInvite={() => {
+          setGuildMenuOpen(false);
+          if (selection.type === 'guild')
+            router.push({
+              pathname: '/guild-invite',
+              params: { id: selection.id, name: selectedGuildName },
+            });
+        }}
+        onCreateChannel={() => {
+          setGuildMenuOpen(false);
+          if (selection.type === 'guild')
+            router.push({ pathname: '/channel-new', params: { guildId: selection.id } });
+        }}
+        onCreateCategory={() => {
+          setGuildMenuOpen(false);
+          if (selection.type === 'guild')
+            router.push({ pathname: '/category-edit', params: { guildId: selection.id } });
+        }}
+      />
+
+      <AddGuildSheet
+        visible={addOpen}
+        onClose={() => setAddOpen(false)}
+        onCreate={() => openAdd('/new-guild')}
+        onJoin={() => openAdd('/join-guild')}
+      />
     </SafeAreaView>
   );
 }
@@ -213,45 +278,6 @@ const styles = StyleSheet.create({
   },
   dmPane: {
     flex: 1,
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: theme.colors.bgSidebar,
-    borderTopLeftRadius: theme.radius.lg,
-    borderTopRightRadius: theme.radius.lg,
-    padding: theme.layout.panelGap,
-    gap: 8,
-  },
-  sheetTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.lg,
-    fontWeight: '700',
-  },
-  sheetDesc: {
-    color: theme.colors.textMuted,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 19,
-    marginBottom: 4,
-  },
-  sheetOption: {
-    padding: 12,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.bgElevated,
-    gap: 2,
-  },
-  sheetOptionTitle: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.base,
-    fontWeight: '600',
-  },
-  sheetOptionDesc: {
-    color: theme.colors.textMuted,
-    fontSize: theme.fontSize.xs,
-    lineHeight: 17,
   },
   fab: {
     position: 'absolute',
