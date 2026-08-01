@@ -27,6 +27,8 @@ export default function DmScreen() {
     kind?: 'dm' | 'group';
     canMessage?: string;
     selfBlocked?: string;
+    /** M1h — sabitlenenler ekranından "mesaja git" (kanal ekranındaki `jumpTo` ile aynı yol). */
+    jumpTo?: string;
   }>();
   const [showProfile, setShowProfile] = useState(false);
   const channelId = params.id;
@@ -109,12 +111,23 @@ export default function DmScreen() {
       <MessageScreen
         channelId={params.id}
         placeholder={placeholder}
+        jumpToMessageId={params.jumpTo}
         markRead={dmApi.markRead}
         typingMode="simple"
         disabledNotice={disabledNotice}
         // 1-1 DM'de arama YOK (sahip kararı 2026-08-01); grup DM'de kalıyor — orada birden çok
         // kişi ve daha uzun geçmiş var, aramanın işi görülüyor. Web'de de aynı ayrım yapıldı.
         searchable={!isDm}
+        // 🔴 DM ve grup DM'de sabitleme **her üyeye açık** — sunucu `requirePinAccess` bu iki
+        // kanal türünde ek kontrol yapmıyor, üyelik yeterli. Ortam kanalındaki `MANAGE_MESSAGES`
+        // şartı buraya taşınmaz; olmayan bir kapıyı istemcide kurmak da gevşetmek kadar yanlış.
+        canPin
+        onOpenPins={() =>
+          router.push({
+            pathname: '/pins',
+            params: { channelId: params.id, name: title, origin: 'dm' },
+          })
+        }
       />
       {showProfile && isDm && params.otherUserId && (
         <ProfileCardModal

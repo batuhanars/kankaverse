@@ -22,6 +22,8 @@ interface MessagesState {
   appendMessage: (message: MessageDto) => void;
   updateMessage: (message: MessageDto) => void;
   /** WS tepki olayının yansıması — sunucu yalnız delta yayar, toplamı istemci tutar. */
+  /** M1h — sabitleme durumu (soket deltası). `pinnedAt` null ise sabitleme kalkmış demektir. */
+  applyPin: (channelId: string, messageId: string, pinnedAt: string | null) => void;
   applyReaction: (
     channelId: string,
     messageId: string,
@@ -149,6 +151,20 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
 
       const messages = [...current];
       messages[idx] = { ...message, reactions };
+      return { byChannel: { ...s.byChannel, [channelId]: { ...s.byChannel[channelId], messages } } };
+    });
+  },
+
+  applyPin(channelId, messageId, pinnedAt) {
+    set((s) => {
+      const current = s.byChannel[channelId]?.messages;
+      if (!current) return s;
+      const idx = current.findIndex((m) => m.id === messageId);
+      // Mesaj yüklü sayfada değilse yapacak bir şey yok — sabitlenenler ekranı listeyi zaten
+      // sunucudan çekiyor, store'a hayalet kayıt eklenmez.
+      if (idx === -1) return s;
+      const messages = [...current];
+      messages[idx] = { ...current[idx], pinnedAt };
       return { byChannel: { ...s.byChannel, [channelId]: { ...s.byChannel[channelId], messages } } };
     });
   },

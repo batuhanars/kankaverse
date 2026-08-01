@@ -124,6 +124,16 @@ function ensureSocket(): Socket {
   socket.on('reaction.added', applyReaction(true));
   socket.on('reaction.removed', applyReaction(false));
 
+  // M1h — sabitleme. Tepkiler gibi DELTA yayını (`broadcastPin`): sunucu mesajın tamamını değil
+  // yalnız durum değişimini gönderiyor, istemci `pinnedAt`'i kendi mesajına yazıyor. Sabitleyen
+  // kişi de aynı olayı alır — istekten sonra iyimser güncelleme YAPILMIYOR, tek yazma yolu bu.
+  socket.on('message.pinned', (data: { messageId: string; channelId: string; pinnedAt: string }) => {
+    useMessagesStore.getState().applyPin(data.channelId, data.messageId, data.pinnedAt);
+  });
+  socket.on('message.unpinned', (data: { messageId: string; channelId: string }) => {
+    useMessagesStore.getState().applyPin(data.channelId, data.messageId, null);
+  });
+
   socket.on('typing:update', (data: { userId: string; username: string; channelId: string }) => {
     useTypingStore.getState().handleUpdate(data.channelId, data.userId, data.username);
   });

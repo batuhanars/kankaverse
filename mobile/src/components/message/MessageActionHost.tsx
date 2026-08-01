@@ -19,9 +19,11 @@ interface Props {
   onReply: () => void;
   /** Düzenle — giriş kutusunu düzenleme moduna alır. */
   onEdit: () => void;
+  /** Sprint M1h — sabitleme yetkisi (ortamda `MANAGE_MESSAGES`, DM/grupta her üye). */
+  canPin: boolean;
 }
 
-export function MessageActionHost({ actions, onReply, onEdit }: Props) {
+export function MessageActionHost({ actions, onReply, onEdit, canPin }: Props) {
   return (
     <>
       <MessageActionSheet
@@ -46,6 +48,13 @@ export function MessageActionHost({ actions, onReply, onEdit }: Props) {
         onDelete={() => {
           actions.setDeleteTarget(actions.target);
           actions.close();
+        }}
+        canPin={canPin}
+        isPinned={actions.isPinned}
+        onTogglePin={() => {
+          const m = actions.target;
+          actions.close();
+          if (m) void actions.togglePin(m);
         }}
       />
 

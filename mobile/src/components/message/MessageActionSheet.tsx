@@ -50,6 +50,15 @@ interface Props {
   onEdit: () => void;
   onCopy: () => void;
   onDelete: () => void;
+  /**
+   * Sprint M1h — sabitleme satırı YALNIZ yetki varsa çizilir. Ortamda `MANAGE_MESSAGES`
+   * (`useGuildPermission` ile hesaplanır), DM/grup DM'de her üye.
+   * 🔴 OWNER/ADMIN kontrolü YETMEZ: `MANAGE_MESSAGES` granüler bir izin, özel rolle de gelebilir.
+   */
+  canPin: boolean;
+  /** Mesaj zaten sabitli mi — aynı satır "Sabitle" ↔ "Sabitlemeyi kaldır" olarak değişir. */
+  isPinned: boolean;
+  onTogglePin: () => void;
 }
 
 export function MessageActionSheet({
@@ -64,6 +73,9 @@ export function MessageActionSheet({
   onEdit,
   onCopy,
   onDelete,
+  canPin,
+  isPinned,
+  onTogglePin,
 }: Props) {
   const bottomInset = useSheetInsets();
 
@@ -121,6 +133,18 @@ export function MessageActionSheet({
                 <Pressable style={styles.option} onPress={onEdit}>
                   <Ionicons name="pencil-outline" size={20} color={theme.colors.textSecondary} />
                   <Text style={styles.optionText}>{t('message.edit')}</Text>
+                </Pressable>
+              )}
+              {canPin && (
+                <Pressable style={styles.option} onPress={onTogglePin}>
+                  <Ionicons
+                    name={isPinned ? 'bookmark' : 'bookmark-outline'}
+                    size={20}
+                    color={theme.colors.textSecondary}
+                  />
+                  <Text style={styles.optionText}>
+                    {isPinned ? t('message.unpin') : t('message.pin')}
+                  </Text>
                 </Pressable>
               )}
               <Pressable style={styles.option} onPress={onCopy}>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { messagesApi, type MessageDto } from '@/api/messages';
+import { extractErrorMessage } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth';
 
 /**
@@ -16,6 +17,8 @@ import { useAuthStore } from '@/stores/auth';
 export function useMessageActions(channelId: string) {
   const myId = useAuthStore((s) => s.user?.id);
   const [target, setTarget] = useState<MessageDto | null>(null);
+  /** Panel kapandıktan sonra oluşan hatalar (sabitleme sınırı, yetki) — ekranda gösterilir. */
+  const [actionError, setActionError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<MessageDto | null>(null);
   const [deleting, setDeleting] = useState(false);
   // Tam emoji listesi ayrı bir modal; panel KAPANIP açılıyor (iç içe modal Android'de güvenilmez).
@@ -77,6 +80,22 @@ export function useMessageActions(channelId: string) {
   return {
     target,
     isMine: !!target && target.author.id === myId,
+    isPinned: !!target?.pinnedAt,
+    /**
+     * Sprint M1h — sabitle/kaldır. Sunucu **idempotent** ve kanal başına **50 sınırı** koyuyor;
+     * sınır aşılırsa Türkçe mesajıyla 409 döner ve o mesaj kullanıcıya gösterilir.
+     * İyimser güncelleme YOK: sonuç zaten sokete düşüyor, iki kaynak birbiriyle yarışmasın.
+     */
+    async togglePin(message: MessageDto) {
+      try {
+        if (message.pinnedAt) await messagesApi.unpin(channelId, message.id);
+        else await messagesApi.pin(channelId, message.id);
+      } catch (e) {
+        setActionError(extractErrorMessage(e));
+      }
+    },
+    actionError,
+    clearActionError: () => setActionError(''),
     myEmojis: target?.reactions?.filter((r) => r.reactedByMe).map((r) => r.emoji) ?? [],
     open,
     close,

@@ -130,6 +130,27 @@ export const messagesApi = {
   // karar verir: düzenleme ve silme **yalnız yazar** (`messages.controller.ts` "yalnız yazar"),
   // tepki her üye, sabitleme guild'de admin / DM'de üye. Sunucu 403 dönerse mesajı gösteririz.
 
+  /**
+   * Sprint M1h — sabitleme. Uçlar M1a'dan beri duruyordu, mobil çağırmıyordu (M1d-C'de bilinçle
+   * atlanmıştı: sabitlenenler yüzeyi yokken sabitlemek "görülemeyen sonuç" olurdu — artık yüzey var).
+   *
+   * 🔴 Sunucu davranışı: **idempotent** (zaten sabitliyse no-op) ve **kanal başına 50 sınırı**
+   * (aşılırsa 409 + Türkçe mesaj). Yetki: ortamda `MANAGE_MESSAGES`, DM/grup DM'de üyelik yeter.
+   */
+  async pin(channelId: string, messageId: string): Promise<null> {
+    const res = await http.post<null>(`/channels/${channelId}/messages/${messageId}/pin`);
+    return res.data;
+  },
+  async unpin(channelId: string, messageId: string): Promise<null> {
+    const res = await http.delete<null>(`/channels/${channelId}/messages/${messageId}/pin`);
+    return res.data;
+  },
+  /** `GET /channels/:id/pins` — `pinnedAt desc`. **Kanal başına**, ortam geneli uç yok. */
+  async listPins(channelId: string): Promise<MessageDto[]> {
+    const res = await http.get<MessageDto[]>(`/channels/${channelId}/pins`);
+    return res.data;
+  },
+
   async edit(channelId: string, messageId: string, content: string): Promise<MessageDto> {
     const res = await http.patch<MessageDto>(`/channels/${channelId}/messages/${messageId}`, { content });
     return res.data;
