@@ -1592,6 +1592,13 @@
     "profile": {
       "edit": "Profili Düzenle"
     },
+    "security": {
+      "passwordSessionsNotice": "Şifreni değiştirdiğinde diğer cihazlardaki oturumların kapanır. Bu cihazda açık kalırsın.",
+      "emailLinkNotice": "Yeni adresine bir doğrulama bağlantısı, eski adresine de değişikliği geri alma bağlantısı gönderilir. Bağlantıya tıklayana kadar e-postan değişmez.",
+      "terminateOthersConfirm": "Bu cihaz dışındaki tüm oturumlar kapatılacak. Diğer cihazlarda yeniden giriş yapman gerekir.",
+      "secretHint": "Bu anahtarı kopyala ve doğrulayıcı uygulamana (Google Authenticator, Authy) elle ekle. Ardından uygulamanın verdiği 6 haneli kodu aşağıya gir.",
+      "recoveryOnceNotice": "Bu kodlar yalnızca bir kez gösterilir. Şimdi güvenli bir yere kaydet; ekrandan çıkınca tekrar göremezsin."
+    },
     "guildSettings": {
       "channelsTitle": "Kanallar",
       "generalTitle": "Genel Ayarlar",

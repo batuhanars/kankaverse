@@ -1631,3 +1631,39 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] `GUILD_INVITE` bildirimi hedefli
 - [ ] Metin `tr.json`'dan, token'dan; gömülü string yok
 - [ ] `typecheck` + `lint` temiz; **`api/`'ye dokunulmadı**
+
+---
+
+## Sprint M1f — Mobil Hesap Güvenliği (Track F2, PM compose 2026-08-01)
+
+> Sözleşme: `contracts/SPRINT_M1F_MOBILE_ACCOUNT_SECURITY_CONTRACT.md` = **tek doğruluk kaynağı**.
+> 🔴 **R7 kapsamında** — reauth akışı + oturum yönetimi sahip incelemesinden geçmeden kapanmaz.
+> `api/`'ye dokunulmadı: sekiz ucun hepsi zaten vardı, mobil yalnız çağırmıyordu.
+
+- [x] `authApi` güvenlik uçları (oturumlar, 2FA, şifre, e-posta, hesap silme) + `twoFactorEnabled`
+- [x] Paylaşılan `ReauthFields` (şifre + 2FA açıksa TOTP) — beş ekranda aynı, satır içi
+- [x] `SecurityForm` ortak kabuk (başlık · klavye · hata · başarı · tek düğme)
+- [x] Hesap Güvenliği merkezi + "Sen" sekmesine dişli *(M1a'da bilinçle boş bırakılan yüzeyin tetikleyicisi)*
+- [x] Şifre Değiştir *(diğer oturumların düşeceği ekranda yazılı)*
+- [x] E-posta Değiştir *(talep + link akışı anlatılıyor, sahte onay ekranı YOK)*
+- [x] Oturumlarım *(tek kapat · diğerlerini kapat · mevcut oturumu kapatmak = çıkış)*
+- [x] İki Adımlı Doğrulama *(kur → metin anahtar → kod → kurtarma kodları; kapat)*
+- [x] Hesabımı Sil *(30 gün grace metni + onay diyaloğu)*
+- [x] `typecheck` + `lint` temiz
+
+### Bilinçli farklar (sapma DEĞİL, sözleşmede yazılı)
+- [x] **QR çizilmiyor**, gizli anahtar metin + kopyala — telefonun kendi QR'ı aynı telefondaki
+  authenticator'a okutulamaz; web'de QR doğru olan, orada duruyor
+- [x] Kurtarma kodları **.txt indirme yok**, kopyala var (mobilde dosya yönetimi açmak istemedik)
+- [x] **Kullanıcı adı değişimi YOK** — uç var ama web "değiştirilemez" diyor; iki istemci çelişemez,
+  🔴 **sahip kararı bekliyor**
+
+### DoD (sözleşme §1 — **fiziksel cihazda**)
+- [ ] Dişli → Hesap Güvenliği açılıyor
+- [ ] Şifre değişiyor; diğer oturumların düştüğünü görüyorum
+- [ ] Oturum listesi geliyor; tek kapatma + diğerlerini kapatma çalışıyor
+- [ ] 2FA kurulabiliyor (anahtar → kod → kurtarma kodları) ve kapatılabiliyor
+- [ ] E-posta değişim talebi gidiyor, posta geliyor
+- [ ] Hesap silme talebi çalışıyor *(🔴 test hesabıyla — sahip kendi hesabında DENEMESİN)*
+- [ ] Yanlış şifre/koda sunucunun Türkçe mesajı görünüyor
+- [ ] 🔴 **R7:** reauth + oturum yönetimi sahip incelemesinden geçti
