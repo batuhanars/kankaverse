@@ -108,14 +108,41 @@ export default function ReorderScreen() {
     if (!ok) setCategories(previous);
   }
 
-  async function saveChannels(next: ReorderRowData[]) {
+  /**
+   * 🔴 Bırakılan yer hem SIRAYI hem KATEGORİYİ belirler (sahip revizesi 2026-08-01).
+   *
+   * Sebep: kenar çubuğu kanalları önce kategoriye göre gruplayıp sonra kendi içinde `position`a
+   * göre sıralıyor. Yani farklı kategorilerdeki iki kanalın bağıl sırası **hiçbir şey ifade
+   * etmiyor** — düz liste, kategoriler arası sürüklemeyi mümkün göstererek yapamayacağı bir şeyi
+   * vaat ediyordu. Artık vaat ediyor ve yapıyor.
+   *
+   * Kural basit ve tahmin edilebilir: **kanal, üstüne düştüğü satırın kategorisine katılır.** En
+   * başa bırakılırsa kategorisiz olur — kenar çubuğu da kategorisizleri en üstte gösteriyor, yani
+   * ekrandaki yer gerçekteki yerle aynı anlama geliyor.
+   */
+  async function saveChannels(next: ReorderRowData[], movedId: string) {
     const previous = channels;
     const byId = new Map(channels.map((c) => [c.id, c]));
-    setChannels(next.map((r) => byId.get(r.id)).filter((c): c is ChannelSummaryDto => !!c));
+    const movedIndex = next.findIndex((r) => r.id === movedId);
+    const above = movedIndex > 0 ? byId.get(next[movedIndex - 1].id) : null;
+    const newCategoryId = movedIndex === 0 ? null : (above?.categoryId ?? null);
+
+    const reordered = next
+      .map((r) => byId.get(r.id))
+      .filter((c): c is ChannelSummaryDto => !!c)
+      .map((c) => (c.id === movedId ? { ...c, categoryId: newCategoryId } : c));
+    setChannels(reordered);
+
     const ok = await persist(() =>
       channelsApi.reorder(
         guildId,
-        next.map((r, i) => ({ id: r.id, position: i })),
+        next.map((r, i) =>
+          // `categoryId` YALNIZ taşınan kanal için gönderilir; diğerleri sırası değişse bile
+          // kendi kategorisinde kalır (uç: undefined → değişmez).
+          r.id === movedId
+            ? { id: r.id, position: i, categoryId: newCategoryId }
+            : { id: r.id, position: i },
+        ),
       ),
     );
     if (!ok) setChannels(previous);
@@ -130,14 +157,21 @@ export default function ReorderScreen() {
     if (!ok) setRoles(previous);
   }
 
-  /** Düz kanal listesi; her satır kendi kategorisini alt etiket olarak taşır. */
+  /**
+   * Düz kanal listesi — **kenar çubuğuyla AYNI sırada**: önce kategorisizler, sonra kategoriler
+   * kendi sıralarında, her biri kendi içinde `position`a göre. Ekrandaki sıra gerçekteki sırayla
+   * birebir olmazsa "sürükledim ama değişmedi" hissi doğar.
+   */
   const categoryName = (id: string | null) =>
     id ? (categories.find((c) => c.id === id)?.name ?? '') : t('mobile.reorder.uncategorized');
-  const channelRows: ReorderRowData[] = channels.map((c) => ({
-    id: c.id,
-    label: c.name ?? '',
-    sublabel: categoryName(c.categoryId),
-  }));
+
+  const inCategory = (id: string | null) =>
+    channels.filter((c) => c.categoryId === id).sort((a, b) => a.position - b.position);
+
+  const channelRows: ReorderRowData[] = [
+    ...inCategory(null),
+    ...categories.flatMap((cat) => inCategory(cat.id)),
+  ].map((c) => ({ id: c.id, label: c.name ?? '', sublabel: categoryName(c.categoryId) }));
 
   return (
     <GestureHandlerRootView style={styles.flex}>
@@ -164,13 +198,13 @@ export default function ReorderScreen() {
         // `ScrollViewContainer` — iç içe sürüklenebilir listelerin ortak kaydırma kabı. Normal
         // ScrollView kullanılırsa iç listelerin sürüklemesi dış kaydırmayla çakışır.
         <ScrollViewContainer contentContainerStyle={styles.body}>
-          <Text style={styles.hint}>{t('mobile.reorder.hint')}</Text>
+          <Text style={styles.hint}>{t('mobile.reorder.channelsHint')}</Text>
           {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 
           <ReorderSection
             title={t('mobile.reorder.categoriesSection')}
             rows={categories.map((c) => ({ id: c.id, label: c.name }))}
-            onReorder={saveCategories}
+            onReorder={(next) => saveCategories(next)}
             emptyHint={t('mobile.reorder.noCategories')}
           />
 
@@ -185,7 +219,7 @@ export default function ReorderScreen() {
           <ReorderSection
             title={t('mobile.reorder.channelsSection')}
             rows={channelRows}
-            onReorder={saveChannels}
+            onReorder={(nextRows, movedId) => saveChannels(nextRows, movedId)}
             emptyHint={t('channel.noChannels')}
           />
 

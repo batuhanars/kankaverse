@@ -16,7 +16,9 @@ import { theme } from '@/theme';
 interface Props {
   title: string;
   rows: ReorderRowData[];
-  onReorder: (next: ReorderRowData[]) => void;
+  /** `movedId` — sürüklenen satır. Kanal listesinde bırakılan yer kategoriyi de belirlediği
+   *  için çağıranın "hangisi taşındı" bilgisine ihtiyacı var. */
+  onReorder: (next: ReorderRowData[], movedId: string) => void;
   /** Tek satırlı listede sürükleyecek bir şey yok — başlık yine yazılır, liste sönük durur. */
   emptyHint?: string;
 }
@@ -33,7 +35,7 @@ export function ReorderSection({ title, rows, onReorder, emptyHint }: Props) {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           scrollEnabled={false}
-          onReorder={({ from, to }) => onReorder(reorderItems(rows, from, to))}
+          onReorder={({ from, to }) => onReorder(reorderItems(rows, from, to), rows[from].id)}
           renderItem={({ item }) => <ReorderRow row={item} />}
         />
       )}
