@@ -31,6 +31,8 @@ interface Props {
   myEmojis: string[];
   onClose: () => void;
   onToggleReaction: (emoji: string) => void;
+  /** Şeridin sonundaki "+" — tam emoji listesini açar (web'deki picker'ın karşılığı). */
+  onOpenPicker: () => void;
   onReply: () => void;
   onEdit: () => void;
   onCopy: () => void;
@@ -43,6 +45,7 @@ export function MessageActionSheet({
   myEmojis,
   onClose,
   onToggleReaction,
+  onOpenPicker,
   onReply,
   onEdit,
   onCopy,
@@ -74,6 +77,16 @@ export function MessageActionSheet({
                   </Pressable>
                 );
               })}
+              {/* Tam liste girişi — şeridin sonunda, Discord'daki gibi. Web'de picker var, mobilde
+                  de olması parite gereği; hızlı şerit yalnız üç emoji taşıyor. */}
+              <Pressable
+                onPress={onOpenPicker}
+                style={styles.emojiButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('message.emojiButton')}
+              >
+                <Ionicons name="add" size={24} color={theme.colors.textSecondary} />
+              </Pressable>
             </View>
 
             <View style={styles.group}>

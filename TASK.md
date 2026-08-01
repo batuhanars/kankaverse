@@ -1444,6 +1444,15 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
     M1d-B'deki ses kanalı kararının aynısı: **görülemeyen sonuç üretilmez**
   - Yetki sunucudan okundu, uydurulmadı: **düzenleme ve silme yalnız YAZAR** (`messages.controller`),
     tepki her üye. Yetkisizde satır **hiç render edilmiyor**
+- [x] **Emoji picker** (sahip talebi 2026-08-01, web paritesi): şeridin sonunda "+" → tam liste.
+  **Yeni bağımlılık `rn-emoji-keyboard` (PM onaylı):** MIT · **sıfır bağımlılık** · peer yalnız
+  react/react-native → **native modül yok, Expo Go'da çalışır, dev build gerektirmez** (M2'ye kadar
+  kritik şart). Alternatif `react-native-emoji-selector` 2022'de kalmış, elendi. `expo-doctor` 18/18.
+  Kategori/arama metinleri kütüphanenin **kendi Türkçe paketinden**, tr.json'a emoji sözlüğü
+  kopyalanmadı; renkler `src/theme` token'larından. *Picker'dan seçim EKLER (toggle etmez) — web
+  `MessageItem.addReaction` ile aynı; toggle yalnız baloncuktaki pill'de.*
+  ⚠️ Kütüphanenin son yayını 2024-05; native tarafı olmadığı için RN yükseltmelerinde kırılma riski
+  düşük ama **cihaz doğrulaması gerekli** (React 19 uyumu fiilen görülmedi)
 - [x] **Tepki gösterimi + canlı güncelleme:** `MessageDto.reactions` tiplendi, baloncuk altında
   pill'ler (kendi tepkim Kor kenarlıklı), tekrar dokun → kalkar.
   🔴 **`reaction.added`/`reaction.removed` WS olayları mobilde HİÇ dinlenmiyordu** → eklendi.
