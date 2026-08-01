@@ -912,6 +912,7 @@
     "editHint": "Enter kaydet · Esc iptal",
     "pin": "Sabitle",
     "unpin": "Sabitlemeyi kaldır",
+    "pinned": "Sabitlendi",
     "pinnedMessages": "Sabitlenen Mesajlar",
     "pinnedMessagesEmpty": "Bu kanalda henüz sabitlenmiş mesaj yok.",
     "jumpToMessage": "Mesaja git",
@@ -1592,6 +1593,12 @@
   "mobile": {
     "profile": {
       "edit": "Profili Düzenle"
+    },
+    "reorder": {
+      "title": "Sırala",
+      "action": "Sırala",
+      "hint": "Taşımak istediğin satıra basılı tut ve sürükle. Değişiklik bırakınca kaydedilir.",
+      "empty": "Sıralanacak bir şey yok."
     },
     "guildSearch": {
       "tabMessages": "Mesajlar",

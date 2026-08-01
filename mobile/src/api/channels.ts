@@ -31,7 +31,22 @@ export interface ChannelSummaryDto {
   slowModeSeconds: number;
 }
 
+/** Sprint M1i — sıralama gövdesi. Üç uç da (kanal/kategori/rol) aynı şekli alıyor. */
+export interface ReorderItem {
+  id: string;
+  position: number;
+}
+
 export const channelsApi = {
+  /**
+   * Sprint M1i — sürükle-bırak sıralama. `PATCH /guilds/:id/channels/reorder`, yetki OWNER/ADMIN
+   * (sunucuda). `categoryId` GÖNDERİLMEZ: uç "undefined → kategori değişmez" diyor, bu ekran
+   * yalnız sırayı değiştiriyor, kanalı kategoriler arasında taşımıyor.
+   */
+  async reorder(guildId: string, items: ReorderItem[]): Promise<null> {
+    const res = await http.patch<null>(`/guilds/${guildId}/channels/reorder`, { items });
+    return res.data;
+  },
   async listByGuild(guildId: string): Promise<ChannelSummaryDto[]> {
     const res = await http.get<ChannelSummaryDto[]>(`/guilds/${guildId}/channels`);
     return res.data;

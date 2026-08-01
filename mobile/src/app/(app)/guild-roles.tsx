@@ -54,14 +54,27 @@ export default function GuildRolesScreen() {
         options={{
           title: t('guildSettings.nav.roller'),
           headerRight: () => (
-            <Pressable
-              onPress={() => router.push({ pathname: '/role-new', params: { guildId } })}
-              hitSlop={10}
-              style={styles.headerAction}
-              accessibilityLabel={t('guildSettings.roles.createButton')}
-            >
-              <Ionicons name="add" size={24} color={theme.colors.accent500} />
-            </Pressable>
+            <View style={styles.headerActions}>
+              {/* Sprint M1i — rol sırası HİYERARŞİDİR (yetki devralma yönü), yalnız görsel
+                  sıralama değil. Kendi ekranında sürüklenir; sunucu `@everyone`i kabul etmediği
+                  için o satır listede hiç yok. */}
+              <Pressable
+                onPress={() => router.push({ pathname: '/reorder', params: { guildId, kind: 'roles' } })}
+                hitSlop={10}
+                style={styles.headerAction}
+                accessibilityLabel={t('mobile.reorder.action')}
+              >
+                <Ionicons name="swap-vertical" size={22} color={theme.colors.textSecondary} />
+              </Pressable>
+              <Pressable
+                onPress={() => router.push({ pathname: '/role-new', params: { guildId } })}
+                hitSlop={10}
+                style={styles.headerAction}
+                accessibilityLabel={t('guildSettings.roles.createButton')}
+              >
+                <Ionicons name="add" size={24} color={theme.colors.accent500} />
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -182,5 +195,6 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: theme.colors.accent500, fontSize: theme.fontSize.xs, fontWeight: '700' },
   empty: { color: theme.colors.textMuted, fontSize: theme.fontSize.sm, textAlign: 'center' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   headerAction: { marginRight: 12 },
 });

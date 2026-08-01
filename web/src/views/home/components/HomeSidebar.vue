@@ -85,8 +85,14 @@ function onChatCreated(channelId: string) {
       </button>
     </div>
 
-    <!-- DM bölüm başlığı + Sohbet Başlat -->
-    <div class="flex items-center justify-between px-4 pt-4 pb-1 shrink-0">
+    <!-- DM bölüm başlığı + Sohbet Başlat.
+         Üst kenarlık (sahip revizesi 2026-08-01): gezinme düğmeleri (Ana Sayfa / Mesaj İstekleri)
+         ile DM listesi iki ayrı şey ama arada hiçbir ayrım yoktu, tek uzun liste gibi okunuyordu.
+         Gölge yok (tasarım sistemi kuralı) — katman ayrımı ince kenarlıkla yapılır. -->
+    <div
+      class="flex items-center justify-between px-4 pt-4 pb-1 shrink-0 border-t"
+      style="border-color: var(--kv-border-subtle);"
+    >
       <p
         class="text-[11px] font-semibold uppercase tracking-widest"
         style="color: var(--kv-text-muted);"

@@ -1665,8 +1665,7 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [x] Oturum listesi geliyor; tek kapatma + diğerlerini kapatma çalışıyor
 - [x] 2FA **kapatıldı ve tekrar kuruldu** — iki yön de yürüdü (anahtar → kod → kurtarma kodları)
 - [x] E-posta değişim talebi gidiyor, posta geliyor
-- [~] Hesap silme *(sahip uyarıyı dikkate aldı, kendi hesabında denemedi — akış kodda hazır,
-  gerçek silme talebi bir test hesabında yürütülmedi)*
+- [x] Hesap silme — **test hesabında uçtan uca yürütüldü** (30 gün grace başladı)
 - [x] Yanlış şifre/koda sunucunun Türkçe mesajı görünüyor
 - [ ] 🔴 **R7:** reauth + oturum yönetimi sahip incelemesinden geçti — **açık, sahipte**
 

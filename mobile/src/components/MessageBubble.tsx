@@ -62,6 +62,18 @@ export function MessageBubble({
             <Text style={styles.time}>{formatClock(message.createdAt)}</Text>
           </View>
         )}
+        {/* Sabitlenmiş rozeti (sahip revizesi 2026-08-01): sabitlemek görülebilir bir sonuç
+            üretmeliydi ama mesajın kendisinde iz yoktu — yalnız Sabitlenenler ekranında görünüyordu.
+            Yanıt alıntısının ÜSTÜNDE, gövdeden ayrı bir satır: mesajın durumu, içeriği değil.
+            `showAuthor` gruplamasından bağımsız — arka arkaya gelen mesajlarda hangisinin
+            sabitlendiği kaybolmasın. */}
+        {message.pinnedAt ? (
+          <View style={styles.pinnedRow}>
+            <Ionicons name="bookmark" size={11} color={theme.colors.accent500} />
+            <Text style={styles.pinnedText}>{t('message.pinned')}</Text>
+          </View>
+        ) : null}
+
         {/* Yanıt alıntısı — gövdenin ÜSTÜNDE, web `MessageRow.vue` ile aynı yer. `replyTo` dolu
             gelmiyorsa (alıntılanan mesaj silinmiş) sunucu yalnız `replyToId` döner; o durumda
             "Silinen mesaj" yazılır, satır gizlenmez — yoksa yanıt bağlamsız kalırdı. */}
@@ -116,6 +128,17 @@ export function MessageBubble({
 }
 
 const styles = StyleSheet.create({
+  pinnedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
+  },
+  pinnedText: {
+    color: theme.colors.accent500,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
+  },
   replyRow: {
     flexDirection: 'row',
     alignItems: 'center',
