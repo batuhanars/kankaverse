@@ -6,20 +6,24 @@ import { theme } from '@/theme';
 export interface ReorderRowData {
   id: string;
   label: string;
-  /** Rol rengi — yalnız rol listesinde dolu. */
+  /** Rol rengi — rozet noktası olarak çizilir. */
   color?: string;
-  /** Satırın altındaki bağlam (kanal listesinde: kanalın kategorisi). */
-  sublabel?: string;
 }
 
 /**
- * Sürüklenebilir satır.
+ * Sürüklenebilir satır (rol sıralaması).
  *
  * `useReorderableDrag` **liste öğesinin içinden** çağrılmak zorunda, bu yüzden ayrı bileşen;
  * ekranın gövdesinde çağrılamaz.
  *
  * Satırın TAMAMI tutamaç (uzun basış): ayrı bir tutamaç ikonuna basmak dokunma hedefini
  * küçültürdü. İkon duruyor ama yalnız "bu satır taşınabilir" ipucu olarak.
+ *
+ * 🔴 Kütüphane seçimi bilinçli: `react-native-draggable-flatlist` DEĞİL. Onun peer bildirimi
+ * `reanimated >=2.8.0` diyor — uygulamayı çökerten `reanimated-color-picker`ın (`>=2.0.0`) aynı
+ * deseni ve son sürümü eski. `react-native-reorderable-list` `>=3.12.0` istiyor, yani modern
+ * Reanimated'a karşı bakım görüyor; kaldırılan `addWhitelistedNativeProps` API'sini çağırmadığı
+ * kaynak taranarak **doğrulandı** — peer aralığına güvenilmedi.
  */
 export function ReorderRow({ row }: { row: ReorderRowData }) {
   const drag = useReorderableDrag();
@@ -27,18 +31,9 @@ export function ReorderRow({ row }: { row: ReorderRowData }) {
     <Pressable onLongPress={drag} delayLongPress={200} style={styles.row}>
       <Ionicons name="reorder-three" size={20} color={theme.colors.textMuted} />
       {row.color ? <View style={[styles.dot, { backgroundColor: row.color }]} /> : null}
-      <View style={styles.texts}>
-        <Text style={styles.label} numberOfLines={1}>
-          {row.label}
-        </Text>
-        {/* Kanalın kategorisi: tek düz listede "bu kanal nerede" sorusunu satırın kendisi
-            yanıtlar; liste kategorilere bölünmek zorunda kalmaz. */}
-        {row.sublabel ? (
-          <Text style={styles.sublabel} numberOfLines={1}>
-            {row.sublabel}
-          </Text>
-        ) : null}
-      </View>
+      <Text style={styles.label} numberOfLines={1}>
+        {row.label}
+      </Text>
     </Pressable>
   );
 }
@@ -54,7 +49,5 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgSidebar,
   },
   dot: { width: 12, height: 12, borderRadius: 6 },
-  texts: { flex: 1 },
-  label: { color: theme.colors.textPrimary, fontSize: theme.fontSize.base },
-  sublabel: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs, marginTop: 1 },
+  label: { flex: 1, color: theme.colors.textPrimary, fontSize: theme.fontSize.base },
 });

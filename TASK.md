@@ -1709,3 +1709,31 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 - [ ] Filtre paneli çalışıyor; çipler görünüyor ve kaldırılabiliyor
 - [ ] Sonuca dokununca ilgili kanal açılıyor
 - [ ] Metin `tr.json`'dan; `typecheck` + `lint` temiz
+
+
+---
+
+## Sprint M1i — Mobil Sürükle-Bırak Sıralama (Track F2, 2026-08-01)
+
+> `api/`'ye dokunulmadı — `PATCH /guilds/:id/{channels,categories,roles}/reorder` zaten duruyordu.
+
+- [x] **Rol hiyerarşisi sıralaması** — Roller ekranı sağ üstünde ikon, sürükle-bırak
+- [x] 🔴 **Rol pozisyonu ters eşleme hatası düzeltildi** — roller `position` DESC gösteriliyor,
+  en üste `position: 0` yazmak hiyerarşiyi baş aşağı çeviriyordu ("sıralama yansımıyor" bulgusu)
+- [x] `@everyone` listede yok (sunucu kabul etmiyor — reddettirmek yerine hiç gösterme)
+- [x] Kütüphane: `react-native-reorderable-list` *(peer `>=3.12.0`; `draggable-flatlist`'in
+  `>=2.8.0`'ı bugün çöken paketin deseni. Kaldırılan API'yi çağırmadığı kaynak taranarak doğrulandı)*
+
+### 🔴 Kapsam kararı: kanal/kategori sıralaması KALDIRILDI (sahip, 2026-08-01)
+Yapıldı, çalıştı, sonra bilinçle çıkarıldı:
+- **Discord mobilde de yok**, yalnız rollerde var — kanal sırası kurulum anında bir kez yapılan iş
+- Web'de zaten var, doğal yeri orası
+- Tek ekranda **beş revize turu** döndü; emek özelliğin değerini aştı
+
+*Geri istenirse git geçmişinde: birleşik liste + `reorderModel.ts` (kategori taşınınca kanalları
+peşinden gelir, kanal bırakıldığı kategoriye girer).*
+
+### DoD (**fiziksel cihazda**)
+- [ ] Roller ekranından sıralama açılıyor, sürükleme çalışıyor
+- [ ] Değiştirilen sıra ekrandan çıkıp dönünce **korunuyor** (ters eşleme düzeltmesinin turu)
+- [ ] Yetkisiz kullanıcıda sunucunun Türkçe reddi görünüyor ve liste eski hâline dönüyor
