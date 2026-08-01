@@ -58,12 +58,27 @@ interface Props {
   // headerRight'ına eklenir — tek `<Stack.Screen>` headerRight sahibi bu bileşen (birden fazla
   // bileşenin aynı route için headerRight yazması güvenilmez sırayla ezilir).
   headerActions?: ReactNode;
+  /**
+   * 🔴 Mesaj arama gösterilsin mi (sahip kararı 2026-08-01). Varsayılan AÇIK; **1-1 DM'de kapalı**
+   * geçilir. Gerekçe: arama ortam kanallarında değerli (çok kişi, çok gün, kaybolan mesaj);
+   * 1-1 DM'de karşında tek kişi var ve konuşma doğrusal — buton yer kaplayıp iş görmüyordu.
+   * Grup DM'de ve ortam kanalında AÇIK kalır. Web'de de aynı kaldırma yapıldı (`DmConversation`).
+   */
+  searchable?: boolean;
 }
 
 // Sprint M1a — kanal VE DM mesaj ekranı için TEK gövde (contract §5 ekran 3: "aynısı"). İkisi de
 // aynı REST/WS yüzeyini kullanır (`/channels/:id/messages` — DM kanalı da bir Channel satırıdır);
 // yalnız "okundu" ucu ve başlık farklı, onlar çağıran route'tan gelir.
-export function MessageScreen({ channelId, placeholder, markRead, typingMode, disabledNotice, headerActions }: Props) {
+export function MessageScreen({
+  channelId,
+  placeholder,
+  markRead,
+  typingMode,
+  disabledNotice,
+  headerActions,
+  searchable = true,
+}: Props) {
   const authUser = useAuthStore((s) => s.user);
   const channelState = useMessagesStore((s) => s.byChannel[channelId]);
   const fetchInitial = useMessagesStore((s) => s.fetchInitial);
@@ -195,14 +210,16 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
           headerRight: () => (
             <View style={styles.headerActionsRow}>
               {headerActions}
-              <Pressable
-                onPress={() => setSearchVisible(true)}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel={t('common.search')}
-              >
-                <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
-              </Pressable>
+              {searchable && (
+                <Pressable
+                  onPress={() => setSearchVisible(true)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.search')}
+                >
+                  <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
+                </Pressable>
+              )}
             </View>
           ),
         }}
