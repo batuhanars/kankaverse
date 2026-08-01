@@ -1,158 +1,140 @@
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import type { UserCardDto } from '@/api/users';
-import { t } from '@/i18n';
+import { bannerColors } from '@/utils/bannerColor';
 import { theme } from '@/theme';
 
 /**
- * Profil düzenlemenin görsel alanları: avatar + afiş (seç / kaldır).
+ * Profil düzenlemenin görsel alanı — **profil ekranının aynısı görünüm** (sahip talebi 2026-08-01):
+ * üstte afiş, üzerine binen avatar, ikisinin de köşesinde **kalem** ikonu. Discord'un profil
+ * düzenleme ekranıyla aynı okuma: "gördüğün şeyin üstüne dokunup değiştiriyorsun".
  *
- * `profile-edit` ekranından ayrıldı — 300 satır eşiği. Yükleme AKIŞI ekranda kalır (presign → PUT →
- * PATCH); burası yalnız görünüm ve niyet: hangi slot'a dokunuldu.
+ * Önceki hâli iki ayrı form satırıydı (etiket + Değiştir/Kaldır düğmeleri); sahip düzenlemenin
+ * sonucunu göremediği için değişti.
  *
- * 🔴 Bu alanlar YALNIZ kullanıcının kendi profili içindir (sahip istisnası 2026-08-01). Ortam
- * ikonu/afişi mobilde hâlâ gösterilir ama yüklenmez — o kural duruyor.
+ * 🔴 Avatar yedeği İKİ KATMAN: `accentSubtle` yarı saydam, tek katman kullanılınca arkasındaki afiş
+ * avatarın içinden görünüyor (2026-08-01'de bir kez yaşandı).
  */
 export type MediaSlot = 'avatar' | 'banner';
 
 interface Props {
   username: string;
   card: UserCardDto | null;
-  /** Hangi slot yükleniyor (null = boşta) — iki düğme aynı anda çalışmaz. */
   uploading: MediaSlot | null;
-  onPick: (slot: MediaSlot) => void;
-  onRemove: (slot: MediaSlot) => void;
+  /** Kalem ikonuna dokunuş. Afişte panel açılır, avatarda doğrudan galeri. */
+  onEdit: (slot: MediaSlot) => void;
 }
 
-export function ProfileMediaFields({ username, card, uploading, onPick, onRemove }: Props) {
-  return (
-    <>
-      <Text style={styles.label}>{t('settings.avatar.label')}</Text>
-      <View style={styles.mediaRow}>
-        {card?.avatarUrl ? (
-          <Image source={{ uri: card.avatarUrl }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback]}>
-            <Text style={styles.avatarFallbackText}>{username.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
-        <View style={styles.actions}>
-          <Pressable onPress={() => onPick('avatar')} style={styles.secondaryButton}>
-            {uploading === 'avatar' ? (
-              <ActivityIndicator color={theme.colors.textPrimary} />
-            ) : (
-              <Text style={styles.secondaryButtonText}>{t('settings.avatar.upload')}</Text>
-            )}
-          </Pressable>
-          {/* "Kaldır" yalnız kaldırılacak bir şey varken — boş yüzey açma. */}
-          {card?.avatarUrl ? (
-            <Pressable onPress={() => onRemove('avatar')} style={styles.linkButton}>
-              <Text style={styles.linkButtonText}>{t('settings.avatar.remove')}</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
+const BANNER_H = 120;
+const AVATAR = 76;
+const OVERLAP = 36;
 
-      <Text style={styles.label}>{t('settings.bannerImage.label')}</Text>
-      <Text style={styles.hint}>{t('settings.bannerImage.hint')}</Text>
-      <View style={styles.bannerPreview}>
-        {card?.bannerUrl ? (
-          <Image source={{ uri: card.bannerUrl }} style={styles.bannerImage} resizeMode="cover" />
+export function ProfileMediaFields({ username, card, uploading, onEdit }: Props) {
+  return (
+    <View style={styles.header}>
+      {card?.bannerUrl ? (
+        <Image source={{ uri: card.bannerUrl }} style={styles.banner} resizeMode="cover" />
+      ) : (
+        <LinearGradient
+          colors={bannerColors(card?.bannerColor)}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.banner}
+        />
+      )}
+
+      {/* Afiş kalemi — sağ üstte, Discord konumu. */}
+      <Pressable onPress={() => onEdit('banner')} style={styles.bannerPencil} hitSlop={8}>
+        {uploading === 'banner' ? (
+          <ActivityIndicator color={theme.colors.textPrimary} size="small" />
         ) : (
-          <View
-            style={[
-              styles.bannerImage,
-              card?.bannerColor ? { backgroundColor: card.bannerColor } : styles.bannerEmpty,
-            ]}
-          />
+          <Ionicons name="pencil" size={16} color={theme.colors.textPrimary} />
         )}
-      </View>
-      <View style={styles.actions}>
-        <Pressable onPress={() => onPick('banner')} style={styles.secondaryButton}>
-          {uploading === 'banner' ? (
-            <ActivityIndicator color={theme.colors.textPrimary} />
-          ) : (
-            <Text style={styles.secondaryButtonText}>{t('settings.bannerImage.upload')}</Text>
-          )}
-        </Pressable>
-        {card?.bannerUrl ? (
-          <Pressable onPress={() => onRemove('banner')} style={styles.linkButton}>
-            <Text style={styles.linkButtonText}>{t('settings.bannerImage.remove')}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-    </>
+      </Pressable>
+
+      {avatarNode(username, card, styles)}
+
+      {/* Avatar kalemi — avatarın sağ üst köşesine binen küçük daire. */}
+      <Pressable onPress={() => onEdit('avatar')} style={styles.avatarPencil} hitSlop={8}>
+        {uploading === 'avatar' ? (
+          <ActivityIndicator color={theme.colors.textPrimary} size="small" />
+        ) : (
+          <Ionicons name="pencil" size={14} color={theme.colors.textPrimary} />
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
+function avatarNode(username: string, card: UserCardDto | null, s: typeof styles) {
+  if (card?.avatarUrl) return <Image source={{ uri: card.avatarUrl }} style={s.avatar} />;
+  return (
+    <View style={[s.avatar, s.avatarFallback]}>
+      <View style={s.avatarTint} />
+      <Text style={s.avatarLetter}>{username.charAt(0).toUpperCase()}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  label: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.xs,
-    fontWeight: '700',
-    marginTop: 12,
+  header: {
+    height: BANNER_H + (AVATAR - OVERLAP),
+    marginHorizontal: -theme.layout.panelGap,
+    marginTop: -theme.layout.panelGap,
   },
-  hint: {
-    color: theme.colors.textMuted,
-    fontSize: theme.fontSize.xs,
-    lineHeight: 17,
+  banner: {
+    height: BANNER_H,
+    width: '100%',
   },
-  mediaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-  },
-  avatarFallback: {
-    backgroundColor: theme.colors.accentSubtle,
+  bannerPencil: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
   },
-  avatarFallbackText: {
+  avatar: {
+    position: 'absolute',
+    left: theme.layout.panelGap,
+    top: BANNER_H - OVERLAP,
+    width: AVATAR,
+    height: AVATAR,
+    borderRadius: AVATAR / 2,
+    borderWidth: 4,
+    borderColor: theme.colors.bgContent,
+  },
+  avatarFallback: {
+    backgroundColor: theme.colors.bgElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.colors.accentSubtle,
+  },
+  avatarLetter: {
     color: theme.colors.accent500,
     fontSize: 26,
     fontWeight: '700',
   },
-  bannerPreview: {
-    height: 96,
-    borderRadius: theme.radius.md,
-    overflow: 'hidden',
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  bannerEmpty: {
-    backgroundColor: theme.colors.bgElevated,
-  },
-  secondaryButton: {
-    minHeight: theme.layout.controlSm,
-    paddingHorizontal: 16,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
+  // Avatarın SAĞ ÜST köşesine biner (Discord konumu) — avatarın kendi kenarlığıyla hizalı.
+  avatarPencil: {
+    position: 'absolute',
+    left: theme.layout.panelGap + AVATAR - 24,
+    top: BANNER_H - OVERLAP - 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  secondaryButtonText: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.sm,
-    fontWeight: '600',
-  },
-  linkButton: {
-    paddingVertical: 6,
-  },
-  linkButtonText: {
-    color: theme.colors.danger,
-    fontSize: theme.fontSize.sm,
-    fontWeight: '600',
+    backgroundColor: theme.colors.accent500,
+    borderWidth: 2,
+    borderColor: theme.colors.bgContent,
   },
 });
