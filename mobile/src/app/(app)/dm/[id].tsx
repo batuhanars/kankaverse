@@ -150,6 +150,9 @@ export default function DmScreen() {
         typingMode="simple"
         disabledNotice={disabledNotice}
         headerActions={headerActions}
+        // 1-1 DM'de arama YOK (sahip kararı 2026-08-01); grup DM'de kalıyor — orada birden çok
+        // kişi ve daha uzun geçmiş var, aramanın işi görülüyor. Web'de de aynı ayrım yapıldı.
+        searchable={!isDm}
       />
       {showProfile && isDm && params.otherUserId && (
         <ProfileCardModal

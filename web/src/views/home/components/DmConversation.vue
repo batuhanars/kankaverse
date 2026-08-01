@@ -724,28 +724,11 @@ function isGroupStart(index: number): boolean {
               @close="showDmPins = false"
             />
           </div>
-          <!-- Mesajlarda Ara butonu (1-1 DM) -->
-          <div class="relative">
-            <button
-              class="w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-              :class="showDmSearch ? 'bg-[var(--kv-accent-subtle)]' : ''"
-              :style="showDmSearch ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
-              :title="t('messageSearch.buttonTitle')"
-              @mouseenter="!showDmSearch && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
-              @mouseleave="!showDmSearch && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
-              @click="toggleDmSearch"
-            >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="8"/>
-                <path d="m21 21-4.35-4.35"/>
-              </svg>
-            </button>
-            <SearchPopover
-              :channel-id="channel.id"
-              :open="showDmSearch"
-              @close="showDmSearch = false"
-            />
-          </div>
+          <!-- 🔴 Mesajlarda Ara 1-1 DM'de KALDIRILDI (sahip kararı 2026-08-01). Gerekçe: arama
+               ortam kanallarında değerli (çok kişi, çok gün, kaybolan mesaj); 1-1 DM'de karşında
+               tek kişi var ve konuşma zaten doğrusal — buton yer kaplıyor, işi görülmüyor.
+               GRUP DM'de KALIYOR (aşağıdaki blok) ve ortam kanallarında da kalıyor.
+               Aynı kaldırma mobilde de yapıldı; iki istemci ayrışmasın. -->
           <!-- Kullanıcıyı şikâyet et -->
           <button
             class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
