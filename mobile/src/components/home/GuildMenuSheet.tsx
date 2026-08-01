@@ -1,5 +1,6 @@
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { sheetBottomPadding, useSheetInsets } from './sheetInsets';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -42,10 +43,14 @@ export function GuildMenuSheet({
   onCreateChannel,
   onCreateCategory,
 }: Props) {
+  const bottomInset = useSheetInsets();
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={() => {}}>
+        <Pressable
+          style={[styles.sheet, { paddingBottom: sheetBottomPadding(bottomInset) }]}
+          onPress={() => {}}
+        >
           <View style={styles.grabber} />
 
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -102,7 +107,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgSidebar,
     borderTopLeftRadius: theme.radius.lg,
     borderTopRightRadius: theme.radius.lg,
-    paddingBottom: 28,
     maxHeight: '85%',
   },
   grabber: {

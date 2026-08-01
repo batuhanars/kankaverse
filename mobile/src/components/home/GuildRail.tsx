@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { ClipPath, Defs, Image as SvgImage, Polygon, Text as SvgText } from 'react-native-svg';
 import type { GuildSummaryDto } from '@/api/guilds';
+import { hexPoints } from '../hexShape';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -21,10 +22,9 @@ interface Props {
 const SIZE = 48;
 
 // design-tokens.md §3 "Şekil & Boşluk" — imza öğesi altıgen, web ServerRail.vue ile birebir aynı
-// clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%). react-native-svg'de
-// clip-path CSS'i yok, aynı 6 nokta 48x48 viewBox'a taşınır. Kullanıcı avatarları (DmSidebar) daire
-// KALIR — bu yalnız ortam ikonları için (design-tokens.md: "kullanıcı avatarları daire kalır").
-const HEX_POINTS = `${SIZE * 0.5},0 ${SIZE},${SIZE * 0.25} ${SIZE},${SIZE * 0.75} ${SIZE * 0.5},${SIZE} 0,${SIZE * 0.75} 0,${SIZE * 0.25}`;
+// silüet. Noktalar `components/hexShape.ts`'ten gelir (davetiye kartı da aynı şekli çiziyor);
+// kullanıcı avatarları (DmSidebar) DAİRE kalır, bu yalnız ortam görselleri için.
+const HEX_POINTS = hexPoints(SIZE);
 
 function HexGuildIcon({ iconUrl, fallbackLetter, active }: { iconUrl: string | null; fallbackLetter: string; active: boolean }) {
   const clipId = `hexClip-${fallbackLetter}`;

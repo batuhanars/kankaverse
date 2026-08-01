@@ -1,4 +1,5 @@
 import { Modal, Pressable, StyleSheet, Text } from 'react-native';
+import { sheetBottomPadding, useSheetInsets } from './sheetInsets';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -13,10 +14,14 @@ interface Props {
 // karşılığı. Ray 72dp olduğu için "Katıl" ve "Kur" ayrı ayrı iki ray düğmesi yapılmadı.
 // `home.tsx`'ten ayrı dosyaya çıkarıldı (300 satır eşiği).
 export function AddGuildSheet({ visible, onClose, onCreate, onJoin }: Props) {
+  const bottomInset = useSheetInsets();
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={() => {}}>
+        <Pressable
+          style={[styles.sheet, { paddingBottom: sheetBottomPadding(bottomInset) }]}
+          onPress={() => {}}
+        >
           <Text style={styles.title}>{t('guild.modal.chooseTitle')}</Text>
           <Text style={styles.desc}>{t('guild.modal.chooseDesc')}</Text>
 

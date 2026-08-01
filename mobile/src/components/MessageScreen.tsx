@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Pressable,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { messagesApi, type MessageDto } from '@/api/messages';
@@ -315,6 +317,28 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
 
   const label = typingLabel();
 
+  // 🔴 Sistem gezinme çubuğu payı (sahip bulgusu 2026-08-01, ÜÇ TUŞLU gezinmeli cihaz). SDK 54'te
+  // edge-to-edge varsayılan AÇIK: uygulama pencerenin tamamına, yani gezinme çubuğunun da ALTINA
+  // çiziyor. Jest gezinmeli cihazda (sahibin telefonu) alttaki çubuk ince olduğu için sorun
+  // görünmüyordu; üç tuşlu cihazda tuşlar doğrudan mesaj kutusunun üstüne biniyor ve "Gönder"e
+  // basılamıyor. Ekranın tamamı yerine YALNIZ alt şerit paylanır — mesaj listesi çubuğun altına
+  // akmaya devam etmeli (edge-to-edge'in istediği görünüm bu).
+  //
+  // Klavye açıkken pay VERİLMEZ: `KeyboardAvoidingView` zaten klavye kadar itiyor, üstüne bir de
+  // gezinme payı eklenirse giriş kutusu klavyenin üstünde havada durur. Klavye açıkken gezinme
+  // çubuğu da klavyenin üstünde değil, klavyenin kendi alanında çizilir.
+  const insets = useSafeAreaInsets();
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  const bottomInset = keyboardVisible ? 0 : insets.bottom;
+
   // Klavye: Android'de de `padding` (sahip bulgusu 2026-07-30, fiziksel cihaz). `behavior` Android'de
   // undefined bırakılmıştı, yani KeyboardAvoidingView hiçbir şey yapmıyordu. Dev, Android'in pencereyi
   // kendi küçültmesine (adjustResize) güvenmiş; ama SDK 54'te edge-to-edge varsayılan AÇIK olduğu için
@@ -413,11 +437,11 @@ export function MessageScreen({ channelId, placeholder, markRead, typingMode, di
       )}
 
       {disabledNotice ? (
-        <View style={styles.disabledBar}>
+        <View style={[styles.disabledBar, { paddingBottom: theme.layout.panelGap + bottomInset }]}>
           <Text style={styles.disabledText}>{disabledNotice}</Text>
         </View>
       ) : (
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, { paddingBottom: theme.layout.panelGap + bottomInset }]}>
           {sendError ? <Text style={styles.sendError}>{sendError}</Text> : null}
           <View style={styles.inputRow}>
             <TextInput

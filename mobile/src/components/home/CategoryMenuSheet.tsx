@@ -1,5 +1,6 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { sheetBottomPadding, useSheetInsets } from './sheetInsets';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -27,10 +28,14 @@ interface Props {
  * Silme, kanal desenindeki gibi düzenleme ekranının içinde — yıkıcı işlem bir dokunuş daha derinde.
  */
 export function CategoryMenuSheet({ visible, categoryName, onClose, onEdit, onCreateChannel }: Props) {
+  const bottomInset = useSheetInsets();
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={() => {}}>
+        <Pressable
+          style={[styles.sheet, { paddingBottom: sheetBottomPadding(bottomInset) }]}
+          onPress={() => {}}
+        >
           <View style={styles.grabber} />
 
           <View style={styles.content}>
@@ -66,7 +71,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgSidebar,
     borderTopLeftRadius: theme.radius.lg,
     borderTopRightRadius: theme.radius.lg,
-    paddingBottom: 28,
   },
   grabber: {
     alignSelf: 'center',
