@@ -32,13 +32,18 @@ export function ProfileHeader({ username, avatarUrl, card }: Props) {
 
   return (
     <View>
-      <View style={[styles.banner, bannerStyle]}>
-        {card?.bannerUrl ? (
-          <Image source={{ uri: card.bannerUrl }} style={styles.bannerImage} resizeMode="cover" />
-        ) : null}
-      </View>
+      {/* 🔴 Avatar afişin üstüne binerken NEGATİF KENAR BOŞLUĞU kullanılmıyor (sahip bulgusu
+          2026-08-01): negatif boşlukla avatarın üst kısmı ebeveyninin DIŞINA taşıyordu ve Android
+          taşan bölgeyi kırpıp altındaki afişi gösteriyordu — avatarın içinden afiş görünüyordu.
+          Doğru çözüm bindirmeyi taşma olmadan kurmak: kapsayıcı afiş + taşma payı kadar YÜKSEK,
+          avatar onun İÇİNDE mutlak konumlu. Böylece hiçbir şey ebeveyn sınırını aşmıyor. */}
+      <View style={styles.header}>
+        <View style={[styles.banner, bannerStyle]}>
+          {card?.bannerUrl ? (
+            <Image source={{ uri: card.bannerUrl }} style={styles.bannerImage} resizeMode="cover" />
+          ) : null}
+        </View>
 
-      <View style={styles.body}>
         {avatarUrl ? (
           <Image source={{ uri: avatarUrl }} style={styles.avatar} />
         ) : (
@@ -46,7 +51,9 @@ export function ProfileHeader({ username, avatarUrl, card }: Props) {
             <Text style={styles.avatarFallbackText}>{username.charAt(0).toUpperCase()}</Text>
           </View>
         )}
+      </View>
 
+      <View style={styles.body}>
         <Text style={styles.username}>{username}</Text>
 
         {card?.bio ? <Text style={styles.bio}>{card.bio}</Text> : null}
@@ -63,9 +70,18 @@ export function ProfileHeader({ username, avatarUrl, card }: Props) {
   );
 }
 
+const BANNER_H = 120;
+const AVATAR = 76;
+/** Avatarın afişin üstüne binen kısmı. Kapsayıcı yüksekliği bu paya göre hesaplanır. */
+const OVERLAP = 36;
+
 const styles = StyleSheet.create({
+  header: {
+    // Afiş + avatarın afişin ALTINDA kalan kısmı → avatar kapsayıcıyı asla aşmaz.
+    height: BANNER_H + (AVATAR - OVERLAP),
+  },
   banner: {
-    height: 120,
+    height: BANNER_H,
     backgroundColor: theme.colors.bgElevated,
   },
   bannerImage: {
@@ -74,16 +90,17 @@ const styles = StyleSheet.create({
   },
   body: {
     paddingHorizontal: theme.layout.panelGap * 1.5,
-    // Avatar afişin üstüne biner (Discord düzeni); negatif kenar boşluğu o bindirmeyi verir.
-    marginTop: -36,
+    paddingTop: 8,
   },
   avatar: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    position: 'absolute',
+    left: theme.layout.panelGap * 1.5,
+    top: BANNER_H - OVERLAP,
+    width: AVATAR,
+    height: AVATAR,
+    borderRadius: AVATAR / 2,
     borderWidth: 4,
     borderColor: theme.colors.bgContent,
-    marginBottom: 8,
   },
   avatarFallback: {
     backgroundColor: theme.colors.accentSubtle,
