@@ -7,6 +7,7 @@ import { guildsApi, type GuildSummaryDto } from '@/api/guilds';
 import { useAuthStore } from '@/stores/auth';
 import type { ChannelSummaryDto } from '@/api/channels';
 import type { DmChannelDto } from '@/api/dm';
+import { DmMenuHost } from '@/components/home/DmMenuHost';
 import { GuildRail, type RailSelection } from '@/components/home/GuildRail';
 import { DmSidebar } from '@/components/home/DmSidebar';
 import { ChannelSidebar } from '@/components/home/ChannelSidebar';
@@ -39,6 +40,9 @@ export default function HomeScreen() {
   // düzenleme ekranına atlamıyor, önce "ne yapabilirim" panelini gösteriyor).
   const [menuChannel, setMenuChannel] = useState<ChannelSummaryDto | null>(null);
   const [menuCategory, setMenuCategory] = useState<CategoryDto | null>(null);
+  // M1d-C §2.3 — uzun basılan DM. Panel LİSTEDEN açılır; sohbetin içinden değil (orada başlığa
+  // dokunmak profili açar). Panelin İÇ akışı `DmMenuHost`ta — bu ekran yalnız "hangi DM" bilgisini tutar.
+  const [menuDm, setMenuDm] = useState<DmChannelDto | null>(null);
 
   // Sprint M1d §6 — seçili ortamdaki kendi rolüm. Sunucuda "benim rolüm" diye ayrı bir uç YOK;
   // web de (stores/channels.ts) üye listesini çekip kendini buluyor, mobil aynı yolu izler.
@@ -150,6 +154,7 @@ export default function HomeScreen() {
         <View style={styles.dmPane}>
           <DmSidebar
             onOpenDm={openDm}
+            onDmMenu={(c) => setMenuDm(c)}
             onOpenRequests={() => router.push('/dm-requests')}
             onOpenSearch={() => router.push('/search')}
             onOpenAddFriend={() => router.push('/friends-add')}
@@ -258,6 +263,13 @@ export default function HomeScreen() {
           if (selection.type === 'guild')
             router.push({ pathname: '/category-edit', params: { guildId: selection.id } });
         }}
+      />
+
+      <DmMenuHost
+        channel={menuDm}
+        onClose={() => setMenuDm(null)}
+        onOpenDm={openDm}
+        onAddFriend={() => router.push('/friends-add')}
       />
 
       <AddGuildSheet
