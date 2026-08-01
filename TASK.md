@@ -1379,6 +1379,12 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
   fark edge-to-edge'de gezinme türüne göre değişiyor → **doğruluğu cihaza bağlıydı**. Kaldırıldı;
   alt boşluk tek yerde `max(klavye yüksekliği, insets.bottom)` ile hesaplanıyor. Toplama YAPILMAZ:
   Android'in IME inset'i klavye görünürken gezinme çubuğu alanını zaten kapsar
+- [~] **Klavye — sahip kararı 2026-08-01: OLDUĞU GİBİ KALIYOR.** Sahibin cihazında sorunsuz, üç tuşlu
+  cihazda mesaj kutusu klavyenin arkasında kalmaya devam ediyor; sahip "yapacak bir şey yok, kalsın"
+  dedi. *PM notu: yapılabilecek bir şey VAR ama bugün ulaşılabilir değil —
+  `react-native-keyboard-controller` klavye inset'ini native tarafta okur ve bu sınıfı kökten çözer,
+  ancak **native modül olduğu için Expo Go'da çalışmaz**, dev build (M2) şartı. Dev build'e geçince
+  masaya gelsin.*
 - [ ] **Aynı `KeyboardAvoidingView` deseni 13 ekranda daha var** (formlar: login/register/kanal-kur/
   kanka-ekle…). Aynı cihaz-bağımlılığı sınıfı, ama içerik üstte olduğu için etkisi küçük.
   **Mesaj ekranındaki düzeltme üç tuşlu cihazda doğrulandıktan SONRA** süpürülecek — doğrulanmamış
