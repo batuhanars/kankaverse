@@ -207,7 +207,7 @@ export class GuildSearchController {
   @ApiQuery({ name: 'from', required: false, description: 'Yazar (authorId) — yalnız o kullanıcının mesajları' })
   @ApiQuery({ name: 'mentions', required: false, description: 'Bahsedilen (userId) — o kullanıcıyı @bahseden mesajlar' })
   @ApiQuery({ name: 'in', required: false, description: 'Kanal (channelId) — yalnız o kanalda gönderilenler' })
-  @ApiQuery({ name: 'has', required: false, description: 'İçerik türü: link | file' })
+  @ApiQuery({ name: 'has', required: false, description: 'İçerik türü: link | image | file (image=image/*|video/* eki, file=medya-dışı ek)' })
   searchGuild(
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,

@@ -39,11 +39,20 @@ export interface SearchToken {
  */
 export default function GuildSearchScreen() {
   const router = useRouter();
-  const { guildId } = useLocalSearchParams<{ guildId: string }>();
+  // Sprint M2c contract §4.2 — kanal detay ekranının "Ara" düğmesi buraya `channelId`/`channelName`
+  // taşıyarak gelir: `in` filtresi AÇILIŞTA ön-seçili olsun ister (route parametresiz çağrılan
+  // eski girişlerde ikisi de yok, davranış değişmez).
+  const { guildId, channelId, channelName } = useLocalSearchParams<{
+    guildId: string;
+    channelId?: string;
+    channelName?: string;
+  }>();
 
   const [tab, setTab] = useState<SearchTab>('messages');
   const [query, setQuery] = useState('');
-  const [tokens, setTokens] = useState<SearchToken[]>([]);
+  const [tokens, setTokens] = useState<SearchToken[]>(() =>
+    channelId ? [{ kind: 'in', value: channelId, label: channelName ?? '' }] : [],
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickKind, setPickKind] = useState<FilterKind | null>(null);
 
@@ -78,7 +87,11 @@ export default function GuildSearchScreen() {
         else params[tk.kind] = tk.value;
       }
       // Sekme `has`'i EZER: Medya sekmesindeyken bağlantı sonucu görmek istenmez.
-      if (activeTab === 'media') params.has = 'file';
+      // 🔴 Sprint M2c contract §2 — sunucu `file` semantiğini "medya-dışı ek"e daralttı ve YENİ
+      // `image` değerini ekledi. Medya sekmesi `file` kullanmaya devam etseydi artık görsel/video
+      // DÖNMEZDİ (M1g'den beri buradaki kusur budur, API değişikliğiyle ortaya çıktı) — `image`
+      // doğru değer.
+      if (activeTab === 'media') params.has = 'image';
       if (activeTab === 'links') params.has = 'link';
       return params;
     },

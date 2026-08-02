@@ -1683,6 +1683,21 @@
     "guildNotifications": {
       "muteLabel": "{name} ortamını sustur",
       "muteDesc": "Ortam susturulduğunda, senden bahsedilmediği sürece okunmamış göstergesi görünmez ve bildirim gelmez."
+    },
+    "channelDetails": {
+      "tabMembers": "Üyeler",
+      "tabMedia": "Medya",
+      "tabPins": "Sabitlemeler",
+      "tabLinks": "Bağlantılar",
+      "tabFiles": "Dosyalar",
+      "muteAction": "Sustur",
+      "inviteMembers": "Üyeleri Davet Et",
+      "noRoleGroup": "Rolsüz — {n}",
+      "notFound": "Kanal bulunamadı.",
+      "membersEmpty": "Bu kanalda henüz üye yok.",
+      "mediaEmpty": "Bu kanalda henüz görsel ya da video yok.",
+      "linksEmpty": "Bu kanalda henüz paylaşılan bağlantı yok.",
+      "filesEmpty": "Bu kanalda henüz dosya yok."
     }
   }
 }

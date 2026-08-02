@@ -8,11 +8,23 @@ import { theme } from '@/theme';
 // Sprint M1a contract §5.5 (🔴 T&S kapısı) — web/src/components/shared/AttachmentView.vue ile
 // BİREBİR aynı kural: mesajdaki ek nesnesi URL içermez, adres GET /attachments/:id'den alınır.
 // scanStatus CLEAN değilse görsel YÜKLENMEZ. Bu bir T&S kapısıdır — kapıyı istemcide gevşetme.
-export function AttachmentView({ attachment }: { attachment: AttachmentDto }) {
+export function AttachmentView({
+  attachment,
+  size,
+}: {
+  attachment: AttachmentDto;
+  /**
+   * Sprint M2c — kanal detay "Medya" ızgarası bu bileşeni SABİT KARE hücrelerde tekrar kullanır
+   * (T&S taraması/durum mantığını ikinci kez yazmamak için). Verilmezse mesaj balonu ölçüsü
+   * (220x160) değişmeden kalır — mevcut çağıran (`MessageBubble`) etkilenmez.
+   */
+  size?: number;
+}) {
   const isImage = attachment.contentType.startsWith('image/');
   const isClean = attachment.scanStatus === ScanStatus.CLEAN;
   const isPending = attachment.scanStatus === ScanStatus.PENDING;
   const isFlagged = attachment.scanStatus === ScanStatus.FLAGGED;
+  const sizeStyle = size ? { width: size, height: size, marginTop: 0 } : undefined;
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
@@ -37,33 +49,33 @@ export function AttachmentView({ attachment }: { attachment: AttachmentDto }) {
     // PENDING — kural: "Görsel YÜKLENMEZ" (contract §5.5 tablosu). Taranmamış medya asla gösterilmez.
     if (isPending) {
       return (
-        <View style={styles.statusBadge}>
+        <View style={[styles.statusBadge, sizeStyle]}>
           <Text style={styles.statusText}>{t('attachment.processing')}</Text>
         </View>
       );
     }
     if (isFlagged) {
       return (
-        <View style={styles.statusBadge}>
+        <View style={[styles.statusBadge, sizeStyle]}>
           <Text style={styles.statusText}>{t('attachment.blocked')}</Text>
         </View>
       );
     }
     if (imageError) {
       return (
-        <View style={styles.statusBadge}>
+        <View style={[styles.statusBadge, sizeStyle]}>
           <Text style={styles.statusText}>{t('attachment.notReady')}</Text>
         </View>
       );
     }
     if (!imageUrl) {
       return (
-        <View style={styles.statusBadge}>
+        <View style={[styles.statusBadge, sizeStyle]}>
           <ActivityIndicator size="small" color={theme.colors.textMuted} />
         </View>
       );
     }
-    return <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />;
+    return <Image source={{ uri: imageUrl }} style={[styles.image, sizeStyle]} resizeMode="cover" />;
   }
 
   // Görsel değil — dosya adı rozeti (yükleme/indirme yok, yalnız gösterim; kapsam dışı).
