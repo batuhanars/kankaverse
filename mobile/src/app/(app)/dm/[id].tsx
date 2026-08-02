@@ -5,6 +5,7 @@ import { dmApi } from '@/api/dm';
 import { useDmStore } from '@/stores/dm';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ProfileCardModal } from '@/components/ProfileCardModal';
+import { ChatBackButton } from '@/components/ChatBackButton';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -92,6 +93,11 @@ export default function DmScreen() {
     <>
       <Stack.Screen
         options={{
+          // Sprint M2a §4.4 — kanal ekranıyla aynı: native geri ok gizlenir, `ChatBackButton`
+          // toplam ping rozetini taşır. 1-1 DM ve grup DM'nin ikisi de bu ekrandan açılıyor
+          // (`kind` param'ı), rozet ikisinde de aynı.
+          headerBackVisible: false,
+          headerLeft: () => <ChatBackButton />,
           headerTitle: () => (
             <Pressable onPress={onTitlePress} style={styles.headerTitle}>
               {params.avatarUrl ? (

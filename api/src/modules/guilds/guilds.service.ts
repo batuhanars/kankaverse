@@ -13,7 +13,7 @@ import { StorageService } from '../../shared/storage/storage.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { GuildJoinService } from '../../shared/guild-join/guild-join.service';
 import { ImageUploadService } from '../../shared/media/image-upload.service';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService, isMuteActive } from '../notifications/notifications.service';
 import { InvitesService } from '../invites/invites.service';
 import { CreateGuildDto } from './dto/create-guild.dto';
 import { UpdateGuildDto } from './dto/update-guild.dto';
@@ -25,7 +25,7 @@ import { GuildMemberDto } from './dto/guild-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { InviteFriendDto } from './dto/invite-friend.dto';
 import { AuditLogEntryDto } from './dto/audit-log-entry.dto';
-import { Guild, GuildRole } from '@prisma/client';
+import { Guild, GuildRole, NotifTargetType, NotificationLevel } from '@prisma/client';
 import { DEFAULT_EVERYONE_PERMISSIONS } from '../../common/permissions';
 
 // İkon yüklemesi için izin verilen görsel tipler (allowlist)
@@ -69,6 +69,21 @@ export function normalizeTags(tags: string[]): string[] {
     result.push(t);
   }
   return result;
+}
+
+/**
+ * M2b §10 R1-1 — kanal bazlı `NotificationPref`'in ortam rozetine (unread/mention) katkısını
+ * çözer. GUILD düzeyi tercih burada UYGULANMAZ (istemci rail görünürlüğünde uygular — çift
+ * süzgeç olmasın). Aktif mute tanımı `notifications.service.ts` `isMuteActive` ile tek kaynak.
+ */
+function resolveChannelBadgeEffect(
+  pref: { muted: boolean; mutedUntil: Date | null; level: NotificationLevel } | undefined,
+): { countUnread: boolean; countMention: boolean } {
+  if (!pref) return { countUnread: true, countMention: true }; // varsayılan: ALL, susturulmamış
+  if (isMuteActive(pref.muted, pref.mutedUntil)) return { countUnread: false, countMention: false };
+  if (pref.level === NotificationLevel.NONE) return { countUnread: false, countMention: false };
+  if (pref.level === NotificationLevel.MENTIONS) return { countUnread: false, countMention: true };
+  return { countUnread: true, countMention: true }; // ALL
 }
 
 const ROLE_ORDER: Record<GuildRole, number> = {
@@ -215,6 +230,13 @@ export class GuildsService {
 
     const activeGuilds = memberships.filter((m) => m.guild.deletedAt === null);
 
+    // M2b §10 R1-1: kullanıcının TÜM kanal-bazlı bildirim tercihleri TEK sorguda (kanal başına
+    // ek sorgu yok). GUILD düzeyi tercih burada bilerek çekilmez (istemci tarafında uygulanıyor).
+    const channelPrefs = await this.prisma.notificationPref.findMany({
+      where: { userId, targetType: NotifTargetType.CHANNEL },
+    });
+    const channelPrefById = new Map(channelPrefs.map((p) => [p.targetId, p]));
+
     // Her guild'in kanalları için okunmamış mesaj + okunmamış bahsetme sayılarını paralel hesapla
     const guildCounts = await Promise.all(
       activeGuilds.map(async (m) => {
@@ -236,7 +258,11 @@ export class GuildsService {
               this.prisma.message.count({ where: base }),
               this.prisma.message.count({ where: { ...base, OR: mentionOr } }),
             ]);
-            return { unread, mentions };
+            const { countUnread, countMention } = resolveChannelBadgeEffect(channelPrefById.get(ch.id));
+            return {
+              unread: countUnread ? unread : 0,
+              mentions: countMention ? mentions : 0,
+            };
           }),
         );
         return {

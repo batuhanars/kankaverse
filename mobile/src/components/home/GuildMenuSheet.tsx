@@ -8,6 +8,8 @@ interface Props {
   visible: boolean;
   guildName: string;
   guildIconUrl?: string | null;
+  /** Sprint M2b §4.3 — `GuildSummaryDto.description`, varsa başlığın altında (4 satır kırpılı). */
+  guildDescription?: string | null;
   /** Yetkisiz üyede yönetim blokları render EDİLMEZ (disabled gösterilmez). */
   canManage: boolean;
   onClose: () => void;
@@ -16,6 +18,11 @@ interface Props {
   onSettings: () => void;
   onCreateChannel: () => void;
   onCreateCategory: () => void;
+  /** Sprint M2a §4.5 — ortamın TÜM kanallarını dolaşıp okundu işaretler (web `useGuildMenuActions.ts`
+   *  `markGuildRead` — menünün 1. maddesi). Yetki gerekmez, HERKESE açık. */
+  onMarkRead: () => void;
+  /** Sprint M2b §4.3 — üçüncü aksiyon: bildirim tercihi ekranına götürür. Yetki gerekmez. */
+  onNotifications: () => void;
 }
 
 /**
@@ -26,25 +33,30 @@ interface Props {
  * alındı, içerik alınmadı.
  *
  * 🔴 KONMAYANLAR (Discord'da var, bizde YOK → eklenmez, mobile/CLAUDE.md "boş yüzey açma"):
- * Takviye/boost · Bildirimler (ortam bildirim tercihi mobilde bağlı değil) · Ayarlar (ortam ayarları
- * M1e) · Etkinlik Oluştur (web'de var, mobilde yok — §10.5 açık kararı) · Sunucu Profilini Düzenle ·
- * Sust. Kanalları Gizle · DM/Mesaj-isteği anahtarları · İstila Bildir · Sunucuyu Bildir ·
- * Güvenlik Eylemleri · Sunucu ID'sini Kopyala · Okunmuş Olarak İşaretle (ortam-geneli okundu
- * mobilde bağlı değil).
+ * Takviye/boost · Etkinlik Oluştur (web'de var, mobilde yok — §10.5 açık kararı) · Sunucu Profilini
+ * Düzenle · Sust. Kanalları Gizle · DM/Mesaj-isteği anahtarları · İstila Bildir · Sunucuyu Bildir ·
+ * Güvenlik Eylemleri · Sunucu ID'sini Kopyala.
  *
- * Şeritte şu an tek aksiyon var (Davet Et) ve bu bilinçli: üç boş daire koyup ikisini çalıştırmamak,
- * paneli büyütmekten daha kötü olurdu.
+ * Sprint M2a §4.5 — "Okunmuş Olarak İşaretle" EKLENDİ (web menüsünün 1. maddesi, önceki not burada
+ * listeliyordu). Yetki gerekmez — `canManage` bloğunun DIŞINDA, her üyeye görünür.
+ *
+ * Sprint M2b §4.3 — aksiyon şeridi üçe çıktı: Davet Et · **Bildirimler** (yeni, `canManage` DIŞINDA —
+ * bildirim tercihi bir yetki kararı değil) · Ortam Ayarları. Yetkisiz üyede yalnız "Bildirimler"
+ * görünür — bu "boş yüzey" değil, tek çalışan aksiyon zaten var.
  */
 export function GuildMenuSheet({
   visible,
   guildName,
   guildIconUrl,
+  guildDescription,
   canManage,
   onClose,
   onInvite,
   onSettings,
   onCreateChannel,
   onCreateCategory,
+  onMarkRead,
+  onNotifications,
 }: Props) {
   const bottomInset = useSheetInsets();
   return (
@@ -58,7 +70,7 @@ export function GuildMenuSheet({
 
           <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {/* Başlık: büyük ikon + ad (Discord düzeni). İkon yoksa baş harf — rail'deki
-                HexGuildIcon deseninin sade karşılığı; burada altıgen kullanılmadı çünkü bu bir
+                GuildRailItem deseninin sade karşılığı; burada altıgen kullanılmadı çünkü bu bir
                 ortam seçici değil, başlık. */}
             {guildIconUrl ? (
               <Image source={{ uri: guildIconUrl }} style={styles.icon} />
@@ -71,35 +83,59 @@ export function GuildMenuSheet({
               {guildName}
             </Text>
 
-            {canManage && (
-              <>
-                {/* Aksiyon şeridi — Discord'un daire şeridi. M1e: yanına **Ayarlar** girişi geldi;
-                    yetkisizde bütün blok zaten render edilmiyor (`canManage`). */}
-                <View style={styles.actionRow}>
-                  <Pressable style={styles.action} onPress={onInvite}>
-                    <View style={styles.actionCircle}>
-                      <Ionicons name="person-add" size={20} color={theme.colors.textPrimary} />
-                    </View>
-                    <Text style={styles.actionLabel}>{t('channel.invite')}</Text>
-                  </Pressable>
-                  <Pressable style={styles.action} onPress={onSettings}>
-                    <View style={styles.actionCircle}>
-                      <Ionicons name="settings-outline" size={20} color={theme.colors.textPrimary} />
-                    </View>
-                    <Text style={styles.actionLabel}>{t('guildSettings.title')}</Text>
-                  </Pressable>
-                </View>
+            {/* Sprint M2b §4.3 — ortam açıklaması, varsa (alan zaten tipli, yeni backend alanı DEĞİL). */}
+            {guildDescription ? (
+              <Text style={styles.description} numberOfLines={4}>
+                {guildDescription}
+              </Text>
+            ) : null}
 
-                <View style={styles.group}>
-                  <Pressable style={styles.option} onPress={onCreateChannel}>
-                    <Text style={styles.optionText}>{t('channel.createTitle')}</Text>
-                  </Pressable>
-                  <View style={styles.divider} />
-                  <Pressable style={styles.option} onPress={onCreateCategory}>
-                    <Text style={styles.optionText}>{t('category.createTitle')}</Text>
-                  </Pressable>
+            {/* Sprint M2a §4.5 — HERKESE açık (yetki gerekmez), bu yüzden `canManage` bloğunun
+                DIŞINDA. Web menüsünün 1. maddesiyle aynı yer (ortamın en üst aksiyonu). */}
+            <View style={styles.group}>
+              <Pressable style={styles.option} onPress={onMarkRead}>
+                <Text style={styles.optionText}>{t('guildMenu.markRead')}</Text>
+              </Pressable>
+            </View>
+
+            {/* Aksiyon şeridi — Discord'un daire şeridi. Sprint M2b §4.3: üçüncü aksiyon
+                "Bildirimler" HERKESE açık (`canManage` DIŞINDA); Davet Et/Ayarlar yetkili kalır.
+                Yetkisiz üyede yalnız Bildirimler görünür — tek daire, boş yüzey değil. */}
+            <View style={styles.actionRow}>
+              {canManage && (
+                <Pressable style={styles.action} onPress={onInvite}>
+                  <View style={styles.actionCircle}>
+                    <Ionicons name="person-add" size={20} color={theme.colors.textPrimary} />
+                  </View>
+                  <Text style={styles.actionLabel}>{t('channel.invite')}</Text>
+                </Pressable>
+              )}
+              <Pressable style={styles.action} onPress={onNotifications}>
+                <View style={styles.actionCircle}>
+                  <Ionicons name="notifications-outline" size={20} color={theme.colors.textPrimary} />
                 </View>
-              </>
+                <Text style={styles.actionLabel}>{t('guildMenu.notifications')}</Text>
+              </Pressable>
+              {canManage && (
+                <Pressable style={styles.action} onPress={onSettings}>
+                  <View style={styles.actionCircle}>
+                    <Ionicons name="settings-outline" size={20} color={theme.colors.textPrimary} />
+                  </View>
+                  <Text style={styles.actionLabel}>{t('guildSettings.title')}</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {canManage && (
+              <View style={styles.group}>
+                <Pressable style={styles.option} onPress={onCreateChannel}>
+                  <Text style={styles.optionText}>{t('channel.createTitle')}</Text>
+                </Pressable>
+                <View style={styles.divider} />
+                <Pressable style={styles.option} onPress={onCreateCategory}>
+                  <Text style={styles.optionText}>{t('category.createTitle')}</Text>
+                </Pressable>
+              </View>
             )}
           </ScrollView>
         </Pressable>
@@ -153,6 +189,11 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: 22,
     fontWeight: '700',
+  },
+  description: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.sm,
+    lineHeight: 18,
   },
   actionRow: {
     flexDirection: 'row',

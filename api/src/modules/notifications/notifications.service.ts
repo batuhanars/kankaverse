@@ -8,6 +8,15 @@ import { NotificationPrefDto, SetNotificationPrefDto } from './dto/notification-
 
 const MAX_LIMIT = 50;
 
+/**
+ * R12/M2b — "Aktif mute" tek kaynak: süresiz (mutedUntil null) veya süresi henüz geçmemiş.
+ * `shouldNotifyChannel` burada kullanır; `guilds.service.ts` `findMyGuilds` rozet süzgeci de
+ * aynı fonksiyonu import eder (iki yerde ayrı mute-mantığı yazılmaz — Sprint M2b §10 R1-1).
+ */
+export function isMuteActive(muted: boolean, mutedUntil: Date | null): boolean {
+  return muted && (!mutedUntil || mutedUntil > new Date());
+}
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -229,8 +238,7 @@ export class NotificationsService {
     if (!effective) return true;
 
     // Süreli sustur: mutedUntil null → süresiz; geçmişse mute sona ermiş (bildir).
-    const muteActive = effective.muted && (!effective.mutedUntil || effective.mutedUntil > new Date());
-    if (muteActive) return false;
+    if (isMuteActive(effective.muted, effective.mutedUntil)) return false;
     if (effective.level === NotificationLevel.NONE) return false;
     return true;
   }

@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { channelsApi, ChannelType, type ChannelSummaryDto } from '@/api/channels';
 import { categoriesApi, type CategoryDto } from '@/api/categories';
 import { extractErrorMessage } from '@/api/errors';
+import { useUnreadStore } from '@/stores/unread';
 import { CategorySection } from './CategorySection';
 import { ChannelRow } from './ChannelRow';
 import { t } from '@/i18n';
@@ -23,10 +24,11 @@ interface Props {
   /** Ortam adına dokunuş → alt panel (§10.2). A yarısındaki tekil davet ikonunun yerini aldı. */
   onOpenGuildMenu: () => void;
   /**
-   * OWNER/ADMIN mi. **Yalnız uzun-basış davranışını** açar; yetkisizde uzun basış hiçbir şey yapmaz
-   * ve hiçbir ipucu gösterilmez (M1b grup yönetimi deseni: yapamayacağın şeyi görmek gürültüdür).
+   * Sprint M2a §4.5 — uzun basış artık HER üyeye açık (panel "Okundu İşaretle" taşıyor, yetki
+   * işi değil). `canManage` gating'i buradan kalktı; panelin İÇİNDEKİ yönetim maddeleri
+   * (Kanalı Düzenle/Kanal Oluştur) `home.tsx`'te `ChannelMenuSheet`/`CategoryMenuSheet`'e geçilen
+   * `canManage` ile koşullu — o bayrağı burada tutmak artık gereksizdi (kullanılmayan prop).
    */
-  canManage: boolean;
   onEditChannel: (channel: ChannelSummaryDto) => void;
   onEditCategory: (category: CategoryDto) => void;
   /** Sprint M1g §2.1 — aksiyon şeridi: ortam içi arama (tam ekran) + davet. */
@@ -57,7 +59,6 @@ export function ChannelSidebar({
   selectedChannelId,
   onOpenChannel,
   onOpenGuildMenu,
-  canManage,
   onEditChannel,
   onEditCategory,
   onOpenSearch,
@@ -74,11 +75,14 @@ export function ChannelSidebar({
   const fetchAll = useCallback(() => {
     Promise.all([channelsApi.listByGuild(guildId), categoriesApi.listByGuild(guildId)])
       .then(([channelList, categoryList]) => {
-        setChannels(
-          channelList
-            .filter((c) => c.type === ChannelType.GUILD_TEXT)
-            .sort((a, b) => a.position - b.position),
-        );
+        const textChannels = channelList
+          .filter((c) => c.type === ChannelType.GUILD_TEXT)
+          .sort((a, b) => a.position - b.position);
+        setChannels(textChannels);
+        // Sprint M2a §5 — merkezi unread store'un İLK hydrate kaynağı. `ChannelRow` artık kendi
+        // sayacını bu store'dan okuyor (canlı güncelleme için); bu satır olmazsa satır her zaman
+        // sıfır görürdü (ilk render'da store boş).
+        useUnreadStore.getState().hydrateChannels(guildId, textChannels);
         setCategories([...categoryList].sort((a, b) => a.position - b.position));
         setState('ready');
       })
@@ -242,7 +246,9 @@ export function ChannelSidebar({
                   name={item.category.name}
                   collapsed={!!collapsed[item.category.id]}
                   onToggle={() => toggleCategory(item.category.id)}
-                  onLongPress={canManage ? () => onEditCategory(item.category) : undefined}
+                  // Sprint M2a §4.5 — artık HER üyeye açık (panel "Okundu İşaretle" taşıyor);
+                  // düzenleme/kanal oluşturma maddeleri panelin İÇİNDE `canManage`'e koşullu.
+                  onLongPress={() => onEditCategory(item.category)}
                 />
               );
             }
@@ -252,7 +258,8 @@ export function ChannelSidebar({
                 channel={channel}
                 selected={channel.id === selectedChannelId}
                 onPress={() => onOpenChannel(channel)}
-                onLongPress={canManage ? () => onEditChannel(channel) : undefined}
+                // Sprint M2a §4.5 — artık HER üyeye açık, bkz. yukarı.
+                onLongPress={() => onEditChannel(channel)}
               />
             );
           }}

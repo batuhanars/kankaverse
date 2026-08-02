@@ -1809,3 +1809,91 @@ peşinden gelir, kanal bırakıldığı kategoriye girer).*
 - [ ] Düzenle → alanlar dolu geliyor, kaydedince değişiyor; **web'den yüklenen kapak silinmiyor**
 - [ ] Sil → onay çıkıyor, listeden düşüyor
 - [ ] Geçmiş tarih / boş ad → Türkçe hata; sunucunun 403'ü Türkçe görünüyor
+
+---
+
+## Sprint M2a — Mobil Okunmamış Görsel Dili (Track F2, PM compose 2026-08-02)
+
+> Sözleşme: `contracts/SPRINT_M2A_MOBILE_UNREAD_CONTRACT.md`. **M2 üçe bölündü** (sahip "bildirim
+> sistemi" başlığı altında üç ayrı iş tarif etti): **M2a** okunmamış görsel dili · **M2b** sustur +
+> bildirim seviyesi yüzeyi (R12 backend'i hazır, mobilde hiç bağlı değil) · **M2c** push (dev build +
+> PushToken + gönderim). Referans: sahibin Discord mobil ekran görüntüleri.
+>
+> `api/`'ye **SIFIR dokunuş** — gereken her alan sunucudan zaten dönüyor, mobil ya tiplememiş ya hiç
+> okumamış. Delege: Sonnet dev oturumu.
+
+- [x] Rail: beyaz okunmamış pip (aktif ortamda dikey çubuğa uzar) + sağ altta kırmızı bahsetme rozeti
+- [x] Kanal satırı: okunmamış = ad **ve ikon** parlar; bahsetme = sağda kırmızı sayaç
+- [x] Ana Sayfa sekmesi + sohbet ekranlarının geri okunda **toplam ping** rozeti (etkinlik formu hariç)
+- [x] Canlı güncelleme: `channel.activity` / `mention` soket olayları rozetleri anında büyütür
+- [x] Merkezi `stores/unread.ts` (bugün: kanal sayacı ekran-yerel, ortam sayacı hiç yok)
+- [x] Okundu işaretle: ortam paneli + kategori paneli eklendi; kanal paneli **her üyeye** açıldı
+- [x] `typecheck` + `lint` temiz; `api/` ve `web/` diffi **boş**
+
+### PM doğrulaması (dev teslimi sonrası)
+- [x] **Çift sayım riski elendi:** `mention` olayı yalnız bahsetme sayacını artırıyor, genel
+  okunmamışı değil. Gerekçe koddan teyit edildi — `messages.controller.ts:70-71` her mesajda
+  `notifyChannelActivity` **ve** `notifyMentions` çağırıyor, yani bahsetmeli mesaj iki olayla
+  geliyor; ikisinde de artırmak sunucunun kendi sayımından saptırırdı
+- [x] **Sözleşme hatası düzeltildi (dev bulgusu):** §4.4 `group/[id].tsx`'i sohbet ekranı sanıyordu;
+  o route grup **yönetim** ekranı, gerçek grup sohbeti `dm/[id].tsx` `kind=group`. İki ekran üç
+  sohbet yüzeyini de kapsıyor
+- [x] Bonus düzeltme: hex `ClipPath` id'si yalnız baş harfe göre üretiliyordu → aynı harfle başlayan
+  iki ortam çakışabilirdi; artık `guild.id` ile anahtarlı
+
+### 🔴 Düzeltilen tutarsızlık (PM denetimi)
+Mobilde genel okunmamış **kırmızı** rozetle çiziliyordu; web'de kırmızı = **bahsetme**, beyaz =
+okunmamış. İki istemci aynı renge farklı anlam yüklüyordu. `unreadMentionCount` mobilde tiplenmiş ama
+hiç kullanılmıyordu. M2a mobili web semantiğine hizalar.
+
+### M2 sonrası kalem (sahip kararı 2026-08-02)
+Üçü aynı backend dokunuşunu paylaştığı için tek pakette: **etkinlik bildirimi** (bugün hiç
+üretilmiyor → "Yeni Etkinlikleri Sustur" ancak bundan sonra anlamlı) · **@everyone/@here bastırma** ·
+**tüm @Rol bahsetmelerini sustur**. *Öne Çıkanlar* karşılığı bizde yok, alınmadı.
+
+### DoD (**fiziksel cihazda** — sahipte)
+- [ ] Okunmamışta beyaz pip, aktif ortamda dikey çubuk; bahsetmede kırmızı sayaç doğru
+- [ ] Kanal listesinde okunmamış parlıyor, bahsetme sağda kırmızı sayaçla
+- [ ] Ana Sayfa sekmesi ve geri okundaki sayı **aynı**; etkinlik sihirbazında rozet yok
+- [ ] Ana ekranda dururken gelen mesaj rozeti **anında** büyütüyor (yenilemeden)
+- [ ] Ortam panelinden "Okundu işaretle" ortamın tümünü temizliyor
+- [ ] Sıradan üye kanal panelinden okundu işaretleyebiliyor
+
+---
+
+## Sprint M2b — Mobil Bildirim Tercihleri (Sustur + Seviye) — 2026-08-02
+
+> Sözleşme: `contracts/SPRINT_M2B_MOBILE_NOTIF_PREFS_CONTRACT.md`. R12 backend'i (NotificationPref,
+> süreli sustur, seviye) hazırdı, mobilde hiç bağlı değildi. Delege: Sonnet dev oturumları.
+
+- [x] `notificationPrefs` store + `GET/PUT /notifications/prefs` bağlantısı (iyimser yaz, hata → geri al)
+- [x] DM paneli: Konuşmayı Sustur (15dk/1s/3s/8s/24s/süresiz) + Bildirim Ayarları
+- [x] Kanal paneli: aynı ikili + başlıkta **ortam simgesi** (hangi ortama ait olduğu belli olsun)
+- [x] Ortam paneli: üçüncü aksiyon **Bildirimler** (her üyeye açık) + **ortam açıklaması**
+- [x] `guild-notifications.tsx`: ortamı sustur (süre) + seviye; seçince anında kaydediyor
+- [x] Rozetler tercihe göre süzülüyor (M2a'nın üstüne); susturulmuş kanal listede sönük
+- [x] Süre/seviye seçicileri M2a'nın `SelectSheet`'ini tekrar kullanıyor — yeni bileşen yok
+
+### R1 — sahip cihaz turu (aynı gün)
+- [x] 🔴 **Ortam rozeti kanal tercihlerini bilmiyordu (`api/` düzeltmesi):** bir kanalı susturunca
+  o kanaldan gelen mesaj **ortam pill'ini yakıyordu**; "Hiçbiri" seçeneği de kanal düzeyinde
+  etkisiz görünüyordu. Kök neden `guilds.service.ts findMyGuilds` toplamının `NotificationPref`'e
+  hiç bakmaması. İstemcide çözülemezdi — rail'de **girilmemiş ortamların kanal listesi yok**.
+  Düzeltme: tek ek sorguyla (`userId` + `targetType: CHANNEL`) tercihler çekilip toplama uygulanıyor;
+  kanal başına sorgu eklenmedi, migration/yeni alan/yeni uç YOK. **Web de aynı düzeltmeyi aldı.**
+  `isMuteActive` `notifications.service.ts`'e çıkarıldı (tek kaynak), 6 yeni birim test.
+- [x] 🔴 **Susturma = TAM SESSİZLİK (sahip kararı, sözleşme §5 revize):** ilk tablo susturulmuşta
+  bahsetme rozetini açık bırakıyor, gerekçe olarak web'i gösteriyordu — **gerekçe yanlıştı**, web de
+  gizliyor. Sahip gerekçesi: *"susturma zaten tamamen susturuyorsun; ince ayarı bildirim seviyesiyle
+  yapıyorsun. Kullanıcı ayarlara girmeden 'şu ortam kafamı ağrıtıyor' diyebilmeli."* Backend de bunu
+  destekliyor (susturulmuşta MENTION bildirimi bile üretmiyor). Mobil web ile birebir aynı davranışta.
+- [x] Kanal panelindeki ortam simgesi büyütüldü (22 → 36)
+- [x] `nest build` + 893 test yeşil · `migrate status` temiz (şema değişmedi) · mobil `typecheck`+`lint` temiz
+
+### DoD (**fiziksel cihazda** — sahipte)
+- [ ] Kanalı susturunca **ortam pill'i artık yanmıyor**; susturulmamış kanaldan mesaj gelince yanıyor
+- [ ] Kanal seviyesi "Hiçbiri" → o kanal hiçbir sayaca katkı vermiyor
+- [ ] Susturulmuş ortam/kanalda bahsetme rozeti de çıkmıyor (tam sessizlik)
+- [ ] DM 8 saat susturulunca panel "Susturmayı Kaldır" + bitiş saatini gösteriyor
+- [ ] Kanal panelinde ortam simgesi okunaklı boyutta
+- [ ] Web'den yapılan susturma mobilde görünüyor (tek kaynak)

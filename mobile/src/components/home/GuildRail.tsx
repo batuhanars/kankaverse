@@ -1,8 +1,11 @@
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { ClipPath, Defs, Image as SvgImage, Polygon, Text as SvgText } from 'react-native-svg';
+import Svg, { Polygon } from 'react-native-svg';
 import type { GuildSummaryDto } from '@/api/guilds';
 import { hexPoints } from '../hexShape';
+import { GuildRailItem } from './GuildRailItem';
+import { useDmUnreadCount } from '@/stores/unread';
+import { badgeLabel } from '@/utils/badgeLabel';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -26,56 +29,14 @@ const SIZE = 48;
 // kullanıcı avatarları (DmSidebar) DAİRE kalır, bu yalnız ortam görselleri için.
 const HEX_POINTS = hexPoints(SIZE);
 
-function HexGuildIcon({ iconUrl, fallbackLetter, active }: { iconUrl: string | null; fallbackLetter: string; active: boolean }) {
-  const clipId = `hexClip-${fallbackLetter}`;
-  return (
-    <View style={styles.hexWrap}>
-      <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
-        <Defs>
-          <ClipPath id={clipId}>
-            <Polygon points={HEX_POINTS} />
-          </ClipPath>
-        </Defs>
-        {/* Yedek katman HER ZAMAN çizilir, resim üstüne biner (sahip bulgusu 2026-07-30): resim
-            yüklenemezse (ulaşılamaz adres, silinmiş dosya, CDN takılması) altıgen bomboş kalıyordu
-            → rail'de görünmez ama dokunulabilir bir öğe. Artık en kötü durumda baş harfe düşer.
-            Harf RN View değil SVG <Text> — RN katmanı Svg'nin ÜSTÜNDE kalırdı, yüklenen resmi
-            kapatırdı. */}
-        <Polygon points={HEX_POINTS} fill={theme.colors.accentSubtle} />
-        <SvgText
-          x={SIZE / 2}
-          y={SIZE / 2}
-          textAnchor="middle"
-          alignmentBaseline="central"
-          fontSize={theme.fontSize.lg}
-          fontWeight="700"
-          fill={theme.colors.accent500}
-        >
-          {fallbackLetter}
-        </SvgText>
-        {iconUrl ? (
-          <SvgImage
-            href={{ uri: iconUrl }}
-            x={0}
-            y={0}
-            width={SIZE}
-            height={SIZE}
-            preserveAspectRatio="xMidYMid slice"
-            clipPath={`url(#${clipId})`}
-          />
-        ) : null}
-        {/* Web'in sol-kenar pil'i yerine hex kenarına doğrudan aktif vurgusu — mobilde rail dar,
-            ayrı bir pil için yer yok; aynı görsel dili (accent500) hex silüetine uygulanmış hâli. */}
-        <Polygon points={HEX_POINTS} fill="none" stroke={active ? theme.colors.accent500 : 'transparent'} strokeWidth={2} />
-      </Svg>
-    </View>
-  );
-}
-
 // Sprint M1a contract §2 — rail + sidebar gezinme mimarisi, kalıcı rail. M0'ın "Ortamların" tam-
 // ekranı kaldırıldı; ortam ikonları buraya taşındı. react-native-svg PM onaylı bağımlılık (dördüncü
-// PM düzeltmesi) — ortam ikonları artık gerçek altıgen maske ile çiziliyor (bkz. HexGuildIcon).
+// PM düzeltmesi) — ortam ikonları artık gerçek altıgen maske ile çiziliyor (bkz. GuildRailItem).
 export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSelectGuild, onAddGuild }: Props) {
+  // Sprint M2b §10 R3-1 — sahip kararı: rail'in DM girişi bir ortam değil, oradan gelen HER mesaj
+  // bahsetme muamelesi görür. Eski beyaz "en az bir okunmamış var mı" pip'i KALDIRILDI, yerine
+  // `useTotalPing`in kullandığı AYNI sayı (`useDmUnreadCount`) kırmızı rozette gösterilir.
+  const dmUnreadCount = useDmUnreadCount();
   return (
     // Sabit genişlik SARAN View'da tutulur, ScrollView'a değil — ScrollView'ın kendi `style`ına
     // verilen `width`, flex-row ebeveyn içinde çapraz eksende (yatay) güvenilir uygulanmıyor
@@ -84,7 +45,7 @@ export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSel
     <View style={styles.rail}>
       <ScrollView style={styles.railScroll} contentContainerStyle={styles.railContent}>
         {/* Sözleşme §8.1-A/2 — baş harf ("M") yerine konuşma baloncuğu. Ortam ikonları altıgen
-            KALIR (HexGuildIcon); baloncuk yalnız bu girişte, ray'in en üstünde. Aynı ikon seti
+            KALIR (GuildRailItem); baloncuk yalnız bu girişte, ray'in en üstünde. Aynı ikon seti
             alt tab çubuğuyla (Ionicons) ortak — ikinci bir ikon dili girmiyor. */}
         <Pressable
           onPress={onSelectDm}
@@ -92,6 +53,15 @@ export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSel
           accessibilityRole="button"
           accessibilityLabel={t('mobile.home.dmEntry')}
         >
+          {/* Sprint M2b §10 R3-1 — kırmızı bahsetme rozeti (GuildRailItem'ın `mentionBadge`iyle
+              AYNI görsel dil): DM bir ortam değil, oradan gelen her okunmamış mesaj bahsetme
+              muamelesi görür. Sıfırsa hiç çizilmez; susturulmuş/`NONE` DM'ler zaten sayılmıyor
+              (`useDmUnreadCount`). */}
+          {dmUnreadCount > 0 && (
+            <View style={styles.dmBadge}>
+              <Text style={styles.dmBadgeText}>{badgeLabel(dmUnreadCount)}</Text>
+            </View>
+          )}
           {/* 🔴 İkon ADI iki durumda da AYNI; yalnız RENK değişiyor (sahip bulgusu 2026-08-01:
               ortam seçiliyken kutu tamamen boş kalıyordu — sönük değil, hiç çizilmiyordu).
               Ad `chatbubble` ↔ `chatbubble-outline` arasında takas ediliyordu ve iki durum
@@ -115,14 +85,14 @@ export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSel
           </Pressable>
         )}
 
-        {guilds.map((g) => {
-          const active = selection.type === 'guild' && selection.id === g.id;
-          return (
-            <Pressable key={g.id} onPress={() => onSelectGuild(g.id)}>
-              <HexGuildIcon iconUrl={g.iconUrl} fallbackLetter={g.name.charAt(0).toUpperCase()} active={active} />
-            </Pressable>
-          );
-        })}
+        {guilds.map((g) => (
+          <GuildRailItem
+            key={g.id}
+            guild={g}
+            active={selection.type === 'guild' && selection.id === g.id}
+            onPress={() => onSelectGuild(g.id)}
+          />
+        ))}
 
         {/* Sprint M1d — "+" ortam listesinin ALTINDA (web ServerRail'de de öyle). Tek düğme, iki
             seçenek açar; "Katıl" ve "Kur" için ayrı ayrı iki ikon konmadı — ray 72dp, ikinci düğme
@@ -137,7 +107,7 @@ export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSel
         >
           {/* Sahip revizesi 2026-07-31 — web `ServerRail` ile aynı dil: ALTIGEN silüet, nötr
               zemin, Kor artı. Önce yuvarlak köşeli kareydi ve ray'deki altıgen ortam ikonlarının
-              yanında yabancı duruyordu. Altıgen `HexGuildIcon` ile AYNI `HEX_POINTS`ten çiziliyor,
+              yanında yabancı duruyordu. Altıgen `GuildRailItem` ile AYNI `HEX_POINTS`ten çiziliyor,
               ikinci bir şekil tanımı girmiyor. */}
           <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
             <Polygon points={HEX_POINTS} fill={theme.colors.bgElevated} />
@@ -202,14 +172,29 @@ const styles = StyleSheet.create({
   iconActive: {
     borderColor: theme.colors.accent500,
   },
-  hexWrap: {
-    width: SIZE,
-    height: SIZE,
-  },
   dmIcon: {
     backgroundColor: theme.colors.bgElevated,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Sprint M2b §10 R3-1 — `GuildRailItem`'ın `mentionBadge`iyle BİREBİR aynı ölçü/konum (sağ-alt,
+  // 18px/min-genişlik, kor zemin) — rail'deki tüm ikonlar aynı rozet dilini paylaşır.
+  dmBadge: {
+    position: 'absolute',
+    right: -4,
+    bottom: -2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: theme.colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dmBadgeText: {
+    color: theme.colors.textPrimary,
+    fontSize: 10,
+    fontWeight: '700',
   },
   addButton: {
     width: SIZE,

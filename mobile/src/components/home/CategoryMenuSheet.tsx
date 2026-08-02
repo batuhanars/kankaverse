@@ -10,6 +10,11 @@ interface Props {
   onClose: () => void;
   onEdit: () => void;
   onCreateChannel: () => void;
+  /** Sprint M2a §4.5 — kategorinin kanallarını dolaşıp okundu işaretler (web `useGuildMenuActions.ts`
+   *  `markGuildRead` deseni, kategori düzeyine uygulanmış hâli). Yetki gerekmez, HERKESE açık. */
+  onMarkRead: () => void;
+  /** Yönetim maddeleri (Düzenle/Kanal Oluştur) YALNIZ bu true iken render edilir. */
+  canManage: boolean;
 }
 
 /**
@@ -20,14 +25,25 @@ interface Props {
  * yazılmamıştı. Sahip DoD-B/14'ü (kategori silinince kanallar kategorisiz olur) bu yüzden test
  * edemedi — kategoriye kanal koyamıyordu.
  *
- * 🔴 KONMAYANLAR (Discord'da var, bizde YOK): Okunmuş Olarak İşaretle (kategori-geneli okundu için
- * kategorinin kanallarını dolaşmak gerekir, ayrı karar) · Davet et (ortam düzeyinde bir iş, ortam
- * panelinde duruyor — ikinci kapı açılmadı) · Kategoriyi Sustur ve Bildirim Ayarları (kategori
- * bildirim tercihi mobilde bağlı değil) · Kanal ID'sini Kopyala (geliştirici modu bizde yok).
+ * 🔴 KONMAYANLAR (Discord'da var, bizde YOK): Davet et (ortam düzeyinde bir iş, ortam panelinde
+ * duruyor — ikinci kapı açılmadı) · Kategoriyi Sustur ve Bildirim Ayarları (kategori bildirim
+ * tercihi mobilde bağlı değil) · Kanal ID'sini Kopyala (geliştirici modu bizde yok).
  *
  * Silme, kanal desenindeki gibi düzenleme ekranının içinde — yıkıcı işlem bir dokunuş daha derinde.
+ *
+ * Sprint M2a §4.5 — "Okunmuş Olarak İşaretle" EKLENDİ (önceki not burada listeliyordu, artık IN).
+ * Panel artık HERKESE açılıyor (önceden yalnız `canManage`); Düzenle/Kanal Oluştur yönetim
+ * maddeleri `canManage` ile koşullu kaldı.
  */
-export function CategoryMenuSheet({ visible, categoryName, onClose, onEdit, onCreateChannel }: Props) {
+export function CategoryMenuSheet({
+  visible,
+  categoryName,
+  onClose,
+  onEdit,
+  onCreateChannel,
+  onMarkRead,
+  canManage,
+}: Props) {
   const bottomInset = useSheetInsets();
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -44,16 +60,25 @@ export function CategoryMenuSheet({ visible, categoryName, onClose, onEdit, onCr
             </Text>
 
             <View style={styles.group}>
-              <Pressable style={styles.option} onPress={onEdit}>
-                <Ionicons name="settings-outline" size={20} color={theme.colors.textSecondary} />
-                <Text style={styles.optionText}>{t('category.editTitle')}</Text>
-              </Pressable>
-              <View style={styles.divider} />
-              <Pressable style={styles.option} onPress={onCreateChannel}>
-                <Ionicons name="add" size={22} color={theme.colors.textSecondary} />
-                <Text style={styles.optionText}>{t('channel.createTitle')}</Text>
+              <Pressable style={styles.option} onPress={onMarkRead}>
+                <Ionicons name="eye-outline" size={20} color={theme.colors.textSecondary} />
+                <Text style={styles.optionText}>{t('guildMenu.markRead')}</Text>
               </Pressable>
             </View>
+
+            {canManage && (
+              <View style={styles.group}>
+                <Pressable style={styles.option} onPress={onEdit}>
+                  <Ionicons name="settings-outline" size={20} color={theme.colors.textSecondary} />
+                  <Text style={styles.optionText}>{t('category.editTitle')}</Text>
+                </Pressable>
+                <View style={styles.divider} />
+                <Pressable style={styles.option} onPress={onCreateChannel}>
+                  <Ionicons name="add" size={22} color={theme.colors.textSecondary} />
+                  <Text style={styles.optionText}>{t('channel.createTitle')}</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         </Pressable>
       </Pressable>
