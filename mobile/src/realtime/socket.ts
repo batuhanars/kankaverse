@@ -4,6 +4,7 @@ import { useMessagesStore } from '@/stores/messages';
 import { useTypingStore } from '@/stores/typing';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useDmStore } from '@/stores/dm';
+import { useUnreadStore } from '@/stores/unread';
 import { useFriendsStore } from '@/stores/friends';
 import { useAuthStore } from '@/stores/auth';
 import type { MessageDto } from '@/api/messages';
@@ -162,17 +163,38 @@ function ensureSocket(): Socket {
     useDmStore.getState().refreshRequests();
   });
 
-  // Kalıcı bildirim (Sprint C1) — rozet + liste anlık.
-  // **`mention` BİLİNÇLİ olarak dinlenmiyor.** Sunucu bir bahsetmede iki şey yayar: anlık `mention`
-  // ve kalıcı `notification`. Ama kalıcı olan, alıcının kanal/ortam bildirim tercihinden SÜZÜLÜR
-  // (api messages.gateway.ts R12 `shouldNotifyChannel` — susturulmuş kanalda kalıcı bildirim hiç
-  // üretilmez). `mention`'ı da rozete bağlamak bu susturmayı baypas eder, yani kullanıcının kapattığı
-  // bildirimi geri açardı. Rozetin tek kaynağı `notification`. (`mention` web'de anlık toast için
-  // kullanılıyor; mobilde toast yok, gelince o zaman dinlenir.)
+  // Sprint M2a §6 — ortam kanallarında rail/kanal listesi rozetlerinin canlı kaynağı. Bugüne kadar
+  // (M1a-M1j) bu olay hiç dinlenmiyordu; Home sekmesi oturum boyunca mount'lu kaldığı için kullanıcı
+  // ana ekranda otururken rozetler hiç artmıyordu — yalnız ekran odaklanınca REST'ten geliyordu.
+  // `authorId` kontrolü GEREKMEZ: sunucu yazarın kendisine bu olayı zaten göndermiyor
+  // (`messages.gateway.ts` `notifyChannelActivity` — "Yazarın kendisine gönderme"). DM kanalıysa
+  // (`guildId` null) sunucu bu olayı hiç yaymıyor — bu yüzden `guildId` burada her zaman `string`.
+  socket.on('channel.activity', (data: { channelId: string; guildId: string; authorId: string }) => {
+    // Sözleşme §6 — o an açık olan kanal sayılmaz (DM store'daki `activeDmChannelId` deseninin kanal
+    // tarafı: bu modüldeki `activeChannelId` zaten `MessageScreen`'in mount/unmount'unda güncelleniyor).
+    if (data.channelId === activeChannelId) return;
+    useUnreadStore.getState().bumpChannel(data.channelId, data.guildId);
+  });
+
+  // Kalıcı bildirim (Sprint C1) — rozet + liste anlık. `notification` olayı Bildirimler sekmesi
+  // rozetinin TEK kaynağı kalır (aşağıdaki `mention` dinleyicisi ona YAZMAZ — bkz. not).
   socket.on('notification', () => {
     const store = useNotificationsStore.getState();
     store.refreshUnreadCount();
     store.fetchFirstPage();
+  });
+
+  // Sprint M2a §6 — `mention` artık dinleniyor ama YALNIZ rail/kanal bahsetme rozetini besliyor;
+  // Bildirimler sekmesi rozetine BAĞLANMADI (M1a'dan beri süren bilinçli karar korunuyor): sunucu bir
+  // bahsetmede iki şey yayar — anlık `mention` (bu) ve kalıcı `notification`. Kalıcı olan alıcının
+  // kanal/ortam bildirim tercihinden SÜZÜLÜR (`messages.gateway.ts` R12 `shouldNotifyChannel` —
+  // susturulmuş kanalda hiç üretilmez); `mention`'ı da rozete bağlamak bu susturmayı baypas ederdi.
+  // `guildId` null → DM/grup DM bahsetmesi: mobilde DM bahsetme SAYISI yok (sunucu DM'de boolean
+  // dönüyor, §1 OUT), bu yüzden atlanır — DM'nin kendi okunmamış noktası zaten `dm.message`'dan geliyor.
+  socket.on('mention', (data: { channelId: string; guildId: string | null }) => {
+    if (!data.guildId) return;
+    if (data.channelId === activeChannelId) return;
+    useUnreadStore.getState().bumpChannel(data.channelId, data.guildId, { mention: true });
   });
 
   // Sprint M1b — `friend.*` HENÜZ dinlenmiyordu (M1a §8.3'ün aynı kusur sınıfı, kanka tarafı için).

@@ -4,6 +4,8 @@ import { theme } from '@/theme';
 import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
+import { useUnreadStore } from '@/stores/unread';
+import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { useBackgroundSocket } from '@/realtime/useBackgroundSocket';
 
 // Auth guard — oturum sunucu tarafında düşerse (401 → refresh de başarısız, bkz. stores/auth.ts
@@ -24,6 +26,7 @@ export default function AppLayout() {
   // çıkıştan sonra sıradaki kullanıcı öncekinin DM listesini görürdü).
   // Sprint M1b — kanka store'u da aynı gerekçeyle oturum kapsamlı (dm store ile birebir aynı
   // sızıntı riski: temizlenmezse çıkıştan sonra sıradaki kullanıcı öncekinin kanka listesini görür).
+  // Sprint M2a — `unread` store aynı sınıf: guild/kanal rozetleri de oturum kapsamlı, aynı `reset()`.
   useEffect(() => {
     if (!userId) return;
     useDmStore.getState().setSessionUser(userId);
@@ -31,9 +34,15 @@ export default function AppLayout() {
     // bulgusu 2026-07-30) aksi halde "Kanka Ekle" ekranına girilmeden 0 kalırdı. Sonraki
     // güncellemeler `friend.*` WS olaylarından geliyor, tekrar çekim gerekmiyor.
     useFriendsStore.getState().fetchAll();
+    // Sprint M2b §6 — bildirim tercihleri de oturum başında BİR KEZ çekilir (rail/kanal listesi
+    // rozet süzgeci bunu bekliyor). Hata sessiz: yüklenemezse varsayılan (susturulmamış/Tümü) kalır,
+    // rozetler süzülmeden gösterilir — yanlış değil, yalnız güncel değil.
+    void useNotificationPrefsStore.getState().load().catch(() => {});
     return () => {
       useDmStore.getState().setSessionUser(null);
       useFriendsStore.getState().reset();
+      useUnreadStore.getState().reset();
+      useNotificationPrefsStore.getState().reset();
     };
   }, [userId]);
 

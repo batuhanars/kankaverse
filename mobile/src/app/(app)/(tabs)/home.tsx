@@ -13,10 +13,11 @@ import { DmSidebar } from '@/components/home/DmSidebar';
 import { ChannelSidebar } from '@/components/home/ChannelSidebar';
 import { GuildMenuSheet } from '@/components/home/GuildMenuSheet';
 import { AddGuildSheet } from '@/components/home/AddGuildSheet';
-import { ChannelMenuSheet } from '@/components/home/ChannelMenuSheet';
+import { ChannelMenuHost } from '@/components/home/ChannelMenuHost';
 import { CategoryMenuSheet } from '@/components/home/CategoryMenuSheet';
 import type { CategoryDto } from '@/api/categories';
-import { channelsApi } from '@/api/channels';
+import { channelsApi, ChannelType } from '@/api/channels';
+import { useUnreadStore } from '@/stores/unread';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -58,6 +59,8 @@ export default function HomeScreen() {
       .list()
       .then((list) => {
         setGuilds(list);
+        // Sprint M2a §5 — rail pip/bahsetme rozetinin İLK hydrate kaynağı.
+        useUnreadStore.getState().hydrateGuilds(list);
         setGuildState('ready');
       })
       .catch(() => setGuildState('error'));
@@ -132,6 +135,53 @@ export default function HomeScreen() {
     return role === 'OWNER' || role === 'ADMIN';
   }, [guilds, selection, myUserId, myRoleByGuild]);
 
+  /**
+   * Sprint M2a §4.5 — dolaşma deseni web `useGuildMenuActions.ts` `markGuildRead`'in birebir aynısı:
+   * yalnız `unreadCount > 0 || unreadMentionCount > 0` olan kanallara `markRead`, hata SESSİZ (biri
+   * düşse diğerleri denenir). İşlem bitince yerel `unread` store'u da her kanal için temizlenir —
+   * bugünkü eksik tam buydu (sunucuya gidiyordu, ekranda rozet kalıyordu).
+   */
+  async function markChannelsRead(channelList: ChannelSummaryDto[], guildId: string) {
+    for (const c of channelList) {
+      if (c.unreadCount > 0 || c.unreadMentionCount > 0) {
+        try {
+          await channelsApi.markRead(c.id);
+        } catch {
+          // sessiz — bir kanal düşse diğerleri denenir
+        }
+        useUnreadStore.getState().clearChannel(c.id, guildId);
+      }
+    }
+  }
+
+  /** Ortam paneli §4.5 — "Okundu İşaretle" (web menüsünün 1. maddesi). Taze liste çekilir: bu
+   *  ekranın kendi state'i yok merkezi bir kanal store'u (M1d bilinçli kararı, bkz. `myRoleByGuild`
+   *  yorumu), tek tüketicili bir bulk-aksiyon için store lift etmek erken soyutlama olurdu. */
+  async function markGuildRead(guildId: string) {
+    try {
+      const list = await channelsApi.listByGuild(guildId);
+      await markChannelsRead(
+        list.filter((c) => c.type === ChannelType.GUILD_TEXT),
+        guildId,
+      );
+    } catch {
+      // sessiz — okundu işaretleme kritik değil
+    }
+  }
+
+  /** Kategori paneli §4.5 — yalnız o kategorinin kanallarını dolaşır. */
+  async function markCategoryRead(guildId: string, categoryId: string) {
+    try {
+      const list = await channelsApi.listByGuild(guildId);
+      await markChannelsRead(
+        list.filter((c) => c.type === ChannelType.GUILD_TEXT && c.categoryId === categoryId),
+        guildId,
+      );
+    } catch {
+      // sessiz
+    }
+  }
+
   function openChannel(channel: ChannelSummaryDto) {
     // Sözleşme §8.1-A/1 — vurgu için "en son açılan kanal" burada tutulur (ChannelSidebar ortam
     // değişiminde remount olduğu için kendi içinde tutamaz; ayrıca kanal ekranı ayrı bir route).
@@ -198,7 +248,6 @@ export default function HomeScreen() {
           onOpenChannel={openChannel}
           guildBannerUrl={selectedGuild?.bannerUrl}
           onOpenGuildMenu={() => setGuildMenuOpen(true)}
-          canManage={canManage}
           onEditChannel={(c) => setMenuChannel(c)}
           onEditCategory={(c) => setMenuCategory(c)}
           // Sprint M1g §2.1 — şerit aksiyonları. Davet MEVCUT ekrana gider (ortam panelindeki
@@ -222,7 +271,13 @@ export default function HomeScreen() {
       <CategoryMenuSheet
         visible={!!menuCategory}
         categoryName={menuCategory?.name ?? ''}
+        canManage={canManage}
         onClose={() => setMenuCategory(null)}
+        onMarkRead={() => {
+          const c = menuCategory;
+          setMenuCategory(null);
+          if (c && selection.type === 'guild') void markCategoryRead(selection.id, c.id);
+        }}
         onEdit={() => {
           const c = menuCategory;
           setMenuCategory(null);
@@ -245,24 +300,25 @@ export default function HomeScreen() {
         }}
       />
 
-      <ChannelMenuSheet
-        visible={!!menuChannel}
-        channelName={menuChannel?.name ?? ''}
+      <ChannelMenuHost
+        channel={menuChannel}
+        guildId={selection.type === 'guild' ? selection.id : ''}
+        guildName={selectedGuildName}
+        guildIconUrl={selectedGuild?.iconUrl}
+        canManage={canManage}
         onClose={() => setMenuChannel(null)}
-        onMarkRead={() => {
-          const id = menuChannel?.id;
-          setMenuChannel(null);
+        onMarkRead={(c) => {
           // Hata sessiz: okundu işaretleme kritik değil, kullanıcıyı hata ekranıyla durdurmaya değmez.
-          if (id) void channelsApi.markRead(id).catch(() => {});
+          void channelsApi.markRead(c.id).catch(() => {});
+          // Sözleşme §4.5 — yerel rozet de anında temizlenir (bugünkü eksik: sunucuya gidiyordu,
+          // ekranda rozet kalıyordu).
+          if (c.guildId) useUnreadStore.getState().clearChannel(c.id, c.guildId);
         }}
-        onEdit={() => {
-          const c = menuChannel;
-          setMenuChannel(null);
-          if (c)
-            router.push({
-              pathname: '/channel-edit',
-              params: { id: c.id, name: c.name ?? '', ageGated: String(c.ageGated) },
-            });
+        onEdit={(c) => {
+          router.push({
+            pathname: '/channel-edit',
+            params: { id: c.id, name: c.name ?? '', ageGated: String(c.ageGated) },
+          });
         }}
       />
 
@@ -270,8 +326,13 @@ export default function HomeScreen() {
         visible={guildMenuOpen}
         guildName={selectedGuildName}
         guildIconUrl={selectedGuild?.iconUrl}
+        guildDescription={selectedGuild?.description}
         canManage={canManage}
         onClose={() => setGuildMenuOpen(false)}
+        onMarkRead={() => {
+          setGuildMenuOpen(false);
+          if (selection.type === 'guild') void markGuildRead(selection.id);
+        }}
         onInvite={() => {
           setGuildMenuOpen(false);
           if (selection.type === 'guild')
@@ -297,6 +358,14 @@ export default function HomeScreen() {
           setGuildMenuOpen(false);
           if (selection.type === 'guild')
             router.push({ pathname: '/category-edit', params: { guildId: selection.id } });
+        }}
+        onNotifications={() => {
+          setGuildMenuOpen(false);
+          if (selection.type === 'guild')
+            router.push({
+              pathname: '/guild-notifications',
+              params: { guildId: selection.id, guildName: selectedGuildName },
+            });
         }}
       />
 

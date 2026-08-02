@@ -1,6 +1,7 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { sheetBottomPadding, useSheetInsets } from './sheetInsets';
+import { muteUntilLabel } from '@/utils/notifPrefUi';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -10,9 +11,12 @@ import { theme } from '@/theme';
  * Varlık sebebi: DM başlığının sağ üstü **tamamen boşaltıldı** (sahip kararı 2026-08-01 — orası
  * sesli/görüntülü aramaya ayrıldı). Oradaki aksiyonlar kaybolmadı, buraya taşındı.
  *
- * 🔴 KONMAYANLAR (Discord'da var, bizde YOK): Favori (yok) · Konuşmayı Sustur + Bildirim Ayarları
- * (**kendi sözleşmesinde**, backend R12 modülü mobilde hiç bağlı değil) · Kanal ID'sini Kopyala
- * (geliştirici modu yok) · "DM'yi Kapat" (bizdeki karşılığı "Sohbeti Temizle" — aynı işe iki ad konmaz).
+ * 🔴 KONMAYANLAR (Discord'da var, bizde YOK): Favori (yok) · Kanal ID'sini Kopyala (geliştirici modu
+ * yok) · "DM'yi Kapat" (bizdeki karşılığı "Sohbeti Temizle" — aynı işe iki ad konmaz).
+ *
+ * Sprint M2b §4.1 — **Konuşmayı Sustur** (süre seçenekli) + **Bildirim Ayarları** eklendi (backend
+ * R12 modülü artık bağlı). Hedef her zaman `targetType: 'CHANNEL', targetId: <dm channelId>` — grup
+ * DM'de de aynı (DM'ler `guildId: null` ile `Channel` tablosunda yaşıyor, ayrı bir tür yok).
  *
  * 🔴 **Okunmuş İşaretle satırı: yetki değil DURUM kuralı.** Okunmamış yokken satır GİZLENMEZ,
  * soluk ve pasif gösterilir. Ayrım M1d-B'de kayda geçti: "yetkisiz aksiyon hiç render edilmez"
@@ -26,11 +30,18 @@ interface Props {
   hasUnread: boolean;
   /** 1-1 DM'de karşı taraf kanka değilse "Kanka Ekle" gösterilir. Grup DM'de asla. */
   canAddFriend: boolean;
+  /** Bu DM'in KENDİ sustur kaydı (fallback yok — DM'in bağlı olduğu bir ortam yok). */
+  muted: boolean;
+  mutedUntil: string | null;
   onClose: () => void;
   onProfile: () => void;
   onAddFriend: () => void;
   onMarkRead: () => void;
   onClear: () => void;
+  /** Susturulmuşsa tek dokunuşla açar (web `MuteDurationFlyout` deseni); değilse süre seçici açılır
+   *  — karar burada değil, çağıranda (`muted` zaten prop olarak elde). */
+  onMutePress: (currentlyMuted: boolean) => void;
+  onLevelPress: () => void;
 }
 
 export function DmMenuSheet({
@@ -38,11 +49,15 @@ export function DmMenuSheet({
   title,
   hasUnread,
   canAddFriend,
+  muted,
+  mutedUntil,
   onClose,
   onProfile,
   onAddFriend,
   onMarkRead,
   onClear,
+  onMutePress,
+  onLevelPress,
 }: Props) {
   const bottomInset = useSheetInsets();
 
@@ -84,6 +99,28 @@ export function DmMenuSheet({
                 <Text style={[styles.optionText, !hasUnread && styles.optionTextDisabled]}>
                   {t('guildMenu.markRead')}
                 </Text>
+              </Pressable>
+            </View>
+
+            {/* Sprint M2b §4.1 — Konuşmayı Sustur + Bildirim Ayarları, ayrı grup. */}
+            <View style={styles.group}>
+              <Pressable style={styles.option} onPress={() => onMutePress(muted)}>
+                <Ionicons
+                  name={muted ? 'volume-high-outline' : 'volume-mute-outline'}
+                  size={20}
+                  color={theme.colors.textSecondary}
+                />
+                <View style={styles.optionTextWrap}>
+                  <Text style={styles.optionText}>
+                    {muted ? t('mobile.notif.unmute') : t('mobile.dm.muteLabel')}
+                  </Text>
+                  {muted && <Text style={styles.optionSubtext}>{muteUntilLabel(mutedUntil)}</Text>}
+                </View>
+              </Pressable>
+              <View style={styles.divider} />
+              <Pressable style={styles.option} onPress={onLevelPress}>
+                <Ionicons name="notifications-outline" size={20} color={theme.colors.textSecondary} />
+                <Text style={styles.optionText}>{t('guildMenu.notifications')}</Text>
               </Pressable>
             </View>
 
@@ -146,15 +183,27 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
   },
+  optionTextWrap: { flex: 1, minWidth: 0 },
   optionText: {
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.lg,
     fontWeight: '500',
+  },
+  // Sustur bitiş etiketi ("{tarih} tarihine kadar") — ana metnin altında, soluk.
+  optionSubtext: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+    marginTop: 2,
   },
   optionTextDisabled: {
     color: theme.colors.textMuted,
   },
   optionTextDanger: {
     color: theme.colors.danger,
+  },
+  divider: {
+    height: 1,
+    marginHorizontal: 16,
+    backgroundColor: theme.colors.borderStrong,
   },
 });

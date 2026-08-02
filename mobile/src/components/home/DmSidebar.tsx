@@ -7,6 +7,8 @@ import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
 import { useTypingStore } from '@/stores/typing';
+import { resolvePref, useNotificationPrefsStore } from '@/stores/notificationPrefs';
+import { NotificationLevel } from '@/api/notifications';
 import { formatMentionsPlain } from '@/utils/mentions';
 import { channelTitle } from '@/utils/channelTitle';
 import { t } from '@/i18n';
@@ -44,6 +46,9 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
   const errorMessage = useDmStore((s) => s.errorMessage);
   const fetchAll = useDmStore((s) => s.fetchAll);
   const typingByChannel = useTypingStore((s) => s.byChannel);
+  // Sprint M2b §10 R2-2 — DM/grup DM'de de §5 süzgeci: hedef susturulmuşsa veya `NONE` ise
+  // okunmamış nokta gösterilmez. `resolvePref` guildId'siz çağrılır (DM'in bağlı bir ortamı yok).
+  const notifPrefs = useNotificationPrefsStore((s) => s.prefs);
 
   useEffect(() => {
     fetchAll();
@@ -142,13 +147,18 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
             const preview = item.lastMessage
               ? formatMentionsPlain(item.lastMessage.content, resolver(item), t('mention.unknown'))
               : '';
+            // §5 R2-2 — susturulmuş veya `NONE` hedefte nokta gösterilmez (okunmamış HESABI
+            // bozulmaz, yalnız gösterim; `clearUnread`/soket katmanı ham veriyi değiştirmeye devam eder).
+            const resolved = resolvePref(notifPrefs, 'CHANNEL', item.id);
+            const showUnread =
+              item.unread && resolved.level !== NotificationLevel.NONE && !resolved.muted;
             return (
               <DmRow
                 name={name}
                 avatarUrl={avatar}
                 preview={preview}
                 typing={typing}
-                unread={item.unread}
+                unread={showUnread}
                 onPress={() => onOpenDm(item)}
                 onLongPress={() => onDmMenu(item)}
               />

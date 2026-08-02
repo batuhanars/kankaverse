@@ -22,6 +22,10 @@ export interface GuildSummaryDto {
   /** Keşfet listesinde görünsün mü (C6). */
   discoverable: boolean;
   tags: string[];
+  // Sprint M2a §3 — rail'deki pip/bahsetme rozeti için. Sunucu M0'dan beri `toGuildDto`'da
+  // dönüyordu (guilds.service.ts), yalnız tiplenmemişti — yeni backend alanı DEĞİL.
+  unreadCount: number;
+  unreadMentionCount: number;
 }
 
 // Sprint M1d §0 — sunucu `GET /invites/:code` için YALNIZ bu üç alanı dönüyor

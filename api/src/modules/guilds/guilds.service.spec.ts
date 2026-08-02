@@ -56,6 +56,9 @@ const prismaMock = {
   message: {
     count: jest.fn(),
   },
+  notificationPref: {
+    findMany: jest.fn(),
+  },
   user: {
     findUnique: jest.fn(),
   },
@@ -127,6 +130,8 @@ function resetMocks() {
   permissionsMock.hasGuildPermission.mockResolvedValue(true);
   permissionsMock.requireMemberHierarchy.mockResolvedValue(undefined);
   permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
+  // M2b §10 R1-1: varsayılan — kanal tercihi yok (bireysel testler override eder)
+  prismaMock.notificationPref.findMany.mockResolvedValue([]);
   configMock.get.mockImplementation((key: string) => {
     const values: Record<string, unknown> = {
       's3.publicUrl': 'http://localhost:9000/kankaverse',
@@ -656,6 +661,95 @@ describe('GuildsService.findMyGuilds — unreadCount', () => {
     const result = await service.findMyGuilds(OWNER_ID);
     expect(result[0].unreadCount).toBe(1);
     expect(result[1].unreadCount).toBe(7);
+  });
+});
+
+// ── GuildsService.findMyGuilds — M2b §10 R1-1: kanal-bazlı NotificationPref süzgeci ──────────
+
+describe('GuildsService.findMyGuilds — kanal bazlı bildirim tercihi süzgeci (M2b R1-1)', () => {
+  let service: GuildsService;
+
+  function makeGuildWithOneChannel() {
+    return {
+      guild: {
+        ...GUILD_FIXTURE,
+        channels: [{ id: 'ch-1', guildId: GUILD_ID, isPrivate: false, channelReads: [] }],
+      },
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.guildMember.findMany.mockResolvedValue([makeGuildWithOneChannel()]);
+    // ch-1: 2 okunmamış mesaj, bunlardan 1'i bahsetme
+    prismaMock.message.count
+      .mockResolvedValueOnce(2) // unread
+      .mockResolvedValueOnce(1); // mentions
+  });
+
+  it('pref yok (varsayılan ALL, susturulmamış) → hem unread hem mention sayılır', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([]);
+
+    const result = await service.findMyGuilds(OWNER_ID);
+    expect(result[0].unreadCount).toBe(2);
+    expect(result[0].unreadMentionCount).toBe(1);
+  });
+
+  it('level=MENTIONS → unread sayılmaz, mention sayılır', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      { targetType: 'CHANNEL', targetId: 'ch-1', muted: false, mutedUntil: null, level: 'MENTIONS' },
+    ]);
+
+    const result = await service.findMyGuilds(OWNER_ID);
+    expect(result[0].unreadCount).toBe(0);
+    expect(result[0].unreadMentionCount).toBe(1);
+  });
+
+  it('level=NONE → ikisi de sayılmaz', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      { targetType: 'CHANNEL', targetId: 'ch-1', muted: false, mutedUntil: null, level: 'NONE' },
+    ]);
+
+    const result = await service.findMyGuilds(OWNER_ID);
+    expect(result[0].unreadCount).toBe(0);
+    expect(result[0].unreadMentionCount).toBe(0);
+  });
+
+  it('aktif mute (süresiz) → ikisi de sayılmaz, level ALL olsa bile', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      { targetType: 'CHANNEL', targetId: 'ch-1', muted: true, mutedUntil: null, level: 'ALL' },
+    ]);
+
+    const result = await service.findMyGuilds(OWNER_ID);
+    expect(result[0].unreadCount).toBe(0);
+    expect(result[0].unreadMentionCount).toBe(0);
+  });
+
+  it('süresi geçmiş mute → mute sona ermiş sayılır, hem unread hem mention sayılır', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      {
+        targetType: 'CHANNEL',
+        targetId: 'ch-1',
+        muted: true,
+        mutedUntil: new Date('2020-01-01T00:00:00Z'), // geçmiş
+        level: 'ALL',
+      },
+    ]);
+
+    const result = await service.findMyGuilds(OWNER_ID);
+    expect(result[0].unreadCount).toBe(2);
+    expect(result[0].unreadMentionCount).toBe(1);
+  });
+
+  it('tek sorgu: notificationPref.findMany userId + targetType CHANNEL ile bir kez çağrılır', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([]);
+
+    await service.findMyGuilds(OWNER_ID);
+    expect(prismaMock.notificationPref.findMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.notificationPref.findMany).toHaveBeenCalledWith({
+      where: { userId: OWNER_ID, targetType: 'CHANNEL' },
+    });
   });
 });
 
