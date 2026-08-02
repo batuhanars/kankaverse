@@ -2618,6 +2618,108 @@ describe('MessagesService.searchGuildMessages — from/mentions filtreleri', () 
   });
 });
 
+// ── MessagesService.searchGuildMessages — has filtresi (link/image/file, M2c §2) ─
+
+describe('MessagesService.searchGuildMessages — has filtresi', () => {
+  let service: MessagesService;
+
+  const GUILD_ID = 'guild-has';
+  const ACCESSIBLE_CHANNEL = { id: 'ch-has-1', name: 'medya', ageGated: false, isPrivate: false };
+
+  // Servisin ürettiği `some`/`NOT` içindeki `startsWith` koşullarını gerçek bir
+  // contentType'a uygular — where şeklini hardcode'layıp yeniden yazmak yerine
+  // servisin ürettiği koşulu bizzat değerlendiriyoruz.
+  function matchesOr(or: { contentType: { startsWith: string } }[], contentType: string) {
+    return or.some((c) => contentType.startsWith(c.contentType.startsWith));
+  }
+
+  function setupAccess() {
+    membershipMock.requireGuildMembership.mockResolvedValue({ membership: { role: 'MEMBER' } });
+    prismaMock.guild.findUnique.mockResolvedValue({ adultsOnly: false });
+    prismaMock.channel.findMany.mockResolvedValue([ACCESSIBLE_CHANNEL]);
+    prismaMock.user.findUnique.mockResolvedValue({ isMinor: false });
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.message.findMany.mockResolvedValue([]);
+  });
+
+  // ── has=link değişmedi ───────────────────────────────────────────────────────
+  it('has=link → where.content link araması (http içerir), attachments dokunulmaz', async () => {
+    setupAccess();
+
+    await service.searchGuildMessages(USER_ID, GUILD_ID, '', { has: 'link' });
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.content).toEqual({ contains: 'http', mode: 'insensitive' });
+    expect(call.where.attachments).toBeUndefined();
+  });
+
+  // ── has=image YENİ ───────────────────────────────────────────────────────────
+  it('has=image → where.attachments.some medya (image/* veya video/*) koşulu üretir', async () => {
+    setupAccess();
+
+    await service.searchGuildMessages(USER_ID, GUILD_ID, '', { has: 'image' });
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.content).toBeUndefined();
+    expect(call.where.attachments.some.OR).toBeDefined();
+    expect(call.where.attachments.some.NOT).toBeUndefined();
+  });
+
+  // ── has=file daraltıldı ──────────────────────────────────────────────────────
+  it('has=file → where.attachments.some NOT medya koşulu üretir (daraltılmış)', async () => {
+    setupAccess();
+
+    await service.searchGuildMessages(USER_ID, GUILD_ID, '', { has: 'file' });
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.content).toBeUndefined();
+    expect(call.where.attachments.some.NOT.OR).toBeDefined();
+  });
+
+  // ── Geçersiz has değeri: bugünkü sessiz-yoksayma davranışı korunur ───────────
+  it('geçersiz has değeri → content/attachments filtresi üretilmez (sessizce yok sayılır)', async () => {
+    setupAccess();
+
+    await service.searchGuildMessages(USER_ID, GUILD_ID, '', { has: 'video' as any });
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.content).toBeUndefined();
+    expect(call.where.attachments).toBeUndefined();
+  });
+
+  // ── Kritik ayrım: medya-dışı ek has=image sonucuna düşmüyor ───────────────────
+  it('medya-dışı ekli mesaj (application/pdf) has=image koşulunu sağlamıyor', async () => {
+    setupAccess();
+
+    await service.searchGuildMessages(USER_ID, GUILD_ID, '', { has: 'image' });
+
+    const or = prismaMock.message.findMany.mock.calls[0][0].where.attachments.some.OR;
+    expect(matchesOr(or, 'application/pdf')).toBe(false);
+    expect(matchesOr(or, 'text/plain')).toBe(false);
+    // Kontrol: gerçek medya türleri koşulu sağlıyor (yanlış-negatif değil)
+    expect(matchesOr(or, 'image/png')).toBe(true);
+    expect(matchesOr(or, 'video/mp4')).toBe(true);
+  });
+
+  // ── Kritik ayrım: görselli/videolu ek has=file sonucuna düşmüyor ──────────────
+  it('görselli (image/png) veya videolu (video/mp4) ek has=file koşulunu sağlamıyor', async () => {
+    setupAccess();
+
+    await service.searchGuildMessages(USER_ID, GUILD_ID, '', { has: 'file' });
+
+    const or = prismaMock.message.findMany.mock.calls[0][0].where.attachments.some.NOT.OR;
+    // NOT.OR sağlanıyorsa (yani medya koşulu tetikleniyorsa) `some.NOT` bunu ELER.
+    expect(matchesOr(or, 'image/png')).toBe(true);
+    expect(matchesOr(or, 'video/mp4')).toBe(true);
+    // Gerçek "dosya" (PDF) medya koşulunu sağlamaz → NOT onu ELEMEZ, sonuçta kalır.
+    expect(matchesOr(or, 'application/pdf')).toBe(false);
+  });
+});
+
 // ── toMessageDto.pinnedAt ────────────────────────────────────────────────────
 
 describe('toMessageDto — pinnedAt alanı', () => {

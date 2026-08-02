@@ -46,13 +46,17 @@ export interface ReactionDto {
 /**
  * Sprint M1g — ortam geneli arama filtreleri. Ad ve değerler `GuildSearchController` sorgu
  * parametreleriyle **BİREBİR** (`from` = authorId, `mentions` = userId, `in` = channelId).
+ *
+ * Sprint M2c contract §2 — `has` üçüncü değer aldı: `image` (eki `image/*` veya `video/*` olan
+ * mesajlar — kanal detay "Medya" sekmesi). `file` sunucuda AYNI PR'de daraltıldı (artık yalnız
+ * medya-DIŞI ekli mesajlar); istemci tarafında bu yalnız bir tip genişlemesi, davranış sunucuda.
  */
 export interface GuildSearchParams {
   q?: string;
   from?: string;
   mentions?: string;
   in?: string;
-  has?: 'link' | 'file';
+  has?: 'link' | 'image' | 'file';
 }
 
 /** Sunucu sonucu kanal bazında gruplayıp döner (`searchGuildMessages` dönüşü birebir). */

@@ -1897,3 +1897,38 @@ hiç kullanılmıyordu. M2a mobili web semantiğine hizalar.
 - [ ] DM 8 saat susturulunca panel "Susturmayı Kaldır" + bitiş saatini gösteriyor
 - [ ] Kanal panelinde ortam simgesi okunaklı boyutta
 - [ ] Web'den yapılan susturma mobilde görünüyor (tek kaynak)
+
+---
+
+## Sprint M2c — Mobil Kanal Detay Ekranı — 2026-08-02
+
+> Sözleşme: `contracts/SPRINT_M2C_MOBILE_CHANNEL_DETAILS_CONTRACT.md`. Sahip Discord'da kanal adının
+> tıklanabilir olduğunu fark etti, aynısını istedi. İki tier: küçük `api/` eklentisi + mobil ekran.
+
+- [x] `api/` — arama `has` filtresi üçe ayrıldı: `link` (aynı) · **`image`** (yeni: image/* + video/*) ·
+  `file` (**daraltıldı**: medya OLMAYAN ekler). Migration yok, yeni uç yok. 899 test yeşil;
+  testler `application/pdf`'in `image`'e, `image/png`'nin `file`'a düşmediğini ayrı ayrı doğruluyor
+- [x] Kanal başlığı tıklanabilir + chevron → kanal detay ekranı
+- [x] Aksiyon şeridi: **Ara** (kanal ön-seçili arama) · **Sustur** (M2b süre seçicisi) ·
+  **Ayarlar** (yalnız yetkilide render edilir)
+- [x] Beş sekme: Üyeler (davet satırı + rol gruplu) · Medya (3 sütun ızgara) · Sabitlemeler ·
+  Bağlantılar · Dosyalar
+- [x] `pins.tsx` içeriği `PinnedMessagesList`'e çıkarıldı — iki yüzey aynı bileşeni kullanıyor
+- [x] `typecheck` + `lint` temiz; `web/` diffi yalnız `tr.json`
+
+### Bilinçli kararlar / dev bulguları
+- [x] **Alt Başlıklar (threads) KONMADI** — Discord'un dördüncü aksiyonu; bizde thread özelliği yok
+- [x] 🔴 **Dev yan etki yakaladı (PM'in sözleşmede atladığı):** mobildeki mevcut M1g "Medya" arama
+  sekmesi `has=file` kullanıyordu; `file` daraltılınca sessizce boşalacaktı → `has=image`'e çevrildi.
+  Sözleşme yalnız web'in "Dosya" filtresini yan etki olarak saymıştı
+- [x] **Chevron yalnız `guildId` bilinen girişlerde** — bildirimler sekmesi/arama/pins kanal ekranına
+  `guildId` taşımıyor (önceden var olan boşluk). Kırık navigasyon vaat etmektense başlık düz metin kalıyor
+- [ ] **Borç:** video ekleri Medya ızgarasında küçük resim değil rozet olarak görünüyor
+  (`AttachmentView`'da video önizleme desteği hiç yoktu)
+
+### DoD (**fiziksel cihazda** — sahipte, API yeniden başlatılmalı)
+- [ ] Kanal başlığında chevron var, dokununca detay açılıyor
+- [ ] Ara → o kanalda arama; Sustur → süre seçimi; yetkisizde Ayarlar yok, şeritte boşluk kalmıyor
+- [ ] Beş sekme de veri getiriyor, boş kanalda boş durum çıkıyor
+- [ ] Medya'da yalnız görsel/video, Dosyalar'da yalnız diğer dosyalar
+- [ ] Üyeler sekmesinde roller gruplu, rolsüz üyeler en altta

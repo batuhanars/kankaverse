@@ -28,10 +28,15 @@ export function MessageError({ message, onRetry }: { message: string; onRetry: (
   );
 }
 
-export function MessageEmpty() {
+/**
+ * `message` opsiyonel — Sprint M2c: kanal detay sekmeleri (Medya/Bağlantılar/Dosyalar/Üyeler) aynı
+ * ortalanmış "boş durum" kabuğunu kullanır, yalnız metni farklı. Verilmezse eski davranış
+ * (`message.noMessages`) değişmeden kalır.
+ */
+export function MessageEmpty({ message }: { message?: string } = {}) {
   return (
     <View style={styles.center}>
-      <Text style={styles.empty}>{t('message.noMessages')}</Text>
+      <Text style={styles.empty}>{message ?? t('message.noMessages')}</Text>
     </View>
   );
 }

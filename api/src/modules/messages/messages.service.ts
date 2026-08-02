@@ -715,7 +715,7 @@ export class MessagesService {
     const from = opts?.from?.trim() || undefined;
     const mentions = opts?.mentions?.trim() || undefined;
     const inChannel = opts?.in?.trim() || undefined;
-    const has = opts?.has?.trim() || undefined; // 'link' | 'file'
+    const has = opts?.has?.trim() || undefined; // 'link' | 'image' | 'file'
 
     // En az biri (q | from | mentions | in | has) dolu olmalı; hiçbiri yoksa boş sonuç.
     if (!hasQ && !from && !mentions && !inChannel && !has) return [];
@@ -764,6 +764,12 @@ export class MessagesService {
             ? linkCond
             : {};
 
+    // `image | file` ayrımı Attachment.contentType üzerinden: image/* veya video/* → medya.
+    // `has=image` → en az bir medya eki; `has=file` → en az bir medya-DIŞI ek (M2c §2).
+    const mediaAttachmentCond = {
+      OR: [{ contentType: { startsWith: 'image/' } }, { contentType: { startsWith: 'video/' } }],
+    };
+
     const messages = await this.prisma.message.findMany({
       where: {
         channelId: { in: accessible.map((c) => c.id) },
@@ -772,8 +778,11 @@ export class MessagesService {
         ...contentWhere,
         ...(from ? { authorId: from } : {}),
         ...(mentions ? { mentions: { has: mentions } } : {}),
-        // `has=file` → en az bir ek
-        ...(has === 'file' ? { attachments: { some: {} } } : {}),
+        ...(has === 'image'
+          ? { attachments: { some: mediaAttachmentCond } }
+          : has === 'file'
+            ? { attachments: { some: { NOT: mediaAttachmentCond } } }
+            : {}),
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
