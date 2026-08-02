@@ -40,5 +40,18 @@ export function useEventDateFormat() {
     return t('event.date.full', { day: d.getDate(), month, time: timePart(d) })
   }
 
-  return { formatEventDate, timePart }
+  /**
+   * Başlangıç + (varsa) bitiş: "bugün saat 21.00 - 23.00".
+   * Bitiş aynı güne düşüyorsa yalnız saat, farklı güne taşıyorsa tam tarih yazılır.
+   */
+  function formatEventRange(startIso: string, endIso: string | null): string {
+    const start = formatEventDate(startIso)
+    if (!endIso) return start
+    const s = new Date(startIso)
+    const e = new Date(endIso)
+    const end = isSameDay(s, e) ? timePart(e) : formatEventDate(endIso)
+    return t('event.date.range', { start, end })
+  }
+
+  return { formatEventDate, formatEventRange, timePart }
 }

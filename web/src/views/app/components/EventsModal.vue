@@ -20,7 +20,7 @@ const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 const eventsStore = useEventsStore()
-const { formatEventDate } = useEventDateFormat()
+const { formatEventRange } = useEventDateFormat()
 
 const events = computed(() => eventsStore.eventsFor(props.guildId))
 
@@ -170,7 +170,7 @@ function recurrenceKey(ev: EventDto): string {
             <div class="flex items-start gap-2">
               <div class="flex-1 min-w-0">
                 <!-- Tarih = ilgili örnek (occurrence), çapa startAt değil -->
-                <p class="text-[12px] font-semibold uppercase tracking-wide" style="color: var(--kv-accent-500);">{{ formatEventDate(ev.occurrenceStartAt) }}</p>
+                <p class="text-[12px] font-semibold uppercase tracking-wide" style="color: var(--kv-accent-500);">{{ formatEventRange(ev.occurrenceStartAt, ev.occurrenceEndAt) }}</p>
                 <p class="text-[16px] font-semibold mt-0.5 truncate" style="color: var(--kv-text-primary);">{{ ev.name }}</p>
                 <p class="text-[13px] mt-0.5 truncate" style="color: var(--kv-text-secondary);">{{ locationLabel(ev) }}</p>
 

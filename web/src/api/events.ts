@@ -10,7 +10,8 @@ export interface CreateEventPayload {
   channelId?: string
   externalLocation?: string
   startAt: string // ISO
-  endAt?: string // ISO
+  // Opsiyonel bitiş. Update'te semantik kapak ile aynı: undefined → değişmez · null → kaldır.
+  endAt?: string | null // ISO
   // Motor fazı: backend artık NONE|DAILY|WEEKLY|MONTHLY kabul ediyor.
   recurrence?: EventRecurrence
   // Sprint V3 Etkinlik Kapak Görseli §4 — presign sonrası attachmentId.

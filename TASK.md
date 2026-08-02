@@ -1737,3 +1737,75 @@ peşinden gelir, kanal bırakıldığı kategoriye girer).*
 - [ ] Roller ekranından sıralama açılıyor, sürükleme çalışıyor
 - [ ] Değiştirilen sıra ekrandan çıkıp dönünce **korunuyor** (ters eşleme düzeltmesinin turu)
 - [ ] Yetkisiz kullanıcıda sunucunun Türkçe reddi görünüyor ve liste eski hâline dönüyor
+
+---
+
+## Sprint M1j — Mobil Ortam Etkinlikleri (Track F2, 2026-08-02)
+
+> Sözleşme: `contracts/SPRINT_M1J_MOBILE_EVENTS_CONTRACT.md`. Kapsam kararları sahip onaylı:
+> **tam CRUD** + kapak **yalnız gösterim**. Referans: sahip Discord mobil akışının 7 ekran görüntüsü.
+> `api/`'ye **dokunulmadı** — etkinlik hattı V3'te uçtan uca yazılmıştı (CRUD + ilgi + tekrarlama +
+> kapak + `canViewEvent` görünürlük choke-point'i). `web/`'de yalnız `tr.json`'a iki mobil metni.
+
+- [x] `api/events.ts` — 7 uç (liste, tekil, oluştur, güncelle, sil, ilgi ekle/kaldır) + tipler
+- [x] Aksiyon şeridine **takvim düğmesi** (M1g'de yeri ayrılmış, düğmesi bilinçli konmamıştı)
+- [x] Etkinlikler ekranı: liste · boş durum · **Oluştur** (yalnız `MANAGE_EVENTS`) · odaklanmada tazeleme
+- [x] Kart: occurrence tarihi · konum · "şu an sürüyor" + 🔁 rozetleri · kapak · açıklama ·
+  **İlgileniyor** iyimser toggle + sayaç · ⋯ (Düzenle/Sil)
+- [x] 3 adımlı form (nerede → ne → önizleme), **oluştur ve düzenle aynı ekran**; donanım geri tuşu
+  adımlar arasında geri gider
+- [x] Tarih/saat: `@react-native-community/datetimepicker` 8.4.4 (**PM onaylı tek yeni bağımlılık**,
+  `npx expo install` ile SDK 54 eşleşmesi)
+- [x] `typecheck` + `lint` temiz
+
+### Bilinçli kararlar
+- [x] 🔴 **`coverImageId` hiçbir payload'a girmiyor** — mobilde kapak yükleme yok ve alanı `null`
+  göndermek backend semantiğinde **web'den yüklenmiş kapağı silerdi**. Tipe bile koyulmadı.
+- [x] **Liste sheet değil tam ekran route** (sözleşme revizesi): RN `Modal` Android'de her şeyin
+  üstünde kalır, üstüne `router.push` ile form açılamazdı. Proje deseni de route yönünde.
+- [x] **Açıklama düz metin** — mobilde markdown boru hattı hiç yok (mesajlar bile öyle); web'in
+  "Markdown desteklenir" ipucu mobile taşınmadı (söz verilmeyen şey yazılmaz).
+- [x] Tarih **`occurrenceStartAt`**'tan, düzenlemede **`startAt`** (çapa) yüklenir — occurrence
+  istemcide yeniden hesaplanmaz.
+
+### R1 — sahip cihaz turu sonrası (2026-08-02)
+> Sahip testi: "etkinlik sistemi çalışıyor, etkinlik oluşturdum". Ayrı ekrandan yönetim kabul edildi
+> (alt panel tercih ediliyordu ama liste büyüyünce ayrı ekran mantıklı bulundu).
+
+- [x] **Sıklık ve kanal seçimi açılır kutu oldu** — inline radyo listesi yerine dokununca alttan
+  panel (`SelectSheet`, Discord deseni). Sahip yalnız sıklığı söyledi; kanal seçimi de aynı
+  etkileşime çekildi (ikisi de Discord'da kapalı kutu, tek bileşen iki yerde)
+- [x] 🔴 **Bitiş tarihi + saati eklendi — HEM WEB HEM MOBİL.** Sahip bulgusu: alan web'de de
+  yoktu, gözden kaçmış. **Backend'de `endAt` baştan vardı** (opsiyonel, `endAt <= startAt` reddi,
+  update'te `null` → kaldır) — eksik olan yalnız UI'dı, `api/`'ye yine dokunulmadı
+- [x] Bitiş kartlarda da görünür: "bugün saat 21.00 - 23.00" (aynı gün → yalnız saat, farklı gün →
+  tam tarih); web + mobil ortak `formatEventRange`
+- [x] Sihirbaz ekranına **sağ üst X** — vazgeçen kullanıcı geri okuna adım adım basmasın
+- [x] `vue-tsc --noEmit` + `vite build` + mobil `typecheck` + `lint` temiz
+
+### R1-b — bitiş ZORUNLU oldu (sahip kararı, aynı gün)
+- [x] Bitiş artık boş kalamaz: varsayılan **başlangıç + 1 saat**, "Bitişi kaldır" düğmesi kaldırıldı
+  (web + mobil). Eski bitişsiz etkinlik düzenlenirken de aynı kuralla dolar
+- [x] **Süre korumalı kaydırma:** başlangıç saati/tarihi değişince bitiş de aynı kadar kayar —
+  yoksa başlangıcı ileri alan kullanıcı her seferinde "bitiş başlangıçtan sonra olmalı" hatasına
+  çarpardı (Discord da böyle davranıyor)
+- [x] *Not: Discord'da ses kanalı etkinliğinde bitiş HİÇ sorulmuyor, yalnız dış konumda zorunlu.
+  Bizde her ikisinde de zorunlu — gerekçe kodda: `computeOccurrence` bitişsiz etkinliğin süresini
+  sıfır sayıyor, yani "şu an sürüyor" rozeti hiç yanmıyordu.*
+
+### Kapsam dışı (borç)
+- [ ] Kapak görseli **yükleme** (sahip kararı) · **paylaş bağlantısı** (web'in `?event=` yakalayıcısı
+  aktif-ortam bağlamına bağlı, link yolu doğrulanmadı) · açıklamada **markdown** · `guild.event_*` **WS**
+- [ ] **Ses kanalı listeleme davranışı** — mobilde ses kanalları hiç listelenmediği için etkinlik
+  formundaki kanal seçicisi gerçek veriyle görülemedi; ses fazı (M4) gelince bakılacak (sahip notu)
+
+### DoD (**fiziksel cihazda** — sahipte)
+- [ ] Şeritte takvim ikonu var, dokununca Etkinlikler açılıyor
+- [ ] Etkinlik yokken boş durum; yetkisiz hesapta "Oluştur" yok
+- [ ] 3 adımdan geçip etkinlik oluşuyor; liste dönünce güncel
+- [ ] Ses kanalı ve "Başka Bir Yer" iki yol da yürüyor
+- [ ] Tekrarlayan etkinlikte 🔁 rozeti + **doğru sonraki tarih**
+- [ ] "İlgileniyor" iki yönde çalışıyor, sayaç doğru
+- [ ] Düzenle → alanlar dolu geliyor, kaydedince değişiyor; **web'den yüklenen kapak silinmiyor**
+- [ ] Sil → onay çıkıyor, listeden düşüyor
+- [ ] Geçmiş tarih / boş ad → Türkçe hata; sunucunun 403'ü Türkçe görünüyor

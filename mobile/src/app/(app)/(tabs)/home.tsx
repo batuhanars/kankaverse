@@ -212,6 +212,10 @@ export default function HomeScreen() {
               params: { id: selection.id, name: selectedGuildName },
             })
           }
+          // Sprint M1j — şeridin üçüncü aksiyonu: ortam etkinlikleri.
+          onOpenEvents={() =>
+            router.push({ pathname: '/guild-events', params: { guildId: selection.id } })
+          }
         />
       )}
 

@@ -795,7 +795,8 @@
     "date": {
       "today": "bugün saat {time}",
       "tomorrow": "yarın saat {time}",
-      "full": "{day} {month} {time}"
+      "full": "{day} {month} {time}",
+      "range": "{start} - {end}"
     },
     "wizard": {
       "createTitle": "Etkinlik Oluştur",
@@ -817,6 +818,10 @@
       "namePlaceholder": "Etkinliğin adı",
       "startDateLabel": "BAŞLANGIÇ TARİHİ",
       "startTimeLabel": "BAŞLANGIÇ SAATİ",
+      "endDateLabel": "BİTİŞ TARİHİ",
+      "endTimeLabel": "BİTİŞ SAATİ",
+      "errEndIncomplete": "Bitiş için hem tarih hem saat gerekli.",
+      "errEndBeforeStart": "Bitiş zamanı başlangıçtan sonra olmalı.",
       "recurrenceLabel": "ETKİNLİK SIKLIĞI",
       "recurrenceNone": "Tekrarlanmaz",
       "recurrenceDaily": "Her gün",
@@ -1599,6 +1604,12 @@
       "action": "Sırala",
       "rolesHint": "Üstteki rol daha yetkilidir. Basılı tut ve sürükle; değişiklik bırakınca kaydedilir.",
       "empty": "Sıralanacak bir şey yok."
+    },
+    "events": {
+      "stepOf": "ADIM {current} / {total}",
+      "locationHint": "İnsanlar nereye geleceğini bilsin.",
+      "infoQuestion": "Etkinliğin neyle ilgili?",
+      "infoHint": "Etkinliğin ayrıntılarını doldur."
     },
     "guildSearch": {
       "tabMessages": "Mesajlar",
