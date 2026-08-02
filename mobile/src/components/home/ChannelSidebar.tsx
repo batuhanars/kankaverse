@@ -32,6 +32,7 @@ interface Props {
   /** Sprint M1g §2.1 — aksiyon şeridi: ortam içi arama (tam ekran) + davet. */
   onOpenSearch: () => void;
   onInvite: () => void;
+  onOpenEvents: () => void;
 }
 
 /** Kategorisiz kanallar için sentetik başlıksız bölüm anahtarı. */
@@ -61,6 +62,7 @@ export function ChannelSidebar({
   onEditCategory,
   onOpenSearch,
   onInvite,
+  onOpenEvents,
 }: Props) {
   const [state, setState] = useState<LoadState>('loading');
   const [channels, setChannels] = useState<ChannelSummaryDto[]>([]);
@@ -170,10 +172,11 @@ export function ChannelSidebar({
         <Ionicons name="chevron-down" size={18} color={theme.colors.textSecondary} />
       </Pressable>
 
-      {/* Sprint M1g §2.1 — ortam adının ALTINDA aksiyon şeridi: geniş arama alanı + davet.
+      {/* Sprint M1g §2.1 — ortam adının ALTINDA aksiyon şeridi: geniş arama alanı + davet + takvim.
           Discord'un yerleşimi (sahip ekran görüntüsü), içerik bizim sahip olduklarımız kadar.
-          🔴 **Takvim (etkinlik) düğmesi YOK** — etkinlik henüz gelmedi, dokununca hiçbir şey
-          yapmayan düğme konmaz (mobile/CLAUDE.md "boş yüzey açma"). Etkinlik gelince buraya girer.
+          Takvim düğmesi M1j'de eklendi (M1g'de yeri ayrılmıştı, düğmesi bilinçli konmamıştı —
+          arkasında özellik yokken dokununca hiçbir şey yapmayacaktı). Etkinlik listesi izne bağlı
+          değil: herkes görür, yalnız oluşturma `MANAGE_EVENTS` ister.
           Arama gerçek bir alan değil, düğme: dokununca tam ekran arama açılır (mobilde dar şeritte
           klavye + sonuç listesi sığmaz). */}
       <View style={styles.actionStrip}>
@@ -193,6 +196,14 @@ export function ChannelSidebar({
           accessibilityLabel={t('channel.invite')}
         >
           <Ionicons name="person-add-outline" size={20} color={theme.colors.textSecondary} />
+        </Pressable>
+        <Pressable
+          onPress={onOpenEvents}
+          style={styles.stripIcon}
+          accessibilityRole="button"
+          accessibilityLabel={t('event.sidebarLabel')}
+        >
+          <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
         </Pressable>
       </View>
 

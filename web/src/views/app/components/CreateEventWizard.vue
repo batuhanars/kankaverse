@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@vueuse/core'
 import { useChannelsStore } from '@/stores/channels'
@@ -21,7 +21,7 @@ const emit = defineEmits<{ close: []; created: [event: EventDto] }>()
 const { t } = useI18n()
 const channelsStore = useChannelsStore()
 const eventsStore = useEventsStore()
-const { formatEventDate } = useEventDateFormat()
+const { formatEventRange } = useEventDateFormat()
 
 const isEdit = computed(() => !!props.event)
 
@@ -53,9 +53,34 @@ function nowPlusOneHourIso(): string {
   d.setHours(d.getHours() + 1)
   return d.toISOString()
 }
-const initialStart = splitIso(props.event?.startAt ?? nowPlusOneHourIso())
+const initialStartIso = props.event?.startAt ?? nowPlusOneHourIso()
+const initialStart = splitIso(initialStartIso)
 const startDate = ref<string>(initialStart.date)
 const startTime = ref<string>(initialStart.time)
+/**
+ * Bitiş **zorunlu** (sahip kararı, R1-b). Backend `endAt`'ı opsiyonel kabul ediyor ama bitişsiz
+ * etkinlikte `computeOccurrence` süreyi sıfır sayıyor → "şu an sürüyor" rozeti hiç yanmıyor.
+ * Varsayılan başlangıç + 1 saat; eski (bitişsiz) etkinlik düzenlenirken de aynı kuralla dolar.
+ */
+function plusOneHourIso(iso: string): string {
+  return new Date(new Date(iso).getTime() + 60 * 60 * 1000).toISOString()
+}
+const initialEnd = splitIso(props.event?.endAt ?? plusOneHourIso(initialStartIso))
+const endDate = ref<string>(initialEnd.date)
+const endTime = ref<string>(initialEnd.time)
+
+// Başlangıç kayarsa bitiş de aynı kadar kayar — SÜRE korunur. Aksi hâlde başlangıcı ileri alan
+// kullanıcı her seferinde "bitiş başlangıçtan sonra olmalı" hatasına çarpardı.
+watch([startDate, startTime], ([nd, nt], [od, ot]) => {
+  if (!nd || !nt || !od || !ot) return
+  const prev = new Date(`${od}T${ot}`).getTime()
+  const next = new Date(`${nd}T${nt}`).getTime()
+  const end = endAtIso()
+  if (Number.isNaN(prev) || Number.isNaN(next) || !end || prev === next) return
+  const shifted = splitIso(new Date(new Date(end).getTime() + (next - prev)).toISOString())
+  endDate.value = shifted.date
+  endTime.value = shifted.time
+})
 // Motor fazı: 4 sıklık etkin (backend computed occurrence ile çözer).
 const recurrence = ref<EventRecurrence>(props.event?.recurrence ?? 'NONE')
 
@@ -186,6 +211,14 @@ function startAtIso(): string | null {
   return composed.toISOString()
 }
 
+function endAtIso(): string | null {
+  if (!endDate.value || !endTime.value) return null
+  const composed = new Date(`${endDate.value}T${endTime.value}`)
+  if (Number.isNaN(composed.getTime())) return null
+  return composed.toISOString()
+}
+
+
 function validateStep1(): boolean {
   errorMsg.value = ''
   if (!locationType.value) {
@@ -218,6 +251,17 @@ function validateStep2(): boolean {
     errorMsg.value = t('event.wizard.errStartPast')
     return false
   }
+  // Bitiş zorunlu (R1-b) ve başlangıçtan sonra olmalı — backend de reddediyor, istemci aynı
+  // kuralı önden uygular. Kullanıcı alanı elle temizlerse "hem tarih hem saat gerekli" der.
+  const end = endAtIso()
+  if (!end) {
+    errorMsg.value = t('event.wizard.errEndIncomplete')
+    return false
+  }
+  if (new Date(end).getTime() <= new Date(iso).getTime()) {
+    errorMsg.value = t('event.wizard.errEndBeforeStart')
+    return false
+  }
   return true
 }
 
@@ -241,7 +285,7 @@ const previewLocation = computed(() => {
 })
 const previewDate = computed(() => {
   const iso = startAtIso()
-  return iso ? formatEventDate(iso) : ''
+  return iso ? formatEventRange(iso, endAtIso()) : ''
 })
 // Tekrar etiketi anahtarı (event.recurrence.daily/weekly/monthly).
 const recurrenceKey = computed(() => recurrence.value.toLowerCase())
@@ -271,6 +315,9 @@ async function submit() {
         channelId: locType === 'VOICE_CHANNEL' ? channelId.value : undefined,
         externalLocation: locType === 'EXTERNAL' ? externalLocation.value.trim() : undefined,
         startAt: iso,
+        // Düzenlemede boş bırakılan bitiş = kaldır (null); backend `endAt: null`'ı temizleme
+        // olarak okur (kapakla aynı semantik).
+        endAt: endAtIso(),
         recurrence: recurrence.value,
       }
       // undefined → kapağa dokunma; null → kaldır; string → yeni kapak.
@@ -289,6 +336,9 @@ async function submit() {
       startAt: iso,
       recurrence: recurrence.value,
     }
+    // Oluşturmada boş bitiş alanı hiç gönderilmez (null göndermeye gerek yok).
+    const endIso = endAtIso()
+    if (endIso) payload.endAt = endIso
     // Create: yalnız yeni kapak yüklendiyse gönder (string). undefined/null → alan yok.
     if (cover) payload.coverImageId = cover
     const created = await eventsStore.createEvent(props.guildId, payload)
@@ -468,6 +518,31 @@ const stepperLabels = computed(() => [
               </div>
             </div>
 
+            <!-- Bitiş (opsiyonel) — ikisi birlikte doldurulur, ikisi birlikte boş bırakılır -->
+            <div class="flex gap-3">
+              <div class="flex-1 flex flex-col gap-1.5">
+                <label class="text-[11px] font-semibold uppercase tracking-wide" style="color: var(--kv-text-secondary);">
+                  {{ t('event.wizard.endDateLabel') }}<span class="ml-0.5" style="color: var(--kv-danger);">*</span>
+                </label>
+                <input
+                  v-model="endDate"
+                  type="date"
+                  class="px-3 py-2 text-[14px] rounded-[var(--kv-radius-md)] border outline-none"
+                  style="background-color: var(--kv-bg-input, var(--kv-bg-elevated)); border-color: var(--kv-border-subtle); color: var(--kv-text-primary);"
+                />
+              </div>
+              <div class="flex-1 flex flex-col gap-1.5">
+                <label class="text-[11px] font-semibold uppercase tracking-wide" style="color: var(--kv-text-secondary);">
+                  {{ t('event.wizard.endTimeLabel') }}<span class="ml-0.5" style="color: var(--kv-danger);">*</span>
+                </label>
+                <input
+                  v-model="endTime"
+                  type="time"
+                  class="px-3 py-2 text-[14px] rounded-[var(--kv-radius-md)] border outline-none"
+                  style="background-color: var(--kv-bg-input, var(--kv-bg-elevated)); border-color: var(--kv-border-subtle); color: var(--kv-text-primary);"
+                />
+              </div>
+            </div>
             <!-- Etkinlik Sıklığı (MVP: yalnız Tekrarlanmaz etkin) -->
             <div class="flex flex-col gap-1.5">
               <label class="text-[11px] font-semibold uppercase tracking-wide" style="color: var(--kv-text-secondary);">
