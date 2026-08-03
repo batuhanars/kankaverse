@@ -7,6 +7,7 @@ import { useDmStore } from '@/stores/dm';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ProfileCardModal } from '@/components/ProfileCardModal';
 import { ChatBackButton } from '@/components/ChatBackButton';
+import { channelTitle } from '@/utils/channelTitle';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -34,7 +35,6 @@ export default function DmScreen() {
   }>();
   const [showProfile, setShowProfile] = useState(false);
   const channelId = params.id;
-  const isDm = params.kind !== 'group';
 
   // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-07-30, M1d-0 turu): bayraklar ROUTE PARAMETRESİNDEN
   // okunuyordu — yani listeden açıldığı ANDAKİ değerden. Engeli başka bir ekrandan (yeni
@@ -45,6 +45,15 @@ export default function DmScreen() {
   // `fetchAll` ile tazeleniyor. Route parametresi yalnız store'da kanal yokken (derin link) yedek.
   const storeChannel = useDmStore((s) => s.channels.find((c) => c.id === params.id));
   const myUserId = useAuthStore((s) => s.user?.id);
+
+  // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-08-03, cihaz turu — push'tan açılan DM): `kind` route
+  // param'ı yalnız listeden gelişte var; push yolu yalnız `{ id }` taşıyor (bkz. `pushNavigation.ts`
+  // `dmTarget` — store'da kanal henüz yoksa minimal id ile açılır). `params.kind !== 'group'` o
+  // durumda HER ZAMAN true'ya düşüyordu (grup DM'i bile 1-1 sanıyordu). Store dolduğunda (`useDmStore`
+  // hook'u zaten reaktif — soğuk açılışta liste sonradan gelince ekran kendiliğinden güncellenir)
+  // gerçek tipi buradan oku; store'da yoksa (soğuk açılış anı / derin link) route param'ına düş —
+  // listeden gelişte ikisi zaten aynı.
+  const isDm = storeChannel ? storeChannel.type === 'DM' : params.kind !== 'group';
 
   /**
    * Sprint M2d §3.2 — bahsetme öneri kaynağı. Grup DM'de üyeler store'daki kanal kaydından gelir;
@@ -94,7 +103,16 @@ export default function DmScreen() {
 
   if (!channelId) return null;
 
-  const title = params.title ?? '';
+  // 🔴 KUSUR 1 düzeltmesi (sahip bulgusu 2026-08-03, cihaz turu) — push'tan açılan DM'de başlıkta
+  // ad yok, avatar boş daire: ekran bu üçünü YALNIZ route param'ından okuyordu, push yolu
+  // `{ id: channelId }` dışında bir şey taşımıyor (`pushNavigation.ts` `dmTarget`). Artık önce
+  // `storeChannel`'dan türetiliyor (1-1'de karşı taraf, grupta `channelTitle` — listedeki satırla
+  // AYNI kaynak); store soğuk açılışta sonradan dolduğu için `useDmStore` hook'u zaten reaktif,
+  // tek seferlik okuma değil. Store'da kayıt yoksa (derin link / soğuk açılış anı) route
+  // param'ına düşülür — listeden gelişte ikisi zaten aynı değeri taşıyor.
+  const title = storeChannel ? channelTitle(storeChannel) : (params.title ?? '');
+  const avatarUrl = storeChannel?.type === 'DM' ? storeChannel.otherUser.avatarUrl : (params.avatarUrl ?? null);
+  const otherUserId = storeChannel?.type === 'DM' ? storeChannel.otherUser.id : (params.otherUserId ?? null);
 
   /** Engelle/engel-kaldır sonrası gerçek durumu sunucudan tazele. Artık yerel override YOK —
    *  store tazelenince ekran kendiliğinden yeni bayrakları okur (T&S disiplini: `canMessage`
@@ -129,8 +147,8 @@ export default function DmScreen() {
           headerLeft: () => <ChatBackButton />,
           headerTitle: () => (
             <Pressable onPress={onTitlePress} style={styles.headerTitle}>
-              {params.avatarUrl ? (
-                <Image source={{ uri: params.avatarUrl }} style={styles.headerAvatar} />
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={styles.headerAvatar} />
               ) : (
                 <View style={[styles.headerAvatar, styles.headerAvatarFallback]}>
                   <Text style={styles.headerAvatarText}>{title.charAt(0).toUpperCase()}</Text>
@@ -167,11 +185,11 @@ export default function DmScreen() {
           })
         }
       />
-      {showProfile && isDm && params.otherUserId && (
+      {showProfile && isDm && otherUserId && (
         <ProfileCardModal
-          userId={params.otherUserId}
+          userId={otherUserId}
           username={title}
-          avatarUrl={params.avatarUrl ?? null}
+          avatarUrl={avatarUrl}
           onClose={() => setShowProfile(false)}
           onChanged={refreshDmStatus}
         />

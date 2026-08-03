@@ -2375,9 +2375,28 @@ sorunsuz · DM ve bahsetme bildirimleri geliyor.
       `unauthenticated`'a düşerse bekleyen hedef **düşürülüyor** — kullanıcı beş dakika sonra elle
       giriş yapınca beklenmedik biçimde eski bir sohbete atlamasın
 
+### R4 — push'tan açılan ekran bağlamsız geliyordu — 2026-08-03
+Sahip turu: bildirime dokununca doğru ekrana gidiliyor ve mesajlar yükleniyor, **ama** DM başlığı ve
+avatarı boş, kanal başlığı boş, kanal mesajlarında rol etiketleri `@rol` diye çiziliyor (kişi
+bahsetmeleri düzgün). Üçünün kökü aynı: bu ekranlara normalde **listeden** giriliyor ve başlık,
+avatar, `guildId` yol parametresi olarak taşınıyor; bildirimden gelince o bağlam yok.
+- [x] DM ekranı başlık/avatar/`otherUserId`'yi **store'dan** türetiyor, parametre yalnız yedek.
+      Reaktif: soğuk açılışta DM listesi dolunca başlık kendiliğinden yerine geliyor
+- [x] Kanal adı `channelsApi.listByGuild(guildId)` ile çözülüyor — **yeni uç yok**, `channel-details`
+      ekranı aynı sorunu zaten böyle çözüyordu
+- [x] `pushNavigation` kanal hedefine `guildId` taşıyor (sunucu zaten gönderiyordu, istemci
+      taşımıyordu) → `rolesApi.listByGuild` çalışıyor → rol adları ve `@everyone` düzgün çiziliyor
+- [x] **Aynı kusur `notifications.tsx`'te de vardı** (bildirimler sekmesinden kanala giderken
+      `guildId` geçilmiyordu) → orada da düzeltildi, kusur iki yerde durmasın
+- [x] 🔴 **Dev'in fazladan yakaladığı:** `isDm` `params.kind !== 'group'` ile hesaplanıyordu; `kind`
+      gelmeyince (push yolu) **her zaman 1-1'e** düşüyordu → push'tan açılan **grup DM'i 1-1 sanılıyordu**
+      (profil kartı davranışı, yanlış yer tutucu metin, arama görünürlüğü). Artık store'daki tip önce
+- [x] `typecheck` + `lint` temiz; `api/` ve `web/` diffi yok
+
 ### Turda HENÜZ yapılmayanlar (sahipte)
-- [ ] Soğuk açılışta bildirime dokununca **doğru DM'e** gidiyor mu (R3 düzeltmesi)
-- [ ] Dev build devri: açılış beyaz gezinme şeridi · arka planda uzun kalıp dönünce reconnect
+- [ ] R4 sonrası: push'tan açılan DM'de ad+avatar, kanalda başlık, rol etiketleri adlarıyla geliyor mu
+- [ ] Push'tan açılan **grup DM** 1-1 sanılmıyor mu (dev'in yakaladığı kusur)
+- [ ] Arka planda uzun kalıp dönünce reconnect (dev build devri; beyaz gezinme şeridi ✅ kalkmış)
 
 ### DoD (cihazda — sahipte)
 - [ ] Uygulama kapalıyken bahsedilince bildirim geliyor, dokununca doğru kanala gidiyor

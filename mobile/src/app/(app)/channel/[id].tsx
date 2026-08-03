@@ -46,6 +46,12 @@ export default function ChannelScreen() {
   const [members, setMembers] = useState<GuildMemberDto[]>([]);
   const [roles, setRoles] = useState<RoleDto[]>([]);
   const [everyoneRoleId, setEveryoneRoleId] = useState<string | null>(null);
+  // 🔴 KUSUR 2 düzeltmesi (sahip bulgusu 2026-08-03, cihaz turu — push'tan açılan kanal): `name`
+  // route param'ı sidebar'dan gelişte var (mevcut GET'i tekrar etmemek için taşınıyor), push yolu
+  // yalnız `{ id, guildId }` taşıyor → başlık boş kalıyordu. Yeni uç YOK: `channel-details.tsx`
+  // AYNI durumda zaten `channelsApi.listByGuild(guildId)` + id'ye göre bulma yolunu kullanıyor
+  // (bkz. o dosyanın `loadChannel`'ı) — burada da o mevcut yol tekrar edildi, kopya değil aynı çağrı.
+  const [resolvedName, setResolvedName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!guildId) return;
@@ -63,6 +69,20 @@ export default function ChannelScreen() {
       })
       .catch(() => {});
   }, [guildId]);
+
+  useEffect(() => {
+    // `name` boş dize olarak da gelebilir (bildirimler/push yolu `name: ''` geçiyor) — `!name` ikisini
+    // de yakalar. `name` doluysa (sidebar'dan gelişte) tekrar çekilmez, sözleşme "ekstra istek yok"
+    // ilkesi burada da geçerli.
+    if (!guildId || name) return;
+    channelsApi
+      .listByGuild(guildId)
+      .then((list) => {
+        const found = list.find((c) => c.id === id);
+        if (found?.name) setResolvedName(found.name);
+      })
+      .catch(() => {});
+  }, [guildId, name, id]);
 
   // 🔴 Kendin listede YOK (sahip sorusu 2026-08-03): sunucu kendi bahsetmeni zaten yok sayıyor
   // (`messages.gateway.ts` alıcı döngüsü yazarı atlıyor), yani o satır seçilse bile hiçbir bildirim
@@ -107,7 +127,9 @@ export default function ChannelScreen() {
   }, [id, guildId]);
 
   if (!id) return null;
-  const channelName = name ?? '';
+  // KUSUR 2 — `name` yoksa (push/bildirim yolu) yukarıdaki `resolvedName`'e düş; o da yoksa (henüz
+  // çekilmedi ya da `guildId` hiç yok) boş kalır — mevcut "yanlış göstermektense göstermeme" kuralı.
+  const channelName = name || resolvedName || '';
 
   // Sprint M2c contract §3 — başlık dokunulabilir + chevron, `channel-details` rotasına gider.
   // 🔴 Yalnız `guildId` param'ı DOLUYSA: bu ekran bazı girişlerden (bildirimler/arama/sabitlemeler)
