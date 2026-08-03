@@ -2398,12 +2398,19 @@ avatar, `guildId` yol parametresi olarak taşınıyor; bildirimden gelince o ba�
 - [ ] Push'tan açılan **grup DM** 1-1 sanılmıyor mu (dev'in yakaladığı kusur)
 - [ ] Arka planda uzun kalıp dönünce reconnect (dev build devri; beyaz gezinme şeridi ✅ kalkmış)
 
-### DoD (cihazda — sahipte)
-- [ ] Uygulama kapalıyken bahsedilince bildirim geliyor, dokununca doğru kanala gidiyor
-- [ ] Susturulmuş ortam/kanaldan bildirim gelmiyor
-- [ ] Etkinlik bildirimi geliyor ve etkinlikler ekranına götürüyor
-- [ ] Çıkışta bildirim kesiliyor; aynı cihazda başka hesap açınca öncekinin bildirimi gelmiyor
-- [ ] Dev build'de gezinme çubuğu beyaz şeridi + reconnect davranışı gözden geçirildi (PLAN devri)
+### DoD (cihazda — sahipte) ✅ KAPANDI 2026-08-03
+- [x] Uygulama kapalıyken bahsedilince bildirim geliyor, dokununca doğru kanala gidiyor
+- [x] **DM mesajı gelince bildirim geliyor**, dokununca o sohbete gidiyor
+- [x] Susturulmuş ortam/kanaldan bildirim gelmiyor (DM, ortam, kanal üçünde de doğrulandı)
+- [x] Etkinlik bildirimi geliyor ve etkinlikler ekranına götürüyor
+- [x] Çıkışta bildirim kesiliyor; **aynı cihazda başka hesap açınca öncekinin bildirimi gelmiyor**
+      (T&S'de en kritik madde — token devri çalışıyor)
+- [x] Dev build: gezinme çubuğu beyaz şeridi **kalkmış**; push'tan açılan ekranlar bağlamıyla geliyor
+
+> **M3 KAPANDI.** Dört revizyon turu sürdü (R1 DM kapsamı · R2 navigasyon + çift bildirim + ham
+> token · R3 oturum beklemesi · R4 ekran bağlamı). Hepsi sahibin **fiziksel cihaz** turlarından
+> çıktı; hiçbiri birim testiyle yakalanabilecek türden değildi. **Ders:** push gibi süreç-dışı
+> yüzeylerde emülatör ve yeşil test yetmiyor, gerçek derleme + gerçek telefon şart.
 
 
 ---
