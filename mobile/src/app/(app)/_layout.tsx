@@ -7,6 +7,7 @@ import { useFriendsStore } from '@/stores/friends';
 import { useUnreadStore } from '@/stores/unread';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { useBackgroundSocket } from '@/realtime/useBackgroundSocket';
+import { syncPushToken } from '@/notifications/push';
 
 // Auth guard — oturum sunucu tarafında düşerse (401 → refresh de başarısız, bkz. stores/auth.ts
 // setSessionExpiredHandler) status 'unauthenticated'a döner; bu grup bunu görüp girişe gönderir.
@@ -38,6 +39,10 @@ export default function AppLayout() {
     // rozet süzgeci bunu bekliyor). Hata sessiz: yüklenemezse varsayılan (susturulmamış/Tümü) kalır,
     // rozetler süzülmeden gösterilir — yanlış değil, yalnız güncel değil.
     void useNotificationPrefsStore.getState().load().catch(() => {});
+    // Sprint M3 §3 — izin akışı oturum açıldıktan SONRA (açılışta değil). Token + kayıt tek
+    // seferlik girişim; hata/izin reddi sessiz (syncPushToken içinde yutuluyor), uygulama akışını
+    // bloke etmez. Çıkışta silme `stores/auth.ts` `logout()`'ta (tek çıkış noktası).
+    void syncPushToken();
     return () => {
       useDmStore.getState().setSessionUser(null);
       useFriendsStore.getState().reset();

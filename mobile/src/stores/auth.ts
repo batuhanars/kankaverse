@@ -11,6 +11,7 @@ import {
   setSessionExpiredHandler,
 } from '@/api/http';
 import { resetSocket } from '@/realtime/socket';
+import { clearPushToken } from '@/notifications/push';
 
 export type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated';
 export type LoginResult = 'ok' | 'challenge' | 'error';
@@ -138,6 +139,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // yerel temizlik yine de yapılır
     } finally {
+      // Sprint M3 §3 — T&S: cihazı bırakan kullanıcının push'u bir sonrakine düşmesin. Access
+      // token TEMİZLENMEDEN önce çağrılır — uç `Authorization` ister (kendi token'ını sil), sıra
+      // değişirse 401 alır ve token sunucuda asılı kalır.
+      await clearPushToken();
       clearAccessToken();
       await clearRefreshToken();
       resetSocket();

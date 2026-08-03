@@ -4,10 +4,14 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useAuthStore } from '@/stores/auth';
+import { usePushNotificationResponder } from '@/notifications/push';
 import { theme } from '@/theme';
 
 export default function RootLayout() {
   const bootstrap = useAuthStore((s) => s.bootstrap);
+  // Sprint M3 §3 — push bildirimine dokununca yönlendirme. Oturumdan bağımsız: dokunuş uygulama
+  // kapalı/arka plandayken de gelebilir, tek mount noktası kök layout (bkz. notifications/push.ts).
+  usePushNotificationResponder();
 
   // 🔴 Sistem gezinme çubuğu ilk açılışta BEYAZ görünüyordu (sahip bulgusu 2026-08-01); login
   // ekranına çıkıp dönünce düzeliyordu. Sebep: SDK 54'te edge-to-edge açık olduğu için gezinme

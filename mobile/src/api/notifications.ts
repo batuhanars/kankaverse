@@ -87,6 +87,16 @@ export interface SetNotificationPrefBody {
   suppressRoleMentions?: boolean;
 }
 
+// Sprint M3 §2.2 — push token uçları. Gövde/imza sözleşmeden birebir (`CreatePushTokenDto`,
+// `api/src/modules/notifications/dto/push-token.dto.ts`): `token` Expo biçimi
+// (`ExponentPushToken[...]`), `platform` yalnız 'android'|'ios' (bugün yalnız android yazılır),
+// `deviceName` teşhis amaçlı ve kullanıcıya gösterilmez.
+export interface RegisterPushTokenBody {
+  token: string;
+  platform: 'android' | 'ios';
+  deviceName?: string;
+}
+
 export const notificationsApi = {
   async list(cursor?: string): Promise<NotificationListResult> {
     const res = await http.get<NotificationListResult>('/notifications', {
@@ -113,6 +123,16 @@ export const notificationsApi = {
   /** Upsert; kısmi update — yalnız gönderilen alanlar değişir. */
   async setPref(body: SetNotificationPrefBody): Promise<NotificationPrefDto> {
     const res = await http.put<NotificationPrefDto>('/notifications/prefs', body);
+    return res.data;
+  },
+  /** Upsert (token unique; userId çağırandan taşınır — bkz. contract §2.1 T&S notu). */
+  async registerPushToken(body: RegisterPushTokenBody): Promise<null> {
+    const res = await http.post<null>('/notifications/push-tokens', body);
+    return res.data;
+  },
+  /** Yalnız kendi token'ını siler; başkasınınki/yok → 404 (sessizce yutulur, bkz. notifications/push.ts). */
+  async deletePushToken(token: string): Promise<null> {
+    const res = await http.delete<null>(`/notifications/push-tokens/${encodeURIComponent(token)}`);
     return res.data;
   },
 };
