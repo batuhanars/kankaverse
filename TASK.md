@@ -1995,6 +1995,31 @@ Sözleşme: `contracts/SPRINT_DM_MENU_CONTRACT.md` (tek doğruluk kaynağı). Ku
 - [x] Testler §2.5 (özellikle: bastırma açıkken doğrudan bahsedilen bildirim ALIR)
 - [x] `nest build` + tüm testler yeşil + `prisma migrate status` temiz
 
+### R1 — DM push kapsama alındı (sahip kararı 2026-08-03) ✅
+- [x] Sahip: *"push bildirim DM'i kapsamalı, tartışmasız bir eksik"* → sözleşmeye §2.6 eklendi
+- [x] **Karar: DM push gider, kalıcı bildirim kaydı AÇILMAZ.** DM'in kendi okunmamış yüzeyi var
+      (liste + rozetler); çana da düşerse aynı olay iki yerde birikir ve iki kez temizlenir.
+      Çan bugünkü anlamını koruyor: bahsetme · kanka · davet · etkinlik
+- [x] `notifyDmActivity` yolunda; alıcı kümesi o yolun zaten hesapladığı yerden alınıyor,
+      yazar filtreleniyor, tercih kapısı **mevcut** `shouldNotifyChannel(userId, null, channelId)`
+- [x] **Dev doğrulaması (koddan):** `shouldNotifyChannel` `guildId=null` verilince yalnız `CHANNEL`
+      tercihini sorguluyor, ortam fallback'i devreye girmiyor → DM'e birebir uygun. Web'in
+      `useDmMenuActions` da susturmayı her zaman `CHANNEL + dmChannelId` ile yazıyor. **İkinci
+      süzgeç kopyası yazılmadı** (R14/R15'te bedeli görülmüştü)
+- [x] 7 yeni test (susturulmuşa gitmez · yazara gitmez · grupta diğer herkese gider · kalıcı kayıt
+      oluşmaz · gövde 100 karaktere kırpılır · PENDING istekte ve guild kanalında gönderilmez);
+      **975 test yeşil**
+
+### Dev build ön yapılandırması (§5 hazırlığı) ✅
+- [x] `app.json`: `android.package = com.kankaverse.app` (**kalıcı kimlik**, Play'e çıkınca
+      değişmez) + `googleServicesFile` + `expo-notifications` plugin kaydı
+- [x] `eas.json`: `development` (dev client, internal, apk) · `preview` (internal, apk) ·
+      `production` (app-bundle). `cli.version` bilinçli boş — sahibin kurulu sürümüne göre
+- [x] `.gitignore`: Firebase **servis hesabı** anahtarı desenleri (gizli); `google-services.json`
+      bilinçle ignore EDİLMEDİ (herkese açık tanımlayıcılar, commit'lenir)
+- [x] `expo-notifications@~0.32.17` + `expo-device@~8.0.10` kuruldu (SDK 54 uyumlu, `expo install`
+      seçti). Ekran/izin kodu bu işte YOK — build hazır olunca §3 ayağı
+
 ### Mobil (`mobile/`) — sözleşme §3
 - [x] `guild-notifications.tsx`: iki anahtar (@everyone Bastır · Yeni Etkinlikleri Sustur), anında kaydet,
       iyimser yaz + hata geri al; yeni bileşen yok (RN `Switch`)

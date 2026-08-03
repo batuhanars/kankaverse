@@ -107,6 +107,40 @@ zaten o noktaya kadar uygulanmış oluyor. Push'a ayrı bir "kime gitsin" mantı
 - Bildirim üretilmeyen alıcıya (susturulmuş) push **gitmez** (R14/R15 süzgeçleri regresyon kilidi)
 - Gönderim hatası ana akışı bozmaz (bildirim yine kaydedilir)
 
+### 2.6 🔴 DM push — R1 kapsam eklemesi (sahip kararı 2026-08-03)
+
+İlk hâlde §2.4 "kalıcı bildirim üretilen yere takıl" diyordu; dev bunu uygularken **DM için kalıcı
+bildirim hiç üretilmediğini** koddan gösterdi (`notifyDmActivity` yalnız WS eventi yayıyor). Sonuç:
+push'un **en çok beklendiği yüzey** kapsam dışı kaldı. Sahip: *"push bildirim DM'i kapsamalı,
+tartışmasız bir eksik."*
+
+**Karar: DM push GÖNDERİLİR, ama kalıcı bildirim kaydı AÇILMAZ.**
+
+Gerekçe: DM'in kendi okunmamış yüzeyi var (DM listesi + rozetler). Çana da düşerse aynı olay iki
+yerde birikir ve kullanıcı ikisini ayrı ayrı temizlemek zorunda kalır. Çan bugünkü anlamını korur:
+bahsetme, kanka, davet, etkinlik.
+
+Uygulama kuralları (bağlayıcı):
+- Tetik noktası DM mesajı gönderimi (`notifyDmActivity` yolu) — yeni uç yok
+- Alıcılar: o DM/grup kanalının **diğer üyeleri** (yazar hariç). Kümeyi o yolun zaten hesapladığı
+  yerden al, yeniden üretme
+- Tercih süzgeci: **mevcut yardımcı** kullanılır (`shouldNotifyChannel` DM kanalında `guildId=null`
+  ile doğru çalışıyor mu → **koddan doğrula**, çalışmıyorsa DUR ve bildir). İkinci bir süzgeç
+  kopyası YAZILMAZ — R14/R15'te bunun bedeli görüldü
+- Susturulmuş DM'e push **gitmez**; "Sohbeti temizle" yapmış kullanıcıya yeni mesajda gider
+  (bugünkü liste davranışıyla tutarlı)
+- Gövde: gönderenin adı + mesaj önizlemesi (≤100 karakter, mevcut `preview` kırpma kuralı).
+  🔴 Ek yok/görsel yok: içerik önizlemesi **kilit ekranında** görünür, fazlasını taşıma
+- `data: { type: 'DM_MESSAGE', channelId }` → istemci o sohbete gider
+
+### 2.7 Borç kaydı — push metni iki yerde
+
+Dev'in bulgusu: sözleşmenin "gövde = `preview`" kuralı beş bildirim tipinin üçünde çalışmıyor
+(`FRIEND_*`'ta `preview` null, `GUILD_INVITE`'ta ham davet kodu). Geçici çözüm: web `tr.json`'daki
+`notification.*` ifadeleri sunucuya düz metin olarak kopyalandı. **Bu bir borçtur:** aynı metin iki
+yerde, ilk değişiklikte ayrışır. PLAN teknik borç tablosuna işlenir; kalıcı çözüm push metinlerini
+tek kaynağa taşımak (sunucu i18n'i ya da istemcide gövde üretimi).
+
 ---
 
 ## §3 `mobile/`
@@ -159,6 +193,7 @@ zaten o noktaya kadar uygulanmış oluyor. Push'a ayrı bir "kime gitsin" mantı
 
 **Cihazda (sahip):**
 - [ ] Uygulama kapalıyken bahsedilince bildirim geliyor, dokununca doğru kanala gidiyor
+- [ ] **DM mesajı gelince bildirim geliyor**, dokununca o sohbete gidiyor; susturulmuş DM'de gelmiyor
 - [ ] Susturulmuş ortam/kanaldan bildirim **gelmiyor**
 - [ ] Etkinlik bildirimi geliyor, dokununca etkinlikler ekranına gidiyor
 - [ ] Çıkış yapınca bildirim **kesiliyor**; aynı cihazda başka hesap açınca öncekinin bildirimi gelmiyor

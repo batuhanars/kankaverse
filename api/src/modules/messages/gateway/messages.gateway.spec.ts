@@ -56,6 +56,10 @@ const notificationsMock = {
   snapshot: jest.fn().mockResolvedValue({ notifications: [], unreadCount: 0 }),
 };
 
+// M3 §2.6 — DM push
+const pushSendToUsersMock = jest.fn();
+const pushMock = { sendToUsers: pushSendToUsersMock };
+
 function makeGateway() {
   return new MessagesGateway(
     jwtMock as any,
@@ -66,6 +70,7 @@ function makeGateway() {
     presenceMock as any,
     dmPermissionMock as any,
     notificationsMock as any,
+    pushMock as any,
   );
 }
 
@@ -81,6 +86,8 @@ function resetMocks() {
   // R15 — varsayılan: içerikte rol token'ı yok / rol üyesi yok
   prismaMock.role.findMany.mockResolvedValue([]);
   prismaMock.guildMemberRole.findMany.mockResolvedValue([]);
+  // M3 §2.6 — varsayılan: push başarıyla "gönderildi" (fire-and-forget, hata yutulur)
+  pushSendToUsersMock.mockResolvedValue(undefined);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -202,6 +209,150 @@ describe('MessagesGateway.notifyChannelActivity', () => {
     await gateway.notifyChannelActivity(CHANNEL_ID, makeMessageDto());
 
     expect(emitToUserMock).not.toHaveBeenCalled();
+  });
+});
+
+// ── MessagesGateway.notifyDmActivity — M3 §2.6 DM push ───────────────────────
+
+describe('MessagesGateway.notifyDmActivity — push (M3 §2.6)', () => {
+  let gateway: MessagesGateway;
+
+  const DM_MEMBER_ID = 'user-dm-member';
+  const GROUP_MEMBER_1 = 'user-group-1';
+  const GROUP_MEMBER_2 = 'user-group-2';
+
+  function makeDmMessageDto(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      id: 'msg-dm-1',
+      content: 'selam nasılsın',
+      createdAt: new Date().toISOString(),
+      author: { id: AUTHOR_ID, username: 'yazar' },
+      channelId: DM_CHANNEL_ID,
+      ...overrides,
+    } as Record<string, unknown>;
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    gateway = makeGateway();
+  });
+
+  it('1-1 DM: susturulmuş alıcıya push GİTMEZ (shouldNotifyChannel false)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: null,
+      dmRequestStatus: null,
+      dmRequesterId: null,
+    });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: DM_MEMBER_ID },
+    ]);
+    notificationsShouldNotifyMock.mockResolvedValue(false);
+
+    await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
+
+    expect(notificationsShouldNotifyMock).toHaveBeenCalledWith(DM_MEMBER_ID, null, DM_CHANNEL_ID);
+    expect(pushSendToUsersMock).not.toHaveBeenCalled();
+  });
+
+  it('yazara push gitmez (alıcı kümesinden filtrelenir)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: null,
+      dmRequestStatus: null,
+      dmRequesterId: null,
+    });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: DM_MEMBER_ID },
+    ]);
+
+    await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
+
+    expect(notificationsShouldNotifyMock).not.toHaveBeenCalledWith(AUTHOR_ID, null, DM_CHANNEL_ID);
+    expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
+    const [targets] = pushSendToUsersMock.mock.calls[0];
+    expect(targets).not.toContain(AUTHOR_ID);
+    expect(targets).toEqual([DM_MEMBER_ID]);
+  });
+
+  it('grup DM: yazar hariç diğer TÜM üyelere push gider', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: null,
+      dmRequestStatus: null,
+      dmRequesterId: null,
+    });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: GROUP_MEMBER_1 },
+      { userId: GROUP_MEMBER_2 },
+    ]);
+
+    await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
+
+    expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
+    const [targets, payload] = pushSendToUsersMock.mock.calls[0];
+    expect(targets).toEqual(expect.arrayContaining([GROUP_MEMBER_1, GROUP_MEMBER_2]));
+    expect(targets).toHaveLength(2);
+    expect(payload.title).toBe('yazar');
+    expect(payload.body).toBe('selam nasılsın');
+    expect(payload.data).toEqual({ type: 'DM_MESSAGE', channelId: DM_CHANNEL_ID });
+  });
+
+  it('DM mesajı için kalıcı bildirim kaydı OLUŞMAZ (notifications.create çağrılmaz)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: null,
+      dmRequestStatus: null,
+      dmRequesterId: null,
+    });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: DM_MEMBER_ID },
+    ]);
+
+    await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
+
+    expect(notificationsCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('gövde ≤100 karaktere kırpılır', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: null,
+      dmRequestStatus: null,
+      dmRequesterId: null,
+    });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: DM_MEMBER_ID },
+    ]);
+
+    await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto({ content: 'a'.repeat(200) }));
+
+    const [, payload] = pushSendToUsersMock.mock.calls[0];
+    expect(payload.body.length).toBe(100);
+  });
+
+  it('bekleyen mesaj isteği (PENDING) → push gönderilmez', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: null,
+      dmRequestStatus: 'PENDING',
+      dmRequesterId: AUTHOR_ID,
+    });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: DM_MEMBER_ID },
+    ]);
+
+    await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
+
+    expect(pushSendToUsersMock).not.toHaveBeenCalled();
+  });
+
+  it('guild kanalı (guildId dolu) → push gönderilmez', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID });
+
+    await gateway.notifyDmActivity(CHANNEL_ID, makeDmMessageDto({ channelId: CHANNEL_ID }));
+
+    expect(pushSendToUsersMock).not.toHaveBeenCalled();
   });
 });
 
