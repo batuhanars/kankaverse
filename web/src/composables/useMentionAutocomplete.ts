@@ -55,8 +55,8 @@ export function useMentionAutocomplete(
   everyoneRoleId?: () => string | null,
   /**
    * R15 — önerilebilir ROLLER (everyone HARİÇ). Çağıran kapı kuralını uygulamış olarak verir:
-   * `mentionable` roller herkese, `mentionable` olmayanlar yalnız `MENTION_EVERYONE` izni olana.
-   * İzin kontrolü burada tekrarlanmaz — tek yerde kalsın (çağıran zaten yetki hattına bağlı).
+   * `mentionable` roller herkese, `mentionable` olmayanlar HİÇ KİMSEYE (R2 revizyonu — izin
+   * baypası yok). Kapı kuralı burada tekrarlanmaz — tek yerde kalsın (çağıranda uygulanır).
    */
   roles?: () => Array<{ id: string; name: string; color?: string | null }>,
 ) {

@@ -618,7 +618,7 @@
       "hoistLabel": "Üyeleri ayrı göster",
       "hoistDesc": "Bu role sahip üyeler üye listesinde ayrı bir grupta görünür.",
       "mentionableLabel": "Bahsedilebilir",
-      "mentionableDesc": "Bu rolü {'@'}bahset ile etiketlemek mümkün olsun.",
+      "mentionableDesc": "Bu rolü {'@'}etiketle ile HERKES bahsedebilsin. Kapalıyken yalnız \"Herkesi Bahset\" izni olanlar etiketleyebilir.",
       "defaultLabel": "Varsayılan rol",
       "defaultDesc": "Ortama yeni katılan üyelere bu rol otomatik atanır. Ortam başına yalnız bir rol varsayılan olabilir.",
       "defaultBadge": "Varsayılan",

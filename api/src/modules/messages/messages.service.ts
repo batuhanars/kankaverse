@@ -141,13 +141,18 @@ export class MessagesService {
     senderId: string,
   ): Promise<{ mentions: string[]; mentionsEveryone: boolean; mentionRoles: string[] }> {
     /**
-     * Adım 0 — ROL token'ları (`<@&roleId>`). R15 §2.2 kapı modeli:
+     * Adım 0 — ROL token'ları (`<@&roleId>`). R15 §2.2 kapı modeli (R2 revizyonu, 2026-08-03):
      *
      *   | Token                        | Kapı                                             |
      *   |------------------------------|--------------------------------------------------|
      *   | rol, `mentionable: true`     | kanalda yazabilen herkes                          |
-     *   | rol, `mentionable: false`    | yalnız `MENTION_EVERYONE` izni olan               |
+     *   | rol, `mentionable: false`    | HİÇ KİMSE (izin baypası yok — anahtar mutlak)     |
      *   | everyone rolü                | İKİ KAPI: `mentionable` VE `MENTION_EVERYONE`     |
+     *
+     * R2: `MENTION_EVERYONE` artık yalnız @everyone'ı yönetir. İlk hâlde kısıtlı rolleri de
+     * baypas ediyordu; göç telafisi o izni everyone rolüne eklediği ortamlarda **her üye**
+     * baypası kazandığı için "bahsetme" anahtarını kapatmak hiçbir şey değiştirmiyordu (canlı
+     * kullanım raporu). Kısıtlı rol artık anahtar açılmadan kimseye açılmaz.
      *
      * @everyone'da iki kapının birlikte aranması bilinçli: `mentionable` ortam çapında
      * kill-switch olarak anlamını korur ("burada kimse herkesi etiketleyemez"), izin ise
@@ -176,9 +181,10 @@ export class MessagesService {
         select: { id: true, mentionable: true, isEveryone: true },
       });
 
-      // İzin EN FAZLA BİR KEZ çözülür ve yalnız gerçekten gerekliyse (tembel).
+      // İzin yalnız everyone token'ı varsa çözülür (R2: normal rollerde izin baypası yok,
+      // gereksiz sorgu açılmaz). EN FAZLA BİR KEZ çözülür.
       let permissionCache: boolean | null = null;
-      const canMentionRestricted = async (): Promise<boolean> => {
+      const canMentionEveryone = async (): Promise<boolean> => {
         if (permissionCache === null) {
           permissionCache = await this.permissions.hasGuildPermission(
             senderId,
@@ -191,10 +197,11 @@ export class MessagesService {
 
       for (const role of roles) {
         if (role.isEveryone) {
-          if (role.mentionable && (await canMentionRestricted())) mentionsEveryone = true;
+          if (role.mentionable && (await canMentionEveryone())) mentionsEveryone = true;
           continue;
         }
-        if (role.mentionable || (await canMentionRestricted())) {
+        // R2: yalnız mentionable rol geçer. İzin baypası yok — kapalı anahtar mutlak.
+        if (role.mentionable) {
           // ≤3 farklı rol (kullanıcı bahsetmesindeki ≤10 kuralının kardeşi); fazlası sessizce düşer.
           if (mentionRoles.length < MAX_ROLE_MENTIONS) mentionRoles.push(role.id);
         }

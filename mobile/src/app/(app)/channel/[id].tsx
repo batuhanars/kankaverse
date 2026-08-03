@@ -79,17 +79,16 @@ export default function ChannelScreen() {
 
   /**
    * R15 — öneri listesine girecek roller (everyone HARİÇ; o ayrı öneri olarak zaten var).
-   * Kapı kuralı burada uygulanır, sözleşme §2.2 ile birebir: `mentionable` roller herkese,
-   * `mentionable` olmayanlar yalnız `MENTION_EVERYONE` izni olana. Sunucu aynı kapıyı bağımsız
-   * uyguluyor; buradaki süzgeç yalnız "seçemeyeceğin şeyi önerme" içindir.
+   * Kapı kuralı burada uygulanır, sözleşme §2.2 + R2 revizyonu ile birebir: `mentionable`
+   * roller herkese, `mentionable` olmayanlar HİÇ KİMSEYE önerilmez (izin baypası yok). Sunucu
+   * aynı kapıyı bağımsız uyguluyor; buradaki süzgeç yalnız "seçemeyeceğin şeyi önerme" içindir.
    */
-  const canMentionRestrictedRoles = useGuildPermission(guildId, 'MENTION_EVERYONE');
   const mentionRoles = useMemo(
     () =>
       roles
-        .filter((r) => !r.isEveryone && (r.mentionable || canMentionRestrictedRoles))
+        .filter((r) => !r.isEveryone && r.mentionable)
         .map((r) => ({ id: r.id, username: r.name, isRole: true, color: r.color })),
-    [roles, canMentionRestrictedRoles],
+    [roles],
   );
 
   const mentionCandidates = useMemo(
