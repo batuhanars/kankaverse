@@ -82,11 +82,20 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
     reactions: reactionsAgg,
     mentions: msg.mentions ?? [],
     mentionsEveryone: msg.mentionsEveryone ?? false,
+    // R15 — istemci hem rol çipini çizmek hem "bana rolümden bahsedildi" bandını yakmak için
+    // rol id'lerini görmeli (kendi rollerimle kesişim istemcide hesaplanır).
+    mentionRoles: msg.mentionRoles ?? [],
     createdAt: msg.createdAt.toISOString(),
   };
 }
 
 // replyTo include fragmanı — tüm sorgularda aynı şekil kullanılır
+/**
+ * R15 §2.4 — tek mesajda en fazla 3 farklı rol etiketlenebilir. Kullanıcı bahsetmesindeki ≤10
+ * kuralının kardeşi: rol bahsetmesi kişi başına değil GRUP başına ping ürettiği için sınır daha dar.
+ */
+const MAX_ROLE_MENTIONS = 3;
+
 const REPLY_TO_INCLUDE = {
   select: {
     id: true,
@@ -129,24 +138,66 @@ export class MessagesService {
   private async resolveMentions(
     channel: { id: string; guildId: string | null; ageGated: boolean; guild?: { adultsOnly: boolean } | null },
     content: string,
-  ): Promise<{ mentions: string[]; mentionsEveryone: boolean }> {
-    // Adım 0: @everyone (rol) token'ı — <@&roleId>. Yalnız guild kanalında + everyone
-    // rolü mentionable ise geçerli (anti-spam kapısı = mentionable toggle). Üye id'leri
-    // mentions dizisine YAZILMAZ (şişme yok); notify/unread `mentionsEveryone` bayrağı ile.
+    senderId: string,
+  ): Promise<{ mentions: string[]; mentionsEveryone: boolean; mentionRoles: string[] }> {
+    /**
+     * Adım 0 — ROL token'ları (`<@&roleId>`). R15 §2.2 kapı modeli:
+     *
+     *   | Token                        | Kapı                                             |
+     *   |------------------------------|--------------------------------------------------|
+     *   | rol, `mentionable: true`     | kanalda yazabilen herkes                          |
+     *   | rol, `mentionable: false`    | yalnız `MENTION_EVERYONE` izni olan               |
+     *   | everyone rolü                | İKİ KAPI: `mentionable` VE `MENTION_EVERYONE`     |
+     *
+     * @everyone'da iki kapının birlikte aranması bilinçli: `mentionable` ortam çapında
+     * kill-switch olarak anlamını korur ("burada kimse herkesi etiketleyemez"), izin ise
+     * kimin yapabileceğini belirler. Tek kapıya indirilirse diğeri yeniden ölü bayrak olur.
+     *
+     * Kapıya takılan token **sessizce düşer** (mesaj gider, ping olmaz) — hata döndürmek
+     * rolün varlığını/adını sızdırırdı.
+     *
+     * 🔴 Üye id'leri `mentions` dizisine YAZILMAZ: rol üyeliği sonradan değişir, mesaja gömülü
+     * üye listesi yanlış tarihe donardı. Alıcı kümesi okuma anında çözülür (`notifyMentions`).
+     */
     let mentionsEveryone = false;
+    const mentionRoles: string[] = [];
     const ROLE_MENTION_REGEX = /<@&([a-zA-Z0-9_-]+)>/g;
     const roleTokenIds = new Set<string>();
     let roleMatch: RegExpExecArray | null;
     while ((roleMatch = ROLE_MENTION_REGEX.exec(content)) !== null) {
       roleTokenIds.add(roleMatch[1]);
     }
+    // DM/grup DM'de rol diye bir şey yok → çözüm hiç çalıştırılmaz (bugünkü davranış).
     if (roleTokenIds.size > 0 && channel.guildId !== null) {
-      const everyoneRole = await this.prisma.role.findFirst({
-        where: { guildId: channel.guildId, isEveryone: true },
-        select: { id: true, mentionable: true },
+      const guildId = channel.guildId;
+      // TEK sorgu; `guildId` şartı başka ortamın rol id'sini otomatik eler.
+      const roles = await this.prisma.role.findMany({
+        where: { guildId, id: { in: Array.from(roleTokenIds) } },
+        select: { id: true, mentionable: true, isEveryone: true },
       });
-      if (everyoneRole?.mentionable && roleTokenIds.has(everyoneRole.id)) {
-        mentionsEveryone = true;
+
+      // İzin EN FAZLA BİR KEZ çözülür ve yalnız gerçekten gerekliyse (tembel).
+      let permissionCache: boolean | null = null;
+      const canMentionRestricted = async (): Promise<boolean> => {
+        if (permissionCache === null) {
+          permissionCache = await this.permissions.hasGuildPermission(
+            senderId,
+            guildId,
+            'MENTION_EVERYONE',
+          );
+        }
+        return permissionCache;
+      };
+
+      for (const role of roles) {
+        if (role.isEveryone) {
+          if (role.mentionable && (await canMentionRestricted())) mentionsEveryone = true;
+          continue;
+        }
+        if (role.mentionable || (await canMentionRestricted())) {
+          // ≤3 farklı rol (kullanıcı bahsetmesindeki ≤10 kuralının kardeşi); fazlası sessizce düşer.
+          if (mentionRoles.length < MAX_ROLE_MENTIONS) mentionRoles.push(role.id);
+        }
       }
     }
 
@@ -158,8 +209,8 @@ export class MessagesService {
       tokenIds.add(match[1]);
     }
 
-    // Erken çıkış: kullanıcı token'ı yoksa yalnız everyone sonucu
-    if (tokenIds.size === 0) return { mentions: [], mentionsEveryone };
+    // Erken çıkış: kullanıcı token'ı yoksa yalnız rol sonucu
+    if (tokenIds.size === 0) return { mentions: [], mentionsEveryone, mentionRoles };
 
     const ids = Array.from(tokenIds);
 
@@ -189,7 +240,7 @@ export class MessagesService {
     }
 
     // Adım 3: ≤10 sınırı (fazlası sessizce düşer)
-    return { mentions: validIds.slice(0, 10), mentionsEveryone };
+    return { mentions: validIds.slice(0, 10), mentionsEveryone, mentionRoles };
   }
 
   async findMessages(userId: string, channelId: string, before?: string) {
@@ -376,7 +427,11 @@ export class MessagesService {
     }
 
     // §3: mention token parse + erişim doğrulaması (§4 T&S) — create'ten önce
-    const { mentions, mentionsEveryone } = await this.resolveMentions(channel, dto.content ?? '');
+    const { mentions, mentionsEveryone, mentionRoles } = await this.resolveMentions(
+      channel,
+      dto.content ?? '',
+      userId,
+    );
 
     const message = await this.prisma.message.create({
       data: {
@@ -386,6 +441,7 @@ export class MessagesService {
         replyToId: dto.replyToId ?? null,
         mentions,
         mentionsEveryone,
+        mentionRoles,
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
@@ -456,11 +512,15 @@ export class MessagesService {
     }
 
     // §3: mention token parse + erişim doğrulaması (§4 T&S) — edit'te yeniden hesapla
-    const { mentions, mentionsEveryone } = await this.resolveMentions(channel, dto.content);
+    const { mentions, mentionsEveryone, mentionRoles } = await this.resolveMentions(
+      channel,
+      dto.content,
+      userId,
+    );
 
     const updated = await this.prisma.message.update({
       where: { id: messageId },
-      data: { content: dto.content, editedAt: new Date(), mentions, mentionsEveryone },
+      data: { content: dto.content, editedAt: new Date(), mentions, mentionsEveryone, mentionRoles },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
         attachments: {

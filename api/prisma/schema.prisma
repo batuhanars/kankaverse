@@ -372,6 +372,10 @@ model Message {
   content     String
   mentions    String[]          @default([])   // §2: bahsedilen + doğrulanmış userId listesi (tekilleştirilmiş, ≤10)
   mentionsEveryone Boolean       @default(false) // @everyone toplu bahsetme (everyone rolü mentionable ise tüm üyelere bildirir)
+  // R15 — bahsedilen ROL id'leri (≤3, everyone rolü HARİÇ; o `mentionsEveryone`e yazılır).
+  // 🔴 Üye id'leri AÇILMAZ: rol üyeliği sonradan değişir, mesaja gömülü üye listesi yanlış tarihe
+  // donardı. Alıcı kümesi okuma anında çözülür (@everyone'da da aynı karar verilmişti).
+  mentionRoles String[]          @default([])
   replyToId   String?
   replyTo     Message?          @relation("MessageReply", fields: [replyToId], references: [id])
   replies     Message[]         @relation("MessageReply")
@@ -656,6 +660,8 @@ model NotificationPref {
   // sessizce geri getirirdi (sözleşme R14 §2.2).
   suppressEveryone Boolean      @default(false) // @everyone genişlemesinden gelen bildirim/rozet bastırılır
   suppressEvents   Boolean      @default(false) // EVENT_CREATED bildirimi üretilmez
+  // R15 — rol genişlemesinden gelen bildirim/rozet bastırılır (doğrudan bahsetme her zaman geçer)
+  suppressRoleMentions Boolean  @default(false)
   updatedAt  DateTime          @updatedAt
 
   @@unique([userId, targetType, targetId])

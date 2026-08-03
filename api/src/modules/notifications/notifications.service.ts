@@ -27,6 +27,7 @@ function toPrefDto(pref: NotificationPref): NotificationPrefDto {
     level: pref.level,
     suppressEveryone: pref.suppressEveryone,
     suppressEvents: pref.suppressEvents,
+    suppressRoleMentions: pref.suppressRoleMentions,
   };
 }
 
@@ -212,7 +213,10 @@ export class NotificationsService {
     // R14 §2.2 — iki bastırma bayrağı YALNIZ ortam düzeyinde anlamlı. Kanal düzeyinde kabul
     // etseydik `channelPref ?? guildPref` override zinciri, kanal kaydı oluşur oluşmaz ortam
     // bastırmasını sessizce geri getirirdi. Erişim kontrolünden ÖNCE elenir (ucuz + net).
-    const suppressionTouched = dto.suppressEveryone !== undefined || dto.suppressEvents !== undefined;
+    const suppressionTouched =
+      dto.suppressEveryone !== undefined ||
+      dto.suppressEvents !== undefined ||
+      dto.suppressRoleMentions !== undefined;
     if (suppressionTouched && dto.targetType !== NotifTargetType.GUILD) {
       throw new BadRequestException({
         message: 'Bu ayar yalnız ortam düzeyinde geçerlidir.',
@@ -235,6 +239,9 @@ export class NotificationsService {
       ...(dto.level !== undefined ? { level: dto.level } : {}),
       ...(dto.suppressEveryone !== undefined ? { suppressEveryone: dto.suppressEveryone } : {}),
       ...(dto.suppressEvents !== undefined ? { suppressEvents: dto.suppressEvents } : {}),
+      ...(dto.suppressRoleMentions !== undefined
+        ? { suppressRoleMentions: dto.suppressRoleMentions }
+        : {}),
     };
 
     const pref = await this.prisma.notificationPref.upsert({

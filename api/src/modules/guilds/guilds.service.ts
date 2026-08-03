@@ -243,6 +243,27 @@ export class GuildsService {
         .filter((p) => p.targetType === NotifTargetType.GUILD && p.suppressEveryone)
         .map((p) => p.targetId),
     );
+    // R15 §2.6 — rol bahsetmesi bastırılan ortamlar (aynı desen).
+    const roleSuppressedGuildIds = new Set(
+      prefs
+        .filter((p) => p.targetType === NotifTargetType.GUILD && p.suppressRoleMentions)
+        .map((p) => p.targetId),
+    );
+
+    /**
+     * R15 §2.6 — kullanıcının TÜM ortamlardaki rol bağları TEK sorquda çekilip ortam bazında
+     * gruplanır. Ortam başına sorgu açmak D18 borcunu büyütürdü (rail her açılışta çağrılıyor).
+     */
+    const myRoleLinks = await this.prisma.guildMemberRole.findMany({
+      where: { member: { userId } },
+      select: { roleId: true, member: { select: { guildId: true } } },
+    });
+    const myRoleIdsByGuild = new Map<string, string[]>();
+    for (const link of myRoleLinks) {
+      const list = myRoleIdsByGuild.get(link.member.guildId);
+      if (list) list.push(link.roleId);
+      else myRoleIdsByGuild.set(link.member.guildId, [link.roleId]);
+    }
 
     // Her guild'in kanalları için okunmamış mesaj + okunmamış bahsetme sayılarını paralel hesapla
     const guildCounts = await Promise.all(
@@ -262,6 +283,12 @@ export class GuildsService {
             const mentionOr: object[] = [{ mentions: { has: userId } }];
             if (!ch.isPrivate && !everyoneSuppressedGuildIds.has(m.guildId)) {
               mentionOr.push({ mentionsEveryone: true });
+            }
+            // R15: rol bahsetmesi de rail rozetine sayılır — @everyone ile AYNI sızıntı kuralı
+            // (özel kanalda toplu-bahsetme dalları hiç eklenmez). Rol kümesi boşsa dal yok.
+            if (!ch.isPrivate && !roleSuppressedGuildIds.has(m.guildId)) {
+              const guildRoleIds = myRoleIdsByGuild.get(m.guildId);
+              if (guildRoleIds?.length) mentionOr.push({ mentionRoles: { hasSome: guildRoleIds } });
             }
             const [unread, mentions] = await Promise.all([
               this.prisma.message.count({ where: base }),

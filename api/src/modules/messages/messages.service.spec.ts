@@ -40,6 +40,10 @@ const prismaMock = {
   user: {
     findUnique: jest.fn(),
   },
+  // R15 — rol bahsetmesi kapı çözümü
+  role: {
+    findMany: jest.fn(),
+  },
 };
 
 const membershipMock = {
@@ -2840,5 +2844,165 @@ describe('MessagesService.create — C9 mesaj isteği kapısı', () => {
       expect.objectContaining({ where: { id: PENDING_CH }, data: { dmRequestStatus: 'ACCEPTED' } }),
     );
     expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Sprint R15 §2.7 — rol bahsetmesi kapı matrisi (`resolveMentions` Adım 0)
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('MessagesService — rol bahsetmesi kapıları (R15 §2.2)', () => {
+  let service: MessagesService;
+
+  const ROLE_MOD = 'role-mod';
+  const ROLE_EVERYONE = 'role-everyone';
+
+  function createdMsg(mentionRoles: string[], mentionsEveryone = false) {
+    return {
+      id: 'msg-r15',
+      channelId: GUILD_CHANNEL_ID,
+      content: 'test',
+      replyToId: null,
+      replyTo: null,
+      editedAt: null,
+      deletedAt: null,
+      createdAt: new Date('2026-08-03T12:00:00Z'),
+      author: { id: USER_ID, username: 'kanka', avatarUrl: null },
+      attachments: [],
+      reactions: [],
+      mentions: [],
+      mentionsEveryone,
+      mentionRoles,
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    automodMock.check.mockReturnValue({ blocked: false });
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.create.mockResolvedValue(createdMsg([]));
+  });
+
+  it('mentionable rol → izin GEREKMEZ, sıradan üye etiketleyebilir', async () => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
+    prismaMock.role.findMany.mockResolvedValue([
+      { id: ROLE_MOD, mentionable: true, isEveryone: false },
+    ]);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, { content: `<@&${ROLE_MOD}> selam` });
+
+    const data = prismaMock.message.create.mock.calls[0][0].data;
+    expect(data.mentionRoles).toEqual([ROLE_MOD]);
+    // İzin hiç sorulmamalı: mentionable rol için gerek yok (tembel çözüm)
+    expect(permissionsMock.hasGuildPermission).not.toHaveBeenCalled();
+  });
+
+  it('mentionable OLMAYAN rol + izinsiz kullanıcı → token sessizce düşer', async () => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
+    prismaMock.role.findMany.mockResolvedValue([
+      { id: ROLE_MOD, mentionable: false, isEveryone: false },
+    ]);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, { content: `<@&${ROLE_MOD}> selam` });
+
+    const data = prismaMock.message.create.mock.calls[0][0].data;
+    // Mesaj GİDER, yalnız ping olmaz — hata fırlatmak rolün varlığını sızdırırdı
+    expect(data.mentionRoles).toEqual([]);
+    expect(data.content).toBe(`<@&${ROLE_MOD}> selam`);
+  });
+
+  it('mentionable OLMAYAN rol + MENTION_EVERYONE izinli kullanıcı → geçer', async () => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    prismaMock.role.findMany.mockResolvedValue([
+      { id: ROLE_MOD, mentionable: false, isEveryone: false },
+    ]);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, { content: `<@&${ROLE_MOD}>` });
+
+    expect(prismaMock.message.create.mock.calls[0][0].data.mentionRoles).toEqual([ROLE_MOD]);
+  });
+
+  it('@everyone → İKİ KAPI: mentionable açık ama izin yoksa geçmez', async () => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
+    prismaMock.role.findMany.mockResolvedValue([
+      { id: ROLE_EVERYONE, mentionable: true, isEveryone: true },
+    ]);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, { content: `<@&${ROLE_EVERYONE}>` });
+
+    const data = prismaMock.message.create.mock.calls[0][0].data;
+    expect(data.mentionsEveryone).toBe(false);
+    expect(data.mentionRoles).toEqual([]); // everyone rolü mentionRoles'e YAZILMAZ
+  });
+
+  it('@everyone → izin var ama mentionable kapalıysa geçmez (kill-switch)', async () => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    prismaMock.role.findMany.mockResolvedValue([
+      { id: ROLE_EVERYONE, mentionable: false, isEveryone: true },
+    ]);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, { content: `<@&${ROLE_EVERYONE}>` });
+
+    expect(prismaMock.message.create.mock.calls[0][0].data.mentionsEveryone).toBe(false);
+  });
+
+  it('@everyone → iki kapı da açıksa geçer', async () => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    prismaMock.role.findMany.mockResolvedValue([
+      { id: ROLE_EVERYONE, mentionable: true, isEveryone: true },
+    ]);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, { content: `<@&${ROLE_EVERYONE}>` });
+
+    expect(prismaMock.message.create.mock.calls[0][0].data.mentionsEveryone).toBe(true);
+  });
+
+  it('başka ortamın rol id’si → sorgu guildId ile daraltıldığı için düşer', async () => {
+    prismaMock.role.findMany.mockResolvedValue([]); // guildId eşleşmedi → satır yok
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, { content: '<@&role-baska-ortam>' });
+
+    expect(prismaMock.role.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ guildId: GUILD_CHANNEL.guildId }) }),
+    );
+    expect(prismaMock.message.create.mock.calls[0][0].data.mentionRoles).toEqual([]);
+  });
+
+  it('≤3 rol sınırı — fazlası sessizce düşer', async () => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    prismaMock.role.findMany.mockResolvedValue(
+      ['r1', 'r2', 'r3', 'r4'].map((id) => ({ id, mentionable: true, isEveryone: false })),
+    );
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: '<@&r1> <@&r2> <@&r3> <@&r4>',
+    });
+
+    expect(prismaMock.message.create.mock.calls[0][0].data.mentionRoles).toEqual(['r1', 'r2', 'r3']);
+  });
+
+  it('DM kanalında rol çözümü hiç çalışmaz (rol diye bir şey yok)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    prismaMock.message.create.mockResolvedValue(createdMsg([]));
+
+    await service.create(USER_ID, CHANNEL_ID, { content: '<@&role-mod>' });
+
+    expect(prismaMock.role.findMany).not.toHaveBeenCalled();
+  });
+
+  it('birden çok kısıtlı token → izin EN FAZLA BİR KEZ çözülür', async () => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    prismaMock.role.findMany.mockResolvedValue([
+      { id: 'r1', mentionable: false, isEveryone: false },
+      { id: 'r2', mentionable: false, isEveryone: false },
+      { id: ROLE_EVERYONE, mentionable: true, isEveryone: true },
+    ]);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: `<@&r1> <@&r2> <@&${ROLE_EVERYONE}>`,
+    });
+
+    expect(permissionsMock.hasGuildPermission).toHaveBeenCalledTimes(1);
   });
 });

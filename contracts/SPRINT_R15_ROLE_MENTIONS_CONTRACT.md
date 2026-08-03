@@ -26,9 +26,12 @@ Yani sunucu düzeltilip istemci düzeltilmezse "@Moderatörler" ekranda **"@ever
 gösteriliyor, işaretlenip kaydediliyor — ve backend **hiçbir yerde okumuyor**. Bugün @everyone'ın tek
 kapısı everyone rolünün `mentionable` anahtarı. R15 bu izni gerçek yapar.
 
-**Mobilde bahsetme yazma yok:** mobil composer'da mention otomatik tamamlama hiç yok (kullanıcı
-bahsetmesi için de yok). Bu **R15'in açtığı bir eksik değil**, bugün de öyle; R15 mobilde yalnız
-**okuma/gösterim + bildirim** tarafını kapsar (§4). Mobilde bahsetme yazma ayrı karar.
+**Mobilde bahsetme yazma — REVİZE (PM, 2026-08-03, M2d sonrası):** bu sözleşme yazıldığında mobil
+composer'da otomatik tamamlama **hiç yoktu** ve §4 "yalnız okuma/gösterim" diye kurulmuştu. **M2d o
+boşluğu kapattı**: mobilde artık üye ve `@everyone` etiketlenebiliyor (`useMentionCompose` +
+`MentionSuggestionList`). Sözleşme olduğu gibi uygulanırsa mobilde kişi ve herkes etiketlenip **rol
+etiketlenemez** — liste zaten ortada dururken savunulamayacak bir asimetri. §4 buna göre genişletildi:
+**roller mobil öneri listesine de girer** (aynı kapı kuralıyla).
 
 ---
 
@@ -41,13 +44,14 @@ bahsetmesi için de yok). Bu **R15'in açtığı bir eksik değil**, bugün de �
 3. `api/`: `NotificationPref.suppressRoleMentions` — sahibin özgün "tüm rol bahsetmelerini sustur" talebi
 4. `web/`: otomatik tamamlamada roller + `<@&roleId>` token'ı + **rol adı/rengiyle** çip render
 5. `mobile/`: rol token'ının doğru adla gösterilmesi (sabit "@everyone" düzeltmesi) + susturma anahtarı
+   + **öneri listesine roller** (M2d sonrası revizyon, §0)
 
 ### OUT (bilinçli)
 
 | Çıkarılan | Gerekçe |
 |---|---|
 | `@here` | Presence-tabanlı bahsetme özelliği hiç yok. Ayrı karar, ayrı iş |
-| Mobilde bahsetme **yazma** (otomatik tamamlama) | Bugün kullanıcı bahsetmesi için de yok; R15'in açtığı boşluk değil. Ayrı sprint |
+| ~~Mobilde bahsetme **yazma**~~ | **KAPSAMA GİRDİ** — M2d listeyi getirdi, roller de o listeye eklenir (§4) |
 | Rol bahsetmesine özel hız sınırı / anti-spam sayacı | Kapı `mentionable` + izin. Gerçek kötüye kullanım görülmeden sayaç eklemek erken |
 | Kanal düzeyinde rol-bahsetme izni (Discord'un kanal override'ları) | Bizde kanal-bazlı izin override sistemi yok. Ayrı ve büyük iş |
 
@@ -191,10 +195,16 @@ sessizce düşüyor mu (hata mesajıyla rol varlığını sızdırmıyor mu), (d
 
 ## §4 `mobile/`
 
-- `utils/mentions.ts`: sabit `"@everyone"` düzeltilir → rol adı çözümü (roller yüklü değilse `@rol`)
+- `utils/mentions.ts`: sabit `"@everyone"` düzeltilir → rol adı çözümü (roller yüklü değilse `@rol`).
+  M2d R1'de eklenen `splitMentions` parça üretiyor; rol parçası da **Kor aksanıyla** çizilmeye devam eder
+- **Öneri listesine roller** (M2d sonrası revizyon): `mentionable` roller herkese, `mentionable`
+  olmayanlar yalnız `MENTION_EVERYONE` izni olana. Kanal ekranı rolleri zaten çekiyor
+  (`rolesApi.listByGuild`, M2d §3.1) — **yeni istek yok**, aynı yanıt süzülür.
+  Rol satırı üye satırından ayırt edilebilir olmalı (rol rengi + ikon), yoksa aynı adlı üye/rol karışır
+- Seçim → `<@&roleId>` token'ı (`useMentionCompose` `select` yolu genelleştirilir; `@everyone`
+  için bugün kullanılan yol rol id'siyle aynı biçimi üretiyor)
 - `guild-notifications.tsx`: üçüncü anahtar **Rol Bahsetmelerini Sustur** (R14'teki iki anahtarın deseni)
 - Rozet/bildirim tarafı sunucudan geldiği gibi çalışır, istemcide ek mantık yok
-- Bahsetme **yazma** bu sprintte YOK (§0)
 
 ---
 
@@ -211,6 +221,7 @@ sessizce düşüyor mu (hata mesajıyla rol varlığını sızdırmıyor mu), (d
 - [ ] `mentionable` olmayan rolü sıradan üye etiketleyince **hiçbir şey olmuyor** (mesaj gidiyor, ping yok)
 - [ ] İzinli kullanıcı aynı rolü etiketleyince ping düşüyor
 - [ ] Etiketlenen rol ekranda **kendi adıyla** görünüyor (web ve mobil), "@everyone" yazmıyor
+- [ ] **Mobilde** `@` yazınca roller de listede; `mentionable` olmayan rol sıradan üyeye görünmüyor
 - [ ] Özel kanalda rol etiketi kanal üyesi olmayanlara **gitmiyor**
 - [ ] "Rol Bahsetmelerini Sustur" açıkken rol pingi gelmiyor, adınla etiketlenince geliyor
 - [ ] @everyone bugünkü gibi çalışmaya devam ediyor (göç telafisi tuttu)

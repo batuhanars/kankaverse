@@ -12,6 +12,8 @@ export interface NotificationPrefDto {
   // R14 — yalnız GUILD satırında anlamlı; CHANNEL satırında her zaman false döner.
   suppressEveryone: boolean;
   suppressEvents: boolean;
+  // R15 — rol genişlemesinden gelen bildirim/rozet bastırılır.
+  suppressRoleMentions: boolean;
 }
 
 /** PUT /notifications/prefs body — upsert (kısmi update; verilmeyen alan korunur). */
@@ -60,4 +62,12 @@ export class SetNotificationPrefDto {
   @IsOptional()
   @IsBoolean()
   suppressEvents?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'R15 — tüm rol bahsetmelerini sustur. YALNIZ targetType=GUILD ile.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  suppressRoleMentions?: boolean;
 }

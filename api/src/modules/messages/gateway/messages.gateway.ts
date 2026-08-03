@@ -569,7 +569,9 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   async notifyMentions(channelId: string, messageDto: Record<string, unknown>) {
     const mentions = (messageDto['mentions'] as string[] | undefined) ?? [];
     const mentionsEveryone = (messageDto['mentionsEveryone'] as boolean | undefined) ?? false;
-    if (mentions.length === 0 && !mentionsEveryone) return;
+    // R15 — rol bahsetmesi üçüncü kaynak. Kapıdan geçmiş rol id'leri (everyone HARİÇ).
+    const mentionRoles = (messageDto['mentionRoles'] as string[] | undefined) ?? [];
+    if (mentions.length === 0 && !mentionsEveryone && mentionRoles.length === 0) return;
 
     const authorId = (messageDto['author'] as Record<string, string>)['id'];
 
@@ -588,10 +590,30 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     });
     const usernameById = new Map<string, string>(users.map((u) => [u.id, u.username]));
 
-    // preview: rol token'ları (<@&...>) → @everyone; kullanıcı token'ları → @username; ≤100 karakter
+    /**
+     * R15 — preview'da rol token'ı artık sabit "@everyone" DEĞİL, rolün kendi adı.
+     * Preview sunucuda üretiliyor ve bildirim listesinde aynen gösteriliyor; sabit metin
+     * bırakılsaydı "@Moderatörler" etiketi bildirimde "@everyone" yazardı.
+     * İçerikteki TÜM rol token'ları çözülür (yalnız kapıdan geçenler değil): kapıya takılan
+     * token da metinde duruyor ve okunur görünmeli.
+     */
     const content = (messageDto['content'] as string) ?? '';
+    const contentRoleIds = Array.from(content.matchAll(/<@&([a-zA-Z0-9_-]+)>/g)).map((m) => m[1]);
+    const roleNameById = new Map<string, string>();
+    if (contentRoleIds.length > 0 && guildId) {
+      const roleRows = await this.prisma.role.findMany({
+        where: { guildId, id: { in: contentRoleIds } },
+        select: { id: true, name: true, isEveryone: true },
+      });
+      for (const r of roleRows) {
+        // everyone rolünün adı şemada zaten "@everyone"; başına ikinci @ konmasın.
+        roleNameById.set(r.id, r.isEveryone ? 'everyone' : r.name);
+      }
+    }
+
+    // preview: rol token'ları → @rolAdı; kullanıcı token'ları → @username; ≤100 karakter
     const preview = content
-      .replace(/<@&[a-zA-Z0-9_-]+>/g, '@everyone')
+      .replace(/<@&([a-zA-Z0-9_-]+)>/g, (_m, id: string) => `@${roleNameById.get(id) ?? 'rol'}`)
       .replace(/<@([a-zA-Z0-9_-]+)>/g, (_match, id: string) => {
         const username = usernameById.get(id);
         return username ? `@${username}` : '@bilinmeyen';
@@ -617,8 +639,19 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     // bahsetmesi HER ZAMAN geçer (kullanıcı adıyla çağrıldıysa susturulmaz).
     let recipients: string[];
     let suppressedEveryone = new Set<string>();
-    if (mentionsEveryone && guildId) {
-      let everyoneIds: string[];
+    // R15 — rol genişlemesinden gelenler ayrı tutulur: susturma tercihleri farklı bayraklar
+    // (`suppressEveryone` vs `suppressRoleMentions`) ve bir kullanıcı iki kaynaktan birden gelebilir.
+    let suppressedRoleMentions = new Set<string>();
+    const fromEveryone = new Set<string>();
+    const fromRole = new Set<string>();
+
+    if ((mentionsEveryone || mentionRoles.length > 0) && guildId) {
+      /**
+       * Özel kanalda GÖRÜNÜR küme: kanal üyeleri ∪ (OWNER/ADMIN). Toplu bahsetmelerin tamamı
+       * (everyone VE rol) bu kümeyle kesiştirilir — kanalı görmeyen üye, rolü yüzünden ping alıp
+       * kanalın varlığını öğrenemez. Sızıntı kapısı iki yolda da AYNI.
+       */
+      let visibleSet: Set<string> | null = null;
       if (channel?.isPrivate) {
         const [cms, privileged] = await Promise.all([
           this.prisma.channelMember.findMany({ where: { channelId }, select: { userId: true } }),
@@ -627,16 +660,40 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
             select: { userId: true },
           }),
         ]);
-        everyoneIds = [...cms.map((m) => m.userId), ...privileged.map((m) => m.userId)];
-      } else {
-        const members = await this.prisma.guildMember.findMany({
-          where: { guildId },
-          select: { userId: true, user: { select: { isMinor: true } } },
-        });
-        const eligible = needsAgeCheck ? members.filter((m) => !m.user.isMinor) : members;
-        everyoneIds = eligible.map((m) => m.userId);
+        visibleSet = new Set([...cms.map((m) => m.userId), ...privileged.map((m) => m.userId)]);
       }
-      recipients = [...new Set([...mentions, ...everyoneIds])];
+
+      if (mentionsEveryone) {
+        if (visibleSet) {
+          for (const id of visibleSet) fromEveryone.add(id);
+        } else {
+          const members = await this.prisma.guildMember.findMany({
+            where: { guildId },
+            select: { userId: true, user: { select: { isMinor: true } } },
+          });
+          const eligible = needsAgeCheck ? members.filter((m) => !m.user.isMinor) : members;
+          for (const m of eligible) fromEveryone.add(m.userId);
+        }
+      }
+
+      if (mentionRoles.length > 0) {
+        // Rol üyeleri TEK sorgu. `member.guildId` şartı başka ortamdan sızmayı engeller
+        // (rol id'si zaten o ortamdan doğrulandı, bu ikinci kemer).
+        const roleMembers = await this.prisma.guildMemberRole.findMany({
+          where: { roleId: { in: mentionRoles }, member: { guildId } },
+          select: { member: { select: { userId: true, user: { select: { isMinor: true } } } } },
+        });
+        for (const rm of roleMembers) {
+          const userId = rm.member.userId;
+          // Yaş kapısı: everyone yolundaki elemenin birebir aynısı.
+          if (needsAgeCheck && rm.member.user.isMinor) continue;
+          // Özel kanal kesişimi.
+          if (visibleSet && !visibleSet.has(userId)) continue;
+          fromRole.add(userId);
+        }
+      }
+
+      recipients = [...new Set([...mentions, ...fromEveryone, ...fromRole])];
 
       // Yalnız genişlemeden gelenlerin (doğrudan bahsedilmeyenlerin) ortam tercihi TEK sorguda;
       // alıcı başına ek sorgu açılmaz.
@@ -649,21 +706,37 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
             targetType: NotifTargetType.GUILD,
             targetId: guildId,
           },
-          select: { userId: true, suppressEveryone: true },
+          select: { userId: true, suppressEveryone: true, suppressRoleMentions: true },
         });
         suppressedEveryone = new Set(
           prefs.filter((p) => p.suppressEveryone).map((p) => p.userId),
+        );
+        suppressedRoleMentions = new Set(
+          prefs.filter((p) => p.suppressRoleMentions).map((p) => p.userId),
         );
       }
     } else {
       recipients = [...new Set(mentions)];
     }
 
+    const directlyMentioned = new Set(mentions);
     for (const mentionedUserId of recipients) {
       // Yazara kendi bahsetmesi için event gönderme
       if (mentionedUserId === authorId) continue;
-      // R14 — bastırılan @everyone: tam sessizlik (ne toast ne rozet ne kalıcı bildirim).
-      if (suppressedEveryone.has(mentionedUserId)) continue;
+      /**
+       * R14 + R15 — toplu bahsetme bastırma. Yalnız GENİŞLEMEDEN gelen alıcıya uygulanır:
+       * adıyla çağrılan kullanıcı her zaman bildirim alır (iki bayrak da onu susturmaz).
+       *
+       * Bir kullanıcı iki kaynaktan birden gelebilir (hem @everyone hem rolü etiketlenmiş).
+       * O zaman susturulmayan kaynak yeter: rol pingini kapatmış ama @everyone'ı açık bırakmış
+       * biri @everyone mesajını almaya devam eder. Tek bayrağa bakıp elemek, kullanıcının
+       * açık bıraktığı kanalı da sessizce kapatırdı.
+       */
+      if (!directlyMentioned.has(mentionedUserId)) {
+        const viaEveryone = fromEveryone.has(mentionedUserId) && !suppressedEveryone.has(mentionedUserId);
+        const viaRole = fromRole.has(mentionedUserId) && !suppressedRoleMentions.has(mentionedUserId);
+        if (!viaEveryone && !viaRole) continue;
+      }
       this.realtime.emitToUser(mentionedUserId, 'mention', eventPayload);
 
       // R12 — Suppression: alıcının kanal/guild bildirim tercihi sustur/NONE ise

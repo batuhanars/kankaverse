@@ -132,6 +132,8 @@ function resetMocks() {
   permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
   // M2b §10 R1-1: varsayılan — kanal tercihi yok (bireysel testler override eder)
   prismaMock.notificationPref.findMany.mockResolvedValue([]);
+  // R15 §2.6: varsayılan — kullanıcının rol bağı yok (rol-bahsetme dalı eklenmez)
+  prismaMock.guildMemberRole.findMany.mockResolvedValue([]);
   configMock.get.mockImplementation((key: string) => {
     const values: Record<string, unknown> = {
       's3.publicUrl': 'http://localhost:9000/kankaverse',
