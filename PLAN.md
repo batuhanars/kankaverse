@@ -238,6 +238,16 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     mobil kopyası aynı hatayı tekrar etmemeli, çip/görsel geri bildirim R15'te gelecekse bile
     mobilde en azından seçilmemiş bahsetmenin sessizce düşmediği görülmeli.
 
+    **M3b mobil profil ekranı + küçük revizeler** — 🟡 **SÖZLEŞME YAZILDI 2026-08-03 gecesi:**
+    `contracts/SPRINT_M3B_MOBILE_PROFILE_REVISIONS_CONTRACT.md`. Sahip sırasını verdi (M4'ten
+    hemen önce). İçerik: kankalar listesi ikon-only aksiyonlar · grup DM panelinde "Profil" yerine
+    "Ayarlar" + grup aksiyonlarının oraya taşınması · zaten kanka olanda "Kanka Ekle" gösterme
+    kusuru · **profil kartının sekmeli ekrana dönüşmesi**. 🔴 Profil ekranının tasarımı **sahibin
+    göndereceği Discord mobil görsellerini bekliyor**, §4 kilitli değil. Bağlayıcı iki karar
+    şimdiden var: ortam üye listesi **yönetim ekranında kalır** (Discord ile hizalı) ve bu yüzden
+    **mesaj yazarına dokunma profile gitmek ZORUNDA** — yoksa ortamda profile ulaşmanın hiçbir yolu
+    kalmaz. Eski backlog notu ↓
+
     **Mobil profil ekranı (sahip 2026-08-03, sırasız backlog):** nick'e basınca açılan profil **kartı** ileride **ayrı bir ekrana** dönüşecek; kanka ekleme, ortak ortamlar vb. o ekranda toplanacak. Bugün karta düğme eklenmiyor (yarın taşınacak yüzeye yatırım yapma). Tetikleyici: sahip sırasını verdiğinde.
   - **✅ KAPANDI 2026-07-30 — Expo SDK 57 → 54 düşürüldü.** Sahip telefonundaki Expo Go 54.0.8 / "supported SDK 54" bildirdi → hedef 54. `expo@~54` + `npx expo install --fix` ile tüm `expo-*`/`react-native` (0.81.5)/`react` (19.1.0) hizalandı; devDeps elle (`typescript ~5.9.2`, `@types/react ~19.1.10`, `eslint-config-expo ~10.0.0` — bu paket 56'dan itibaren SDK numarasına geçtiği için 54'ün karşılığı 10.0.0). Eski ağaçtan kalan `react-server-dom-webpack` peer çatışması yaptı → `node_modules`+lock silinip temiz kurulum. **Doğrulama:** `expo-doctor` 18/18 · `typecheck` + `lint` temiz · android bundle derlendi (3.54 MB hbc). Kod tarafında SDK-57'ye özel API kullanılmamış, tek satır değişmedi. Sürüm kilidi `mobile/AGENTS.md` + `mobile/CLAUDE.md`'ye yazıldı. **Kalan: sahip telefonda açıp doğrulasın.**
     <details><summary>Özgün kalem (2026-07-29 akşamı)</summary> `mobile/` SDK 57 ile kuruldu ("kurulum anındaki güncel kararlı sürüm" kuralı). Emülatörde sorunsuz, çünkü Expo CLI **projeye birebir uyan** Expo Go derlemesini indiriyor. **Gerçek telefonda açılmıyor:** Play Store'daki Expo Go henüz SDK 57'ye çıkmadı → "Project is incompatible with this version of Expo Go". PM dev build'i öne çekmeyi önerdi, sahip sürümü düşürmeyi seçti. **Yarının ilk işi:** telefondaki Expo Go'nun desteklediği SDK'yı tespit et, `mobile/` o seviyeye indir (`expo`, tüm `expo-*`, `react-native`, `react`, `react-native-svg`, `@expo/vector-icons`, `socket.io-client` hizalanır), emülatörde + **telefonda** doğrula. **Ders:** "en güncel kararlı" ≠ "mağaza istemcisinin desteklediği"; sözleşmede ikincisi şart koşulacak. Dev build (APK; mağaza sürümü AAB) bu bağımlılığı tamamen kaldırır ve M2'de push için zaten gerekecek.
