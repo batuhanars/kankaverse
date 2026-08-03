@@ -10,6 +10,14 @@
 /** Hem kullanıcı (`<@id>`) hem rol (`<@&id>`) token'ını yakalar; grup 1 dolu ise rol. */
 const ANY_MENTION_RE = /<@(&?)([a-zA-Z0-9_-]+)>/g;
 
+/**
+ * R15 — rol adının başına '@' koy, zaten '@' ile başlıyorsa tekrarlama.
+ * everyone rolünün adı veritabanında zaten "@everyone" (web `utils/mentions.ts` ikizi).
+ */
+export function prefixRoleName(name: string): string {
+  return name.startsWith('@') ? name : `@${name}`;
+}
+
 export interface MentionSegment {
   text: string;
   /** true → bahsetme parçası (vurgulu çizilir), false → sıradan metin */
@@ -20,13 +28,14 @@ export interface MentionSegment {
  * İçeriği "sıradan metin" ve "bahsetme" parçalarına böler. Çağıran her parçayı kendi stiliyle
  * çizer; böylece tek bir `<Text>` içinde iç içe vurgulu parçalar oluşur.
  *
- * 🔴 Rol token'ı bugün HER ZAMAN "@everyone" olarak çözülüyor — bu bilinen bir eksik, R15 rol
- * bahsetmelerini getirince gerçek rol adı gelecek (sözleşme §8).
+ * R15 — rol token'ı `resolveRole` ile gerçek rol adına çözülür (eskiden sabit "@everyone" yazıyordu).
  */
 export function splitMentions(
   content: string,
   resolve: (id: string) => string | undefined,
   fallback: string,
+  /** R15 — roleId → rol adı. Verilmezse rol token'ı "@rol" yedeğine düşer. */
+  resolveRole?: (roleId: string) => string | undefined,
 ): MentionSegment[] {
   const segments: MentionSegment[] = [];
   let lastIndex = 0;
@@ -38,10 +47,15 @@ export function splitMentions(
       segments.push({ text: content.slice(lastIndex, match.index), isMention: false });
     }
     const isRole = match[1] === '&';
-    segments.push({
-      text: isRole ? '@everyone' : `@${resolve(match[2]) ?? fallback}`,
-      isMention: true,
-    });
+    let text: string;
+    if (isRole) {
+      // R15 — artık SABİT "@everyone" değil; çözülemezse nötr "@rol" yedeği
+      const roleName = resolveRole?.(match[2]);
+      text = roleName ? prefixRoleName(roleName) : '@rol';
+    } else {
+      text = `@${resolve(match[2]) ?? fallback}`;
+    }
+    segments.push({ text, isMention: true });
     lastIndex = match.index + match[0].length;
   }
   if (lastIndex < content.length) {
@@ -55,8 +69,9 @@ export function formatMentionsPlain(
   content: string,
   resolve: (id: string) => string | undefined,
   fallback: string,
+  resolveRole?: (roleId: string) => string | undefined,
 ): string {
-  return splitMentions(content, resolve, fallback)
+  return splitMentions(content, resolve, fallback, resolveRole)
     .map((s) => s.text)
     .join('');
 }

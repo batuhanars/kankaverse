@@ -38,6 +38,12 @@ export function MentionSuggestionList({ suggestions, onSelect }: Props) {
               <View style={[styles.avatar, styles.avatarFallback]}>
                 <Ionicons name="people-outline" size={16} color={theme.colors.textSecondary} />
               </View>
+            ) : c.isRole ? (
+              /* R15 — rol satırı: rolün KENDİ rengiyle nokta. Aynı adı taşıyan bir üyeyle
+                 karışmasın diye ikon ve renk üye satırından ayrı tutuldu (web ikizi). */
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <View style={[styles.roleDot, { backgroundColor: c.color || theme.colors.textMuted }]} />
+              </View>
             ) : c.avatarUrl ? (
               <Image source={{ uri: c.avatarUrl }} style={styles.avatar} />
             ) : (
@@ -46,12 +52,20 @@ export function MentionSuggestionList({ suggestions, onSelect }: Props) {
               </View>
             )}
             <View style={styles.textWrap}>
-              <Text style={styles.name} numberOfLines={1}>
-                {c.isEveryone ? t('mobile.mention.everyoneLabel') : c.username}
+              <Text
+                style={[styles.name, c.isRole && c.color ? { color: c.color } : null]}
+                numberOfLines={1}
+              >
+                {c.isEveryone ? t('mobile.mention.everyoneLabel') : `@${c.username}`}
               </Text>
               {c.isEveryone && (
                 <Text style={styles.hint} numberOfLines={1}>
                   {t('mobile.mention.everyoneHint')}
+                </Text>
+              )}
+              {c.isRole && (
+                <Text style={styles.hint} numberOfLines={1}>
+                  {t('mention.roleHint')}
                 </Text>
               )}
             </View>
@@ -94,6 +108,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xs,
     fontWeight: '700',
   },
+  roleDot: { width: 10, height: 10, borderRadius: 5 },
   textWrap: { flex: 1, minWidth: 0 },
   name: {
     color: theme.colors.textPrimary,

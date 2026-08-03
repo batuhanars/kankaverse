@@ -2178,3 +2178,62 @@ uyarı üretmiyor).
       satır, `clearPending` sıfırlaması ve koşul birlikte temizlendi). Sunucu kapısı bağımsız
       duruyor: `mentionable` değilse `resolveMentions` `mentionsEveryone` yazmaz, istemci ne
       gönderirse göndersin. `vue-tsc --noEmit` + `vite build` temiz
+
+
+---
+
+## Sprint R15 — Rol Bahsetmesi (@Rol) + Rol Bahsetmelerini Sustur — 2026-08-03
+
+> Sözleşme: `contracts/SPRINT_R15_ROLE_MENTIONS_CONTRACT.md` = **tek doğruluk kaynağı**.
+> R14 merge edildikten sonra başlatıldı (sıra kilidi tutuldu). **R7-hafif** (§2.8).
+> Dev kutu işaretler, item EKLEMEZ.
+
+### Sözleşme revizyonu (PM, başlarken)
+- [x] §0/§4 "mobilde bahsetme yazma yok" diyordu; **M2d o boşluğu kapatmıştı**. Olduğu gibi
+      uygulansa mobilde kişi ve @everyone etiketlenip rol etiketlenemezdi (liste ortada dururken
+      savunulamaz asimetri). §4 genişletildi: roller mobil öneri listesine de girer
+
+### Backend (`api/`) — sözleşme §2
+- [x] Şema: `Message.mentionRoles` (≤3, everyone hariç) + `NotificationPref.suppressRoleMentions`;
+      üye id'leri GÖMÜLMÜYOR (rol üyeliği değişir, alıcı kümesi okuma anında çözülür)
+- [x] `resolveMentions` kapı modeli: mentionable rol → herkes · mentionable olmayan → yalnız
+      `MENTION_EVERYONE` · @everyone → **iki kapı**. Kapıya takılan token sessizce düşer.
+      İzin **tembel** ve en fazla bir kez çözülür
+- [x] `notifyMentions` rol genişlemesi: rol üyeleri tek sorgu, özel kanalda **görünür kümeyle
+      kesiştirme**, yaş kapısında minör eleme — iki süzgeç de @everyone yolundakiyle birebir
+- [x] Susturma: bir kullanıcı hem everyone hem rolden gelebilir → **susturulmayan kaynak yeter**
+      (tek bayrağa bakıp elemek kullanıcının açık bıraktığı kanalı da kapatırdı)
+- [x] Rozet üçüncü dalı: `findMyGuilds` (tüm ortamların rol bağları TEK sorgu) + `findByGuild`
+- [x] `preview` rol token'ını **rol adına** çözer (sabit "@everyone" değil)
+- [x] 🔴 Göç telafisi migration: everyone rolü mentionable olan ortamlara `MENTION_EVERYONE`
+      eklendi → **2 ortam etkilendi** (`Test hoo`, `test 2`); bugün @everyone yazabilen sıradan
+      üyeler yazabilmeye devam ediyor, kısma artık elle yapılabiliyor
+- [x] 17 yeni test (kapı matrisi, özel kanal, yaş kapısı, susturma regresyon kilidi, ≤3 sınırı,
+      izin tek-çözüm); **946 test yeşil**, `nest build` + `migrate status` temiz
+
+### Web (`web/`) — sözleşme §3
+- [x] Öneri listesinde roller (kapı kuralı uygulanmış) + rol satırı rolün kendi rengiyle
+- [x] Render: `<@&id>` → rol adı + rengi. Renk **yalnız `#rrggbb`** kalıbına uyarsa gömülüyor
+      (bu HTML sanitize'dan SONRA üretiliyor, DOMPurify görmüyor → doğrulama tek kemer)
+- [x] Bahsetme bandı rol bahsetmesinde de yanıyor (`mentionRoles` ∩ kendi rollerim)
+- [x] Bildirim Ayarları panelinde üçüncü kutucuk; `vue-tsc` + `vite build` temiz
+
+### Mobil (`mobile/`) — sözleşme §4 (revize)
+- [x] `splitMentions` rol adını çözüyor (sabit "@everyone" kalktı); rol parçası Kor aksanıyla çizilir
+- [x] Öneri listesine roller (kanal ekranı rolleri zaten çekiyordu — **yeni istek yok**)
+- [x] Üçüncü anahtar: Rol Bahsetmelerini Sustur; `typecheck` + `lint` temiz
+
+### Bilinçli karar — rol adları elle yazılınca çevrilmez
+`@everyone` için "listeden seçmesen de çalışsın" kuralı vardı; **rollere taşınmadı** (iki istemcide
+de). Gerekçe: rol adı serbest metinle çakışabilir ("@Test yaptım") ve yanlış gruba ping atmak yanlış
+kişiye ping atmaktan daha gürültülü. `@everyone` tek ve sabit bir hedef, rol adı değil.
+
+### DoD (**uçtan uca** — sahipte)
+- [ ] `mentionable` rolü etiketle → o roldeki üyeler bildirim + rozet alıyor, almayanlar almıyor
+- [ ] `mentionable` olmayan rolü sıradan üye etiketleyince hiçbir şey olmuyor (mesaj gidiyor, ping yok)
+- [ ] İzinli kullanıcı aynı rolü etiketleyince ping düşüyor
+- [ ] Etiketlenen rol ekranda **kendi adıyla** görünüyor (web ve mobil), "@everyone" yazmıyor
+- [ ] **Mobilde** `@` yazınca roller de listede; `mentionable` olmayan rol sıradan üyeye görünmüyor
+- [ ] Özel kanalda rol etiketi kanal üyesi olmayanlara gitmiyor
+- [ ] "Rol Bahsetmelerini Sustur" açıkken rol pingi gelmiyor, adınla etiketlenince geliyor
+- [ ] @everyone bugünkü gibi çalışmaya devam ediyor (göç telafisi tuttu)
