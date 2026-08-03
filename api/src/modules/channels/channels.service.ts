@@ -173,9 +173,21 @@ export class ChannelsService {
           targetId: guildId,
         },
       },
-      select: { suppressEveryone: true },
+      select: { suppressEveryone: true, suppressRoleMentions: true },
     });
     const suppressEveryone = guildPref?.suppressEveryone ?? false;
+    const suppressRoleMentions = guildPref?.suppressRoleMentions ?? false;
+
+    // R15 §2.6 — kullanıcının BU ortamdaki rol id'leri, TEK sorgu (kanal başına sorgu yok).
+    // Susturulmuşsa hiç çekilmez: sonuç kullanılmayacak.
+    let myRoleIds: string[] = [];
+    if (!suppressRoleMentions) {
+      const myRoles = await this.prisma.guildMemberRole.findMany({
+        where: { member: { guildId, userId } },
+        select: { roleId: true },
+      });
+      myRoleIds = myRoles.map((r) => r.roleId);
+    }
 
     // Her kanal için okunmamış mesaj + okunmamış bahsetme sayısını paralel hesapla.
     // Locked (girilemez) kanalda okunmamış sayısı sızdırmamak için 0 bırakılır.
@@ -193,6 +205,9 @@ export class ChannelsService {
         // R14: bastırma açıksa everyone dalı düşer; doğrudan bahsetme her zaman sayılır.
         const mentionOr: object[] = [{ mentions: { has: userId } }];
         if (!suppressEveryone) mentionOr.push({ mentionsEveryone: true });
+        // R15: rolümden bahsedilen mesajlar da bahsetme sayılır. Rol kümesi boşsa dal hiç
+        // eklenmez — boş `hasSome` sorgusu üretmenin anlamı yok.
+        if (myRoleIds.length > 0) mentionOr.push({ mentionRoles: { hasSome: myRoleIds } });
         const [unread, mentions] = await Promise.all([
           this.prisma.message.count({ where: base }),
           this.prisma.message.count({ where: { ...base, OR: mentionOr } }),

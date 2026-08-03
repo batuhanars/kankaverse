@@ -25,6 +25,10 @@ const prismaMock = {
     findUnique: jest.fn(),
     findMany: jest.fn(),
   },
+  // R15 §2.6 — kullanıcının o ortamdaki rol id'leri (rol-bahsetme rozet dalı)
+  guildMemberRole: {
+    findMany: jest.fn(),
+  },
   user: {
     findUnique: jest.fn(),
   },
@@ -60,6 +64,8 @@ function resetMocks() {
   permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
   // Realtime alıcı sorguları (varsayılan boş — emit no-op)
   prismaMock.guildMember.findMany.mockResolvedValue([]);
+  // R15 §2.6: varsayılan — rol bağı yok (bireysel testler override eder)
+  prismaMock.guildMemberRole.findMany.mockResolvedValue([]);
   prismaMock.channelMember.findMany.mockResolvedValue([]);
   // R14 — varsayılan: ortam bildirim tercihi kaydı yok (@everyone bastırma kapalı)
   prismaMock.notificationPref.findUnique.mockResolvedValue(null);

@@ -20,6 +20,9 @@ const prismaMock = {
   user: { findUnique: jest.fn(), findMany: jest.fn() },
   channelMember: { findMany: jest.fn() },
   notificationPref: { findMany: jest.fn() },
+  // R15 — rol bahsetmesi: preview'da rol adı çözümü + alıcı kümesi rol genişlemesi
+  role: { findMany: jest.fn() },
+  guildMemberRole: { findMany: jest.fn() },
 };
 
 const jwtMock = { verify: jest.fn() };
@@ -75,6 +78,9 @@ function resetMocks() {
   notificationsShouldNotifyMock.mockResolvedValue(true);
   // R14 — varsayılan: @everyone bastırma kaydı yok
   prismaMock.notificationPref.findMany.mockResolvedValue([]);
+  // R15 — varsayılan: içerikte rol token'ı yok / rol üyesi yok
+  prismaMock.role.findMany.mockResolvedValue([]);
+  prismaMock.guildMemberRole.findMany.mockResolvedValue([]);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -563,5 +569,165 @@ describe('MessagesGateway.notifyMentions', () => {
       expect(targets).toEqual([EVERYONE_ONLY_ID]);
       expect(targets).not.toContain('user-minor');
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Sprint R15 §2.5/§2.7 — rol bahsetmesi alıcı kümesi (T&S süzgeçleri + susturma)
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('MessagesGateway.notifyMentions — rol bahsetmesi (R15)', () => {
+  let gateway: MessagesGateway;
+
+  const ROLE_MOD = 'role-mod';
+  const ROLE_MEMBER_1 = 'user-role-1';
+  const ROLE_MEMBER_2 = 'user-role-2';
+  const DIRECT_USER = 'user-direct';
+
+  function roleDto(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'msg-role-1',
+      channelId: CHANNEL_ID,
+      content: `<@&${ROLE_MOD}> toplantı var`,
+      mentions: [],
+      mentionsEveryone: false,
+      mentionRoles: [ROLE_MOD],
+      author: { id: AUTHOR_ID, username: 'author', avatarUrl: null },
+      createdAt: new Date().toISOString(),
+      ...overrides,
+    } as Record<string, unknown>;
+  }
+
+  /** Rol üyeleri fixture — `guildMemberRole.findMany` select şekliyle birebir. */
+  function roleMembers(...entries: { userId: string; isMinor?: boolean }[]) {
+    return entries.map((e) => ({
+      member: { userId: e.userId, user: { isMinor: e.isMinor ?? false } },
+    }));
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    gateway = makeGateway();
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: GUILD_ID,
+      isPrivate: false,
+      ageGated: false,
+      guild: { adultsOnly: false },
+    });
+    prismaMock.user.findMany.mockResolvedValue([]);
+    prismaMock.role.findMany.mockResolvedValue([
+      { id: ROLE_MOD, name: 'Moderatör', isEveryone: false },
+    ]);
+  });
+
+  it('rol üyelerine bildirim gider, rolde olmayana gitmez', async () => {
+    prismaMock.guildMemberRole.findMany.mockResolvedValue(
+      roleMembers({ userId: ROLE_MEMBER_1 }, { userId: ROLE_MEMBER_2 }),
+    );
+
+    await gateway.notifyMentions(CHANNEL_ID, roleDto());
+
+    const notified = emitToUserMock.mock.calls.filter((c) => c[1] === 'mention').map((c) => c[0]);
+    expect(notified).toEqual(expect.arrayContaining([ROLE_MEMBER_1, ROLE_MEMBER_2]));
+    expect(notified).not.toContain('user-baska');
+  });
+
+  it('yazar kendi rol bahsetmesinden bildirim ALMAZ', async () => {
+    prismaMock.guildMemberRole.findMany.mockResolvedValue(
+      roleMembers({ userId: AUTHOR_ID }, { userId: ROLE_MEMBER_1 }),
+    );
+
+    await gateway.notifyMentions(CHANNEL_ID, roleDto());
+
+    const notified = emitToUserMock.mock.calls.filter((c) => c[1] === 'mention').map((c) => c[0]);
+    expect(notified).not.toContain(AUTHOR_ID);
+    expect(notified).toContain(ROLE_MEMBER_1);
+  });
+
+  it('ÖZEL kanal → rol sahibi kanal üyesi değilse ping ALMAZ (sızıntı kapısı)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: GUILD_ID,
+      isPrivate: true,
+      ageGated: false,
+      guild: { adultsOnly: false },
+    });
+    // Kanal üyesi yalnız ROLE_MEMBER_1; ROLE_MEMBER_2 rolde ama kanalda değil
+    prismaMock.channelMember.findMany.mockResolvedValue([{ userId: ROLE_MEMBER_1 }]);
+    prismaMock.guildMember.findMany.mockResolvedValue([]); // OWNER/ADMIN yok
+    prismaMock.guildMemberRole.findMany.mockResolvedValue(
+      roleMembers({ userId: ROLE_MEMBER_1 }, { userId: ROLE_MEMBER_2 }),
+    );
+
+    await gateway.notifyMentions(CHANNEL_ID, roleDto());
+
+    const notified = emitToUserMock.mock.calls.filter((c) => c[1] === 'mention').map((c) => c[0]);
+    expect(notified).toContain(ROLE_MEMBER_1);
+    expect(notified).not.toContain(ROLE_MEMBER_2);
+  });
+
+  it('YAŞ-KAPILI kanal → minör rol sahibi ping ALMAZ', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: GUILD_ID,
+      isPrivate: false,
+      ageGated: true,
+      guild: { adultsOnly: false },
+    });
+    prismaMock.guildMemberRole.findMany.mockResolvedValue(
+      roleMembers({ userId: ROLE_MEMBER_1, isMinor: true }, { userId: ROLE_MEMBER_2 }),
+    );
+
+    await gateway.notifyMentions(CHANNEL_ID, roleDto());
+
+    const notified = emitToUserMock.mock.calls.filter((c) => c[1] === 'mention').map((c) => c[0]);
+    expect(notified).not.toContain(ROLE_MEMBER_1);
+    expect(notified).toContain(ROLE_MEMBER_2);
+  });
+
+  it('suppressRoleMentions açık → rol pingi düşmez, AMA doğrudan bahsedilen ALIR (regresyon kilidi)', async () => {
+    prismaMock.guildMemberRole.findMany.mockResolvedValue(
+      roleMembers({ userId: ROLE_MEMBER_1 }, { userId: DIRECT_USER }),
+    );
+    // Her iki kullanıcı da rol bahsetmesini susturmuş; DIRECT_USER ayrıca adıyla çağrılıyor.
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      { userId: ROLE_MEMBER_1, suppressEveryone: false, suppressRoleMentions: true },
+      { userId: DIRECT_USER, suppressEveryone: false, suppressRoleMentions: true },
+    ]);
+
+    await gateway.notifyMentions(
+      CHANNEL_ID,
+      roleDto({
+        mentions: [DIRECT_USER],
+        content: `<@&${ROLE_MOD}> ve <@${DIRECT_USER}>`,
+      }),
+    );
+
+    const notified = emitToUserMock.mock.calls.filter((c) => c[1] === 'mention').map((c) => c[0]);
+    expect(notified).not.toContain(ROLE_MEMBER_1); // yalnız rolden geliyordu → susturuldu
+    expect(notified).toContain(DIRECT_USER); // adıyla çağrıldı → bastırma onu kesmez
+  });
+
+  it('hem @everyone hem rolden gelen kullanıcı: yalnız BİRİNİ susturmuşsa yine alır', async () => {
+    prismaMock.guildMember.findMany.mockResolvedValue([
+      { userId: ROLE_MEMBER_1, user: { isMinor: false } },
+    ]);
+    prismaMock.guildMemberRole.findMany.mockResolvedValue(roleMembers({ userId: ROLE_MEMBER_1 }));
+    // Rol bahsetmelerini susturmuş ama @everyone'ı açık bırakmış
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      { userId: ROLE_MEMBER_1, suppressEveryone: false, suppressRoleMentions: true },
+    ]);
+
+    await gateway.notifyMentions(CHANNEL_ID, roleDto({ mentionsEveryone: true }));
+
+    const notified = emitToUserMock.mock.calls.filter((c) => c[1] === 'mention').map((c) => c[0]);
+    expect(notified).toContain(ROLE_MEMBER_1);
+  });
+
+  it('preview rol token’ını ROL ADIYLA çözer, sabit "@everyone" yazmaz', async () => {
+    prismaMock.guildMemberRole.findMany.mockResolvedValue(roleMembers({ userId: ROLE_MEMBER_1 }));
+
+    await gateway.notifyMentions(CHANNEL_ID, roleDto());
+
+    const mentionCall = emitToUserMock.mock.calls.find((c) => c[1] === 'mention');
+    expect(mentionCall?.[2].preview).toContain('@Moderatör');
+    expect(mentionCall?.[2].preview).not.toContain('@everyone');
   });
 });
