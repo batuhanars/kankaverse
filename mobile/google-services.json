@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1034446694229",
+    "project_id": "kankaverse-app",
+    "storage_bucket": "kankaverse-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1034446694229:android:22e547d48adbfa8af131dc",
+        "android_client_info": {
+          "package_name": "com.kankaverse.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8VBx_ocSdmVroxEqVnNyQKbvxekVAYbE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
