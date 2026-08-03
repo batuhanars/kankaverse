@@ -8,6 +8,7 @@ import { rolesApi } from '@/api/roles';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ChatBackButton } from '@/components/ChatBackButton';
 import { useGuildPermission } from '@/hooks/useGuildPermission';
+import { useAuthStore } from '@/stores/auth';
 import { useUnreadStore } from '@/stores/unread';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -61,9 +62,16 @@ export default function ChannelScreen() {
       .catch(() => {});
   }, [guildId]);
 
+  // 🔴 Kendin listede YOK (sahip sorusu 2026-08-03): sunucu kendi bahsetmeni zaten yok sayıyor
+  // (`messages.gateway.ts` alıcı döngüsü yazarı atlıyor), yani o satır seçilse bile hiçbir bildirim
+  // üretmiyor. Mobilde liste en fazla 8 satır; ölü satıra yer ayrılmaz.
+  const myUserId = useAuthStore((s) => s.user?.id);
   const mentionCandidates = useMemo(
-    () => members.map((m) => ({ id: m.userId, username: m.username, avatarUrl: m.avatarUrl })),
-    [members],
+    () =>
+      members
+        .filter((m) => m.userId !== myUserId)
+        .map((m) => ({ id: m.userId, username: m.username, avatarUrl: m.avatarUrl })),
+    [members, myUserId],
   );
 
   // Sprint M2a §4.5/DoD — kanalı açınca ilgili rozet ANINDA düşer. Sunucuya `markRead` zaten

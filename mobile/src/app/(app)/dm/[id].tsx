@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { dmApi } from '@/api/dm';
+import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ProfileCardModal } from '@/components/ProfileCardModal';
@@ -43,6 +44,7 @@ export default function DmScreen() {
   // Doğru kaynak store: `dm` store'u sunucudan gelen `canMessage`/`selfBlocked`'ı taşıyor ve her
   // `fetchAll` ile tazeleniyor. Route parametresi yalnız store'da kanal yokken (derin link) yedek.
   const storeChannel = useDmStore((s) => s.channels.find((c) => c.id === params.id));
+  const myUserId = useAuthStore((s) => s.user?.id);
 
   /**
    * Sprint M2d §3.2 — bahsetme öneri kaynağı. Grup DM'de üyeler store'daki kanal kaydından gelir;
@@ -52,11 +54,14 @@ export default function DmScreen() {
    */
   const mentionCandidates = useMemo(() => {
     if (storeChannel?.type === 'GROUP_DM') {
-      return storeChannel.members.map((m) => ({
-        id: m.id,
-        username: m.username,
-        avatarUrl: m.avatarUrl,
-      }));
+      // Kendin listede yok — sunucu kendi bahsetmeni yok sayıyor (kanal ekranındaki not).
+      return storeChannel.members
+        .filter((m) => m.id !== myUserId)
+        .map((m) => ({
+          id: m.id,
+          username: m.username,
+          avatarUrl: m.avatarUrl,
+        }));
     }
     if (storeChannel?.type === 'DM') {
       const u = storeChannel.otherUser;
@@ -66,7 +71,7 @@ export default function DmScreen() {
       return [{ id: params.otherUserId, username: params.title, avatarUrl: params.avatarUrl ?? null }];
     }
     return [];
-  }, [storeChannel, params.otherUserId, params.title, params.avatarUrl]);
+  }, [storeChannel, myUserId, params.otherUserId, params.title, params.avatarUrl]);
 
   // M1d-0 R1 (sahip kararı 2026-07-31) — başlıktaki kanka ekle ikonu **KALDIRILDI**. 2026-07-30'da
   // eklenmişti çünkü o gün profil kartında ekleme yoktu; R1-d kartı eklemeyi getirince başlık ikonu

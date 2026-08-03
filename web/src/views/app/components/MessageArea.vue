@@ -146,8 +146,14 @@ watch(
 )
 
 // Sprint V2: mention autocomplete (guild kanalı → guild üyeleri)
+// 🔴 Kendini bahsetme önerisi YOK (sahip sorusu 2026-08-03): sunucu kendi bahsetmeni zaten yok
+// sayıyor (`messages.gateway.ts` alıcı döngüsü `if (mentionedUserId === authorId) continue`),
+// yani o satırı seçmek metne `@sen` yazmaktan başka hiçbir şey yapmıyor — tıklayınca hiçbir şey
+// olmayan öneri gösterilmez.
 const mentionMembers = computed(() =>
-  guildMembers.value.map((m) => ({ id: m.userId, username: m.username, avatarUrl: m.avatarUrl }))
+  guildMembers.value
+    .filter((m) => m.userId !== authStore.user?.id)
+    .map((m) => ({ id: m.userId, username: m.username, avatarUrl: m.avatarUrl }))
 )
 
 // @everyone: yalnız everyone rolü mentionable ise id döner (aksi → null → öneri yok)
