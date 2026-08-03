@@ -29,6 +29,8 @@ const props = defineProps<{
    */
   suppressEveryone?: boolean
   suppressEvents?: boolean
+  /** R15 — rol bahsetmelerini sustur (yine yalnız ortam menüsünde). */
+  suppressRoleMentions?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -36,6 +38,7 @@ const emit = defineEmits<{
   (e: 'select', level: NotificationLevelType): void
   (e: 'toggle-everyone'): void
   (e: 'toggle-events'): void
+  (e: 'toggle-role-mentions'): void
 }>()
 
 const { t } = useI18n()
@@ -62,10 +65,14 @@ const flyoutLeft = ref(0)
 // Bastırma kutucukları eklenince panel hem genişler hem uzar; konumlama (sağa/sola çevirme,
 // alt kenardan taşma) bu ölçülere bakıyor, sabitler tek yerde tutulur.
 const hasSuppressions = computed(
-  () => props.suppressEveryone !== undefined || props.suppressEvents !== undefined,
+  () =>
+    props.suppressEveryone !== undefined ||
+    props.suppressEvents !== undefined ||
+    props.suppressRoleMentions !== undefined,
 )
-const FLYOUT_W = computed(() => (hasSuppressions.value ? 236 : 184))
-const FLYOUT_H = computed(() => (hasSuppressions.value ? 224 : 132))
+const FLYOUT_W = computed(() => (hasSuppressions.value ? 252 : 184))
+// Üç kutucuk + ayraç: yükseklik konumlama clamp'ini besliyor, satır eklenince güncellenmeli.
+const FLYOUT_H = computed(() => (hasSuppressions.value ? 264 : 132))
 
 const options = computed(() => [
   { level: NotificationLevel.ALL, label: t('guildMenu.notificationsAll') },
@@ -195,6 +202,18 @@ onUnmounted(() => {
           <span class="nlf-option__label">{{ t('guildMenu.suppressEvents') }}</span>
           <span class="nlf-box" :class="suppressEvents ? 'nlf-box--on' : ''">
             <svg v-if="suppressEvents" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </span>
+        </button>
+        <button
+          type="button"
+          class="nlf-option"
+          role="menuitemcheckbox"
+          :aria-checked="suppressRoleMentions === true"
+          @click="emit('toggle-role-mentions')"
+        >
+          <span class="nlf-option__label">{{ t('guildMenu.suppressRoleMentions') }}</span>
+          <span class="nlf-box" :class="suppressRoleMentions ? 'nlf-box--on' : ''">
+            <svg v-if="suppressRoleMentions" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
           </span>
         </button>
       </template>

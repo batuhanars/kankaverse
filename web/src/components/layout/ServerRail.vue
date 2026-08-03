@@ -78,8 +78,10 @@ const {
   setGuildLevel,
   suppressEveryone,
   suppressEvents,
+  suppressRoleMentions,
   toggleSuppressEveryone,
   toggleSuppressEvents,
+  toggleSuppressRoleMentions,
   copyGuildId,
 } = useGuildMenuActions(() => contextGuild.value?.id ?? '')
 
@@ -523,9 +525,11 @@ function badgeLabel(count: number): string {
         :level="guildLevel"
         :suppress-everyone="suppressEveryone"
         :suppress-events="suppressEvents"
+        :suppress-role-mentions="suppressRoleMentions"
         @select="setGuildLevel"
         @toggle-everyone="toggleSuppressEveryone"
         @toggle-events="toggleSuppressEvents"
+        @toggle-role-mentions="toggleSuppressRoleMentions"
       />
 
       <!-- 5. Sunucu Ayarları — canOpenSettings -->

@@ -292,6 +292,9 @@ export interface MessageDto {
   reactions?: ReactionDto[]
   mentions?: string[]  // Sprint V2 — doğrulanmış bahsedilen userId'ler (boşsa [])
   mentionsEveryone?: boolean  // @everyone toplu bahsetme (everyone rolü mentionable iken)
+  // R15 — bahsedilen ROL id'leri (≤3, everyone hariç). Kendi rollerimle kesişimi istemcide
+  // hesaplanır: "bana rolümden bahsedildi" bandı ve rol çipi bunu kullanır.
+  mentionRoles?: string[]
   pinnedAt: string | null  // Sprint V2 Pins — dolu ise sabitlenen mesaj
 }
 
@@ -445,6 +448,8 @@ export interface NotificationPrefDto {
   // Sprint R14 — yalnız GUILD satırında anlamlı; CHANNEL satırında sunucu her zaman false döner.
   suppressEveryone: boolean
   suppressEvents: boolean
+  // Sprint R15 — rol bahsetmelerini sustur (yine yalnız GUILD)
+  suppressRoleMentions: boolean
 }
 
 // Sprint R5 — Ortam denetim kaydı (moderasyon aksiyon logları)

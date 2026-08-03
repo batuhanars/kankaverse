@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useRolesStore } from '@/stores/roles'
 import { useMessagesStore } from '@/stores/messages'
 import { messagesApi } from '@/api/messages'
 import MessageRow from './MessageRow.vue'
@@ -37,12 +38,35 @@ function mentionResolver(userId: string): string {
   return member ? member.username : t('mention.unknown')
 }
 
-// Sprint V2: kendi bahsedilme vurgusu
-const isMentioned = computed(
-  () =>
-    props.message.mentionsEveryone === true ||
-    !!props.message.mentions?.includes(authStore.user?.id ?? ''),
-)
+/**
+ * R15 — rol çözücü: roleId → { ad, renk }. Roller store'dan okunur (kart/ayarlar hattı zaten
+ * dolduruyor). Bulunamazsa `undefined` döner ve render "@rol" yedeğine düşer — silinmiş ya da
+ * henüz yüklenmemiş rol için uydurma ad basmayız.
+ */
+const rolesStore = useRolesStore()
+function roleResolver(roleId: string): { name: string; color?: string | null } | undefined {
+  if (!props.guildId) return undefined
+  const role = rolesStore.rolesFor(props.guildId).find((r) => r.id === roleId)
+  return role ? { name: role.name, color: role.color } : undefined
+}
+
+/** R15 — bana atanmış rol id'leri (bahsetme bandı kesişimi için). */
+const myRoleIds = computed<string[]>(() => {
+  if (!props.guildId) return []
+  const me = props.guildMembers?.find((m) => m.userId === authStore.user?.id)
+  return me?.roles?.map((r) => r.id) ?? []
+})
+
+// Sprint V2: kendi bahsedilme vurgusu — R15: rolümden bahsedilmek de sayılır
+const isMentioned = computed(() => {
+  if (props.message.mentionsEveryone === true) return true
+  if (props.message.mentions?.includes(authStore.user?.id ?? '')) return true
+  const roles = props.message.mentionRoles
+  if (roles?.length && myRoleIds.value.length) {
+    return roles.some((id) => myRoleIds.value.includes(id))
+  }
+  return false
+})
 
 // Kullanıcı kartı popover (yazar adına tıklama — MessageRow gelecekte emit ile bağlanabilir)
 const showCard = ref(false)
@@ -195,6 +219,7 @@ onUnmounted(() => {
     :is-group-start="isGroupStart"
     :is-editing="editing"
     :mention-resolver="mentionResolver"
+    :role-resolver="roleResolver"
     :is-mentioned="isMentioned"
     :can-pin="canPin ?? false"
     :can-manage-messages="canManageMessages ?? false"

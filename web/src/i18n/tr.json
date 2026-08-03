@@ -452,6 +452,8 @@
     "suppressEveryoneHint": "Bu ortamda herkese yapılan bahsetmeler seni bildirmez.",
     "suppressEvents": "Yeni Etkinlikleri Sustur",
     "suppressEventsHint": "Bu ortamda yeni etkinlik oluşturulduğunda bildirim alma.",
+    "suppressRoleMentions": "Rol Bahsetmelerini Sustur",
+    "suppressRoleMentionsHint": "Bu ortamda rollerin etiketlenmesi seni bildirmez.",
     "copyId": "Sunucu ID'sini Kopyala",
     "idBadge": "ID",
     "idCopied": "Sunucu ID'si kopyalandı",
@@ -1316,6 +1318,7 @@
   "mention": {
     "unknown": "bilinmeyen",
     "everyoneHint": "Bu ortamdaki herkese bildir",
+    "roleHint": "Bu roldeki herkese bildir",
     "autocompleteEmpty": "Eşleşen üye bulunamadı.",
     "banner": "Yeni bahsetmelerin var",
     "bannerHint": "Sıradaki bahsetmenin olduğu kanala git"

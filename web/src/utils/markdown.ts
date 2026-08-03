@@ -20,6 +20,7 @@
 
 import MarkdownIt from 'markdown-it'
 import DOMPurify, { type Config as DOMPurifyConfig } from 'dompurify'
+import { prefixRoleName } from './mentions'
 
 // ────────────────────────────────────────────────────────────
 // 1. markdown-it instance (bir kez oluştur — modül kapsamı)
@@ -139,12 +140,14 @@ export function renderMessageHtml(
   content: string,
   resolve: (id: string) => string | undefined,
   fallback: string,
+  /** R15 — roleId → { name, color }. Verilmezse rol token'ı "@rol" yedeğiyle çizilir. */
+  resolveRole?: (roleId: string) => { name: string; color?: string | null } | undefined,
 ): string {
   if (!content) return ''
 
   // Adım 1: token'ları yer-tutucuyla değiştir (markdown'dan ÖNCE)
-  // 1a: @everyone rol token'ı (<@&id>) → everyone yer-tutucu (id çözümüne gerek yok)
-  const withEveryone = content.replace(ROLE_MENTION_RE, () => EVERYONE_PLACEHOLDER)
+  // 1a: rol token'ı (<@&id>) → id TAŞIYAN yer-tutucu (R15: ad ve renk id'den çözülür)
+  const withEveryone = content.replace(ROLE_MENTION_RE, (_m, id: string) => toRolePlaceholder(id))
   // 1b: <@id> kullanıcı token'ları
   const mentionMap = new Map<string, string>()
   const withPlaceholders = withEveryone.replace(MENTION_RE, (_match, id: string) => {
@@ -161,7 +164,17 @@ export function renderMessageHtml(
   // Adım 4: yer-tutucuları stilli mention span'lerine çevir
   // (Sanitize sonrasında — span ve class allowlist'te olduğu için hayatta kalır)
   const finalHtml = cleanHtml
-    .replace(EVERYONE_PLACEHOLDER_RE, () => '<span class="kv-mention kv-mention--everyone">@everyone</span>')
+    .replace(ROLE_PLACEHOLDER_RE, (_match, roleId: string) => {
+      const role = resolveRole?.(roleId)
+      // Çözülemeyen rol (silinmiş / başka ortam / roller yüklenmemiş) → nötr "@rol" yedeği
+      if (!role) return '<span class="kv-mention kv-mention--everyone">@rol</span>'
+      const label = escapeHtml(prefixRoleName(role.name))
+      // 🔴 Renk YALNIZ #rrggbb kalıbına uyuyorsa gömülür. Bu HTML sanitize'dan SONRA üretiliyor
+      // (DOMPurify onu görmüyor), dolayısıyla değeri burada doğrulamak tek kemer.
+      const safeColor = role.color && /^#[0-9a-fA-F]{6}$/.test(role.color) ? role.color : null
+      const style = safeColor ? ` style="color:${safeColor}"` : ''
+      return `<span class="kv-mention kv-mention--everyone"${style}>${label}</span>`
+    })
     .replace(PLACEHOLDER_RE, (_match, id: string) => {
       const username = mentionMap.get(id) ?? fallback
       return mentionSpanHtml(username)

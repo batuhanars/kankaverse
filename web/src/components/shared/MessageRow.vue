@@ -33,6 +33,8 @@ const props = defineProps<{
   isEditing?: boolean
   // Sprint V2: userId → username çözücü (parent sağlar; guild/DM bağlamına göre)
   mentionResolver?: (userId: string) => string
+  /** R15 — roleId → { ad, renk }. Verilmezse rol token'ı "@rol" yedeğiyle çizilir (DM'de böyle). */
+  roleResolver?: (roleId: string) => { name: string; color?: string | null } | undefined
   // Sprint V2: kendi-bahsedilme vurgusu
   isMentioned?: boolean
   // Sprint V2 Pins: kullanıcı bu kanalda mesaj sabitleyebilir mi? (parent hesaplar)
@@ -104,6 +106,7 @@ const renderedContent = computed<string>(() => {
     content,
     (id) => props.mentionResolver?.(id),
     t('mention.unknown'),
+    (roleId) => props.roleResolver?.(roleId),
   )
 })
 </script>
@@ -228,7 +231,7 @@ const renderedContent = computed<string>(() => {
           <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">
             {{ message.replyTo.authorUsername }}
           </span>
-          <span class="truncate">{{ formatMentionsPlain(message.replyTo.content, (id) => mentionResolver?.(id), t('mention.unknown')) }}</span>
+          <span class="truncate">{{ formatMentionsPlain(message.replyTo.content, (id) => mentionResolver?.(id), t('mention.unknown'), (roleId) => roleResolver?.(roleId)?.name) }}</span>
         </template>
         <template v-else>
           <span class="italic">{{ t('reply.deleted') }}</span>

@@ -106,6 +106,7 @@ export function useGuildMenuActions(guildId: Ref<string> | (() => string)) {
   // (sustur geçici, bu ayar kalıcı — sözleşme §3.1).
   const suppressEveryone = computed(() => prefsStore.suppressEveryone(gid.value))
   const suppressEvents = computed(() => prefsStore.suppressEvents(gid.value))
+  const suppressRoleMentions = computed(() => prefsStore.suppressRoleMentions(gid.value))
 
   async function toggleSuppressEveryone() {
     const id = gid.value
@@ -135,6 +136,20 @@ export function useGuildMenuActions(guildId: Ref<string> | (() => string)) {
     }
   }
 
+  async function toggleSuppressRoleMentions() {
+    const id = gid.value
+    if (!id) return
+    try {
+      await prefsStore.setPref({
+        targetType: NotifTargetType.GUILD,
+        targetId: id,
+        suppressRoleMentions: !suppressRoleMentions.value,
+      })
+    } catch {
+      toast.error(t('guildMenu.levelError'))
+    }
+  }
+
   // ── Sunucu ID'sini kopyala ──
   async function copyGuildId() {
     const id = gid.value
@@ -158,8 +173,10 @@ export function useGuildMenuActions(guildId: Ref<string> | (() => string)) {
     setGuildLevel,
     suppressEveryone,
     suppressEvents,
+    suppressRoleMentions,
     toggleSuppressEveryone,
     toggleSuppressEvents,
+    toggleSuppressRoleMentions,
     copyGuildId,
   }
 }

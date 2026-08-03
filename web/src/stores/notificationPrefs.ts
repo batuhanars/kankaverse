@@ -81,6 +81,11 @@ export const useNotificationPrefsStore = defineStore('notificationPrefs', () => 
     return prefs.get(key('GUILD', guildId))?.suppressEvents ?? false
   }
 
+  /** R15 — rol bahsetmelerini sustur (yine yalnız GUILD hedefinde anlamlı). */
+  function suppressRoleMentions(guildId: string): boolean {
+    return prefs.get(key('GUILD', guildId))?.suppressRoleMentions ?? false
+  }
+
   /**
    * Efektif bildirim seviyesi. CHANNEL için kanal kaydı yoksa (guildId verildiyse)
    * GUILD tercihine düşer; o da yoksa 'ALL'.
@@ -106,9 +111,10 @@ export const useNotificationPrefsStore = defineStore('notificationPrefs', () => 
     muted?: boolean
     mutedUntil?: string | null
     level?: NotificationLevelType
-    // R14 — sunucu bu ikisini yalnız targetType=GUILD ile kabul eder (aksi 400 INVALID_PREF_TARGET).
+    // R14/R15 — sunucu bu üçünü yalnız targetType=GUILD ile kabul eder (aksi 400 INVALID_PREF_TARGET).
     suppressEveryone?: boolean
     suppressEvents?: boolean
+    suppressRoleMentions?: boolean
   }) {
     const res = await notificationsApi.setPref(body)
     const pref = res.data
@@ -125,6 +131,7 @@ export const useNotificationPrefsStore = defineStore('notificationPrefs', () => 
     channelBadgeEffect,
     suppressEveryone,
     suppressEvents,
+    suppressRoleMentions,
     effectiveLevel,
     setPref,
   }

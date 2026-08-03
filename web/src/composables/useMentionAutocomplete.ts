@@ -23,6 +23,9 @@ export interface MentionMember {
   username: string
   avatarUrl?: string | null
   isEveryone?: boolean // @everyone özel önerisi (gerçek üye değil)
+  // R15 — rol önerisi: gerçek üye değil, seçilince <@&roleId> token'ına çevrilir
+  isRole?: boolean
+  color?: string | null
 }
 
 // @everyone özel önerisi için sabit sentinel id
@@ -50,6 +53,12 @@ export function useMentionAutocomplete(
   setCursor: (pos: number) => void,
   // @everyone rol id'si — yalnız everyone rolü mentionable ise dolu döner; null → @everyone önerisi yok
   everyoneRoleId?: () => string | null,
+  /**
+   * R15 — önerilebilir ROLLER (everyone HARİÇ). Çağıran kapı kuralını uygulamış olarak verir:
+   * `mentionable` roller herkese, `mentionable` olmayanlar yalnız `MENTION_EVERYONE` izni olana.
+   * İzin kontrolü burada tekrarlanmaz — tek yerde kalsın (çağıran zaten yetki hattına bağlı).
+   */
+  roles?: () => Array<{ id: string; name: string; color?: string | null }>,
 ) {
   const showPopover = ref(false)
   const suggestions = ref<MentionMember[]>([])
@@ -57,6 +66,8 @@ export function useMentionAutocomplete(
 
   // username → userId: picker'dan seçilen bahsetmeler (gönderimde token'a çevrilir)
   const pendingMentions = ref<Map<string, string>>(new Map())
+  // R15 — rol adı → roleId (gönderimde <@&roleId> token'ına çevrilir)
+  const pendingRoles = ref<Map<string, string>>(new Map())
 
   // Aktif sorgu bilgisi (seçim sırasında değiştirmek için)
   const _currentQuery = ref<{ query: string; start: number } | null>(null)
@@ -85,6 +96,12 @@ export function useMentionAutocomplete(
     if (everyoneRoleId?.() && 'everyone'.startsWith(q)) {
       list.push({ id: EVERYONE_ID, username: 'everyone', isEveryone: true })
     }
+    // R15 — roller üyelerin ÜSTÜNDE (grup hedefi daha az sayıda, aranan çoğunlukla odur)
+    for (const role of roles?.() ?? []) {
+      if (role.name.toLowerCase().includes(q)) {
+        list.push({ id: role.id, username: role.name, isRole: true, color: role.color })
+      }
+    }
     list.push(...filtered)
 
     if (!list.length) {
@@ -109,7 +126,9 @@ export function useMentionAutocomplete(
     const newCursor = before.length + replacement.length
     // Gerçek üye → username→userId haritası. @everyone için bayrak TUTULMAZ: dönüşüm artık
     // seçime değil rolün mentionable olmasına bakıyor (bkz. applyMentionTokens).
-    if (!member.isEveryone) pendingMentions.value.set(member.username, member.id)
+    // R15 — rol seçimi ayrı haritada; token biçimi farklı (<@&id>).
+    if (member.isRole) pendingRoles.value.set(member.username, member.id)
+    else if (!member.isEveryone) pendingMentions.value.set(member.username, member.id)
     showPopover.value = false
     suggestions.value = []
     _currentQuery.value = null
@@ -169,6 +188,13 @@ export function useMentionAutocomplete(
     if (roleId) {
       result = result.replace(/@everyone(?=\s|$)/g, `<@&${roleId}>`)
     }
+    // R15 — rol adları: YALNIZ listeden seçilenler (kullanıcı adlarındaki kuralın aynısı).
+    // Serbest yazılan `@Moderatör` çevrilmez: rol adı serbest metinle çakışabilir ve yanlış
+    // gruba ping atmak kişiye yanlış ping atmaktan daha gürültülü olurdu.
+    for (const [roleName, id] of pendingRoles.value.entries()) {
+      const regex = new RegExp(`@${escapeRegex(roleName)}(?=\\s|$)`, 'g')
+      result = result.replace(regex, `<@&${id}>`)
+    }
     for (const [username, userId] of pendingMentions.value.entries()) {
       // Tam kelime eşleşmesi: @username arkasında kelime-sınırı (boşluk, satır sonu, metin sonu)
       const regex = new RegExp(`@${escapeRegex(username)}(?=\\s|$)`, 'g')
@@ -183,6 +209,7 @@ export function useMentionAutocomplete(
 
   function clearPending() {
     pendingMentions.value = new Map()
+    pendingRoles.value = new Map()
     showPopover.value = false
   }
 
