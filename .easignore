@@ -1,0 +1,43 @@
+# EAS Build arşiv süzgeci (monorepo kökü)
+#
+# NEDEN VAR: EAS, proje bir git deposunun içindeyken **depo kökünden** arşiv üretiyor.
+# Bu monorepoda kök = kankaverse/, yani `mobile/` derlenirken `api/`, `web/`, `landing/`,
+# `desktop/` de paketleniyordu. İki somut sonucu oldu (2026-08-03, ilk build denemesi):
+#
+#   1. `landing/dist` bir SYMLINK (→ landing/.output/public). Windows'ta symlink oluşturmak
+#      yönetici yetkisi ister → arşivleme "EPERM: operation not permitted, symlink ..." ile
+#      düştü ve build hiç başlamadı.
+#   2. Gereksiz yüzlerce MB yükleniyordu.
+#
+# 🔴 İKİNCİ İŞLEVİ (daha sinsi): `.easignore` VARSA EAS `.gitignore` yerine BUNU kullanır.
+# `mobile/src/i18n/tr.generated.json` git tarafından ignore ediliyor ama uygulamanın çalışması
+# için ŞART (i18n tek kaynağı web/src/i18n/tr.json'dan üretiliyor; üretim betiği yalnız
+# start/typecheck/lint öncesinde koşuyor, EAS derlemesinde koşmuyor). `.gitignore` mantığıyla
+# arşivlenseydi bundle çeviri dosyası olmadan derlenirdi. Burada ignore ETMEYEREK yerel üretilmiş
+# dosyanın yüklenmesini sağlıyoruz.
+
+# ─── Diğer tier'lar: mobil derlemesine girmez ────────────────────────────────
+/api/
+/web/
+/landing/
+/desktop/
+/infra/
+/contracts/
+/design-refs/
+
+# Kök dokümanlar
+/*.md
+
+# ─── Bağımlılıklar ve derleme çıktıları ──────────────────────────────────────
+node_modules/
+.expo/
+dist/
+build/
+.git/
+
+# ─── Gizli dosyalar (ikinci kemer; .gitignore'da da var) ─────────────────────
+.env
+.env.*
+*firebase-adminsdk*.json
+*serviceAccount*.json
+*service-account*.json
