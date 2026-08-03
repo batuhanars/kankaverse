@@ -1932,3 +1932,181 @@ hiç kullanılmıyordu. M2a mobili web semantiğine hizalar.
 - [ ] Beş sekme de veri getiriyor, boş kanalda boş durum çıkıyor
 - [ ] Medya'da yalnız görsel/video, Dosyalar'da yalnız diğer dosyalar
 - [ ] Üyeler sekmesinde roller gruplu, rolsüz üyeler en altta
+
+
+---
+
+## Küçük Revizeler — 2026-08-03 (sahip turu, PM onaylı)
+
+> M2a/M2b/M2c cihaz turu **temiz geçti** (sahip doğruladı 2026-08-03). Aşağıdakiler o turda ve
+> web kullanımında biriken küçük kalemler. Scope creep DEĞİL (sahip talebi). Dev kutu işaretler, item EKLEMEZ.
+
+### R-a — Mobil: etkinlik kartı ⋯ menüsü kartın üstünde açılsın (`mobile/`)
+
+Bugün menü `EventCard.tsx:122` kartın **en altında**, ayraçlı blok olarak açılıyor: iki öğe için
+kartı uzatıyor ve kartın yapısını bozuyor. Sahip "kartın üzerinde açılsın, iki buton zaten, küçük
+bir menü güzel durur" dedi.
+
+- [x] Menü, kart gövdesi içinde **mutlak konumlu küçük popover**: ⋯ düğmesinin **altına**, sağa yaslı
+      (`top` ~34-40, `right` ~10), `minWidth` ~150, `bgContent` + `borderStrong` + `radius.md`
+      (kart `bgElevated` olduğu için kontrast şart), Android'de `elevation`, `zIndex`
+- [x] Menü açıkken kart içini kaplayan **saydam kapatıcı** (`StyleSheet.absoluteFill` `Pressable`) →
+      karta dokununca menü kapanır. **Yeni `Modal` AÇMA** — liste zaten bir sheet Modal'ı, iç içe
+      Modal Android'de kırılgan (mevcut dosyadaki not aynen geçerli)
+- [x] Kart akışı menü açılınca **yer değiştirmez** (bugün ittiriyor)
+- [x] 🔴 **Taşma kontrolü:** kart `overflow: 'hidden'`. En kısa kartta (kapaksız + açıklamasız +
+      rozetsiz) menü kartın altından **kırpılmamalı**. Kırpılıyorsa çözüm: kartı `overflow: 'visible'`
+      yap + kapak görseline kendi `borderTopLeftRadius`/`borderTopRightRadius` değerlerini ver
+      (yarıçap kaybolmasın). Üçüncü bir yol arama, sapma hissi → DUR
+- [x] `typecheck` + `lint` temiz; yeni bağımlılık yok; metinler `tr.json`, ölçü/renk `theme`
+
+### R-b — Web: DM sağ-tık menüsü + başlık sadeleşmesi (`web/`)
+
+Sözleşme: `contracts/SPRINT_DM_MENU_CONTRACT.md` (tek doğruluk kaynağı). Kutular orada, DoD §6.
+
+### Ertelendi (sahip kararı, **yapılmayacak**)
+
+- **Mobil: nick'e basınca açılan profil kartına "Kanka Ekle"** → sahip erteledi. Gerekçe: o kart
+  ileride **ayrı bir profil ekranına** dönüşecek ve asıl doldurma o zaman yapılacak. Bugün oraya
+  düğme koymak, yarın taşınacak bir yüzeye yatırım olur. Kanka ekleme mobilde **DM panelinden**
+  erişilebilir durumda, dilsiz değil.
+
+
+---
+
+## Sprint R14 — Bildirim Kapsamı: Etkinlik Bildirimi + @everyone Bastırma — 2026-08-03
+
+> Sözleşme: `contracts/SPRINT_R14_NOTIFICATION_SCOPE_CONTRACT.md` = **tek doğruluk kaynağı**.
+> Sahip kararı 2026-08-02 ("M2 sonrası kalem"), PM compose 2026-08-03. **R7-nötr** (yeni erişim
+> kararı yok; bastırma yalnız kullanıcının kendi bildirim yüzeyini kısar). Dev kutu işaretler, item EKLEMEZ.
+>
+> Sahip onaylı kapsam kararları: **@here OUT** (özellik hiç yok) · **rol bahsetmesi susturma → R15**
+> (özelliğin kendisi orada yazılır, anahtar orada anlam kazanır).
+
+### Backend (`api/`) — sözleşme §2
+- [x] Şema: `NotificationType.EVENT_CREATED` + `NotificationPref.suppressEveryone/suppressEvents`
+      (additive, tek migration, DB'ye **uygulanır**)
+- [x] `setPref`: iki bayrak yalnız `targetType=GUILD` ile kabul; aksi → `400 INVALID_PREF_TARGET`
+- [x] `events.service.create` → `EVENT_CREATED` üretimi (alıcı kümesi `eventRecipients`'tan aynen;
+      tercih süzgeci tek sorgu, insert tek `createManyAndReturn`, alıcı başına sorgu YOK)
+- [x] `NotificationsService.createMany` (actor/guild çözümü bir kez, emit kullanıcı başına)
+- [x] @everyone bastırma üç yüzeyde: `notifyMentions` (emit + persist) · `findMyGuilds` rozeti ·
+      `findByGuild` kanal rozeti. **Doğrudan bahsetme her zaman geçer**
+- [x] Testler §2.5 (özellikle: bastırma açıkken doğrudan bahsedilen bildirim ALIR)
+- [x] `nest build` + tüm testler yeşil + `prisma migrate status` temiz
+
+### Mobil (`mobile/`) — sözleşme §3
+- [x] `guild-notifications.tsx`: iki anahtar (@everyone Bastır · Yeni Etkinlikleri Sustur), anında kaydet,
+      iyimser yaz + hata geri al; yeni bileşen yok (RN `Switch`)
+- [x] `notifications.tsx`: `EVENT_CREATED` satırı (takvim ikonu) → ortamın etkinlikler ekranı;
+      `guildId` yoksa satır tıklanmaz
+- [x] `notificationPrefs` store iki alanı taşır; `typecheck` + `lint` temiz
+
+### Web (`web/`) — sözleşme §4
+- [x] Aynı iki anahtar ortam bildirim yüzeyinde — **iki yüzeye birden** (`ServerRail` sağ-tık menüsü +
+      `ChannelPanel` ortam başlığı dropdown'ı); ikisi de `useGuildMenuActions`'ı paylaşıyor, tıklayınca
+      menü kapanmıyor (arka arkaya iki anahtar çevrilebilsin)
+- [x] **Yerleşim düzeltmesi (sahip 2026-08-03, Discord ekran görüntüsüyle):** iki bayrak önce menünün
+      **üst seviyesine** satır olarak konmuştu; sahip Discord'un bunları "Bildirim Ayarları" alt
+      panelinin içinde, seviye radyolarının altında kutucuk olarak tuttuğunu gösterdi. Satırlar
+      söküldü, `NotifLevelFlyout`'a opsiyonel `suppressEveryone`/`suppressEvents` prop'u eklendi:
+      prop verilmezse bölüm hiç render edilmiyor → **kanal menüsünde çıkmıyor** (sunucu zaten kanal
+      hedefini `INVALID_PREF_TARGET` ile reddediyor, gösterilseydi tıklanınca hata verirdi).
+      Kutucuğa basınca panel kapanmıyor; panel genişliği/yüksekliği bayraklı halde büyüyor
+      (konumlama sabitleri computed'e çevrildi, kenar-taşma clamp'i bozulmasın)
+- [x] `NotificationBell` + `useNativeNotifications` `EVENT_CREATED` tanır (metin mobille birebir)
+- [x] Metinler `tr.json`'a **bir kez** (mobil oradan import eder); `vue-tsc --noEmit` temiz
+
+> **Dev notu — bildirime tıklayınca etkinlikler nasıl açılıyor:** bildirimde etkinlik ID'si YOK
+> (`preview` = etkinlik adı), o yüzden kart vurgusu yapılmıyor; satır ortamın ilk kanalına gidip
+> `?events=1` ile modalı açtırıyor (mevcut `?event=<id>` derin-link yolunun ikizi). Bu sırada
+> `ChannelPanel`'deki derin-link yakalayıcısı `onMounted`'dan **watcher**'a çevrildi: panel ortam
+> sidebar'ı olarak mounted kaldığı için, **aynı ortamdayken** gelen bildirime tıklamak query'yi
+> değiştiriyor ama mount'u tetiklemiyordu → tıklama sessizce ölürdü. Kanalsız ortamda satır hiçbir
+> yere götürmüyor (kırık navigasyon vaat etme kuralı).
+
+### DoD (**cihaz + tarayıcı** — sahipte)
+- [x] Etkinlik oluştur → diğer hesapta bildirim satırı çıkıyor, dokununca etkinliğe gidiyor
+- [x] "Yeni Etkinlikleri Sustur" açıkken bildirim gelmiyor; ortam susturulmuşken de gelmiyor
+- [x] "@everyone Bastır" açıkken: rail rozeti yanmıyor, kanal rozeti yanmıyor, bildirim düşmüyor
+      — bir tur geri açılıp **tekrar kapandı** (aşağıdaki test-yöntemi notu)
+- [~] Aynı mesajda doğrudan bahsedilen kullanıcı bildirimi **alıyor** — **birim testiyle kilitli**
+      (§2.5), sahip elle tetikleyemedi (aşağıdaki mobil kısıtı)
+- [x] Web'den açılan anahtar mobilde görünüyor
+
+### Sahip DoD turu — 2026-08-03 (kapandı)
+
+- **Bastırma testi web'den tetiklendi, mobilden değil:** mobilde `@` girişi henüz yok (ne kişi ne
+  everyone bahsedilebiliyor), bahsetme yalnız web'den üretilebiliyor. Bastırmanın **mobil rozetine**
+  etkisi bu turda doğrulanmadı; süzgeç sunucuda olduğu için istemciden bağımsız, ama kayda geçsin.
+- **🟢 Doğru davranış (bastırma AÇIKKEN):** bastırılmış bir @everyone mesajı beyaz pill üretir.
+  Bastırma yalnız *bahsetme* yolunu keser (kırmızı rozet + kalıcı bildirim + anlık `mention` olayı);
+  mesajın kendisi o kanala düşmüş bir mesaj olduğu için normal okunmamış sayılmaya devam eder.
+  Sahip seviyeyi "Hiçbiri" yapınca beyaz pill de kayboldu → iki katman bağımsız, sözleşme §2.4 ile birebir.
+- **Test yöntemi tuzağı (iki taraf da yanıldı, kayda geçsin):** sahip "bastırmayı kaldırdım, kırmızı
+  rozet yine çıkmadı" dedi; PM bunu kabul edip maddeyi geri açtı. Gerçek sebep ikisinden de basitti:
+  o sırada **bildirim seviyesi "Hiçbiri"ydi**, yani zaten hiçbir rozet çıkmazdı. Seviye "Tümü"ye
+  alınınca @everyone kırmızı baloncuğu üretti. **Ders:** bastırma testinde seviye ALL olmalı, yoksa
+  iki süzgeç üst üste biner ve hangisinin kestiği anlaşılmaz.
+- **🔴 Yan bulgu (R15'e devredildi) — `@everyone` iki kapı arkasında:** **(1)** `@everyone` rolünün
+  `mentionable` alanı **varsayılan `false`** (`guilds.service.ts:195`; yerel DB'de 12 ortamın 10'unda
+  kapalı) → `@` listesinde "everyone" önerisi hiç çıkmaz; **(2)** anahtar açık olsa bile öneriyi
+  **listeden seçmek** şart: `pendingEveryone` yalnız `selectSuggestion`'da set ediliyor, elle yazılan
+  `@everyone` token'a çevrilmiyor ve kullanıcıya **hiçbir uyarı verilmiyor** (sessiz başarısızlık;
+  Discord'da yazmak yeter). Sunucu doğru davranıyor: token yoksa `mentionsEveryone=false`
+  (`messages.service.ts:143-151`). R15 kapı modelini (`mentionable` + `MENTION_EVERYONE`) ve rol
+  çipini getirince ikisi de kapanır.
+- **🔴 Sahip bulgusu → R15'e devredildi:** bir rolün "bahsedilebilir" anahtarı açıkken mesaj
+  kutusunda `@` yazınca o rol öneri listesinde **çıkmıyor**. Kodda doğrulandı: `useMentionAutocomplete.ts`
+  yalnız üyeleri + `everyoneRoleId`'yi öneriyor, normal rol hiç listelenmiyor. R14 regresyonu DEĞİL,
+  özellik henüz yazılmadı. PLAN C1-c'deki ölü-ayar bulgusunun görünen yüzü (rol ayarlarında
+  "bahsedilebilir" ve `MENTION_EVERYONE` gösteriliyor + kaydediliyor ama backend okumuyor).
+  R15 sözleşmesi bunu kapsıyor.
+
+### R-c — Mobil: etkinlik kartında ⋯ menüsü KALKSIN, iki ikon doğrudan kartta (`mobile/`)
+
+Sahip cihazda R-a'yı denedi: popover çalışıyor ama karar değişti — *"menü olmasın, o iki butonu
+direkt kart üzerinde gösterelim, ikon bazlı"*. R-a'nın popover'ı ve kapatıcısı **tamamen sökülür**
+(ölü kod bırakma).
+
+- [x] `EventCard.tsx`: ⋯ düğmesi + `menuOpen`/`onToggleMenu` prop'u + popover + kapatıcı **kaldırılır**;
+      çağıran ekran (`guild-events.tsx`) menü state'inden arındırılır
+- [x] Yerine `canManage` olduğunda **iki ikon düğmesi** kartın sağ üstünde (başlık satırında, ⋯'nin yeri):
+      **dişli** (`settings-outline`) → düzenle · **X** (`close-outline`) → sil. X `theme.colors.danger`
+- [x] Dokunma hedefi ≥40dp (`hitSlop` ile), ikonlar arası boşluk kartı sıkıştırmasın; başlık `titleBlock`
+      daralmasın (uzun etkinlik adı hâlâ iki satır)
+- [x] Silme onayı **korunur** (mevcut `ConfirmDialog` akışı) — tek dokunuşla silme YOK
+- [x] R-a'nın kırpılma çözümü (`overflow: 'visible'` + kapak köşe yarıçapları) artık **gereksizse geri alınır**
+      (popover gitti); kartın kapak köşeleri bozulmadan eski `overflow: 'hidden'` haline dönmeli
+- [x] `typecheck` + `lint` temiz; erişilebilirlik etiketleri (`accessibilityLabel`) iki düğmede de var
+
+---
+
+## Sprint WEB-PARITE — Rozet Paritesi + Menü Cilası + DM Profil Paneli — 2026-08-03
+
+> Sözleşme: `contracts/SPRINT_WEB_NOTIF_PARITY_CONTRACT.md` = **tek doğruluk kaynağı**.
+> Kaynak: **sahip canlı web testi** 2026-08-03. Saf `web/`, **sıfır backend**. Kutular sözleşme §5'te,
+> özet aşağıda. Dev kutu işaretler, item EKLEMEZ.
+
+- [x] Canlı rozet paritesi: `channelBadgeEffect` (mobil ikizi) + `useSocket` üç handler'da süzgeç
+      (`channel.activity` · `mention` · `dm.message`)
+- [x] `DmList`: susturulmuş DM sönük + rozetsiz, ama listede kalıyor ve son mesajı güncelleniyor
+- [x] Kanal sağ-tık menüsünde **süreli sustur** (`MuteDurationFlyout`; `useChannelMenuActions`'a
+      `muteChannelFor`/`unmuteChannel`)
+- [x] `MuteDurationFlyout` + `NotifLevelFlyout` **hover** ile açılıyor (150ms kapanma gecikmesi),
+      tıklama ve klavye korunuyor, alt-sayfa modunda davranış değişmiyor
+- [x] `<1280`'de DM profil paneli toggle + overlay (üye paneli deseni)
+- [x] `vue-tsc --noEmit` temiz · `vite build` geçer · `api/` diffi yok
+
+### 🔴 Sahip canlı testi bulgusu (2026-08-03) — hover yarım bağlanmıştı
+
+Sahip web'de denedi: **Bildirim Ayarları hover ile açılıyor, Sustur açılmıyor.** Kök neden:
+`MuteDurationFlyout` `useFlyoutMenu`'yu import edip handler'ları destructure etmiş ama
+**template'e hiç bağlamamış** — tetikleyicide yalnız `@click` vardı, `@mouseenter`/`@mouseleave`/
+`@keydown` yoktu, teleport edilen panelde de yoktu. Yani composable takılıydı, kablosu yoktu;
+ayrıca `open.value` doğrudan yazıldığı için "aynı anda tek flyout" koordinasyonu da devre dışıydı.
+Düzeltme: `NotifLevelFlyout` ile birebir aynı bağlanış (`toggleFlyout(positionFlyout)` +
+üç hover/klavye handler'ı + panelde `onPanelEnter/Leave/Keydown`), `pick`/dış-tık/scroll
+kapanışları `closeFlyout()`e çevrildi. **Ders:** composable'ı çağırmak davranışı getirmez;
+şablon bağlanışı ayrı bir doğrulama adımı (typecheck bunu yakalamaz — kullanılmayan destructure
+uyarı üretmiyor).
