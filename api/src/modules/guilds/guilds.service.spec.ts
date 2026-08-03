@@ -742,13 +742,15 @@ describe('GuildsService.findMyGuilds — kanal bazlı bildirim tercihi süzgeci 
     expect(result[0].unreadMentionCount).toBe(1);
   });
 
-  it('tek sorgu: notificationPref.findMany userId + targetType CHANNEL ile bir kez çağrılır', async () => {
+  // R14: sorgu kanal+ortam tercihlerini BİRLİKTE çeker (ortam satırından yalnız
+  // suppressEveryone okunur); kanal başına ek sorgu yok — tek findMany kuralı korunur.
+  it('tek sorgu: notificationPref.findMany kullanıcının tüm tercihleri için bir kez çağrılır', async () => {
     prismaMock.notificationPref.findMany.mockResolvedValue([]);
 
     await service.findMyGuilds(OWNER_ID);
     expect(prismaMock.notificationPref.findMany).toHaveBeenCalledTimes(1);
     expect(prismaMock.notificationPref.findMany).toHaveBeenCalledWith({
-      where: { userId: OWNER_ID, targetType: 'CHANNEL' },
+      where: { userId: OWNER_ID },
     });
   });
 });
@@ -1393,5 +1395,88 @@ describe('GuildsService.joinDiscovery — C6 (discoverable + Sprint 7A gate)', (
     expect(result.id).toBe(GUILD_ID);
     expect(result.discoverable).toBe(true);
     expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── GuildsService.findMyGuilds — R14 §2.4b: @everyone bastırma (rail rozeti) ─────────────────
+
+describe('GuildsService.findMyGuilds — @everyone bastırma rail rozeti (R14)', () => {
+  let service: GuildsService;
+
+  function membershipWithChannel(isPrivate = false) {
+    return {
+      guildId: GUILD_ID,
+      guild: {
+        ...GUILD_FIXTURE,
+        channels: [{ id: 'ch-1', guildId: GUILD_ID, isPrivate, channelReads: [] }],
+      },
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.guildMember.findMany.mockResolvedValue([membershipWithChannel()]);
+    prismaMock.message.count.mockResolvedValue(0);
+  });
+
+  it('bastırma yok → mention sayımı @everyone dalını İÇERİR', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([]);
+
+    await service.findMyGuilds(OWNER_ID);
+
+    // ikinci message.count çağrısı mention sayımı
+    const mentionWhere = prismaMock.message.count.mock.calls[1][0].where;
+    expect(mentionWhere.OR).toEqual([
+      { mentions: { has: OWNER_ID } },
+      { mentionsEveryone: true },
+    ]);
+  });
+
+  it('suppressEveryone=true → @everyone dalı DÜŞER, doğrudan bahsetme kalır', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      {
+        targetType: 'GUILD',
+        targetId: GUILD_ID,
+        muted: false,
+        mutedUntil: null,
+        level: 'ALL',
+        suppressEveryone: true,
+        suppressEvents: false,
+      },
+    ]);
+
+    await service.findMyGuilds(OWNER_ID);
+
+    const mentionWhere = prismaMock.message.count.mock.calls[1][0].where;
+    expect(mentionWhere.OR).toEqual([{ mentions: { has: OWNER_ID } }]);
+  });
+
+  it('başka ortamın bastırması bu ortamı etkilemez', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      {
+        targetType: 'GUILD',
+        targetId: 'baska-ortam',
+        muted: false,
+        mutedUntil: null,
+        level: 'ALL',
+        suppressEveryone: true,
+        suppressEvents: false,
+      },
+    ]);
+
+    await service.findMyGuilds(OWNER_ID);
+
+    const mentionWhere = prismaMock.message.count.mock.calls[1][0].where;
+    expect(mentionWhere.OR).toContainEqual({ mentionsEveryone: true });
+  });
+
+  it('tercihler TEK findMany ile çekilir (kanal + ortam birlikte)', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([]);
+
+    await service.findMyGuilds(OWNER_ID);
+
+    expect(prismaMock.notificationPref.findMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.notificationPref.findMany).toHaveBeenCalledWith({ where: { userId: OWNER_ID } });
   });
 });

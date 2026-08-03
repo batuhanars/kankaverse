@@ -19,6 +19,7 @@ const prismaMock = {
   session: { findFirst: jest.fn() },
   user: { findUnique: jest.fn(), findMany: jest.fn() },
   channelMember: { findMany: jest.fn() },
+  notificationPref: { findMany: jest.fn() },
 };
 
 const jwtMock = { verify: jest.fn() };
@@ -72,6 +73,8 @@ function resetMocks() {
   notificationsMock.snapshot.mockResolvedValue({ notifications: [], unreadCount: 0 });
   // R12 — varsayılan: suppression yok (bildirim üretilir); süzme testleri override eder.
   notificationsShouldNotifyMock.mockResolvedValue(true);
+  // R14 — varsayılan: @everyone bastırma kaydı yok
+  prismaMock.notificationPref.findMany.mockResolvedValue([]);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -448,5 +451,117 @@ describe('MessagesGateway.notifyMentions', () => {
     expect(notificationsCreateMock).not.toHaveBeenCalled();
     // anlık `mention` WS eventi yine de gider (tercih yalnız kalıcı bildirimi süzer)
     expect(emitToUserMock).toHaveBeenCalledTimes(1);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // R14 §2.4a — @everyone bastırma (ne emit ne persist); doğrudan bahsetme geçer
+  // ─────────────────────────────────────────────────────────────────────────
+  describe('@everyone bastırma (R14)', () => {
+    const EVERYONE_ONLY_ID = 'user-everyone-only';
+
+    function makeEveryoneDto(mentions: string[] = []) {
+      return {
+        id: 'msg-everyone-1',
+        channelId: CHANNEL_ID,
+        content: mentions.length ? `<@&role-everyone> ve <@${mentions[0]}>` : '<@&role-everyone> herkes',
+        mentions,
+        mentionsEveryone: true,
+        author: { id: AUTHOR_ID, username: 'author', avatarUrl: null },
+        createdAt: new Date().toISOString(),
+      } as Record<string, unknown>;
+    }
+
+    it('suppressEveryone=true → everyone alıcısına NE emit NE persist', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID, isPrivate: false });
+      prismaMock.user.findMany.mockResolvedValue([]);
+      prismaMock.guildMember.findMany.mockResolvedValue([
+        { userId: AUTHOR_ID, user: { isMinor: false } },
+        { userId: EVERYONE_ONLY_ID, user: { isMinor: false } },
+      ]);
+      prismaMock.notificationPref.findMany.mockResolvedValue([
+        { userId: EVERYONE_ONLY_ID, suppressEveryone: true },
+      ]);
+
+      await gateway.notifyMentions(CHANNEL_ID, makeEveryoneDto());
+
+      expect(emitToUserMock).not.toHaveBeenCalled();
+      expect(notificationsCreateMock).not.toHaveBeenCalled();
+    });
+
+    // REGRESYON KİLİDİ (sözleşme §2.5): bastırma yalnız genişlemeden geleni keser.
+    it('bastırma açık ama AYNI mesajda doğrudan bahsedilen kullanıcı bildirimi ALIR', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID, isPrivate: false });
+      prismaMock.user.findMany.mockResolvedValue([{ id: MENTIONED_USER_1, username: 'kanka1' }]);
+      prismaMock.guildMember.findMany.mockResolvedValue([
+        { userId: AUTHOR_ID, user: { isMinor: false } },
+        { userId: MENTIONED_USER_1, user: { isMinor: false } },
+        { userId: EVERYONE_ONLY_ID, user: { isMinor: false } },
+      ]);
+      // İkisi de bastırma açmış; ama MENTIONED_USER_1 doğrudan bahsediliyor → geçer.
+      prismaMock.notificationPref.findMany.mockResolvedValue([
+        { userId: EVERYONE_ONLY_ID, suppressEveryone: true },
+      ]);
+
+      await gateway.notifyMentions(CHANNEL_ID, makeEveryoneDto([MENTIONED_USER_1]));
+
+      // Tercih sorgusu YALNIZ genişlemeden gelenler için (doğrudan bahsedilen kapsam DIŞI)
+      const prefCall = prismaMock.notificationPref.findMany.mock.calls[0][0];
+      expect(prefCall.where.userId.in).toContain(EVERYONE_ONLY_ID);
+      expect(prefCall.where.userId.in).not.toContain(MENTIONED_USER_1);
+      expect(prefCall.where.targetType).toBe('GUILD');
+      expect(prefCall.where.targetId).toBe(GUILD_ID);
+
+      // Doğrudan bahsedilen: hem emit hem persist
+      expect(emitToUserMock).toHaveBeenCalledTimes(1);
+      expect(emitToUserMock).toHaveBeenCalledWith(MENTIONED_USER_1, 'mention', expect.anything());
+      expect(notificationsCreateMock).toHaveBeenCalledTimes(1);
+      expect(notificationsCreateMock.mock.calls[0][0]).toBe(MENTIONED_USER_1);
+    });
+
+    it('bastırma kaydı yok → everyone alıcısı normal şekilde emit + persist alır', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID, isPrivate: false });
+      prismaMock.user.findMany.mockResolvedValue([]);
+      prismaMock.guildMember.findMany.mockResolvedValue([
+        { userId: AUTHOR_ID, user: { isMinor: false } },
+        { userId: EVERYONE_ONLY_ID, user: { isMinor: false } },
+      ]);
+
+      await gateway.notifyMentions(CHANNEL_ID, makeEveryoneDto());
+
+      expect(emitToUserMock).toHaveBeenCalledWith(EVERYONE_ONLY_ID, 'mention', expect.anything());
+      expect(notificationsCreateMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('T&S regresyon: özel kanalda everyone yalnız kanal üyeleri + owner/admin\'e gider (sızıntı yok)', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID, isPrivate: true });
+      prismaMock.user.findMany.mockResolvedValue([]);
+      prismaMock.channelMember.findMany.mockResolvedValue([{ userId: EVERYONE_ONLY_ID }]);
+      prismaMock.guildMember.findMany.mockResolvedValue([{ userId: AUTHOR_ID }]); // OWNER/ADMIN sorgusu
+
+      await gateway.notifyMentions(CHANNEL_ID, makeEveryoneDto());
+
+      const targets = emitToUserMock.mock.calls.map((c) => c[0]);
+      expect(targets).toEqual([EVERYONE_ONLY_ID]); // guild geneline SIZMAZ
+    });
+
+    it('T&S regresyon: yaş-kapılı kanalda minör everyone bildirimi almaz', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue({
+        guildId: GUILD_ID,
+        isPrivate: false,
+        ageGated: true,
+      });
+      prismaMock.user.findMany.mockResolvedValue([]);
+      prismaMock.guildMember.findMany.mockResolvedValue([
+        { userId: AUTHOR_ID, user: { isMinor: false } },
+        { userId: EVERYONE_ONLY_ID, user: { isMinor: false } },
+        { userId: 'user-minor', user: { isMinor: true } },
+      ]);
+
+      await gateway.notifyMentions(CHANNEL_ID, makeEveryoneDto());
+
+      const targets = emitToUserMock.mock.calls.map((c) => c[0]);
+      expect(targets).toEqual([EVERYONE_ONLY_ID]);
+      expect(targets).not.toContain('user-minor');
+    });
   });
 });

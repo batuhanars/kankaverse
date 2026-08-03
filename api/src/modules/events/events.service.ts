@@ -10,10 +10,14 @@ import { MembershipService } from '../../shared/membership/membership.service';
 import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { StorageService } from '../../shared/storage/storage.service';
+import { NotificationsService, isMuteActive } from '../notifications/notifications.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
-import { GuildEvent, ScanStatus } from '@prisma/client';
+import { GuildEvent, NotificationLevel, NotifTargetType, ScanStatus } from '@prisma/client';
 import { computeOccurrence } from './occurrence.util';
+
+/** R14 §2.3 — bildirim önizlemesi en fazla 120 karakter (Notification.preview sözleşmesi). */
+const EVENT_PREVIEW_MAX = 120;
 
 /**
  * EventDto (Sözleşme §3 — Etkinlik Motoru). status + occurrence TÜRETİLİR
@@ -71,6 +75,7 @@ export class EventsService {
     private realtime: RealtimeService,
     private config: ConfigService,
     private storage: StorageService,
+    private notifications: NotificationsService,
   ) {
     this.scanEnabled = config.get<boolean>('attachmentScanEnabled') ?? false;
   }
@@ -324,8 +329,49 @@ export class EventsService {
     const dtoOut = toEventDto(event, 0, false, coverImageUrl);
     const recipients = await this.eventRecipients(event);
     this.realtime.emitToUsers(recipients, 'guild.event_created', dtoOut);
+    await this.notifyEventCreated(event, recipients);
 
     return dtoOut;
+  }
+
+  /**
+   * R14 §2.3 — `EVENT_CREATED` kalıcı bildirimi.
+   *
+   * Alıcı kümesi `eventRecipients`'tan AYNEN alınır (yeni erişim kararı YOK — R7-nötr):
+   * o küme zaten yaş/özel-kanal/üyelik süzgecinden geçmiş. Burada yalnız kullanıcının kendi
+   * tercihi uygulanır: aktif sustur · level=NONE · suppressEvents.
+   *
+   * N+1 yok: tercihler TEK `findMany`, insert TEK `createManyAndReturn` (createMany içinde).
+   */
+  private async notifyEventCreated(event: GuildEvent, recipients: string[]): Promise<void> {
+    const targets = recipients.filter((id) => id !== event.creatorId);
+    if (targets.length === 0) return;
+
+    const prefs = await this.prisma.notificationPref.findMany({
+      where: {
+        userId: { in: targets },
+        targetType: NotifTargetType.GUILD,
+        targetId: event.guildId,
+      },
+    });
+    const prefByUser = new Map(prefs.map((p) => [p.userId, p]));
+
+    const eligible = targets.filter((userId) => {
+      const pref = prefByUser.get(userId);
+      if (!pref) return true; // kayıt yok → varsayılan (bildir)
+      if (isMuteActive(pref.muted, pref.mutedUntil)) return false;
+      if (pref.level === NotificationLevel.NONE) return false;
+      if (pref.suppressEvents) return false;
+      return true;
+    });
+
+    await this.notifications.createMany(eligible, {
+      type: 'EVENT_CREATED',
+      actorId: event.creatorId,
+      guildId: event.guildId,
+      ...(event.channelId ? { channelId: event.channelId } : {}),
+      preview: event.name.slice(0, EVENT_PREVIEW_MAX),
+    });
   }
 
   /**
