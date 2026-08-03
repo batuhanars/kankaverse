@@ -2110,3 +2110,37 @@ Düzeltme: `NotifLevelFlyout` ile birebir aynı bağlanış (`toggleFlyout(posit
 kapanışları `closeFlyout()`e çevrildi. **Ders:** composable'ı çağırmak davranışı getirmez;
 şablon bağlanışı ayrı bir doğrulama adımı (typecheck bunu yakalamaz — kullanılmayan destructure
 uyarı üretmiyor).
+
+---
+
+## Sprint M2d — Mobil Bahsetme Yazma (@üye + @everyone) — 2026-08-03
+
+> Sözleşme: `contracts/SPRINT_M2D_MOBILE_MENTION_COMPOSE_CONTRACT.md` = **tek doğruluk kaynağı**.
+> Kaynak: sahip cihaz turu 2026-08-03 ("mobilde @everyone yazınca liste çıkmıyor"). Yalnız `mobile/`,
+> `api/` diffi YOK, `web/` diffi yalnız `tr.json`. **R7-nötr.** Dev kutu işaretler, item EKLEMEZ.
+>
+> **Sıra kilidi:** R15 bu sprint bitmeden başlamaz — R15'in mobil ayağı ("rolleri öneri listesine
+> ekle") bu listenin var olmasına dayanıyor.
+
+- [ ] `useMentionCompose` kancası: `@` sorgusu (imleç takibi `onSelectionChange` ile), süzme, en fazla
+      8 öneri; `@everyone` yalnız rol `mentionable` ise ve listenin en üstünde
+- [ ] Veri kaynakları: ortam kanalında `guildsApi.listMembers` + `rolesApi.listByGuild`;
+      DM'de karşı taraf, grup DM'de üyeler. Ekran açılışında bir kez, `@` yazınca istek YOK
+- [ ] Öneri listesi mesaj kutusunun üstünde (yeni `Modal` yok, yeni bağımlılık yok),
+      `keyboardShouldPersistTaps`, ≥44dp dokunma hedefi, geri tuşu önce listeyi kapatır
+- [ ] Gönderimde token dönüşümü: `@ad` → `<@userId>` (yalnız seçilenler),
+      `@everyone` → `<@&roleId>`; başarıda temizle, hatada KORU
+- [ ] 🔴 §4.4 — elle yazılan `@everyone` de token'a çevrilir (web'deki sessiz başarısızlık
+      mobile TAŞINMAZ); kullanıcı adlarında bu YAPILMAZ (asimetri bilinçli, sözleşmede gerekçesi var)
+- [ ] `guildId`siz açılan kanal ekranında liste hiç açılmaz (yarım liste = yanlış vaat)
+- [ ] `typecheck` + `lint` temiz; metinler `tr.json`'a bir kez; `MessageComposer.tsx` 300 satırı geçmez
+
+### DoD (**fiziksel cihazda** — sahipte)
+- [ ] Ortam kanalında `@` yazınca üye listesi çıkıyor ve yazdıkça süzülüyor
+- [ ] Seçilen üye gönderilince karşı hesapta **kırmızı bahsetme rozeti** + bildirim oluşuyor
+- [ ] `@everyone` bahsedilebilir ortamda listede çıkıyor ve çalışıyor; bahsedilebilir olmayan ortamda
+      ne listede çıkıyor ne elle yazılınca bahsetme oluyor
+- [ ] Elle yazılan `@everyone` (listeden seçmeden) bahsedilebilir ortamda çalışıyor
+- [ ] 1-1 DM'de karşı taraf, grup DM'de üyeler listede; DM'de `@everyone` yok
+- [ ] Liste açıkken klavye kapanmıyor; metnin ortasına dokunup `@` yazınca doğru sorguyla açılıyor
+- [ ] Bildirimlerden açılan kanalda (guildId yok) liste açılmıyor, ekran normal çalışıyor
