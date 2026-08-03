@@ -91,12 +91,17 @@ const PURIFY_CONFIG: DOMPurifyConfig = {
 //    \x02 (STX) ve \x03 (ETX) — kullanıcı girişinde imkânsız
 // ────────────────────────────────────────────────────────────
 const MENTION_RE = /<@([a-zA-Z0-9_-]+)>/g
-// @everyone rol token'ı: <@&roleId> (& kullanıcı regex'ine takılmaz). Yalnız everyone önerilir.
-const ROLE_MENTION_RE = /<@&[a-zA-Z0-9_-]+>/g
-const EVERYONE_PLACEHOLDER = '\x02EVERYONE\x03'
-const EVERYONE_PLACEHOLDER_RE = /\x02EVERYONE\x03/g
+// R15 — rol token'ı: <@&roleId> (& kullanıcı regex'ine takılmaz). Artık id YAKALANIR:
+// eskiden her rol token'ı sabit "@everyone"e çevriliyordu, şimdi ad ve renk id'den çözülüyor.
+const ROLE_MENTION_RE = /<@&([a-zA-Z0-9_-]+)>/g
+const ROLE_PLACEHOLDER_PREFIX = '\x02ROLE:'
+const ROLE_PLACEHOLDER_RE = /\x02ROLE:([a-zA-Z0-9_-]+)\x03/g
 const PLACEHOLDER_PREFIX = '\x02MENTION:'
 const PLACEHOLDER_SUFFIX = '\x03'
+
+function toRolePlaceholder(id: string): string {
+  return `${ROLE_PLACEHOLDER_PREFIX}${id}${PLACEHOLDER_SUFFIX}`
+}
 
 function toPlaceholder(id: string): string {
   return `${PLACEHOLDER_PREFIX}${id}${PLACEHOLDER_SUFFIX}`
