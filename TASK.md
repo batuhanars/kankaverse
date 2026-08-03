@@ -2363,9 +2363,20 @@ sorunsuz · DM ve bahsetme bildirimleri geliyor.
       (`resolveMentionPreview`) çıkarıldı — kopya yazılsaydı aynı mesaj için iki farklı metin çıkardı
 - [x] 978 test yeşil (3 yeni); mobil `typecheck` + `lint` temiz
 
+### R3 — sahip cihaz turu, ikinci geçiş — 2026-08-03
+- [x] 🟢 **T&S: hesap devri temiz.** Aynı telefonda ikinci hesaba geçilince önceki kullanıcının
+      bildirimi cihaza **düşmüyor** (token upsert'ü `userId`'yi taşıyor). En kritik madde geçti
+- [x] 🟢 Çıkış/tekrar giriş sonrası bildirim yine geliyor; **dokununca çökme kusuru gitmiş**
+- [x] 🔴 **Ama dokununca DM yerine GİRİŞ EKRANINA atıyordu.** Sebep: navigasyonun hazır olmasını
+      bekliyorduk, **oturumun** hazır olmasını beklemiyorduk. Soğuk açılışta `'ready'` olayı,
+      `bootstrap()` (refresh + me) bitmeden ateşleniyor; o anda `(app)/_layout.tsx:54` guard'ı
+      `status !== 'authenticated'` görüp `/login`'e yönlendirip bizim push yönlendirmemizi eziyordu.
+      Düzeltme: flush artık **iki şart** istiyor (navigasyon hazır **VE** `status !== 'booting'`).
+      `unauthenticated`'a düşerse bekleyen hedef **düşürülüyor** — kullanıcı beş dakika sonra elle
+      giriş yapınca beklenmedik biçimde eski bir sohbete atlamasın
+
 ### Turda HENÜZ yapılmayanlar (sahipte)
-- [ ] **Çıkışta bildirim kesiliyor mu** (T&S)
-- [ ] **Aynı cihazda hesap değişince** öncekinin bildirimi düşmüyor mu (T&S — token devri)
+- [ ] Soğuk açılışta bildirime dokununca **doğru DM'e** gidiyor mu (R3 düzeltmesi)
 - [ ] Dev build devri: açılış beyaz gezinme şeridi · arka planda uzun kalıp dönünce reconnect
 
 ### DoD (cihazda — sahipte)

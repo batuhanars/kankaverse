@@ -6,6 +6,7 @@ import Constants from 'expo-constants';
 import { router, useNavigationContainerRef } from 'expo-router';
 import { notificationsApi } from '@/api/notifications';
 import { resolvePushTarget } from '@/utils/pushNavigation';
+import { useAuthStore } from '@/stores/auth';
 
 /**
  * Sprint M3 §3 — mobil push istemci ayağı.
@@ -117,34 +118,62 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
  * yanıt kapanışta (closure) SAKLANIR, react-navigation'ın 'ready' event'i ateşlenince (container
  * gerçekten mount olup ilk state'i kurunca) flush edilir. Uygulama açıkken gelen dokunuş zaten
  * navigasyon hazırken gerçekleşir (kullanıcı bir ekranda duruyor) — o yol hâlâ anında çalışır.
+ *
+ * KUSUR 2 düzeltmesi (KUSUR 1'in üstüne, sahip fiziksel cihazda buldu) — `navigationRef.isReady()`
+ * tek başına yetmiyordu: soğuk açılışta container 'ready' event'ini bootstrap() (`stores/auth.ts`)
+ * henüz sonuçlanmadan, `status: 'booting'` iken ateşliyor. O anda flush edip `router.push` çağırınca
+ * hedef ekrana gidiyorduk ama bir tık sonra `(app)/_layout.tsx`'teki auth guard
+ * (`if (status !== 'authenticated') return <Redirect href="/login" />`) — 'booting' da bu şartı
+ * sağladığı için — bizim yönlendirmemizi login'e EZİYORDU. bootstrap sonradan 'authenticated'e
+ * dönse bile o an login ekranındayız, geri dönüş yok.
+ *
+ * Çözüm: bekletme şartına navigasyon hazırlığının YANINA oturum hazırlığı da eklendi. `status`
+ * hâlâ 'booting' iken flush ERTELENİR (auth guard'ın bizi ezmesini önler). `status`
+ * 'unauthenticated'e düşerse (cihazda geçerli oturum yok, kullanıcı elle giriş yapacak) bekleyen
+ * yanıt DÜŞÜRÜLÜR — aksi hâlde kullanıcı beş dakika sonra elle giriş yapınca beklenmedik biçimde
+ * eski bir sohbete atlardı (push'un işaret ettiği sohbet o oturumla ilgisiz olabilir). Oturum
+ * durumu `useAuthStore`'un zaten var olan vanilla `subscribe` API'siyle izleniyor — yeni bir global
+ * state/altyapı YOK. Uygulama açıkken gelen dokunuş yolu değişmedi: navigasyon zaten hazır VE
+ * oturum zaten 'authenticated' olduğu için tek `tryFlush` çağrısında anında işlenir.
  */
 export function usePushNotificationResponder(): void {
   const navigationRef = useNavigationContainerRef();
 
   useEffect(() => {
-    // Soğuk açılışta `navigationRef.isReady()` henüz false iken gelen yanıt burada bekletilir.
+    // Navigasyon hazır OLMADAN ya da oturum henüz 'booting' iken gelen yanıt burada bekletilir.
     let pending: Notifications.NotificationResponse | null = null;
 
-    const respond = (response: Notifications.NotificationResponse) => {
-      if (navigationRef.isReady()) {
-        handleNotificationResponse(response);
-      } else {
-        pending = response;
-      }
-    };
+    const tryFlush = () => {
+      if (!pending) return;
+      if (!navigationRef.isReady()) return;
 
-    const flushPending = () => {
-      if (!pending || !navigationRef.isReady()) return;
+      const status = useAuthStore.getState().status;
+      if (status === 'booting') return; // oturum kararı henüz yok — auth guard bizi ezer, bekle
+
+      if (status === 'unauthenticated') {
+        // Oturum yok — kullanıcı elle giriş yapacak, eski hedefe sürpriz atlama YOK.
+        pending = null;
+        return;
+      }
+
       const response = pending;
       pending = null;
       handleNotificationResponse(response);
+    };
+
+    const respond = (response: Notifications.NotificationResponse) => {
+      pending = response;
+      tryFlush();
     };
 
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(respond);
     // 'ready' — react-navigation'ın NavigationContainer gerçekten mount olduğunda ATEŞLEDİĞİ event
     // (bkz. @react-navigation/core `NavigationContainerEventMap`); `assertIsReady()`'nin baktığı
     // `isReady()` ile aynı andan hemen sonra gelir.
-    const unsubscribeReady = navigationRef.addListener('ready', flushPending);
+    const unsubscribeReady = navigationRef.addListener('ready', tryFlush);
+    // `useAuthStore`'un vanilla `subscribe`'ı: 'booting' → 'authenticated'/'unauthenticated' geçişini
+    // React render döngüsüne bağlı olmadan yakalar (bu bir hook değil, effect içinde plain subscribe).
+    const unsubscribeAuth = useAuthStore.subscribe(tryFlush);
 
     const last = Notifications.getLastNotificationResponse();
     if (last) respond(last);
@@ -152,6 +181,7 @@ export function usePushNotificationResponder(): void {
     return () => {
       responseSubscription.remove();
       unsubscribeReady();
+      unsubscribeAuth();
     };
   }, [navigationRef]);
 }
