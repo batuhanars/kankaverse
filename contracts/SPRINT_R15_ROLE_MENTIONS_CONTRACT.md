@@ -89,8 +89,27 @@ aksi hâlde `400 INVALID_PREF_TARGET`.
 | Token | Kapı |
 |---|---|
 | `<@&rol>` · rol `mentionable: true` | Kanalda mesaj yazabilen **herkes** |
-| `<@&rol>` · rol `mentionable: false` | Yalnız `MENTION_EVERYONE` izni olan (OWNER/ADMIN/ADMINISTRATOR dahil — `hasGuildPermission` zaten kapsıyor) |
+| `<@&rol>` · rol `mentionable: false` | **HİÇ KİMSE** (sahip/yönetici dahil) — bkz. R2 revizyonu |
 | `<@&everyoneRolü>` | **İki kapı birden:** everyone rolü `mentionable: true` **VE** gönderende `MENTION_EVERYONE` |
+
+### 🔴 R2 revizyonu (sahip kararı 2026-08-03, canlı kullanım sonrası)
+
+İlk hâlde `mentionable: false` rolü **`MENTION_EVERYONE` izni olan** etiketleyebiliyordu (Discord
+modeli: tek izin hem @everyone'ı hem kısıtlı rolleri yönetir). **Bu pratikte çöktü:** §2.3 göç
+telafisi o izni `@everyone` rolüne eklediği için, o ortamlardaki **her üye** baypası kazandı ve
+"bahsetme" anahtarını kapatmak hiçbir şey değiştirmedi. Sahip tam olarak bunu bildirdi: *"Hey
+rolünün bahsedilme ayarını kapattım ama gene de listede görünüyor ve normal kullanıcı da
+etiketleyebiliyor."*
+
+Kök sorun: **tek izin iki farklı yetkiyi yönetiyordu** ve sahibin istediği durum ("@everyone herkese
+açık kalsın, kapalı roller kapansın") bu modelde **ifade edilemiyordu**.
+
+**Yeni kural:** `mentionable: false` → o rol **hiç kimseye önerilmez ve hiç kimse etiketleyemez.**
+İzin baypası yok. Anahtar adının hakkını verir, öngörülebilir. Yönetici o rolü pinglemek isterse
+anahtarı açar, atar, kapatır — toplu ping'de sürtünme istenen şeydir.
+
+`MENTION_EVERYONE` böylece **yalnız @everyone'ı** yönetir (adıyla tutarlı); rollerle ilgisi kalmaz.
+Göç telafisi migration'ı **olduğu gibi kalır** — amacı @everyone'ı korumaktı, o hâlâ geçerli.
 
 @everyone'da iki kapının birlikte aranmasının sebebi: `mentionable` ortam çapında **kill-switch**
 olarak anlamını korusun ("burada kimse herkesi etiketleyemez"), izin ise **kimin** yapabileceğini

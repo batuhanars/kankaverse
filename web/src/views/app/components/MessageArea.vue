@@ -166,19 +166,18 @@ const everyoneMentionRoleId = computed<string | null>(() => {
 
 /**
  * R15 — önerilebilir roller (everyone HARİÇ; o ayrı öneri olarak zaten var).
- * Kapı kuralı burada uygulanır (sözleşme §2.2 ile birebir):
+ * Kapı kuralı burada uygulanır (sözleşme §2.2 + R2 revizyonu ile birebir):
  *   mentionable rol → herkese görünür
- *   mentionable OLMAYAN rol → yalnız MENTION_EVERYONE izni olana
+ *   mentionable OLMAYAN rol → HİÇ KİMSEYE önerilmez (izin baypası yok)
  * Sunucu aynı kapıyı bağımsız uyguluyor; buradaki süzgeç yalnız "seçemeyeceğin şeyi önerme"
  * içindir, yetki kararı değildir.
  */
-const canMentionRestrictedRoles = computed(() => can('MENTION_EVERYONE'))
 const mentionRoles = computed(() => {
   const gid = guildsStore.activeGuildId
   if (!gid) return []
   return rolesStore
     .rolesFor(gid)
-    .filter((r) => !r.isEveryone && (r.mentionable || canMentionRestrictedRoles.value))
+    .filter((r) => !r.isEveryone && r.mentionable)
     .map((r) => ({ id: r.id, name: r.name, color: r.color }))
 })
 

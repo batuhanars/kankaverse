@@ -2849,8 +2849,9 @@ describe('MessagesService.create — C9 mesaj isteği kapısı', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Sprint R15 §2.7 — rol bahsetmesi kapı matrisi (`resolveMentions` Adım 0)
+// R2 revizyonu (2026-08-03): mentionable=false rol için MENTION_EVERYONE baypası kaldırıldı.
 // ═══════════════════════════════════════════════════════════════════════════════
-describe('MessagesService — rol bahsetmesi kapıları (R15 §2.2)', () => {
+describe('MessagesService — rol bahsetmesi kapıları (R15 §2.2, R2 revizyonu)', () => {
   let service: MessagesService;
 
   const ROLE_MOD = 'role-mod';
@@ -2911,7 +2912,7 @@ describe('MessagesService — rol bahsetmesi kapıları (R15 §2.2)', () => {
     expect(data.content).toBe(`<@&${ROLE_MOD}> selam`);
   });
 
-  it('mentionable OLMAYAN rol + MENTION_EVERYONE izinli kullanıcı → geçer', async () => {
+  it('R2: mentionable OLMAYAN rol + MENTION_EVERYONE izinli kullanıcı → yine de düşer (izin baypası kalktı)', async () => {
     permissionsMock.hasGuildPermission.mockResolvedValue(true);
     prismaMock.role.findMany.mockResolvedValue([
       { id: ROLE_MOD, mentionable: false, isEveryone: false },
@@ -2919,7 +2920,9 @@ describe('MessagesService — rol bahsetmesi kapıları (R15 §2.2)', () => {
 
     await service.create(USER_ID, GUILD_CHANNEL_ID, { content: `<@&${ROLE_MOD}>` });
 
-    expect(prismaMock.message.create.mock.calls[0][0].data.mentionRoles).toEqual([ROLE_MOD]);
+    expect(prismaMock.message.create.mock.calls[0][0].data.mentionRoles).toEqual([]);
+    // R2: kısıtlı rol için izin artık hiç sorulmaz (yalnız everyone token'ı sorar)
+    expect(permissionsMock.hasGuildPermission).not.toHaveBeenCalled();
   });
 
   it('@everyone → İKİ KAPI: mentionable açık ama izin yoksa geçmez', async () => {
@@ -2991,7 +2994,7 @@ describe('MessagesService — rol bahsetmesi kapıları (R15 §2.2)', () => {
     expect(prismaMock.role.findMany).not.toHaveBeenCalled();
   });
 
-  it('birden çok kısıtlı token → izin EN FAZLA BİR KEZ çözülür', async () => {
+  it('R2: kısıtlı roller + everyone token birlikte → izin yalnız everyone için EN FAZLA BİR KEZ çözülür', async () => {
     permissionsMock.hasGuildPermission.mockResolvedValue(true);
     prismaMock.role.findMany.mockResolvedValue([
       { id: 'r1', mentionable: false, isEveryone: false },
@@ -3003,6 +3006,22 @@ describe('MessagesService — rol bahsetmesi kapıları (R15 §2.2)', () => {
       content: `<@&r1> <@&r2> <@&${ROLE_EVERYONE}>`,
     });
 
+    // r1/r2 kısıtlı → izinden bağımsız düşer; izin yalnız everyone token'ı için bir kez çözülür.
+    expect(prismaMock.message.create.mock.calls[0][0].data.mentionRoles).toEqual([]);
+    expect(prismaMock.message.create.mock.calls[0][0].data.mentionsEveryone).toBe(true);
     expect(permissionsMock.hasGuildPermission).toHaveBeenCalledTimes(1);
+  });
+
+  it('R2: yalnız kısıtlı roller (everyone token yok) → izin hiç çözülmez (tembel çağrı)', async () => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    prismaMock.role.findMany.mockResolvedValue([
+      { id: 'r1', mentionable: false, isEveryone: false },
+      { id: 'r2', mentionable: false, isEveryone: false },
+    ]);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, { content: '<@&r1> <@&r2>' });
+
+    expect(prismaMock.message.create.mock.calls[0][0].data.mentionRoles).toEqual([]);
+    expect(permissionsMock.hasGuildPermission).not.toHaveBeenCalled();
   });
 });
