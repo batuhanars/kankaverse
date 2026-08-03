@@ -131,6 +131,13 @@ Uygulama kuralları (bağlayıcı):
   (bugünkü liste davranışıyla tutarlı)
 - Gövde: gönderenin adı + mesaj önizlemesi (≤100 karakter, mevcut `preview` kırpma kuralı).
   🔴 Ek yok/görsel yok: içerik önizlemesi **kilit ekranında** görünür, fazlasını taşıma
+- 🔴 **R2 (cihaz turu bulgusu):** gövde **bahsetme token'ları çözülmüş** olmalı. İlk hâlde ham
+  `content` gönderiliyordu ve kilit ekranında `<@cmq93ul...>` yazıyordu. Çözüm `notifyMentions`'ın
+  kullandığı mantığın AYNISI olmak zorunda → ortak yardımcı (`resolveMentionPreview`), kopya değil;
+  ayrışırsa aynı mesaj için iki farklı metin görünür
+- 🔴 **R2 — çift bildirim:** DM mesajında **doğrudan bahsedilen** kullanıcı `sendDmPush` alıcı
+  kümesinden **çıkarılır**; o kişi bahsetme yolundan zaten push aldı. Aksi hâlde telefona iki
+  bildirim düşüyor (cihaz turunda görüldü). Kalıcı bildirim (çan) davranışı DEĞİŞMEZ
 - `data: { type: 'DM_MESSAGE', channelId }` → istemci o sohbete gider
 
 ### 2.7 Borç kaydı — push metni iki yerde

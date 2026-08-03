@@ -492,9 +492,15 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   /**
+   * M3 sonrası KUSUR 2 düzeltmesi — bir DM mesajında doğrudan bahsedilen kullanıcı, aynı mesaj
+   * için `notifyMentions` yolundan (aşağıda) zaten push aldı. Burada tekrar göndermek aynı olay
+   * için TELEFONA İKİ bildirim düşürüyordu (sahip bulgusu, dev-build testi). `mentions` — bu
+   * mesajın resolveMentions çıktısı — alıcı kümesinden çıkarılır; kalıcı çan davranışına DOKUNULMAZ.
+   *
    * M3 §2.6 — DM mesajı için push gönderimi. `notifyDmActivity`'nin zaten hesapladığı `members`
-   * kümesini kullanır (yeniden üretmez); yazar filtrelenir, kalanlar `shouldNotifyChannel` ile
-   * tercih süzgecinden geçer (susturulmuş → push yok). Fire-and-forget: ana akışı bloke etmez.
+   * kümesini kullanır (yeniden üretmez); yazar (+ doğrudan bahsedilenler) filtrelenir, kalanlar
+   * `shouldNotifyChannel` ile tercih süzgecinden geçer (susturulmuş → push yok). Fire-and-forget:
+   * ana akışı bloke etmez.
    */
   private async sendDmPush(
     channelId: string,
@@ -503,7 +509,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     content: string,
   ): Promise<void> {
     const author = messageDto['author'] as { id: string; username: string };
-    const recipients = memberIds.filter((id) => id !== author.id);
+    const mentioned = new Set((messageDto['mentions'] as string[] | undefined) ?? []);
+    const recipients = memberIds.filter((id) => id !== author.id && !mentioned.has(id));
     if (recipients.length === 0) return;
 
     const eligibility = await Promise.all(
@@ -512,13 +519,62 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const allowed = recipients.filter((_, i) => eligibility[i]);
     if (allowed.length === 0) return;
 
+    // KUSUR 3 düzeltmesi — gövde artık `content.slice(0,100)` ham token'la değil, `notifyMentions`
+    // ile AYNI yardımcıdan (resolveMentionPreview) geçmiş, token'ları çözülmüş metinle gider.
+    const body = await this.resolveMentionPreview(content, null);
+
     await this.push
       .sendToUsers(allowed, {
         title: author.username,
-        body: content.slice(0, 100),
+        body,
         data: { type: 'DM_MESSAGE', channelId },
       })
       .catch(() => {});
+  }
+
+  /**
+   * KUSUR 3 düzeltmesi — bahsetme token'larını (`<@userId>`, `<@&roleId>`) okunabilir metne çözer.
+   * `notifyMentions` (kanal/DM mention önizlemesi) VE `sendDmPush` (DM push gövdesi) TEK bu
+   * yardımcıyı kullanır: davranış iki yerde ayrı yazılsaydı ilk değişiklikte ayrışır, kullanıcı
+   * bildirimde farklı metin görürdü (bkz. sözleşme notu — aynı risk R14/R15'te @everyone
+   * bastırmasında ikinci bir süzgeç kopyası için de yazılmıştı).
+   *
+   * Token'lar İÇERİKTEN regex ile çıkarılır (parametre olarak verilen listeden değil) — R15'in
+   * rol token'ı için zaten kullandığı yaklaşımın aynısı: mesajda geçen HER token çözülür, yalnız
+   * kapıdan geçmiş/resolveMentions çıktısındakiler değil.
+   *
+   * `guildId` null ise (DM) rol sorgusu atlanır — DM'de rol kavramı yok; token yine de gelirse
+   * (savunmacı) nötr "@rol" karşılığı döner.
+   */
+  private async resolveMentionPreview(content: string, guildId: string | null): Promise<string> {
+    const userIds = Array.from(content.matchAll(/<@([a-zA-Z0-9_-]+)>/g)).map((m) => m[1]);
+    const roleIds = Array.from(content.matchAll(/<@&([a-zA-Z0-9_-]+)>/g)).map((m) => m[1]);
+
+    const usernameById = new Map<string, string>();
+    if (userIds.length > 0) {
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, username: true },
+      });
+      for (const u of users) usernameById.set(u.id, u.username);
+    }
+
+    const roleNameById = new Map<string, string>();
+    if (roleIds.length > 0 && guildId) {
+      const roles = await this.prisma.role.findMany({
+        where: { guildId, id: { in: roleIds } },
+        select: { id: true, name: true, isEveryone: true },
+      });
+      for (const r of roles) roleNameById.set(r.id, r.isEveryone ? 'everyone' : r.name);
+    }
+
+    return content
+      .replace(/<@&([a-zA-Z0-9_-]+)>/g, (_m, id: string) => `@${roleNameById.get(id) ?? 'rol'}`)
+      .replace(/<@([a-zA-Z0-9_-]+)>/g, (_m, id: string) => {
+        const username = usernameById.get(id);
+        return username ? `@${username}` : '@bilinmeyen';
+      })
+      .slice(0, 100);
   }
 
   /**
@@ -625,42 +681,18 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const guildId = channel?.guildId ?? null;
     const needsAgeCheck = !!channel && (channel.ageGated || (channel.guild?.adultsOnly ?? false));
 
-    // Bahsedilen kullanıcıların username'lerini tek sorguda çek (preview + payload için)
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: mentions } },
-      select: { id: true, username: true },
-    });
-    const usernameById = new Map<string, string>(users.map((u) => [u.id, u.username]));
-
     /**
      * R15 — preview'da rol token'ı artık sabit "@everyone" DEĞİL, rolün kendi adı.
      * Preview sunucuda üretiliyor ve bildirim listesinde aynen gösteriliyor; sabit metin
      * bırakılsaydı "@Moderatörler" etiketi bildirimde "@everyone" yazardı.
      * İçerikteki TÜM rol token'ları çözülür (yalnız kapıdan geçenler değil): kapıya takılan
      * token da metinde duruyor ve okunur görünmeli.
+     *
+     * KUSUR 3 düzeltmesi — bu çözüm artık `resolveMentionPreview` yardımcısında: `sendDmPush`
+     * (DM push gövdesi) AYNI yardımcıyı kullanır, davranış iki yerde ayrışmaz.
      */
     const content = (messageDto['content'] as string) ?? '';
-    const contentRoleIds = Array.from(content.matchAll(/<@&([a-zA-Z0-9_-]+)>/g)).map((m) => m[1]);
-    const roleNameById = new Map<string, string>();
-    if (contentRoleIds.length > 0 && guildId) {
-      const roleRows = await this.prisma.role.findMany({
-        where: { guildId, id: { in: contentRoleIds } },
-        select: { id: true, name: true, isEveryone: true },
-      });
-      for (const r of roleRows) {
-        // everyone rolünün adı şemada zaten "@everyone"; başına ikinci @ konmasın.
-        roleNameById.set(r.id, r.isEveryone ? 'everyone' : r.name);
-      }
-    }
-
-    // preview: rol token'ları → @rolAdı; kullanıcı token'ları → @username; ≤100 karakter
-    const preview = content
-      .replace(/<@&([a-zA-Z0-9_-]+)>/g, (_m, id: string) => `@${roleNameById.get(id) ?? 'rol'}`)
-      .replace(/<@([a-zA-Z0-9_-]+)>/g, (_match, id: string) => {
-        const username = usernameById.get(id);
-        return username ? `@${username}` : '@bilinmeyen';
-      })
-      .slice(0, 100);
+    const preview = await this.resolveMentionPreview(content, guildId);
 
     const author = messageDto['author'] as { id: string; username: string; avatarUrl: string | null };
 

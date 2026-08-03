@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
+import { router, useNavigationContainerRef } from 'expo-router';
 import { notificationsApi } from '@/api/notifications';
 import { resolvePushTarget } from '@/utils/pushNavigation';
 
@@ -104,12 +104,54 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
  * dokunuş uygulama kapalıyken/arka plandayken de gelebilir). Soğuk açılış (`getLastNotificationResponse`)
  * DE kontrol edilir: DoD'daki "uygulama kapalıyken bahsedilince bildirim geliyor, dokununca doğru
  * kanala gidiyor" tam olarak bu senaryo.
+ *
+ * KUSUR 1 düzeltmesi (M3 sonrası, sahip bulgusu — cihazda dev build testi) — soğuk açılışta
+ * `getLastNotificationResponse()` kök layout'un İLK render'ında, native navigasyon container'ı
+ * henüz mount OLMADAN döner. O anda `router.push` çağırmak expo-router'ın kendi hata ekranını
+ * tetikliyordu: "Attempted to navigate before mounting the Root Layout component."
+ *
+ * Kurulu expo-router (6.0.24) kaynağında (`build/global-state/router-store.js` → `assertIsReady()`)
+ * `router.push` tam olarak `navigationRef.isReady()` şartına bakıyor — bu yüzden burada da
+ * dolaylı bir işaret (ör. state.key) değil, expo-router'ın kendi export ettiği
+ * `useNavigationContainerRef()` ile AYNI ref/AYNI kontrol kullanılıyor: `.isReady()` false iken
+ * yanıt kapanışta (closure) SAKLANIR, react-navigation'ın 'ready' event'i ateşlenince (container
+ * gerçekten mount olup ilk state'i kurunca) flush edilir. Uygulama açıkken gelen dokunuş zaten
+ * navigasyon hazırken gerçekleşir (kullanıcı bir ekranda duruyor) — o yol hâlâ anında çalışır.
  */
 export function usePushNotificationResponder(): void {
+  const navigationRef = useNavigationContainerRef();
+
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
+    // Soğuk açılışta `navigationRef.isReady()` henüz false iken gelen yanıt burada bekletilir.
+    let pending: Notifications.NotificationResponse | null = null;
+
+    const respond = (response: Notifications.NotificationResponse) => {
+      if (navigationRef.isReady()) {
+        handleNotificationResponse(response);
+      } else {
+        pending = response;
+      }
+    };
+
+    const flushPending = () => {
+      if (!pending || !navigationRef.isReady()) return;
+      const response = pending;
+      pending = null;
+      handleNotificationResponse(response);
+    };
+
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(respond);
+    // 'ready' — react-navigation'ın NavigationContainer gerçekten mount olduğunda ATEŞLEDİĞİ event
+    // (bkz. @react-navigation/core `NavigationContainerEventMap`); `assertIsReady()`'nin baktığı
+    // `isReady()` ile aynı andan hemen sonra gelir.
+    const unsubscribeReady = navigationRef.addListener('ready', flushPending);
+
     const last = Notifications.getLastNotificationResponse();
-    if (last) handleNotificationResponse(last);
-    return () => subscription.remove();
-  }, []);
+    if (last) respond(last);
+
+    return () => {
+      responseSubscription.remove();
+      unsubscribeReady();
+    };
+  }, [navigationRef]);
 }
