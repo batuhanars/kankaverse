@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AttachmentView } from './AttachmentView';
-import { formatMentionsPlain } from '@/utils/mentions';
+import { formatMentionsPlain, splitMentions } from '@/utils/mentions';
 import type { MessageDto } from '@/api/messages';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -41,7 +41,11 @@ export function MessageBubble({
   onLongPress,
   onToggleReaction,
 }: Props) {
-  const displayContent = formatMentionsPlain(message.content, resolveMention, t('mention.unknown'));
+  // M2d R1 — bahsetmeler Kor aksanıyla çizilir (web `.kv-mention` karşılığı): metin parçalara
+  // bölünüp vurgulu olanlar iç içe `<Text>` ile boyanır. Uzunluk kontrolü için düz karşılığı da
+  // hesaplanır (boş içerikte blok hiç render edilmiyor — ek/attachment-only mesajlar).
+  const mentionSegments = splitMentions(message.content, resolveMention, t('mention.unknown'));
+  const displayContent = mentionSegments.map((seg) => seg.text).join('');
   const reactions = message.reactions ?? [];
 
   return (
@@ -96,7 +100,15 @@ export function MessageBubble({
 
         {displayContent.length > 0 && (
           <Text style={styles.content}>
-            {displayContent}
+            {mentionSegments.map((seg, i) =>
+              seg.isMention ? (
+                <Text key={i} style={styles.mention}>
+                  {seg.text}
+                </Text>
+              ) : (
+                seg.text
+              ),
+            )}
             {message.editedAt ? <Text style={styles.edited}> {t('message.edited')}</Text> : null}
           </Text>
         )}
@@ -246,5 +258,12 @@ const styles = StyleSheet.create({
   edited: {
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.xs,
+  },
+  // Web `.kv-mention` ile aynı dil: Kor metin + soluk Kor zemin. Yatay dolgu KONMADI — RN'de
+  // iç içe `<Text>`in padding'i Android'de güvenilmez çiziliyor, olmayan bir hizalama vaat etmez.
+  mention: {
+    color: theme.colors.accent500,
+    backgroundColor: theme.colors.accentSubtle,
+    fontWeight: '500',
   },
 });

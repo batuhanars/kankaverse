@@ -2147,6 +2147,17 @@ uyarı üretmiyor).
   `View`. Android geri tuşu onu zaten görmüyor, ilk basış klavyeyi kapatıyor ve liste onunla birlikte
   görünmez oluyor. `BackHandler` eklemek olmayan bir soruna kod yazmak olurdu; DoD maddesi cihaz
   turunda "geri tuşu ekrandan atmıyor" olarak doğrulanmalı.
+### R1 — sahip cihaz turu (aynı gün)
+- [x] **Bahsetmeler mobilde düz yazı rengindeydi**, web'de Kor aksanlı (`.kv-mention`: soluk Kor
+      zemin + Kor metin). Mobil aynı dile çekildi: `utils/mentions.ts`'e `splitMentions` eklendi
+      (metni "sıradan" ve "bahsetme" parçalarına böler), `MessageBubble` vurgulu parçaları iç içe
+      `<Text>` ile boyuyor. `formatMentionsPlain` artık onun üstünde ince bir sarmalayıcı — iki ayrı
+      regex hattı tutulmuyor (alıntı/önizleme yüzeyleri düz metni kullanmaya devam ediyor).
+      *Yatay dolgu konmadı: RN'de iç içe `<Text>` padding'i Android'de güvenilmez.*
+- [x] Bahsetme listesinde **kendini gösterme** (dört yüzey: web ortam kanalı + grup DM, mobil ortam
+      kanalı + grup DM). Sunucu kendi bahsetmeni zaten yok sayıyor (`messages.gateway.ts` alıcı
+      döngüsü yazarı atlıyor) → satır seçilse bile hiçbir bildirim üretmiyordu
+
 - **`MessageScreen.tsx` 344 → 370 satır.** Kök `CLAUDE.md` eşiğini (300) bu sprint ÖNCESİNDE de
   aşıyordu; bölme yapılmadı (erken soyutlama yerine gerçek acıyı bekle). Tetikleyici: bu ekrana
   bir sonraki özellik geldiğinde liste/başlık parçalarını çıkar.
