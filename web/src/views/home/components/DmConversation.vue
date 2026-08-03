@@ -110,8 +110,10 @@ const dmMentionMembers = computed(() => {
   if (props.channel.type === 'DM') {
     return [{ id: props.channel.otherUser.id, username: props.channel.otherUser.username, avatarUrl: props.channel.otherUser.avatarUrl }]
   }
-  // GROUP_DM
-  return props.channel.members.map((m) => ({ id: m.id, username: m.username, avatarUrl: m.avatarUrl }))
+  // GROUP_DM — kendin listede yok (sunucu kendi bahsetmeni yok sayıyor; bkz. MessageArea notu)
+  return props.channel.members
+    .filter((m) => m.id !== authStore.user?.id)
+    .map((m) => ({ id: m.id, username: m.username, avatarUrl: m.avatarUrl }))
 })
 
 // Sprint V2: mention çözücü — userId → username (DM katılımcıları)
