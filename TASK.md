@@ -2321,11 +2321,25 @@ açılıyor, roller kendi renkleriyle listeleniyor, mesajlar çiziliyor.
 - Gönderim **await edilmiyor** (fire-and-forget + `.catch`): `create` mesaj POST'unun içinde
   çağrılıyor, await etmek Expo gecikmesini gönderenin yanıtına eklerdi. PM doğruladı, kabul.
 
-### Mobil (`mobile/`) — sözleşme §3
-- [ ] `expo-notifications` + izin akışı (oturum sonrası, ısrarcı ikinci sorma yok)
-- [ ] Token kaydı + **çıkışta silme**
-- [ ] Bildirime dokunma → tipe göre yönlendirme; hedef çözülemezse yalnız uygulamayı aç
-- [ ] Ön plandayken banner gösterme; `typecheck` + `lint` temiz
+### Mobil (`mobile/`) — sözleşme §3 ✅ (kod; cihaz turu sahipte)
+- [x] İzin akışı oturum başlangıcında (`(app)/_layout.tsx` mevcut oturum efekti); `canAskAgain`
+      gözetiliyor → kesin ret sonrası tekrar sorulmuyor
+- [x] Token: `projectId` `app.json`'dan okunuyor (hardcode yok) → `POST /notifications/push-tokens`
+- [x] 🔴 **Çıkışta silme sırası doğru:** `clearPushToken()` **`clearAccessToken()`'dan ÖNCE**
+      çağrılıyor — uç `Authorization` istiyor, sıra ters olsa 401 alınır ve token sunucuda asılı
+      kalırdı (PM koddan doğruladı)
+- [x] Yönlendirme `utils/pushNavigation.ts`: MENTION → kanal/DM · DM_MESSAGE → DM ·
+      EVENT_CREATED → etkinlikler · FRIEND_* → mevcut ekranlar · çözülemeyen → **yalnız uygulama
+      açılır** (kırık navigasyon vaat edilmiyor). Soğuk açılış da yakalanıyor
+      (`getLastNotificationResponse`)
+- [x] Ön planda banner yok; emülatör/izinsiz/ağ hatası sessizce geçiliyor, uygulamayı bloke etmiyor
+- [x] `typecheck` + `lint` temiz; `api/` ve `web/` diffi yok
+
+### Dev bulgusu — `expo-dev-client` eksikti (PM kurdu)
+`eas.json`'daki `development` profili `developmentClient: true` diyor ama paket kurulu değildi;
+dev build çıksa bile `expo start --dev-client` ile bağlanmazdı. Dev bunu lint'in yan etkisi olarak
+fark edip bildirdi (kendi başına bağımlılık eklemedi — doğru davranış). PM onayıyla
+`expo-dev-client@~6.0.21` kuruldu. **Sahip build'i bundan önce başlattıysa yeniden alması gerekiyor.**
 
 ### Sahip adımları (§5 — bunlar olmadan mobil ayak başlamaz)
 - [ ] **Dev build (APK)** — push Expo Go'da Android'de çalışmaz
