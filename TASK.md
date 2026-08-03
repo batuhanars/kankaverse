@@ -2130,8 +2130,9 @@ uyarı üretmiyor).
       `keyboardShouldPersistTaps`, ≥44dp dokunma hedefi, geri tuşu önce listeyi kapatır
 - [ ] Gönderimde token dönüşümü: `@ad` → `<@userId>` (yalnız seçilenler),
       `@everyone` → `<@&roleId>`; başarıda temizle, hatada KORU
-- [ ] 🔴 §4.4 — elle yazılan `@everyone` de token'a çevrilir (web'deki sessiz başarısızlık
-      mobile TAŞINMAZ); kullanıcı adlarında bu YAPILMAZ (asimetri bilinçli, sözleşmede gerekçesi var)
+- [ ] 🔴 §4.4 — elle yazılan `@everyone` de token'a çevrilir; kullanıcı adlarında bu YAPILMAZ
+      (asimetri bilinçli, sözleşmede gerekçesi var). **Web bu davranışa çekildi** (sahip kararı
+      2026-08-03, aşağıdaki ek madde) → mobil ikizini uygular, iki istemci aynı
 - [ ] `guildId`siz açılan kanal ekranında liste hiç açılmaz (yarım liste = yanlış vaat)
 - [ ] `typecheck` + `lint` temiz; metinler `tr.json`'a bir kez; `MessageComposer.tsx` 300 satırı geçmez
 
@@ -2144,3 +2145,10 @@ uyarı üretmiyor).
 - [ ] 1-1 DM'de karşı taraf, grup DM'de üyeler listede; DM'de `@everyone` yok
 - [ ] Liste açıkken klavye kapanmıyor; metnin ortasına dokunup `@` yazınca doğru sorguyla açılıyor
 - [ ] Bildirimlerden açılan kanalda (guildId yok) liste açılmıyor, ekran normal çalışıyor
+
+### Web ayağı (sahip kararı 2026-08-03) — M2d'den ÖNCE yapıldı
+- [x] `useMentionAutocomplete`: `@everyone` dönüşümü artık **listeden seçime bağlı değil**, tek kapı
+      rolün `mentionable` olması. `pendingEveryone` bayrağı ölü kaldığı için kaldırıldı (set eden
+      satır, `clearPending` sıfırlaması ve koşul birlikte temizlendi). Sunucu kapısı bağımsız
+      duruyor: `mentionable` değilse `resolveMentions` `mentionsEveryone` yazmaz, istemci ne
+      gönderirse göndersin. `vue-tsc --noEmit` + `vite build` temiz

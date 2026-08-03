@@ -57,8 +57,6 @@ export function useMentionAutocomplete(
 
   // username → userId: picker'dan seçilen bahsetmeler (gönderimde token'a çevrilir)
   const pendingMentions = ref<Map<string, string>>(new Map())
-  // @everyone seçildi mi (gönderimde <@&roleId> token'ına çevrilir)
-  const pendingEveryone = ref(false)
 
   // Aktif sorgu bilgisi (seçim sırasında değiştirmek için)
   const _currentQuery = ref<{ query: string; start: number } | null>(null)
@@ -109,9 +107,9 @@ export function useMentionAutocomplete(
     const newText = before + replacement + after
     setContent(newText)
     const newCursor = before.length + replacement.length
-    // @everyone → ayrı bayrak; gerçek üye → username→userId haritası
-    if (member.isEveryone) pendingEveryone.value = true
-    else pendingMentions.value.set(member.username, member.id)
+    // Gerçek üye → username→userId haritası. @everyone için bayrak TUTULMAZ: dönüşüm artık
+    // seçime değil rolün mentionable olmasına bakıyor (bkz. applyMentionTokens).
+    if (!member.isEveryone) pendingMentions.value.set(member.username, member.id)
     showPopover.value = false
     suggestions.value = []
     _currentQuery.value = null
@@ -147,14 +145,27 @@ export function useMentionAutocomplete(
   }
 
   /**
-   * Gönderim öncesi: pendingMentions'taki her @username → <@userId> token'ına çevir.
-   * Seçilmemiş serbest @x dokunulmaz.
-   * Kelime-sınırı: @username'in ardından boşluk, satır sonu veya metin sonu.
+   * Gönderim öncesi token dönüşümü:
+   *   - `@kullanıcıadı` → `<@userId>` — YALNIZ listeden seçilenler (pendingMentions).
+   *     Seçilmemiş serbest `@x` dokunulmaz.
+   *   - `@everyone` → `<@&roleId>` — seçilmiş olması ŞART DEĞİL (aşağıdaki gerekçe).
+   * Kelime-sınırı: token'ın ardından boşluk, satır sonu veya metin sonu.
    */
   function applyMentionTokens(text: string): string {
     let result = text
-    // @everyone → <@&roleId> (rol hâlâ mentionable ise)
-    const roleId = pendingEveryone.value ? everyoneRoleId?.() : null
+    /**
+     * @everyone → <@&roleId>. **Öneriyi listeden seçmiş olmak ŞART DEĞİL** (sahip kararı
+     * 2026-08-03): elle yazılan `@everyone` da çevrilir. Önceden `pendingEveryone` bayrağı
+     * şarttı ve elle yazan kullanıcı sessizce sıradan mesaj göndermiş oluyordu — ne bir uyarı
+     * ne bir işaret vardı (sahip tam olarak buna takıldı). Discord'da da yazmak yeter.
+     *
+     * Kapı gevşemiyor: `everyoneRoleId()` yalnız **everyone rolü `mentionable` ise** dolu döner
+     * (varsayılanı `false`), ve sunucu aynı kapıyı bağımsız uyguluyor — istemci ne gönderirse
+     * göndersin `resolveMentions` mentionable değilse `mentionsEveryone` yazmaz.
+     * Kullanıcı adları için AYNISI YAPILMAZ: serbest `@kelime`'yi kişiye eşlemek isim araması
+     * ister (yeni uç) ve yanlış kişiyi bahsetme riski taşır — bu asimetri bilinçli.
+     */
+    const roleId = everyoneRoleId?.() ?? null
     if (roleId) {
       result = result.replace(/@everyone(?=\s|$)/g, `<@&${roleId}>`)
     }
@@ -172,7 +183,6 @@ export function useMentionAutocomplete(
 
   function clearPending() {
     pendingMentions.value = new Map()
-    pendingEveryone.value = false
     showPopover.value = false
   }
 
