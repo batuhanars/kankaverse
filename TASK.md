@@ -2345,6 +2345,29 @@ fark edip bildirdi (kendi başına bağımlılık eklemedi — doğru davranış
 - [ ] **Dev build (APK)** — push Expo Go'da Android'de çalışmaz
 - [ ] **FCM kimlik bilgisi** Expo hesabına tanımlı (Firebase projesi + anahtar)
 
+### R2 — sahip cihaz turu (dev build, fiziksel telefon) — 2026-08-03
+**Çalışan:** bildirim düşüyor (ikon rozeti + üst çekmece) · susturma **DM, ortam ve kanalda**
+sorunsuz · DM ve bahsetme bildirimleri geliyor.
+
+**Üç kusur çıktı, üçü de düzeltildi:**
+- [x] 🔴 **Bildirime dokununca çöküyordu:** "Attempted to navigate before mounting the Root Layout".
+      Soğuk açılışta yönlendirme, kök navigasyon bağlanmadan çalışıyordu. Dev, expo-router'ın
+      kaynağını okuyup `router.push`'un tam olarak `navigationRef.isReady()`e baktığını gösterdi ve
+      **aynı ref/aynı şarta** bağladı: hazır değilse yanıt bekletiliyor, `'ready'` olayında
+      işleniyor. Uygulama açıkken yol anında çalışmaya devam ediyor
+- [x] 🔴 **DM'de etiketlenince İKİ bildirim:** aynı mesaj hem bahsetme hem DM yolundan push
+      üretiyordu. `sendDmPush` artık doğrudan bahsedilenleri alıcı kümesinden çıkarıyor.
+      Çan davranışı değişmedi
+- [x] 🔴 **DM push gövdesi ham token gösteriyordu** (`<@cmq93ul...>`). Sözleşme açığı: §2.6 "gövde =
+      önizleme" derken token çözümünü şart koşmamıştı. Çözüm `notifyMentions`'la **ortak yardımcıya**
+      (`resolveMentionPreview`) çıkarıldı — kopya yazılsaydı aynı mesaj için iki farklı metin çıkardı
+- [x] 978 test yeşil (3 yeni); mobil `typecheck` + `lint` temiz
+
+### Turda HENÜZ yapılmayanlar (sahipte)
+- [ ] **Çıkışta bildirim kesiliyor mu** (T&S)
+- [ ] **Aynı cihazda hesap değişince** öncekinin bildirimi düşmüyor mu (T&S — token devri)
+- [ ] Dev build devri: açılış beyaz gezinme şeridi · arka planda uzun kalıp dönünce reconnect
+
 ### DoD (cihazda — sahipte)
 - [ ] Uygulama kapalıyken bahsedilince bildirim geliyor, dokununca doğru kanala gidiyor
 - [ ] Susturulmuş ortam/kanaldan bildirim gelmiyor

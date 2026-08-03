@@ -86,6 +86,9 @@ function resetMocks() {
   // R15 — varsayılan: içerikte rol token'ı yok / rol üyesi yok
   prismaMock.role.findMany.mockResolvedValue([]);
   prismaMock.guildMemberRole.findMany.mockResolvedValue([]);
+  // KUSUR 3 — resolveMentionPreview varsayılanı: içerikte kullanıcı token'ı yoksa hiç çağrılmaz,
+  // varsa da (mock override etmemişse) boş sonuç → @bilinmeyen fallback'i (throw yerine).
+  prismaMock.user.findMany.mockResolvedValue([]);
   // M3 §2.6 — varsayılan: push başarıyla "gönderildi" (fire-and-forget, hata yutulur)
   pushSendToUsersMock.mockResolvedValue(undefined);
 }
@@ -353,6 +356,92 @@ describe('MessagesGateway.notifyDmActivity — push (M3 §2.6)', () => {
     await gateway.notifyDmActivity(CHANNEL_ID, makeDmMessageDto({ channelId: CHANNEL_ID }));
 
     expect(pushSendToUsersMock).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // M3 sonrası KUSUR 2 — DM'de etiketlenen kullanıcı `notifyMentions` yolundan zaten push aldı;
+  // `sendDmPush` onu İKİNCİ KEZ göndermemeli (aksi hâlde telefona iki bildirim düşer).
+  // ─────────────────────────────────────────────────────────────────────────
+  it('KUSUR 2 — grup DM: doğrudan bahsedilen üyeye sendDmPush GÖNDERMEZ, diğerine gönderir', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: null,
+      dmRequestStatus: null,
+      dmRequesterId: null,
+    });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: GROUP_MEMBER_1 },
+      { userId: GROUP_MEMBER_2 },
+    ]);
+
+    await gateway.notifyDmActivity(
+      DM_CHANNEL_ID,
+      makeDmMessageDto({
+        content: `<@${GROUP_MEMBER_1}> bakar mısın`,
+        mentions: [GROUP_MEMBER_1],
+      }),
+    );
+
+    expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
+    const [targets] = pushSendToUsersMock.mock.calls[0];
+    expect(targets).not.toContain(GROUP_MEMBER_1);
+    expect(targets).toEqual([GROUP_MEMBER_2]);
+  });
+
+  it('KUSUR 2 — tüm üyeler doğrudan bahsedilmişse (mentions == alıcılar) push hiç gönderilmez', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: null,
+      dmRequestStatus: null,
+      dmRequesterId: null,
+    });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: DM_MEMBER_ID },
+    ]);
+
+    await gateway.notifyDmActivity(
+      DM_CHANNEL_ID,
+      makeDmMessageDto({
+        content: `<@${DM_MEMBER_ID}> selam`,
+        mentions: [DM_MEMBER_ID],
+      }),
+    );
+
+    expect(pushSendToUsersMock).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // M3 sonrası KUSUR 3 — DM push gövdesi ham `<@id>` token'ı göstermemeli, `notifyMentions`
+  // ile AYNI çözümden (resolveMentionPreview) geçmeli.
+  // ─────────────────────────────────────────────────────────────────────────
+  it('KUSUR 3 — DM push gövdesinde ham bahsetme tokeni kalmaz, @kullanıcıadına çözülür', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: null,
+      dmRequestStatus: null,
+      dmRequesterId: null,
+    });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: DM_MEMBER_ID },
+      { userId: GROUP_MEMBER_1 },
+    ]);
+    prismaMock.user.findMany.mockResolvedValue([
+      { id: GROUP_MEMBER_1, username: 'kankakullanici' },
+    ]);
+
+    await gateway.notifyDmActivity(
+      DM_CHANNEL_ID,
+      makeDmMessageDto({
+        content: `<@${GROUP_MEMBER_1}> bir bak`,
+        mentions: [GROUP_MEMBER_1],
+      }),
+    );
+
+    // GROUP_MEMBER_1 doğrudan bahsedilen — push almaz (KUSUR 2); yalnız DM_MEMBER_ID kalır.
+    expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
+    const [, payload] = pushSendToUsersMock.mock.calls[0];
+    expect(payload.body).not.toMatch(/<@/);
+    expect(payload.body).toBe('@kankakullanici bir bak');
   });
 });
 
