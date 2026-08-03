@@ -791,8 +791,10 @@ const {
   setGuildLevel,
   suppressEveryone,
   suppressEvents,
+  suppressRoleMentions,
   toggleSuppressEveryone,
   toggleSuppressEvents,
+  toggleSuppressRoleMentions,
   copyGuildId,
 } = useGuildMenuActions(() => guildsStore.activeGuildId ?? '')
 
@@ -1068,9 +1070,11 @@ onUnmounted(() => {
           :level="guildLevel"
           :suppress-everyone="suppressEveryone"
           :suppress-events="suppressEvents"
+          :suppress-role-mentions="suppressRoleMentions"
           @select="setGuildLevel"
           @toggle-everyone="toggleSuppressEveryone"
           @toggle-events="toggleSuppressEvents"
+          @toggle-role-mentions="toggleSuppressRoleMentions"
         />
 
         <!-- Ortam Ayarları (settings'te yapabileceği bir şey olan herkes) -->

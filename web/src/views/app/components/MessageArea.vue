@@ -164,6 +164,24 @@ const everyoneMentionRoleId = computed<string | null>(() => {
   return everyone?.mentionable ? everyone.id : null
 })
 
+/**
+ * R15 — önerilebilir roller (everyone HARİÇ; o ayrı öneri olarak zaten var).
+ * Kapı kuralı burada uygulanır (sözleşme §2.2 ile birebir):
+ *   mentionable rol → herkese görünür
+ *   mentionable OLMAYAN rol → yalnız MENTION_EVERYONE izni olana
+ * Sunucu aynı kapıyı bağımsız uyguluyor; buradaki süzgeç yalnız "seçemeyeceğin şeyi önerme"
+ * içindir, yetki kararı değildir.
+ */
+const canMentionRestrictedRoles = computed(() => can('MENTION_EVERYONE'))
+const mentionRoles = computed(() => {
+  const gid = guildsStore.activeGuildId
+  if (!gid) return []
+  return rolesStore
+    .rolesFor(gid)
+    .filter((r) => !r.isEveryone && (r.mentionable || canMentionRestrictedRoles.value))
+    .map((r) => ({ id: r.id, name: r.name, color: r.color }))
+})
+
 const mention = useMentionAutocomplete(
   mentionMembers,
   () => content.value,
@@ -171,6 +189,7 @@ const mention = useMentionAutocomplete(
   () => textareaEl.value?.selectionStart ?? 0,
   (pos) => { nextTick(() => { textareaEl.value?.setSelectionRange(pos, pos) }) },
   () => everyoneMentionRoleId.value,
+  () => mentionRoles.value,
 )
 
 watch(
@@ -509,6 +528,18 @@ function resetComposerHeight() {
                 </div>
                 <span class="font-semibold">@everyone</span>
                 <span class="text-[12px] truncate" style="color: var(--kv-text-muted);">{{ t('mention.everyoneHint') }}</span>
+              </template>
+              <!-- R15 — rol önerisi: rolün KENDİ rengiyle, altıgen değil yuvarlak nokta.
+                   Aynı adı taşıyan bir üyeyle karışmasın diye ikon ve renk ayrı tutuldu. -->
+              <template v-else-if="member.isRole">
+                <div class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center" style="background-color: var(--kv-bg-content);">
+                  <span
+                    class="w-2.5 h-2.5 rounded-full"
+                    :style="{ backgroundColor: member.color || 'var(--kv-text-muted)' }"
+                  />
+                </div>
+                <span class="font-semibold" :style="{ color: member.color || undefined }">@{{ member.username }}</span>
+                <span class="text-[12px] truncate" style="color: var(--kv-text-muted);">{{ t('mention.roleHint') }}</span>
               </template>
               <!-- Gerçek üye → daire avatar -->
               <template v-else>
