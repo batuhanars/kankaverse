@@ -31,7 +31,6 @@ export default function GuildEventsScreen() {
   const [events, setEvents] = useState<EventDto[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [actionError, setActionError] = useState('');
-  const [menuId, setMenuId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EventDto | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -51,7 +50,6 @@ export default function GuildEventsScreen() {
   useFocusEffect(fetchAll);
 
   function openForm(eventId?: string) {
-    setMenuId(null);
     router.push({
       pathname: '/event-form',
       params: eventId ? { guildId: params.guildId, eventId } : { guildId: params.guildId },
@@ -151,14 +149,9 @@ export default function GuildEventsScreen() {
             <EventCard
               event={item}
               canManage={canManage}
-              menuOpen={menuId === item.id}
-              onToggleMenu={() => setMenuId(menuId === item.id ? null : item.id)}
               onToggleInterest={() => toggleInterest(item)}
               onEdit={() => openForm(item.id)}
-              onDelete={() => {
-                setMenuId(null);
-                setDeleteTarget(item);
-              }}
+              onDelete={() => setDeleteTarget(item)}
             />
           )}
         />

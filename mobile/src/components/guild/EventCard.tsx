@@ -17,22 +17,12 @@ import { theme } from '@/theme';
 interface Props {
   event: EventDto;
   canManage: boolean;
-  menuOpen: boolean;
-  onToggleMenu: () => void;
   onToggleInterest: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-export function EventCard({
-  event,
-  canManage,
-  menuOpen,
-  onToggleMenu,
-  onToggleInterest,
-  onEdit,
-  onDelete,
-}: Props) {
+export function EventCard({ event, canManage, onToggleInterest, onEdit, onDelete }: Props) {
   const location =
     event.locationType === 'VOICE_CHANNEL'
       ? `🔊 ${event.channelName ?? ''}`
@@ -60,16 +50,30 @@ export function EventCard({
             </Text>
           </View>
 
+          {/* R-c: menü yok, iki aksiyon doğrudan kartta. Düğmeler görsel olarak 28dp; `hitSlop`
+              dokunma hedefini 40dp'ye çıkarıyor. Aradaki boşluk (ICON_GAP) iki hitSlop alanı
+              **çakışmasın** diye 2 × HIT_SLOP: silme yanlışlıkla tetiklenmesin. */}
           {canManage ? (
-            <Pressable
-              onPress={onToggleMenu}
-              style={styles.menuButton}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.settings')}
-              hitSlop={8}
-            >
-              <Ionicons name="ellipsis-horizontal" size={18} color={theme.colors.textMuted} />
-            </Pressable>
+            <View style={styles.iconRow}>
+              <Pressable
+                onPress={onEdit}
+                style={styles.iconButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('event.edit')}
+                hitSlop={HIT_SLOP}
+              >
+                <Ionicons name="settings-outline" size={18} color={theme.colors.textMuted} />
+              </Pressable>
+              <Pressable
+                onPress={onDelete}
+                style={styles.iconButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('event.delete')}
+                hitSlop={HIT_SLOP}
+              >
+                <Ionicons name="close-outline" size={20} color={theme.colors.danger} />
+              </Pressable>
+            </View>
           ) : null}
         </View>
 
@@ -116,25 +120,16 @@ export function EventCard({
             {t('event.interestedCount', { count: String(event.interestedCount) })}
           </Text>
         </View>
-
-        {/* ⋯ menüsü kartın İÇİNDE açılır (ayrı Modal değil): liste zaten bir sheet Modal'ı,
-            üstüne ikinci bir sheet yığmak Android'de kırılgan. Silme onayı zaten Modal açacak. */}
-        {menuOpen && canManage ? (
-          <View style={styles.menu}>
-            <Pressable onPress={onEdit} style={styles.menuItem}>
-              <Ionicons name="pencil-outline" size={16} color={theme.colors.textSecondary} />
-              <Text style={styles.menuText}>{t('event.edit')}</Text>
-            </Pressable>
-            <Pressable onPress={onDelete} style={styles.menuItem}>
-              <Ionicons name="trash-outline" size={16} color={theme.colors.danger} />
-              <Text style={[styles.menuText, styles.menuTextDanger]}>{t('event.delete')}</Text>
-            </Pressable>
-          </View>
-        ) : null}
       </View>
     </View>
   );
 }
+
+const COVER_HEIGHT = 130;
+const BODY_PADDING = 14;
+/** 28dp düğme + iki yandan 6dp = 40dp dokunma hedefi. */
+const HIT_SLOP = 6;
+const ICON_GAP = HIT_SLOP * 2;
 
 const styles = StyleSheet.create({
   card: {
@@ -142,10 +137,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.borderSubtle,
     backgroundColor: theme.colors.bgElevated,
+    // Kart dışına taşan bir yüzey kalmadı (R-c ile popover söküldü) → kırpma geri geldi;
+    // kapak görselinin üst köşelerini kartın yarıçapına bu kırpıyor.
     overflow: 'hidden',
   },
-  cover: { width: '100%', height: 130 },
-  body: { padding: 14, gap: 8 },
+  cover: { width: '100%', height: COVER_HEIGHT },
+  body: { padding: BODY_PADDING, gap: 8 },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   titleBlock: { flex: 1, gap: 2 },
   date: {
@@ -156,7 +153,8 @@ const styles = StyleSheet.create({
   },
   name: { color: theme.colors.textPrimary, fontSize: theme.fontSize.lg, fontWeight: '700' },
   location: { color: theme.colors.textSecondary, fontSize: theme.fontSize.sm },
-  menuButton: {
+  iconRow: { flexDirection: 'row', alignItems: 'center', gap: ICON_GAP },
+  iconButton: {
     width: theme.layout.controlSm,
     height: theme.layout.controlSm,
     alignItems: 'center',
@@ -196,20 +194,4 @@ const styles = StyleSheet.create({
   interestText: { color: theme.colors.textSecondary, fontSize: theme.fontSize.sm, fontWeight: '600' },
   interestTextOn: { color: theme.colors.success },
   count: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs },
-  menu: {
-    marginTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.borderSubtle,
-    paddingTop: 6,
-    gap: 2,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    minHeight: 40,
-    paddingHorizontal: 4,
-  },
-  menuText: { color: theme.colors.textSecondary, fontSize: theme.fontSize.base },
-  menuTextDanger: { color: theme.colors.danger },
 });
