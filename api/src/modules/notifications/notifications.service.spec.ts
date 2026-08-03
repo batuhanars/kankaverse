@@ -17,6 +17,11 @@ const prismaMock = {
     findMany: jest.fn(),
     upsert: jest.fn(),
   },
+  pushToken: {
+    upsert: jest.fn(),
+    findUnique: jest.fn(),
+    delete: jest.fn(),
+  },
   user: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
@@ -35,8 +40,11 @@ const membershipMock = {
   requireChannelAccess: jest.fn(),
 };
 
+const pushSendToUsersMock = jest.fn();
+const pushMock = { sendToUsers: pushSendToUsersMock };
+
 function makeService() {
-  return new NotificationsService(prismaMock as any, realtimeMock as any, membershipMock as any);
+  return new NotificationsService(prismaMock as any, realtimeMock as any, membershipMock as any, pushMock as any);
 }
 
 function resetMocks() {
@@ -46,6 +54,7 @@ function resetMocks() {
   prismaMock.guild.findUnique.mockResolvedValue(null);
   prismaMock.guild.findMany.mockResolvedValue([]);
   prismaMock.notificationPref.findMany.mockResolvedValue([]);
+  pushSendToUsersMock.mockResolvedValue(undefined);
 }
 
 const USER_ID = 'user-recipient';
@@ -131,6 +140,62 @@ describe('NotificationsService', () => {
 
       expect(dto.actor).toBeNull();
     });
+
+    // ── M3 §2.4 — push, kalıcı bildirim üretilen noktaya takılı ────────────────
+    it('persist sonrası push.sendToUsers([userId], payload) çağrılır (aynı alıcı, yeni süzgeç yok)', async () => {
+      prismaMock.notification.create.mockResolvedValue(makeRow());
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: ACTOR_ID,
+        username: 'aktor',
+        avatarUrl: null,
+      });
+
+      await service.create(USER_ID, {
+        type: 'MENTION' as any,
+        actorId: ACTOR_ID,
+        guildId: 'guild-1',
+        channelId: 'ch-1',
+        messageId: 'msg-1',
+        preview: '@kanka selam',
+      });
+
+      // Fire-and-forget: microtask kuyruğunun boşalmasını bekle.
+      await Promise.resolve();
+
+      expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
+      const [targets, payload] = pushSendToUsersMock.mock.calls[0];
+      expect(targets).toEqual([USER_ID]);
+      expect(payload.data).toEqual({
+        type: 'MENTION',
+        guildId: 'guild-1',
+        channelId: 'ch-1',
+        messageId: 'msg-1',
+      });
+      expect(payload.body).toContain('aktor');
+      expect(payload.body).toContain('@kanka selam');
+    });
+
+    it('push.sendToUsers reddederse bile create() normal dto döner (ana akış bozulmaz)', async () => {
+      prismaMock.notification.create.mockResolvedValue(makeRow());
+      pushSendToUsersMock.mockRejectedValue(new Error('expo kapalı'));
+
+      const dto = await service.create(USER_ID, { type: 'MENTION' as any, actorId: ACTOR_ID });
+
+      expect(dto.id).toBe('notif-1');
+    });
+
+    it('preview yoksa (FRIEND_REQUEST) push body actor + sabit metin taşır', async () => {
+      prismaMock.notification.create.mockResolvedValue(
+        makeRow({ type: 'FRIEND_REQUEST', preview: null, channelId: null, messageId: null, guildId: null }),
+      );
+      prismaMock.user.findUnique.mockResolvedValue({ id: ACTOR_ID, username: 'aktor', avatarUrl: null });
+
+      await service.create(USER_ID, { type: 'FRIEND_REQUEST' as any, actorId: ACTOR_ID });
+      await Promise.resolve();
+
+      const [, payload] = pushSendToUsersMock.mock.calls[0];
+      expect(payload.body).toBe('aktor sana kanka isteği gönderdi.');
+    });
   });
 
   // ── R14 — createMany: tek insert, actor/guild çözümü bir kez, emit kullanıcı başına ────
@@ -179,6 +244,35 @@ describe('NotificationsService', () => {
 
       const call = prismaMock.notification.createManyAndReturn.mock.calls[0][0];
       expect(call.data).toHaveLength(1);
+    });
+
+    // ── M3 §2.4 — push TEK çağrıda tüm alıcılara (data ortak) ─────────────────
+    it('push.sendToUsers(targets, payload) TEK kez, tüm alıcılarla çağrılır', async () => {
+      prismaMock.notification.createManyAndReturn.mockResolvedValue([
+        makeRow({ id: 'n1', userId: USER_ID, type: 'EVENT_CREATED', messageId: null, preview: 'Oyun Gecesi' }),
+        makeRow({ id: 'n2', userId: OTHER_ID, type: 'EVENT_CREATED', messageId: null, preview: 'Oyun Gecesi' }),
+      ]);
+      prismaMock.user.findMany.mockResolvedValue([{ id: ACTOR_ID, username: 'aktor', avatarUrl: null }]);
+      prismaMock.guild.findMany.mockResolvedValue([{ id: 'guild-1', name: 'Ortam' }]);
+
+      await service.createMany([USER_ID, OTHER_ID], {
+        type: 'EVENT_CREATED' as any,
+        actorId: ACTOR_ID,
+        guildId: 'guild-1',
+        preview: 'Oyun Gecesi',
+      });
+
+      expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
+      const [targets, payload] = pushSendToUsersMock.mock.calls[0];
+      expect(targets).toEqual([USER_ID, OTHER_ID]);
+      expect(payload.data.type).toBe('EVENT_CREATED');
+      expect(payload.body).toContain('Oyun Gecesi');
+    });
+
+    it('boş alıcı listesi → push.sendToUsers çağrılmaz', async () => {
+      await service.createMany([], { type: 'EVENT_CREATED' as any });
+
+      expect(pushSendToUsersMock).not.toHaveBeenCalled();
     });
   });
 
@@ -481,6 +575,60 @@ describe('NotificationsService', () => {
       await service.shouldNotifyChannel(USER_ID, null, 'ch-1');
       const call = prismaMock.notificationPref.findMany.mock.calls[0][0];
       expect(call.where.OR).toEqual([{ targetType: 'CHANNEL', targetId: 'ch-1' }]);
+    });
+  });
+
+  // ── M3 §2.1/§2.2 — push token upsert (userId TAŞINIR) ───────────────────────
+  describe('registerPushToken', () => {
+    it('upsert çağrılır; update dalı da userId yazar (token devrinde eski kullanıcı sızmasın)', async () => {
+      prismaMock.pushToken.upsert.mockResolvedValue({});
+
+      await service.registerPushToken(USER_ID, {
+        token: 'ExponentPushToken[abc]',
+        platform: 'android',
+        deviceName: 'Pixel',
+      });
+
+      expect(prismaMock.pushToken.upsert).toHaveBeenCalledWith({
+        where: { token: 'ExponentPushToken[abc]' },
+        create: { userId: USER_ID, token: 'ExponentPushToken[abc]', platform: 'android', deviceName: 'Pixel' },
+        update: { userId: USER_ID, platform: 'android', deviceName: 'Pixel', lastUsedAt: expect.any(Date) },
+      });
+    });
+
+    it('deviceName verilmezse null yazılır', async () => {
+      prismaMock.pushToken.upsert.mockResolvedValue({});
+
+      await service.registerPushToken(USER_ID, { token: 'ExponentPushToken[abc]', platform: 'android' });
+
+      const call = prismaMock.pushToken.upsert.mock.calls[0][0];
+      expect(call.create.deviceName).toBeNull();
+      expect(call.update.deviceName).toBeNull();
+    });
+  });
+
+  describe('deletePushToken', () => {
+    it('kendi token\'ını siler', async () => {
+      prismaMock.pushToken.findUnique.mockResolvedValue({ token: 'ExponentPushToken[abc]', userId: USER_ID });
+
+      await service.deletePushToken(USER_ID, 'ExponentPushToken[abc]');
+
+      expect(prismaMock.pushToken.delete).toHaveBeenCalledWith({ where: { token: 'ExponentPushToken[abc]' } });
+    });
+
+    it('başkasının token\'ı → jenerik 404 (delete çağrılmaz, varlık sızdırılmaz)', async () => {
+      prismaMock.pushToken.findUnique.mockResolvedValue({ token: 'ExponentPushToken[abc]', userId: OTHER_ID });
+
+      await expect(service.deletePushToken(USER_ID, 'ExponentPushToken[abc]')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prismaMock.pushToken.delete).not.toHaveBeenCalled();
+    });
+
+    it('token yoksa → jenerik 404', async () => {
+      prismaMock.pushToken.findUnique.mockResolvedValue(null);
+
+      await expect(service.deletePushToken(USER_ID, 'yok')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

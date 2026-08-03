@@ -155,6 +155,7 @@ model User {
   notifications       Notification[]     @relation("UserNotifications")
   notificationsActed  Notification[]     @relation("NotificationActor")
   notificationPrefs   NotificationPref[] @relation("UserNotificationPrefs")
+  pushTokens          PushToken[]
 }
 
 model AuthToken {
@@ -665,6 +666,25 @@ model NotificationPref {
   updatedAt  DateTime          @updatedAt
 
   @@unique([userId, targetType, targetId])
+  @@index([userId])
+}
+
+// ─── Sprint M3: Mobil Push Bildirimi ──────────────────────────────────────────
+// 🔴 Token KULLANICIYA bağlıdır, CİHAZA değil. Aynı cihazda hesap değişince
+// upsert (token @unique üzerinden) userId'yi yeni kullanıcıya taşır — aksi hâlde
+// önceki kullanıcının bildirimi yeni kullanıcının cihazına düşer (T&S sızıntısı,
+// bkz. SPRINT_M3_MOBILE_PUSH_CONTRACT.md §2.1/§4).
+
+model PushToken {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String   @unique // Expo push token (ExponentPushToken[...])
+  platform   String // 'android' | 'ios' — bugün yalnız android yazılır
+  deviceName String? // kullanıcıya gösterilmez; teşhis için
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+
   @@index([userId])
 }
 

@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -14,6 +15,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { SetNotificationPrefDto } from './dto/notification-pref.dto';
+import { CreatePushTokenDto } from './dto/push-token.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -64,5 +66,21 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Tek bildirimi okundu işaretle (sahiplik; başkasınınki → 404)' })
   markOne(@CurrentUser() user: { id: string }, @Param('id') id: string) {
     return this.notificationsService.markOne(user.id, id);
+  }
+
+  // ── M3 — Mobil push token kaydı (Expo) ─────────────────────────────────────
+
+  @Post('push-tokens')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Push token kaydet/güncelle (upsert; token unique, userId çağırandan taşınır)' })
+  registerPushToken(@CurrentUser() user: { id: string }, @Body() dto: CreatePushTokenDto) {
+    return this.notificationsService.registerPushToken(user.id, dto);
+  }
+
+  @Delete('push-tokens/:token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Kendi push token'ını sil (başkasınınki/yok → 404, varlık sızdırma yok)" })
+  deletePushToken(@CurrentUser() user: { id: string }, @Param('token') token: string) {
+    return this.notificationsService.deletePushToken(user.id, token);
   }
 }
