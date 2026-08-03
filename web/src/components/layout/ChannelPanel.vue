@@ -237,17 +237,25 @@ const eventCount = computed(() => eventsStore.countFor(activeGuildId.value))
 // ── Deep-link: ?event=<id> → etkinlik modalını aç + kartı vurgula (Motor §6) ──
 // MVP'de paylaş linki kopyalanıyordu ama açılmıyordu — bu açık kalemi kapatır.
 // Aktif guild yeterli: link aynı ortamda paylaşılıyor, kart vurgusu modalda yapılır.
+// R14: `?events=1` (etkinlik-id'siz giriş — bildirim satırı) aynı yolu kullanır.
+// `onMounted` YERİNE watcher: ChannelPanel sidebar olarak MOUNTED KALIYOR; aynı ortamdayken
+// gelen bildirime tıklayınca query değişir ama mount tetiklenmezdi → tıklama sessizce ölürdü.
 const highlightEventId = ref<string | null>(null)
-onMounted(() => {
-  const raw = router.currentRoute.value.query.event
-  const eventId = Array.isArray(raw) ? raw[0] : raw
-  if (!eventId) return
-  highlightEventId.value = eventId
-  showEventsModal.value = true
-  // Query'yi tüket — geri/yenile derin linki tekrar tetiklemesin.
-  const { event: _consumed, ...rest } = router.currentRoute.value.query
-  router.replace({ query: rest }).catch(() => {})
-})
+watch(
+  () => router.currentRoute.value.query,
+  (query) => {
+    const rawId = query.event
+    const eventId = Array.isArray(rawId) ? rawId[0] : rawId
+    const openOnly = query.events === '1'
+    if (!eventId && !openOnly) return
+    highlightEventId.value = eventId ?? null
+    showEventsModal.value = true
+    // Query'yi tüket — geri/yenile derin linki tekrar tetiklemesin.
+    const { event: _consumedId, events: _consumedFlag, ...rest } = query
+    router.replace({ query: rest }).catch(() => {})
+  },
+  { immediate: true },
+)
 
 // REV-13b: ses kanalı aktif-süresi (sidebar, yeşil) — saniyede bir tik
 const voiceNow = ref(Date.now())
@@ -781,6 +789,10 @@ const {
   unmuteGuild,
   guildLevel,
   setGuildLevel,
+  suppressEveryone,
+  suppressEvents,
+  toggleSuppressEveryone,
+  toggleSuppressEvents,
   copyGuildId,
 } = useGuildMenuActions(() => guildsStore.activeGuildId ?? '')
 
@@ -849,7 +861,9 @@ function closeChannelContext() {
 const {
   markChannelRead,
   isChannelMuted,
-  toggleChannelMute,
+  channelMutedUntil,
+  muteChannelFor,
+  unmuteChannel,
   channelLevel,
   setChannelLevel,
   copyChannelId,
@@ -1048,8 +1062,16 @@ onUnmounted(() => {
           @unmute="unmuteGuild"
         />
 
-        <!-- Bildirim Ayarları — yana açılan flyout (NotifLevelFlyout) -->
-        <NotifLevelFlyout :level="guildLevel" @select="setGuildLevel" />
+        <!-- Bildirim Ayarları — yana açılan flyout (seviye + R14 bastırma kutucukları;
+             ServerRail ortam menüsüyle aynı bağlanış) -->
+        <NotifLevelFlyout
+          :level="guildLevel"
+          :suppress-everyone="suppressEveryone"
+          :suppress-events="suppressEvents"
+          @select="setGuildLevel"
+          @toggle-everyone="toggleSuppressEveryone"
+          @toggle-events="toggleSuppressEvents"
+        />
 
         <!-- Ortam Ayarları (settings'te yapabileceği bir şey olan herkes) -->
         <button
@@ -2175,17 +2197,15 @@ onUnmounted(() => {
 
       <div class="ch-ctx__divider" />
 
-      <!-- 4. Kanalı Sustur — sağda işaret (✓) muted ise -->
-      <button
-        class="ch-ctx__item"
-        role="menuitemcheckbox"
-        :aria-checked="isChannelMuted"
-        @click="toggleChannelMute"
-      >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-        <span class="ch-ctx__label">{{ t('channelMenu.mute') }}</span>
-        <svg v-if="isChannelMuted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__check"><path d="M20 6 9 17l-5-5"/></svg>
-      </button>
+      <!-- 4. Kanalı Sustur — süre menüsü (Sprint WEB-PARITE §3.1; ortam/DM menüsüyle aynı bileşen) -->
+      <MuteDurationFlyout
+        :muted="isChannelMuted"
+        :muted-until="channelMutedUntil"
+        :label="t('channelMenu.mute')"
+        :unmute-label="t('channelMenu.unmute')"
+        @mute="muteChannelFor"
+        @unmute="unmuteChannel"
+      />
 
       <!-- 5. Bildirim Ayarları — yana açılan flyout (NotifLevelFlyout) -->
       <NotifLevelFlyout :level="channelLevel" @select="setChannelLevel" />

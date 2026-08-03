@@ -74,6 +74,9 @@ function notificationText(n: NotificationDto): string {
       return t('notification.friendAccept', { actor })
     case 'GUILD_INVITE':
       return t('notification.guildInvite', { actor, guild: n.guildName ?? t('invite.unknownGuild') })
+    case 'EVENT_CREATED':
+      // R14 — metin mobille BİREBİR (tek kaynak tr.json)
+      return t('notification.eventCreated', { actor, event: n.preview ?? '' })
     default:
       return actor
   }
@@ -91,6 +94,24 @@ function relativeTime(iso: string): string {
   const day = Math.floor(hour / 24)
   if (day < 7) return t('notification.daysAgo', { n: day })
   return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })
+}
+
+/**
+ * R14 — ortamın etkinlikler yüzeyini aç. Etkinlikler modalı `ChannelPanel`'de yaşıyor
+ * (ortam sidebar'ı) → önce ortamın bir kanalına gidilir, sonra `?events=1` modalı açtırır.
+ * Kanal seçimi `ServerRail.selectGuild` deseni: yüklü değilse fetch, ilk kanal.
+ */
+async function openGuildEvents(guildId: string) {
+  if (!channelsStore.channelsForGuild(guildId).length) {
+    await channelsStore.fetchChannelsAndCategories(guildId).catch(() => {})
+  }
+  const channels = channelsStore.channelsForGuild(guildId)
+  if (!channels.length) return // kanalsız ortam → kırık navigasyon vaat etme
+  router.push({
+    name: 'channel',
+    params: { guildId, channelId: channels[0].id },
+    query: { events: '1' },
+  })
 }
 
 // Tıkla → ilgili yere git + okundu işaretle
@@ -115,6 +136,10 @@ async function onItemClick(n: NotificationDto) {
   } else if (n.type === 'GUILD_INVITE' && n.preview) {
     // preview = davet kodu → kabul/reddet görünümü
     router.push(`/invite/${n.preview}`)
+  } else if (n.type === 'EVENT_CREATED' && n.guildId) {
+    // R14 — ortamın etkinlikler yüzeyi. Bildirimde etkinlik ID'si yok (preview = ad),
+    // o yüzden kart vurgusu yapılmaz; `?events=1` yalnız modalı açar (ChannelPanel yakalar).
+    await openGuildEvents(n.guildId)
   }
 }
 </script>
@@ -225,9 +250,10 @@ async function onItemClick(n: NotificationDto) {
             <p class="text-[13px] leading-snug" style="color: var(--kv-text-body);">
               {{ notificationText(item) }}
             </p>
-            <!-- Mention önizlemesi (varsa) — GUILD_INVITE'ta preview davet kodudur, gösterilmez -->
+            <!-- Mention önizlemesi (varsa) — GUILD_INVITE'ta preview davet kodudur, gösterilmez;
+                 EVENT_CREATED'ta preview etkinlik adı ve zaten metnin içinde geçiyor (tekrar etmesin) -->
             <p
-              v-if="item.preview && item.type !== 'GUILD_INVITE'"
+              v-if="item.preview && item.type !== 'GUILD_INVITE' && item.type !== 'EVENT_CREATED'"
               class="text-[12px] leading-snug mt-0.5 truncate"
               style="color: var(--kv-text-muted);"
             >

@@ -9,6 +9,8 @@ import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
 import { useSocket } from '@/composables/useSocket'
+import { useAppShellNav } from '@/composables/useAppShellNav'
+import { isWide } from '@/composables/useResponsive'
 import HomeTopBar from './components/HomeTopBar.vue'
 import DmConversation from './components/DmConversation.vue'
 import DmProfilePanel from './components/DmProfilePanel.vue'
@@ -21,6 +23,11 @@ const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
 const { leaveChannel } = useSocket()
+// Sprint WEB-PARITE §4 — DM profil paneli <1280'de overlay. Sağ panel state'i ortam
+// görünümüyle AYNI singleton (`rightPanelOpen`): paralel state yok, ESC kapatması
+// `AppShell`'de zaten kurulu (`!isWide && rightPanelVisible → closeRightPanel`),
+// route değişiminde null'a döner → ≥1280 inline davranışı bozulmaz.
+const { rightPanelVisible, toggleRightPanel, closeRightPanel } = useAppShellNav()
 
 const activeDmChannel = computed(() => dmStore.activeChannel())
 
@@ -76,21 +83,71 @@ watch(() => props.channelId, (id) => sync(id), { immediate: true })
     >
       {{ t('messageRequests.sentBanner') }}
     </div>
-    <div v-if="activeDmChannel" class="flex flex-1 min-w-0 overflow-hidden gap-4">
+    <div v-if="activeDmChannel" class="flex flex-1 min-w-0 overflow-hidden gap-4 relative">
+      <!-- `cleared` KALKTI: sohbeti temizleme DM satırı menüsüne taşındı (SPRINT_DM_MENU §4),
+           aktif DM temizlenince ana sayfaya dönüşü `DmList` yapıyor. -->
       <DmConversation
         :channel="activeDmChannel"
-        @cleared="toHome"
+        :profile-panel-open="rightPanelVisible"
+        @toggle-profile="toggleRightPanel"
         @left="toHome"
         @deleted="toHome"
       />
       <!-- Profil paneli yalnızca 1-1 DM için.
+           ≥1280: bugünkü inline davranış aynen (koşulsuz açık).
            `hidden xl:flex` DEĞİL: bazı tarayıcı eklentileri her sayfaya katmansız
            `.hidden{display:none}` enjekte ediyor ve Tailwind'in katmanlı varyantını
            eziyor → panel geniş ekranda da gizli kalıyordu. `hidden` sınıf adını hiç
            kullanmayan bu kalıp aynı işi yapar ve dış CSS'e bağışıklıdır. -->
-      <div v-if="activeDmChannel.type === 'DM'" class="flex max-xl:hidden">
-        <DmProfilePanel :other-user="activeDmChannel.otherUser" />
-      </div>
+      <template v-if="activeDmChannel.type === 'DM'">
+        <div v-if="isWide" class="flex">
+          <DmProfilePanel :other-user="activeDmChannel.otherUser" />
+        </div>
+
+        <!-- <1280: sağdan overlay drawer (üye paneli deseni — TextChannelView §A ikizi) -->
+        <template v-else>
+          <Transition name="kv-fade">
+            <div
+              v-if="rightPanelVisible"
+              class="absolute inset-0 z-20"
+              style="background-color: rgba(0,0,0,0.6);"
+              aria-hidden="true"
+              @click="closeRightPanel"
+            />
+          </Transition>
+
+          <Transition name="kv-slide-right">
+            <div
+              v-if="rightPanelVisible"
+              class="absolute right-0 inset-y-0 z-30 flex overflow-hidden"
+              role="dialog"
+              :aria-label="t('dm.profilePanel')"
+            >
+              <DmProfilePanel :other-user="activeDmChannel.otherUser" />
+            </div>
+          </Transition>
+        </template>
+      </template>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Üye paneli overlay'iyle aynı geçişler (TextChannelView) — yeni animasyon dili uydurulmadı. */
+.kv-fade-enter-active,
+.kv-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.kv-fade-enter-from,
+.kv-fade-leave-to {
+  opacity: 0;
+}
+.kv-slide-right-enter-active,
+.kv-slide-right-leave-active {
+  transition: transform 0.3s ease;
+}
+.kv-slide-right-enter-from,
+.kv-slide-right-leave-to {
+  transform: translateX(100%);
+}
+</style>

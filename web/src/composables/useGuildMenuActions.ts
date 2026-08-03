@@ -101,6 +101,40 @@ export function useGuildMenuActions(guildId: Ref<string> | (() => string)) {
     }
   }
 
+  // ── R14: ortam düzeyi bastırma bayrakları (@everyone · yeni etkinlik) ──
+  // Sunucu ikisini yalnız GUILD hedefiyle kabul eder; ortam susturulmuşken de gizlenmez
+  // (sustur geçici, bu ayar kalıcı — sözleşme §3.1).
+  const suppressEveryone = computed(() => prefsStore.suppressEveryone(gid.value))
+  const suppressEvents = computed(() => prefsStore.suppressEvents(gid.value))
+
+  async function toggleSuppressEveryone() {
+    const id = gid.value
+    if (!id) return
+    try {
+      await prefsStore.setPref({
+        targetType: NotifTargetType.GUILD,
+        targetId: id,
+        suppressEveryone: !suppressEveryone.value,
+      })
+    } catch {
+      toast.error(t('guildMenu.levelError'))
+    }
+  }
+
+  async function toggleSuppressEvents() {
+    const id = gid.value
+    if (!id) return
+    try {
+      await prefsStore.setPref({
+        targetType: NotifTargetType.GUILD,
+        targetId: id,
+        suppressEvents: !suppressEvents.value,
+      })
+    } catch {
+      toast.error(t('guildMenu.levelError'))
+    }
+  }
+
   // ── Sunucu ID'sini kopyala ──
   async function copyGuildId() {
     const id = gid.value
@@ -122,6 +156,10 @@ export function useGuildMenuActions(guildId: Ref<string> | (() => string)) {
     unmuteGuild,
     guildLevel,
     setGuildLevel,
+    suppressEveryone,
+    suppressEvents,
+    toggleSuppressEveryone,
+    toggleSuppressEvents,
     copyGuildId,
   }
 }

@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useNotificationsStore } from '@/stores/notifications';
 import type { NotificationDto } from '@/api/notifications';
 import { t } from '@/i18n';
@@ -31,6 +32,9 @@ function notificationText(n: NotificationDto): string {
       return t('notification.friendAccept', { actor });
     case 'GUILD_INVITE':
       return t('notification.guildInvite', { actor, guild: n.guildName ?? t('invite.unknownGuild') });
+    case 'EVENT_CREATED':
+      // Sprint R14 §3.2 — `preview` = etkinlik adı (web NotificationBell ile AYNI anahtar)
+      return t('notification.eventCreated', { actor, event: n.preview ?? '' });
     default:
       return actor;
   }
@@ -96,6 +100,12 @@ export default function NotificationsScreen() {
       if (n.preview) router.push({ pathname: '/join-guild', params: { code: n.preview } });
       return;
     }
+    // Sprint R14 §3.2 — EVENT_CREATED → ortamın etkinlikler ekranı. Bildirimde etkinlik ID'si YOK
+    // (`preview` = ad), o yüzden karta zıplama yok; `guildId` yoksa satır zaten tıklanamaz.
+    if (n.type === 'EVENT_CREATED') {
+      if (n.guildId) router.push({ pathname: '/guild-events', params: { guildId: n.guildId } });
+      return;
+    }
     if (n.type !== 'MENTION' || !n.channelId) return;
     if (n.guildId) {
       router.push({ pathname: '/channel/[id]', params: { id: n.channelId, name: '' } });
@@ -148,6 +158,7 @@ export default function NotificationsScreen() {
               item.type === 'FRIEND_REQUEST' ||
               item.type === 'FRIEND_ACCEPT' ||
               (item.type === 'GUILD_INVITE' && !!item.preview) ||
+              (item.type === 'EVENT_CREATED' && !!item.guildId) ||
               (item.type === 'MENTION' && !!item.channelId);
             return (
               <Pressable
@@ -155,7 +166,12 @@ export default function NotificationsScreen() {
                 onPress={clickable ? () => onItemPress(item) : undefined}
                 style={[styles.row, !item.readAt && styles.rowUnread]}
               >
-                {item.actor?.avatarUrl ? (
+                {/* R14 §3.2 — etkinlik bildiriminin simgesi takvim (özne kişi değil etkinlik) */}
+                {item.type === 'EVENT_CREATED' ? (
+                  <View style={[styles.avatar, styles.avatarFallback]}>
+                    <Ionicons name="calendar-outline" size={18} color={theme.colors.textSecondary} />
+                  </View>
+                ) : item.actor?.avatarUrl ? (
                   <Image source={{ uri: item.actor.avatarUrl }} style={styles.avatar} />
                 ) : (
                   <View style={[styles.avatar, styles.avatarFallback]}>
@@ -166,7 +182,8 @@ export default function NotificationsScreen() {
                 )}
                 <View style={styles.rowBody}>
                   <Text style={styles.text}>{notificationText(item)}</Text>
-                  {item.preview && item.type !== 'GUILD_INVITE' ? (
+                  {/* EVENT_CREATED'ta preview etkinlik adı ve zaten metnin içinde — tekrar etmesin */}
+                  {item.preview && item.type !== 'GUILD_INVITE' && item.type !== 'EVENT_CREATED' ? (
                     <Text style={styles.preview} numberOfLines={1}>
                       {item.preview}
                     </Text>

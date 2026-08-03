@@ -14,7 +14,6 @@ import { useCallStore } from '@/stores/call'
 import { useVoiceStore } from '@/stores/voice'
 import DmCallPanel from './DmCallPanel.vue'
 import { messagesApi } from '@/api/messages'
-import { dmApi } from '@/api/dm'
 import { formatMentionsPlain } from '@/utils/mentions'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
@@ -88,8 +87,10 @@ async function toggleDmReaction(msg: MessageDto, emoji: string, reactedByMe: boo
 
 const props = defineProps<{
   channel: DmChannelDto
+  /** Sprint WEB-PARITE §4 — sağ profil panelinin efektif görünürlüğü (yalnız <1280'de anlamlı). */
+  profilePanelOpen?: boolean
 }>()
-const emit = defineEmits<{ cleared: []; left: []; deleted: [] }>()
+const emit = defineEmits<{ left: []; deleted: []; toggleProfile: [] }>()
 
 const { t } = useI18n()
 const messagesStore = useMessagesStore()
@@ -190,8 +191,6 @@ const sendError = ref('')
 const listEl = ref<HTMLElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
 const realtimeError = ref(false)
-const showClearConfirm = ref(false)
-const clearing = ref(false)
 const unblocking = ref(false)
 const reportTargetId = ref<string | null>(null)
 const reportTargetType = ref<'MESSAGE' | 'USER'>('MESSAGE')
@@ -281,12 +280,8 @@ async function confirmDelete() {
   }
 }
 
-function openReportUser() {
-  if (dmChannel.value) {
-    reportTargetType.value = 'USER'
-    reportTargetId.value = dmChannel.value.otherUser.id
-  }
-}
+// Kullanıcı şikâyeti buradan kalktı (SPRINT_DM_MENU §4) — DM satırı menüsünde ve profil
+// panelinde. Bu modal artık yalnız MESAJ şikâyetini taşıyor.
 
 const messages = computed(() => messagesStore.messagesForChannel(props.channel.id))
 const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channel.id] ?? false)
@@ -506,18 +501,9 @@ async function onUnpinMessage(messageId: string) {
 //   return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
 // }
 
-// 1-1 DM: sohbeti temizle
-async function clearConversation() {
-  clearing.value = true
-  try {
-    await dmApi.clearChannel(props.channel.id)
-    dmStore.removeChannel(props.channel.id)
-    emit('cleared')
-  } finally {
-    clearing.value = false
-    showClearConfirm.value = false
-  }
-}
+// 🔴 "Sohbeti Temizle" buradan KALKTI (SPRINT_DM_MENU §4) — akış DM satırı menüsünde
+// (`DmList` + `useDmMenuActions`). Aktif DM temizlenince ana sayfaya dönüş davranışı orada
+// korunuyor; burada ikinci bir kopya bırakılmadı.
 
 async function unblockUser() {
   if (!dmChannel.value) return
@@ -636,16 +622,16 @@ function isGroupStart(index: number): boolean {
                `hidden xl:*` kalıbı bilinçle kullanılmadı (eklenti `.hidden` çakışması — DmView'daki not). -->
           <button
             v-if="showAddFriend"
-            class="xl:hidden flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors disabled:opacity-60"
+            class="xl:hidden w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors disabled:opacity-60"
             style="color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);"
             :title="t('friends.add')"
+            :aria-label="t('friends.add')"
             :disabled="addingFriend"
             @click="addFriendInDm"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
             </svg>
-            <span>{{ t('friends.add') }}</span>
           </button>
           <span
             v-else-if="dmChannel && addFriendSent && !isFriendInDm"
@@ -729,26 +715,28 @@ function isGroupStart(index: number): boolean {
                tek kişi var ve konuşma zaten doğrusal — buton yer kaplıyor, işi görülmüyor.
                GRUP DM'de KALIYOR (aşağıdaki blok) ve ortam kanallarında da kalıyor.
                Aynı kaldırma mobilde de yapıldı; iki istemci ayrışmasın. -->
-          <!-- Kullanıcıyı şikâyet et -->
+          <!-- Profil paneli toggle (Sprint WEB-PARITE §4): YALNIZ <1280 — o genişlikte panel
+               `DmView`'da overlay olarak açılıyor, ≥1280'de zaten sabit duruyor (çift giriş yok).
+               `hidden xl:*` kalıbı bilinçle kullanılmadı (eklenti `.hidden` çakışması). -->
           <button
-            class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-            style="color: var(--kv-text-muted);"
-            @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-danger)'"
-            @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
-            @click="openReportUser"
+            class="xl:hidden w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+            :class="profilePanelOpen ? 'bg-[var(--kv-accent-subtle)]' : ''"
+            :style="profilePanelOpen ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
+            :title="t('dm.profilePanel')"
+            :aria-label="t('dm.profilePanel')"
+            :aria-expanded="profilePanelOpen === true"
+            @mouseenter="!profilePanelOpen && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
+            @mouseleave="!profilePanelOpen && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
+            @click="emit('toggleProfile')"
           >
-            {{ t('report.reportUser') }}
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
           </button>
-          <!-- Sohbeti temizle -->
-          <button
-            class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-            style="color: var(--kv-text-muted);"
-            @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-text-secondary)'"
-            @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
-            @click="showClearConfirm = true"
-          >
-            {{ t('dm.clearConversation') }}
-          </button>
+          <!-- 🔴 "Kullanıcıyı şikâyet et" ve "Sohbeti Temizle" METİN butonları KALDIRILDI
+               (SPRINT_DM_MENU §4): ikon şeridinin arasında sırıtıyorlardı. İkisi de DM satırı
+               sağ-tık menüsüne taşındı; şikâyet ayrıca profil panelinde de var. Erişim
+               kaybolmadı — menü her genişlikte açılıyor (T&S: güvenlik aksiyonu kaybolmaz). -->
         </template>
 
         <!-- GROUP_DM başlığı -->
@@ -1124,16 +1112,6 @@ function isGroupStart(index: number): boolean {
       @deleted="emit('deleted')"
     />
   </div>
-
-  <!-- Sohbeti temizle onayı (1-1 DM) -->
-  <ConfirmDialog
-    v-if="showClearConfirm"
-    :message="t('dm.clearConfirmMsg')"
-    :confirm-label="t('dm.clearButton')"
-    :loading="clearing"
-    @confirm="clearConversation"
-    @cancel="showClearConfirm = false"
-  />
 
   <!-- Mesaj silme onayı -->
   <ConfirmDialog

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SelectSheet } from '@/components/guild/SelectSheet';
@@ -29,6 +29,10 @@ export default function GuildNotificationsScreen() {
   const muted = useNotificationPrefsStore((s) => s.isMuted(NotifTargetType.GUILD, guildId));
   const mutedUntil = useNotificationPrefsStore((s) => s.mutedUntilFor(NotifTargetType.GUILD, guildId));
   const level = useNotificationPrefsStore((s) => s.effectiveLevel(NotifTargetType.GUILD, guildId));
+  // R14 §3.1 — ortam düzeyi bastırma bayrakları. Ortam susturulmuşken de GİZLENMEZ:
+  // sustur geçici olabilir, bu ayar kalıcıdır (sözleşme).
+  const suppressEveryone = useNotificationPrefsStore((s) => s.suppressEveryone(guildId));
+  const suppressEvents = useNotificationPrefsStore((s) => s.suppressEvents(guildId));
 
   const [subSheet, setSubSheet] = useState<'none' | 'mute' | 'level'>('none');
   const [errorMessage, setErrorMessage] = useState('');
@@ -91,6 +95,23 @@ export default function GuildNotificationsScreen() {
     }
   }
 
+  /**
+   * R14 §3.1 — anahtar değişince ANINDA kaydedilir. Store `setPref`'i zaten iyimser yazıp
+   * hatada geri alıyor; burada yalnız hatayı görünür kılıyoruz (ekranın mevcut deseni).
+   */
+  async function onToggleSuppress(field: 'suppressEveryone' | 'suppressEvents', value: boolean) {
+    setErrorMessage('');
+    try {
+      await useNotificationPrefsStore.getState().setPref({
+        targetType: NotifTargetType.GUILD,
+        targetId: guildId,
+        [field]: value,
+      });
+    } catch (e) {
+      setErrorMessage(extractErrorMessage(e));
+    }
+  }
+
   const levelLabel =
     level === NotificationLevel.MENTIONS
       ? t('guildMenu.notificationsMentions')
@@ -130,6 +151,36 @@ export default function GuildNotificationsScreen() {
               <Text style={styles.rowSubtext}>{levelLabel}</Text>
             </View>
           </Pressable>
+        </View>
+
+        {/* R14 §3.1 — üçüncü grup: iki bastırma anahtarı (yeni bileşen yok, RN Switch) */}
+        <View style={[styles.group, styles.groupSpaced]}>
+          <View style={styles.row}>
+            <Ionicons name="people-outline" size={20} color={theme.colors.textSecondary} />
+            <View style={styles.rowTextWrap}>
+              <Text style={styles.rowLabel}>{t('guildMenu.suppressEveryone')}</Text>
+              <Text style={styles.rowSubtext}>{t('guildMenu.suppressEveryoneHint')}</Text>
+            </View>
+            <Switch
+              value={suppressEveryone}
+              onValueChange={(v) => void onToggleSuppress('suppressEveryone', v)}
+              trackColor={{ false: theme.colors.borderStrong, true: theme.colors.accent500 }}
+              accessibilityLabel={t('guildMenu.suppressEveryone')}
+            />
+          </View>
+          <View style={styles.row}>
+            <Ionicons name="calendar-outline" size={20} color={theme.colors.textSecondary} />
+            <View style={styles.rowTextWrap}>
+              <Text style={styles.rowLabel}>{t('guildMenu.suppressEvents')}</Text>
+              <Text style={styles.rowSubtext}>{t('guildMenu.suppressEventsHint')}</Text>
+            </View>
+            <Switch
+              value={suppressEvents}
+              onValueChange={(v) => void onToggleSuppress('suppressEvents', v)}
+              trackColor={{ false: theme.colors.borderStrong, true: theme.colors.accent500 }}
+              accessibilityLabel={t('guildMenu.suppressEvents')}
+            />
+          </View>
         </View>
 
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
