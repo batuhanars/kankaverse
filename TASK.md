@@ -2228,6 +2228,29 @@ uyarı üretmiyor).
 de). Gerekçe: rol adı serbest metinle çakışabilir ("@Test yaptım") ve yanlış gruba ping atmak yanlış
 kişiye ping atmaktan daha gürültülü. `@everyone` tek ve sabit bir hedef, rol adı değil.
 
+### 🔴 R1 — web'de mention listesi hiç açılmıyordu (sahip bulgusu, aynı gün)
+
+**Belirti:** web'de `@` yazınca öneri listesi açılmıyor; mobil sorunsuz. Sahip yeniden başlattı, geçmedi.
+
+**Kök neden (bende):** `utils/markdown.ts`'te `toRolePlaceholder` ve `ROLE_PLACEHOLDER_RE`
+**kullanılıyor ama hiç tanımlanmamıştı** — sabit bloğunu değiştiren düzenlemem sessizce tutmamış,
+dosyada eski `EVERYONE_PLACEHOLDER` sabitleri kalmıştı. Zincir: mesaj render'ı `ReferenceError`
+atıyor → `MessageRow` mount olamıyor (instance `null`) → sonraki her patch Vue'da
+`emitsOptions of null` ile çöküyor → **mesaj alanının tamamı güncellenmiyor**, dolayısıyla
+`showPopover=true` olmasına rağmen liste DOM'a hiç basılmıyor.
+
+**Neden doğrulamalarım yakalamadı — kalıcı ders:**
+- `vue-tsc --noEmit` bu depoda **hiçbir şeyi denetlemiyor** (proje referansları yüzünden 0 çıktı
+  veriyor). Tanımsız değişkeni bile görmedi. **Gerçek denetim `vue-tsc -b`** (bilinen 6 önceden-var
+  hata: livekit + ModerationView; sayı 6'dan büyükse yeni hata var demektir)
+- `vite build` tip denetlemez (esbuild tipleri siler) → `ReferenceError` iki kapıdan da geçti
+- Tarayıcıda **sert yenileme** şart: normal yenileme bayat modül servis ediyordu, ilk bisect
+  turumu tamamen yanılttı (geri aldığım dosyanın etkisi görünmedi)
+
+**Düzeltme:** eksik sabitler tanımlandı (`ROLE_PLACEHOLDER_PREFIX` + `ROLE_PLACEHOLDER_RE` +
+`toRolePlaceholder`), ölü `EVERYONE_PLACEHOLDER` çifti kaldırıldı. Tarayıcıda doğrulandı: liste
+açılıyor, roller kendi renkleriyle listeleniyor, mesajlar çiziliyor.
+
 ### DoD (**uçtan uca** — sahipte)
 - [ ] `mentionable` rolü etiketle → o roldeki üyeler bildirim + rozet alıyor, almayanlar almıyor
 - [ ] `mentionable` olmayan rolü sıradan üye etiketleyince hiçbir şey olmuyor (mesaj gidiyor, ping yok)
