@@ -23,7 +23,10 @@ expo-env.d.ts
 # tanımlayıcıları taşır, bilinçli olarak commit'lenir (bkz. M3 sözleşmesi §5).
 *serviceAccount*.json
 *service-account*.json
-firebase-adminsdk-*.json
+# 🔴 Desen BAŞTAN eşleşmeye çalışmamalı: Firebase'in verdiği gerçek ad
+# "<proje>-firebase-adminsdk-<hash>.json" biçiminde, yani "firebase-adminsdk-*" ile
+# BAŞLAMIYOR. İlk yazımda öyleydi ve dosya ignore edilmiyordu (2026-08-03 yakalandı).
+*firebase-adminsdk*.json
 
 # Metro
 .metro-health-check*
