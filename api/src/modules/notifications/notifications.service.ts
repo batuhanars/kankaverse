@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Notification, NotifTargetType, NotificationLevel } from '@prisma/client';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Notification, NotificationPref, NotifTargetType, NotificationLevel } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { MembershipService } from '../../shared/membership/membership.service';
@@ -15,6 +15,19 @@ const MAX_LIMIT = 50;
  */
 export function isMuteActive(muted: boolean, mutedUntil: Date | null): boolean {
   return muted && (!mutedUntil || mutedUntil > new Date());
+}
+
+/** R12/R14 — NotificationPref satırı → istemci sözleşmesi şekli (tek kaynak; get + set aynı map). */
+function toPrefDto(pref: NotificationPref): NotificationPrefDto {
+  return {
+    targetType: pref.targetType,
+    targetId: pref.targetId,
+    muted: pref.muted,
+    mutedUntil: pref.mutedUntil ? pref.mutedUntil.toISOString() : null,
+    level: pref.level,
+    suppressEveryone: pref.suppressEveryone,
+    suppressEvents: pref.suppressEvents,
+  };
 }
 
 @Injectable()
@@ -46,6 +59,38 @@ export class NotificationsService {
     const dto = await this.toNotificationDto(notification);
     this.realtime.emitToUser(userId, 'notification', dto);
     return dto;
+  }
+
+  /**
+   * R14 §2.3 — Aynı bildirimi ÇOK alıcıya üret (etkinlik gibi toplu tetikleyiciler).
+   *
+   * N+1 yasağı: insert TEK `createManyAndReturn`, actor/guild çözümü `toNotificationDtos` ile
+   * TEK sorguda (alıcı başına sorgu YOK). Emit kullanıcı başına yapılır — payload kişiye özel
+   * (kendi bildirim id'si). Tekil `create()` bozulmaz; iki yol da aynı DTO şeklini üretir.
+   *
+   * Alıcı listesi ÇAĞIRANIN sorumluluğu: burada erişim/tercih kararı verilmez (R7-nötr) —
+   * çağıran zaten T&S-süzülmüş + tercih-süzülmüş kümeyi geçirir.
+   */
+  async createMany(userIds: string[], data: CreateNotificationData): Promise<NotificationDto[]> {
+    const targets = [...new Set(userIds)];
+    if (targets.length === 0) return [];
+
+    const rows = await this.prisma.notification.createManyAndReturn({
+      data: targets.map((userId) => ({
+        userId,
+        type: data.type,
+        actorId: data.actorId ?? null,
+        guildId: data.guildId ?? null,
+        channelId: data.channelId ?? null,
+        messageId: data.messageId ?? null,
+        preview: data.preview ?? null,
+      })),
+    });
+
+    // toNotificationDtos satır sırasını korur → index eşlemesi güvenli.
+    const dtos = await this.toNotificationDtos(rows);
+    rows.forEach((row, i) => this.realtime.emitToUser(row.userId, 'notification', dtos[i]));
+    return dtos;
   }
 
   /**
@@ -156,13 +201,7 @@ export class NotificationsService {
   /** R12 — Kullanıcının TÜM tercih kayıtları (varsayılandan sapanlar). Boş olabilir. */
   async getPrefs(userId: string): Promise<NotificationPrefDto[]> {
     const rows = await this.prisma.notificationPref.findMany({ where: { userId } });
-    return rows.map((r) => ({
-      targetType: r.targetType,
-      targetId: r.targetId,
-      muted: r.muted,
-      mutedUntil: r.mutedUntil ? r.mutedUntil.toISOString() : null,
-      level: r.level,
-    }));
+    return rows.map((r) => toPrefDto(r));
   }
 
   /**
@@ -170,11 +209,33 @@ export class NotificationsService {
    * Hafif erişim: GUILD → üyelik; CHANNEL → requireChannelAccess (sızıntı yok).
    */
   async setPref(userId: string, dto: SetNotificationPrefDto): Promise<NotificationPrefDto> {
+    // R14 §2.2 — iki bastırma bayrağı YALNIZ ortam düzeyinde anlamlı. Kanal düzeyinde kabul
+    // etseydik `channelPref ?? guildPref` override zinciri, kanal kaydı oluşur oluşmaz ortam
+    // bastırmasını sessizce geri getirirdi. Erişim kontrolünden ÖNCE elenir (ucuz + net).
+    const suppressionTouched = dto.suppressEveryone !== undefined || dto.suppressEvents !== undefined;
+    if (suppressionTouched && dto.targetType !== NotifTargetType.GUILD) {
+      throw new BadRequestException({
+        message: 'Bu ayar yalnız ortam düzeyinde geçerlidir.',
+        error: 'INVALID_PREF_TARGET',
+      });
+    }
+
     if (dto.targetType === NotifTargetType.GUILD) {
       await this.membership.requireGuildMembership(userId, dto.targetId);
     } else {
       await this.membership.requireChannelAccess(userId, dto.targetId);
     }
+
+    // Kısmi update: yalnız gönderilen alanlar yazılır (create ve update aynı seti kullanır).
+    const changed = {
+      ...(dto.muted !== undefined ? { muted: dto.muted } : {}),
+      ...(dto.mutedUntil !== undefined
+        ? { mutedUntil: dto.mutedUntil ? new Date(dto.mutedUntil) : null }
+        : {}),
+      ...(dto.level !== undefined ? { level: dto.level } : {}),
+      ...(dto.suppressEveryone !== undefined ? { suppressEveryone: dto.suppressEveryone } : {}),
+      ...(dto.suppressEvents !== undefined ? { suppressEvents: dto.suppressEvents } : {}),
+    };
 
     const pref = await this.prisma.notificationPref.upsert({
       where: {
@@ -188,24 +249,12 @@ export class NotificationsService {
         userId,
         targetType: dto.targetType,
         targetId: dto.targetId,
-        ...(dto.muted !== undefined ? { muted: dto.muted } : {}),
-        ...(dto.mutedUntil !== undefined ? { mutedUntil: dto.mutedUntil ? new Date(dto.mutedUntil) : null } : {}),
-        ...(dto.level !== undefined ? { level: dto.level } : {}),
+        ...changed,
       },
-      update: {
-        ...(dto.muted !== undefined ? { muted: dto.muted } : {}),
-        ...(dto.mutedUntil !== undefined ? { mutedUntil: dto.mutedUntil ? new Date(dto.mutedUntil) : null } : {}),
-        ...(dto.level !== undefined ? { level: dto.level } : {}),
-      },
+      update: { ...changed },
     });
 
-    return {
-      targetType: pref.targetType,
-      targetId: pref.targetId,
-      muted: pref.muted,
-      mutedUntil: pref.mutedUntil ? pref.mutedUntil.toISOString() : null,
-      level: pref.level,
-    };
+    return toPrefDto(pref);
   }
 
   /**

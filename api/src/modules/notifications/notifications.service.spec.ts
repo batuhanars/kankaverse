@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
@@ -6,6 +6,7 @@ import { NotificationsService } from './notifications.service';
 const prismaMock = {
   notification: {
     create: jest.fn(),
+    createManyAndReturn: jest.fn(),
     findMany: jest.fn(),
     findUnique: jest.fn(),
     update: jest.fn(),
@@ -129,6 +130,55 @@ describe('NotificationsService', () => {
       const dto = await service.create(USER_ID, { type: 'MENTION' as any, actorId: ACTOR_ID });
 
       expect(dto.actor).toBeNull();
+    });
+  });
+
+  // ── R14 — createMany: tek insert, actor/guild çözümü bir kez, emit kullanıcı başına ────
+  describe('createMany', () => {
+    it('tek createManyAndReturn + kullanıcı başına emit; actor/guild TEK sorguda çözülür', async () => {
+      prismaMock.notification.createManyAndReturn.mockResolvedValue([
+        makeRow({ id: 'n1', userId: USER_ID, type: 'EVENT_CREATED', messageId: null, preview: 'Oyun Gecesi' }),
+        makeRow({ id: 'n2', userId: OTHER_ID, type: 'EVENT_CREATED', messageId: null, preview: 'Oyun Gecesi' }),
+      ]);
+      prismaMock.user.findMany.mockResolvedValue([{ id: ACTOR_ID, username: 'aktor', avatarUrl: null }]);
+      prismaMock.guild.findMany.mockResolvedValue([{ id: 'guild-1', name: 'Ortam' }]);
+
+      const dtos = await service.createMany([USER_ID, OTHER_ID], {
+        type: 'EVENT_CREATED' as any,
+        actorId: ACTOR_ID,
+        guildId: 'guild-1',
+        preview: 'Oyun Gecesi',
+      });
+
+      expect(prismaMock.notification.createManyAndReturn).toHaveBeenCalledTimes(1);
+      // N+1 yok: actor ve guild çözümü birer sorgu (alıcı başına DEĞİL)
+      expect(prismaMock.user.findMany).toHaveBeenCalledTimes(1);
+      expect(prismaMock.guild.findMany).toHaveBeenCalledTimes(1);
+      expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+
+      expect(dtos).toHaveLength(2);
+      expect(dtos[0].type).toBe('EVENT_CREATED');
+      expect(dtos[0].guildName).toBe('Ortam');
+      expect(emitToUserMock).toHaveBeenCalledTimes(2);
+      expect(emitToUserMock).toHaveBeenCalledWith(USER_ID, 'notification', dtos[0]);
+      expect(emitToUserMock).toHaveBeenCalledWith(OTHER_ID, 'notification', dtos[1]);
+    });
+
+    it('boş alıcı listesi → insert de emit de yok', async () => {
+      const dtos = await service.createMany([], { type: 'EVENT_CREATED' as any });
+
+      expect(dtos).toEqual([]);
+      expect(prismaMock.notification.createManyAndReturn).not.toHaveBeenCalled();
+      expect(emitToUserMock).not.toHaveBeenCalled();
+    });
+
+    it('tekrarlı alıcı id tekilleştirilir', async () => {
+      prismaMock.notification.createManyAndReturn.mockResolvedValue([]);
+
+      await service.createMany([USER_ID, USER_ID], { type: 'EVENT_CREATED' as any });
+
+      const call = prismaMock.notification.createManyAndReturn.mock.calls[0][0];
+      expect(call.data).toHaveLength(1);
     });
   });
 
@@ -316,6 +366,77 @@ describe('NotificationsService', () => {
       const call = prismaMock.notificationPref.upsert.mock.calls[0][0];
       expect(call.update).toEqual({ muted: true }); // level yok
       expect(call.create).toEqual({ userId: USER_ID, targetType: 'CHANNEL', targetId: 'ch-1', muted: true });
+    });
+
+    // ── R14 §2.2 — bastırma bayrakları YALNIZ ortam düzeyinde ────────────────
+    it('GUILD hedefi + suppressEveryone/suppressEvents → upsert payload\'ına girer', async () => {
+      prismaMock.notificationPref.upsert.mockResolvedValue({
+        targetType: 'GUILD',
+        targetId: 'guild-1',
+        muted: false,
+        mutedUntil: null,
+        level: 'ALL',
+        suppressEveryone: true,
+        suppressEvents: true,
+      });
+
+      const dto = await service.setPref(USER_ID, {
+        targetType: 'GUILD' as any,
+        targetId: 'guild-1',
+        suppressEveryone: true,
+        suppressEvents: true,
+      });
+
+      const call = prismaMock.notificationPref.upsert.mock.calls[0][0];
+      expect(call.update).toEqual({ suppressEveryone: true, suppressEvents: true });
+      expect(dto.suppressEveryone).toBe(true);
+      expect(dto.suppressEvents).toBe(true);
+    });
+
+    it('CHANNEL hedefi + suppressEveryone → 400 INVALID_PREF_TARGET (upsert yapılmaz)', async () => {
+      await expect(
+        service.setPref(USER_ID, {
+          targetType: 'CHANNEL' as any,
+          targetId: 'ch-1',
+          suppressEveryone: true,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        service.setPref(USER_ID, {
+          targetType: 'CHANNEL' as any,
+          targetId: 'ch-1',
+          suppressEveryone: true,
+        }),
+      ).rejects.toMatchObject({ response: { error: 'INVALID_PREF_TARGET' } });
+
+      expect(prismaMock.notificationPref.upsert).not.toHaveBeenCalled();
+      expect(membershipMock.requireChannelAccess).not.toHaveBeenCalled();
+    });
+
+    it('CHANNEL hedefi + suppressEvents=false (açıkça) → yine 400 (alan gönderildiyse yeter)', async () => {
+      await expect(
+        service.setPref(USER_ID, {
+          targetType: 'CHANNEL' as any,
+          targetId: 'ch-1',
+          suppressEvents: false,
+        }),
+      ).rejects.toMatchObject({ response: { error: 'INVALID_PREF_TARGET' } });
+    });
+
+    it('CHANNEL hedefi + bayrak YOK → normal akış (mevcut davranış bozulmaz)', async () => {
+      prismaMock.notificationPref.upsert.mockResolvedValue({
+        targetType: 'CHANNEL',
+        targetId: 'ch-1',
+        muted: true,
+        mutedUntil: null,
+        level: 'ALL',
+        suppressEveryone: false,
+        suppressEvents: false,
+      });
+
+      await service.setPref(USER_ID, { targetType: 'CHANNEL' as any, targetId: 'ch-1', muted: true });
+
+      expect(prismaMock.notificationPref.upsert).toHaveBeenCalledTimes(1);
     });
   });
 

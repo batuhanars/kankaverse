@@ -9,6 +9,9 @@ export interface NotificationPrefDto {
   muted: boolean;
   mutedUntil: string | null; // ISO; null = süresiz (muted true ise). Geçmişse mute bitmiş.
   level: NotificationLevel; // ALL | MENTIONS | NONE
+  // R14 — yalnız GUILD satırında anlamlı; CHANNEL satırında her zaman false döner.
+  suppressEveryone: boolean;
+  suppressEvents: boolean;
 }
 
 /** PUT /notifications/prefs body — upsert (kısmi update; verilmeyen alan korunur). */
@@ -41,4 +44,20 @@ export class SetNotificationPrefDto {
   @IsOptional()
   @IsEnum(NotificationLevel, { message: 'Geçersiz bildirim seviyesi.' })
   level?: NotificationLevel;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'R14 — @everyone bastır. YALNIZ targetType=GUILD ile; aksi 400 INVALID_PREF_TARGET.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  suppressEveryone?: boolean;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'R14 — yeni etkinlik bildirimlerini sustur. YALNIZ targetType=GUILD ile.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  suppressEvents?: boolean;
 }

@@ -12,7 +12,7 @@ import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { AddChannelMemberDto } from './dto/add-channel-member.dto';
-import { Channel } from '@prisma/client';
+import { Channel, NotifTargetType } from '@prisma/client';
 
 export function toChannelDto(
   channel: Channel,
@@ -163,6 +163,20 @@ export class ChannelsService {
     const lockedFor = (ch: (typeof channels)[number]): boolean =>
       ch.isPrivate && !isPrivileged && !memberChannelIds.has(ch.id);
 
+    // R14 §2.4c — ortam düzeyi @everyone bastırma: açıksa everyone mesajları kanal mention
+    // rozetine katkı vermez. TEK sorgu (kanal başına ek sorgu yok).
+    const guildPref = await this.prisma.notificationPref.findUnique({
+      where: {
+        userId_targetType_targetId: {
+          userId,
+          targetType: NotifTargetType.GUILD,
+          targetId: guildId,
+        },
+      },
+      select: { suppressEveryone: true },
+    });
+    const suppressEveryone = guildPref?.suppressEveryone ?? false;
+
     // Her kanal için okunmamış mesaj + okunmamış bahsetme sayısını paralel hesapla.
     // Locked (girilemez) kanalda okunmamış sayısı sızdırmamak için 0 bırakılır.
     const counts = await Promise.all(
@@ -175,12 +189,13 @@ export class ChannelsService {
           authorId: { not: userId }, // kendi mesajları sayma
           ...(lastRead !== null && { createdAt: { gt: lastRead } }),
         };
+        // REV-4: okunmamış bahsetme — beni içeren mention VEYA @everyone toplu bahsetme.
+        // R14: bastırma açıksa everyone dalı düşer; doğrudan bahsetme her zaman sayılır.
+        const mentionOr: object[] = [{ mentions: { has: userId } }];
+        if (!suppressEveryone) mentionOr.push({ mentionsEveryone: true });
         const [unread, mentions] = await Promise.all([
           this.prisma.message.count({ where: base }),
-          // REV-4: okunmamış bahsetme — beni içeren mention VEYA @everyone toplu bahsetme
-          this.prisma.message.count({
-            where: { ...base, OR: [{ mentions: { has: userId } }, { mentionsEveryone: true }] },
-          }),
+          this.prisma.message.count({ where: { ...base, OR: mentionOr } }),
         ]);
         return { unread, mentions };
       }),

@@ -230,12 +230,19 @@ export class GuildsService {
 
     const activeGuilds = memberships.filter((m) => m.guild.deletedAt === null);
 
-    // M2b §10 R1-1: kullanıcının TÜM kanal-bazlı bildirim tercihleri TEK sorguda (kanal başına
-    // ek sorgu yok). GUILD düzeyi tercih burada bilerek çekilmez (istemci tarafında uygulanıyor).
-    const channelPrefs = await this.prisma.notificationPref.findMany({
-      where: { userId, targetType: NotifTargetType.CHANNEL },
-    });
-    const channelPrefById = new Map(channelPrefs.map((p) => [p.targetId, p]));
+    // M2b §10 R1-1: kullanıcının TÜM bildirim tercihleri TEK sorguda (kanal başına ek sorgu yok).
+    // GUILD düzeyi sustur/level burada bilerek UYGULANMAZ (istemci rail görünürlüğünde uygular);
+    // ortam satırından yalnız R14 `suppressEveryone` okunur — çift süzgeç doğmaz.
+    const prefs = await this.prisma.notificationPref.findMany({ where: { userId } });
+    const channelPrefById = new Map(
+      prefs.filter((p) => p.targetType === NotifTargetType.CHANNEL).map((p) => [p.targetId, p]),
+    );
+    // R14 §2.4b — @everyone bastırılan ortamlarda everyone mesajları mention rozetine katılmaz.
+    const everyoneSuppressedGuildIds = new Set(
+      prefs
+        .filter((p) => p.targetType === NotifTargetType.GUILD && p.suppressEveryone)
+        .map((p) => p.targetId),
+    );
 
     // Her guild'in kanalları için okunmamış mesaj + okunmamış bahsetme sayılarını paralel hesapla
     const guildCounts = await Promise.all(
@@ -253,7 +260,9 @@ export class GuildsService {
             // sızdırmamak için flag eklenmez (özel kanal sayımı guild açılınca channels.service'te
             // erişim-süzgeçli yapılır).
             const mentionOr: object[] = [{ mentions: { has: userId } }];
-            if (!ch.isPrivate) mentionOr.push({ mentionsEveryone: true });
+            if (!ch.isPrivate && !everyoneSuppressedGuildIds.has(m.guildId)) {
+              mentionOr.push({ mentionsEveryone: true });
+            }
             const [unread, mentions] = await Promise.all([
               this.prisma.message.count({ where: base }),
               this.prisma.message.count({ where: { ...base, OR: mentionOr } }),

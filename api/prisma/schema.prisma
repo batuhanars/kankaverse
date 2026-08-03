@@ -86,6 +86,7 @@ enum NotificationType {
   FRIEND_REQUEST
   FRIEND_ACCEPT
   GUILD_INVITE
+  EVENT_CREATED // R14 — ortamda yeni etkinlik oluşturuldu
 }
 
 enum NotificationLevel {
@@ -650,6 +651,11 @@ model NotificationPref {
   muted      Boolean           @default(false)
   mutedUntil DateTime?         // null + muted=true → süresiz; geçmişse mute sona ermiş (bildir)
   level      NotificationLevel @default(ALL)
+  // R14 — yalnız targetType=GUILD satırında anlamlı (setPref kanal hedefinde 400 INVALID_PREF_TARGET).
+  // Kanal düzeyi bilinçli DIŞARIDA: kayıt-bazlı override zinciri (channelPref ?? guildPref) bastırmayı
+  // sessizce geri getirirdi (sözleşme R14 §2.2).
+  suppressEveryone Boolean      @default(false) // @everyone genişlemesinden gelen bildirim/rozet bastırılır
+  suppressEvents   Boolean      @default(false) // EVENT_CREATED bildirimi üretilmez
   updatedAt  DateTime          @updatedAt
 
   @@unique([userId, targetType, targetId])

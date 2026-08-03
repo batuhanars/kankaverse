@@ -31,6 +31,9 @@ const prismaMock = {
   message: {
     count: jest.fn(),
   },
+  notificationPref: {
+    findUnique: jest.fn(),
+  },
 };
 
 const membershipMock = {
@@ -58,6 +61,8 @@ function resetMocks() {
   // Realtime alıcı sorguları (varsayılan boş — emit no-op)
   prismaMock.guildMember.findMany.mockResolvedValue([]);
   prismaMock.channelMember.findMany.mockResolvedValue([]);
+  // R14 — varsayılan: ortam bildirim tercihi kaydı yok (@everyone bastırma kapalı)
+  prismaMock.notificationPref.findUnique.mockResolvedValue(null);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -1107,5 +1112,55 @@ describe('§2 DM sızıntı önleme — ChannelMember tür filtresi', () => {
     expect(guildChannel.guildId !== null).toBe(true);
     // DM kanalı → işlenir
     expect(dmChannel.guildId !== null).toBe(false);
+  });
+});
+
+// ── ChannelsService.findByGuild — R14 §2.4c: @everyone bastırma (kanal rozeti) ──────────────
+
+describe('ChannelsService.findByGuild — @everyone bastırma kanal rozeti (R14)', () => {
+  let service: ChannelsService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    prismaMock.channel.findMany.mockResolvedValue([{ ...makeChannel(), channelReads: [] }]);
+    prismaMock.message.count.mockResolvedValue(0);
+  });
+
+  it('bastırma yok → mention sayımı @everyone dalını İÇERİR', async () => {
+    await service.findByGuild(USER_ID, GUILD_ID);
+
+    const mentionWhere = prismaMock.message.count.mock.calls[1][0].where;
+    expect(mentionWhere.OR).toEqual([
+      { mentions: { has: USER_ID } },
+      { mentionsEveryone: true },
+    ]);
+  });
+
+  it('suppressEveryone=true → @everyone dalı DÜŞER, doğrudan bahsetme kalır', async () => {
+    prismaMock.notificationPref.findUnique.mockResolvedValue({ suppressEveryone: true });
+
+    await service.findByGuild(USER_ID, GUILD_ID);
+
+    const mentionWhere = prismaMock.message.count.mock.calls[1][0].where;
+    expect(mentionWhere.OR).toEqual([{ mentions: { has: USER_ID } }]);
+  });
+
+  it('tercih TEK findUnique ile (userId + GUILD + guildId), kanal başına sorgu yok', async () => {
+    prismaMock.channel.findMany.mockResolvedValue([
+      { ...makeChannel({ id: 'ch-1' }), channelReads: [] },
+      { ...makeChannel({ id: 'ch-2' }), channelReads: [] },
+    ]);
+
+    await service.findByGuild(USER_ID, GUILD_ID);
+
+    expect(prismaMock.notificationPref.findUnique).toHaveBeenCalledTimes(1);
+    const call = prismaMock.notificationPref.findUnique.mock.calls[0][0];
+    expect(call.where.userId_targetType_targetId).toEqual({
+      userId: USER_ID,
+      targetType: 'GUILD',
+      targetId: GUILD_ID,
+    });
   });
 });

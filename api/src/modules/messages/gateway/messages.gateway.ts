@@ -9,6 +9,7 @@ import {
   OnGatewayInit,
 } from '@nestjs/websockets';
 import { HttpException } from '@nestjs/common';
+import { NotifTargetType } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -610,7 +611,12 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     // Alıcı kümesi: doğrudan bahsedilenler + (everyone ise) kanalı GÖREBİLEN üyeler.
     // T&S: (a) özel kanalda everyone yalnız kanal üyeleri + owner/admin'e gider (genel guild'e DEĞİL —
     // sızıntı yok); (b) yaş-kapılı kanalda minörler hariç (özel kanal üyeleri ekleme anında zaten gated).
+    //
+    // R14 §2.4a — @everyone bastırma: alıcı YALNIZ everyone genişlemesinden geliyorsa ve ortam
+    // tercihinde `suppressEveryone` açıksa ne emit ne persist edilir. Doğrudan `<@kullanıcı>`
+    // bahsetmesi HER ZAMAN geçer (kullanıcı adıyla çağrıldıysa susturulmaz).
     let recipients: string[];
+    let suppressedEveryone = new Set<string>();
     if (mentionsEveryone && guildId) {
       let everyoneIds: string[];
       if (channel?.isPrivate) {
@@ -631,6 +637,24 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         everyoneIds = eligible.map((m) => m.userId);
       }
       recipients = [...new Set([...mentions, ...everyoneIds])];
+
+      // Yalnız genişlemeden gelenlerin (doğrudan bahsedilmeyenlerin) ortam tercihi TEK sorguda;
+      // alıcı başına ek sorgu açılmaz.
+      const mentioned = new Set(mentions);
+      const expandedOnly = recipients.filter((id) => !mentioned.has(id));
+      if (expandedOnly.length > 0) {
+        const prefs = await this.prisma.notificationPref.findMany({
+          where: {
+            userId: { in: expandedOnly },
+            targetType: NotifTargetType.GUILD,
+            targetId: guildId,
+          },
+          select: { userId: true, suppressEveryone: true },
+        });
+        suppressedEveryone = new Set(
+          prefs.filter((p) => p.suppressEveryone).map((p) => p.userId),
+        );
+      }
     } else {
       recipients = [...new Set(mentions)];
     }
@@ -638,6 +662,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     for (const mentionedUserId of recipients) {
       // Yazara kendi bahsetmesi için event gönderme
       if (mentionedUserId === authorId) continue;
+      // R14 — bastırılan @everyone: tam sessizlik (ne toast ne rozet ne kalıcı bildirim).
+      if (suppressedEveryone.has(mentionedUserId)) continue;
       this.realtime.emitToUser(mentionedUserId, 'mention', eventPayload);
 
       // R12 — Suppression: alıcının kanal/guild bildirim tercihi sustur/NONE ise

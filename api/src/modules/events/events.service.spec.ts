@@ -27,6 +27,9 @@ const prismaMock = {
     findUnique: jest.fn(),
     update: jest.fn(),
   },
+  notificationPref: {
+    findMany: jest.fn(),
+  },
 };
 
 const membershipMock = {
@@ -46,6 +49,10 @@ const configMock = { get: jest.fn() };
 // StorageService mock — presignGet (kapak URL çözümü)
 const storageMock = { presignGet: jest.fn() };
 
+// R14 — NotificationsService mock (EVENT_CREATED toplu üretimi)
+const notificationsCreateManyMock = jest.fn();
+const notificationsMock = { createMany: notificationsCreateManyMock };
+
 function makeService() {
   return new EventsService(
     prismaMock as any,
@@ -54,6 +61,7 @@ function makeService() {
     realtimeMock as any,
     configMock as any,
     storageMock as any,
+    notificationsMock as any,
   );
 }
 
@@ -70,6 +78,9 @@ function resetMocks() {
   // Kapak: varsayılan scan KAPALI; presignGet sabit URL döner
   configMock.get.mockReturnValue(false);
   storageMock.presignGet.mockResolvedValue('https://cdn.example/presigned-cover');
+  // R14 — bildirim tercihi varsayılanı: kayıt yok (herkes bildirim alır)
+  prismaMock.notificationPref.findMany.mockResolvedValue([]);
+  notificationsCreateManyMock.mockResolvedValue([]);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -871,5 +882,187 @@ describe('EventsService kapak — update semantiği (null/undefined/string)', ()
     });
     const updateArg = prismaMock.guildEvent.update.mock.calls[0][0];
     expect(updateArg.data).toMatchObject({ coverImageId: COVER_ID });
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// R14 §2.3 — EVENT_CREATED kalıcı bildirimi
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('EventsService.create — EVENT_CREATED bildirimi (R14)', () => {
+  let service: EventsService;
+
+  const OTHER_ID = 'user-2';
+  const THIRD_ID = 'user-3';
+
+  function createDto() {
+    return {
+      name: 'Oyun Gecesi',
+      locationType: 'EXTERNAL' as const,
+      externalLocation: 'Kadıköy',
+      startAt: FUTURE.toISOString(),
+    };
+  }
+
+  function guildPref(userId: string, overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      userId,
+      targetType: 'GUILD',
+      targetId: GUILD_ID,
+      muted: false,
+      mutedUntil: null,
+      level: 'ALL',
+      suppressEveryone: false,
+      suppressEvents: false,
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.guildEvent.create.mockResolvedValue(makeEvent());
+    prismaMock.guildMember.findMany.mockResolvedValue([
+      { userId: USER_ID }, // oluşturan
+      { userId: OTHER_ID },
+      { userId: THIRD_ID },
+    ]);
+  });
+
+  it('tercih kaydı yok → oluşturan HARİÇ tüm alıcılara tek createMany ile bildirim', async () => {
+    await service.create(USER_ID, GUILD_ID, createDto());
+
+    expect(notificationsCreateManyMock).toHaveBeenCalledTimes(1);
+    const [userIds, data] = notificationsCreateManyMock.mock.calls[0];
+    expect(userIds).toEqual([OTHER_ID, THIRD_ID]); // oluşturan kendine bildirim almaz
+    expect(data.type).toBe('EVENT_CREATED');
+    expect(data.actorId).toBe(USER_ID);
+    expect(data.guildId).toBe(GUILD_ID);
+    expect(data.preview).toBe('Oyun Gecesi');
+    expect(data.messageId).toBeUndefined();
+  });
+
+  it('alıcı başına sorgu YOK: tercihler tek findMany ile çekilir', async () => {
+    await service.create(USER_ID, GUILD_ID, createDto());
+
+    expect(prismaMock.notificationPref.findMany).toHaveBeenCalledTimes(1);
+    const call = prismaMock.notificationPref.findMany.mock.calls[0][0];
+    expect(call.where).toEqual({
+      userId: { in: [OTHER_ID, THIRD_ID] },
+      targetType: 'GUILD',
+      targetId: GUILD_ID,
+    });
+  });
+
+  it('suppressEvents=true → o kullanıcı bildirim ALMAZ, diğerleri alır', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      guildPref(OTHER_ID, { suppressEvents: true }),
+    ]);
+
+    await service.create(USER_ID, GUILD_ID, createDto());
+
+    const [userIds] = notificationsCreateManyMock.mock.calls[0];
+    expect(userIds).toEqual([THIRD_ID]);
+  });
+
+  it('suppressEvents=false → bildirim üretilir (mevcut davranış korunur)', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      guildPref(OTHER_ID, { suppressEvents: false }),
+    ]);
+
+    await service.create(USER_ID, GUILD_ID, createDto());
+
+    const [userIds] = notificationsCreateManyMock.mock.calls[0];
+    expect(userIds).toEqual([OTHER_ID, THIRD_ID]);
+  });
+
+  it('ortam susturulmuş (aktif mute) → bildirim yok (tam sessizlik)', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      guildPref(OTHER_ID, { muted: true, mutedUntil: null }),
+    ]);
+
+    await service.create(USER_ID, GUILD_ID, createDto());
+
+    const [userIds] = notificationsCreateManyMock.mock.calls[0];
+    expect(userIds).toEqual([THIRD_ID]);
+  });
+
+  it('süresi geçmiş mute → mute bitmiş sayılır, bildirim üretilir', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      guildPref(OTHER_ID, { muted: true, mutedUntil: new Date('2020-01-01T00:00:00Z') }),
+    ]);
+
+    await service.create(USER_ID, GUILD_ID, createDto());
+
+    const [userIds] = notificationsCreateManyMock.mock.calls[0];
+    expect(userIds).toEqual([OTHER_ID, THIRD_ID]);
+  });
+
+  it('level=NONE → bildirim yok', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      guildPref(OTHER_ID, { level: 'NONE' }),
+    ]);
+
+    await service.create(USER_ID, GUILD_ID, createDto());
+
+    const [userIds] = notificationsCreateManyMock.mock.calls[0];
+    expect(userIds).toEqual([THIRD_ID]);
+  });
+
+  it('VOICE etkinlik: alıcı kümesi eventRecipients ile AYNI (yaş kapısıyla elenen bildirim almaz)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(voiceChannel());
+    prismaMock.guildEvent.create.mockResolvedValue(
+      makeEvent({
+        locationType: 'VOICE_CHANNEL',
+        channelId: VOICE_CHANNEL_ID,
+        externalLocation: null,
+        channel: { name: 'sesli' },
+      }),
+    );
+    // THIRD_ID minör → kanala erişemez
+    membershipMock.requireChannelAccess.mockImplementation(async (uid: string) => {
+      if (uid === THIRD_ID) throw new ForbiddenException({ error: 'AGE_RESTRICTED' });
+      return undefined;
+    });
+
+    await service.create(USER_ID, GUILD_ID, {
+      name: 'Sesli Etkinlik',
+      locationType: 'VOICE_CHANNEL',
+      channelId: VOICE_CHANNEL_ID,
+      startAt: FUTURE.toISOString(),
+    });
+
+    const [userIds, data] = notificationsCreateManyMock.mock.calls[0];
+    expect(userIds).toEqual([OTHER_ID]); // minör alıcı kümesinde yok → bildirim de yok
+    expect(data.channelId).toBe(VOICE_CHANNEL_ID);
+  });
+
+  it('oluşturandan başka alıcı yok → tercih sorgusu da createMany da yapılmaz', async () => {
+    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: USER_ID }]);
+
+    await service.create(USER_ID, GUILD_ID, createDto());
+
+    expect(prismaMock.notificationPref.findMany).not.toHaveBeenCalled();
+    expect(notificationsCreateManyMock).not.toHaveBeenCalled();
+  });
+
+  it('preview 120 karakterle sınırlanır', async () => {
+    const longName = 'a'.repeat(200);
+    prismaMock.guildEvent.create.mockResolvedValue(makeEvent({ name: longName }));
+
+    await service.create(USER_ID, GUILD_ID, { ...createDto(), name: longName });
+
+    const [, data] = notificationsCreateManyMock.mock.calls[0];
+    expect(data.preview).toHaveLength(120);
+  });
+
+  it('etkinlik güncelleme/silme bildirim ÜRETMEZ (yalnız oluşturma — sözleşme OUT)', async () => {
+    prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent());
+    prismaMock.guildEvent.update.mockResolvedValue(makeEvent({ name: 'Yeni Ad', channel: null }));
+
+    await service.update(USER_ID, EVENT_ID, { name: 'Yeni Ad' });
+    await service.remove(USER_ID, EVENT_ID);
+
+    expect(notificationsCreateManyMock).not.toHaveBeenCalled();
   });
 });
