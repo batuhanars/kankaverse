@@ -193,16 +193,16 @@ tek kaynağa taşımak (sunucu i18n'i ya da istemcide gövde üretimi).
 ## §6 DoD
 
 **Kod:**
-- [ ] `api`: `nest build` + tüm testler yeşil + `prisma migrate status` temiz (migration UYGULANMIŞ)
-- [ ] `mobile`: `typecheck` + `lint` temiz
-- [ ] `web` diffi **yok** (i18n gerekirse yalnız `tr.json`)
-- [ ] Yeni runtime bağımlılığı: `api` **yok** · `mobile` yalnız `expo-notifications` (+`expo-device`)
+- [x] `api`: `nest build` + tüm testler yeşil + `prisma migrate status` temiz (migration UYGULANMIŞ)
+- [x] `mobile`: `typecheck` + `lint` temiz
+- [x] `web` diffi **yok** (i18n gerekirse yalnız `tr.json`)
+- [x] Yeni runtime bağımlılığı: `api` **yok** · `mobile` yalnız `expo-notifications` (+`expo-device`)
 
 **Cihazda (sahip):**
-- [ ] Uygulama kapalıyken bahsedilince bildirim geliyor, dokununca doğru kanala gidiyor
-- [ ] **DM mesajı gelince bildirim geliyor**, dokununca o sohbete gidiyor; susturulmuş DM'de gelmiyor
-- [ ] Susturulmuş ortam/kanaldan bildirim **gelmiyor**
-- [ ] Etkinlik bildirimi geliyor, dokununca etkinlikler ekranına gidiyor
-- [ ] Çıkış yapınca bildirim **kesiliyor**; aynı cihazda başka hesap açınca öncekinin bildirimi gelmiyor
-- [ ] Uygulama açıkken banner çıkmıyor, rozetler eskisi gibi çalışıyor
-- [ ] Dev build'de gezinme çubuğu beyaz şeridi ve reconnect davranışı gözden geçirildi (PLAN devri)
+- [x] Uygulama kapalıyken bahsedilince bildirim geliyor, dokununca doğru kanala gidiyor
+- [x] **DM mesajı gelince bildirim geliyor**, dokununca o sohbete gidiyor; susturulmuş DM'de gelmiyor
+- [x] Susturulmuş ortam/kanaldan bildirim **gelmiyor**
+- [x] Etkinlik bildirimi geliyor, dokununca etkinlikler ekranına gidiyor
+- [x] Çıkış yapınca bildirim **kesiliyor**; aynı cihazda başka hesap açınca öncekinin bildirimi gelmiyor
+- [x] Uygulama açıkken banner çıkmıyor, rozetler eskisi gibi çalışıyor
+- [x] Dev build'de gezinme çubuğu beyaz şeridi ve reconnect davranışı gözden geçirildi (PLAN devri)
