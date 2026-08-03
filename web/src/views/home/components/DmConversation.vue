@@ -90,7 +90,8 @@ const props = defineProps<{
   /** Sprint WEB-PARITE §4 — sağ profil panelinin efektif görünürlüğü (yalnız <1280'de anlamlı). */
   profilePanelOpen?: boolean
 }>()
-const emit = defineEmits<{ left: []; deleted: []; toggleProfile: [] }>()
+// `left` kalktı: GroupManagePanel artık hiç emit etmiyor (İş 2 — ayrıl DM satırı menüsüne taşındı).
+const emit = defineEmits<{ deleted: []; toggleProfile: [] }>()
 
 const { t } = useI18n()
 const messagesStore = useMessagesStore()
@@ -1110,7 +1111,6 @@ function isGroupStart(index: number): boolean {
       :owner-id="groupChannel.ownerId"
       :members="groupChannel.members"
       @close="groupPanelPref = false"
-      @left="emit('left')"
       @deleted="emit('deleted')"
     />
   </div>

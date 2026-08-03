@@ -2404,3 +2404,41 @@ avatar, `guildId` yol parametresi olarak taşınıyor; bildirimden gelince o ba�
 - [ ] Etkinlik bildirimi geliyor ve etkinlikler ekranına götürüyor
 - [ ] Çıkışta bildirim kesiliyor; aynı cihazda başka hesap açınca öncekinin bildirimi gelmiyor
 - [ ] Dev build'de gezinme çubuğu beyaz şeridi + reconnect davranışı gözden geçirildi (PLAN devri)
+
+
+---
+
+## Küçük Revizeler — 2026-08-03 akşamı (sahip web turu)
+
+### 🔴 Bastırma kutucukları DM ve kanal menüsünde de çıkıyordu — Vue boolean-cast tuzağı
+Sahip grup DM'e sağ tıklayıp "Bildirim Ayarları"nı açtı: **@everyone Bastır · Yeni Etkinlikleri
+Sustur · Rol Bahsetmelerini Sustur** üçü de orada. Grup DM'de @everyone diye bir şey yok, etkinlik
+ve rol de yok.
+
+**Kök neden (PM'in R14'te kurduğu mekanizma yanlıştı):** `NotifLevelFlyout` bölümü
+`props.suppressEveryone !== undefined || ...` ile gösteriyordu, yani "prop verildi mi" tahminine
+dayanıyordu. Vue 3'te **boolean prop dönüşümü** var: type-only `defineProps` ile `x?: boolean`
+tanımlanınca prop hiç geçilmese bile değer `undefined` DEĞİL **`false`** oluyor → koşul her zaman
+doğru → bölüm her menüde çıkıyordu.
+
+🔴 **PM'in sahibe verdiği "kanal menüsünde çıkmaz" güvencesi de bu yüzden YANLIŞTI.**
+
+- [x] Görünürlük artık **açık bayrağa** bağlı (`showSuppressions`), varsayılan gizli; tahmin yok
+- [x] Dört yüzey tek tek: ServerRail ortam menüsü **gösterir** · ChannelPanel ortam dropdown'ı
+      **gösterir** · ChannelPanel **kanal** menüsü göstermez · DmList (1-1 + grup) göstermez
+- [x] `vue-tsc -b` 6 (bilinen), `vite build` geçiyor
+
+### Grup DM aksiyonları sağ-tık menüsüne taşındı (sahip isteği)
+- [x] "Üye Ekle" ve "Gruptan Ayrıl" `GroupManagePanel`'in dibinden **DM satırı menüsüne** taşındı;
+      yalnız GROUP_DM satırında görünüyor, 1-1 DM'de yok
+- [x] Mevcut akışlar tekrar kullanıldı (`dmStore.addGroupMember` / `leaveGroup`, üye-ekle modal
+      görünümü, `ConfirmDialog` ile ayrılma onayı) — **tek tıkla gruptan çıkma yok**
+- [x] Panelde artık tetiklenmeyen `left` emit zinciri temizlendi (ölü kod bırakılmadı)
+
+### 🟢 Etkinlik ⋯ menüsü — kusur DEĞİLMİŞ
+Sahip "yetkisiz hesapta etkinlik silme düğmesini görüyorum" dedi. Kod ve DB incelendi: web'de menü
+zaten `v-if="canManage"` ile gizli (Haziran'dan beri) ve `canManage` sunucudaki kuralı birebir
+aynalıyor (`MANAGE_EVENTS`; yaratıcıya özel ayrıcalık **yok**). Sebep hesabın kendisiydi:
+test hesabı `Test hoo` ortamında `Test` rolüne sahip ve o rolde **ADMINISTRATOR** bayrağı var →
+tam yetki → menüyü görmesi **doğru**. Yetkisiz davranışı görmek için `Hoop` ya da `test 2`
+ortamında denenmeli (orada düz üye).

@@ -1068,6 +1068,7 @@ onUnmounted(() => {
              ServerRail ortam menüsüyle aynı bağlanış) -->
         <NotifLevelFlyout
           :level="guildLevel"
+          show-suppressions
           :suppress-everyone="suppressEveryone"
           :suppress-events="suppressEvents"
           :suppress-role-mentions="suppressRoleMentions"

@@ -85,12 +85,13 @@ watch(() => props.channelId, (id) => sync(id), { immediate: true })
     </div>
     <div v-if="activeDmChannel" class="flex flex-1 min-w-0 overflow-hidden gap-4 relative">
       <!-- `cleared` KALKTI: sohbeti temizleme DM satırı menüsüne taşındı (SPRINT_DM_MENU §4),
-           aktif DM temizlenince ana sayfaya dönüşü `DmList` yapıyor. -->
+           aktif DM temizlenince ana sayfaya dönüşü `DmList` yapıyor. Aynı desen `left` için de
+           geçerli (İş 2, 2026-08-03): gruptan ayrılma artık DM satırı menüsünden tetikleniyor,
+           dönüşü de o yapıyor — `DmConversation` bu emit'i artık hiç üretmiyor. -->
       <DmConversation
         :channel="activeDmChannel"
         :profile-panel-open="rightPanelVisible"
         @toggle-profile="toggleRightPanel"
-        @left="toHome"
         @deleted="toHome"
       />
       <!-- Profil paneli yalnızca 1-1 DM için.

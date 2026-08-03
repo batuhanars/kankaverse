@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDmStore } from '@/stores/dm'
+import { useFriendsStore } from '@/stores/friends'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { usePresenceStore } from '@/stores/presence'
 import { useAuthStore } from '@/stores/auth'
@@ -27,6 +28,7 @@ const emit = defineEmits<{ select: [channelId: string] }>()
 const { t } = useI18n()
 const router = useRouter()
 const dmStore = useDmStore()
+const friendsStore = useFriendsStore()
 const prefsStore = useNotificationPrefsStore()
 const presenceStore = usePresenceStore()
 const authStore = useAuthStore()
@@ -93,6 +95,9 @@ const menuChannel = ref<DmChannelDto | null>(null)
 const menuX = ref(0)
 const menuY = ref(0)
 const menuDm = computed(() => (menuChannel.value?.type === 'DM' ? menuChannel.value : null))
+// İş 2 (2026-08-03) — grup DM'e özgü menü öğeleri (Üye Ekle / Gruptan Ayrıl), taşındığı yer:
+// `GroupManagePanel.vue` artık bu ikisini göstermiyor.
+const menuGroup = computed(() => (menuChannel.value?.type === 'GROUP_DM' ? menuChannel.value : null))
 
 function closeMenu() {
   menuChannel.value = null
@@ -190,6 +195,75 @@ function openReport() {
   const ch = menuDm.value
   closeMenu()
   if (ch) reportUserId.value = ch.otherUser.id
+}
+
+// ── Grup DM: Üye Ekle (İş 2 — panelden taşındı, akış aynı: `dmStore.addGroupMember`) ──
+// Hedef ayrı bir ref'te tutulur: menü kapanınca `menuChannel` null'a düşer, modal açıkken
+// hâlâ hangi gruba eklediğimizi bilmemiz gerekiyor.
+type GroupDmChannel = Extract<DmChannelDto, { type: 'GROUP_DM' }>
+const addMemberTarget = ref<GroupDmChannel | null>(null)
+const addingMemberId = ref<string | null>(null)
+const addMemberError = ref('')
+
+const addableFriends = computed(() => {
+  const group = addMemberTarget.value
+  if (!group) return []
+  const memberIds = new Set(group.members.map((m) => m.id))
+  return friendsStore.friends.filter((f) => !memberIds.has(f.user.id))
+})
+
+function openAddMember() {
+  const group = menuGroup.value
+  closeMenu()
+  if (!group) return
+  addMemberError.value = ''
+  addMemberTarget.value = group
+}
+
+function closeAddMember() {
+  addMemberTarget.value = null
+  addMemberError.value = ''
+}
+
+async function doAddGroupMember(userId: string) {
+  const target = addMemberTarget.value
+  if (!target || addingMemberId.value) return
+  addMemberError.value = ''
+  addingMemberId.value = userId
+  try {
+    await dmStore.addGroupMember(target.id, userId)
+    addMemberTarget.value = null
+  } catch {
+    addMemberError.value = t('group.addMemberError')
+  } finally {
+    addingMemberId.value = null
+  }
+}
+
+// ── Grup DM: Gruptan Ayrıl (İş 2 — panelden taşındı, akış aynı: `dmStore.leaveGroup`) ──
+// Aktif sohbet ayrılırsa `askClear`/`confirmClear` ile aynı desen: ana sayfaya dön (kayıp
+// sohbet ekranında kalınmaz).
+const leaveGroupTarget = ref<GroupDmChannel | null>(null)
+const leavingGroup = ref(false)
+
+function askLeaveGroup() {
+  leaveGroupTarget.value = menuGroup.value
+  closeMenu()
+}
+
+async function confirmLeaveGroup() {
+  const target = leaveGroupTarget.value
+  if (!target) return
+  leavingGroup.value = true
+  try {
+    await dmStore.leaveGroup(target.id)
+    if (props.activeChannelId === target.id) router.push({ name: 'app' })
+  } catch {
+    toast.error(t('group.leaveError'))
+  } finally {
+    leavingGroup.value = false
+    leaveGroupTarget.value = null
+  }
 }
 </script>
 
@@ -353,6 +427,12 @@ function openReport() {
       <span>{{ t('friends.add') }}</span>
     </button>
 
+    <!-- 2b. Üye Ekle (yalnız grup DM — İş 2, panelden taşındı) -->
+    <button v-if="menuGroup" class="kv-ctx__item" role="menuitem" @click="openAddMember">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+      <span>{{ t('group.addMember') }}</span>
+    </button>
+
     <!-- 3. Okunmuş Olarak İşaretle -->
     <button class="kv-ctx__item" role="menuitem" @click="doMarkRead">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M20 6 9 17l-5-5"/></svg>
@@ -385,6 +465,12 @@ function openReport() {
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
       <span>{{ t('report.reportUser') }}</span>
     </button>
+
+    <!-- 7b. Gruptan Ayrıl (yalnız grup DM, danger — İş 2, panelden taşındı) -->
+    <button v-if="menuGroup" class="kv-ctx__item kv-ctx__item--danger" role="menuitem" @click="askLeaveGroup">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span>{{ t('group.leaveGroup') }}</span>
+    </button>
   </ContextMenuShell>
 
   <!-- Sohbeti temizle onayı (mevcut metin/akış) -->
@@ -411,5 +497,59 @@ function openReport() {
     :card="profileCard"
     @close="profileCard = null"
     @open-dm="(id: string) => { profileCard = null; emit('select', id) }"
+  />
+
+  <!-- Grup: üye ekle mini-modal (İş 2 — GroupManagePanel'den taşındı, aynı akış/görünüm) -->
+  <div
+    v-if="addMemberTarget"
+    class="fixed inset-0 z-50 flex items-center justify-center"
+    style="background-color: rgba(0,0,0,0.5);"
+    @click.self="closeAddMember"
+  >
+    <div
+      class="w-[360px] max-h-[60vh] flex flex-col rounded-[var(--kv-radius-lg)] overflow-hidden"
+      style="background-color: var(--kv-bg-sidebar);"
+    >
+      <div class="flex items-center justify-between px-4 py-3 border-b shrink-0" style="border-color: var(--kv-border-subtle);">
+        <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+          {{ t('group.addMemberTitle') }}
+        </h3>
+        <button class="text-[18px] cursor-pointer hover:opacity-70" style="color: var(--kv-text-muted);" @click="closeAddMember">✕</button>
+      </div>
+      <div class="flex-1 overflow-y-auto px-3 py-2">
+        <p v-if="!addableFriends.length" class="text-[13px] px-2 py-3" style="color: var(--kv-text-muted);">
+          {{ t('group.noFriends') }}
+        </p>
+        <button
+          v-for="f in addableFriends"
+          :key="f.user.id"
+          class="w-full flex items-center gap-3 px-2 py-2 rounded-[var(--kv-radius-md)] cursor-pointer transition-colors text-left"
+          :class="addingMemberId === f.user.id ? 'opacity-50 pointer-events-none' : ''"
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
+          @click="doAddGroupMember(f.user.id)"
+        >
+          <div
+            class="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-semibold text-white"
+            style="background-color: var(--kv-accent-500);"
+          >
+            <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
+            <span v-else>{{ f.user.username[0].toUpperCase() }}</span>
+          </div>
+          <span class="text-[14px] truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</span>
+        </button>
+        <p v-if="addMemberError" class="text-[13px] px-2 mt-1" style="color: var(--kv-danger);">{{ addMemberError }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grup: gruptan ayrıl onayı (İş 2 — GroupManagePanel'den taşındı, aynı metin/akış) -->
+  <ConfirmDialog
+    v-if="leaveGroupTarget"
+    :message="t('group.leaveConfirm')"
+    :confirm-label="t('group.leaveAction')"
+    :loading="leavingGroup"
+    @confirm="confirmLeaveGroup"
+    @cancel="leaveGroupTarget = null"
   />
 </template>
