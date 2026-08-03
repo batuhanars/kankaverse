@@ -523,6 +523,7 @@ function badgeLabel(count: number): string {
            Bastırma bayrakları üst menüde DEĞİL, bu panelin içinde (Discord deseni). -->
       <NotifLevelFlyout
         :level="guildLevel"
+        show-suppressions
         :suppress-everyone="suppressEveryone"
         :suppress-events="suppressEvents"
         :suppress-role-mentions="suppressRoleMentions"

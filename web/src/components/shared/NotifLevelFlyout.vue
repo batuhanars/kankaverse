@@ -22,11 +22,18 @@ const props = defineProps<{
   /** Mevcut efektif seviye (✓ için) */
   level: NotificationLevelType
   /**
-   * R14 — ortam düzeyi bastırma bayrakları. **Yalnız ortam menüsünde** verilir; verilmezse
-   * kutucuk bölümü hiç render edilmez (kanal menüsünde bu ayarlar YOK — sunucu kanal hedefini
-   * `400 INVALID_PREF_TARGET` ile reddediyor, o yüzden gösterilmesi de yanlış olurdu).
-   * Discord da bunları üst menüde değil, tam olarak bu panelin altında tutuyor.
+   * R14 — bastırma kutucuk bölümünün görünürlüğü. **Açık bayrak**: çağıran `true` GEÇMEDİKÇE
+   * bölüm render edilmez. Varsayılan (geçilmezse) **gizli**.
+   *
+   * 🔴 Bilinçli olarak `suppressEveryone !== undefined` gibi bir tahmine DAYANMAZ: Vue 3'te
+   * type-only `boolean` prop'lar host hiç geçmese bile `undefined` değil **`false`** olarak
+   * çözülür (boolean-cast — bkz. `resolvePropValue`), yani "prop verildi mi" testi hep true
+   * çıkardı. Bu yüzden görünürlük ayrı, açık bir prop'a bağlı: yalnız ortam menüleri
+   * (`ServerRail` sağ-tık menüsü + `ChannelPanel` ortam başlığı dropdown'ı) `true` geçer.
+   * Kanal context menüsü ve DM menüsü hiç geçmez → varsayılan `false` ile gizli kalır
+   * (sunucu bu üç alanı yalnız `targetType=GUILD` ile kabul ediyor, `400 INVALID_PREF_TARGET`).
    */
+  showSuppressions?: boolean
   suppressEveryone?: boolean
   suppressEvents?: boolean
   /** R15 — rol bahsetmelerini sustur (yine yalnız ortam menüsünde). */
@@ -64,12 +71,7 @@ const flyoutLeft = ref(0)
 
 // Bastırma kutucukları eklenince panel hem genişler hem uzar; konumlama (sağa/sola çevirme,
 // alt kenardan taşma) bu ölçülere bakıyor, sabitler tek yerde tutulur.
-const hasSuppressions = computed(
-  () =>
-    props.suppressEveryone !== undefined ||
-    props.suppressEvents !== undefined ||
-    props.suppressRoleMentions !== undefined,
-)
+const hasSuppressions = computed(() => props.showSuppressions === true)
 const FLYOUT_W = computed(() => (hasSuppressions.value ? 252 : 184))
 // Üç kutucuk + ayraç: yükseklik konumlama clamp'ini besliyor, satır eklenince güncellenmeli.
 const FLYOUT_H = computed(() => (hasSuppressions.value ? 264 : 132))

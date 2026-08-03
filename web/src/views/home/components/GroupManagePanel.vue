@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDmStore } from '@/stores/dm'
-import { useFriendsStore } from '@/stores/friends'
 import { useAuthStore } from '@/stores/auth'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import UserCardPopover from '@/components/shared/UserCardPopover.vue'
@@ -14,11 +13,14 @@ const props = defineProps<{
   ownerId: string
   members: GroupDmMemberDto[]
 }>()
-const emit = defineEmits<{ close: []; left: []; deleted: [] }>()
+// İş 2 (2026-08-03): "Üye Ekle" + "Ayrıl" düğmeleri DM satırı sağ-tık menüsüne taşındı
+// (`DmList.vue`); panel yalnız üye listesi + owner'a özgü aksiyonları (yeniden adlandır/sil)
+// tutuyor. `left` bu yüzden artık hiç emit edilmiyor — zincir (`DmConversation`/`DmView`)
+// birlikte temizlendi (dead wiring bırakılmadı).
+const emit = defineEmits<{ close: []; deleted: [] }>()
 
 const { t } = useI18n()
 const dmStore = useDmStore()
-const friendsStore = useFriendsStore()
 const authStore = useAuthStore()
 
 const isOwner = computed(() => authStore.user?.id === props.ownerId)
@@ -68,47 +70,6 @@ async function removeMember() {
   } finally {
     removing.value = false
     removeMemberTarget.value = null
-  }
-}
-
-// Grupta olmayan kankalar (eklenebilir)
-const addableFriends = computed(() =>
-  friendsStore.friends.filter((f) => !props.members.find((m) => m.id === f.user.id))
-)
-
-// --- Üye ekle ---
-const showAddMember = ref(false)
-const addingId = ref<string | null>(null)
-const addError = ref('')
-
-async function addMember(userId: string) {
-  if (addingId.value) return
-  addError.value = ''
-  addingId.value = userId
-  try {
-    await dmStore.addGroupMember(props.groupId, userId)
-    showAddMember.value = false
-  } catch {
-    addError.value = t('group.addMemberError')
-  } finally {
-    addingId.value = null
-  }
-}
-
-// --- Ayrıl ---
-const showLeaveConfirm = ref(false)
-const leaving = ref(false)
-
-async function leaveGroup() {
-  leaving.value = true
-  try {
-    await dmStore.leaveGroup(props.groupId)
-    emit('left')
-  } catch {
-    // sessiz hata — zaten bildirim alacak
-  } finally {
-    leaving.value = false
-    showLeaveConfirm.value = false
   }
 }
 
@@ -221,22 +182,12 @@ async function renameGroup() {
       </div>
     </div>
 
-    <!-- Aksiyonlar -->
-    <div class="px-3 pb-4 pt-2 shrink-0 border-t space-y-1" style="border-color: var(--kv-border-subtle);">
-      <!-- Üye Ekle -->
-      <button
-        class="w-full text-left px-3 py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium cursor-pointer transition-colors"
-        style="color: var(--kv-text-secondary);"
-        @mouseenter="($event.target as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
-        @mouseleave="($event.target as HTMLElement).style.backgroundColor = 'transparent'"
-        @click="showAddMember = true"
-      >
-        + {{ t('group.addMember') }}
-      </button>
-
+    <!-- Aksiyonlar — "Üye Ekle" ve "Ayrıl" DM satırı sağ-tık menüsüne taşındı (İş 2, 2026-08-03;
+         bkz. `DmList.vue`). Yalnız owner-özel aksiyonlar kaldı; owner değilse bölüm tümden
+         gizlenir (iki düğme çıkınca boş bir dip bırakmasın). -->
+    <div v-if="isOwner" class="px-3 pb-4 pt-2 shrink-0 border-t space-y-1" style="border-color: var(--kv-border-subtle);">
       <!-- Yeniden Adlandır (owner) -->
       <button
-        v-if="isOwner"
         class="w-full text-left px-3 py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium cursor-pointer transition-colors"
         style="color: var(--kv-text-secondary);"
         @mouseenter="($event.target as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
@@ -246,20 +197,8 @@ async function renameGroup() {
         ✏️ {{ t('group.renameGroup') }}
       </button>
 
-      <!-- Ayrıl -->
-      <button
-        class="w-full text-left px-3 py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium cursor-pointer transition-colors"
-        style="color: var(--kv-text-muted);"
-        @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-danger)'"
-        @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
-        @click="showLeaveConfirm = true"
-      >
-        ← {{ t('group.leaveGroup') }}
-      </button>
-
       <!-- Grubu Sil (owner) -->
       <button
-        v-if="isOwner"
         class="w-full text-left px-3 py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium cursor-pointer transition-colors"
         style="color: var(--kv-text-muted);"
         @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-danger)'"
@@ -270,50 +209,6 @@ async function renameGroup() {
       </button>
     </div>
   </aside>
-
-  <!-- Üye ekle mini-modal -->
-  <div
-    v-if="showAddMember"
-    class="fixed inset-0 z-50 flex items-center justify-center"
-    style="background-color: rgba(0,0,0,0.5);"
-    @click.self="showAddMember = false"
-  >
-    <div
-      class="w-[360px] max-h-[60vh] flex flex-col rounded-[var(--kv-radius-lg)] overflow-hidden"
-      style="background-color: var(--kv-bg-sidebar);"
-    >
-      <div class="flex items-center justify-between px-4 py-3 border-b shrink-0" style="border-color: var(--kv-border-subtle);">
-        <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
-          {{ t('group.addMemberTitle') }}
-        </h3>
-        <button class="text-[18px] cursor-pointer hover:opacity-70" style="color: var(--kv-text-muted);" @click="showAddMember = false">✕</button>
-      </div>
-      <div class="flex-1 overflow-y-auto px-3 py-2">
-        <p v-if="!addableFriends.length" class="text-[13px] px-2 py-3" style="color: var(--kv-text-muted);">
-          {{ t('group.noFriends') }}
-        </p>
-        <button
-          v-for="f in addableFriends"
-          :key="f.user.id"
-          class="w-full flex items-center gap-3 px-2 py-2 rounded-[var(--kv-radius-md)] cursor-pointer transition-colors text-left"
-          :class="addingId === f.user.id ? 'opacity-50 pointer-events-none' : ''"
-          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
-          @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
-          @click="addMember(f.user.id)"
-        >
-          <div
-            class="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-semibold text-white"
-            style="background-color: var(--kv-accent-500);"
-          >
-            <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
-            <span v-else>{{ f.user.username[0].toUpperCase() }}</span>
-          </div>
-          <span class="text-[14px] truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</span>
-        </button>
-        <p v-if="addError" class="text-[13px] px-2 mt-1" style="color: var(--kv-danger);">{{ addError }}</p>
-      </div>
-    </div>
-  </div>
 
   <!-- Yeniden adlandır mini-modal -->
   <div
@@ -360,16 +255,6 @@ async function renameGroup() {
       </div>
     </div>
   </div>
-
-  <!-- Ayrıl onayı -->
-  <ConfirmDialog
-    v-if="showLeaveConfirm"
-    :message="t('group.leaveConfirm')"
-    :confirm-label="t('group.leaveAction')"
-    :loading="leaving"
-    @confirm="leaveGroup"
-    @cancel="showLeaveConfirm = false"
-  />
 
   <!-- Sil onayı (owner) -->
   <ConfirmDialog
