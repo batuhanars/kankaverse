@@ -19,6 +19,7 @@ import { RealtimeService } from '../../../shared/realtime/realtime.service';
 import { PresenceService, ActiveStatus } from '../../../shared/presence/presence.service';
 import { DmPermissionService } from '../../../shared/dm-permission/dm-permission.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { PushService } from '../../../shared/push/push.service';
 
 interface AuthSocket extends Socket {
   data: { userId: string; sessionId: string; username?: string };
@@ -40,6 +41,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private presence: PresenceService,
     private dmPermission: DmPermissionService,
     private notifications: NotificationsService,
+    private push: PushService,
   ) {}
 
   afterInit(server: Server) {
@@ -437,6 +439,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
    * DM kanalında mesaj gönderildiğinde üyelerin user:<id> odalarına bildirim yayar.
    * Alıcı o anda DM odasına join etmemiş olsa bile DM listesi (son mesaj + okunmamış) güncellenir.
    * Guild kanalıysa (guildId dolu) hiçbir şey yapmaz — guild kanallarda room:* yayını yeterli.
+   *
+   * M3 §2.6 — DM push: kalıcı bildirim (`Notification` satırı) hiç üretilmez (DM'in kendi
+   * okunmamış yüzeyi zaten var — çan bahsetme/kanka/davet/etkinlik anlamını korur). Push yine
+   * de gider; alıcı kümesi burada zaten hesaplanan `members` (yazar hariç), ikinci bir "kime
+   * gitsin" süzgeci YAZILMAZ. Tercih kapısı mevcut `shouldNotifyChannel` (guildId=null → yalnız
+   * CHANNEL-seviyeli tercih sorgulanır; DM sustur/seviye ayarı zaten yalnız bu targetType'ta
+   * yazılıyor — bkz. web `useDmMenuActions`).
    */
   async notifyDmActivity(channelId: string, messageDto: Record<string, unknown>) {
     const channel = await this.prisma.channel.findUnique({
@@ -454,6 +463,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     // C9: PENDING mesaj isteği → normal dm.message YOK (sessiz: liste/masaüstü bildirimi tetiklemez).
     // Alıcıya (istek sahibi olmayan) yalnız sessiz 'dm.request' → "Mesaj İstekleri" rozeti güncellensin.
+    // Push de gönderilmez (bu satırdan sonrası hiç çalışmıyor) — istek onaylanmadan bildirim yok.
     if (channel.dmRequestStatus === 'PENDING') {
       const recipient = members.find((m) => m.userId !== channel.dmRequesterId);
       if (recipient) this.realtime.emitToUser(recipient.userId, 'dm.request', { channelId });
@@ -477,6 +487,38 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     for (const member of members) {
       this.realtime.emitToUser(member.userId, 'dm.message', payload);
     }
+
+    await this.sendDmPush(channelId, members.map((m) => m.userId), messageDto, content);
+  }
+
+  /**
+   * M3 §2.6 — DM mesajı için push gönderimi. `notifyDmActivity`'nin zaten hesapladığı `members`
+   * kümesini kullanır (yeniden üretmez); yazar filtrelenir, kalanlar `shouldNotifyChannel` ile
+   * tercih süzgecinden geçer (susturulmuş → push yok). Fire-and-forget: ana akışı bloke etmez.
+   */
+  private async sendDmPush(
+    channelId: string,
+    memberIds: string[],
+    messageDto: Record<string, unknown>,
+    content: string,
+  ): Promise<void> {
+    const author = messageDto['author'] as { id: string; username: string };
+    const recipients = memberIds.filter((id) => id !== author.id);
+    if (recipients.length === 0) return;
+
+    const eligibility = await Promise.all(
+      recipients.map((recipientId) => this.notifications.shouldNotifyChannel(recipientId, null, channelId)),
+    );
+    const allowed = recipients.filter((_, i) => eligibility[i]);
+    if (allowed.length === 0) return;
+
+    await this.push
+      .sendToUsers(allowed, {
+        title: author.username,
+        body: content.slice(0, 100),
+        data: { type: 'DM_MESSAGE', channelId },
+      })
+      .catch(() => {});
   }
 
   /**

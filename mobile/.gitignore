@@ -18,6 +18,13 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Firebase servis hesabı anahtarı (gizli — FCM V1 push için EAS credentials'a yüklenir,
+# repoya ASLA girmez). google-services.json bunun DIŞINDA — herkese açık istemci
+# tanımlayıcıları taşır, bilinçli olarak commit'lenir (bkz. M3 sözleşmesi §5).
+*serviceAccount*.json
+*service-account*.json
+firebase-adminsdk-*.json
+
 # Metro
 .metro-health-check*
 
