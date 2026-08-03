@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { channelsApi } from '@/api/channels';
 import { guildsApi, type GuildMemberDto } from '@/api/guilds';
-import { rolesApi } from '@/api/roles';
+import { rolesApi, type RoleDto } from '@/api/roles';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ChatBackButton } from '@/components/ChatBackButton';
 import { useGuildPermission } from '@/hooks/useGuildPermission';
@@ -44,6 +44,7 @@ export default function ChannelScreen() {
    * kusur değil, ekranın kendi mesaj hatası ayrı zaten.
    */
   const [members, setMembers] = useState<GuildMemberDto[]>([]);
+  const [roles, setRoles] = useState<RoleDto[]>([]);
   const [everyoneRoleId, setEveryoneRoleId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,8 +56,9 @@ export default function ChannelScreen() {
     rolesApi
       .listByGuild(guildId)
       // Yalnız everyone rolü VE yalnız `mentionable` ise: kapı burada, web `MessageArea.vue` ikizi.
-      .then((roles) => {
-        const everyone = roles.find((r) => r.isEveryone);
+      .then((list) => {
+        setRoles(list);
+        const everyone = list.find((r) => r.isEveryone);
         setEveryoneRoleId(everyone?.mentionable ? everyone.id : null);
       })
       .catch(() => {});
@@ -66,6 +68,30 @@ export default function ChannelScreen() {
   // (`messages.gateway.ts` alıcı döngüsü yazarı atlıyor), yani o satır seçilse bile hiçbir bildirim
   // üretmiyor. Mobilde liste en fazla 8 satır; ölü satıra yer ayrılmaz.
   const myUserId = useAuthStore((s) => s.user?.id);
+  /**
+   * R15 — mesaj gövdesindeki `<@&id>` token'ı için rol adı çözücü. Bulunamazsa `undefined`
+   * döner ve çizim "@rol" yedeğine düşer (silinmiş / henüz yüklenmemiş rol için ad uydurulmaz).
+   */
+  const resolveRole = useCallback(
+    (roleId: string) => roles.find((r) => r.id === roleId)?.name,
+    [roles],
+  );
+
+  /**
+   * R15 — öneri listesine girecek roller (everyone HARİÇ; o ayrı öneri olarak zaten var).
+   * Kapı kuralı burada uygulanır, sözleşme §2.2 ile birebir: `mentionable` roller herkese,
+   * `mentionable` olmayanlar yalnız `MENTION_EVERYONE` izni olana. Sunucu aynı kapıyı bağımsız
+   * uyguluyor; buradaki süzgeç yalnız "seçemeyeceğin şeyi önerme" içindir.
+   */
+  const canMentionRestrictedRoles = useGuildPermission(guildId, 'MENTION_EVERYONE');
+  const mentionRoles = useMemo(
+    () =>
+      roles
+        .filter((r) => !r.isEveryone && (r.mentionable || canMentionRestrictedRoles))
+        .map((r) => ({ id: r.id, username: r.name, isRole: true, color: r.color })),
+    [roles, canMentionRestrictedRoles],
+  );
+
   const mentionCandidates = useMemo(
     () =>
       members
@@ -125,7 +151,9 @@ export default function ChannelScreen() {
         jumpToMessageId={jumpTo}
         canPin={canPin}
         mentionCandidates={mentionCandidates}
+        mentionRoles={mentionRoles}
         everyoneRoleId={everyoneRoleId}
+        resolveRole={resolveRole}
         onOpenPins={() =>
           router.push({ pathname: '/pins', params: { channelId: id, name: name ?? '' } })
         }

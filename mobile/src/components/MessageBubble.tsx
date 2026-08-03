@@ -19,6 +19,8 @@ interface Props {
   showAuthor: boolean;
   isMine: boolean;
   resolveMention: (userId: string) => string | undefined;
+  /** R15 — roleId → rol adı. Verilmezse rol token'ı "@rol" yedeğiyle çizilir (DM'de böyle). */
+  resolveRole?: (roleId: string) => string | undefined;
   /** Sözleşme §3.5 — mesaj aramasından "gidiyor" (jump) sonrası geçici vurgu. Birkaç saniye sonra
    *  otomatik söner (bkz. MessageScreen `highlightId` zamanlayıcısı). */
   highlighted?: boolean;
@@ -37,6 +39,7 @@ export function MessageBubble({
   showAuthor,
   isMine,
   resolveMention,
+  resolveRole,
   highlighted,
   onLongPress,
   onToggleReaction,
@@ -44,7 +47,12 @@ export function MessageBubble({
   // M2d R1 — bahsetmeler Kor aksanıyla çizilir (web `.kv-mention` karşılığı): metin parçalara
   // bölünüp vurgulu olanlar iç içe `<Text>` ile boyanır. Uzunluk kontrolü için düz karşılığı da
   // hesaplanır (boş içerikte blok hiç render edilmiyor — ek/attachment-only mesajlar).
-  const mentionSegments = splitMentions(message.content, resolveMention, t('mention.unknown'));
+  const mentionSegments = splitMentions(
+    message.content,
+    resolveMention,
+    t('mention.unknown'),
+    resolveRole,
+  );
   const displayContent = mentionSegments.map((seg) => seg.text).join('');
   const reactions = message.reactions ?? [];
 
@@ -88,7 +96,12 @@ export function MessageBubble({
               <Text style={styles.replyText} numberOfLines={1}>
                 <Text style={styles.replyAuthor}>{message.replyTo.authorUsername}</Text>
                 {'  '}
-                {formatMentionsPlain(message.replyTo.content, resolveMention, t('mention.unknown'))}
+                {formatMentionsPlain(
+                  message.replyTo.content,
+                  resolveMention,
+                  t('mention.unknown'),
+                  resolveRole,
+                )}
               </Text>
             ) : (
               <Text style={[styles.replyText, styles.replyDeleted]} numberOfLines={1}>

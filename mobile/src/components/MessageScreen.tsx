@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -31,9 +31,6 @@ import { theme } from '@/theme';
 
 type LoadState = 'loading' | 'error' | 'ready';
 
-// Sabit boş dizi: her render'da yeni [] üretmek `useMentionCompose`in useCallback bağımlılığını
-// boşuna değiştirir (liste her tuşta yeniden kurulurdu).
-const EMPTY_CANDIDATES: MentionCandidate[] = [];
 
 interface Props {
   channelId: string;
@@ -74,6 +71,10 @@ interface Props {
   mentionCandidates?: MentionCandidate[];
   /** `@everyone` rol id'si — YALNIZ everyone rolü `mentionable` ise dolu; aksi `null`. */
   everyoneRoleId?: string | null;
+  /** R15 — roleId → rol adı (mesaj gövdesindeki `<@&id>` token'ı için). */
+  resolveRole?: (roleId: string) => string | undefined;
+  /** R15 — öneri listesine girecek roller (kapı kuralı çağıranda uygulanmış). */
+  mentionRoles?: MentionCandidate[];
 }
 
 // Sprint M1a — kanal VE DM mesaj ekranı için TEK gövde (contract §5 ekran 3: "aynısı"). İkisi de
@@ -92,6 +93,8 @@ export function MessageScreen({
   onOpenPins,
   mentionCandidates,
   everyoneRoleId,
+  resolveRole,
+  mentionRoles,
 }: Props) {
   const authUser = useAuthStore((s) => s.user);
   const fetchInitial = useMessagesStore((s) => s.fetchInitial);
@@ -105,7 +108,12 @@ export function MessageScreen({
   // "Yazıyor" yayını + etiketi kendi kancasında (M1d-C §2.1).
   const typing = useTypingEmitter(channelId, typingMode);
   // Bahsetme yazma: @ sorgusu, öneri listesi, gönderimde token dönüşümü (M2d §4).
-  const mention = useMentionCompose(mentionCandidates ?? EMPTY_CANDIDATES, everyoneRoleId);
+  // R15 — roller listenin ÜSTÜNDE (web ile aynı sıra); kapı kuralı çağıranda uygulandı.
+  const mentionSource = useMemo(
+    () => [...(mentionRoles ?? []), ...(mentionCandidates ?? [])],
+    [mentionRoles, mentionCandidates],
+  );
+  const mention = useMentionCompose(mentionSource, everyoneRoleId);
   // Giriş kutusu: metin, gönderim, yanıt/düzenleme modları (M1d-C §2.5).
   const composer = useMessageComposer(channelId, typing, mention);
 
@@ -255,6 +263,7 @@ export function MessageScreen({
               showAuthor={item.showAuthor}
               isMine={item.message.author.id === authUser?.id}
               resolveMention={(id) => resolveUsername(channelId, id)}
+              resolveRole={resolveRole}
               highlighted={item.message.id === list.highlightId}
               onLongPress={() => actions.open(item.message)}
               onToggleReaction={(emoji) => actions.toggleReaction(item.message, emoji)}

@@ -18,6 +18,9 @@ export interface MentionCandidate {
   avatarUrl?: string | null;
   /** `@everyone` özel önerisi — gerçek üye değil, satır ikonu ve dönüşümü farklı. */
   isEveryone?: boolean;
+  /** R15 — rol önerisi: seçilince `<@&roleId>` token'ına çevrilir. */
+  isRole?: boolean;
+  color?: string | null;
 }
 
 /** `@everyone` önerisi için sabit sentinel id (gerçek bir kullanıcı id'si değil). */
@@ -54,6 +57,8 @@ export function useMentionCompose(
   const textRef = useRef('');
   const queryRef = useRef<{ query: string; start: number } | null>(null);
   const pickedRef = useRef<Map<string, string>>(new Map());
+  // R15 — rol adı → roleId (token biçimi farklı: <@&id>)
+  const pickedRolesRef = useRef<Map<string, string>>(new Map());
 
   const hasEveryone = !!everyoneRoleId;
 
@@ -130,7 +135,8 @@ export function useMentionCompose(
       const replacement = `@${candidate.username} `;
       // `@everyone` için kayıt TUTULMAZ: dönüşümü seçime değil rolün mentionable olmasına bağlı
       // (web'de de `pendingEveryone` bayrağı bu yüzden kaldırıldı — sözleşme §4.4).
-      if (!candidate.isEveryone) pickedRef.current.set(candidate.username, candidate.id);
+      if (candidate.isRole) pickedRolesRef.current.set(candidate.username, candidate.id);
+      else if (!candidate.isEveryone) pickedRef.current.set(candidate.username, candidate.id);
       queryRef.current = null;
       setVisible(false);
       setSuggestions([]);
@@ -164,6 +170,13 @@ export function useMentionCompose(
       if (everyoneRoleId) {
         result = result.replace(/@everyone(?=\s|$)/g, `<@&${everyoneRoleId}>`);
       }
+      // R15 — rol adları YALNIZ listeden seçilenler çevrilir (@everyone'daki "elle yazma da
+      // çalışır" kuralı rollere TAŞINMADI: rol adı serbest metinle çakışabilir ve yanlış gruba
+      // ping atmak, yanlış kişiye ping atmaktan daha gürültülü. Web ile birebir aynı karar).
+      for (const [roleName, roleId] of pickedRolesRef.current.entries()) {
+        const regex = new RegExp(`@${escapeRegex(roleName)}(?=\\s|$)`, 'g');
+        result = result.replace(regex, `<@&${roleId}>`);
+      }
       for (const [username, userId] of pickedRef.current.entries()) {
         const regex = new RegExp(`@${escapeRegex(username)}(?=\\s|$)`, 'g');
         result = result.replace(regex, `<@${userId}>`);
@@ -176,6 +189,7 @@ export function useMentionCompose(
   /** Gönderim BAŞARILI olunca çağrılır. Hatada çağrılmaz — kullanıcı bahsetmelerini kaybetmesin. */
   const clearPicked = useCallback(() => {
     pickedRef.current = new Map();
+    pickedRolesRef.current = new Map();
   }, []);
 
   return useMemo(

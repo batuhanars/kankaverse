@@ -92,6 +92,8 @@ interface NotificationPrefsState {
   /** R14 — ortam düzeyi bastırma bayrakları; kayıt yoksa `false` (bastırma kapalı). */
   suppressEveryone: (guildId: string) => boolean;
   suppressEvents: (guildId: string) => boolean;
+  /** R15 — rol bahsetmelerini sustur. */
+  suppressRoleMentions: (guildId: string) => boolean;
   /** `effectiveMuted` + `effectiveLevel`'in birleşimi (sözleşme §6 `resolve` imzası). */
   resolve: (targetType: NotifTargetType, targetId: string, guildId?: string | null) => ResolvedNotificationPref;
 
@@ -118,6 +120,7 @@ export const useNotificationPrefsStore = create<NotificationPrefsState>((set, ge
       level: body.level ?? prev?.level ?? NotificationLevel.ALL,
       suppressEveryone: body.suppressEveryone ?? prev?.suppressEveryone ?? false,
       suppressEvents: body.suppressEvents ?? prev?.suppressEvents ?? false,
+      suppressRoleMentions: body.suppressRoleMentions ?? prev?.suppressRoleMentions ?? false,
     };
     set((s) => ({ prefs: { ...s.prefs, [k]: optimistic } }));
     try {
@@ -156,6 +159,10 @@ export const useNotificationPrefsStore = create<NotificationPrefsState>((set, ge
 
   suppressEvents(guildId) {
     return get().prefs[prefKey('GUILD', guildId)]?.suppressEvents ?? false;
+  },
+
+  suppressRoleMentions(guildId) {
+    return get().prefs[prefKey('GUILD', guildId)]?.suppressRoleMentions ?? false;
   },
 
   resolve(targetType, targetId, guildId) {

@@ -33,6 +33,7 @@ export default function GuildNotificationsScreen() {
   // sustur geçici olabilir, bu ayar kalıcıdır (sözleşme).
   const suppressEveryone = useNotificationPrefsStore((s) => s.suppressEveryone(guildId));
   const suppressEvents = useNotificationPrefsStore((s) => s.suppressEvents(guildId));
+  const suppressRoleMentions = useNotificationPrefsStore((s) => s.suppressRoleMentions(guildId));
 
   const [subSheet, setSubSheet] = useState<'none' | 'mute' | 'level'>('none');
   const [errorMessage, setErrorMessage] = useState('');
@@ -99,7 +100,10 @@ export default function GuildNotificationsScreen() {
    * R14 §3.1 — anahtar değişince ANINDA kaydedilir. Store `setPref`'i zaten iyimser yazıp
    * hatada geri alıyor; burada yalnız hatayı görünür kılıyoruz (ekranın mevcut deseni).
    */
-  async function onToggleSuppress(field: 'suppressEveryone' | 'suppressEvents', value: boolean) {
+  async function onToggleSuppress(
+    field: 'suppressEveryone' | 'suppressEvents' | 'suppressRoleMentions',
+    value: boolean,
+  ) {
     setErrorMessage('');
     try {
       await useNotificationPrefsStore.getState().setPref({
@@ -179,6 +183,20 @@ export default function GuildNotificationsScreen() {
               onValueChange={(v) => void onToggleSuppress('suppressEvents', v)}
               trackColor={{ false: theme.colors.borderStrong, true: theme.colors.accent500 }}
               accessibilityLabel={t('guildMenu.suppressEvents')}
+            />
+          </View>
+          {/* R15 — üçüncü anahtar: rol bahsetmelerini sustur (web ile aynı metin) */}
+          <View style={styles.row}>
+            <Ionicons name="pricetag-outline" size={20} color={theme.colors.textSecondary} />
+            <View style={styles.rowTextWrap}>
+              <Text style={styles.rowLabel}>{t('guildMenu.suppressRoleMentions')}</Text>
+              <Text style={styles.rowSubtext}>{t('guildMenu.suppressRoleMentionsHint')}</Text>
+            </View>
+            <Switch
+              value={suppressRoleMentions}
+              onValueChange={(v) => void onToggleSuppress('suppressRoleMentions', v)}
+              trackColor={{ false: theme.colors.borderStrong, true: theme.colors.accent500 }}
+              accessibilityLabel={t('guildMenu.suppressRoleMentions')}
             />
           </View>
         </View>

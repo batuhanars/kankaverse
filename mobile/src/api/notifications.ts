@@ -70,6 +70,8 @@ export interface NotificationPrefDto {
   // Sprint R14 — yalnız GUILD satırında anlamlı; CHANNEL satırında sunucu her zaman false döner.
   suppressEveryone: boolean;
   suppressEvents: boolean;
+  // R15 — rol bahsetmelerini sustur (yine yalnız GUILD).
+  suppressRoleMentions: boolean;
 }
 
 // PUT gövdesi — sözleşme §2 "verilmeyen alan korunur" (kısmi update, tüm alanlar opsiyonel).
@@ -82,6 +84,7 @@ export interface SetNotificationPrefBody {
   // R14 — sunucu bu ikisini yalnız targetType=GUILD ile kabul eder (aksi 400 INVALID_PREF_TARGET).
   suppressEveryone?: boolean;
   suppressEvents?: boolean;
+  suppressRoleMentions?: boolean;
 }
 
 export const notificationsApi = {
