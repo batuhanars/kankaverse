@@ -42,6 +42,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b38160d2-abdb-443c-b3ef-c2ed14f948f9"
+      }
+    },
+    "owner": "azeroth"
   }
 }
