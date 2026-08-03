@@ -115,6 +115,9 @@ export default () => {
     screenEnabled: process.env.SCREEN_ENABLED === 'true',
     // Discord şablon göçü (yapı-only) feature-flag — default KAPALI. Açma: DISCORD_IMPORT_ENABLED=true
     discordImportEnabled: process.env.DISCORD_IMPORT_ENABLED === 'true',
+    // Sprint M3 — Expo Push gönderimi feature-flag. Default false → PushService no-op
+    // (dev build/FCM kimlik bilgisi olmadan sessizce devre dışı; §2.3).
+    expoPushEnabled: process.env.EXPO_PUSH_ENABLED === 'true',
     // Kayıt modu — kapalı-test fazı (Sprint Closed-Registration)
     // 'open' (default): kayıt açık, davet kodu yok sayılır.
     // 'invite': yalnız geçerli davet koduyla kayıt.

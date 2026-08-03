@@ -3,8 +3,10 @@ import { Notification, NotificationPref, NotifTargetType, NotificationLevel } fr
 import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { MembershipService } from '../../shared/membership/membership.service';
+import { PushService } from '../../shared/push/push.service';
 import { CreateNotificationData, NotificationDto } from './dto/notification.dto';
 import { NotificationPrefDto, SetNotificationPrefDto } from './dto/notification-pref.dto';
+import { CreatePushTokenDto } from './dto/push-token.dto';
 
 const MAX_LIMIT = 50;
 
@@ -37,12 +39,18 @@ export class NotificationsService {
     private prisma: PrismaService,
     private realtime: RealtimeService,
     private membership: MembershipService,
+    private push: PushService,
   ) {}
 
   /**
    * §2 — Bildirim üret: persist SONRA emit. NotificationDto döner.
    * Üretim yalnız zaten T&S-süzülmüş tetikleyicilerden çağrılır (R7-hafif) —
    * burada yeni erişim kararı YOK.
+   *
+   * M3 §2.4 — kalıcı bildirim üretilen NOKTAYA push takılır (aynı alıcı kümesi,
+   * yeni bir "kime gitsin" süzgeci YOK). Fire-and-forget: push gönderimi ana akışı
+   * (persist + WS emit + HTTP/WS yanıtı) ASLA bloke ETMEZ; PushService kendi içinde
+   * tüm hataları yutar, burada `.catch` yalnız ek güvenlik.
    */
   async create(userId: string, data: CreateNotificationData): Promise<NotificationDto> {
     const notification = await this.prisma.notification.create({
@@ -59,6 +67,7 @@ export class NotificationsService {
 
     const dto = await this.toNotificationDto(notification);
     this.realtime.emitToUser(userId, 'notification', dto);
+    this.push.sendToUsers([userId], this.toPushPayload(dto)).catch(() => {});
     return dto;
   }
 
@@ -91,6 +100,11 @@ export class NotificationsService {
     // toNotificationDtos satır sırasını korur → index eşlemesi güvenli.
     const dtos = await this.toNotificationDtos(rows);
     rows.forEach((row, i) => this.realtime.emitToUser(row.userId, 'notification', dtos[i]));
+    // M3 §2.4 — tek payload tüm alıcılara (data/preview ortak; createMany'nin kendi tanımı gereği
+    // her satır aynı CreateNotificationData'dan üretildi). Fire-and-forget (bkz. create() notu).
+    if (dtos.length > 0) {
+      this.push.sendToUsers(targets, this.toPushPayload(dtos[0])).catch(() => {});
+    }
     return dtos;
   }
 
@@ -193,6 +207,48 @@ export class NotificationsService {
       where: { userId: recipientId, actorId: requesterId, type: 'FRIEND_REQUEST', readAt: null },
       data: { readAt: new Date() },
     });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // M3 §2.1/§2.2 — Push token kaydı (Expo). Token KULLANICIYA bağlıdır, cihaza değil.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * POST /notifications/push-tokens — upsert (token @unique).
+   * 🔴 Aynı cihazda başka hesap açılırsa `userId` yeni kullanıcıya TAŞINIR (update dalı da
+   * userId'yi yazar) — aksi hâlde önceki kullanıcının bildirimi yeni kullanıcının cihazına
+   * düşerdi (T&S sızıntısı, contract §2.1/§4).
+   */
+  async registerPushToken(userId: string, dto: CreatePushTokenDto): Promise<null> {
+    await this.prisma.pushToken.upsert({
+      where: { token: dto.token },
+      create: {
+        userId,
+        token: dto.token,
+        platform: dto.platform,
+        deviceName: dto.deviceName ?? null,
+      },
+      update: {
+        userId,
+        platform: dto.platform,
+        deviceName: dto.deviceName ?? null,
+        lastUsedAt: new Date(),
+      },
+    });
+    return null;
+  }
+
+  /**
+   * DELETE /notifications/push-tokens/:token — yalnız KENDİ token'ını siler.
+   * Başkasınınki veya yok → jenerik 404 (varlık sızdırma yok — §2.2).
+   */
+  async deletePushToken(userId: string, token: string): Promise<null> {
+    const row = await this.prisma.pushToken.findUnique({ where: { token } });
+    if (!row || row.userId !== userId) {
+      throw new NotFoundException({ message: 'Push token bulunamadı.', error: 'PUSH_TOKEN_NOT_FOUND' });
+    }
+    await this.prisma.pushToken.delete({ where: { token } });
+    return null;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -372,5 +428,51 @@ export class NotificationsService {
         createdAt: n.createdAt.toISOString(),
       };
     });
+  }
+
+  /**
+   * M3 §2.4 — kalıcı bildirimden push payload'ı türet. Sunucuda i18n YOK (contract'ın kendi
+   * tespiti); `preview` yalnız MENTION ve EVENT_CREATED'ta gerçek görüntülenebilir metin taşır
+   * (mobil `notifications.tsx`'te de yalnız bu ikisinde preview ayrı satırda gösteriliyor —
+   * FRIEND_REQUEST/FRIEND_ACCEPT'te preview hiç yok, GUILD_INVITE'ta preview davet KODU, düz
+   * metin değil). O yüzden gövde metni türü başına, mobil ekranla AYNI anlamı taşıyacak şekilde
+   * (bkz. web/mobile `notification.*` i18n anahtarları) burada birebir yansıtılır — "preview'ı
+   * olduğu gibi bas" literal okuması 3/5 tipte boş/anlamsız gövde üretirdi.
+   */
+  private toPushPayload(dto: NotificationDto): { title?: string; body: string; data: { type: string; guildId?: string | null; channelId?: string | null; messageId?: string | null } } {
+    const actor = dto.actor?.username ?? 'Biri';
+    let body: string;
+    switch (dto.type) {
+      case 'MENTION':
+        body = dto.preview ? `${actor}: ${dto.preview}` : `${actor} seni bir mesajda etiketledi.`;
+        break;
+      case 'FRIEND_REQUEST':
+        body = `${actor} sana kanka isteği gönderdi.`;
+        break;
+      case 'FRIEND_ACCEPT':
+        body = `${actor} kanka isteğini kabul etti.`;
+        break;
+      case 'GUILD_INVITE':
+        body = `${actor} seni ${dto.guildName ?? 'bir ortama'} davet etti.`;
+        break;
+      case 'EVENT_CREATED':
+        body = dto.preview
+          ? `${actor} yeni bir etkinlik oluşturdu: ${dto.preview}`
+          : `${actor} yeni bir etkinlik oluşturdu.`;
+        break;
+      default:
+        body = actor;
+    }
+
+    return {
+      title: actor,
+      body,
+      data: {
+        type: dto.type,
+        guildId: dto.guildId,
+        channelId: dto.channelId,
+        messageId: dto.messageId,
+      },
+    };
   }
 }

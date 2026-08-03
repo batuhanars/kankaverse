@@ -2260,3 +2260,55 @@ açılıyor, roller kendi renkleriyle listeleniyor, mesajlar çiziliyor.
 - [ ] Özel kanalda rol etiketi kanal üyesi olmayanlara gitmiyor
 - [ ] "Rol Bahsetmelerini Sustur" açıkken rol pingi gelmiyor, adınla etiketlenince geliyor
 - [ ] @everyone bugünkü gibi çalışmaya devam ediyor (göç telafisi tuttu)
+
+
+---
+
+## Sprint M3 — Mobil Push Bildirimi — 2026-08-03
+
+> Sözleşme: `contracts/SPRINT_M3_MOBILE_PUSH_CONTRACT.md` = **tek doğruluk kaynağı**.
+> Sahip kararı: "push'u bitirelim, ses en sona". **Kod dev oturumlarına delege edildi**
+> ([[pm-dev-cift-yonlu-denetim]] — PM sözleşme + inceleme, kod dev'de).
+
+### Backend (`api/`) — sözleşme §2 ✅
+- [x] `PushToken` modeli + migration (DB'ye uygulandı). Token **kullanıcıya** bağlı: aynı cihazda
+      hesap değişince `token` upsert'ü `userId`'yi **taşıyor** (eski kullanıcının bildirimi yeni
+      kullanıcıya düşmez — T&S kritik madde, PM koddan doğruladı)
+- [x] `POST /notifications/push-tokens` (upsert) · `DELETE /notifications/push-tokens/:token`
+      (yalnız kendi token'ı, aksi jenerik 404 — varlık sızdırmaz)
+- [x] `PushService` (SharedModule): Expo Push API, ≤100'lük chunk, `DeviceNotRegistered` →
+      token silinir, tüm hatalar yutulur + loglanır. **Yeni bağımlılık yok** (fetch yeterli)
+- [x] `EXPO_PUSH_ENABLED` (default `false`) → kapalıyken hiç istek atılmaz; `.env.example` güncel
+- [x] §2.4 — push **kalıcı bildirim üretilen noktaya** takıldı (`create`/`createMany`); ayrı bir
+      "kime gitsin" mantığı YAZILMADI, tüm tercih süzgeçleri oraya kadar zaten uygulanmış oluyor
+- [x] 21 yeni test; **968 test yeşil**, `nest build` + `migrate status` temiz
+
+### Dev bulguları (delegasyonun karşılığı — PM'in sözleşmede atladıkları)
+- **DM push'u bu sprintte YOK, gerekçesi koddan okundu:** `notifyDmActivity` yalnız WS eventi
+  yayıyor, `NotificationsService.create` çağırmıyor → DM için **kalıcı bildirim üretilmiyor**.
+  Sözleşme "kalıcı bildirim varsa push" dediği için DM doğal olarak kapsam dışı kaldı.
+  🔴 **Ürün açığı olarak kayda geçsin:** DM en çok push beklenen yüzey; ayrı kalem.
+- **Sözleşme "push gövdesi = `preview`" diyordu, bu 5 bildirim tipinin 3'ünde çalışmıyor:**
+  `FRIEND_REQUEST`/`FRIEND_ACCEPT`'te `preview` null, `GUILD_INVITE`'ta ham davet **kodu**
+  (mobil zaten metin olarak göstermiyor). Dev, web `tr.json`'daki `notification.*` ifadelerinin
+  aynısını sunucuya düz metin olarak yazdı (backend'de zaten Türkçe düz metinler var).
+  🔴 **Borç:** push metni ile istemci metni iki ayrı yerde → ilk değişiklikte ayrışır.
+- Gönderim **await edilmiyor** (fire-and-forget + `.catch`): `create` mesaj POST'unun içinde
+  çağrılıyor, await etmek Expo gecikmesini gönderenin yanıtına eklerdi. PM doğruladı, kabul.
+
+### Mobil (`mobile/`) — sözleşme §3
+- [ ] `expo-notifications` + izin akışı (oturum sonrası, ısrarcı ikinci sorma yok)
+- [ ] Token kaydı + **çıkışta silme**
+- [ ] Bildirime dokunma → tipe göre yönlendirme; hedef çözülemezse yalnız uygulamayı aç
+- [ ] Ön plandayken banner gösterme; `typecheck` + `lint` temiz
+
+### Sahip adımları (§5 — bunlar olmadan mobil ayak başlamaz)
+- [ ] **Dev build (APK)** — push Expo Go'da Android'de çalışmaz
+- [ ] **FCM kimlik bilgisi** Expo hesabına tanımlı (Firebase projesi + anahtar)
+
+### DoD (cihazda — sahipte)
+- [ ] Uygulama kapalıyken bahsedilince bildirim geliyor, dokununca doğru kanala gidiyor
+- [ ] Susturulmuş ortam/kanaldan bildirim gelmiyor
+- [ ] Etkinlik bildirimi geliyor ve etkinlikler ekranına götürüyor
+- [ ] Çıkışta bildirim kesiliyor; aynı cihazda başka hesap açınca öncekinin bildirimi gelmiyor
+- [ ] Dev build'de gezinme çubuğu beyaz şeridi + reconnect davranışı gözden geçirildi (PLAN devri)
