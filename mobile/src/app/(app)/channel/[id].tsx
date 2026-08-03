@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { channelsApi } from '@/api/channels';
+import { guildsApi, type GuildMemberDto } from '@/api/guilds';
+import { rolesApi } from '@/api/roles';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ChatBackButton } from '@/components/ChatBackButton';
 import { useGuildPermission } from '@/hooks/useGuildPermission';
@@ -27,6 +29,42 @@ export default function ChannelScreen() {
    * göstermemek.
    */
   const canPin = useGuildPermission(guildId, 'MANAGE_MESSAGES');
+
+  /**
+   * Sprint M2d §3.1 — bahsetme öneri kaynağı. Ekran açılışında BİR KEZ çekilir; `@` yazınca
+   * istek atılmaz, süzme bellekte yapılır. Yeni store açılmadı (ekran seviyesi state yeterli,
+   * `channel-details.tsx` deseni).
+   *
+   * 🔴 `guildId` yoksa hiç çekilmez: bu ekran bildirimler/arama/sabitlemeler yollarından
+   * `guildId` OLMADAN da açılabiliyor (M2c'de belgelenen mevcut boşluk). O durumda öneri listesi
+   * hiç açılmaz — yarım liste göstermek yanlış vaat olur.
+   *
+   * Hata sessiz: liste boş kalır, kullanıcıya hata gösterilmez. Mesaj yazmayı engelleyen bir
+   * kusur değil, ekranın kendi mesaj hatası ayrı zaten.
+   */
+  const [members, setMembers] = useState<GuildMemberDto[]>([]);
+  const [everyoneRoleId, setEveryoneRoleId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!guildId) return;
+    guildsApi
+      .getMembers(guildId)
+      .then(setMembers)
+      .catch(() => {});
+    rolesApi
+      .listByGuild(guildId)
+      // Yalnız everyone rolü VE yalnız `mentionable` ise: kapı burada, web `MessageArea.vue` ikizi.
+      .then((roles) => {
+        const everyone = roles.find((r) => r.isEveryone);
+        setEveryoneRoleId(everyone?.mentionable ? everyone.id : null);
+      })
+      .catch(() => {});
+  }, [guildId]);
+
+  const mentionCandidates = useMemo(
+    () => members.map((m) => ({ id: m.userId, username: m.username, avatarUrl: m.avatarUrl })),
+    [members],
+  );
 
   // Sprint M2a §4.5/DoD — kanalı açınca ilgili rozet ANINDA düşer. Sunucuya `markRead` zaten
   // `MessageScreen` mount'unda gidiyor (contract §5); bu yalnız yerel `unread` store'un aynı anda
@@ -78,6 +116,8 @@ export default function ChannelScreen() {
         typingMode="named"
         jumpToMessageId={jumpTo}
         canPin={canPin}
+        mentionCandidates={mentionCandidates}
+        everyoneRoleId={everyoneRoleId}
         onOpenPins={() =>
           router.push({ pathname: '/pins', params: { channelId: id, name: name ?? '' } })
         }

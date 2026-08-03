@@ -17,6 +17,12 @@ import { useMessagesStore } from '@/stores/messages';
 export function useMessageComposer(
   channelId: string,
   typing: { onInputChange: (text: string) => void; stop: () => void },
+  /**
+   * Sprint M2d — gönderim öncesi bahsetme token dönüşümü. Verilmezse metin olduğu gibi gider
+   * (bahsetme kaynağı olmayan ekranlar için). Dönüşüm SUNUCUYA giden metne uygulanır; kutuda
+   * kullanıcının yazdığı okunur hâl (`@ad`) kalır.
+   */
+  mentions?: { applyMentionTokens: (text: string) => string; clearPicked: () => void },
 ) {
   const appendMessage = useMessagesStore((s) => s.appendMessage);
   const updateMessage = useMessagesStore((s) => s.updateMessage);
@@ -60,19 +66,24 @@ export function useMessageComposer(
     setSending(true);
     setSendError('');
     typing.stop();
+    // M2d — `@ad` → `<@userId>`, `@everyone` → `<@&roleId>`. Düzenlemede de uygulanır.
+    const payload = mentions ? mentions.applyMentionTokens(trimmed) : trimmed;
     try {
       if (editing) {
         // Sunucu düzenlemeyi yalnız YAZARA açıyor; yetkisizde bu mod zaten başlatılmıyor.
-        const updated = await messagesApi.edit(channelId, editing.id, trimmed);
+        const updated = await messagesApi.edit(channelId, editing.id, payload);
         // WS `message.updated` de gelir; store aynı id'yi yerine koyduğu için mükerrer olmaz.
         updateMessage(updated);
         setEditing(null);
       } else {
-        const message = await messagesApi.send(channelId, trimmed, replyTo?.id);
+        const message = await messagesApi.send(channelId, payload, replyTo?.id);
         appendMessage(message);
         setReplyTo(null);
       }
       setInput('');
+      // Yalnız BAŞARIDA temizlenir: hata durumunda kullanıcı tekrar deneyecek, seçtiği
+      // bahsetmeleri kaybetmesin (sözleşme §4.3).
+      mentions?.clearPicked();
     } catch (e) {
       setSendError(extractErrorMessage(e));
     } finally {

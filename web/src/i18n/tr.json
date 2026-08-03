@@ -1606,6 +1606,11 @@
     "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
   },
   "mobile": {
+    "mention": {
+      "everyoneLabel": "@everyone",
+      "everyoneHint": "Bu kanaldaki herkese bildirim gider",
+      "empty": "Eşleşen kimse yok"
+    },
     "profile": {
       "edit": "Profili Düzenle"
     },

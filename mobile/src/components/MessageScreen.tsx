@@ -18,6 +18,7 @@ import { MessageSearchModal } from './MessageSearchModal';
 import { MessageComposer } from './message/MessageComposer';
 import { useTypingEmitter } from './message/useTypingEmitter';
 import { useMessageComposer } from './message/useMessageComposer';
+import { useMentionCompose, type MentionCandidate } from './message/useMentionCompose';
 import { useMessageListController } from './message/useMessageListController';
 import { MessageEmpty, MessageError, MessageLoading } from './message/MessageStates';
 import { MessageActionHost } from './message/MessageActionHost';
@@ -29,6 +30,10 @@ import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 type LoadState = 'loading' | 'error' | 'ready';
+
+// Sabit boş dizi: her render'da yeni [] üretmek `useMentionCompose`in useCallback bağımlılığını
+// boşuna değiştirir (liste her tuşta yeniden kurulurdu).
+const EMPTY_CANDIDATES: MentionCandidate[] = [];
 
 interface Props {
   channelId: string;
@@ -61,6 +66,14 @@ interface Props {
    * arama ortam kanallarında değerli, 1-1'de karşında tek kişi var. Web'de de aynısı yapıldı.
    */
   searchable?: boolean;
+  /**
+   * Sprint M2d — bahsetme öneri kaynağı. Ortam kanalında ortam üyeleri, 1-1 DM'de karşı taraf,
+   * grup DM'de grup üyeleri. **Boş/verilmemiş → `@` yazınca liste hiç açılmaz** (örn. `guildId`
+   * taşımayan kanal ekranı: yarım liste göstermek yanlış vaat olur, sözleşme §3.1).
+   */
+  mentionCandidates?: MentionCandidate[];
+  /** `@everyone` rol id'si — YALNIZ everyone rolü `mentionable` ise dolu; aksi `null`. */
+  everyoneRoleId?: string | null;
 }
 
 // Sprint M1a — kanal VE DM mesaj ekranı için TEK gövde (contract §5 ekran 3: "aynısı"). İkisi de
@@ -77,6 +90,8 @@ export function MessageScreen({
   jumpToMessageId,
   canPin = false,
   onOpenPins,
+  mentionCandidates,
+  everyoneRoleId,
 }: Props) {
   const authUser = useAuthStore((s) => s.user);
   const fetchInitial = useMessagesStore((s) => s.fetchInitial);
@@ -89,8 +104,10 @@ export function MessageScreen({
 
   // "Yazıyor" yayını + etiketi kendi kancasında (M1d-C §2.1).
   const typing = useTypingEmitter(channelId, typingMode);
+  // Bahsetme yazma: @ sorgusu, öneri listesi, gönderimde token dönüşümü (M2d §4).
+  const mention = useMentionCompose(mentionCandidates ?? EMPTY_CANDIDATES, everyoneRoleId);
   // Giriş kutusu: metin, gönderim, yanıt/düzenleme modları (M1d-C §2.5).
-  const composer = useMessageComposer(channelId, typing);
+  const composer = useMessageComposer(channelId, typing, mention);
 
   // react-hooks/set-state-in-effect — GuildsScreen (M0) deseni: effect gövdesi fetch'i DOĞRUDAN
   // (adlandırılmış bir sarmalayıcı fonksiyonu çağırmadan) inline zincirler; setState yalnız
@@ -260,7 +277,10 @@ export function MessageScreen({
 
       <MessageComposer
         value={composer.input}
-        onChangeText={composer.onChangeInput}
+        onChangeText={(text) => {
+          composer.onChangeInput(text);
+          mention.onChangeText(text);
+        }}
         onSend={composer.onSend}
         sending={composer.sending}
         sendError={composer.sendError}
@@ -272,6 +292,12 @@ export function MessageScreen({
         replyToSnippet={composer.replyTo?.content}
         editing={!!composer.editing}
         onCancelMode={composer.cancelMode}
+        mentionSuggestions={mention.visible ? mention.suggestions : undefined}
+        onMentionSelect={(candidate) => {
+          const next = mention.select(candidate, composer.input);
+          if (next) composer.onChangeInput(next.text);
+        }}
+        onSelectionChange={mention.onSelectionChange}
       />
 
       <MessageActionHost

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { dmApi } from '@/api/dm';
@@ -43,6 +43,30 @@ export default function DmScreen() {
   // Doğru kaynak store: `dm` store'u sunucudan gelen `canMessage`/`selfBlocked`'ı taşıyor ve her
   // `fetchAll` ile tazeleniyor. Route parametresi yalnız store'da kanal yokken (derin link) yedek.
   const storeChannel = useDmStore((s) => s.channels.find((c) => c.id === params.id));
+
+  /**
+   * Sprint M2d §3.2 — bahsetme öneri kaynağı. Grup DM'de üyeler store'daki kanal kaydından gelir;
+   * 1-1 DM'de tek kişilik liste (store yoksa route param'ından — derin link yedeği, başlıkla
+   * aynı kaynak). Kendini bahsetmek anlamsız olduğu için listede kendi hesabın YOK; grup üyeleri
+   * sunucudan zaten "ben hariç" gelmiyor, o yüzden burada süzülmez — 1-1'de zaten karşı taraf tek.
+   */
+  const mentionCandidates = useMemo(() => {
+    if (storeChannel?.type === 'GROUP_DM') {
+      return storeChannel.members.map((m) => ({
+        id: m.id,
+        username: m.username,
+        avatarUrl: m.avatarUrl,
+      }));
+    }
+    if (storeChannel?.type === 'DM') {
+      const u = storeChannel.otherUser;
+      return [{ id: u.id, username: u.username, avatarUrl: u.avatarUrl }];
+    }
+    if (params.otherUserId && params.title) {
+      return [{ id: params.otherUserId, username: params.title, avatarUrl: params.avatarUrl ?? null }];
+    }
+    return [];
+  }, [storeChannel, params.otherUserId, params.title, params.avatarUrl]);
 
   // M1d-0 R1 (sahip kararı 2026-07-31) — başlıktaki kanka ekle ikonu **KALDIRILDI**. 2026-07-30'da
   // eklenmişti çünkü o gün profil kartında ekleme yoktu; R1-d kartı eklemeyi getirince başlık ikonu
@@ -117,6 +141,9 @@ export default function DmScreen() {
       <MessageScreen
         channelId={params.id}
         placeholder={placeholder}
+        // Sprint M2d §3.2 — bahsetme kaynağı: 1-1 DM'de karşı taraf, grup DM'de grup üyeleri.
+        // Ekstra istek YOK, ikisi de zaten elde. `@everyone` verilmez (guild yok).
+        mentionCandidates={mentionCandidates}
         jumpToMessageId={params.jumpTo}
         markRead={dmApi.markRead}
         typingMode="simple"
