@@ -4,14 +4,24 @@
  * Discord deseni: susturulmamışken süre seçtirir (15dk/1s/3s/8s/24s/süresiz);
  * susturulmuşken tek satır "Sesini Aç" (alt etiket: ne zamana kadar).
  *
- * NotifLevelFlyout ile aynı konumlama/teleport/click-flyout iskeleti (tıklamayla açılır).
+ * NotifLevelFlyout ile aynı konumlama/teleport/flyout iskeleti; açılma davranışı (hover +
+ * gecikmeli kapanma + klavye + aynı anda tek panel) ortak `useFlyoutMenu`'de (Sprint WEB-PARITE §3.2).
+ * Susturulmuşken tetikleyici alt panel AÇMAZ (tek tık → sesi aç) → `enabled: !muted`.
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useFlyoutMenu } from '@/composables/useFlyoutMenu'
 
 const props = defineProps<{
   muted: boolean
   mutedUntil: string | null
+  /**
+   * Satır etiketleri. Verilmezse ortam (guild) metinleri — mevcut iki çağıran (ServerRail,
+   * ChannelPanel) hiç değişmez. DM menüsü "Konuşmayı Sustur"/"Susturmayı Kaldır" geçirir;
+   * bileşen "Sunucuyu Sustur" yazsaydı DM satırında yanlış metin çıkardı.
+   */
+  label?: string
+  unmuteLabel?: string
 }>()
 
 const emit = defineEmits<{
@@ -21,9 +31,20 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const open = ref(false)
-const triggerEl = ref<HTMLElement | null>(null)
-const panelEl = ref<HTMLElement | null>(null)
+const {
+  open,
+  triggerEl,
+  panelEl,
+  closeFlyout,
+  toggleFlyout,
+  onTriggerEnter,
+  onTriggerLeave,
+  onPanelEnter,
+  onPanelLeave,
+  onTriggerKeydown,
+  onPanelKeydown,
+} = useFlyoutMenu({ enabled: () => !props.muted })
+
 const flipLeft = ref(false)
 const flyoutTop = ref(0)
 const flyoutLeft = ref(0)
@@ -72,16 +93,12 @@ function onTriggerClick() {
     emit('unmute')
     return
   }
-  if (open.value) open.value = false
-  else {
-    open.value = true
-    positionFlyout()
-  }
+  toggleFlyout(positionFlyout)
 }
 
 function pick(minutes: number | null) {
   emit('mute', minutes)
-  open.value = false
+  closeFlyout()
 }
 
 const flyoutStyle = computed(
@@ -93,10 +110,10 @@ function onDocPointer(e: MouseEvent) {
   const target = e.target as Node
   if (triggerEl.value?.contains(target)) return
   if (panelEl.value?.contains(target)) return
-  open.value = false
+  closeFlyout()
 }
 function onScrollOrResize() {
-  if (open.value) open.value = false
+  if (open.value) closeFlyout()
 }
 onMounted(() => {
   document.addEventListener('click', onDocPointer, true)
@@ -119,12 +136,15 @@ onUnmounted(() => {
     :aria-haspopup="!muted"
     :aria-expanded="open"
     @click.stop="onTriggerClick"
+    @mouseenter="onTriggerEnter(positionFlyout)"
+    @mouseleave="onTriggerLeave"
+    @keydown="onTriggerKeydown($event, positionFlyout)"
   >
     <!-- Susturulmuşsa: ses-açık ikonu; değilse ses-kapalı (mute) ikonu -->
     <svg v-if="muted" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mdf-icon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
     <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mdf-icon"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
     <span class="mdf-label">
-      {{ muted ? t('guildMenu.unmute') : t('guildMenu.mute') }}
+      {{ muted ? (unmuteLabel ?? t('guildMenu.unmute')) : (label ?? t('guildMenu.mute')) }}
       <span v-if="muted && untilLabel" class="mdf-sublabel">{{ untilLabel }}</span>
     </span>
     <svg v-if="!muted" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="mdf-chevron"><path d="M9 18l6-6-6-6"/></svg>
@@ -139,6 +159,9 @@ onUnmounted(() => {
       :style="flyoutStyle"
       :class="flipLeft ? 'mdf-flyout--left' : ''"
       @click.stop
+      @mouseenter="onPanelEnter"
+      @mouseleave="onPanelLeave"
+      @keydown="onPanelKeydown"
     >
       <button
         v-for="opt in options"

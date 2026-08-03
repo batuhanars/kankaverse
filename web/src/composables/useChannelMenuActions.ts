@@ -28,19 +28,40 @@ export function useChannelMenuActions(channel: Ref<ChannelDto | null> | (() => C
     await channelsStore.markChannelRead(c.id, c.guildId ?? undefined)
   }
 
-  // ── Sustur (kanal seviyesi) ──
+  // ── Sustur (kanal seviyesi; süreli — Sprint WEB-PARITE §3.1, useGuildMenuActions ikizi) ──
   const isChannelMuted = computed(() =>
     prefsStore.isMuted(NotifTargetType.CHANNEL, target.value?.id ?? ''),
   )
+  const channelMutedUntil = computed(() =>
+    prefsStore.mutedUntilFor(NotifTargetType.CHANNEL, target.value?.id ?? ''),
+  )
 
-  async function toggleChannelMute() {
+  // minutes=null → süresiz; aksi → şimdi + dakika. Süre listesi MuteDurationFlyout'ta (tek kaynak).
+  async function muteChannelFor(minutes: number | null) {
+    const c = target.value
+    if (!c) return
+    const mutedUntil = minutes === null ? null : new Date(Date.now() + minutes * 60_000).toISOString()
+    try {
+      await prefsStore.setPref({
+        targetType: NotifTargetType.CHANNEL,
+        targetId: c.id,
+        muted: true,
+        mutedUntil,
+      })
+    } catch {
+      toast.error(t('guildMenu.muteError'))
+    }
+  }
+
+  async function unmuteChannel() {
     const c = target.value
     if (!c) return
     try {
       await prefsStore.setPref({
         targetType: NotifTargetType.CHANNEL,
         targetId: c.id,
-        muted: !isChannelMuted.value,
+        muted: false,
+        mutedUntil: null,
       })
     } catch {
       toast.error(t('guildMenu.muteError'))
@@ -97,7 +118,9 @@ export function useChannelMenuActions(channel: Ref<ChannelDto | null> | (() => C
   return {
     markChannelRead,
     isChannelMuted,
-    toggleChannelMute,
+    channelMutedUntil,
+    muteChannelFor,
+    unmuteChannel,
     channelLevel,
     setChannelLevel,
     copyChannelId,

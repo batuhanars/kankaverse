@@ -78,6 +78,10 @@ export function useNativeNotifications() {
       case 'GUILD_INVITE':
         body = t('notification.guildInvite', { actor, guild })
         break
+      case 'EVENT_CREATED':
+        // R14 — masaüstü toast'ta sessizce düşmesin; metin çandakiyle aynı anahtardan
+        body = t('notification.eventCreated', { actor, event: dto.preview ?? '' })
+        break
       default:
         body = actor
     }

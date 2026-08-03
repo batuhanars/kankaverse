@@ -89,6 +89,9 @@ interface NotificationPrefsState {
   effectiveLevel: (targetType: NotifTargetType, targetId: string, guildId?: string | null) => NotificationLevel;
   /** Efektif sustur durumu — CHANNEL için kayıt yoksa GUILD'in kendi mute'una düşer (§3). */
   effectiveMuted: (targetType: NotifTargetType, targetId: string, guildId?: string | null) => boolean;
+  /** R14 — ortam düzeyi bastırma bayrakları; kayıt yoksa `false` (bastırma kapalı). */
+  suppressEveryone: (guildId: string) => boolean;
+  suppressEvents: (guildId: string) => boolean;
   /** `effectiveMuted` + `effectiveLevel`'in birleşimi (sözleşme §6 `resolve` imzası). */
   resolve: (targetType: NotifTargetType, targetId: string, guildId?: string | null) => ResolvedNotificationPref;
 
@@ -113,6 +116,8 @@ export const useNotificationPrefsStore = create<NotificationPrefsState>((set, ge
       muted: body.muted ?? prev?.muted ?? false,
       mutedUntil: 'mutedUntil' in body ? (body.mutedUntil ?? null) : (prev?.mutedUntil ?? null),
       level: body.level ?? prev?.level ?? NotificationLevel.ALL,
+      suppressEveryone: body.suppressEveryone ?? prev?.suppressEveryone ?? false,
+      suppressEvents: body.suppressEvents ?? prev?.suppressEvents ?? false,
     };
     set((s) => ({ prefs: { ...s.prefs, [k]: optimistic } }));
     try {
@@ -143,6 +148,14 @@ export const useNotificationPrefsStore = create<NotificationPrefsState>((set, ge
 
   effectiveMuted(targetType, targetId, guildId) {
     return resolvePref(get().prefs, targetType, targetId, guildId).muted;
+  },
+
+  suppressEveryone(guildId) {
+    return get().prefs[prefKey('GUILD', guildId)]?.suppressEveryone ?? false;
+  },
+
+  suppressEvents(guildId) {
+    return get().prefs[prefKey('GUILD', guildId)]?.suppressEvents ?? false;
   },
 
   resolve(targetType, targetId, guildId) {

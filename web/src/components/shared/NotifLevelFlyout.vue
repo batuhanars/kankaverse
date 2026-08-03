@@ -9,33 +9,63 @@
  *
  * Görsel: kendi `--kv-*` tabanlı stili — host menü class'ından bağımsız tutarlı.
  * Gölge YOK (tasarım kuralı); katman = elevated bg + ince subtle kenarlık.
+ *
+ * Sprint WEB-PARITE §3.2 — açılma davranışı (hover + gecikmeli kapanma + klavye + tek-açık)
+ * `useFlyoutMenu`'de; MuteDurationFlyout ile birebir aynı kural (ikinci kopya yok).
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useFlyoutMenu } from '@/composables/useFlyoutMenu'
 import { NotificationLevel, type NotificationLevel as NotificationLevelType } from '@/types'
 
 const props = defineProps<{
   /** Mevcut efektif seviye (✓ için) */
   level: NotificationLevelType
+  /**
+   * R14 — ortam düzeyi bastırma bayrakları. **Yalnız ortam menüsünde** verilir; verilmezse
+   * kutucuk bölümü hiç render edilmez (kanal menüsünde bu ayarlar YOK — sunucu kanal hedefini
+   * `400 INVALID_PREF_TARGET` ile reddediyor, o yüzden gösterilmesi de yanlış olurdu).
+   * Discord da bunları üst menüde değil, tam olarak bu panelin altında tutuyor.
+   */
+  suppressEveryone?: boolean
+  suppressEvents?: boolean
 }>()
 
 const emit = defineEmits<{
   /** Seviye seçildi — çağıran setGuildLevel/setChannelLevel tetikler */
   (e: 'select', level: NotificationLevelType): void
+  (e: 'toggle-everyone'): void
+  (e: 'toggle-events'): void
 }>()
 
 const { t } = useI18n()
 
-const open = ref(false)
-const triggerEl = ref<HTMLElement | null>(null)
-const panelEl = ref<HTMLElement | null>(null)
+const {
+  open,
+  triggerEl,
+  panelEl,
+  closeFlyout,
+  toggleFlyout,
+  onTriggerEnter,
+  onTriggerLeave,
+  onPanelEnter,
+  onPanelLeave,
+  onTriggerKeydown,
+  onPanelKeydown,
+} = useFlyoutMenu()
+
 // Flyout SOLA mı açılacak (sağda yer yoksa)? + dikey hizalama (üst kenar)
 const flipLeft = ref(false)
 const flyoutTop = ref(0)
 const flyoutLeft = ref(0)
 
-const FLYOUT_W = 184
-const FLYOUT_H = 132
+// Bastırma kutucukları eklenince panel hem genişler hem uzar; konumlama (sağa/sola çevirme,
+// alt kenardan taşma) bu ölçülere bakıyor, sabitler tek yerde tutulur.
+const hasSuppressions = computed(
+  () => props.suppressEveryone !== undefined || props.suppressEvents !== undefined,
+)
+const FLYOUT_W = computed(() => (hasSuppressions.value ? 236 : 184))
+const FLYOUT_H = computed(() => (hasSuppressions.value ? 224 : 132))
 
 const options = computed(() => [
   { level: NotificationLevel.ALL, label: t('guildMenu.notificationsAll') },
@@ -48,31 +78,15 @@ function positionFlyout() {
   if (!el) return
   const rect = el.getBoundingClientRect()
   // Yatay: tercihen sağa; sağda taşma varsa SOLA
-  const fitsRight = rect.right + FLYOUT_W + 4 <= window.innerWidth - 8
+  const fitsRight = rect.right + FLYOUT_W.value + 4 <= window.innerWidth - 8
   flipLeft.value = !fitsRight
-  flyoutLeft.value = fitsRight ? rect.right + 2 : rect.left - FLYOUT_W - 2
+  flyoutLeft.value = fitsRight ? rect.right + 2 : rect.left - FLYOUT_W.value - 2
   // Dikey: üst kenarla hizala; alt kenardan taşarsa yukarı kaydır
   let top = rect.top
-  if (top + FLYOUT_H > window.innerHeight - 8) {
-    top = Math.max(8, window.innerHeight - FLYOUT_H - 8)
+  if (top + FLYOUT_H.value > window.innerHeight - 8) {
+    top = Math.max(8, window.innerHeight - FLYOUT_H.value - 8)
   }
   flyoutTop.value = top
-}
-
-function openFlyout() {
-  open.value = true
-  // DOM güncellensin diye ölçümü bir sonraki frame'e bırakmaya gerek yok —
-  // trigger zaten render'da; konumu anında hesapla.
-  positionFlyout()
-}
-
-function closeFlyout() {
-  open.value = false
-}
-
-function onTriggerClick() {
-  if (open.value) closeFlyout()
-  else openFlyout()
 }
 
 function pick(level: NotificationLevelType) {
@@ -81,7 +95,7 @@ function pick(level: NotificationLevelType) {
 }
 
 const flyoutStyle = computed(
-  () => `top:${flyoutTop.value}px;left:${flyoutLeft.value}px;width:${FLYOUT_W}px;`,
+  () => `top:${flyoutTop.value}px;left:${flyoutLeft.value}px;width:${FLYOUT_W.value}px;`,
 )
 
 // Dış-tık / scroll / resize → flyout kapanır (host menü zaten kendi kapanmasını yönetir,
@@ -118,7 +132,10 @@ onUnmounted(() => {
     role="menuitem"
     :aria-haspopup="true"
     :aria-expanded="open"
-    @click.stop="onTriggerClick"
+    @click.stop="toggleFlyout(positionFlyout)"
+    @mouseenter="onTriggerEnter(positionFlyout)"
+    @mouseleave="onTriggerLeave"
+    @keydown="onTriggerKeydown($event, positionFlyout)"
   >
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nlf-icon"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
     <span class="nlf-label">{{ t('guildMenu.notifications') }}</span>
@@ -135,6 +152,9 @@ onUnmounted(() => {
       :style="flyoutStyle"
       :class="flipLeft ? 'nlf-flyout--left' : ''"
       @click.stop
+      @mouseenter="onPanelEnter"
+      @mouseleave="onPanelLeave"
+      @keydown="onPanelKeydown"
     >
       <button
         v-for="opt in options"
@@ -148,6 +168,36 @@ onUnmounted(() => {
         <span class="nlf-option__label">{{ opt.label }}</span>
         <svg v-if="props.level === opt.level" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="nlf-check"><path d="M20 6 9 17l-5-5"/></svg>
       </button>
+
+      <!-- R14 — bastırma kutucukları (yalnız ortam menüsünde). Seçince panel KAPANMAZ:
+           kullanıcı arka arkaya iki kutuyu işaretleyebilsin (Discord da böyle). -->
+      <template v-if="hasSuppressions">
+        <div class="nlf-divider" />
+        <button
+          type="button"
+          class="nlf-option"
+          role="menuitemcheckbox"
+          :aria-checked="suppressEveryone === true"
+          @click="emit('toggle-everyone')"
+        >
+          <span class="nlf-option__label">{{ t('guildMenu.suppressEveryone') }}</span>
+          <span class="nlf-box" :class="suppressEveryone ? 'nlf-box--on' : ''">
+            <svg v-if="suppressEveryone" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </span>
+        </button>
+        <button
+          type="button"
+          class="nlf-option"
+          role="menuitemcheckbox"
+          :aria-checked="suppressEvents === true"
+          @click="emit('toggle-events')"
+        >
+          <span class="nlf-option__label">{{ t('guildMenu.suppressEvents') }}</span>
+          <span class="nlf-box" :class="suppressEvents ? 'nlf-box--on' : ''">
+            <svg v-if="suppressEvents" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </span>
+        </button>
+      </template>
     </div>
   </Teleport>
 </template>
@@ -230,5 +280,34 @@ onUnmounted(() => {
 .nlf-check {
   flex-shrink: 0;
   color: var(--kv-accent-500);
+}
+
+/* R14 — seviye radyoları ile bastırma kutucuklarını ayıran ince çizgi (menü ayracı dili) */
+.nlf-divider {
+  height: 1px;
+  margin: 4px 6px;
+  background-color: var(--kv-border-subtle);
+}
+
+/* Kutucuk: seviye satırlarındaki ✓'ten görsel olarak AYRI dursun — radyo değil, aç/kapa */
+.nlf-box {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid var(--kv-border-strong, var(--kv-border-subtle));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
+}
+
+.nlf-box--on {
+  background-color: var(--kv-accent-500);
+  border-color: var(--kv-accent-500);
+  color: #fff;
 }
 </style>

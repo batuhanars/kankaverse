@@ -51,6 +51,37 @@ export const useNotificationPrefsStore = defineStore('notificationPrefs', () => 
   }
 
   /**
+   * Sprint WEB-PARITE §2.1 — canlı rozet artışının uyguladığı tablo (mobil
+   * `mobile/src/stores/notificationPrefs.ts` `channelBadgeEffect` ile BİREBİR; backend
+   * `guilds.service.ts` `resolveChannelBadgeEffect` de aynı tabloyu kullanır — üç kaynak örtüşür).
+   *
+   * 🔴 Yalnız kanalın KENDİ (`CHANNEL`) tercihine bakar, GUILD'e DÜŞMEZ: ortam düzeyi süzgeci
+   * `ServerRail` çizim anında zaten uyguluyor, burada da uygulansa çift süzgeç olurdu.
+   *
+   * pref yok → { true, true } · aktif mute / NONE → { false, false } · MENTIONS → { false, true }.
+   */
+  function channelBadgeEffect(channelId: string): { countUnread: boolean; countMention: boolean } {
+    const pref = prefs.get(key('CHANNEL', channelId))
+    if (!pref) return { countUnread: true, countMention: true } // varsayılan: ALL, susturulmamış
+    if (isMuted('CHANNEL', channelId)) return { countUnread: false, countMention: false }
+    if (pref.level === NotificationLevel.NONE) return { countUnread: false, countMention: false }
+    if (pref.level === NotificationLevel.MENTIONS) return { countUnread: false, countMention: true }
+    return { countUnread: true, countMention: true } // ALL
+  }
+
+  /**
+   * Sprint R14 — ortam düzeyi bastırma bayrakları. Yalnız GUILD hedefinde anlamlı;
+   * kayıt yoksa varsayılan `false` (bastırma kapalı = bugünkü davranış).
+   */
+  function suppressEveryone(guildId: string): boolean {
+    return prefs.get(key('GUILD', guildId))?.suppressEveryone ?? false
+  }
+
+  function suppressEvents(guildId: string): boolean {
+    return prefs.get(key('GUILD', guildId))?.suppressEvents ?? false
+  }
+
+  /**
    * Efektif bildirim seviyesi. CHANNEL için kanal kaydı yoksa (guildId verildiyse)
    * GUILD tercihine düşer; o da yoksa 'ALL'.
    */
@@ -75,6 +106,9 @@ export const useNotificationPrefsStore = defineStore('notificationPrefs', () => 
     muted?: boolean
     mutedUntil?: string | null
     level?: NotificationLevelType
+    // R14 — sunucu bu ikisini yalnız targetType=GUILD ile kabul eder (aksi 400 INVALID_PREF_TARGET).
+    suppressEveryone?: boolean
+    suppressEvents?: boolean
   }) {
     const res = await notificationsApi.setPref(body)
     const pref = res.data
@@ -82,5 +116,16 @@ export const useNotificationPrefsStore = defineStore('notificationPrefs', () => 
     return pref
   }
 
-  return { prefs, load, prefFor, isMuted, mutedUntilFor, effectiveLevel, setPref }
+  return {
+    prefs,
+    load,
+    prefFor,
+    isMuted,
+    mutedUntilFor,
+    channelBadgeEffect,
+    suppressEveryone,
+    suppressEvents,
+    effectiveLevel,
+    setPref,
+  }
 })

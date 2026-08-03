@@ -12,6 +12,8 @@ export const NotificationType = {
   FRIEND_REQUEST: 'FRIEND_REQUEST',
   FRIEND_ACCEPT: 'FRIEND_ACCEPT',
   GUILD_INVITE: 'GUILD_INVITE',
+  // Sprint R14 — ortamda yeni etkinlik oluşturuldu (`preview` = etkinlik adı)
+  EVENT_CREATED: 'EVENT_CREATED',
 } as const;
 // eslint-disable-next-line @typescript-eslint/no-redeclare -- enum-like const+type deseni, bkz. api/channels.ts
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
@@ -65,6 +67,9 @@ export interface NotificationPrefDto {
   // ISO; null = süresiz (muted true iken). Geçmişse mute BİTMİŞ sayılır (§3 çözümleme kuralı).
   mutedUntil: string | null;
   level: NotificationLevel;
+  // Sprint R14 — yalnız GUILD satırında anlamlı; CHANNEL satırında sunucu her zaman false döner.
+  suppressEveryone: boolean;
+  suppressEvents: boolean;
 }
 
 // PUT gövdesi — sözleşme §2 "verilmeyen alan korunur" (kısmi update, tüm alanlar opsiyonel).
@@ -74,6 +79,9 @@ export interface SetNotificationPrefBody {
   muted?: boolean;
   mutedUntil?: string | null;
   level?: NotificationLevel;
+  // R14 — sunucu bu ikisini yalnız targetType=GUILD ile kabul eder (aksi 400 INVALID_PREF_TARGET).
+  suppressEveryone?: boolean;
+  suppressEvents?: boolean;
 }
 
 export const notificationsApi = {

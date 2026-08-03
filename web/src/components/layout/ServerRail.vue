@@ -76,6 +76,10 @@ const {
   unmuteGuild,
   guildLevel,
   setGuildLevel,
+  suppressEveryone,
+  suppressEvents,
+  toggleSuppressEveryone,
+  toggleSuppressEvents,
   copyGuildId,
 } = useGuildMenuActions(() => contextGuild.value?.id ?? '')
 
@@ -513,8 +517,16 @@ function badgeLabel(count: number): string {
         @unmute="unmuteGuild"
       />
 
-      <!-- 4. Bildirim Ayarları — yana açılan flyout (NotifLevelFlyout) -->
-      <NotifLevelFlyout :level="guildLevel" @select="setGuildLevel" />
+      <!-- 4. Bildirim Ayarları — yana açılan flyout (seviye + R14 bastırma kutucukları).
+           Bastırma bayrakları üst menüde DEĞİL, bu panelin içinde (Discord deseni). -->
+      <NotifLevelFlyout
+        :level="guildLevel"
+        :suppress-everyone="suppressEveryone"
+        :suppress-events="suppressEvents"
+        @select="setGuildLevel"
+        @toggle-everyone="toggleSuppressEveryone"
+        @toggle-events="toggleSuppressEvents"
+      />
 
       <!-- 5. Sunucu Ayarları — canOpenSettings -->
       <template v-if="ctxCanOpenSettings">

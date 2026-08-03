@@ -404,6 +404,8 @@ export const NotificationType = {
   FRIEND_REQUEST: 'FRIEND_REQUEST',
   FRIEND_ACCEPT: 'FRIEND_ACCEPT',
   GUILD_INVITE: 'GUILD_INVITE',
+  // Sprint R14 — ortamda yeni etkinlik oluşturuldu
+  EVENT_CREATED: 'EVENT_CREATED',
 } as const
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType]
 
@@ -440,6 +442,9 @@ export interface NotificationPrefDto {
   muted: boolean
   mutedUntil: string | null // ISO; null = süresiz (muted true ise). Geçmişse mute bitmiş.
   level: NotificationLevel
+  // Sprint R14 — yalnız GUILD satırında anlamlı; CHANNEL satırında sunucu her zaman false döner.
+  suppressEveryone: boolean
+  suppressEvents: boolean
 }
 
 // Sprint R5 — Ortam denetim kaydı (moderasyon aksiyon logları)

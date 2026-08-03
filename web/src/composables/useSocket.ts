@@ -9,6 +9,7 @@ import { useDmStore } from '@/stores/dm'
 import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
 import { useMembersStore } from '@/stores/members'
+import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import type { GuildMemberDto, ChannelDto, CategoryDto, RoleDto } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useRolesStore } from '@/stores/roles'
@@ -67,6 +68,7 @@ export function useSocket() {
   const channelsStore = useChannelsStore()
   const guildsStore = useGuildsStore()
   const membersStore = useMembersStore()
+  const prefsStore = useNotificationPrefsStore()
   const authStore = useAuthStore()
   const rolesStore = useRolesStore()
   const eventsStore = useEventsStore()
@@ -162,7 +164,10 @@ export function useSocket() {
     })
 
     socket.on('dm.message', (data: { channelId: string; lastMessage: { content: string; createdAt: string }; senderId: string }) => {
-      dmStore.applyActivity(data)
+      // Sprint WEB-PARITE §2.2 — susturulmuş/`NONE` DM okunmamış SAYILMAZ; ama sohbet listede
+      // yaşamaya devam eder: son mesaj önizlemesi + sıralama yine güncellenir (yalnız rozet yanmaz).
+      const { countUnread } = prefsStore.channelBadgeEffect(data.channelId)
+      dmStore.applyActivity(data, { countUnread })
       // Masaüstü toast (DM/grup) — pencere arkada VEYA bu DM açık değilse
       maybeFireDmToast(data, dmStore.activeDmChannelId === data.channelId)
     })
@@ -243,6 +248,8 @@ export function useSocket() {
       // REV-4: guild kanalında bahsetme → o kanalı izlemiyorsam mention rozetini artır
       // (rail kırmızı sayaç + kanal sidebar bandı). DM (guildId null) → bu sistem dışı.
       if (payload.guildId && activeChannelId !== payload.channelId) {
+        // Sprint WEB-PARITE §2.2 — kanal susturulmuş/`NONE` ise ne kanal ne ortam sayacı artar.
+        if (!prefsStore.channelBadgeEffect(payload.channelId).countMention) return
         channelsStore.markChannelMentioned(payload.channelId, payload.guildId)
         guildsStore.incrementGuildMention(payload.guildId)
       }
@@ -256,6 +263,9 @@ export function useSocket() {
       maybeFireChannelToast(data, isActive)
       // Kullanıcı o kanalı şu an izliyorsa unread saymıyoruz
       if (isActive) return
+      // Sprint WEB-PARITE §2.2 — susturulmuş/`NONE`/`MENTIONS` kanalda düz mesaj sayılmaz:
+      // ne kanal satırı ne de rail'deki ortam simgesi yanar (süzgeç artış anında, çizimde değil).
+      if (!prefsStore.channelBadgeEffect(data.channelId).countUnread) return
       channelsStore.markChannelUnread(data.channelId, data.guildId)
       guildsStore.incrementGuildUnread(data.guildId)
     })

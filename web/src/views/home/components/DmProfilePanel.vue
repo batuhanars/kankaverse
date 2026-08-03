@@ -3,9 +3,12 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { usersApi } from '@/api/users'
+import { useFriendsStore } from '@/stores/friends'
+import { useToastStore } from '@/stores/toast'
 import { renderMessageHtml } from '@/utils/markdown'
 import { bannerBackground } from '@/utils/bannerColor'
 import FullProfileModal from '@/components/shared/FullProfileModal.vue'
+import ReportModal from '@/components/shared/ReportModal.vue'
 import type { FriendCodeUserDto, UserProfileCardDto } from '@/types'
 
 const props = defineProps<{ otherUser: FriendCodeUserDto }>()
@@ -51,6 +54,39 @@ function onOpenDm(channelId: string) {
   showFullProfile.value = false
   router.push({ name: 'dm', params: { channelId } })
 }
+
+// ── SPRINT_DM_MENU §4 — panel aksiyonları (Kanka Ekle · Şikâyet Et) ──
+// Panel kartı zaten çekiyor, yeni istek yok. ≥1280'de kanka ekleme kapısı burasıdır;
+// başlıktaki ikon `xl:hidden` ile yalnız panel gizliyken görünür (çift giriş yok).
+const friendsStore = useFriendsStore()
+const toast = useToastStore()
+const addingFriend = ref(false)
+const addFriendSent = ref(false)
+const showReport = ref(false)
+
+const canAddFriend = computed(
+  () => !!card.value && card.value.friendStatus === 'none' && !addFriendSent.value,
+)
+
+/** Ret **jenerik** — sebep/statü gösterilmez (Sprint 4A G2 kuralı). */
+async function addFriend() {
+  if (addingFriend.value) return
+  addingFriend.value = true
+  try {
+    await friendsStore.sendRequestByUser(props.otherUser.id)
+    addFriendSent.value = true
+  } catch {
+    toast.error(t('friends.addFailed'))
+  } finally {
+    addingFriend.value = false
+  }
+}
+
+// Başka kullanıcıya geçilince "istek gönderildi" durumu sıfırlanır
+watch(() => props.otherUser.id, () => {
+  addFriendSent.value = false
+  showReport.value = false
+})
 </script>
 
 <template>
@@ -145,6 +181,39 @@ function onOpenDm(channelId: string) {
       </button>
     </div>
 
+    <!-- Aksiyon satırları (SPRINT_DM_MENU §4). Şikâyet satırı `card` gelmese de durur:
+         güvenlik aksiyonu veri kapısına bağlanmaz. -->
+    <div class="px-5 pb-3 shrink-0 flex flex-col gap-2">
+      <button
+        v-if="canAddFriend"
+        class="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-[var(--kv-radius-md)] cursor-pointer transition-opacity hover:opacity-80 text-left disabled:opacity-60"
+        style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
+        :disabled="addingFriend"
+        @click="addFriend"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+        </svg>
+        <span class="text-[13px] font-semibold">{{ t('friends.add') }}</span>
+      </button>
+      <p
+        v-else-if="addFriendSent"
+        class="px-4 py-2.5 text-[13px]"
+        style="color: var(--kv-text-muted);"
+      >{{ t('friends.requestSent') }}</p>
+
+      <button
+        class="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-[var(--kv-radius-md)] cursor-pointer transition-colors text-left hover:bg-[var(--kv-bg-elevated)]"
+        style="color: var(--kv-danger);"
+        @click="showReport = true"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>
+        </svg>
+        <span class="text-[13px] font-semibold">{{ t('report.reportUser') }}</span>
+      </button>
+    </div>
+
     <!-- Tam profil (alt sabit) -->
     <div v-if="card" class="p-4 border-t" style="border-color: var(--kv-border-subtle);">
       <button
@@ -161,6 +230,13 @@ function onOpenDm(channelId: string) {
       :card="card"
       @close="showFullProfile = false"
       @open-dm="onOpenDm"
+    />
+
+    <ReportModal
+      v-if="showReport"
+      target-type="USER"
+      :target-id="otherUser.id"
+      @close="showReport = false"
     />
   </aside>
 </template>

@@ -71,11 +71,22 @@ export const useDmStore = defineStore('dm', () => {
     return channels.value.find((c) => c.id === activeDmChannelId.value) ?? null
   }
 
-  async function applyActivity(payload: {
-    channelId: string
-    lastMessage: { content: string; createdAt: string }
-    senderId: string
-  }) {
+  /**
+   * WS `dm.message` → son mesaj + sıralama + okunmamış.
+   *
+   * Sprint WEB-PARITE §2.2 — `opts.countUnread === false` (susturulmuş / seviye `NONE` DM):
+   * sohbet listede YAŞAMAYA devam eder (önizleme + sıralama güncellenir), yalnız `unread`
+   * işaretlenmez. Süzgecin tek kaynağı `notificationPrefs.channelBadgeEffect`; burada ikinci
+   * bir mute mantığı yok, çağıran (useSocket) kararı geçirir.
+   */
+  async function applyActivity(
+    payload: {
+      channelId: string
+      lastMessage: { content: string; createdAt: string }
+      senderId: string
+    },
+    opts?: { countUnread?: boolean },
+  ) {
     const authStore = useAuthStore()
     const idx = channels.value.findIndex((c) => c.id === payload.channelId)
 
@@ -103,9 +114,13 @@ export const useDmStore = defineStore('dm', () => {
       channels.value.splice(idx, 1)
       channels.value.unshift(ch)
 
-      // Unread: kendi mesajım DEĞİLSE ve aktif DM DEĞİLSE set et
+      // Unread: kendi mesajım DEĞİLSE, aktif DM DEĞİLSE ve tercih susturmuyorsa set et
       const myId = authStore.user?.id
-      if (payload.senderId !== myId && payload.channelId !== activeDmChannelId.value) {
+      if (
+        opts?.countUnread !== false &&
+        payload.senderId !== myId &&
+        payload.channelId !== activeDmChannelId.value
+      ) {
         ch.unread = true
       }
     } else {
