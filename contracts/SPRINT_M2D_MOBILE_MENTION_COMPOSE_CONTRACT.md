@@ -40,7 +40,7 @@ bağlanışı. Desen okunur, **kopyalanmaz** (Metro proje kökü dışını çö
 - `@everyone` önerisi — **yalnız** o ortamın `@everyone` rolü `mentionable` ise
 - Seçilen öneriyi gönderimde token'a çevirme: `@kullanıcıadı` → `<@userId>`,
   `@everyone` → `<@&everyoneRoleId>`
-- Seçilmemiş bahsetmenin **sessizce düşmediğinin görülmesi** (§4.4 — bu sprintin kalite maddesi)
+- Elle yazılan `@everyone`'ın da çalışması — listeden seçme şartı yok (§4.4; web aynı davranışa çekildi)
 
 ### OUT (bilinçli)
 
@@ -136,7 +136,8 @@ Web'deki kuralın aynısı: imlecin **solundaki** `@kelime` bloğu.
 ### 4.3 Seçim ve token'a çevirme
 
 - Dokununca: `@sorgu` bloğu `@kullanıcıadı ` (sonda boşluk) ile değiştirilir, imleç sonuna gider
-- Seçilen kayıt bellekte tutulur: `Map<username, userId>`; `@everyone` için ayrı bayrak
+- Seçilen kayıt bellekte tutulur: `Map<username, userId>`. `@everyone` için **bayrak tutulmaz** —
+  dönüşüm seçime değil rolün `mentionable` olmasına bakar (§4.4); web'de de bayrak kaldırıldı
 - Gönderim öncesi `applyMentionTokens(text)`:
   - `@everyone` → `<@&everyoneRoleId>` (rol **hâlâ** mentionable ise)
   - `@kullanıcıadı` → `<@userId>`, **tam kelime sınırıyla** (`(?=\s|$)`)
@@ -144,23 +145,30 @@ Web'deki kuralın aynısı: imlecin **solundaki** `@kelime` bloğu.
   tekrar deneyecek, bahsetmeleri kaybetmesin)
 - Düzenleme modunda da aynı dönüşüm uygulanır (`useMessageComposer` düzenlemeyi de gönderiyor)
 
-### 4.4 🔴 Sessiz başarısızlık taşınmayacak (bu sprintin kalite maddesi)
+### 4.4 🔴 Elle yazılan `@everyone` de çalışır (iki istemcide AYNI)
 
-Web'de bilinen bir tuzak var ve **mobil kopyası onu tekrar etmemeli**: kullanıcı öneriyi listeden
-seçmeden elle `@everyone` yazarsa metin token'a çevrilmiyor, mesaj sıradan mesaj olarak gidiyor ve
-**kullanıcıya hiçbir şey söylenmiyor**. Sahip tam olarak buna takıldı (2026-08-03).
+Web'de bir tuzak vardı: kullanıcı öneriyi listeden seçmeden elle `@everyone` yazarsa metin token'a
+çevrilmiyor, mesaj sıradan mesaj olarak gidiyor ve **kullanıcıya hiçbir şey söylenmiyordu**. Sahip
+tam olarak buna takıldı (2026-08-03).
 
-Mobilde çözüm — **iki kural**:
+**Sahip kararı (aynı gün): davranış iki istemcide de "hem liste hem elle yazma".** Web tarafı bu
+sprintin dışında, karar alınır alınmaz düzeltildi (`useMentionAutocomplete.applyMentionTokens`
+artık `pendingEveryone` bayrağına bakmıyor, bayrak kaldırıldı). **Mobil aynı davranışı uygular** —
+yani bu madde artık "web'in hatasını taşıma" değil, "iki istemci aynı davranır".
 
-1. **Elle yazılan `@everyone` de token'a çevrilir**, seçilmiş olması şart değil: rol `mentionable`
-   ise `applyMentionTokens` metindeki `@everyone` geçişlerini çevirir. (Discord'da da yazmak
-   yeter; sunucu zaten `mentionable` kapısını uyguluyor, yani bu kapıyı gevşetmez.)
+1. **Elle yazılan `@everyone` token'a çevrilir**, seçilmiş olması şart değil: rol `mentionable` ise
+   `applyMentionTokens` metindeki `@everyone` geçişlerini çevirir. (Discord'da da yazmak yeter;
+   sunucu zaten `mentionable` kapısını bağımsız uyguluyor, yani kapı gevşemiyor.)
 2. **Kullanıcı adları için aynısı YAPILMAZ** — yalnız listeden seçilenler çevrilir. Sebep: rastgele
    bir `@kelime` metnini kullanıcıya eşlemek için isim araması gerekir, o da yeni bir uç demektir
    (kapsam dışı) ve yanlış kişiyi bahsetme riski taşır.
 
-> Bu asimetri bilinçlidir ve sözleşmede yazılıdır: `@everyone` **tek ve sabit** bir hedef, kullanıcı
-> adı değil. Dev "tutarlı olsun" diye ikisini eşitlemeye **kalkmaz** → sapma.
+> Bu asimetri bilinçlidir: `@everyone` **tek ve sabit** bir hedef, kullanıcı adı değil. Dev
+> "tutarlı olsun" diye ikisini eşitlemeye **kalkmaz** → sapma.
+>
+> **Bilinen sınır (ikisinde de aynı):** dönüşüm kelime-sınırına bakıyor (`@everyone` ardından boşluk
+> ya da metin sonu). `@everyone!` gibi noktalama bitişik yazımlar çevrilmez. Bugünkü web davranışı
+> da bu; mobil onu değiştirmez.
 
 ### 4.5 Klavye ve dokunma
 
