@@ -108,7 +108,12 @@ export default function NotificationsScreen() {
     }
     if (n.type !== 'MENTION' || !n.channelId) return;
     if (n.guildId) {
-      router.push({ pathname: '/channel/[id]', params: { id: n.channelId, name: '' } });
+      // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-08-03, cihaz turu — push'tan açılan kanal). Push
+      // yolu (`pushNavigation.ts`) aynı kusuru taşıyordu ve orada düzeltildi; burada da `guildId`
+      // taşınmıyordu → `resolveRole` boş liste görüp `@rol` yedeğine düşüyordu (aynı kusur iki
+      // yerde durmasın). `guildId` zaten `NotificationDto`'da var (EVENT_CREATED dalı yukarıda
+      // kullanıyor), yeni bir alan/istek gerekmiyor.
+      router.push({ pathname: '/channel/[id]', params: { id: n.channelId, name: '', guildId: n.guildId } });
     } else {
       router.push({
         pathname: '/dm/[id]',

@@ -22,7 +22,15 @@ export function resolvePushTarget(data: Record<string, unknown>): Href | null {
     case 'MENTION':
       if (!channelId) return null;
       // `onItemPress` ile aynı hedef: guild kanalıysa kanal ekranı, yoksa DM.
-      return guildId ? { pathname: '/channel/[id]', params: { id: channelId, name: '' } } : dmTarget(channelId);
+      // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-08-03, cihaz turu) — `guildId` BİLİNÇLİ olarak
+      // geçilmiyordu ("bildirimler sekmesindeki mevcut tuhaflığı aynala" kararı, bkz. eski yorum).
+      // Sonuç: kanal ekranı `guildId` olmadan açılıyor → `rolesApi.listByGuild` hiç çekilmiyor →
+      // `resolveRole` her zaman `undefined` → mesaj gövdesinde `@everyone`/rol etiketleri "@rol"
+      // yedeğine düşüyor. Sunucu `data.guildId`yi zaten gönderiyor (bkz. dosya başı yorumu);
+      // taşımamak bilinçli bir kısıtlama değil, kopyalanan bir eksiklikti. Artık taşınıyor.
+      return guildId
+        ? { pathname: '/channel/[id]', params: { id: channelId, name: '', guildId } }
+        : dmTarget(channelId);
     case 'DM_MESSAGE':
       // M3 §2.6 — DM push'u kalıcı bildirim ÜRETMEZ, yalnız push gider; hedef her zaman DM ekranı.
       if (!channelId) return null;
