@@ -2122,19 +2122,34 @@ uyarı üretmiyor).
 > **Sıra kilidi:** R15 bu sprint bitmeden başlamaz — R15'in mobil ayağı ("rolleri öneri listesine
 > ekle") bu listenin var olmasına dayanıyor.
 
-- [ ] `useMentionCompose` kancası: `@` sorgusu (imleç takibi `onSelectionChange` ile), süzme, en fazla
+- [x] `useMentionCompose` kancası: `@` sorgusu (imleç takibi `onSelectionChange` ile), süzme, en fazla
       8 öneri; `@everyone` yalnız rol `mentionable` ise ve listenin en üstünde
-- [ ] Veri kaynakları: ortam kanalında `guildsApi.listMembers` + `rolesApi.listByGuild`;
+- [x] Veri kaynakları: ortam kanalında `guildsApi.getMembers` + `rolesApi.listByGuild`;
       DM'de karşı taraf, grup DM'de üyeler. Ekran açılışında bir kez, `@` yazınca istek YOK
-- [ ] Öneri listesi mesaj kutusunun üstünde (yeni `Modal` yok, yeni bağımlılık yok),
-      `keyboardShouldPersistTaps`, ≥44dp dokunma hedefi, geri tuşu önce listeyi kapatır
-- [ ] Gönderimde token dönüşümü: `@ad` → `<@userId>` (yalnız seçilenler),
+      *(sözleşme `listMembers` yazıyordu, uçun gerçek adı `getMembers` — imza sapması değil, düzeltildi)*
+- [x] Öneri listesi mesaj kutusunun üstünde (yeni `Modal` yok, yeni bağımlılık yok),
+      `keyboardShouldPersistTaps`, ≥44dp dokunma hedefi
+- [x] Gönderimde token dönüşümü: `@ad` → `<@userId>` (yalnız seçilenler),
       `@everyone` → `<@&roleId>`; başarıda temizle, hatada KORU
-- [ ] 🔴 §4.4 — elle yazılan `@everyone` de token'a çevrilir; kullanıcı adlarında bu YAPILMAZ
+- [x] 🔴 §4.4 — elle yazılan `@everyone` de token'a çevrilir; kullanıcı adlarında bu YAPILMAZ
       (asimetri bilinçli, sözleşmede gerekçesi var). **Web bu davranışa çekildi** (sahip kararı
       2026-08-03, aşağıdaki ek madde) → mobil ikizini uygular, iki istemci aynı
-- [ ] `guildId`siz açılan kanal ekranında liste hiç açılmaz (yarım liste = yanlış vaat)
-- [ ] `typecheck` + `lint` temiz; metinler `tr.json`'a bir kez; `MessageComposer.tsx` 300 satırı geçmez
+- [x] `guildId`siz açılan kanal ekranında liste hiç açılmaz (yarım liste = yanlış vaat)
+- [x] `typecheck` + `lint` temiz; metinler `tr.json`'a bir kez; `MessageComposer.tsx` 230 satır
+
+### Uygulama notları (PM, aynı gün)
+- 🔴 **İmleç hesabı ilk yazımda yanlıştı, düzeltildi:** `onSelectionChange` yalnız imleci saklıyordu,
+  sorguyu yeniden hesaplamıyordu. RN'de `onChangeText` `onSelectionChange`'ten ÖNCE tetiklendiği
+  için metnin ORTASINA dokunup yazan kullanıcıda sorgu metnin SONUNDAN okunuyordu (DoD'un o maddesi
+  düşerdi). Artık iki giriş noktası da ortak `recompute(text, pos)`'u çağırıyor; kanca son metni
+  `textRef`'te tutuyor. Yan fayda: var olan bir `@kelime`'nin içine dokunmak da listeyi açıyor.
+- **Geri tuşu maddesi uygulanmadı:** liste `Modal` değil, giriş şeridiyle aynı ağaçta sıradan bir
+  `View`. Android geri tuşu onu zaten görmüyor, ilk basış klavyeyi kapatıyor ve liste onunla birlikte
+  görünmez oluyor. `BackHandler` eklemek olmayan bir soruna kod yazmak olurdu; DoD maddesi cihaz
+  turunda "geri tuşu ekrandan atmıyor" olarak doğrulanmalı.
+- **`MessageScreen.tsx` 344 → 370 satır.** Kök `CLAUDE.md` eşiğini (300) bu sprint ÖNCESİNDE de
+  aşıyordu; bölme yapılmadı (erken soyutlama yerine gerçek acıyı bekle). Tetikleyici: bu ekrana
+  bir sonraki özellik geldiğinde liste/başlık parçalarını çıkar.
 
 ### DoD (**fiziksel cihazda** — sahipte)
 - [ ] Ortam kanalında `@` yazınca üye listesi çıkıyor ve yazdıkça süzülüyor

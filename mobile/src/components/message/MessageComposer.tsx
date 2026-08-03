@@ -1,5 +1,7 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { MentionSuggestionList } from './MentionSuggestionList';
+import type { MentionCandidate } from './useMentionCompose';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -35,6 +37,14 @@ interface Props {
   editing?: boolean;
   /** Modu iptal et (× düğmesi). */
   onCancelMode?: () => void;
+  /**
+   * Sprint M2d — bahsetme önerileri. Boş dizi → liste hiç render edilmez (kaynak yoksa,
+   * örn. `guildId`siz açılan kanal ekranında, yüzey de olmaz: yarım liste yanlış vaat).
+   */
+  mentionSuggestions?: MentionCandidate[];
+  onMentionSelect?: (candidate: MentionCandidate) => void;
+  /** `TextInput` imleç takibi — kanca sorguyu buradan okur (RN'de selectionStart bedava değil). */
+  onSelectionChange?: (start: number) => void;
 }
 
 export function MessageComposer({
@@ -51,6 +61,9 @@ export function MessageComposer({
   replyToSnippet,
   editing,
   onCancelMode,
+  mentionSuggestions,
+  onMentionSelect,
+  onSelectionChange,
 }: Props) {
   const canSend = !!value.trim() && !sending;
   const modeActive = editing || !!replyToAuthor;
@@ -83,6 +96,12 @@ export function MessageComposer({
         </View>
       )}
 
+      {/* M2d — öneri listesi giriş şeridinin HEMEN ÜSTÜNDE; "yazıyor" şeridini yerinden
+          oynatmaması için onun da üstünde durur (sözleşme §4.2). */}
+      {!!mentionSuggestions?.length && onMentionSelect && (
+        <MentionSuggestionList suggestions={mentionSuggestions} onSelect={onMentionSelect} />
+      )}
+
       {typingLabel && (
         <View style={styles.typingRow}>
           <Text style={styles.typingText}>{typingLabel}</Text>
@@ -104,6 +123,7 @@ export function MessageComposer({
               placeholderTextColor={theme.colors.textMuted}
               style={styles.input}
               multiline
+              onSelectionChange={(e) => onSelectionChange?.(e.nativeEvent.selection.start)}
             />
             <Pressable
               onPress={onSend}
