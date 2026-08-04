@@ -143,8 +143,11 @@ export function MessageBubble({
             {message.editedAt ? <Text style={styles.edited}> {t('message.edited')}</Text> : null}
           </Text>
         )}
+        {/* Sprint M3c R2 — `interactive`: görsele dokun → tam ekran, dosyaya dokun → sistemde aç.
+            YALNIZ burada açık; kanal detay sekmelerinde dokunuş "mesaja git" demek (bkz.
+            `AttachmentView` prop notu). CLEAN olmayan ekler orada da burada da dokunulamaz. */}
         {message.attachments?.map((a) => (
-          <AttachmentView key={a.id} attachment={a} />
+          <AttachmentView key={a.id} attachment={a} interactive />
         ))}
 
         {/* Tepki pill'leri — sunucu emoji bazında TOPLAYARAK dönüyor (kim verdi listesi yok), o
