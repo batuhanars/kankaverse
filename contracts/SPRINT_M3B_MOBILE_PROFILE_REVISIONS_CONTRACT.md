@@ -189,6 +189,29 @@ Uygulamalar · Sunuculara Davet Et. Boş bölüm bile çizilmez.
 **çizme** (mobilde ses yok, tıklanınca gidecek yer yok). Ama panelin düzeni, aksiyonların altına
 "şu an sesli kanalda" satırı sonradan girince bozulmayacak şekilde kurulsun.
 
+### 3.2.1 Yerleşim — Discord hizalaması (sahip kararı 2026-08-04, R3)
+
+> Sahip cihazda gördü: ilk uygulama **her şeyi sığdırmaya** çalışmış (ortak ortamlar listesi
+> kesiliyor), altta üç tam genişlikte düğme var ve panel **kaymıyor**. Discord'un paneli kayıyor.
+
+🔴 **Sığdırma yok, panel KAYAR.** İçerik uzunsa kaydırılır; hiçbir bölüm kırpılmaz, listeler
+kesilmez. Panel Discord gibi ekranın büyük kısmını kaplar (~%90), kalan kısımda alttaki ekran görünür.
+
+Yukarıdan aşağıya:
+1. **Afiş** (`bannerUrl`/`bannerColor`), üzerine binen **avatar** (mevcut `me/ProfileHeader`)
+2. Afişin **sağ üstünde ⋯** (§3.3)
+3. **Kimlik kartı:** ad + altında **ikon şeridi** (§3.3). Discord'un "kullanıcı adı" ikinci satırı ve
+   "Yani/aka" satırı **YOK** (bizde `username` tek kimlik, ikinci satır tekrar olur)
+4. Kayan bölümler: **HAKKIMDA** (`bio`) → **üyelik tarihi** → **ROLLER** → **ORTAK ORTAMLAR** →
+   **ORTAK KANKALAR**. Boş olan bölüm **hiç çizilmez** (başlık bile yok)
+
+🔴 **Discord'da olup bizde OLMAYAN, koyma:** Bağlantılar (Steam/Kick) · Not · Uygulamalar ·
+Sunuculara Davet Et · Ses Ayarları (M4'te bile bu panele girmeyecek, o ses HUD'ının işi).
+
+🔴 **M4 uyumu:** ikon şeridi 2-4 öğeyi **yeniden tasarım gerektirmeden** alacak şekilde kurulur
+(esnek yatay dizilim, sabit sütun sayısı varsayma). M4'te Sesli Arama + Görüntülü Arama şeride
+girecek, `voiceStatus` satırı da aksiyonların altına eklenecek. **Şimdi ikisini de çizme.**
+
 ### 3.3 Aksiyonlar
 
 Mevcut `ProfileCardModal` aksiyonları **bire bir korunur**, kaybolan tek bir tane bile olmayacak:
@@ -202,10 +225,32 @@ Mevcut `ProfileCardModal` aksiyonları **bire bir korunur**, kaybolan tek bir ta
 - **Engelle** — onaylı
 - **Engeli Kaldır** — `selfBlocked` ise
 
+**Yerleşim (sahip kararı 2026-08-04 — Discord birebir):**
+
+| Aksiyon | Yer |
+|---|---|
+| **Mesaj** · **Kanka Ekle** | kimlik kartı içindeki **ikon şeridi** (ikon üstte, küçük etiket altta) |
+| **Kankalıktan Çıkar** · **Engelle** · **Engeli Kaldır** | afişin sağ üstündeki **⋯** → ikincil panel |
+
+Gerekçe: küçük ikonla engelleme/arkadaşlıktan çıkarma yanlış basmaya açık, Discord da yıkıcıları
+şeride koymuyor. **PM itirazı ve sahip kararı:** PM yıkıcıları panelin dibinde tehlike satırları
+olarak önerdi (menü ardına girmesin diye); sahip Discord birebir hizalamayı seçti. İtiraz kayda
+geçti, karar sahibin.
+
+🔴 **T&S kemeri (PM şartı):** ⋯ düğmesi, üç yıkıcı aksiyondan **herhangi biri mümkünse HER ZAMAN
+görünür**. Koşullu gizleme, sığdırma, kaydırma ardına saklama yok. Engelleme menüye girdiği için
+menünün kapısı hiç kaybolmamalı — M1d-0 tam olarak "engelleme ulaşılamaz oldu" diye açılmıştı.
+Hiçbiri mümkün değilse (kendi profilin) ⋯ hiç çizilmez.
+
+🔴 **Katman tuzağı:** ⋯ paneli, profil panelinin **üstünde** ikinci bir modal. Buna `ConfirmDialog`
+da eklenince üç katman olur. Projede bunun deseni var (`DmMenuHost`/`DmMoreHost`): ikinci modal
+açılmadan önce birincisi kapanır, yoksa arka arkaya iki karartılmış perde biner. **Aynı deseni
+kullan**, yeni bir katmanlama icat etme.
+
 🔴 **Engelleme kaybolmayacak.** Mobilde engel kaldırmanın tek yolu bir dönem bu kart olduğu için
 M1d-0 sprinti açılmıştı; aynı hataya düşülmeyecek.
 
-🔴 **Sesli/Görüntülü Arama düğmeleri YOK** → M4.
+🔴 **Sesli/Görüntülü Arama düğmeleri YOK** → M4 (şeritte **yer** bırakılır, düğme çizilmez).
 
 ### 3.4 T&S
 
