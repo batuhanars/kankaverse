@@ -2575,3 +2575,43 @@ yani semptom tedavi edilmişti. Header kalkınca başlık kendi yerine dönebili
 - [ ] Üç ekranda sistem geri tuşu (jest + üç tuşlu) çalışıyor mu
 - [ ] Diğer ekranların header'ı bozulmadı mı (Ortam Ayarları, sohbet ekranları)
 - [ ] **R7:** §5.2 `getUserCard` onayı → **onay gelene kadar kod commit'i YOK**
+
+### R3 — profil paneli Discord yerleşimine hizalandı — 2026-08-04
+
+> Sahip cihazda gördü: panel her şeyi **sığdırmaya** çalışıyor (ortak ortamlar listesi kesiliyor),
+> altta üç tam genişlikte düğme var, panel **kaymıyor**. Discord'unki kayıyor ve aksiyonlar üstte,
+> kimlik kartının içinde ikon + küçük etiket olarak duruyor.
+
+- [x] Panel `maxHeight: '90%'` + `ScrollView` `flexShrink: 1` → kısa profilde içerik kadar, uzunda
+      kaydırıyor. **Hiçbir listeye yükseklik sınırı / `slice` yok** (kesilen bölüm kalmadı)
+- [x] Alt güvenli alan `sheetBottomPadding` ile, **`ScrollView`in dışında** → son bölüm üç tuşlu
+      gezinmede tuşların arkasına girmiyor
+- [x] Yeni `ProfileActionStrip` (ikon üstte, etiket altta): Mesaj + Kanka Ekle. `flexDirection: row`
+      + her öğe `flex: 1` + `gap` → **sabit sütun sayısı yok**; M4'te Sesli/Görüntülü diziye iki
+      eleman eklenerek girer, bileşen değişmez. 360dp'de 4 öğe ≈ 76dp, dokunma hedefi 44dp üstünde
+- [x] Yeni `ProfileMoreSheet` (⋯): Kankalıktan Çıkar · Engelle · Engeli Kaldır. Alttaki üç tam
+      genişlikte kutu kalktı
+- [x] **Katman makinesi:** tek `layer` state (`profile|more|confirmBlock|confirmRemove`) → aynı anda
+      **yalnız bir modal** görünür, üst üste binen perde yok (`DmMenuHost` deseni). Vazgeç → profile
+      döner (⋯'ye değil); hata → profile döner + mesaj (`ConfirmDialog`ın hata yüzeyi yok, orada
+      bırakılsa kullanıcı sebebi hiç göremezdi)
+- [x] **T&S kemeri:** `canRemoveFriend`/`canBlock`/`canUnblock` **ayrı ayrı** hesaplanıp
+      `showMore` OR'landı (R7'de satır satır denetlenebilsin diye tek boolean'a sıkıştırılmadı);
+      ⋯ `ScrollView`in kardeşi → kaydırınca kaybolmuyor; kendi profilinde üçü de false → ⋯ yok
+- [x] **i18n'e yeni anahtar YOK** (mevcut `settings.bioLabel`/`userCard.moreActions`/`friends.*`)
+- [x] `typecheck` + `lint` temiz; header ekranlarına ve `api/`ye dokunulmadı
+
+**Dev'in bilinçli sapması (PM onayladı):** sözleşmenin iki maddesi çelişiyordu — §3.2.1 "⋯ afişin
+sağ üstünde" (afiş kayan içerikte) ve §3.3 "kaydırma ardına saklama yok". Dev ⋯'yi `ScrollView`
+dışına alıp T&S kemerini görsel birebirliğe tercih etti: durağan hâlde afişin sağ üstünde, kaydırınca
+içeriğin üstünde **sabit kalıyor** (Discord'da banner'la kayar). **Sahip cihazda karar verecek**,
+"kaysın" derse tek satır.
+
+🔴 **Dev'in yakaladığı canlı-öncesi bağımlılık:** kart **404** dönerse ⋯ hiç gelmiyor → o kullanıcıyı
+panelden engelleyemezsin. Sabah kapattığımız T&S deliği **ancak §5.2 canlıya çıkınca** tam kapanıyor.
+§5.2 R7 onayı beklediği için commit edilmedi → **ikisi birlikte çıkmalı.**
+
+⚠️ **Eşik uyarısı (dev):** `ProfileHeader` artık iki bayrak prop taşıyor (`surfaceColor`,
+`showDetails`). **Üçüncüsü gelirse** bu "prop genişletme" değil gizli fork olur ve bileşen bölünmeli.
+`ProfileSheet` 355 satır — bilinçli bölünmedi (T&S kemeri + katman makinesi + mutasyonlar R7'de
+birbirine bakarak okunmalı); şerit ve ⋯ menüsü zaten ayrı dosyalara çıkarıldı.
