@@ -745,8 +745,6 @@
     "channelTypeLabel": "KANAL TÜRÜ",
     "channelTypeText": "Metin",
     "channelTypeVoice": "Ses",
-    "channelTypeForum": "Forum",
-    "channelTypeSoon": "yakında",
     "privateLabel": "Özel Kanal",
     "privateDesc": "Özel kanalı herkes görür ama yalnızca seçili kişiler ve yöneticiler girebilir.",
     "privateSaveHint": "Kanalı özel yaptıktan sonra kaydet; üyeleri sonra bu ekrandan yönetebilirsin.",
