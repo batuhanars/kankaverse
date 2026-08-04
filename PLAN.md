@@ -257,9 +257,32 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     çok daha geniş**. Yeni bir karar değil, ölçeği değişen bir karar (bkz. [[csam-upload-strategi]]).
     </details>
 
-    **(5) En son: ses + ekran/kamera paylaşımı (M4).** En ağır parça (LiveKit, mikrofon/kamera
-    izinleri, arka planda ses) + gerçek cihaz + en yoğun T&S incelemesi (yaş kapılı yüzeyler).
-    Sahip Discord mobilden sesli/görüntülü ekran görüntülerini topladı, sözleşme onlarla yazılacak.
+    **(5) En son: M4 SES.** Sahip Discord mobil görsellerini topladı (2026-08-04); sözleşme
+    görseller + sahibin anlatımıyla yazılacak.
+    🟢 **PM taraması 2026-08-04 — M4 sanılandan KÜÇÜK:** ses **zaten var ve R7'den geçmiş**.
+    Uçlar canlı (`voice/token` · `voice/participants` · `voice/leave`), moderasyon canlı (R11:
+    `mute` · `move` · `stop-broadcast` · `disconnect` + AuditLog), LiveKit webhook'ları bağlı,
+    `livekit-server-sdk` (api) + `livekit-client` (web) kurulu, **beş kapılı medya izin modeli**
+    (minör/`mediaEnabled`/`ageGated`/`adultsOnly`) yazılı. **M4 = mevcut sisteme mobil istemci**,
+    yeni sistem değil. Yaş kapıları sunucuda, mobil yalnız sonucu gösterecek.
+    🔴 **Asıl iş platform tarafında:** foreground service (olmadan arka planda bağlantı düşer —
+    isteğe bağlı değil) · ses yönlendirme (telefon/hoparlör/bluetooth/kulaklık, gelen çağrı kesintisi) ·
+    yüzen mini pencere · WebRTC yeni native bağımlılık → **yeni dev build** (D38 bu derlemeye biniyor).
+    **Sahip faz bölmesi (2026-08-04):** (a) 1-1 + grup DM sesli · (b) ortam sesli kanalı + sesli
+    kanal ekleme · (c) görüntülü (DM + ortam kamera). **Ekran paylaşımı mobilde YOK** (sunucu
+    destekliyor, istemci kapsamı kararı; Android MediaProjection ayrı izin + ayrı FGS türü + Play
+    beyanı, telefonda değeri düşük).
+    ⚠️ **PM itirazı — ilk iki parça takas edilmeli:** DM aramasında **tam çalma akışı** var
+    (`voice:call_invite` WS eventi, `call.ts` giden/gelen/zaman-aşımı, `IncomingCallModal`) ve
+    mobilde asıl zorluk **uygulama kapalıyken gelen arama** (yüksek öncelikli push, ekran uyandırma,
+    tam ekran arama bildirimi). Ortam sesli kanalında bunların hiçbiri yok — dokun ve gir. Yani
+    sahibin (a) parçası ağır platform işinin TAMAMI + çalma; ortam kanalı ise çalma olmadan aynı
+    platform işini kanıtlar. **Karşı argüman (sahip lehine):** ~12 kullanıcıyla ortam sesli kanalı
+    dolu sunucu ister, 1-1 arama tek kişiyle işe yarar → ürün değeri sahibin sırasını destekliyor.
+    Gerçek ödünleşme, **karar sahipte** (yarın konuşulacak).
+    ℹ️ **Küçük bulgu:** mobil kanal oluşturmada tür seçici bilinçli yok (`channel-new.tsx` yorumu) —
+    mobil ses kanallarını hiç listelemiyor (M1a `GUILD_TEXT` süzgeci). "Sesli kanal ekleme" aslında
+    **süzgeci kaldır + seçiciyi geri koy**; zaten öngörülmüş, küçük iş.
     **M2d mobil bahsetme yazma (sahip kararı 2026-08-03, R15'ten ÖNCE):** mobilde bahsetme
     **üretilemiyor** — `MessageComposer.tsx`'te tek satır bahsetme kodu yok (ne `@` yakalayıcı, ne
     öneri listesi, ne token'a çevirme). **Alma tarafı çalışıyor** (`utils/mentions.ts` gelen
