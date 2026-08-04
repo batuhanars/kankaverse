@@ -2535,3 +2535,43 @@ ortamında denenmeli (orada düz üye).
 
 ### R7 — sahip onayı BEKLİYOR
 - [ ] §5.2 `getUserCard` erişim genişletmesi satır satır inceleme. **Onay gelene kadar commit YOK.**
+
+### R2 — sahip cihaz turu (görsel) + header düzeltmesi — 2026-08-04
+
+**Sahip onayladı:** profil paneli ✅ · 1-1 DM detay ✅ · grup DM detay ✅ (görsel).
+
+**Header sorunu — sahibin teşhisi PM'inkinden iyiydi.** PM "aynı sorun her ekranda, global düzeltelim"
+demişti. Sahip ekran ekran bakıp gösterdi ki sorun şeridin **rengi değil boş olması**: Ortam
+Ayarları'nda içi dolu (ok + başlık) → kasıtlı duruyor; DM sohbet ekranında altındaki mesaj
+listesinden ayrışması **işe yarıyor**. Yalnız içi boşken kötü duruyor. → global `screenOptions`'a
+dokunulmadı, diğer ~40 ekran olduğu gibi kaldı.
+
+Sahibin ikinci tespiti: kanal başlığı M2c'de **bu boş şeridi doldurmak için** header'a alınmıştı,
+yani semptom tedavi edilmişti. Header kalkınca başlık kendi yerine dönebilir (Discord mantığı).
+
+- [x] `dm-details` + `channel-details` → `headerShown: false` (geri oku dahil; Android'de sistem
+      geri tuşu jest ve üç tuşlu gezinmede evrensel, Discord da buna güveniyor)
+- [x] ⋯ sabit üst bloğun sağ üstüne taşındı — blok kayan sekme gövdesinin **kardeşi** olduğu için
+      içerik kayarken çakışmıyor; başlığa ⋯ genişliğinde iki yana dolgu (uzun ad altına girmiyor)
+- [x] Üst güvenli alan **gerçek inset** (`useSafeAreaInsets`), sabit dolgu yazılmadı ([[cihaz-farkliliklari-hesaba-kat]])
+- [x] Kanal başlığı (`#ad`) header'dan içeriğe döndü; iki detay ekranı aynı başlık ölçüsünü kullanıyor
+- [x] Ekran okuyucu: iki başlık da `accessibilityRole="header"` (native başlık gidince ekran isimsiz
+      kalmasın); ⋯ etiketli; grup DM'de dokunulamaz kimlik bloğuna rol/etiket **verilmiyor**
+- [x] Grup DM detayında avatar kaldırıldı (başlık-only, kanal gibi); **1-1'de avatar KALDI** —
+      R1'in T&S deliğini kapatan dokunma hedefi o
+- [x] `typecheck` + `lint` temiz
+
+**Dev'in işaretlediği, sahibin cihazda bakması gerekenler:**
+- Sohbet ekranı → detay ekranı geçişinde şerit "atlıyor" (birinde header var, diğerinde yok);
+  native-stack'te görünür sıçrama yapabilir. Kabul edilemezse çözüm `animation: 'fade'`,
+  **önce görülmeli** — dev şimdiden değiştirmedi
+- Grup DM'de ekranın adı yalnız üye adlarından üretilen başlıktan okunuyor (native başlık gidince
+  geri yığınındaki bağlam kayboldu); 1-1 ve kanalda yeterli, grupta daha zayıf
+
+### M3b — sahipte kalan
+- [ ] 🔴 **Engelleme senaryosu (tek doğrulanmamış T&S maddesi):** karşı tarafın hiç yazmadığı bir
+      1-1 DM'de avatara dokun → profil → Engelle; **sohbeti temizledikten sonra** da aynı yol
+- [ ] Durum çubuğu çakışması (çentikli cihaz), ⋯ konumu, uzun grup adı kesiliyor mu
+- [ ] Üç ekranda sistem geri tuşu (jest + üç tuşlu) çalışıyor mu
+- [ ] Diğer ekranların header'ı bozulmadı mı (Ortam Ayarları, sohbet ekranları)
+- [ ] **R7:** §5.2 `getUserCard` onayı → **onay gelene kadar kod commit'i YOK**
