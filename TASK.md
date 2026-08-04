@@ -2796,3 +2796,38 @@ Kod dosyalarının hiçbiri etkilenmedi. Anahtarlar metinleri yazan oturumdan ge
 
 **Sahibin bakacağı en riskli nokta:** ek seçip **hiç yazmadan** gönderme — panel kapandıktan sonra
 kutuda yazı yokken gönder ikonu **görünür** olmalı (regresyon riski en yüksek yer).
+
+### R2 + R3 — eke dokunma + klavye regresyonu — 2026-08-04
+
+**🔴 Klavye regresyonu (PM çözdü, sprint kapsamı dışı ama bloke ediciydi).** Yeni dev build alınınca
+**bütün sohbet ekranlarında** mesaj kutusu klavyenin arkasında kaldı. Kod değişmemişti; native kabuk
+değişince davranış terse döndü (eski build'de pencere klavye açılınca kendini küçültüyordu, yenisinde
+küçültmüyor). `KeyboardAvoidingView` kaldırıldı — kendi hesabı ekran-koordinatı ile pencere-koordinatını
+karıştırıyor, Android edge-to-edge ile güvenilir değil.
+- [x] Sahip cihazında **ÖLÇÜLDÜ** ve sayılar dosyaya yazıldı: screen 872.7 · window 822.9 ·
+      insets.top 33.8 · insets.bottom 16 · klavye 287 · klavye tepesi 570.
+      `window = screen − insets.top − insets.bottom` doğrulandı; örtüşme = 822.9 − (570 − 33.8) =
+      286.7 ≈ klavye yüksekliği → gereken pay **klavyenin kendi yüksekliği**, sihirli sayı değil özdeşlik
+- [x] Blok artık **dört denemenin** kaydını taşıyor. Ortak kök: **cihazın davranışını varsaymak**.
+      Dördüncüde ölçüldü ve tek turda oturdu. Sonda için ekrana geçici ölçüm şeridi kondu, sonra silindi
+
+**Eke dokunma (sahip onaylı ek kapsam):**
+- [x] Görsele dokun → tam ekran · dosyaya dokun → sistemde açılır (`Linking`, yeni bağımlılık yok)
+- [x] 🔴 **Viewer adresi açılırken tazeleniyor.** Presigned URL 300 sn ömürlü; PM'in "tekrar istek atma"
+      talimatı viewer'a da uygulanınca 5 dakikadan eski fotoğrafta tam ekran **sessizce siyah** kalıyordu.
+      Dev bunu bulup önerdi. **Yan kazanç:** tarama kapısı büyütme anında **ikinci kez** doğrulanıyor
+- [x] T&S kapısı **yapısal**: PENDING/FLAGGED ek `Pressable`'a hiç dönüşmüyor (erken dönüşler önce);
+      `interactive` varsayılanı false → Medya/Dosyalar sekmelerindeki "mesaja git" bozulmadı
+- [x] Taslak şeridi başarılı gönderimde artık parlamıyor; koruma daralmadan tek yere toplandı
+- [x] Gönderim sürerken çip silme devre dışı → yarış kaynağında öldü (PM, dev'in merge önerisi yerine:
+      kurtarma yolunun sade kalması hata anında çalışması gereken tek şey olduğu için önemli)
+- [x] **Erişilebilirlik:** çipin ×'i 38dp, yanıt/düzenleme iptali 40dp bulundu — ikisi de 44 kuralının
+      altındaydı ve **ikisi de PM incelemesinden geçmişti**. Düzeltildi → **D37**
+- [x] `uploadLabel` görünür bırakıldı (dev'in bilinçli sapması, PM onayladı): parlamanın kaynağı
+      `setAttachments`'tı, etiket değil; kaldırılsaydı 8 MB'lık fotoğrafta 3-10 sn sessiz ekran kalırdı
+
+**Yeni borçlar:** D36 (presigned adres tarayıcı geçmişine düşüyor) · D37 (dokunma hedefi ölçülmüyor,
+göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı beklentisi doğar)
+
+> **M3c KAPANDI.** Üç revizyon turu + bir bloke edici regresyon. Sahip cihazda doğruladı:
+> ek gönderme · galeri ızgarası · emoji · kutu cilası · klavye.
