@@ -2449,3 +2449,89 @@ aynalıyor (`MANAGE_EVENTS`; yaratıcıya özel ayrıcalık **yok**). Sebep hesa
 test hesabı `Test hoo` ortamında `Test` rolüne sahip ve o rolde **ADMINISTRATOR** bayrağı var →
 tam yetki → menüyü görmesi **doğru**. Yetkisiz davranışı görmek için `Hoop` ya da `test 2`
 ortamında denenmeli (orada düz üye).
+
+---
+
+## Sprint M3b — DM Detay Ekranı + Profil Alt-Paneli — 2026-08-04
+
+> Sözleşme: `contracts/SPRINT_M3B_MOBILE_PROFILE_REVISIONS_CONTRACT.md` = **tek doğruluk kaynağı**.
+> Sahip görselleri sabah gönderdi, sözleşme revize edildi, **kod iki dev oturumuna delege edildi**
+> (api + mobile paralel). PM sözleşme + inceleme, kod dev'de ([[pm-dev-cift-yonlu-denetim]]).
+
+### Backend (`api/`) — sözleşme §5
+- [x] §5.1 `has=` süzgeci kanal kapsamlı arama ucuna eklendi; `link|image|file` değerleri ortam
+      ucuyla aynı, `has` doluyken `q` opsiyonel, `has` yokken bugünkü davranış birebir
+- [x] §5.1 süzgeç mantığı **ortak private helper'a çıkarıldı** (`buildSearchContentFilter`),
+      kopyalanmadı — kopya olsaydı aynı ek DM'de "dosya" ortamda "medya" sayılabilirdi
+- [x] §5.1 G4 `clearedAt` filtresi korundu, cursor `lt` ile tek `createdAt` objesinde (B1/D5 dersi)
+- [x] §5.1 `take: 30` → `50` (ortam ucuyla eşitleme; iki istemcide de sayfalama ve `length===30`
+      sezgiseli olmadığı PM tarafından doğrulandı → D5 sınıfı sessiz kırılma yok)
+- [x] §5.2 `getUserCard` erişimine **1-1 DM üyeliği** eklendi + fail-closed kısıt (yalnız-DM
+      erişiminde `mutualFriends`/`mutualGuilds` boş) — **R7, sahip onayı bekliyor**
+- [x] §5.2 **PENDING istek erişim saymıyor** (PM revizyonu, aşağı bkz.) + GROUP_DM kapısına
+      `deletedAt: null` (silinmiş grubun üyeleri süresiz kart açıyordu)
+- [x] `nest build` temiz · **1000 test yeşil** (10 yeni) · `migrate status` temiz, şema değişmedi
+
+### Mobil (`mobile/`) — sözleşme §1-§4
+- [x] §1 kankalar listesi aksiyonları ikon-only (44×44, `accessibilityLabel` zorunlu)
+- [x] §4 DM panelinde "Kanka Ekle" kapısı web'le eşitlendi (`!selfBlocked && !isFriend && !requestSent`);
+      web'in yerel bayrağı yerine store'daki giden istek kaydı kullanıldı (mobilde ekran değişiyor)
+- [x] §3 `ProfileCardModal` → `ProfileSheet` alt-paneli; afiş + Hakkımda + üyelik tarihi + roller +
+      ortak ortam/kanka. Aksiyonlar korundu, mutasyonlar `useFriendsStore` üzerinden (M1d-0 dersi).
+      `me/ProfileHeader` yeniden kullanıldı (fork edilseydi iki cihaz kusuru düzeltmesi geri gelirdi)
+- [x] §3.1 **mesaj yazarına dokunma → profil** (zorunlu madde; ortamda profile ulaşmanın tek yolu)
+- [x] §2 `dm-details.tsx` yeni ekran; sekmeler M2c bileşenlerinden, `ChannelMembersTab` **yeniden
+      kullanılmadı** (rol bölümlemesi grup DM'de karşılıksız) → `GroupMembersTab`
+- [x] §2.3.1 `group/[id].tsx` **silindi**, üye listesi sekmeye katlandı; 👑 rozeti, ✕ üye çıkarma
+      (yalnız sahip + onay), kendi satırın dokunulmaz — hepsi taşındı. Ölü rota kalmadı (tek gerçek
+      yönlendirme `dm/[id].tsx:136` idi, kalanlar yorum)
+- [x] §5.1 istemci ayağı: `useChannelSearchTab` kanal ucuna geçti, `guildId` prop'u üç sekmeden düştü,
+      `flatMap` katmanı kalktı; `NOT_CHANNEL_MEMBER` → boş liste (tek yerde), **`AGE_RESTRICTED` hata
+      olarak KALDI** (yaş kapısı sessizce gizlenmez — dev'in doğru ayrımı)
+- [x] i18n'e tek yeni anahtar (`mobile.dmDetails.menuRow`); kalanı mevcut anahtarlarla karşılandı
+- [x] `typecheck` + `lint` temiz; `api/` diffi yok
+
+### R1 — PM incelemesi: sözleşmenin ÜÇ hatası dev'ler tarafından yakalandı
+- [x] 🔴 **PENDING isteği profil keşif yoluna dönüşüyordu** (backend dev). Sözleşme gerekçeyi
+      "isteği **kabul etmiş**" üzerinden kurup kuralı "açık DM kanalı var" diye yazmıştı; kanal
+      istek **gönderildiği anda** oluşuyor (`dm.service:212`) → yabancı tek taraflı istek atarak
+      karşı tarafın kartını açabilirdi. Düzeltme: başlatan taraf kabul edilene kadar erişim
+      kazanmaz, alıcı kazanır. PM doğrulaması: `PENDING` satırda `dmRequesterId` her zaman dolu
+      (tek nesnede birlikte yazılıyor, başka yerde set edilmiyor); üç kollu `OR` nullable alanda
+      `NOT` üç-değerli mantık tuzağından kaçınıyor
+- [x] 🔴 **1-1 DM'de engellemeye ulaşılamıyordu** (mobil dev). §3.1 profilin tek yolunu "mesaj
+      yazarı" yaptı; karşı taraf hiç yazmadıysa **veya sohbet temizlendiyse** (G4) yazar satırı yok,
+      kanka değilse listede yok, `DmMenuSheet`'te engelleme yok → §3.3'e "engelleme kaybolmayacak"
+      yazıp §2.1 ile delmişim, M1d-0 sınıfı. Düzeltme: 1-1 detay başlığındaki avatar/ad → profil paneli
+- [x] 🔴 **Sahibin 2026-08-01 kararı çiğnenmişti** (mobil dev). "1-1 DM'de mesaj arama KALDIRILDI,
+      web + mobil" (bu dosya satır 1428) — sözleşme Ara'yı ayrım yapmadan başlığa koymuştu.
+      Düzeltme: Ara yalnız grup DM'de; sohbet ekranındaki `searchable={!isDm}` dokunulmadı
+- [x] ⚠️ Kayıt düzeltmesi: §3.3'teki "Mesaj" **korunan aksiyon değil YENİ aksiyon** — eski kartta
+      hiç yoktu, `canMessage` mobilde tiplenmemişti bile. Kalıyor, ama etiket yanlıştı
+
+### Ertelenenler (PM kararı, sprint ortasında sessizce daraltılmadı)
+- D33 `getUserCard` fail-closed kısıtı GROUP_DM'i kapsamıyor (grup üyeleri birbirine yabancı olabilir)
+- D34 grup silme/ayrılma sonrası geri tuşu ölü sohbete düşüyor (yeni değil, eski ekranda da vardı)
+
+### DoD (cihazda — SAHİPTE, henüz yapılmadı)
+- [ ] Kankalar listesinde aksiyonlar ikon-only, dokunma hedefi rahat
+- [ ] DM başlığına dokununca detay ekranı açılıyor (profil kartı değil)
+- [ ] Grup DM başlığına dokununca **üye listesine ATMIYOR**, sekmeli ekran açılıyor
+- [ ] DM detayında Medya / Sabitlemeler / Bağlantılar / Dosyalar **gerçekten doluyor**
+- [ ] 🔴 **Karşı tarafın hiç yazmadığı bir 1-1 DM'de engelleyebiliyorsun** (başlıktaki avatara dokun
+      → profil → Engelle); **sohbeti temizledikten sonra da** aynı yol çalışıyor. T&S kilidi
+- [ ] 1-1 DM detayında Ara YOK (yalnız Sustur, ortalanmış), grup DM detayında Ara + Sustur var
+- [ ] Grup DM Üyeler sekmesinde 👑 · **sahip üye çıkarabiliyor (✕ + onay)** · kendi satırın dokunulmaz
+- [ ] Grup DM ⋯ menüsünde Üye Ekle · Yeniden Adlandır · Gruptan Ayrıl · Grubu Sil; onaylar duruyor
+- [ ] 1-1 DM ⋯ menüsünde Sohbeti Temizle çalışıyor
+- [ ] Mesaj yazarına dokununca profil alt-paneli açılıyor (kanal ve DM)
+- [ ] Panelde afiş, Hakkımda, üyelik tarihi, ortak ortam/kanka geliyor; boş olanlar çizilmiyor
+- [ ] Zaten kanka olduğun kişinin DM panelinde "Kanka Ekle" yok
+- [ ] Ortam üye listesi hâlâ yönetim ekranına gidiyor (değişmedi)
+- [ ] Sesli/Görüntülü Arama düğmesi hiçbir yerde yok (M4)
+- [ ] Özel kanalın (üye değilken) detayında sekmeler **boş**, kırmızı hata değil
+- [ ] Alt panel üstünde `ConfirmDialog` çift perde kararması yapmıyor
+- [ ] Üç tuşlu gezinmede panel son satırı tuşların arkasında kalmıyor
+
+### R7 — sahip onayı BEKLİYOR
+- [ ] §5.2 `getUserCard` erişim genişletmesi satır satır inceleme. **Onay gelene kadar commit YOK.**
