@@ -35,6 +35,32 @@ interface DmState {
 
   fetchAll: () => Promise<void>;
   refreshRequests: () => Promise<void>;
+  /**
+   * Sprint M3b R6 — mesaj isteğini reddet; `block: true` ise sunucu aynı işlemde **engeller**.
+   *
+   * 🔴 Neden store'a girdi (M1d-0 dersi): `dm-requests.tsx` bugüne kadar `dmApi.rejectRequest`i
+   * DOĞRUDAN çağırıp yalnız KENDİ yerel listesini süzüyordu. Sonuç: bu store'daki `requestCount`
+   * (DmSidebar'daki "Mesaj İstekleri (n)" rozeti) bayat kalıyordu. Engelleme eklenince aynı boşluk
+   * daha da büyürdü — engel, DM'in `canMessage`/`selfBlocked` bayraklarını da değiştiriyor ve o
+   * bayraklar da bu store'da. Mutasyonun yan etkisinin sahibi tek olmalı: artık burası.
+   *
+   * `fetchAll()` ikisini birden tazeliyor (kanal listesi + istek sayısı), ayrı çağrı gerekmiyor.
+   * 🔴 `useFriendsStore` BURADAN çağrılmaz — friends.ts zaten dm.ts'i import ediyor, ters yön
+   * döngü kurardı. Engellenenler listesi kendi ekranının mount'unda çekiliyor, bayat kalmıyor.
+   */
+  rejectRequest: (channelId: string, block: boolean) => Promise<void>;
+  /**
+   * Sprint M3b R6 — mesaj isteğini kabul et. `rejectRequest` ile **aynı kalıp**, aynı gerekçe:
+   * ekran bunu da `dmApi` üzerinden doğrudan çağırıyordu, store hiç haberdar olmuyordu → (a)
+   * `requestCount` rozeti bayat kalıyordu, (b) kabul edilen kanal `PENDING`ten `ACCEPTED`e geçtiği
+   * hâlde bir sonraki `fetchAll`a kadar DM listesine girmiyordu (`visibleChannels` PENDING olanları
+   * süzüyor). Reddetme store'dan, kabul etme API'den geçseydi aynı dosyada iki desen kalırdı.
+   *
+   * 🔴 **Dönüş değeri korunuyor:** `dmApi.acceptRequest` kabul edilen kanalı döndürüyor ve çağıran
+   * ekran onunla sohbete yönleniyor. Store araya girerken `void`e düşürülseydi o akış sessizce
+   * kırılırdı (web'in dm store'u da bu yüzden kanalı döndürüyor).
+   */
+  acceptRequest: (channelId: string) => Promise<DmChannelDto>;
   applyActivity: (payload: DmActivity) => Promise<void>;
   setActiveDm: (channelId: string | null) => void;
   clearUnread: (channelId: string) => void;
@@ -91,6 +117,22 @@ export const useDmStore = create<DmState>((set, get) => ({
     } catch {
       // sessizce yut — rozet güncellenmeden kalır, liste yine çalışır
     }
+  },
+
+  async rejectRequest(channelId, block) {
+    await dmApi.rejectRequest(channelId, block);
+    // Hata YUTULMAZ (yukarıdaki `refreshRequests`in aksine): çağıran ekran kullanıcıya Türkçe
+    // mesajı göstermek zorunda, sessiz başarısızlık "reddettim sandım" durumu üretirdi.
+    await get().fetchAll();
+  },
+
+  async acceptRequest(channelId) {
+    // Kanal SUNUCU yanıtından alınır, `fetchAll` sonrası listeden aranmaz: yanıt otoriter kaynak ve
+    // liste bir sebeple onu taşımasa bile yönlendirme kırılmamalı.
+    const channel = await dmApi.acceptRequest(channelId);
+    // Hata yutulmaz (aynı gerekçe: sessiz başarısızlık "kabul ettim sandım" üretir).
+    await get().fetchAll();
+    return channel;
   },
 
   async applyActivity(payload) {
