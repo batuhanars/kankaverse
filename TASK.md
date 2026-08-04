@@ -2635,6 +2635,30 @@ birbirine bakarak okunmalı); şerit ve ⋯ menüsü zaten ayrı dosyalara çık
 
 ---
 
+### R5 — ⋯ ayrı panel değil menü — 2026-08-04
+
+> Sahip: "3 nokta butonuna basınca kırmızı butonlar **ayrı panel** olarak açılıyor, menü olarak
+> açılsa daha iyi olur." R3'te ayrı `Modal` olduğu için profil paneli kaybolup yerine yeni bir alt
+> panel geliyordu.
+
+- [x] `ProfileMoreSheet` **silindi** → `ProfileMoreMenu` (ad artık yalan söylemiyor: alt panel değil).
+      İçindeki `Modal` tamamen kalktı — import bile edilmiyor, yalnız yorumda anılıyor
+- [x] Menü profil panelinin **içinde**, ⋯'nin tam altına ankrajlı (`top: MORE_INSET + MORE_HIT`,
+      `right: MORE_INSET`); panel arkada **görünür kalıyor**
+- [x] 🔴 **Ölçüler tek yerde:** `MORE_HIT`/`MORE_INSET` menü dosyasından export, `ProfileSheet`
+      import ediyor — ayrı yazılsaydı ilk değişiklikte menü düğmenin altında değil ortasında açardı
+- [x] 🔴 **Android geri tuşu** tek yerde dallandı (`dismissTopLayer`): menü açıkken geri **yalnız
+      menüyü** kapatıyor, bir daha geri paneli kapatıyor. Aynı fonksiyon karartı dokunuşuna da
+      bağlandı — yoksa "dışarı dokunuş menüyü kapatır" kuralı yakalayıcıda geçerli, karartıda
+      geçersiz olurdu
+- [x] Onay akışı korundu: Engelle → **önce menü kapanır** → onay; Vazgeç → profile döner (menüye
+      değil); hata → profile döner + mesaj. Üç katman üst üste binmiyor
+- [x] R3'teki "profil panelini gizle ki iki perde binmesin" numarasına **gerek kalmadı** —
+      `Modal.visible` artık yalnız onay diyaloğunda kapanıyor
+- [x] T&S kemeri ve R4 görünümü aynen korundu; `typecheck` + `lint` temiz
+
+---
+
 > **M3b KOD TARAFI KAPANDI.** api 1008 test yeşil + build/migrate temiz · mobile typecheck + lint
-> temiz. Dört revizyon turu: R1 (sözleşmenin üç hatası) · R2 (header) · R3 (Discord yerleşimi) ·
-> R4 (⋯ cilası). **Commit atılmadı — §5.2 R7 onayı bekliyor.**
+> temiz. Beş revizyon turu: R1 (sözleşmenin üç hatası) · R2 (header) · R3 (Discord yerleşimi) ·
+> R4 (⋯ cilası) · R5 (menü). **Commit atılmadı — §5.2 R7 onayı bekliyor.**
