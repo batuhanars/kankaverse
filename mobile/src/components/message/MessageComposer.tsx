@@ -7,6 +7,13 @@ import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 /**
+ * Kutunun içindeki emoji ikonunun yuvası. **Tek sayı, iki yerde**: `TextInput`in sağ dolgusu ve
+ * düğmenin genişliği. Ayrışırlarsa ya metin ikonun altına girer ya da dokunma hedefi küçülür —
+ * 44dp seçilmesi tesadüf değil, dokunma hedefi alt sınırı (`layout.inputMinHeight`) ile aynı.
+ */
+const EMOJI_SLOT = theme.layout.inputMinHeight;
+
+/**
  * Mesaj giriş şeridi — "yazıyor" etiketi + giriş kutusu + Gönder, ya da engelli/izinsiz durumda
  * sebep şeridi.
  *
@@ -186,35 +193,54 @@ export function MessageComposer({
                 <Ionicons name="add" size={24} color={theme.colors.textSecondary} />
               </Pressable>
             )}
-            <TextInput
-              value={value}
-              onChangeText={onChangeText}
-              placeholder={placeholder}
-              placeholderTextColor={theme.colors.textMuted}
-              style={styles.input}
-              multiline
-              selection={selection ?? undefined}
-              onSelectionChange={(e) =>
-                onSelectionChange?.(e.nativeEvent.selection.start, e.nativeEvent.selection.end)
-              }
-            />
-            {onOpenEmoji && (
+            {/* Emoji ikonu kutunun İÇİNDE, sağa yaslı (M3c R1 — Discord yerleşimi). Sarmalayıcı
+                gerekli: mutlak konumlanan düğme `TextInput`in kendi kutusuna göre değil, onunla
+                aynı sınırlara sahip bir kapsayıcıya göre yerleşsin. */}
+            <View style={styles.inputWrap}>
+              <TextInput
+                value={value}
+                onChangeText={onChangeText}
+                placeholder={placeholder}
+                placeholderTextColor={theme.colors.textMuted}
+                style={styles.input}
+                multiline
+                selection={selection ?? undefined}
+                onSelectionChange={(e) =>
+                  onSelectionChange?.(e.nativeEvent.selection.start, e.nativeEvent.selection.end)
+                }
+              />
+              {onOpenEmoji && (
+                <Pressable
+                  onPress={onOpenEmoji}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mobile.emoji.open')}
+                  style={styles.emojiButton}
+                >
+                  <Ionicons name="happy-outline" size={22} color={theme.colors.textMuted} />
+                </Pressable>
+              )}
+            </View>
+
+            {/* 🔴 Gönder YALNIZ `canSend` iken çizilir (devre dışı hâli gösterilmez) — kutu o alanı
+                geri alıyor. Koşul metne değil `canSend`e bağlı: ek seçip hiç yazmayan kullanıcı da
+                gönderebilmeli (sunucunun `EMPTY_MESSAGE` kuralıyla aynı). Metin kalktığı için
+                ekran okuyucunun tek kaynağı `accessibilityLabel`.
+
+                `|| sending` gönderim SÜRERKEN yuvayı tutar. `canSend` gönderim boyunca false olduğu
+                için düğme aksi hâlde kaybolur, kutu genişler, metin yeniden sarılır ve gönderim
+                bitince hepsi geri sıçrardı — kullanıcının basmasıyla sonucu arasında iki kez
+                oynayan bir yerleşim. `canSend` mantığına dokunulmadı, yalnız yuva korunuyor. */}
+            {(canSend || sending) && (
               <Pressable
-                onPress={onOpenEmoji}
+                onPress={() => onSend()}
+                disabled={!canSend}
                 accessibilityRole="button"
-                accessibilityLabel={t('mobile.emoji.open')}
-                style={styles.iconButton}
+                accessibilityLabel={t('message.send')}
+                style={[styles.iconButton, !canSend && styles.iconButtonBusy]}
               >
-                <Ionicons name="happy-outline" size={22} color={theme.colors.textMuted} />
+                <Ionicons name="send" size={20} color={theme.colors.accent500} />
               </Pressable>
             )}
-            <Pressable
-              onPress={() => onSend()}
-              disabled={!canSend}
-              style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-            >
-              <Text style={styles.sendButtonText}>{t('message.send')}</Text>
-            </Pressable>
           </View>
         </View>
       )}
@@ -309,8 +335,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  input: {
+  /** Gönderim sürerken: yuva duruyor ama düğme basılamaz olduğu belli oluyor. */
+  iconButtonBusy: {
+    opacity: 0.4,
+  },
+  inputWrap: {
     flex: 1,
+    minWidth: 0,
+  },
+  input: {
     minHeight: theme.layout.inputMinHeight,
     maxHeight: 120,
     borderRadius: theme.radius.md,
@@ -318,25 +351,23 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.borderStrong,
     backgroundColor: theme.colors.bgSidebar,
     color: theme.colors.textPrimary,
-    paddingHorizontal: 14,
+    paddingLeft: 14,
+    // 🔴 Metin emoji ikonunun ALTINA girmesin: ikon yuvası kadar sağ dolgu. (`DmDetailsHeader`'daki
+    // `⋯` ile aynı sınıf hata — mutlak konumlu ikon metnin akışını kendiliğinden itmez.)
+    paddingRight: EMOJI_SLOT,
     paddingVertical: 10,
     fontSize: theme.fontSize.base,
   },
-  sendButton: {
-    minHeight: theme.layout.inputMinHeight,
-    paddingHorizontal: 16,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accent500,
+  // Dokunma hedefi 44dp; kutu çok satıra büyüyünce ikon SON satırın hizasında kalır (alta yaslı),
+  // ortada asılı kalmaz.
+  emojiButton: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: EMOJI_SLOT,
+    height: theme.layout.inputMinHeight,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
-  sendButtonText: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.sm,
-    fontWeight: '600',
   },
   disabledBar: {
     borderTopWidth: 1,
