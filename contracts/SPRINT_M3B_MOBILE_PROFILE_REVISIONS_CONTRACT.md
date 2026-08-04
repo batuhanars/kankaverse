@@ -288,10 +288,29 @@ ulaşmanın tek yolu mesaj yazarı olunca bu delik her DM'de görünür hale gel
 
 - Rastgele ID ile profil tarama yüzeyi **kapalı kalır**: DM kanalı kurmak zaten `canDm` kapısından
   geçiyor, yeni bir keşif yolu açılmıyor.
-- 🔴 **PM kısıtı (fail-closed):** erişim **yalnız DM üyeliğinden** geliyorsa (arkadaşlık yok,
-  ortak ortam yok) → `mutualFriends` ve `mutualGuilds` **boş dizi** döner. Gerekçe: engelleyebilmek
-  için kimliği görmek yeterli, yabancıya sosyal graf açmak yeni bir ifşa olur. Arkadaşlık veya ortak
-  ortam varsa bugünkü davranış aynen sürer.
+- 🔴 **Graf görünürlüğü ayrı karara bağlanır (sahip kararı 2026-08-04, `canSeeMutuals`).**
+  Sözleşmenin ilk hâli yalnız "yalnız-DM erişiminde boş" diyordu; sahip "engellenmiş birinin ortak
+  kankasını göremesin" deyince PM kuralı **pozitif bir ilkeye** çevirdi:
+
+  > **Kendi tek taraflı hareketinle sosyal graf görünürlüğü kazanamazsın.**
+
+  `mutualFriends` / `mutualGuilds` **yalnız** şu üç durumda dolu döner:
+  1. **Kabul edilmiş** arkadaşlık (`ACCEPTED`)
+  2. Ortak ortam üyeliği
+  3. **Sana gelmiş, henüz cevaplamadığın** istek (`PENDING` + `addresseeId === callerId`) — kabul
+     kararını verirken ortak kankaya bakmak gerçek bir ihtiyaç, ve kazancı sen sağlamıyorsun
+
+  Boş dönen her şey: **engel (İKİ yönde de)** · tek başına 1-1 DM · **tek başına GROUP_DM**
+  (**D33 borcu bununla kapandı** — grup üyeleri birbirine yabancı olabilir) · **senin gönderdiğin**
+  bekleyen istek (bu sabahki PENDING DM deliğinin aynısı: biri kodunla istek atıp graf göremez) ·
+  `DECLINED`.
+
+  ⚠️ **`DECLINED` sözleşmede yoktu** (backend dev bulgusu): `FriendshipStatus` üç değerli ve
+  arkadaşlık sorgusunda **statü süzgeci yok** → DECLINED satır da dönüyor. Kural "friendship var mı"
+  değil **statüye** baktığı için kapalı; ayrıca testi var.
+
+  🔴 Bu yalnız **ne gösterildiği** kararıdır, **kimin görebildiği** (`hasRelation` → 404) değil.
+  Engel hâlâ kartı açar (engeli kaldırabilmek için gerekli), sadece graf boş gelir.
 - `selfBlocked` semantiği **değişmez** ("o beni engelledi" asla dönmez).
 - Birim testi: (a) yalnız-DM erişimi kart döner, (b) o kartta iki mutual listesi de boş,
   (c) ilişkisiz üçüncü kişi hâlâ 404, (d) mevcut ortak-ortam/arkadaş yolları bozulmadı.
