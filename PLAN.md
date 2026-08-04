@@ -238,15 +238,26 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     mobil kopyası aynı hatayı tekrar etmemeli, çip/görsel geri bildirim R15'te gelecekse bile
     mobilde en azından seçilmemiş bahsetmenin sessizce düşmediği görülmeli.
 
-    **M3b mobil profil ekranı + küçük revizeler** — 🟡 **SÖZLEŞME YAZILDI 2026-08-03 gecesi:**
-    `contracts/SPRINT_M3B_MOBILE_PROFILE_REVISIONS_CONTRACT.md`. Sahip sırasını verdi (M4'ten
-    hemen önce). İçerik: kankalar listesi ikon-only aksiyonlar · grup DM panelinde "Profil" yerine
-    "Ayarlar" + grup aksiyonlarının oraya taşınması · zaten kanka olanda "Kanka Ekle" gösterme
-    kusuru · **profil kartının sekmeli ekrana dönüşmesi**. 🔴 Profil ekranının tasarımı **sahibin
-    göndereceği Discord mobil görsellerini bekliyor**, §4 kilitli değil. Bağlayıcı iki karar
-    şimdiden var: ortam üye listesi **yönetim ekranında kalır** (Discord ile hizalı) ve bu yüzden
-    **mesaj yazarına dokunma profile gitmek ZORUNDA** — yoksa ortamda profile ulaşmanın hiçbir yolu
-    kalmaz. Eski backlog notu ↓
+    **M3b DM detay ekranı + profil alt-paneli + küçük revizeler** — 🟢 **SÖZLEŞME TAM KİLİTLİ
+    2026-08-04 sabahı** (görseller geldi, revize edildi):
+    `contracts/SPRINT_M3B_MOBILE_PROFILE_REVISIONS_CONTRACT.md`. Sahip sırasını verdi (M4'ten hemen önce).
+    🔴 **Dünkü sözleşme yanlış anlamıştı:** sahibin "profil ekranı" dediği şey aslında **DM detay
+    ekranı** (M2c kanal detayının DM ikizi: avatar + Ara/Sustur + Üyeler·Medya·Sabitlemeler·
+    Bağlantılar·Dosyalar sekmeleri). Gerçek profil ise Discord'da **alttan kayan panel**, ayrı ekran
+    değil. Dünkü §2 ("grup ayarları ekranı") yerini DM detayının ⋯ menüsüne bıraktı, ayrı ekran
+    kurulmuyor. İçerik: kankalar listesi ikon-only · DM detay ekranı · `ProfileCardModal` → alt-panel
+    (afiş + Hakkımda + üyelik tarihi + ortak ortam/kanka; hepsi `users/:id/card`'da **zaten var**,
+    çizilmiyordu) · zaten kanka olanda "Kanka Ekle" kusuru. Bağlayıcı: ortam üye listesi **yönetim
+    ekranında kalır** (Discord ile hizalı) → **mesaj yazarına dokunma profile gitmek ZORUNDA**
+    (ortamda profile ulaşmanın tek yolu). Sesli/görüntülü arama düğmeleri **yok** → M4.
+    🔴 **İki backend işi sahip onaylı, "api diffi yok" maddesi DÜŞTÜ:** (1) kanal kapsamlı aramaya
+    `has=` süzgeci — Medya/Bağlantılar/Dosyalar sekmeleri bugün yalnız ortam kapsamlı uçta çalışıyor,
+    DM'in `guildId`'si yok; süzgeç mantığı ortak helper'a çıkarılacak (kopya = aynı ekin DM'de
+    "dosya" ortamda "medya" sayılması). (2) **R7:** `getUserCard` erişimine **DM üyeliği** eklenir —
+    C9 mesaj isteğiyle gelen, arkadaş olmayan, ortak ortamı olmayan yetişkinde kart bugün 404 dönüyor
+    ve o kişi **engellenemiyor**; delik bugün de var ama profil yolu açılınca görünür olacak.
+    PM fail-closed kısıtı: erişim yalnız DM üyeliğinden geliyorsa `mutualFriends`/`mutualGuilds`
+    **boş** döner (yabancıya sosyal graf açma). Eski backlog notu ↓
 
     **Mobil profil ekranı (sahip 2026-08-03, sırasız backlog):** nick'e basınca açılan profil **kartı** ileride **ayrı bir ekrana** dönüşecek; kanka ekleme, ortak ortamlar vb. o ekranda toplanacak. Bugün karta düğme eklenmiyor (yarın taşınacak yüzeye yatırım yapma). Tetikleyici: sahip sırasını verdiğinde.
   - **✅ KAPANDI 2026-07-30 — Expo SDK 57 → 54 düşürüldü.** Sahip telefonundaki Expo Go 54.0.8 / "supported SDK 54" bildirdi → hedef 54. `expo@~54` + `npx expo install --fix` ile tüm `expo-*`/`react-native` (0.81.5)/`react` (19.1.0) hizalandı; devDeps elle (`typescript ~5.9.2`, `@types/react ~19.1.10`, `eslint-config-expo ~10.0.0` — bu paket 56'dan itibaren SDK numarasına geçtiği için 54'ün karşılığı 10.0.0). Eski ağaçtan kalan `react-server-dom-webpack` peer çatışması yaptı → `node_modules`+lock silinip temiz kurulum. **Doğrulama:** `expo-doctor` 18/18 · `typecheck` + `lint` temiz · android bundle derlendi (3.54 MB hbc). Kod tarafında SDK-57'ye özel API kullanılmamış, tek satır değişmedi. Sürüm kilidi `mobile/AGENTS.md` + `mobile/CLAUDE.md`'ye yazıldı. **Kalan: sahip telefonda açıp doğrulasın.**
