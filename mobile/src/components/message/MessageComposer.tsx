@@ -123,7 +123,9 @@ export function MessageComposer({
           </View>
           <Pressable
             onPress={onCancelMode}
-            hitSlop={10}
+            // 20px ikon + her yandan 12 = 44dp. Önceden 10'du → 40dp, sınırın altındaydı.
+            // Çipin ×'inde de aynı kusur vardı (R3'te düzeltildi); bu düğme o turun kapsamında değildi.
+            hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel={t('reply.cancel')}
           >
@@ -169,11 +171,19 @@ export function MessageComposer({
                   <Text style={styles.draftName} numberOfLines={1}>
                     {draft.filename}
                   </Text>
+                  {/* 🔴 Gönderim sürerken kaldırma KAPALI. `onSend` yerel bir taslak kopyası
+                      tutuyor; yükleme sürerken bir çip silinip sonra gönderim patlarsa, kurtarma
+                      yolu o kopyayı geri yazıp silineni diriltirdi. Yarışı kaynağında kesmek,
+                      kurtarma yoluna birleştirme mantığı eklemekten daha güvenli — hata anında
+                      çalışması gereken tek yol o. Dokunma hedefi (44dp) korunuyor, yalnız soluyor. */}
                   <Pressable
                     onPress={() => onRemoveAttachment?.(draft.key)}
-                    hitSlop={10}
+                    disabled={sending}
+                    hitSlop={13}
                     accessibilityRole="button"
+                    accessibilityState={{ disabled: sending }}
                     accessibilityLabel={t('attachment.remove')}
+                    style={sending && styles.draftRemoveBusy}
                   >
                     <Ionicons name="close-circle" size={18} color={theme.colors.textMuted} />
                   </Pressable>
@@ -322,6 +332,9 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xs,
+  },
+  draftRemoveBusy: {
+    opacity: 0.4,
   },
   inputRow: {
     flexDirection: 'row',

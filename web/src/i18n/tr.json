@@ -1607,6 +1607,10 @@
     "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
   },
   "mobile": {
+    "attachment": {
+      "viewImage": "Görseli büyüt",
+      "openFile": "Dosyayı aç"
+    },
     "attach": {
       "open": "Ek ekle",
       "files": "Dosyalar",

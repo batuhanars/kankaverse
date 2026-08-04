@@ -84,40 +84,40 @@ export function useMessageComposer(
   }
 
   /**
-   * Taslak ekleri yükler ve `attachmentId` listesini döner.
+   * Taslak ekleri sırayla yükler ve `attachmentId` listesini döner.
+   *
+   * 🔴 **Görünür state'e HİÇ yazmaz.** Yüklenen kimlikler çağıranın verdiği diziye **yerinde**
+   * işlenir; çağıran o diziyi yalnız HATA yolunda `setAttachments`e geçirir. Önceden burada
+   * `setAttachments` vardı ve başarılı gönderimde taslak şeridi bir kare görünüp kayboluyordu
+   * (sahip bulgusu: "görsel bir anlığına kutuya düşüyor"). Şerit bir hata kurtarma yüzeyi;
+   * her şey yolunda giderken görünmesi için sebep yok.
    *
    * 🔴 **Kısmi başarısızlık = mesaj GÖNDERİLMEZ** (sözleşme §3). Yarısı giden mesaj sessiz veri
-   * kaybıdır. Başarılı olanların kimliği taslakta SAKLANIR: kullanıcı tekrar denediğinde aynı dosya
+   * kaybıdır. Başarılı olanların kimliği dizide KALIR: kullanıcı tekrar denediğinde aynı dosya
    * ikinci kez yüklenmez (hem veri yakar hem sunucuda sahipsiz kayıt biriktirirdi).
    *
    * Sıralı yükleme bilinçli: paralelde ilk hata diğerlerini yarıda bırakır ve "kaçıncısı patladı"
    * bilgisi kaybolur; ayrıca mobil bağlantıda aynı anda 10 PUT açmak faydadan çok zarar.
    */
   async function uploadAttachments(drafts: DraftAttachment[]): Promise<string[]> {
-    const next = [...drafts];
-    for (let i = 0; i < next.length; i += 1) {
-      if (next[i].uploadedId) continue;
-      setUploadLabel(t('mobile.attach.uploading', { done: i + 1, total: next.length }));
-      try {
-        const uploadedId = await uploadDraftAttachment(next[i]);
-        next[i] = { ...next[i], uploadedId };
-      } catch (e) {
-        // Buraya kadar yüklenenler korunur; kutudaki seçim de durur.
-        setAttachments(next);
-        throw e;
-      }
+    for (let i = 0; i < drafts.length; i += 1) {
+      if (drafts[i].uploadedId) continue;
+      setUploadLabel(t('mobile.attach.uploading', { done: i + 1, total: drafts.length }));
+      // Hata FIRLARSA dizi o ana kadarki ilerlemeyi taşır (çağıran yakalayıp state'e yazar).
+      drafts[i] = { ...drafts[i], uploadedId: await uploadDraftAttachment(drafts[i]) };
     }
-    setAttachments(next);
-    return next.map((a) => a.uploadedId!);
+    return drafts.map((a) => a.uploadedId!);
   }
 
   /**
-   * @param pending Panelden yeni onaylanan ekler — state'e yazılıp AYNI çağrıda gönderilir.
-   * Ayrı `add` + `send` olsaydı `attachments` bu çağrının kapanışında hâlâ eski değeri taşırdı.
+   * @param pending Panelden yeni onaylanan ekler — AYNI çağrıda gönderilir. Görünür state'e
+   * yazılmaz: ayrı `add` + `send` olsaydı hem `attachments` bu çağrının kapanışında eski değeri
+   * taşırdı hem de şerit başarılı gönderimde bir kare parlardı.
    */
   async function onSend(pending?: DraftAttachment[]) {
-    const drafts = pending?.length ? [...attachments, ...pending] : attachments;
-    if (pending?.length) setAttachments(drafts);
+    // 🔴 Yerel çalışma kopyası. `uploadAttachments` bunu YERİNDE günceller; hata yolunda
+    // `setAttachments(drafts)` ile şerit tam olarak bu hâliyle geri gelir (yüklenmişler işaretli).
+    const drafts = pending?.length ? [...attachments, ...pending] : [...attachments];
 
     const trimmed = input.trim();
     // Sunucu ile aynı kural (`EMPTY_MESSAGE`): en az bir ek varsa boş metin geçerli.
@@ -139,13 +139,18 @@ export function useMessageComposer(
         const message = await messagesApi.send(channelId, payload, replyTo?.id, attachmentIds);
         appendMessage(message);
         setReplyTo(null);
-        setAttachments([]);
+        // Şerit zaten boşsa gereksiz render açılmasın (mutlu yol artık state'e hiç dokunmuyor).
+        setAttachments((prev) => (prev.length ? [] : prev));
       }
       setInput('');
       // Yalnız BAŞARIDA temizlenir: hata durumunda kullanıcı tekrar deneyecek, seçtiği
       // bahsetmeleri kaybetmesin (sözleşme §4.3).
       mentions?.clearPicked();
     } catch (e) {
+      // 🔴 Seçim burada KORUNUR (sözleşme §3): hata hangi adımda olursa olsun (yükleme ya da
+      // mesaj gönderimi) taslaklar şeride geri konur — yüklenmiş olanlar `uploadedId`siyle, ki
+      // tekrar denemede yeniden yüklenmesinler.
+      if (drafts.length) setAttachments(drafts);
       // Depolamaya PUT hatasının envelope'ı yok → ham durum kodu ekrana basılmaz, ne olduğu yazılır.
       setSendError(isStorageUploadError(e) ? t('mobile.attach.uploadFailed') : extractErrorMessage(e));
     } finally {
