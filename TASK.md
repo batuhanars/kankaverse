@@ -2706,3 +2706,72 @@ birbirine bakarak okunmalı); şerit ve ⋯ menüsü zaten ayrı dosyalara çık
 > global header yanlış teşhis, "engelleme T&S kilidi" yanlış ürün muhakemesi). Hiçbiri birim
 > testiyle çıkmazdı. Ayrıca dev'lere sorulan "store/yan-etki sahibi kim" sorusu, sözleşmede hiç
 > olmayan üç kusur ortaya çıkardı. [[pm-dev-cift-yonlu-denetim]] doğrulandı.
+
+
+---
+
+## Sprint M3c — Mobil Medya: Ek Gönderme + Emoji — 2026-08-04
+
+> Sözleşme: `contracts/SPRINT_M3C_MOBILE_MEDIA_CONTRACT.md`. **Faz sırası sahip kararıyla ters
+> çevrildi:** özgün harita "ses → medya" diyordu, medya sesin önüne alındı. Gerekçe: M3b'de DM
+> detayına üç medya sekmesi konuldu ve mobil kullanıcı onları dolduramıyordu; ayrıca M4 ağır ve uzun,
+> ondan önce uğraştırmayan işlerin bitmesi isteniyor. **Ad M3c, M4 değil** — "M4 = ses" onlarca yerde
+> geçiyor, medyayı M4 yapmak sesi M5'e kaydırıp o referansları bozardı.
+
+### Mobil (`mobile/`) — §1-§4
+- [x] `+` düğmesi → alttan panel; kısa hâlde **Galeriden Seç** + **Dosyalar** satırları + galeri
+      ızgarası (ilk hücre kamera); yukarı sürüklenince tam ekran (Geri / Tüm Albümler)
+- [x] Uygulama içi ızgara `expo-media-library` ile **(sahip kararı, PM itirazına rağmen)** — PM sistem
+      seçicisini önermişti (sıfır izin/bağımlılık/Play beyanı); sahip Discord birebir hizalamayı seçti
+- [x] 🔴 **İzin reddedilirse uygulama kilitlenmiyor:** ızgara çizilmez, üç yol açık kalır
+      (Galeriden Seç · Dosyalar · Kamera — üçü de galeri iznine bağlı değil)
+- [x] 🔴 **Android 14+ kısmi erişim:** "daha fazla fotoğraf seç" + `AppState` dinleyicisi. Dev'in
+      yakaladığı incelik: `presentPermissionsPickerAsync` **ekranı gösterince** çözülüyor, kullanıcı
+      seçimini bitirince değil → dinleyici olmasa "yeni fotoğraf paylaştım ama ızgarada yok" olurdu
+- [x] Belge gönderme `expo-document-picker` **(sahip onayı)** — sunucu zaten pdf/txt kabul ediyordu,
+      web gönderebiliyordu, yalnız mobil gönderemiyordu. `copyToCacheDirectory` şart: Android
+      `content://` URI'sini `uploadAsync` okuyamıyor (sessiz "PDF seçtim ama patladı" tuzağı)
+- [x] **Dört kaynak tek huniden** (ızgara · foto seçici · belge seçici · kamera): her kaynağın tek işi
+      ortak şekle çevirmek, doğrulama yalnız `attachmentDraft`'ta, izin listesi sunucununkinin **aynası**
+- [x] 🔴 **Kısmi başarısızlıkta mesaj GÖNDERİLMEZ**, seçim korunur, yüklenmiş olanlar tekrar yüklenmez
+- [x] `UPLOADS_ENABLED` istemciye taşınmadı, `presign` 403'ü otorite (web ile aynı)
+- [x] Emoji düğmesi → `rn-emoji-keyboard` (**zaten kurulu**, tepkilerde kullanılıyor; yeni paket yok).
+      Emoji **imlecin olduğu yere** yazılıyor; `onChangeText` sonra `setSelection` sırası kritik
+- [x] Düzenleme modunda `+` gizli (`PATCH` yalnız `content` alıyor, sonradan ek bağlanamıyor)
+- [x] `typecheck` + `lint` temiz; `api/` diffi yok
+
+### Web (`web/`) — §5
+- [x] Ölü **"Forum"** kanal türü seçeneği kaldırıldı + öksüz kalan `channelTypeSoon` anahtarı
+- [x] `vue-tsc -b` 6 bilinen hata (değişmedi), `vite build` temiz
+
+### PM sözleşme hataları (dev'ler yakaladı)
+- [x] 🔴 **DoD'a "video gönderiliyor" yazmıştım, İMKÂNSIZDI.** Sunucu izin listesi
+      (`ALLOWED_CONTENT_TYPES`) = `png/jpeg/gif/webp/pdf/txt`; **video yok**. PM yazarken sunucuyu
+      kontrol etmemişti. Dev durdu, `api/`ye dokunmadı, bildirdi → **doğru davranış** (kendi başına
+      eklese R7 yüzeyine habersiz dokunmuş olurdu). Sahip kararı: video şimdi açılmıyor → **D35**.
+      **Yan kazanç:** ızgara yalnız fotoğrafa kısılınca `READ_MEDIA_VIDEO` Play beyanı gereksizleşti
+- [x] 🔴 **Tek "Dosyalar" satırı yazıp galeri seçicisine bağlamıştım.** Dev bunu **UI yalanı** sayıp
+      durdu ve haklıydı (onaylı paket belge vermiyor) → `expo-document-picker` onaylandı, iki ayrı satır
+- [x] ⚠️ "Android 13+ kısmi erişim" yazmıştım, doğrusu **14+**; 13'te izin ya hep ya hiç
+- [x] `MAX_UPLOAD_MB` istemciye taşınmıyor → `.env.example`'a uyarı yazıldı (düşürülürse istemci
+      sınırı sunucudan gevşek kalır, kullanıcı uyarı almadan 400 yer)
+
+### 🔴 PM operasyon hatası — `tr.json` değişiklikleri silindi ve geri alındı
+`git add -p` etkileşimini `/dev/null` ile atlamaya çalışıp ardından **`git checkout -- web/src/i18n/tr.json`**
+çalıştırdım. Commit edilmemiş oldukları için mobil oturumun eklediği **19 i18n anahtarı** ve web
+oturumunun sildiği `channel.*` anahtarları **kayboldu**; git'te iz yok (dangling blob taraması boş).
+Kod dosyalarının hiçbiri etkilenmedi. Anahtarlar metinleri yazan oturumdan geri alındı, kodla
+**birebir karşılaştırılarak** doğrulandı (19/19, eksik ve fazla yok).
+**Ders:** commit edilmemiş çalışma varken, hele iki oturum aynı dosyaya yazarken, `git checkout --`
+çalıştırılmaz. Doğru sıra: önce commit, sonra düzenleme. Dev de aynı riski raporunda uyarmıştı.
+
+### DoD (cihazda — SAHİPTE)
+- [ ] `+` → panel; ızgarada son fotoğraflar, ilk hücre kamera; sürükleyince tam ekran
+- [ ] Görsel gönderiliyor ve karşı tarafta (web dahil) görünüyor · **PDF** gönderiliyor
+- [ ] Çoklu seçim tek mesajda gidiyor; 10 sınırı uyarıyor; boyut aşımında Türkçe uyarı
+- [ ] 🔴 Galeri izni reddedilince kilitlenmiyor, üç yol da çalışıyor
+- [ ] 🔴 Kısmi erişimde (Android 14+) "daha fazla seç"ten dönünce ızgara tazeleniyor
+- [ ] Emoji imlecin olduğu yere giriyor; **emoji sonrası harf yazınca imleç geri sıçramıyor**
+- [ ] Tepki emoji akışı bozulmadı
+- [ ] Ek gönderilen mesaj **DM detayının Medya/Dosyalar sekmesinde** görünüyor (M3b halkası kapanıyor)
+- [ ] Web'de kanal oluştururken Forum seçeneği yok
