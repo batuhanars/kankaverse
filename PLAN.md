@@ -268,10 +268,11 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     🔴 **Asıl iş platform tarafında:** foreground service (olmadan arka planda bağlantı düşer —
     isteğe bağlı değil) · ses yönlendirme (telefon/hoparlör/bluetooth/kulaklık, gelen çağrı kesintisi) ·
     yüzen mini pencere · WebRTC yeni native bağımlılık → **yeni dev build** (D38 bu derlemeye biniyor).
-    **Sahip faz bölmesi (2026-08-04):** (a) 1-1 + grup DM sesli · (b) ortam sesli kanalı + sesli
-    kanal ekleme · (c) görüntülü (DM + ortam kamera). **Ekran paylaşımı mobilde YOK** (sunucu
-    destekliyor, istemci kapsamı kararı; Android MediaProjection ayrı izin + ayrı FGS türü + Play
-    beyanı, telefonda değeri düşük).
+    **Sahip faz bölmesi (2026-08-04, KESİN):** **(1)** 1-1 DM sesli → **(2)** grup DM sesli →
+    **(3)** ortam sesli kanalı (+ listeleme süzgeci ve sesli kanal ekleme) → sonra **aynı sırayla
+    görüntülü**: **(4)** 1-1 DM · **(5)** grup DM · **(6)** ortam kanalı kamera.
+    **Ekran paylaşımı mobilde YOK** (sunucu destekliyor, istemci kapsamı kararı; Android
+    MediaProjection ayrı izin + ayrı FGS türü + Play beyanı, telefonda değeri düşük).
     ⚠️ **PM itirazı — ilk iki parça takas edilmeli:** DM aramasında **tam çalma akışı** var
     (`voice:call_invite` WS eventi, `call.ts` giden/gelen/zaman-aşımı, `IncomingCallModal`) ve
     mobilde asıl zorluk **uygulama kapalıyken gelen arama** (yüksek öncelikli push, ekran uyandırma,
@@ -279,7 +280,18 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     sahibin (a) parçası ağır platform işinin TAMAMI + çalma; ortam kanalı ise çalma olmadan aynı
     platform işini kanıtlar. **Karşı argüman (sahip lehine):** ~12 kullanıcıyla ortam sesli kanalı
     dolu sunucu ister, 1-1 arama tek kişiyle işe yarar → ürün değeri sahibin sırasını destekliyor.
-    Gerçek ödünleşme, **karar sahipte** (yarın konuşulacak).
+    Gerçek ödünleşme.
+    ✅ **KARAR: sahip itirazı reddetti ve gerekçesi PM'inkinden güçlü (2026-08-04).** "En ağır kısmı
+    başa alıyorum ki bunları yaparsak ortam kanal işi kolay olur." **PM kabul etti:** ortam kanalıyla
+    başlansaydı çalma akışı hiç düşünülmeden bir platform katmanı kurulur, sonra onu yeniden
+    şekillendirmek gerekebilirdi. En zor durumu başa almak temelin **baştan doğru** kurulmasını
+    garantiliyor. PM'in itirazı risk sıralamasıydı, sahibinki mimari sıralama; bu iş için ikincisi doğru.
+    🔴 **Sözleşme notu (yarın):** ilk parça (1-1 DM sesli) tek başına ağır platform işinin TAMAMINI
+    taşıyor — WebRTC bağımlılığı + yeni dev build · mikrofon izni · foreground service · ses
+    yönlendirme · çalma akışı · **uygulama kapalıyken gelen arama** (yüksek öncelikli push, ekran
+    uyandırma). Faz sırası değişmiyor, ama sözleşme M4a'yı **içeriden** sıralamalı ki çalmanın tamamı
+    inmeden önce cihazda doğrulanabilir bir ara durak olsun ("var olan aramaya katıl" → sonra çalma).
+    Bu, M1d dersinin faz sırasını bozmadan uygulanmış hâli.
     ℹ️ **Küçük bulgu:** mobil kanal oluşturmada tür seçici bilinçli yok (`channel-new.tsx` yorumu) —
     mobil ses kanallarını hiç listelemiyor (M1a `GUILD_TEXT` süzgeci). "Sesli kanal ekleme" aslında
     **süzgeci kaldır + seçiciyi geri koy**; zaten öngörülmüş, küçük iş.
