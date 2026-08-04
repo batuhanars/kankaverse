@@ -245,6 +245,23 @@ kalmaz.
 🔴 **Regresyon kilidi:** ortam kanal detayındaki üç sekme bu değişiklikten sonra **aynı sonucu
 vermeli**. Dev bunu doğrulamadan kapatmaz (özel kanal dahil).
 
+**İki uç arasındaki üç fark — PM revizyonu 2026-08-04, backend dev'in bulgusu.** Sözleşmenin ilk
+hâli "aynı sonuç" derken bunları hesaba katmamıştı:
+
+1. **Sayfa boyutu:** kanal ucu `take: 30`, ortam ucu `50` idi → sekmeler kanal ucuna geçince ortam
+   kanalında gösterilen medya sayısı düşecekti. **Karar: kanal ucu 50'ye çıkarılır** (koşullu take
+   yok). Güvenlik doğrulaması PM'de yapıldı: mobil `MessageSearchModal` ve web `SearchPopover`
+   sayfalama yapmıyor ve `length === 30` gibi bir "daha var mı" sezgiseli kullanmıyor → D5 sınıfı
+   sessiz kırılma riski yok.
+2. **Dönüş şekli:** ortam ucu kanal-gruplu (`{channelId, channelName, messages}[]`), kanal ucu düz
+   `MessageDto[]`. `useChannelSearchTab`'deki `flatMap` katmanı kalkar.
+3. 🔴 **Erişilemeyen kanalda hata davranışı:** ortam ucu sessizce `[]` dönüyordu, kanal ucu
+   `403 NOT_CHANNEL_MEMBER` **fırlatıyor**. "Görünür ama kilitli" özel kanalın detayını açan üye
+   olmayan kullanıcıda sekmeler hata durumuna düşer. **Karar: backend'e dokunulmaz**
+   (`requireChannelAccess` ortak T&S choke-point'i, arama için özelleştirilmez); istemci **403'ü
+   boş/kilitli durum olarak** karşılar, kırmızı hata basmaz. Çözüm `useChannelSearchTab` içinde tek
+   yerde, üç sekmeye kopyalanmaz.
+
 ### 5.2 `getUserCard` erişimine DM üyeliği eklenir (R7)
 
 **Sorun:** bugünkü kural "aynı ortamda **VEYA** arkadaşlık/blok ilişkisi var". C9 mesaj isteğini
@@ -263,6 +280,24 @@ ulaşmanın tek yolu mesaj yazarı olunca bu delik her DM'de görünür hale gel
 - `selfBlocked` semantiği **değişmez** ("o beni engelledi" asla dönmez).
 - Birim testi: (a) yalnız-DM erişimi kart döner, (b) o kartta iki mutual listesi de boş,
   (c) ilişkisiz üçüncü kişi hâlâ 404, (d) mevcut ortak-ortam/arkadaş yolları bozulmadı.
+
+🔴 **PM revizyonu 2026-08-04 — kabul edilmemiş istek erişim SAYILMAZ (backend dev'in bulgusu).**
+Sözleşmenin ilk hâli gerekçeyi "C9 mesaj isteğini **kabul etmiş**" üzerinden kuruyordu ama kuralı
+"açık DM kanalı var" diye yazmıştı. İkisi aynı şey değil: `dm.service` kanalı ve iki `ChannelMember`
+kaydını **istek gönderildiği anda** yaratıyor. Literal kural, yabancının tek taraflı istek atarak
+karşı tarafın kartını açmasına izin verirdi → **istek atmak bir profil keşif yolu** olurdu.
+
+Düzeltilmiş kural: **isteği başlatan taraf, istek kabul edilene kadar o kanaldan erişim kazanmaz.**
+Alıcı taraf kazanır (§5.2'nin varlık sebebi zaten alıcının engelleyebilmesi). Başlatan için davranış
+**bugünküyle aynı** kalır (404) → regresyon değil, açılmayacak kapının açılmaması.
+
+Ek test: (e) alıcı PENDING istekte kartı açar, (f) başlatan açamaz (404), (g) istek kabul edilince
+başlatan da açar.
+
+**Ek düzeltme (PM yetkilendirmesi, aynı fonksiyon):** GROUP_DM erişim kapısında `deletedAt` kontrolü
+yok → **silinmiş** bir grubun üyeleri süresiz birbirinin kartını açabiliyor (`ChannelMember` satırları
+soft-delete'te kalıyor). Yeni DM kapısı `deletedAt: null` içerdiği için tutarsızlık görünür hâle
+geldi. Tek satır, düzeltilir, testi eklenir.
 
 **R7:** bu değişiklik erişim kapısı genişletmesidir → satır satır insan incelemesi. Sahip onayı
 alınmadan merge edilmez.
