@@ -1,10 +1,10 @@
 import EmojiPicker, { tr as emojiTr } from 'rn-emoji-keyboard';
 import { MessageActionSheet } from './MessageActionSheet';
 import { ForwardMessageModal } from './ForwardMessageModal';
+import { emojiPickerTheme } from './emojiPickerTheme';
 import type { useMessageActions } from './useMessageActions';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { t } from '@/i18n';
-import { theme } from '@/theme';
 
 /**
  * Mesaj panelinin yerleşimi: panel + silme onayı bir arada. `DmMenuHost` ile aynı desen ve aynı
@@ -61,8 +61,10 @@ export function MessageActionHost({ actions, onReply, onEdit, canPin }: Props) {
       {/* Tam emoji listesi — `rn-emoji-keyboard` (PM onaylı bağımlılık: MIT, SIFIR bağımlılık,
           native modül yok → Expo Go'da çalışır, dev build gerektirmez).
           Kategori adları ve arama metni kütüphanenin KENDİ Türkçe paketinden (`tr`) geliyor;
-          bizim tr.json'a emoji kategorisi kopyalanmadı. Renkler `src/theme` token'larından —
-          kütüphanenin varsayılan teması bizim koyu paletimizle uyuşmuyordu. Gölge yok. */}
+          bizim tr.json'a emoji kategorisi kopyalanmadı.
+          Sprint M3c §4 — tema nesnesi `emojiPickerTheme.ts`e taşındı: mesaj kutusundaki emoji
+          düğmesi aynı seçiciyi kullanıyor, iki yerde aynı 20 satırlık renk bloğu tutulsaydı biri
+          değişip diğeri unutulurdu. **Akış değişmedi**, yalnız renkler tek kaynağa bağlandı. */}
       <EmojiPicker
         open={actions.pickerOpen}
         onClose={actions.closePicker}
@@ -70,25 +72,7 @@ export function MessageActionHost({ actions, onReply, onEdit, canPin }: Props) {
         translation={emojiTr}
         enableSearchBar
         categoryPosition="top"
-        theme={{
-          backdrop: 'rgba(0, 0, 0, 0.55)',
-          knob: theme.colors.borderStrong,
-          container: theme.colors.bgSidebar,
-          header: theme.colors.textPrimary,
-          skinTonesContainer: theme.colors.bgElevated,
-          category: {
-            icon: theme.colors.textMuted,
-            iconActive: theme.colors.accent500,
-            container: theme.colors.bgElevated,
-            containerActive: theme.colors.accentSubtle,
-          },
-          search: {
-            background: theme.colors.bgElevated,
-            text: theme.colors.textPrimary,
-            placeholder: theme.colors.textMuted,
-            icon: theme.colors.textMuted,
-          },
-        }}
+        theme={emojiPickerTheme}
       />
 
       {actions.forwardTarget && (
