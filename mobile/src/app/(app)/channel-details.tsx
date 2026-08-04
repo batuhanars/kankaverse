@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { channelsApi, type ChannelSummaryDto } from '@/api/channels';
 import { guildsApi, type GuildMemberDto } from '@/api/guilds';
@@ -35,6 +36,7 @@ import { theme } from '@/theme';
  */
 export default function ChannelDetailsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { channelId, guildId } = useLocalSearchParams<{ channelId: string; guildId: string }>();
   const myUserId = useAuthStore((s) => s.user?.id);
 
@@ -142,11 +144,14 @@ export default function ChannelDetailsScreen() {
   if (!channelId || !guildId) return null;
 
   return (
-    <View style={styles.flex}>
-      {/* 🔴 Sahip cihaz turu revizesi — başlık native header'a taşındı (geri okuyla aynı hizada
-          `# kanal-adı`). Önceki tasarım ekran içinde AYRICA büyük ortalı başlık çiziyordu; boş
-          native header + o başlık üst üste binip aradaki ölü alanı büyütüyordu. */}
-      <Stack.Screen options={{ title: channel ? `#${channel.name}` : '' }} />
+    // R2 §A — üst pay gerçek inset'ten; header kalktığı için durum çubuğunun altına giriyoruz.
+    <View style={[styles.flex, { paddingTop: insets.top }]}>
+      {/* 🔴 R2 §A (sahip turu 2026-08-04) — native header TAMAMEN kapalı. M2c'de başlık buraya
+          taşınmıştı çünkü "boş şerit + ekran içi başlık" ölü alan bırakıyordu; sahip teşhisi
+          sorunun şeridin BOŞ olması olduğunu gösterdi, yani semptom tedavi edilmişti. Şerit
+          gidince başlık `ChannelDetailsHeader`daki kendi yerine döndü. Global `screenOptions`a
+          dokunulmadı — içi dolu header'ı olan ~40 ekran aynen duruyor. */}
+      <Stack.Screen options={{ headerShown: false }} />
 
       {channelState === 'loading' && (
         <View style={styles.center}>
@@ -218,18 +223,15 @@ export default function ChannelDetailsScreen() {
                 }
               />
             )}
-            {tab === 'media' && (
-              <ChannelMediaTab guildId={guildId} channelId={channelId} onOpenMessage={openMessage} />
-            )}
+            {/* M3b §5.1 — üç sekme artık kanal kapsamlı arama ucuna gidiyor; `guildId` prop'u
+                düştü. Sonuç kümesi DEĞİŞMEMELİ: eski çağrı da `in=<channelId>` ile tek kanala
+                daraltılmıştı, erişim kapısı ikisinde de sunucuda. */}
+            {tab === 'media' && <ChannelMediaTab channelId={channelId} onOpenMessage={openMessage} />}
             {tab === 'pins' && (
               <PinnedMessagesList channelId={channelId} onOpenMessage={(m) => openMessage(m.id)} />
             )}
-            {tab === 'links' && (
-              <ChannelLinksTab guildId={guildId} channelId={channelId} onOpenMessage={openMessage} />
-            )}
-            {tab === 'files' && (
-              <ChannelFilesTab guildId={guildId} channelId={channelId} onOpenMessage={openMessage} />
-            )}
+            {tab === 'links' && <ChannelLinksTab channelId={channelId} onOpenMessage={openMessage} />}
+            {tab === 'files' && <ChannelFilesTab channelId={channelId} onOpenMessage={openMessage} />}
           </View>
         </>
       )}

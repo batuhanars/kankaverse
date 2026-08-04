@@ -28,13 +28,16 @@ interface Props {
   title: string;
   /** Okunmamış mesaj var mı — yoksa "Okunmuş İşaretle" soluk + pasif. */
   hasUnread: boolean;
-  /** 1-1 DM'de karşı taraf kanka değilse "Kanka Ekle" gösterilir. Grup DM'de asla. */
+  /** 1-1 DM'de karşı taraf kanka değilse "Kanka Ekle" gösterilir. Grup DM'de asla.
+   *  Kararı çağıran verir (`DmMenuHost` — kanka mı / engelledim mi / istek gitti mi, §4). */
   canAddFriend: boolean;
   /** Bu DM'in KENDİ sustur kaydı (fallback yok — DM'in bağlı olduğu bir ortam yok). */
   muted: boolean;
   mutedUntil: string | null;
   onClose: () => void;
-  onProfile: () => void;
+  /** M3b §2.1 — ilk satır artık **DM detay ekranına** gider (eskiden sohbeti açıyordu; sohbet zaten
+   *  satıra kısa dokunuşla açılıyor, ikinci kapı gereksizdi). */
+  onDetails: () => void;
   onAddFriend: () => void;
   onMarkRead: () => void;
   onClear: () => void;
@@ -52,7 +55,7 @@ export function DmMenuSheet({
   muted,
   mutedUntil,
   onClose,
-  onProfile,
+  onDetails,
   onAddFriend,
   onMarkRead,
   onClear,
@@ -76,10 +79,11 @@ export function DmMenuSheet({
             </Text>
 
             <View style={styles.group}>
-              <Pressable style={styles.option} onPress={onProfile}>
-                <Ionicons name="person-outline" size={20} color={theme.colors.textSecondary} />
-                {/* Yeni anahtar eklenmedi: `member.actions.profile` web'de zaten "Profil". */}
-                <Text style={styles.optionText}>{t('member.actions.profile')}</Text>
+              <Pressable style={styles.option} onPress={onDetails}>
+                <Ionicons name="information-circle-outline" size={20} color={theme.colors.textSecondary} />
+                {/* M3b §2.1 — satır "Profil" değil artık: hedef DM detay ekranı. Profil, mesaj
+                    yazarına dokununca açılan alt-panel (§3.1). */}
+                <Text style={styles.optionText}>{t('mobile.dmDetails.menuRow')}</Text>
               </Pressable>
               {canAddFriend && (
                 <Pressable style={styles.option} onPress={onAddFriend}>

@@ -20,7 +20,7 @@ const GROUP_MEMBER_LIMIT = 9;
 
 // Sprint M1b Revizyon R2 (§13) — Grup DM kurma, "Yeni Mesaj" ekranından adı konmuş ayrı bir giriş
 // (eskiden new-chat.tsx'te örtük bir 2+ seçim dalıydı). Yönetim (ad değiştir/üye ekle-çıkar/ayrıl/
-// sil) hâlâ group/[id].tsx'te, bu ekran yalnız KURMA.
+// sil) M3b §2.4 ile DM detay ekranının ⋯ menüsünde, bu ekran yalnız KURMA.
 export default function NewGroupScreen() {
   const router = useRouter();
   const friends = useFriendsStore((s) => s.friends);
@@ -71,7 +71,7 @@ export default function NewGroupScreen() {
       // Sözleşme §3.3 🔴 T&S — grup kurma minöre kapalı (`GROUP_MINOR_FORBIDDEN`) + üyeler kanka
       // olmak zorunda (`NOT_FRIEND`). Sunucu bu retleri jenerik verir; istemci sebebi tahmin
       // ETMEZ, extractErrorMessage sunucunun Türkçe mesajını gösterir (statü sızdırmaz).
-      // R3 — grup adsız kurulur (`name` DTO'da opsiyonel); adlandırma group/[id].tsx'e taşındı.
+      // R3 — grup adsız kurulur (`name` DTO'da opsiyonel); adlandırma DM detayının ⋯ menüsünde.
       const channel = await createGroup(Array.from(selected));
       router.replace(dmRouteParams(channel));
     } catch (e) {

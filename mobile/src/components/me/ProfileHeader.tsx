@@ -22,6 +22,21 @@ interface Props {
   username: string;
   avatarUrl: string | null;
   card: UserCardDto | null;
+  /**
+   * Sprint M3b §3.2 — avatarın afişten ayrılmasını sağlayan halkanın rengi. Avatar afişin üstüne
+   * bindiği için bu halka ARKA PLANLA aynı olmak zorunda; varsayılan "Sen" sekmesinin zemini
+   * (`bgContent`). Profil alt-paneli farklı bir yüzeyde (`bgSidebar`) duruyor → bileşen fork
+   * EDİLMEDİ, tek prop genişletildi (§2.1 deseni: "farklı davranıyorsa prop'u genişlet").
+   */
+  surfaceColor?: string;
+  /**
+   * Sprint M3b R3 §3.2.1 — biyografi + üyelik tarihi bu bileşende mi çizilsin. "Sen" sekmesinde
+   * EVET (varsayılan, davranış değişmedi). Profil alt-panelinde HAYIR: orada ikisi de **başlıklı
+   * bölüm** olarak (HAKKIMDA / Üyelik tarihi) kayan gövdede çiziliyor ve aralarına ikon şeridi
+   * giriyor. Bileşen fork edilmedi; afiş+avatar bindirmesinin iki cihaz kusuru düzeltmesi tek
+   * yerde kalsın diye tek bayrakla ayrıldı.
+   */
+  showDetails?: boolean;
 }
 
 /** Kök CLAUDE.md — TR tarih biçimi "25 Ekim 2023". */
@@ -29,7 +44,7 @@ function formatMemberSince(iso: string): string {
   return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-export function ProfileHeader({ username, avatarUrl, card }: Props) {
+export function ProfileHeader({ username, avatarUrl, card, surfaceColor, showDetails = true }: Props) {
   // 🔴 `bannerColor` bir CSS rengi DEĞİL, preset anahtarı ('blue', 'cream'…). Önce düz
   // `backgroundColor` olarak veriliyordu; 'blue' gibi bazı anahtarlar CSS renk adına denk geldiği
   // için kısmen çalışıyor, 'cream'/'dark' gibi olanlar hiç çalışmıyordu. Artık web'le aynı
@@ -51,7 +66,7 @@ export function ProfileHeader({ username, avatarUrl, card }: Props) {
         )}
 
         {avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          <Image source={{ uri: avatarUrl }} style={[styles.avatar, !!surfaceColor && { borderColor: surfaceColor }]} />
         ) : (
           // 🔴 Yedek avatar İKİ KATMAN (sahip bulgusu 2026-08-01): `accentSubtle` bir token ama
           // YARI SAYDAM (`rgba(255,107,61,0.12)`). Tek katman kullanılınca arkasındaki afiş
@@ -59,7 +74,7 @@ export function ProfileHeader({ username, avatarUrl, card }: Props) {
           // Uygulamanın başka yerlerinde fark edilmiyor çünkü orada arka plan zaten düz koyu.
           // Çözüm rengi elle karıştırmak DEĞİL (uydurma renk token dışıdır): altta opak zemin,
           // üstünde aynı saydam vurgu → başka yerlerdeki görünümün aynısı, ama afişi geçirmiyor.
-          <View style={[styles.avatar, styles.avatarFallback]}>
+          <View style={[styles.avatar, styles.avatarFallback, !!surfaceColor && { borderColor: surfaceColor }]}>
             <View style={styles.avatarTint} />
             <Text style={styles.avatarFallbackText}>{username.charAt(0).toUpperCase()}</Text>
           </View>
@@ -69,9 +84,9 @@ export function ProfileHeader({ username, avatarUrl, card }: Props) {
       <View style={styles.body}>
         <Text style={styles.username}>{username}</Text>
 
-        {card?.bio ? <Text style={styles.bio}>{card.bio}</Text> : null}
+        {showDetails && card?.bio ? <Text style={styles.bio}>{card.bio}</Text> : null}
 
-        {card?.memberSince ? (
+        {showDetails && card?.memberSince ? (
           <Text style={styles.memberSince}>
             {/* `settings.banner.previewMemberSince` web'de zaten "Üyelik tarihi: {date}" — yeni
                 anahtar açılmadı. (`profile.memberSince` yalnız etiket, tarih taşımıyor.) */}

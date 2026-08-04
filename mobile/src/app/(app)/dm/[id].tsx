@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { dmApi } from '@/api/dm';
 import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
 import { MessageScreen } from '@/components/MessageScreen';
-import { ProfileCardModal } from '@/components/ProfileCardModal';
 import { ChatBackButton } from '@/components/ChatBackButton';
 import { channelTitle } from '@/utils/channelTitle';
 import { t } from '@/i18n';
@@ -33,7 +32,6 @@ export default function DmScreen() {
     /** M1h — sabitlenenler ekranından "mesaja git" (kanal ekranındaki `jumpTo` ile aynı yol). */
     jumpTo?: string;
   }>();
-  const [showProfile, setShowProfile] = useState(false);
   const channelId = params.id;
 
   // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-07-30, M1d-0 turu): bayraklar ROUTE PARAMETRESİNDEN
@@ -112,15 +110,10 @@ export default function DmScreen() {
   // param'ına düşülür — listeden gelişte ikisi zaten aynı değeri taşıyor.
   const title = storeChannel ? channelTitle(storeChannel) : (params.title ?? '');
   const avatarUrl = storeChannel?.type === 'DM' ? storeChannel.otherUser.avatarUrl : (params.avatarUrl ?? null);
-  const otherUserId = storeChannel?.type === 'DM' ? storeChannel.otherUser.id : (params.otherUserId ?? null);
 
-  /** Engelle/engel-kaldır sonrası gerçek durumu sunucudan tazele. Artık yerel override YOK —
-   *  store tazelenince ekran kendiliğinden yeni bayrakları okur (T&S disiplini: `canMessage`
-   *  backend otoritesinde; istemci ne gevşetir ne kendi kafasına göre hesaplar). */
-  async function refreshDmStatus() {
-    await useDmStore.getState().fetchAll();
-  }
-
+  // 🔴 `canMessage`/`selfBlocked` store'dan okunur, yerel override YOK — profil paneli engelleme
+  // mutasyonunu `useFriendsStore` üzerinden yapıyor, o da dm store'unu tazeliyor; ekran yeni
+  // bayrakları kendiliğinden görür (T&S disiplini: karar backend otoritesinde).
   const canMessage =
     storeChannel && storeChannel.type === 'DM' ? storeChannel.canMessage : params.canMessage !== 'false';
   const selfBlocked =
@@ -130,10 +123,13 @@ export default function DmScreen() {
 
   const placeholder = isDm ? t('dm.placeholder', { user: title }) : t('dm.groupPlaceholder', { name: title });
 
-  /** Başlığa dokunuş: 1-1'de profil kartı, grupta grup ekranı (sözleşme §2.2). */
+  /**
+   * Başlığa dokunuş → **DM detay ekranı** (M3b §2.1). Eskiden 1-1'de profil kartı, grupta doğrudan
+   * üye listesi ekranı açılıyordu; ikisi de kalktı. Profil artık mesaj yazarına dokununca açılıyor
+   * (§3.1), grup üye listesi de detay ekranının bir sekmesi (§2.3.1).
+   */
   function onTitlePress() {
-    if (isDm) setShowProfile(true);
-    else router.push({ pathname: '/group/[id]', params: { id: channelId } });
+    router.push({ pathname: '/dm-details', params: { id: channelId } });
   }
 
   return (
@@ -185,15 +181,6 @@ export default function DmScreen() {
           })
         }
       />
-      {showProfile && isDm && otherUserId && (
-        <ProfileCardModal
-          userId={otherUserId}
-          username={title}
-          avatarUrl={avatarUrl}
-          onClose={() => setShowProfile(false)}
-          onChanged={refreshDmStatus}
-        />
-      )}
     </>
   );
 }

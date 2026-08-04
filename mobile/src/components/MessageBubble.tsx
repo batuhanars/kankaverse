@@ -26,6 +26,15 @@ interface Props {
   highlighted?: boolean;
   /** M1d-C §2.4 — uzun basış mesaj panelini açar (web'deki hover şeridinin dokunmatik karşılığı). */
   onLongPress?: () => void;
+  /**
+   * Sprint M3b §3.1 — yazarın avatarına/adına dokunuş **profil alt-panelini** açar. Web'de bu yol
+   * zaten var (`MessageItem` → `UserCardPopover`); mobilde hiç yoktu ve ortam üye listesi yönetim
+   * ekranında kaldığı için bu, bir ORTAMDA profile ulaşmanın tek yolu.
+   *
+   * Yalnız `showAuthor` satırında var — gruplanmış (art arda) mesajlarda avatar/ad zaten çizilmiyor,
+   * olmayan bir hedefe dokunma alanı uydurulmaz.
+   */
+  onPressAuthor?: () => void;
   /** Tepki pill'ine dokunuş: kendi tepkimi kaldırır, başkasınınkine katılır (web ile aynı). */
   onToggleReaction?: (emoji: string) => void;
 }
@@ -42,6 +51,7 @@ export function MessageBubble({
   resolveRole,
   highlighted,
   onLongPress,
+  onPressAuthor,
   onToggleReaction,
 }: Props) {
   // M2d R1 — bahsetmeler Kor aksanıyla çizilir (web `.kv-mention` karşılığı): metin parçalara
@@ -63,14 +73,22 @@ export function MessageBubble({
       style={[styles.row, showAuthor && styles.rowSpaced, highlighted && styles.rowHighlighted]}
     >
       {showAuthor && (
-        <View style={styles.avatar}>
+        <Pressable
+          onPress={onPressAuthor}
+          disabled={!onPressAuthor}
+          accessibilityRole="button"
+          accessibilityLabel={message.author.username}
+          style={styles.avatar}
+        >
           <Text style={styles.avatarText}>{message.author.username.charAt(0).toUpperCase()}</Text>
-        </View>
+        </Pressable>
       )}
       <View style={[styles.body, !showAuthor && styles.bodyIndent]}>
         {showAuthor && (
           <View style={styles.headerLine}>
-            <Text style={[styles.author, isMine && styles.authorMine]}>{message.author.username}</Text>
+            <Pressable onPress={onPressAuthor} disabled={!onPressAuthor} accessibilityRole="button">
+              <Text style={[styles.author, isMine && styles.authorMine]}>{message.author.username}</Text>
+            </Pressable>
             <Text style={styles.time}>{formatClock(message.createdAt)}</Text>
           </View>
         )}

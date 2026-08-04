@@ -24,7 +24,6 @@ function iconFor(contentType: string): keyof typeof Ionicons.glyphMap {
 }
 
 interface Props {
-  guildId: string;
   channelId: string;
   onOpenMessage: (messageId: string) => void;
 }
@@ -37,9 +36,11 @@ interface Props {
  * Client-side ek filtresi (image/video hariç tutma) sunucunun `has=file` tanımıyla BİREBİR aynı
  * kural (contract §2 tablosu) — burada TEKRARLANIYOR çünkü bir mesajın birden fazla eki olabilir
  * ve bunlardan biri görsel biri değilse (karma ek), yalnız medya-dışı olanı bu sekmede gösterilir.
+ *
+ * M3b §5.1 — `guildId` düştü (kanal kapsamlı uç); ortam kanalı ve DM aynı bileşeni kullanır.
  */
-export function ChannelFilesTab({ guildId, channelId, onOpenMessage }: Props) {
-  const { state, messages, errorMessage, retry } = useChannelSearchTab(guildId, channelId, 'file');
+export function ChannelFilesTab({ channelId, onOpenMessage }: Props) {
+  const { state, messages, errorMessage, retry } = useChannelSearchTab(channelId, 'file');
 
   const rows: Row[] = messages.flatMap((m) =>
     (m.attachments ?? [])

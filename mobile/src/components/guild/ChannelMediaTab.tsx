@@ -16,7 +16,6 @@ interface Cell {
 }
 
 interface Props {
-  guildId: string;
   channelId: string;
   onOpenMessage: (messageId: string) => void;
 }
@@ -28,9 +27,12 @@ interface Props {
  *
  * Video ekleri bugün `AttachmentView`de küçük resim ÜRETMİYOR (yalnız görsel önizleniyor, video
  * dosya-rozeti olarak düşüyor) — bu **mevcut** bir sınır, bu sprintte genişletilmedi.
+ *
+ * Sprint M3b §5.1 — `guildId` prop'u DÜŞTÜ: kanca artık kanal kapsamlı uca gidiyor, böylece aynı
+ * sekme hem ortam kanalında hem DM'de çalışıyor (fork edilmedi, tek kaynak).
  */
-export function ChannelMediaTab({ guildId, channelId, onOpenMessage }: Props) {
-  const { state, messages, errorMessage, retry } = useChannelSearchTab(guildId, channelId, 'image');
+export function ChannelMediaTab({ channelId, onOpenMessage }: Props) {
+  const { state, messages, errorMessage, retry } = useChannelSearchTab(channelId, 'image');
   const { width } = useWindowDimensions();
 
   const cells = useMemo<Cell[]>(

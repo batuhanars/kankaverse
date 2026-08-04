@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { useFriendsStore } from '@/stores/friends';
 import { useDmStore } from '@/stores/dm';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { ProfileCardModal } from '@/components/ProfileCardModal';
+import { ProfileSheet } from '@/components/profile/ProfileSheet';
 import { type FriendDto } from '@/api/friends';
 import { extractErrorMessage } from '@/api/errors';
 import { dmRouteParams } from '@/utils/dmRoute';
@@ -103,7 +104,7 @@ export default function FriendsListScreen() {
             return (
               <View style={styles.row}>
                 {/* Sprint M1d-0 DoD turu (sahip kararı 2026-07-31) — ada/avatara dokunmak profil
-                    kartını açar. Sebep: engelleme mobilde YALNIZ `ProfileCardModal` üzerinden
+                    panelini açar (M3b §3: kart → alt-panel). Sebep: engelleme mobilde YALNIZ o panel üzerinden
                     yapılabiliyor ve o kart da yalnız DM başlığı + grup üye listesinden açılıyordu;
                     yani hiç DM'leşmediğin bir kankayı engellemenin yolu YOKTU (DoD #2'nin tam
                     senaryosu). Satıra üçüncü bir "Engelle" düğmesi konmadı: engellemenin uygulamada
@@ -125,12 +126,29 @@ export default function FriendsListScreen() {
                     {item.user.username}
                   </Text>
                 </Pressable>
+                {/* Sprint M3b §1 — aksiyonlar İKON-ONLY. Metin etiketleri satırın yarısını yiyordu
+                    (sahip gözlemi); ad alanı kırpılıyordu. İkonlar web'deki karşılıklarıyla tutarlı
+                    (`FriendsPanel.vue` mesaj gönder = sohbet balonu). Etiket ekrandan kalkınca ekran
+                    okuyucunun TEK kaynağı `accessibilityLabel` — o yüzden zorunlu, `hitSlop` ile
+                    küçültme yok: dokunma hedefi 44dp gerçek kutu olarak duruyor. */}
                 <View style={styles.actions}>
-                  <Pressable disabled={busy} onPress={() => onMessage(item)} style={styles.dmButton}>
-                    <Text style={styles.dmText}>{t('friends.dm')}</Text>
+                  <Pressable
+                    disabled={busy}
+                    onPress={() => onMessage(item)}
+                    style={styles.dmButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('friends.dm')}
+                  >
+                    <Ionicons name="chatbubble-outline" size={20} color={theme.colors.textPrimary} />
                   </Pressable>
-                  <Pressable disabled={busy} onPress={() => setRemoveTarget(item)} style={styles.removeButton}>
-                    <Text style={styles.removeText}>{t('friends.remove')}</Text>
+                  <Pressable
+                    disabled={busy}
+                    onPress={() => setRemoveTarget(item)}
+                    style={styles.removeButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('friends.remove')}
+                  >
+                    <Ionicons name="person-remove-outline" size={20} color={theme.colors.textSecondary} />
                   </Pressable>
                 </View>
               </View>
@@ -140,7 +158,7 @@ export default function FriendsListScreen() {
       )}
 
       {cardTarget && (
-        <ProfileCardModal
+        <ProfileSheet
           userId={cardTarget.user.id}
           username={cardTarget.user.username}
           avatarUrl={cardTarget.user.avatarUrl}
@@ -252,31 +270,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  // 44dp = Android dokunma hedefi alt sınırı (§1). Daire, çünkü ikon-only düğme kare kutuda
+  // "kesilmiş buton" gibi duruyor; web'deki karşılığı da `rounded-full`.
   dmButton: {
-    minHeight: theme.layout.controlSm,
-    paddingHorizontal: 12,
-    borderRadius: theme.radius.md,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: theme.colors.accent500,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dmText: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.xs,
-    fontWeight: '600',
-  },
   removeButton: {
-    minHeight: theme.layout.controlSm,
-    paddingHorizontal: 12,
-    borderRadius: theme.radius.md,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: theme.colors.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  removeText: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.xs,
-    fontWeight: '600',
   },
 });

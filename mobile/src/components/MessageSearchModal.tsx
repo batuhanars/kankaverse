@@ -46,7 +46,7 @@ export function MessageSearchModal({ channelId, onClose, onJump }: Props) {
       setLoading(true);
       setError('');
       messagesApi
-        .search(channelId, trimmed)
+        .search(channelId, { q: trimmed })
         .then((list) => setResults(list))
         .catch((e) => setError(extractErrorMessage(e)))
         .finally(() => setLoading(false));

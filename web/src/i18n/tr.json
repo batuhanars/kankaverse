@@ -1716,6 +1716,9 @@
       "mediaEmpty": "Bu kanalda henüz görsel ya da video yok.",
       "linksEmpty": "Bu kanalda henüz paylaşılan bağlantı yok.",
       "filesEmpty": "Bu kanalda henüz dosya yok."
+    },
+    "dmDetails": {
+      "menuRow": "Sohbet Detayları"
     }
   }
 }

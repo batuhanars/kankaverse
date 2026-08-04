@@ -13,8 +13,9 @@ import { theme } from '@/theme';
  *
  * 🔴 Etkinlik formu (`event-form.tsx`) BİLİNÇLİ HARİÇ — o ekranın geri oku sihirbaz adımları
  * arasında gezinir (kendi `headerLeft`'i var), rozet taşımaz (sahip talebi, sözleşme §4.4).
- * 🔴 `group/[id].tsx` de HARİÇ — o ekran grup DM'nin sohbeti değil, YÖNETİM ekranı (üye listesi/ayrıl/
- * sil); asıl grup sohbeti `dm/[id].tsx`'te (`kind=group` param'ıyla) açılıyor, rozet oraya eklendi.
+ * 🔴 `dm-details.tsx` de HARİÇ — o ekran DM'in sohbeti değil DETAYI (üye listesi/medya/grup
+ * aksiyonları); asıl sohbet `dm/[id].tsx`'te açılıyor, rozet orada. (M3b öncesinde aynı gerekçe
+ * `group/[id].tsx` için yazılmıştı; o ekran bu ekrana katlandı ve rotası kaldırıldı.)
  */
 export function ChatBackButton() {
   const router = useRouter();
