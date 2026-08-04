@@ -7,7 +7,7 @@ import { AutomodService } from '../../shared/automod/automod.service';
 import { ModerationService } from '../../shared/moderation/moderation.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
-import { Attachment, Message, MessageReaction, ScanStatus, User } from '@prisma/client';
+import { Attachment, Message, MessageReaction, Prisma, ScanStatus, User } from '@prisma/client';
 
 type AttachmentDto = Pick<Attachment, 'id' | 'filename' | 'contentType' | 'size' | 'scanStatus'>;
 
@@ -675,13 +675,58 @@ export class MessagesService {
     return null;
   }
 
-  async searchMessages(userId: string, channelId: string, q: string, before?: string) {
+  /**
+   * M3b §5.1 — `q` (metin) + `has` (link/image/file) süzgeçlerinin ORTAK Prisma `where` parçası.
+   * Kanal kapsamlı `searchMessages` ve ortam kapsamlı `searchGuildMessages` **ikisi de** bunu çağırır.
+   * Kopyalansaydı aynı ek bir uçta "dosya" diğerinde "medya" sayılabilirdi (M3 `resolveMentionPreview` dersi).
+   *
+   * - `q` + `has=link` aynı `content` anahtarını ezmesin → AND ile birleşir; tekil durumlarda
+   *   `content` doğrudan kalır (mevcut q-only davranış birebir korunur).
+   * - `image` = en az bir `image/*` veya `video/*` ek · `file` = en az bir medya-DIŞI ek (M2c §2).
+   * - Tanınmayan `has` değeri sessizce yok sayılır (bugünkü ortam ucu davranışı).
+   *
+   * @param safeQ trim'lenmiş + 100 karakterde kesilmiş sorgu ('' = metin filtresi yok)
+   * @param has   'link' | 'image' | 'file' | undefined
+   */
+  private buildSearchContentFilter(safeQ: string, has?: string): Prisma.MessageWhereInput {
+    const hasQ = safeQ.length > 0;
+    const qCond = { content: { contains: safeQ, mode: 'insensitive' as const } };
+    const linkCond = { content: { contains: 'http', mode: 'insensitive' as const } };
+
+    const contentWhere: Prisma.MessageWhereInput =
+      hasQ && has === 'link'
+        ? { AND: [qCond, linkCond] }
+        : hasQ
+          ? qCond
+          : has === 'link'
+            ? linkCond
+            : {};
+
+    // `image | file` ayrımı Attachment.contentType üzerinden: image/* veya video/* → medya.
+    const mediaAttachmentCond = {
+      OR: [{ contentType: { startsWith: 'image/' } }, { contentType: { startsWith: 'video/' } }],
+    };
+
+    return {
+      ...contentWhere,
+      ...(has === 'image'
+        ? { attachments: { some: mediaAttachmentCond } }
+        : has === 'file'
+          ? { attachments: { some: { NOT: mediaAttachmentCond } } }
+          : {}),
+    };
+  }
+
+  async searchMessages(userId: string, channelId: string, q: string, before?: string, has?: string) {
     // Erişim + yaş kapısı + DM throw'ları propagate
     const channel = await this.membership.requireChannelAccess(userId, channelId);
 
-    // q doğrulama: trim, min 2 karakter
-    const trimmedQ = q.trim();
-    if (trimmedQ.length < 2) {
+    // q doğrulama: trim, min 2 karakter.
+    // M3b §5.1: `has` doluysa q OPSİYONEL (DM medya/bağlantı/dosya sekmeleri sorgusuz çalışır).
+    // `has` yoksa bugünkü kural birebir korunur → q zorunlu. Dolu gelen q her hâlükârda ≥2 karakter.
+    const trimmedQ = (q ?? '').trim();
+    const hasFilter = has?.trim() || undefined;
+    if ((!hasFilter || trimmedQ.length > 0) && trimmedQ.length < 2) {
       throw new BadRequestException({
         error: 'QUERY_TOO_SHORT',
         message: 'Arama için en az 2 karakter girin.',
@@ -715,7 +760,9 @@ export class MessagesService {
       where: {
         channelId,
         deletedAt: null,
-        content: { contains: safeQ, mode: 'insensitive' },
+        // q + has ortak helper'dan (ortam ucuyla aynı mantık — §5.1)
+        ...this.buildSearchContentFilter(safeQ, hasFilter),
+        // G4 clearedAt (gt) + cursor before (lt) TEK createdAt objesinde birleşik kalır (B1/D5)
         ...(Object.keys(createdAtFilter).length ? { createdAt: createdAtFilter } : {}),
       },
       include: {
@@ -727,7 +774,9 @@ export class MessagesService {
         replyTo: REPLY_TO_INCLUDE,
       },
       orderBy: { createdAt: 'desc' },
-      take: 30,
+      // M3b §5.1 (PM kararı): ortam ucuyla EŞİT (50). DM/kanal medya-bağlantı-dosya sekmeleri
+      // artık bu uca geldiği için 30'da kalsaydı ortam kanalında gösterilen sonuç sayısı düşerdi.
+      take: 50,
     });
 
     return messages.map((msg) => toMessageDto(msg, userId));
@@ -818,38 +867,16 @@ export class MessagesService {
     if (accessible.length === 0) return [];
 
     const nameById = new Map(accessible.map((c) => [c.id, c.name]));
-    const qCond = { content: { contains: safeQ, mode: 'insensitive' as const } };
-    const linkCond = { content: { contains: 'http', mode: 'insensitive' as const } };
-    // q + has=link aynı `content` anahtarını ezmesin → AND ile birleştir; tekil
-    // durumlarda content doğrudan kalır (mevcut q-only davranış korunur).
-    const contentWhere =
-      hasQ && has === 'link'
-        ? { AND: [qCond, linkCond] }
-        : hasQ
-          ? qCond
-          : has === 'link'
-            ? linkCond
-            : {};
-
-    // `image | file` ayrımı Attachment.contentType üzerinden: image/* veya video/* → medya.
-    // `has=image` → en az bir medya eki; `has=file` → en az bir medya-DIŞI ek (M2c §2).
-    const mediaAttachmentCond = {
-      OR: [{ contentType: { startsWith: 'image/' } }, { contentType: { startsWith: 'video/' } }],
-    };
 
     const messages = await this.prisma.message.findMany({
       where: {
         channelId: { in: accessible.map((c) => c.id) },
         deletedAt: null,
         // Dolu filtreler AND'lenir; boş olanlar where'e hiç girmez.
-        ...contentWhere,
+        // q + has ortak helper'dan (kanal ucuyla aynı mantık — §5.1)
+        ...this.buildSearchContentFilter(safeQ, has),
         ...(from ? { authorId: from } : {}),
         ...(mentions ? { mentions: { has: mentions } } : {}),
-        ...(has === 'image'
-          ? { attachments: { some: mediaAttachmentCond } }
-          : has === 'file'
-            ? { attachments: { some: { NOT: mediaAttachmentCond } } }
-            : {}),
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },

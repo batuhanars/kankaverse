@@ -44,16 +44,18 @@ export class MessagesController {
   // Statik '/search' segmenti — ':messageId' parametreli route'lardan ÖNCE tanımlanmalı
   // (NestJS statik segmentleri önce eşleştirir; bu konumlama garanti eder.)
   @Get('search')
-  @ApiOperation({ summary: 'Kanal içi mesaj arama (case-insensitive, max 30 sonuç)' })
-  @ApiQuery({ name: 'q', required: true, description: 'Arama sorgusu (min 2, max 100 karakter)' })
+  @ApiOperation({ summary: 'Kanal içi mesaj arama (case-insensitive, max 50 sonuç)' })
+  @ApiQuery({ name: 'q', required: false, description: 'Arama sorgusu (min 2, max 100 karakter). `has` verilmezse ZORUNLU.' })
   @ApiQuery({ name: 'before', required: false, description: 'Cursor: bu mesaj ID\'sinden öncesi' })
+  @ApiQuery({ name: 'has', required: false, description: 'İçerik türü: link | image | file (image=image/*|video/* eki, file=medya-dışı ek). Doluysa `q` opsiyonel.' })
   searchMessages(
     @CurrentUser() user: { id: string },
     @Param('id') channelId: string,
     @Query('q') q: string,
     @Query('before') before?: string,
+    @Query('has') has?: string,
   ) {
-    return this.messagesService.searchMessages(user.id, channelId, q ?? '', before);
+    return this.messagesService.searchMessages(user.id, channelId, q ?? '', before, has);
   }
 
   @Post()

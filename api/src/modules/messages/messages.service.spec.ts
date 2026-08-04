@@ -2400,15 +2400,15 @@ describe('MessagesService.searchMessages', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // TEST 7 — take ≤ 30
+  // TEST 7 — take ≤ 50 (M3b §5.1: ortam ucuyla eşitlendi, eskiden 30)
   // ─────────────────────────────────────────────────────────────────────────
-  it('take=30 ile çağrılır (sabit limit)', async () => {
+  it('take=50 ile çağrılır (sabit limit, ortam ucuyla eşit)', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
 
     await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'arama');
 
     const findManyCall = prismaMock.message.findMany.mock.calls[0][0];
-    expect(findManyCall.take).toBe(30);
+    expect(findManyCall.take).toBe(50);
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -2451,6 +2451,165 @@ describe('MessagesService.searchMessages', () => {
     expect(results[0].content).toBe('arama metni burada');
     expect(results[0].author.username).toBe('kanka');
     expect(typeof results[0].createdAt).toBe('string'); // ISO string
+  });
+});
+
+// ── MessagesService.searchMessages — has süzgeci (M3b §5.1) ──────────────────
+
+describe('MessagesService.searchMessages — has süzgeci (M3b §5.1)', () => {
+  let service: MessagesService;
+
+  // Servisin ürettiği `startsWith` koşullarını gerçek bir contentType'a uygular
+  // (where şeklini hardcode'lamak yerine üretilen koşulu değerlendiriyoruz).
+  function matchesOr(or: { contentType: { startsWith: string } }[], contentType: string) {
+    return or.some((c) => contentType.startsWith(c.contentType.startsWith));
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.message.findMany.mockResolvedValue([]);
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+  });
+
+  // ── q opsiyonelleşmesi: yalnız `has` doluysa ─────────────────────────────────
+  it('has dolu + q boş → QUERY_TOO_SHORT atmaz, content filtresi üretilmez', async () => {
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, '', undefined, 'image');
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.content).toBeUndefined();
+    expect(call.where.attachments.some.OR).toBeDefined();
+  });
+
+  it('has dolu + q tek karakter (dolu ama <2) → hâlâ QUERY_TOO_SHORT', async () => {
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'a', undefined, 'image');
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    expect((thrown!.getResponse() as { error: string }).error).toBe('QUERY_TOO_SHORT');
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
+  });
+
+  it('has YOK + q boş → bugünkü davranış birebir: QUERY_TOO_SHORT', async () => {
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, '');
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    expect((thrown!.getResponse() as { error: string }).error).toBe('QUERY_TOO_SHORT');
+  });
+
+  it('has boş string → yok sayılır, q zorunluluğu düşmez', async () => {
+    let thrown: BadRequestException | undefined;
+    try {
+      await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, '', undefined, '   ');
+    } catch (e) {
+      thrown = e as BadRequestException;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    expect((thrown!.getResponse() as { error: string }).error).toBe('QUERY_TOO_SHORT');
+  });
+
+  // ── has değerleri ortam ucuyla AYNI sonucu üretir (ortak helper) ──────────────
+  it('has=link → content http araması, attachments dokunulmaz', async () => {
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, '', undefined, 'link');
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.content).toEqual({ contains: 'http', mode: 'insensitive' });
+    expect(call.where.attachments).toBeUndefined();
+  });
+
+  it('has=image → medya (image/*|video/*) ek koşulu; pdf düşmez', async () => {
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, '', undefined, 'image');
+
+    const or = prismaMock.message.findMany.mock.calls[0][0].where.attachments.some.OR;
+    expect(matchesOr(or, 'image/png')).toBe(true);
+    expect(matchesOr(or, 'video/mp4')).toBe(true);
+    expect(matchesOr(or, 'application/pdf')).toBe(false);
+  });
+
+  it('has=file → medya-DIŞI ek koşulu (NOT medya)', async () => {
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, '', undefined, 'file');
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.content).toBeUndefined();
+    const or = call.where.attachments.some.NOT.OR;
+    expect(matchesOr(or, 'image/png')).toBe(true); // NOT bunu eler
+    expect(matchesOr(or, 'application/pdf')).toBe(false); // gerçek dosya kalır
+  });
+
+  it('q + has=link → content ezilmez, AND ile birleşir', async () => {
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'merhaba', undefined, 'link');
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.content).toBeUndefined();
+    expect(call.where.AND).toEqual([
+      { content: { contains: 'merhaba', mode: 'insensitive' } },
+      { content: { contains: 'http', mode: 'insensitive' } },
+    ]);
+  });
+
+  it('q + has=image → hem content hem attachments filtresi AND\'lenir', async () => {
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'merhaba', undefined, 'image');
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.content).toEqual({ contains: 'merhaba', mode: 'insensitive' });
+    expect(call.where.attachments.some.OR).toBeDefined();
+  });
+
+  it('geçersiz has değeri → sessizce yok sayılır (ortam ucuyla aynı davranış)', async () => {
+    await service.searchMessages(USER_ID, GUILD_CHANNEL_ID, 'merhaba', undefined, 'video');
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.content).toEqual({ contains: 'merhaba', mode: 'insensitive' });
+    expect(call.where.attachments).toBeUndefined();
+  });
+
+  // ── G4 clearedAt korunur: has ile birlikte de tek createdAt objesinde ─────────
+  it('DM + clearedAt + before + has → createdAt { gt, lt } TEK objede, has filtresi yanında durur', async () => {
+    const clearedAt = new Date('2024-01-10T10:00:00Z');
+    const beforeCreatedAt = new Date('2024-01-15T12:00:00Z');
+
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue({ id: 'msg-b', createdAt: beforeCreatedAt });
+    prismaMock.channelMember.findUnique.mockResolvedValue({ clearedAt });
+
+    await service.searchMessages(USER_ID, CHANNEL_ID, '', 'msg-b', 'image');
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.createdAt).toEqual({ gt: clearedAt, lt: beforeCreatedAt });
+    expect(call.where.attachments.some.OR).toBeDefined();
+  });
+
+  it('DM + clearedAt + has (before yok) → temizlenmiş sohbetin medyası geri gelmez', async () => {
+    const clearedAt = new Date('2024-01-10T10:00:00Z');
+
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    prismaMock.channelMember.findUnique.mockResolvedValue({ clearedAt });
+
+    await service.searchMessages(USER_ID, CHANNEL_ID, '', undefined, 'file');
+
+    const call = prismaMock.message.findMany.mock.calls[0][0];
+    expect(call.where.createdAt).toEqual({ gt: clearedAt });
+  });
+
+  it('erişim kapısı değişmedi: requireChannelAccess hatası propagate, findMany çağrılmaz', async () => {
+    membershipMock.requireChannelAccess.mockRejectedValue(
+      new ForbiddenException({ message: 'Erişim yok.', error: 'CHANNEL_FORBIDDEN' }),
+    );
+
+    await expect(
+      service.searchMessages(USER_ID, GUILD_CHANNEL_ID, '', undefined, 'image'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prismaMock.message.findMany).not.toHaveBeenCalled();
   });
 });
 
