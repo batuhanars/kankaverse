@@ -68,9 +68,21 @@ tamamen farklı). Ortak olan sekme gövdesi, ortak olmayan kabuk.
 - Büyük daire avatar (grup DM'de grup avatarı/baş harf), altında ad.
 - Discord'da adın altında ikinci satırda kullanıcı adı var; bizde `username` tek kimlik →
   **ikinci satır yok**, tekrar etme.
-- Aksiyon düğmeleri: **Ara** (mevcut `MessageSearchModal`) · **Sustur** (mevcut bildirim tercihi akışı).
-  🔴 **Sesli/Görüntülü Arama düğmesi YOK** → M4. Yer tutucu da koyma.
+- Aksiyon düğmeleri: **Sustur** (mevcut bildirim tercihi akışı) · **Ara** → 🔴 **YALNIZ GRUP DM'de**.
+  *(PM düzeltmesi 2026-08-04, mobil dev'in bulgusu: sözleşmenin ilk hâli Ara'yı ayrım yapmadan
+  koymuştu ve bu **sahibin 2026-08-01 kararını çiğniyordu** — `TASK.md` 1428: "1-1 DM'de mesaj arama
+  KALDIRILDI, web + mobil. Grup DM'de ve ortam kanalında KALIYOR." Gerekçesi kayıtlı: 1-1'de karşında
+  tek kişi var, konuşma doğrusal. Sohbet ekranındaki `searchable={!isDm}` zaten doğru, ona dokunma.)*
+- 🔴 **Sesli/Görüntülü Arama düğmesi YOK** → M4. Yer tutucu da koyma.
 - Sağ üstte **⋯** → alt-panel (§2.4).
+
+🔴 **1-1 DM'de avatar/ad dokunulabilir → `ProfileSheet` açar** (PM düzeltmesi 2026-08-04, mobil
+dev'in bulgusu). Gerekçe bir **T&S deliği**: §3.1 profilin tek yolunu "mesaj yazarı" yapmıştı, ama
+karşı taraf hiç yazmadıysa **veya kullanıcı sohbeti temizlediyse** (G4) yazar satırı yok; kanka
+değilse kankalar listesinde de yok; `DmMenuSheet`'te engelleme yok. Sonuç: o kişiyi **engellemenin
+hiçbir yolu kalmıyordu** — §3.3'teki "engelleme kaybolmayacak" maddesini §2.1'in kendisi deliyordu.
+M1d-0 sprintini açtıran hatanın aynı sınıfı. Grup DM'de başlık dokunulmaz kalır (Üyeler sekmesi
+zaten var, ikinci yol gereksiz).
 
 ### 2.3 Sekmeler
 
@@ -181,7 +193,10 @@ Uygulamalar · Sunuculara Davet Et. Boş bölüm bile çizilmez.
 
 Mevcut `ProfileCardModal` aksiyonları **bire bir korunur**, kaybolan tek bir tane bile olmayacak:
 
-- **Mesaj** (yeni ekleme değil: `canMessage` true ise DM'e götürür; false ise düğme çizilmez)
+- **Mesaj** (`canMessage` true ise DM'e götürür; false ise düğme çizilmez). ⚠️ **Düzeltme:** sözleşmenin
+  ilk hâli bunu "mevcut aksiyonlar bire bir korunur" başlığı altında "yeni ekleme değil" diye
+  yazmıştı; **yanlıştı** — `ProfileCardModal`'da Mesaj düğmesi hiç yoktu, `canMessage` mobilde
+  tiplenmemişti bile. Bu bir **davranış eklemesi**, koruma değil. Kalıyor, ama kayıt doğru olsun.
 - **Kanka Ekle** — yalnız `friendStatus === 'none'`; gönderim sonrası bilgi metnine döner
 - **Arkadaşlıktan Çıkar** — yalnız `friends`; onaylı
 - **Engelle** — onaylı
@@ -329,6 +344,9 @@ alınmadan merge edilmez.
 - [ ] DM başlığına dokununca **DM detay ekranı** açılıyor (profil kartı değil)
 - [ ] DM detayında Medya / Sabitlemeler / Bağlantılar / Dosyalar **gerçekten doluyor**
 - [ ] **Grup DM başlığına dokununca üye listesine ATMIYOR**, sekmeli detay ekranı açılıyor
+- [ ] 🔴 **Hiç yazmamış / sohbeti temizlediğin bir 1-1 DM'de karşı tarafı ENGELLEYEBİLİYORSUN**
+      (detay başlığındaki avatara dokun → profil paneli → Engelle). T&S kilidi, atlanmaz
+- [ ] 1-1 DM detayında **Ara düğmesi YOK**, grup DM detayında var (sahip kararı 2026-08-01)
 - [ ] 1-1 DM'de Üyeler sekmesi yok, grup DM'de var
 - [ ] Grup DM Üyeler sekmesinde 👑 rozeti duruyor · **grup sahibi üye çıkarabiliyor (✕ + onay)** ·
       kendi satırın dokunulmuyor · üyeye dokununca profil alt-paneli açılıyor
