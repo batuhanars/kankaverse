@@ -258,6 +258,314 @@ describe('UsersService', () => {
     });
   });
 
+  // ── M3b §5.2 (R7): erişime 1-1 DM üyeliği eklendi + fail-closed sosyal graf ───
+  describe('getUserCard — DM üyeliği erişimi (M3b §5.2, R7)', () => {
+    const CALLER = 'caller-1';
+    const TARGET = 'target-1';
+
+    function mockTargetExists() {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: TARGET,
+        username: 'hedef',
+        avatarUrl: null,
+        bio: 'yabancı bio',
+        createdAt: CREATED_AT,
+      });
+    }
+
+    type DmRow = { dmRequestStatus: string | null; dmRequesterId: string | null };
+    const NORMAL_DM: DmRow = { dmRequestStatus: null, dmRequesterId: null };
+
+    // Servisin ürettiği OR kollarını gerçek bir kanal satırına uygular — where şeklini
+    // hardcode'layıp yeniden yazmak yerine üretilen koşulu bizzat değerlendiriyoruz
+    // (`{ not: x }` biçimi destekli).
+    function rowMatchesOr(or: any[], row: DmRow) {
+      return or.some((arm) =>
+        Object.entries(arm).every(([key, cond]: [string, any]) =>
+          cond && typeof cond === 'object' && 'not' in cond
+            ? (row as any)[key] !== cond.not
+            : (row as any)[key] === cond,
+        ),
+      );
+    }
+
+    // channelMember.findFirst iki kez çağrılır (GROUP_DM kapısı + DM kapısı);
+    // hangisinin dolduğunu sorgunun `channel.type`'ından ayırt ediyoruz. DM kapısında
+    // verilen satır servisin kendi OR koşulundan geçerse üyelik döner (DB gibi).
+    function mockChannelAccess(opts: { dm?: DmRow | null; groupDm?: boolean }) {
+      prismaMock.channelMember.findFirst.mockImplementation((args: any) => {
+        const ch = args.where.channel;
+        if (ch.type === 'DM') {
+          if (!opts.dm) return Promise.resolve(null);
+          return Promise.resolve(rowMatchesOr(ch.OR, opts.dm) ? { id: 'cm-dm' } : null);
+        }
+        if (ch.type === 'GROUP_DM') return Promise.resolve(opts.groupDm ? { id: 'cm-group' } : null);
+        return Promise.resolve(null);
+      });
+    }
+
+    // (a) yalnız-DM erişimi → kart döner
+    it('yalnız açık 1-1 DM kanalı var (arkadaşlık/ortam/grup yok) → kart döner, 404 değil', async () => {
+      mockTargetExists();
+      mockChannelAccess({ dm: NORMAL_DM });
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.id).toBe(TARGET);
+      expect(card.bio).toBe('yabancı bio');
+      expect(card.friendStatus).toBe('none');
+
+      // DM kapısı sorgusu doğru: caller üye + hedef üye + tip DM + soft-delete HARİÇ
+      const dmCall = prismaMock.channelMember.findFirst.mock.calls
+        .map((c: any[]) => c[0])
+        .find((a: any) => a.where.channel.type === 'DM');
+      expect(dmCall.where.userId).toBe(CALLER);
+      expect(dmCall.where.channel.deletedAt).toBeNull();
+      expect(dmCall.where.channel.members.some.userId).toBe(TARGET);
+    });
+
+    // (b) yalnız-DM erişiminde sosyal graf kapalı (fail-closed)
+    it('yalnız-DM erişimi → mutualFriends/mutualGuilds BOŞ (yabancıya sosyal graf açılmaz)', async () => {
+      mockTargetExists();
+      mockChannelAccess({ dm: NORMAL_DM });
+      // Sorgulansaydı dolu dönecekti — çağrılmadığını da doğruluyoruz
+      prismaMock.friendship.findMany.mockResolvedValue([
+        { requesterId: CALLER, addresseeId: 'ortak' },
+      ]);
+      prismaMock.guild.findMany.mockResolvedValue([{ id: 'g1', name: 'Ortam', iconUrl: null }]);
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.mutualFriends).toEqual([]);
+      expect(card.mutualGuilds).toEqual([]);
+      // Kesişim sorguları hiç yapılmadı (boş dizi "hesaplanıp atıldı" değil, hiç sorulmadı)
+      expect(prismaMock.friendship.findMany).not.toHaveBeenCalled();
+      expect(prismaMock.guild.findMany).not.toHaveBeenCalled();
+    });
+
+    // (c) ilişkisiz üçüncü kişi hâlâ 404
+    it('DM yok + grup yok + ortam yok + ilişki yok → hâlâ 404 (tarama yüzeyi kapalı)', async () => {
+      mockTargetExists();
+      mockChannelAccess({}); // ne DM ne GROUP_DM
+
+      await expect(service.getUserCard(CALLER, TARGET)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    // (d) mevcut yollar bozulmadı
+    it('ortak ortam yolu bozulmadı: DM olmasa da kart + mutual kesişimi hesaplanır', async () => {
+      mockTargetExists();
+      mockChannelAccess({});
+      prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm1' });
+      prismaMock.guild.findMany.mockResolvedValue([{ id: 'g1', name: 'Ortam', iconUrl: null }]);
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.id).toBe(TARGET);
+      expect(card.mutualGuilds).toEqual([{ id: 'g1', name: 'Ortam', iconUrl: null }]);
+      expect(prismaMock.friendship.findMany).toHaveBeenCalled();
+    });
+
+    it('arkadaşlık yolu bozulmadı: DM de olsa mutual kesişimi kısıtlanmaz', async () => {
+      mockTargetExists();
+      mockChannelAccess({ dm: NORMAL_DM }); // DM var AMA tek erişim kaynağı değil
+      prismaMock.friendship.findFirst.mockResolvedValue({
+        id: 'f1',
+        status: 'ACCEPTED',
+        requesterId: CALLER,
+        addresseeId: TARGET,
+      });
+      prismaMock.guild.findMany.mockResolvedValue([{ id: 'g1', name: 'Ortam', iconUrl: null }]);
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.friendStatus).toBe('friends');
+      expect(card.mutualGuilds).toEqual([{ id: 'g1', name: 'Ortam', iconUrl: null }]);
+      expect(prismaMock.friendship.findMany).toHaveBeenCalled();
+    });
+
+    // ── C9 kısıtı: PENDING istekte yalnız ALICI taraf erişim kazanır ────────────
+    it('PENDING istek — ALICI taraf kartı açabilir (gelen isteği engelleyebilmeli)', async () => {
+      mockTargetExists();
+      // İsteği hedef başlattı, caller alıcı
+      mockChannelAccess({ dm: { dmRequestStatus: 'PENDING', dmRequesterId: TARGET } });
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.id).toBe(TARGET);
+      expect(card.mutualFriends).toEqual([]); // yalnız-DM erişimi → fail-closed
+    });
+
+    it('PENDING istek — BAŞLATAN taraf kartı açamaz → 404 (tek taraflı istekle profil açılmaz)', async () => {
+      mockTargetExists();
+      // İsteği caller başlattı, hedef henüz kabul etmedi
+      mockChannelAccess({ dm: { dmRequestStatus: 'PENDING', dmRequesterId: CALLER } });
+
+      await expect(service.getUserCard(CALLER, TARGET)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('istek KABUL edilince başlatan taraf da kartı açabilir', async () => {
+      mockTargetExists();
+      mockChannelAccess({ dm: { dmRequestStatus: 'ACCEPTED', dmRequesterId: CALLER } });
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.id).toBe(TARGET);
+    });
+
+    // ── Silinmiş grup kanalı erişim vermez (DM kapısıyla tutarlı) ───────────────
+    it('GROUP_DM kapısı da soft-delete edilmiş kanalı süzer (deletedAt: null)', async () => {
+      mockTargetExists();
+      mockChannelAccess({ groupDm: true });
+
+      await service.getUserCard(CALLER, TARGET);
+
+      const groupCall = prismaMock.channelMember.findFirst.mock.calls
+        .map((c: any[]) => c[0])
+        .find((a: any) => a.where.channel.type === 'GROUP_DM');
+      expect(groupCall.where.channel.deletedAt).toBeNull();
+    });
+  });
+
+  // ── M3b §5.2 sahip turu (R7): ortak kanka/ortam görünürlüğü tek ilkede ───────
+  // İLKE: kendi tek taraflı hareketinle sosyal graf görünürlüğü kazanamazsın.
+  describe('getUserCard — ortak kanka/ortam görünürlüğü (M3b §5.2, R7)', () => {
+    const CALLER = 'caller-1';
+    const TARGET = 'target-1';
+    const MUTUAL_GUILD = { id: 'g1', name: 'Ortam', iconUrl: null };
+
+    beforeEach(() => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: TARGET,
+        username: 'hedef',
+        avatarUrl: null,
+        bio: null,
+        createdAt: CREATED_AT,
+      });
+      // Graf AÇILIRSA görülecek veri — kapalı beklenen testlerde hiç sorgulanmamalı
+      prismaMock.guild.findMany.mockResolvedValue([MUTUAL_GUILD]);
+      prismaMock.friendship.findMany.mockResolvedValue([]);
+    });
+
+    // Graf kapalı: yalnız boş dizi değil, kesişim SORGUSU hiç yapılmamalı
+    function expectGrafKapali(card: { mutualFriends: unknown[]; mutualGuilds: unknown[] }) {
+      expect(card.mutualFriends).toEqual([]);
+      expect(card.mutualGuilds).toEqual([]);
+      expect(prismaMock.friendship.findMany).not.toHaveBeenCalled();
+      expect(prismaMock.guild.findMany).not.toHaveBeenCalled();
+    }
+
+    function expectGrafAcik(card: { mutualGuilds: unknown[] }) {
+      expect(card.mutualGuilds).toEqual([MUTUAL_GUILD]);
+      expect(prismaMock.friendship.findMany).toHaveBeenCalled();
+    }
+
+    // (a) ENGELLEYEN taraf
+    it('ben onu engelledim → graf kapalı (kart yine açılır, engeli kaldırabilmek için)', async () => {
+      prismaMock.userBlock.findUnique
+        .mockResolvedValueOnce({ id: 'blk' }) // callerBlock
+        .mockResolvedValueOnce(null); // targetBlock
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.id).toBe(TARGET);
+      expect(card.selfBlocked).toBe(true);
+      expectGrafKapali(card);
+    });
+
+    // (b) ENGELLENEN taraf — sahibin asıl isteği
+    it('o beni engelledi → graf kapalı (selfBlocked yine sızmaz)', async () => {
+      prismaMock.userBlock.findUnique
+        .mockResolvedValueOnce(null) // callerBlock
+        .mockResolvedValueOnce({ id: 'blk' }); // targetBlock
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.selfBlocked).toBe(false); // G3 semantiği değişmedi
+      expectGrafKapali(card);
+    });
+
+    // (c) yalnız GROUP_DM — D33 borcu
+    it('yalnız ortak GROUP_DM → graf kapalı (grup üyeleri birbirine yabancı olabilir)', async () => {
+      prismaMock.channelMember.findFirst.mockImplementation((args: any) =>
+        Promise.resolve(args.where.channel.type === 'GROUP_DM' ? { id: 'cm-group' } : null),
+      );
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.id).toBe(TARGET); // erişim kuralı DEĞİŞMEDİ
+      expectGrafKapali(card);
+    });
+
+    // (d) GİDEN bekleyen istek — tek taraflı hareket
+    it('benim gönderdiğim bekleyen istek → graf kapalı (istek atarak graf açılmaz)', async () => {
+      prismaMock.friendship.findFirst.mockResolvedValue({
+        id: 'f1',
+        status: 'PENDING',
+        requesterId: CALLER,
+        addresseeId: TARGET,
+      });
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.friendStatus).toBe('pending_out');
+      expectGrafKapali(card);
+    });
+
+    // (e) GELEN bekleyen istek — bilinçli açık kol
+    it('bana gelmiş bekleyen istek → graf AÇIK (kabul kararını verirken gerçek ihtiyaç)', async () => {
+      prismaMock.friendship.findFirst.mockResolvedValue({
+        id: 'f1',
+        status: 'PENDING',
+        requesterId: TARGET,
+        addresseeId: CALLER,
+      });
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.friendStatus).toBe('pending_in');
+      expectGrafAcik(card);
+    });
+
+    // (f) kabul edilmiş arkadaşlık
+    it('kabul edilmiş arkadaşlık → graf açık', async () => {
+      prismaMock.friendship.findFirst.mockResolvedValue({
+        id: 'f1',
+        status: 'ACCEPTED',
+        requesterId: CALLER,
+        addresseeId: TARGET,
+      });
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.friendStatus).toBe('friends');
+      expectGrafAcik(card);
+    });
+
+    // (g) ortak ortam
+    it('ortak ortam → graf açık', async () => {
+      prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm1' });
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expectGrafAcik(card);
+    });
+
+    // Reddedilmiş istek açık kollardan hiçbiri değil
+    it('DECLINED arkadaşlık → graf kapalı', async () => {
+      prismaMock.friendship.findFirst.mockResolvedValue({
+        id: 'f1',
+        status: 'DECLINED',
+        requesterId: TARGET,
+        addresseeId: CALLER,
+      });
+
+      const card = await service.getUserCard(CALLER, TARGET);
+
+      expect(card.friendStatus).toBe('none');
+      expectGrafKapali(card);
+    });
+  });
+
   // ── C10 kart zenginleştirme: canMessage + rol/ses ifşa kapıları ───────────────
   describe('getUserCard — C10 (canMessage / roller / ses durumu)', () => {
     const CALLER = 'caller-1';

@@ -70,8 +70,12 @@ export class UsersService {
   /**
    * GET /users/:id/card — Kullanıcı detay kartı (mesaj yazarına/avatarına tıkla → popover).
    *
-   * Erişim kuralı (§6, R7 inceleme noktası): çağıran + hedef aynı ortamda VEYA aralarında
-   * arkadaşlık/blok ilişkisi varsa görüntülenir. Aksi hâlde 404 (rastgele ID profil tarama yüzeyi kapatır).
+   * Erişim kuralı (§6, R7 inceleme noktası): çağıran + hedef aynı ortamda VEYA ortak GROUP_DM'de
+   * VEYA aralarında açık bir 1-1 DM kanalı (M3b §5.2) VEYA arkadaşlık/blok ilişkisi varsa görüntülenir.
+   * Aksi hâlde 404 (rastgele ID profil tarama yüzeyi kapatır).
+   *
+   * M3b §5.2: mutualFriends/mutualGuilds erişimden AYRI karara bağlıdır (`canSeeMutuals`) —
+   * kendi tek taraflı hareketinle sosyal graf görünürlüğü kazanamazsın.
    *
    * selfBlocked = yalnız "ben onu engelledim" (güvenli). "O beni engelledi" ASLA dönmez (G3).
    */
@@ -106,8 +110,9 @@ export class UsersService {
     });
     if (!target) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
 
-    // Erişim kontrolü: ortak ortam VEYA ortak GROUP_DM üyeliği VEYA ilişki (arkadaş/bekleyen/blok herhangi yönde)
-    const [sharedGuild, sharedGroupDm, friendship, callerBlock, targetBlock] = await Promise.all([
+    // Erişim kontrolü: ortak ortam VEYA ortak GROUP_DM üyeliği VEYA açık 1-1 DM kanalı (M3b §5.2)
+    // VEYA ilişki (arkadaş/bekleyen/blok herhangi yönde)
+    const [sharedGuild, sharedGroupDm, sharedDm, friendship, callerBlock, targetBlock] = await Promise.all([
       this.prisma.guildMember.findFirst({
         where: {
           userId: callerId,
@@ -118,12 +123,42 @@ export class UsersService {
         },
         select: { id: true },
       }),
+      // M3b (PM yetkilendirmesi 2026-08-04): `deletedAt: null` — grup silindiğinde ChannelMember
+      // satırları kalıyor (dm.service `deleteGroupDm` yalnız kanalı soft-delete ediyor), kapı
+      // bunu süzmediği için silinmiş grubun üyeleri süresiz birbirinin kartını açabiliyordu.
+      // Artık DM kapısıyla tutarlı.
       this.prisma.channelMember.findFirst({
         where: {
           userId: callerId,
           channel: {
             type: 'GROUP_DM',
+            deletedAt: null,
             members: { some: { userId: targetId } },
+          },
+        },
+        select: { id: true },
+      }),
+      // M3b §5.2 (R7): açık 1-1 DM kanalı. Yeni keşif yüzeyi DEĞİL — DM kanalı kurmak zaten
+      // canDm kapısından geçiyor. `deletedAt: null` şart: reddedilen/kapatılan istek kanalı
+      // (soft-delete) erişim vermeye devam etmemeli (fail-closed).
+      //
+      // C9 kısıtı (PM revizyonu 2026-08-04): isteği BAŞLATAN taraf, istek KABUL EDİLENE kadar
+      // erişim kazanmaz — aksi hâlde yabancı, tek taraflı istek atarak kart açardı. ALICI taraf
+      // kazanır; §5.2'nin varlık sebebi zaten alıcının gönderen kişiyi engelleyebilmesi.
+      // OR kolları null-güvenli pozitif eşitlik (bkz. friend-permission.service `dmRequestStatus`
+      // kolları + dm.service gelen-istek sorgusu): PENDING satırda `dmRequesterId` her zaman dolu.
+      this.prisma.channelMember.findFirst({
+        where: {
+          userId: callerId,
+          channel: {
+            type: 'DM',
+            deletedAt: null,
+            members: { some: { userId: targetId } },
+            OR: [
+              { dmRequestStatus: null }, // legacy/normal DM — kabul edilmiş sayılır
+              { dmRequestStatus: 'ACCEPTED' },
+              { dmRequestStatus: 'PENDING', dmRequesterId: { not: callerId } }, // yalnız alıcı taraf
+            ],
           },
         },
         select: { id: true },
@@ -147,7 +182,7 @@ export class UsersService {
       }),
     ]);
 
-    const hasRelation = sharedGuild || sharedGroupDm || friendship || callerBlock || targetBlock;
+    const hasRelation = sharedGuild || sharedGroupDm || sharedDm || friendship || callerBlock || targetBlock;
     if (!hasRelation) {
       throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
     }
@@ -161,12 +196,35 @@ export class UsersService {
       }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // M3b §5.2 (R7, sahip turu 2026-08-04) — ortak kanka/ortam görünürlüğü.
+    //
+    // 🔴 İLKE: kendi TEK TARAFLI hareketinle sosyal graf görünürlüğü kazanamazsın.
+    //
+    // Graf YALNIZ şu üç kolda açılır:
+    //   1. kabul edilmiş arkadaşlık
+    //   2. ortak ortam üyeliği
+    //   3. SANA gelmiş, henüz cevaplamadığın arkadaşlık isteği — kabul kararını verirken ortak
+    //      kankaya bakmak gerçek bir ihtiyaç ve kazancı sen sağlamıyorsun, ilkeyi bozmaz.
+    //
+    // Kapsanmayan her durum boş dizi: engel (İKİ yönde de — engellediğin/seni engelleyen kişinin
+    // ortak kankasını görmezsin), tek başına 1-1 DM üyeliği, tek başına GROUP_DM üyeliği (D33:
+    // grup üyeleri birbirine yabancı olabilir), SENİN gönderdiğin bekleyen istek, DECLINED.
+    //
+    // NOT: bu yalnız NE GÖSTERİLDİĞİ kararıdır; KİMİN GÖREBİLDİĞİ (hasRelation → 404) değişmedi.
+    // Engel hâlâ kartı açar — engeli kaldırabilmek için gerekli — sadece graf boş gelir.
+    // ─────────────────────────────────────────────────────────────────────────
+    const canSeeMutuals =
+      friendship?.status === 'ACCEPTED' ||
+      !!sharedGuild ||
+      (friendship?.status === 'PENDING' && friendship.addresseeId === callerId);
+
     // Erişim kapısı geçti → ek profil verisi (yeni sızıntı yok: yalnız viewer'ın KENDİ
     // arkadaş/sunucularıyla kesişim; minör/yaş alanı hiçbir şekilde dönmez).
     // C10: canMessage (inline kutu kapısı), roller (guild bağlamında) ve ses durumu paralel toplanır.
     const [mutualFriends, mutualGuilds, canDm, roles, voiceStatus] = await Promise.all([
-      this.getMutualFriends(callerId, targetId),
-      this.getMutualGuilds(callerId, targetId),
+      canSeeMutuals ? this.getMutualFriends(callerId, targetId) : Promise.resolve<MutualFriendDto[]>([]),
+      canSeeMutuals ? this.getMutualGuilds(callerId, targetId) : Promise.resolve<MutualGuildDto[]>([]),
       this.dmPermission.canDm(callerId, targetId),
       guildId ? this.getGuildRoles(guildId, targetId, callerId) : Promise.resolve<UserCardRoleDto[]>([]),
       this.getVoiceStatus(callerId, targetId),
