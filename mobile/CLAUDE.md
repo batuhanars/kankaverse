@@ -51,6 +51,26 @@ build (M2) ile kalkar.
 ## Doğrulama
 
 - `npm run typecheck` (tsc --noEmit) ve `npm run lint` temiz olacak.
-- Cihaz doğrulaması **Expo Go** ile (dev build M2'de gelir). `npx expo start` → telefonda QR.
+- Cihaz doğrulaması **dev build** ile (`npx expo start --dev-client`); M2'den beri Expo Go değil.
 - `EXPO_PUBLIC_API_URL` makinenin LAN IP'si olmalı; `localhost` fiziksel cihazdan çalışmaz.
 - Telefon bağlanamıyorsa **CORS'a dokunma** — native'de CORS yok, sebep başka yerdedir.
+
+### 🔴 Yeni native paket = yeni dev build (2026-08-04 dersi)
+
+`expo start --dev-client` yalnız **JavaScript'i** yeniler; native kabuk telefondaki APK'dır. Native
+kod içeren bir paket eklendiğinde (çoğu `expo-*` ve `react-native-*`, ayrıca `app.json` `plugins`
+girdisi gerektiren her şey) **mevcut APK geçersizdir** ve yeniden derlenmeli:
+
+```
+cd mobile && npx eas-cli build --profile development --platform android
+```
+
+> `npx eas build` **çalışmaz** — ikili `eas-cli` paketinden gelir, `eas` diye bir paket yok
+> ("could not determine executable to run" hatası budur).
+
+**İmza belirti:** uygulama açılışta modül yüklenirken patlar, yığının dibinde bir rota dosyası
+(`src/app/...`) görünür ve asıl hata `Cannot find native module '...'` der. Kodda arama —
+JS tarafı doğru, eksik olan native taraf. M3c'de `expo-media-library` + `expo-document-picker`
+eklenince tam olarak bu yaşandı.
+
+**Saf JS paketleri bu şartı doğurmaz** (örn. `rn-emoji-keyboard`) — eski build'de de çalışırlar.
