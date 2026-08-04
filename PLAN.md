@@ -226,7 +226,20 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     **(2) M1c hesap yüzeyleri** — 🟡 **SÖZLEŞME YAZILDI 2026-07-30:** `contracts/SPRINT_M1C_MOBILE_ACCOUNT_CONTRACT.md`. Kayıt + şifre kurtarma + **e-posta doğrulama** (mobilde hiç yoktu → doğrulanmamış kullanıcı ortam kuramayınca sebebi göremiyordu). **🔴 R7:** yaş kapısı otoritesi sunucuda (`MIN_AGE=13`) ve **rıza adımı** web'deki onay modalıyla birebir taşınır — asıl R7 riski yaş değil, sessizce atlanabilecek rıza adımıdır. `reset-password`/`verify-email` ekranları bilinçli kapsam dışı (link web'e gider; uygulamayı açması Android App Links + imzalı derleme ister → M2). Yeni env: `EXPO_PUBLIC_WEB_URL`. **Sahip kararı: ortam işlemlerinden ÖNCE.** Gerekçe: küçük ve kendi içinde kapalı bir iş, "hesap" hikâyesini tamamlıyor ve sosyal çekirdeğin doğal devamı. **NOT (sahip, 2026-07-29 akşamı): Play testi için acele YOK** — testçi/mağaza süreçlerine **uygulama bittikten sonra** girilecek, geliştirmenin arasına sokulmayacak. PM'in ilk yazdığı "test saatini erken başlat" gerekçesi bu yüzden **geçersiz**, sıralama sahibin tercihi olarak duruyor. Takvimi öne çekmek istenirse bu madde yeniden tartışılır. **🔴 Kayıt ekranı şartları:** doğum tarihi + yaş kapısı **web ile birebir aynı sıkılıkta** (mobil daha gevşek kapı olamaz — R7 incelemesi) + Play veri güvenliği formu ve yaş derecelendirmesi o noktada doldurulur.
     **(2.5) M1d-0 hesap merkezi + engellenenler** — 🟡 **SÖZLEŞME YAZILDI 2026-07-30:** `contracts/SPRINT_M1D0_MOBILE_FRIENDS_CONTRACT.md`. Varlık sebebi bir **geri alınamaz işlem**: hiç DM'leşmediğin birini engelleyince arkadaşlık da silindiği için kişi mobilde hiçbir yüzeyde kalmıyor → engel kaldırılamıyor. Uç ve mobil çağrı hazır, eksik olan tek şey ulaşacak satır. **Sahip itirazıyla revize edildi:** üst seviye "Kankalar" ekranı YOK (Discord mobil de mobili sade tutuyor), 4. sekme YOK; "Sen" sekmesi hesap merkezine dönüşüp iki satır taşır (Kankalar · Engellenenler). **Mağaza sürümünden önce kapanmak zorunda.**
     **(3) M1d ortam bütünlüğü** — 🟡 **SÖZLEŞME YAZILDI 2026-07-31:** `contracts/SPRINT_M1D_MOBILE_GUILDS_CONTRACT.md`. **davetle katılma önce** (bugün mobilde ortama katılma yolu YOK — kategori düzenleme iyileştirmesi, katılma varlık şartı) · kanal kategorileri (sahip istedi; `categoryId` kanal DTO'sunda mevcut, kategori modülü var → çoğunlukla istemci işi) · kanal listesi düzeni. **Sprint iki yarıya bölündü** (DoD-A ortama girebilmek / DoD-B ortamı düzenlemek); A kapanmadan B'ye geçilmez — M1d-0 turu küçük parçanın gerçekten yürünebildiğini, büyüğün kusuru gizlediğini gösterdi. **R7-nötr olmalı:** katılma kapıları (yaş/ban/zaten-üye) Sprint 7A'da sunucuya yazıldı ve R7'den geçti, mobil yalnız sonucu gösterir. **Kapsama eklendi:** ortam KURMA — PLAN'ın özgün M1d satırında yoktu ama M1c DoD'u "doğrulanmamış kullanıcı ortam kuramadığında sebebini anlar" maddesini açıkça buraya ertelemişti; kurma olmadan o madde kapanamaz. **Kapsam dışı:** davet listeleme/iptal ekranı · sürükle-sırala · kanal CRUD · üye listesi/kick/ban · Keşfet · A5 public davet karşılama sayfası.
-    **(4) MEDYA — ses'ten ÖNCE (sahip kararı 2026-08-04, faz sırası revize).** Özgün harita
+    **(4) M3c MEDYA — ses'ten ÖNCE.** 🟢 **SÖZLEŞME YAZILDI 2026-08-04:**
+    `contracts/SPRINT_M3C_MOBILE_MEDIA_CONTRACT.md`. Kapsam: `+` ek düğmesi + **uygulama içi galeri
+    ızgarası** (Discord birebir) + emoji düğmesi + web'den ölü "Forum" seçeneğinin kaldırılması.
+    **Adlandırma M3c, M4 DEĞİL** — "M4 = ses" onlarca yerde geçiyor, medyayı M4 yapmak sesi M5'e
+    kaydırıp o referansları bozardı. **Sahip kararı (PM itirazına rağmen):** sistem seçicisi yerine
+    Discord'daki uygulama-içi ızgara → `expo-media-library` + **hassas galeri izni** + **Play beyan
+    formu**. PM sistem seçicisini önermişti (sıfır izin/bağımlılık/beyan); sahip "hoş bir tasarım
+    varsın izin istesin, politikalara yazarız" dedi, itiraz kayda geçti. 🔴 **Android 13+ kısmi
+    erişim** ("yalnız seçilen fotoğraflar") dalı sözleşmede zorunlu madde. **Emoji neredeyse bedava:**
+    `rn-emoji-keyboard` zaten kurulu ve tepkilerde kullanılıyor, iş onu composer'a bağlamak.
+    🔴 **Lansman kalemi:** Play gönderiminde `READ_MEDIA_IMAGES`/`READ_MEDIA_VIDEO` beyan formu +
+    gizlilik politikası metni — gönderim gününde sürpriz olmasın.
+
+    <details><summary>Faz sırası neden değişti (sahip kararı 2026-08-04)</summary> Özgün harita
     "ses → medya" diyordu; sahip tersine çevirdi. Gerekçesi iki katmanlı: (a) **mobilde ek gönderme
     HİÇ yok** — `MessageComposer` 230 satır, içinde tek satır ek kodu yok, ataç düğmesi bile;
     `AttachmentView` sadece **gelen** eki çiziyor. M3b'de DM detayına üç medya sekmesi koyduk ve
@@ -238,6 +251,7 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     mesaja bağlamak. 🔴 **T&S notu:** CSAM taraması hâlâ kapalı (`SCAN=false`); web'den yükleme
     masaüstü isterken mobil yükleme kamera rulosundan tek dokunuş → aynı risk sınıfı ama **huni
     çok daha geniş**. Yeni bir karar değil, ölçeği değişen bir karar (bkz. [[csam-upload-strategi]]).
+    </details>
 
     **(5) En son: ses + ekran/kamera paylaşımı (M4).** En ağır parça (LiveKit, mikrofon/kamera
     izinleri, arka planda ses) + gerçek cihaz + en yoğun T&S incelemesi (yaş kapılı yüzeyler).
