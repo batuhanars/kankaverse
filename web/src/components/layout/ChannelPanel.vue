@@ -1628,20 +1628,6 @@ onUnmounted(() => {
             </svg>
             <span class="text-[12px] font-medium" :style="{ color: createType === 'GUILD_VOICE' ? 'var(--kv-text-primary)' : 'var(--kv-text-muted)' }">{{ t('channel.channelTypeVoice') }}</span>
           </button>
-          <!-- Forum — devre dışı -->
-          <div
-            class="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-[var(--kv-radius-md)] border cursor-not-allowed opacity-50"
-            style="border-color: var(--kv-border-subtle);"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            <span class="text-[12px] font-medium" style="color: var(--kv-text-muted);">{{ t('channel.channelTypeForum') }}</span>
-            <span
-              class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
-              style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
-            >{{ t('channel.channelTypeSoon') }}</span>
-          </div>
         </div>
       </div>
 
