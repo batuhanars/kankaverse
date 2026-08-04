@@ -2615,3 +2615,26 @@ panelden engelleyemezsin. Sabah kapattığımız T&S deliği **ancak §5.2 canl�
 `showDetails`). **Üçüncüsü gelirse** bu "prop genişletme" değil gizli fork olur ve bileşen bölünmeli.
 `ProfileSheet` 355 satır — bilinçli bölünmedi (T&S kemeri + katman makinesi + mutasyonlar R7'de
 birbirine bakarak okunmalı); şerit ve ⋯ menüsü zaten ayrı dosyalara çıkarıldı.
+
+### R4 — ⋯ düğmesi sadeleşti — 2026-08-04
+
+> Sahip: "güzel olmuş" (panel yerleşimi, kaydırma, ikon şeridi, bölümler onaylandı). İki görsel not.
+
+- [x] ⋯ üstten/sağdan boşluk `16` → `24` (`MORE_INSET`); ikonun görünen kenar boşluğu 35dp
+      (44dp kutu içinde 22dp ikon → her yanda 11dp görünmez pay)
+- [x] Arka plan dairesi + `borderRadius` **kaldırıldı**, üç nokta düz duruyor (sahip isteği)
+- [x] 🔴 **Okunabilirlik telafisi (PM şartı):** daire aynı zamanda **açık renkli afişte** ⋯'nin
+      okunmasını sağlıyordu (afiş kullanıcı görseli, beyaza yakın olabilir). Arka plan bloğu geri
+      getirilmeden `textShadow` ile çözüldü (`Ionicons` altta `Text` çizdiği için geçerli); koyu
+      afişte ve panel zemininde gölge görünmüyor, kirlilik eklemiyor
+- [x] Dokunma hedefi **44×44 korundu** (daire gitti diye küçültülmedi); `accessibilityRole`/label
+      yerinde; ⋯ hâlâ `ScrollView` kardeşi (T&S kemeri duruyor)
+- [x] `typecheck` + `lint` temiz; tek dosya değişti, panelin geri kalanına dokunulmadı
+
+**Cihazda bakılacak:** açık renkli afişli bir profilde üç nokta kayboluyor mu (gölge yetiyor mu).
+
+---
+
+> **M3b KOD TARAFI KAPANDI.** api 1008 test yeşil + build/migrate temiz · mobile typecheck + lint
+> temiz. Dört revizyon turu: R1 (sözleşmenin üç hatası) · R2 (header) · R3 (Discord yerleşimi) ·
+> R4 (⋯ cilası). **Commit atılmadı — §5.2 R7 onayı bekliyor.**
