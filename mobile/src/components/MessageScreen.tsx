@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   FlatList,
   Keyboard,
-  KeyboardAvoidingView,
   Pressable,
   StyleSheet,
   Text,
@@ -188,31 +187,51 @@ export function MessageScreen({
   // Mesaj paneli akışı (uzun basış · tepki · kopyala · sil) — M1d-C §2.4.
   const actions = useMessageActions(channelId);
 
-
-  // 🔴 Klavye + gezinme çubuğu payı — bu blok İKİ KEZ yanlış kuruldu, ikisi de kayda geçiyor.
-  //
-  // Deneme 1 (KAV yok, `max(klavye yüksekliği, insets.bottom)`): klavye yüksekliğini ham okuyup
-  // kapsayıcıya pay verdi. **Sahibin cihazında kutu tepeye fırladı** (2026-08-01): o cihazda
-  // pencere klavye açılınca ZATEN küçülüyor, yani pay ikinci kez eklenmiş oldu. Üç tuşlu cihazda
-  // ise tersi çıktı, eksik kaldı. Varsayım yanlıştı: "pencere küçülmez" her cihazda doğru değil.
-  //
-  // Doğru olan ÖLÇMEK: `KeyboardAvoidingView` yüksekliği varsaymaz, görünümün gerçek çerçevesi ile
-  // klavyenin ekran koordinatı farkını ölçer; cihazın davranışını cihazdan öğrenir. Gezinme çubuğu
-  // payı AYRI iştir, yalnız klavye KAPALIYKEN verilir (açıkken KAV zaten itiyor).
   const insets = useSafeAreaInsets();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [kbGeom, setKbGeom] = useState({ h: 0 });
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardVisible(true);
+      setKbGeom({ h: Math.round(e.endCoordinates.height) });
+    });
     const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
     return () => {
       show.remove();
       hide.remove();
     };
   }, []);
+
+  // 🔴 Klavye payı — bu blok ÜÇ KEZ yanlış kuruldu; üçünün de kökü aynı: cihazın davranışını
+  // VARSAYMAK. Dördüncüsü olmasın diye 2026-08-04'te sahip cihazında ÖLÇÜLEN sayılarla yazıldı.
+  //
+  // Deneme 1 (KAV yok, `max(klavye, insets.bottom)`): kutu tepeye fırladı — o günün native
+  //   kabuğunda pencere klavye açılınca ZATEN küçülüyordu, pay ikinci kez eklenmiş oldu.
+  // Deneme 2 (`KeyboardAvoidingView behavior="padding"`): o kabukta çalıştı. Ama M3c'de
+  //   `expo-media-library`/`expo-document-picker` eklenip YENİ dev build alınınca davranış terse
+  //   döndü — pencere artık küçülmüyor — ve kutu klavyenin arkasında kaldı. KAV'ın kendi hesabı da
+  //   ekran-koordinatı (`screenY`) ile pencere-koordinatını (`measureInWindow`) karıştırdığı için
+  //   Android'de edge-to-edge ile güvenilir değil.
+  // Deneme 3 (KAV + `keyboardVerticalOffset={useHeaderHeight()}`): kutu çok yukarı fırladı.
+  //   `useHeaderHeight()` bu ekranlarda 247 döndürüyor (gerçek başlık ~55dp) — offset olarak
+  //   kullanılamaz.
+  //
+  // ÖLÇÜLEN (sahip cihazı, klavye AÇIKKEN): screen 872.7 · window 822.9 · insets.top 33.8 ·
+  //   insets.bottom 16 · klavye yüksekliği 287 · klavye tepesi (screenY) 570.
+  //   → window (822.9) klavye açıkken DEĞİŞMİYOR: pencere kendini küçültmüyor, payı biz veriyoruz.
+  //   → window = screen − insets.top − insets.bottom (822.9 = 872.7 − 33.8 − 16) ✓
+  //   → klavyenin tepesi pencere koordinatında: screenY − insets.top = 536.2
+  //   → örtüşme = 822.9 − 536.2 = 286.7 ≈ klavye yüksekliği (287)
+  //
+  // Yani gereken pay **klavyenin kendi yüksekliği**; bu sihirli sayı değil, özdeşlik: pencere iki
+  // güvenli alan payını zaten dışlıyor ve klavye gezinme çubuğunun hemen üstünde oturuyor, ikisi
+  // sadeleşiyor. `- insets.bottom` çıkarmak payı İKİ KEZ düşürür (Deneme 4'te bu da denendi, eksik
+  // kaldı). Formül bilerek koordinat sistemi İÇERMİYOR — üç denemeyi de bozan şey oydu.
+  const keyboardPad = keyboardVisible ? kbGeom.h + theme.layout.panelGap : 0;
   const bottomInset = keyboardVisible ? 0 : insets.bottom;
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior="padding">
+    <View style={[styles.flex, { paddingBottom: keyboardPad }]}>
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -344,7 +363,7 @@ export function MessageScreen({
           }}
         />
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
