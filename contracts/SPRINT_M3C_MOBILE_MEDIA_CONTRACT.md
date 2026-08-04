@@ -33,8 +33,12 @@ Ayrıca tepkiler (reaction) eklendi ama **mesaj kutusunda emoji düğmesi yok** 
 `MessageComposer`'ın soluna **`+`** düğmesi. Dokununca alttan panel açılır.
 
 **Panel, ilk hâl (kısa):**
-- Üstte tek satır düğme: **Dosyalar** → sistem dosya seçicisi
+- Üstte **iki satır düğme: "Galeriden Seç"** (sistem foto seçicisi) ve **"Dosyalar"** (sistem belge
+  seçicisi, `expo-document-picker` — sahip onayı 2026-08-04, §2'ye ek)
   🔴 Discord'daki **"Anketler" YOK** — bizde anket/forum kavramı yok, boş yüzey açma kuralı
+  ⚠️ **Düzeltme:** sözleşmenin ilk hâli tek "Dosyalar" satırı yazıp onu galeri seçicisine bağlıyordu.
+  Dev bunu **UI yalanı** sayıp durdu ve haklıydı: onaylı paket (`expo-media-library`) belge vermiyor,
+  "Dosyalar" deyip galeri açmak olurdu. İki ayrı satır, iki ayrı işlev.
 - Altında **galeri ızgarası** (§2): ilk hücre **kamera**, sonrasında en yeni medya
 - Seçim yapıldıkça seçili hücreler işaretlenir, gönder düğmesi seçim sayısını gösterir
 
@@ -56,12 +60,16 @@ Discord birebir ızgarayı seçti: *"hoş bir tasarım varsın izin istesin, pol
 - İzin akışı: reddedilirse ızgara yerine **açıklayıcı satır + "Dosyalar"a yönlendirme**. Uygulama
   kilitlenmez, ek gönderme sistem seçicisi üzerinden yine mümkün olur.
 
-🔴 **Android 13+ kısmi erişim dalı ZORUNLU.** Kullanıcı "yalnız seçilen fotoğraflar" izni verebiliyor;
+🔴 **Android 14+ kısmi erişim dalı ZORUNLU.** *(Düzeltme: sözleşme "13+" yazıyordu, YANLIŞ —
+`READ_MEDIA_VISUAL_USER_SELECTED` ve `presentPermissionsPickerAsync` Android **14+**; 13'te izin ya
+hep ya hiç. Cihaz testinde 13'lü telefonda bu dal görünmez, "eksik" sanılmasın.)* Kullanıcı "yalnız seçilen fotoğraflar" izni verebiliyor;
 o hâlde ızgara kütüphanenin **tamamını göremez**. Bu ele alınmazsa kullanıcı "fotoğraflarım
 kaybolmuş" sanır. Kısmi erişimde ızgaranın üstünde **"Daha fazla fotoğraf seç"** yolu olmalı.
 Bu, ızgara kararının bir parçası; atlanamaz.
 
-🔴 **Play beyanı:** `READ_MEDIA_IMAGES`/`READ_MEDIA_VIDEO` Google Play'de **hassas izin**; mağaza
+🔴 **Play beyanı:** `READ_MEDIA_IMAGES` Google Play'de **hassas izin**;
+*(Daraldı: video açılmadığı için `granularPermissions: ["photo"]` yeterli oldu → `READ_MEDIA_VIDEO`
+beyanı gerekmiyor. Dev'in yan kazancı, beyan yüzeyi yarıya indi.)* mağaza
 gönderiminde beyan formu doldurulacak ve gizlilik politikasına yazılacak. Sahip bunu bilerek kabul
 etti. **PLAN'a lansman kalemi olarak işlenir** — gönderim gününde sürpriz olmasın.
 
@@ -94,6 +102,9 @@ bkz. [[sonraki-faz-medya]]) — mobilde ayrı bir bayrak mekanizması **icat etm
 
 **`scanStatus`:** yeni ek `PENDING` doğar; indirme kapısı `CLEAN` ister (`SCAN=false` iken her şey
 otomatik `CLEAN`). `AttachmentView` bu mantığı **zaten taşıyor**, ikinci kez yazma.
+⚠️ **Kayda geçsin (dev bulgusu):** kapı **gönderenin kendi ekine de** uygulanıyor. `SCAN=false` iken
+görünmez, ama tarama açıldığı gün kullanıcı kendi gönderdiği fotoğrafı bir süre "İşleniyor…" olarak
+görecek. Bu sprintte iş yok; `SCAN` açılırken UX kararı verilecek.
 
 ---
 
@@ -165,7 +176,13 @@ Bu sprintte uygulanacak kemerler:
 - [ ] Panel yukarı sürüklenince Dosyalar kaybolup Geri / Tüm Albümler çıkıyor
 - [ ] Tüm Albümler ve Dosyalar sistem seçicisini açıyor
 - [ ] Görsel gönderiliyor ve **karşı tarafta görünüyor** (web'de de)
-- [ ] Video ve PDF gönderiliyor
+- [ ] **PDF/belge** gönderiliyor (`expo-document-picker`, sahip onayı)
+- [ ] ~~Video gönderiliyor~~ → 🔴 **DoD'dan ÇIKARILDI.** Sunucu izin listesi
+      (`attachments.service ALLOWED_CONTENT_TYPES`) = `png/jpeg/gif/webp/pdf/txt`; **video YOK**.
+      PM bunu DoD'a yazarken kontrol etmemişti, `api/` diffi olmadan imkânsızdı. Dev durdu ve bildirdi.
+      **Sahip kararı 2026-08-04: video şimdi açılmıyor** (api değişikliği + `READ_MEDIA_VIDEO` Play
+      beyanının geri gelmesi + 25 MB'ın telefon videolarını zaten reddetmesi + `SCAN=false` iken en
+      ağır türü açmanın T&S riski). PLAN borcu olarak yazıldı
 - [ ] Çoklu seçim (2-3 dosya) tek mesajda gidiyor; 10 sınırı uyarıyor
 - [ ] Boyut sınırını aşan dosyada anlaşılır Türkçe uyarı
 - [ ] 🔴 **Galeri izni reddedilince** uygulama kilitlenmiyor, Dosyalar yolu çalışıyor
