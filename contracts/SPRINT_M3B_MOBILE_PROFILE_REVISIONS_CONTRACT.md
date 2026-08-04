@@ -50,9 +50,15 @@ ekranına** yönlendirir. Uzun-basma panelindeki (`DmMenuSheet`) ilk satır da b
 Yeni ekran: `mobile/src/app/(app)/dm-details.tsx`.
 
 🔴 **Kopyalama yasak.** Ekran, M2c'de çıkarılmış bileşenleri **yeniden kullanır**:
-`ChannelDetailsTabBar` · `ChannelMembersTab` · `ChannelMediaTab` · `ChannelLinksTab` ·
-`ChannelFilesTab` · sabitlemeler sekmesinin mevcut içeriği. Sekme içi mantık ikinci kez yazılmaz.
+`ChannelDetailsTabBar` · `ChannelMediaTab` · `ChannelLinksTab` · `ChannelFilesTab` ·
+sabitlemeler sekmesinin mevcut içeriği. Sekme içi mantık ikinci kez yazılmaz.
 Bir bileşen DM'de farklı davranmak zorundaysa **prop'u genişlet**, fork etme.
+
+🔴 **Tek istisna `ChannelMembersTab` — onu YENİDEN KULLANMA.** Ortam üyesi `GuildMemberDto`
+(`roles[]` taşır) ve sekme üyeleri **en yüksek pozisyonlu role göre bölümlere ayırıyor**. Grup DM
+üyesi `DmParticipantDto`; **rol diye bir şey yok**, gruplama da yok. Bu bileşeni iki şekle
+genelleştirmek çalışan bir bileşene tanımı gereği hiç kesişmeyen bir dal eklemek olur → grup DM
+kendi düz üye sekmesini alır (§2.3). Ortak olan **satır görünümü**, sekme değil.
 
 `channel-details.tsx` **ayrı kalır** (başlığı, `canManage` kararı, Ayarlar/Davet Et düğmeleri
 tamamen farklı). Ortak olan sekme gövdesi, ortak olmayan kabuk.
@@ -70,7 +76,7 @@ tamamen farklı). Ortak olan sekme gövdesi, ortak olmayan kabuk.
 
 | Sekme | 1-1 DM | Grup DM | Kaynak |
 |---|---|---|---|
-| Üyeler | **gösterme** (iki kişi, bilgi değeri yok) | ✅ mevcut grup üye listesi | `ChannelMembersTab` |
+| Üyeler | **gösterme** (iki kişi, bilgi değeri yok) | ✅ | **yeni** `GroupMembersTab` (§2.3.1) |
 | Medya | ✅ | ✅ | `ChannelMediaTab` (§5.1 sonrası) |
 | Sabitlemeler | ✅ | ✅ | `GET /channels/:id/pins` (zaten kanal kapsamlı) |
 | Bağlantılar | ✅ | ✅ | `ChannelLinksTab` (§5.1 sonrası) |
@@ -80,7 +86,29 @@ tamamen farklı). Ortak olan sekme gövdesi, ortak olmayan kabuk.
   gösterecek bir şey yok, boş yüzey açma kuralı). Sekme çubuğu 4 sekmeyle başlar.
 - Grup DM Üyeler sekmesinde Discord'un "Yeni Grup" satırı **yok** → bizde karşılığı olan akış
   "Üye Ekle" ve o ⋯ menüsünde (§2.4).
-- Üye satırına dokunma → **profil alt-paneli** (§3).
+
+### 2.3.1 Grup DM Üyeler sekmesi — `group/[id].tsx` buraya katlanır
+
+Sahip kararı 2026-08-04: grup DM başlığına dokununca bugün **doğrudan üye listesi ekranı**
+(`group/[id].tsx`) açılıyor. Artık açılmayacak; grup DM de sekmeli ekrana girecek, üye listesi o
+ekranın **bir sekmesi** olacak. Kanal detayıyla aynı mantık, tek fark grup DM'de **rol yok**.
+
+Yeni bileşen `GroupMembersTab`, `group/[id].tsx`'in liste gövdesini **davranışıyla birlikte** taşır:
+
+- Üye satırı: avatar + kullanıcı adı
+- Grup sahibi satırında **👑 rozeti**
+- 🔴 **Üye çıkarma (✕) korunur** — yalnız grup sahibine görünür, `ConfirmDialog` onayı korunur.
+  Bu satır aksiyonu ⋯ menüsündeki dört aksiyonun listesinde yoktu; taşıma sırasında **düşerse
+  grup sahibi üye çıkaramaz hale gelir**. M1d-0'daki "engelleme kayboldu" hatasının aynısı.
+- 🔴 Kendi satırın **dokunulabilir değil** (kendini engelleyemez/çıkaramazsın) — bugünkü davranış
+- Üye satırına dokunma → **profil alt-paneli** (§3)
+- Yetki kararı istemcide **yeniden hesaplanmaz**; bugünkü `isOwner` / `channel.ownerId` mantığı aynen
+
+`group/[id].tsx` **rotası kaldırılır**; ona giden tüm yönlendirmeler DM detay ekranına döner.
+Ölü ekran bırakılmaz.
+🔴 Kaldırmadan önce **ona giden her yol taranır** (uzun-basma paneli, DM başlığı, grup oluşturma
+sonrası yönlendirme, push yönlendirmesi `pushNavigation.ts`, bildirimler sekmesi). Biri atlanırsa
+kullanıcı var olmayan rotaya düşer.
 
 ### 2.4 ⋯ alt-paneli
 
@@ -92,7 +120,8 @@ Mevcut `*Sheet.tsx` desenini kullan (`Modal transparent animationType="slide"`),
 
 **Grup DM** (dünkü §2'nin taşındığı yer):
 - **Üye Ekle · Yeniden Adlandır · Gruptan Ayrıl · Grubu Sil** → `group/[id].tsx` ekranının
-  **dibindeki aksiyonlar buraya taşınır**, oradan kalkar.
+  **dibindeki aksiyonlar buraya taşınır**, oradan kalkar. (Satır içi **üye çıkarma** bu listede
+  değil, Üyeler sekmesinde kalır → §2.3.1.)
 - Yetki: bugünkü kural **aynen** korunur (silme/yeniden adlandırma grup sahibinde, ayrılma herkeste).
   🔴 Yetki kararını istemcide **yeniden hesaplama**; bugün ne yapıyorsa o.
 - Yıkıcı aksiyonların onayı korunur. Tek dokunuşla gruptan çıkma / grup silme **YOK**.
@@ -101,8 +130,9 @@ Mevcut `*Sheet.tsx` desenini kullan (`Modal transparent animationType="slide"`),
 
 ### 2.5 Kapsam dışı
 
-`group/[id].tsx` ekranı **kalır mı kalkar mı** sorusu bu sprintte açılmaz: dip aksiyonları taşınır,
-üye listesi yerinde kalır. Ekranın tamamen DM detayına katlanması ayrı bir iş, PM kararı.
+- Grup DM'e **rol/yetki sistemi** getirmek: yok, gelmiyor. Grup DM'de tek ayrım `ownerId`.
+- Grup DM'e **davet linki**: yok (grup üyeliği yalnız kanka listesinden ekleme ile büyür).
+- 1-1 DM'de Üyeler sekmesi.
 
 ---
 
@@ -255,12 +285,18 @@ alınmadan merge edilmez.
 - [ ] Yeni bağımlılık yok · yeni endpoint yok · migration yok
 - [ ] Sekme içi mantık kopyalanmadı (§2.1) · `has` süzgeci ortak helper'a çıkarıldı (§5.1)
 - [ ] Ortam kanal detayının üç sekmesi §5.1 değişikliğinden sonra aynı sonucu veriyor (özel kanal dahil)
+- [ ] `ChannelMembersTab` grup DM için genelleştirilmedi, ortam tarafı dokunulmadı (§2.1)
+- [ ] `group/[id].tsx` rotası kaldırıldı **ve** ona giden hiçbir yönlendirme kalmadı
+      (uzun-basma paneli · DM başlığı · grup oluşturma sonrası · `pushNavigation.ts` · bildirimler)
 
 **Cihazda (sahip):**
 - [ ] Kankalar listesinde aksiyonlar ikon-only, dokunma hedefi rahat
 - [ ] DM başlığına dokununca **DM detay ekranı** açılıyor (profil kartı değil)
 - [ ] DM detayında Medya / Sabitlemeler / Bağlantılar / Dosyalar **gerçekten doluyor**
+- [ ] **Grup DM başlığına dokununca üye listesine ATMIYOR**, sekmeli detay ekranı açılıyor
 - [ ] 1-1 DM'de Üyeler sekmesi yok, grup DM'de var
+- [ ] Grup DM Üyeler sekmesinde 👑 rozeti duruyor · **grup sahibi üye çıkarabiliyor (✕ + onay)** ·
+      kendi satırın dokunulmuyor · üyeye dokununca profil alt-paneli açılıyor
 - [ ] Grup DM ⋯ menüsünde Üye Ekle · Yeniden Adlandır · Gruptan Ayrıl · Grubu Sil; onaylar duruyor
 - [ ] 1-1 DM ⋯ menüsünde Sohbeti Temizle çalışıyor
 - [ ] Mesaj yazarına dokununca **profil alt-paneli** açılıyor (kanal ve DM)
