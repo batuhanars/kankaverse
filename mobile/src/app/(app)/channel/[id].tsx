@@ -171,6 +171,9 @@ export default function ChannelScreen() {
         typingMode="named"
         jumpToMessageId={jumpTo}
         canPin={canPin}
+        // M3b §3.2 — profil alt-panelinin rol rozetleri için ortam bağlamı. Bu ekran `guildId`
+        // olmadan da açılabiliyor (bildirim/arama yolu); o durumda panel Roller bölümünü çizmez.
+        guildId={guildId}
         mentionCandidates={mentionCandidates}
         mentionRoles={mentionRoles}
         everyoneRoleId={everyoneRoleId}

@@ -6,14 +6,14 @@ import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 interface Props {
-  guildId: string;
   channelId: string;
   onOpenMessage: (messageId: string) => void;
 }
 
-/** Sprint M2c contract §4.3 — "Bağlantılar" sekmesi: `has=link`, mesaj listesi. */
-export function ChannelLinksTab({ guildId, channelId, onOpenMessage }: Props) {
-  const { state, messages, errorMessage, retry } = useChannelSearchTab(guildId, channelId, 'link');
+/** Sprint M2c contract §4.3 — "Bağlantılar" sekmesi: `has=link`, mesaj listesi.
+ *  M3b §5.1 — `guildId` düştü (kanal kapsamlı uç); ortam kanalı ve DM aynı bileşeni kullanır. */
+export function ChannelLinksTab({ channelId, onOpenMessage }: Props) {
+  const { state, messages, errorMessage, retry } = useChannelSearchTab(channelId, 'link');
 
   if (state === 'loading') return <MessageLoading />;
   if (state === 'error') return <MessageError message={errorMessage} onRetry={retry} />;

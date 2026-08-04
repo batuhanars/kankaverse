@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { dmApi, type DmChannelDto } from '@/api/dm';
 import { useDmStore } from '@/stores/dm';
+import { useFriendsStore } from '@/stores/friends';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { NotifTargetType, type NotificationLevel } from '@/api/notifications';
 import { channelTitle } from '@/utils/channelTitle';
@@ -21,15 +22,15 @@ interface Props {
   /** Uzun basılan DM; null ise panel kapalı. */
   channel: DmChannelDto | null;
   onClose: () => void;
-  /** Profil satırı — sohbet ekranındaki kartın aynısı (aynı hedefe iki giriş, yeni yüzey değil). */
-  onOpenDm: (channel: DmChannelDto) => void;
+  /** İlk satır — M3b §2.1 ile **DM detay ekranı** (sohbet başlığına dokunmakla aynı hedef). */
+  onOpenDetails: (channel: DmChannelDto) => void;
   onAddFriend: () => void;
 }
 
 /** Ana panel mi, yoksa üstüne açılan süre/seviye seçici mi görünüyor. */
 type SubSheet = 'none' | 'mute' | 'level';
 
-export function DmMenuHost({ channel, onClose, onOpenDm, onAddFriend }: Props) {
+export function DmMenuHost({ channel, onClose, onOpenDetails, onAddFriend }: Props) {
   const [clearTarget, setClearTarget] = useState<DmChannelDto | null>(null);
   const [clearing, setClearing] = useState(false);
   // Sprint M2b §4.1 — süre/seviye seçici, `DmMenuSheet`in ÜSTÜNE değil YERİNE açılır (tek modal
@@ -45,6 +46,27 @@ export function DmMenuHost({ channel, onClose, onOpenDm, onAddFriend }: Props) {
   );
   // DM'in bağlı olduğu bir ortam yok → fallback GUILD'i yok, yalnız kendi kaydı veya varsayılan.
   const level = useNotificationPrefsStore((s) => s.effectiveLevel(NotifTargetType.CHANNEL, dmChannelId));
+
+  // 🔴 Sprint M3b §4 — kusur düzeltmesi (sahip ekran görüntüsü 2026-08-04). Kapı yalnız
+  // `channel?.type === 'DM'` idi: "1-1 DM mi" sorusuna bakıp "zaten kanka mıyız" sorusunu hiç
+  // sormuyordu, bu yüzden kankanın DM panelinde de "Kanka Ekle" duruyordu. Web'deki kapı
+  // (`DmConversation.showAddFriend`) üç şart taşıyor: kanka değil + ben engellememişim + istek
+  // gönderilmemiş. Aynı üçü burada da uygulanıyor — veri zaten elde, yeni istek atılmıyor.
+  //
+  // Web'in yerel `addFriendSent` bayrağının mobil karşılığı store'daki GİDEN istek kaydı:
+  // mobilde "Kanka Ekle" satırı inline gönderim yapmıyor, `/friends-add` ekranına götürüyor →
+  // panele dönüldüğünde yerel bir bayrak zaten yaşamıyor olurdu. `requests` listesi sunucudan
+  // geliyor ve `direction` taşıyor, yani daha dayanıklı bir kaynak.
+  //
+  // 🔴 T&S: "o beni engelledi" durumu buraya HİÇ girmiyor (`selfBlocked` yalnız "ben engelledim").
+  // Gizleme sebebi kullanıcıya açıklanmaz; ret zaten sunucuda jenerik.
+  const otherUserId = channel?.type === 'DM' ? channel.otherUser.id : null;
+  const isFriend = useFriendsStore((s) => !!otherUserId && s.friends.some((f) => f.user.id === otherUserId));
+  const requestSent = useFriendsStore(
+    (s) => !!otherUserId && s.requests.some((r) => r.direction === 'outgoing' && r.user.id === otherUserId),
+  );
+  const canAddFriend =
+    channel?.type === 'DM' && !channel.selfBlocked && !isFriend && !requestSent;
 
   async function onConfirmClear() {
     if (!clearTarget) return;
@@ -107,15 +129,15 @@ export function DmMenuHost({ channel, onClose, onOpenDm, onAddFriend }: Props) {
         visible={!!channel && subSheet === 'none'}
         title={channel ? channelTitle(channel) : ''}
         hasUnread={!!channel?.unread}
-        // Kanka Ekle yalnız 1-1 DM'de: grup DM'de tek bir "karşı taraf" yok → hiç render edilmez.
-        canAddFriend={channel?.type === 'DM'}
+        // Kanka Ekle yalnız 1-1 DM'de VE henüz kanka olunmamışsa (§4 — yukarıdaki kapı).
+        canAddFriend={canAddFriend}
         muted={muted}
         mutedUntil={mutedUntil}
         onClose={closeAll}
-        onProfile={() => {
+        onDetails={() => {
           const c = channel;
           closeAll();
-          if (c) onOpenDm(c);
+          if (c) onOpenDetails(c);
         }}
         onAddFriend={() => {
           closeAll();

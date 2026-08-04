@@ -42,7 +42,8 @@ export default function HomeScreen() {
   const [menuChannel, setMenuChannel] = useState<ChannelSummaryDto | null>(null);
   const [menuCategory, setMenuCategory] = useState<CategoryDto | null>(null);
   // M1d-C §2.3 — uzun basılan DM. Panel LİSTEDEN açılır; sohbetin içinden değil (orada başlığa
-  // dokunmak profili açar). Panelin İÇ akışı `DmMenuHost`ta — bu ekran yalnız "hangi DM" bilgisini tutar.
+  // dokunmak DM detay ekranını açar — M3b §2.1). Panelin İÇ akışı `DmMenuHost`ta — bu ekran yalnız
+  // "hangi DM" bilgisini tutar.
   const [menuDm, setMenuDm] = useState<DmChannelDto | null>(null);
 
   // Sprint M1d §6 — seçili ortamdaki kendi rolüm. Sunucuda "benim rolüm" diye ayrı bir uç YOK;
@@ -372,7 +373,9 @@ export default function HomeScreen() {
       <DmMenuHost
         channel={menuDm}
         onClose={() => setMenuDm(null)}
-        onOpenDm={openDm}
+        // M3b §2.1 — panelin ilk satırı DM detay ekranına gider (sohbeti açmıyor: sohbet zaten
+        // satıra kısa dokunuşla açılıyor, aynı hedefe ikinci kapı gereksizdi).
+        onOpenDetails={(c) => router.push({ pathname: '/dm-details', params: { id: c.id } })}
         onAddFriend={() => router.push('/friends-add')}
       />
 

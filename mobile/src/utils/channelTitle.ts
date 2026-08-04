@@ -5,7 +5,7 @@ import { t } from '@/i18n';
  * Bir DM/grup kanalının kullanıcıya gösterilecek adı.
  *
  * **Neden tek yerde (Rule of Three, 2026-07-30):** aynı mantık üç yere kopyalanmıştı — `DmSidebar`
- * (liste satırı), `dmRoute` (sohbet başlığı) ve `group/[id].tsx` (yönetim ekranı başlığı). Üçüncüsü
+ * (liste satırı), `dmRoute` (sohbet başlığı) ve grup yönetim ekranı başlığı. Üçüncüsü
  * **kopyayı yanlış yapmıştı**: `channel.name || t('group.noName')` diyerek üye adları yedeğini
  * atlıyordu, yani adsız grup listede "ahmet, mehmet" görünürken yönetim ekranında jenerik "Grup"
  * oluyordu. M1b R3 ile grup adı kurma anında SORULMADIĞI için (adsız grup artık istisna değil kural)

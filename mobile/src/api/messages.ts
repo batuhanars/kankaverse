@@ -59,6 +59,21 @@ export interface GuildSearchParams {
   has?: 'link' | 'image' | 'file';
 }
 
+/**
+ * Sprint M3b §5.1 — **kanal kapsamlı** arama parametreleri (`GET /channels/:id/messages/search`).
+ * `has` değerleri ortam ucuyla AYNI (yeni değer icat edilmedi); `has` doluyken `q` opsiyonel,
+ * `has` yokken bugünkü davranış birebir (q zorunlu, min 2 karakter → `QUERY_TOO_SHORT`).
+ *
+ * Gerekçe: kanal detayının Medya/Bağlantılar/Dosyalar sekmeleri ortam ucuna (`in=<channelId>`)
+ * gidiyordu; DM'in `guildId`'si olmadığı için o yol DM'de kullanılamıyordu. Uç kanal kapsamlısına
+ * taşındı → ortam kanalı ve DM tek yoldan akıyor, istemcide dallanma kalmadı.
+ */
+export interface ChannelSearchParams {
+  q?: string;
+  has?: 'link' | 'image' | 'file';
+  before?: string;
+}
+
 /** Sunucu sonucu kanal bazında gruplayıp döner (`searchGuildMessages` dönüşü birebir). */
 export interface GuildSearchGroupDto {
   channelId: string;
@@ -99,12 +114,16 @@ export const messagesApi = {
     });
     return res.data;
   },
-  // Sözleşme §3.5 — kanal içi mesaj arama (case-insensitive, max 30 sonuç, backend'de min 2 karakter
-  // zorunlu — `messages.controller.ts` `searchMessages`). Ortam-geneli arama (`/guilds/:id/messages/
-  // search`) bu sprintte KULLANILMIYOR (sözleşme §3.5 kapsam dışı notu).
-  async search(channelId: string, q: string, before?: string): Promise<MessageDto[]> {
+  // Sözleşme §3.5 — kanal içi mesaj arama (case-insensitive, max 30 sonuç, backend'de `q` verildiğinde
+  // min 2 karakter zorunlu — `messages.controller.ts` `searchMessages`).
+  //
+  // M3b §5.1 — imza tek parametre nesnesine çevrildi ve `has` süzgeci eklendi. İKİNCİ BİR METOT
+  // AÇILMADI: aynı uca giden iki fonksiyon, ileride biri değişip diğeri unutulduğunda sessizce
+  // ayrışırdı (M3'ün `resolveMentionPreview` dersi).
+  async search(channelId: string, params: ChannelSearchParams): Promise<MessageDto[]> {
     const res = await http.get<MessageDto[]>(`/channels/${channelId}/messages/search`, {
-      params: before ? { q, before } : { q },
+      // Boş alanlar sorguya HİÇ girmez (ortam ucundaki `searchGuild` ile aynı disiplin).
+      params: Object.fromEntries(Object.entries(params).filter(([, v]) => v)),
     });
     return res.data;
   },

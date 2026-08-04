@@ -13,7 +13,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { extractErrorMessage } from '@/api/errors';
+import type { MessageAuthorDto } from '@/api/messages';
 import { MessageBubble } from './MessageBubble';
+import { ProfileSheet } from './profile/ProfileSheet';
 import { MessageSearchModal } from './MessageSearchModal';
 import { MessageComposer } from './message/MessageComposer';
 import { useTypingEmitter } from './message/useTypingEmitter';
@@ -75,6 +77,12 @@ interface Props {
   resolveRole?: (roleId: string) => string | undefined;
   /** R15 — öneri listesine girecek roller (kapı kuralı çağıranda uygulanmış). */
   mentionRoles?: MentionCandidate[];
+  /**
+   * Sprint M3b §3.2 — profil alt-panelinin ortam bağlamı. Verilirse `GET /users/:id/card` rol
+   * rozetlerini de döner; verilmezse (DM/grup DM, ya da `guildId`siz açılmış kanal ekranı) panel
+   * Roller bölümünü hiç çizmez. Yeni istek/uç değil, mevcut ucun parametresi.
+   */
+  guildId?: string;
 }
 
 // Sprint M1a — kanal VE DM mesaj ekranı için TEK gövde (contract §5 ekran 3: "aynısı"). İkisi de
@@ -95,6 +103,7 @@ export function MessageScreen({
   everyoneRoleId,
   resolveRole,
   mentionRoles,
+  guildId,
 }: Props) {
   const authUser = useAuthStore((s) => s.user);
   const fetchInitial = useMessagesStore((s) => s.fetchInitial);
@@ -104,6 +113,10 @@ export function MessageScreen({
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   const [searchVisible, setSearchVisible] = useState(false);
+  // Sprint M3b §3.1 — mesaj yazarına dokununca açılan profil alt-paneli. Hedef `MessageAuthorDto`
+  // olarak tutuluyor (id + ad + avatar zaten mesajda var) → panel açılırken ek istek yok, kartı
+  // kendisi çekiyor.
+  const [profileTarget, setProfileTarget] = useState<MessageAuthorDto | null>(null);
 
   // "Yazıyor" yayını + etiketi kendi kancasında (M1d-C §2.1).
   const typing = useTypingEmitter(channelId, typingMode);
@@ -266,6 +279,7 @@ export function MessageScreen({
               resolveRole={resolveRole}
               highlighted={item.message.id === list.highlightId}
               onLongPress={() => actions.open(item.message)}
+              onPressAuthor={() => setProfileTarget(item.message.author)}
               onToggleReaction={(emoji) => actions.toggleReaction(item.message, emoji)}
             />
           )}
@@ -323,6 +337,16 @@ export function MessageScreen({
           if (m) composer.startEdit(m);
         }}
       />
+
+      {profileTarget && (
+        <ProfileSheet
+          userId={profileTarget.id}
+          username={profileTarget.username}
+          avatarUrl={profileTarget.avatarUrl}
+          guildId={guildId}
+          onClose={() => setProfileTarget(null)}
+        />
+      )}
 
       {searchVisible && (
         <MessageSearchModal

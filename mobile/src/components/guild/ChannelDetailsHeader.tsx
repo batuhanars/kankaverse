@@ -19,10 +19,14 @@ interface Props {
  * ayrıldı — dosya 300 satır eşiğini aşıyordu (kök CLAUDE.md "dosya 300+ satır → düzelt" sinyali),
  * bu bölüm saf sunum, kendi state'i yok.
  *
- * 🔴 Sahip cihaz turu revizesi — kanal adı BURADA değil, native header'a taşındı (`channel-details.tsx`
- * `Stack.Screen options.title`): ekranda büyük ortalı başlık + boş native header üst üste ölü alan
- * bırakıyordu. Yaş rozeti (`ageGated`) native başlığa sıkıştırılmadı (kısa alan, kırpılırdı) — burada,
- * aksiyon şeridinin ÜSTÜNDE küçük bir işaret olarak kaldı.
+ * 🔴 **R2 §A — kanal adı BURAYA geri döndü.** M2c turunda başlık native header'a taşınmıştı çünkü
+ * "ekranda büyük ortalı başlık + BOŞ native header" üst üste ölü alan bırakıyordu. Sahip teşhisi
+ * (2026-08-04): asıl sorun şeridin boş olmasıydı, başlığın yeri değil — yani semptom tedavi
+ * edilmişti. Header tamamen kalkınca başlık kendi yerine döndü (Discord mantığı), ölü alan da
+ * kaynağından kalktı. Ekran okuyucu için `accessibilityRole="header"`: native başlık gidince
+ * ekranın adını duyuran tek satır bu.
+ *
+ * Yaş rozeti (`ageGated`) başlığın altında küçük bir işaret olarak kaldı.
  *
  * Görsel dil `GuildMenuSheet`in aksiyon şeridinden alındı (daire + alt etiket); o bileşen
  * BURADA import edilmedi çünkü tamamen farklı bir yüzey (alttan panel vs. tam ekran başlık) —
@@ -31,6 +35,10 @@ interface Props {
 export function ChannelDetailsHeader({ channel, muted, canManage, onSearch, onMute, onSettings }: Props) {
   return (
     <View style={styles.header}>
+      <Text style={styles.title} accessibilityRole="header" numberOfLines={1}>
+        #{channel.name}
+      </Text>
+
       {channel.ageGated && (
         <Text style={styles.ageBadge} numberOfLines={1}>
           {t('channel.ageGatedBadge')}
@@ -77,6 +85,13 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 4,
     gap: 10,
+  },
+  title: {
+    alignSelf: 'center',
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.xxl,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   ageBadge: {
     alignSelf: 'center',

@@ -5,6 +5,27 @@ import http from './http';
 // roller/ses durumu — C10 sprint'i), ama M1b yalnız engelle/arkadaşlıktan-çıkar KARARI için
 // gereken alt kümeyi kullanıyor. Rule of Three deseni (bkz. api/channels.ts yorumu): kullanılmayan
 // alanlar tiplenmedi.
+/** Sprint M3b §3.2 — ortak ortam satırı (`users.service.ts` `MutualGuildDto`). */
+export interface MutualGuildDto {
+  id: string;
+  name: string;
+  iconUrl: string | null;
+}
+
+/** Ortak kanka satırı (`MutualFriendDto`). */
+export interface MutualFriendDto {
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+}
+
+/** C10 — rol rozeti; YALNIZ `guildId` bağlamıyla çağrılınca dolu, aksi hâlde `[]`. */
+export interface UserCardRoleDto {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface UserCardDto {
   id: string;
   username: string;
@@ -19,6 +40,16 @@ export interface UserCardDto {
   bannerColor: string | null;
   /** ISO tarih — TR biçiminde ("25 Ekim 2023") gösterilir. */
   memberSince: string;
+  // Sprint M3b §3.2 — profil alt-paneli bu alanları çiziyor. Yine **yeni backend alanı değil**
+  // (C5/C10'dan beri dönüyor), yalnız mobilde tiplenmemişti.
+  mutualFriends: MutualFriendDto[];
+  mutualGuilds: MutualGuildDto[];
+  /** `canDm` otoritesi — "Mesaj" düğmesinin kapısı. İstemci kendi kafasına göre hesaplamaz. */
+  canMessage: boolean;
+  roles: UserCardRoleDto[];
+  // 🔴 `voiceStatus` BİLİNÇLİ tiplenmedi: mobilde ses M4'te geliyor, bu sprintte çizilmiyor ve
+  // çizilmeyecek bir alanı tiplemek "yakında" vaadi olurdu. Panelin düzeni o satır sonradan
+  // aksiyonların ALTINA girince bozulmayacak şekilde kuruldu (bkz. ProfileSheet).
 }
 
 export interface UpdateProfileDto {
@@ -40,8 +71,15 @@ export interface PresignResult {
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export const usersApi = {
-  async getCard(userId: string): Promise<UserCardDto> {
-    const res = await http.get<UserCardDto>(`/users/${userId}/card`);
+  /**
+   * `guildId` opsiyonel — verilirse sunucu **rol rozetlerini** doldurur
+   * (`users.controller.ts` `@Query('guildId')`, C10). Verilmezse `roles: []` döner ve panel o
+   * bölümü hiç çizmez. Yeni uç değil, mevcut ucun bugüne kadar kullanılmayan parametresi.
+   */
+  async getCard(userId: string, guildId?: string): Promise<UserCardDto> {
+    const res = await http.get<UserCardDto>(`/users/${userId}/card`, {
+      params: guildId ? { guildId } : undefined,
+    });
     return res.data;
   },
 
