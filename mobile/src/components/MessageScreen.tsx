@@ -17,7 +17,7 @@ import type { MessageAuthorDto } from '@/api/messages';
 import { MessageBubble } from './MessageBubble';
 import { ProfileSheet } from './profile/ProfileSheet';
 import { MessageSearchModal } from './MessageSearchModal';
-import { MessageComposer } from './message/MessageComposer';
+import { ComposerHost } from './message/ComposerHost';
 import { useTypingEmitter } from './message/useTypingEmitter';
 import { useMessageComposer } from './message/useMessageComposer';
 import { useMentionCompose, type MentionCandidate } from './message/useMentionCompose';
@@ -298,29 +298,15 @@ export function MessageScreen({
         </Pressable>
       )}
 
-      <MessageComposer
-        value={composer.input}
-        onChangeText={(text) => {
-          composer.onChangeInput(text);
-          mention.onChangeText(text);
-        }}
-        onSend={composer.onSend}
-        sending={composer.sending}
-        sendError={composer.sendError}
+      {/* Sprint M3c — kutu + ek paneli + emoji seçici tek yerleşimde (`ComposerHost`); ekran yalnız
+          bağlamı geçirir. Kutunun kendi iç akışı (taslak ekler, imleç, seçiciler) ekranın işi değil. */}
+      <ComposerHost
+        composer={composer}
+        mention={mention}
         placeholder={placeholder}
         disabledNotice={disabledNotice}
         typingLabel={typing.label}
         bottomInset={bottomInset}
-        replyToAuthor={composer.replyTo?.author.username}
-        replyToSnippet={composer.replyTo?.content}
-        editing={!!composer.editing}
-        onCancelMode={composer.cancelMode}
-        mentionSuggestions={mention.visible ? mention.suggestions : undefined}
-        onMentionSelect={(candidate) => {
-          const next = mention.select(candidate, composer.input);
-          if (next) composer.onChangeInput(next.text);
-        }}
-        onSelectionChange={mention.onSelectionChange}
       />
 
       <MessageActionHost

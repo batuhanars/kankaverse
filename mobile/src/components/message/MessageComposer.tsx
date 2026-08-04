@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MentionSuggestionList } from './MentionSuggestionList';
 import type { MentionCandidate } from './useMentionCompose';
+import type { DraftAttachment } from '@/utils/attachmentUpload';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -43,8 +44,26 @@ interface Props {
    */
   mentionSuggestions?: MentionCandidate[];
   onMentionSelect?: (candidate: MentionCandidate) => void;
-  /** `TextInput` imleç takibi — kanca sorguyu buradan okur (RN'de selectionStart bedava değil). */
-  onSelectionChange?: (start: number) => void;
+  /**
+   * `TextInput` imleç takibi — bahsetme kancası sorguyu `start`'tan, emoji ekleme aralığın
+   * ikisinden okur (RN'de selection bedava değil, tek olaydan iki tüketici beslenir).
+   */
+  onSelectionChange?: (start: number, end: number) => void;
+  /**
+   * Sprint M3c §4 — emoji eklendikten sonra imleci emojinin ARKASINA taşımak için TEK render
+   * boyunca kontrol edilen seçim. Kalıcı kontrol Android IME'siyle kavga ediyor (bkz.
+   * `useEmojiInsert`).
+   */
+  selection?: { start: number; end: number } | null;
+  /** Sprint M3c §1 — `+` düğmesi. Verilmezse düğme çizilmez (yüzeyi olmayan ekranlar için). */
+  onOpenAttach?: () => void;
+  /** Sprint M3c §4 — emoji seçiciyi aç. Verilmezse düğme çizilmez. */
+  onOpenEmoji?: () => void;
+  /** Gönderilmeyi bekleyen ekler — kutunun üstünde şerit olarak görünür. */
+  attachments?: DraftAttachment[];
+  onRemoveAttachment?: (key: string) => void;
+  /** "Yükleniyor… 2/5" — boşsa şerit çizilmez. */
+  uploadLabel?: string;
 }
 
 export function MessageComposer({
@@ -64,9 +83,19 @@ export function MessageComposer({
   mentionSuggestions,
   onMentionSelect,
   onSelectionChange,
+  selection,
+  onOpenAttach,
+  onOpenEmoji,
+  attachments,
+  onRemoveAttachment,
+  uploadLabel,
 }: Props) {
-  const canSend = !!value.trim() && !sending;
+  // Sunucu ile aynı kural: en az bir ek varsa boş metinle de gönderilebilir (`EMPTY_MESSAGE`).
+  const canSend = (!!value.trim() || !!attachments?.length) && !sending;
   const modeActive = editing || !!replyToAuthor;
+  // 🔴 Düzenleme modunda ek düğmesi YOK: `PATCH .../messages/:id` yalnız `content` alıyor, var olan
+  // mesaja sonradan ek bağlanamıyor. Düğmeyi göstermek "ekledim ama gitmedi" hâli üretirdi.
+  const showAttach = !!onOpenAttach && !editing;
 
   return (
     <>
@@ -115,7 +144,48 @@ export function MessageComposer({
       ) : (
         <View style={[styles.inputBar, { paddingBottom: theme.layout.panelGap + bottomInset }]}>
           {sendError ? <Text style={styles.sendError}>{sendError}</Text> : null}
+          {uploadLabel ? <Text style={styles.uploadLabel}>{uploadLabel}</Text> : null}
+
+          {/* Sprint M3c §3 — gönderilmeyi bekleyen ekler. Gönderim hatasında bu şerit AYAKTA KALIR
+              (seçim korunur), kullanıcı aynı seçimle tekrar deneyebilir. */}
+          {!!attachments?.length && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.draftRow}>
+              {attachments.map((draft) => (
+                <View key={draft.key} style={styles.draftChip}>
+                  {draft.contentType.startsWith('image/') ? (
+                    <Image source={{ uri: draft.uri }} style={styles.draftThumb} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.draftThumb}>
+                      <Ionicons name="document-outline" size={20} color={theme.colors.textSecondary} />
+                    </View>
+                  )}
+                  <Text style={styles.draftName} numberOfLines={1}>
+                    {draft.filename}
+                  </Text>
+                  <Pressable
+                    onPress={() => onRemoveAttachment?.(draft.key)}
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('attachment.remove')}
+                  >
+                    <Ionicons name="close-circle" size={18} color={theme.colors.textMuted} />
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
           <View style={styles.inputRow}>
+            {showAttach && (
+              <Pressable
+                onPress={onOpenAttach}
+                accessibilityRole="button"
+                accessibilityLabel={t('mobile.attach.open')}
+                style={styles.iconButton}
+              >
+                <Ionicons name="add" size={24} color={theme.colors.textSecondary} />
+              </Pressable>
+            )}
             <TextInput
               value={value}
               onChangeText={onChangeText}
@@ -123,10 +193,23 @@ export function MessageComposer({
               placeholderTextColor={theme.colors.textMuted}
               style={styles.input}
               multiline
-              onSelectionChange={(e) => onSelectionChange?.(e.nativeEvent.selection.start)}
+              selection={selection ?? undefined}
+              onSelectionChange={(e) =>
+                onSelectionChange?.(e.nativeEvent.selection.start, e.nativeEvent.selection.end)
+              }
             />
+            {onOpenEmoji && (
+              <Pressable
+                onPress={onOpenEmoji}
+                accessibilityRole="button"
+                accessibilityLabel={t('mobile.emoji.open')}
+                style={styles.iconButton}
+              >
+                <Ionicons name="happy-outline" size={22} color={theme.colors.textMuted} />
+              </Pressable>
+            )}
             <Pressable
-              onPress={onSend}
+              onPress={() => onSend()}
               disabled={!canSend}
               style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
             >
@@ -183,10 +266,48 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xs,
     marginBottom: 6,
   },
+  uploadLabel: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+    marginBottom: 6,
+  },
+  draftRow: {
+    gap: 8,
+    paddingBottom: 8,
+  },
+  draftChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    maxWidth: 200,
+    paddingRight: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.bgElevated,
+    overflow: 'hidden',
+  },
+  draftThumb: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.bgSidebar,
+  },
+  draftName: {
+    flexShrink: 1,
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.xs,
+  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 8,
+    gap: 4,
+  },
+  // Dokunma hedefi 44dp (sözleşme §1) — ikon 24px olsa da basılabilir alan küçülmez.
+  iconButton: {
+    width: theme.layout.inputMinHeight,
+    height: theme.layout.inputMinHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   input: {
     flex: 1,

@@ -1609,6 +1609,29 @@
     "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
   },
   "mobile": {
+    "attach": {
+      "open": "Ek ekle",
+      "files": "Dosyalar",
+      "title": "Ek Gönder",
+      "gallery": "Galeriden Seç",
+      "allAlbums": "Tüm Albümler",
+      "back": "Geri",
+      "camera": "Kamera",
+      "cameraDenied": "Kamera izni verilmedi.",
+      "expand": "Paneli büyüt",
+      "collapse": "Paneli küçült",
+      "send": "Gönder ({count})",
+      "limit": "Bir mesaja en fazla {count} dosya ekleyebilirsin.",
+      "permissionDenied": "Galeri izni verilmediği için fotoğrafların burada listelenmiyor. Yine de aşağıdaki seçiciyle dosya gönderebilirsin.",
+      "pickMore": "Daha fazla fotoğraf seç",
+      "limitedNotice": "Yalnızca izin verdiğin fotoğraflar görünüyor.",
+      "empty": "Galeride fotoğraf bulunamadı.",
+      "uploading": "Yükleniyor… {done}/{total}",
+      "uploadFailed": "Dosya yüklenemedi, mesaj gönderilmedi. Tekrar deneyebilirsin."
+    },
+    "emoji": {
+      "open": "Emoji ekle"
+    },
     "mention": {
       "everyoneLabel": "@everyone",
       "everyoneHint": "Bu kanaldaki herkese bildirim gider",

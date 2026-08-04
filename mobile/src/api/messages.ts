@@ -106,11 +106,23 @@ export const messagesApi = {
     });
     return res.data;
   },
-  /** `replyToId` — M1d-C §2.5. Uç bunu M1a'dan beri destekliyordu, mobil yalnız göndermiyordu. */
-  async send(channelId: string, content: string, replyToId?: string): Promise<MessageDto> {
+  /**
+   * `replyToId` — M1d-C §2.5. Uç bunu M1a'dan beri destekliyordu, mobil yalnız göndermiyordu.
+   *
+   * Sprint M3c §3 — `attachmentIds` (presign + PUT sonrası). 🔴 **`content` opsiyoneldir**: en az
+   * bir ek varsa boş metin geçerlidir (`CreateMessageDto` `@IsOptional`, servis `EMPTY_MESSAGE`
+   * kuralı). Boş string GÖNDERİLMEZ — `@IsNotEmpty` onu reddediyor, alan hiç yazılmaz.
+   */
+  async send(
+    channelId: string,
+    content: string,
+    replyToId?: string,
+    attachmentIds?: string[],
+  ): Promise<MessageDto> {
     const res = await http.post<MessageDto>(`/channels/${channelId}/messages`, {
-      content,
+      ...(content ? { content } : {}),
       ...(replyToId ? { replyToId } : {}),
+      ...(attachmentIds?.length ? { attachmentIds } : {}),
     });
     return res.data;
   },
