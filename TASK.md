@@ -2775,3 +2775,24 @@ Kod dosyalarının hiçbiri etkilenmedi. Anahtarlar metinleri yazan oturumdan ge
 - [ ] Tepki emoji akışı bozulmadı
 - [ ] Ek gönderilen mesaj **DM detayının Medya/Dosyalar sekmesinde** görünüyor (M3b halkası kapanıyor)
 - [ ] Web'de kanal oluştururken Forum seçeneği yok
+
+### R1 — mesaj kutusu cilası — 2026-08-04
+
+> Sahip cihaz turu: **ek gönderme ve emoji çalışıyor**, galeri ızgarası sorunsuz, görsel gönderiliyor.
+> Tek şikâyet: kutu Discord'unkiyle yan yana **sıkışık** duruyor.
+
+- [x] Gönder **ikon-only** ve yalnız `canSend` iken görünür. 🔴 Koşul **metne değil `canSend`'e**
+      bağlı — ek seçip yazı yazmayan kullanıcı da gönderebilmeli (`canSend` ifadesi değişmedi)
+- [x] Görünürlük `(canSend || sending)`: saf `canSend` olsaydı basıldığı anda düğme kaybolur, kutu
+      genişler, metin yeniden sarılır, gönderim bitince geri sıçrardı — tek dokunuşa iki yerleşim
+      oynaması. Yuva gönderim boyunca soluk duruyor
+- [x] Emoji ikonu **input'un içinde**; `EMOJI_SLOT` tek sabit hem `paddingRight` hem düğme genişliği
+      (iki ayrı sayı olsaydı biri değişip diğeri unutulurdu — `DmDetailsHeader`'daki ⋯ ile aynı sınıf).
+      Çok satırda ikon son satır hizasında kalıyor
+- [x] **Sol ok mekanizması YAPILMADI (sahip kararı, PM önerisi):** Discord'da o ok üç düğmeyi
+      katlıyor, bizde solda tek `+` var ve ok da `+` da ~44dp → yer kazandırmıyor, bir dokunuş
+      ekliyor. **Tetikleyici:** M4'te ses kaydı düğmesi gelince solda iki düğme olur, ok anlamlanır
+- [x] `typecheck` + `lint` temiz
+
+**Sahibin bakacağı en riskli nokta:** ek seçip **hiç yazmadan** gönderme — panel kapandıktan sonra
+kutuda yazı yokken gönder ikonu **görünür** olmalı (regresyon riski en yüksek yer).
