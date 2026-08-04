@@ -2663,6 +2663,46 @@ birbirine bakarak okunmalı); şerit ve ⋯ menüsü zaten ayrı dosyalara çık
 
 ---
 
+### R6 — Mesaj isteğinde "Reddet ve Engelle" (sahip onaylı ek kalem) — 2026-08-04
+
+> Sahip itirazından çıktı: engelleme asıl **yabancı mesaj isteğiyle taciz ettiğinde** gerekiyor.
+> Mobilde o ekranda yalnız Reddet vardı; web'de "Reddet ve Engelle" var ve backend destekliyor
+> (`rejectRequest` ikinci parametresi), mobil hep `false` geçiyordu. Kodda gerekçesi yazılıydı:
+> M1 sözleşmesi orada yalnız kabul/ret istemiş.
+
+- [x] Üçüncü aksiyon: **Reddet ve Engelle** (düz metin, `danger`, görsel ağırlığı Reddet'ten düşük;
+      `minHeight: 44` — silik olmak küçük olmak değil) + `ConfirmDialog` (kişinin adı geçiyor)
+- [x] **Sıfır yeni şey:** uç mobilde zaten vardı, dört i18n anahtarı `tr.json`'da zaten vardı,
+      `api/` diffi yok
+- [x] `privacyNote` duruyor; ret jenerik (engelleyip engellemediğin karşı tarafa sızmıyor)
+
+**Dev'in sormadığım soruyu araştırırken bulduğu ÜÇ kusur — üçü de M1d-0'ın aynı sınıfı:**
+- [x] 🔴 **"Mesaj İstekleri (n)" rozeti bayat kalıyordu.** Ekran `dmApi`'yi **doğrudan** çağırıp
+      yalnız kendi yerel listesini süzüyordu; `useDmStore` haberdar olmuyordu. Store'da tam bu iş
+      için yazılmış tazeleme fonksiyonu vardı, hiç çağrılmıyordu. → mutasyonlar `useDmStore`
+      üzerinden (`rejectRequest`/`acceptRequest` + `fetchAll`)
+- [x] 🔴 **Kabul edilen kanal DM listesine girmiyordu** (`PENDING`→`ACCEPTED` sonrası bir sonraki
+      `fetchAll`'a kadar `visibleChannels` dışarıda bırakıyordu)
+- [x] 🔴 **T&S bayrakları istemcide GÖMÜLÜYDÜ.** Kabul sonrası yönlendirmede `canMessage: 'true'`,
+      `selfBlocked: 'false'` düz metin yazılıydı — sunucunun ne dediğine bakılmadan "mesaj kutusu
+      açık" varsayılıyordu. `mobile/CLAUDE.md`'nin "kapıyı istemcide kurma, backend'in kararını
+      istemcide gevşetme" kuralının ihlali. → `dmRouteParams(channel)` ile sunucu yanıtından taşınıyor
+- [x] Dev `accept`'i kapsam sınırı gereği **düzeltmeyip sordu** (doğru davranış); PM onayladı,
+      gerekçe: yarım bırakmak iki durumdan da kötü (aynı dosyada iki desen + rozet bir yolda
+      güncellenip diğerinde güncellenmiyor)
+- [x] Ekranda artık tek desen: **mutasyonlar store'dan, okumalar doğrudan API'den**
+- [x] `useFriendsStore` dm store'undan çağrılmadı — `friends.ts` zaten `dm.ts`'i import ediyor,
+      ters yön döngü kurardı; gerek de yok (engellenenler listesi kendi ekranının mount'unda çekiliyor)
+- [x] `typecheck` + `lint` temiz
+
+---
+
 > **M3b KOD TARAFI KAPANDI.** api 1008 test yeşil + build/migrate temiz · mobile typecheck + lint
-> temiz. Beş revizyon turu: R1 (sözleşmenin üç hatası) · R2 (header) · R3 (Discord yerleşimi) ·
-> R4 (⋯ cilası) · R5 (menü). **Commit atılmadı — §5.2 R7 onayı bekliyor.**
+> temiz. Altı revizyon turu: R1 (sözleşmenin üç hatası) · R2 (header) · R3 (Discord yerleşimi) ·
+> R4 (⋯ cilası) · R5 (menü) · R6 (Reddet ve Engelle + üç bayat-store kusuru).
+> **Commit atılmadı — §5.2 R7 onayı bekliyor.**
+>
+> **Günün dersi:** delegasyon bugün PM'in **beş** hatasını yakaladı (üçü dev'lerden, ikisi sahipten:
+> global header yanlış teşhis, "engelleme T&S kilidi" yanlış ürün muhakemesi). Hiçbiri birim
+> testiyle çıkmazdı. Ayrıca dev'lere sorulan "store/yan-etki sahibi kim" sorusu, sözleşmede hiç
+> olmayan üç kusur ortaya çıkardı. [[pm-dev-cift-yonlu-denetim]] doğrulandı.
