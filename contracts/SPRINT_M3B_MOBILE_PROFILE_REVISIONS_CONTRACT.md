@@ -76,13 +76,25 @@ tamamen farklı). Ortak olan sekme gövdesi, ortak olmayan kabuk.
 - 🔴 **Sesli/Görüntülü Arama düğmesi YOK** → M4. Yer tutucu da koyma.
 - Sağ üstte **⋯** → alt-panel (§2.4).
 
-🔴 **1-1 DM'de avatar/ad dokunulabilir → `ProfileSheet` açar** (PM düzeltmesi 2026-08-04, mobil
-dev'in bulgusu). Gerekçe bir **T&S deliği**: §3.1 profilin tek yolunu "mesaj yazarı" yapmıştı, ama
-karşı taraf hiç yazmadıysa **veya kullanıcı sohbeti temizlediyse** (G4) yazar satırı yok; kanka
-değilse kankalar listesinde de yok; `DmMenuSheet`'te engelleme yok. Sonuç: o kişiyi **engellemenin
-hiçbir yolu kalmıyordu** — §3.3'teki "engelleme kaybolmayacak" maddesini §2.1'in kendisi deliyordu.
-M1d-0 sprintini açtıran hatanın aynı sınıfı. Grup DM'de başlık dokunulmaz kalır (Üyeler sekmesi
-zaten var, ikinci yol gereksiz).
+**1-1 DM'de avatar/ad dokunulabilir → `ProfileSheet` açar.** §3.1 profilin tek yolunu "mesaj yazarı"
+yaptığı için, karşı tarafın hiç yazmadığı DM'de profile ulaşılamıyordu. Grup DM'de başlık dokunulmaz
+kalır (Üyeler sekmesi zaten var, ikinci yol gereksiz).
+
+⚠️ **PM kayıt düzeltmesi 2026-08-04 (sahip itirazı) — bu madde başta "T&S kilidi" diye yazılmıştı,
+o çerçeve YANLIŞTI.** PM gerekçeyi "o kişiyi engellemenin hiçbir yolu kalmıyor" üzerine kurmuştu.
+Sahip itiraz etti ve haklı çıktı, iki ayrı sebeple:
+1. **Ürün gerçeği:** engelleme, karşı taraf **ısrarla yazdığında** ihtiyaç olur ve o anda ekranda
+   mesaj vardır → yazar dokunuşu zaten çalışır. İki taraf sessizce ayrıldıysa kimse engel atmaz.
+2. **Kod gerçeği:** "sohbeti temizledikten sonra" senaryosu **zaten imkânsız** — G4 gereği temizlenen
+   ve sonrasında yeni mesaj gelmeyen DM **listeden tamamen düşüyor** (`dm.service` §G4), o ekrana
+   gidilemiyor. Karşı taraf tekrar yazarsa DM listeye dönüyor ve mesajı orada oluyor.
+
+Madde **kalıyor** (profile bakmak, kanka eklemek için doğru affordance, Discord da böyle), ama
+gerekçesi engelleme değil **profil erişimi**. DoD'daki "T&S kilidi" ibaresi kaldırıldı.
+
+🔴 **Asıl boşluk başka yerdeymiş (§6):** yabancı mesaj isteğiyle taciz ettiğinde mobilde Mesaj
+İstekleri ekranında **engelleme yok** (yalnız Reddet). Web'de "Reddet ve Engelle" var ve backend
+destekliyor. Sahibin tarif ettiği gerçek senaryo tam orası.
 
 ### 2.3 Sekmeler
 
@@ -408,8 +420,8 @@ alınmadan merge edilmez.
 - [ ] DM başlığına dokununca **DM detay ekranı** açılıyor (profil kartı değil)
 - [ ] DM detayında Medya / Sabitlemeler / Bağlantılar / Dosyalar **gerçekten doluyor**
 - [ ] **Grup DM başlığına dokununca üye listesine ATMIYOR**, sekmeli detay ekranı açılıyor
-- [ ] 🔴 **Hiç yazmamış / sohbeti temizlediğin bir 1-1 DM'de karşı tarafı ENGELLEYEBİLİYORSUN**
-      (detay başlığındaki avatara dokun → profil paneli → Engelle). T&S kilidi, atlanmaz
+- [ ] 1-1 DM detay başlığındaki avatara dokununca profil paneli açılıyor
+      *(başta "T&S kilidi" diye yazılmıştı, sahip itirazıyla düzeltildi — bkz. §2.2)*
 - [ ] 1-1 DM detayında **Ara düğmesi YOK**, grup DM detayında var (sahip kararı 2026-08-01)
 - [ ] 1-1 DM'de Üyeler sekmesi yok, grup DM'de var
 - [ ] Grup DM Üyeler sekmesinde 👑 rozeti duruyor · **grup sahibi üye çıkarabiliyor (✕ + onay)** ·

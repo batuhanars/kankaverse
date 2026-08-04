@@ -2569,8 +2569,12 @@ yani semptom tedavi edilmişti. Header kalkınca başlık kendi yerine dönebili
   geri yığınındaki bağlam kayboldu); 1-1 ve kanalda yeterli, grupta daha zayıf
 
 ### M3b — sahipte kalan
-- [ ] 🔴 **Engelleme senaryosu (tek doğrulanmamış T&S maddesi):** karşı tarafın hiç yazmadığı bir
-      1-1 DM'de avatara dokun → profil → Engelle; **sohbeti temizledikten sonra** da aynı yol
+- [x] ⚠️ **PM kayıt düzeltmesi (sahip itirazı, akşam):** bu madde "T&S kilidi" diye yazılmıştı,
+      çerçeve **yanlıştı**. (1) Engelleme, karşı taraf ısrarla yazdığında ihtiyaç olur; o anda
+      ekranda mesaj vardır → yazar dokunuşu zaten çalışır. İki taraf sessizce ayrıldıysa kimse engel
+      atmaz. (2) "Sohbeti temizledikten sonra" senaryosu **zaten imkânsız** — G4 gereği temizlenen
+      ve sonrasında mesaj gelmeyen DM listeden tamamen düşüyor, o ekrana gidilemiyor.
+      Avatar dokunuşu **kalıyor** ama gerekçesi profil erişimi, engelleme değil
 - [ ] Durum çubuğu çakışması (çentikli cihaz), ⋯ konumu, uzun grup adı kesiliyor mu
 - [ ] Üç ekranda sistem geri tuşu (jest + üç tuşlu) çalışıyor mu
 - [ ] Diğer ekranların header'ı bozulmadı mı (Ortam Ayarları, sohbet ekranları)
