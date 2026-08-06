@@ -68,7 +68,8 @@
             "audioType": "communication"
           }
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
