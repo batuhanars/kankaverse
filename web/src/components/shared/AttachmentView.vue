@@ -37,10 +37,9 @@ const isActionDisabled = computed(
   () => downloading.value || isPending.value || isBlocked.value,
 )
 
-// Görsel: mount'ta URL çek
-if (isImage && props.attachment.scanStatus === ScanStatus.CLEAN) {
+function loadImageUrl() {
   imageLoading.value = true
-  attachmentsApi
+  return attachmentsApi
     .getUrl(props.attachment.id)
     .then((res) => {
       imageUrl.value = res.data.url
@@ -52,6 +51,37 @@ if (isImage && props.attachment.scanStatus === ScanStatus.CLEAN) {
     .finally(() => {
       imageLoading.value = false
     })
+}
+
+// Görsel: mount'ta URL çek
+if (isImage && props.attachment.scanStatus === ScanStatus.CLEAN) {
+  loadImageUrl()
+}
+
+/**
+ * 🔴 Adres ölmüşse BİR KEZ tazele (sahip bulgusu 2026-08-06: uzun süre açık kalan sekmede
+ * görseller kırık ikonla geliyordu, dosya kartları sağlamdı).
+ *
+ * Sebep: `getUrl` presigned ve **300 sn** ömürlü, ama `<img loading="lazy">` indirmeyi görsel
+ * ekrana girene kadar erteliyor. Mesaj geldiğinde adres alınıyor, kullanıcı başka yere bakıyorsa
+ * indirme dakikalar/saatler sonra oluyor ve adres çoktan ölmüş oluyor → 403 → kırık görsel.
+ * Dosya kartı etkilenmiyordu çünkü o, tıklama anında taze adres alıyor.
+ *
+ * Aynı sınıf kusur mobilde M3c R3'te bulunup düzeltilmişti (tam ekran görüntüleyici açılırken
+ * adresi tazeliyor); web'de kimse bakmamıştı. **Yan kazanç aynısı:** tarama kapısı büyütme/yeniden
+ * yükleme anında ikinci kez doğrulanıyor.
+ *
+ * Tek deneme: `retried` bayrağı olmasa, kalıcı bir hatada (silinmiş nesne) sonsuz döngü olurdu.
+ */
+const retried = ref(false)
+function onImageError() {
+  if (retried.value) {
+    imageError.value = 'not_ready'
+    return
+  }
+  retried.value = true
+  imageUrl.value = null
+  loadImageUrl()
 }
 
 // Dosya (PDF vb.) → yeni sekme (tarayıcı görüntüleyici)
@@ -66,9 +96,13 @@ async function openUrl() {
   }
 }
 
-// Görsel → lightbox
+// Görsel → lightbox. Açarken adres TAZELENİR: küçük önizleme dakikalar önce yüklenmiş olabilir ve
+// o adres artık ölü olabilir — büyütünce sessizce siyah kalırdı. Mobilde M3c R3'te aynısı yapıldı.
 function openLightbox() {
-  if (imageUrl.value) lightboxOpen.value = true
+  if (!imageUrl.value) return
+  lightboxOpen.value = true
+  retried.value = false
+  loadImageUrl()
 }
 
 function formatBytes(bytes: number): string {
@@ -128,6 +162,7 @@ function formatBytes(bytes: number): string {
       style="max-width: 360px; max-height: 240px;"
       loading="lazy"
       @click="openLightbox"
+      @error="onImageError"
     />
   </div>
 
