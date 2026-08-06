@@ -24,22 +24,52 @@ gerekçesi kabul edildi: en zor durum başa alınırsa temel baştan doğru kuru
 
 ---
 
-## §0.1 🔴 İç sıralama — üç durak, üçü de cihazda doğrulanabilir
+## §0.1 🔴 Arama modeli — "oda önce", klasik telefon değil
+
+**Sahip gözlemi 2026-08-06 (Discord'da doğruladı):** DM'de telefon düğmesine basınca **doğrudan sese
+katılıyorsun**. Karşı tarafın kartı pasif duruyor ve üstünde "arkadaşın katılacaktır" yazıyor.
+Yani modern Discord'da arama = **girilen bir oda**; karşı tarafa ayrıca çalma bildirimi gidiyor ama
+arayan beklemiyor, zaten içeride.
+
+**Bizim webimiz bugün KLASİK modeli uyguluyor** (`useCall.ts:17` `startCall`): arayan `call_invite`
+gönderir, "Aranıyor…" barında **bekler**, ancak `voice.call_accepted` gelince odaya girer
+(`useSocket.ts:390`). Yani iki model arasında gerçek bir fark var ve seçim yapılmalı.
+
+✅ **KARAR: mobil "oda önce" modelini uygular.** Gerekçeler:
+- **Bedava geliyor.** M4a-1 zaten "odaya katıl" inşa ediyor; arayan tarafı bu modelde **aynı ekran**.
+  Ayrı bir "Aranıyor…" ekranı, geri-zil durumu, iptal-vs-kapat ayrımı, 30 sn arayan-tarafı zaman
+  aşımı — bunların **hepsi düşüyor**.
+- **Sunucu değişmiyor.** İki model de aynı uçları kullanıyor; sunucu yalnız röle. `voice:call_invite`
+  ack alır, `voice/token` odaya sokar. Sıralama istemci kararı.
+- **İki model birbiriyle çalışıyor.** Web'den (klasik) arayan → mobil çalar → kabul → ses açılır.
+  Mobilden (oda önce) arayan → web'de çalar → kabul → ses açılır. Cevaplanmazsa web kullanıcısı DM'i
+  açınca **"Sese Katıl"** görür; web'de bu zaten var (`DmConversation.vue:313` `hasOngoingCall`).
+- **T&S açığı yok.** `voice/token` DM dalında `requireDmCallGate` çalışıyor (`voice.service.ts:160`):
+  blok, bekleyen mesaj isteği ve ilişki kapısı **mint anında** yeniden bakılıyor. Yani izinsiz kişi
+  DM odasında tek başına oturup karşı tarafa "arama sürüyor" şeridi bile gösteremez.
+
+⚠️ **Bedeli — web ile davranış ayrışması.** Web klasik kalıyor: web kullanıcısı arayınca hâlâ
+bekleme barı görecek. Uçlar uyumlu olduğu için bozulma yok, ama **iki istemci aynı özelliği farklı
+gösteriyor**. Web'i oda-önce modeline taşımak ayrı ve küçük bir web işi → **D39** olarak borç
+tablosuna yazıldı. M4a kapsamına alınmadı (mobil sprintinde web'e dokunmak sapma olurdu).
+
+---
+
+## §0.2 🔴 İç sıralama — üç durak, üçü de cihazda doğrulanabilir
 
 Faz sırası değişmiyor; M4a **içeriden** üçe bölünüyor. Gerekçe M1d dersi: tek hamlede inen büyük
 native iş patladığında hangi katmanın patladığı anlaşılmıyor.
 
 | Durak | Kapsam | Cihazda doğrulanan |
 |---|---|---|
-| **M4a-1** | Var olan aramaya **katıl** + arama ekranı + ses yönlendirme + foreground service + mini pencere | Web'den başlatılan DM aramasına telefondan katılıp **karşılıklı konuşmak** |
-| **M4a-2** | Çalma akışı (uygulama **açıkken**): giden arama, gelen arama, reddet/iptal/zaman aşımı, zil sesleri | Telefondan arama başlatmak ve telefonda çalan aramayı cevaplamak |
-| **M4a-3** | Uygulama **kapalıyken** gelen arama: yüksek öncelikli push + bildirim üzerinden cevaplama | Uygulama tamamen kapalıyken gelen aramayı görmek |
+| **M4a-1** | Odaya girme (**arama başlatma = katılma**, aynı eylem) + arama ekranı + ses yönlendirme + foreground service + mini pencere | Telefondan aramayı **başlatmak**, web'de çalması, karşılıklı konuşmak |
+| **M4a-2** | Mobilde **gelen** arama, uygulama **açıkken**: çalma ekranı, kabul/reddet, zil sesleri | Web'den arandığında telefonun çalması ve cevaplanması |
+| **M4a-3** | Mobilde gelen arama, uygulama **kapalıyken**: yüksek öncelikli push + bildirimden cevaplama | Uygulama tamamen kapalıyken gelen aramayı görmek |
 
 Her durak sonunda **dur, sahibe bildir, cihaz turu bekle.** Bir sonraki durağa sahip onayıyla geçilir.
 
-> M4a-1 tek başına da anlamlı bir ürün: web'deki kanka aramayı başlatır, telefondaki kişi DM ekranındaki
-> **"Sesli aramaya katıl"** satırıyla girer. Web'de bu zaten böyle çalışıyor (`DmConversation.vue:313`
-> `hasOngoingCall` → Katıl düğmesi). Yani M4a-1 **web davranışının mobil eşi**, yarım özellik değil.
+> Oda-önce modelinin yan kazancı: **M4a-1 tek başına tam bir özellik.** Telefondan arama başlatılıyor,
+> web'deki kanka çalıyor ve cevaplıyor. Eski bölmede M4a-1 yalnız "katıl" olurdu.
 
 ---
 
@@ -110,7 +140,7 @@ POST /channels/:channelId/voice/leave   → null
 
 ---
 
-## §3 M4a-1 — Var olan aramaya katıl
+## §3 M4a-1 — Odaya girme (başlatma = katılma)
 
 ### §3.1 DM ekranındaki giriş noktası
 
@@ -119,11 +149,16 @@ POST /channels/:channelId/voice/leave   → null
 2. `GET voice/participants` bir kez çağrılır → katılımcı listesi + `startedAt`.
 3. `voice.participant_joined/left` ile liste canlı güncellenir.
 
-**Aramada kimse yoksa:** hiçbir şey gösterilmez (boş yüzey açma kuralı). Arama **başlatma** düğmesi
-M4a-2'ye ait; M4a-1'de kutuya tıklayınca hiçbir şey yapmayan telefon ikonu **konmaz**.
+**Başlıkta telefon düğmesi** (≥44dp). Oda-önce modelinde (§0.1) **başlatmak ile katılmak aynı eylem**:
 
-**Arama sürüyorsa** (`participants.length > 0` ve biz bağlı değilsek): sohbetin üstünde şerit —
-katılımcı avatarları + "Sesli arama sürüyor" + **"Katıl"** düğmesi (Kor aksan, ≥44dp).
+- **Aramada kimse yoksa** → düğme *aramayı başlatır*: önce `voice:call_invite` (karşı taraf çalar),
+  ack `ok` ise odaya girilir. Ack `ok:false` ise **odaya girilmez**, nötr mesaj: "Şu anda ulaşılamıyor."
+  🔴 Sıra önemli: davet ÖNCE. Ters sırada, izin yokken kullanıcı bir saniyeliğine odaya girip
+  atılmış gibi görünürdü (`voice/token` aynı kapıyı zaten uyguluyor, ama görünen davranış çirkin olurdu).
+- **Arama sürüyorsa** (`participants.length > 0`, biz bağlı değiliz) → düğme *katılır*: `call_invite`
+  **gönderilmez** (karşı taraf zaten içeride, tekrar çaldırmak spam olur; web'deki `REV-11` kararının
+  aynısı). Ek olarak sohbetin üstünde şerit: katılımcı avatarları + "Sesli arama sürüyor" + **"Katıl"**.
+- **Biz bağlıysak** → düğme arama ekranına geri döndürür (mini pencere ile aynı iş).
 
 ### §3.2 Katılma akışı
 
@@ -149,8 +184,16 @@ katılımcı listesinde **hayalet kullanıcı** kalır (web'de bu dev-fix olarak
 çıkarma, R11B `disconnect`) yerel durum sıfırlanır, ekran kapanır, kullanıcıya Türkçe bilgi verilir.
 Sessizce sonsuza kadar "bağlı" görünen bir ekran kalmaz.
 
-**Tek kişi kalınca (REV-12 pariteti):** DM aramasında yalnız kendimiz kaldıysak **60 sn** sonra arama
-otomatik biter. Biri katılırsa sayaç iptal.
+**Tek kişi kalınca — 🔴 süre oda-önce modeli için yeniden ayarlandı.** Web'de bu süre **60 sn**
+(REV-12) ve o model için doğru: orada tek başına kalmak "karşı taraf aramadan çıktı" demek. Oda-önce
+modelinde ise arayan **kabul edilmeden önce de** tek başına oturuyor; 60 sn cevap vermek için kısa.
+- **Hiç kimse katılmadıysa** (arayan bekliyor): **3 dk** sonra otomatik biter.
+- **Biri katılıp sonra çıktıysa**: **60 sn** (web pariteti).
+İki eşik tek yerde sabit olarak durur, ekrana gömülmez.
+
+**Reddedilme:** `voice.call_rejected` gelirse arayan odada bekletilmez → odadan çıkarılır + nötr
+bilgi ("Şu anda ulaşılamıyor"). Gerekçe: açıkça reddeden birini "istediğin zaman katılabilirsin"
+diye bekleyen bir oda ile karşılamak dürtme yüzeyidir. *(Cevapsızlık farklı: orada oda 3 dk durur.)*
 
 ---
 
@@ -168,8 +211,12 @@ DM detayına gider · sağda **ses çıkışı** düğmesi (§5).
 - **Konuşan** kutucuk: `colors.online` (#3DB46E) kenarlık. Konuşma algısı per-participant
   `IsSpeakingChanged` ile (web'deki ders: aggregate `ActiveSpeakersChanged` mute/unmute döngüsünde kaçıyor).
 - **Mikrofonu kapalı** katılımcı: avatar üstünde çizili mikrofon rozeti.
-- **Tek başınayken:** "Bu aramada tek başınasın." + "<ad> istediği zaman katılabilir." (görsel 10 metni,
-  bizim tonumuza uyarlanmış). Bu metin 60 sn otomatik bitirmeyi de anlamlı kılar.
+- **Tek başınayken:** karşı tarafın kutucuğu **soluk** durur (görsel 10) + "Bu aramada tek başınasın."
+  ve "<ad> istediği zaman katılabilir." Bu, oda-önce modelinin kullanıcıya görünen yüzü: arayan
+  "bekleme ekranı" değil, boş bir oda görür. Metin 3 dk otomatik bitirmeyi de anlaşılır kılar.
+- **Çaldığını göster:** davet gönderildiyse ve karşı taraf henüz katılmadıysa soluk kutucukta
+  "Çalıyor…" göstergesi durur. Kullanıcı bildirimin gittiğini bilmeli; yoksa "acaba haberi oldu mu"
+  sorusu kalır (sahibin Discord'da tam olarak takıldığı nokta).
 
 **Alt kontrol çubuğu:** yalnız **üç** düğme — **mikrofon** (aç/kapa) · **sohbet** (DM'e dön, küçültme ile
 aynı sonuç değil: sohbeti açar) · **kapat** (kırmızı `danger`, ≥56dp).
@@ -229,27 +276,35 @@ Küçültünce arama **kapanmaz**: uygulamanın üstünde küçük bir kutucuk k
 
 ---
 
-## §8 M4a-2 — Çalma akışı (uygulama açıkken)
+## §8 M4a-2 — Mobilde gelen arama (uygulama açıkken)
 
 > **Bu durak M4a-1 sahip onayından sonra başlar.**
+>
+> 🔴 **Giden arama burada DEĞİL, M4a-1'de.** Oda-önce modelinde (§0.1) arama başlatmak odaya
+> girmektir; ayrı "Aranıyor…" ekranı, geri-zil durumu, iptal-vs-kapat ayrımı ve arayan tarafı
+> 30 sn zaman aşımı **hiç yazılmıyor**. Bu durakta yalnız **karşılama** tarafı var.
 
-**Giden:** DM başlığına telefon ikonu (M4a-1'de yoktu, burada gelir) → `voice:call_invite` →
-ack `ok:false` ise nötr "Şu anda ulaşılamıyor" → ack `ok` ise **"Aranıyor…"** ekranı + geri-zil sesi +
-**30 sn** zaman aşımı (web `CALL_TIMEOUT_MS` pariteti) → `voice.call_accepted` gelince odaya katıl.
-İptal → `voice:call_cancel`.
+`voice.incoming_call` → tam ekran gelen arama görünümü: arayanın avatarı + adı,
+**Reddet** (`danger`) / **Kabul et** (Kor aksan) + zil sesi + titreşim.
+- Kabul → `voice:call_accept` + odaya katıl (M4a-1'in katılma akışı aynen kullanılır).
+- Reddet → `voice:call_reject` (arayan odadan çıkarılır, §3.3).
+- **30 sn** cevap verilmezse çalma ekranı kapanır ve **"cevapsız arama"ya** döner.
+  ⚠️ Arayan tarafta oda 3 dk durmaya devam eder (§3.3) — iki süre farklı ve bu bilinçli: çalma
+  penceresi kısa, oda penceresi uzun. Kullanıcı çalma bittikten sonra da DM'deki "Katıl"la girebilir.
+- Arayan odadan çıkarsa çalma ekranı kendiliğinden kapanır.
+  🔴 Bugün sunucu bunu **yalnız** `voice:call_cancel` ile bildiriyor; oda-önce modelinde arayan
+  "iptal" değil "odadan çıkma" yapıyor. Mobil arayan **odadan çıkarken `voice:call_cancel` da gönderir**
+  (karşı taraf henüz katılmadıysa). Böylece `api/` değişmeden çalan telefon susar. Bu M4a-1'in işidir,
+  M4a-2 yalnız tüketir.
 
-**Gelen (uygulama açıkken):** `voice.incoming_call` → tam ekran gelen arama görünümü: arayanın avatarı +
-adı, **Reddet** (kırmızı) / **Kabul et** (yeşil değil, Kor aksan) + zil sesi + titreşim.
-Kabul → `voice:call_accept` + odaya katıl. Reddet → `voice:call_reject`.
-Arayan iptal ederse (`voice.call_canceled`) ekran kendiliğinden kapanır.
-
-🔴 **Görsel yok:** sahip çalma/gelen arama ekranlarının ekran görüntüsünü almamış. Bu iki ekran
-web'deki `IncomingCallModal` + `OutgoingCallBar` davranışından ve Android alışkanlığından türetilecek.
-**İlk revizyon turunun buraya gelmesi bekleniyor** — sahip cihazda görüp söyleyecek.
+🔴 **Görsel yok:** sahip gelen arama ekranının ekran görüntüsünü almamış. Ekran web'deki
+`IncomingCallModal` davranışından ve Android alışkanlığından türetilecek. **İlk revizyon turunun
+buraya gelmesi bekleniyor.**
 
 **Sesler:** web sesleri Web Audio ile **sentezliyor** (`useCallSounds.ts`), React Native'de Web Audio yok.
-Aynı ton reçetesinden (çift-zil / tek ton geri-zil / bağlan-ayrıl blipleri) **kısa ses dosyaları üretilip**
+Aynı ton reçetesinden (çift-zil zil / bağlan-ayrıl blipleri) **kısa ses dosyaları üretilip**
 `assets/sounds/` altına konur, `expo-audio` ile çalınır. Hazır zil sesi indirilmez (lisans + ton tutarlılığı).
+Geri-zil (ringback) **üretilmez**: oda-önce modelinde arayan zaten odada, bekleme tonu yok.
 Zil sesi cihaz sessizdeyken çalmaz, titreşim kalır.
 
 ---
@@ -324,7 +379,11 @@ Aşağıdakiler **bu sprintte yapılmaz**; istenirse PM sözleşmeyi revize eder
 - [ ] Kod içinde gömülü kullanıcı metni yok, gömülü renk/ölçü yok (`src/theme`'den)
 
 **M4a-1 (cihazda — SAHİPTE):**
-- [ ] Web'den başlatılan DM aramasına telefondan katılınıyor, **iki taraf birbirini duyuyor**
+- [ ] 🔴 **Telefondan arama başlatılıyor:** telefon düğmesine basınca odaya giriliyor ve **web'de zil
+      çalıyor**; web kabul edince iki taraf birbirini duyuyor
+- [ ] Cevap gelmezken telefonda karşı tarafın kutucuğu **soluk** + "Çalıyor…" duruyor
+- [ ] Web'den başlatılan aramaya telefondan **katılınıyor** (DM'deki "Katıl" şeridi), zil tekrar çalmıyor
+- [ ] Web'den reddedilince telefon odadan çıkıyor + nötr mesaj; hiç cevaplanmazsa 3 dk sonra düşüyor
 - [ ] Mikrofon aç/kapa çalışıyor; karşı tarafta mikrofon-kapalı rozeti görünüyor
 - [ ] Konuşan kişinin kutucuğu yeşil kenarlıkla işaretleniyor
 - [ ] Ses çıkışı seçici: hoparlör ↔ telefon geçişi çalışıyor; **Bluetooth kulaklık bağlıysa listede**
@@ -334,14 +393,14 @@ Aşağıdakiler **bu sprintte yapılmaz**; istenirse PM sözleşmeyi revize eder
 - [ ] Aramadan çıkınca karşı tarafta **hayalet katılımcı kalmıyor** (`voice/leave`)
 - [ ] Mikrofon izni reddedilince açıklama + "Ayarları aç" çıkıyor, uygulama **kilitlenmiyor**
 - [ ] Uçak moduna alıp geri açınca ekran sonsuza kadar "bağlı" kalmıyor
-- [ ] Tek başına kalınca 60 sn sonra arama kendiliğinden bitiyor
+- [ ] Karşı taraf katılıp sonra çıkınca 60 sn sonra arama kendiliğinden bitiyor
 - [ ] **Mevcut özelliklerde regresyon yok:** mesaj gönderme, ek gönderme, klavye payı, bildirimler
       (yeni dev build alındı, M3c'deki klavye regresyonu **native kabuk değişince** olmuştu)
 
 **M4a-2 (cihazda):**
-- [ ] Telefondan arama başlatılıyor, web'de çalıyor, kabul edilince ses açılıyor
 - [ ] Web'den arandığında telefonda (uygulama açıkken) çalıyor; kabul/reddet çalışıyor
-- [ ] 30 sn cevapsızda arama kendiliğinden düşüyor, iki tarafta da ekran kapanıyor
+- [ ] 30 sn cevapsızda çalma ekranı kapanıyor; DM'de "Katıl" şeridi hâlâ duruyor (oda 3 dk yaşıyor)
+- [ ] Web arayan odadan çıkınca telefon **susuyor** (M4a-1'in `call_cancel` gönderimi doğrulanır)
 - [ ] Ulaşılamayan kişide **nötr** mesaj çıkıyor (sebep sızmıyor)
 - [ ] Cihaz sessizdeyken zil çalmıyor, titreşim var
 
