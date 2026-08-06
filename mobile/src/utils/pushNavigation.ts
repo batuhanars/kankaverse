@@ -49,7 +49,9 @@ export function resolvePushTarget(data: Record<string, unknown>): Href | null {
   }
 }
 
-function dmTarget(channelId: string): Href {
+/** M4a-2 (`notifications/incomingCall.ts`) de aynı hedefi kullanır: bildirim gövdesine dokununca
+ *  o DM'e gidiliyor — push'un DM hedefiyle aynı çözümleme, kopya yok. */
+export function dmTarget(channelId: string): Href {
   const channel = useDmStore.getState().channels.find((c) => c.id === channelId);
   if (channel) return dmRouteParams(channel);
   return { pathname: '/dm/[id]', params: { id: channelId } };

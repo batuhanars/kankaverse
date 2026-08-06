@@ -67,10 +67,21 @@ interface VoiceState {
    * §3.1/§3.2 — izin + (gerekirse) davet + token + bağlan. `peerLabel` bildirim gövdesi (karşı ad).
    * `reason: 'mic_denied'` çağıran ekranın "Ayarları Aç" seçeneği sunması için — metin karşılaştırması
    * yerine ayrık bir kod (çeviri değişirse kırılmasın).
+   *
+   * 🔴 M4a-2 sözleşme §8.2 tuzağı — `options.invite === false` davetin KOŞULSUZ atlanmasını
+   * zorlar. Varsayılan (`options` verilmemiş/`invite` belirtilmemiş) davranış DEĞİŞMEDİ: davet
+   * kararı `alreadyOngoing`e (presence store'un o an dolu olup olmaması) bakarak verilir — bu DM
+   * ekranındaki telefon düğmesi için doğru, çünkü kullanıcı o ekrandayken presence zaten dolu.
+   * Ama bildirimden "Aramaya Katıl"a basan kullanıcı büyük ihtimalle DM ekranında DEĞİL (presence
+   * hiç abone olunmamış, liste boş) — `alreadyOngoing` yanlışlıkla false çıkar ve bu fonksiyon
+   * arayanı GERİ ARAR (karşı taraf zaten bizi aradı, hâlâ odada). `invite: false` bu varsayımı
+   * bildirim kabul yolunda tamamen devre dışı bırakır: biz zaten `voice.incoming_call` aldık,
+   * karşı tarafın odada olduğunu WS'ten biliyoruz, presence listesine bakmaya gerek yok.
    */
   startOrJoin: (
     channelId: string,
     peerLabel: string,
+    options?: { invite?: boolean },
   ) => Promise<{ ok: boolean; message?: string; reason?: 'mic_denied' | 'other' }>;
   /** `userInitiated` true ise (kullanıcı "kapat"a bastı) `disconnectReason` set edilmez. */
   leave: (userInitiated?: boolean) => Promise<void>;
@@ -149,7 +160,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     set({ outputId: id });
   },
 
-  async startOrJoin(channelId, peerLabel) {
+  async startOrJoin(channelId, peerLabel, options) {
     if (get().connectedChannelId === channelId) return { ok: true };
     if (room) await get().leave(true);
 
@@ -160,7 +171,10 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       return { ok: false, message: t('mobile.call.micPermissionDenied'), reason: 'mic_denied' };
     }
 
-    const alreadyOngoing = useVoicePresenceStore.getState().for(channelId).length > 0;
+    // `invite: false` (bildirimden "Aramaya Katıl") → presence listesine BAKILMAZ, davet asla
+    // gönderilmez. Bkz. yukarıdaki arayüz yorumu — bu, PM'in işaret ettiği "sessiz geri arama" tuzağı.
+    const alreadyOngoing =
+      options?.invite === false ? true : useVoicePresenceStore.getState().for(channelId).length > 0;
     currentPeerLabel = peerLabel;
     set({ connecting: true, disconnectReason: null, didInvite: !alreadyOngoing });
 

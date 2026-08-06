@@ -1764,7 +1764,11 @@
       "outputEarpiece": "Telefon",
       "outputHeadset": "Kablolu kulaklık",
       "outputBluetooth": "Bluetooth",
-      "chatAction": "Sohbet"
+      "chatAction": "Sohbet",
+      "incomingTitle": "Gelen Arama",
+      "incomingBody": "{name} seni arıyor!",
+      "joinAction": "Aramaya Katıl",
+      "incomingNotifChannel": "Gelen arama"
     }
   }
 }

@@ -9,6 +9,7 @@ import { useFriendsStore } from '@/stores/friends';
 import { useAuthStore } from '@/stores/auth';
 import { useVoiceStore } from '@/stores/voice';
 import { useVoicePresenceStore } from '@/stores/voicePresence';
+import { presentIncomingCall, dismissIncomingCall } from '@/notifications/incomingCall';
 import type { MessageDto } from '@/api/messages';
 import type { FriendDto, FriendRequestDto } from '@/api/friends';
 import type { VoiceParticipantDto } from '@/api/voice';
@@ -250,6 +251,21 @@ function ensureSocket(): Socket {
     useVoiceStore.getState().handleCallRejected(data.channelId);
   });
 
+  // ---- M4a-2 gelen arama (sözleşme §8, uygulama açıkken) ----
+  // Yalnız CALLEE tarafı: davet bize geldi → bildirim + zil (`notifications/incomingCall.ts`).
+  // 🔴 Sözleşme §2 — `caller` şekli `VoiceParticipantDto` (`userId`) DEĞİL, ayrı bir alan adı (`id`);
+  // presence olaylarındaki katılımcı DTO'suyla karıştırılmasın diye burada AYRI tiplendi.
+  socket.on(
+    'voice.incoming_call',
+    (data: { channelId: string; caller: { id: string; username: string; avatarUrl: string | null } }) => {
+      void presentIncomingCall(data.channelId, data.caller);
+    },
+  );
+  // §8.2 — arayan odadan çıkarken (M4a-1'in `call_cancel` gönderimi) telefonumuz kendiliğinden susar.
+  socket.on('voice.call_canceled', (data: { channelId: string }) => {
+    void dismissIncomingCall(data.channelId);
+  });
+
   return socket;
 }
 
@@ -291,6 +307,18 @@ export function callInvite(channelId: string): Promise<{ ok: boolean; error?: st
  */
 export function callCancel(channelId: string): void {
   socket?.emit('voice:call_cancel', { channelId });
+}
+
+/**
+ * M4a-2 sözleşme §8.2 — bildirimden "Aramaya Katıl"/"Reddet". Best-effort, ack YOK (§2 tablosunda
+ * bu ikisi `callInvite`'ın aksine ack almıyor — `callCancel` ile aynı desen). Sunucuya ulaşmasa bile
+ * istemci kendi tarafını (bildirim/zil temizliği, `startOrJoin`) zaten `incomingCall.ts`'te yürütüyor.
+ */
+export function callAccept(channelId: string): void {
+  socket?.emit('voice:call_accept', { channelId });
+}
+export function callReject(channelId: string): void {
+  socket?.emit('voice:call_reject', { channelId });
 }
 
 /** Ön plana dönüşte / boot'ta çağrılır (contract §4.3). Zaten bağlıysa no-op. */

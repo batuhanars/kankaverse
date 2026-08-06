@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useAuthStore } from '@/stores/auth';
 import { usePushNotificationResponder } from '@/notifications/push';
+import { useIncomingCallResponder } from '@/notifications/incomingCall';
 import { theme } from '@/theme';
 import { MiniCallWindow } from '@/components/call/MiniCallWindow';
 
@@ -18,6 +19,9 @@ export default function RootLayout() {
   // Sprint M3 §3 — push bildirimine dokununca yönlendirme. Oturumdan bağımsız: dokunuş uygulama
   // kapalı/arka plandayken de gelebilir, tek mount noktası kök layout (bkz. notifications/push.ts).
   usePushNotificationResponder();
+  // M4a-2 sözleşme §8 — gelen arama bildirimi (Reddet/Aramaya Katıl/gövde). Aynı mount noktası,
+  // aynı native response akışı (bkz. notifications/incomingCall.ts dosya başı yorumu).
+  useIncomingCallResponder();
 
   // 🔴 Sistem gezinme çubuğu ilk açılışta BEYAZ görünüyordu (sahip bulgusu 2026-08-01); login
   // ekranına çıkıp dönünce düzeliyordu. Sebep: SDK 54'te edge-to-edge açık olduğu için gezinme
