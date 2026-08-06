@@ -19,7 +19,10 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.BLUETOOTH_CONNECT"
+      ]
     },
     "web": {
       "output": "static",
@@ -44,7 +47,26 @@
           "photosPermission": "Kankaverse, sohbete fotoğraf gönderebilmen için galerine erişmek istiyor.",
           "savePhotosPermission": "Kankaverse galerine fotoğraf kaydetmek istiyor.",
           "isAccessMediaLocationEnabled": false,
-          "granularPermissions": ["photo"]
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ],
+      "expo-audio",
+      "expo-web-browser",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "microphonePermission": "Kankaverse, sesli aramada konuşabilmen için mikrofonuna erişmek istiyor.",
+          "cameraPermission": "Kankaverse görüntülü arama geldiğinde kamerana erişmek isteyecek."
+        }
+      ],
+      [
+        "@livekit/react-native-expo-plugin",
+        {
+          "android": {
+            "audioType": "communication"
+          }
         }
       ]
     ],

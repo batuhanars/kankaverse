@@ -7,8 +7,11 @@ import { useDmStore } from '@/stores/dm';
 import { useUnreadStore } from '@/stores/unread';
 import { useFriendsStore } from '@/stores/friends';
 import { useAuthStore } from '@/stores/auth';
+import { useVoiceStore } from '@/stores/voice';
+import { useVoicePresenceStore } from '@/stores/voicePresence';
 import type { MessageDto } from '@/api/messages';
 import type { FriendDto, FriendRequestDto } from '@/api/friends';
+import type { VoiceParticipantDto } from '@/api/voice';
 
 // Sprint M1a contract §4 — web/src/composables/useSocket.ts deseni birebir taşındı (yalnız bu
 // sprintte KULLANILAN olay alt kümesi — contract §4.2 tablosu). En kritik nokta (contract girişi
@@ -22,6 +25,16 @@ let activeChannelId: string | null = null;
 let onReconnectRefetch: (() => void) | null = null;
 // auth_error sonrası art arda tazele-dene sayacı (sonsuz döngü koruması)
 let authRetryCount = 0;
+
+// M4a-1 sözleşme §3.1 — ses presence aboneliği (DM ekranındaki "sesli arama sürüyor" şeridi).
+// Web'de bir Set (birden çok panel aynı anda abone olabilir); mobilde tek seferde tek DM ekranı
+// açık olduğu için `activeChannelId` ile AYNI tek-değer deseni yeterli — reconnect'te yeniden abone.
+let activeVoiceChannelId: string | null = null;
+
+/** DM ekranı mount/unmount'ta çağırır (bkz. `stores/voice.ts` `subscribePresence`/`unsubscribePresence`). */
+export function setActiveVoiceChannel(channelId: string | null): void {
+  activeVoiceChannelId = channelId;
+}
 
 /** Mesaj ekranı mount/unmount'ta çağırır — reconnect'te hangi kanalın yeniden çekileceğini bildirir. */
 export function setActiveChannel(channelId: string | null, refetch?: () => void): void {
@@ -74,6 +87,11 @@ function ensureSocket(): Socket {
       joinRoom(activeChannelId);
       // contract §4.3 — "sadece yeni gelenleri dinle" yetmez; arada kaçan mesajlar yeniden çekilir.
       onReconnectRefetch?.();
+    }
+    // M4a-1 §3.1 — reconnect sonrası ses presence aboneliği de yeniden kurulur (yoksa DM ekranı
+    // açık kalırken bağlantı düşüp gelirse "sesli arama sürüyor" şeridi bayat kalırdı).
+    if (activeVoiceChannelId) {
+      socket?.emit('voice:subscribe', { channelId: activeVoiceChannelId });
     }
   });
 
@@ -214,7 +232,65 @@ function ensureSocket(): Socket {
     useFriendsStore.getState().handleRemoved(payload.userId);
   });
 
+  // ---- M4a-1 sesli arama (sözleşme §2/§3) ----
+  // Presence (panel görünümü — DM ekranında bağlı olmasak da "kim var" şeridi için).
+  socket.on('voice.participant_joined', (data: { channelId: string; participant: VoiceParticipantDto }) => {
+    useVoicePresenceStore.getState().addParticipant(data.channelId, data.participant);
+  });
+  socket.on('voice.participant_left', (data: { channelId: string; userId: string }) => {
+    useVoicePresenceStore.getState().removeParticipant(data.channelId, data.userId);
+  });
+
+  // Oda-önce modeli (§0.1) — arayan zaten odada; bu iki olay yalnız UI durumunu günceller,
+  // `join()` burada TETİKLENMEZ (web'in klasik modelinin aksine, bkz. web useSocket.ts satır 390-399).
+  socket.on('voice.call_accepted', (data: { channelId: string }) => {
+    useVoiceStore.getState().handleCallAccepted(data.channelId);
+  });
+  socket.on('voice.call_rejected', (data: { channelId: string }) => {
+    useVoiceStore.getState().handleCallRejected(data.channelId);
+  });
+
   return socket;
+}
+
+// ---- M4a-1 sesli arama emit'leri (sözleşme §2) ----
+
+/** DM ekranı mount/unmount'ta — o kanalın "kim var" presence'ına abone ol/çık. */
+export function voiceSubscribe(channelId: string): void {
+  ensureSocket().emit('voice:subscribe', { channelId });
+}
+export function voiceUnsubscribe(channelId: string): void {
+  socket?.emit('voice:unsubscribe', { channelId });
+}
+
+/**
+ * Arama başlat — ack `{ok:false}` dönerse (sözleşme §2 🔴) istemci kodu AÇIMLAMAZ, nötr mesaj
+ * gösterir (T&S, R7). `joinChannel`in ack+timeout desenini birebir izler.
+ */
+export function callInvite(channelId: string): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const s = ensureSocket();
+    let settled = false;
+    const done = (ack: { ok: boolean; error?: string }) => {
+      if (settled) return;
+      settled = true;
+      resolve(ack);
+    };
+    const timer = setTimeout(() => done({ ok: false, error: 'TIMEOUT' }), 5000);
+    s.emit('voice:call_invite', { channelId }, (ack: { ok: boolean; error?: string }) => {
+      clearTimeout(timer);
+      done(ack ?? { ok: false });
+    });
+  });
+}
+
+/**
+ * §8'de M4a-1'e verilen tek istisna: odadan çıkarken karşı taraf henüz katılmadıysa bu da
+ * gönderilir (arayan tarafın çalan telefonunu/web bekleme barını susturur). Best-effort, ack yok
+ * (web `useSocket.ts callCancel` ile aynı — sunucu `{ok:true}` dönse de istemci beklemiyor).
+ */
+export function callCancel(channelId: string): void {
+  socket?.emit('voice:call_cancel', { channelId });
 }
 
 /** Ön plana dönüşte / boot'ta çağrılır (contract §4.3). Zaten bağlıysa no-op. */

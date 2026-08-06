@@ -71,6 +71,10 @@ export default function AppLayout() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="dm-requests" />
+      {/* M4a-1 sözleşme §4 — arama ekranı "tam ekran modal". Kendi başlığını çizer (headerShown
+          false); Android donanım geri tuşu varsayılan pop davranışıyla küçültme ile AYNI sonucu
+          verir (arama bağlı kalır, mini pencere belirir) — ayrı bir BackHandler gerekmiyor. */}
+      <Stack.Screen name="call" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
     </Stack>
   );
 }

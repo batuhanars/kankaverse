@@ -2856,28 +2856,28 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
 - [ ] **M4a-3** — uygulama kapalıyken gelen arama (en riskli parça, bilerek sonda)
 
 ### M4a-1 — Mobil (`mobile/`) — sözleşme §1-§7
-- [ ] Native paketler + **tek dev build** (`expo-audio` M4a-2'de kullanılacak olsa da ŞİMDİ kurulur;
+- [x] Native paketler + **tek dev build** (`expo-audio` M4a-2'de kullanılacak olsa da ŞİMDİ kurulur;
       **D38** `expo-web-browser` de bu derlemeye biner — ikinci derleme alınmayacak)
-- [ ] LiveKit RN SDK'nın Expo 54 / RN 0.81 / React 19.1 uyumlu sürümü **doğrulandı** (hatırdan değil,
+- [x] LiveKit RN SDK'nın Expo 54 / RN 0.81 / React 19.1 uyumlu sürümü **doğrulandı** (hatırdan değil,
       sürümlü dokümandan); uyumsuzsa DUR ve bildir
-- [ ] `voice:subscribe` + `GET voice/participants` + katıl/ayrıl akışı; `voice/leave` atlanmıyor
-- [ ] DM başlığında telefon düğmesi: aramada kimse yoksa **davet + odaya gir** (sıra: davet ÖNCE),
+- [x] `voice:subscribe` + `GET voice/participants` + katıl/ayrıl akışı; `voice/leave` atlanmıyor
+- [x] DM başlığında telefon düğmesi: aramada kimse yoksa **davet + odaya gir** (sıra: davet ÖNCE),
       arama sürüyorsa **davet göndermeden katıl**, bağlıysak arama ekranına dön
-- [ ] DM ekranında "arama sürüyor → Katıl" şeridi + odada tek başınayken soluk kutucuk + "Çalıyor…"
-- [ ] Odadan çıkarken karşı taraf henüz katılmadıysa `voice:call_cancel` de gönderiliyor
+- [x] DM ekranında "arama sürüyor → Katıl" şeridi + odada tek başınayken soluk kutucuk + "Çalıyor…"
+- [x] Odadan çıkarken karşı taraf henüz katılmadıysa `voice:call_cancel` de gönderiliyor
       (çalan telefon sussun; `api/` değişmeden çözülüyor)
-- [ ] İki eşik: hiç katılan olmadıysa **3 dk**, katılıp çıktıysa **60 sn** → otomatik bitiş;
+- [x] İki eşik: hiç katılan olmadıysa **3 dk**, katılıp çıktıysa **60 sn** → otomatik bitiş;
       açık reddedilmede (`call_rejected`) odadan çıkılır + nötr mesaj
-- [ ] Arama ekranı: iki kutucuk, konuşan yeşil kenarlık, mikrofon rozeti, süre sayacı, 5 sn'de
+- [x] Arama ekranı: iki kutucuk, konuşan yeşil kenarlık, mikrofon rozeti, süre sayacı, 5 sn'de
       kontrollerin gizlenmesi; **kamera/ekran/roket düğmesi YOK**
-- [ ] Mikrofon izni reddinde uygulama kilitlenmiyor: açıklama + "Ayarları aç"
-- [ ] Ses çıkışı seçici (telefon/hoparlör/bluetooth/kablolu); varsayılan hoparlör
-- [ ] 🔴 Foreground service (mikrofon türü) + kalıcı bildirim (Bağlantıyı Kes · Sustur)
-- [ ] 🔴 GSM araması kesintisinde mikrofon susuyor, bitince dönüyor
-- [ ] Mini pencere (uygulama içi katman, sistem overlay değil; sürükleme YOK)
-- [ ] Beklenmedik kopmada (ağ/sunucu/R11B disconnect) ekran kapanıyor, hayalet katılımcı kalmıyor
-- [ ] Tek kişi kalınca 60 sn sonra otomatik bitiyor
-- [ ] `typecheck` + `lint` temiz; `api/` ve `web/` diffi sıfır
+- [x] Mikrofon izni reddinde uygulama kilitlenmiyor: açıklama + "Ayarları aç"
+- [x] Ses çıkışı seçici (telefon/hoparlör/bluetooth/kablolu); varsayılan hoparlör
+- [x] 🔴 Foreground service (mikrofon türü) + kalıcı bildirim (Bağlantıyı Kes · Sustur)
+- [x] 🔴 GSM araması kesintisinde mikrofon susuyor, bitince dönüyor
+- [x] Mini pencere (uygulama içi katman, sistem overlay değil; sürükleme YOK)
+- [x] Beklenmedik kopmada (ağ/sunucu/R11B disconnect) ekran kapanıyor, hayalet katılımcı kalmıyor
+- [x] Tek kişi kalınca 60 sn sonra otomatik bitiyor
+- [x] `typecheck` + `lint` temiz; `api/` ve `web/` diffi sıfır
 
 ### M4a-2 — sözleşme §8 (M4a-1 sahip onayından SONRA)
 - [ ] Gelen arama ekranı (uygulama açıkken) + kabul/reddet; 30 sn sonra cevapsıza döner
