@@ -162,6 +162,7 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
 | D36 | **Presigned indirme adresi tarayıcı geçmişine ve indirmelere düşüyor** — mobilde dosya eki `Linking.openURL` ile sistem tarayıcısında açılıyor; adres 300 sn boyunca yeniden kullanılabilir ve tarayıcı geçmişi/indirme kaydında kalıyor. Erişim kapısı sunucuda duruyor ama dosya bir kez uygulamanın kontrolünden çıkıyor | mobile + web | M3c mobil dev bulgusu / 2026-08-04 | düşük (adres kısa ömürlü; web'de de aynı sınıf, yeni değil) | **ertelendi** — düzeltmesi dosyayı uygulama içinde açmak (`expo-sharing`/gömülü görüntüleyici = yeni bağımlılık + yeni dev build). **Tetikleyici:** CSAM tarayıcı devreye girdiğinde (o noktada içeriğin uygulama dışına sızma yolları tekrar taranmalı). 🔴 **UYARI (2026-08-04, sahip sorusu üzerine):** `expo-web-browser` (uygulama içi tarayıcı katmanı) bu borcu **ÇÖZMEZ** — Custom Tabs, Chrome'un geçmişini ve çerezlerini paylaşır, adres yine tarayıcı geçmişine düşer. Onu gerçekten çözen tek şey kendi PDF görüntüleyicimiz (`react-native-pdf`/WebView). "Web-browser'a geçtik, sorun kalmadı" sonucuna varılmasın |
 | D38 | **PDF/dosya eki sistem tarayıcısında açılıyor, kullanıcı uygulamadan çıkıyor** — `Linking.openURL` harici tarayıcıya devrediyor. Ayrıca presigned adres `Content-Disposition` göndermediği için indirme değil önizleme oluyor (karar tarayıcıya kalıyor; hiç karar verilmemiş bir davranış) | mobile | sahip sorusu / 2026-08-04 | düşük (çalışıyor, yalnız uygulamadan çıkarıyor) | **ertelendi (PM önerisi):** çözüm `expo-web-browser` — uygulama içi tarayıcı katmanı, geri tuşu uygulamaya döner, **kod tarafı tek satır**. Ama yeni native paket = yeni dev build. 🔴 **M4'ün WebRTC derlemesine bindirilecek**, küçük bir UX iyileştirmesi için ayrı derleme alınmayacak. İndirme davranışı isteniyorsa ayrıca sunucuda `ResponseContentDisposition` (küçük api işi) |
 | D37 | **Mesaj kutusundaki `+` ve emoji dışındaki küçük düğmelerde dokunma hedefi denetlenmemiş** — R3'te çipin ×'i 38dp, yanıt/düzenleme iptali 40dp bulundu (ikisi de 44 kuralının altında, ikisi de düzeltildi). İkisi de PM incelemesinden geçmişti; kural sözleşmelerde yazılı ama **ölçülmüyor**, göz kararı denetleniyor | mobile | M3c R3 / 2026-08-04 | düşük (erişilebilirlik; tek tek düzeltilebiliyor) | **ertelendi** — kalıcı çözüm `hitSlop`+ikon boyutu ilişkisini tek yardımcıya bağlamak (`touchTarget(iconSize)`) ya da lint kuralı. **Tetikleyici:** üçüncü kez aynı kusur bulunursa ([[overengineering-kacin]] gereği şimdi soyutlanmadı) |
+| D39 | **DM arama modeli web'de "klasik telefon", mobilde "oda önce" olacak** — webde arayan `call_invite` gönderip "Aranıyor…" barında **bekliyor**, odaya ancak `voice.call_accepted` gelince giriyor (`useCall.ts:17`, `useSocket.ts:390`). Discord bu modeli terk etmiş: telefon düğmesi doğrudan odaya sokuyor, karşı taraf çalıyor, cevap gelmezse arayan boş odada "arkadaşın katılabilir" ile bekliyor (sahip 2026-08-06'da fark etti). M4a mobili **oda-önce** yazıyor | web | M4a sözleşmesi / 2026-08-06 | düşük-orta (bozulma yok, uçlar ortak ve iki model **birbiriyle çalışıyor**; ama aynı özellik iki istemcide farklı görünüyor) | **ertelendi (PM kararı)** — mobil sprintinde web'e dokunmak sapma olurdu. Düzeltme küçük: `startCall` davetten sonra beklemeden `voiceStore.join` çağırsın, `OutgoingCallBar` yerine boş-oda durumu göstersin, `call_accepted` yalnız "çalıyor" göstergesini düşürsün. **Tetikleyici:** M4a-1 cihazda doğrulanıp oda-önce modeli sahibe iyi gelirse web aynı tura alınır (kötü gelirse mobil klasiğe döner, bu borç düşer) |
 
 ---
 
@@ -286,11 +287,20 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     başlansaydı çalma akışı hiç düşünülmeden bir platform katmanı kurulur, sonra onu yeniden
     şekillendirmek gerekebilirdi. En zor durumu başa almak temelin **baştan doğru** kurulmasını
     garantiliyor. PM'in itirazı risk sıralamasıydı, sahibinki mimari sıralama; bu iş için ikincisi doğru.
+    🔴 **ARAMA MODELİ DEĞİŞTİ (sahip gözlemi 2026-08-06):** Discord DM aramasını "klasik telefon"dan
+    **"oda önce"**ye taşımış — telefon düğmesi doğrudan sese sokuyor, karşı taraf çalıyor, cevap
+    gelmezse arayan boş odada bekliyor ("arkadaşın katılacaktır"). Sahip bunu fark edip sordu, kod
+    tarafı doğrulandı: **webimiz hâlâ klasik** (arayan bekler, kabul gelince girer). **Mobil oda-önce
+    yazılacak** — M4a-1 zaten odaya girmeyi inşa ediyor, arayan tarafı bedava geliyor; ayrı "Aranıyor…"
+    ekranı, geri-zil ve iptal durumları **hiç yazılmıyor**. Sunucu değişmiyor (yalnız röle), iki model
+    birbiriyle çalışıyor, T&S açığı yok (`voice/token` DM dalında `requireDmCallGate` mint anında
+    çalışıyor). Web'in aynı modele taşınması → **D39**.
     ✅ **M4a SÖZLEŞMESİ YAZILDI (2026-08-06):** `contracts/SPRINT_M4A_MOBILE_VOICE_CONTRACT.md`.
     Sahibin 12 ekran görüntüsü depoya alındı → `design-refs/m4-ses/`. Faz sırası değişmedi; sözleşme
-    M4a'yı **içeriden** üçe böldü, üçü de cihazda doğrulanabilir: **M4a-1** var olan aramaya katıl
-    (ağır platform işinin tamamı, çalma yok) → **M4a-2** çalma, uygulama açıkken → **M4a-3** uygulama
-    kapalıyken gelen arama. Bu, M1d dersinin faz sırasını bozmadan uygulanmış hâli.
+    M4a'yı **içeriden** üçe böldü, üçü de cihazda doğrulanabilir: **M4a-1** odaya girme (ağır platform
+    işinin tamamı + **arama başlatma**, çünkü oda-önce modelinde ikisi aynı eylem) → **M4a-2** mobilde
+    **gelen** arama, uygulama açıkken → **M4a-3** uygulama kapalıyken gelen arama.
+    Bu, M1d dersinin faz sırasını bozmadan uygulanmış hâli.
     🔴 **Tek derleme kuralı:** `expo-audio` (M4a-2'de kullanılacak) ve D38'in `expo-web-browser`'ı
     M4a-1 başında kurulur; native paket için ikinci dev build alınmaz.
     🔴 **`api/` M4a-1 ve M4a-2'de DEĞİŞMEZ.** M4a-3'ün yüksek öncelikli push'u `PushService`

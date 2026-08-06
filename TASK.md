@@ -2841,12 +2841,18 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
 > **`api/` DEĞİŞMEZ** (M4a-3 hariç; oraya gelince PM sözleşmeyi revize eder).
 >
 > Sözleşme sahibin 12 Discord ekran görüntüsüyle yazıldı → `design-refs/m4-ses/`.
-> 🔴 **Görsel eksiği kayda geçti:** çalma ve gelen arama ekranlarının görüntüsü yok; o iki ekran
-> web davranışından türetilecek, ilk revizyon turunun oraya gelmesi bekleniyor.
+> 🔴 **Görsel eksiği kayda geçti:** gelen arama ekranının görüntüsü yok; web davranışından
+> türetilecek, ilk revizyon turunun oraya gelmesi bekleniyor.
+>
+> 🔴 **Arama modeli "oda önce" (sahip gözlemi 2026-08-06, sözleşme §0.1).** Discord DM aramasını
+> klasik telefon modelinden çıkarmış: telefon düğmesi doğrudan odaya sokuyor, karşı taraf çalıyor,
+> cevap gelmezse arayan boş odada bekliyor. Mobil bunu uygular; **web klasik kalıyor → D39**.
+> Kazanç: ayrı "Aranıyor…" ekranı, geri-zil, iptal-vs-kapat ayrımı ve arayan-tarafı zaman aşımı
+> **hiç yazılmıyor**. Sunucu değişmiyor, iki model birbiriyle çalışıyor.
 
 ### İç sıralama (PM kararı — faz sırası bozulmadan)
-- [ ] **M4a-1** — var olan aramaya katıl (ağır platform işi burada, çalma yok)
-- [ ] **M4a-2** — çalma akışı, uygulama açıkken
+- [ ] **M4a-1** — odaya girme: **başlatma = katılma** (ağır platform işinin tamamı burada)
+- [ ] **M4a-2** — mobilde **gelen** arama, uygulama açıkken
 - [ ] **M4a-3** — uygulama kapalıyken gelen arama (en riskli parça, bilerek sonda)
 
 ### M4a-1 — Mobil (`mobile/`) — sözleşme §1-§7
@@ -2855,7 +2861,13 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
 - [ ] LiveKit RN SDK'nın Expo 54 / RN 0.81 / React 19.1 uyumlu sürümü **doğrulandı** (hatırdan değil,
       sürümlü dokümandan); uyumsuzsa DUR ve bildir
 - [ ] `voice:subscribe` + `GET voice/participants` + katıl/ayrıl akışı; `voice/leave` atlanmıyor
-- [ ] DM ekranında "arama sürüyor → Katıl" şeridi (arama yokken **hiçbir şey gösterilmez**)
+- [ ] DM başlığında telefon düğmesi: aramada kimse yoksa **davet + odaya gir** (sıra: davet ÖNCE),
+      arama sürüyorsa **davet göndermeden katıl**, bağlıysak arama ekranına dön
+- [ ] DM ekranında "arama sürüyor → Katıl" şeridi + odada tek başınayken soluk kutucuk + "Çalıyor…"
+- [ ] Odadan çıkarken karşı taraf henüz katılmadıysa `voice:call_cancel` de gönderiliyor
+      (çalan telefon sussun; `api/` değişmeden çözülüyor)
+- [ ] İki eşik: hiç katılan olmadıysa **3 dk**, katılıp çıktıysa **60 sn** → otomatik bitiş;
+      açık reddedilmede (`call_rejected`) odadan çıkılır + nötr mesaj
 - [ ] Arama ekranı: iki kutucuk, konuşan yeşil kenarlık, mikrofon rozeti, süre sayacı, 5 sn'de
       kontrollerin gizlenmesi; **kamera/ekran/roket düğmesi YOK**
 - [ ] Mikrofon izni reddinde uygulama kilitlenmiyor: açıklama + "Ayarları aç"
@@ -2868,9 +2880,10 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
 - [ ] `typecheck` + `lint` temiz; `api/` ve `web/` diffi sıfır
 
 ### M4a-2 — sözleşme §8 (M4a-1 sahip onayından SONRA)
-- [ ] Giden arama + 30 sn zaman aşımı + iptal; ulaşılamayanda **nötr** mesaj (R7)
-- [ ] Gelen arama ekranı (uygulama açıkken) + kabul/reddet
-- [ ] Zil/geri-zil/blip sesleri: web'in ton reçetesinden **üretilen** dosyalar (hazır zil indirilmez)
+- [ ] Gelen arama ekranı (uygulama açıkken) + kabul/reddet; 30 sn sonra cevapsıza döner
+      *(oda arayan tarafta 3 dk yaşamaya devam eder — iki süre bilerek farklı)*
+- [ ] Zil sesi + titreşim: web'in ton reçetesinden **üretilen** dosyalar (hazır zil indirilmez).
+      **Geri-zil üretilmez** — oda-önce modelinde arayan zaten odada, bekleme tonu yok
 
 ### M4a-3 — sözleşme §9 (M4a-2 sahip onayından SONRA)
 - [ ] 🔴 Yüksek öncelikli push **`api/` işi** — PM sözleşmeyi revize edecek, dev kendi başına dokunmaz
