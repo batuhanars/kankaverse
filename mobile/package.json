@@ -1,6 +1,6 @@
 {
   "name": "kankaverse-mobile",
-  "main": "expo-router/entry",
+  "main": "index.js",
   "version": "1.0.0",
   "dependencies": {
     "@config-plugins/react-native-webrtc": "13.0.0",

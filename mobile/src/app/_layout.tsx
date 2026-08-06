@@ -3,20 +3,16 @@ import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { registerGlobals } from '@livekit/react-native';
 import { useAuthStore } from '@/stores/auth';
 import { usePushNotificationResponder } from '@/notifications/push';
 import { theme } from '@/theme';
 import { MiniCallWindow } from '@/components/call/MiniCallWindow';
 
-// M4a-1 sözleşme §1 — LiveKit'in gerektirdiği WebRTC global'leri (registerGlobals) uygulama
-// açılışında BİR KEZ, herhangi bir LiveKit/Room kullanımından ÖNCE kayıt olmalı. Modül kapsamında
-// (component dışı) çağrılır ki bu dosya import edildiği an — expo-router'ın ilk yüklediği kullanıcı
-// modülü — çalışsın; bir effect içine konsaydı ilk render'dan SONRA çalışır, o kadar geç kalmak
-// yeterli olabilir ama garanti değil (bkz. LiveKit Expo quickstart: "Must be called before using
-// LiveKit").
-registerGlobals();
-
+// 🔴 `registerGlobals()` BURADA DEĞİL, `mobile/index.js`'te (uygulama giriş noktası). Burada
+// duruyordu ve YETMİYORDU: expo-router rota dosyalarını `require.context` ile topluca yüklediği için
+// `stores/voice.ts` → `livekit-client` bu dosyanın gövdesinden ÖNCE değerlendiriliyor, LiveKit'in
+// DOMException polyfill'i henüz kurulmamış oluyordu → açılışta kırmızı ekran. Gerekçenin tamamı
+// `index.js`'te. Buraya geri taşıma.
 export default function RootLayout() {
   const bootstrap = useAuthStore((s) => s.bootstrap);
   // Sprint M3 §3 — push bildirimine dokununca yönlendirme. Oturumdan bağımsız: dokunuş uygulama
