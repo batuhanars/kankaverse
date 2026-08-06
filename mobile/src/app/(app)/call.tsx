@@ -70,9 +70,13 @@ export default function CallScreen() {
   useEffect(() => {
     if (!wasConnectedRef.current || connectedChannelId !== null) return;
     const reason = useVoiceStore.getState().disconnectReason;
-    if (reason) Alert.alert(reason);
     useVoiceStore.getState().clearDisconnectReason();
+    // 🔴 Sıra: ÖNCE geri dön, uyarıyı SONRAKİ tick'te göster (sahip cihaz turu 2026-08-06,
+    // "bağlantıyı kes → beyaz ekran"). `Alert` bu ekran sökülürken açılınca yerel diyalog, kapanmakta
+    // olan tam ekran modalın üstüne bindiriliyor ve Fabric görünüm ağacını bozuyordu
+    // (`addViewAt: The specified child already has a parent`). Uyarı artık DM ekranının üstünde çıkar.
     router.back();
+    if (reason) setTimeout(() => Alert.alert(reason), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectedChannelId]);
 

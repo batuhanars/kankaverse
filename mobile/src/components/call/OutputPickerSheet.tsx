@@ -61,8 +61,13 @@ export function OutputPickerSheet({ visible, onClose }: { visible: boolean; onCl
     AudioSession.selectAudioOutput(id).catch(() => {});
   }
 
+  // 🔴 Kapalıyken `Modal` HİÇ kurulmaz (yalnız `visible={false}` vermek yetmez). Sürekli kurulu
+  // duran bir Modal, sahne ekranı sökülürken Fabric'in görünüm ağacında ikinci bir kök taşıyor ve
+  // "child already has a parent" sınıfı çökmeleri besliyor (sahip cihaz turu 2026-08-06).
+  if (!visible) return null;
+
   return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal transparent visible animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={[styles.sheet, { paddingBottom: sheetBottomPadding(bottomInset) }]} onPress={() => {}}>
           <View style={styles.grabber} />
