@@ -73,6 +73,12 @@ interface VoiceState {
 
 // Yerel bağlantı nesnesi — reaktif değil (web voice.ts ile aynı gerekçe, kompleks/mutable nesne).
 let room: Room | null = null;
+// 🔴 "Ayrılış bizden mi başladı" bayrağı (sahip cihaz turu 2026-08-06). `leave()` içindeki
+// `room.disconnect()` LiveKit'in `Disconnected` olayını tetikliyor; o dinleyici bunu BEKLENMEDİK
+// kopma sanıp ikinci bir `leave()` başlatıyor ve `disconnectReason`ı "Bağlantı kesildi" ile
+// eziyordu. Görünen iki kusur da buydu: (1) karşı taraf reddedince nötr mesaj yerine "bağlantı
+// kesildi" çıkıyor, (2) her kapatmada iki temizlik + iki `voice/leave` isteği iç içe giriyor.
+let leaving = false;
 let peerEverJoined = false;
 let aloneTimer: ReturnType<typeof setTimeout> | null = null;
 let foregroundListenerRemove: (() => void) | null = null;
@@ -248,6 +254,11 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   },
 
   async leave(userInitiated = false) {
+    // Yeniden girişi engelle: `room.disconnect()` sırasında gelen `Disconnected` olayı ya da
+    // bildirimden gelen ikinci "Bağlantıyı Kes" bu fonksiyonu tekrar çağırabiliyor. İkinci geçiş
+    // `voice/leave`i ikinci kez atıyor ve durumu yarıda sıfırlıyordu.
+    if (leaving) return;
+    leaving = true;
     const channelId = get().connectedChannelId;
     const wasAlone = get().roomParticipants.length <= 1;
     clearAloneTimer();
@@ -295,6 +306,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       outputId: null,
       disconnectReason: userInitiated ? null : get().disconnectReason,
     });
+    leaving = false;
   },
 
   async toggleMute() {
@@ -406,9 +418,11 @@ function wireRoom(
     scheduleAloneCheckIfNeeded(get);
   });
   r.on(RoomEvent.Disconnected, (reason?: unknown) => {
-    // §3.3 🔴 — beklenmedik kopmada da aynı temizlik (ağ/sunucu/A4/R11B). `leave()` zaten
-    // idempotent (room=null kontrolü); burada yalnız kullanıcıya Türkçe bilgi + temizlik.
+    // §3.3 🔴 — YALNIZ beklenmedik kopma (ağ/sunucu/A4/R11B). Ayrılışı biz başlattıysak
+    // (`leaving`) bu olay `room.disconnect()`in kendi yankısıdır: temizlik zaten yürüyor ve
+    // buradaki "Bağlantı kesildi" mesajı gerçek sebebi (ör. karşı taraf reddetti) EZER.
     if (__DEV__) console.warn('[voice] LiveKit Disconnected — reason:', reason);
+    if (leaving) return;
     if (get().connectedChannelId === channelId) {
       set({ disconnectReason: t('mobile.call.disconnected') });
       room = null;
