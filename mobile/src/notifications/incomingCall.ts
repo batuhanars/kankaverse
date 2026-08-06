@@ -33,7 +33,11 @@ import { t } from '@/i18n';
 const VIBRATE_PATTERN = [0, 400, 200, 400, 2000]; // web ringCycle ile aynı ritim (0.4s+0.2s+0.4s+2s=3s)
 const RING_TIMEOUT_MS = 30_000; // §8.2 — 30 sn cevapsız
 
-const CHANNEL_ID = 'incoming_call';
+// 🔴 Kanal kimliği SÜRÜMLÜ. Android bildirim kanalı bir kez kurulduktan sonra ayarları
+// (ses/titreşim/önem) **değiştirilemez**; `setNotificationChannelAsync` aynı kimlikle çağrılınca
+// sessizce hiçbir şey yapmaz. Ayar değişince kimlik de artırılır, yoksa telefonunda eski kanal
+// duran herkes eski davranışı yaşar. (v1: sessiz + titreşimsiz → heads-up çıkmıyordu, bkz. aşağısı.)
+const CHANNEL_ID = 'incoming_call_v2';
 const CATEGORY_ID = 'incoming_call';
 const NOTIFICATION_DATA_TYPE = 'incoming_call';
 
@@ -56,9 +60,15 @@ async function ensureSetup(): Promise<void> {
   // karışmaz, burası tamamen ayrı bir kanal kimliği.
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: t('mobile.call.incomingNotifChannel'),
-    importance: Notifications.AndroidImportance.HIGH,
-    sound: null, // §8.3 — kanal sessiz, döngü biz yönetiriz
-    enableVibrate: false, // titreşim de biz yönetiriz (Vibration.vibrate) — tek kaynak, çift titreşim yok
+    importance: Notifications.AndroidImportance.MAX,
+    sound: null, // §8.3 — kanal sesi YOK; zil `expo-audio` ile döngüde (kanal sesi tek atış)
+    // 🔴 Titreşim kanalda AÇIK ama deseni neredeyse yok (1 ms). Gerçek titreşimi biz yönetiyoruz
+    // (`Vibration.vibrate` döngüde, §8.3). Buradaki tek amaç kanalın "sessiz kanal" sayılmaması:
+    // sesi ve titreşimi kapalı bir kanal, önemi HIGH olsa bile birçok cihazda (özellikle MIUI)
+    // **heads-up olarak ekranın üstünde belirmez**, doğrudan bildirim gölgesine düşer. Sahip tam
+    // bunu bildirdi (2026-08-06): "sadece üstteki bildirim yerinde görünüyor, ekranda belirmiyor".
+    enableVibrate: true,
+    vibrationPattern: [0, 1],
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
   });
   await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
@@ -107,6 +117,8 @@ export async function presentIncomingCall(
       data: { type: NOTIFICATION_DATA_TYPE, channelId, callerId: caller.id, callerName: caller.username },
       categoryIdentifier: CATEGORY_ID,
       sound: false, // §8.3 — bildirimin KENDİ sesi de yok, zil expo-audio'dan
+      // Heads-up için kanal önemi tek başına yetmiyor; bildirimin kendi önceliği de en üstte olmalı.
+      priority: Notifications.AndroidNotificationPriority.MAX,
       // Gövdeye dokunma yalnız DM'e götürür (§8.2) — bildirim otomatik SİLİNMEZ, kullanıcı hâlâ
       // Reddet/Aramaya Katıl'a basabilmeli (kabul/reddet/zaman aşımı/iptal `dismissIncomingCall`
       // ile elle kaldırıyor — tek kapanış noktası, dosya başı yorumu).
