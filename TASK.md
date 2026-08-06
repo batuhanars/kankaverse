@@ -2879,11 +2879,21 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
 - [x] Tek kişi kalınca 60 sn sonra otomatik bitiyor
 - [x] `typecheck` + `lint` temiz; `api/` ve `web/` diffi sıfır
 
-### M4a-2 — sözleşme §8 (M4a-1 sahip onayından SONRA)
-- [ ] Gelen arama ekranı (uygulama açıkken) + kabul/reddet; 30 sn sonra cevapsıza döner
-      *(oda arayan tarafta 3 dk yaşamaya devam eder — iki süre bilerek farklı)*
-- [ ] Zil sesi + titreşim: web'in ton reçetesinden **üretilen** dosyalar (hazır zil indirilmez).
-      **Geri-zil üretilmez** — oda-önce modelinde arayan zaten odada, bekleme tonu yok
+### M4a-2 — sözleşme §8 (SIRADAKİ)
+> 🔴 **Sunum tam ekran DEĞİL, bildirim** (sahip görselleri 2026-08-06 → `design-refs/m4-ses/13`, `14`).
+> Discord hem kilit ekranında hem uygulama açıkken aynı bildirimi gösteriyor: "Gelen Arama /
+> <ad> seni arıyor!" + **Reddet** · **Aramaya Katıl**. Sözleşmenin ilk hâli tam ekran ekran diyordu,
+> düzeltildi. Kazanç üç katlı: ayrı ekranın sökülme kusurları hiç doğmuyor (M4a-1'deki beyaz ekranın
+> kaynağı buydu), M4a-3 aynı arayüzü kullanacak, **`USE_FULL_SCREEN_INTENT` riski konusuz kaldı**.
+
+- [ ] Yüksek önemli **ayrı** bildirim kanalı (M4a-1'in "arama sürüyor" kanalı düşük önemli, karışmaz);
+      uygulama önplandayken de üstte görünüyor
+- [ ] Eylemler: Reddet → `call_reject` · Aramaya Katıl → `call_accept` + katılma akışı + arama ekranı
+- [ ] Gövdeye dokunma → o DM'e götürür (arama ekranı yalnız kabulde açılır)
+- [ ] 30 sn cevapsız → bildirim kalkar *(oda arayan tarafta 3 dk yaşar — iki süre bilerek farklı)*
+- [ ] `voice.call_canceled` → bildirim kendiliğinden kaybolur; kabul/reddet sonrası da asılı kalmaz
+- [ ] Zil **`expo-audio` ile döngüde** çalınır, kanal sesi ile değil (kanal sesi tek atış);
+      cihaz sessizdeyken zil yok, titreşim var. Geri-zil üretilmez
 
 ### M4a-3 — sözleşme §9 (M4a-2 sahip onayından SONRA)
 - [ ] 🔴 Yüksek öncelikli push **`api/` işi** — PM sözleşmeyi revize edecek, dev kendi başına dokunmaz

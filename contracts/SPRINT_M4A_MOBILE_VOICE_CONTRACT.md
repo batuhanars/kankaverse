@@ -291,28 +291,56 @@ Küçültünce arama **kapanmaz**: uygulamanın üstünde küçük bir kutucuk k
 > girmektir; ayrı "Aranıyor…" ekranı, geri-zil durumu, iptal-vs-kapat ayrımı ve arayan tarafı
 > 30 sn zaman aşımı **hiç yazılmıyor**. Bu durakta yalnız **karşılama** tarafı var.
 
-`voice.incoming_call` → tam ekran gelen arama görünümü: arayanın avatarı + adı,
-**Reddet** (`danger`) / **Kabul et** (Kor aksan) + zil sesi + titreşim.
-- Kabul → `voice:call_accept` + odaya katıl (M4a-1'in katılma akışı aynen kullanılır).
-- Reddet → `voice:call_reject` (arayan odadan çıkarılır, §3.3).
-- **30 sn** cevap verilmezse çalma ekranı kapanır ve **"cevapsız arama"ya** döner.
-  ⚠️ Arayan tarafta oda 3 dk durmaya devam eder (§3.3) — iki süre farklı ve bu bilinçli: çalma
-  penceresi kısa, oda penceresi uzun. Kullanıcı çalma bittikten sonra da DM'deki "Katıl"la girebilir.
-- Arayan odadan çıkarsa çalma ekranı kendiliğinden kapanır.
-  🔴 Bugün sunucu bunu **yalnız** `voice:call_cancel` ile bildiriyor; oda-önce modelinde arayan
-  "iptal" değil "odadan çıkma" yapıyor. Mobil arayan **odadan çıkarken `voice:call_cancel` da gönderir**
-  (karşı taraf henüz katılmadıysa). Böylece `api/` değişmeden çalan telefon susar. Bu M4a-1'in işidir,
-  M4a-2 yalnız tüketir.
+### §8.1 🔴 Sunum: TAM EKRAN DEĞİL, BİLDİRİM (sahip görselleri 2026-08-06)
 
-🔴 **Görsel yok:** sahip gelen arama ekranının ekran görüntüsünü almamış. Ekran web'deki
-`IncomingCallModal` davranışından ve Android alışkanlığından türetilecek. **İlk revizyon turunun
-buraya gelmesi bekleniyor.**
+Sözleşmenin ilk hâli "tam ekran gelen arama görünümü" diyordu. Sahip Discord'da gelen aramayı
+çekti (`design-refs/m4-ses/13-gelen-arama-kilit-ekrani.jpg` · `14-gelen-arama-uygulama-uzeri.jpg`)
+ve **Discord tam ekran arayüz göstermiyor**: hem kilit ekranında hem *uygulama açıkken üstte* **aynı
+bildirim** çıkıyor — başlık "Gelen Arama", gövde "<ad> seni arıyor!", iki eylem: **Reddet** ·
+**Aramaya Katıl**. Tasarım kaynağı görsellerdir; tam ekran ekran **yazılmıyor**.
 
-**Sesler:** web sesleri Web Audio ile **sentezliyor** (`useCallSounds.ts`), React Native'de Web Audio yok.
-Aynı ton reçetesinden (çift-zil zil / bağlan-ayrıl blipleri) **kısa ses dosyaları üretilip**
-`assets/sounds/` altına konur, `expo-audio` ile çalınır. Hazır zil sesi indirilmez (lisans + ton tutarlılığı).
-Geri-zil (ringback) **üretilmez**: oda-önce modelinde arayan zaten odada, bekleme tonu yok.
-Zil sesi cihaz sessizdeyken çalmaz, titreşim kalır.
+**Bu bir sadeleşme, üç kazancı var:**
+1. Ayrı bir React ekranı, gezinme dalı ve onun sökülme kusurları (M4a-1'de beyaz ekranın kaynağı tam
+   olarak buydu) **hiç doğmuyor**.
+2. M4a-2 ile M4a-3 **aynı sunumu** paylaşıyor: fark yalnız tetikleyicide (WS mi, push mi).
+   M4a-3'e geçince yeni arayüz yazılmayacak.
+3. 🔴 **`USE_FULL_SCREEN_INTENT` ihtiyacı düşüyor.** §9'da "Play 'arama uygulaması' beyanı
+   alınamazsa tam ekran çalan arayüz olmaz" diye bir risk yazmıştım; Discord'un kendisi de tam ekran
+   kullanmadığına göre bu risk **konusuz kaldı**.
+
+### §8.2 Davranış
+
+`voice.incoming_call` (WS, uygulama açık) → yerel bildirim:
+- Kanal: **ayrı ve yüksek önemli** (`IMPORTANCE_HIGH`) — M4a-1'in "arama sürüyor" kanalı
+  `IMPORTANCE_LOW`, ikisi karışmaz. Uygulama önplandayken de **üstte (heads-up)** görünmeli
+  (`expo-notifications` handler'ı bu bildirim için banner göstermeli).
+- Eylemler: **Reddet** → `voice:call_reject` · **Aramaya Katıl** → `voice:call_accept` + M4a-1'in
+  katılma akışı (`startOrJoin`, davet göndermeden) + arama ekranını aç.
+- Bildirime (gövdeye) dokunmak: uygulamayı açar ve **o DM'e** götürür; arama ekranı yalnız kabul
+  edilince açılır.
+- **30 sn** cevapsız → bildirim kaldırılır. ⚠️ Arayan tarafta oda **3 dk** yaşar (§3.3): kullanıcı
+  çalma bittikten sonra DM'deki "Katıl" şeridinden hâlâ girebilir. İki süre bilerek farklı.
+- Arayan vazgeçerse (`voice.call_canceled`) bildirim **kendiliğinden kaybolur**.
+  🔴 Oda-önce modelinde arayan "iptal" değil "odadan çıkma" yapıyor; mobil arayan odadan çıkarken
+  `voice:call_cancel` **da** gönderiyor (M4a-1'de yazıldı) → `api/` değişmeden telefon susuyor.
+- Kabul/reddet sonrası bildirim her hâlde kaldırılır (asılı kalan "Gelen Arama" olmaz).
+
+**Kapsam dışı (şimdilik):** görsel 14'teki DM listesinde **"Devam Eden Arama" / "Arama Sona Erdi"**
+satır durumu. Hoş ve ucuz görünüyor ama listeye yeni bir durum kaynağı bağlamak ayrı iş; M4a-2
+bitince değerlendirilir.
+
+### §8.3 Sesler
+
+Web sesleri Web Audio ile **sentezliyor** (`useCallSounds.ts`), React Native'de Web Audio yok. Aynı
+ton reçetesinden (çift-zil) **kısa bir ses dosyası üretilip** `assets/sounds/` altına konur.
+
+🔴 **Zil `expo-audio` ile ÇALINIR, bildirim kanalının sesiyle değil.** Kanal sesi tek atış çalar;
+arama zili **çalma boyunca döngüde** olmalı. Kanal `setSound(null)` ile sessiz kurulur, döngüyü biz
+yönetiriz: kabul/reddet/zaman aşımı/iptal → durur. Bu, bildirimin kendi sesiyle zilin üst üste
+binmesini de önler.
+- Cihaz sessiz/rahatsız-etmeyin kipindeyse **zil çalmaz, titreşim kalır**.
+- Geri-zil (ringback) **üretilmez**: oda-önce modelinde arayan zaten odada, bekleme tonu yok.
+- Bağlanma/ayrılma blipleri M4a-1'de yoktu, M4a-2'de de **eklenmiyor** (kapsam sabit kalsın).
 
 ---
 
@@ -324,14 +352,13 @@ Zil sesi cihaz sessizdeyken çalmaz, titreşim kalır.
   🔴 Bu **`api/` değişikliğidir** (`PushService` bugün yalnız mesaj bildirimi gönderiyor, `priority`
   alanı yok). M4a-3'e gelindiğinde **PM sözleşmeyi revize eder**; dev kendi başına `api/`ye dokunmaz.
   M4a-1 ve M4a-2 boyunca `api/` diffi **sıfır** olmalı.
-- Android'de ayrı **bildirim kanalı** (yüksek önem, zil sesi, titreşim deseni).
-- Bildirim eylemleri: **Kabul et** / **Reddet**. Kabul → uygulama açılır ve doğrudan aramaya girer.
-- ⚠️ **PM'in dürüst beklentisi:** GSM aramaları gibi **tam ekran çalan** bir arayüz Android 14+'ta
-  `USE_FULL_SCREEN_INTENT` iznine bağlı ve Play bunu "arama uygulaması" beyanıyla veriyor. Bu izin
-  alınamazsa sonuç **yüksek öncelikli, sesli, eylemli bildirim** olur (tam ekran değil). Bu bir
-  başarısızlık değil, platformun kuralı. Dev buraya geldiğinde neyin mümkün olduğunu ölçüp raporlar,
-  karar sahibin.
-- Zaman aşımı geçmiş çağrının bildirimi **temizlenir** (30 sn sonra "cevapsız arama"ya döner veya düşer).
+- 🟢 **Arayüz zaten M4a-2'de yazıldı** (§8.1): bildirim, kanal, eylemler ve zil aynen kullanılır.
+  Bu durakta **yeni ekran yok**; tek fark tetikleyici — WS yerine push.
+- ✅ **`USE_FULL_SCREEN_INTENT` riski KAPANDI (2026-08-06):** sözleşmenin ilk hâli tam ekran çalan
+  arayüz varsayıyor ve "Play 'arama uygulaması' beyanı alınamazsa olmaz" diyordu. Sahibin görselleri
+  Discord'un da tam ekran kullanmadığını gösterdi → o izin hiç istenmeyecek, risk konusuz kaldı.
+- Kabul → uygulama açılır ve doğrudan aramaya girer (uygulama kapalıysa açılış + katılma zinciri).
+- Zaman aşımı geçmiş çağrının bildirimi **temizlenir**; asılı "Gelen Arama" kalmaz.
 
 ---
 
