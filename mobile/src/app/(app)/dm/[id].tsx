@@ -1,14 +1,20 @@
-import { useEffect, useMemo } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { dmApi } from '@/api/dm';
 import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
+import { useVoiceStore } from '@/stores/voice';
+import { useVoicePresenceStore, type VoicePresenceParticipant } from '@/stores/voicePresence';
+import { OngoingCallBanner } from '@/components/call/OngoingCallBanner';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ChatBackButton } from '@/components/ChatBackButton';
 import { channelTitle } from '@/utils/channelTitle';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
+
+const EMPTY_PRESENCE: VoicePresenceParticipant[] = [];
 
 // Sprint M1a contract §5 ekran 3 — DM mesaj ekranı: kanal ekranıyla "aynısı" (MessageScreen ortak
 // gövde) + başlıkta karşı tarafın adı/avatarı (dokunuş → salt okunur profil kartı, yalnız 1-1 DM'de
@@ -99,6 +105,21 @@ export default function DmScreen() {
     return () => useDmStore.getState().setActiveDm(null);
   }, [channelId]);
 
+  // M4a-1 sözleşme §3.1 — ses presence aboneliği, YALNIZ 1-1 DM'de (grup DM sesli M4b, kapsam dışı).
+  // "Arama başlatma = katılma" modelinde bu abonelik + `GET voice/participants` DM ekranının kendi
+  // işi — call.tsx'in değil (o zaten bağlıyken açılır).
+  useEffect(() => {
+    if (!channelId || !isDm) return;
+    useVoicePresenceStore.getState().subscribe(channelId);
+    return () => useVoicePresenceStore.getState().unsubscribe(channelId);
+  }, [channelId, isDm]);
+
+  const presenceParticipants = useVoicePresenceStore((s) =>
+    isDm && channelId ? (s.byChannel[channelId] ?? EMPTY_PRESENCE) : EMPTY_PRESENCE,
+  );
+  const isConnectedHere = useVoiceStore((s) => s.connectedChannelId === channelId);
+  const [callBusy, setCallBusy] = useState(false);
+
   if (!channelId) return null;
 
   // 🔴 KUSUR 1 düzeltmesi (sahip bulgusu 2026-08-03, cihaz turu) — push'tan açılan DM'de başlıkta
@@ -122,6 +143,31 @@ export default function DmScreen() {
   const disabledNotice = isDm && !canMessage ? (selfBlocked ? t('dm.selfBlocked') : t('dm.cannotMessage')) : null;
 
   const placeholder = isDm ? t('dm.placeholder', { user: title }) : t('dm.groupPlaceholder', { name: title });
+
+  // §3.1 — başlıktaki telefon düğmesi: kimse yoksa BAŞLATIR (davet + katıl), biri varsa KATILIR
+  // (davet gönderilmez — §3.1 "tekrar çaldırmak spam olur"), biz zaten bağlıysak arama ekranına döner.
+  async function handleCallPress() {
+    if (isConnectedHere) {
+      router.push({ pathname: '/call', params: { channelId } });
+      return;
+    }
+    if (callBusy) return;
+    setCallBusy(true);
+    const res = await useVoiceStore.getState().startOrJoin(channelId, title);
+    setCallBusy(false);
+    if (res.ok) {
+      router.push({ pathname: '/call', params: { channelId } });
+      return;
+    }
+    if (res.reason === 'mic_denied') {
+      Alert.alert(res.message ?? t('common.error'), undefined, [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('mobile.call.micPermissionSettings'), onPress: () => Linking.openSettings() },
+      ]);
+      return;
+    }
+    if (res.message) Alert.alert(res.message);
+  }
 
   /**
    * Başlığa dokunuş → **DM detay ekranı** (M3b §2.1). Eskiden 1-1'de profil kartı, grupta doğrudan
@@ -167,6 +213,34 @@ export default function DmScreen() {
         markRead={dmApi.markRead}
         typingMode="simple"
         disabledNotice={disabledNotice}
+        // M4a-1 sözleşme §3.1/§4 — telefon düğmesi + "sesli arama sürüyor" şeridi YALNIZ 1-1 DM'de
+        // (grup DM sesli M4b, kapsam dışı — sözleşme §12). Başlığın sağ üstü buraya ayrılmıştı
+        // (yukarıdaki yorum), tek kapı bu.
+        headerActions={
+          isDm ? (
+            <Pressable
+              onPress={handleCallPress}
+              disabled={callBusy}
+              // D37 dersi: 20px ikon + hitSlop yalnız yeterince büyükse ≥44dp dokunma hedefine
+              // ulaşır (20 + 2×12 = 44). Kardeş ikonlar (sabitleme/arama) 10 kullanıyor — onlara
+              // dokunmuyorum (kapsam dışı), yeni düğmemi göz kararıyla bırakmıyorum.
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={t('mobile.call.startAction')}
+            >
+              <Ionicons name="call" size={20} color={theme.colors.textSecondary} />
+            </Pressable>
+          ) : undefined
+        }
+        topBanner={
+          isDm ? (
+            <OngoingCallBanner
+              participants={isConnectedHere ? [] : presenceParticipants}
+              joining={callBusy}
+              onJoin={handleCallPress}
+            />
+          ) : undefined
+        }
         // 1-1 DM'de arama YOK (sahip kararı 2026-08-01); grup DM'de kalıyor — orada birden çok
         // kişi ve daha uzun geçmiş var, aramanın işi görülüyor. Web'de de aynı ayrım yapıldı.
         searchable={!isDm}

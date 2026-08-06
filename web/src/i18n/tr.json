@@ -1744,6 +1744,27 @@
     },
     "dmDetails": {
       "menuRow": "Sohbet Detayları"
+    },
+    "call": {
+      "startAction": "Sesli ara",
+      "ongoing": "Sesli arama sürüyor",
+      "unreachable": "Şu anda ulaşılamıyor.",
+      "disconnected": "Bağlantı kesildi.",
+      "micPermissionDenied": "Kankaverse'in mikrofonuna erişimi yok, bu yüzden sesli aramaya katılamazsın.",
+      "micPermissionSettings": "Ayarları Aç",
+      "aloneTitle": "Bu aramada tek başınasın.",
+      "aloneSubtitle": "{name} istediği zaman katılabilir.",
+      "ringing": "Çalıyor…",
+      "notifDisconnect": "Bağlantıyı Kes",
+      "notifChannel": "Sesli arama",
+      "endCall": "Aramayı bitir",
+      "minimize": "Küçült",
+      "outputTitle": "Ses çıkışını seç",
+      "outputSpeaker": "Hoparlör",
+      "outputEarpiece": "Telefon",
+      "outputHeadset": "Kablolu kulaklık",
+      "outputBluetooth": "Bluetooth",
+      "chatAction": "Sohbet"
     }
   }
 }

@@ -3,9 +3,19 @@ import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
+import { registerGlobals } from '@livekit/react-native';
 import { useAuthStore } from '@/stores/auth';
 import { usePushNotificationResponder } from '@/notifications/push';
 import { theme } from '@/theme';
+import { MiniCallWindow } from '@/components/call/MiniCallWindow';
+
+// M4a-1 sözleşme §1 — LiveKit'in gerektirdiği WebRTC global'leri (registerGlobals) uygulama
+// açılışında BİR KEZ, herhangi bir LiveKit/Room kullanımından ÖNCE kayıt olmalı. Modül kapsamında
+// (component dışı) çağrılır ki bu dosya import edildiği an — expo-router'ın ilk yüklediği kullanıcı
+// modülü — çalışsın; bir effect içine konsaydı ilk render'dan SONRA çalışır, o kadar geç kalmak
+// yeterli olabilir ama garanti değil (bkz. LiveKit Expo quickstart: "Must be called before using
+// LiveKit").
+registerGlobals();
 
 export default function RootLayout() {
   const bootstrap = useAuthStore((s) => s.bootstrap);
@@ -41,6 +51,10 @@ export default function RootLayout() {
           kullandığı native yüzey varsayılan beyaz olmasın diye kök stack'te de eşleştirilir
           (ör. login → (app) geçişi). */}
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.bgRail } }} />
+      {/* Sözleşme §7 — mini pencere sistem seviyesi bir overlay DEĞİL, kök ağacın en üstünde mutlak
+          konumlu bir bileşen (Discord'un yaptığı da bu). Kökte tek yerde mount edilir ki "uygulamanın
+          her ekranında görünür" olsun; kendi içinde aramada değilken null döner (boş yüzey açmaz). */}
+      <MiniCallWindow />
     </View>
   );
 }

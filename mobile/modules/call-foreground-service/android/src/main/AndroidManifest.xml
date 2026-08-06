@@ -1,0 +1,13 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- M4a-1 sözleşme §6 — Android 14+ zorunlu tür beyanı; @livekit/react-native yalnız genel
+       FOREGROUND_SERVICE iznini bildiriyor, mikrofon-tipi servis izni ve servisin kendisi burada. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+
+  <application>
+    <service
+      android:name=".CallForegroundService"
+      android:exported="false"
+      android:foregroundServiceType="microphone" />
+  </application>
+</manifest>

@@ -46,6 +46,9 @@ interface Props {
   // headerRight'ına eklenir — tek `<Stack.Screen>` headerRight sahibi bu bileşen (birden fazla
   // bileşenin aynı route için headerRight yazması güvenilmez sırayla ezilir).
   headerActions?: ReactNode;
+  /** M4a-1 — mesaj listesinin ÜSTÜNDE, başlığın altında sabit bir şerit (ör. "Sesli arama sürüyor").
+   *  Genel isimlendirildi (voice'e özel değil): ekran veriyorsa çizilir, vermezse hiçbir şey. */
+  topBanner?: ReactNode;
   /**
    * Sprint M1g R1 — ekran açılır açılmaz bu mesaja git ve **geçici olarak vurgula**.
    * Ortam içi aramadan gelir. Atlama/vurgulama makinesi zaten `useMessageListController`'daydı
@@ -94,6 +97,7 @@ export function MessageScreen({
   typingMode,
   disabledNotice,
   headerActions,
+  topBanner,
   searchable = true,
   jumpToMessageId,
   canPin = false,
@@ -263,6 +267,8 @@ export function MessageScreen({
           ),
         }}
       />
+
+      {topBanner}
 
       {loadState === 'loading' && <MessageLoading />}
       {loadState === 'error' && <MessageError message={errorMessage} onRetry={retryLoad} />}

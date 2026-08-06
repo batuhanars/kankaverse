@@ -127,7 +127,14 @@ POST /channels/:channelId/voice/leave   → null
 | gönder | `voice:call_accept` / `voice:call_reject` / `voice:call_cancel` | `{ channelId }` |
 | al | `voice.incoming_call` | `{ channelId, caller: { id, username, avatarUrl } }` |
 | al | `voice.call_accepted` / `voice.call_rejected` / `voice.call_canceled` | `{ channelId }` |
-| al | `voice.participant_joined` / `voice.participant_left` | `{ channelId, userId, username, avatarUrl }` |
+| al | `voice.participant_joined` | `{ channelId, participant: { userId, username, avatarUrl } }` |
+| al | `voice.participant_left` | `{ channelId, userId }` |
+
+> ⚠️ **PM hatası (düzeltildi 2026-08-06):** bu iki satır ilk yazımda **yanlıştı** — `participant_joined`
+> düz alanlarla (`{ channelId, userId, username, avatarUrl }`) yazılmıştı. Sunucunun gerçek yayını
+> `voice.service.ts:214` `joinedPayload` ve web tüketicisi (`useSocket.ts:341`) iç içe şekli kullanıyor.
+> Dev doğru şekli kodladı ama **raporlamadı**; sözleşme ile kod ayrılınca sözleşme düzeltilir, sessiz
+> geçilmez (bir sonraki okuyan yanlış tabloya güvenir).
 
 **Kurallar:**
 - `voice:call_invite` ack'i `{ ok: false }` dönerse kullanıcıya **nötr** mesaj: "Şu anda ulaşılamıyor."
