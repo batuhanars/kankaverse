@@ -44,9 +44,15 @@ class CallForegroundServiceModule : Module() {
       context.startService(CallForegroundService.updateIntent(context, body, muteLabel))
     }
 
+    // 🔴 Parametresiz `AsyncFunction`ta `return@AsyncFunction` KULLANILMAZ. Parametreli
+    // kardeşlerinin (yukarıda) aksine bu aşırı yükleme lambda'nın dönüş tipini `Any?` olarak
+    // çözüyor; boş `return@` yalnız beklenen tip `Unit` iken geçerli olduğundan derleme
+    // "Return type mismatch: expected 'Any?', actual 'Unit'" ile patlıyor (EAS derlemesini
+    // düşüren hata buydu, 2026-08-06). Aynı kontrol `?.let` ile ifade olarak yazılır.
     AsyncFunction("stop") {
-      val context = appContext.reactContext ?: return@AsyncFunction
-      context.startService(CallForegroundService.stopIntent(context))
+      appContext.reactContext?.let { context ->
+        context.startService(CallForegroundService.stopIntent(context))
+      }
     }
   }
 
