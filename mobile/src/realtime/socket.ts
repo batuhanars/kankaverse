@@ -310,15 +310,38 @@ export function callCancel(channelId: string): void {
 }
 
 /**
- * M4a-2 sözleşme §8.2 — bildirimden "Aramaya Katıl"/"Reddet". Best-effort, ack YOK (§2 tablosunda
- * bu ikisi `callInvite`'ın aksine ack almıyor — `callCancel` ile aynı desen). Sunucuya ulaşmasa bile
- * istemci kendi tarafını (bildirim/zil temizliği, `startOrJoin`) zaten `incomingCall.ts`'te yürütüyor.
+ * M4a-2 sözleşme §8.2 — bildirimden "Aramaya Katıl"/"Reddet".
+ *
+ * 🔴 `socket?.emit` DEĞİL `ensureSocket()` (sahip bulgusu 2026-08-06: mobil kabul edip odaya
+ * giriyor ama web hâlâ çalıyor). Kabul, bildirim eyleminden geliyor; o an uygulama arka planda
+ * olabilir (kilit ekranı / bildirim perdesi) ve `useBackgroundSocket` soketi **kapatmış** olur.
+ * `ensureSocket()` örneği garanti eder + kapalıysa yeniden bağlar; socket.io kapalıyken emit'i
+ * tamponlar ve bağlanınca akıtır, yani paket kaybolmaz.
+ *
+ * Ack ile gönderiliyor (sunucu `{ok:true}` dönüyor): sessiz başarısızlık yerine görünür kayıt.
+ * Ack gelmezse dev derlemesinde konsola düşer — teşhis "tahmin" değil "ölçüm" olsun diye.
  */
+function emitCallSignal(event: 'voice:call_accept' | 'voice:call_reject', channelId: string): void {
+  const s = ensureSocket();
+  if (!s.connected) s.connect();
+  let acked = false;
+  s.emit(event, { channelId }, () => {
+    acked = true;
+    if (__DEV__) console.log(`[voice] ${event} ack alindi`);
+  });
+  if (__DEV__) {
+    console.log(`[voice] ${event} gonderildi, connected=${s.connected}`);
+    setTimeout(() => {
+      if (!acked) console.warn(`[voice] ${event} ACK GELMEDI — sunucuya ulasmamis olabilir`);
+    }, 3000);
+  }
+}
+
 export function callAccept(channelId: string): void {
-  socket?.emit('voice:call_accept', { channelId });
+  emitCallSignal('voice:call_accept', channelId);
 }
 export function callReject(channelId: string): void {
-  socket?.emit('voice:call_reject', { channelId });
+  emitCallSignal('voice:call_reject', channelId);
 }
 
 /** Ön plana dönüşte / boot'ta çağrılır (contract §4.3). Zaten bağlıysa no-op. */
