@@ -286,12 +286,20 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     başlansaydı çalma akışı hiç düşünülmeden bir platform katmanı kurulur, sonra onu yeniden
     şekillendirmek gerekebilirdi. En zor durumu başa almak temelin **baştan doğru** kurulmasını
     garantiliyor. PM'in itirazı risk sıralamasıydı, sahibinki mimari sıralama; bu iş için ikincisi doğru.
-    🔴 **Sözleşme notu (yarın):** ilk parça (1-1 DM sesli) tek başına ağır platform işinin TAMAMINI
-    taşıyor — WebRTC bağımlılığı + yeni dev build · mikrofon izni · foreground service · ses
-    yönlendirme · çalma akışı · **uygulama kapalıyken gelen arama** (yüksek öncelikli push, ekran
-    uyandırma). Faz sırası değişmiyor, ama sözleşme M4a'yı **içeriden** sıralamalı ki çalmanın tamamı
-    inmeden önce cihazda doğrulanabilir bir ara durak olsun ("var olan aramaya katıl" → sonra çalma).
-    Bu, M1d dersinin faz sırasını bozmadan uygulanmış hâli.
+    ✅ **M4a SÖZLEŞMESİ YAZILDI (2026-08-06):** `contracts/SPRINT_M4A_MOBILE_VOICE_CONTRACT.md`.
+    Sahibin 12 ekran görüntüsü depoya alındı → `design-refs/m4-ses/`. Faz sırası değişmedi; sözleşme
+    M4a'yı **içeriden** üçe böldü, üçü de cihazda doğrulanabilir: **M4a-1** var olan aramaya katıl
+    (ağır platform işinin tamamı, çalma yok) → **M4a-2** çalma, uygulama açıkken → **M4a-3** uygulama
+    kapalıyken gelen arama. Bu, M1d dersinin faz sırasını bozmadan uygulanmış hâli.
+    🔴 **Tek derleme kuralı:** `expo-audio` (M4a-2'de kullanılacak) ve D38'in `expo-web-browser`'ı
+    M4a-1 başında kurulur; native paket için ikinci dev build alınmaz.
+    🔴 **`api/` M4a-1 ve M4a-2'de DEĞİŞMEZ.** M4a-3'ün yüksek öncelikli push'u `PushService`
+    değişikliği ister (bugün `priority` alanı yok) → oraya gelince **PM sözleşmeyi revize eder**.
+    ⚠️ **Görsel eksiği:** çalma/gelen arama ekranlarının görüntüsü yok (sahip almamış); o iki ekran
+    web davranışından türetilecek, ilk revizyon turunun oraya gelmesi bekleniyor.
+    ⚠️ **Kapsam kararı — mobilde sağırlaştırma (deafen) YOK:** web'de var, tek kişilik aramada değeri
+    düşük; grup/ortam fazında yeniden değerlendirilecek. Discord'un foreground bildiriminde üçüncü
+    eylem olarak duruyor, bizde iki eylem olacak (Bağlantıyı Kes · Sustur).
     ℹ️ **Küçük bulgu:** mobil kanal oluşturmada tür seçici bilinçli yok (`channel-new.tsx` yorumu) —
     mobil ses kanallarını hiç listelemiyor (M1a `GUILD_TEXT` süzgeci). "Sesli kanal ekleme" aslında
     **süzgeci kaldır + seçiciyi geri koy**; zaten öngörülmüş, küçük iş.

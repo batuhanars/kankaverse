@@ -3,8 +3,8 @@
 # Kankaverse — `mobile/` Tier CLAUDE.md
 
 > Kök `CLAUDE.md` cascade ile zaten yükleniyor. **Cross-cutting kuralları buraya kopyalama.**
-> Aktif sözleşme: `../contracts/SPRINT_M1A_MOBILE_SHELL_CONTRACT.md` = **tek doğruluk kaynağı**
-> (M0 bitti, sözleşmesi arşiv değeri taşıyor).
+> Aktif sözleşme: `../contracts/SPRINT_M4A_MOBILE_VOICE_CONTRACT.md` = **tek doğruluk kaynağı**
+> (biten sprintlerin sözleşmeleri arşiv değeri taşır; kabuk kararları için `SPRINT_M1A_MOBILE_SHELL_CONTRACT.md`).
 > Endpoint imzası, DTO şekli, ekran sayısı sözleşmeden **sapamaz**. Sapma ihtiyacı → **DUR**, kullanıcıya bildir,
 > PM revize etsin. `TASK.md`'ye item ekleme, yalnız kutu işaretle.
 

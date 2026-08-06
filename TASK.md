@@ -2831,3 +2831,53 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
 
 > **M3c KAPANDI.** Üç revizyon turu + bir bloke edici regresyon. Sahip cihazda doğruladı:
 > ek gönderme · galeri ızgarası · emoji · kutu cilası · klavye.
+
+---
+
+## Sprint M4a — Mobil Sesli Arama: 1-1 DM — 2026-08-06
+
+> Sözleşme: `contracts/SPRINT_M4A_MOBILE_VOICE_CONTRACT.md`. Faz sırası PLAN.md'de kesin
+> (1-1 DM → grup DM → ortam kanalı → aynı sırayla görüntülü). Bu sprint yalnız **1-1 DM sesli**.
+> **`api/` DEĞİŞMEZ** (M4a-3 hariç; oraya gelince PM sözleşmeyi revize eder).
+>
+> Sözleşme sahibin 12 Discord ekran görüntüsüyle yazıldı → `design-refs/m4-ses/`.
+> 🔴 **Görsel eksiği kayda geçti:** çalma ve gelen arama ekranlarının görüntüsü yok; o iki ekran
+> web davranışından türetilecek, ilk revizyon turunun oraya gelmesi bekleniyor.
+
+### İç sıralama (PM kararı — faz sırası bozulmadan)
+- [ ] **M4a-1** — var olan aramaya katıl (ağır platform işi burada, çalma yok)
+- [ ] **M4a-2** — çalma akışı, uygulama açıkken
+- [ ] **M4a-3** — uygulama kapalıyken gelen arama (en riskli parça, bilerek sonda)
+
+### M4a-1 — Mobil (`mobile/`) — sözleşme §1-§7
+- [ ] Native paketler + **tek dev build** (`expo-audio` M4a-2'de kullanılacak olsa da ŞİMDİ kurulur;
+      **D38** `expo-web-browser` de bu derlemeye biner — ikinci derleme alınmayacak)
+- [ ] LiveKit RN SDK'nın Expo 54 / RN 0.81 / React 19.1 uyumlu sürümü **doğrulandı** (hatırdan değil,
+      sürümlü dokümandan); uyumsuzsa DUR ve bildir
+- [ ] `voice:subscribe` + `GET voice/participants` + katıl/ayrıl akışı; `voice/leave` atlanmıyor
+- [ ] DM ekranında "arama sürüyor → Katıl" şeridi (arama yokken **hiçbir şey gösterilmez**)
+- [ ] Arama ekranı: iki kutucuk, konuşan yeşil kenarlık, mikrofon rozeti, süre sayacı, 5 sn'de
+      kontrollerin gizlenmesi; **kamera/ekran/roket düğmesi YOK**
+- [ ] Mikrofon izni reddinde uygulama kilitlenmiyor: açıklama + "Ayarları aç"
+- [ ] Ses çıkışı seçici (telefon/hoparlör/bluetooth/kablolu); varsayılan hoparlör
+- [ ] 🔴 Foreground service (mikrofon türü) + kalıcı bildirim (Bağlantıyı Kes · Sustur)
+- [ ] 🔴 GSM araması kesintisinde mikrofon susuyor, bitince dönüyor
+- [ ] Mini pencere (uygulama içi katman, sistem overlay değil; sürükleme YOK)
+- [ ] Beklenmedik kopmada (ağ/sunucu/R11B disconnect) ekran kapanıyor, hayalet katılımcı kalmıyor
+- [ ] Tek kişi kalınca 60 sn sonra otomatik bitiyor
+- [ ] `typecheck` + `lint` temiz; `api/` ve `web/` diffi sıfır
+
+### M4a-2 — sözleşme §8 (M4a-1 sahip onayından SONRA)
+- [ ] Giden arama + 30 sn zaman aşımı + iptal; ulaşılamayanda **nötr** mesaj (R7)
+- [ ] Gelen arama ekranı (uygulama açıkken) + kabul/reddet
+- [ ] Zil/geri-zil/blip sesleri: web'in ton reçetesinden **üretilen** dosyalar (hazır zil indirilmez)
+
+### M4a-3 — sözleşme §9 (M4a-2 sahip onayından SONRA)
+- [ ] 🔴 Yüksek öncelikli push **`api/` işi** — PM sözleşmeyi revize edecek, dev kendi başına dokunmaz
+- [ ] Bildirimden kabul/reddet; cevapsız arama bildirimi asılı kalmıyor
+- [ ] Tam ekran çalan arayüz Play beyanına bağlı; ölç ve raporla, karar sahibin
+
+### DoD (cihazda — SAHİPTE)
+> Tam liste sözleşme §13'te. Kritik dört madde: arka planda ses kesilmiyor · GSM araması kesintisi
+> doğru · hayalet katılımcı kalmıyor · **yeni dev build sonrası mevcut özelliklerde regresyon yok**
+> (M3c'de klavye regresyonu tam olarak native kabuk değişince çıkmıştı).
