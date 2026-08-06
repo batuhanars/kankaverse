@@ -35,6 +35,7 @@ export default function CallScreen() {
   const isMuted = useVoiceStore((s) => s.isMuted);
   const canPublish = useVoiceStore((s) => s.canPublish);
   const didInvite = useVoiceStore((s) => s.didInvite);
+  const isLeaving = useVoiceStore((s) => s.isLeaving);
 
   const channel = useDmStore((s) => s.channels.find((c) => c.id === channelId));
   const myUser = useAuthStore((s) => s.user);
@@ -46,6 +47,11 @@ export default function CallScreen() {
   // (kopma/reddedilme/zaman aşımı/kullanıcı kapat) "gerçek bir ayrılış" olduğunu ayırt eder —
   // ekran channelId hâlâ bağlanmamışken (olmayan bir sekmeye deep-link gibi) sessizce geri döner.
   const wasConnectedRef = useRef(false);
+  // Ayrılış anında çizimi dondurmak için son iyi bilinen görünüm verisi (bkz. aşağıdaki `shown`).
+  const frozenRef = useRef<{ participants: typeof roomParticipants; canPublish: boolean }>({
+    participants: [],
+    canPublish: false,
+  });
 
   function resetHideTimer() {
     setControlsVisible(true);
@@ -64,21 +70,30 @@ export default function CallScreen() {
     if (connectedChannelId === channelId) wasConnectedRef.current = true;
   }, [connectedChannelId, channelId]);
 
-  // §3.3 🔴 — beklenmedik/bilgilendirilmesi gereken her ayrılışta ekran kapanır, Türkçe bilgi
-  // gösterilir (reddedilme, tek-başına zaman aşımı, LiveKit Disconnected, kullanıcı "kapat"a
-  // basmışsa `disconnectReason` null'dır — sessizce kapanır).
+  // §3.3 🔴 — her ayrılışta (kullanıcı kapattı · reddedildi · zaman aşımı · kopma · bildirimden
+  // "Bağlantıyı Kes") ekran yığından çıkar, sebep varsa Türkçe bilgi verilir.
+  //
+  // Tetikleyici `isLeaving`, `connectedChannelId === null` DEĞİL: ayrılış BAŞLADIĞI anda çıkılmalı.
+  // Durumun boşalmasını beklersek ekran, kapanma animasyonunun ortasında bambaşka bir ağaçla
+  // (kutucuklar gitmiş, "tek başınasın" gelmiş) yeniden çiziliyor ve Fabric o anda sökülmekte olan
+  // yüzeye görünüm eklemeye çalışıp `addViewAt: The specified child already has a parent` ile
+  // patlıyordu (beyaz ekran). `connectedChannelId` dalı yalnız YEDEK: ekran, durum çoktan
+  // temizlenmişken açık kalmışsa yine de kapanır.
+  const goneRef = useRef(false);
   useEffect(() => {
-    if (!wasConnectedRef.current || connectedChannelId !== null) return;
+    if (goneRef.current || !wasConnectedRef.current) return;
+    if (!isLeaving && connectedChannelId !== null) return;
+    goneRef.current = true;
+    // Kontrolleri gizleme sayacı da susturulur: kapanma sırasında tetiklenirse üst bar ve alt çubuk
+    // sökülmekte olan yüzeyde unmount olur — dondurma ile aynı gerekçe.
+    if (hideTimer.current) clearTimeout(hideTimer.current);
     const reason = useVoiceStore.getState().disconnectReason;
     useVoiceStore.getState().clearDisconnectReason();
-    // 🔴 Sıra: ÖNCE geri dön, uyarıyı SONRAKİ tick'te göster (sahip cihaz turu 2026-08-06,
-    // "bağlantıyı kes → beyaz ekran"). `Alert` bu ekran sökülürken açılınca yerel diyalog, kapanmakta
-    // olan tam ekran modalın üstüne bindiriliyor ve Fabric görünüm ağacını bozuyordu
-    // (`addViewAt: The specified child already has a parent`). Uyarı artık DM ekranının üstünde çıkar.
     router.back();
+    // Uyarı sökülme sırasında değil, bir sonraki tick'te ve DM ekranının üstünde açılır.
     if (reason) setTimeout(() => Alert.alert(reason), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectedChannelId]);
+  }, [isLeaving, connectedChannelId]);
 
   // Süre sayacı — `connectedAt`ten itibaren mm:ss (web `connectedAt` pariteti).
   const [now, setNow] = useState(Date.now());
@@ -97,12 +112,18 @@ export default function CallScreen() {
 
   if (!channelId) return null;
 
-  const localMember = roomParticipants.find((p) => p.isLocal);
-  const peerMember = roomParticipants.find((p) => !p.isLocal);
+  // 🔴 Ayrılış başladıysa görünüm DONDURULUR. Kapanma animasyonu sürerken `leave()` durumu
+  // boşaltıyor; donmasaydı kutucuklar/uyarı satırları sökülmekte olan yüzeyde mount-unmount olur ve
+  // beyaz ekranı üreten Fabric hatası tekrar tetiklenebilirdi. Kullanıcı zaten ekranı görmüyor.
+  if (!isLeaving) frozenRef.current = { participants: roomParticipants, canPublish };
+  const shown = isLeaving ? frozenRef.current : { participants: roomParticipants, canPublish };
+
+  const localMember = shown.participants.find((p) => p.isLocal);
+  const peerMember = shown.participants.find((p) => !p.isLocal);
   const peerFallback = channel?.type === 'DM' ? channel.otherUser : null;
   const peerName = peerMember?.username ?? peerFallback?.username ?? '';
   const peerAvatar = peerMember?.avatarUrl ?? peerFallback?.avatarUrl ?? null;
-  const alone = roomParticipants.length <= 1;
+  const alone = shown.participants.length <= 1;
 
   // 🔴 PM incelemesi (2026-08-06) — burada ÖNCEDEN `leave(true)` + `router.back()` art arda
   // çağrılıyordu. `leave()` içindeki await'ler (room.disconnect, AudioSession.stopAudioSession)
@@ -183,14 +204,14 @@ export default function CallScreen() {
             <Text style={styles.aloneSubtitle}>{t('mobile.call.aloneSubtitle', { name: peerName })}</Text>
           </View>
         )}
-        {!canPublish && <Text style={styles.listenerNotice}>{t('voice.listenerOnly')}</Text>}
+        {!shown.canPublish && <Text style={styles.listenerNotice}>{t('voice.listenerOnly')}</Text>}
       </View>
 
       {controlsVisible && (
         <View style={[styles.controls, { paddingBottom: insets.bottom + 16 }]}>
           <CallControls
             isMuted={isMuted}
-            canPublish={canPublish}
+            canPublish={shown.canPublish}
             onToggleMute={() => {
               resetHideTimer();
               void useVoiceStore.getState().toggleMute();

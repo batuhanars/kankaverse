@@ -36,6 +36,15 @@ interface VoiceState {
   connectedChannelId: string | null;
   connecting: boolean;
   connectedAt: number | null;
+  /**
+   * 🔴 Ayrılış BAŞLADI (henüz durum temizlenmedi). Arama ekranı bunu izleyip **durum boşalmadan
+   * önce** gezinme yığınından çıkıyor. Neden: `leave()` sonunda `roomParticipants`/`canPublish`
+   * sıfırlanınca ekran yeniden çiziliyor (kutucuklar gidiyor, "tek başınasın" metni geliyor) — ve bu
+   * yeniden çizim, tam ekran modal kapanma animasyonundayken native ağaca yeni görünüm eklemeye
+   * çalışıyordu: `addViewAt: The specified child already has a parent` → beyaz ekran
+   * (sahip cihaz turu 2026-08-06, ikinci tur).
+   */
+  isLeaving: boolean;
   /** Bu oturumda BİZ mi çağırdık (§4 "Çalıyor…" göstergesi) — katılınca (mevcut odaya) false kalır. */
   didInvite: boolean;
   isMuted: boolean;
@@ -120,6 +129,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   connectedChannelId: null,
   connecting: false,
   connectedAt: null,
+  isLeaving: false,
   didInvite: false,
   isMuted: false,
   canPublish: false,
@@ -259,6 +269,9 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     // `voice/leave`i ikinci kez atıyor ve durumu yarıda sıfırlıyordu.
     if (leaving) return;
     leaving = true;
+    // Ekran bunu görünce YIĞINDAN ÇIKAR (bkz. `isLeaving` açıklaması). Bilerek en başta ve
+    // `await`lerden ÖNCE: aşağıdaki temizlik durumu boşaltmadan önce ekranın gitmiş olması gerekiyor.
+    set({ isLeaving: true });
     const channelId = get().connectedChannelId;
     const wasAlone = get().roomParticipants.length <= 1;
     clearAloneTimer();
@@ -297,6 +310,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       connectedChannelId: null,
       connecting: false,
       connectedAt: null,
+      isLeaving: false,
       didInvite: false,
       isMuted: false,
       canPublish: false,
