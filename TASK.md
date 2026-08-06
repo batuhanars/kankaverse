@@ -2851,7 +2851,7 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
 > **hiç yazılmıyor**. Sunucu değişmiyor, iki model birbiriyle çalışıyor.
 
 ### İç sıralama (PM kararı — faz sırası bozulmadan)
-- [ ] **M4a-1** — odaya girme: **başlatma = katılma** (ağır platform işinin tamamı burada)
+- [x] **M4a-1** — odaya girme: **başlatma = katılma** (ağır platform işinin tamamı burada) — ✅ CİHAZDA DOĞRULANDI
 - [ ] **M4a-2** — mobilde **gelen** arama, uygulama açıkken
 - [ ] **M4a-3** — uygulama kapalıyken gelen arama (en riskli parça, bilerek sonda)
 
@@ -2890,7 +2890,51 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
 - [ ] Bildirimden kabul/reddet; cevapsız arama bildirimi asılı kalmıyor
 - [ ] Tam ekran çalan arayüz Play beyanına bağlı; ölç ve raporla, karar sahibin
 
-### DoD (cihazda — SAHİPTE)
-> Tam liste sözleşme §13'te. Kritik dört madde: arka planda ses kesilmiyor · GSM araması kesintisi
-> doğru · hayalet katılımcı kalmıyor · **yeni dev build sonrası mevcut özelliklerde regresyon yok**
-> (M3c'de klavye regresyonu tam olarak native kabuk değişince çıkmıştı).
+### DoD (cihazda) — ✅ SAHİP DOĞRULADI 2026-08-06
+> Tam liste sözleşme §13'te. Sahip turu: arama başlatma, karşılıklı konuşma, arka planda ses,
+> bildirim eylemleri, küçültme, mini pencere ve regresyonlar **tamam**. Bulunan kusurlar aşağıda.
+
+### 🔴 Derleme ve açılış: üç ayrı hata, üçü de sahip build almadan önce görülmedi
+
+1. **Kotlin derleme hatası** — parametresiz `AsyncFunction("stop")` içinde `return@AsyncFunction`
+   kullanılmış; o aşırı yükleme lambda dönüş tipini `Any?` çözüyor, boş `return@` yalnız `Unit`
+   beklenirken geçerli. İki fonksiyon derlenip üçüncüsü patlıyordu. **EAS "unknown error" deyip
+   satırı göstermedi**, hata yerelde (`expo prebuild` + `gradlew`) 4 dakikada bulundu.
+2. **`expo-asset` sürüm çakışması** — `expo-audio`'nun peer'ı `expo-asset: "*"` diyor, npm latest'i
+   (57.0.8) kurmuş; proje SDK 54, `expo` paketi `~12.0.13` istiyor. SDK 57 hattından native modül
+   → açılışta `NoClassDefFoundError`. `npx expo install expo-asset` ile sabitlendi, `expo-doctor` 18/18.
+   ⚠️ Bu, config plugin sürümünde yaşananın aynı sınıfı: **latest ≠ SDK'ya uygun**. Bu sefer peer
+   bağımlılığı üzerinden arka kapıdan girdi, kimse bakmadı.
+3. **`DOMException` yok** — `livekit-client` modül seviyesinde `DeferrableMapAbortError extends
+   DOMException` tanımlıyor, Hermes'te bu sınıf yok. Polyfill `@livekit/react-native` import edilince
+   kuruluyor ama `registerGlobals()` `_layout.tsx`'teydi ve **yetmiyordu**: expo-router rota
+   dosyalarını `require.context` ile topluca yüklüyor, `stores/voice.ts` o gövdeden önce
+   değerlendiriliyor. Çözüm: `mobile/index.js` giriş noktası (`main` oraya bakıyor), `require` ile
+   deterministik sıra.
+
+> **Ders (hafızaya yazıldı):** native diff varsa buluta göndermeden önce yerelde derle **ve
+> emülatörde aç**. Bugün ikisi ayrı ayrı patladı: derleme başarılı olup uygulama açılmayabiliyor.
+
+### Sahip cihaz turu — üç kusur, üçü de JS (yeni derleme gerekmedi)
+
+- [x] 🔴 **Ret mesajı eziliyordu.** `leave()` içindeki `room.disconnect()` LiveKit'in `Disconnected`
+      olayını tetikliyor, dinleyici bunu beklenmedik kopma sanıp **ikinci bir `leave()`** başlatıyor
+      ve nötr mesajı ("Şu anda ulaşılamıyor") "Bağlantı kesildi" ile eziyordu. Sözleşme §3.3 sapması,
+      üstelik R7 nötr-mesaj şartına dokunuyordu. Düzeltme: `leaving` bayrağı — `leave()` yeniden
+      girişe kapalı, dinleyici ayrılışı biz başlattıysak sessizce çıkıyor
+- [x] 🔴 **Çift `voice/leave` isteği** — aynı kökün ikinci sonucu, aynı bayrakla kapandı
+- [x] 🔴 **Kapatınca beyaz ekran** (`addViewAt: The specified child already has a parent`).
+      **İki denemede çözüldü.** İlk hipotez (Alert'in sökülme sırasında açılması + sürekli kurulu
+      `Modal`) yanlıştı. Gerçek sebep: `leave()` durumu sıfırlayınca ekran **kapanma animasyonunun
+      ortasında** bambaşka bir ağaçla yeniden çiziliyordu (kutucuklar gidiyor, "tek başınasın" ve
+      "dinleyici" satırları geliyor) → Fabric sökülmekte olan yüzeye görünüm ekliyor. Düzeltme:
+      store'a `isLeaving`, ekran **durum boşalmadan önce** yığından çıkıyor, çıkarken görünüm
+      donduruluyor, gizleme sayacı susturuluyor
+      ⚠️ **Kanıtlanmadan düzeltildi:** iki hesapla gerçek arama gerektiği için yerelde üretilemedi.
+      Bu sınıf bir kusur tekrar ederse **önce logcat** (telefonda USB hata ayıklama), tahmin turu yok
+
+### Web ↔ mobil boşluğu (kusur değil, sıradaki iş)
+Sahip "web'den arayınca mobile düşmüyor" dedi. **Beklenen:** çalma M4a-2'nin işi. Ayrıca web klasik
+modelde olduğu için arayan odaya girmiyor → mobilde "arama sürüyor" şeridi de çıkmıyor. M4a-2 bu
+halkayı kapatıyor: web `voice:call_invite` zaten gönderiyor, mobil onu karşılayınca uçtan uca çalışır
+(D39/web revizyonu bunun için şart DEĞİL).
