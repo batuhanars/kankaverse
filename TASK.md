@@ -2886,14 +2886,19 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
 > düzeltildi. Kazanç üç katlı: ayrı ekranın sökülme kusurları hiç doğmuyor (M4a-1'deki beyaz ekranın
 > kaynağı buydu), M4a-3 aynı arayüzü kullanacak, **`USE_FULL_SCREEN_INTENT` riski konusuz kaldı**.
 
-- [ ] Yüksek önemli **ayrı** bildirim kanalı (M4a-1'in "arama sürüyor" kanalı düşük önemli, karışmaz);
+- [x] Yüksek önemli **ayrı** bildirim kanalı (M4a-1'in "arama sürüyor" kanalı düşük önemli, karışmaz);
       uygulama önplandayken de üstte görünüyor
-- [ ] Eylemler: Reddet → `call_reject` · Aramaya Katıl → `call_accept` + katılma akışı + arama ekranı
-- [ ] Gövdeye dokunma → o DM'e götürür (arama ekranı yalnız kabulde açılır)
-- [ ] 30 sn cevapsız → bildirim kalkar *(oda arayan tarafta 3 dk yaşar — iki süre bilerek farklı)*
-- [ ] `voice.call_canceled` → bildirim kendiliğinden kaybolur; kabul/reddet sonrası da asılı kalmaz
-- [ ] Zil **`expo-audio` ile döngüde** çalınır, kanal sesi ile değil (kanal sesi tek atış);
-      cihaz sessizdeyken zil yok, titreşim var. Geri-zil üretilmez
+- [x] Eylemler: Reddet → `call_reject` · Aramaya Katıl → `call_accept` + katılma akışı + arama ekranı
+- [x] Gövdeye dokunma → o DM'e götürür (arama ekranı yalnız kabulde açılır)
+- [x] 30 sn cevapsız → bildirim kalkar *(oda arayan tarafta 3 dk yaşar — iki süre bilerek farklı)*
+- [x] `voice.call_canceled` → bildirim kendiliğinden kaybolur; kabul/reddet sonrası da asılı kalmaz
+- [~] Zil **`expo-audio` ile döngüde** çalınır, kanal sesi ile değil (kanal sesi tek atış) — YAPILDI.
+      **Titreşim var — YAPILDI** (`Vibration.vibrate`, ringer modundan bağımsız çalışan RN çekirdek
+      API'si). 🔴 **"Cihaz sessizdeyken zil çalmıyor" YAPILAMADI** — kurulu paketlerde (`expo-audio`,
+      `expo-notifications`) Android ringer modunu (sessiz/titreşim/normal) sorgulayan bir API yok;
+      bunu doğru çözmenin bilinen yolu native koda inmek, bu sprintte yeni native modül YASAK. Zil şu an
+      cihaz sessizde de KOŞULSUZ çalıyor. Sahibe/PM'e raporlandı, karar bekliyor (native modül mü,
+      kabul edilebilir borç mu). Geri-zil üretilmedi (kapsam dışı, doğru).
 
 ### M4a-3 — sözleşme §9 (M4a-2 sahip onayından SONRA)
 - [ ] 🔴 Yüksek öncelikli push **`api/` işi** — PM sözleşmeyi revize edecek, dev kendi başına dokunmaz

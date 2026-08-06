@@ -339,6 +339,11 @@ arama zili **çalma boyunca döngüde** olmalı. Kanal `setSound(null)` ile sess
 yönetiriz: kabul/reddet/zaman aşımı/iptal → durur. Bu, bildirimin kendi sesiyle zilin üst üste
 binmesini de önler.
 - Cihaz sessiz/rahatsız-etmeyin kipindeyse **zil çalmaz, titreşim kalır**.
+  ⚠️ **KARŞILANAMADI (2026-08-06, dev durdu ve bildirdi) → D40.** Titreşim tarafı doğru, ama kurulu
+  paket setinde Android ringer modunu sorgulayan API yok (`expo-audio`'nun `playsInSilentMode`'u
+  iOS'a özel). Zil şu an sessiz kipte de çalıyor. Yeni native modül bu sprintte yasaktı; PM bunu
+  **M4a-3'e** bağladı: orada uygulama kapalıyken zil zaten kanal sesinden gelmek zorunda, mekanizma
+  baştan ele alınacak. 🔴 Kanal sesi kurulduktan sonra değişmez → düzeltmede **yeni kanal kimliği**.
 - Geri-zil (ringback) **üretilmez**: oda-önce modelinde arayan zaten odada, bekleme tonu yok.
 - Bağlanma/ayrılma blipleri M4a-1'de yoktu, M4a-2'de de **eklenmiyor** (kapsam sabit kalsın).
 

@@ -15,14 +15,24 @@ import { useAuthStore } from '@/stores/auth';
  * kullanıcı zaten içeride, rozetler var"). `shouldShowList: true` bırakıldı: bildirim sistem
  * geçmişinde/merkezinde kalabilir, yalnız anlık drop-down/ses ASILMAZ. Modül yüklenir yüklenmez
  * BİR KEZ ayarlanır — React yaşam döngüsüne bağlı değil (Expo'nun kendi önerdiği kalıp).
+ *
+ * 🔴 M4a-2 istisnası (sözleşme §8.2) — `expo-notifications` global TEK bir handler kabul ediyor,
+ * push ile gelen arama bildirimi aynı fonksiyondan geçiyor. Gelen arama bildirimi (`notifications/
+ * incomingCall.ts`, `data.type === 'incoming_call'`) uygulama ön plandayken de ÜSTTE (heads-up)
+ * görünmeli — sözleşme bunu açıkça istiyor ("Discord'un yaptığı gibi"). Ses yine YOK
+ * (`shouldPlaySound: false`): zil `expo-audio` ile ayrıca ve döngüde çalınıyor, bildirimin kendi
+ * sesiyle üst üste binmesin diye.
  */
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: false,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => {
+    const isIncomingCall = notification.request.content.data?.type === 'incoming_call';
+    return {
+      shouldShowBanner: isIncomingCall,
+      shouldShowList: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 // Son başarıyla alınan/kaydedilen token — çıkışta DELETE'e taşınır (§3: "Çıkışta DELETE çağrılır").
