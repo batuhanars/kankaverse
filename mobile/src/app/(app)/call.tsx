@@ -51,6 +51,13 @@ export default function CallScreen() {
   const callChannelName = useVoiceStore((s) => s.callChannelName);
   const callGuildName = useVoiceStore((s) => s.callGuildName);
   const isGuildCall = callKind === 'guild';
+  // 🔴 M4b sözleşme §4 — bu dosya sözleşmenin §1 dosya tablosunda YOK, ama DoD §10 "İkinci kişi
+  // katılınca ızgarada iki kutucuk" maddesi N-katılımcılı grid'i zorunlu kılıyor: DM dalının
+  // sabit iki-kutucuk düzeni (aşağıdaki `else` bloğu) 3+ kişilik bir grup DM'de eksik kutucuk
+  // üretirdi. `isGridCall` DM DIŞINDAKİ ikisini (guild + group) aynı ızgaraya yönlendirir — guild
+  // ızgarası zaten N-katılımcılı, yeni bir düzen İCAT EDİLMEDİ, seçim koşulu genişletildi. PM'e
+  // rapor edildi (bkz. dev raporu) — dosya listesi güncellenmeli.
+  const isGridCall = callKind !== 'dm';
 
   const channel = useDmStore((s) => s.channels.find((c) => c.id === channelId));
   const myUser = useAuthStore((s) => s.user);
@@ -145,6 +152,10 @@ export default function CallScreen() {
   const peerName = peerMember?.username ?? peerFallback?.username ?? '';
   const peerAvatar = peerMember?.avatarUrl ?? peerFallback?.avatarUrl ?? null;
   const alone = shown.participants.length <= 1;
+  // Grup DM'de tek "karşı taraf" yok (N kişi) — başlık `peerName`e (ilk katılan kim ise o) değil,
+  // grubun adına bağlanır (`stores/voice.ts` `startOrJoin` `kind==='group'`de `callChannelName`'i
+  // guild gibi dolduruyor). DM dalında bu ifade `peerName`e eşit kalır — davranış DEĞİŞMEDİ.
+  const nonGuildTitle = callKind === 'group' ? (callChannelName ?? peerName) : peerName;
 
   // 🔴 PM incelemesi (2026-08-06) — burada ÖNCEDEN `leave(true)` + `router.back()` art arda
   // çağrılıyordu. `leave()` içindeki await'ler (room.disconnect, AudioSession.stopAudioSession)
@@ -216,9 +227,12 @@ export default function CallScreen() {
             </Text>
           </View>
         ) : (
+          // DM VE grup DM ortak dal — grup DM'de `handleOpenChat` yine dolu (sohbet düğmesi §4'te
+          // "grup DM'de görünür" dediği için chat açma burada da doğru), yalnız gösterilen ad
+          // `nonGuildTitle` üzerinden (DM'de `peerName`e eşit, davranış DEĞİŞMEDİ).
           <Pressable onPress={handleOpenChat} style={styles.topBarCenter} accessibilityRole="button">
             <Text style={styles.peerName} numberOfLines={1}>
-              {peerName}
+              {nonGuildTitle}
             </Text>
             <Text style={styles.duration}>{duration}</Text>
           </Pressable>
@@ -236,11 +250,19 @@ export default function CallScreen() {
         </Pressable>
       </View>
 
-      {isGuildCall ? (
+      {isGridCall ? (
         // §5 — N katılımcılı ızgara. M4a'nın `ParticipantTile`ı AYNEN yeniden kullanılır (yeni
         // tasarım dili icat edilmiyor); her kutucuk `guildCols` genişliğinde bir hücreye sarılır —
         // sütun sayısı arttıkça hücre küçülür (tekil `ParticipantTile` ölçüsü sabit kalır, bu
         // dosya §1 kapsamında değil).
+        //
+        // 🔴 M4b — bu dal ÖNCEDEN `isGuildCall` (yalnız `kind==='guild'`) ile seçiliyordu; artık
+        // `isGridCall` (`kind!=='dm'`) ile guild VE group paylaşıyor. Guild'in davranışı DEĞİŞMEDİ
+        // (guild zaten bu dala giriyordu) — yalnız group da aynı dala EKLENDİ. "Tek başınasın"
+        // metni de guild'inkiyle PAYLAŞILIYOR (yeni metin eklenmedi, §4/§7 kararı): DM'in
+        // `aloneSubtitle`i `{name}` (tek kişi) parametreli, N kişilik bir gruba uymuyordu;
+        // `guildAloneSubtitle` ("Arkadaşların katıldığında burada görünecekler") kişi adı
+        // gerektirmeden hem guild hem grup DM için doğru okunuyor — dev kararı, PM'e raporlandı.
         <View style={styles.tiles}>
           <ScrollView
             style={styles.gridScroll}

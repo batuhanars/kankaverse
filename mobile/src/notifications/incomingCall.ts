@@ -27,10 +27,19 @@ import { t } from '@/i18n';
  *
  * 🔴 KAYNAK: `assets/sounds/incoming-call.wav` (M4a-2'nin çift-zil ritmi, SİLİNMEDİ — bilerek: bu
  * dosyanın tek işi bu üretimin kaynağı olmak, kod hiçbir yerden `require` etmiyor). Üretim komutu:
- * `ffmpeg -stream_loop 9 -i incoming-call.wav -ar 22050 -ac 1 -sample_fmt s16 incoming_call_channel.wav`
+ * `ffmpeg -stream_loop 9 -i incoming-call.wav -af "volume=13.9dB" -ar 22050 -ac 1 -sample_fmt s16 incoming_call_channel.wav`
  * — kaynağı 10 kez ardışık dizip (~30 sn) mono/22kHz/16-bit'e indiriyor (aşağıdaki APK boyutu notuna
  * bkz.). Aynı ton reçetesi, yeni kayıt yok. Kaynak dosya değişirse (ör. zil sesi güncellenirse) aynı
- * komut yeniden çalıştırılır.
+ * komut yeniden çalıştırılır (kazancı `ffmpeg -af volumedetect` ile ÖLÇÜP `-1 dB - max_volume` formülüyle
+ * yeniden hesapla — sabit `13.9dB` bu kaynağa özel, farklı bir kaynakla kopyalanmaz).
+ *
+ * 🔴 D44 (PM ölçümü 2026-08-07, sahip cihaz turu) — dosya teknik olarak sağlamdı (30 sn/mono/22050/s16)
+ * ama SESSİZDİ: `ffmpeg -af volumedetect` tepe **-14.9 dB** / ortalama **-28.4 dB** ölçtü — tam ölçeğin
+ * ~%18'i, bildirim sesi zaten sistemce kısılarak çalındığı için pratikte duyulmuyordu. `volume=13.9dB`
+ * kazancı kaynağa (döngüden ÖNCE, `-i` sonrası `-af`) uygulanarak tepe **-1.0 dB** / ortalama **-14.5 dB**'ye
+ * çıkarıldı — süre/format/kanal/örnekleme AYNI kaldı (yalnız kazanç), dosya boyutu değişmedi (1 292 KiB /
+ * 1 323 078 bayt, aynı PCM matematiği). Kanal kimliği (`incoming_call_v3`, aşağıda) BİLEREK değişmedi —
+ * içerik değişti, kanal ayarı değil.
  * 🔴 Dosya adı ALT ÇİZGİ ile: Android ham kaynak adı `[a-z0-9_]` dışına çıkamıyor, tire (`-`)
  * `expo prebuild`'i "Resource name is not valid" hatasıyla düşürüyor — ilk denemede öğrenildi.
  *

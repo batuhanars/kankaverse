@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { Room, RoomEvent, ParticipantEvent, Track, type Participant, type RemoteParticipant } from 'livekit-client';
 import { AudioSession, AndroidAudioTypePresets } from '@livekit/react-native';
 import { voiceApi } from '@/api/voice';
-import { callInvite, callCancel } from '@/realtime/socket';
+import { callInvite, callCancel, groupCallStart } from '@/realtime/socket';
 import { useVoicePresenceStore } from '@/stores/voicePresence';
 import { extractErrorMessage, extractErrorCode } from '@/api/errors';
 import {
@@ -55,7 +55,13 @@ interface VoiceState {
    * aynı gerçeği okur. `callChannelName`/`callGuildName` yalnız `kind==='guild'` iken dolu (DM'de
    * başlık zaten `roomParticipants`/DM store'undan türetiliyor, burada tekrar edilmiyor).
    */
-  callKind: 'dm' | 'guild';
+  /**
+   * 🔴 M4b sözleşme §2 — üçüncü dal `'group'` (grup DM). `callChannelName` guild'deki gibi grup
+   * DM'de de dolu (grubun adı — `dm/[id].tsx`'in başlıktaki `title`'ı, `startOrJoin`e `label` olarak
+   * geliyor); `callGuildName` grup DM'de her zaman null kalır (guild'e özgü ikinci satır, grubun
+   * ortam-adı eşdeğeri yok). `call.tsx` grid düzenini `callKind !== 'dm'` ile seçer (guild VE group).
+   */
+  callKind: 'dm' | 'group' | 'guild';
   callChannelName: string | null;
   callGuildName: string | null;
   /**
@@ -107,11 +113,22 @@ interface VoiceState {
    * `didInvite`e bakıyor) devre dışı bırakır — üç ayrı davranışı TEK noktadan, DM yolunun kod
    * yolunu hiç değiştirmeden kapatır. Ayrıca §4 — yalnız-kalma zaman aşımını kapatır (`autoEndWhenAlone`,
    * bkz. modül değişkeni).
+   *
+   * 🔴 M4b sözleşme §2 — `kind: 'group'` (grup DM). DM dalıyla PAYLAŞTIĞI şey: `alreadyOngoing`
+   * hesabı BİREBİR aynı (presence doluysa sinyal atlanır, "tekrar çaldırmak spam olur" kuralının
+   * grup karşılığı — web `useCall.ts` `onGroupVoiceClick`/`startGroupCall` pariteti). AYRIŞTIĞI
+   * şey: (1) sinyal `voice:call_invite` DEĞİL `voice:group_call_start` (sunucuda grup dışı kanalda
+   * `NOT_GROUP` döner — §0 tuzağı), (2) `didInvite` bu dalda KOŞULSUZ `false` (`alreadyOngoing`dan
+   * bağımsız — grupta "Çalıyor…" hiç çıkmaz, §5: kimse çalmaz), (3) `startOrJoin` başarısız olup
+   * geri sarılırken (`catch` bloğu) `callCancel` GÖNDERİLMEZ — grupta iptal edilecek bir "ring" yok
+   * (sunucudaki `otherDmMember` grup kanalında rastgele TEK bir üyeye giderdi, anlamsız hedef).
+   * `autoEndWhenAlone` DM ile PAYLAŞIR (`!isGuild`, `kind==='group'` için de `true`) — §3 "yeni
+   * koşul ekleme" uyarısının karşılığı, bu satır zaten değişmedi.
    */
   startOrJoin: (
     channelId: string,
     label: string,
-    options?: { invite?: boolean; kind?: 'dm' | 'guild'; guildName?: string },
+    options?: { invite?: boolean; kind?: 'dm' | 'group' | 'guild'; guildName?: string },
   ) => Promise<{ ok: boolean; message?: string; reason?: 'mic_denied' | 'other' }>;
   /** `userInitiated` true ise (kullanıcı "kapat"a bastı) `disconnectReason` set edilmez. */
   leave: (userInitiated?: boolean) => Promise<void>;
@@ -227,13 +244,19 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     }
 
     const isGuild = options?.kind === 'guild';
+    // 🔴 M4b sözleşme §2 — üçüncü dal. DM/guild kod yolları bu satırın eklenmesiyle DEĞİŞMEDİ
+    // (`isGuild` hâlâ yalnız `kind==='guild'`e bakıyor); `isGroup` tamamen AYRI bir bayrak.
+    const isGroup = options?.kind === 'group';
     // §4 — bkz. modül değişkeni yorumu. Her oturumun başında YENİDEN hesaplanır (bir önceki
-    // oturumdan kalma değer bir sonrakini kirletemez).
+    // oturumdan kalma değer bir sonrakini kirletemez). `isGuild` guild'de false, group'ta da
+    // false → §3 "yeni koşul eklemeden" grup için de `true` çıkar (sözleşme §3'ün doğruladığı hesap).
     autoEndWhenAlone = !isGuild;
 
     // Guild dalında `alreadyOngoing` KOŞULSUZ true — bkz. arayüzdeki §3 yorumu (invite bloğunu
     // atlatır + didInvite'ı kalıcı false yapar). DM dalı BİREBİR eskisi gibi: `invite: false`
     // (bildirimden "Aramaya Katıl") → presence listesine BAKILMAZ, davet asla gönderilmez.
+    // Grup dalı BU HESABI DM İLE PAYLAŞIR (§2 tablosu — web `hasOngoingCall`/`onGroupVoiceClick`
+    // pariteti): presence doluysa sinyal atlanır, doğrudan katılınır.
     const alreadyOngoing = isGuild
       ? true
       : options?.invite === false
@@ -251,16 +274,23 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     set({
       connecting: true,
       disconnectReason: null,
-      didInvite: !alreadyOngoing,
+      // 🔴 §5 — grupta KOŞULSUZ false (`alreadyOngoing`dan bağımsız): "Çalıyor…" göstergesi grup
+      // DM'de hiç çıkmaz, kimse çalmadığı için gösterilecek bir şey yok.
+      didInvite: isGroup ? false : !alreadyOngoing,
       pendingCallScreen: true,
-      callKind: isGuild ? 'guild' : 'dm',
-      callChannelName: isGuild ? label : null,
+      callKind: isGuild ? 'guild' : isGroup ? 'group' : 'dm',
+      // Grup DM'de de dolu (grubun adı) — call.tsx başlığı guild'deki gibi buradan okur (§4 yorumu).
+      callChannelName: isGuild || isGroup ? label : null,
       callGuildName: isGuild ? (options?.guildName ?? null) : null,
     });
 
-    // §3.1 🔴 — sıra önemli: davet ÖNCE (kimse yoksa). Ack `ok:false` ise odaya HİÇ girilmez.
+    // §3.1 🔴 — sıra önemli: davet/bildirim ÖNCE (kimse yoksa). Ack `ok:false` ise odaya HİÇ
+    // girilmez. Grup dalı `voice:group_call_start` gönderir (DEĞİL `voice:call_invite` — §0
+    // tuzağı: guild dışı bir DM kanalında `call_invite` sunucudan `NOT_DM` alır, grup kanalında da
+    // aynı şekilde `NOT_DM` dönerdi çünkü kanal tipi `GROUP_DM`). Ack başarısızlığı (`NOT_GROUP`/
+    // `FORBIDDEN`) kullanıcıya AÇIMLANMAZ — DM'le AYNI nötr metin (§2: "ayrım kullanıcıya açımlanmaz").
     if (!alreadyOngoing) {
-      const ack = await callInvite(channelId);
+      const ack = isGroup ? await groupCallStart(channelId) : await callInvite(channelId);
       if (!ack.ok) {
         set({ connecting: false, didInvite: false });
         return { ok: false, message: t('mobile.call.unreachable') };
@@ -351,7 +381,11 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     } catch (e: unknown) {
       const code = extractErrorCode(e);
       const message = code === 'CHANNEL_FULL' ? t('voice.channelFull') : extractErrorMessage(e);
-      if (!alreadyOngoing) callCancel(channelId); // §8 istisnası — davet gönderildiyse geri al
+      // §8 istisnası — davet gönderildiyse geri al. Grup dalında ATLANIR: `voice:call_cancel`
+      // sunucuda `otherDmMember` ile TEK bir "karşı taraf" arar (`findMany` + `find`), grup
+      // kanalında rastgele bir üyeye giderdi — grupta iptal edilecek bir "ring" zaten yok (§5,
+      // kimse çalmıyor), gönderecek bir şey olmadığı için bilerek sessiz kalınır.
+      if (!alreadyOngoing && !isGroup) callCancel(channelId);
       await get().leave(true);
       return { ok: false, message };
     }

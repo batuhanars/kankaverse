@@ -58,6 +58,13 @@ export default function DmScreen() {
   // gerçek tipi buradan oku; store'da yoksa (soğuk açılış anı / derin link) route param'ına düş —
   // listeden gelişte ikisi zaten aynı.
   const isDm = storeChannel ? storeChannel.type === 'DM' : params.kind !== 'group';
+  // 🔴 M4b sözleşme §1/§4 — grup DM sesli. `isDm` YALNIZ 1-1'i ayırt eder (yukarıdaki tarihçe
+  // korunuyor, değiştirilmedi); bu ayrı bayrak grup DM'i ayırt eder. `voiceEligible` ikisinin
+  // birleşimi — bu ekran zaten yalnız DM/GROUP_DM kanallarını çiziyor (guild `channel/[id].tsx`'te),
+  // yani pratikte "her zaman true" ama açık tutuluyor: gelecekte bu ekrana üçüncü bir tür eklenirse
+  // (yok bugün) sessizce ses özelliği kazanmasın.
+  const isGroupDm = storeChannel ? storeChannel.type === 'GROUP_DM' : params.kind === 'group';
+  const voiceEligible = isDm || isGroupDm;
 
   /**
    * Sprint M2d §3.2 — bahsetme öneri kaynağı. Grup DM'de üyeler store'daki kanal kaydından gelir;
@@ -105,17 +112,18 @@ export default function DmScreen() {
     return () => useDmStore.getState().setActiveDm(null);
   }, [channelId]);
 
-  // M4a-1 sözleşme §3.1 — ses presence aboneliği, YALNIZ 1-1 DM'de (grup DM sesli M4b, kapsam dışı).
-  // "Arama başlatma = katılma" modelinde bu abonelik + `GET voice/participants` DM ekranının kendi
-  // işi — call.tsx'in değil (o zaten bağlıyken açılır).
+  // M4a-1 sözleşme §3.1 — ses presence aboneliği. M4b'den beri 1-1 DM VE grup DM'de (`voiceEligible`);
+  // grup DM kapsam dışı bırakılışı M4a'nın sınırıydı, bu sprintte kalktı. "Arama başlatma = katılma"
+  // modelinde bu abonelik + `GET voice/participants` DM ekranının kendi işi — call.tsx'in değil
+  // (o zaten bağlıyken açılır).
   useEffect(() => {
-    if (!channelId || !isDm) return;
+    if (!channelId || !voiceEligible) return;
     useVoicePresenceStore.getState().subscribe(channelId);
     return () => useVoicePresenceStore.getState().unsubscribe(channelId);
-  }, [channelId, isDm]);
+  }, [channelId, voiceEligible]);
 
   const presenceParticipants = useVoicePresenceStore((s) =>
-    isDm && channelId ? (s.byChannel[channelId] ?? EMPTY_PRESENCE) : EMPTY_PRESENCE,
+    voiceEligible && channelId ? (s.byChannel[channelId] ?? EMPTY_PRESENCE) : EMPTY_PRESENCE,
   );
   const isConnectedHere = useVoiceStore((s) => s.connectedChannelId === channelId);
   const [callBusy, setCallBusy] = useState(false);
@@ -146,6 +154,13 @@ export default function DmScreen() {
 
   // §3.1 — başlıktaki telefon düğmesi: kimse yoksa BAŞLATIR (davet + katıl), biri varsa KATILIR
   // (davet gönderilmez — §3.1 "tekrar çaldırmak spam olur"), biz zaten bağlıysak arama ekranına döner.
+  //
+  // 🔴 M4b sözleşme §0 tuzağı DÜZELTİLDİ — bu fonksiyon ÖNCEDEN ayrım yapmadan `startOrJoin(channelId,
+  // title)` çağırıyordu (varsayılan `kind:'dm'`). Düğme grup DM'de açılınca bu yol `voice:call_invite`
+  // gönderiyor, sunucu grup kanalında bunu `NOT_DM` ile reddediyor ve kullanıcı sebepsiz "Şu anda
+  // ulaşılamıyor" görüyordu — grup DM kendi sinyalini (`voice:group_call_start`) kullanmak zorunda.
+  // `isGroupDm` burada yalnız `kind` seçiyor; DM dalı (`isGroupDm===false`) `options` vermeden ÖNCEKİYLE
+  // BİREBİR AYNI çağrıyı yapıyor (regresyon yasak — bkz. `stores/voice.ts` DM/guild dalları değişmedi).
   async function handleCallPress() {
     if (isConnectedHere) {
       router.push({ pathname: '/call', params: { channelId } });
@@ -153,7 +168,9 @@ export default function DmScreen() {
     }
     if (callBusy) return;
     setCallBusy(true);
-    const res = await useVoiceStore.getState().startOrJoin(channelId, title);
+    const res = await useVoiceStore
+      .getState()
+      .startOrJoin(channelId, title, isGroupDm ? { kind: 'group' } : undefined);
     setCallBusy(false);
     if (res.ok) {
       router.push({ pathname: '/call', params: { channelId } });
@@ -213,11 +230,12 @@ export default function DmScreen() {
         markRead={dmApi.markRead}
         typingMode="simple"
         disabledNotice={disabledNotice}
-        // M4a-1 sözleşme §3.1/§4 — telefon düğmesi + "sesli arama sürüyor" şeridi YALNIZ 1-1 DM'de
-        // (grup DM sesli M4b, kapsam dışı — sözleşme §12). Başlığın sağ üstü buraya ayrılmıştı
-        // (yukarıdaki yorum), tek kapı bu.
+        // M4a-1 sözleşme §3.1/§4 — telefon düğmesi + "sesli arama sürüyor" şeridi. M4b'den beri
+        // 1-1 DM VE grup DM'de (`voiceEligible`, §4: "Grup DM'de de görünür"/"OngoingCallBanner
+        // grup DM'de de kullanılır, yeni bileşen yazılmaz") — M4a'nın "yalnız 1-1" sınırı bu
+        // sprintte kalktı. Başlığın sağ üstü buraya ayrılmıştı (yukarıdaki yorum), tek kapı bu.
         headerActions={
-          isDm ? (
+          voiceEligible ? (
             <Pressable
               onPress={handleCallPress}
               disabled={callBusy}
@@ -233,7 +251,7 @@ export default function DmScreen() {
           ) : undefined
         }
         topBanner={
-          isDm ? (
+          voiceEligible ? (
             <OngoingCallBanner
               participants={isConnectedHere ? [] : presenceParticipants}
               joining={callBusy}
