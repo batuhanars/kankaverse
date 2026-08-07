@@ -82,7 +82,9 @@ export function ChannelRow({ channel, selected, onPress, onLongPress }: Props) {
         {isVoice ? (
           <Ionicons
             name="volume-medium-outline"
-            size={16}
+            // `#` ile ayni fontSize.lg (16) optik olarak KUCUK duruyordu: hash kalin (600) ve yogun,
+            // outline ikon ince cizgili. Ikonlar yanindaki metinle dengelenmek icin bir tik buyuk olur.
+            size={19}
             style={styles.voiceIcon}
             color={selected ? theme.colors.accent500 : theme.colors.textSecondary}
           />
