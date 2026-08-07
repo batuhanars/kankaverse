@@ -3158,21 +3158,39 @@ düğmesi no-op'a düşer (`isConnectedTo` false) · karşı tarafa `call_cancel
 > görünmüyor** ve topluluk platformunun asıl kullanımı bu; grup DM araması daha niş. Ağır platform
 > işi M4a'da bittiği için geriye kanal listesi + katılma akışı kalıyor. **M4b sıraya geri düştü.**
 
-### Mobil (`mobile/`)
-- [ ] Kanal listesi süzgeci kalktı: ses kanalları kendi sırasında, hoparlör ikonuyla görünüyor
-      (bugün `home.tsx:165/178` `GUILD_TEXT` ile süzüyor → ses kanalları hiç görünmüyor)
-- [ ] Satıra dokunma **doğrudan katılıyor** (web pariteti), ara ekran/onay yok
-- [ ] 🔴 **Yalnız-kalma zaman aşımı guild kanalında KAPALI.** Bugün `scheduleAloneCheckIfNeeded`
-      koşulsuz çalışıyor → kanala ilk giren 3 dk sonra sessizce atılırdı ve "bağlantı düşüyor"
-      sanılırdı. Web'de ayrım zaten var (`autoEndWhenAlone` varsayılan false), mobile taşınıyor.
-      DM'in iki sabiti aynen kalıyor
-- [ ] Katılma **davetsiz** (`call_invite` yok, kimse çalmıyor); DM yolu **birebir korunuyor**
-- [ ] Arama ekranı çok katılımcıya açıldı (bugün `participants.find(p => !p.isLocal)` ile tek karşı
-      taraf varsayıyor); ızgara sıralaması **kararlı**, her çizimde yer değiştirmiyor
-- [ ] Kanal satırının altında içeridekiler görünüyor (M4a presence altyapısı, yeni uç yok);
-      ortamdan çıkınca abonelik bırakılıyor
-- [ ] Kanal oluşturmada tür seçici (Metin/Ses), varsayılan Metin
-- [ ] T&S: kapılar sunucuda, özel kanal **görünür-kilitli** (sessizce gizlenmiyor), video/ekran yok
+### Mobil (`mobile/`) — ✅ KOD BİTTİ, 🔴 CİHAZ TURU SAHİPTE
+- [x] Kanal listesi süzgeci kalktı: ses kanalları kendi sırasında, hoparlör ikonuyla görünüyor
+- [x] Satıra dokunma **doğrudan katılıyor** (web pariteti), ara ekran/onay yok
+- [x] 🔴 **Yalnız-kalma zaman aşımı guild kanalında KAPALI.** `autoEndWhenAlone` bayrağı her
+      `startOrJoin`de `!isGuild` ile hesaplanıyor, iki ayrı yerde kontrol ediliyor (zamanlayıcı
+      kurulumu + callback). DM'in iki sabiti dokunulmadı
+- [x] Katılma **davetsiz**: guild dalında `alreadyOngoing` koşulsuz `true` zorlanarak invite bloğu,
+      `didInvite` ve `leave()`teki `callCancel` **tek noktadan** kapatıldı — DM kod yoluna hiç
+      dokunmadan. Dev'in çözümü, zarif
+- [x] Arama ekranı ızgaraya açıldı. **Ek sort yazılmadı:** LiveKit `remoteParticipants` bir `Map`,
+      insert sırasını koruyor → sıralama zaten kararlı. Dev bunu ölçüp gereksiz kod yazmadı
+- [x] Kanal satırının altında içeridekiler görünüyor (M4a presence altyapısı, yeni uç yok)
+- [x] Kanal oluşturmada tür seçici (Metin/Ses), varsayılan Metin
+- [x] Kilitli özel kanalda Türkçe uyarı — **metin kanallarını da kapsıyor**. Web'de
+      (`ChannelPanel.vue:375`) bu kontrol zaten vardı, mobilde hiç yoktu → kapsam kayması değil,
+      parite düzeltmesi
+- [x] İki UI yalanı kapatıldı: ses kanalı menüsünde "Okundu İşaretle" gizlendi (ses kanalının
+      mesajı yok), guild aramasında "Sohbet" düğmesi gizlendi (minimize'ın aynısını yapıp başka
+      şey vaat ediyordu). `onOpenChat` opsiyonel yapıldı, DM tarafı birebir aynı
+- [x] **Native diff YOK** (saf JS/TS) → yeni dev build gerekmiyor. ⚠️ Bu yüzden [[D44]] zil sesi
+      düzeltmesi bu sprinte **bindirilemedi**, build fırsatı beklemeye devam ediyor
+- [x] `typecheck` · `lint` · `expo-doctor` temiz; `api/` diffi sıfır, `web/` yalnız `tr.json` (+4)
+
+### Bu sprintte yakalananlar
+- 🔴 **PM atıf hatası:** sözleşme §0 kanal süzgecini `home.tsx:165/178` diye gösteriyordu, o satırlar
+  `markRead` süzgeciydi ve `GUILD_TEXT`te kalmaları **doğruydu**. Dev yanlış satırı değiştirmedi,
+  gerçek yeri (`ChannelSidebar.tsx`) buldu ve bildirdi. Sözleşme düzeltildi + not eklendi:
+  **satır atıfları kanıt değil işaret**
+- 🔴 **Mimari sınır → [[D45]]:** presence aboneliği tek-değerli izleyiciye bağlı (M4a'nın "ekranda
+  tek DM var" varsayımı). Ortam listesinde çok kanal aynı anda mount olduğu için reconnect sonrası
+  yalnız sonuncusu tazeleniyor. Dev **DUR kuralına uydu**, `realtime/socket.ts` §1'de yoktu
+- Dev dördüncü bir dosyaya (`CallControls.tsx`) dokunduğunu **açıkça bildirdi** ve gerekçelendirdi
+  (düğmeyi gizlemenin tek temiz yolu); kabul edildi
 
 ### DoD (cihazda — SAHİPTE)
 > Tam liste sözleşme §11'de. İki kritik madde: **kanalda tek başına 5 dakika durup atılmamak** (§4)
