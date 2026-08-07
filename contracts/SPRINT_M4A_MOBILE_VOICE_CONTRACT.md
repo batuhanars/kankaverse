@@ -474,6 +474,17 @@ Uygulama ölüyken `expo-audio` çalışmaz. Tek yol **bildirim kanalına gömü
 ayarları kurulduktan sonra **değiştirilemez** (M4a-2'nin `_v2` dersi), dolayısıyla mevcut sessiz
 `incoming_call_v2` kanalı bu iş için kullanılamaz.
 
+🔴 **KANIT — sahip cihaz turu 2026-08-07, artık hipotez değil.** Aynı telefonda, aynı arama sırasında
+iki bildirim yan yana düştü: bizim `incoming_call_v2` kanalımızdan gelen (sessiz) **heads-up
+çıkarmadı**, yalnız durum çubuğunda ikon oldu; `api/` push'ı yanlışlıkla varsayılan/`Miscellaneous`
+kanalına düştüğü için (mobil `incoming_call_v3`'ü henüz kurmamıştı) o **heads-up çıkardı**. Kontrollü
+karşılaştırma: fark eden tek değişken kanalın sesi. **M4a-2'nin `vibrationPattern: [0, 1]` numarası
+Android'i ikna etmiyor** — kanalın gerçek bir sesi olmak zorunda.
+
+⚠️ **"Arka planda çalışıyor" yanıltıcıydı:** uygulama arka plandayken soket kapalı olduğu için JS
+bildirimi hiç üretilmiyor; o senaryoda görülen heads-up **push'ın kendisiydi**, bizim kanalımızın
+değil. Aynı hataya düşme: iki yolu ayırt etmeden "çalışıyor" deme.
+
 **Sıra bozulmadan izlenecek:**
 
 1. **Önce tek kanal dene.** `incoming_call_v3` kurulur, sesi **gömülü** (30 sn'ye yakın, kendi
@@ -509,6 +520,17 @@ uygulama kapalıyken ara.
 değişiklik → yeni dev build**. Bu duraktaki tek native diff budur. [[native-degisince-once-yerel-derle]]:
 EAS'a göndermeden önce yerelde `expo prebuild` + `gradlew`, sonra **emülatörde aç** (M4a-1'de derleme
 geçip uygulama açılmamıştı; ikisi ayrı kapı).
+
+#### §9.2.1b Eski kanallar silinir
+
+Sahip turunda cihaz ayarlarında **iki ayrı "Gelen arama" kanalı** göründü (`incoming_call` v1 +
+`incoming_call_v2`), ikisi de aynı adla. Kimlik her yükseldiğinde eskisi cihazda çöp olarak kalıyor
+ve kullanıcı ayarlarda hangisinin gerçek olduğunu ayırt edemiyor — birini kapatırsa yanlış olanı
+kapatmış olabilir.
+
+→ Yeni kanal kurulurken eskiler **silinir** (`deleteNotificationChannelAsync`, v1 + v2). Silme
+idempotent olmalı (kanal yoksa hata vermemeli) ve kurulumla **aynı yerde** yapılmalı, ayrı bir
+temizlik akışı açılmamalı.
 
 #### §9.2.2 Kanal ve kategori açılışta kurulur
 
@@ -556,9 +578,11 @@ bir `incoming_call` **reddi** ise ve üzerinden 30 sn'den fazla geçtiyse, yaln�
 
 #### §9.2.5 Asılı bildirim ve çift bildirim
 
-- **Çift bildirim (ön plan):** uygulama ön plandayken hem WS hem push gelir. `setNotificationHandler`
-  (`push.ts`) `data.type === 'incoming_call'` için o kanal **zaten çalıyorsa** `shouldShowBanner:
-  false` döner. Sunucuda presence'a bakılmaz: "arka plana yeni düştü" yarışında arama tamamen
+- **Çift bildirim (ön plan):** uygulama ön plandayken hem WS hem push gelir. 🔴 **Bu sahip turunda
+  fiilen görüldü** (2026-08-07): ekranda iki "Gelen Arama" kartı yan yana durdu, biri butonlu (JS),
+  biri butonsuz (push). `api/` ayağı önce gittiği için bugün canlı bir kusur; bu madde onu kapatıyor.
+  `setNotificationHandler` (`push.ts`) `data.type === 'incoming_call'` için o kanal **zaten
+  çalıyorsa** `shouldShowBanner: false` döner. Sunucuda presence'a bakılmaz: "arka plana yeni düştü" yarışında arama tamamen
   kaçardı, bastırma istemcide daha güvenli.
 - **Arayan iptal ettiyse:** iptal push'ı gönderilmez (data-only push Android'de güvenilir değil).
   Bunun yerine: uygulama ön plana geldiğinde **aktif olmayan** `incoming_call` bildirimleri
