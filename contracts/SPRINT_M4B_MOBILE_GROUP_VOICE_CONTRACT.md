@@ -284,3 +284,91 @@ Listede olmayan dosya → **DUR ve bildir.**
       **hâlâ doğru** — bu maddeyi atlama, D45 tam burada kırılıyordu
 - [ ] 1-1 DM satırlarında gösterge **yok** (§13.2 kararı)
 - [ ] Ortam kanal listesindeki gösterge **regresyonsuz** (aynı altyapıyı paylaşıyorlar)
+
+---
+
+## §14 EK — cihaz turu #2 sonrası üç düzeltme (sahip 2026-08-07 akşam)
+
+Tur büyük ölçüde geçti: grup DM sesli çalışıyor, DM listesi göstergesi çalışıyor, ortam kanalı
+göstergesi regresyonsuz. Üç düzeltme + bir **karar geri alma**.
+
+### §14.1 🔴 §5 GERİ ALINDI — grup DM'de çağrı GİDER
+
+Sözleşme §5 "grup DM'de kimse çalmaz" diyordu. **Bu karar yanlıştı, geri alınıyor** (sahip Discord'da
+doğruladı, ekran görüntüleriyle geldi).
+
+PM'in gerekçesi şuydu: "üç kişilik grupta her katılan herkesi çaldırırsa üç kez çalar." Kaçırdığı
+ayrım: **çalan yalnız İLK BAŞLATMA**, sonradan katılanlar kimseyi çaldırmaz. Ve bu ayrım
+**zaten kodda var** — §2'nin "odada zaten biri varsa sinyal gönderilmez" kuralı tam olarak bunu
+sağlıyor. Yani endişe, çözümü zaten mevcut olan bir soruna karşıydı.
+
+**Olacak:** `voice.group_call_started` alınınca **çalma akışı başlar** — 1-1 DM ile aynı sunum
+(`presentIncomingCall`, aynı kanal, aynı zil, aynı Reddet · Aramaya Katıl düğmeleri).
+- Bildirim metni grubu belli etmeli ("<ad> grup aramasına başladı" tonunda; kesin metin §7 kuralıyla).
+- **Aramaya Katıl** → odaya katılır (grup dalı, `kind: 'group'`).
+- **Reddet** → yalnız **yerel** temizlik: bildirim kapanır, zil susar. 🔴 Sunucuya reject sinyali
+  **GÖNDERİLMEZ**: `voice:call_reject` sunucuda `otherDmMember` ile tek bir karşı taraf buluyor,
+  grup kanalında bu **rastgele bir üyeye** giderdi. Arayan zaten odada; kimin reddettiğini bilmesi
+  de gerekmiyor.
+- 30 sn cevapsız → bildirim kalkar (1-1 ile aynı).
+
+**Web ayağı da aynı** (sahip açıkça istedi): bugün `useSocket.ts` `voice.group_call_started`'ı yalnız
+`callStore.setNotice` ile karşılıyor. Web de çalma sunumunu göstermeli (1-1'deki `IncomingCallModal`
+yeniden kullanılır). Kabul → odaya katıl; reddet → yalnız yerel kapatma, sinyal yok.
+
+⚠️ **Bu, `web/` diffini sıfır olmaktan çıkarır.** Bu ek için `web/` kapsama girer (§14.4).
+
+### §14.2 Arama ekranı: kartlar ALT ALTA (ızgara değil)
+
+M4c ekranı ızgaraya açmıştı. **Mobilde yanlış:** dar ekranda yan yana sıkışan kartlar, sesli
+aramada bakılan tek şeyi (kim konuşuyor) zorlaştırıyor. Discord da sesli aramada tam genişlik
+kartları **alt alta** diziyor (sahip ekran görüntüsü).
+
+- Katılımcılar **tek sütun**, tam genişlik, **alt alta**; taşınca **kaydırılır** (10 kişi de olsa).
+- Konuşan işareti, mikrofon-kapalı rozeti, avatar/ad düzeni **korunur** — yalnız yerleşim değişir.
+- Sıralama kararlılığı korunur (M4c'de LiveKit'in insert sırasına güvenilmişti, aynen kalsın).
+- 🔴 Izgara **silinmiyor, ertelenmiyor** — video geldiğinde (M4d) yeniden gerekecek. Ama bu sprintte
+  ses için kullanılan düzen dikey liste; ızgarayı "ileride lazım" diye ölü kod olarak **bırakma**,
+  video sprintinde yeniden yazılır (o zaman video kutucuğu farklı olacak zaten).
+
+### §14.3 Zil hâlâ kısık — dinamik aralık
+
+Tepe zaten sınırda (-1.0 dB), daha yükseltmek **kırpma** üretir. Sorun **ortalama** seviye:
+-14.5 dB, yani ses tepe yapıyor ama zamanın çoğunda sessiz.
+
+**Dinamik aralığı sıkıştır** (`ffmpeg` `loudnorm` veya `compand`): sakin bölümler yükselir, algılanan
+gürlük artar, tepe -1 dB'de kalır. Hedef ortalama **~-9 dB civarı** (kesin sayı dev'in ölçümüne
+bağlı; kırpma **olmayacak**).
+- Süre/format/kanal/örnekleme **değişmez** (30 sn / mono / 22050 / s16).
+- Yeni tepe + ortalama ölçümünü **raporla**; kırpma olmadığını da doğrula.
+- Kanal kimliği **değişmez** (`incoming_call_v4`) — dosya içeriği değişiyor, kanal ayarı değil.
+
+ℹ️ Ses tuşuyla seviye ayarlama konusu sahip kararıyla **kapatıldı** ("gerisi önemli değil").
+v4'ün `NOTIFICATION_RINGTONE` ayarı yerinde kalıyor.
+
+### §14.4 Kapsam
+
+| Dosya | İş |
+|---|---|
+| `mobile/src/realtime/socket.ts` | `group_call_started` → çalma akışı (§14.1) |
+| `mobile/src/notifications/incomingCall.ts` | grup çağrısı sunumu + reddette sinyal yok (§14.1) |
+| `mobile/src/app/(app)/call.tsx` | dikey liste düzeni (§14.2) |
+| `mobile/assets/sounds/incoming_call_channel.wav` | dinamik aralık (§14.3) |
+| `web/src/composables/useSocket.ts` + çalma sunumu | web grup çağrısı (§14.1) |
+| `web/src/i18n/tr.json` | yeni metinler |
+
+`api/` diffi **SIFIR** (sunucu zaten gerekeni yapıyor).
+
+### §14.5 DoD eki
+
+**Dev'de:** mobil `typecheck`/`lint`/`expo-doctor` temiz · web `vue-tsc -b` bilinen **6**'da ·
+🔴 **`vite build` çalıştırıldı** (web/CLAUDE.md kuralı — şablon ifadelerini başka hiçbir denetim
+yakalamıyor) · `api/` diffi sıfır · yeni ses ölçümü raporlandı
+
+**Cihazda/tarayıcıda (SAHİPTE):**
+- [ ] Grup DM'de arama başlatınca **diğer üyeler çalıyor** (mobil ve web)
+- [ ] Sonradan katılan biri **kimseyi çaldırmıyor** (ilk başlatma ile katılma ayrımı)
+- [ ] Grupta Reddet → zil susar, bildirim kapanır; arayan tarafta **bir şey değişmez**
+- [ ] Arama ekranında 3 kişi **alt alta**, tam genişlik; taşınca kaydırılıyor
+- [ ] Zil **belirgin şekilde daha gür**; kırpma/cızırtı yok
+- [ ] 🔴 **REGRESYON:** 1-1 DM araması, ortam ses kanalı, DM listesi göstergesi eskisi gibi
