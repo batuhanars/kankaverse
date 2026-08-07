@@ -3027,6 +3027,21 @@ ancak **veritabanına bakılarak** bulunabildi. Sahip kararıyla geri alındı: 
 seviyesi, aramayı susturmaz; yalnız `muted` susturur. Sözleşme §9.1 madde 3 güncellendi, iki test
 geri almanın regresyon koruması oldu.
 
+
+### ✅ M4a KAPANDI — sahip onayı 2026-08-07
+
+Sahip cihazda tam turu attı: **"her şey normal, bildirimlerde sorun yok"**. Web tarafı (D39) da
+tarayıcıda doğrulandı. 1-1 DM sesli arama uçtan uca çalışıyor: mobilden başlatma, webden arandığında
+çalma, kabul/reddet, uygulama kapalıyken bildirim, mini pencere, arka planda ses.
+
+**Açık kalan iki kalem borca çevrildi (sahip kararı: "takılmayalım, devam edelim"):**
+- [[D43]] uygulama tamamen ölüyken bildirimde eylem düğmeleri yok (platform sınırı, işlev kaybı yok)
+- [[D44]] zil sesi duyulmuyor (ölçüldü: dosya sağlam ama tepe -14.9 dB; normalize + yeni build gerek)
+
+⚠️ **[[D40]] doğrulanamadı, kapanmadı.** "Cihaz sessizdeyken zil çalmasın" borcunun kanal sesine
+geçişle kendiliğinden kapanması bekleniyordu; zil hiç duyulmadığı için (D44) test edilemedi.
+D44 düzelince **birlikte** doğrulanır: sessize al, ara, çalmamalı; sesi aç, ara, çalmalı.
+
 ### DoD (cihazda) — ✅ SAHİP DOĞRULADI 2026-08-06
 > Tam liste sözleşme §13'te. Sahip turu: arama başlatma, karşılıklı konuşma, arka planda ses,
 > bildirim eylemleri, küçültme, mini pencere ve regresyonlar **tamam**. Bulunan kusurlar aşağıda.
