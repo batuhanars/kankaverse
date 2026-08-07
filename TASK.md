@@ -3238,3 +3238,36 @@ düğmesi no-op'a düşer (`isConnectedTo` false) · karşı tarafa `call_cancel
 > **(1) zil sesi DUYULUYOR** (D44'ün asıl testi), **(2) telefon sessizdeyken çalmıyor** → [[D40]]
 > kapanır, **(3) grup DM'de kimse katılmazsa arama 3 dakikada düşüyor** (ortam kanalından farkı),
 > **(4) 1-1 DM ve ortam kanalı REGRESYONSUZ**.
+
+---
+
+## Sprint M4z — M4 Kapanış Temizliği — 2026-08-08 ✅ KAPANDI
+
+> Sözleşme: `contracts/SPRINT_M4Z_KAPANIS_CONTRACT.md`. Altı kalem, hepsi cihazda doğrulandı.
+
+- [x] **D47** web'de DM listesi ses göstergesi — 🔴 dev özellik yazmadan önce aboneliği kontrol etti
+      ve aynı kusur sınıfını web'de de buldu (uykudaydı): sayaç yokluğu yüzünden açık grup DM'den
+      çıkınca listedeki gösterge sessizce ölecekti. Özellik önce yazılsaydı kusuru kendi eliyle
+      üretecekti
+- [x] **D48** ses kanalına girmeden önce ara panel — mevcut sheet deseni yeniden kullanıldı
+- [x] **D49** iki kişilik grup → DM yönlendirmesi — dev iki store'da kopya-satır kusurunu yakaladı
+      (sunucu artık **mevcut** bir DM döndürebiliyor, körü körüne listeye ekleniyordu)
+- [x] **§E** grup aramasında bekleyen üyeler soluk görünüyor — altyapı iki tarafta da vardı
+      (1-1 için yazılmıştı), çoğullaştırıldı. Bekleyende "Çalıyor…" **yok**: grup daveti tek
+      seferlik, 60 sn sonra kimse çalmıyor, etiket yalan olurdu
+- [x] **§F** 🔴 grup çağrısı iptali — arayan kapatınca zil/titreşim/bildirim **anında** susuyor
+      (sahip doğruladı). Sunucu sinyali seçildi, presence tabanlı alternatif elendi (çalan tarafın
+      o kanalı dinliyor olması ekrana bağlıydı → bazen çalışan bir çözüm olurdu)
+- [x] Web'de grup çağrısında **sunucu cevabı kontrol edilmiyordu** — sunucu reddetse bile sessizce
+      odaya giriliyor, karşı taraf çalmıyor, kullanıcı hiçbir uyarı görmüyordu ("web'ten çağrı
+      düşmüyor" semptomu buydu). Mobil bu kontrolü baştan yapıyordu
+- [x] Mobilde grup DM'de telefon yerine **hoparlör** ikonu (web ve Discord mobil ile aynı ayrım:
+      grup sesli bir çağrı değil, girilen bir oda)
+
+### 🔴 PM dersi — kabul edilen sınırlar cihazda sınanmalı
+Bu sprintte sahibin turu **üç kez** PM'in "kabul edilebilir" dediği şeyi kusur olarak geri getirdi:
+grup DM'de çalma olmaması (§5 kararı, geri alındı) · grup iptalinin olmaması ("30 sn'de kendi
+kendine susar" — cihazda ortada olmayan bir çağrı yarım dakika çalıyor) · ızgara düzeni (dar ekranda
+sesli aramada bakılan tek şeyi zorlaştırıyordu). Üçü de kağıt üstünde savunulabilirdi.
+**Sonuç:** PM'in kapsam kısıtları bir tasarım kararı değil, **doğrulanmamış bir varsayımdır**;
+sahip turundan geçmeden "kabul edildi" sayılmaz.
