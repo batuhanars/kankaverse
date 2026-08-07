@@ -9,6 +9,7 @@ import { useFriendsStore } from '@/stores/friends';
 import { useTypingStore } from '@/stores/typing';
 import { resolvePref, useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { NotificationLevel } from '@/api/notifications';
+import { useVoicePresenceStore } from '@/stores/voicePresence';
 import { formatMentionsPlain } from '@/utils/mentions';
 import { channelTitle } from '@/utils/channelTitle';
 import { t } from '@/i18n';
@@ -53,6 +54,30 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  // Sözleşme M4b §13.1/§13.3 — grup DM satırlarının ses presence aboneliği burada yönetilir
+  // (`DmRow` yalnız store'dan OKUR, gösterge — bkz. o dosyadaki not). [[D45]]'in ref-sayılı
+  // aboneliği sayesinde aynı kanalı burada VE açık DM ekranında (`dm/[id].tsx`) izlemek güvenli:
+  // biri unmount olunca öbürü kör kalmıyor.
+  //
+  // Bağımlılık `channels` DİZİSİNİN KENDİSİ değil, yalnız GRUP DM kimliklerinin SIRALANMIŞ kümesi
+  // (`groupDmIdsKey`) — `channels` yeni mesaj geldikçe (sıralama, önizleme) sık yeni referans alır;
+  // ham diziye bağımlı olsaydı her mesajda gereksiz unsubscribe+subscribe çakılırdı (D45'in ref
+  // sayacı bunu güvenli kılar ama gürültü olurdu). Yalnız küme gerçekten DEĞİŞİNCE (grup kuruldu/
+  // silindi/gruptan çıkıldı) yeniden kurulur.
+  const groupDmIdsKey = channels
+    .filter((c) => c.type === 'GROUP_DM')
+    .map((c) => c.id)
+    .sort()
+    .join(',');
+
+  useEffect(() => {
+    const ids = groupDmIdsKey ? groupDmIdsKey.split(',') : [];
+    ids.forEach((id) => useVoicePresenceStore.getState().subscribe(id));
+    return () => {
+      ids.forEach((id) => useVoicePresenceStore.getState().unsubscribe(id));
+    };
+  }, [groupDmIdsKey]);
 
   function retry() {
     useDmStore.setState({ state: 'loading' });
@@ -159,6 +184,8 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
                 preview={preview}
                 typing={typing}
                 unread={showUnread}
+                channelId={item.id}
+                isGroup={item.type === 'GROUP_DM'}
                 onPress={() => onOpenDm(item)}
                 onLongPress={() => onDmMenu(item)}
               />
