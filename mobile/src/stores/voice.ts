@@ -64,9 +64,10 @@ interface VoiceState {
   setOutputId: (id: AudioOutputId) => void;
 
   /**
-   * §3.1/§3.2 — izin + (gerekirse) davet + token + bağlan. `peerLabel` bildirim gövdesi (karşı ad).
-   * `reason: 'mic_denied'` çağıran ekranın "Ayarları Aç" seçeneği sunması için — metin karşılaştırması
-   * yerine ayrık bir kod (çeviri değişirse kırılmasın).
+   * §3.1/§3.2 — izin + (gerekirse) davet + token + bağlan. `label` bildirim gövdesi (DM'de karşı
+   * ad, guild'de kanal adı — bkz. `kind` altındaki not). `reason: 'mic_denied'` çağıran ekranın
+   * "Ayarları Aç" seçeneği sunması için — metin karşılaştırması yerine ayrık bir kod (çeviri
+   * değişirse kırılmasın).
    *
    * 🔴 M4a-2 sözleşme §8.2 tuzağı — `options.invite === false` davetin KOŞULSUZ atlanmasını
    * zorlar. Varsayılan (`options` verilmemiş/`invite` belirtilmemiş) davranış DEĞİŞMEDİ: davet
@@ -77,11 +78,19 @@ interface VoiceState {
    * arayanı GERİ ARAR (karşı taraf zaten bizi aradı, hâlâ odada). `invite: false` bu varsayımı
    * bildirim kabul yolunda tamamen devre dışı bırakır: biz zaten `voice.incoming_call` aldık,
    * karşı tarafın odada olduğunu WS'ten biliyoruz, presence listesine bakmaya gerek yok.
+   *
+   * 🔴 M4c sözleşme §3 — `kind: 'guild'` (varsayılan `'dm'`, DM çağrı yerleri hiç değişmedi).
+   * Guild dalı DAVETSİZDİR: `alreadyOngoing` KOŞULSUZ `true` zorlanır — bu tek satır invite
+   * bloğunu (`if (!alreadyOngoing) { callInvite... }`) tamamen atlatır, `didInvite`i (`!alreadyOngoing`)
+   * kalıcı `false` yapar (→ "Çalıyor…" hiç çıkmaz) VE `leave()`teki `callCancel` dalını (yalnız
+   * `didInvite`e bakıyor) devre dışı bırakır — üç ayrı davranışı TEK noktadan, DM yolunun kod
+   * yolunu hiç değiştirmeden kapatır. Ayrıca §4 — yalnız-kalma zaman aşımını kapatır (`autoEndWhenAlone`,
+   * bkz. modül değişkeni).
    */
   startOrJoin: (
     channelId: string,
-    peerLabel: string,
-    options?: { invite?: boolean },
+    label: string,
+    options?: { invite?: boolean; kind?: 'dm' | 'guild' },
   ) => Promise<{ ok: boolean; message?: string; reason?: 'mic_denied' | 'other' }>;
   /** `userInitiated` true ise (kullanıcı "kapat"a bastı) `disconnectReason` set edilmez. */
   leave: (userInitiated?: boolean) => Promise<void>;
@@ -100,6 +109,13 @@ let room: Room | null = null;
 // kesildi" çıkıyor, (2) her kapatmada iki temizlik + iki `voice/leave` isteği iç içe giriyor.
 let leaving = false;
 let peerEverJoined = false;
+// §4 🔴 — DM'de yalnız-kalma zaman aşımı açık, guild'de KAPALI (web `stores/voice.ts:231`
+// `autoEndWhenAlone` pariteti: web'de varsayılan false, DM çağrısı açıkça true yapıyor; burada
+// eşdeğeri `startOrJoin`de `!isGuild` olarak hesaplanıyor — bkz. o fonksiyondaki yorum). Guild
+// kanalında ilk giren arkadaşlarını bekler; 3dk sonra sessizce atılmak "bağlantı düşüyor" sanısı
+// yaratırdı (sözleşme §4). Modül değişkeni: `scheduleAloneCheckIfNeeded` + zamanlayıcı callback'i
+// ikisi de okur.
+let autoEndWhenAlone = true;
 let aloneTimer: ReturnType<typeof setTimeout> | null = null;
 let foregroundListenerRemove: (() => void) | null = null;
 // Bildirim gövdesi (karşı tarafın adı) — `toggleMute` yalnız eylem etiketini günceller, gövdeyi
@@ -160,7 +176,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     set({ outputId: id });
   },
 
-  async startOrJoin(channelId, peerLabel, options) {
+  async startOrJoin(channelId, label, options) {
     if (get().connectedChannelId === channelId) return { ok: true };
     if (room) await get().leave(true);
 
@@ -171,11 +187,20 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       return { ok: false, message: t('mobile.call.micPermissionDenied'), reason: 'mic_denied' };
     }
 
-    // `invite: false` (bildirimden "Aramaya Katıl") → presence listesine BAKILMAZ, davet asla
-    // gönderilmez. Bkz. yukarıdaki arayüz yorumu — bu, PM'in işaret ettiği "sessiz geri arama" tuzağı.
-    const alreadyOngoing =
-      options?.invite === false ? true : useVoicePresenceStore.getState().for(channelId).length > 0;
-    currentPeerLabel = peerLabel;
+    const isGuild = options?.kind === 'guild';
+    // §4 — bkz. modül değişkeni yorumu. Her oturumun başında YENİDEN hesaplanır (bir önceki
+    // oturumdan kalma değer bir sonrakini kirletemez).
+    autoEndWhenAlone = !isGuild;
+
+    // Guild dalında `alreadyOngoing` KOŞULSUZ true — bkz. arayüzdeki §3 yorumu (invite bloğunu
+    // atlatır + didInvite'ı kalıcı false yapar). DM dalı BİREBİR eskisi gibi: `invite: false`
+    // (bildirimden "Aramaya Katıl") → presence listesine BAKILMAZ, davet asla gönderilmez.
+    const alreadyOngoing = isGuild
+      ? true
+      : options?.invite === false
+        ? true
+        : useVoicePresenceStore.getState().for(channelId).length > 0;
+    currentPeerLabel = label;
     set({ connecting: true, disconnectReason: null, didInvite: !alreadyOngoing });
 
     // §3.1 🔴 — sıra önemli: davet ÖNCE (kimse yoksa). Ack `ok:false` ise odaya HİÇ girilmez.
@@ -253,7 +278,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
         const muteLabel = get().isMuted ? t('voice.unmute') : t('voice.mute');
         await startCallForegroundService(
           t('mobile.call.ongoing'),
-          peerLabel,
+          label,
           muteLabel,
           t('mobile.call.notifDisconnect'),
           t('mobile.call.notifChannel'),
@@ -290,6 +315,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     const wasAlone = get().roomParticipants.length <= 1;
     clearAloneTimer();
     peerEverJoined = false;
+    autoEndWhenAlone = true; // §4 — kozmetik sıfırlama, bir sonraki `startOrJoin` zaten üzerine yazar
     currentPeerLabel = '';
     // Her oturum yeni bir `Room` nesnesi (yeni katılımcı kimlikleri) — bir sonraki `startOrJoin`
     // eski oturumdan kalma handler'larla karışmasın diye map burada temizlenir.
@@ -405,13 +431,18 @@ function detachSpeaking(p: Participant) {
   speakingHandlers.delete(p.identity);
 }
 
-/** §3.3 — tek başına kalınca eşik (3dk hiç katılmadıysa · 60sn katılıp çıktıysa). */
+/**
+ * §3.3/§4 — tek başına kalınca eşik (3dk hiç katılmadıysa · 60sn katılıp çıktıysa). `autoEndWhenAlone`
+ * false ise (guild kanalı) bu fonksiyon HİÇ zamanlayıcı kurmaz — kanalın ilk üyesi arkadaşlarını
+ * beklerken sessizce atılmaz (web `voice.ts` `watch(...roomParticipants.value.length...)` pariteti).
+ */
 function scheduleAloneCheckIfNeeded(get: () => VoiceState) {
   clearAloneTimer();
+  if (!autoEndWhenAlone) return;
   if (get().roomParticipants.length !== 1) return;
   const timeout = peerEverJoined ? ALONE_TIMEOUT_LEFT_MS : ALONE_TIMEOUT_NEVER_JOINED_MS;
   aloneTimer = setTimeout(() => {
-    if (get().roomParticipants.length === 1) void get().leave(false);
+    if (autoEndWhenAlone && get().roomParticipants.length === 1) void get().leave(false);
   }, timeout);
 }
 

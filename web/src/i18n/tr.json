@@ -1768,6 +1768,10 @@
       "incomingBody": "{name} seni arıyor!",
       "joinAction": "Aramaya Katıl",
       "incomingNotifChannel": "Gelen arama"
+    },
+    "voice": {
+      "guildAloneTitle": "Bu kanalda ilk sensin.",
+      "guildAloneSubtitle": "Arkadaşların katıldığında burada görünecekler."
     }
   }
 }

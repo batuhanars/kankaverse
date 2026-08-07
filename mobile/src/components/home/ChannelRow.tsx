@@ -1,11 +1,17 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { ChannelSummaryDto } from '@/api/channels';
+import { useEffect } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { ChannelType, type ChannelSummaryDto } from '@/api/channels';
 import { useUnreadStore } from '@/stores/unread';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { NotificationLevel } from '@/api/notifications';
 import { badgeLabel } from '@/utils/badgeLabel';
+import { useVoicePresenceStore, type VoicePresenceParticipant } from '@/stores/voicePresence';
+import { useVoiceStore } from '@/stores/voice';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
+
+const EMPTY_PRESENCE: VoicePresenceParticipant[] = [];
 
 interface Props {
   channel: ChannelSummaryDto;
@@ -25,6 +31,8 @@ interface Props {
 // REST'ten gelen `channel.unreadCount/unreadMentionCount` yalnız store boş olduğunda (ilk render,
 // hydrate henüz işlenmeden) yedek değer.
 export function ChannelRow({ channel, selected, onPress, onLongPress }: Props) {
+  const isVoice = channel.type === ChannelType.GUILD_VOICE;
+
   const unread = useUnreadStore((s) => s.channels[channel.id]?.unread ?? channel.unreadCount);
   const mentions = useUnreadStore((s) => s.channels[channel.id]?.mentions ?? channel.unreadMentionCount);
   // Sprint M2b §3/§5 R1-3 — CHANNEL kaydı varsa TAMAMEN o kazanır, yoksa GUILD'e düşer (resolvePref
@@ -37,8 +45,30 @@ export function ChannelRow({ channel, selected, onPress, onLongPress }: Props) {
   const muted = useNotificationPrefsStore((s) =>
     s.effectiveMuted('CHANNEL', channel.id, channel.guildId),
   );
-  const showUnread = unread > 0 && level === NotificationLevel.ALL && !muted;
-  const showMentionBadge = mentions > 0 && level !== NotificationLevel.NONE && !muted;
+  // Sprint M4c §2 — ses kanalının mesajı yok, okunmamış/bahsetme rozeti ASLA gösterilmez (server
+  // zaten 0 döner, ama `isVoice` koruması "hangisi doğru sıfır" varsayımına bağlı kalmaz).
+  const showUnread = !isVoice && unread > 0 && level === NotificationLevel.ALL && !muted;
+  const showMentionBadge = !isVoice && mentions > 0 && level !== NotificationLevel.NONE && !muted;
+
+  // Sprint M4c §6 — "kanalda kim var" (web `VoiceParticipantList` pariteti, iki katman): BU
+  // kanala LiveKit ile bağlıyken canlı `voice.ts` (`roomParticipants`/mute anlık), değilken WS
+  // presence anlık görüntüsü (`voicePresence.ts`) — presence snapshot'ında mute bilgisi hiç yok
+  // (sunucu yalnız kim-var döner), bu yüzden mikrofon rozeti YALNIZ bağlı olduğumuz kanalda çıkar.
+  useEffect(() => {
+    if (!isVoice) return;
+    useVoicePresenceStore.getState().subscribe(channel.id);
+    return () => useVoicePresenceStore.getState().unsubscribe(channel.id);
+  }, [isVoice, channel.id]);
+
+  const presence = useVoicePresenceStore((s) =>
+    isVoice ? (s.byChannel[channel.id] ?? EMPTY_PRESENCE) : EMPTY_PRESENCE,
+  );
+  const connectedHere = useVoiceStore((s) => isVoice && s.connectedChannelId === channel.id);
+  const localMuted = useVoiceStore((s) => s.isMuted);
+  const remoteMutedIds = useVoiceStore((s) => s.mutedUserIds);
+  const roomParticipants = useVoiceStore((s) => s.roomParticipants);
+  const members: { userId: string; username: string; avatarUrl: string | null; isLocal?: boolean }[] =
+    connectedHere ? roomParticipants : presence;
 
   return (
     <Pressable
@@ -48,31 +78,77 @@ export function ChannelRow({ channel, selected, onPress, onLongPress }: Props) {
       accessibilityRole="button"
       accessibilityState={{ selected }}
     >
-      <Text
-        style={[
-          styles.hash,
-          showUnread && styles.hashUnread,
-          selected && styles.hashSelected,
-          muted && styles.mutedText,
-        ]}
-      >
-        #
-      </Text>
-      <Text
-        style={[
-          styles.name,
-          showUnread && styles.nameUnread,
-          selected && styles.nameSelected,
-          muted && styles.mutedText,
-        ]}
-        numberOfLines={1}
-      >
-        {channel.name}
-      </Text>
-      {channel.ageGated && <Text style={styles.ageBadge}>{t('channel.ageGatedBadge')}</Text>}
-      {showMentionBadge && (
-        <View style={styles.mentionBadge}>
-          <Text style={styles.mentionBadgeText}>{badgeLabel(mentions)}</Text>
+      <View style={styles.rowContent}>
+        {isVoice ? (
+          <Ionicons
+            name="volume-medium-outline"
+            size={16}
+            style={styles.voiceIcon}
+            color={selected ? theme.colors.accent500 : theme.colors.textSecondary}
+          />
+        ) : (
+          <Text
+            style={[
+              styles.hash,
+              showUnread && styles.hashUnread,
+              selected && styles.hashSelected,
+              muted && styles.mutedText,
+            ]}
+          >
+            #
+          </Text>
+        )}
+        <Text
+          style={[
+            styles.name,
+            showUnread && styles.nameUnread,
+            selected && styles.nameSelected,
+            muted && styles.mutedText,
+          ]}
+          numberOfLines={1}
+        >
+          {channel.name}
+        </Text>
+        {/* Sprint M4c §8 — item 6 pariteti: özel kanal HERKESE görünür, kilit rozeti "giremezsin"i
+            sessizce gizlemez (T&S — R7). Yalnız kilit İKONU; dokununca ne olacağı `home.tsx`'in işi. */}
+        {channel.locked && (
+          <Ionicons
+            name="lock-closed"
+            size={12}
+            style={styles.lockIcon}
+            color={theme.colors.textMuted}
+          />
+        )}
+        {channel.ageGated && <Text style={styles.ageBadge}>{t('channel.ageGatedBadge')}</Text>}
+        {showMentionBadge && (
+          <View style={styles.mentionBadge}>
+            <Text style={styles.mentionBadgeText}>{badgeLabel(mentions)}</Text>
+          </View>
+        )}
+      </View>
+
+      {isVoice && members.length > 0 && (
+        <View style={styles.presenceList}>
+          {members.map((p) => {
+            const micOff = connectedHere && (p.isLocal ? localMuted : remoteMutedIds.has(p.userId));
+            return (
+              <View key={p.userId} style={styles.presenceRow}>
+                {p.avatarUrl ? (
+                  <Image source={{ uri: p.avatarUrl }} style={styles.presenceAvatar} />
+                ) : (
+                  <View style={[styles.presenceAvatar, styles.presenceAvatarFallback]}>
+                    <Text style={styles.presenceAvatarFallbackText}>
+                      {p.username.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <Text style={styles.presenceName} numberOfLines={1}>
+                  {p.username}
+                </Text>
+                {micOff && <Ionicons name="mic-off" size={11} color={theme.colors.danger} />}
+              </View>
+            );
+          })}
         </View>
       )}
     </Pressable>
@@ -82,14 +158,19 @@ export function ChannelRow({ channel, selected, onPress, onLongPress }: Props) {
 const styles = StyleSheet.create({
   // Sözleşme §8.1-A/1 — 40dp dokunma hedefi + 2dp ritim boşluğu; ayırıcı çizgi YOK
   // (Discord da ritim+dolgu ile ayırır).
+  // Sprint M4c §6 — ses satırı iki kat oldu (satır + altında kim-var listesi), `row` bu yüzden
+  // sütuna döndü; asıl satır içeriği `rowContent`e taşındı (metin kanalında tek satır, davranış
+  // aynı — yalnız bir sarmalayıcı katman eklendi).
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
     minHeight: 40,
     paddingVertical: 8,
     paddingHorizontal: 10,
     marginBottom: 2,
     borderRadius: theme.radius.md,
+  },
+  rowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   rowSelected: { backgroundColor: theme.colors.bgElevated },
   hash: {
@@ -97,6 +178,14 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.lg,
     marginRight: 7,
     fontWeight: '600',
+  },
+  // Sprint M4c §2 — ses kanalı ikonu (`#`in yerini alır), web `ChannelPanel.vue:1185` pariteti.
+  voiceIcon: {
+    marginRight: 7,
+  },
+  // Sprint M4c §8 — özel kanal kilit rozeti (item 6 pariteti).
+  lockIcon: {
+    marginLeft: 4,
   },
   hashSelected: { color: theme.colors.accent500 },
   // Sprint M2a §4.2 — kanal ikonu (`#`) de okunmamışta parlıyor, isimle AYNI kural.
@@ -133,5 +222,37 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: 10,
     fontWeight: '700',
+  },
+  // Sprint M4c §6 — "kanalda kim var" (web `VoiceParticipantList` pariteti, sade sürüm: yalnız
+  // avatar + ad + mikrofon rozeti — #1/#2/#3 R11 moderasyon yüzeyleri §10 kapsam dışı).
+  presenceList: {
+    marginTop: 2,
+    paddingLeft: 30, // ikonun hizasından biraz içeri (web `pl-8` pariteti)
+    gap: 2,
+  },
+  presenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  presenceAvatar: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+  },
+  presenceAvatarFallback: {
+    backgroundColor: theme.colors.accentSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presenceAvatarFallbackText: {
+    color: theme.colors.accent500,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  presenceName: {
+    flex: 1,
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.xs,
   },
 });

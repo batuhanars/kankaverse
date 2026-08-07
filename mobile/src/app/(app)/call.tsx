@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,11 +20,21 @@ const CONTROLS_HIDE_MS = 5000;
  * M4a-1 sözleşme §4 — arama ekranı, tam ekran modal. Bu ekran bağlantıyı BAŞLATMAZ: DM ekranı
  * (`dm/[id].tsx` `handleCallPress`) zaten `voiceStore.startOrJoin` ile bağlanıp buraya
  * yönlendiriyor, ya da mini pencereden geri dönülüyor (§7). Burası yalnız var olan bağlantıyı çizer.
+ *
+ * M4c sözleşme §5 — `kind: 'guild'` (varsayılan `'dm'`, `home.tsx` `joinVoiceChannel` geçiyor) N
+ * katılımcılı ızgaraya açar; DM dalı (iki-kutucuk, "Çalıyor…", peer adı) SATIR SATIR aynı kaldı —
+ * yeni dal DM koşullarının YANINA eklendi, İÇİNE değil (M4a cihazda doğrulandı, regresyon yasak).
  */
 export default function CallScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ channelId: string }>();
+  const params = useLocalSearchParams<{
+    channelId: string;
+    kind?: 'dm' | 'guild';
+    channelName?: string;
+    guildName?: string;
+  }>();
   const channelId = params.channelId;
+  const isGuildCall = params.kind === 'guild';
   const insets = useSafeAreaInsets();
 
   const connectedChannelId = useVoiceStore((s) => s.connectedChannelId);
@@ -137,9 +147,28 @@ export default function CallScreen() {
     void useVoiceStore.getState().leave(true);
   }
 
+  // Sprint M4c §5 dev notu — guild ses kanalının kendi metin akışı YOK (`GUILD_VOICE` mesaj
+  // taşımıyor), yani DM'deki "sohbeti aç" hedefinin guild karşılığı diye bir ekran yok.
+  // `CallControls` bu sözleşmenin dosya listesinde değil (§1) — üçüncü düğmeyi kaldırmak/gizlemek
+  // o dosyayı değiştirmeyi gerektirirdi. Bunun yerine düğme küçültme ile AYNI, gerçek bir eylem
+  // yapar (`router.back()`) — "Sohbet" etiketi tam doğru değil ama BOŞ bir düğme de değil; guild
+  // akışında `/call` her zaman `home.tsx`den push edildiği için `back()` güvenle oraya döner.
   function handleOpenChat() {
+    if (isGuildCall) {
+      router.back();
+      return;
+    }
     router.push(channel ? dmRouteParams(channel) : { pathname: '/dm/[id]', params: { id: channelId } });
   }
+
+  // §5 — ızgara sütun sayısı katılımcı adedine göre (kutucuklar arttıkça küçülür); sıra `shown.participants`
+  // sırasıdır (yerel + LiveKit `remoteParticipants` Map iterasyon sırası = KATILMA sırası, `Map` insert
+  // sırasını korur, mute/konuşma değişince YENİDEN SIRALANMAZ) — bu yüzden ayrıca sort GEREKMEZ, zaten kararlı.
+  // Sabit yüzde tablosu (üçten fazla sütuna çıkmıyoruz — RN `DimensionValue` yalnız `${number}%`
+  // literal'lerini kabul ediyor, dinamik `${100/n}%` şablon string'i tip hatası verirdi).
+  const GRID_CELL_WIDTH: Record<1 | 2 | 3, '100%' | '50%' | '33.33%'> = { 1: '100%', 2: '50%', 3: '33.33%' };
+  const guildCols = shown.participants.length <= 1 ? 1 : shown.participants.length <= 4 ? 2 : 3;
+  const gridCellWidth = GRID_CELL_WIDTH[guildCols];
 
   return (
     <Pressable style={styles.flex} onPress={resetHideTimer}>
@@ -163,12 +192,24 @@ export default function CallScreen() {
           >
             <Ionicons name="chevron-down" size={26} color={theme.colors.textPrimary} />
           </Pressable>
-          <Pressable onPress={handleOpenChat} style={styles.topBarCenter} accessibilityRole="button">
-            <Text style={styles.peerName} numberOfLines={1}>
-              {peerName}
-            </Text>
-            <Text style={styles.duration}>{duration}</Text>
-          </Pressable>
+          {/* §5 — başlık kanal adı + ortam adı (guild) / karşı taraf adı (DM, tıklanınca sohbet açar). */}
+          {isGuildCall ? (
+            <View style={styles.topBarCenter}>
+              <Text style={styles.peerName} numberOfLines={1}>
+                {params.channelName ?? ''}
+              </Text>
+              <Text style={styles.duration} numberOfLines={1}>
+                {(params.guildName ?? '') + ' · ' + duration}
+              </Text>
+            </View>
+          ) : (
+            <Pressable onPress={handleOpenChat} style={styles.topBarCenter} accessibilityRole="button">
+              <Text style={styles.peerName} numberOfLines={1}>
+                {peerName}
+              </Text>
+              <Text style={styles.duration}>{duration}</Text>
+            </Pressable>
+          )}
           <Pressable
             onPress={() => {
               resetHideTimer();
@@ -183,29 +224,61 @@ export default function CallScreen() {
         </View>
       )}
 
-      <View style={styles.tiles}>
-        <ParticipantTile
-          name={localMember?.username ?? myUser?.username ?? t('voice.you')}
-          avatarUrl={localMember?.avatarUrl ?? myUser?.avatarUrl ?? null}
-          speaking={localMember ? speakingUserIds.has(localMember.userId) : false}
-          micOff={isMuted}
-        />
-        <ParticipantTile
-          name={peerName}
-          avatarUrl={peerAvatar}
-          speaking={peerMember ? speakingUserIds.has(peerMember.userId) : false}
-          micOff={peerMember ? mutedUserIds.has(peerMember.userId) : false}
-          dimmed={alone}
-          ringing={alone && didInvite}
-        />
-        {alone && (
-          <View style={styles.aloneNotice}>
-            <Text style={styles.aloneTitle}>{t('mobile.call.aloneTitle')}</Text>
-            <Text style={styles.aloneSubtitle}>{t('mobile.call.aloneSubtitle', { name: peerName })}</Text>
-          </View>
-        )}
-        {!shown.canPublish && <Text style={styles.listenerNotice}>{t('voice.listenerOnly')}</Text>}
-      </View>
+      {isGuildCall ? (
+        // §5 — N katılımcılı ızgara. M4a'nın `ParticipantTile`ı AYNEN yeniden kullanılır (yeni
+        // tasarım dili icat edilmiyor); her kutucuk `guildCols` genişliğinde bir hücreye sarılır —
+        // sütun sayısı arttıkça hücre küçülür (tekil `ParticipantTile` ölçüsü sabit kalır, bu
+        // dosya §1 kapsamında değil).
+        <View style={styles.tiles}>
+          <ScrollView
+            style={styles.gridScroll}
+            contentContainerStyle={styles.grid}
+            showsVerticalScrollIndicator={false}
+          >
+            {shown.participants.map((p) => (
+              <View key={p.userId} style={[styles.gridCell, { width: gridCellWidth }]}>
+                <ParticipantTile
+                  name={p.username}
+                  avatarUrl={p.avatarUrl}
+                  speaking={speakingUserIds.has(p.userId)}
+                  micOff={p.isLocal ? isMuted : mutedUserIds.has(p.userId)}
+                />
+              </View>
+            ))}
+          </ScrollView>
+          {alone && (
+            <View style={styles.aloneNotice}>
+              <Text style={styles.aloneTitle}>{t('mobile.voice.guildAloneTitle')}</Text>
+              <Text style={styles.aloneSubtitle}>{t('mobile.voice.guildAloneSubtitle')}</Text>
+            </View>
+          )}
+          {!shown.canPublish && <Text style={styles.listenerNotice}>{t('voice.listenerOnly')}</Text>}
+        </View>
+      ) : (
+        <View style={styles.tiles}>
+          <ParticipantTile
+            name={localMember?.username ?? myUser?.username ?? t('voice.you')}
+            avatarUrl={localMember?.avatarUrl ?? myUser?.avatarUrl ?? null}
+            speaking={localMember ? speakingUserIds.has(localMember.userId) : false}
+            micOff={isMuted}
+          />
+          <ParticipantTile
+            name={peerName}
+            avatarUrl={peerAvatar}
+            speaking={peerMember ? speakingUserIds.has(peerMember.userId) : false}
+            micOff={peerMember ? mutedUserIds.has(peerMember.userId) : false}
+            dimmed={alone}
+            ringing={alone && didInvite}
+          />
+          {alone && (
+            <View style={styles.aloneNotice}>
+              <Text style={styles.aloneTitle}>{t('mobile.call.aloneTitle')}</Text>
+              <Text style={styles.aloneSubtitle}>{t('mobile.call.aloneSubtitle', { name: peerName })}</Text>
+            </View>
+          )}
+          {!shown.canPublish && <Text style={styles.listenerNotice}>{t('voice.listenerOnly')}</Text>}
+        </View>
+      )}
 
       {controlsVisible && (
         <View style={[styles.controls, { paddingBottom: insets.bottom + 16 }]}>
@@ -259,6 +332,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 16,
     paddingHorizontal: theme.layout.panelGap * 2,
+  },
+  // §5 — guild ızgarası. `gridScroll` `flex:1` ile `tiles`in tüm yüksekliğini kaplar (sınırlı bir
+  // yükseklik olmadan `ScrollView` kaydırmaz); içerik azken `alignContent:'center'` dikeyde
+  // ortalar, taşınca kaydırma devreye girer.
+  gridScroll: {
+    flex: 1,
+    alignSelf: 'stretch',
+  },
+  grid: {
+    flexGrow: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignContent: 'center',
+    justifyContent: 'center',
+  },
+  gridCell: {
+    padding: 6,
   },
   aloneNotice: {
     alignItems: 'center',

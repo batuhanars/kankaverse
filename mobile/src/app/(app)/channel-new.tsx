@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { channelsApi, normalizeChannelName } from '@/api/channels';
+import { ChannelType, channelsApi, normalizeChannelName } from '@/api/channels';
 import { extractErrorMessage } from '@/api/errors';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -20,17 +20,22 @@ const NAME_MIN = 2;
 
 // Sprint M1d-B contract §10.1 + §11 — kanal oluştur. Ortam adı alt panelinden açılır.
 //
-// 🔴 Tür seçici (Metin/Ses) BİLİNÇLİ YOK: uç `GUILD_VOICE`i destekliyor ama mobil ses kanallarını
-// listelemiyor (M1a `GUILD_TEXT` süzgeci) → ses kanalı oluşturulsaydı kullanıcı kendi yarattığı
-// kanalı GÖREMEZDİ. Discord'un seçicisi bu yüzden kopyalanmadı; M4 ses fazına ertelendi.
+// Sprint M4c §7 — tür seçici (Metin/Ses) GELDİ. M1d-B'de bilinçli yoktu: ses kanalı oluşturulsaydı
+// kullanıcı kendi yarattığı kanalı GÖREMEZDİ (M1a `GUILD_TEXT` süzgeci). M4c bu kısıtı kaldırdı
+// (§2), seçici artık anlamlı.
 //
 // Sorulan iki alan erişim kararıdır: `isPrivate` (görünür ama kilitli) ve `ageGated` (T&S kapısı,
-// Sprint 4A `AGE_RESTRICTED`). Sonradan bulunması zor ayarı kurma anında sormak doğrudur.
-// Sorulmayanlar varsayılanla gider: slowMode · userLimit · bitrate · mediaEnabled.
+// Sprint 4A `AGE_RESTRICTED`). Sonradan bulunması zor ayarı kurma anında sormak doğrudur. İkisi de
+// tür-bağımsız (metin/ses ayrımı yapmadan sorulur — web'de de aynı). Sorulmayanlar varsayılanla
+// gider: slowMode · userLimit · bitrate · mediaEnabled (§10 — bunlar OLUŞTURMA'da hiç yok, yalnız
+// DÜZENLEME'ye ertelendi, mobil düzenleme ekranı da henüz bunları taşımıyor).
 export default function NewChannelScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ guildId: string; categoryId?: string }>();
   const [name, setName] = useState('');
+  const [type, setType] = useState<typeof ChannelType.GUILD_TEXT | typeof ChannelType.GUILD_VOICE>(
+    ChannelType.GUILD_TEXT,
+  );
   const [isPrivate, setIsPrivate] = useState(false);
   const [ageGated, setAgeGated] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -52,6 +57,7 @@ export default function NewChannelScreen() {
     try {
       await channelsApi.create(params.guildId, {
         name,
+        type,
         categoryId: params.categoryId ?? null,
         isPrivate,
         ageGated,
@@ -81,6 +87,41 @@ export default function NewChannelScreen() {
           returnKeyType="done"
           onSubmitEditing={onCreate}
         />
+
+        {/* Sözleşme §7 — tür seçici, varsayılan Metin (bugünkü davranış korunur). */}
+        <Text style={styles.label}>{t('channel.channelTypeLabel')}</Text>
+        <View style={styles.typeRow}>
+          <Pressable
+            onPress={() => setType(ChannelType.GUILD_TEXT)}
+            style={[styles.typeChip, type === ChannelType.GUILD_TEXT && styles.typeChipActive]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: type === ChannelType.GUILD_TEXT }}
+          >
+            <Text
+              style={[
+                styles.typeChipText,
+                type === ChannelType.GUILD_TEXT && styles.typeChipTextActive,
+              ]}
+            >
+              {t('channel.channelTypeText')}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setType(ChannelType.GUILD_VOICE)}
+            style={[styles.typeChip, type === ChannelType.GUILD_VOICE && styles.typeChipActive]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: type === ChannelType.GUILD_VOICE }}
+          >
+            <Text
+              style={[
+                styles.typeChipText,
+                type === ChannelType.GUILD_VOICE && styles.typeChipTextActive,
+              ]}
+            >
+              {t('channel.channelTypeVoice')}
+            </Text>
+          </Pressable>
+        </View>
 
         <View style={styles.toggleRow}>
           <View style={styles.toggleText}>
@@ -137,6 +178,34 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xs,
     fontWeight: '700',
+  },
+  // Sözleşme §7 — Metin/Ses seçici (segmented chip; mobilde ayrı bir Select primitive'i yok,
+  // `guildMenu`/`SelectSheet` deseninden daha ağır olurdu — iki seçenek için gereksiz).
+  typeRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  typeChip: {
+    flex: 1,
+    minHeight: theme.layout.controlSm,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    backgroundColor: theme.colors.bgElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typeChipActive: {
+    borderColor: theme.colors.accent500,
+    backgroundColor: theme.colors.accentSubtle,
+  },
+  typeChipText: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.sm,
+    fontWeight: '600',
+  },
+  typeChipTextActive: {
+    color: theme.colors.accent500,
   },
   input: {
     minHeight: theme.layout.inputMinHeight,
