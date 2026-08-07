@@ -1137,6 +1137,7 @@
   },
   "call": {
     "incoming": "Gelen sesli arama",
+    "incomingGroup": "Gelen grup araması",
     "accept": "Kabul et",
     "reject": "Reddet",
     "ringing": "Çalıyor…",
@@ -1766,6 +1767,8 @@
       "chatAction": "Sohbet",
       "incomingTitle": "Gelen Arama",
       "incomingBody": "{name} seni arıyor!",
+      "incomingGroupTitle": "Grup Araması",
+      "incomingGroupBody": "{name} grup aramasına başladı",
       "joinAction": "Aramaya Katıl",
       "incomingNotifChannel": "Gelen arama"
     },

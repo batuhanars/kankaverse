@@ -177,15 +177,6 @@ export default function CallScreen() {
     router.push(channel ? dmRouteParams(channel) : { pathname: '/dm/[id]', params: { id: channelId } });
   }
 
-  // §5 — ızgara sütun sayısı katılımcı adedine göre (kutucuklar arttıkça küçülür); sıra `shown.participants`
-  // sırasıdır (yerel + LiveKit `remoteParticipants` Map iterasyon sırası = KATILMA sırası, `Map` insert
-  // sırasını korur, mute/konuşma değişince YENİDEN SIRALANMAZ) — bu yüzden ayrıca sort GEREKMEZ, zaten kararlı.
-  // Sabit yüzde tablosu (üçten fazla sütuna çıkmıyoruz — RN `DimensionValue` yalnız `${number}%`
-  // literal'lerini kabul ediyor, dinamik `${100/n}%` şablon string'i tip hatası verirdi).
-  const GRID_CELL_WIDTH: Record<1 | 2 | 3, '100%' | '50%' | '33.33%'> = { 1: '100%', 2: '50%', 3: '33.33%' };
-  const guildCols = shown.participants.length <= 1 ? 1 : shown.participants.length <= 4 ? 2 : 3;
-  const gridCellWidth = GRID_CELL_WIDTH[guildCols];
-
   return (
     <Pressable style={styles.flex} onPress={resetHideTimer}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -251,33 +242,36 @@ export default function CallScreen() {
       </View>
 
       {isGridCall ? (
-        // §5 — N katılımcılı ızgara. M4a'nın `ParticipantTile`ı AYNEN yeniden kullanılır (yeni
-        // tasarım dili icat edilmiyor); her kutucuk `guildCols` genişliğinde bir hücreye sarılır —
-        // sütun sayısı arttıkça hücre küçülür (tekil `ParticipantTile` ölçüsü sabit kalır, bu
-        // dosya §1 kapsamında değil).
+        // §14.2 — N katılımcı **tek sütun, tam genişlik, ALT ALTA**. M4c bunu ızgaraya açmıştı;
+        // sahip cihazda gördü ve geri aldı: dar ekranda yan yana sıkışan kutucuklar sesli aramada
+        // bakılan tek şeyi (kim konuşuyor) zorlaştırıyor, Discord da sesli aramada tam genişlik
+        // kartları alt alta diziyor. Izgara ölü kod olarak BIRAKILMADI (§14.2: video sprintinde
+        // yeniden yazılacak, o zaman kutucuk zaten farklı olacak).
         //
-        // 🔴 M4b — bu dal ÖNCEDEN `isGuildCall` (yalnız `kind==='guild'`) ile seçiliyordu; artık
-        // `isGridCall` (`kind!=='dm'`) ile guild VE group paylaşıyor. Guild'in davranışı DEĞİŞMEDİ
-        // (guild zaten bu dala giriyordu) — yalnız group da aynı dala EKLENDİ. "Tek başınasın"
-        // metni de guild'inkiyle PAYLAŞILIYOR (yeni metin eklenmedi, §4/§7 kararı): DM'in
+        // `ParticipantTile` AYNEN duruyor — konuşan kenarlığı, mikrofon-kapalı rozeti, avatar/ad
+        // düzeni değişmedi, yalnız YERLEŞİM değişti. Sıra da değişmedi: `shown.participants`
+        // (yerel + LiveKit `remoteParticipants` Map iterasyonu = katılma sırası; `Map` insert
+        // sırasını korur, mute/konuşma değişince yeniden sıralanmaz) — ayrıca sort gerekmez.
+        //
+        // 🔴 M4b — bu dal `isGridCall` (`kind!=='dm'`) ile guild VE group tarafından paylaşılıyor.
+        // "Tek başınasın" metni guild'inkiyle PAYLAŞILIYOR (yeni metin eklenmedi): DM'in
         // `aloneSubtitle`i `{name}` (tek kişi) parametreli, N kişilik bir gruba uymuyordu;
         // `guildAloneSubtitle` ("Arkadaşların katıldığında burada görünecekler") kişi adı
-        // gerektirmeden hem guild hem grup DM için doğru okunuyor — dev kararı, PM'e raporlandı.
+        // gerektirmeden hem guild hem grup DM için doğru okunuyor.
         <View style={styles.tiles}>
           <ScrollView
-            style={styles.gridScroll}
-            contentContainerStyle={styles.grid}
+            style={styles.listScroll}
+            contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           >
             {shown.participants.map((p) => (
-              <View key={p.userId} style={[styles.gridCell, { width: gridCellWidth }]}>
-                <ParticipantTile
-                  name={p.username}
-                  avatarUrl={p.avatarUrl}
-                  speaking={speakingUserIds.has(p.userId)}
-                  micOff={p.isLocal ? isMuted : mutedUserIds.has(p.userId)}
-                />
-              </View>
+              <ParticipantTile
+                key={p.userId}
+                name={p.username}
+                avatarUrl={p.avatarUrl}
+                speaking={speakingUserIds.has(p.userId)}
+                micOff={p.isLocal ? isMuted : mutedUserIds.has(p.userId)}
+              />
             ))}
           </ScrollView>
           {alone && (
@@ -374,22 +368,18 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingHorizontal: theme.layout.panelGap * 2,
   },
-  // §5 — guild ızgarası. `gridScroll` `flex:1` ile `tiles`in tüm yüksekliğini kaplar (sınırlı bir
-  // yükseklik olmadan `ScrollView` kaydırmaz); içerik azken `alignContent:'center'` dikeyde
-  // ortalar, taşınca kaydırma devreye girer.
-  gridScroll: {
+  // §14.2 — guild/grup katılımcı listesi: tek sütun, tam genişlik, alt alta. `listScroll` `flex:1`
+  // ile `tiles`in tüm yüksekliğini kaplar (sınırlı bir yükseklik olmadan `ScrollView` kaydırmaz);
+  // içerik azken `justifyContent:'center'` dikeyde ortalar, taşınca (10 kişi de olsa) `flexGrow:1`
+  // içerik yüksekliğine bırakır ve kaydırma devreye girer.
+  listScroll: {
     flex: 1,
     alignSelf: 'stretch',
   },
-  grid: {
+  list: {
     flexGrow: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignContent: 'center',
     justifyContent: 'center',
-  },
-  gridCell: {
-    padding: 6,
+    gap: 12,
   },
   aloneNotice: {
     alignItems: 'center',

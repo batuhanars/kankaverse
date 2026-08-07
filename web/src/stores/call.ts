@@ -4,6 +4,14 @@ import { ref } from 'vue'
 export interface IncomingCall {
   channelId: string
   caller: { id: string; username: string; avatarUrl: string | null }
+  /**
+   * 🔴 M4b §14.1 — çağrının türü. Alan YOKSA `'dm'` (1-1 daveti, `voice.incoming_call`): mevcut
+   * çağıranların hiçbiri değişmedi. `'group'` grup DM'in `voice.group_call_started`'ıdır; sunum
+   * aynı modaldır, ayrım yalnız metin ve sinyalde — grupta kabul/reddet sunucuya GÖNDERİLMEZ
+   * (`voice:call_accept`/`voice:call_reject` sunucuda `otherDmMember` ile "kendisi olmayan ilk
+   * üye"yi buluyor; grup kanalında hedef rastgele bir üye olurdu). Bkz. composables/useCall.ts.
+   */
+  kind?: 'dm' | 'group'
 }
 
 /**
