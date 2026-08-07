@@ -29,6 +29,11 @@ export interface ChannelSummaryDto {
   // M1e: aynı durum — `toChannelDto` bunları da dönüyor, düzenleme ekranı genişleyince tiplendi.
   isPrivate: boolean;
   slowModeSeconds: number;
+  // Sprint M4c §8 — item 6 pariteti (web `types/index.ts` `locked`): özel kanal HERKESE görünür,
+  // `locked=true` ise kullanıcı görür ama GİREMEZ (üye değil). `toChannelDto` bunu her zaman
+  // döner (varsayılan false) — mobil M4c'ye kadar bu alanı hiç tiplemiyordu çünkü kilit hiçbir
+  // yüzeyde GÖSTERİLMİYORDU; ses kanalı satırı bunu artık gösteriyor (§2/§8).
+  locked: boolean;
 }
 
 export const channelsApi = {
@@ -44,16 +49,23 @@ export const channelsApi = {
   /**
    * Sprint M1d-B (sözleşme §11) — kanal oluştur (OWNER/ADMIN).
    *
-   * 🔴 `type` GÖNDERİLMİYOR (varsayılan `GUILD_TEXT`). Uç `GUILD_VOICE`i destekliyor ama mobil ses
-   * kanallarını listelemiyor (M1a `GUILD_TEXT` süzgeci: girilemeyen satır = boş yüzey) → ses kanalı
-   * oluşturulabilseydi kullanıcı **kendi yarattığı kanalı göremezdi**. M4 ses fazına ertelendi.
+   * Sprint M4c §7 — `type` artık gönderiliyor (`channel-new.tsx`'teki tür seçici). M1d-B'den beri
+   * gönderilmiyordu çünkü mobil ses kanallarını hiç listelemiyordu (girilemeyen satır = boş yüzey);
+   * M4c bu kısıtı kaldırdı (§2 — kanal listesi artık `GUILD_VOICE`i de gösteriyor).
    *
    * Sorulmayan alanlar (varsayılanla gider): `slowModeSeconds` · `userLimit` · `bitrate` ·
-   * `mediaEnabled`. Sorulanlar erişim kararıdır: `isPrivate` + `ageGated` (T&S kapısı).
+   * `mediaEnabled` (§10 — bunlar OLUŞTURMA'da değil DÜZENLEME'de bile yok, kapsam dışı kaldı).
+   * Sorulanlar erişim kararıdır: `isPrivate` + `ageGated` (T&S kapısı).
    */
   async create(
     guildId: string,
-    body: { name: string; categoryId?: string | null; isPrivate?: boolean; ageGated?: boolean },
+    body: {
+      name: string;
+      type?: ChannelType;
+      categoryId?: string | null;
+      isPrivate?: boolean;
+      ageGated?: boolean;
+    },
   ): Promise<ChannelSummaryDto> {
     const res = await http.post<ChannelSummaryDto>(`/guilds/${guildId}/channels`, body);
     return res.data;

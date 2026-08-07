@@ -49,9 +49,13 @@ function collapseKey(guildId: string, categoryId: string): string {
   return `kv:cat-collapsed:${guildId}:${categoryId}`;
 }
 
-// Sprint M1a contract §0 + §2 — yalnız GUILD_TEXT kanalları listelenir; ses satırını gösterip
-// dokununca hiçbir şey yapmamak "boş yüzey" olurdu (mobile/CLAUDE.md yasağı).
+// Sprint M1a contract §0 + §2 — YALNIZ GUILD_TEXT listeleniyordu; ses satırını gösterip dokununca
+// hiçbir şey yapmamak "boş yüzey" olurdu (mobile/CLAUDE.md yasağı) — ama katılma akışı yoktu.
 // Sprint M1d-B — kanallar artık kategori başlıkları altında gruplu (§2.5).
+// Sprint M4c §2 — katılma akışı geldi (`home.tsx` `openChannel`), GUILD_VOICE artık süzgeçten
+// ÇIKARILDI: metin kanallarıyla AYNI listede, kendi `position`inde (web'in ayrı bölüm yapmadığı
+// gibi). Ses kanalının okunmamış/bahsetme sayacı YOK — `hydrateChannels`e yalnız metin alt kümesi
+// verilir (§2: "okunmadı mantığı bu satırlara uygulanmaz").
 export function ChannelSidebar({
   guildId,
   guildName,
@@ -75,14 +79,20 @@ export function ChannelSidebar({
   const fetchAll = useCallback(() => {
     Promise.all([channelsApi.listByGuild(guildId), categoriesApi.listByGuild(guildId)])
       .then(([channelList, categoryList]) => {
-        const textChannels = channelList
-          .filter((c) => c.type === ChannelType.GUILD_TEXT)
+        // Sprint M4c §2 — metin + ses, tek liste, `position` sırasıyla (web pariteti: ayrı bölüm yok).
+        const visibleChannels = channelList
+          .filter((c) => c.type === ChannelType.GUILD_TEXT || c.type === ChannelType.GUILD_VOICE)
           .sort((a, b) => a.position - b.position);
-        setChannels(textChannels);
+        setChannels(visibleChannels);
         // Sprint M2a §5 — merkezi unread store'un İLK hydrate kaynağı. `ChannelRow` artık kendi
         // sayacını bu store'dan okuyor (canlı güncelleme için); bu satır olmazsa satır her zaman
         // sıfır görürdü (ilk render'da store boş).
-        useUnreadStore.getState().hydrateChannels(guildId, textChannels);
+        // Sprint M4c §2 — yalnız METİN alt kümesi verilir: ses kanalının mesajı yok, okunmamış
+        // kavramı yok; ses satırını da hydrate etmek anlamsız bir sıfır kaydı eklerdi.
+        useUnreadStore.getState().hydrateChannels(
+          guildId,
+          visibleChannels.filter((c) => c.type === ChannelType.GUILD_TEXT),
+        );
         setCategories([...categoryList].sort((a, b) => a.position - b.position));
         setState('ready');
       })

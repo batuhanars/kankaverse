@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,6 +18,7 @@ import { CategoryMenuSheet } from '@/components/home/CategoryMenuSheet';
 import type { CategoryDto } from '@/api/categories';
 import { channelsApi, ChannelType } from '@/api/channels';
 import { useUnreadStore } from '@/stores/unread';
+import { useVoiceStore } from '@/stores/voice';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -51,6 +52,10 @@ export default function HomeScreen() {
   // **Yeni bir guild store AÇILMADI** (sözleşme §6): bu kayıt yalnız bu ekranın ihtiyacı, tek
   // tüketicisi var. İkinci bir ekran rol bilmek zorunda kalırsa acı gerçektir → dur, PM'e sor.
   const [myRoleByGuild, setMyRoleByGuild] = useState<Record<string, string>>({});
+
+  // Sprint M4c §3 — ses kanalına katılma sürüyorken ikinci dokunuşu yutar (`dm/[id].tsx`
+  // `callBusy` ile aynı desen).
+  const [voiceJoining, setVoiceJoining] = useState(false);
 
   // react-hooks/set-state-in-effect: effect gövdesi setState'i SENKRON çağırmaz (ilk değer zaten
   // 'loading') — yalnız fetch'i başlatır, sonuç .then/.catch'te (asenkron) yazılır. "Tekrar dene"
@@ -183,7 +188,19 @@ export default function HomeScreen() {
     }
   }
 
+  // Sprint M4c §8 — item 6 pariteti (web `ChannelPanel.vue` `selectChannel`): kilitli özel kanal
+  // HERKESE görünür ama giriş yok — sessizce yutmak yerine Türkçe uyarı (T&S, R7 "sessizce
+  // gizleme yok"). Metin/ses ikisi için de geçerli; `openChannel` tek giriş noktası olduğu için tek yerde.
   function openChannel(channel: ChannelSummaryDto) {
+    if (channel.locked) {
+      Alert.alert(t('channel.lockedToast'));
+      return;
+    }
+    // Sözleşme §2/§3 — ses kanalı satırına dokunma = DOĞRUDAN katılım, ara ekran yok.
+    if (channel.type === ChannelType.GUILD_VOICE) {
+      void joinVoiceChannel(channel);
+      return;
+    }
     // Sözleşme §8.1-A/1 — vurgu için "en son açılan kanal" burada tutulur (ChannelSidebar ortam
     // değişiminde remount olduğu için kendi içinde tutamaz; ayrıca kanal ekranı ayrı bir route).
     setLastOpenedChannelId(channel.id);
@@ -193,6 +210,50 @@ export default function HomeScreen() {
       pathname: '/channel/[id]',
       params: { id: channel.id, name: channel.name ?? '', guildId: channel.guildId ?? '' },
     });
+  }
+
+  // Sprint M4c §3 — davetsiz katılım (`kind: 'guild'`, bkz. `stores/voice.ts` `startOrJoin` yorumu).
+  // `dm/[id].tsx` `handleCallPress` ile AYNI izin/hata deseni (mic_denied → "Ayarları Aç"); tek
+  // fark davet yok, `label` DM'deki karşı ad yerine kanal adı (bildirim gövdesi §3).
+  async function joinVoiceChannel(channel: ChannelSummaryDto) {
+    if (voiceJoining) return;
+    if (useVoiceStore.getState().connectedChannelId === channel.id) {
+      router.push({
+        pathname: '/call',
+        params: {
+          channelId: channel.id,
+          kind: 'guild',
+          channelName: channel.name ?? '',
+          guildName: selectedGuildName,
+        },
+      });
+      return;
+    }
+    setVoiceJoining(true);
+    const res = await useVoiceStore
+      .getState()
+      .startOrJoin(channel.id, channel.name ?? '', { kind: 'guild' });
+    setVoiceJoining(false);
+    if (res.ok) {
+      router.push({
+        pathname: '/call',
+        params: {
+          channelId: channel.id,
+          kind: 'guild',
+          channelName: channel.name ?? '',
+          guildName: selectedGuildName,
+        },
+      });
+      return;
+    }
+    if (res.reason === 'mic_denied') {
+      Alert.alert(res.message ?? t('common.error'), undefined, [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('mobile.call.micPermissionSettings'), onPress: () => Linking.openSettings() },
+      ]);
+      return;
+    }
+    if (res.message) Alert.alert(res.message);
   }
 
   function openDm(channel: DmChannelDto) {
