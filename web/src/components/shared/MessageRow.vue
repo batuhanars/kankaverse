@@ -80,9 +80,7 @@ onUnmounted(() => clearActive(overlayKey.value))
 const showFollowTime = ref(false)
 
 function formatTime(iso: string): string {
-  return new Date(iso)
-    .toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-    .replace(':', '.')
+  return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }).replace(':', '.')
 }
 
 // Satır arka plan hover (inline style ile — Tailwind arbitrary değeri token taşımaz)
@@ -126,11 +124,7 @@ const renderedContent = computed<string>(() => {
     :data-message-id="message.id"
     class="relative flex gap-3 px-4 rounded group"
     :class="[isGroupStart ? 'mt-4 py-0.5' : 'py-0.5', isMentioned ? 'border-l-2' : '']"
-    :style="
-      isMentioned
-        ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
-        : ''
-    "
+    :style="isMentioned ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);' : ''"
     @mouseenter="onRowEnter"
     @mouseleave="onRowLeave"
   >
@@ -141,13 +135,11 @@ const renderedContent = computed<string>(() => {
     <div
       v-if="!isEditing"
       class="absolute -top-3 right-4 transition-opacity"
-      :class="
-        isMenuOpen
-          ? 'opacity-100 z-40'
-          : toolbarSuppressed
-            ? 'opacity-0 pointer-events-none z-10'
-            : 'opacity-0 group-hover:opacity-100 z-10'
-      "
+      :class="isMenuOpen
+        ? 'opacity-100 z-40'
+        : toolbarSuppressed
+          ? 'opacity-0 pointer-events-none z-10'
+          : 'opacity-0 group-hover:opacity-100 z-10'"
     >
       <MessageActionsMenu
         ref="actionsMenuRef"
@@ -174,7 +166,7 @@ const renderedContent = computed<string>(() => {
         <!-- Grup başı: 40px daire avatar -->
         <div
           class="w-10 h-10 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[15px] font-semibold text-white"
-          style="background-color: var(--kv-accent-500)"
+          style="background-color: var(--kv-accent-500);"
         >
           <img
             v-if="message.author.avatarUrl"
@@ -190,7 +182,7 @@ const renderedContent = computed<string>(() => {
         <span
           v-if="showFollowTime"
           class="text-[11px] pt-0.5 select-none"
-          style="color: var(--kv-text-muted); line-height: 1.6"
+          style="color: var(--kv-text-muted); line-height: 1.6;"
         >
           {{ formatTime(message.createdAt) }}
         </span>
@@ -201,20 +193,27 @@ const renderedContent = computed<string>(() => {
     <div class="flex-1 min-w-0">
       <!-- Grup başı başlık: kullanıcı adı + saat + (düzenlendi) + pin rozeti -->
       <div v-if="isGroupStart" class="flex items-baseline gap-2 mb-0.5">
-        <span class="text-[16px] font-semibold leading-snug" style="color: var(--kv-text-primary)">
+        <span
+          class="text-[16px] font-semibold leading-snug"
+          style="color: var(--kv-text-primary);"
+        >
           {{ message.author.username }}
         </span>
-        <span class="text-[12px]" style="color: var(--kv-text-muted)">
+        <span class="text-[12px]" style="color: var(--kv-text-muted);">
           {{ formatTime(message.createdAt) }}
         </span>
-        <span v-if="message.editedAt" class="text-[11px]" style="color: var(--kv-text-muted)">
+        <span
+          v-if="message.editedAt"
+          class="text-[11px]"
+          style="color: var(--kv-text-muted);"
+        >
           {{ t('message.edited') }}
         </span>
         <!-- Pin rozeti: pinnedAt doluysa göster -->
         <span
           v-if="message.pinnedAt"
           class="text-[11px] select-none"
-          style="color: var(--kv-text-muted)"
+          style="color: var(--kv-text-muted);"
           :title="t('message.pinnedMessages')"
         >
           📌
@@ -225,21 +224,14 @@ const renderedContent = computed<string>(() => {
       <div
         v-if="message.replyToId"
         class="flex items-center gap-1.5 mb-1 pl-2 text-[12px] max-w-[480px] truncate cursor-default rounded-[var(--kv-radius-sm)]"
-        style="border-left: 2px solid var(--kv-text-muted); color: var(--kv-text-muted)"
+        style="border-left: 2px solid var(--kv-text-muted); color: var(--kv-text-muted);"
       >
         <span class="shrink-0">↩</span>
         <template v-if="message.replyTo">
-          <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary)">
+          <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">
             {{ message.replyTo.authorUsername }}
           </span>
-          <span class="truncate">{{
-            formatMentionsPlain(
-              message.replyTo.content,
-              (id) => mentionResolver?.(id),
-              t('mention.unknown'),
-              (roleId) => roleResolver?.(roleId)?.name,
-            )
-          }}</span>
+          <span class="truncate">{{ formatMentionsPlain(message.replyTo.content, (id) => mentionResolver?.(id), t('mention.unknown'), (roleId) => roleResolver?.(roleId)?.name) }}</span>
         </template>
         <template v-else>
           <span class="italic">{{ t('reply.deleted') }}</span>
@@ -255,7 +247,7 @@ const renderedContent = computed<string>(() => {
         <template v-if="message.attachments?.length && message.content">
           <div
             class="mt-0.5 rounded-[var(--kv-radius-sm)] overflow-hidden"
-            style="max-width: 360px; background-color: var(--kv-bg-sidebar)"
+            style="max-width: 360px; background-color: var(--kv-bg-sidebar);"
           >
             <AttachmentView
               v-for="att in message.attachments"
@@ -269,7 +261,7 @@ const renderedContent = computed<string>(() => {
             -->
             <div
               class="kv-md px-3 pb-3 pt-1.5 text-[16px] break-words"
-              style="color: var(--kv-text-primary)"
+              style="color: var(--kv-text-primary);"
               v-html="renderedContent"
             />
           </div>
@@ -279,7 +271,7 @@ const renderedContent = computed<string>(() => {
           <div
             v-if="message.content"
             class="kv-md text-[16px] break-words"
-            style="color: var(--kv-text-primary)"
+            style="color: var(--kv-text-primary);"
             v-html="renderedContent"
           />
           <!-- Takip mesajında (başlık yok) "(düzenlendi)" metni + pin rozeti gövde dışında -->
@@ -287,21 +279,25 @@ const renderedContent = computed<string>(() => {
             <span
               v-if="message.editedAt"
               class="text-[11px] ml-1"
-              style="color: var(--kv-text-muted)"
+              style="color: var(--kv-text-muted);"
             >
               {{ t('message.edited') }}
             </span>
             <span
               v-if="message.pinnedAt"
               class="text-[11px] ml-1 select-none"
-              style="color: var(--kv-text-muted)"
+              style="color: var(--kv-text-muted);"
               :title="t('message.pinnedMessages')"
             >
               📌
             </span>
           </template>
           <!-- Yalnız ek (açıklamasız) -->
-          <AttachmentView v-for="att in message.attachments" :key="att.id" :attachment="att" />
+          <AttachmentView
+            v-for="att in message.attachments"
+            :key="att.id"
+            :attachment="att"
+          />
         </template>
 
         <!-- Reaksiyon pill'leri -->

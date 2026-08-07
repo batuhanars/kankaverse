@@ -163,7 +163,7 @@ onUnmounted(() => {
   -->
   <div
     class="flex items-center rounded-[var(--kv-radius-md)] border"
-    style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle)"
+    style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
     @click.stop
   >
     <!-- Hızlı reaksiyon emoji'leri -->
@@ -205,51 +205,31 @@ onUnmounted(() => {
         </svg>
       </button>
       <!-- Tam emoji picker — Teleport to body ile viewport-farkındalıklı konumlandırma -->
-      <EmojiPicker v-if="showEmojiPicker" :anchor-el="emojiTriggerEl" @select="pickEmoji" />
+      <EmojiPicker
+        v-if="showEmojiPicker"
+        :anchor-el="emojiTriggerEl"
+        @select="pickEmoji"
+      />
     </div>
 
     <!-- ↩ Yanıtla -->
     <button
       class="w-8 h-8 flex items-center justify-center text-[15px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
-      style="color: var(--kv-text-muted)"
+      style="color: var(--kv-text-muted);"
       :title="t('reply.button')"
       @click="onReply"
     >
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <polyline points="9 17 4 12 9 7" />
-        <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
-      </svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
     </button>
 
     <!-- ↪ İlet (forward — başka bir DM'e gönder) -->
     <button
       class="w-8 h-8 flex items-center justify-center text-[15px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
-      style="color: var(--kv-text-muted)"
+      style="color: var(--kv-text-muted);"
       :title="t('message.forward')"
       @click="onForward"
     >
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <polyline points="15 17 20 12 15 7" />
-        <path d="M4 18v-2a4 4 0 0 1 4-4h12" />
-      </svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
     </button>
 
     <!-- ⋯ Daha fazla -->
@@ -257,7 +237,7 @@ onUnmounted(() => {
       <button
         class="w-8 h-8 flex items-center justify-center text-[16px] font-bold cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
         :class="showMore ? 'bg-[var(--kv-bg-sidebar)]' : ''"
-        style="color: var(--kv-text-secondary); line-height: 1"
+        style="color: var(--kv-text-secondary); line-height: 1;"
         :title="t('message.actions')"
         @click="toggleMore"
       >
@@ -268,16 +248,14 @@ onUnmounted(() => {
       <div
         v-if="showMore"
         class="absolute top-full right-0 mt-1 z-50 rounded-[var(--kv-radius-md)] py-1 min-w-[160px]"
-        style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle)"
+        style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
       >
         <!-- Düzenle (yalnız kendi + içerik varsa) -->
         <button
           v-if="isMine && hasContent"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
-          style="color: var(--kv-text-primary)"
-          @mouseenter="
-            ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'
-          "
+          style="color: var(--kv-text-primary);"
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'"
           @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
           @click="onEdit"
         >
@@ -289,10 +267,8 @@ onUnmounted(() => {
         <button
           v-if="isMine || canManageMessages"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
-          style="color: var(--kv-danger)"
-          @mouseenter="
-            ($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'
-          "
+          style="color: var(--kv-danger);"
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'"
           @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
           @click="onDelete"
         >
@@ -304,10 +280,8 @@ onUnmounted(() => {
         <button
           v-if="canPin && !isPinned"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
-          style="color: var(--kv-text-primary)"
-          @mouseenter="
-            ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'
-          "
+          style="color: var(--kv-text-primary);"
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'"
           @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
           @click="onPin"
         >
@@ -317,10 +291,8 @@ onUnmounted(() => {
         <button
           v-if="canPin && isPinned"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
-          style="color: var(--kv-text-primary)"
-          @mouseenter="
-            ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'
-          "
+          style="color: var(--kv-text-primary);"
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'"
           @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
           @click="onUnpin"
         >
@@ -332,10 +304,8 @@ onUnmounted(() => {
         <button
           v-if="!isMine"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
-          style="color: var(--kv-danger)"
-          @mouseenter="
-            ($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'
-          "
+          style="color: var(--kv-danger);"
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'"
           @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
           @click="onReport"
         >

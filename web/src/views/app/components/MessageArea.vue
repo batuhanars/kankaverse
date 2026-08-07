@@ -153,7 +153,7 @@ watch(
 const mentionMembers = computed(() =>
   guildMembers.value
     .filter((m) => m.userId !== authStore.user?.id)
-    .map((m) => ({ id: m.userId, username: m.username, avatarUrl: m.avatarUrl })),
+    .map((m) => ({ id: m.userId, username: m.username, avatarUrl: m.avatarUrl }))
 )
 
 // @everyone: yalnız everyone rolü mentionable ise id döner (aksi → null → öneri yok)
@@ -184,15 +184,9 @@ const mentionRoles = computed(() => {
 const mention = useMentionAutocomplete(
   mentionMembers,
   () => content.value,
-  (v) => {
-    content.value = v
-  },
+  (v) => { content.value = v },
   () => textareaEl.value?.selectionStart ?? 0,
-  (pos) => {
-    nextTick(() => {
-      textareaEl.value?.setSelectionRange(pos, pos)
-    })
-  },
+  (pos) => { nextTick(() => { textareaEl.value?.setSelectionRange(pos, pos) }) },
   () => everyoneMentionRoleId.value,
   () => mentionRoles.value,
 )
@@ -287,13 +281,7 @@ function onFileSelected(e: Event) {
 }
 
 // Modal'dan gelen sent event'i → mesaj gönder
-async function onAttachmentSent({
-  attachmentId,
-  caption,
-}: {
-  attachmentId: string
-  caption: string
-}) {
+async function onAttachmentSent({ attachmentId, caption }: { attachmentId: string; caption: string }) {
   if (!channelId.value) return
   composeFile.value = null
   slowModeSeconds.value = null
@@ -304,20 +292,17 @@ async function onAttachmentSent({
     stickToBottom = true // kendi eki gönderdim → dibe kay
     messagesStore.appendMessage(data)
   } catch (e: unknown) {
-    const err = e as {
-      response?: { data?: { error?: string; message?: string; retryAfter?: number } }
-    }
+    const err = e as { response?: { data?: { error?: string; message?: string; retryAfter?: number } } }
     const errCode = err.response?.data?.error
     if (errCode === 'SLOW_MODE') {
       const retry = err.response?.data?.retryAfter
       slowModeSeconds.value = typeof retry === 'number' ? retry : null
-      sendError.value =
-        slowModeSeconds.value !== null
-          ? t('message.errors.SLOW_MODE_RETRY', { seconds: slowModeSeconds.value })
-          : t('message.errors.SLOW_MODE')
+      sendError.value = slowModeSeconds.value !== null
+        ? t('message.errors.SLOW_MODE_RETRY', { seconds: slowModeSeconds.value })
+        : t('message.errors.SLOW_MODE')
     } else {
       sendError.value = errCode
-        ? t(`message.errors.${errCode}`) || err.response?.data?.message || t('common.error')
+        ? (t(`message.errors.${errCode}`) || err.response?.data?.message || t('common.error'))
         : t('common.error')
     }
   }
@@ -345,20 +330,17 @@ async function send() {
     messagesStore.appendMessage(data)
   } catch (e: unknown) {
     content.value = text
-    const err = e as {
-      response?: { data?: { error?: string; message?: string; retryAfter?: number } }
-    }
+    const err = e as { response?: { data?: { error?: string; message?: string; retryAfter?: number } } }
     const errCode = err.response?.data?.error
     if (errCode === 'SLOW_MODE') {
       const retry = err.response?.data?.retryAfter
       slowModeSeconds.value = typeof retry === 'number' ? retry : null
-      sendError.value =
-        slowModeSeconds.value !== null
-          ? t('message.errors.SLOW_MODE_RETRY', { seconds: slowModeSeconds.value })
-          : t('message.errors.SLOW_MODE')
+      sendError.value = slowModeSeconds.value !== null
+        ? t('message.errors.SLOW_MODE_RETRY', { seconds: slowModeSeconds.value })
+        : t('message.errors.SLOW_MODE')
     } else {
       sendError.value = errCode
-        ? t(`message.errors.${errCode}`) || err.response?.data?.message || t('common.error')
+        ? (t(`message.errors.${errCode}`) || err.response?.data?.message || t('common.error'))
         : t('common.error')
     }
   } finally {
@@ -380,10 +362,7 @@ function onTextareaInput() {
   slowModeSeconds.value = null
   onTypingInput()
   const el = textareaEl.value
-  if (el) {
-    el.style.height = 'auto'
-    el.style.height = el.scrollHeight + 'px'
-  }
+  if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }
   // Sprint V2: mention autocomplete tetikle
   mention.onInput()
 }
@@ -395,96 +374,84 @@ function resetComposerHeight() {
 </script>
 
 <template>
-  <div class="flex flex-col flex-1 min-w-0 min-h-0" style="background-color: var(--kv-bg-content)">
+  <div class="flex flex-col flex-1 min-w-0 min-h-0" style="background-color: var(--kv-bg-content);">
     <div
       v-if="channelId && realtimeError"
       class="shrink-0 px-4 py-2 text-[13px] text-center"
-      style="background-color: var(--kv-warning); color: var(--kv-bg-rail)"
+      style="background-color: var(--kv-warning); color: var(--kv-bg-rail);"
     >
       {{ t('message.realtimeError') }}
     </div>
     <div class="relative flex-1 min-h-0 flex flex-col">
-      <div
-        ref="listEl"
-        class="flex-1 min-h-0 overflow-y-auto py-4 flex flex-col gap-0.5"
-        @scroll="onListScroll"
-      >
-        <div v-if="!channelId" class="flex-1 flex items-center justify-center">
-          <p style="color: var(--kv-text-muted)">{{ t('channel.selectChannel') }}</p>
-        </div>
-
-        <template v-else>
-          <div v-if="hasMore" class="flex justify-center py-2">
-            <button
-              class="text-[13px] hover:underline cursor-pointer"
-              style="color: var(--kv-info)"
-              @click="loadMore"
-            >
-              {{ t('message.loadMore') }}
-            </button>
-          </div>
-
-          <p
-            v-if="!messages.length"
-            class="text-center text-[14px] py-8"
-            style="color: var(--kv-text-muted)"
-          >
-            {{ t('message.noMessages') }}
-          </p>
-
-          <MessageItem
-            v-for="(msg, index) in messages"
-            :key="msg.id"
-            :message="msg"
-            :is-group-start="isGroupStart(index)"
-            :guild-members="guildMembers"
-            :can-pin="canPin"
-            :can-manage-messages="canManageMessages"
-            :guild-id="guildsStore.activeGuildId ?? undefined"
-            @reply="setReplyingTo"
-          />
-        </template>
+    <div ref="listEl" class="flex-1 min-h-0 overflow-y-auto py-4 flex flex-col gap-0.5" @scroll="onListScroll">
+      <div v-if="!channelId" class="flex-1 flex items-center justify-center">
+        <p style="color: var(--kv-text-muted);">{{ t('channel.selectChannel') }}</p>
       </div>
 
-      <!-- REV-9: yeni mesaj geldiğinde (yukarıdayken) aşağı-in butonu + gelen mesaj sayısı -->
-      <button
-        v-if="newMessageCount > 0"
-        class="absolute right-4 bottom-3 z-10 flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full cursor-pointer transition-opacity hover:opacity-90 shadow-lg"
-        style="background-color: var(--kv-accent-500); color: #ffffff"
-        @click="jumpToBottom"
-      >
-        <span
-          class="flex items-center justify-center text-[11px] font-bold rounded-full"
-          style="min-width: 18px; height: 18px; background-color: var(--kv-danger)"
+      <template v-else>
+        <div v-if="hasMore" class="flex justify-center py-2">
+          <button
+            class="text-[13px] hover:underline cursor-pointer"
+            style="color: var(--kv-info);"
+            @click="loadMore"
+          >
+            {{ t('message.loadMore') }}
+          </button>
+        </div>
+
+        <p
+          v-if="!messages.length"
+          class="text-center text-[14px] py-8"
+          style="color: var(--kv-text-muted);"
         >
-          {{ newMessageCount > 99 ? '99+' : newMessageCount }}
-        </span>
-        <span class="text-[12px] font-semibold">{{ t('message.newMessages') }}</span>
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
+          {{ t('message.noMessages') }}
+        </p>
+
+        <MessageItem
+          v-for="(msg, index) in messages"
+          :key="msg.id"
+          :message="msg"
+          :is-group-start="isGroupStart(index)"
+          :guild-members="guildMembers"
+          :can-pin="canPin"
+          :can-manage-messages="canManageMessages"
+          :guild-id="guildsStore.activeGuildId ?? undefined"
+          @reply="setReplyingTo"
+        />
+      </template>
+    </div>
+
+    <!-- REV-9: yeni mesaj geldiğinde (yukarıdayken) aşağı-in butonu + gelen mesaj sayısı -->
+    <button
+      v-if="newMessageCount > 0"
+      class="absolute right-4 bottom-3 z-10 flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full cursor-pointer transition-opacity hover:opacity-90 shadow-lg"
+      style="background-color: var(--kv-accent-500); color: #ffffff;"
+      @click="jumpToBottom"
+    >
+      <span class="flex items-center justify-center text-[11px] font-bold rounded-full" style="min-width: 18px; height: 18px; background-color: var(--kv-danger);">
+        {{ newMessageCount > 99 ? '99+' : newMessageCount }}
+      </span>
+      <span class="text-[12px] font-semibold">{{ t('message.newMessages') }}</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </button>
     </div>
 
     <div v-if="channelId" class="shrink-0 px-4 pb-6 pt-2">
       <!-- Gönderme hatası (örn. MESSAGE_BLOCKED) -->
-      <div v-if="sendError" class="px-1 mb-1 text-[13px]" style="color: var(--kv-danger)">
+      <div
+        v-if="sendError"
+        class="px-1 mb-1 text-[13px]"
+        style="color: var(--kv-danger);"
+      >
         {{ sendError }}
       </div>
       <!-- Yazıyor göstergesi -->
       <div
         v-if="typingLabel"
         class="h-5 px-1 mb-1 text-[12px] italic"
-        style="color: var(--kv-text-muted)"
+        style="color: var(--kv-text-muted);"
       >
         {{ typingLabel }}
       </div>
@@ -493,20 +460,14 @@ function resetComposerHeight() {
       <div
         v-if="replyingTo"
         class="flex items-center gap-2 px-3 py-1.5 mb-1 rounded-t-[var(--kv-radius-sm)] text-[12px] truncate"
-        style="
-          background-color: var(--kv-bg-elevated);
-          border: 1px solid var(--kv-border-subtle);
-          border-bottom: none;
-        "
+        style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle); border-bottom: none;"
       >
-        <span class="shrink-0" style="color: var(--kv-text-muted)">↩</span>
-        <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary)">{{
-          t('reply.to', { author: replyingTo.author.username })
-        }}</span>
-        <span class="truncate" style="color: var(--kv-text-muted)">— {{ replyingTo.content }}</span>
+        <span class="shrink-0" style="color: var(--kv-text-muted);">↩</span>
+        <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">{{ t('reply.to', { author: replyingTo.author.username }) }}</span>
+        <span class="truncate" style="color: var(--kv-text-muted);">— {{ replyingTo.content }}</span>
         <button
           class="shrink-0 ml-auto cursor-pointer hover:opacity-80 transition-opacity"
-          style="color: var(--kv-text-muted)"
+          style="color: var(--kv-text-muted);"
           :title="t('reply.cancel')"
           @click="cancelReply"
         >
@@ -517,11 +478,7 @@ function resetComposerHeight() {
       <div
         class="flex items-center gap-2 px-4 border"
         :class="replyingTo ? 'rounded-b-[var(--kv-radius-md)]' : 'rounded-[var(--kv-radius-md)]'"
-        style="
-          background-color: var(--kv-bg-elevated);
-          border-color: var(--kv-border-strong);
-          min-height: 44px;
-        "
+        style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
       >
         <!-- Gizli dosya input -->
         <input
@@ -535,29 +492,15 @@ function resetComposerHeight() {
         <button
           type="button"
           class="shrink-0 w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:opacity-100"
-          style="color: var(--kv-text-secondary); align-self: center"
+          style="color: var(--kv-text-secondary); align-self: center;"
           :aria-label="t('attachment.addFile')"
           :title="t('attachment.addFile')"
           @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
-          @mouseleave="
-            ($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'
-          "
+          @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'"
           @click="openFilePicker"
         >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path
-              d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"
-            />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
           </svg>
         </button>
         <!-- Sprint V2: mention autocomplete — relative sarmalayıcı popover için -->
@@ -565,79 +508,45 @@ function resetComposerHeight() {
           <div
             v-if="mention.showPopover.value"
             class="absolute bottom-full left-0 mb-1 z-50 min-w-[200px] max-w-[320px] overflow-hidden rounded-[var(--kv-radius-md)] border"
-            style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle)"
+            style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
             @mousedown.prevent
           >
             <div
               v-for="(member, idx) in mention.suggestions.value"
               :key="member.id"
               class="flex items-center gap-2 px-3 py-2 cursor-pointer text-[14px]"
-              :style="
-                idx === mention.activeIndex.value
-                  ? 'background-color: var(--kv-accent-subtle); color: var(--kv-text-primary);'
-                  : 'color: var(--kv-text-secondary);'
-              "
+              :style="idx === mention.activeIndex.value
+                ? 'background-color: var(--kv-accent-subtle); color: var(--kv-text-primary);'
+                : 'color: var(--kv-text-secondary);'"
               @click="mention.selectSuggestion(member)"
             >
               <!-- @everyone → grup ikonu + açıklama -->
               <template v-if="member.isEveryone">
-                <div
-                  class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center"
-                  style="background-color: var(--kv-bg-content)"
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    style="color: var(--kv-text-secondary)"
-                  >
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
+                <div class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center" style="background-color: var(--kv-bg-content);">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-secondary);"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 </div>
                 <span class="font-semibold">@everyone</span>
-                <span class="text-[12px] truncate" style="color: var(--kv-text-muted)">{{
-                  t('mention.everyoneHint')
-                }}</span>
+                <span class="text-[12px] truncate" style="color: var(--kv-text-muted);">{{ t('mention.everyoneHint') }}</span>
               </template>
               <!-- R15 — rol önerisi: rolün KENDİ rengiyle, altıgen değil yuvarlak nokta.
                    Aynı adı taşıyan bir üyeyle karışmasın diye ikon ve renk ayrı tutuldu. -->
               <template v-else-if="member.isRole">
-                <div
-                  class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center"
-                  style="background-color: var(--kv-bg-content)"
-                >
+                <div class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center" style="background-color: var(--kv-bg-content);">
                   <span
                     class="w-2.5 h-2.5 rounded-full"
                     :style="{ backgroundColor: member.color || 'var(--kv-text-muted)' }"
                   />
                 </div>
-                <span class="font-semibold" :style="{ color: member.color || undefined }"
-                  >@{{ member.username }}</span
-                >
-                <span class="text-[12px] truncate" style="color: var(--kv-text-muted)">{{
-                  t('mention.roleHint')
-                }}</span>
+                <span class="font-semibold" :style="{ color: member.color || undefined }">@{{ member.username }}</span>
+                <span class="text-[12px] truncate" style="color: var(--kv-text-muted);">{{ t('mention.roleHint') }}</span>
               </template>
               <!-- Gerçek üye → daire avatar -->
               <template v-else>
                 <div
                   class="w-6 h-6 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-white"
-                  style="background-color: var(--kv-accent-500)"
+                  style="background-color: var(--kv-accent-500);"
                 >
-                  <img
-                    v-if="member.avatarUrl"
-                    :src="member.avatarUrl"
-                    :alt="member.username"
-                    class="w-full h-full object-cover"
-                  />
+                  <img v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.username" class="w-full h-full object-cover" />
                   <span v-else>{{ member.username[0].toUpperCase() }}</span>
                 </div>
                 <span class="font-medium">@{{ member.username }}</span>
@@ -650,14 +559,7 @@ function resetComposerHeight() {
             rows="1"
             :placeholder="inputPlaceholder()"
             class="w-full bg-transparent text-[15px] resize-none outline-none"
-            style="
-              max-height: 50vh;
-              font-family: var(--kv-font-ui);
-              color: var(--kv-text-primary);
-              line-height: 1.5;
-              padding-top: 10px;
-              padding-bottom: 10px;
-            "
+            style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary); line-height: 1.5; padding-top: 10px; padding-bottom: 10px;"
             @keydown="onKeydown"
             @input="onTextareaInput"
             @blur="stopTyping"
@@ -669,7 +571,7 @@ function resetComposerHeight() {
             ref="composeEmojiTriggerEl"
             type="button"
             class="py-1 px-1 cursor-pointer hover:opacity-80 transition-opacity"
-            style="color: var(--kv-text-muted); font-size: 18px; line-height: 1"
+            style="color: var(--kv-text-muted); font-size: 18px; line-height: 1;"
             :aria-label="t('message.emojiButton')"
             @click.stop="toggleEmojiPicker"
           >

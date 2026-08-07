@@ -18,20 +18,11 @@ const { toggleLeftDrawer } = useAppShellNav()
     <button
       v-if="isMobile"
       class="ml-2 w-9 h-9 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer shrink-0"
-      style="color: var(--kv-text-muted)"
+      style="color: var(--kv-text-muted);"
       :aria-label="t('nav.openMenu')"
       @click="toggleLeftDrawer"
     >
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="3" y1="6" x2="21" y2="6" />
         <line x1="3" y1="12" x2="21" y2="12" />
         <line x1="3" y1="18" x2="21" y2="18" />
@@ -40,9 +31,10 @@ const { toggleLeftDrawer } = useAppShellNav()
 
     <!-- Sunucu adı — flex-1, ortada -->
     <div class="flex-1 flex items-center justify-center px-6">
-      <span class="text-[16px] font-semibold truncate" style="color: var(--kv-text-primary)">{{
-        guildsStore.activeGuild()?.name ?? ''
-      }}</span>
+      <span
+        class="text-[16px] font-semibold truncate"
+        style="color: var(--kv-text-primary);"
+      >{{ guildsStore.activeGuild()?.name ?? '' }}</span>
     </div>
 
     <!-- Sunucu-geneli arama → sağ sidebar panelini aç/kapa -->
@@ -54,18 +46,8 @@ const { toggleLeftDrawer } = useAppShellNav()
         :title="t('guildSearch.title')"
         @click="toggleSearch"
       >
-        <svg
-          width="17"
-          height="17"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
         </svg>
       </button>
     </div>

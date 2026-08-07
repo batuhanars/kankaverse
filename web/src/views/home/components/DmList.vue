@@ -97,9 +97,7 @@ const menuY = ref(0)
 const menuDm = computed(() => (menuChannel.value?.type === 'DM' ? menuChannel.value : null))
 // İş 2 (2026-08-03) — grup DM'e özgü menü öğeleri (Üye Ekle / Gruptan Ayrıl), taşındığı yer:
 // `GroupManagePanel.vue` artık bu ikisini göstermiyor.
-const menuGroup = computed(() =>
-  menuChannel.value?.type === 'GROUP_DM' ? menuChannel.value : null,
-)
+const menuGroup = computed(() => (menuChannel.value?.type === 'GROUP_DM' ? menuChannel.value : null))
 
 function closeMenu() {
   menuChannel.value = null
@@ -271,11 +269,8 @@ async function confirmLeaveGroup() {
 
 <template>
   <div class="flex-1 overflow-y-auto px-2 pt-2 pb-20">
-    <p
-      v-if="!visibleChannels.length"
-      class="px-2 py-3 text-[13px]"
-      style="color: var(--kv-text-muted)"
-    >
+
+    <p v-if="!visibleChannels.length" class="px-2 py-3 text-[13px]" style="color: var(--kv-text-muted);">
       {{ t('dm.noDms') }}
     </p>
 
@@ -289,34 +284,25 @@ async function confirmLeaveGroup() {
     >
       <button
         class="w-full flex items-center gap-3 pl-2 pr-9 py-2 rounded-[var(--kv-radius-md)] transition-colors cursor-pointer text-left"
-        :style="
-          activeChannelId === ch.id
-            ? 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary); box-shadow: inset 2px 0 0 var(--kv-accent-500);'
-            : dmSilenced(ch)
-              ? 'color: var(--kv-text-muted);'
-              : 'color: var(--kv-text-secondary);'
-        "
+        :style="activeChannelId === ch.id
+          ? 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary); box-shadow: inset 2px 0 0 var(--kv-accent-500);'
+          : dmSilenced(ch)
+            ? 'color: var(--kv-text-muted);'
+            : 'color: var(--kv-text-secondary);'"
         @click="emit('select', ch.id)"
       >
         <!-- Avatar alanı -->
         <div class="relative shrink-0">
           <!-- 1-1 DM: tekil avatar + presence -->
           <template v-if="ch.type === 'DM'">
-            <div
-              class="w-8 h-8 rounded-full overflow-hidden"
-              style="background-color: var(--kv-bg-content)"
-            >
+            <div class="w-8 h-8 rounded-full overflow-hidden" style="background-color: var(--kv-bg-content);">
               <img
                 v-if="ch.otherUser.avatarUrl"
                 :src="ch.otherUser.avatarUrl"
                 :alt="ch.otherUser.username"
                 class="w-full h-full object-cover"
               />
-              <span
-                v-else
-                class="w-full h-full flex items-center justify-center text-[12px] font-semibold"
-                style="color: var(--kv-text-secondary)"
-              >
+              <span v-else class="w-full h-full flex items-center justify-center text-[12px] font-semibold" style="color: var(--kv-text-secondary);">
                 {{ ch.otherUser.username[0].toUpperCase() }}
               </span>
             </div>
@@ -324,7 +310,7 @@ async function confirmLeaveGroup() {
             <span
               v-if="dmShowUnread(ch)"
               class="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2"
-              style="background-color: var(--kv-accent-500); border-color: var(--kv-bg-sidebar)"
+              style="background-color: var(--kv-accent-500); border-color: var(--kv-bg-sidebar);"
             />
             <!-- Presence noktası (okunmamış rozet yoksa) -->
             <PresenceDot
@@ -342,7 +328,7 @@ async function confirmLeaveGroup() {
               <div
                 v-if="ch.members[1]"
                 class="absolute bottom-0 right-0 w-6 h-6 rounded-full overflow-hidden border-2 flex items-center justify-center text-[9px] font-semibold text-white"
-                style="background-color: var(--kv-bg-content); border-color: var(--kv-bg-sidebar)"
+                style="background-color: var(--kv-bg-content); border-color: var(--kv-bg-sidebar);"
               >
                 <img
                   v-if="ch.members[1].avatarUrl"
@@ -350,24 +336,14 @@ async function confirmLeaveGroup() {
                   :alt="ch.members[1].username"
                   class="w-full h-full object-cover"
                 />
-                <span
-                  v-else
-                  style="
-                    background-color: var(--kv-accent-500);
-                    width: 100%;
-                    height: 100%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                  "
-                >
+                <span v-else style="background-color: var(--kv-accent-500); width:100%; height:100%; display:flex; align-items:center; justify-content:center;">
                   {{ ch.members[1].username[0].toUpperCase() }}
                 </span>
               </div>
               <!-- İkinci avatar (öne) -->
               <div
                 class="absolute top-0 left-0 w-6 h-6 rounded-full overflow-hidden border-2 flex items-center justify-center text-[9px] font-semibold text-white"
-                style="background-color: var(--kv-bg-content); border-color: var(--kv-bg-sidebar)"
+                style="background-color: var(--kv-bg-content); border-color: var(--kv-bg-sidebar);"
               >
                 <img
                   v-if="ch.members[0]?.avatarUrl"
@@ -375,17 +351,7 @@ async function confirmLeaveGroup() {
                   :alt="ch.members[0].username"
                   class="w-full h-full object-cover"
                 />
-                <span
-                  v-else
-                  style="
-                    background-color: var(--kv-accent-500);
-                    width: 100%;
-                    height: 100%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                  "
-                >
+                <span v-else style="background-color: var(--kv-accent-500); width:100%; height:100%; display:flex; align-items:center; justify-content:center;">
                   {{ (ch.members[0]?.username ?? '?')[0].toUpperCase() }}
                 </span>
               </div>
@@ -394,7 +360,7 @@ async function confirmLeaveGroup() {
             <span
               v-if="dmShowUnread(ch)"
               class="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2"
-              style="background-color: var(--kv-accent-500); border-color: var(--kv-bg-sidebar)"
+              style="background-color: var(--kv-accent-500); border-color: var(--kv-bg-sidebar);"
             />
           </template>
         </div>
@@ -411,15 +377,11 @@ async function confirmLeaveGroup() {
           <p
             v-if="typingUsersForChannel(ch.id).length > 0"
             class="text-[12px] truncate italic"
-            style="color: var(--kv-accent-500)"
+            style="color: var(--kv-accent-500);"
           >
             {{ t('typing.simple') }}
           </p>
-          <p
-            v-else-if="ch.lastMessage"
-            class="text-[12px] truncate"
-            style="color: var(--kv-text-muted)"
-          >
+          <p v-else-if="ch.lastMessage" class="text-[12px] truncate" style="color: var(--kv-text-muted);">
             {{ formatLastMessage(ch, ch.lastMessage.content) }}
           </p>
         </div>
@@ -430,113 +392,50 @@ async function confirmLeaveGroup() {
            varyant sırasına güvenmek gerekmesin. -->
       <button
         class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-opacity hover:bg-[var(--kv-bg-rail)]"
-        :class="
-          menuChannel?.id === ch.id || isMobile
-            ? 'opacity-100'
-            : 'opacity-0 group-hover:opacity-100'
-        "
-        style="width: 24px; height: 24px; color: var(--kv-text-muted)"
+        :class="menuChannel?.id === ch.id || isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
+        style="width: 24px; height: 24px; color: var(--kv-text-muted);"
         :title="t('dm.menuTitle')"
         :aria-label="t('dm.menuTitle')"
         @click.stop="onDotsClick($event, ch)"
       >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="5" r="1" fill="currentColor" />
-          <circle cx="12" cy="12" r="1" fill="currentColor" />
-          <circle cx="12" cy="19" r="1" fill="currentColor" />
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="5" r="1" fill="currentColor"/>
+          <circle cx="12" cy="12" r="1" fill="currentColor"/>
+          <circle cx="12" cy="19" r="1" fill="currentColor"/>
         </svg>
       </button>
     </div>
   </div>
 
   <!-- DM menüsü — paylaşılan kabuk (öğe sırası sözleşme §3.1/§3.2 ile bağlayıcı) -->
-  <ContextMenuShell v-if="menuChannel" :x="menuX" :y="menuY" menu-id="dm-row" @close="closeMenu">
+  <ContextMenuShell
+    v-if="menuChannel"
+    :x="menuX"
+    :y="menuY"
+    menu-id="dm-row"
+    @close="closeMenu"
+  >
     <!-- 1. Profil (yalnız 1-1) -->
     <button v-if="menuDm" class="kv-ctx__item" role="menuitem" @click="openProfile">
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="kv-ctx__icon"
-      >
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-        <circle cx="12" cy="7" r="4" />
-      </svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       <span>{{ t('member.actions.profile') }}</span>
     </button>
 
     <!-- 2. Kanka Ekle (yalnız 1-1 ve kanka değilse) -->
     <button v-if="menuDm && canAddFriend" class="kv-ctx__item" role="menuitem" @click="doAddFriend">
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2.2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="kv-ctx__icon"
-      >
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <line x1="19" y1="8" x2="19" y2="14" />
-        <line x1="22" y1="11" x2="16" y2="11" />
-      </svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
       <span>{{ t('friends.add') }}</span>
     </button>
 
     <!-- 2b. Üye Ekle (yalnız grup DM — İş 2, panelden taşındı) -->
     <button v-if="menuGroup" class="kv-ctx__item" role="menuitem" @click="openAddMember">
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2.2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="kv-ctx__icon"
-      >
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <line x1="19" y1="8" x2="19" y2="14" />
-        <line x1="22" y1="11" x2="16" y2="11" />
-      </svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
       <span>{{ t('group.addMember') }}</span>
     </button>
 
     <!-- 3. Okunmuş Olarak İşaretle -->
     <button class="kv-ctx__item" role="menuitem" @click="doMarkRead">
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="kv-ctx__icon"
-      >
-        <path d="M20 6 9 17l-5-5" />
-      </svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M20 6 9 17l-5-5"/></svg>
       <span>{{ t('guildMenu.markRead') }}</span>
     </button>
 
@@ -557,70 +456,19 @@ async function confirmLeaveGroup() {
 
     <!-- 6. Sohbeti Temizle -->
     <button class="kv-ctx__item" role="menuitem" @click="askClear">
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="kv-ctx__icon"
-      >
-        <polyline points="3 6 5 6 21 6" />
-        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-        <path d="M10 11v6M14 11v6" />
-      </svg>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
       <span>{{ t('dm.clearConversation') }}</span>
     </button>
 
     <!-- 7. Şikâyet Et (yalnız 1-1; hedef tek kullanıcı) -->
-    <button
-      v-if="menuDm"
-      class="kv-ctx__item kv-ctx__item--danger"
-      role="menuitem"
-      @click="openReport"
-    >
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="kv-ctx__icon"
-      >
-        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-        <line x1="4" y1="22" x2="4" y2="15" />
-      </svg>
+    <button v-if="menuDm" class="kv-ctx__item kv-ctx__item--danger" role="menuitem" @click="openReport">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
       <span>{{ t('report.reportUser') }}</span>
     </button>
 
     <!-- 7b. Gruptan Ayrıl (yalnız grup DM, danger — İş 2, panelden taşındı) -->
-    <button
-      v-if="menuGroup"
-      class="kv-ctx__item kv-ctx__item--danger"
-      role="menuitem"
-      @click="askLeaveGroup"
-    >
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="kv-ctx__icon"
-      >
-        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-        <polyline points="16 17 21 12 16 7" />
-        <line x1="21" y1="12" x2="9" y2="12" />
-      </svg>
+    <button v-if="menuGroup" class="kv-ctx__item kv-ctx__item--danger" role="menuitem" @click="askLeaveGroup">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       <span>{{ t('group.leaveGroup') }}</span>
     </button>
   </ContextMenuShell>
@@ -648,46 +496,28 @@ async function confirmLeaveGroup() {
     v-if="profileCard"
     :card="profileCard"
     @close="profileCard = null"
-    @open-dm="
-      (id: string) => {
-        profileCard = null
-        emit('select', id)
-      }
-    "
+    @open-dm="(id: string) => { profileCard = null; emit('select', id) }"
   />
 
   <!-- Grup: üye ekle mini-modal (İş 2 — GroupManagePanel'den taşındı, aynı akış/görünüm) -->
   <div
     v-if="addMemberTarget"
     class="fixed inset-0 z-50 flex items-center justify-center"
-    style="background-color: rgba(0, 0, 0, 0.5)"
+    style="background-color: rgba(0,0,0,0.5);"
     @click.self="closeAddMember"
   >
     <div
       class="w-[360px] max-h-[60vh] flex flex-col rounded-[var(--kv-radius-lg)] overflow-hidden"
-      style="background-color: var(--kv-bg-sidebar)"
+      style="background-color: var(--kv-bg-sidebar);"
     >
-      <div
-        class="flex items-center justify-between px-4 py-3 border-b shrink-0"
-        style="border-color: var(--kv-border-subtle)"
-      >
-        <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary)">
+      <div class="flex items-center justify-between px-4 py-3 border-b shrink-0" style="border-color: var(--kv-border-subtle);">
+        <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
           {{ t('group.addMemberTitle') }}
         </h3>
-        <button
-          class="text-[18px] cursor-pointer hover:opacity-70"
-          style="color: var(--kv-text-muted)"
-          @click="closeAddMember"
-        >
-          ✕
-        </button>
+        <button class="text-[18px] cursor-pointer hover:opacity-70" style="color: var(--kv-text-muted);" @click="closeAddMember">✕</button>
       </div>
       <div class="flex-1 overflow-y-auto px-3 py-2">
-        <p
-          v-if="!addableFriends.length"
-          class="text-[13px] px-2 py-3"
-          style="color: var(--kv-text-muted)"
-        >
+        <p v-if="!addableFriends.length" class="text-[13px] px-2 py-3" style="color: var(--kv-text-muted);">
           {{ t('group.noFriends') }}
         </p>
         <button
@@ -695,31 +525,20 @@ async function confirmLeaveGroup() {
           :key="f.user.id"
           class="w-full flex items-center gap-3 px-2 py-2 rounded-[var(--kv-radius-md)] cursor-pointer transition-colors text-left"
           :class="addingMemberId === f.user.id ? 'opacity-50 pointer-events-none' : ''"
-          @mouseenter="
-            ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'
-          "
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
           @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
           @click="doAddGroupMember(f.user.id)"
         >
           <div
             class="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-semibold text-white"
-            style="background-color: var(--kv-accent-500)"
+            style="background-color: var(--kv-accent-500);"
           >
-            <img
-              v-if="f.user.avatarUrl"
-              :src="f.user.avatarUrl"
-              :alt="f.user.username"
-              class="w-full h-full object-cover"
-            />
+            <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
             <span v-else>{{ f.user.username[0].toUpperCase() }}</span>
           </div>
-          <span class="text-[14px] truncate" style="color: var(--kv-text-primary)">{{
-            f.user.username
-          }}</span>
+          <span class="text-[14px] truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</span>
         </button>
-        <p v-if="addMemberError" class="text-[13px] px-2 mt-1" style="color: var(--kv-danger)">
-          {{ addMemberError }}
-        </p>
+        <p v-if="addMemberError" class="text-[13px] px-2 mt-1" style="color: var(--kv-danger);">{{ addMemberError }}</p>
       </div>
     </div>
   </div>

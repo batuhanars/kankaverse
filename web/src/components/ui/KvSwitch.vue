@@ -11,9 +11,7 @@ defineProps<{
     type="button"
     :disabled="disabled"
     class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 disabled:opacity-50"
-    :style="
-      model ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'
-    "
+    :style="model ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'"
     @click="model = !model"
   >
     <span

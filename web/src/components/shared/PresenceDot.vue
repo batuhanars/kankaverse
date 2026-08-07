@@ -13,13 +13,10 @@ defineProps<{
     class="block rounded-full shrink-0"
     :style="{
       backgroundColor:
-        status === 'online'
-          ? 'var(--kv-online)'
-          : status === 'away'
-            ? 'var(--kv-idle)'
-            : status === 'dnd'
-              ? 'var(--kv-dnd)'
-              : 'var(--kv-offline)',
+        status === 'online'  ? 'var(--kv-online)'  :
+        status === 'away'    ? 'var(--kv-idle)'     :
+        status === 'dnd'     ? 'var(--kv-dnd)'      :
+                               'var(--kv-offline)',
       borderWidth: borderColor ? '2px' : '0',
       borderStyle: borderColor ? 'solid' : 'none',
       borderColor: borderColor ?? 'transparent',

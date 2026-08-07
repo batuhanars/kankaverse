@@ -43,9 +43,7 @@ function avatarInitial(username: string): string {
 function formatDate(iso: string): string {
   const d = new Date(iso)
   const date = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
-  const time = d
-    .toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-    .replace(':', '.')
+  const time = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }).replace(':', '.')
   return `${date} ${time}`
 }
 
@@ -80,29 +78,26 @@ onMounted(() => load())
 <template>
   <section class="flex flex-col gap-4 max-w-xl">
     <div>
-      <h3
-        class="text-[13px] font-semibold uppercase tracking-widest mb-1"
-        style="color: var(--kv-text-muted)"
-      >
+      <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
         {{ t('audit.title') }}
       </h3>
-      <p class="text-[12px]" style="color: var(--kv-text-muted)">
+      <p class="text-[12px]" style="color: var(--kv-text-muted);">
         {{ t('audit.subtitle') }}
       </p>
     </div>
 
     <!-- Yükleniyor (ilk) -->
-    <p v-if="loading" class="text-[13px]" style="color: var(--kv-text-muted)">
+    <p v-if="loading" class="text-[13px]" style="color: var(--kv-text-muted);">
       {{ t('audit.loading') }}
     </p>
 
     <!-- Hata -->
-    <p v-else-if="error" class="text-[13px]" style="color: var(--kv-danger)">
+    <p v-else-if="error" class="text-[13px]" style="color: var(--kv-danger);">
       {{ t('audit.error') }}
     </p>
 
     <!-- Boş durum -->
-    <p v-else-if="isEmpty" class="text-[13px]" style="color: var(--kv-text-muted)">
+    <p v-else-if="isEmpty" class="text-[13px]" style="color: var(--kv-text-muted);">
       {{ t('audit.empty') }}
     </p>
 
@@ -112,12 +107,12 @@ onMounted(() => load())
         v-for="entry in entries"
         :key="entry.id"
         class="flex items-start gap-2.5 px-3 py-2.5 rounded-[var(--kv-radius-md)] border"
-        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated)"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
       >
         <!-- Actor avatarı (daire) -->
         <div
           class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-semibold text-white"
-          style="background-color: var(--kv-accent-500)"
+          style="background-color: var(--kv-accent-500);"
         >
           <img
             v-if="entry.actor.avatarUrl"
@@ -130,27 +125,22 @@ onMounted(() => load())
 
         <div class="flex-1 min-w-0">
           <!-- İnsan-okur Türkçe cümle (i18n-t ile actor/target bold) -->
-          <i18n-t
-            :keypath="sentenceKey(entry)"
-            tag="p"
-            class="text-[14px]"
-            style="color: var(--kv-text-primary)"
-          >
+          <i18n-t :keypath="sentenceKey(entry)" tag="p" class="text-[14px]" style="color: var(--kv-text-primary);">
             <template #actor>
-              <strong style="color: var(--kv-text-primary)">{{ entry.actor.username }}</strong>
+              <strong style="color: var(--kv-text-primary);">{{ entry.actor.username }}</strong>
             </template>
             <template v-if="entry.targetUser" #target>
-              <strong style="color: var(--kv-text-primary)">{{ entry.targetUser.username }}</strong>
+              <strong style="color: var(--kv-text-primary);">{{ entry.targetUser.username }}</strong>
             </template>
           </i18n-t>
 
           <!-- Sebep -->
-          <p v-if="entry.reason" class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+          <p v-if="entry.reason" class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
             {{ t('audit.reason', { reason: entry.reason }) }}
           </p>
 
           <!-- Tarih -->
-          <p class="text-[11px] mt-1" style="color: var(--kv-text-muted)">
+          <p class="text-[11px] mt-1" style="color: var(--kv-text-muted);">
             {{ formatDate(entry.createdAt) }}
           </p>
         </div>

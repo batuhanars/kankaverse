@@ -37,13 +37,13 @@ function download() {
   <Teleport to="body">
     <div
       class="fixed inset-0 z-50 flex items-center justify-center"
-      style="background-color: var(--kv-bg-overlay)"
+      style="background-color: var(--kv-bg-overlay);"
       @click.self="emit('close')"
     >
       <!-- Kapat butonu -->
       <button
         class="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-[20px] cursor-pointer transition-opacity hover:opacity-70"
-        style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary)"
+        style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
         :aria-label="t('common.close')"
         @click="emit('close')"
       >
@@ -55,13 +55,13 @@ function download() {
         :src="url"
         :alt="filename ?? ''"
         class="rounded-[var(--kv-radius-sm)] object-contain"
-        style="max-width: 90vw; max-height: 90vh"
+        style="max-width: 90vw; max-height: 90vh;"
       />
 
       <!-- İndir butonu -->
       <button
         class="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-[var(--kv-radius-sm)] text-[13px] font-medium cursor-pointer transition-opacity hover:opacity-80"
-        style="background-color: var(--kv-bg-elevated); color: var(--kv-accent-500)"
+        style="background-color: var(--kv-bg-elevated); color: var(--kv-accent-500);"
         @click="download"
       >
         {{ t('attachment.download') }}

@@ -39,9 +39,7 @@ const channelId = computed(() => channelsStore.activeChannelId ?? '')
 const channelName = computed(() => channelsStore.activeChannel()?.name ?? '')
 const guildId = computed(() => channelsStore.activeChannel()?.guildId ?? '')
 const connectedHere = computed(() => voiceStore.connectedChannelId === channelId.value)
-const members = computed<RoomMember[]>(() =>
-  connectedHere.value ? voiceStore.roomParticipants : [],
-)
+const members = computed<RoomMember[]>(() => (connectedHere.value ? voiceStore.roomParticipants : []))
 
 // FIX 2 — yayın yapanlar üstte (stable sort)
 const sortedMembers = computed<RoomMember[]>(() =>
@@ -58,9 +56,7 @@ const canMute = computed(() => can('MUTE_MEMBERS'))
 const canMove = computed(() => can('MOVE_MEMBERS'))
 
 // Hedef owner mı? (owner hedeflenemez)
-const ownerId = computed(
-  () => guildsStore.guilds.find((g) => g.id === guildId.value)?.ownerId ?? null,
-)
+const ownerId = computed(() => guildsStore.guilds.find((g) => g.id === guildId.value)?.ownerId ?? null)
 function isOwner(m: RoomMember): boolean {
   return !!ownerId.value && m.userId === ownerId.value
 }
@@ -127,8 +123,7 @@ const screenFocusKey = computed<string | null>(() => {
   return screen?.key ?? null
 })
 const effectiveFocusKey = computed<string | null>(() => {
-  if (focusedKey.value && tiles.value.some((t) => t.key === focusedKey.value))
-    return focusedKey.value
+  if (focusedKey.value && tiles.value.some((t) => t.key === focusedKey.value)) return focusedKey.value
   return screenFocusKey.value
 })
 const isStageMode = computed(() => effectiveFocusKey.value !== null)
@@ -166,8 +161,7 @@ function tileProps(tile: VoiceTileData, variant: 'grid' | 'stage' | 'strip') {
     canMove: canMove.value,
     moveTargets: moveTargets.value,
     broadcasting: m ? isBroadcastingFor(m) : false,
-    focused:
-      variant === 'stage' ? true : variant === 'strip' && tile.key === effectiveFocusKey.value,
+    focused: variant === 'stage' ? true : variant === 'strip' && tile.key === effectiveFocusKey.value,
   }
 }
 
@@ -248,64 +242,33 @@ function errMessage(e: unknown, fallbackKey: string): string {
 </script>
 
 <template>
-  <div
-    ref="roomRef"
-    class="flex flex-col flex-1 min-h-0 overflow-hidden mr-4 rounded-[var(--kv-radius-lg)]"
-    style="background-color: var(--kv-bg-content)"
-  >
+  <div ref="roomRef" class="flex flex-col flex-1 min-h-0 overflow-hidden mr-4 rounded-[var(--kv-radius-lg)]" style="background-color: var(--kv-bg-content);">
     <!-- Üst başlık: ses kanalı adı -->
-    <div
-      class="shrink-0 flex items-center gap-2 px-4 h-14 border-b"
-      style="border-color: var(--kv-border-subtle)"
-    >
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        style="color: var(--kv-text-muted)"
-      >
-        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+    <div class="shrink-0 flex items-center gap-2 px-4 h-14 border-b" style="border-color: var(--kv-border-subtle);">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
       </svg>
-      <span class="text-[16px] font-semibold truncate" style="color: var(--kv-text-primary)">{{
-        channelName
-      }}</span>
-      <span v-if="connectedHere" class="text-[13px] shrink-0" style="color: var(--kv-text-muted)"
-        >· {{ members.length }}</span
-      >
+      <span class="text-[16px] font-semibold truncate" style="color: var(--kv-text-primary);">{{ channelName }}</span>
+      <span v-if="connectedHere" class="text-[13px] shrink-0" style="color: var(--kv-text-muted);">· {{ members.length }}</span>
     </div>
 
     <!-- Orta -->
     <div class="flex-1 min-h-0 overflow-hidden p-4">
       <!-- Bağlanılıyor -->
-      <div
-        v-if="!connectedHere && voiceStore.connecting"
-        class="h-full flex items-center justify-center"
-      >
-        <p class="text-[15px]" style="color: var(--kv-text-muted)">{{ t('voice.joining') }}</p>
+      <div v-if="!connectedHere && voiceStore.connecting" class="h-full flex items-center justify-center">
+        <p class="text-[15px]" style="color: var(--kv-text-muted);">{{ t('voice.joining') }}</p>
       </div>
       <!-- Bağlı değil → katıl -->
-      <div
-        v-else-if="!connectedHere"
-        class="h-full flex flex-col items-center justify-center gap-3"
-      >
-        <p class="text-[15px]" style="color: var(--kv-text-muted)">{{ t('voice.notConnected') }}</p>
+      <div v-else-if="!connectedHere" class="h-full flex flex-col items-center justify-center gap-3">
+        <p class="text-[15px]" style="color: var(--kv-text-muted);">{{ t('voice.notConnected') }}</p>
         <button
           class="px-4 py-2 rounded-[var(--kv-radius-md)] text-[14px] font-semibold text-white cursor-pointer transition-opacity hover:opacity-90"
-          style="background-color: var(--kv-accent-500)"
+          style="background-color: var(--kv-accent-500);"
           @click="voiceStore.join(channelId)"
-        >
-          {{ t('voice.joinAction') }}
-        </button>
-        <p v-if="voiceStore.error" class="text-[13px]" style="color: var(--kv-danger)">
-          {{ voiceStore.error }}
-        </p>
+        >{{ t('voice.joinAction') }}</button>
+        <p v-if="voiceStore.error" class="text-[13px]" style="color: var(--kv-danger);">{{ voiceStore.error }}</p>
       </div>
 
       <!-- Bağlı: SAHNE düzeni (odak varsa) -->
@@ -327,33 +290,17 @@ function errMessage(e: unknown, fallbackKey: string): string {
           <button
             v-if="showGridButton"
             class="shrink-0 flex items-center gap-1.5 px-3 h-[72px] rounded-[var(--kv-radius-md)] text-[12px] cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-text-secondary); background-color: var(--kv-bg-elevated)"
+            style="color: var(--kv-text-secondary); background-color: var(--kv-bg-elevated);"
             @click="clearFocus"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <rect x="3" y="3" width="7" height="7" />
-              <rect x="14" y="3" width="7" height="7" />
-              <rect x="14" y="14" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
             </svg>
             {{ t('voice.gridView') }}
           </button>
           <div class="flex-1 min-w-0 flex gap-2 overflow-x-auto py-0.5">
-            <div
-              v-for="tile in tiles"
-              :key="tile.key"
-              class="shrink-0"
-              style="width: 128px; height: 72px"
-            >
+            <div v-for="tile in tiles" :key="tile.key" class="shrink-0" style="width: 128px; height: 72px;">
               <VoiceTile
                 v-bind="tileProps(tile, 'strip')"
                 @focus="setFocus(tile.key)"
@@ -383,11 +330,7 @@ function errMessage(e: unknown, fallbackKey: string): string {
     </div>
 
     <!-- Alt kontrol barı: kontroller ortada, tam ekran en sağda aynı hizada (Discord-tarzı) -->
-    <div
-      v-if="connectedHere"
-      class="shrink-0 grid grid-cols-3 items-end px-4 py-4 border-t"
-      style="border-color: var(--kv-border-subtle)"
-    >
+    <div v-if="connectedHere" class="shrink-0 grid grid-cols-3 items-end px-4 py-4 border-t" style="border-color: var(--kv-border-subtle);">
       <div></div>
       <div class="justify-self-center">
         <VoiceControlBar />
@@ -395,42 +338,18 @@ function errMessage(e: unknown, fallbackKey: string): string {
       <div class="justify-self-end">
         <button
           class="w-11 h-11 flex items-center justify-center rounded-full cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary)"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
           :title="isFullscreen ? t('voice.exitFullscreen') : t('voice.enterFullscreen')"
           :aria-label="isFullscreen ? t('voice.exitFullscreen') : t('voice.enterFullscreen')"
           @click="toggleRoomFullscreen"
         >
-          <svg
-            v-if="!isFullscreen"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-            <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-            <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-            <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+          <svg v-if="!isFullscreen" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+            <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
           </svg>
-          <svg
-            v-else
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M4 14h3a2 2 0 0 1 2 2v3" />
-            <path d="M20 10h-3a2 2 0 0 1-2-2V5" />
-            <path d="M14 20v-3a2 2 0 0 1 2-2h3" />
-            <path d="M10 4v3a2 2 0 0 1-2 2H5" />
+          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 14h3a2 2 0 0 1 2 2v3"/><path d="M20 10h-3a2 2 0 0 1-2-2V5"/>
+            <path d="M14 20v-3a2 2 0 0 1 2-2h3"/><path d="M10 4v3a2 2 0 0 1-2 2H5"/>
           </svg>
         </button>
       </div>

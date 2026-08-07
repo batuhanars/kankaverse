@@ -39,16 +39,9 @@ const friendsStore = useFriendsStore()
 const notificationPrefsStore = useNotificationPrefsStore()
 const { connect, disconnect } = useSocket()
 const {
-  showServerModal,
-  serverModalStep,
-  showAddFriendModal,
-  openServerModal,
-  closeServerModal,
-  closeAddFriend,
+  showServerModal, serverModalStep, showAddFriendModal, openServerModal, closeServerModal, closeAddFriend,
   // Birleşik kullanıcı ayarları modalı (UserCard + UserCardPopover "kendi profili" açar)
-  showUserSettings,
-  userSettingsSection,
-  openUserSettings,
+  showUserSettings, userSettingsSection, openUserSettings,
 } = useAppModals()
 
 // Router watch'ı kurar (her route değişiminde drawer'ları kapat).
@@ -143,7 +136,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full overflow-hidden" style="background-color: var(--kv-bg-rail)">
+  <div class="flex flex-col h-full overflow-hidden" style="background-color: var(--kv-bg-rail);">
     <EmailVerificationBanner v-if="authStore.user && !authStore.user.emailVerified" />
 
     <!--
@@ -166,10 +159,7 @@ onUnmounted(() => {
           'flex flex-col h-full',
           'transition-transform duration-300 ease-in-out',
           isMobile
-            ? [
-                'absolute inset-y-0 left-0 z-30',
-                leftDrawerOpen ? 'translate-x-0' : '-translate-x-full',
-              ]
+            ? ['absolute inset-y-0 left-0 z-30', leftDrawerOpen ? 'translate-x-0' : '-translate-x-full']
             : 'relative shrink-0 translate-x-0',
         ]"
         :role="isMobile ? 'dialog' : 'navigation'"
@@ -192,7 +182,7 @@ onUnmounted(() => {
         <div
           v-if="isMobile && leftDrawerOpen"
           class="absolute inset-0 z-20"
-          style="background-color: rgba(0, 0, 0, 0.6)"
+          style="background-color: rgba(0,0,0,0.6);"
           aria-hidden="true"
           @click="closeLeftDrawer"
         />
@@ -205,11 +195,7 @@ onUnmounted(() => {
     <ServerModal v-if="showServerModal" :initial-step="serverModalStep" @close="closeServerModal" />
     <FriendAddModal v-if="showAddFriendModal" @close="closeAddFriend" />
     <!-- Birleşik kullanıcı ayarları modalı -->
-    <UserSettingsView
-      v-if="showUserSettings"
-      :initial-section="userSettingsSection"
-      @close="showUserSettings = false"
-    />
+    <UserSettingsView v-if="showUserSettings" :initial-section="userSettingsSection" @close="showUserSettings = false" />
     <!-- Gelen DM sesli arama (global) -->
     <IncomingCallModal />
   </div>

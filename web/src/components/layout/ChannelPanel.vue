@@ -140,22 +140,19 @@ const activeGuildId = computed(() => guildsStore.activeGuildId ?? '')
 
 const uncategorizedChannels = computed(() => {
   void collapseToggleTick.value
-  return channelsStore
-    .channelsForGuild(activeGuildId.value)
+  return channelsStore.channelsForGuild(activeGuildId.value)
     .filter((c) => !c.categoryId)
     .sort((a, b) => a.position - b.position)
 })
 
 const sortedCategories = computed(() => {
-  return channelsStore
-    .categoriesForGuild(activeGuildId.value)
+  return channelsStore.categoriesForGuild(activeGuildId.value)
     .slice()
     .sort((a, b) => a.position - b.position)
 })
 
 function channelsForCategory(categoryId: string): ChannelDto[] {
-  return channelsStore
-    .channelsForGuild(activeGuildId.value)
+  return channelsStore.channelsForGuild(activeGuildId.value)
     .filter((c) => c.categoryId === categoryId)
     .sort((a, b) => a.position - b.position)
 }
@@ -263,14 +260,8 @@ watch(
 // REV-13b: ses kanalı aktif-süresi (sidebar, yeşil) — saniyede bir tik
 const voiceNow = ref(Date.now())
 let voiceTick: ReturnType<typeof setInterval> | null = null
-onMounted(() => {
-  voiceTick = setInterval(() => {
-    voiceNow.value = Date.now()
-  }, 1000)
-})
-onUnmounted(() => {
-  if (voiceTick) clearInterval(voiceTick)
-})
+onMounted(() => { voiceTick = setInterval(() => { voiceNow.value = Date.now() }, 1000) })
+onUnmounted(() => { if (voiceTick) clearInterval(voiceTick) })
 
 function voiceDuration(channelId: string): string {
   const startedAt = voiceStore.startedAtFor(channelId)
@@ -316,8 +307,7 @@ function onDragEnd() {
 
 // Bir grubun (kategori veya kategorisiz) kanalları, position sırasında
 function groupChannels(categoryId: string | null): ChannelDto[] {
-  return channelsStore
-    .channelsForGuild(activeGuildId.value)
+  return channelsStore.channelsForGuild(activeGuildId.value)
     .filter((c) => (c.categoryId ?? null) === categoryId)
     .sort((a, b) => a.position - b.position)
 }
@@ -326,9 +316,7 @@ async function dropChannelInto(targetCategoryId: string | null, beforeChannelId:
   const draggedId = dragChannelId.value
   onDragEnd()
   if (!draggedId || !isAdmin.value) return
-  const dragged = channelsStore
-    .channelsForGuild(activeGuildId.value)
-    .find((c) => c.id === draggedId)
+  const dragged = channelsStore.channelsForGuild(activeGuildId.value).find((c) => c.id === draggedId)
   if (!dragged || draggedId === beforeChannelId) return
 
   const group = groupChannels(targetCategoryId).filter((c) => c.id !== draggedId)
@@ -352,10 +340,7 @@ async function dropCategoryBefore(beforeCategoryId: string | null) {
   const draggedId = dragCategoryId.value
   onDragEnd()
   if (!draggedId || !isAdmin.value) return
-  const all = channelsStore
-    .categoriesForGuild(activeGuildId.value)
-    .slice()
-    .sort((a, b) => a.position - b.position)
+  const all = channelsStore.categoriesForGuild(activeGuildId.value).slice().sort((a, b) => a.position - b.position)
   const dragged = all.find((c) => c.id === draggedId)
   if (!dragged || draggedId === beforeCategoryId) return
   const rest = all.filter((c) => c.id !== draggedId)
@@ -556,11 +541,9 @@ async function addChannelMember(userId: string) {
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string; message?: string } } }
     const code = err.response?.data?.error
-    addMemberError.value =
-      code &&
-      ['NOT_PRIVATE_CHANNEL', 'NOT_GUILD_MEMBER', 'AGE_RESTRICTED', 'FORBIDDEN'].includes(code)
-        ? t(`channel.members.errors.${code}`)
-        : (err.response?.data?.message ?? t('common.error'))
+    addMemberError.value = code && ['NOT_PRIVATE_CHANNEL', 'NOT_GUILD_MEMBER', 'AGE_RESTRICTED', 'FORBIDDEN'].includes(code)
+      ? t(`channel.members.errors.${code}`)
+      : (err.response?.data?.message ?? t('common.error'))
   } finally {
     addMemberLoading.value = false
   }
@@ -601,22 +584,11 @@ async function submitSettings() {
   settingsSaving.value = true
   settingsError.value = ''
   try {
-    const payload: {
-      name?: string
-      ageGated?: boolean
-      isPrivate?: boolean
-      slowModeSeconds?: number
-      userLimit?: number
-      bitrate?: number
-      mediaEnabled?: boolean
-    } = {}
+    const payload: { name?: string; ageGated?: boolean; isPrivate?: boolean; slowModeSeconds?: number; userLimit?: number; bitrate?: number; mediaEnabled?: boolean } = {}
     if (name !== target.name) payload.name = name
-    if (settingsAgeGated.value !== (target.ageGated ?? false))
-      payload.ageGated = settingsAgeGated.value
-    if (settingsIsPrivate.value !== (target.isPrivate ?? false))
-      payload.isPrivate = settingsIsPrivate.value
-    if (settingsSlowMode.value !== (target.slowModeSeconds ?? 0))
-      payload.slowModeSeconds = settingsSlowMode.value
+    if (settingsAgeGated.value !== (target.ageGated ?? false)) payload.ageGated = settingsAgeGated.value
+    if (settingsIsPrivate.value !== (target.isPrivate ?? false)) payload.isPrivate = settingsIsPrivate.value
+    if (settingsSlowMode.value !== (target.slowModeSeconds ?? 0)) payload.slowModeSeconds = settingsSlowMode.value
     // R10 + C7 — ses kanalı ayarları (yalnız GUILD_VOICE)
     if (target.type === 'GUILD_VOICE') {
       const limit = Math.min(99, Math.max(0, Math.floor(settingsUserLimit.value || 0)))
@@ -624,8 +596,7 @@ async function submitSettings() {
       const bitrate = Math.min(96, Math.max(8, Math.floor(settingsBitrate.value || 64)))
       if (bitrate !== (target.bitrate ?? 64)) payload.bitrate = bitrate
       // C7 — medya toggle (yalnız GUILD_VOICE'ta anlamlı; backend text kanalında no-op ama redundant PATCH'ten kaçın)
-      if (settingsMediaEnabled.value !== (target.mediaEnabled ?? false))
-        payload.mediaEnabled = settingsMediaEnabled.value
+      if (settingsMediaEnabled.value !== (target.mediaEnabled ?? false)) payload.mediaEnabled = settingsMediaEnabled.value
     }
     if (Object.keys(payload).length > 0) {
       await channelsStore.updateChannel(target.id, guildId, payload)
@@ -669,10 +640,9 @@ async function confirmDelete() {
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string; message?: string } } }
     const code = err.response?.data?.error
-    deleteError.value =
-      code === 'LAST_CHANNEL'
-        ? t('channel.errors.LAST_CHANNEL')
-        : (err.response?.data?.message ?? t('common.error'))
+    deleteError.value = code === 'LAST_CHANNEL'
+      ? t('channel.errors.LAST_CHANNEL')
+      : (err.response?.data?.message ?? t('common.error'))
   } finally {
     deleting.value = false
   }
@@ -807,12 +777,8 @@ function closeGuildMenu() {
   showGuildMenu.value = false
   releaseIfOwner('cp-guild')
 }
-closeOnOther('cp-guild', () => {
-  showGuildMenu.value = false
-})
-closeOnOther('cp-channel', () => {
-  contextChannel.value = null
-})
+closeOnOther('cp-guild', () => { showGuildMenu.value = false })
+closeOnOther('cp-channel', () => { contextChannel.value = null })
 
 // ── Ortam menü aksiyonları (ServerRail ile paylaşılan composable) ──
 const {
@@ -946,15 +912,9 @@ function doCopyChannelId() {
 }
 
 // Dışarı-tık / Esc / scroll ile kapan (ServerRail deseni)
-function onChCtxDocPointer() {
-  closeChannelContext()
-}
-function onChCtxKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') closeChannelContext()
-}
-function onChCtxScroll() {
-  closeChannelContext()
-}
+function onChCtxDocPointer() { closeChannelContext() }
+function onChCtxKey(e: KeyboardEvent) { if (e.key === 'Escape') closeChannelContext() }
+function onChCtxScroll() { closeChannelContext() }
 onMounted(() => {
   document.addEventListener('click', onChCtxDocPointer)
   document.addEventListener('contextmenu', onChCtxDocPointer)
@@ -973,41 +933,22 @@ onUnmounted(() => {
   <!-- F: 4 köşe radius — HomeSidebar ile tutarlı -->
   <aside
     class="flex flex-col shrink-0 overflow-hidden rounded-none mt-0 md:rounded-[var(--kv-radius-lg)] md:mt-4"
-    style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar)"
-    @click="
-      closeCategoryMenu()
-      closeGuildMenu()
-    "
+    style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
+    @click="closeCategoryMenu(); closeGuildMenu()"
   >
     <!-- Ortam adı başlığı — sol: ad + chevron (menü tetikler), sağ: üye davet ikonu -->
     <!-- C8: ortam afişi varsa üstte Discord-tarzı banner; ad + davet satırı afişin altına bindirilir. -->
     <div
       class="relative shrink-0 border-b"
       :class="activeGuildBannerUrl ? '' : 'flex items-center px-2 gap-1'"
-      :style="
-        activeGuildBannerUrl
-          ? 'border-color: var(--kv-border-subtle);'
-          : 'border-color: var(--kv-border-subtle); height: var(--kv-header-height);'
-      "
+      :style="activeGuildBannerUrl
+        ? 'border-color: var(--kv-border-subtle);'
+        : 'border-color: var(--kv-border-subtle); height: var(--kv-header-height);'"
     >
       <!-- Afiş görseli (yalnız afiş varsa) + okunabilirlik için alt gradient scrim -->
-      <div v-if="activeGuildBannerUrl" class="relative w-full" style="height: 120px">
-        <img
-          :src="activeGuildBannerUrl"
-          alt=""
-          class="absolute inset-0 w-full h-full object-cover"
-        />
-        <div
-          class="absolute inset-0"
-          style="
-            background: linear-gradient(
-              to top,
-              rgba(0, 0, 0, 0.72) 0%,
-              rgba(0, 0, 0, 0.12) 55%,
-              rgba(0, 0, 0, 0) 100%
-            );
-          "
-        />
+      <div v-if="activeGuildBannerUrl" class="relative w-full" style="height: 120px;">
+        <img :src="activeGuildBannerUrl" alt="" class="absolute inset-0 w-full h-full object-cover" />
+        <div class="absolute inset-0" style="background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.12) 55%, rgba(0,0,0,0) 100%);" />
       </div>
 
       <!-- Ad + davet satırı — afiş varsa afişin altına absolute bindirilir, yoksa barın içinde -->
@@ -1019,25 +960,16 @@ onUnmounted(() => {
         <button
           class="flex-1 min-w-0 flex items-center px-2 gap-1.5 h-9 rounded-[var(--kv-radius-sm)] font-semibold text-[15px] cursor-pointer transition-colors"
           :class="activeGuildBannerUrl ? 'hover:bg-white/10' : 'hover:bg-[var(--kv-bg-elevated)]'"
-          :style="
-            activeGuildBannerUrl
-              ? 'color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.6);'
-              : 'color: var(--kv-text-primary);'
-          "
+          :style="activeGuildBannerUrl
+            ? 'color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.6);'
+            : 'color: var(--kv-text-primary);'"
           @click.stop="toggleGuildMenu"
         >
           <span class="truncate text-left">{{ guildsStore.activeGuild()?.name ?? '' }}</span>
           <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="shrink-0 transition-transform"
-            :class="showGuildMenu ? 'rotate-180' : ''"
+            width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+            class="shrink-0 transition-transform" :class="showGuildMenu ? 'rotate-180' : ''"
             :style="activeGuildBannerUrl ? 'color: #fff;' : 'color: var(--kv-text-muted);'"
           >
             <polyline points="6 9 12 15 18 9" />
@@ -1049,29 +981,15 @@ onUnmounted(() => {
           v-if="can('CREATE_INVITE')"
           class="shrink-0 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
           :class="activeGuildBannerUrl ? 'hover:bg-white/10' : 'hover:bg-[var(--kv-bg-elevated)]'"
-          :style="
-            activeGuildBannerUrl
-              ? 'width: var(--kv-control-sm); height: var(--kv-control-sm); color: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));'
-              : 'width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);'
-          "
+          :style="activeGuildBannerUrl
+            ? 'width: var(--kv-control-sm); height: var(--kv-control-sm); color: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));'
+            : 'width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);'"
           :title="t('invitePeople.title')"
           :aria-label="t('invitePeople.title')"
           @click.stop="showInvitePeople = true"
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <line x1="19" y1="8" x2="19" y2="14" />
-            <line x1="22" y1="11" x2="16" y2="11" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
           </svg>
         </button>
       </div>
@@ -1080,151 +998,63 @@ onUnmounted(() => {
       <div
         v-if="showGuildMenu"
         class="absolute left-2 right-2 top-full mt-1 z-50 rounded-[var(--kv-radius-md)] py-1 border overflow-hidden"
-        style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle)"
+        style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
         @click.stop
       >
         <!-- Okunmuş Olarak İşaretle — herkese -->
         <button
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-text-primary)"
+          style="color: var(--kv-text-primary);"
           @click="doMarkRead"
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            style="color: var(--kv-text-muted)"
-            class="shrink-0"
-          >
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><path d="M20 6 9 17l-5-5"/></svg>
           <span>{{ t('guildMenu.markRead') }}</span>
         </button>
 
-        <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle)" />
+        <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
 
         <!-- Kanal Oluştur (admin) -->
         <button
           v-if="isAdmin"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-text-primary)"
-          @click="
-            closeGuildMenu()
-            openCreate(null)
-          "
+          style="color: var(--kv-text-primary);"
+          @click="closeGuildMenu(); openCreate(null)"
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            style="color: var(--kv-text-muted)"
-            class="shrink-0"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           <span>{{ t('channel.addUncategorized') }}</span>
         </button>
         <!-- Kategori Oluştur (admin) -->
         <button
           v-if="isAdmin"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-text-primary)"
-          @click="
-            closeGuildMenu()
-            openCreateCategory()
-          "
+          style="color: var(--kv-text-primary);"
+          @click="closeGuildMenu(); openCreateCategory()"
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            style="color: var(--kv-text-muted)"
-            class="shrink-0"
-          >
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <line x1="17" y1="14" x2="17" y2="20" />
-            <line x1="14" y1="17" x2="20" y2="17" />
-          </svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><line x1="17" y1="14" x2="17" y2="20"/><line x1="14" y1="17" x2="20" y2="17"/></svg>
           <span>{{ t('category.createCategory') }}</span>
         </button>
         <!-- Etkinlik Oluştur (MANAGE_EVENTS) -->
         <button
           v-if="canManageEvents"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-text-primary)"
-          @click="
-            closeGuildMenu()
-            showCreateEventWizard = true
-          "
+          style="color: var(--kv-text-primary);"
+          @click="closeGuildMenu(); showCreateEventWizard = true"
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            style="color: var(--kv-text-muted)"
-            class="shrink-0"
-          >
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span>{{ t('event.menuCreate') }}</span>
         </button>
         <!-- Üye Davet Et (CREATE_INVITE — @everyone'da var → pratikte herkes) -->
         <button
           v-if="can('CREATE_INVITE')"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-text-primary)"
-          @click="
-            closeGuildMenu()
-            showInvitePeople = true
-          "
+          style="color: var(--kv-text-primary);"
+          @click="closeGuildMenu(); showInvitePeople = true"
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            style="color: var(--kv-text-muted)"
-            class="shrink-0"
-          >
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <line x1="19" y1="8" x2="19" y2="14" />
-            <line x1="22" y1="11" x2="16" y2="11" />
-          </svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
           <span>{{ t('invitePeople.title') }}</span>
         </button>
 
-        <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle)" />
+        <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
 
         <!-- Sunucuyu Sustur — süre menüsü (Görsel #15) -->
         <MuteDurationFlyout
@@ -1252,121 +1082,47 @@ onUnmounted(() => {
         <button
           v-if="canOpenSettings"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-text-primary)"
-          @click="
-            closeGuildMenu()
-            showSettings = true
-          "
+          style="color: var(--kv-text-primary);"
+          @click="closeGuildMenu(); showSettings = true"
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            style="color: var(--kv-text-muted)"
-            class="shrink-0"
-          >
-            <circle cx="12" cy="12" r="3" />
-            <path
-              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
-            />
-          </svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span>{{ t('common.settings') }}</span>
         </button>
 
-        <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle)" />
+        <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
 
         <!-- Sunucu ID'sini Kopyala — herkese -->
         <button
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-text-primary)"
+          style="color: var(--kv-text-primary);"
           @click="copyGuildId"
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            style="color: var(--kv-text-muted)"
-            class="shrink-0"
-          >
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           <span class="flex-1 min-w-0">{{ t('guildMenu.copyId') }}</span>
-          <span
-            class="shrink-0 text-[10px] font-bold px-1.5 rounded-[var(--kv-radius-sm)]"
-            style="background-color: var(--kv-bg-rail); color: var(--kv-text-muted)"
-            >{{ t('guildMenu.idBadge') }}</span
-          >
+          <span class="shrink-0 text-[10px] font-bold px-1.5 rounded-[var(--kv-radius-sm)]" style="background-color: var(--kv-bg-rail); color: var(--kv-text-muted);">{{ t('guildMenu.idBadge') }}</span>
         </button>
 
         <!-- Ayraç + Ortamı Şikâyet Et + Ortamdan Ayrıl (OWNER hariç — kendi ortamını şikâyet edemez) -->
         <template v-if="!isOwner">
-          <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle)" />
+          <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
           <button
             class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors"
-            style="color: var(--kv-danger)"
-            @mouseenter="
-              ($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'
-            "
+            style="color: var(--kv-danger);"
+            @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
-            @click="
-              closeGuildMenu()
-              showReportGuild = true
-            "
+            @click="closeGuildMenu(); showReportGuild = true"
           >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="shrink-0"
-            >
-              <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-              <line x1="4" y1="22" x2="4" y2="15" />
-            </svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
             <span>{{ t('report.reportGuild') }}</span>
           </button>
           <button
             class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left cursor-pointer transition-colors"
-            style="color: var(--kv-danger)"
-            @mouseenter="
-              ($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'
-            "
+            style="color: var(--kv-danger);"
+            @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
-            @click="
-              closeGuildMenu()
-              showLeaveConfirm = true
-            "
+            @click="closeGuildMenu(); showLeaveConfirm = true"
           >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="shrink-0"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             <span>{{ t('guild.leave') }}</span>
           </button>
         </template>
@@ -1375,269 +1131,166 @@ onUnmounted(() => {
 
     <!-- Kanal listesi -->
     <div class="flex-1 overflow-y-auto pt-4 pb-20 px-2">
+
       <!-- ── (0) Etkinlikler satırı — kanal listesinin üstünde, border ile ayrılmış ── -->
       <button
         type="button"
         class="w-full flex items-center gap-2 py-1.5 px-2 mb-3 pb-3 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors border-b"
-        style="border-color: var(--kv-border-subtle); color: var(--kv-text-secondary)"
+        style="border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);"
         @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
         @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'"
         @click="showEventsModal = true"
       >
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          style="color: var(--kv-text-muted)"
-          class="shrink-0"
-        >
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-          <line x1="16" y1="2" x2="16" y2="6" />
-          <line x1="8" y1="2" x2="8" y2="6" />
-          <line x1="3" y1="10" x2="21" y2="10" />
-        </svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span class="flex-1 truncate">{{ t('event.sidebarLabel') }}</span>
         <span
           v-if="eventCount > 0"
           class="shrink-0 text-[11px] font-bold px-1.5 rounded-full"
-          style="
-            background-color: var(--kv-bg-elevated);
-            color: var(--kv-text-secondary);
-            line-height: 1.5;
-          "
-          >{{ eventCount > 99 ? '99+' : eventCount }}</span
-        >
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary); line-height: 1.5;"
+        >{{ eventCount > 99 ? '99+' : eventCount }}</span>
       </button>
 
       <!-- ── (1) Kategorisiz kanallar — en üstte ── -->
       <template v-for="channel in uncategorizedChannels" :key="channel.id">
-        <div
-          :data-channel-row="channel.id"
-          :draggable="isAdmin"
-          class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
-          :class="[
-            channelsStore.activeChannelId === channel.id
-              ? 'bg-[var(--kv-bg-elevated)] text-[var(--kv-accent-400)] shadow-[inset_2px_0_0_var(--kv-accent-500)]'
-              : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
-            highlightedChannelId === channel.id ? 'kv-mention-highlight' : '',
-            dragOverChannelId === channel.id ? 'kv-drop-target' : '',
-          ]"
-          @dragstart="onChannelDragStart($event, channel)"
-          @dragend="onDragEnd"
-          @dragover.prevent="dragOverChannelId = channel.id"
-          @dragleave="dragOverChannelId === channel.id ? (dragOverChannelId = null) : null"
-          @drop="dropChannelInto(channel.categoryId ?? null, channel.id)"
-          @contextmenu.prevent="openChannelContext($event, channel)"
-        >
-          <!-- Sola yaslı beyaz okunmamış noktası — okunmamış varsa hep görünür (ServerRail gibi).
+      <div
+        :data-channel-row="channel.id"
+        :draggable="isAdmin"
+        class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
+        :class="[
+          channelsStore.activeChannelId === channel.id
+            ? 'bg-[var(--kv-bg-elevated)] text-[var(--kv-accent-400)] shadow-[inset_2px_0_0_var(--kv-accent-500)]'
+            : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
+          highlightedChannelId === channel.id ? 'kv-mention-highlight' : '',
+          dragOverChannelId === channel.id ? 'kv-drop-target' : '',
+        ]"
+        @dragstart="onChannelDragStart($event, channel)"
+        @dragend="onDragEnd"
+        @dragover.prevent="dragOverChannelId = channel.id"
+        @dragleave="dragOverChannelId === channel.id ? (dragOverChannelId = null) : null"
+        @drop="dropChannelInto(channel.categoryId ?? null, channel.id)"
+        @contextmenu.prevent="openChannelContext($event, channel)"
+      >
+        <!-- Sola yaslı beyaz okunmamış noktası — okunmamış varsa hep görünür (ServerRail gibi).
              Bahsetme de varsa sağdaki kırmızı sayaçla BİRLİKTE durur; rozet pip'i ezmez. -->
-          <span
-            v-if="channelShowGenericUnread(channel) && channelsStore.activeChannelId !== channel.id"
-            class="channel-unread-pip"
-            aria-hidden="true"
-          />
-          <button
-            class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-2 pr-2"
-            @click="selectChannel(channel)"
-          >
-            <!-- C: kanal türü ikonu — ses kanalı hoparlör, metin # -->
-            <svg
-              v-if="channel.type === 'GUILD_VOICE'"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.25"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              style="color: var(--kv-text-muted)"
-              class="shrink-0"
-            >
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-            </svg>
-            <span
-              v-else
-              class="text-[16px] font-semibold leading-none"
-              :style="{
-                color:
-                  channelsStore.activeChannelId === channel.id
-                    ? 'var(--kv-accent-400)'
-                    : 'var(--kv-text-muted)',
-              }"
-              >#</span
-            >
-            <span
-              class="truncate"
-              :class="[
-                channelHasVisibleUnread(channel) && channelsStore.activeChannelId !== channel.id
-                  ? 'font-semibold text-[var(--kv-text-primary)]'
-                  : '',
-                channelDimmed(channel) && channelsStore.activeChannelId !== channel.id
-                  ? 'opacity-60'
-                  : '',
-              ]"
-              >{{ channel.name }}</span
-            >
-            <!-- C: isPrivate kilit rozeti -->
-            <span
-              v-if="channel.isPrivate"
-              class="shrink-0"
-              :title="t('channel.privateLabel')"
-              style="color: var(--kv-text-muted)"
-            >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            </span>
-            <!-- Yaş-kapılı kanal: amber uyarı üçgeni (özel kanal kilidinden ayrı; "giremezsin" değil "dikkat" der); "18+" yazısı yerine tooltip -->
-            <span
-              v-if="channel.ageGated"
-              class="shrink-0"
-              :title="t('channel.ageRestrictedLockTitle')"
-              style="color: var(--kv-warning)"
-            >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path
-                  d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"
-                />
-                <line x1="12" y1="9" x2="12" y2="13" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-            </span>
-            <span
-              v-if="channel.slowModeSeconds > 0"
-              class="shrink-0"
-              :title="t('channel.slowModeLabel')"
-              style="color: var(--kv-text-muted)"
-            >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.25"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-            </span>
-          </button>
-
-          <span
-            v-if="channel.type === 'GUILD_VOICE' && channel.userLimit > 0"
-            class="shrink-0 text-[11px] font-semibold px-1.5 rounded-full mr-1 group-hover:hidden"
-            style="
-              background-color: var(--kv-bg-elevated);
-              color: var(--kv-text-secondary);
-              line-height: 1.5;
-              font-variant-numeric: tabular-nums;
-            "
-            :title="t('channel.voiceCountLabel')"
-            >{{ String(voiceCount(channel.id)).padStart(2, '0') }} / {{ channel.userLimit }}</span
-          >
-
-          <span
-            v-if="channel.type === 'GUILD_VOICE' && voiceDuration(channel.id)"
-            class="shrink-0 text-[11px] font-semibold mr-1.5"
-            style="color: var(--kv-online, #3db46e); font-variant-numeric: tabular-nums"
-            >{{ voiceDuration(channel.id) }}</span
-          >
-
-          <span
-            v-if="channelShowMention(channel) && channelsStore.activeChannelId !== channel.id"
-            class="shrink-0 channel-unread-badge"
-          >
-            {{ channel.unreadMentionCount > 99 ? '99+' : channel.unreadMentionCount }}
-          </span>
-
-          <div
-            v-if="isAdmin"
-            class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pr-2"
-          >
-            <!-- Davet et (solda) -->
-            <button
-              class="kv-chan-action flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer transition-colors"
-              style="width: var(--kv-control-sm); height: var(--kv-control-sm)"
-              :title="t('channel.invite')"
-              @click.stop="showInvitePeople = true"
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <line x1="19" y1="8" x2="19" y2="14" />
-                <line x1="22" y1="11" x2="16" y2="11" />
-              </svg>
-            </button>
-            <!-- Düzenle / dişli (sağda) -->
-            <button
-              class="kv-chan-action flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer transition-colors"
-              style="width: var(--kv-control-sm); height: var(--kv-control-sm)"
-              :title="t('channel.settingsTitle')"
-              @click.stop="openSettings(channel)"
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="12" cy="12" r="3" />
-                <path
-                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-        <!-- Ses kanalı → katılımcı alt-listesi -->
-        <VoiceParticipantList
-          v-if="channel.type === 'GUILD_VOICE'"
-          :channel-id="channel.id"
-          :guild-id="channel.guildId ?? ''"
+        <span
+          v-if="channelShowGenericUnread(channel) && channelsStore.activeChannelId !== channel.id"
+          class="channel-unread-pip"
+          aria-hidden="true"
         />
+        <button
+          class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-2 pr-2"
+          @click="selectChannel(channel)"
+        >
+          <!-- C: kanal türü ikonu — ses kanalı hoparlör, metin # -->
+          <svg v-if="channel.type === 'GUILD_VOICE'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+          </svg>
+          <span v-else class="text-[16px] font-semibold leading-none" :style="{ color: channelsStore.activeChannelId === channel.id ? 'var(--kv-accent-400)' : 'var(--kv-text-muted)' }">#</span>
+          <span
+            class="truncate"
+            :class="[
+              channelHasVisibleUnread(channel) && channelsStore.activeChannelId !== channel.id
+                ? 'font-semibold text-[var(--kv-text-primary)]'
+                : '',
+              channelDimmed(channel) && channelsStore.activeChannelId !== channel.id
+                ? 'opacity-60'
+                : '',
+            ]"
+          >{{ channel.name }}</span>
+          <!-- C: isPrivate kilit rozeti -->
+          <span
+            v-if="channel.isPrivate"
+            class="shrink-0"
+            :title="t('channel.privateLabel')"
+            style="color: var(--kv-text-muted);"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </span>
+          <!-- Yaş-kapılı kanal: amber uyarı üçgeni (özel kanal kilidinden ayrı; "giremezsin" değil "dikkat" der); "18+" yazısı yerine tooltip -->
+          <span
+            v-if="channel.ageGated"
+            class="shrink-0"
+            :title="t('channel.ageRestrictedLockTitle')"
+            style="color: var(--kv-warning);"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </span>
+          <span
+            v-if="channel.slowModeSeconds > 0"
+            class="shrink-0"
+            :title="t('channel.slowModeLabel')"
+            style="color: var(--kv-text-muted);"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </span>
+        </button>
+
+        <span
+          v-if="channel.type === 'GUILD_VOICE' && channel.userLimit > 0"
+          class="shrink-0 text-[11px] font-semibold px-1.5 rounded-full mr-1 group-hover:hidden"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary); line-height: 1.5; font-variant-numeric: tabular-nums;"
+          :title="t('channel.voiceCountLabel')"
+        >{{ String(voiceCount(channel.id)).padStart(2, '0') }} / {{ channel.userLimit }}</span>
+
+        <span
+          v-if="channel.type === 'GUILD_VOICE' && voiceDuration(channel.id)"
+          class="shrink-0 text-[11px] font-semibold mr-1.5"
+          style="color: var(--kv-online, #3DB46E); font-variant-numeric: tabular-nums;"
+        >{{ voiceDuration(channel.id) }}</span>
+
+        <span
+          v-if="channelShowMention(channel) && channelsStore.activeChannelId !== channel.id"
+          class="shrink-0 channel-unread-badge"
+        >
+          {{ channel.unreadMentionCount > 99 ? '99+' : channel.unreadMentionCount }}
+        </span>
+
+        <div
+          v-if="isAdmin"
+          class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pr-2"
+        >
+          <!-- Davet et (solda) -->
+          <button
+            class="kv-chan-action flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer transition-colors"
+            style="width: var(--kv-control-sm); height: var(--kv-control-sm);"
+            :title="t('channel.invite')"
+            @click.stop="showInvitePeople = true"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <line x1="19" y1="8" x2="19" y2="14"/>
+              <line x1="22" y1="11" x2="16" y2="11"/>
+            </svg>
+          </button>
+          <!-- Düzenle / dişli (sağda) -->
+          <button
+            class="kv-chan-action flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer transition-colors"
+            style="width: var(--kv-control-sm); height: var(--kv-control-sm);"
+            :title="t('channel.settingsTitle')"
+            @click.stop="openSettings(channel)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <!-- Ses kanalı → katılımcı alt-listesi -->
+      <VoiceParticipantList v-if="channel.type === 'GUILD_VOICE'" :channel-id="channel.id" :guild-id="channel.guildId ?? ''" />
       </template>
 
       <!-- ── (2) Kategoriler — position asc; E: başlıklar DB'den gelir ── -->
@@ -1661,25 +1314,18 @@ onUnmounted(() => {
           >
             <!-- Ok ikonu -->
             <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              width="10" height="10" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
               :class="categoryIsCollapsed(cat.id) ? '' : 'rotate-90'"
               class="shrink-0 transition-transform"
-              style="color: var(--kv-text-muted)"
+              style="color: var(--kv-text-muted);"
             >
-              <polyline points="9 18 15 12 9 6" />
+              <polyline points="9 18 15 12 9 6"/>
             </svg>
             <span
               class="text-[11px] font-semibold uppercase tracking-widest truncate"
-              style="color: var(--kv-text-muted)"
-              >{{ cat.name }}</span
-            >
+              style="color: var(--kv-text-muted);"
+            >{{ cat.name }}</span>
           </button>
 
           <!-- ADMIN: kategori menü butonu + kanal ekle -->
@@ -1687,26 +1333,13 @@ onUnmounted(() => {
             <!-- Bu kategoriye kanal ekle (D: per-kategori "+", categoryId geçirir) -->
             <button
               class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
-              style="
-                width: var(--kv-control-sm);
-                height: var(--kv-control-sm);
-                color: var(--kv-text-muted);
-              "
+              style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
               :title="t('category.addChannel')"
               @click.stop="openCreate(cat.id)"
             >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
             </button>
 
@@ -1714,27 +1347,14 @@ onUnmounted(() => {
             <div class="relative">
               <button
                 class="flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer"
-                style="
-                  width: var(--kv-control-sm);
-                  height: var(--kv-control-sm);
-                  color: var(--kv-text-muted);
-                "
+                style="width: var(--kv-control-sm); height: var(--kv-control-sm); color: var(--kv-text-muted);"
                 :title="t('common.settings')"
                 @click.stop="toggleCategoryMenu(cat.id)"
               >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <circle cx="12" cy="5" r="1" fill="currentColor" />
-                  <circle cx="12" cy="12" r="1" fill="currentColor" />
-                  <circle cx="12" cy="19" r="1" fill="currentColor" />
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                  <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                  <circle cx="12" cy="19" r="1" fill="currentColor"/>
                 </svg>
               </button>
 
@@ -1742,30 +1362,20 @@ onUnmounted(() => {
               <div
                 v-if="openCategoryMenuId === cat.id"
                 class="absolute right-0 top-full mt-1 z-20 rounded-[var(--kv-radius-md)] border overflow-hidden"
-                style="
-                  min-width: 148px;
-                  background-color: var(--kv-bg-elevated);
-                  border-color: var(--kv-border-subtle);
-                "
+                style="min-width: 148px; background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
                 @click.stop
               >
                 <button
                   class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-                  style="color: var(--kv-text-secondary)"
-                  @click="
-                    closeCategoryMenu()
-                    openRenameCategory(cat)
-                  "
+                  style="color: var(--kv-text-secondary);"
+                  @click="closeCategoryMenu(); openRenameCategory(cat)"
                 >
                   {{ t('category.rename') }}
                 </button>
                 <button
                   class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-                  style="color: var(--kv-danger)"
-                  @click="
-                    closeCategoryMenu()
-                    openDeleteCategory(cat)
-                  "
+                  style="color: var(--kv-danger);"
+                  @click="closeCategoryMenu(); openDeleteCategory(cat)"
                 >
                   {{ t('category.delete') }}
                 </button>
@@ -1777,217 +1387,138 @@ onUnmounted(() => {
         <!-- Kategorinin kanalları (katlanmışsa gizli) -->
         <template v-if="!categoryIsCollapsed(cat.id)">
           <template v-for="channel in channelsForCategory(cat.id)" :key="channel.id">
-            <div
-              :data-channel-row="channel.id"
-              :draggable="isAdmin"
-              class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
-              :class="[
-                channelsStore.activeChannelId === channel.id
-                  ? 'bg-[var(--kv-bg-elevated)] text-[var(--kv-accent-400)] shadow-[inset_2px_0_0_var(--kv-accent-500)]'
-                  : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
-                highlightedChannelId === channel.id ? 'kv-mention-highlight' : '',
-                dragOverChannelId === channel.id ? 'kv-drop-target' : '',
-              ]"
-              @dragstart="onChannelDragStart($event, channel)"
-              @dragend="onDragEnd"
-              @dragover.prevent="dragOverChannelId = channel.id"
-              @dragleave="dragOverChannelId === channel.id ? (dragOverChannelId = null) : null"
-              @drop="dropChannelInto(channel.categoryId ?? null, channel.id)"
-              @contextmenu.prevent="openChannelContext($event, channel)"
-            >
-              <!-- Sola yaslı beyaz okunmamış noktası — okunmamış varsa hep görünür (ServerRail gibi).
+          <div
+            :data-channel-row="channel.id"
+            :draggable="isAdmin"
+            class="group relative w-full flex items-center gap-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] text-left transition-colors"
+            :class="[
+              channelsStore.activeChannelId === channel.id
+                ? 'bg-[var(--kv-bg-elevated)] text-[var(--kv-accent-400)] shadow-[inset_2px_0_0_var(--kv-accent-500)]'
+                : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-accent-subtle)] hover:text-[var(--kv-text-primary)]',
+              highlightedChannelId === channel.id ? 'kv-mention-highlight' : '',
+              dragOverChannelId === channel.id ? 'kv-drop-target' : '',
+            ]"
+            @dragstart="onChannelDragStart($event, channel)"
+            @dragend="onDragEnd"
+            @dragover.prevent="dragOverChannelId = channel.id"
+            @dragleave="dragOverChannelId === channel.id ? (dragOverChannelId = null) : null"
+            @drop="dropChannelInto(channel.categoryId ?? null, channel.id)"
+            @contextmenu.prevent="openChannelContext($event, channel)"
+          >
+            <!-- Sola yaslı beyaz okunmamış noktası — okunmamış varsa hep görünür (ServerRail gibi).
              Bahsetme de varsa sağdaki kırmızı sayaçla BİRLİKTE durur; rozet pip'i ezmez. -->
-              <span
-                v-if="
-                  channelShowGenericUnread(channel) && channelsStore.activeChannelId !== channel.id
-                "
-                class="channel-unread-pip"
-                aria-hidden="true"
-              />
-              <button
-                class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-4 pr-2"
-                @click="selectChannel(channel)"
-              >
-                <!-- C: kanal türü ikonu — ses kanalı hoparlör, metin # -->
-                <svg
-                  v-if="channel.type === 'GUILD_VOICE'"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.25"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  style="color: var(--kv-text-muted)"
-                  class="shrink-0"
-                >
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                </svg>
-                <span
-                  v-else
-                  class="text-[16px] font-semibold leading-none"
-                  :style="{
-                    color:
-                      channelsStore.activeChannelId === channel.id
-                        ? 'var(--kv-accent-400)'
-                        : 'var(--kv-text-muted)',
-                  }"
-                  >#</span
-                >
-                <span
-                  class="truncate"
-                  :class="[
-                    channelHasVisibleUnread(channel) && channelsStore.activeChannelId !== channel.id
-                      ? 'font-semibold text-[var(--kv-text-primary)]'
-                      : '',
-                    channelDimmed(channel) && channelsStore.activeChannelId !== channel.id
-                      ? 'opacity-60'
-                      : '',
-                  ]"
-                  >{{ channel.name }}</span
-                >
-                <!-- C: isPrivate kilit rozeti -->
-                <span
-                  v-if="channel.isPrivate"
-                  class="shrink-0"
-                  :title="t('channel.privateLabel')"
-                  style="color: var(--kv-text-muted)"
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                </span>
-                <!-- Yaş-kapılı kanal: amber uyarı üçgeni (özel kanal kilidinden ayrı; "giremezsin" değil "dikkat" der); "18+" yazısı yerine tooltip -->
-                <span
-                  v-if="channel.ageGated"
-                  class="shrink-0"
-                  :title="t('channel.ageRestrictedLockTitle')"
-                  style="color: var(--kv-warning)"
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path
-                      d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"
-                    />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                </span>
-                <span
-                  v-if="channel.slowModeSeconds > 0"
-                  class="shrink-0"
-                  :title="t('channel.slowModeLabel')"
-                  style="color: var(--kv-text-muted)"
-                >
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.25"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                </span>
-              </button>
-
-              <span
-                v-if="channel.type === 'GUILD_VOICE' && voiceDuration(channel.id)"
-                class="shrink-0 text-[11px] font-semibold mr-1.5"
-                style="color: var(--kv-online, #3db46e); font-variant-numeric: tabular-nums"
-                >{{ voiceDuration(channel.id) }}</span
-              >
-
-              <span
-                v-if="channelShowMention(channel) && channelsStore.activeChannelId !== channel.id"
-                class="shrink-0 channel-unread-badge"
-              >
-                {{ channel.unreadMentionCount > 99 ? '99+' : channel.unreadMentionCount }}
-              </span>
-
-              <div
-                v-if="isAdmin"
-                class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pr-2"
-              >
-                <!-- Davet et (solda) -->
-                <button
-                  class="kv-chan-action flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer transition-colors"
-                  style="width: var(--kv-control-sm); height: var(--kv-control-sm)"
-                  :title="t('channel.invite')"
-                  @click.stop="showInvitePeople = true"
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <line x1="19" y1="8" x2="19" y2="14" />
-                    <line x1="22" y1="11" x2="16" y2="11" />
-                  </svg>
-                </button>
-                <!-- Düzenle / dişli (sağda) -->
-                <button
-                  class="kv-chan-action flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer transition-colors"
-                  style="width: var(--kv-control-sm); height: var(--kv-control-sm)"
-                  :title="t('channel.settingsTitle')"
-                  @click.stop="openSettings(channel)"
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="3" />
-                    <path
-                      d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <!-- Ses kanalı → katılımcı alt-listesi -->
-            <VoiceParticipantList
-              v-if="channel.type === 'GUILD_VOICE'"
-              :channel-id="channel.id"
-              :guild-id="channel.guildId ?? ''"
+            <span
+              v-if="channelShowGenericUnread(channel) && channelsStore.activeChannelId !== channel.id"
+              class="channel-unread-pip"
+              aria-hidden="true"
             />
+            <button
+              class="flex-1 flex items-center gap-2 min-w-0 cursor-pointer pl-4 pr-2"
+              @click="selectChannel(channel)"
+            >
+              <!-- C: kanal türü ikonu — ses kanalı hoparlör, metin # -->
+              <svg v-if="channel.type === 'GUILD_VOICE'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);" class="shrink-0">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              </svg>
+              <span v-else class="text-[16px] font-semibold leading-none" :style="{ color: channelsStore.activeChannelId === channel.id ? 'var(--kv-accent-400)' : 'var(--kv-text-muted)' }">#</span>
+              <span
+                class="truncate"
+                :class="[
+                  channelHasVisibleUnread(channel) && channelsStore.activeChannelId !== channel.id
+                    ? 'font-semibold text-[var(--kv-text-primary)]'
+                    : '',
+                  channelDimmed(channel) && channelsStore.activeChannelId !== channel.id
+                    ? 'opacity-60'
+                    : '',
+                ]"
+              >{{ channel.name }}</span>
+              <!-- C: isPrivate kilit rozeti -->
+              <span
+                v-if="channel.isPrivate"
+                class="shrink-0"
+                :title="t('channel.privateLabel')"
+                style="color: var(--kv-text-muted);"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </span>
+              <!-- Yaş-kapılı kanal: amber uyarı üçgeni (özel kanal kilidinden ayrı; "giremezsin" değil "dikkat" der); "18+" yazısı yerine tooltip -->
+              <span
+                v-if="channel.ageGated"
+                class="shrink-0"
+                :title="t('channel.ageRestrictedLockTitle')"
+                style="color: var(--kv-warning);"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </span>
+              <span
+                v-if="channel.slowModeSeconds > 0"
+                class="shrink-0"
+                :title="t('channel.slowModeLabel')"
+                style="color: var(--kv-text-muted);"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </span>
+            </button>
+
+            <span
+              v-if="channel.type === 'GUILD_VOICE' && voiceDuration(channel.id)"
+              class="shrink-0 text-[11px] font-semibold mr-1.5"
+              style="color: var(--kv-online, #3DB46E); font-variant-numeric: tabular-nums;"
+            >{{ voiceDuration(channel.id) }}</span>
+
+            <span
+              v-if="channelShowMention(channel) && channelsStore.activeChannelId !== channel.id"
+              class="shrink-0 channel-unread-badge"
+            >
+              {{ channel.unreadMentionCount > 99 ? '99+' : channel.unreadMentionCount }}
+            </span>
+
+            <div
+              v-if="isAdmin"
+              class="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pr-2"
+            >
+              <!-- Davet et (solda) -->
+              <button
+                class="kv-chan-action flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer transition-colors"
+                style="width: var(--kv-control-sm); height: var(--kv-control-sm);"
+                :title="t('channel.invite')"
+                @click.stop="showInvitePeople = true"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <line x1="19" y1="8" x2="19" y2="14"/>
+                  <line x1="22" y1="11" x2="16" y2="11"/>
+                </svg>
+              </button>
+              <!-- Düzenle / dişli (sağda) -->
+              <button
+                class="kv-chan-action flex items-center justify-center rounded-[var(--kv-radius-sm)] hover:bg-[var(--kv-bg-elevated)] cursor-pointer transition-colors"
+                style="width: var(--kv-control-sm); height: var(--kv-control-sm);"
+                :title="t('channel.settingsTitle')"
+                @click.stop="openSettings(channel)"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <!-- Ses kanalı → katılımcı alt-listesi -->
+          <VoiceParticipantList v-if="channel.type === 'GUILD_VOICE'" :channel-id="channel.id" :guild-id="channel.guildId ?? ''" />
           </template>
         </template>
       </template>
@@ -1995,7 +1526,7 @@ onUnmounted(() => {
       <p
         v-if="!uncategorizedChannels.length && !sortedCategories.length"
         class="px-2 text-[13px]"
-        style="color: var(--kv-text-muted)"
+        style="color: var(--kv-text-muted);"
       >
         {{ t('channel.noChannels') }}
       </p>
@@ -2007,29 +1538,16 @@ onUnmounted(() => {
       v-if="totalMentions > 0"
       type="button"
       class="shrink-0 flex items-center gap-2 px-4 py-2.5 text-left transition-opacity cursor-pointer hover:opacity-90"
-      style="background-color: var(--kv-danger); color: #ffffff"
+      style="background-color: var(--kv-danger); color: #ffffff;"
       :title="t('mention.bannerHint')"
       @click="jumpToNextMention"
     >
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="shrink-0"
-      >
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
       </svg>
       <span class="flex-1 text-[13px] font-semibold leading-tight">{{ t('mention.banner') }}</span>
-      <span
-        class="shrink-0 text-[12px] font-bold px-1.5 rounded-full"
-        style="background-color: rgba(255, 255, 255, 0.25)"
-      >
+      <span class="shrink-0 text-[12px] font-bold px-1.5 rounded-full" style="background-color: rgba(255,255,255,0.25);">
         {{ totalMentions > 99 ? '99+' : totalMentions }}
       </span>
     </button>
@@ -2060,7 +1578,11 @@ onUnmounted(() => {
   />
 
   <!-- Kanal oluştur modalı -->
-  <KvModal v-if="showCreate" :title="t('channel.createTitle')" @close="showCreate = false">
+  <KvModal
+    v-if="showCreate"
+    :title="t('channel.createTitle')"
+    @close="showCreate = false"
+  >
     <form class="flex flex-col gap-4" @submit.prevent="submitCreate">
       <KvInput
         v-model="createName"
@@ -2072,10 +1594,7 @@ onUnmounted(() => {
 
       <!-- C: Kanal türü seçici (yalnız görsel) -->
       <div class="flex flex-col gap-2">
-        <p
-          class="text-[11px] font-semibold uppercase tracking-widest"
-          style="color: var(--kv-text-muted)"
-        >
+        <p class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
           {{ t('channel.channelTypeLabel') }}
         </p>
         <div class="flex gap-2">
@@ -2084,68 +1603,30 @@ onUnmounted(() => {
             type="button"
             class="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-[var(--kv-radius-md)] cursor-pointer transition-colors"
             :class="createType === 'GUILD_TEXT' ? 'border-2' : 'border'"
-            :style="
-              createType === 'GUILD_TEXT'
-                ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
-                : 'border-color: var(--kv-border-subtle);'
-            "
+            :style="createType === 'GUILD_TEXT'
+              ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
+              : 'border-color: var(--kv-border-subtle);'"
             @click="createType = 'GUILD_TEXT'"
           >
-            <span
-              class="text-[18px] font-bold leading-none"
-              :style="{
-                color:
-                  createType === 'GUILD_TEXT' ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)',
-              }"
-              >#</span
-            >
-            <span
-              class="text-[12px] font-medium"
-              :style="{
-                color:
-                  createType === 'GUILD_TEXT' ? 'var(--kv-text-primary)' : 'var(--kv-text-muted)',
-              }"
-              >{{ t('channel.channelTypeText') }}</span
-            >
+            <span class="text-[18px] font-bold leading-none" :style="{ color: createType === 'GUILD_TEXT' ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)' }">#</span>
+            <span class="text-[12px] font-medium" :style="{ color: createType === 'GUILD_TEXT' ? 'var(--kv-text-primary)' : 'var(--kv-text-muted)' }">{{ t('channel.channelTypeText') }}</span>
           </button>
           <!-- Ses — seçilebilir (audio-only) -->
           <button
             type="button"
             class="flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-[var(--kv-radius-md)] cursor-pointer transition-colors"
             :class="createType === 'GUILD_VOICE' ? 'border-2' : 'border'"
-            :style="
-              createType === 'GUILD_VOICE'
-                ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
-                : 'border-color: var(--kv-border-subtle);'
-            "
+            :style="createType === 'GUILD_VOICE'
+              ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
+              : 'border-color: var(--kv-border-subtle);'"
             @click="createType = 'GUILD_VOICE'"
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              :style="{
-                color:
-                  createType === 'GUILD_VOICE' ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)',
-              }"
-            >
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ color: createType === 'GUILD_VOICE' ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)' }">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
             </svg>
-            <span
-              class="text-[12px] font-medium"
-              :style="{
-                color:
-                  createType === 'GUILD_VOICE' ? 'var(--kv-text-primary)' : 'var(--kv-text-muted)',
-              }"
-              >{{ t('channel.channelTypeVoice') }}</span
-            >
+            <span class="text-[12px] font-medium" :style="{ color: createType === 'GUILD_VOICE' ? 'var(--kv-text-primary)' : 'var(--kv-text-muted)' }">{{ t('channel.channelTypeVoice') }}</span>
           </button>
         </div>
       </div>
@@ -2153,24 +1634,20 @@ onUnmounted(() => {
       <!-- D: isPrivate toggle -->
       <div
         class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
-        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated)"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
       >
         <div class="flex-1 min-w-0">
-          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary)">
+          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
             {{ t('channel.privateLabel') }}
           </p>
-          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
             {{ t('channel.privateDesc') }}
           </p>
         </div>
         <button
           type="button"
           class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-          :style="
-            createIsPrivate
-              ? 'background-color: var(--kv-accent-500);'
-              : 'background-color: var(--kv-bg-rail);'
-          "
+          :style="createIsPrivate ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'"
           @click="createIsPrivate = !createIsPrivate"
         >
           <span
@@ -2183,24 +1660,20 @@ onUnmounted(() => {
       <!-- 18+ yaş-kapılı toggle (aynen durur) -->
       <div
         class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
-        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated)"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
       >
         <div class="flex-1 min-w-0">
-          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary)">
+          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
             {{ t('channel.ageGatedLabel') }}
           </p>
-          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
             {{ t('channel.ageGatedDesc') }}
           </p>
         </div>
         <button
           type="button"
           class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-          :style="
-            createAgeGated
-              ? 'background-color: var(--kv-accent-500);'
-              : 'background-color: var(--kv-bg-rail);'
-          "
+          :style="createAgeGated ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'"
           @click="createAgeGated = !createAgeGated"
         >
           <span
@@ -2224,7 +1697,11 @@ onUnmounted(() => {
   </KvModal>
 
   <!-- Kanal ayarları modalı (yeniden adlandır + yavaş mod + kategori) -->
-  <KvModal v-if="settingsTarget" :title="t('channel.settingsTitle')" @close="settingsTarget = null">
+  <KvModal
+    v-if="settingsTarget"
+    :title="t('channel.settingsTitle')"
+    @close="settingsTarget = null"
+  >
     <form class="flex flex-col gap-4" @submit.prevent="submitSettings">
       <KvInput
         v-model="settingsName"
@@ -2236,51 +1713,42 @@ onUnmounted(() => {
 
       <!-- Yavaş mod seçimi -->
       <div class="flex flex-col gap-1.5">
-        <label
-          class="text-[11px] font-semibold uppercase tracking-widest"
-          style="color: var(--kv-text-muted)"
-        >
+        <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
           {{ t('channel.slowModeLabel') }}
         </label>
-        <p class="text-[12px]" style="color: var(--kv-text-muted)">
+        <p class="text-[12px]" style="color: var(--kv-text-muted);">
           {{ t('channel.slowModeDesc') }}
         </p>
         <select
           v-model.number="settingsSlowMode"
           class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] outline-none border cursor-pointer"
-          style="
-            background-color: var(--kv-bg-elevated);
-            border-color: var(--kv-border-strong);
-            color: var(--kv-text-primary);
-          "
+          style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
         >
-          <option v-for="opt in SLOW_MODE_OPTIONS" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
+          <option
+            v-for="opt in SLOW_MODE_OPTIONS"
+            :key="opt.value"
+            :value="opt.value"
+          >{{ opt.label }}</option>
         </select>
       </div>
 
       <!-- Özel kanal toggle (sonradan özel yap/kaldır) -->
       <div
         class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
-        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated)"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
       >
         <div class="flex-1 min-w-0">
-          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary)">
+          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
             {{ t('channel.privateLabel') }}
           </p>
-          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
             {{ t('channel.privateDesc') }}
           </p>
         </div>
         <button
           type="button"
           class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-          :style="
-            settingsIsPrivate
-              ? 'background-color: var(--kv-accent-500);'
-              : 'background-color: var(--kv-bg-rail);'
-          "
+          :style="settingsIsPrivate ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'"
           @click="settingsIsPrivate = !settingsIsPrivate"
         >
           <span
@@ -2294,7 +1762,7 @@ onUnmounted(() => {
       <p
         v-if="settingsIsPrivate && !settingsTarget.isPrivate"
         class="text-[12px] -mt-1"
-        style="color: var(--kv-text-muted)"
+        style="color: var(--kv-text-muted);"
       >
         {{ t('channel.privateSaveHint') }}
       </p>
@@ -2302,24 +1770,20 @@ onUnmounted(() => {
       <!-- 18+ yaş-kapılı toggle -->
       <div
         class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
-        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated)"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
       >
         <div class="flex-1 min-w-0">
-          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary)">
+          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
             {{ t('channel.ageGatedLabel') }}
           </p>
-          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
             {{ t('channel.ageGatedDesc') }}
           </p>
         </div>
         <button
           type="button"
           class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-          :style="
-            settingsAgeGated
-              ? 'background-color: var(--kv-accent-500);'
-              : 'background-color: var(--kv-bg-rail);'
-          "
+          :style="settingsAgeGated ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'"
           @click="settingsAgeGated = !settingsAgeGated"
         >
           <span
@@ -2333,24 +1797,20 @@ onUnmounted(() => {
       <div
         v-if="settingsTarget.type === 'GUILD_VOICE'"
         class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
-        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated)"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
       >
         <div class="flex-1 min-w-0">
-          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary)">
+          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
             {{ t('channel.mediaEnabledLabel') }}
           </p>
-          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
             {{ t('channel.mediaEnabledDesc') }}
           </p>
         </div>
         <button
           type="button"
           class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-          :style="
-            settingsMediaEnabled
-              ? 'background-color: var(--kv-accent-500);'
-              : 'background-color: var(--kv-bg-rail);'
-          "
+          :style="settingsMediaEnabled ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'"
           @click="settingsMediaEnabled = !settingsMediaEnabled"
         >
           <span
@@ -2363,16 +1823,10 @@ onUnmounted(() => {
       <!-- Kullanıcı limiti (R10 — yalnız ses kanalları; Discord-tarzı kaydırıcı: ∞ … 99) -->
       <div v-if="settingsTarget.type === 'GUILD_VOICE'" class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
-          <label
-            class="text-[11px] font-semibold uppercase tracking-widest"
-            style="color: var(--kv-text-muted)"
-          >
+          <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
             {{ t('channel.userLimitLabel') }}
           </label>
-          <span
-            class="text-[13px] font-semibold"
-            style="color: var(--kv-text-primary); font-variant-numeric: tabular-nums"
-          >
+          <span class="text-[13px] font-semibold" style="color: var(--kv-text-primary); font-variant-numeric: tabular-nums;">
             {{ (settingsUserLimit ?? 0) > 0 ? settingsUserLimit : '∞' }}
           </span>
         </div>
@@ -2386,10 +1840,10 @@ onUnmounted(() => {
           :style="`background: linear-gradient(to right, var(--kv-accent-500) ${((settingsUserLimit ?? 0) / 99) * 100}%, var(--kv-bg-elevated) ${((settingsUserLimit ?? 0) / 99) * 100}%);`"
           @input="settingsUserLimit = Number(($event.target as HTMLInputElement).value)"
         />
-        <div class="flex justify-between text-[11px]" style="color: var(--kv-text-muted)">
+        <div class="flex justify-between text-[11px]" style="color: var(--kv-text-muted);">
           <span>∞</span><span>99</span>
         </div>
-        <p class="text-[12px]" style="color: var(--kv-text-muted)">
+        <p class="text-[12px]" style="color: var(--kv-text-muted);">
           {{ t('channel.userLimitHint') }}
         </p>
       </div>
@@ -2397,16 +1851,10 @@ onUnmounted(() => {
       <!-- Bit hızı (R10 — yalnız ses kanalları; Discord-tarzı kaydırıcı: 8 … 96 kbps) -->
       <div v-if="settingsTarget.type === 'GUILD_VOICE'" class="flex flex-col gap-1.5">
         <div class="flex items-center justify-between">
-          <label
-            class="text-[11px] font-semibold uppercase tracking-widest"
-            style="color: var(--kv-text-muted)"
-          >
+          <label class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
             {{ t('channel.bitrateLabel') }}
           </label>
-          <span
-            class="text-[13px] font-semibold"
-            style="color: var(--kv-text-primary); font-variant-numeric: tabular-nums"
-          >
+          <span class="text-[13px] font-semibold" style="color: var(--kv-text-primary); font-variant-numeric: tabular-nums;">
             {{ settingsBitrate }} kbps
           </span>
         </div>
@@ -2420,10 +1868,10 @@ onUnmounted(() => {
           :style="`background: linear-gradient(to right, var(--kv-accent-500) ${((settingsBitrate - 8) / 88) * 100}%, var(--kv-bg-elevated) ${((settingsBitrate - 8) / 88) * 100}%);`"
           @input="settingsBitrate = Number(($event.target as HTMLInputElement).value)"
         />
-        <div class="flex justify-between text-[11px]" style="color: var(--kv-text-muted)">
+        <div class="flex justify-between text-[11px]" style="color: var(--kv-text-muted);">
           <span>8 kbps</span><span>96 kbps</span>
         </div>
-        <p class="text-[12px]" style="color: var(--kv-text-muted)">
+        <p class="text-[12px]" style="color: var(--kv-text-muted);">
           {{ t('channel.bitrateHint') }}
         </p>
       </div>
@@ -2433,13 +1881,10 @@ onUnmounted(() => {
         <div class="flex flex-col gap-3 pt-1">
           <!-- Bölüm başlığı -->
           <div>
-            <p
-              class="text-[11px] font-semibold uppercase tracking-widest mb-1"
-              style="color: var(--kv-text-muted)"
-            >
+            <p class="text-[11px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
               {{ t('channel.members.sectionTitle') }}
             </p>
-            <p class="text-[12px]" style="color: var(--kv-text-muted)">
+            <p class="text-[12px]" style="color: var(--kv-text-muted);">
               {{ t('channel.members.privateNote') }}
             </p>
           </div>
@@ -2447,19 +1892,19 @@ onUnmounted(() => {
           <!-- Mevcut üyeler listesi -->
           <div
             class="rounded-[var(--kv-radius-md)] border overflow-hidden"
-            style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated)"
+            style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
           >
             <p
               v-if="membersLoading"
               class="px-3 py-2 text-[13px]"
-              style="color: var(--kv-text-muted)"
+              style="color: var(--kv-text-muted);"
             >
               {{ t('channel.members.loading') }}
             </p>
             <p
               v-else-if="channelMembers.length === 0"
               class="px-3 py-2 text-[13px]"
-              style="color: var(--kv-text-muted)"
+              style="color: var(--kv-text-muted);"
             >
               {{ t('channel.members.noMembers') }}
             </p>
@@ -2468,12 +1913,12 @@ onUnmounted(() => {
               v-else
               :key="member.id"
               class="flex items-center gap-2 px-3 py-2 border-b last:border-b-0"
-              style="border-color: var(--kv-border-subtle)"
+              style="border-color: var(--kv-border-subtle);"
             >
               <!-- Avatar (daire) -->
               <div
                 class="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[12px] font-semibold overflow-hidden"
-                style="background-color: var(--kv-accent-500); color: #fff"
+                style="background-color: var(--kv-accent-500); color: #fff;"
               >
                 <img
                   v-if="member.avatarUrl"
@@ -2484,29 +1929,20 @@ onUnmounted(() => {
                 <span v-else>{{ member.username.charAt(0).toUpperCase() }}</span>
               </div>
               <!-- Ad -->
-              <span class="flex-1 text-[14px] truncate" style="color: var(--kv-text-primary)">
+              <span class="flex-1 text-[14px] truncate" style="color: var(--kv-text-primary);">
                 {{ member.username }}
               </span>
               <!-- Çıkar butonu -->
               <button
                 class="shrink-0 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-rail)]"
-                style="width: 24px; height: 24px; color: var(--kv-danger)"
+                style="width: 24px; height: 24px; color: var(--kv-danger);"
                 :title="t('channel.members.remove')"
                 type="button"
                 @click="removeChannelMember(member.id)"
               >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               </button>
             </div>
@@ -2514,10 +1950,7 @@ onUnmounted(() => {
 
           <!-- Üye ekle: arama + liste -->
           <div class="flex flex-col gap-2">
-            <p
-              class="text-[11px] font-semibold uppercase tracking-widest"
-              style="color: var(--kv-text-muted)"
-            >
+            <p class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
               {{ t('channel.members.addMember') }}
             </p>
             <input
@@ -2525,26 +1958,17 @@ onUnmounted(() => {
               type="text"
               :placeholder="t('channel.members.addMemberSearch')"
               class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] outline-none border"
-              style="
-                background-color: var(--kv-bg-elevated);
-                border-color: var(--kv-border-strong);
-                color: var(--kv-text-primary);
-              "
+              style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
             />
             <!-- Hata mesajı -->
-            <p v-if="addMemberError" class="text-[12px]" style="color: var(--kv-danger)">
+            <p v-if="addMemberError" class="text-[12px]" style="color: var(--kv-danger);">
               {{ addMemberError }}
             </p>
             <!-- Eklenebilir üye listesi -->
             <div
               v-if="eligibleToAdd.length > 0"
               class="rounded-[var(--kv-radius-md)] border overflow-hidden"
-              style="
-                border-color: var(--kv-border-subtle);
-                background-color: var(--kv-bg-elevated);
-                max-height: 180px;
-                overflow-y: auto;
-              "
+              style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); max-height: 180px; overflow-y: auto;"
             >
               <button
                 v-for="member in eligibleToAdd"
@@ -2552,13 +1976,13 @@ onUnmounted(() => {
                 type="button"
                 :disabled="addMemberLoading"
                 class="w-full flex items-center gap-2 px-3 py-2 text-left border-b last:border-b-0 transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)] disabled:opacity-50 disabled:cursor-not-allowed"
-                style="border-color: var(--kv-border-subtle)"
+                style="border-color: var(--kv-border-subtle);"
                 @click="addChannelMember(member.userId)"
               >
                 <!-- Avatar (daire) -->
                 <div
                   class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[11px] font-semibold overflow-hidden"
-                  style="background-color: var(--kv-accent-500); color: #fff"
+                  style="background-color: var(--kv-accent-500); color: #fff;"
                 >
                   <img
                     v-if="member.avatarUrl"
@@ -2568,29 +1992,19 @@ onUnmounted(() => {
                   />
                   <span v-else>{{ member.username.charAt(0).toUpperCase() }}</span>
                 </div>
-                <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-secondary)">
+                <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-secondary);">
                   {{ member.username }}
                 </span>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  style="color: var(--kv-text-muted); shrink: 0"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted); shrink: 0;">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
               </button>
             </div>
             <p
               v-else-if="!addMemberLoading && guildMembersAll.length > 0"
               class="text-[13px]"
-              style="color: var(--kv-text-muted)"
+              style="color: var(--kv-text-muted);"
             >
               {{ t('channel.members.noEligible') }}
             </p>
@@ -2619,20 +2033,11 @@ onUnmounted(() => {
   <KvModal
     v-if="deleteTarget && deleteError"
     :title="t('channel.deleteTitle')"
-    @close="
-      deleteTarget = null
-      deleteError = ''
-    "
+    @close="deleteTarget = null; deleteError = ''"
   >
-    <p class="text-[14px] mb-4" style="color: var(--kv-danger)">{{ deleteError }}</p>
+    <p class="text-[14px] mb-4" style="color: var(--kv-danger);">{{ deleteError }}</p>
     <div class="flex justify-end">
-      <KvButton
-        variant="ghost"
-        @click="
-          deleteTarget = null
-          deleteError = ''
-        "
-      >
+      <KvButton variant="ghost" @click="deleteTarget = null; deleteError = ''">
         {{ t('common.close') }}
       </KvButton>
     </div>
@@ -2674,7 +2079,11 @@ onUnmounted(() => {
   </KvModal>
 
   <!-- Kategori yeniden adlandır modalı -->
-  <KvModal v-if="renameTarget" :title="t('category.renameTitle')" @close="renameTarget = null">
+  <KvModal
+    v-if="renameTarget"
+    :title="t('category.renameTitle')"
+    @close="renameTarget = null"
+  >
     <form class="flex flex-col gap-4" @submit.prevent="submitRenameCategory">
       <KvInput
         v-model="renameName"
@@ -2709,16 +2118,11 @@ onUnmounted(() => {
   <ConfirmDialog
     v-if="showLeaveConfirm"
     :title="t('guild.leaveTitle')"
-    :message="
-      leaveError || t('guild.leaveConfirm', { name: guildsStore.activeGuild()?.name ?? '' })
-    "
+    :message="leaveError || t('guild.leaveConfirm', { name: guildsStore.activeGuild()?.name ?? '' })"
     :confirm-label="t('guild.leave')"
     :loading="leaving"
     @confirm="doLeave"
-    @cancel="
-      showLeaveConfirm = false
-      leaveError = ''
-    "
+    @cancel="showLeaveConfirm = false; leaveError = ''"
   />
 
   <!-- Etkinlikler modalı -->
@@ -2727,10 +2131,7 @@ onUnmounted(() => {
     :guild-id="activeGuildId"
     :can-manage="canManageEvents"
     :highlight-event-id="highlightEventId"
-    @close="
-      showEventsModal = false
-      highlightEventId = null
-    "
+    @close="showEventsModal = false; highlightEventId = null"
   />
 
   <!-- Etkinlik oluştur sihirbazı (ortam menüsünden) -->
@@ -2760,19 +2161,7 @@ onUnmounted(() => {
         role="menuitem"
         @click="doChannelMarkRead"
       >
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="ch-ctx__icon"
-        >
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><path d="M20 6 9 17l-5-5"/></svg>
         <span>{{ t('guildMenu.markRead') }}</span>
       </button>
 
@@ -2783,45 +2172,17 @@ onUnmounted(() => {
         role="menuitem"
         @click="openChannelInvite"
       >
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="ch-ctx__icon"
-        >
-          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <line x1="19" y1="8" x2="19" y2="14" />
-          <line x1="22" y1="11" x2="16" y2="11" />
-        </svg>
-        <span>{{
-          contextChannel.type === 'GUILD_VOICE'
-            ? t('channelMenu.inviteVoice')
-            : t('channelMenu.inviteText')
-        }}</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        <span>{{ contextChannel.type === 'GUILD_VOICE' ? t('channelMenu.inviteVoice') : t('channelMenu.inviteText') }}</span>
       </button>
 
       <!-- 3. Bağlantıyı Kopyala — herkese -->
-      <button class="ch-ctx__item" role="menuitem" @click="doCopyChannelLink">
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="ch-ctx__icon"
-        >
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-        </svg>
+      <button
+        class="ch-ctx__item"
+        role="menuitem"
+        @click="doCopyChannelLink"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         <span>{{ t('channelMenu.copyLink') }}</span>
       </button>
 
@@ -2844,44 +2205,22 @@ onUnmounted(() => {
       <template v-if="isAdmin">
         <div class="ch-ctx__divider" />
         <!-- 6. Kanalı Düzenle -->
-        <button class="ch-ctx__item" role="menuitem" @click="openChannelSettings">
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="ch-ctx__icon"
-          >
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-          </svg>
+        <button
+          class="ch-ctx__item"
+          role="menuitem"
+          @click="openChannelSettings"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           <span>{{ t('channelMenu.edit') }}</span>
         </button>
         <!-- 7. Kanal Oluştur (türe göre: metin → metin, ses → ses; o kategoride) -->
-        <button class="ch-ctx__item" role="menuitem" @click="openChannelCreate">
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="ch-ctx__icon"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          <span>{{
-            contextChannel.type === 'GUILD_VOICE'
-              ? t('channelMenu.createVoice')
-              : t('channelMenu.createText')
-          }}</span>
+        <button
+          class="ch-ctx__item"
+          role="menuitem"
+          @click="openChannelCreate"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>{{ contextChannel.type === 'GUILD_VOICE' ? t('channelMenu.createVoice') : t('channelMenu.createText') }}</span>
         </button>
         <!-- 8. Kanalı Sil (danger) -->
         <button
@@ -2889,22 +2228,7 @@ onUnmounted(() => {
           role="menuitem"
           @click="openChannelDelete"
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="ch-ctx__icon"
-          >
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-            <path d="M10 11v6M14 11v6" />
-            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-          </svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
           <span>{{ t('channelMenu.delete') }}</span>
         </button>
       </template>
@@ -2912,21 +2236,12 @@ onUnmounted(() => {
       <div class="ch-ctx__divider" />
 
       <!-- 9. Kanal ID'sini Kopyala — herkese -->
-      <button class="ch-ctx__item" role="menuitem" @click="doCopyChannelId">
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="ch-ctx__icon"
-        >
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
+      <button
+        class="ch-ctx__item"
+        role="menuitem"
+        @click="doCopyChannelId"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ch-ctx__icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         <span class="ch-ctx__label">{{ t('channelMenu.copyId') }}</span>
         <span class="ch-ctx__id-badge">{{ t('guildMenu.idBadge') }}</span>
       </button>
@@ -2944,22 +2259,10 @@ onUnmounted(() => {
   animation: kv-mention-fade 2.6s ease-out forwards;
 }
 @keyframes kv-mention-fade {
-  0% {
-    outline-color: rgba(242, 59, 75, 0);
-    background-color: transparent;
-  }
-  10% {
-    outline-color: rgba(242, 59, 75, 1);
-    background-color: var(--kv-accent-subtle);
-  }
-  45% {
-    outline-color: rgba(242, 59, 75, 1);
-    background-color: transparent;
-  }
-  100% {
-    outline-color: rgba(242, 59, 75, 0);
-    background-color: transparent;
-  }
+  0%   { outline-color: rgba(242, 59, 75, 0); background-color: transparent; }
+  10%  { outline-color: rgba(242, 59, 75, 1); background-color: var(--kv-accent-subtle); }
+  45%  { outline-color: rgba(242, 59, 75, 1); background-color: transparent; }
+  100% { outline-color: rgba(242, 59, 75, 0); background-color: transparent; }
 }
 
 /* Drag-reorder: üzerine bırakılacak hedef göstergesi (üst aksan çizgisi) */

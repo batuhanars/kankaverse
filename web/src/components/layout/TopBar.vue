@@ -21,11 +21,7 @@ function togglePins(e: MouseEvent) {
 <template>
   <header
     class="flex items-center px-4 gap-3 shrink-0 border-b"
-    style="
-      height: var(--kv-header-height);
-      background-color: var(--kv-bg-content);
-      border-color: var(--kv-border-subtle);
-    "
+    style="height: var(--kv-header-height); background-color: var(--kv-bg-content); border-color: var(--kv-border-subtle);"
   >
     <span class="text-[var(--kv-text-muted)] font-medium">#</span>
     <span class="text-[15px] font-semibold text-[var(--kv-text-primary)]">
@@ -40,14 +36,8 @@ function togglePins(e: MouseEvent) {
           :class="showPins ? 'bg-[var(--kv-accent-subtle)]' : ''"
           :style="showPins ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
           :title="t('message.pinnedMessages')"
-          @mouseenter="
-            !showPins &&
-            (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')
-          "
-          @mouseleave="
-            !showPins &&
-            (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')
-          "
+          @mouseenter="!showPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
+          @mouseleave="!showPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
           @click="togglePins"
         >
           📌
@@ -71,6 +61,7 @@ function togglePins(e: MouseEvent) {
       >
         {{ t('member.panel') }}
       </button>
+
     </div>
   </header>
 </template>

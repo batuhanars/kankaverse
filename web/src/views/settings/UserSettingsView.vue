@@ -39,9 +39,7 @@ const VALID_SECTIONS: NavSection[] = ['profil', 'hesap', 'ses', 'gizlilik', 'mas
 // Masaüstü (Electron) istemcisinde ek sekme — tarayıcıda gizli.
 const isElectron = window.kankaverse?.isElectron === true
 const activeSection = ref<NavSection>(
-  VALID_SECTIONS.includes(props.initialSection as NavSection)
-    ? (props.initialSection as NavSection)
-    : 'profil',
+  VALID_SECTIONS.includes(props.initialSection as NavSection) ? (props.initialSection as NavSection) : 'profil',
 )
 
 // Profil en üstte — profil görünümü düzenlemeleri buradan başlar (sahip tercihi).
@@ -211,9 +209,7 @@ const bannerImageUploading = ref(false)
 const bannerImageUploadPct = ref(0)
 const bannerImageError = ref('')
 
-const bannerImageDisplayUrl = computed(
-  () => bannerImagePreviewUrl.value ?? authStore.user?.bannerUrl ?? null,
-)
+const bannerImageDisplayUrl = computed(() => bannerImagePreviewUrl.value ?? authStore.user?.bannerUrl ?? null)
 
 function triggerBannerImagePicker() {
   if (bannerImageUploading.value) return
@@ -288,11 +284,7 @@ const bannerPresetKeys = BANNER_PRESET_KEYS
 const draftBannerColor = computed(() => authStore.user?.bannerColor ?? null)
 const profileMemberSince = computed(() =>
   authStore.user
-    ? new Date(authStore.user.createdAt).toLocaleDateString('tr-TR', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      })
+    ? new Date(authStore.user.createdAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
     : '',
 )
 async function setBannerColor(key: string | null) {
@@ -351,7 +343,7 @@ async function selectPolicy(p: DmPolicy) {
   <Teleport to="body">
     <div
       class="fixed inset-0 z-50 flex"
-      style="background-color: var(--kv-bg-overlay)"
+      style="background-color: var(--kv-bg-overlay);"
       role="dialog"
       aria-modal="true"
       :aria-label="t('settings.title')"
@@ -360,27 +352,15 @@ async function selectPolicy(p: DmPolicy) {
       <div
         v-if="!isMobile"
         class="shrink-0 flex justify-end"
-        style="
-          width: 42%;
-          min-width: 280px;
-          max-width: 560px;
-          background-color: var(--kv-bg-sidebar);
-        "
+        style="width: 42%; min-width: 280px; max-width: 560px; background-color: var(--kv-bg-sidebar);"
       >
         <!-- Sol nav kolonu -->
         <div
           class="shrink-0 flex flex-col py-8 px-3 border-r"
-          style="
-            width: 220px;
-            background-color: var(--kv-bg-sidebar);
-            border-color: var(--kv-border-subtle);
-          "
+          style="width: 220px; background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle);"
         >
           <div class="px-2 mb-4">
-            <p
-              class="text-[11px] font-bold uppercase tracking-widest truncate"
-              style="color: var(--kv-text-muted)"
-            >
+            <p class="text-[11px] font-bold uppercase tracking-widest truncate" style="color: var(--kv-text-muted);">
               {{ t('settings.title') }}
             </p>
           </div>
@@ -391,11 +371,9 @@ async function selectPolicy(p: DmPolicy) {
               :key="item.key"
               type="button"
               class="w-full flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] font-medium text-left cursor-pointer transition-colors"
-              :class="
-                activeSection === item.key
-                  ? 'bg-[var(--kv-bg-elevated)] text-[var(--kv-accent-400)] shadow-[inset_2px_0_0_var(--kv-accent-500)]'
-                  : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-bg-elevated)] hover:text-[var(--kv-text-primary)]'
-              "
+              :class="activeSection === item.key
+                ? 'bg-[var(--kv-bg-elevated)] text-[var(--kv-accent-400)] shadow-[inset_2px_0_0_var(--kv-accent-500)]'
+                : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-bg-elevated)] hover:text-[var(--kv-text-primary)]'"
               @click="activeSection = item.key"
             >
               {{ t(item.labelKey) }}
@@ -405,30 +383,22 @@ async function selectPolicy(p: DmPolicy) {
       </div>
 
       <!-- ── İçerik alanı (hem mobil hem masaüstü) ── -->
-      <div
-        class="flex-1 flex flex-col overflow-hidden min-w-0"
-        style="background-color: var(--kv-bg-content)"
-      >
+      <div class="flex-1 flex flex-col overflow-hidden min-w-0" style="background-color: var(--kv-bg-content);">
+
         <!-- ── MOBİL (<768): Üst sekme şeridi ── -->
         <div
           v-if="isMobile"
           class="shrink-0 flex items-center border-b overflow-x-auto"
-          style="
-            background-color: var(--kv-bg-sidebar);
-            border-color: var(--kv-border-subtle);
-            scrollbar-width: none;
-          "
+          style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle); scrollbar-width: none;"
         >
           <button
             v-for="item in navItems"
             :key="item.key"
             type="button"
             class="shrink-0 px-4 py-3 text-[13px] font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2"
-            :style="
-              activeSection === item.key
-                ? 'color: var(--kv-accent-400); border-color: var(--kv-accent-500);'
-                : 'color: var(--kv-text-secondary); border-color: transparent;'
-            "
+            :style="activeSection === item.key
+              ? 'color: var(--kv-accent-400); border-color: var(--kv-accent-500);'
+              : 'color: var(--kv-text-secondary); border-color: transparent;'"
             @click="activeSection = item.key"
           >
             {{ t(item.labelKey) }}
@@ -438,20 +408,11 @@ async function selectPolicy(p: DmPolicy) {
           <button
             type="button"
             class="shrink-0 ml-auto flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-            style="width: 44px; height: 44px; color: var(--kv-text-muted)"
+            style="width: 44px; height: 44px; color: var(--kv-text-muted);"
             :aria-label="t('common.close')"
             @click="emit('close')"
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -462,35 +423,22 @@ async function selectPolicy(p: DmPolicy) {
         <div
           v-if="!isMobile"
           class="shrink-0 flex items-center justify-between border-b"
-          style="height: var(--kv-header-height); border-color: var(--kv-border-subtle)"
+          style="height: var(--kv-header-height); border-color: var(--kv-border-subtle);"
         >
-          <div class="flex items-center justify-between flex-1" style="max-width: 1000px">
-            <h2 class="text-[18px] font-semibold px-8" style="color: var(--kv-text-primary)">
+          <div class="flex items-center justify-between flex-1" style="max-width: 1000px;">
+            <h2 class="text-[18px] font-semibold px-8" style="color: var(--kv-text-primary);">
               {{ t(navItems.find((i) => i.key === activeSection)!.labelKey) }}
             </h2>
             <div class="flex items-center gap-3 px-8">
-              <span
-                class="text-[11px] font-semibold uppercase tracking-widest"
-                style="color: var(--kv-text-muted)"
-                >ESC</span
-              >
+              <span class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">ESC</span>
               <button
                 type="button"
                 class="flex items-center justify-center rounded-full transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-                style="width: 32px; height: 32px; color: var(--kv-text-muted)"
+                style="width: 32px; height: 32px; color: var(--kv-text-muted);"
                 :aria-label="t('common.close')"
                 @click="emit('close')"
               >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -501,65 +449,40 @@ async function selectPolicy(p: DmPolicy) {
 
         <!-- İçerik gövde -->
         <div class="flex-1 overflow-y-auto">
-          <div style="max-width: 1000px; width: 100%">
+          <div style="max-width: 1000px; width: 100%;">
             <div class="px-4 py-4 md:px-8 md:py-6">
+
               <!-- ── Hesap ── (Discord-tarzı satırlar; "Düzenle" → modal) -->
               <div v-if="activeSection === 'hesap'" class="flex flex-col gap-8 max-w-2xl">
                 <!-- Hesap Bilgileri -->
                 <section>
-                  <h3 class="text-[18px] font-bold mb-2" style="color: var(--kv-text-primary)">
+                  <h3 class="text-[18px] font-bold mb-2" style="color: var(--kv-text-primary);">
                     {{ t('settings.account.infoTitle') }}
                   </h3>
-                  <div
-                    class="rounded-[var(--kv-radius-lg)] divide-y divide-[color:var(--kv-border-subtle)]"
-                    style="background-color: var(--kv-bg-sidebar)"
-                  >
+                  <div class="rounded-[var(--kv-radius-lg)] divide-y divide-[color:var(--kv-border-subtle)]" style="background-color: var(--kv-bg-sidebar);">
                     <!-- Kullanıcı Adı -->
                     <div class="flex items-center justify-between gap-4 px-5 py-4">
-                      <p
-                        class="text-[14px] font-medium shrink-0"
-                        style="color: var(--kv-text-secondary)"
-                      >
+                      <p class="text-[14px] font-medium shrink-0" style="color: var(--kv-text-secondary);">
                         {{ t('settings.account.username') }}
                       </p>
                       <div class="flex items-center gap-3 min-w-0">
-                        <span class="text-[14px] truncate" style="color: var(--kv-text-primary)">{{
-                          authStore.user?.username
-                        }}</span>
-                        <button class="kv-row-btn" @click="editModal = 'username'">
-                          {{ t('settings.account.edit') }}
-                        </button>
+                        <span class="text-[14px] truncate" style="color: var(--kv-text-primary);">{{ authStore.user?.username }}</span>
+                        <button class="kv-row-btn" @click="editModal = 'username'">{{ t('settings.account.edit') }}</button>
                       </div>
                     </div>
                     <!-- E-posta -->
-                    <div
-                      class="flex items-center justify-between gap-4 px-5 py-4"
-                      style="border-color: var(--kv-border-subtle)"
-                    >
-                      <p
-                        class="text-[14px] font-medium shrink-0"
-                        style="color: var(--kv-text-secondary)"
-                      >
+                    <div class="flex items-center justify-between gap-4 px-5 py-4" style="border-color: var(--kv-border-subtle);">
+                      <p class="text-[14px] font-medium shrink-0" style="color: var(--kv-text-secondary);">
                         {{ t('settings.account.email') }}
                       </p>
                       <div class="flex items-center gap-3 min-w-0">
-                        <span
-                          class="text-[14px] truncate"
-                          style="color: var(--kv-text-primary); font-variant-numeric: tabular-nums"
-                          >{{ maskedEmail }}</span
-                        >
+                        <span class="text-[14px] truncate" style="color: var(--kv-text-primary); font-variant-numeric: tabular-nums;">{{ maskedEmail }}</span>
                         <button
                           class="text-[13px] cursor-pointer shrink-0 hover:underline"
-                          style="color: var(--kv-accent-500)"
+                          style="color: var(--kv-accent-500);"
                           @click="revealEmail = !revealEmail"
-                        >
-                          {{
-                            revealEmail ? t('settings.account.hide') : t('settings.account.show')
-                          }}
-                        </button>
-                        <button class="kv-row-btn" @click="editModal = 'email'">
-                          {{ t('settings.account.edit') }}
-                        </button>
+                        >{{ revealEmail ? t('settings.account.hide') : t('settings.account.show') }}</button>
+                        <button class="kv-row-btn" @click="editModal = 'email'">{{ t('settings.account.edit') }}</button>
                       </div>
                     </div>
                   </div>
@@ -567,82 +490,43 @@ async function selectPolicy(p: DmPolicy) {
 
                 <!-- Şifre ve Güvenlik -->
                 <section>
-                  <h3 class="text-[18px] font-bold mb-2" style="color: var(--kv-text-primary)">
+                  <h3 class="text-[18px] font-bold mb-2" style="color: var(--kv-text-primary);">
                     {{ t('settings.account.securityTitle') }}
                   </h3>
-                  <div
-                    class="rounded-[var(--kv-radius-lg)] divide-y divide-[color:var(--kv-border-subtle)]"
-                    style="background-color: var(--kv-bg-sidebar)"
-                  >
+                  <div class="rounded-[var(--kv-radius-lg)] divide-y divide-[color:var(--kv-border-subtle)]" style="background-color: var(--kv-bg-sidebar);">
                     <!-- Şifre -->
-                    <div
-                      class="flex items-center justify-between gap-4 px-5 py-4"
-                      style="border-color: var(--kv-border-subtle)"
-                    >
-                      <p class="text-[14px] font-medium" style="color: var(--kv-text-secondary)">
+                    <div class="flex items-center justify-between gap-4 px-5 py-4" style="border-color: var(--kv-border-subtle);">
+                      <p class="text-[14px] font-medium" style="color: var(--kv-text-secondary);">
                         {{ t('settings.account.password') }}
                       </p>
-                      <button class="kv-row-btn" @click="editModal = 'password'">
-                        {{ t('settings.account.edit') }}
-                      </button>
+                      <button class="kv-row-btn" @click="editModal = 'password'">{{ t('settings.account.edit') }}</button>
                     </div>
                     <!-- 2FA -->
                     <button
                       class="w-full flex items-center justify-between gap-4 px-5 py-4 text-left cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
-                      style="border-color: var(--kv-border-subtle)"
+                      style="border-color: var(--kv-border-subtle);"
                       @click="editModal = '2fa'"
                     >
-                      <p class="text-[14px] font-medium" style="color: var(--kv-text-secondary)">
+                      <p class="text-[14px] font-medium" style="color: var(--kv-text-secondary);">
                         {{ t('settings.account.twoFactor') }}
                       </p>
                       <span class="flex items-center gap-2 shrink-0">
-                        <span
-                          class="text-[13px]"
-                          :style="`color: ${authStore.user?.twoFactorEnabled ? 'var(--kv-online, #3DB46E)' : 'var(--kv-text-muted)'};`"
-                        >
-                          {{
-                            authStore.user?.twoFactorEnabled
-                              ? t('settings.account.twoFactorOn')
-                              : t('settings.account.twoFactorSetup')
-                          }}
+                        <span class="text-[13px]" :style="`color: ${authStore.user?.twoFactorEnabled ? 'var(--kv-online, #3DB46E)' : 'var(--kv-text-muted)'};`">
+                          {{ authStore.user?.twoFactorEnabled ? t('settings.account.twoFactorOn') : t('settings.account.twoFactorSetup') }}
                         </span>
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2.5"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          style="color: var(--kv-text-muted)"
-                        >
-                          <polyline points="9 18 15 12 9 6" />
-                        </svg>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);"><polyline points="9 18 15 12 9 6"/></svg>
                       </span>
                     </button>
                     <!-- Oturumlar -->
                     <button
                       class="w-full flex items-center justify-between gap-4 px-5 py-4 text-left cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
-                      style="border-color: var(--kv-border-subtle)"
+                      style="border-color: var(--kv-border-subtle);"
                       @click="editModal = 'sessions'"
                     >
-                      <p class="text-[14px] font-medium" style="color: var(--kv-text-secondary)">
+                      <p class="text-[14px] font-medium" style="color: var(--kv-text-secondary);">
                         {{ t('settings.account.sessions') }}
                       </p>
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        style="color: var(--kv-text-muted)"
-                      >
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);"><polyline points="9 18 15 12 9 6"/></svg>
                     </button>
                   </div>
                 </section>
@@ -651,25 +535,13 @@ async function selectPolicy(p: DmPolicy) {
                 <section>
                   <button
                     class="w-full flex items-center justify-between gap-4 px-5 py-4 rounded-[var(--kv-radius-lg)] text-left cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
-                    style="background-color: var(--kv-bg-sidebar)"
+                    style="background-color: var(--kv-bg-sidebar);"
                     @click="editModal = 'delete'"
                   >
-                    <p class="text-[14px] font-medium" style="color: var(--kv-danger)">
+                    <p class="text-[14px] font-medium" style="color: var(--kv-danger);">
                       {{ t('settings.account.delete') }}
                     </p>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      style="color: var(--kv-text-muted)"
-                    >
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);"><polyline points="9 18 15 12 9 6"/></svg>
                   </button>
                 </section>
               </div>
@@ -678,34 +550,23 @@ async function selectPolicy(p: DmPolicy) {
               <div v-else-if="activeSection === 'profil'" class="flex gap-8">
                 <!-- SOL: avatar + bio + afiş görsel/renk swatch'ları -->
                 <div class="flex-1 min-w-0 max-w-xl flex flex-col gap-6">
+
                   <!-- Sprint C8 — Avatar -->
                   <section v-if="!mediaUploadsDisabled">
-                    <h3
-                      class="text-[13px] font-semibold uppercase tracking-widest mb-3"
-                      style="color: var(--kv-text-muted)"
-                    >
+                    <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
                       {{ t('settings.avatar.label') }}
                     </h3>
                     <div class="flex items-center gap-4">
                       <div
                         class="w-16 h-16 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[22px] font-bold text-white"
-                        style="background-color: var(--kv-accent-500)"
+                        style="background-color: var(--kv-accent-500);"
                       >
-                        <img
-                          v-if="avatarDisplayUrl"
-                          :src="avatarDisplayUrl"
-                          class="w-full h-full object-cover"
-                        />
+                        <img v-if="avatarDisplayUrl" :src="avatarDisplayUrl" class="w-full h-full object-cover" />
                         <span v-else>{{ (authStore.user?.username ?? '?')[0].toUpperCase() }}</span>
                       </div>
                       <div class="flex flex-col gap-1.5 min-w-0">
                         <div class="flex gap-2">
-                          <KvButton
-                            size="sm"
-                            :disabled="avatarUploading"
-                            :loading="avatarUploading"
-                            @click="triggerAvatarPicker"
-                          >
+                          <KvButton size="sm" :disabled="avatarUploading" :loading="avatarUploading" @click="triggerAvatarPicker">
                             {{ t('settings.avatar.upload') }}
                           </KvButton>
                           <KvButton
@@ -718,16 +579,10 @@ async function selectPolicy(p: DmPolicy) {
                             {{ t('settings.avatar.remove') }}
                           </KvButton>
                         </div>
-                        <p
-                          v-if="avatarUploading && avatarUploadPct > 0"
-                          class="text-[12px]"
-                          style="color: var(--kv-text-muted)"
-                        >
+                        <p v-if="avatarUploading && avatarUploadPct > 0" class="text-[12px]" style="color: var(--kv-text-muted);">
                           {{ t('settings.avatar.uploading', { pct: avatarUploadPct }) }}
                         </p>
-                        <p v-if="avatarError" class="text-[12px]" style="color: var(--kv-danger)">
-                          {{ avatarError }}
-                        </p>
+                        <p v-if="avatarError" class="text-[12px]" style="color: var(--kv-danger);">{{ avatarError }}</p>
                       </div>
                     </div>
                     <input
@@ -740,26 +595,16 @@ async function selectPolicy(p: DmPolicy) {
                   </section>
 
                   <!-- Görsel yükleme kapalıysa tek bir bilgi notu (avatar + afiş ortak bayrak) -->
-                  <p
-                    v-if="mediaUploadsDisabled"
-                    class="text-[12px]"
-                    style="color: var(--kv-text-muted)"
-                  >
+                  <p v-if="mediaUploadsDisabled" class="text-[12px]" style="color: var(--kv-text-muted);">
                     {{ t('settings.mediaUploadsDisabled') }}
                   </p>
 
                   <section>
                     <div class="flex items-center justify-between mb-3">
-                      <h3
-                        class="text-[13px] font-semibold uppercase tracking-widest"
-                        style="color: var(--kv-text-muted)"
-                      >
+                      <h3 class="text-[13px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
                         {{ t('settings.bioLabel') }}
                       </h3>
-                      <span
-                        class="text-[12px]"
-                        :style="`color: ${draftBio.length > BIO_MAX ? 'var(--kv-danger)' : 'var(--kv-text-muted)'};`"
-                      >
+                      <span class="text-[12px]" :style="`color: ${draftBio.length > BIO_MAX ? 'var(--kv-danger)' : 'var(--kv-text-muted)'};`">
                         {{ t('settings.bioCounter', { count: draftBio.length }) }}
                       </span>
                     </div>
@@ -770,29 +615,15 @@ async function selectPolicy(p: DmPolicy) {
                       rows="5"
                       :maxlength="BIO_MAX"
                       class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
-                      style="
-                        border-color: var(--kv-border-subtle);
-                        background-color: var(--kv-bg-elevated);
-                        color: var(--kv-text-primary);
-                      "
+                      style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
                     />
                     <div class="flex items-center justify-between gap-3 mt-3">
-                      <p v-if="bioError" class="text-[12px] flex-1" style="color: var(--kv-danger)">
-                        {{ bioError }}
-                      </p>
-                      <p
-                        v-else-if="bioSaved && !bioDirty"
-                        class="text-[12px] flex-1"
-                        style="color: var(--kv-success)"
-                      >
+                      <p v-if="bioError" class="text-[12px] flex-1" style="color: var(--kv-danger);">{{ bioError }}</p>
+                      <p v-else-if="bioSaved && !bioDirty" class="text-[12px] flex-1" style="color: var(--kv-success);">
                         {{ t('settings.bioSaved') }}
                       </p>
                       <span v-else class="flex-1" />
-                      <KvButton
-                        :disabled="!bioDirty || savingBio"
-                        :loading="savingBio"
-                        @click="saveBio"
-                      >
+                      <KvButton :disabled="!bioDirty || savingBio" :loading="savingBio" @click="saveBio">
                         {{ t('common.save') }}
                       </KvButton>
                     </div>
@@ -800,33 +631,21 @@ async function selectPolicy(p: DmPolicy) {
 
                   <!-- Sprint C8 — Profil Afişi (görsel) -->
                   <section v-if="!mediaUploadsDisabled">
-                    <h3
-                      class="text-[13px] font-semibold uppercase tracking-widest mb-1"
-                      style="color: var(--kv-text-muted)"
-                    >
+                    <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
                       {{ t('settings.bannerImage.label') }}
                     </h3>
-                    <p class="text-[12px] mb-3" style="color: var(--kv-text-muted)">
+                    <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
                       {{ t('settings.bannerImage.hint') }}
                     </p>
                     <div
                       class="rounded-[var(--kv-radius-md)] overflow-hidden mb-3"
-                      style="height: 80px"
+                      style="height: 80px;"
                       :style="{ background: bannerBackground(draftBannerColor) }"
                     >
-                      <img
-                        v-if="bannerImageDisplayUrl"
-                        :src="bannerImageDisplayUrl"
-                        class="w-full h-full object-cover"
-                      />
+                      <img v-if="bannerImageDisplayUrl" :src="bannerImageDisplayUrl" class="w-full h-full object-cover" />
                     </div>
                     <div class="flex gap-2">
-                      <KvButton
-                        size="sm"
-                        :disabled="bannerImageUploading"
-                        :loading="bannerImageUploading"
-                        @click="triggerBannerImagePicker"
-                      >
+                      <KvButton size="sm" :disabled="bannerImageUploading" :loading="bannerImageUploading" @click="triggerBannerImagePicker">
                         {{ t('settings.bannerImage.upload') }}
                       </KvButton>
                       <KvButton
@@ -839,20 +658,10 @@ async function selectPolicy(p: DmPolicy) {
                         {{ t('settings.bannerImage.remove') }}
                       </KvButton>
                     </div>
-                    <p
-                      v-if="bannerImageUploading && bannerImageUploadPct > 0"
-                      class="text-[12px] mt-1.5"
-                      style="color: var(--kv-text-muted)"
-                    >
+                    <p v-if="bannerImageUploading && bannerImageUploadPct > 0" class="text-[12px] mt-1.5" style="color: var(--kv-text-muted);">
                       {{ t('settings.bannerImage.uploading', { pct: bannerImageUploadPct }) }}
                     </p>
-                    <p
-                      v-if="bannerImageError"
-                      class="text-[12px] mt-1.5"
-                      style="color: var(--kv-danger)"
-                    >
-                      {{ bannerImageError }}
-                    </p>
+                    <p v-if="bannerImageError" class="text-[12px] mt-1.5" style="color: var(--kv-danger);">{{ bannerImageError }}</p>
                     <input
                       ref="bannerImageFileInput"
                       type="file"
@@ -864,86 +673,44 @@ async function selectPolicy(p: DmPolicy) {
 
                   <!-- Afiş rengi swatch'ları (görsel afiş yoksa fallback olarak kullanılır) -->
                   <section>
-                    <h3
-                      class="text-[13px] font-semibold uppercase tracking-widest mb-1"
-                      style="color: var(--kv-text-muted)"
-                    >
+                    <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
                       {{ t('settings.banner.label') }}
                     </h3>
-                    <p class="text-[12px] mb-3" style="color: var(--kv-text-muted)">
-                      {{ t('settings.banner.hint') }}
-                    </p>
+                    <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">{{ t('settings.banner.hint') }}</p>
                     <div class="flex flex-wrap gap-2.5">
                       <button
                         class="rounded-[var(--kv-radius-md)] border-2 cursor-pointer transition-transform flex items-center justify-center"
-                        style="width: 48px; height: 48px"
+                        style="width: 48px; height: 48px;"
                         :style="`background: ${bannerBackground(null)}; border-color: ${draftBannerColor === null ? 'var(--kv-accent-500)' : 'transparent'}; transform: ${draftBannerColor === null ? 'scale(1.06)' : 'none'};`"
                         :title="t('settings.banner.default')"
                         @click="setBannerColor(null)"
                       >
-                        <svg
-                          v-if="draftBannerColor === null"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#fff"
-                          stroke-width="3"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        >
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
+                        <svg v-if="draftBannerColor === null" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                       </button>
                       <button
                         v-for="key in bannerPresetKeys"
                         :key="key"
                         class="rounded-[var(--kv-radius-md)] border-2 cursor-pointer transition-transform flex items-center justify-center"
-                        style="width: 48px; height: 48px"
+                        style="width: 48px; height: 48px;"
                         :style="`background: ${bannerBackground(key)}; border-color: ${draftBannerColor === key ? 'var(--kv-accent-500)' : 'transparent'}; transform: ${draftBannerColor === key ? 'scale(1.06)' : 'none'};`"
                         @click="setBannerColor(key)"
                       >
-                        <svg
-                          v-if="draftBannerColor === key"
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#fff"
-                          stroke-width="3"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        >
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
+                        <svg v-if="draftBannerColor === key" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
                       </button>
                     </div>
                   </section>
                 </div>
 
                 <!-- SAĞ: profil önizleme kartı (canlı draft; ortam ayarlarındaki gibi) -->
-                <div class="block max-lg:hidden shrink-0 self-start" style="width: 320px">
-                  <h3
-                    class="text-[13px] font-semibold uppercase tracking-widest mb-3"
-                    style="color: var(--kv-text-muted)"
-                  >
+                <div class="block max-lg:hidden shrink-0 self-start" style="width: 320px;">
+                  <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
                     {{ t('settings.banner.previewTitle') }}
                   </h3>
-                  <div
-                    class="overflow-hidden rounded-[var(--kv-radius-lg)] border"
-                    style="
-                      border-color: var(--kv-border-subtle);
-                      background-color: var(--kv-bg-sidebar);
-                    "
-                  >
+                  <div class="overflow-hidden rounded-[var(--kv-radius-lg)] border" style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-sidebar);">
                     <!-- Afiş (görsel varsa üstte; yoksa renk/gradient) + banner'a binen avatar -->
                     <!-- overflow-hidden YOK: avatar bottom:-28px ile alta taşar; dış kart (rounded+overflow-hidden)
                          zaten afişin üst köşelerini kırpar, iç div'e gerek yok (GuildSettingsView deseni). -->
-                    <div
-                      class="relative"
-                      style="height: 100px"
-                      :style="{ background: bannerBackground(draftBannerColor) }"
-                    >
+                    <div class="relative" style="height: 100px;" :style="{ background: bannerBackground(draftBannerColor) }">
                       <img
                         v-if="bannerImageDisplayUrl"
                         :src="bannerImageDisplayUrl"
@@ -952,30 +719,18 @@ async function selectPolicy(p: DmPolicy) {
                       />
                       <div
                         class="absolute w-[72px] h-[72px] rounded-full border-4 overflow-hidden flex items-center justify-center text-[24px] font-bold text-white"
-                        style="
-                          left: 16px;
-                          bottom: -28px;
-                          border-color: var(--kv-bg-sidebar);
-                          background-color: var(--kv-accent-500);
-                        "
+                        style="left: 16px; bottom: -28px; border-color: var(--kv-bg-sidebar); background-color: var(--kv-accent-500);"
                       >
-                        <img
-                          v-if="avatarDisplayUrl"
-                          :src="avatarDisplayUrl"
-                          class="w-full h-full object-cover"
-                        />
+                        <img v-if="avatarDisplayUrl" :src="avatarDisplayUrl" class="w-full h-full object-cover" />
                         <span v-else>{{ (authStore.user?.username ?? '?')[0].toUpperCase() }}</span>
                       </div>
                     </div>
                     <!-- Ad + üyelik tarihi -->
                     <div class="pt-9 pb-4 px-4">
-                      <p
-                        class="text-[16px] font-semibold truncate"
-                        style="color: var(--kv-text-primary)"
-                      >
+                      <p class="text-[16px] font-semibold truncate" style="color: var(--kv-text-primary);">
                         {{ authStore.user?.username }}
                       </p>
-                      <p class="text-[12px] mt-1" style="color: var(--kv-text-muted)">
+                      <p class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
                         {{ t('settings.banner.previewMemberSince', { date: profileMemberSince }) }}
                       </p>
                     </div>
@@ -996,13 +751,10 @@ async function selectPolicy(p: DmPolicy) {
               <!-- ── Gizlilik ── (dmPolicy) -->
               <div v-else-if="activeSection === 'gizlilik'" class="flex flex-col gap-6 max-w-xl">
                 <section>
-                  <h3
-                    class="text-[13px] font-semibold uppercase tracking-widest mb-1"
-                    style="color: var(--kv-text-muted)"
-                  >
+                  <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
                     {{ t('settings.dmPolicy.label') }}
                   </h3>
-                  <p class="text-[12px] mb-3" style="color: var(--kv-text-muted)">
+                  <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
                     {{ t('settings.dmPolicy.description') }}
                   </p>
                   <div class="flex flex-col gap-2">
@@ -1011,92 +763,61 @@ async function selectPolicy(p: DmPolicy) {
                       :key="opt"
                       type="button"
                       class="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-[var(--kv-radius-md)] border text-left cursor-pointer transition-colors"
-                      :style="
-                        opt === currentPolicy
-                          ? 'border-color: var(--kv-accent-500); background-color: var(--kv-bg-elevated);'
-                          : 'border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);'
-                      "
+                      :style="opt === currentPolicy
+                        ? 'border-color: var(--kv-accent-500); background-color: var(--kv-bg-elevated);'
+                        : 'border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);'"
                       :disabled="savingPolicy"
                       @click="selectPolicy(opt)"
                     >
                       <span class="flex-1 min-w-0">
-                        <span
-                          class="block text-[14px] font-medium"
-                          style="color: var(--kv-text-primary)"
-                        >
+                        <span class="block text-[14px] font-medium" style="color: var(--kv-text-primary);">
                           {{ policyLabel(opt) }}
                         </span>
-                        <span class="block text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+                        <span class="block text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
                           {{ policyDesc(opt) }}
                         </span>
                       </span>
                       <span
                         v-if="opt === currentPolicy"
                         class="shrink-0 flex items-center justify-center w-5 h-5 rounded-full"
-                        style="background-color: var(--kv-accent-500)"
+                        style="background-color: var(--kv-accent-500);"
                       >
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#fff"
-                          stroke-width="3"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
                       </span>
                     </button>
                   </div>
 
-                  <p v-if="policyError" class="text-[12px] mt-3" style="color: var(--kv-danger)">
-                    {{ policyError }}
-                  </p>
-                  <p
-                    v-else-if="policySaved"
-                    class="text-[12px] mt-3"
-                    style="color: var(--kv-success)"
-                  >
+                  <p v-if="policyError" class="text-[12px] mt-3" style="color: var(--kv-danger);">{{ policyError }}</p>
+                  <p v-else-if="policySaved" class="text-[12px] mt-3" style="color: var(--kv-success);">
                     {{ t('settings.dmPolicy.saved') }}
                   </p>
                 </section>
               </div>
 
               <!-- ── Admin — Kullanıcılar + Platform Davetleri ── (yalnız isModerator) -->
-              <div
-                v-else-if="activeSection === 'admin' && authStore.user?.isModerator"
-                class="flex flex-col gap-6"
-              >
+              <div v-else-if="activeSection === 'admin' && authStore.user?.isModerator" class="flex flex-col gap-6">
                 <!-- Alt-geçiş: kullanıcılar / davetler -->
-                <div
-                  class="flex items-center gap-1 self-start rounded-[var(--kv-radius-md)] p-1"
-                  style="background-color: var(--kv-bg-sidebar)"
-                >
+                <div class="flex items-center gap-1 self-start rounded-[var(--kv-radius-md)] p-1" style="background-color: var(--kv-bg-sidebar);">
                   <button
-                    v-for="sub in ['kullanicilar', 'davetler'] as const"
+                    v-for="sub in (['kullanicilar', 'davetler'] as const)"
                     :key="sub"
                     type="button"
                     class="px-3 py-1.5 rounded-[var(--kv-radius-sm)] text-[13px] font-medium cursor-pointer transition-colors"
-                    :style="
-                      adminSub === sub
-                        ? 'color: var(--kv-accent-400); background-color: var(--kv-bg-elevated);'
-                        : 'color: var(--kv-text-secondary); background-color: transparent;'
-                    "
+                    :style="adminSub === sub
+                      ? 'color: var(--kv-accent-400); background-color: var(--kv-bg-elevated);'
+                      : 'color: var(--kv-text-secondary); background-color: transparent;'"
                     @click="adminSub = sub"
                   >
-                    {{
-                      sub === 'kullanicilar'
-                        ? t('admin.users.title')
-                        : t('admin.platformInvite.listTitle')
-                    }}
+                    {{ sub === 'kullanicilar' ? t('admin.users.title') : t('admin.platformInvite.listTitle') }}
                   </button>
                 </div>
 
                 <PlatformUsersSection v-if="adminSub === 'kullanicilar'" />
                 <PlatformInviteSection v-else />
               </div>
+
             </div>
           </div>
         </div>
@@ -1104,25 +825,13 @@ async function selectPolicy(p: DmPolicy) {
     </div>
 
     <!-- ── Hesap düzenleme modalları (Düzenle → modal) ── -->
-    <KvModal
-      v-if="editModal === 'username'"
-      :title="t('security.username.title')"
-      @close="editModal = null"
-    >
+    <KvModal v-if="editModal === 'username'" :title="t('security.username.title')" @close="editModal = null">
       <ChangeUsernameSection :in-modal="true" @saved="editModal = null" />
     </KvModal>
-    <KvModal
-      v-if="editModal === 'password'"
-      :title="t('security.password.title')"
-      @close="editModal = null"
-    >
+    <KvModal v-if="editModal === 'password'" :title="t('security.password.title')" @close="editModal = null">
       <ChangePasswordSection :in-modal="true" @saved="editModal = null" />
     </KvModal>
-    <KvModal
-      v-if="editModal === 'email'"
-      :title="t('security.email.title')"
-      @close="editModal = null"
-    >
+    <KvModal v-if="editModal === 'email'" :title="t('security.email.title')" @close="editModal = null">
       <ChangeEmailSection :in-modal="true" />
     </KvModal>
     <!-- 2FA / Oturumlar / Sil → kendi başlıklarını gösterir (KvModal title'sız) -->

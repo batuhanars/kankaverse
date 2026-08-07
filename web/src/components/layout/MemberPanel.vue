@@ -97,13 +97,7 @@ const groups = computed((): MemberGroup[] => {
   const online = allMembers.filter((m) => presenceStore.getStatus(m.userId) !== 'offline')
   const offline = allMembers.filter((m) => presenceStore.getStatus(m.userId) === 'offline')
 
-  const hoistGroups = new Map<
-    string,
-    {
-      role: { id: string; name: string; color: string; position: number }
-      members: GuildMemberDto[]
-    }
-  >()
+  const hoistGroups = new Map<string, { role: { id: string; name: string; color: string; position: number }; members: GuildMemberDto[] }>()
   const noHoistOnline: GuildMemberDto[] = []
 
   for (const member of online) {
@@ -131,20 +125,10 @@ const groups = computed((): MemberGroup[] => {
   const result: MemberGroup[] = [...sortedHoistGroups]
 
   if (noHoistOnline.length > 0) {
-    result.push({
-      key: 'online',
-      label: t('member.online', { n: noHoistOnline.length }),
-      color: null,
-      members: noHoistOnline,
-    })
+    result.push({ key: 'online', label: t('member.online', { n: noHoistOnline.length }), color: null, members: noHoistOnline })
   }
   if (offline.length > 0) {
-    result.push({
-      key: 'offline',
-      label: t('member.offline', { n: offline.length }),
-      color: null,
-      members: offline,
-    })
+    result.push({ key: 'offline', label: t('member.offline', { n: offline.length }), color: null, members: offline })
   }
 
   return result.filter((g) => g.members.length > 0)
@@ -341,11 +325,9 @@ async function confirmKick() {
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string; message?: string } } }
     const code = err.response?.data?.error
-    kickError.value =
-      code &&
-      ['CANNOT_KICK_OWNER', 'CANNOT_KICK_SELF', 'NOT_GUILD_MEMBER', 'FORBIDDEN'].includes(code)
-        ? t(`member.errors.${code}`)
-        : (err.response?.data?.message ?? t('common.error'))
+    kickError.value = code && ['CANNOT_KICK_OWNER', 'CANNOT_KICK_SELF', 'NOT_GUILD_MEMBER', 'FORBIDDEN'].includes(code)
+      ? t(`member.errors.${code}`)
+      : (err.response?.data?.message ?? t('common.error'))
     closeKick()
   } finally {
     kicking.value = false
@@ -377,11 +359,9 @@ async function confirmBan() {
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string; message?: string } } }
     const code = err.response?.data?.error
-    kickError.value =
-      code &&
-      ['CANNOT_BAN_OWNER', 'CANNOT_BAN_SELF', 'NOT_GUILD_MEMBER', 'FORBIDDEN'].includes(code)
-        ? t(`member.errors.${code}`)
-        : (err.response?.data?.message ?? t('common.error'))
+    kickError.value = code && ['CANNOT_BAN_OWNER', 'CANNOT_BAN_SELF', 'NOT_GUILD_MEMBER', 'FORBIDDEN'].includes(code)
+      ? t(`member.errors.${code}`)
+      : (err.response?.data?.message ?? t('common.error'))
     banTarget.value = null
   } finally {
     banning.value = false
@@ -422,17 +402,13 @@ async function confirmTransfer() {
 <template>
   <aside
     class="flex flex-col shrink-0 overflow-hidden rounded-none mb-0 mr-0 xl:rounded-[var(--kv-radius-lg)] xl:mb-4 xl:mr-4"
-    style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar)"
+    style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
     @click="closeMenu"
   >
     <!-- Başlık -->
     <div
       class="flex items-center px-4 shrink-0 border-b text-[13px] font-semibold uppercase tracking-widest"
-      style="
-        height: var(--kv-header-height);
-        border-color: var(--kv-border-subtle);
-        color: var(--kv-text-muted);
-      "
+      style="height: var(--kv-header-height); border-color: var(--kv-border-subtle); color: var(--kv-text-muted);"
     >
       {{ t('member.panel') }}
     </div>
@@ -441,7 +417,7 @@ async function confirmTransfer() {
     <p
       v-if="roleError || kickError"
       class="mx-3 mt-2 px-3 py-2 text-[12px] rounded-[var(--kv-radius-sm)]"
-      style="background-color: var(--kv-bg-elevated); color: var(--kv-danger)"
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-danger);"
     >
       {{ roleError || kickError }}
     </p>
@@ -455,9 +431,7 @@ async function confirmTransfer() {
           :style="group.color ? `color: ${group.color};` : 'color: var(--kv-text-muted);'"
         >
           {{ group.label }}
-          <span v-if="group.color" class="opacity-60 normal-case ml-1"
-            >— {{ group.members.length }}</span
-          >
+          <span v-if="group.color" class="opacity-60 normal-case ml-1">— {{ group.members.length }}</span>
         </p>
 
         <!-- Üye satırları -->
@@ -498,11 +472,11 @@ async function confirmTransfer() {
 
   <!-- Kick modalı — opsiyonel sebep alanı (R2) -->
   <KvModal v-if="kickTarget" :title="t('member.actions.kickTitle')" @close="closeKick">
-    <p class="text-[14px] mb-5" style="color: var(--kv-text-body)">
+    <p class="text-[14px] mb-5" style="color: var(--kv-text-body);">
       {{ t('member.actions.kickConfirmMessage', { username: kickTarget.username }) }}
     </p>
 
-    <label class="block text-[12px] font-semibold mb-1.5" style="color: var(--kv-text-muted)">
+    <label class="block text-[12px] font-semibold mb-1.5" style="color: var(--kv-text-muted);">
       {{ t('member.actions.kickReasonLabel') }}
     </label>
     <textarea
@@ -511,17 +485,11 @@ async function confirmTransfer() {
       maxlength="500"
       rows="3"
       class="w-full resize-none px-3 py-2 text-[14px] rounded-[var(--kv-radius-md)] border outline-none mb-6"
-      style="
-        background-color: var(--kv-bg-elevated);
-        color: var(--kv-text-body);
-        border-color: var(--kv-border-subtle);
-      "
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-body); border-color: var(--kv-border-subtle);"
     />
 
     <div class="flex gap-3 justify-end">
-      <KvButton variant="ghost" :disabled="kicking" @click="closeKick">{{
-        t('common.cancel')
-      }}</KvButton>
+      <KvButton variant="ghost" :disabled="kicking" @click="closeKick">{{ t('common.cancel') }}</KvButton>
       <KvButton variant="danger" :loading="kicking" @click="confirmKick">
         {{ t('member.actions.kickConfirmButton') }}
       </KvButton>

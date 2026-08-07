@@ -15,7 +15,7 @@ const { t } = useI18n()
 
 <template>
   <KvModal :title="props.title ?? t('common.confirm')" @close="emit('cancel')">
-    <p class="text-[14px] mb-6" style="color: var(--kv-text-body)">{{ message }}</p>
+    <p class="text-[14px] mb-6" style="color: var(--kv-text-body);">{{ message }}</p>
     <div class="flex gap-3 justify-end">
       <KvButton variant="ghost" @click="emit('cancel')">{{ t('common.cancel') }}</KvButton>
       <KvButton variant="danger" :loading="loading" @click="emit('confirm')">

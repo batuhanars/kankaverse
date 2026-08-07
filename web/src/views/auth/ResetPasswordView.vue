@@ -44,7 +44,7 @@ const onSubmit = handleSubmit(async (values) => {
     apiError.value =
       code === 'INVALID_TOKEN'
         ? t('auth.errors.INVALID_TOKEN')
-        : (err.response?.data?.message ?? t('common.error'))
+        : err.response?.data?.message ?? t('common.error')
   } finally {
     loading.value = false
   }
@@ -60,40 +60,36 @@ function getError(field: string): string | undefined {
 <template>
   <div
     class="min-h-screen flex items-center justify-center"
-    style="background-color: var(--kv-bg-rail)"
+    style="background-color: var(--kv-bg-rail);"
   >
     <div
       class="w-full max-w-sm rounded-[var(--kv-radius-lg)] p-8"
-      style="
-        background-color: var(--kv-bg-sidebar);
-        border: 1px solid var(--kv-border-subtle);
-        border-top: 3px solid var(--kv-accent-500);
-      "
+      style="background-color: var(--kv-bg-sidebar); border: 1px solid var(--kv-border-subtle); border-top: 3px solid var(--kv-accent-500);"
     >
       <div class="mb-6 text-center">
         <img
           :src="logoDikey"
           :alt="t('brand.name')"
           class="mx-auto mb-5"
-          style="width: 120px; height: auto"
+          style="width: 120px; height: auto;"
         />
-        <h1 class="text-[22px] font-semibold" style="color: var(--kv-text-primary)">
+        <h1 class="text-[22px] font-semibold" style="color: var(--kv-text-primary);">
           {{ t('resetPassword.title') }}
         </h1>
-        <p class="mt-1 text-[13px]" style="color: var(--kv-text-muted)">
+        <p class="mt-1 text-[13px]" style="color: var(--kv-text-muted);">
           {{ t('resetPassword.subtitle') }}
         </p>
       </div>
 
       <!-- Token yok / geçersiz link -->
       <template v-if="tokenError">
-        <p class="text-[14px] text-center mb-4" style="color: var(--kv-danger)">
+        <p class="text-[14px] text-center mb-4" style="color: var(--kv-danger);">
           {{ t('resetPassword.invalidToken') }}
         </p>
         <RouterLink
           :to="{ name: 'forgot-password' }"
           class="block text-center text-[13px]"
-          style="color: var(--kv-accent-500)"
+          style="color: var(--kv-accent-500);"
         >
           {{ t('forgotPassword.title') }}
         </RouterLink>
@@ -103,7 +99,7 @@ function getError(field: string): string | undefined {
       <template v-else-if="success">
         <p
           class="text-[14px] text-center rounded-[var(--kv-radius-md)] px-4 py-3 mb-4"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary)"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
         >
           {{ t('resetPassword.successMessage') }}
         </p>
@@ -125,7 +121,7 @@ function getError(field: string): string | undefined {
             :required="true"
           />
 
-          <p v-if="apiError" class="text-[13px] text-center" style="color: var(--kv-danger)">
+          <p v-if="apiError" class="text-[13px] text-center" style="color: var(--kv-danger);">
             {{ apiError }}
           </p>
 

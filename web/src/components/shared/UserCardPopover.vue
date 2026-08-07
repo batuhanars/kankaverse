@@ -35,20 +35,14 @@ const menuOpen = ref(false)
 // Üyelik tarihi + ortak kanka/ortam özet satırı (kart zenginleştirme)
 const memberSinceLabel = computed(() =>
   card.value
-    ? new Date(card.value.memberSince).toLocaleDateString('tr-TR', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      })
+    ? new Date(card.value.memberSince).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
     : '',
 )
 const mutualText = computed(() => {
   if (!card.value) return ''
   const parts: string[] = []
-  if (card.value.mutualFriends.length)
-    parts.push(t('userCard.mutualFriendsShort', { n: card.value.mutualFriends.length }))
-  if (card.value.mutualGuilds.length)
-    parts.push(t('userCard.mutualGuildsShort', { n: card.value.mutualGuilds.length }))
+  if (card.value.mutualFriends.length) parts.push(t('userCard.mutualFriendsShort', { n: card.value.mutualFriends.length }))
+  if (card.value.mutualGuilds.length) parts.push(t('userCard.mutualGuildsShort', { n: card.value.mutualGuilds.length }))
   return parts.join(' • ')
 })
 
@@ -123,8 +117,7 @@ let errorTimer: ReturnType<typeof setTimeout> | null = null
 const isSelf = computed(() => props.userId === authStore.user?.id)
 
 const posStyle = computed(() => {
-  const W = 300,
-    H = 420
+  const W = 300, H = 420
   const left = Math.max(8, Math.min(props.x, window.innerWidth - W - 8))
   const top = Math.max(8, Math.min(props.y + 8, window.innerHeight - H - 8))
   return `top:${top}px;left:${left}px;`
@@ -178,9 +171,7 @@ async function addFriend() {
     added.value = true
   } catch {
     errorMsg.value = t('userCard.requestFailed')
-    errorTimer = setTimeout(() => {
-      errorMsg.value = ''
-    }, 3000)
+    errorTimer = setTimeout(() => { errorMsg.value = '' }, 3000)
   } finally {
     adding.value = false
   }
@@ -192,33 +183,20 @@ async function addFriend() {
     <div
       ref="popoverEl"
       class="fixed z-50 w-[300px] rounded-[var(--kv-radius-lg)] overflow-y-auto overflow-x-hidden"
-      :style="
-        posStyle +
-        'max-height:calc(100vh - 16px);background-color:var(--kv-bg-elevated);border:1px solid var(--kv-border-subtle);'
-      "
+      :style="posStyle + 'max-height:calc(100vh - 16px);background-color:var(--kv-bg-elevated);border:1px solid var(--kv-border-subtle);'"
       @click="menuOpen = false"
     >
       <!-- Yüklenme -->
       <div v-if="loading" class="flex items-center justify-center py-8">
-        <span class="text-[13px]" style="color: var(--kv-text-muted)">{{
-          t('common.loading')
-        }}</span>
+        <span class="text-[13px]" style="color:var(--kv-text-muted);">{{ t('common.loading') }}</span>
       </div>
 
       <!-- Kart -->
       <template v-else-if="card">
         <!-- Banner + üstteki ikon aksiyonlar + banner'a binen avatar -->
         <div class="relative">
-          <div
-            class="h-[106px] relative overflow-hidden"
-            :style="{ background: bannerBackground(card.bannerColor) }"
-          >
-            <img
-              v-if="card.bannerUrl"
-              :src="card.bannerUrl"
-              alt=""
-              class="absolute inset-0 w-full h-full object-cover"
-            />
+          <div class="h-[106px] relative overflow-hidden" :style="{ background: bannerBackground(card.bannerColor) }">
+            <img v-if="card.bannerUrl" :src="card.bannerUrl" alt="" class="absolute inset-0 w-full h-full object-cover" />
           </div>
 
           <!-- Sağ üst ikon butonlar (kendi kartım değilse): +Kanka + ⋯ menü -->
@@ -227,97 +205,40 @@ async function addFriend() {
             <button
               v-if="card.friendStatus === 'none' && !card.selfBlocked"
               class="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-60"
-              style="background-color: rgba(0, 0, 0, 0.55); color: #fff; backdrop-filter: blur(2px)"
+              style="background-color: rgba(0,0,0,0.55); color: #fff; backdrop-filter: blur(2px);"
               :title="added ? t('userCard.requestSent') : t('userCard.addFriend')"
               :disabled="added || adding"
               @click.stop="addFriend"
             >
-              <svg
-                v-if="added"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-              <svg
-                v-else
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <line x1="19" y1="8" x2="19" y2="14" />
-                <line x1="22" y1="11" x2="16" y2="11" />
-              </svg>
+              <svg v-if="added" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
             </button>
 
             <!-- ⋯ menü -->
             <div class="relative">
               <button
                 class="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-opacity hover:opacity-90"
-                style="
-                  background-color: rgba(0, 0, 0, 0.55);
-                  color: #fff;
-                  backdrop-filter: blur(2px);
-                "
+                style="background-color: rgba(0,0,0,0.55); color: #fff; backdrop-filter: blur(2px);"
                 :title="t('userCard.moreActions')"
                 @click.stop="menuOpen = !menuOpen"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="5" cy="12" r="2" />
-                  <circle cx="12" cy="12" r="2" />
-                  <circle cx="19" cy="12" r="2" />
-                </svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
               </button>
 
               <div
                 v-if="menuOpen"
                 class="absolute top-full right-0 mt-1.5 w-[200px] rounded-[var(--kv-radius-md)] py-1 z-30 overflow-hidden"
-                style="
-                  background-color: var(--kv-bg-content);
-                  border: 1px solid var(--kv-border-subtle);
-                  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-                "
+                style="background-color: var(--kv-bg-content); border: 1px solid var(--kv-border-subtle); box-shadow: 0 8px 24px rgba(0,0,0,0.4);"
                 @click.stop
               >
-                <button
-                  class="w-full text-left px-3 py-2 text-[13px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-                  style="color: var(--kv-text-primary)"
-                  @click="
-                    menuOpen = false
-                    showFullProfile = true
-                  "
-                >
+                <button class="w-full text-left px-3 py-2 text-[13px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]" style="color: var(--kv-text-primary);" @click="menuOpen = false; showFullProfile = true">
                   {{ t('profile.viewFull') }}
                 </button>
-                <button
-                  class="w-full text-left px-3 py-2 text-[13px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-                  style="color: var(--kv-text-primary)"
-                  @click="copyId"
-                >
+                <button class="w-full text-left px-3 py-2 text-[13px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]" style="color: var(--kv-text-primary);" @click="copyId">
                   {{ t('userCard.copyId') }}
                 </button>
-                <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle)" />
-                <button
-                  class="w-full text-left px-3 py-2 text-[13px] cursor-pointer transition-colors hover:bg-[rgba(242,59,75,0.1)]"
-                  style="color: var(--kv-danger)"
-                  @click="
-                    menuOpen = false
-                    showReportModal = true
-                  "
-                >
+                <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
+                <button class="w-full text-left px-3 py-2 text-[13px] cursor-pointer transition-colors hover:bg-[rgba(242,59,75,0.1)]" style="color: var(--kv-danger);" @click="menuOpen = false; showReportModal = true">
                   {{ t('report.reportUser') }}
                 </button>
               </div>
@@ -327,90 +248,46 @@ async function addFriend() {
           <!-- Avatar (banner'a binen; absolute → kırpılmaz) -->
           <div
             class="absolute left-4 -bottom-8 z-10 w-[68px] h-[68px] rounded-full border-4 overflow-hidden flex items-center justify-center text-[24px] font-bold text-white"
-            style="border-color: var(--kv-bg-elevated); background-color: var(--kv-accent-500)"
+            style="border-color: var(--kv-bg-elevated); background-color: var(--kv-accent-500);"
           >
-            <img
-              v-if="card.avatarUrl"
-              :src="card.avatarUrl"
-              :alt="card.username"
-              class="w-full h-full object-cover"
-            />
+            <img v-if="card.avatarUrl" :src="card.avatarUrl" :alt="card.username" class="w-full h-full object-cover" />
             <span v-else>{{ card.username[0].toUpperCase() }}</span>
           </div>
         </div>
 
         <!-- İçerik -->
         <div class="px-4 pt-11 pb-4">
-          <p class="text-[17px] font-bold truncate" style="color: var(--kv-text-primary)">
+          <p class="text-[17px] font-bold truncate" style="color: var(--kv-text-primary);">
             {{ card.username }}
           </p>
 
           <!-- Statü rozeti (kanka / bekleyen) -->
-          <p
-            v-if="card.friendStatus === 'friends'"
-            class="text-[12px] mt-0.5"
-            style="color: var(--kv-success)"
-          >
+          <p v-if="card.friendStatus === 'friends'" class="text-[12px] mt-0.5" style="color: var(--kv-success);">
             {{ t('userCard.statusFriend') }}
           </p>
-          <p
-            v-else-if="card.friendStatus === 'pending_out'"
-            class="text-[12px] mt-0.5"
-            style="color: var(--kv-text-muted)"
-          >
+          <p v-else-if="card.friendStatus === 'pending_out'" class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
             {{ t('userCard.statusPending') }}
           </p>
-          <p
-            v-else-if="card.friendStatus === 'pending_in'"
-            class="text-[12px] mt-0.5"
-            style="color: var(--kv-text-muted)"
-          >
+          <p v-else-if="card.friendStatus === 'pending_in'" class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
             {{ t('userCard.statusPendingIn') }}
           </p>
 
           <!-- Ortak kanka/ortam özeti -->
-          <p v-if="mutualText" class="text-[12px] mt-1.5" style="color: var(--kv-text-muted)">
+          <p v-if="mutualText" class="text-[12px] mt-1.5" style="color: var(--kv-text-muted);">
             {{ mutualText }}
           </p>
 
           <!-- Detay kartı: bio + üyelik (kart zenginleştirme) -->
-          <div
-            class="mt-3 rounded-[var(--kv-radius-md)] p-3 flex flex-col gap-3"
-            style="background-color: var(--kv-bg-content)"
-          >
+          <div class="mt-3 rounded-[var(--kv-radius-md)] p-3 flex flex-col gap-3" style="background-color: var(--kv-bg-content);">
             <div>
-              <h3
-                class="text-[10px] font-bold uppercase tracking-widest mb-1"
-                style="color: var(--kv-text-muted)"
-              >
-                {{ t('profile.bio') }}
-              </h3>
-              <p
-                v-if="card.bio"
-                class="text-[13px] leading-relaxed break-words"
-                style="
-                  color: var(--kv-text-body);
-                  display: -webkit-box;
-                  -webkit-line-clamp: 4;
-                  -webkit-box-orient: vertical;
-                  overflow: hidden;
-                "
-              >
-                {{ card.bio }}
-              </p>
-              <p v-else class="text-[13px]" style="color: var(--kv-text-muted)">
-                {{ t('profile.noBio') }}
-              </p>
+              <h3 class="text-[10px] font-bold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">{{ t('profile.bio') }}</h3>
+              <p v-if="card.bio" class="text-[13px] leading-relaxed break-words" style="color: var(--kv-text-body); display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden;">{{ card.bio }}</p>
+              <p v-else class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('profile.noBio') }}</p>
             </div>
-            <div class="h-px" style="background-color: var(--kv-border-subtle)" />
+            <div class="h-px" style="background-color: var(--kv-border-subtle);" />
             <div>
-              <h3
-                class="text-[10px] font-bold uppercase tracking-widest mb-1"
-                style="color: var(--kv-text-muted)"
-              >
-                {{ t('userCard.memberSincePrefix') }}
-              </h3>
-              <p class="text-[13px]" style="color: var(--kv-text-body)">{{ memberSinceLabel }}</p>
+              <h3 class="text-[10px] font-bold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">{{ t('userCard.memberSincePrefix') }}</h3>
+              <p class="text-[13px]" style="color: var(--kv-text-body);">{{ memberSinceLabel }}</p>
             </div>
           </div>
 
@@ -418,81 +295,31 @@ async function addFriend() {
           <button
             v-if="card.voiceStatus"
             class="w-full mt-3 rounded-[var(--kv-radius-md)] p-3 flex items-center gap-3 text-left transition-opacity hover:opacity-90 cursor-pointer"
-            style="background-color: var(--kv-bg-content)"
+            style="background-color: var(--kv-bg-content);"
             @click="goToVoice"
           >
-            <span
-              class="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-              style="background-color: var(--kv-accent-500); color: #fff"
-            >
-              <svg
-                v-if="card.voiceStatus.streaming"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="2" y="3" width="20" height="14" rx="2" />
-                <line x1="8" y1="21" x2="16" y2="21" />
-                <line x1="12" y1="17" x2="12" y2="21" />
-              </svg>
-              <svg
-                v-else
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="23" />
-              </svg>
+            <span class="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style="background-color: var(--kv-accent-500); color: #fff;">
+              <svg v-if="card.voiceStatus.streaming" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
             </span>
             <span class="min-w-0 flex-1">
-              <span
-                class="block text-[11px] font-bold uppercase tracking-wide"
-                style="color: var(--kv-accent-400)"
-                >{{ voiceStatusLabel }}</span
-              >
-              <span class="block text-[13px] truncate" style="color: var(--kv-text-primary)">{{
-                card.voiceStatus.channelName
-              }}</span>
-              <span
-                v-if="card.voiceStatus.guildName"
-                class="block text-[11px] truncate"
-                style="color: var(--kv-text-muted)"
-                >{{ card.voiceStatus.guildName }}</span
-              >
+              <span class="block text-[11px] font-bold uppercase tracking-wide" style="color: var(--kv-accent-400);">{{ voiceStatusLabel }}</span>
+              <span class="block text-[13px] truncate" style="color: var(--kv-text-primary);">{{ card.voiceStatus.channelName }}</span>
+              <span v-if="card.voiceStatus.guildName" class="block text-[11px] truncate" style="color: var(--kv-text-muted);">{{ card.voiceStatus.guildName }}</span>
             </span>
           </button>
 
           <!-- C10: Roller (yalnız ortam bağlamında dolu) -->
           <div v-if="card.roles.length" class="mt-3">
-            <h3
-              class="text-[10px] font-bold uppercase tracking-widest mb-1.5"
-              style="color: var(--kv-text-muted)"
-            >
-              {{ t('userCard.rolesTitle') }}
-            </h3>
+            <h3 class="text-[10px] font-bold uppercase tracking-widest mb-1.5" style="color: var(--kv-text-muted);">{{ t('userCard.rolesTitle') }}</h3>
             <div class="flex flex-wrap gap-1.5">
               <span
                 v-for="r in card.roles"
                 :key="r.id"
                 class="inline-flex items-center gap-1.5 px-2 py-1 rounded-[var(--kv-radius-sm)] text-[12px]"
-                style="background-color: var(--kv-bg-content); color: var(--kv-text-body)"
+                style="background-color: var(--kv-bg-content); color: var(--kv-text-body);"
               >
-                <span
-                  class="w-2.5 h-2.5 rounded-full shrink-0"
-                  :style="{ backgroundColor: r.color }"
-                />
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: r.color }" />
                 {{ r.name }}
               </span>
             </div>
@@ -507,28 +334,16 @@ async function addFriend() {
               :disabled="sending"
               maxlength="2000"
               class="w-full px-3 py-2.5 rounded-[var(--kv-radius-md)] text-[13px] outline-none disabled:opacity-60"
-              style="
-                background-color: var(--kv-bg-content);
-                color: var(--kv-text-primary);
-                border: 1px solid var(--kv-border-subtle);
-              "
+              style="background-color: var(--kv-bg-content); color: var(--kv-text-primary); border: 1px solid var(--kv-border-subtle);"
               @keydown.enter.prevent="sendInline"
             />
-            <p
-              v-if="card.friendStatus !== 'friends'"
-              class="text-[11px] mt-1.5"
-              style="color: var(--kv-text-muted)"
-            >
+            <p v-if="card.friendStatus !== 'friends'" class="text-[11px] mt-1.5" style="color: var(--kv-text-muted);">
               {{ t('userCard.messageRequestHint') }}
             </p>
           </div>
 
           <!-- Mesaj gönderilemiyor (izin yok) → jenerik not -->
-          <p
-            v-else-if="!isSelf && !card.selfBlocked && !card.canMessage"
-            class="text-[12px] mt-3 text-center"
-            style="color: var(--kv-text-muted)"
-          >
+          <p v-else-if="!isSelf && !card.selfBlocked && !card.canMessage" class="text-[12px] mt-3 text-center" style="color: var(--kv-text-muted);">
             {{ t('userCard.cannotMessage') }}
           </p>
 
@@ -536,23 +351,19 @@ async function addFriend() {
           <button
             v-if="isSelf"
             class="w-full mt-3 py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium transition-opacity hover:opacity-90 cursor-pointer"
-            style="background-color: var(--kv-accent-500); color: #fff"
+            style="background-color: var(--kv-accent-500); color: #fff;"
             @click="goToMyProfile"
           >
             {{ t('userCard.goToMyProfile') }}
           </button>
 
           <!-- Engellediysem bilgi notu -->
-          <p
-            v-if="card.selfBlocked && !isSelf"
-            class="text-[12px] mt-3 text-center"
-            style="color: var(--kv-text-muted)"
-          >
+          <p v-if="card.selfBlocked && !isSelf" class="text-[12px] mt-3 text-center" style="color: var(--kv-text-muted);">
             {{ t('userCard.selfBlockedNote') }}
           </p>
 
           <!-- Jenerik hata -->
-          <p v-if="errorMsg" class="text-[12px] mt-3 text-center" style="color: var(--kv-danger)">
+          <p v-if="errorMsg" class="text-[12px] mt-3 text-center" style="color: var(--kv-danger);">
             {{ errorMsg }}
           </p>
         </div>
@@ -565,10 +376,7 @@ async function addFriend() {
     v-if="showReportModal && card"
     target-type="USER"
     :target-id="card.id"
-    @close="
-      showReportModal = false
-      emit('close')
-    "
+    @close="showReportModal = false; emit('close')"
   />
 
   <!-- Tam profil modalı -->
