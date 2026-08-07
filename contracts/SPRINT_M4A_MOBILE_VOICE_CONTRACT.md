@@ -110,6 +110,11 @@ erişmek istiyor."). `registerGlobals()` uygulama girişinde bir kez çağrılı
 
 ## §2 Sunucu sözleşmesi — birebir, değiştirilemez
 
+> ℹ️ **M4a-3 istisnası (PM revizyonu 2026-08-07):** aşağıdaki HTTP/WS yüzeyi **hiç değişmiyor** —
+> yeni endpoint, yeni olay, yeni payload alanı yok. M4a-3'ün `api/` işi tamamen mevcut
+> `voice:call_invite` işleyicisinin **içinde** kalıyor (push gönderimi + mute kontrolü). Sınırları
+> §9.1'de; oradaki üç dosyanın dışına çıkmak sapmadır.
+
 **HTTP** (envelope: `{ success, statusCode, data }` — gerçek veri `response.data.data`):
 
 ```
@@ -351,19 +356,209 @@ binmesini de önler.
 
 ## §9 M4a-3 — Uygulama kapalıyken gelen arama
 
-> **Bu durak M4a-2 sahip onayından sonra başlar. En riskli parça bilerek sona bırakıldı.**
+> **PM REVİZYONU 2026-08-07.** Bu bölüm baştan yazıldı: ilk hâli tek paragraflık niyet beyanıydı
+> ("sunucu push göndermeli"), M4a-3'e gelindiğinde revize edileceği kendi içinde yazılıydı. Aşağısı
+> uygulanabilir sözleşme. **Bu durak M4a-2 sahip onayından sonra başlar.**
+>
+> ✅ **`USE_FULL_SCREEN_INTENT` riski KAPANDI (2026-08-06):** sözleşmenin ilk hâli tam ekran çalan
+> arayüz varsayıyor ve "Play 'arama uygulaması' beyanı alınamazsa olmaz" diyordu. Sahibin görselleri
+> Discord'un da tam ekran kullanmadığını gösterdi → o izin hiç istenmeyecek, risk konusuz kaldı.
+>
+> 🟢 **Yeni ekran YOK.** Bildirim, kanal, eylemler ve kabul zinciri M4a-2'de yazıldı (§8.1). Bu
+> durakta değişen tek şey **tetikleyici**: WS yerine push. İş, o tetikleyicinin uygulama ölüyken
+> çalışmasını sağlamakta.
 
-- `voice:call_invite` alındığında sunucu callee'ye **yüksek öncelikli push** göndermeli.
-  🔴 Bu **`api/` değişikliğidir** (`PushService` bugün yalnız mesaj bildirimi gönderiyor, `priority`
-  alanı yok). M4a-3'e gelindiğinde **PM sözleşmeyi revize eder**; dev kendi başına `api/`ye dokunmaz.
-  M4a-1 ve M4a-2 boyunca `api/` diffi **sıfır** olmalı.
-- 🟢 **Arayüz zaten M4a-2'de yazıldı** (§8.1): bildirim, kanal, eylemler ve zil aynen kullanılır.
-  Bu durakta **yeni ekran yok**; tek fark tetikleyici — WS yerine push.
-- ✅ **`USE_FULL_SCREEN_INTENT` riski KAPANDI (2026-08-06):** sözleşmenin ilk hâli tam ekran çalan
-  arayüz varsayıyor ve "Play 'arama uygulaması' beyanı alınamazsa olmaz" diyordu. Sahibin görselleri
-  Discord'un da tam ekran kullanmadığını gösterdi → o izin hiç istenmeyecek, risk konusuz kaldı.
-- Kabul → uygulama açılır ve doğrudan aramaya girer (uygulama kapalıysa açılış + katılma zinciri).
-- Zaman aşımı geçmiş çağrının bildirimi **temizlenir**; asılı "Gelen Arama" kalmaz.
+### §9.0 🔴 Bu durakta neyin çalışmadığını önce kabul et
+
+M4a-2 akışının üç ayağı **uygulama ölüyken yok**:
+
+| Ayak | M4a-2'de nasıl | Uygulama kapalıyken |
+|---|---|---|
+| Tetikleyici | `voice.incoming_call` (WS) | ❌ soket yok (`useBackgroundSocket` arka planda kapatıyor) |
+| Zil | `expo-audio` döngüde | ❌ JS çalışmıyor → **kanal sesi tek yol** |
+| Bildirim kurulumu | `ensureSetup()` ilk aramada | ❌ o kod hiç çalışmadı → **kanal/kategori kurulu olmayabilir** |
+
+Bu üç satır §9.2'nin tamamını açıklıyor. Dev bunları "eksik özellik" değil **fizik** kabul eder;
+etraflarından dolaşılır, üzerlerine JS yazılmaz.
+
+### §9.1 Sunucu (`api/`) — bu sprintte `api/` diffi ARTIK SIFIR DEĞİL
+
+M4a-1 ve M4a-2 boyunca geçerli olan "`api/` diffi sıfır" kuralı **yalnız bu durak için** kalkar.
+Kapsam aşağıdaki üç dosyayla sınırlıdır; başka `api/` dosyasına dokunmak sapmadır (DUR + bildir).
+
+**1. `shared/push/push.service.ts` — `PushPayload` genişletilir (geriye uyumlu).**
+
+```ts
+export interface PushPayload {
+  title?: string;
+  body: string;
+  data: {
+    type: string;
+    guildId?: string | null;
+    channelId?: string | null;
+    messageId?: string | null;
+    callerId?: string | null;      // YENİ — yalnız type='incoming_call'
+    callerName?: string | null;    // YENİ — yalnız type='incoming_call'
+  };
+  // YENİ, hepsi opsiyonel: verilmezse bugünkü davranış birebir korunur (mesaj push'ı DEĞİŞMEZ)
+  priority?: 'default' | 'high';
+  androidChannelId?: string;       // Expo mesajındaki `channelId` alanına map'lenir
+  categoryId?: string;             // bildirim eylem butonları (Reddet · Aramaya Katıl)
+  ttlSeconds?: number;             // Expo `ttl`
+}
+```
+
+🔴 **`androidChannelId` ayrı isimlendirildi çünkü Expo mesaj alanının adı `channelId` ve
+`data.channelId` (bizim DM kanalımız) ile **aynı kelimeyi taşıyor**. İki farklı şey; tek isimle
+yazılırsa bir sonraki okuyan karıştırır. Servis içinde Expo'ya giderken `channelId:
+payload.androidChannelId` diye map'lenir.
+
+`sendBatch`/`handleTickets` mantığı değişmez. Ölü token silme, hata yutma, 100'lük parçalama aynen.
+
+**2. `modules/messages/gateway/messages.gateway.ts` — `handleCallInvite` içine push.**
+
+`this.push` gateway'e **zaten inject edilmiş** (bugün kullanılmıyor). Eklenecek tek blok, mevcut
+`emitToUser('voice.incoming_call', ...)` çağrısının **hemen ardına**:
+
+```ts
+this.push.sendToUsers([calleeId], {
+  title: '<i18n: mobile.call.incomingTitle>',
+  body: '<i18n: mobile.call.incomingBody, name=caller.username>',
+  data: { type: 'incoming_call', channelId, callerId: userId, callerName: caller?.username ?? userId },
+  priority: 'high',
+  androidChannelId: '<§9.2.1'de belirlenen kanal kimliği>',
+  categoryId: 'incoming_call',
+  ttlSeconds: 30,   // §8.2'nin 30 sn'si: geç düşen push zil çalmaz
+}).catch(() => {});
+```
+
+Kurallar:
+- **Fire-and-forget.** `await` YOK. Push gecikmesi/başarısızlığı `{ ok: true }` ack'ini geciktirmez
+  ve WS yolunu bozmaz (M3 §2.4 ile aynı ilke).
+- **Kalıcı `Notification` kaydı ÜRETİLMEZ.** Arama bildirim listesine düşmez, `NotificationsService`
+  kullanılmaz. Gerekçe: bildirim listesi "sonra bakılacak" şeyler içindir; 30 saniyelik bir çalma
+  oraya düşerse liste geçmiş aramalarla dolar (cevapsız arama kaydı ayrı iştir, §9.4).
+- **Yeni "kime gitsin" süzgeci YOK.** `canDm` kapısı **üç satır yukarıda** zaten geçildi; push o
+  kararın çıktısına gider. Kapıyı ikinci kez uygulamak (kopya süzgeç) yasak.
+- **Mute kontrolü ⟶ push'a değil, davetin tamamına.** Aşağıdaki 3. madde.
+- `title`/`body` **koda gömülmez.** Sunucuda `tr.json` yok; metin bugünkü mesaj push'ının izlediği
+  yolu izler. Dev `toPushPayload`'ın metni nasıl ürettiğine bakar ve **aynı** deseni kullanır. Yeni
+  bir metin mekanizması icat etmez; desen yetmiyorsa DUR ve bildir.
+
+**3. Susturulmuş DM'de arama — tek noktada, `handleCallInvite` içinde.**
+
+Alıcı o DM kanalını **etkin olarak susturmuşsa** (`isMuteActive`, R12/M2b) callee'ye **ne push ne
+WS** gider. Kontrol `canDm` kapısından **sonra**, emit'ten **önce** yapılır.
+
+🔴 **Arayan bunu ANLAMAZ.** Ack yine `{ ok: true }` döner, arayan normal "Çalıyor…" görür ve 3 dk
+sonra cevapsız kalır. "Ulaşılamıyor" dönmek susturmayı ifşa ederdi; §10'un nötrlük kuralı burada da
+geçerli. Bu, mute'un bugünkü tanımını genişletmiyor: "bu kişiden bildirim istemiyorum" zaten
+aramayı da kapsar, aksi hâlde susturma tek tıkla baypas edilebilir bir şey olurdu.
+
+### §9.2 İstemci (`mobile/`)
+
+#### §9.2.1 🔴 Zil: kanal sesi kararı — ölç, sonra seç
+
+Uygulama ölüyken `expo-audio` çalışmaz. Tek yol **bildirim kanalına gömülü ses**. Android'de kanal
+ayarları kurulduktan sonra **değiştirilemez** (M4a-2'nin `_v2` dersi), dolayısıyla mevcut sessiz
+`incoming_call_v2` kanalı bu iş için kullanılamaz.
+
+**Sıra bozulmadan izlenecek:**
+
+1. **Önce tek kanal dene.** `incoming_call_v3` kurulur, sesi **gömülü** (30 sn'ye yakın, kendi
+   içinde döngülü bir zil dosyası — Android bildirim sesini tekrarlamaz, uzunluk döngünün yerini
+   tutar). Ön plan (WS) yolundaki `expo-audio` zili **kaldırılır**, iki yol da kanal sesini kullanır.
+   Titreşim `Vibration.vibrate` ile kalır (ringer modundan bağımsız çalıştığı doğrulandı).
+2. **Ölç:** kabul/reddet/iptal ile bildirim kaldırıldığında **ses kesiliyor mu?** Kesiliyorsa
+   tek kanal kalır, iş biter.
+3. **Kesilmiyorsa** (Android bildirim sesini iptalde durdurmayabilir): ön plan yolu eski sessiz
+   kanalda + `expo-audio` zilinde **kalır**, push yolu için ayrı sesli kanal (`incoming_call_bg_v1`)
+   kullanılır. İki kanal sistem ayarlarında iki satır olarak görünür; adları ayırt edici olur
+   (`mobile.call.incomingNotifChannel` + yeni bir anahtar). Bu bilinçli bir çirkinliktir, ölçüm
+   onu gerektirirse kabul edilir.
+
+Hangisi seçilirse seçilsin **sonuç TASK.md'ye yazılır**: hangi yol, hangi ölçüm, neden.
+
+🟢 **Bu, M4a-2'nin açık borcunu da kapatabilir.** M4a-2'de "cihaz sessizdeyken zil çalmasın"
+yapılamamıştı: `expo-audio` medya akışından çalıyor ve kurulu paketlerde ringer modunu **sorgulayan**
+API yok. Kanal sesine geçilince o sorunun kendisi ortadan kalkar — ringer moduna saygıyı **sistem**
+gösterir, uygulamanın modu bilmesi hiç gerekmez. Yani 1. seçenek tutarsa iki iş tek hamlede biter;
+tutmaz da 3. seçeneğe düşülürse (iki kanal) ön plan yolu eski borcuyla kalır ve borç PLAN.md'ye
+taşınır. Dev bunu **ölçerken birlikte doğrular**: telefonu sessize al, hem ön plandan hem
+uygulama kapalıyken ara.
+
+⚠️ Ses dosyası `app.json`'daki `expo-notifications` plugin `sounds` dizisine girer → **native
+değişiklik → yeni dev build**. Bu duraktaki tek native diff budur. [[native-degisince-once-yerel-derle]]:
+EAS'a göndermeden önce yerelde `expo prebuild` + `gradlew`, sonra **emülatörde aç** (M4a-1'de derleme
+geçip uygulama açılmamıştı; ikisi ayrı kapı).
+
+#### §9.2.2 Kanal ve kategori açılışta kurulur
+
+`ensureSetup()` bugün **ilk gelen aramada** çalışıyor. Push ile gelen bildirimi **sistem** gösterir,
+JS'e uğramaz: kanal kurulu değilse ses/önem yanlış olur, kategori kurulu değilse **Reddet · Aramaya
+Katıl düğmeleri hiç çıkmaz**.
+
+→ Kurulum **uygulama açılışında bir kez** yapılır (`syncPushToken` ile aynı yer, oturum açıldıktan
+sonra). `ensureSetup()`'ın idempotent yapısı korunur; çağrı noktası eklenir, mantık kopyalanmaz.
+
+#### §9.2.3 Kabul: soğuk açılış zinciri
+
+Bildirimden **Aramaya Katıl** → uygulama açılır → doğrudan aramaya girer.
+
+🔴 `useIncomingCallResponder` bugün **düz bir listener**: uygulama ölüyken basılan eylemi kaçırır ve
+soket/oturum hazır olmadan `startOrJoin` çağırır. `usePushNotificationResponder`'da (`push.ts`) bu
+problem **zaten çözülmüş**: `getLastNotificationResponse()` + navigasyon `ready` + auth `booting`
+bitene kadar bekletme. Aynı bekletme **yeniden kullanılır** (kopyalanmaz; iki yer aynı deseni
+gerektiriyorsa ortak bir yardımcıya çıkar, Rule of Three'ye bakma, bu ikinci değil **aynı** problem).
+
+- Oturum kapalıysa (`unauthenticated`) sürpriz atlama YOK, aynen push tarafındaki karar.
+- Katılmadan önce soket **hazır olmalı** (`ensureSocket`, 2cdd1d3'teki ders).
+- Arayan çoktan gitmişse odaya girilir ve M4a-1'in "tek başınasın" hâli görünür; bu **doğru**
+  davranıştır, ayrı bir hata ekranı yazılmaz.
+
+#### §9.2.4 🔴 Reddet, uygulama ölüyken sinyal GÖNDEREMEZ (kabul edilen sınır)
+
+`opensAppToForeground: false` olan bir eylem uygulama ölüyken basıldığında **JS başlatılmaz**;
+`expo-notifications` yanıtı ancak uygulama bir dahaki açılışında `getLastNotificationResponse` ile
+verir. O an `voice:call_reject` göndermek anlamsızdır (arama çoktan bitmiş).
+
+**Karar:** reddet **yerel** kalır — bildirim kapanır, zil susar, sinyal **denenir** (uygulama
+canlıysa gider, değilse gitmez). Arayan tarafta sonuç "cevap yok" olur, 3 dk'lık oda ömrü zaten bunu
+karşılıyor.
+
+Alternatifler ve neden seçilmedi:
+- *Reddet uygulamayı açsın:* arayanı bilgilendirmek için kullanıcının ekranını çalmak. Discord da
+  yapmıyor, sahibin görselleri de bunu göstermiyor.
+- *Native `ConnectionService`/telecom entegrasyonu:* doğru çözüm, ama yeni native modül. M4a
+  kapsamının dışında, gerekirse ayrı sprint.
+
+⚠️ **Gecikmiş yanıt asılı kalmasın:** uygulama açılışında işlenen `getLastNotificationResponse`
+bir `incoming_call` **reddi** ise ve üzerinden 30 sn'den fazla geçtiyse, yalnız temizlik yapılır
+(sinyal gönderilmez). "Uygulamayı açtım, alakasız bir arama reddedildi" sınıfı kusur böyle önlenir.
+
+#### §9.2.5 Asılı bildirim ve çift bildirim
+
+- **Çift bildirim (ön plan):** uygulama ön plandayken hem WS hem push gelir. `setNotificationHandler`
+  (`push.ts`) `data.type === 'incoming_call'` için o kanal **zaten çalıyorsa** `shouldShowBanner:
+  false` döner. Sunucuda presence'a bakılmaz: "arka plana yeni düştü" yarışında arama tamamen
+  kaçardı, bastırma istemcide daha güvenli.
+- **Arayan iptal ettiyse:** iptal push'ı gönderilmez (data-only push Android'de güvenilir değil).
+  Bunun yerine: uygulama ön plana geldiğinde **aktif olmayan** `incoming_call` bildirimleri
+  temizlenir (`getPresentedNotificationsAsync` + süzgeç). "Asılı Gelen Arama kalmaz" şartı böyle
+  karşılanır; 30 sn'lik `ttl` zaten geç düşen push'ı da eler.
+
+### §9.3 T&S notu
+
+Bu durak **yeni bir ifşa yüzeyi açmıyor**: gösterilen bilgi (arayanın adı) M4a-2'de zaten kilit
+ekranında görünüyordu (`lockscreenVisibility: PUBLIC`) ve `canDm` kapısını geçmiş bir kişiye ait.
+Push, aynı bilginin ikinci taşıyıcısıdır. §10'un tamamı bu durakta da aynen geçerli.
+
+### §9.4 Bu duraktan bilerek çıkarılanlar
+
+- **Cevapsız arama kaydı/bildirimi** (DM'de "Cevapsız arama" satırı) — ayrı iş, mesaj şeması işi.
+- **iOS** — Android-first, bu durak Android'i kapatır.
+- **Native telecom/`ConnectionService`** — §9.2.4.
+- **Ortam sesli kanalına push** — M4c.
 
 ---
 
@@ -414,8 +609,17 @@ Aşağıdakiler **bu sprintte yapılmaz**; istenirse PM sözleşmeyi revize eder
 
 **Her durakta (dev'de):**
 - [ ] `npm run typecheck` temiz · `npm run lint` temiz
-- [ ] `api/` ve `web/` diffi **sıfır** (M4a-3 hariç; orada PM sözleşme revize eder)
+- [ ] `web/` diffi **sıfır** (üç durağın hiçbirinde web'e dokunulmaz)
+- [ ] `api/` diffi **sıfır** — M4a-1 ve M4a-2'de. **M4a-3'te §9.1'in üç dosyasıyla sınırlı**
+      (`push.service.ts`, `messages.gateway.ts` + testleri); dördüncü dosya = sapma
 - [ ] Kod içinde gömülü kullanıcı metni yok, gömülü renk/ölçü yok (`src/theme`'den)
+
+**M4a-3 (dev'de, cihaza gitmeden):**
+- [ ] `api/`: `npm run test` temiz; `push.service.spec.ts` yeni opsiyonel alanları kapsıyor
+      (verilmediğinde bugünkü mesaj push'ı **birebir aynı** kalıyor — regresyon testi)
+- [ ] `api/`: susturulmuş DM'de davet → ne WS ne push, ack yine `{ ok: true }` (nötrlük testi)
+- [ ] Prisma şema değişikliği **yok** (bu durak tabloya dokunmuyor; olsaydı `migrate status` şartı gelirdi)
+- [ ] Native diff yerelde derlendi **ve emülatörde açıldı**, sonra EAS ([[native-degisince-once-yerel-derle]])
 
 **M4a-1 (cihazda — SAHİPTE):**
 - [ ] 🔴 **Telefondan arama başlatılıyor:** telefon düğmesine basınca odaya giriliyor ve **web'de zil
@@ -444,8 +648,18 @@ Aşağıdakiler **bu sprintte yapılmaz**; istenirse PM sözleşmeyi revize eder
 - [ ] Cihaz sessizdeyken zil çalmıyor, titreşim var
 
 **M4a-3 (cihazda):**
-- [ ] Uygulama **tamamen kapalıyken** gelen arama bildirimi geliyor, kabul edince aramaya giriliyor
-- [ ] Cevapsız aramanın bildirimi ekranda asılı kalmıyor
+- [ ] 🔴 Uygulama **tamamen kapalıyken** (son uygulamalardan kaydırılıp atılmış) web'den arandığında
+      telefon **çalıyor**, bildirim üstte beliriyor, **Reddet · Aramaya Katıl düğmeleri görünüyor**
+- [ ] Aramaya Katıl → uygulama açılıyor ve **doğrudan aramaya giriyor** (DM'e düşüp beklemiyor);
+      iki taraf birbirini duyuyor
+- [ ] Reddet → zil susuyor, bildirim kapanıyor, uygulama **açılmıyor** (§9.2.4: arayan "cevap yok" görür)
+- [ ] Ekran kilitliyken de aynısı çalışıyor
+- [ ] Uygulama **ön plandayken** arandığında **tek** bildirim çıkıyor (WS + push çift göstermiyor)
+- [ ] Cevapsız aramanın bildirimi asılı kalmıyor; uygulama açılınca eski "Gelen Arama" temizleniyor
+- [ ] Uygulamayı bir süre sonra elle açınca **alakasız eski arama işlenmiyor** (§9.2.4 30 sn kuralı)
+- [ ] Susturulmuş bir DM'den arandığında telefon **hiç çalmıyor**, arayan tarafta özel bir hata da yok
+- [ ] Zil kararı (§9.2.1) hangi yolla çözüldü, ölçüm sonucu **TASK.md'ye yazıldı**
+- [ ] **Regresyon:** mesaj push'ı eskisi gibi çalışıyor (yeni alanlar mesaj yolunu bozmadı)
 
 ---
 

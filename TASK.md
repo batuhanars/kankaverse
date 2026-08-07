@@ -2838,7 +2838,8 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
 
 > Sözleşme: `contracts/SPRINT_M4A_MOBILE_VOICE_CONTRACT.md`. Faz sırası PLAN.md'de kesin
 > (1-1 DM → grup DM → ortam kanalı → aynı sırayla görüntülü). Bu sprint yalnız **1-1 DM sesli**.
-> **`api/` DEĞİŞMEZ** (M4a-3 hariç; oraya gelince PM sözleşmeyi revize eder).
+> **`api/` DEĞİŞMEZ** — M4a-3 hariç: **sözleşme 2026-08-07'de revize edildi** (§2 istisna notu + §9
+> baştan yazıldı), `api/` kapsamı §9.1'in üç dosyasıyla sınırlı. Dördüncü dosya = sapma.
 >
 > Sözleşme sahibin 12 Discord ekran görüntüsüyle yazıldı → `design-refs/m4-ses/`.
 > 🔴 **Görsel eksiği kayda geçti:** gelen arama ekranının görüntüsü yok; web davranışından
@@ -2901,9 +2902,30 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
       kabul edilebilir borç mu). Geri-zil üretilmedi (kapsam dışı, doğru).
 
 ### M4a-3 — sözleşme §9 (M4a-2 sahip onayından SONRA)
-- [ ] 🔴 Yüksek öncelikli push **`api/` işi** — PM sözleşmeyi revize edecek, dev kendi başına dokunmaz
-- [ ] Bildirimden kabul/reddet; cevapsız arama bildirimi asılı kalmıyor
-- [ ] Tam ekran çalan arayüz Play beyanına bağlı; ölç ve raporla, karar sahibin
+> ✅ **Sözleşme revize edildi 2026-08-07.** §9 baştan yazıldı: sunucu kapsamı üç dosyaya sabitlendi,
+> uygulama ölüyken çalışmayan üç ayak (tetikleyici · zil · kurulum) tabloya döküldü, iki karar
+> gerekçesiyle bağlandı (reddet sinyali gönderilemez · susturulmuş DM sessiz kalır).
+> Tam ekran arayüz maddesi **düştü**: `USE_FULL_SCREEN_INTENT` hiç istenmeyecek (2026-08-06).
+
+**`api/` — §9.1 (üç dosya, dördüncüsü sapma)**
+- [ ] `PushPayload` opsiyonel alanlarla genişledi (`priority`, `androidChannelId`, `categoryId`,
+      `ttlSeconds`, `data.callerId/callerName`); alanlar verilmeyince **mesaj push'ı birebir aynı**
+- [ ] `handleCallInvite` → `emitToUser`'ın hemen ardına fire-and-forget push (kalıcı `Notification`
+      kaydı ÜRETİLMEZ, `canDm` ikinci kez uygulanmaz)
+- [ ] Susturulmuş DM'de (`isMuteActive`) ne WS ne push; ack yine `{ ok: true }` (nötrlük, §10)
+- [ ] Test: yeni alanlar için kapsam + mesaj push'ı regresyonu
+
+**`mobile/` — §9.2**
+- [ ] 🔴 Zil kararı: önce tek sesli kanal (`incoming_call_v3`) denenir, bildirim kaldırılınca ses
+      kesiliyor mu **ölçülür**; kesilmiyorsa push yolu ayrı kanala ayrılır. **Sonuç buraya yazılır**
+      🟢 Tutarsa **M4a-2'nin açık borcu da kapanır**: ringer moduna saygıyı sistem gösterir, "cihaz
+      sessizdeyken zil çalmasın" için native modüle inmeye gerek kalmaz (sessize alıp iki yolu da ölç)
+- [ ] Kanal + kategori **açılışta** kuruluyor (yoksa push bildiriminde eylem düğmeleri hiç çıkmaz)
+- [ ] Kabul → soğuk açılış zinciri: `push.ts`'teki bekletme deseni (nav ready + auth booting)
+      yeniden kullanılıyor, kopyalanmıyor; katılmadan önce `ensureSocket`
+- [ ] Reddet yerel (§9.2.4 kabul edilen sınır); 30 sn'den eski yanıt işlenmiyor, yalnız temizlenir
+- [ ] Ön planda çift bildirim yok (handler bastırıyor); uygulama açılınca asılı arama temizleniyor
+- [ ] Native diff → yerelde derle + emülatörde aç, sonra EAS
 
 ### DoD (cihazda) — ✅ SAHİP DOĞRULADI 2026-08-06
 > Tam liste sözleşme §13'te. Sahip turu: arama başlatma, karşılıklı konuşma, arka planda ses,
