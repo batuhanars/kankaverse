@@ -60,7 +60,16 @@ describe('EmergencyService (A4 — R7)', () => {
 
     const snap = prismaMock.report.create.mock.calls[0][0].data.contextSnapshot;
     // İzinli metadata anahtarları dışında alan olmamalı (içerik sızıntısı koruması)
-    const allowed = ['presserId', 'isMinor', 'triggeredAt', 'channelId', 'channelName', 'guildId', 'participants', 'broadcasters'];
+    const allowed = [
+      'presserId',
+      'isMinor',
+      'triggeredAt',
+      'channelId',
+      'channelName',
+      'guildId',
+      'participants',
+      'broadcasters',
+    ];
     expect(Object.keys(snap).every((k) => allowed.includes(k))).toBe(true);
     expect(snap).not.toHaveProperty('content');
     expect(snap).not.toHaveProperty('message');
@@ -87,8 +96,14 @@ describe('EmergencyService (A4 — R7)', () => {
     prismaMock.channel.findUnique.mockResolvedValue({ name: 'genel-ses', guildId: 'g-1' });
 
     const order: string[] = [];
-    prismaMock.report.create.mockImplementation(() => { order.push('report'); return Promise.resolve({ id: 'rpt-1' }); });
-    voiceMock.pullSelfFromVoice.mockImplementation(() => { order.push('pull'); return Promise.resolve(); });
+    prismaMock.report.create.mockImplementation(() => {
+      order.push('report');
+      return Promise.resolve({ id: 'rpt-1' });
+    });
+    voiceMock.pullSelfFromVoice.mockImplementation(() => {
+      order.push('pull');
+      return Promise.resolve();
+    });
 
     await service.trigger('victim-1', 'ch-1');
 
@@ -105,7 +120,11 @@ describe('EmergencyService (A4 — R7)', () => {
     expect(data.targetType).toBe('USER');
     expect(data.targetId).toBe('victim-1');
     expect(voiceMock.pullSelfFromVoice).not.toHaveBeenCalled();
-    expect(Object.keys(data.contextSnapshot).sort()).toEqual(['isMinor', 'presserId', 'triggeredAt']);
+    expect(Object.keys(data.contextSnapshot).sort()).toEqual([
+      'isMinor',
+      'presserId',
+      'triggeredAt',
+    ]);
   });
 
   it('minör tetik: snapshot.isMinor=true + audit metadata isMinor=true (triyaj önceliği)', async () => {
@@ -128,23 +147,35 @@ describe('EmergencyService (A4 — R7)', () => {
   it('addStatement: kendi EMERGENCY raporu → description güncellenir (trim) + audit', async () => {
     prismaMock.report.findUnique.mockResolvedValue({ reporterId: 'victim-1', reason: 'EMERGENCY' });
 
-    await service.addStatement('victim-1', 'rpt-1', '  odada biri ekranında uygunsuz şey gösterdi  ');
+    await service.addStatement(
+      'victim-1',
+      'rpt-1',
+      '  odada biri ekranında uygunsuz şey gösterdi  ',
+    );
 
     expect(prismaMock.report.update.mock.calls[0][0]).toMatchObject({
       where: { id: 'rpt-1' },
       data: { description: 'odada biri ekranında uygunsuz şey gösterdi' },
     });
-    expect(prismaMock.auditLog.create.mock.calls[0][0].data.action).toBe('emergency.statement_added');
+    expect(prismaMock.auditLog.create.mock.calls[0][0].data.action).toBe(
+      'emergency.statement_added',
+    );
   });
 
   it('addStatement: BAŞKASININ raporu → 403, güncelleme YOK (varlık sızdırma yok)', async () => {
-    prismaMock.report.findUnique.mockResolvedValue({ reporterId: 'someone-else', reason: 'EMERGENCY' });
+    prismaMock.report.findUnique.mockResolvedValue({
+      reporterId: 'someone-else',
+      reason: 'EMERGENCY',
+    });
     await expect(service.addStatement('victim-1', 'rpt-1', 'x')).rejects.toThrow();
     expect(prismaMock.report.update).not.toHaveBeenCalled();
   });
 
   it('addStatement: EMERGENCY olmayan rapora → 403 (acil-dışı raporlar dokunulamaz)', async () => {
-    prismaMock.report.findUnique.mockResolvedValue({ reporterId: 'victim-1', reason: 'HARASSMENT' });
+    prismaMock.report.findUnique.mockResolvedValue({
+      reporterId: 'victim-1',
+      reason: 'HARASSMENT',
+    });
     await expect(service.addStatement('victim-1', 'rpt-1', 'x')).rejects.toThrow();
     expect(prismaMock.report.update).not.toHaveBeenCalled();
   });

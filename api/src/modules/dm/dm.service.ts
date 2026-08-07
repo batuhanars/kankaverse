@@ -109,17 +109,22 @@ export class DmService {
         if (!hasNewMessage) continue;
       }
 
-      const unread = lastMsg !== null && (m.lastReadAt === null || lastMsg.createdAt > m.lastReadAt);
+      const unread =
+        lastMsg !== null && (m.lastReadAt === null || lastMsg.createdAt > m.lastReadAt);
       const otherId = otherMember?.user.id;
       const selfBlocked = otherId ? selfBlockedSet.has(otherId) : false;
-      const anyBlock = otherId ? (selfBlockedSet.has(otherId) || blockedMeSet.has(otherId)) : false;
+      const anyBlock = otherId ? selfBlockedSet.has(otherId) || blockedMeSet.has(otherId) : false;
       const canMessage = !anyBlock;
 
       result.push({
         id: m.channel.id,
         type: 'DM' as const,
         otherUser: otherMember
-          ? { id: otherMember.user.id, username: otherMember.user.username, avatarUrl: otherMember.user.avatarUrl }
+          ? {
+              id: otherMember.user.id,
+              username: otherMember.user.username,
+              avatarUrl: otherMember.user.avatarUrl,
+            }
           : null,
         lastMessage: lastMsg
           ? {
@@ -127,7 +132,11 @@ export class DmService {
               channelId: lastMsg.channelId,
               content: lastMsg.content,
               replyToId: lastMsg.replyToId,
-              author: { id: lastMsg.author.id, username: lastMsg.author.username, avatarUrl: lastMsg.author.avatarUrl },
+              author: {
+                id: lastMsg.author.id,
+                username: lastMsg.author.username,
+                avatarUrl: lastMsg.author.avatarUrl,
+              },
               createdAt: lastMsg.createdAt.toISOString(),
             }
           : null,
@@ -140,7 +149,8 @@ export class DmService {
     // GROUP_DM kanalları
     for (const m of groupMemberships) {
       const lastMsg = m.channel.messages[0] ?? null;
-      const unread = lastMsg !== null && (m.lastReadAt === null || lastMsg.createdAt > m.lastReadAt);
+      const unread =
+        lastMsg !== null && (m.lastReadAt === null || lastMsg.createdAt > m.lastReadAt);
 
       result.push({
         id: m.channel.id,
@@ -158,7 +168,11 @@ export class DmService {
               channelId: lastMsg.channelId,
               content: lastMsg.content,
               replyToId: lastMsg.replyToId,
-              author: { id: lastMsg.author.id, username: lastMsg.author.username, avatarUrl: lastMsg.author.avatarUrl },
+              author: {
+                id: lastMsg.author.id,
+                username: lastMsg.author.username,
+                avatarUrl: lastMsg.author.avatarUrl,
+              },
               createdAt: lastMsg.createdAt.toISOString(),
             }
           : null,
@@ -175,14 +189,18 @@ export class DmService {
     const result = await this.dmPermission.canDm(senderId, targetId);
     if (!result.allowed) {
       // G3: blok dahil tüm ret nedenleri jenerik DM_NOT_ALLOWED (BLOCKED istemciye dönmez)
-      throw new ForbiddenException({ message: 'Bu kullanıcıya mesaj gönderemezsiniz.', error: 'DM_NOT_ALLOWED' });
+      throw new ForbiddenException({
+        message: 'Bu kullanıcıya mesaj gönderemezsiniz.',
+        error: 'DM_NOT_ALLOWED',
+      });
     }
 
     const target = await this.prisma.user.findUnique({
       where: { id: targetId, deletedAt: null },
       select: { id: true, username: true, avatarUrl: true },
     });
-    if (!target) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+    if (!target)
+      throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
 
     // Mevcut DM kanalını ara (soft-delete HARİÇ — reddedilen istek kanalı yeniden dönmesin).
     // Mevcut PENDING/ACCEPTED/legacy kanal varsa onu döner: yeni istek oluşturmaz.
@@ -209,7 +227,9 @@ export class DmService {
         data: {
           type: 'DM',
           guildId: null,
-          ...(result.asRequest ? { dmRequestStatus: 'PENDING' as const, dmRequesterId: senderId } : {}),
+          ...(result.asRequest
+            ? { dmRequestStatus: 'PENDING' as const, dmRequesterId: senderId }
+            : {}),
         },
       });
       await tx.channelMember.createMany({
@@ -236,7 +256,10 @@ export class DmService {
     // Benzersizlik + kendini içermez
     const uniqueIds = [...new Set(dto.memberIds)].filter((id) => id !== creatorId);
     if (uniqueIds.length === 0 || uniqueIds.length > 9) {
-      throw new BadRequestException({ message: 'Geçersiz üye listesi.', error: 'INVALID_MEMBER_LIST' });
+      throw new BadRequestException({
+        message: 'Geçersiz üye listesi.',
+        error: 'INVALID_MEMBER_LIST',
+      });
     }
 
     // Kapı 1: creator isMinor?
@@ -244,9 +267,13 @@ export class DmService {
       where: { id: creatorId, deletedAt: null },
       select: { isMinor: true },
     });
-    if (!creator) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+    if (!creator)
+      throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
     if (creator.isMinor) {
-      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'GROUP_MINOR_FORBIDDEN' });
+      throw new ForbiddenException({
+        message: 'Bu işlem için yetkiniz yok.',
+        error: 'GROUP_MINOR_FORBIDDEN',
+      });
     }
 
     // Kapı 2: her üye — karşılıklı arkadaş + minör değil
@@ -277,7 +304,9 @@ export class DmService {
           ownerId: creatorId,
           name: dto.name ?? null,
         },
-        include: { members: { include: { user: { select: { id: true, username: true, avatarUrl: true } } } } },
+        include: {
+          members: { include: { user: { select: { id: true, username: true, avatarUrl: true } } } },
+        },
       });
       await tx.channelMember.createMany({
         data: [
@@ -319,7 +348,10 @@ export class DmService {
 
     const targetId = dto.userId;
     if (targetId === callerId) {
-      throw new BadRequestException({ message: 'Kendinizi ekleyemezsiniz.', error: 'CANNOT_ADD_SELF' });
+      throw new BadRequestException({
+        message: 'Kendinizi ekleyemezsiniz.',
+        error: 'CANNOT_ADD_SELF',
+      });
     }
 
     const target = await this.prisma.user.findUnique({
@@ -363,7 +395,10 @@ export class DmService {
       where: { channelId_userId: { channelId: groupId, userId } },
     });
     if (!membership) {
-      throw new ForbiddenException({ message: 'Bu grubun üyesi değilsiniz.', error: 'NOT_CHANNEL_MEMBER' });
+      throw new ForbiddenException({
+        message: 'Bu grubun üyesi değilsiniz.',
+        error: 'NOT_CHANNEL_MEMBER',
+      });
     }
 
     await this.prisma.channelMember.delete({ where: { id: membership.id } });
@@ -391,7 +426,8 @@ export class DmService {
 
     if (targetUserId === callerId) {
       throw new BadRequestException({
-        message: 'Kendinizi gruptan çıkaramazsınız. Gruptan ayrılmak için ayrılma seçeneğini kullanın.',
+        message:
+          'Kendinizi gruptan çıkaramazsınız. Gruptan ayrılmak için ayrılma seçeneğini kullanın.',
         error: 'CANNOT_REMOVE_SELF',
       });
     }
@@ -400,7 +436,10 @@ export class DmService {
       where: { channelId_userId: { channelId: groupId, userId: targetUserId } },
     });
     if (!membership) {
-      throw new NotFoundException({ message: 'Kullanıcı bu grubun üyesi değil.', error: 'MEMBER_NOT_FOUND' });
+      throw new NotFoundException({
+        message: 'Kullanıcı bu grubun üyesi değil.',
+        error: 'MEMBER_NOT_FOUND',
+      });
     }
 
     await this.prisma.channelMember.delete({ where: { id: membership.id } });
@@ -461,7 +500,10 @@ export class DmService {
       where: { channelId_userId: { channelId, userId } },
     });
     if (!member) {
-      throw new ForbiddenException({ message: 'Bu kanala erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+      throw new ForbiddenException({
+        message: 'Bu kanala erişim izniniz yok.',
+        error: 'NOT_CHANNEL_MEMBER',
+      });
     }
     await this.prisma.channelMember.update({
       where: { id: member.id },
@@ -482,7 +524,10 @@ export class DmService {
       where: { channelId_userId: { channelId, userId } },
     });
     if (!member) {
-      throw new ForbiddenException({ message: 'Bu kanala erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+      throw new ForbiddenException({
+        message: 'Bu kanala erişim izniniz yok.',
+        error: 'NOT_CHANNEL_MEMBER',
+      });
     }
     await this.prisma.channelMember.update({
       where: { id: member.id },
@@ -512,7 +557,10 @@ export class DmService {
       where: { channelId_userId: { channelId: groupId, userId } },
     });
     if (!member) {
-      throw new ForbiddenException({ message: 'Bu grubun üyesi değilsiniz.', error: 'NOT_CHANNEL_MEMBER' });
+      throw new ForbiddenException({
+        message: 'Bu grubun üyesi değilsiniz.',
+        error: 'NOT_CHANNEL_MEMBER',
+      });
     }
     return member;
   }
@@ -549,7 +597,9 @@ export class DmService {
     ]);
 
     const unread =
-      lastMsg !== null && (membership?.lastReadAt === null || (lastMsg.createdAt > (membership?.lastReadAt ?? new Date(0))));
+      lastMsg !== null &&
+      (membership?.lastReadAt === null ||
+        lastMsg.createdAt > (membership?.lastReadAt ?? new Date(0)));
 
     const selfBlocked = !!selfBlockRecord;
     const canMessage = !selfBlocked && !otherBlockRecord;
@@ -564,7 +614,11 @@ export class DmService {
             channelId: lastMsg.channelId,
             content: lastMsg.content,
             replyToId: lastMsg.replyToId,
-            author: { id: lastMsg.author.id, username: lastMsg.author.username, avatarUrl: lastMsg.author.avatarUrl },
+            author: {
+              id: lastMsg.author.id,
+              username: lastMsg.author.username,
+              avatarUrl: lastMsg.author.avatarUrl,
+            },
             createdAt: lastMsg.createdAt.toISOString(),
           }
         : null,
@@ -606,7 +660,11 @@ export class DmService {
     return channels.map((c) => ({
       channelId: c.id,
       requester: c.dmRequester
-        ? { id: c.dmRequester.id, username: c.dmRequester.username, avatarUrl: c.dmRequester.avatarUrl }
+        ? {
+            id: c.dmRequester.id,
+            username: c.dmRequester.username,
+            avatarUrl: c.dmRequester.avatarUrl,
+          }
         : null,
       preview: c.messages[0]?.content ?? '',
       createdAt: c.createdAt.toISOString(),
@@ -629,7 +687,10 @@ export class DmService {
       where: { channelId_userId: { channelId, userId } },
     });
     if (!member) {
-      throw new ForbiddenException({ message: 'Bu isteğe erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+      throw new ForbiddenException({
+        message: 'Bu isteğe erişim izniniz yok.',
+        error: 'NOT_CHANNEL_MEMBER',
+      });
     }
     return channel;
   }
@@ -645,7 +706,8 @@ export class DmService {
       where: { id: channel.dmRequesterId! },
       select: { id: true, username: true, avatarUrl: true },
     });
-    if (!other) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+    if (!other)
+      throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
     return this.toDmChannelDto(channelId, other, userId);
   }
 

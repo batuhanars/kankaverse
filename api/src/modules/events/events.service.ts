@@ -108,16 +108,28 @@ export class EventsService {
     });
 
     if (!attachment) {
-      throw new BadRequestException({ message: 'Geçersiz kapak görseli.', error: 'INVALID_COVER_IMAGE' });
+      throw new BadRequestException({
+        message: 'Geçersiz kapak görseli.',
+        error: 'INVALID_COVER_IMAGE',
+      });
     }
     if (attachment.uploaderId !== userId) {
-      throw new BadRequestException({ message: 'Geçersiz kapak görseli.', error: 'INVALID_COVER_IMAGE' });
+      throw new BadRequestException({
+        message: 'Geçersiz kapak görseli.',
+        error: 'INVALID_COVER_IMAGE',
+      });
     }
     if (!attachment.contentType.startsWith('image/')) {
-      throw new BadRequestException({ message: 'Kapak görseli bir resim olmalıdır.', error: 'INVALID_COVER_TYPE' });
+      throw new BadRequestException({
+        message: 'Kapak görseli bir resim olmalıdır.',
+        error: 'INVALID_COVER_TYPE',
+      });
     }
     if (attachment.messageId !== null) {
-      throw new BadRequestException({ message: 'Geçersiz kapak görseli.', error: 'INVALID_COVER_IMAGE' });
+      throw new BadRequestException({
+        message: 'Geçersiz kapak görseli.',
+        error: 'INVALID_COVER_IMAGE',
+      });
     }
 
     // scan-gate: dev (false) → CLEAN; prod/gelecek (true) → PENDING → tarama servisi (R5)
@@ -178,10 +190,10 @@ export class EventsService {
    * (minör statüsü / yaş sebebi sızmaz). Görünüyorsa event döner.
    */
   private async requireEventAccess(viewerId: string, eventId: string): Promise<EventWithChannel> {
-    const event = (await this.prisma.guildEvent.findFirst({
+    const event = await this.prisma.guildEvent.findFirst({
       where: { id: eventId, deletedAt: null },
       include: { channel: { select: { name: true } } },
-    })) as EventWithChannel | null;
+    });
     if (!event) {
       throw new NotFoundException({ message: 'Etkinlik bulunamadı.', error: 'EVENT_NOT_FOUND' });
     }
@@ -241,7 +253,10 @@ export class EventsService {
   // İlgi sayaçları
   // ───────────────────────────────────────────────────────────────────────────
 
-  private async interestInfo(eventId: string, viewerId: string): Promise<{ count: number; byMe: boolean }> {
+  private async interestInfo(
+    eventId: string,
+    viewerId: string,
+  ): Promise<{ count: number; byMe: boolean }> {
     const [count, mine] = await Promise.all([
       this.prisma.guildEventInterest.count({ where: { eventId } }),
       this.prisma.guildEventInterest.findUnique({
@@ -287,7 +302,10 @@ export class EventsService {
 
     if (dto.locationType === 'VOICE_CHANNEL') {
       if (!dto.channelId) {
-        throw new BadRequestException({ message: 'Ses kanalı seçilmelidir.', error: 'EVENT_LOCATION_REQUIRED' });
+        throw new BadRequestException({
+          message: 'Ses kanalı seçilmelidir.',
+          error: 'EVENT_LOCATION_REQUIRED',
+        });
       }
       await this.validateVoiceChannel(dto.channelId, guildId);
       // R7: creator de kanala erişebilmeli (minör/yaş kapısı) — AGE_RESTRICTED propagate eder
@@ -296,7 +314,10 @@ export class EventsService {
     } else {
       // EXTERNAL
       if (!dto.externalLocation || dto.externalLocation.trim().length === 0) {
-        throw new BadRequestException({ message: 'Konum belirtilmelidir.', error: 'EVENT_LOCATION_REQUIRED' });
+        throw new BadRequestException({
+          message: 'Konum belirtilmelidir.',
+          error: 'EVENT_LOCATION_REQUIRED',
+        });
       }
       externalLocation = dto.externalLocation;
     }
@@ -308,7 +329,7 @@ export class EventsService {
       coverImageId = dto.coverImageId;
     }
 
-    const event = (await this.prisma.guildEvent.create({
+    const event = await this.prisma.guildEvent.create({
       data: {
         guildId,
         creatorId: userId,
@@ -323,7 +344,7 @@ export class EventsService {
         coverImageId,
       },
       include: { channel: { select: { name: true } } },
-    })) as EventWithChannel;
+    });
 
     const coverImageUrl = await this.resolveCoverUrl(event.coverImageId);
     const dtoOut = toEventDto(event, 0, false, coverImageUrl);
@@ -385,8 +406,14 @@ export class EventsService {
 
     const now = new Date();
     const sorted = [...events].sort((a, b) => {
-      const oa = computeOccurrence({ startAt: a.startAt, endAt: a.endAt, recurrence: a.recurrence }, now);
-      const ob = computeOccurrence({ startAt: b.startAt, endAt: b.endAt, recurrence: b.recurrence }, now);
+      const oa = computeOccurrence(
+        { startAt: a.startAt, endAt: a.endAt, recurrence: a.recurrence },
+        now,
+      );
+      const ob = computeOccurrence(
+        { startAt: b.startAt, endAt: b.endAt, recurrence: b.recurrence },
+        now,
+      );
       return oa.occurrenceStartAt.getTime() - ob.occurrenceStartAt.getTime();
     });
 
@@ -407,9 +434,9 @@ export class EventsService {
 
   /** PATCH /events/:id — MANAGE_EVENTS. */
   async update(userId: string, eventId: string, dto: UpdateEventDto) {
-    const existing = (await this.prisma.guildEvent.findFirst({
+    const existing = await this.prisma.guildEvent.findFirst({
       where: { id: eventId, deletedAt: null },
-    })) as GuildEvent | null;
+    });
     if (!existing) {
       throw new NotFoundException({ message: 'Etkinlik bulunamadı.', error: 'EVENT_NOT_FOUND' });
     }
@@ -470,7 +497,10 @@ export class EventsService {
       if (locationType === 'VOICE_CHANNEL') {
         const channelId = dto.channelId ?? existing.channelId;
         if (!channelId) {
-          throw new BadRequestException({ message: 'Ses kanalı seçilmelidir.', error: 'EVENT_LOCATION_REQUIRED' });
+          throw new BadRequestException({
+            message: 'Ses kanalı seçilmelidir.',
+            error: 'EVENT_LOCATION_REQUIRED',
+          });
         }
         await this.validateVoiceChannel(channelId, existing.guildId);
         await this.membership.requireChannelAccess(userId, channelId);
@@ -480,7 +510,10 @@ export class EventsService {
       } else {
         const externalLocation = dto.externalLocation ?? existing.externalLocation;
         if (!externalLocation || externalLocation.trim().length === 0) {
-          throw new BadRequestException({ message: 'Konum belirtilmelidir.', error: 'EVENT_LOCATION_REQUIRED' });
+          throw new BadRequestException({
+            message: 'Konum belirtilmelidir.',
+            error: 'EVENT_LOCATION_REQUIRED',
+          });
         }
         data.locationType = 'EXTERNAL';
         data.externalLocation = externalLocation;
@@ -488,11 +521,11 @@ export class EventsService {
       }
     }
 
-    const updated = (await this.prisma.guildEvent.update({
+    const updated = await this.prisma.guildEvent.update({
       where: { id: eventId },
       data,
       include: { channel: { select: { name: true } } },
-    })) as EventWithChannel;
+    });
 
     const info = await this.interestInfo(updated.id, userId);
     const coverImageUrl = await this.resolveCoverUrl(updated.coverImageId);
@@ -506,9 +539,9 @@ export class EventsService {
 
   /** DELETE /events/:id — MANAGE_EVENTS, soft-delete. → null */
   async remove(userId: string, eventId: string) {
-    const existing = (await this.prisma.guildEvent.findFirst({
+    const existing = await this.prisma.guildEvent.findFirst({
       where: { id: eventId, deletedAt: null },
-    })) as GuildEvent | null;
+    });
     if (!existing) {
       throw new NotFoundException({ message: 'Etkinlik bulunamadı.', error: 'EVENT_NOT_FOUND' });
     }
@@ -558,10 +591,10 @@ export class EventsService {
    * (görünürlük kapısı koyarsak öksüz-ilgi tuzağı doğar). Event yoksa 404.
    */
   async removeInterest(userId: string, eventId: string) {
-    const event = (await this.prisma.guildEvent.findFirst({
+    const event = await this.prisma.guildEvent.findFirst({
       where: { id: eventId, deletedAt: null },
       include: { channel: { select: { name: true } } },
-    })) as EventWithChannel | null;
+    });
     if (!event) {
       throw new NotFoundException({ message: 'Etkinlik bulunamadı.', error: 'EVENT_NOT_FOUND' });
     }
@@ -595,7 +628,10 @@ export class EventsService {
       channel.guildId !== guildId ||
       channel.type !== 'GUILD_VOICE'
     ) {
-      throw new BadRequestException({ message: 'Geçersiz ses kanalı.', error: 'INVALID_EVENT_CHANNEL' });
+      throw new BadRequestException({
+        message: 'Geçersiz ses kanalı.',
+        error: 'INVALID_EVENT_CHANNEL',
+      });
     }
   }
 }

@@ -25,22 +25,19 @@ export class AttachmentsController {
   @Post('presign')
   @UseGuards(VerifiedEmailGuard)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Dosya yükleme için presigned PUT URL al (doğrulanmış e-posta zorunlu)' })
-  presign(
-    @CurrentUser() user: { id: string },
-    @Body() dto: PresignAttachmentDto,
-  ) {
+  @ApiOperation({
+    summary: 'Dosya yükleme için presigned PUT URL al (doğrulanmış e-posta zorunlu)',
+  })
+  presign(@CurrentUser() user: { id: string }, @Body() dto: PresignAttachmentDto) {
     return this.attachmentsService.presign(user.id, dto);
   }
 
   @Get(':id')
   @ApiOperation({
-    summary: '[R7] Dosya indirme URL (erişim kontrolü + scan kapısı; redirect yok — presigned URL body\'de döner)',
+    summary:
+      "[R7] Dosya indirme URL (erişim kontrolü + scan kapısı; redirect yok — presigned URL body'de döner)",
   })
-  getDownloadUrl(
-    @CurrentUser() user: { id: string },
-    @Param('id') attachmentId: string,
-  ) {
+  getDownloadUrl(@CurrentUser() user: { id: string }, @Param('id') attachmentId: string) {
     return this.attachmentsService.getDownloadUrl(user.id, attachmentId);
   }
 }

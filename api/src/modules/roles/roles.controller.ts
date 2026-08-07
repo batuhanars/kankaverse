@@ -29,10 +29,7 @@ export class RolesController {
 
   @Get('guilds/:id/roles')
   @ApiOperation({ summary: 'Ortam rollerini listele (yalnız üyeler görebilir); position DESC' })
-  listRoles(
-    @CurrentUser() user: { id: string },
-    @Param('id') guildId: string,
-  ) {
+  listRoles(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
     return this.rolesService.listRoles(user.id, guildId);
   }
 
@@ -53,7 +50,9 @@ export class RolesController {
 
   @Patch('guilds/:id/roles/reorder')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Rolleri toplu sırala (drag-reorder; OWNER/ADMIN; @everyone hariç). Dönüş null.' })
+  @ApiOperation({
+    summary: 'Rolleri toplu sırala (drag-reorder; OWNER/ADMIN; @everyone hariç). Dönüş null.',
+  })
   reorderRoles(
     @CurrentUser() user: { id: string },
     @Param('id') id: string,
@@ -80,10 +79,7 @@ export class RolesController {
   @Delete('roles/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Rol sil (OWNER/ADMIN); @everyone silinemez. Dönüş null.' })
-  deleteRole(
-    @CurrentUser() user: { id: string },
-    @Param('id') roleId: string,
-  ) {
+  deleteRole(@CurrentUser() user: { id: string }, @Param('id') roleId: string) {
     return this.rolesService.deleteRole(user.id, roleId);
   }
 
@@ -91,7 +87,9 @@ export class RolesController {
 
   @Post('roles/:id/members/:userId')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Üyeye rol ata (OWNER/ADMIN; idempotent). Dönüş: güncel üye DTO (roles dahil).' })
+  @ApiOperation({
+    summary: 'Üyeye rol ata (OWNER/ADMIN; idempotent). Dönüş: güncel üye DTO (roles dahil).',
+  })
   assignRole(
     @CurrentUser() user: { id: string },
     @Param('id') roleId: string,
@@ -104,7 +102,9 @@ export class RolesController {
 
   @Delete('roles/:id/members/:userId')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Üyeden rol çıkar (OWNER/ADMIN; idempotent). Dönüş: güncel üye DTO (roles dahil).' })
+  @ApiOperation({
+    summary: 'Üyeden rol çıkar (OWNER/ADMIN; idempotent). Dönüş: güncel üye DTO (roles dahil).',
+  })
   removeRole(
     @CurrentUser() user: { id: string },
     @Param('id') roleId: string,

@@ -1,10 +1,4 @@
-import {
-  ExceptionFilter,
-  Catch,
-  ArgumentsHost,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 
@@ -29,7 +23,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         message = Array.isArray(raw) ? raw.join(', ') : ((raw as string) ?? message);
         error = (r.error as string) ?? this.defaultError(statusCode);
       } else {
-        message = res as string;
+        message = res;
         error = this.defaultError(statusCode);
       }
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {

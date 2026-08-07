@@ -152,7 +152,9 @@ export class FriendPermissionService {
       // kullanıcıya bedel yükler, korumaya bir şey katmaz.
       //
       // Gruptan ayrılmak/çıkarılmak bu izni GERİ ALIR (sorgu anlık üyeliğe bakar, geçmişe değil).
-      const sharedGroupDm = sharedGuild ? false : await this.hasSharedGroupDmChannel(senderId, targetId);
+      const sharedGroupDm = sharedGuild
+        ? false
+        : await this.hasSharedGroupDmChannel(senderId, targetId);
       if (!sharedGuild && !sharedGroupDm) {
         return { allowed: false, reason: 'USER_NOT_FOUND' };
       }
@@ -214,4 +216,3 @@ export class FriendPermissionService {
     return shared !== null;
   }
 }
-

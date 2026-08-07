@@ -33,7 +33,12 @@ const permissionsMock = {
 const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
 
 function makeService() {
-  return new CategoriesService(prismaMock as any, membershipMock as any, permissionsMock as any, realtimeMock as any);
+  return new CategoriesService(
+    prismaMock as any,
+    membershipMock as any,
+    permissionsMock as any,
+    realtimeMock as any,
+  );
 }
 
 function resetMocks() {
@@ -79,17 +84,25 @@ describe('CategoriesService.create', () => {
   });
 
   it('MEMBER → 403 FORBIDDEN fırlatır', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: MEMBER_MEMBERSHIP,
+    });
     permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
-    await expect(service.create('member-1', GUILD_ID, { name: 'Yeni' })).rejects.toThrow(ForbiddenException);
+    await expect(service.create('member-1', GUILD_ID, { name: 'Yeni' })).rejects.toThrow(
+      ForbiddenException,
+    );
     await expect(service.create('member-1', GUILD_ID, { name: 'Yeni' })).rejects.toMatchObject({
       response: { error: 'FORBIDDEN' },
     });
   });
 
   it('OWNER → kategori oluşturur; position = max + 1', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MEMBERSHIP,
+    });
     prismaMock.channelCategory.aggregate.mockResolvedValue({ _max: { position: 2 } });
     const created = makeCategory({ name: 'Yeni', position: 3 });
     prismaMock.channelCategory.create.mockResolvedValue(created);
@@ -105,7 +118,10 @@ describe('CategoriesService.create', () => {
   });
 
   it('ADMIN → kategori oluşturur', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: ADMIN_MEMBERSHIP });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: ADMIN_MEMBERSHIP,
+    });
     prismaMock.channelCategory.aggregate.mockResolvedValue({ _max: { position: null } });
     const created = makeCategory({ name: 'Admin Kategori', position: 0 });
     prismaMock.channelCategory.create.mockResolvedValue(created);
@@ -115,7 +131,10 @@ describe('CategoriesService.create', () => {
   });
 
   it('ilk kategori (max=null) → position 0 hesaplanır', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MEMBERSHIP,
+    });
     prismaMock.channelCategory.aggregate.mockResolvedValue({ _max: { position: null } });
     const created = makeCategory({ position: 0 });
     prismaMock.channelCategory.create.mockResolvedValue(created);
@@ -128,7 +147,10 @@ describe('CategoriesService.create', () => {
   });
 
   it('ikinci kategori (max=0) → position 1 hesaplanır', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MEMBERSHIP,
+    });
     prismaMock.channelCategory.aggregate.mockResolvedValue({ _max: { position: 0 } });
     const created = makeCategory({ position: 1 });
     prismaMock.channelCategory.create.mockResolvedValue(created);
@@ -152,7 +174,10 @@ describe('CategoriesService.findByGuild', () => {
   });
 
   it('üye → kategorileri position asc sırasıyla döner', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MEMBERSHIP,
+    });
     const cats = [
       makeCategory({ id: 'cat-1', name: 'A', position: 0 }),
       makeCategory({ id: 'cat-2', name: 'B', position: 1 }),
@@ -180,7 +205,10 @@ describe('CategoriesService.findByGuild', () => {
   });
 
   it('silinmiş kategoriler dahil edilmez (where filtresi)', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: MEMBER_MEMBERSHIP,
+    });
     prismaMock.channelCategory.findMany.mockResolvedValue([]);
 
     await service.findByGuild('member-1', GUILD_ID);
@@ -204,7 +232,9 @@ describe('CategoriesService.update', () => {
   it('kategori yok → 404 CATEGORY_NOT_FOUND', async () => {
     prismaMock.channelCategory.findUnique.mockResolvedValue(null);
 
-    await expect(service.update(USER_ID, CATEGORY_ID, { name: 'Yeni' })).rejects.toThrow(NotFoundException);
+    await expect(service.update(USER_ID, CATEGORY_ID, { name: 'Yeni' })).rejects.toThrow(
+      NotFoundException,
+    );
     await expect(service.update(USER_ID, CATEGORY_ID, { name: 'Yeni' })).rejects.toMatchObject({
       response: { error: 'CATEGORY_NOT_FOUND' },
     });
@@ -212,15 +242,23 @@ describe('CategoriesService.update', () => {
 
   it('MEMBER → 403 FORBIDDEN', async () => {
     prismaMock.channelCategory.findUnique.mockResolvedValue(makeCategory());
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: MEMBER_MEMBERSHIP,
+    });
     permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
-    await expect(service.update('member-1', CATEGORY_ID, { name: 'Yeni' })).rejects.toThrow(ForbiddenException);
+    await expect(service.update('member-1', CATEGORY_ID, { name: 'Yeni' })).rejects.toThrow(
+      ForbiddenException,
+    );
   });
 
   it('OWNER → adı günceller', async () => {
     prismaMock.channelCategory.findUnique.mockResolvedValue(makeCategory());
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MEMBERSHIP,
+    });
     const updated = makeCategory({ name: 'Güncel Ad' });
     prismaMock.channelCategory.update.mockResolvedValue(updated);
 
@@ -233,7 +271,10 @@ describe('CategoriesService.update', () => {
 
   it('OWNER → position günceller', async () => {
     prismaMock.channelCategory.findUnique.mockResolvedValue(makeCategory({ position: 0 }));
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MEMBERSHIP,
+    });
     const updated = makeCategory({ position: 3 });
     prismaMock.channelCategory.update.mockResolvedValue(updated);
 
@@ -263,7 +304,10 @@ describe('CategoriesService.remove', () => {
 
   it('MEMBER → 403 FORBIDDEN', async () => {
     prismaMock.channelCategory.findUnique.mockResolvedValue(makeCategory());
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: MEMBER_MEMBERSHIP });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: MEMBER_MEMBERSHIP,
+    });
     permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
     await expect(service.remove('member-1', CATEGORY_ID)).rejects.toThrow(ForbiddenException);
@@ -271,8 +315,14 @@ describe('CategoriesService.remove', () => {
 
   it('OWNER → transaction: kanallar categoryId=null, kategori soft-delete; null döner', async () => {
     prismaMock.channelCategory.findUnique.mockResolvedValue(makeCategory());
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
-    prismaMock.$transaction.mockResolvedValue([{ count: 2 }, makeCategory({ deletedAt: new Date() })]);
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MEMBERSHIP,
+    });
+    prismaMock.$transaction.mockResolvedValue([
+      { count: 2 },
+      makeCategory({ deletedAt: new Date() }),
+    ]);
 
     const result = await service.remove(USER_ID, CATEGORY_ID);
 
@@ -295,7 +345,10 @@ describe('CategoriesService.remove', () => {
 
   it('ADMIN → silme yetkisi var', async () => {
     prismaMock.channelCategory.findUnique.mockResolvedValue(makeCategory());
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: ADMIN_MEMBERSHIP });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: ADMIN_MEMBERSHIP,
+    });
     prismaMock.$transaction.mockResolvedValue([]);
 
     const result = await service.remove('admin-1', CATEGORY_ID);
@@ -331,7 +384,11 @@ describe('ChannelsService — categoryId cross-guild guard (INVALID_CATEGORY)', 
     requireChannelAccess: jest.fn(),
   };
 
-  const channelRealtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
+  const channelRealtimeMock = {
+    emitToUser: jest.fn(),
+    emitToUsers: jest.fn(),
+    emitToRoom: jest.fn(),
+  };
 
   const channelPermissionsMock = {
     hasGuildPermission: jest.fn().mockResolvedValue(true),
@@ -346,11 +403,19 @@ describe('ChannelsService — categoryId cross-guild guard (INVALID_CATEGORY)', 
     channelPermissionsMock.hasGuildPermission.mockResolvedValue(true);
     channelPrismaMock.guildMember.findMany.mockResolvedValue([]);
     channelPrismaMock.channelMember.findMany.mockResolvedValue([]);
-    channelService = new ChannelsService(channelPrismaMock as any, channelMembershipMock as any, channelPermissionsMock as any, channelRealtimeMock as any);
+    channelService = new ChannelsService(
+      channelPrismaMock as any,
+      channelMembershipMock as any,
+      channelPermissionsMock as any,
+      channelRealtimeMock as any,
+    );
   });
 
   it('create: başka guild kategorisi → 400 INVALID_CATEGORY', async () => {
-    channelMembershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MS });
+    channelMembershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MS,
+    });
     // Kategori başka guild'e ait
     channelPrismaMock.channelCategory.findUnique.mockResolvedValue({
       id: 'cat-other',
@@ -367,7 +432,10 @@ describe('ChannelsService — categoryId cross-guild guard (INVALID_CATEGORY)', 
   });
 
   it('create: silinmiş kategori → 400 INVALID_CATEGORY', async () => {
-    channelMembershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MS });
+    channelMembershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MS,
+    });
     channelPrismaMock.channelCategory.findUnique.mockResolvedValue({
       id: CATEGORY_ID,
       guildId: GUILD_ID,
@@ -380,7 +448,10 @@ describe('ChannelsService — categoryId cross-guild guard (INVALID_CATEGORY)', 
   });
 
   it('create: var olmayan kategori → 400 INVALID_CATEGORY', async () => {
-    channelMembershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MS });
+    channelMembershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MS,
+    });
     channelPrismaMock.channelCategory.findUnique.mockResolvedValue(null);
 
     await expect(
@@ -390,11 +461,18 @@ describe('ChannelsService — categoryId cross-guild guard (INVALID_CATEGORY)', 
 
   it('update: başka guild kategorisi → 400 INVALID_CATEGORY', async () => {
     channelPrismaMock.channel.findUnique.mockResolvedValue({
-      id: 'ch-1', guildId: GUILD_ID, deletedAt: null,
+      id: 'ch-1',
+      guildId: GUILD_ID,
+      deletedAt: null,
     });
-    channelMembershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MS });
+    channelMembershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MS,
+    });
     channelPrismaMock.channelCategory.findUnique.mockResolvedValue({
-      id: 'cat-other', guildId: OTHER_GUILD_ID, deletedAt: null,
+      id: 'cat-other',
+      guildId: OTHER_GUILD_ID,
+      deletedAt: null,
     });
 
     await expect(
@@ -403,29 +481,58 @@ describe('ChannelsService — categoryId cross-guild guard (INVALID_CATEGORY)', 
   });
 
   it('create: geçerli kategori (aynı guild, silinmemiş) → başarıyla oluşturulur', async () => {
-    channelMembershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MS });
+    channelMembershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MS,
+    });
     channelPrismaMock.channelCategory.findUnique.mockResolvedValue({
-      id: CATEGORY_ID, guildId: GUILD_ID, deletedAt: null,
+      id: CATEGORY_ID,
+      guildId: GUILD_ID,
+      deletedAt: null,
     });
     channelPrismaMock.channel.aggregate.mockResolvedValue({ _max: { position: 0 } });
     const created = {
-      id: 'ch-new', type: 'GUILD_TEXT', guildId: GUILD_ID, categoryId: CATEGORY_ID,
-      name: 'kanal', ageGated: false, position: 1, slowModeSeconds: 0, deletedAt: null, createdAt: new Date(),
+      id: 'ch-new',
+      type: 'GUILD_TEXT',
+      guildId: GUILD_ID,
+      categoryId: CATEGORY_ID,
+      name: 'kanal',
+      ageGated: false,
+      position: 1,
+      slowModeSeconds: 0,
+      deletedAt: null,
+      createdAt: new Date(),
     };
     channelPrismaMock.channel.create.mockResolvedValue(created);
 
-    const result = await channelService.create(USER_ID, GUILD_ID, { name: 'kanal', categoryId: CATEGORY_ID });
+    const result = await channelService.create(USER_ID, GUILD_ID, {
+      name: 'kanal',
+      categoryId: CATEGORY_ID,
+    });
     expect(result).toMatchObject({ categoryId: CATEGORY_ID });
   });
 
   it('update: categoryId=null → kategorisizleştirir (doğrulama çalışmaz)', async () => {
     channelPrismaMock.channel.findUnique.mockResolvedValue({
-      id: 'ch-1', guildId: GUILD_ID, deletedAt: null,
+      id: 'ch-1',
+      guildId: GUILD_ID,
+      deletedAt: null,
     });
-    channelMembershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MS });
+    channelMembershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MS,
+    });
     const updated = {
-      id: 'ch-1', type: 'GUILD_TEXT', guildId: GUILD_ID, categoryId: null,
-      name: 'kanal', ageGated: false, position: 0, slowModeSeconds: 0, deletedAt: null, createdAt: new Date(),
+      id: 'ch-1',
+      type: 'GUILD_TEXT',
+      guildId: GUILD_ID,
+      categoryId: null,
+      name: 'kanal',
+      ageGated: false,
+      position: 0,
+      slowModeSeconds: 0,
+      deletedAt: null,
+      createdAt: new Date(),
     };
     channelPrismaMock.channel.update.mockResolvedValue(updated);
 

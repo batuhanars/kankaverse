@@ -53,7 +53,7 @@ describe('PushService', () => {
     });
   });
 
-  it('alıcının hiç token\'ı yoksa fetch çağrılmaz', async () => {
+  it("alıcının hiç token'ı yoksa fetch çağrılmaz", async () => {
     prismaMock.pushToken.findMany.mockResolvedValue([]);
     const service = makeService(true);
     await service.sendToUsers(['u1'], BASE_PAYLOAD);
@@ -61,7 +61,7 @@ describe('PushService', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('token(lar) bulunursa Expo Push API\'ye doğru gövdeyle istek atar', async () => {
+  it("token(lar) bulunursa Expo Push API'ye doğru gövdeyle istek atar", async () => {
     prismaMock.pushToken.findMany.mockResolvedValue([
       { token: 'ExponentPushToken[a]' },
       { token: 'ExponentPushToken[b]' },
@@ -92,7 +92,7 @@ describe('PushService', () => {
   });
 
   // ── §2.3 — ≤100 mesaj/istek (chunk) ─────────────────────────────────────────
-  it('100\'den fazla token → birden çok istek (chunk ≤100)', async () => {
+  it("100'den fazla token → birden çok istek (chunk ≤100)", async () => {
     const tokens = Array.from({ length: 101 }, (_, i) => ({ token: `ExponentPushToken[t${i}]` }));
     prismaMock.pushToken.findMany.mockResolvedValue(tokens);
     (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ data: [] }) });
@@ -174,7 +174,10 @@ describe('PushService', () => {
   describe('M4a-3 §9.1 — yeni opsiyonel alanlar', () => {
     it('REGRESYON: yeni alanlar verilmezse Expo gövdesi bugünküyle birebir aynı (yalnız to/title/body/data)', async () => {
       prismaMock.pushToken.findMany.mockResolvedValue([{ token: 'ExponentPushToken[a]' }]);
-      (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ data: [{ status: 'ok' }] }) });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: [{ status: 'ok' }] }),
+      });
 
       const service = makeService(true);
       await service.sendToUsers(['u1'], {
@@ -194,15 +197,23 @@ describe('PushService', () => {
       ]);
     });
 
-    it('priority/androidChannelId/categoryId/ttlSeconds → Expo mesajına doğru map\'lenir (channelId/ttl adları)', async () => {
+    it("priority/androidChannelId/categoryId/ttlSeconds → Expo mesajına doğru map'lenir (channelId/ttl adları)", async () => {
       prismaMock.pushToken.findMany.mockResolvedValue([{ token: 'ExponentPushToken[a]' }]);
-      (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ data: [{ status: 'ok' }] }) });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: [{ status: 'ok' }] }),
+      });
 
       const service = makeService(true);
       await service.sendToUsers(['u1'], {
         title: 'Gelen Arama',
         body: 'kanka1 seni arıyor!',
-        data: { type: 'incoming_call', channelId: 'ch-dm-1', callerId: 'u-caller', callerName: 'kanka1' },
+        data: {
+          type: 'incoming_call',
+          channelId: 'ch-dm-1',
+          callerId: 'u-caller',
+          callerName: 'kanka1',
+        },
         priority: 'high',
         androidChannelId: 'incoming_call_v3',
         categoryId: 'incoming_call',
@@ -215,7 +226,12 @@ describe('PushService', () => {
           to: 'ExponentPushToken[a]',
           title: 'Gelen Arama',
           body: 'kanka1 seni arıyor!',
-          data: { type: 'incoming_call', channelId: 'ch-dm-1', callerId: 'u-caller', callerName: 'kanka1' },
+          data: {
+            type: 'incoming_call',
+            channelId: 'ch-dm-1',
+            callerId: 'u-caller',
+            callerName: 'kanka1',
+          },
           priority: 'high',
           // 🔴 `androidChannelId` Expo mesajının `channelId` alanına map'lenir (data.channelId ile karışmasın diye ayrı isimlendirildi).
           channelId: 'incoming_call_v3',

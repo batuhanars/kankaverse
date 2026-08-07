@@ -73,11 +73,17 @@ export class FriendsService {
   private throwFromPermissionReason(reason: string | undefined): never {
     switch (reason) {
       case 'CANNOT_FRIEND_SELF':
-        throw new BadRequestException({ message: 'Kendinize arkadaşlık isteği gönderemezsiniz.', error: 'CANNOT_FRIEND_SELF' });
+        throw new BadRequestException({
+          message: 'Kendinize arkadaşlık isteği gönderemezsiniz.',
+          error: 'CANNOT_FRIEND_SELF',
+        });
       case 'ALREADY_FRIENDS':
         throw new ConflictException({ message: 'Zaten arkadaşsınız.', error: 'ALREADY_FRIENDS' });
       case 'REQUEST_EXISTS':
-        throw new ConflictException({ message: 'Bekleyen bir istek zaten mevcut.', error: 'REQUEST_EXISTS' });
+        throw new ConflictException({
+          message: 'Bekleyen bir istek zaten mevcut.',
+          error: 'REQUEST_EXISTS',
+        });
       case 'USER_NOT_FOUND':
       default:
         // USER_NOT_FOUND kapsayıcı jenerik: yok / blok / minör / ortam yok — ayırt edilemez (G3)
@@ -201,7 +207,10 @@ export class FriendsService {
       select: { id: true, username: true, avatarUrl: true },
     });
     if (!target) {
-      throw new NotFoundException({ message: 'Bu kodla kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+      throw new NotFoundException({
+        message: 'Bu kodla kullanıcı bulunamadı.',
+        error: 'USER_NOT_FOUND',
+      });
     }
 
     const check = await this.friendPermission.canSendFriendRequest(senderId, target.id, 'CODE');
@@ -217,7 +226,11 @@ export class FriendsService {
    * G2: tıkla-ekle; ortak ortam zorunlu + her iki taraf yetişkin (G1).
    */
   async sendFriendRequestByUser(senderId: string, dto: SendFriendRequestByUserDto) {
-    const check = await this.friendPermission.canSendFriendRequest(senderId, dto.userId, 'USER_CLICK');
+    const check = await this.friendPermission.canSendFriendRequest(
+      senderId,
+      dto.userId,
+      'USER_CLICK',
+    );
     if (!check.allowed) {
       this.throwFromPermissionReason(check.reason);
     }
@@ -239,7 +252,10 @@ export class FriendsService {
       throw new NotFoundException({ message: 'İstek bulunamadı.', error: 'REQUEST_NOT_FOUND' });
     }
     if (request.addresseeId !== userId) {
-      throw new ForbiddenException({ message: 'Bu isteği kabul etme yetkiniz yok.', error: 'FORBIDDEN' });
+      throw new ForbiddenException({
+        message: 'Bu isteği kabul etme yetkiniz yok.',
+        error: 'FORBIDDEN',
+      });
     }
 
     const accepted = await this.prisma.friendship.update({
@@ -276,7 +292,10 @@ export class FriendsService {
       throw new NotFoundException({ message: 'İstek bulunamadı.', error: 'REQUEST_NOT_FOUND' });
     }
     if (request.addresseeId !== userId) {
-      throw new ForbiddenException({ message: 'Bu isteği reddetme yetkiniz yok.', error: 'FORBIDDEN' });
+      throw new ForbiddenException({
+        message: 'Bu isteği reddetme yetkiniz yok.',
+        error: 'FORBIDDEN',
+      });
     }
 
     await this.prisma.friendship.update({ where: { id: requestId }, data: { status: 'DECLINED' } });
@@ -297,7 +316,10 @@ export class FriendsService {
       },
     });
     if (!friendship) {
-      throw new NotFoundException({ message: 'Arkadaşlık bulunamadı.', error: 'FRIENDSHIP_NOT_FOUND' });
+      throw new NotFoundException({
+        message: 'Arkadaşlık bulunamadı.',
+        error: 'FRIENDSHIP_NOT_FOUND',
+      });
     }
 
     await this.prisma.friendship.delete({ where: { id: friendship.id } });

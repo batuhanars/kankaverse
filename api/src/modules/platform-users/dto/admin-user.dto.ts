@@ -15,14 +15,20 @@ export class AdminUserDto {
   @ApiProperty({ description: 'e-Devlet doğrulama durumu' }) verificationStatus: string;
   @ApiPropertyOptional({ nullable: true, description: 'Kaydolurken kullanılan davet kodu' })
   invitedViaCode: string | null;
-  @ApiProperty({ description: 'Anlık çevrimiçi durumu (bellek-içi, bu instance)', enum: ['online', 'away', 'dnd', 'offline'] })
+  @ApiProperty({
+    description: 'Anlık çevrimiçi durumu (bellek-içi, bu instance)',
+    enum: ['online', 'away', 'dnd', 'offline'],
+  })
   presence: 'online' | 'away' | 'dnd' | 'offline';
   @ApiProperty({ description: 'Sahibi olduğu (açtığı) ortam sayısı' }) ownedGuildCount: number;
   @ApiProperty({ description: 'Üye olduğu ortam sayısı' }) membershipCount: number;
   @ApiProperty({ description: 'Gönderdiği mesaj sayısı' }) messageCount: number;
   @ApiPropertyOptional({ nullable: true, description: 'Son oturum aktivitesi (son görülme, ISO)' })
   lastActiveAt: string | null;
-  @ApiPropertyOptional({ nullable: true, description: 'Hesap silme talebi tarihi (ISO); null = talep yok. 30 gün sonra purge.' })
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Hesap silme talebi tarihi (ISO); null = talep yok. 30 gün sonra purge.',
+  })
   deletionRequestedAt: string | null;
   @ApiProperty({ description: 'Kayıt tarihi (ISO)' }) createdAt: string;
 }

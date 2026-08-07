@@ -139,7 +139,8 @@ export class PushService {
     const deadTokens = tickets
       .map((ticket, i) => ({ ticket, token: batch[i]?.to }))
       .filter(
-        ({ ticket }) => ticket?.status === 'error' && ticket?.details?.error === 'DeviceNotRegistered',
+        ({ ticket }) =>
+          ticket?.status === 'error' && ticket?.details?.error === 'DeviceNotRegistered',
       )
       .map(({ token }) => token)
       .filter((t): t is string => !!t);

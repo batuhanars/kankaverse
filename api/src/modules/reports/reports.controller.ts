@@ -22,10 +22,7 @@ export class ReportsController {
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'İçerik/kullanıcı şikâyeti (rate-limited)' })
-  create(
-    @CurrentUser() user: { id: string },
-    @Body() dto: CreateReportDto,
-  ) {
+  create(@CurrentUser() user: { id: string }, @Body() dto: CreateReportDto) {
     return this.reportsService.create(user.id, dto);
   }
 }

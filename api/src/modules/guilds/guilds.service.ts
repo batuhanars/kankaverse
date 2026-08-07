@@ -38,7 +38,12 @@ const ICON_EXT: Record<string, string> = {
   'image/webp': 'webp',
 };
 
-export function toGuildDto(guild: Guild, unreadCount = 0, unreadMentionCount = 0, memberCount?: number) {
+export function toGuildDto(
+  guild: Guild,
+  unreadCount = 0,
+  unreadMentionCount = 0,
+  memberCount?: number,
+) {
   return {
     id: guild.id,
     name: guild.name,
@@ -94,7 +99,9 @@ const ROLE_ORDER: Record<GuildRole, number> = {
 
 /** GuildMember.roleLinks → GuildMemberDto.roles şekli (tek kaynak; @everyone örtük, atanmaz). */
 function mapRoleLinks(
-  roleLinks?: { role: { id: string; name: string; color: string; position: number; hoist: boolean } }[],
+  roleLinks?: {
+    role: { id: string; name: string; color: string; position: number; hoist: boolean };
+  }[],
 ): { id: string; name: string; color: string; position: number; hoist: boolean }[] {
   return (roleLinks ?? []).map((rl) => ({
     id: rl.role.id,
@@ -294,7 +301,9 @@ export class GuildsService {
               this.prisma.message.count({ where: base }),
               this.prisma.message.count({ where: { ...base, OR: mentionOr } }),
             ]);
-            const { countUnread, countMention } = resolveChannelBadgeEffect(channelPrefById.get(ch.id));
+            const { countUnread, countMention } = resolveChannelBadgeEffect(
+              channelPrefById.get(ch.id),
+            );
             return {
               unread: countUnread ? unread : 0,
               mentions: countMention ? mentions : 0,
@@ -332,7 +341,10 @@ export class GuildsService {
         where: { guildId_userId: { guildId, userId } },
       });
       if (!membership || membership.role !== 'OWNER') {
-        throw new ForbiddenException({ message: 'Bu ayarı yalnız ortam sahibi değiştirebilir.', error: 'FORBIDDEN' });
+        throw new ForbiddenException({
+          message: 'Bu ayarı yalnız ortam sahibi değiştirebilir.',
+          error: 'FORBIDDEN',
+        });
       }
     }
 
@@ -570,7 +582,7 @@ export class GuildsService {
     // 3. Hedef OWNER mı? (actor=OWNER, targetUserId=actor ya da başka OWNER)
     if (targetMembership.role === GuildRole.OWNER) {
       throw new BadRequestException({
-        message: "Ortam sahibinin rolü değiştirilemez.",
+        message: 'Ortam sahibinin rolü değiştirilemez.',
         error: 'CANNOT_MODIFY_OWNER',
       });
     }
@@ -578,7 +590,7 @@ export class GuildsService {
     // 4. Güncelle (idempotent — zaten o rolse no-op, update çalışır ama fark yok)
     const updated = await this.prisma.guildMember.update({
       where: { guildId_userId: { guildId, userId: targetUserId } },
-      data: { role: dto.role as GuildRole },
+      data: { role: dto.role },
       include: {
         user: { select: { id: true, username: true, avatarUrl: true, bannerUrl: true } },
         roleLinks: { include: { role: true } },
@@ -741,7 +753,10 @@ export class GuildsService {
     }
     const recipients = await this.guildMemberIds(guildId);
     const channelIds = (
-      await this.prisma.channel.findMany({ where: { guildId, deletedAt: null }, select: { id: true } })
+      await this.prisma.channel.findMany({
+        where: { guildId, deletedAt: null },
+        select: { id: true },
+      })
     ).map((c) => c.id);
     await this.prisma.$transaction([
       this.prisma.channelMember.deleteMany({ where: { userId, channelId: { in: channelIds } } }),
@@ -756,13 +771,19 @@ export class GuildsService {
   async transferOwnership(actorId: string, guildId: string, targetUserId: string): Promise<null> {
     await this.requireOwner(actorId, guildId);
     if (actorId === targetUserId) {
-      throw new BadRequestException({ message: 'Zaten ortam sahibisiniz.', error: 'ALREADY_OWNER' });
+      throw new BadRequestException({
+        message: 'Zaten ortam sahibisiniz.',
+        error: 'ALREADY_OWNER',
+      });
     }
     const target = await this.prisma.guildMember.findUnique({
       where: { guildId_userId: { guildId, userId: targetUserId } },
     });
     if (!target) {
-      throw new NotFoundException({ message: 'Kullanıcı bu sunucunun üyesi değil.', error: 'NOT_GUILD_MEMBER' });
+      throw new NotFoundException({
+        message: 'Kullanıcı bu sunucunun üyesi değil.',
+        error: 'NOT_GUILD_MEMBER',
+      });
     }
 
     const result = await this.prisma.$transaction([
@@ -791,7 +812,13 @@ export class GuildsService {
     for (const m of [newOwner, oldOwner]) {
       this.realtime.emitToUsers(recipients, 'guild.member_updated', {
         guildId,
-        member: { userId: m.user.id, username: m.user.username, avatarUrl: m.user.avatarUrl, role: m.role, roles: mapRoleLinks(m.roleLinks) },
+        member: {
+          userId: m.user.id,
+          username: m.user.username,
+          avatarUrl: m.user.avatarUrl,
+          role: m.role,
+          roles: mapRoleLinks(m.roleLinks),
+        },
       });
     }
     await this.prisma.auditLog.create({
@@ -808,34 +835,55 @@ export class GuildsService {
 
   // ─── §F: Ortam-ban (kalıcı; kick + tekrar davetle giremez) ───────────────
   /** POST /guilds/:id/members/:userId/ban — BAN_MEMBERS izni + üye hiyerarşisi + GuildBan kaydı. */
-  async banMember(actorId: string, guildId: string, targetUserId: string, reason?: string): Promise<null> {
+  async banMember(
+    actorId: string,
+    guildId: string,
+    targetUserId: string,
+    reason?: string,
+  ): Promise<null> {
     await this.membership.requireGuildMembership(actorId, guildId);
     const canBan = await this.permissions.hasGuildPermission(actorId, guildId, 'BAN_MEMBERS');
     if (!canBan) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
     if (actorId === targetUserId) {
-      throw new BadRequestException({ message: 'Kendinizi yasaklayamazsınız.', error: 'CANNOT_BAN_SELF' });
+      throw new BadRequestException({
+        message: 'Kendinizi yasaklayamazsınız.',
+        error: 'CANNOT_BAN_SELF',
+      });
     }
     const target = await this.prisma.guildMember.findUnique({
       where: { guildId_userId: { guildId, userId: targetUserId } },
     });
     if (!target) {
-      throw new NotFoundException({ message: 'Kullanıcı bu sunucunun üyesi değil.', error: 'NOT_GUILD_MEMBER' });
+      throw new NotFoundException({
+        message: 'Kullanıcı bu sunucunun üyesi değil.',
+        error: 'NOT_GUILD_MEMBER',
+      });
     }
     if (target.role === GuildRole.OWNER) {
-      throw new BadRequestException({ message: 'Ortam sahibi yasaklanamaz.', error: 'CANNOT_BAN_OWNER' });
+      throw new BadRequestException({
+        message: 'Ortam sahibi yasaklanamaz.',
+        error: 'CANNOT_BAN_OWNER',
+      });
     }
     // Üye hiyerarşisi: hedef üyenin en yüksek position < aktörünki (OWNER muaf)
     await this.permissions.requireMemberHierarchy(actorId, guildId, targetUserId);
 
     const recipients = await this.guildMemberIds(guildId);
     const channelIds = (
-      await this.prisma.channel.findMany({ where: { guildId, deletedAt: null }, select: { id: true } })
+      await this.prisma.channel.findMany({
+        where: { guildId, deletedAt: null },
+        select: { id: true },
+      })
     ).map((c) => c.id);
     await this.prisma.$transaction([
-      this.prisma.channelMember.deleteMany({ where: { userId: targetUserId, channelId: { in: channelIds } } }),
-      this.prisma.guildMember.delete({ where: { guildId_userId: { guildId, userId: targetUserId } } }),
+      this.prisma.channelMember.deleteMany({
+        where: { userId: targetUserId, channelId: { in: channelIds } },
+      }),
+      this.prisma.guildMember.delete({
+        where: { guildId_userId: { guildId, userId: targetUserId } },
+      }),
       this.prisma.guildBan.upsert({
         where: { guildId_userId: { guildId, userId: targetUserId } },
         update: { bannedById: actorId, reason: reason ?? null },
@@ -862,7 +910,10 @@ export class GuildsService {
     if (!canBan) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
-    const bans = await this.prisma.guildBan.findMany({ where: { guildId }, orderBy: { createdAt: 'desc' } });
+    const bans = await this.prisma.guildBan.findMany({
+      where: { guildId },
+      orderBy: { createdAt: 'desc' },
+    });
     const users = await this.prisma.user.findMany({
       where: { id: { in: bans.map((b) => b.userId) } },
       select: { id: true, username: true, avatarUrl: true },
@@ -970,7 +1021,7 @@ export class GuildsService {
           username: log.actor.username,
           avatarUrl: log.actor.avatarUrl,
         },
-        targetUser: tid ? targetById.get(tid) ?? null : null,
+        targetUser: tid ? (targetById.get(tid) ?? null) : null,
         reason,
       };
     });
@@ -1004,7 +1055,10 @@ export class GuildsService {
 
     // 2. Self davet reddi.
     if (targetUserId === callerId) {
-      throw new BadRequestException({ message: 'Kendini ortama davet edemezsin.', error: 'CANNOT_INVITE_SELF' });
+      throw new BadRequestException({
+        message: 'Kendini ortama davet edemezsin.',
+        error: 'CANNOT_INVITE_SELF',
+      });
     }
 
     // 3. Arkadaşlık (kanka) kontrolü — doğrudan prisma ile (circular yok; removeFriend deseni).
@@ -1019,7 +1073,10 @@ export class GuildsService {
       select: { id: true },
     });
     if (!friendship) {
-      throw new ForbiddenException({ message: 'Yalnız kankalarını davet edebilirsin.', error: 'NOT_FRIENDS' });
+      throw new ForbiddenException({
+        message: 'Yalnız kankalarını davet edebilirsin.',
+        error: 'NOT_FRIENDS',
+      });
     }
 
     // 4. Hedef zaten üye mi (kanka zaten ortamda — sızıntı değil).
@@ -1028,7 +1085,10 @@ export class GuildsService {
       select: { userId: true },
     });
     if (existingMember) {
-      throw new BadRequestException({ message: 'Bu kanka zaten ortamda.', error: 'ALREADY_MEMBER' });
+      throw new BadRequestException({
+        message: 'Bu kanka zaten ortamda.',
+        error: 'ALREADY_MEMBER',
+      });
     }
 
     // Etki: caller'ın aktif (süresiz/süresi dolmamış, maxUses dolmamış) davet kodunu

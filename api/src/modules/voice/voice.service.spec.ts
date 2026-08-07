@@ -1,4 +1,8 @@
-import { BadRequestException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { VoiceService } from './voice.service';
 
 // ── LiveKit SDK mock ───────────────────────────────────────────────────────────
@@ -54,7 +58,11 @@ const prismaMock = {
 
 const membershipMock = { requireChannelAccess: jest.fn(), requireNoDmBlock: jest.fn() };
 const permissionsMock = { hasGuildPermission: jest.fn() };
-const realtimeMock = { emitToRoom: jest.fn(), emitToUsers: jest.fn(), emitToVoicePresence: jest.fn() };
+const realtimeMock = {
+  emitToRoom: jest.fn(),
+  emitToUsers: jest.fn(),
+  emitToVoicePresence: jest.fn(),
+};
 const dmPermissionMock = { canDm: jest.fn() };
 
 function makeConfig(overrides: Record<string, unknown> = {}) {
@@ -86,7 +94,9 @@ const USER_ID = 'user-1';
 const CHANNEL_ID = 'chan-1';
 const GUILD_ID = 'guild-1';
 
-function voiceChannel(overrides: { adultsOnly?: boolean; mediaEnabled?: boolean } & Record<string, unknown> = {}) {
+function voiceChannel(
+  overrides: { adultsOnly?: boolean; mediaEnabled?: boolean } & Record<string, unknown> = {},
+) {
   const { adultsOnly, mediaEnabled, ...rest } = overrides;
   return {
     id: CHANNEL_ID,
@@ -103,7 +113,11 @@ beforeEach(() => {
   lastAccessTokenOpts = null;
   mockToJwt.mockResolvedValue('jwt-token');
   // isMinor: false → varsayılan yetişkin; video testleri override eder
-  prismaMock.user.findUnique.mockResolvedValue({ username: 'ali', avatarUrl: null, isMinor: false });
+  prismaMock.user.findUnique.mockResolvedValue({
+    username: 'ali',
+    avatarUrl: null,
+    isMinor: false,
+  });
   // video yokken voiceMute varsayılan null (server-mute yok)
   prismaMock.voiceMute.findUnique.mockResolvedValue(null);
   // guild varsayılan: adultsOnly=false (normal kanal)
@@ -119,9 +133,19 @@ beforeEach(() => {
 // ── VOICE_DISABLED ───────────────────────────────────────────────────────────
 describe('VoiceService — env eksik', () => {
   it('LiveKit env yoksa mintToken 503 VOICE_DISABLED', async () => {
-    const svc = makeService(makeConfig({ 'livekit.apiKey': undefined, 'livekit.apiSecret': undefined, 'livekit.url': undefined }));
-    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toBeInstanceOf(ServiceUnavailableException);
-    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({ response: { error: 'VOICE_DISABLED' } });
+    const svc = makeService(
+      makeConfig({
+        'livekit.apiKey': undefined,
+        'livekit.apiSecret': undefined,
+        'livekit.url': undefined,
+      }),
+    );
+    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'VOICE_DISABLED' },
+    });
   });
 });
 
@@ -131,7 +155,9 @@ describe('VoiceService.mintToken', () => {
     membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'GUILD_TEXT' }));
     const svc = makeService();
     await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toBeInstanceOf(BadRequestException);
-    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({ response: { error: 'NOT_VOICE_CHANNEL' } });
+    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'NOT_VOICE_CHANNEL' },
+    });
   });
 
   it('erişim kapısı hatası sapmadan yayılır (AGE_RESTRICTED)', async () => {
@@ -139,13 +165,17 @@ describe('VoiceService.mintToken', () => {
       Object.assign(new Error('age'), { response: { error: 'AGE_RESTRICTED' } }),
     );
     const svc = makeService();
-    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({ response: { error: 'AGE_RESTRICTED' } });
+    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'AGE_RESTRICTED' },
+    });
   });
 
   it('yerleşik üye → canPublish=true, audio-only grant (yalnız mikrofon), token+url döner; bayraklar false → canPublishCamera/Screen=false', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel());
     // joinedAt 48 saat önce → cutoff'tan önce → yerleşik
-    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(Date.now() - 48 * 3600 * 1000) });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      joinedAt: new Date(Date.now() - 48 * 3600 * 1000),
+    });
 
     const svc = makeService(); // cameraEnabled/screenEnabled=false (BUILD-DARK varsayılan)
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
@@ -181,7 +211,9 @@ describe('VoiceService.mintToken', () => {
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
 
     expect(res.canPublish).toBe(true);
-    expect(mockAddGrant).toHaveBeenCalledWith(expect.objectContaining({ canPublish: true, canSubscribe: true }));
+    expect(mockAddGrant).toHaveBeenCalledWith(
+      expect.objectContaining({ canPublish: true, canSubscribe: true }),
+    );
   });
 
   it('üyelik yoksa (guildMember null) → canPublish=false (güvenli taraf)', async () => {
@@ -197,7 +229,9 @@ describe('VoiceService.mintToken', () => {
 // ── DM/grup sesli arama kapısı (Sprint V2 DM call) ────────────────────────────
 describe('VoiceService.mintToken — DM/grup', () => {
   it('1-1 DM, arkadaş (canDm allowed) → token + canPublish=true', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'DM', guildId: null }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ type: 'DM', guildId: null }),
+    );
     membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
     prismaMock.channelMember.findFirst.mockResolvedValue({ userId: 'other-1' });
     dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
@@ -211,28 +245,38 @@ describe('VoiceService.mintToken — DM/grup', () => {
   });
 
   it('1-1 DM, canDm reddederse → DM_NOT_ALLOWED (token üretilmez)', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'DM', guildId: null }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ type: 'DM', guildId: null }),
+    );
     membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
     prismaMock.channelMember.findFirst.mockResolvedValue({ userId: 'other-1' });
     dmPermissionMock.canDm.mockResolvedValue({ allowed: false, reason: 'DM_NOT_ALLOWED' });
 
     const svc = makeService();
-    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({ response: { error: 'DM_NOT_ALLOWED' } });
+    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'DM_NOT_ALLOWED' },
+    });
   });
 
   it('1-1 DM, block (requireNoDmBlock fırlatır) → yayılır, canDm çağrılmaz', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'DM', guildId: null }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ type: 'DM', guildId: null }),
+    );
     membershipMock.requireNoDmBlock.mockRejectedValue(
       Object.assign(new Error('block'), { response: { error: 'DM_NOT_ALLOWED' } }),
     );
 
     const svc = makeService();
-    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({ response: { error: 'DM_NOT_ALLOWED' } });
+    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'DM_NOT_ALLOWED' },
+    });
     expect(dmPermissionMock.canDm).not.toHaveBeenCalled();
   });
 
   it('GROUP_DM → block kontrolü yeter, per-pair canDm YOK → canPublish=true', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'GROUP_DM', guildId: null }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ type: 'GROUP_DM', guildId: null }),
+    );
     membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
 
     const svc = makeService();
@@ -290,7 +334,9 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
 
   // C7.1: 18+ kanal + admin medya açmış → video var (ageGated tek başına yetmez; mediaEnabled şart)
   it('GUILD_VOICE ageGated=true + mediaEnabled=true, yetişkin → canPublishCamera+Screen=true', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ ageGated: true, mediaEnabled: true }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ ageGated: true, mediaEnabled: true }),
+    );
     prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
 
     const svc = makeService(videoConfig());
@@ -300,14 +346,21 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
     expect(res.canPublishScreen).toBe(true);
     expect(mockAddGrant).toHaveBeenCalledWith(
       expect.objectContaining({
-        canPublishSources: expect.arrayContaining(['MICROPHONE', 'CAMERA', 'SCREEN_SHARE', 'SCREEN_SHARE_AUDIO']),
+        canPublishSources: expect.arrayContaining([
+          'MICROPHONE',
+          'CAMERA',
+          'SCREEN_SHARE',
+          'SCREEN_SHARE_AUDIO',
+        ]),
       }),
     );
   });
 
   // C7.1: adultsOnly guild + admin medya açmış → video var (adultsOnly tek başına yetmez)
   it('GUILD_VOICE adultsOnly=true guild + mediaEnabled=true → video var', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ ageGated: false, adultsOnly: true, mediaEnabled: true }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ ageGated: false, adultsOnly: true, mediaEnabled: true }),
+    );
     prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
 
     const svc = makeService(videoConfig());
@@ -321,11 +374,17 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
   // Pratikte minör ageGated kanala giremez (requireChannelAccess → AGE_RESTRICTED).
   // Bu test "resolveVideoSources artık GUILD_VOICE'ta kendi başına minörü bloklamaz; koruma erişim kapısında"
   // gerçeğini belgeler. Savunma derinliği §D moveParticipant + requireChannelAccess'te.
-  it('GUILD_VOICE mediaEnabled=true, minör → C7\'de video VAR (kapı 2 kaldırıldı; erişim kapısı + §D invariant korur)', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ ageGated: true, mediaEnabled: true }));
+  it("GUILD_VOICE mediaEnabled=true, minör → C7'de video VAR (kapı 2 kaldırıldı; erişim kapısı + §D invariant korur)", async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ ageGated: true, mediaEnabled: true }),
+    );
     prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
     // mintToken metadata fetch → isMinor: true (resolveVideoSources'ta artık bu sorgu yok — GUILD_VOICE için kapı 2 kaldırıldı)
-    prismaMock.user.findUnique.mockResolvedValue({ username: 'ali', avatarUrl: null, isMinor: true });
+    prismaMock.user.findUnique.mockResolvedValue({
+      username: 'ali',
+      avatarUrl: null,
+      isMinor: true,
+    });
 
     const svc = makeService(videoConfig());
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
@@ -337,7 +396,9 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
 
   // §F: ses-mic karantinası kaldırıldı → YENİ üye de ageGated yetişkin bağlamında video açabilir
   it('GUILD_VOICE ageGated=true + mediaEnabled=true, YENİ üye (karantina yok) → canPublish=true + video açık', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ ageGated: true, mediaEnabled: true }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ ageGated: true, mediaEnabled: true }),
+    );
     prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(), role: 'MEMBER' }); // az önce katıldı
 
     const svc = makeService(videoConfig());
@@ -355,7 +416,9 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
 
   // §F: server-mute → video düşer
   it('GUILD_VOICE mediaEnabled=true, server-mute → video düşer', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ ageGated: true, mediaEnabled: true }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ ageGated: true, mediaEnabled: true }),
+    );
     prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
     prismaMock.voiceMute.findUnique.mockResolvedValue({ id: 'vm-1' }); // mute var
 
@@ -372,12 +435,18 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
 
   // §F: DM iki-taraf-yetişkin → video var
   it('DM, iki taraf yetişkin → video var', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'DM', guildId: null }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ type: 'DM', guildId: null }),
+    );
     membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
     prismaMock.channelMember.findFirst.mockResolvedValue({ userId: 'other-1' });
     dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
     // Her user.findUnique çağrısı yetişkin döner (hem kendisi hem diğer)
-    prismaMock.user.findUnique.mockResolvedValue({ username: 'ali', avatarUrl: null, isMinor: false });
+    prismaMock.user.findUnique.mockResolvedValue({
+      username: 'ali',
+      avatarUrl: null,
+      isMinor: false,
+    });
 
     const svc = makeService(videoConfig());
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
@@ -388,7 +457,9 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
 
   // §F / C7: DM minör↔yetişkin → audio var, video yok (değişmedi — DM reti KORUNUR)
   it('DM, karşı taraf minör → audio var, video [] (C7: DM minör reti kapı 5 DM dalında korundu)', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'DM', guildId: null }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ type: 'DM', guildId: null }),
+    );
     membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
     prismaMock.channelMember.findFirst.mockResolvedValue({ userId: 'other-1' });
     dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
@@ -398,8 +469,8 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
     //  3. mintToken: user metadata fetch → yetişkin
     // Mock sırası C4 ile AYNI (kapı değil konum değişti; sıra korunuyor)
     prismaMock.user.findUnique
-      .mockResolvedValueOnce({ isMinor: false })                             // resolveVideoSources kapı5-DM self
-      .mockResolvedValueOnce({ isMinor: true })                              // resolveVideoSources kapı5-DM other
+      .mockResolvedValueOnce({ isMinor: false }) // resolveVideoSources kapı5-DM self
+      .mockResolvedValueOnce({ isMinor: true }) // resolveVideoSources kapı5-DM other
       .mockResolvedValueOnce({ username: 'ali', avatarUrl: null, isMinor: false }); // mintToken metadata
 
     const svc = makeService(videoConfig());
@@ -412,7 +483,9 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
 
   // C7: DM self minör → video [] (self-minör kontrolü kapı 5 DM dalında)
   it('DM, self minör (karşı taraf yetişkin) → audio var, video [] (C7: DM self-minör reti korundu)', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'DM', guildId: null }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ type: 'DM', guildId: null }),
+    );
     membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
     prismaMock.channelMember.findFirst.mockResolvedValue({ userId: 'other-1' });
     dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
@@ -420,7 +493,7 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
     //  1. resolveVideoSources kapı5-DM: self isMinor → true → erken [] (other sorgusu yapılmaz)
     //  2. mintToken metadata: yetişkin-görünümlü (ama isMinor=true → audio token üretilir)
     prismaMock.user.findUnique
-      .mockResolvedValueOnce({ isMinor: true })                              // resolveVideoSources kapı5-DM self → ret
+      .mockResolvedValueOnce({ isMinor: true }) // resolveVideoSources kapı5-DM self → ret
       .mockResolvedValueOnce({ username: 'ali', avatarUrl: null, isMinor: true }); // mintToken metadata
 
     const svc = makeService(videoConfig());
@@ -433,7 +506,9 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
 
   // §F: GROUP_DM, bir minör üye → video []
   it('GROUP_DM, bir üye minör → video []', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'GROUP_DM', guildId: null }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ type: 'GROUP_DM', guildId: null }),
+    );
     membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
     prismaMock.channelMember.findMany.mockResolvedValue([
       { userId: 'u1' },
@@ -452,12 +527,11 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
 
   // §F: GROUP_DM, tüm üyeler yetişkin → video var
   it('GROUP_DM, tüm üyeler yetişkin → video var', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type: 'GROUP_DM', guildId: null }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ type: 'GROUP_DM', guildId: null }),
+    );
     membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
-    prismaMock.channelMember.findMany.mockResolvedValue([
-      { userId: 'u1' },
-      { userId: 'u2' },
-    ]);
+    prismaMock.channelMember.findMany.mockResolvedValue([{ userId: 'u1' }, { userId: 'u2' }]);
     prismaMock.user.count.mockResolvedValue(0); // minör yok
 
     const svc = makeService(videoConfig());
@@ -471,7 +545,9 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
 
   // C7 §G test matrisi — genel kanal mediaEnabled=false → video yok
   it('C7: GUILD_VOICE genel kanal mediaEnabled=false → video grant yok (admin açmadan kapalı)', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ mediaEnabled: false, ageGated: false }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ mediaEnabled: false, ageGated: false }),
+    );
     prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
 
     const svc = makeService(videoConfig());
@@ -496,7 +572,12 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
     expect(res.canPublishScreen).toBe(true);
     expect(mockAddGrant).toHaveBeenCalledWith(
       expect.objectContaining({
-        canPublishSources: expect.arrayContaining(['MICROPHONE', 'CAMERA', 'SCREEN_SHARE', 'SCREEN_SHARE_AUDIO']),
+        canPublishSources: expect.arrayContaining([
+          'MICROPHONE',
+          'CAMERA',
+          'SCREEN_SHARE',
+          'SCREEN_SHARE_AUDIO',
+        ]),
       }),
     );
   });
@@ -505,7 +586,11 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
   it('C7: GUILD_VOICE mediaEnabled=true, MİNÖR → video VAR (temel C7 senaryo)', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ mediaEnabled: true }));
     prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
-    prismaMock.user.findUnique.mockResolvedValue({ username: 'genç', avatarUrl: null, isMinor: true });
+    prismaMock.user.findUnique.mockResolvedValue({
+      username: 'genç',
+      avatarUrl: null,
+      isMinor: true,
+    });
 
     const svc = makeService(videoConfig());
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
@@ -522,7 +607,9 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
 
   // C7.1 test matrisi — adultsOnly TEK BAŞINA medya açmaz (18+ ayrıştırması, sahip 2026-06-30)
   it('C7.1: GUILD_VOICE adultsOnly=true, mediaEnabled=false → video YOK (18+ tek başına medya açmaz)', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ adultsOnly: true, mediaEnabled: false }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ adultsOnly: true, mediaEnabled: false }),
+    );
     prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
 
     const svc = makeService(videoConfig());
@@ -534,7 +621,9 @@ describe('VoiceService — resolveVideoSources (Sprint C4, §F)', () => {
 
   // C7.1 test matrisi — ageGated TEK BAŞINA medya açmaz
   it('C7.1: GUILD_VOICE ageGated=true, mediaEnabled=false → video YOK (18+ tek başına medya açmaz)', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ ageGated: true, mediaEnabled: false }));
+    membershipMock.requireChannelAccess.mockResolvedValue(
+      voiceChannel({ ageGated: true, mediaEnabled: false }),
+    );
     prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
 
     const svc = makeService(videoConfig());
@@ -576,14 +665,20 @@ describe('VoiceService.handleWebhook', () => {
     mockReceive.mockResolvedValue({
       event: 'participant_joined',
       room: { name: CHANNEL_ID },
-      participant: { identity: USER_ID, name: 'ali', metadata: JSON.stringify({ avatarUrl: 'a.png' }) },
+      participant: {
+        identity: USER_ID,
+        name: 'ali',
+        metadata: JSON.stringify({ avatarUrl: 'a.png' }),
+      },
     });
     prismaMock.voiceSession.findFirst.mockResolvedValue(null);
 
     const svc = makeService();
     await svc.handleWebhook('{}', 'auth');
 
-    expect(prismaMock.voiceSession.create).toHaveBeenCalledWith({ data: { channelId: CHANNEL_ID, userId: USER_ID } });
+    expect(prismaMock.voiceSession.create).toHaveBeenCalledWith({
+      data: { channelId: CHANNEL_ID, userId: USER_ID },
+    });
     expect(realtimeMock.emitToRoom).toHaveBeenCalledWith(CHANNEL_ID, 'voice.participant_joined', {
       channelId: CHANNEL_ID,
       participant: { userId: USER_ID, username: 'ali', avatarUrl: 'a.png' },
@@ -617,7 +712,10 @@ describe('VoiceService.handleWebhook', () => {
     await svc.handleWebhook('{}', 'auth');
 
     expect(prismaMock.voiceSession.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'vs-9' }, data: expect.objectContaining({ leftAt: expect.any(Date) }) }),
+      expect.objectContaining({
+        where: { id: 'vs-9' },
+        data: expect.objectContaining({ leftAt: expect.any(Date) }),
+      }),
     );
     expect(realtimeMock.emitToRoom).toHaveBeenCalledWith(CHANNEL_ID, 'voice.participant_left', {
       channelId: CHANNEL_ID,
@@ -656,7 +754,9 @@ describe('VoiceService.mintToken — R11 server-mute', () => {
   it('VoiceMute kaydı varsa → canPublish=false (karantina değil, kalıcı mute)', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel());
     // Yerleşik üye (yoksa zaten false dönerdi) ama mute var → false
-    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(Date.now() - 48 * 3600 * 1000) });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      joinedAt: new Date(Date.now() - 48 * 3600 * 1000),
+    });
     prismaMock.voiceMute.findUnique.mockResolvedValue({ id: 'vm-1' });
 
     const svc = makeService();
@@ -666,7 +766,9 @@ describe('VoiceService.mintToken — R11 server-mute', () => {
 
   it('VoiceMute yoksa → resolveCanPublish ile karantinaya saygı', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel());
-    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(Date.now() - 48 * 3600 * 1000) });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      joinedAt: new Date(Date.now() - 48 * 3600 * 1000),
+    });
     prismaMock.voiceMute.findUnique.mockResolvedValue(null);
 
     const svc = makeService();
@@ -710,7 +812,11 @@ describe('VoiceService.muteParticipant', () => {
     await expect(svc.muteParticipant(USER_ID, CHANNEL_ID, TARGET_ID)).rejects.toMatchObject({
       response: { error: 'FORBIDDEN' },
     });
-    expect(permissionsMock.hasGuildPermission).toHaveBeenCalledWith(USER_ID, GUILD_ID, 'MUTE_MEMBERS');
+    expect(permissionsMock.hasGuildPermission).toHaveBeenCalledWith(
+      USER_ID,
+      GUILD_ID,
+      'MUTE_MEMBERS',
+    );
   });
 
   it('hedef = actor → CANNOT_MUTE_SELF', async () => {
@@ -834,7 +940,11 @@ describe('VoiceService.moveParticipant', () => {
       .mockResolvedValueOnce(targetChannel());
     permissionsMock.hasGuildPermission.mockResolvedValue(true);
     // C7 §D: targetUser isMinor=false (varsayılan — invariant yalnız isMinor=true'da tetiklenir)
-    prismaMock.user.findUnique.mockResolvedValue({ username: 'ali', avatarUrl: null, isMinor: false });
+    prismaMock.user.findUnique.mockResolvedValue({
+      username: 'ali',
+      avatarUrl: null,
+      isMinor: false,
+    });
     prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
     mockListParticipants.mockResolvedValue([]);
   });
@@ -842,22 +952,32 @@ describe('VoiceService.moveParticipant', () => {
   it('yetki yoksa → 403 FORBIDDEN', async () => {
     permissionsMock.hasGuildPermission.mockResolvedValue(false);
     const svc = makeService();
-    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+    await expect(
+      svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID),
+    ).rejects.toMatchObject({
       response: { error: 'FORBIDDEN' },
     });
-    expect(permissionsMock.hasGuildPermission).toHaveBeenCalledWith(USER_ID, GUILD_ID, 'MOVE_MEMBERS');
+    expect(permissionsMock.hasGuildPermission).toHaveBeenCalledWith(
+      USER_ID,
+      GUILD_ID,
+      'MOVE_MEMBERS',
+    );
   });
 
   it('hedef = kaynak → SAME_CHANNEL', async () => {
     const svc = makeService();
-    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, CHANNEL_ID)).rejects.toMatchObject({
+    await expect(
+      svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, CHANNEL_ID),
+    ).rejects.toMatchObject({
       response: { error: 'SAME_CHANNEL' },
     });
   });
 
   it('hedef = actor → CANNOT_MOVE_SELF', async () => {
     const svc = makeService();
-    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, USER_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+    await expect(
+      svc.moveParticipant(USER_ID, CHANNEL_ID, USER_ID, TARGET_CHANNEL_ID),
+    ).rejects.toMatchObject({
       response: { error: 'CANNOT_MOVE_SELF' },
     });
   });
@@ -866,7 +986,9 @@ describe('VoiceService.moveParticipant', () => {
     prismaMock.channel.findFirst.mockReset();
     prismaMock.channel.findFirst.mockResolvedValueOnce(gvChannel()).mockResolvedValueOnce(null);
     const svc = makeService();
-    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+    await expect(
+      svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID),
+    ).rejects.toMatchObject({
       response: { error: 'CHANNEL_NOT_FOUND' },
     });
   });
@@ -877,7 +999,9 @@ describe('VoiceService.moveParticipant', () => {
       .mockResolvedValueOnce(gvChannel())
       .mockResolvedValueOnce(targetChannel({ guildId: 'other-guild' }));
     const svc = makeService();
-    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+    await expect(
+      svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID),
+    ).rejects.toMatchObject({
       response: { error: 'CHANNEL_NOT_FOUND' },
     });
   });
@@ -888,7 +1012,9 @@ describe('VoiceService.moveParticipant', () => {
       .mockResolvedValueOnce(gvChannel())
       .mockResolvedValueOnce(targetChannel({ type: 'GUILD_TEXT' }));
     const svc = makeService();
-    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+    await expect(
+      svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID),
+    ).rejects.toMatchObject({
       response: { error: 'NOT_VOICE_CHANNEL' },
     });
   });
@@ -896,7 +1022,9 @@ describe('VoiceService.moveParticipant', () => {
   it('hedef OWNER → CANNOT_MOVE_OWNER', async () => {
     prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'OWNER' });
     const svc = makeService();
-    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+    await expect(
+      svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID),
+    ).rejects.toMatchObject({
       response: { error: 'CANNOT_MOVE_OWNER' },
     });
   });
@@ -909,7 +1037,9 @@ describe('VoiceService.moveParticipant', () => {
     prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
     mockListParticipants.mockResolvedValue([{ identity: 'a' }, { identity: 'b' }]);
     const svc = makeService();
-    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+    await expect(
+      svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID),
+    ).rejects.toMatchObject({
       response: { error: 'CHANNEL_FULL' },
     });
   });
@@ -923,7 +1053,9 @@ describe('VoiceService.moveParticipant', () => {
     prismaMock.user.findUnique.mockResolvedValue({ isMinor: true }); // target user minör
 
     const svc = makeService();
-    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+    await expect(
+      svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID),
+    ).rejects.toMatchObject({
       response: { error: 'AGE_RESTRICTED' },
     });
     // Taşıma gerçekleşmemeli
@@ -939,7 +1071,9 @@ describe('VoiceService.moveParticipant', () => {
     prismaMock.user.findUnique.mockResolvedValue({ isMinor: true }); // target user minör
 
     const svc = makeService();
-    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).rejects.toMatchObject({
+    await expect(
+      svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID),
+    ).rejects.toMatchObject({
       response: { error: 'AGE_RESTRICTED' },
     });
     expect(mockRemoveParticipant).not.toHaveBeenCalled();
@@ -955,7 +1089,11 @@ describe('VoiceService.moveParticipant', () => {
 
     const svc = makeService();
     await svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID);
-    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith([TARGET_ID], 'voice.moved', expect.any(Object));
+    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith(
+      [TARGET_ID],
+      'voice.moved',
+      expect.any(Object),
+    );
   });
 
   it('başarı → removeParticipant(kaynak) + socket voice.moved YALNIZ taşınan kullanıcıya', async () => {
@@ -974,7 +1112,9 @@ describe('VoiceService.moveParticipant', () => {
   it('removeParticipant hatası yutulur (best-effort) — yönlendirme event yine gider', async () => {
     mockRemoveParticipant.mockRejectedValue(new Error('not connected'));
     const svc = makeService();
-    await expect(svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID)).resolves.toBeUndefined();
+    await expect(
+      svc.moveParticipant(USER_ID, CHANNEL_ID, TARGET_ID, TARGET_CHANNEL_ID),
+    ).resolves.toBeUndefined();
     expect(realtimeMock.emitToUsers).toHaveBeenCalled();
   });
 });
@@ -1033,7 +1173,10 @@ describe('VoiceService.mintToken — B1 teftiş-girişi bypass matrisi (R7)', ()
     mockRawChannel();
     permissionsMock.hasGuildPermission.mockResolvedValue(true);
     // Yerleşik üye gibi davranması için (resolveCanPublish → OWNER/ADMIN bypass veya karantina geçmiş)
-    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(Date.now() - 48 * 3600 * 1000), role: 'MEMBER' });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      joinedAt: new Date(Date.now() - 48 * 3600 * 1000),
+      role: 'MEMBER',
+    });
 
     const svc = makeService();
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
@@ -1057,16 +1200,28 @@ describe('VoiceService.mintToken — B1 teftiş-girişi bypass matrisi (R7)', ()
     mockNotChannelMember();
     mockRawChannel();
     permissionsMock.hasGuildPermission.mockResolvedValue(false); // guild rolü YOK
-    prismaMock.user.findUnique.mockResolvedValue({ username: 'mod', avatarUrl: null, isMinor: false, isModerator: true });
+    prismaMock.user.findUnique.mockResolvedValue({
+      username: 'mod',
+      avatarUrl: null,
+      isMinor: false,
+      isModerator: true,
+    });
     prismaMock.report.count.mockResolvedValue(1); // bu kanalda açık acil var
-    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(Date.now() - 48 * 3600 * 1000), role: 'MEMBER' });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      joinedAt: new Date(Date.now() - 48 * 3600 * 1000),
+      role: 'MEMBER',
+    });
 
     const svc = makeService();
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
     expect(res.token).toBe('jwt-token');
     expect(prismaMock.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ actorId: USER_ID, action: 'voice.emergency_inspect', entityId: CHANNEL_ID }),
+        data: expect.objectContaining({
+          actorId: USER_ID,
+          action: 'voice.emergency_inspect',
+          entityId: CHANNEL_ID,
+        }),
       }),
     );
   });
@@ -1075,22 +1230,36 @@ describe('VoiceService.mintToken — B1 teftiş-girişi bypass matrisi (R7)', ()
     mockNotChannelMember();
     mockRawChannel();
     permissionsMock.hasGuildPermission.mockResolvedValue(false);
-    prismaMock.user.findUnique.mockResolvedValue({ username: 'mod', avatarUrl: null, isMinor: false, isModerator: true });
+    prismaMock.user.findUnique.mockResolvedValue({
+      username: 'mod',
+      avatarUrl: null,
+      isMinor: false,
+      isModerator: true,
+    });
     prismaMock.report.count.mockResolvedValue(0); // acil YOK → mod rastgele kanala sızamaz
 
     const svc = makeService();
-    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({ response: { error: 'NOT_CHANNEL_MEMBER' } });
+    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'NOT_CHANNEL_MEMBER' },
+    });
   });
 
   it('NOT_CHANNEL_MEMBER + AÇIK EMERGENCY ama isModerator DEĞİL → hata fırlatılır (yalnız platform mod)', async () => {
     mockNotChannelMember();
     mockRawChannel();
     permissionsMock.hasGuildPermission.mockResolvedValue(false);
-    prismaMock.user.findUnique.mockResolvedValue({ username: 'normal', avatarUrl: null, isMinor: false, isModerator: false });
+    prismaMock.user.findUnique.mockResolvedValue({
+      username: 'normal',
+      avatarUrl: null,
+      isMinor: false,
+      isModerator: false,
+    });
     prismaMock.report.count.mockResolvedValue(1);
 
     const svc = makeService();
-    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({ response: { error: 'NOT_CHANNEL_MEMBER' } });
+    await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({
+      response: { error: 'NOT_CHANNEL_MEMBER' },
+    });
   });
 
   it('NOT_CHANNEL_MEMBER + MUTE_MEMBERS VAR + kanal doluysa → enforceUserLimit MUTE_MEMBERS bypass ile aşılır', async () => {
@@ -1099,16 +1268,21 @@ describe('VoiceService.mintToken — B1 teftiş-girişi bypass matrisi (R7)', ()
     permissionsMock.hasGuildPermission.mockResolvedValue(true); // hem MUTE_MEMBERS hem MANAGE_CHANNELS bypass
     // Oda dolu (2 katılımcı, limit=2)
     mockListParticipants.mockResolvedValue([{ identity: 'a' }, { identity: 'b' }]);
-    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(Date.now() - 48 * 3600 * 1000), role: 'MEMBER' });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      joinedAt: new Date(Date.now() - 48 * 3600 * 1000),
+      role: 'MEMBER',
+    });
 
     const svc = makeService();
     // MUTE_MEMBERS bypass → dolu kanala girer (CHANNEL_FULL fırlamamalı)
     await expect(svc.mintToken(USER_ID, CHANNEL_ID)).resolves.toMatchObject({ token: 'jwt-token' });
   });
 
-  it('normal giriş (NOT_CHANNEL_MEMBER YOK) → audit yazılmaz (sadece bypass-giriş audit\'lenir)', async () => {
+  it("normal giriş (NOT_CHANNEL_MEMBER YOK) → audit yazılmaz (sadece bypass-giriş audit'lenir)", async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel());
-    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(Date.now() - 48 * 3600 * 1000) });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      joinedAt: new Date(Date.now() - 48 * 3600 * 1000),
+    });
 
     const svc = makeService();
     await svc.mintToken(USER_ID, CHANNEL_ID);
@@ -1120,7 +1294,10 @@ describe('VoiceService.mintToken — B1 teftiş-girişi bypass matrisi (R7)', ()
     // Mod sadece MUTE_MEMBERS, kanal normal (ageGated=false)
     mockRawChannel({ ageGated: false, guild: { adultsOnly: false } });
     permissionsMock.hasGuildPermission.mockResolvedValue(true);
-    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(Date.now() - 48 * 3600 * 1000), role: 'MEMBER' });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      joinedAt: new Date(Date.now() - 48 * 3600 * 1000),
+      role: 'MEMBER',
+    });
 
     const svc = makeService(makeConfig({ cameraEnabled: true, screenEnabled: true }));
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
@@ -1144,7 +1321,11 @@ describe('VoiceService.stopBroadcast (R11B B2, R7)', () => {
     await expect(svc.stopBroadcast(USER_ID, CHANNEL_ID, TARGET_ID)).rejects.toMatchObject({
       response: { error: 'FORBIDDEN' },
     });
-    expect(permissionsMock.hasGuildPermission).toHaveBeenCalledWith(USER_ID, GUILD_ID, 'MUTE_MEMBERS');
+    expect(permissionsMock.hasGuildPermission).toHaveBeenCalledWith(
+      USER_ID,
+      GUILD_ID,
+      'MUTE_MEMBERS',
+    );
   });
 
   it('hedef = actor → CANNOT_STOP_SELF', async () => {
@@ -1199,15 +1380,14 @@ describe('VoiceService.stopBroadcast (R11B B2, R7)', () => {
     );
   });
 
-  it('başarı → WS voice.broadcast_stopped room\'a yayılır', async () => {
+  it("başarı → WS voice.broadcast_stopped room'a yayılır", async () => {
     const svc = makeService();
     await svc.stopBroadcast(USER_ID, CHANNEL_ID, TARGET_ID);
 
-    expect(realtimeMock.emitToRoom).toHaveBeenCalledWith(
-      CHANNEL_ID,
-      'voice.broadcast_stopped',
-      { channelId: CHANNEL_ID, userId: TARGET_ID },
-    );
+    expect(realtimeMock.emitToRoom).toHaveBeenCalledWith(CHANNEL_ID, 'voice.broadcast_stopped', {
+      channelId: CHANNEL_ID,
+      userId: TARGET_ID,
+    });
   });
 
   it('LiveKit hatası yutulur (best-effort) — audit + WS yine çalışır', async () => {
@@ -1233,7 +1413,11 @@ describe('VoiceService.disconnectParticipant (R11B B3, R7)', () => {
     await expect(svc.disconnectParticipant(USER_ID, CHANNEL_ID, TARGET_ID)).rejects.toMatchObject({
       response: { error: 'FORBIDDEN' },
     });
-    expect(permissionsMock.hasGuildPermission).toHaveBeenCalledWith(USER_ID, GUILD_ID, 'MOVE_MEMBERS');
+    expect(permissionsMock.hasGuildPermission).toHaveBeenCalledWith(
+      USER_ID,
+      GUILD_ID,
+      'MOVE_MEMBERS',
+    );
   });
 
   it('hedef = actor → CANNOT_DISCONNECT_SELF', async () => {
@@ -1274,21 +1458,22 @@ describe('VoiceService.disconnectParticipant (R11B B3, R7)', () => {
     );
   });
 
-  it('başarı → WS voice.kicked room\'a yayılır', async () => {
+  it("başarı → WS voice.kicked room'a yayılır", async () => {
     const svc = makeService();
     await svc.disconnectParticipant(USER_ID, CHANNEL_ID, TARGET_ID);
 
-    expect(realtimeMock.emitToRoom).toHaveBeenCalledWith(
-      CHANNEL_ID,
-      'voice.kicked',
-      { channelId: CHANNEL_ID, userId: TARGET_ID },
-    );
+    expect(realtimeMock.emitToRoom).toHaveBeenCalledWith(CHANNEL_ID, 'voice.kicked', {
+      channelId: CHANNEL_ID,
+      userId: TARGET_ID,
+    });
   });
 
   it('LiveKit hatası yutulur (best-effort) — audit + WS yine çalışır', async () => {
     mockRemoveParticipant.mockRejectedValue(new Error('not connected'));
     const svc = makeService();
-    await expect(svc.disconnectParticipant(USER_ID, CHANNEL_ID, TARGET_ID)).resolves.toBeUndefined();
+    await expect(
+      svc.disconnectParticipant(USER_ID, CHANNEL_ID, TARGET_ID),
+    ).resolves.toBeUndefined();
     expect(prismaMock.auditLog.create).toHaveBeenCalled();
     expect(realtimeMock.emitToRoom).toHaveBeenCalled();
   });

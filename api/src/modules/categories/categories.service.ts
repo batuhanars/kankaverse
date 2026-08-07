@@ -35,7 +35,10 @@ export class CategoriesService {
 
   /** Guild'in tüm üye id'leri (kategori olayı yayını — kategori özel değildir). */
   private async guildMemberIds(guildId: string): Promise<string[]> {
-    const members = await this.prisma.guildMember.findMany({ where: { guildId }, select: { userId: true } });
+    const members = await this.prisma.guildMember.findMany({
+      where: { guildId },
+      select: { userId: true },
+    });
     return members.map((m) => m.userId);
   }
 
@@ -57,7 +60,10 @@ export class CategoriesService {
     });
 
     const dtoOut = toCategoryDto(category);
-    this.realtime.emitToUsers(await this.guildMemberIds(guildId), 'category.created', { guildId, category: dtoOut });
+    this.realtime.emitToUsers(await this.guildMemberIds(guildId), 'category.created', {
+      guildId,
+      category: dtoOut,
+    });
     return dtoOut;
   }
 
@@ -92,12 +98,19 @@ export class CategoriesService {
     });
 
     const dtoOut = toCategoryDto(updated);
-    this.realtime.emitToUsers(await this.guildMemberIds(category.guildId), 'category.updated', { guildId: category.guildId, category: dtoOut });
+    this.realtime.emitToUsers(await this.guildMemberIds(category.guildId), 'category.updated', {
+      guildId: category.guildId,
+      category: dtoOut,
+    });
     return dtoOut;
   }
 
   /** Toplu kategori sıralama (drag-reorder): position güncelle (OWNER/ADMIN) + category.updated yayını. */
-  async reorder(userId: string, guildId: string, items: { id: string; position: number }[]): Promise<null> {
+  async reorder(
+    userId: string,
+    guildId: string,
+    items: { id: string; position: number }[],
+  ): Promise<null> {
     await this.membership.requireGuildMembership(userId, guildId);
     await this.requireManageChannels(userId, guildId);
 
@@ -116,7 +129,10 @@ export class CategoriesService {
     );
     const recipients = await this.guildMemberIds(guildId);
     for (const cat of updated) {
-      this.realtime.emitToUsers(recipients, 'category.updated', { guildId, category: toCategoryDto(cat) });
+      this.realtime.emitToUsers(recipients, 'category.updated', {
+        guildId,
+        category: toCategoryDto(cat),
+      });
     }
     return null;
   }
@@ -145,7 +161,10 @@ export class CategoriesService {
     ]);
 
     // Realtime: kategori silindi → frontend o kategorinin kanallarını kategorisize düşürür
-    this.realtime.emitToUsers(await this.guildMemberIds(category.guildId), 'category.deleted', { guildId: category.guildId, categoryId });
+    this.realtime.emitToUsers(await this.guildMemberIds(category.guildId), 'category.deleted', {
+      guildId: category.guildId,
+      categoryId,
+    });
 
     return null;
   }

@@ -1,14 +1,19 @@
 const REQUIRED_ENVS = ['DATABASE_URL', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'] as const;
 
 // S3 değişkenleri: dev'de opsiyonel (MinIO), prod'da zorunlu
-const S3_REQUIRED_PROD_ENVS = ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY', 'S3_SECRET_KEY'] as const;
+const S3_REQUIRED_PROD_ENVS = [
+  'S3_ENDPOINT',
+  'S3_BUCKET',
+  'S3_ACCESS_KEY',
+  'S3_SECRET_KEY',
+] as const;
 
 export default () => {
   for (const key of REQUIRED_ENVS) {
     if (!process.env[key]) {
       throw new Error(
         `FATAL: Zorunlu ortam değişkeni '${key}' tanımlanmamış. ` +
-        `'.env' dosyasını kontrol edin. Uygulama başlamıyor.`,
+          `'.env' dosyasını kontrol edin. Uygulama başlamıyor.`,
       );
     }
   }
@@ -20,7 +25,7 @@ export default () => {
       if (!process.env[key]) {
         throw new Error(
           `FATAL: Production ortamında (UPLOADS_ENABLED!=false iken) S3 değişkeni '${key}' zorunludur. ` +
-          `Yüklemeyi kapatmak için UPLOADS_ENABLED=false ver.`,
+            `Yüklemeyi kapatmak için UPLOADS_ENABLED=false ver.`,
         );
       }
     }
@@ -28,8 +33,7 @@ export default () => {
 
   if (process.env.NODE_ENV === 'production' && !process.env.RESEND_API_KEY) {
     throw new Error(
-      `FATAL: Production ortamında 'RESEND_API_KEY' zorunludur. ` +
-      `E-posta gönderimi yapılamaz.`,
+      `FATAL: Production ortamında 'RESEND_API_KEY' zorunludur. ` + `E-posta gönderimi yapılamaz.`,
     );
   }
 
@@ -98,7 +102,10 @@ export default () => {
       // (imzasız <img> GET). Mesaj/DM ekleri private bucket + presigned GET'te kalır (üyelik/scan kapısı).
       // Dev/MinIO'da varsayılan olarak ana bucket'a düşer (mevcut davranış korunur).
       publicBucket: process.env.S3_PUBLIC_BUCKET ?? process.env.S3_BUCKET ?? 'kankaverse',
-      publicBaseUrl: process.env.S3_PUBLIC_BASE_URL ?? process.env.S3_PUBLIC_URL ?? 'http://localhost:9000/kankaverse',
+      publicBaseUrl:
+        process.env.S3_PUBLIC_BASE_URL ??
+        process.env.S3_PUBLIC_URL ??
+        'http://localhost:9000/kankaverse',
     },
     maxUploadMb: parseInt(process.env.MAX_UPLOAD_MB ?? '25', 10),
     // LANSMAN: ATTACHMENT_SCAN_ENABLED=true + gerçek CSAM tarayıcı olmadan canlıya ALINMAZ (R5)
@@ -126,7 +133,7 @@ export default () => {
     registrationMode: (() => {
       const raw = process.env.REGISTRATION_MODE ?? 'open';
       if (raw === 'open' || raw === 'invite' || raw === 'closed') {
-        return raw as 'open' | 'invite' | 'closed';
+        return raw;
       }
       // Bilinmeyen değer → fail-closed + uyarı
       console.warn(

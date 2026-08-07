@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { PermissionsService } from '../../shared/permissions/permissions.service';
@@ -101,17 +97,12 @@ export class InvitesService {
       where: {
         guildId,
         deletedAt: null,
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gt: now } },
-        ],
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
     });
 
     // maxUses dolmuş olanları filtrele
-    return invites
-      .filter((inv) => inv.maxUses === null || inv.uses < inv.maxUses)
-      .map(toInviteDto);
+    return invites.filter((inv) => inv.maxUses === null || inv.uses < inv.maxUses).map(toInviteDto);
   }
 
   /** DELETE /invites/:code — o ortamın OWNER/ADMIN'i */
@@ -123,7 +114,11 @@ export class InvitesService {
 
     // Yetki: MANAGE_GUILD izni olmalı
     await this.membershipService.requireGuildMembership(userId, invite.guildId);
-    const canManage = await this.permissions.hasGuildPermission(userId, invite.guildId, 'MANAGE_GUILD');
+    const canManage = await this.permissions.hasGuildPermission(
+      userId,
+      invite.guildId,
+      'MANAGE_GUILD',
+    );
     if (!canManage) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
@@ -172,7 +167,10 @@ export class InvitesService {
     });
 
     if (!invite || !isInviteActive(invite)) {
-      throw new NotFoundException({ message: 'Davet geçersiz veya süresi dolmuş.', error: 'INVITE_INVALID' });
+      throw new NotFoundException({
+        message: 'Davet geçersiz veya süresi dolmuş.',
+        error: 'INVITE_INVALID',
+      });
     }
 
     const guild = invite.guild;

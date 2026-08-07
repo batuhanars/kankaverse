@@ -21,7 +21,7 @@ export class CreateMessageDto {
   @IsString()
   replyToId?: string;
 
-  @ApiPropertyOptional({ type: [String], description: 'Eklenecek dosya ID\'leri (presign sonrası)' })
+  @ApiPropertyOptional({ type: [String], description: "Eklenecek dosya ID'leri (presign sonrası)" })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(10, { message: 'Bir mesaja en fazla 10 dosya eklenebilir.' })

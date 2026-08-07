@@ -109,11 +109,7 @@ export function computeOccurrence(event: OccurrenceInput, now: Date): Occurrence
     const occStart = new Date(startMs);
     const occEnd = new Date(startMs + duration);
     const status: OccurrenceStatus =
-      nowMs < occStart.getTime()
-        ? 'SCHEDULED'
-        : nowMs <= occEnd.getTime()
-          ? 'ACTIVE'
-          : 'COMPLETED';
+      nowMs < occStart.getTime() ? 'SCHEDULED' : nowMs <= occEnd.getTime() ? 'ACTIVE' : 'COMPLETED';
     return { occurrenceStartAt: occStart, occurrenceEndAt: occEnd, status };
   }
 

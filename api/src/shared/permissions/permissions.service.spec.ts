@@ -108,7 +108,9 @@ describe('PermissionsService.hasGuildPermission', () => {
       role: 'MEMBER',
       roleLinks: [],
     });
-    prismaMock.role.findFirst.mockResolvedValue({ permissions: ['VIEW_CHANNELS', 'CREATE_INVITE'] });
+    prismaMock.role.findFirst.mockResolvedValue({
+      permissions: ['VIEW_CHANNELS', 'CREATE_INVITE'],
+    });
     expect(await service.hasGuildPermission(MEMBER_ID, GUILD_ID, 'CREATE_INVITE')).toBe(true);
   });
 
@@ -178,11 +180,7 @@ describe('PermissionsService.actorHighestPosition', () => {
   it('Atanmış birden fazla rol → max position döner', async () => {
     prismaMock.guildMember.findUnique.mockResolvedValue({
       role: 'MEMBER',
-      roleLinks: [
-        { role: { position: 3 } },
-        { role: { position: 7 } },
-        { role: { position: 2 } },
-      ],
+      roleLinks: [{ role: { position: 3 } }, { role: { position: 7 } }, { role: { position: 2 } }],
     });
     expect(await service.actorHighestPosition(MEMBER_ID, GUILD_ID)).toBe(7);
   });
@@ -220,7 +218,9 @@ describe('PermissionsService.requireRoleHierarchy', () => {
       role: 'MEMBER',
       roleLinks: [{ role: { position: 5 } }],
     });
-    await expect(service.requireRoleHierarchy(MEMBER_ID, GUILD_ID, 5)).rejects.toThrow(ForbiddenException);
+    await expect(service.requireRoleHierarchy(MEMBER_ID, GUILD_ID, 5)).rejects.toThrow(
+      ForbiddenException,
+    );
     await expect(service.requireRoleHierarchy(MEMBER_ID, GUILD_ID, 5)).rejects.toMatchObject({
       response: { error: 'ROLE_HIERARCHY' },
     });
@@ -231,7 +231,9 @@ describe('PermissionsService.requireRoleHierarchy', () => {
       role: 'MEMBER',
       roleLinks: [{ role: { position: 3 } }],
     });
-    await expect(service.requireRoleHierarchy(MEMBER_ID, GUILD_ID, 7)).rejects.toThrow(ForbiddenException);
+    await expect(service.requireRoleHierarchy(MEMBER_ID, GUILD_ID, 7)).rejects.toThrow(
+      ForbiddenException,
+    );
     await expect(service.requireRoleHierarchy(MEMBER_ID, GUILD_ID, 7)).rejects.toMatchObject({
       response: { error: 'ROLE_HIERARCHY' },
     });
@@ -260,14 +262,18 @@ describe('PermissionsService.requireMemberHierarchy', () => {
     prismaMock.guildMember.findUnique
       .mockResolvedValueOnce({ role: 'MEMBER', roleLinks: [{ role: { position: 2 } }] }) // target
       .mockResolvedValueOnce({ role: 'OWNER', roleLinks: [] }); // actor
-    await expect(service.requireMemberHierarchy(OWNER_ID, GUILD_ID, TARGET_ID)).resolves.toBeUndefined();
+    await expect(
+      service.requireMemberHierarchy(OWNER_ID, GUILD_ID, TARGET_ID),
+    ).resolves.toBeUndefined();
   });
 
   it('hedef OWNER → 403 MEMBER_HIERARCHY (asla hedef alınamaz)', async () => {
     prismaMock.guildMember.findUnique
       .mockResolvedValueOnce({ role: 'OWNER', roleLinks: [] }) // target
       .mockResolvedValueOnce({ role: 'MEMBER', roleLinks: [{ role: { position: 5 } }] }); // actor
-    await expect(service.requireMemberHierarchy(MEMBER_ID, GUILD_ID, TARGET_ID)).rejects.toMatchObject({
+    await expect(
+      service.requireMemberHierarchy(MEMBER_ID, GUILD_ID, TARGET_ID),
+    ).rejects.toMatchObject({
       response: { error: 'MEMBER_HIERARCHY' },
     });
   });
@@ -276,14 +282,18 @@ describe('PermissionsService.requireMemberHierarchy', () => {
     prismaMock.guildMember.findUnique
       .mockResolvedValueOnce({ role: 'MEMBER', roleLinks: [{ role: { position: 2 } }] }) // target
       .mockResolvedValueOnce({ role: 'MEMBER', roleLinks: [{ role: { position: 5 } }] }); // actor
-    await expect(service.requireMemberHierarchy(MEMBER_ID, GUILD_ID, TARGET_ID)).resolves.toBeUndefined();
+    await expect(
+      service.requireMemberHierarchy(MEMBER_ID, GUILD_ID, TARGET_ID),
+    ).resolves.toBeUndefined();
   });
 
   it('hedef position === aktör position → 403 MEMBER_HIERARCHY', async () => {
     prismaMock.guildMember.findUnique
       .mockResolvedValueOnce({ role: 'MEMBER', roleLinks: [{ role: { position: 5 } }] }) // target
       .mockResolvedValueOnce({ role: 'MEMBER', roleLinks: [{ role: { position: 5 } }] }); // actor
-    await expect(service.requireMemberHierarchy(MEMBER_ID, GUILD_ID, TARGET_ID)).rejects.toMatchObject({
+    await expect(
+      service.requireMemberHierarchy(MEMBER_ID, GUILD_ID, TARGET_ID),
+    ).rejects.toMatchObject({
       response: { error: 'MEMBER_HIERARCHY' },
     });
   });
@@ -292,7 +302,9 @@ describe('PermissionsService.requireMemberHierarchy', () => {
     prismaMock.guildMember.findUnique
       .mockResolvedValueOnce({ role: 'MEMBER', roleLinks: [{ role: { position: 8 } }] }) // target
       .mockResolvedValueOnce({ role: 'MEMBER', roleLinks: [{ role: { position: 3 } }] }); // actor
-    await expect(service.requireMemberHierarchy(MEMBER_ID, GUILD_ID, TARGET_ID)).rejects.toMatchObject({
+    await expect(
+      service.requireMemberHierarchy(MEMBER_ID, GUILD_ID, TARGET_ID),
+    ).rejects.toMatchObject({
       response: { error: 'MEMBER_HIERARCHY' },
     });
   });
@@ -302,14 +314,18 @@ describe('PermissionsService.requireMemberHierarchy', () => {
     prismaMock.guildMember.findUnique
       .mockResolvedValueOnce({ role: 'MEMBER', roleLinks: [] }) // target (pos 0)
       .mockResolvedValueOnce({ role: 'ADMIN', roleLinks: [] }); // actor (MAX_SAFE_INTEGER)
-    await expect(service.requireMemberHierarchy(ADMIN_ID, GUILD_ID, TARGET_ID)).resolves.toBeUndefined();
+    await expect(
+      service.requireMemberHierarchy(ADMIN_ID, GUILD_ID, TARGET_ID),
+    ).resolves.toBeUndefined();
   });
 
   it('enum-ADMIN aktör → başka enum-ADMIN hedefi → 403 (eski "yönetici yöneticiyi yönetemez" korunur)', async () => {
     prismaMock.guildMember.findUnique
       .mockResolvedValueOnce({ role: 'ADMIN', roleLinks: [] }) // target (MAX)
       .mockResolvedValueOnce({ role: 'ADMIN', roleLinks: [] }); // actor (MAX) → beraberlik bloklanır
-    await expect(service.requireMemberHierarchy(ADMIN_ID, GUILD_ID, TARGET_ID)).rejects.toMatchObject({
+    await expect(
+      service.requireMemberHierarchy(ADMIN_ID, GUILD_ID, TARGET_ID),
+    ).rejects.toMatchObject({
       response: { error: 'MEMBER_HIERARCHY' },
     });
   });
@@ -332,14 +348,20 @@ describe('PermissionsService.effectivePermissions', () => {
     prismaMock.guildMember.findUnique.mockResolvedValue(ADMIN_MEMBERSHIP);
     expect((await service.effectivePermissions(ADMIN_ID, GUILD_ID)).all).toBe(true);
 
-    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER', roleLinks: [ADMINISTRATOR_ROLE_LINK] });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      role: 'MEMBER',
+      roleLinks: [ADMINISTRATOR_ROLE_LINK],
+    });
     prismaMock.role.findFirst.mockResolvedValue({ permissions: [] });
     expect((await service.effectivePermissions(MEMBER_ID, GUILD_ID)).all).toBe(true);
   });
 
   it('izinli MEMBER → all:false + flags efektif bayrakları içerir', async () => {
     prismaMock.guild.findUnique.mockResolvedValue(GUILD);
-    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER', roleLinks: [MANAGE_CHANNELS_ROLE_LINK] });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      role: 'MEMBER',
+      roleLinks: [MANAGE_CHANNELS_ROLE_LINK],
+    });
     prismaMock.role.findFirst.mockResolvedValue(EVERYONE_ROLE);
     const result = await service.effectivePermissions(MEMBER_ID, GUILD_ID);
     expect(result.all).toBe(false);

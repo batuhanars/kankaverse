@@ -77,7 +77,7 @@ describe('FriendsService — C1 bildirim üretimi', () => {
     prismaMock.friendship.findFirst.mockResolvedValue(null); // mevcut yok → yeni PENDING
     prismaMock.friendship.create.mockResolvedValue(friendshipRow());
 
-    await service.sendFriendRequest(SENDER_ID, { friendCode: 'ABC123' } as any);
+    await service.sendFriendRequest(SENDER_ID, { friendCode: 'ABC123' });
 
     expect(realtimeMock.emitToUser).toHaveBeenCalledWith(
       TARGET_ID,
@@ -109,7 +109,7 @@ describe('FriendsService — C1 bildirim üretimi', () => {
       }),
     );
 
-    await service.sendFriendRequest(SENDER_ID, { friendCode: 'ABC123' } as any);
+    await service.sendFriendRequest(SENDER_ID, { friendCode: 'ABC123' });
 
     // Bildirim: istek sahibi (requesterId = TARGET_ID), kabul eden = SENDER_ID
     expect(notificationsCreateMock).toHaveBeenCalledWith(TARGET_ID, {
@@ -144,9 +144,7 @@ describe('FriendsService — C1 bildirim üretimi', () => {
 
   // ── FRIEND_REMOVE: bildirim ÜRETMEZ (sessiz T&S — R7-hafif) ──────────────────
   it('removeFriend → notifications.create ÇAĞRILMAZ (sessiz); friend.remove WS aynen', async () => {
-    prismaMock.friendship.findFirst.mockResolvedValue(
-      friendshipRow({ status: 'ACCEPTED' }),
-    );
+    prismaMock.friendship.findFirst.mockResolvedValue(friendshipRow({ status: 'ACCEPTED' }));
     prismaMock.friendship.delete.mockResolvedValue(friendshipRow());
 
     await service.removeFriend(SENDER_ID, TARGET_ID);

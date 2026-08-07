@@ -56,11 +56,23 @@ export class DmPermissionService {
     const [sender, target] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: senderId, deletedAt: null },
-        select: { id: true, isMinor: true, dmPolicy: true, verificationStatus: true, createdAt: true },
+        select: {
+          id: true,
+          isMinor: true,
+          dmPolicy: true,
+          verificationStatus: true,
+          createdAt: true,
+        },
       }),
       this.prisma.user.findUnique({
         where: { id: targetId, deletedAt: null },
-        select: { id: true, isMinor: true, dmPolicy: true, verificationStatus: true, createdAt: true },
+        select: {
+          id: true,
+          isMinor: true,
+          dmPolicy: true,
+          verificationStatus: true,
+          createdAt: true,
+        },
       }),
     ]);
 

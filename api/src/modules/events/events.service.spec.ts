@@ -68,7 +68,10 @@ function makeService() {
 function resetMocks() {
   jest.resetAllMocks();
   permissionsMock.hasGuildPermission.mockResolvedValue(true);
-  membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD, membership: OWNER_MEMBERSHIP });
+  membershipMock.requireGuildMembership.mockResolvedValue({
+    guild: GUILD,
+    membership: OWNER_MEMBERSHIP,
+  });
   membershipMock.requireChannelAccess.mockResolvedValue(undefined);
   // İlgi sayaç varsayılanları
   prismaMock.guildEventInterest.count.mockResolvedValue(0);
@@ -168,7 +171,11 @@ describe('EventsService.create', () => {
         }),
       }),
     );
-    expect(result).toMatchObject({ name: 'Oyun Gecesi', interestedCount: 0, interestedByMe: false });
+    expect(result).toMatchObject({
+      name: 'Oyun Gecesi',
+      interestedCount: 0,
+      interestedByMe: false,
+    });
     // EXTERNAL → tüm guild üyeleri alıcı
     expect(realtimeMock.emitToUsers).toHaveBeenCalledWith(
       [USER_ID, 'u2'],
@@ -250,7 +257,12 @@ describe('EventsService.create', () => {
 
   it('VOICE: geçerli kanal + creator erişimli → oluşturur, WS alıcıları kanal-erişimli üyeler', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(voiceChannel());
-    const created = makeEvent({ locationType: 'VOICE_CHANNEL', channelId: VOICE_CHANNEL_ID, externalLocation: null, channel: { name: 'sesli' } });
+    const created = makeEvent({
+      locationType: 'VOICE_CHANNEL',
+      channelId: VOICE_CHANNEL_ID,
+      externalLocation: null,
+      channel: { name: 'sesli' },
+    });
     prismaMock.guildEvent.create.mockResolvedValue(created);
     prismaMock.guildMember.findMany.mockResolvedValue([{ userId: USER_ID }, { userId: 'minor-1' }]);
     // minor-1 kanala erişemez (yaş kapısı)
@@ -268,7 +280,11 @@ describe('EventsService.create', () => {
 
     expect(result).toMatchObject({ channelId: VOICE_CHANNEL_ID, channelName: 'sesli' });
     // minör süzüldü → yalnız creator alıcı
-    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith([USER_ID], 'guild.event_created', expect.anything());
+    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith(
+      [USER_ID],
+      'guild.event_created',
+      expect.anything(),
+    );
   });
 });
 
@@ -284,11 +300,17 @@ describe('EventsService görünürlük (findVisibleEvents / requireEventAccess)'
   });
 
   it('voice ageGated etkinlik → minör görmez (listede süzülür)', async () => {
-    const voiceEvent = makeEvent({ locationType: 'VOICE_CHANNEL', channelId: VOICE_CHANNEL_ID, channel: { name: 'sesli' } });
+    const voiceEvent = makeEvent({
+      locationType: 'VOICE_CHANNEL',
+      channelId: VOICE_CHANNEL_ID,
+      channel: { name: 'sesli' },
+    });
     const externalEvent = makeEvent({ id: 'event-2', locationType: 'EXTERNAL' });
     prismaMock.guildEvent.findMany.mockResolvedValue([voiceEvent, externalEvent]);
     // minör voice kanalına erişemez, external'a erişir
-    membershipMock.requireChannelAccess.mockRejectedValue(new ForbiddenException({ error: 'AGE_RESTRICTED' }));
+    membershipMock.requireChannelAccess.mockRejectedValue(
+      new ForbiddenException({ error: 'AGE_RESTRICTED' }),
+    );
 
     const result = await service.findByGuild('minor-1', GUILD_ID);
 
@@ -297,9 +319,15 @@ describe('EventsService görünürlük (findVisibleEvents / requireEventAccess)'
   });
 
   it('voice ageGated etkinlik → minör GET 404 (jenerik EVENT_NOT_FOUND, sebep sızmaz)', async () => {
-    const voiceEvent = makeEvent({ locationType: 'VOICE_CHANNEL', channelId: VOICE_CHANNEL_ID, channel: { name: 'sesli' } });
+    const voiceEvent = makeEvent({
+      locationType: 'VOICE_CHANNEL',
+      channelId: VOICE_CHANNEL_ID,
+      channel: { name: 'sesli' },
+    });
     prismaMock.guildEvent.findFirst.mockResolvedValue(voiceEvent);
-    membershipMock.requireChannelAccess.mockRejectedValue(new ForbiddenException({ error: 'AGE_RESTRICTED' }));
+    membershipMock.requireChannelAccess.mockRejectedValue(
+      new ForbiddenException({ error: 'AGE_RESTRICTED' }),
+    );
 
     const err = await service.findOne('minor-1', EVENT_ID).catch((e) => e);
     expect(err).toBeInstanceOf(NotFoundException);
@@ -307,7 +335,11 @@ describe('EventsService görünürlük (findVisibleEvents / requireEventAccess)'
   });
 
   it('erişimli kullanıcı → voice etkinliği görür', async () => {
-    const voiceEvent = makeEvent({ locationType: 'VOICE_CHANNEL', channelId: VOICE_CHANNEL_ID, channel: { name: 'sesli' } });
+    const voiceEvent = makeEvent({
+      locationType: 'VOICE_CHANNEL',
+      channelId: VOICE_CHANNEL_ID,
+      channel: { name: 'sesli' },
+    });
     prismaMock.guildEvent.findFirst.mockResolvedValue(voiceEvent);
     membershipMock.requireChannelAccess.mockResolvedValue(undefined);
 
@@ -352,7 +384,9 @@ describe('EventsService.update / remove', () => {
 
   it('update startAt geçmişe → EVENT_START_IN_PAST', async () => {
     prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent());
-    await expect(service.update(USER_ID, EVENT_ID, { startAt: PAST.toISOString() })).rejects.toMatchObject({
+    await expect(
+      service.update(USER_ID, EVENT_ID, { startAt: PAST.toISOString() }),
+    ).rejects.toMatchObject({
       response: { error: 'EVENT_START_IN_PAST' },
     });
   });
@@ -363,7 +397,11 @@ describe('EventsService.update / remove', () => {
     prismaMock.guildMember.findMany.mockResolvedValue([{ userId: USER_ID }]);
 
     await service.update(USER_ID, EVENT_ID, { name: 'Güncel' });
-    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith([USER_ID], 'guild.event_updated', expect.anything());
+    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith(
+      [USER_ID],
+      'guild.event_updated',
+      expect.anything(),
+    );
   });
 
   it('remove → soft-delete + guild.event_deleted {guildId, eventId}', async () => {
@@ -376,11 +414,10 @@ describe('EventsService.update / remove', () => {
     expect(prismaMock.guildEvent.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ deletedAt: expect.any(Date) }) }),
     );
-    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith(
-      [USER_ID],
-      'guild.event_deleted',
-      { guildId: GUILD_ID, eventId: EVENT_ID },
-    );
+    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith([USER_ID], 'guild.event_deleted', {
+      guildId: GUILD_ID,
+      eventId: EVENT_ID,
+    });
   });
 
   it('remove var olmayan → EVENT_NOT_FOUND', async () => {
@@ -406,7 +443,10 @@ describe('EventsService interest (idempotent)', () => {
     prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent());
     prismaMock.guildEventInterest.upsert.mockResolvedValue({ eventId: EVENT_ID, userId: USER_ID });
     prismaMock.guildEventInterest.count.mockResolvedValue(1);
-    prismaMock.guildEventInterest.findUnique.mockResolvedValue({ eventId: EVENT_ID, userId: USER_ID });
+    prismaMock.guildEventInterest.findUnique.mockResolvedValue({
+      eventId: EVENT_ID,
+      userId: USER_ID,
+    });
 
     const result = await service.addInterest(USER_ID, EVENT_ID);
 
@@ -421,9 +461,15 @@ describe('EventsService interest (idempotent)', () => {
   });
 
   it('addInterest görünmeyen etkinlik (minör/voice) → EVENT_NOT_FOUND, upsert çağrılmaz', async () => {
-    const voiceEvent = makeEvent({ locationType: 'VOICE_CHANNEL', channelId: VOICE_CHANNEL_ID, channel: { name: 'sesli' } });
+    const voiceEvent = makeEvent({
+      locationType: 'VOICE_CHANNEL',
+      channelId: VOICE_CHANNEL_ID,
+      channel: { name: 'sesli' },
+    });
     prismaMock.guildEvent.findFirst.mockResolvedValue(voiceEvent);
-    membershipMock.requireChannelAccess.mockRejectedValue(new ForbiddenException({ error: 'AGE_RESTRICTED' }));
+    membershipMock.requireChannelAccess.mockRejectedValue(
+      new ForbiddenException({ error: 'AGE_RESTRICTED' }),
+    );
 
     await expect(service.addInterest('minor-1', EVENT_ID)).rejects.toMatchObject({
       response: { error: 'EVENT_NOT_FOUND' },
@@ -606,7 +652,7 @@ describe('EventsService motor (recurrence + occurrence sıralama)', () => {
       locationType: 'EXTERNAL',
       externalLocation: 'Yer',
       startAt: FUTURE.toISOString(),
-      recurrence: 'DAILY' as any,
+      recurrence: 'DAILY',
     });
 
     expect(prismaMock.guildEvent.create).toHaveBeenCalledWith(
@@ -671,7 +717,9 @@ describe('EventsService motor (recurrence + occurrence sıralama)', () => {
   it('DTO: occurrenceStartAt/EndAt computed alanları döner', async () => {
     const start = new Date(Date.now() + 86_400_000);
     const end = new Date(Date.now() + 86_400_000 + 3_600_000);
-    prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ startAt: start, endAt: end, recurrence: 'NONE' }));
+    prismaMock.guildEvent.findFirst.mockResolvedValue(
+      makeEvent({ startAt: start, endAt: end, recurrence: 'NONE' }),
+    );
     const result = await service.findOne(USER_ID, EVENT_ID);
     expect(result.occurrenceStartAt.getTime()).toBe(start.getTime());
     expect(result.occurrenceEndAt.getTime()).toBe(end.getTime());
@@ -723,7 +771,9 @@ describe('EventsService kapak — attachCover (create/update iliştirme)', () =>
   });
 
   it('başkasının attachment’ı (uploaderId !== userId) → INVALID_COVER_IMAGE', async () => {
-    prismaMock.attachment.findUnique.mockResolvedValue(imageAttachment({ uploaderId: 'other-user' }));
+    prismaMock.attachment.findUnique.mockResolvedValue(
+      imageAttachment({ uploaderId: 'other-user' }),
+    );
     await expect(createWithCover(COVER_ID)).rejects.toMatchObject({
       response: { error: 'INVALID_COVER_IMAGE' },
     });
@@ -731,7 +781,9 @@ describe('EventsService kapak — attachCover (create/update iliştirme)', () =>
   });
 
   it('image/* olmayan tip → INVALID_COVER_TYPE (400)', async () => {
-    prismaMock.attachment.findUnique.mockResolvedValue(imageAttachment({ contentType: 'application/pdf' }));
+    prismaMock.attachment.findUnique.mockResolvedValue(
+      imageAttachment({ contentType: 'application/pdf' }),
+    );
     await expect(createWithCover(COVER_ID)).rejects.toMatchObject({
       response: { error: 'INVALID_COVER_TYPE' },
     });
@@ -847,7 +899,9 @@ describe('EventsService kapak — update semantiği (null/undefined/string)', ()
 
   it('coverImageId undefined → data.coverImageId dokunulmaz', async () => {
     prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ coverImageId: COVER_ID }));
-    prismaMock.guildEvent.update.mockResolvedValue(makeEvent({ coverImageId: COVER_ID, channel: null }));
+    prismaMock.guildEvent.update.mockResolvedValue(
+      makeEvent({ coverImageId: COVER_ID, channel: null }),
+    );
 
     await service.update(USER_ID, EVENT_ID, { name: 'Yeni Ad' });
 
@@ -858,7 +912,9 @@ describe('EventsService kapak — update semantiği (null/undefined/string)', ()
 
   it('coverImageId null → kaldırılır (data.coverImageId = null), eski attachment’a dokunulmaz', async () => {
     prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ coverImageId: COVER_ID }));
-    prismaMock.guildEvent.update.mockResolvedValue(makeEvent({ coverImageId: null, channel: null }));
+    prismaMock.guildEvent.update.mockResolvedValue(
+      makeEvent({ coverImageId: null, channel: null }),
+    );
 
     await service.update(USER_ID, EVENT_ID, { coverImageId: null } as any);
 
@@ -872,7 +928,9 @@ describe('EventsService kapak — update semantiği (null/undefined/string)', ()
   it('coverImageId string → attachCover + data.coverImageId ata', async () => {
     prismaMock.guildEvent.findFirst.mockResolvedValue(makeEvent({ coverImageId: null }));
     prismaMock.attachment.findUnique.mockResolvedValue(imageAttachment());
-    prismaMock.guildEvent.update.mockResolvedValue(makeEvent({ coverImageId: COVER_ID, channel: null }));
+    prismaMock.guildEvent.update.mockResolvedValue(
+      makeEvent({ coverImageId: COVER_ID, channel: null }),
+    );
 
     await service.update(USER_ID, EVENT_ID, { coverImageId: COVER_ID });
 

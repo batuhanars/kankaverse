@@ -41,7 +41,8 @@ const REFRESH_COOKIE = 'refresh_token';
 //  - Aynı-site (subdomain: app./api.kankaverse.com) → 'lax' (varsayılan), Secure yalnız prod.
 //  - Çapraz-site (düz *.vercel.app + *.railway.app) → COOKIE_SAMESITE=none; tarayıcı 'none' için Secure ZORUNLU kılar.
 // Topoloji değişince (subdomain'e geçiş) yalnız env kaldırılır — kod değişmez.
-const COOKIE_SAMESITE = (process.env.COOKIE_SAMESITE as 'lax' | 'none' | 'strict' | undefined) ?? 'lax';
+const COOKIE_SAMESITE =
+  (process.env.COOKIE_SAMESITE as 'lax' | 'none' | 'strict' | undefined) ?? 'lax';
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production' || COOKIE_SAMESITE === 'none',
@@ -57,7 +58,8 @@ type AuthUser = { id: string; sessionId: string; emailVerifiedAt: Date | null };
 const CLIENT_TYPE_HEADER = {
   name: 'X-Client-Type',
   required: false,
-  description: "Yalnız 'mobile' allowlist'te; varsa yanıt gövdesine refreshToken eklenir. Yoksa/başka değerde davranış web ile birebir aynı (cookie, gövdede token yok).",
+  description:
+    "Yalnız 'mobile' allowlist'te; varsa yanıt gövdesine refreshToken eklenir. Yoksa/başka değerde davranış web ile birebir aynı (cookie, gövdede token yok).",
 } as const;
 
 @ApiTags('auth')
@@ -71,7 +73,9 @@ export class AuthController {
   // ── Public meta ────────────────────────────────────────────────────────────
 
   @Get('registration-mode')
-  @ApiOperation({ summary: 'Kayıt modunu sorgula (auth yok — frontend davet alanını buna göre gösterir)' })
+  @ApiOperation({
+    summary: 'Kayıt modunu sorgula (auth yok — frontend davet alanını buna göre gösterir)',
+  })
   registrationMode() {
     const mode = this.config.get<'open' | 'invite' | 'closed'>('registrationMode') ?? 'open';
     return { mode };
@@ -91,7 +95,11 @@ export class AuthController {
     @Headers('x-client-type') clientTypeHeader?: string,
   ) {
     const clientType = normalizeClientType(clientTypeHeader);
-    const { user, accessToken, refreshToken } = await this.authService.register(dto, req.ip, clientType);
+    const { user, accessToken, refreshToken } = await this.authService.register(
+      dto,
+      req.ip,
+      clientType,
+    );
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
     return clientType === 'mobile' ? { user, accessToken, refreshToken } : { user, accessToken };
   }
@@ -130,14 +138,21 @@ export class AuthController {
     @Headers('x-client-type') clientTypeHeader?: string,
   ) {
     const clientType = normalizeClientType(clientTypeHeader);
-    const { user, accessToken, refreshToken } = await this.authService.login2fa(dto, req.ip, clientType);
+    const { user, accessToken, refreshToken } = await this.authService.login2fa(
+      dto,
+      req.ip,
+      clientType,
+    );
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
     return clientType === 'mobile' ? { user, accessToken, refreshToken } : { user, accessToken };
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Access token yenileme (mobil + gövde token → gövde kanalı; aksi hâlde cookie varsa cookie, yoksa gövdeden mobil bearer akışı)" })
+  @ApiOperation({
+    summary:
+      'Access token yenileme (mobil + gövde token → gövde kanalı; aksi hâlde cookie varsa cookie, yoksa gövdeden mobil bearer akışı)',
+  })
   @ApiHeader(CLIENT_TYPE_HEADER)
   async refresh(
     @Req() req: Request,
@@ -154,7 +169,11 @@ export class AuthController {
     const preferBody = clientType === 'mobile' && Boolean(body?.refreshToken);
     const usingCookie = !preferBody && Boolean(cookieToken);
     const rawToken = usingCookie ? cookieToken! : (body?.refreshToken ?? '');
-    const { accessToken, refreshToken } = await this.authService.refresh(rawToken, req.ip, usingCookie);
+    const { accessToken, refreshToken } = await this.authService.refresh(
+      rawToken,
+      req.ip,
+      usingCookie,
+    );
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
     return usingCookie ? { accessToken } : { accessToken, refreshToken };
   }
@@ -164,10 +183,7 @@ export class AuthController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Oturumu kapat' })
-  async logout(
-    @CurrentUser() user: AuthUser,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async logout(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
     await this.authService.logout(user.sessionId);
     res.clearCookie(REFRESH_COOKIE, { path: '/' });
     return null;
@@ -294,7 +310,9 @@ export class AuthController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 3600000 } })
-  @ApiOperation({ summary: 'E-posta değiştir — reauth; yeni adrese doğrulama + eski adrese geri-al (5/saat)' })
+  @ApiOperation({
+    summary: 'E-posta değiştir — reauth; yeni adrese doğrulama + eski adrese geri-al (5/saat)',
+  })
   async changeEmail(@CurrentUser() user: AuthUser, @Body() dto: ChangeEmailDto) {
     return this.authService.changeEmail(user.id, dto);
   }
@@ -304,7 +322,9 @@ export class AuthController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 3600000 } })
-  @ApiOperation({ summary: 'Kullanıcı adı değiştir — reauth (mevcut şifre + opsiyonel TOTP) (5/saat)' })
+  @ApiOperation({
+    summary: 'Kullanıcı adı değiştir — reauth (mevcut şifre + opsiyonel TOTP) (5/saat)',
+  })
   async changeUsername(@CurrentUser() user: AuthUser, @Body() dto: ChangeUsernameDto) {
     return this.authService.changeUsername(user.id, dto);
   }

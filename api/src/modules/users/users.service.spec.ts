@@ -19,7 +19,12 @@ const voiceMock = { getLiveParticipation: jest.fn() };
 
 // C8: ImageUploadService — StorageService/ConfigService mock üzerinden gerçek örnek
 // (presignAvatar/setAvatar/presignBanner/setBanner testleri bunun üzerinden geçer).
-const storageMock = { presignPut: jest.fn(), presignPutPublic: jest.fn(), presignGet: jest.fn(), delete: jest.fn() };
+const storageMock = {
+  presignPut: jest.fn(),
+  presignPutPublic: jest.fn(),
+  presignGet: jest.fn(),
+  delete: jest.fn(),
+};
 const configMock = {
   get: jest.fn((key: string) => {
     const values: Record<string, unknown> = {
@@ -68,7 +73,11 @@ function resetMocks() {
   prismaMock.user.findMany.mockResolvedValue([]);
   prismaMock.voiceSession.findFirst.mockResolvedValue(null);
   dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
-  voiceMock.getLiveParticipation.mockResolvedValue({ present: false, streaming: false, video: false });
+  voiceMock.getLiveParticipation.mockResolvedValue({
+    present: false,
+    streaming: false,
+    video: false,
+  });
   resetMediaMocks();
 }
 
@@ -299,7 +308,8 @@ describe('UsersService', () => {
           if (!opts.dm) return Promise.resolve(null);
           return Promise.resolve(rowMatchesOr(ch.OR, opts.dm) ? { id: 'cm-dm' } : null);
         }
-        if (ch.type === 'GROUP_DM') return Promise.resolve(opts.groupDm ? { id: 'cm-group' } : null);
+        if (ch.type === 'GROUP_DM')
+          return Promise.resolve(opts.groupDm ? { id: 'cm-group' } : null);
         return Promise.resolve(null);
       });
     }
@@ -612,8 +622,18 @@ describe('UsersService', () => {
         .mockResolvedValueOnce({
           roleLinks: [
             { role: { id: 'r-low', name: 'Üye', color: '#aaa', position: 1, isEveryone: false } },
-            { role: { id: 'r-everyone', name: '@everyone', color: '#000', position: 0, isEveryone: true } },
-            { role: { id: 'r-high', name: 'Admin', color: '#f00', position: 5, isEveryone: false } },
+            {
+              role: {
+                id: 'r-everyone',
+                name: '@everyone',
+                color: '#000',
+                position: 0,
+                isEveryone: true,
+              },
+            },
+            {
+              role: { id: 'r-high', name: 'Admin', color: '#f00', position: 5, isEveryone: false },
+            },
           ],
         });
       const card = await service.getUserCard(CALLER, TARGET, GUILD);
@@ -652,15 +672,29 @@ describe('UsersService', () => {
     it('LiveKit CANLI doğrular + ekran yayını → streaming true', async () => {
       mockTargetExists();
       mockActiveSession();
-      voiceMock.getLiveParticipation.mockResolvedValue({ present: true, streaming: true, video: false });
+      voiceMock.getLiveParticipation.mockResolvedValue({
+        present: true,
+        streaming: true,
+        video: false,
+      });
       const card = await service.getUserCard(CALLER, TARGET);
-      expect(card.voiceStatus).toMatchObject({ channelId: 'vc-1', channelName: 'Lounge', guildName: 'Ortam', streaming: true, video: false });
+      expect(card.voiceStatus).toMatchObject({
+        channelId: 'vc-1',
+        channelName: 'Lounge',
+        guildName: 'Ortam',
+        streaming: true,
+        video: false,
+      });
     });
 
     it('bayat oturum: LiveKit hedefi içermiyor (present=false) → null', async () => {
       mockTargetExists();
       mockActiveSession();
-      voiceMock.getLiveParticipation.mockResolvedValue({ present: false, streaming: false, video: false });
+      voiceMock.getLiveParticipation.mockResolvedValue({
+        present: false,
+        streaming: false,
+        video: false,
+      });
       const card = await service.getUserCard(CALLER, TARGET);
       expect(card.voiceStatus).toBeNull();
     });
@@ -784,7 +818,9 @@ describe('UsersService.presignAvatar / presignBanner', () => {
   });
 
   it('UPLOADS_ENABLED=false → ForbiddenException UPLOADS_DISABLED', async () => {
-    configMock.get.mockImplementation((key: string) => (key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse'));
+    configMock.get.mockImplementation((key: string) =>
+      key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse',
+    );
 
     await expect(service.presignAvatar('u1', 'image/png')).rejects.toMatchObject({
       response: expect.objectContaining({ error: 'UPLOADS_DISABLED' }),
@@ -804,7 +840,9 @@ describe('UsersService.presignAvatar / presignBanner', () => {
   });
 
   it('profil afişi: UPLOADS_ENABLED=false → ForbiddenException UPLOADS_DISABLED', async () => {
-    configMock.get.mockImplementation((key: string) => (key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse'));
+    configMock.get.mockImplementation((key: string) =>
+      key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse',
+    );
 
     await expect(service.presignBanner('u1', 'image/png')).rejects.toMatchObject({
       response: expect.objectContaining({ error: 'UPLOADS_DISABLED' }),
@@ -830,7 +868,9 @@ describe('UsersService.setAvatar / setBanner', () => {
   });
 
   it('UPLOADS_ENABLED=false iken storageKey ile avatar SET → ForbiddenException UPLOADS_DISABLED (D14 savunma-derinliği)', async () => {
-    configMock.get.mockImplementation((key: string) => (key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse'));
+    configMock.get.mockImplementation((key: string) =>
+      key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse',
+    );
 
     await expect(
       service.setAvatar('u1', { storageKey: 'avatars/u1/abc.png' }),
@@ -841,12 +881,17 @@ describe('UsersService.setAvatar / setBanner', () => {
   });
 
   it('UPLOADS_ENABLED=false iken storageKey null → avatar KALDIRMA yine çalışır (kapı yalnız set yolunda)', async () => {
-    configMock.get.mockImplementation((key: string) => (key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse'));
+    configMock.get.mockImplementation((key: string) =>
+      key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse',
+    );
     prismaMock.user.update.mockResolvedValue({ ...USER_FIXTURE_BASE, avatarUrl: null });
 
     const result = await service.setAvatar('u1', { storageKey: null });
     expect(result.avatarUrl).toBeNull();
-    expect(prismaMock.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { avatarUrl: null } });
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { avatarUrl: null },
+    });
   });
 
   it('geçerli storageKey → avatarUrl publicUrl + "/" + storageKey olarak kaydedilir', async () => {
@@ -856,7 +901,10 @@ describe('UsersService.setAvatar / setBanner', () => {
 
     const result = await service.setAvatar('u1', { storageKey });
 
-    expect(prismaMock.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { avatarUrl: expectedUrl } });
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { avatarUrl: expectedUrl },
+    });
     expect(result.avatarUrl).toBe(expectedUrl);
   });
 
@@ -865,7 +913,10 @@ describe('UsersService.setAvatar / setBanner', () => {
 
     const result = await service.setAvatar('u1', { storageKey: null });
 
-    expect(prismaMock.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { avatarUrl: null } });
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { avatarUrl: null },
+    });
     expect(result.avatarUrl).toBeNull();
   });
 
@@ -887,7 +938,10 @@ describe('UsersService.setAvatar / setBanner', () => {
 
     const result = await service.setBanner('u1', { storageKey });
 
-    expect(prismaMock.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { bannerUrl: expectedUrl } });
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { bannerUrl: expectedUrl },
+    });
     expect(result.bannerUrl).toBe(expectedUrl);
   });
 
@@ -896,7 +950,10 @@ describe('UsersService.setAvatar / setBanner', () => {
 
     const result = await service.setBanner('u1', { storageKey: null });
 
-    expect(prismaMock.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { bannerUrl: null } });
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { bannerUrl: null },
+    });
     expect(result.bannerUrl).toBeNull();
   });
 });

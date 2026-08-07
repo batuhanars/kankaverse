@@ -82,7 +82,10 @@ export class ModerationModuleService {
         where: { id: dto.relatedReportId },
       });
       if (!report) {
-        throw new NotFoundException({ message: 'İlgili rapor bulunamadı.', error: 'REPORT_NOT_FOUND' });
+        throw new NotFoundException({
+          message: 'İlgili rapor bulunamadı.',
+          error: 'REPORT_NOT_FOUND',
+        });
       }
     }
 
@@ -91,7 +94,10 @@ export class ModerationModuleService {
       where: { id: dto.targetUserId, deletedAt: null },
     });
     if (!targetUser) {
-      throw new NotFoundException({ message: 'Hedef kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+      throw new NotFoundException({
+        message: 'Hedef kullanıcı bulunamadı.',
+        error: 'USER_NOT_FOUND',
+      });
     }
 
     // Aksiyonu oluştur
@@ -148,11 +154,18 @@ export class ModerationModuleService {
    * BAN/MUTE → lazy enforcement (her istek sırasında shared/ModerationService okur).
    * WARN/SHADOW_LIMIT → yalnızca kayıt (SHADOW_LIMIT stub).
    */
-  private async applyInstantEnforcement(moderatorId: string, dto: CreateActionDto, actionId: string) {
+  private async applyInstantEnforcement(
+    moderatorId: string,
+    dto: CreateActionDto,
+    actionId: string,
+  ) {
     switch (dto.type) {
       case 'KICK': {
         if (!dto.scope) {
-          throw new BadRequestException({ message: 'KICK aksiyonu için guildId (scope) gereklidir.', error: 'SCOPE_REQUIRED' });
+          throw new BadRequestException({
+            message: 'KICK aksiyonu için guildId (scope) gereklidir.',
+            error: 'SCOPE_REQUIRED',
+          });
         }
         // GuildMember kaydını sil
         const membership = await this.prisma.guildMember.findUnique({

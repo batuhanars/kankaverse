@@ -115,7 +115,9 @@ export class DiscordImportService {
   ) {}
 
   /** Discord template API'sinden serialized_source_guild getir. */
-  private async fetchTemplate(code: string): Promise<{ name: string; roles: SerializedRole[]; channels: SerializedChannel[] }> {
+  private async fetchTemplate(
+    code: string,
+  ): Promise<{ name: string; roles: SerializedRole[]; channels: SerializedChannel[] }> {
     // TR'de Discord DPI ile engelli → TR sunucusu discord.com'a çıkamaz. Ayarlıysa TR-dışı
     // bir proxy (örn. Cloudflare Worker) üzerinden geç; yoksa doğrudan (dev/TR-dışı).
     const proxy = process.env.DISCORD_TEMPLATE_PROXY?.trim();
@@ -123,20 +125,31 @@ export class DiscordImportService {
     const url = proxy
       ? `${proxy}${proxy.includes('?') ? '&' : '?'}code=${encodeURIComponent(code)}`
       : `https://discord.com/api/v10/guilds/templates/${code}`;
-    const headers: Record<string, string> = { 'User-Agent': 'Kankaverse (https://kankaverse.com, 1.0)' };
+    const headers: Record<string, string> = {
+      'User-Agent': 'Kankaverse (https://kankaverse.com, 1.0)',
+    };
     if (proxy && secret) headers['x-proxy-secret'] = secret;
 
     let res: Response;
     try {
       res = await fetch(url, { headers });
     } catch {
-      throw new BadRequestException({ message: 'Discord şablonu alınamadı (ağ hatası).', error: 'TEMPLATE_FETCH_FAILED' });
+      throw new BadRequestException({
+        message: 'Discord şablonu alınamadı (ağ hatası).',
+        error: 'TEMPLATE_FETCH_FAILED',
+      });
     }
     if (res.status === 404) {
-      throw new BadRequestException({ message: 'Şablon bulunamadı veya süresi dolmuş.', error: 'TEMPLATE_NOT_FOUND' });
+      throw new BadRequestException({
+        message: 'Şablon bulunamadı veya süresi dolmuş.',
+        error: 'TEMPLATE_NOT_FOUND',
+      });
     }
     if (!res.ok) {
-      throw new BadRequestException({ message: 'Discord şablonu alınamadı.', error: 'TEMPLATE_FETCH_FAILED' });
+      throw new BadRequestException({
+        message: 'Discord şablonu alınamadı.',
+        error: 'TEMPLATE_FETCH_FAILED',
+      });
     }
     const data = (await res.json()) as {
       name?: string;
@@ -144,7 +157,10 @@ export class DiscordImportService {
     };
     const src = data.serialized_source_guild;
     if (!src || !Array.isArray(src.channels)) {
-      throw new BadRequestException({ message: 'Şablon içeriği okunamadı.', error: 'TEMPLATE_INVALID' });
+      throw new BadRequestException({
+        message: 'Şablon içeriği okunamadı.',
+        error: 'TEMPLATE_INVALID',
+      });
     }
     return { name: data.name ?? 'Discord Ortamı', roles: src.roles ?? [], channels: src.channels };
   }
@@ -152,7 +168,10 @@ export class DiscordImportService {
   async importTemplate(userId: string, input: string, nameOverride?: string) {
     const code = extractTemplateCode(input);
     if (!code) {
-      throw new BadRequestException({ message: 'Geçersiz şablon linki veya kodu.', error: 'INVALID_TEMPLATE' });
+      throw new BadRequestException({
+        message: 'Geçersiz şablon linki veya kodu.',
+        error: 'INVALID_TEMPLATE',
+      });
     }
 
     const tpl = await this.fetchTemplate(code);
@@ -175,7 +194,9 @@ export class DiscordImportService {
           position: 0,
           hoist: false,
           mentionable: false,
-          permissions: everyone ? mapPermissions(everyone.permissions) : DEFAULT_EVERYONE_PERMISSIONS,
+          permissions: everyone
+            ? mapPermissions(everyone.permissions)
+            : DEFAULT_EVERYONE_PERMISSIONS,
           isEveryone: true,
         },
       });
@@ -200,24 +221,33 @@ export class DiscordImportService {
       }
 
       // Kategoriler önce (placeholder id → gerçek kategori id haritası)
-      const categories = tpl.channels.filter((c) => mapChannelType(c.type) === 'CATEGORY').slice(0, 50);
+      const categories = tpl.channels
+        .filter((c) => mapChannelType(c.type) === 'CATEGORY')
+        .slice(0, 50);
       const catMap = new Map<string, string>();
       let catPos = 0;
       for (const c of categories) {
         const cat = await tx.channelCategory.create({
-          data: { guildId: guild.id, name: clampName(c.name, 'kategori'), position: c.position ?? catPos++ },
+          data: {
+            guildId: guild.id,
+            name: clampName(c.name, 'kategori'),
+            position: c.position ?? catPos++,
+          },
         });
         catMap.set(String(c.id), cat.id);
       }
 
       // Kanallar (kategori-dışı), parent_id → kategori id
       const channels = tpl.channels
-        .filter((c) => { const t = mapChannelType(c.type); return t === 'GUILD_TEXT' || t === 'GUILD_VOICE'; })
+        .filter((c) => {
+          const t = mapChannelType(c.type);
+          return t === 'GUILD_TEXT' || t === 'GUILD_VOICE';
+        })
         .slice(0, 200);
       let chPos = 0;
       for (const c of channels) {
         const type = mapChannelType(c.type) as 'GUILD_TEXT' | 'GUILD_VOICE';
-        const categoryId = c.parent_id != null ? catMap.get(String(c.parent_id)) ?? null : null;
+        const categoryId = c.parent_id != null ? (catMap.get(String(c.parent_id)) ?? null) : null;
         await tx.channel.create({
           data: {
             guildId: guild.id,
@@ -229,7 +259,9 @@ export class DiscordImportService {
             slowModeSeconds: Math.min(Math.max(c.rate_limit_per_user ?? 0, 0), 21600),
             ...(type === 'GUILD_VOICE' && {
               userLimit: Math.min(Math.max(c.user_limit ?? 0, 0), 99),
-              ...(c.bitrate ? { bitrate: Math.min(Math.max(Math.round(c.bitrate / 1000), 8), 96) } : {}),
+              ...(c.bitrate
+                ? { bitrate: Math.min(Math.max(Math.round(c.bitrate / 1000), 8), 96) }
+                : {}),
             }),
           },
         });

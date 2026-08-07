@@ -79,13 +79,26 @@ export class UsersService {
    *
    * selfBlocked = yalnız "ben onu engelledim" (güvenli). "O beni engelledi" ASLA dönmez (G3).
    */
-  async getUserCard(callerId: string, targetId: string, guildId?: string): Promise<UserProfileCardDto> {
+  async getUserCard(
+    callerId: string,
+    targetId: string,
+    guildId?: string,
+  ): Promise<UserProfileCardDto> {
     if (callerId === targetId) {
       const me = await this.prisma.user.findUnique({
         where: { id: callerId, deletedAt: null },
-        select: { id: true, username: true, avatarUrl: true, bannerUrl: true, bio: true, bannerColor: true, createdAt: true },
+        select: {
+          id: true,
+          username: true,
+          avatarUrl: true,
+          bannerUrl: true,
+          bio: true,
+          bannerColor: true,
+          createdAt: true,
+        },
       });
-      if (!me) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+      if (!me)
+        throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
       return {
         id: me.id,
         username: me.username,
@@ -106,83 +119,94 @@ export class UsersService {
 
     const target = await this.prisma.user.findUnique({
       where: { id: targetId, deletedAt: null },
-      select: { id: true, username: true, avatarUrl: true, bannerUrl: true, bio: true, bannerColor: true, createdAt: true },
+      select: {
+        id: true,
+        username: true,
+        avatarUrl: true,
+        bannerUrl: true,
+        bio: true,
+        bannerColor: true,
+        createdAt: true,
+      },
     });
-    if (!target) throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+    if (!target)
+      throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
 
     // Erişim kontrolü: ortak ortam VEYA ortak GROUP_DM üyeliği VEYA açık 1-1 DM kanalı (M3b §5.2)
     // VEYA ilişki (arkadaş/bekleyen/blok herhangi yönde)
-    const [sharedGuild, sharedGroupDm, sharedDm, friendship, callerBlock, targetBlock] = await Promise.all([
-      this.prisma.guildMember.findFirst({
-        where: {
-          userId: callerId,
-          guild: {
-            deletedAt: null,
-            members: { some: { userId: targetId } },
+    const [sharedGuild, sharedGroupDm, sharedDm, friendship, callerBlock, targetBlock] =
+      await Promise.all([
+        this.prisma.guildMember.findFirst({
+          where: {
+            userId: callerId,
+            guild: {
+              deletedAt: null,
+              members: { some: { userId: targetId } },
+            },
           },
-        },
-        select: { id: true },
-      }),
-      // M3b (PM yetkilendirmesi 2026-08-04): `deletedAt: null` — grup silindiğinde ChannelMember
-      // satırları kalıyor (dm.service `deleteGroupDm` yalnız kanalı soft-delete ediyor), kapı
-      // bunu süzmediği için silinmiş grubun üyeleri süresiz birbirinin kartını açabiliyordu.
-      // Artık DM kapısıyla tutarlı.
-      this.prisma.channelMember.findFirst({
-        where: {
-          userId: callerId,
-          channel: {
-            type: 'GROUP_DM',
-            deletedAt: null,
-            members: { some: { userId: targetId } },
+          select: { id: true },
+        }),
+        // M3b (PM yetkilendirmesi 2026-08-04): `deletedAt: null` — grup silindiğinde ChannelMember
+        // satırları kalıyor (dm.service `deleteGroupDm` yalnız kanalı soft-delete ediyor), kapı
+        // bunu süzmediği için silinmiş grubun üyeleri süresiz birbirinin kartını açabiliyordu.
+        // Artık DM kapısıyla tutarlı.
+        this.prisma.channelMember.findFirst({
+          where: {
+            userId: callerId,
+            channel: {
+              type: 'GROUP_DM',
+              deletedAt: null,
+              members: { some: { userId: targetId } },
+            },
           },
-        },
-        select: { id: true },
-      }),
-      // M3b §5.2 (R7): açık 1-1 DM kanalı. Yeni keşif yüzeyi DEĞİL — DM kanalı kurmak zaten
-      // canDm kapısından geçiyor. `deletedAt: null` şart: reddedilen/kapatılan istek kanalı
-      // (soft-delete) erişim vermeye devam etmemeli (fail-closed).
-      //
-      // C9 kısıtı (PM revizyonu 2026-08-04): isteği BAŞLATAN taraf, istek KABUL EDİLENE kadar
-      // erişim kazanmaz — aksi hâlde yabancı, tek taraflı istek atarak kart açardı. ALICI taraf
-      // kazanır; §5.2'nin varlık sebebi zaten alıcının gönderen kişiyi engelleyebilmesi.
-      // OR kolları null-güvenli pozitif eşitlik (bkz. friend-permission.service `dmRequestStatus`
-      // kolları + dm.service gelen-istek sorgusu): PENDING satırda `dmRequesterId` her zaman dolu.
-      this.prisma.channelMember.findFirst({
-        where: {
-          userId: callerId,
-          channel: {
-            type: 'DM',
-            deletedAt: null,
-            members: { some: { userId: targetId } },
+          select: { id: true },
+        }),
+        // M3b §5.2 (R7): açık 1-1 DM kanalı. Yeni keşif yüzeyi DEĞİL — DM kanalı kurmak zaten
+        // canDm kapısından geçiyor. `deletedAt: null` şart: reddedilen/kapatılan istek kanalı
+        // (soft-delete) erişim vermeye devam etmemeli (fail-closed).
+        //
+        // C9 kısıtı (PM revizyonu 2026-08-04): isteği BAŞLATAN taraf, istek KABUL EDİLENE kadar
+        // erişim kazanmaz — aksi hâlde yabancı, tek taraflı istek atarak kart açardı. ALICI taraf
+        // kazanır; §5.2'nin varlık sebebi zaten alıcının gönderen kişiyi engelleyebilmesi.
+        // OR kolları null-güvenli pozitif eşitlik (bkz. friend-permission.service `dmRequestStatus`
+        // kolları + dm.service gelen-istek sorgusu): PENDING satırda `dmRequesterId` her zaman dolu.
+        this.prisma.channelMember.findFirst({
+          where: {
+            userId: callerId,
+            channel: {
+              type: 'DM',
+              deletedAt: null,
+              members: { some: { userId: targetId } },
+              OR: [
+                { dmRequestStatus: null }, // legacy/normal DM — kabul edilmiş sayılır
+                { dmRequestStatus: 'ACCEPTED' },
+                { dmRequestStatus: 'PENDING', dmRequesterId: { not: callerId } }, // yalnız alıcı taraf
+              ],
+            },
+          },
+          select: { id: true },
+        }),
+        this.prisma.friendship.findFirst({
+          where: {
             OR: [
-              { dmRequestStatus: null }, // legacy/normal DM — kabul edilmiş sayılır
-              { dmRequestStatus: 'ACCEPTED' },
-              { dmRequestStatus: 'PENDING', dmRequesterId: { not: callerId } }, // yalnız alıcı taraf
+              { requesterId: callerId, addresseeId: targetId },
+              { requesterId: targetId, addresseeId: callerId },
             ],
           },
-        },
-        select: { id: true },
-      }),
-      this.prisma.friendship.findFirst({
-        where: {
-          OR: [
-            { requesterId: callerId, addresseeId: targetId },
-            { requesterId: targetId, addresseeId: callerId },
-          ],
-        },
-        select: { id: true, status: true, requesterId: true, addresseeId: true },
-      }),
-      this.prisma.userBlock.findUnique({
-        where: { blockerId_blockedId: { blockerId: callerId, blockedId: targetId } },
-        select: { id: true },
-      }),
-      this.prisma.userBlock.findUnique({
-        where: { blockerId_blockedId: { blockerId: targetId, blockedId: callerId } },
-        select: { id: true },
-      }),
-    ]);
+          select: { id: true, status: true, requesterId: true, addresseeId: true },
+        }),
+        this.prisma.userBlock.findUnique({
+          where: { blockerId_blockedId: { blockerId: callerId, blockedId: targetId } },
+          select: { id: true },
+        }),
+        this.prisma.userBlock.findUnique({
+          where: { blockerId_blockedId: { blockerId: targetId, blockedId: callerId } },
+          select: { id: true },
+        }),
+      ]);
 
-    const hasRelation = sharedGuild || sharedGroupDm || sharedDm || friendship || callerBlock || targetBlock;
+    const hasRelation =
+      sharedGuild || sharedGroupDm || sharedDm || friendship || callerBlock || targetBlock;
     if (!hasRelation) {
       throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
     }
@@ -223,10 +247,16 @@ export class UsersService {
     // arkadaş/sunucularıyla kesişim; minör/yaş alanı hiçbir şekilde dönmez).
     // C10: canMessage (inline kutu kapısı), roller (guild bağlamında) ve ses durumu paralel toplanır.
     const [mutualFriends, mutualGuilds, canDm, roles, voiceStatus] = await Promise.all([
-      canSeeMutuals ? this.getMutualFriends(callerId, targetId) : Promise.resolve<MutualFriendDto[]>([]),
-      canSeeMutuals ? this.getMutualGuilds(callerId, targetId) : Promise.resolve<MutualGuildDto[]>([]),
+      canSeeMutuals
+        ? this.getMutualFriends(callerId, targetId)
+        : Promise.resolve<MutualFriendDto[]>([]),
+      canSeeMutuals
+        ? this.getMutualGuilds(callerId, targetId)
+        : Promise.resolve<MutualGuildDto[]>([]),
       this.dmPermission.canDm(callerId, targetId),
-      guildId ? this.getGuildRoles(guildId, targetId, callerId) : Promise.resolve<UserCardRoleDto[]>([]),
+      guildId
+        ? this.getGuildRoles(guildId, targetId, callerId)
+        : Promise.resolve<UserCardRoleDto[]>([]),
       this.getVoiceStatus(callerId, targetId),
     ]);
 
@@ -253,7 +283,11 @@ export class UsersService {
    * yüksekten alçağa. Erişim kapısı: caller o ortamın ÜYESİ değilse [] (rol ifşası yalnız üyelere).
    * Hedef üye değilse (kart başka bağlamdan açıldıysa) []. Yeni sızıntı yok — üye listesi rolleri zaten görünür.
    */
-  private async getGuildRoles(guildId: string, targetId: string, callerId: string): Promise<UserCardRoleDto[]> {
+  private async getGuildRoles(
+    guildId: string,
+    targetId: string,
+    callerId: string,
+  ): Promise<UserCardRoleDto[]> {
     const callerMember = await this.prisma.guildMember.findUnique({
       where: { guildId_userId: { guildId, userId: callerId } },
       select: { id: true },
@@ -264,7 +298,11 @@ export class UsersService {
       where: { guildId_userId: { guildId, userId: targetId } },
       select: {
         roleLinks: {
-          select: { role: { select: { id: true, name: true, color: true, position: true, isEveryone: true } } },
+          select: {
+            role: {
+              select: { id: true, name: true, color: true, position: true, isEveryone: true },
+            },
+          },
         },
       },
     });
@@ -282,9 +320,16 @@ export class UsersService {
    * LiveKit `captureVoiceContext` ile GERÇEKTEN içeride mi + yayın (ekran/kamera) doğrulanır (bayat oturum düzeltilir).
    * Erişim kapısı: caller o ortamın üyesi değilse null. Ses katılımcı listesi zaten üyelere görünür → yeni ifşa yok.
    */
-  private async getVoiceStatus(callerId: string, targetId: string): Promise<UserCardVoiceDto | null> {
+  private async getVoiceStatus(
+    callerId: string,
+    targetId: string,
+  ): Promise<UserCardVoiceDto | null> {
     const session = await this.prisma.voiceSession.findFirst({
-      where: { userId: targetId, leftAt: null, channel: { guildId: { not: null }, deletedAt: null } },
+      where: {
+        userId: targetId,
+        leftAt: null,
+        channel: { guildId: { not: null }, deletedAt: null },
+      },
       orderBy: { joinedAt: 'desc' },
       select: {
         channelId: true,
@@ -368,7 +413,11 @@ export class UsersService {
    * set-endpoint ortak mantığı (avatar/banner): storageKey null → kaldır (null döner).
    * storageKey verilmişse → uploadsEnabled savunma-derinliği + prefix doğrulaması + public URL.
    */
-  private resolveMediaUrl(userId: string, dto: SetMediaDto, prefix: 'avatars' | 'banners'): string | null {
+  private resolveMediaUrl(
+    userId: string,
+    dto: SetMediaDto,
+    prefix: 'avatars' | 'banners',
+  ): string | null {
     if (dto.storageKey == null) return null;
     // Savunma-derinliği (D14 dersi): yükleme kapalıyken yeni görsel SET edilemez; kaldırma serbest.
     this.imageUpload.assertUploadsEnabled();

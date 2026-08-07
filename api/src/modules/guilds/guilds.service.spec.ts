@@ -257,7 +257,7 @@ describe('GuildsService.presignIcon', () => {
     prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
 
     const dto: PresignIconDto = { contentType: 'image/webp' };
-    const result = await service.presignIcon(OWNER_ID, GUILD_ID, dto) as { storageKey: string };
+    const result = (await service.presignIcon(OWNER_ID, GUILD_ID, dto)) as { storageKey: string };
 
     expect(result.storageKey).toMatch(/\.webp$/);
   });
@@ -329,7 +329,7 @@ describe('GuildsService.setIcon', () => {
 
     const dto: SetIconDto = { storageKey };
 
-    const result = await service.setIcon(OWNER_ID, GUILD_ID, dto) as { iconUrl: string | null };
+    const result = (await service.setIcon(OWNER_ID, GUILD_ID, dto)) as { iconUrl: string | null };
 
     expect(prismaMock.guild.update).toHaveBeenCalledWith({
       where: { id: GUILD_ID },
@@ -380,7 +380,7 @@ describe('GuildsService.setIcon', () => {
 
     const dto: SetIconDto = { storageKey: null };
 
-    const result = await service.setIcon(OWNER_ID, GUILD_ID, dto) as { iconUrl: string | null };
+    const result = (await service.setIcon(OWNER_ID, GUILD_ID, dto)) as { iconUrl: string | null };
 
     expect(prismaMock.guild.update).toHaveBeenCalledWith({
       where: { id: GUILD_ID },
@@ -396,7 +396,7 @@ describe('GuildsService.setIcon', () => {
 
     const dto: SetIconDto = {};
 
-    const result = await service.setIcon(OWNER_ID, GUILD_ID, dto) as { iconUrl: string | null };
+    const result = (await service.setIcon(OWNER_ID, GUILD_ID, dto)) as { iconUrl: string | null };
 
     expect(prismaMock.guild.update).toHaveBeenCalledWith({
       where: { id: GUILD_ID },
@@ -522,7 +522,9 @@ describe('GuildsService.setBanner', () => {
       key === 'uploadsEnabled' ? false : 'http://localhost:9000/kankaverse',
     );
 
-    const result = (await service.setBanner(OWNER_ID, GUILD_ID, { storageKey: null })) as { bannerUrl: string | null };
+    const result = (await service.setBanner(OWNER_ID, GUILD_ID, { storageKey: null })) as {
+      bannerUrl: string | null;
+    };
     expect(result.bannerUrl).toBeNull();
   });
 
@@ -534,7 +536,9 @@ describe('GuildsService.setBanner', () => {
     prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
     prismaMock.guild.update.mockResolvedValue({ ...GUILD_FIXTURE, bannerUrl: expectedBannerUrl });
 
-    const result = await service.setBanner(OWNER_ID, GUILD_ID, { storageKey }) as { bannerUrl: string | null };
+    const result = (await service.setBanner(OWNER_ID, GUILD_ID, { storageKey })) as {
+      bannerUrl: string | null;
+    };
 
     expect(prismaMock.guild.update).toHaveBeenCalledWith({
       where: { id: GUILD_ID },
@@ -548,7 +552,9 @@ describe('GuildsService.setBanner', () => {
     prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
     prismaMock.guild.update.mockResolvedValue({ ...GUILD_FIXTURE, bannerUrl: null });
 
-    const result = await service.setBanner(OWNER_ID, GUILD_ID, { storageKey: null }) as { bannerUrl: string | null };
+    const result = (await service.setBanner(OWNER_ID, GUILD_ID, { storageKey: null })) as {
+      bannerUrl: string | null;
+    };
 
     expect(prismaMock.guild.update).toHaveBeenCalledWith({
       where: { id: GUILD_ID },
@@ -633,9 +639,7 @@ describe('GuildsService.findMyGuilds — unreadCount', () => {
   });
 
   it('kanalı olmayan guild → unreadCount 0', async () => {
-    prismaMock.guildMember.findMany.mockResolvedValue([
-      makeGuildWithChannels([]),
-    ]);
+    prismaMock.guildMember.findMany.mockResolvedValue([makeGuildWithChannels([])]);
 
     const result = await service.findMyGuilds(OWNER_ID);
     expect(result[0].unreadCount).toBe(0);
@@ -700,7 +704,13 @@ describe('GuildsService.findMyGuilds — kanal bazlı bildirim tercihi süzgeci 
 
   it('level=MENTIONS → unread sayılmaz, mention sayılır', async () => {
     prismaMock.notificationPref.findMany.mockResolvedValue([
-      { targetType: 'CHANNEL', targetId: 'ch-1', muted: false, mutedUntil: null, level: 'MENTIONS' },
+      {
+        targetType: 'CHANNEL',
+        targetId: 'ch-1',
+        muted: false,
+        mutedUntil: null,
+        level: 'MENTIONS',
+      },
     ]);
 
     const result = await service.findMyGuilds(OWNER_ID);
@@ -775,12 +785,19 @@ describe('GuildsService.create — varsayılan kategori', () => {
       guild: { create: jest.fn().mockResolvedValue(GUILD_FIXTURE) },
       guildMember: { create: jest.fn().mockResolvedValue({}) },
       channelCategory: {
-        create: jest.fn().mockResolvedValue({ id: CATEGORY_ID, name: 'Metin Kanalları', position: 0, guildId: GUILD_ID }),
+        create: jest.fn().mockResolvedValue({
+          id: CATEGORY_ID,
+          name: 'Metin Kanalları',
+          position: 0,
+          guildId: GUILD_ID,
+        }),
       },
       channel: { create: jest.fn().mockResolvedValue({}) },
       role: { create: jest.fn().mockResolvedValue({}) },
     };
-    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock));
+    prismaMock.$transaction.mockImplementation(
+      async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock),
+    );
 
     await service.create(OWNER_ID, { name: 'Test Ortamı' });
 
@@ -811,7 +828,9 @@ describe('GuildsService.create — varsayılan kategori', () => {
       channel: { create: jest.fn().mockResolvedValue({}) },
       role: { create: jest.fn().mockResolvedValue({}) },
     };
-    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock));
+    prismaMock.$transaction.mockImplementation(
+      async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock),
+    );
 
     const result = await service.create(OWNER_ID, { name: 'Test Ortamı' });
 
@@ -822,7 +841,7 @@ describe('GuildsService.create — varsayılan kategori', () => {
     });
   });
 
-  it('varsayılan kanal categoryId = oluşturulan kategorinin id\'si', async () => {
+  it("varsayılan kanal categoryId = oluşturulan kategorinin id'si", async () => {
     const dynamicCatId = 'dyn-cat-999';
     const txMock = {
       guild: { create: jest.fn().mockResolvedValue(GUILD_FIXTURE) },
@@ -831,7 +850,9 @@ describe('GuildsService.create — varsayılan kategori', () => {
       channel: { create: jest.fn().mockResolvedValue({}) },
       role: { create: jest.fn().mockResolvedValue({}) },
     };
-    prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock));
+    prismaMock.$transaction.mockImplementation(
+      async (fn: (tx: typeof txMock) => Promise<unknown>) => fn(txMock),
+    );
 
     await service.create(OWNER_ID, { name: 'Yeni Ortam' });
 
@@ -860,7 +881,10 @@ describe('GuildsService.deleteGuild — §A', () => {
 
     expect(result).toBeNull();
     expect(prismaMock.guild.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: GUILD_ID }, data: expect.objectContaining({ deletedAt: expect.any(Date) }) }),
+      expect.objectContaining({
+        where: { id: GUILD_ID },
+        data: expect.objectContaining({ deletedAt: expect.any(Date) }),
+      }),
     );
   });
 
@@ -878,7 +902,9 @@ describe('GuildsService.deleteGuild — §A', () => {
     prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
     prismaMock.guildMember.findUnique.mockResolvedValue(MEMBER_MEMBERSHIP);
 
-    await expect(service.deleteGuild(MEMBER_ID, GUILD_ID)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.deleteGuild(MEMBER_ID, GUILD_ID)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
     expect(prismaMock.guild.update).not.toHaveBeenCalled();
   });
 
@@ -894,8 +920,18 @@ describe('GuildsService.deleteGuild — §A', () => {
 
 const ADMIN_ID = 'user-admin';
 const ADMIN_MEMBERSHIP = { id: 'gm-admin', guildId: GUILD_ID, userId: ADMIN_ID, role: 'ADMIN' };
-const MEMBER_MEMBERSHIP_WITH_ID = { id: 'gm-member', guildId: GUILD_ID, userId: MEMBER_ID, role: 'MEMBER' };
-const OWNER_MEMBERSHIP_WITH_ID = { id: 'gm-owner', guildId: GUILD_ID, userId: OWNER_ID, role: 'OWNER' };
+const MEMBER_MEMBERSHIP_WITH_ID = {
+  id: 'gm-member',
+  guildId: GUILD_ID,
+  userId: MEMBER_ID,
+  role: 'MEMBER',
+};
+const OWNER_MEMBERSHIP_WITH_ID = {
+  id: 'gm-owner',
+  guildId: GUILD_ID,
+  userId: OWNER_ID,
+  role: 'OWNER',
+};
 
 const USER_ADMIN = { id: ADMIN_ID, username: 'admin-user', avatarUrl: null };
 const USER_MEMBER = { id: MEMBER_ID, username: 'member-user', avatarUrl: null };
@@ -911,16 +947,18 @@ describe('GuildsService.updateMemberRole — §B (R7)', () => {
 
   // ── Başarılı senaryolar ───────────────────────────────────────────────────
 
-  it('OWNER → MEMBER\'ı ADMIN\'e yükseltir; güncel üye DTO döner', async () => {
+  it("OWNER → MEMBER'ı ADMIN'e yükseltir; güncel üye DTO döner", async () => {
     prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
     prismaMock.guildMember.findUnique
-      .mockResolvedValueOnce(OWNER_MEMBERSHIP_WITH_ID)            // requireOwner actor kontrolü
+      .mockResolvedValueOnce(OWNER_MEMBERSHIP_WITH_ID) // requireOwner actor kontrolü
       .mockResolvedValueOnce({ ...MEMBER_MEMBERSHIP_WITH_ID, user: USER_MEMBER }); // hedef
 
     const updatedMember = { ...MEMBER_MEMBERSHIP_WITH_ID, role: 'ADMIN', user: USER_MEMBER };
     prismaMock.guildMember.update.mockResolvedValue(updatedMember);
 
-    const result = await service.updateMemberRole(OWNER_ID, GUILD_ID, MEMBER_ID, { role: AssignableGuildRole.ADMIN });
+    const result = await service.updateMemberRole(OWNER_ID, GUILD_ID, MEMBER_ID, {
+      role: AssignableGuildRole.ADMIN,
+    });
 
     expect(prismaMock.guildMember.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -932,7 +970,7 @@ describe('GuildsService.updateMemberRole — §B (R7)', () => {
     expect(result.userId).toBe(MEMBER_ID);
   });
 
-  it('OWNER → ADMIN\'i MEMBER\'a düşürür', async () => {
+  it("OWNER → ADMIN'i MEMBER'a düşürür", async () => {
     prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
     prismaMock.guildMember.findUnique
       .mockResolvedValueOnce(OWNER_MEMBERSHIP_WITH_ID)
@@ -941,7 +979,9 @@ describe('GuildsService.updateMemberRole — §B (R7)', () => {
     const updatedMember = { ...ADMIN_MEMBERSHIP, role: 'MEMBER', user: USER_ADMIN };
     prismaMock.guildMember.update.mockResolvedValue(updatedMember);
 
-    const result = await service.updateMemberRole(OWNER_ID, GUILD_ID, ADMIN_ID, { role: AssignableGuildRole.MEMBER });
+    const result = await service.updateMemberRole(OWNER_ID, GUILD_ID, ADMIN_ID, {
+      role: AssignableGuildRole.MEMBER,
+    });
 
     expect(result.role).toBe('MEMBER');
   });
@@ -955,7 +995,9 @@ describe('GuildsService.updateMemberRole — §B (R7)', () => {
     const updatedMember = { ...ADMIN_MEMBERSHIP, role: 'ADMIN', user: USER_ADMIN };
     prismaMock.guildMember.update.mockResolvedValue(updatedMember);
 
-    const result = await service.updateMemberRole(OWNER_ID, GUILD_ID, ADMIN_ID, { role: AssignableGuildRole.ADMIN });
+    const result = await service.updateMemberRole(OWNER_ID, GUILD_ID, ADMIN_ID, {
+      role: AssignableGuildRole.ADMIN,
+    });
     expect(result.role).toBe('ADMIN');
     expect(prismaMock.guildMember.update).toHaveBeenCalledTimes(1);
   });
@@ -977,11 +1019,16 @@ describe('GuildsService.updateMemberRole — §B (R7)', () => {
     prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
     prismaMock.guildMember.findUnique
       .mockResolvedValueOnce(OWNER_MEMBERSHIP_WITH_ID)
-      .mockResolvedValueOnce({ ...OWNER_MEMBERSHIP_WITH_ID, user: { id: OWNER_ID, username: 'owner', avatarUrl: null } });
+      .mockResolvedValueOnce({
+        ...OWNER_MEMBERSHIP_WITH_ID,
+        user: { id: OWNER_ID, username: 'owner', avatarUrl: null },
+      });
 
     await expect(
       service.updateMemberRole(OWNER_ID, GUILD_ID, OWNER_ID, { role: AssignableGuildRole.MEMBER }),
-    ).rejects.toMatchObject({ response: expect.objectContaining({ error: 'CANNOT_MODIFY_OWNER' }) });
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'CANNOT_MODIFY_OWNER' }),
+    });
 
     expect(prismaMock.guildMember.update).not.toHaveBeenCalled();
   });
@@ -993,7 +1040,9 @@ describe('GuildsService.updateMemberRole — §B (R7)', () => {
       .mockResolvedValueOnce(null); // hedef bulunamadı
 
     await expect(
-      service.updateMemberRole(OWNER_ID, GUILD_ID, 'unknown-user', { role: AssignableGuildRole.ADMIN }),
+      service.updateMemberRole(OWNER_ID, GUILD_ID, 'unknown-user', {
+        role: AssignableGuildRole.ADMIN,
+      }),
     ).rejects.toMatchObject({ response: expect.objectContaining({ error: 'NOT_GUILD_MEMBER' }) });
   });
 
@@ -1003,9 +1052,15 @@ describe('GuildsService.updateMemberRole — §B (R7)', () => {
       .mockResolvedValueOnce(OWNER_MEMBERSHIP_WITH_ID)
       .mockResolvedValueOnce({ ...MEMBER_MEMBERSHIP_WITH_ID, user: USER_MEMBER });
 
-    prismaMock.guildMember.update.mockResolvedValue({ ...MEMBER_MEMBERSHIP_WITH_ID, role: 'ADMIN', user: USER_MEMBER });
+    prismaMock.guildMember.update.mockResolvedValue({
+      ...MEMBER_MEMBERSHIP_WITH_ID,
+      role: 'ADMIN',
+      user: USER_MEMBER,
+    });
 
-    await service.updateMemberRole(OWNER_ID, GUILD_ID, MEMBER_ID, { role: AssignableGuildRole.ADMIN });
+    await service.updateMemberRole(OWNER_ID, GUILD_ID, MEMBER_ID, {
+      role: AssignableGuildRole.ADMIN,
+    });
 
     expect(prismaMock.auditLog.create).toHaveBeenCalledTimes(1);
     const auditCall = prismaMock.auditLog.create.mock.calls[0][0];
@@ -1033,7 +1088,12 @@ describe('GuildsService.kickMember — §C (R7)', () => {
 
   function mockActorRole(role: 'OWNER' | 'ADMIN' | 'MEMBER') {
     const actorId = role === 'OWNER' ? OWNER_ID : role === 'ADMIN' ? ADMIN_ID : MEMBER_ID;
-    const membershipRecord = { id: `gm-${role.toLowerCase()}`, guildId: GUILD_ID, userId: actorId, role };
+    const membershipRecord = {
+      id: `gm-${role.toLowerCase()}`,
+      guildId: GUILD_ID,
+      userId: actorId,
+      role,
+    };
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD_FIXTURE,
       membership: membershipRecord,
@@ -1051,10 +1111,7 @@ describe('GuildsService.kickMember — §C (R7)', () => {
   }
 
   function mockChannels() {
-    prismaMock.channel.findMany.mockResolvedValue([
-      { id: 'ch-1' },
-      { id: 'ch-2' },
-    ]);
+    prismaMock.channel.findMany.mockResolvedValue([{ id: 'ch-1' }, { id: 'ch-2' }]);
   }
 
   // ── OWNER başarılı senaryolar ─────────────────────────────────────────────
@@ -1228,23 +1285,36 @@ describe('GuildsService — ortam yönetimi (leave/transfer/ban)', () => {
 
   // leaveGuild
   it('leaveGuild: OWNER ayrılamaz → OWNER_CANNOT_LEAVE', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD_FIXTURE, membership: { role: 'OWNER', userId: OWNER_ID } });
-    await expect(service.leaveGuild(OWNER_ID, GUILD_ID)).rejects.toMatchObject({ response: { error: 'OWNER_CANNOT_LEAVE' } });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: { role: 'OWNER', userId: OWNER_ID },
+    });
+    await expect(service.leaveGuild(OWNER_ID, GUILD_ID)).rejects.toMatchObject({
+      response: { error: 'OWNER_CANNOT_LEAVE' },
+    });
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it('leaveGuild: MEMBER ayrılır → null + member_left', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD_FIXTURE, membership: { role: 'MEMBER', userId: MEMBER_ID } });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: { role: 'MEMBER', userId: MEMBER_ID },
+    });
     const r = await service.leaveGuild(MEMBER_ID, GUILD_ID);
     expect(r).toBeNull();
-    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith(expect.any(Array), 'guild.member_left', { guildId: GUILD_ID, userId: MEMBER_ID });
+    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith(expect.any(Array), 'guild.member_left', {
+      guildId: GUILD_ID,
+      userId: MEMBER_ID,
+    });
   });
 
   // transferOwnership
   it('transferOwnership: OWNER değil → FORBIDDEN', async () => {
     prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
     prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'ADMIN', userId: ADMIN_ID });
-    await expect(service.transferOwnership(ADMIN_ID, GUILD_ID, MEMBER_ID)).rejects.toMatchObject({ response: { error: 'FORBIDDEN' } });
+    await expect(service.transferOwnership(ADMIN_ID, GUILD_ID, MEMBER_ID)).rejects.toMatchObject({
+      response: { error: 'FORBIDDEN' },
+    });
   });
 
   it('transferOwnership: hedef üye değil → NOT_GUILD_MEMBER', async () => {
@@ -1252,7 +1322,9 @@ describe('GuildsService — ortam yönetimi (leave/transfer/ban)', () => {
     prismaMock.guildMember.findUnique
       .mockResolvedValueOnce({ role: 'OWNER', userId: OWNER_ID })
       .mockResolvedValueOnce(null);
-    await expect(service.transferOwnership(OWNER_ID, GUILD_ID, 'ghost')).rejects.toMatchObject({ response: { error: 'NOT_GUILD_MEMBER' } });
+    await expect(service.transferOwnership(OWNER_ID, GUILD_ID, 'ghost')).rejects.toMatchObject({
+      response: { error: 'NOT_GUILD_MEMBER' },
+    });
   });
 
   it('transferOwnership: başarı → null', async () => {
@@ -1271,33 +1343,63 @@ describe('GuildsService — ortam yönetimi (leave/transfer/ban)', () => {
 
   // banMember
   it('banMember: BAN_MEMBERS izni yok → FORBIDDEN', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD_FIXTURE, membership: { role: 'MEMBER', userId: MEMBER_ID } });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: { role: 'MEMBER', userId: MEMBER_ID },
+    });
     permissionsMock.hasGuildPermission.mockResolvedValueOnce(false);
-    await expect(service.banMember(MEMBER_ID, GUILD_ID, 'other-user')).rejects.toMatchObject({ response: { error: 'FORBIDDEN' } });
+    await expect(service.banMember(MEMBER_ID, GUILD_ID, 'other-user')).rejects.toMatchObject({
+      response: { error: 'FORBIDDEN' },
+    });
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it('banMember: ADMIN, hedef ADMIN → hiyerarşi eşit → MEMBER_HIERARCHY (Faz 3)', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD_FIXTURE, membership: { role: 'ADMIN', userId: ADMIN_ID } });
-    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'ADMIN', userId: 'other-admin', id: 'gm-x' });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: { role: 'ADMIN', userId: ADMIN_ID },
+    });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      role: 'ADMIN',
+      userId: 'other-admin',
+      id: 'gm-x',
+    });
     permissionsMock.requireMemberHierarchy.mockRejectedValueOnce(
       Object.assign(new (require('@nestjs/common').ForbiddenException)(), {
         response: { error: 'MEMBER_HIERARCHY' },
       }),
     );
-    await expect(service.banMember(ADMIN_ID, GUILD_ID, 'other-admin')).rejects.toMatchObject({ response: { error: 'MEMBER_HIERARCHY' } });
+    await expect(service.banMember(ADMIN_ID, GUILD_ID, 'other-admin')).rejects.toMatchObject({
+      response: { error: 'MEMBER_HIERARCHY' },
+    });
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it('banMember: hedef OWNER → CANNOT_BAN_OWNER', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD_FIXTURE, membership: { role: 'ADMIN', userId: ADMIN_ID } });
-    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'OWNER', userId: OWNER_ID, id: 'gm-o' });
-    await expect(service.banMember(ADMIN_ID, GUILD_ID, OWNER_ID)).rejects.toMatchObject({ response: { error: 'CANNOT_BAN_OWNER' } });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: { role: 'ADMIN', userId: ADMIN_ID },
+    });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      role: 'OWNER',
+      userId: OWNER_ID,
+      id: 'gm-o',
+    });
+    await expect(service.banMember(ADMIN_ID, GUILD_ID, OWNER_ID)).rejects.toMatchObject({
+      response: { error: 'CANNOT_BAN_OWNER' },
+    });
   });
 
   it('banMember: OWNER → MEMBER yasaklar → null + tx (GuildBan upsert dahil)', async () => {
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD_FIXTURE, membership: { role: 'OWNER', userId: OWNER_ID } });
-    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER', userId: MEMBER_ID, id: 'gm-m' });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: { role: 'OWNER', userId: OWNER_ID },
+    });
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      role: 'MEMBER',
+      userId: MEMBER_ID,
+      id: 'gm-m',
+    });
     const r = await service.banMember(OWNER_ID, GUILD_ID, MEMBER_ID, 'spam');
     expect(r).toBeNull();
     expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
@@ -1312,7 +1414,10 @@ describe('GuildsService.update — C6 (discoverable/tags/bannerColor)', () => {
     resetMocks();
     service = makeService();
     prismaMock.guild.findUnique.mockResolvedValue(GUILD_FIXTURE);
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD_FIXTURE, membership: { role: 'OWNER', userId: OWNER_ID } });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_FIXTURE,
+      membership: { role: 'OWNER', userId: OWNER_ID },
+    });
     permissionsMock.hasGuildPermission.mockResolvedValue(true);
   });
 
@@ -1326,7 +1431,9 @@ describe('GuildsService.update — C6 (discoverable/tags/bannerColor)', () => {
     // 'Oyun'→'oyun' (tekil), 'muzik', 'sohbet'; boşlar atılır
     expect(result.tags).toEqual(['oyun', 'muzik', 'sohbet']);
     expect(prismaMock.guild.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ tags: ['oyun', 'muzik', 'sohbet'] }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ tags: ['oyun', 'muzik', 'sohbet'] }),
+      }),
     );
   });
 
@@ -1334,7 +1441,10 @@ describe('GuildsService.update — C6 (discoverable/tags/bannerColor)', () => {
     prismaMock.guild.update.mockImplementation(({ data }: any) =>
       Promise.resolve({ ...GUILD_FIXTURE, ...data }),
     );
-    const result = await service.update(OWNER_ID, GUILD_ID, { discoverable: true, bannerColor: 'blue' });
+    const result = await service.update(OWNER_ID, GUILD_ID, {
+      discoverable: true,
+      bannerColor: 'blue',
+    });
     expect(result.discoverable).toBe(true);
     expect(result.bannerColor).toBe('blue');
     const callData = prismaMock.guild.update.mock.calls[0][0].data;
@@ -1357,33 +1467,43 @@ describe('GuildsService.joinDiscovery — C6 (discoverable + Sprint 7A gate)', (
 
   it('discoverable değil → 403 NOT_DISCOVERABLE', async () => {
     prismaMock.guild.findUnique.mockResolvedValue({ ...GUILD_FIXTURE, discoverable: false });
-    await expect(service.joinDiscovery('user1', GUILD_ID)).rejects.toMatchObject({ response: { error: 'NOT_DISCOVERABLE' } });
+    await expect(service.joinDiscovery('user1', GUILD_ID)).rejects.toMatchObject({
+      response: { error: 'NOT_DISCOVERABLE' },
+    });
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it('guild yok → 403 NOT_DISCOVERABLE', async () => {
     prismaMock.guild.findUnique.mockResolvedValue(null);
-    await expect(service.joinDiscovery('user1', GUILD_ID)).rejects.toMatchObject({ response: { error: 'NOT_DISCOVERABLE' } });
+    await expect(service.joinDiscovery('user1', GUILD_ID)).rejects.toMatchObject({
+      response: { error: 'NOT_DISCOVERABLE' },
+    });
   });
 
   it('[R7] adultsOnly + minör → 403 AGE_RESTRICTED (Sprint 7A gate miras)', async () => {
     prismaMock.guild.findUnique.mockResolvedValue(DISCOVERABLE_ADULTS);
     prismaMock.user.findUnique.mockResolvedValue({ isMinor: true });
-    await expect(service.joinDiscovery('minor1', 'guild-adults')).rejects.toMatchObject({ response: { error: 'AGE_RESTRICTED' } });
+    await expect(service.joinDiscovery('minor1', 'guild-adults')).rejects.toMatchObject({
+      response: { error: 'AGE_RESTRICTED' },
+    });
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it('[ban] yasaklı kullanıcı → 403 GUILD_BANNED (Sprint 7A gate miras)', async () => {
     prismaMock.guild.findUnique.mockResolvedValue(DISCOVERABLE_GUILD);
     prismaMock.guildBan.findUnique.mockResolvedValue({ guildId: GUILD_ID, userId: 'user1' });
-    await expect(service.joinDiscovery('user1', GUILD_ID)).rejects.toMatchObject({ response: { error: 'GUILD_BANNED' } });
+    await expect(service.joinDiscovery('user1', GUILD_ID)).rejects.toMatchObject({
+      response: { error: 'GUILD_BANNED' },
+    });
     expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
   it('zaten üye → 409 ALREADY_MEMBER', async () => {
     prismaMock.guild.findUnique.mockResolvedValue(DISCOVERABLE_GUILD);
     prismaMock.guildMember.findUnique.mockResolvedValue({ id: 'gm1' });
-    await expect(service.joinDiscovery('user1', GUILD_ID)).rejects.toMatchObject({ response: { error: 'ALREADY_MEMBER' } });
+    await expect(service.joinDiscovery('user1', GUILD_ID)).rejects.toMatchObject({
+      response: { error: 'ALREADY_MEMBER' },
+    });
   });
 
   it('başarılı join → GuildDto + tx (üye create) + realtime member_joined', async () => {
@@ -1429,10 +1549,7 @@ describe('GuildsService.findMyGuilds — @everyone bastırma rail rozeti (R14)',
 
     // ikinci message.count çağrısı mention sayımı
     const mentionWhere = prismaMock.message.count.mock.calls[1][0].where;
-    expect(mentionWhere.OR).toEqual([
-      { mentions: { has: OWNER_ID } },
-      { mentionsEveryone: true },
-    ]);
+    expect(mentionWhere.OR).toEqual([{ mentions: { has: OWNER_ID } }, { mentionsEveryone: true }]);
   });
 
   it('suppressEveryone=true → @everyone dalı DÜŞER, doğrudan bahsetme kalır', async () => {
@@ -1479,6 +1596,8 @@ describe('GuildsService.findMyGuilds — @everyone bastırma rail rozeti (R14)',
     await service.findMyGuilds(OWNER_ID);
 
     expect(prismaMock.notificationPref.findMany).toHaveBeenCalledTimes(1);
-    expect(prismaMock.notificationPref.findMany).toHaveBeenCalledWith({ where: { userId: OWNER_ID } });
+    expect(prismaMock.notificationPref.findMany).toHaveBeenCalledWith({
+      where: { userId: OWNER_ID },
+    });
   });
 });

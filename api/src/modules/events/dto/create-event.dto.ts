@@ -1,11 +1,4 @@
-import {
-  IsString,
-  IsOptional,
-  IsEnum,
-  IsDateString,
-  Length,
-  MaxLength,
-} from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsDateString, Length, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventRecurrence } from '@prisma/client';
 
@@ -25,7 +18,10 @@ export class CreateEventDto {
   @Length(1, 100, { message: 'Etkinlik adı 1-100 karakter olmalıdır.' })
   name: string;
 
-  @ApiPropertyOptional({ example: 'Birlikte Among Us oynuyoruz.', description: 'Açıklama (markdown)' })
+  @ApiPropertyOptional({
+    example: 'Birlikte Among Us oynuyoruz.',
+    description: 'Açıklama (markdown)',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(1000, { message: 'Açıklama en fazla 1000 karakter olabilir.' })
@@ -35,12 +31,18 @@ export class CreateEventDto {
   @IsEnum(['VOICE_CHANNEL', 'EXTERNAL'] as const, { message: 'Geçersiz konum türü.' })
   locationType: 'VOICE_CHANNEL' | 'EXTERNAL';
 
-  @ApiPropertyOptional({ example: 'channel-id', description: 'Ses kanalı ID — VOICE_CHANNEL ise zorunlu' })
+  @ApiPropertyOptional({
+    example: 'channel-id',
+    description: 'Ses kanalı ID — VOICE_CHANNEL ise zorunlu',
+  })
   @IsOptional()
   @IsString()
   channelId?: string;
 
-  @ApiPropertyOptional({ example: 'Kadıköy Sahil', description: 'Dış konum (düz metin) — EXTERNAL ise zorunlu' })
+  @ApiPropertyOptional({
+    example: 'Kadıköy Sahil',
+    description: 'Dış konum (düz metin) — EXTERNAL ise zorunlu',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200, { message: 'Konum en fazla 200 karakter olabilir.' })
@@ -50,7 +52,10 @@ export class CreateEventDto {
   @IsDateString({}, { message: 'Geçerli bir başlangıç tarihi girin.' })
   startAt: string;
 
-  @ApiPropertyOptional({ example: '2026-06-20T21:00:00.000Z', description: 'Bitiş (ISO, opsiyonel, > startAt)' })
+  @ApiPropertyOptional({
+    example: '2026-06-20T21:00:00.000Z',
+    description: 'Bitiş (ISO, opsiyonel, > startAt)',
+  })
   @IsOptional()
   @IsDateString({}, { message: 'Geçerli bir bitiş tarihi girin.' })
   endAt?: string;

@@ -201,7 +201,11 @@ describe('MessagesGateway.notifyChannelActivity', () => {
     await gateway.notifyChannelActivity(CHANNEL_ID, makeMessageDto());
 
     // AUTHOR_ID'ye emit edilmemeli
-    expect(emitToUserMock).not.toHaveBeenCalledWith(AUTHOR_ID, expect.anything(), expect.anything());
+    expect(emitToUserMock).not.toHaveBeenCalledWith(
+      AUTHOR_ID,
+      expect.anything(),
+      expect.anything(),
+    );
     // MEMBER_1'e emit edilmeli
     expect(emitToUserMock).toHaveBeenCalledTimes(1);
     expect(emitToUserMock).toHaveBeenCalledWith(MEMBER_1_ID, 'channel.activity', expect.anything());
@@ -455,11 +459,13 @@ describe('MessagesGateway.notifyMentions', () => {
   const MENTIONED_USER_1 = 'user-mentioned-1';
   const MENTIONED_USER_2 = 'user-mentioned-2';
 
-  function makeMentionDto(overrides: Partial<{
-    mentions: string[];
-    authorId: string;
-    content: string;
-  }> = {}) {
+  function makeMentionDto(
+    overrides: Partial<{
+      mentions: string[];
+      authorId: string;
+      content: string;
+    }> = {},
+  ) {
     const authorId = overrides.authorId ?? AUTHOR_ID;
     const mentions = overrides.mentions ?? [MENTIONED_USER_1];
     const content = overrides.content ?? `<@${MENTIONED_USER_1}> buna bakabilir misin`;
@@ -490,7 +496,7 @@ describe('MessagesGateway.notifyMentions', () => {
 
   it('mentions undefined → erken çıkar, emit yapılmaz', async () => {
     const dto = makeMentionDto({ mentions: [] });
-    delete (dto as Record<string, unknown>)['mentions'];
+    delete dto['mentions'];
 
     await gateway.notifyMentions(CHANNEL_ID, dto);
 
@@ -505,11 +511,14 @@ describe('MessagesGateway.notifyMentions', () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: AUTHOR_ID, username: 'author' }]);
 
     // yazar kendini bahsediyor
-    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({
-      mentions: [AUTHOR_ID],
-      authorId: AUTHOR_ID,
-      content: `<@${AUTHOR_ID}> bla`,
-    }));
+    await gateway.notifyMentions(
+      CHANNEL_ID,
+      makeMentionDto({
+        mentions: [AUTHOR_ID],
+        authorId: AUTHOR_ID,
+        content: `<@${AUTHOR_ID}> bla`,
+      }),
+    );
 
     expect(emitToUserMock).not.toHaveBeenCalled();
   });
@@ -519,15 +528,16 @@ describe('MessagesGateway.notifyMentions', () => {
   // ─────────────────────────────────────────────────────────────────────────
   it('başarılı mention → bahsedilene §5 payload ile emit yapılır', async () => {
     prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID });
-    prismaMock.user.findMany.mockResolvedValue([
-      { id: MENTIONED_USER_1, username: 'kanka1' },
-    ]);
+    prismaMock.user.findMany.mockResolvedValue([{ id: MENTIONED_USER_1, username: 'kanka1' }]);
 
-    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({
-      mentions: [MENTIONED_USER_1],
-      authorId: AUTHOR_ID,
-      content: `<@${MENTIONED_USER_1}> buna bakar mısın`,
-    }));
+    await gateway.notifyMentions(
+      CHANNEL_ID,
+      makeMentionDto({
+        mentions: [MENTIONED_USER_1],
+        authorId: AUTHOR_ID,
+        content: `<@${MENTIONED_USER_1}> buna bakar mısın`,
+      }),
+    );
 
     expect(emitToUserMock).toHaveBeenCalledTimes(1);
     const [targetId, event, payload] = emitToUserMock.mock.calls[0];
@@ -546,14 +556,15 @@ describe('MessagesGateway.notifyMentions', () => {
   // ─────────────────────────────────────────────────────────────────────────
   it('DM kanalı → payload guildId=null', async () => {
     prismaMock.channel.findUnique.mockResolvedValue({ guildId: null });
-    prismaMock.user.findMany.mockResolvedValue([
-      { id: MENTIONED_USER_1, username: 'kanka1' },
-    ]);
+    prismaMock.user.findMany.mockResolvedValue([{ id: MENTIONED_USER_1, username: 'kanka1' }]);
 
-    await gateway.notifyMentions(DM_CHANNEL_ID, makeMentionDto({
-      mentions: [MENTIONED_USER_1],
-      authorId: AUTHOR_ID,
-    }));
+    await gateway.notifyMentions(
+      DM_CHANNEL_ID,
+      makeMentionDto({
+        mentions: [MENTIONED_USER_1],
+        authorId: AUTHOR_ID,
+      }),
+    );
 
     const [, , payload] = emitToUserMock.mock.calls[0];
     expect(payload.guildId).toBeNull();
@@ -568,10 +579,13 @@ describe('MessagesGateway.notifyMentions', () => {
       { id: MENTIONED_USER_1, username: 'kankakullanici' },
     ]);
 
-    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({
-      mentions: [MENTIONED_USER_1],
-      content: `<@${MENTIONED_USER_1}> selam`,
-    }));
+    await gateway.notifyMentions(
+      CHANNEL_ID,
+      makeMentionDto({
+        mentions: [MENTIONED_USER_1],
+        content: `<@${MENTIONED_USER_1}> selam`,
+      }),
+    );
 
     const [, , payload] = emitToUserMock.mock.calls[0];
     expect(payload.preview).toBe('@kankakullanici selam');
@@ -579,15 +593,16 @@ describe('MessagesGateway.notifyMentions', () => {
 
   it('preview: çözülemeyen token → @bilinmeyen', async () => {
     prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID });
-    prismaMock.user.findMany.mockResolvedValue([
-      { id: MENTIONED_USER_1, username: 'kanka1' },
-    ]);
+    prismaMock.user.findMany.mockResolvedValue([{ id: MENTIONED_USER_1, username: 'kanka1' }]);
     const UNKNOWN_ID = 'user-unknown-xyz';
 
-    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({
-      mentions: [MENTIONED_USER_1],
-      content: `<@${MENTIONED_USER_1}> ve <@${UNKNOWN_ID}>`,
-    }));
+    await gateway.notifyMentions(
+      CHANNEL_ID,
+      makeMentionDto({
+        mentions: [MENTIONED_USER_1],
+        content: `<@${MENTIONED_USER_1}> ve <@${UNKNOWN_ID}>`,
+      }),
+    );
 
     const [, , payload] = emitToUserMock.mock.calls[0];
     expect(payload.preview).toContain('@bilinmeyen');
@@ -596,15 +611,16 @@ describe('MessagesGateway.notifyMentions', () => {
 
   it('preview: 100 karakteri aşan içerik kesilir', async () => {
     prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID });
-    prismaMock.user.findMany.mockResolvedValue([
-      { id: MENTIONED_USER_1, username: 'k' },
-    ]);
+    prismaMock.user.findMany.mockResolvedValue([{ id: MENTIONED_USER_1, username: 'k' }]);
     const longContent = `<@${MENTIONED_USER_1}> ` + 'a'.repeat(200);
 
-    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({
-      mentions: [MENTIONED_USER_1],
-      content: longContent,
-    }));
+    await gateway.notifyMentions(
+      CHANNEL_ID,
+      makeMentionDto({
+        mentions: [MENTIONED_USER_1],
+        content: longContent,
+      }),
+    );
 
     const [, , payload] = emitToUserMock.mock.calls[0];
     expect(payload.preview.length).toBeLessThanOrEqual(100);
@@ -620,11 +636,14 @@ describe('MessagesGateway.notifyMentions', () => {
       { id: MENTIONED_USER_2, username: 'kanka2' },
     ]);
 
-    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({
-      mentions: [MENTIONED_USER_1, MENTIONED_USER_2],
-      authorId: AUTHOR_ID,
-      content: `<@${MENTIONED_USER_1}> ve <@${MENTIONED_USER_2}>`,
-    }));
+    await gateway.notifyMentions(
+      CHANNEL_ID,
+      makeMentionDto({
+        mentions: [MENTIONED_USER_1, MENTIONED_USER_2],
+        authorId: AUTHOR_ID,
+        content: `<@${MENTIONED_USER_1}> ve <@${MENTIONED_USER_2}>`,
+      }),
+    );
 
     expect(emitToUserMock).toHaveBeenCalledTimes(2);
     const targets = emitToUserMock.mock.calls.map((c) => c[0]);
@@ -643,11 +662,14 @@ describe('MessagesGateway.notifyMentions', () => {
       { id: MENTIONED_USER_2, username: 'kanka2' },
     ]);
 
-    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({
-      mentions: [MENTIONED_USER_1, MENTIONED_USER_2],
-      authorId: AUTHOR_ID,
-      content: `<@${MENTIONED_USER_1}> ve <@${MENTIONED_USER_2}>`,
-    }));
+    await gateway.notifyMentions(
+      CHANNEL_ID,
+      makeMentionDto({
+        mentions: [MENTIONED_USER_1, MENTIONED_USER_2],
+        authorId: AUTHOR_ID,
+        content: `<@${MENTIONED_USER_1}> ve <@${MENTIONED_USER_2}>`,
+      }),
+    );
 
     expect(notificationsCreateMock).toHaveBeenCalledTimes(2);
     const recipients = notificationsCreateMock.mock.calls.map((c) => c[0]);
@@ -666,11 +688,14 @@ describe('MessagesGateway.notifyMentions', () => {
     prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID });
     prismaMock.user.findMany.mockResolvedValue([{ id: AUTHOR_ID, username: 'author' }]);
 
-    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({
-      mentions: [AUTHOR_ID],
-      authorId: AUTHOR_ID,
-      content: `<@${AUTHOR_ID}> bla`,
-    }));
+    await gateway.notifyMentions(
+      CHANNEL_ID,
+      makeMentionDto({
+        mentions: [AUTHOR_ID],
+        authorId: AUTHOR_ID,
+        content: `<@${AUTHOR_ID}> bla`,
+      }),
+    );
 
     expect(notificationsCreateMock).not.toHaveBeenCalled();
   });
@@ -689,13 +714,20 @@ describe('MessagesGateway.notifyMentions', () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: MENTIONED_USER_1, username: 'kanka1' }]);
     notificationsShouldNotifyMock.mockResolvedValue(false);
 
-    await gateway.notifyMentions(CHANNEL_ID, makeMentionDto({
-      mentions: [MENTIONED_USER_1],
-      authorId: AUTHOR_ID,
-      content: `<@${MENTIONED_USER_1}> selam`,
-    }));
+    await gateway.notifyMentions(
+      CHANNEL_ID,
+      makeMentionDto({
+        mentions: [MENTIONED_USER_1],
+        authorId: AUTHOR_ID,
+        content: `<@${MENTIONED_USER_1}> selam`,
+      }),
+    );
 
-    expect(notificationsShouldNotifyMock).toHaveBeenCalledWith(MENTIONED_USER_1, GUILD_ID, CHANNEL_ID);
+    expect(notificationsShouldNotifyMock).toHaveBeenCalledWith(
+      MENTIONED_USER_1,
+      GUILD_ID,
+      CHANNEL_ID,
+    );
     expect(notificationsCreateMock).not.toHaveBeenCalled();
     // anlık `mention` WS eventi yine de gider (tercih yalnız kalıcı bildirimi süzer)
     expect(emitToUserMock).toHaveBeenCalledTimes(1);
@@ -711,7 +743,9 @@ describe('MessagesGateway.notifyMentions', () => {
       return {
         id: 'msg-everyone-1',
         channelId: CHANNEL_ID,
-        content: mentions.length ? `<@&role-everyone> ve <@${mentions[0]}>` : '<@&role-everyone> herkes',
+        content: mentions.length
+          ? `<@&role-everyone> ve <@${mentions[0]}>`
+          : '<@&role-everyone> herkes',
         mentions,
         mentionsEveryone: true,
         author: { id: AUTHOR_ID, username: 'author', avatarUrl: null },
@@ -780,7 +814,7 @@ describe('MessagesGateway.notifyMentions', () => {
       expect(notificationsCreateMock).toHaveBeenCalledTimes(1);
     });
 
-    it('T&S regresyon: özel kanalda everyone yalnız kanal üyeleri + owner/admin\'e gider (sızıntı yok)', async () => {
+    it("T&S regresyon: özel kanalda everyone yalnız kanal üyeleri + owner/admin'e gider (sızıntı yok)", async () => {
       prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID, isPrivate: true });
       prismaMock.user.findMany.mockResolvedValue([]);
       prismaMock.channelMember.findMany.mockResolvedValue([{ userId: EVERYONE_ONLY_ID }]);
@@ -1095,7 +1129,7 @@ describe('MessagesGateway.handleCallInvite (M4a-3 §9.1)', () => {
     expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
   });
 
-  it('level=MENTIONS → bu dal MENTIONS\'ı susturmaz, arama normal gider (regresyon)', async () => {
+  it("level=MENTIONS → bu dal MENTIONS'ı susturmaz, arama normal gider (regresyon)", async () => {
     prismaMock.notificationPref.findUnique.mockResolvedValue({
       muted: false,
       mutedUntil: null,

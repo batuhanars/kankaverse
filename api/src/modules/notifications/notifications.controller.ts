@@ -43,7 +43,9 @@ export class NotificationsController {
   }
 
   @Get('prefs')
-  @ApiOperation({ summary: 'Bildirim tercihleri (kullanıcının tüm kayıtları; varsayılandan sapanlar)' })
+  @ApiOperation({
+    summary: 'Bildirim tercihleri (kullanıcının tüm kayıtları; varsayılandan sapanlar)',
+  })
   getPrefs(@CurrentUser() user: { id: string }) {
     return this.notificationsService.getPrefs(user.id);
   }
@@ -72,14 +74,18 @@ export class NotificationsController {
 
   @Post('push-tokens')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Push token kaydet/güncelle (upsert; token unique, userId çağırandan taşınır)' })
+  @ApiOperation({
+    summary: 'Push token kaydet/güncelle (upsert; token unique, userId çağırandan taşınır)',
+  })
   registerPushToken(@CurrentUser() user: { id: string }, @Body() dto: CreatePushTokenDto) {
     return this.notificationsService.registerPushToken(user.id, dto);
   }
 
   @Delete('push-tokens/:token')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Kendi push token'ını sil (başkasınınki/yok → 404, varlık sızdırma yok)" })
+  @ApiOperation({
+    summary: "Kendi push token'ını sil (başkasınınki/yok → 404, varlık sızdırma yok)",
+  })
   deletePushToken(@CurrentUser() user: { id: string }, @Param('token') token: string) {
     return this.notificationsService.deletePushToken(user.id, token);
   }
