@@ -47,6 +47,25 @@ interface VoiceState {
   isLeaving: boolean;
   /** Bu oturumda BİZ mi çağırdık (§4 "Çalıyor…" göstergesi) — katılınca (mevcut odaya) false kalır. */
   didInvite: boolean;
+  /**
+   * 🔴 M4c sahip bulgusu (2026-08-07) — arama TÜRÜ artık route parametresi DEĞİL, burada. `/call`a
+   * giren yol birden fazla (`home.tsx` katılım, `dm/[id].tsx` arama, bildirim kabulü,
+   * `MiniCallWindow` yeniden açma) ve biri (`MiniCallWindow`) parametre taşımıyordu — ekran DM
+   * moduna düşüyordu. Otorite `startOrJoin`in yazdığı bu alan; `/call` ne yoldan açılırsa açılsın
+   * aynı gerçeği okur. `callChannelName`/`callGuildName` yalnız `kind==='guild'` iken dolu (DM'de
+   * başlık zaten `roomParticipants`/DM store'undan türetiliyor, burada tekrar edilmiyor).
+   */
+  callKind: 'dm' | 'guild';
+  callChannelName: string | null;
+  callGuildName: string | null;
+  /**
+   * 🔴 M4c sahip bulgusu — katılma başarılı olduktan sonra `router.push('/call')` çalışana kadar
+   * birkaç render'lık bir pencere var; bu sırada `connectedChannelId` zaten dolu ama rota hâlâ
+   * `/call` DEĞİL, yani `MiniCallWindow` bir an görünüp kayboluyordu. Bu bayrak o pencereyi kapatır —
+   * `startOrJoin` başlarken true, `/call` mount olunca (`clearPendingCallScreen`) veya güvenlik
+   * zaman aşımında false olur.
+   */
+  pendingCallScreen: boolean;
   isMuted: boolean;
   canPublish: boolean;
   roomParticipants: RoomMember[];
@@ -62,6 +81,8 @@ interface VoiceState {
   isConnectedTo: (channelId: string) => boolean;
   clearDisconnectReason: () => void;
   setOutputId: (id: AudioOutputId) => void;
+  /** `/call` mount effect'i çağırır — bkz. `pendingCallScreen` yorumu. */
+  clearPendingCallScreen: () => void;
 
   /**
    * §3.1/§3.2 — izin + (gerekirse) davet + token + bağlan. `label` bildirim gövdesi (DM'de karşı
@@ -90,7 +111,7 @@ interface VoiceState {
   startOrJoin: (
     channelId: string,
     label: string,
-    options?: { invite?: boolean; kind?: 'dm' | 'guild' },
+    options?: { invite?: boolean; kind?: 'dm' | 'guild'; guildName?: string },
   ) => Promise<{ ok: boolean; message?: string; reason?: 'mic_denied' | 'other' }>;
   /** `userInitiated` true ise (kullanıcı "kapat"a bastı) `disconnectReason` set edilmez. */
   leave: (userInitiated?: boolean) => Promise<void>;
@@ -117,6 +138,13 @@ let peerEverJoined = false;
 // ikisi de okur.
 let autoEndWhenAlone = true;
 let aloneTimer: ReturnType<typeof setTimeout> | null = null;
+// §7 (MiniCallWindow flaşı) — güvenlik zaman aşımı: `/call` her zaman mount olup
+// `clearPendingCallScreen`ı çağırıyor, ama bir çağıran ekran ileride `startOrJoin` başarılı
+// olduktan sonra navigasyon yapmazsa bayrak SONSUZA KADAR takılı kalıp mini pencereyi kalıcı
+// gizlerdi — bu, düzelttiğimiz flaştan daha kötü bir kusur olurdu. İdempotent: `/call` zaten
+// temizlediyse burası no-op.
+const PENDING_CALL_SCREEN_TIMEOUT_MS = 4000;
+let pendingCallScreenTimer: ReturnType<typeof setTimeout> | null = null;
 let foregroundListenerRemove: (() => void) | null = null;
 // Bildirim gövdesi (karşı tarafın adı) — `toggleMute` yalnız eylem etiketini günceller, gövdeyi
 // `roomParticipants`ten YENİDEN TÜRETMEZ (katılmadan önce boş dönerdi, bildirim adı silinirdi).
@@ -158,6 +186,10 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   connectedAt: null,
   isLeaving: false,
   didInvite: false,
+  callKind: 'dm',
+  callChannelName: null,
+  callGuildName: null,
+  pendingCallScreen: false,
   isMuted: false,
   canPublish: false,
   roomParticipants: [],
@@ -174,6 +206,13 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   },
   setOutputId(id) {
     set({ outputId: id });
+  },
+  clearPendingCallScreen() {
+    if (pendingCallScreenTimer) {
+      clearTimeout(pendingCallScreenTimer);
+      pendingCallScreenTimer = null;
+    }
+    set({ pendingCallScreen: false });
   },
 
   async startOrJoin(channelId, label, options) {
@@ -201,7 +240,23 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
         ? true
         : useVoicePresenceStore.getState().for(channelId).length > 0;
     currentPeerLabel = label;
-    set({ connecting: true, disconnectReason: null, didInvite: !alreadyOngoing });
+    // §7 — bkz. arayüz yorumu: mini pencerenin flaşını önlemek için `connecting:true`yla AYNI
+    // set()'te açılır (mümkün olduğunca erken); güvenlik zaman aşımı yeniden kurulur (bir önceki
+    // aramadan kalan zamanlayıcı varsa önce temizlenir — iç içe zamanlayıcı bırakmaz).
+    if (pendingCallScreenTimer) clearTimeout(pendingCallScreenTimer);
+    pendingCallScreenTimer = setTimeout(() => {
+      pendingCallScreenTimer = null;
+      set({ pendingCallScreen: false });
+    }, PENDING_CALL_SCREEN_TIMEOUT_MS);
+    set({
+      connecting: true,
+      disconnectReason: null,
+      didInvite: !alreadyOngoing,
+      pendingCallScreen: true,
+      callKind: isGuild ? 'guild' : 'dm',
+      callChannelName: isGuild ? label : null,
+      callGuildName: isGuild ? (options?.guildName ?? null) : null,
+    });
 
     // §3.1 🔴 — sıra önemli: davet ÖNCE (kimse yoksa). Ack `ok:false` ise odaya HİÇ girilmez.
     if (!alreadyOngoing) {
@@ -314,6 +369,10 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     const channelId = get().connectedChannelId;
     const wasAlone = get().roomParticipants.length <= 1;
     clearAloneTimer();
+    if (pendingCallScreenTimer) {
+      clearTimeout(pendingCallScreenTimer);
+      pendingCallScreenTimer = null;
+    }
     peerEverJoined = false;
     autoEndWhenAlone = true; // §4 — kozmetik sıfırlama, bir sonraki `startOrJoin` zaten üzerine yazar
     currentPeerLabel = '';
@@ -352,6 +411,12 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       connectedAt: null,
       isLeaving: false,
       didInvite: false,
+      // §7 — bir sonraki aramanın türünü bu oturumdan kalma değer belirlemesin (bugün
+      // `autoEndWhenAlone`da aynı sınıfa dikkat edildi — burada aynı ders).
+      callKind: 'dm',
+      callChannelName: null,
+      callGuildName: null,
+      pendingCallScreen: false,
       isMuted: false,
       canPublish: false,
       roomParticipants: [],
