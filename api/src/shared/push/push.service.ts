@@ -15,7 +15,17 @@ export interface PushPayload {
     guildId?: string | null;
     channelId?: string | null;
     messageId?: string | null;
+    callerId?: string | null; // M4a-3 §9.1 — yalnız type='incoming_call'
+    callerName?: string | null; // M4a-3 §9.1 — yalnız type='incoming_call'
   };
+  // M4a-3 §9.1 — YENİ, hepsi opsiyonel: verilmezse bugünkü davranış birebir korunur
+  // (mesaj push'ı DEĞİŞMEZ). `androidChannelId` bilerek `channelId` DEĞİL: Expo mesajının
+  // kendi `channelId` alanı ile `data.channelId` (bizim DM kanalımız) aynı kelimeyi taşıyor,
+  // iki farklı şey — burada map'lenirken ayrışır (aşağıda `sendToUsers`).
+  priority?: 'default' | 'high';
+  androidChannelId?: string;
+  categoryId?: string;
+  ttlSeconds?: number; // Expo `ttl`
 }
 
 interface ExpoTicket {
@@ -29,6 +39,10 @@ interface ExpoMessage {
   title?: string;
   body: string;
   data: unknown;
+  priority?: 'default' | 'high';
+  channelId?: string;
+  categoryId?: string;
+  ttl?: number;
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -74,11 +88,17 @@ export class PushService {
       });
       if (tokens.length === 0) return;
 
+      // M4a-3 §9.1 — yeni alanlar undefined kalırsa JSON.stringify onları atar; verilmediğinde
+      // gövde bugünküyle birebir aynı kalır (regresyon güvencesi).
       const messages: ExpoMessage[] = tokens.map((t) => ({
         to: t.token,
         title: payload.title,
         body: payload.body,
         data: payload.data,
+        priority: payload.priority,
+        channelId: payload.androidChannelId,
+        categoryId: payload.categoryId,
+        ttl: payload.ttlSeconds,
       }));
 
       for (const batch of chunk(messages, CHUNK_SIZE)) {

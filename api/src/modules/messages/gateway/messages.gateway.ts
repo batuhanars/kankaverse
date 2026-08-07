@@ -9,7 +9,7 @@ import {
   OnGatewayInit,
 } from '@nestjs/websockets';
 import { HttpException } from '@nestjs/common';
-import { NotifTargetType } from '@prisma/client';
+import { NotifTargetType, NotificationLevel } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -18,7 +18,7 @@ import { MembershipService } from '../../../shared/membership/membership.service
 import { RealtimeService } from '../../../shared/realtime/realtime.service';
 import { PresenceService, ActiveStatus } from '../../../shared/presence/presence.service';
 import { DmPermissionService } from '../../../shared/dm-permission/dm-permission.service';
-import { NotificationsService } from '../../notifications/notifications.service';
+import { NotificationsService, isMuteActive } from '../../notifications/notifications.service';
 import { PushService } from '../../../shared/push/push.service';
 
 interface AuthSocket extends Socket {
@@ -334,6 +334,29 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const gate = await this.dmPermission.canDm(userId, calleeId);
     if (!gate.allowed) return { ok: false, error: 'DM_NOT_ALLOWED' };
 
+    // M4a-3 §9.1 madde 3 — callee o DM kanalını ETKİN olarak susturmuşsa ne WS ne push gider.
+    // `canDm` kapısından SONRA, emit'ten ÖNCE. 🔴 R7 nötrlük: arayan bunu ANLAMAZ, ack yine
+    // {ok:true} döner (normal "Çalıyor…" görür, 3 dk sonra cevapsız kalır) — farklı hata kodu/
+    // mesaj/zamanlama YOK, aksi hâlde susturma ifşa olurdu.
+    // PM düzeltmesi 2026-08-07 — "susturulmuş" iki hâli kapsar: isMuteActive VEYA level=NONE.
+    // MENTIONS dahil değil (o "yalnız bana seslenilince" demek; arama zaten doğrudan o kişiye).
+    const calleePref = await this.prisma.notificationPref.findUnique({
+      where: {
+        userId_targetType_targetId: {
+          userId: calleeId,
+          targetType: NotifTargetType.CHANNEL,
+          targetId: channelId,
+        },
+      },
+    });
+    if (
+      calleePref &&
+      (isMuteActive(calleePref.muted, calleePref.mutedUntil) ||
+        calleePref.level === NotificationLevel.NONE)
+    ) {
+      return { ok: true };
+    }
+
     const caller = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { username: true, avatarUrl: true },
@@ -342,6 +365,29 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       channelId,
       caller: { id: userId, username: caller?.username ?? userId, avatarUrl: caller?.avatarUrl ?? null },
     });
+
+    // M4a-3 §9.1 madde 2 — fire-and-forget push (await YOK, ack'i geciktirmez/bozmaz).
+    // Kalıcı Notification kaydı ÜRETİLMEZ, NotificationsService kullanılmaz. "Kime gitsin"
+    // süzgeci burada İKİNCİ KEZ uygulanmaz — canDm kararı üç satır yukarıda zaten geçildi.
+    // title/body: sunucuda tr.json yok (§9.1); `toPushPayload` (notifications.service.ts)
+    // deseni izlenir — Türkçe metin doğrudan koda yazılır, mobil `mobile.call.incomingTitle`/
+    // `incomingBody` (web/src/i18n/tr.json) ile AYNI metin (M4a-2'de zaten kilit ekranında
+    // görünen bilgi, §9.3 — yeni bir ifşa yüzeyi değil).
+    const callerName = caller?.username ?? userId;
+    this.push
+      .sendToUsers([calleeId], {
+        title: 'Gelen Arama',
+        body: `${callerName} seni arıyor!`,
+        data: { type: 'incoming_call', channelId, callerId: userId, callerName },
+        priority: 'high',
+        // §9.2.1 — mobilin kuracağı sesli-kanal kimliği; kanal ayarları kurulduktan sonra
+        // DEĞİŞTİRİLEMEZ, mobil taraf farklı bir kimlik seçerse bu satır o kimlikle güncellenir.
+        androidChannelId: 'incoming_call_v3',
+        categoryId: 'incoming_call',
+        ttlSeconds: 30,
+      })
+      .catch(() => {});
+
     return { ok: true };
   }
 
