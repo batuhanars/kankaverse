@@ -2985,3 +2985,34 @@ Sahip "web'den arayınca mobile düşmüyor" dedi. **Beklenen:** çalma M4a-2'ni
 modelde olduğu için arayan odaya girmiyor → mobilde "arama sürüyor" şeridi de çıkmıyor. M4a-2 bu
 halkayı kapatıyor: web `voice:call_invite` zaten gönderiyor, mobil onu karşılayınca uçtan uca çalışır
 (D39/web revizyonu bunun için şart DEĞİL).
+
+---
+
+## Sprint D39 — Web DM Arama Modeli: "oda önce" — 2026-08-07
+
+> Sözleşme: `contracts/SPRINT_D39_WEB_CALL_MODEL_CONTRACT.md`. Tier **yalnız `web/`**;
+> `api/` + `mobile/` diffi sıfır, sunucu sözleşmesi hiç değişmiyor.
+>
+> **Sıra kararı:** PLAN.md D39 kaydında tetikleyici "M4 kapanışı" yazıyordu; sahip 2026-08-07'de
+> öne aldı. Boşa gitme riski büyük ölçüde düşmüştü, çünkü oda-önce modeli M4a-1'de **cihazda
+> doğrulandı** → "mobil klasiğe döner, borç düşer" ihtimali fiilen kalmadı.
+
+### Web (`web/`)
+- [ ] `startCall` daveti gönderip **beklemeden** odaya katılıyor (ack `{ok:false}` ise girmiyor)
+- [ ] `call_accepted` artık `join` ETMİYOR, yalnız "çalıyor" göstergesini düşürüyor (çift-join tuzağı §3)
+- [ ] `call_rejected` / iptal → nötr mesaj + **odadan çıkış**; çıkışta `call_cancel` gidiyor
+      (karşı tarafın zili asılı kalmasın) — kapanış **tek noktadan**, dört yere serpilmiyor
+- [ ] 🔴 Yalnız-kalma zaman aşımı ikiye ayrıldı: hiç kimse katılmadıysa **3 dk**, biri katılıp
+      çıktıysa **60 sn**. Tek sabit bırakılırsa cevapsız arama 60 saniyede düşerdi (§4).
+      Referans: `mobile/src/stores/voice.ts` (`peerEverJoined`)
+- [ ] `OutgoingCallBar` kalktı; oda görünümünde **bekleyen katılımcı** kutucuğu (soluk + "Çalıyor…"),
+      mobil M4a-1 pariteti. Geri-zil sahipsiz kalmıyor
+- [ ] `pendingVideoCall` + `consumePendingVideoCall` **kaldırıldı** (oda-önce modelde niyet doğrudan
+      `join`'e geçiyor; ölü kalırsa sonraki okuyan olmayan bir akış sanır)
+- [ ] Nötr mesaj DEĞİŞMEDİ (R7): "Şu anda ulaşılamıyor." — `error` kodu açımlanmıyor
+- [ ] `vue-tsc -b` temiz (🔴 `--noEmit` yalancı yeşil), `lint` temiz
+
+### DoD (tarayıcıda, iki hesap — SAHİPTE)
+> Tam liste sözleşme §10'da. Kritik üçü: arayan **anında odada** + karşı taraf soluk kutucukla
+> "Çalıyor…", cevapsız arama **60 sn'de düşmüyor** (3 dk yaşıyor), arayan çıkınca karşı tarafın
+> zili susuyor.
