@@ -157,6 +157,20 @@ export default function CallScreen() {
   // guild gibi dolduruyor). DM dalında bu ifade `peerName`e eşit kalır — davranış DEĞİŞMEDİ.
   const nonGuildTitle = callKind === 'group' ? (callChannelName ?? peerName) : peerName;
 
+  // M4z §E — grup DM'de HENÜZ KATILMAMIŞ üyeler de soluk kart olarak çizilir ("kimi bekliyorum").
+  // 🔴 Yalnız `kind === 'group'`: bu ekranda guild ile aynı ızgara dalı paylaşılıyor ama guild'de
+  // "üye" = sunucudaki herkes demek olurdu (§E.1) — guild dalında liste HER ZAMAN boş kalır.
+  // Kaynak DM store'daki kanal kaydının `members` dizisi; yeni uç çağrılmaz.
+  // 🔴 Sıra kararlı: ada göre (TR), eşitlikte id'ye göre — biri katılınca kalan kartlar zıplamaz.
+  // Odadakiler her zaman önce çizilir, bekleyenler listenin SONUNA eklenir.
+  const inRoomIds = new Set(shown.participants.map((p) => p.userId));
+  const pendingMembers =
+    callKind === 'group' && channel?.type === 'GROUP_DM'
+      ? channel.members
+          .filter((m) => m.id !== myUser?.id && !inRoomIds.has(m.id))
+          .sort((a, b) => a.username.localeCompare(b.username, 'tr') || a.id.localeCompare(b.id))
+      : [];
+
   // 🔴 PM incelemesi (2026-08-06) — burada ÖNCEDEN `leave(true)` + `router.back()` art arda
   // çağrılıyordu. `leave()` içindeki await'ler (room.disconnect, AudioSession.stopAudioSession)
   // yüzünden `connectedChannelId` cihazın hızına göre GEÇ null olabiliyordu; eğer bu ekran hâlâ
@@ -273,8 +287,25 @@ export default function CallScreen() {
                 micOff={p.isLocal ? isMuted : mutedUserIds.has(p.userId)}
               />
             ))}
+            {/* M4z §E — bekleyen üyeler: aynı kutucuk, yalnız `dimmed`. Mikrofon/konuşma
+                göstergesi YOK (o bilgi yok), `ringing` de YOK — grupta kimin telefonunun
+                çaldığını bilmiyoruz (1-1 dalındaki "Çalıyor…" olduğu gibi duruyor). */}
+            {pendingMembers.map((m) => (
+              <ParticipantTile
+                key={`pending:${m.id}`}
+                name={m.username}
+                avatarUrl={m.avatarUrl}
+                speaking={false}
+                micOff={false}
+                dimmed
+              />
+            ))}
           </ScrollView>
-          {alone && (
+          {/* §E — "Arkadaşların katıldığında burada görünecekler" artık YALNIZ gerçekten boş
+              ekranda gösterilir. Bekleyen kartlar çizildiğinde o cümle kendi kendini yalanlıyordu:
+              üyeler zaten görünüyor. Ortam kanalında `pendingMembers` her zaman boş olduğu için
+              oradaki davranış değişmiyor. */}
+          {alone && pendingMembers.length === 0 && (
             <View style={styles.aloneNotice}>
               <Text style={styles.aloneTitle}>{t('mobile.voice.guildAloneTitle')}</Text>
               <Text style={styles.aloneSubtitle}>{t('mobile.voice.guildAloneSubtitle')}</Text>

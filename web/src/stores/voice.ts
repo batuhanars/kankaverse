@@ -38,11 +38,14 @@ export interface VideoTrackEntry {
   track: RemoteTrack | LocalVideoTrack
 }
 
-// D39 §5 — bekleyen katılımcı (arayan odaya girdi, karşı taraf henüz katılmadı): gerçek bir
-// RoomMember değil, DM kanalından bilinen ad/avatar. Yalnız DmCallPanel üretir.
+// D39 §5 — bekleyen katılımcı (biz odadayız, o henüz katılmadı): gerçek bir RoomMember değil,
+// DM kanalından bilinen ad/avatar. Yalnız DmCallPanel üretir.
+// M4z §E — artık ÇOĞUL kullanılır: 1-1'de tek karşı taraf, grup DM'de odada olmayan her üye.
+// `ringing` yalnız 1-1'de true (davet çalıyor); grup üyesi için "Çalıyor…" iddia edilmez — bilgi yok.
 export interface PendingPeer {
   username: string
   avatarUrl: string | null
+  ringing: boolean
 }
 
 // Kart ızgarası/sahnesi için kutucuk: video track'i olan tile video, olmayan avatar, katılmamış

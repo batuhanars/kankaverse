@@ -248,7 +248,7 @@ function onDisconnect() {
         <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
       </svg>
       <span class="truncate" :class="isStrip ? 'text-[11px]' : 'text-[12px]'" style="color: #fff;">
-        {{ name() }}<template v-if="tile.kind === 'pending'"> · {{ t('call.ringing') }}</template><template v-else-if="isLocal()"> ({{ t('voice.you') }})</template>
+        {{ name() }}<template v-if="tile.peer?.ringing"> · {{ t('call.ringing') }}</template><template v-else-if="isLocal()"> ({{ t('voice.you') }})</template>
       </span>
     </div>
   </div>
