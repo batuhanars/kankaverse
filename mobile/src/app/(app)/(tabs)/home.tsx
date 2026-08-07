@@ -15,6 +15,7 @@ import { GuildMenuSheet } from '@/components/home/GuildMenuSheet';
 import { AddGuildSheet } from '@/components/home/AddGuildSheet';
 import { ChannelMenuHost } from '@/components/home/ChannelMenuHost';
 import { CategoryMenuSheet } from '@/components/home/CategoryMenuSheet';
+import { VoiceChannelSheet } from '@/components/home/VoiceChannelSheet';
 import type { CategoryDto } from '@/api/categories';
 import { channelsApi, ChannelType } from '@/api/channels';
 import { useUnreadStore } from '@/stores/unread';
@@ -56,6 +57,9 @@ export default function HomeScreen() {
   // Sprint M4c §3 — ses kanalına katılma sürüyorken ikinci dokunuşu yutar (`dm/[id].tsx`
   // `callBusy` ile aynı desen).
   const [voiceJoining, setVoiceJoining] = useState(false);
+  // Sprint M4z §B (D48) — dokunulan ses kanalı; null ise ara panel kapalı. Panel açık olmak
+  // katılım DEĞİLDİR: odaya yalnız panelin "Sese Katıl" düğmesi sokar.
+  const [voiceSheetChannel, setVoiceSheetChannel] = useState<ChannelSummaryDto | null>(null);
 
   // react-hooks/set-state-in-effect: effect gövdesi setState'i SENKRON çağırmaz (ilk değer zaten
   // 'loading') — yalnız fetch'i başlatır, sonuç .then/.catch'te (asenkron) yazılır. "Tekrar dene"
@@ -196,9 +200,11 @@ export default function HomeScreen() {
       Alert.alert(t('channel.lockedToast'));
       return;
     }
-    // Sözleşme §2/§3 — ses kanalı satırına dokunma = DOĞRUDAN katılım, ara ekran yok.
+    // Sprint M4z §B (D48) — ses kanalı satırına dokunma artık ARA PANEL açar, odaya girmez.
+    // M4c §2'de doğrudan katılımdı (web pariteti); mobilde yanlışlıkla dokunup sese düşmek çok
+    // kolaydı ve girmeden kimin içeride olduğu görünmüyordu. Katılım bir dokunuş daha derinde.
     if (channel.type === ChannelType.GUILD_VOICE) {
-      void joinVoiceChannel(channel);
+      setVoiceSheetChannel(channel);
       return;
     }
     // Sözleşme §8.1-A/1 — vurgu için "en son açılan kanal" burada tutulur (ChannelSidebar ortam
@@ -221,9 +227,14 @@ export default function HomeScreen() {
   // düşüyordu (sahip cihaz bulgusu). Otorite artık `stores/voice.ts` (`startOrJoin` bu bilgiyi
   // duruma yazıyor) — `/call` hangi yoldan açılırsa açılsın aynı gerçeği okur. Bu ekran yalnız
   // `channelId`i taşır (o zaten tekil ve tartışmasız).
+  //
+  // Sprint M4z §B (D48) — çağıran artık satır değil, ara panelin "Sese Katıl" düğmesi. Akışın
+  // KENDİSİ değişmedi (`kind: 'guild'`, aynı izin/hata deseni); yalnız panel başarı yolunda
+  // kapatılır. Hata yolunda panel AÇIK kalır: kullanıcı uyarıyı okuyup aynı yerden tekrar dener.
   async function joinVoiceChannel(channel: ChannelSummaryDto) {
     if (voiceJoining) return;
     if (useVoiceStore.getState().connectedChannelId === channel.id) {
+      setVoiceSheetChannel(null);
       router.push({ pathname: '/call', params: { channelId: channel.id } });
       return;
     }
@@ -233,6 +244,7 @@ export default function HomeScreen() {
       .startOrJoin(channel.id, channel.name ?? '', { kind: 'guild', guildName: selectedGuildName });
     setVoiceJoining(false);
     if (res.ok) {
+      setVoiceSheetChannel(null);
       router.push({ pathname: '/call', params: { channelId: channel.id } });
       return;
     }
@@ -428,6 +440,17 @@ export default function HomeScreen() {
         // satıra kısa dokunuşla açılıyor, aynı hedefe ikinci kapı gereksizdi).
         onOpenDetails={(c) => router.push({ pathname: '/dm-details', params: { id: c.id } })}
         onAddFriend={() => router.push('/friends-add')}
+      />
+
+      {/* Sprint M4z §B (D48) — ses kanalı ara paneli: kanal adı + içerdekiler + Katıl. */}
+      <VoiceChannelSheet
+        channel={voiceSheetChannel}
+        joining={voiceJoining}
+        onClose={() => setVoiceSheetChannel(null)}
+        onJoin={() => {
+          const c = voiceSheetChannel;
+          if (c) void joinVoiceChannel(c);
+        }}
       />
 
       <AddGuildSheet
