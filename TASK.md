@@ -2992,6 +2992,41 @@ arayanın avatarı var, bizde yok. Küçük bir parite kalemi; mobil ayağına e
 > 300 KB'a inmek 8 kHz'e düşmeyi (zil kabalaşır) veya süreyi kısaltmayı (aramanın bir kısmında
 > sessizlik) gerektirirdi. 2.6 MB → 1.29 MB kazancı yeterli, daha fazlası ödünleşme.
 
+
+### M4a-3 cihaz turu #1 (2026-08-07) — iki kök neden + bir platform sınırı
+
+**Geçenler:** heads-up düşüyor · uygulama açıkken tek bildirim · kabul/reddet çalışıyor · reddedince
+ses kesiliyor (§9.2.1 ölçüm 2. adımı **GEÇTİ** → tek kanalda kalıyoruz, `api/` kimliği değişmiyor) ·
+ayarlarda tek "Gelen arama" kanalı kaldı · uygulama tamamen kapalıyken bildirim geliyor.
+
+**🔴 Bulunan iki kök neden (ikisi de düzeltildi):**
+1. **Çift bildirim bastırması kendi bildirimimizi öldürüyordu.** `current` state'i `await`ten sonra
+   senkron set ediliyor, handler sonraki tick'te geliyor → `isChannelRinging` kendi bildirimimize
+   `true` diyordu. Semptom: "titriyor ama bildirim yok". Yerel bildirime `data.source: 'ws'` işareti
+   kondu. **Ders:** iki taşıyıcının payload'ını "tutarlılık için" birebir aynı yapmak, sonradan
+   ayırt etmeyi imkânsız kıldı.
+2. **`trigger: null` → bildirimlerimiz bizim kanalımıza HİÇ gitmiyordu.** `expo-notifications`
+   Android'de kanal kimliğini içerikten değil **trigger'dan** okuyor; null trigger her zaman
+   kütüphanenin fallback kanalına düşüyor. Yani kanal önemi/sesi/titreşimi **M4a-2'den beri**
+   hiç uygulanmamış. `trigger: { channelId: CHANNEL_ID }` ile düzeltildi.
+   🔴 **PM teşhis hatası:** sabahki "sessiz kanal heads-up çıkarmıyor" teşhisi eksikti — kanıt
+   (iki bildirim yan yana) doğruydu, yorumu yanlıştı. Kanalımız hiç kullanılmıyormuş. Dev bunu
+   **dokümandan değil kütüphanenin native kaynağından** buldu; bu refleks bu turda iki kez kazandırdı.
+
+**Kabul edilen sınır → [[D43]]:** uygulama **tamamen ölüyken** gelen bildirimde eylem düğmeleri
+(Reddet · Aramaya Katıl) çıkmıyor. Platform davranışı: Expo üst düzey `title`/`body` ile FCM
+notification-type mesaj üretiyor, süreç ölüyken Play Services bildirimi **kendisi** gösteriyor,
+uygulamanın `onMessageReceived`'ı hiç çağrılmıyor, düğmeler yalnız orada ekleniyor. Kanal ve ses
+çalışıyor çünkü onlar Play Services'in tanıdığı gerçek FCM alanları. **Sahip kararı: şimdilik böyle
+kalsın** (işlev kaybı yok, gövdeye dokunup DM'den katılınıyor); alternatifi data-only push, çalışan
+teslimatı riske atıyor ve gerçek cihaz doğrulaması istiyor.
+
+**Yan bulgu → `api/` geri alması:** sahip mobilden web'i aradı, web'de hiçbir şey olmadı. Sebep
+sabah eklediğimiz `level === NONE` dalıydı (o DM için `muted=false, level=NONE` kaydı duruyordu) ve
+ancak **veritabanına bakılarak** bulunabildi. Sahip kararıyla geri alındı: `level` bir mesaj bildirim
+seviyesi, aramayı susturmaz; yalnız `muted` susturur. Sözleşme §9.1 madde 3 güncellendi, iki test
+geri almanın regresyon koruması oldu.
+
 ### DoD (cihazda) — ✅ SAHİP DOĞRULADI 2026-08-06
 > Tam liste sözleşme §13'te. Sahip turu: arama başlatma, karşılıklı konuşma, arka planda ses,
 > bildirim eylemleri, küçültme, mini pencere ve regresyonlar **tamam**. Bulunan kusurlar aşağıda.
