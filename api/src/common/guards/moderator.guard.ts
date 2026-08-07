@@ -1,5 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuthenticatedRequest } from '../types/request-user';
 
 /**
  * ModeratorGuard — platform-seviyesi moderatör kapısı (R7 — insan incelemesi zorunlu).
@@ -12,7 +13,7 @@ export class ModeratorGuard implements CanActivate {
   constructor(private prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const userId: string | undefined = request.user?.id;
 
     if (!userId) {

@@ -174,7 +174,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
    * Light doğrulama: gönderen socket auth'tan userId alınır (spoofing yalnız kozmetik).
    */
   @SubscribeMessage('voice:broadcast')
-  async handleVoiceBroadcast(
+  handleVoiceBroadcast(
     @ConnectedSocket() socket: AuthSocket,
     @MessageBody() payload: { channelId: string; active: boolean },
   ) {

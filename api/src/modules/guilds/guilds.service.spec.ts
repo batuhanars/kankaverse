@@ -1157,7 +1157,7 @@ describe('GuildsService.kickMember — §C (R7)', () => {
     const actorId = mockActorRole('ADMIN');
     mockTargetMember(ANOTHER_MEMBER_ID, 'ADMIN'); // hedef de ADMIN
     permissionsMock.requireMemberHierarchy.mockRejectedValueOnce(
-      Object.assign(new (require('@nestjs/common').ForbiddenException)(), {
+      Object.assign(new ForbiddenException(), {
         response: { error: 'MEMBER_HIERARCHY' },
       }),
     );
@@ -1365,7 +1365,7 @@ describe('GuildsService — ortam yönetimi (leave/transfer/ban)', () => {
       id: 'gm-x',
     });
     permissionsMock.requireMemberHierarchy.mockRejectedValueOnce(
-      Object.assign(new (require('@nestjs/common').ForbiddenException)(), {
+      Object.assign(new ForbiddenException(), {
         response: { error: 'MEMBER_HIERARCHY' },
       }),
     );

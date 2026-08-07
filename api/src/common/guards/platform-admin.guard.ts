@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { AuthenticatedRequest } from '../types/request-user';
 
 /**
  * PlatformAdminGuard — platform-seviyesi admin kapısı (R7 — insan incelemesi zorunlu).
@@ -12,7 +13,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@
 @Injectable()
 export class PlatformAdminGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const user = context.switchToHttp().getRequest().user as { isModerator?: boolean } | undefined;
+    const user = context.switchToHttp().getRequest<AuthenticatedRequest>().user;
     if (!user?.isModerator) {
       throw new ForbiddenException({ message: 'Yetersiz yetki.', error: 'FORBIDDEN' });
     }

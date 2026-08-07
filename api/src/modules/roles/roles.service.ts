@@ -9,11 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
-import {
-  filterKnownPermissions,
-  DEFAULT_EVERYONE_PERMISSIONS,
-  PermissionFlag,
-} from '../../common/permissions';
+import { filterKnownPermissions, PermissionFlag } from '../../common/permissions';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { RoleDto } from './dto/role.dto';

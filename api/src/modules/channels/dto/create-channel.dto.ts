@@ -49,7 +49,7 @@ export class CreateChannelDto {
 
   @ApiPropertyOptional({ example: 'cat-id', description: 'Kategori ID (null = kategorisiz)' })
   @IsOptional()
-  @ValidateIf((o) => o.categoryId !== null)
+  @ValidateIf((o: { categoryId?: string | null }) => o.categoryId !== null)
   @IsString()
   categoryId?: string | null;
 

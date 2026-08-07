@@ -18,7 +18,7 @@ export class EmailService {
     if (this.useResend) {
       // Dinamik import: resend yüklüyse kullan, yoksa hata zaten startup'ta
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { Resend } = require('resend');
+      const { Resend } = require('resend') as typeof import('resend');
       this.resendClient = new Resend(apiKey);
     }
   }

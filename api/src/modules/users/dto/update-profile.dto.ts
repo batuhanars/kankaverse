@@ -11,7 +11,7 @@ export class UpdateProfileDto {
   @ApiPropertyOptional({ maxLength: 512, description: 'Profil metni (≤512). Boş bırakılabilir.' })
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @MaxLength(512, { message: 'Bio en fazla 512 karakter olabilir.' })
   bio?: string;
 

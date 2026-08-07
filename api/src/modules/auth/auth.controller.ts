@@ -161,7 +161,8 @@ export class AuthController {
     @Headers('x-client-type') clientTypeHeader?: string,
   ) {
     const clientType = normalizeClientType(clientTypeHeader);
-    const cookieToken: string | undefined = req.cookies?.[REFRESH_COOKIE];
+    // req.cookies tipi @types/cookie-parser'da Record<string, any> — indeks erişimi any döner, cast ediyoruz.
+    const cookieToken: string | undefined = req.cookies?.[REFRESH_COOKIE] as string | undefined;
     // [Sprint M0 — R7, 2026-07-29 revizyon] RN'in okhttp katmanı kendi cookie kavanozunu tutar; mobil
     // istek cookie'li gelse bile clientType==='mobile' + gövdede token varsa gövde kanalı seçilir
     // (cookie yok sayılır). Aksi hâlde bugünkü davranış birebir korunur. Kapı (auth.service.ts REFRESH_

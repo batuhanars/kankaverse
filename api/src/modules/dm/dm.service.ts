@@ -343,7 +343,7 @@ export class DmService {
   // [R7] ekleyenin arkadaşı + minör değil + zaten üye değil
   // ─────────────────────────────────────────────────────────────────────────────
   async addGroupMember(callerId: string, groupId: string, dto: AddGroupMemberDto) {
-    const channel = await this.requireGroupChannel(groupId);
+    await this.requireGroupChannel(groupId);
     await this.requireGroupMember(callerId, groupId);
 
     const targetId = dto.userId;

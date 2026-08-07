@@ -822,7 +822,7 @@ export class VoiceService {
   ): Promise<void> {
     if (!(userLimit > 0) || !this.roomService) return;
 
-    let participants;
+    let participants: Awaited<ReturnType<RoomServiceClient['listParticipants']>>;
     try {
       participants = await this.roomService.listParticipants(channelId);
     } catch {
