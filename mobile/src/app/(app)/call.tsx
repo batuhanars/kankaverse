@@ -21,20 +21,21 @@ const CONTROLS_HIDE_MS = 5000;
  * (`dm/[id].tsx` `handleCallPress`) zaten `voiceStore.startOrJoin` ile bağlanıp buraya
  * yönlendiriyor, ya da mini pencereden geri dönülüyor (§7). Burası yalnız var olan bağlantıyı çizer.
  *
- * M4c sözleşme §5 — `kind: 'guild'` (varsayılan `'dm'`, `home.tsx` `joinVoiceChannel` geçiyor) N
- * katılımcılı ızgaraya açar; DM dalı (iki-kutucuk, "Çalıyor…", peer adı) SATIR SATIR aynı kaldı —
- * yeni dal DM koşullarının YANINA eklendi, İÇİNE değil (M4a cihazda doğrulandı, regresyon yasak).
+ * M4c sözleşme §5 — guild araması (`kind: 'guild'`) N katılımcılı ızgaraya açar; DM dalı
+ * (iki-kutucuk, "Çalıyor…", peer adı) SATIR SATIR aynı kaldı — yeni dal DM koşullarının YANINA
+ * eklendi, İÇİNE değil (M4a cihazda doğrulandı, regresyon yasak).
+ *
+ * 🔴 PM takibi (2026-08-07, sahip cihaz bulgusu) — arama türü/başlık bilgisi ARTIK ROUTE
+ * PARAMETRESİNDEN OKUNMUYOR. `/call`a birden fazla giriş yolu var (`home.tsx`, `dm/[id].tsx`,
+ * bildirim kabulü, `MiniCallWindow` yeniden açma) ve biri (`MiniCallWindow`) `kind` taşımıyordu —
+ * ekran sessizce DM moduna düşüyordu (yanlış metin + hayalet ikinci kutucuk + geri gelen sohbet
+ * düğmesi). Otorite artık `stores/voice.ts` (`callKind`/`callChannelName`/`callGuildName`,
+ * `startOrJoin` yazıyor) — `/call` HANGİ YOLDAN açılırsa açılsın aynı gerçeği okur.
  */
 export default function CallScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    channelId: string;
-    kind?: 'dm' | 'guild';
-    channelName?: string;
-    guildName?: string;
-  }>();
+  const params = useLocalSearchParams<{ channelId: string }>();
   const channelId = params.channelId;
-  const isGuildCall = params.kind === 'guild';
   const insets = useSafeAreaInsets();
 
   const connectedChannelId = useVoiceStore((s) => s.connectedChannelId);
@@ -46,6 +47,10 @@ export default function CallScreen() {
   const canPublish = useVoiceStore((s) => s.canPublish);
   const didInvite = useVoiceStore((s) => s.didInvite);
   const isLeaving = useVoiceStore((s) => s.isLeaving);
+  const callKind = useVoiceStore((s) => s.callKind);
+  const callChannelName = useVoiceStore((s) => s.callChannelName);
+  const callGuildName = useVoiceStore((s) => s.callGuildName);
+  const isGuildCall = callKind === 'guild';
 
   const channel = useDmStore((s) => s.channels.find((c) => c.id === channelId));
   const myUser = useAuthStore((s) => s.user);
@@ -74,6 +79,12 @@ export default function CallScreen() {
     return () => {
       if (hideTimer.current) clearTimeout(hideTimer.current);
     };
+  }, []);
+
+  // §7 (mini pencere flaşı) — bu ekran gerçekten mount olduğunda "geçiş bekleniyor" bayrağı iner;
+  // `MiniCallWindow` o ana kadar (kısa asenkron gezinme penceresi) kendini gizli tutuyordu.
+  useEffect(() => {
+    useVoiceStore.getState().clearPendingCallScreen();
   }, []);
 
   useEffect(() => {
@@ -174,49 +185,56 @@ export default function CallScreen() {
         style={StyleSheet.absoluteFill}
       />
 
-      {controlsVisible && (
-        <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            accessibilityRole="button"
-            // "common.close" değil — bu düğme kapatmıyor, küçültüyor (§7); ekran görsel 11'deki
-            // aynı düğmeye karşılık geliyor. Hang-up etiketiyle aynı incelemede fark edildi.
-            accessibilityLabel={t('mobile.call.minimize')}
-          >
-            <Ionicons name="chevron-down" size={26} color={theme.colors.textPrimary} />
+      {/*
+        PM takibi (2026-08-07, sahip cihaz bulgusu) — bu blok ÖNCEDEN `controlsVisible &&` ile
+        koşullu render ediliyordu; gizlenince alan düzenden TAMAMEN çıkıyor, ortadaki katılımcı
+        kartı yukarı sıçrayıp altta boşluk kalıyordu. Blok artık HER ZAMAN mount'lu — yalnız
+        `opacity`/`pointerEvents` değişiyor, alan (yükseklik + `paddingTop`) korunuyor.
+      */}
+      <View
+        style={[styles.topBar, { paddingTop: insets.top + 8 }, !controlsVisible && styles.controlsHidden]}
+        pointerEvents={controlsVisible ? 'auto' : 'none'}
+      >
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={12}
+          accessibilityRole="button"
+          // "common.close" değil — bu düğme kapatmıyor, küçültüyor (§7); ekran görsel 11'deki
+          // aynı düğmeye karşılık geliyor. Hang-up etiketiyle aynı incelemede fark edildi.
+          accessibilityLabel={t('mobile.call.minimize')}
+        >
+          <Ionicons name="chevron-down" size={26} color={theme.colors.textPrimary} />
+        </Pressable>
+        {/* §5 — başlık kanal adı + ortam adı (guild) / karşı taraf adı (DM, tıklanınca sohbet açar). */}
+        {isGuildCall ? (
+          <View style={styles.topBarCenter}>
+            <Text style={styles.peerName} numberOfLines={1}>
+              {callChannelName ?? ''}
+            </Text>
+            <Text style={styles.duration} numberOfLines={1}>
+              {(callGuildName ?? '') + ' · ' + duration}
+            </Text>
+          </View>
+        ) : (
+          <Pressable onPress={handleOpenChat} style={styles.topBarCenter} accessibilityRole="button">
+            <Text style={styles.peerName} numberOfLines={1}>
+              {peerName}
+            </Text>
+            <Text style={styles.duration}>{duration}</Text>
           </Pressable>
-          {/* §5 — başlık kanal adı + ortam adı (guild) / karşı taraf adı (DM, tıklanınca sohbet açar). */}
-          {isGuildCall ? (
-            <View style={styles.topBarCenter}>
-              <Text style={styles.peerName} numberOfLines={1}>
-                {params.channelName ?? ''}
-              </Text>
-              <Text style={styles.duration} numberOfLines={1}>
-                {(params.guildName ?? '') + ' · ' + duration}
-              </Text>
-            </View>
-          ) : (
-            <Pressable onPress={handleOpenChat} style={styles.topBarCenter} accessibilityRole="button">
-              <Text style={styles.peerName} numberOfLines={1}>
-                {peerName}
-              </Text>
-              <Text style={styles.duration}>{duration}</Text>
-            </Pressable>
-          )}
-          <Pressable
-            onPress={() => {
-              resetHideTimer();
-              setOutputSheetOpen(true);
-            }}
-            hitSlop={12}
-            accessibilityRole="button"
-            accessibilityLabel={t('mobile.call.outputTitle')}
-          >
-            <Ionicons name="volume-high-outline" size={24} color={theme.colors.textPrimary} />
-          </Pressable>
-        </View>
-      )}
+        )}
+        <Pressable
+          onPress={() => {
+            resetHideTimer();
+            setOutputSheetOpen(true);
+          }}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel={t('mobile.call.outputTitle')}
+        >
+          <Ionicons name="volume-high-outline" size={24} color={theme.colors.textPrimary} />
+        </Pressable>
+      </View>
 
       {isGuildCall ? (
         // §5 — N katılımcılı ızgara. M4a'nın `ParticipantTile`ı AYNEN yeniden kullanılır (yeni
@@ -274,20 +292,22 @@ export default function CallScreen() {
         </View>
       )}
 
-      {controlsVisible && (
-        <View style={[styles.controls, { paddingBottom: insets.bottom + 16 }]}>
-          <CallControls
-            isMuted={isMuted}
-            canPublish={shown.canPublish}
-            onToggleMute={() => {
-              resetHideTimer();
-              void useVoiceStore.getState().toggleMute();
-            }}
-            onOpenChat={isGuildCall ? undefined : handleOpenChat}
-            onHangUp={handleHangUp}
-          />
-        </View>
-      )}
+      {/* Aynı düzen-koruma gerekçesi — bkz. üst bar yorumu. */}
+      <View
+        style={[styles.controls, { paddingBottom: insets.bottom + 16 }, !controlsVisible && styles.controlsHidden]}
+        pointerEvents={controlsVisible ? 'auto' : 'none'}
+      >
+        <CallControls
+          isMuted={isMuted}
+          canPublish={shown.canPublish}
+          onToggleMute={() => {
+            resetHideTimer();
+            void useVoiceStore.getState().toggleMute();
+          }}
+          onOpenChat={isGuildCall ? undefined : handleOpenChat}
+          onHangUp={handleHangUp}
+        />
+      </View>
 
       <OutputPickerSheet visible={outputSheetOpen} onClose={() => setOutputSheetOpen(false)} />
     </Pressable>
@@ -305,6 +325,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: theme.layout.panelGap,
     paddingBottom: 8,
+  },
+  // PM takibi (2026-08-07) — üst bar/alt kontrol HER ZAMAN mount'lu; gizlenince yalnız bu uygulanır.
+  // Alan (yükseklik) korunur, kalan içerik (kutucuklar) yerinde kalır — sıçrama/kırpılma yok.
+  controlsHidden: {
+    opacity: 0,
   },
   topBarCenter: {
     flex: 1,

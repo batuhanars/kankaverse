@@ -8,21 +8,28 @@ import { theme } from '@/theme';
 /**
  * M4a-1 sözleşme §7 — mini pencere. Sistem seviyesi bir overlay DEĞİL (overlay izni/PiP yok);
  * kök `_layout.tsx`'te mount edilen mutlak konumlu bir bileşen (Discord'un yaptığı da bu).
- * Görünürlük sürüklenebilir bir "minimized" state'i İZLEMEZ — yalnız iki koşuldan türetilir:
- * bağlıyız VE mevcut rota `/call` DEĞİL. Rota `/call` olunca tam ekran zaten kendini gösteriyor,
- * mini pencere o an anlamsız — ayrı bir state'i senkron tutmaya gerek kalmıyor (D37/M3c dersi:
- * gereksiz state = senkron kalma riski).
+ * Görünürlük sürüklenebilir bir "minimized" state'i İZLEMEZ — yalnız üç koşuldan türetilir:
+ * bağlıyız VE mevcut rota `/call` DEĞİL VE `/call`a geçiş BEKLEMİYORUZ. Rota `/call` olunca tam
+ * ekran zaten kendini gösteriyor, mini pencere o an anlamsız — ayrı bir state'i senkron tutmaya
+ * gerek kalmıyor (D37/M3c dersi: gereksiz state = senkron kalma riski).
+ *
+ * 🔴 M4c sahip bulgusu (2026-08-07) — üçüncü koşul (`pendingCallScreen`) sonradan eklendi:
+ * `startOrJoin` başarılı olur olmaz `connectedChannelId` dolar ama `router.push('/call')` henüz
+ * çalışmamıştır (asenkron gezinme) — o birkaç render'lık pencerede bu bileşen (`pathname` hâlâ
+ * eski ekran) kısaca görünüp tam ekran açılınca kayboluyordu (flaş). `pendingCallScreen`
+ * `stores/voice.ts`'te bu geçişi işaretliyor.
  */
 export function MiniCallWindow() {
   const pathname = usePathname();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const connectedChannelId = useVoiceStore((s) => s.connectedChannelId);
+  const pendingCallScreen = useVoiceStore((s) => s.pendingCallScreen);
   const roomParticipants = useVoiceStore((s) => s.roomParticipants);
   const speakingUserIds = useVoiceStore((s) => s.speakingUserIds);
   const channel = useDmStore((s) => s.channels.find((c) => c.id === connectedChannelId));
 
-  if (!connectedChannelId || pathname === '/call') return null;
+  if (!connectedChannelId || pathname === '/call' || pendingCallScreen) return null;
 
   const peer = channel?.type === 'DM' ? channel.otherUser : null;
   const peerMember = roomParticipants.find((p) => !p.isLocal);

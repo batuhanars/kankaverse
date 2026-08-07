@@ -215,35 +215,25 @@ export default function HomeScreen() {
   // Sprint M4c §3 — davetsiz katılım (`kind: 'guild'`, bkz. `stores/voice.ts` `startOrJoin` yorumu).
   // `dm/[id].tsx` `handleCallPress` ile AYNI izin/hata deseni (mic_denied → "Ayarları Aç"); tek
   // fark davet yok, `label` DM'deki karşı ad yerine kanal adı (bildirim gövdesi §3).
+  //
+  // 🔴 PM takibi (2026-08-07) — `/call`a `kind`/`channelName`/`guildName` route parametresi olarak
+  // ARTIK GEÇİLMİYOR: `MiniCallWindow`'un kendi push'u bunları hiç taşımıyordu ve ekran DM moduna
+  // düşüyordu (sahip cihaz bulgusu). Otorite artık `stores/voice.ts` (`startOrJoin` bu bilgiyi
+  // duruma yazıyor) — `/call` hangi yoldan açılırsa açılsın aynı gerçeği okur. Bu ekran yalnız
+  // `channelId`i taşır (o zaten tekil ve tartışmasız).
   async function joinVoiceChannel(channel: ChannelSummaryDto) {
     if (voiceJoining) return;
     if (useVoiceStore.getState().connectedChannelId === channel.id) {
-      router.push({
-        pathname: '/call',
-        params: {
-          channelId: channel.id,
-          kind: 'guild',
-          channelName: channel.name ?? '',
-          guildName: selectedGuildName,
-        },
-      });
+      router.push({ pathname: '/call', params: { channelId: channel.id } });
       return;
     }
     setVoiceJoining(true);
     const res = await useVoiceStore
       .getState()
-      .startOrJoin(channel.id, channel.name ?? '', { kind: 'guild' });
+      .startOrJoin(channel.id, channel.name ?? '', { kind: 'guild', guildName: selectedGuildName });
     setVoiceJoining(false);
     if (res.ok) {
-      router.push({
-        pathname: '/call',
-        params: {
-          channelId: channel.id,
-          kind: 'guild',
-          channelName: channel.name ?? '',
-          guildName: selectedGuildName,
-        },
-      });
+      router.push({ pathname: '/call', params: { channelId: channel.id } });
       return;
     }
     if (res.reason === 'mic_denied') {
