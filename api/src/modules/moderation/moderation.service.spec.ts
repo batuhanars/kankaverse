@@ -130,7 +130,9 @@ describe('ReportsService', () => {
     // Tam olarak 4 alan (targetType, targetId, reason, reportedAt)
     const keys = Object.keys(snapshot);
     expect(keys).toHaveLength(4);
-    expect(keys).toEqual(expect.arrayContaining(['targetType', 'targetId', 'reason', 'reportedAt']));
+    expect(keys).toEqual(
+      expect.arrayContaining(['targetType', 'targetId', 'reason', 'reportedAt']),
+    );
   });
 
   it('create → jenerik { id } doner', async () => {
@@ -152,9 +154,7 @@ describe('ModeratorGuard', () => {
   function makeGuard(isModerator: boolean | null) {
     const guardPrisma = {
       user: {
-        findUnique: jest.fn().mockResolvedValue(
-          isModerator === null ? null : { isModerator },
-        ),
+        findUnique: jest.fn().mockResolvedValue(isModerator === null ? null : { isModerator }),
       },
     };
     const guard = new ModeratorGuard(guardPrisma as any);
@@ -276,7 +276,10 @@ describe('ModerationModuleService.createAction — MEDIA_REMOVE (C8/R7)', () => 
     jest.resetAllMocks();
     service = new ModerationModuleService(prismaMock as any);
     prismaMock.user.findUnique.mockResolvedValue({ id: TARGET_ID, deletedAt: null });
-    prismaMock.moderationAction.create.mockResolvedValue({ id: 'action-media', type: 'MEDIA_REMOVE' });
+    prismaMock.moderationAction.create.mockResolvedValue({
+      id: 'action-media',
+      type: 'MEDIA_REMOVE',
+    });
     prismaMock.auditLog.create.mockResolvedValue({});
   });
 
@@ -587,7 +590,7 @@ describe('DmPermissionService enforcement — BAN', () => {
     jest.resetAllMocks();
   });
 
-  it("sender aktif BAN → canDm false (DM_NOT_ALLOWED)", async () => {
+  it('sender aktif BAN → canDm false (DM_NOT_ALLOWED)', async () => {
     dmModeration.hasActiveBan.mockResolvedValue(true);
 
     const service = makeService();
@@ -635,7 +638,7 @@ describe('FriendPermissionService enforcement — BAN', () => {
     jest.resetAllMocks();
   });
 
-  it("sender aktif BAN → canSendFriendRequest false (USER_NOT_FOUND jenerik)", async () => {
+  it('sender aktif BAN → canSendFriendRequest false (USER_NOT_FOUND jenerik)', async () => {
     fpModeration.hasActiveBan.mockResolvedValue(true);
 
     const service = makeService();

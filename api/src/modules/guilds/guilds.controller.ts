@@ -46,7 +46,10 @@ export class GuildsController {
   @Post()
   @UseGuards(VerifiedEmailGuard)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Yeni sunucu oluştur (guild + owner member + #genel-sohbet); e-posta doğrulanmış gerekir' })
+  @ApiOperation({
+    summary:
+      'Yeni sunucu oluştur (guild + owner member + #genel-sohbet); e-posta doğrulanmış gerekir',
+  })
   create(@CurrentUser() user: { id: string }, @Body() dto: CreateGuildDto) {
     return this.guildsService.create(user.id, dto);
   }
@@ -61,10 +64,18 @@ export class GuildsController {
   @Post('import/discord-template')
   @UseGuards(VerifiedEmailGuard)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Discord sunucu şablonundan Ortam oluştur (yalnız yapı; bayrak arkasında)' })
-  importDiscordTemplate(@CurrentUser() user: { id: string }, @Body() dto: ImportDiscordTemplateDto) {
+  @ApiOperation({
+    summary: 'Discord sunucu şablonundan Ortam oluştur (yalnız yapı; bayrak arkasında)',
+  })
+  importDiscordTemplate(
+    @CurrentUser() user: { id: string },
+    @Body() dto: ImportDiscordTemplateDto,
+  ) {
     if (this.config.get<boolean>('discordImportEnabled') !== true) {
-      throw new ForbiddenException({ message: 'Discord göçü şu anda kapalı.', error: 'FEATURE_DISABLED' });
+      throw new ForbiddenException({
+        message: 'Discord göçü şu anda kapalı.',
+        error: 'FEATURE_DISABLED',
+      });
     }
     return this.discordImport.importTemplate(user.id, dto.template, dto.name);
   }
@@ -76,7 +87,10 @@ export class GuildsController {
   }
 
   @Get(':id/members')
-  @ApiOperation({ summary: 'Ortam üye listesini getir (yalnız üyeler görebilir); rol önceliği OWNER>ADMIN>MEMBER, sonra username' })
+  @ApiOperation({
+    summary:
+      'Ortam üye listesini getir (yalnız üyeler görebilir); rol önceliği OWNER>ADMIN>MEMBER, sonra username',
+  })
   getMembers(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
     return this.guildsService.getMembers(user.id, guildId);
   }
@@ -106,7 +120,9 @@ export class GuildsController {
 
   @Patch(':id/icon')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Ortam ikonunu güncelle veya kaldır (yalnız OWNER). storageKey: null → ikon siler.' })
+  @ApiOperation({
+    summary: 'Ortam ikonunu güncelle veya kaldır (yalnız OWNER). storageKey: null → ikon siler.',
+  })
   setIcon(
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,
@@ -131,7 +147,9 @@ export class GuildsController {
 
   @Patch(':id/banner')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Ortam afişini güncelle veya kaldır (yalnız OWNER). storageKey: null → afiş siler.' })
+  @ApiOperation({
+    summary: 'Ortam afişini güncelle veya kaldır (yalnız OWNER). storageKey: null → afiş siler.',
+  })
   setBanner(
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,
@@ -142,7 +160,10 @@ export class GuildsController {
 
   @Post(':id/join-discovery')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Keşfet üzerinden ortama katıl (discoverable zorunlu + Sprint 7A yaş/ban/üyelik kapısı).' })
+  @ApiOperation({
+    summary:
+      'Keşfet üzerinden ortama katıl (discoverable zorunlu + Sprint 7A yaş/ban/üyelik kapısı).',
+  })
   joinDiscovery(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
     return this.guildsService.joinDiscovery(user.id, guildId);
   }
@@ -152,10 +173,7 @@ export class GuildsController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Ortamı sil (soft-delete; yalnız OWNER). Dönüş null.' })
-  deleteGuild(
-    @CurrentUser() user: { id: string },
-    @Param('id') guildId: string,
-  ) {
+  deleteGuild(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
     return this.guildsService.deleteGuild(user.id, guildId);
   }
 
@@ -163,7 +181,9 @@ export class GuildsController {
 
   @Patch(':id/members/:userId/role')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Üye rolünü değiştir (yalnız OWNER; ADMIN|MEMBER; OWNER rolü atılamaz).' })
+  @ApiOperation({
+    summary: 'Üye rolünü değiştir (yalnız OWNER; ADMIN|MEMBER; OWNER rolü atılamaz).',
+  })
   updateMemberRole(
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,
@@ -177,7 +197,9 @@ export class GuildsController {
 
   @Delete(':id/members/:userId')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Üyeyi ortamdan at (OWNER: ADMIN/MEMBER; ADMIN: yalnız MEMBER). Dönüş null.' })
+  @ApiOperation({
+    summary: 'Üyeyi ortamdan at (OWNER: ADMIN/MEMBER; ADMIN: yalnız MEMBER). Dönüş null.',
+  })
   kickMember(
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,
@@ -200,7 +222,10 @@ export class GuildsController {
 
   @Post(':id/members/:userId/transfer')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Ortam sahipliğini devret (yalnız OWNER; hedef OWNER, eski sahip ADMIN olur). Dönüş null.' })
+  @ApiOperation({
+    summary:
+      'Ortam sahipliğini devret (yalnız OWNER; hedef OWNER, eski sahip ADMIN olur). Dönüş null.',
+  })
   transferOwnership(
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,
@@ -213,7 +238,10 @@ export class GuildsController {
 
   @Post(':id/members/:userId/ban')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Üyeyi kalıcı yasakla (kick + tekrar davetle giremez). Hiyerarşi kick ile aynı. Dönüş null.' })
+  @ApiOperation({
+    summary:
+      'Üyeyi kalıcı yasakla (kick + tekrar davetle giremez). Hiyerarşi kick ile aynı. Dönüş null.',
+  })
   banMember(
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,
@@ -244,7 +272,10 @@ export class GuildsController {
 
   @Post(':id/invite-friend')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Kankayı ortama davet et: hedefe kalıcı GUILD_INVITE bildirimi düşer (CREATE_INVITE + arkadaşlık şart). Dönüş null.' })
+  @ApiOperation({
+    summary:
+      'Kankayı ortama davet et: hedefe kalıcı GUILD_INVITE bildirimi düşer (CREATE_INVITE + arkadaşlık şart). Dönüş null.',
+  })
   inviteFriend(
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,
@@ -256,7 +287,10 @@ export class GuildsController {
   // ─── §G: Denetim kaydı okuma ──────────────────────────────────────────────
 
   @Get(':id/audit-logs')
-  @ApiOperation({ summary: 'Ortam denetim kaydını getir (owner veya MANAGE_GUILD). limit varsayılan 50, max 100; before = cursor (auditLog id).' })
+  @ApiOperation({
+    summary:
+      'Ortam denetim kaydını getir (owner veya MANAGE_GUILD). limit varsayılan 50, max 100; before = cursor (auditLog id).',
+  })
   getAuditLogs(
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,

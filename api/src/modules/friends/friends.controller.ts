@@ -47,7 +47,10 @@ export class FriendsController {
   @Post('requests/by-user')
   @Throttle({ default: { ttl: 3600000, limit: 20 } })
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Kullanıcı ID ile istek gönder (USER_CLICK, G2 tıkla-ekle) — ortak ortam + yetişkin zorunlu' })
+  @ApiOperation({
+    summary:
+      'Kullanıcı ID ile istek gönder (USER_CLICK, G2 tıkla-ekle) — ortak ortam + yetişkin zorunlu',
+  })
   sendRequestByUser(@CurrentUser() user: { id: string }, @Body() dto: SendFriendRequestByUserDto) {
     return this.friendsService.sendFriendRequestByUser(user.id, dto);
   }

@@ -47,7 +47,12 @@ function makeService() {
   // GuildJoinService gerçek örnek — Sprint 7A gate'i tek kaynaktan paylaşılır (duplike değil).
   // Aynı prismaMock + realtimeMock ile wire edilir; mevcut kapı testleri aynen geçer.
   const guildJoin = new GuildJoinService(prismaMock as any, realtimeMock as any);
-  return new InvitesService(prismaMock as any, membershipMock as any, permissionsMock as any, guildJoin);
+  return new InvitesService(
+    prismaMock as any,
+    membershipMock as any,
+    permissionsMock as any,
+    guildJoin,
+  );
 }
 
 function resetMocks() {
@@ -60,13 +65,31 @@ function resetMocks() {
 }
 
 // ── Fixture helpers ──────────────────────────────────────────────────────────
-const GUILD_NORMAL = { id: 'guild1', name: 'Oyun Klanı', ownerId: 'owner1', adultsOnly: false, iconUrl: null, createdAt: new Date(), updatedAt: new Date(), deletedAt: null };
+const GUILD_NORMAL = {
+  id: 'guild1',
+  name: 'Oyun Klanı',
+  ownerId: 'owner1',
+  adultsOnly: false,
+  iconUrl: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  deletedAt: null,
+};
 const GUILD_ADULTS = { ...GUILD_NORMAL, id: 'guild2', adultsOnly: true };
 
-function makeInvite(overrides: Partial<{
-  id: string; code: string; guildId: string; guild: typeof GUILD_NORMAL;
-  maxUses: number | null; uses: number; expiresAt: Date | null; deletedAt: Date | null; createdAt: Date;
-}> = {}) {
+function makeInvite(
+  overrides: Partial<{
+    id: string;
+    code: string;
+    guildId: string;
+    guild: typeof GUILD_NORMAL;
+    maxUses: number | null;
+    uses: number;
+    expiresAt: Date | null;
+    deletedAt: Date | null;
+    createdAt: Date;
+  }> = {},
+) {
   return {
     id: 'inv1',
     code: 'ABCD1234',
@@ -124,8 +147,9 @@ describe('InvitesService.createInvite', () => {
     });
     permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
-    await expect(service.createInvite('member1', GUILD_NORMAL.id, {}))
-      .rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.createInvite('member1', GUILD_NORMAL.id, {})).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 });
 
@@ -142,8 +166,9 @@ describe('InvitesService.joinByInvite — [R7] kapı sırası', () => {
   it('davet bulunamadı → 404 INVITE_INVALID', async () => {
     prismaMock.invite.findUnique.mockResolvedValue(null);
 
-    await expect(service.joinByInvite('user1', 'BADCODE'))
-      .rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.joinByInvite('user1', 'BADCODE')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
 
     try {
       await service.joinByInvite('user1', 'BADCODE');
@@ -153,12 +178,11 @@ describe('InvitesService.joinByInvite — [R7] kapı sırası', () => {
   });
 
   it('iptal edilmiş davet (deletedAt!=null) → 404 INVITE_INVALID', async () => {
-    prismaMock.invite.findUnique.mockResolvedValue(
-      makeInvite({ deletedAt: new Date() }),
-    );
+    prismaMock.invite.findUnique.mockResolvedValue(makeInvite({ deletedAt: new Date() }));
 
-    await expect(service.joinByInvite('user1', 'ABCD1234'))
-      .rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.joinByInvite('user1', 'ABCD1234')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('süresi dolmuş davet → 404 INVITE_INVALID', async () => {
@@ -166,17 +190,17 @@ describe('InvitesService.joinByInvite — [R7] kapı sırası', () => {
       makeInvite({ expiresAt: new Date(Date.now() - 1000) }),
     );
 
-    await expect(service.joinByInvite('user1', 'ABCD1234'))
-      .rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.joinByInvite('user1', 'ABCD1234')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('maxUses dolmuş davet → 404 INVITE_INVALID', async () => {
-    prismaMock.invite.findUnique.mockResolvedValue(
-      makeInvite({ maxUses: 5, uses: 5 }),
-    );
+    prismaMock.invite.findUnique.mockResolvedValue(makeInvite({ maxUses: 5, uses: 5 }));
 
-    await expect(service.joinByInvite('user1', 'ABCD1234'))
-      .rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.joinByInvite('user1', 'ABCD1234')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   // 2. [R7 KRİTİK] adultsOnly + minör → AGE_RESTRICTED
@@ -186,8 +210,9 @@ describe('InvitesService.joinByInvite — [R7] kapı sırası', () => {
     );
     prismaMock.user.findUnique.mockResolvedValue({ isMinor: true });
 
-    await expect(service.joinByInvite('minor1', 'ABCD1234'))
-      .rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.joinByInvite('minor1', 'ABCD1234')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
 
     try {
       prismaMock.invite.findUnique.mockResolvedValue(
@@ -203,10 +228,14 @@ describe('InvitesService.joinByInvite — [R7] kapı sırası', () => {
   it('[ban] yasaklı kullanıcı davetle giremez → 403 GUILD_BANNED', async () => {
     prismaMock.invite.findUnique.mockResolvedValue(makeInvite());
     prismaMock.guildBan.findUnique.mockResolvedValue({
-      guildId: GUILD_NORMAL.id, userId: 'user1', bannedById: 'owner1', reason: null,
+      guildId: GUILD_NORMAL.id,
+      userId: 'user1',
+      bannedById: 'owner1',
+      reason: null,
     });
-    await expect(service.joinByInvite('user1', 'ABCD1234'))
-      .rejects.toMatchObject({ response: { error: 'GUILD_BANNED' } });
+    await expect(service.joinByInvite('user1', 'ABCD1234')).rejects.toMatchObject({
+      response: { error: 'GUILD_BANNED' },
+    });
   });
 
   it('[R7] adultsOnly ortam + minör → isMinor sızdırılmaz (sadece AGE_RESTRICTED)', async () => {
@@ -231,8 +260,9 @@ describe('InvitesService.joinByInvite — [R7] kapı sırası', () => {
     prismaMock.user.findUnique.mockResolvedValue({ isMinor: false });
     prismaMock.guildMember.findUnique.mockResolvedValue({ id: 'gm1' }); // zaten üye
 
-    await expect(service.joinByInvite('adult1', 'ABCD1234'))
-      .rejects.toBeInstanceOf(ConflictException);
+    await expect(service.joinByInvite('adult1', 'ABCD1234')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 
   it('normal ortam (non-adultsOnly) + minör → yaş kontrolü yapılmaz, devam eder', async () => {
@@ -240,8 +270,9 @@ describe('InvitesService.joinByInvite — [R7] kapı sırası', () => {
     prismaMock.guildMember.findUnique.mockResolvedValue({ id: 'gm1' }); // zaten üye
 
     // user.findUnique çağrılMAMALI (adultsOnly=false)
-    await expect(service.joinByInvite('minor1', 'ABCD1234'))
-      .rejects.toBeInstanceOf(ConflictException);
+    await expect(service.joinByInvite('minor1', 'ABCD1234')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
 
     expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
   });
@@ -251,8 +282,9 @@ describe('InvitesService.joinByInvite — [R7] kapı sırası', () => {
     prismaMock.invite.findUnique.mockResolvedValue(makeInvite());
     prismaMock.guildMember.findUnique.mockResolvedValue({ id: 'gm1' });
 
-    await expect(service.joinByInvite('user1', 'ABCD1234'))
-      .rejects.toBeInstanceOf(ConflictException);
+    await expect(service.joinByInvite('user1', 'ABCD1234')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
 
     try {
       prismaMock.invite.findUnique.mockResolvedValue(makeInvite());
@@ -267,10 +299,7 @@ describe('InvitesService.joinByInvite — [R7] kapı sırası', () => {
   it('geçerli davet + yeni üye → GuildDto döner, transaction çalışır', async () => {
     prismaMock.invite.findUnique.mockResolvedValue(makeInvite());
     prismaMock.guildMember.findUnique.mockResolvedValue(null);
-    prismaMock.$transaction.mockResolvedValue([
-      { id: 'gm-new' },
-      { ...makeInvite(), uses: 1 },
-    ]);
+    prismaMock.$transaction.mockResolvedValue([{ id: 'gm-new' }, { ...makeInvite(), uses: 1 }]);
 
     const result = await service.joinByInvite('newuser', 'ABCD1234');
     expect(result.id).toBe(GUILD_NORMAL.id);
@@ -291,26 +320,30 @@ describe('InvitesService.revokeInvite', () => {
   it('davet bulunamadı → 404 INVITE_INVALID', async () => {
     prismaMock.invite.findUnique.mockResolvedValue(null);
 
-    await expect(service.revokeInvite('owner1', 'BADCODE'))
-      .rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.revokeInvite('owner1', 'BADCODE')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('zaten iptal edilmiş → 404 INVITE_INVALID', async () => {
-    prismaMock.invite.findUnique.mockResolvedValue(
-      makeInvite({ deletedAt: new Date() }),
-    );
+    prismaMock.invite.findUnique.mockResolvedValue(makeInvite({ deletedAt: new Date() }));
 
-    await expect(service.revokeInvite('owner1', 'ABCD1234'))
-      .rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.revokeInvite('owner1', 'ABCD1234')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('MEMBER rolüyle → 403 FORBIDDEN', async () => {
     prismaMock.invite.findUnique.mockResolvedValue(makeInvite());
-    membershipMock.requireGuildMembership.mockResolvedValue({ guild: GUILD_NORMAL, membership: { role: 'MEMBER' } });
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD_NORMAL,
+      membership: { role: 'MEMBER' },
+    });
     permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
-    await expect(service.revokeInvite('member1', 'ABCD1234'))
-      .rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.revokeInvite('member1', 'ABCD1234')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 
   it('OWNER → başarıyla iptal eder, null döner', async () => {

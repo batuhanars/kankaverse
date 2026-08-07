@@ -30,13 +30,14 @@ export class ModerationService {
    * @param userId  Sorgulanacak kullanıcı
    * @param guildId Kanal bağlamı (MUTE scope eşleşmesi için); null/undefined = yalnızca global kontrol
    */
-  async getActiveRestrictions(userId: string, guildId?: string | null): Promise<ActiveRestriction[]> {
+  async getActiveRestrictions(
+    userId: string,
+    guildId?: string | null,
+  ): Promise<ActiveRestriction[]> {
     const now = new Date();
 
     // scope filtresi: global (null) VEYA verilen guildId
-    const scopeFilter = guildId
-      ? { OR: [{ scope: null }, { scope: guildId }] }
-      : { scope: null };
+    const scopeFilter = guildId ? { OR: [{ scope: null }, { scope: guildId }] } : { scope: null };
 
     const actions = await this.prisma.moderationAction.findMany({
       where: {
@@ -71,9 +72,7 @@ export class ModerationService {
    */
   async hasActiveMute(userId: string, guildId: string | null): Promise<boolean> {
     const now = new Date();
-    const muteFilter = guildId
-      ? { OR: [{ scope: null }, { scope: guildId }] }
-      : { scope: null };
+    const muteFilter = guildId ? { OR: [{ scope: null }, { scope: guildId }] } : { scope: null };
 
     const mute = await this.prisma.moderationAction.findFirst({
       where: {

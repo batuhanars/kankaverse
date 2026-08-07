@@ -32,7 +32,9 @@ describe('VerifiedEmailGuard', () => {
     try {
       guard.canActivate(ctx);
     } catch (e) {
-      expect((e as ForbiddenException).getResponse()).toMatchObject({ error: 'EMAIL_NOT_VERIFIED' });
+      expect((e as ForbiddenException).getResponse()).toMatchObject({
+        error: 'EMAIL_NOT_VERIFIED',
+      });
     }
   });
 

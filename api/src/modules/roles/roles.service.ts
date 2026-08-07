@@ -9,25 +9,32 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
-import { filterKnownPermissions, DEFAULT_EVERYONE_PERMISSIONS, PermissionFlag } from '../../common/permissions';
+import {
+  filterKnownPermissions,
+  DEFAULT_EVERYONE_PERMISSIONS,
+  PermissionFlag,
+} from '../../common/permissions';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { RoleDto } from './dto/role.dto';
 
 /** Prisma Role kaydını RoleDto'ya dönüştürür. memberCount sorgu sonucu verilir. */
-function toRoleDto(role: {
-  id: string;
-  guildId: string;
-  name: string;
-  color: string;
-  position: number;
-  hoist: boolean;
-  mentionable: boolean;
-  permissions: string[];
-  iconUrl: string | null;
-  isEveryone: boolean;
-  isDefault: boolean;
-}, memberCount: number): RoleDto {
+function toRoleDto(
+  role: {
+    id: string;
+    guildId: string;
+    name: string;
+    color: string;
+    position: number;
+    hoist: boolean;
+    mentionable: boolean;
+    permissions: string[];
+    iconUrl: string | null;
+    isEveryone: boolean;
+    isDefault: boolean;
+  },
+  memberCount: number,
+): RoleDto {
   return {
     id: role.id,
     guildId: role.guildId,
@@ -200,12 +207,16 @@ export class RolesService {
       }
     }
 
-    const permissions = dto.permissions !== undefined
-      ? filterKnownPermissions(dto.permissions)
-      : undefined;
+    const permissions =
+      dto.permissions !== undefined ? filterKnownPermissions(dto.permissions) : undefined;
     // F1: izin değişiyorsa aktör yalnız kendi sahip olduğu yeni bayrakları ekleyebilir
     if (permissions !== undefined) {
-      await this.requireCanGrant(actorId, role.guildId, permissions, filterKnownPermissions(role.permissions));
+      await this.requireCanGrant(
+        actorId,
+        role.guildId,
+        permissions,
+        filterKnownPermissions(role.permissions),
+      );
     }
 
     // Varsayılan rol (yeni üyelere otomatik): @everyone olamaz; guild başına TEK.
@@ -253,7 +264,11 @@ export class RolesService {
     for (const id of clearedRoleIds) {
       const r = await this.prisma.role.findUnique({ where: { id } });
       if (r) {
-        this.realtime.emitToUsers(memberIds, 'guild.role_updated', toRoleDto(r, await this.roleMemberCount(id)));
+        this.realtime.emitToUsers(
+          memberIds,
+          'guild.role_updated',
+          toRoleDto(r, await this.roleMemberCount(id)),
+        );
       }
     }
 
@@ -293,7 +308,11 @@ export class RolesService {
     actorId: string,
     roleId: string,
     targetUserId: string,
-  ): Promise<import('../guilds/dto/guild-member.dto').GuildMemberDto & { roles: { id: string; name: string; color: string; position: number; hoist: boolean }[] }> {
+  ): Promise<
+    import('../guilds/dto/guild-member.dto').GuildMemberDto & {
+      roles: { id: string; name: string; color: string; position: number; hoist: boolean }[];
+    }
+  > {
     const role = await this.findRoleOrFail(roleId);
     await this.requireManageRoles(actorId, role.guildId);
     // @everyone örtük — atama/çıkarma yasak (hiyerarşi kontrolünden önce fırlatır)
@@ -358,7 +377,11 @@ export class RolesService {
     actorId: string,
     roleId: string,
     targetUserId: string,
-  ): Promise<import('../guilds/dto/guild-member.dto').GuildMemberDto & { roles: { id: string; name: string; color: string; position: number; hoist: boolean }[] }> {
+  ): Promise<
+    import('../guilds/dto/guild-member.dto').GuildMemberDto & {
+      roles: { id: string; name: string; color: string; position: number; hoist: boolean }[];
+    }
+  > {
     const role = await this.findRoleOrFail(roleId);
     await this.requireManageRoles(actorId, role.guildId);
     if (role.isEveryone) {
@@ -466,7 +489,9 @@ export class RolesService {
   private toExtendedMemberDto(member: {
     user: { id: string; username: string; avatarUrl: string | null; bannerUrl: string | null };
     role: GuildRole;
-    roleLinks: { role: { id: string; name: string; color: string; position: number; hoist: boolean } }[];
+    roleLinks: {
+      role: { id: string; name: string; color: string; position: number; hoist: boolean };
+    }[];
   }) {
     return {
       userId: member.user.id,

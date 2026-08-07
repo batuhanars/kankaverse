@@ -50,9 +50,7 @@ export class AutomodService {
     // Tek kelime → token başı (prefix). `ı` normalize'de korunduğu için token
     // sınıfına dahil; gerisi a-z0-9.
     const tokens = normalized.split(/[^a-z0-9ı]+/).filter(Boolean);
-    const blocked = tokens.some((token) =>
-      this.bannedWords.some((word) => token.startsWith(word)),
-    );
+    const blocked = tokens.some((token) => this.bannedWords.some((word) => token.startsWith(word)));
     return { blocked };
   }
 

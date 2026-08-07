@@ -363,7 +363,11 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     });
     this.realtime.emitToUser(calleeId, 'voice.incoming_call', {
       channelId,
-      caller: { id: userId, username: caller?.username ?? userId, avatarUrl: caller?.avatarUrl ?? null },
+      caller: {
+        id: userId,
+        username: caller?.username ?? userId,
+        avatarUrl: caller?.avatarUrl ?? null,
+      },
     });
 
     // M4a-3 §9.1 madde 2 — fire-and-forget push (await YOK, ack'i geciktirmez/bozmaz).
@@ -397,7 +401,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() payload: { channelId: string },
   ) {
     const other = await this.otherDmMember(payload.channelId, socket.data.userId);
-    if (other) this.realtime.emitToUser(other, 'voice.call_accepted', { channelId: payload.channelId });
+    if (other)
+      this.realtime.emitToUser(other, 'voice.call_accepted', { channelId: payload.channelId });
     return { ok: true };
   }
 
@@ -407,7 +412,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() payload: { channelId: string },
   ) {
     const other = await this.otherDmMember(payload.channelId, socket.data.userId);
-    if (other) this.realtime.emitToUser(other, 'voice.call_rejected', { channelId: payload.channelId });
+    if (other)
+      this.realtime.emitToUser(other, 'voice.call_rejected', { channelId: payload.channelId });
     return { ok: true };
   }
 
@@ -417,7 +423,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() payload: { channelId: string },
   ) {
     const other = await this.otherDmMember(payload.channelId, socket.data.userId);
-    if (other) this.realtime.emitToUser(other, 'voice.call_canceled', { channelId: payload.channelId });
+    if (other)
+      this.realtime.emitToUser(other, 'voice.call_canceled', { channelId: payload.channelId });
     return { ok: true };
   }
 
@@ -429,7 +436,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const userId = socket.data.userId;
     const { channelId } = payload;
 
-    const channel = await this.prisma.channel.findUnique({ where: { id: channelId }, select: { type: true } });
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { type: true },
+    });
     if (!channel || channel.type !== 'GROUP_DM') return { ok: false, error: 'NOT_GROUP' };
 
     try {
@@ -518,7 +528,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     const content =
       typeof messageDto['content'] === 'string' && messageDto['content'].trim().length > 0
-        ? (messageDto['content'] as string)
+        ? messageDto['content']
         : '[dosya]';
 
     const payload = {
@@ -534,7 +544,12 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.realtime.emitToUser(member.userId, 'dm.message', payload);
     }
 
-    await this.sendDmPush(channelId, members.map((m) => m.userId), messageDto, content);
+    await this.sendDmPush(
+      channelId,
+      members.map((m) => m.userId),
+      messageDto,
+      content,
+    );
   }
 
   /**
@@ -560,7 +575,9 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (recipients.length === 0) return;
 
     const eligibility = await Promise.all(
-      recipients.map((recipientId) => this.notifications.shouldNotifyChannel(recipientId, null, channelId)),
+      recipients.map((recipientId) =>
+        this.notifications.shouldNotifyChannel(recipientId, null, channelId),
+      ),
     );
     const allowed = recipients.filter((_, i) => eligibility[i]);
     if (allowed.length === 0) return;
@@ -681,14 +698,18 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     // Önizleme: mention token'larını temizle (<@&..>→@everyone, <@..>→@birisi), ≤100 karakter.
     // Boş içerik (yalnız ek) → [dosya].
-    const rawContent = typeof messageDto['content'] === 'string' ? (messageDto['content'] as string) : '';
+    const rawContent = typeof messageDto['content'] === 'string' ? messageDto['content'] : '';
     const preview = (rawContent.trim().length > 0 ? rawContent : '[dosya]')
       .replace(/<@&[a-zA-Z0-9_-]+>/g, '@everyone')
       .replace(/<@[a-zA-Z0-9_-]+>/g, '@birisi')
       .slice(0, 100);
 
     const basePayload = { channelId, guildId, authorId };
-    const richPayload = { ...basePayload, author: { id: author.id, username: author.username }, preview };
+    const richPayload = {
+      ...basePayload,
+      author: { id: author.id, username: author.username },
+      preview,
+    };
 
     for (const member of guildMembers) {
       // Yazarın kendisine gönderme
@@ -722,7 +743,12 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     // Kanal: guildId + özel mi + yaş kapısı (DM ise guildId null)
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId },
-      select: { guildId: true, isPrivate: true, ageGated: true, guild: { select: { adultsOnly: true } } },
+      select: {
+        guildId: true,
+        isPrivate: true,
+        ageGated: true,
+        guild: { select: { adultsOnly: true } },
+      },
     });
     const guildId = channel?.guildId ?? null;
     const needsAgeCheck = !!channel && (channel.ageGated || (channel.guild?.adultsOnly ?? false));
@@ -740,7 +766,11 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const content = (messageDto['content'] as string) ?? '';
     const preview = await this.resolveMentionPreview(content, guildId);
 
-    const author = messageDto['author'] as { id: string; username: string; avatarUrl: string | null };
+    const author = messageDto['author'] as {
+      id: string;
+      username: string;
+      avatarUrl: string | null;
+    };
 
     const eventPayload = {
       messageId: messageDto['id'] as string,
@@ -828,9 +858,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
           },
           select: { userId: true, suppressEveryone: true, suppressRoleMentions: true },
         });
-        suppressedEveryone = new Set(
-          prefs.filter((p) => p.suppressEveryone).map((p) => p.userId),
-        );
+        suppressedEveryone = new Set(prefs.filter((p) => p.suppressEveryone).map((p) => p.userId));
         suppressedRoleMentions = new Set(
           prefs.filter((p) => p.suppressRoleMentions).map((p) => p.userId),
         );
@@ -853,8 +881,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
        * açık bıraktığı kanalı da sessizce kapatırdı.
        */
       if (!directlyMentioned.has(mentionedUserId)) {
-        const viaEveryone = fromEveryone.has(mentionedUserId) && !suppressedEveryone.has(mentionedUserId);
-        const viaRole = fromRole.has(mentionedUserId) && !suppressedRoleMentions.has(mentionedUserId);
+        const viaEveryone =
+          fromEveryone.has(mentionedUserId) && !suppressedEveryone.has(mentionedUserId);
+        const viaRole =
+          fromRole.has(mentionedUserId) && !suppressedRoleMentions.has(mentionedUserId);
         if (!viaEveryone && !viaRole) continue;
       }
       this.realtime.emitToUser(mentionedUserId, 'mention', eventPayload);
@@ -881,5 +911,4 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       });
     }
   }
-
 }

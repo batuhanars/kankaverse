@@ -23,17 +23,29 @@ export function calculateIsMinor(birthDate: Date): boolean {
 export function validateBirthDate(raw: string): Date {
   const birthDate = new Date(raw);
   if (isNaN(birthDate.getTime())) {
-    throw new UnprocessableEntityException({ message: 'Geçersiz doğum tarihi.', error: 'INVALID_BIRTHDATE' });
+    throw new UnprocessableEntityException({
+      message: 'Geçersiz doğum tarihi.',
+      error: 'INVALID_BIRTHDATE',
+    });
   }
   if (birthDate >= new Date()) {
-    throw new UnprocessableEntityException({ message: 'Doğum tarihi geçmişte olmalıdır.', error: 'INVALID_BIRTHDATE' });
+    throw new UnprocessableEntityException({
+      message: 'Doğum tarihi geçmişte olmalıdır.',
+      error: 'INVALID_BIRTHDATE',
+    });
   }
   const age = calculateAge(birthDate);
   if (age > MAX_AGE) {
-    throw new UnprocessableEntityException({ message: 'Geçersiz doğum tarihi.', error: 'INVALID_BIRTHDATE' });
+    throw new UnprocessableEntityException({
+      message: 'Geçersiz doğum tarihi.',
+      error: 'INVALID_BIRTHDATE',
+    });
   }
   if (age < MIN_AGE) {
-    throw new UnprocessableEntityException({ message: 'Kayıt için en az 13 yaşında olmalısın.', error: 'UNDERAGE' });
+    throw new UnprocessableEntityException({
+      message: 'Kayıt için en az 13 yaşında olmalısın.',
+      error: 'UNDERAGE',
+    });
   }
   return birthDate;
 }

@@ -25,7 +25,10 @@ export class ModeratorGuard implements CanActivate {
     });
 
     if (!user?.isModerator) {
-      throw new ForbiddenException({ message: 'Bu işlem için moderatör yetkisi gereklidir.', error: 'FORBIDDEN' });
+      throw new ForbiddenException({
+        message: 'Bu işlem için moderatör yetkisi gereklidir.',
+        error: 'FORBIDDEN',
+      });
     }
 
     return true;

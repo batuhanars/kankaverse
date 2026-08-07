@@ -29,7 +29,10 @@ export class BlocksService {
 
   async blockUser(blockerId: string, dto: CreateBlockDto) {
     if (blockerId === dto.userId) {
-      throw new BadRequestException({ message: 'Kendinizi engelleyemezsiniz.', error: 'CANNOT_BLOCK_SELF' });
+      throw new BadRequestException({
+        message: 'Kendinizi engelleyemezsiniz.',
+        error: 'CANNOT_BLOCK_SELF',
+      });
     }
 
     const target = await this.prisma.user.findUnique({
@@ -44,7 +47,10 @@ export class BlocksService {
       where: { blockerId_blockedId: { blockerId, blockedId: dto.userId } },
     });
     if (existing) {
-      throw new ConflictException({ message: 'Bu kullanıcı zaten engellenmiş.', error: 'ALREADY_BLOCKED' });
+      throw new ConflictException({
+        message: 'Bu kullanıcı zaten engellenmiş.',
+        error: 'ALREADY_BLOCKED',
+      });
     }
 
     // Transaction: engelle + arkadaşlık sil + bekleyen istekleri iptal

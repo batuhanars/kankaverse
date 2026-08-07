@@ -1,4 +1,12 @@
-import { IsEnum, IsString, IsNotEmpty, IsBoolean, IsOptional, IsDateString, ValidateIf } from 'class-validator';
+import {
+  IsEnum,
+  IsString,
+  IsNotEmpty,
+  IsBoolean,
+  IsOptional,
+  IsDateString,
+  ValidateIf,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { NotificationLevel, NotifTargetType } from '@prisma/client';
 
@@ -35,21 +43,27 @@ export class SetNotificationPrefDto {
   @ApiPropertyOptional({
     example: '2026-06-17T15:00:00.000Z',
     nullable: true,
-    description: 'Susturma bitiş zamanı (ISO). null = süresiz (muted true ise). Süreli sustur için verilir.',
+    description:
+      'Susturma bitiş zamanı (ISO). null = süresiz (muted true ise). Süreli sustur için verilir.',
   })
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
   @IsDateString({}, { message: 'Geçersiz tarih.' })
   mutedUntil?: string | null;
 
-  @ApiPropertyOptional({ enum: NotificationLevel, example: 'MENTIONS', description: 'Bildirim seviyesi (varsayılan ALL)' })
+  @ApiPropertyOptional({
+    enum: NotificationLevel,
+    example: 'MENTIONS',
+    description: 'Bildirim seviyesi (varsayılan ALL)',
+  })
   @IsOptional()
   @IsEnum(NotificationLevel, { message: 'Geçersiz bildirim seviyesi.' })
   level?: NotificationLevel;
 
   @ApiPropertyOptional({
     example: true,
-    description: 'R14 — @everyone bastır. YALNIZ targetType=GUILD ile; aksi 400 INVALID_PREF_TARGET.',
+    description:
+      'R14 — @everyone bastır. YALNIZ targetType=GUILD ile; aksi 400 INVALID_PREF_TARGET.',
   })
   @IsOptional()
   @IsBoolean()

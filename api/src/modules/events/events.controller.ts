@@ -37,19 +37,13 @@ export class EventsController {
 
   @Get('guilds/:id/events')
   @ApiOperation({ summary: 'Görünür etkinlikleri listele (üye + görünürlük, startAt artan)' })
-  findByGuild(
-    @CurrentUser() user: { id: string },
-    @Param('id') guildId: string,
-  ) {
+  findByGuild(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
     return this.eventsService.findByGuild(user.id, guildId);
   }
 
   @Get('events/:id')
   @ApiOperation({ summary: 'Tek etkinlik (üye + görünürlük)' })
-  findOne(
-    @CurrentUser() user: { id: string },
-    @Param('id') eventId: string,
-  ) {
+  findOne(@CurrentUser() user: { id: string }, @Param('id') eventId: string) {
     return this.eventsService.findOne(user.id, eventId);
   }
 
@@ -67,30 +61,21 @@ export class EventsController {
   @Delete('events/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Etkinliği soft-delete et (MANAGE_EVENTS). Dönüş null.' })
-  remove(
-    @CurrentUser() user: { id: string },
-    @Param('id') eventId: string,
-  ) {
+  remove(@CurrentUser() user: { id: string }, @Param('id') eventId: string) {
     return this.eventsService.remove(user.id, eventId);
   }
 
   @Post('events/:id/interest')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '"İlgileniyor" işaretle (üye + görünürlük; idempotent)' })
-  addInterest(
-    @CurrentUser() user: { id: string },
-    @Param('id') eventId: string,
-  ) {
+  addInterest(@CurrentUser() user: { id: string }, @Param('id') eventId: string) {
     return this.eventsService.addInterest(user.id, eventId);
   }
 
   @Delete('events/:id/interest')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'İlgiyi kaldır (üye; idempotent)' })
-  removeInterest(
-    @CurrentUser() user: { id: string },
-    @Param('id') eventId: string,
-  ) {
+  removeInterest(@CurrentUser() user: { id: string }, @Param('id') eventId: string) {
     return this.eventsService.removeInterest(user.id, eventId);
   }
 }

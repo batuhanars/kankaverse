@@ -216,7 +216,9 @@ export class ChannelsService {
       }),
     );
 
-    return channels.map((ch, i) => toChannelDto(ch, counts[i].unread, counts[i].mentions, lockedFor(ch)));
+    return channels.map((ch, i) =>
+      toChannelDto(ch, counts[i].unread, counts[i].mentions, lockedFor(ch)),
+    );
   }
 
   /** POST /channels/:id/read — kanaldaki son mesajı okundu işaretle */
@@ -360,7 +362,9 @@ export class ChannelsService {
     );
 
     // Realtime: güncel kanalları TÜM guild üyelerine yay (özel kanal görünür ama locked)
-    const updated = await this.prisma.channel.findMany({ where: { id: { in: valid.map((v) => v.id) } } });
+    const updated = await this.prisma.channel.findMany({
+      where: { id: { in: valid.map((v) => v.id) } },
+    });
     for (const ch of updated) {
       await this.emitChannelEventToGuild('channel.updated', guildId, ch);
     }
@@ -439,7 +443,10 @@ export class ChannelsService {
     // DM kanalı: guildId yoksa requireGuildMembership çağrılamaz; erken çıkış.
     // DM-lik bilgisini sızdırma riski önemsiz (guild context'i yok zaten).
     if (!channel.guildId) {
-      throw new BadRequestException({ message: 'Bu işlem yalnızca özel guild kanallarında kullanılabilir.', error: 'NOT_PRIVATE_CHANNEL' });
+      throw new BadRequestException({
+        message: 'Bu işlem yalnızca özel guild kanallarında kullanılabilir.',
+        error: 'NOT_PRIVATE_CHANNEL',
+      });
     }
 
     // §2 MANAGE_CHANNELS GATE — önce yetki; yetkisiz kullanıcı bundan ötesini göremez.
@@ -448,7 +455,10 @@ export class ChannelsService {
 
     // Domain doğrulaması: kanal özel değilse işlem anlamsız (GATE sonrası — sızıntı yok).
     if (!channel.isPrivate) {
-      throw new BadRequestException({ message: 'Bu işlem yalnızca özel guild kanallarında kullanılabilir.', error: 'NOT_PRIVATE_CHANNEL' });
+      throw new BadRequestException({
+        message: 'Bu işlem yalnızca özel guild kanallarında kullanılabilir.',
+        error: 'NOT_PRIVATE_CHANNEL',
+      });
     }
 
     // Hedef kullanıcı guild üyesi mi?
@@ -456,7 +466,10 @@ export class ChannelsService {
       where: { guildId_userId: { guildId: channel.guildId, userId: dto.userId } },
     });
     if (!targetGuildMembership) {
-      throw new BadRequestException({ message: 'Kullanıcı bu ortamın üyesi değil.', error: 'NOT_GUILD_MEMBER' });
+      throw new BadRequestException({
+        message: 'Kullanıcı bu ortamın üyesi değil.',
+        error: 'NOT_GUILD_MEMBER',
+      });
     }
 
     // R7: Yaş kapısı — kanal ageGated veya guild adultsOnly ise hedef minör olamaz
@@ -467,7 +480,10 @@ export class ChannelsService {
         select: { isMinor: true },
       });
       if (target?.isMinor) {
-        throw new BadRequestException({ message: 'Yaşa kısıtlı kanala reşit olmayan kullanıcı eklenemez.', error: 'AGE_RESTRICTED' });
+        throw new BadRequestException({
+          message: 'Yaşa kısıtlı kanala reşit olmayan kullanıcı eklenemez.',
+          error: 'AGE_RESTRICTED',
+        });
       }
     }
 
@@ -508,7 +524,10 @@ export class ChannelsService {
 
     // DM kanalı: guildId yoksa requireGuildMembership çağrılamaz; erken çıkış.
     if (!channel.guildId) {
-      throw new BadRequestException({ message: 'Bu işlem yalnızca guild kanallarında kullanılabilir.', error: 'NOT_PRIVATE_CHANNEL' });
+      throw new BadRequestException({
+        message: 'Bu işlem yalnızca guild kanallarında kullanılabilir.',
+        error: 'NOT_PRIVATE_CHANNEL',
+      });
     }
 
     // §2 MANAGE_CHANNELS GATE — önce yetki.
@@ -552,7 +571,10 @@ export class ChannelsService {
       where: { guildId: channel.guildId!, deletedAt: null },
     });
     if (activeCount <= 1) {
-      throw new ConflictException({ message: 'Son kanal silinemez; ortamda en az bir kanal olmalıdır.', error: 'LAST_CHANNEL' });
+      throw new ConflictException({
+        message: 'Son kanal silinemez; ortamda en az bir kanal olmalıdır.',
+        error: 'LAST_CHANNEL',
+      });
     }
 
     // item 6: özel kanal herkese görünür → silme de TÜM guild üyelerine (ghost kanal kalmasın)
@@ -563,7 +585,10 @@ export class ChannelsService {
       data: { deletedAt: new Date() },
     });
 
-    this.realtime.emitToUsers(recipients, 'channel.deleted', { guildId: channel.guildId, channelId });
+    this.realtime.emitToUsers(recipients, 'channel.deleted', {
+      guildId: channel.guildId,
+      channelId,
+    });
 
     return null;
   }

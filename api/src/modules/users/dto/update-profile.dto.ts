@@ -21,7 +21,12 @@ export class UpdateProfileDto {
   dmPolicy?: DmPolicy;
 
   // Profil afiş rengi (preset anahtar; allowlist). null → varsayılan (marka Kor). Görsel afiş ileride.
-  @ApiPropertyOptional({ example: 'blue', enum: BANNER_PRESET_KEYS, nullable: true, description: 'Profil afiş rengi preset anahtarı (veya null).' })
+  @ApiPropertyOptional({
+    example: 'blue',
+    enum: BANNER_PRESET_KEYS,
+    nullable: true,
+    description: 'Profil afiş rengi preset anahtarı (veya null).',
+  })
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
   @IsIn(BANNER_PRESET_KEYS, { message: 'Geçersiz afiş rengi.' })

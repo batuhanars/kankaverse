@@ -18,7 +18,7 @@ describe('AutomodService.check', () => {
     });
 
     it('sayı ve noktalama → geçer', () => {
-      expect(service.check('Toplantı saat 15:30\'da!').blocked).toBe(false);
+      expect(service.check("Toplantı saat 15:30'da!").blocked).toBe(false);
     });
   });
 

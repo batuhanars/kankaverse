@@ -26,15 +26,57 @@ const ADULT_USER = { id: 'user1', isMinor: false };
 const MINOR_USER = { id: 'minor1', isMinor: true };
 
 // Kanallar: channel.findUnique artık guild'i include ederek döner (Sprint 7A)
-const GUILD_CHANNEL = { id: 'ch1', guildId: 'guild1', ageGated: false, isPrivate: false, deletedAt: null, guild: GUILD };
-const DM_CHANNEL = { id: 'dm1', guildId: null, ageGated: false, isPrivate: false, deletedAt: null, guild: null };
-const AGE_GATED_CHANNEL = { id: 'ch-adult', guildId: 'guild1', ageGated: true, isPrivate: false, deletedAt: null, guild: GUILD };
+const GUILD_CHANNEL = {
+  id: 'ch1',
+  guildId: 'guild1',
+  ageGated: false,
+  isPrivate: false,
+  deletedAt: null,
+  guild: GUILD,
+};
+const DM_CHANNEL = {
+  id: 'dm1',
+  guildId: null,
+  ageGated: false,
+  isPrivate: false,
+  deletedAt: null,
+  guild: null,
+};
+const AGE_GATED_CHANNEL = {
+  id: 'ch-adult',
+  guildId: 'guild1',
+  ageGated: true,
+  isPrivate: false,
+  deletedAt: null,
+  guild: GUILD,
+};
 // adultsOnly guild kanalı (Sprint 7A §4 erişim-zamanı enforcement)
 const ADULTS_ONLY_GUILD = { id: 'guild2', deletedAt: null, adultsOnly: true };
-const ADULTS_ONLY_CHANNEL = { id: 'ch-ao', guildId: 'guild2', ageGated: false, isPrivate: false, deletedAt: null, guild: ADULTS_ONLY_GUILD };
+const ADULTS_ONLY_CHANNEL = {
+  id: 'ch-ao',
+  guildId: 'guild2',
+  ageGated: false,
+  isPrivate: false,
+  deletedAt: null,
+  guild: ADULTS_ONLY_GUILD,
+};
 // Özel kanal (Sprint V2 B — R7)
-const PRIVATE_CHANNEL = { id: 'ch-priv', guildId: 'guild1', ageGated: false, isPrivate: true, deletedAt: null, guild: GUILD };
-const PRIVATE_AGE_GATED_CHANNEL = { id: 'ch-priv-adult', guildId: 'guild1', ageGated: true, isPrivate: true, deletedAt: null, guild: GUILD };
+const PRIVATE_CHANNEL = {
+  id: 'ch-priv',
+  guildId: 'guild1',
+  ageGated: false,
+  isPrivate: true,
+  deletedAt: null,
+  guild: GUILD,
+};
+const PRIVATE_AGE_GATED_CHANNEL = {
+  id: 'ch-priv-adult',
+  guildId: 'guild1',
+  ageGated: true,
+  isPrivate: true,
+  deletedAt: null,
+  guild: GUILD,
+};
 const OWNER_MEMBERSHIP = { guildId: 'guild1', userId: 'owner1', role: 'OWNER' };
 const ADMIN_MEMBERSHIP = { guildId: 'guild1', userId: 'admin1', role: 'ADMIN' };
 
@@ -110,13 +152,15 @@ describe('MembershipService.requireChannelAccess', () => {
       prismaMock.channel.findUnique.mockResolvedValue(AGE_GATED_CHANNEL);
       prismaMock.user.findUnique.mockResolvedValue({ isMinor: true });
 
-      await expect(service.requireChannelAccess(MINOR_USER.id, AGE_GATED_CHANNEL.id)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.requireChannelAccess(MINOR_USER.id, AGE_GATED_CHANNEL.id),
+      ).rejects.toThrow(ForbiddenException);
 
       prismaMock.channel.findUnique.mockResolvedValue(AGE_GATED_CHANNEL);
       prismaMock.user.findUnique.mockResolvedValue({ isMinor: true });
-      await expect(service.requireChannelAccess(MINOR_USER.id, AGE_GATED_CHANNEL.id)).rejects.toMatchObject({
+      await expect(
+        service.requireChannelAccess(MINOR_USER.id, AGE_GATED_CHANNEL.id),
+      ).rejects.toMatchObject({
         response: { error: 'AGE_RESTRICTED' },
       });
     });
@@ -155,7 +199,11 @@ describe('MembershipService.requireChannelAccess', () => {
     it('adultsOnly guild kanalı + yetişkin + üye → geçer', async () => {
       prismaMock.channel.findUnique.mockResolvedValue(ADULTS_ONLY_CHANNEL);
       prismaMock.user.findUnique.mockResolvedValue({ isMinor: false });
-      prismaMock.guildMember.findUnique.mockResolvedValue({ guildId: 'guild2', userId: 'adult1', role: 'MEMBER' });
+      prismaMock.guildMember.findUnique.mockResolvedValue({
+        guildId: 'guild2',
+        userId: 'adult1',
+        role: 'MEMBER',
+      });
 
       const result = await service.requireChannelAccess('adult1', ADULTS_ONLY_CHANNEL.id);
       expect(result).toMatchObject({ id: ADULTS_ONLY_CHANNEL.id });
@@ -182,9 +230,12 @@ describe('MembershipService.requireChannelAccess', () => {
       expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
     });
 
-    it('DM kanalı adultsOnly\'den etkilenmez', async () => {
+    it("DM kanalı adultsOnly'den etkilenmez", async () => {
       prismaMock.channel.findUnique.mockResolvedValue(DM_CHANNEL);
-      prismaMock.channelMember.findUnique.mockResolvedValue({ channelId: 'dm1', userId: MINOR_USER.id });
+      prismaMock.channelMember.findUnique.mockResolvedValue({
+        channelId: 'dm1',
+        userId: MINOR_USER.id,
+      });
 
       // Minör DM kanalına girebilir (adultsOnly guild kanalı değil)
       const result = await service.requireChannelAccess(MINOR_USER.id, DM_CHANNEL.id);
@@ -270,7 +321,11 @@ describe('MembershipService.requireNoDmBlock — G3 blok-obfuscation', () => {
 
   it('blok sender→other → ForbiddenException DM_NOT_ALLOWED fırlatır (BLOCKED sızdırmaz)', async () => {
     prismaMock.channelMember.findFirst.mockResolvedValue({ userId: 'user2' });
-    prismaMock.userBlock.findFirst.mockResolvedValue({ id: 'blk1', blockerId: 'user1', blockedId: 'user2' });
+    prismaMock.userBlock.findFirst.mockResolvedValue({
+      id: 'blk1',
+      blockerId: 'user1',
+      blockedId: 'user2',
+    });
 
     await expect(service.requireNoDmBlock('user1', 'dm1')).rejects.toThrow(ForbiddenException);
 
@@ -281,7 +336,11 @@ describe('MembershipService.requireNoDmBlock — G3 blok-obfuscation', () => {
 
   it('blok other→sender → ForbiddenException DM_NOT_ALLOWED fırlatır (BLOCKED sızdırmaz)', async () => {
     prismaMock.channelMember.findFirst.mockResolvedValue({ userId: 'user2' });
-    prismaMock.userBlock.findFirst.mockResolvedValue({ id: 'blk2', blockerId: 'user2', blockedId: 'user1' });
+    prismaMock.userBlock.findFirst.mockResolvedValue({
+      id: 'blk2',
+      blockerId: 'user2',
+      blockedId: 'user1',
+    });
 
     await expect(service.requireNoDmBlock('user1', 'dm1')).rejects.toThrow(ForbiddenException);
 
@@ -350,16 +409,19 @@ describe('MembershipService.requireChannelAccess — özel kanal (isPrivate)', (
     prismaMock.guildMember.findUnique.mockResolvedValue(MEMBERSHIP); // role: MEMBER
     prismaMock.channelMember.findUnique.mockResolvedValue(null);
 
-    await expect(
-      service.requireChannelAccess('user1', PRIVATE_CHANNEL.id),
-    ).rejects.toMatchObject({ response: { error: 'NOT_CHANNEL_MEMBER' } });
+    await expect(service.requireChannelAccess('user1', PRIVATE_CHANNEL.id)).rejects.toMatchObject({
+      response: { error: 'NOT_CHANNEL_MEMBER' },
+    });
   });
 
   // MEMBER + ChannelMember kaydı VAR → erişim verilir
   it('özel kanal + MEMBER + ChannelMember kaydı var → erişim verilir', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(PRIVATE_CHANNEL);
     prismaMock.guildMember.findUnique.mockResolvedValue(MEMBERSHIP);
-    prismaMock.channelMember.findUnique.mockResolvedValue({ channelId: PRIVATE_CHANNEL.id, userId: 'user1' });
+    prismaMock.channelMember.findUnique.mockResolvedValue({
+      channelId: PRIVATE_CHANNEL.id,
+      userId: 'user1',
+    });
 
     const result = await service.requireChannelAccess('user1', PRIVATE_CHANNEL.id);
     expect(result).toMatchObject({ id: PRIVATE_CHANNEL.id });
@@ -393,7 +455,10 @@ describe('MembershipService.requireChannelAccess — özel kanal (isPrivate)', (
     prismaMock.channel.findUnique.mockResolvedValue(PRIVATE_AGE_GATED_CHANNEL);
     prismaMock.user.findUnique.mockResolvedValue({ isMinor: false });
     prismaMock.guildMember.findUnique.mockResolvedValue(MEMBERSHIP);
-    prismaMock.channelMember.findUnique.mockResolvedValue({ channelId: PRIVATE_AGE_GATED_CHANNEL.id, userId: 'user1' });
+    prismaMock.channelMember.findUnique.mockResolvedValue({
+      channelId: PRIVATE_AGE_GATED_CHANNEL.id,
+      userId: 'user1',
+    });
 
     const result = await service.requireChannelAccess('user1', PRIVATE_AGE_GATED_CHANNEL.id);
     expect(result).toMatchObject({ id: PRIVATE_AGE_GATED_CHANNEL.id });

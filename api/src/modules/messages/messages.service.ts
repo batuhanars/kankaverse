@@ -1,4 +1,12 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
@@ -15,9 +23,11 @@ type ReactionAggDto = { emoji: string; count: number; reactedByMe: boolean };
 
 type ReplyToDto = { id: string; content: string; authorUsername: string } | null;
 
-type ReplyToRaw = (Pick<Message, 'id' | 'content' | 'deletedAt'> & {
-  author: Pick<User, 'username'>;
-}) | null;
+type ReplyToRaw =
+  | (Pick<Message, 'id' | 'content' | 'deletedAt'> & {
+      author: Pick<User, 'username'>;
+    })
+  | null;
 
 type MessageWithAuthor = Message & {
   author: Pick<User, 'id' | 'username' | 'avatarUrl'>;
@@ -31,9 +41,7 @@ type MessageWithAuthor = Message & {
 // replyTo snippet: ≤100 karakter; dosya ekli + boş içerik → "[dosya]"; silinmişse null
 function buildReplyToDto(raw: ReplyToRaw): ReplyToDto {
   if (!raw || raw.deletedAt !== null) return null;
-  const snippet = raw.content.trim().length > 0
-    ? raw.content.slice(0, 100)
-    : '[dosya]';
+  const snippet = raw.content.trim().length > 0 ? raw.content.slice(0, 100) : '[dosya]';
   return { id: raw.id, content: snippet, authorUsername: raw.author.username };
 }
 
@@ -136,7 +144,12 @@ export class MessagesService {
    *   Çağıranlar (create, editMessage) bu objeyi zaten elde ediyor; ayrı bayrak sorgusu yapılmaz.
    */
   private async resolveMentions(
-    channel: { id: string; guildId: string | null; ageGated: boolean; guild?: { adultsOnly: boolean } | null },
+    channel: {
+      id: string;
+      guildId: string | null;
+      ageGated: boolean;
+      guild?: { adultsOnly: boolean } | null;
+    },
     content: string,
     senderId: string,
   ): Promise<{ mentions: string[]; mentionsEveryone: boolean; mentionRoles: string[] }> {
@@ -307,13 +320,19 @@ export class MessagesService {
     // R7 Enforcement: BAN (global) → mesaj gönderme yasak
     const hasBan = await this.moderation.hasActiveBan(userId);
     if (hasBan) {
-      throw new ForbiddenException({ message: 'Hesabınız kısıtlandığı için mesaj gönderemezsiniz.', error: 'USER_BANNED' });
+      throw new ForbiddenException({
+        message: 'Hesabınız kısıtlandığı için mesaj gönderemezsiniz.',
+        error: 'USER_BANNED',
+      });
     }
 
     // R7 Enforcement: MUTE (scope-aware) → bu kanalda mesaj gönderme yasak
     const hasMute = await this.moderation.hasActiveMute(userId, channel.guildId ?? null);
     if (hasMute) {
-      throw new ForbiddenException({ message: 'Bu kanalda mesaj gönderme yetkiniz kısıtlandı.', error: 'USER_MUTED' });
+      throw new ForbiddenException({
+        message: 'Bu kanalda mesaj gönderme yetkiniz kısıtlandı.',
+        error: 'USER_MUTED',
+      });
     }
 
     // Yavaş mod (slow mode): yalnızca guild kanallarında; OWNER/ADMIN muaf
@@ -335,7 +354,11 @@ export class MessagesService {
           if (elapsedMs < requiredMs) {
             const retryAfter = Math.ceil((requiredMs - elapsedMs) / 1000);
             throw new HttpException(
-              { message: `Yavaş mod aktif. Lütfen ${retryAfter} saniye bekleyin.`, error: 'SLOW_MODE', retryAfter },
+              {
+                message: `Yavaş mod aktif. Lütfen ${retryAfter} saniye bekleyin.`,
+                error: 'SLOW_MODE',
+                retryAfter,
+              },
               HttpStatus.TOO_MANY_REQUESTS,
             );
           }
@@ -399,7 +422,10 @@ export class MessagesService {
         select: { id: true, channelId: true, deletedAt: true },
       });
       if (!replyTarget || replyTarget.deletedAt !== null || replyTarget.channelId !== channelId) {
-        throw new BadRequestException({ message: 'Geçersiz yanıt hedefi.', error: 'INVALID_REPLY' });
+        throw new BadRequestException({
+          message: 'Geçersiz yanıt hedefi.',
+          error: 'INVALID_REPLY',
+        });
       }
     }
 
@@ -412,7 +438,7 @@ export class MessagesService {
 
       if (attachments.length !== dto.attachmentIds!.length) {
         throw new BadRequestException({
-          message: 'Geçersiz dosya eki ID\'si.',
+          message: "Geçersiz dosya eki ID'si.",
           error: 'ATTACHMENT_NOT_FOUND',
         });
       }
@@ -499,12 +525,18 @@ export class MessagesService {
     }
 
     if (message.authorId !== userId) {
-      throw new ForbiddenException({ message: 'Bu mesajı düzenleme yetkiniz yok.', error: 'NOT_MESSAGE_AUTHOR' });
+      throw new ForbiddenException({
+        message: 'Bu mesajı düzenleme yetkiniz yok.',
+        error: 'NOT_MESSAGE_AUTHOR',
+      });
     }
 
     // İçerik boş olamaz
     if (!dto.content || dto.content.trim().length === 0) {
-      throw new BadRequestException({ message: 'Mesaj içeriği boş olamaz.', error: 'EMPTY_MESSAGE' });
+      throw new BadRequestException({
+        message: 'Mesaj içeriği boş olamaz.',
+        error: 'EMPTY_MESSAGE',
+      });
     }
 
     // Automod: guild kanalı içerik filtresi
@@ -527,7 +559,13 @@ export class MessagesService {
 
     const updated = await this.prisma.message.update({
       where: { id: messageId },
-      data: { content: dto.content, editedAt: new Date(), mentions, mentionsEveryone, mentionRoles },
+      data: {
+        content: dto.content,
+        editedAt: new Date(),
+        mentions,
+        mentionsEveryone,
+        mentionRoles,
+      },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
         attachments: {
@@ -557,11 +595,21 @@ export class MessagesService {
     if (message.authorId !== userId) {
       if (!channel.guildId) {
         // DM/grup DM kanalında başkasının mesajını silemezsin
-        throw new ForbiddenException({ message: 'Bu mesajı silme yetkiniz yok.', error: 'NOT_MESSAGE_AUTHOR' });
+        throw new ForbiddenException({
+          message: 'Bu mesajı silme yetkiniz yok.',
+          error: 'NOT_MESSAGE_AUTHOR',
+        });
       }
-      const canManage = await this.permissions.hasGuildPermission(userId, channel.guildId, 'MANAGE_MESSAGES');
+      const canManage = await this.permissions.hasGuildPermission(
+        userId,
+        channel.guildId,
+        'MANAGE_MESSAGES',
+      );
       if (!canManage) {
-        throw new ForbiddenException({ message: 'Bu mesajı silme yetkiniz yok.', error: 'NOT_MESSAGE_AUTHOR' });
+        throw new ForbiddenException({
+          message: 'Bu mesajı silme yetkiniz yok.',
+          error: 'NOT_MESSAGE_AUTHOR',
+        });
       }
     }
 
@@ -615,9 +663,16 @@ export class MessagesService {
   ): Promise<void> {
     if (channel.guildId) {
       // Guild kanalı: üyeliği zaten requireChannelAccess doğruladı; MANAGE_MESSAGES kontrolü ek
-      const canManage = await this.permissions.hasGuildPermission(userId, channel.guildId, 'MANAGE_MESSAGES');
+      const canManage = await this.permissions.hasGuildPermission(
+        userId,
+        channel.guildId,
+        'MANAGE_MESSAGES',
+      );
       if (!canManage) {
-        throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+        throw new ForbiddenException({
+          message: 'Bu işlem için yetkiniz yok.',
+          error: 'FORBIDDEN',
+        });
       }
     }
     // DM/grup DM: requireChannelAccess üyeliği yeterli — ek kontrol yok
@@ -642,7 +697,10 @@ export class MessagesService {
       where: { channelId, pinnedAt: { not: null }, deletedAt: null },
     });
     if (pinCount >= 50) {
-      throw new ConflictException({ message: 'Bu kanalda en fazla 50 mesaj sabitlenebilir.', error: 'PIN_LIMIT' });
+      throw new ConflictException({
+        message: 'Bu kanalda en fazla 50 mesaj sabitlenebilir.',
+        error: 'PIN_LIMIT',
+      });
     }
 
     await this.prisma.message.update({
@@ -717,7 +775,13 @@ export class MessagesService {
     };
   }
 
-  async searchMessages(userId: string, channelId: string, q: string, before?: string, has?: string) {
+  async searchMessages(
+    userId: string,
+    channelId: string,
+    q: string,
+    before?: string,
+    has?: string,
+  ) {
     // Erişim + yaş kapısı + DM throw'ları propagate
     const channel = await this.membership.requireChannelAccess(userId, channelId);
 
@@ -823,7 +887,10 @@ export class MessagesService {
     const trimmedQ = (q ?? '').trim();
     const hasQ = trimmedQ.length > 0;
     if (hasQ && trimmedQ.length < 2) {
-      throw new BadRequestException({ error: 'QUERY_TOO_SHORT', message: 'Arama için en az 2 karakter girin.' });
+      throw new BadRequestException({
+        error: 'QUERY_TOO_SHORT',
+        message: 'Arama için en az 2 karakter girin.',
+      });
     }
     const safeQ = trimmedQ.slice(0, 100);
 
@@ -836,14 +903,20 @@ export class MessagesService {
     // En az biri (q | from | mentions | in | has) dolu olmalı; hiçbiri yoksa boş sonuç.
     if (!hasQ && !from && !mentions && !inChannel && !has) return [];
 
-    const guild = await this.prisma.guild.findUnique({ where: { id: guildId }, select: { adultsOnly: true } });
+    const guild = await this.prisma.guild.findUnique({
+      where: { id: guildId },
+      select: { adultsOnly: true },
+    });
     const channels = await this.prisma.channel.findMany({
       where: { guildId, deletedAt: null, type: 'GUILD_TEXT' },
       select: { id: true, name: true, ageGated: true, isPrivate: true },
     });
 
     const privileged = membership.role === 'OWNER' || membership.role === 'ADMIN';
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { isMinor: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isMinor: true },
+    });
     const isMinor = user?.isMinor ?? false;
 
     // Özel kanal üyeliği (yalnız ayrıcalıklı değilse gerekir)
@@ -880,7 +953,9 @@ export class MessagesService {
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
-        attachments: { select: { id: true, filename: true, contentType: true, size: true, scanStatus: true } },
+        attachments: {
+          select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+        },
         reactions: { select: { userId: true, emoji: true } },
         replyTo: REPLY_TO_INCLUDE,
       },

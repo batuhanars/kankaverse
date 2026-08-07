@@ -59,7 +59,12 @@ const TOTP_VERIFY_OPTS = { ...TOTP_OPTS, epochTolerance: 30 };
 // ─── Dönüş tipleri ──────────────────────────────────────────────────────────
 
 type LoginResult =
-  | { type: 'session'; user: ReturnType<typeof toUserDto>; accessToken: string; refreshToken: string }
+  | {
+      type: 'session';
+      user: ReturnType<typeof toUserDto>;
+      accessToken: string;
+      refreshToken: string;
+    }
   | { type: 'challenge'; challengeToken: string };
 
 // ─── Service ────────────────────────────────────────────────────────────────
@@ -88,7 +93,8 @@ export class AuthService implements OnModuleInit {
 
     // ── [R7] Kayıt modu kapısı — kullanıcı yaratmadan ÖNCE ───────────────────
     // Sıra: closed → invite-claim → open (fail-closed)
-    const registrationMode = this.config.get<'open' | 'invite' | 'closed'>('registrationMode') ?? 'open';
+    const registrationMode =
+      this.config.get<'open' | 'invite' | 'closed'>('registrationMode') ?? 'open';
 
     if (registrationMode === 'closed') {
       throw new ForbiddenException({
@@ -113,10 +119,16 @@ export class AuthService implements OnModuleInit {
     ]);
 
     if (existingUsername) {
-      throw new ConflictException({ message: 'Bu kullanıcı adı zaten kullanımda.', error: 'USERNAME_TAKEN' });
+      throw new ConflictException({
+        message: 'Bu kullanıcı adı zaten kullanımda.',
+        error: 'USERNAME_TAKEN',
+      });
     }
     if (existingEmail) {
-      throw new ConflictException({ message: 'Bu e-posta adresi zaten kayıtlı.', error: 'EMAIL_TAKEN' });
+      throw new ConflictException({
+        message: 'Bu e-posta adresi zaten kayıtlı.',
+        error: 'EMAIL_TAKEN',
+      });
     }
 
     const passwordHash = await argon2.hash(dto.password, ARGON2_OPTIONS);
@@ -165,7 +177,13 @@ export class AuthService implements OnModuleInit {
 
     this.sendVerificationEmailSilent(user.id, user.email);
 
-    const { accessToken, refreshToken } = await this.createSession(user.id, ip, undefined, user.email, clientType);
+    const { accessToken, refreshToken } = await this.createSession(
+      user.id,
+      ip,
+      undefined,
+      user.email,
+      clientType,
+    );
     return { user: toUserDto(user), accessToken, refreshToken };
   }
 
@@ -248,12 +266,18 @@ export class AuthService implements OnModuleInit {
 
     if (!user) {
       await argon2.verify(this.dummyHash, dto.password).catch(() => {});
-      throw new UnauthorizedException({ message: 'Kullanıcı adı/e-posta veya şifre hatalı.', error: 'INVALID_CREDENTIALS' });
+      throw new UnauthorizedException({
+        message: 'Kullanıcı adı/e-posta veya şifre hatalı.',
+        error: 'INVALID_CREDENTIALS',
+      });
     }
 
     const valid = await argon2.verify(user.passwordHash, dto.password);
     if (!valid) {
-      throw new UnauthorizedException({ message: 'Kullanıcı adı/e-posta veya şifre hatalı.', error: 'INVALID_CREDENTIALS' });
+      throw new UnauthorizedException({
+        message: 'Kullanıcı adı/e-posta veya şifre hatalı.',
+        error: 'INVALID_CREDENTIALS',
+      });
     }
 
     // 2FA etkinse challenge döndür, session açma. Silme iptali ancak tam giriş
@@ -269,7 +293,13 @@ export class AuthService implements OnModuleInit {
     // Tam giriş (2FA'sız) tamamlandı → bekleyen silme talebini iptal et
     await this.cancelPendingDeletionOnLogin(user);
 
-    const { accessToken, refreshToken } = await this.createSession(user.id, ip, undefined, user.email, clientType);
+    const { accessToken, refreshToken } = await this.createSession(
+      user.id,
+      ip,
+      undefined,
+      user.email,
+      clientType,
+    );
     return { type: 'session', user: toUserDto(user), accessToken, refreshToken };
   }
 
@@ -280,28 +310,47 @@ export class AuthService implements OnModuleInit {
         secret: this.config.get<string>('jwt.accessSecret'),
       });
     } catch {
-      throw new UnauthorizedException({ message: 'Challenge süresi dolmuş veya geçersiz.', error: 'INVALID_REFRESH' });
+      throw new UnauthorizedException({
+        message: 'Challenge süresi dolmuş veya geçersiz.',
+        error: 'INVALID_REFRESH',
+      });
     }
 
     if (!payload.twoFactorChallenge) {
-      throw new UnauthorizedException({ message: 'Geçersiz challenge token.', error: 'INVALID_REFRESH' });
+      throw new UnauthorizedException({
+        message: 'Geçersiz challenge token.',
+        error: 'INVALID_REFRESH',
+      });
     }
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub, deletedAt: null },
     });
-    if (!user) throw new UnauthorizedException({ message: 'Kullanıcı bulunamadı.', error: 'INVALID_CREDENTIALS' });
+    if (!user)
+      throw new UnauthorizedException({
+        message: 'Kullanıcı bulunamadı.',
+        error: 'INVALID_CREDENTIALS',
+      });
 
     // TOTP veya kurtarma kodu doğrula
     const codeValid = await this.verifyTotpOrRecoveryCode(user, dto.code);
     if (!codeValid) {
-      throw new BadRequestException({ message: 'Geçersiz 2FA kodu.', error: 'INVALID_TWO_FACTOR_CODE' });
+      throw new BadRequestException({
+        message: 'Geçersiz 2FA kodu.',
+        error: 'INVALID_TWO_FACTOR_CODE',
+      });
     }
 
     // Tam giriş tamamlandı (şifre + 2FA) → bekleyen silme talebini iptal et
     await this.cancelPendingDeletionOnLogin(user);
 
-    const { accessToken, refreshToken } = await this.createSession(user.id, ip, undefined, user.email, clientType);
+    const { accessToken, refreshToken } = await this.createSession(
+      user.id,
+      ip,
+      undefined,
+      user.email,
+      clientType,
+    );
     return { user: toUserDto(user), accessToken, refreshToken };
   }
 
@@ -314,7 +363,10 @@ export class AuthService implements OnModuleInit {
    */
   async refresh(rawRefreshToken: string, ip?: string, usingCookie = true) {
     if (!rawRefreshToken) {
-      throw new UnauthorizedException({ message: 'Yenileme tokeni bulunamadı.', error: 'INVALID_REFRESH' });
+      throw new UnauthorizedException({
+        message: 'Yenileme tokeni bulunamadı.',
+        error: 'INVALID_REFRESH',
+      });
     }
 
     let payload: { sub: string; sessionId: string; family: string };
@@ -323,7 +375,10 @@ export class AuthService implements OnModuleInit {
         secret: this.config.get<string>('jwt.refreshSecret'),
       });
     } catch {
-      throw new UnauthorizedException({ message: 'Geçersiz yenileme tokeni.', error: 'INVALID_REFRESH' });
+      throw new UnauthorizedException({
+        message: 'Geçersiz yenileme tokeni.',
+        error: 'INVALID_REFRESH',
+      });
     }
 
     const session = await this.prisma.session.findUnique({ where: { id: payload.sessionId } });
@@ -333,12 +388,18 @@ export class AuthService implements OnModuleInit {
         where: { tokenFamily: payload.family, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-      throw new UnauthorizedException({ message: 'Yenileme tokeni yeniden kullanımı tespit edildi.', error: 'REFRESH_REUSE_DETECTED' });
+      throw new UnauthorizedException({
+        message: 'Yenileme tokeni yeniden kullanımı tespit edildi.',
+        error: 'REFRESH_REUSE_DETECTED',
+      });
     }
 
     // [R7] Bearer teslim kapısı — cookie yoksa yalnız mobile session gövdeden kabul edilir.
     if (!usingCookie && session.clientType !== 'mobile') {
-      throw new UnauthorizedException({ message: 'Bu oturum türü için yenileme kanalı geçersiz.', error: 'REFRESH_CHANNEL_MISMATCH' });
+      throw new UnauthorizedException({
+        message: 'Bu oturum türü için yenileme kanalı geçersiz.',
+        error: 'REFRESH_CHANNEL_MISMATCH',
+      });
     }
 
     const tokenValid = await argon2.verify(session.refreshTokenHash, rawRefreshToken);
@@ -346,18 +407,30 @@ export class AuthService implements OnModuleInit {
     if (session.revokedAt !== null) {
       const withinGrace = Date.now() - session.revokedAt.getTime() < REFRESH_RACE_GRACE_MS;
       if (tokenValid && withinGrace) {
-        throw new UnauthorizedException({ message: 'Oturum az önce yenilendi, tekrar dene.', error: 'INVALID_REFRESH' });
+        throw new UnauthorizedException({
+          message: 'Oturum az önce yenilendi, tekrar dene.',
+          error: 'INVALID_REFRESH',
+        });
       }
       await this.prisma.session.updateMany({
         where: { tokenFamily: session.tokenFamily, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-      throw new UnauthorizedException({ message: 'Yenileme tokeni yeniden kullanımı tespit edildi.', error: 'REFRESH_REUSE_DETECTED' });
+      throw new UnauthorizedException({
+        message: 'Yenileme tokeni yeniden kullanımı tespit edildi.',
+        error: 'REFRESH_REUSE_DETECTED',
+      });
     }
 
     if (!tokenValid) {
-      await this.prisma.session.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
-      throw new UnauthorizedException({ message: 'Geçersiz yenileme tokeni.', error: 'INVALID_REFRESH' });
+      await this.prisma.session.update({
+        where: { id: session.id },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException({
+        message: 'Geçersiz yenileme tokeni.',
+        error: 'INVALID_REFRESH',
+      });
     }
 
     const claim = await this.prisma.session.updateMany({
@@ -365,7 +438,10 @@ export class AuthService implements OnModuleInit {
       data: { revokedAt: new Date() },
     });
     if (claim.count === 0) {
-      throw new UnauthorizedException({ message: 'Oturum az önce yenilendi, tekrar dene.', error: 'INVALID_REFRESH' });
+      throw new UnauthorizedException({
+        message: 'Oturum az önce yenilendi, tekrar dene.',
+        error: 'INVALID_REFRESH',
+      });
     }
 
     const { accessToken, refreshToken } = await this.createSession(
@@ -388,7 +464,10 @@ export class AuthService implements OnModuleInit {
     // Savunma-derinliği: normalde ulaşılamaz (deleteAccount tüm session'ları revoke eder + login
     // silme talebini login'den ÖNCE temizler) — yine de silinmeye-işaretli hesap normal görünmesin.
     if (user.deletionRequestedAt) {
-      throw new ForbiddenException({ message: 'Hesap silme talebi bekliyor.', error: 'ACCOUNT_DELETION_PENDING' });
+      throw new ForbiddenException({
+        message: 'Hesap silme talebi bekliyor.',
+        error: 'ACCOUNT_DELETION_PENDING',
+      });
     }
     return toUserDto(user);
   }
@@ -401,7 +480,10 @@ export class AuthService implements OnModuleInit {
     if (!user) throw new UnauthorizedException('Kullanıcı bulunamadı.');
 
     if (user.emailVerifiedAt !== null) {
-      throw new ConflictException({ message: 'E-posta adresi zaten doğrulanmış.', error: 'EMAIL_ALREADY_VERIFIED' });
+      throw new ConflictException({
+        message: 'E-posta adresi zaten doğrulanmış.',
+        error: 'EMAIL_ALREADY_VERIFIED',
+      });
     }
 
     const updated = await this.prisma.user.update({
@@ -416,10 +498,17 @@ export class AuthService implements OnModuleInit {
     if (!user) throw new UnauthorizedException('Kullanıcı bulunamadı.');
 
     if (user.emailVerifiedAt !== null) {
-      throw new ConflictException({ message: 'E-posta adresi zaten doğrulanmış.', error: 'EMAIL_ALREADY_VERIFIED' });
+      throw new ConflictException({
+        message: 'E-posta adresi zaten doğrulanmış.',
+        error: 'EMAIL_ALREADY_VERIFIED',
+      });
     }
 
-    const rawToken = await this.createAuthToken(userId, AuthTokenType.EMAIL_VERIFICATION, EMAIL_VERIFICATION_TTL_MS);
+    const rawToken = await this.createAuthToken(
+      userId,
+      AuthTokenType.EMAIL_VERIFICATION,
+      EMAIL_VERIFICATION_TTL_MS,
+    );
     await this.emailService.sendVerificationEmail(user.email, rawToken);
     return null;
   }
@@ -458,7 +547,10 @@ export class AuthService implements OnModuleInit {
     if (!user) throw new UnauthorizedException('Kullanıcı bulunamadı.');
 
     if (user.twoFactorEnabled) {
-      throw new ConflictException({ message: '2FA zaten etkin.', error: 'TWO_FACTOR_ALREADY_ENABLED' });
+      throw new ConflictException({
+        message: '2FA zaten etkin.',
+        error: 'TWO_FACTOR_ALREADY_ENABLED',
+      });
     }
 
     await this.verifyReauth(user, dto.currentPassword, dto.totpCode);
@@ -489,10 +581,16 @@ export class AuthService implements OnModuleInit {
     if (!user) throw new UnauthorizedException('Kullanıcı bulunamadı.');
 
     if (user.twoFactorEnabled) {
-      throw new ConflictException({ message: '2FA zaten etkin.', error: 'TWO_FACTOR_ALREADY_ENABLED' });
+      throw new ConflictException({
+        message: '2FA zaten etkin.',
+        error: 'TWO_FACTOR_ALREADY_ENABLED',
+      });
     }
     if (!user.totpSecret) {
-      throw new BadRequestException({ message: 'Önce 2FA kurulumunu tamamla.', error: 'TWO_FACTOR_NOT_ENABLED' });
+      throw new BadRequestException({
+        message: 'Önce 2FA kurulumunu tamamla.',
+        error: 'TWO_FACTOR_NOT_ENABLED',
+      });
     }
 
     const encKey = this.getTotpEncKey();
@@ -500,7 +598,10 @@ export class AuthService implements OnModuleInit {
     const valid = totpVerifySync({ token: dto.code, secret, ...TOTP_VERIFY_OPTS }).valid;
 
     if (!valid) {
-      throw new BadRequestException({ message: 'Geçersiz 2FA kodu.', error: 'INVALID_TWO_FACTOR_CODE' });
+      throw new BadRequestException({
+        message: 'Geçersiz 2FA kodu.',
+        error: 'INVALID_TWO_FACTOR_CODE',
+      });
     }
 
     // Önceki kurtarma kodlarını temizle + yenilerini üret
@@ -523,7 +624,10 @@ export class AuthService implements OnModuleInit {
     if (!user) throw new UnauthorizedException('Kullanıcı bulunamadı.');
 
     if (!user.twoFactorEnabled) {
-      throw new ConflictException({ message: '2FA zaten kapalı.', error: 'TWO_FACTOR_NOT_ENABLED' });
+      throw new ConflictException({
+        message: '2FA zaten kapalı.',
+        error: 'TWO_FACTOR_NOT_ENABLED',
+      });
     }
 
     await this.verifyReauth(user, dto.currentPassword, dto.totpCode);
@@ -620,7 +724,10 @@ export class AuthService implements OnModuleInit {
     }
     const taken = await this.prisma.user.findUnique({ where: { username: newUsername } });
     if (taken) {
-      throw new ConflictException({ message: 'Bu kullanıcı adı zaten kullanımda.', error: 'USERNAME_TAKEN' });
+      throw new ConflictException({
+        message: 'Bu kullanıcı adı zaten kullanımda.',
+        error: 'USERNAME_TAKEN',
+      });
     }
 
     const updated = await this.prisma.user.update({
@@ -639,7 +746,10 @@ export class AuthService implements OnModuleInit {
     const newEmail = dto.newEmail.toLowerCase().trim();
     const taken = await this.prisma.user.findUnique({ where: { email: newEmail } });
     if (taken) {
-      throw new ConflictException({ message: 'Bu e-posta adresi zaten kullanımda.', error: 'EMAIL_TAKEN' });
+      throw new ConflictException({
+        message: 'Bu e-posta adresi zaten kullanımda.',
+        error: 'EMAIL_TAKEN',
+      });
     }
 
     // Yeni adrese doğrulama + eski adrese geri-al tokenleri oluştur (fire-and-forget)
@@ -654,9 +764,14 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException({ message: 'Geçersiz token.', error: 'INVALID_TOKEN' });
     }
 
-    const taken = await this.prisma.user.findFirst({ where: { email: token.payload, id: { not: token.userId } } });
+    const taken = await this.prisma.user.findFirst({
+      where: { email: token.payload, id: { not: token.userId } },
+    });
     if (taken) {
-      throw new ConflictException({ message: 'Bu e-posta adresi artık kullanımda.', error: 'EMAIL_TAKEN' });
+      throw new ConflictException({
+        message: 'Bu e-posta adresi artık kullanımda.',
+        error: 'EMAIL_TAKEN',
+      });
     }
 
     const updated = await this.prisma.user.update({
@@ -734,21 +849,28 @@ export class AuthService implements OnModuleInit {
 
     if (user.twoFactorEnabled) {
       if (!totpCode) {
-        throw new UnauthorizedException({ message: '2FA kodu gerekli.', error: 'INVALID_CREDENTIALS' });
+        throw new UnauthorizedException({
+          message: '2FA kodu gerekli.',
+          error: 'INVALID_CREDENTIALS',
+        });
       }
       const encKey = this.getTotpEncKey();
       const secret = decryptSecret(user.totpSecret!, encKey);
       const valid2fa = totpVerifySync({ token: totpCode, secret, ...TOTP_VERIFY_OPTS }).valid;
       if (!valid2fa) {
-        throw new UnauthorizedException({ message: 'Geçersiz 2FA kodu.', error: 'INVALID_CREDENTIALS' });
+        throw new UnauthorizedException({
+          message: 'Geçersiz 2FA kodu.',
+          error: 'INVALID_CREDENTIALS',
+        });
       }
     }
   }
 
   private async verifyTotpOrRecoveryCode(user: User, code: string): Promise<boolean> {
     // Kurtarma kodu formatı: XXXX-XXXX-XXXX-XXXX (dashes içerir veya 16 harf)
-    const isRecoveryFormat = /^[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}$/i.test(code)
-      || /^[A-Z2-7]{16}$/i.test(code);
+    const isRecoveryFormat =
+      /^[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}$/i.test(code) ||
+      /^[A-Z2-7]{16}$/i.test(code);
 
     if (!isRecoveryFormat && user.totpSecret) {
       const encKey = this.getTotpEncKey();
@@ -777,7 +899,12 @@ export class AuthService implements OnModuleInit {
     return key;
   }
 
-  async createAuthToken(userId: string, type: AuthTokenType, ttlMs: number, payload?: string): Promise<string> {
+  async createAuthToken(
+    userId: string,
+    type: AuthTokenType,
+    ttlMs: number,
+    payload?: string,
+  ): Promise<string> {
     const { raw, hash } = generateAuthToken();
     const expiresAt = new Date(Date.now() + ttlMs);
 
@@ -798,7 +925,10 @@ export class AuthService implements OnModuleInit {
     const token = await this.prisma.authToken.findFirst({ where: { tokenHash: hash, type } });
 
     if (!token || token.usedAt !== null || token.expiresAt < new Date()) {
-      throw new BadRequestException({ message: 'Geçersiz veya süresi dolmuş bağlantı.', error: 'INVALID_TOKEN' });
+      throw new BadRequestException({
+        message: 'Geçersiz veya süresi dolmuş bağlantı.',
+        error: 'INVALID_TOKEN',
+      });
     }
 
     const claim = await this.prisma.authToken.updateMany({
@@ -806,7 +936,10 @@ export class AuthService implements OnModuleInit {
       data: { usedAt: new Date() },
     });
     if (claim.count === 0) {
-      throw new BadRequestException({ message: 'Geçersiz veya süresi dolmuş bağlantı.', error: 'INVALID_TOKEN' });
+      throw new BadRequestException({
+        message: 'Geçersiz veya süresi dolmuş bağlantı.',
+        error: 'INVALID_TOKEN',
+      });
     }
 
     return token;
@@ -867,7 +1000,9 @@ export class AuthService implements OnModuleInit {
     this.createAuthToken(userId, AuthTokenType.EMAIL_VERIFICATION, EMAIL_VERIFICATION_TTL_MS)
       .then((rawToken) => this.emailService.sendVerificationEmail(email, rawToken))
       .catch((err) => {
-        this.logger.error(`Doğrulama e-postası gönderilemedi (kullanıcı: ${userId}): ${String(err)}`);
+        this.logger.error(
+          `Doğrulama e-postası gönderilemedi (kullanıcı: ${userId}): ${String(err)}`,
+        );
       });
   }
 
@@ -875,7 +1010,9 @@ export class AuthService implements OnModuleInit {
     this.createAuthToken(userId, AuthTokenType.PASSWORD_RESET, PASSWORD_RESET_TTL_MS)
       .then((rawToken) => this.emailService.sendPasswordResetEmail(email, rawToken))
       .catch((err) => {
-        this.logger.error(`Şifre sıfırlama e-postası gönderilemedi (kullanıcı: ${userId}): ${String(err)}`);
+        this.logger.error(
+          `Şifre sıfırlama e-postası gönderilemedi (kullanıcı: ${userId}): ${String(err)}`,
+        );
       });
   }
 
@@ -891,7 +1028,9 @@ export class AuthService implements OnModuleInit {
         ]),
       )
       .catch((err) => {
-        this.logger.error(`E-posta değişim tokenleri gönderilemedi (kullanıcı: ${userId}): ${String(err)}`);
+        this.logger.error(
+          `E-posta değişim tokenleri gönderilemedi (kullanıcı: ${userId}): ${String(err)}`,
+        );
       });
   }
 }

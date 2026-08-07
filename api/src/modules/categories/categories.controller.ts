@@ -38,10 +38,7 @@ export class CategoriesController {
 
   @Get('guilds/:id/categories')
   @ApiOperation({ summary: 'Ortam kategorilerini listele (üye)' })
-  findByGuild(
-    @CurrentUser() user: { id: string },
-    @Param('id') guildId: string,
-  ) {
+  findByGuild(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
     return this.categoriesService.findByGuild(user.id, guildId);
   }
 
@@ -70,10 +67,7 @@ export class CategoriesController {
   @Delete('categories/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Kategoriyi soft-delete et; kanallar kategorisiz kalır (OWNER/ADMIN)' })
-  remove(
-    @CurrentUser() user: { id: string },
-    @Param('id') categoryId: string,
-  ) {
+  remove(@CurrentUser() user: { id: string }, @Param('id') categoryId: string) {
     return this.categoriesService.remove(user.id, categoryId);
   }
 }

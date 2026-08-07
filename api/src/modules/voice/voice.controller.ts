@@ -30,7 +30,9 @@ export class VoiceController {
   // Sprint C4: dönüşe canPublishCamera + canPublishScreen eklendi (BUILD-DARK: bayraklar false → false).
   @Post(':id/voice/token')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Ses kanalına katılım tokeni (LiveKit; audio + koşullu video/ekran, BUILD-DARK)' })
+  @ApiOperation({
+    summary: 'Ses kanalına katılım tokeni (LiveKit; audio + koşullu video/ekran, BUILD-DARK)',
+  })
   mintToken(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
     return this.voiceService.mintToken(user.id, channelId);
   }
@@ -133,7 +135,9 @@ export class VoiceInspectController {
   // B3 — Odadan-çıkar (ses oturumundan düşür, üyelik korunur) — MOVE_MEMBERS
   @Post(':id/voice/disconnect')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Katılımcıyı ses oturumundan çıkar, ortam üyeliği korunur (MOVE_MEMBERS)' })
+  @ApiOperation({
+    summary: 'Katılımcıyı ses oturumundan çıkar, ortam üyeliği korunur (MOVE_MEMBERS)',
+  })
   async disconnect(
     @CurrentUser() user: { id: string },
     @Param('id') channelId: string,

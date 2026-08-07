@@ -2,7 +2,7 @@ import { IsNotEmpty, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class Login2faDto {
-  @ApiProperty({ description: 'Login\'den dönen challenge token (5 dk geçerli)' })
+  @ApiProperty({ description: "Login'den dönen challenge token (5 dk geçerli)" })
   @IsString()
   @IsNotEmpty()
   challengeToken: string;

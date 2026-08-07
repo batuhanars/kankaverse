@@ -39,10 +39,7 @@ export class ChannelsController {
 
   @Get('guilds/:id/channels')
   @ApiOperation({ summary: 'Sunucu kanallarını listele (üye)' })
-  findByGuild(
-    @CurrentUser() user: { id: string },
-    @Param('id') guildId: string,
-  ) {
+  findByGuild(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
     return this.channelsService.findByGuild(user.id, guildId);
   }
 
@@ -70,17 +67,18 @@ export class ChannelsController {
 
   @Delete('channels/:id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Kanalı soft-delete et (OWNER/ADMIN); son kanal silinemez → 409 LAST_CHANNEL' })
-  remove(
-    @CurrentUser() user: { id: string },
-    @Param('id') channelId: string,
-  ) {
+  @ApiOperation({
+    summary: 'Kanalı soft-delete et (OWNER/ADMIN); son kanal silinemez → 409 LAST_CHANNEL',
+  })
+  remove(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
     return this.channelsService.remove(user.id, channelId);
   }
 
   @Post('channels/read-all')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Üyesi olunan tüm guild kanallarını okundu işaretle (toplu). Dönüş null.' })
+  @ApiOperation({
+    summary: 'Üyesi olunan tüm guild kanallarını okundu işaretle (toplu). Dönüş null.',
+  })
   markAllRead(@CurrentUser() user: { id: string }) {
     return this.channelsService.markAllRead(user.id);
   }
@@ -88,10 +86,7 @@ export class ChannelsController {
   @Post('channels/:id/read')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Kanalı okundu işaretle — lastReadAt=now upsert' })
-  markRead(
-    @CurrentUser() user: { id: string },
-    @Param('id') channelId: string,
-  ) {
+  markRead(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
     return this.channelsService.markRead(user.id, channelId);
   }
 
@@ -100,10 +95,7 @@ export class ChannelsController {
   @Get('channels/:id/members')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Özel kanalın üyelerini listele (OWNER/ADMIN); genel kanalda boş []' })
-  getChannelMembers(
-    @CurrentUser() user: { id: string },
-    @Param('id') channelId: string,
-  ) {
+  getChannelMembers(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
     return this.channelsService.getChannelMembers(user.id, channelId);
   }
 

@@ -1,4 +1,16 @@
-import { IsString, IsBoolean, IsOptional, IsInt, IsIn, Min, Max, MinLength, MaxLength, Matches, ValidateIf } from 'class-validator';
+import {
+  IsString,
+  IsBoolean,
+  IsOptional,
+  IsInt,
+  IsIn,
+  Min,
+  Max,
+  MinLength,
+  MaxLength,
+  Matches,
+  ValidateIf,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateChannelDto {
@@ -6,10 +18,16 @@ export class CreateChannelDto {
   @IsString()
   @MinLength(2, { message: 'Kanal adı en az 2 karakter olmalıdır.' })
   @MaxLength(50, { message: 'Kanal adı en fazla 50 karakter olabilir.' })
-  @Matches(/^[a-z0-9çğıöşü-]+$/, { message: 'Kanal adı yalnızca küçük harf, rakam ve tire içerebilir.' })
+  @Matches(/^[a-z0-9çğıöşü-]+$/, {
+    message: 'Kanal adı yalnızca küçük harf, rakam ve tire içerebilir.',
+  })
   name: string;
 
-  @ApiPropertyOptional({ example: 'GUILD_VOICE', enum: ['GUILD_TEXT', 'GUILD_VOICE'], description: 'Kanal türü (varsayılan GUILD_TEXT)' })
+  @ApiPropertyOptional({
+    example: 'GUILD_VOICE',
+    enum: ['GUILD_TEXT', 'GUILD_VOICE'],
+    description: 'Kanal türü (varsayılan GUILD_TEXT)',
+  })
   @IsOptional()
   @IsIn(['GUILD_TEXT', 'GUILD_VOICE'], { message: 'Geçersiz kanal türü.' })
   type?: 'GUILD_TEXT' | 'GUILD_VOICE';
@@ -19,7 +37,10 @@ export class CreateChannelDto {
   @IsBoolean()
   ageGated?: boolean;
 
-  @ApiPropertyOptional({ example: 5, description: 'Yavaş mod gecikmesi (saniye, 0=kapalı, maks 21600)' })
+  @ApiPropertyOptional({
+    example: 5,
+    description: 'Yavaş mod gecikmesi (saniye, 0=kapalı, maks 21600)',
+  })
   @IsOptional()
   @IsInt({ message: 'Yavaş mod değeri tam sayı olmalıdır.' })
   @Min(0, { message: 'Yavaş mod değeri 0 veya daha büyük olmalıdır.' })
@@ -32,12 +53,18 @@ export class CreateChannelDto {
   @IsString()
   categoryId?: string | null;
 
-  @ApiPropertyOptional({ example: false, description: 'Özel kanal — yalnız OWNER/ADMIN ve izin verilen üyeler erişir (varsayılan false)' })
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Özel kanal — yalnız OWNER/ADMIN ve izin verilen üyeler erişir (varsayılan false)',
+  })
   @IsOptional()
   @IsBoolean()
   isPrivate?: boolean;
 
-  @ApiPropertyOptional({ example: 10, description: 'Ses kanalı kullanıcı limiti (yalnız GUILD_VOICE; 0=sınırsız, maks 99)' })
+  @ApiPropertyOptional({
+    example: 10,
+    description: 'Ses kanalı kullanıcı limiti (yalnız GUILD_VOICE; 0=sınırsız, maks 99)',
+  })
   @IsOptional()
   @IsInt({ message: 'Kullanıcı limiti tam sayı olmalıdır.' })
   @Min(0, { message: 'Kullanıcı limiti 0 veya daha büyük olmalıdır.' })

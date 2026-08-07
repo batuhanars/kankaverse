@@ -45,9 +45,18 @@ export class MessagesController {
   // (NestJS statik segmentleri önce eşleştirir; bu konumlama garanti eder.)
   @Get('search')
   @ApiOperation({ summary: 'Kanal içi mesaj arama (case-insensitive, max 50 sonuç)' })
-  @ApiQuery({ name: 'q', required: false, description: 'Arama sorgusu (min 2, max 100 karakter). `has` verilmezse ZORUNLU.' })
-  @ApiQuery({ name: 'before', required: false, description: 'Cursor: bu mesaj ID\'sinden öncesi' })
-  @ApiQuery({ name: 'has', required: false, description: 'İçerik türü: link | image | file (image=image/*|video/* eki, file=medya-dışı ek). Doluysa `q` opsiyonel.' })
+  @ApiQuery({
+    name: 'q',
+    required: false,
+    description: 'Arama sorgusu (min 2, max 100 karakter). `has` verilmezse ZORUNLU.',
+  })
+  @ApiQuery({ name: 'before', required: false, description: "Cursor: bu mesaj ID'sinden öncesi" })
+  @ApiQuery({
+    name: 'has',
+    required: false,
+    description:
+      'İçerik türü: link | image | file (image=image/*|video/* eki, file=medya-dışı ek). Doluysa `q` opsiyonel.',
+  })
   searchMessages(
     @CurrentUser() user: { id: string },
     @Param('id') channelId: string,
@@ -178,16 +187,11 @@ export class MessagesController {
 @UseGuards(JwtAuthGuard)
 @Controller('channels/:id')
 export class PinsController {
-  constructor(
-    private messagesService: MessagesService,
-  ) {}
+  constructor(private messagesService: MessagesService) {}
 
   @Get('pins')
   @ApiOperation({ summary: 'Kanaldaki sabitlenmiş mesajlar listesi (pinnedAt desc)' })
-  findPins(
-    @CurrentUser() user: { id: string },
-    @Param('id') channelId: string,
-  ) {
+  findPins(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
     return this.messagesService.findPins(user.id, channelId);
   }
 }
@@ -206,10 +210,26 @@ export class GuildSearchController {
   @Get('search')
   @ApiOperation({ summary: 'Sunucu-geneli mesaj arama (erişilebilir kanallarda, kanal-gruplu)' })
   @ApiQuery({ name: 'q', required: false, description: 'Arama sorgusu (min 2, max 100 karakter)' })
-  @ApiQuery({ name: 'from', required: false, description: 'Yazar (authorId) — yalnız o kullanıcının mesajları' })
-  @ApiQuery({ name: 'mentions', required: false, description: 'Bahsedilen (userId) — o kullanıcıyı @bahseden mesajlar' })
-  @ApiQuery({ name: 'in', required: false, description: 'Kanal (channelId) — yalnız o kanalda gönderilenler' })
-  @ApiQuery({ name: 'has', required: false, description: 'İçerik türü: link | image | file (image=image/*|video/* eki, file=medya-dışı ek)' })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    description: 'Yazar (authorId) — yalnız o kullanıcının mesajları',
+  })
+  @ApiQuery({
+    name: 'mentions',
+    required: false,
+    description: 'Bahsedilen (userId) — o kullanıcıyı @bahseden mesajlar',
+  })
+  @ApiQuery({
+    name: 'in',
+    required: false,
+    description: 'Kanal (channelId) — yalnız o kanalda gönderilenler',
+  })
+  @ApiQuery({
+    name: 'has',
+    required: false,
+    description: 'İçerik türü: link | image | file (image=image/*|video/* eki, file=medya-dışı ek)',
+  })
   searchGuild(
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,

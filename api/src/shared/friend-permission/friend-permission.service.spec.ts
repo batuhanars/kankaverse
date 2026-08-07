@@ -109,7 +109,11 @@ describe('FriendPermissionService.canSendFriendRequest — §3 matrisi', () => {
     });
 
     it('ACCEPTED → ALREADY_FRIENDS', async () => {
-      prismaMock.friendship.findFirst.mockResolvedValue({ status: 'ACCEPTED', requesterId: ADULT.id, addresseeId: ADULT2.id });
+      prismaMock.friendship.findFirst.mockResolvedValue({
+        status: 'ACCEPTED',
+        requesterId: ADULT.id,
+        addresseeId: ADULT2.id,
+      });
       const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'CODE');
       expect(r).toEqual({ allowed: false, reason: 'ALREADY_FRIENDS' });
     });
@@ -166,7 +170,9 @@ describe('FriendPermissionService.canSendFriendRequest — §3 matrisi', () => {
     });
 
     it('her ikisi minör + ortak ortam → USER_NOT_FOUND (G1)', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce(MINOR).mockResolvedValueOnce({ id: 'minor2', isMinor: true });
+      prismaMock.user.findUnique
+        .mockResolvedValueOnce(MINOR)
+        .mockResolvedValueOnce({ id: 'minor2', isMinor: true });
       prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm1' });
       const r = await service.canSendFriendRequest(MINOR.id, 'minor2', 'USER_CLICK');
       expect(r).toEqual({ allowed: false, reason: 'USER_NOT_FOUND' });
@@ -191,13 +197,15 @@ describe('FriendPermissionService.canSendFriendRequest — §3 matrisi', () => {
       prismaMock.channelMember.findMany.mockImplementation((args: any) => {
         const type = args?.where?.channel?.type;
         if (type === 'DM') return Promise.resolve(opts.dm ? [{ channelId: 'dm-1' }] : []);
-        if (type === 'GROUP_DM') return Promise.resolve(opts.groupDm ? [{ channelId: 'grp-1' }] : []);
+        if (type === 'GROUP_DM')
+          return Promise.resolve(opts.groupDm ? [{ channelId: 'grp-1' }] : []);
         return Promise.resolve([]);
       });
       prismaMock.channelMember.findFirst.mockImplementation((args: any) => {
         const ids: string[] = args?.where?.channelId?.in ?? [];
         if (ids.includes('dm-1')) return Promise.resolve(opts.dm ? { channelId: 'dm-1' } : null);
-        if (ids.includes('grp-1')) return Promise.resolve(opts.groupDm ? { channelId: 'grp-1' } : null);
+        if (ids.includes('grp-1'))
+          return Promise.resolve(opts.groupDm ? { channelId: 'grp-1' } : null);
         return Promise.resolve(null);
       });
     }
@@ -272,7 +280,9 @@ describe('FriendPermissionService.canSendFriendRequest — §3 matrisi', () => {
     });
 
     it('her ikisi minör + CODE → allowed', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce(MINOR).mockResolvedValueOnce({ id: 'minor2', isMinor: true });
+      prismaMock.user.findUnique
+        .mockResolvedValueOnce(MINOR)
+        .mockResolvedValueOnce({ id: 'minor2', isMinor: true });
       const r = await service.canSendFriendRequest(MINOR.id, 'minor2', 'CODE');
       expect(r).toEqual({ allowed: true });
     });
@@ -303,8 +313,8 @@ describe('FriendPermissionService.canSendFriendRequest — §3 matrisi', () => {
   // ── Kural 6a: Karantina (R7) — USER_CLICK ortak-ortam basamağı ──────────
   describe('Kural 6a karantina (R7): sender yeni üye → ortak-ortam basamağı geçmez', () => {
     // joinedAt sabitleri
-    const ONE_HOUR_AGO = new Date(NOW - 1 * 60 * 60 * 1000);        // karantinada (24s içinde)
-    const TWO_DAYS_AGO = new Date(NOW - 48 * 60 * 60 * 1000);        // yerleşik (24s dışında)
+    const ONE_HOUR_AGO = new Date(NOW - 1 * 60 * 60 * 1000); // karantinada (24s içinde)
+    const TWO_DAYS_AGO = new Date(NOW - 48 * 60 * 60 * 1000); // yerleşik (24s dışında)
 
     it('sender karantinada (joinedAt 1 saat önce, quarantine 24s) → ortak-ortam null → USER_NOT_FOUND', async () => {
       configMock.get.mockReturnValue(24);
@@ -319,7 +329,10 @@ describe('FriendPermissionService.canSendFriendRequest — §3 matrisi', () => {
       configMock.get.mockReturnValue(24);
       prismaMock.user.findUnique.mockResolvedValueOnce(ADULT).mockResolvedValueOnce(ADULT2);
       // guildMember karantina filtresi eşleşir → kayıt döner
-      prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm-settled', joinedAt: TWO_DAYS_AGO });
+      prismaMock.guildMember.findFirst.mockResolvedValue({
+        id: 'gm-settled',
+        joinedAt: TWO_DAYS_AGO,
+      });
       const r = await service.canSendFriendRequest(ADULT.id, ADULT2.id, 'USER_CLICK');
       expect(r).toEqual({ allowed: true });
     });

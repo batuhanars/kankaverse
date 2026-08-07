@@ -56,7 +56,10 @@ function makeService(prismaMock: ReturnType<typeof makePrismaMock>) {
   return new AuthService(prismaMock as any, jwtService, configMock as any, emailServiceMock as any);
 }
 
-function signRefreshToken(jwtService: JwtService, payload: { sub: string; sessionId: string; family: string }) {
+function signRefreshToken(
+  jwtService: JwtService,
+  payload: { sub: string; sessionId: string; family: string },
+) {
   return jwtService.sign(payload, { secret: REFRESH_SECRET, expiresIn: '30d' });
 }
 
@@ -72,8 +75,16 @@ describe('AuthService.refresh — bearer teslim kapısı', () => {
     const service = makeService(prismaMock);
     const jwtService = new JwtService();
 
-    const rawToken = signRefreshToken(jwtService, { sub: 'user-1', sessionId: 'session-1', family: 'family-1' });
-    const refreshTokenHash = await argon2.hash(rawToken, { type: argon2.argon2id, memoryCost: 19456, timeCost: 2 });
+    const rawToken = signRefreshToken(jwtService, {
+      sub: 'user-1',
+      sessionId: 'session-1',
+      family: 'family-1',
+    });
+    const refreshTokenHash = await argon2.hash(rawToken, {
+      type: argon2.argon2id,
+      memoryCost: 19456,
+      timeCost: 2,
+    });
 
     prismaMock.session.findUnique.mockResolvedValue({
       id: 'session-1',
@@ -84,7 +95,9 @@ describe('AuthService.refresh — bearer teslim kapısı', () => {
       revokedAt: null,
     });
 
-    await expect(service.refresh(rawToken, '1.2.3.4', /* usingCookie */ false)).rejects.toMatchObject({
+    await expect(
+      service.refresh(rawToken, '1.2.3.4', /* usingCookie */ false),
+    ).rejects.toMatchObject({
       response: { error: 'REFRESH_CHANNEL_MISMATCH' },
     });
 
@@ -99,8 +112,16 @@ describe('AuthService.refresh — bearer teslim kapısı', () => {
     const service = makeService(prismaMock);
     const jwtService = new JwtService();
 
-    const rawToken = signRefreshToken(jwtService, { sub: 'user-1', sessionId: 'session-1', family: 'family-1' });
-    const refreshTokenHash = await argon2.hash(rawToken, { type: argon2.argon2id, memoryCost: 19456, timeCost: 2 });
+    const rawToken = signRefreshToken(jwtService, {
+      sub: 'user-1',
+      sessionId: 'session-1',
+      family: 'family-1',
+    });
+    const refreshTokenHash = await argon2.hash(rawToken, {
+      type: argon2.argon2id,
+      memoryCost: 19456,
+      timeCost: 2,
+    });
 
     prismaMock.session.findUnique.mockResolvedValue({
       id: 'session-1',
@@ -126,8 +147,16 @@ describe('AuthService.refresh — bearer teslim kapısı', () => {
     const service = makeService(prismaMock);
     const jwtService = new JwtService();
 
-    const rawToken = signRefreshToken(jwtService, { sub: 'user-1', sessionId: 'session-mobile', family: 'family-mobile' });
-    const refreshTokenHash = await argon2.hash(rawToken, { type: argon2.argon2id, memoryCost: 19456, timeCost: 2 });
+    const rawToken = signRefreshToken(jwtService, {
+      sub: 'user-1',
+      sessionId: 'session-mobile',
+      family: 'family-mobile',
+    });
+    const refreshTokenHash = await argon2.hash(rawToken, {
+      type: argon2.argon2id,
+      memoryCost: 19456,
+      timeCost: 2,
+    });
 
     prismaMock.session.findUnique.mockResolvedValue({
       id: 'session-mobile',
@@ -158,8 +187,16 @@ describe('AuthService.refresh — bearer teslim kapısı', () => {
     const service = makeService(prismaMock);
     const jwtService = new JwtService();
 
-    const rawToken = signRefreshToken(jwtService, { sub: 'user-1', sessionId: 'session-mobile', family: 'family-mobile' });
-    const refreshTokenHash = await argon2.hash(rawToken, { type: argon2.argon2id, memoryCost: 19456, timeCost: 2 });
+    const rawToken = signRefreshToken(jwtService, {
+      sub: 'user-1',
+      sessionId: 'session-mobile',
+      family: 'family-mobile',
+    });
+    const refreshTokenHash = await argon2.hash(rawToken, {
+      type: argon2.argon2id,
+      memoryCost: 19456,
+      timeCost: 2,
+    });
 
     const sessionRow: { revokedAt: Date | null; [k: string]: unknown } = {
       id: 'session-mobile',

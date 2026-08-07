@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -23,7 +34,10 @@ export class UsersController {
   }
 
   @Get(':id/card')
-  @ApiOperation({ summary: 'Kullanıcı detay kartı (ortak ortam veya ilişki zorunlu, aksi hâlde 404). guildId → rol rozetleri.' })
+  @ApiOperation({
+    summary:
+      'Kullanıcı detay kartı (ortak ortam veya ilişki zorunlu, aksi hâlde 404). guildId → rol rozetleri.',
+  })
   getUserCard(
     @CurrentUser() user: { id: string },
     @Param('id') targetId: string,
@@ -37,7 +51,9 @@ export class UsersController {
   @Post('me/avatar/presign')
   @UseGuards(VerifiedEmailGuard)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Avatar yüklemek için presigned PUT URL al (e-posta doğrulanmış gerekir)' })
+  @ApiOperation({
+    summary: 'Avatar yüklemek için presigned PUT URL al (e-posta doğrulanmış gerekir)',
+  })
   presignAvatar(@CurrentUser() user: { id: string }, @Body() dto: PresignAvatarDto) {
     return this.usersService.presignAvatar(user.id, dto.contentType);
   }
@@ -54,7 +70,9 @@ export class UsersController {
   @Post('me/banner/presign')
   @UseGuards(VerifiedEmailGuard)
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Profil afişi yüklemek için presigned PUT URL al (e-posta doğrulanmış gerekir)' })
+  @ApiOperation({
+    summary: 'Profil afişi yüklemek için presigned PUT URL al (e-posta doğrulanmış gerekir)',
+  })
   presignBanner(@CurrentUser() user: { id: string }, @Body() dto: PresignBannerDto) {
     return this.usersService.presignBanner(user.id, dto.contentType);
   }

@@ -29,7 +29,10 @@ export class DmController {
   constructor(private dmService: DmService) {}
 
   @Get('channels')
-  @ApiOperation({ summary: 'DM kanalları — 1-1 + GROUP_DM (son mesaj + unread). G4: temizlenmiş kanallar filtrelenir.' })
+  @ApiOperation({
+    summary:
+      'DM kanalları — 1-1 + GROUP_DM (son mesaj + unread). G4: temizlenmiş kanallar filtrelenir.',
+  })
   getDmChannels(@CurrentUser() user: { id: string }) {
     return this.dmService.getDmChannels(user.id);
   }
@@ -44,7 +47,10 @@ export class DmController {
 
   @Delete('channels/:id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'G4 inbox soft-delete: DM kaydı çağıranın listesinden temizlenir, mesajlar DB\'de durur' })
+  @ApiOperation({
+    summary:
+      "G4 inbox soft-delete: DM kaydı çağıranın listesinden temizlenir, mesajlar DB'de durur",
+  })
   clearChannel(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
     return this.dmService.clearDmChannel(user.id, channelId);
   }
@@ -59,7 +65,9 @@ export class DmController {
   // ─── C9 Mesaj İstekleri (arkadaş-olmayan DM onay süzgeci) ───────────────────
 
   @Get('requests')
-  @ApiOperation({ summary: 'C9: bana gelen bekleyen mesaj istekleri (gönderen + ilk mesaj önizleme)' })
+  @ApiOperation({
+    summary: 'C9: bana gelen bekleyen mesaj istekleri (gönderen + ilk mesaj önizleme)',
+  })
   getMessageRequests(@CurrentUser() user: { id: string }) {
     return this.dmService.getMessageRequests(user.id);
   }

@@ -1,4 +1,11 @@
-import { IsArray, IsString, ArrayMinSize, ArrayMaxSize, IsOptional, MaxLength } from 'class-validator';
+import {
+  IsArray,
+  IsString,
+  ArrayMinSize,
+  ArrayMaxSize,
+  IsOptional,
+  MaxLength,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateGroupDmDto {

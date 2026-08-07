@@ -129,7 +129,12 @@ describe('RolesService.createRole', () => {
 
     const result = await service.createRole(OWNER_ID, GUILD_ID, { name: 'Moderatör' });
 
-    expect(result).toMatchObject({ name: 'Moderatör', guildId: GUILD_ID, position: 1, memberCount: 0 });
+    expect(result).toMatchObject({
+      name: 'Moderatör',
+      guildId: GUILD_ID,
+      position: 1,
+      memberCount: 0,
+    });
     expect(prismaMock.role.create).toHaveBeenCalledTimes(1);
   });
 
@@ -153,14 +158,16 @@ describe('RolesService.createRole', () => {
     });
     permissionsMock.hasGuildPermission.mockResolvedValue(false);
 
-    await expect(service.createRole(MEMBER_ID, GUILD_ID, { name: 'Deneme' })).rejects.toMatchObject({
-      response: expect.objectContaining({ error: 'FORBIDDEN' }),
-    });
+    await expect(service.createRole(MEMBER_ID, GUILD_ID, { name: 'Deneme' })).rejects.toMatchObject(
+      {
+        response: expect.objectContaining({ error: 'FORBIDDEN' }),
+      },
+    );
     expect(prismaMock.role.create).not.toHaveBeenCalled();
   });
 
   // ── F1 (R7): "sahip olmadığın izni veremezsin" (Discord kuralı) ──────────────
-  it('MANAGE_ROLES olan MEMBER sahip olmadığı ADMINISTRATOR\'ı veremez → 403 CANNOT_GRANT_PERMISSION', async () => {
+  it("MANAGE_ROLES olan MEMBER sahip olmadığı ADMINISTRATOR'ı veremez → 403 CANNOT_GRANT_PERMISSION", async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD_FIXTURE,
       membership: MEMBER_MEMBERSHIP,
@@ -173,8 +180,13 @@ describe('RolesService.createRole', () => {
     prismaMock.role.aggregate.mockResolvedValue({ _max: { position: 1 } });
 
     await expect(
-      service.createRole(MEMBER_ID, GUILD_ID, { name: 'Sahte Admin', permissions: ['ADMINISTRATOR'] }),
-    ).rejects.toMatchObject({ response: expect.objectContaining({ error: 'CANNOT_GRANT_PERMISSION' }) });
+      service.createRole(MEMBER_ID, GUILD_ID, {
+        name: 'Sahte Admin',
+        permissions: ['ADMINISTRATOR'],
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'CANNOT_GRANT_PERMISSION' }),
+    });
     expect(prismaMock.role.create).not.toHaveBeenCalled();
   });
 
@@ -189,10 +201,17 @@ describe('RolesService.createRole', () => {
       flags: new Set(['MANAGE_ROLES', 'KICK_MEMBERS']),
     });
     prismaMock.role.aggregate.mockResolvedValue({ _max: { position: 1 } });
-    prismaMock.role.create.mockResolvedValue({ ...ROLE_FIXTURE, position: 2, permissions: ['KICK_MEMBERS'] });
+    prismaMock.role.create.mockResolvedValue({
+      ...ROLE_FIXTURE,
+      position: 2,
+      permissions: ['KICK_MEMBERS'],
+    });
     prismaMock.guildMemberRole.count.mockResolvedValue(0);
 
-    const result = await service.createRole(MEMBER_ID, GUILD_ID, { name: 'Atıcı', permissions: ['KICK_MEMBERS'] });
+    const result = await service.createRole(MEMBER_ID, GUILD_ID, {
+      name: 'Atıcı',
+      permissions: ['KICK_MEMBERS'],
+    });
     expect(result.position).toBe(2);
     expect(prismaMock.role.create).toHaveBeenCalledTimes(1);
   });
@@ -242,7 +261,10 @@ describe('RolesService.createRole', () => {
     });
     prismaMock.role.aggregate.mockResolvedValue({ _max: { position: 0 } });
     prismaMock.role.create.mockResolvedValue(ROLE_FIXTURE);
-    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: OWNER_ID }, { userId: MEMBER_ID }]);
+    prismaMock.guildMember.findMany.mockResolvedValue([
+      { userId: OWNER_ID },
+      { userId: MEMBER_ID },
+    ]);
     prismaMock.guildMemberRole.count.mockResolvedValue(0);
 
     await service.createRole(OWNER_ID, GUILD_ID, { name: 'Moderatör' });
@@ -308,7 +330,9 @@ describe('RolesService.deleteRole', () => {
   it('rol bulunamadı → NotFoundException ROLE_NOT_FOUND', async () => {
     prismaMock.role.findUnique.mockResolvedValue(null);
 
-    await expect(service.deleteRole(OWNER_ID, 'nonexistent')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.deleteRole(OWNER_ID, 'nonexistent')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('silme başarılı → guild.role_deleted realtime eventi yayılır', async () => {
@@ -322,11 +346,9 @@ describe('RolesService.deleteRole', () => {
 
     await service.deleteRole(OWNER_ID, ROLE_ID);
 
-    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith(
-      [OWNER_ID],
-      'guild.role_deleted',
-      { roleId: ROLE_ID },
-    );
+    expect(realtimeMock.emitToUsers).toHaveBeenCalledWith([OWNER_ID], 'guild.role_deleted', {
+      roleId: ROLE_ID,
+    });
   });
 });
 
@@ -356,12 +378,10 @@ describe('RolesService.assignRole', () => {
       guild: GUILD_FIXTURE,
       membership: OWNER_MEMBERSHIP,
     });
-    prismaMock.guildMember.findUnique
-      .mockResolvedValueOnce(MEMBER_GM)
-      .mockResolvedValueOnce({
-        ...MEMBER_GM,
-        roleLinks: [{ role: ROLE_FIXTURE }],
-      });
+    prismaMock.guildMember.findUnique.mockResolvedValueOnce(MEMBER_GM).mockResolvedValueOnce({
+      ...MEMBER_GM,
+      roleLinks: [{ role: ROLE_FIXTURE }],
+    });
     prismaMock.guildMemberRole.upsert.mockResolvedValue({});
 
     const result = await service.assignRole(OWNER_ID, ROLE_ID, MEMBER_ID);
@@ -422,7 +442,10 @@ describe('RolesService.assignRole', () => {
       .mockResolvedValueOnce(MEMBER_GM)
       .mockResolvedValueOnce({ ...MEMBER_GM, roleLinks: [{ role: ROLE_FIXTURE }] });
     prismaMock.guildMemberRole.upsert.mockResolvedValue({});
-    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: OWNER_ID }, { userId: MEMBER_ID }]);
+    prismaMock.guildMember.findMany.mockResolvedValue([
+      { userId: OWNER_ID },
+      { userId: MEMBER_ID },
+    ]);
 
     await service.assignRole(OWNER_ID, ROLE_ID, MEMBER_ID);
 
@@ -485,7 +508,12 @@ describe('RolesService.removeRole', () => {
       membership: OWNER_MEMBERSHIP,
     });
     prismaMock.guildMember.findUnique
-      .mockResolvedValueOnce({ id: MEMBER_GM.id, guildId: GUILD_ID, userId: MEMBER_ID, role: GuildRole.MEMBER })
+      .mockResolvedValueOnce({
+        id: MEMBER_GM.id,
+        guildId: GUILD_ID,
+        userId: MEMBER_ID,
+        role: GuildRole.MEMBER,
+      })
       .mockResolvedValueOnce(MEMBER_GM_AFTER_REMOVE);
     prismaMock.guildMemberRole.deleteMany.mockResolvedValue({ count: 1 });
 
@@ -503,10 +531,18 @@ describe('RolesService.removeRole', () => {
       membership: OWNER_MEMBERSHIP,
     });
     prismaMock.guildMember.findUnique
-      .mockResolvedValueOnce({ id: MEMBER_GM.id, guildId: GUILD_ID, userId: MEMBER_ID, role: GuildRole.MEMBER })
+      .mockResolvedValueOnce({
+        id: MEMBER_GM.id,
+        guildId: GUILD_ID,
+        userId: MEMBER_ID,
+        role: GuildRole.MEMBER,
+      })
       .mockResolvedValueOnce(MEMBER_GM_AFTER_REMOVE);
     prismaMock.guildMemberRole.deleteMany.mockResolvedValue({ count: 1 });
-    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: OWNER_ID }, { userId: MEMBER_ID }]);
+    prismaMock.guildMember.findMany.mockResolvedValue([
+      { userId: OWNER_ID },
+      { userId: MEMBER_ID },
+    ]);
 
     await service.removeRole(OWNER_ID, ROLE_ID, MEMBER_ID);
 
@@ -553,7 +589,12 @@ describe('RolesService.removeRole', () => {
       membership: OWNER_MEMBERSHIP,
     });
     prismaMock.guildMember.findUnique
-      .mockResolvedValueOnce({ id: MEMBER_GM.id, guildId: GUILD_ID, userId: MEMBER_ID, role: GuildRole.MEMBER })
+      .mockResolvedValueOnce({
+        id: MEMBER_GM.id,
+        guildId: GUILD_ID,
+        userId: MEMBER_ID,
+        role: GuildRole.MEMBER,
+      })
       .mockResolvedValueOnce(MEMBER_GM_AFTER_REMOVE);
     prismaMock.guildMemberRole.deleteMany.mockResolvedValue({ count: 0 }); // zaten yoktu
 
@@ -628,7 +669,9 @@ describe('RolesService.listRoles', () => {
       new ForbiddenException({ message: 'Erişim yok.', error: 'FORBIDDEN' }),
     );
 
-    await expect(service.listRoles('stranger', GUILD_ID)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.listRoles('stranger', GUILD_ID)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
     expect(prismaMock.role.findMany).not.toHaveBeenCalled();
   });
 });
@@ -712,7 +755,10 @@ describe('RolesService.reorderRoles', () => {
     resetMocks();
     service = makeService();
     // guildMemberIds için varsayılan
-    prismaMock.guildMember.findMany.mockResolvedValue([{ userId: OWNER_ID }, { userId: MEMBER_ID }]);
+    prismaMock.guildMember.findMany.mockResolvedValue([
+      { userId: OWNER_ID },
+      { userId: MEMBER_ID },
+    ]);
     // $transaction: gelen array'deki promise'leri çalıştırır
     prismaMock.$transaction.mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops));
     // role.update: güncel role fixture döndür

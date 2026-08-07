@@ -175,7 +175,10 @@ export class NotificationsService {
   async markOne(userId: string, id: string): Promise<NotificationDto> {
     const notification = await this.prisma.notification.findUnique({ where: { id } });
     if (!notification || notification.userId !== userId) {
-      throw new NotFoundException({ message: 'Bildirim bulunamadı.', error: 'NOTIFICATION_NOT_FOUND' });
+      throw new NotFoundException({
+        message: 'Bildirim bulunamadı.',
+        error: 'NOTIFICATION_NOT_FOUND',
+      });
     }
 
     const updated = notification.readAt
@@ -245,7 +248,10 @@ export class NotificationsService {
   async deletePushToken(userId: string, token: string): Promise<null> {
     const row = await this.prisma.pushToken.findUnique({ where: { token } });
     if (!row || row.userId !== userId) {
-      throw new NotFoundException({ message: 'Push token bulunamadı.', error: 'PUSH_TOKEN_NOT_FOUND' });
+      throw new NotFoundException({
+        message: 'Push token bulunamadı.',
+        error: 'PUSH_TOKEN_NOT_FOUND',
+      });
     }
     await this.prisma.pushToken.delete({ where: { token } });
     return null;
@@ -414,13 +420,15 @@ export class NotificationsService {
     const guildNameById = new Map(guilds.map((g) => [g.id, g.name]));
 
     return rows.map((n) => {
-      const actor = n.actorId ? actorById.get(n.actorId) ?? null : null;
+      const actor = n.actorId ? (actorById.get(n.actorId) ?? null) : null;
       return {
         id: n.id,
         type: n.type,
-        actor: actor ? { id: actor.id, username: actor.username, avatarUrl: actor.avatarUrl } : null,
+        actor: actor
+          ? { id: actor.id, username: actor.username, avatarUrl: actor.avatarUrl }
+          : null,
         guildId: n.guildId,
-        guildName: n.guildId ? guildNameById.get(n.guildId) ?? null : null,
+        guildName: n.guildId ? (guildNameById.get(n.guildId) ?? null) : null,
         channelId: n.channelId,
         messageId: n.messageId,
         preview: n.preview,
@@ -439,7 +447,16 @@ export class NotificationsService {
    * (bkz. web/mobile `notification.*` i18n anahtarları) burada birebir yansıtılır — "preview'ı
    * olduğu gibi bas" literal okuması 3/5 tipte boş/anlamsız gövde üretirdi.
    */
-  private toPushPayload(dto: NotificationDto): { title?: string; body: string; data: { type: string; guildId?: string | null; channelId?: string | null; messageId?: string | null } } {
+  private toPushPayload(dto: NotificationDto): {
+    title?: string;
+    body: string;
+    data: {
+      type: string;
+      guildId?: string | null;
+      channelId?: string | null;
+      messageId?: string | null;
+    };
+  } {
     const actor = dto.actor?.username ?? 'Biri';
     let body: string;
     switch (dto.type) {

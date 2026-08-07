@@ -16,7 +16,10 @@ export class CreatePushTokenDto {
   @IsIn(['android', 'ios'], { message: 'Geçersiz platform.' })
   platform: 'android' | 'ios';
 
-  @ApiPropertyOptional({ example: 'Pixel 8 (dev build)', description: 'Teşhis amaçlı; kullanıcıya gösterilmez.' })
+  @ApiPropertyOptional({
+    example: 'Pixel 8 (dev build)',
+    description: 'Teşhis amaçlı; kullanıcıya gösterilmez.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)

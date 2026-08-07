@@ -283,7 +283,7 @@ describe('PresenceService', () => {
       expect(audience).toContain('friend1');
     });
 
-    it('userId kendisi audience\'a girmez (dedup)', async () => {
+    it("userId kendisi audience'a girmez (dedup)", async () => {
       prismaMock.friendship.findMany.mockResolvedValueOnce([
         { requesterId: 'user1', addresseeId: 'user1' }, // kendine arkadaş olamaz ama savunma testi
       ]);

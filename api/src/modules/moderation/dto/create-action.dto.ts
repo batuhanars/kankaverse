@@ -44,7 +44,8 @@ export class CreateActionDto {
 
   @ApiPropertyOptional({
     enum: MediaTarget,
-    description: 'MEDIA_REMOVE aksiyonu için zorunlu hedef (USER_AVATAR|USER_BANNER|GUILD_BANNER|GUILD_ICON).',
+    description:
+      'MEDIA_REMOVE aksiyonu için zorunlu hedef (USER_AVATAR|USER_BANNER|GUILD_BANNER|GUILD_ICON).',
   })
   @IsOptional()
   @IsEnum(MediaTarget)

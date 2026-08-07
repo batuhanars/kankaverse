@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  ForbiddenException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, ForbiddenException, ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
@@ -60,7 +56,10 @@ export class GuildJoinService {
       where: { guildId_userId: { guildId: guild.id, userId } },
     });
     if (ban) {
-      throw new ForbiddenException({ message: 'Bu ortamdan yasaklandınız.', error: 'GUILD_BANNED' });
+      throw new ForbiddenException({
+        message: 'Bu ortamdan yasaklandınız.',
+        error: 'GUILD_BANNED',
+      });
     }
 
     // 3. Zaten üye kontrolü
@@ -68,7 +67,10 @@ export class GuildJoinService {
       where: { guildId_userId: { guildId: guild.id, userId } },
     });
     if (existing) {
-      throw new ConflictException({ message: 'Bu sunucuya zaten üyesiniz.', error: 'ALREADY_MEMBER' });
+      throw new ConflictException({
+        message: 'Bu sunucuya zaten üyesiniz.',
+        error: 'ALREADY_MEMBER',
+      });
     }
 
     // 4. Transaction: üye oluştur (+ çağıranın ek işlemleri)
@@ -114,7 +116,20 @@ export class GuildJoinService {
       include: {
         user: { select: { id: true, username: true, avatarUrl: true } },
         // Varsayılan rol atandıysa üye doğru rol başlığı altında ANLIK görünsün.
-        roleLinks: { include: { role: { select: { id: true, name: true, color: true, position: true, hoist: true, isEveryone: true } } } },
+        roleLinks: {
+          include: {
+            role: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                position: true,
+                hoist: true,
+                isEveryone: true,
+              },
+            },
+          },
+        },
       },
     });
     if (!newMember) return;

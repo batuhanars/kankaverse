@@ -81,7 +81,9 @@ describe('DiscoveryService.listGuilds — [R7 KRİTİK] adultsOnly minör süzme
   it('memberCount azalan sıralama + memberCount _count.members map + nextCursor', async () => {
     prismaMock.user.findUnique.mockResolvedValue({ isMinor: false });
     // 31 sonuç döndür (PAGE_LIMIT+1) → hasMore=true
-    const many = Array.from({ length: 31 }, (_, i) => makeGuild({ id: `g${i}`, _count: { members: 31 - i } }));
+    const many = Array.from({ length: 31 }, (_, i) =>
+      makeGuild({ id: `g${i}`, _count: { members: 31 - i } }),
+    );
     prismaMock.guild.findMany.mockResolvedValue(many);
 
     const res = await service.listGuilds('adult1', {});
@@ -119,6 +121,9 @@ describe('DiscoveryService.popularTags', () => {
     expect(res[0]).toEqual({ tag: 'oyun', count: 3 });
     expect(res.find((t) => t.tag === 'müzik')?.count).toBe(1);
     // yalnız discoverable + deletedAt:null sorgulanır
-    expect(prismaMock.guild.findMany.mock.calls[0][0].where).toEqual({ discoverable: true, deletedAt: null });
+    expect(prismaMock.guild.findMany.mock.calls[0][0].where).toEqual({
+      discoverable: true,
+      deletedAt: null,
+    });
   });
 });

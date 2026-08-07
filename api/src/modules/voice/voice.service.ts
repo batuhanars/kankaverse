@@ -7,12 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  AccessToken,
-  RoomServiceClient,
-  WebhookReceiver,
-  TrackSource,
-} from 'livekit-server-sdk';
+import { AccessToken, RoomServiceClient, WebhookReceiver, TrackSource } from 'livekit-server-sdk';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { PermissionsService } from '../../shared/permissions/permissions.service';
@@ -142,7 +137,7 @@ export class VoiceService {
       }
 
       // Yetki onaylandı (guild MUTE_MEMBERS veya platform acil-yanıt) → teftiş-girişi.
-      channel = rawChannel as typeof channel;
+      channel = rawChannel;
       isInspectEntry = true;
     }
 
@@ -289,7 +284,14 @@ export class VoiceService {
    */
   private async resolveVideoSources(
     userId: string,
-    channel: { id: string; type: string; guildId: string | null; ageGated?: boolean; mediaEnabled?: boolean; guild?: { adultsOnly: boolean } | null },
+    channel: {
+      id: string;
+      type: string;
+      guildId: string | null;
+      ageGated?: boolean;
+      mediaEnabled?: boolean;
+      guild?: { adultsOnly: boolean } | null;
+    },
     otherDmUserId: string | null,
   ): Promise<TrackSource[]> {
     const cameraEnabled = this.config.get<boolean>('cameraEnabled') ?? false;
@@ -377,9 +379,17 @@ export class VoiceService {
     await this.requireGuildPermission(actorId, channel.guildId, 'MUTE_MEMBERS');
 
     if (targetUserId === actorId) {
-      throw new BadRequestException({ message: 'Kendini susturamazsın.', error: 'CANNOT_MUTE_SELF' });
+      throw new BadRequestException({
+        message: 'Kendini susturamazsın.',
+        error: 'CANNOT_MUTE_SELF',
+      });
     }
-    await this.requireTargetNotOwner(channel.guildId, targetUserId, 'CANNOT_MUTE_OWNER', 'Ortam sahibi susturulamaz.');
+    await this.requireTargetNotOwner(
+      channel.guildId,
+      targetUserId,
+      'CANNOT_MUTE_OWNER',
+      'Ortam sahibi susturulamaz.',
+    );
 
     await this.prisma.voiceMute.upsert({
       where: { channelId_userId: { channelId, userId: targetUserId } },
@@ -400,7 +410,10 @@ export class VoiceService {
       }
     }
 
-    this.realtime.emitToRoom(channelId, 'voice.participant_muted', { channelId, userId: targetUserId });
+    this.realtime.emitToRoom(channelId, 'voice.participant_muted', {
+      channelId,
+      userId: targetUserId,
+    });
   }
 
   /**
@@ -427,7 +440,10 @@ export class VoiceService {
       }
     }
 
-    this.realtime.emitToRoom(channelId, 'voice.participant_unmuted', { channelId, userId: targetUserId });
+    this.realtime.emitToRoom(channelId, 'voice.participant_unmuted', {
+      channelId,
+      userId: targetUserId,
+    });
   }
 
   /**
@@ -446,10 +462,16 @@ export class VoiceService {
     await this.requireGuildPermission(actorId, source.guildId, 'MOVE_MEMBERS');
 
     if (targetChannelId === channelId) {
-      throw new BadRequestException({ message: 'Kullanıcı zaten bu kanalda.', error: 'SAME_CHANNEL' });
+      throw new BadRequestException({
+        message: 'Kullanıcı zaten bu kanalda.',
+        error: 'SAME_CHANNEL',
+      });
     }
     if (targetUserId === actorId) {
-      throw new BadRequestException({ message: 'Kendini taşıyamazsın.', error: 'CANNOT_MOVE_SELF' });
+      throw new BadRequestException({
+        message: 'Kendini taşıyamazsın.',
+        error: 'CANNOT_MOVE_SELF',
+      });
     }
 
     // Hedef kanal: var mı + aynı guild + GUILD_VOICE (ageGated + guild.adultsOnly invariant için de fetch et)
@@ -465,10 +487,16 @@ export class VoiceService {
       },
     });
     if (!target || target.guildId !== source.guildId) {
-      throw new BadRequestException({ message: 'Hedef kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
+      throw new BadRequestException({
+        message: 'Hedef kanal bulunamadı.',
+        error: 'CHANNEL_NOT_FOUND',
+      });
     }
     if (target.type !== 'GUILD_VOICE') {
-      throw new BadRequestException({ message: 'Hedef bir ses kanalı değil.', error: 'NOT_VOICE_CHANNEL' });
+      throw new BadRequestException({
+        message: 'Hedef bir ses kanalı değil.',
+        error: 'NOT_VOICE_CHANNEL',
+      });
     }
 
     // C7 §D — Yetki-baypas invariant'ı: minör → 18+ hedef bağlam → ret (koşulsuz kemer).
@@ -487,7 +515,12 @@ export class VoiceService {
       }
     }
 
-    await this.requireTargetNotOwner(source.guildId, targetUserId, 'CANNOT_MOVE_OWNER', 'Ortam sahibi taşınamaz.');
+    await this.requireTargetNotOwner(
+      source.guildId,
+      targetUserId,
+      'CANNOT_MOVE_OWNER',
+      'Ortam sahibi taşınamaz.',
+    );
 
     // R10 deseni — hedef doluluk (taşınan kullanıcı hedefte zaten yoksa sayılır). LiveKit erişilemezse geç.
     if (target.userLimit > 0 && this.roomService) {
@@ -499,7 +532,10 @@ export class VoiceService {
       }
       if (participants && !participants.some((p) => p.identity === targetUserId)) {
         if (participants.length >= target.userLimit) {
-          throw new ForbiddenException({ message: 'Hedef ses kanalı dolu.', error: 'CHANNEL_FULL' });
+          throw new ForbiddenException({
+            message: 'Hedef ses kanalı dolu.',
+            error: 'CHANNEL_FULL',
+          });
         }
       }
     }
@@ -533,9 +569,17 @@ export class VoiceService {
     await this.requireGuildPermission(actorId, channel.guildId, 'MUTE_MEMBERS');
 
     if (targetUserId === actorId) {
-      throw new BadRequestException({ message: 'Kendi yayınını bu komutla durduramazsın.', error: 'CANNOT_STOP_SELF' });
+      throw new BadRequestException({
+        message: 'Kendi yayınını bu komutla durduramazsın.',
+        error: 'CANNOT_STOP_SELF',
+      });
     }
-    await this.requireTargetNotOwner(channel.guildId, targetUserId, 'CANNOT_STOP_OWNER', 'Ortam sahibinin yayını durdurulamaz.');
+    await this.requireTargetNotOwner(
+      channel.guildId,
+      targetUserId,
+      'CANNOT_STOP_OWNER',
+      'Ortam sahibinin yayını durdurulamaz.',
+    );
 
     // LiveKit: yalnız video/ekran kaynakları düşür — ses (microphone) KALIR.
     // canPublish false YAPILMAZ; bu sustur'dan temel fark.
@@ -561,8 +605,14 @@ export class VoiceService {
       },
     });
 
-    this.realtime.emitToRoom(channelId, 'voice.broadcast_stopped', { channelId, userId: targetUserId });
-    this.realtime.emitToVoicePresence(channelId, 'voice.broadcast_stopped', { channelId, userId: targetUserId });
+    this.realtime.emitToRoom(channelId, 'voice.broadcast_stopped', {
+      channelId,
+      userId: targetUserId,
+    });
+    this.realtime.emitToVoicePresence(channelId, 'voice.broadcast_stopped', {
+      channelId,
+      userId: targetUserId,
+    });
   }
 
   /**
@@ -570,15 +620,27 @@ export class VoiceService {
    * Etki: hedef ses oturumundan düşer. Ortam üyeliğine DOKUNULMAZ (rejoin edebilir).
    * Kalıcı = guild kick/ban ayrı aksiyon. Best-effort (R11 deseni).
    */
-  async disconnectParticipant(actorId: string, channelId: string, targetUserId: string): Promise<void> {
+  async disconnectParticipant(
+    actorId: string,
+    channelId: string,
+    targetUserId: string,
+  ): Promise<void> {
     this.assertEnabled();
     const channel = await this.requireGuildVoiceChannel(channelId);
     await this.requireGuildPermission(actorId, channel.guildId, 'MOVE_MEMBERS');
 
     if (targetUserId === actorId) {
-      throw new BadRequestException({ message: 'Kendini odadan çıkaramazsın.', error: 'CANNOT_DISCONNECT_SELF' });
+      throw new BadRequestException({
+        message: 'Kendini odadan çıkaramazsın.',
+        error: 'CANNOT_DISCONNECT_SELF',
+      });
     }
-    await this.requireTargetNotOwner(channel.guildId, targetUserId, 'CANNOT_DISCONNECT_OWNER', 'Ortam sahibi odadan çıkarılamaz.');
+    await this.requireTargetNotOwner(
+      channel.guildId,
+      targetUserId,
+      'CANNOT_DISCONNECT_OWNER',
+      'Ortam sahibi odadan çıkarılamaz.',
+    );
 
     // LiveKit: katılımcıyı oturumdan düşür — best-effort.
     if (this.roomService) {
@@ -635,7 +697,9 @@ export class VoiceService {
             const sources = [
               ...new Set(
                 (p.tracks ?? [])
-                  .filter((t) => t.source === TrackSource.CAMERA || t.source === TrackSource.SCREEN_SHARE)
+                  .filter(
+                    (t) => t.source === TrackSource.CAMERA || t.source === TrackSource.SCREEN_SHARE,
+                  )
                   .map((t) => (t.source === TrackSource.CAMERA ? 'camera' : 'screen')),
               ),
             ];
@@ -692,7 +756,10 @@ export class VoiceService {
       throw new BadRequestException({ message: 'Kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
     }
     if (channel.type !== 'GUILD_VOICE' || !channel.guildId) {
-      throw new BadRequestException({ message: 'Bu bir ses kanalı değil.', error: 'NOT_VOICE_CHANNEL' });
+      throw new BadRequestException({
+        message: 'Bu bir ses kanalı değil.',
+        error: 'NOT_VOICE_CHANNEL',
+      });
     }
     return { id: channel.id, guildId: channel.guildId };
   }
@@ -769,7 +836,11 @@ export class VoiceService {
     // Yetkili bypass (owner/admin örtük geçer).
     // B1 (R11B): MUTE_MEMBERS de bypass yapar — mod dolu kanala teftiş için girebilir.
     if (guildId) {
-      const bypassManage = await this.permissions.hasGuildPermission(userId, guildId, 'MANAGE_CHANNELS');
+      const bypassManage = await this.permissions.hasGuildPermission(
+        userId,
+        guildId,
+        'MANAGE_CHANNELS',
+      );
       if (bypassManage) return;
       const bypassMute = await this.permissions.hasGuildPermission(userId, guildId, 'MUTE_MEMBERS');
       if (bypassMute) return;
@@ -793,13 +864,19 @@ export class VoiceService {
         select: { dmRequestStatus: true },
       });
       if (ch?.dmRequestStatus === 'PENDING') {
-        throw new ForbiddenException({ message: 'Bu kişiyle sesli görüşemezsin.', error: 'DM_NOT_ALLOWED' });
+        throw new ForbiddenException({
+          message: 'Bu kişiyle sesli görüşemezsin.',
+          error: 'DM_NOT_ALLOWED',
+        });
       }
       const other = await this.otherDmMember(channelId, userId);
       if (other) {
         const res = await this.dmPermission.canDm(userId, other);
         if (!res.allowed) {
-          throw new ForbiddenException({ message: 'Bu kişiyle sesli görüşemezsin.', error: 'DM_NOT_ALLOWED' });
+          throw new ForbiddenException({
+            message: 'Bu kişiyle sesli görüşemezsin.',
+            error: 'DM_NOT_ALLOWED',
+          });
         }
       }
     }
@@ -877,7 +954,12 @@ export class VoiceService {
       switch (event.event) {
         case 'participant_joined':
           if (room && participant?.identity) {
-            await this.onParticipantJoined(room, participant.identity, participant.name, participant.metadata);
+            await this.onParticipantJoined(
+              room,
+              participant.identity,
+              participant.name,
+              participant.metadata,
+            );
           }
           break;
         case 'participant_left':

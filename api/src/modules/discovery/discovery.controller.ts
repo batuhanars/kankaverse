@@ -14,14 +14,17 @@ export class DiscoveryController {
 
   @Get('guilds')
   @ApiOperation({
-    summary: 'Keşfet: discoverable ortamlar (arama/etiket/imleç). adultsOnly minör görüntüleyiciye süzülür.',
+    summary:
+      'Keşfet: discoverable ortamlar (arama/etiket/imleç). adultsOnly minör görüntüleyiciye süzülür.',
   })
   listGuilds(@CurrentUser() user: { id: string }, @Query() query: ListDiscoveryQueryDto) {
     return this.discoveryService.listGuilds(user.id, query);
   }
 
   @Get('tags')
-  @ApiOperation({ summary: 'Keşfet: popüler etiketler (discoverable ortamlardan agregat, azalan).' })
+  @ApiOperation({
+    summary: 'Keşfet: popüler etiketler (discoverable ortamlardan agregat, azalan).',
+  })
   popularTags() {
     return this.discoveryService.popularTags();
   }

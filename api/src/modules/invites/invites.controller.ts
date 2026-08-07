@@ -35,38 +35,27 @@ export class InvitesController {
 
   @Get('guilds/:id/invites')
   @ApiOperation({ summary: 'Aktif davetleri listele (OWNER/ADMIN)' })
-  listInvites(
-    @CurrentUser() user: { id: string },
-    @Param('id') guildId: string,
-  ) {
+  listInvites(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
     return this.invitesService.listInvites(user.id, guildId);
   }
 
   @Delete('invites/:code')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Daveti iptal et (o ortamın OWNER/ADMIN\'i)' })
-  revokeInvite(
-    @CurrentUser() user: { id: string },
-    @Param('code') code: string,
-  ) {
+  @ApiOperation({ summary: "Daveti iptal et (o ortamın OWNER/ADMIN'i)" })
+  revokeInvite(@CurrentUser() user: { id: string }, @Param('code') code: string) {
     return this.invitesService.revokeInvite(user.id, code);
   }
 
   @Get('invites/:code')
   @ApiOperation({ summary: 'Davet önizleme (auth)' })
-  previewInvite(
-    @Param('code') code: string,
-  ) {
+  previewInvite(@Param('code') code: string) {
     return this.invitesService.previewInvite(code);
   }
 
   @Post('invites/:code/join')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Davet kodu ile ortama katıl (auth) — [R7] adultsOnly kapısı' })
-  joinByInvite(
-    @CurrentUser() user: { id: string },
-    @Param('code') code: string,
-  ) {
+  joinByInvite(@CurrentUser() user: { id: string }, @Param('code') code: string) {
     return this.invitesService.joinByInvite(user.id, code);
   }
 }

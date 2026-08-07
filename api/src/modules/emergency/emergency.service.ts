@@ -23,7 +23,10 @@ export class EmergencyService {
     private realtime: RealtimeService,
   ) {}
 
-  async trigger(presserId: string, channelId?: string): Promise<{ acknowledged: true; reportId: string }> {
+  async trigger(
+    presserId: string,
+    channelId?: string,
+  ): Promise<{ acknowledged: true; reportId: string }> {
     const presser = await this.prisma.user.findUnique({
       where: { id: presserId },
       select: { isMinor: true },
@@ -128,7 +131,11 @@ export class EmergencyService {
    * Mağdurun kendi rızasıyla yazdığı beyan → A2 sessiz-içerik gating'ine GİRMEZ (gönüllü, kendi koruması).
    * Canlı ses "ifade alma" reddedildi — beyan yalnız metin, mağdurun temposunda.
    */
-  async addStatement(userId: string, reportId: string, description: string): Promise<{ acknowledged: true }> {
+  async addStatement(
+    userId: string,
+    reportId: string,
+    description: string,
+  ): Promise<{ acknowledged: true }> {
     const report = await this.prisma.report.findUnique({
       where: { id: reportId },
       select: { reporterId: true, reason: true },

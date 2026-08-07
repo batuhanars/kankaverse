@@ -1,4 +1,13 @@
-import { Controller, Post, Patch, Param, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Patch,
+  Param,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { EmergencyService } from './emergency.service';
@@ -21,7 +30,9 @@ export class EmergencyController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @ApiOperation({ summary: 'Acil yardım tetikle — anında-çek + platform eskalasyon (metadata-only)' })
+  @ApiOperation({
+    summary: 'Acil yardım tetikle — anında-çek + platform eskalasyon (metadata-only)',
+  })
   trigger(@CurrentUser() user: { id: string }, @Body() dto: TriggerEmergencyDto) {
     return this.emergencyService.trigger(user.id, dto.channelId);
   }

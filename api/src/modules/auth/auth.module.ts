@@ -7,11 +7,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { SharedModule } from '../../shared/shared.module';
 
 @Module({
-  imports: [
-    PassportModule,
-    JwtModule.register({}),
-    SharedModule,
-  ],
+  imports: [PassportModule, JwtModule.register({}), SharedModule],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
 })

@@ -99,9 +99,7 @@ export class StorageService {
    * S3'ten nesneyi sil.
    */
   async delete(key: string): Promise<void> {
-    await this.client.send(
-      new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
-    );
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
     this.logger.debug(`delete: key=${key}`);
   }
 }

@@ -7,7 +7,9 @@ class NewUsernameField {
   @IsString()
   @MinLength(3, { message: 'Kullanıcı adı en az 3 karakter olmalıdır.' })
   @MaxLength(32, { message: 'Kullanıcı adı en fazla 32 karakter olabilir.' })
-  @Matches(/^[a-zA-Z0-9_]+$/, { message: 'Kullanıcı adı yalnızca harf, rakam ve alt çizgi içerebilir.' })
+  @Matches(/^[a-zA-Z0-9_]+$/, {
+    message: 'Kullanıcı adı yalnızca harf, rakam ve alt çizgi içerebilir.',
+  })
   newUsername: string;
 }
 

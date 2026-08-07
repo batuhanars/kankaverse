@@ -34,11 +34,14 @@ export const AUTOMOD_WORDS: string[] = [
   // ── Ağır cinsel küfür ────────────────────────────────────────────────────────
   'orospu',
   'orospuçocuğu',
-  'amınakoyim', 'aminakoyim', // ı ve i yazımı — ikisi de küfür, çakışma yok
-  'amınakoyayım', 'aminakoyayim',
+  'amınakoyim',
+  'aminakoyim', // ı ve i yazımı — ikisi de küfür, çakışma yok
+  'amınakoyayım',
+  'aminakoyayim',
   'sik', // prefix → sikiyorum/siktir/sikeyim hepsi; `sık`/`şık` ı farkıyla ayrışır
   'yarak', // yarrak→daralt; `yaralı`/`yaramaz`/`yaratık` güvenli (4. harf ayrışır)
-  'amcık', 'amcik', // ı ve i yazımı; `amca`/`amaç`/`amcam` güvenli
+  'amcık',
+  'amcik', // ı ve i yazımı; `amca`/`amaç`/`amcam` güvenli
   // ── Ağır hakaret / homofobik / ırkçı slur ───────────────────────────────────
   'piç',
   'piçlik',
@@ -52,16 +55,23 @@ export const AUTOMOD_WORDS: string[] = [
   'pezevenk',
   'puşt',
   'sürtük',
-  'götveren', 'göt veren', // homofobik; tek-kelime + boşluklu yazım (göt tek başına hariç)
+  'götveren',
+  'göt veren', // homofobik; tek-kelime + boşluklu yazım (göt tek başına hariç)
   'götlek',
   'neger',
   'zenci',
   // ── Kutsal değerlere hakaret (çok kelimeli — tam substring; ı + i yazımı) ─────
   // config — sahip günceller; 4B insan-onaylı ban'a yükseltilecek
-  'allahını satayım', 'allahini satayim',
-  'allahına koyayım', 'allahina koyayim',
-  'allahının götüne', 'allahinin gotune',
-  'dinini satayım', 'dinini satayim',
-  'peygamberi satayım', 'peygamberi satayim',
-  'kuranı satayım', 'kurani satayim',
+  'allahını satayım',
+  'allahini satayim',
+  'allahına koyayım',
+  'allahina koyayim',
+  'allahının götüne',
+  'allahinin gotune',
+  'dinini satayım',
+  'dinini satayim',
+  'peygamberi satayım',
+  'peygamberi satayim',
+  'kuranı satayım',
+  'kurani satayim',
 ];

@@ -14,7 +14,35 @@ import { ImageUploadService } from './media/image-upload.service';
 import { PushService } from './push/push.service';
 
 @Module({
-  providers: [EmailService, MembershipService, PermissionsService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService, GuildJoinService, ImageUploadService, PushService],
-  exports: [EmailService, MembershipService, PermissionsService, DmPermissionService, FriendPermissionService, RealtimeService, PresenceService, AutomodService, StorageService, ModerationService, GuildJoinService, ImageUploadService, PushService],
+  providers: [
+    EmailService,
+    MembershipService,
+    PermissionsService,
+    DmPermissionService,
+    FriendPermissionService,
+    RealtimeService,
+    PresenceService,
+    AutomodService,
+    StorageService,
+    ModerationService,
+    GuildJoinService,
+    ImageUploadService,
+    PushService,
+  ],
+  exports: [
+    EmailService,
+    MembershipService,
+    PermissionsService,
+    DmPermissionService,
+    FriendPermissionService,
+    RealtimeService,
+    PresenceService,
+    AutomodService,
+    StorageService,
+    ModerationService,
+    GuildJoinService,
+    ImageUploadService,
+    PushService,
+  ],
 })
 export class SharedModule {}

@@ -35,7 +35,10 @@ export class MembershipService {
       where: { guildId_userId: { guildId, userId } },
     });
     if (!membership) {
-      throw new ForbiddenException({ message: 'Bu sunucuya erişim izniniz yok.', error: 'FORBIDDEN' });
+      throw new ForbiddenException({
+        message: 'Bu sunucuya erişim izniniz yok.',
+        error: 'FORBIDDEN',
+      });
     }
 
     return { guild, membership };
@@ -68,7 +71,10 @@ export class MembershipService {
           select: { isMinor: true },
         });
         if (user?.isMinor) {
-          throw new ForbiddenException({ message: 'Bu kanala yaşınız nedeniyle erişemezsiniz.', error: 'AGE_RESTRICTED' });
+          throw new ForbiddenException({
+            message: 'Bu kanala yaşınız nedeniyle erişemezsiniz.',
+            error: 'AGE_RESTRICTED',
+          });
         }
       }
 
@@ -76,7 +82,10 @@ export class MembershipService {
         where: { guildId_userId: { guildId: channel.guildId, userId } },
       });
       if (!membership) {
-        throw new ForbiddenException({ message: 'Bu kanala erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+        throw new ForbiddenException({
+          message: 'Bu kanala erişim izniniz yok.',
+          error: 'NOT_CHANNEL_MEMBER',
+        });
       }
 
       // R7 (Sprint V2): özel kanal kapısı — yaş kapısından SONRA uygulanır.
@@ -88,7 +97,10 @@ export class MembershipService {
             where: { channelId_userId: { channelId: channel.id, userId } },
           });
           if (!channelMember) {
-            throw new ForbiddenException({ message: 'Bu kanala erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+            throw new ForbiddenException({
+              message: 'Bu kanala erişim izniniz yok.',
+              error: 'NOT_CHANNEL_MEMBER',
+            });
           }
         }
       }
@@ -103,7 +115,10 @@ export class MembershipService {
           select: { isMinor: true },
         });
         if (user?.isMinor) {
-          throw new ForbiddenException({ message: 'Bu kanala yaşınız nedeniyle erişemezsiniz.', error: 'AGE_RESTRICTED' });
+          throw new ForbiddenException({
+            message: 'Bu kanala yaşınız nedeniyle erişemezsiniz.',
+            error: 'AGE_RESTRICTED',
+          });
         }
       }
 
@@ -111,7 +126,10 @@ export class MembershipService {
         where: { channelId_userId: { channelId, userId } },
       });
       if (!member) {
-        throw new ForbiddenException({ message: 'Bu kanala erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+        throw new ForbiddenException({
+          message: 'Bu kanala erişim izniniz yok.',
+          error: 'NOT_CHANNEL_MEMBER',
+        });
       }
     }
 
@@ -142,14 +160,20 @@ export class MembershipService {
           select: { isMinor: true },
         });
         if (user?.isMinor) {
-          throw new ForbiddenException({ message: 'Bu kanala yaşınız nedeniyle erişemezsiniz.', error: 'AGE_RESTRICTED' });
+          throw new ForbiddenException({
+            message: 'Bu kanala yaşınız nedeniyle erişemezsiniz.',
+            error: 'AGE_RESTRICTED',
+          });
         }
       }
       const membership = await this.prisma.guildMember.findUnique({
         where: { guildId_userId: { guildId: channel.guildId, userId } },
       });
       if (!membership) {
-        throw new ForbiddenException({ message: 'Bu kanala erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+        throw new ForbiddenException({
+          message: 'Bu kanala erişim izniniz yok.',
+          error: 'NOT_CHANNEL_MEMBER',
+        });
       }
       // Özel kanal bloğu YOK — görünürlük herkese (item 6).
     } else {
@@ -157,7 +181,10 @@ export class MembershipService {
         where: { channelId_userId: { channelId, userId } },
       });
       if (!member) {
-        throw new ForbiddenException({ message: 'Bu kanala erişim izniniz yok.', error: 'NOT_CHANNEL_MEMBER' });
+        throw new ForbiddenException({
+          message: 'Bu kanala erişim izniniz yok.',
+          error: 'NOT_CHANNEL_MEMBER',
+        });
       }
     }
 
@@ -185,7 +212,10 @@ export class MembershipService {
       },
     });
     if (block) {
-      throw new ForbiddenException({ message: 'Bu kullanıcıya mesaj gönderemezsiniz.', error: 'DM_NOT_ALLOWED' });
+      throw new ForbiddenException({
+        message: 'Bu kullanıcıya mesaj gönderemezsiniz.',
+        error: 'DM_NOT_ALLOWED',
+      });
     }
   }
 }
