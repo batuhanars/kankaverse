@@ -64,6 +64,17 @@ import { t } from '@/i18n';
  * saniyesinde garip/çift bir titreşim hissederse bu BİLİNEN ve KABUL EDİLMİŞ bir durumdur, yeni kusur
  * sanıp tur açmasın.
  *
+ * 🔴 GERİYE DÖNÜK DÜZELTME (emülatör doğrulaması sırasında bulundu, 2026-08-07) — yukarıdaki §9.2.1
+ * KANIT paragrafındaki "sessiz kanal heads-up çıkarmıyordu" gözlemi YÖNÜ doğru (kanalın gerçek sesi
+ * gerekiyordu) ama M4a-2'den beri **ek bir kusurla** karışıktı: `presentIncomingCall`'ın
+ * `scheduleNotificationAsync` çağrısı `trigger: null` kullanıyordu, bu ise Android'de kanalı HİÇBİR
+ * ZAMAN `CHANNEL_ID`'ye değil, `expo-notifications`'ın kendi `expo_notifications_fallback_notification_
+ * channel`ine yönlendiriyordu (bkz. aşağıdaki `trigger: { channelId: CHANNEL_ID }` satırının yorumu).
+ * Yani WS yolunun kanalı hiçbir zaman ne `incoming_call_v2` ne `incoming_call_v3`'tü — KANIT'teki
+ * karşılaştırma "bizim kanalımız" ile değil, kütüphanenin varsayılan kanalıyla push'un doğru kanalı
+ * arasındaydı. Sonuç (gerçek ses gerekli) hâlâ geçerli, ama WS yolu şimdi düzeltiliyor: doğru trigger
+ * ile artık gerçekten `CHANNEL_ID`'ye gidiyor.
+ *
  * ⚠️ Ölçüm 2. adımı (kabul/reddet/iptal ile bildirim kaldırıldığında kanal sesinin gerçekten
  * KESİLİP kesilmediği) SAHİPTE doğrulanacak — bu dev session'ın cihazı yok (bkz. rapor). Kesilmezse
  * (Android bazı OEM'lerde bildirim sesini iptalde durdurmayabilir) §9.2.1'in 3. seçeneğine
@@ -163,7 +174,24 @@ export async function presentIncomingCall(
     content: {
       title: t('mobile.call.incomingTitle'),
       body: t('mobile.call.incomingBody', { name: caller.username }),
-      data: { type: NOTIFICATION_DATA_TYPE, channelId, callerId: caller.id, callerName: caller.username },
+      // 🔴 PM bulgusu (2026-08-07, ikinci tur) — `source: 'ws'` BİLEREK eklendi. `push.ts`'in
+      // bastırma kontrolü (§9.2.5) `isChannelRinging(channelId)`e bakıyordu ama bu, `current`
+      // state'i `scheduleNotificationAsync` çözüldükten SONRA (senkron, aynı satır bloğunda) yazılıyor
+      // — handler ise native köprüden bir sonraki tick'te çağrılıyor. Yani KENDİ ürettiğimiz bu
+      // bildirim bile `isChannelRinging` sorusuna `true` yanıtı buluyor ve kendi kendini bastırıyordu
+      // (titreşim vardı çünkü o handler'dan bağımsız, ama banner/liste/ses tamamen gitmişti — sahip
+      // cihazda gördü). `api/`nin push payload'ı ve bu yerel bildirim AYNI `data.type`/`channelId`
+      // taşıyor (o gün "birebir aynı yap" doğru görünmüştü, ayırt etmeyi imkânsız kıldı). `source`
+      // BUNUN İÇİN VAR: yalnız bu dosyanın ürettiği bildirimde bulunur, `api/` payload'ında YOK (ve
+      // eklenmeyecek — `api/` diffi sıfır kalmalı). `push.ts` handler'ı artık `source !== 'ws'`
+      // ŞARTINI da arıyor, kendi bildirimimiz zamanlamadan bağımsız her zaman geçiyor.
+      data: {
+        type: NOTIFICATION_DATA_TYPE,
+        channelId,
+        callerId: caller.id,
+        callerName: caller.username,
+        source: 'ws',
+      },
       categoryIdentifier: CATEGORY_ID,
       // §9.2.1 — `sound` alanı BİLEREK verilmiyor: Android, kanalın kendi gömülü sesini kullanır
       // (M4a-2'de burada `sound: false` vardı, zil `expo-audio`'dan geliyordu — o yol kaldırıldı).
@@ -173,7 +201,17 @@ export async function presentIncomingCall(
       // ile elle kaldırıyor — tek kapanış noktası, dosya başı yorumu).
       autoDismiss: false,
     },
-    trigger: null,
+    // 🔴 KRİTİK DÜZELTME (emülatör doğrulaması sırasında bulundu, 2026-08-07) — `trigger: null`
+    // "hemen gönder" gibi görünüyor ama Android tarafında `BaseNotificationBuilder.channelId`
+    // (`expo-notifications` native kaynağı) trigger'ı OKUYARAK kanal kimliğini bulur; `trigger`
+    // JS `null` gelince native `trigger == null` dalına düşer ve HER ZAMAN
+    // `expo_notifications_fallback_notification_channel`e (kütüphanenin kendi varsayılan kanalı,
+    // IMPORTANCE_HIGH ama BİZİM sesimiz/titreşimimiz/görünürlüğümüz YOK) düşer — `CHANNEL_ID`
+    // (`incoming_call_v3`) HİÇ KULLANILMAZ. Bu M4a-2'den beri (`trigger: null` o zaman da vardı)
+    // sessizce yanlıştı; logcat'te "Couldn't get channel for the notifications - trigger is 'null'.
+    // Fallback to '...' channel" satırıyla yakalandı. Doğru "hemen gönder" şekli
+    // `ChannelAwareTriggerInput` (`{ channelId: string }`) — kanalı taşıyan, gecikmesiz trigger.
+    trigger: { channelId: CHANNEL_ID },
   });
 
   const timeoutTimer = setTimeout(() => {

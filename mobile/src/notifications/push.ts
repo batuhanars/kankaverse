@@ -27,6 +27,19 @@ import { useGatedNotificationResponder } from '@/notifications/responseGate';
  * çalıyorsa (`isChannelRinging`, `incomingCall.ts`) bu ikinci kopya TAMAMEN bastırılır (banner/liste/
  * ses hiçbiri çıkmaz) — sahip cihaz turunda (2026-08-07) görülen "iki 'Gelen Arama' kartı yan yana"
  * kusuru budur (WS yolu + push aynı anda, `api/` M4a-3 ile push ayağı bugün canlıya girdi).
+ *
+ * 🔴 REGRESYON DÜZELTMESİ (PM bulgusu, 2026-08-07 ikinci tur) — bastırma koşulu YALNIZ
+ * `isChannelRinging` iken KENDİ ürettiğimiz bildirimi de bastırıyordu: `incomingCall.ts`
+ * `presentIncomingCall`'da `current` state'i `scheduleNotificationAsync` çözüldükten hemen sonra
+ * SENKRON yazılıyor, ama BU handler native köprüden bir SONRAKİ tick'te çağrılıyor — yani kendi
+ * bildirimimiz değerlendirildiğinde `current` çoktan doluydu, `isChannelRinging(channelId)` `true`
+ * dönüyordu ve WS'in TEK bildirimi de sessizce yutuluyordu (titreşim vardı çünkü o ayrı bir yoldan,
+ * `Vibration.vibrate` ile geliyor — semptom birebir buydu: "titriyor ama bildirim yok"). `api/`nin
+ * push payload'ı ve bu yerel bildirim AYNI `data.type`/`data.channelId` taşıdığı için ikisini ayırt
+ * etmenin başka yolu yoktu. Çözüm: `incomingCall.ts` kendi ürettiği bildirime `data.source: 'ws'`
+ * damgası basıyor, `api/` payload'ında bu alan YOK (ve eklenmeyecek). Bastırma artık YALNIZ
+ * `source !== 'ws'` (yani "bu push, bizim yerel bildirimimiz değil") VE `isChannelRinging` ikisi
+ * birden doğruyken tetikleniyor — kendi bildirimimiz zamanlamadan bağımsız her zaman geçer.
  */
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
@@ -34,7 +47,8 @@ Notifications.setNotificationHandler({
     const isIncomingCall = data?.type === 'incoming_call';
     if (isIncomingCall) {
       const channelId = typeof data?.channelId === 'string' ? data.channelId : null;
-      if (channelId && isChannelRinging(channelId)) {
+      const isOwnLocalNotification = data?.source === 'ws';
+      if (channelId && !isOwnLocalNotification && isChannelRinging(channelId)) {
         return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false };
       }
     }
