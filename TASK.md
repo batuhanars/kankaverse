@@ -3195,3 +3195,37 @@ düğmesi no-op'a düşer (`isConnectedTo` false) · karşı tarafa `call_cancel
 ### DoD (cihazda — SAHİPTE)
 > Tam liste sözleşme §11'de. İki kritik madde: **kanalda tek başına 5 dakika durup atılmamak** (§4)
 > ve **DM aramasının regresyonsuz kalması** (§3/§4 ayrımı DM yolunu bozmamalı).
+
+---
+
+## Sprint M4b — Mobil Grup DM Sesli + Zil Sesi (D44) — 2026-08-07
+
+> Sözleşme: `contracts/SPRINT_M4B_MOBILE_GROUP_VOICE_CONTRACT.md`. Tier yalnız `mobile/`.
+> **M4 sesin son durağı** — bu bitince sıradaki faz görüntülü.
+>
+> 🔴 **İki iş tek sprintte, bilinçli:** D44 native build gerektiriyor (ses dosyası native varlık),
+> M4b zaten cihaz turu gerektiriyor. Ayrı yapılsalar iki build iki tur olurdu. **Üçüncü iş
+> eklenmedi:** [[D43]] (push eylem düğmeleri) bilerek dışarıda — çalışan bir yolu riske atıyor ve
+> karışık turda teşhis zorlaşır (bugün M4a-3'te tam bu yaşandı).
+
+### Mobil (`mobile/`)
+- [ ] Grup DM **kendi sinyalini** kullanıyor: `voice:group_call_start`. 🔴 DM'in `call_invite`i
+      grup kanalda `NOT_DM` döner — düğme açılıp o yol kullanılsaydı kullanıcı sebepsiz
+      "ulaşılamıyor" görürdü
+- [ ] 🔴 Grup DM'de **kimse çalmıyor**: `voice.group_call_started` yalnız bilgilendirme, zil/bildirim
+      yok. Bilinçli kısıt — üç kişilik grupta her katılan herkesi çaldırsaydı üç kez çalardı
+- [ ] Yalnız-kalma zaman aşımı grup DM'de **AÇIK** (ortam kanalında kapalıydı). Gerekçe: grup DM bir
+      **çağrı**, ortam kanalı bir **mekân**. M4c'nin `!isGuild` hesabı bunu zaten doğru veriyor
+- [ ] Telefon düğmesi + "sese katıl" şeridi grup DM'de görünüyor (bugün `isDm` ile kapalı)
+- [ ] Arama ekranı M4c'nin ızgarası, yeni ekran yok. Sohbet düğmesi grup DM'de **var**
+      (ortam kanalında yoktu — grup DM'in metin akışı var)
+- [ ] **D44:** ses dosyası tepe ~-1 dB'ye normalize edildi (bugün -14.9 dB, tam ölçeğin ~%18'i).
+      Süre/format/kanal/örnekleme değişmiyor, yalnız kazanç. Kanal kimliği `incoming_call_v3`
+      **değişmiyor** (değişirse sunucudaki `androidChannelId` ile ayrışır)
+- [ ] Yerelde derlendi + emülatörde açıldı (native diff var)
+
+### DoD (cihazda — SAHİPTE)
+> Tam liste sözleşme §10'da. Dört kritik madde:
+> **(1) zil sesi DUYULUYOR**, **(2) telefon sessizdeyken çalmıyor** ([[D40]] kapanır),
+> **(3) grup DM'de kimse katılmazsa arama 3 dakikada düşüyor** (ortam kanalından farkı),
+> **(4) 1-1 DM ve ortam kanalı REGRESYONSUZ**.
