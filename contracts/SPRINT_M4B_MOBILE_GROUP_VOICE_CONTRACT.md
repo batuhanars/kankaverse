@@ -220,3 +220,67 @@ Eski kanallar (v1, v2, v3) silme listesine eklendi.
 
 ⚠️ Bu **yeni bir dev build** gerektirir (kanal ayarı yalnız ilk kurulumda yazılır; eski build'de
 v4 hiç oluşmaz).
+
+---
+
+## §13 EK — DM listesinde ses göstergesi + [[D45]] (sahip isteği 2026-08-07)
+
+Sahip grup DM sesliyi cihazda denedi, çalışıyor. İsteği: **DM listesinde hangi grupta ses olduğu
+görünsün** — ortam kanal listesindeki "kim var" göstergesinin (M4c §6) grup DM karşılığı.
+Gerekçesi: birden çok grup varsa hangisinde konuşulduğu listeden anlaşılsın.
+
+### §13.1 🔴 Bu özellik D45'i zorunlu kılıyor — önce o
+
+`realtime/socket.ts:33` `activeVoiceChannelId` **tek bir değer** tutuyor ve reconnect'te (satır 94)
+yalnız o kanal yeniden abone oluyor. M4a'da bu doğruydu: ekranda tek bir DM vardı.
+
+DM listesi **aynı anda birden çok** grup DM'i izleyecek. Bugünkü haliyle: hepsi mount'ta
+`voice:subscribe` gönderir ama `setActiveVoiceChannel` her çağrıda üzerine yazar → bağlantı bir kez
+koptuğunda **yalnız son mount olan** kanal yeniden abone olur, diğerleri sessizce ölür ve liste
+**yanlış bilgi gösterir** (ses varken "kimse yok").
+
+Sahibin isteği tam olarak çok-kanallı senaryo olduğu için bu artık ertelenebilir bir borç değil.
+
+**Düzeltme:** `activeVoiceChannelId: string | null` → **`Set<string>`**. `voiceSubscribe`/
+`voiceUnsubscribe` kümeye ekler/çıkarır; reconnect'te kümedeki **hepsi** yeniden abone olur.
+- Aynı kanala iki abone varsa (liste satırı + açık DM ekranı) kümede tek kayıt kalır; **çıkarken
+  diğerini düşürme** — sayaç mı tutulacak yoksa çıkarma mı yeterli, dev karar verir ve gerekçesini
+  yazar (basit tutmak serbest, ama "iki ekran aynı kanalı izlerken biri kapanınca diğeri kör kalıyor"
+  durumu **olmamalı**).
+- Sızıntı bırakma: ekran/satır unmount olunca abonelik düşer.
+
+### §13.2 Gösterge
+
+**Yalnız grup DM.** 1-1 DM'de "seste" zaten arama demektir ve o akış çalma/şerit ile karşılanıyor;
+listeye ikinci bir yüzey eklemek gürültü olur (sahip de grup dedi).
+
+- Grup DM satırında, o an seste olan varsa **küçük bir gösterge**: ortam kanalındakiyle **aynı dil**
+  (M4c §6 — küçük avatarlar veya sayı + hoparlör ikonu). Yeni tasarım dili icat etme, oradaki
+  bileşeni/deseni yeniden kullan.
+- Kimse yoksa **hiçbir şey** çizilmez (boş kutu değil).
+- Gösterge **tıklanabilir olmak zorunda değil**; satıra dokunmak zaten DM'i açıyor ve orada "sese
+  katıl" şeridi var. Ayrı bir katılma kısayolu **eklenmiyor** (kapsam sabit).
+
+### §13.3 Kapsam
+
+| Dosya | İş |
+|---|---|
+| `src/realtime/socket.ts` | D45 — abonelik kümesi + reconnect'te hepsini yeniden abone et |
+| `src/stores/voicePresence.ts` | küme API'sine uyum |
+| `src/components/home/DmRow.tsx` | grup DM satırında ses göstergesi |
+| `src/components/home/DmSidebar.tsx` | satırların aboneliği (mount/unmount) |
+
+Listede olmayan dosya → **DUR ve bildir.**
+
+### §13.4 DoD eki
+
+**Dev'de:** `typecheck` · `lint` · `expo-doctor` temiz; `api/` + `web/` diffi sıfır; native diff **yok**
+(bu ek saf JS — çıkarsa haber ver).
+
+**Cihazda (SAHİPTE):**
+- [ ] Grup DM'de biri sesteyken DM listesinde o grupta gösterge **var**; çıkınca **kayboluyor**
+- [ ] Birden çok grupta ses varsa **hepsinde** görünüyor (D45'in asıl testi)
+- [ ] 🔴 **Uçağa alıp geri çıkar** (veya Wi-Fi kapat-aç): bağlantı koptuktan sonra göstergeler
+      **hâlâ doğru** — bu maddeyi atlama, D45 tam burada kırılıyordu
+- [ ] 1-1 DM satırlarında gösterge **yok** (§13.2 kararı)
+- [ ] Ortam kanal listesindeki gösterge **regresyonsuz** (aynı altyapıyı paylaşıyorlar)

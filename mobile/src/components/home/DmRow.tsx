@@ -1,4 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useVoicePresenceStore } from '@/stores/voicePresence';
 import { theme } from '@/theme';
 import { t } from '@/i18n';
 
@@ -16,11 +18,21 @@ interface Props {
   preview: string;
   typing: boolean;
   unread: boolean;
+  /** Sözleşme M4b §13.2 — ses göstergesi için. Yalnız grup DM'de anlamlı; abonelik (mount/unmount)
+   *  `DmSidebar`in işi, burası yalnız store'dan OKUR (ChannelRow'un M4c §6 deseniyle aynı ayrım). */
+  channelId: string;
+  isGroup: boolean;
   onPress: () => void;
   onLongPress: () => void;
 }
 
-export function DmRow({ name, avatarUrl, preview, typing, unread, onPress, onLongPress }: Props) {
+export function DmRow({ name, avatarUrl, preview, typing, unread, channelId, isGroup, onPress, onLongPress }: Props) {
+  // Sözleşme M4b §13.2 — "yalnız grup DM": 1-1 DM'de "seste" zaten arama demektir (telefon
+  // düğmesi + "sesli arama sürüyor" şeridi o akışı zaten karşılıyor), ikinci bir yüzey gürültü
+  // olur. `ChannelRow`ün M4c §6 deseniyle AYNI görsel dil (hoparlör ikonu + sayı, accent renk);
+  // yeni bir tasarım icat edilmedi. Kimse yoksa hiçbir şey render edilmez (boş rozet yok).
+  const voiceCount = useVoicePresenceStore((s) => (isGroup ? (s.byChannel[channelId]?.length ?? 0) : 0));
+
   return (
     <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={styles.row}>
       {avatarUrl ? (
@@ -46,6 +58,12 @@ export function DmRow({ name, avatarUrl, preview, typing, unread, onPress, onLon
           </Text>
         ) : null}
       </View>
+      {voiceCount > 0 && (
+        <View style={styles.voiceBadge} accessibilityLabel={t('mobile.dm.voiceActive', { n: voiceCount })}>
+          <Ionicons name="volume-medium-outline" size={13} color={theme.colors.accent500} />
+          <Text style={styles.voiceBadgeText}>{voiceCount}</Text>
+        </View>
+      )}
       {unread && <View style={styles.unreadDot} />}
     </Pressable>
   );
@@ -105,5 +123,19 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: theme.colors.accent500,
     marginLeft: 8,
+  },
+  // Sözleşme M4b §13.2 — ChannelRow'un ses ikonu + accent renginin (M4c §6) yeniden kullanımı,
+  // burada "sayı + hoparlör ikonu" varyantı (satır tek satırlık kompakt olduğu için avatar
+  // yığını yerine).
+  voiceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginLeft: 6,
+  },
+  voiceBadgeText: {
+    color: theme.colors.accent500,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
   },
 });

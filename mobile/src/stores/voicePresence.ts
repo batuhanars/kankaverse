@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { voiceApi, type VoiceParticipantDto } from '@/api/voice';
-import { setActiveVoiceChannel, voiceSubscribe, voiceUnsubscribe } from '@/realtime/socket';
+import { voiceSubscribe, voiceUnsubscribe } from '@/realtime/socket';
 
 /**
  * M4a-1 sözleşme §3.1 — ses presence'ı (DM ekranındaki "sesli arama sürüyor" şeridi). `stores/voice.ts`
@@ -33,7 +33,9 @@ export const useVoicePresenceStore = create<VoicePresenceState>((set, get) => ({
   startedAtByChannel: {},
 
   subscribe(channelId) {
-    setActiveVoiceChannel(channelId);
+    // [[D45]] M4b §13.1 — `voiceSubscribe`/`voiceUnsubscribe` artık referans sayılı (bkz.
+    // `realtime/socket.ts`); ayrı bir `setActiveVoiceChannel` çağrısına gerek kalmadı, reconnect
+    // yeniden-abonesi doğrudan o sayaçtan besleniyor.
     voiceSubscribe(channelId);
     voiceApi
       .getParticipants(channelId)
@@ -52,7 +54,6 @@ export const useVoicePresenceStore = create<VoicePresenceState>((set, get) => ({
   },
 
   unsubscribe(channelId) {
-    setActiveVoiceChannel(null);
     voiceUnsubscribe(channelId);
   },
 

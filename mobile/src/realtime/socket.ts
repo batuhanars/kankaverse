@@ -27,15 +27,19 @@ let onReconnectRefetch: (() => void) | null = null;
 // auth_error sonrası art arda tazele-dene sayacı (sonsuz döngü koruması)
 let authRetryCount = 0;
 
-// M4a-1 sözleşme §3.1 — ses presence aboneliği (DM ekranındaki "sesli arama sürüyor" şeridi).
-// Web'de bir Set (birden çok panel aynı anda abone olabilir); mobilde tek seferde tek DM ekranı
-// açık olduğu için `activeChannelId` ile AYNI tek-değer deseni yeterli — reconnect'te yeniden abone.
-let activeVoiceChannelId: string | null = null;
-
-/** DM ekranı mount/unmount'ta çağırır (bkz. `stores/voice.ts` `subscribePresence`/`unsubscribePresence`). */
-export function setActiveVoiceChannel(channelId: string | null): void {
-  activeVoiceChannelId = channelId;
-}
+// [[D45]] M4b §13.1 — ses presence aboneliği artık ÇOKLU kanal + REFERANS SAYILI. Eski hâli
+// (`activeVoiceChannelId: string | null`) M4a'da doğruydu: ekranda tek bir DM vardı. M4b'nin DM
+// listesi aynı anda birden çok grup DM'i izliyor: hepsi mount'ta abone olur ama tek-değerli
+// izleyicide her `setActiveVoiceChannel` çağrısı öncekinin üzerine yazardı — reconnect'te yalnız
+// SON mount olan kanal yeniden abone olurdu, diğerleri sessizce ölürdü (PLAN.md D45).
+//
+// Set değil SAYAÇ (`Map<channelId, refCount>`) seçildi: aynı kanalı iki bağımsız tüketici izleyebilir
+// (ör. DM listesindeki satır + o an açık olan DM ekranı, bkz. `dm/[id].tsx`). Salt Set'te "çıkar"
+// tek bir unmount'ta kanalı tamamen kümeden düşürür — ikinci tüketici hâlâ izlerken kör kalırdı
+// (§13.1'in yasakladığı tam olarak bu durum). Sayaç sıfıra İNENE kadar sunucuya `voice:unsubscribe`
+// gitmez; ilk abonede (`0 → 1`) `voice:subscribe` gider, tekrarları sunucuya ulaşmaz (gereksiz emit
+// değil, idempotent oda üyeliği zaten böyle davranırdı ama sayaç bunu açıkça garanti eder).
+const voiceChannelRefCounts = new Map<string, number>();
 
 /** Mesaj ekranı mount/unmount'ta çağırır — reconnect'te hangi kanalın yeniden çekileceğini bildirir. */
 export function setActiveChannel(channelId: string | null, refetch?: () => void): void {
@@ -89,10 +93,11 @@ function ensureSocket(): Socket {
       // contract §4.3 — "sadece yeni gelenleri dinle" yetmez; arada kaçan mesajlar yeniden çekilir.
       onReconnectRefetch?.();
     }
-    // M4a-1 §3.1 — reconnect sonrası ses presence aboneliği de yeniden kurulur (yoksa DM ekranı
-    // açık kalırken bağlantı düşüp gelirse "sesli arama sürüyor" şeridi bayat kalırdı).
-    if (activeVoiceChannelId) {
-      socket?.emit('voice:subscribe', { channelId: activeVoiceChannelId });
+    // M4a-1 §3.1 / [[D45]] M4b §13.1 — reconnect sonrası ses presence aboneliği yeniden kurulur.
+    // Sayaçtaki HER kanal (tekli DM ekranı da, DM listesindeki çok sayıda grup satırı da) yeniden
+    // abone olur — eskiden yalnız son mount olan tek kanal yeniden abone oluyordu.
+    for (const channelId of voiceChannelRefCounts.keys()) {
+      socket?.emit('voice:subscribe', { channelId });
     }
   });
 
@@ -282,12 +287,32 @@ function ensureSocket(): Socket {
 
 // ---- M4a-1 sesli arama emit'leri (sözleşme §2) ----
 
-/** DM ekranı mount/unmount'ta — o kanalın "kim var" presence'ına abone ol/çık. */
+/**
+ * DM ekranı/satırı mount'ta — o kanalın "kim var" presence'ına abone ol. [[D45]] — referans
+ * sayısı 0'dan 1'e çıkarken sunucuya gerçekten `voice:subscribe` gider; ikinci/üçüncü tüketici
+ * (aynı kanalı izleyen başka bir satır/ekran) yalnız sayacı artırır, sunucuya tekrar gitmez.
+ */
 export function voiceSubscribe(channelId: string): void {
-  ensureSocket().emit('voice:subscribe', { channelId });
+  const count = (voiceChannelRefCounts.get(channelId) ?? 0) + 1;
+  voiceChannelRefCounts.set(channelId, count);
+  if (count === 1) ensureSocket().emit('voice:subscribe', { channelId });
 }
+
+/**
+ * unmount'ta — referans sayısını azaltır. [[D45]] — yalnız GERÇEKTEN son tüketici çıkınca (`1 → 0`)
+ * sunucuya `voice:unsubscribe` gider ve kanal sayaçtan düşer; başka bir tüketici hâlâ izliyorsa
+ * (§13.1'in yasakladığı "biri kapanınca diğeri kör kalıyor" durumu) sayaç yalnız azalır, abonelik
+ * sürer.
+ */
 export function voiceUnsubscribe(channelId: string): void {
-  socket?.emit('voice:unsubscribe', { channelId });
+  const count = voiceChannelRefCounts.get(channelId);
+  if (count === undefined) return;
+  if (count <= 1) {
+    voiceChannelRefCounts.delete(channelId);
+    socket?.emit('voice:unsubscribe', { channelId });
+  } else {
+    voiceChannelRefCounts.set(channelId, count - 1);
+  }
 }
 
 /**
@@ -399,6 +424,10 @@ export function resetSocket(): void {
   activeChannelId = null;
   onReconnectRefetch = null;
   authRetryCount = 0;
+  // [[D45]] — yeni oturumda eski sayaçlarla başlamasın (logout sırasında ekranlar zaten unmount
+  // olur ve kendi unsubscribe'larını çağırır, ama bu kesin bir güvence değil — örn. React ağacı
+  // temizlenmeden logout tetiklenirse sayaç sıfırlanmadan kalabilirdi).
+  voiceChannelRefCounts.clear();
 }
 
 /** Mesaj ekranı mount'ta manuel join (ack'li; 5sn timeout — web/useSocket.ts joinChannel deseni). */

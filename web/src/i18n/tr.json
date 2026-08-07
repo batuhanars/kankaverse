@@ -1716,7 +1716,8 @@
       "linkOpenError": "Bağlantı açılamadı. Lütfen tekrar dene."
     },
     "dm": {
-      "muteLabel": "Konuşmayı Sustur"
+      "muteLabel": "Konuşmayı Sustur",
+      "voiceActive": "Seste {n} kişi var"
     },
     "notif": {
       "unmute": "Susturmayı Kaldır"
