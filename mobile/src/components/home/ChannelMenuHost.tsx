@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ChannelSummaryDto } from '@/api/channels';
+import { ChannelType, type ChannelSummaryDto } from '@/api/channels';
 import { NotifTargetType, type NotificationLevel } from '@/api/notifications';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { SelectSheet } from '@/components/guild/SelectSheet';
@@ -104,6 +104,10 @@ export function ChannelMenuHost({
       <ChannelMenuSheet
         visible={!!channel && subSheet === 'none'}
         channelName={channel?.name ?? ''}
+        // PM takibi (2026-08-07) — ses kanalının mesajı yok, "Okundu İşaretle" oraya ait değil
+        // (tıklayınca bir şey olduğunu sanan kullanıcı — boş yüzey). Sheet bu bayrağa göre yalnız
+        // O maddeyi gizler, başka bir eylem eklenmedi.
+        isVoice={channel?.type === ChannelType.GUILD_VOICE}
         guildId={guildId}
         guildName={guildName}
         guildIconUrl={guildIconUrl}
