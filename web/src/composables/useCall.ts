@@ -24,8 +24,14 @@ function ensureRingback() {
   ringbackScope.run(() => {
     const callStore = useCallStore()
     const { startRingback, stopRingback } = useCallSounds()
+    // 🔴 M4z §F — geri-zil YALNIZ 1-1'de. `outgoing` artık grupta da doluyor ("başlatan benim"
+    // bilgisi iptal sinyali için gerekiyordu); gösterim/ses tarafının kapısı burası. Grup DM'de
+    // ne geri-zil çalar ne "Çalıyor…" çıkar — M4b kararı aynen duruyor.
     watch(
-      () => callStore.outgoing?.channelId,
+      () => {
+        const out = callStore.outgoing
+        return out && out.kind === 'dm' ? out.channelId : undefined
+      },
       (id) => {
         if (id) startRingback()
         else stopRingback()
@@ -106,6 +112,11 @@ export function useCall() {
         callStore.setNotice('unreachable') // nötr — sebep sızmaz
         return
       }
+      // 🔴 M4z §F — "bu grup çağrısını BEN başlattım". Yalnız bu dalda (gerçekten sinyal
+      // gönderdiğimizde) set edilir: sonradan katılan (`others.length > 0`) iptal göndermez.
+      // Çıkışta `voiceStore.leave()` → `cancelRingingIfNeeded` bunu okuyup `voice:group_call_cancel`
+      // gönderiyor; iptal ÇAĞRI YERLERİNE serpilmiyor, kapanış tek noktada kalıyor.
+      callStore.setOutgoing(channelId, 'group')
     }
     await voiceStore.join(channelId, { autoEndWhenAlone: true }) // REV-12: grup çağrısı
   }

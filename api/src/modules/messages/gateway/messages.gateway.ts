@@ -463,6 +463,53 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     return { ok: true };
   }
 
+  /**
+   * 🔴 M4z sözleşme §F — grup çağrısı İPTALİ (sahip bulgusu 2026-08-08: arayan kapatınca karşı
+   * taraflarda zil, titreşim ve bildirim 30 sn'lik zaman aşımına kadar sürüyordu; ortada olmayan
+   * bir çağrı çalıyordu). M4b grup çağrısını açmış ama iptal ayağını açmamıştı.
+   *
+   * `handleGroupCallStart`in BİREBİR aynısı; tek fark yayılan olayın adı (`voice.group_call_canceled`)
+   * ve payload'ın `by` taşımaması — zili susturmak için kimin iptal ettiği gerekmiyor, `channelId`
+   * yeter (alıcı tarafta `dismissIncomingCall`/`clearIncoming` yalnız kanala bakıyor).
+   *
+   * 🔴 R7: YENİ KAPI KURULMUYOR. Kanal tipi + `requireChannelAccess` + `requireNoDmBlock` üçlüsü
+   * `group_call_start` ile AYNI; kopya bir üyelik/engel süzgeci yazılmadı. Yani "çaldırabilen"
+   * ile "susturabilen" tam olarak aynı kapıdan geçiyor.
+   *
+   * 1-1'in `voice:call_cancel`i burada KULLANILAMAZ: o `otherDmMember` ile tek bir "karşı taraf"
+   * buluyor, grup kanalında rastgele bir üyeye giderdi (M4b'de grup dalının boş kalma sebebi buydu).
+   */
+  @SubscribeMessage('voice:group_call_cancel')
+  async handleGroupCallCancel(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { channelId: string },
+  ) {
+    const userId = socket.data.userId;
+    const { channelId } = payload;
+
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { type: true },
+    });
+    if (!channel || channel.type !== 'GROUP_DM') return { ok: false, error: 'NOT_GROUP' };
+
+    try {
+      await this.membership.requireChannelAccess(userId, channelId);
+      await this.membership.requireNoDmBlock(userId, channelId);
+    } catch {
+      return { ok: false, error: 'FORBIDDEN' };
+    }
+
+    const members = await this.prisma.channelMember.findMany({
+      where: { channelId, userId: { not: userId } },
+      select: { userId: true },
+    });
+    for (const m of members) {
+      this.realtime.emitToUser(m.userId, 'voice.group_call_canceled', { channelId });
+    }
+    return { ok: true };
+  }
+
   broadcastMessage(channelId: string, messageDto: unknown) {
     this.server.to(`room:${channelId}`).emit('message.created', messageDto);
   }

@@ -66,8 +66,11 @@ export type VoiceTileData =
 // D39 §2/§11 — leave() sırasında hâlâ çalıyorsak karşı tarafa call_cancel bildirmek için enjekte
 // edilen kanca. useSocket.ts (zaten bu store'u import ediyor) bunu bağlar — tersi yönde bir import
 // (voice.ts → useSocket.ts) döngüsel bağımlılık olurdu, o yüzden çağrı burada değil dışarıdan gelir.
-let onLeaveWhileRinging: ((channelId: string) => void) | null = null
-export function setLeaveWhileRingingHandler(fn: (channelId: string) => void) {
+// 🔴 M4z §F — `kind` parametresi: grup çağrısında 1-1'in `voice:call_cancel`i KULLANILAMAZ
+// (sunucuda `otherDmMember` tek bir "karşı taraf" bulur, grup kanalında rastgele bir üyeye
+// giderdi). Hangi event'in gideceğine useSocket.ts karar verir; kapanış noktası burada TEK kalır.
+let onLeaveWhileRinging: ((channelId: string, kind: 'dm' | 'group') => void) | null = null
+export function setLeaveWhileRingingHandler(fn: (channelId: string, kind: 'dm' | 'group') => void) {
   onLeaveWhileRinging = fn
 }
 
@@ -351,7 +354,11 @@ export const useVoiceStore = defineStore('voice', () => {
     if (!channelId) return
     const callStore = useCallStore()
     if (!callStore.isRinging(channelId)) return
-    onLeaveWhileRinging?.(channelId)
+    // 🔴 M4z §F — grup dalı da BURADAN geçer (yeni bir kapanış noktası açılmadı). Grupta koşul
+    // "kimse katılmamışsa" DEĞİL: üç kişilik grupta biri katılmışken bir başkası hâlâ çalıyor
+    // olabilir; başlatan çıkarken onun da zili susmalı. Katılmış olan etkilenmez (iptal alıcıda
+    // yalnız çalma sunumunu kapatır). Guild ses kanalında `outgoing` hiç set olmaz → no-op.
+    onLeaveWhileRinging?.(channelId, callStore.outgoing?.kind ?? 'dm')
     callStore.clearOutgoing()
   }
 

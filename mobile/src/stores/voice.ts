@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { Room, RoomEvent, ParticipantEvent, Track, type Participant, type RemoteParticipant } from 'livekit-client';
 import { AudioSession, AndroidAudioTypePresets } from '@livekit/react-native';
 import { voiceApi } from '@/api/voice';
-import { callInvite, callCancel, groupCallStart } from '@/realtime/socket';
+import { callInvite, callCancel, groupCallStart, groupCallCancel } from '@/realtime/socket';
 import { useVoicePresenceStore } from '@/stores/voicePresence';
 import { extractErrorMessage, extractErrorCode } from '@/api/errors';
 import {
@@ -45,7 +45,16 @@ interface VoiceState {
    * (sahip cihaz turu 2026-08-06, ikinci tur).
    */
   isLeaving: boolean;
-  /** Bu oturumda BİZ mi çağırdık (§4 "Çalıyor…" göstergesi) — katılınca (mevcut odaya) false kalır. */
+  /**
+   * Bu oturumda BİZ mi çağırdık — katılınca (mevcut odaya) false kalır.
+   *
+   * 🔴 M4z §F — anlamı GERİ KAZANILDI: "başlatan benim" bilgisi. M4b'de grup dalında KOŞULSUZ
+   * `false` yapılmıştı; amaç yalnız "Çalıyor…" göstergesini grupta gizlemekti, ama bu bayrak aynı
+   * zamanda `leave()`teki iptal dalını besliyor — grupta iptal gönderilemiyordu (arayan çıkınca
+   * karşı taraflarda zil 30 sn çalmaya devam ediyordu). Artık grupta da `!alreadyOngoing`;
+   * GÖSTERİM tarafı `callKind === 'dm'` ile kapılanıyor (call.tsx), bayrağın kendisi değil.
+   * Guild dalında hâlâ kalıcı `false` (`alreadyOngoing` koşulsuz true — §3 yorumu).
+   */
   didInvite: boolean;
   /**
    * 🔴 M4c sahip bulgusu (2026-08-07) — arama TÜRÜ artık route parametresi DEĞİL, burada. `/call`a
@@ -118,10 +127,11 @@ interface VoiceState {
    * hesabı BİREBİR aynı (presence doluysa sinyal atlanır, "tekrar çaldırmak spam olur" kuralının
    * grup karşılığı — web `useCall.ts` `onGroupVoiceClick`/`startGroupCall` pariteti). AYRIŞTIĞI
    * şey: (1) sinyal `voice:call_invite` DEĞİL `voice:group_call_start` (sunucuda grup dışı kanalda
-   * `NOT_GROUP` döner — §0 tuzağı), (2) `didInvite` bu dalda KOŞULSUZ `false` (`alreadyOngoing`dan
-   * bağımsız — grupta "Çalıyor…" hiç çıkmaz, §5: kimse çalmaz), (3) `startOrJoin` başarısız olup
-   * geri sarılırken (`catch` bloğu) `callCancel` GÖNDERİLMEZ — grupta iptal edilecek bir "ring" yok
-   * (sunucudaki `otherDmMember` grup kanalında rastgele TEK bir üyeye giderdi, anlamsız hedef).
+   * `NOT_GROUP` döner — §0 tuzağı), (2) 🔴 M4z §F: `didInvite` artık grupta da `!alreadyOngoing`
+   * (eskiden koşulsuz `false`ti; "Çalıyor…" gizleme işi GÖSTERİM tarafına, `call.tsx`teki
+   * `callKind === 'dm'` kapısına taşındı), (3) `startOrJoin` başarısız olup geri sarılırken
+   * (`catch` bloğu) iptal olarak `callCancel` DEĞİL `groupCallCancel` gönderilir (1-1'in
+   * `otherDmMember`i grup kanalında rastgele TEK bir üyeye giderdi — anlamsız hedef).
    * `autoEndWhenAlone` DM ile PAYLAŞIR (`!isGuild`, `kind==='group'` için de `true`) — §3 "yeni
    * koşul ekleme" uyarısının karşılığı, bu satır zaten değişmedi.
    */
@@ -274,9 +284,11 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     set({
       connecting: true,
       disconnectReason: null,
-      // 🔴 §5 — grupta KOŞULSUZ false (`alreadyOngoing`dan bağımsız): "Çalıyor…" göstergesi grup
-      // DM'de hiç çıkmaz, kimse çalmadığı için gösterilecek bir şey yok.
-      didInvite: isGroup ? false : !alreadyOngoing,
+      // 🔴 M4z §F — grupta da `!alreadyOngoing` ("bu çağrıyı ben başlattım"). Sonradan katılanda
+      // `alreadyOngoing` true olduğu için false kalır → iptali yalnız BAŞLATAN gönderir.
+      // "Çalıyor…" göstergesinin grupta çıkmaması artık burada değil, `call.tsx`te kapılanıyor.
+      // Guild: `alreadyOngoing` koşulsuz true → didInvite kalıcı false (davranış aynen korundu).
+      didInvite: !alreadyOngoing,
       pendingCallScreen: true,
       callKind: isGuild ? 'guild' : isGroup ? 'group' : 'dm',
       // Grup DM'de de dolu (grubun adı) — call.tsx başlığı guild'deki gibi buradan okur (§4 yorumu).
@@ -381,11 +393,14 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     } catch (e: unknown) {
       const code = extractErrorCode(e);
       const message = code === 'CHANNEL_FULL' ? t('voice.channelFull') : extractErrorMessage(e);
-      // §8 istisnası — davet gönderildiyse geri al. Grup dalında ATLANIR: `voice:call_cancel`
-      // sunucuda `otherDmMember` ile TEK bir "karşı taraf" arar (`findMany` + `find`), grup
-      // kanalında rastgele bir üyeye giderdi — grupta iptal edilecek bir "ring" zaten yok (§5,
-      // kimse çalmıyor), gönderecek bir şey olmadığı için bilerek sessiz kalınır.
-      if (!alreadyOngoing && !isGroup) callCancel(channelId);
+      // §8 istisnası — sinyal gönderildiyse geri al (odaya hiç giremedik, karşı taraf boşuna çalıyor).
+      // 🔴 M4z §F: grup dalı artık ATLANMIYOR, kendi iptalini (`voice:group_call_cancel`) gönderiyor.
+      // Buradaki gönderim `leave()`teki ile ÇAKIŞMAZ: bu yolda `connectedChannelId` hiç dolmadığı
+      // için `leave()`in iptal dalı (kanalı oradan okuyor) zaten sessiz kalır.
+      if (!alreadyOngoing) {
+        if (isGroup) groupCallCancel(channelId);
+        else callCancel(channelId);
+      }
       await get().leave(true);
       return { ok: false, message };
     }
@@ -434,7 +449,17 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
 
     // §8 istisnası — davet gönderilmişti ve kimse katılmadıysa, çıkarken karşı tarafın
     // çalan telefonunu/web bekleme barını da susturmak için call_cancel gönderilir.
-    if (channelId && get().didInvite && wasAlone) callCancel(channelId);
+    //
+    // 🔴 M4z §F — grup dalı YANINDA, tek noktada (çağrı yerlerine serpilmez). İki fark:
+    //  - Event `voice:group_call_cancel` (1-1'inki grupta rastgele bir üyeye giderdi).
+    //  - `wasAlone` KOŞULU YOK: üç kişilik grupta B katılmışken C hâlâ çalıyor olabilir; başlatan
+    //    çıkarken C'nin zili de susmalı. Katılmış olan etkilenmez (iptal yalnız çalma sunumunu
+    //    kapatır, odadakinin bağlantısına dokunmaz — sözleşme §F.3).
+    // Guild'de `didInvite` kalıcı false olduğu için ortam ses kanalı iki dala da girmez.
+    if (channelId && get().didInvite) {
+      if (get().callKind === 'group') groupCallCancel(channelId);
+      else if (wasAlone) callCancel(channelId);
+    }
 
     // Dev-fix: LiveKit webhook'u yakalayamazsa diğer istemcilerin presence'ı güncellensin.
     if (channelId) voiceApi.leave(channelId).catch(() => {});

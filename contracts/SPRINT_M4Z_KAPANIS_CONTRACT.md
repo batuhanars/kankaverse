@@ -174,3 +174,77 @@ karşılanıyor — **ikisi de bozulmayacak**.
 - [ ] Ayrılınca tekrar soluğa düşüyor
 - [ ] 🔴 **REGRESYON:** 1-1 DM araması (web'de bekleyen kutucuk, mobilde "Çalıyor…") aynı ·
       **ortam ses kanalında bekleyen kart YOK** (orada üye = tüm sunucu)
+
+---
+
+## §F — Grup çağrısı iptali: arayan çıkınca zil susar (sahip bulgusu 2026-08-08)
+
+🔴 **Kusur:** grup DM'de arayan çağrıyı kapattığında karşı taraflarda **zil çalmaya devam ediyor**,
+titreşim sürüyor, bildirim ekranda kalıyor. Hem mobil hem web. 30 sn'lik zaman aşımı sonunda susuyor
+ama o süre boyunca ortada olmayan bir çağrı çalıyor.
+
+**Neden var:** M4b §14.1 grup çağrısını açtı ama iptal ayağını **açmadı**. Sunucudaki
+`voice:call_cancel` tek bir karşı taraf buluyor (`otherDmMember`), grup kanalında rastgele bir üyeye
+giderdi — o yüzden grup dalında hiç kullanılmadı. Dev bunu M4b raporunda bildirmişti
+("grupta `call_canceled` karşılığı yok; başlatan çıkarsa zil 30 sn'de kendi kendine susar") ve
+kabul edilebilir sanılmıştı. **Cihazda kabul edilebilir değil.**
+
+### §F.1 Çözüm: sunucuya grup iptali (presence'a dayanma)
+
+İki yol vardı, **sunucu sinyali** seçildi:
+- ✅ **Seçilen:** `voice:group_call_cancel` → tüm üyelere `voice.group_call_canceled`. 1-1 ile
+  **simetrik** (aynı zihinsel model), aboneliğin o an aktif olup olmamasına **bağlı değil**, ve
+  mevcut `group_call_start` işleyicisinin birebir kopyası.
+- ❌ **Elenen:** presence tabanlı ("odada kimse kalmadıysa zili sustur"). `voice.participant_left`
+  zaten dinleniyor ve arayan **çökerse** de çalışırdı; ama çalan tarafın o kanalın presence'ına
+  **abone olması** gerekiyor ve abonelik ekrana bağlı (DM listesi görünürken var, başka ekranda
+  yok). Çalma başlarken abone olup bitince bırakmak gerekirdi — daha çok kod, daha çok kırılma yüzeyi.
+
+### §F.2 Sunucu (`api/`)
+
+`messages.gateway.ts`'e `voice:group_call_cancel` işleyicisi. **`handleGroupCallStart`'ın aynısı**,
+tek fark yayılan olayın adı:
+- Kanal `GROUP_DM` değilse `NOT_GROUP`
+- `requireChannelAccess` + `requireNoDmBlock` (aynı kapılar, kopya süzgeç yazma)
+- Diğer üyelere `voice.group_call_canceled` → `{ channelId }`
+
+🔴 R7: yeni bir kapı **kurulmuyor**, `group_call_start` ile **aynı** kapılar. Ack `{ ok }`.
+
+### §F.3 İstemciler
+
+**Gönderme:** grup çağrısını **başlatan** kişi odadan çıkarken `voice:group_call_cancel` gönderir.
+- 🔴 Bunun için "bu grup çağrısını ben başlattım" bilgisi gerekiyor. M4b'de `didInvite` grup dalında
+  **koşulsuz false** yapılmıştı (amaç: "Çalıyor…" göstergesi grupta çıkmasın). Bu bayrak **geri
+  kazanılır**: `didInvite` grupta da `!alreadyOngoing` olur, gösterim tarafı `callKind === 'dm' &&
+  didInvite` ile kapılanır. Yeni bir kavram/bayrak **eklenmez**.
+- Sonradan katılan (`alreadyOngoing`) iptal **göndermez** — başlatan değil.
+- Kapanış **tek noktadan**: `leave()` içinde, 1-1'in `callCancel` dalının yanında. Çağrı yerlerine
+  serpme (M4a-1 dersi).
+
+**Alma:** `voice.group_call_canceled` → çalma akışını kapat.
+- Mobil: `dismissIncomingCall(channelId)` (zil + titreşim + bildirim, dört bitiş yolunun ortak çıkışı)
+- Web: `callStore.clearIncoming()` (modal + zil)
+- Zaten katılmış olan **etkilenmez** (odada kalır); bu yalnız **çalan** tarafı susturur.
+
+### §F.4 Kapsam
+
+| Dosya | İş |
+|---|---|
+| `api/src/modules/messages/gateway/messages.gateway.ts` | `voice:group_call_cancel` işleyicisi + testi |
+| `mobile/src/realtime/socket.ts` | gönderme fonksiyonu + `group_call_canceled` alımı |
+| `mobile/src/stores/voice.ts` | `didInvite` grup dalı + `leave()`te iptal |
+| `mobile/src/app/(app)/call.tsx` | "Çalıyor…" gösterimi `dm` ile kapılanır |
+| `web/src/composables/useSocket.ts` | gönderme + alım |
+| `web/src/composables/useCall.ts` / `stores/voice.ts` | başlatan bayrağı + çıkışta iptal |
+
+### §F.5 DoD
+
+**Dev'de:** `api/` jest (+yeni test) · tsc · eslint · mobil typecheck/lint/doctor · web `vue-tsc -b`
+(bilinen 6) + 🔴 `vite build`
+
+**Sahipte:**
+- [ ] 🔴 Grup DM'de ara, karşı taraf çalarken **kapat** → zil, titreşim ve bildirim **anında** susar
+      (mobil ve web, iki yönde de)
+- [ ] Karşı taraf **katıldıktan sonra** arayan çıkarsa katılan **odada kalır** (iptal onu etkilemez)
+- [ ] Sonradan katılan biri çıkınca **kimsenin zili susmaz** (o başlatan değil)
+- [ ] 🔴 REGRESYON: 1-1 aramada iptal eskisi gibi · grupta "Çalıyor…" göstergesi hâlâ **çıkmıyor**

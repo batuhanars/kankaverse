@@ -295,6 +295,15 @@ function ensureSocket(): Socket {
     },
   );
 
+  // 🔴 M4z sözleşme §F — grup çağrısını BAŞLATAN odadan çıktı: zil, titreşim ve bildirim ANINDA
+  // sussun (eskiden 30 sn'lik zaman aşımına kadar ortada olmayan bir çağrı çalıyordu). 1-1'in
+  // `voice.call_canceled` dalıyla simetrik: aynı ortak çıkış (`dismissIncomingCall` — kabul/reddet/
+  // zaman aşımı/iptal dört yolunun tek temizlik noktası). Zaten ODAYA KATILMIŞ olan etkilenmez:
+  // `dismissIncomingCall` yalnız çalma sunumunu kapatır, LiveKit bağlantısına dokunmaz.
+  socket.on('voice.group_call_canceled', (data: { channelId: string }) => {
+    void dismissIncomingCall(data.channelId);
+  });
+
   return socket;
 }
 
@@ -379,6 +388,17 @@ export function groupCallStart(channelId: string): Promise<{ ok: boolean; error?
  */
 export function callCancel(channelId: string): void {
   socket?.emit('voice:call_cancel', { channelId });
+}
+
+/**
+ * 🔴 M4z sözleşme §F — grup çağrısının iptali. `callCancel`in grup karşılığı: aynı best-effort
+ * desen (ack YOK, `socket?.emit`), yalnız event adı farklı. 1-1'in `voice:call_cancel`i grupta
+ * KULLANILAMAZ — sunucuda `otherDmMember` ile tek bir "karşı taraf" bulup rastgele bir üyeye
+ * giderdi (M4b'de grup dalının boş kalma sebebi). Sunucu tarafı `voice:group_call_start` ile
+ * AYNI kapılardan geçirir (`requireChannelAccess` + `requireNoDmBlock`).
+ */
+export function groupCallCancel(channelId: string): void {
+  socket?.emit('voice:group_call_cancel', { channelId });
 }
 
 /**
