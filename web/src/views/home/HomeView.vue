@@ -34,9 +34,7 @@ const dmStore = useDmStore()
 const { leaveChannel } = useSocket()
 const { openServerModal, openAddFriend } = useAppModals()
 
-const initialTab = computed<'all' | 'pending'>(() =>
-  route.query.tab === 'pending' ? 'pending' : 'all',
-)
+const initialTab = computed<'all' | 'pending'>(() => (route.query.tab === 'pending' ? 'pending' : 'all'))
 
 function clearActive() {
   guildsStore.setActiveGuild(null)
@@ -45,13 +43,7 @@ function clearActive() {
   channelsStore.setActiveChannel(null)
   dmStore.setActiveChannel(null)
 }
-watch(
-  () => route.name,
-  () => {
-    if (route.name === 'app') clearActive()
-  },
-  { immediate: true },
-)
+watch(() => route.name, () => { if (route.name === 'app') clearActive() }, { immediate: true })
 
 function selectDm(channelId: string) {
   router.push({ name: 'dm', params: { channelId } })
@@ -100,7 +92,7 @@ async function openGuild(guildId: string) {
           <div
             v-if="rightPanelVisible"
             class="absolute inset-0 z-20"
-            style="background-color: rgba(0, 0, 0, 0.6)"
+            style="background-color: rgba(0,0,0,0.6);"
             aria-hidden="true"
             @click="closeRightPanel"
           />

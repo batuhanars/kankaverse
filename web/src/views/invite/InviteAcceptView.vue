@@ -63,10 +63,7 @@ async function join() {
     }
     const channels = channelsStore.channelsForGuild(guild.id)
     if (channels.length > 0) {
-      await router.replace({
-        name: 'channel',
-        params: { guildId: guild.id, channelId: channels[0].id },
-      })
+      await router.replace({ name: 'channel', params: { guildId: guild.id, channelId: channels[0].id } })
     } else {
       guildsStore.setActiveGuild(guild.id)
       channelsStore.setActiveChannel(null)
@@ -76,9 +73,7 @@ async function join() {
     const err = e as { response?: { data?: { message?: string; error?: string } } }
     const errCode = err.response?.data?.error
     joinError.value =
-      (errCode && t(`invite.errors.${errCode}`, '')) ||
-      err.response?.data?.message ||
-      t('common.error')
+      (errCode && t(`invite.errors.${errCode}`, '')) || err.response?.data?.message || t('common.error')
   } finally {
     joining.value = false
   }
@@ -92,34 +87,30 @@ function goHome() {
 <template>
   <div
     class="min-h-screen flex items-center justify-center px-4"
-    style="background-color: var(--kv-bg-rail)"
+    style="background-color: var(--kv-bg-rail);"
   >
     <div
       class="w-full max-w-sm rounded-[var(--kv-radius-lg)] p-8 text-center"
-      style="
-        background-color: var(--kv-bg-sidebar);
-        border: 1px solid var(--kv-border-subtle);
-        border-top: 3px solid var(--kv-accent-500);
-      "
+      style="background-color: var(--kv-bg-sidebar); border: 1px solid var(--kv-border-subtle); border-top: 3px solid var(--kv-accent-500);"
     >
       <img
         :src="logoDikey"
         :alt="t('brand.name')"
         class="mx-auto mb-6"
-        style="width: 130px; height: auto"
+        style="width: 130px; height: auto;"
       />
 
       <!-- Yükleniyor -->
-      <p v-if="loadingPreview" class="text-[14px]" style="color: var(--kv-text-muted)">
+      <p v-if="loadingPreview" class="text-[14px]" style="color: var(--kv-text-muted);">
         {{ t('inviteAccept.loading') }}
       </p>
 
       <!-- Geçersiz / süresi dolmuş davet -->
       <template v-else-if="previewError">
-        <h1 class="text-[18px] font-semibold mb-2" style="color: var(--kv-text-primary)">
+        <h1 class="text-[18px] font-semibold mb-2" style="color: var(--kv-text-primary);">
           {{ t('inviteAccept.invalidTitle') }}
         </h1>
-        <p class="text-[13px] mb-6" style="color: var(--kv-text-muted)">
+        <p class="text-[13px] mb-6" style="color: var(--kv-text-muted);">
           {{ t('inviteAccept.invalidDesc') }}
         </p>
         <KvButton class="w-full" @click="goHome">{{ t('inviteAccept.goHome') }}</KvButton>
@@ -127,7 +118,7 @@ function goHome() {
 
       <!-- Geçerli davet — önizleme + katıl -->
       <template v-else-if="preview">
-        <p class="text-[13px] mb-4" style="color: var(--kv-text-muted)">
+        <p class="text-[13px] mb-4" style="color: var(--kv-text-muted);">
           {{ t('inviteAccept.youInvited') }}
         </p>
 
@@ -145,19 +136,19 @@ function goHome() {
         </div>
 
         <div class="flex items-center justify-center gap-2 mb-6">
-          <h1 class="text-[18px] font-semibold truncate" style="color: var(--kv-text-primary)">
+          <h1 class="text-[18px] font-semibold truncate" style="color: var(--kv-text-primary);">
             {{ preview.guildName }}
           </h1>
           <span
             v-if="preview.adultsOnly"
             class="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-[var(--kv-radius-sm)]"
-            style="background-color: var(--kv-danger); color: #fff"
+            style="background-color: var(--kv-danger); color: #fff;"
           >
             {{ t('invite.adultsOnlyBadge') }}
           </span>
         </div>
 
-        <p v-if="joinError" class="text-[13px] mb-4" style="color: var(--kv-danger)">
+        <p v-if="joinError" class="text-[13px] mb-4" style="color: var(--kv-danger);">
           {{ joinError }}
         </p>
 
@@ -166,7 +157,7 @@ function goHome() {
         </KvButton>
         <button
           class="mt-4 text-[12px] cursor-pointer"
-          style="color: var(--kv-text-muted)"
+          style="color: var(--kv-text-muted);"
           @click="goHome"
         >
           {{ t('inviteAccept.goHome') }}

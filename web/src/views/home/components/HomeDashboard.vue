@@ -37,177 +37,139 @@ function createdLabel(iso: string): string {
 
 <template>
   <div
-    class="flex-1 min-w-0 flex flex-col mb-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
-    style="background-color: var(--kv-bg-content)"
-  >
+class="flex-1 min-w-0 flex flex-col mb-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
+       style="background-color: var(--kv-bg-content);">
     <div class="flex-1 min-h-0 overflow-y-auto">
-      <div class="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
-        <!-- Karşılama -->
-        <div class="px-1">
-          <h1 class="text-[26px] font-bold mb-1.5" style="color: var(--kv-text-primary)">
-            {{ t('home.welcome', { username: authStore.user?.username }) }} 👋
-          </h1>
-          <p class="text-[15px]" style="color: var(--kv-text-muted)">
-            {{ t('home.welcomeSubtitle') }}
-          </p>
-        </div>
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
 
-        <!-- Hızlı Aksiyonlar -->
-        <div>
-          <p class="section-label">{{ t('home.quickActions') }}</p>
-          <div
-            class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-            :class="discordImportEnabled ? 'xl:grid-cols-4' : ''"
-          >
-            <!-- Kanka Ekle -->
-            <button class="tile-btn" @click="emit('addFriend')">
-              <div class="tile-icon">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--kv-accent-500)"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <line x1="19" y1="8" x2="19" y2="14" />
-                  <line x1="22" y1="11" x2="16" y2="11" />
-                </svg>
-              </div>
-              <div>
-                <p class="tile-title">{{ t('home.addFriend') }}</p>
-                <p class="tile-desc">{{ t('home.addFriendDesc') }}</p>
-              </div>
-            </button>
+      <!-- Karşılama -->
+      <div class="px-1">
+        <h1 class="text-[26px] font-bold mb-1.5" style="color: var(--kv-text-primary);">
+          {{ t('home.welcome', { username: authStore.user?.username }) }} 👋
+        </h1>
+        <p class="text-[15px]" style="color: var(--kv-text-muted);">
+          {{ t('home.welcomeSubtitle') }}
+        </p>
+      </div>
 
-            <!-- Ortam Oluştur -->
-            <button class="tile-btn" @click="emit('createOrtam')">
-              <div class="tile-icon">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--kv-accent-500)"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-              </div>
-              <div>
-                <p class="tile-title">{{ t('home.createOrtam') }}</p>
-                <p class="tile-desc">{{ t('home.createOrtamDesc') }}</p>
-              </div>
-            </button>
+      <!-- Hızlı Aksiyonlar -->
+      <div>
+        <p class="section-label">{{ t('home.quickActions') }}</p>
+        <div
+          class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+          :class="discordImportEnabled ? 'xl:grid-cols-4' : ''"
+        >
 
-            <!-- Ortama Katıl -->
-            <button class="tile-btn" @click="emit('joinOrtam')">
-              <div class="tile-icon">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--kv-accent-500)"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                  <polyline points="10 17 15 12 10 7" />
-                  <line x1="15" y1="12" x2="3" y2="12" />
-                </svg>
-              </div>
-              <div>
-                <p class="tile-title">{{ t('home.joinOrtam') }}</p>
-                <p class="tile-desc">{{ t('home.joinOrtamDesc') }}</p>
-              </div>
-            </button>
+          <!-- Kanka Ekle -->
+          <button class="tile-btn" @click="emit('addFriend')">
+            <div class="tile-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--kv-accent-500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <line x1="19" y1="8" x2="19" y2="14"/>
+                <line x1="22" y1="11" x2="16" y2="11"/>
+              </svg>
+            </div>
+            <div>
+              <p class="tile-title">{{ t('home.addFriend') }}</p>
+              <p class="tile-desc">{{ t('home.addFriendDesc') }}</p>
+            </div>
+          </button>
 
-            <!-- Discord'tan İçeri Aktar (yalnız göç bayrağı açıkken) -->
-            <button v-if="discordImportEnabled" class="tile-btn" @click="emit('importOrtam')">
-              <div class="tile-icon">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--kv-accent-500)"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              </div>
-              <div>
-                <p class="tile-title">{{ t('home.importOrtam') }}</p>
-                <p class="tile-desc">{{ t('home.importOrtamDesc') }}</p>
-              </div>
-            </button>
-          </div>
-        </div>
+          <!-- Ortam Oluştur -->
+          <button class="tile-btn" @click="emit('createOrtam')">
+            <div class="tile-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--kv-accent-500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+            </div>
+            <div>
+              <p class="tile-title">{{ t('home.createOrtam') }}</p>
+              <p class="tile-desc">{{ t('home.createOrtamDesc') }}</p>
+            </div>
+          </button>
 
-        <!-- Ortamların -->
-        <div>
-          <p class="section-label">{{ t('home.myOrtamlar') }}</p>
+          <!-- Ortama Katıl -->
+          <button class="tile-btn" @click="emit('joinOrtam')">
+            <div class="tile-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--kv-accent-500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                <polyline points="10 17 15 12 10 7"/>
+                <line x1="15" y1="12" x2="3" y2="12"/>
+              </svg>
+            </div>
+            <div>
+              <p class="tile-title">{{ t('home.joinOrtam') }}</p>
+              <p class="tile-desc">{{ t('home.joinOrtamDesc') }}</p>
+            </div>
+          </button>
 
-          <p v-if="!guildsStore.guilds.length" class="empty-text">
-            {{ t('home.noOrtam') }}
-          </p>
+          <!-- Discord'tan İçeri Aktar (yalnız göç bayrağı açıkken) -->
+          <button v-if="discordImportEnabled" class="tile-btn" @click="emit('importOrtam')">
+            <div class="tile-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--kv-accent-500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            </div>
+            <div>
+              <p class="tile-title">{{ t('home.importOrtam') }}</p>
+              <p class="tile-desc">{{ t('home.importOrtamDesc') }}</p>
+            </div>
+          </button>
 
-          <div v-else class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <button
-              v-for="guild in guildsStore.guilds"
-              :key="guild.id"
-              class="ortam-card"
-              @click="emit('openGuild', guild.id)"
-            >
-              <!-- Afiş (görsel varsa üstte; yoksa renk/gradient) + altıgen simge -->
-              <div
-                class="ortam-card__banner"
-                :style="{ background: bannerBackground(guild.bannerColor) }"
-              >
-                <img
-                  v-if="guild.bannerUrl"
-                  :src="guild.bannerUrl"
-                  alt=""
-                  class="absolute inset-0 w-full h-full object-cover"
-                />
-                <div class="ortam-card__icon">
-                  <img
-                    v-if="guild.iconUrl"
-                    :src="guild.iconUrl"
-                    :alt="guild.name"
-                    class="w-full h-full object-cover"
-                  />
-                  <span v-else>{{ guild.name.charAt(0).toUpperCase() }}</span>
-                </div>
-              </div>
-              <!-- Gövde: ad + üye sayısı · kuruluş -->
-              <div class="px-4 pt-7 pb-4">
-                <p class="text-[15px] font-semibold truncate" style="color: var(--kv-text-primary)">
-                  {{ guild.name }}
-                </p>
-                <p class="text-[12px] mt-1" style="color: var(--kv-text-muted)">
-                  <template v-if="guild.memberCount !== undefined"
-                    >{{ t('discover.memberCount', { count: guild.memberCount }) }} · </template
-                  >{{ t('home.createdAt', { date: createdLabel(guild.createdAt) }) }}
-                </p>
-              </div>
-            </button>
-          </div>
         </div>
       </div>
+
+      <!-- Ortamların -->
+      <div>
+        <p class="section-label">{{ t('home.myOrtamlar') }}</p>
+
+        <p v-if="!guildsStore.guilds.length" class="empty-text">
+          {{ t('home.noOrtam') }}
+        </p>
+
+        <div v-else class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <button
+            v-for="guild in guildsStore.guilds"
+            :key="guild.id"
+            class="ortam-card"
+            @click="emit('openGuild', guild.id)"
+          >
+            <!-- Afiş (görsel varsa üstte; yoksa renk/gradient) + altıgen simge -->
+            <div class="ortam-card__banner" :style="{ background: bannerBackground(guild.bannerColor) }">
+              <img
+                v-if="guild.bannerUrl"
+                :src="guild.bannerUrl"
+                alt=""
+                class="absolute inset-0 w-full h-full object-cover"
+              />
+              <div class="ortam-card__icon">
+                <img
+                  v-if="guild.iconUrl"
+                  :src="guild.iconUrl"
+                  :alt="guild.name"
+                  class="w-full h-full object-cover"
+                />
+                <span v-else>{{ guild.name.charAt(0).toUpperCase() }}</span>
+              </div>
+            </div>
+            <!-- Gövde: ad + üye sayısı · kuruluş -->
+            <div class="px-4 pt-7 pb-4">
+              <p class="text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
+                {{ guild.name }}
+              </p>
+              <p class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
+                <template v-if="guild.memberCount !== undefined">{{ t('discover.memberCount', { count: guild.memberCount }) }} · </template>{{ t('home.createdAt', { date: createdLabel(guild.createdAt) }) }}
+              </p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+    </div>
     </div>
   </div>
 </template>

@@ -48,31 +48,25 @@ async function submitStatement() {
 
 <template>
   <KvModal v-if="store.open" :title="t('emergency.feedbackTitle')" @close="store.close()">
-    <p class="text-[14px] mb-2" style="color: var(--kv-text-body)">
-      {{ t('emergency.feedbackPulled') }}
-    </p>
-    <p class="text-[14px] mb-4" style="color: var(--kv-text-body)">
+    <p class="text-[14px] mb-2" style="color: var(--kv-text-body);">{{ t('emergency.feedbackPulled') }}</p>
+    <p class="text-[14px] mb-4" style="color: var(--kv-text-body);">
       {{ store.failed ? t('emergency.feedbackError') : t('emergency.feedbackReported') }}
     </p>
 
     <div
       class="rounded-[var(--kv-radius-md)] p-3 mb-5 flex flex-col gap-1"
-      style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle)"
+      style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
     >
-      <span class="text-[12px] font-semibold mb-1" style="color: var(--kv-text-muted)">
+      <span class="text-[12px] font-semibold mb-1" style="color: var(--kv-text-muted);">
         {{ t('emergency.resourcesTitle') }}
       </span>
-      <span class="text-[13px]" style="color: var(--kv-text-body)">{{
-        t('emergency.resourceEmergency')
-      }}</span>
-      <span class="text-[13px]" style="color: var(--kv-text-body)">{{
-        t('emergency.resourceSupport')
-      }}</span>
+      <span class="text-[13px]" style="color: var(--kv-text-body);">{{ t('emergency.resourceEmergency') }}</span>
+      <span class="text-[13px]" style="color: var(--kv-text-body);">{{ t('emergency.resourceSupport') }}</span>
     </div>
 
     <!-- Opsiyonel gönüllü beyan (yalnız metin; bloke etmez) -->
     <div v-if="!sent" class="mb-4">
-      <label class="block text-[13px] font-medium mb-1.5" style="color: var(--kv-text-secondary)">
+      <label class="block text-[13px] font-medium mb-1.5" style="color: var(--kv-text-secondary);">
         {{ t('emergency.statementLabel') }}
       </label>
       <textarea
@@ -81,15 +75,10 @@ async function submitStatement() {
         maxlength="2000"
         :placeholder="t('emergency.statementPlaceholder')"
         class="w-full px-3 py-2 rounded-[var(--kv-radius-md)] text-[14px] resize-none outline-none border"
-        style="
-          background-color: var(--kv-bg-elevated);
-          border-color: var(--kv-border-strong);
-          color: var(--kv-text-primary);
-          font-family: var(--kv-font-ui);
-        "
+        style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary); font-family: var(--kv-font-ui);"
       ></textarea>
     </div>
-    <p v-else class="text-[13px] mb-4" style="color: var(--kv-success, #3db46e)">
+    <p v-else class="text-[13px] mb-4" style="color: var(--kv-success, #3DB46E);">
       {{ t('emergency.statementSent') }}
     </p>
 

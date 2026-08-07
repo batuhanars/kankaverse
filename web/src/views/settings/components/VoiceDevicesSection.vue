@@ -16,8 +16,7 @@ const outputs = ref<MediaDeviceInfo[]>([])
 const needsPermission = ref(false)
 // setSinkId yalnız bazı tarayıcılarda (çıkış cihazı seçimi); yoksa sistem varsayılanı.
 const supportsOutputSelect = ref(
-  typeof (document.createElement('audio') as HTMLMediaElement & { setSinkId?: unknown })
-    .setSinkId === 'function',
+  typeof (document.createElement('audio') as HTMLMediaElement & { setSinkId?: unknown }).setSinkId === 'function',
 )
 
 async function refresh() {
@@ -66,83 +65,53 @@ onMounted(refresh)
     <div
       v-if="needsPermission"
       class="flex items-center justify-between gap-3 px-4 py-3 rounded-[var(--kv-radius-md)]"
-      style="background-color: var(--kv-bg-sidebar)"
+      style="background-color: var(--kv-bg-sidebar);"
     >
-      <p class="text-[13px]" style="color: var(--kv-text-muted)">
-        {{ t('settings.voice.permissionHint') }}
-      </p>
-      <button class="kv-row-btn shrink-0" @click="grantPermission">
-        {{ t('settings.voice.grant') }}
-      </button>
+      <p class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('settings.voice.permissionHint') }}</p>
+      <button class="kv-row-btn shrink-0" @click="grantPermission">{{ t('settings.voice.grant') }}</button>
     </div>
 
     <!-- Giriş Cihazı (Mikrofon) -->
     <section>
-      <h3
-        class="text-[13px] font-semibold uppercase tracking-widest mb-2"
-        style="color: var(--kv-text-muted)"
-      >
+      <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-2" style="color: var(--kv-text-muted);">
         {{ t('settings.voice.inputDevice') }}
       </h3>
       <select
         :value="voice.inputDeviceId"
         class="w-full px-3 py-2 rounded-[var(--kv-radius-md)] text-[14px] outline-none border cursor-pointer"
-        style="
-          background-color: var(--kv-bg-elevated);
-          border-color: var(--kv-border-strong);
-          color: var(--kv-text-primary);
-        "
+        style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
         @change="onInput"
       >
         <option value="default">{{ t('settings.voice.systemDefault') }}</option>
-        <option v-for="(d, i) in inputs" :key="d.deviceId" :value="d.deviceId">
-          {{ deviceLabel(d, i) }}
-        </option>
+        <option v-for="(d, i) in inputs" :key="d.deviceId" :value="d.deviceId">{{ deviceLabel(d, i) }}</option>
       </select>
     </section>
 
     <!-- Çıkış Cihazı (Hoparlör) -->
     <section>
-      <h3
-        class="text-[13px] font-semibold uppercase tracking-widest mb-2"
-        style="color: var(--kv-text-muted)"
-      >
+      <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-2" style="color: var(--kv-text-muted);">
         {{ t('settings.voice.outputDevice') }}
       </h3>
       <select
         v-if="supportsOutputSelect"
         :value="voice.outputDeviceId"
         class="w-full px-3 py-2 rounded-[var(--kv-radius-md)] text-[14px] outline-none border cursor-pointer"
-        style="
-          background-color: var(--kv-bg-elevated);
-          border-color: var(--kv-border-strong);
-          color: var(--kv-text-primary);
-        "
+        style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
         @change="onOutput"
       >
         <option value="default">{{ t('settings.voice.systemDefault') }}</option>
-        <option v-for="(d, i) in outputs" :key="d.deviceId" :value="d.deviceId">
-          {{ deviceLabel(d, i) }}
-        </option>
+        <option v-for="(d, i) in outputs" :key="d.deviceId" :value="d.deviceId">{{ deviceLabel(d, i) }}</option>
       </select>
-      <p v-else class="text-[13px]" style="color: var(--kv-text-muted)">
-        {{ t('settings.voice.outputUnsupported') }}
-      </p>
+      <p v-else class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('settings.voice.outputUnsupported') }}</p>
     </section>
 
     <!-- Çıkış Sesi -->
     <section>
       <div class="flex items-center justify-between mb-2">
-        <h3
-          class="text-[13px] font-semibold uppercase tracking-widest"
-          style="color: var(--kv-text-muted)"
-        >
+        <h3 class="text-[13px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
           {{ t('settings.voice.outputVolume') }}
         </h3>
-        <span
-          class="text-[13px] font-semibold"
-          style="color: var(--kv-text-primary); font-variant-numeric: tabular-nums"
-        >
+        <span class="text-[13px] font-semibold" style="color: var(--kv-text-primary); font-variant-numeric: tabular-nums;">
           {{ Math.round(voice.outputVolume * 100) }}%
         </span>
       </div>

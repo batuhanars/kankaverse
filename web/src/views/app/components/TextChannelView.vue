@@ -32,7 +32,10 @@ const showMemberPanel = computed(() => rightPanelVisible.value)
 <template>
   <div class="flex flex-1 min-w-0 overflow-hidden gap-4 relative">
     <div class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden rounded-[var(--kv-radius-lg)]">
-      <TopBar :show-member-panel="showMemberPanel" @toggle-members="toggleRightPanel" />
+      <TopBar
+        :show-member-panel="showMemberPanel"
+        @toggle-members="toggleRightPanel"
+      />
       <MessageArea class="flex-1 min-h-0" />
     </div>
 
@@ -54,7 +57,7 @@ const showMemberPanel = computed(() => rightPanelVisible.value)
         <div
           v-if="rightPanelVisible"
           class="absolute inset-0 z-20"
-          style="background-color: rgba(0, 0, 0, 0.6)"
+          style="background-color: rgba(0,0,0,0.6);"
           aria-hidden="true"
           @click="closeRightPanel"
         />

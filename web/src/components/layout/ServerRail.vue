@@ -60,17 +60,12 @@ const ctxY = ref(0)
 
 // Menü koordinatörü: başka bir menü (ChannelPanel) açılınca rail menüsü kapanır (Görsel #14)
 const { openExclusive, releaseIfOwner, closeOnOther } = useMenuCoordinator()
-closeOnOther('rail-ctx', () => {
-  contextGuild.value = null
-})
+closeOnOther('rail-ctx', () => { contextGuild.value = null })
 
 // Hedef ortamın izinleri (aktif ortam değil — sağ-tıklanan).
 // reaktif: contextGuild değişince yeni guild.id'ye çözülür.
-const {
-  can: ctxCan,
-  canOpenSettings: ctxCanOpenSettings,
-  isOwner: ctxIsOwner,
-} = useGuildPermissions(() => contextGuild.value?.id ?? '')
+const { can: ctxCan, canOpenSettings: ctxCanOpenSettings, isOwner: ctxIsOwner } =
+  useGuildPermissions(() => contextGuild.value?.id ?? '')
 
 // Sustur/bildirim/okundu/ID — herkese açık aksiyonlar (paylaşılan composable)
 const {
@@ -303,7 +298,11 @@ function badgeLabel(count: number): string {
     <div class="divider" />
 
     <!-- Guild ikonları -->
-    <div v-for="guild in guildsStore.guilds" :key="guild.id" class="rail-item">
+    <div
+      v-for="guild in guildsStore.guilds"
+      :key="guild.id"
+      class="rail-item"
+    >
       <!-- Discord tarzı sol pill (animasyonlu: gizli / kısa / orta / uzun) -->
       <span :class="['pill', pillClass(guild)]" />
 
@@ -323,13 +322,21 @@ function badgeLabel(count: number): string {
           ]"
         >
           <span class="hex">
-            <img v-if="guild.iconUrl" :src="guild.iconUrl" :alt="guild.name" class="hex-img" />
+            <img
+              v-if="guild.iconUrl"
+              :src="guild.iconUrl"
+              :alt="guild.name"
+              class="hex-img"
+            />
             <span v-else class="hex-label">{{ guildInitial(guild.name) }}</span>
           </span>
 
           <!-- REV-4: kırmızı sayaç = okunmamış BAHSETME (generic unread değil; o beyaz pill'de).
                Sağ-alt; aktif guild'de de gösterilir, yalnız 0'da gizlenir -->
-          <span v-if="guild.unreadMentionCount > 0 && showMentionBadge(guild.id)" class="badge">
+          <span
+            v-if="guild.unreadMentionCount > 0 && showMentionBadge(guild.id)"
+            class="badge"
+          >
             {{ badgeLabel(guild.unreadMentionCount) }}
           </span>
         </span>
@@ -374,9 +381,7 @@ function badgeLabel(count: number): string {
         @mouseenter="showTooltip($event, t('discover.railTooltip'))"
         @mouseleave="hideTooltip"
       >
-        <span
-          :class="['hex', 'hex--discover', { 'hex--discover-active': route.name === 'discover' }]"
-        >
+        <span :class="['hex', 'hex--discover', { 'hex--discover-active': route.name === 'discover' }]">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"
@@ -452,20 +457,12 @@ function badgeLabel(count: number): string {
       @contextmenu.prevent.stop
     >
       <!-- 1. Okunmuş Olarak İşaretle — herkese -->
-      <button class="rail-ctx__item" role="menuitem" @click="doMarkRead">
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="rail-ctx__icon"
-        >
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
+      <button
+        class="rail-ctx__item"
+        role="menuitem"
+        @click="doMarkRead"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><path d="M20 6 9 17l-5-5"/></svg>
         <span>{{ t('guildMenu.markRead') }}</span>
       </button>
 
@@ -476,22 +473,7 @@ function badgeLabel(count: number): string {
         role="menuitem"
         @click="openInvite"
       >
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="rail-ctx__icon"
-        >
-          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <line x1="19" y1="8" x2="19" y2="14" />
-          <line x1="22" y1="11" x2="16" y2="11" />
-        </svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
         <span>{{ t('invitePeople.title') }}</span>
       </button>
 
@@ -504,20 +486,7 @@ function badgeLabel(count: number): string {
           role="menuitem"
           @click="ctxQuickCreate('create-channel')"
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="rail-ctx__icon"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           <span>{{ t('channel.addUncategorized') }}</span>
         </button>
         <button
@@ -526,23 +495,7 @@ function badgeLabel(count: number): string {
           role="menuitem"
           @click="ctxQuickCreate('create-category')"
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="rail-ctx__icon"
-          >
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <line x1="17" y1="14" x2="17" y2="20" />
-            <line x1="14" y1="17" x2="20" y2="17" />
-          </svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><line x1="17" y1="14" x2="17" y2="20"/><line x1="14" y1="17" x2="20" y2="17"/></svg>
           <span>{{ t('category.createCategory') }}</span>
         </button>
         <button
@@ -551,22 +504,7 @@ function badgeLabel(count: number): string {
           role="menuitem"
           @click="ctxQuickCreate('create-event')"
         >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="rail-ctx__icon"
-          >
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span>{{ t('event.menuCreate') }}</span>
         </button>
       </template>
@@ -598,23 +536,12 @@ function badgeLabel(count: number): string {
       <!-- 5. Sunucu Ayarları — canOpenSettings -->
       <template v-if="ctxCanOpenSettings">
         <div class="rail-ctx__divider" />
-        <button class="rail-ctx__item" role="menuitem" @click="openSettings">
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="rail-ctx__icon"
-          >
-            <circle cx="12" cy="12" r="3" />
-            <path
-              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
-            />
-          </svg>
+        <button
+          class="rail-ctx__item"
+          role="menuitem"
+          @click="openSettings"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span>{{ t('guildSettings.title') }}</span>
         </button>
       </template>
@@ -622,21 +549,12 @@ function badgeLabel(count: number): string {
       <div class="rail-ctx__divider" />
 
       <!-- 7. Sunucu ID'sini Kopyala — herkese -->
-      <button class="rail-ctx__item" role="menuitem" @click="copyGuildId">
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="rail-ctx__icon"
-        >
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
+      <button
+        class="rail-ctx__item"
+        role="menuitem"
+        @click="copyGuildId"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         <span class="rail-ctx__label">{{ t('guildMenu.copyId') }}</span>
         <span class="rail-ctx__id-badge">{{ t('guildMenu.idBadge') }}</span>
       </button>
@@ -644,22 +562,12 @@ function badgeLabel(count: number): string {
       <!-- 8. Ortamdan Ayrıl — OWNER hariç (owner ayrılamaz) -->
       <template v-if="!ctxIsOwner">
         <div class="rail-ctx__divider" />
-        <button class="rail-ctx__item rail-ctx__item--danger" role="menuitem" @click="openLeave">
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="rail-ctx__icon"
-          >
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
+        <button
+          class="rail-ctx__item rail-ctx__item--danger"
+          role="menuitem"
+          @click="openLeave"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="rail-ctx__icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           <span>{{ t('guild.leave') }}</span>
         </button>
       </template>
@@ -691,14 +599,14 @@ function badgeLabel(count: number): string {
     :confirm-label="t('guild.leave')"
     :loading="leaving"
     @confirm="doLeave"
-    @cancel="
-      showLeaveConfirm = false
-      leaveError = ''
-    "
+    @cancel="showLeaveConfirm = false; leaveError = ''"
   />
 
   <!-- Uygulamayı İndir modalı -->
-  <DownloadAppModal v-if="showDownloadModal" @close="showDownloadModal = false" />
+  <DownloadAppModal
+    v-if="showDownloadModal"
+    @close="showDownloadModal = false"
+  />
 </template>
 
 <style scoped>
@@ -751,9 +659,7 @@ function badgeLabel(count: number): string {
   width: 4px;
   border-radius: 0 3px 3px 0;
   background-color: var(--kv-text-primary);
-  transition:
-    height 0.15s ease,
-    opacity 0.15s ease;
+  transition: height 0.15s ease, opacity 0.15s ease;
   pointer-events: none;
 }
 
@@ -803,10 +709,7 @@ function badgeLabel(count: number): string {
   overflow: hidden;
   font-size: 13px;
   font-weight: 600;
-  transition:
-    background-color 0.15s,
-    color 0.15s,
-    border-radius 0.15s;
+  transition: background-color 0.15s, color 0.15s, border-radius 0.15s;
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
 }
 
@@ -887,9 +790,7 @@ function badgeLabel(count: number): string {
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   background-color: var(--kv-bg-elevated);
   color: var(--kv-accent-500);
-  transition:
-    background-color 0.15s,
-    color 0.15s;
+  transition: background-color 0.15s, color 0.15s;
 }
 
 .add-btn:hover .hex--add {
@@ -912,10 +813,7 @@ function badgeLabel(count: number): string {
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   background-color: var(--kv-bg-elevated);
   color: var(--kv-text-secondary);
-  transition:
-    background-color 0.15s,
-    color 0.15s,
-    border-radius 0.15s;
+  transition: background-color 0.15s, color 0.15s, border-radius 0.15s;
 }
 
 .guild-btn:hover .hex--discover {
@@ -940,10 +838,7 @@ function badgeLabel(count: number): string {
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   background-color: var(--kv-bg-elevated);
   color: var(--kv-text-secondary);
-  transition:
-    background-color 0.15s,
-    color 0.15s,
-    border-radius 0.15s;
+  transition: background-color 0.15s, color 0.15s, border-radius 0.15s;
 }
 
 .download-btn:hover .hex--download {

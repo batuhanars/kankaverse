@@ -22,13 +22,7 @@ const toast = useToastStore()
 const apiError = ref('')
 const loading = ref(false)
 const showConsent = ref(false)
-type RegisterValues = {
-  email: string
-  username: string
-  password: string
-  birthDate: string
-  inviteCode?: string
-}
+type RegisterValues = { email: string; username: string; password: string; birthDate: string; inviteCode?: string }
 const pendingValues = ref<RegisterValues | null>(null)
 
 // ── Kayıt modu: mount'ta çek, moduna göre form davranışı ──────────────────
@@ -113,63 +107,44 @@ function getError(field: string): string | undefined {
 <template>
   <div
     class="min-h-screen flex items-center justify-center py-10"
-    style="background-color: var(--kv-bg-rail)"
+    style="background-color: var(--kv-bg-rail);"
   >
     <div
       class="w-full max-w-sm rounded-[var(--kv-radius-lg)] p-8"
-      style="
-        background-color: var(--kv-bg-sidebar);
-        border: 1px solid var(--kv-border-subtle);
-        border-top: 3px solid var(--kv-accent-500);
-      "
+      style="background-color: var(--kv-bg-sidebar); border: 1px solid var(--kv-border-subtle); border-top: 3px solid var(--kv-accent-500);"
     >
       <div class="mb-6 text-center">
         <img
           :src="logoDikey"
           :alt="t('brand.name')"
           class="mx-auto mb-5"
-          style="width: 150px; height: auto"
+          style="width: 150px; height: auto;"
         />
-        <h1 class="text-[22px] font-semibold" style="color: var(--kv-text-primary)">
+        <h1 class="text-[22px] font-semibold" style="color: var(--kv-text-primary);">
           {{ t('auth.registerTitle') }}
         </h1>
-        <p class="mt-1 text-[13px]" style="color: var(--kv-text-muted)">
-          {{ t('auth.registerSubtitle') }}
-        </p>
+        <p class="mt-1 text-[13px]" style="color: var(--kv-text-muted);">{{ t('auth.registerSubtitle') }}</p>
       </div>
 
       <!-- Yükleniyor durumu -->
       <div v-if="modeLoading" class="flex justify-center py-8">
-        <span class="text-[14px]" style="color: var(--kv-text-muted)">{{
-          t('common.loading')
-        }}</span>
+        <span class="text-[14px]" style="color: var(--kv-text-muted);">{{ t('common.loading') }}</span>
       </div>
 
       <!-- Kapalı kayıt bilgi kartı -->
       <div
         v-else-if="registrationMode === 'closed'"
         class="rounded-[var(--kv-radius-md)] p-5 text-center"
-        style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle)"
+        style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
       >
-        <svg
-          class="mx-auto mb-3"
-          width="32"
-          height="32"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          style="color: var(--kv-text-muted)"
-        >
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        <svg class="mx-auto mb-3" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
-        <p class="text-[15px] font-semibold mb-1" style="color: var(--kv-text-primary)">
+        <p class="text-[15px] font-semibold mb-1" style="color: var(--kv-text-primary);">
           {{ t('register.invite.closedTitle') }}
         </p>
-        <p class="text-[13px]" style="color: var(--kv-text-muted)">
+        <p class="text-[13px]" style="color: var(--kv-text-muted);">
           {{ t('register.invite.closedDesc') }}
         </p>
       </div>
@@ -221,7 +196,7 @@ function getError(field: string): string | undefined {
           :required="true"
         />
 
-        <p v-if="apiError" class="text-[13px] text-center" style="color: var(--kv-danger)">
+        <p v-if="apiError" class="text-[13px] text-center" style="color: var(--kv-danger);">
           {{ apiError }}
         </p>
 
@@ -230,9 +205,9 @@ function getError(field: string): string | undefined {
         </KvButton>
       </form>
 
-      <p class="mt-6 text-center text-[13px]" style="color: var(--kv-text-muted)">
+      <p class="mt-6 text-center text-[13px]" style="color: var(--kv-text-muted);">
         {{ t('auth.hasAccount') }}
-        <RouterLink to="/login" class="font-medium" style="color: var(--kv-accent-500)">
+        <RouterLink to="/login" class="font-medium" style="color: var(--kv-accent-500);">
           {{ t('auth.login') }}
         </RouterLink>
       </p>
@@ -241,36 +216,22 @@ function getError(field: string): string | undefined {
     <!-- Onay modalı: Kayıt Ol (form geçerli) → açılır; "Okudum, kabul ediyorum" asıl kaydı yapar.
          Form kısa kalır, onay tam karar anında + açık → "görmedim duymadım" savunması kapanır. -->
     <KvModal v-if="showConsent" :title="t('legal.consentTitle')" @close="showConsent = false">
-      <p class="text-[13px] leading-relaxed mb-3" style="color: var(--kv-text-body)">
+      <p class="text-[13px] leading-relaxed mb-3" style="color: var(--kv-text-body);">
         {{ t('legal.consentAccess') }}
       </p>
-      <p class="text-[13px] leading-relaxed mb-4" style="color: var(--kv-text-body)">
+      <p class="text-[13px] leading-relaxed mb-4" style="color: var(--kv-text-body);">
         {{ t('legal.consentScanning') }}
       </p>
-      <p class="text-[13px] leading-relaxed mb-5" style="color: var(--kv-text-secondary)">
+      <p class="text-[13px] leading-relaxed mb-5" style="color: var(--kv-text-secondary);">
         {{ t('legal.consentAgreePre') }}
-        <a
-          href="/kurallar"
-          target="_blank"
-          rel="noopener"
-          style="color: var(--kv-accent-500); text-decoration: underline"
-          >{{ t('legal.rules.linkLabel') }}</a
-        >
+        <a href="/kurallar" target="_blank" rel="noopener" style="color: var(--kv-accent-500); text-decoration: underline;">{{ t('legal.rules.linkLabel') }}</a>
         {{ t('legal.and') }}
-        <a
-          href="/gizlilik"
-          target="_blank"
-          rel="noopener"
-          style="color: var(--kv-accent-500); text-decoration: underline"
-          >{{ t('legal.privacy.linkLabel') }}</a
-        >
+        <a href="/gizlilik" target="_blank" rel="noopener" style="color: var(--kv-accent-500); text-decoration: underline;">{{ t('legal.privacy.linkLabel') }}</a>
         {{ t('legal.consentAgreePost') }}
       </p>
       <div class="flex gap-3 justify-end">
         <KvButton variant="ghost" @click="showConsent = false">{{ t('common.cancel') }}</KvButton>
-        <KvButton variant="primary" :loading="loading" @click="confirmRegister">{{
-          t('legal.consentConfirm')
-        }}</KvButton>
+        <KvButton variant="primary" :loading="loading" @click="confirmRegister">{{ t('legal.consentConfirm') }}</KvButton>
       </div>
     </KvModal>
   </div>

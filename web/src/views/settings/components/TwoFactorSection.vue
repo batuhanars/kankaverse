@@ -11,7 +11,12 @@ import ReauthModal from '@/components/shared/ReauthModal.vue'
 const { t } = useI18n()
 const auth = useAuthStore()
 
-type Phase = 'idle' | 'setup-reauth' | 'setup-qr' | 'setup-codes' | 'disable-reauth'
+type Phase =
+  | 'idle'
+  | 'setup-reauth'
+  | 'setup-qr'
+  | 'setup-codes'
+  | 'disable-reauth'
 
 const phase = ref<Phase>('idle')
 const setupData = ref<TwoFactorSetupDto | null>(null)
@@ -95,26 +100,20 @@ function downloadCodes() {
     <!-- Başlık + durum -->
     <div class="flex items-center justify-between mb-3">
       <div>
-        <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary)">
+        <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
           {{ t('security.twoFactor.title') }}
         </h3>
-        <p class="text-[13px] mt-0.5" style="color: var(--kv-text-muted)">
+        <p class="text-[13px] mt-0.5" style="color: var(--kv-text-muted);">
           {{ t('security.twoFactor.description') }}
         </p>
       </div>
       <span
         class="px-2 py-0.5 rounded-full text-[12px] font-medium"
-        :style="
-          auth.user?.twoFactorEnabled
-            ? 'background: rgba(61,180,110,0.15); color: #3DB46E;'
-            : 'background: var(--kv-bg-elevated); color: var(--kv-text-muted);'
-        "
+        :style="auth.user?.twoFactorEnabled
+          ? 'background: rgba(61,180,110,0.15); color: #3DB46E;'
+          : 'background: var(--kv-bg-elevated); color: var(--kv-text-muted);'"
       >
-        {{
-          auth.user?.twoFactorEnabled
-            ? t('security.twoFactor.statusEnabled')
-            : t('security.twoFactor.statusDisabled')
-        }}
+        {{ auth.user?.twoFactorEnabled ? t('security.twoFactor.statusEnabled') : t('security.twoFactor.statusDisabled') }}
       </span>
     </div>
 
@@ -131,21 +130,13 @@ function downloadCodes() {
     <!-- QR göster + kod al -->
     <template v-else-if="phase === 'setup-qr' && setupData">
       <div class="flex flex-col gap-4 mt-2">
-        <p class="text-[13px]" style="color: var(--kv-text-muted)">
-          {{ t('security.twoFactor.scanHint') }}
-        </p>
+        <p class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('security.twoFactor.scanHint') }}</p>
         <img :src="setupData.qrDataUrl" alt="QR" class="w-40 h-40 rounded-[var(--kv-radius-md)]" />
         <div>
-          <p
-            class="text-[11px] font-semibold uppercase tracking-wide mb-1"
-            style="color: var(--kv-text-secondary)"
-          >
+          <p class="text-[11px] font-semibold uppercase tracking-wide mb-1" style="color: var(--kv-text-secondary);">
             {{ t('security.twoFactor.secret') }}
           </p>
-          <code
-            class="text-[13px] px-2 py-1 rounded-[var(--kv-radius-sm)] select-all"
-            style="background: var(--kv-bg-elevated); color: var(--kv-text-primary)"
-          >
+          <code class="text-[13px] px-2 py-1 rounded-[var(--kv-radius-sm)] select-all" style="background: var(--kv-bg-elevated); color: var(--kv-text-primary);">
             {{ setupData.secret }}
           </code>
         </div>
@@ -169,27 +160,23 @@ function downloadCodes() {
     <template v-else-if="phase === 'setup-codes'">
       <div class="flex flex-col gap-4 mt-2">
         <div>
-          <p class="text-[13px] font-semibold mb-1" style="color: var(--kv-text-primary)">
+          <p class="text-[13px] font-semibold mb-1" style="color: var(--kv-text-primary);">
             {{ t('security.twoFactor.recoveryTitle') }}
           </p>
-          <p class="text-[12px] mb-3" style="color: var(--kv-text-muted)">
-            {{ t('security.twoFactor.recoveryHint') }}
-          </p>
+          <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">{{ t('security.twoFactor.recoveryHint') }}</p>
           <div class="grid grid-cols-2 gap-1.5">
             <code
               v-for="code in recoveryCodes"
               :key="code"
               class="text-[13px] px-2 py-1 rounded-[var(--kv-radius-sm)] text-center select-all"
-              style="background: var(--kv-bg-elevated); color: var(--kv-text-primary)"
+              style="background: var(--kv-bg-elevated); color: var(--kv-text-primary);"
             >
               {{ code }}
             </code>
           </div>
         </div>
         <div class="flex gap-3">
-          <KvButton variant="ghost" @click="downloadCodes">{{
-            t('security.twoFactor.downloadCodes')
-          }}</KvButton>
+          <KvButton variant="ghost" @click="downloadCodes">{{ t('security.twoFactor.downloadCodes') }}</KvButton>
           <KvButton @click="finishSetup">{{ t('security.twoFactor.done') }}</KvButton>
         </div>
       </div>
@@ -204,10 +191,7 @@ function downloadCodes() {
     :loading="reauthLoading"
     :error="reauthError"
     @confirm="onSetupReauth"
-    @cancel="
-      phase = 'idle'
-      reauthError = ''
-    "
+    @cancel="phase = 'idle'; reauthError = ''"
   />
   <ReauthModal
     v-if="phase === 'disable-reauth'"
@@ -216,9 +200,6 @@ function downloadCodes() {
     :loading="reauthLoading"
     :error="reauthError"
     @confirm="onDisableReauth"
-    @cancel="
-      phase = 'idle'
-      reauthError = ''
-    "
+    @cancel="phase = 'idle'; reauthError = ''"
   />
 </template>

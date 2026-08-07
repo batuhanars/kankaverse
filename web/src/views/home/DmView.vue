@@ -69,23 +69,17 @@ function toHome() {
   router.push({ name: 'app' })
 }
 
-watch(
-  () => props.channelId,
-  (id) => sync(id),
-  { immediate: true },
-)
+watch(() => props.channelId, (id) => sync(id), { immediate: true })
 </script>
 
 <template>
   <div class="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
-    <HomeTopBar
-      @select-dm="(id: string) => router.push({ name: 'dm', params: { channelId: id } })"
-    />
+    <HomeTopBar @select-dm="(id: string) => router.push({ name: 'dm', params: { channelId: id } })" />
     <!-- C9 — giden istek kabul bekliyor bandı -->
     <div
       v-if="outgoingPending"
       class="shrink-0 mx-4 mt-2 px-4 py-2.5 rounded-[var(--kv-radius-md)] text-[13px]"
-      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary)"
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
     >
       {{ t('messageRequests.sentBanner') }}
     </div>
@@ -117,7 +111,7 @@ watch(
             <div
               v-if="rightPanelVisible"
               class="absolute inset-0 z-20"
-              style="background-color: rgba(0, 0, 0, 0.6)"
+              style="background-color: rgba(0,0,0,0.6);"
               aria-hidden="true"
               @click="closeRightPanel"
             />

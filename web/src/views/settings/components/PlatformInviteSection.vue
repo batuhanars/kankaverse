@@ -101,11 +101,7 @@ function statusColor(status: ReturnType<typeof inviteStatus>): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('tr-TR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 // ── İptal (DELETE) ─────────────────────────────────────────────────────────
@@ -132,19 +128,14 @@ async function confirmRevoke() {
 
 <template>
   <div class="flex flex-col gap-8 max-w-2xl">
+
     <!-- ── Davet Oluştur ── -->
     <section>
-      <h3
-        class="text-[13px] font-semibold uppercase tracking-widest mb-3"
-        style="color: var(--kv-text-muted)"
-      >
+      <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
         {{ t('admin.platformInvite.createTitle') }}
       </h3>
 
-      <div
-        class="flex flex-col gap-3 rounded-[var(--kv-radius-lg)] p-4"
-        style="background-color: var(--kv-bg-sidebar)"
-      >
+      <div class="flex flex-col gap-3 rounded-[var(--kv-radius-lg)] p-4" style="background-color: var(--kv-bg-sidebar);">
         <div class="flex gap-3">
           <div class="flex-1">
             <KvNumberInput
@@ -171,9 +162,7 @@ async function confirmRevoke() {
           :placeholder="t('admin.platformInvite.notePlaceholder')"
         />
 
-        <p v-if="createError" class="text-[12px]" style="color: var(--kv-danger)">
-          {{ createError }}
-        </p>
+        <p v-if="createError" class="text-[12px]" style="color: var(--kv-danger);">{{ createError }}</p>
 
         <KvButton :loading="creating" @click="createInvite">
           {{ t('admin.platformInvite.createButton') }}
@@ -183,19 +172,13 @@ async function confirmRevoke() {
         <div
           v-if="newCode"
           class="flex items-center justify-between gap-3 rounded-[var(--kv-radius-md)] px-4 py-3"
-          style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-accent-500)"
+          style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-accent-500);"
         >
           <div class="flex flex-col gap-0.5 min-w-0">
-            <span
-              class="text-[10px] font-semibold uppercase tracking-widest"
-              style="color: var(--kv-text-muted)"
-            >
+            <span class="text-[10px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
               {{ t('admin.platformInvite.newCodeLabel') }}
             </span>
-            <span
-              class="text-[18px] font-mono font-bold tracking-widest"
-              style="color: var(--kv-accent-500)"
-            >
+            <span class="text-[18px] font-mono font-bold tracking-widest" style="color: var(--kv-accent-500);">
               {{ newCode }}
             </span>
           </div>
@@ -208,40 +191,28 @@ async function confirmRevoke() {
 
     <!-- ── Davet Listesi ── -->
     <section>
-      <h3
-        class="text-[13px] font-semibold uppercase tracking-widest mb-3"
-        style="color: var(--kv-text-muted)"
-      >
+      <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
         {{ t('admin.platformInvite.listTitle') }}
       </h3>
 
-      <div v-if="listLoading" class="text-[13px] py-4" style="color: var(--kv-text-muted)">
+      <div v-if="listLoading" class="text-[13px] py-4" style="color: var(--kv-text-muted);">
         {{ t('common.loading') }}
       </div>
-      <p v-else-if="listError" class="text-[13px]" style="color: var(--kv-danger)">
-        {{ listError }}
-      </p>
-      <p
-        v-else-if="invites.length === 0"
-        class="text-[13px] py-4"
-        style="color: var(--kv-text-muted)"
-      >
+      <p v-else-if="listError" class="text-[13px]" style="color: var(--kv-danger);">{{ listError }}</p>
+      <p v-else-if="invites.length === 0" class="text-[13px] py-4" style="color: var(--kv-text-muted);">
         {{ t('admin.platformInvite.empty') }}
       </p>
 
-      <div
-        v-else
-        class="rounded-[var(--kv-radius-lg)] overflow-hidden divide-y divide-[color:var(--kv-border-subtle)]"
-        style="background-color: var(--kv-bg-sidebar)"
-      >
-        <div v-for="inv in invites" :key="inv.id" class="flex items-center gap-3 px-4 py-3">
+      <div v-else class="rounded-[var(--kv-radius-lg)] overflow-hidden divide-y divide-[color:var(--kv-border-subtle)]" style="background-color: var(--kv-bg-sidebar);">
+        <div
+          v-for="inv in invites"
+          :key="inv.id"
+          class="flex items-center gap-3 px-4 py-3"
+        >
           <!-- Kod + not -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <span
-                class="text-[14px] font-mono font-semibold"
-                style="color: var(--kv-text-primary)"
-              >
+              <span class="text-[14px] font-mono font-semibold" style="color: var(--kv-text-primary);">
                 {{ inv.code }}
               </span>
               <span
@@ -252,20 +223,13 @@ async function confirmRevoke() {
               </span>
             </div>
             <div class="flex items-center gap-3 mt-0.5 flex-wrap">
-              <span class="text-[12px]" style="color: var(--kv-text-muted)">
-                {{
-                  t('admin.platformInvite.usesCount', { uses: inv.uses, max: inv.maxUses ?? '∞' })
-                }}
+              <span class="text-[12px]" style="color: var(--kv-text-muted);">
+                {{ t('admin.platformInvite.usesCount', { uses: inv.uses, max: inv.maxUses ?? '∞' }) }}
               </span>
-              <span class="text-[12px]" style="color: var(--kv-text-muted)">
+              <span class="text-[12px]" style="color: var(--kv-text-muted);">
                 {{ formatDate(inv.createdAt) }}
               </span>
-              <span
-                v-if="inv.note"
-                class="text-[12px] truncate max-w-[160px]"
-                :title="inv.note"
-                style="color: var(--kv-text-muted)"
-              >
+              <span v-if="inv.note" class="text-[12px] truncate max-w-[160px]" :title="inv.note" style="color: var(--kv-text-muted);">
                 {{ inv.note }}
               </span>
             </div>
@@ -275,7 +239,7 @@ async function confirmRevoke() {
           <button
             v-if="inviteStatus(inv) === 'active'"
             class="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-            style="color: var(--kv-danger)"
+            style="color: var(--kv-danger);"
             @click="revokeTarget = inv"
           >
             {{ t('admin.platformInvite.revoke') }}

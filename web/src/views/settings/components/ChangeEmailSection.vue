@@ -57,16 +57,11 @@ function getError(field: string): string | undefined {
 
 <template>
   <div>
-    <h3
-      v-if="!inModal"
-      class="text-[15px] font-semibold mb-1"
-      style="color: var(--kv-text-primary)"
-    >
+    <h3 v-if="!inModal" class="text-[15px] font-semibold mb-1" style="color: var(--kv-text-primary);">
       {{ t('security.email.title') }}
     </h3>
-    <p class="text-[13px] mb-3" style="color: var(--kv-text-muted)">
-      {{ t('security.email.current') }}:
-      <strong style="color: var(--kv-text-secondary)">{{ auth.user?.email }}</strong>
+    <p class="text-[13px] mb-3" style="color: var(--kv-text-muted);">
+      {{ t('security.email.current') }}: <strong style="color: var(--kv-text-secondary);">{{ auth.user?.email }}</strong>
     </p>
     <form class="flex flex-col gap-3" @submit.prevent="onSubmit">
       <KvInput
@@ -93,10 +88,8 @@ function getError(field: string): string | undefined {
         :placeholder="t('security.email.totpCodePlaceholder')"
         autocomplete="one-time-code"
       />
-      <p v-if="apiError" class="text-[13px]" style="color: var(--kv-danger)">{{ apiError }}</p>
-      <p v-if="success" class="text-[13px]" style="color: #3db46e">
-        {{ t('security.email.success') }}
-      </p>
+      <p v-if="apiError" class="text-[13px]" style="color: var(--kv-danger);">{{ apiError }}</p>
+      <p v-if="success" class="text-[13px]" style="color: #3DB46E;">{{ t('security.email.success') }}</p>
       <KvButton type="submit" :loading="loading" class="self-start">
         {{ t('security.email.submit') }}
       </KvButton>

@@ -32,7 +32,7 @@ function submit() {
 
 <template>
   <KvModal :title="title" @close="emit('cancel')">
-    <p class="text-[13px] mb-4" style="color: var(--kv-text-muted)">{{ t('reauth.subtitle') }}</p>
+    <p class="text-[13px] mb-4" style="color: var(--kv-text-muted);">{{ t('reauth.subtitle') }}</p>
     <form class="flex flex-col gap-4" @submit.prevent="submit">
       <KvInput
         v-model="currentPassword"
@@ -47,11 +47,9 @@ function submit() {
         :placeholder="t('reauth.totpCodePlaceholder')"
         autocomplete="one-time-code"
       />
-      <p v-if="error" class="text-[13px]" style="color: var(--kv-danger)">{{ error }}</p>
+      <p v-if="error" class="text-[13px]" style="color: var(--kv-danger);">{{ error }}</p>
       <div class="flex gap-3 justify-end">
-        <KvButton variant="ghost" type="button" @click="emit('cancel')">{{
-          t('common.cancel')
-        }}</KvButton>
+        <KvButton variant="ghost" type="button" @click="emit('cancel')">{{ t('common.cancel') }}</KvButton>
         <KvButton type="submit" :loading="loading">{{ t('reauth.confirm') }}</KvButton>
       </div>
     </form>

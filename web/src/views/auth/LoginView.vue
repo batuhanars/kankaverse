@@ -54,7 +54,7 @@ const onSubmit = handleSubmit(async (values) => {
     apiError.value =
       code === 'INVALID_CREDENTIALS'
         ? t('auth.errors.INVALID_CREDENTIALS')
-        : (err.response?.data?.message ?? t('common.error'))
+        : err.response?.data?.message ?? t('common.error')
   } finally {
     loading.value = false
   }
@@ -70,29 +70,23 @@ function getError(field: string): string | undefined {
 <template>
   <div
     class="min-h-screen flex items-center justify-center"
-    style="background-color: var(--kv-bg-rail)"
+    style="background-color: var(--kv-bg-rail);"
   >
     <div
       class="w-full max-w-sm rounded-[var(--kv-radius-lg)] p-8"
-      style="
-        background-color: var(--kv-bg-sidebar);
-        border: 1px solid var(--kv-border-subtle);
-        border-top: 3px solid var(--kv-accent-500);
-      "
+      style="background-color: var(--kv-bg-sidebar); border: 1px solid var(--kv-border-subtle); border-top: 3px solid var(--kv-accent-500);"
     >
       <div class="mb-6 text-center">
         <img
           :src="logoDikey"
           :alt="t('brand.name')"
           class="mx-auto mb-5"
-          style="width: 150px; height: auto"
+          style="width: 150px; height: auto;"
         />
-        <h1 class="text-[22px] font-semibold" style="color: var(--kv-text-primary)">
+        <h1 class="text-[22px] font-semibold" style="color: var(--kv-text-primary);">
           {{ t('auth.loginTitle') }}
         </h1>
-        <p class="mt-1 text-[13px]" style="color: var(--kv-text-muted)">
-          {{ t('auth.loginSubtitle') }}
-        </p>
+        <p class="mt-1 text-[13px]" style="color: var(--kv-text-muted);">{{ t('auth.loginSubtitle') }}</p>
       </div>
 
       <form class="flex flex-col gap-4" @submit.prevent="onSubmit">
@@ -117,7 +111,7 @@ function getError(field: string): string | undefined {
           :required="true"
         />
 
-        <p v-if="apiError" class="text-[13px] text-center" style="color: var(--kv-danger)">
+        <p v-if="apiError" class="text-[13px] text-center" style="color: var(--kv-danger);">
           {{ apiError }}
         </p>
 
@@ -125,7 +119,7 @@ function getError(field: string): string | undefined {
           <RouterLink
             :to="{ name: 'forgot-password' }"
             class="text-[12px]"
-            style="color: var(--kv-text-muted)"
+            style="color: var(--kv-text-muted);"
           >
             {{ t('auth.forgotPassword') }}
           </RouterLink>
@@ -137,46 +131,32 @@ function getError(field: string): string | undefined {
       </form>
 
       <div class="my-4 flex items-center gap-3">
-        <div class="flex-1 h-px" style="background-color: var(--kv-border-subtle)" />
-        <span class="text-[12px]" style="color: var(--kv-text-muted)">{{ t('auth.or') }}</span>
-        <div class="flex-1 h-px" style="background-color: var(--kv-border-subtle)" />
+        <div class="flex-1 h-px" style="background-color: var(--kv-border-subtle);" />
+        <span class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('auth.or') }}</span>
+        <div class="flex-1 h-px" style="background-color: var(--kv-border-subtle);" />
       </div>
       <button
         disabled
         class="w-full py-2.5 rounded-[var(--kv-radius-md)] border text-[14px] font-medium cursor-not-allowed opacity-50 flex items-center justify-center gap-2"
-        style="border-color: var(--kv-border-strong); color: var(--kv-text-muted)"
+        style="border-color: var(--kv-border-strong); color: var(--kv-text-muted);"
         :title="t('auth.edevletComingSoon')"
       >
         {{ t('auth.edevletLogin') }}
       </button>
 
-      <p class="mt-6 text-center text-[13px]" style="color: var(--kv-text-muted)">
+      <p class="mt-6 text-center text-[13px]" style="color: var(--kv-text-muted);">
         {{ t('auth.noAccount') }}
-        <RouterLink to="/register" class="font-medium" style="color: var(--kv-accent-500)">
+        <RouterLink to="/register" class="font-medium" style="color: var(--kv-accent-500);">
           {{ t('auth.register') }}
         </RouterLink>
       </p>
 
-      <p class="mt-4 text-center text-[12px]" style="color: var(--kv-text-muted)">
-        <RouterLink
-          to="/kurallar"
-          style="
-            color: var(--kv-text-muted);
-            text-decoration: underline;
-            text-underline-offset: 2px;
-          "
-        >
+      <p class="mt-4 text-center text-[12px]" style="color: var(--kv-text-muted);">
+        <RouterLink to="/kurallar" style="color: var(--kv-text-muted); text-decoration: underline; text-underline-offset: 2px;">
           {{ t('legal.rules.linkLabel') }}
         </RouterLink>
         ·
-        <RouterLink
-          to="/gizlilik"
-          style="
-            color: var(--kv-text-muted);
-            text-decoration: underline;
-            text-underline-offset: 2px;
-          "
-        >
+        <RouterLink to="/gizlilik" style="color: var(--kv-text-muted); text-decoration: underline; text-underline-offset: 2px;">
           {{ t('legal.privacy.linkLabel') }}
         </RouterLink>
       </p>

@@ -37,22 +37,18 @@ async function onReauth(payload: { currentPassword: string; totpCode?: string })
 
 <template>
   <div>
-    <h3 class="text-[15px] font-semibold mb-2" style="color: var(--kv-danger)">
+    <h3 class="text-[15px] font-semibold mb-2" style="color: var(--kv-danger);">
       {{ t('security.deleteAccount.title') }}
     </h3>
 
     <!-- Tek onay ekranı: uyarı + şifre reauth (asıl güvenlik kapısı). Eski çift-onay (showConfirm) kaldırıldı. -->
     <div
       class="px-4 py-3 rounded-[var(--kv-radius-md)] mb-3 text-[13px]"
-      style="background: rgba(242, 59, 75, 0.1); color: var(--kv-danger)"
+      style="background: rgba(242,59,75,0.1); color: var(--kv-danger);"
     >
       {{ t('security.deleteAccount.warning') }}
     </div>
-    <KvButton
-      variant="ghost"
-      class="border-[var(--kv-danger)] text-[var(--kv-danger)]"
-      @click="showReauth = true"
-    >
+    <KvButton variant="ghost" class="border-[var(--kv-danger)] text-[var(--kv-danger)]" @click="showReauth = true">
       {{ t('security.deleteAccount.confirm') }}
     </KvButton>
   </div>
@@ -64,9 +60,6 @@ async function onReauth(payload: { currentPassword: string; totpCode?: string })
     :loading="reauthLoading"
     :error="reauthError"
     @confirm="onReauth"
-    @cancel="
-      showReauth = false
-      reauthError = ''
-    "
+    @cancel="showReauth = false; reauthError = ''"
   />
 </template>

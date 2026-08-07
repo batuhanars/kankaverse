@@ -63,24 +63,25 @@ async function submit() {
   <Teleport to="body">
     <div
       class="fixed inset-0 z-50 flex items-end justify-stretch md:items-center md:justify-center"
-      style="background-color: rgba(0, 0, 0, 0.6)"
+      style="background-color: rgba(0,0,0,0.6);"
       @click.self="emit('close')"
     >
       <div
-        class="w-full h-full flex flex-col rounded-none overflow-hidden md:w-[420px] md:h-auto md:max-h-[80vh] md:rounded-[var(--kv-radius-lg)]"
-        style="background-color: var(--kv-bg-sidebar)"
+        class="w-full h-full flex flex-col rounded-none overflow-hidden
+               md:w-[420px] md:h-auto md:max-h-[80vh] md:rounded-[var(--kv-radius-lg)]"
+        style="background-color: var(--kv-bg-sidebar);"
       >
         <!-- Başlık -->
         <div
           class="flex items-center justify-between px-5 py-4 border-b shrink-0"
-          style="border-color: var(--kv-border-subtle)"
+          style="border-color: var(--kv-border-subtle);"
         >
-          <h2 class="text-[16px] font-semibold" style="color: var(--kv-text-primary)">
+          <h2 class="text-[16px] font-semibold" style="color: var(--kv-text-primary);">
             {{ t('startChat.title') }}
           </h2>
           <button
             class="text-[20px] leading-none cursor-pointer transition-opacity hover:opacity-70"
-            style="color: var(--kv-text-muted)"
+            style="color: var(--kv-text-muted);"
             @click="emit('close')"
           >
             ✕
@@ -89,10 +90,7 @@ async function submit() {
 
         <!-- Grup adı — yalnızca 2+ seçimde görünür -->
         <div v-if="isGroup" class="px-5 pt-4 pb-2 shrink-0">
-          <label
-            class="block text-[11px] font-semibold uppercase tracking-wide mb-1"
-            style="color: var(--kv-text-muted)"
-          >
+          <label class="block text-[11px] font-semibold uppercase tracking-wide mb-1" style="color: var(--kv-text-muted);">
             {{ t('startChat.groupNameLabel') }}
           </label>
           <input
@@ -100,19 +98,12 @@ async function submit() {
             maxlength="50"
             :placeholder="t('startChat.groupNamePlaceholder')"
             class="w-full px-3 py-2 rounded-[var(--kv-radius-md)] text-[14px] outline-none border"
-            style="
-              background-color: var(--kv-bg-content);
-              border-color: var(--kv-border-strong);
-              color: var(--kv-text-primary);
-            "
+            style="background-color: var(--kv-bg-content); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
           />
         </div>
 
         <!-- Kanka listesi başlığı -->
-        <p
-          class="px-5 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide shrink-0"
-          style="color: var(--kv-text-muted)"
-        >
+        <p class="px-5 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wide shrink-0" style="color: var(--kv-text-muted);">
           {{ t('startChat.selectFriends') }}
         </p>
 
@@ -121,7 +112,7 @@ async function submit() {
           <p
             v-if="!friends.length"
             class="px-2 py-3 text-[13px]"
-            style="color: var(--kv-text-muted)"
+            style="color: var(--kv-text-muted);"
           >
             {{ t('startChat.noFriends') }}
           </p>
@@ -129,28 +120,22 @@ async function submit() {
             v-for="f in friends"
             :key="f.user.id"
             class="w-full flex items-center gap-3 px-2 py-2 rounded-[var(--kv-radius-md)] transition-colors cursor-pointer text-left"
-            :style="selectedIds.has(f.user.id) ? 'background-color: var(--kv-accent-subtle);' : ''"
+            :style="selectedIds.has(f.user.id)
+              ? 'background-color: var(--kv-accent-subtle);'
+              : ''"
             @click="toggleFriend(f.user.id)"
           >
             <!-- Checkbox göstergesi -->
             <div
               class="w-4 h-4 rounded-sm border shrink-0 flex items-center justify-center"
-              :style="
-                selectedIds.has(f.user.id)
-                  ? 'background-color: var(--kv-accent-500); border-color: var(--kv-accent-500);'
-                  : 'border-color: var(--kv-border-strong);'
-              "
+              :style="selectedIds.has(f.user.id)
+                ? 'background-color: var(--kv-accent-500); border-color: var(--kv-accent-500);'
+                : 'border-color: var(--kv-border-strong);'"
             >
               <svg
                 v-if="selectedIds.has(f.user.id)"
-                width="10"
-                height="10"
-                viewBox="0 0 12 12"
-                fill="none"
-                stroke="white"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+                width="10" height="10" viewBox="0 0 12 12" fill="none"
+                stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
               >
                 <polyline points="2,6 5,9 10,3" />
               </svg>
@@ -159,7 +144,7 @@ async function submit() {
             <!-- Avatar -->
             <div
               class="w-8 h-8 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[12px] font-semibold text-white"
-              style="background-color: var(--kv-accent-500)"
+              style="background-color: var(--kv-accent-500);"
             >
               <img
                 v-if="f.user.avatarUrl"
@@ -170,33 +155,29 @@ async function submit() {
               <span v-else>{{ f.user.username[0].toUpperCase() }}</span>
             </div>
 
-            <span class="text-[14px] font-medium truncate" style="color: var(--kv-text-primary)">
+            <span class="text-[14px] font-medium truncate" style="color: var(--kv-text-primary);">
               {{ f.user.username }}
             </span>
           </button>
         </div>
 
         <!-- Hata + Aksiyonlar -->
-        <div class="px-5 pb-5 pt-3 shrink-0 border-t" style="border-color: var(--kv-border-subtle)">
-          <p v-if="error" class="text-[13px] mb-2" style="color: var(--kv-danger)">
+        <div class="px-5 pb-5 pt-3 shrink-0 border-t" style="border-color: var(--kv-border-subtle);">
+          <p v-if="error" class="text-[13px] mb-2" style="color: var(--kv-danger);">
             {{ error }}
           </p>
           <div class="flex gap-2 justify-end">
             <button
               class="px-4 py-2 text-[14px] font-medium rounded-[var(--kv-radius-md)] cursor-pointer transition-opacity hover:opacity-80"
-              style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary)"
+              style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
               @click="emit('close')"
             >
               {{ t('common.cancel') }}
             </button>
             <button
               class="px-4 py-2 text-[14px] font-semibold rounded-[var(--kv-radius-md)] transition-opacity"
-              :class="
-                selectionCount === 0 || submitting
-                  ? 'opacity-50 cursor-not-allowed'
-                  : 'cursor-pointer hover:opacity-90'
-              "
-              style="background-color: var(--kv-accent-500); color: #fff"
+              :class="selectionCount === 0 || submitting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
+              style="background-color: var(--kv-accent-500); color: #fff;"
               :disabled="selectionCount === 0 || submitting"
               @click="submit"
             >

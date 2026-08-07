@@ -135,36 +135,24 @@ onMounted(() => {
   <!-- Ana içerik = yüzen panel (sol kolon = rail+DiscoverSidebar, AppShell gap-4'ten ayrı) -->
   <div
     class="flex flex-col flex-1 min-w-0 mt-4 mr-4 mb-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
-    style="background-color: var(--kv-bg-content)"
+    style="background-color: var(--kv-bg-content);"
   >
     <div class="flex-1 overflow-y-auto">
-      <div class="mx-auto w-full px-8 py-8" style="max-width: 1100px">
+      <div class="mx-auto w-full px-8 py-8" style="max-width: 1100px;">
         <!-- Başlık -->
         <header class="mb-6">
-          <h1 class="text-[22px] font-bold" style="color: var(--kv-text-primary)">
+          <h1 class="text-[22px] font-bold" style="color: var(--kv-text-primary);">
             {{ t('discover.title') }}
           </h1>
-          <p class="text-[14px] mt-1" style="color: var(--kv-text-muted)">
+          <p class="text-[14px] mt-1" style="color: var(--kv-text-muted);">
             {{ t('discover.subtitle') }}
           </p>
         </header>
 
         <!-- Arama -->
         <div class="relative mb-4">
-          <span
-            class="absolute left-3 top-1/2 -translate-y-1/2"
-            style="color: var(--kv-text-muted)"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
+          <span class="absolute left-3 top-1/2 -translate-y-1/2" style="color: var(--kv-text-muted);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
@@ -174,11 +162,7 @@ onMounted(() => {
             type="text"
             :placeholder="t('discover.search')"
             class="w-full pl-10 pr-3 py-2.5 text-[14px] rounded-[var(--kv-radius-md)] border outline-none transition-colors"
-            style="
-              background-color: var(--kv-bg-elevated);
-              color: var(--kv-text-primary);
-              border-color: var(--kv-border-strong);
-            "
+            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary); border-color: var(--kv-border-strong);"
             @input="onSearchInput"
           />
         </div>
@@ -190,11 +174,9 @@ onMounted(() => {
             :key="tg.tag"
             type="button"
             class="text-[13px] font-medium px-3 py-1.5 rounded-full border transition-colors cursor-pointer"
-            :style="
-              activeTag === tg.tag
-                ? 'background-color: var(--kv-accent-500); color: #ffffff; border-color: var(--kv-accent-500);'
-                : 'background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary); border-color: var(--kv-border-subtle);'
-            "
+            :style="activeTag === tg.tag
+              ? 'background-color: var(--kv-accent-500); color: #ffffff; border-color: var(--kv-accent-500);'
+              : 'background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary); border-color: var(--kv-border-subtle);'"
             @click="toggleTag(tg.tag)"
           >
             {{ tg.tag }}
@@ -203,12 +185,10 @@ onMounted(() => {
         </div>
 
         <!-- Hata -->
-        <p v-if="loadError" class="text-[13px] mb-4" style="color: var(--kv-danger)">
-          {{ loadError }}
-        </p>
+        <p v-if="loadError" class="text-[13px] mb-4" style="color: var(--kv-danger);">{{ loadError }}</p>
 
         <!-- Yükleniyor -->
-        <p v-if="loading" class="text-[14px]" style="color: var(--kv-text-muted)">
+        <p v-if="loading" class="text-[14px]" style="color: var(--kv-text-muted);">
           {{ t('common.loading') }}
         </p>
 
@@ -217,20 +197,17 @@ onMounted(() => {
           v-else-if="items.length === 0"
           class="flex flex-col items-center justify-center text-center py-16"
         >
-          <p class="text-[15px] font-medium" style="color: var(--kv-text-secondary)">
+          <p class="text-[15px] font-medium" style="color: var(--kv-text-secondary);">
             {{ t('discover.empty') }}
           </p>
-          <p class="text-[13px] mt-1" style="color: var(--kv-text-muted)">
+          <p class="text-[13px] mt-1" style="color: var(--kv-text-muted);">
             {{ t('discover.emptyHint') }}
           </p>
         </div>
 
         <!-- Kart grid -->
         <template v-else>
-          <div
-            class="grid gap-4"
-            style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr))"
-          >
+          <div class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));">
             <DiscoverGuildCard
               v-for="g in items"
               :key="g.id"
@@ -247,11 +224,7 @@ onMounted(() => {
             <button
               type="button"
               class="text-[14px] font-medium px-5 py-2 rounded-[var(--kv-radius-md)] border transition-colors cursor-pointer"
-              style="
-                background-color: var(--kv-bg-elevated);
-                color: var(--kv-text-secondary);
-                border-color: var(--kv-border-subtle);
-              "
+              style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary); border-color: var(--kv-border-subtle);"
               :disabled="loadingMore"
               @click="loadMore"
             >

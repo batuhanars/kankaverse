@@ -43,9 +43,7 @@ async function markEverythingRead() {
 const showNotifications = ref(false)
 const bellRef = ref<HTMLElement | null>(null)
 
-onClickOutside(bellRef, () => {
-  showNotifications.value = false
-})
+onClickOutside(bellRef, () => { showNotifications.value = false })
 
 function openNotifications() {
   showNotifications.value = !showNotifications.value
@@ -75,10 +73,7 @@ function notificationText(n: NotificationDto): string {
     case 'FRIEND_ACCEPT':
       return t('notification.friendAccept', { actor })
     case 'GUILD_INVITE':
-      return t('notification.guildInvite', {
-        actor,
-        guild: n.guildName ?? t('invite.unknownGuild'),
-      })
+      return t('notification.guildInvite', { actor, guild: n.guildName ?? t('invite.unknownGuild') })
     case 'EVENT_CREATED':
       // R14 — metin mobille BİREBİR (tek kaynak tr.json)
       return t('notification.eventCreated', { actor, event: n.preview ?? '' })
@@ -153,36 +148,21 @@ async function onItemClick(n: NotificationDto) {
   <div ref="bellRef" class="relative shrink-0">
     <button
       class="relative w-9 h-9 rounded-[var(--kv-radius-md)] flex items-center justify-center cursor-pointer transition-colors"
-      :style="
-        showNotifications
-          ? 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);'
-          : 'color: var(--kv-text-muted);'
-      "
-      :class="
-        !showNotifications
-          ? 'hover:bg-[var(--kv-bg-elevated)] hover:text-[var(--kv-text-primary)]'
-          : ''
-      "
+      :style="showNotifications
+        ? 'background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);'
+        : 'color: var(--kv-text-muted);'"
+      :class="!showNotifications ? 'hover:bg-[var(--kv-bg-elevated)] hover:text-[var(--kv-text-primary)]' : ''"
       @click="openNotifications"
     >
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
       </svg>
       <!-- Okunmamış rozet (bildirim + bekleyen mesaj isteği) -->
       <span
         v-if="bellBadge > 0"
         class="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center text-white pointer-events-none"
-        style="background-color: var(--kv-danger); line-height: 1"
+        style="background-color: var(--kv-danger); line-height: 1;"
       >
         {{ bellBadge > 99 ? '99+' : bellBadge }}
       </span>
@@ -192,18 +172,10 @@ async function onItemClick(n: NotificationDto) {
     <div
       v-if="showNotifications"
       class="absolute top-full right-0 mt-2 w-[320px] rounded-[var(--kv-radius-lg)] overflow-hidden"
-      style="
-        background-color: var(--kv-bg-elevated);
-        border: 1px solid var(--kv-border-subtle);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-        z-index: 50;
-      "
+      style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle); box-shadow: 0 8px 32px rgba(0,0,0,0.4); z-index: 50;"
     >
-      <div
-        class="px-4 py-3 border-b flex items-center justify-between gap-2"
-        style="border-color: var(--kv-border-subtle)"
-      >
-        <p class="text-[14px] font-bold" style="color: var(--kv-text-primary)">
+      <div class="px-4 py-3 border-b flex items-center justify-between gap-2" style="border-color: var(--kv-border-subtle);">
+        <p class="text-[14px] font-bold" style="color: var(--kv-text-primary);">
           {{ t('notification.title') }}
         </p>
         <button
@@ -222,45 +194,29 @@ async function onItemClick(n: NotificationDto) {
         v-if="requestCount > 0"
         type="button"
         class="w-full text-left flex items-center gap-3 px-4 py-3 border-b cursor-pointer transition-colors hover:brightness-110"
-        style="border-color: var(--kv-border-subtle); background-color: var(--kv-accent-subtle)"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-accent-subtle);"
         @click="openRequests"
       >
-        <div
-          class="w-8 h-8 rounded-full shrink-0 flex items-center justify-center"
-          style="background-color: var(--kv-accent-500)"
-        >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#fff"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
+        <div class="w-8 h-8 rounded-full shrink-0 flex items-center justify-center" style="background-color: var(--kv-accent-500);">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-[13px] font-medium leading-snug" style="color: var(--kv-text-primary)">
+          <p class="text-[13px] font-medium leading-snug" style="color: var(--kv-text-primary);">
             {{ t('notification.messageRequests', { n: requestCount }) }}
           </p>
         </div>
-        <span
-          class="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[11px] font-bold text-white shrink-0"
-          style="background-color: var(--kv-accent-500)"
-          >{{ requestCount }}</span
-        >
+        <span class="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[11px] font-bold text-white shrink-0" style="background-color: var(--kv-accent-500);">{{ requestCount }}</span>
       </button>
 
       <!-- Boş durum (bildirim yok VE bekleyen istek yok) -->
       <div v-if="!notificationsStore.items.length && requestCount === 0" class="py-10 text-center">
-        <p class="text-[13px]" style="color: var(--kv-text-muted)">{{ t('notification.empty') }}</p>
+        <p class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('notification.empty') }}</p>
       </div>
 
       <!-- Bildirim listesi -->
-      <div v-else class="overflow-y-auto" style="max-height: 360px" @scroll="onScroll">
+      <div v-else class="overflow-y-auto" style="max-height: 360px;" @scroll="onScroll">
         <button
           v-for="item in notificationsStore.items"
           :key="item.id"
@@ -273,40 +229,25 @@ async function onItemClick(n: NotificationDto) {
           <div
             v-if="item.actor"
             class="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[13px] font-semibold text-white overflow-hidden"
-            style="background-color: var(--kv-accent-500)"
+            style="background-color: var(--kv-accent-500);"
           >
-            <img
-              v-if="item.actor.avatarUrl"
-              :src="item.actor.avatarUrl"
-              :alt="item.actor.username"
-              class="w-full h-full object-cover"
-            />
+            <img v-if="item.actor.avatarUrl" :src="item.actor.avatarUrl" :alt="item.actor.username" class="w-full h-full object-cover" />
             <span v-else>{{ item.actor.username[0].toUpperCase() }}</span>
           </div>
           <!-- Aktör yoksa jenerik ikon -->
           <div
             v-else
             class="w-8 h-8 rounded-full shrink-0 flex items-center justify-center"
-            style="background-color: var(--kv-bg-content)"
+            style="background-color: var(--kv-bg-content);"
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              style="color: var(--kv-text-muted)"
-            >
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
             </svg>
           </div>
 
           <div class="flex-1 min-w-0">
-            <p class="text-[13px] leading-snug" style="color: var(--kv-text-body)">
+            <p class="text-[13px] leading-snug" style="color: var(--kv-text-body);">
               {{ notificationText(item) }}
             </p>
             <!-- Mention önizlemesi (varsa) — GUILD_INVITE'ta preview davet kodudur, gösterilmez;
@@ -314,11 +255,11 @@ async function onItemClick(n: NotificationDto) {
             <p
               v-if="item.preview && item.type !== 'GUILD_INVITE' && item.type !== 'EVENT_CREATED'"
               class="text-[12px] leading-snug mt-0.5 truncate"
-              style="color: var(--kv-text-muted)"
+              style="color: var(--kv-text-muted);"
             >
               {{ item.preview }}
             </p>
-            <p class="text-[11px] mt-1" style="color: var(--kv-text-muted)">
+            <p class="text-[11px] mt-1" style="color: var(--kv-text-muted);">
               {{ relativeTime(item.createdAt) }}
             </p>
           </div>
@@ -327,15 +268,13 @@ async function onItemClick(n: NotificationDto) {
           <span
             v-if="!item.readAt"
             class="w-2 h-2 rounded-full shrink-0 mt-1.5"
-            style="background-color: var(--kv-accent-500)"
+            style="background-color: var(--kv-accent-500);"
           />
         </button>
 
         <!-- Daha fazla yükleniyor -->
         <div v-if="notificationsStore.loadingMore" class="py-3 text-center">
-          <p class="text-[12px]" style="color: var(--kv-text-muted)">
-            {{ t('notification.loadMore') }}
-          </p>
+          <p class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('notification.loadMore') }}</p>
         </div>
       </div>
     </div>

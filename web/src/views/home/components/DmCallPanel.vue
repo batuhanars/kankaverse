@@ -11,12 +11,7 @@
  */
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  useVoiceStore,
-  type RoomMember,
-  type VoiceTileData,
-  type PendingPeer,
-} from '@/stores/voice'
+import { useVoiceStore, type RoomMember, type VoiceTileData, type PendingPeer } from '@/stores/voice'
 import { useCallStore } from '@/stores/call'
 import { useDmStore } from '@/stores/dm'
 import VoiceControlBar from '@/components/shared/VoiceControlBar.vue'
@@ -90,17 +85,14 @@ const firstVideoKey = computed<string | null>(() => {
 })
 // Öncelik: kullanıcı tıkladıysa o; yoksa kendi videom; yoksa ekran paylaşımı; yoksa ilk video.
 const effectiveFocusKey = computed<string | null>(() => {
-  if (focusedKey.value && tiles.value.some((tl) => tl.key === focusedKey.value))
-    return focusedKey.value
+  if (focusedKey.value && tiles.value.some((tl) => tl.key === focusedKey.value)) return focusedKey.value
   return localVideoKey.value ?? screenFocusKey.value ?? firstVideoKey.value
 })
 const isStageMode = computed(() => effectiveFocusKey.value !== null)
 const focusedTile = computed<VoiceTileData | null>(
   () => tiles.value.find((tl) => tl.key === effectiveFocusKey.value) ?? null,
 )
-function setFocus(key: string) {
-  focusedKey.value = key
-}
+function setFocus(key: string) { focusedKey.value = key }
 
 // Sığdır/doldur: ekran paylaşımı 'contain' (tüm ekran görünür), kamera 'cover' (çerçeveyi doldurur).
 // Manuel geçiş butonu kaldırıldı — sahne sabit 16:9 çerçeveye oturduğundan bu varsayılanlar yeterli.
@@ -123,8 +115,7 @@ function tileProps(tile: VoiceTileData, variant: 'grid' | 'stage' | 'strip') {
     canMove: false,
     moveTargets: [],
     broadcasting: false,
-    focused:
-      variant === 'stage' ? true : variant === 'strip' && tile.key === effectiveFocusKey.value,
+    focused: variant === 'stage' ? true : variant === 'strip' && tile.key === effectiveFocusKey.value,
   }
 }
 
@@ -151,15 +142,10 @@ async function toggleFullscreen() {
   <div
     v-if="voiceStore.connectingChannelId === channelId && !connected"
     class="shrink-0 mx-4 mt-3 rounded-[var(--kv-radius-lg)] overflow-hidden flex items-center gap-2 px-4 py-3"
-    style="background-color: var(--kv-bg-content); border: 1px solid var(--kv-border-subtle)"
+    style="background-color: var(--kv-bg-content); border: 1px solid var(--kv-border-subtle);"
   >
-    <span
-      class="w-2 h-2 rounded-full shrink-0 animate-pulse"
-      style="background-color: var(--kv-accent-500)"
-    />
-    <span class="text-[13px]" style="color: var(--kv-text-secondary)">{{
-      t('voice.joining')
-    }}</span>
+    <span class="w-2 h-2 rounded-full shrink-0 animate-pulse" style="background-color: var(--kv-accent-500);" />
+    <span class="text-[13px]" style="color: var(--kv-text-secondary);">{{ t('voice.joining') }}</span>
   </div>
 
   <!-- Bağlı: ses paneli (üstte; sohbet altta akar) -->
@@ -167,28 +153,19 @@ async function toggleFullscreen() {
     v-else-if="connected"
     ref="rootRef"
     class="kv-dm-voice shrink-0 mx-4 mt-3 rounded-[var(--kv-radius-lg)] overflow-hidden flex flex-col"
-    style="background-color: var(--kv-bg-content); border: 1px solid var(--kv-border-subtle)"
+    style="background-color: var(--kv-bg-content); border: 1px solid var(--kv-border-subtle);"
   >
     <!-- Üst etiket -->
     <div class="flex items-center gap-2 px-4 pt-3 shrink-0">
-      <span
-        class="w-2 h-2 rounded-full shrink-0"
-        style="background-color: var(--kv-online, #3db46e)"
-      />
-      <span
-        class="text-[12px] font-semibold uppercase tracking-widest"
-        style="color: var(--kv-online, #3db46e)"
-      >
+      <span class="w-2 h-2 rounded-full shrink-0" style="background-color: var(--kv-online, #3DB46E);" />
+      <span class="text-[12px] font-semibold uppercase tracking-widest" style="color: var(--kv-online, #3DB46E);">
         {{ t('voice.connected') }}
       </span>
-      <span class="text-[12px]" style="color: var(--kv-text-muted)">· {{ members.length }}</span>
+      <span class="text-[12px]" style="color: var(--kv-text-muted);">· {{ members.length }}</span>
     </div>
 
     <!-- Orta: video varsa sahne (ortada, dar) + altta şerit · yoksa kompakt avatar şeridi -->
-    <div
-      class="px-4 pt-3 overflow-hidden"
-      :class="hasVideo ? 'kv-dm-voice-stage' : 'kv-dm-voice-avatars'"
-    >
+    <div class="px-4 pt-3 overflow-hidden" :class="hasVideo ? 'kv-dm-voice-stage' : 'kv-dm-voice-avatars'">
       <!-- VIDEO: büyük odak ortada (yatayda paneli kaplamaz) + altta küçük şerit -->
       <div v-if="isStageMode" class="w-full h-full flex flex-col gap-3">
         <div class="flex-1 min-h-0 flex items-center justify-center">
@@ -202,17 +179,12 @@ async function toggleFullscreen() {
         </div>
         <!-- Şerit: tüm kutucuklar — tıklanan öne (sahneye) çıkar. Taşınca güvenli-ortalama
              (az kutucukta ortalı, çok kutucukta baştan kaydırılabilir). -->
-        <div
-          class="shrink-0 flex items-center gap-2 overflow-x-auto py-0.5"
-          style="justify-content: safe center"
-        >
-          <div
-            v-for="tile in tiles"
-            :key="tile.key"
-            class="shrink-0"
-            style="width: 128px; height: 72px"
-          >
-            <VoiceTile v-bind="tileProps(tile, 'strip')" @focus="setFocus(tile.key)" />
+        <div class="shrink-0 flex items-center gap-2 overflow-x-auto py-0.5" style="justify-content: safe center;">
+          <div v-for="tile in tiles" :key="tile.key" class="shrink-0" style="width: 128px; height: 72px;">
+            <VoiceTile
+              v-bind="tileProps(tile, 'strip')"
+              @focus="setFocus(tile.key)"
+            />
           </div>
         </div>
       </div>
@@ -223,7 +195,7 @@ async function toggleFullscreen() {
           v-for="tile in tiles"
           :key="tile.key"
           class="flex flex-col items-center gap-2"
-          style="width: 92px"
+          style="width: 92px;"
         >
           <div class="relative shrink-0">
             <div
@@ -232,7 +204,7 @@ async function toggleFullscreen() {
                 tile.member && isSpeaking(tile.member) ? 'kv-speaking' : '',
                 tile.kind === 'pending' ? 'opacity-40' : '',
               ]"
-              style="background-color: var(--kv-accent-500)"
+              style="background-color: var(--kv-accent-500);"
             >
               <img
                 v-if="tile.member?.avatarUrl || tile.peer?.avatarUrl"
@@ -240,48 +212,27 @@ async function toggleFullscreen() {
                 :alt="tile.member?.username ?? tile.peer?.username"
                 class="w-full h-full object-cover"
               />
-              <span v-else class="text-[24px]">{{
-                (tile.member?.username ?? tile.peer?.username)?.[0]?.toUpperCase()
-              }}</span>
+              <span v-else class="text-[24px]">{{ (tile.member?.username ?? tile.peer?.username)?.[0]?.toUpperCase() }}</span>
             </div>
             <!-- Mute rozeti (sağ-alt) -->
             <div
               v-if="tile.member && isMutedFor(tile.member)"
               class="absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] rounded-full flex items-center justify-center"
-              style="background-color: var(--kv-bg-content)"
+              style="background-color: var(--kv-bg-content);"
             >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                style="color: var(--kv-danger)"
-              >
-                <line x1="1" y1="1" x2="23" y2="23" />
-                <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-                <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
-                <line x1="12" y1="19" x2="12" y2="23" />
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-danger);">
+                <line x1="1" y1="1" x2="23" y2="23"/>
+                <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
+                <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
               </svg>
             </div>
           </div>
-          <span
-            class="text-[12px] truncate max-w-full text-center"
-            style="color: var(--kv-text-secondary)"
-          >
-            {{ tile.member?.username ?? tile.peer?.username
-            }}<template v-if="tile.member?.isLocal"> ({{ t('voice.you') }})</template>
+          <span class="text-[12px] truncate max-w-full text-center" style="color: var(--kv-text-secondary);">
+            {{ tile.member?.username ?? tile.peer?.username }}<template v-if="tile.member?.isLocal"> ({{ t('voice.you') }})</template>
           </span>
           <!-- D39 §5: bekleyen katılımcı — "Çalıyor…" -->
-          <span
-            v-if="tile.kind === 'pending'"
-            class="text-[11px]"
-            style="color: var(--kv-text-muted)"
-            >{{ t('call.ringing') }}</span
-          >
+          <span v-if="tile.kind === 'pending'" class="text-[11px]" style="color: var(--kv-text-muted);">{{ t('call.ringing') }}</span>
         </div>
       </div>
     </div>
@@ -295,42 +246,18 @@ async function toggleFullscreen() {
       <div class="justify-self-end">
         <button
           class="w-11 h-11 flex items-center justify-center rounded-full cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary)"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
           :title="isFullscreen ? t('voice.exitFullscreen') : t('voice.enterFullscreen')"
           :aria-label="isFullscreen ? t('voice.exitFullscreen') : t('voice.enterFullscreen')"
           @click="toggleFullscreen"
         >
-          <svg
-            v-if="!isFullscreen"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-            <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
-            <path d="M3 16v3a2 2 0 0 0 2 2h3" />
-            <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+          <svg v-if="!isFullscreen" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+            <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
           </svg>
-          <svg
-            v-else
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M4 14h3a2 2 0 0 1 2 2v3" />
-            <path d="M20 10h-3a2 2 0 0 1-2-2V5" />
-            <path d="M14 20v-3a2 2 0 0 1 2-2h3" />
-            <path d="M10 4v3a2 2 0 0 1-2 2H5" />
+          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 14h3a2 2 0 0 1 2 2v3"/><path d="M20 10h-3a2 2 0 0 1-2-2V5"/>
+            <path d="M14 20v-3a2 2 0 0 1 2-2h3"/><path d="M10 4v3a2 2 0 0 1-2 2H5"/>
           </svg>
         </button>
       </div>

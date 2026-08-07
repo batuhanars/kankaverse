@@ -17,10 +17,7 @@ const state = ref<State>('loading')
 
 onMounted(async () => {
   const token = route.query.token as string | undefined
-  if (!token) {
-    state.value = 'error'
-    return
-  }
+  if (!token) { state.value = 'error'; return }
   try {
     const res = await authApi.confirmEmailChange(token)
     auth.updateUser(res.data.user)
@@ -32,51 +29,26 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div
-    class="min-h-screen flex items-center justify-center"
-    style="background-color: var(--kv-bg-rail)"
-  >
-    <div
-      class="w-full max-w-sm rounded-[var(--kv-radius-lg)] p-8 text-center"
-      style="
-        background-color: var(--kv-bg-sidebar);
-        border: 1px solid var(--kv-border-subtle);
-        border-top: 3px solid var(--kv-accent-500);
-      "
-    >
-      <img :src="logoDikey" :alt="t('brand.name')" class="mx-auto mb-6" style="width: 120px" />
+  <div class="min-h-screen flex items-center justify-center" style="background-color: var(--kv-bg-rail);">
+    <div class="w-full max-w-sm rounded-[var(--kv-radius-lg)] p-8 text-center" style="background-color: var(--kv-bg-sidebar); border: 1px solid var(--kv-border-subtle); border-top: 3px solid var(--kv-accent-500);">
+      <img :src="logoDikey" :alt="t('brand.name')" class="mx-auto mb-6" style="width: 120px;" />
 
       <template v-if="state === 'loading'">
-        <p class="text-[15px]" style="color: var(--kv-text-secondary)">{{ t('common.loading') }}</p>
+        <p class="text-[15px]" style="color: var(--kv-text-secondary);">{{ t('common.loading') }}</p>
       </template>
 
       <template v-else-if="state === 'success'">
-        <h1 class="text-[20px] font-semibold mb-2" style="color: var(--kv-text-primary)">
-          {{ t('emailChange.confirmTitle') }}
-        </h1>
-        <p class="text-[14px] mb-6" style="color: var(--kv-text-secondary)">
-          {{ t('emailChange.confirmSuccess') }}
-        </p>
-        <KvButton
-          class="w-full"
-          @click="
-            auth.isAuthenticated() ? router.push({ name: 'app' }) : router.push({ name: 'login' })
-          "
-        >
+        <h1 class="text-[20px] font-semibold mb-2" style="color: var(--kv-text-primary);">{{ t('emailChange.confirmTitle') }}</h1>
+        <p class="text-[14px] mb-6" style="color: var(--kv-text-secondary);">{{ t('emailChange.confirmSuccess') }}</p>
+        <KvButton class="w-full" @click="auth.isAuthenticated() ? router.push({ name: 'app' }) : router.push({ name: 'login' })">
           {{ auth.isAuthenticated() ? t('emailChange.goToApp') : t('emailChange.goToLogin') }}
         </KvButton>
       </template>
 
       <template v-else>
-        <h1 class="text-[20px] font-semibold mb-2" style="color: var(--kv-text-primary)">
-          {{ t('emailChange.confirmTitle') }}
-        </h1>
-        <p class="text-[14px] mb-6" style="color: var(--kv-danger)">
-          {{ t('emailChange.confirmError') }}
-        </p>
-        <KvButton variant="ghost" class="w-full" @click="router.push({ name: 'login' })">{{
-          t('emailChange.goToLogin')
-        }}</KvButton>
+        <h1 class="text-[20px] font-semibold mb-2" style="color: var(--kv-text-primary);">{{ t('emailChange.confirmTitle') }}</h1>
+        <p class="text-[14px] mb-6" style="color: var(--kv-danger);">{{ t('emailChange.confirmError') }}</p>
+        <KvButton variant="ghost" class="w-full" @click="router.push({ name: 'login' })">{{ t('emailChange.goToLogin') }}</KvButton>
       </template>
     </div>
   </div>

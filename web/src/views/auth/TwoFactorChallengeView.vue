@@ -51,22 +51,18 @@ async function submit() {
 <template>
   <div
     class="min-h-screen flex items-center justify-center"
-    style="background-color: var(--kv-bg-rail)"
+    style="background-color: var(--kv-bg-rail);"
   >
     <div
       class="w-full max-w-sm rounded-[var(--kv-radius-lg)] p-8"
-      style="
-        background-color: var(--kv-bg-sidebar);
-        border: 1px solid var(--kv-border-subtle);
-        border-top: 3px solid var(--kv-accent-500);
-      "
+      style="background-color: var(--kv-bg-sidebar); border: 1px solid var(--kv-border-subtle); border-top: 3px solid var(--kv-accent-500);"
     >
       <div class="mb-6 text-center">
-        <img :src="logoDikey" :alt="t('brand.name')" class="mx-auto mb-5" style="width: 120px" />
-        <h1 class="text-[22px] font-semibold" style="color: var(--kv-text-primary)">
+        <img :src="logoDikey" :alt="t('brand.name')" class="mx-auto mb-5" style="width: 120px;" />
+        <h1 class="text-[22px] font-semibold" style="color: var(--kv-text-primary);">
           {{ t('twoFactorLogin.title') }}
         </h1>
-        <p class="mt-1 text-[13px]" style="color: var(--kv-text-muted)">
+        <p class="mt-1 text-[13px]" style="color: var(--kv-text-muted);">
           {{ useRecovery ? t('twoFactorLogin.recoverySubtitle') : t('twoFactorLogin.subtitle') }}
         </p>
       </div>
@@ -75,17 +71,11 @@ async function submit() {
         <KvInput
           v-model="code"
           :label="useRecovery ? t('twoFactorLogin.recoveryCode') : t('twoFactorLogin.code')"
-          :placeholder="
-            useRecovery
-              ? t('twoFactorLogin.recoveryCodePlaceholder')
-              : t('twoFactorLogin.codePlaceholder')
-          "
+          :placeholder="useRecovery ? t('twoFactorLogin.recoveryCodePlaceholder') : t('twoFactorLogin.codePlaceholder')"
           autocomplete="one-time-code"
         />
 
-        <p v-if="apiError" class="text-[13px] text-center" style="color: var(--kv-danger)">
-          {{ apiError }}
-        </p>
+        <p v-if="apiError" class="text-[13px] text-center" style="color: var(--kv-danger);">{{ apiError }}</p>
 
         <KvButton type="submit" :loading="loading" class="w-full">
           {{ t('twoFactorLogin.submit') }}
@@ -95,15 +85,12 @@ async function submit() {
       <div class="mt-4 flex flex-col items-center gap-2">
         <button
           class="text-[13px] cursor-pointer"
-          style="color: var(--kv-accent-500)"
-          @click="
-            useRecovery = !useRecovery
-            code = ''
-          "
+          style="color: var(--kv-accent-500);"
+          @click="useRecovery = !useRecovery; code = ''"
         >
           {{ useRecovery ? t('twoFactorLogin.useTotp') : t('twoFactorLogin.useRecovery') }}
         </button>
-        <RouterLink :to="{ name: 'login' }" class="text-[13px]" style="color: var(--kv-text-muted)">
+        <RouterLink :to="{ name: 'login' }" class="text-[13px]" style="color: var(--kv-text-muted);">
           {{ t('twoFactorLogin.back') }}
         </RouterLink>
       </div>

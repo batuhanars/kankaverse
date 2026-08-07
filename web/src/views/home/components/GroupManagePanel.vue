@@ -115,22 +115,19 @@ async function renameGroup() {
 <template>
   <aside
     class="flex flex-col shrink-0 mb-4 mr-4 rounded-[var(--kv-radius-lg)] overflow-hidden"
-    style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar)"
+    style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
   >
     <!-- Başlık -->
     <div
       class="flex items-center justify-between px-4 border-b shrink-0"
-      style="height: var(--kv-header-height); border-color: var(--kv-border-subtle)"
+      style="height: var(--kv-header-height); border-color: var(--kv-border-subtle);"
     >
-      <span
-        class="text-[13px] font-semibold uppercase tracking-wide"
-        style="color: var(--kv-text-muted)"
-      >
+      <span class="text-[13px] font-semibold uppercase tracking-wide" style="color: var(--kv-text-muted);">
         {{ t('group.members') }}
       </span>
       <button
         class="text-[16px] cursor-pointer transition-opacity hover:opacity-70"
-        style="color: var(--kv-text-muted)"
+        style="color: var(--kv-text-muted);"
         @click="emit('close')"
       >
         ✕
@@ -143,15 +140,13 @@ async function renameGroup() {
         v-for="member in sortedMembers"
         :key="member.id"
         class="group flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
-        @mouseenter="
-          ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'
-        "
+        @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
         @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
         @click="openCard(member.id, $event)"
       >
         <div
           class="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-semibold text-white"
-          style="background-color: var(--kv-accent-500)"
+          style="background-color: var(--kv-accent-500);"
         >
           <img
             v-if="member.avatarUrl"
@@ -161,14 +156,14 @@ async function renameGroup() {
           />
           <span v-else>{{ member.username[0].toUpperCase() }}</span>
         </div>
-        <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-primary)">
+        <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-primary);">
           {{ member.username }}
         </span>
         <!-- Taç: owner işareti -->
         <span
           v-if="member.id === ownerId"
           class="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-          style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500)"
+          style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
         >
           👑
         </span>
@@ -176,22 +171,12 @@ async function renameGroup() {
         <button
           v-else-if="isOwner && member.id !== authStore.user?.id"
           class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 w-5 h-5 flex items-center justify-center rounded cursor-pointer"
-          style="color: var(--kv-danger)"
+          style="color: var(--kv-danger);"
           :title="t('group.removeMember')"
           @click.stop="removeMemberTarget = member"
         >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
       </div>
@@ -200,21 +185,14 @@ async function renameGroup() {
     <!-- Aksiyonlar — "Üye Ekle" ve "Ayrıl" DM satırı sağ-tık menüsüne taşındı (İş 2, 2026-08-03;
          bkz. `DmList.vue`). Yalnız owner-özel aksiyonlar kaldı; owner değilse bölüm tümden
          gizlenir (iki düğme çıkınca boş bir dip bırakmasın). -->
-    <div
-      v-if="isOwner"
-      class="px-3 pb-4 pt-2 shrink-0 border-t space-y-1"
-      style="border-color: var(--kv-border-subtle)"
-    >
+    <div v-if="isOwner" class="px-3 pb-4 pt-2 shrink-0 border-t space-y-1" style="border-color: var(--kv-border-subtle);">
       <!-- Yeniden Adlandır (owner) -->
       <button
         class="w-full text-left px-3 py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium cursor-pointer transition-colors"
-        style="color: var(--kv-text-secondary)"
+        style="color: var(--kv-text-secondary);"
         @mouseenter="($event.target as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
         @mouseleave="($event.target as HTMLElement).style.backgroundColor = 'transparent'"
-        @click="
-          showRename = true
-          renameValue = groupName ?? ''
-        "
+        @click="showRename = true; renameValue = groupName ?? ''"
       >
         ✏️ {{ t('group.renameGroup') }}
       </button>
@@ -222,7 +200,7 @@ async function renameGroup() {
       <!-- Grubu Sil (owner) -->
       <button
         class="w-full text-left px-3 py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium cursor-pointer transition-colors"
-        style="color: var(--kv-text-muted)"
+        style="color: var(--kv-text-muted);"
         @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-danger)'"
         @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
         @click="showDeleteConfirm = true"
@@ -236,33 +214,19 @@ async function renameGroup() {
   <div
     v-if="showRename"
     class="fixed inset-0 z-50 flex items-center justify-center"
-    style="background-color: rgba(0, 0, 0, 0.5)"
+    style="background-color: rgba(0,0,0,0.5);"
     @click.self="showRename = false"
   >
     <div
       class="w-[360px] rounded-[var(--kv-radius-lg)] overflow-hidden"
-      style="background-color: var(--kv-bg-sidebar)"
+      style="background-color: var(--kv-bg-sidebar);"
     >
-      <div
-        class="flex items-center justify-between px-4 py-3 border-b"
-        style="border-color: var(--kv-border-subtle)"
-      >
-        <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary)">
-          {{ t('group.renameTitle') }}
-        </h3>
-        <button
-          class="text-[18px] cursor-pointer hover:opacity-70"
-          style="color: var(--kv-text-muted)"
-          @click="showRename = false"
-        >
-          ✕
-        </button>
+      <div class="flex items-center justify-between px-4 py-3 border-b" style="border-color: var(--kv-border-subtle);">
+        <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">{{ t('group.renameTitle') }}</h3>
+        <button class="text-[18px] cursor-pointer hover:opacity-70" style="color: var(--kv-text-muted);" @click="showRename = false">✕</button>
       </div>
       <div class="px-4 py-4">
-        <label
-          class="block text-[11px] font-semibold uppercase tracking-wide mb-1"
-          style="color: var(--kv-text-muted)"
-        >
+        <label class="block text-[11px] font-semibold uppercase tracking-wide mb-1" style="color: var(--kv-text-muted);">
           {{ t('group.renameLabel') }}
         </label>
         <input
@@ -270,34 +234,24 @@ async function renameGroup() {
           maxlength="50"
           :placeholder="t('group.renamePlaceholder')"
           class="w-full px-3 py-2 rounded-[var(--kv-radius-md)] text-[14px] outline-none border"
-          style="
-            background-color: var(--kv-bg-content);
-            border-color: var(--kv-border-strong);
-            color: var(--kv-text-primary);
-          "
+          style="background-color: var(--kv-bg-content); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
           @keydown.enter="renameGroup"
         />
-        <p v-if="renameError" class="text-[13px] mt-1" style="color: var(--kv-danger)">
-          {{ renameError }}
-        </p>
+        <p v-if="renameError" class="text-[13px] mt-1" style="color: var(--kv-danger);">{{ renameError }}</p>
       </div>
       <div class="flex justify-end gap-2 px-4 pb-4">
         <button
           class="px-4 py-2 text-[14px] rounded-[var(--kv-radius-md)] cursor-pointer hover:opacity-80"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary)"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
           @click="showRename = false"
-        >
-          {{ t('common.cancel') }}
-        </button>
+        >{{ t('common.cancel') }}</button>
         <button
           class="px-4 py-2 text-[14px] font-semibold rounded-[var(--kv-radius-md)] cursor-pointer hover:opacity-90 transition-opacity"
           :class="!renameValue.trim() || renaming ? 'opacity-50 cursor-not-allowed' : ''"
-          style="background-color: var(--kv-accent-500); color: #fff"
+          style="background-color: var(--kv-accent-500); color: #fff;"
           :disabled="!renameValue.trim() || renaming"
           @click="renameGroup"
-        >
-          {{ t('group.renameAction') }}
-        </button>
+        >{{ t('group.renameAction') }}</button>
       </div>
     </div>
   </div>
@@ -323,5 +277,11 @@ async function renameGroup() {
   />
 
   <!-- Kullanıcı kartı (üyeye sol-tık — mesaj-yazarı deseni) -->
-  <UserCardPopover v-if="showCard" :user-id="cardUserId" :x="cardX" :y="cardY" @close="closeCard" />
+  <UserCardPopover
+    v-if="showCard"
+    :user-id="cardUserId"
+    :x="cardX"
+    :y="cardY"
+    @close="closeCard"
+  />
 </template>

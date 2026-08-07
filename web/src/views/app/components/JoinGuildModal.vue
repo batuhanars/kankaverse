@@ -75,20 +75,20 @@ async function submit() {
       <div
         v-if="preview"
         class="flex items-center gap-3 px-3 py-2.5 rounded-[var(--kv-radius-md)] border"
-        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated)"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
       >
         <div class="flex-1 min-w-0">
-          <p class="text-[14px] font-medium truncate" style="color: var(--kv-text-primary)">
+          <p class="text-[14px] font-medium truncate" style="color: var(--kv-text-primary);">
             {{ preview.guildName }}
           </p>
-          <p v-if="!preview.valid" class="text-[12px]" style="color: var(--kv-danger)">
+          <p v-if="!preview.valid" class="text-[12px]" style="color: var(--kv-danger);">
             {{ t('invite.errors.INVITE_INVALID') }}
           </p>
         </div>
         <span
           v-if="preview.adultsOnly"
           class="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-[var(--kv-radius-sm)]"
-          style="background-color: var(--kv-danger); color: #fff"
+          style="background-color: var(--kv-danger); color: #fff;"
         >
           {{ t('invite.adultsOnlyBadge') }}
         </span>

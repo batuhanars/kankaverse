@@ -32,7 +32,7 @@ function guildInitial(name: string): string {
 <template>
   <article
     class="flex flex-col rounded-[var(--kv-radius-lg)] border overflow-hidden"
-    style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-sidebar)"
+    style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-sidebar);"
   >
     <!-- Afiş: yüklenmiş görsel varsa o, yoksa renk gradient -->
     <div class="relative h-20 shrink-0" :style="bannerStyle">
@@ -68,13 +68,13 @@ function guildInitial(name: string): string {
     <!-- Gövde -->
     <div class="flex flex-col flex-1 px-4 pt-7 pb-4 gap-2">
       <div class="flex items-center gap-2 min-w-0">
-        <h3 class="text-[15px] font-semibold truncate" style="color: var(--kv-text-primary)">
+        <h3 class="text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
           {{ guild.name }}
         </h3>
         <span
           v-if="guild.adultsOnly"
           class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded"
-          style="background-color: var(--kv-danger-subtle); color: var(--kv-danger)"
+          style="background-color: var(--kv-danger-subtle); color: var(--kv-danger);"
         >
           18+
         </span>
@@ -83,7 +83,7 @@ function guildInitial(name: string): string {
       <p
         v-if="guild.description"
         class="text-[13px] line-clamp-2"
-        style="color: var(--kv-text-muted)"
+        style="color: var(--kv-text-muted);"
       >
         {{ guild.description }}
       </p>
@@ -94,7 +94,7 @@ function guildInitial(name: string): string {
           v-for="tag in guild.tags"
           :key="tag"
           class="text-[11px] px-2 py-0.5 rounded-full"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary)"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
         >
           {{ tag }}
         </span>
@@ -102,7 +102,7 @@ function guildInitial(name: string): string {
 
       <!-- Alt satır: üye sayısı + Katıl -->
       <div class="flex items-center justify-between gap-2 mt-auto pt-2">
-        <span class="text-[12px] font-medium" style="color: var(--kv-text-muted)">
+        <span class="text-[12px] font-medium" style="color: var(--kv-text-muted);">
           {{ t('discover.memberCount', { count: guild.memberCount }) }}
         </span>
         <!-- Zaten üye → Sunucuya Git; değilse Katıl -->
