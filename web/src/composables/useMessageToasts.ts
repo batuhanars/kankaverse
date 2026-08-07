@@ -72,7 +72,8 @@ export function maybeFireDmToast(
   let title: string
   let body: string
   if (channel?.type === 'GROUP_DM') {
-    const sender = channel.members.find((m) => m.id === payload.senderId)?.username ?? t('notification.someone')
+    const sender =
+      channel.members.find((m) => m.id === payload.senderId)?.username ?? t('notification.someone')
     title = channel.name ?? t('notification.groupFallback')
     body = t('notification.channelMessage', { actor: sender, text: content })
   } else if (channel?.type === 'DM') {
@@ -84,7 +85,12 @@ export function maybeFireDmToast(
     body = content
   }
 
-  fire(title, body, () => router.push({ name: 'dm', params: { channelId: payload.channelId } }), payload.channelId)
+  fire(
+    title,
+    body,
+    () => router.push({ name: 'dm', params: { channelId: payload.channelId } }),
+    payload.channelId,
+  )
 }
 
 /**
@@ -111,7 +117,8 @@ export function maybeFireChannelToast(
   if (prefs.isMuted('CHANNEL', payload.channelId)) return
   if (prefs.isMuted('GUILD', payload.guildId)) return
   // Sunucu kanalı: yalnız seviye ALL'da düz mesaj toast'ı (MENTIONS/NONE → bahsetme zaten ayrı).
-  if (prefs.effectiveLevel('CHANNEL', payload.channelId, payload.guildId) !== NotificationLevel.ALL) return
+  if (prefs.effectiveLevel('CHANNEL', payload.channelId, payload.guildId) !== NotificationLevel.ALL)
+    return
 
   if (throttled(payload.channelId)) return
 
@@ -119,12 +126,19 @@ export function maybeFireChannelToast(
   const channels = useChannelsStore()
   const ch = channels.findChannelById(payload.channelId)
   const title = `#${ch?.name ?? t('notification.channelFallback')}`
-  const body = t('notification.channelMessage', { actor: payload.author.username, text: payload.preview })
+  const body = t('notification.channelMessage', {
+    actor: payload.author.username,
+    text: payload.preview,
+  })
 
   fire(
     title,
     body,
-    () => router.push({ name: 'channel', params: { guildId: payload.guildId, channelId: payload.channelId } }),
+    () =>
+      router.push({
+        name: 'channel',
+        params: { guildId: payload.guildId, channelId: payload.channelId },
+      }),
     payload.channelId,
   )
 }

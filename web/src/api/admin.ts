@@ -13,9 +13,9 @@ export interface PlatformInviteDto {
 }
 
 export interface CreatePlatformInvitePayload {
-  maxUses?: number     // 1-10000; yoksa sınırsız
-  expiresInHours?: number  // 1-8760; yoksa süresiz
-  note?: string        // ≤200 karakter; admin notu
+  maxUses?: number // 1-10000; yoksa sınırsız
+  expiresInHours?: number // 1-8760; yoksa süresiz
+  note?: string // ≤200 karakter; admin notu
 }
 
 // Admin kullanıcı genel-bakış satırı (yalnız isModerator). Hassas alanlar backend'de saklı.

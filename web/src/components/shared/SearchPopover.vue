@@ -41,7 +41,9 @@ const memberResults = computed(() => {
   if (q.length < 1) return []
   return membersStore
     .membersFor(props.guildId)
-    .filter((m) => m.userId !== authStore.user?.id && m.username.toLocaleLowerCase('tr').includes(q))
+    .filter(
+      (m) => m.userId !== authStore.user?.id && m.username.toLocaleLowerCase('tr').includes(q),
+    )
     .slice(0, 8)
 })
 
@@ -73,9 +75,11 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 function formatTime(iso: string): string {
   const d = new Date(iso)
-  return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) +
+  return (
+    d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) +
     ' ' +
     d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }).replace(':', '.')
+  )
 }
 
 function contentPlain(content: string): string {
@@ -85,8 +89,9 @@ function contentPlain(content: string): string {
 // REV-3: eşleşen kelimeyi vurgula. XSS-güvenli: önce HTML kaçışı, sonra kaçışlı
 // terimi case-insensitive <mark> ile sar (yalnız <mark> enjekte edilir).
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
   )
 }
 function escapeRegex(s: string): string {
@@ -165,20 +170,20 @@ function onDocKeydown(e: KeyboardEvent) {
     v-if="open"
     ref="popoverEl"
     class="absolute top-full right-0 mt-2 z-50 w-[380px] max-h-[520px] flex flex-col overflow-hidden rounded-[var(--kv-radius-md)]"
-    style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
+    style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle)"
     @click.stop
   >
     <!-- Başlık -->
     <div
       class="flex items-center justify-between px-4 py-3 shrink-0 border-b"
-      style="border-color: var(--kv-border-subtle);"
+      style="border-color: var(--kv-border-subtle)"
     >
-      <span class="text-[14px] font-semibold" style="color: var(--kv-text-primary);">
+      <span class="text-[14px] font-semibold" style="color: var(--kv-text-primary)">
         {{ t('messageSearch.panelTitle') }}
       </span>
       <button
         class="w-6 h-6 flex items-center justify-center rounded text-[14px] cursor-pointer transition-colors"
-        style="color: var(--kv-text-muted);"
+        style="color: var(--kv-text-muted)"
         :title="t('common.close')"
         @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
         @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)'"
@@ -189,13 +194,18 @@ function onDocKeydown(e: KeyboardEvent) {
     </div>
 
     <!-- Arama input'u -->
-    <div class="px-4 py-2 shrink-0 border-b" style="border-color: var(--kv-border-subtle);">
+    <div class="px-4 py-2 shrink-0 border-b" style="border-color: var(--kv-border-subtle)">
       <input
         ref="inputEl"
         v-model="query"
         type="text"
         class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] outline-none border"
-        style="background-color: var(--kv-bg-content); color: var(--kv-text-primary); border-color: var(--kv-border-strong); font-family: var(--kv-font-ui);"
+        style="
+          background-color: var(--kv-bg-content);
+          color: var(--kv-text-primary);
+          border-color: var(--kv-border-strong);
+          font-family: var(--kv-font-ui);
+        "
         :placeholder="t('messageSearch.inputPlaceholder')"
         @input="onInput"
       />
@@ -205,7 +215,10 @@ function onDocKeydown(e: KeyboardEvent) {
     <div class="flex-1 overflow-y-auto py-2">
       <!-- REV-3 part2: ortam üyeleri (anlık, client-side; ≥1 karakter) -->
       <template v-if="memberResults.length">
-        <p class="px-4 pt-1 pb-1 text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+        <p
+          class="px-4 pt-1 pb-1 text-[11px] font-semibold uppercase tracking-widest"
+          style="color: var(--kv-text-muted)"
+        >
           {{ t('messageSearch.membersSection') }}
         </p>
         <button
@@ -214,39 +227,41 @@ function onDocKeydown(e: KeyboardEvent) {
           class="w-full flex items-center gap-2.5 px-4 py-2 text-left cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
           @click="onMemberClick(m.userId)"
         >
-          <div class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[11px] font-semibold text-white" style="background-color: var(--kv-accent-500);">
-            <img v-if="m.avatarUrl" :src="m.avatarUrl" :alt="m.username" class="w-full h-full object-cover" />
+          <div
+            class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[11px] font-semibold text-white"
+            style="background-color: var(--kv-accent-500)"
+          >
+            <img
+              v-if="m.avatarUrl"
+              :src="m.avatarUrl"
+              :alt="m.username"
+              class="w-full h-full object-cover"
+            />
             <span v-else>{{ m.username[0].toUpperCase() }}</span>
           </div>
-          <span class="text-[13px] truncate" style="color: var(--kv-text-primary);">{{ m.username }}</span>
+          <span class="text-[13px] truncate" style="color: var(--kv-text-primary)">{{
+            m.username
+          }}</span>
         </button>
-        <div class="mx-4 my-1.5 border-t" style="border-color: var(--kv-border-subtle);" />
+        <div class="mx-4 my-1.5 border-t" style="border-color: var(--kv-border-subtle)" />
       </template>
 
       <!-- <2 karakter ipucu -->
       <p
         v-if="query.length > 0 && query.trim().length < 2"
         class="px-4 py-3 text-[13px]"
-        style="color: var(--kv-text-muted);"
+        style="color: var(--kv-text-muted)"
       >
         {{ t('messageSearch.minChars') }}
       </p>
 
       <!-- Yükleniyor -->
-      <p
-        v-else-if="loading"
-        class="px-4 py-3 text-[13px]"
-        style="color: var(--kv-text-muted);"
-      >
+      <p v-else-if="loading" class="px-4 py-3 text-[13px]" style="color: var(--kv-text-muted)">
         {{ t('messageSearch.loading') }}
       </p>
 
       <!-- Hata -->
-      <p
-        v-else-if="error"
-        class="px-4 py-3 text-[13px]"
-        style="color: var(--kv-danger);"
-      >
+      <p v-else-if="error" class="px-4 py-3 text-[13px]" style="color: var(--kv-danger)">
         {{ error }}
       </p>
 
@@ -254,7 +269,7 @@ function onDocKeydown(e: KeyboardEvent) {
       <p
         v-else-if="query.trim().length >= 2 && !loading && results.length === 0"
         class="px-4 py-3 text-[13px]"
-        style="color: var(--kv-text-muted);"
+        style="color: var(--kv-text-muted)"
       >
         {{ t('messageSearch.empty') }}
       </p>
@@ -265,7 +280,7 @@ function onDocKeydown(e: KeyboardEvent) {
           v-for="msg in results"
           :key="msg.id"
           class="flex gap-3 px-4 py-2.5 border-b last:border-b-0 cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
-          style="border-color: var(--kv-border-subtle);"
+          style="border-color: var(--kv-border-subtle)"
           role="button"
           :title="t('message.jumpToMessage')"
           @click="onJump(msg.id)"
@@ -273,7 +288,7 @@ function onDocKeydown(e: KeyboardEvent) {
           <!-- Yazar avatarı (daire) -->
           <div
             class="w-8 h-8 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-semibold text-white"
-            style="background-color: var(--kv-accent-500);"
+            style="background-color: var(--kv-accent-500)"
           >
             <img
               v-if="msg.author.avatarUrl"
@@ -287,10 +302,13 @@ function onDocKeydown(e: KeyboardEvent) {
           <!-- İçerik -->
           <div class="flex-1 min-w-0">
             <div class="flex items-baseline gap-2 mb-0.5">
-              <span class="text-[13px] font-semibold truncate" style="color: var(--kv-text-primary);">
+              <span
+                class="text-[13px] font-semibold truncate"
+                style="color: var(--kv-text-primary)"
+              >
                 {{ msg.author.username }}
               </span>
-              <span class="text-[11px] shrink-0" style="color: var(--kv-text-muted);">
+              <span class="text-[11px] shrink-0" style="color: var(--kv-text-muted)">
                 {{ formatTime(msg.createdAt) }}
               </span>
             </div>
@@ -298,13 +316,13 @@ function onDocKeydown(e: KeyboardEvent) {
             <p
               v-if="msg.content"
               class="text-[13px] break-words line-clamp-3"
-              style="color: var(--kv-text-body);"
+              style="color: var(--kv-text-body)"
               v-html="highlight(msg.content)"
             />
             <p
               v-else-if="msg.attachments?.length"
               class="text-[13px] italic"
-              style="color: var(--kv-text-muted);"
+              style="color: var(--kv-text-muted)"
             >
               {{ msg.attachments[0].filename }}
             </p>

@@ -127,24 +127,45 @@ function recurrenceKey(ev: EventDto): string {
         @click="openMenuId = null"
       >
         <!-- Başlık -->
-        <div class="px-6 pt-5 pb-4 shrink-0 border-b flex items-center gap-3" style="border-color: var(--kv-border-subtle);">
-          <h2 class="flex-1 text-[20px] font-semibold" style="color: var(--kv-text-primary);">
+        <div
+          class="px-6 pt-5 pb-4 shrink-0 border-b flex items-center gap-3"
+          style="border-color: var(--kv-border-subtle)"
+        >
+          <h2 class="flex-1 text-[20px] font-semibold" style="color: var(--kv-text-primary)">
             {{ t('event.modalTitle', { count: events.length }) }}
           </h2>
-          <KvButton v-if="canManage" size="sm" @click="openCreate">{{ t('event.create') }}</KvButton>
+          <KvButton v-if="canManage" size="sm" @click="openCreate">{{
+            t('event.create')
+          }}</KvButton>
           <button
             class="flex items-center justify-center w-8 h-8 rounded-[var(--kv-radius-sm)] cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-            style="color: var(--kv-text-muted);"
+            style="color: var(--kv-text-muted)"
             :aria-label="t('common.cancel')"
             @click="emit('close')"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
 
         <!-- Liste -->
         <div class="overflow-y-auto flex-1 min-h-0 px-6 py-5 flex flex-col gap-3">
-          <p v-if="!events.length" class="text-[14px] text-center py-8" style="color: var(--kv-text-muted);">
+          <p
+            v-if="!events.length"
+            class="text-[14px] text-center py-8"
+            style="color: var(--kv-text-muted)"
+          >
             {{ t('event.empty') }}
           </p>
 
@@ -154,9 +175,11 @@ function recurrenceKey(ev: EventDto): string {
             :data-event-card="ev.id"
             class="rounded-[var(--kv-radius-md)] border overflow-hidden flex flex-col"
             :class="highlightedId === ev.id ? 'kv-event-highlight' : ''"
-            :style="highlightedId === ev.id
-              ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
-              : 'border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);'"
+            :style="
+              highlightedId === ev.id
+                ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);'
+                : 'border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);'
+            "
           >
             <!-- Kapak banner (Sprint V3 §5) — yalnız coverImageUrl dolu (tarama-CLEAN) ise; lightbox yok -->
             <img
@@ -164,92 +187,175 @@ function recurrenceKey(ev: EventDto): string {
               :src="ev.coverImageUrl"
               :alt="ev.name"
               class="w-full object-cover"
-              style="height: 130px;"
+              style="height: 130px"
             />
             <div class="p-4 flex flex-col gap-2">
-            <div class="flex items-start gap-2">
-              <div class="flex-1 min-w-0">
-                <!-- Tarih = ilgili örnek (occurrence), çapa startAt değil -->
-                <p class="text-[12px] font-semibold uppercase tracking-wide" style="color: var(--kv-accent-500);">{{ formatEventRange(ev.occurrenceStartAt, ev.occurrenceEndAt) }}</p>
-                <p class="text-[16px] font-semibold mt-0.5 truncate" style="color: var(--kv-text-primary);">{{ ev.name }}</p>
-                <p class="text-[13px] mt-0.5 truncate" style="color: var(--kv-text-secondary);">{{ locationLabel(ev) }}</p>
-
-                <!-- Rozetler: şu an sürüyor (ACTIVE) + tekrar -->
-                <div v-if="ev.status === 'ACTIVE' || ev.recurrence !== 'NONE'" class="flex flex-wrap items-center gap-1.5 mt-1.5">
-                  <span
-                    v-if="ev.status === 'ACTIVE'"
-                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                    style="background-color: rgba(61,180,110,0.15); color: var(--kv-online, #3DB46E);"
+              <div class="flex items-start gap-2">
+                <div class="flex-1 min-w-0">
+                  <!-- Tarih = ilgili örnek (occurrence), çapa startAt değil -->
+                  <p
+                    class="text-[12px] font-semibold uppercase tracking-wide"
+                    style="color: var(--kv-accent-500)"
                   >
-                    <span class="w-1.5 h-1.5 rounded-full" style="background-color: var(--kv-online, #3DB46E);" />
-                    {{ t('event.card.active') }}
-                  </span>
-                  <span
-                    v-if="ev.recurrence !== 'NONE'"
-                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
-                    style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
-                  >🔁 {{ t(`event.recurrence.${recurrenceKey(ev)}`) }}</span>
+                    {{ formatEventRange(ev.occurrenceStartAt, ev.occurrenceEndAt) }}
+                  </p>
+                  <p
+                    class="text-[16px] font-semibold mt-0.5 truncate"
+                    style="color: var(--kv-text-primary)"
+                  >
+                    {{ ev.name }}
+                  </p>
+                  <p class="text-[13px] mt-0.5 truncate" style="color: var(--kv-text-secondary)">
+                    {{ locationLabel(ev) }}
+                  </p>
+
+                  <!-- Rozetler: şu an sürüyor (ACTIVE) + tekrar -->
+                  <div
+                    v-if="ev.status === 'ACTIVE' || ev.recurrence !== 'NONE'"
+                    class="flex flex-wrap items-center gap-1.5 mt-1.5"
+                  >
+                    <span
+                      v-if="ev.status === 'ACTIVE'"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                      style="
+                        background-color: rgba(61, 180, 110, 0.15);
+                        color: var(--kv-online, #3db46e);
+                      "
+                    >
+                      <span
+                        class="w-1.5 h-1.5 rounded-full"
+                        style="background-color: var(--kv-online, #3db46e)"
+                      />
+                      {{ t('event.card.active') }}
+                    </span>
+                    <span
+                      v-if="ev.recurrence !== 'NONE'"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                      style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500)"
+                      >🔁 {{ t(`event.recurrence.${recurrenceKey(ev)}`) }}</span
+                    >
+                  </div>
+                </div>
+
+                <!-- ⋯ menü (yetkili) -->
+                <div v-if="canManage" class="relative shrink-0">
+                  <button
+                    class="flex items-center justify-center w-7 h-7 rounded-[var(--kv-radius-sm)] cursor-pointer hover:bg-[var(--kv-bg-sidebar)]"
+                    style="color: var(--kv-text-muted)"
+                    :aria-label="t('common.settings')"
+                    @click.stop="toggleMenu(ev.id)"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <circle cx="12" cy="5" r="1" fill="currentColor" />
+                      <circle cx="12" cy="12" r="1" fill="currentColor" />
+                      <circle cx="12" cy="19" r="1" fill="currentColor" />
+                    </svg>
+                  </button>
+                  <div
+                    v-if="openMenuId === ev.id"
+                    class="absolute right-0 top-full mt-1 z-20 rounded-[var(--kv-radius-md)] border overflow-hidden"
+                    style="
+                      min-width: 130px;
+                      background-color: var(--kv-bg-sidebar);
+                      border-color: var(--kv-border-subtle);
+                    "
+                    @click.stop
+                  >
+                    <button
+                      class="w-full text-left px-3 py-2 text-[13px] cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                      style="color: var(--kv-text-secondary)"
+                      @click="
+                        openMenuId = null
+                        openEdit(ev)
+                      "
+                    >
+                      {{ t('event.edit') }}
+                    </button>
+                    <button
+                      class="w-full text-left px-3 py-2 text-[13px] cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+                      style="color: var(--kv-danger)"
+                      @click="
+                        openMenuId = null
+                        deleteTarget = ev
+                      "
+                    >
+                      {{ t('event.delete') }}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <!-- ⋯ menü (yetkili) -->
-              <div v-if="canManage" class="relative shrink-0">
+              <!-- Açıklama: güvenli markdown render (renderMessageHtml → DOMPurify sanitize; v-html güvenli) -->
+              <div
+                v-if="ev.description"
+                class="kv-md text-[13px] break-words"
+                style="color: var(--kv-text-body)"
+                v-html="renderDescription(ev.description)"
+              />
+
+              <!-- Aksiyon satırı -->
+              <div class="flex items-center gap-2 mt-1">
                 <button
-                  class="flex items-center justify-center w-7 h-7 rounded-[var(--kv-radius-sm)] cursor-pointer hover:bg-[var(--kv-bg-sidebar)]"
-                  style="color: var(--kv-text-muted);"
-                  :aria-label="t('common.settings')"
-                  @click.stop="toggleMenu(ev.id)"
+                  type="button"
+                  class="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--kv-radius-sm)] text-[13px] font-medium cursor-pointer transition-colors border"
+                  :style="
+                    ev.interestedByMe
+                      ? 'background-color: rgba(61,180,110,0.15); border-color: var(--kv-online, #3DB46E); color: var(--kv-online, #3DB46E);'
+                      : 'background-color: transparent; border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'
+                  "
+                  @click="toggle(ev)"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    :fill="ev.interestedByMe ? 'currentColor' : 'none'"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  {{ t('event.interested') }}
                 </button>
-                <div
-                  v-if="openMenuId === ev.id"
-                  class="absolute right-0 top-full mt-1 z-20 rounded-[var(--kv-radius-md)] border overflow-hidden"
-                  style="min-width: 130px; background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle);"
-                  @click.stop
+                <span class="text-[12px]" style="color: var(--kv-text-muted)">{{
+                  t('event.interestedCount', { count: ev.interestedCount })
+                }}</span>
+                <button
+                  type="button"
+                  class="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--kv-radius-sm)] text-[13px] cursor-pointer hover:bg-[var(--kv-bg-sidebar)]"
+                  style="color: var(--kv-text-muted)"
+                  @click="share(ev)"
                 >
-                  <button
-                    class="w-full text-left px-3 py-2 text-[13px] cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-                    style="color: var(--kv-text-secondary);"
-                    @click="openMenuId = null; openEdit(ev)"
-                  >{{ t('event.edit') }}</button>
-                  <button
-                    class="w-full text-left px-3 py-2 text-[13px] cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-                    style="color: var(--kv-danger);"
-                    @click="openMenuId = null; deleteTarget = ev"
-                  >{{ t('event.delete') }}</button>
-                </div>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                    <polyline points="16 6 12 2 8 6" />
+                    <line x1="12" y1="2" x2="12" y2="15" />
+                  </svg>
+                  {{
+                    copied && shareSource.includes(ev.id)
+                      ? t('event.shareCopied')
+                      : t('event.share')
+                  }}
+                </button>
               </div>
-            </div>
-
-            <!-- Açıklama: güvenli markdown render (renderMessageHtml → DOMPurify sanitize; v-html güvenli) -->
-            <div v-if="ev.description" class="kv-md text-[13px] break-words" style="color: var(--kv-text-body);" v-html="renderDescription(ev.description)" />
-
-
-            <!-- Aksiyon satırı -->
-            <div class="flex items-center gap-2 mt-1">
-              <button
-                type="button"
-                class="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--kv-radius-sm)] text-[13px] font-medium cursor-pointer transition-colors border"
-                :style="ev.interestedByMe
-                  ? 'background-color: rgba(61,180,110,0.15); border-color: var(--kv-online, #3DB46E); color: var(--kv-online, #3DB46E);'
-                  : 'background-color: transparent; border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'"
-                @click="toggle(ev)"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" :fill="ev.interestedByMe ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                {{ t('event.interested') }}
-              </button>
-              <span class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('event.interestedCount', { count: ev.interestedCount }) }}</span>
-              <button
-                type="button"
-                class="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--kv-radius-sm)] text-[13px] cursor-pointer hover:bg-[var(--kv-bg-sidebar)]"
-                style="color: var(--kv-text-muted);"
-                @click="share(ev)"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                {{ copied && shareSource.includes(ev.id) ? t('event.shareCopied') : t('event.share') }}
-              </button>
-            </div>
             </div>
           </div>
         </div>
@@ -286,7 +392,12 @@ function recurrenceKey(ev: EventDto): string {
   animation: kv-event-pulse 1.2s ease-in-out;
 }
 @keyframes kv-event-pulse {
-  0%, 100% { background-color: var(--kv-accent-subtle); }
-  30% { background-color: var(--kv-bg-elevated); }
+  0%,
+  100% {
+    background-color: var(--kv-accent-subtle);
+  }
+  30% {
+    background-color: var(--kv-bg-elevated);
+  }
 }
 </style>

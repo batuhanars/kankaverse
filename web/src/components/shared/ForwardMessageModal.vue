@@ -67,11 +67,11 @@ onMounted(() => {
 
 <template>
   <KvModal :title="t('message.forwardTitle')" @close="emit('close')">
-    <div class="flex flex-col gap-3 min-w-0" style="width: 360px; max-width: 100%;">
+    <div class="flex flex-col gap-3 min-w-0" style="width: 360px; max-width: 100%">
       <!-- İletilecek mesaj önizlemesi -->
       <div
         class="px-3 py-2 rounded-[var(--kv-radius-md)] text-[13px] line-clamp-2"
-        style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+        style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary)"
       >
         {{ forwardText || t('message.forwardEmpty') }}
       </div>
@@ -81,7 +81,11 @@ onMounted(() => {
         v-model="query"
         type="text"
         class="w-full px-3 py-2 rounded-[var(--kv-radius-md)] text-[14px] outline-none border"
-        style="background-color: var(--kv-bg-content); color: var(--kv-text-primary); border-color: var(--kv-border-strong);"
+        style="
+          background-color: var(--kv-bg-content);
+          color: var(--kv-text-primary);
+          border-color: var(--kv-border-strong);
+        "
         :placeholder="t('message.forwardSearch')"
       />
 
@@ -96,21 +100,38 @@ onMounted(() => {
         >
           <div
             class="w-8 h-8 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-semibold text-white"
-            style="background-color: var(--kv-accent-500);"
+            style="background-color: var(--kv-accent-500)"
           >
-            <img v-if="channelAvatar(c)" :src="channelAvatar(c)!" :alt="channelName(c)" class="w-full h-full object-cover" />
+            <img
+              v-if="channelAvatar(c)"
+              :src="channelAvatar(c)!"
+              :alt="channelName(c)"
+              class="w-full h-full object-cover"
+            />
             <span v-else>{{ channelInitial(c) }}</span>
           </div>
-          <span class="flex-1 truncate text-[14px]" style="color: var(--kv-text-primary);">{{ channelName(c) }}</span>
+          <span class="flex-1 truncate text-[14px]" style="color: var(--kv-text-primary)">{{
+            channelName(c)
+          }}</span>
           <span
             v-if="sentIds.has(c.id)"
             class="shrink-0 text-[12px] font-medium"
-            style="color: var(--kv-online, #3DB46E);"
-          >{{ t('message.forwardedShort') }}</span>
-          <span v-else-if="sendingId === c.id" class="shrink-0 text-[12px]" style="color: var(--kv-text-muted);">…</span>
+            style="color: var(--kv-online, #3db46e)"
+            >{{ t('message.forwardedShort') }}</span
+          >
+          <span
+            v-else-if="sendingId === c.id"
+            class="shrink-0 text-[12px]"
+            style="color: var(--kv-text-muted)"
+            >…</span
+          >
         </button>
 
-        <p v-if="!filtered.length" class="px-2 py-4 text-[13px]" style="color: var(--kv-text-muted);">
+        <p
+          v-if="!filtered.length"
+          class="px-2 py-4 text-[13px]"
+          style="color: var(--kv-text-muted)"
+        >
           {{ t('message.forwardNoChannels') }}
         </p>
       </div>

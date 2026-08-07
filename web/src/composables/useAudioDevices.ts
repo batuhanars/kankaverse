@@ -11,7 +11,8 @@ export function useAudioDevices() {
   const needsPermission = ref(false)
   // setSinkId yalnız bazı tarayıcılarda (çıkış cihazı seçimi)
   const supportsOutputSelect =
-    typeof (document.createElement('audio') as HTMLMediaElement & { setSinkId?: unknown }).setSinkId === 'function'
+    typeof (document.createElement('audio') as HTMLMediaElement & { setSinkId?: unknown })
+      .setSinkId === 'function'
 
   async function refresh() {
     try {

@@ -63,8 +63,12 @@ function computePosition() {
 }
 
 // Scroll/resize sırasında pozisyonu güncelle
-function onScroll() { computePosition() }
-function onResize() { computePosition() }
+function onScroll() {
+  computePosition()
+}
+function onResize() {
+  computePosition()
+}
 
 watch(
   () => props.anchorEl,
@@ -91,21 +95,13 @@ onUnmounted(() => {
   <!-- Teleport modunda (anchorEl verilmişse): body'e Teleport et, position:fixed -->
   <Teleport v-if="anchorEl" to="body">
     <div class="kv-emoji-picker" :style="style" @click.stop>
-      <EmojiPickerLib
-        :native="true"
-        theme="dark"
-        @select="onSelect"
-      />
+      <EmojiPickerLib :native="true" theme="dark" @select="onSelect" />
     </div>
   </Teleport>
 
   <!-- Geriye dönük uyumlu mod (anchorEl yoksa): normal akışta render -->
   <div v-else class="kv-emoji-picker" @click.stop>
-    <EmojiPickerLib
-      :native="true"
-      theme="dark"
-      @select="onSelect"
-    />
+    <EmojiPickerLib :native="true" theme="dark" @select="onSelect" />
   </div>
 </template>
 

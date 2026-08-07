@@ -19,7 +19,9 @@ const actionError = ref('')
 const actionSuccess = ref('')
 
 // Aksiyon formu: her rapor için ayrı state
-const actionForms = ref<Record<string, { type: ModActionType; reason: string; expiresInHours: string }>>({})
+const actionForms = ref<
+  Record<string, { type: ModActionType; reason: string; expiresInHours: string }>
+>({})
 
 const ACTION_TYPES: ModActionType[] = ['WARN', 'MUTE', 'KICK', 'BAN']
 
@@ -72,8 +74,10 @@ async function submitAction(report: ReportDto) {
     await moderationApi.createAction(payload)
     actionSuccess.value = t('moderation.actionSuccess')
     // Kuyruktan kaldır
-    reports.value = reports.value.filter(r => r.id !== report.id)
-    setTimeout(() => { actionSuccess.value = '' }, 3000)
+    reports.value = reports.value.filter((r) => r.id !== report.id)
+    setTimeout(() => {
+      actionSuccess.value = ''
+    }, 3000)
   } catch {
     actionError.value = t('moderation.actionError')
   } finally {
@@ -89,26 +93,34 @@ function priorityBadgeStyle(priority: number): string {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('tr-TR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
 // A4 — yayıncı track kaynaklarını (camera/screen) Türkçe etikete çevir.
 function broadcasterSources(sources: string[]): string {
-  return sources.map((s) => (s === 'camera' ? t('moderation.emCamera') : t('moderation.emScreen'))).join(', ')
+  return sources
+    .map((s) => (s === 'camera' ? t('moderation.emCamera') : t('moderation.emScreen')))
+    .join(', ')
 }
 </script>
 
 <template>
-  <div class="min-h-screen p-6" style="background-color: var(--kv-bg-content); color: var(--kv-text-primary);">
+  <div
+    class="min-h-screen p-6"
+    style="background-color: var(--kv-bg-content); color: var(--kv-text-primary)"
+  >
     <div class="max-w-4xl mx-auto">
       <!-- Başlık -->
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-[22px] font-semibold">{{ t('moderation.title') }}</h1>
         <button
           class="text-[13px] cursor-pointer hover:underline"
-          style="color: var(--kv-text-muted);"
+          style="color: var(--kv-text-muted)"
           @click="router.push({ name: 'app' })"
         >
           {{ t('moderation.backToApp') }}
@@ -116,12 +128,12 @@ function broadcasterSources(sources: string[]): string {
       </div>
 
       <!-- Yüklenme -->
-      <div v-if="loading" class="text-[14px]" style="color: var(--kv-text-muted);">
+      <div v-if="loading" class="text-[14px]" style="color: var(--kv-text-muted)">
         {{ t('common.loading') }}
       </div>
 
       <!-- Yükleme hatası -->
-      <div v-else-if="loadError" class="text-[14px]" style="color: var(--kv-danger);">
+      <div v-else-if="loadError" class="text-[14px]" style="color: var(--kv-danger)">
         {{ loadError }}
       </div>
 
@@ -129,7 +141,7 @@ function broadcasterSources(sources: string[]): string {
       <div
         v-else-if="!reports.length"
         class="text-[14px] py-8 text-center"
-        style="color: var(--kv-text-muted);"
+        style="color: var(--kv-text-muted)"
       >
         {{ t('moderation.emptyQueue') }}
       </div>
@@ -137,10 +149,18 @@ function broadcasterSources(sources: string[]): string {
       <!-- Rapor listesi -->
       <template v-else>
         <!-- Eylem geri bildirimi -->
-        <div v-if="actionSuccess" class="mb-4 px-4 py-2 rounded-[var(--kv-radius-md)] text-[13px]" style="background-color: var(--kv-success); color: #fff;">
+        <div
+          v-if="actionSuccess"
+          class="mb-4 px-4 py-2 rounded-[var(--kv-radius-md)] text-[13px]"
+          style="background-color: var(--kv-success); color: #fff"
+        >
           {{ actionSuccess }}
         </div>
-        <div v-if="actionError" class="mb-4 px-4 py-2 rounded-[var(--kv-radius-md)] text-[13px]" style="background-color: var(--kv-danger); color: #fff;">
+        <div
+          v-if="actionError"
+          class="mb-4 px-4 py-2 rounded-[var(--kv-radius-md)] text-[13px]"
+          style="background-color: var(--kv-danger); color: #fff"
+        >
           {{ actionError }}
         </div>
 
@@ -149,7 +169,7 @@ function broadcasterSources(sources: string[]): string {
             v-for="report in reports"
             :key="report.id"
             class="rounded-[var(--kv-radius-lg)] p-4 border"
-            style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle);"
+            style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle)"
           >
             <!-- Rapor başlık satırı -->
             <div class="flex items-start justify-between gap-3 mb-3">
@@ -164,28 +184,34 @@ function broadcasterSources(sources: string[]): string {
                 <!-- Sebep -->
                 <span
                   class="px-2 py-0.5 rounded text-[12px] font-medium"
-                  style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+                  style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary)"
                 >
                   {{ t(`reason.${report.reason}`) }}
                 </span>
                 <!-- Hedef türü -->
-                <span class="text-[12px]" style="color: var(--kv-text-muted);">
+                <span class="text-[12px]" style="color: var(--kv-text-muted)">
                   {{ t(`moderation.targetType.${report.targetType}`) }}
                 </span>
               </div>
-              <span class="text-[11px] shrink-0" style="color: var(--kv-text-muted);">
+              <span class="text-[11px] shrink-0" style="color: var(--kv-text-muted)">
                 {{ formatDate(report.createdAt) }}
               </span>
             </div>
 
             <!-- Hedef ID (kullanıcı hedefli değilse sadece ID göster) -->
-            <div class="mb-2 text-[13px]" style="color: var(--kv-text-body);">
-              <span style="color: var(--kv-text-muted);">{{ t('moderation.targetId') }}: </span>
-              <code class="text-[12px]" style="font-family: var(--kv-font-mono);">{{ report.targetId }}</code>
+            <div class="mb-2 text-[13px]" style="color: var(--kv-text-body)">
+              <span style="color: var(--kv-text-muted)">{{ t('moderation.targetId') }}: </span>
+              <code class="text-[12px]" style="font-family: var(--kv-font-mono)">{{
+                report.targetId
+              }}</code>
             </div>
 
             <!-- Açıklama -->
-            <div v-if="report.description" class="mb-3 text-[13px] italic" style="color: var(--kv-text-secondary);">
+            <div
+              v-if="report.description"
+              class="mb-3 text-[13px] italic"
+              style="color: var(--kv-text-secondary)"
+            >
               "{{ report.description }}"
             </div>
 
@@ -193,57 +219,92 @@ function broadcasterSources(sources: string[]): string {
             <div
               v-if="report.reason === 'EMERGENCY'"
               class="mb-3 p-3 rounded-[var(--kv-radius-sm)] flex flex-col gap-1.5"
-              style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-danger);"
+              style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-danger)"
             >
-              <span class="text-[12px] font-semibold" style="color: var(--kv-danger);">{{ t('moderation.emTitle') }}</span>
+              <span class="text-[12px] font-semibold" style="color: var(--kv-danger)">{{
+                t('moderation.emTitle')
+              }}</span>
               <template v-if="report.contextSnapshot?.channelId">
-                <div class="text-[12px]" style="color: var(--kv-text-body);">
-                  <span style="color: var(--kv-text-muted);">{{ t('moderation.emChannel') }}: </span>
-                  <strong>{{ report.contextSnapshot.channelName || report.contextSnapshot.channelId }}</strong>
+                <div class="text-[12px]" style="color: var(--kv-text-body)">
+                  <span style="color: var(--kv-text-muted)">{{ t('moderation.emChannel') }}: </span>
+                  <strong>{{
+                    report.contextSnapshot.channelName || report.contextSnapshot.channelId
+                  }}</strong>
                   <span
                     v-if="report.contextSnapshot.isMinor"
                     class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold"
-                    style="background-color: var(--kv-danger); color: #fff;"
-                  >{{ t('moderation.emMinor') }}</span>
+                    style="background-color: var(--kv-danger); color: #fff"
+                    >{{ t('moderation.emMinor') }}</span
+                  >
                 </div>
-                <div class="text-[12px]" style="color: var(--kv-text-body);">
-                  <span style="color: var(--kv-text-muted);">{{ t('moderation.emTime') }}: </span>
-                  {{ report.contextSnapshot.triggeredAt ? formatDate(report.contextSnapshot.triggeredAt) : '—' }}
+                <div class="text-[12px]" style="color: var(--kv-text-body)">
+                  <span style="color: var(--kv-text-muted)">{{ t('moderation.emTime') }}: </span>
+                  {{
+                    report.contextSnapshot.triggeredAt
+                      ? formatDate(report.contextSnapshot.triggeredAt)
+                      : '—'
+                  }}
                 </div>
-                <div class="text-[12px]" style="color: var(--kv-text-body);">
-                  <span style="color: var(--kv-text-muted);">{{ t('moderation.emBroadcasters') }}: </span>
+                <div class="text-[12px]" style="color: var(--kv-text-body)">
+                  <span style="color: var(--kv-text-muted)"
+                    >{{ t('moderation.emBroadcasters') }}:
+                  </span>
                   <template v-if="report.contextSnapshot.broadcasters?.length">
-                    <span v-for="b in report.contextSnapshot.broadcasters" :key="b.userId" class="inline-block mr-2">
-                      <code class="text-[11px]" style="font-family: var(--kv-font-mono);">{{ b.userId }}</code>
-                      <span style="color: var(--kv-text-muted);"> ({{ broadcasterSources(b.sources) }})</span>
+                    <span
+                      v-for="b in report.contextSnapshot.broadcasters"
+                      :key="b.userId"
+                      class="inline-block mr-2"
+                    >
+                      <code class="text-[11px]" style="font-family: var(--kv-font-mono)">{{
+                        b.userId
+                      }}</code>
+                      <span style="color: var(--kv-text-muted)">
+                        ({{ broadcasterSources(b.sources) }})</span
+                      >
                     </span>
                   </template>
-                  <span v-else style="color: var(--kv-text-muted);">{{ t('moderation.emNoBroadcasters') }}</span>
+                  <span v-else style="color: var(--kv-text-muted)">{{
+                    t('moderation.emNoBroadcasters')
+                  }}</span>
                 </div>
-                <div v-if="report.contextSnapshot.participants?.length" class="text-[12px]" style="color: var(--kv-text-body);">
-                  <span style="color: var(--kv-text-muted);">{{ t('moderation.emParticipants') }} ({{ report.contextSnapshot.participants.length }}): </span>
+                <div
+                  v-if="report.contextSnapshot.participants?.length"
+                  class="text-[12px]"
+                  style="color: var(--kv-text-body)"
+                >
+                  <span style="color: var(--kv-text-muted)"
+                    >{{ t('moderation.emParticipants') }} ({{
+                      report.contextSnapshot.participants.length
+                    }}):
+                  </span>
                   <code
                     v-for="p in report.contextSnapshot.participants"
                     :key="p"
                     class="mr-2 text-[11px]"
-                    style="font-family: var(--kv-font-mono); color: var(--kv-text-secondary);"
-                  >{{ p }}</code>
+                    style="font-family: var(--kv-font-mono); color: var(--kv-text-secondary)"
+                    >{{ p }}</code
+                  >
                 </div>
               </template>
-              <span v-else class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('moderation.emNone') }}</span>
+              <span v-else class="text-[12px]" style="color: var(--kv-text-muted)">{{
+                t('moderation.emNone')
+              }}</span>
             </div>
 
             <!-- CSAM uyarısı — içerik render edilmez -->
             <div
               v-if="report.reason === 'CSAM'"
               class="mb-3 px-3 py-2 rounded-[var(--kv-radius-sm)] text-[12px] font-semibold"
-              style="background-color: var(--kv-danger); color: #fff;"
+              style="background-color: var(--kv-danger); color: #fff"
             >
               {{ t('moderation.csamWarning') }}
             </div>
 
             <!-- Aksiyon formu (CSAM için de göster — manuel escalate) -->
-            <div class="border-t pt-3 mt-1 flex flex-col gap-2" style="border-color: var(--kv-border-subtle);">
+            <div
+              class="border-t pt-3 mt-1 flex flex-col gap-2"
+              style="border-color: var(--kv-border-subtle)"
+            >
               <div class="flex flex-wrap gap-2 items-end">
                 <!-- Tip seçimi -->
                 <div class="flex gap-1">
@@ -252,9 +313,11 @@ function broadcasterSources(sources: string[]): string {
                     :key="aType"
                     type="button"
                     class="px-2 py-1 text-[12px] rounded cursor-pointer transition-colors"
-                    :style="actionForms[report.id]?.type === aType
-                      ? 'background-color: var(--kv-accent-500); color: #fff;'
-                      : 'background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);'"
+                    :style="
+                      actionForms[report.id]?.type === aType
+                        ? 'background-color: var(--kv-accent-500); color: #fff;'
+                        : 'background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);'
+                    "
                     @click="actionForms[report.id].type = aType"
                   >
                     {{ t(`moderation.action.${aType}`) }}
@@ -263,13 +326,20 @@ function broadcasterSources(sources: string[]): string {
 
                 <!-- Süre (MUTE/BAN için) -->
                 <input
-                  v-if="actionForms[report.id]?.type === 'MUTE' || actionForms[report.id]?.type === 'BAN'"
+                  v-if="
+                    actionForms[report.id]?.type === 'MUTE' ||
+                    actionForms[report.id]?.type === 'BAN'
+                  "
                   v-model="actionForms[report.id].expiresInHours"
                   type="number"
                   min="1"
                   :placeholder="t('moderation.expiresPlaceholder')"
                   class="px-2 py-1 rounded-[var(--kv-radius-sm)] text-[12px] border outline-none w-24"
-                  style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
+                  style="
+                    background-color: var(--kv-bg-elevated);
+                    border-color: var(--kv-border-strong);
+                    color: var(--kv-text-primary);
+                  "
                 />
               </div>
 
@@ -280,7 +350,11 @@ function broadcasterSources(sources: string[]): string {
                   type="text"
                   :placeholder="t('moderation.reasonPlaceholder')"
                   class="flex-1 px-3 py-1.5 rounded-[var(--kv-radius-sm)] text-[13px] border outline-none"
-                  style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
+                  style="
+                    background-color: var(--kv-bg-elevated);
+                    border-color: var(--kv-border-strong);
+                    color: var(--kv-text-primary);
+                  "
                 />
                 <KvButton
                   variant="danger"

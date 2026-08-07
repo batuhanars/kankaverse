@@ -56,7 +56,8 @@ export function useGuildMenuActions(guildId: Ref<string> | (() => string)) {
   async function muteGuildFor(minutes: number | null) {
     const id = gid.value
     if (!id) return
-    const mutedUntil = minutes === null ? null : new Date(Date.now() + minutes * 60_000).toISOString()
+    const mutedUntil =
+      minutes === null ? null : new Date(Date.now() + minutes * 60_000).toISOString()
     try {
       await prefsStore.setPref({
         targetType: NotifTargetType.GUILD,

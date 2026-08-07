@@ -66,7 +66,9 @@ const untilLabel = computed(() => {
   if (!props.muted) return ''
   if (!props.mutedUntil) return t('guildMenu.muteUntilForever')
   const d = new Date(props.mutedUntil)
-  const time = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }).replace(':', '.')
+  const time = d
+    .toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+    .replace(':', '.')
   const today = new Date()
   const sameDay = d.toDateString() === today.toDateString()
   const date = sameDay ? '' : d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) + ' '
@@ -141,13 +143,56 @@ onUnmounted(() => {
     @keydown="onTriggerKeydown($event, positionFlyout)"
   >
     <!-- Susturulmuşsa: ses-açık ikonu; değilse ses-kapalı (mute) ikonu -->
-    <svg v-if="muted" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mdf-icon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-    <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mdf-icon"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+    <svg
+      v-if="muted"
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="mdf-icon"
+    >
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+    </svg>
+    <svg
+      v-else
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="mdf-icon"
+    >
+      <path d="M11 5 6 9H2v6h4l5 4V5z" />
+      <line x1="23" y1="9" x2="17" y2="15" />
+      <line x1="17" y1="9" x2="23" y2="15" />
+    </svg>
     <span class="mdf-label">
       {{ muted ? (unmuteLabel ?? t('guildMenu.unmute')) : (label ?? t('guildMenu.mute')) }}
       <span v-if="muted && untilLabel" class="mdf-sublabel">{{ untilLabel }}</span>
     </span>
-    <svg v-if="!muted" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="mdf-chevron"><path d="M9 18l6-6-6-6"/></svg>
+    <svg
+      v-if="!muted"
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="mdf-chevron"
+    >
+      <path d="M9 18l6-6-6-6" />
+    </svg>
   </button>
 
   <Teleport to="body">

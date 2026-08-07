@@ -34,14 +34,19 @@ function pick(m: GuildMemberDto) {
       v-model="term"
       type="text"
       class="w-full px-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[12px] outline-none border"
-      style="background-color: var(--kv-bg-content); color: var(--kv-text-primary); border-color: var(--kv-border-strong); font-family: var(--kv-font-ui);"
+      style="
+        background-color: var(--kv-bg-content);
+        color: var(--kv-text-primary);
+        border-color: var(--kv-border-strong);
+        font-family: var(--kv-font-ui);
+      "
       :placeholder="placeholder"
       @focus="open = true"
     />
     <div
       v-if="open && filtered.length"
       class="absolute z-10 left-0 right-0 mt-1 max-h-44 overflow-y-auto rounded-[var(--kv-radius-sm)] border"
-      style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+      style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle)"
     >
       <button
         v-for="m in filtered"
@@ -51,12 +56,19 @@ function pick(m: GuildMemberDto) {
       >
         <span
           class="w-5 h-5 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-white"
-          style="background-color: var(--kv-accent-500);"
+          style="background-color: var(--kv-accent-500)"
         >
-          <img v-if="m.avatarUrl" :src="m.avatarUrl" :alt="m.username" class="w-full h-full object-cover" />
+          <img
+            v-if="m.avatarUrl"
+            :src="m.avatarUrl"
+            :alt="m.username"
+            class="w-full h-full object-cover"
+          />
           <span v-else>{{ m.username[0].toUpperCase() }}</span>
         </span>
-        <span class="text-[12px] truncate" style="color: var(--kv-text-body);">{{ m.username }}</span>
+        <span class="text-[12px] truncate" style="color: var(--kv-text-body)">{{
+          m.username
+        }}</span>
       </button>
     </div>
   </div>

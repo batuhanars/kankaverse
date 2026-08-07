@@ -130,11 +130,13 @@ function onRowLeave(e: MouseEvent) {
     <div class="relative shrink-0">
       <div
         class="w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-semibold overflow-hidden"
-        :style="props.isOffline
-          ? 'background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);'
-          : props.roleColor
-            ? `background-color: ${props.roleColor}33; color: ${props.roleColor};`
-            : 'background-color: var(--kv-accent-500); color: #fff;'"
+        :style="
+          props.isOffline
+            ? 'background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);'
+            : props.roleColor
+              ? `background-color: ${props.roleColor}33; color: ${props.roleColor};`
+              : 'background-color: var(--kv-accent-500); color: #fff;'
+        "
       >
         <img
           v-if="member.avatarUrl"
@@ -165,7 +167,7 @@ function onRowLeave(e: MouseEvent) {
     <span
       v-if="member.role === 'OWNER'"
       class="shrink-0 text-[10px] px-1 py-0.5 rounded"
-      style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
+      style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500)"
       :title="t('member.role.OWNER')"
     >
       👑
@@ -174,7 +176,7 @@ function onRowLeave(e: MouseEvent) {
     <span
       v-else-if="member.role === 'ADMIN'"
       class="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded"
-      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted)"
     >
       {{ t('member.role.ADMIN') }}
     </span>
@@ -185,22 +187,33 @@ function onRowLeave(e: MouseEvent) {
     <div
       v-if="shouldShowMenuFn(member)"
       class="relative shrink-0 transition-opacity"
-      :class="props.ownerActive
-        ? 'opacity-100'
-        : props.hoverSuppressed
-          ? 'opacity-0 pointer-events-none'
-          : 'opacity-0 group-hover:opacity-100'"
+      :class="
+        props.ownerActive
+          ? 'opacity-100'
+          : props.hoverSuppressed
+            ? 'opacity-0 pointer-events-none'
+            : 'opacity-0 group-hover:opacity-100'
+      "
     >
       <button
         class="flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-bg-rail)]"
-        style="width: 20px; height: 20px; color: var(--kv-text-muted);"
+        style="width: 20px; height: 20px; color: var(--kv-text-muted)"
         :disabled="roleLoading === member.userId"
         @click.stop="onButtonClick"
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="5" r="1" fill="currentColor"/>
-          <circle cx="12" cy="12" r="1" fill="currentColor"/>
-          <circle cx="12" cy="19" r="1" fill="currentColor"/>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="5" r="1" fill="currentColor" />
+          <circle cx="12" cy="12" r="1" fill="currentColor" />
+          <circle cx="12" cy="19" r="1" fill="currentColor" />
         </svg>
       </button>
     </div>
@@ -216,14 +229,17 @@ function onRowLeave(e: MouseEvent) {
       >
         <div
           class="fixed z-50 rounded-[var(--kv-radius-md)] border overflow-hidden py-1"
-          :style="menuStyle + 'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); box-shadow: 0 8px 24px rgba(0,0,0,0.4);'"
+          :style="
+            menuStyle +
+            'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); box-shadow: 0 8px 24px rgba(0,0,0,0.4);'
+          "
           @click.stop
           @contextmenu.stop.prevent
         >
           <!-- Profil (kullanıcı kartını aç) -->
           <button
             class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-text-secondary);"
+            style="color: var(--kv-text-secondary)"
             @click="emit('selectMember', member.userId, menuX, menuY)"
           >
             {{ t('member.actions.profile') }}
@@ -232,29 +248,40 @@ function onRowLeave(e: MouseEvent) {
           <button
             v-if="!isSelf"
             class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-text-secondary);"
+            style="color: var(--kv-text-secondary)"
             @click="emit('messageMember', member)"
           >
             {{ t('member.actions.sendMessage') }}
           </button>
 
           <!-- Moderasyon bölümü ayracı -->
-          <div v-if="hasModeration" class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
+          <div
+            v-if="hasModeration"
+            class="my-1 mx-2 border-t"
+            style="border-color: var(--kv-border-subtle)"
+          />
 
           <!-- R1: Rolleri Yönet (MANAGE_ROLES) — alt-menüde rol-seçici -->
           <template v-if="canManageRolesFn(member)">
             <button
               class="w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-              style="color: var(--kv-text-secondary);"
+              style="color: var(--kv-text-secondary)"
               @click.stop="emit('toggleRoleSubmenu', member.userId)"
             >
               <span>{{ t('member.actions.manageRoles') }}</span>
               <svg
-                width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                class="shrink-0 transition-transform" :class="roleSubmenuUserId === member.userId ? 'rotate-90' : ''"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="shrink-0 transition-transform"
+                :class="roleSubmenuUserId === member.userId ? 'rotate-90' : ''"
               >
-                <path d="M9 18l6-6-6-6"/>
+                <path d="M9 18l6-6-6-6" />
               </svg>
             </button>
 
@@ -262,12 +289,12 @@ function onRowLeave(e: MouseEvent) {
             <div
               v-if="roleSubmenuUserId === member.userId"
               class="max-h-56 overflow-y-auto border-t"
-              style="border-color: var(--kv-border-subtle);"
+              style="border-color: var(--kv-border-subtle)"
             >
               <p
                 v-if="!assignableRoles || assignableRoles.length === 0"
                 class="px-3 py-2 text-[12px]"
-                style="color: var(--kv-text-muted);"
+                style="color: var(--kv-text-muted)"
               >
                 {{ t('member.actions.noAssignableRoles') }}
               </p>
@@ -275,27 +302,38 @@ function onRowLeave(e: MouseEvent) {
                 v-for="role in assignableRoles"
                 :key="role.id"
                 class="w-full flex items-center gap-2 px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-                style="color: var(--kv-text-secondary);"
+                style="color: var(--kv-text-secondary)"
                 :disabled="roleLoading === member.userId"
                 @click.stop="emit('toggleRole', member, role)"
               >
                 <!-- Onay kutusu: atanmışsa dolu -->
                 <span
                   class="shrink-0 w-3.5 h-3.5 rounded-[3px] border flex items-center justify-center"
-                  :style="memberHasRole(role.id)
-                    ? 'background-color: var(--kv-accent-500); border-color: var(--kv-accent-500);'
-                    : 'border-color: var(--kv-border-strong);'"
+                  :style="
+                    memberHasRole(role.id)
+                      ? 'background-color: var(--kv-accent-500); border-color: var(--kv-accent-500);'
+                      : 'border-color: var(--kv-border-strong);'
+                  "
                 >
                   <svg
                     v-if="memberHasRole(role.id)"
-                    width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff"
-                    stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"
+                    width="9"
+                    height="9"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#fff"
+                    stroke-width="3.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
                   >
-                    <path d="M20 6L9 17l-5-5"/>
+                    <path d="M20 6L9 17l-5-5" />
                   </svg>
                 </span>
                 <!-- Rol renk noktası -->
-                <span class="shrink-0 w-2 h-2 rounded-full" :style="`background-color: ${role.color};`" />
+                <span
+                  class="shrink-0 w-2 h-2 rounded-full"
+                  :style="`background-color: ${role.color};`"
+                />
                 <span class="flex-1 min-w-0 truncate">{{ role.name }}</span>
               </button>
             </div>
@@ -304,7 +342,7 @@ function onRowLeave(e: MouseEvent) {
           <button
             v-if="canKickFn(member)"
             class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-danger);"
+            style="color: var(--kv-danger)"
             @click="emit('openKick', member)"
           >
             {{ t('member.actions.kick') }}
@@ -313,7 +351,7 @@ function onRowLeave(e: MouseEvent) {
           <button
             v-if="canBanFn(member)"
             class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-danger);"
+            style="color: var(--kv-danger)"
             @click="emit('openBan', member)"
           >
             {{ t('member.actions.ban') }}
@@ -322,17 +360,17 @@ function onRowLeave(e: MouseEvent) {
           <button
             v-if="canTransferFn(member)"
             class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-text-secondary);"
+            style="color: var(--kv-text-secondary)"
             @click="emit('openTransfer', member)"
           >
             {{ t('member.actions.transferOwnership') }}
           </button>
 
           <!-- Kullanıcı ID kopyala (her zaman) -->
-          <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle);" />
+          <div class="my-1 mx-2 border-t" style="border-color: var(--kv-border-subtle)" />
           <button
             class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-text-secondary);"
+            style="color: var(--kv-text-secondary)"
             @click="emit('copyMemberId', member.userId)"
           >
             {{ t('member.actions.copyId') }}

@@ -11,9 +11,7 @@ export function useEventDateFormat() {
   const { t } = useI18n()
 
   function timePart(d: Date): string {
-    return d
-      .toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
-      .replace(':', '.')
+    return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }).replace(':', '.')
   }
 
   function isSameDay(a: Date, b: Date): boolean {

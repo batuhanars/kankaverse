@@ -290,12 +290,12 @@ export interface MessageDto {
   editedAt: string | null
   attachments?: AttachmentDto[]
   reactions?: ReactionDto[]
-  mentions?: string[]  // Sprint V2 — doğrulanmış bahsedilen userId'ler (boşsa [])
-  mentionsEveryone?: boolean  // @everyone toplu bahsetme (everyone rolü mentionable iken)
+  mentions?: string[] // Sprint V2 — doğrulanmış bahsedilen userId'ler (boşsa [])
+  mentionsEveryone?: boolean // @everyone toplu bahsetme (everyone rolü mentionable iken)
   // R15 — bahsedilen ROL id'leri (≤3, everyone hariç). Kendi rollerimle kesişimi istemcide
   // hesaplanır: "bana rolümden bahsedildi" bandı ve rol çipi bunu kullanır.
   mentionRoles?: string[]
-  pinnedAt: string | null  // Sprint V2 Pins — dolu ise sabitlenen mesaj
+  pinnedAt: string | null // Sprint V2 Pins — dolu ise sabitlenen mesaj
 }
 
 // Sprint V2 — Özel kanal üye DTO (GET/POST /channels/:id/members)

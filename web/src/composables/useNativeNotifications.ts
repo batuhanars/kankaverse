@@ -102,7 +102,7 @@ export function useNativeNotifications() {
   function _navigate(dto: NotificationDto) {
     if (dto.type === 'MENTION' && dto.guildId && dto.channelId) {
       router.push({ name: 'channel', params: { guildId: dto.guildId, channelId: dto.channelId } })
-    } else if ((dto.type === 'FRIEND_REQUEST' || dto.type === 'FRIEND_ACCEPT') ) {
+    } else if (dto.type === 'FRIEND_REQUEST' || dto.type === 'FRIEND_ACCEPT') {
       router.push({ name: 'app' }) // HomeView → kankaları göster
     } else if (dto.type === 'GUILD_INVITE' && dto.guildId) {
       router.push({ name: 'app' }) // davet; invite akışı ayrı

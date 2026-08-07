@@ -150,9 +150,7 @@ function guildInitial(name: string): string {
 const previewName = computed(() => draftName.value.trim() || props.guild.name)
 
 const previewBannerStyle = computed(() =>
-  draftBannerColor.value
-    ? bannerBackground(draftBannerColor.value)
-    : 'var(--kv-bg-elevated)',
+  draftBannerColor.value ? bannerBackground(draftBannerColor.value) : 'var(--kv-bg-elevated)',
 )
 
 const previewCreatedAt = computed(() => {
@@ -293,10 +291,13 @@ async function saveAll() {
     const trimmedName = draftName.value.trim()
     if (trimmedName && trimmedName !== props.guild.name) patch.name = trimmedName
     if (draftAdultsOnly.value !== props.guild.adultsOnly) patch.adultsOnly = draftAdultsOnly.value
-    if (draftDescription.value !== (props.guild.description ?? '')) patch.description = draftDescription.value
-    if (draftBannerColor.value !== props.guild.bannerColor) patch.bannerColor = draftBannerColor.value
+    if (draftDescription.value !== (props.guild.description ?? ''))
+      patch.description = draftDescription.value
+    if (draftBannerColor.value !== props.guild.bannerColor)
+      patch.bannerColor = draftBannerColor.value
     if (!tagsEqual(draftTags.value, props.guild.tags)) patch.tags = draftTags.value
-    if (draftDiscoverable.value !== props.guild.discoverable) patch.discoverable = draftDiscoverable.value
+    if (draftDiscoverable.value !== props.guild.discoverable)
+      patch.discoverable = draftDiscoverable.value
 
     let updated: GuildDto | null = null
     if (Object.keys(patch).length > 0) {
@@ -400,7 +401,8 @@ async function createInvite() {
   try {
     const payload: { maxUses?: number; expiresInHours?: number } = {}
     if (newMaxUses.value && newMaxUses.value > 0) payload.maxUses = newMaxUses.value
-    if (newExpiresInHours.value && newExpiresInHours.value > 0) payload.expiresInHours = newExpiresInHours.value
+    if (newExpiresInHours.value && newExpiresInHours.value > 0)
+      payload.expiresInHours = newExpiresInHours.value
     const res = await invitesApi.create(props.guild.id, payload)
     createdInvite.value = res.data
     newMaxUses.value = null
@@ -520,11 +522,31 @@ interface NavItem {
 }
 
 const navItems = computed<NavItem[]>(() => [
-  { key: 'genel',    labelKey: 'guildSettings.nav.genel',    visible: props.isOwner || can('MANAGE_GUILD') },
-  { key: 'roller',   labelKey: 'guildSettings.nav.roller',   visible: props.isOwner || can('MANAGE_ROLES') },
-  { key: 'davetler', labelKey: 'guildSettings.nav.davetler', visible: props.isOwner || can('CREATE_INVITE') || can('MANAGE_GUILD') },
-  { key: 'yasaklar', labelKey: 'guildSettings.nav.yasaklar', visible: props.isOwner || can('BAN_MEMBERS') },
-  { key: 'denetim',  labelKey: 'guildSettings.nav.denetim',  visible: props.isOwner || can('MANAGE_GUILD') },
+  {
+    key: 'genel',
+    labelKey: 'guildSettings.nav.genel',
+    visible: props.isOwner || can('MANAGE_GUILD'),
+  },
+  {
+    key: 'roller',
+    labelKey: 'guildSettings.nav.roller',
+    visible: props.isOwner || can('MANAGE_ROLES'),
+  },
+  {
+    key: 'davetler',
+    labelKey: 'guildSettings.nav.davetler',
+    visible: props.isOwner || can('CREATE_INVITE') || can('MANAGE_GUILD'),
+  },
+  {
+    key: 'yasaklar',
+    labelKey: 'guildSettings.nav.yasaklar',
+    visible: props.isOwner || can('BAN_MEMBERS'),
+  },
+  {
+    key: 'denetim',
+    labelKey: 'guildSettings.nav.denetim',
+    visible: props.isOwner || can('MANAGE_GUILD'),
+  },
 ])
 
 const dangerItem = computed(() => props.isOwner)
@@ -612,7 +634,7 @@ function confirmNavDiscard() {
   <Teleport to="body">
     <div
       class="fixed inset-0 z-50 flex"
-      style="background-color: var(--kv-bg-overlay);"
+      style="background-color: var(--kv-bg-overlay)"
       role="dialog"
       aria-modal="true"
       :aria-label="t('guildSettings.title')"
@@ -621,71 +643,96 @@ function confirmNavDiscard() {
       <div
         v-if="!isMobile"
         class="shrink-0 flex justify-end"
-        style="width: 42%; min-width: 280px; max-width: 560px; background-color: var(--kv-bg-sidebar);"
+        style="
+          width: 42%;
+          min-width: 280px;
+          max-width: 560px;
+          background-color: var(--kv-bg-sidebar);
+        "
       >
-      <!-- Sol nav kolonu -->
-      <div
-        class="shrink-0 flex flex-col py-8 px-3 border-r"
-        style="width: 220px; background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle);"
-      >
-        <!-- Ortam adı başlığı -->
-        <div class="px-2 mb-4">
-          <p class="text-[11px] font-bold uppercase tracking-widest truncate" style="color: var(--kv-text-muted);">
-            {{ guild.name }}
-          </p>
+        <!-- Sol nav kolonu -->
+        <div
+          class="shrink-0 flex flex-col py-8 px-3 border-r"
+          style="
+            width: 220px;
+            background-color: var(--kv-bg-sidebar);
+            border-color: var(--kv-border-subtle);
+          "
+        >
+          <!-- Ortam adı başlığı -->
+          <div class="px-2 mb-4">
+            <p
+              class="text-[11px] font-bold uppercase tracking-widest truncate"
+              style="color: var(--kv-text-muted)"
+            >
+              {{ guild.name }}
+            </p>
+          </div>
+
+          <!-- Nav öğeleri -->
+          <nav class="flex flex-col gap-0.5 flex-1">
+            <template v-for="item in navItems" :key="item.key">
+              <button
+                v-if="item.visible"
+                type="button"
+                class="w-full flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] font-medium text-left cursor-pointer transition-colors"
+                :class="
+                  activeSection === item.key
+                    ? 'bg-[var(--kv-bg-elevated)] text-[var(--kv-accent-400)] shadow-[inset_2px_0_0_var(--kv-accent-500)]'
+                    : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-bg-elevated)] hover:text-[var(--kv-text-primary)]'
+                "
+                @click="requestNav(item.key)"
+              >
+                {{ t(item.labelKey) }}
+              </button>
+            </template>
+
+            <!-- Ayraç + Tehlikeli Bölge (OWNER) -->
+            <template v-if="dangerItem">
+              <div class="my-2 mx-1 border-t" style="border-color: var(--kv-border-subtle)" />
+              <button
+                type="button"
+                class="w-full flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] font-medium text-left cursor-pointer transition-colors"
+                style="color: var(--kv-danger)"
+                @mouseenter="
+                  ($event.currentTarget as HTMLElement).style.backgroundColor =
+                    'rgba(242,59,75,0.1)'
+                "
+                @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
+                @click="showDeleteGuild = true"
+              >
+                {{ t('guildSettings.nav.ortamiSil') }}
+              </button>
+            </template>
+          </nav>
         </div>
-
-        <!-- Nav öğeleri -->
-        <nav class="flex flex-col gap-0.5 flex-1">
-          <template v-for="item in navItems" :key="item.key">
-            <button
-              v-if="item.visible"
-              type="button"
-              class="w-full flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] font-medium text-left cursor-pointer transition-colors"
-              :class="activeSection === item.key
-                ? 'bg-[var(--kv-bg-elevated)] text-[var(--kv-accent-400)] shadow-[inset_2px_0_0_var(--kv-accent-500)]'
-                : 'text-[var(--kv-text-secondary)] hover:bg-[var(--kv-bg-elevated)] hover:text-[var(--kv-text-primary)]'"
-              @click="requestNav(item.key)"
-            >
-              {{ t(item.labelKey) }}
-            </button>
-          </template>
-
-          <!-- Ayraç + Tehlikeli Bölge (OWNER) -->
-          <template v-if="dangerItem">
-            <div class="my-2 mx-1 border-t" style="border-color: var(--kv-border-subtle);" />
-            <button
-              type="button"
-              class="w-full flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)] text-[14px] font-medium text-left cursor-pointer transition-colors"
-              style="color: var(--kv-danger);"
-              @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
-              @click="showDeleteGuild = true"
-            >
-              {{ t('guildSettings.nav.ortamiSil') }}
-            </button>
-          </template>
-        </nav>
-      </div>
       </div>
 
       <!-- ── İçerik alanı (hem mobil hem masaüstü) ── -->
-      <div class="flex-1 flex flex-col overflow-hidden min-w-0" style="background-color: var(--kv-bg-content);">
-
+      <div
+        class="flex-1 flex flex-col overflow-hidden min-w-0"
+        style="background-color: var(--kv-bg-content)"
+      >
         <!-- ── MOBİL (<768): Üst sekme şeridi ── -->
         <div
           v-if="isMobile"
           class="shrink-0 flex items-center border-b overflow-x-auto"
-          style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle); scrollbar-width: none;"
+          style="
+            background-color: var(--kv-bg-sidebar);
+            border-color: var(--kv-border-subtle);
+            scrollbar-width: none;
+          "
         >
           <template v-for="item in navItems" :key="item.key">
             <button
               v-if="item.visible"
               type="button"
               class="shrink-0 px-4 py-3 text-[13px] font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2"
-              :style="activeSection === item.key
-                ? 'color: var(--kv-accent-400); border-color: var(--kv-accent-500);'
-                : 'color: var(--kv-text-secondary); border-color: transparent;'"
+              :style="
+                activeSection === item.key
+                  ? 'color: var(--kv-accent-400); border-color: var(--kv-accent-500);'
+                  : 'color: var(--kv-text-secondary); border-color: transparent;'
+              "
               @click="requestNav(item.key)"
             >
               {{ t(item.labelKey) }}
@@ -697,7 +744,7 @@ function confirmNavDiscard() {
             <button
               type="button"
               class="shrink-0 px-4 py-3 text-[13px] font-medium transition-colors cursor-pointer whitespace-nowrap border-b-2"
-              style="color: var(--kv-danger); border-color: transparent;"
+              style="color: var(--kv-danger); border-color: transparent"
               @click="showDeleteGuild = true"
             >
               {{ t('guildSettings.nav.ortamiSil') }}
@@ -708,13 +755,22 @@ function confirmNavDiscard() {
           <button
             type="button"
             class="shrink-0 ml-auto flex items-center justify-center cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-            style="width: 44px; height: 44px; color: var(--kv-text-muted);"
+            style="width: 44px; height: 44px; color: var(--kv-text-muted)"
             :aria-label="t('common.close')"
             @click="requestClose"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -723,31 +779,52 @@ function confirmNavDiscard() {
         <div
           v-if="!isMobile"
           class="shrink-0 flex items-center justify-between border-b"
-          style="height: var(--kv-header-height); border-color: var(--kv-border-subtle);"
+          style="height: var(--kv-header-height); border-color: var(--kv-border-subtle)"
         >
           <!-- İç kolon max-width sarıcısı -->
-          <div class="flex items-center justify-between flex-1" style="max-width: 1000px;">
-            <h2 class="text-[18px] font-semibold px-8" style="color: var(--kv-text-primary);">
+          <div class="flex items-center justify-between flex-1" style="max-width: 1000px">
+            <h2 class="text-[18px] font-semibold px-8" style="color: var(--kv-text-primary)">
               <span v-if="activeSection === 'genel'">{{ t('guildSettings.nav.genel') }}</span>
-              <span v-else-if="activeSection === 'roller'">{{ t('guildSettings.nav.roller') }}</span>
-              <span v-else-if="activeSection === 'davetler'">{{ t('guildSettings.nav.davetler') }}</span>
-              <span v-else-if="activeSection === 'yasaklar'">{{ t('guildSettings.nav.yasaklar') }}</span>
-              <span v-else-if="activeSection === 'denetim'">{{ t('guildSettings.nav.denetim') }}</span>
+              <span v-else-if="activeSection === 'roller'">{{
+                t('guildSettings.nav.roller')
+              }}</span>
+              <span v-else-if="activeSection === 'davetler'">{{
+                t('guildSettings.nav.davetler')
+              }}</span>
+              <span v-else-if="activeSection === 'yasaklar'">{{
+                t('guildSettings.nav.yasaklar')
+              }}</span>
+              <span v-else-if="activeSection === 'denetim'">{{
+                t('guildSettings.nav.denetim')
+              }}</span>
             </h2>
 
             <!-- Kapat butonu + ESC göstergesi -->
             <div class="flex items-center gap-3 px-8">
-              <span class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">ESC</span>
+              <span
+                class="text-[11px] font-semibold uppercase tracking-widest"
+                style="color: var(--kv-text-muted)"
+                >ESC</span
+              >
               <button
                 type="button"
                 class="flex items-center justify-center rounded-full transition-colors cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-                style="width: 32px; height: 32px; color: var(--kv-text-muted);"
+                style="width: 32px; height: 32px; color: var(--kv-text-muted)"
                 :aria-label="t('common.close')"
                 @click="requestClose"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/>
-                  <line x1="6" y1="6" x2="18" y2="18"/>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             </div>
@@ -777,476 +854,651 @@ function confirmNavDiscard() {
         </div>
 
         <div v-else class="flex-1 overflow-y-auto">
-          <div style="max-width: 1000px; width: 100%;">
+          <div style="max-width: 1000px; width: 100%">
             <div class="px-4 py-4 md:px-8 md:py-6">
-
-          <!-- ── Genel bölümü ── -->
-          <div v-if="activeSection === 'genel'" class="flex flex-col lg:flex-row gap-8 items-start">
-
-            <!-- ── SOL kolon: form (bölümler arası border ayraç + boşluk) ── -->
-            <div class="flex-1 min-w-0 flex flex-col max-w-xl [&>section]:py-7 [&>section]:border-b [&>section]:border-[color:var(--kv-border-subtle)] [&>section:first-of-type]:pt-0 [&>section:last-of-type]:border-b-0">
-
-            <!-- Ad düzenle (Simge'nin üstüne alındı — sahip) -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.nameSection') }}
-              </h3>
-              <KvInput
-                v-model="draftName"
-                :label="t('guildSettings.nameLabel')"
-                :placeholder="t('guild.namePlaceholder')"
-                :disabled="saving"
-              />
-            </section>
-
-            <!-- Ortam simgesi (inline önizleme kaldırıldı — sağ önizleme kartı gösteriyor) -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.iconSection') }}
-              </h3>
-              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.iconHint') }}
-              </p>
-              <div class="flex flex-col gap-2">
-                <div v-if="!pendingIconFile && !pendingIconRemove" class="flex gap-2">
-                  <KvButton size="sm" :disabled="saving" @click="triggerIconPicker">
-                    {{ t('guildSettings.iconUpload') }}
-                  </KvButton>
-                  <KvButton
-                    v-if="guild.iconUrl"
-                    size="sm"
-                    variant="danger"
-                    :disabled="saving"
-                    @click="markIconForRemoval"
-                  >
-                    {{ t('guildSettings.iconRemove') }}
-                  </KvButton>
-                </div>
-
-                <div v-else class="flex flex-col gap-1.5">
-                  <p class="text-[12px]" style="color: var(--kv-text-muted);">
-                    <span v-if="pendingIconFile">{{ t('guildSettings.iconPending') }}</span>
-                    <span v-else>{{ t('guildSettings.iconRemovePending') }}</span>
-                  </p>
-                  <div class="flex gap-2">
-                    <KvButton size="sm" :disabled="saving" @click="triggerIconPicker">
-                      {{ t('guildSettings.iconUpload') }}
-                    </KvButton>
-                    <KvButton size="sm" variant="danger" :disabled="saving" @click="cancelPendingIcon">
-                      {{ t('guildSettings.iconCancelPending') }}
-                    </KvButton>
-                  </div>
-                </div>
-
-                <p v-if="iconError" class="text-[12px]" style="color: var(--kv-danger);">{{ iconError }}</p>
-              </div>
-
-              <input
-                ref="iconFileInput"
-                type="file"
-                accept="image/*"
-                class="hidden"
-                @change="onIconFileChange"
-              />
-            </section>
-
-            <!-- ── Sprint C8: Ortam Afişi (görsel) ── -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.bannerImageSection') }}
-              </h3>
-              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.bannerImageHint') }}
-              </p>
-              <div class="flex flex-col gap-2">
-                <div v-if="!pendingBannerFile && !pendingBannerRemove" class="flex gap-2">
-                  <KvButton size="sm" :disabled="saving" @click="triggerBannerPicker">
-                    {{ t('guildSettings.bannerImageUpload') }}
-                  </KvButton>
-                  <KvButton
-                    v-if="guild.bannerUrl"
-                    size="sm"
-                    variant="danger"
-                    :disabled="saving"
-                    @click="markBannerForRemoval"
-                  >
-                    {{ t('guildSettings.bannerImageRemove') }}
-                  </KvButton>
-                </div>
-
-                <div v-else class="flex flex-col gap-1.5">
-                  <p class="text-[12px]" style="color: var(--kv-text-muted);">
-                    <span v-if="pendingBannerFile">{{ t('guildSettings.bannerImagePending') }}</span>
-                    <span v-else>{{ t('guildSettings.bannerImageRemovePending') }}</span>
-                  </p>
-                  <div class="flex gap-2">
-                    <KvButton size="sm" :disabled="saving" @click="triggerBannerPicker">
-                      {{ t('guildSettings.bannerImageUpload') }}
-                    </KvButton>
-                    <KvButton size="sm" variant="danger" :disabled="saving" @click="cancelPendingBanner">
-                      {{ t('guildSettings.bannerImageCancelPending') }}
-                    </KvButton>
-                  </div>
-                </div>
-
-                <p v-if="bannerError" class="text-[12px]" style="color: var(--kv-danger);">{{ bannerError }}</p>
-              </div>
-
-              <input
-                ref="bannerFileInput"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                class="hidden"
-                @change="onBannerFileChange"
-              />
-            </section>
-
-            <!-- ── Sprint C6: Afiş (renk/gradient preset swatch) ── -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.bannerLabel') }}
-              </h3>
-              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.bannerHint') }}
-              </p>
-              <div class="flex flex-wrap gap-2.5">
-                <button
-                  v-for="key in bannerPresetKeys"
-                  :key="key"
-                  type="button"
-                  class="rounded-[var(--kv-radius-md)] border-2 transition-transform cursor-pointer"
-                  style="width: 48px; height: 48px;"
-                  :style="{
-                    background: bannerBackground(key),
-                    borderColor: draftBannerColor === key ? 'var(--kv-accent-500)' : 'transparent',
-                    transform: draftBannerColor === key ? 'scale(1.06)' : 'none',
-                  }"
-                  :aria-pressed="draftBannerColor === key"
-                  :aria-label="key"
-                  :disabled="saving"
-                  @click="selectBanner(key)"
-                />
-              </div>
-            </section>
-
-            <!-- ── Sprint C6: Özellikler (max 5 etiket) — Açıklama'nın üstüne alındı (sahip) ── -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.featuresLabel') }}
-              </h3>
-              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.featuresHint', { max: MAX_TAGS }) }}
-              </p>
-
-              <!-- Mevcut çipler -->
-              <div v-if="draftTags.length" class="flex flex-wrap gap-2 mb-3">
-                <span
-                  v-for="tag in draftTags"
-                  :key="tag"
-                  class="flex items-center gap-1.5 text-[13px] pl-3 pr-1.5 py-1 rounded-full"
-                  style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
-                >
-                  {{ tag }}
-                  <button
-                    type="button"
-                    class="flex items-center justify-center rounded-full transition-colors cursor-pointer hover:bg-[var(--kv-bg-content)]"
-                    style="width: 18px; height: 18px; color: var(--kv-text-muted);"
-                    :aria-label="t('guildSettings.featureRemove', { tag })"
-                    :disabled="saving"
-                    @click="removeTag(tag)"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                </span>
-              </div>
-
-              <!-- Ekleme satırı -->
-              <form class="flex gap-2 items-end" @submit.prevent="addTag">
-                <div class="flex-1">
-                  <KvInput
-                    v-model="newTagInput"
-                    :placeholder="t('guildSettings.featurePlaceholder')"
-                    :disabled="saving || draftTags.length >= MAX_TAGS"
-                  />
-                </div>
-                <KvButton
-                  size="sm"
-                  type="submit"
-                  :disabled="saving || draftTags.length >= MAX_TAGS || !newTagInput.trim()"
-                >
-                  {{ t('guildSettings.featureAdd') }}
-                </KvButton>
-              </form>
-              <p v-if="draftTags.length >= MAX_TAGS" class="text-[12px] mt-2" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.featuresFull', { max: MAX_TAGS }) }}
-              </p>
-            </section>
-
-            <!-- Ortam açıklaması (Özellikler'in altına alındı — sahip) -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.descriptionSection') }}
-              </h3>
-              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.descriptionSubtitle') }}
-              </p>
-              <textarea
-                v-model="draftDescription"
-                :placeholder="t('guildSettings.descriptionPlaceholder')"
-                :disabled="saving"
-                rows="5"
-                maxlength="2000"
-                class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
-                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
-              />
-            </section>
-
-            <!-- ── Sprint C6: Keşfet'te Göster (discoverable) ── -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.discoverableSection') }}
-              </h3>
+              <!-- ── Genel bölümü ── -->
               <div
-                class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
-                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+                v-if="activeSection === 'genel'"
+                class="flex flex-col lg:flex-row gap-8 items-start"
               >
-                <div class="flex-1 min-w-0">
-                  <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
-                    {{ t('guildSettings.discoverableLabel') }}
-                  </p>
-                  <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
-                    {{ t('guildSettings.discoverableHint') }}
-                  </p>
-                </div>
-                <KvSwitch v-model="draftDiscoverable" :disabled="saving" />
-              </div>
-            </section>
-
-            <!-- adultsOnly toggle (18+ — en altta) -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.adultsOnlySection') }}
-              </h3>
-              <div
-                class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
-                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
-              >
-                <div class="flex-1 min-w-0">
-                  <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
-                    {{ t('guildSettings.adultsOnlyLabel') }}
-                  </p>
-                  <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
-                    {{ t('guildSettings.adultsOnlyDesc') }}
-                  </p>
-                  <p v-if="!isOwner" class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
-                    {{ t('guildSettings.adultsOnlyOwnerOnly') }}
-                  </p>
-                </div>
-                <KvSwitch v-model="draftAdultsOnly" :disabled="saving || !isOwner" />
-              </div>
-            </section>
-
-            <!-- İkon/afiş yükleme ilerleme durumu (hata/başarı artık toast'ta) -->
-            <div
-              v-if="saving && (iconUploadPct > 0 || bannerUploadPct > 0)"
-              class="mt-2 pt-4 border-t flex flex-col gap-1"
-              style="border-color: var(--kv-border-subtle);"
-            >
-              <p v-if="iconUploadPct > 0" class="text-[12px]" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.iconUploading', { pct: iconUploadPct }) }}
-              </p>
-              <p v-if="bannerUploadPct > 0" class="text-[12px]" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.bannerImageUploading', { pct: bannerUploadPct }) }}
-              </p>
-            </div>
-            </div><!-- /SOL kolon -->
-
-            <!-- ── SAĞ kolon: Ortam profil önizleme kartı (sticky, canlı draft) ── -->
-            <div
-              class="block max-lg:hidden shrink-0 self-start sticky top-0"
-              style="width: 320px;"
-            >
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.previewTitle') }}
-              </h3>
-              <div
-                class="overflow-hidden rounded-[var(--kv-radius-lg)] border"
-                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-sidebar);"
-              >
-                <!-- Afiş şeridi (görsel yüklüyse üstte; yoksa renk/gradient preset) -->
+                <!-- ── SOL kolon: form (bölümler arası border ayraç + boşluk) ── -->
                 <div
-                  class="relative"
-                  style="height: 100px;"
-                  :style="{ background: previewBannerStyle }"
+                  class="flex-1 min-w-0 flex flex-col max-w-xl [&>section]:py-7 [&>section]:border-b [&>section]:border-[color:var(--kv-border-subtle)] [&>section:first-of-type]:pt-0 [&>section:last-of-type]:border-b-0"
                 >
-                  <img
-                    v-if="previewBannerImageUrl"
-                    :src="previewBannerImageUrl"
-                    alt=""
-                    class="absolute inset-0 w-full h-full object-cover"
-                  />
-                  <!-- Afişin alt kenarına binen simge (altıgen) -->
-                  <div
-                    class="absolute flex items-center justify-center"
-                    style="left: 16px; bottom: -28px; width: 72px; height: 72px; background-color: var(--kv-bg-sidebar); clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);"
-                  >
+                  <!-- Ad düzenle (Simge'nin üstüne alındı — sahip) -->
+                  <section>
+                    <h3
+                      class="text-[13px] font-semibold uppercase tracking-widest mb-3"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('guildSettings.nameSection') }}
+                    </h3>
+                    <KvInput
+                      v-model="draftName"
+                      :label="t('guildSettings.nameLabel')"
+                      :placeholder="t('guild.namePlaceholder')"
+                      :disabled="saving"
+                    />
+                  </section>
+
+                  <!-- Ortam simgesi (inline önizleme kaldırıldı — sağ önizleme kartı gösteriyor) -->
+                  <section>
+                    <h3
+                      class="text-[13px] font-semibold uppercase tracking-widest mb-1"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('guildSettings.iconSection') }}
+                    </h3>
+                    <p class="text-[12px] mb-3" style="color: var(--kv-text-muted)">
+                      {{ t('guildSettings.iconHint') }}
+                    </p>
+                    <div class="flex flex-col gap-2">
+                      <div v-if="!pendingIconFile && !pendingIconRemove" class="flex gap-2">
+                        <KvButton size="sm" :disabled="saving" @click="triggerIconPicker">
+                          {{ t('guildSettings.iconUpload') }}
+                        </KvButton>
+                        <KvButton
+                          v-if="guild.iconUrl"
+                          size="sm"
+                          variant="danger"
+                          :disabled="saving"
+                          @click="markIconForRemoval"
+                        >
+                          {{ t('guildSettings.iconRemove') }}
+                        </KvButton>
+                      </div>
+
+                      <div v-else class="flex flex-col gap-1.5">
+                        <p class="text-[12px]" style="color: var(--kv-text-muted)">
+                          <span v-if="pendingIconFile">{{ t('guildSettings.iconPending') }}</span>
+                          <span v-else>{{ t('guildSettings.iconRemovePending') }}</span>
+                        </p>
+                        <div class="flex gap-2">
+                          <KvButton size="sm" :disabled="saving" @click="triggerIconPicker">
+                            {{ t('guildSettings.iconUpload') }}
+                          </KvButton>
+                          <KvButton
+                            size="sm"
+                            variant="danger"
+                            :disabled="saving"
+                            @click="cancelPendingIcon"
+                          >
+                            {{ t('guildSettings.iconCancelPending') }}
+                          </KvButton>
+                        </div>
+                      </div>
+
+                      <p v-if="iconError" class="text-[12px]" style="color: var(--kv-danger)">
+                        {{ iconError }}
+                      </p>
+                    </div>
+
+                    <input
+                      ref="iconFileInput"
+                      type="file"
+                      accept="image/*"
+                      class="hidden"
+                      @change="onIconFileChange"
+                    />
+                  </section>
+
+                  <!-- ── Sprint C8: Ortam Afişi (görsel) ── -->
+                  <section>
+                    <h3
+                      class="text-[13px] font-semibold uppercase tracking-widest mb-1"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('guildSettings.bannerImageSection') }}
+                    </h3>
+                    <p class="text-[12px] mb-3" style="color: var(--kv-text-muted)">
+                      {{ t('guildSettings.bannerImageHint') }}
+                    </p>
+                    <div class="flex flex-col gap-2">
+                      <div v-if="!pendingBannerFile && !pendingBannerRemove" class="flex gap-2">
+                        <KvButton size="sm" :disabled="saving" @click="triggerBannerPicker">
+                          {{ t('guildSettings.bannerImageUpload') }}
+                        </KvButton>
+                        <KvButton
+                          v-if="guild.bannerUrl"
+                          size="sm"
+                          variant="danger"
+                          :disabled="saving"
+                          @click="markBannerForRemoval"
+                        >
+                          {{ t('guildSettings.bannerImageRemove') }}
+                        </KvButton>
+                      </div>
+
+                      <div v-else class="flex flex-col gap-1.5">
+                        <p class="text-[12px]" style="color: var(--kv-text-muted)">
+                          <span v-if="pendingBannerFile">{{
+                            t('guildSettings.bannerImagePending')
+                          }}</span>
+                          <span v-else>{{ t('guildSettings.bannerImageRemovePending') }}</span>
+                        </p>
+                        <div class="flex gap-2">
+                          <KvButton size="sm" :disabled="saving" @click="triggerBannerPicker">
+                            {{ t('guildSettings.bannerImageUpload') }}
+                          </KvButton>
+                          <KvButton
+                            size="sm"
+                            variant="danger"
+                            :disabled="saving"
+                            @click="cancelPendingBanner"
+                          >
+                            {{ t('guildSettings.bannerImageCancelPending') }}
+                          </KvButton>
+                        </div>
+                      </div>
+
+                      <p v-if="bannerError" class="text-[12px]" style="color: var(--kv-danger)">
+                        {{ bannerError }}
+                      </p>
+                    </div>
+
+                    <input
+                      ref="bannerFileInput"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      class="hidden"
+                      @change="onBannerFileChange"
+                    />
+                  </section>
+
+                  <!-- ── Sprint C6: Afiş (renk/gradient preset swatch) ── -->
+                  <section>
+                    <h3
+                      class="text-[13px] font-semibold uppercase tracking-widest mb-1"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('guildSettings.bannerLabel') }}
+                    </h3>
+                    <p class="text-[12px] mb-3" style="color: var(--kv-text-muted)">
+                      {{ t('guildSettings.bannerHint') }}
+                    </p>
+                    <div class="flex flex-wrap gap-2.5">
+                      <button
+                        v-for="key in bannerPresetKeys"
+                        :key="key"
+                        type="button"
+                        class="rounded-[var(--kv-radius-md)] border-2 transition-transform cursor-pointer"
+                        style="width: 48px; height: 48px"
+                        :style="{
+                          background: bannerBackground(key),
+                          borderColor:
+                            draftBannerColor === key ? 'var(--kv-accent-500)' : 'transparent',
+                          transform: draftBannerColor === key ? 'scale(1.06)' : 'none',
+                        }"
+                        :aria-pressed="draftBannerColor === key"
+                        :aria-label="key"
+                        :disabled="saving"
+                        @click="selectBanner(key)"
+                      />
+                    </div>
+                  </section>
+
+                  <!-- ── Sprint C6: Özellikler (max 5 etiket) — Açıklama'nın üstüne alındı (sahip) ── -->
+                  <section>
+                    <h3
+                      class="text-[13px] font-semibold uppercase tracking-widest mb-1"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('guildSettings.featuresLabel') }}
+                    </h3>
+                    <p class="text-[12px] mb-3" style="color: var(--kv-text-muted)">
+                      {{ t('guildSettings.featuresHint', { max: MAX_TAGS }) }}
+                    </p>
+
+                    <!-- Mevcut çipler -->
+                    <div v-if="draftTags.length" class="flex flex-wrap gap-2 mb-3">
+                      <span
+                        v-for="tag in draftTags"
+                        :key="tag"
+                        class="flex items-center gap-1.5 text-[13px] pl-3 pr-1.5 py-1 rounded-full"
+                        style="
+                          background-color: var(--kv-bg-elevated);
+                          color: var(--kv-text-secondary);
+                        "
+                      >
+                        {{ tag }}
+                        <button
+                          type="button"
+                          class="flex items-center justify-center rounded-full transition-colors cursor-pointer hover:bg-[var(--kv-bg-content)]"
+                          style="width: 18px; height: 18px; color: var(--kv-text-muted)"
+                          :aria-label="t('guildSettings.featureRemove', { tag })"
+                          :disabled="saving"
+                          @click="removeTag(tag)"
+                        >
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          >
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      </span>
+                    </div>
+
+                    <!-- Ekleme satırı -->
+                    <form class="flex gap-2 items-end" @submit.prevent="addTag">
+                      <div class="flex-1">
+                        <KvInput
+                          v-model="newTagInput"
+                          :placeholder="t('guildSettings.featurePlaceholder')"
+                          :disabled="saving || draftTags.length >= MAX_TAGS"
+                        />
+                      </div>
+                      <KvButton
+                        size="sm"
+                        type="submit"
+                        :disabled="saving || draftTags.length >= MAX_TAGS || !newTagInput.trim()"
+                      >
+                        {{ t('guildSettings.featureAdd') }}
+                      </KvButton>
+                    </form>
+                    <p
+                      v-if="draftTags.length >= MAX_TAGS"
+                      class="text-[12px] mt-2"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('guildSettings.featuresFull', { max: MAX_TAGS }) }}
+                    </p>
+                  </section>
+
+                  <!-- Ortam açıklaması (Özellikler'in altına alındı — sahip) -->
+                  <section>
+                    <h3
+                      class="text-[13px] font-semibold uppercase tracking-widest mb-1"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('guildSettings.descriptionSection') }}
+                    </h3>
+                    <p class="text-[12px] mb-3" style="color: var(--kv-text-muted)">
+                      {{ t('guildSettings.descriptionSubtitle') }}
+                    </p>
+                    <textarea
+                      v-model="draftDescription"
+                      :placeholder="t('guildSettings.descriptionPlaceholder')"
+                      :disabled="saving"
+                      rows="5"
+                      maxlength="2000"
+                      class="w-full resize-none rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
+                      style="
+                        border-color: var(--kv-border-subtle);
+                        background-color: var(--kv-bg-elevated);
+                        color: var(--kv-text-primary);
+                      "
+                    />
+                  </section>
+
+                  <!-- ── Sprint C6: Keşfet'te Göster (discoverable) ── -->
+                  <section>
+                    <h3
+                      class="text-[13px] font-semibold uppercase tracking-widest mb-3"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('guildSettings.discoverableSection') }}
+                    </h3>
                     <div
-                      class="flex items-center justify-center overflow-hidden text-[20px] font-semibold"
-                      style="width: 64px; height: 64px; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+                      class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+                      style="
+                        border-color: var(--kv-border-subtle);
+                        background-color: var(--kv-bg-elevated);
+                      "
+                    >
+                      <div class="flex-1 min-w-0">
+                        <p class="text-[14px] font-medium" style="color: var(--kv-text-primary)">
+                          {{ t('guildSettings.discoverableLabel') }}
+                        </p>
+                        <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+                          {{ t('guildSettings.discoverableHint') }}
+                        </p>
+                      </div>
+                      <KvSwitch v-model="draftDiscoverable" :disabled="saving" />
+                    </div>
+                  </section>
+
+                  <!-- adultsOnly toggle (18+ — en altta) -->
+                  <section>
+                    <h3
+                      class="text-[13px] font-semibold uppercase tracking-widest mb-3"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('guildSettings.adultsOnlySection') }}
+                    </h3>
+                    <div
+                      class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+                      style="
+                        border-color: var(--kv-border-subtle);
+                        background-color: var(--kv-bg-elevated);
+                      "
+                    >
+                      <div class="flex-1 min-w-0">
+                        <p class="text-[14px] font-medium" style="color: var(--kv-text-primary)">
+                          {{ t('guildSettings.adultsOnlyLabel') }}
+                        </p>
+                        <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+                          {{ t('guildSettings.adultsOnlyDesc') }}
+                        </p>
+                        <p
+                          v-if="!isOwner"
+                          class="text-[12px] mt-1"
+                          style="color: var(--kv-text-muted)"
+                        >
+                          {{ t('guildSettings.adultsOnlyOwnerOnly') }}
+                        </p>
+                      </div>
+                      <KvSwitch v-model="draftAdultsOnly" :disabled="saving || !isOwner" />
+                    </div>
+                  </section>
+
+                  <!-- İkon/afiş yükleme ilerleme durumu (hata/başarı artık toast'ta) -->
+                  <div
+                    v-if="saving && (iconUploadPct > 0 || bannerUploadPct > 0)"
+                    class="mt-2 pt-4 border-t flex flex-col gap-1"
+                    style="border-color: var(--kv-border-subtle)"
+                  >
+                    <p
+                      v-if="iconUploadPct > 0"
+                      class="text-[12px]"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('guildSettings.iconUploading', { pct: iconUploadPct }) }}
+                    </p>
+                    <p
+                      v-if="bannerUploadPct > 0"
+                      class="text-[12px]"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('guildSettings.bannerImageUploading', { pct: bannerUploadPct }) }}
+                    </p>
+                  </div>
+                </div>
+                <!-- /SOL kolon -->
+
+                <!-- ── SAĞ kolon: Ortam profil önizleme kartı (sticky, canlı draft) ── -->
+                <div
+                  class="block max-lg:hidden shrink-0 self-start sticky top-0"
+                  style="width: 320px"
+                >
+                  <h3
+                    class="text-[13px] font-semibold uppercase tracking-widest mb-3"
+                    style="color: var(--kv-text-muted)"
+                  >
+                    {{ t('guildSettings.previewTitle') }}
+                  </h3>
+                  <div
+                    class="overflow-hidden rounded-[var(--kv-radius-lg)] border"
+                    style="
+                      border-color: var(--kv-border-subtle);
+                      background-color: var(--kv-bg-sidebar);
+                    "
+                  >
+                    <!-- Afiş şeridi (görsel yüklüyse üstte; yoksa renk/gradient preset) -->
+                    <div
+                      class="relative"
+                      style="height: 100px"
+                      :style="{ background: previewBannerStyle }"
                     >
                       <img
-                        v-if="previewIconUrl"
-                        :src="previewIconUrl"
-                        :alt="previewName"
-                        class="w-full h-full object-cover"
+                        v-if="previewBannerImageUrl"
+                        :src="previewBannerImageUrl"
+                        alt=""
+                        class="absolute inset-0 w-full h-full object-cover"
                       />
-                      <span v-else>{{ guildInitial(previewName) }}</span>
+                      <!-- Afişin alt kenarına binen simge (altıgen) -->
+                      <div
+                        class="absolute flex items-center justify-center"
+                        style="
+                          left: 16px;
+                          bottom: -28px;
+                          width: 72px;
+                          height: 72px;
+                          background-color: var(--kv-bg-sidebar);
+                          clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+                        "
+                      >
+                        <div
+                          class="flex items-center justify-center overflow-hidden text-[20px] font-semibold"
+                          style="
+                            width: 64px;
+                            height: 64px;
+                            clip-path: polygon(
+                              50% 0%,
+                              100% 25%,
+                              100% 75%,
+                              50% 100%,
+                              0% 75%,
+                              0% 25%
+                            );
+                            background-color: var(--kv-bg-elevated);
+                            color: var(--kv-text-secondary);
+                          "
+                        >
+                          <img
+                            v-if="previewIconUrl"
+                            :src="previewIconUrl"
+                            :alt="previewName"
+                            class="w-full h-full object-cover"
+                          />
+                          <span v-else>{{ guildInitial(previewName) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Ad + meta (simge için sol boşluk) -->
+                    <div class="pt-9 pb-4 px-4">
+                      <p
+                        class="text-[16px] font-semibold truncate"
+                        style="color: var(--kv-text-primary)"
+                      >
+                        {{ previewName }}
+                      </p>
+                      <p class="text-[12px] mt-1" style="color: var(--kv-text-muted)">
+                        {{ previewCreatedAt }}
+                        <span v-if="previewMemberCount !== null">
+                          · {{ t('guildSettings.previewMembers', { n: previewMemberCount }) }}
+                        </span>
+                      </p>
                     </div>
                   </div>
                 </div>
-                <!-- Ad + meta (simge için sol boşluk) -->
-                <div class="pt-9 pb-4 px-4">
-                  <p class="text-[16px] font-semibold truncate" style="color: var(--kv-text-primary);">
-                    {{ previewName }}
-                  </p>
-                  <p class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
-                    {{ previewCreatedAt }}
-                    <span v-if="previewMemberCount !== null">
-                      · {{ t('guildSettings.previewMembers', { n: previewMemberCount }) }}
-                    </span>
-                  </p>
-                </div>
-              </div>
-            </div><!-- /SAĞ kolon -->
-          </div>
-
-          <!-- ── Davetler bölümü ── -->
-          <div v-else-if="activeSection === 'davetler'" class="flex flex-col gap-6 max-w-xl">
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.inviteSection') }}
-              </h3>
-
-              <!-- Davet oluştur formu (CREATE_INVITE) -->
-              <form v-if="isOwner || can('CREATE_INVITE')" class="flex flex-wrap gap-2 items-end mb-4" @submit.prevent="createInvite">
-                <div style="width: 116px;">
-                  <KvNumberInput
-                    v-model="newMaxUses"
-                    :label="t('invite.maxUsesLabel')"
-                    :placeholder="t('invite.maxUsesPlaceholder')"
-                    :min="1"
-                    :max="999"
-                  />
-                </div>
-                <div style="width: 132px;">
-                  <KvNumberInput
-                    v-model="newExpiresInHours"
-                    :label="t('invite.expiresInHoursLabel')"
-                    :placeholder="t('invite.expiresInHoursPlaceholder')"
-                    :min="1"
-                    :max="168"
-                  />
-                </div>
-                <KvButton type="submit" :loading="creatingInvite">
-                  {{ t('invite.createButton') }}
-                </KvButton>
-              </form>
-              <p v-if="createError" class="text-[12px] mb-3" style="color: var(--kv-danger);">{{ createError }}</p>
-
-              <!-- Yeni oluşturulan davet linki -->
-              <div
-                v-if="createdInvite"
-                class="flex items-center gap-2 px-3 py-2.5 mb-4 rounded-[var(--kv-radius-md)] border"
-                style="border-color: var(--kv-accent-500); background-color: var(--kv-bg-elevated);"
-              >
-                <span class="flex-1 text-[13px] font-mono truncate" style="color: var(--kv-text-primary);">
-                  {{ inviteLink }}
-                </span>
-                <KvButton size="sm" @click="copy()">
-                  {{ copied ? t('invite.copied') : t('invite.copy') }}
-                </KvButton>
+                <!-- /SAĞ kolon -->
               </div>
 
-              <!-- Aktif davetler (listele/iptal → MANAGE_GUILD) -->
-              <template v-if="isOwner || can('MANAGE_GUILD')">
-              <div v-if="invitesLoading" class="text-[13px]" style="color: var(--kv-text-muted);">
-                {{ t('common.loading') }}
-              </div>
-              <div v-else-if="invites.length === 0" class="text-[13px]" style="color: var(--kv-text-muted);">
-                {{ t('invite.noActiveInvites') }}
-              </div>
-              <ul v-else class="flex flex-col gap-2">
-                <li
-                  v-for="inv in invites"
-                  :key="inv.code"
-                  class="flex items-center gap-3 px-3 py-2 rounded-[var(--kv-radius-md)] border"
-                  style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
-                >
-                  <code class="flex-1 text-[13px] font-mono" style="color: var(--kv-text-primary);">{{ inv.code }}</code>
-                  <span class="text-[12px] shrink-0" style="color: var(--kv-text-muted);">
-                    {{ t('invite.usesCount', { uses: inv.uses, max: inv.maxUses ?? '∞' }) }}
-                  </span>
-                  <span class="text-[12px] shrink-0" style="color: var(--kv-text-muted);">
-                    {{ formatExpiry(inv.expiresAt) }}
-                  </span>
-                  <KvButton size="sm" variant="danger" @click="revokeTarget = inv">
-                    {{ t('invite.revoke') }}
-                  </KvButton>
-                </li>
-              </ul>
-              </template>
-            </section>
-          </div>
-
-          <!-- ── Yasaklar bölümü ── -->
-          <div v-else-if="activeSection === 'yasaklar'" class="flex flex-col gap-6 max-w-xl">
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.bansSection') }}
-              </h3>
-              <p v-if="bansLoading" class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('common.loading') }}</p>
-              <p v-else-if="bans.length === 0" class="text-[13px]" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.bansEmpty') }}
-              </p>
-              <ul v-else class="flex flex-col gap-1.5">
-                <li
-                  v-for="b in bans"
-                  :key="b.userId"
-                  class="flex items-center gap-2.5 px-3 py-2 rounded-[var(--kv-radius-md)] border"
-                  style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
-                >
-                  <div
-                    class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-semibold text-white"
-                    style="background-color: var(--kv-accent-500);"
+              <!-- ── Davetler bölümü ── -->
+              <div v-else-if="activeSection === 'davetler'" class="flex flex-col gap-6 max-w-xl">
+                <section>
+                  <h3
+                    class="text-[13px] font-semibold uppercase tracking-widest mb-3"
+                    style="color: var(--kv-text-muted)"
                   >
-                    <img v-if="b.avatarUrl" :src="b.avatarUrl" :alt="b.username" class="w-full h-full object-cover" />
-                    <span v-else>{{ b.username[0]?.toUpperCase() }}</span>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-[14px] truncate" style="color: var(--kv-text-primary);">{{ b.username }}</p>
-                    <p v-if="b.reason" class="text-[12px] truncate" style="color: var(--kv-text-muted);">{{ b.reason }}</p>
-                  </div>
-                  <KvButton variant="ghost" :loading="unbanningId === b.userId" @click="unban(b.userId)">
-                    {{ t('guildSettings.unban') }}
-                  </KvButton>
-                </li>
-              </ul>
-            </section>
-          </div>
+                    {{ t('guildSettings.inviteSection') }}
+                  </h3>
 
-          <!-- ── Denetim Kaydı bölümü ── -->
-          <div v-else-if="activeSection === 'denetim'">
-            <AuditLogSection :guild-id="guild.id" />
-          </div>
+                  <!-- Davet oluştur formu (CREATE_INVITE) -->
+                  <form
+                    v-if="isOwner || can('CREATE_INVITE')"
+                    class="flex flex-wrap gap-2 items-end mb-4"
+                    @submit.prevent="createInvite"
+                  >
+                    <div style="width: 116px">
+                      <KvNumberInput
+                        v-model="newMaxUses"
+                        :label="t('invite.maxUsesLabel')"
+                        :placeholder="t('invite.maxUsesPlaceholder')"
+                        :min="1"
+                        :max="999"
+                      />
+                    </div>
+                    <div style="width: 132px">
+                      <KvNumberInput
+                        v-model="newExpiresInHours"
+                        :label="t('invite.expiresInHoursLabel')"
+                        :placeholder="t('invite.expiresInHoursPlaceholder')"
+                        :min="1"
+                        :max="168"
+                      />
+                    </div>
+                    <KvButton type="submit" :loading="creatingInvite">
+                      {{ t('invite.createButton') }}
+                    </KvButton>
+                  </form>
+                  <p v-if="createError" class="text-[12px] mb-3" style="color: var(--kv-danger)">
+                    {{ createError }}
+                  </p>
 
-            </div><!-- /px-8 py-6 -->
-          </div><!-- /max-width kolon -->
-        </div><!-- /flex-1 overflow-y-auto (else) -->
-      </div><!-- /sağ içerik alanı -->
-    </div><!-- /fixed dialog -->
+                  <!-- Yeni oluşturulan davet linki -->
+                  <div
+                    v-if="createdInvite"
+                    class="flex items-center gap-2 px-3 py-2.5 mb-4 rounded-[var(--kv-radius-md)] border"
+                    style="
+                      border-color: var(--kv-accent-500);
+                      background-color: var(--kv-bg-elevated);
+                    "
+                  >
+                    <span
+                      class="flex-1 text-[13px] font-mono truncate"
+                      style="color: var(--kv-text-primary)"
+                    >
+                      {{ inviteLink }}
+                    </span>
+                    <KvButton size="sm" @click="copy()">
+                      {{ copied ? t('invite.copied') : t('invite.copy') }}
+                    </KvButton>
+                  </div>
+
+                  <!-- Aktif davetler (listele/iptal → MANAGE_GUILD) -->
+                  <template v-if="isOwner || can('MANAGE_GUILD')">
+                    <div
+                      v-if="invitesLoading"
+                      class="text-[13px]"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('common.loading') }}
+                    </div>
+                    <div
+                      v-else-if="invites.length === 0"
+                      class="text-[13px]"
+                      style="color: var(--kv-text-muted)"
+                    >
+                      {{ t('invite.noActiveInvites') }}
+                    </div>
+                    <ul v-else class="flex flex-col gap-2">
+                      <li
+                        v-for="inv in invites"
+                        :key="inv.code"
+                        class="flex items-center gap-3 px-3 py-2 rounded-[var(--kv-radius-md)] border"
+                        style="
+                          border-color: var(--kv-border-subtle);
+                          background-color: var(--kv-bg-elevated);
+                        "
+                      >
+                        <code
+                          class="flex-1 text-[13px] font-mono"
+                          style="color: var(--kv-text-primary)"
+                          >{{ inv.code }}</code
+                        >
+                        <span class="text-[12px] shrink-0" style="color: var(--kv-text-muted)">
+                          {{ t('invite.usesCount', { uses: inv.uses, max: inv.maxUses ?? '∞' }) }}
+                        </span>
+                        <span class="text-[12px] shrink-0" style="color: var(--kv-text-muted)">
+                          {{ formatExpiry(inv.expiresAt) }}
+                        </span>
+                        <KvButton size="sm" variant="danger" @click="revokeTarget = inv">
+                          {{ t('invite.revoke') }}
+                        </KvButton>
+                      </li>
+                    </ul>
+                  </template>
+                </section>
+              </div>
+
+              <!-- ── Yasaklar bölümü ── -->
+              <div v-else-if="activeSection === 'yasaklar'" class="flex flex-col gap-6 max-w-xl">
+                <section>
+                  <h3
+                    class="text-[13px] font-semibold uppercase tracking-widest mb-3"
+                    style="color: var(--kv-text-muted)"
+                  >
+                    {{ t('guildSettings.bansSection') }}
+                  </h3>
+                  <p v-if="bansLoading" class="text-[13px]" style="color: var(--kv-text-muted)">
+                    {{ t('common.loading') }}
+                  </p>
+                  <p
+                    v-else-if="bans.length === 0"
+                    class="text-[13px]"
+                    style="color: var(--kv-text-muted)"
+                  >
+                    {{ t('guildSettings.bansEmpty') }}
+                  </p>
+                  <ul v-else class="flex flex-col gap-1.5">
+                    <li
+                      v-for="b in bans"
+                      :key="b.userId"
+                      class="flex items-center gap-2.5 px-3 py-2 rounded-[var(--kv-radius-md)] border"
+                      style="
+                        border-color: var(--kv-border-subtle);
+                        background-color: var(--kv-bg-elevated);
+                      "
+                    >
+                      <div
+                        class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-semibold text-white"
+                        style="background-color: var(--kv-accent-500)"
+                      >
+                        <img
+                          v-if="b.avatarUrl"
+                          :src="b.avatarUrl"
+                          :alt="b.username"
+                          class="w-full h-full object-cover"
+                        />
+                        <span v-else>{{ b.username[0]?.toUpperCase() }}</span>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-[14px] truncate" style="color: var(--kv-text-primary)">
+                          {{ b.username }}
+                        </p>
+                        <p
+                          v-if="b.reason"
+                          class="text-[12px] truncate"
+                          style="color: var(--kv-text-muted)"
+                        >
+                          {{ b.reason }}
+                        </p>
+                      </div>
+                      <KvButton
+                        variant="ghost"
+                        :loading="unbanningId === b.userId"
+                        @click="unban(b.userId)"
+                      >
+                        {{ t('guildSettings.unban') }}
+                      </KvButton>
+                    </li>
+                  </ul>
+                </section>
+              </div>
+
+              <!-- ── Denetim Kaydı bölümü ── -->
+              <div v-else-if="activeSection === 'denetim'">
+                <AuditLogSection :guild-id="guild.id" />
+              </div>
+            </div>
+            <!-- /px-8 py-6 -->
+          </div>
+          <!-- /max-width kolon -->
+        </div>
+        <!-- /flex-1 overflow-y-auto (else) -->
+      </div>
+      <!-- /sağ içerik alanı -->
+    </div>
+    <!-- /fixed dialog -->
 
     <!-- Davet iptal onay diyaloğu -->
     <ConfirmDialog
@@ -1277,7 +1529,10 @@ function confirmNavDiscard() {
       :message="navConfirmMessage"
       :confirm-label="t('guildSettings.roles.discardButton')"
       @confirm="confirmNavDiscard"
-      @cancel="showNavConfirm = false; pendingNav = null"
+      @cancel="
+        showNavConfirm = false
+        pendingNav = null
+      "
     />
 
     <!-- Genel ayarlar: Discord-tarzı sabit alt kaydet barı (Roller deseni) -->
@@ -1285,18 +1540,26 @@ function confirmNavDiscard() {
       <div
         v-if="activeSection === 'genel' && isDirty"
         class="fixed left-1/2 -translate-x-1/2 z-[55] flex items-center gap-4 px-4 py-3 rounded-[var(--kv-radius-md)] border"
-        style="bottom: 24px; min-width: 420px; max-width: 92vw; background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+        style="
+          bottom: 24px;
+          min-width: 420px;
+          max-width: 92vw;
+          background-color: var(--kv-bg-elevated);
+          border-color: var(--kv-border-subtle);
+        "
       >
-        <span class="flex-1 text-[14px] font-medium" style="color: var(--kv-text-primary);">
+        <span class="flex-1 text-[14px] font-medium" style="color: var(--kv-text-primary)">
           {{ t('guildSettings.unsavedBar.title') }}
         </span>
         <button
           type="button"
           class="text-[14px] font-medium cursor-pointer transition-colors"
-          style="color: var(--kv-text-secondary);"
+          style="color: var(--kv-text-secondary)"
           :disabled="saving"
           @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
-          @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'"
+          @mouseleave="
+            ($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'
+          "
           @click="resetDrafts"
         >
           {{ t('guildSettings.unsavedBar.reset') }}

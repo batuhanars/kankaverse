@@ -143,7 +143,8 @@ export function useTypingLabel(
     if (users.length === 0) return null
     if (!named) return t('typing.simple')
     if (users.length === 1) return t('typing.one', { user: users[0].username })
-    if (users.length === 2) return t('typing.two', { user1: users[0].username, user2: users[1].username })
+    if (users.length === 2)
+      return t('typing.two', { user1: users[0].username, user2: users[1].username })
     return t('typing.many')
   })
   return { label }

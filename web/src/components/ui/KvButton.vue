@@ -25,7 +25,10 @@ defineProps<{
           : 'bg-[var(--kv-accent-500)] text-white hover:bg-[var(--kv-accent-400)] active:bg-[var(--kv-accent-600)]',
     ]"
   >
-    <span v-if="loading" class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+    <span
+      v-if="loading"
+      class="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+    />
     <slot />
   </button>
 </template>

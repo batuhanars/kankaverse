@@ -40,7 +40,8 @@ export function useChannelMenuActions(channel: Ref<ChannelDto | null> | (() => C
   async function muteChannelFor(minutes: number | null) {
     const c = target.value
     if (!c) return
-    const mutedUntil = minutes === null ? null : new Date(Date.now() + minutes * 60_000).toISOString()
+    const mutedUntil =
+      minutes === null ? null : new Date(Date.now() + minutes * 60_000).toISOString()
     try {
       await prefsStore.setPref({
         targetType: NotifTargetType.CHANNEL,

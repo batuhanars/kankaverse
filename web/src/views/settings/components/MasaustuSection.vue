@@ -11,7 +11,11 @@ import KvSwitch from '@/components/ui/KvSwitch.vue'
 const { t } = useI18n()
 
 type DesktopSettings = { openAtLogin: boolean; startMinimized: boolean; closeToTray: boolean }
-const settings = ref<DesktopSettings>({ openAtLogin: false, startMinimized: false, closeToTray: true })
+const settings = ref<DesktopSettings>({
+  openAtLogin: false,
+  startMinimized: false,
+  closeToTray: true,
+})
 const loading = ref(true)
 
 onMounted(async () => {
@@ -30,18 +34,33 @@ async function update(key: keyof DesktopSettings, value: boolean) {
 }
 
 const rows: { key: keyof DesktopSettings; titleKey: string; descKey: string }[] = [
-  { key: 'openAtLogin', titleKey: 'settings.desktop.openAtLoginLabel', descKey: 'settings.desktop.openAtLoginDesc' },
-  { key: 'startMinimized', titleKey: 'settings.desktop.startMinimizedLabel', descKey: 'settings.desktop.startMinimizedDesc' },
-  { key: 'closeToTray', titleKey: 'settings.desktop.closeToTrayLabel', descKey: 'settings.desktop.closeToTrayDesc' },
+  {
+    key: 'openAtLogin',
+    titleKey: 'settings.desktop.openAtLoginLabel',
+    descKey: 'settings.desktop.openAtLoginDesc',
+  },
+  {
+    key: 'startMinimized',
+    titleKey: 'settings.desktop.startMinimizedLabel',
+    descKey: 'settings.desktop.startMinimizedDesc',
+  },
+  {
+    key: 'closeToTray',
+    titleKey: 'settings.desktop.closeToTrayLabel',
+    descKey: 'settings.desktop.closeToTrayDesc',
+  },
 ]
 </script>
 
 <template>
   <div class="max-w-xl">
-    <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
+    <h3
+      class="text-[13px] font-semibold uppercase tracking-widest mb-1"
+      style="color: var(--kv-text-muted)"
+    >
       {{ t('settings.desktop.title') }}
     </h3>
-    <p class="text-[12px] mb-4" style="color: var(--kv-text-muted);">
+    <p class="text-[12px] mb-4" style="color: var(--kv-text-muted)">
       {{ t('settings.desktop.intro') }}
     </p>
 
@@ -50,11 +69,13 @@ const rows: { key: keyof DesktopSettings; titleKey: string; descKey: string }[] 
         v-for="row in rows"
         :key="row.key"
         class="flex items-center justify-between gap-4 py-3 border-b"
-        style="border-color: var(--kv-border-subtle);"
+        style="border-color: var(--kv-border-subtle)"
       >
         <div class="min-w-0">
-          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">{{ t(row.titleKey) }}</p>
-          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">{{ t(row.descKey) }}</p>
+          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary)">
+            {{ t(row.titleKey) }}
+          </p>
+          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">{{ t(row.descKey) }}</p>
         </div>
         <KvSwitch
           :model-value="settings[row.key]"

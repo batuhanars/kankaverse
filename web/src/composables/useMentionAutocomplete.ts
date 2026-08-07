@@ -32,7 +32,10 @@ export interface MentionMember {
 const EVERYONE_ID = '@everyone'
 
 // @sorgu tespiti: imlecin solundaki @kelime bloğu
-function findMentionQuery(text: string, cursorPos: number): { query: string; start: number } | null {
+function findMentionQuery(
+  text: string,
+  cursorPos: number,
+): { query: string; start: number } | null {
   // Geriye doğru @ ara; kelime-sınırı: boşluk veya satır başı
   const before = text.slice(0, cursorPos)
   const match = before.match(/@([\w]*)$/)
@@ -140,7 +143,8 @@ export function useMentionAutocomplete(
     if (!showPopover.value) return false
     if (e.key === 'ArrowUp') {
       e.preventDefault()
-      activeIndex.value = (activeIndex.value - 1 + suggestions.value.length) % suggestions.value.length
+      activeIndex.value =
+        (activeIndex.value - 1 + suggestions.value.length) % suggestions.value.length
       return true
     }
     if (e.key === 'ArrowDown') {

@@ -75,8 +75,21 @@ const activeTab = ref<Tab>('appearance')
 
 // ── İzin bayrakları (Faz 3) — gruplu; ADMINISTRATOR ayrıca en üstte ─────────
 const PERMISSION_GROUPS: { key: string; flags: string[] }[] = [
-  { key: 'general', flags: ['VIEW_CHANNELS', 'MANAGE_CHANNELS', 'MANAGE_ROLES', 'MANAGE_GUILD', 'MANAGE_EMOJIS', 'CREATE_INVITE'] },
-  { key: 'membership', flags: ['KICK_MEMBERS', 'BAN_MEMBERS', 'CHANGE_NICKNAME', 'MANAGE_NICKNAMES'] },
+  {
+    key: 'general',
+    flags: [
+      'VIEW_CHANNELS',
+      'MANAGE_CHANNELS',
+      'MANAGE_ROLES',
+      'MANAGE_GUILD',
+      'MANAGE_EMOJIS',
+      'CREATE_INVITE',
+    ],
+  },
+  {
+    key: 'membership',
+    flags: ['KICK_MEMBERS', 'BAN_MEMBERS', 'CHANGE_NICKNAME', 'MANAGE_NICKNAMES'],
+  },
   { key: 'message', flags: ['MANAGE_MESSAGES', 'MENTION_EVERYONE'] },
   { key: 'voice', flags: ['MUTE_MEMBERS', 'MOVE_MEMBERS', 'PRIORITY_SPEAKER'] },
 ]
@@ -92,7 +105,9 @@ const pendingRemove = ref<Set<string>>(new Set())
 const initialMemberIds = computed<Set<string>>(() => {
   const role = selectedRole.value
   if (!role) return new Set()
-  return new Set(allMembers.value.filter((m) => m.roles.some((r) => r.id === role.id)).map((m) => m.userId))
+  return new Set(
+    allMembers.value.filter((m) => m.roles.some((r) => r.id === role.id)).map((m) => m.userId),
+  )
 })
 
 // Kaydedildiğinde role sahip olacak üye kümesi (initial + bekleyen ekle − bekleyen çıkar)
@@ -185,17 +200,20 @@ const permsDirty = computed(() => {
   return a.length !== b.length || a.some((f, i) => f !== b[i])
 })
 
-const appearanceDirty = computed(() =>
-  selectedRole.value !== null &&
-  (draftName.value !== selectedRole.value.name ||
-    draftColor.value !== selectedRole.value.color ||
-    draftHoist.value !== selectedRole.value.hoist ||
-    draftMentionable.value !== selectedRole.value.mentionable ||
-    draftIsDefault.value !== selectedRole.value.isDefault),
+const appearanceDirty = computed(
+  () =>
+    selectedRole.value !== null &&
+    (draftName.value !== selectedRole.value.name ||
+      draftColor.value !== selectedRole.value.color ||
+      draftHoist.value !== selectedRole.value.hoist ||
+      draftMentionable.value !== selectedRole.value.mentionable ||
+      draftIsDefault.value !== selectedRole.value.isDefault),
 )
 
-const isDirty = computed(() =>
-  selectedRole.value !== null && (appearanceDirty.value || permsDirty.value || membersDirty.value),
+const isDirty = computed(
+  () =>
+    selectedRole.value !== null &&
+    (appearanceDirty.value || permsDirty.value || membersDirty.value),
 )
 
 // Üst bileşene (GuildSettingsView) dirty durumunu bildir → nav/kapat guard'ı
@@ -271,7 +289,8 @@ async function createRole() {
   } catch (err: unknown) {
     const e = err as { response?: { data?: { error?: string } } }
     const code = e?.response?.data?.error ?? ''
-    errorMsg.value = t(`guildSettings.roles.errors.${code}`) || t('guildSettings.roles.createButton')
+    errorMsg.value =
+      t(`guildSettings.roles.errors.${code}`) || t('guildSettings.roles.createButton')
   } finally {
     creating.value = false
   }
@@ -430,9 +449,8 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
        MOD 1 — LİSTE (selectedRoleId === null)
        ════════════════════════════════════════════ -->
   <div v-if="!selectedRoleId" class="flex flex-col gap-5 pb-4">
-
     <!-- Açıklama satırı -->
-    <p class="text-[13px]" style="color: var(--kv-text-secondary);">
+    <p class="text-[13px]" style="color: var(--kv-text-secondary)">
       {{ t('guildSettings.roles.listDesc') }}
     </p>
 
@@ -440,7 +458,7 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
     <p
       v-if="errorMsg"
       class="px-3 py-2 text-[12px] rounded-[var(--kv-radius-sm)]"
-      style="background-color: var(--kv-bg-elevated); color: var(--kv-danger);"
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-danger)"
     >
       {{ errorMsg }}
     </p>
@@ -450,9 +468,13 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
       v-if="everyoneRole"
       type="button"
       class="w-full flex items-center gap-3 px-4 py-3 rounded-[var(--kv-radius-md)] border text-left transition-colors cursor-pointer"
-      style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
-      @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'"
-      @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
+      style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated)"
+      @mouseenter="
+        ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'
+      "
+      @mouseleave="
+        ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'
+      "
       @click="selectRole(everyoneRole!.id)"
     >
       <!-- Renk noktası -->
@@ -462,26 +484,34 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
       />
       <!-- Metinler -->
       <div class="flex-1 min-w-0">
-        <p class="text-[14px] font-semibold" style="color: var(--kv-text-primary);">
+        <p class="text-[14px] font-semibold" style="color: var(--kv-text-primary)">
           {{ t('guildSettings.roles.everyoneCardTitle') }}
         </p>
-        <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+        <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
           {{ t('guildSettings.roles.everyoneCardSubtitle') }}
         </p>
       </div>
       <!-- Chevron -->
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="color: var(--kv-text-muted);">
-        <path d="M9 18l6-6-6-6"/>
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="shrink-0"
+        style="color: var(--kv-text-muted)"
+      >
+        <path d="M9 18l6-6-6-6" />
       </svg>
     </button>
 
     <!-- Arama + Rol Oluştur -->
     <div class="flex items-center gap-3">
       <div class="flex-1">
-        <KvInput
-          v-model="roleSearch"
-          :placeholder="t('guildSettings.roles.searchPlaceholder')"
-        />
+        <KvInput v-model="roleSearch" :placeholder="t('guildSettings.roles.searchPlaceholder')" />
       </div>
       <KvButton v-if="canEdit" :loading="creating" @click="createRole">
         {{ t('guildSettings.roles.createButton') }}
@@ -489,16 +519,22 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
     </div>
 
     <!-- Yardım metni -->
-    <p class="text-[12px]" style="color: var(--kv-text-muted);">
+    <p class="text-[12px]" style="color: var(--kv-text-muted)">
       {{ t('guildSettings.roles.colorHint') }}
     </p>
 
     <!-- Tablo başlığı -->
     <div class="flex items-center px-3 py-1">
-      <span class="flex-1 text-[11px] font-bold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+      <span
+        class="flex-1 text-[11px] font-bold uppercase tracking-widest"
+        style="color: var(--kv-text-muted)"
+      >
         {{ t('guildSettings.roles.rolesCountHeader') }} — {{ filteredRoles.length }}
       </span>
-      <span class="text-[11px] font-bold uppercase tracking-widest shrink-0" style="color: var(--kv-text-muted);">
+      <span
+        class="text-[11px] font-bold uppercase tracking-widest shrink-0"
+        style="color: var(--kv-text-muted)"
+      >
         {{ t('guildSettings.roles.membersHeader') }}
       </span>
     </div>
@@ -514,8 +550,12 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
         :class="dragOverRoleId === role.id ? 'kv-drop-target' : ''"
         :style="`color: var(--kv-text-secondary); border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);${dragRoleId === role.id ? ' opacity: 0.4;' : ''}`"
         :draggable="canEdit && !roleSearch ? 'true' : 'false'"
-        @mouseenter="($event.currentTarget as HTMLElement).style.borderColor = 'var(--kv-accent-subtle)'"
-        @mouseleave="($event.currentTarget as HTMLElement).style.borderColor = 'var(--kv-border-subtle)'"
+        @mouseenter="
+          ($event.currentTarget as HTMLElement).style.borderColor = 'var(--kv-accent-subtle)'
+        "
+        @mouseleave="
+          ($event.currentTarget as HTMLElement).style.borderColor = 'var(--kv-border-subtle)'
+        "
         @click="selectRole(role.id)"
         @keydown.enter="selectRole(role.id)"
         @dragstart="onRoleDragStart($event, role)"
@@ -528,64 +568,94 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
         <div
           v-if="dragOverRoleId === role.id"
           class="absolute inset-x-0 top-0 h-0.5 rounded-full pointer-events-none"
-          style="background-color: var(--kv-accent-500);"
+          style="background-color: var(--kv-accent-500)"
         />
         <!-- Sürükleme tutacağı (canEdit + arama yok) -->
         <span
           v-if="canEdit && !roleSearch"
           class="shrink-0 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity"
-          style="color: var(--kv-text-muted);"
+          style="color: var(--kv-text-muted)"
           @click.stop
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="9" cy="5" r="1"/><circle cx="15" cy="5" r="1"/>
-            <circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/>
-            <circle cx="9" cy="19" r="1"/><circle cx="15" cy="19" r="1"/>
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="9" cy="5" r="1" />
+            <circle cx="15" cy="5" r="1" />
+            <circle cx="9" cy="12" r="1" />
+            <circle cx="15" cy="12" r="1" />
+            <circle cx="9" cy="19" r="1" />
+            <circle cx="15" cy="19" r="1" />
           </svg>
         </span>
         <!-- Renk noktası -->
-        <span
-          class="shrink-0 w-3 h-3 rounded-full"
-          :style="`background-color: ${role.color};`"
-        />
+        <span class="shrink-0 w-3 h-3 rounded-full" :style="`background-color: ${role.color};`" />
         <!-- Ad -->
-        <span class="flex-1 text-[14px] font-medium truncate" style="color: var(--kv-text-primary);">
+        <span class="flex-1 text-[14px] font-medium truncate" style="color: var(--kv-text-primary)">
           {{ role.name }}
         </span>
         <!-- Varsayılan rol rozeti -->
         <span
           v-if="role.isDefault"
           class="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-          style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500);"
-        >{{ t('guildSettings.roles.defaultBadge') }}</span>
+          style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500)"
+          >{{ t('guildSettings.roles.defaultBadge') }}</span
+        >
         <!-- Üye sayısı + ikon -->
-        <div class="shrink-0 flex items-center gap-1" style="color: var(--kv-text-muted);">
+        <div class="shrink-0 flex items-center gap-1" style="color: var(--kv-text-muted)">
           <span class="text-[13px]">{{ role.memberCount }}</span>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
           </svg>
         </div>
         <!-- Aksiyon butonları (canEdit, her zaman görünür) -->
-        <div
-          v-if="canEdit"
-          class="shrink-0 flex items-center gap-0.5"
-        >
+        <div v-if="canEdit" class="shrink-0 flex items-center gap-0.5">
           <!-- Düzenle -->
           <button
             type="button"
             class="flex items-center justify-center w-9 h-9 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary)"
             :title="t('guildSettings.roles.editTooltip')"
-            @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'"
-            @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
+            @mouseenter="
+              ($event.currentTarget as HTMLElement).style.backgroundColor =
+                'var(--kv-accent-subtle)'
+            "
+            @mouseleave="
+              ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'
+            "
             @click.stop="selectRole(role.id)"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
           </button>
           <!-- Sil (isEveryone değilse) -->
@@ -593,23 +663,50 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
             v-if="!role.isEveryone"
             type="button"
             class="flex items-center justify-center w-9 h-9 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary)"
             :title="t('guildSettings.roles.deleteTooltip')"
-            @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-danger-subtle)'; ($event.currentTarget as HTMLElement).style.color = 'var(--kv-danger)'"
-            @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'; ($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'"
+            @mouseenter="
+              ;($event.currentTarget as HTMLElement).style.backgroundColor =
+                'var(--kv-danger-subtle)'
+              ;($event.currentTarget as HTMLElement).style.color = 'var(--kv-danger)'
+            "
+            @mouseleave="
+              ;($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'
+              ;($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'
+            "
             @click.stop="pendingDeleteRole = role"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-              <path d="M10 11v6M14 11v6"/>
-              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6M14 11v6" />
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
             </svg>
           </button>
         </div>
         <!-- Chevron -->
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="color: var(--kv-text-muted);">
-          <path d="M9 18l6-6-6-6"/>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="shrink-0"
+          style="color: var(--kv-text-muted)"
+        >
+          <path d="M9 18l6-6-6-6" />
         </svg>
       </div>
 
@@ -617,7 +714,7 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
       <p
         v-if="filteredRoles.length === 0 && roleSearch"
         class="px-3 py-2 text-[13px]"
-        style="color: var(--kv-text-muted);"
+        style="color: var(--kv-text-muted)"
       >
         {{ t('guildSettings.roles.noRoleSelected') }}
       </p>
@@ -628,24 +725,39 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
        MOD 2 — DETAY (selectedRoleId !== null)
        ════════════════════════════════════════════ -->
   <div v-else class="flex min-h-0 h-full w-full">
-
     <!-- Sol dar kolon: GERİ + rol listesi -->
     <div
       class="shrink-0 flex flex-col border-r overflow-y-auto"
-      style="width: 220px; background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle);"
+      style="
+        width: 220px;
+        background-color: var(--kv-bg-sidebar);
+        border-color: var(--kv-border-subtle);
+      "
     >
       <!-- GERİ + Yeni rol oluştur -->
-      <div class="flex items-center justify-between px-3 py-3 border-b shrink-0" style="border-color: var(--kv-border-subtle);">
+      <div
+        class="flex items-center justify-between px-3 py-3 border-b shrink-0"
+        style="border-color: var(--kv-border-subtle)"
+      >
         <button
           type="button"
           class="flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-widest cursor-pointer transition-colors"
-          style="color: var(--kv-text-muted);"
+          style="color: var(--kv-text-muted)"
           @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
           @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)'"
           @click="backToList"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M15 18l-6-6 6-6"/>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M15 18l-6-6 6-6" />
           </svg>
           {{ t('guildSettings.roles.back') }}
         </button>
@@ -653,12 +765,21 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
           v-if="canEdit"
           :disabled="creating"
           class="flex items-center justify-center w-5 h-5 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-text-muted);"
+          style="color: var(--kv-text-muted)"
           :title="t('guildSettings.roles.createButton')"
           @click="createRole"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 5v14M5 12h14"/>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 5v14M5 12h14" />
           </svg>
         </button>
       </div>
@@ -670,357 +791,450 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
           :key="role.id"
           type="button"
           class="w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] transition-colors cursor-pointer"
-          :class="selectedRoleId === role.id ? 'bg-[var(--kv-accent-subtle)]' : 'hover:bg-[var(--kv-bg-elevated)]'"
-          :style="selectedRoleId === role.id ? 'color: var(--kv-text-primary);' : 'color: var(--kv-text-secondary);'"
+          :class="
+            selectedRoleId === role.id
+              ? 'bg-[var(--kv-accent-subtle)]'
+              : 'hover:bg-[var(--kv-bg-elevated)]'
+          "
+          :style="
+            selectedRoleId === role.id
+              ? 'color: var(--kv-text-primary);'
+              : 'color: var(--kv-text-secondary);'
+          "
           @click="selectRole(role.id)"
         >
           <span class="shrink-0 w-3 h-3 rounded-full" :style="`background-color: ${role.color};`" />
           <span class="flex-1 truncate font-medium">{{ role.name }}</span>
           <svg
             v-if="role.isEveryone"
-            width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-            class="shrink-0" style="color: var(--kv-text-muted);"
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="shrink-0"
+            style="color: var(--kv-text-muted)"
           >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
         </button>
       </div>
     </div>
 
     <!-- Ana alan: editör -->
-    <div class="flex-1 min-w-0 flex flex-col overflow-hidden" style="background-color: var(--kv-bg-content);">
-
+    <div
+      class="flex-1 min-w-0 flex flex-col overflow-hidden"
+      style="background-color: var(--kv-bg-content)"
+    >
       <!-- Dar iç kolon (max 720px, sola yaslı) -->
-      <div class="flex flex-col min-h-0 flex-1 overflow-hidden" style="max-width: 720px; width: 100%;">
-
-      <!-- Editör başlık -->
       <div
-        class="shrink-0 px-8 pt-6 pb-0"
+        class="flex flex-col min-h-0 flex-1 overflow-hidden"
+        style="max-width: 720px; width: 100%"
       >
-        <h3 class="text-[11px] font-bold uppercase tracking-widest mb-4" style="color: var(--kv-text-muted);">
-          {{ t('guildSettings.roles.editTitle', { name: selectedRole?.name ?? '' }) }}
-        </h3>
+        <!-- Editör başlık -->
+        <div class="shrink-0 px-8 pt-6 pb-0">
+          <h3
+            class="text-[11px] font-bold uppercase tracking-widest mb-4"
+            style="color: var(--kv-text-muted)"
+          >
+            {{ t('guildSettings.roles.editTitle', { name: selectedRole?.name ?? '' }) }}
+          </h3>
 
-        <!-- Sekmeler -->
-        <div class="flex gap-0 border-b" style="border-color: var(--kv-border-subtle);">
-          <button
-            type="button"
-            class="px-4 py-2 text-[14px] font-medium transition-colors cursor-pointer border-b-2"
-            :style="activeTab === 'appearance'
-              ? 'color: var(--kv-text-primary); border-color: var(--kv-accent-500);'
-              : 'color: var(--kv-text-secondary); border-color: transparent;'"
-            @click="activeTab = 'appearance'"
-          >
-            {{ t('guildSettings.roles.tabAppearance') }}
-          </button>
-          <button
-            type="button"
-            class="px-4 py-2 text-[14px] font-medium transition-colors cursor-pointer border-b-2"
-            :style="activeTab === 'permissions'
-              ? 'color: var(--kv-text-primary); border-color: var(--kv-accent-500);'
-              : 'color: var(--kv-text-secondary); border-color: transparent;'"
-            @click="activeTab = 'permissions'"
-          >
-            {{ t('guildSettings.roles.tabPermissions') }}
-          </button>
-          <button
-            v-if="!selectedRole?.isEveryone"
-            type="button"
-            class="px-4 py-2 text-[14px] font-medium transition-colors cursor-pointer border-b-2"
-            :style="activeTab === 'members'
-              ? 'color: var(--kv-text-primary); border-color: var(--kv-accent-500);'
-              : 'color: var(--kv-text-secondary); border-color: transparent;'"
-            @click="activeTab = 'members'"
-          >
-            {{ t('guildSettings.roles.tabMembers') }} ({{ membersWithRole }})
-          </button>
+          <!-- Sekmeler -->
+          <div class="flex gap-0 border-b" style="border-color: var(--kv-border-subtle)">
+            <button
+              type="button"
+              class="px-4 py-2 text-[14px] font-medium transition-colors cursor-pointer border-b-2"
+              :style="
+                activeTab === 'appearance'
+                  ? 'color: var(--kv-text-primary); border-color: var(--kv-accent-500);'
+                  : 'color: var(--kv-text-secondary); border-color: transparent;'
+              "
+              @click="activeTab = 'appearance'"
+            >
+              {{ t('guildSettings.roles.tabAppearance') }}
+            </button>
+            <button
+              type="button"
+              class="px-4 py-2 text-[14px] font-medium transition-colors cursor-pointer border-b-2"
+              :style="
+                activeTab === 'permissions'
+                  ? 'color: var(--kv-text-primary); border-color: var(--kv-accent-500);'
+                  : 'color: var(--kv-text-secondary); border-color: transparent;'
+              "
+              @click="activeTab = 'permissions'"
+            >
+              {{ t('guildSettings.roles.tabPermissions') }}
+            </button>
+            <button
+              v-if="!selectedRole?.isEveryone"
+              type="button"
+              class="px-4 py-2 text-[14px] font-medium transition-colors cursor-pointer border-b-2"
+              :style="
+                activeTab === 'members'
+                  ? 'color: var(--kv-text-primary); border-color: var(--kv-accent-500);'
+                  : 'color: var(--kv-text-secondary); border-color: transparent;'
+              "
+              @click="activeTab = 'members'"
+            >
+              {{ t('guildSettings.roles.tabMembers') }} ({{ membersWithRole }})
+            </button>
+          </div>
         </div>
-      </div>
 
-      <!-- İçerik alanı — alt boşluk: yüzen kaydet barı son satırı kapatmasın (Görsel #31) -->
-      <div class="flex-1 overflow-y-auto px-8 pt-5 pb-28 flex flex-col gap-5">
-
-        <!-- Hata -->
-        <p
-          v-if="errorMsg"
-          class="px-3 py-2 text-[12px] rounded-[var(--kv-radius-sm)]"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-danger);"
-        >
-          {{ errorMsg }}
-        </p>
-
-        <!-- @everyone uyarısı -->
-        <p
-          v-if="selectedRole?.isEveryone"
-          class="px-3 py-2 text-[12px] rounded-[var(--kv-radius-sm)]"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
-        >
-          {{ t('guildSettings.roles.everyoneNote') }}
-        </p>
-
-        <!-- ══ GÖRÜNÜM SEKMESİ ══ -->
-        <template v-if="activeTab === 'appearance'">
-
-          <!-- ROL ADI -->
-          <section v-if="!selectedRole?.isEveryone">
-            <label class="block text-[11px] font-semibold uppercase tracking-widest mb-1.5" style="color: var(--kv-text-muted);">
-              {{ t('guildSettings.roles.nameLabel') }}
-            </label>
-            <input
-              v-model="draftName"
-              type="text"
-              :disabled="!canEdit"
-              :placeholder="t('guildSettings.roles.namePlaceholder')"
-              class="w-full max-w-xs rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
-              style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
-            />
-          </section>
-
-          <!-- ROL RENGİ -->
-          <section>
-            <label class="block text-[11px] font-semibold uppercase tracking-widest mb-1.5" style="color: var(--kv-text-muted);">
-              {{ t('guildSettings.roles.colorLabel') }}
-            </label>
-            <div class="flex flex-wrap gap-2 mb-2">
-              <button
-                v-for="preset in COLOR_PRESETS"
-                :key="preset"
-                class="w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 cursor-pointer"
-                :style="`background-color: ${preset}; border-color: ${draftColor === preset ? 'var(--kv-text-primary)' : 'transparent'};`"
-                :disabled="!canEdit"
-                @click="draftColor = preset"
-              />
-            </div>
-            <div class="flex items-center gap-2 mt-1">
-              <label class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('guildSettings.roles.colorCustomLabel') }}</label>
-              <input
-                v-model="draftColor"
-                type="text"
-                :disabled="!canEdit"
-                :placeholder="t('guildSettings.roles.colorPlaceholder')"
-                maxlength="7"
-                class="w-28 rounded-[var(--kv-radius-sm)] border px-2 py-1 text-[13px] font-mono outline-none transition-colors"
-                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
-              />
-              <span
-                v-if="hexValid"
-                class="w-5 h-5 rounded-full border"
-                :style="`background-color: ${draftColor}; border-color: var(--kv-border-subtle);`"
-              />
-            </div>
-            <p v-if="!hexValid && draftColor !== ''" class="mt-1 text-[11px]" style="color: var(--kv-danger);">
-              {{ t('guildSettings.roles.colorInvalid') }}
-            </p>
-          </section>
-
-          <!-- HOIST -->
-          <section v-if="!selectedRole?.isEveryone">
-            <div
-              class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
-              style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
-            >
-              <div class="flex-1 min-w-0">
-                <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
-                  {{ t('guildSettings.roles.hoistLabel') }}
-                </p>
-                <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
-                  {{ t('guildSettings.roles.hoistDesc') }}
-                </p>
-              </div>
-              <KvSwitch v-model="draftHoist" :disabled="!canEdit" />
-            </div>
-          </section>
-
-          <!-- MENTIONABLE -->
-          <section>
-            <div
-              class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
-              style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
-            >
-              <div class="flex-1 min-w-0">
-                <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
-                  {{ t('guildSettings.roles.mentionableLabel') }}
-                </p>
-                <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
-                  {{ t('guildSettings.roles.mentionableDesc') }}
-                </p>
-              </div>
-              <KvSwitch v-model="draftMentionable" :disabled="!canEdit" />
-            </div>
-          </section>
-
-          <!-- VARSAYILAN ROL — yeni katılan üyelere otomatik atanır (@everyone hariç) -->
-          <section v-if="!selectedRole?.isEveryone">
-            <div
-              class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
-              style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
-            >
-              <div class="flex-1 min-w-0">
-                <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
-                  {{ t('guildSettings.roles.defaultLabel') }}
-                </p>
-                <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
-                  {{ t('guildSettings.roles.defaultDesc') }}
-                </p>
-              </div>
-              <KvSwitch v-model="draftIsDefault" :disabled="!canEdit" />
-            </div>
-          </section>
-
-          <!-- Rolü Sil — destructive, taslak-kaydından bağımsız -->
-          <section
-            v-if="canEdit && !selectedRole?.isEveryone"
-            class="pt-4 mt-2 border-t"
-            style="border-color: var(--kv-border-subtle);"
-          >
-            <KvButton variant="danger" :disabled="deleting" :loading="deleting" @click="showDeleteConfirm = true">
-              {{ deleting ? t('guildSettings.roles.deleting') : t('guildSettings.roles.deleteButton') }}
-            </KvButton>
-          </section>
-
-        </template>
-
-        <!-- ══ İZİNLER SEKMESİ ══ -->
-        <template v-if="activeTab === 'permissions'">
-
-          <!-- F1: aktör tüm izinlere sahip değilse "veremezsin" notu -->
+        <!-- İçerik alanı — alt boşluk: yüzen kaydet barı son satırı kapatmasın (Görsel #31) -->
+        <div class="flex-1 overflow-y-auto px-8 pt-5 pb-28 flex flex-col gap-5">
+          <!-- Hata -->
           <p
-            v-if="canEdit && !hasAll"
+            v-if="errorMsg"
             class="px-3 py-2 text-[12px] rounded-[var(--kv-radius-sm)]"
-            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+            style="background-color: var(--kv-bg-elevated); color: var(--kv-danger)"
           >
-            {{ t('guildSettings.roles.permsGrantHint') }}
+            {{ errorMsg }}
           </p>
 
-          <!-- ADMINISTRATOR — en üstte, uyarılı -->
-          <section>
-            <div
-              class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
-              :style="hasAdmin
-                ? 'border-color: var(--kv-danger); background-color: var(--kv-danger-subtle);'
-                : 'border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);'"
-            >
-              <div class="flex-1 min-w-0">
-                <p class="text-[14px] font-semibold" style="color: var(--kv-text-primary);">
-                  {{ t('guildSettings.roles.permsAdminLabel') }}
-                </p>
-                <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
-                  {{ t('guildSettings.roles.permsAdminDesc') }}
-                </p>
-              </div>
-              <KvSwitch
-                :model-value="hasAdmin"
-                :disabled="!canToggleFlag('ADMINISTRATOR')"
-                @update:model-value="(v: boolean) => setPerm('ADMINISTRATOR', v)"
-              />
-            </div>
-            <p
-              v-if="hasAdmin"
-              class="mt-2 px-3 py-2 text-[12px] rounded-[var(--kv-radius-sm)]"
-              style="background-color: var(--kv-danger-subtle); color: var(--kv-danger);"
-            >
-              {{ t('guildSettings.roles.permsAdminWarning') }}
-            </p>
-          </section>
+          <!-- @everyone uyarısı -->
+          <p
+            v-if="selectedRole?.isEveryone"
+            class="px-3 py-2 text-[12px] rounded-[var(--kv-radius-sm)]"
+            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted)"
+          >
+            {{ t('guildSettings.roles.everyoneNote') }}
+          </p>
 
-          <!-- Bayrak grupları -->
-          <section v-for="group in PERMISSION_GROUPS" :key="group.key">
-            <label class="block text-[11px] font-semibold uppercase tracking-widest mb-1.5" style="color: var(--kv-text-muted);">
-              {{ t(`guildSettings.roles.permsGroups.${group.key}`) }}
-            </label>
-            <div class="flex flex-col gap-2">
+          <!-- ══ GÖRÜNÜM SEKMESİ ══ -->
+          <template v-if="activeTab === 'appearance'">
+            <!-- ROL ADI -->
+            <section v-if="!selectedRole?.isEveryone">
+              <label
+                class="block text-[11px] font-semibold uppercase tracking-widest mb-1.5"
+                style="color: var(--kv-text-muted)"
+              >
+                {{ t('guildSettings.roles.nameLabel') }}
+              </label>
+              <input
+                v-model="draftName"
+                type="text"
+                :disabled="!canEdit"
+                :placeholder="t('guildSettings.roles.namePlaceholder')"
+                class="w-full max-w-xs rounded-[var(--kv-radius-md)] border px-3 py-2 text-[14px] outline-none transition-colors"
+                style="
+                  border-color: var(--kv-border-subtle);
+                  background-color: var(--kv-bg-elevated);
+                  color: var(--kv-text-primary);
+                "
+              />
+            </section>
+
+            <!-- ROL RENGİ -->
+            <section>
+              <label
+                class="block text-[11px] font-semibold uppercase tracking-widest mb-1.5"
+                style="color: var(--kv-text-muted)"
+              >
+                {{ t('guildSettings.roles.colorLabel') }}
+              </label>
+              <div class="flex flex-wrap gap-2 mb-2">
+                <button
+                  v-for="preset in COLOR_PRESETS"
+                  :key="preset"
+                  class="w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 cursor-pointer"
+                  :style="`background-color: ${preset}; border-color: ${draftColor === preset ? 'var(--kv-text-primary)' : 'transparent'};`"
+                  :disabled="!canEdit"
+                  @click="draftColor = preset"
+                />
+              </div>
+              <div class="flex items-center gap-2 mt-1">
+                <label class="text-[12px]" style="color: var(--kv-text-muted)">{{
+                  t('guildSettings.roles.colorCustomLabel')
+                }}</label>
+                <input
+                  v-model="draftColor"
+                  type="text"
+                  :disabled="!canEdit"
+                  :placeholder="t('guildSettings.roles.colorPlaceholder')"
+                  maxlength="7"
+                  class="w-28 rounded-[var(--kv-radius-sm)] border px-2 py-1 text-[13px] font-mono outline-none transition-colors"
+                  style="
+                    border-color: var(--kv-border-subtle);
+                    background-color: var(--kv-bg-elevated);
+                    color: var(--kv-text-primary);
+                  "
+                />
+                <span
+                  v-if="hexValid"
+                  class="w-5 h-5 rounded-full border"
+                  :style="`background-color: ${draftColor}; border-color: var(--kv-border-subtle);`"
+                />
+              </div>
+              <p
+                v-if="!hexValid && draftColor !== ''"
+                class="mt-1 text-[11px]"
+                style="color: var(--kv-danger)"
+              >
+                {{ t('guildSettings.roles.colorInvalid') }}
+              </p>
+            </section>
+
+            <!-- HOIST -->
+            <section v-if="!selectedRole?.isEveryone">
               <div
-                v-for="flag in group.flags"
-                :key="flag"
-                class="flex items-center justify-between gap-4 px-3 py-2.5 rounded-[var(--kv-radius-md)] border transition-opacity"
-                :style="`border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);${hasAdmin ? ' opacity: 0.55;' : ''}`"
+                class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+                style="
+                  border-color: var(--kv-border-subtle);
+                  background-color: var(--kv-bg-elevated);
+                "
               >
                 <div class="flex-1 min-w-0">
-                  <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
-                    {{ t(`guildSettings.roles.permsFlags.${flag}.label`) }}
+                  <p class="text-[14px] font-medium" style="color: var(--kv-text-primary)">
+                    {{ t('guildSettings.roles.hoistLabel') }}
                   </p>
-                  <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
-                    {{ t(`guildSettings.roles.permsFlags.${flag}.desc`) }}
+                  <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+                    {{ t('guildSettings.roles.hoistDesc') }}
+                  </p>
+                </div>
+                <KvSwitch v-model="draftHoist" :disabled="!canEdit" />
+              </div>
+            </section>
+
+            <!-- MENTIONABLE -->
+            <section>
+              <div
+                class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+                style="
+                  border-color: var(--kv-border-subtle);
+                  background-color: var(--kv-bg-elevated);
+                "
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="text-[14px] font-medium" style="color: var(--kv-text-primary)">
+                    {{ t('guildSettings.roles.mentionableLabel') }}
+                  </p>
+                  <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+                    {{ t('guildSettings.roles.mentionableDesc') }}
+                  </p>
+                </div>
+                <KvSwitch v-model="draftMentionable" :disabled="!canEdit" />
+              </div>
+            </section>
+
+            <!-- VARSAYILAN ROL — yeni katılan üyelere otomatik atanır (@everyone hariç) -->
+            <section v-if="!selectedRole?.isEveryone">
+              <div
+                class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+                style="
+                  border-color: var(--kv-border-subtle);
+                  background-color: var(--kv-bg-elevated);
+                "
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="text-[14px] font-medium" style="color: var(--kv-text-primary)">
+                    {{ t('guildSettings.roles.defaultLabel') }}
+                  </p>
+                  <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+                    {{ t('guildSettings.roles.defaultDesc') }}
+                  </p>
+                </div>
+                <KvSwitch v-model="draftIsDefault" :disabled="!canEdit" />
+              </div>
+            </section>
+
+            <!-- Rolü Sil — destructive, taslak-kaydından bağımsız -->
+            <section
+              v-if="canEdit && !selectedRole?.isEveryone"
+              class="pt-4 mt-2 border-t"
+              style="border-color: var(--kv-border-subtle)"
+            >
+              <KvButton
+                variant="danger"
+                :disabled="deleting"
+                :loading="deleting"
+                @click="showDeleteConfirm = true"
+              >
+                {{
+                  deleting
+                    ? t('guildSettings.roles.deleting')
+                    : t('guildSettings.roles.deleteButton')
+                }}
+              </KvButton>
+            </section>
+          </template>
+
+          <!-- ══ İZİNLER SEKMESİ ══ -->
+          <template v-if="activeTab === 'permissions'">
+            <!-- F1: aktör tüm izinlere sahip değilse "veremezsin" notu -->
+            <p
+              v-if="canEdit && !hasAll"
+              class="px-3 py-2 text-[12px] rounded-[var(--kv-radius-sm)]"
+              style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted)"
+            >
+              {{ t('guildSettings.roles.permsGrantHint') }}
+            </p>
+
+            <!-- ADMINISTRATOR — en üstte, uyarılı -->
+            <section>
+              <div
+                class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+                :style="
+                  hasAdmin
+                    ? 'border-color: var(--kv-danger); background-color: var(--kv-danger-subtle);'
+                    : 'border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);'
+                "
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="text-[14px] font-semibold" style="color: var(--kv-text-primary)">
+                    {{ t('guildSettings.roles.permsAdminLabel') }}
+                  </p>
+                  <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+                    {{ t('guildSettings.roles.permsAdminDesc') }}
                   </p>
                 </div>
                 <KvSwitch
-                  :model-value="hasAdmin || hasPerm(flag)"
-                  :disabled="hasAdmin || !canToggleFlag(flag)"
-                  @update:model-value="(v: boolean) => setPerm(flag, v)"
+                  :model-value="hasAdmin"
+                  :disabled="!canToggleFlag('ADMINISTRATOR')"
+                  @update:model-value="(v: boolean) => setPerm('ADMINISTRATOR', v)"
                 />
               </div>
-            </div>
-          </section>
-
-        </template>
-
-        <!-- ══ ÜYELERİ YÖNET SEKMESİ ══ -->
-        <template v-if="activeTab === 'members' && !selectedRole?.isEveryone">
-
-          <!-- Arama + Üye Ekle -->
-          <div class="flex items-center gap-3">
-            <div class="flex-1">
-              <KvInput
-                v-model="memberSearch"
-                :placeholder="t('guildSettings.roles.memberSearchPlaceholder')"
-              />
-            </div>
-            <KvButton v-if="canEdit" @click="addMemberSearch = ''; showAddMember = true">
-              {{ t('guildSettings.roles.addMemberButton') }}
-            </KvButton>
-          </div>
-
-          <p v-if="roleMembers.length === 0" class="text-[13px]" style="color: var(--kv-text-muted);">
-            {{ t('guildSettings.roles.roleMembersEmpty') }}
-          </p>
-
-          <div v-else class="flex flex-col gap-1">
-            <div
-              v-for="member in roleMembers"
-              :key="member.userId"
-              class="group flex items-center gap-3 px-3 py-2 rounded-[var(--kv-radius-sm)] border"
-              style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
-            >
-              <!-- Avatar -->
-              <div
-                class="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold overflow-hidden shrink-0"
-                style="background-color: var(--kv-accent-500); color: #fff;"
+              <p
+                v-if="hasAdmin"
+                class="mt-2 px-3 py-2 text-[12px] rounded-[var(--kv-radius-sm)]"
+                style="background-color: var(--kv-danger-subtle); color: var(--kv-danger)"
               >
-                <img
-                  v-if="member.avatarUrl"
-                  :src="member.avatarUrl"
-                  :alt="member.username"
-                  class="w-full h-full object-cover"
-                />
-                <span v-else>{{ member.username.charAt(0).toUpperCase() }}</span>
+                {{ t('guildSettings.roles.permsAdminWarning') }}
+              </p>
+            </section>
+
+            <!-- Bayrak grupları -->
+            <section v-for="group in PERMISSION_GROUPS" :key="group.key">
+              <label
+                class="block text-[11px] font-semibold uppercase tracking-widest mb-1.5"
+                style="color: var(--kv-text-muted)"
+              >
+                {{ t(`guildSettings.roles.permsGroups.${group.key}`) }}
+              </label>
+              <div class="flex flex-col gap-2">
+                <div
+                  v-for="flag in group.flags"
+                  :key="flag"
+                  class="flex items-center justify-between gap-4 px-3 py-2.5 rounded-[var(--kv-radius-md)] border transition-opacity"
+                  :style="`border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);${hasAdmin ? ' opacity: 0.55;' : ''}`"
+                >
+                  <div class="flex-1 min-w-0">
+                    <p class="text-[14px] font-medium" style="color: var(--kv-text-primary)">
+                      {{ t(`guildSettings.roles.permsFlags.${flag}.label`) }}
+                    </p>
+                    <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
+                      {{ t(`guildSettings.roles.permsFlags.${flag}.desc`) }}
+                    </p>
+                  </div>
+                  <KvSwitch
+                    :model-value="hasAdmin || hasPerm(flag)"
+                    :disabled="hasAdmin || !canToggleFlag(flag)"
+                    @update:model-value="(v: boolean) => setPerm(flag, v)"
+                  />
+                </div>
               </div>
-              <!-- Ad -->
-              <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-primary);">
-                {{ member.username }}
-              </span>
-              <!-- Rolden çıkar (X) -->
-              <button
+            </section>
+          </template>
+
+          <!-- ══ ÜYELERİ YÖNET SEKMESİ ══ -->
+          <template v-if="activeTab === 'members' && !selectedRole?.isEveryone">
+            <!-- Arama + Üye Ekle -->
+            <div class="flex items-center gap-3">
+              <div class="flex-1">
+                <KvInput
+                  v-model="memberSearch"
+                  :placeholder="t('guildSettings.roles.memberSearchPlaceholder')"
+                />
+              </div>
+              <KvButton
                 v-if="canEdit"
-                type="button"
-                class="shrink-0 flex items-center justify-center w-7 h-7 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-                style="background-color: transparent; color: var(--kv-text-muted);"
-                :title="t('guildSettings.roles.removeMemberTooltip')"
-                @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-danger-subtle)'; ($event.currentTarget as HTMLElement).style.color = 'var(--kv-danger)'"
-                @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; ($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)'"
-                @click="removeMemberFromRole(member.userId)"
+                @click="
+                  addMemberSearch = ''
+                  showAddMember = true
+                "
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
+                {{ t('guildSettings.roles.addMemberButton') }}
+              </KvButton>
             </div>
-          </div>
 
-        </template>
+            <p
+              v-if="roleMembers.length === 0"
+              class="text-[13px]"
+              style="color: var(--kv-text-muted)"
+            >
+              {{ t('guildSettings.roles.roleMembersEmpty') }}
+            </p>
 
+            <div v-else class="flex flex-col gap-1">
+              <div
+                v-for="member in roleMembers"
+                :key="member.userId"
+                class="group flex items-center gap-3 px-3 py-2 rounded-[var(--kv-radius-sm)] border"
+                style="
+                  border-color: var(--kv-border-subtle);
+                  background-color: var(--kv-bg-elevated);
+                "
+              >
+                <!-- Avatar -->
+                <div
+                  class="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold overflow-hidden shrink-0"
+                  style="background-color: var(--kv-accent-500); color: #fff"
+                >
+                  <img
+                    v-if="member.avatarUrl"
+                    :src="member.avatarUrl"
+                    :alt="member.username"
+                    class="w-full h-full object-cover"
+                  />
+                  <span v-else>{{ member.username.charAt(0).toUpperCase() }}</span>
+                </div>
+                <!-- Ad -->
+                <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-primary)">
+                  {{ member.username }}
+                </span>
+                <!-- Rolden çıkar (X) -->
+                <button
+                  v-if="canEdit"
+                  type="button"
+                  class="shrink-0 flex items-center justify-center w-7 h-7 rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
+                  style="background-color: transparent; color: var(--kv-text-muted)"
+                  :title="t('guildSettings.roles.removeMemberTooltip')"
+                  @mouseenter="
+                    ;($event.currentTarget as HTMLElement).style.backgroundColor =
+                      'var(--kv-danger-subtle)'
+                    ;($event.currentTarget as HTMLElement).style.color = 'var(--kv-danger)'
+                  "
+                  @mouseleave="
+                    ;($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
+                    ;($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)'
+                  "
+                  @click="removeMemberFromRole(member.userId)"
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
       </div>
-      </div><!-- /dar iç kolon -->
+      <!-- /dar iç kolon -->
     </div>
   </div>
 
@@ -1061,23 +1275,34 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
     <div
       v-if="showAddMember"
       class="fixed inset-0 z-[60] flex items-center justify-center p-4"
-      style="background-color: var(--kv-bg-overlay);"
+      style="background-color: var(--kv-bg-overlay)"
       @click.self="showAddMember = false"
     >
       <div
         class="flex flex-col w-full max-w-md rounded-[var(--kv-radius-lg)] border overflow-hidden"
-        style="max-height: 70vh; background-color: var(--kv-bg-content); border-color: var(--kv-border-subtle);"
+        style="
+          max-height: 70vh;
+          background-color: var(--kv-bg-content);
+          border-color: var(--kv-border-subtle);
+        "
       >
-        <div class="shrink-0 px-5 py-4 border-b" style="border-color: var(--kv-border-subtle);">
-          <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+        <div class="shrink-0 px-5 py-4 border-b" style="border-color: var(--kv-border-subtle)">
+          <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary)">
             {{ t('guildSettings.roles.addMemberTitle') }}
           </h3>
         </div>
         <div class="shrink-0 px-5 pt-3">
-          <KvInput v-model="addMemberSearch" :placeholder="t('guildSettings.roles.memberSearchPlaceholder')" />
+          <KvInput
+            v-model="addMemberSearch"
+            :placeholder="t('guildSettings.roles.memberSearchPlaceholder')"
+          />
         </div>
         <div class="flex-1 overflow-y-auto px-5 py-3 flex flex-col gap-1">
-          <p v-if="addableMembers.length === 0" class="text-[13px]" style="color: var(--kv-text-muted);">
+          <p
+            v-if="addableMembers.length === 0"
+            class="text-[13px]"
+            style="color: var(--kv-text-muted)"
+          >
             {{ t('guildSettings.roles.addMemberEmpty') }}
           </p>
           <button
@@ -1089,19 +1314,41 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
           >
             <div
               class="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-semibold overflow-hidden shrink-0"
-              style="background-color: var(--kv-accent-500); color: #fff;"
+              style="background-color: var(--kv-accent-500); color: #fff"
             >
-              <img v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.username" class="w-full h-full object-cover" />
+              <img
+                v-if="member.avatarUrl"
+                :src="member.avatarUrl"
+                :alt="member.username"
+                class="w-full h-full object-cover"
+              />
               <span v-else>{{ member.username.charAt(0).toUpperCase() }}</span>
             </div>
-            <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-primary);">{{ member.username }}</span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-accent-500);">
-              <path d="M12 5v14M5 12h14"/>
+            <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-primary)">{{
+              member.username
+            }}</span>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              style="color: var(--kv-accent-500)"
+            >
+              <path d="M12 5v14M5 12h14" />
             </svg>
           </button>
         </div>
-        <div class="shrink-0 px-5 py-3 border-t flex justify-end" style="border-color: var(--kv-border-subtle);">
-          <KvButton variant="ghost" @click="showAddMember = false">{{ t('common.close') }}</KvButton>
+        <div
+          class="shrink-0 px-5 py-3 border-t flex justify-end"
+          style="border-color: var(--kv-border-subtle)"
+        >
+          <KvButton variant="ghost" @click="showAddMember = false">{{
+            t('common.close')
+          }}</KvButton>
         </div>
       </div>
     </div>
@@ -1112,15 +1359,21 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
     <div
       v-if="selectedRoleId && canEdit && isDirty"
       class="fixed left-1/2 -translate-x-1/2 z-[55] flex items-center gap-4 px-4 py-3 rounded-[var(--kv-radius-md)] border"
-      style="bottom: 24px; min-width: 420px; max-width: 92vw; background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+      style="
+        bottom: 24px;
+        min-width: 420px;
+        max-width: 92vw;
+        background-color: var(--kv-bg-elevated);
+        border-color: var(--kv-border-subtle);
+      "
     >
-      <span class="flex-1 text-[14px] font-medium" style="color: var(--kv-text-primary);">
+      <span class="flex-1 text-[14px] font-medium" style="color: var(--kv-text-primary)">
         {{ t('guildSettings.roles.unsavedBar') }}
       </span>
       <button
         type="button"
         class="text-[14px] font-medium cursor-pointer transition-colors"
-        style="color: var(--kv-text-secondary);"
+        style="color: var(--kv-text-secondary)"
         :disabled="saving"
         @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
         @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'"

@@ -50,7 +50,13 @@ export interface PendingPeer {
 // paylaşılan tip. Her varyant `member`/`entry`/`peer`'ı (opsiyonel-undefined dahil) taşır ki
 // tüketiciler union'ı daraltmadan optional-chaining ile okuyabilsin.
 export type VoiceTileData =
-  | { key: string; kind: 'video'; member: RoomMember | null; entry: VideoTrackEntry; peer?: undefined }
+  | {
+      key: string
+      kind: 'video'
+      member: RoomMember | null
+      entry: VideoTrackEntry
+      peer?: undefined
+    }
   | { key: string; kind: 'avatar'; member: RoomMember; entry?: undefined; peer?: undefined }
   | { key: string; kind: 'pending'; member?: undefined; entry?: undefined; peer: PendingPeer }
 
@@ -181,11 +187,15 @@ export const useVoiceStore = defineStore('voice', () => {
   // göstergeyi sürdürmemiz yeterli (set bağlı oda kapsamında anlamlı).
   function addServerMute(channelId: string, userId: string) {
     if (connectedChannelId.value !== channelId) return
-    const s = new Set(serverMutedUserIds.value); s.add(userId); serverMutedUserIds.value = s
+    const s = new Set(serverMutedUserIds.value)
+    s.add(userId)
+    serverMutedUserIds.value = s
   }
   function removeServerMute(channelId: string, userId: string) {
     if (connectedChannelId.value !== channelId) return
-    const s = new Set(serverMutedUserIds.value); s.delete(userId); serverMutedUserIds.value = s
+    const s = new Set(serverMutedUserIds.value)
+    s.delete(userId)
+    serverMutedUserIds.value = s
   }
   function isServerMuted(userId: string): boolean {
     return serverMutedUserIds.value.has(userId)
@@ -224,7 +234,10 @@ export const useVoiceStore = defineStore('voice', () => {
   }
 
   // ── Yerel bağlantı ──────────────────────────────────────────────────────────
-  async function join(channelId: string, opts?: { autoEndWhenAlone?: boolean; startWithCamera?: boolean }) {
+  async function join(
+    channelId: string,
+    opts?: { autoEndWhenAlone?: boolean; startWithCamera?: boolean },
+  ) {
     if (connectedChannelId.value === channelId || connecting.value) return
     if (room) await leave()
 
@@ -247,7 +260,11 @@ export const useVoiceStore = defineStore('voice', () => {
       wireRoom(room)
       await room.connect(data.url, data.token)
       // Tarayıcı autoplay kilidini katılım jesti açar; yine de garantiye al
-      try { await room.startAudio() } catch { /* jest gerektirebilir; ses ilk etkileşimde açılır */ }
+      try {
+        await room.startAudio()
+      } catch {
+        /* jest gerektirebilir; ses ilk etkileşimde açılır */
+      }
 
       connectedChannelId.value = channelId
       connectedAt.value = Date.now() // REV-13: süre sayacı başlangıcı
@@ -282,7 +299,8 @@ export const useVoiceStore = defineStore('voice', () => {
         } catch (e) {
           // Mikrofon açılamadı → dinleyici kal + NEDENİ görünür yap (sessiz yutma yok)
           isMuted.value = true
-          micError.value = !window.isSecureContext || (e as Error)?.message === 'insecure' ? 'insecure' : 'denied'
+          micError.value =
+            !window.isSecureContext || (e as Error)?.message === 'insecure' ? 'insecure' : 'denied'
         }
       } else {
         // Karantina VEYA varsayılan-sustur: dinleyici modu
@@ -359,7 +377,11 @@ export const useVoiceStore = defineStore('voice', () => {
     if (leftChannelId) useCallSounds().playDisconnect()
 
     if (room) {
-      try { await room.disconnect() } catch { /* yoksay */ }
+      try {
+        await room.disconnect()
+      } catch {
+        /* yoksay */
+      }
       room = null
     }
 
@@ -378,7 +400,10 @@ export const useVoiceStore = defineStore('voice', () => {
     autoEndWhenAlone = false // REV-12
     pendingCameraStart = false
     peerEverJoined = false // D39 §4
-    if (aloneTimer) { clearTimeout(aloneTimer); aloneTimer = null }
+    if (aloneTimer) {
+      clearTimeout(aloneTimer)
+      aloneTimer = null
+    }
     isMuted.value = false
     canPublish.value = false
     canPublishCamera.value = false
@@ -398,12 +423,24 @@ export const useVoiceStore = defineStore('voice', () => {
   // LiveKit Participant → RoomMember (metadata'dan avatar)
   function toRoomMember(p: Participant, localId: string | undefined): RoomMember {
     let avatarUrl: string | null = null
-    try { if (p.metadata) avatarUrl = (JSON.parse(p.metadata)?.avatarUrl ?? null) } catch { /* yoksay */ }
-    return { userId: p.identity, username: p.name || p.identity, avatarUrl, isLocal: p.identity === localId }
+    try {
+      if (p.metadata) avatarUrl = JSON.parse(p.metadata)?.avatarUrl ?? null
+    } catch {
+      /* yoksay */
+    }
+    return {
+      userId: p.identity,
+      username: p.name || p.identity,
+      avatarUrl,
+      isLocal: p.identity === localId,
+    }
   }
 
   function refreshRoomParticipants() {
-    if (!room) { roomParticipants.value = []; return }
+    if (!room) {
+      roomParticipants.value = []
+      return
+    }
     const localId = room.localParticipant?.identity
     const list: RoomMember[] = [toRoomMember(room.localParticipant, localId)]
     for (const p of room.remoteParticipants.values()) list.push(toRoomMember(p, localId))
@@ -413,7 +450,10 @@ export const useVoiceStore = defineStore('voice', () => {
 
   // Konuşan setini tüm katılımcıların isSpeaking'inden yeniden kur (mute/unmute dayanıklı)
   function recomputeSpeaking() {
-    if (!room) { speakingUserIds.value = new Set(); return }
+    if (!room) {
+      speakingUserIds.value = new Set()
+      return
+    }
     const s = new Set<string>()
     if (room.localParticipant?.isSpeaking) s.add(room.localParticipant.identity)
     for (const p of room.remoteParticipants.values()) if (p.isSpeaking) s.add(p.identity)
@@ -481,7 +521,11 @@ export const useVoiceStore = defineStore('voice', () => {
     localStorage.setItem('kv.voice.inputDevice', id)
     // Canlı: bağlı + mikrofon açıksa cihazı anında değiştir
     if (room && canPublish.value && !isMuted.value) {
-      try { await room.switchActiveDevice('audioinput', id) } catch { /* yoksay */ }
+      try {
+        await room.switchActiveDevice('audioinput', id)
+      } catch {
+        /* yoksay */
+      }
     }
   }
   function setOutputDevice(id: string) {
@@ -504,12 +548,22 @@ export const useVoiceStore = defineStore('voice', () => {
       // Sağırlaştır → mikrofonu kapat (önceki durumu hatırla)
       muteBeforeDeafen = isMuted.value
       if (canPublish.value && !isMuted.value) {
-        try { await room.localParticipant.setMicrophoneEnabled(false); isMuted.value = true } catch { /* yoksay */ }
+        try {
+          await room.localParticipant.setMicrophoneEnabled(false)
+          isMuted.value = true
+        } catch {
+          /* yoksay */
+        }
       }
     } else {
       // Sağırlığı kaldır → mikrofonu sağırlık öncesi haline getir
       if (canPublish.value && !muteBeforeDeafen && isMuted.value) {
-        try { await room.localParticipant.setMicrophoneEnabled(true); isMuted.value = false } catch { /* yoksay */ }
+        try {
+          await room.localParticipant.setMicrophoneEnabled(true)
+          isMuted.value = false
+        } catch {
+          /* yoksay */
+        }
       }
     }
   }
@@ -517,7 +571,11 @@ export const useVoiceStore = defineStore('voice', () => {
   // ── C4: video track listesi güncelleme yardımcıları ──────────────────────────
   function _participantMeta(p: Participant): { username: string; avatarUrl: string | null } {
     let avatarUrl: string | null = null
-    try { if (p.metadata) avatarUrl = (JSON.parse(p.metadata)?.avatarUrl ?? null) } catch { /* yoksay */ }
+    try {
+      if (p.metadata) avatarUrl = JSON.parse(p.metadata)?.avatarUrl ?? null
+    } catch {
+      /* yoksay */
+    }
     return { username: p.name || p.identity, avatarUrl }
   }
 
@@ -530,7 +588,14 @@ export const useVoiceStore = defineStore('voice', () => {
     const existing = videoTracks.value.findIndex(
       (e) => e.participantId === p.identity && e.trackKind === trackKind,
     )
-    const entry: VideoTrackEntry = { participantId: p.identity, username, avatarUrl, isLocal, trackKind, track }
+    const entry: VideoTrackEntry = {
+      participantId: p.identity,
+      username,
+      avatarUrl,
+      isLocal,
+      trackKind,
+      track,
+    }
     if (existing >= 0) {
       videoTracks.value = videoTracks.value.map((e, i) => (i === existing ? entry : e))
     } else {
@@ -546,33 +611,39 @@ export const useVoiceStore = defineStore('voice', () => {
 
   // ── LiveKit Room olayları ─────────────────────────────────────────────────────
   function wireRoom(r: Room) {
-    r.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _pub: RemoteTrackPublication, p: RemoteParticipant) => {
-      if (track.kind === Track.Kind.Audio) {
-        const el = track.attach() // <audio autoplay>
-        el.style.display = 'none'
-        el.muted = isDeafened.value // sağırsa yeni gelen sesi de sustur
-        el.volume = outputVolume.value // çıkış sesi tercihi
-        // Çıkış cihazı (hoparlör) tercihi — setSinkId destekleyen tarayıcılarda
-        applySinkId(el)
-        document.body.appendChild(el)
-        remoteAudioEls.add(el)
-      } else if (track.kind === Track.Kind.Video) {
-        // C4: uzak video track geldi → listeye ekle
-        _addVideoTrack(p, track)
-      }
-    })
-    r.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, _pub: RemoteTrackPublication, p: RemoteParticipant) => {
-      if (track.kind === Track.Kind.Audio) {
-        track.detach().forEach((el) => {
-          remoteAudioEls.delete(el)
-          el.remove()
-        })
-      } else if (track.kind === Track.Kind.Video) {
-        // C4: uzak video track düştü
-        const trackKind = track.source === Track.Source.Camera ? 'camera' : 'screen'
-        _removeVideoTrack(p.identity, trackKind)
-      }
-    })
+    r.on(
+      RoomEvent.TrackSubscribed,
+      (track: RemoteTrack, _pub: RemoteTrackPublication, p: RemoteParticipant) => {
+        if (track.kind === Track.Kind.Audio) {
+          const el = track.attach() // <audio autoplay>
+          el.style.display = 'none'
+          el.muted = isDeafened.value // sağırsa yeni gelen sesi de sustur
+          el.volume = outputVolume.value // çıkış sesi tercihi
+          // Çıkış cihazı (hoparlör) tercihi — setSinkId destekleyen tarayıcılarda
+          applySinkId(el)
+          document.body.appendChild(el)
+          remoteAudioEls.add(el)
+        } else if (track.kind === Track.Kind.Video) {
+          // C4: uzak video track geldi → listeye ekle
+          _addVideoTrack(p, track)
+        }
+      },
+    )
+    r.on(
+      RoomEvent.TrackUnsubscribed,
+      (track: RemoteTrack, _pub: RemoteTrackPublication, p: RemoteParticipant) => {
+        if (track.kind === Track.Kind.Audio) {
+          track.detach().forEach((el) => {
+            remoteAudioEls.delete(el)
+            el.remove()
+          })
+        } else if (track.kind === Track.Kind.Video) {
+          // C4: uzak video track düştü
+          const trackKind = track.source === Track.Source.Camera ? 'camera' : 'screen'
+          _removeVideoTrack(p.identity, trackKind)
+        }
+      },
+    )
     // Konuşma algısı: per-participant IsSpeakingChanged (mute/unmute'a dayanıklı).
     // ActiveSpeakersChanged aggregate'ı mute/unmute döngüsünde kaçabiliyor; her
     // katılımcının isSpeaking'ini tarayıp seti yeniden kuruyoruz.
@@ -599,14 +670,18 @@ export const useVoiceStore = defineStore('voice', () => {
         _removeVideoTrack(p.identity, pub.source === Track.Source.Camera ? 'camera' : 'screen')
         return
       }
-      const s = new Set(mutedUserIds.value); s.add(p.identity); mutedUserIds.value = s
+      const s = new Set(mutedUserIds.value)
+      s.add(p.identity)
+      mutedUserIds.value = s
     })
     r.on(RoomEvent.TrackUnmuted, (pub, p: Participant) => {
       if (pub.kind === Track.Kind.Video) {
         if (pub.track) _addVideoTrack(p, pub.track as RemoteTrack | LocalVideoTrack)
         return
       }
-      const s = new Set(mutedUserIds.value); s.delete(p.identity); mutedUserIds.value = s
+      const s = new Set(mutedUserIds.value)
+      s.delete(p.identity)
+      mutedUserIds.value = s
     })
     r.on(RoomEvent.Disconnected, (reason?: unknown) => {
       // REV-7 teşhisi: kendiliğinden düşmenin NEDENİ konsola (DUPLICATE_IDENTITY,
@@ -672,7 +747,10 @@ export const useVoiceStore = defineStore('voice', () => {
   watch(
     () => roomParticipants.value.length,
     (len) => {
-      if (aloneTimer) { clearTimeout(aloneTimer); aloneTimer = null }
+      if (aloneTimer) {
+        clearTimeout(aloneTimer)
+        aloneTimer = null
+      }
       if (!autoEndWhenAlone || !connectedChannelId.value) return
       if (len === 1) {
         const timeoutMs = peerEverJoined ? ALONE_TIMEOUT_LEFT_MS : ALONE_TIMEOUT_NEVER_JOINED_MS

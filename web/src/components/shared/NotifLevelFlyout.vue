@@ -146,9 +146,34 @@ onUnmounted(() => {
     @mouseleave="onTriggerLeave"
     @keydown="onTriggerKeydown($event, positionFlyout)"
   >
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nlf-icon"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="nlf-icon"
+    >
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
     <span class="nlf-label">{{ t('guildMenu.notifications') }}</span>
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="nlf-chevron"><path d="M9 18l6-6-6-6"/></svg>
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="nlf-chevron"
+    >
+      <path d="M9 18l6-6-6-6" />
+    </svg>
   </button>
 
   <!-- Yana açılan panel — body'ye teleport (host menü overflow:hidden'ı kırpmasın) -->
@@ -175,7 +200,20 @@ onUnmounted(() => {
         @click="pick(opt.level)"
       >
         <span class="nlf-option__label">{{ opt.label }}</span>
-        <svg v-if="props.level === opt.level" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="nlf-check"><path d="M20 6 9 17l-5-5"/></svg>
+        <svg
+          v-if="props.level === opt.level"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="nlf-check"
+        >
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
       </button>
 
       <!-- R14 — bastırma kutucukları (yalnız ortam menüsünde). Seçince panel KAPANMAZ:
@@ -191,7 +229,19 @@ onUnmounted(() => {
         >
           <span class="nlf-option__label">{{ t('guildMenu.suppressEveryone') }}</span>
           <span class="nlf-box" :class="suppressEveryone ? 'nlf-box--on' : ''">
-            <svg v-if="suppressEveryone" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            <svg
+              v-if="suppressEveryone"
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
           </span>
         </button>
         <button
@@ -203,7 +253,19 @@ onUnmounted(() => {
         >
           <span class="nlf-option__label">{{ t('guildMenu.suppressEvents') }}</span>
           <span class="nlf-box" :class="suppressEvents ? 'nlf-box--on' : ''">
-            <svg v-if="suppressEvents" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            <svg
+              v-if="suppressEvents"
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
           </span>
         </button>
         <button
@@ -215,7 +277,19 @@ onUnmounted(() => {
         >
           <span class="nlf-option__label">{{ t('guildMenu.suppressRoleMentions') }}</span>
           <span class="nlf-box" :class="suppressRoleMentions ? 'nlf-box--on' : ''">
-            <svg v-if="suppressRoleMentions" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            <svg
+              v-if="suppressRoleMentions"
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
           </span>
         </button>
       </template>

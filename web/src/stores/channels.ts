@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { guildsApi } from '@/api/guilds'
 import { channelsApi, categoriesApi } from '@/api/channels'
 import { useGuildsStore } from '@/stores/guilds'
-import type { ChannelDto, CategoryDto, GuildMemberRole } from '@/types'
+import type { ChannelDto, CategoryDto } from '@/types'
 
 export const useChannelsStore = defineStore('channels', () => {
   const channelsByGuild = ref<Record<string, ChannelDto[]>>({})
@@ -50,16 +50,30 @@ export const useChannelsStore = defineStore('channels', () => {
 
     // Kullanıcının rolünü üye listesinden öğren (arka planda, hata sessiz)
     if (userId) {
-      guildsApi.getMembers(guildId).then((res) => {
-        const me = res.data.find((m) => m.userId === userId)
-        if (me) {
-          useGuildsStore().setMyRole(guildId, me.role as GuildMemberRole)
-        }
-      }).catch(() => { /* sessiz */ })
+      guildsApi
+        .getMembers(guildId)
+        .then((res) => {
+          const me = res.data.find((m) => m.userId === userId)
+          if (me) {
+            useGuildsStore().setMyRole(guildId, me.role)
+          }
+        })
+        .catch(() => {
+          /* sessiz */
+        })
     }
   }
 
-  async function createChannel(guildId: string, payload: { name: string; type?: 'GUILD_TEXT' | 'GUILD_VOICE'; ageGated?: boolean; isPrivate?: boolean; categoryId?: string | null }): Promise<ChannelDto> {
+  async function createChannel(
+    guildId: string,
+    payload: {
+      name: string
+      type?: 'GUILD_TEXT' | 'GUILD_VOICE'
+      ageGated?: boolean
+      isPrivate?: boolean
+      categoryId?: string | null
+    },
+  ): Promise<ChannelDto> {
     const res = await guildsApi.createChannel(guildId, payload)
     if (!channelsByGuild.value[guildId]) channelsByGuild.value[guildId] = []
     // upsert (ham push DEĞİL): backend `channel.created` WS olayını yaratıcıya da yayınlar;
@@ -68,7 +82,19 @@ export const useChannelsStore = defineStore('channels', () => {
     return res.data
   }
 
-  async function updateChannel(channelId: string, guildId: string, payload: { name?: string; ageGated?: boolean; slowModeSeconds?: number; categoryId?: string | null; userLimit?: number; bitrate?: number; mediaEnabled?: boolean }): Promise<ChannelDto> {
+  async function updateChannel(
+    channelId: string,
+    guildId: string,
+    payload: {
+      name?: string
+      ageGated?: boolean
+      slowModeSeconds?: number
+      categoryId?: string | null
+      userLimit?: number
+      bitrate?: number
+      mediaEnabled?: boolean
+    },
+  ): Promise<ChannelDto> {
     const res = await channelsApi.update(channelId, payload)
     const list = channelsByGuild.value[guildId]
     if (list) {
@@ -99,7 +125,11 @@ export const useChannelsStore = defineStore('channels', () => {
     return res.data
   }
 
-  async function renameCategory(categoryId: string, guildId: string, name: string): Promise<CategoryDto> {
+  async function renameCategory(
+    categoryId: string,
+    guildId: string,
+    name: string,
+  ): Promise<CategoryDto> {
     const res = await categoriesApi.rename(categoryId, name)
     // Otoritatif tazele
     const fresh = await guildsApi.getCategories(guildId)
@@ -118,7 +148,11 @@ export const useChannelsStore = defineStore('channels', () => {
     categoriesByGuild.value[guildId] = catsRes.data
   }
 
-  async function assignChannelCategory(channelId: string, guildId: string, categoryId: string | null): Promise<ChannelDto> {
+  async function assignChannelCategory(
+    channelId: string,
+    guildId: string,
+    categoryId: string | null,
+  ): Promise<ChannelDto> {
     const res = await channelsApi.update(channelId, { categoryId })
     const list = channelsByGuild.value[guildId]
     if (list) {
@@ -149,14 +183,18 @@ export const useChannelsStore = defineStore('channels', () => {
     }
     // Optimistik guild sayacı — event yolu kalıyor (fallback)
     if (resolvedGuildId) {
-      window.dispatchEvent(new CustomEvent('kv:guild:recheck-unread', { detail: { guildId: resolvedGuildId } }))
+      window.dispatchEvent(
+        new CustomEvent('kv:guild:recheck-unread', { detail: { guildId: resolvedGuildId } }),
+      )
     }
     try {
       await channelsApi.markRead(channelId)
       // Sunucu-otoritesi: POST başarılı → kanalları sunucudan tazele; guild sayacını gerçek toplamdan güncelle
       if (resolvedGuildId) {
         await fetchChannels(resolvedGuildId)
-        window.dispatchEvent(new CustomEvent('kv:guild:recheck-unread', { detail: { guildId: resolvedGuildId } }))
+        window.dispatchEvent(
+          new CustomEvent('kv:guild:recheck-unread', { detail: { guildId: resolvedGuildId } }),
+        )
       }
     } catch {
       // Sessizce yut — okundu işaretleme kritik değil
@@ -177,7 +215,9 @@ export const useChannelsStore = defineStore('channels', () => {
     // Yüklü tüm kanalları sıfırla
     for (const gid of Object.keys(channelsByGuild.value)) {
       channelsByGuild.value[gid] = channelsByGuild.value[gid].map((c) =>
-        c.unreadCount > 0 || c.unreadMentionCount > 0 ? { ...c, unreadCount: 0, unreadMentionCount: 0 } : c,
+        c.unreadCount > 0 || c.unreadMentionCount > 0
+          ? { ...c, unreadCount: 0, unreadMentionCount: 0 }
+          : c,
       )
     }
     // Tüm guild rozetlerini sıfırla (yüklenmemiş guild'ler de dahil)
@@ -229,7 +269,11 @@ export const useChannelsStore = defineStore('channels', () => {
     } else {
       // Güncelleme: unread sayaçları korunur (WS DTO'sunda 0 gelir)
       const next = [...list]
-      next[idx] = { ...channel, unreadCount: next[idx].unreadCount, unreadMentionCount: next[idx].unreadMentionCount }
+      next[idx] = {
+        ...channel,
+        unreadCount: next[idx].unreadCount,
+        unreadMentionCount: next[idx].unreadMentionCount,
+      }
       channelsByGuild.value[guildId] = next
     }
   }
@@ -242,32 +286,48 @@ export const useChannelsStore = defineStore('channels', () => {
     if (!list) return
     const idx = list.findIndex((c) => c.id === category.id)
     if (idx === -1) categoriesByGuild.value[guildId] = [...list, category]
-    else { const next = [...list]; next[idx] = category; categoriesByGuild.value[guildId] = next }
+    else {
+      const next = [...list]
+      next[idx] = category
+      categoriesByGuild.value[guildId] = next
+    }
   }
   function removeCategoryLocal(guildId: string, categoryId: string): void {
     const cats = categoriesByGuild.value[guildId]
     if (cats) categoriesByGuild.value[guildId] = cats.filter((c) => c.id !== categoryId)
     // Kategorinin kanalları kategorisize düşer (backend de böyle yapar)
     const chans = channelsByGuild.value[guildId]
-    if (chans) channelsByGuild.value[guildId] = chans.map((c) => (c.categoryId === categoryId ? { ...c, categoryId: null } : c))
+    if (chans)
+      channelsByGuild.value[guildId] = chans.map((c) =>
+        c.categoryId === categoryId ? { ...c, categoryId: null } : c,
+      )
   }
 
   // Drag-reorder optimistik uygulama (API + WS ile reconcile)
-  function applyChannelReorder(guildId: string, items: { id: string; position: number; categoryId?: string | null }[]): void {
+  function applyChannelReorder(
+    guildId: string,
+    items: { id: string; position: number; categoryId?: string | null }[],
+  ): void {
     const list = channelsByGuild.value[guildId]
     if (!list) return
     const byId = new Map(items.map((i) => [i.id, i]))
     channelsByGuild.value[guildId] = list.map((c) => {
       const it = byId.get(c.id)
       if (!it) return c
-      return { ...c, position: it.position, ...(it.categoryId !== undefined ? { categoryId: it.categoryId } : {}) }
+      return {
+        ...c,
+        position: it.position,
+        ...(it.categoryId !== undefined ? { categoryId: it.categoryId } : {}),
+      }
     })
   }
   function applyCategoryReorder(guildId: string, items: { id: string; position: number }[]): void {
     const list = categoriesByGuild.value[guildId]
     if (!list) return
     const byId = new Map(items.map((i) => [i.id, i.position]))
-    categoriesByGuild.value[guildId] = list.map((c) => (byId.has(c.id) ? { ...c, position: byId.get(c.id)! } : c))
+    categoriesByGuild.value[guildId] = list.map((c) =>
+      byId.has(c.id) ? { ...c, position: byId.get(c.id)! } : c,
+    )
   }
 
   function channelsWithMentions(guildId: string) {

@@ -101,9 +101,11 @@ function pinContentPlain(content: string): string {
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
-  return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) +
+  return (
+    d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) +
     ' ' +
     d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }).replace(':', '.')
+  )
 }
 
 // Parent, WS pin/unpin geldiğinde bunu çağırır (expose ile)
@@ -118,20 +120,20 @@ defineExpose({ refresh })
     v-if="open"
     ref="popoverEl"
     class="absolute top-full right-0 mt-2 z-50 w-[340px] max-h-[480px] flex flex-col overflow-hidden rounded-[var(--kv-radius-md)]"
-    style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
+    style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle)"
     @click.stop
   >
     <!-- Başlık -->
     <div
       class="flex items-center justify-between px-4 py-3 shrink-0 border-b"
-      style="border-color: var(--kv-border-subtle);"
+      style="border-color: var(--kv-border-subtle)"
     >
-      <span class="text-[14px] font-semibold" style="color: var(--kv-text-primary);">
+      <span class="text-[14px] font-semibold" style="color: var(--kv-text-primary)">
         📌 {{ t('message.pinnedMessages') }}
       </span>
       <button
         class="w-6 h-6 flex items-center justify-center rounded text-[14px] cursor-pointer transition-colors"
-        style="color: var(--kv-text-muted);"
+        style="color: var(--kv-text-muted)"
         :title="t('common.close')"
         @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
         @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)'"
@@ -144,29 +146,17 @@ defineExpose({ refresh })
     <!-- İçerik -->
     <div class="flex-1 overflow-y-auto py-2">
       <!-- Yükleniyor -->
-      <p
-        v-if="loading"
-        class="px-4 py-3 text-[13px]"
-        style="color: var(--kv-text-muted);"
-      >
+      <p v-if="loading" class="px-4 py-3 text-[13px]" style="color: var(--kv-text-muted)">
         {{ t('common.loading') }}
       </p>
 
       <!-- Hata -->
-      <p
-        v-else-if="error"
-        class="px-4 py-3 text-[13px]"
-        style="color: var(--kv-danger);"
-      >
+      <p v-else-if="error" class="px-4 py-3 text-[13px]" style="color: var(--kv-danger)">
         {{ error }}
       </p>
 
       <!-- Boş durum -->
-      <p
-        v-else-if="!pins.length"
-        class="px-4 py-3 text-[13px]"
-        style="color: var(--kv-text-muted);"
-      >
+      <p v-else-if="!pins.length" class="px-4 py-3 text-[13px]" style="color: var(--kv-text-muted)">
         {{ t('message.pinnedMessagesEmpty') }}
       </p>
 
@@ -176,7 +166,7 @@ defineExpose({ refresh })
           v-for="pin in pins"
           :key="pin.id"
           class="flex gap-3 px-4 py-2.5 border-b last:border-b-0 cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
-          style="border-color: var(--kv-border-subtle);"
+          style="border-color: var(--kv-border-subtle)"
           role="button"
           :title="t('message.jumpToMessage')"
           @click="onJump(pin.id)"
@@ -184,7 +174,7 @@ defineExpose({ refresh })
           <!-- Yazar avatarı (daire) -->
           <div
             class="w-8 h-8 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-semibold text-white"
-            style="background-color: var(--kv-accent-500);"
+            style="background-color: var(--kv-accent-500)"
           >
             <img
               v-if="pin.author.avatarUrl"
@@ -198,24 +188,27 @@ defineExpose({ refresh })
           <!-- İçerik -->
           <div class="flex-1 min-w-0">
             <div class="flex items-baseline gap-2 mb-0.5">
-              <span class="text-[13px] font-semibold truncate" style="color: var(--kv-text-primary);">
+              <span
+                class="text-[13px] font-semibold truncate"
+                style="color: var(--kv-text-primary)"
+              >
                 {{ pin.author.username }}
               </span>
-              <span class="text-[11px] shrink-0" style="color: var(--kv-text-muted);">
+              <span class="text-[11px] shrink-0" style="color: var(--kv-text-muted)">
                 {{ formatDate(pin.createdAt) }}
               </span>
             </div>
             <p
               v-if="pin.content"
               class="text-[13px] break-words line-clamp-3"
-              style="color: var(--kv-text-body);"
+              style="color: var(--kv-text-body)"
             >
               {{ pinContentPlain(pin.content) }}
             </p>
             <p
               v-else-if="pin.attachments?.length"
               class="text-[13px] italic"
-              style="color: var(--kv-text-muted);"
+              style="color: var(--kv-text-muted)"
             >
               {{ pin.attachments[0].filename }}
             </p>

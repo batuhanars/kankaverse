@@ -110,7 +110,7 @@ function onKeydown(e: KeyboardEvent) {
     <!-- Önizleme alanı -->
     <div
       class="w-full rounded-[var(--kv-radius-md)] overflow-hidden mb-4 flex items-center justify-center"
-      style="min-height: 180px; background-color: var(--kv-bg-rail);"
+      style="min-height: 180px; background-color: var(--kv-bg-rail)"
     >
       <!-- Görsel önizleme -->
       <img
@@ -118,7 +118,7 @@ function onKeydown(e: KeyboardEvent) {
         :src="previewUrl"
         :alt="file.name"
         class="max-w-full object-contain rounded-[var(--kv-radius-md)]"
-        style="max-height: 260px;"
+        style="max-height: 260px"
       />
 
       <!-- Görsel-dışı: ikon + ad + boyut -->
@@ -135,7 +135,17 @@ function onKeydown(e: KeyboardEvent) {
           <rect width="48" height="48" rx="8" fill="var(--kv-danger)" fill-opacity="0.15" />
           <path d="M12 6h18l8 8v28H12V6z" fill="var(--kv-danger)" fill-opacity="0.7" />
           <path d="M30 6l8 8h-8V6z" fill="var(--kv-danger)" />
-          <text x="24" y="32" text-anchor="middle" font-size="9" font-weight="700" fill="var(--kv-danger)" font-family="sans-serif">PDF</text>
+          <text
+            x="24"
+            y="32"
+            text-anchor="middle"
+            font-size="9"
+            font-weight="700"
+            fill="var(--kv-danger)"
+            font-family="sans-serif"
+          >
+            PDF
+          </text>
         </svg>
 
         <!-- DOC/DOCX ikon -->
@@ -150,7 +160,17 @@ function onKeydown(e: KeyboardEvent) {
           <rect width="48" height="48" rx="8" fill="var(--kv-info)" fill-opacity="0.15" />
           <path d="M12 6h18l8 8v28H12V6z" fill="var(--kv-info)" fill-opacity="0.7" />
           <path d="M30 6l8 8h-8V6z" fill="var(--kv-info)" />
-          <text x="24" y="32" text-anchor="middle" font-size="9" font-weight="700" fill="var(--kv-info)" font-family="sans-serif">DOC</text>
+          <text
+            x="24"
+            y="32"
+            text-anchor="middle"
+            font-size="9"
+            font-weight="700"
+            fill="var(--kv-info)"
+            font-family="sans-serif"
+          >
+            DOC
+          </text>
         </svg>
 
         <!-- TXT ikon -->
@@ -165,7 +185,17 @@ function onKeydown(e: KeyboardEvent) {
           <rect width="48" height="48" rx="8" fill="var(--kv-text-muted)" fill-opacity="0.2" />
           <path d="M12 6h18l8 8v28H12V6z" fill="var(--kv-text-secondary)" fill-opacity="0.7" />
           <path d="M30 6l8 8h-8V6z" fill="var(--kv-text-secondary)" />
-          <text x="24" y="32" text-anchor="middle" font-size="9" font-weight="700" fill="var(--kv-text-primary)" font-family="sans-serif">TXT</text>
+          <text
+            x="24"
+            y="32"
+            text-anchor="middle"
+            font-size="9"
+            font-weight="700"
+            fill="var(--kv-text-primary)"
+            font-family="sans-serif"
+          >
+            TXT
+          </text>
         </svg>
 
         <!-- Genel dosya ikonu -->
@@ -183,10 +213,13 @@ function onKeydown(e: KeyboardEvent) {
           <path d="M18 22h12M18 28h8" stroke="white" stroke-width="1.5" stroke-linecap="round" />
         </svg>
 
-        <span class="text-[13px] font-medium truncate max-w-[200px] text-center" style="color: var(--kv-text-primary);">
+        <span
+          class="text-[13px] font-medium truncate max-w-[200px] text-center"
+          style="color: var(--kv-text-primary)"
+        >
           {{ file.name }}
         </span>
-        <span class="text-[12px]" style="color: var(--kv-text-muted);">
+        <span class="text-[12px]" style="color: var(--kv-text-muted)">
           {{ formatBytes(file.size) }}
         </span>
       </div>
@@ -196,15 +229,15 @@ function onKeydown(e: KeyboardEvent) {
     <div v-if="uploading" class="mb-3">
       <div
         class="w-full h-1 rounded-full overflow-hidden"
-        style="background-color: var(--kv-bg-elevated);"
+        style="background-color: var(--kv-bg-elevated)"
       >
         <div
           class="h-full rounded-full transition-all duration-200"
-          style="background-color: var(--kv-accent-500);"
+          style="background-color: var(--kv-accent-500)"
           :style="{ width: `${uploadProgress}%` }"
         />
       </div>
-      <p class="text-[12px] mt-1" style="color: var(--kv-text-muted);">
+      <p class="text-[12px] mt-1" style="color: var(--kv-text-muted)">
         {{ t('attachment.compose.uploading', { pct: uploadProgress }) }}
       </p>
     </div>
@@ -213,7 +246,7 @@ function onKeydown(e: KeyboardEvent) {
     <div
       v-if="uploadError"
       class="mb-3 px-3 py-2 rounded-[var(--kv-radius-sm)] text-[13px]"
-      style="background-color: var(--kv-bg-elevated); color: var(--kv-danger);"
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-danger)"
     >
       {{ uploadError }}
     </div>

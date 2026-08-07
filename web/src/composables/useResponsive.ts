@@ -9,10 +9,10 @@ import { useBreakpoints, breakpointsTailwind } from '@vueuse/core'
  */
 const bp = useBreakpoints(breakpointsTailwind)
 
-export const isMobile = bp.smaller('md')         // < 768
-export const isTablet = bp.between('md', 'lg')   // 768–1023
-export const isDesktop = bp.between('lg', 'xl')  // 1024–1279
-export const isWide = bp.greaterOrEqual('xl')     // ≥ 1280
+export const isMobile = bp.smaller('md') // < 768
+export const isTablet = bp.between('md', 'lg') // 768–1023
+export const isDesktop = bp.between('lg', 'xl') // 1024–1279
+export const isWide = bp.greaterOrEqual('xl') // ≥ 1280
 
 export function useResponsive() {
   return { isMobile, isTablet, isDesktop, isWide }

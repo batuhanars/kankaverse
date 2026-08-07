@@ -28,11 +28,11 @@ export const useAuthStore = defineStore('auth', () => {
   // Sprint 2B: login artık 2FA challenge dönebilir
   async function login(payload: LoginPayload): Promise<LoginChallengeDto | null> {
     const res = await authApi.loginWithChallenge(payload)
-    const data = res.data as LoginChallengeDto | { user: UserDto; accessToken: string }
+    const data = res.data
     if ('twoFactorRequired' in data) {
-      return data as LoginChallengeDto
+      return data
     }
-    const authData = data as { user: UserDto; accessToken: string }
+    const authData = data
     setAccessToken(authData.accessToken)
     user.value = authData.user
     return null
@@ -66,5 +66,17 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
-  return { user, ready, init, register, login, loginTwoFa, logout, clearAuth, isAuthenticated, isEmailVerified, updateUser }
+  return {
+    user,
+    ready,
+    init,
+    register,
+    login,
+    loginTwoFa,
+    logout,
+    clearAuth,
+    isAuthenticated,
+    isEmailVerified,
+    updateUser,
+  }
 })

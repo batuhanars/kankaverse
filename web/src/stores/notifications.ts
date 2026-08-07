@@ -42,7 +42,9 @@ export const useNotificationsStore = defineStore('notifications', () => {
     if (initialFetched.value && !nextCursor.value) return
     loadingMore.value = true
     try {
-      const res = await notificationsApi.list(initialFetched.value ? nextCursor.value ?? undefined : undefined)
+      const res = await notificationsApi.list(
+        initialFetched.value ? (nextCursor.value ?? undefined) : undefined,
+      )
       const { items: page, nextCursor: cursor } = res.data
       if (!initialFetched.value) {
         // İlk REST çağrısı: snapshot (yalnız okunmamış) yerine tam ilk sayfayı koy

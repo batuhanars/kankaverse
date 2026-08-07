@@ -15,7 +15,9 @@ let ringbackTimer: ReturnType<typeof setInterval> | null = null // giden geri-zi
 function audioCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null
   if (!ctx) {
-    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    const Ctor =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!Ctor) return null
     ctx = new Ctor()
   }
@@ -142,5 +144,15 @@ function playAlert() {
 }
 
 export function useCallSounds() {
-  return { startRingtone, stopRingtone, startRingback, stopRingback, playConnect, playDisconnect, playPeerJoin, playPeerLeave, playAlert }
+  return {
+    startRingtone,
+    stopRingtone,
+    startRingback,
+    stopRingback,
+    playConnect,
+    playDisconnect,
+    playPeerJoin,
+    playPeerLeave,
+    playAlert,
+  }
 }

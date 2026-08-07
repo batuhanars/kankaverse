@@ -1,5 +1,11 @@
 import http from './axios'
-import type { UserDto, SessionDto, TwoFactorSetupDto, RecoveryCodesDto, LoginChallengeDto } from '@/types'
+import type {
+  UserDto,
+  SessionDto,
+  TwoFactorSetupDto,
+  RecoveryCodesDto,
+  LoginChallengeDto,
+} from '@/types'
 
 export interface RegisterPayload {
   username: string
@@ -62,7 +68,10 @@ export const authApi = {
     return http.post<null>('/auth/2fa/disable', { currentPassword, totpCode })
   },
   loginTwoFa(challengeToken: string, code: string) {
-    return http.post<{ user: UserDto; accessToken: string }>('/auth/login/2fa', { challengeToken, code })
+    return http.post<{ user: UserDto; accessToken: string }>('/auth/login/2fa', {
+      challengeToken,
+      code,
+    })
   },
   // Sprint 2B — oturumlar
   getSessions() {
@@ -97,6 +106,9 @@ export const authApi = {
   // Not: hesap silme iptali ayrı endpoint DEĞİL — re-login silme talebini iptal eder (backend: cancelPendingDeletionOnLogin).
   // Sprint 2B — login (union dönüşü: normal | 2FA challenge)
   loginWithChallenge(payload: { email: string; password: string }) {
-    return http.post<{ user: UserDto; accessToken: string } | LoginChallengeDto>('/auth/login', payload)
+    return http.post<{ user: UserDto; accessToken: string } | LoginChallengeDto>(
+      '/auth/login',
+      payload,
+    )
   },
 }

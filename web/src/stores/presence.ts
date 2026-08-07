@@ -53,5 +53,13 @@ export const usePresenceStore = defineStore('presence', () => {
     return selfStatus(myId)
   })
 
-  return { statusMap, applySnapshot, applyUpdate, getStatus, myStatus, manualStatus, setManualStatus }
+  return {
+    statusMap,
+    applySnapshot,
+    applyUpdate,
+    getStatus,
+    myStatus,
+    manualStatus,
+    setManualStatus,
+  }
 })

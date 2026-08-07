@@ -19,20 +19,40 @@ export const useCallStore = defineStore('call', () => {
   // Nötr bilgi (ulaşılamadı / reddedildi) — engellenme/ilişki sızdırmaz
   const notice = ref<string>('')
 
-  function setOutgoing(channelId: string) { outgoing.value = { channelId } }
-  function clearOutgoing() { outgoing.value = null }
-  function isRinging(channelId: string) { return outgoing.value?.channelId === channelId }
+  function setOutgoing(channelId: string) {
+    outgoing.value = { channelId }
+  }
+  function clearOutgoing() {
+    outgoing.value = null
+  }
+  function isRinging(channelId: string) {
+    return outgoing.value?.channelId === channelId
+  }
 
-  function setIncoming(call: IncomingCall) { incoming.value = call }
-  function clearIncoming() { incoming.value = null }
+  function setIncoming(call: IncomingCall) {
+    incoming.value = call
+  }
+  function clearIncoming() {
+    incoming.value = null
+  }
 
-  function setNotice(msg: string) { notice.value = msg }
-  function clearNotice() { notice.value = '' }
+  function setNotice(msg: string) {
+    notice.value = msg
+  }
+  function clearNotice() {
+    notice.value = ''
+  }
 
   return {
-    outgoing, incoming, notice,
-    setOutgoing, clearOutgoing, isRinging,
-    setIncoming, clearIncoming,
-    setNotice, clearNotice,
+    outgoing,
+    incoming,
+    notice,
+    setOutgoing,
+    clearOutgoing,
+    isRinging,
+    setIncoming,
+    clearIncoming,
+    setNotice,
+    clearNotice,
   }
 })

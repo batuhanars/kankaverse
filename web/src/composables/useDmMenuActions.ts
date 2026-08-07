@@ -51,7 +51,8 @@ export function useDmMenuActions(channel: Ref<DmChannelDto | null> | (() => DmCh
   async function muteDmFor(minutes: number | null) {
     const c = target.value
     if (!c) return
-    const mutedUntil = minutes === null ? null : new Date(Date.now() + minutes * 60_000).toISOString()
+    const mutedUntil =
+      minutes === null ? null : new Date(Date.now() + minutes * 60_000).toISOString()
     try {
       await prefsStore.setPref({
         targetType: NotifTargetType.CHANNEL,

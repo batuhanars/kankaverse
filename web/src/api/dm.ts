@@ -19,10 +19,8 @@ export const dmApi = {
     http.post<DmChannelDto>('/dm/groups', { memberIds, ...(name ? { name } : {}) }),
   addGroupMember: (groupId: string, userId: string) =>
     http.post<null>(`/dm/groups/${groupId}/members`, { userId }),
-  leaveGroup: (groupId: string) =>
-    http.delete<null>(`/dm/groups/${groupId}/members/me`),
-  deleteGroup: (groupId: string) =>
-    http.delete<null>(`/dm/groups/${groupId}`),
+  leaveGroup: (groupId: string) => http.delete<null>(`/dm/groups/${groupId}/members/me`),
+  deleteGroup: (groupId: string) => http.delete<null>(`/dm/groups/${groupId}`),
   renameGroup: (groupId: string, name: string) =>
     http.patch<DmChannelDto>(`/dm/groups/${groupId}`, { name }),
   removeGroupMember: (groupId: string, userId: string) =>

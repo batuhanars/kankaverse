@@ -90,7 +90,10 @@ const livePopupPos = ref({ x: 0, y: 0 })
 let closeTimer: ReturnType<typeof setTimeout> | null = null
 
 function openLivePopup(e: MouseEvent, userId: string) {
-  if (closeTimer) { clearTimeout(closeTimer); closeTimer = null }
+  if (closeTimer) {
+    clearTimeout(closeTimer)
+    closeTimer = null
+  }
   const badge = (e.currentTarget as HTMLElement).getBoundingClientRect()
   // Rozet sağına/altına konumlandır; sağdan taşarsa sola kaydır (viewport clamp)
   let x = badge.right + 6
@@ -111,10 +114,15 @@ function scheduleLivePopupClose() {
 }
 
 function cancelLivePopupClose() {
-  if (closeTimer) { clearTimeout(closeTimer); closeTimer = null }
+  if (closeTimer) {
+    clearTimeout(closeTimer)
+    closeTimer = null
+  }
 }
 
-onClickOutside(livePopupRef, () => { livePopupUserId.value = null })
+onClickOutside(livePopupRef, () => {
+  livePopupUserId.value = null
+})
 
 async function watchStream() {
   livePopupUserId.value = null
@@ -126,15 +134,22 @@ async function watchStream() {
 const ctxMenu = ref<{ userId: string; x: number; y: number } | null>(null)
 const ctxMenuRef = ref<HTMLElement | null>(null)
 const ctxMoveSubmenuOpen = ref(false)
-onClickOutside(ctxMenuRef, () => { ctxMenu.value = null; ctxMoveSubmenuOpen.value = false })
+onClickOutside(ctxMenuRef, () => {
+  ctxMenu.value = null
+  ctxMoveSubmenuOpen.value = false
+})
 
 const selfId = computed(() => authStore.user?.id ?? '')
-const guildIdResolved = computed(() => props.guildId ?? channelsStore.findChannelById(props.channelId)?.guildId ?? '')
+const guildIdResolved = computed(
+  () => props.guildId ?? channelsStore.findChannelById(props.channelId)?.guildId ?? '',
+)
 const { can } = useGuildPermissions(() => guildIdResolved.value)
 const canMute = computed(() => can('MUTE_MEMBERS'))
 const canMove = computed(() => can('MOVE_MEMBERS'))
 
-const ownerId = computed(() => guildsStore.guilds.find((g) => g.id === guildIdResolved.value)?.ownerId ?? null)
+const ownerId = computed(
+  () => guildsStore.guilds.find((g) => g.id === guildIdResolved.value)?.ownerId ?? null,
+)
 
 function openContextMenu(e: MouseEvent, userId: string) {
   ctxMoveSubmenuOpen.value = false
@@ -166,7 +181,9 @@ function isCtxServerMuted(): boolean {
 
 // Zaten arkadaş mı → "Kanka Ekle" gizlenir (friends AppShell'de hidrate edilir)
 function isCtxFriend(): boolean {
-  return ctxMenu.value ? friendsStore.friends.some((f) => f.user.id === ctxMenu.value!.userId) : false
+  return ctxMenu.value
+    ? friendsStore.friends.some((f) => f.user.id === ctxMenu.value!.userId)
+    : false
 }
 
 // Taşı: aynı guild'in diğer ses kanalları (mevcut hariç)
@@ -232,7 +249,7 @@ const blockingUserId = ref<string | null>(null)
 const blockingUsername = ref('')
 
 function ctxBlock() {
-  const member = members.value.find(m => m.userId === ctxMenu.value!.userId)
+  const member = members.value.find((m) => m.userId === ctxMenu.value!.userId)
   blockingUserId.value = ctxMenu.value!.userId
   blockingUsername.value = member?.username ?? ctxMenu.value!.userId
   ctxMenu.value = null
@@ -283,7 +300,7 @@ const disconnectingUserId = ref<string | null>(null)
 const disconnectingUsername = ref('')
 
 function ctxDisconnect() {
-  const member = members.value.find(m => m.userId === ctxMenu.value!.userId)
+  const member = members.value.find((m) => m.userId === ctxMenu.value!.userId)
   disconnectingUserId.value = ctxMenu.value!.userId
   disconnectingUsername.value = member?.username ?? ctxMenu.value!.userId
   ctxMenu.value = null
@@ -301,8 +318,6 @@ async function doDisconnect() {
     disconnectingUserId.value = null
   }
 }
-
-
 </script>
 
 <template>
@@ -311,16 +326,21 @@ async function doDisconnect() {
       v-for="p in sortedMembers"
       :key="p.userId"
       class="flex items-center gap-2 py-0.5 text-[13px] group/row"
-      style="color: var(--kv-text-secondary);"
+      style="color: var(--kv-text-secondary)"
       @contextmenu.prevent="openContextMenu($event, p.userId)"
     >
       <!-- Avatar (daire) + konuşma halkası -->
       <div
         class="w-5 h-5 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-white"
         :class="{ 'kv-speaking': isSpeaking(p.userId) }"
-        style="background-color: var(--kv-accent-500);"
+        style="background-color: var(--kv-accent-500)"
       >
-        <img v-if="p.avatarUrl" :src="p.avatarUrl" :alt="p.username" class="w-full h-full object-cover" />
+        <img
+          v-if="p.avatarUrl"
+          :src="p.avatarUrl"
+          :alt="p.username"
+          class="w-full h-full object-cover"
+        />
         <span v-else>{{ p.username[0]?.toUpperCase() }}</span>
       </div>
       <span class="truncate flex-1">{{ p.username }}</span>
@@ -329,7 +349,7 @@ async function doDisconnect() {
       <button
         v-if="isBroadcasting(p.userId)"
         class="text-[10px] font-bold px-1.5 py-0.5 rounded-sm leading-none cursor-pointer shrink-0"
-        style="background-color: var(--kv-accent-500); color: #fff;"
+        style="background-color: var(--kv-accent-500); color: #fff"
         @mouseenter="openLivePopup($event, p.userId)"
         @mouseleave="scheduleLivePopupClose"
       >
@@ -339,13 +359,21 @@ async function doDisconnect() {
       <!-- Mute göstergesi -->
       <svg
         v-if="isMuted(p.userId, p.isLocal)"
-        width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-        style="color: var(--kv-danger);" class="shrink-0"
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        style="color: var(--kv-danger)"
+        class="shrink-0"
       >
-        <line x1="1" y1="1" x2="23" y2="23"/>
-        <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
-        <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
-        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="1" y1="1" x2="23" y2="23" />
+        <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+        <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
+        <line x1="12" y1="19" x2="12" y2="23" />
       </svg>
     </div>
   </div>
@@ -361,19 +389,31 @@ async function doDisconnect() {
       @mouseleave="scheduleLivePopupClose"
       @click.stop
     >
-      <p class="text-[12px] font-semibold mb-1" style="color: var(--kv-text-primary);">
+      <p class="text-[12px] font-semibold mb-1" style="color: var(--kv-text-primary)">
         {{ t('voice.nowStreaming') }}
       </p>
-      <span class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-sm mb-2 leading-none" style="background-color: var(--kv-accent-500); color: #fff;">
+      <span
+        class="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-sm mb-2 leading-none"
+        style="background-color: var(--kv-accent-500); color: #fff"
+      >
         {{ t('voice.live') }}
       </span>
       <button
         class="flex items-center gap-1.5 w-full py-1.5 px-2 rounded-[var(--kv-radius-sm)] text-[12px] font-medium text-white cursor-pointer transition-opacity hover:opacity-90"
-        style="background-color: var(--kv-success, #3DB46E);"
+        style="background-color: var(--kv-success, #3db46e)"
         @click="watchStream"
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="5 3 19 12 5 21 5 3"/>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polygon points="5 3 19 12 5 21 5 3" />
         </svg>
         {{ t('voice.watchStream') }}
       </button>
@@ -392,7 +432,7 @@ async function doDisconnect() {
       <!-- Standart aksiyonlar: Profil (herkes için) -->
       <button
         class="w-full text-left px-3 py-1.5 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-        style="color: var(--kv-text-secondary);"
+        style="color: var(--kv-text-secondary)"
         @click="ctxViewProfile"
       >
         {{ t('voice.viewProfile') }}
@@ -403,7 +443,7 @@ async function doDisconnect() {
         <!-- Mesaj Gönder -->
         <button
           class="w-full text-left px-3 py-1.5 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-text-secondary);"
+          style="color: var(--kv-text-secondary)"
           @click="ctxSendMessage"
         >
           {{ t('voice.sendMessage') }}
@@ -412,7 +452,7 @@ async function doDisconnect() {
         <button
           v-if="!isCtxFriend()"
           class="w-full text-left px-3 py-1.5 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-text-secondary);"
+          style="color: var(--kv-text-secondary)"
           @click="ctxAddFriend"
         >
           {{ t('voice.addFriend') }}
@@ -420,7 +460,7 @@ async function doDisconnect() {
         <!-- Engelle (danger) -->
         <button
           class="w-full text-left px-3 py-1.5 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-          style="color: var(--kv-danger);"
+          style="color: var(--kv-danger)"
           @click="ctxBlock"
         >
           {{ t('voice.blockUser') }}
@@ -428,12 +468,12 @@ async function doDisconnect() {
 
         <!-- Ayraç + Mod aksiyonları (yalnız yetkili, hedef owner değilse) -->
         <template v-if="canModCtx()">
-          <div class="my-1 border-t" style="border-color: var(--kv-border-subtle);"></div>
+          <div class="my-1 border-t" style="border-color: var(--kv-border-subtle)"></div>
           <!-- Sustur / Susturmayı kaldır (MUTE_MEMBERS) -->
           <button
             v-if="canMute"
             class="w-full text-left px-3 py-1.5 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-text-secondary);"
+            style="color: var(--kv-text-secondary)"
             @click="ctxToggleMute"
           >
             {{ isCtxServerMuted() ? t('voice.serverUnmute') : t('voice.serverMute') }}
@@ -442,7 +482,7 @@ async function doDisconnect() {
           <button
             v-if="canMute && isCtxBroadcasting()"
             class="w-full text-left px-3 py-1.5 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-text-secondary);"
+            style="color: var(--kv-text-secondary)"
             @click="ctxStopBroadcast"
           >
             {{ t('voice.stopBroadcast') }}
@@ -451,21 +491,38 @@ async function doDisconnect() {
           <template v-if="canMove">
             <button
               class="w-full text-left px-3 py-1.5 text-[13px] flex items-center justify-between transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-              style="color: var(--kv-text-secondary);"
+              style="color: var(--kv-text-secondary)"
               @click.stop="ctxMoveSubmenuOpen = !ctxMoveSubmenuOpen"
             >
               <span>{{ t('voice.moveTo') }}</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 transition-transform" :class="ctxMoveSubmenuOpen ? 'rotate-90' : ''"><polyline points="9 18 15 12 9 6"/></svg>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="shrink-0 transition-transform"
+                :class="ctxMoveSubmenuOpen ? 'rotate-90' : ''"
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </button>
             <div v-if="ctxMoveSubmenuOpen" class="max-h-44 overflow-y-auto">
-              <p v-if="ctxMoveTargets.length === 0" class="px-5 py-1.5 text-[12px]" style="color: var(--kv-text-muted);">
+              <p
+                v-if="ctxMoveTargets.length === 0"
+                class="px-5 py-1.5 text-[12px]"
+                style="color: var(--kv-text-muted)"
+              >
                 {{ t('voice.noMoveTargets') }}
               </p>
               <button
                 v-for="target in ctxMoveTargets"
                 :key="target.id"
                 class="w-full text-left px-5 py-1.5 text-[12px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)] truncate"
-                style="color: var(--kv-text-secondary);"
+                style="color: var(--kv-text-secondary)"
                 @click="ctxMoveTo(target.id)"
               >
                 {{ target.name }}
@@ -476,7 +533,7 @@ async function doDisconnect() {
           <button
             v-if="canMove"
             class="w-full text-left px-3 py-1.5 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
-            style="color: var(--kv-danger);"
+            style="color: var(--kv-danger)"
             @click="ctxDisconnect"
           >
             {{ t('voice.disconnectUser') }}
@@ -492,7 +549,10 @@ async function doDisconnect() {
     :message="t('friends.confirmBlock')"
     :confirm-label="t('friends.block')"
     @confirm="doBlock"
-    @cancel="showBlockConfirm = false; blockingUserId = null"
+    @cancel="
+      showBlockConfirm = false
+      blockingUserId = null
+    "
   />
 
   <!-- Odadan çıkar onay dialog -->
@@ -501,7 +561,10 @@ async function doDisconnect() {
     :message="t('voice.disconnectConfirm', { username: disconnectingUsername })"
     :confirm-label="t('voice.disconnectUser')"
     @confirm="doDisconnect"
-    @cancel="showDisconnectConfirm = false; disconnectingUserId = null"
+    @cancel="
+      showDisconnectConfirm = false
+      disconnectingUserId = null
+    "
   />
 
   <!-- Kullanıcı kartı (guildId → rol rozetleri) -->

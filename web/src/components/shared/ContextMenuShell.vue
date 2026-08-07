@@ -48,9 +48,7 @@ function clampToViewport() {
   top.value = Math.max(EDGE, Math.min(props.y, window.innerHeight - rect.height - EDGE))
 }
 
-const posStyle = computed(() =>
-  isMobile.value ? '' : `left:${left.value}px;top:${top.value}px;`,
-)
+const posStyle = computed(() => (isMobile.value ? '' : `left:${left.value}px;top:${top.value}px;`))
 
 // Başka bir menü açılırsa bu kapanır (koordinatör)
 closeOnOther(props.menuId, () => emit('close'))

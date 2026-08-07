@@ -33,7 +33,11 @@ onMounted(() => {
 })
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+  return new Date(iso).toLocaleDateString('tr-TR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
 }
 
 // Çevrimiçi durumu → renk (tasarım token'larıyla; presence renkleri brief'te sabit)
@@ -58,16 +62,19 @@ function lastSeen(u: AdminUserDto): string {
 <template>
   <div class="flex flex-col gap-4">
     <div class="flex items-center justify-between">
-      <h3 class="text-[13px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+      <h3
+        class="text-[13px] font-semibold uppercase tracking-widest"
+        style="color: var(--kv-text-muted)"
+      >
         {{ t('admin.users.title') }}
       </h3>
       <div class="flex items-center gap-3">
-        <span v-if="!loading && !loadError" class="text-[12px]" style="color: var(--kv-text-muted);">
+        <span v-if="!loading && !loadError" class="text-[12px]" style="color: var(--kv-text-muted)">
           {{ t('admin.users.count', { count: users.length }) }}
         </span>
         <button
           class="text-[12px] font-medium px-3 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-          style="color: var(--kv-accent-500);"
+          style="color: var(--kv-accent-500)"
           :disabled="loading"
           @click="loadUsers"
         >
@@ -76,23 +83,23 @@ function lastSeen(u: AdminUserDto): string {
       </div>
     </div>
 
-    <div v-if="loading" class="text-[13px] py-4" style="color: var(--kv-text-muted);">
+    <div v-if="loading" class="text-[13px] py-4" style="color: var(--kv-text-muted)">
       {{ t('common.loading') }}
     </div>
-    <p v-else-if="loadError" class="text-[13px]" style="color: var(--kv-danger);">{{ loadError }}</p>
-    <p v-else-if="users.length === 0" class="text-[13px] py-4" style="color: var(--kv-text-muted);">
+    <p v-else-if="loadError" class="text-[13px]" style="color: var(--kv-danger)">{{ loadError }}</p>
+    <p v-else-if="users.length === 0" class="text-[13px] py-4" style="color: var(--kv-text-muted)">
       {{ t('admin.users.empty') }}
     </p>
 
     <div
       v-else
       class="rounded-[var(--kv-radius-lg)] overflow-hidden divide-y divide-[color:var(--kv-border-subtle)]"
-      style="background-color: var(--kv-bg-sidebar);"
+      style="background-color: var(--kv-bg-sidebar)"
     >
       <!-- Başlık satırı (yalnız masaüstü) -->
       <div
         class="flex max-md:hidden items-center gap-3 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-widest"
-        style="color: var(--kv-text-muted); background-color: var(--kv-bg-elevated);"
+        style="color: var(--kv-text-muted); background-color: var(--kv-bg-elevated)"
       >
         <span class="flex-1 min-w-0">{{ t('admin.users.colUser') }}</span>
         <span class="w-[160px] shrink-0">{{ t('admin.users.colEmail') }}</span>
@@ -116,42 +123,56 @@ function lastSeen(u: AdminUserDto): string {
               :style="`background-color: ${presenceColor(u.presence)};`"
               :title="presenceLabel(u.presence)"
             />
-            <span class="text-[14px] font-semibold" style="color: var(--kv-text-primary);">
+            <span class="text-[14px] font-semibold" style="color: var(--kv-text-primary)">
               {{ u.username }}
             </span>
             <span
               v-if="u.isModerator"
               class="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-              style="color: var(--kv-accent-500); background-color: var(--kv-bg-elevated);"
-            >{{ t('admin.users.badgeAdmin') }}</span>
+              style="color: var(--kv-accent-500); background-color: var(--kv-bg-elevated)"
+              >{{ t('admin.users.badgeAdmin') }}</span
+            >
             <span
               v-if="u.isMinor"
               class="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-              style="color: var(--kv-danger); background-color: var(--kv-bg-elevated);"
-            >{{ t('admin.users.badgeMinor') }}</span>
+              style="color: var(--kv-danger); background-color: var(--kv-bg-elevated)"
+              >{{ t('admin.users.badgeMinor') }}</span
+            >
             <span
               class="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
               :style="`color: ${u.emailVerified ? 'var(--kv-online, #3DB46E)' : 'var(--kv-text-muted)'}; background-color: var(--kv-bg-elevated);`"
-            >{{ u.emailVerified ? t('admin.users.badgeVerified') : t('admin.users.badgeUnverified') }}</span>
+              >{{
+                u.emailVerified ? t('admin.users.badgeVerified') : t('admin.users.badgeUnverified')
+              }}</span
+            >
             <span
               v-if="u.deletionRequestedAt"
               class="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-              style="color: #fff; background-color: var(--kv-danger);"
-              :title="t('admin.users.deletionRequestedAt', { date: formatDate(u.deletionRequestedAt) })"
-            >{{ t('admin.users.badgeDeletion') }}</span>
+              style="color: #fff; background-color: var(--kv-danger)"
+              :title="
+                t('admin.users.deletionRequestedAt', { date: formatDate(u.deletionRequestedAt) })
+              "
+              >{{ t('admin.users.badgeDeletion') }}</span
+            >
           </div>
         </div>
 
         <!-- E-posta -->
         <div class="w-full md:w-[160px] shrink-0 min-w-0">
-          <span class="text-[12px] truncate block" :title="u.email" style="color: var(--kv-text-muted);">
+          <span
+            class="text-[12px] truncate block"
+            :title="u.email"
+            style="color: var(--kv-text-muted)"
+          >
             {{ u.email }}
           </span>
         </div>
 
         <!-- Ortam: açtığı + üye olduğu -->
-        <div class="w-full md:w-[120px] shrink-0 text-[12px]" style="color: var(--kv-text-muted);">
-          <span :style="u.ownedGuildCount > 0 ? 'color: var(--kv-text-primary); font-weight: 600;' : ''">
+        <div class="w-full md:w-[120px] shrink-0 text-[12px]" style="color: var(--kv-text-muted)">
+          <span
+            :style="u.ownedGuildCount > 0 ? 'color: var(--kv-text-primary); font-weight: 600;' : ''"
+          >
             {{ t('admin.users.guildsOwned', { count: u.ownedGuildCount }) }}
           </span>
           <span class="mx-1 opacity-50">·</span>
@@ -159,20 +180,31 @@ function lastSeen(u: AdminUserDto): string {
         </div>
 
         <!-- Mesaj sayısı -->
-        <div class="w-full md:w-[70px] shrink-0 md:text-right text-[12px]" style="color: var(--kv-text-muted);">
+        <div
+          class="w-full md:w-[70px] shrink-0 md:text-right text-[12px]"
+          style="color: var(--kv-text-muted)"
+        >
           {{ u.messageCount }}
         </div>
 
         <!-- Son görülme -->
         <div class="w-full md:w-[120px] shrink-0 text-[12px]">
-          <span :style="u.presence !== 'offline' ? `color: ${presenceColor(u.presence)}; font-weight: 600;` : 'color: var(--kv-text-muted);'">
+          <span
+            :style="
+              u.presence !== 'offline'
+                ? `color: ${presenceColor(u.presence)}; font-weight: 600;`
+                : 'color: var(--kv-text-muted);'
+            "
+          >
             {{ lastSeen(u) }}
           </span>
         </div>
 
         <!-- Kayıt tarihi -->
         <div class="w-full md:w-[100px] shrink-0">
-          <span class="text-[12px]" style="color: var(--kv-text-muted);">{{ formatDate(u.createdAt) }}</span>
+          <span class="text-[12px]" style="color: var(--kv-text-muted)">{{
+            formatDate(u.createdAt)
+          }}</span>
         </div>
       </div>
     </div>
