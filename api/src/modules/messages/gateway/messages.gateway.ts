@@ -386,7 +386,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         priority: 'high',
         // §9.2.1 — mobilin kuracağı sesli-kanal kimliği; kanal ayarları kurulduktan sonra
         // DEĞİŞTİRİLEMEZ, mobil taraf farklı bir kimlik seçerse bu satır o kimlikle güncellenir.
-        androidChannelId: 'incoming_call_v3',
+        androidChannelId: 'incoming_call_v4',
         categoryId: 'incoming_call',
         ttlSeconds: 30,
       })

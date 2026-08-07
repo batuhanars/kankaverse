@@ -215,7 +215,7 @@ describe('PushService', () => {
           callerName: 'kanka1',
         },
         priority: 'high',
-        androidChannelId: 'incoming_call_v3',
+        androidChannelId: 'incoming_call_v4',
         categoryId: 'incoming_call',
         ttlSeconds: 30,
       });
@@ -234,7 +234,7 @@ describe('PushService', () => {
           },
           priority: 'high',
           // 🔴 `androidChannelId` Expo mesajının `channelId` alanına map'lenir (data.channelId ile karışmasın diye ayrı isimlendirildi).
-          channelId: 'incoming_call_v3',
+          channelId: 'incoming_call_v4',
           categoryId: 'incoming_call',
           ttl: 30,
         },
