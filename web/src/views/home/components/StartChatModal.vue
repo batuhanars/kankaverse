@@ -37,13 +37,18 @@ async function submit() {
     const ids = Array.from(selectedIds.value)
     let channel
     if (ids.length === 1) {
-      // 1-1 DM — canDm kapısı (minör+arkadaş izinli)
+      // D49 — tek seçim = iki kişi = grup değil, 1-1 DM. canDm kapısı uygulanır (minör+arkadaş
+      // izinli). Sunucu da `POST /dm/groups`a tek üye gelirse aynı yere yönlendiriyor; burada
+      // doğrudan DM ucu çağrılıyor, sonuç ve kapı aynı. Kullanıcıya uyarı/hata gösterilmez,
+      // düğme kilitlenmez — yönlendirme sessizdir.
       channel = await dmStore.openChannel(ids[0])
     } else {
-      // Grup DM — grup kapısı (minör reddedilir)
+      // Grup DM (3+ kişi) — grup kapısı (minör reddedilir)
       const name = groupName.value.trim() || undefined
       channel = await dmStore.createGroup(ids, name)
     }
+    // Dönen kanal DM de olabilir grup da; her ikisinde de doğrudan sohbete gidilir
+    // ("grup oluşturuldu" gibi bir bildirim gösterilmez).
     emit('created', channel.id)
   } catch {
     // Jenerik hata — GROUP_MINOR_FORBIDDEN veya NOT_FRIEND / canDm sebep gösterilmez (T&S: statü sızdırma yok)

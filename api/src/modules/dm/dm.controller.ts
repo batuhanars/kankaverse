@@ -95,7 +95,11 @@ export class DmController {
   @Post('groups')
   @Throttle({ default: { ttl: 3600000, limit: 10 } })
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: '[R7] Grup DM oluştur — yetişkin-only + arkadaş-tabanlı' })
+  @ApiOperation({
+    summary:
+      '[R7] Grup DM oluştur — yetişkin-only + arkadaş-tabanlı. D49: tek üye (toplam 2 kişi) ' +
+      "gönderilirse grup KURULMAZ, 1-1 DM döner (type: 'DM'); istemci dönen type'a bakar.",
+  })
   createGroupDm(@CurrentUser() user: { id: string }, @Body() dto: CreateGroupDmDto) {
     return this.dmService.createGroupDm(user.id, dto);
   }

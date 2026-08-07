@@ -197,7 +197,11 @@ export const useDmStore = create<DmState>((set, get) => ({
 
   async createGroup(memberIds, name) {
     const channel = await dmApi.createGroup(memberIds, name);
-    set((s) => ({ channels: [channel, ...s.channels] }));
+    // D49: sunucu tek üyeli (toplam 2 kişi) istekte GRUP DEĞİL 1-1 DM döner — mevcut DM varsa
+    // o kanalın kendisi. Dönen kanal listede zaten olabilir; körü körüne başa eklemek kopya
+    // satır açardı. `createChannel` ile aynı eşleştirme deseni (visibleChannels PENDING isteği
+    // listeden süzer, ekran yine sohbete gider).
+    set((s) => ({ channels: visibleChannels([channel, ...withoutChannel(s.channels, channel.id)]) }));
     return channel;
   },
 

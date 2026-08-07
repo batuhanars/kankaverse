@@ -121,11 +121,11 @@ describe('DmService.createGroupDm — T&S kapı sırası', () => {
     prismaMock.user.findUnique.mockResolvedValue({ isMinor: true });
 
     await expect(
-      service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A], name: 'Grup' }),
+      service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A, MEMBER_B], name: 'Grup' }),
     ).rejects.toThrow(ForbiddenException);
 
     try {
-      await service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A], name: 'Grup' });
+      await service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A, MEMBER_B], name: 'Grup' });
     } catch (e) {
       const resp = (e as ForbiddenException).getResponse() as { error: string };
       expect(resp.error).toBe('GROUP_MINOR_FORBIDDEN');
@@ -136,7 +136,7 @@ describe('DmService.createGroupDm — T&S kapı sırası', () => {
     prismaMock.user.findUnique.mockResolvedValue({ isMinor: true });
 
     try {
-      await service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A] });
+      await service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A, MEMBER_B] });
     } catch {
       // beklenen — minör guard fırlatıyor, burada yalnız yan-etkiyi (findMany çağrılmadı) doğruluyoruz
     }
@@ -150,15 +150,16 @@ describe('DmService.createGroupDm — T&S kapı sırası', () => {
   // ─────────────────────────────────────────────────────────────────────────
   it('[R7][G1] member minör → BadRequestException NOT_FRIEND (statü sızıntısı yok)', async () => {
     prismaMock.user.findUnique.mockResolvedValue({ isMinor: false }); // creator yetişkin
-    prismaMock.user.findMany.mockResolvedValue([MINOR_USER]);
+    prismaMock.user.findMany.mockResolvedValue([MINOR_USER, ADULT_MEMBER_A]);
     prismaMock.friendship.findFirst.mockResolvedValue({ id: 'f1' }); // arkadaş olsa bile NOT_FRIEND döner
 
-    await expect(service.createGroupDm(CREATOR_ID, { memberIds: [MINOR_USER.id] })).rejects.toThrow(
-      BadRequestException,
-    );
+    // D49: tek üyeli istek artık DM'e yönlenir → grup kapısını sınamak için 2 üye (toplam 3 kişi)
+    await expect(
+      service.createGroupDm(CREATOR_ID, { memberIds: [MINOR_USER.id, MEMBER_A] }),
+    ).rejects.toThrow(BadRequestException);
 
     try {
-      await service.createGroupDm(CREATOR_ID, { memberIds: [MINOR_USER.id] });
+      await service.createGroupDm(CREATOR_ID, { memberIds: [MINOR_USER.id, MEMBER_A] });
     } catch (e) {
       const resp = (e as BadRequestException).getResponse() as { error: string };
       expect(resp.error).toBe('NOT_FRIEND');
@@ -170,15 +171,16 @@ describe('DmService.createGroupDm — T&S kapı sırası', () => {
   // ─────────────────────────────────────────────────────────────────────────
   it('[R7] member arkadaş değil → BadRequestException NOT_FRIEND', async () => {
     prismaMock.user.findUnique.mockResolvedValue({ isMinor: false });
-    prismaMock.user.findMany.mockResolvedValue([ADULT_MEMBER_A]);
+    prismaMock.user.findMany.mockResolvedValue([ADULT_MEMBER_A, ADULT_MEMBER_B]);
     prismaMock.friendship.findFirst.mockResolvedValue(null); // arkadaş değil
 
-    await expect(service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A] })).rejects.toThrow(
-      BadRequestException,
-    );
+    // D49: tek üyeli istek artık DM'e yönlenir → grup kapısını sınamak için 2 üye (toplam 3 kişi)
+    await expect(
+      service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A, MEMBER_B] }),
+    ).rejects.toThrow(BadRequestException);
 
     try {
-      await service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A] });
+      await service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A, MEMBER_B] });
     } catch (e) {
       const resp = (e as BadRequestException).getResponse() as { error: string };
       expect(resp.error).toBe('NOT_FRIEND');
@@ -220,10 +222,136 @@ describe('DmService.createGroupDm — T&S kapı sırası', () => {
       name: 'Test',
     });
 
-    expect(result.type).toBe('GROUP_DM');
+    // D49 sonrası dönüş tipi union (GROUP_DM | DM) — daraltmadan alan okunamaz
+    if (result.type !== 'GROUP_DM') throw new Error('GROUP_DM bekleniyordu');
     expect(result.ownerId).toBe(CREATOR_ID);
     expect(result.members).toHaveLength(3);
     expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── D49: iki kişilik grup → 1-1 DM'e yönlendirme ─────────────────────────────
+
+describe("DmService.createGroupDm — D49 iki kişilik grup DM'e yönlenir", () => {
+  let service: DmService;
+
+  const TARGET_USER = { id: MEMBER_A, username: 'memberA', avatarUrl: null };
+  const DM_CH = 'dm-ch-1';
+
+  /** toDmChannelDto'nun yan sorgularını nötrle (blok yok, mesaj yok, istek yok). */
+  function stubToDmChannelDto() {
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm', lastReadAt: null });
+    prismaMock.message.findFirst.mockResolvedValue(null);
+    prismaMock.userBlock.findUnique.mockResolvedValue(null);
+    prismaMock.channel.findUnique.mockResolvedValue({
+      dmRequestStatus: null,
+      dmRequesterId: null,
+    });
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  it('tek üye (toplam 2 kişi) → DM döner, GRUP OLUŞMAZ', async () => {
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
+    prismaMock.user.findUnique.mockResolvedValue(TARGET_USER);
+    prismaMock.channelMember.findFirst.mockResolvedValue(null); // mevcut DM yok
+    prismaMock.channel.create.mockResolvedValue({ id: DM_CH });
+    prismaMock.channelMember.createMany.mockResolvedValue({ count: 2 });
+    prismaMock.$transaction.mockImplementation(
+      async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock),
+    );
+    stubToDmChannelDto();
+
+    const result = await service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A], name: 'Grup' });
+
+    expect(result.type).toBe('DM');
+    expect(result.id).toBe(DM_CH);
+    // Grup kapıları (creator minör / üye sorgusu) hiç çalıştırılmadı
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+    // Oluşturulan kanal DM; GROUP_DM oluşturulmadı ve grup adı kullanılmadı
+    const createArg = prismaMock.channel.create.mock.calls[0][0];
+    expect(createArg.data.type).toBe('DM');
+    expect(createArg.data.name).toBeUndefined();
+  });
+
+  it('mevcut DM varsa AYNI kanal döner (yeni kanal açılmaz)', async () => {
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
+    prismaMock.user.findUnique.mockResolvedValue(TARGET_USER);
+    prismaMock.channelMember.findFirst.mockResolvedValue({
+      channel: { id: DM_CH, type: 'DM', deletedAt: null },
+    });
+    stubToDmChannelDto();
+
+    const result = await service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A] });
+
+    expect(result.type).toBe('DM');
+    expect(result.id).toBe(DM_CH);
+    expect(prismaMock.channel.create).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('kendisi listeye girmişse (memberIds içinde creator) yine tek üye sayılır → DM', async () => {
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
+    prismaMock.user.findUnique.mockResolvedValue(TARGET_USER);
+    prismaMock.channelMember.findFirst.mockResolvedValue({
+      channel: { id: DM_CH, type: 'DM', deletedAt: null },
+    });
+    stubToDmChannelDto();
+
+    const result = await service.createGroupDm(CREATOR_ID, {
+      memberIds: [MEMBER_A, CREATOR_ID, MEMBER_A],
+    });
+
+    expect(result.type).toBe('DM');
+    expect(dmPermissionMock.canDm).toHaveBeenCalledWith(CREATOR_ID, MEMBER_A);
+  });
+
+  it('[R7] canDm reddederse jenerik DM_NOT_ALLOWED döner (ayrı "grup" metni yok)', async () => {
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: false, reason: 'BLOCKED' });
+
+    await expect(service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A] })).rejects.toThrow(
+      ForbiddenException,
+    );
+
+    try {
+      await service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A] });
+    } catch (e) {
+      const resp = (e as ForbiddenException).getResponse() as { error: string; message: string };
+      expect(resp.error).toBe('DM_NOT_ALLOWED');
+      expect(resp.message).toBe('Bu kullanıcıya mesaj gönderemezsiniz.');
+    }
+  });
+
+  it('regresyon: iki üye (toplam 3 kişi) → eskisi gibi GRUP oluşur, canDm çağrılmaz', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({ isMinor: false });
+    prismaMock.user.findMany.mockResolvedValue([ADULT_MEMBER_A, ADULT_MEMBER_B]);
+    prismaMock.friendship.findFirst.mockResolvedValue({ id: 'f1' });
+    prismaMock.$transaction.mockImplementation(
+      async (fn: (tx: typeof prismaMock) => Promise<unknown>) => {
+        prismaMock.channel.create.mockResolvedValue({
+          id: GROUP_ID,
+          type: 'GROUP_DM',
+          name: null,
+          ownerId: CREATOR_ID,
+          members: [],
+        });
+        prismaMock.channelMember.createMany.mockResolvedValue({ count: 3 });
+        return fn(prismaMock);
+      },
+    );
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { user: { id: CREATOR_ID, username: 'creator', avatarUrl: null } },
+      { user: { id: MEMBER_A, username: 'memberA', avatarUrl: null } },
+      { user: { id: MEMBER_B, username: 'memberB', avatarUrl: null } },
+    ]);
+
+    const result = await service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A, MEMBER_B] });
+
+    expect(result.type).toBe('GROUP_DM');
+    expect(dmPermissionMock.canDm).not.toHaveBeenCalled();
   });
 });
 
