@@ -134,7 +134,15 @@ export const useDmStore = defineStore('dm', () => {
   async function createGroup(memberIds: string[], name?: string): Promise<DmChannelDto> {
     const res = await dmApi.createGroup(memberIds, name)
     const channel = res.data
-    channels.value.unshift(channel)
+    // D49: sunucu tek üyeli (toplam 2 kişi) istekte GRUP DEĞİL 1-1 DM döner — mevcut DM varsa
+    // o kanalın kendisi. Dönen kanal listede zaten olabilir; körü körüne unshift kopya satır
+    // açardı. openChannel ile aynı eşleştirme deseni.
+    const idx = channels.value.findIndex((c) => c.id === channel.id)
+    if (idx === -1) {
+      channels.value.unshift(channel)
+    } else {
+      channels.value[idx] = channel
+    }
     activeDmChannelId.value = channel.id
     return channel
   }

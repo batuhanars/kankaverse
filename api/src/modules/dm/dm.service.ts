@@ -247,6 +247,7 @@ export class DmService {
   // ─────────────────────────────────────────────────────────────────────────────
   // POST /dm/groups
   // [R7] T&S kapı sırası (insan incelemesi zorunlu):
+  //   0. D49: tek üye (toplam 2 kişi) → grup DEĞİL, 1-1 DM'e yönlendirilir (aşağıda)
   //   1. creator isMinor → 403 GROUP_MINOR_FORBIDDEN
   //   2. her memberId: isMutualFriend değilse → 400 NOT_FRIEND (jenerik)
   //      member.isMinor → 403 GROUP_MINOR_FORBIDDEN (jenerik; statü sızdırılmaz)
@@ -260,6 +261,21 @@ export class DmService {
         message: 'Geçersiz üye listesi.',
         error: 'INVALID_MEMBER_LIST',
       });
+    }
+
+    // ── D49: iki kişilik grup = DM'in kötü kopyası ──────────────────────────────
+    // Tek üye kaldıysa açılmak istenen şey aslında bir 1-1 DM. Grup kurmak yerine
+    // getOrCreateDmChannel'a yönlendirilir (mevcut DM varsa o kanal döner, yenisi
+    // açılmaz). Bu bir HATA yolu değil, BAŞARI yolu — istemci dönen `type: 'DM'`e
+    // bakıp DM ekranına gider, kullanıcıya uyarı gösterilmez.
+    //
+    // 🔴 [R7] Kapı bilinçli olarak değişir: grup yolu isMutualFriend + minör kontrolü
+    // uygularken bu dal canDm'e tabidir (dmPolicy'ye göre arkadaş olmayana "istek"
+    // izni verebilir). Kapı GEVŞEMİYOR, açılan şey bir DM olduğu için DM'in kendi
+    // kapısı uygulanıyor. Ret hâlinde canDm'in jenerik DM_NOT_ALLOWED'ı döner;
+    // "grup kurulamadı" gibi ayrı bir metin üretilmez (statü sızdırma yok).
+    if (uniqueIds.length === 1) {
+      return this.getOrCreateDmChannel(creatorId, { userId: uniqueIds[0] });
     }
 
     // Kapı 1: creator isMinor?

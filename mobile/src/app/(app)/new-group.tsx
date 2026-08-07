@@ -72,6 +72,11 @@ export default function NewGroupScreen() {
       // olmak zorunda (`NOT_FRIEND`). Sunucu bu retleri jenerik verir; istemci sebebi tahmin
       // ETMEZ, extractErrorMessage sunucunun Türkçe mesajını gösterir (statü sızdırmaz).
       // R3 — grup adsız kurulur (`name` DTO'da opsiyonel); adlandırma DM detayının ⋯ menüsünde.
+      //
+      // D49 — tek kişi seçiliyse (toplam 2 kişi) sunucu GRUP KURMAZ, 1-1 DM döner (mevcut DM
+      // varsa onu). Bu bir hata değil başarı yolu: `dmRouteParams` dönen `type`'a bakıp DM
+      // ekranına götürür, "grup oluşturuldu" gibi bir bildirim gösterilmez. 🔴 Önden engelleme
+      // YOK — tek seçim serbest, düğme kilitlenmez, uyarı çıkmaz; yönlendirme sessizdir.
       const channel = await createGroup(Array.from(selected));
       router.replace(dmRouteParams(channel));
     } catch (e) {
