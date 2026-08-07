@@ -3,7 +3,9 @@ import { Alert, AppState, type AppStateStatus, Linking, Vibration } from 'react-
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useVoiceStore } from '@/stores/voice';
+import { useDmStore } from '@/stores/dm';
 import { callAccept, callReject } from '@/realtime/socket';
+import { channelTitle } from '@/utils/channelTitle';
 import { dmTarget } from '@/utils/pushNavigation';
 import { useGatedNotificationResponder } from '@/notifications/responseGate';
 import { t } from '@/i18n';
@@ -26,12 +28,22 @@ import { t } from '@/i18n';
  * dosyası (`assets/sounds/incoming_call_channel.wav`).
  *
  * 🔴 KAYNAK: `assets/sounds/incoming-call.wav` (M4a-2'nin çift-zil ritmi, SİLİNMEDİ — bilerek: bu
- * dosyanın tek işi bu üretimin kaynağı olmak, kod hiçbir yerden `require` etmiyor). Üretim komutu:
- * `ffmpeg -stream_loop 9 -i incoming-call.wav -af "volume=13.9dB" -ar 22050 -ac 1 -sample_fmt s16 incoming_call_channel.wav`
- * — kaynağı 10 kez ardışık dizip (~30 sn) mono/22kHz/16-bit'e indiriyor (aşağıdaki APK boyutu notuna
- * bkz.). Aynı ton reçetesi, yeni kayıt yok. Kaynak dosya değişirse (ör. zil sesi güncellenirse) aynı
- * komut yeniden çalıştırılır (kazancı `ffmpeg -af volumedetect` ile ÖLÇÜP `-1 dB - max_volume` formülüyle
- * yeniden hesapla — sabit `13.9dB` bu kaynağa özel, farklı bir kaynakla kopyalanmaz).
+ * dosyanın tek işi bu üretimin kaynağı olmak, kod hiçbir yerden `require` etmiyor). Üretim komutu
+ * (M4b §14.3, dinamik aralık sıkıştırması — eski hâli yalnız `volume=13.9dB` idi):
+ * ```
+ * ffmpeg -stream_loop 9 -i incoming-call.wav -af "compand=attacks=0.001:decays=0.01:points=-80/-80|-45/-2.5|-15/-1.2|0/-1:soft-knee=3,volume=6dB,alimiter=limit=0.891:attack=5:release=50,volume=-1dB" -ar 22050 -ac 1 -sample_fmt s16 incoming_call_channel.wav
+ * ```
+ * — kaynağı 10 kez ardışık dizip (~30 sn) mono/22kHz/16-bit'e indiriyor (aşağıdaki APK boyutu
+ * notuna bkz.). Aynı ton reçetesi, yeni kayıt yok. Zincirin işi sırayla: `compand` zilin kendi
+ * içindeki genlik dalgalanmasını (20 ms'lik pencerelerde -20…-28 dB arası titreşen bir warble)
+ * düzleştirir, `volume=6dB` limitere iş verir, `alimiter` tepeyi TAŞIRMADAN sınırlar (compand tek
+ * başına +6.4 dBFS'e taşıyordu — s16'ya çevrilince sessizce KIRPILIRDI), son `volume=-1dB` tepeyi
+ * -1 dB'ye oturtur.
+ *
+ * 🔴 ÖLÇÜM TUZAĞI (M4b §14.3 sırasında bulundu): ara dosyayı s16 yazıp `volumedetect` ile ölçmek
+ * YANILTIR — taşan tepe s16'da zaten kırpılmış olur ve `max_volume` masum bir `0.0 dB` gösterir.
+ * Kazanç ayarı yapılacaksa ara ürün `-c:a pcm_f32le` ile FLOAT yazılıp `astats` `Peak level dB`
+ * okunmalı. Kırpma kanıtı: `astats` `Flat factor: 0.000000` (kırpma düz plato üretir).
  *
  * 🔴 D44 (PM ölçümü 2026-08-07, sahip cihaz turu) — dosya teknik olarak sağlamdı (30 sn/mono/22050/s16)
  * ama SESSİZDİ: `ffmpeg -af volumedetect` tepe **-14.9 dB** / ortalama **-28.4 dB** ölçtü — tam ölçeğin
@@ -40,6 +52,19 @@ import { t } from '@/i18n';
  * çıkarıldı — süre/format/kanal/örnekleme AYNI kaldı (yalnız kazanç), dosya boyutu değişmedi (1 292 KiB /
  * 1 323 078 bayt, aynı PCM matematiği). Kanal kimliği (`incoming_call_v3`, aşağıda) BİLEREK değişmedi —
  * içerik değişti, kanal ayarı değil.
+ *
+ * 🔴 M4b §14.3 (sahip ikinci cihaz turu) — zil HÂLÂ kısıktı. Tepe zaten sınırdaydı (-1.0 dB), sorun
+ * ORTALAMAYDI: -14.5 dB. Yukarıdaki compand+limiter zinciriyle tepe **-0.98 dB** (değişmedi),
+ * ortalama **-10.7 dB** (+3.8 dB), EBU R128 gürlüğü **-11.4 → -7.6 LUFS**. Kırpma yok
+ * (`Flat factor 0.000000`), süre/format/kanal/örnekleme ve dosya boyutu AYNI.
+ *
+ * ⚠️ Neden -9 dB DEĞİL (sözleşmenin istediği hedef): zilin ritmi 3 sn'lik bir döngüde 0.8 sn ton +
+ * 2.2 sn SESSİZLİK (0.4+0.2+0.4+2.0). Ortalama tüm sessizliği de sayar; tonun görev döngüsü %26.7
+ * olduğu için tepe -1 dB'de kalan KIRPILMAMIŞ bir sinüs bile en fazla **-9.75 dB** ortalama verir
+ * (10·log10(0.267) = -5.74 dB, sinüsün tepe/RMS farkı 3.01 dB). -10.7 bu fiziksel tavanın 1 dB
+ * altında; kalanı ancak dalga biçimini kırparak (cızırtı) ya da ritmi değiştirerek alınır, ikisi de
+ * §14.3'te yasak. Daha gür isteniyorsa değiştirilecek şey ritim (sessizliği kısaltmak), kazanç değil.
+ *
  * 🔴 Dosya adı ALT ÇİZGİ ile: Android ham kaynak adı `[a-z0-9_]` dışına çıkamıyor, tire (`-`)
  * `expo prebuild`'i "Resource name is not valid" hatasıyla düşürüyor — ilk denemede öğrenildi.
  *
@@ -116,6 +141,19 @@ interface RingingCall {
   timeoutTimer: ReturnType<typeof setTimeout>;
 }
 
+/**
+ * 🔴 M4b §14.1 — çağrının türü. `'dm'` M4a'nın 1-1 daveti (`voice.incoming_call`), `'group'` grup
+ * DM'in `voice.group_call_started`'ı. SUNUM aynı (aynı kanal, aynı zil, aynı iki düğme); ayrım
+ * yalnız METİN ve SİNYAL'de:
+ * - grupta kabul/reddet sunucuya GÖNDERİLMEZ. Sunucudaki `voice:call_accept`/`voice:call_reject`
+ *   karşı tarafı `otherDmMember` ile buluyor; o fonksiyon "kendisi olmayan İLK üye"yi döndürüyor,
+ *   yani grup kanalında hedef RASTGELE bir üye olurdu (yanlış kişinin ekranında "arama reddedildi").
+ *   Arayan zaten odada; kimin reddettiğini bilmesi de gerekmiyor (§14.1).
+ * - katılma `startOrJoin`e `kind: 'group'` ile gider (grup dalı — `voice:group_call_start` sinyali
+ *   `invite:false` ile zaten atlanıyor, biz KATILANIZ, yeniden çaldıran taraf değil).
+ */
+type IncomingCallKind = 'dm' | 'group';
+
 let current: RingingCall | null = null;
 
 /**
@@ -183,16 +221,27 @@ export function isChannelRinging(channelId: string): boolean {
 export async function presentIncomingCall(
   channelId: string,
   caller: { id: string; username: string; avatarUrl: string | null },
+  options?: { kind?: IncomingCallKind },
 ): Promise<void> {
   if (current?.channelId === channelId) return; // aynı çağrı — yinelenen event, no-op
   if (current) await dismissIncomingCall(current.channelId);
 
   await ensureIncomingCallNotificationsSetup();
 
+  const kind: IncomingCallKind = options?.kind ?? 'dm';
+  const isGroup = kind === 'group';
+
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
-      title: t('mobile.call.incomingTitle'),
-      body: t('mobile.call.incomingBody', { name: caller.username }),
+      // §14.1 — "bildirim metni grubu belli etmeli": 1-1'de "Gelen Arama / <ad> seni arıyor!",
+      // grupta "Grup Araması / <ad> grup aramasına başladı". Grubun ADI metne girmiyor: sunucunun
+      // `voice.group_call_started` yükü yalnız `{ channelId, by }` taşıyor, grup adı istemcide
+      // türetiliyor (`channelTitle`) ve DM listesi henüz yüklenmemişken (soğuk açılış) boş çıkardı —
+      // yanlış/eksik bir başlık yerine kimin başlattığı yeterli bilgi.
+      title: isGroup ? t('mobile.call.incomingGroupTitle') : t('mobile.call.incomingTitle'),
+      body: isGroup
+        ? t('mobile.call.incomingGroupBody', { name: caller.username })
+        : t('mobile.call.incomingBody', { name: caller.username }),
       // 🔴 PM bulgusu (2026-08-07, ikinci tur) — `source: 'ws'` BİLEREK eklendi. `push.ts`'in
       // bastırma kontrolü (§9.2.5) `isChannelRinging(channelId)`e bakıyordu ama bu, `current`
       // state'i `scheduleNotificationAsync` çözüldükten SONRA (senkron, aynı satır bloğunda) yazılıyor
@@ -210,6 +259,10 @@ export async function presentIncomingCall(
         callerId: caller.id,
         callerName: caller.username,
         source: 'ws',
+        // §14.1 — yanıt işleyicisi (soğuk açılışta bile) yalnız bu yükü görür; kabul/reddetin
+        // sinyal göndermeyeceğini buradan bilir. `api/`nin push yükünde bu alan YOK → `undefined`
+        // → 'dm' varsayılanı, yani 1-1 push yolu DEĞİŞMEDİ (`api/` diffi sıfır kalır).
+        callKind: kind,
       },
       categoryIdentifier: CATEGORY_ID,
       // §9.2.1 — `sound` alanı BİLEREK verilmiyor: Android, kanalın kendi gömülü sesini kullanır
@@ -299,6 +352,7 @@ export function useIncomingCallResponder(): void {
     const channelId = typeof data.channelId === 'string' ? data.channelId : null;
     if (!channelId) return;
     const callerName = typeof data.callerName === 'string' ? data.callerName : '';
+    const isGroup = data.callKind === 'group';
 
     if (response.actionIdentifier === 'reject') {
       // §9.2.4 🔴 — reddet uygulama ölüyken sinyal GÖNDEREMEZ (yeni JS başlatılmıyor); bu dal yalnız
@@ -307,6 +361,10 @@ export function useIncomingCallResponder(): void {
       // yerel temizlik yapılır (zaten no-op: `current` soğuk açılışta null).
       const age = Date.now() - response.notification.date;
       void dismissIncomingCall(channelId);
+      // 🔴 §14.1 — grupta reddet YALNIZ YEREL: zil susar, bildirim kapanır, sunucuya HİÇBİR ŞEY
+      // gitmez (bkz. `IncomingCallKind` yorumu — `voice:call_reject` grupta rastgele bir üyeye
+      // giderdi). Bu satır 1-1 dalının ÖNÜNDE duruyor, o dal satır satır aynı kaldı.
+      if (isGroup) return;
       if (age > RING_TIMEOUT_MS) return;
       callReject(channelId);
       return;
@@ -321,12 +379,21 @@ export function useIncomingCallResponder(): void {
 
     if (response.actionIdentifier === 'accept') {
       void dismissIncomingCall(channelId);
-      callAccept(channelId);
+      // §14.1 — grupta kabul de sunucuya gitmez (reddetle aynı `otherDmMember` gerekçesi); 1-1
+      // dalı DEĞİŞMEDİ.
+      if (!isGroup) callAccept(channelId);
+      // Grupta arama ekranının başlığı grubun adı olmalı (`startOrJoin` `label`i `callChannelName`e
+      // yazıyor). Ad DM store'undan gelir; bildirim yükünde yok (bkz. `presentIncomingCall`
+      // başlığındaki not) — store henüz yüklenmemişse başlatanın adına düşer.
+      const groupChannel = isGroup ? useDmStore.getState().channels.find((c) => c.id === channelId) : undefined;
+      const label = groupChannel ? channelTitle(groupChannel) : callerName;
       // §0.1/§8.2 — davet KESİNLİKLE gönderilmez (`invite: false`): arayan zaten odada, biz
       // yalnız katılıyoruz. Presence store'a hiç bakılmıyor (dev'in DM ekranında olmadığı senaryo).
+      // Grupta da aynısı geçerli — `invite:false` grup dalında `voice:group_call_start`ı atlatır,
+      // yani KATILAN kimseyi yeniden çaldırmaz (§14.5 "sonradan katılan kimseyi çaldırmıyor").
       void useVoiceStore
         .getState()
-        .startOrJoin(channelId, callerName, { invite: false })
+        .startOrJoin(channelId, label, { invite: false, kind: isGroup ? 'group' : 'dm' })
         .then((res) => {
           if (res.ok) {
             router.push({ pathname: '/call', params: { channelId } });

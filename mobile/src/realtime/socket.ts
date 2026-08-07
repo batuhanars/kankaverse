@@ -271,16 +271,29 @@ function ensureSocket(): Socket {
     void dismissIncomingCall(data.channelId);
   });
 
-  // ---- M4b grup DM sesli (sözleşme §5) ----
-  // 🔴 ÇALMA YOK ve **BİLDİRİM DE YOK** — bu olay bilerek DİNLENMİYOR.
-  // `presentIncomingCall` çağrılmaz (her katılan herkesi çaldırsaydı üç kişilik bir grup üç kez
-  // çalardı). PM kararı 2026-08-07: uygulama içi bilgilendirme de yapılmıyor. Sözleşme §5 bunu
-  // "kabul edilebilir" diyordu, zorunlu değil; mobilde pasif bir toast bileşeni yok ve `Alert.alert`
-  // MODAL bir diyalog — kullanıcı yazı yazarken ekranı keser ve dokunmadan kapanmaz, yani "hafif
-  // bilgilendirme" değil. Web'deki karşılığı (`setNotice`) kendiliğinden kaybolan pasif bir şerit.
-  // Yanlış ağırlıkta bir bildirim koymaktansa hiç koymuyoruz: kullanıcı o DM'i açtığında
-  // `OngoingCallBanner`ı zaten görüyor (§4) ve tek dokunuşla katılıyor.
-  // Toast altyapısı gelirse (birden çok kullanım biriktiğinde) burası yeniden değerlendirilir.
+  // ---- M4b grup DM sesli — §14.1 (sözleşme §5 GERİ ALINDI) ----
+  // 🔴 Grup DM'de artık ÇALIYOR. §5 "kimse çalmaz" diyordu; PM'in gerekçesi ("üç kişilik grupta her
+  // katılan üç kez çaldırır") yanlıştı: çaldıran yalnız İLK BAŞLATMA. Sonradan katılan bu olayı
+  // ÜRETMEZ, çünkü `stores/voice.ts` grup dalında odada biri varsa (`alreadyOngoing`)
+  // `voice:group_call_start` sinyalini hiç göndermiyor — ayrım zaten koddaydı.
+  //
+  // Sunum 1-1 ile AYNI yol (`presentIncomingCall`): aynı kanal, aynı zil, aynı Reddet/Aramaya Katıl
+  // düğmeleri. Ayrımlar `notifications/incomingCall.ts`te (metin + kabul/reddette sinyal yok).
+  // `avatarUrl: null` — sunucu bu olayda yalnız `{ id, username }` gönderiyor (bildirim avatarı
+  // zaten kullanılmıyor, tip uyumu için).
+  socket.on(
+    'voice.group_call_started',
+    (data: { channelId: string; by: { id: string; username: string } }) => {
+      // Zaten o odadaysak çalmayız: sunucu başlatana göndermiyor ama başka bir istemci (web/mobil)
+      // ikinci kez sinyal üretirse odadaki kişinin telefonu kendi konuşmasında çalardı.
+      if (useVoiceStore.getState().connectedChannelId === data.channelId) return;
+      void presentIncomingCall(
+        data.channelId,
+        { id: data.by.id, username: data.by.username, avatarUrl: null },
+        { kind: 'group' },
+      );
+    },
+  );
 
   return socket;
 }

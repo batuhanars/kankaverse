@@ -468,8 +468,18 @@ export function useSocket() {
     socket.on(
       'voice.group_call_started',
       (data: { channelId: string; by: { id: string; username: string } }) => {
-        // v1: bilgilendirme (grup DM'de "Sese Katıl" zaten her zaman görünür)
-        callStore.setNotice(`group:${data.by.username}`)
+        // 🔴 M4b §14.1 — ESKİDEN yalnız `setNotice('group:…')` (kendiliğinden kaybolan pasif şerit)
+        // gösteriliyordu. Sahip kararıyla grup DM'de de ARTIK ÇALIYOR: 1-1'in `IncomingCallModal`'ı
+        // yeniden kullanılır (yeni modal yazılmadı), aynı zil, aynı Reddet/Kabul düğmeleri.
+        // Sonradan katılan kimseyi çaldırmaz: `DmConversation.onGroupVoiceClick` odada biri varsa
+        // `voice:group_call_start` sinyalini hiç göndermiyor — ayrım zaten koddaydı.
+        // Avatar yok: sunucu bu olayda yalnız `{ id, username }` gönderiyor (modal baş harfe düşer).
+        if (voiceStore.connectedChannelId === data.channelId) return // biz zaten odadayız
+        callStore.setIncoming({
+          channelId: data.channelId,
+          caller: { id: data.by.id, username: data.by.username, avatarUrl: null },
+          kind: 'group',
+        })
       },
     )
 

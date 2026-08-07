@@ -60,22 +60,39 @@ export function useCall() {
     if (voiceStore.isConnectedTo(channelId)) void voiceStore.leave()
   }
 
+  // 🔴 M4b §14.1 — grup DM'de gelen çağrının kabul/reddi sunucuya SİNYAL GÖNDERMEZ. Sunucudaki
+  // `voice:call_accept`/`voice:call_reject` karşı tarafı `otherDmMember` ile buluyor; o fonksiyon
+  // "kendisi olmayan İLK üye"yi döndürdüğü için grup kanalında hedef RASTGELE bir üye olurdu
+  // (yanlış kişide "arama reddedildi" bildirimi + odadan atılma). Arayan zaten odada; kimin
+  // reddettiğini bilmesi de gerekmiyor. 1-1 dalı satır satır aynı kaldı.
+  const isGroupIncoming = () => callStore.incoming?.kind === 'group'
+
   // Gelen çağrıyı kabul → katıl
   async function acceptCall(channelId: string) {
-    callAccept(channelId)
+    const group = isGroupIncoming()
+    if (!group) callAccept(channelId)
     callStore.clearIncoming()
+    // Grup çağrısında da yalnız-kalma zaman aşımı açık (sözleşme §3: grup DM bir çağrıdır, mekân
+    // değil) — `startGroupCall`/`onGroupVoiceClick` ile aynı seçenek.
     await voiceStore.join(channelId, { autoEndWhenAlone: true }) // REV-12: DM çağrısı
   }
 
   function rejectCall(channelId: string) {
-    callReject(channelId)
-    callStore.clearIncoming()
+    const group = isGroupIncoming()
+    if (!group) callReject(channelId)
+    callStore.clearIncoming() // grupta TEK yaptığımız bu: yerel kapatma (zil de burada susar)
   }
 
-  // Grup: sese katıl (yoksa başlat-bildir + katıl)
+  // 🔴 "Sonradan katılan kimseyi çaldırmaz" kuralı BURADA, tek noktada (PM 2026-08-07).
+  // Önceden bu kontrol çağıranda (`DmConversation.onGroupVoiceClick`) duruyordu ve bugün doğru
+  // çalışıyordu — ama kural çağırana bağlıydı: ikinci bir çağıran eklenip kontrolü unutsaydı
+  // gruptaki HERKES yeniden çalardı ve sebebi bu dosyada görünmezdi. Mobil bunu doğru yerde
+  // yapıyor (`stores/voice.ts` `alreadyOngoing`), web de aynı hizaya alındı.
   async function startGroupCall(channelId: string) {
     if (voiceStore.isConnectedTo(channelId)) return
-    await groupCallStart(channelId)
+    const alreadyOngoing = voiceStore.participantsFor(channelId).length > 0
+    // Odada biri varsa bu bir KATILMA, yeni bir çağrı değil → sinyal gönderilmez, kimse çalmaz.
+    if (!alreadyOngoing) await groupCallStart(channelId)
     await voiceStore.join(channelId, { autoEndWhenAlone: true }) // REV-12: grup çağrısı
   }
 

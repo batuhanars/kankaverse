@@ -1,7 +1,9 @@
 <script setup lang="ts">
 /**
- * IncomingCallModal — gelen DM sesli arama daveti (AppShell'de global).
+ * IncomingCallModal — gelen sesli arama daveti (AppShell'de global).
  * callStore.incoming dolunca üstte modal; 30sn cevapsız → otomatik reddet.
+ * M4b §14.1 — aynı sunum artık GRUP DM çağrısını da karşılıyor (`kind: 'group'`); yeni modal
+ * yazılmadı. Grupta "reddet" yalnız yerel kapatmadır (sinyal yok — bkz. useCall.ts).
  */
 import { watch, computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -16,13 +18,15 @@ const { startRingtone, stopRingtone } = useCallSounds()
 
 let timer: ReturnType<typeof setTimeout> | null = null
 
-// Nötr bilgi (ulaşılamadı / reddedildi / grup başladı) — kodları metne çevir, otomatik temizle
+// Nötr bilgi (ulaşılamadı / reddedildi) — kodları metne çevir, otomatik temizle.
+// 🔴 M4b §14.1 — `group:` dalı KALDIRILDI: grup DM artık pasif şeritle değil çalma sunumuyla
+// karşılanıyor (aşağıdaki modal). Dal zaten kırıktı — `call.groupStarted` anahtarı tr.json'da hiç
+// yoktu, vue-i18n anahtar yolunu ham basardı.
 const noticeText = computed(() => {
   const n = callStore.notice
   if (!n) return ''
   if (n === 'unreachable') return t('call.unreachable')
   if (n === 'rejected') return t('call.rejected')
-  if (n.startsWith('group:')) return t('call.groupStarted', { user: n.slice(6) })
   return ''
 })
 watch(() => callStore.notice, (n) => {
@@ -71,7 +75,10 @@ onUnmounted(() => { if (timer) clearTimeout(timer); stopRingtone() })
     </div>
 
     <div class="min-w-0">
-      <p class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('call.incoming') }}</p>
+      <!-- §14.1 — grup çağrısında üst satır türü belli eder; alt satır her iki durumda da başlatan kişi. -->
+      <p class="text-[12px]" style="color: var(--kv-text-muted);">
+        {{ callStore.incoming.kind === 'group' ? t('call.incomingGroup') : t('call.incoming') }}
+      </p>
       <p class="text-[14px] font-semibold truncate" style="color: var(--kv-text-primary);">{{ callStore.incoming.caller.username }}</p>
     </div>
 

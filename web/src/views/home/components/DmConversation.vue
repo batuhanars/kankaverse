@@ -312,11 +312,10 @@ watch(
 // REV-11: bu kanalda (1-1/grup) başkaları seste mi → ring yerine doğrudan "Sese Katıl"
 const hasOngoingCall = computed(() => voiceStore.participantsFor(props.channel.id).length > 0)
 
-// REV-11: grup ses — devam eden çağrıya doğrudan katıl (tekrar "başlattı" bildirimi yayma);
-// yoksa başlat-bildir + katıl.
+// REV-11: grup ses. "Devam eden çağrıya katıl vs. yeni çağrı başlat" ayrımı ARTIK BURADA DEĞİL —
+// useCall.startGroupCall içinde, tek noktada (PM 2026-08-07). Buradan yalnız niyet iletilir.
 function onGroupVoiceClick() {
-  if (hasOngoingCall.value) voiceStore.join(props.channel.id, { autoEndWhenAlone: true })
-  else startGroupCall(props.channel.id)
+  void startGroupCall(props.channel.id)
 }
 
 // Görüntülü ara (1-1 DM): D39 §6 — oda-önce'de arayan hemen girdiği için niyet doğrudan
