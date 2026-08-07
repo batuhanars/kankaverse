@@ -39,9 +39,18 @@ sprint web'i mobile hizalıyor.
 | `web/src/composables/useSocket.ts` | `call_accepted` artık `join` ETMEZ (zaten odadayız); `call_rejected` odadan çıkarır |
 | `web/src/stores/voice.ts` | yalnız-kalma zaman aşımı ikiye ayrılır (§4) |
 | `web/src/components/layout/OutgoingCallBar.vue` | kalkar; yerine oda içinde bekleyen-katılımcı gösterimi (§5) |
-| ses odası görünümü (`VoiceRoomView.vue` + tile bileşeni) | bekleyen katılımcı kutucuğu (§5) |
+| `web/src/views/home/components/DmCallPanel.vue` + `components/shared/VoiceTile.vue` | bekleyen katılımcı kutucuğu (§5) |
 | `web/src/stores/call.ts` | `pendingVideoCall` sadeleşir (§6) |
+| `web/src/views/home/components/DmConversation.vue` | `setPendingVideoCall` çağrısı düşer; ring "İptal ✕" düğmesi kalkar (§5 gerekçesi) |
+| `web/src/components/layout/UserCard.vue` | `OutgoingCallBar` import/kullanımı düşer |
 | `web/src/i18n/tr.json` | yeni anahtar(lar), §8 |
+
+> 🔴 **PM düzeltmesi 2026-08-07 (dev bulgusu):** bu tablonun ilk hâli bekleyen katılımcı kutucuğu
+> için **`VoiceRoomView.vue`** diyordu — **yanlıştı**. O bileşen yalnız guild ses kanalı yolu
+> (`GUILD_VOICE`, `GuildChannelView`'dan mount ediliyor); DM aramaları tamamen `DmCallPanel.vue`
+> üzerinden çiziliyor ve guild kanalları hiç çalmıyor. Dev doğru dosyayı bulup **bildirdi**, sessizce
+> geçmedi. Son iki satır (`DmConversation`, `UserCard`) da ilk listede eksikti: biri `pendingVideoCall`
+> kaldırılınca derlenmiyor, diğeri silinen bileşeni import ediyor — ikisi de kaçınılmazdı.
 
 `api/`, `mobile/`, `desktop/`, `landing/` diffi **sıfır**.
 
@@ -187,7 +196,9 @@ anahtarlarını web'e taşıma, o yön yanlış). Yeni anahtar gerekiyorsa `call
 **Dev'de:**
 - [ ] `npm run typecheck` — 🔴 **yalnız `vue-tsc -b`** (bilinen 6 önceden-var hata; fazlası senin).
       `--noEmit` yalancı yeşildir, hiçbir şeyi denetlemez
-- [ ] `npm run lint` temiz
+- [ ] ~~`npm run lint` temiz~~ — 🔴 **madde geçersiz (PM hatası, 2026-08-07):** `web/`'de ne `lint`
+      script'i ne ESLint yapılandırması var (`api/eslint.config.mjs` ve `mobile/eslint.config.js`
+      varken web tier'ında hiç kurulmamış). Çalıştırılacak bir şey yok; borç **D42** olarak kaydedildi
 - [ ] `api/`, `mobile/`, `desktop/`, `landing/` diffi **sıfır**
 - [ ] Gömülü kullanıcı metni yok; renk/ölçü `--kv-*` token'larından
 - [ ] `pendingVideoCall` ve `consumePendingVideoCall` gerçekten **kaldırıldı** (ölü kod bırakılmadı)
@@ -202,6 +213,11 @@ anahtarlarını web'e taşıma, o yön yanlış). Yeni anahtar gerekiyorsa `call
 - [ ] Karşı taraf katılıp sonra çıkarsa arama 60 saniyede bitiyor (eski davranış korunuyor)
 - [ ] Görüntülü arama düğmesi: kamera **baştan** açık giriyor
 - [ ] Ulaşılamayan kişiye arama: nötr mesaj, **odaya girilmiyor**
+- [ ] 🔴 **Odaya katılma başarısız olursa arama kilitlenmiyor** (inceleme bulgusu 2026-08-07):
+      davet gitti ama `join` patladı (token 403 / LiveKit hatası / ağ) → "çalıyor" durumu temizlenir,
+      geri-zil susar, iptal düğmesi ölü kalmaz, karşı tarafa `call_cancel` gider.
+      Tarayıcıda üretmesi zor; **kodda kapatıldığı doğrulanır** (`leave()` bağlanma aşamasındaki
+      kanal kimliğini de görüyor mu)
 - [ ] **Web ↔ mobil uçtan uca:** web'den arayınca mobilde "arama sürüyor" şeridi çıkıyor,
       mobilden katılınca iki taraf birbirini duyuyor
 - [ ] Guild ses kanalında regresyon yok (yalnız kalınca kendiliğinden düşmüyor)

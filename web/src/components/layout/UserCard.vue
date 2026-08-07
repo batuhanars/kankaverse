@@ -5,7 +5,6 @@ import { useAuthStore } from '@/stores/auth'
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
 import { useVoiceStore } from '@/stores/voice'
 import VoiceConnectedBar from '@/components/layout/VoiceConnectedBar.vue'
-import OutgoingCallBar from '@/components/layout/OutgoingCallBar.vue'
 import { useSocket } from '@/composables/useSocket'
 import { useAudioDevices } from '@/composables/useAudioDevices'
 import { onClickOutside } from '@vueuse/core'
@@ -166,10 +165,8 @@ function onLogout() {
         ? 'background-color: var(--kv-bg-content); border: 1px solid var(--kv-border-strong);'
         : 'background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);'"
     >
-      <!-- Giden çağrı çalıyor (DM'den çıksan da görünür; kabul edilince VoiceConnectedBar devralır) -->
-      <OutgoingCallBar />
-
-      <!-- Aktif ses oturumu (bağlıyken üstte; altında divider) -->
+      <!-- D39: giden çağrı artık odada bekler (VoiceConnectedBar burada zaten görünür) —
+           ayrı "Aranıyor" barı kalktı, "Çalıyor…" göstergesi ses odası görünümünde (VoiceTile). -->
       <VoiceConnectedBar />
 
       <!-- Kullanıcı pill satırı (kendi border/rounding'i yok; kapsayıcı sağlıyor) -->

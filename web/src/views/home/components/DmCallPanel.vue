@@ -11,16 +11,30 @@
  */
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useVoiceStore, type RoomMember, type VoiceTileData } from '@/stores/voice'
+import { useVoiceStore, type RoomMember, type VoiceTileData, type PendingPeer } from '@/stores/voice'
+import { useCallStore } from '@/stores/call'
+import { useDmStore } from '@/stores/dm'
 import VoiceControlBar from '@/components/shared/VoiceControlBar.vue'
 import VoiceTile from '@/components/shared/VoiceTile.vue'
 
 const props = defineProps<{ channelId: string }>()
 const { t } = useI18n()
 const voiceStore = useVoiceStore()
+const callStore = useCallStore()
+const dmStore = useDmStore()
 
 const connected = computed(() => voiceStore.isConnectedTo(props.channelId))
 const members = computed<RoomMember[]>(() => (connected.value ? voiceStore.roomParticipants : []))
+
+// D39 §5 — bekleyen katılımcı: yalnız 1-1 DM'de, biz çalıyorken (arayan zaten odada) ve karşı
+// taraf henüz katılmadıysa. Grup DM'de tek bir "karşı taraf" yok, kapsam dışı (§9).
+const pendingPeer = computed<PendingPeer | null>(() => {
+  if (!callStore.isRinging(props.channelId)) return null
+  const dm = dmStore.channels.find((c) => c.id === props.channelId)
+  if (!dm || dm.type !== 'DM') return null
+  if (members.value.some((m) => m.userId === dm.otherUser.id)) return null // zaten katıldı
+  return { username: dm.otherUser.username, avatarUrl: dm.otherUser.avatarUrl }
+})
 
 function isSpeaking(m: RoomMember): boolean {
   return voiceStore.speakingUserIds.has(m.userId) && !isMutedFor(m)
@@ -44,7 +58,11 @@ const tiles = computed<VoiceTileData[]>(() => {
   const avatarTiles: VoiceTileData[] = members.value
     .filter((m) => !withVideo.has(m.userId))
     .map((m) => ({ key: m.userId, kind: 'avatar', member: m }))
-  return [...videoTiles, ...avatarTiles]
+  // D39 §5 — bekleyen katılımcı kutucuğu (soluk avatar + "Çalıyor…")
+  const pendingTiles: VoiceTileData[] = pendingPeer.value
+    ? [{ key: 'pending', kind: 'pending', peer: pendingPeer.value }]
+    : []
+  return [...videoTiles, ...avatarTiles, ...pendingTiles]
 })
 
 // Video var mı? Yoksa kompakt avatar şeridi; varsa sahne (büyük odak + şerit).
@@ -182,16 +200,19 @@ async function toggleFullscreen() {
           <div class="relative shrink-0">
             <div
               class="w-16 h-16 rounded-full flex items-center justify-center font-bold text-white overflow-hidden"
-              :class="tile.member && isSpeaking(tile.member) ? 'kv-speaking' : ''"
+              :class="[
+                tile.member && isSpeaking(tile.member) ? 'kv-speaking' : '',
+                tile.kind === 'pending' ? 'opacity-40' : '',
+              ]"
               style="background-color: var(--kv-accent-500);"
             >
               <img
-                v-if="tile.member?.avatarUrl"
-                :src="tile.member.avatarUrl"
-                :alt="tile.member.username"
+                v-if="tile.member?.avatarUrl || tile.peer?.avatarUrl"
+                :src="(tile.member?.avatarUrl ?? tile.peer?.avatarUrl) as string"
+                :alt="tile.member?.username ?? tile.peer?.username"
                 class="w-full h-full object-cover"
               />
-              <span v-else class="text-[24px]">{{ tile.member?.username[0]?.toUpperCase() }}</span>
+              <span v-else class="text-[24px]">{{ (tile.member?.username ?? tile.peer?.username)?.[0]?.toUpperCase() }}</span>
             </div>
             <!-- Mute rozeti (sağ-alt) -->
             <div
@@ -208,8 +229,10 @@ async function toggleFullscreen() {
             </div>
           </div>
           <span class="text-[12px] truncate max-w-full text-center" style="color: var(--kv-text-secondary);">
-            {{ tile.member?.username }}<template v-if="tile.member?.isLocal"> ({{ t('voice.you') }})</template>
+            {{ tile.member?.username ?? tile.peer?.username }}<template v-if="tile.member?.isLocal"> ({{ t('voice.you') }})</template>
           </span>
+          <!-- D39 §5: bekleyen katılımcı — "Çalıyor…" -->
+          <span v-if="tile.kind === 'pending'" class="text-[11px]" style="color: var(--kv-text-muted);">{{ t('call.ringing') }}</span>
         </div>
       </div>
     </div>

@@ -44,7 +44,7 @@ const { t } = useI18n()
 const isStrip = props.variant === 'strip'
 
 function name(): string {
-  return props.tile.member?.username ?? props.tile.entry?.username ?? ''
+  return props.tile.member?.username ?? props.tile.entry?.username ?? props.tile.peer?.username ?? ''
 }
 function isLocal(): boolean {
   return props.tile.member?.isLocal ?? props.tile.entry?.isLocal ?? false
@@ -115,6 +115,16 @@ function onDisconnect() {
       :class="fit === 'contain' ? 'object-contain' : 'object-cover'"
       :aria-label="tile.entry.trackKind === 'screen' ? t('voice.screenShareActive') : t('voice.cameraActive')"
     />
+    <!-- D39 §5: bekleyen katılımcı — soluk avatar (henüz gerçek RoomMember değil, DM'den bilinen ad/avatar) -->
+    <div
+      v-else-if="tile.kind === 'pending'"
+      class="rounded-full flex items-center justify-center font-bold text-white overflow-hidden opacity-40"
+      :class="isStrip ? 'w-10 h-10 text-[16px]' : 'w-24 h-24 text-[32px]'"
+      style="background-color: var(--kv-accent-500);"
+    >
+      <img v-if="tile.peer.avatarUrl" :src="tile.peer.avatarUrl" :alt="tile.peer.username" class="w-full h-full object-cover" />
+      <span v-else>{{ tile.peer.username[0]?.toUpperCase() }}</span>
+    </div>
     <!-- Avatar (video yok) -->
     <div
       v-else
@@ -238,7 +248,7 @@ function onDisconnect() {
         <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
       </svg>
       <span class="truncate" :class="isStrip ? 'text-[11px]' : 'text-[12px]'" style="color: #fff;">
-        {{ name() }}<template v-if="isLocal()"> ({{ t('voice.you') }})</template>
+        {{ name() }}<template v-if="tile.kind === 'pending'"> · {{ t('call.ringing') }}</template><template v-else-if="isLocal()"> ({{ t('voice.you') }})</template>
       </span>
     </div>
   </div>

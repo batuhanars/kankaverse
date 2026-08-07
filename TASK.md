@@ -2997,20 +2997,44 @@ halkayı kapatıyor: web `voice:call_invite` zaten gönderiyor, mobil onu karş�
 > öne aldı. Boşa gitme riski büyük ölçüde düşmüştü, çünkü oda-önce modeli M4a-1'de **cihazda
 > doğrulandı** → "mobil klasiğe döner, borç düşer" ihtimali fiilen kalmadı.
 
-### Web (`web/`)
-- [ ] `startCall` daveti gönderip **beklemeden** odaya katılıyor (ack `{ok:false}` ise girmiyor)
-- [ ] `call_accepted` artık `join` ETMİYOR, yalnız "çalıyor" göstergesini düşürüyor (çift-join tuzağı §3)
-- [ ] `call_rejected` / iptal → nötr mesaj + **odadan çıkış**; çıkışta `call_cancel` gidiyor
+### Web (`web/`) — ✅ KOD BİTTİ, tarayıcı DoD sahipte
+- [x] `startCall` daveti gönderip **beklemeden** odaya katılıyor (ack `{ok:false}` ise girmiyor)
+- [x] `call_accepted` artık `join` ETMİYOR, yalnız "çalıyor" göstergesini düşürüyor (çift-join tuzağı §3)
+- [x] `call_rejected` / iptal → nötr mesaj + **odadan çıkış**; çıkışta `call_cancel` gidiyor
       (karşı tarafın zili asılı kalmasın) — kapanış **tek noktadan**, dört yere serpilmiyor
-- [ ] 🔴 Yalnız-kalma zaman aşımı ikiye ayrıldı: hiç kimse katılmadıysa **3 dk**, biri katılıp
+      (`cancelRingingIfNeeded`; `leave()` VE beklenmedik `Disconnected` yolu ikisi de oradan geçiyor)
+- [x] 🔴 Yalnız-kalma zaman aşımı ikiye ayrıldı: hiç kimse katılmadıysa **3 dk**, biri katılıp
       çıktıysa **60 sn**. Tek sabit bırakılırsa cevapsız arama 60 saniyede düşerdi (§4).
       Referans: `mobile/src/stores/voice.ts` (`peerEverJoined`)
-- [ ] `OutgoingCallBar` kalktı; oda görünümünde **bekleyen katılımcı** kutucuğu (soluk + "Çalıyor…"),
-      mobil M4a-1 pariteti. Geri-zil sahipsiz kalmıyor
-- [ ] `pendingVideoCall` + `consumePendingVideoCall` **kaldırıldı** (oda-önce modelde niyet doğrudan
-      `join`'e geçiyor; ölü kalırsa sonraki okuyan olmayan bir akış sanır)
-- [ ] Nötr mesaj DEĞİŞMEDİ (R7): "Şu anda ulaşılamıyor." — `error` kodu açımlanmıyor
-- [ ] `vue-tsc -b` temiz (🔴 `--noEmit` yalancı yeşil), `lint` temiz
+- [x] `OutgoingCallBar` kalktı; oda görünümünde **bekleyen katılımcı** kutucuğu (soluk + "Çalıyor…"),
+      mobil M4a-1 pariteti. Geri-zil `useCall`'a taşındı — bileşen yaşam döngüsünden **ayrık**
+      `effectScope` ile (DM'den çıkınca susmasın diye; dev'in kendi çözümü, gerekçesi raporlandı)
+- [x] `pendingVideoCall` + `consumePendingVideoCall` **kaldırıldı**; ölü kalan `call.calling` /
+      `call.cancel` i18n anahtarları da temizlendi (hiçbir tier'da kullanılmıyordu)
+- [x] Nötr mesaj DEĞİŞMEDİ (R7): "Şu anda ulaşılamıyor." — `error` kodu açımlanmıyor
+- [x] `vue-tsc -b`: bilinen **6 önceden-var** hata, yeni hata yok (🔴 `--noEmit` yalancı yeşil)
+
+### 🔴 İncelemede yakalanan blocker — kodda kapatıldı, tarayıcıda üretilemezdi
+**Arayan odaya katılamazsa arama "çalıyor" durumunda kilitleniyordu.** `startCall` daveti gönderip
+`setOutgoing` yaptıktan sonra `join()` patlarsa (token 403 `CHANNEL_FULL` · LiveKit hatası · ağ ·
+env eksikken 503), `join`'in catch'i `leave()` çağırıyor ama `leave()` temizliği
+`connectedChannelId`'ye bakıyordu — o değer yalnız `room.connect()` **başarılı olduktan sonra**
+set ediliyor, hata ondan önce olursa `null`. Sonuç zinciri: geri-zil sonsuza kadar çalar · iptal
+düğmesi no-op'a düşer (`isConnectedTo` false) · karşı tarafa `call_cancel` hiç gitmez · kullanıcının
+çıkışı kalmaz. Düzeltme: temizlik çağrısı bağlanma aşamasındaki kanal kimliğini de görüyor
+(`leftChannelId ?? connectingChannelId.value`).
+> Dev **daha dar** bir düzeltme seçti ve gerekçelendirdi: `leftChannelId`'nin kendisini genişletmek
+> ayrılma sesi + `voiceApi.leave` davranışını da sessizce değiştirirdi (dosyada o niyeti belgeleyen
+> bir yorum zaten duruyordu). PM önerisinden bilinçli ve **doğru** sapma.
+
+### PM sözleşme hataları (dev yakaladı, sessiz geçmedi)
+- §1 tablosu bekleyen-katılımcı kutucuğu için `VoiceRoomView.vue` diyordu → o **guild ses** yolu;
+  DM aramaları `DmCallPanel.vue`'den çiziliyor, guild kanalları hiç çalmıyor. Sözleşme düzeltildi
+- DoD'a `npm run lint` koydum → `web/`'de ne script ne ESLint yapılandırması **var**. Madde geçersiz
+  kılındı, borç **D42** açıldı ([[D41]] ile aynı turda). Karşılığı olmayan bir DoD maddesi diğer
+  maddelere "işaretle geç" alışkanlığı bulaştırır
+- `DmConversation.vue` + `UserCard.vue` §1 listesinde eksikti (biri `pendingVideoCall` kalkınca
+  derlenmiyor, diğeri silinen bileşeni import ediyor) — ikisi de kaçınılmazdı
 
 ### DoD (tarayıcıda, iki hesap — SAHİPTE)
 > Tam liste sözleşme §10'da. Kritik üçü: arayan **anında odada** + karşı taraf soluk kutucukla
