@@ -169,4 +169,60 @@ describe('PushService', () => {
     await expect(service.sendToUsers(['u1'], BASE_PAYLOAD)).resolves.toBeUndefined();
     expect(global.fetch).not.toHaveBeenCalled();
   });
+
+  // ── M4a-3 §9.1 — PushPayload genişlemesi, geriye uyumlu ────────────────────
+  describe('M4a-3 §9.1 — yeni opsiyonel alanlar', () => {
+    it('REGRESYON: yeni alanlar verilmezse Expo gövdesi bugünküyle birebir aynı (yalnız to/title/body/data)', async () => {
+      prismaMock.pushToken.findMany.mockResolvedValue([{ token: 'ExponentPushToken[a]' }]);
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ data: [{ status: 'ok' }] }) });
+
+      const service = makeService(true);
+      await service.sendToUsers(['u1'], {
+        title: 'Aktör',
+        body: 'merhaba',
+        data: { type: 'MENTION', channelId: 'ch-1' },
+      });
+
+      const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+      expect(body).toEqual([
+        {
+          to: 'ExponentPushToken[a]',
+          title: 'Aktör',
+          body: 'merhaba',
+          data: { type: 'MENTION', channelId: 'ch-1' },
+        },
+      ]);
+    });
+
+    it('priority/androidChannelId/categoryId/ttlSeconds → Expo mesajına doğru map\'lenir (channelId/ttl adları)', async () => {
+      prismaMock.pushToken.findMany.mockResolvedValue([{ token: 'ExponentPushToken[a]' }]);
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ data: [{ status: 'ok' }] }) });
+
+      const service = makeService(true);
+      await service.sendToUsers(['u1'], {
+        title: 'Gelen Arama',
+        body: 'kanka1 seni arıyor!',
+        data: { type: 'incoming_call', channelId: 'ch-dm-1', callerId: 'u-caller', callerName: 'kanka1' },
+        priority: 'high',
+        androidChannelId: 'incoming_call_v3',
+        categoryId: 'incoming_call',
+        ttlSeconds: 30,
+      });
+
+      const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+      expect(body).toEqual([
+        {
+          to: 'ExponentPushToken[a]',
+          title: 'Gelen Arama',
+          body: 'kanka1 seni arıyor!',
+          data: { type: 'incoming_call', channelId: 'ch-dm-1', callerId: 'u-caller', callerName: 'kanka1' },
+          priority: 'high',
+          // 🔴 `androidChannelId` Expo mesajının `channelId` alanına map'lenir (data.channelId ile karışmasın diye ayrı isimlendirildi).
+          channelId: 'incoming_call_v3',
+          categoryId: 'incoming_call',
+          ttl: 30,
+        },
+      ]);
+    });
+  });
 });

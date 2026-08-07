@@ -19,7 +19,7 @@ const prismaMock = {
   session: { findFirst: jest.fn() },
   user: { findUnique: jest.fn(), findMany: jest.fn() },
   channelMember: { findMany: jest.fn() },
-  notificationPref: { findMany: jest.fn() },
+  notificationPref: { findMany: jest.fn(), findUnique: jest.fn() },
   // R15 — rol bahsetmesi: preview'da rol adı çözümü + alıcı kümesi rol genişlemesi
   role: { findMany: jest.fn() },
   guildMemberRole: { findMany: jest.fn() },
@@ -83,6 +83,8 @@ function resetMocks() {
   notificationsShouldNotifyMock.mockResolvedValue(true);
   // R14 — varsayılan: @everyone bastırma kaydı yok
   prismaMock.notificationPref.findMany.mockResolvedValue([]);
+  // M4a-3 §9.1 — varsayılan: susturma kaydı yok (arama normal gider)
+  prismaMock.notificationPref.findUnique.mockResolvedValue(null);
   // R15 — varsayılan: içerikte rol token'ı yok / rol üyesi yok
   prismaMock.role.findMany.mockResolvedValue([]);
   prismaMock.guildMemberRole.findMany.mockResolvedValue([]);
@@ -969,5 +971,138 @@ describe('MessagesGateway.notifyMentions — rol bahsetmesi (R15)', () => {
     const mentionCall = emitToUserMock.mock.calls.find((c) => c[1] === 'mention');
     expect(mentionCall?.[2].preview).toContain('@Moderatör');
     expect(mentionCall?.[2].preview).not.toContain('@everyone');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// M4a-3 §9.1 — handleCallInvite: push eklemesi + susturulmuş DM'de sessiz kalma
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('MessagesGateway.handleCallInvite (M4a-3 §9.1)', () => {
+  let gateway: MessagesGateway;
+
+  const CALLER_ID = 'user-caller';
+  const CALLEE_ID = 'user-callee';
+  const CALL_DM_ID = 'ch-dm-call';
+
+  function socketFor(userId: string) {
+    return { data: { userId } } as any;
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    gateway = makeGateway();
+    prismaMock.channel.findUnique.mockResolvedValue({ type: 'DM', dmRequestStatus: null });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: CALLER_ID },
+      { userId: CALLEE_ID },
+    ]);
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
+    prismaMock.user.findUnique.mockResolvedValue({ username: 'arayankanka', avatarUrl: null });
+  });
+
+  it('gate geçilir, susturma yok → WS emiti AYNI kalır + push gider, ack {ok:true}', async () => {
+    const res = await gateway.handleCallInvite(socketFor(CALLER_ID), { channelId: CALL_DM_ID });
+
+    expect(res).toEqual({ ok: true });
+    expect(emitToUserMock).toHaveBeenCalledWith(CALLEE_ID, 'voice.incoming_call', {
+      channelId: CALL_DM_ID,
+      caller: { id: CALLER_ID, username: 'arayankanka', avatarUrl: null },
+    });
+
+    expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
+    const [targets, payload] = pushSendToUsersMock.mock.calls[0];
+    expect(targets).toEqual([CALLEE_ID]);
+    expect(payload.data).toEqual({
+      type: 'incoming_call',
+      channelId: CALL_DM_ID,
+      callerId: CALLER_ID,
+      callerName: 'arayankanka',
+    });
+    expect(payload.priority).toBe('high');
+    expect(payload.ttlSeconds).toBe(30);
+    expect(payload.categoryId).toBe('incoming_call');
+    expect(typeof payload.androidChannelId).toBe('string');
+    expect(typeof payload.title).toBe('string');
+    expect(payload.body).toContain('arayankanka');
+  });
+
+  it('gate reddederse (canDm allowed=false) → ne WS ne push, ack {ok:false, error: DM_NOT_ALLOWED}', async () => {
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: false });
+
+    const res = await gateway.handleCallInvite(socketFor(CALLER_ID), { channelId: CALL_DM_ID });
+
+    expect(res).toEqual({ ok: false, error: 'DM_NOT_ALLOWED' });
+    expect(emitToUserMock).not.toHaveBeenCalled();
+    expect(pushSendToUsersMock).not.toHaveBeenCalled();
+  });
+
+  it('§9.1 madde 3 — callee DM kanalını ETKİN olarak susturmuş → ne WS ne push, ama ack yine {ok:true} (nötrlük)', async () => {
+    prismaMock.notificationPref.findUnique.mockResolvedValue({ muted: true, mutedUntil: null });
+
+    const res = await gateway.handleCallInvite(socketFor(CALLER_ID), { channelId: CALL_DM_ID });
+
+    expect(res).toEqual({ ok: true }); // arayan susturmayı ANLAMAZ — farklı ack/kod YOK
+    expect(emitToUserMock).not.toHaveBeenCalled();
+    expect(pushSendToUsersMock).not.toHaveBeenCalled();
+    expect(prismaMock.notificationPref.findUnique).toHaveBeenCalledWith({
+      where: {
+        userId_targetType_targetId: {
+          userId: CALLEE_ID,
+          targetType: 'CHANNEL',
+          targetId: CALL_DM_ID,
+        },
+      },
+    });
+  });
+
+  it('mute süresi geçmiş (mutedUntil geçmişte) → etkin sayılmaz, WS + push normal gider', async () => {
+    prismaMock.notificationPref.findUnique.mockResolvedValue({
+      muted: true,
+      mutedUntil: new Date(Date.now() - 60_000),
+    });
+
+    const res = await gateway.handleCallInvite(socketFor(CALLER_ID), { channelId: CALL_DM_ID });
+
+    expect(res).toEqual({ ok: true });
+    expect(emitToUserMock).toHaveBeenCalledTimes(1);
+    expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('muted=false kaydı (susturma kapalı) → normal gider', async () => {
+    prismaMock.notificationPref.findUnique.mockResolvedValue({ muted: false, mutedUntil: null });
+
+    await gateway.handleCallInvite(socketFor(CALLER_ID), { channelId: CALL_DM_ID });
+
+    expect(emitToUserMock).toHaveBeenCalledTimes(1);
+    expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
+  });
+
+  // PM düzeltmesi 2026-08-07 — "susturulmuş" isMuteActive dışında level=NONE'ı da kapsar.
+  it('level=NONE (muted=false) → ne WS ne push, ack yine {ok:true} (nötrlük)', async () => {
+    prismaMock.notificationPref.findUnique.mockResolvedValue({
+      muted: false,
+      mutedUntil: null,
+      level: 'NONE',
+    });
+
+    const res = await gateway.handleCallInvite(socketFor(CALLER_ID), { channelId: CALL_DM_ID });
+
+    expect(res).toEqual({ ok: true });
+    expect(emitToUserMock).not.toHaveBeenCalled();
+    expect(pushSendToUsersMock).not.toHaveBeenCalled();
+  });
+
+  it('level=MENTIONS → bu dal MENTIONS\'ı susturmaz, arama normal gider (regresyon)', async () => {
+    prismaMock.notificationPref.findUnique.mockResolvedValue({
+      muted: false,
+      mutedUntil: null,
+      level: 'MENTIONS',
+    });
+
+    const res = await gateway.handleCallInvite(socketFor(CALLER_ID), { channelId: CALL_DM_ID });
+
+    expect(res).toEqual({ ok: true });
+    expect(emitToUserMock).toHaveBeenCalledTimes(1);
+    expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
   });
 });

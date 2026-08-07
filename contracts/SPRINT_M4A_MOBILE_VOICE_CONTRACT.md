@@ -447,8 +447,19 @@ Kurallar:
 
 **3. Susturulmuş DM'de arama — tek noktada, `handleCallInvite` içinde.**
 
-Alıcı o DM kanalını **etkin olarak susturmuşsa** (`isMuteActive`, R12/M2b) callee'ye **ne push ne
-WS** gider. Kontrol `canDm` kapısından **sonra**, emit'ten **önce** yapılır.
+Alıcı o DM kanalını **etkin olarak susturmuşsa** callee'ye **ne push ne WS** gider. Kontrol `canDm`
+kapısından **sonra**, emit'ten **önce** yapılır.
+
+"Susturulmuş" iki hâli kapsar (`NotificationPref`, hedef **`CHANNEL` + DM kanal id'si** — DM'lerde
+`guildId: null`, guild fallback'i yok):
+- `isMuteActive(muted, mutedUntil)` → true (R12/M2b)
+- `level === NONE`
+
+🔴 **`level` neden dahil (PM düzeltmesi 2026-08-07):** sözleşmenin ilk hâli yalnız `isMuteActive`
+diyordu, **eksikti**. DM menüsü (`useDmMenuActions.ts`) susturmanın yanında bildirim **seviyesi** de
+sunuyor; "Hiçbiri" seçen kullanıcı mesaj bildirimi almazken telefonunun çalması tutarsız olurdu.
+`MENTIONS` **dahil DEĞİL**: o "yalnız bana seslenilince" demek, arama zaten tanımı gereği doğrudan
+o kişiye yöneliktir.
 
 🔴 **Arayan bunu ANLAMAZ.** Ack yine `{ ok: true }` döner, arayan normal "Çalıyor…" görür ve 3 dk
 sonra cevapsız kalır. "Ulaşılamıyor" dönmek susturmayı ifşa ederdi; §10'un nötrlük kuralı burada da
@@ -478,6 +489,13 @@ ayarları kurulduktan sonra **değiştirilemez** (M4a-2'nin `_v2` dersi), dolay�
    onu gerektirirse kabul edilir.
 
 Hangisi seçilirse seçilsin **sonuç TASK.md'ye yazılır**: hangi yol, hangi ölçüm, neden.
+
+🔴 **Kanal kimliği sunucuyla EŞLEŞMEK ZORUNDA.** `api/` tarafı push'ı gönderirken kanal kimliğini
+string olarak yazıyor (`androidChannelId`, `messages.gateway.ts`). Şu an `incoming_call_v3` yazılı,
+çünkü §9.2.1'in 1. seçeneği bu adı öneriyor. Ölçüm 3. seçeneğe düşürürse (iki kanal) **gateway'deki
+string de güncellenir**. İki taraf sessizce ayrışırsa kusur şöyle görünür: **push geliyor ama sesi
+yok / üstte belirmiyor** — kimse "kanal kimliği tutmuyor" diye düşünmez, saatler zil kodunda aranır.
+Mobil ayağının DoD'unda bu eşleşme **ayrı bir madde** olarak doğrulanır.
 
 🟢 **Bu, M4a-2'nin açık borcunu da kapatabilir.** M4a-2'de "cihaz sessizdeyken zil çalmasın"
 yapılamamıştı: `expo-audio` medya akışından çalıyor ve kurulu paketlerde ringer modunu **sorgulayan**
@@ -658,6 +676,9 @@ Aşağıdakiler **bu sprintte yapılmaz**; istenirse PM sözleşmeyi revize eder
 - [ ] Cevapsız aramanın bildirimi asılı kalmıyor; uygulama açılınca eski "Gelen Arama" temizleniyor
 - [ ] Uygulamayı bir süre sonra elle açınca **alakasız eski arama işlenmiyor** (§9.2.4 30 sn kuralı)
 - [ ] Susturulmuş bir DM'den arandığında telefon **hiç çalmıyor**, arayan tarafta özel bir hata da yok
+      (aynısı bildirim seviyesi "Hiçbiri" seçilmiş DM için de geçerli)
+- [ ] 🔴 Mobildeki bildirim kanalı kimliği ile `messages.gateway.ts`'teki `androidChannelId`
+      **aynı string** (§9.2.1; ayrışırsa push sessiz gelir ve sebebi zil kodunda aranır)
 - [ ] Zil kararı (§9.2.1) hangi yolla çözüldü, ölçüm sonucu **TASK.md'ye yazıldı**
 - [ ] **Regresyon:** mesaj push'ı eskisi gibi çalışıyor (yeni alanlar mesaj yolunu bozmadı)
 

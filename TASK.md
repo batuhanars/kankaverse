@@ -2907,13 +2907,23 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
 > gerekçesiyle bağlandı (reddet sinyali gönderilemez · susturulmuş DM sessiz kalır).
 > Tam ekran arayüz maddesi **düştü**: `USE_FULL_SCREEN_INTENT` hiç istenmeyecek (2026-08-06).
 
-**`api/` — §9.1 (üç dosya, dördüncüsü sapma)**
-- [ ] `PushPayload` opsiyonel alanlarla genişledi (`priority`, `androidChannelId`, `categoryId`,
+**`api/` — §9.1 (üç dosya, dördüncüsü sapma)** — ✅ KOD BİTTİ, 🔴 **R7 MERGE ONAYI SAHİPTE** (commit edilmedi)
+- [x] `PushPayload` opsiyonel alanlarla genişledi (`priority`, `androidChannelId`, `categoryId`,
       `ttlSeconds`, `data.callerId/callerName`); alanlar verilmeyince **mesaj push'ı birebir aynı**
-- [ ] `handleCallInvite` → `emitToUser`'ın hemen ardına fire-and-forget push (kalıcı `Notification`
+      (`undefined` alanları `JSON.stringify` düşürüyor → gövde bit bit aynı, regresyon testiyle bağlandı)
+- [x] `handleCallInvite` → `emitToUser`'ın hemen ardına fire-and-forget push (kalıcı `Notification`
       kaydı ÜRETİLMEZ, `canDm` ikinci kez uygulanmaz)
-- [ ] Susturulmuş DM'de (`isMuteActive`) ne WS ne push; ack yine `{ ok: true }` (nötrlük, §10)
-- [ ] Test: yeni alanlar için kapsam + mesaj push'ı regresyonu
+- [x] Susturulmuş DM'de ne WS ne push; ack yine `{ ok: true }` (nötrlük, §10)
+      🔴 **PM sözleşme hatası, incelemede yakalandı:** ilk hâli yalnız `isMuteActive` diyordu;
+      DM menüsünde bildirim **seviyesi** de var → `level=NONE` dalı eklendi (`MENTIONS` hariç).
+      Delegasyonun iki yönlü yakalaması burada işe yaradı ([[pm-dev-cift-yonlu-denetim]])
+- [x] Test: yeni alanlar + mesaj push'ı regresyonu + mute/NONE/MENTIONS dalları — **1017/1017**
+- [ ] 🔴 **`npm run lint` temiz DEĞİL — sprint dışı borç, sahip kararı bekliyor.** Sebep: repoda
+      checked-in kod ile prettier ayarı ayrışmış (dokunulmamış `roles.service.ts` tek başına 50 hata,
+      repo geneli ~793). Dev `--fix` çalıştırınca 151 dosya biçimlendi, geri alıp dört dosyasını elle
+      yeniden kurdu — doğru karar, aksi hâlde R7 onayına 151 dosyalık okunamaz diff giderdi.
+      Öneri: M4a bitince tek mekanik commit ile hizala; DoD'un "lint temiz" satırı da gözden geçirilmeli
+      (bu repoda hiçbir sprintte karşılanmamış görünüyor)
 
 **`mobile/` — §9.2**
 - [ ] 🔴 Zil kararı: önce tek sesli kanal (`incoming_call_v3`) denenir, bildirim kaldırılınca ses
