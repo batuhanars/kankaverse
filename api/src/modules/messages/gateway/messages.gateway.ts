@@ -9,7 +9,7 @@ import {
   OnGatewayInit,
 } from '@nestjs/websockets';
 import { HttpException } from '@nestjs/common';
-import { NotifTargetType, NotificationLevel } from '@prisma/client';
+import { NotifTargetType } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -338,8 +338,12 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     // `canDm` kapısından SONRA, emit'ten ÖNCE. 🔴 R7 nötrlük: arayan bunu ANLAMAZ, ack yine
     // {ok:true} döner (normal "Çalıyor…" görür, 3 dk sonra cevapsız kalır) — farklı hata kodu/
     // mesaj/zamanlama YOK, aksi hâlde susturma ifşa olurdu.
-    // PM düzeltmesi 2026-08-07 — "susturulmuş" iki hâli kapsar: isMuteActive VEYA level=NONE.
-    // MENTIONS dahil değil (o "yalnız bana seslenilince" demek; arama zaten doğrudan o kişiye).
+    // 🔴 "Susturulmuş" YALNIZ isMuteActive demektir. Ara bir sürümde `level === NONE` de aramayı
+    // susturuyordu; sahip kararıyla GERİ ALINDI (2026-08-07, ikinci tur) — `level` bir MESAJ bildirim
+    // seviyesi ("Bahsedilince"nin aramada karşılığı yok) ve sonuç tamamen sessiz olduğu için kimse
+    // neden arama gelmediğini anlayamıyordu (sahip mobilden aradı, sebep ancak DB'ye bakılarak
+    // bulundu). `muted`'da bu endişe yok: niyet açık ("beni rahatsız etme"), arama rahatsızlıktır.
+    // Sözleşme §9.1 madde 3.
     const calleePref = await this.prisma.notificationPref.findUnique({
       where: {
         userId_targetType_targetId: {
@@ -349,11 +353,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         },
       },
     });
-    if (
-      calleePref &&
-      (isMuteActive(calleePref.muted, calleePref.mutedUntil) ||
-        calleePref.level === NotificationLevel.NONE)
-    ) {
+    if (calleePref && isMuteActive(calleePref.muted, calleePref.mutedUntil)) {
       return { ok: true };
     }
 

@@ -450,16 +450,25 @@ Kurallar:
 Alıcı o DM kanalını **etkin olarak susturmuşsa** callee'ye **ne push ne WS** gider. Kontrol `canDm`
 kapısından **sonra**, emit'ten **önce** yapılır.
 
-"Susturulmuş" iki hâli kapsar (`NotificationPref`, hedef **`CHANNEL` + DM kanal id'si** — DM'lerde
-`guildId: null`, guild fallback'i yok):
+"Susturulmuş" **YALNIZ** şu demektir (`NotificationPref`, hedef **`CHANNEL` + DM kanal id'si** —
+DM'lerde `guildId: null`, guild fallback'i yok):
 - `isMuteActive(muted, mutedUntil)` → true (R12/M2b)
-- `level === NONE`
 
-🔴 **`level` neden dahil (PM düzeltmesi 2026-08-07):** sözleşmenin ilk hâli yalnız `isMuteActive`
-diyordu, **eksikti**. DM menüsü (`useDmMenuActions.ts`) susturmanın yanında bildirim **seviyesi** de
-sunuyor; "Hiçbiri" seçen kullanıcı mesaj bildirimi almazken telefonunun çalması tutarsız olurdu.
-`MENTIONS` **dahil DEĞİL**: o "yalnız bana seslenilince" demek, arama zaten tanımı gereği doğrudan
-o kişiye yöneliktir.
+🔴 **`level` DAHİL DEĞİL — karar iki kez döndü, son hâli budur (sahip kararı 2026-08-07, ikinci tur).**
+Ara bir sürümde `level === NONE` de aramayı susturuyordu; gerekçe "mesaj bildirimi almayan birinin
+telefonunun çalması tutarsız olur" idi. **Gerçek kullanımda ilk denemede geri alındı:** sahip
+mobilden web'i aradı, web'de hiçbir şey olmadı ve sebebi ancak veritabanına bakılarak bulundu
+(`Azeroth` hesabının o DM'i için `muted=false, level=NONE` kaydı duruyordu).
+
+Neden geri alındı:
+- `level` bir **mesaj bildirim seviyesi** (Tümü / Bahsedilince / Hiçbiri). "Bahsedilince"nin aramada
+  karşılığı yok; kullanıcı o ayarı yaparken mesajları düşünüyor, aramayı değil.
+- Sonuç **tamamen sessiz**: nötrlük gereği arayan da aranan da neden bir şey olmadığını anlayamıyor.
+  Susturmayı ifşa etmemek doğru, ama ifşa etmediğimiz şeyin kapsamı ne kadar genişse teşhis o kadar
+  imkânsızlaşıyor. Sahip de PM de anlayamadı.
+- `muted` için aynı endişe **yok**: orada niyet açık ("beni rahatsız etme") ve arama rahatsızlıktır.
+
+`MENTIONS` de dahil değildi, öyle kalıyor.
 
 🔴 **Arayan bunu ANLAMAZ.** Ack yine `{ ok: true }` döner, arayan normal "Çalıyor…" görür ve 3 dk
 sonra cevapsız kalır. "Ulaşılamıyor" dönmek susturmayı ifşa ederdi; §10'un nötrlük kuralı burada da
