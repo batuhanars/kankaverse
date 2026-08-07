@@ -14,6 +14,7 @@ import {
 import { voiceApi, type VoiceParticipantDto } from '@/api/voice'
 import { useToastStore } from '@/stores/toast'
 import { useAuthStore } from '@/stores/auth'
+import { useCallStore } from '@/stores/call'
 import { useCallSounds } from '@/composables/useCallSounds'
 import { i18n } from '@/i18n'
 
@@ -37,11 +38,29 @@ export interface VideoTrackEntry {
   track: RemoteTrack | LocalVideoTrack
 }
 
-// Kart ızgarası/sahnesi için kutucuk: video track'i olan tile video, olmayan avatar.
-// VoiceRoomView (ızgara/sahne/şerit) ve VoiceTile arasında paylaşılan tip.
+// D39 §5 — bekleyen katılımcı (arayan odaya girdi, karşı taraf henüz katılmadı): gerçek bir
+// RoomMember değil, DM kanalından bilinen ad/avatar. Yalnız DmCallPanel üretir.
+export interface PendingPeer {
+  username: string
+  avatarUrl: string | null
+}
+
+// Kart ızgarası/sahnesi için kutucuk: video track'i olan tile video, olmayan avatar, katılmamış
+// olan (ring) pending. VoiceRoomView/DmCallPanel (ızgara/sahne/şerit) ve VoiceTile arasında
+// paylaşılan tip. Her varyant `member`/`entry`/`peer`'ı (opsiyonel-undefined dahil) taşır ki
+// tüketiciler union'ı daraltmadan optional-chaining ile okuyabilsin.
 export type VoiceTileData =
-  | { key: string; kind: 'video'; member: RoomMember | null; entry: VideoTrackEntry }
-  | { key: string; kind: 'avatar'; member: RoomMember; entry?: undefined }
+  | { key: string; kind: 'video'; member: RoomMember | null; entry: VideoTrackEntry; peer?: undefined }
+  | { key: string; kind: 'avatar'; member: RoomMember; entry?: undefined; peer?: undefined }
+  | { key: string; kind: 'pending'; member?: undefined; entry?: undefined; peer: PendingPeer }
+
+// D39 §2/§11 — leave() sırasında hâlâ çalıyorsak karşı tarafa call_cancel bildirmek için enjekte
+// edilen kanca. useSocket.ts (zaten bu store'u import ediyor) bunu bağlar — tersi yönde bir import
+// (voice.ts → useSocket.ts) döngüsel bağımlılık olurdu, o yüzden çağrı burada değil dışarıdan gelir.
+let onLeaveWhileRinging: ((channelId: string) => void) | null = null
+export function setLeaveWhileRingingHandler(fn: (channelId: string) => void) {
+  onLeaveWhileRinging = fn
+}
 
 /**
  * Voice store — LiveKit ses kanalları (audio-only v1).
@@ -64,7 +83,15 @@ export const useVoiceStore = defineStore('voice', () => {
   // REV-12: DM/grup çağrısında tek kişi kalınca otomatik bitir
   let autoEndWhenAlone = false
   let aloneTimer: ReturnType<typeof setTimeout> | null = null
-  const ALONE_TIMEOUT_MS = 60_000
+  // D39 §4 — oda-önce modelde arayan odaya hemen girip yalnız başlar (klasik modelde hiç
+  // yalnız kalmıyordu). Tek sabit bunu sessizce "cevapsız arama süresi"ne çevirirdi (60sn'de
+  // düşerdi). İkiye ayrılır — referans: mobile/src/stores/voice.ts §3.3.
+  const ALONE_TIMEOUT_NEVER_JOINED_MS = 3 * 60_000 // hiç kimse katılmadı (arayan bekliyor)
+  const ALONE_TIMEOUT_LEFT_MS = 60_000 // biri katılıp sonra çıktı (eski davranış)
+  // D39 §4 — karşı taraf bu oturumda BİR KEZ bile odaya katıldı mı (hangi zaman aşımının
+  // uygulanacağını belirler). join() başında sıfırlanır, refreshRoomParticipants'ta 2+ katılımcı
+  // görülünce set edilir.
+  let peerEverJoined = false
   const isMuted = ref(false)
   const canPublish = ref(false)
   // C4 — video yetenek bayrakları (build-dark: false; sunucu açınca true olur → UI belirir)
@@ -203,6 +230,7 @@ export const useVoiceStore = defineStore('voice', () => {
 
     autoEndWhenAlone = opts?.autoEndWhenAlone ?? false
     pendingCameraStart = opts?.startWithCamera ?? false
+    peerEverJoined = false // D39 §4 — yeni oturum, henüz kimse katılmadı
     connecting.value = true
     connectingChannelId.value = channelId
     error.value = ''
@@ -294,11 +322,33 @@ export const useVoiceStore = defineStore('voice', () => {
     }
   }
 
+  // D39 §2/§11 — kapanış tek nokta: hâlâ "çalıyor" durumundaysak (arayan kabul gelmeden ayrılıyor
+  // — iptal düğmesi, "Bağlantıyı Kes", sekme kapama) karşı tarafın zilini de kesmemiz gerekir.
+  // Guild ses kanalında outgoing hiç set olmadığından bu no-op'tur. `leave()` VE beklenmedik
+  // `RoomEvent.Disconnected` yolu — her ikisi de buradan geçer, çağrı noktalarına serpilmez.
+  function cancelRingingIfNeeded(channelId: string | null) {
+    if (!channelId) return
+    const callStore = useCallStore()
+    if (!callStore.isRinging(channelId)) return
+    onLeaveWhileRinging?.(channelId)
+    callStore.clearOutgoing()
+  }
+
   async function leave() {
     // İyimser: kendini panel listesinden hemen çıkar — webhook participant_left
     // gecikse de çıkan kişinin KENDİ sidebar'ı + süre sayacı anında düzelir.
     // Gözlemciler webhook → voice:<id> ile (presence aboneliği) canlı güncellenir.
     const leftChannelId = connectedChannelId.value
+    // D39 blocker fix (PM 2026-08-07) — join() başarısız olursa (CHANNEL_FULL/ağ/LiveKit hatası)
+    // room.connect() hiç tamamlanmadığından connectedChannelId hâlâ null'dur; join'in catch bloğu
+    // yine de leave()'i çağırır. O yolda "çalıyor" durumu connectedChannelId'ye bakarak asla
+    // temizlenmez → geri-zil sonsuza kadar çalar, iptal düğmesi no-op'a düşer (isConnectedTo false).
+    // connectingChannelId join'in finally'sinde null'lanır ama BU satır finally'den ÖNCE (catch
+    // içinden) çalışır, yani hedef kanalı hâlâ taşır — yalnız "çalıyor"u kapatmak için ona da bakıyoruz.
+    // Geri kalan temizlik (katılımcı listesi/ayrılma sesi/voiceApi.leave) BİLEREK yalnız
+    // leftChannelId'ye bağlı kalır: gerçekten bağlanmadıysak bunlar tetiklenmemeli (aşağıdaki
+    // playDisconnect yorumu zaten bu niyeti koruyor).
+    cancelRingingIfNeeded(leftChannelId ?? connectingChannelId.value)
     const selfId = useAuthStore().user?.id
     if (leftChannelId && selfId) {
       removeParticipant(leftChannelId, selfId)
@@ -327,6 +377,7 @@ export const useVoiceStore = defineStore('voice', () => {
     connectedAt.value = null // REV-13
     autoEndWhenAlone = false // REV-12
     pendingCameraStart = false
+    peerEverJoined = false // D39 §4
     if (aloneTimer) { clearTimeout(aloneTimer); aloneTimer = null }
     isMuted.value = false
     canPublish.value = false
@@ -357,6 +408,7 @@ export const useVoiceStore = defineStore('voice', () => {
     const list: RoomMember[] = [toRoomMember(room.localParticipant, localId)]
     for (const p of room.remoteParticipants.values()) list.push(toRoomMember(p, localId))
     roomParticipants.value = list
+    if (list.length >= 2) peerEverJoined = true // D39 §4 — mobile pariteti
   }
 
   // Konuşan setini tüm katılımcıların isSpeaking'inden yeniden kur (mute/unmute dayanıklı)
@@ -564,6 +616,7 @@ export const useVoiceStore = defineStore('voice', () => {
       // Yoksa removeParticipant ile atılan kullanıcı kanalda hayalet + sayaç olarak kalır
       // (resetLocalState yalnız bağlı-oda görünümünü temizler, kanal-presence map'ini DEĞİL).
       const leftChannelId = connectedChannelId.value
+      cancelRingingIfNeeded(leftChannelId) // D39 §11 — beklenmedik kopma da "çalıyor"u susturmalı
       const selfId = useAuthStore().user?.id
       if (leftChannelId && selfId) {
         removeParticipant(leftChannelId, selfId)
@@ -612,17 +665,20 @@ export const useVoiceStore = defineStore('voice', () => {
     }
   }
 
-  // REV-12: DM/grup çağrısında tek kişi (yalnız ben) kalınca ALONE_TIMEOUT_MS sonra otomatik bitir.
-  // Biri katılırsa (length>1) sayaç iptal. Guild ses kanalında uygulanmaz (autoEndWhenAlone=false).
+  // REV-12/D39 §4: DM/grup çağrısında tek kişi (yalnız ben) kalınca otomatik bitir. Süre
+  // `peerEverJoined`e göre ayrılır: karşı taraf hiç katılmadıysa (arayan çalıyor bekliyor) 3dk,
+  // katılıp çıktıysa (eski davranış) 60sn. Biri katılırsa (length>1) sayaç iptal. Guild ses
+  // kanalında uygulanmaz (autoEndWhenAlone=false).
   watch(
     () => roomParticipants.value.length,
     (len) => {
       if (aloneTimer) { clearTimeout(aloneTimer); aloneTimer = null }
       if (!autoEndWhenAlone || !connectedChannelId.value) return
       if (len === 1) {
+        const timeoutMs = peerEverJoined ? ALONE_TIMEOUT_LEFT_MS : ALONE_TIMEOUT_NEVER_JOINED_MS
         aloneTimer = setTimeout(() => {
           if (autoEndWhenAlone && roomParticipants.value.length === 1) leave()
-        }, ALONE_TIMEOUT_MS)
+        }, timeoutMs)
       }
     },
   )

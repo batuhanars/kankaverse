@@ -100,7 +100,7 @@ const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
 const callStore = useCallStore()
 const voiceStore = useVoiceStore()
-const { startCall, cancelCall, startGroupCall } = useCall()
+const { startCall, startGroupCall } = useCall()
 const { joinChannel, leaveChannel } = useSocket()
 const { onInput: onTypingInput, stopTyping } = useTyping(() => props.channel.id)
 const { label: typingLabel } = useTypingLabel(() => props.channel.id, t, { named: false })
@@ -319,14 +319,10 @@ function onGroupVoiceClick() {
   else startGroupCall(props.channel.id)
 }
 
-// Görüntülü ara (1-1 DM): sesli çağrıyla aynı ring akışı + kabul sonrası kamera niyeti.
+// Görüntülü ara (1-1 DM): D39 §6 — oda-önce'de arayan hemen girdiği için niyet doğrudan
+// join'e (startWithCamera) geçer; artık "kabul sonrası aç" diye saklanacak bir şey yok.
 async function startVideoCall(channelId: string) {
-  callStore.setPendingVideoCall(true)
-  await startCall(channelId)
-  // startCall başarısız (ulaşılamadı) olursa flag'i temizle
-  if (!callStore.isRinging(channelId)) {
-    callStore.setPendingVideoCall(false)
-  }
+  await startCall(channelId, { startWithCamera: true })
 }
 
 // Mesaja zıpla (pins/arama) — zıplama sırasında alta kaymayı bastır
@@ -641,20 +637,13 @@ function isGroupStart(index: number): boolean {
             class="xl:hidden text-[12px] px-1"
             style="color: var(--kv-text-muted);"
           >{{ t('friends.requestSent') }}</span>
-          <!-- Sesli arama (1-1): çalıyor→İptal · aktif çağrı→Sese Katıl · yoksa→telefon (ring).
-               Bu kanala bağlıyken buton yok (kontroller DmCallPanel'de). -->
-          <button
-            v-if="callStore.isRinging(channel.id)"
-            class="flex items-center gap-1.5 text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] cursor-pointer"
-            style="color: var(--kv-danger);"
-            :title="t('call.cancel')"
-            @click="cancelCall(channel.id)"
-          >
-            <span class="italic">{{ t('call.calling') }}</span> ✕
-          </button>
+          <!-- Sesli arama (1-1): aktif çağrı→Sese Katıl · yoksa→telefon (ring).
+               D39 §5: çalıyorken de zaten bağlıyız (oda-önce) → "Bu kanala bağlıyken buton yok
+               (kontroller DmCallPanel'de)" aşağıdaki tüm dallar için geçerli; "çalıyor" göstergesi
+               artık ayrı bir başlık düğmesi değil, DmCallPanel'in bekleyen-katılımcı kutucuğunda. -->
           <!-- REV-11: devam eden çağrı → ring yerine doğrudan katıl -->
           <button
-            v-else-if="!voiceStore.isConnectedTo(channel.id) && hasOngoingCall"
+            v-if="!voiceStore.isConnectedTo(channel.id) && hasOngoingCall"
             class="flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
             style="color: var(--kv-online, #3DB46E);"
             :title="t('call.joinGroup')"

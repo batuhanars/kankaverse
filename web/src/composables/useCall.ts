@@ -1,34 +1,57 @@
+import { effectScope, watch } from 'vue'
 import { useSocket } from './useSocket'
 import { useCallStore } from '@/stores/call'
 import { useVoiceStore } from '@/stores/voice'
+import { useCallSounds } from '@/composables/useCallSounds'
 
 /**
- * useCall — DM sesli arama akışı (ring + grup katıl) + timeout yönetimi.
- * Sinyaller useSocket'te; ses voice store'da. Sözleşme: SPRINT_V2_DM_CALL_CONTRACT.md.
+ * useCall — DM sesli arama akışı: "oda önce" (SPRINT_D39). Telefon düğmesi arayanı doğrudan odaya
+ * sokar (ack.ok → join, beklemeden); karşı taraf çalar. `voice.call_accepted` yalnız "çalıyor"
+ * göstergesini düşürür (useSocket.ts). Arayan-tarafı sabit zaman aşımı YOK — oda ömrünü
+ * voiceStore'un yalnız-kalma ayrımı belirler (bkz. stores/voice.ts §4).
+ * Sinyaller useSocket'te; ses voice store'da. Sözleşme: SPRINT_D39_WEB_CALL_MODEL_CONTRACT.md.
  */
-const CALL_TIMEOUT_MS = 30_000
+
+// D39 §5 — geri-zil (ringback): eskiden OutgoingCallBar'ın watch'ındaydı, bar kalktığı için
+// sahipsiz kalırdı. Çağrı yaşam döngüsünün zaten sahibi burası (useCall). Detached effect scope:
+// useCall() hangi component'ten ilk çağrılırsa çağrılsın (DmConversation/IncomingCallModal), o
+// component unmount olsa da callStore.outgoing yaşadığı sürece bağımsız çalışmaya devam eder.
+let ringbackScope: ReturnType<typeof effectScope> | null = null
+function ensureRingback() {
+  if (ringbackScope) return
+  ringbackScope = effectScope(true)
+  ringbackScope.run(() => {
+    const callStore = useCallStore()
+    const { startRingback, stopRingback } = useCallSounds()
+    watch(
+      () => callStore.outgoing?.channelId,
+      (id) => { if (id) startRingback(); else stopRingback() },
+    )
+  })
+}
 
 export function useCall() {
-  const { callInvite, groupCallStart, callAccept, callReject, callCancel } = useSocket()
+  const { callInvite, groupCallStart, callAccept, callReject } = useSocket()
   const callStore = useCallStore()
   const voiceStore = useVoiceStore()
+  ensureRingback()
 
-  // 1-1: ara
-  async function startCall(channelId: string) {
+  // 1-1: ara — oda-önce (§2): ack.ok → BEKLEMEDEN odaya katıl, karşı taraf çalar.
+  // ack.ok === false → nötr mesaj, odaya hiç girilmez (§3).
+  async function startCall(channelId: string, opts?: { startWithCamera?: boolean }) {
     const ack = await callInvite(channelId)
     if (!ack.ok) {
       callStore.setNotice('unreachable') // nötr — engellenme/ilişki sızmaz
       return
     }
     callStore.setOutgoing(channelId)
-    window.setTimeout(() => {
-      if (callStore.isRinging(channelId)) cancelCall(channelId)
-    }, CALL_TIMEOUT_MS)
+    await voiceStore.join(channelId, { autoEndWhenAlone: true, startWithCamera: opts?.startWithCamera })
   }
 
+  // İptal — kapanış tek nokta (§2/§11): voiceStore.leave() hâlâ çalıyorsak call_cancel'ı
+  // kendi gönderir (stores/voice.ts cancelRingingIfNeeded), burada tekrarlanmaz.
   function cancelCall(channelId: string) {
-    callCancel(channelId)
-    callStore.clearOutgoing()
+    if (voiceStore.isConnectedTo(channelId)) void voiceStore.leave()
   }
 
   // Gelen çağrıyı kabul → katıl

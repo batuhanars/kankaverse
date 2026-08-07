@@ -14,7 +14,7 @@ import type { GuildMemberDto, ChannelDto, CategoryDto, RoleDto } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useRolesStore } from '@/stores/roles'
 import { useEventsStore } from '@/stores/events'
-import { useVoiceStore, type VoiceParticipant } from '@/stores/voice'
+import { useVoiceStore, setLeaveWhileRingingHandler, type VoiceParticipant } from '@/stores/voice'
 import { useCallStore, type IncomingCall } from '@/stores/call'
 import { useEmergencyAlertsStore, type EmergencyAlert } from '@/stores/emergencyAlerts'
 import { useCallSounds } from '@/composables/useCallSounds'
@@ -56,6 +56,11 @@ export function voiceBroadcast(channelId: string, active: boolean) {
 }
 // auth_error sonrası art arda tazele-dene sayacı (sonsuz döngü koruması; başarılı connect'te sıfırlanır)
 let authRetryCount = 0
+
+// D39 §2/§11 — voice store'un leave()'i hâlâ "çalıyor" durumundayken çağrılırsa (iptal/"Bağlantıyı
+// Kes"/sekme kapama) buradan call_cancel emit edilir. Modül seviyesi: voiceSubscribe/voiceBroadcast
+// ile aynı desen, döngüsel import'tan kaçınır (voice.ts bu dosyayı DEĞİL, tersini import eder zaten).
+setLeaveWhileRingingHandler((channelId) => socket?.emit('voice:call_cancel', { channelId }))
 
 export function useSocket() {
   const connected = ref(false)
@@ -387,15 +392,23 @@ export function useSocket() {
     socket.on('voice.incoming_call', (data: IncomingCall) => {
       callStore.setIncoming(data)
     })
-    socket.on('voice.call_accepted', (data: { channelId: string }) => {
-      // Karşı taraf kabul etti → odaya katıl, çalma durumunu temizle
-      const startWithCamera = callStore.consumePendingVideoCall()
+    socket.on('voice.call_accepted', () => {
+      // D39 §2/§3 — oda-önce: arayan zaten odada (startCall'da join etti). Karşı taraf kabul etti,
+      // yalnız "çalıyor" göstergesini düşür. İKİNCİ join YOK — çift-join tuzağı (§3): LiveKit yeniden
+      // bağlanma, ses kesilmesi, hayalet katılımcı riski taşırdı.
       callStore.clearOutgoing()
-      voiceStore.join(data.channelId, { autoEndWhenAlone: true, startWithCamera }) // REV-12: DM çağrısı
     })
     socket.on('voice.call_rejected', () => {
+      // D39 §2 — arayan zaten odada; reddedilince odadan da çıkması gerekir (klasik modelde
+      // henüz odaya girmemiş olduğu için bu adım yoktu).
+      // 🔴 Sıra ÖNEMLİ: clearOutgoing() leave()'den ÖNCE gelmeli. voiceStore.leave() içindeki
+      // cancelRingingIfNeeded, callStore.isRinging'e bakıp hâlâ true ise call_cancel gönderir —
+      // burada zaten reddedilmiş bir aramaya cancel göndermek anlamsız (karşı taraf zaten biliyor).
+      // clearOutgoing() önce çalışınca isRinging false olur, gereksiz cancel atlanır. Satırları
+      // yer değiştirme.
       callStore.clearOutgoing()
       callStore.setNotice('rejected')
+      void voiceStore.leave()
     })
     socket.on('voice.call_canceled', () => {
       callStore.clearIncoming()
