@@ -25,7 +25,10 @@ function ensureRingback() {
     const { startRingback, stopRingback } = useCallSounds()
     watch(
       () => callStore.outgoing?.channelId,
-      (id) => { if (id) startRingback(); else stopRingback() },
+      (id) => {
+        if (id) startRingback()
+        else stopRingback()
+      },
     )
   })
 }
@@ -45,7 +48,10 @@ export function useCall() {
       return
     }
     callStore.setOutgoing(channelId)
-    await voiceStore.join(channelId, { autoEndWhenAlone: true, startWithCamera: opts?.startWithCamera })
+    await voiceStore.join(channelId, {
+      autoEndWhenAlone: true,
+      startWithCamera: opts?.startWithCamera,
+    })
   }
 
   // İptal — kapanış tek nokta (§2/§11): voiceStore.leave() hâlâ çalıyorsak call_cancel'ı

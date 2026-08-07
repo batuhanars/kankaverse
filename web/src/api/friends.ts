@@ -10,8 +10,7 @@ export const friendsApi = {
     http.post<FriendRequestDto | FriendDto>('/friends/requests/by-user', { userId }),
   acceptRequest: (requestId: string) =>
     http.post<FriendDto>(`/friends/requests/${requestId}/accept`),
-  declineRequest: (requestId: string) =>
-    http.post<null>(`/friends/requests/${requestId}/decline`),
+  declineRequest: (requestId: string) => http.post<null>(`/friends/requests/${requestId}/decline`),
   removeFriend: (userId: string) => http.delete<null>(`/friends/${userId}`),
   getBlocked: () => http.get<BlockedUserDto[]>('/blocks'),
   blockUser: (userId: string) => http.post<null>('/blocks', { userId }),

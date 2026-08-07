@@ -75,10 +75,26 @@ const filteredChannels = computed(() => {
 
 // Discord-tarzı filtre kategorileri (Görsel #17)
 const filterCategories = [
-  { kind: 'from' as const, label: () => t('guildSearch.cat.from'), hint: () => t('guildSearch.cat.fromHint') },
-  { kind: 'in' as const, label: () => t('guildSearch.cat.in'), hint: () => t('guildSearch.cat.inHint') },
-  { kind: 'has' as const, label: () => t('guildSearch.cat.has'), hint: () => t('guildSearch.cat.hasHint') },
-  { kind: 'mentions' as const, label: () => t('guildSearch.cat.mentions'), hint: () => t('guildSearch.cat.mentionsHint') },
+  {
+    kind: 'from' as const,
+    label: () => t('guildSearch.cat.from'),
+    hint: () => t('guildSearch.cat.fromHint'),
+  },
+  {
+    kind: 'in' as const,
+    label: () => t('guildSearch.cat.in'),
+    hint: () => t('guildSearch.cat.inHint'),
+  },
+  {
+    kind: 'has' as const,
+    label: () => t('guildSearch.cat.has'),
+    hint: () => t('guildSearch.cat.hasHint'),
+  },
+  {
+    kind: 'mentions' as const,
+    label: () => t('guildSearch.cat.mentions'),
+    hint: () => t('guildSearch.cat.mentionsHint'),
+  },
 ]
 const hasOptions = computed(() => [
   { value: 'link' as const, label: t('guildSearch.has.link') },
@@ -88,11 +104,16 @@ const hasOptions = computed(() => [
 // Çubuktaki prefix token etiketi (activeCat aktifken — "şu kullanıcıdan:" vb.)
 const activeCatToken = computed(() => {
   switch (activeCat.value) {
-    case 'from': return t('guildSearch.token.from')
-    case 'mentions': return t('guildSearch.token.mentions')
-    case 'in': return t('guildSearch.token.in')
-    case 'has': return t('guildSearch.token.has')
-    default: return ''
+    case 'from':
+      return t('guildSearch.token.from')
+    case 'mentions':
+      return t('guildSearch.token.mentions')
+    case 'in':
+      return t('guildSearch.token.in')
+    case 'has':
+      return t('guildSearch.token.has')
+    default:
+      return ''
   }
 })
 const valuePlaceholder = computed(() =>
@@ -106,7 +127,11 @@ const hasAnyFilter = computed(
 const canSearch = computed(() => query.value.trim().length >= 2 || hasAnyFilter.value)
 
 const hasLabel = computed(() =>
-  hasType.value === 'link' ? t('guildSearch.has.link') : hasType.value === 'file' ? t('guildSearch.has.file') : '',
+  hasType.value === 'link'
+    ? t('guildSearch.has.link')
+    : hasType.value === 'file'
+      ? t('guildSearch.has.file')
+      : '',
 )
 
 function onInputFocus() {
@@ -130,10 +155,22 @@ function closeDropdowns() {
 }
 // Değer seçildi → filtre uygulanır (watch doSearch tetikler) + menüler kapanır (refocus YOK,
 // yoksa odak menüyü hemen yeniden açar). Kullanıcı tekrar tıklayınca menü yine açılır.
-function setFrom(m: GuildMemberDto) { fromMember.value = m; closeDropdowns() }
-function setMentions(m: GuildMemberDto) { mentionsMember.value = m; closeDropdowns() }
-function setIn(c: ChannelDto) { inChannel.value = c; closeDropdowns() }
-function setHas(v: 'link' | 'file') { hasType.value = v; closeDropdowns() }
+function setFrom(m: GuildMemberDto) {
+  fromMember.value = m
+  closeDropdowns()
+}
+function setMentions(m: GuildMemberDto) {
+  mentionsMember.value = m
+  closeDropdowns()
+}
+function setIn(c: ChannelDto) {
+  inChannel.value = c
+  closeDropdowns()
+}
+function setHas(v: 'link' | 'file') {
+  hasType.value = v
+  closeDropdowns()
+}
 
 // Enter: aktif kategori yokken serbest metin araması yap + menüyü kapat
 function onEnter() {
@@ -143,7 +180,10 @@ function onEnter() {
 }
 
 // ── Güvenli highlight: parça parça, v-html YOK ───────────────────────────
-interface Part { text: string; mark: boolean }
+interface Part {
+  text: string
+  mark: boolean
+}
 function highlightParts(content: string): Part[] {
   const plain = formatMentionsPlain(content, () => undefined, t('mention.unknown'))
   const term = query.value.trim()
@@ -237,19 +277,19 @@ function onKeydown(e: KeyboardEvent) {
 <template>
   <aside
     class="w-[320px] shrink-0 flex flex-col min-h-0 overflow-hidden rounded-[var(--kv-radius-lg)] border"
-    style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle);"
+    style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle)"
   >
     <!-- Başlık -->
     <div
       class="flex items-center justify-between px-4 shrink-0 border-b"
-      style="height: var(--kv-header-height); border-color: var(--kv-border-subtle);"
+      style="height: var(--kv-header-height); border-color: var(--kv-border-subtle)"
     >
-      <span class="text-[14px] font-semibold" style="color: var(--kv-text-primary);">
+      <span class="text-[14px] font-semibold" style="color: var(--kv-text-primary)">
         {{ t('guildSearch.title') }}
       </span>
       <button
         class="w-6 h-6 flex items-center justify-center rounded text-[14px] cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
-        style="color: var(--kv-text-muted);"
+        style="color: var(--kv-text-muted)"
         :title="t('common.close')"
         @click="close"
       >
@@ -258,23 +298,25 @@ function onKeydown(e: KeyboardEvent) {
     </div>
 
     <!-- Arama girişi + inline filtreler (menü arama çubuğuna bağlı — Görsel #17/#18) -->
-    <div class="px-3 py-3 shrink-0 border-b" style="border-color: var(--kv-border-subtle);">
+    <div class="px-3 py-3 shrink-0 border-b" style="border-color: var(--kv-border-subtle)">
       <div ref="searchBox" class="relative">
         <!-- Çubuk: aktif kategori varsa prefix token + değer-süzme; yoksa serbest metin -->
         <div
           class="flex items-center gap-1.5 px-2.5 py-2 rounded-[var(--kv-radius-sm)] border"
-          style="background-color: var(--kv-bg-content); border-color: var(--kv-border-strong);"
+          style="background-color: var(--kv-bg-content); border-color: var(--kv-border-strong)"
         >
           <span v-if="activeCat" class="kv-token shrink-0">
             {{ activeCatToken }}
-            <button class="kv-token__x" :title="t('common.clear')" @click.stop="cancelCategory">✕</button>
+            <button class="kv-token__x" :title="t('common.clear')" @click.stop="cancelCategory">
+              ✕
+            </button>
           </span>
           <input
             ref="inputEl"
             v-model="inputModel"
             type="text"
             class="flex-1 min-w-0 bg-transparent outline-none text-[14px]"
-            style="color: var(--kv-text-primary); font-family: var(--kv-font-ui);"
+            style="color: var(--kv-text-primary); font-family: var(--kv-font-ui)"
             :placeholder="activeCat ? valuePlaceholder : t('guildSearch.placeholder')"
             @focus="onInputFocus"
             @click="onInputFocus"
@@ -283,11 +325,11 @@ function onKeydown(e: KeyboardEvent) {
         </div>
 
         <!-- Açılır: kategori menüsü (odak + aktif kategori yok) -->
-        <div
-          v-if="menuOpen && !activeCat"
-          class="kv-search-dropdown"
-        >
-          <p class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+        <div v-if="menuOpen && !activeCat" class="kv-search-dropdown">
+          <p
+            class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest"
+            style="color: var(--kv-text-muted)"
+          >
             {{ t('guildSearch.filters') }}
           </p>
           <button
@@ -296,22 +338,84 @@ function onKeydown(e: KeyboardEvent) {
             class="w-full flex items-start gap-2.5 px-3 py-2 text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
             @click="chooseCategory(cat.kind)"
           >
-            <span class="mt-0.5 shrink-0" style="color: var(--kv-text-muted);">
-              <svg v-if="cat.kind === 'from'" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              <svg v-else-if="cat.kind === 'in'" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
-              <svg v-else-if="cat.kind === 'has'" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-              <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>
+            <span class="mt-0.5 shrink-0" style="color: var(--kv-text-muted)">
+              <svg
+                v-if="cat.kind === 'from'"
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              <svg
+                v-else-if="cat.kind === 'in'"
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="4" y1="9" x2="20" y2="9" />
+                <line x1="4" y1="15" x2="20" y2="15" />
+                <line x1="10" y1="3" x2="8" y2="21" />
+                <line x1="16" y1="3" x2="14" y2="21" />
+              </svg>
+              <svg
+                v-else-if="cat.kind === 'has'"
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"
+                />
+              </svg>
+              <svg
+                v-else
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="4" />
+                <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94" />
+              </svg>
             </span>
             <span class="min-w-0">
-              <span class="block text-[13px] font-semibold" style="color: var(--kv-text-primary);">{{ cat.label() }}</span>
-              <span class="block text-[11px]" style="color: var(--kv-text-muted);">{{ cat.hint() }}</span>
+              <span class="block text-[13px] font-semibold" style="color: var(--kv-text-primary)">{{
+                cat.label()
+              }}</span>
+              <span class="block text-[11px]" style="color: var(--kv-text-muted)">{{
+                cat.hint()
+              }}</span>
             </span>
           </button>
         </div>
 
         <!-- Açılır: değer listesi (aktif kategori) -->
         <div v-else-if="activeCat" class="kv-search-dropdown">
-          <p class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+          <p
+            class="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest"
+            style="color: var(--kv-text-muted)"
+          >
             {{ activeCatToken }}
           </p>
 
@@ -323,13 +427,27 @@ function onKeydown(e: KeyboardEvent) {
               class="w-full flex items-center gap-2 px-3 py-1.5 text-left cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
               @click="activeCat === 'from' ? setFrom(m) : setMentions(m)"
             >
-              <span class="w-6 h-6 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-white" style="background-color: var(--kv-accent-500);">
-                <img v-if="m.avatarUrl" :src="m.avatarUrl" :alt="m.username" class="w-full h-full object-cover" />
+              <span
+                class="w-6 h-6 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-white"
+                style="background-color: var(--kv-accent-500)"
+              >
+                <img
+                  v-if="m.avatarUrl"
+                  :src="m.avatarUrl"
+                  :alt="m.username"
+                  class="w-full h-full object-cover"
+                />
                 <span v-else>{{ m.username[0]?.toUpperCase() }}</span>
               </span>
-              <span class="truncate text-[13px]" style="color: var(--kv-text-primary);">{{ m.username }}</span>
+              <span class="truncate text-[13px]" style="color: var(--kv-text-primary)">{{
+                m.username
+              }}</span>
             </button>
-            <p v-if="!filteredMembers.length" class="px-3 py-2 text-[12px]" style="color: var(--kv-text-muted);">
+            <p
+              v-if="!filteredMembers.length"
+              class="px-3 py-2 text-[12px]"
+              style="color: var(--kv-text-muted)"
+            >
               {{ t('guildSearch.noMembers') }}
             </p>
           </template>
@@ -340,13 +458,17 @@ function onKeydown(e: KeyboardEvent) {
               v-for="c in filteredChannels"
               :key="c.id"
               class="w-full flex items-center gap-1.5 px-3 py-1.5 text-left text-[13px] cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-              style="color: var(--kv-text-primary);"
+              style="color: var(--kv-text-primary)"
               @click="setIn(c)"
             >
-              <span style="color: var(--kv-text-muted);">#</span>
+              <span style="color: var(--kv-text-muted)">#</span>
               <span class="truncate">{{ c.name }}</span>
             </button>
-            <p v-if="!filteredChannels.length" class="px-3 py-2 text-[12px]" style="color: var(--kv-text-muted);">
+            <p
+              v-if="!filteredChannels.length"
+              class="px-3 py-2 text-[12px]"
+              style="color: var(--kv-text-muted)"
+            >
               {{ t('guildSearch.noChannels') }}
             </p>
           </template>
@@ -357,11 +479,39 @@ function onKeydown(e: KeyboardEvent) {
               v-for="opt in hasOptions"
               :key="opt.value"
               class="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[13px] cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
-              style="color: var(--kv-text-primary);"
+              style="color: var(--kv-text-primary)"
               @click="setHas(opt.value)"
             >
-              <svg v-if="opt.value === 'link'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-              <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-muted);"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+              <svg
+                v-if="opt.value === 'link'"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                style="color: var(--kv-text-muted)"
+              >
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              <svg
+                v-else
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                style="color: var(--kv-text-muted)"
+              >
+                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+                <polyline points="13 2 13 9 20 9" />
+              </svg>
               {{ opt.label }}
             </button>
           </template>
@@ -370,10 +520,30 @@ function onKeydown(e: KeyboardEvent) {
 
       <!-- Uygulanmış filtre chip'leri -->
       <div v-if="hasAnyFilter" class="mt-2 flex flex-wrap gap-1.5">
-        <span v-if="fromMember" class="kv-chip">{{ t('guildSearch.fromLabel') }}: {{ fromMember.username }}<button class="kv-chip__x" :title="t('common.clear')" @click="fromMember = null">✕</button></span>
-        <span v-if="inChannel" class="kv-chip">{{ t('guildSearch.cat.in') }}: #{{ inChannel.name }}<button class="kv-chip__x" :title="t('common.clear')" @click="inChannel = null">✕</button></span>
-        <span v-if="hasType" class="kv-chip">{{ t('guildSearch.cat.has') }}: {{ hasLabel }}<button class="kv-chip__x" :title="t('common.clear')" @click="hasType = null">✕</button></span>
-        <span v-if="mentionsMember" class="kv-chip">{{ t('guildSearch.mentionsLabel') }}: {{ mentionsMember.username }}<button class="kv-chip__x" :title="t('common.clear')" @click="mentionsMember = null">✕</button></span>
+        <span v-if="fromMember" class="kv-chip"
+          >{{ t('guildSearch.fromLabel') }}: {{ fromMember.username
+          }}<button class="kv-chip__x" :title="t('common.clear')" @click="fromMember = null">
+            ✕
+          </button></span
+        >
+        <span v-if="inChannel" class="kv-chip"
+          >{{ t('guildSearch.cat.in') }}: #{{ inChannel.name
+          }}<button class="kv-chip__x" :title="t('common.clear')" @click="inChannel = null">
+            ✕
+          </button></span
+        >
+        <span v-if="hasType" class="kv-chip"
+          >{{ t('guildSearch.cat.has') }}: {{ hasLabel
+          }}<button class="kv-chip__x" :title="t('common.clear')" @click="hasType = null">
+            ✕
+          </button></span
+        >
+        <span v-if="mentionsMember" class="kv-chip"
+          >{{ t('guildSearch.mentionsLabel') }}: {{ mentionsMember.username
+          }}<button class="kv-chip__x" :title="t('common.clear')" @click="mentionsMember = null">
+            ✕
+          </button></span
+        >
       </div>
     </div>
 
@@ -381,30 +551,26 @@ function onKeydown(e: KeyboardEvent) {
     <div
       v-if="searched && !loading && !error"
       class="px-4 py-2 shrink-0 text-[11px] font-semibold uppercase tracking-widest border-b"
-      style="color: var(--kv-text-muted); border-color: var(--kv-border-subtle);"
+      style="color: var(--kv-text-muted); border-color: var(--kv-border-subtle)"
     >
       {{ t('guildSearch.resultCount', { n: totalResults() }) }}
     </div>
 
     <!-- Sonuç listesi -->
     <div class="flex-1 overflow-y-auto py-2">
-      <p
-        v-if="!searched"
-        class="px-4 py-3 text-[13px]"
-        style="color: var(--kv-text-muted);"
-      >
+      <p v-if="!searched" class="px-4 py-3 text-[13px]" style="color: var(--kv-text-muted)">
         {{ t('guildSearch.hint') }}
       </p>
-      <p v-else-if="loading" class="px-4 py-3 text-[13px]" style="color: var(--kv-text-muted);">
+      <p v-else-if="loading" class="px-4 py-3 text-[13px]" style="color: var(--kv-text-muted)">
         {{ t('messageSearch.loading') }}
       </p>
-      <p v-else-if="error" class="px-4 py-3 text-[13px]" style="color: var(--kv-danger);">
+      <p v-else-if="error" class="px-4 py-3 text-[13px]" style="color: var(--kv-danger)">
         {{ error }}
       </p>
       <p
         v-else-if="totalResults() === 0"
         class="px-4 py-3 text-[13px]"
-        style="color: var(--kv-text-muted);"
+        style="color: var(--kv-text-muted)"
       >
         {{ t('messageSearch.empty') }}
       </p>
@@ -413,7 +579,7 @@ function onKeydown(e: KeyboardEvent) {
         <div v-for="g in groups" :key="g.channelId" class="mb-1">
           <p
             class="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-widest truncate"
-            style="color: var(--kv-text-muted);"
+            style="color: var(--kv-text-muted)"
           >
             # {{ g.channelName }}
           </p>
@@ -427,7 +593,7 @@ function onKeydown(e: KeyboardEvent) {
           >
             <div
               class="w-7 h-7 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[11px] font-semibold text-white"
-              style="background-color: var(--kv-accent-500);"
+              style="background-color: var(--kv-accent-500)"
             >
               <img
                 v-if="msg.author.avatarUrl"
@@ -439,25 +605,30 @@ function onKeydown(e: KeyboardEvent) {
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-baseline gap-2 mb-0.5">
-                <span class="text-[13px] font-semibold truncate" style="color: var(--kv-text-primary);">
+                <span
+                  class="text-[13px] font-semibold truncate"
+                  style="color: var(--kv-text-primary)"
+                >
                   {{ msg.author.username }}
                 </span>
-                <span class="text-[11px] shrink-0" style="color: var(--kv-text-muted);">
+                <span class="text-[11px] shrink-0" style="color: var(--kv-text-muted)">
                   {{ formatTime(msg.createdAt) }}
                 </span>
               </div>
               <p
                 v-if="msg.content"
                 class="text-[13px] break-words whitespace-pre-wrap"
-                style="color: var(--kv-text-body);"
-              ><template v-for="(part, i) in highlightParts(msg.content)" :key="i"><mark
-                  v-if="part.mark"
-                  class="kv-hl"
-                >{{ part.text }}</mark><template v-else>{{ part.text }}</template></template></p>
+                style="color: var(--kv-text-body)"
+              >
+                <template v-for="(part, i) in highlightParts(msg.content)" :key="i"
+                  ><mark v-if="part.mark" class="kv-hl">{{ part.text }}</mark
+                  ><template v-else>{{ part.text }}</template></template
+                >
+              </p>
               <p
                 v-else-if="msg.attachments?.length"
                 class="text-[13px] italic"
-                style="color: var(--kv-text-muted);"
+                style="color: var(--kv-text-muted)"
               >
                 {{ msg.attachments[0].filename }}
               </p>

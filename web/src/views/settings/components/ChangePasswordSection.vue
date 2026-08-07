@@ -57,7 +57,11 @@ function getError(field: string): string | undefined {
 
 <template>
   <div>
-    <h3 v-if="!inModal" class="text-[15px] font-semibold mb-3" style="color: var(--kv-text-primary);">
+    <h3
+      v-if="!inModal"
+      class="text-[15px] font-semibold mb-3"
+      style="color: var(--kv-text-primary)"
+    >
       {{ t('security.password.title') }}
     </h3>
     <form class="flex flex-col gap-3" @submit.prevent="onSubmit">
@@ -85,8 +89,10 @@ function getError(field: string): string | undefined {
         :placeholder="t('security.password.totpCodePlaceholder')"
         autocomplete="one-time-code"
       />
-      <p v-if="apiError" class="text-[13px]" style="color: var(--kv-danger);">{{ apiError }}</p>
-      <p v-if="success" class="text-[13px]" style="color: #3DB46E;">{{ t('security.password.success') }}</p>
+      <p v-if="apiError" class="text-[13px]" style="color: var(--kv-danger)">{{ apiError }}</p>
+      <p v-if="success" class="text-[13px]" style="color: #3db46e">
+        {{ t('security.password.success') }}
+      </p>
       <KvButton type="submit" :loading="loading" class="self-start">
         {{ t('security.password.submit') }}
       </KvButton>

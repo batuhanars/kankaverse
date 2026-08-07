@@ -168,14 +168,21 @@ export function useSocket() {
       messagesStore.removeMessage(data.channelId, data.messageId)
     })
 
-    socket.on('dm.message', (data: { channelId: string; lastMessage: { content: string; createdAt: string }; senderId: string }) => {
-      // Sprint WEB-PARITE §2.2 — susturulmuş/`NONE` DM okunmamış SAYILMAZ; ama sohbet listede
-      // yaşamaya devam eder: son mesaj önizlemesi + sıralama yine güncellenir (yalnız rozet yanmaz).
-      const { countUnread } = prefsStore.channelBadgeEffect(data.channelId)
-      dmStore.applyActivity(data, { countUnread })
-      // Masaüstü toast (DM/grup) — pencere arkada VEYA bu DM açık değilse
-      maybeFireDmToast(data, dmStore.activeDmChannelId === data.channelId)
-    })
+    socket.on(
+      'dm.message',
+      (data: {
+        channelId: string
+        lastMessage: { content: string; createdAt: string }
+        senderId: string
+      }) => {
+        // Sprint WEB-PARITE §2.2 — susturulmuş/`NONE` DM okunmamış SAYILMAZ; ama sohbet listede
+        // yaşamaya devam eder: son mesaj önizlemesi + sıralama yine güncellenir (yalnız rozet yanmaz).
+        const { countUnread } = prefsStore.channelBadgeEffect(data.channelId)
+        dmStore.applyActivity(data, { countUnread })
+        // Masaüstü toast (DM/grup) — pencere arkada VEYA bu DM açık değilse
+        maybeFireDmToast(data, dmStore.activeDmChannelId === data.channelId)
+      },
+    )
 
     // C9 — bana yeni mesaj isteği geldi (sessiz: masaüstü toast YOK, yalnız "Mesaj İstekleri" rozeti güncellenir)
     socket.on('dm.request', () => {
@@ -202,9 +209,12 @@ export function useSocket() {
       notificationsStore.handleIncoming(dto)
     })
 
-    socket.on('notification:snapshot', (payload: { notifications: NotificationDto[]; unreadCount: number }) => {
-      notificationsStore.applySnapshot(payload)
-    })
+    socket.on(
+      'notification:snapshot',
+      (payload: { notifications: NotificationDto[]; unreadCount: number }) => {
+        notificationsStore.applySnapshot(payload)
+      },
+    )
 
     // A4 — Acil alarm (yalnız platform isModerator alır; sunucu otorite). Kalıcı alarm + dikkat sesi.
     socket.on('emergency.alert', (data: EmergencyAlert) => {
@@ -212,9 +222,12 @@ export function useSocket() {
       useCallSounds().playAlert()
     })
 
-    socket.on('presence:snapshot', (payload: { states: Array<{ userId: string; status: PresenceStatus }> }) => {
-      presenceStore.applySnapshot(payload.states)
-    })
+    socket.on(
+      'presence:snapshot',
+      (payload: { states: Array<{ userId: string; status: PresenceStatus }> }) => {
+        presenceStore.applySnapshot(payload.states)
+      },
+    )
 
     socket.on('presence:update', (payload: { userId: string; status: PresenceStatus }) => {
       presenceStore.applyUpdate(payload.userId, payload.status)
@@ -229,18 +242,39 @@ export function useSocket() {
     })
 
     // Sprint V2: reaksiyon WS olayları
-    socket.on('reaction.added', (data: { messageId: string; channelId: string; emoji: string; userId: string }) => {
-      messagesStore.applyReaction(data.messageId, data.emoji, data.userId, authStore.user?.id ?? '', true)
-    })
+    socket.on(
+      'reaction.added',
+      (data: { messageId: string; channelId: string; emoji: string; userId: string }) => {
+        messagesStore.applyReaction(
+          data.messageId,
+          data.emoji,
+          data.userId,
+          authStore.user?.id ?? '',
+          true,
+        )
+      },
+    )
 
-    socket.on('reaction.removed', (data: { messageId: string; channelId: string; emoji: string; userId: string }) => {
-      messagesStore.applyReaction(data.messageId, data.emoji, data.userId, authStore.user?.id ?? '', false)
-    })
+    socket.on(
+      'reaction.removed',
+      (data: { messageId: string; channelId: string; emoji: string; userId: string }) => {
+        messagesStore.applyReaction(
+          data.messageId,
+          data.emoji,
+          data.userId,
+          authStore.user?.id ?? '',
+          false,
+        )
+      },
+    )
 
     // Sprint V2 Pins: sabitleme WS olayları (§5)
-    socket.on('message.pinned', (data: { messageId: string; channelId: string; pinnedAt: string }) => {
-      messagesStore.setPinned(data.channelId, data.messageId, data.pinnedAt)
-    })
+    socket.on(
+      'message.pinned',
+      (data: { messageId: string; channelId: string; pinnedAt: string }) => {
+        messagesStore.setPinned(data.channelId, data.messageId, data.pinnedAt)
+      },
+    )
 
     socket.on('message.unpinned', (data: { messageId: string; channelId: string }) => {
       messagesStore.setPinned(data.channelId, data.messageId, null)
@@ -249,31 +283,43 @@ export function useSocket() {
     // Sprint V2: @bahsetme — kanal/guild `unreadMentionCount` rozetini sürer.
     // Bell ARTIK bunu tüketmez (Sprint C1 → kalıcı `notification` event'i); bu event
     // yalnız rozet sistemi için korunur (başka tüketicisi var).
-    socket.on('mention', (payload: { messageId: string; channelId: string; guildId: string | null }) => {
-      // REV-4: guild kanalında bahsetme → o kanalı izlemiyorsam mention rozetini artır
-      // (rail kırmızı sayaç + kanal sidebar bandı). DM (guildId null) → bu sistem dışı.
-      if (payload.guildId && activeChannelId !== payload.channelId) {
-        // Sprint WEB-PARITE §2.2 — kanal susturulmuş/`NONE` ise ne kanal ne ortam sayacı artar.
-        if (!prefsStore.channelBadgeEffect(payload.channelId).countMention) return
-        channelsStore.markChannelMentioned(payload.channelId, payload.guildId)
-        guildsStore.incrementGuildMention(payload.guildId)
-      }
-    })
+    socket.on(
+      'mention',
+      (payload: { messageId: string; channelId: string; guildId: string | null }) => {
+        // REV-4: guild kanalında bahsetme → o kanalı izlemiyorsam mention rozetini artır
+        // (rail kırmızı sayaç + kanal sidebar bandı). DM (guildId null) → bu sistem dışı.
+        if (payload.guildId && activeChannelId !== payload.channelId) {
+          // Sprint WEB-PARITE §2.2 — kanal susturulmuş/`NONE` ise ne kanal ne ortam sayacı artar.
+          if (!prefsStore.channelBadgeEffect(payload.channelId).countMention) return
+          channelsStore.markChannelMentioned(payload.channelId, payload.guildId)
+          guildsStore.incrementGuildMention(payload.guildId)
+        }
+      },
+    )
 
     // Kanal aktivitesi — başka üyenin mesajı. Zengin payload (author + preview) yalnız
     // kanalı okuyabilen üyeye gelir (backend T&S kapısı); masaüstü toast onu kullanır.
-    socket.on('channel.activity', (data: { channelId: string; guildId: string; authorId: string; author?: { id: string; username: string }; preview?: string }) => {
-      const isActive = activeChannelId === data.channelId
-      // Masaüstü toast — pencere arkada VEYA bu kanal açık değilse
-      maybeFireChannelToast(data, isActive)
-      // Kullanıcı o kanalı şu an izliyorsa unread saymıyoruz
-      if (isActive) return
-      // Sprint WEB-PARITE §2.2 — susturulmuş/`NONE`/`MENTIONS` kanalda düz mesaj sayılmaz:
-      // ne kanal satırı ne de rail'deki ortam simgesi yanar (süzgeç artış anında, çizimde değil).
-      if (!prefsStore.channelBadgeEffect(data.channelId).countUnread) return
-      channelsStore.markChannelUnread(data.channelId, data.guildId)
-      guildsStore.incrementGuildUnread(data.guildId)
-    })
+    socket.on(
+      'channel.activity',
+      (data: {
+        channelId: string
+        guildId: string
+        authorId: string
+        author?: { id: string; username: string }
+        preview?: string
+      }) => {
+        const isActive = activeChannelId === data.channelId
+        // Masaüstü toast — pencere arkada VEYA bu kanal açık değilse
+        maybeFireChannelToast(data, isActive)
+        // Kullanıcı o kanalı şu an izliyorsa unread saymıyoruz
+        if (isActive) return
+        // Sprint WEB-PARITE §2.2 — susturulmuş/`NONE`/`MENTIONS` kanalda düz mesaj sayılmaz:
+        // ne kanal satırı ne de rail'deki ortam simgesi yanar (süzgeç artış anında, çizimde değil).
+        if (!prefsStore.channelBadgeEffect(data.channelId).countUnread) return
+        channelsStore.markChannelUnread(data.channelId, data.guildId)
+        guildsStore.incrementGuildUnread(data.guildId)
+      },
+    )
 
     // REV-14: ortam üye olayları — üye listesi + mention autocomplete anlık (yenileme yok)
     socket.on('guild.member_joined', (data: { guildId: string; member: GuildMemberDto }) => {
@@ -343,9 +389,12 @@ export function useSocket() {
     })
 
     // Sprint V2 LiveKit: ses kanalı presence (backend webhook → WS; sözleşme §5)
-    socket.on('voice.participant_joined', (data: { channelId: string; participant: VoiceParticipant }) => {
-      voiceStore.addParticipant(data.channelId, data.participant)
-    })
+    socket.on(
+      'voice.participant_joined',
+      (data: { channelId: string; participant: VoiceParticipant }) => {
+        voiceStore.addParticipant(data.channelId, data.participant)
+      },
+    )
 
     socket.on('voice.participant_left', (data: { channelId: string; userId: string }) => {
       voiceStore.removeParticipant(data.channelId, data.userId)
@@ -383,7 +432,10 @@ export function useSocket() {
       // Hedef kanalın guild'ine yönlen (kanal store'dan guildId bul)
       const target = channelsStore.findChannelById(data.toChannelId)
       if (target?.guildId) {
-        router.push({ name: 'channel', params: { guildId: target.guildId, channelId: data.toChannelId } })
+        router.push({
+          name: 'channel',
+          params: { guildId: target.guildId, channelId: data.toChannelId },
+        })
       }
       useToastStore().info(i18n.global.t('voice.movedToast'))
     })
@@ -413,10 +465,13 @@ export function useSocket() {
     socket.on('voice.call_canceled', () => {
       callStore.clearIncoming()
     })
-    socket.on('voice.group_call_started', (data: { channelId: string; by: { id: string; username: string } }) => {
-      // v1: bilgilendirme (grup DM'de "Sese Katıl" zaten her zaman görünür)
-      callStore.setNotice(`group:${data.by.username}`)
-    })
+    socket.on(
+      'voice.group_call_started',
+      (data: { channelId: string; by: { id: string; username: string } }) => {
+        // v1: bilgilendirme (grup DM'de "Sese Katıl" zaten her zaman görünür)
+        callStore.setNotice(`group:${data.by.username}`)
+      },
+    )
 
     // Typing emit fonksiyonlarını useTyping composable'ına bağla
     _bindTypingEmitters(
@@ -473,23 +528,50 @@ export function useSocket() {
     return new Promise((resolve) => {
       if (!socket) return resolve({ ok: false, error: 'NOT_CONNECTED' })
       let settled = false
-      const done = (ack: { ok: boolean; error?: string }) => { if (!settled) { settled = true; resolve(ack) } }
+      const done = (ack: { ok: boolean; error?: string }) => {
+        if (!settled) {
+          settled = true
+          resolve(ack)
+        }
+      }
       const timer = setTimeout(() => done({ ok: false, error: 'TIMEOUT' }), 5000)
-      socket.emit(event, { channelId }, (ack: { ok: boolean; error?: string }) => { clearTimeout(timer); done(ack ?? { ok: false }) })
+      socket.emit(event, { channelId }, (ack: { ok: boolean; error?: string }) => {
+        clearTimeout(timer)
+        done(ack ?? { ok: false })
+      })
     })
   }
-  function callInvite(channelId: string) { return _emitAck('voice:call_invite', channelId) }
-  function groupCallStart(channelId: string) { return _emitAck('voice:group_call_start', channelId) }
-  function callAccept(channelId: string) { socket?.emit('voice:call_accept', { channelId }) }
-  function callReject(channelId: string) { socket?.emit('voice:call_reject', { channelId }) }
-  function callCancel(channelId: string) { socket?.emit('voice:call_cancel', { channelId }) }
+  function callInvite(channelId: string) {
+    return _emitAck('voice:call_invite', channelId)
+  }
+  function groupCallStart(channelId: string) {
+    return _emitAck('voice:group_call_start', channelId)
+  }
+  function callAccept(channelId: string) {
+    socket?.emit('voice:call_accept', { channelId })
+  }
+  function callReject(channelId: string) {
+    socket?.emit('voice:call_reject', { channelId })
+  }
+  function callCancel(channelId: string) {
+    socket?.emit('voice:call_cancel', { channelId })
+  }
 
   onUnmounted(() => {
     // intentionally empty — disconnect AppShell (layout) tarafından yönetiliyor
   })
 
   return {
-    connected, connect, disconnect, joinChannel, leaveChannel, setPresence,
-    callInvite, groupCallStart, callAccept, callReject, callCancel,
+    connected,
+    connect,
+    disconnect,
+    joinChannel,
+    leaveChannel,
+    setPresence,
+    callInvite,
+    groupCallStart,
+    callAccept,
+    callReject,
+    callCancel,
   }
 }

@@ -21,7 +21,9 @@ const props = withDefaults(
 
 const model = defineModel<number | null>()
 
-const display = computed(() => (model.value === null || model.value === undefined ? '' : String(model.value)))
+const display = computed(() =>
+  model.value === null || model.value === undefined ? '' : String(model.value),
+)
 
 function clamp(n: number): number {
   return Math.min(props.max, Math.max(props.min, n))
@@ -48,7 +50,7 @@ function bump(dir: 1 | -1) {
     <label
       v-if="label"
       class="text-[11px] font-semibold uppercase tracking-wide"
-      style="color: var(--kv-text-secondary);"
+      style="color: var(--kv-text-secondary)"
     >
       {{ label }}
     </label>
@@ -62,28 +64,42 @@ function bump(dir: 1 | -1) {
         :step="step"
         :placeholder="placeholder"
         class="kv-num__input w-full pl-3 pr-9 py-2 text-[14px] rounded-[var(--kv-radius-md)] border outline-none transition-colors"
-        style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary); border-color: var(--kv-border-strong);"
+        style="
+          background-color: var(--kv-bg-elevated);
+          color: var(--kv-text-primary);
+          border-color: var(--kv-border-strong);
+        "
         @input="onInput"
       />
       <!-- Özel stepper (▲▼) — sağda dikey -->
       <div class="kv-num__stepper absolute right-1 top-1 bottom-1 flex flex-col">
-        <button
-          type="button"
-          class="kv-num__btn"
-          tabindex="-1"
-          aria-label="+"
-          @click="bump(1)"
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+        <button type="button" class="kv-num__btn" tabindex="-1" aria-label="+" @click="bump(1)">
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="18 15 12 9 6 15" />
+          </svg>
         </button>
-        <button
-          type="button"
-          class="kv-num__btn"
-          tabindex="-1"
-          aria-label="−"
-          @click="bump(-1)"
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <button type="button" class="kv-num__btn" tabindex="-1" aria-label="−" @click="bump(-1)">
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
         </button>
       </div>
     </div>
@@ -116,7 +132,9 @@ function bump(dir: 1 | -1) {
   background: transparent;
   color: var(--kv-text-muted);
   cursor: pointer;
-  transition: background-color 0.12s, color 0.12s;
+  transition:
+    background-color 0.12s,
+    color 0.12s;
 }
 .kv-num__btn:hover {
   background-color: var(--kv-accent-subtle);

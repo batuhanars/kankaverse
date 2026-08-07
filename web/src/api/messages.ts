@@ -29,7 +29,9 @@ export const messagesApi = {
   },
   // Sprint V2: reaksiyon kaldır
   removeReaction(channelId: string, messageId: string, emoji: string) {
-    return http.delete<null>(`/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`)
+    return http.delete<null>(
+      `/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
+    )
   },
   // Sprint V2 Pins: mesajı sabitle (§4 POST)
   pinMessage(channelId: string, messageId: string) {

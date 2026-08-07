@@ -16,7 +16,10 @@ export interface MediaPresignResult {
 
 export const usersApi = {
   getCard: (userId: string, guildId?: string) =>
-    http.get<UserProfileCardDto>(`/users/${userId}/card`, guildId ? { params: { guildId } } : undefined),
+    http.get<UserProfileCardDto>(
+      `/users/${userId}/card`,
+      guildId ? { params: { guildId } } : undefined,
+    ),
   // Sprint C5 §2 — kendi profil/gizlilik güncelle → güncel UserDto
   updateProfile: (payload: UpdateProfilePayload) => http.patch<UserDto>('/users/me', payload),
   // Sprint C8 §5 — avatar (self, VerifiedEmail)

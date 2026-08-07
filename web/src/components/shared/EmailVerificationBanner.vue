@@ -34,13 +34,17 @@ async function resend() {
 <template>
   <div
     class="flex items-center justify-between gap-4 px-4 py-2 text-[13px] shrink-0"
-    style="background-color: var(--kv-warning-subtle, #3D2E0E); color: var(--kv-warning, #E8A33D); border-bottom: 1px solid var(--kv-border-strong);"
+    style="
+      background-color: var(--kv-warning-subtle, #3d2e0e);
+      color: var(--kv-warning, #e8a33d);
+      border-bottom: 1px solid var(--kv-border-strong);
+    "
   >
     <span v-if="sent">{{ t('emailVerification.resendSuccess') }}</span>
     <template v-else>
       <span>{{ t('emailVerification.bannerMessage') }}</span>
       <div class="flex items-center gap-3 shrink-0">
-        <span v-if="error" style="color: var(--kv-danger);">{{ error }}</span>
+        <span v-if="error" style="color: var(--kv-danger)">{{ error }}</span>
         <button
           class="font-medium underline cursor-pointer disabled:opacity-50"
           :disabled="loading"

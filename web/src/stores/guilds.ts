@@ -146,9 +146,34 @@ export const useGuildsStore = defineStore('guilds', () => {
   function incrementGuildMention(guildId: string): void {
     const idx = guilds.value.findIndex((g) => g.id === guildId)
     if (idx !== -1) {
-      guilds.value[idx] = { ...guilds.value[idx], unreadMentionCount: guilds.value[idx].unreadMentionCount + 1 }
+      guilds.value[idx] = {
+        ...guilds.value[idx],
+        unreadMentionCount: guilds.value[idx].unreadMentionCount + 1,
+      }
     }
   }
 
-  return { guilds, activeGuildId, myRoleByGuild, activeGuild, fetchGuilds, createGuild, importDiscordTemplate, joinByInvite, joinDiscovery, updateGuild, updateGuildIcon, updateGuildBanner, deleteGuild, removeGuildLocal, setActiveGuild, setMyRole, isAdminInActiveGuild, setGuildUnreadCount, incrementGuildUnread, setGuildMentionCount, incrementGuildMention }
+  return {
+    guilds,
+    activeGuildId,
+    myRoleByGuild,
+    activeGuild,
+    fetchGuilds,
+    createGuild,
+    importDiscordTemplate,
+    joinByInvite,
+    joinDiscovery,
+    updateGuild,
+    updateGuildIcon,
+    updateGuildBanner,
+    deleteGuild,
+    removeGuildLocal,
+    setActiveGuild,
+    setMyRole,
+    isAdminInActiveGuild,
+    setGuildUnreadCount,
+    incrementGuildUnread,
+    setGuildMentionCount,
+    incrementGuildMention,
+  }
 })

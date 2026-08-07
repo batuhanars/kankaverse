@@ -10,11 +10,16 @@ export interface TriggerEmergencyPayload {
 }
 
 export const emergencyApi = {
-  trigger(payload: TriggerEmergencyPayload = {}): Promise<ApiResponse<{ acknowledged: boolean; reportId: string }>> {
+  trigger(
+    payload: TriggerEmergencyPayload = {},
+  ): Promise<ApiResponse<{ acknowledged: boolean; reportId: string }>> {
     return api.post('/emergency', payload)
   },
   // B1b — mağdurun kendi acil raporuna gönüllü metin beyanı (yalnız metin).
-  addStatement(reportId: string, description: string): Promise<ApiResponse<{ acknowledged: boolean }>> {
+  addStatement(
+    reportId: string,
+    description: string,
+  ): Promise<ApiResponse<{ acknowledged: boolean }>> {
     return api.patch(`/emergency/${reportId}`, { description })
   },
 }

@@ -97,7 +97,7 @@ async function handleCreate() {
     error.value =
       code === 'EMAIL_NOT_VERIFIED'
         ? t('auth.errors.EMAIL_NOT_VERIFIED')
-        : err.response?.data?.message ?? t('common.error')
+        : (err.response?.data?.message ?? t('common.error'))
   } finally {
     loading.value = false
   }
@@ -117,7 +117,9 @@ async function handleJoin() {
     const err = e as { response?: { data?: { message?: string; error?: string } } }
     const errCode = err.response?.data?.error
     error.value =
-      (errCode && t(`invite.errors.${errCode}`, '')) || err.response?.data?.message || t('common.error')
+      (errCode && t(`invite.errors.${errCode}`, '')) ||
+      err.response?.data?.message ||
+      t('common.error')
   } finally {
     loading.value = false
   }
@@ -145,34 +147,43 @@ async function handleImport() {
   <Teleport to="body">
     <div
       class="fixed inset-0 z-50 flex items-end justify-stretch md:items-center md:justify-center"
-      style="background-color: var(--kv-bg-overlay);"
+      style="background-color: var(--kv-bg-overlay)"
       @click.self="emit('close')"
     >
       <div
-        class="relative w-full h-full rounded-none overflow-hidden
-               md:h-auto md:rounded-[var(--kv-radius-lg)]"
-        style="max-width: 440px; background-color: var(--kv-bg-sidebar);"
+        class="relative w-full h-full rounded-none overflow-hidden md:h-auto md:rounded-[var(--kv-radius-lg)]"
+        style="max-width: 440px; background-color: var(--kv-bg-sidebar)"
         role="dialog"
         aria-modal="true"
       >
         <!-- Kapat butonu -->
         <button
           class="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)] z-10"
-          style="color: var(--kv-text-muted);"
+          style="color: var(--kv-text-muted)"
           @click="emit('close')"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
 
         <!-- ── Adım 1: Seç ── -->
         <template v-if="step === 'choose'">
           <div class="px-6 pt-7 pb-2 text-center">
-            <h2 class="text-[22px] font-bold mb-2" style="color: var(--kv-text-primary);">
+            <h2 class="text-[22px] font-bold mb-2" style="color: var(--kv-text-primary)">
               {{ t('guild.modal.chooseTitle') }}
             </h2>
-            <p class="text-[14px] leading-relaxed" style="color: var(--kv-text-muted);">
+            <p class="text-[14px] leading-relaxed" style="color: var(--kv-text-muted)">
               {{ t('guild.modal.chooseDesc') }}
             </p>
           </div>
@@ -181,40 +192,62 @@ async function handleImport() {
             <!-- Kendin Oluştur -->
             <button
               class="flex items-center gap-4 w-full px-4 py-3.5 rounded-[var(--kv-radius-md)] border text-left cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-              style="border-color: var(--kv-border-subtle);"
+              style="border-color: var(--kv-border-subtle)"
               @click="step = 'create'"
             >
               <span class="text-[24px] shrink-0 leading-none">🏗️</span>
               <div class="flex-1 min-w-0">
-                <p class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+                <p class="text-[15px] font-semibold" style="color: var(--kv-text-primary)">
                   {{ t('guild.modal.createOption') }}
                 </p>
-                <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+                <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
                   {{ t('guild.modal.createOptionDesc') }}
                 </p>
               </div>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="color: var(--kv-text-muted);">
-                <polyline points="9 18 15 12 9 6"/>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="shrink-0"
+                style="color: var(--kv-text-muted)"
+              >
+                <polyline points="9 18 15 12 9 6" />
               </svg>
             </button>
 
             <!-- Bir Sunucuya Katıl -->
             <button
               class="flex items-center gap-4 w-full px-4 py-3.5 rounded-[var(--kv-radius-md)] border text-left cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-              style="border-color: var(--kv-border-subtle);"
+              style="border-color: var(--kv-border-subtle)"
               @click="step = 'join'"
             >
               <span class="text-[24px] shrink-0 leading-none">🔗</span>
               <div class="flex-1 min-w-0">
-                <p class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+                <p class="text-[15px] font-semibold" style="color: var(--kv-text-primary)">
                   {{ t('guild.modal.joinOption') }}
                 </p>
-                <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+                <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
                   {{ t('guild.modal.joinOptionDesc') }}
                 </p>
               </div>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="color: var(--kv-text-muted);">
-                <polyline points="9 18 15 12 9 6"/>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="shrink-0"
+                style="color: var(--kv-text-muted)"
+              >
+                <polyline points="9 18 15 12 9 6" />
               </svg>
             </button>
 
@@ -222,20 +255,31 @@ async function handleImport() {
             <button
               v-if="discordImportEnabled"
               class="flex items-center gap-4 w-full px-4 py-3.5 rounded-[var(--kv-radius-md)] border text-left cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-              style="border-color: var(--kv-border-subtle);"
+              style="border-color: var(--kv-border-subtle)"
               @click="step = 'import'"
             >
               <span class="text-[24px] shrink-0 leading-none">📥</span>
               <div class="flex-1 min-w-0">
-                <p class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+                <p class="text-[15px] font-semibold" style="color: var(--kv-text-primary)">
                   {{ t('guild.modal.importOption') }}
                 </p>
-                <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+                <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted)">
                   {{ t('guild.modal.importOptionDesc') }}
                 </p>
               </div>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="color: var(--kv-text-muted);">
-                <polyline points="9 18 15 12 9 6"/>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="shrink-0"
+                style="color: var(--kv-text-muted)"
+              >
+                <polyline points="9 18 15 12 9 6" />
               </svg>
             </button>
           </div>
@@ -247,24 +291,36 @@ async function handleImport() {
             <!-- Geri -->
             <button
               class="flex items-center gap-1.5 text-[13px] mb-5 cursor-pointer transition-colors hover:opacity-80"
-              style="color: var(--kv-text-muted);"
+              style="color: var(--kv-text-muted)"
               @click="reset"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="15 18 9 12 15 6"/>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6" />
               </svg>
               {{ t('guild.modal.back') }}
             </button>
 
-            <h2 class="text-[22px] font-bold mb-1" style="color: var(--kv-text-primary);">
+            <h2 class="text-[22px] font-bold mb-1" style="color: var(--kv-text-primary)">
               {{ t('guild.modal.createTitle') }}
             </h2>
-            <p class="text-[13px] mb-6" style="color: var(--kv-text-muted);">
+            <p class="text-[13px] mb-6" style="color: var(--kv-text-muted)">
               {{ t('guild.modal.createDesc') }}
             </p>
 
             <form @submit.prevent="handleCreate">
-              <label class="block text-[11px] font-semibold uppercase tracking-widest mb-2" style="color: var(--kv-text-muted);">
+              <label
+                class="block text-[11px] font-semibold uppercase tracking-widest mb-2"
+                style="color: var(--kv-text-muted)"
+              >
                 {{ t('guild.nameLabel') }}
               </label>
               <input
@@ -272,11 +328,21 @@ async function handleImport() {
                 :placeholder="t('guild.namePlaceholder')"
                 required
                 class="w-full px-3 py-2.5 text-[14px] rounded-[var(--kv-radius-md)] outline-none mb-1"
-                style="background-color: var(--kv-bg-rail); color: var(--kv-text-primary); border: 1px solid var(--kv-border-subtle);"
-                @focus="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-accent-500)'"
-                @blur="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-border-subtle)'"
+                style="
+                  background-color: var(--kv-bg-rail);
+                  color: var(--kv-text-primary);
+                  border: 1px solid var(--kv-border-subtle);
+                "
+                @focus="
+                  ($event.target as HTMLInputElement).style.borderColor = 'var(--kv-accent-500)'
+                "
+                @blur="
+                  ($event.target as HTMLInputElement).style.borderColor = 'var(--kv-border-subtle)'
+                "
               />
-              <p v-if="error" class="text-[12px] mb-3" style="color: var(--kv-danger);">{{ error }}</p>
+              <p v-if="error" class="text-[12px] mb-3" style="color: var(--kv-danger)">
+                {{ error }}
+              </p>
 
               <div class="flex justify-between items-center mt-5">
                 <KvButton variant="ghost" type="button" @click="emit('close')">
@@ -296,24 +362,36 @@ async function handleImport() {
             <!-- Geri -->
             <button
               class="flex items-center gap-1.5 text-[13px] mb-5 cursor-pointer transition-colors hover:opacity-80"
-              style="color: var(--kv-text-muted);"
+              style="color: var(--kv-text-muted)"
               @click="reset"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="15 18 9 12 15 6"/>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6" />
               </svg>
               {{ t('guild.modal.back') }}
             </button>
 
-            <h2 class="text-[22px] font-bold mb-1" style="color: var(--kv-text-primary);">
+            <h2 class="text-[22px] font-bold mb-1" style="color: var(--kv-text-primary)">
               {{ t('guild.modal.joinTitle') }}
             </h2>
-            <p class="text-[13px] mb-6" style="color: var(--kv-text-muted);">
+            <p class="text-[13px] mb-6" style="color: var(--kv-text-muted)">
               {{ t('guild.modal.joinDesc') }}
             </p>
 
             <form @submit.prevent="handleJoin">
-              <label class="block text-[11px] font-semibold uppercase tracking-widest mb-2" style="color: var(--kv-text-muted);">
+              <label
+                class="block text-[11px] font-semibold uppercase tracking-widest mb-2"
+                style="color: var(--kv-text-muted)"
+              >
                 {{ t('invite.codeLabel') }}
               </label>
               <!-- Sahip bulgusu 2026-07-31: kullanıcı kodu küçük harfle yazınca katılma sessizce
@@ -329,35 +407,48 @@ async function handleImport() {
                 :placeholder="t('invite.codePlaceholder')"
                 required
                 class="w-full px-3 py-2.5 text-[14px] rounded-[var(--kv-radius-md)] outline-none mb-1 uppercase tracking-widest"
-                style="background-color: var(--kv-bg-rail); color: var(--kv-text-primary); border: 1px solid var(--kv-border-subtle);"
-                @focus="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-accent-500)'"
-                @blur="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-border-subtle)'"
+                style="
+                  background-color: var(--kv-bg-rail);
+                  color: var(--kv-text-primary);
+                  border: 1px solid var(--kv-border-subtle);
+                "
+                @focus="
+                  ($event.target as HTMLInputElement).style.borderColor = 'var(--kv-accent-500)'
+                "
+                @blur="
+                  ($event.target as HTMLInputElement).style.borderColor = 'var(--kv-border-subtle)'
+                "
               />
 
               <!-- Önizleme -->
               <div
                 v-if="preview"
                 class="flex items-center gap-3 px-3 py-2.5 mb-2 rounded-[var(--kv-radius-md)] border"
-                style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+                style="
+                  border-color: var(--kv-border-subtle);
+                  background-color: var(--kv-bg-elevated);
+                "
               >
                 <div class="flex-1 min-w-0">
-                  <p class="text-[14px] font-medium truncate" style="color: var(--kv-text-primary);">
+                  <p class="text-[14px] font-medium truncate" style="color: var(--kv-text-primary)">
                     {{ preview.guildName }}
                   </p>
-                  <p v-if="!preview.valid" class="text-[12px]" style="color: var(--kv-danger);">
+                  <p v-if="!preview.valid" class="text-[12px]" style="color: var(--kv-danger)">
                     {{ t('invite.errors.INVITE_INVALID') }}
                   </p>
                 </div>
                 <span
                   v-if="preview.adultsOnly"
                   class="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-[var(--kv-radius-sm)]"
-                  style="background-color: var(--kv-danger); color: #fff;"
+                  style="background-color: var(--kv-danger); color: #fff"
                 >
                   {{ t('invite.adultsOnlyBadge') }}
                 </span>
               </div>
 
-              <p v-if="error" class="text-[12px] mb-3" style="color: var(--kv-danger);">{{ error }}</p>
+              <p v-if="error" class="text-[12px] mb-3" style="color: var(--kv-danger)">
+                {{ error }}
+              </p>
 
               <div class="flex justify-between items-center mt-5">
                 <KvButton variant="ghost" type="button" @click="emit('close')">
@@ -377,24 +468,36 @@ async function handleImport() {
             <!-- Geri -->
             <button
               class="flex items-center gap-1.5 text-[13px] mb-5 cursor-pointer transition-colors hover:opacity-80"
-              style="color: var(--kv-text-muted);"
+              style="color: var(--kv-text-muted)"
               @click="reset"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="15 18 9 12 15 6"/>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6" />
               </svg>
               {{ t('guild.modal.back') }}
             </button>
 
-            <h2 class="text-[22px] font-bold mb-1" style="color: var(--kv-text-primary);">
+            <h2 class="text-[22px] font-bold mb-1" style="color: var(--kv-text-primary)">
               {{ t('guild.modal.importTitle') }}
             </h2>
-            <p class="text-[13px] mb-6" style="color: var(--kv-text-muted);">
+            <p class="text-[13px] mb-6" style="color: var(--kv-text-muted)">
               {{ t('guild.modal.importDesc') }}
             </p>
 
             <form @submit.prevent="handleImport">
-              <label class="block text-[11px] font-semibold uppercase tracking-widest mb-2" style="color: var(--kv-text-muted);">
+              <label
+                class="block text-[11px] font-semibold uppercase tracking-widest mb-2"
+                style="color: var(--kv-text-muted)"
+              >
                 {{ t('guild.modal.importLabel') }}
               </label>
               <input
@@ -402,14 +505,24 @@ async function handleImport() {
                 :placeholder="t('guild.modal.importPlaceholder')"
                 required
                 class="w-full px-3 py-2.5 text-[14px] rounded-[var(--kv-radius-md)] outline-none mb-2"
-                style="background-color: var(--kv-bg-rail); color: var(--kv-text-primary); border: 1px solid var(--kv-border-subtle);"
-                @focus="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-accent-500)'"
-                @blur="($event.target as HTMLInputElement).style.borderColor = 'var(--kv-border-subtle)'"
+                style="
+                  background-color: var(--kv-bg-rail);
+                  color: var(--kv-text-primary);
+                  border: 1px solid var(--kv-border-subtle);
+                "
+                @focus="
+                  ($event.target as HTMLInputElement).style.borderColor = 'var(--kv-accent-500)'
+                "
+                @blur="
+                  ($event.target as HTMLInputElement).style.borderColor = 'var(--kv-border-subtle)'
+                "
               />
-              <p class="text-[12px] mb-1" style="color: var(--kv-text-muted);">
+              <p class="text-[12px] mb-1" style="color: var(--kv-text-muted)">
                 {{ t('guild.modal.importNote') }}
               </p>
-              <p v-if="error" class="text-[12px] mb-3" style="color: var(--kv-danger);">{{ error }}</p>
+              <p v-if="error" class="text-[12px] mb-3" style="color: var(--kv-danger)">
+                {{ error }}
+              </p>
 
               <div class="flex justify-between items-center mt-5">
                 <KvButton variant="ghost" type="button" @click="emit('close')">
@@ -422,7 +535,6 @@ async function handleImport() {
             </form>
           </div>
         </template>
-
       </div>
     </div>
   </Teleport>

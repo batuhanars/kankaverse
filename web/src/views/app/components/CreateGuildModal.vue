@@ -34,7 +34,7 @@ async function submit() {
     error.value =
       code === 'EMAIL_NOT_VERIFIED'
         ? t('auth.errors.EMAIL_NOT_VERIFIED')
-        : err.response?.data?.message ?? t('common.error')
+        : (err.response?.data?.message ?? t('common.error'))
   } finally {
     loading.value = false
   }

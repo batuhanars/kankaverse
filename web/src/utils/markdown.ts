@@ -26,9 +26,9 @@ import { prefixRoleName } from './mentions'
 // 1. markdown-it instance (bir kez oluştur — modül kapsamı)
 // ────────────────────────────────────────────────────────────
 const md = new MarkdownIt({
-  html: false,      // ham HTML render etme — kaçır (güvenlik katmanı 1)
-  linkify: true,    // URL'leri otomatik link'e çevir
-  breaks: true,     // tek satır sonu → <br>
+  html: false, // ham HTML render etme — kaçır (güvenlik katmanı 1)
+  linkify: true, // URL'leri otomatik link'e çevir
+  breaks: true, // tek satır sonu → <br>
 })
 
 // Başlık kurallarını devre dışı bırak (# H1 / ## H2 …)
@@ -36,7 +36,11 @@ md.disable('heading')
 // Tablo ve resim kurallarını devre dışı bırak
 md.disable('image')
 // Not: markdown-it çekirdeğinde 'table' ayrı kural; eklenmemişse disable sessizce geçer
-try { md.disable('table') } catch { /* built-in yoksa ignore */ }
+try {
+  md.disable('table')
+} catch {
+  /* built-in yoksa ignore */
+}
 
 // ────────────────────────────────────────────────────────────
 // 2. Link render kuralı override (güvenlik §1)
@@ -75,12 +79,22 @@ md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
 // ────────────────────────────────────────────────────────────
 const PURIFY_CONFIG: DOMPurifyConfig = {
   ALLOWED_TAGS: [
-    'b', 'strong', 'i', 'em', 'u', 's', 'del',
-    'code', 'pre',
+    'b',
+    'strong',
+    'i',
+    'em',
+    'u',
+    's',
+    'del',
+    'code',
+    'pre',
     'blockquote',
-    'ul', 'ol', 'li',
+    'ul',
+    'ol',
+    'li',
     'a',
-    'br', 'p',
+    'br',
+    'p',
     'span',
   ],
   ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
@@ -164,7 +178,7 @@ export function renderMessageHtml(
   const rawHtml = md.render(withPlaceholders)
 
   // Adım 3: DOMPurify sanitize
-  const cleanHtml = DOMPurify.sanitize(rawHtml, PURIFY_CONFIG) as unknown as string
+  const cleanHtml = DOMPurify.sanitize(rawHtml, PURIFY_CONFIG)
 
   // Adım 4: yer-tutucuları stilli mention span'lerine çevir
   // (Sanitize sonrasında — span ve class allowlist'te olduğu için hayatta kalır)

@@ -50,5 +50,13 @@ export const useRolesStore = defineStore('roles', () => {
     rolesByGuild.value[guildId] = updated.sort((a, b) => b.position - a.position)
   }
 
-  return { rolesByGuild, rolesFor, fetchRoles, upsertRole, removeRoleLocal, findGuildIdByRole, applyReorder }
+  return {
+    rolesByGuild,
+    rolesFor,
+    fetchRoles,
+    upsertRole,
+    removeRoleLocal,
+    findGuildIdByRole,
+    applyReorder,
+  }
 })

@@ -36,10 +36,7 @@ export function useMessageJump() {
  * Dönen `isJumping`, listenin otomatik "en alta kaydır" watcher'ı tarafından okunur
  * (zıplama sırasında alta kaymayı bastırmak için).
  */
-export function useJumpToMessage(
-  listEl: Ref<HTMLElement | null>,
-  channelId: () => string | null,
-) {
+export function useJumpToMessage(listEl: Ref<HTMLElement | null>, channelId: () => string | null) {
   const store = useMessagesStore()
   const isJumping = ref(false)
 

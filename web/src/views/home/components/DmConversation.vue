@@ -109,7 +109,13 @@ const { label: typingLabel } = useTypingLabel(() => props.channel.id, t, { named
 // 1-1 DM: karşı kullanıcı; GROUP_DM: grup üyeleri
 const dmMentionMembers = computed(() => {
   if (props.channel.type === 'DM') {
-    return [{ id: props.channel.otherUser.id, username: props.channel.otherUser.username, avatarUrl: props.channel.otherUser.avatarUrl }]
+    return [
+      {
+        id: props.channel.otherUser.id,
+        username: props.channel.otherUser.username,
+        avatarUrl: props.channel.otherUser.avatarUrl,
+      },
+    ]
   }
   // GROUP_DM — kendin listede yok (sunucu kendi bahsetmeni yok sayıyor; bkz. MessageArea notu)
   return props.channel.members
@@ -128,22 +134,28 @@ function dmMentionResolver(userId: string): string {
 
 // Sprint V2: kendi-bahsedilme vurgusu (DM bağlamı)
 function isDmMentioned(msg: MessageDto): boolean {
-  return !!(msg.mentions?.includes(authStore.user?.id ?? ''))
+  return !!msg.mentions?.includes(authStore.user?.id ?? '')
 }
 
 // Sprint V2: mention autocomplete
 const mention = useMentionAutocomplete(
   dmMentionMembers,
   () => content.value,
-  (v) => { content.value = v },
+  (v) => {
+    content.value = v
+  },
   () => dmTextareaEl.value?.selectionStart ?? 0,
-  (pos) => { nextTick(() => { dmTextareaEl.value?.setSelectionRange(pos, pos) }) },
+  (pos) => {
+    nextTick(() => {
+      dmTextareaEl.value?.setSelectionRange(pos, pos)
+    })
+  },
 )
 
 // Tip yardımcıları
 const isGroup = computed(() => props.channel.type === 'GROUP_DM')
-const dmChannel = computed(() => props.channel.type === 'DM' ? props.channel : null)
-const groupChannel = computed(() => props.channel.type === 'GROUP_DM' ? props.channel : null)
+const dmChannel = computed(() => (props.channel.type === 'DM' ? props.channel : null))
+const groupChannel = computed(() => (props.channel.type === 'GROUP_DM' ? props.channel : null))
 
 // REV-5: 1-1 DM'de karşı taraf arkadaş değilse "Arkadaş ekle" göster.
 // Engelliyken veya zaten arkadaşken/istek gönderildikten sonra gizlenir.
@@ -155,7 +167,11 @@ const isFriendInDm = computed(
 const addFriendSent = ref(false)
 const addingFriend = ref(false)
 const showAddFriend = computed(
-  () => !!dmChannel.value && !dmChannel.value.selfBlocked && !isFriendInDm.value && !addFriendSent.value,
+  () =>
+    !!dmChannel.value &&
+    !dmChannel.value.selfBlocked &&
+    !isFriendInDm.value &&
+    !addFriendSent.value,
 )
 
 async function addFriendInDm() {
@@ -176,7 +192,12 @@ async function addFriendInDm() {
 }
 
 // Kanal değişince ekle-durumunu sıfırla (yeni DM açılınca buton tekrar değerlendirilsin)
-watch(() => props.channel.id, () => { addFriendSent.value = false })
+watch(
+  () => props.channel.id,
+  () => {
+    addFriendSent.value = false
+  },
+)
 
 // Grup adı: verilen ad yoksa üye adlarından üretilir
 const groupDisplayName = computed(() => {
@@ -246,9 +267,8 @@ async function saveEdit() {
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string } } }
     const code = err.response?.data?.error
-    state.error = code === 'MESSAGE_BLOCKED'
-      ? t('message.errors.MESSAGE_BLOCKED')
-      : t('common.error')
+    state.error =
+      code === 'MESSAGE_BLOCKED' ? t('message.errors.MESSAGE_BLOCKED') : t('common.error')
     state.loading = false
   }
 }
@@ -292,7 +312,10 @@ const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channel.id] 
 watch(
   () => props.channel.id,
   async (id, oldId) => {
-    if (oldId) { leaveChannel(oldId); voiceUnsubscribe(oldId) }
+    if (oldId) {
+      leaveChannel(oldId)
+      voiceUnsubscribe(oldId)
+    }
     if (!id) return
     const ack = await joinChannel(id)
     realtimeError.value = !ack.ok
@@ -341,20 +364,24 @@ function onListScroll() {
   if (stickToBottom) newMessageCount.value = 0
 }
 
-watch(() => messages.value.length, async (n, o) => {
-  if (isJumping.value || n <= o) return
-  // REV-9 fix: kendi mesajım (HTTP yanıtı VEYA WS eko) → her zaman dibe kay, bildirim sayma.
-  const last = messages.value[messages.value.length - 1]
-  const mine = last?.author.id === authStore.user?.id
-  if (stickToBottom || mine) {
-    newMessageCount.value = 0
-    await nextTick()
-    scrollToBottom()
-  } else {
-    // Yukarıda okuyorum + başkasının mesajı → kaydırma; gelenleri say
-    newMessageCount.value += n - o
-  }
-}, { flush: 'post' })
+watch(
+  () => messages.value.length,
+  async (n, o) => {
+    if (isJumping.value || n <= o) return
+    // REV-9 fix: kendi mesajım (HTTP yanıtı VEYA WS eko) → her zaman dibe kay, bildirim sayma.
+    const last = messages.value[messages.value.length - 1]
+    const mine = last?.author.id === authStore.user?.id
+    if (stickToBottom || mine) {
+      newMessageCount.value = 0
+      await nextTick()
+      scrollToBottom()
+    } else {
+      // Yukarıda okuyorum + başkasının mesajı → kaydırma; gelenleri say
+      newMessageCount.value += n - o
+    }
+  },
+  { flush: 'post' },
+)
 
 function scrollToBottom() {
   if (listEl.value) listEl.value.scrollTop = listEl.value.scrollHeight
@@ -385,7 +412,13 @@ function onFileSelected(e: Event) {
   composeFile.value = file
 }
 
-async function onAttachmentSent({ attachmentId, caption }: { attachmentId: string; caption: string }) {
+async function onAttachmentSent({
+  attachmentId,
+  caption,
+}: {
+  attachmentId: string
+  caption: string
+}) {
   composeFile.value = null
   const replyId = replyingTo.value?.id
   replyingTo.value = null
@@ -422,7 +455,9 @@ async function send() {
     const err = e as { response?: { data?: { error?: string; message?: string } } }
     const errCode = err.response?.data?.error
     sendError.value = errCode
-      ? (t(`message.errors.${errCode}`) !== `message.errors.${errCode}` ? t(`message.errors.${errCode}`) : (err.response?.data?.message ?? t('common.error')))
+      ? t(`message.errors.${errCode}`) !== `message.errors.${errCode}`
+        ? t(`message.errors.${errCode}`)
+        : (err.response?.data?.message ?? t('common.error'))
       : t('common.error')
   } finally {
     sending.value = false
@@ -442,7 +477,10 @@ function onDmTextareaInput() {
   sendError.value = ''
   onTypingInput()
   const el = dmTextareaEl.value
-  if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px' }
+  if (el) {
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }
   // Sprint V2: mention autocomplete tetikle
   mention.onInput()
 }
@@ -586,18 +624,22 @@ function isGroupStart(index: number): boolean {
     <!-- Ana sohbet alanı -->
     <div
       class="flex flex-col flex-1 min-w-0 overflow-hidden mb-4 rounded-[var(--kv-radius-lg)]"
-      style="background-color: var(--kv-bg-content);"
+      style="background-color: var(--kv-bg-content)"
     >
       <!-- Başlık çubuğu -->
       <div
         class="flex items-center px-4 gap-3 shrink-0 border-b rounded-t-[var(--kv-radius-lg)]"
-        style="height: var(--kv-header-height); border-color: var(--kv-border-subtle); background-color: var(--kv-bg-content);"
+        style="
+          height: var(--kv-header-height);
+          border-color: var(--kv-border-subtle);
+          background-color: var(--kv-bg-content);
+        "
       >
         <!-- 1-1 DM başlığı -->
         <template v-if="dmChannel">
           <div
             class="w-8 h-8 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-bold text-white"
-            style="background-color: var(--kv-accent-500);"
+            style="background-color: var(--kv-accent-500)"
           >
             <img
               v-if="dmChannel.otherUser.avatarUrl"
@@ -607,7 +649,10 @@ function isGroupStart(index: number): boolean {
             />
             <span v-else>{{ dmChannel.otherUser.username[0].toUpperCase() }}</span>
           </div>
-          <span class="flex-1 text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
+          <span
+            class="flex-1 text-[15px] font-semibold truncate"
+            style="color: var(--kv-text-primary)"
+          >
             {{ dmChannel.otherUser.username }}
           </span>
           <!-- REV-5: arkadaş değilse "Arkadaş ekle" (Sprint 4A by-user; ret jenerik)
@@ -622,21 +667,35 @@ function isGroupStart(index: number): boolean {
           <button
             v-if="showAddFriend"
             class="xl:hidden w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors disabled:opacity-60"
-            style="color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);"
+            style="color: var(--kv-accent-500); background-color: var(--kv-accent-subtle)"
             :title="t('friends.add')"
             :aria-label="t('friends.add')"
             :disabled="addingFriend"
             @click="addFriendInDm"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <line x1="19" y1="8" x2="19" y2="14" />
+              <line x1="22" y1="11" x2="16" y2="11" />
             </svg>
           </button>
           <span
             v-else-if="dmChannel && addFriendSent && !isFriendInDm"
             class="xl:hidden text-[12px] px-1"
-            style="color: var(--kv-text-muted);"
-          >{{ t('friends.requestSent') }}</span>
+            style="color: var(--kv-text-muted)"
+            >{{ t('friends.requestSent') }}</span
+          >
           <!-- Sesli arama (1-1): aktif çağrı→Sese Katıl · yoksa→telefon (ring).
                D39 §5: çalıyorken de zaten bağlıyız (oda-önce) → "Bu kanala bağlıyken buton yok
                (kontroller DmCallPanel'de)" aşağıdaki tüm dallar için geçerli; "çalıyor" göstergesi
@@ -645,42 +704,85 @@ function isGroupStart(index: number): boolean {
           <button
             v-if="!voiceStore.isConnectedTo(channel.id) && hasOngoingCall"
             class="flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
-            style="color: var(--kv-online, #3DB46E);"
+            style="color: var(--kv-online, #3db46e)"
             :title="t('call.joinGroup')"
-            @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-content)'"
-            @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
+            @mouseenter="
+              ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-content)'
+            "
+            @mouseleave="
+              ($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
+            "
             @click="voiceStore.join(channel.id, { autoEndWhenAlone: true })"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
+              />
             </svg>
             {{ t('call.joinGroup') }}
           </button>
           <button
             v-else-if="!voiceStore.isConnectedTo(channel.id)"
             class="w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-            style="color: var(--kv-text-muted);"
+            style="color: var(--kv-text-muted)"
             :title="t('call.callButton')"
-            @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-online, #3DB46E)'"
+            @mouseenter="
+              ($event.currentTarget as HTMLElement).style.color = 'var(--kv-online, #3DB46E)'
+            "
             @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)'"
             @click="startCall(channel.id)"
           >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
+              />
             </svg>
           </button>
           <!-- Görüntülü ara (1-1 DM, boşta): camcorder ikonu; join + startWithCamera niyeti -->
           <button
-            v-if="!voiceStore.isConnectedTo(channel.id) && !callStore.isRinging(channel.id) && !hasOngoingCall && channel.type === 'DM'"
+            v-if="
+              !voiceStore.isConnectedTo(channel.id) &&
+              !callStore.isRinging(channel.id) &&
+              !hasOngoingCall &&
+              channel.type === 'DM'
+            "
             class="w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
-            style="color: var(--kv-text-muted);"
+            style="color: var(--kv-text-muted)"
             :title="t('call.videoCall')"
             @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-accent-500)'"
             @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)'"
             @click="startVideoCall(channel.id)"
           >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polygon points="23 7 16 12 23 17 23 7" />
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
             </svg>
           </button>
           <!-- Sabitlenen mesajlar butonu -->
@@ -690,17 +792,19 @@ function isGroupStart(index: number): boolean {
               :class="showDmPins ? 'bg-[var(--kv-accent-subtle)]' : ''"
               :style="showDmPins ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
               :title="t('message.pinnedMessages')"
-              @mouseenter="!showDmPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
-              @mouseleave="!showDmPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
+              @mouseenter="
+                !showDmPins &&
+                (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')
+              "
+              @mouseleave="
+                !showDmPins &&
+                (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')
+              "
               @click="toggleDmPins"
             >
               📌
             </button>
-            <PinsPopover
-              :channel-id="channel.id"
-              :open="showDmPins"
-              @close="showDmPins = false"
-            />
+            <PinsPopover :channel-id="channel.id" :open="showDmPins" @close="showDmPins = false" />
           </div>
           <!-- 🔴 Mesajlarda Ara 1-1 DM'de KALDIRILDI (sahip kararı 2026-08-01). Gerekçe: arama
                ortam kanallarında değerli (çok kişi, çok gün, kaybolan mesaj); 1-1 DM'de karşında
@@ -713,16 +817,35 @@ function isGroupStart(index: number): boolean {
           <button
             class="xl:hidden w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
             :class="profilePanelOpen ? 'bg-[var(--kv-accent-subtle)]' : ''"
-            :style="profilePanelOpen ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
+            :style="
+              profilePanelOpen ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'
+            "
             :title="t('dm.profilePanel')"
             :aria-label="t('dm.profilePanel')"
             :aria-expanded="profilePanelOpen === true"
-            @mouseenter="!profilePanelOpen && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
-            @mouseleave="!profilePanelOpen && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
+            @mouseenter="
+              !profilePanelOpen &&
+              (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')
+            "
+            @mouseleave="
+              !profilePanelOpen &&
+              (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')
+            "
             @click="emit('toggleProfile')"
           >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            <svg
+              width="17"
+              height="17"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
             </svg>
           </button>
           <!-- 🔴 "Kullanıcıyı şikâyet et" ve "Sohbeti Temizle" METİN butonları KALDIRILDI
@@ -738,24 +861,34 @@ function isGroupStart(index: number): boolean {
             <div
               v-if="groupChannel.members[1]"
               class="absolute bottom-0 right-0 w-6 h-6 rounded-full overflow-hidden border-2 flex items-center justify-center text-[9px] font-semibold text-white"
-              style="background-color: var(--kv-accent-500); border-color: var(--kv-bg-content);"
+              style="background-color: var(--kv-accent-500); border-color: var(--kv-bg-content)"
             >
-              <img v-if="groupChannel.members[1].avatarUrl" :src="groupChannel.members[1].avatarUrl" :alt="groupChannel.members[1].username" class="w-full h-full object-cover" />
+              <img
+                v-if="groupChannel.members[1].avatarUrl"
+                :src="groupChannel.members[1].avatarUrl"
+                :alt="groupChannel.members[1].username"
+                class="w-full h-full object-cover"
+              />
               <span v-else>{{ groupChannel.members[1].username[0].toUpperCase() }}</span>
             </div>
             <div
               class="absolute top-0 left-0 w-6 h-6 rounded-full overflow-hidden border-2 flex items-center justify-center text-[9px] font-semibold text-white"
-              style="background-color: var(--kv-accent-500); border-color: var(--kv-bg-content);"
+              style="background-color: var(--kv-accent-500); border-color: var(--kv-bg-content)"
             >
-              <img v-if="groupChannel.members[0]?.avatarUrl" :src="groupChannel.members[0].avatarUrl" :alt="groupChannel.members[0].username" class="w-full h-full object-cover" />
+              <img
+                v-if="groupChannel.members[0]?.avatarUrl"
+                :src="groupChannel.members[0].avatarUrl"
+                :alt="groupChannel.members[0].username"
+                class="w-full h-full object-cover"
+              />
               <span v-else>{{ (groupChannel.members[0]?.username ?? '?')[0].toUpperCase() }}</span>
             </div>
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
+            <p class="text-[15px] font-semibold truncate" style="color: var(--kv-text-primary)">
               {{ groupDisplayName }}
             </p>
-            <p class="text-[12px]" style="color: var(--kv-text-muted);">
+            <p class="text-[12px]" style="color: var(--kv-text-muted)">
               {{ t('group.memberCount', { n: groupChannel.members.length }) }}
             </p>
           </div>
@@ -763,16 +896,29 @@ function isGroupStart(index: number): boolean {
           <button
             v-if="!voiceStore.isConnectedTo(channel.id)"
             class="flex items-center gap-1.5 text-[13px] px-2.5 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
-            style="color: var(--kv-online, #3DB46E);"
+            style="color: var(--kv-online, #3db46e)"
             :title="t('call.joinGroup')"
-            @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-content)'"
-            @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
+            @mouseenter="
+              ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-content)'
+            "
+            @mouseleave="
+              ($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
+            "
             @click="onGroupVoiceClick"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
             </svg>
             {{ t('call.joinGroup') }}
           </button>
@@ -783,32 +929,52 @@ function isGroupStart(index: number): boolean {
               :class="showDmPins ? 'bg-[var(--kv-accent-subtle)]' : ''"
               :style="showDmPins ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
               :title="t('message.pinnedMessages')"
-              @mouseenter="!showDmPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
-              @mouseleave="!showDmPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
+              @mouseenter="
+                !showDmPins &&
+                (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')
+              "
+              @mouseleave="
+                !showDmPins &&
+                (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')
+              "
               @click="toggleDmPins"
             >
               📌
             </button>
-            <PinsPopover
-              :channel-id="channel.id"
-              :open="showDmPins"
-              @close="showDmPins = false"
-            />
+            <PinsPopover :channel-id="channel.id" :open="showDmPins" @close="showDmPins = false" />
           </div>
           <!-- Mesajlarda Ara butonu (GROUP_DM) -->
           <div class="relative">
             <button
               class="w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
               :class="showDmSearch ? 'bg-[var(--kv-accent-subtle)]' : ''"
-              :style="showDmSearch ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'"
+              :style="
+                showDmSearch ? 'color: var(--kv-accent-500);' : 'color: var(--kv-text-muted);'
+              "
               :title="t('messageSearch.buttonTitle')"
-              @mouseenter="!showDmSearch && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')"
-              @mouseleave="!showDmSearch && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
+              @mouseenter="
+                !showDmSearch &&
+                (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)')
+              "
+              @mouseleave="
+                !showDmSearch &&
+                (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')
+              "
               @click="toggleDmSearch"
             >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="8"/>
-                <path d="m21 21-4.35-4.35"/>
+              <svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
               </svg>
             </button>
             <SearchPopover
@@ -836,7 +1002,7 @@ function isGroupStart(index: number): boolean {
       <div
         v-if="realtimeError"
         class="shrink-0 px-4 py-2 text-[13px] text-center"
-        style="background-color: var(--kv-warning); color: var(--kv-bg-rail);"
+        style="background-color: var(--kv-warning); color: var(--kv-bg-rail)"
       >
         {{ t('message.realtimeError') }}
       </div>
@@ -846,117 +1012,148 @@ function isGroupStart(index: number): boolean {
 
       <!-- Mesaj listesi (Discord stili — baloncuk yok, sola yaslı düz liste) -->
       <div class="relative flex-1 min-h-0 flex flex-col">
-      <div ref="listEl" class="flex-1 overflow-y-auto py-4 flex flex-col" @scroll="onListScroll">
-        <div v-if="hasMore" class="flex justify-center py-2">
-          <button
-            class="text-[13px] hover:underline cursor-pointer"
-            style="color: var(--kv-info);"
-            @click="loadMore"
-          >
-            {{ t('message.loadMore') }}
-          </button>
-        </div>
-        <p
-          v-if="!messages.length"
-          class="text-center text-[14px] py-8"
-          style="color: var(--kv-text-muted);"
-        >
-          {{ t('dm.empty') }}
-        </p>
-
-        <MessageRow
-          v-for="(msg, index) in messages"
-          :key="msg.id"
-          :message="msg"
-          :is-mine="isMine(msg)"
-          :is-group-start="isGroupStart(index)"
-          :is-editing="isMine(msg) && editState?.messageId === msg.id"
-          :mention-resolver="dmMentionResolver"
-          :is-mentioned="isDmMentioned(msg)"
-          :can-pin="true"
-          @reply="startReply"
-          @forward="(m) => { forwardMsg = m; showForward = true }"
-          @edit="startEdit"
-          @delete="openDeleteConfirm"
-          @report="openReportMessage"
-          @add-reaction="(_msgId, emoji) => pickDmEmoji(msg, emoji)"
-          @pin="onPinMessage"
-          @unpin="onUnpinMessage"
-        >
-          <!-- Inline düzenleme modu (kendi mesajı) -->
-          <template #editing>
-            <div v-if="isMine(msg) && editState?.messageId === msg.id" class="mt-1">
-              <textarea
-                ref="editTextareaEl"
-                v-model="editState!.content"
-                rows="1"
-                class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] resize-none outline-none border"
-                style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary); border-color: var(--kv-border-strong); font-family: var(--kv-font-ui); max-height: 200px;"
-                :disabled="editState!.loading"
-                @keydown="onEditKeydown"
-                @input="($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
-              />
-              <p v-if="editState!.error" class="text-[12px] mt-1" style="color: var(--kv-danger);">{{ editState!.error }}</p>
-              <div class="flex gap-2 mt-1 text-[12px]" style="color: var(--kv-text-muted);">
-                <span>{{ t('message.editHint') }}</span>
-                <button class="underline cursor-pointer hover:opacity-80" style="color: var(--kv-danger);" @click="cancelEdit">
-                  {{ t('common.cancel') }}
-                </button>
-              </div>
-            </div>
-          </template>
-
-          <!-- Reaksiyon pill'leri -->
-          <template #reactions>
+        <div ref="listEl" class="flex-1 overflow-y-auto py-4 flex flex-col" @scroll="onListScroll">
+          <div v-if="hasMore" class="flex justify-center py-2">
             <button
-              v-for="reaction in msg.reactions"
-              :key="reaction.emoji"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] cursor-pointer transition-colors border"
-              :style="reaction.reactedByMe
-                ? 'background-color: var(--kv-accent-subtle); border-color: var(--kv-accent-500); color: var(--kv-accent-500);'
-                : 'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'"
-              :title="t('reaction.toggleTitle')"
-              @click.stop="toggleDmReaction(msg, reaction.emoji, reaction.reactedByMe)"
+              class="text-[13px] hover:underline cursor-pointer"
+              style="color: var(--kv-info)"
+              @click="loadMore"
             >
-              <span>{{ reaction.emoji }}</span>
-              <span class="font-medium">{{ reaction.count }}</span>
+              {{ t('message.loadMore') }}
             </button>
-          </template>
-        </MessageRow>
-      </div>
+          </div>
+          <p
+            v-if="!messages.length"
+            class="text-center text-[14px] py-8"
+            style="color: var(--kv-text-muted)"
+          >
+            {{ t('dm.empty') }}
+          </p>
 
-      <!-- REV-9: yeni mesaj geldiğinde (yukarıdayken) aşağı-in butonu + gelen mesaj sayısı -->
-      <button
-        v-if="newMessageCount > 0"
-        class="absolute right-4 bottom-3 z-10 flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full cursor-pointer transition-opacity hover:opacity-90 shadow-lg"
-        style="background-color: var(--kv-accent-500); color: #ffffff;"
-        @click="jumpToBottom"
-      >
-        <span class="flex items-center justify-center text-[11px] font-bold rounded-full" style="min-width: 18px; height: 18px; background-color: var(--kv-danger);">
-          {{ newMessageCount > 99 ? '99+' : newMessageCount }}
-        </span>
-        <span class="text-[12px] font-semibold">{{ t('message.newMessages') }}</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </button>
+          <MessageRow
+            v-for="(msg, index) in messages"
+            :key="msg.id"
+            :message="msg"
+            :is-mine="isMine(msg)"
+            :is-group-start="isGroupStart(index)"
+            :is-editing="isMine(msg) && editState?.messageId === msg.id"
+            :mention-resolver="dmMentionResolver"
+            :is-mentioned="isDmMentioned(msg)"
+            :can-pin="true"
+            @reply="startReply"
+            @forward="
+              (m) => {
+                forwardMsg = m
+                showForward = true
+              }
+            "
+            @edit="startEdit"
+            @delete="openDeleteConfirm"
+            @report="openReportMessage"
+            @add-reaction="(_msgId, emoji) => pickDmEmoji(msg, emoji)"
+            @pin="onPinMessage"
+            @unpin="onUnpinMessage"
+          >
+            <!-- Inline düzenleme modu (kendi mesajı) -->
+            <template #editing>
+              <div v-if="isMine(msg) && editState?.messageId === msg.id" class="mt-1">
+                <textarea
+                  ref="editTextareaEl"
+                  v-model="editState!.content"
+                  rows="1"
+                  class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] resize-none outline-none border"
+                  style="
+                    background-color: var(--kv-bg-elevated);
+                    color: var(--kv-text-primary);
+                    border-color: var(--kv-border-strong);
+                    font-family: var(--kv-font-ui);
+                    max-height: 200px;
+                  "
+                  :disabled="editState!.loading"
+                  @keydown="onEditKeydown"
+                  @input="
+                    ;($event.target as HTMLTextAreaElement).style.height = 'auto'
+                    ;($event.target as HTMLTextAreaElement).style.height =
+                      ($event.target as HTMLTextAreaElement).scrollHeight + 'px'
+                  "
+                />
+                <p v-if="editState!.error" class="text-[12px] mt-1" style="color: var(--kv-danger)">
+                  {{ editState!.error }}
+                </p>
+                <div class="flex gap-2 mt-1 text-[12px]" style="color: var(--kv-text-muted)">
+                  <span>{{ t('message.editHint') }}</span>
+                  <button
+                    class="underline cursor-pointer hover:opacity-80"
+                    style="color: var(--kv-danger)"
+                    @click="cancelEdit"
+                  >
+                    {{ t('common.cancel') }}
+                  </button>
+                </div>
+              </div>
+            </template>
+
+            <!-- Reaksiyon pill'leri -->
+            <template #reactions>
+              <button
+                v-for="reaction in msg.reactions"
+                :key="reaction.emoji"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] cursor-pointer transition-colors border"
+                :style="
+                  reaction.reactedByMe
+                    ? 'background-color: var(--kv-accent-subtle); border-color: var(--kv-accent-500); color: var(--kv-accent-500);'
+                    : 'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'
+                "
+                :title="t('reaction.toggleTitle')"
+                @click.stop="toggleDmReaction(msg, reaction.emoji, reaction.reactedByMe)"
+              >
+                <span>{{ reaction.emoji }}</span>
+                <span class="font-medium">{{ reaction.count }}</span>
+              </button>
+            </template>
+          </MessageRow>
+        </div>
+
+        <!-- REV-9: yeni mesaj geldiğinde (yukarıdayken) aşağı-in butonu + gelen mesaj sayısı -->
+        <button
+          v-if="newMessageCount > 0"
+          class="absolute right-4 bottom-3 z-10 flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full cursor-pointer transition-opacity hover:opacity-90 shadow-lg"
+          style="background-color: var(--kv-accent-500); color: #ffffff"
+          @click="jumpToBottom"
+        >
+          <span
+            class="flex items-center justify-center text-[11px] font-bold rounded-full"
+            style="min-width: 18px; height: 18px; background-color: var(--kv-danger)"
+          >
+            {{ newMessageCount > 99 ? '99+' : newMessageCount }}
+          </span>
+          <span class="text-[12px] font-semibold">{{ t('message.newMessages') }}</span>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
       </div>
 
       <!-- Mesaj input / Engel bandı -->
       <div class="px-4 pb-4 pt-2 shrink-0">
         <!-- Gönderme hatası -->
-        <div
-          v-if="sendError"
-          class="px-1 mb-1 text-[13px]"
-          style="color: var(--kv-danger);"
-        >
+        <div v-if="sendError" class="px-1 mb-1 text-[13px]" style="color: var(--kv-danger)">
           {{ sendError }}
         </div>
         <!-- Yazıyor göstergesi -->
         <div
           v-if="typingLabel"
           class="h-5 px-1 mb-1 text-[12px] italic"
-          style="color: var(--kv-text-muted);"
+          style="color: var(--kv-text-muted)"
         >
           {{ typingLabel }}
         </div>
@@ -965,7 +1162,7 @@ function isGroupStart(index: number): boolean {
         <div
           v-if="!canMessage"
           class="flex items-center justify-center gap-3 py-3 rounded-[var(--kv-radius-md)] text-[13px]"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted)"
         >
           <span v-if="selfBlocked">{{ t('dm.selfBlocked') }}</span>
           <span v-else>{{ t('dm.cannotMessage') }}</span>
@@ -973,7 +1170,7 @@ function isGroupStart(index: number): boolean {
             v-if="selfBlocked"
             class="text-[13px] font-medium underline cursor-pointer transition-opacity hover:opacity-80"
             :class="unblocking ? 'opacity-60 pointer-events-none' : ''"
-            style="color: var(--kv-accent-500);"
+            style="color: var(--kv-accent-500)"
             @click="unblockUser"
           >
             {{ t('dm.unblock') }}
@@ -995,14 +1192,25 @@ function isGroupStart(index: number): boolean {
           <div
             v-if="replyingTo"
             class="flex items-center gap-2 px-3 py-1.5 rounded-t-[var(--kv-radius-sm)] text-[12px] truncate"
-            style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle); border-bottom: none;"
+            style="
+              background-color: var(--kv-bg-elevated);
+              border: 1px solid var(--kv-border-subtle);
+              border-bottom: none;
+            "
           >
-            <span class="shrink-0" style="color: var(--kv-text-muted);">↩</span>
-            <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">{{ t('reply.to', { author: replyingTo.author.username }) }}</span>
-            <span class="truncate" style="color: var(--kv-text-muted);">— {{ formatMentionsPlain(replyingTo.content, dmMentionResolver, t('mention.unknown')) }}</span>
+            <span class="shrink-0" style="color: var(--kv-text-muted)">↩</span>
+            <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary)">{{
+              t('reply.to', { author: replyingTo.author.username })
+            }}</span>
+            <span class="truncate" style="color: var(--kv-text-muted)"
+              >—
+              {{
+                formatMentionsPlain(replyingTo.content, dmMentionResolver, t('mention.unknown'))
+              }}</span
+            >
             <button
               class="shrink-0 ml-auto cursor-pointer hover:opacity-80 transition-opacity"
-              style="color: var(--kv-text-muted);"
+              style="color: var(--kv-text-muted)"
               :title="t('reply.cancel')"
               @click="cancelReply"
             >
@@ -1012,21 +1220,43 @@ function isGroupStart(index: number): boolean {
 
           <div
             class="flex items-center gap-2 px-4 border"
-            :class="replyingTo ? 'rounded-b-[var(--kv-radius-md)]' : 'rounded-[var(--kv-radius-md)]'"
-            style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
+            :class="
+              replyingTo ? 'rounded-b-[var(--kv-radius-md)]' : 'rounded-[var(--kv-radius-md)]'
+            "
+            style="
+              background-color: var(--kv-bg-elevated);
+              border-color: var(--kv-border-strong);
+              min-height: 44px;
+            "
           >
             <button
               type="button"
               class="shrink-0 w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
-              style="color: var(--kv-text-secondary);"
+              style="color: var(--kv-text-secondary)"
               :aria-label="t('attachment.addFile')"
               :title="t('attachment.addFile')"
-              @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'"
+              @mouseenter="
+                ($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'
+              "
+              @mouseleave="
+                ($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'
+              "
               @click="openFilePicker"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"
+                />
               </svg>
             </button>
             <!-- Sprint V2: mention autocomplete — relative sarmalayıcı popover için -->
@@ -1034,23 +1264,33 @@ function isGroupStart(index: number): boolean {
               <div
                 v-if="mention.showPopover.value"
                 class="absolute bottom-full left-0 mb-1 z-50 min-w-[200px] max-w-[320px] overflow-hidden rounded-[var(--kv-radius-md)] border"
-                style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+                style="
+                  background-color: var(--kv-bg-elevated);
+                  border-color: var(--kv-border-subtle);
+                "
                 @mousedown.prevent
               >
                 <div
                   v-for="(member, idx) in mention.suggestions.value"
                   :key="member.id"
                   class="flex items-center gap-2 px-3 py-2 cursor-pointer text-[14px]"
-                  :style="idx === mention.activeIndex.value
-                    ? 'background-color: var(--kv-accent-subtle); color: var(--kv-text-primary);'
-                    : 'color: var(--kv-text-secondary);'"
+                  :style="
+                    idx === mention.activeIndex.value
+                      ? 'background-color: var(--kv-accent-subtle); color: var(--kv-text-primary);'
+                      : 'color: var(--kv-text-secondary);'
+                  "
                   @click="mention.selectSuggestion(member)"
                 >
                   <div
                     class="w-6 h-6 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-white"
-                    style="background-color: var(--kv-accent-500);"
+                    style="background-color: var(--kv-accent-500)"
                   >
-                    <img v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.username" class="w-full h-full object-cover" />
+                    <img
+                      v-if="member.avatarUrl"
+                      :src="member.avatarUrl"
+                      :alt="member.username"
+                      class="w-full h-full object-cover"
+                    />
                     <span v-else>{{ member.username[0].toUpperCase() }}</span>
                   </div>
                   <span class="font-medium">@{{ member.username }}</span>
@@ -1062,7 +1302,14 @@ function isGroupStart(index: number): boolean {
                 rows="1"
                 :placeholder="inputPlaceholder"
                 class="w-full bg-transparent text-[15px] resize-none outline-none"
-                style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary); line-height: 1.5; padding-top: 10px; padding-bottom: 10px;"
+                style="
+                  max-height: 50vh;
+                  font-family: var(--kv-font-ui);
+                  color: var(--kv-text-primary);
+                  line-height: 1.5;
+                  padding-top: 10px;
+                  padding-bottom: 10px;
+                "
                 @keydown="onKeydown"
                 @input="onDmTextareaInput"
                 @blur="stopTyping"
@@ -1074,7 +1321,7 @@ function isGroupStart(index: number): boolean {
                 ref="dmComposeEmojiTriggerEl"
                 type="button"
                 class="py-1 px-1 cursor-pointer hover:opacity-80 transition-opacity"
-                style="color: var(--kv-text-muted); font-size: 18px; line-height: 1;"
+                style="color: var(--kv-text-muted); font-size: 18px; line-height: 1"
                 :aria-label="t('message.emojiButton')"
                 @click.stop="toggleComposeEmojiPicker"
               >

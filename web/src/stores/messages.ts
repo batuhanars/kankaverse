@@ -45,7 +45,13 @@ export const useMessagesStore = defineStore('messages', () => {
     const idx = list.findIndex((m) => m.id === dto.id)
     if (idx !== -1) {
       // Sprint V2: mentions + mentionsEveryone da güncellenir (edit → backend yeniden hesaplar)
-      list[idx] = { ...list[idx], content: dto.content, editedAt: dto.editedAt, mentions: dto.mentions, mentionsEveryone: dto.mentionsEveryone }
+      list[idx] = {
+        ...list[idx],
+        content: dto.content,
+        editedAt: dto.editedAt,
+        mentions: dto.mentions,
+        mentionsEveryone: dto.mentionsEveryone,
+      }
     }
   }
 
@@ -58,7 +64,13 @@ export const useMessagesStore = defineStore('messages', () => {
   }
 
   // Sprint V2: reaksiyon güncelle (WS veya optimistik)
-  function applyReaction(messageId: string, emoji: string, userId: string, meId: string, added: boolean) {
+  function applyReaction(
+    messageId: string,
+    emoji: string,
+    userId: string,
+    meId: string,
+    added: boolean,
+  ) {
     for (const list of Object.values(messagesByChannel.value)) {
       const msg = list.find((m) => m.id === messageId)
       if (!msg) continue

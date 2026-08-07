@@ -12,7 +12,10 @@ export const guildsApi = {
   },
   // Discord şablon göçü (yapı-only) — bayrak arkasında
   importDiscordTemplate(template: string, name?: string) {
-    return http.post<GuildDto>('/guilds/import/discord-template', { template, ...(name ? { name } : {}) })
+    return http.post<GuildDto>('/guilds/import/discord-template', {
+      template,
+      ...(name ? { name } : {}),
+    })
   },
   discordImportStatus() {
     return http.get<{ enabled: boolean }>('/guilds/import/discord-template')
@@ -37,7 +40,16 @@ export const guildsApi = {
   getChannels(guildId: string) {
     return http.get<ChannelDto[]>(`/guilds/${guildId}/channels`)
   },
-  createChannel(guildId: string, payload: { name: string; type?: 'GUILD_TEXT' | 'GUILD_VOICE'; ageGated?: boolean; isPrivate?: boolean; categoryId?: string | null }) {
+  createChannel(
+    guildId: string,
+    payload: {
+      name: string
+      type?: 'GUILD_TEXT' | 'GUILD_VOICE'
+      ageGated?: boolean
+      isPrivate?: boolean
+      categoryId?: string | null
+    },
+  ) {
     return http.post<ChannelDto>(`/guilds/${guildId}/channels`, payload)
   },
   getMembers(guildId: string) {
@@ -69,7 +81,9 @@ export const guildsApi = {
   },
   // Sprint V2 Guild Admin — Üye at / kick (OWNER veya ADMIN); opsiyonel sebep (max 512)
   kickMember(guildId: string, userId: string, reason?: string) {
-    return http.delete<null>(`/guilds/${guildId}/members/${userId}`, { data: reason ? { reason } : {} })
+    return http.delete<null>(`/guilds/${guildId}/members/${userId}`, {
+      data: reason ? { reason } : {},
+    })
   },
   // Ortam yönetimi — ayrıl / sahiplik devri / ban
   leaveGuild(guildId: string) {
@@ -94,7 +108,10 @@ export const guildsApi = {
     })
   },
   // Drag-reorder: kanal/kategori toplu sıralama
-  reorderChannels(guildId: string, items: { id: string; position: number; categoryId?: string | null }[]) {
+  reorderChannels(
+    guildId: string,
+    items: { id: string; position: number; categoryId?: string | null }[],
+  ) {
     return http.patch<null>(`/guilds/${guildId}/channels/reorder`, { items })
   },
   reorderCategories(guildId: string, items: { id: string; position: number }[]) {

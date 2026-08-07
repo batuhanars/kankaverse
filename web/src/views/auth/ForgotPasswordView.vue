@@ -41,23 +41,27 @@ function getError(field: string): string | undefined {
 <template>
   <div
     class="min-h-screen flex items-center justify-center"
-    style="background-color: var(--kv-bg-rail);"
+    style="background-color: var(--kv-bg-rail)"
   >
     <div
       class="w-full max-w-sm rounded-[var(--kv-radius-lg)] p-8"
-      style="background-color: var(--kv-bg-sidebar); border: 1px solid var(--kv-border-subtle); border-top: 3px solid var(--kv-accent-500);"
+      style="
+        background-color: var(--kv-bg-sidebar);
+        border: 1px solid var(--kv-border-subtle);
+        border-top: 3px solid var(--kv-accent-500);
+      "
     >
       <div class="mb-6 text-center">
         <img
           :src="logoDikey"
           :alt="t('brand.name')"
           class="mx-auto mb-5"
-          style="width: 120px; height: auto;"
+          style="width: 120px; height: auto"
         />
-        <h1 class="text-[22px] font-semibold" style="color: var(--kv-text-primary);">
+        <h1 class="text-[22px] font-semibold" style="color: var(--kv-text-primary)">
           {{ t('forgotPassword.title') }}
         </h1>
-        <p class="mt-1 text-[13px]" style="color: var(--kv-text-muted);">
+        <p class="mt-1 text-[13px]" style="color: var(--kv-text-muted)">
           {{ t('forgotPassword.subtitle') }}
         </p>
       </div>
@@ -66,14 +70,14 @@ function getError(field: string): string | undefined {
       <template v-if="sent">
         <p
           class="text-[14px] text-center rounded-[var(--kv-radius-md)] px-4 py-3 mb-4"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary)"
         >
           {{ t('forgotPassword.successMessage') }}
         </p>
         <RouterLink
           :to="{ name: 'login' }"
           class="block text-center text-[13px] mt-4"
-          style="color: var(--kv-accent-500);"
+          style="color: var(--kv-accent-500)"
         >
           {{ t('forgotPassword.backToLogin') }}
         </RouterLink>
@@ -96,8 +100,8 @@ function getError(field: string): string | undefined {
           </KvButton>
         </form>
 
-        <p class="mt-6 text-center text-[13px]" style="color: var(--kv-text-muted);">
-          <RouterLink :to="{ name: 'login' }" style="color: var(--kv-accent-500);">
+        <p class="mt-6 text-center text-[13px]" style="color: var(--kv-text-muted)">
+          <RouterLink :to="{ name: 'login' }" style="color: var(--kv-accent-500)">
             {{ t('forgotPassword.backToLogin') }}
           </RouterLink>
         </p>

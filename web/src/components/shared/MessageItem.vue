@@ -240,17 +240,29 @@ onUnmounted(() => {
           v-model="editContent"
           rows="1"
           class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] resize-none outline-none border"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary); border-color: var(--kv-border-strong); font-family: var(--kv-font-ui); max-height: 200px;"
+          style="
+            background-color: var(--kv-bg-elevated);
+            color: var(--kv-text-primary);
+            border-color: var(--kv-border-strong);
+            font-family: var(--kv-font-ui);
+            max-height: 200px;
+          "
           :disabled="editLoading"
           @keydown="onEditKeydown"
-          @input="($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
+          @input="
+            ;($event.target as HTMLTextAreaElement).style.height = 'auto'
+            ;($event.target as HTMLTextAreaElement).style.height =
+              ($event.target as HTMLTextAreaElement).scrollHeight + 'px'
+          "
         />
-        <p v-if="editError" class="text-[12px] mt-1" style="color: var(--kv-danger);">{{ editError }}</p>
-        <div class="flex gap-2 mt-1 text-[12px]" style="color: var(--kv-text-muted);">
+        <p v-if="editError" class="text-[12px] mt-1" style="color: var(--kv-danger)">
+          {{ editError }}
+        </p>
+        <div class="flex gap-2 mt-1 text-[12px]" style="color: var(--kv-text-muted)">
           <span>{{ t('message.editHint') }}</span>
           <button
             class="underline cursor-pointer hover:opacity-80"
-            style="color: var(--kv-danger);"
+            style="color: var(--kv-danger)"
             @click="cancelEdit"
           >
             {{ t('common.cancel') }}
@@ -265,9 +277,11 @@ onUnmounted(() => {
         v-for="reaction in message.reactions"
         :key="reaction.emoji"
         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[13px] cursor-pointer transition-colors border"
-        :style="reaction.reactedByMe
-          ? 'background-color: var(--kv-accent-subtle); border-color: var(--kv-accent-500); color: var(--kv-accent-500);'
-          : 'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'"
+        :style="
+          reaction.reactedByMe
+            ? 'background-color: var(--kv-accent-subtle); border-color: var(--kv-accent-500); color: var(--kv-accent-500);'
+            : 'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'
+        "
         :title="t('reaction.toggleTitle')"
         @click.stop="toggleReaction(reaction.emoji, reaction.reactedByMe)"
       >
@@ -296,11 +310,7 @@ onUnmounted(() => {
   />
 
   <!-- Mesaj ilet (forward) modalı -->
-  <ForwardMessageModal
-    v-if="showForward"
-    :message="message"
-    @close="showForward = false"
-  />
+  <ForwardMessageModal v-if="showForward" :message="message" @close="showForward = false" />
 
   <!-- Mesaj silme onayı -->
   <ConfirmDialog

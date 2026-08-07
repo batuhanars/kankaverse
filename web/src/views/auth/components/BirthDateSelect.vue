@@ -82,8 +82,11 @@ watch(
 
 <template>
   <div class="flex flex-col gap-1.5">
-    <label class="text-[11px] font-semibold uppercase tracking-wide" style="color: var(--kv-text-secondary);">
-      {{ t('auth.birthDate') }}<span class="ml-0.5" style="color: var(--kv-danger);">*</span>
+    <label
+      class="text-[11px] font-semibold uppercase tracking-wide"
+      style="color: var(--kv-text-secondary)"
+    >
+      {{ t('auth.birthDate') }}<span class="ml-0.5" style="color: var(--kv-danger)">*</span>
     </label>
     <div class="grid grid-cols-3 gap-2">
       <KvSelect
@@ -105,7 +108,7 @@ watch(
         :error="undefined"
       />
     </div>
-    <span v-if="error" class="text-[12px]" style="color: var(--kv-danger);">{{ error }}</span>
-    <p class="text-[11px]" style="color: var(--kv-text-muted);">{{ t('auth.birthDateHelp') }}</p>
+    <span v-if="error" class="text-[12px]" style="color: var(--kv-danger)">{{ error }}</span>
+    <p class="text-[11px]" style="color: var(--kv-text-muted)">{{ t('auth.birthDateHelp') }}</p>
   </div>
 </template>

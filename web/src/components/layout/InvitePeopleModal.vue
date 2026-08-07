@@ -117,7 +117,10 @@ onMounted(() => {
     <div class="flex flex-col gap-5">
       <!-- (a) Davet linki -->
       <div class="flex flex-col gap-2">
-        <p class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+        <p
+          class="text-[11px] font-semibold uppercase tracking-widest"
+          style="color: var(--kv-text-muted)"
+        >
           {{ t('invitePeople.linkLabel') }}
         </p>
 
@@ -125,15 +128,19 @@ onMounted(() => {
         <div
           v-if="creating"
           class="h-10 rounded-[var(--kv-radius-md)] animate-pulse"
-          style="background-color: var(--kv-bg-elevated);"
+          style="background-color: var(--kv-bg-elevated)"
         />
 
         <div
           v-else-if="inviteCode"
           class="flex items-center gap-2 px-3 py-2 rounded-[var(--kv-radius-md)] border"
-          style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+          style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated)"
         >
-          <code class="flex-1 text-[13px] font-mono truncate" style="color: var(--kv-text-primary);">{{ inviteLink }}</code>
+          <code
+            class="flex-1 text-[13px] font-mono truncate"
+            style="color: var(--kv-text-primary)"
+            >{{ inviteLink }}</code
+          >
           <KvButton size="sm" @click="copy()">
             {{ copied ? t('invite.copied') : t('invite.copy') }}
           </KvButton>
@@ -142,7 +149,10 @@ onMounted(() => {
 
       <!-- (b) Kanka listesi -->
       <div class="flex flex-col gap-2">
-        <p class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+        <p
+          class="text-[11px] font-semibold uppercase tracking-widest"
+          style="color: var(--kv-text-muted)"
+        >
           {{ t('invitePeople.friendsLabel') }}
         </p>
 
@@ -150,33 +160,49 @@ onMounted(() => {
         <div
           v-if="!friendsLoading && friends.length > 0"
           class="flex items-center gap-2 px-3 py-2 rounded-[var(--kv-radius-md)] border"
-          style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+          style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated)"
         >
           <svg
-            width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-            class="shrink-0" style="color: var(--kv-text-muted);"
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="shrink-0"
+            style="color: var(--kv-text-muted)"
           >
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <input
             v-model="query"
             type="text"
             :placeholder="t('invitePeople.searchPlaceholder')"
             class="flex-1 min-w-0 bg-transparent text-[14px] outline-none"
-            style="color: var(--kv-text-primary);"
+            style="color: var(--kv-text-primary)"
           />
         </div>
 
-        <div v-if="friendsLoading" class="text-[13px]" style="color: var(--kv-text-muted);">
+        <div v-if="friendsLoading" class="text-[13px]" style="color: var(--kv-text-muted)">
           {{ t('common.loading') }}
         </div>
 
-        <div v-else-if="friends.length === 0" class="text-[13px]" style="color: var(--kv-text-muted);">
+        <div
+          v-else-if="friends.length === 0"
+          class="text-[13px]"
+          style="color: var(--kv-text-muted)"
+        >
           {{ t('invitePeople.noFriends') }}
         </div>
 
-        <div v-else-if="filteredFriends.length === 0" class="text-[13px]" style="color: var(--kv-text-muted);">
+        <div
+          v-else-if="filteredFriends.length === 0"
+          class="text-[13px]"
+          style="color: var(--kv-text-muted)"
+        >
           {{ t('invitePeople.noResults') }}
         </div>
 
@@ -185,10 +211,10 @@ onMounted(() => {
             v-for="friend in filteredFriends"
             :key="friend.user.id"
             class="flex items-center gap-2.5 px-3 py-2 rounded-[var(--kv-radius-md)] border"
-            style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+            style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated)"
           >
             <UserAvatar :username="friend.user.username" :avatar-url="friend.user.avatarUrl" />
-            <span class="flex-1 min-w-0 text-[14px] truncate" style="color: var(--kv-text-primary);">
+            <span class="flex-1 min-w-0 text-[14px] truncate" style="color: var(--kv-text-primary)">
               {{ friend.user.username }}
             </span>
             <KvButton
@@ -198,7 +224,11 @@ onMounted(() => {
               :loading="sendState[friend.user.id] === 'sending'"
               @click="inviteFriend(friend)"
             >
-              {{ sendState[friend.user.id] === 'sent' ? t('invitePeople.invited') : t('invitePeople.inviteButton') }}
+              {{
+                sendState[friend.user.id] === 'sent'
+                  ? t('invitePeople.invited')
+                  : t('invitePeople.inviteButton')
+              }}
             </KvButton>
           </li>
         </ul>

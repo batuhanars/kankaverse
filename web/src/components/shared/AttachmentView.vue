@@ -29,13 +29,10 @@ const isDoc =
 const isTxt = props.attachment.contentType === 'text/plain'
 
 const isBlocked = computed(
-  () =>
-    props.attachment.scanStatus === ScanStatus.FLAGGED || imageError.value === 'blocked',
+  () => props.attachment.scanStatus === ScanStatus.FLAGGED || imageError.value === 'blocked',
 )
 const isPending = computed(() => props.attachment.scanStatus === ScanStatus.PENDING)
-const isActionDisabled = computed(
-  () => downloading.value || isPending.value || isBlocked.value,
-)
+const isActionDisabled = computed(() => downloading.value || isPending.value || isBlocked.value)
 
 function loadImageUrl() {
   imageLoading.value = true
@@ -119,7 +116,7 @@ function formatBytes(bytes: number): string {
     <div
       v-if="isPending"
       class="flex items-center gap-2 px-3 py-2 rounded-[var(--kv-radius-sm)] text-[13px]"
-      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted)"
     >
       <span>⏳</span>
       <span>{{ t('attachment.processing') }}</span>
@@ -129,7 +126,7 @@ function formatBytes(bytes: number): string {
     <div
       v-else-if="isBlocked"
       class="flex items-center gap-2 px-3 py-2 rounded-[var(--kv-radius-sm)] text-[13px]"
-      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted)"
     >
       <span>🚫</span>
       <span>{{ t('attachment.blocked') }}</span>
@@ -139,7 +136,7 @@ function formatBytes(bytes: number): string {
     <div
       v-else-if="imageLoading"
       class="flex items-center gap-2 px-3 py-2 rounded-[var(--kv-radius-sm)] text-[13px]"
-      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted)"
     >
       <span>{{ t('common.loading') }}</span>
     </div>
@@ -148,7 +145,7 @@ function formatBytes(bytes: number): string {
     <div
       v-else-if="imageError"
       class="flex items-center gap-2 px-3 py-2 rounded-[var(--kv-radius-sm)] text-[13px]"
-      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted)"
     >
       <span>{{ t('attachment.notReady') }}</span>
     </div>
@@ -159,7 +156,7 @@ function formatBytes(bytes: number): string {
       :src="imageUrl"
       :alt="attachment.filename"
       class="max-w-full rounded-[var(--kv-radius-sm)] cursor-pointer object-contain"
-      style="max-width: 360px; max-height: 240px;"
+      style="max-width: 360px; max-height: 240px"
       loading="lazy"
       @click="openLightbox"
       @error="onImageError"
@@ -170,33 +167,87 @@ function formatBytes(bytes: number): string {
   <div
     v-else
     class="flex items-center gap-3 mt-1.5 px-3 py-2 rounded-[var(--kv-radius-sm)]"
-    style="background-color: var(--kv-bg-elevated);"
+    style="background-color: var(--kv-bg-elevated)"
   >
     <!-- Tipli dosya ikonu -->
     <div class="w-9 h-9 shrink-0 flex items-center justify-center" aria-hidden="true">
       <!-- PDF -->
-      <svg v-if="isPdf" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-9 h-9">
+      <svg
+        v-if="isPdf"
+        viewBox="0 0 36 36"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        class="w-9 h-9"
+      >
         <rect width="36" height="36" rx="6" fill="var(--kv-danger)" fill-opacity="0.15" />
         <path d="M9 5h13l6 6v20H9V5z" fill="var(--kv-danger)" fill-opacity="0.65" />
         <path d="M22 5l6 6h-6V5z" fill="var(--kv-danger)" />
-        <text x="18" y="25" text-anchor="middle" font-size="7" font-weight="700" fill="var(--kv-danger)" font-family="sans-serif">PDF</text>
+        <text
+          x="18"
+          y="25"
+          text-anchor="middle"
+          font-size="7"
+          font-weight="700"
+          fill="var(--kv-danger)"
+          font-family="sans-serif"
+        >
+          PDF
+        </text>
       </svg>
       <!-- DOC/DOCX -->
-      <svg v-else-if="isDoc" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-9 h-9">
+      <svg
+        v-else-if="isDoc"
+        viewBox="0 0 36 36"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        class="w-9 h-9"
+      >
         <rect width="36" height="36" rx="6" fill="var(--kv-info)" fill-opacity="0.15" />
         <path d="M9 5h13l6 6v20H9V5z" fill="var(--kv-info)" fill-opacity="0.65" />
         <path d="M22 5l6 6h-6V5z" fill="var(--kv-info)" />
-        <text x="18" y="25" text-anchor="middle" font-size="7" font-weight="700" fill="var(--kv-info)" font-family="sans-serif">DOC</text>
+        <text
+          x="18"
+          y="25"
+          text-anchor="middle"
+          font-size="7"
+          font-weight="700"
+          fill="var(--kv-info)"
+          font-family="sans-serif"
+        >
+          DOC
+        </text>
       </svg>
       <!-- TXT -->
-      <svg v-else-if="isTxt" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-9 h-9">
+      <svg
+        v-else-if="isTxt"
+        viewBox="0 0 36 36"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        class="w-9 h-9"
+      >
         <rect width="36" height="36" rx="6" fill="var(--kv-text-muted)" fill-opacity="0.2" />
         <path d="M9 5h13l6 6v20H9V5z" fill="var(--kv-text-secondary)" fill-opacity="0.65" />
         <path d="M22 5l6 6h-6V5z" fill="var(--kv-text-secondary)" />
-        <text x="18" y="25" text-anchor="middle" font-size="7" font-weight="700" fill="var(--kv-text-primary)" font-family="sans-serif">TXT</text>
+        <text
+          x="18"
+          y="25"
+          text-anchor="middle"
+          font-size="7"
+          font-weight="700"
+          fill="var(--kv-text-primary)"
+          font-family="sans-serif"
+        >
+          TXT
+        </text>
       </svg>
       <!-- Genel -->
-      <svg v-else viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-9 h-9">
+      <svg
+        v-else
+        viewBox="0 0 36 36"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        class="w-9 h-9"
+      >
         <rect width="36" height="36" rx="6" fill="var(--kv-accent-500)" fill-opacity="0.15" />
         <path d="M9 5h13l6 6v20H9V5z" fill="var(--kv-accent-500)" fill-opacity="0.65" />
         <path d="M22 5l6 6h-6V5z" fill="var(--kv-accent-500)" />
@@ -206,10 +257,10 @@ function formatBytes(bytes: number): string {
 
     <!-- Ad + boyut -->
     <div class="flex flex-col min-w-0 flex-1">
-      <span class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary);">
+      <span class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary)">
         {{ attachment.filename }}
       </span>
-      <span class="text-[11px]" style="color: var(--kv-text-muted);">
+      <span class="text-[11px]" style="color: var(--kv-text-muted)">
         {{ formatBytes(attachment.size) }}
       </span>
     </div>
@@ -221,7 +272,7 @@ function formatBytes(bytes: number): string {
         v-if="isPdf && !isPending && !isBlocked"
         :disabled="isActionDisabled"
         class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-opacity cursor-pointer"
-        style="color: var(--kv-accent-500);"
+        style="color: var(--kv-accent-500)"
         :class="isActionDisabled ? 'opacity-40 pointer-events-none' : 'hover:opacity-80'"
         @click="openUrl"
       >
@@ -232,7 +283,7 @@ function formatBytes(bytes: number): string {
       <button
         :disabled="isActionDisabled"
         class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-opacity cursor-pointer"
-        style="color: var(--kv-accent-500);"
+        style="color: var(--kv-accent-500)"
         :class="isActionDisabled ? 'opacity-40 pointer-events-none' : 'hover:opacity-80'"
         @click="openUrl"
       >
