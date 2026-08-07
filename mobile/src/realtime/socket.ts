@@ -266,6 +266,17 @@ function ensureSocket(): Socket {
     void dismissIncomingCall(data.channelId);
   });
 
+  // ---- M4b grup DM sesli (sözleşme §5) ----
+  // 🔴 ÇALMA YOK ve **BİLDİRİM DE YOK** — bu olay bilerek DİNLENMİYOR.
+  // `presentIncomingCall` çağrılmaz (her katılan herkesi çaldırsaydı üç kişilik bir grup üç kez
+  // çalardı). PM kararı 2026-08-07: uygulama içi bilgilendirme de yapılmıyor. Sözleşme §5 bunu
+  // "kabul edilebilir" diyordu, zorunlu değil; mobilde pasif bir toast bileşeni yok ve `Alert.alert`
+  // MODAL bir diyalog — kullanıcı yazı yazarken ekranı keser ve dokunmadan kapanmaz, yani "hafif
+  // bilgilendirme" değil. Web'deki karşılığı (`setNotice`) kendiliğinden kaybolan pasif bir şerit.
+  // Yanlış ağırlıkta bir bildirim koymaktansa hiç koymuyoruz: kullanıcı o DM'i açtığında
+  // `OngoingCallBanner`ı zaten görüyor (§4) ve tek dokunuşla katılıyor.
+  // Toast altyapısı gelirse (birden çok kullanım biriktiğinde) burası yeniden değerlendirilir.
+
   return socket;
 }
 
@@ -294,6 +305,29 @@ export function callInvite(channelId: string): Promise<{ ok: boolean; error?: st
     };
     const timer = setTimeout(() => done({ ok: false, error: 'TIMEOUT' }), 5000);
     s.emit('voice:call_invite', { channelId }, (ack: { ok: boolean; error?: string }) => {
+      clearTimeout(timer);
+      done(ack ?? { ok: false });
+    });
+  });
+}
+
+/**
+ * M4b sözleşme §2 — grup DM'in KENDİ sinyali. `callInvite`in ack+timeout desenini birebir izler
+ * (aynı 5sn timeout, aynı ack şekli) ama AYRI bir event: `voice:group_call_start`. Sunucu kanal
+ * `GROUP_DM` değilse `NOT_GROUP` döner (§0 tuzağı — `callInvite` kullanılsaydı `NOT_DM` dönerdi,
+ * ikisi de istemciye açımlanmaz, `stores/voice.ts` nötr mesaj gösterir).
+ */
+export function groupCallStart(channelId: string): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const s = ensureSocket();
+    let settled = false;
+    const done = (ack: { ok: boolean; error?: string }) => {
+      if (settled) return;
+      settled = true;
+      resolve(ack);
+    };
+    const timer = setTimeout(() => done({ ok: false, error: 'TIMEOUT' }), 5000);
+    s.emit('voice:group_call_start', { channelId }, (ack: { ok: boolean; error?: string }) => {
       clearTimeout(timer);
       done(ack ?? { ok: false });
     });
