@@ -1,12 +1,12 @@
-import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { router, useNavigationContainerRef } from 'expo-router';
+import { router } from 'expo-router';
 import { notificationsApi } from '@/api/notifications';
 import { resolvePushTarget } from '@/utils/pushNavigation';
-import { useAuthStore } from '@/stores/auth';
+import { isChannelRinging } from '@/notifications/incomingCall';
+import { useGatedNotificationResponder } from '@/notifications/responseGate';
 
 /**
  * Sprint M3 §3 — mobil push istemci ayağı.
@@ -19,17 +19,29 @@ import { useAuthStore } from '@/stores/auth';
  * 🔴 M4a-2 istisnası (sözleşme §8.2) — `expo-notifications` global TEK bir handler kabul ediyor,
  * push ile gelen arama bildirimi aynı fonksiyondan geçiyor. Gelen arama bildirimi (`notifications/
  * incomingCall.ts`, `data.type === 'incoming_call'`) uygulama ön plandayken de ÜSTTE (heads-up)
- * görünmeli — sözleşme bunu açıkça istiyor ("Discord'un yaptığı gibi"). Ses yine YOK
- * (`shouldPlaySound: false`): zil `expo-audio` ile ayrıca ve döngüde çalınıyor, bildirimin kendi
- * sesiyle üst üste binmesin diye.
+ * görünmeli — sözleşme bunu açıkça istiyor ("Discord'un yaptığı gibi").
+ *
+ * 🔴 M4a-3 (sözleşme §9.2.1 + §9.2.5) — zil artık kanal sesi (bkz. `incomingCall.ts` CHANNEL_ID),
+ * `shouldPlaySound: true` gelen arama için: hem WS'in yerel bildirimi hem foreground'da gelen push
+ * bu yolu paylaşıyor, ikisi de kanalın gömülü sesini çalsın. `data.channelId` için ZATEN bir bildirim
+ * çalıyorsa (`isChannelRinging`, `incomingCall.ts`) bu ikinci kopya TAMAMEN bastırılır (banner/liste/
+ * ses hiçbiri çıkmaz) — sahip cihaz turunda (2026-08-07) görülen "iki 'Gelen Arama' kartı yan yana"
+ * kusuru budur (WS yolu + push aynı anda, `api/` M4a-3 ile push ayağı bugün canlıya girdi).
  */
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
-    const isIncomingCall = notification.request.content.data?.type === 'incoming_call';
+    const data = notification.request.content.data as Record<string, unknown> | undefined;
+    const isIncomingCall = data?.type === 'incoming_call';
+    if (isIncomingCall) {
+      const channelId = typeof data?.channelId === 'string' ? data.channelId : null;
+      if (channelId && isChannelRinging(channelId)) {
+        return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false };
+      }
+    }
     return {
       shouldShowBanner: isIncomingCall,
       shouldShowList: true,
-      shouldPlaySound: false,
+      shouldPlaySound: isIncomingCall,
       shouldSetBadge: false,
     };
   },
@@ -116,82 +128,12 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
  * DE kontrol edilir: DoD'daki "uygulama kapalıyken bahsedilince bildirim geliyor, dokununca doğru
  * kanala gidiyor" tam olarak bu senaryo.
  *
- * KUSUR 1 düzeltmesi (M3 sonrası, sahip bulgusu — cihazda dev build testi) — soğuk açılışta
- * `getLastNotificationResponse()` kök layout'un İLK render'ında, native navigasyon container'ı
- * henüz mount OLMADAN döner. O anda `router.push` çağırmak expo-router'ın kendi hata ekranını
- * tetikliyordu: "Attempted to navigate before mounting the Root Layout component."
- *
- * Kurulu expo-router (6.0.24) kaynağında (`build/global-state/router-store.js` → `assertIsReady()`)
- * `router.push` tam olarak `navigationRef.isReady()` şartına bakıyor — bu yüzden burada da
- * dolaylı bir işaret (ör. state.key) değil, expo-router'ın kendi export ettiği
- * `useNavigationContainerRef()` ile AYNI ref/AYNI kontrol kullanılıyor: `.isReady()` false iken
- * yanıt kapanışta (closure) SAKLANIR, react-navigation'ın 'ready' event'i ateşlenince (container
- * gerçekten mount olup ilk state'i kurunca) flush edilir. Uygulama açıkken gelen dokunuş zaten
- * navigasyon hazırken gerçekleşir (kullanıcı bir ekranda duruyor) — o yol hâlâ anında çalışır.
- *
- * KUSUR 2 düzeltmesi (KUSUR 1'in üstüne, sahip fiziksel cihazda buldu) — `navigationRef.isReady()`
- * tek başına yetmiyordu: soğuk açılışta container 'ready' event'ini bootstrap() (`stores/auth.ts`)
- * henüz sonuçlanmadan, `status: 'booting'` iken ateşliyor. O anda flush edip `router.push` çağırınca
- * hedef ekrana gidiyorduk ama bir tık sonra `(app)/_layout.tsx`'teki auth guard
- * (`if (status !== 'authenticated') return <Redirect href="/login" />`) — 'booting' da bu şartı
- * sağladığı için — bizim yönlendirmemizi login'e EZİYORDU. bootstrap sonradan 'authenticated'e
- * dönse bile o an login ekranındayız, geri dönüş yok.
- *
- * Çözüm: bekletme şartına navigasyon hazırlığının YANINA oturum hazırlığı da eklendi. `status`
- * hâlâ 'booting' iken flush ERTELENİR (auth guard'ın bizi ezmesini önler). `status`
- * 'unauthenticated'e düşerse (cihazda geçerli oturum yok, kullanıcı elle giriş yapacak) bekleyen
- * yanıt DÜŞÜRÜLÜR — aksi hâlde kullanıcı beş dakika sonra elle giriş yapınca beklenmedik biçimde
- * eski bir sohbete atlardı (push'un işaret ettiği sohbet o oturumla ilgisiz olabilir). Oturum
- * durumu `useAuthStore`'un zaten var olan vanilla `subscribe` API'siyle izleniyor — yeni bir global
- * state/altyapı YOK. Uygulama açıkken gelen dokunuş yolu değişmedi: navigasyon zaten hazır VE
- * oturum zaten 'authenticated' olduğu için tek `tryFlush` çağrısında anında işlenir.
+ * KUSUR 1/KUSUR 2 düzeltmesi (M3 sonrası, sahip bulgusu — cihazda dev build testi): navigasyon
+ * container mount olmadan / auth bootstrap bitmeden gelen soğuk-açılış yanıtını bekletme deseni artık
+ * `notifications/responseGate.ts`'te (`useGatedNotificationResponder`) — M4a-3 sözleşme §9.2.3 ile
+ * `useIncomingCallResponder` (`incomingCall.ts`) AYNI problemi paylaştığı için oraya çıkarıldı.
+ * Ayrıntılı iki kusurun tam anlatımı o dosyanın başındaki yorumda.
  */
 export function usePushNotificationResponder(): void {
-  const navigationRef = useNavigationContainerRef();
-
-  useEffect(() => {
-    // Navigasyon hazır OLMADAN ya da oturum henüz 'booting' iken gelen yanıt burada bekletilir.
-    let pending: Notifications.NotificationResponse | null = null;
-
-    const tryFlush = () => {
-      if (!pending) return;
-      if (!navigationRef.isReady()) return;
-
-      const status = useAuthStore.getState().status;
-      if (status === 'booting') return; // oturum kararı henüz yok — auth guard bizi ezer, bekle
-
-      if (status === 'unauthenticated') {
-        // Oturum yok — kullanıcı elle giriş yapacak, eski hedefe sürpriz atlama YOK.
-        pending = null;
-        return;
-      }
-
-      const response = pending;
-      pending = null;
-      handleNotificationResponse(response);
-    };
-
-    const respond = (response: Notifications.NotificationResponse) => {
-      pending = response;
-      tryFlush();
-    };
-
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener(respond);
-    // 'ready' — react-navigation'ın NavigationContainer gerçekten mount olduğunda ATEŞLEDİĞİ event
-    // (bkz. @react-navigation/core `NavigationContainerEventMap`); `assertIsReady()`'nin baktığı
-    // `isReady()` ile aynı andan hemen sonra gelir.
-    const unsubscribeReady = navigationRef.addListener('ready', tryFlush);
-    // `useAuthStore`'un vanilla `subscribe`'ı: 'booting' → 'authenticated'/'unauthenticated' geçişini
-    // React render döngüsüne bağlı olmadan yakalar (bu bir hook değil, effect içinde plain subscribe).
-    const unsubscribeAuth = useAuthStore.subscribe(tryFlush);
-
-    const last = Notifications.getLastNotificationResponse();
-    if (last) respond(last);
-
-    return () => {
-      responseSubscription.remove();
-      unsubscribeReady();
-      unsubscribeAuth();
-    };
-  }, [navigationRef]);
+  useGatedNotificationResponder(handleNotificationResponse);
 }

@@ -2957,17 +2957,40 @@ arayanın avatarı var, bizde yok. Küçük bir parite kalemi; mobil ayağına e
       Öneri: M4a bitince tek mekanik commit ile hizala; DoD'un "lint temiz" satırı da gözden geçirilmeli
       (bu repoda hiçbir sprintte karşılanmamış görünüyor)
 
-**`mobile/` — §9.2**
-- [ ] 🔴 Zil kararı: önce tek sesli kanal (`incoming_call_v3`) denenir, bildirim kaldırılınca ses
-      kesiliyor mu **ölçülür**; kesilmiyorsa push yolu ayrı kanala ayrılır. **Sonuç buraya yazılır**
-      🟢 Tutarsa **M4a-2'nin açık borcu da kapanır**: ringer moduna saygıyı sistem gösterir, "cihaz
-      sessizdeyken zil çalmasın" için native modüle inmeye gerek kalmaz (sessize alıp iki yolu da ölç)
-- [ ] Kanal + kategori **açılışta** kuruluyor (yoksa push bildiriminde eylem düğmeleri hiç çıkmaz)
-- [ ] Kabul → soğuk açılış zinciri: `push.ts`'teki bekletme deseni (nav ready + auth booting)
-      yeniden kullanılıyor, kopyalanmıyor; katılmadan önce `ensureSocket`
-- [ ] Reddet yerel (§9.2.4 kabul edilen sınır); 30 sn'den eski yanıt işlenmiyor, yalnız temizlenir
-- [ ] Ön planda çift bildirim yok (handler bastırıyor); uygulama açılınca asılı arama temizleniyor
-- [ ] Native diff → yerelde derle + emülatörde aç, sonra EAS
+**`mobile/` — §9.2** — ✅ KOD BİTTİ, 🔴 **EAS BUILD + CİHAZ TURU SAHİPTE**
+- [x] 🔴 Zil kararı: **1. seçenek — tek kanal** `incoming_call_v3` (sunucudaki `androidChannelId` ile
+      birebir aynı string). Kanala gömülü ~30 sn'lik döngülü zil; ön plandaki `expo-audio` zili
+      **kaldırıldı**, iki yol da kanal sesini kullanıyor. Dosya `ffmpeg -stream_loop` ile mevcut
+      `incoming-call.wav`'dan üretildi (yeni kayıt yok), mono/22kHz/16-bit → **1.29 MB**
+      ⚠️ **Ölçümün 2. adımı SAHİPTE:** kabul/reddet/iptalde kanal sesi gerçekten **kesiliyor mu**?
+      Kesilmezse §9.2.1'in 3. seçeneğine düşülür (iki kanal) ve o zaman `api/`deki
+      `androidChannelId` de **birlikte** güncellenir
+      🟢 Tutarsa [[D40]] da kapanır: ringer moduna saygıyı sistem gösterir (sessize alıp iki yolu da ölç)
+      🔴 **Tuzak kayda geçti:** Android ham kaynak adı `[a-z0-9_]` dışına çıkamaz — dosya adındaki
+      **tire** `expo prebuild`'i "Resource name is not valid" ile düşürüyor. Yerelde 1 dakikada
+      bulundu; EAS'ta "unknown error" olarak dönerdi ([[native-degisince-once-yerel-derle]])
+- [x] §9.2.1b Eski kanallar siliniyor (v1 + v2 birikmişti, aynı adla — kullanıcı hangisinin gerçek
+      olduğunu ayırt edemiyordu)
+- [x] Kanal + kategori **açılışta** kuruluyor (`(app)/_layout.tsx`, `syncPushToken` ile aynı yer)
+- [x] Kabul → soğuk açılış zinciri: bekletme deseni `notifications/responseGate.ts`'e **çıkarıldı**,
+      push responder ile gelen-arama responder'ı **aynı** hook'u kullanıyor (kopya değil)
+- [x] Reddet yerel (§9.2.4); `notification.date` ile 30 sn'den eski yanıtta sinyal **denenmiyor**
+- [x] Ön planda çift bildirim bastırılıyor (`isChannelRinging` → handler); `AppState` 'active'
+      geçişinde asılı `incoming_call` bildirimleri temizleniyor
+- [x] Native diff → yerelde `expo prebuild --clean` + `gradlew` **BUILD SUCCESSFUL**, emülatörde
+      açıldı, logcat temiz (M4a-1'in "derleme geçti ama açılmadı" tuzağı yok)
+- [x] Ölü kalıntılar: **`expo-audio` kaldırıldı** (M4a-1'in "tek derleme kuralı" gerekçesi düştü;
+      blip sesleri gelirse zaten yeni build alınır). Eski `incoming-call.wav` **kaynak olarak
+      korundu**, üretim komutu dosya başı yorumuna bağlandı
+- [x] Ön planda titreşim **iki kaynaktan** geliyor (kanal deseni + JS döngüsü). M4a-2'nin "tek
+      kaynak" kararı **bilerek** tersine çevrildi: arka planda JS koşmuyor, kanal titreşimi olmazsa
+      hiç titreşim olmaz. Çakışma kaldırılmadı, **yorumda açıkça belgelendi** → cihazda garip bir
+      titreşim hissedilirse bu bilinen ve kabul edilmiş, yeni tur açılmaz
+
+> 📏 **PM tahmini düzeltildi (dev haklıydı):** ses dosyası için "~300 KB'a iner" demiştim; WAV
+> sıkıştırmasız PCM olduğu için boyut matematik olarak sabit (`22050 × 2 × 1 × 30 = 1.29 MB`).
+> 300 KB'a inmek 8 kHz'e düşmeyi (zil kabalaşır) veya süreyi kısaltmayı (aramanın bir kısmında
+> sessizlik) gerektirirdi. 2.6 MB → 1.29 MB kazancı yeterli, daha fazlası ödünleşme.
 
 ### DoD (cihazda) — ✅ SAHİP DOĞRULADI 2026-08-06
 > Tam liste sözleşme §13'te. Sahip turu: arama başlatma, karşılıklı konuşma, arka planda ses,

@@ -1,48 +1,94 @@
 import { useEffect } from 'react';
-import { Alert, Linking, Vibration } from 'react-native';
+import { Alert, AppState, type AppStateStatus, Linking, Vibration } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { router } from 'expo-router';
 import { useVoiceStore } from '@/stores/voice';
 import { callAccept, callReject } from '@/realtime/socket';
 import { dmTarget } from '@/utils/pushNavigation';
+import { useGatedNotificationResponder } from '@/notifications/responseGate';
 import { t } from '@/i18n';
 
 /**
  * M4a-2 sözleşme §8 — mobilde **gelen** arama, uygulama açıkken. Sunum TAM EKRAN DEĞİL, bildirim
  * (§8.1, sahip görselleri `design-refs/m4-ses/13-14`): "Gelen Arama" / "<ad> seni arıyor!" + Reddet ·
- * Aramaya Katıl. `voice.incoming_call` yalnız WS'ten gelir (`realtime/socket.ts`) — bu sprintte push
- * YOK (M4a-3), yani bu akış zaten yalnız uygulama ÖN PLANDAYKEN çalışır (`useBackgroundSocket.ts`
- * arka plana düşünce soketi kapatıyor, WS event'i arka planda hiç gelmiyor — §8'in "açıkken" sınırı
- * bu yüzden koda hiç yazılmak ZORUNDA kalmadı, doğal sonuç).
+ * Aramaya Katıl. `voice.incoming_call` WS'ten gelir (`realtime/socket.ts`, uygulama ön plandayken).
  *
- * §8.3 🔴 — zil `expo-audio` ile DÖNGÜDE çalınır, bildirim kanalının sesiyle DEĞİL (kanal tek atış
- * çalar). Kanal burada `sound: null` ile sessiz kurulur; döngü + titreşim tamamen bu modülün elinde,
- * dört bitiş yolunun (kabul · reddet · zaman aşımı · arayan iptal) HEPSİ `dismiss()`e çıkar — M4a-1
- * dersi #1 ("kapanış yollarını tek noktadan yönet") burada da uygulanıyor.
+ * 🔴 M4a-3 (sözleşme §9) — aynı sunum artık push tetikleyicisini de karşılar: uygulama ölüyken
+ * `api/`nin gönderdiği push, kanal/kategori kurulumunu (§9.2.2) ve `useGatedNotificationResponder`
+ * ile soğuk açılış zincirini (§9.2.3) paylaşır. Bu dosyada YENİ bir ekran/kanal-kavramı YOK; değişen
+ * yalnız zilin nereden geldiği (§9.2.1) ve kurulumun ne zaman çalıştığı (§9.2.2).
  *
- * ⚠️ Bilinen sınır (rapor edildi, PM/sahip kararı bekliyor): Android'in "cihaz sessiz/rahatsız
- * etmeyin kipinde ÇALMASIN" davranışı normalde sistemin kendi ringtone/notification akışını
- * kullanınca otomatik gelir (ringer modunu okur). `expo-audio`/`expo-notifications` (kurulu paket
- * seti) ringer modunu SORGULAYAN bir API sunmuyor — bunu native koda inmeden yapmanın bilinen bir
- * yolu yok. Bu yüzden zil BURADA koşulsuz çalınıyor (media stream, ringer'dan bağımsız); yalnız
- * TİTREŞİM garanti (`Vibration.vibrate` ringer modundan bağımsız çalışır, RN çekirdek API'si — bu
- * kısım tam istenen gibi). Yeni native modül bu sprintte YASAK olduğu için düzeltme burada durduruldu.
+ * §9.2.1 🔴 KANIT (sahip cihaz turu 2026-08-07) — sessiz kanal (eski `incoming_call_v2`, `sound:
+ * null` + JS'te `expo-audio` ile döngülü zil) heads-up ÇIKARMIYORDU; aynı arama sırasında `api/`nin
+ * (henüz kurulmamış) `incoming_call_v3` kanalına düşen push ÇIKARDI. Fark eden tek değişken kanalın
+ * GERÇEK sesi. Ölçümün 1. seçeneği izlendi: TEK kanal (`incoming_call_v3`, sunucudaki
+ * `androidChannelId` ile birebir aynı string), kanala GÖMÜLÜ ~30 sn'lik kendi içinde döngülü bir zil
+ * dosyası (`assets/sounds/incoming_call_channel.wav`).
+ *
+ * 🔴 KAYNAK: `assets/sounds/incoming-call.wav` (M4a-2'nin çift-zil ritmi, SİLİNMEDİ — bilerek: bu
+ * dosyanın tek işi bu üretimin kaynağı olmak, kod hiçbir yerden `require` etmiyor). Üretim komutu:
+ * `ffmpeg -stream_loop 9 -i incoming-call.wav -ar 22050 -ac 1 -sample_fmt s16 incoming_call_channel.wav`
+ * — kaynağı 10 kez ardışık dizip (~30 sn) mono/22kHz/16-bit'e indiriyor (aşağıdaki APK boyutu notuna
+ * bkz.). Aynı ton reçetesi, yeni kayıt yok. Kaynak dosya değişirse (ör. zil sesi güncellenirse) aynı
+ * komut yeniden çalıştırılır.
+ * 🔴 Dosya adı ALT ÇİZGİ ile: Android ham kaynak adı `[a-z0-9_]` dışına çıkamıyor, tire (`-`)
+ * `expo prebuild`'i "Resource name is not valid" hatasıyla düşürüyor — ilk denemede öğrenildi.
+ *
+ * 🔴 APK boyutu (PM incelemesi 2026-08-07) — ilk üretim 44.1kHz/mono/16-bit'te 2.6 MB'tı, zil sesi
+ * için gereksiz büyüktü. mono+22kHz+16-bit'e düşürüldü → 1.29 MB (`22050 Hz × 2 byte × 30 sn` —
+ * WAV sıkıştırmasız PCM olduğu için matematik bu, PM'in tahmin ettiği ~300 KB'a bu parametrelerle
+ * ulaşılmıyor; daha küçük istenirse örnekleme hızını daha da düşürmek ya da döngü süresini kısaltmak
+ * gerekir, ikisi de ayrı bir karar — bkz. rapor). Format `.wav` kalmak ZORUNDA: `expo-notifications`
+ * plugin `sounds` dizisi `.wav` bekliyor, `.ogg`'a geçmek doğrulanamayan bir risk (emülatörde format
+ * uyumluluğu test edilemez, yalnız cihazda görülür).
+ *
+ * Ön plan (WS) yolundaki `expo-audio` zili KALDIRILDI (paket de `package.json`'dan çıkarıldı — gerçek
+ * kullanımı kalmadı, M4a-1'in "tek derleme kuralı" gerekçesi artık geçersiz); iki yol da (WS'in yerel
+ * bildirimi + push) artık kanalın sesini kullanıyor — Android bildirim sesini kendi başına
+ * TEKRARLAMAZ, dosyanın ~30 sn uzunluğu döngünün yerini tutuyor (§8.2'nin 30 sn zaman aşımı ve
+ * `api/`nin 30 sn `ttl`siyle örtüşüyor).
+ *
+ * 🟢 M4a-2'nin açık borcu (D40, "cihaz sessizdeyken zil çalmasın") bu değişiklikle KENDİLİĞİNDEN
+ * kapanıyor: Android kanal sesini ringer modundan bağımsız ÇALAMAZ (sistemin kendi davranışı),
+ * uygulamanın ringer modunu SORGULAMASINA gerek kalmadı.
+ *
+ * ⚠️ 🔴 Titreşim BİLEREK iki kaynaktan geliyor, ÇAKIŞMA VAR (PM incelemesi 2026-08-07) — kanal
+ * `enableVibrate: true` + gerçek `vibrationPattern` ile kurulu (M4a-2'de v1 tam tersini yapmıştı:
+ * `enableVibrate: false`, "tek kaynak, çift titreşim yok"; burada o karar BİLEREK TERSİNE ÇEVRİLDİ).
+ * Android bildirim gösterildiğinde kanal titreşimini uygulama ön planda olsun olmasın çalıştırır; JS
+ * de ön planda `Vibration.vibrate` ile ayrıca döngüde titreşiyor (ringer modundan bağımsız çalıştığı
+ * M4a-2'de doğrulandı). Sonuç: ÖN PLANDA bildirim gösterildiği ilk anda kanal titreşimi (tek atış) ile
+ * JS'in döngüsü üst üste biner. Bu ÇAKIŞMA KALDIRILMIYOR çünkü ikisi de gerekli: arka planda/push'ta
+ * JS koşmuyor, kanal titreşimi olmazsa orada HİÇ titreşim olmaz (M4a-3'ün asıl var oluş nedeni).
+ * Alternatif arka planda titreşimsizlik olurdu, o daha kötü. Sahip cihazda ön planda aramanın ilk
+ * saniyesinde garip/çift bir titreşim hissederse bu BİLİNEN ve KABUL EDİLMİŞ bir durumdur, yeni kusur
+ * sanıp tur açmasın.
+ *
+ * ⚠️ Ölçüm 2. adımı (kabul/reddet/iptal ile bildirim kaldırıldığında kanal sesinin gerçekten
+ * KESİLİP kesilmediği) SAHİPTE doğrulanacak — bu dev session'ın cihazı yok (bkz. rapor). Kesilmezse
+ * (Android bazı OEM'lerde bildirim sesini iptalde durdurmayabilir) §9.2.1'in 3. seçeneğine
+ * (`incoming_call_bg_v1`, iki ayrı kanal) düşülür; o zaman bu dosyadaki CHANNEL_ID VE
+ * `api/messages.gateway.ts`'teki `androidChannelId` BİRLİKTE güncellenir.
  */
 
-const VIBRATE_PATTERN = [0, 400, 200, 400, 2000]; // web ringCycle ile aynı ritim (0.4s+0.2s+0.4s+2s=3s)
-const RING_TIMEOUT_MS = 30_000; // §8.2 — 30 sn cevapsız
-
-// 🔴 Kanal kimliği SÜRÜMLÜ. Android bildirim kanalı bir kez kurulduktan sonra ayarları
-// (ses/titreşim/önem) **değiştirilemez**; `setNotificationChannelAsync` aynı kimlikle çağrılınca
-// sessizce hiçbir şey yapmaz. Ayar değişince kimlik de artırılır, yoksa telefonunda eski kanal
-// duran herkes eski davranışı yaşar. (v1: sessiz + titreşimsiz → heads-up çıkmıyordu, bkz. aşağısı.)
-const CHANNEL_ID = 'incoming_call_v2';
+// 🔴 Kanal kimliği SÜRÜMLÜ ve SUNUCUYLA EŞLEŞMEK ZORUNDA (`api/src/modules/messages/gateway/
+// messages.gateway.ts` `androidChannelId: 'incoming_call_v3'`). Android bildirim kanalı bir kez
+// kurulduktan sonra ayarları (ses/titreşim/önem) **değiştirilemez**; `setNotificationChannelAsync`
+// aynı kimlikle çağrılınca sessizce hiçbir şey yapmaz. Ayar değişince kimlik de artırılır — bu yüzden
+// v3'e geçildi (v2: sessiz kanal, heads-up çıkarmıyordu, §9.2.1 KANIT).
+const CHANNEL_ID = 'incoming_call_v3';
+// §9.2.1b — sahip cihaz turunda ayarlarda İKİ ayrı "Gelen arama" kanalı birikmiş görüldü (v1 + v2,
+// aynı adla). Yeni kanal kurulurken eskiler silinir; kullanıcı ayarlarda hangisinin gerçek olduğunu
+// artık ayırt etmek zorunda kalmaz.
+const OLD_CHANNEL_IDS = ['incoming_call', 'incoming_call_v2'];
+const CHANNEL_SOUND_FILE = 'incoming_call_channel.wav'; // app.json expo-notifications plugin `sounds`
 const CATEGORY_ID = 'incoming_call';
 const NOTIFICATION_DATA_TYPE = 'incoming_call';
 
+const VIBRATE_PATTERN = [0, 400, 200, 400, 2000]; // web ringCycle ile aynı ritim (0.4s+0.2s+0.4s+2s=3s)
+const RING_TIMEOUT_MS = 30_000; // §8.2 — 30 sn cevapsız; §9.2.4'te "eski yanıt" eşiği olarak da kullanılır
+
 let setupDone = false;
-let ringPlayer: AudioPlayer | null = null;
 
 interface RingingCall {
   channelId: string;
@@ -52,23 +98,39 @@ interface RingingCall {
 
 let current: RingingCall | null = null;
 
-async function ensureSetup(): Promise<void> {
+/**
+ * §9.2.2 — kanal + kategori kurulumu artık uygulama AÇILIŞINDA bir kez çağrılır (`(app)/_layout.tsx`,
+ * `syncPushToken` ile aynı yer, oturum açıldıktan sonra). Push ile gelen bildirimi SİSTEM gösterir,
+ * JS'e hiç uğramaz: kanal kurulu değilse ses/önem yanlış olur, kategori kurulu değilse Reddet/
+ * Aramaya Katıl düğmeleri HİÇ çıkmaz. `presentIncomingCall` (WS yolu) da kendi güvenliği için çağırır
+ * — idempotent (`setupDone`), mantık kopyalanmıyor, yalnız çağrı noktası eklendi.
+ */
+export async function ensureIncomingCallNotificationsSetup(): Promise<void> {
   if (setupDone) return;
   setupDone = true;
-  // §8.2 — ayrı ve YÜKSEK önemli kanal; M4a-1'in "Sesli arama sürüyor" bildirimi (native
+
+  // §9.2.1b — eski kanallar temizlenir. İdempotent: kanal zaten yoksa `deleteNotificationChannelAsync`
+  // sessizce döner, ama savunmacı try/catch (kurulum akışı bir eski-kanal hatasıyla asla düşmesin).
+  for (const oldChannelId of OLD_CHANNEL_IDS) {
+    try {
+      await Notifications.deleteNotificationChannelAsync(oldChannelId);
+    } catch {
+      // yoksay — zaten yoktu
+    }
+  }
+
+  // §9.2.1 — ayrı ve YÜKSEK önemli kanal; M4a-1'in "Sesli arama sürüyor" bildirimi (native
   // `call-foreground-service` modülü, kendi kanalını Kotlin tarafında kurar) düşük önemli — ikisi
-  // karışmaz, burası tamamen ayrı bir kanal kimliği.
+  // karışmaz, burası tamamen ayrı bir kanal kimliği. Kanalın artık GERÇEK bir sesi var (KANIT'in
+  // gösterdiği tek değişken). `enableVibrate: true` + gerçek `vibrationPattern` BİLEREK: arka
+  // planda/push'ta tek titreşim kaynağı bu; ön planda JS'in `Vibration.vibrate`'iyle KESİŞTİĞİ
+  // (dosya başı yorumu) kabul edilmiş bir çakışma, çözülmüyor.
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: t('mobile.call.incomingNotifChannel'),
     importance: Notifications.AndroidImportance.MAX,
-    sound: null, // §8.3 — kanal sesi YOK; zil `expo-audio` ile döngüde (kanal sesi tek atış)
-    // 🔴 Titreşim kanalda AÇIK ama deseni neredeyse yok (1 ms). Gerçek titreşimi biz yönetiyoruz
-    // (`Vibration.vibrate` döngüde, §8.3). Buradaki tek amaç kanalın "sessiz kanal" sayılmaması:
-    // sesi ve titreşimi kapalı bir kanal, önemi HIGH olsa bile birçok cihazda (özellikle MIUI)
-    // **heads-up olarak ekranın üstünde belirmez**, doğrudan bildirim gölgesine düşer. Sahip tam
-    // bunu bildirdi (2026-08-06): "sadece üstteki bildirim yerinde görünüyor, ekranda belirmiyor".
+    sound: CHANNEL_SOUND_FILE,
     enableVibrate: true,
-    vibrationPattern: [0, 1],
+    vibrationPattern: VIBRATE_PATTERN,
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
   });
   await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
@@ -77,29 +139,16 @@ async function ensureSetup(): Promise<void> {
   ]);
 }
 
-function startRing() {
-  if (!ringPlayer) {
-    ringPlayer = createAudioPlayer(require('../../assets/sounds/incoming-call.wav'));
-    ringPlayer.loop = true;
-  }
-  try {
-    ringPlayer.seekTo(0);
-  } catch {
-    // yoksay — yeniden başta çalmak kozmetik, oynatmayı engellemez
-  }
-  ringPlayer.play();
-  Vibration.vibrate(VIBRATE_PATTERN, true);
-}
-
-function stopRing() {
-  ringPlayer?.pause();
-  Vibration.cancel();
+/** §9.2.5 — bu kanal için ZATEN bir bildirim çalıyor mu? `push.ts`'teki global handler foreground'da
+ *  gelen ikinci kopyayı (WS + push aynı anda) bastırmak için okur. */
+export function isChannelRinging(channelId: string): boolean {
+  return current?.channelId === channelId;
 }
 
 /**
  * `voice.incoming_call` (WS) alınınca çağrılır (`realtime/socket.ts`). Aynı kanal için ikinci bir
- * bildirim/zil AÇILMAZ (M4a-1'in "yeniden giriş" dersi #2 — burada "aynı çağrı için iki bildirim"
- * sınıfı kusur olurdu). Farklı bir kanaldan eş zamanlı ikinci bir arama gelirse öncekinin yerini alır.
+ * bildirim AÇILMAZ (M4a-1'in "yeniden giriş" dersi #2). Farklı bir kanaldan eş zamanlı ikinci bir
+ * arama gelirse öncekinin yerini alır.
  */
 export async function presentIncomingCall(
   channelId: string,
@@ -108,7 +157,7 @@ export async function presentIncomingCall(
   if (current?.channelId === channelId) return; // aynı çağrı — yinelenen event, no-op
   if (current) await dismissIncomingCall(current.channelId);
 
-  await ensureSetup();
+  await ensureIncomingCallNotificationsSetup();
 
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
@@ -116,8 +165,8 @@ export async function presentIncomingCall(
       body: t('mobile.call.incomingBody', { name: caller.username }),
       data: { type: NOTIFICATION_DATA_TYPE, channelId, callerId: caller.id, callerName: caller.username },
       categoryIdentifier: CATEGORY_ID,
-      sound: false, // §8.3 — bildirimin KENDİ sesi de yok, zil expo-audio'dan
-      // Heads-up için kanal önemi tek başına yetmiyor; bildirimin kendi önceliği de en üstte olmalı.
+      // §9.2.1 — `sound` alanı BİLEREK verilmiyor: Android, kanalın kendi gömülü sesini kullanır
+      // (M4a-2'de burada `sound: false` vardı, zil `expo-audio`'dan geliyordu — o yol kaldırıldı).
       priority: Notifications.AndroidNotificationPriority.MAX,
       // Gövdeye dokunma yalnız DM'e götürür (§8.2) — bildirim otomatik SİLİNMEZ, kullanıcı hâlâ
       // Reddet/Aramaya Katıl'a basabilmeli (kabul/reddet/zaman aşımı/iptal `dismissIncomingCall`
@@ -132,7 +181,9 @@ export async function presentIncomingCall(
   }, RING_TIMEOUT_MS);
 
   current = { channelId, notificationId, timeoutTimer };
-  startRing();
+  // §9.2.1 — kanalın kendi sesi zaten çalıyor (bildirim gösterilirken sistem otomatik çalar);
+  // titreşim ayrıca JS'ten (ringer modundan bağımsız çalıştığı M4a-2'de doğrulandı).
+  Vibration.vibrate(VIBRATE_PATTERN, true);
 }
 
 /** Dört bitiş yolunun (kabul · reddet · zaman aşımı · arayan iptal) ORTAK çıkışı. */
@@ -141,7 +192,7 @@ export async function dismissIncomingCall(channelId: string): Promise<void> {
   clearTimeout(current.timeoutTimer);
   const { notificationId } = current;
   current = null;
-  stopRing();
+  Vibration.cancel();
   try {
     await Notifications.dismissNotificationAsync(notificationId);
   } catch {
@@ -150,58 +201,99 @@ export async function dismissIncomingCall(channelId: string): Promise<void> {
 }
 
 /**
+ * §9.2.5 — "arayan iptal ettiyse bildirim kendiliğinden kaybolur" WS yolunda `voice.call_canceled`
+ * ile çalışıyor (`realtime/socket.ts` → `dismissIncomingCall`). Uygulama ARKA PLANDAYKEN iptal olursa
+ * (soket kapalı, JS o event'i hiç görmedi) tray'de asılı bir "Gelen Arama" kalabilir — iptal push'ı
+ * YOK (data-only push Android'de güvenilir değil). Bunun yerine uygulama ön plana her dönüşünde
+ * ARTIK aktif olmayan (bizim `current`'ımızla eşleşmeyen) `incoming_call` bildirimleri temizlenir.
+ * 30 sn'lik `ttl` zaten geç düşen push'ı server tarafında eliyor, bu da kalan asılı kayıtları siler.
+ */
+async function clearStaleIncomingCallNotifications(): Promise<void> {
+  const presented = await Notifications.getPresentedNotificationsAsync();
+  const stale = presented.filter((n) => {
+    const data = n.request.content.data as Record<string, unknown> | undefined;
+    if (data?.type !== NOTIFICATION_DATA_TYPE) return false;
+    return n.request.identifier !== current?.notificationId;
+  });
+  await Promise.all(
+    stale.map((n) =>
+      Notifications.dismissNotificationAsync(n.request.identifier).catch(() => {
+        // yoksay — zaten kullanıcı tarafından temizlenmiş olabilir
+      }),
+    ),
+  );
+}
+
+/**
  * Kök layout'ta BİR KEZ mount edilir (`_layout.tsx`, `usePushNotificationResponder` ile aynı yer).
- * Reddet/Aramaya Katıl eylemleri ve gövde dokunuşu burada çözülür; push yanıt dinleyicisiyle
- * (`notifications/push.ts`) AYNI native event akışını paylaşır ama `data.type` süzgeciyle ayrışır —
- * ikisi de aynı response'u alır, kendi ilgilenmediğini sessizce atlar (çakışma yok).
+ * Reddet/Aramaya Katıl eylemleri ve gövde dokunuşu burada çözülür.
+ *
+ * 🔴 M4a-3 §9.2.3 — soğuk açılış zinciri artık `useGatedNotificationResponder` ile: uygulama ölüyken
+ * "Aramaya Katıl"a basılırsa `getLastNotificationResponse()` navigasyon HAZIR ve auth 'booting'
+ * DEĞİLKEN işlenir (`push.ts`teki KUSUR 1/2 düzeltmesiyle aynı desen, kopya değil — bkz.
+ * `notifications/responseGate.ts`). Oturum kapalıysa (`unauthenticated`) sürpriz atlama yok, gate
+ * kendisi düşürür. Katılmadan önce soket hazır olması `callAccept`/`emitCallSignal`'in zaten
+ * `ensureSocket()` kullanmasıyla garanti (2cdd1d3 dersi, `realtime/socket.ts`).
  */
 export function useIncomingCallResponder(): void {
+  useGatedNotificationResponder((response) => {
+    const data = response.notification.request.content.data as Record<string, unknown>;
+    if (data?.type !== NOTIFICATION_DATA_TYPE) return;
+    const channelId = typeof data.channelId === 'string' ? data.channelId : null;
+    if (!channelId) return;
+    const callerName = typeof data.callerName === 'string' ? data.callerName : '';
+
+    if (response.actionIdentifier === 'reject') {
+      // §9.2.4 🔴 — reddet uygulama ölüyken sinyal GÖNDEREMEZ (yeni JS başlatılmıyor); bu dal yalnız
+      // GEÇ işlenen (soğuk açılış üzerinden gelen) bir reddi görür. Yanıt üzerinden 30 sn'den fazla
+      // geçtiyse "alakasız eski arama reddedildi" sınıfı kusuru önlemek için sinyal DENENMEZ, yalnız
+      // yerel temizlik yapılır (zaten no-op: `current` soğuk açılışta null).
+      const age = Date.now() - response.notification.date;
+      void dismissIncomingCall(channelId);
+      if (age > RING_TIMEOUT_MS) return;
+      callReject(channelId);
+      return;
+    }
+
+    if (response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+      // §8.2 — gövdeye dokunma yalnız DM'e götürür; arama ekranı AÇILMAZ, zil de durmaz
+      // (kullanıcı henüz kabul/reddetmedi).
+      router.push(dmTarget(channelId));
+      return;
+    }
+
+    if (response.actionIdentifier === 'accept') {
+      void dismissIncomingCall(channelId);
+      callAccept(channelId);
+      // §0.1/§8.2 — davet KESİNLİKLE gönderilmez (`invite: false`): arayan zaten odada, biz
+      // yalnız katılıyoruz. Presence store'a hiç bakılmıyor (dev'in DM ekranında olmadığı senaryo).
+      void useVoiceStore
+        .getState()
+        .startOrJoin(channelId, callerName, { invite: false })
+        .then((res) => {
+          if (res.ok) {
+            router.push({ pathname: '/call', params: { channelId } });
+            return;
+          }
+          if (res.reason === 'mic_denied') {
+            Alert.alert(res.message ?? t('common.error'), undefined, [
+              { text: t('common.cancel'), style: 'cancel' },
+              { text: t('mobile.call.micPermissionSettings'), onPress: () => Linking.openSettings() },
+            ]);
+            return;
+          }
+          if (res.message) Alert.alert(res.message);
+        });
+    }
+  });
+
+  // §9.2.5 — asılı bildirim temizliği: her ön plana dönüşte VE mount anında (uygulama az önce
+  // arka plandan/ölüden açıldıysa da aynı temizlik geçerli olsun diye).
   useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as Record<string, unknown>;
-      if (data?.type !== NOTIFICATION_DATA_TYPE) return;
-      const channelId = typeof data.channelId === 'string' ? data.channelId : null;
-      if (!channelId) return;
-      const callerName = typeof data.callerName === 'string' ? data.callerName : '';
-
-      if (response.actionIdentifier === 'reject') {
-        void dismissIncomingCall(channelId);
-        callReject(channelId);
-        return;
-      }
-
-      if (response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
-        // §8.2 — gövdeye dokunma yalnız DM'e götürür; arama ekranı AÇILMAZ, zil de durmaz
-        // (kullanıcı henüz kabul/reddetmedi).
-        router.push(dmTarget(channelId));
-        return;
-      }
-
-      if (response.actionIdentifier === 'accept') {
-        void dismissIncomingCall(channelId);
-        callAccept(channelId);
-        // §0.1/§8.2 — davet KESİNLİKLE gönderilmez (`invite: false`): arayan zaten odada, biz
-        // yalnız katılıyoruz. Presence store'a hiç bakılmıyor (dev'in DM ekranında olmadığı senaryo).
-        void useVoiceStore
-          .getState()
-          .startOrJoin(channelId, callerName, { invite: false })
-          .then((res) => {
-            if (res.ok) {
-              router.push({ pathname: '/call', params: { channelId } });
-              return;
-            }
-            if (res.reason === 'mic_denied') {
-              Alert.alert(res.message ?? t('common.error'), undefined, [
-                { text: t('common.cancel'), style: 'cancel' },
-                { text: t('mobile.call.micPermissionSettings'), onPress: () => Linking.openSettings() },
-              ]);
-              return;
-            }
-            if (res.message) Alert.alert(res.message);
-          });
-      }
+    void clearStaleIncomingCallNotifications();
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') void clearStaleIncomingCallNotifications();
     });
-
     return () => sub.remove();
   }, []);
 }
