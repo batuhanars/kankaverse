@@ -1077,8 +1077,11 @@ describe('MessagesGateway.handleCallInvite (M4a-3 §9.1)', () => {
     expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
   });
 
-  // PM düzeltmesi 2026-08-07 — "susturulmuş" isMuteActive dışında level=NONE'ı da kapsar.
-  it('level=NONE (muted=false) → ne WS ne push, ack yine {ok:true} (nötrlük)', async () => {
+  // 🔴 Sahip kararı 2026-08-07 (ikinci tur) — `level` aramayı SUSTURMAZ, yalnız `muted` susturur.
+  // Ara bir sürümde level=NONE de kesiyordu; gerçek kullanımda ilk denemede geri alındı (sonuç tamamen
+  // sessiz olduğu için sebep ancak DB'ye bakılarak bulunabilmişti). Bu iki test o geri almanın
+  // regresyon koruması: bildirim SEVİYESİ ne olursa olsun arama gider.
+  it('level=NONE (muted=false) → arama GİDER (level aramayı susturmaz)', async () => {
     prismaMock.notificationPref.findUnique.mockResolvedValue({
       muted: false,
       mutedUntil: null,
@@ -1088,8 +1091,8 @@ describe('MessagesGateway.handleCallInvite (M4a-3 §9.1)', () => {
     const res = await gateway.handleCallInvite(socketFor(CALLER_ID), { channelId: CALL_DM_ID });
 
     expect(res).toEqual({ ok: true });
-    expect(emitToUserMock).not.toHaveBeenCalled();
-    expect(pushSendToUsersMock).not.toHaveBeenCalled();
+    expect(emitToUserMock).toHaveBeenCalledTimes(1);
+    expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
   });
 
   it('level=MENTIONS → bu dal MENTIONS\'ı susturmaz, arama normal gider (regresyon)', async () => {
