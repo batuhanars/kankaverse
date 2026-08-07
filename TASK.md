@@ -2853,7 +2853,9 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
 
 ### İç sıralama (PM kararı — faz sırası bozulmadan)
 - [x] **M4a-1** — odaya girme: **başlatma = katılma** (ağır platform işinin tamamı burada) — ✅ CİHAZDA DOĞRULANDI
-- [ ] **M4a-2** — mobilde **gelen** arama, uygulama açıkken
+- [x] **M4a-2** — mobilde **gelen** arama, uygulama açıkken — ✅ CİHAZDA DOĞRULANDI 2026-08-07
+      (tek açık kalem **heads-up** → kök nedeni bulundu, düzeltmesi M4a-3'ün zil kanalı işiyle
+      birleşti; aşağıdaki "sahip turu #2" bölümü)
 - [ ] **M4a-3** — uygulama kapalıyken gelen arama (en riskli parça, bilerek sonda)
 
 ### M4a-1 — Mobil (`mobile/`) — sözleşme §1-§7
@@ -2901,7 +2903,37 @@ göz kararı denetleniyor) · D35'e ek (video açılınca tam ekran oynatıcı b
       cihaz sessizde de KOŞULSUZ çalıyor. Sahibe/PM'e raporlandı, karar bekliyor (native modül mü,
       kabul edilebilir borç mu). Geri-zil üretilmedi (kapsam dışı, doğru).
 
-### M4a-3 — sözleşme §9 (M4a-2 sahip onayından SONRA)
+### Sahip turu #2 (2026-08-07) — M4a-2 geçti, heads-up kök nedeni bulundu
+
+Kabul/reddet, gövdeye dokunma, arayan iptali ve nötr mesaj **çalışıyor**. Açık kalan tek kalem
+bildirimin ekranın üstünde belirmemesiydi (yalnız durum çubuğu ikonu). DND hipotezi elendi: kapalıyken
+de olmuyordu.
+
+🟢 **Kök neden kesinleşti — tahminle değil, kontrollü karşılaştırmayla.** Sahibin ekran görüntüsünde
+aynı telefonda, aynı arama sırasında **iki bildirim yan yana** düştü:
+- bizim `incoming_call_v2` kanalımız (sessiz, `vibrationPattern: [0, 1]`) → **heads-up YOK**
+- `api/` push'ı, `incoming_call_v3` cihazda kurulu olmadığı için varsayılan kanala düşmüş → **heads-up VAR**
+
+Fark eden tek değişken kanalın sesi. **M4a-2'nin 1 ms titreşim numarası Android'i ikna etmiyor**
+(f542190'ın denediği çözüm), kanalın gerçek bir sesi olmak zorunda. Düzeltme M4a-3 §9.2.1'in zaten
+gerektirdiği şey → **üç sorun tek hamlede kapanıyor**: bu heads-up kusuru + [[D40]] (sessiz kipte zil
+çalıyor) + uygulama kapalıyken çalma.
+
+⚠️ **"Arka planda çalışıyordu" gözlemi yanıltıcıydı** — arka planda soket kapalı, JS bildirimi hiç
+üretilmiyor; orada görülen heads-up **push'ın kendisiydi**. İki yolu ayırt etmeden "çalışıyor" demek
+bu turda yanlış sonuca götürecekti.
+
+**İki yan bulgu (ikisi de sözleşmeye alındı):**
+- **Ön planda çift bildirim** — biri butonlu (JS/WS), biri butonsuz (push). `api/` ayağı mobilden
+  önce gittiği için **bugün canlı bir kusur**; §9.2.5 kapatıyor. Fazlar arası sıra bedeli, beklenen
+  ara durum
+- **Ayarlarda iki "Gelen arama" kanalı birikmiş** (v1 + v2, aynı adla) — kullanıcı hangisinin gerçek
+  olduğunu ayırt edemiyor, yanlış olanı kapatabilir → §9.2.1b: yeni kanal kurulurken eskiler silinir
+
+**Açık ürün sorusu (sahibe soruldu, yanıt bekliyor):** Discord'un gelen arama bildiriminde sağda
+arayanın avatarı var, bizde yok. Küçük bir parite kalemi; mobil ayağına eklenir ya da kapsam dışı kalır.
+
+### M4a-3 — sözleşme §9 (M4a-2 sahip onayından SONRA) — 🔵 MOBİL AYAĞI DELEGE EDİLDİ 2026-08-07
 > ✅ **Sözleşme revize edildi 2026-08-07.** §9 baştan yazıldı: sunucu kapsamı üç dosyaya sabitlendi,
 > uygulama ölüyken çalışmayan üç ayak (tetikleyici · zil · kurulum) tabloya döküldü, iki karar
 > gerekçesiyle bağlandı (reddet sinyali gönderilemez · susturulmuş DM sessiz kalır).
