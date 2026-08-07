@@ -8,6 +8,7 @@ import { useUnreadStore } from '@/stores/unread';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { useBackgroundSocket } from '@/realtime/useBackgroundSocket';
 import { syncPushToken } from '@/notifications/push';
+import { ensureIncomingCallNotificationsSetup } from '@/notifications/incomingCall';
 
 // Auth guard — oturum sunucu tarafında düşerse (401 → refresh de başarısız, bkz. stores/auth.ts
 // setSessionExpiredHandler) status 'unauthenticated'a döner; bu grup bunu görüp girişe gönderir.
@@ -43,6 +44,11 @@ export default function AppLayout() {
     // seferlik girişim; hata/izin reddi sessiz (syncPushToken içinde yutuluyor), uygulama akışını
     // bloke etmez. Çıkışta silme `stores/auth.ts` `logout()`'ta (tek çıkış noktası).
     void syncPushToken();
+    // M4a-3 sözleşme §9.2.2 — kanal/kategori kurulumu burada, aynı yerde: push ile gelen gelen-arama
+    // bildirimini SİSTEM gösterir (JS'e uğramaz), kurulum ilk çağrıya kadar ertelenirse (eski
+    // davranış) kanal/kategori henüz yokken düşen push'ta ses yanlış olur, düğmeler hiç çıkmaz.
+    // `ensureIncomingCallNotificationsSetup` idempotent (`setupDone`), tekrar çağrı zararsız.
+    void ensureIncomingCallNotificationsSetup();
     return () => {
       useDmStore.getState().setSessionUser(null);
       useFriendsStore.getState().reset();
