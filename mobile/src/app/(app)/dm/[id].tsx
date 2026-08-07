@@ -246,7 +246,13 @@ export default function DmScreen() {
               accessibilityRole="button"
               accessibilityLabel={t('mobile.call.startAction')}
             >
-              <Ionicons name="call" size={20} color={theme.colors.textSecondary} />
+              {/* Grup DM'de hoparlör, 1-1'de telefon (sahip isteği 2026-08-08): grup sesli bir
+                  ÇAĞRI değil, girilen bir oda — Discord mobil ve bizim web'imiz de öyle ayırıyor. */}
+              <Ionicons
+                name={isDm ? 'call' : 'volume-medium-outline'}
+                size={isDm ? 20 : 22}
+                color={theme.colors.textSecondary}
+              />
             </Pressable>
           ) : undefined
         }

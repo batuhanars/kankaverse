@@ -2,6 +2,7 @@ import { effectScope, watch } from 'vue'
 import { useSocket } from './useSocket'
 import { useCallStore } from '@/stores/call'
 import { useVoiceStore } from '@/stores/voice'
+import { useAuthStore } from '@/stores/auth'
 import { useCallSounds } from '@/composables/useCallSounds'
 
 /**
@@ -84,15 +85,28 @@ export function useCall() {
   }
 
   // 🔴 "Sonradan katılan kimseyi çaldırmaz" kuralı BURADA, tek noktada (PM 2026-08-07).
-  // Önceden bu kontrol çağıranda (`DmConversation.onGroupVoiceClick`) duruyordu ve bugün doğru
-  // çalışıyordu — ama kural çağırana bağlıydı: ikinci bir çağıran eklenip kontrolü unutsaydı
-  // gruptaki HERKES yeniden çalardı ve sebebi bu dosyada görünmezdi. Mobil bunu doğru yerde
-  // yapıyor (`stores/voice.ts` `alreadyOngoing`), web de aynı hizaya alındı.
+  // Önceden çağıranda (`DmConversation.onGroupVoiceClick`) duruyordu ve doğru çalışıyordu, ama
+  // kural çağırana bağlıydı: ikinci bir çağıran kontrolü unutsa gruptaki HERKES yeniden çalardı.
+  // Mobil bunu doğru yerde yapıyor (`stores/voice.ts` `alreadyOngoing`), web de aynı hizada.
+  //
+  // 🔴 ACK KONTROLÜ (sahip bulgusu 2026-08-08): eskiden `groupCallStart`ın dönüşü YOK SAYILIYORDU.
+  // Sunucu `NOT_GROUP`/`FORBIDDEN` dönse bile web sessizce odaya giriyor, karşı taraf çalmıyor ve
+  // kullanıcı hiçbir uyarı görmüyordu — "web'ten çağrı düşmüyor" semptomu tam buydu. Mobil bu
+  // kontrolü baştan yapıyordu (`stores/voice.ts`), web'de eksikti. Hata ayrımı kullanıcıya
+  // AÇIMLANMAZ: 1-1 ile aynı nötr metin (T&S).
   async function startGroupCall(channelId: string) {
     if (voiceStore.isConnectedTo(channelId)) return
-    const alreadyOngoing = voiceStore.participantsFor(channelId).length > 0
-    // Odada biri varsa bu bir KATILMA, yeni bir çağrı değil → sinyal gönderilmez, kimse çalmaz.
-    if (!alreadyOngoing) await groupCallStart(channelId)
+    // Kendimi hariç tut: presence listesi bayat/hayalet bir kendi kaydımı taşırsa `alreadyOngoing`
+    // yanlışlıkla true olur ve çağrı sinyali hiç gitmezdi (aynı sessiz başarısızlık sınıfı).
+    const myId = useAuthStore().user?.id
+    const others = voiceStore.participantsFor(channelId).filter((p) => p.userId !== myId)
+    if (others.length === 0) {
+      const ack = await groupCallStart(channelId)
+      if (!ack.ok) {
+        callStore.setNotice('unreachable') // nötr — sebep sızmaz
+        return
+      }
+    }
     await voiceStore.join(channelId, { autoEndWhenAlone: true }) // REV-12: grup çağrısı
   }
 
