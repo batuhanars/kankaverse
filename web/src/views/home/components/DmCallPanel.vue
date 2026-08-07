@@ -14,6 +14,7 @@ import { useI18n } from 'vue-i18n'
 import { useVoiceStore, type RoomMember, type VoiceTileData, type PendingPeer } from '@/stores/voice'
 import { useCallStore } from '@/stores/call'
 import { useDmStore } from '@/stores/dm'
+import { useAuthStore } from '@/stores/auth'
 import VoiceControlBar from '@/components/shared/VoiceControlBar.vue'
 import VoiceTile from '@/components/shared/VoiceTile.vue'
 
@@ -22,18 +23,38 @@ const { t } = useI18n()
 const voiceStore = useVoiceStore()
 const callStore = useCallStore()
 const dmStore = useDmStore()
+const authStore = useAuthStore()
 
 const connected = computed(() => voiceStore.isConnectedTo(props.channelId))
 const members = computed<RoomMember[]>(() => (connected.value ? voiceStore.roomParticipants : []))
 
-// D39 §5 — bekleyen katılımcı: yalnız 1-1 DM'de, biz çalıyorken (arayan zaten odada) ve karşı
-// taraf henüz katılmadıysa. Grup DM'de tek bir "karşı taraf" yok, kapsam dışı (§9).
-const pendingPeer = computed<PendingPeer | null>(() => {
-  if (!callStore.isRinging(props.channelId)) return null
+// Bekleyen katılımcılar — biz odadayız, onlar henüz katılmadı. İki dal:
+//  - 1-1 DM (D39 §5): yalnız BİZ çalıyorken karşı taraf, "Çalıyor…" etiketiyle. Davranış aynen korundu.
+//  - Grup DM (M4z §E): kanalın odada olmayan TÜM üyeleri, etiketsiz — grupta kimin telefonunun
+//    çaldığını bilmiyoruz, uydurmuyoruz. Kaynak DM store'daki kanal kaydı; yeni uç çağrılmaz.
+// Ortam ses kanalı bu panele hiç düşmez (VoiceRoomView) — guild dalı kapsam dışı (§E.1).
+// 🔴 Sıra kararlı: ada göre (TR), eşitlikte id'ye göre. Biri katılınca kalan kartlar zıplamaz;
+// odadakiler her zaman önce gelir (tiles dizisinde bekleyenler EN SONA eklenir).
+const pendingPeers = computed<Array<{ id: string; peer: PendingPeer }>>(() => {
+  if (!connected.value) return []
   const dm = dmStore.channels.find((c) => c.id === props.channelId)
-  if (!dm || dm.type !== 'DM') return null
-  if (members.value.some((m) => m.userId === dm.otherUser.id)) return null // zaten katıldı
-  return { username: dm.otherUser.username, avatarUrl: dm.otherUser.avatarUrl }
+  if (!dm) return []
+  if (dm.type === 'DM') {
+    if (!callStore.isRinging(props.channelId)) return []
+    if (members.value.some((m) => m.userId === dm.otherUser.id)) return [] // zaten katıldı
+    return [
+      {
+        id: dm.otherUser.id,
+        peer: { username: dm.otherUser.username, avatarUrl: dm.otherUser.avatarUrl, ringing: true },
+      },
+    ]
+  }
+  const meId = authStore.user?.id
+  const inRoom = new Set(members.value.map((m) => m.userId))
+  return dm.members
+    .filter((m) => m.id !== meId && !inRoom.has(m.id))
+    .sort((a, b) => a.username.localeCompare(b.username, 'tr') || a.id.localeCompare(b.id))
+    .map((m) => ({ id: m.id, peer: { username: m.username, avatarUrl: m.avatarUrl, ringing: false } }))
 })
 
 function isSpeaking(m: RoomMember): boolean {
@@ -58,10 +79,12 @@ const tiles = computed<VoiceTileData[]>(() => {
   const avatarTiles: VoiceTileData[] = members.value
     .filter((m) => !withVideo.has(m.userId))
     .map((m) => ({ key: m.userId, kind: 'avatar', member: m }))
-  // D39 §5 — bekleyen katılımcı kutucuğu (soluk avatar + "Çalıyor…")
-  const pendingTiles: VoiceTileData[] = pendingPeer.value
-    ? [{ key: 'pending', kind: 'pending', peer: pendingPeer.value }]
-    : []
+  // Bekleyen katılımcı kutucukları (soluk avatar; 1-1'de ayrıca "Çalıyor…")
+  const pendingTiles: VoiceTileData[] = pendingPeers.value.map((p) => ({
+    key: `pending:${p.id}`,
+    kind: 'pending',
+    peer: p.peer,
+  }))
   return [...videoTiles, ...avatarTiles, ...pendingTiles]
 })
 
@@ -231,8 +254,8 @@ async function toggleFullscreen() {
           <span class="text-[12px] truncate max-w-full text-center" style="color: var(--kv-text-secondary);">
             {{ tile.member?.username ?? tile.peer?.username }}<template v-if="tile.member?.isLocal"> ({{ t('voice.you') }})</template>
           </span>
-          <!-- D39 §5: bekleyen katılımcı — "Çalıyor…" -->
-          <span v-if="tile.kind === 'pending'" class="text-[11px]" style="color: var(--kv-text-muted);">{{ t('call.ringing') }}</span>
+          <!-- D39 §5: bekleyen katılımcı — yalnız 1-1'de "Çalıyor…" (grup üyesinde bu bilgi yok) -->
+          <span v-if="tile.peer?.ringing" class="text-[11px]" style="color: var(--kv-text-muted);">{{ t('call.ringing') }}</span>
         </div>
       </div>
     </div>

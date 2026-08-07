@@ -124,3 +124,53 @@ Sistemde kısa süre iki davranış bulunması kabul edilebilir; o gruplar zaten
 - [ ] **D49:** iki kişi seçip grup kurmaya çalış → **DM açılıyor**, grup oluşmuyor; aynı kişiyle
       tekrar dene → **aynı DM**; üç kişi seç → grup eskisi gibi oluşuyor
 - [ ] Regresyon: 1-1 arama · grup DM araması · ortam ses kanalı · DM listesi göstergesi (mobil)
+
+---
+
+## §E — Grup DM aramasında bekleyen üyeler soluk görünür (sahip isteği 2026-08-08)
+
+Cihaz turu geçti. Tek istek: **grup DM'de sese girdiğinde henüz katılmamış üyelerin kartları da
+görünsün, pasif/soluk olarak.** Hem mobil hem web.
+
+Bu, D39'da web'in 1-1 aramasına konan "bekleyen katılımcı kutucuğu"nun grup karşılığı: kimi
+beklediğin ekranda görünmüyorsa arama boş bir odaya bakmak gibi duruyor.
+
+### §E.1 Kapsam — YALNIZ grup DM
+
+🔴 **Ortam ses kanalında YOK.** Orada "üye" demek sunucudaki herkes demek; katılmamış olanları soluk
+kart yapmak yüzlerce kart üretir. Guild dalı **değişmez**.
+
+1-1 DM'de web'de zaten var (`DmCallPanel` `pendingPeer`), mobilde `didInvite` ile "Çalıyor…" olarak
+karşılanıyor — **ikisi de bozulmayacak**.
+
+### §E.2 Davranış
+
+- Bekleyen küme = **grup kanalının üyeleri** − (odadakiler + kendim).
+  Kaynak: DM store'undaki grup kanalı kaydının `members` dizisi. Yeni uç **çağrılmaz**.
+- Bekleyen kart: avatar + ad, **soluk** (mobil `ParticipantTile` `dimmed`, web `opacity-40` —
+  ikisi de zaten var). Yeni bileşen/tasarım dili **icat edilmez**.
+- Katılınca kart normale döner (artık odadaki listeden gelir), ayrılınca tekrar bekleyene düşer.
+- 🔴 **Sıralama kararlı olmalı:** odadakiler önce, bekleyenler sonda; bekleyenler kendi içinde sabit
+  bir ölçüte göre (ad ya da üye listesi sırası). Biri katılınca **kartlar zıplamamalı**.
+- Bekleyende mikrofon rozeti / konuşma göstergesi **yok** (bilgi yok, uydurma).
+
+### §E.3 Kapsam
+
+| Dosya | İş |
+|---|---|
+| `mobile/src/app/(app)/call.tsx` | grup dalında bekleyen kartlar |
+| `web/src/views/home/components/DmCallPanel.vue` | `pendingPeer` (tekil) → grup için çoğul |
+| `web/src/stores/voice.ts` | gerekiyorsa `PendingPeer` tipinin çoğul kullanımı |
+
+`api/` diffi **SIFIR**. Native diff **yok**.
+
+### §E.4 DoD
+
+**Dev'de:** mobil `typecheck`/`lint`/`expo-doctor` · web `vue-tsc -b` (bilinen **6**) + 🔴 **`vite build`** · `api/` sıfır
+
+**Sahipte:**
+- [ ] Grup DM'de sese gir → katılmamış üyeler **soluk kartlar** olarak görünüyor (mobil + web)
+- [ ] Biri katılınca kartı normale dönüyor, **diğer kartlar zıplamıyor**
+- [ ] Ayrılınca tekrar soluğa düşüyor
+- [ ] 🔴 **REGRESYON:** 1-1 DM araması (web'de bekleyen kutucuk, mobilde "Çalıyor…") aynı ·
+      **ortam ses kanalında bekleyen kart YOK** (orada üye = tüm sunucu)

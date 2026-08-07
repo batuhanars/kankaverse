@@ -10,7 +10,8 @@ interface Props {
    *  ActiveSpeakersChanged mute/unmute döngüsünde kaçıyor — bkz. `stores/voice.ts` `attachSpeaking`). */
   speaking: boolean;
   micOff: boolean;
-  /** §4 — karşı taraf henüz katılmadıysa kutucuk soluk durur. */
+  /** §4 — karşı taraf henüz katılmadıysa kutucuk soluk durur. M4z §E ile grup DM'de odada
+   *  olmayan üyeler için de kullanılır (orada `ringing` verilmez). */
   dimmed?: boolean;
   /** §4 — davet gönderildi, karşı taraf henüz katılmadı: "Çalıyor…" göstergesi. */
   ringing?: boolean;
