@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FlatList, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useMessagesStore } from '@/stores/messages';
+import { isNewDay } from '@/utils/dateSeparator';
 import type { MessageDto } from '@/api/messages';
 
 /**
@@ -14,6 +15,8 @@ import type { MessageDto } from '@/api/messages';
 export interface RenderItem {
   message: MessageDto;
   showAuthor: boolean;
+  /** C11 — bu mesajın ÜSTÜNE tarih ayracı girer mi? (yeni gün burada başlıyor) */
+  isDayStart: boolean;
 }
 
 /** Web `MessageArea.vue` onListScroll ile aynı eşik. Liste `inverted`, yani dip = offset 0. */
@@ -27,16 +30,24 @@ const HIGHLIGHT_MS = 2500;
 /**
  * Ardışık mesajları grupla: aynı yazarın 5 dakika içindeki mesajlarında başlık (avatar + ad + saat)
  * tekrar edilmez. Liste verisinin kendisi olduğu için bu dosyada — ekran yalnız render eder.
+ *
+ * C11 — tarih ayracı burada TÜRETİLİR (mesaja yazılmaz): her hesaplamada komşu karşılaştırması
+ * yapılır, böylece yukarı kaydırıp eski paket başa eklendiğinde eski en-üst ayraç kendiliğinden
+ * doğru yere kayar. Ayrıca ayraç grubu BÖLER (§3): ayraçtan sonraki ilk mesaj aynı yazara ait
+ * olsa bile tam başlıkla çizilir, yoksa ayracın altında sahipsiz bir gövde kalırdı.
+ * Burada yalnız "yeni gün mü" kararı var; ETİKET ("Bugün"/"Dün") render anında hesaplanır.
  */
 function buildRenderItems(messages: MessageDto[]): RenderItem[] {
   const FIVE_MIN = 5 * 60 * 1000;
   return messages.map((message, idx) => {
     const prev = messages[idx - 1];
+    const isDayStart = isNewDay(message.createdAt, prev?.createdAt);
     const showAuthor =
+      isDayStart ||
       !prev ||
       prev.author.id !== message.author.id ||
       new Date(message.createdAt).getTime() - new Date(prev.createdAt).getTime() > FIVE_MIN;
-    return { message, showAuthor };
+    return { message, showAuthor, isDayStart };
   });
 }
 

@@ -17,6 +17,7 @@ import { MessageBubble } from './MessageBubble';
 import { ProfileSheet } from './profile/ProfileSheet';
 import { MessageSearchModal } from './MessageSearchModal';
 import { ComposerHost } from './message/ComposerHost';
+import { DateSeparator } from './message/DateSeparator';
 import { useTypingEmitter } from './message/useTypingEmitter';
 import { useMessageComposer } from './message/useMessageComposer';
 import { useMentionCompose, type MentionCandidate } from './message/useMentionCompose';
@@ -296,17 +297,26 @@ export function MessageScreen({
             list.loadingOlder ? <ActivityIndicator color={theme.colors.textMuted} style={styles.loadMore} /> : null
           }
           renderItem={({ item }) => (
-            <MessageBubble
-              message={item.message}
-              showAuthor={item.showAuthor}
-              isMine={item.message.author.id === authUser?.id}
-              resolveMention={(id) => resolveUsername(channelId, id)}
-              resolveRole={resolveRole}
-              highlighted={item.message.id === list.highlightId}
-              onLongPress={() => actions.open(item.message)}
-              onPressAuthor={() => setProfileTarget(item.message.author)}
-              onToggleReaction={(emoji) => actions.toggleReaction(item.message, emoji)}
-            />
+            // 🔴 C11 — bu sarmalayıcı `View` ŞART, `<>` fragment DEĞİL. `inverted` listede RN
+            // hücre kabını `flexDirection: 'column-reverse'` + `scaleY(-1)` ile kuruyor
+            // (VirtualizedListCellRenderer: `[styles.columnReverse, inversionStyle]`) — bu
+            // yüzden hücrenin DOĞRUDAN çocukları ekranda TERS sırada çizilir; fragment
+            // kullanılsaydı ayraç mesajın ALTINDA görünürdü. Araya bir View girince iç düzen
+            // normal sütun olur ve iki çevirme sadeleşir: ayraç mesajın üstünde.
+            <View>
+              {item.isDayStart && <DateSeparator iso={item.message.createdAt} />}
+              <MessageBubble
+                message={item.message}
+                showAuthor={item.showAuthor}
+                isMine={item.message.author.id === authUser?.id}
+                resolveMention={(id) => resolveUsername(channelId, id)}
+                resolveRole={resolveRole}
+                highlighted={item.message.id === list.highlightId}
+                onLongPress={() => actions.open(item.message)}
+                onPressAuthor={() => setProfileTarget(item.message.author)}
+                onToggleReaction={(emoji) => actions.toggleReaction(item.message, emoji)}
+              />
+            </View>
           )}
         />
       )}

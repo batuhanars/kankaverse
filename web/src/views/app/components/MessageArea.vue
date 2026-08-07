@@ -14,8 +14,10 @@ import { useJumpToMessage } from '@/composables/useMessageJump'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { messagesApi } from '@/api/messages'
 import MessageItem from '@/components/shared/MessageItem.vue'
+import DateDivider from '@/components/shared/DateDivider.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
+import { isNewDay, dayDividerLabel } from '@/utils/dateSeparator'
 import type { MessageDto } from '@/types'
 
 const { t } = useI18n()
@@ -72,14 +74,28 @@ const messages = computed(() =>
 
 // Gruplama: mesaj grup başı mı?
 // Kural: ilk mesaj VEYA önceki yazarı farklı VEYA öncekinden > 7 dakika geçmişse → grup başı.
+// C11 §3: tarih ayracı grubu BÖLER — ayraçtan sonraki ilk mesaj aynı yazara ait olsa bile tam
+// başlıkla (avatar + ad) çizilir, yoksa ayracın altında sahipsiz bir gövde kalırdı.
 function isGroupStart(index: number): boolean {
   if (index === 0) return true
   const cur = messages.value[index]
   const prev = messages.value[index - 1]
+  if (isNewDay(cur.createdAt, prev.createdAt)) return true
   if (cur.author.id !== prev.author.id) return true
   const diffMs = new Date(cur.createdAt).getTime() - new Date(prev.createdAt).getTime()
   return diffMs > 7 * 60 * 1000
 }
+
+// C11 — tarih ayraçları listeden TÜRETİLİR (diziye gömülmez): her hesaplamada komşu
+// karşılaştırması yapılır, böylece yukarı kaydırıp eski paket başa eklendiğinde eski en-üst
+// ayraç kendiliğinden doğru yere kayar. `null` = o mesajın üstünde ayraç yok.
+const dayLabels = computed<(string | null)[]>(() =>
+  messages.value.map((msg, index) =>
+    isNewDay(msg.createdAt, messages.value[index - 1]?.createdAt)
+      ? dayDividerLabel(msg.createdAt, t)
+      : null,
+  ),
+)
 const hasMore = computed(() =>
   channelId.value ? (messagesStore.hasMoreByChannel[channelId.value] ?? false) : false,
 )
@@ -407,17 +423,19 @@ function resetComposerHeight() {
           {{ t('message.noMessages') }}
         </p>
 
-        <MessageItem
-          v-for="(msg, index) in messages"
-          :key="msg.id"
-          :message="msg"
-          :is-group-start="isGroupStart(index)"
-          :guild-members="guildMembers"
-          :can-pin="canPin"
-          :can-manage-messages="canManageMessages"
-          :guild-id="guildsStore.activeGuildId ?? undefined"
-          @reply="setReplyingTo"
-        />
+        <template v-for="(msg, index) in messages" :key="msg.id">
+          <!-- C11: gün değişiminde ayraç (Bugün · Dün · 25 Ekim 2026) -->
+          <DateDivider v-if="dayLabels[index]" :label="dayLabels[index] || ''" />
+          <MessageItem
+            :message="msg"
+            :is-group-start="isGroupStart(index)"
+            :guild-members="guildMembers"
+            :can-pin="canPin"
+            :can-manage-messages="canManageMessages"
+            :guild-id="guildsStore.activeGuildId ?? undefined"
+            @reply="setReplyingTo"
+          />
+        </template>
       </template>
     </div>
 
