@@ -3271,3 +3271,36 @@ kendine susar" — cihazda ortada olmayan bir çağrı yarım dakika çalıyor) 
 sesli aramada bakılan tek şeyi zorlaştırıyordu). Üçü de kağıt üstünde savunulabilirdi.
 **Sonuç:** PM'in kapsam kısıtları bir tasarım kararı değil, **doğrulanmamış bir varsayımdır**;
 sahip turundan geçmeden "kabul edildi" sayılmaz.
+
+---
+
+## Sprint C11 — Mesaj Listesinde Tarih Ayracı — 2026-08-08 ✅ KOD BİTTİ
+
+> Sözleşme: `contracts/SPRINT_C11_TARIH_AYRACI_CONTRACT.md`. Tier `web/` + `mobile/`, `api/` sıfır.
+
+- [x] **Bugün** · **Dün** · **25 Ekim 2026** — altı yüzey (kanal · 1-1 DM · grup DM × iki istemci),
+      **üç** bağlama noktasıyla karşılandı (web'de DM bileşeni 1-1 ve grubu birlikte çiziyor)
+- [x] Gün kimliği **yerel gün başlangıcı damgası**; saat farkı hiç kullanılmadı (23.50'de atılan
+      mesaj 00.10'da "bugün" sayılırdı)
+- [x] Etiket render anında hesaplanıyor, mesaja iliştirilmiyor. Gece yarısı kayması için **tek**
+      dakikalık zamanlayıcı, yalnız gün değişince yazıyor; mobilde son abone gidince duruyor
+- [x] Ayraçlar listeden **türetiliyor**, diziye gömülmüyor → sonsuz kaydırmada yerleri kendiliğinden
+      düzeliyor
+- [x] 🔴 **RN tuzağı yakalandı:** `inverted` FlatList hücre kabını `column-reverse` + `scaleY(-1)`
+      ile kuruyor, yani hücrenin doğrudan çocukları ekranda **ters** çiziliyor. Fragment
+      kullanılsaydı ayraç mesajın **altında** görünürdü. Sarmalayıcı `View` konuldu, gerekçesi
+      yorumda (ileride "gereksiz View" diye kaldırılmasın)
+- [x] Gruplama iki istemcide de vardı; "yeni gün = grup başı" kuralı eklendi → ayraçtan sonraki ilk
+      mesaj aynı yazara ait olsa bile tam başlıkla çiziliyor. Saat gösterimi değişmedi
+- [x] `vue-tsc` bilinen 6 · `vite build` başarılı · mobil temiz · `api/` sıfır · native diff yok
+
+### Dev bulgusu → [[D50]]
+Web'de eski mesaj yüklerken ekran zıplıyor ve son mesaj çağırana aitse liste dibe atılıyor.
+**C11 ile gelmedi, önceden vardı**; mobilde korumalar var, webde yok. Dev kapsam dışı olduğu için
+dokunmadı (doğru davranış).
+
+### DoD (cihaz/tarayıcı — SAHİPTE)
+- [ ] Kanal · 1-1 DM · grup DM'de gün geçişleri doğru (web + mobil)
+- [ ] Yukarı kaydırıp eski paket yükle: ayraçlar doğru yerde
+- [ ] Ayraçtan sonraki ilk mesaj avatar + ad ile çiziliyor
+- [ ] Gece yarısını geçirip ekranı açık bırak: **Bugün → Dün** kayıyor
