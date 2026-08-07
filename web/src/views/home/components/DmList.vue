@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDmStore } from '@/stores/dm'
@@ -8,6 +8,8 @@ import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { usePresenceStore } from '@/stores/presence'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
+import { useVoiceStore } from '@/stores/voice'
+import { voiceSubscribe, voiceUnsubscribe } from '@/composables/useSocket'
 import { useTyping } from '@/composables/useTyping'
 import { useResponsive } from '@/composables/useResponsive'
 import { useDmMenuActions } from '@/composables/useDmMenuActions'
@@ -33,6 +35,7 @@ const prefsStore = useNotificationPrefsStore()
 const presenceStore = usePresenceStore()
 const authStore = useAuthStore()
 const toast = useToastStore()
+const voiceStore = useVoiceStore()
 const { isMobile } = useResponsive()
 const { typingUsersForChannel } = useTyping(() => null)
 
@@ -44,6 +47,57 @@ const visibleChannels = computed(() =>
 
 function truncate(text: string, max = 40) {
   return text.length > max ? text.slice(0, max) + '…' : text
+}
+
+// ── D47 — grup DM satırında ses göstergesi ───────────────────────────────────
+// **Yalnız grup DM.** 1-1 DM'de "seste" zaten arama demek; o akış çalma sesi + `DmCallPanel` ile
+// karşılanıyor, ikinci bir yüzey gürültü olur.
+//
+// Abonelik burada (liste) yönetilir, çizim aşağıda satırda — `VoiceParticipantList`in kanal
+// panelindeki ayrımının aynısı. Açık grup DM'e `DmConversation` da abone olduğu için
+// `voiceSubscribe` referans sayılıdır (bkz. `useSocket.ts`); ikisi aynı kanalı çakışmadan izler.
+//
+// Bağımlılık kanal DİZİSİ değil, grup DM kimliklerinin sıralanmış anahtarı: `dmStore.channels`
+// her yeni mesajda (sıralama/önizleme) yeni referans alır, ham diziye baksaydık her mesajda
+// abonelik sökülüp yeniden kurulurdu.
+const groupDmIdsKey = computed(() =>
+  visibleChannels.value
+    .filter((ch) => ch.type === 'GROUP_DM')
+    .map((ch) => ch.id)
+    .sort()
+    .join(','),
+)
+
+let subscribedVoiceIds: string[] = []
+
+watch(
+  groupDmIdsKey,
+  (key) => {
+    const next = key ? key.split(',') : []
+    const prev = subscribedVoiceIds
+    // Önce yeniye abone ol, sonra eskiyi bırak: iki kümede de olan kanalın sayacı sıfıra düşmez,
+    // gereksiz unsubscribe/subscribe turu (ve o turda kaybolan gösterge) olmaz.
+    for (const id of next) voiceSubscribe(id)
+    for (const id of prev) voiceUnsubscribe(id)
+    subscribedVoiceIds = next
+    // Abonelik yalnız BUNDAN SONRAKİ olayları taşır; hâlihazırda seste olanlar için anlık görüntü
+    // gerekli (`VoiceParticipantList`in mount deseniyle aynı). Yalnız yeni gelen kanallar için.
+    const prevSet = new Set(prev)
+    for (const id of next) {
+      if (!prevSet.has(id)) void voiceStore.loadParticipants(id)
+    }
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  for (const id of subscribedVoiceIds) voiceUnsubscribe(id)
+  subscribedVoiceIds = []
+})
+
+/** Seste kaç kişi var — grup DM dışında her zaman 0 (gösterge çizilmez). */
+function voiceCount(ch: DmChannelDto): number {
+  return ch.type === 'GROUP_DM' ? voiceStore.participantsFor(ch.id).length : 0
 }
 
 /**
@@ -385,6 +439,23 @@ async function confirmLeaveGroup() {
             {{ formatLastMessage(ch, ch.lastMessage.content) }}
           </p>
         </div>
+
+        <!-- D47 — grup DM'de ses göstergesi. Seste kimse yoksa HİÇBİR ŞEY çizilmez (boş rozet yok),
+             1-1 DM'de hiç çizilmez (`voiceCount` orada zaten 0). Görsel dil kanal panelindeki ses
+             sayacı hapı: yuvarlak hap + `tabular-nums`; rengi aksan, çünkü satır etkinken arka plan
+             `--kv-bg-elevated` oluyor ve o tonda hap kaybolurdu. -->
+        <span
+          v-if="voiceCount(ch) > 0"
+          class="shrink-0 flex items-center gap-1 text-[11px] font-semibold px-1.5 rounded-full"
+          style="background-color: var(--kv-accent-subtle); color: var(--kv-accent-500); line-height: 1.5; font-variant-numeric: tabular-nums;"
+          :title="t('dm.voiceActive', { n: voiceCount(ch) })"
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          </svg>
+          {{ voiceCount(ch) }}
+        </span>
       </button>
 
       <!-- ⋯ menü butonu. Dokunmatikte hover yok → <768'de kalıcı görünür (sözleşme §5).

@@ -1162,7 +1162,8 @@
     "mute": "Konuşmayı Sustur",
     "unmute": "Susturmayı Kaldır",
     "menuTitle": "Sohbet menüsü",
-    "profilePanel": "Profil"
+    "profilePanel": "Profil",
+    "voiceActive": "Seste {n} kişi var"
   },
   "group": {
     "createButton": "Grup Oluştur",

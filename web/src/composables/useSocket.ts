@@ -34,19 +34,30 @@ let socket: Socket | null = null
 let refCount = 0
 // Reconnect sonrası yeniden join için aktif kanalı modül seviyesinde sakla
 let activeChannelId: string | null = null
-// Ses presence abonelikleri (sidebar "kim var" canlı) — reconnect'te yeniden abone
-const voiceSubscriptions = new Set<string>()
+// Ses presence abonelikleri (sidebar "kim var" canlı) — reconnect'te yeniden abone.
+// **Referans sayılı** (kanal → izleyen tüketici sayısı), D47/mobil [[D45]] ile aynı sınıf düzeltme:
+// aynı kanalı birden çok tüketici izleyebiliyor (açık grup DM'de `DmConversation` + DM listesindeki
+// `DmList` ses göstergesi). Düz bir Set'te ilk unmount `voice:unsubscribe` gönderiyordu ve hâlâ
+// izleyen öbür tüketici sessizce kör kalıyordu — "seste biri var ama listede görünmüyor".
+const voiceSubscriptions = new Map<string, number>()
 
-// Ses presence aboneliği — VoiceParticipantList mount'ta abone, unmount'ta bırakır.
+// Ses presence aboneliği — tüketici mount'ta abone olur, unmount'ta bırakır.
 // Modül-seviyesi (useSocket'in ağır store kurulumu olmadan doğrudan import edilir).
-// Set reconnect'te yeniden aboneyi sağlar (bkz. connect handler). İdempotent.
+// Map reconnect'te yeniden aboneyi de sağlar (bkz. connect handler).
 export function voiceSubscribe(channelId: string) {
-  if (voiceSubscriptions.has(channelId)) return
-  voiceSubscriptions.add(channelId)
-  socket?.emit('voice:subscribe', { channelId })
+  const count = (voiceSubscriptions.get(channelId) ?? 0) + 1
+  voiceSubscriptions.set(channelId, count)
+  // Sunucuya yalnız GERÇEK ilk abonede (0 → 1) gider; sonrakiler sayacı artırır.
+  if (count === 1) socket?.emit('voice:subscribe', { channelId })
 }
 export function voiceUnsubscribe(channelId: string) {
-  if (!voiceSubscriptions.has(channelId)) return
+  const count = voiceSubscriptions.get(channelId)
+  if (count === undefined) return
+  if (count > 1) {
+    voiceSubscriptions.set(channelId, count - 1)
+    return
+  }
+  // GERÇEK son tüketici çıktı (1 → 0) → aboneliği bırak.
   voiceSubscriptions.delete(channelId)
   socket?.emit('voice:unsubscribe', { channelId })
 }
@@ -114,7 +125,7 @@ export function useSocket() {
         _joinRoom(activeChannelId)
       }
       // Reconnect: ses presence aboneliklerini yeniden kur (sidebar canlı kalsın)
-      for (const channelId of voiceSubscriptions) {
+      for (const channelId of voiceSubscriptions.keys()) {
         socket?.emit('voice:subscribe', { channelId })
       }
       // Reconnect sonrası sunucu bellek-içi presence'ı sıfırladı (online döner).
