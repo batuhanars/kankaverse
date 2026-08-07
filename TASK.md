@@ -3208,24 +3208,33 @@ düğmesi no-op'a düşer (`isConnectedTo` false) · karşı tarafa `call_cancel
 > eklenmedi:** [[D43]] (push eylem düğmeleri) bilerek dışarıda — çalışan bir yolu riske atıyor ve
 > karışık turda teşhis zorlaşır (bugün M4a-3'te tam bu yaşandı).
 
-### Mobil (`mobile/`)
-- [ ] Grup DM **kendi sinyalini** kullanıyor: `voice:group_call_start`. 🔴 DM'in `call_invite`i
-      grup kanalda `NOT_DM` döner — düğme açılıp o yol kullanılsaydı kullanıcı sebepsiz
-      "ulaşılamıyor" görürdü
-- [ ] 🔴 Grup DM'de **kimse çalmıyor**: `voice.group_call_started` yalnız bilgilendirme, zil/bildirim
-      yok. Bilinçli kısıt — üç kişilik grupta her katılan herkesi çaldırsaydı üç kez çalardı
-- [ ] Yalnız-kalma zaman aşımı grup DM'de **AÇIK** (ortam kanalında kapalıydı). Gerekçe: grup DM bir
-      **çağrı**, ortam kanalı bir **mekân**. M4c'nin `!isGuild` hesabı bunu zaten doğru veriyor
-- [ ] Telefon düğmesi + "sese katıl" şeridi grup DM'de görünüyor (bugün `isDm` ile kapalı)
-- [ ] Arama ekranı M4c'nin ızgarası, yeni ekran yok. Sohbet düğmesi grup DM'de **var**
-      (ortam kanalında yoktu — grup DM'in metin akışı var)
-- [ ] **D44:** ses dosyası tepe ~-1 dB'ye normalize edildi (bugün -14.9 dB, tam ölçeğin ~%18'i).
-      Süre/format/kanal/örnekleme değişmiyor, yalnız kazanç. Kanal kimliği `incoming_call_v3`
-      **değişmiyor** (değişirse sunucudaki `androidChannelId` ile ayrışır)
-- [ ] Yerelde derlendi + emülatörde açıldı (native diff var)
+### Mobil (`mobile/`) — ✅ KOD BİTTİ, 🔴 EAS BUILD + CİHAZ TURU SAHİPTE
+- [x] Grup DM **kendi sinyalini** kullanıyor: `voice:group_call_start`
+- [x] 🔴 Grup DM'de **kimse çalmıyor** — dahası **uygulama içi bildirim de yok** (PM kararı).
+      Dev `Alert.alert` ile bilgilendirme koymuştu; `Alert` **modal** bir diyalog, kullanıcı yazı
+      yazarken ekranı keser ve dokunmadan kapanmaz — "hafif bilgilendirme" değil. Web'deki karşılığı
+      kendiliğinden kaybolan pasif bir şerit. Yanlış ağırlıkta bildirim koymaktansa hiç koymadık;
+      kullanıcı DM'i açınca şeridi zaten görüyor. Ölü i18n anahtarı da temizlendi
+- [x] Yalnız-kalma zaman aşımı grup DM'de **AÇIK**. M4c'nin `!isGuild` hesabı zaten doğru veriyordu,
+      **yeni koşul eklenmedi** (sözleşme §3 bunu şart koşmuştu, dev doğruladı)
+- [x] Üç dal ayrıldı (`dm`/`group`/`guild`): `isGroup` **ayrı bayrak**, `isGuild`e dokunulmadı →
+      DM ve ortam kanalı kod yolları değişmedi
+- [x] `didInvite` grupta koşulsuz `false`; başarısız katılmada `callCancel` **gönderilmiyor**
+      (sunucudaki `otherDmMember` grup kanalında rastgele tek bir üyeye giderdi — dev'in yakalaması)
+- [x] Telefon düğmesi + "sese katıl" şeridi grup DM'de açıldı; arama ekranı M4c'nin ızgarası
+- [x] **D44:** ses tepe **-14.9 → -1.0 dB**, ortalama -28.4 → -14.5. Süre/format/kanal/örnekleme ve
+      boyut aynen korundu, yalnız kazanç. 🟢 **Native `res/raw` kopyasında da doğrulandı** — prebuild
+      dosyayı aldı, yani APK'ya girecek olan normalize edilmiş hali
+- [x] `typecheck` · `lint` · `api`+`web` diffi sıfır (`tr.json` hariç)
+
+> ⚠️ **Emülatör açılış doğrulaması YAPILAMADI.** Dev üç kez emülatör boot beklerken takıldı, ortam
+> yanıt vermedi. PM kod incelemesiyle ve **native `res/raw` dosyasını ölçerek** doğruladı; uygulamanın
+> emülatörde açılışı görülmedi. Bu turda native diff yalnız bir **ses varlığı** (kod yok), yani
+> M4a-1'deki "derleme geçti ama açılmadı" sınıfı risk düşük — ama sıfır değil, sahip build alırken
+> ilk açılışa dikkat etsin.
 
 ### DoD (cihazda — SAHİPTE)
 > Tam liste sözleşme §10'da. Dört kritik madde:
-> **(1) zil sesi DUYULUYOR**, **(2) telefon sessizdeyken çalmıyor** ([[D40]] kapanır),
-> **(3) grup DM'de kimse katılmazsa arama 3 dakikada düşüyor** (ortam kanalından farkı),
+> **(1) zil sesi DUYULUYOR** (D44'ün asıl testi), **(2) telefon sessizdeyken çalmıyor** → [[D40]]
+> kapanır, **(3) grup DM'de kimse katılmazsa arama 3 dakikada düşüyor** (ortam kanalından farkı),
 > **(4) 1-1 DM ve ortam kanalı REGRESYONSUZ**.
