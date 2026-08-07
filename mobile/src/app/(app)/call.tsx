@@ -327,7 +327,12 @@ export default function CallScreen() {
             speaking={peerMember ? speakingUserIds.has(peerMember.userId) : false}
             micOff={peerMember ? mutedUserIds.has(peerMember.userId) : false}
             dimmed={alone}
-            ringing={alone && didInvite}
+            /* 🔴 M4z §F — `didInvite` artık grupta da true olabiliyor ("başlatan benim" bilgisi
+               iptal için gerekiyordu). "Çalıyor…" göstergesi YALNIZ 1-1'e ait: kapı burada.
+               Bu dal zaten `isGridCall === false` (yani `callKind === 'dm'`) iken çiziliyor;
+               koşul yine de AÇIKÇA yazılıyor — düzen seçimi ileride değişirse gösterge sessizce
+               grupta belirmesin. */
+            ringing={alone && didInvite && callKind === 'dm'}
           />
           {alone && (
             <View style={styles.aloneNotice}>

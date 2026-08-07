@@ -20,15 +20,24 @@ export interface IncomingCall {
  * Sözleşme: contracts/SPRINT_V2_DM_CALL_CONTRACT.md.
  */
 export const useCallStore = defineStore('call', () => {
-  // Giden çağrı: biz arıyoruz, karşı taraf çalıyor (ringing)
-  const outgoing = ref<{ channelId: string } | null>(null)
+  /**
+   * Giden çağrı: biz arıyoruz, karşı taraf çalıyor (ringing).
+   *
+   * 🔴 M4z §F — `kind` eklendi: mobildeki `didInvite` + `callKind` ikilisinin web karşılığı.
+   * "Bu çağrıyı BEN başlattım" bilgisi olmadan çıkışta iptal sinyali gönderilemiyordu (arayan
+   * kapatınca karşı taraflarda zil 30 sn çalmaya devam ediyordu). `'group'` yalnız BAŞLATANDA
+   * dolar; sonradan katılanda `setOutgoing` hiç çağrılmaz (bkz. composables/useCall.ts).
+   * GÖSTERİM tarafı (`useCall` geri-zili) `kind === 'dm'` ile kapılı — grupta "Çalıyor…"/geri-zil
+   * ÇIKMAZ, bayrak yalnız iptal için taşınıyor.
+   */
+  const outgoing = ref<{ channelId: string; kind: 'dm' | 'group' } | null>(null)
   // Gelen çağrı: bizi arıyorlar
   const incoming = ref<IncomingCall | null>(null)
   // Nötr bilgi (ulaşılamadı / reddedildi) — engellenme/ilişki sızdırmaz
   const notice = ref<string>('')
 
-  function setOutgoing(channelId: string) {
-    outgoing.value = { channelId }
+  function setOutgoing(channelId: string, kind: 'dm' | 'group' = 'dm') {
+    outgoing.value = { channelId, kind }
   }
   function clearOutgoing() {
     outgoing.value = null

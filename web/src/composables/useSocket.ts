@@ -71,7 +71,12 @@ let authRetryCount = 0
 // D39 §2/§11 — voice store'un leave()'i hâlâ "çalıyor" durumundayken çağrılırsa (iptal/"Bağlantıyı
 // Kes"/sekme kapama) buradan call_cancel emit edilir. Modül seviyesi: voiceSubscribe/voiceBroadcast
 // ile aynı desen, döngüsel import'tan kaçınır (voice.ts bu dosyayı DEĞİL, tersini import eder zaten).
-setLeaveWhileRingingHandler((channelId) => socket?.emit('voice:call_cancel', { channelId }))
+// 🔴 M4z §F — grup dalı: `voice:call_cancel` grupta KULLANILAMAZ (sunucuda `otherDmMember` tek
+// bir "karşı taraf" bulur, grup kanalında rastgele bir üyeye giderdi). Grubun kendi event'i
+// sunucuda `voice:group_call_start` ile AYNI kapılardan geçer.
+setLeaveWhileRingingHandler((channelId, kind) =>
+  socket?.emit(kind === 'group' ? 'voice:group_call_cancel' : 'voice:call_cancel', { channelId }),
+)
 
 export function useSocket() {
   const connected = ref(false)
@@ -493,6 +498,14 @@ export function useSocket() {
         })
       },
     )
+    // 🔴 M4z §F — grup çağrısını BAŞLATAN odadan çıktı: modal ve zil ANINDA kapansın (eskiden
+    // 30 sn'lik zaman aşımına kadar ortada olmayan bir çağrı çalıyordu). 1-1'in
+    // `voice.call_canceled` dalıyla simetrik, aynı ortak çıkış. Zaten ODAYA KATILMIŞ olan
+    // etkilenmez: `clearIncoming` yalnız çalma durumunu temizler, LiveKit bağlantısına dokunmaz
+    // (odadakinin `incoming`ı zaten `acceptCall`da boşaltılmıştı).
+    socket.on('voice.group_call_canceled', () => {
+      callStore.clearIncoming()
+    })
 
     // Typing emit fonksiyonlarını useTyping composable'ına bağla
     _bindTypingEmitters(
