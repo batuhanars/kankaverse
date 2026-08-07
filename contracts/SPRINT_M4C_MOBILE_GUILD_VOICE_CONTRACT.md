@@ -21,7 +21,7 @@ yönlendirme (hoparlör/kulaklık/Bluetooth), GSM kesintisi, mini pencere, arka 
 ekliyor.
 
 **Bugün mobilde ne var:** hiçbir şey. Kanal listesi ses kanallarını **süzüyor**
-(`(tabs)/home.tsx:165` ve `:178` → `list.filter((c) => c.type === ChannelType.GUILD_TEXT)`),
+(render süzgeci `components/home/ChannelSidebar.tsx`de),
 kanal oluşturma ekranında tür seçici **bilinçli olarak yok** (`channel-new.tsx:23`), API katmanı
 create'te `type` **göndermiyor** (`api/channels.ts:47`). Yani kullanıcı mobilden bir ortamın ses
 kanalına ne girebiliyor, ne görebiliyor, ne de oluşturabiliyor.
@@ -43,6 +43,13 @@ kanalına ne girebiliyor, ne görebiliyor, ne de oluşturabiliyor.
 | `web/src/i18n/tr.json` | yeni `mobile.voice.*` anahtarları (§9) |
 
 Listede olmayan dosyaya ihtiyaç → **DUR ve bildir.**
+
+> 🔴 **PM atıf hatası düzeltildi (dev bulgusu 2026-08-07):** §0 önce süzgeci `home.tsx:165/178`
+> diye gösteriyordu — **yanlıştı**. O satırlar `markRead` süzgeçleridir ve `GUILD_TEXT`te kalmaları
+> **doğrudur** (ses kanalının okunmamışı yok). Gerçek render süzgeci `ChannelSidebar.tsx`teydi. Dev
+> yanlış satırı değiştirmedi, doğru yeri buldu ve bildirdi. Sözleşmedeki satır atıfları **kanıt değil
+> işaret**: dev her zaman kendi okumasıyla doğrular.
+
 
 ---
 
