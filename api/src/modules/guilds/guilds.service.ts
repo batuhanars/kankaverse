@@ -1093,7 +1093,6 @@ export class GuildsService {
 
     // Etki: caller'ın aktif (süresiz/süresi dolmamış, maxUses dolmamış) davet kodunu
     // yeniden kullan; yoksa caller adına yeni süresiz kod üret (kod spam'ini önler).
-    const now = new Date();
     const reusable = await this.prisma.invite.findFirst({
       where: {
         guildId,

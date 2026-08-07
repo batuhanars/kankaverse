@@ -1,6 +1,7 @@
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { createClient } from 'redis';
+import { Server, ServerOptions } from 'socket.io';
 
 export class RedisIoAdapter extends IoAdapter {
   private adapterConstructor: ReturnType<typeof createAdapter>;
@@ -23,16 +24,17 @@ export class RedisIoAdapter extends IoAdapter {
     this.adapterConstructor = createAdapter(pubClient, subClient);
   }
 
-  createIOServer(port: number, options?: any): any {
+  createIOServer(port: number, options?: Partial<ServerOptions>): Server {
     // CORS: origin config'ten gelir; credentials true (httpOnly cookie auth)
-    const serverOptions = {
+    const serverOptions: Partial<ServerOptions> = {
       ...options,
       cors: {
         origin: this.allowedOrigin,
         credentials: true,
       },
     };
-    const server = super.createIOServer(port, serverOptions);
+    // Nest'in IoAdapter.createIOServer imzası `any` döner (üçüncü parti tip) — Server'a assert ediyoruz.
+    const server = super.createIOServer(port, serverOptions) as Server;
     server.adapter(this.adapterConstructor);
     return server;
   }

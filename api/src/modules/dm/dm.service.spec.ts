@@ -61,7 +61,6 @@ const MEMBER_A = 'member-a';
 const MEMBER_B = 'member-b';
 const GROUP_ID = 'group-ch-1';
 
-const ADULT_CREATOR = { id: CREATOR_ID, isMinor: false, username: 'creator', avatarUrl: null };
 const ADULT_MEMBER_A = { id: MEMBER_A, isMinor: false, username: 'memberA', avatarUrl: null };
 const ADULT_MEMBER_B = { id: MEMBER_B, isMinor: false, username: 'memberB', avatarUrl: null };
 
@@ -138,7 +137,9 @@ describe('DmService.createGroupDm — T&S kapı sırası', () => {
 
     try {
       await service.createGroupDm(CREATOR_ID, { memberIds: [MEMBER_A] });
-    } catch {}
+    } catch {
+      // beklenen — minör guard fırlatıyor, burada yalnız yan-etkiyi (findMany çağrılmadı) doğruluyoruz
+    }
 
     // user.findMany (members sorgusu) çağrılmamalı
     expect(prismaMock.user.findMany).not.toHaveBeenCalled();
@@ -372,7 +373,6 @@ describe('DmService.removeGroupMember', () => {
   let service: DmService;
 
   const TARGET_ID = 'target-user-1';
-  const TARGET_MEMBER = { id: TARGET_ID, isMinor: false, username: 'target', avatarUrl: null };
 
   beforeEach(() => {
     resetMocks();

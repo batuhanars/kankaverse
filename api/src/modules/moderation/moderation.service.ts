@@ -132,7 +132,7 @@ export class ModerationModuleService {
     });
 
     // Enforcement: anlık aksiyonlar
-    await this.applyInstantEnforcement(moderatorId, dto, action.id);
+    await this.applyInstantEnforcement(moderatorId, dto);
 
     // relatedReportId varsa raporu RESOLVED yap
     if (dto.relatedReportId) {
@@ -154,11 +154,7 @@ export class ModerationModuleService {
    * BAN/MUTE → lazy enforcement (her istek sırasında shared/ModerationService okur).
    * WARN/SHADOW_LIMIT → yalnızca kayıt (SHADOW_LIMIT stub).
    */
-  private async applyInstantEnforcement(
-    moderatorId: string,
-    dto: CreateActionDto,
-    actionId: string,
-  ) {
+  private async applyInstantEnforcement(moderatorId: string, dto: CreateActionDto) {
     switch (dto.type) {
       case 'KICK': {
         if (!dto.scope) {
@@ -180,12 +176,6 @@ export class ModerationModuleService {
       }
 
       case 'CONTENT_REMOVE': {
-        // targetId = messageId olarak yorumla
-        const message = await this.prisma.message.findUnique({
-          where: { id: dto.targetUserId }, // dto.targetUserId değil, ancak CONTENT_REMOVE için targetId farklı
-          // NOT: CONTENT_REMOVE'da targetId mesaj ID'si; bu sprint scope veya
-          // relatedReportId'deki targetId'den çıkartılır. Basitleştirilmiş: scope = messageId.
-        });
         // scope = messageId (CONTENT_REMOVE konvansiyonu: scope alana messageId yazılır)
         if (dto.scope) {
           const msg = await this.prisma.message.findUnique({ where: { id: dto.scope } });

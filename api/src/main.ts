@@ -1,10 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const cookieParser = require('cookie-parser');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const express = require('express');
+import cookieParser from 'cookie-parser';
+import express from 'express';
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';

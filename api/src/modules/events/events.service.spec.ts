@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { EventsService } from './events.service';
 import { computeOccurrence } from './occurrence.util';
 
@@ -266,7 +266,7 @@ describe('EventsService.create', () => {
     prismaMock.guildEvent.create.mockResolvedValue(created);
     prismaMock.guildMember.findMany.mockResolvedValue([{ userId: USER_ID }, { userId: 'minor-1' }]);
     // minor-1 kanala erişemez (yaş kapısı)
-    membershipMock.requireChannelAccess.mockImplementation(async (uid: string) => {
+    membershipMock.requireChannelAccess.mockImplementation((uid: string) => {
       if (uid === 'minor-1') throw new ForbiddenException({ error: 'AGE_RESTRICTED' });
       return undefined;
     });
@@ -531,9 +531,6 @@ describe('EventDto status türetimi', () => {
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('computeOccurrence (saf util)', () => {
-  const HOUR = 3_600_000;
-  const DAY = 86_400_000;
-
   it('NONE gelecek → k=0, SCHEDULED, occurrence = çapa', () => {
     const start = new Date('2026-07-01T19:00:00.000Z');
     const now = new Date('2026-06-16T12:00:00.000Z');
@@ -1078,7 +1075,7 @@ describe('EventsService.create — EVENT_CREATED bildirimi (R14)', () => {
       }),
     );
     // THIRD_ID minör → kanala erişemez
-    membershipMock.requireChannelAccess.mockImplementation(async (uid: string) => {
+    membershipMock.requireChannelAccess.mockImplementation((uid: string) => {
       if (uid === THIRD_ID) throw new ForbiddenException({ error: 'AGE_RESTRICTED' });
       return undefined;
     });

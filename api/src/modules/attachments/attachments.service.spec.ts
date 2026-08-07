@@ -58,7 +58,6 @@ function resetMocks() {
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
 
 const USER_ID = 'user-abc';
-const OTHER_USER_ID = 'user-other';
 const ATTACHMENT_ID = 'att-1';
 const CHANNEL_ID = 'ch-guild-1';
 const MESSAGE_ID = 'msg-1';

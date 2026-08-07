@@ -1865,7 +1865,6 @@ describe('MessagesService — resolveMentions (§3 + §4 T&S)', () => {
 // ── MessagesService.pinMessage / unpinMessage / findPins ─────────────────────
 
 const PIN_MSG_ID = 'msg-pin-1';
-const GUILD_ID = 'guild-xyz';
 const ADMIN_MEMBER = { role: 'ADMIN' };
 const OWNER_MEMBER = { role: 'OWNER' };
 const REGULAR_MEMBER = { role: 'MEMBER' };

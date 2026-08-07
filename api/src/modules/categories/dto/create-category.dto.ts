@@ -7,6 +7,6 @@ export class CreateCategoryDto {
   @IsString()
   @MinLength(1, { message: 'Kategori adı en az 1 karakter olmalıdır.' })
   @MaxLength(50, { message: 'Kategori adı en fazla 50 karakter olabilir.' })
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   name: string;
 }

@@ -68,7 +68,7 @@ describe('PushService', () => {
     ]);
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ data: [{ status: 'ok' }, { status: 'ok' }] }),
+      json: () => ({ data: [{ status: 'ok' }, { status: 'ok' }] }),
     });
 
     const service = makeService(true);
@@ -95,7 +95,7 @@ describe('PushService', () => {
   it("100'den fazla token → birden çok istek (chunk ≤100)", async () => {
     const tokens = Array.from({ length: 101 }, (_, i) => ({ token: `ExponentPushToken[t${i}]` }));
     prismaMock.pushToken.findMany.mockResolvedValue(tokens);
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ data: [] }) });
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: () => ({ data: [] }) });
 
     const service = makeService(true);
     await service.sendToUsers(['u1'], BASE_PAYLOAD);
@@ -115,7 +115,7 @@ describe('PushService', () => {
     ]);
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({
+      json: () => ({
         data: [
           { status: 'error', message: 'gitti', details: { error: 'DeviceNotRegistered' } },
           { status: 'ok' },
@@ -135,7 +135,7 @@ describe('PushService', () => {
     prismaMock.pushToken.findMany.mockResolvedValue([{ token: 'ExponentPushToken[a]' }]);
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ data: [{ status: 'ok' }] }),
+      json: () => ({ data: [{ status: 'ok' }] }),
     });
 
     const service = makeService(true);
@@ -176,7 +176,7 @@ describe('PushService', () => {
       prismaMock.pushToken.findMany.mockResolvedValue([{ token: 'ExponentPushToken[a]' }]);
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ data: [{ status: 'ok' }] }),
+        json: () => ({ data: [{ status: 'ok' }] }),
       });
 
       const service = makeService(true);
@@ -201,7 +201,7 @@ describe('PushService', () => {
       prismaMock.pushToken.findMany.mockResolvedValue([{ token: 'ExponentPushToken[a]' }]);
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
-        json: async () => ({ data: [{ status: 'ok' }] }),
+        json: () => ({ data: [{ status: 'ok' }] }),
       });
 
       const service = makeService(true);
