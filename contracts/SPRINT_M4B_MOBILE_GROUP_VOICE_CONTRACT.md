@@ -196,3 +196,27 @@ gerçekten yeni bir metin gerekiyorsa `mobile.call.*` altına eklenir ve **neden
    anlaşıldı, prettier Vue şablonlarını bozdu ve tip denetimi yeşil döndü.
 3. **Sözleşmede olmayan bir şey gerekiyorsa DUR** ve bildir. §1'de dosya listesi var.
 4. **Sunucu otoritedir.** Token, katılımcı listesi ve izin bayrakları sunucudan gelir.
+
+---
+
+## §12 EK — kanal v4: zil ses akışı (sahip cihaz turu 2026-08-07)
+
+D44 turu **başarılı geçti**: zil duyuluyor, telefon sessizdeyken çalmıyor ([[D40]] kapandı),
+1-1 DM ve ortam kanalı regresyonsuz. Tek pürüz: **ses tuşuyla zil seviyesi ayarlanamıyor, zil
+susuyor.**
+
+Sebep: v3 kanalı `audioAttributes` vermiyordu → ses varsayılan **`NOTIFICATION` akışından**
+çalıyordu. Android'de bildirim sesi çalarken ses tuşu sesi **susturur**, seviyeyi ayarlamaz.
+Gerçek arama uygulamaları zil akışını kullanır.
+
+**Düzeltme:** kanal `audioAttributes: { usage: NOTIFICATION_RINGTONE, contentType: SONIFICATION }`
+ile kuruluyor → ses tuşu **zil seviyesine** bağlanıyor. Ringer moduna (sessiz/DND) saygı davranışı
+**aynen korunuyor**; D40'ı kapatan mekanizma bozulmuyor, ses yalnız doğru akışa taşınıyor.
+
+🔴 Kanal ayarı kurulduktan sonra değişmediği için **kimlik v4'e çıktı** (`incoming_call_v4`) ve
+`api/src/modules/messages/gateway/messages.gateway.ts`'teki `androidChannelId` **birlikte**
+güncellendi — M4c'de kayıt altına alınan ayrışma riski budur, iki taraf tek commit'te değişti.
+Eski kanallar (v1, v2, v3) silme listesine eklendi.
+
+⚠️ Bu **yeni bir dev build** gerektirir (kanal ayarı yalnız ilk kurulumda yazılır; eski build'de
+v4 hiç oluşmaz).

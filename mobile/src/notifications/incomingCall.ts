@@ -92,15 +92,15 @@ import { t } from '@/i18n';
  */
 
 // 🔴 Kanal kimliği SÜRÜMLÜ ve SUNUCUYLA EŞLEŞMEK ZORUNDA (`api/src/modules/messages/gateway/
-// messages.gateway.ts` `androidChannelId: 'incoming_call_v3'`). Android bildirim kanalı bir kez
+// messages.gateway.ts` `androidChannelId: 'incoming_call_v4'`). Android bildirim kanalı bir kez
 // kurulduktan sonra ayarları (ses/titreşim/önem) **değiştirilemez**; `setNotificationChannelAsync`
 // aynı kimlikle çağrılınca sessizce hiçbir şey yapmaz. Ayar değişince kimlik de artırılır — bu yüzden
 // v3'e geçildi (v2: sessiz kanal, heads-up çıkarmıyordu, §9.2.1 KANIT).
-const CHANNEL_ID = 'incoming_call_v3';
+const CHANNEL_ID = 'incoming_call_v4';
 // §9.2.1b — sahip cihaz turunda ayarlarda İKİ ayrı "Gelen arama" kanalı birikmiş görüldü (v1 + v2,
 // aynı adla). Yeni kanal kurulurken eskiler silinir; kullanıcı ayarlarda hangisinin gerçek olduğunu
 // artık ayırt etmek zorunda kalmaz.
-const OLD_CHANNEL_IDS = ['incoming_call', 'incoming_call_v2'];
+const OLD_CHANNEL_IDS = ['incoming_call', 'incoming_call_v2', 'incoming_call_v3'];
 const CHANNEL_SOUND_FILE = 'incoming_call_channel.wav'; // app.json expo-notifications plugin `sounds`
 const CATEGORY_ID = 'incoming_call';
 const NOTIFICATION_DATA_TYPE = 'incoming_call';
@@ -152,6 +152,16 @@ export async function ensureIncomingCallNotificationsSetup(): Promise<void> {
     enableVibrate: true,
     vibrationPattern: VIBRATE_PATTERN,
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    // 🔴 SES AKIŞI (sahip cihaz turu 2026-08-07, v3→v4 sebebi): v3'te bu alan verilmiyordu, yani
+    // ses VARSAYILAN olarak `NOTIFICATION` akışından çalıyordu. Android'de bildirim sesi çalarken
+    // ses tuşuna basmak sesi SUSTURUR, seviyeyi ayarlamaz — sahip "sesi artıramıyorum, duruyor"
+    // dedi. Gerçek arama uygulamaları zil akışını kullanır: `NOTIFICATION_RINGTONE` ses tuşunu
+    // ZİL seviyesine bağlar ve ringer moduna (sessiz/DND) saygı davranışı AYNEN korunur — yani
+    // D40'ı kapatan mekanizma bozulmuyor, yalnız doğru akışa taşınıyor.
+    audioAttributes: {
+      usage: Notifications.AndroidAudioUsage.NOTIFICATION_RINGTONE,
+      contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+    },
   });
   await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
     { identifier: 'reject', buttonTitle: t('call.reject'), options: { opensAppToForeground: false } },
