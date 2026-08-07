@@ -933,6 +933,10 @@
     "forwardedShort": "İletildi ✓",
     "forwardEmpty": "(boş mesaj)",
     "forwardNoChannels": "İletecek bir DM yok. Önce bir kankayla sohbet başlat.",
+    "dateDivider": {
+      "today": "Bugün",
+      "yesterday": "Dün"
+    },
     "errors": {
       "MESSAGE_BLOCKED": "Mesajınız topluluk kurallarına uygun değil.",
       "USER_BANNED": "Hesabınız askıya alındı. Mesaj gönderemezsiniz.",
