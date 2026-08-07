@@ -147,17 +147,11 @@ export default function CallScreen() {
     void useVoiceStore.getState().leave(true);
   }
 
-  // Sprint M4c §5 dev notu — guild ses kanalının kendi metin akışı YOK (`GUILD_VOICE` mesaj
-  // taşımıyor), yani DM'deki "sohbeti aç" hedefinin guild karşılığı diye bir ekran yok.
-  // `CallControls` bu sözleşmenin dosya listesinde değil (§1) — üçüncü düğmeyi kaldırmak/gizlemek
-  // o dosyayı değiştirmeyi gerektirirdi. Bunun yerine düğme küçültme ile AYNI, gerçek bir eylem
-  // yapar (`router.back()`) — "Sohbet" etiketi tam doğru değil ama BOŞ bir düğme de değil; guild
-  // akışında `/call` her zaman `home.tsx`den push edildiği için `back()` güvenle oraya döner.
+  // PM takibi (2026-08-07) — guild aramasında bu fonksiyon HİÇ ÇAĞRILMAZ: `CallControls`'a
+  // `onOpenChat` artık `isGuildCall` iken `undefined` geçiliyor (düğme çizilmiyor — `CallControls.tsx`
+  // §1 dışıydı ama "guild ses kanalının metin akışı yok" gerçek nedeni orada bir prop eklemeyi
+  // gerektirdi, minimize'la aynı işi yapıp yanlış etiket taşıyan düğme yerine). DM dalı DEĞİŞMEDİ.
   function handleOpenChat() {
-    if (isGuildCall) {
-      router.back();
-      return;
-    }
     router.push(channel ? dmRouteParams(channel) : { pathname: '/dm/[id]', params: { id: channelId } });
   }
 
@@ -289,7 +283,7 @@ export default function CallScreen() {
               resetHideTimer();
               void useVoiceStore.getState().toggleMute();
             }}
-            onOpenChat={handleOpenChat}
+            onOpenChat={isGuildCall ? undefined : handleOpenChat}
             onHangUp={handleHangUp}
           />
         </View>

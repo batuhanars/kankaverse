@@ -17,6 +17,12 @@ interface Props {
   visible: boolean;
   /** `#` ön eki burada eklenir; çağıran ham adı geçer. */
   channelName: string;
+  /**
+   * PM takibi (2026-08-07) — ses kanalının mesajı yok: "Okundu İşaretle" o kanal için anlamsız
+   * (tıklayınca hiçbir görünür şey olmuyor, kullanıcı bir eylem gerçekleştiğini sanıyor — boş
+   * yüzey). Yalnız o maddeyi gizler; sustur/bildirim/düzenle etkilenmez.
+   */
+  isVoice: boolean;
   /** Sprint M2b §4.2 — başlığın SOLUNA çizilen ortam ikonu (hangi ortama ait olduğu belirsizdi). */
   guildId: string;
   guildName: string;
@@ -60,6 +66,7 @@ interface Props {
 export function ChannelMenuSheet({
   visible,
   channelName,
+  isVoice,
   guildId,
   guildName,
   guildIconUrl,
@@ -124,12 +131,16 @@ export function ChannelMenuSheet({
               </Text>
             </View>
 
-            <View style={styles.group}>
-              <Pressable style={styles.option} onPress={onMarkRead}>
-                <Ionicons name="eye-outline" size={20} color={theme.colors.textSecondary} />
-                <Text style={styles.optionText}>{t('guildMenu.markRead')}</Text>
-              </Pressable>
-            </View>
+            {/* PM takibi (2026-08-07) — ses kanalında mesaj/okunmamış kavramı yok, madde tamamen
+                kaldırılır (gri/disabled DEĞİL — "yapamayacağın şey" değil "anlamı olmayan şey"). */}
+            {!isVoice && (
+              <View style={styles.group}>
+                <Pressable style={styles.option} onPress={onMarkRead}>
+                  <Ionicons name="eye-outline" size={20} color={theme.colors.textSecondary} />
+                  <Text style={styles.optionText}>{t('guildMenu.markRead')}</Text>
+                </Pressable>
+              </View>
+            )}
 
             {/* Sprint M2b §4.2 — Sustur + Bildirim Ayarları, her üyeye açık. */}
             <View style={styles.group}>

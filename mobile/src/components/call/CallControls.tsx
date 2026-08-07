@@ -8,7 +8,13 @@ interface Props {
   /** Karantina (`canPublish=false`) — düğme görünür ama pasif (§2). */
   canPublish: boolean;
   onToggleMute: () => void;
-  onOpenChat: () => void;
+  /**
+   * PM takibi (2026-08-07, M4c) — opsiyonel: `undefined` iken düğme HİÇ ÇİZİLMEZ. Guild ses
+   * kanalının kendi metin akışı yok, "Sohbet" etiketiyle minimize'ın aynısını yapan bir düğme
+   * yanlış vaat veriyordu (boş yüzey sınıfı). DM araması bu prop'u her zaman geçer, davranış
+   * DEĞİŞMEDİ — yalnız guild çağıran taraf artık hiç geçmiyor.
+   */
+  onOpenChat?: () => void;
   onHangUp: () => void;
 }
 
@@ -34,14 +40,16 @@ export function CallControls({ isMuted, canPublish, onToggleMute, onOpenChat, on
         />
       </Pressable>
 
-      <Pressable
-        onPress={onOpenChat}
-        style={styles.circle}
-        accessibilityRole="button"
-        accessibilityLabel={t('mobile.call.chatAction')}
-      >
-        <Ionicons name="chatbubble" size={22} color={theme.colors.textPrimary} />
-      </Pressable>
+      {onOpenChat && (
+        <Pressable
+          onPress={onOpenChat}
+          style={styles.circle}
+          accessibilityRole="button"
+          accessibilityLabel={t('mobile.call.chatAction')}
+        >
+          <Ionicons name="chatbubble" size={22} color={theme.colors.textPrimary} />
+        </Pressable>
+      )}
 
       <Pressable
         onPress={onHangUp}
