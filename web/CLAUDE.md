@@ -109,6 +109,30 @@ oradan türetilir.
   üst bar 64px (tüm header/sidebar-header tek yükseklik — 2026-06-12) · mesaj input min 44px (max 50vh). Breakpoint: 768 (drawer) · 1024 (üye paneli yok) · 1280 (tam).
 - Presence renkleri: çevrimiçi `#3DB46E` · boşta `#E8A33D` · DnD `#F23B4B` · çevrimdışı `#6E675E`.
 
+---
+
+## Doğrulama — 🔴 tip denetimi TEK BAŞINA yetmez
+
+Bu tier'da **otomatik test yok.** Elindeki tüm güvence şu üç adım ve üçü farklı şeyleri yakalıyor:
+
+```
+npx vue-tsc -b     # tip denetimi — bilinen 6 ÖNCEDEN-VAR hata; fazlası senin
+npm run lint       # ESLint + prettier (D42'de kuruldu)
+npx vite build     # 🔴 ŞART: derleme
+```
+
+🔴 **`vue-tsc --noEmit` YALANCI YEŞİLDİR**, hiçbir şeyi denetlemez. Yalnız `-b` kullan.
+(2026-08-03: tanımsız bir değişkeni kaçırdı, web'de mesaj alanı çöktü.)
+
+🔴 **`vite build` atlanamaz.** Ne tip denetimi ne lint, Vue **şablon ifadelerinin** içini ayrıştırır.
+Şablonda bozuk bir ifade varken ikisi de yeşil döner ve uygulama açılmaz.
+(2026-08-07: prettier `semi: false` çok ifadeli `@click` handler'larının noktalı virgülünü kaldırdı,
+12 dosya kırıldı; `vue-tsc` ve lint temizdi, sahip tarayıcıda buldu.)
+
+**Toplu değişiklik yaptıysan** (biçimlendirme, codemod, refactor) derleme de yetmeyebilir — davranış
+testi yok. Sahibe **hangi akışları elle gezmesi gerektiğini** söyle; "yeşil" diye teslim etme.
+
+
 ## Sapma Kuralı
 
 Contract'taki endpoint/DTO/enum'a uymuyorsa kod yazma → **dur, kullanıcıya bildir, PM'e dön.**
