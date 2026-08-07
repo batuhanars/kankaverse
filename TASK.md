@@ -3145,3 +3145,35 @@ düğmesi no-op'a düşer (`isConnectedTo` false) · karşı tarafa `call_cancel
 > Tam liste sözleşme §10'da. Kritik üçü: arayan **anında odada** + karşı taraf soluk kutucukla
 > "Çalıyor…", cevapsız arama **60 sn'de düşmüyor** (3 dk yaşıyor), arayan çıkınca karşı tarafın
 > zili susuyor.
+
+---
+
+## Sprint M4c — Mobil Ortam Sesli Kanalı — 2026-08-07
+
+> Sözleşme: `contracts/SPRINT_M4C_MOBILE_GUILD_VOICE_CONTRACT.md`. Tier yalnız `mobile/`;
+> `api/` + `web/` diffi sıfır (i18n kaynağı hariç).
+>
+> 🔄 **Faz sırası takas edildi (sahip kararı 2026-08-07):** PLAN sırası (1) 1-1 DM → (2) grup DM →
+> (3) ortam kanalı idi. M4a bitince (3) öne alındı. Gerekçe: mobilde ortam ses kanalları **hiç
+> görünmüyor** ve topluluk platformunun asıl kullanımı bu; grup DM araması daha niş. Ağır platform
+> işi M4a'da bittiği için geriye kanal listesi + katılma akışı kalıyor. **M4b sıraya geri düştü.**
+
+### Mobil (`mobile/`)
+- [ ] Kanal listesi süzgeci kalktı: ses kanalları kendi sırasında, hoparlör ikonuyla görünüyor
+      (bugün `home.tsx:165/178` `GUILD_TEXT` ile süzüyor → ses kanalları hiç görünmüyor)
+- [ ] Satıra dokunma **doğrudan katılıyor** (web pariteti), ara ekran/onay yok
+- [ ] 🔴 **Yalnız-kalma zaman aşımı guild kanalında KAPALI.** Bugün `scheduleAloneCheckIfNeeded`
+      koşulsuz çalışıyor → kanala ilk giren 3 dk sonra sessizce atılırdı ve "bağlantı düşüyor"
+      sanılırdı. Web'de ayrım zaten var (`autoEndWhenAlone` varsayılan false), mobile taşınıyor.
+      DM'in iki sabiti aynen kalıyor
+- [ ] Katılma **davetsiz** (`call_invite` yok, kimse çalmıyor); DM yolu **birebir korunuyor**
+- [ ] Arama ekranı çok katılımcıya açıldı (bugün `participants.find(p => !p.isLocal)` ile tek karşı
+      taraf varsayıyor); ızgara sıralaması **kararlı**, her çizimde yer değiştirmiyor
+- [ ] Kanal satırının altında içeridekiler görünüyor (M4a presence altyapısı, yeni uç yok);
+      ortamdan çıkınca abonelik bırakılıyor
+- [ ] Kanal oluşturmada tür seçici (Metin/Ses), varsayılan Metin
+- [ ] T&S: kapılar sunucuda, özel kanal **görünür-kilitli** (sessizce gizlenmiyor), video/ekran yok
+
+### DoD (cihazda — SAHİPTE)
+> Tam liste sözleşme §11'de. İki kritik madde: **kanalda tek başına 5 dakika durup atılmamak** (§4)
+> ve **DM aramasının regresyonsuz kalması** (§3/§4 ayrımı DM yolunu bozmamalı).
