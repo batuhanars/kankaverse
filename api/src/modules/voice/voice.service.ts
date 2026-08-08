@@ -489,6 +489,17 @@ export class VoiceService {
     // çağrıyla kesilmez. Sustur TÜM track'leri (ses + video + ekran) zorla keser — predicate yok.
     await this.forceMuteTracks(channelId, targetUserId);
 
+    // 🔴 İKİ ODAYA DA (sahip cihaz turu 2026-08-08): `emitToRoom` yalnız `room:<kanal>`a yayar — o,
+    // METİN kanalı odasıdır. Web ses kanalını açtığında oraya da giriyor, mobil arama ekranı GİRMİYOR;
+    // sonuç: mobilde susturma etiketi hiç "Susturmayı Kaldır"a dönmüyordu, yani moderatör mobilden
+    // susturabiliyor ama geri alamıyordu. `participant_joined`/`participant_left`/`broadcast_stopped`
+    // zaten iki odaya da yayılıyordu — susturma/kaldırma bu desenin dışında kalmış.
+    // (`voice.kicked` de yalnız `room:`a gidiyor ama orada tek bilgi kaynağı olay DEĞİL: sunucu
+    //  katılımcıyı LiveKit'ten attığı için istemci kopmadan anlıyor — bilerek dokunulmadı.)
+    this.realtime.emitToVoicePresence(channelId, 'voice.participant_muted', {
+      channelId,
+      userId: targetUserId,
+    });
     this.realtime.emitToRoom(channelId, 'voice.participant_muted', {
       channelId,
       userId: targetUserId,
@@ -538,6 +549,11 @@ export class VoiceService {
       }
     }
 
+    // İki odaya da — bkz. `muteParticipant`taki gerekçe (mobil `voice:<kanal>` odasında).
+    this.realtime.emitToVoicePresence(channelId, 'voice.participant_unmuted', {
+      channelId,
+      userId: targetUserId,
+    });
     this.realtime.emitToRoom(channelId, 'voice.participant_unmuted', {
       channelId,
       userId: targetUserId,
