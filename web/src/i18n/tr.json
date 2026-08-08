@@ -1194,6 +1194,7 @@
     "deleteConfirm": "Grubu silmek istediğinden emin misin? Bu işlem geri alınamaz.",
     "deleteAction": "Sil",
     "deleteError": "Grup silinemedi.",
+    "editGroup": "Düzenle",
     "renameGroup": "Yeniden Adlandır",
     "renameTitle": "Grubu Yeniden Adlandır",
     "renameLabel": "Yeni ad",

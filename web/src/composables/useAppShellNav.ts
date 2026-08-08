@@ -19,6 +19,14 @@ const rightPanelOpen = ref<boolean | null>(null)
 // Resize'da doğru davranır (geniş→dar küçülünce overlay kendiliğinden açılmaz).
 const rightPanelVisible = computed(() => rightPanelOpen.value ?? isWide.value)
 
+// Grup ayarları paneli (`GroupManagePanel.vue`, DmConversation'ın sağ tarafı). Aynı
+// nullable-tercih deseni; AYRI singleton — 1-1 DM profil paneli (rightPanelOpen) ile aynı anda
+// farklı DM tiplerinde bağımsız yaşıyorlar, tek boolean'a sığmazlar.
+// Sprint R18: DmList'teki "Düzenle" menü öğesi paneli buradan zorla açar — `DmConversation`
+// artık kendi lokal ref'i yerine bunu okuyor, iki ayrı istemci aynı state'i paylaşıyor.
+const groupPanelOpen = ref<boolean | null>(null)
+const groupPanelVisible = computed(() => groupPanelOpen.value ?? isWide.value)
+
 // Router watch bir kez kurulur (modül yüklendiğinde). Her route değişiminde
 // her iki drawer'ı da kapat. AppShell.vue mount'u beklemeden çalışır.
 let _routerWatchInstalled = false
@@ -34,6 +42,7 @@ export function useAppShellNav() {
       // null = breakpoint varsayılanına dön → ≥1280 üye paneli açık kalır (regresyon yok),
       // <1280 overlay kapanır. (false yazılırsa geniş ekranda kanal değişince panel gizlenir.)
       rightPanelOpen.value = null
+      groupPanelOpen.value = null
     })
   }
 
@@ -50,14 +59,28 @@ export function useAppShellNav() {
   function closeRightPanel() {
     rightPanelOpen.value = false
   }
+  function toggleGroupPanel() {
+    groupPanelOpen.value = !groupPanelVisible.value
+  }
+  function openGroupPanel() {
+    groupPanelOpen.value = true
+  }
+  function closeGroupPanel() {
+    groupPanelOpen.value = false
+  }
 
   return {
     leftDrawerOpen,
     rightPanelOpen,
     rightPanelVisible,
+    groupPanelOpen,
+    groupPanelVisible,
     toggleLeftDrawer,
     closeLeftDrawer,
     toggleRightPanel,
     closeRightPanel,
+    toggleGroupPanel,
+    openGroupPanel,
+    closeGroupPanel,
   }
 }
