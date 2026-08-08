@@ -206,6 +206,11 @@ export default function CallScreen() {
   const peerName = peerMember?.username ?? peerFallback?.username ?? '';
   const peerAvatar = peerMember?.avatarUrl ?? peerFallback?.avatarUrl ?? null;
   const alone = shown.participants.length <= 1;
+  // M4d §3-R 🔴 — düzen kamera durumundan TÜRETİLİR, ayrı bir state TUTULMAZ. Uzak tarafın "kamerası
+  // açık" bilgisinin tek kaynağı `remoteCameraPublication`in gerçek bir track taşıması (niyet değil,
+  // gözlemlenen yayın — DM'de zaten başka bir sinyalimiz yok). Yalnız `isGridCall===false` (DM) dalında
+  // okunur; grup/guild bu revizyona dokunmuyor (§3-R: "isGridCall dalına DOKUNULMAZ").
+  const anyCameraOn = shown.isCameraOn || !!shown.remoteCameraPublication?.track;
   // Grup DM'de tek "karşı taraf" yok (N kişi) — başlık `peerName`e (ilk katılan kim ise o) değil,
   // grubun adına bağlanır (`stores/voice.ts` `startOrJoin` `kind==='group'`de `callChannelName`'i
   // guild gibi dolduruyor). DM dalında bu ifade `peerName`e eşit kalır — davranış DEĞİŞMEDİ.
@@ -388,18 +393,57 @@ export default function CallScreen() {
           )}
           {!shown.canPublish && <Text style={styles.listenerNotice}>{t('voice.listenerOnly')}</Text>}
         </View>
+      ) : anyCameraOn ? (
+        // M4d §3-R 🔴 — kamera açıkken Discord düzeni: tam alan = karşı taraf, sağ üst köşe = sen
+        // (yalnız SENİN kameran açıkken çizilir). Düzen `anyCameraOn`dan türetiliyor, ayrı bir state
+        // yok — kamera kapanınca bir render sonra aşağıdaki `else` dalına (klasik iki-kutucuk) döner.
+        <View style={styles.focusArea}>
+          <ParticipantTile
+            variant="full"
+            name={peerName}
+            avatarUrl={peerAvatar}
+            speaking={peerMember ? speakingUserIds.has(peerMember.userId) : false}
+            micOff={peerMember ? mutedUserIds.has(peerMember.userId) : false}
+            ringing={alone && didInvite && callKind === 'dm'}
+            videoPublication={shown.remoteCameraPublication}
+          />
+          {shown.isCameraOn && (
+            <View style={styles.selfCorner}>
+              <ParticipantTile
+                variant="corner"
+                name={localMember?.username ?? myUser?.username ?? t('voice.you')}
+                avatarUrl={localMember?.avatarUrl ?? myUser?.avatarUrl ?? null}
+                speaking={localMember ? speakingUserIds.has(localMember.userId) : false}
+                micOff={isMuted}
+                videoPublication={shown.localCameraPublication}
+                mirror={shown.cameraFacing === 'user'}
+              />
+            </View>
+          )}
+          {alone && (
+            // 🔴 PM incelemesi (2026-08-08) — bu blok ÖNCEDEN `absoluteFill` + ortalanmış bir
+            // kaplamaydı ve tam-alan kutusunun ORTALANMIŞ avatar+adıyla üst üste biniyordu. Çakışma
+            // en sık yaşanacak anda çıkıyordu: "görüntülü ara"ya bastın, kameran açık, karşı taraf
+            // henüz katılmadı. Eski iki-kutucuk düzeninde bu yazı akıştaydı (kutucukların altında);
+            // burada da akışa alındı — tam-alan kutusu `flex:1`, yazı altında kendi yüksekliğini alır.
+            <View style={styles.focusAloneNotice} pointerEvents="none">
+              <Text style={styles.aloneTitle}>{t('mobile.call.aloneTitle')}</Text>
+              <Text style={styles.aloneSubtitle}>{t('mobile.call.aloneSubtitle', { name: peerName })}</Text>
+            </View>
+          )}
+          {!shown.canPublish && (
+            <Text style={[styles.listenerNotice, styles.focusListenerNotice]}>{t('voice.listenerOnly')}</Text>
+          )}
+        </View>
       ) : (
+        // Sözleşme §3/M4a — kimsenin kamerası açık değilken bugünkü iki-kutucuk düzeni AYNEN
+        // (sesli arama regresyonu yasak, §3-R).
         <View style={styles.tiles}>
           <ParticipantTile
             name={localMember?.username ?? myUser?.username ?? t('voice.you')}
             avatarUrl={localMember?.avatarUrl ?? myUser?.avatarUrl ?? null}
             speaking={localMember ? speakingUserIds.has(localMember.userId) : false}
             micOff={isMuted}
-            // M4d §3/§6 — bu dal zaten yalnız DM'de çiziliyor (`isGridCall===false`). `isCameraOn`
-            // false iken publication dolu olsa bile geçirmiyoruz (arka planda durdurulmuş bir
-            // publication'ı yanlışlıkla "hâlâ yayında" gibi göstermemek için — donmuş kare tuzağı).
-            videoPublication={shown.isCameraOn ? shown.localCameraPublication : null}
-            mirror={shown.cameraFacing === 'user'}
           />
           <ParticipantTile
             name={peerName}
@@ -413,7 +457,6 @@ export default function CallScreen() {
                koşul yine de AÇIKÇA yazılıyor — düzen seçimi ileride değişirse gösterge sessizce
                grupta belirmesin. */
             ringing={alone && didInvite && callKind === 'dm'}
-            videoPublication={shown.remoteCameraPublication}
           />
           {alone && (
             <View style={styles.aloneNotice}>
@@ -488,6 +531,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 16,
     paddingHorizontal: theme.layout.panelGap * 2,
+  },
+  // M4d §3-R — kamera açıkken tam-alan düzen. `tiles`ten farkı: tek büyük kutu (video/avatar
+  // uçtan uca), köşe kutusunun mutlak konumlanabilmesi için `position:'relative'`.
+  focusArea: {
+    flex: 1,
+    position: 'relative',
+    paddingHorizontal: theme.layout.panelGap,
+  },
+  selfCorner: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  // "Tek başınasın" bildirimi `tiles` düzeninde akışın bir parçasıydı (kutucukların altında); tam
+  // alan düzeninde de akışta kalıyor — kaplama yapılırsa tam-alan kutusunun ortalanmış avatar+adıyla
+  // çakışıyor (PM incelemesi 2026-08-08, yukarıdaki yorum).
+  // `pointerEvents:'none'` — üst Pressable'ın kontrol çubuğu gizleme/gösterme dokunuşunu YUTMASIN.
+  focusAloneNotice: {
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 32,
+    paddingTop: 16,
+  },
+  focusListenerNotice: {
+    position: 'absolute',
+    bottom: 16,
+    alignSelf: 'center',
   },
   // §14.2 — guild/grup katılımcı listesi: tek sütun, tam genişlik, alt alta. `listScroll` `flex:1`
   // ile `tiles`in tüm yüksekliğini kaplar (sınırlı bir yükseklik olmadan `ScrollView` kaydırmaz);
