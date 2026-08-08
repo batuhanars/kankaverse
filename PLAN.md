@@ -298,6 +298,24 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     başlansaydı çalma akışı hiç düşünülmeden bir platform katmanı kurulur, sonra onu yeniden
     şekillendirmek gerekebilirdi. En zor durumu başa almak temelin **baştan doğru** kurulmasını
     garantiliyor. PM'in itirazı risk sıralamasıydı, sahibinki mimari sıralama; bu iş için ikincisi doğru.
+
+    **🎥 Görüntülü yarı — kamera/arka plan kararı (sahip + PM, 2026-08-08).** Sahip Discord'u cihazda
+    test etti: arka plana alınca kamera küçük yüzen pencerede **devam ediyor**, uygulama tamamen
+    kapatılınca kamera düşüyor ama ses sürüyor, geri girince kamera geri geliyor. Bunun tek bir
+    açıklaması var: **kamera görünür arayüze bağlı, ses servise bağlı.** Discord'un arka planda kamerayı
+    sürdürmesi **PiP** sayesinde (PiP'te aktivite Android açısından hâlâ görünür), `FOREGROUND_SERVICE_CAMERA`
+    sayesinde değil. **KARAR: kamera FGS tipi eklenmiyor** (Play beyanı + native diff getirir, Discord bile
+    yapmıyor). Sonuçlar:
+    - **(4)(5)(6) görüntülü sprintleri native diff İSTEMİYOR** — `android.permission.CAMERA` webrtc config
+      plugin'i ile manifest'te zaten var, `@livekit/react-native` kurulu (`VideoTrack`), sunucu kapısı
+      (`canPublishCamera`) C4/C7'de yazılmış ve R7'den geçmiş. Saf istemci işi, yeni dev build yok.
+    - **Ara davranış:** PiP gelene kadar arka plana alınca video yayını durur, ses devam eder, öne dönünce
+      video kendiliğinden geri gelir (kullanıcı niyeti korunur). Bilinen ve kabul edilmiş ara durum.
+    - **M4p PiP ayrı sprint**, (4) bittikten sonra. Çağrı ekranı üç yüzeyde ortak olduğu için bir kez
+      yazılınca (5)/(6) bedavaya gelir. Native diff olduğundan **D44 zil sesi düzeltmesi (kanal v4) o
+      derlemeye biner** (tek derleme kuralı). ⚠️ MIUI'de PiP ayrı bir uygulama izni ve bazı cihazlarda
+      varsayılan kapalı → M4p DoD'una "izin kapalıyken ne oluyor" maddesi yazılacak.
+    - **M4d sözleşmesi yazıldı 2026-08-08:** `contracts/SPRINT_M4D_MOBILE_VIDEO_DM_CONTRACT.md`.
     🔴 **ARAMA MODELİ DEĞİŞTİ (sahip gözlemi 2026-08-06):** Discord DM aramasını "klasik telefon"dan
     **"oda önce"**ye taşımış — telefon düğmesi doğrudan sese sokuyor, karşı taraf çalıyor, cevap
     gelmezse arayan boş odada bekliyor ("arkadaşın katılacaktır"). Sahip bunu fark edip sordu, kod

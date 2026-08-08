@@ -3304,3 +3304,28 @@ dokunmadı (doğru davranış).
 - [ ] Yukarı kaydırıp eski paket yükle: ayraçlar doğru yerde
 - [ ] Ayraçtan sonraki ilk mesaj avatar + ad ile çiziliyor
 - [ ] Gece yarısını geçirip ekranı açık bırak: **Bugün → Dün** kayıyor
+
+---
+
+## Sprint M4d — Mobil Görüntülü Arama: 1-1 DM — 2026-08-08 🟡 AÇILDI
+
+> Sözleşme: `contracts/SPRINT_M4D_MOBILE_VIDEO_DM_CONTRACT.md`. Tier yalnız `mobile/`;
+> `api/` + `web/` kod diffi sıfır (i18n kaynağı hariç). **Native diff YOK → yeni dev build YOK.**
+>
+> Sahip faz bölmesinin görüntülü yarısının ilk parçası: (4) 1-1 DM · (5) grup DM · (6) ortam kanalı.
+
+- [ ] Token yanıtındaki `canPublishCamera` store'a alınıyor (bugün okunmadan atılıyor)
+- [ ] Kamera aç/kapat + ön-arka çevirme; publication `null` dönerse state geri alınıyor (web tuzağı)
+- [ ] Kamera izni reddedilince arama düşmüyor, "Ayarları Aç" çıkıyor (`camera_denied` ayrık kodu)
+- [ ] DM başlığında görüntülü ara düğmesi (`startWithCamera`), web'deki `pendingCameraStart` deseni
+- [ ] Video kutucuğu mevcut `ParticipantTile`'a dal olarak eklendi, yeni bileşen yazılmadı
+- [ ] 🔴 Arka plan: kamera durur, ses devam eder, öne dönünce kamera **kendiliğinden** geri gelir
+      (`cameraIntent` ≠ `isCameraOn` ayrımı)
+- [ ] T&S: kapı sunucuda, `canPublishCamera=false` iken düğme çizilmiyor (görünür-kilitli **değil** —
+      1-1 DM'de açıklama karşı tarafın minör olduğunu ifşa ederdi, brief §5/G1)
+
+### DoD (cihazda — SAHİPTE, iki hesap gerekiyor)
+> Tam liste sözleşme §10'da. Dört kritik madde: **(1)** görüntülü ara düğmesi aramayı kamera açık
+> başlatıyor · **(2)** arka plana alınca ses sürüyor ve dönünce görüntü kendiliğinden geliyor ·
+> **(3)** izin reddi aramayı düşürmüyor · **(4)** kamerasız 1-1 DM araması, grup DM ve ortam sesli
+> kanalı **regresyonsuz**.
