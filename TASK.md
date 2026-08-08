@@ -3411,3 +3411,20 @@ aynı turda düzeltilecek.
 > Tam liste sözleşme §5'te. En kritik iki madde: **(1)** web'den "yayını durdur" → mobilde kamera
 > düşüyor, ses devam ediyor · **(2)** sonrasında arka plana alıp dönünce kamera **kendiliğinden geri
 > açılmıyor**.
+
+---
+
+## Sprint M4t — Mobil T&S Pariteti: Kamera Uyarısı + Acil Buton — 2026-08-08 🟡 AÇILDI
+
+> Sözleşme: `contracts/SPRINT_M4T_MOBILE_TS_PARITY_CONTRACT.md`. Sahip isteği: webde canlı olan iki
+> T&S yüzeyi mobilde hiç yok. Tier yalnız `mobile/`; sunucu tarafı hazır, native diff yok.
+
+- [ ] Kamera uyarısı (C7 §E2) — yalnız genel/açık ortam ses kanalında, kanal başına bir kez,
+      bellekte (kalıcı saklama YOK — webde de sessionStorage)
+- [ ] Acil buton (A4) — onay → `POST /emergency` → sunucu odadan çeker → geri bildirim ekranı
+      (metin beyanı isteğe bağlı, `PATCH /emergency/:id`)
+- [ ] 🔴 Acil basıldığında "Bağlantı kesildi." hata mesajı gösterilmiyor (sunucu attı, kusur değil)
+- [ ] 🔴 Acil buton otomatik gizlenmeye tabi değil — panik anındaki kullanıcı "ekrana dokun" adımını
+      yapamaz
+- [ ] Yerleşim: arama ekranının üst barı (alt çubuk zaten beş düğme; acil kontrol yanlış düğmeye
+      komşu olmamalı)
