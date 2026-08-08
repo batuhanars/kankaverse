@@ -3514,11 +3514,22 @@ WS kapısının **anlamı değişmedi**, yalnız depolama kanal-anahtarlı oldu.
 > Sözleşme: `contracts/SPRINT_R17_VOICE_PERMISSION_FIDELITY_CONTRACT.md`. Tier `api/` + `web/`;
 > `mobile/` diffi sıfır (mobil ayağı M4p sonrası).
 
-- [ ] 🔴 `api`: moderasyon uçları izin yazarken `canPublishSources`ı da yazıyor. **LiveKit'te boş
+- [x] 🔴 `api`: moderasyon uçları izin yazarken `canPublishSources`ı da yazıyor. **LiveKit'te boş
       liste "hiçbiri" değil "HEPSİ SERBEST" demek** — bugün susturup açılan kullanıcıya kanalın
       kuralına bakılmaksızın tüm kaynaklar veriliyor (kamera dahil). UI kusuru bu sızıntıyı gizliyordu
-- [ ] `web` D51: `setCameraEnabled` publication kontrolü (mobil doğrusu yazılı)
-- [ ] `web` D52: kamera tarafı izin/unpublish dinleyicisi (R16 yalnız sesi ekledi)
+- [x] `web` D51: `setCameraEnabled` publication kontrolü (mobil doğrusu yazılı)
+- [x] `web` D52: kamera tarafı izin/unpublish dinleyicisi (R16 yalnız sesi ekledi)
+
+### PM incelemesi (2026-08-08)
+- Kaynak hesabı `resolveCanPublishSources` olarak tek metoda çıktı; `mintToken` ve `unmuteParticipant`
+  paylaşıyor (kopyalanmadı)
+- `updateParticipant`ın **üç** çağrı yerinin hepsi denetlendi: sustur `canPublish:false` (+ boş-dizi
+  tuzağını açıklayan uyarı yorumu) · susturmayı kaldır açık liste · yayın-durdur `[MICROPHONE]`.
+  Dördüncü çağrı yeri yok
+- Webde "kendi kapatmamız" ile "sunucunun kesmesi" ayrımı mobildeki `localCameraStopping` deseniyle
+  yapıldı; boş `canPublishSources` istemcide **fail-closed** okunuyor (LiveKit'in "hepsi serbest"
+  varsayımı istemcide benimsenmedi — savunma derinliği)
+- `api` build ✅ · 1036/1036 test ✅ (3 yeni) · `vue-tsc` bilinen 6 ✅ · `vite build` ✅ (kendim çalıştırdım)
 
 ### DoD (SAHİPTE)
 > En kritik iki madde: **(1)** sustur→aç sonrası kamera düğmesi çıkıp girmeden geri geliyor ·
