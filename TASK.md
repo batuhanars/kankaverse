@@ -3353,3 +3353,24 @@ Sahip iki yönde de denedi (mobil→web, web→mobil).
 **Sahip ürün kararı:** aramayı kabul eden tarafın kamerası **otomatik açılmıyor**, tercihe bırakıldı
 (arayanın kamerası açılıyor — o zaten görüntülü aramayı başlatan taraf, açılmasaydı tezat olurdu).
 Karşı taraf kamerasını açmak istemeyebilir. Bu davranış bilinçli, kusur değil.
+
+---
+
+## Sprint M4e — Mobil Görüntülü Arama: Grup DM — 2026-08-08 🟡 AÇILDI
+
+> Sözleşme: `contracts/SPRINT_M4E_MOBILE_VIDEO_GROUP_CONTRACT.md`. Tier yalnız `mobile/`;
+> `api/` + `web/` kod diffi sıfır, **native diff yok**.
+>
+> Kamera altyapısının tamamı M4d'de yazıldı ve cihazda doğrulandı; bu sprint onu **çoğullaştırıyor**.
+
+- [ ] 🔴 Uzak kamera state'i tek slottan **userId anahtarlı** yapıya çıktı (grupta ikinci kamera
+      birincisini eziyordu); 1-1 DM aynı kaynaktan türetiyor, paralel state yok
+- [ ] Kamera düğmesi kapısı grup DM'i kapsıyor (guild hariç — M4f)
+- [ ] Kamera açıkken **iki sütunlu ızgara**; kimse açmadığında bugünkü tek sütun alt alta düzen aynen
+- [ ] Kendi kutucuğun ızgaranın elemanı (1-1'deki köşe önizlemesi grupta yok)
+- [ ] T&S: grupta bir minör bile varsa video yok (sunucu kararı), düğme çizilmiyor
+
+### DoD (cihazda — SAHİPTE, en az üç hesap)
+> Tam liste sözleşme §6'da. En kritik iki madde: **(1)** 1-1 DM görüntülü arama **regresyonsuz**
+> (map refactor'ünün bozabileceği tek yer) · **(2)** iki kişi aynı anda kamera açınca ikisi de
+> görünüyor.

@@ -317,6 +317,19 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
       derlemeye biner** (tek derleme kuralı). ⚠️ MIUI'de PiP ayrı bir uygulama izni ve bazı cihazlarda
       varsayılan kapalı → M4p DoD'una "izin kapalıyken ne oluyor" maddesi yazılacak.
     - **M4d sözleşmesi yazıldı 2026-08-08:** `contracts/SPRINT_M4D_MOBILE_VIDEO_DM_CONTRACT.md`.
+    - **🔄 PiP sırası değişti (sahip önerisi, PM kabul etti 2026-08-08 akşamı).** PM "PiP'i (4)'ten
+      hemen sonra yapalım, D44 zil sesi o derlemeye biner" demişti; sahip "önce video yarısını
+      bitirelim, PiP en son" dedi. **PM itirazını geri çekti:** D44 argümanı zayıftı — mobil
+      yayınlanmadı, sessiz zili sahipten başka yaşayan yok, bir derlemeyi öne çekmeye yetmez. Sahibin
+      gerekçesi daha güçlü: **PiP en son yazılırsa sarmalayacağı ekran bitmiş olur** ve "PiP'te N kişi
+      nasıl görünür" sorusu bir kez cevaplanır (önce yazılsa 1-1'e göre kurulup grup/ortam gelince
+      yeniden şekillenirdi). M4'ün başındaki "en ağır kısmı başa al" kararının tersten aynı mantığı.
+      **Yeni sıra: M4e grup DM görüntülü → M4f ortam kanalı kamera → M4p PiP + D44 + o ana kadar
+      birikmiş native ne varsa.**
+    - **D38 için not (M4d turunda fark edildi):** `expo-web-browser` paketi zaten kurulu ve `app.json`
+      plugins'te, yani **mevcut APK'nın içinde**; kod hâlâ `Linking.openURL` kullanıyor. Yani D38 tek
+      satırlık iş ve **yeni derleme beklemiyor** — "bir sonraki native derlemeye biner" kaydı bayat,
+      herhangi bir JS sprintine sıkıştırılabilir.
     🔴 **ARAMA MODELİ DEĞİŞTİ (sahip gözlemi 2026-08-06):** Discord DM aramasını "klasik telefon"dan
     **"oda önce"**ye taşımış — telefon düğmesi doğrudan sese sokuyor, karşı taraf çalıyor, cevap
     gelmezse arayan boş odada bekliyor ("arkadaşın katılacaktır"). Sahip bunu fark edip sordu, kod
