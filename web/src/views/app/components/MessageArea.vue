@@ -233,6 +233,12 @@ const { isJumping } = useJumpToMessage(listEl, () => channelId.value)
 // okuyorsa yakalamaya çalışma. length izlenir (appendMessage in-place push → referans
 // değişmez, eski watch(messages) tetiklenmezdi) + prepend/loadMore'da stick=false ⇒ kaymaz.
 let stickToBottom = true
+// D50 — mobile useMessageListController'daki `loadingOlder` korumasının web karşılığı:
+// `loadMore` (başa ekleme) sırasında uzunluk watcher'ı bastırılır. Guard olmadan watcher
+// "kanalın en son mesajı çağırana mı ait" diye bakıp öyleyse listeyi dibe atıyordu — kullanıcı
+// tam da o an eski mesajı okumaya çalışırken. Prepend, dipteki son mesajı DEĞİŞTİRMEZ; bu bayrak
+// olmadan watcher'ın "mine" dalı yine de tetiklenirdi.
+let loadingOlder = false
 // REV-9: yukarıda geçmiş okurken gelen yeni mesaj sayısı → sağ-alt "aşağı in" butonu rozeti
 const newMessageCount = ref(0)
 function onListScroll() {
@@ -245,7 +251,7 @@ function onListScroll() {
 watch(
   () => messages.value.length,
   async (n, o) => {
-    if (isJumping.value || n <= o) return
+    if (isJumping.value || n <= o || loadingOlder) return
     // REV-9 fix: kendi mesajım (HTTP yanıtı VEYA WS eko ile gelsin) → her zaman dibe kay,
     // bildirim SAYMA. WS eko await'ten önce gelip stickToBottom henüz false iken bildirim
     // sayıyordu → son mesajın yazarına bakıp düzelt.
@@ -276,10 +282,25 @@ function jumpToBottom() {
   scrollToBottom()
 }
 
+// D50 — "daha fazla yükle" başa ekleme yapar; scrollTop sabit kalırsa görünüm eklenen
+// paketin tamamı kadar kayar (kullanıcı okuduğu yerden kopar). Yükseklik farkını telafi et:
+// eski/yeni scrollHeight farkını scrollTop'a ekle, göz aynı içerikte kalsın.
 async function loadMore() {
   if (!channelId.value || !messages.value.length) return
+  const el = listEl.value
+  const prevScrollHeight = el?.scrollHeight ?? 0
+  const prevScrollTop = el?.scrollTop ?? 0
   const oldest = messages.value[0].id
-  await messagesStore.fetchMessages(channelId.value, oldest)
+  loadingOlder = true
+  try {
+    await messagesStore.fetchMessages(channelId.value, oldest)
+    await nextTick()
+    if (el) {
+      el.scrollTop = prevScrollTop + (el.scrollHeight - prevScrollHeight)
+    }
+  } finally {
+    loadingOlder = false
+  }
 }
 
 // Dosya seçimi → modal aç
