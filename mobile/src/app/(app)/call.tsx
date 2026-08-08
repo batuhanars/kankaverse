@@ -47,13 +47,16 @@ export default function CallScreen() {
   const canPublish = useVoiceStore((s) => s.canPublish);
   const didInvite = useVoiceStore((s) => s.didInvite);
   const isLeaving = useVoiceStore((s) => s.isLeaving);
+  // M4f §3.3 — sunucu kaynaklı kamera kesilmesi bildirimi (`stores/voice.ts` `wireRoom` yazıyor,
+  // `disconnectReason` ile AYNI desen: bir kez set edilir, aşağıdaki effect Alert ile gösterip temizler).
+  const cameraStoppedNotice = useVoiceStore((s) => s.cameraStoppedNotice);
   const callKind = useVoiceStore((s) => s.callKind);
   const callChannelName = useVoiceStore((s) => s.callChannelName);
   const callGuildName = useVoiceStore((s) => s.callGuildName);
-  // M4d §1/§7 — kamera 1-1 DM'de VE (M4e §1/§4) grup DM'de. `canPublishCamera` sunucudan guild
-  // aramalarında da gelebilir (C4/C7 masaüstü kamerası zaten oradan çalışıyor) — bu yüzden
-  // `callKind` kapısı burada BİLEREK ayrı tutuluyor, yalnız store'a güvenilmiyor. Guild M4f'in işi.
-  const isDmCall = callKind === 'dm';
+  // M4d §1/§7 → M4e §1/§4 → M4f §2 🔴 — kamera artık üç arama türünde de aynı kapıdan geçiyor:
+  // `callKind` bazlı ayrı bir kapı YOK, tek kapı `canPublishCamera` (sunucu kararı,
+  // `resolveVideoSources`). Guild daha önce burada bilinçli dışarıda tutuluyordu (masaüstü
+  // kamerası C4/C7'den zaten çalışıyordu ama istemci tarafı yazılmamıştı) — bu sprint kapıyı açtı.
   const isGroupCall = callKind === 'group';
   const canPublishCamera = useVoiceStore((s) => s.canPublishCamera);
   const isCameraOn = useVoiceStore((s) => s.isCameraOn);
@@ -139,6 +142,17 @@ export default function CallScreen() {
     })();
   }, []);
 
+  // M4f §3.3 🔴 — bu sprintin T&S ayağı: sunucu ortam kanalında yayını kestiğinde (R11
+  // yayın-durdur) kullanıcı SESSİZ kalmaz. `disconnectReason`ın alt bar/üst bar kapanma
+  // gerekçesiyle aynı deseni: store bir kez set eder, bu effect Alert ile gösterip temizler.
+  // Arama BİTMİYOR (yalnız kamera düşüyor) — bu yüzden `isLeaving`/`router.back()` effect'inden
+  // AYRI, kendi effect'i var. Metin GEREKÇE söylemez (bkz. i18n `mobile.call.cameraStopped`).
+  useEffect(() => {
+    if (!cameraStoppedNotice) return;
+    useVoiceStore.getState().clearCameraStoppedNotice();
+    Alert.alert(cameraStoppedNotice);
+  }, [cameraStoppedNotice]);
+
   useEffect(() => {
     if (connectedChannelId === channelId) wasConnectedRef.current = true;
   }, [connectedChannelId, channelId]);
@@ -218,12 +232,13 @@ export default function CallScreen() {
   // korunur (`ParticipantTile`in `videoPublication` prop'u `null`i bekliyor, `undefined`i değil).
   const peerCameraPublication = peerMember ? (shown.remoteCameraPublications[peerMember.userId] ?? null) : null;
   const anyCameraOn = shown.isCameraOn || !!peerCameraPublication?.track;
-  // M4e §3.1 🔴 — grup DM'in kendi kamera-açık hesabı: YALNIZ `isGroupCall` iken anlamlı. Guild'i
-  // BİLEREK dışarıda bırakır (`isGroupCall &&` kapısı) — guild kamerası M4f'in işi; masaüstünden
-  // (C4/C7) guild kanalına biri kamera açsa bile bu hesap `false` kalır, mobil o dalı hâlâ bugünkü
-  // tek-sütun listeyle çizer (§3.1: "Guild kamerası bu sprintte AÇILMAZ").
+  // M4e §3.1 → M4f §2 🔴 — "en az bir kamera açıkken ızgara" hesabı artık guild'i de kapsıyor.
+  // Yeni bir hesap YAZILMADI, kısıt genişletildi (sözleşme §2: "`isGroupCall &&` kısıtı genişletilir").
+  // Kimsenin kamerası açık değilken guild görünümü bugünkü tek-sütun alt alta listeyle AYNEN kalır —
+  // bu ifade yalnız `false`tan `true`ya döndüğünde (biri kamera açtığında) ızgaraya geçişi tetikler.
   const anyGroupCameraOn =
-    isGroupCall && (shown.isCameraOn || Object.values(shown.remoteCameraPublications).some((p) => !!p?.track));
+    (isGroupCall || isGuildCall) &&
+    (shown.isCameraOn || Object.values(shown.remoteCameraPublications).some((p) => !!p?.track));
   // Grup DM'de tek "karşı taraf" yok (N kişi) — başlık `peerName`e (ilk katılan kim ise o) değil,
   // grubun adına bağlanır (`stores/voice.ts` `startOrJoin` `kind==='group'`de `callChannelName`'i
   // guild gibi dolduruyor). DM dalında bu ifade `peerName`e eşit kalır — davranış DEĞİŞMEDİ.
@@ -264,8 +279,8 @@ export default function CallScreen() {
   }
 
   // M4d §2/§7 — desen mikrofonun izin reddi ile birebir aynı (`dm/[id].tsx` `handleCallPress`):
-  // reddedilirse arama düşmez, yalnız "Ayarları Aç" gösterilir. M4e §4 🔴 — bu fonksiyon `isDmCall`
-  // VEYA `isGroupCall` iken `CallControls`'a geçiliyor (aşağıda), guild'de hiç çağrılmaz.
+  // reddedilirse arama düşmez, yalnız "Ayarları Aç" gösterilir. M4e §4 → M4f §2 🔴 — artık üç arama
+  // türünde de `CallControls`'a geçiliyor (aşağıda); görünürlük orada `canPublishCamera`ya bağlı.
   function handleToggleCamera() {
     resetHideTimer();
     void (async () => {
@@ -350,13 +365,11 @@ export default function CallScreen() {
 
       {isGridCall ? (
         anyGroupCameraOn ? (
-          // M4e §3.1/§3.2 🔴 — grup DM'de EN AZ BİR kamera açıkken iki sütunlu ızgara (bakılan şey
-          // video aramasında yüz; tek-sütun tam-genişlik kartlar ekranda iki kişi gösterip gerisini
-          // kaydırmaya iterdi). `ParticipantTile` yine 'card' varyantı (yeni varyant eklenmedi,
-          // video geldiğinde kendi içinde dikey dikdörtgene döner — bkz. bileşen). Kendi kutucuğun
-          // ızgaranın bir elemanı: 1-1'deki köşe önizlemesi burada YOK (§3.2). Guild bu dala hiç
-          // girmez (`anyGroupCameraOn` yalnız `isGroupCall` iken true olabilir — §3.1 "guild
-          // kamerası bu sprintte açılmaz").
+          // M4e §3.1/§3.2 → M4f §2 🔴 — grup DM VE guild'de EN AZ BİR kamera açıkken iki sütunlu
+          // ızgara (bakılan şey video aramasında yüz; tek-sütun tam-genişlik kartlar ekranda iki kişi
+          // gösterip gerisini kaydırmaya iterdi). `ParticipantTile` yine 'card' varyantı (yeni varyant
+          // eklenmedi, video geldiğinde kendi içinde dikey dikdörtgene döner — bkz. bileşen). Kendi
+          // kutucuğun ızgaranın bir elemanı: 1-1'deki köşe önizlemesi burada YOK (§3.2).
           <View style={styles.tiles}>
             <ScrollView
               style={styles.listScroll}
@@ -539,11 +552,13 @@ export default function CallScreen() {
           }}
           onOpenChat={isGuildCall ? undefined : handleOpenChat}
           onHangUp={handleHangUp}
-          // M4e §4 🔴 — kamera düğmesi kapısı grup DM'i de kapsar; guild HARİÇ (M4f'in işi).
-          canPublishCamera={(isDmCall || isGroupCall) && canPublishCamera}
+          // M4e §4 → M4f §2 🔴 — kamera düğmesi kapısı artık üç arama türünde de aynı:
+          // `callKind` bazlı kısıt kalktı, tek kapı `canPublishCamera` (`CallControls`in kendi
+          // `showCamera` hesabı zaten bunu VE `onToggleCamera` doluluğunu kontrol ediyor).
+          canPublishCamera={canPublishCamera}
           isCameraOn={shown.isCameraOn}
-          onToggleCamera={isDmCall || isGroupCall ? handleToggleCamera : undefined}
-          onSwitchCamera={isDmCall || isGroupCall ? handleSwitchCamera : undefined}
+          onToggleCamera={handleToggleCamera}
+          onSwitchCamera={handleSwitchCamera}
         />
       </View>
 
