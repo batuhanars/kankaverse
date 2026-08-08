@@ -3377,3 +3377,24 @@ Karşı taraf kamerasını açmak istemeyebilir. Bu davranış bilinçli, kusur 
 - [x] Biri kamerasını kapatınca yalnız onun kutucuğu avatara dönüyor
 - [x] Kimse kamera açmadığında sesli grup araması bugünkü gibi (tek sütun, alt alta)
 - [x] Ortam sesli kanalı regresyonsuz
+
+---
+
+## Sprint M4f — Mobil Görüntülü: Ortam Sesli Kanalı — 2026-08-08 🟡 AÇILDI
+
+> Sözleşme: `contracts/SPRINT_M4F_MOBILE_VIDEO_GUILD_CONTRACT.md`. Tier yalnız `mobile/`;
+> `api/` + `web/` kod diffi sıfır, native diff yok. Görüntülü yarının **son** parçası.
+
+- [ ] Kamera kapısı guild'i kapsıyor; ızgara düzeni ortam kanalında da açılıyor (kimse kamera
+      açmayınca bugünkü tek sütun liste aynen)
+- [ ] 🔴 **Sunucu yayını kestiğinde istemci uyuyor** (R11 `stop-broadcast` — DM'de ve grup DM'de bu uç
+      yoktu, istemci ayağı hiç yazılmamıştı): `LocalTrackUnpublished` → kamera kapanır,
+      `ParticipantPermissionsChanged` → `canPublishCamera` güncellenir
+- [ ] 🔴 `cameraIntent` de sıfırlanıyor — yoksa arka plandan dönünce kamera kendiliğinden açılıp
+      moderatörün kararıyla çekişir (sessiz T&S delinmesi)
+- [ ] Kullanıcı sessiz bırakılmıyor ama gerekçe söylenmiyor ("moderatör" denmez — o bilgi istemcide yok)
+
+### DoD (cihazda — SAHİPTE)
+> Tam liste sözleşme §5'te. En kritik iki madde: **(1)** web'den "yayını durdur" → mobilde kamera
+> düşüyor, ses devam ediyor · **(2)** sonrasında arka plana alıp dönünce kamera **kendiliğinden geri
+> açılmıyor**.
