@@ -255,9 +255,16 @@ async function doBlock() {
 // Moderasyon: server-mute toggle
 async function ctxToggleMute() {
   const userId = ctxMenu.value!.userId
+  // 🔴 D53 KÖK NEDEN (sahip turu 2026-08-08) — bu değer menü KAPATILMADAN ÖNCE okunmak ZORUNDA.
+  // `isCtxServerMuted()` `ctxMenu.value`ya bakıyor; aşağıdaki satır onu `null` yapınca fonksiyon her
+  // zaman `false` dönüyordu → "Susturmayı Kaldır"a basmak her seferinde SUSTUR ucuna gidiyordu.
+  // Etiket doğruydu (menü açıkken hesaplanıyor), eylem yanlıştı (menü kapandıktan sonra). Üstelik
+  // `muteParticipant` `upsert` olduğu için ikinci susturma sessizce 200 dönüyor: ne hata, ne toast,
+  // ne değişiklik — "butona basıyorum hiçbir şey olmuyor" tam olarak buydu.
+  const wasServerMuted = isCtxServerMuted()
   ctxMenu.value = null
   try {
-    if (isCtxServerMuted()) await voiceApi.unmute(props.channelId, userId)
+    if (wasServerMuted) await voiceApi.unmute(props.channelId, userId)
     else await voiceApi.mute(props.channelId, userId)
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
