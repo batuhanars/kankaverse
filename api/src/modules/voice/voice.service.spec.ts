@@ -49,6 +49,7 @@ const prismaMock = {
   },
   voiceMute: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
     upsert: jest.fn(),
     deleteMany: jest.fn(),
   },
@@ -120,6 +121,8 @@ beforeEach(() => {
   });
   // video yokken voiceMute varsayılan null (server-mute yok)
   prismaMock.voiceMute.findUnique.mockResolvedValue(null);
+  // R16 §2: listParticipants mutedUserIds varsayılan boş (susturma testleri override eder)
+  prismaMock.voiceMute.findMany.mockResolvedValue([]);
   // guild varsayılan: adultsOnly=false (normal kanal)
   prismaMock.guild.findUnique.mockResolvedValue({ adultsOnly: false });
   // user.count varsayılan: minör yok (GROUP_DM testleri override eder)
@@ -1484,5 +1487,80 @@ describe('VoiceService.disconnectParticipant (R11B B3, R7)', () => {
     await svc.disconnectParticipant(USER_ID, CHANNEL_ID, TARGET_ID);
     // prismaMock'ta guildMember.delete/update yok — mock çağrısı yoksa test geçer
     expect(prismaMock.guildMember.findUnique).toHaveBeenCalledTimes(1); // yalnız requireTargetNotOwner
+  });
+});
+
+// ── R16 §2: listParticipants — mutedUserIds ──────────────────────────────────
+describe('VoiceService.listParticipants — R16 §2 mutedUserIds', () => {
+  beforeEach(() => {
+    mockListParticipants.mockResolvedValue([
+      { identity: TARGET_ID, name: 'hedef', metadata: undefined, joinedAt: 1000 },
+    ]);
+  });
+
+  it('GUILD_VOICE, susturulmuş kullanıcı varsa → mutedUserIds listede geliyor', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(gvChannel());
+    prismaMock.voiceMute.findMany.mockResolvedValue([{ userId: TARGET_ID }]);
+
+    const svc = makeService();
+    const res = await svc.listParticipants(USER_ID, CHANNEL_ID);
+
+    expect(res.mutedUserIds).toEqual([TARGET_ID]);
+    // var olan alanların şekli korunuyor
+    expect(res.participants).toEqual([
+      { userId: TARGET_ID, username: 'hedef', avatarUrl: null },
+    ]);
+    expect(prismaMock.voiceMute.findMany).toHaveBeenCalledWith({
+      where: { channelId: CHANNEL_ID },
+      select: { userId: true },
+    });
+  });
+
+  it('GUILD_VOICE, susturma kalkınca → mutedUserIds listeden düşüyor', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(gvChannel());
+    prismaMock.voiceMute.findMany.mockResolvedValue([]); // unmute sonrası kayıt silinmiş
+
+    const svc = makeService();
+    const res = await svc.listParticipants(USER_ID, CHANNEL_ID);
+
+    expect(res.mutedUserIds).toEqual([]);
+  });
+
+  it('DM kanalında mutedUserIds her zaman boş dönüyor (VoiceMute yok)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue({
+      id: CHANNEL_ID,
+      type: 'DM',
+      guildId: null,
+    });
+
+    const svc = makeService();
+    const res = await svc.listParticipants(USER_ID, CHANNEL_ID);
+
+    expect(res.mutedUserIds).toEqual([]);
+    expect(prismaMock.voiceMute.findMany).not.toHaveBeenCalled();
+  });
+
+  it('GROUP_DM kanalında mutedUserIds her zaman boş dönüyor (VoiceMute yok)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue({
+      id: CHANNEL_ID,
+      type: 'GROUP_DM',
+      guildId: null,
+    });
+
+    const svc = makeService();
+    const res = await svc.listParticipants(USER_ID, CHANNEL_ID);
+
+    expect(res.mutedUserIds).toEqual([]);
+  });
+
+  it('LiveKit oda erişilemez (catch dalı) → mutedUserIds yine de kalıcı kayıttan döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(gvChannel());
+    prismaMock.voiceMute.findMany.mockResolvedValue([{ userId: TARGET_ID }]);
+    mockListParticipants.mockRejectedValue(new Error('room not found'));
+
+    const svc = makeService();
+    const res = await svc.listParticipants(USER_ID, CHANNEL_ID);
+
+    expect(res).toEqual({ startedAt: null, participants: [], mutedUserIds: [TARGET_ID] });
   });
 });

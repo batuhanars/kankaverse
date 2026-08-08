@@ -159,9 +159,9 @@ function isCtxBroadcasting(): boolean {
   return ctxMenu.value ? voiceStore.isBroadcasting(props.channelId, ctxMenu.value.userId) : false
 }
 
-// Server mute durumu (sadece bağlı olduğumuz kanalda anlamlı)
+// R16 §3.1 — kanal-scoped: bağlı olsak da olmasak da bu kanalın hidrate edilmiş susturma listesine bakar.
 function isCtxServerMuted(): boolean {
-  return ctxMenu.value ? voiceStore.serverMutedUserIds.has(ctxMenu.value.userId) : false
+  return ctxMenu.value ? voiceStore.serverMutedUserIdsFor(props.channelId).has(ctxMenu.value.userId) : false
 }
 
 // Zaten arkadaş mı → "Kanka Ekle" gizlenir (friends AppShell'de hidrate edilir)

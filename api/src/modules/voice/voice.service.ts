@@ -894,6 +894,9 @@ export class VoiceService {
 
   /**
    * C3 — Anlık katılımcılar. Kaynak: LiveKit room state (DB değil).
+   * R16 §2 — `mutedUserIds` eklendi (`VoiceMute` tablosu, kalıcı kayıt — LiveKit room state'inden
+   * BAĞIMSIZ). Yalnız GUILD_VOICE'ta anlamlı; DM/GROUP_DM'de VoiceMute hiç yazılmaz → her zaman [].
+   * Var olan alanların şekli (startedAt/participants) DEĞİŞMEDİ — yalnız yeni alan eklendi.
    */
   async listParticipants(userId: string, channelId: string) {
     this.assertEnabled();
@@ -907,6 +910,10 @@ export class VoiceService {
         error: 'NOT_VOICE_CHANNEL',
       });
     }
+
+    // R16 §2 — kalıcı susturma kaydı, LiveKit room state'inden ayrı sorgu (oda kapalıyken/hata
+    // durumunda da doğru dönmesi için try/catch DIŞINDA hesaplanır).
+    const mutedUserIds = await this.getMutedUserIds(channel.type, channelId);
 
     try {
       const participants = await this.roomService!.listParticipants(channelId);
@@ -922,11 +929,22 @@ export class VoiceService {
           username: p.name || p.identity,
           avatarUrl: this.parseAvatar(p.metadata),
         })),
+        mutedUserIds,
       };
     } catch {
-      // Oda henüz açılmadıysa LiveKit hata döndürür → boş
-      return { startedAt: null, participants: [] };
+      // Oda henüz açılmadıysa LiveKit hata döndürür → boş katılımcı listesi; mute kaydı yine dönsün.
+      return { startedAt: null, participants: [], mutedUserIds };
     }
+  }
+
+  /** R16 §2 — kanaldaki kalıcı susturulmuş kullanıcı id'leri. Yalnız GUILD_VOICE'ta VoiceMute var. */
+  private async getMutedUserIds(channelType: string, channelId: string): Promise<string[]> {
+    if (channelType !== 'GUILD_VOICE') return [];
+    const mutes = await this.prisma.voiceMute.findMany({
+      where: { channelId },
+      select: { userId: true },
+    });
+    return mutes.map((m) => m.userId);
   }
 
   /**

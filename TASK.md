@@ -3473,6 +3473,21 @@ aynı turda düzeltilecek.
       demek değil
 - [ ] `voice.listenerOnly` metni düzeltildi (var olmayan karantinayı gerekçe gösteriyordu)
 
+### 🔴 Dev bulgusu — sözleşmenin kendi DoD'u karşılanamıyordu
+`serverMutedUserIds` **düz bir Set**'ti (kanal kırılımı yok). Bu, yalnız "yazan tek yol bağlı olduğun
+kanaldı" varsayımıyla güvenliydi. Ama `VoiceParticipantList` kenar çubuğunda **her ses kanalı için bir
+kez** çiziliyor ve hepsi aynı store'u okuyor → hidrasyon düz Set'e yazılsa bir kanalın susturma
+görüntüsü diğerinin etiketine sızardı; tam da bu sprintin düzeltmeye çalıştığı akışı sessizce bozardı.
+Dev yapıyı `Record<channelId, Set<userId>>`e çevirdi (aynı dosyadaki `participantsByChannel` deseni).
+WS kapısının **anlamı değişmedi**, yalnız depolama kanal-anahtarlı oldu. PM kabul etti: sözleşmenin
+"bağlı değilken sustur, etiket doğru olsun" maddesi düz Set'le zaten imkânsızdı.
+
+### PM incelemesi
+- `isMuted`e sunucu kaynaklı hiçbir yolun yazmadığını doğruladım (yalnız kullanıcı eylemleri:
+  toggle, sağırlaştırma, mikrofon hatası). Yani "kendi tercihini koruma" mantığının dayandığı varsayım
+  gerçekten geçerli
+- `api` build ✅ · 1033/1033 test ✅ · `vue-tsc` bilinen 6 ✅ · `vite build` ✅ (kendim çalıştırdım)
+
 ### DoD (tarayıcıda — SAHİPTE)
 > Tam liste sözleşme §5'te. Gerçek kabul testi: **sahibin kilitli kalmış ikinci hesabı bu akışla
 > kurtarılabiliyor** (bugün UI'da geri alma yolu yok).
