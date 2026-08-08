@@ -1,6 +1,17 @@
-import { PermissionsAndroid, Platform } from 'react-native';
+import { AppState, PermissionsAndroid, Platform, type AppStateStatus } from 'react-native';
 import { create } from 'zustand';
-import { Room, RoomEvent, ParticipantEvent, Track, type Participant, type RemoteParticipant } from 'livekit-client';
+import {
+  Room,
+  RoomEvent,
+  ParticipantEvent,
+  Track,
+  LocalVideoTrack,
+  type Participant,
+  type RemoteParticipant,
+  type RemoteTrack,
+  type LocalTrackPublication,
+  type RemoteTrackPublication,
+} from 'livekit-client';
 import { AudioSession, AndroidAudioTypePresets } from '@livekit/react-native';
 import { voiceApi } from '@/api/voice';
 import { callInvite, callCancel, groupCallStart, groupCallCancel } from '@/realtime/socket';
@@ -19,7 +30,9 @@ import { t } from '@/i18n';
  * konuşan/susturulmuş göstergesi, tek-başına-kalma zaman aşımı). "Kim var" presence şeridi ayrı bir
  * store'da (`stores/voicePresence.ts` — DM ekranı bağlı olmasak da onu okur, web'deki iki katman
  * ayrımının burada iki dosyaya bölünmüş hâli). Web `stores/voice.ts` davranış referansı ama
- * KOPYALANMADI: video/deafen/cihaz-seçim state'i yok (M4a-1 kapsamı dışı, sözleşme §12).
+ * KOPYALANMADI: deafen/cihaz-seçim state'i hâlâ yok (kapsam dışı). 🔴 M4d ile 1-1 DM kamerası
+ * eklendi (`canPublishCamera`/`isCameraOn`/`cameraFacing` + yerel/uzak publication) — ekran
+ * paylaşımı ve grup/guild kamerası (M4e/M4f) hâlâ YOK.
  */
 
 export interface RoomMember {
@@ -83,6 +96,31 @@ interface VoiceState {
   pendingCallScreen: boolean;
   isMuted: boolean;
   canPublish: boolean;
+  /**
+   * M4d §2/§7 — sunucunun DM'de video izni kararı (`resolveVideoSources`, R7 kapısı: iki taraf da
+   * yetişkinse video, biri minörse yok). `false` iken kamera yüzeyi HİÇ ÇİZİLMEZ — "görünür-kilitli
+   * yap" genel ilkesinin bilinçli istisnası (brief §5/G1: minör statüsü UI'da asla gösterilmez).
+   */
+  canPublishCamera: boolean;
+  /**
+   * M4d §2 🔴 — yalnız GERÇEK publication geldiğinde `true` olur (null-publication tuzağı: sunucu
+   * grant vermediğinde SDK sessizce publication döndürmeyebilir). `cameraIntent` (modül değişkeni,
+   * §6) ile KARIŞTIRILMAZ: bu, "şu an gerçekten yayında mıyız" — o, "kullanıcı açık bırakmıştı mı".
+   */
+  isCameraOn: boolean;
+  /** §3/§4 — yerel önizleme yalnız ön kamerada (`user`) aynalanır; çevrilince aynalama kalkar. */
+  cameraFacing: 'user' | 'environment';
+  /** §3 — `ParticipantTile`in `VideoTrack` için okuduğu yerel/uzak kamera publication'ı. Uzak taraf
+   *  tek slot (1-1 DM kapsamı — §1, grup/guild M4e/M4f). */
+  localCameraPublication: LocalTrackPublication | null;
+  remoteCameraPublication: RemoteTrackPublication | null;
+  /**
+   * §2 — DM başlığındaki "görüntülü ara" niyeti: `startOrJoin` bağlantı kurulduktan hemen sonra
+   * yazar, `/call` mount effect'i tüketip temizler (`pendingCallScreen` ile aynı temizlenme
+   * disiplini — bkz. o alanın yorumu). Gerçek kamera açma işini burada YAPMAZ: çalışma-anı izni
+   * gerektiği için `toggleCamera`in AYNISI çağrılır, "Ayarları Aç" reddi de oradan gelir.
+   */
+  pendingCameraStart: boolean;
   roomParticipants: RoomMember[];
   speakingUserIds: Set<string>;
   mutedUserIds: Set<string>;
@@ -138,11 +176,31 @@ interface VoiceState {
   startOrJoin: (
     channelId: string,
     label: string,
-    options?: { invite?: boolean; kind?: 'dm' | 'group' | 'guild'; guildName?: string },
+    options?: {
+      invite?: boolean;
+      kind?: 'dm' | 'group' | 'guild';
+      guildName?: string;
+      /** M4d §2 — bağlantı kurulduktan sonra kamera otomatik açılsın mı (DM başlığındaki
+       *  görüntülü ara düğmesi). Web `pendingCameraStart` pariteti. */
+      startWithCamera?: boolean;
+    },
   ) => Promise<{ ok: boolean; message?: string; reason?: 'mic_denied' | 'other' }>;
   /** `userInitiated` true ise (kullanıcı "kapat"a bastı) `disconnectReason` set edilmez. */
   leave: (userInitiated?: boolean) => Promise<void>;
   toggleMute: () => Promise<void>;
+  /**
+   * M4d §2/§4/§6 — kamera aç/kapat. Yalnız `canPublishCamera` true VE `callKind==='dm'` iken
+   * anlamlı (§1 kapsamı — grup/guild kamerası M4e/M4f, bu fonksiyon oralarda çağrılmaz ama yine de
+   * kendi kapısını taşır). İzin isteme deseni `requestMicPermission` ile birebir aynı: reddedilirse
+   * `reason:'camera_denied'` döner, çağıran ekran mikrofondaki `mic_denied` ile aynı "Ayarları Aç"
+   * uyarısını gösterir.
+   */
+  toggleCamera: () => Promise<{ ok: boolean; message?: string; reason?: 'camera_denied' }>;
+  /** §4 — track KAPATILIP AÇILMAZ (karşı tarafta kutucuk yanıp sönerdi); LiveKit'in `restartTrack`
+   *  yolu aynı publication'ı yeni `facingMode` ile yeniden başlatır. Yalnız kamera açıkken anlamlı. */
+  switchCamera: () => Promise<void>;
+  /** `/call` mount effect'i çağırır — bkz. `pendingCameraStart` yorumu. */
+  clearPendingCameraStart: () => void;
 
   handleCallAccepted: (channelId: string) => void;
   handleCallRejected: (channelId: string) => void;
@@ -173,6 +231,15 @@ let aloneTimer: ReturnType<typeof setTimeout> | null = null;
 const PENDING_CALL_SCREEN_TIMEOUT_MS = 4000;
 let pendingCallScreenTimer: ReturnType<typeof setTimeout> | null = null;
 let foregroundListenerRemove: (() => void) | null = null;
+// M4d §6 🔴 — kullanıcı NİYETİ (kamerayı açık bırakmıştı mı), `isCameraOn`dan (şu an gerçekten
+// yayında mıyız) BİLEREK AYRI: arka plana alınca `isCameraOn` false olur ama bu true kalır; öne
+// dönünce `handleAppStateChange` bunu okuyup kamerayı sessizce geri açar. Yalnız `toggleCamera`
+// YAZAR — arka plan/ön plan geçişi yalnız OKUR (kullanıcının "kapattım" iradesiyle "arka planda
+// geçici durduruldu" birbirine karışmasın). `leave()` her oturumda sıfırlar.
+let cameraIntent = false;
+// §6 — AppState aboneliği `startOrJoin` içinde kurulur, `leave()`te söker (foreground listener ile
+// aynı yaşam döngüsü deseni).
+let appStateSub: { remove: () => void } | null = null;
 // Bildirim gövdesi (karşı tarafın adı) — `toggleMute` yalnız eylem etiketini günceller, gövdeyi
 // `roomParticipants`ten YENİDEN TÜRETMEZ (katılmadan önce boş dönerdi, bildirim adı silinirdi).
 let currentPeerLabel = '';
@@ -194,6 +261,14 @@ function clearAloneTimer() {
 async function requestMicPermission(): Promise<boolean> {
   if (Platform.OS !== 'android') return true;
   const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+  return granted === PermissionsAndroid.RESULTS.GRANTED;
+}
+
+// M4d §2 — desen `requestMicPermission` ile birebir aynı (manifest izni zaten
+// `@config-plugins/react-native-webrtc` tarafından bildirilmiş, bkz. sözleşme §0).
+async function requestCameraPermission(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+  const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
   return granted === PermissionsAndroid.RESULTS.GRANTED;
 }
 
@@ -219,6 +294,12 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   pendingCallScreen: false,
   isMuted: false,
   canPublish: false,
+  canPublishCamera: false,
+  isCameraOn: false,
+  cameraFacing: 'user',
+  localCameraPublication: null,
+  remoteCameraPublication: null,
+  pendingCameraStart: false,
   roomParticipants: [],
   speakingUserIds: new Set(),
   mutedUserIds: new Set(),
@@ -240,6 +321,9 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       pendingCallScreenTimer = null;
     }
     set({ pendingCallScreen: false });
+  },
+  clearPendingCameraStart() {
+    set({ pendingCameraStart: false });
   },
 
   async startOrJoin(channelId, label, options) {
@@ -290,6 +374,9 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       // Guild: `alreadyOngoing` koşulsuz true → didInvite kalıcı false (davranış aynen korundu).
       didInvite: !alreadyOngoing,
       pendingCallScreen: true,
+      // M4d §7 — kozmetik sıfırlama, bir önceki oturumdan kalma bayrak yeni oturumu kirletemez
+      // (`pendingCallScreen` ile aynı ders).
+      pendingCameraStart: false,
       callKind: isGuild ? 'guild' : isGroup ? 'group' : 'dm',
       // Grup DM'de de dolu (grubun adı) — call.tsx başlığı guild'deki gibi buradan okur (§4 yorumu).
       callChannelName: isGuild || isGroup ? label : null,
@@ -350,6 +437,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
         connectedChannelId: channelId,
         connectedAt: Date.now(),
         canPublish: data.canPublish,
+        canPublishCamera: data.canPublishCamera ?? false,
         connecting: false,
       });
 
@@ -367,6 +455,22 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
 
       refreshRoomParticipants(set, get);
       scheduleAloneCheckIfNeeded(get);
+
+      // M4d §2 — DM başlığından "görüntülü ara" ile geldiysek VE sunucu izin verdiyse, niyeti
+      // burada YALNIZ İŞARETLE — gerçek açma işi `/call`in mount effect'inde `toggleCamera` ile
+      // olur (çalışma-anı izni gerektiği için; `pendingCallScreen` ile aynı yazan-taraf/tüketen-taraf
+      // ayrımı). `canPublishCamera` false ise bayrak hiç set edilmez, hiçbir yerde tüketilmez.
+      if (options?.startWithCamera && data.canPublishCamera) {
+        set({ pendingCameraStart: true });
+      }
+
+      // M4d §6 — kamera görünür arayüze bağlı: arka plana alınca yayın durur, öne dönünce `cameraIntent`
+      // varsa kendiliğinden geri açılır. Abonelik foreground listener ile AYNI yaşam döngüsünde
+      // (kur burada, sök `leave()`te) — bir önceki oturumdan kalan varsa önce kaldırılır.
+      appStateSub?.remove();
+      appStateSub = AppState.addEventListener('change', (next: AppStateStatus) => {
+        void handleAppStateChange(next, set, get);
+      });
 
       // §6 — bildirim/servis kurulumu KENDİ try/catch'inde: burada patlarsa (ör. sistem izni
       // reddetti) az önce başarıyla kurulan LiveKit bağlantısını AŞAĞIDAKİ catch'e düşürüp
@@ -425,6 +529,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     peerEverJoined = false;
     autoEndWhenAlone = true; // §4 — kozmetik sıfırlama, bir sonraki `startOrJoin` zaten üzerine yazar
     currentPeerLabel = '';
+    cameraIntent = false; // M4d §6 — yeni oturum eski niyeti hatırlamaz (diğer kozmetik sıfırlamalarla aynı ders)
     // Her oturum yeni bir `Room` nesnesi (yeni katılımcı kimlikleri) — bir sonraki `startOrJoin`
     // eski oturumdan kalma handler'larla karışmasın diye map burada temizlenir.
     speakingHandlers.clear();
@@ -432,6 +537,8 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     foregroundListenerRemove?.();
     foregroundListenerRemove = null;
     stopCallForegroundService().catch(() => {});
+    appStateSub?.remove(); // M4d §6 — foreground listener ile aynı yaşam döngüsü
+    appStateSub = null;
 
     if (room) {
       try {
@@ -478,6 +585,12 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       pendingCallScreen: false,
       isMuted: false,
       canPublish: false,
+      canPublishCamera: false,
+      isCameraOn: false,
+      cameraFacing: 'user',
+      localCameraPublication: null,
+      remoteCameraPublication: null,
+      pendingCameraStart: false,
       roomParticipants: [],
       speakingUserIds: new Set(),
       mutedUserIds: new Set(),
@@ -496,6 +609,59 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       updateCallForegroundService(currentPeerLabel, next ? t('voice.unmute') : t('voice.mute')).catch(() => {});
     } catch {
       // izin/cihaz yoksa değiştirme
+    }
+  },
+
+  async toggleCamera() {
+    // §1/§7 — `callKind !== 'dm'` kapısı BİLEREK: yüzey `call.tsx`te zaten yalnız DM dalında
+    // bağlanır ama fonksiyon kendi kapısını da taşır (ileride yanlış yerden çağrılırsa sessizce
+    // no-op olsun, M4e/M4f'in kamerası burada AÇILMASIN).
+    if (!room || !get().canPublishCamera || get().callKind !== 'dm') return { ok: false };
+
+    if (get().isCameraOn) {
+      try {
+        await room.localParticipant.setCameraEnabled(false);
+      } catch {
+        // yoksay — yerel state yine de kapanmış sayılır
+      }
+      cameraIntent = false;
+      set({ isCameraOn: false, localCameraPublication: null });
+      return { ok: true };
+    }
+
+    // §2 🔴 — desen `requestMicPermission` ile birebir aynı: reddedilirse arama DÜŞMEZ, yalnız
+    // kamera açılmaz. Çağıran ekran bu mesajı gösterip "Ayarları Aç" seçeneği sunar.
+    const granted = await requestCameraPermission();
+    if (!granted) {
+      return { ok: false, message: t('mobile.call.cameraPermissionDenied'), reason: 'camera_denied' };
+    }
+    try {
+      const pub = await room.localParticipant.setCameraEnabled(true, { facingMode: get().cameraFacing });
+      // §2 🔴 null-publication tuzağı — sunucu grant vermediğinde SDK sessizce publication
+      // DÖNMEYEBİLİR (web'de yaşandı, bkz. sözleşme §2.4). `isCameraOn` yalnız GERÇEK publication
+      // geldiğinde true olur; aksi halde niyet de yazılmaz (kullanıcı düğmeye tekrar basabilsin).
+      if (!pub) return { ok: false };
+      cameraIntent = true;
+      set({ isCameraOn: true, localCameraPublication: pub });
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  },
+
+  async switchCamera() {
+    if (!room || !get().isCameraOn) return;
+    // §4 — track KAPATILIP AÇILMAZ (karşı tarafta kutucuk yanıp sönerdi). Mevcut yayının publication'ı
+    // üzerinden `restartTrack` ile aynı track yeni `facingMode`la yeniden başlatılır.
+    const pub = room.localParticipant.getTrackPublication(Track.Source.Camera);
+    const track = pub?.track;
+    if (!(track instanceof LocalVideoTrack)) return;
+    const next: 'user' | 'environment' = get().cameraFacing === 'user' ? 'environment' : 'user';
+    try {
+      await track.restartTrack({ facingMode: next });
+      set({ cameraFacing: next });
+    } catch {
+      // yoksay — cihaz ikinci bir kamerayı desteklemiyor olabilir, mevcut track değişmeden kalır
     }
   },
 
@@ -570,6 +736,45 @@ function scheduleAloneCheckIfNeeded(get: () => VoiceState) {
   }, timeout);
 }
 
+/**
+ * M4d §6 🔴 — bu sprintin asıl işi. Model: kamera GÖRÜNÜR ARAYÜZE bağlı, ses SERVİSE bağlı
+ * (foreground service tipi `microphone`; Android 14+ kameranın arayüzsüz çalışması ayrı bir FGS tipi
+ * + Play beyanı ister — PM kararı 2026-08-08: o yola girilmiyor, Discord da PiP'siz girmiyor). PiP
+ * BU SPRINTTE YOK (M4p) — yani arka plana alınca karşı taraf görüntüyü kaybeder, bu KABUL EDİLMİŞ
+ * ara durumdur, kusur değildir (sözleşme §6).
+ *
+ * `cameraIntent` (modül değişkeni) burada yalnız OKUNUR, hiç YAZILMAZ — niyeti yalnız `toggleCamera`
+ * değiştirir. Böylece "kullanıcı kapattı" ile "arka planda geçici durduruldu" birbirine karışmaz.
+ */
+async function handleAppStateChange(
+  next: AppStateStatus,
+  set: (partial: Partial<VoiceState>) => void,
+  get: () => VoiceState,
+) {
+  if (!room) return;
+  if (next === 'background') {
+    if (!get().isCameraOn) return;
+    try {
+      await room.localParticipant.setCameraEnabled(false);
+    } catch {
+      // yoksay — arka planda hata gösterecek bir ekran yok, sessizce dener
+    }
+    set({ isCameraOn: false, localCameraPublication: null });
+  } else if (next === 'active') {
+    // Niyet yoksa ya da zaten açıksa (arka plana hiç düşmeden dönmüş olabilir) dokunma. Sunucu
+    // izni (`canPublishCamera`) öne dönüşte de kontrol edilir — §6: "değilse kamera açılmaz, kapı
+    // sunucuda".
+    if (!cameraIntent || get().isCameraOn || !get().canPublishCamera) return;
+    try {
+      const pub = await room.localParticipant.setCameraEnabled(true, { facingMode: get().cameraFacing });
+      if (pub) set({ isCameraOn: true, localCameraPublication: pub });
+    } catch {
+      // yoksay — öne dönüşte izin istemi göstermek YANLIŞ olurdu (kullanıcı arka plandan yeni döndü,
+      // beklemediği bir sistem promptu görürdü); sessizce kapalı kalır, düğmeden tekrar denenebilir.
+    }
+  }
+}
+
 function wireRoom(
   r: Room,
   channelId: string,
@@ -577,16 +782,42 @@ function wireRoom(
   get: () => VoiceState,
 ) {
   r.on(RoomEvent.TrackMuted, (pub, p: Participant) => {
-    if (pub.kind !== Track.Kind.Audio) return;
+    if (pub.kind === Track.Kind.Video) {
+      // M4d §3 🔴 — LiveKit bazı yollarda kamera track'ini unpublish etmek yerine MUTE eder
+      // (`TrackUnsubscribed` gelmez) — web'de yaşanan tuzak (`stores/voice.ts` yorumu), burada da
+      // aynı çift-yol (bkz. TrackSubscribed/TrackUnsubscribed altta) izleniyor. Yalnız UZAK
+      // kameranın mute'u kutucuğu avatara döndürür; yerel kapanış `toggleCamera`/arka plan dalının
+      // kendi işi (o zaten `localCameraPublication`i temizliyor).
+      if (pub.source === Track.Source.Camera && p.identity !== r.localParticipant.identity) {
+        set({ remoteCameraPublication: null });
+      }
+      return;
+    }
     const s = new Set(get().mutedUserIds);
     s.add(p.identity);
     set({ mutedUserIds: s });
   });
   r.on(RoomEvent.TrackUnmuted, (pub, p: Participant) => {
-    if (pub.kind !== Track.Kind.Audio) return;
+    if (pub.kind === Track.Kind.Video) {
+      if (pub.source === Track.Source.Camera && p.identity !== r.localParticipant.identity && pub.track) {
+        set({ remoteCameraPublication: pub as RemoteTrackPublication });
+      }
+      return;
+    }
     const s = new Set(get().mutedUserIds);
     s.delete(p.identity);
     set({ mutedUserIds: s });
+  });
+  // M4d §3 — uzak kameranın asıl kazanım/kayıp yolu: katılımcı yayına başlayınca/bırakınca.
+  // `remoteCameraPublication` tek slot (1-1 DM kapsamı — §1); `track` parametresi kullanılmıyor,
+  // publication zaten track'i taşıyor (ParticipantTile `.track` ile kontrol ediyor).
+  r.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, pub: RemoteTrackPublication) => {
+    if (track.kind !== Track.Kind.Video || track.source !== Track.Source.Camera) return;
+    set({ remoteCameraPublication: pub });
+  });
+  r.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+    if (track.kind !== Track.Kind.Video || track.source !== Track.Source.Camera) return;
+    set({ remoteCameraPublication: null });
   });
   r.on(RoomEvent.ActiveSpeakersChanged, () => recomputeSpeaking(set));
   r.on(RoomEvent.ParticipantConnected, (p: RemoteParticipant) => {
@@ -599,6 +830,9 @@ function wireRoom(
     refreshRoomParticipants(set, get);
     recomputeSpeaking(set);
     scheduleAloneCheckIfNeeded(get);
+    // M4d §3 — ayrılan katılımcı kamera yayınlıyorduysa donuk kare kalmasın (1-1 DM'de tek slot
+    // olduğu için "kimin kamerası" ayrımına gerek yok — ayrılan zaten tek karşı taraftı).
+    set({ remoteCameraPublication: null });
   });
   r.on(RoomEvent.Disconnected, (reason?: unknown) => {
     // §3.3 🔴 — YALNIZ beklenmedik kopma (ağ/sunucu/A4/R11B). Ayrılışı biz başlattıysak
