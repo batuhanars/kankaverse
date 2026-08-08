@@ -3600,10 +3600,10 @@ yükseltmesinde kaybolur ve gerçek kullanıcıya hiçbir şey kazandırmaz.
 > Sözleşme: `contracts/SPRINT_R18_GROUP_DM_MENU_CONTRACT.md`. Tier yalnız `web/`; uçlar ve store
 > eylemleri hazır, eksik olan tek şey menüden erişim.
 
-- [ ] Bağlam menüsüne **Düzenle** (grup ayarlarını açar — yeni modal YAZILMAZ, mevcut panel açılır)
-- [ ] Bağlam menüsüne **Grubu Sil** (yalnız sahip görür, onaylı, geri alınamaz)
-- [ ] Etiket "Yeniden Adlandır" değil **"Düzenle"** (sahip kararı — ayar yüzeyi açılsın)
-- [ ] Yeniden adlandırma/silme mantığı kopyalanmadı, mevcut store eylemleri çağrıldı
+- [x] Bağlam menüsüne **Düzenle** (grup ayarlarını açar — yeni modal YAZILMAZ, mevcut panel açılır)
+- [x] Bağlam menüsüne **Grubu Sil** (yalnız sahip görür, onaylı, geri alınamaz)
+- [x] Etiket "Yeniden Adlandır" değil **"Düzenle"** (sahip kararı — ayar yüzeyi açılsın)
+- [x] Yeniden adlandırma/silme mantığı kopyalanmadı, mevcut store eylemleri çağrıldı
 
 ---
 
@@ -3616,3 +3616,11 @@ yükseltmesinde kaybolur ve gerçek kullanıcıya hiçbir şey kazandırmaz.
 - [x] 🔴 1-1 DM ve grup DM'de **hâlâ gizli** — orada video kapısı YAŞ kapısı, görünür-kilitli düğme
       karşı tarafın minör olduğunu ifşa ederdi (brief §5/G1). Bilinçli ayrım, sadeleştirilmeyecek
 - [x] İzin geri gelince düğme kendiliğinden etkinleşiyor (R17 + M4f dinleyicisi besliyor)
+
+### PM incelemesi (2026-08-08)
+Panelin açık/kapalı durumu `DmConversation`ın **lokal ref**'iydi, `DmList`ten erişilemiyordu. Dev onu
+`useAppShellNav`e taşıdı — aynı dosyadaki 1-1 DM profil paneli deseninin (`rightPanelOpen`) ikizi,
+ayrı singleton (iki panel farklı DM tiplerinde bağımsız yaşıyor). `router.afterEach` sıfırlaması da
+oraya eklendi; bu yüzden "Düzenle" önce `await router.push` yapıp **sonra** paneli açıyor, yoksa
+gezinme paneli hemen kapatırdı. Yapısal ama gerekli bir değişiklik, kabul edildi.
+`vue-tsc` bilinen 6 ✅ · `vite build` ✅ (kendim çalıştırdım).
