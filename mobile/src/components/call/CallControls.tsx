@@ -16,16 +16,46 @@ interface Props {
    */
   onOpenChat?: () => void;
   onHangUp: () => void;
+  /**
+   * M4d §5/§7 — yalnız `onToggleCamera` de dolu VE bu true iken kamera düğmesi çizilir. Çağıran
+   * taraf (`call.tsx`) bunu `callKind==='dm' && canPublishCamera` ile besler; grup/guild kamerası
+   * kapsam dışı (M4e/M4f) — düğme hiç görünmez. T&S §7: "görünür-kilitli yap" ilkesinin bilinçli
+   * istisnası, `canPublishCamera=false` sessizce hiç çizilmeyerek uygulanır.
+   */
+  canPublishCamera?: boolean;
+  isCameraOn?: boolean;
+  onToggleCamera?: () => void;
+  /** §4 — yalnız kamera AÇIKKEN çizilir (boş yüzey açma kuralı); kamera kapalıyken bu prop dolu
+   *  gelse bile düğme çizilmez (`isCameraOn` de kontrol edilir). */
+  onSwitchCamera?: () => void;
 }
 
 /**
- * M4a-1 sözleşme §4 — alt kontrol çubuğu, yalnız ÜÇ düğme (kamera/ekran/roket YOK — §4 🔴).
- * Dokunma hedefleri D37 dersiyle ÖLÇÜLEREK: mikrofon/sohbet 56dp daire (≥44dp şartını rahatça
- * geçiyor), kapat düğmesi de 56dp (sözleşme "≥56dp" şartı).
+ * M4a-1 sözleşme §4 — alt kontrol çubuğu. M4d ile beşe çıkabiliyor: mikrofon · kamera ·
+ * kamera çevir (yalnız kamera açıkken) · sohbet · kapat (§5). Dokunma hedefleri D37 dersiyle
+ * ÖLÇÜLEREK sabit 56dp daire — beşe çıkınca KÜÇÜLTÜLMEZ, aralık daralır (§5 🔴).
  */
-export function CallControls({ isMuted, canPublish, onToggleMute, onOpenChat, onHangUp }: Props) {
+export function CallControls({
+  isMuted,
+  canPublish,
+  onToggleMute,
+  onOpenChat,
+  onHangUp,
+  canPublishCamera,
+  isCameraOn,
+  onToggleCamera,
+  onSwitchCamera,
+}: Props) {
+  const showCamera = !!canPublishCamera && !!onToggleCamera;
+  const showFlip = showCamera && !!isCameraOn && !!onSwitchCamera;
+  // §5 🔴 D37 dersi — beş düğme (56dp + 24dp aralık) dar Android ekranlarında (~360dp) taşıyor;
+  // düğme küçültülmez, aralık daraltılır (12dp — 56dp dairelerin kendisi zaten bol dokunma payı
+  // veriyor, aradaki boşluğun daralması dokunma hedefini küçültmez).
+  const buttonCount = 2 + (onOpenChat ? 1 : 0) + (showCamera ? 1 : 0) + (showFlip ? 1 : 0);
+  const gap = buttonCount >= 5 ? 12 : 24;
+
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, { gap }]}>
       <Pressable
         onPress={onToggleMute}
         disabled={!canPublish}
@@ -39,6 +69,28 @@ export function CallControls({ isMuted, canPublish, onToggleMute, onOpenChat, on
           color={canPublish ? theme.colors.textPrimary : theme.colors.textMuted}
         />
       </Pressable>
+
+      {showCamera && (
+        <Pressable
+          onPress={onToggleCamera}
+          style={[styles.circle, isCameraOn && styles.circleActive]}
+          accessibilityRole="button"
+          accessibilityLabel={isCameraOn ? t('voice.cameraOff') : t('voice.cameraOn')}
+        >
+          <Ionicons name={isCameraOn ? 'videocam' : 'videocam-off'} size={22} color={theme.colors.textPrimary} />
+        </Pressable>
+      )}
+
+      {showFlip && (
+        <Pressable
+          onPress={onSwitchCamera}
+          style={styles.circle}
+          accessibilityRole="button"
+          accessibilityLabel={t('mobile.call.flipCamera')}
+        >
+          <Ionicons name="camera-reverse-outline" size={24} color={theme.colors.textPrimary} />
+        </Pressable>
+      )}
 
       {onOpenChat && (
         <Pressable
@@ -77,10 +129,10 @@ const CIRCLE = 56;
 
 const styles = StyleSheet.create({
   row: {
+    // §5 — `gap` burada YOK: buton sayısına göre bileşen gövdesinde hesaplanıp inline uygulanıyor.
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 24,
   },
   circle: {
     width: CIRCLE,

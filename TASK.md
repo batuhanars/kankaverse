@@ -3314,14 +3314,14 @@ dokunmadı (doğru davranış).
 >
 > Sahip faz bölmesinin görüntülü yarısının ilk parçası: (4) 1-1 DM · (5) grup DM · (6) ortam kanalı.
 
-- [ ] Token yanıtındaki `canPublishCamera` store'a alınıyor (bugün okunmadan atılıyor)
-- [ ] Kamera aç/kapat + ön-arka çevirme; publication `null` dönerse state geri alınıyor (web tuzağı)
-- [ ] Kamera izni reddedilince arama düşmüyor, "Ayarları Aç" çıkıyor (`camera_denied` ayrık kodu)
-- [ ] DM başlığında görüntülü ara düğmesi (`startWithCamera`), web'deki `pendingCameraStart` deseni
-- [ ] Video kutucuğu mevcut `ParticipantTile`'a dal olarak eklendi, yeni bileşen yazılmadı
-- [ ] 🔴 Arka plan: kamera durur, ses devam eder, öne dönünce kamera **kendiliğinden** geri gelir
+- [x] Token yanıtındaki `canPublishCamera` store'a alınıyor (bugün okunmadan atılıyor)
+- [x] Kamera aç/kapat + ön-arka çevirme; publication `null` dönerse state geri alınıyor (web tuzağı)
+- [x] Kamera izni reddedilince arama düşmüyor, "Ayarları Aç" çıkıyor (`camera_denied` ayrık kodu)
+- [x] DM başlığında görüntülü ara düğmesi (`startWithCamera`), web'deki `pendingCameraStart` deseni
+- [x] Video kutucuğu mevcut `ParticipantTile`'a dal olarak eklendi, yeni bileşen yazılmadı
+- [x] 🔴 Arka plan: kamera durur, ses devam eder, öne dönünce kamera **kendiliğinden** geri gelir
       (`cameraIntent` ≠ `isCameraOn` ayrımı)
-- [ ] T&S: kapı sunucuda, `canPublishCamera=false` iken düğme çizilmiyor (görünür-kilitli **değil** —
+- [x] T&S: kapı sunucuda, `canPublishCamera=false` iken düğme çizilmiyor (görünür-kilitli **değil** —
       1-1 DM'de açıklama karşı tarafın minör olduğunu ifşa ederdi, brief §5/G1)
 
 ### DoD (cihazda — SAHİPTE, iki hesap gerekiyor)

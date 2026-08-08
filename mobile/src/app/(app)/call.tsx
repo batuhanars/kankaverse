@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -50,6 +50,16 @@ export default function CallScreen() {
   const callKind = useVoiceStore((s) => s.callKind);
   const callChannelName = useVoiceStore((s) => s.callChannelName);
   const callGuildName = useVoiceStore((s) => s.callGuildName);
+  // M4d §1/§7 — kamera yalnız 1-1 DM'de (§1 kapsamı, grup/guild M4e/M4f). `canPublishCamera`
+  // sunucudan guild/group aramalarında da gelebilir (C4/C7 masaüstü kamerası zaten oradan
+  // çalışıyor) — bu yüzden `callKind === 'dm'` kapısı burada BİLEREK ayrı tutuluyor, yalnız
+  // store'a güvenilmiyor.
+  const isDmCall = callKind === 'dm';
+  const canPublishCamera = useVoiceStore((s) => s.canPublishCamera);
+  const isCameraOn = useVoiceStore((s) => s.isCameraOn);
+  const cameraFacing = useVoiceStore((s) => s.cameraFacing);
+  const localCameraPublication = useVoiceStore((s) => s.localCameraPublication);
+  const remoteCameraPublication = useVoiceStore((s) => s.remoteCameraPublication);
   const isGuildCall = callKind === 'guild';
   // 🔴 M4b sözleşme §4 — bu dosya sözleşmenin §1 dosya tablosunda YOK, ama DoD §10 "İkinci kişi
   // katılınca ızgarada iki kutucuk" maddesi N-katılımcılı grid'i zorunlu kılıyor: DM dalının
@@ -70,9 +80,23 @@ export default function CallScreen() {
   // ekran channelId hâlâ bağlanmamışken (olmayan bir sekmeye deep-link gibi) sessizce geri döner.
   const wasConnectedRef = useRef(false);
   // Ayrılış anında çizimi dondurmak için son iyi bilinen görünüm verisi (bkz. aşağıdaki `shown`).
-  const frozenRef = useRef<{ participants: typeof roomParticipants; canPublish: boolean }>({
+  // M4d §3 — kamera alanları da BURAYA eklendi: `leave()` bunları da sıfırlıyor, dondurulmazsa
+  // kapanma animasyonu sürerken tile avatara dönüp native `VideoTrack` view'ı söker — üst yorumdaki
+  // Fabric crash sınıfıyla aynı risk (native view churn, tam olarak `isLeaving` donmasının önlediği şey).
+  const frozenRef = useRef<{
+    participants: typeof roomParticipants;
+    canPublish: boolean;
+    isCameraOn: boolean;
+    cameraFacing: typeof cameraFacing;
+    localCameraPublication: typeof localCameraPublication;
+    remoteCameraPublication: typeof remoteCameraPublication;
+  }>({
     participants: [],
     canPublish: false,
+    isCameraOn: false,
+    cameraFacing: 'user',
+    localCameraPublication: null,
+    remoteCameraPublication: null,
   });
 
   function resetHideTimer() {
@@ -92,6 +116,25 @@ export default function CallScreen() {
   // `MiniCallWindow` o ana kadar (kısa asenkron gezinme penceresi) kendini gizli tutuyordu.
   useEffect(() => {
     useVoiceStore.getState().clearPendingCallScreen();
+  }, []);
+
+  // M4d §2 — DM başlığından "görüntülü ara" ile geldiysek (`pendingCameraStart`, `startOrJoin`
+  // bağlantı kurulunca yazdı), kamerayı BURADA aç: çalışma-anı izni gerektiği için `toggleCamera`in
+  // AYNISI çağrılıyor (web `pendingCameraStart` pariteti + mobilin izin katmanı). Reddedilirse arama
+  // DÜŞMEZ — yalnız "Ayarları Aç" gösterilir, mikrofondaki `mic_denied` ile birebir aynı desen.
+  useEffect(() => {
+    const store = useVoiceStore.getState();
+    if (!store.pendingCameraStart) return;
+    store.clearPendingCameraStart();
+    void (async () => {
+      const res = await store.toggleCamera();
+      if (!res.ok && res.reason === 'camera_denied') {
+        Alert.alert(res.message ?? t('common.error'), undefined, [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('mobile.call.micPermissionSettings'), onPress: () => Linking.openSettings() },
+        ]);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -143,8 +186,19 @@ export default function CallScreen() {
   // 🔴 Ayrılış başladıysa görünüm DONDURULUR. Kapanma animasyonu sürerken `leave()` durumu
   // boşaltıyor; donmasaydı kutucuklar/uyarı satırları sökülmekte olan yüzeyde mount-unmount olur ve
   // beyaz ekranı üreten Fabric hatası tekrar tetiklenebilirdi. Kullanıcı zaten ekranı görmüyor.
-  if (!isLeaving) frozenRef.current = { participants: roomParticipants, canPublish };
-  const shown = isLeaving ? frozenRef.current : { participants: roomParticipants, canPublish };
+  if (!isLeaving) {
+    frozenRef.current = {
+      participants: roomParticipants,
+      canPublish,
+      isCameraOn,
+      cameraFacing,
+      localCameraPublication,
+      remoteCameraPublication,
+    };
+  }
+  const shown = isLeaving
+    ? frozenRef.current
+    : { participants: roomParticipants, canPublish, isCameraOn, cameraFacing, localCameraPublication, remoteCameraPublication };
 
   const localMember = shown.participants.find((p) => p.isLocal);
   const peerMember = shown.participants.find((p) => !p.isLocal);
@@ -189,6 +243,27 @@ export default function CallScreen() {
   // gerektirdi, minimize'la aynı işi yapıp yanlış etiket taşıyan düğme yerine). DM dalı DEĞİŞMEDİ.
   function handleOpenChat() {
     router.push(channel ? dmRouteParams(channel) : { pathname: '/dm/[id]', params: { id: channelId } });
+  }
+
+  // M4d §2/§7 — desen mikrofonun izin reddi ile birebir aynı (`dm/[id].tsx` `handleCallPress`):
+  // reddedilirse arama düşmez, yalnız "Ayarları Aç" gösterilir. Bu fonksiyon yalnız `isDmCall` iken
+  // `CallControls`'a geçiliyor (aşağıda), grup/guild'de hiç çağrılmaz.
+  function handleToggleCamera() {
+    resetHideTimer();
+    void (async () => {
+      const res = await useVoiceStore.getState().toggleCamera();
+      if (!res.ok && res.reason === 'camera_denied') {
+        Alert.alert(res.message ?? t('common.error'), undefined, [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('mobile.call.micPermissionSettings'), onPress: () => Linking.openSettings() },
+        ]);
+      }
+    })();
+  }
+
+  function handleSwitchCamera() {
+    resetHideTimer();
+    void useVoiceStore.getState().switchCamera();
   }
 
   return (
@@ -320,6 +395,11 @@ export default function CallScreen() {
             avatarUrl={localMember?.avatarUrl ?? myUser?.avatarUrl ?? null}
             speaking={localMember ? speakingUserIds.has(localMember.userId) : false}
             micOff={isMuted}
+            // M4d §3/§6 — bu dal zaten yalnız DM'de çiziliyor (`isGridCall===false`). `isCameraOn`
+            // false iken publication dolu olsa bile geçirmiyoruz (arka planda durdurulmuş bir
+            // publication'ı yanlışlıkla "hâlâ yayında" gibi göstermemek için — donmuş kare tuzağı).
+            videoPublication={shown.isCameraOn ? shown.localCameraPublication : null}
+            mirror={shown.cameraFacing === 'user'}
           />
           <ParticipantTile
             name={peerName}
@@ -333,6 +413,7 @@ export default function CallScreen() {
                koşul yine de AÇIKÇA yazılıyor — düzen seçimi ileride değişirse gösterge sessizce
                grupta belirmesin. */
             ringing={alone && didInvite && callKind === 'dm'}
+            videoPublication={shown.remoteCameraPublication}
           />
           {alone && (
             <View style={styles.aloneNotice}>
@@ -358,6 +439,10 @@ export default function CallScreen() {
           }}
           onOpenChat={isGuildCall ? undefined : handleOpenChat}
           onHangUp={handleHangUp}
+          canPublishCamera={isDmCall && canPublishCamera}
+          isCameraOn={shown.isCameraOn}
+          onToggleCamera={isDmCall ? handleToggleCamera : undefined}
+          onSwitchCamera={isDmCall ? handleSwitchCamera : undefined}
         />
       </View>
 

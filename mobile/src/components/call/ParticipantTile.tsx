@@ -1,5 +1,7 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { VideoTrack } from '@livekit/react-native';
+import type { TrackPublication } from 'livekit-client';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -15,15 +17,46 @@ interface Props {
   dimmed?: boolean;
   /** §4 — davet gönderildi, karşı taraf henüz katılmadı: "Çalıyor…" göstergesi. */
   ringing?: boolean;
+  /**
+   * M4d §3 — video track yayını varsa avatar YERİNE bu çizilir; kalan her şey (ad, mikrofon rozeti,
+   * konuşma halkası, dimmed, ringing) AYNI yerinde kalır (sözleşme: "yeni bir kutucuk bileşeni
+   * yazılmaz"). Yalnız `.track` gerçekten varsa video sayılır — publication'ın kendisi (mute'lu bir
+   * publication `track`i temizler, bkz. `stores/voice.ts` `wireRoom`).
+   */
+  videoPublication?: TrackPublication | null;
+  /** §3 — yalnız yerel ÖN kamera önizlemesinde true (kullanıcı kendini aynada gördüğü gibi görür;
+   *  arka kameraya geçilince aynalama kalkar). Uzak taraf için hiç geçilmez. */
+  mirror?: boolean;
 }
 
 const AVATAR_SIZE = 88;
 
-export function ParticipantTile({ name, avatarUrl, speaking, micOff, dimmed, ringing }: Props) {
+export function ParticipantTile({
+  name,
+  avatarUrl,
+  speaking,
+  micOff,
+  dimmed,
+  ringing,
+  videoPublication,
+  mirror,
+}: Props) {
+  const hasVideo = !!videoPublication?.track;
   return (
     <View style={[styles.tile, dimmed && styles.tileDimmed]}>
       <View style={[styles.avatarWrap, speaking && styles.avatarSpeaking]}>
-        {avatarUrl ? (
+        {hasVideo ? (
+          // `trackRef`in tipi (`@livekit/components-react`) bu projede kurulu değil (yalnız RN
+          // paketi kurulu, §0 — sıfır yeni bağımlılık kuralı); VideoTrack çalışma zamanında yalnız
+          // `publication.track`/`publication.trackSid` okuyor, `as any` bu iki alanı taşıyan
+          // publication'ı geçirmek için yeterli ve güvenli.
+          <VideoTrack
+            trackRef={{ publication: videoPublication } as any}
+            style={styles.avatarVideo}
+            mirror={mirror}
+            objectFit="cover"
+          />
+        ) : avatarUrl ? (
           <Image source={{ uri: avatarUrl }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, styles.avatarFallback]}>
@@ -71,6 +104,14 @@ const styles = StyleSheet.create({
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
+  },
+  // M4d §3 — `avatar` ile AYNI ölçü; `VideoTrack`'in kendi `style` prop'u tek obje kabul ediyor
+  // (StyleSheet dizisi birleştirilemiyor), o yüzden `overflow:hidden` ayrı bir girdi.
+  avatarVideo: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+    overflow: 'hidden',
   },
   avatarFallback: {
     backgroundColor: theme.colors.accentSubtle,

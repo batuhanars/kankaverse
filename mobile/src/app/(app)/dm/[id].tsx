@@ -161,7 +161,11 @@ export default function DmScreen() {
   // ulaşılamıyor" görüyordu — grup DM kendi sinyalini (`voice:group_call_start`) kullanmak zorunda.
   // `isGroupDm` burada yalnız `kind` seçiyor; DM dalı (`isGroupDm===false`) `options` vermeden ÖNCEKİYLE
   // BİREBİR AYNI çağrıyı yapıyor (regresyon yasak — bkz. `stores/voice.ts` DM/guild dalları değişmedi).
-  async function handleCallPress() {
+  //
+  // M4d §2 — telefon VE kamera düğmesi bu ortak akışı paylaşır (`startWithCamera` tek fark); ikisini
+  // ayrı kopyalamak yerine tek yerde tutuluyor (Rule of Three'yi beklemeye gerek yok, tek satır farkla
+  // birebir aynı gövdeyi ikinci kez yazmak olurdu).
+  async function startCall(startWithCamera: boolean) {
     if (isConnectedHere) {
       router.push({ pathname: '/call', params: { channelId } });
       return;
@@ -170,7 +174,7 @@ export default function DmScreen() {
     setCallBusy(true);
     const res = await useVoiceStore
       .getState()
-      .startOrJoin(channelId, title, isGroupDm ? { kind: 'group' } : undefined);
+      .startOrJoin(channelId, title, isGroupDm ? { kind: 'group' } : startWithCamera ? { startWithCamera: true } : undefined);
     setCallBusy(false);
     if (res.ok) {
       router.push({ pathname: '/call', params: { channelId } });
@@ -184,6 +188,17 @@ export default function DmScreen() {
       return;
     }
     if (res.message) Alert.alert(res.message);
+  }
+
+  function handleCallPress() {
+    void startCall(false);
+  }
+
+  // M4d §2 — DM başlığındaki "görüntülü ara" düğmesi (`startWithCamera`): yalnız 1-1 DM'de VE henüz
+  // bağlanmamışken çizilir (aşağıdaki JSX) — web pariteti (`DmConversation.vue` video düğmesi de
+  // `!isConnectedTo` şartıyla kayboluyor; bağlıyken kamera kontrolü artık `/call` ekranının işi).
+  function handleVideoCallPress() {
+    void startCall(true);
   }
 
   /**
@@ -236,24 +251,40 @@ export default function DmScreen() {
         // sprintte kalktı. Başlığın sağ üstü buraya ayrılmıştı (yukarıdaki yorum), tek kapı bu.
         headerActions={
           voiceEligible ? (
-            <Pressable
-              onPress={handleCallPress}
-              disabled={callBusy}
-              // D37 dersi: 20px ikon + hitSlop yalnız yeterince büyükse ≥44dp dokunma hedefine
-              // ulaşır (20 + 2×12 = 44). Kardeş ikonlar (sabitleme/arama) 10 kullanıyor — onlara
-              // dokunmuyorum (kapsam dışı), yeni düğmemi göz kararıyla bırakmıyorum.
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel={t('mobile.call.startAction')}
-            >
-              {/* Grup DM'de hoparlör, 1-1'de telefon (sahip isteği 2026-08-08): grup sesli bir
-                  ÇAĞRI değil, girilen bir oda — Discord mobil ve bizim web'imiz de öyle ayırıyor. */}
-              <Ionicons
-                name={isDm ? 'call' : 'volume-medium-outline'}
-                size={isDm ? 20 : 22}
-                color={theme.colors.textSecondary}
-              />
-            </Pressable>
+            <>
+              <Pressable
+                onPress={handleCallPress}
+                disabled={callBusy}
+                // D37 dersi: 20px ikon + hitSlop yalnız yeterince büyükse ≥44dp dokunma hedefine
+                // ulaşır (20 + 2×12 = 44). Kardeş ikonlar (sabitleme/arama) 10 kullanıyor — onlara
+                // dokunmuyorum (kapsam dışı), yeni düğmemi göz kararıyla bırakmıyorum.
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={t('mobile.call.startAction')}
+              >
+                {/* Grup DM'de hoparlör, 1-1'de telefon (sahip isteği 2026-08-08): grup sesli bir
+                    ÇAĞRI değil, girilen bir oda — Discord mobil ve bizim web'imiz de öyle ayırıyor. */}
+                <Ionicons
+                  name={isDm ? 'call' : 'volume-medium-outline'}
+                  size={isDm ? 20 : 22}
+                  color={theme.colors.textSecondary}
+                />
+              </Pressable>
+              {/* M4d §1/§2 — görüntülü ara: yalnız 1-1 DM'de VE henüz bağlı değilken (web
+                  `DmConversation.vue` pariteti — bağlıyken kamera kontrolü `/call` ekranının işi,
+                  telefon ikonu zaten oraya döndürüyor). Grup DM'de yok (§1 kapsamı — M4e). */}
+              {isDm && !isConnectedHere && (
+                <Pressable
+                  onPress={handleVideoCallPress}
+                  disabled={callBusy}
+                  hitSlop={12}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mobile.call.startVideoAction')}
+                >
+                  <Ionicons name="videocam-outline" size={20} color={theme.colors.textSecondary} />
+                </Pressable>
+              )}
+            </>
           ) : undefined
         }
         topBanner={
