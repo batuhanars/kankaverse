@@ -3583,11 +3583,11 @@ yükseltmesinde kaybolur ve gerçek kullanıcıya hiçbir şey kazandırmaz.
 > Sahip Discord mobili açıp ekran görüntüsüyle gösterdi; **oluşturma formu sade kalıyor, ayarlar
 > ekranı taşıyor** ayrımı sahibin bulgusu.
 
-- [ ] `ChannelSummaryDto`ya `userLimit` · `bitrate` · `mediaEnabled` tiplendi (yeni backend alanı DEĞİL)
-- [ ] Üç kontrol `channel-edit.tsx`e eklendi; kanal **oluşturma** formu değişmedi
-- [ ] 🔴 Kanal türü üç çağıran ekrandan da taşınıyor; `type` yoksa ses alanları **çizilmiyor**
+- [x] `ChannelSummaryDto`ya `userLimit` · `bitrate` · `mediaEnabled` tiplendi (yeni backend alanı DEĞİL)
+- [x] Üç kontrol `channel-edit.tsx`e eklendi; kanal **oluşturma** formu değişmedi
+- [x] 🔴 Kanal türü üç çağıran ekrandan da taşınıyor; `type` yoksa ses alanları **çizilmiyor**
       (M4c dersi: route parametresine güvenen ekran, bir çağıran unutunca sessizce yanlış moda düşer)
-- [ ] `mediaEnabledDesc` açıklaması gösteriliyor (C7 anahtarı — minör dahil kamera açan ayar)
+- [x] `mediaEnabledDesc` açıklaması gösteriliyor (C7 anahtarı — minör dahil kamera açan ayar)
 
 ### DoD (cihazda — SAHİPTE)
 > Tam liste sözleşme §5'te. Kritik: metin kanalında bu üç alan **görünmemeli**, ses kanalında

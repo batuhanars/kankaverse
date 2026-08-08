@@ -63,6 +63,12 @@ export default function GuildChannelsScreen() {
         isPrivate: String(c.isPrivate),
         slowModeSeconds: String(c.slowModeSeconds),
         categoryId: c.categoryId ?? '',
+        // M4g §3 — bu ekran yalnız GUILD_TEXT listeliyor (üstteki filtre), o yüzden `type` burada
+        // hep 'GUILD_TEXT' gidecek ve ses alanları hiç render edilmeyecek — beklenen davranış.
+        type: c.type,
+        userLimit: String(c.userLimit),
+        bitrate: String(c.bitrate),
+        mediaEnabled: String(c.mediaEnabled),
       },
     });
   }

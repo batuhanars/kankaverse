@@ -34,6 +34,12 @@ export interface ChannelSummaryDto {
   // döner (varsayılan false) — mobil M4c'ye kadar bu alanı hiç tiplemiyordu çünkü kilit hiçbir
   // yüzeyde GÖSTERİLMİYORDU; ses kanalı satırı bunu artık gösteriyor (§2/§8).
   locked: boolean;
+  // Sprint M4g — `toChannelDto` üçünü zaten dönüyordu (channels.service.ts), yalnız tiplenmemişti.
+  // Yalnız GUILD_VOICE'ta anlamlı; `channel-edit` bu alanları yalnız `type === GUILD_VOICE` iken
+  // gösterir/gönderir (fail-closed — §3 sözleşme).
+  userLimit: number;
+  bitrate: number;
+  mediaEnabled: boolean;
 }
 
 export const channelsApi = {
@@ -54,7 +60,9 @@ export const channelsApi = {
    * M4c bu kısıtı kaldırdı (§2 — kanal listesi artık `GUILD_VOICE`i de gösteriyor).
    *
    * Sorulmayan alanlar (varsayılanla gider): `slowModeSeconds` · `userLimit` · `bitrate` ·
-   * `mediaEnabled` (§10 — bunlar OLUŞTURMA'da değil DÜZENLEME'de bile yok, kapsam dışı kaldı).
+   * `mediaEnabled` — sahip kararı (M4g sözleşmesi): bu alanlar OLUŞTURMA formuna KONMAZ, yalnız
+   * var olan kanalın ayarlarında (`channel-edit`) düzenlenir. Kapsam dışı kalan OLUŞTURMA, DÜZENLEME
+   * değil (M4g'den önce ikisi de yoktu).
    * Sorulanlar erişim kararıdır: `isPrivate` + `ageGated` (T&S kapısı).
    */
   async create(
@@ -74,8 +82,9 @@ export const channelsApi = {
   /**
    * M1e — düzenleme yüzeyi genişledi (sahip talebi 2026-08-01): kategori · özel kanal · yavaş mod.
    *
-   * 🔴 Sunucunun `UpdateChannelDto`sunda AYRICA `userLimit` · `bitrate` · `mediaEnabled` var; bunlar
-   * **yalnız ses kanalı** alanları ve mobil ses kanallarını hiç listelemiyor → gönderilmiyor.
+   * M4g — `userLimit` · `bitrate` · `mediaEnabled` eklendi. 🔴 Bunlar **yalnız ses kanalı**
+   * alanları; `channel-edit` bunları yalnız `type === GUILD_VOICE` iken body'ye ekler (fail-closed,
+   * §3 sözleşme) — çağıran `type` taşımazsa bu üçü hiç gönderilmez, yanlış kanala yazılmaz.
    * 🔴 Kanal "başlığı"/açıklaması (Discord'daki topic) **sunucuda YOK** — `Channel` modelinde böyle
    * bir alan yok, o yüzden ekranda da yok.
    */
@@ -87,6 +96,9 @@ export const channelsApi = {
       isPrivate?: boolean;
       slowModeSeconds?: number;
       categoryId?: string | null;
+      userLimit?: number;
+      bitrate?: number;
+      mediaEnabled?: boolean;
     },
   ): Promise<ChannelSummaryDto> {
     const res = await http.patch<ChannelSummaryDto>(`/channels/${channelId}`, body);

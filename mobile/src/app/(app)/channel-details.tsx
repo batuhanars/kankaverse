@@ -192,6 +192,11 @@ export default function ChannelDetailsScreen() {
                   slowModeSeconds: String(channel.slowModeSeconds),
                   categoryId: channel.categoryId ?? '',
                   guildId,
+                  // M4g §3 — fail-closed savunması bu taşımaya bağlı.
+                  type: channel.type,
+                  userLimit: String(channel.userLimit),
+                  bitrate: String(channel.bitrate),
+                  mediaEnabled: String(channel.mediaEnabled),
                 },
               })
             }
