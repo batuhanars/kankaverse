@@ -3685,3 +3685,34 @@ Sahip webde bakıp onayladı, ayrı ayrı işaretlemeye gerek kalmadı:
 - **Taşı alt menüsü** menünün sağında ayrı kutu ✅
 - **M4j** taşıma akışı ✅ (hedef kanal adı da sunucudan gelir hâle getirildi)
 - **M4i · M4g · M4p · M4t · R17 · R19** cihazda doğrulandı
+
+---
+
+## Sprint M4h — Mobil Ses Moderasyonu — 2026-08-08 ✅ KOD BİTTİ
+
+> Sözleşme: `contracts/SPRINT_M4H_MOBILE_VOICE_MODERATION_CONTRACT.md`. Tier yalnız `mobile/`,
+> native diff yok. Sunucudaki dört uç bugüne dek mobilde hiç kullanılmıyordu.
+
+- [x] Arama ekranında katılımcıya dokununca moderasyon alt sayfası (mevcut sheet deseni; yeni altyapı yok)
+- [x] Sustur / Susturmayı Kaldır · Yayını Durdur · Taşı · Odadan Çıkar (onaylı)
+- [x] 🔴 **D53 tuzağı mobilde tekrarlanmadı:** susturulma durumu eylemin İLK satırında yerel sabite
+      alınıyor, sheet kapanışı okumayı etkilemiyor. Ayrıca durum kaynağı ayrıştırıldı —
+      `serverMutedUserIds` (kalıcı sunucu susturması) ≠ `mutedUserIds` (LiveKit track mute)
+- [x] `mutedUserIds` mobilde tiplendi + WS ile canlı güncelleniyor (R16'da sunucuya eklenmişti,
+      yalnız web kullanıyordu)
+- [x] Yetki `useGuildPermission` ile; kendine ve ortam sahibine eylem yok; yetkisizde sheet açılmıyor
+- [x] `typecheck` + `lint` temiz · `api/`+`web/` diffi sıfır (PM doğruladı)
+
+### Sözleşme sapması (dev bildirdi, PM kabul etti)
+`home.tsx`e 3 satır: `startOrJoin`e `guildId` geçiliyor. Sözleşmenin dosya listesinde yoktu ama
+yapısal olarak zorunluydu — `call.tsx` guildId almadan yetki kapısı hiç açılamazdı, özellik kalıcı
+kapalı kalırdı. Dev bunu gizlemek yerine raporladı.
+
+### DoD (cihazda — SAHİPTE)
+- [ ] Yetkili olarak katılımcıya dokun → eylemler görünüyor; yetkisiz hesapta **hiçbiri** görünmüyor
+- [ ] Sustur → ses **ve** kamera kesiliyor, etiket "Susturmayı Kaldır"a dönüyor
+- [ ] Susturmayı kaldır → gerçekten kalkıyor (webdeki D53 tuzağı tekrarlanmadı)
+- [ ] Yayını durdur → video düşüyor, **ses sürüyor**
+- [ ] Taşı → hedefe geçiyor; dolu/yaş-kapılı hedefte **sebep** görünüyor
+- [ ] Odadan çıkar → onay çıkıyor, sonra hedef odadan düşüyor
+- [ ] Kendine ve ortam sahibine eylem görünmüyor

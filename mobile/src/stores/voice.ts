@@ -96,6 +96,14 @@ interface VoiceState {
   callChannelName: string | null;
   callGuildName: string | null;
   /**
+   * Sprint M4h §1/§2 — ortamın id'si (`callGuildName` ADIYLA AYNI YERDE dolu — yalnız `kind==='guild'`).
+   * `callGuildName` yalnız GÖSTERİM içindi (ikinci satır metni); moderasyon sheet'inin
+   * `useGuildPermission(guildId, ...)` + `channelsApi.listByGuild(guildId)` çağırabilmesi için id
+   * lazımdı, o yüzden ayrı bir alan (adı basmak ile yetkiyi sorgulamak farklı ihtiyaçlar). DM/grup
+   * DM'de `callGuildName` gibi her zaman `null` — moderasyon o dallarda hiç yok.
+   */
+  guildId: string | null;
+  /**
    * Sprint M4t §2 🔴 — C7 §E2 kamera uyarısının kapı koşulu: yalnız `kind==='guild'` VE kanal
    * `ageGated` değil VE ortam `adultsOnly` değil (web `useVoiceNudge.ts` `isGeneralVoiceChannel`
    * pariteti). DM/grup DM'de çağıran taraf bu alanı hiç geçmez → `false` kalır (nudge o dallarda
@@ -175,6 +183,24 @@ interface VoiceState {
   roomParticipants: RoomMember[];
   speakingUserIds: Set<string>;
   mutedUserIds: Set<string>;
+  /**
+   * Sprint M4h §3 🔴 (kontrat `SPRINT_M4H_MOBILE_VOICE_MODERATION_CONTRACT.md`, R16) — KALICI
+   * (server) susturma listesi. `mutedUserIds`in TAMAMEN AYRI bir kavram: o LiveKit track-mute'unu
+   * (kendi kapatması + sunucu zorlaması ikisini birden) yansıtan bir "mikrofon simgesi" durumu;
+   * `serverMutedUserIds` yalnız moderatörün `voiceApi.mute`/`unmute` ile yazdığı KALICI bayrak — bir
+   * katılımcı kendi mikrofonunu kapatınca bu Set DEĞİŞMEZ. Moderasyon sheet'inin "Sustur"/
+   * "Susturmayı Kaldır" etiketinin TEK okuma kaynağı budur.
+   *
+   * 🔴 D53 tuzağı (web'de bugün yaşandı, kontrat §3) — etiket doğru göründüğü hâlde eylem yanlış
+   * uca gidebiliyordu çünkü durum menü KAPATILDIKTAN SONRA okunuyordu. Kural: bu Set'ten okuma
+   * eylem tetiklenmeden ÖNCE (sheet'in `onPress` closure'ı render anındaki değeri yakalar), sheet
+   * kapanışı okumayı ETKİLEMEZ — bkz. `components/call/ParticipantModerationHost.tsx`.
+   *
+   * Kaynak: `startOrJoin` bağlandıktan sonra `voiceApi.getParticipants` ile HİDRATE eder (yalnız
+   * guild dalı — DM/GROUP_DM sunucuda her zaman `[]` döner); canlı güncelleme WS
+   * `voice.participant_muted`/`unmuted` ile (`realtime/socket.ts` → `applyServerMute`).
+   */
+  serverMutedUserIds: Set<string>;
   /** Beklenmedik/bilgilendirilmesi gereken ayrılış nedeni (Türkçe) — çağıran ekran Alert ile gösterir,
    *  sonra temizler. Kullanıcı kendi "kapat"a bastıysa null kalır (alert gösterilmez). */
   disconnectReason: string | null;
@@ -244,6 +270,9 @@ interface VoiceState {
       invite?: boolean;
       kind?: 'dm' | 'group' | 'guild';
       guildName?: string;
+      /** Sprint M4h §1 — `callGuildName`in id karşılığı, bkz. `guildId` alan yorumu. Yalnız
+       *  `kind:'guild'` çağıran taraf (`home.tsx` `joinVoiceChannel`, `handleMoved`) geçer. */
+      guildId?: string | null;
       /** M4d §2 — bağlantı kurulduktan sonra kamera otomatik açılsın mı (DM başlığındaki
        *  görüntülü ara düğmesi). Web `pendingCameraStart` pariteti. */
       startWithCamera?: boolean;
@@ -296,6 +325,12 @@ interface VoiceState {
      *  ad buradan gelmezse arama ekranı başlıksız kalıyordu (sahip cihaz turu 2026-08-08). */
     toChannelName?: string,
   ) => Promise<{ ok: boolean; message?: string; reason?: 'mic_denied' | 'other' } | void>;
+  /**
+   * Sprint M4h §3 — `realtime/socket.ts`in `voice.participant_muted`/`unmuted` dinleyicileri
+   * çağırır. `channelId` bağlı olduğumuz kanalla eşleşmiyorsa yok sayılır (stale/ilgisiz bildirim —
+   * `handleMoved`teki aynı koruma deseni).
+   */
+  applyServerMute: (channelId: string, userId: string, muted: boolean) => void;
 }
 
 // Yerel bağlantı nesnesi — reaktif değil (web voice.ts ile aynı gerekçe, kompleks/mutable nesne).
@@ -390,6 +425,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   callKind: 'dm',
   callChannelName: null,
   callGuildName: null,
+  guildId: null,
   isGeneralVoiceChannel: false,
   emergencyPending: false,
   movePending: false,
@@ -405,6 +441,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   roomParticipants: [],
   speakingUserIds: new Set(),
   mutedUserIds: new Set(),
+  serverMutedUserIds: new Set(),
   disconnectReason: null,
   cameraStoppedNotice: null,
   outputId: null,
@@ -493,6 +530,8 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       // Grup DM'de de dolu (grubun adı) — call.tsx başlığı guild'deki gibi buradan okur (§4 yorumu).
       callChannelName: isGuild || isGroup ? label : null,
       callGuildName: isGuild ? (options?.guildName ?? null) : null,
+      // Sprint M4h §1 — `callGuildName` ile AYNI kapı (yalnız guild dalı), bkz. alan yorumu.
+      guildId: isGuild ? (options?.guildId ?? null) : null,
       // Sprint M4t §2 — yalnız guild dalında çağıran tarafın hesabı okunur; DM/grup hiç geçmediği
       // için zaten `undefined` → `false` (nudge o dallarda sorulmaz, sözleşme §2.1).
       isGeneralVoiceChannel: isGuild ? !!options?.isGeneralVoiceChannel : false,
@@ -573,6 +612,23 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
 
       refreshRoomParticipants(set, get);
       scheduleAloneCheckIfNeeded(get);
+
+      // Sprint M4h §3 🔴 — server-mute hidrasyonu. Yalnız guild dalı (DM/GROUP_DM sunucuda her
+      // zaman `mutedUserIds: []` döner, gereksiz istek atılmaz). Best-effort + geç-gelen yanıtın
+      // stale yazmaması için hâlâ AYNI kanaldayız mı kontrolü (`handleMoved`teki desenle aynı ders).
+      if (isGuild) {
+        void voiceApi
+          .getParticipants(channelId)
+          .then((res) => {
+            if (get().connectedChannelId === channelId) {
+              set({ serverMutedUserIds: new Set(res.mutedUserIds) });
+            }
+          })
+          .catch(() => {
+            // yoksay — sheet açılana kadar WS güncellemesi/yeniden deneme yok; en kötü ihtimalle
+            // etiket bir sonraki `voice.participant_muted/unmuted` olayına kadar "Sustur" gösterir.
+          });
+      }
 
       // M4d §2 — DM başlığından "görüntülü ara" ile geldiysek VE sunucu izin verdiyse, niyeti
       // burada YALNIZ İŞARETLE — gerçek açma işi `/call`in mount effect'inde `toggleCamera` ile
@@ -719,6 +775,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       callKind: 'dm',
       callChannelName: null,
       callGuildName: null,
+      guildId: null,
       // Diğer kozmetik sıfırlamalarla aynı ders — bir sonraki `startOrJoin` zaten üzerine yazar.
       // 🔴 `emergencyPending` BİLİNÇLİ OLARAK burada YOK: bu `set()` emergency akışının kendisi
       // tarafından (sunucu kicki → `Disconnected` → `leave(false)`) tetiklenebilir; burada
@@ -737,6 +794,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       roomParticipants: [],
       speakingUserIds: new Set(),
       mutedUserIds: new Set(),
+      serverMutedUserIds: new Set(),
       cameraStoppedNotice: null,
       outputId: null,
       disconnectReason: userInitiated ? null : get().disconnectReason,
@@ -829,14 +887,26 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     // Bağlı olduğumuz kanal `fromChannelId` DEĞİL VE boş da değilse (başka bir aramadayız) —
     // stale/ilgisiz bildirim, aktif farklı bir oturumu kesmeyiz.
     if (current !== null && current !== fromChannelId) return;
+    // Sprint M4h §4 🔴 — `guildId` BURADA yakalanır: aşağıdaki `leave()` durumu sıfırlıyor, o
+    // yüzden `startOrJoin`e geçilmezse hedef kanaldaki moderasyon sheet'i (call.tsx) guildId'siz
+    // kalır (yetki sorgusu hep `false` döner, sheet hiç açılmaz gibi görünür — sessiz bozulma).
+    const guildId = get().guildId;
     // `disconnectReason` burada koşulsuz temizlenir: ters sırada (LiveKit kicki bu olaydan önce
     // ulaştıysa) `wireRoom`daki `Disconnected` `movePending` henüz false iken ateşlenmiş olabilir ve
     // "Bağlantı kesildi." yazmış olabilir — bkz. arayüzdeki `handleMoved` yorumu.
     set({ movePending: true, disconnectReason: null });
     if (current === fromChannelId) await get().leave(true);
-    const res = await get().startOrJoin(toChannelId, toChannelName ?? '', { kind: 'guild' });
+    const res = await get().startOrJoin(toChannelId, toChannelName ?? '', { kind: 'guild', guildId });
     set({ movePending: false });
     return res;
+  },
+
+  applyServerMute(channelId, userId, muted) {
+    if (get().connectedChannelId !== channelId) return;
+    const s = new Set(get().serverMutedUserIds);
+    if (muted) s.add(userId);
+    else s.delete(userId);
+    set({ serverMutedUserIds: s });
   },
 }));
 

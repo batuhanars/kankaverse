@@ -258,6 +258,18 @@ function ensureSocket(): Socket {
     useVoiceStore.getState().handleCallRejected(data.channelId);
   });
 
+  // ---- Sprint M4h — ses kanalı moderasyonu (§3, R16) ----
+  // Sunucu (`voice.service.ts` `muteParticipant`/`unmuteParticipant`) yalnız o kanaldaki tüm
+  // istemcilere yayar; `channelId` `applyServerMute` içinde bağlı olduğumuz kanalla eşleşmeyen
+  // stale/ilgisiz olayları eler (web `useSocket.ts:420-425` pariteti — mantık taşındı, kod
+  // kopyalanmadı).
+  socket.on('voice.participant_muted', (data: { channelId: string; userId: string }) => {
+    useVoiceStore.getState().applyServerMute(data.channelId, data.userId, true);
+  });
+  socket.on('voice.participant_unmuted', (data: { channelId: string; userId: string }) => {
+    useVoiceStore.getState().applyServerMute(data.channelId, data.userId, false);
+  });
+
   // ---- Sprint M4j (D55) — moderatör taşıması ----
   // Sunucu (`voice.service.ts` `moveParticipant`) kullanıcıyı kaynak LiveKit odasından ÖNCEDEN
   // çıkarır ve YALNIZ taşınan kullanıcıya bu olayı gönderir; hedefe katılmak istemcinin işi (web

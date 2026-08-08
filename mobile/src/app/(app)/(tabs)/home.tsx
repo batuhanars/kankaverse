@@ -247,6 +247,9 @@ export default function HomeScreen() {
     const res = await useVoiceStore.getState().startOrJoin(channel.id, channel.name ?? '', {
       kind: 'guild',
       guildName: selectedGuildName,
+      // Sprint M4h §1 — moderasyon sheet'inin (call.tsx) `useGuildPermission`/`channelsApi.listByGuild`
+      // için ihtiyaç duyduğu id; `channel.guildId` zaten elde (ekstra istek yok).
+      guildId: channel.guildId,
       isGeneralVoiceChannel,
     });
     setVoiceJoining(false);
