@@ -4,15 +4,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useVoiceStore } from '@/stores/voice';
+import { useVoiceStore, type RoomMember } from '@/stores/voice';
 import { useDmStore } from '@/stores/dm';
 import { useAuthStore } from '@/stores/auth';
+import { useGuildPermission } from '@/hooks/useGuildPermission';
+import { guildsApi } from '@/api/guilds';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { ParticipantTile } from '@/components/call/ParticipantTile';
 import { CallControls } from '@/components/call/CallControls';
 import { OutputPickerSheet } from '@/components/call/OutputPickerSheet';
 import { EmergencyButton } from '@/components/call/EmergencyButton';
 import { CameraNudgeModal, shouldShowCameraNudge, markCameraNudgeShown } from '@/components/call/CameraNudgeModal';
+import { ParticipantModerationHost } from '@/components/call/ParticipantModerationHost';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -85,6 +88,43 @@ export default function CallScreen() {
 
   const channel = useDmStore((s) => s.channels.find((c) => c.id === channelId));
   const myUser = useAuthStore((s) => s.user);
+
+  // ── Sprint M4h — ses kanalı moderasyonu (kontrat SPRINT_M4H_MOBILE_VOICE_MODERATION_CONTRACT.md) ──
+  // Yüzey yalnız guild araması: `guildId` DM/grup DM'de her zaman `null` (bkz. `stores/voice.ts`
+  // `guildId` alan yorumu), aşağıdaki `useGuildPermission` çağrıları o dallarda otomatik `false` döner.
+  const guildId = useVoiceStore((s) => s.guildId);
+  const serverMutedUserIds = useVoiceStore((s) => s.serverMutedUserIds);
+  const canMute = useGuildPermission(isGuildCall ? guildId : null, 'MUTE_MEMBERS');
+  const canMove = useGuildPermission(isGuildCall ? guildId : null, 'MOVE_MEMBERS');
+  // Sözleşme §2 — kendine ve ORTAM SAHİBİNE eylem gösterilmez. Tekil "bu guild'in sahibi kim" ucu
+  // yok (`useGuildPermission` ile aynı gerekçe): üye olduğum ortamlar listesinden okunur.
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isGuildCall || !guildId) {
+      setOwnerId(null);
+      return;
+    }
+    let cancelled = false;
+    guildsApi
+      .list()
+      .then((guilds) => {
+        if (!cancelled) setOwnerId(guilds.find((g) => g.id === guildId)?.ownerId ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setOwnerId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isGuildCall, guildId]);
+  const [moderationTarget, setModerationTarget] = useState<RoomMember | null>(null);
+  function canModerate(p: RoomMember): boolean {
+    if (!isGuildCall) return false;
+    if (!canMute && !canMove) return false;
+    if (p.userId === myUser?.id) return false;
+    if (ownerId && p.userId === ownerId) return false;
+    return true;
+  }
 
   const [outputSheetOpen, setOutputSheetOpen] = useState(false);
   // Sprint M4t §2 — kamera nudge modalı görünürlüğü (kapı/hatırlama `CameraNudgeModal.tsx`te).
@@ -420,7 +460,15 @@ export default function CallScreen() {
               showsVerticalScrollIndicator={false}
             >
               {shown.participants.map((p) => (
-                <View key={p.userId} style={styles.gridItem}>
+                // Sprint M4h — moderasyon sheet tetikleyicisi (yalnız guild aramasında + yetkili +
+                // kendi/sahip dışı; bkz. `canModerate`). Yetkisiz/self/sahip dokunuşu yutar (`disabled`),
+                // görsel geri bildirim eklemez — düğme gibi görünmesin diye ripple/opacity YOK.
+                <Pressable
+                  key={p.userId}
+                  style={styles.gridItem}
+                  disabled={!canModerate(p)}
+                  onPress={() => setModerationTarget(p)}
+                >
                   <ParticipantTile
                     name={p.username}
                     avatarUrl={p.avatarUrl}
@@ -429,7 +477,7 @@ export default function CallScreen() {
                     videoPublication={p.isLocal ? shown.localCameraPublication : (shown.remoteCameraPublications[p.userId] ?? null)}
                     mirror={p.isLocal && shown.cameraFacing === 'user'}
                   />
-                </View>
+                </Pressable>
               ))}
               {pendingMembers.map((m) => (
                 <View key={`pending:${m.id}`} style={styles.gridItem}>
@@ -471,13 +519,15 @@ export default function CallScreen() {
               showsVerticalScrollIndicator={false}
             >
               {shown.participants.map((p) => (
-                <ParticipantTile
-                  key={p.userId}
-                  name={p.username}
-                  avatarUrl={p.avatarUrl}
-                  speaking={speakingUserIds.has(p.userId)}
-                  micOff={p.isLocal ? isMuted : mutedUserIds.has(p.userId)}
-                />
+                // Sprint M4h — bkz. ızgara dalındaki aynı yorum (`canModerate`).
+                <Pressable key={p.userId} disabled={!canModerate(p)} onPress={() => setModerationTarget(p)}>
+                  <ParticipantTile
+                    name={p.username}
+                    avatarUrl={p.avatarUrl}
+                    speaking={speakingUserIds.has(p.userId)}
+                    micOff={p.isLocal ? isMuted : mutedUserIds.has(p.userId)}
+                  />
+                </Pressable>
               ))}
               {/* M4z §E — bekleyen üyeler: aynı kutucuk, yalnız `dimmed`. Mikrofon/konuşma
                   göstergesi YOK (o bilgi yok), `ringing` de YOK — grupta kimin telefonunun
@@ -608,6 +658,20 @@ export default function CallScreen() {
       </View>
 
       <OutputPickerSheet visible={outputSheetOpen} onClose={() => setOutputSheetOpen(false)} />
+      {/* Sprint M4h — moderasyon paneli. `isServerMuted`/`isBroadcasting` RENDER ANINDA türetilir
+          (sözleşme §3 — Host'un `onToggleMute` closure'ı bu değeri panel kapanmadan ÖNCE yakalar). */}
+      <ParticipantModerationHost
+        channelId={channelId}
+        guildId={guildId}
+        participant={moderationTarget}
+        canMute={canMute}
+        canMove={canMove}
+        isServerMuted={moderationTarget ? serverMutedUserIds.has(moderationTarget.userId) : false}
+        isBroadcasting={
+          moderationTarget ? !!shown.remoteCameraPublications[moderationTarget.userId]?.track : false
+        }
+        onClose={() => setModerationTarget(null)}
+      />
       <CameraNudgeModal
         visible={cameraNudgeVisible}
         onConfirm={() => {
