@@ -12,6 +12,10 @@ import {
   type LocalTrackPublication,
   type RemoteTrackPublication,
 } from 'livekit-client';
+// M4f §3.2 🔴 — `TrackSource` (protobuf numeric enum) `livekit-client`in KENDİ bağımlılığı, yeni bir
+// paket EKLENMEDİ. `ParticipantPermission.canPublishSources`in tip kaynağı burası (`livekit-client`
+// bu tipi kendisi re-export etmiyor); yalnız CAMERA karşılaştırması için kullanılıyor.
+import { TrackSource } from '@livekit/protocol';
 import { AudioSession, AndroidAudioTypePresets } from '@livekit/react-native';
 import { voiceApi } from '@/api/voice';
 import { callInvite, callCancel, groupCallStart, groupCallCancel } from '@/realtime/socket';
@@ -133,12 +137,21 @@ interface VoiceState {
   /** Beklenmedik/bilgilendirilmesi gereken ayrılış nedeni (Türkçe) — çağıran ekran Alert ile gösterir,
    *  sonra temizler. Kullanıcı kendi "kapat"a bastıysa null kalır (alert gösterilmez). */
   disconnectReason: string | null;
+  /**
+   * M4f §3.3 🔴 — sunucu kaynaklı kamera kesilmesi bildirimi (R11 yayın-durdur / izin düşüşü).
+   * `disconnectReason` ile AYNI desen (ekran Alert gösterip temizler) ama AYRI alan: arama
+   * BİTMİYOR, yalnız kamera düşüyor — `disconnectReason`ın "ekranı kapat" akışına karışmaması
+   * gerekiyor. Metin GEREKÇE söylemez ("moderatör" demez) — o bilgi istemcide yok, tahmin edilmez.
+   */
+  cameraStoppedNotice: string | null;
   /** §5 — son BİLİNEN çıkış seçimi (SDK "şu an hangisi aktif" sorgusu vermiyor, yalnız kendi
    *  seçimlerimizi takip ediyoruz — bkz. `OutputPickerSheet`in rapordaki bilinen sınırı). */
   outputId: AudioOutputId | null;
 
   isConnectedTo: (channelId: string) => boolean;
   clearDisconnectReason: () => void;
+  /** `cameraStoppedNotice` yorumuna bkz. — çağıran ekran Alert'i gösterdikten sonra çağırır. */
+  clearCameraStoppedNotice: () => void;
   setOutputId: (id: AudioOutputId) => void;
   /** `/call` mount effect'i çağırır — bkz. `pendingCallScreen` yorumu. */
   clearPendingCallScreen: () => void;
@@ -242,6 +255,13 @@ let foregroundListenerRemove: (() => void) | null = null;
 // YAZAR — arka plan/ön plan geçişi yalnız OKUR (kullanıcının "kapattım" iradesiyle "arka planda
 // geçici durduruldu" birbirine karışmasın). `leave()` her oturumda sıfırlar.
 let cameraIntent = false;
+// M4f §3.1 🔴 — "bu unpublish biz mi istedik" bayrağı (`leaving` ile aynı desen). LiveKit'in yerel
+// unpublish yolu TEK: kullanıcı düğmeye bastığında (`toggleCamera`) ve arka plana alındığında
+// (`handleAppStateChange`) da, sunucu R11 yayın-durdur ile izni düşürdüğünde de aynı
+// `RoomEvent.LocalTrackUnpublished` olayı ateşlenir — SDK ikisini AYIRT ETMEZ (bkz. wireRoom
+// yorumu). Bu bayrak true iken gelen olay "biz zaten hallettik" sayılır (o yolun kendi state
+// güncellemesi var); false iken gelen olay sunucu kaynaklıdır.
+let localCameraStopping = false;
 // §6 — AppState aboneliği `startOrJoin` içinde kurulur, `leave()`te söker (foreground listener ile
 // aynı yaşam döngüsü deseni).
 let appStateSub: { remove: () => void } | null = null;
@@ -309,6 +329,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   speakingUserIds: new Set(),
   mutedUserIds: new Set(),
   disconnectReason: null,
+  cameraStoppedNotice: null,
   outputId: null,
 
   isConnectedTo(channelId) {
@@ -316,6 +337,9 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   },
   clearDisconnectReason() {
     set({ disconnectReason: null });
+  },
+  clearCameraStoppedNotice() {
+    set({ cameraStoppedNotice: null });
   },
   setOutputId(id) {
     set({ outputId: id });
@@ -521,6 +545,12 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     // `voice/leave`i ikinci kez atıyor ve durumu yarıda sıfırlıyordu.
     if (leaving) return;
     leaving = true;
+    // 🔴 PM incelemesi (2026-08-08, M4f) — `room.disconnect()` yerel track'leri de unpublish eder ve
+    // bu, kamera açıkken `LocalTrackUnpublished`i ateşler. Bayrak kalkmasaydı o olay SUNUCU KAYNAKLI
+    // sayılır, kullanıcı aramayı kaparken "Kameran kapatıldı" uyarısı alırdı (üstelik uyarı ekran
+    // yığından çıktıktan sonra, DM ekranının üstünde belirirdi). Kapanış BİZDEN — burada işaretlenir,
+    // aşağıdaki oturum sıfırlaması `false`a döndürür.
+    localCameraStopping = true;
     // Ekran bunu görünce YIĞINDAN ÇIKAR (bkz. `isLeaving` açıklaması). Bilerek en başta ve
     // `await`lerden ÖNCE: aşağıdaki temizlik durumu boşaltmadan önce ekranın gitmiş olması gerekiyor.
     set({ isLeaving: true });
@@ -535,6 +565,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     autoEndWhenAlone = true; // §4 — kozmetik sıfırlama, bir sonraki `startOrJoin` zaten üzerine yazar
     currentPeerLabel = '';
     cameraIntent = false; // M4d §6 — yeni oturum eski niyeti hatırlamaz (diğer kozmetik sıfırlamalarla aynı ders)
+    localCameraStopping = false; // M4f §3.1 — aynı kozmetik sıfırlama, bir önceki oturumdan kalamaz
     // Her oturum yeni bir `Room` nesnesi (yeni katılımcı kimlikleri) — bir sonraki `startOrJoin`
     // eski oturumdan kalma handler'larla karışmasın diye map burada temizlenir.
     speakingHandlers.clear();
@@ -599,6 +630,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       roomParticipants: [],
       speakingUserIds: new Set(),
       mutedUserIds: new Set(),
+      cameraStoppedNotice: null,
       outputId: null,
       disconnectReason: userInitiated ? null : get().disconnectReason,
     });
@@ -618,17 +650,22 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   },
 
   async toggleCamera() {
-    // §1/§7 + M4e §4 🔴 — kapı `callKind` DM ya da grup iken açık, guild'de KAPALI kalır (M4f'in
-    // işi). Yüzey `call.tsx`te zaten yalnız bu iki daldan bağlanır ama fonksiyon kendi kapısını da
-    // taşır (ileride yanlış yerden çağrılırsa sessizce no-op olsun).
-    const kind = get().callKind;
-    if (!room || !get().canPublishCamera || (kind !== 'dm' && kind !== 'group')) return { ok: false };
+    // §1/§7 + M4e §4 → M4f §2 🔴 — `callKind` bazlı kapı KALKTI (guild artık DIŞARIDA BIRAKILMIYOR).
+    // Kapı artık yalnız `canPublishCamera` (sunucu kararı, `resolveVideoSources`) — üç arama türünde
+    // de aynı fonksiyon, aynı koşul.
+    if (!room || !get().canPublishCamera) return { ok: false };
 
     if (get().isCameraOn) {
+      // M4f §3.1 — bu unpublish BİZDEN: `wireRoom`daki `LocalTrackUnpublished` dinleyicisi aynı
+      // olayı sunucu kaynaklı unpublish ile AYIRT EDEMEZ (SDK ikisinde de aynı olayı ateşler); bu
+      // bayrak "zaten biz hallettik" der, dinleyici tekrar iş yapmaz (bkz. modül değişkeni yorumu).
+      localCameraStopping = true;
       try {
         await room.localParticipant.setCameraEnabled(false);
       } catch {
         // yoksay — yerel state yine de kapanmış sayılır
+      } finally {
+        localCameraStopping = false;
       }
       cameraIntent = false;
       set({ isCameraOn: false, localCameraPublication: null });
@@ -760,10 +797,15 @@ async function handleAppStateChange(
   if (!room) return;
   if (next === 'background') {
     if (!get().isCameraOn) return;
+    // M4f §3.1 — bu unpublish de BİZDEN (bkz. `toggleCamera`teki aynı bayrak yorumu); `cameraIntent`
+    // burada yine YAZILMAZ (üstteki yorum), yalnız sunucu kaynaklı unpublish dinleyicisi susturuluyor.
+    localCameraStopping = true;
     try {
       await room.localParticipant.setCameraEnabled(false);
     } catch {
       // yoksay — arka planda hata gösterecek bir ekran yok, sessizce dener
+    } finally {
+      localCameraStopping = false;
     }
     set({ isCameraOn: false, localCameraPublication: null });
   } else if (next === 'active') {
@@ -817,6 +859,38 @@ function wireRoom(
     const s = new Set(get().mutedUserIds);
     s.delete(p.identity);
     set({ mutedUserIds: s });
+  });
+  // M4f §3.1 🔴 — bu sprintin asıl işi. Yerel kamera track'i unpublish olduğunda (`LocalTrackUnpublished`,
+  // kaynak Camera) SDK bunun BİZDEN mi (`toggleCamera`/arka plan) yoksa SUNUCUDAN mı (R11 yayın-durdur,
+  // `voice.service.ts` `stopBroadcast` → `canPublishSources` düşer → LiveKit izni zorla düşürür) geldiğini
+  // AYIRT ETMEZ — ikisi de aynı olayı ateşler (bkz. `livekit-client` `handleLocalTrackUnpublished`,
+  // `unpublishTrack`in tek çağrı noktası). `localCameraStopping` bayrağı true iken bu, BİZİM az önce
+  // istediğimiz kapanış — o yolun kendi state güncellemesi zaten var, burası ikinci kez iş yapmaz.
+  // false iken gelen olay sunucu kaynaklıdır: `isCameraOn`/`localCameraPublication` düşürülür VE
+  // `cameraIntent` SIFIRLANIR (atlanırsa öne dönüşte `handleAppStateChange` moderasyon kararını
+  // sessizce deler, kamerayı kendiliğinden yeniden açar) — kullanıcıya `cameraStoppedNotice` ile
+  // (nedensiz) kısa bir bilgi verilir, ekran bunu Alert ile gösterip temizler (§3.3).
+  r.on(RoomEvent.LocalTrackUnpublished, (pub: LocalTrackPublication) => {
+    if (pub.source !== Track.Source.Camera) return;
+    // `leaving` de kontrol edilir: ayrılış `localCameraStopping`i en başta işaretliyor ama beklenmedik
+    // kopmada (`Disconnected` → `leave()`) sıra tersine dönebilir; iki bayrak birlikte "bu kapanış
+    // bizden/oturum bitiyor" der (PM incelemesi 2026-08-08).
+    if (localCameraStopping || leaving) return;
+    cameraIntent = false;
+    set({
+      isCameraOn: false,
+      localCameraPublication: null,
+      cameraStoppedNotice: t('mobile.call.cameraStopped'),
+    });
+  });
+  // M4f §3.2 🔴 — sunucu izin kararını (R11 yayın-durdur / re-mint) canlı yansıt: yayın kesilince
+  // düğme kaybolsun, izin geri gelirse (sonraki token mint'inde) düğme geri gelsin. Yalnız YEREL
+  // katılımcının değişimi ilgimizi çeker — uzak katılımcıların izin değişimi bu istemcide görünür
+  // bir şey değiştirmez. T&S §4: yaş bandı istemciye inmiyor, yalnız `canPublishSources` okunuyor.
+  r.on(RoomEvent.ParticipantPermissionsChanged, (_prev, participant: Participant) => {
+    if (participant.identity !== r.localParticipant.identity) return;
+    const canCamera = participant.permissions?.canPublishSources.includes(TrackSource.CAMERA) ?? false;
+    set({ canPublishCamera: canCamera });
   });
   // M4d §3 — uzak kameranın asıl kazanım/kayıp yolu: katılımcı yayına başlayınca/bırakınca.
   // M4e §2 🔴 — `remoteCameraPublications` artık `participant.identity` (userId) anahtarlı ÇOĞUL

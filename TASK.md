@@ -3384,14 +3384,28 @@ Karşı taraf kamerasını açmak istemeyebilir. Bu davranış bilinçli, kusur 
 > Sözleşme: `contracts/SPRINT_M4F_MOBILE_VIDEO_GUILD_CONTRACT.md`. Tier yalnız `mobile/`;
 > `api/` + `web/` kod diffi sıfır, native diff yok. Görüntülü yarının **son** parçası.
 
-- [ ] Kamera kapısı guild'i kapsıyor; ızgara düzeni ortam kanalında da açılıyor (kimse kamera
-      açmayınca bugünkü tek sütun liste aynen)
-- [ ] 🔴 **Sunucu yayını kestiğinde istemci uyuyor** (R11 `stop-broadcast` — DM'de ve grup DM'de bu uç
-      yoktu, istemci ayağı hiç yazılmamıştı): `LocalTrackUnpublished` → kamera kapanır,
-      `ParticipantPermissionsChanged` → `canPublishCamera` güncellenir
-- [ ] 🔴 `cameraIntent` de sıfırlanıyor — yoksa arka plandan dönünce kamera kendiliğinden açılıp
+- [x] Kamera kapısı guild'i kapsıyor; ızgara düzeni ortam kanalında da açılıyor (kimse kamera
+      açmayınca bugünkü tek sütun liste aynen). `callKind` bazlı kapı tamamen kalktı, tek kapı
+      `canPublishCamera`
+- [x] 🔴 **Sunucu yayını kestiğinde istemci uyuyor** (R11 `stop-broadcast`): `LocalTrackUnpublished` →
+      kamera kapanır, `ParticipantPermissionsChanged` → `canPublishCamera` güncellenir.
+      ⚠️ **Dev bulgusu:** LiveKit SDK bizim kendi unpublish'imizle sunucunun zorla indirmesini AYIRT
+      ETMİYOR (ikisi de aynı olay) → `localCameraStopping` bayrağı (mevcut `leaving` deseni)
+- [x] 🔴 `cameraIntent` de sıfırlanıyor — yoksa arka plandan dönünce kamera kendiliğinden açılıp
       moderatörün kararıyla çekişir (sessiz T&S delinmesi)
-- [ ] Kullanıcı sessiz bırakılmıyor ama gerekçe söylenmiyor ("moderatör" denmez — o bilgi istemcide yok)
+- [x] Kullanıcı sessiz bırakılmıyor ama gerekçe söylenmiyor ("moderatör" denmez — o bilgi istemcide yok)
+
+### 🔴 PM incelemesinde yakalanan bug
+Kamera açıkken aramayı kapatınca `room.disconnect()` yerel track'leri de unpublish ediyor →
+`LocalTrackUnpublished` ateşleniyor → bayrak `false` olduğu için olay **sunucu kaynaklı** sayılıyordu:
+kullanıcı aramayı kaparken "Kameran kapatıldı" uyarısı alacaktı, üstelik ekran yığından çıktığı için
+uyarı DM ekranının üstünde belirecekti. `leave()` artık bayrağı en başta işaretliyor, dinleyici de
+`leaving`i ayrıca kontrol ediyor.
+
+### Web pariteti → [[D52]]
+Aynı üç maddenin hiçbiri webde yok (`LocalTrackUnpublished`/`ParticipantPermissionsChanged` grep: sıfır).
+Yayını durdurulan web kullanıcısının düğmesi "kamera açık" göstermeye devam ediyor. D51 ile aynı dosya,
+aynı turda düzeltilecek.
 
 ### DoD (cihazda — SAHİPTE)
 > Tam liste sözleşme §5'te. En kritik iki madde: **(1)** web'den "yayını durdur" → mobilde kamera

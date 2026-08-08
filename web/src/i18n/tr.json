@@ -1759,6 +1759,7 @@
       "micPermissionDenied": "Kankaverse'in mikrofonuna erişimi yok, bu yüzden sesli aramaya katılamazsın.",
       "micPermissionSettings": "Ayarları Aç",
       "cameraPermissionDenied": "Kankaverse'in kamerana erişimi yok, bu yüzden kamerayı açamazsın.",
+      "cameraStopped": "Kameran kapatıldı.",
       "flipCamera": "Kamerayı çevir",
       "aloneTitle": "Bu aramada tek başınasın.",
       "aloneSubtitle": "{name} istediği zaman katılabilir.",

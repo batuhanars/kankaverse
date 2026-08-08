@@ -17,11 +17,11 @@ interface Props {
   onOpenChat?: () => void;
   onHangUp: () => void;
   /**
-   * M4d §5/§7 — yalnız `onToggleCamera` de dolu VE bu true iken kamera düğmesi çizilir. Çağıran
-   * taraf (`call.tsx`) bunu `(callKind==='dm' || callKind==='group') && canPublishCamera` ile besler
-   * (M4e §4); guild kamerası kapsam dışı (M4f) — orada düğme hiç görünmez. T&S §7: "görünür-kilitli
-   * yap" ilkesinin bilinçli
-   * istisnası, `canPublishCamera=false` sessizce hiç çizilmeyerek uygulanır.
+   * M4d §5/§7 → M4e §4 → M4f §2 🔴 — yalnız `onToggleCamera` de dolu VE bu true iken kamera düğmesi
+   * çizilir. Çağıran taraf (`call.tsx`) artık üç arama türünde de aynı `canPublishCamera`yı besler
+   * (`callKind` bazlı bir kısıt YOK — M4f ile guild kapsam dışı olmaktan çıktı). T&S §7:
+   * "görünür-kilitli yap" ilkesinin bilinçli istisnası, `canPublishCamera=false` sessizce hiç
+   * çizilmeyerek uygulanır.
    */
   canPublishCamera?: boolean;
   isCameraOn?: boolean;
