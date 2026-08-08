@@ -120,6 +120,19 @@ interface VoiceState {
    */
   emergencyPending: boolean;
   /**
+   * Sprint M4j (D55) 🔴 — moderatör başka ses kanalına taşıdığında (`voice.moved`, `realtime/socket.ts`
+   * dinler) sunucu bizi kaynak LiveKit odasından ÖNCEDEN çıkarıyor (`voice.service.ts`
+   * `moveParticipant`); bu bir hata değil, taşımanın parçası. `emergencyPending` ile BİREBİR AYNI
+   * iki-nokta bastırma deseni (kontrat notu: "aynısını kur, yeni mekanizma icat etme"):
+   *  (1) `wireRoom`daki `RoomEvent.Disconnected` — bu bayrak true iken "Bağlantı kesildi." YAZILMAZ.
+   *  (2) `call.tsx`teki otomatik `router.back()` — bu bayrak true iken ERTELENİR, ekran hedef
+   *      kanalda kalır (kutucuklar sökülüp yeniden mount olmaz — §1 "ekran hedef kanalda kalır").
+   * `handleMoved` başında `true`, hedefe katılma denemesi bitince (başarı/başarısızlık fark etmez)
+   * `false` olur — `emergencyPending`in `endEmergency()`i gibi ayrı bir kapatma eylemi YOK, çünkü
+   * kapanışı bekleyen bir kullanıcı geri bildirimi (EmergencyButton'daki modal) burada yok.
+   */
+  movePending: boolean;
+  /**
    * 🔴 M4c sahip bulgusu — katılma başarılı olduktan sonra `router.push('/call')` çalışana kadar
    * birkaç render'lık bir pencere var; bu sırada `connectedChannelId` zaten dolu ama rota hâlâ
    * `/call` DEĞİL, yani `MiniCallWindow` bir an görünüp kayboluyordu. Bu bayrak o pencereyi kapatır —
@@ -257,6 +270,29 @@ interface VoiceState {
 
   handleCallAccepted: (channelId: string) => void;
   handleCallRejected: (channelId: string) => void;
+  /**
+   * Sprint M4j (D55) 🔴 — `realtime/socket.ts`in `voice.moved` dinleyicisi çağırır. Web
+   * `useSocket.ts:445`in mantığı taşındı (kod kopyalanmadı — Vue ≠ RN): kaynaktan ayrıl, hedefe
+   * `startOrJoin` ile katıl. `kind:'guild'` sabit (taşıma yalnız ortam ses kanalları için var —
+   * DM/grup DM'de moderatör taşıma kavramı yok). `label` boş geçilir (§3 — mobilde kanal store'u
+   * yok, adı elde etmenin yolu yeni bir uç/store kurmak olurdu; kontrat bunu yasaklıyor).
+   *
+   * 🔴 Yarış durumu (bkz. `movePending` alan yorumu) — sunucu LiveKit kickini (`removeParticipant`)
+   * bu Socket.IO olayından ÖNCE awaitliyor ama iki sinyal FARKLI taşımalar (LiveKit medya bağlantısı
+   * vs. Socket.IO); hangisi istemciye ÖNCE ulaşır garanti değil:
+   *  - Yaygın sıra (bu olay önce): hâlâ `fromChannelId`e bağlıyız → kendi `leave(true)`imiz
+   *    LiveKit'in (muhtemelen az sonra gelecek) `Disconnected`ını `leaving` bayrağıyla zaten yutar.
+   *  - Nadir ters sıra (LiveKit kicki önce ulaşırsa): `Disconnected` bu fonksiyon çalışmadan ateşlenmiş
+   *    olabilir — `connectedChannelId` burada zaten boş/`fromChannelId`den farklı bulunur. Bu durumda
+   *    `leave()` tekrar ÇAĞRILMAZ (zaten temizlenmiş), ama olası hatalı `disconnectReason` burada
+   *    temizlenir ve hedefe katılım YİNE denenir — sessiz bırakma yasak.
+   * Bağlı olduğumuz kanal `fromChannelId` DEĞİLSE (başka bir aramadaysak) olay tamamen yok sayılır —
+   * stale/ilgisiz bir taşınma bildirimi aktif farklı bir oturumu kesmemeli.
+   */
+  handleMoved: (
+    fromChannelId: string,
+    toChannelId: string,
+  ) => Promise<{ ok: boolean; message?: string; reason?: 'mic_denied' | 'other' } | void>;
 }
 
 // Yerel bağlantı nesnesi — reaktif değil (web voice.ts ile aynı gerekçe, kompleks/mutable nesne).
@@ -353,6 +389,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   callGuildName: null,
   isGeneralVoiceChannel: false,
   emergencyPending: false,
+  movePending: false,
   pendingCallScreen: false,
   isMuted: false,
   canPublish: false,
@@ -633,12 +670,17 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     appStateSub = null;
 
     if (room) {
+      // 🔴 PM incelemesi (2026-08-08, M4j) — `disconnect()` BEKLEMELİ. O bekleme sırasında taşınma
+      // akışı (`handleMoved`) yeni bir `Room` kurup modül değişkenini ÜZERİNE yazabiliyor; koşulsuz
+      // `room = null` o yeni odanın referansını siliyordu (dev bu riski raporladı, "gizlemiyorum"
+      // diye işaretledi). Referansı yakala, yalnız HÂLÂ AYNI odaysa sıfırla.
+      const leavingRoom = room;
       try {
-        await room.disconnect();
+        await leavingRoom.disconnect();
       } catch {
         // yoksay
       }
-      room = null;
+      if (room === leavingRoom) room = null;
     }
     try {
       await AudioSession.stopAudioSession();
@@ -777,6 +819,21 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     if (get().connectedChannelId !== channelId) return;
     set({ disconnectReason: t('mobile.call.unreachable') });
     void get().leave(false);
+  },
+
+  async handleMoved(fromChannelId, toChannelId) {
+    const current = get().connectedChannelId;
+    // Bağlı olduğumuz kanal `fromChannelId` DEĞİL VE boş da değilse (başka bir aramadayız) —
+    // stale/ilgisiz bildirim, aktif farklı bir oturumu kesmeyiz.
+    if (current !== null && current !== fromChannelId) return;
+    // `disconnectReason` burada koşulsuz temizlenir: ters sırada (LiveKit kicki bu olaydan önce
+    // ulaştıysa) `wireRoom`daki `Disconnected` `movePending` henüz false iken ateşlenmiş olabilir ve
+    // "Bağlantı kesildi." yazmış olabilir — bkz. arayüzdeki `handleMoved` yorumu.
+    set({ movePending: true, disconnectReason: null });
+    if (current === fromChannelId) await get().leave(true);
+    const res = await get().startOrJoin(toChannelId, '', { kind: 'guild' });
+    set({ movePending: false });
+    return res;
   },
 }));
 
@@ -1033,10 +1090,14 @@ function wireRoom(
       // Sprint M4t §3.1 🔴 — acil buton onaylandıysa bu kopma SUNUCU KAYNAKLI ve BEKLENEN
       // (removeParticipant, A4 §B1.3): "Bağlantı kesildi." kusur mesajı EZMEZ, `EmergencyButton`
       // kendi geri bildirim akışını gösterir (bkz. `emergencyPending` alan yorumu).
-      if (!get().emergencyPending) {
+      // Sprint M4j (D55) 🔴 — moderatör taşıması da AYNI sebeple ezmez: sunucu kicki taşımanın
+      // parçası (bkz. `movePending` alan yorumu, `handleMoved` bu kopmayı KENDİSİ yönetiyor).
+      if (!get().emergencyPending && !get().movePending) {
         set({ disconnectReason: t('mobile.call.disconnected') });
       }
-      room = null;
+      // 🔴 Aynı kapı (bkz. `leave()` içindeki yorum): bu dinleyici ESKİ odaya ait; taşınmada yeni oda
+      // çoktan kurulmuş olabilir, o zaman burada sıfırlamak yenisini siler.
+      if (room === r) room = null;
       void get().leave(false);
     }
   });
