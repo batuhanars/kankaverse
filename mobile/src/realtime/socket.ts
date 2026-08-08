@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 import { getAccessToken, refreshAccessToken } from '@/api/http';
 import { useMessagesStore } from '@/stores/messages';
@@ -10,6 +11,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useVoiceStore } from '@/stores/voice';
 import { useVoicePresenceStore } from '@/stores/voicePresence';
 import { presentIncomingCall, dismissIncomingCall } from '@/notifications/incomingCall';
+import { t } from '@/i18n';
 import type { MessageDto } from '@/api/messages';
 import type { FriendDto, FriendRequestDto } from '@/api/friends';
 import type { VoiceParticipantDto } from '@/api/voice';
@@ -254,6 +256,28 @@ function ensureSocket(): Socket {
   });
   socket.on('voice.call_rejected', (data: { channelId: string }) => {
     useVoiceStore.getState().handleCallRejected(data.channelId);
+  });
+
+  // ---- Sprint M4j (D55) — moderatör taşıması ----
+  // Sunucu (`voice.service.ts` `moveParticipant`) kullanıcıyı kaynak LiveKit odasından ÖNCEDEN
+  // çıkarır ve YALNIZ taşınan kullanıcıya bu olayı gönderir; hedefe katılmak istemcinin işi (web
+  // `useSocket.ts:445` pariteti — mantık taşındı, kod kopyalanmadı). Bastırma ("Bağlantı kesildi"
+  // gösterilmemesi) + hedefe yeniden katılma `handleMoved`in kendi işi (`movePending` —
+  // `emergencyPending` deseni, bkz. `stores/voice.ts`); burası yalnız SONUCU kullanıcıya bildirir
+  // (🔴 sessiz başarısızlık yasak — dolu kanal/yaş kapısı/izin gibi bir sebeple hedefe katılım
+  // başarısız olursa sunucudan gelen Türkçe mesaj gösterilir).
+  socket.on('voice.moved', (data: { fromChannelId: string; toChannelId: string }) => {
+    void useVoiceStore
+      .getState()
+      .handleMoved(data.fromChannelId, data.toChannelId)
+      .then((res) => {
+        if (!res) return; // başka bir aramadaydık — ilgisiz, sessizce geç
+        if (!res.ok) {
+          Alert.alert(res.message ?? t('mobile.call.unreachable'));
+          return;
+        }
+        Alert.alert(t('voice.movedToast'));
+      });
   });
 
   // ---- M4a-2 gelen arama (sözleşme §8, uygulama açıkken) ----

@@ -58,6 +58,10 @@ export default function CallScreen() {
   // Sprint M4t §3 — acil akış sürerken otomatik `router.back()` ERTELENİR (bkz. aşağıdaki
   // `goneRef` effect'i + `stores/voice.ts` `emergencyPending` yorumu).
   const emergencyPending = useVoiceStore((s) => s.emergencyPending);
+  // Sprint M4j (D55) — moderatör taşıması sürerken de AYNI sebeple ERTELENİR: kaynaktan ayrılış bir
+  // hata değil, hedefe katılma denemesi bitene kadar ekran hedef kanalda kalır (bkz. `goneRef`
+  // effect'i + `stores/voice.ts` `movePending` yorumu).
+  const movePending = useVoiceStore((s) => s.movePending);
   // M4d §1/§7 → M4e §1/§4 → M4f §2 🔴 — kamera artık üç arama türünde de aynı kapıdan geçiyor:
   // `callKind` bazlı ayrı bir kapı YOK, tek kapı `canPublishCamera` (sunucu kararı,
   // `resolveVideoSources`). Guild daha önce burada bilinçli dışarıda tutuluyordu (masaüstü
@@ -181,7 +185,10 @@ export default function CallScreen() {
     // çekmiş/çekmemiş olabilir) navigasyon ERTELENİR: ekran mount'lu kalır ki geri bildirim modalı
     // unmount olmadan gösterilebilsin. `emergencyPending` false'a dönünce (kullanıcı feedback'i
     // kapattı) bu effect TEKRAR çalışır ve normal akışa (aşağısı) devam eder.
-    if (emergencyPending) return;
+    // Sprint M4j (D55) 🔴 — moderatör taşıması sürüyorsa (`movePending`) da AYNI sebeple ERTELENİR:
+    // kaynaktan ayrılış `handleMoved`in hedefe katılma denemesinin bir adımı, ekranın geri gitmesi
+    // gerekmiyor — hedefe katılınca `connectedChannelId` yeni kanala döner, ekran orada kalır.
+    if (emergencyPending || movePending) return;
     goneRef.current = true;
     // Kontrolleri gizleme sayacı da susturulur: kapanma sırasında tetiklenirse üst bar ve alt çubuk
     // sökülmekte olan yüzeyde unmount olur — dondurma ile aynı gerekçe.
@@ -192,7 +199,7 @@ export default function CallScreen() {
     // Uyarı sökülme sırasında değil, bir sonraki tick'te ve DM ekranının üstünde açılır.
     if (reason) setTimeout(() => Alert.alert(reason), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLeaving, connectedChannelId, emergencyPending]);
+  }, [isLeaving, connectedChannelId, emergencyPending, movePending]);
 
   // Süre sayacı — `connectedAt`ten itibaren mm:ss (web `connectedAt` pariteti).
   const [now, setNow] = useState(Date.now());

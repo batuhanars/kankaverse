@@ -3654,3 +3654,24 @@ bilgi almaya girmiş oluyor, yazı doğru bilgi veriyor. Kapanmış karar, tekra
 - [ ] Yayını durdur → video kesiliyor, **ses sürüyor**
 - [ ] Susturmayı kaldır → kendi isteğiyle kapatmışsa mikrofon **açılmıyor**
 - [ ] Kanalda medyayı kapat → o an kamerası açık olanın kamerası **düşüyor** (yeniden bağlanmadan)
+
+---
+
+## Sprint M4j — Mobilde "Taşındın" Akışı (D55) — 2026-08-08 ✅ KOD BİTTİ
+
+> Sözleşme: `contracts/SPRINT_M4J_MOBILE_MOVED_CONTRACT.md`. Tier yalnız `mobile/`, native diff yok.
+
+- [x] `voice.moved` dinleniyor; kaynaktan çıkılıp hedefe katılınıyor
+- [x] 🔴 Kopma "Bağlantı kesildi." diye gösterilmiyor (`movePending`, `emergencyPending` ikizi)
+- [x] Katılım başarısızsa sunucunun Türkçe sebebi gösteriliyor (sessiz başarısızlık yok)
+- [x] 🔴 **PM eki — ters-sıra yarışı kapatıldı:** dev, eski `leave()`in bekleyen `disconnect()`inin
+      yeni odanın referansını sıfırlayabileceğini raporladı (gizlemedi, iyi davranış). İki
+      `room = null` noktasına kimlik kontrolü kondu — yalnız hâlâ aynı odaysa sıfırlanıyor
+
+### DoD (cihazda — SAHİPTE)
+- [ ] Webden mobil kullanıcıyı başka ses kanalına taşı → mobil **hedef kanalda** beliriyor
+- [ ] Moderatör hedef kanalda kullanıcıyı **görüyor**
+- [ ] "Bağlantın kesildi" uyarısı **çıkmıyor**, taşındığı bilgisi görünüyor
+- [ ] Dolu/yaş-kapılı hedefe taşımada kullanıcı **sebebi görüyor**
+> ⚠️ Kırmızı konsol kutusu (LiveKit `console.error`) yine çıkabilir — bağlantı gerçekten kopuyor.
+> Başarı ölçütü yukarıdaki dört madde; kutu mağaza sürümünde zaten yok.
