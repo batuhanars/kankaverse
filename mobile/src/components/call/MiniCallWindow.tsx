@@ -1,4 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePathname, useRouter } from 'expo-router';
 import { useVoiceStore } from '@/stores/voice';
@@ -34,7 +35,13 @@ export function MiniCallWindow() {
   const peer = channel?.type === 'DM' ? channel.otherUser : null;
   const peerMember = roomParticipants.find((p) => !p.isLocal);
   const avatarUrl = peerMember?.avatarUrl ?? peer?.avatarUrl ?? null;
-  const initial = (peerMember?.username ?? peer?.username ?? '?').charAt(0).toUpperCase();
+  // 🔴 Sahip cihaz turu (2026-08-08) — bu kutu KARŞI TARAFI gösterir. Aramada yalnızken (ortam ses
+  // kanalına tek başına girmek, ya da taşınıp boş kanala düşmek) gösterilecek kimse olmuyordu ve
+  // kod boş addan ilk harfi alıp **"?"** basıyordu: kullanıcıya hata gibi görünüyor. Kendi avatarımızı
+  // koymak bilgi vermez (kim olduğunu zaten biliyor); o durumda hoparlör ikonu doğru bilgi taşır:
+  // "hâlâ bir ses aramasındasın". `alone` ayrı bir state DEĞİL, katılımcı listesinden türetiliyor.
+  const alone = !peerMember && !peer;
+  const initial = (peerMember?.username ?? peer?.username ?? '').charAt(0).toUpperCase();
   const speaking = peerMember ? speakingUserIds.has(peerMember.userId) : false;
 
   return (
@@ -48,7 +55,11 @@ export function MiniCallWindow() {
           <Image source={{ uri: avatarUrl }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, styles.avatarFallback]}>
-            <Text style={styles.avatarFallbackText}>{initial}</Text>
+            {alone || !initial ? (
+              <Ionicons name="volume-medium" size={22} color={theme.colors.accent500} />
+            ) : (
+              <Text style={styles.avatarFallbackText}>{initial}</Text>
+            )}
           </View>
         )}
       </View>
