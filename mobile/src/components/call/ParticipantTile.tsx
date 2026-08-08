@@ -5,7 +5,7 @@ import type { TrackPublication } from 'livekit-client';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
-type Variant = 'card' | 'full' | 'corner';
+type Variant = 'card' | 'full' | 'corner' | 'pip';
 
 interface Props {
   name: string;
@@ -42,6 +42,9 @@ interface Props {
    * - `'corner'` — sağ üst köşedeki küçük kendi-önizleme karesi. Yalnız kamera açıkken çağrılır
    *   (kapı çağıran tarafta — kapalıyken köşe kutusu hiç render edilmez). Ad/ringing yok, konuşma
    *   halkası VAR (§3-R: "iki-kutucuk düzeninde bugünkü gibi kalır").
+   * - `'pip'` — M4p sözleşme §3: sistem PiP penceresi (~150dp). Video/avatar TAM ALAN kaplar, ad/
+   *   mikrofon rozeti/konuşma kenarlığı/"Çalıyor…" YOK ("kontrol yok, metin yok" kırmızı çizgisi) —
+   *   `CallPipOverlay`in TEK tükettiği varyant.
    */
   variant?: Variant;
 }
@@ -96,6 +99,22 @@ export function ParticipantTile({
           </View>
         )}
         {ringing && <Text style={styles.fullRinging}>{t('mobile.call.ringing')}</Text>}
+      </View>
+    );
+  }
+
+  if (variant === 'pip') {
+    return (
+      <View style={styles.pipWrap}>
+        {hasVideo ? (
+          <VideoTrack trackRef={trackRef} style={styles.pipFill} mirror={mirror} objectFit="cover" />
+        ) : avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={styles.pipFill} />
+        ) : (
+          <View style={[styles.pipFill, styles.avatarFallback]}>
+            <Text style={styles.avatarFallbackText}>{name.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -312,6 +331,16 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.online,
   },
   cornerFill: {
+    width: '100%',
+    height: '100%',
+  },
+
+  // ── M4p §3 'pip' — sistem PiP penceresi, TAM ALAN, sıfır chrome ────────────
+  pipWrap: {
+    flex: 1,
+    backgroundColor: theme.colors.bgElevated,
+  },
+  pipFill: {
     width: '100%',
     height: '100%',
   },
