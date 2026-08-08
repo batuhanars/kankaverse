@@ -3345,9 +3345,9 @@ turda bakılsaydı ikinci tur hiç olmayacaktı. Kusur dev'in değil sözleşmen
 Sahip iki yönde de denedi (mobil→web, web→mobil).
 - [x] **(1)** görüntülü ara düğmesi aramayı kamera açık başlatıyor
 - [x] **(2)** arka plana alınca ses sürüyor, dönünce görüntü kaldığı yerden devam ediyor
-- [ ] **(3)** izin reddi aramayı düşürmüyor — ⚠️ **TEST EDİLEMEDİ**: kamera izni cihazda zaten
-      verilmişti, dal hiç çalışmadı. Kodda yazılı ama cihazda görülmedi. İzin elle geri alınıp
-      denenecek ([[pm-kapsam-kisitlari-varsayimdir]]: görülmeyen dal geçmiş sayılmaz)
+- [x] **(3)** izin akışı — sahip cihazda "her seferinde sor"a çevirdi, **izin istemi çıkıyor**.
+      ⚠️ Not: doğrulanan şey istemin çıkması; "reddet"e basıldığında aramanın düşmemesi + "Ayarları
+      Aç" uyarısı sahibin hangi düğmeye bastığına bağlı, ayrıca teyit edilirse tam kapanır
 - [x] **(4)** kamerasız 1-1 DM araması, grup DM ve ortam sesli kanalı regresyonsuz
 
 **Sahip ürün kararı:** aramayı kabul eden tarafın kamerası **otomatik açılmıyor**, tercihe bırakıldı
@@ -3370,7 +3370,10 @@ Karşı taraf kamerasını açmak istemeyebilir. Bu davranış bilinçli, kusur 
 - [x] Kendi kutucuğun ızgaranın elemanı (1-1'deki köşe önizlemesi grupta yok)
 - [x] T&S: grupta bir minör bile varsa video yok (sunucu kararı), düğme çizilmiyor
 
-### DoD (cihazda — SAHİPTE, en az üç hesap)
-> Tam liste sözleşme §6'da. En kritik iki madde: **(1)** 1-1 DM görüntülü arama **regresyonsuz**
-> (map refactor'ünün bozabileceği tek yer) · **(2)** iki kişi aynı anda kamera açınca ikisi de
-> görünüyor.
+### DoD (cihazda) — 🟢 SAHİP TURU GEÇTİ 2026-08-08 (altı maddenin altısı)
+- [x] 1-1 DM görüntülü arama **regresyonsuz** (map refactor'ünün bozabileceği tek yer — temiz)
+- [x] Grup DM'de kamera açılıyor, diğerleri görüyor
+- [x] İki kişi aynı anda kamera açınca ikisi de görünüyor (tek slot ezilme kusuru gitti)
+- [x] Biri kamerasını kapatınca yalnız onun kutucuğu avatara dönüyor
+- [x] Kimse kamera açmadığında sesli grup araması bugünkü gibi (tek sütun, alt alta)
+- [x] Ortam sesli kanalı regresyonsuz
