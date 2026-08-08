@@ -3612,7 +3612,7 @@ yükseltmesinde kaybolur ve gerçek kullanıcıya hiçbir şey kazandırmaz.
 > Sözleşme: `contracts/SPRINT_M4I_MOBILE_CAMERA_LOCKED_CONTRACT.md`. Tier yalnız `mobile/`, native
 > diff yok. Sahip isteği: "kamera butonu kalkmasın, üstü çizilsin."
 
-- [ ] Ortam kanalında `canPublishCamera=false` → düğme çiziliyor ama pasif/üstü çizili
-- [ ] 🔴 1-1 DM ve grup DM'de **hâlâ gizli** — orada video kapısı YAŞ kapısı, görünür-kilitli düğme
+- [x] Ortam kanalında `canPublishCamera=false` → düğme çiziliyor ama pasif/üstü çizili
+- [x] 🔴 1-1 DM ve grup DM'de **hâlâ gizli** — orada video kapısı YAŞ kapısı, görünür-kilitli düğme
       karşı tarafın minör olduğunu ifşa ederdi (brief §5/G1). Bilinçli ayrım, sadeleştirilmeyecek
-- [ ] İzin geri gelince düğme kendiliğinden etkinleşiyor (R17 + M4f dinleyicisi besliyor)
+- [x] İzin geri gelince düğme kendiliğinden etkinleşiyor (R17 + M4f dinleyicisi besliyor)

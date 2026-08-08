@@ -588,10 +588,12 @@ export default function CallScreen() {
           }}
           onOpenChat={isGuildCall ? undefined : handleOpenChat}
           onHangUp={handleHangUp}
-          // M4e §4 → M4f §2 🔴 — kamera düğmesi kapısı artık üç arama türünde de aynı:
-          // `callKind` bazlı kısıt kalktı, tek kapı `canPublishCamera` (`CallControls`in kendi
-          // `showCamera` hesabı zaten bunu VE `onToggleCamera` doluluğunu kontrol ediyor).
+          // M4e §4 → M4f §2 → M4i §2 🔴 — kamera düğmesi kapısı `canPublishCamera` (`CallControls`in
+          // `showCamera` hesabı bunu VE `onToggleCamera` doluluğunu kontrol ediyor); `isGuildCall`
+          // yalnız GÖSTERİMİ ayırır — ortam kanalında izin yokken düğme görünür-kilitli kalır, DM/grup
+          // DM'de eskisi gibi hiç çizilmez (T&S: DM'de video kapısı yaş kapısıdır, ifşa riski).
           canPublishCamera={canPublishCamera}
+          isGuildCall={isGuildCall}
           isCameraOn={shown.isCameraOn}
           onToggleCamera={handleToggleCamera}
           onSwitchCamera={handleSwitchCamera}

@@ -17,13 +17,19 @@ interface Props {
   onOpenChat?: () => void;
   onHangUp: () => void;
   /**
-   * M4d §5/§7 → M4e §4 → M4f §2 🔴 — yalnız `onToggleCamera` de dolu VE bu true iken kamera düğmesi
-   * çizilir. Çağıran taraf (`call.tsx`) artık üç arama türünde de aynı `canPublishCamera`yı besler
-   * (`callKind` bazlı bir kısıt YOK — M4f ile guild kapsam dışı olmaktan çıktı). T&S §7:
-   * "görünür-kilitli yap" ilkesinin bilinçli istisnası, `canPublishCamera=false` sessizce hiç
-   * çizilmeyerek uygulanır.
+   * M4d §5/§7 → M4e §4 → M4f §2 → M4i §2 🔴 — yalnız `onToggleCamera` de dolu VE (`canPublishCamera`
+   * true VEYA `isGuildCall` true) iken kamera düğmesi çizilir. M4i ile davranış bağlama göre ayrıldı:
+   * ortam sesli kanalında (`isGuildCall`) kapalılığın sebebi kanal ayarı/karantina/susturmadır, yaş
+   * bilgisi sızdırmaz → düğme **görünür-kilitli** (çizilir, üstü çizili, pasif). DM/grup DM'de video
+   * kapısı **yaş** kapısıdır — görünür-kilitli düğme karşı tarafın minör olduğunu ifşa eder (brief
+   * §5/G1) → orada `canPublishCamera=false` iken düğme **bugünkü gibi hiç çizilmez**. Bu ayrım
+   * sadeleştirilmeyecek, gerekçesi T&S'tir (sözleşme §2).
    */
   canPublishCamera?: boolean;
+  /** M4i §2 🔴 — kamera düğmesinin görünür-kilitli mi yoksa gizli mi davranacağını belirleyen bağlam
+   *  ayracı. Yalnız ortam sesli kanalında (`callKind==='guild'`) true geçilir; DM ve grup DM'de
+   *  `undefined`/`false` kalır (gizli davranış korunur). */
+  isGuildCall?: boolean;
   isCameraOn?: boolean;
   onToggleCamera?: () => void;
   /** §4 — yalnız kamera AÇIKKEN çizilir (boş yüzey açma kuralı); kamera kapalıyken bu prop dolu
@@ -43,11 +49,15 @@ export function CallControls({
   onOpenChat,
   onHangUp,
   canPublishCamera,
+  isGuildCall,
   isCameraOn,
   onToggleCamera,
   onSwitchCamera,
 }: Props) {
-  const showCamera = !!canPublishCamera && !!onToggleCamera;
+  // M4i §2 🔴 — ortam kanalında izin yokken de düğme çizilir (görünür-kilitli); DM/grup DM'de
+  // `isGuildCall` false/undefined olduğu için `canPublishCamera=false` düğmeyi eskisi gibi gizler.
+  const showCamera = !!onToggleCamera && (!!canPublishCamera || !!isGuildCall);
+  const cameraLocked = showCamera && !canPublishCamera;
   const showFlip = showCamera && !!isCameraOn && !!onSwitchCamera;
   // §5 🔴 D37 dersi — beş düğme (56dp + 24dp aralık) dar Android ekranlarında (~360dp) taşıyor;
   // düğme küçültülmez, aralık daraltılır (12dp — 56dp dairelerin kendisi zaten bol dokunma payı
@@ -74,11 +84,16 @@ export function CallControls({
       {showCamera && (
         <Pressable
           onPress={onToggleCamera}
-          style={[styles.circle, isCameraOn && styles.circleActive]}
+          disabled={cameraLocked}
+          style={[styles.circle, isCameraOn && styles.circleActive, cameraLocked && styles.circleDisabled]}
           accessibilityRole="button"
           accessibilityLabel={isCameraOn ? t('voice.cameraOff') : t('voice.cameraOn')}
         >
-          <Ionicons name={isCameraOn ? 'videocam' : 'videocam-off'} size={22} color={theme.colors.textPrimary} />
+          <Ionicons
+            name={isCameraOn ? 'videocam' : 'videocam-off'}
+            size={22}
+            color={cameraLocked ? theme.colors.textMuted : theme.colors.textPrimary}
+          />
         </Pressable>
       )}
 
