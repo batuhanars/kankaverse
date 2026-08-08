@@ -50,16 +50,18 @@ export default function CallScreen() {
   const callKind = useVoiceStore((s) => s.callKind);
   const callChannelName = useVoiceStore((s) => s.callChannelName);
   const callGuildName = useVoiceStore((s) => s.callGuildName);
-  // M4d §1/§7 — kamera yalnız 1-1 DM'de (§1 kapsamı, grup/guild M4e/M4f). `canPublishCamera`
-  // sunucudan guild/group aramalarında da gelebilir (C4/C7 masaüstü kamerası zaten oradan
-  // çalışıyor) — bu yüzden `callKind === 'dm'` kapısı burada BİLEREK ayrı tutuluyor, yalnız
-  // store'a güvenilmiyor.
+  // M4d §1/§7 — kamera 1-1 DM'de VE (M4e §1/§4) grup DM'de. `canPublishCamera` sunucudan guild
+  // aramalarında da gelebilir (C4/C7 masaüstü kamerası zaten oradan çalışıyor) — bu yüzden
+  // `callKind` kapısı burada BİLEREK ayrı tutuluyor, yalnız store'a güvenilmiyor. Guild M4f'in işi.
   const isDmCall = callKind === 'dm';
+  const isGroupCall = callKind === 'group';
   const canPublishCamera = useVoiceStore((s) => s.canPublishCamera);
   const isCameraOn = useVoiceStore((s) => s.isCameraOn);
   const cameraFacing = useVoiceStore((s) => s.cameraFacing);
   const localCameraPublication = useVoiceStore((s) => s.localCameraPublication);
-  const remoteCameraPublication = useVoiceStore((s) => s.remoteCameraPublication);
+  // M4e §2 🔴 — userId anahtarlı çoğul map (tek kaynak). DM dalı da BURADAN türetir (aşağıda
+  // `peerCameraPublication`), paralel bir tek-slot state TUTULMAZ.
+  const remoteCameraPublications = useVoiceStore((s) => s.remoteCameraPublications);
   const isGuildCall = callKind === 'guild';
   // 🔴 M4b sözleşme §4 — bu dosya sözleşmenin §1 dosya tablosunda YOK, ama DoD §10 "İkinci kişi
   // katılınca ızgarada iki kutucuk" maddesi N-katılımcılı grid'i zorunlu kılıyor: DM dalının
@@ -89,14 +91,14 @@ export default function CallScreen() {
     isCameraOn: boolean;
     cameraFacing: typeof cameraFacing;
     localCameraPublication: typeof localCameraPublication;
-    remoteCameraPublication: typeof remoteCameraPublication;
+    remoteCameraPublications: typeof remoteCameraPublications;
   }>({
     participants: [],
     canPublish: false,
     isCameraOn: false,
     cameraFacing: 'user',
     localCameraPublication: null,
-    remoteCameraPublication: null,
+    remoteCameraPublications: {},
   });
 
   function resetHideTimer() {
@@ -193,12 +195,12 @@ export default function CallScreen() {
       isCameraOn,
       cameraFacing,
       localCameraPublication,
-      remoteCameraPublication,
+      remoteCameraPublications,
     };
   }
   const shown = isLeaving
     ? frozenRef.current
-    : { participants: roomParticipants, canPublish, isCameraOn, cameraFacing, localCameraPublication, remoteCameraPublication };
+    : { participants: roomParticipants, canPublish, isCameraOn, cameraFacing, localCameraPublication, remoteCameraPublications };
 
   const localMember = shown.participants.find((p) => p.isLocal);
   const peerMember = shown.participants.find((p) => !p.isLocal);
@@ -207,10 +209,21 @@ export default function CallScreen() {
   const peerAvatar = peerMember?.avatarUrl ?? peerFallback?.avatarUrl ?? null;
   const alone = shown.participants.length <= 1;
   // M4d §3-R 🔴 — düzen kamera durumundan TÜRETİLİR, ayrı bir state TUTULMAZ. Uzak tarafın "kamerası
-  // açık" bilgisinin tek kaynağı `remoteCameraPublication`in gerçek bir track taşıması (niyet değil,
-  // gözlemlenen yayın — DM'de zaten başka bir sinyalimiz yok). Yalnız `isGridCall===false` (DM) dalında
-  // okunur; grup/guild bu revizyona dokunmuyor (§3-R: "isGridCall dalına DOKUNULMAZ").
-  const anyCameraOn = shown.isCameraOn || !!shown.remoteCameraPublication?.track;
+  // açık" bilgisinin tek kaynağı, karşı tarafın map'teki kaydının gerçek bir track taşıması (niyet
+  // değil, gözlemlenen yayın — DM'de zaten başka bir sinyalimiz yok). Yalnız `isGridCall===false`
+  // (DM) dalında okunur; grup kendi hesabını aşağıda (`anyGroupCameraOn`) ayrı tutar.
+  //
+  // M4e §2 🔴 — `peerMember` henüz `roomParticipants`e düşmeden (katılma anındaki kısa pencere)
+  // `peerCameraPublication` `undefined` olabilir; `?? null` ile `TrackPublication | null` sözleşmesi
+  // korunur (`ParticipantTile`in `videoPublication` prop'u `null`i bekliyor, `undefined`i değil).
+  const peerCameraPublication = peerMember ? (shown.remoteCameraPublications[peerMember.userId] ?? null) : null;
+  const anyCameraOn = shown.isCameraOn || !!peerCameraPublication?.track;
+  // M4e §3.1 🔴 — grup DM'in kendi kamera-açık hesabı: YALNIZ `isGroupCall` iken anlamlı. Guild'i
+  // BİLEREK dışarıda bırakır (`isGroupCall &&` kapısı) — guild kamerası M4f'in işi; masaüstünden
+  // (C4/C7) guild kanalına biri kamera açsa bile bu hesap `false` kalır, mobil o dalı hâlâ bugünkü
+  // tek-sütun listeyle çizer (§3.1: "Guild kamerası bu sprintte AÇILMAZ").
+  const anyGroupCameraOn =
+    isGroupCall && (shown.isCameraOn || Object.values(shown.remoteCameraPublications).some((p) => !!p?.track));
   // Grup DM'de tek "karşı taraf" yok (N kişi) — başlık `peerName`e (ilk katılan kim ise o) değil,
   // grubun adına bağlanır (`stores/voice.ts` `startOrJoin` `kind==='group'`de `callChannelName`'i
   // guild gibi dolduruyor). DM dalında bu ifade `peerName`e eşit kalır — davranış DEĞİŞMEDİ.
@@ -251,8 +264,8 @@ export default function CallScreen() {
   }
 
   // M4d §2/§7 — desen mikrofonun izin reddi ile birebir aynı (`dm/[id].tsx` `handleCallPress`):
-  // reddedilirse arama düşmez, yalnız "Ayarları Aç" gösterilir. Bu fonksiyon yalnız `isDmCall` iken
-  // `CallControls`'a geçiliyor (aşağıda), grup/guild'de hiç çağrılmaz.
+  // reddedilirse arama düşmez, yalnız "Ayarları Aç" gösterilir. M4e §4 🔴 — bu fonksiyon `isDmCall`
+  // VEYA `isGroupCall` iken `CallControls`'a geçiliyor (aşağıda), guild'de hiç çağrılmaz.
   function handleToggleCamera() {
     resetHideTimer();
     void (async () => {
@@ -336,63 +349,107 @@ export default function CallScreen() {
       </View>
 
       {isGridCall ? (
-        // §14.2 — N katılımcı **tek sütun, tam genişlik, ALT ALTA**. M4c bunu ızgaraya açmıştı;
-        // sahip cihazda gördü ve geri aldı: dar ekranda yan yana sıkışan kutucuklar sesli aramada
-        // bakılan tek şeyi (kim konuşuyor) zorlaştırıyor, Discord da sesli aramada tam genişlik
-        // kartları alt alta diziyor. Izgara ölü kod olarak BIRAKILMADI (§14.2: video sprintinde
-        // yeniden yazılacak, o zaman kutucuk zaten farklı olacak).
-        //
-        // `ParticipantTile` AYNEN duruyor — konuşan kenarlığı, mikrofon-kapalı rozeti, avatar/ad
-        // düzeni değişmedi, yalnız YERLEŞİM değişti. Sıra da değişmedi: `shown.participants`
-        // (yerel + LiveKit `remoteParticipants` Map iterasyonu = katılma sırası; `Map` insert
-        // sırasını korur, mute/konuşma değişince yeniden sıralanmaz) — ayrıca sort gerekmez.
-        //
-        // 🔴 M4b — bu dal `isGridCall` (`kind!=='dm'`) ile guild VE group tarafından paylaşılıyor.
-        // "Tek başınasın" metni guild'inkiyle PAYLAŞILIYOR (yeni metin eklenmedi): DM'in
-        // `aloneSubtitle`i `{name}` (tek kişi) parametreli, N kişilik bir gruba uymuyordu;
-        // `guildAloneSubtitle` ("Arkadaşların katıldığında burada görünecekler") kişi adı
-        // gerektirmeden hem guild hem grup DM için doğru okunuyor.
-        <View style={styles.tiles}>
-          <ScrollView
-            style={styles.listScroll}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-          >
-            {shown.participants.map((p) => (
-              <ParticipantTile
-                key={p.userId}
-                name={p.username}
-                avatarUrl={p.avatarUrl}
-                speaking={speakingUserIds.has(p.userId)}
-                micOff={p.isLocal ? isMuted : mutedUserIds.has(p.userId)}
-              />
-            ))}
-            {/* M4z §E — bekleyen üyeler: aynı kutucuk, yalnız `dimmed`. Mikrofon/konuşma
-                göstergesi YOK (o bilgi yok), `ringing` de YOK — grupta kimin telefonunun
-                çaldığını bilmiyoruz (1-1 dalındaki "Çalıyor…" olduğu gibi duruyor). */}
-            {pendingMembers.map((m) => (
-              <ParticipantTile
-                key={`pending:${m.id}`}
-                name={m.username}
-                avatarUrl={m.avatarUrl}
-                speaking={false}
-                micOff={false}
-                dimmed
-              />
-            ))}
-          </ScrollView>
-          {/* §E — "Arkadaşların katıldığında burada görünecekler" artık YALNIZ gerçekten boş
-              ekranda gösterilir. Bekleyen kartlar çizildiğinde o cümle kendi kendini yalanlıyordu:
-              üyeler zaten görünüyor. Ortam kanalında `pendingMembers` her zaman boş olduğu için
-              oradaki davranış değişmiyor. */}
-          {alone && pendingMembers.length === 0 && (
-            <View style={styles.aloneNotice}>
-              <Text style={styles.aloneTitle}>{t('mobile.voice.guildAloneTitle')}</Text>
-              <Text style={styles.aloneSubtitle}>{t('mobile.voice.guildAloneSubtitle')}</Text>
-            </View>
-          )}
-          {!shown.canPublish && <Text style={styles.listenerNotice}>{t('voice.listenerOnly')}</Text>}
-        </View>
+        anyGroupCameraOn ? (
+          // M4e §3.1/§3.2 🔴 — grup DM'de EN AZ BİR kamera açıkken iki sütunlu ızgara (bakılan şey
+          // video aramasında yüz; tek-sütun tam-genişlik kartlar ekranda iki kişi gösterip gerisini
+          // kaydırmaya iterdi). `ParticipantTile` yine 'card' varyantı (yeni varyant eklenmedi,
+          // video geldiğinde kendi içinde dikey dikdörtgene döner — bkz. bileşen). Kendi kutucuğun
+          // ızgaranın bir elemanı: 1-1'deki köşe önizlemesi burada YOK (§3.2). Guild bu dala hiç
+          // girmez (`anyGroupCameraOn` yalnız `isGroupCall` iken true olabilir — §3.1 "guild
+          // kamerası bu sprintte açılmaz").
+          <View style={styles.tiles}>
+            <ScrollView
+              style={styles.listScroll}
+              contentContainerStyle={styles.grid}
+              showsVerticalScrollIndicator={false}
+            >
+              {shown.participants.map((p) => (
+                <View key={p.userId} style={styles.gridItem}>
+                  <ParticipantTile
+                    name={p.username}
+                    avatarUrl={p.avatarUrl}
+                    speaking={speakingUserIds.has(p.userId)}
+                    micOff={p.isLocal ? isMuted : mutedUserIds.has(p.userId)}
+                    videoPublication={p.isLocal ? shown.localCameraPublication : (shown.remoteCameraPublications[p.userId] ?? null)}
+                    mirror={p.isLocal && shown.cameraFacing === 'user'}
+                  />
+                </View>
+              ))}
+              {pendingMembers.map((m) => (
+                <View key={`pending:${m.id}`} style={styles.gridItem}>
+                  <ParticipantTile name={m.username} avatarUrl={m.avatarUrl} speaking={false} micOff={false} dimmed />
+                </View>
+              ))}
+            </ScrollView>
+            {alone && pendingMembers.length === 0 && (
+              <View style={styles.aloneNotice}>
+                <Text style={styles.aloneTitle}>{t('mobile.voice.guildAloneTitle')}</Text>
+                <Text style={styles.aloneSubtitle}>{t('mobile.voice.guildAloneSubtitle')}</Text>
+              </View>
+            )}
+            {!shown.canPublish && <Text style={styles.listenerNotice}>{t('voice.listenerOnly')}</Text>}
+          </View>
+        ) : (
+          // §14.2 — N katılımcı **tek sütun, tam genişlik, ALT ALTA**. M4c bunu ızgaraya açmıştı;
+          // sahip cihazda gördü ve geri aldı: dar ekranda yan yana sıkışan kutucuklar sesli aramada
+          // bakılan tek şeyi (kim konuşuyor) zorlaştırıyor, Discord da sesli aramada tam genişlik
+          // kartları alt alta diziyor. Izgara ölü kod olarak BIRAKILMADI (§14.2: video sprintinde
+          // yeniden yazılacak, o zaman kutucuk zaten farklı olacak).
+          //
+          // `ParticipantTile` AYNEN duruyor — konuşan kenarlığı, mikrofon-kapalı rozeti, avatar/ad
+          // düzeni değişmedi, yalnız YERLEŞİM değişti. Sıra da değişmedi: `shown.participants`
+          // (yerel + LiveKit `remoteParticipants` Map iterasyonu = katılma sırası; `Map` insert
+          // sırasını korur, mute/konuşma değişince yeniden sıralanmaz) — ayrıca sort gerekmez.
+          //
+          // 🔴 M4b — bu dal `isGridCall` (`kind!=='dm'`) ile guild VE group tarafından paylaşılıyor.
+          // M4e 🔴 — grup DM'de KİMSENİN kamerası açık değilken de bu dal çizilir (`anyGroupCameraOn`
+          // false), sözleşme §3.1'in "sesli grup araması hiç değişmemeli" şartı budur.
+          // "Tek başınasın" metni guild'inkiyle PAYLAŞILIYOR (yeni metin eklenmedi): DM'in
+          // `aloneSubtitle`i `{name}` (tek kişi) parametreli, N kişilik bir gruba uymuyordu;
+          // `guildAloneSubtitle` ("Arkadaşların katıldığında burada görünecekler") kişi adı
+          // gerektirmeden hem guild hem grup DM için doğru okunuyor.
+          <View style={styles.tiles}>
+            <ScrollView
+              style={styles.listScroll}
+              contentContainerStyle={styles.list}
+              showsVerticalScrollIndicator={false}
+            >
+              {shown.participants.map((p) => (
+                <ParticipantTile
+                  key={p.userId}
+                  name={p.username}
+                  avatarUrl={p.avatarUrl}
+                  speaking={speakingUserIds.has(p.userId)}
+                  micOff={p.isLocal ? isMuted : mutedUserIds.has(p.userId)}
+                />
+              ))}
+              {/* M4z §E — bekleyen üyeler: aynı kutucuk, yalnız `dimmed`. Mikrofon/konuşma
+                  göstergesi YOK (o bilgi yok), `ringing` de YOK — grupta kimin telefonunun
+                  çaldığını bilmiyoruz (1-1 dalındaki "Çalıyor…" olduğu gibi duruyor). */}
+              {pendingMembers.map((m) => (
+                <ParticipantTile
+                  key={`pending:${m.id}`}
+                  name={m.username}
+                  avatarUrl={m.avatarUrl}
+                  speaking={false}
+                  micOff={false}
+                  dimmed
+                />
+              ))}
+            </ScrollView>
+            {/* §E — "Arkadaşların katıldığında burada görünecekler" artık YALNIZ gerçekten boş
+                ekranda gösterilir. Bekleyen kartlar çizildiğinde o cümle kendi kendini yalanlıyordu:
+                üyeler zaten görünüyor. Ortam kanalında `pendingMembers` her zaman boş olduğu için
+                oradaki davranış değişmiyor. */}
+            {alone && pendingMembers.length === 0 && (
+              <View style={styles.aloneNotice}>
+                <Text style={styles.aloneTitle}>{t('mobile.voice.guildAloneTitle')}</Text>
+                <Text style={styles.aloneSubtitle}>{t('mobile.voice.guildAloneSubtitle')}</Text>
+              </View>
+            )}
+            {!shown.canPublish && <Text style={styles.listenerNotice}>{t('voice.listenerOnly')}</Text>}
+          </View>
+        )
       ) : anyCameraOn ? (
         // M4d §3-R 🔴 — kamera açıkken Discord düzeni: tam alan = karşı taraf, sağ üst köşe = sen
         // (yalnız SENİN kameran açıkken çizilir). Düzen `anyCameraOn`dan türetiliyor, ayrı bir state
@@ -405,7 +462,7 @@ export default function CallScreen() {
             speaking={peerMember ? speakingUserIds.has(peerMember.userId) : false}
             micOff={peerMember ? mutedUserIds.has(peerMember.userId) : false}
             ringing={alone && didInvite && callKind === 'dm'}
-            videoPublication={shown.remoteCameraPublication}
+            videoPublication={peerCameraPublication}
           />
           {shown.isCameraOn && (
             <View style={styles.selfCorner}>
@@ -482,10 +539,11 @@ export default function CallScreen() {
           }}
           onOpenChat={isGuildCall ? undefined : handleOpenChat}
           onHangUp={handleHangUp}
-          canPublishCamera={isDmCall && canPublishCamera}
+          // M4e §4 🔴 — kamera düğmesi kapısı grup DM'i de kapsar; guild HARİÇ (M4f'in işi).
+          canPublishCamera={(isDmCall || isGroupCall) && canPublishCamera}
           isCameraOn={shown.isCameraOn}
-          onToggleCamera={isDmCall ? handleToggleCamera : undefined}
-          onSwitchCamera={isDmCall ? handleSwitchCamera : undefined}
+          onToggleCamera={isDmCall || isGroupCall ? handleToggleCamera : undefined}
+          onSwitchCamera={isDmCall || isGroupCall ? handleSwitchCamera : undefined}
         />
       </View>
 
@@ -571,6 +629,18 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     gap: 12,
+  },
+  // M4e §3.1/§3.2 — grup DM'de en az bir kamera açıkken iki sütunlu ızgara. `list`in aksine dikeyde
+  // ortalamaz (kamerayla dolu ekranda üstten akış daha doğal, Discord da öyle) — `flexGrow` yeterli.
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingBottom: 12,
+  },
+  gridItem: {
+    width: '48%',
   },
   aloneNotice: {
     alignItems: 'center',

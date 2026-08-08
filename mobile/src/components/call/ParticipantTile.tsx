@@ -33,7 +33,9 @@ interface Props {
   /**
    * M4d §3-R — düzen kamera durumundan TÜRETİLİR (`call.tsx`), bu bileşen kendi başına bir düzen
    * state'i TUTMAZ; hangi varyantın çizileceğine çağıran taraf karar verir.
-   * - `'card'` (varsayılan) — bugünkü iki-kutucuk/ızgara kartı, sözleşme §3, HİÇ değişmedi.
+   * - `'card'` (varsayılan) — bugünkü iki-kutucuk/ızgara kartı, sözleşme §3, videosuz davranışı
+   *   HİÇ değişmedi. M4e §3.2 🔴 — `videoPublication` geldiğinde (grup DM ızgarası) dairesel avatar
+   *   yerine dikey dikdörtgene yakın bir video karesi çizilir; yeni bir varyant EKLENMEDİ.
    * - `'full'` — kamera açıkken karşı taraf için TAM ALAN: video varsa uçtan uca kaplar, yoksa
    *   bugünkü avatar+ad büyütülmüş halde ortalanır. Mikrofon rozeti + "Çalıyor…" korunur, konuşma
    *   halkası YOK.
@@ -114,25 +116,37 @@ export function ParticipantTile({
     );
   }
 
-  // 'card' — sözleşme §3, bugünkü davranış HİÇ değişmedi (iki-kutucuk DM + ızgara guild/grup).
+  // 'card' — sözleşme §3, HİÇ VİDEOSUZ davranış değişmedi (iki-kutucuk DM + ızgara guild/grup).
+  // M4e §3.2 🔴 — video geldiğinde (grup DM ızgarası) avatarın dairesel çerçevesi yerine dikey
+  // dikdörtgene yakın bir video karesi çizilir (yüz görünsün); ad + mikrofon rozeti + konuşma
+  // kenarlığı AYNI yerinde kalır, yeni bir varyant EKLENMEDİ.
   return (
     <View style={[styles.tile, dimmed && styles.tileDimmed]}>
-      <View style={[styles.avatarWrap, speaking && styles.avatarSpeaking]}>
-        {hasVideo ? (
-          <VideoTrack trackRef={trackRef} style={styles.avatarVideo} mirror={mirror} objectFit="cover" />
-        ) : avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback]}>
-            <Text style={styles.avatarFallbackText}>{name.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
-        {micOff && (
-          <View style={styles.micBadge}>
-            <Ionicons name="mic-off" size={14} color={theme.colors.textPrimary} />
-          </View>
-        )}
-      </View>
+      {hasVideo ? (
+        <View style={[styles.videoWrap, speaking && styles.videoSpeaking]}>
+          <VideoTrack trackRef={trackRef} style={styles.videoFill} mirror={mirror} objectFit="cover" />
+          {micOff && (
+            <View style={styles.videoMicBadge}>
+              <Ionicons name="mic-off" size={14} color={theme.colors.textPrimary} />
+            </View>
+          )}
+        </View>
+      ) : (
+        <View style={[styles.avatarWrap, speaking && styles.avatarSpeaking]}>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarFallbackText}>{name.charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
+          {micOff && (
+            <View style={styles.micBadge}>
+              <Ionicons name="mic-off" size={14} color={theme.colors.textPrimary} />
+            </View>
+          )}
+        </View>
+      )}
       <Text style={styles.name} numberOfLines={1}>
         {name}
       </Text>
@@ -169,14 +183,6 @@ const styles = StyleSheet.create({
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
   },
-  // M4d §3 — `avatar` ile AYNI ölçü; `VideoTrack`'in kendi `style` prop'u tek obje kabul ediyor
-  // (StyleSheet dizisi birleştirilemiyor), o yüzden `overflow:hidden` ayrı bir girdi.
-  avatarVideo: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
-    overflow: 'hidden',
-  },
   avatarFallback: {
     backgroundColor: theme.colors.accentSubtle,
     alignItems: 'center',
@@ -208,6 +214,37 @@ const styles = StyleSheet.create({
   ringing: {
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.sm,
+  },
+
+  // ── M4e §3.2 'card' + video — grup DM ızgarasında dikey dikdörtgene yakın video karesi ──────
+  videoWrap: {
+    width: '100%',
+    aspectRatio: 3 / 4,
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: 'transparent',
+    backgroundColor: theme.colors.bgElevated,
+  },
+  videoSpeaking: {
+    borderColor: theme.colors.online,
+  },
+  videoFill: {
+    width: '100%',
+    height: '100%',
+  },
+  videoMicBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: theme.colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.bgElevated,
   },
 
   // ── §3-R 'full' — kamera açıkken karşı tarafın tam-alan görünümü ─────────────

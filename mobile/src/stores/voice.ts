@@ -31,8 +31,9 @@ import { t } from '@/i18n';
  * store'da (`stores/voicePresence.ts` — DM ekranı bağlı olmasak da onu okur, web'deki iki katman
  * ayrımının burada iki dosyaya bölünmüş hâli). Web `stores/voice.ts` davranış referansı ama
  * KOPYALANMADI: deafen/cihaz-seçim state'i hâlâ yok (kapsam dışı). 🔴 M4d ile 1-1 DM kamerası
- * eklendi (`canPublishCamera`/`isCameraOn`/`cameraFacing` + yerel/uzak publication) — ekran
- * paylaşımı ve grup/guild kamerası (M4e/M4f) hâlâ YOK.
+ * eklendi (`canPublishCamera`/`isCameraOn`/`cameraFacing` + yerel/uzak publication); M4e ile grup
+ * DM'e çoğullaştı (`remoteCameraPublications` userId-anahtarlı map, `toggleCamera` kapısı grup DM'i
+ * de kapsıyor) — ekran paylaşımı ve guild kamerası (M4f) hâlâ YOK.
  */
 
 export interface RoomMember {
@@ -110,10 +111,15 @@ interface VoiceState {
   isCameraOn: boolean;
   /** §3/§4 — yerel önizleme yalnız ön kamerada (`user`) aynalanır; çevrilince aynalama kalkar. */
   cameraFacing: 'user' | 'environment';
-  /** §3 — `ParticipantTile`in `VideoTrack` için okuduğu yerel/uzak kamera publication'ı. Uzak taraf
-   *  tek slot (1-1 DM kapsamı — §1, grup/guild M4e/M4f). */
+  /** §3 — `ParticipantTile`in `VideoTrack` için okuduğu yerel kamera publication'ı. */
   localCameraPublication: LocalTrackPublication | null;
-  remoteCameraPublication: RemoteTrackPublication | null;
+  /**
+   * M4e §2 🔴 — uzak kamera artık userId (LiveKit `identity`) anahtarlı ÇOĞUL yapı (eskiden tek
+   * slot `remoteCameraPublication`; grupta ikinci kişi kamerasını açınca birincininkini eziyordu).
+   * **Tek kaynak**: 1-1 DM dalı da (`call.tsx`) bu map'ten karşı tarafın kaydını okur, paralel bir
+   * tek-slot state AYRICA TUTULMAZ (D37/M3c dersi — gereksiz state = senkron kalma riski).
+   */
+  remoteCameraPublications: Record<string, RemoteTrackPublication>;
   /**
    * §2 — DM başlığındaki "görüntülü ara" niyeti: `startOrJoin` bağlantı kurulduktan hemen sonra
    * yazar, `/call` mount effect'i tüketip temizler (`pendingCallScreen` ile aynı temizlenme
@@ -189,11 +195,10 @@ interface VoiceState {
   leave: (userInitiated?: boolean) => Promise<void>;
   toggleMute: () => Promise<void>;
   /**
-   * M4d §2/§4/§6 — kamera aç/kapat. Yalnız `canPublishCamera` true VE `callKind==='dm'` iken
-   * anlamlı (§1 kapsamı — grup/guild kamerası M4e/M4f, bu fonksiyon oralarda çağrılmaz ama yine de
-   * kendi kapısını taşır). İzin isteme deseni `requestMicPermission` ile birebir aynı: reddedilirse
-   * `reason:'camera_denied'` döner, çağıran ekran mikrofondaki `mic_denied` ile aynı "Ayarları Aç"
-   * uyarısını gösterir.
+   * M4d §2/§4/§6 — kamera aç/kapat. M4e §4 🔴 — kapı artık `callKind==='dm'` **VEYA** `'group'`;
+   * guild kapalı kalır (M4d'de bilerek konmuştu, tamamen kaldırılmadı). İzin isteme deseni
+   * `requestMicPermission` ile birebir aynı: reddedilirse `reason:'camera_denied'` döner, çağıran
+   * ekran mikrofondaki `mic_denied` ile aynı "Ayarları Aç" uyarısını gösterir.
    */
   toggleCamera: () => Promise<{ ok: boolean; message?: string; reason?: 'camera_denied' }>;
   /** §4 — track KAPATILIP AÇILMAZ (karşı tarafta kutucuk yanıp sönerdi); LiveKit'in `restartTrack`
@@ -298,7 +303,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   isCameraOn: false,
   cameraFacing: 'user',
   localCameraPublication: null,
-  remoteCameraPublication: null,
+  remoteCameraPublications: {},
   pendingCameraStart: false,
   roomParticipants: [],
   speakingUserIds: new Set(),
@@ -589,7 +594,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       isCameraOn: false,
       cameraFacing: 'user',
       localCameraPublication: null,
-      remoteCameraPublication: null,
+      remoteCameraPublications: {},
       pendingCameraStart: false,
       roomParticipants: [],
       speakingUserIds: new Set(),
@@ -613,10 +618,11 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   },
 
   async toggleCamera() {
-    // §1/§7 — `callKind !== 'dm'` kapısı BİLEREK: yüzey `call.tsx`te zaten yalnız DM dalında
-    // bağlanır ama fonksiyon kendi kapısını da taşır (ileride yanlış yerden çağrılırsa sessizce
-    // no-op olsun, M4e/M4f'in kamerası burada AÇILMASIN).
-    if (!room || !get().canPublishCamera || get().callKind !== 'dm') return { ok: false };
+    // §1/§7 + M4e §4 🔴 — kapı `callKind` DM ya da grup iken açık, guild'de KAPALI kalır (M4f'in
+    // işi). Yüzey `call.tsx`te zaten yalnız bu iki daldan bağlanır ama fonksiyon kendi kapısını da
+    // taşır (ileride yanlış yerden çağrılırsa sessizce no-op olsun).
+    const kind = get().callKind;
+    if (!room || !get().canPublishCamera || (kind !== 'dm' && kind !== 'group')) return { ok: false };
 
     if (get().isCameraOn) {
       try {
@@ -786,10 +792,12 @@ function wireRoom(
       // M4d §3 🔴 — LiveKit bazı yollarda kamera track'ini unpublish etmek yerine MUTE eder
       // (`TrackUnsubscribed` gelmez) — web'de yaşanan tuzak (`stores/voice.ts` yorumu), burada da
       // aynı çift-yol (bkz. TrackSubscribed/TrackUnsubscribed altta) izleniyor. Yalnız UZAK
-      // kameranın mute'u kutucuğu avatara döndürür; yerel kapanış `toggleCamera`/arka plan dalının
-      // kendi işi (o zaten `localCameraPublication`i temizliyor).
+      // kameranın mute'u KENDİ kaydını map'ten düşürür (M4e §2 — çoğul yapı, başkasının kaydına
+      // dokunmaz); yerel kapanış `toggleCamera`/arka plan dalının kendi işi.
       if (pub.source === Track.Source.Camera && p.identity !== r.localParticipant.identity) {
-        set({ remoteCameraPublication: null });
+        const next = { ...get().remoteCameraPublications };
+        delete next[p.identity];
+        set({ remoteCameraPublications: next });
       }
       return;
     }
@@ -800,7 +808,9 @@ function wireRoom(
   r.on(RoomEvent.TrackUnmuted, (pub, p: Participant) => {
     if (pub.kind === Track.Kind.Video) {
       if (pub.source === Track.Source.Camera && p.identity !== r.localParticipant.identity && pub.track) {
-        set({ remoteCameraPublication: pub as RemoteTrackPublication });
+        set({
+          remoteCameraPublications: { ...get().remoteCameraPublications, [p.identity]: pub as RemoteTrackPublication },
+        });
       }
       return;
     }
@@ -809,15 +819,18 @@ function wireRoom(
     set({ mutedUserIds: s });
   });
   // M4d §3 — uzak kameranın asıl kazanım/kayıp yolu: katılımcı yayına başlayınca/bırakınca.
-  // `remoteCameraPublication` tek slot (1-1 DM kapsamı — §1); `track` parametresi kullanılmıyor,
-  // publication zaten track'i taşıyor (ParticipantTile `.track` ile kontrol ediyor).
-  r.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, pub: RemoteTrackPublication) => {
+  // M4e §2 🔴 — `remoteCameraPublications` artık `participant.identity` (userId) anahtarlı ÇOĞUL
+  // yapı (grupta N kişi yayın yapabilir; eskiden tek slot ikinci kişiyi ezerdi). `track` parametresi
+  // kullanılmıyor, publication zaten track'i taşıyor (ParticipantTile `.track` ile kontrol ediyor).
+  r.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, pub: RemoteTrackPublication, participant: RemoteParticipant) => {
     if (track.kind !== Track.Kind.Video || track.source !== Track.Source.Camera) return;
-    set({ remoteCameraPublication: pub });
+    set({ remoteCameraPublications: { ...get().remoteCameraPublications, [participant.identity]: pub } });
   });
-  r.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+  r.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, _pub: RemoteTrackPublication, participant: RemoteParticipant) => {
     if (track.kind !== Track.Kind.Video || track.source !== Track.Source.Camera) return;
-    set({ remoteCameraPublication: null });
+    const next = { ...get().remoteCameraPublications };
+    delete next[participant.identity];
+    set({ remoteCameraPublications: next });
   });
   r.on(RoomEvent.ActiveSpeakersChanged, () => recomputeSpeaking(set));
   r.on(RoomEvent.ParticipantConnected, (p: RemoteParticipant) => {
@@ -830,9 +843,11 @@ function wireRoom(
     refreshRoomParticipants(set, get);
     recomputeSpeaking(set);
     scheduleAloneCheckIfNeeded(get);
-    // M4d §3 — ayrılan katılımcı kamera yayınlıyorduysa donuk kare kalmasın (1-1 DM'de tek slot
-    // olduğu için "kimin kamerası" ayrımına gerek yok — ayrılan zaten tek karşı taraftı).
-    set({ remoteCameraPublication: null });
+    // M4d §3 / M4e §2 🔴 — ayrılan katılımcı kamera yayınlıyorduysa donuk kare kalmasın. Grupta N
+    // kişi olabileceği için yalnız AYRILANIN kaydı map'ten düşürülür, diğerleri etkilenmez.
+    const next = { ...get().remoteCameraPublications };
+    delete next[p.identity];
+    set({ remoteCameraPublications: next });
   });
   r.on(RoomEvent.Disconnected, (reason?: unknown) => {
     // §3.3 🔴 — YALNIZ beklenmedik kopma (ağ/sunucu/A4/R11B). Ayrılışı biz başlattıysak
