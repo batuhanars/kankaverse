@@ -335,13 +335,23 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
       **PM görüşü: kapatılmalı.** Moderasyon **anlık bir eylem**, kurulum yapılandırması değil —
       [[mobil-kapsam-web-de-kalabilir]] kuralı buna uymaz (o kural ağır tek-seferlik yapılandırma
       içindi). **Sıra: M4p PiP'ten SONRA ayrı sprint** (M4 fazını kapatmak öncelikli; moderasyon
-      video yarısının parçası değil, yeni yetenek).
-    - **Kanal ayarları (mediaEnabled · userLimit · bitrate) mobilde AÇILMIYOR — bilinçli.** Sahip
-      2026-08-08'de sordu; ayrım net: **kuralların etkisi mobilde zaten işliyor** (`mediaEnabled`
-      kapalıysa sunucu `canPublishCamera=false` verir → kamera düğmesi çizilmez, yalnız ses kalır;
-      `userLimit` token mint'inde `enforceUserLimit` ile uygulanır → mobil dolu kanala giremez,
-      Türkçe hata görür). Eksik olan yalnız **ayarı mobilden değiştirmek** ve o, kurulum anında bir
-      kez yapılan yapılandırma → [[mobil-kapsam-web-de-kalabilir]] gereği webde kalır.
+      video yarısının parçası değil, yeni yetenek). **Sprint M4h.**
+    - **Mobil sprint kuyruğu (2026-08-08 akşamı):** M4f cihaz turu → **M4p PiP** (M4 fazı kapanır,
+      D44 zil sesi + birikmiş native ne varsa o derlemeye biner) → **M4g kanal ayarları** (üç alan,
+      küçük) → **M4h mobil ses moderasyonu** (sustur · taşı · at · yayını durdur).
+    - **Kanal ayarları (mediaEnabled · userLimit · bitrate) MOBİLE GELECEK — PM önerisi geri alındı
+      2026-08-08.** PM "kurulum yapılandırması, [[mobil-kapsam-web-de-kalabilir]] gereği webde kalsın"
+      demişti. **Sahip referans uygulamaya baktı ve ekran görüntüsüyle çürüttü:** Discord mobilde
+      bit hızı · video kalitesi · kullanıcı limiti · bölge, kanal ayarlarında **var**. PM'in hatası
+      kuralı yanlış uygulamak değil, **[[revize-turu-esigi]]'nin "referansa İLK turda bak" maddesini
+      yine atlamak**tı (aynı hata M4d §3'te de yapılmıştı).
+      🔴 **Sahibin bulduğu asıl ayrım:** Discord bu alanları **oluşturma formuna KOYMAMIŞ**, yalnız
+      var olan kanalın **ayarlar ekranında** var. Yani "mobil sade kalsın" doğru sezgiydi ama yeri
+      oluşturma formu; ayarlar ekranı tam sürüm olabilir. Bizde de öyle: oluşturma formu (tür ·
+      ad · özel kanal · 18+) **DEĞİŞMEZ**, üç alan `channel-edit.tsx`e eklenir (bugün orada yalnız
+      ad · 18+ · özel · yavaş mod var; sunucu `UpdateChannelDto` üçünü de zaten kabul ediyor).
+      ⚠️ Alanlar kanal türüne göre koşullu çizilmeli (yavaş mod metin kanalına, bu üçü ses kanalına).
+      **Sprint M4g olarak sıraya alındı.**
     - **D38 için not (M4d turunda fark edildi):** `expo-web-browser` paketi zaten kurulu ve `app.json`
       plugins'te, yani **mevcut APK'nın içinde**; kod hâlâ `Linking.openURL` kullanıyor. Yani D38 tek
       satırlık iş ve **yeni derleme beklemiyor** — "bir sonraki native derlemeye biner" kaydı bayat,
