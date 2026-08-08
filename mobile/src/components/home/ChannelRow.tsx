@@ -121,7 +121,19 @@ export function ChannelRow({ channel, selected, onPress, onLongPress }: Props) {
             color={theme.colors.textMuted}
           />
         )}
-        {channel.ageGated && <Text style={styles.ageBadge}>{t('channel.ageGatedBadge')}</Text>}
+        {/* 🔴 Sahip cihaz turu 2026-08-08 — web pariteti: "18+" YAZISI KALDIRILDI, yerine amber uyarı
+            üçgeni. Gerekçe webde de yazılı (`ChannelPanel.vue`): kilit ikonu "giremezsin" der, üçgen
+            "dikkat" der; "18+" yazısı ise içeride ayrı bir şey varmış havası veriyordu. Kilit
+            (`channel.locked`) özel kanalın ikonu, bu ondan AYRI ve karıştırılmamalı. */}
+        {channel.ageGated && (
+          <Ionicons
+            name="warning"
+            size={12}
+            style={styles.ageIcon}
+            color={theme.colors.warning}
+            accessibilityLabel={t('channel.ageRestrictedLockTitle')}
+          />
+        )}
         {showMentionBadge && (
           <View style={styles.mentionBadge}>
             <Text style={styles.mentionBadgeText}>{badgeLabel(mentions)}</Text>
@@ -203,10 +215,8 @@ const styles = StyleSheet.create({
   },
   nameUnread: { color: theme.colors.textPrimary, fontWeight: '700' },
   nameSelected: { color: theme.colors.textPrimary, fontWeight: '600' },
-  ageBadge: {
-    color: theme.colors.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
+  // Yaş-kapılı kanal ikonu — `lockIcon` ile aynı ölçü/aralık, yalnız rengi uyarı tonunda.
+  ageIcon: {
     marginRight: 6,
   },
   // Sprint M2a §2/§4.2 — eski `unreadBadge` (genel okunmamış, kırmızı) yerine BAHSETME sayacı.
