@@ -134,7 +134,11 @@ export const useVoiceStore = defineStore('voice', () => {
   // Mikrofonu kapalı uzak katılımcılar (TrackMuted/Unmuted)
   const mutedUserIds = ref<Set<string>>(new Set())
   // R11: moderatör (server) susturması — self/track mute'tan AYRI. WS ile beslenir.
-  const serverMutedUserIds = ref<Set<string>>(new Set())
+  // R16 §3.1 — kanal-scoped: participantsByChannel/broadcastingByChannel ile AYNI desen. Flat tek
+  // Set olsaydı, ChannelPanel'de aynı anda render edilen BİRDEN FAZLA VoiceParticipantList (her
+  // GUILD_VOICE kanalı kendi bileşenini açar) hidrasyonda birbirinin susturma kaydını ezerdi —
+  // moderatör bağlı olmadığı bir kanalın listesini açtığında yanlış kanalın mute kaydı sızardı.
+  const serverMutedUserIdsByChannel = ref<Record<string, Set<string>>>({})
   // #1 — Yayın durumu: kanal → yayın yapan userId'ler (WS voice.broadcast_started/stopped ile beslenir)
   const broadcastingByChannel = ref<Record<string, Set<string>>>({})
 
@@ -171,6 +175,14 @@ export const useVoiceStore = defineStore('voice', () => {
       const res = await voiceApi.getParticipants(channelId)
       participantsByChannel.value[channelId] = res.data.participants.map(toParticipant)
       channelStartedAt.value[channelId] = res.data.startedAt // REV-13b
+      // R16 §3.1 — kalıcı susturma hidrasyonu: sayfa yenilense de, moderatör bu kanala hiç
+      // bağlanmamış olsa da liste doğru gelir. addServerMute/removeServerMute'in bağlı-oda kapısına
+      // TAKILMAZ (kasıtlı — DUR/bildir maddesi bu ayrımı netleştirmek içindi); WS olayları bu
+      // girdiyi güncellemeye devam eder (kanal ID aynı map anahtarını hedefler).
+      serverMutedUserIdsByChannel.value = {
+        ...serverMutedUserIdsByChannel.value,
+        [channelId]: new Set(res.data.mutedUserIds),
+      }
     } catch {
       participantsByChannel.value[channelId] = []
       channelStartedAt.value[channelId] = null
@@ -189,22 +201,27 @@ export const useVoiceStore = defineStore('voice', () => {
   }
 
   // ── R11: moderatör (server) susturması ────────────────────────────────────
-  // WS voice.participant_muted/unmuted — yalnız o an bağlı olduğumuz kanal için
-  // göstergeyi sürdürmemiz yeterli (set bağlı oda kapsamında anlamlı).
+  // WS voice.participant_muted/unmuted — CANLI güncelleme. connectedChannelId !== channelId erken
+  // dönüşü KORUNUR (R16 §3.1 sözleşmesi): bu iki fonksiyon yalnız o an bağlı olduğumuz kanal için WS
+  // olaylarını uygular — anlamı DEĞİŞMEDİ. Hidrasyon (loadParticipants, aşağıda) bu kapıya TAKILMAZ,
+  // ayrı bir yol olarak kanal-scoped map'e doğrudan yazar (bağlı olunmayan kanal için de geçerli).
   function addServerMute(channelId: string, userId: string) {
     if (connectedChannelId.value !== channelId) return
-    const s = new Set(serverMutedUserIds.value)
+    const s = new Set(serverMutedUserIdsByChannel.value[channelId] ?? [])
     s.add(userId)
-    serverMutedUserIds.value = s
+    serverMutedUserIdsByChannel.value = { ...serverMutedUserIdsByChannel.value, [channelId]: s }
   }
   function removeServerMute(channelId: string, userId: string) {
     if (connectedChannelId.value !== channelId) return
-    const s = new Set(serverMutedUserIds.value)
+    const s = new Set(serverMutedUserIdsByChannel.value[channelId] ?? [])
     s.delete(userId)
-    serverMutedUserIds.value = s
+    serverMutedUserIdsByChannel.value = { ...serverMutedUserIdsByChannel.value, [channelId]: s }
+  }
+  function serverMutedUserIdsFor(channelId: string): Set<string> {
+    return serverMutedUserIdsByChannel.value[channelId] ?? new Set()
   }
   function isServerMuted(userId: string): boolean {
-    return serverMutedUserIds.value.has(userId)
+    return connectedChannelId.value ? serverMutedUserIdsFor(connectedChannelId.value).has(userId) : false
   }
 
   // ── #1: Yayın durumu (WS voice.broadcast_started/stopped) ───────────────────
@@ -426,7 +443,10 @@ export const useVoiceStore = defineStore('voice', () => {
     speakingUserIds.value = new Set()
     roomParticipants.value = []
     mutedUserIds.value = new Set()
-    serverMutedUserIds.value = new Set() // R11: oda kapsamlı moderatör-mute göstergesi
+    // R16 §3.1: serverMutedUserIdsByChannel BURADA sıfırlanmaz — artık kanal-scoped, ChannelPanel'de
+    // hâlâ görünen DİĞER kanalların hidrate edilmiş susturma listelerini taşır. Ayrıldığımız kanalın
+    // kendi girdisi zaten doğru kalır (son WS/hidrasyon durumunu yansıtır); bir sonraki loadParticipants
+    // tazeler.
     remoteAudioEls.clear()
   }
 
@@ -693,6 +713,45 @@ export const useVoiceStore = defineStore('voice', () => {
       s.delete(p.identity)
       mutedUserIds.value = s
     })
+    // R16 §3.2 🔴 — server-mute/unmute'in ses karşılığı (mobile M4f'te kamera için yazılanın aynı
+    // deseni: `mobile/src/stores/voice.ts` `ParticipantPermissionsChanged` bloğu — mantık taşındı,
+    // kod kopyalanmadı). Bugüne dek `canPublish` yalnız join()'de mint yanıtından bir kez okunuyordu;
+    // bağlıyken sunucu izni geri verse de istemci hiç haberdar olmuyordu (mikrofon düğmesi pasif
+    // kalıyordu, susturma kalkınca yeniden bağlanmak GEREKİYORDU — bu sprintin asıl kusuru).
+    // Yalnız YEREL katılımcı ilgimizi çeker; uzak katılımcıların izin değişimi burada görünür bir
+    // şey değiştirmez (onların "susturuldu" rozeti serverMutedUserIdsByChannel + WS'ten gelir).
+    r.on(RoomEvent.ParticipantPermissionsChanged, (_prev, participant: Participant) => {
+      if (participant.identity !== r.localParticipant.identity) return
+      const nextCanPublish = participant.permissions?.canPublish ?? false
+      const wasCanPublish = canPublish.value
+      canPublish.value = nextCanPublish
+      if (nextCanPublish && !wasCanPublish) {
+        // İzin geri geldi (susturma kaldırıldı). 🔴 `isMuted` BURADA yalnız OKUNUR — susturulmadan
+        // önceki kendi tercihi budur (susturma sırasında bu değere hiç dokunulmadı, aşağıdaki `else`
+        // dalına bakınız). preferMuted/isMuted true ise (kullanıcı zaten kendi isteğiyle kapalıydı)
+        // mikrofon AÇILMAZ — sunucu izni geri vermek "mikrofonunu aç" demek değildir.
+        if (!isMuted.value) {
+          void (async () => {
+            try {
+              if (!navigator.mediaDevices?.getUserMedia) throw new Error('insecure')
+              await room?.localParticipant.setMicrophoneEnabled(true, micCaptureOpts())
+              micError.value = ''
+            } catch (e) {
+              // Cihaz/izin sorunu — dinleyici kal, nedeni göster (join()'deki aynı davranış)
+              isMuted.value = true
+              micError.value =
+                !window.isSecureContext || (e as Error)?.message === 'insecure'
+                  ? 'insecure'
+                  : 'denied'
+            }
+          })()
+        }
+      }
+      // else (izin düştü / susturuldu): `isMuted` KASITLI olarak değiştirilmez — kullanıcının kendi
+      // mikrofon tercihini bu anda dondurmuş oluruz, izin geri gelince yukarıdaki dal onu okur.
+      // LiveKit SFU izni düşünce zaten yerel track'i zorla unpublish eder (sustuktan sonra ses
+      // gitmez); `canPublish=false` mikrofon düğmesini gizler (VoiceControlBar `v-if`).
+    })
     r.on(RoomEvent.Disconnected, (reason?: unknown) => {
       // REV-7 teşhisi: kendiliğinden düşmenin NEDENİ konsola (DUPLICATE_IDENTITY,
       // SERVER_SHUTDOWN, ağ vb. — runtime'da görünür). Tekrar üreten kullanıcı paylaşır.
@@ -798,7 +857,7 @@ export const useVoiceStore = defineStore('voice', () => {
     micError,
     roomParticipants,
     mutedUserIds,
-    serverMutedUserIds,
+    serverMutedUserIdsByChannel,
     broadcastingByChannel,
     isConnectedTo,
     clearError,
@@ -809,6 +868,7 @@ export const useVoiceStore = defineStore('voice', () => {
     removeParticipant,
     addServerMute,
     removeServerMute,
+    serverMutedUserIdsFor,
     isServerMuted,
     addBroadcast,
     removeBroadcast,

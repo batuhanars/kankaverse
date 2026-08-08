@@ -16,9 +16,11 @@ export interface VoiceParticipantDto {
 }
 
 // REV-13b: katılımcılar + kanal aktif-başlangıcı (en erken katılım, ms epoch)
+// R16 §2: mutedUserIds eklendi — kalıcı (server) susturma, yalnız GUILD_VOICE'ta dolu; DM/GROUP_DM'de her zaman [].
 export interface VoiceParticipantsResponse {
   startedAt: number | null
   participants: VoiceParticipantDto[]
+  mutedUserIds: string[]
 }
 
 export const voiceApi = {

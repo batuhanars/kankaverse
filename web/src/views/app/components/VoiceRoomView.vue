@@ -81,7 +81,9 @@ function isMutedFor(m: RoomMember): boolean {
   return m.isLocal ? voiceStore.isMuted : voiceStore.mutedUserIds.has(m.userId)
 }
 function isServerMutedFor(m: RoomMember): boolean {
-  return !m.isLocal && voiceStore.serverMutedUserIds.has(m.userId)
+  // R16 §3.1 — kanal-scoped; `members` yalnız bağlıyken doluyor (satır 42), yani burada her zaman
+  // aktif kanal anlamlı.
+  return !m.isLocal && voiceStore.serverMutedUserIdsFor(channelId.value).has(m.userId)
 }
 
 // ── Kutucuklar ────────────────────────────────────────────────────────────────
