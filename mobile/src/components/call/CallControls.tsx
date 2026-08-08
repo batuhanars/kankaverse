@@ -18,8 +18,9 @@ interface Props {
   onHangUp: () => void;
   /**
    * M4d §5/§7 — yalnız `onToggleCamera` de dolu VE bu true iken kamera düğmesi çizilir. Çağıran
-   * taraf (`call.tsx`) bunu `callKind==='dm' && canPublishCamera` ile besler; grup/guild kamerası
-   * kapsam dışı (M4e/M4f) — düğme hiç görünmez. T&S §7: "görünür-kilitli yap" ilkesinin bilinçli
+   * taraf (`call.tsx`) bunu `(callKind==='dm' || callKind==='group') && canPublishCamera` ile besler
+   * (M4e §4); guild kamerası kapsam dışı (M4f) — orada düğme hiç görünmez. T&S §7: "görünür-kilitli
+   * yap" ilkesinin bilinçli
    * istisnası, `canPublishCamera=false` sessizce hiç çizilmeyerek uygulanır.
    */
   canPublishCamera?: boolean;

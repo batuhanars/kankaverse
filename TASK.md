@@ -3363,12 +3363,12 @@ Karşı taraf kamerasını açmak istemeyebilir. Bu davranış bilinçli, kusur 
 >
 > Kamera altyapısının tamamı M4d'de yazıldı ve cihazda doğrulandı; bu sprint onu **çoğullaştırıyor**.
 
-- [ ] 🔴 Uzak kamera state'i tek slottan **userId anahtarlı** yapıya çıktı (grupta ikinci kamera
+- [x] 🔴 Uzak kamera state'i tek slottan **userId anahtarlı** yapıya çıktı (grupta ikinci kamera
       birincisini eziyordu); 1-1 DM aynı kaynaktan türetiyor, paralel state yok
-- [ ] Kamera düğmesi kapısı grup DM'i kapsıyor (guild hariç — M4f)
-- [ ] Kamera açıkken **iki sütunlu ızgara**; kimse açmadığında bugünkü tek sütun alt alta düzen aynen
-- [ ] Kendi kutucuğun ızgaranın elemanı (1-1'deki köşe önizlemesi grupta yok)
-- [ ] T&S: grupta bir minör bile varsa video yok (sunucu kararı), düğme çizilmiyor
+- [x] Kamera düğmesi kapısı grup DM'i kapsıyor (guild hariç — M4f)
+- [x] Kamera açıkken **iki sütunlu ızgara**; kimse açmadığında bugünkü tek sütun alt alta düzen aynen
+- [x] Kendi kutucuğun ızgaranın elemanı (1-1'deki köşe önizlemesi grupta yok)
+- [x] T&S: grupta bir minör bile varsa video yok (sunucu kararı), düğme çizilmiyor
 
 ### DoD (cihazda — SAHİPTE, en az üç hesap)
 > Tam liste sözleşme §6'da. En kritik iki madde: **(1)** 1-1 DM görüntülü arama **regresyonsuz**
