@@ -3491,3 +3491,18 @@ WS kapısının **anlamı değişmedi**, yalnız depolama kanal-anahtarlı oldu.
 ### DoD (tarayıcıda — SAHİPTE)
 > Tam liste sözleşme §5'te. Gerçek kabul testi: **sahibin kilitli kalmış ikinci hesabı bu akışla
 > kurtarılabiliyor** (bugün UI'da geri alma yolu yok).
+
+---
+
+## Sprint R16m — Susturma Kalkınca Mobil de Tazelensin — 2026-08-08 🟡 AÇILDI
+
+> R16 §6'nın mobil ayağı. Sözleşme: `contracts/SPRINT_R16_VOICE_MUTE_STATE_CONTRACT.md` §3.2 (web'de
+> yazıldı, mobil ayrı tura bırakılmıştı — M4t o sırada aynı dosyalardaydı).
+>
+> 🔴 **Sahip turu 2026-08-08 bunu ortaya çıkardı:** susturulan hesap MOBİLDE olduğu için, sunucu izni
+> geri verse de mobil öğrenmiyor; kullanıcı kanaldan çıkıp girmeden konuşamıyor. Kapsam kararı PM'e ait.
+
+- [ ] `ParticipantPermissionsChanged` (yerel katılımcı) → `canPublish` güncelleniyor
+- [ ] İzin geri geldiğinde mikrofon yeniden yayınlanıyor — **ama kullanıcı kendi isteğiyle
+      kapatmışsa açılmıyor** (`isMuted` yalnız okunuyor; web'deki aynı ayrım)
+- [ ] İzin düştüğünde (susturulma anında) `canPublish=false` yansıyor, gösterge doğru metni veriyor
