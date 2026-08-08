@@ -3632,3 +3632,25 @@ gezinme paneli hemen kapatırdı. Yapısal ama gerekli bir değişiklik, kabul e
 Kanal **listesinde** "18+" yazısı uyarı üçgeniyle değiştirildi (web pariteti). **Kanal detay
 ekranındaki** "18+" yazısı **KALIYOR** — sahip cihazda gördü ve sorun görmedi. Orada kullanıcı zaten
 bilgi almaya girmiş oluyor, yazı doğru bilgi veriyor. Kapanmış karar, tekrar açılmayacak.
+
+---
+
+## Sprint R19 — Susturma Gerçekten Kessin + D54 — 2026-08-08 ✅ KOD BİTTİ
+
+> Sözleşme: `contracts/SPRINT_R19_MUTE_ENFORCEMENT_CONTRACT.md`. Tier yalnız `api/`.
+
+- [x] 🔴 **Kök neden:** susturma LiveKit'e yalnız **izin** yazıyordu, zaten **yayında olan** track'lere
+      dokunmuyordu. Kesilmeleri LiveKit'in yan etkisine bırakılmıştı ve güvenilmez çıktı — aynı gün bir
+      turda kesti, ötekinde kesmedi (sahip: "susturdum, hâlâ konuşabiliyor, kamera açık kalıyor")
+- [x] `mutePublishedTrack` (SDK'da vardı, hiç kullanılmıyordu) ile yayındaki track'ler zorla kesiliyor:
+      **sustur** → hepsi (ses+video+ekran) · **yayını durdur** → yalnız video/ekran, ses kalıyor
+- [x] 🔴 **Susturmayı kaldırma zorla AÇMIYOR** — kullanıcı kendi isteğiyle susmuşsa öyle kalıyor;
+      regresyon testi bunu koruyor
+- [x] **D54** kapandı (bkz. PLAN)
+- [x] `api` build ✅ · 1055/1055 test ✅ (PM kendi çalıştırdı) · `web`+`mobile` diffi sıfır
+
+### DoD (SAHİPTE)
+- [ ] Sustur → hedefin sesi VE kamerası **anında** kesiliyor
+- [ ] Yayını durdur → video kesiliyor, **ses sürüyor**
+- [ ] Susturmayı kaldır → kendi isteğiyle kapatmışsa mikrofon **açılmıyor**
+- [ ] Kanalda medyayı kapat → o an kamerası açık olanın kamerası **düşüyor** (yeniden bağlanmadan)

@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
+import { VoiceService } from '../voice/voice.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { AddChannelMemberDto } from './dto/add-channel-member.dto';
@@ -48,6 +49,7 @@ export class ChannelsService {
     private membership: MembershipService,
     private permissions: PermissionsService,
     private realtime: RealtimeService,
+    private voiceService: VoiceService,
   ) {}
 
   /** MANAGE_CHANNELS iznini kontrol et; yoksa 403 FORBIDDEN */
@@ -310,6 +312,22 @@ export class ChannelsService {
 
     const dtoOut = toChannelDto(updated);
     await this.emitChannelEventToGuild('channel.updated', updated.guildId!, updated);
+
+    // §4 D54 (Sprint R19) — GUILD_VOICE + ageGated/mediaEnabled FİİLEN değiştiyse (undefined DTO
+    // alanı = dokunulmadı, dolayısıyla "değişmedi" sayılır) o an bağlı katılımcıların LiveKit
+    // izinleri tazelenir. Ayar sıkılaştırıldığında (medya kapatıldı) gecikme T&S açığıdır — asıl
+    // kazanç bu yön. Best-effort: kanal ayarı zaten kalıcı olarak güncellendi; tazeleme başarısız
+    // olsa da (LiveKit erişilemez) ayar değişimi geri alınmaz — bir sonraki mintToken zaten doğrusunu verir.
+    const ageGatedChanged = dto.ageGated !== undefined && dto.ageGated !== channel.ageGated;
+    const mediaEnabledChanged =
+      dto.mediaEnabled !== undefined && dto.mediaEnabled !== channel.mediaEnabled;
+    if (updated.type === 'GUILD_VOICE' && (ageGatedChanged || mediaEnabledChanged)) {
+      try {
+        await this.voiceService.refreshChannelPermissions(channelId);
+      } catch {
+        // best-effort — tazeleme başarısız olsa da kanal ayarı geçerli kalır
+      }
+    }
 
     return dtoOut;
   }
