@@ -3506,3 +3506,35 @@ WS kapısının **anlamı değişmedi**, yalnız depolama kanal-anahtarlı oldu.
 - [x] İzin geri geldiğinde mikrofon yeniden yayınlanıyor — **ama kullanıcı kendi isteğiyle
       kapatmışsa açılmıyor** (`isMuted` yalnız okunuyor; web'deki aynı ayrım)
 - [x] İzin düştüğünde (susturulma anında) `canPublish=false` yansıyor, gösterge doğru metni veriyor
+
+---
+
+## Sprint R17 — Ses İzinlerinin Sadakati — 2026-08-08 🟡 AÇILDI
+
+> Sözleşme: `contracts/SPRINT_R17_VOICE_PERMISSION_FIDELITY_CONTRACT.md`. Tier `api/` + `web/`;
+> `mobile/` diffi sıfır (mobil ayağı M4p sonrası).
+
+- [ ] 🔴 `api`: moderasyon uçları izin yazarken `canPublishSources`ı da yazıyor. **LiveKit'te boş
+      liste "hiçbiri" değil "HEPSİ SERBEST" demek** — bugün susturup açılan kullanıcıya kanalın
+      kuralına bakılmaksızın tüm kaynaklar veriliyor (kamera dahil). UI kusuru bu sızıntıyı gizliyordu
+- [ ] `web` D51: `setCameraEnabled` publication kontrolü (mobil doğrusu yazılı)
+- [ ] `web` D52: kamera tarafı izin/unpublish dinleyicisi (R16 yalnız sesi ekledi)
+
+### DoD (SAHİPTE)
+> En kritik iki madde: **(1)** sustur→aç sonrası kamera düğmesi çıkıp girmeden geri geliyor ·
+> **(2)** kameranın kapalı olduğu genel kanalda sustur→aç sonrası kullanıcı kamera **açamıyor**.
+
+---
+
+## Sprint M4p — Mobil PiP + D44 — 2026-08-08 🟡 AÇILDI
+
+> Sözleşme: `contracts/SPRINT_M4P_MOBILE_PIP_CONTRACT.md`. 🔴 **Native diff var → yeni dev build.**
+> M4 fazının son sprinti.
+
+- [ ] PiP: çağrı aktifken uygulamadan çıkınca sistem PiP penceresi
+- [ ] PiP içeriği kompakt: 1-1'de karşı taraf, grup/ortamda **konuşan** kişi; kontrol/metin yok
+- [ ] PiP'teyken kamera DURMUYOR (M4d §6'nın istisnası); PiP yoksa bugünkü davranış
+- [ ] FGS tipi `microphone` kalıyor — kamera FGS tipi eklenmiyor (Play beyanı, Discord da girmiyor)
+- [ ] **D44 zil sesi** bu derlemeye biniyor (kanal v4)
+- [ ] 🔴 MIUI'de PiP izni kapalıyken çökmüyor, bugünkü davranışa düşüyor
+- [ ] 🔴 Yerel derleme (`prebuild` + `gradlew`) EAS'tan ÖNCE
