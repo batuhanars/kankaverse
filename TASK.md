@@ -3559,6 +3559,16 @@ PiP'e geçince `java.lang.IllegalArgumentException: Cannot coerce value...` ekra
 aralık tersine dönüyor (`min > max`) ve `coerceIn` patlıyor. Dev menüsü dar pencereyi hesaba katmıyor.
 
 🔴 **Mağaza sürümünde bu bileşen YOK** (`expo-dev-menu` yalnız geliştirme derlemesinde). Kullanıcı
-asla görmeyecek. **Çözüm:** dev menüde "Action button" anahtarını kapat (`showFab` tercihi, varsayılanı
-zaten `false`). **Bize yama YAZILMAYACAK** — Expo'nun paketine yama SDK yükseltmesinde kaybolur ve
-gerçek kullanıcıya hiçbir şey kazandırmaz. Tekrar raporlanmasın diye yazıldı.
+asla görmeyecek.
+
+⚠️ **PM'in ilk önerisi YANLIŞTI:** "dev menüde Action button'ı kapat" dedim, sahip denedi, hata devam
+etti. Kaynağı okuyunca sebebi net: `BindingView.kt` `MovableFloatingActionButton`ı **koşulsuz**
+compose ediyor; `showFab` yalnız `visible` parametresi (satır 92), yani görünürlüğü kapatıyor ama
+konum hesabını durdurmuyor. Hesap `LaunchedEffect(bounds.x, bounds.y)` ile **pencere boyutu her
+değiştiğinde** çalışıyor — PiP'e geçiş tam olarak bu. `coerceIn(0f, bounds.x)` çağrısında `bounds`
+negatife düşünce aralık boş kalıyor ve Kotlin istisna fırlatıyor. **Ayarla önlenemez.**
+
+**Doğru yol:** PiP doğrulaması `preview` profiliyle yapılır (`eas.json`da mevcut; `developmentClient`
+yok → dev menü yok → FAB yok). ⚠️ Preview derlemesi `EXPO_PUBLIC_API_URL`i derleme anında gömer, yani
+LAN IP ile derlenirse yalnız o ağda çalışır. **Bize yama YAZILMAYACAK** — Expo'nun paketine yama SDK
+yükseltmesinde kaybolur ve gerçek kullanıcıya hiçbir şey kazandırmaz.
