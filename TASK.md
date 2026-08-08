@@ -3604,3 +3604,15 @@ yükseltmesinde kaybolur ve gerçek kullanıcıya hiçbir şey kazandırmaz.
 - [ ] Bağlam menüsüne **Grubu Sil** (yalnız sahip görür, onaylı, geri alınamaz)
 - [ ] Etiket "Yeniden Adlandır" değil **"Düzenle"** (sahip kararı — ayar yüzeyi açılsın)
 - [ ] Yeniden adlandırma/silme mantığı kopyalanmadı, mevcut store eylemleri çağrıldı
+
+---
+
+## Sprint M4i — Kamera Düğmesi Görünür-Kilitli — 2026-08-08 🟡 AÇILDI
+
+> Sözleşme: `contracts/SPRINT_M4I_MOBILE_CAMERA_LOCKED_CONTRACT.md`. Tier yalnız `mobile/`, native
+> diff yok. Sahip isteği: "kamera butonu kalkmasın, üstü çizilsin."
+
+- [ ] Ortam kanalında `canPublishCamera=false` → düğme çiziliyor ama pasif/üstü çizili
+- [ ] 🔴 1-1 DM ve grup DM'de **hâlâ gizli** — orada video kapısı YAŞ kapısı, görünür-kilitli düğme
+      karşı tarafın minör olduğunu ifşa ederdi (brief §5/G1). Bilinçli ayrım, sadeleştirilmeyecek
+- [ ] İzin geri gelince düğme kendiliğinden etkinleşiyor (R17 + M4f dinleyicisi besliyor)
