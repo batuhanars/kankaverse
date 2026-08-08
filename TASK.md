@@ -3572,3 +3572,23 @@ negatife düşünce aralık boş kalıyor ve Kotlin istisna fırlatıyor. **Ayar
 yok → dev menü yok → FAB yok). ⚠️ Preview derlemesi `EXPO_PUBLIC_API_URL`i derleme anında gömer, yani
 LAN IP ile derlenirse yalnız o ağda çalışır. **Bize yama YAZILMAYACAK** — Expo'nun paketine yama SDK
 yükseltmesinde kaybolur ve gerçek kullanıcıya hiçbir şey kazandırmaz.
+
+---
+
+## Sprint M4g — Mobil Ses Kanalı Ayarları — 2026-08-08 🟡 AÇILDI
+
+> Sözleşme: `contracts/SPRINT_M4G_MOBILE_CHANNEL_SETTINGS_CONTRACT.md`. Tier yalnız `mobile/`;
+> sunucu üç alanı zaten kabul ediyor ve döndürüyor, metinler `tr.json`da hazır. Native diff yok.
+>
+> Sahip Discord mobili açıp ekran görüntüsüyle gösterdi; **oluşturma formu sade kalıyor, ayarlar
+> ekranı taşıyor** ayrımı sahibin bulgusu.
+
+- [ ] `ChannelSummaryDto`ya `userLimit` · `bitrate` · `mediaEnabled` tiplendi (yeni backend alanı DEĞİL)
+- [ ] Üç kontrol `channel-edit.tsx`e eklendi; kanal **oluşturma** formu değişmedi
+- [ ] 🔴 Kanal türü üç çağıran ekrandan da taşınıyor; `type` yoksa ses alanları **çizilmiyor**
+      (M4c dersi: route parametresine güvenen ekran, bir çağıran unutunca sessizce yanlış moda düşer)
+- [ ] `mediaEnabledDesc` açıklaması gösteriliyor (C7 anahtarı — minör dahil kamera açan ayar)
+
+### DoD (cihazda — SAHİPTE)
+> Tam liste sözleşme §5'te. Kritik: metin kanalında bu üç alan **görünmemeli**, ses kanalında
+> görünmeli; oluşturma formu değişmemeli.
