@@ -3455,3 +3455,24 @@ aynı turda düzeltilecek.
 > YAPILMADI (dev talimatı). En kritik maddeler: genel kanalda kamera uyarısı bir kez çıkıyor mu ·
 > yaş-kapılı/DM'de hiç çıkmıyor mu · acil buton kontrolü soluklaştıktan sonra da basılabiliyor mu ·
 > "Bağlantı kesildi." mesajı acilde görünmüyor mu.
+
+---
+
+## Sprint R16 — Susturma Durumu Görünür Olsun (D53) — 2026-08-08 🟡 AÇILDI
+
+> Sözleşme: `contracts/SPRINT_R16_VOICE_MUTE_STATE_CONTRACT.md`. Tier: `api/` + `web/`.
+> Mobil karşılığı ayrı turda (sözleşme §6).
+
+- [ ] `api`: `voice/participants` yanıtına `mutedUserIds` eklendi (yalnız GUILD_VOICE; DM'de boş),
+      var olan alanlar değişmedi
+- [ ] `web`: susturulmuş listesi sunucudan hidrate ediliyor → **sayfa yenilendikten sonra da**
+      "Susturmayı Kaldır" görünüyor (kusurun kökü buydu: bilgi yalnız oturum belleğindeydi)
+- [ ] 🔴 `web`: susturma kalkınca kullanıcı **yeniden bağlanmadan** konuşabiliyor
+      (`ParticipantPermissionsChanged` — M4f'te kamera için yazılanın ses karşılığı)
+- [ ] 🔴 Kullanıcının kendi mikrofon tercihi ezilmiyor — sunucunun izni geri vermesi "mikrofonunu aç"
+      demek değil
+- [ ] `voice.listenerOnly` metni düzeltildi (var olmayan karantinayı gerekçe gösteriyordu)
+
+### DoD (tarayıcıda — SAHİPTE)
+> Tam liste sözleşme §5'te. Gerçek kabul testi: **sahibin kilitli kalmış ikinci hesabı bu akışla
+> kurtarılabiliyor** (bugün UI'da geri alma yolu yok).
