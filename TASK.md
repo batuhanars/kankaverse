@@ -3299,11 +3299,12 @@ Web'de eski mesaj yüklerken ekran zıplıyor ve son mesaj çağırana aitse lis
 **C11 ile gelmedi, önceden vardı**; mobilde korumalar var, webde yok. Dev kapsam dışı olduğu için
 dokunmadı (doğru davranış).
 
-### DoD (cihaz/tarayıcı — SAHİPTE)
-- [ ] Kanal · 1-1 DM · grup DM'de gün geçişleri doğru (web + mobil)
-- [ ] Yukarı kaydırıp eski paket yükle: ayraçlar doğru yerde
-- [ ] Ayraçtan sonraki ilk mesaj avatar + ad ile çiziliyor
-- [ ] Gece yarısını geçirip ekranı açık bırak: **Bugün → Dün** kayıyor
+### DoD (cihaz/tarayıcı) — 🟢 SAHİP ONAYLADI 2026-08-07
+Sahip aynı gün "tamam" dedi; **PM kutuları işaretlemeyi unuttu**, 2026-08-08'de sahip hatırlattı.
+- [x] Kanal · 1-1 DM · grup DM'de gün geçişleri doğru (web + mobil)
+- [x] Yukarı kaydırıp eski paket yükle: ayraçlar doğru yerde
+- [x] Ayraçtan sonraki ilk mesaj avatar + ad ile çiziliyor
+- [x] Gece yarısını geçirip ekranı açık bırak: **Bugün → Dün** kayıyor
 
 ---
 
@@ -3624,3 +3625,10 @@ ayrı singleton (iki panel farklı DM tiplerinde bağımsız yaşıyor). `router
 oraya eklendi; bu yüzden "Düzenle" önce `await router.push` yapıp **sonra** paneli açıyor, yoksa
 gezinme paneli hemen kapatırdı. Yapısal ama gerekli bir değişiklik, kabul edildi.
 `vue-tsc` bilinen 6 ✅ · `vite build` ✅ (kendim çalıştırdım).
+
+---
+
+## Kanal detayı "18+" yazısı — sahip kararı 2026-08-08
+Kanal **listesinde** "18+" yazısı uyarı üçgeniyle değiştirildi (web pariteti). **Kanal detay
+ekranındaki** "18+" yazısı **KALIYOR** — sahip cihazda gördü ve sorun görmedi. Orada kullanıcı zaten
+bilgi almaya girmiş oluyor, yazı doğru bilgi veriyor. Kapanmış karar, tekrar açılmayacak.
