@@ -3345,9 +3345,8 @@ turda bakılsaydı ikinci tur hiç olmayacaktı. Kusur dev'in değil sözleşmen
 Sahip iki yönde de denedi (mobil→web, web→mobil).
 - [x] **(1)** görüntülü ara düğmesi aramayı kamera açık başlatıyor
 - [x] **(2)** arka plana alınca ses sürüyor, dönünce görüntü kaldığı yerden devam ediyor
-- [x] **(3)** izin akışı — sahip cihazda "her seferinde sor"a çevirdi, **izin istemi çıkıyor**.
-      ⚠️ Not: doğrulanan şey istemin çıkması; "reddet"e basıldığında aramanın düşmemesi + "Ayarları
-      Aç" uyarısı sahibin hangi düğmeye bastığına bağlı, ayrıca teyit edilirse tam kapanır
+- [x] **(3)** izin reddi aramayı düşürmüyor — sahip cihazda "her seferinde sor"a çevirip **reddetti**:
+      istem çıkıyor, reddedince arama düşmüyor ve "Ayarları Aç" modalı açılıyor. Dal uçtan uca görüldü
 - [x] **(4)** kamerasız 1-1 DM araması, grup DM ve ortam sesli kanalı regresyonsuz
 
 **Sahip ürün kararı:** aramayı kabul eden tarafın kamerası **otomatik açılmıyor**, tercihe bırakıldı
