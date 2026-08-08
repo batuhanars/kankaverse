@@ -92,6 +92,30 @@ interface VoiceState {
   callChannelName: string | null;
   callGuildName: string | null;
   /**
+   * Sprint M4t §2 🔴 — C7 §E2 kamera uyarısının kapı koşulu: yalnız `kind==='guild'` VE kanal
+   * `ageGated` değil VE ortam `adultsOnly` değil (web `useVoiceNudge.ts` `isGeneralVoiceChannel`
+   * pariteti). DM/grup DM'de çağıran taraf bu alanı hiç geçmez → `false` kalır (nudge o dallarda
+   * hiç sorulmaz). Hesap burada YAPILMAZ — çağıran ekran (`home.tsx` `joinVoiceChannel`, elinde
+   * `ChannelSummaryDto.ageGated` + `GuildSummaryDto.adultsOnly` olan tek yer) hesaplayıp `startOrJoin`
+   * options'ına geçirir; bu store yalnız SONUCU taşır (`call.tsx`in nudge kapısını okuduğu tek yer).
+   */
+  isGeneralVoiceChannel: boolean;
+  /**
+   * Sprint M4t §3 🔴 — A4 acil akışı. `EmergencyButton.handleConfirm` istek gitmeden HEMEN ÖNCE
+   * `true` yapar (yarış durumu yok: sunucu kicki bu isteğin işlenişinin bir parçası, yani ancak
+   * istek gönderildikten SONRA gerçekleşebilir). İki yeri bastırır:
+   *  (1) `wireRoom`daki `RoomEvent.Disconnected` — sunucu kicki bir hata DEĞİL, "Bağlantı kesildi."
+   *      yazılmaz.
+   *  (2) `call.tsx`teki otomatik `router.back()` — bu bayrak true iken ERTELENİR, ekran mount'lu
+   *      kalır ki `EmergencyButton`in geri bildirim modalı unmount olmadan gösterilebilsin.
+   * `EmergencyButton.closeFeedback` kullanıcı feedback'i kapatınca `endEmergency()` ile false'a
+   * döner — o an ertelenmiş navigasyon devam eder. 🔴 `leave()`in oturum-sonu `set({...})`
+   * bloğunda BİLEREK sıfırlanmaz: leave() emergency akışının KENDİSİ tarafından (sunucu kicki →
+   * `Disconnected` → `leave(false)`) tetiklenir; orada sıfırlansa navigasyon erteleme daha
+   * feedback modalı görünmeden biterdi.
+   */
+  emergencyPending: boolean;
+  /**
    * 🔴 M4c sahip bulgusu — katılma başarılı olduktan sonra `router.push('/call')` çalışana kadar
    * birkaç render'lık bir pencere var; bu sırada `connectedChannelId` zaten dolu ama rota hâlâ
    * `/call` DEĞİL, yani `MiniCallWindow` bir an görünüp kayboluyordu. Bu bayrak o pencereyi kapatır —
@@ -155,6 +179,10 @@ interface VoiceState {
   setOutputId: (id: AudioOutputId) => void;
   /** `/call` mount effect'i çağırır — bkz. `pendingCallScreen` yorumu. */
   clearPendingCallScreen: () => void;
+  /** `EmergencyButton.handleConfirm` çağırır — bkz. `emergencyPending` yorumu. */
+  beginEmergency: () => void;
+  /** `EmergencyButton.closeFeedback` çağırır — bkz. `emergencyPending` yorumu. */
+  endEmergency: () => void;
 
   /**
    * §3.1/§3.2 — izin + (gerekirse) davet + token + bağlan. `label` bildirim gövdesi (DM'de karşı
@@ -202,6 +230,9 @@ interface VoiceState {
       /** M4d §2 — bağlantı kurulduktan sonra kamera otomatik açılsın mı (DM başlığındaki
        *  görüntülü ara düğmesi). Web `pendingCameraStart` pariteti. */
       startWithCamera?: boolean;
+      /** Sprint M4t §2 — bkz. `isGeneralVoiceChannel` alan yorumu. Yalnız `kind:'guild'` çağıran
+       *  taraf (`home.tsx`) geçer; DM/grup DM hiç geçmez (nudge o dallarda sorulmaz). */
+      isGeneralVoiceChannel?: boolean;
     },
   ) => Promise<{ ok: boolean; message?: string; reason?: 'mic_denied' | 'other' }>;
   /** `userInitiated` true ise (kullanıcı "kapat"a bastı) `disconnectReason` set edilmez. */
@@ -316,6 +347,8 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   callKind: 'dm',
   callChannelName: null,
   callGuildName: null,
+  isGeneralVoiceChannel: false,
+  emergencyPending: false,
   pendingCallScreen: false,
   isMuted: false,
   canPublish: false,
@@ -353,6 +386,12 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   },
   clearPendingCameraStart() {
     set({ pendingCameraStart: false });
+  },
+  beginEmergency() {
+    set({ emergencyPending: true });
+  },
+  endEmergency() {
+    set({ emergencyPending: false });
   },
 
   async startOrJoin(channelId, label, options) {
@@ -410,6 +449,12 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       // Grup DM'de de dolu (grubun adı) — call.tsx başlığı guild'deki gibi buradan okur (§4 yorumu).
       callChannelName: isGuild || isGroup ? label : null,
       callGuildName: isGuild ? (options?.guildName ?? null) : null,
+      // Sprint M4t §2 — yalnız guild dalında çağıran tarafın hesabı okunur; DM/grup hiç geçmediği
+      // için zaten `undefined` → `false` (nudge o dallarda sorulmaz, sözleşme §2.1).
+      isGeneralVoiceChannel: isGuild ? !!options?.isGeneralVoiceChannel : false,
+      // Kozmetik sıfırlama — bir önceki oturumdan kalma acil-bayrak yeni oturumu kirletemez
+      // (`pendingCameraStart` ile aynı ders). Normal akışta zaten `endEmergency()` ile temiz gelir.
+      emergencyPending: false,
     });
 
     // §3.1 🔴 — sıra önemli: davet/bildirim ÖNCE (kimse yoksa). Ack `ok:false` ise odaya HİÇ
@@ -618,6 +663,12 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       callKind: 'dm',
       callChannelName: null,
       callGuildName: null,
+      // Diğer kozmetik sıfırlamalarla aynı ders — bir sonraki `startOrJoin` zaten üzerine yazar.
+      // 🔴 `emergencyPending` BİLİNÇLİ OLARAK burada YOK: bu `set()` emergency akışının kendisi
+      // tarafından (sunucu kicki → `Disconnected` → `leave(false)`) tetiklenebilir; burada
+      // sıfırlansa `EmergencyButton`in geri bildirim modalı hiç görünmeden `call.tsx`in ertelenmiş
+      // navigasyonu serbest kalırdı. Yalnız `endEmergency()` sıfırlar (bkz. o alanın yorumu).
+      isGeneralVoiceChannel: false,
       pendingCallScreen: false,
       isMuted: false,
       canPublish: false,
@@ -930,7 +981,12 @@ function wireRoom(
     if (__DEV__) console.warn('[voice] LiveKit Disconnected — reason:', reason);
     if (leaving) return;
     if (get().connectedChannelId === channelId) {
-      set({ disconnectReason: t('mobile.call.disconnected') });
+      // Sprint M4t §3.1 🔴 — acil buton onaylandıysa bu kopma SUNUCU KAYNAKLI ve BEKLENEN
+      // (removeParticipant, A4 §B1.3): "Bağlantı kesildi." kusur mesajı EZMEZ, `EmergencyButton`
+      // kendi geri bildirim akışını gösterir (bkz. `emergencyPending` alan yorumu).
+      if (!get().emergencyPending) {
+        set({ disconnectReason: t('mobile.call.disconnected') });
+      }
       room = null;
       void get().leave(false);
     }

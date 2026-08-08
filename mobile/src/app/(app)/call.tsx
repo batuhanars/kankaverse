@@ -11,6 +11,8 @@ import { dmRouteParams } from '@/utils/dmRoute';
 import { ParticipantTile } from '@/components/call/ParticipantTile';
 import { CallControls } from '@/components/call/CallControls';
 import { OutputPickerSheet } from '@/components/call/OutputPickerSheet';
+import { EmergencyButton } from '@/components/call/EmergencyButton';
+import { CameraNudgeModal, shouldShowCameraNudge, markCameraNudgeShown } from '@/components/call/CameraNudgeModal';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -53,6 +55,9 @@ export default function CallScreen() {
   const callKind = useVoiceStore((s) => s.callKind);
   const callChannelName = useVoiceStore((s) => s.callChannelName);
   const callGuildName = useVoiceStore((s) => s.callGuildName);
+  // Sprint M4t §3 — acil akış sürerken otomatik `router.back()` ERTELENİR (bkz. aşağıdaki
+  // `goneRef` effect'i + `stores/voice.ts` `emergencyPending` yorumu).
+  const emergencyPending = useVoiceStore((s) => s.emergencyPending);
   // M4d §1/§7 → M4e §1/§4 → M4f §2 🔴 — kamera artık üç arama türünde de aynı kapıdan geçiyor:
   // `callKind` bazlı ayrı bir kapı YOK, tek kapı `canPublishCamera` (sunucu kararı,
   // `resolveVideoSources`). Guild daha önce burada bilinçli dışarıda tutuluyordu (masaüstü
@@ -78,6 +83,8 @@ export default function CallScreen() {
   const myUser = useAuthStore((s) => s.user);
 
   const [outputSheetOpen, setOutputSheetOpen] = useState(false);
+  // Sprint M4t §2 — kamera nudge modalı görünürlüğü (kapı/hatırlama `CameraNudgeModal.tsx`te).
+  const [cameraNudgeVisible, setCameraNudgeVisible] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Bu ekran BU channelId'ye bağlıyken bir kez true olur; sonra `connectedChannelId` boşalırsa
@@ -170,6 +177,11 @@ export default function CallScreen() {
   useEffect(() => {
     if (goneRef.current || !wasConnectedRef.current) return;
     if (!isLeaving && connectedChannelId !== null) return;
+    // Sprint M4t §3 🔴 — acil akış sürüyorsa (`EmergencyButton` onaylandı, sunucu bizi henüz
+    // çekmiş/çekmemiş olabilir) navigasyon ERTELENİR: ekran mount'lu kalır ki geri bildirim modalı
+    // unmount olmadan gösterilebilsin. `emergencyPending` false'a dönünce (kullanıcı feedback'i
+    // kapattı) bu effect TEKRAR çalışır ve normal akışa (aşağısı) devam eder.
+    if (emergencyPending) return;
     goneRef.current = true;
     // Kontrolleri gizleme sayacı da susturulur: kapanma sırasında tetiklenirse üst bar ve alt çubuk
     // sökülmekte olan yüzeyde unmount olur — dondurma ile aynı gerekçe.
@@ -180,7 +192,7 @@ export default function CallScreen() {
     // Uyarı sökülme sırasında değil, bir sonraki tick'te ve DM ekranının üstünde açılır.
     if (reason) setTimeout(() => Alert.alert(reason), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLeaving, connectedChannelId]);
+  }, [isLeaving, connectedChannelId, emergencyPending]);
 
   // Süre sayacı — `connectedAt`ten itibaren mm:ss (web `connectedAt` pariteti).
   const [now, setNow] = useState(Date.now());
@@ -281,8 +293,8 @@ export default function CallScreen() {
   // M4d §2/§7 — desen mikrofonun izin reddi ile birebir aynı (`dm/[id].tsx` `handleCallPress`):
   // reddedilirse arama düşmez, yalnız "Ayarları Aç" gösterilir. M4e §4 → M4f §2 🔴 — artık üç arama
   // türünde de `CallControls`'a geçiliyor (aşağıda); görünürlük orada `canPublishCamera`ya bağlı.
-  function handleToggleCamera() {
-    resetHideTimer();
+  // Sprint M4t §2 — asıl kamera açma işlemi (nudge onaylandıktan/gerekmediğinde çağrılır).
+  function openCamera() {
     void (async () => {
       const res = await useVoiceStore.getState().toggleCamera();
       if (!res.ok && res.reason === 'camera_denied') {
@@ -292,6 +304,19 @@ export default function CallScreen() {
         ]);
       }
     })();
+  }
+
+  function handleToggleCamera() {
+    resetHideTimer();
+    const store = useVoiceStore.getState();
+    // Sprint M4t §2.3 — yalnız AÇARKEN (kapatırken nudge anlamsız) ve kanal daha önce görmediyse
+    // modal kamera açılmadan ÖNCE çıkar; onaylarsa `openCamera` (aşağıdaki modal `onConfirm`)
+    // çağrılır, vazgeçerse hiçbir şey olmaz (kamera kapalı kalır, arama sürer).
+    if (!store.isCameraOn && shouldShowCameraNudge(store.isGeneralVoiceChannel, connectedChannelId)) {
+      setCameraNudgeVisible(true);
+      return;
+    }
+    openCamera();
   }
 
   function handleSwitchCamera() {
@@ -361,6 +386,17 @@ export default function CallScreen() {
         >
           <Ionicons name="volume-high-outline" size={24} color={theme.colors.textPrimary} />
         </Pressable>
+      </View>
+
+      {/*
+        Sprint M4t §3.3 🔴 — acil buton OTOMATİK GİZLENMEYE TABİ DEĞİL: yukarıdaki `topBar`
+        `controlsHidden` (opacity 0) aldığında RN opaklığı alt ağaca da uygular, bu yüzden buton
+        o View'ın İÇİNE konsa fade'den kaçamazdı. Ayrı, hiçbir zaman soluklaşmayan bir satırda
+        (aynı üst-bar bölgesinde, hemen altında) duruyor — panik anındaki kullanıcı "ekrana dokun,
+        kontroller gelsin" adımını yapmadan basabiliyor.
+      */}
+      <View style={styles.emergencyRow} pointerEvents="box-none">
+        <EmergencyButton />
       </View>
 
       {isGridCall ? (
@@ -563,6 +599,15 @@ export default function CallScreen() {
       </View>
 
       <OutputPickerSheet visible={outputSheetOpen} onClose={() => setOutputSheetOpen(false)} />
+      <CameraNudgeModal
+        visible={cameraNudgeVisible}
+        onConfirm={() => {
+          markCameraNudgeShown(connectedChannelId);
+          setCameraNudgeVisible(false);
+          openCamera();
+        }}
+        onClose={() => setCameraNudgeVisible(false)}
+      />
     </Pressable>
   );
 }
@@ -598,6 +643,13 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.sm,
     marginTop: 2,
+  },
+  // Sprint M4t §3.3 — `topBar`in fade'inden BAĞIMSIZ ayrı satır (bkz. render'daki yorum).
+  emergencyRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: theme.layout.panelGap,
+    paddingBottom: 8,
   },
   tiles: {
     flex: 1,

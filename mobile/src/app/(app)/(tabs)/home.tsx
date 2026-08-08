@@ -239,9 +239,16 @@ export default function HomeScreen() {
       return;
     }
     setVoiceJoining(true);
-    const res = await useVoiceStore
-      .getState()
-      .startOrJoin(channel.id, channel.name ?? '', { kind: 'guild', guildName: selectedGuildName });
+    // Sprint M4t §2 — C7 nudge kapısı: yalnız kanal `ageGated` değilken VE ortam `adultsOnly`
+    // değilken kamera uyarısı sorulacak (bkz. `stores/voice.ts` `isGeneralVoiceChannel` yorumu).
+    // Hesap yalnız BURADA yapılabilir: `ChannelSummaryDto.ageGated` + `GuildSummaryDto.adultsOnly`
+    // ikisi de bu closure'da hazır, `startOrJoin` sonrasında (call.tsx'te) elde YOK.
+    const isGeneralVoiceChannel = !channel.ageGated && !(selectedGuild?.adultsOnly ?? false);
+    const res = await useVoiceStore.getState().startOrJoin(channel.id, channel.name ?? '', {
+      kind: 'guild',
+      guildName: selectedGuildName,
+      isGeneralVoiceChannel,
+    });
     setVoiceJoining(false);
     if (res.ok) {
       setVoiceSheetChannel(null);
