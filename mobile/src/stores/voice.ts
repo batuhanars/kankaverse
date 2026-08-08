@@ -292,6 +292,9 @@ interface VoiceState {
   handleMoved: (
     fromChannelId: string,
     toChannelId: string,
+    /** Hedef kanalın adı — sunucudan gelir (`voice.moved` payload'ı). Mobilde kanal store'u yok,
+     *  ad buradan gelmezse arama ekranı başlıksız kalıyordu (sahip cihaz turu 2026-08-08). */
+    toChannelName?: string,
   ) => Promise<{ ok: boolean; message?: string; reason?: 'mic_denied' | 'other' } | void>;
 }
 
@@ -821,7 +824,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     void get().leave(false);
   },
 
-  async handleMoved(fromChannelId, toChannelId) {
+  async handleMoved(fromChannelId, toChannelId, toChannelName) {
     const current = get().connectedChannelId;
     // Bağlı olduğumuz kanal `fromChannelId` DEĞİL VE boş da değilse (başka bir aramadayız) —
     // stale/ilgisiz bildirim, aktif farklı bir oturumu kesmeyiz.
@@ -831,7 +834,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     // "Bağlantı kesildi." yazmış olabilir — bkz. arayüzdeki `handleMoved` yorumu.
     set({ movePending: true, disconnectReason: null });
     if (current === fromChannelId) await get().leave(true);
-    const res = await get().startOrJoin(toChannelId, '', { kind: 'guild' });
+    const res = await get().startOrJoin(toChannelId, toChannelName ?? '', { kind: 'guild' });
     set({ movePending: false });
     return res;
   },
