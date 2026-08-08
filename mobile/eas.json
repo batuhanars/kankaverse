@@ -11,11 +11,19 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://kankaverse.com/api",
+        "EXPO_PUBLIC_WEB_URL": "https://kankaverse.com"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://kankaverse.com/api",
+        "EXPO_PUBLIC_WEB_URL": "https://kankaverse.com"
       }
     }
   }
