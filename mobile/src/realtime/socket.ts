@@ -266,19 +266,24 @@ function ensureSocket(): Socket {
   // `emergencyPending` deseni, bkz. `stores/voice.ts`); burası yalnız SONUCU kullanıcıya bildirir
   // (🔴 sessiz başarısızlık yasak — dolu kanal/yaş kapısı/izin gibi bir sebeple hedefe katılım
   // başarısız olursa sunucudan gelen Türkçe mesaj gösterilir).
-  socket.on('voice.moved', (data: { fromChannelId: string; toChannelId: string }) => {
-    void useVoiceStore
-      .getState()
-      .handleMoved(data.fromChannelId, data.toChannelId)
-      .then((res) => {
-        if (!res) return; // başka bir aramadaydık — ilgisiz, sessizce geç
-        if (!res.ok) {
-          Alert.alert(res.message ?? t('mobile.call.unreachable'));
-          return;
-        }
-        Alert.alert(t('voice.movedToast'));
-      });
-  });
+  socket.on(
+    'voice.moved',
+    (data: { fromChannelId: string; toChannelId: string; toChannelName?: string | null }) => {
+      // `toChannelName` sunucudan gelir (sahip cihaz turu 2026-08-08): mobilde kanal store'u yok,
+      // ad olmadan arama ekranı başlıksız kalıyordu. Gelmezse boş geçilir — ekran çökmez.
+      void useVoiceStore
+        .getState()
+        .handleMoved(data.fromChannelId, data.toChannelId, data.toChannelName ?? '')
+        .then((res) => {
+          if (!res) return; // başka bir aramadaydık — ilgisiz, sessizce geç
+          if (!res.ok) {
+            Alert.alert(res.message ?? t('mobile.call.unreachable'));
+            return;
+          }
+          Alert.alert(t('voice.movedToast'));
+        });
+    },
+  );
 
   // ---- M4a-2 gelen arama (sözleşme §8, uygulama açıkken) ----
   // Yalnız CALLEE tarafı: davet bize geldi → bildirim + zil (`notifications/incomingCall.ts`).

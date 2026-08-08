@@ -659,6 +659,10 @@ export class VoiceService {
         id: true,
         type: true,
         guildId: true,
+        // Sahip cihaz turu 2026-08-08 — taşınan istemci hedef kanalın ADINI bilmiyordu: mobilde kanal
+        // store'u yok (bilinçli), M4j §3 "ad yoksa boş geç" demişti ve arama ekranı başlıksız kalıyordu.
+        // Adı sunucu gönderiyor; hedef kaydı zaten burada, ek sorgu yok.
+        name: true,
         userLimit: true,
         ageGated: true,
         guild: { select: { adultsOnly: true } },
@@ -729,6 +733,7 @@ export class VoiceService {
     this.realtime.emitToUsers([targetUserId], 'voice.moved', {
       fromChannelId: channelId,
       toChannelId: targetChannelId,
+      toChannelName: target.name,
     });
 
     if (this.roomService) {
