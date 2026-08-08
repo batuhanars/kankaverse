@@ -3434,8 +3434,21 @@ aynı turda düzeltilecek.
 - [x] 🔴 Acil basıldığında "Bağlantı kesildi." hata mesajı gösterilmiyor (sunucu attı, kusur değil)
 - [x] 🔴 Acil buton otomatik gizlenmeye tabi değil — panik anındaki kullanıcı "ekrana dokun" adımını
       yapamaz
-- [x] Yerleşim: arama ekranının üst barı (alt çubuk zaten beş düğme; acil kontrol yanlış düğmeye
-      komşu olmamalı)
+- [x] Yerleşim: arama ekranının üst barı. Soluklaşan `topBar`ın İÇİNDE değil KARDEŞİ olarak çizildi —
+      RN'de `opacity` alt ağaca iniyor, iç içe konsaydı acil buton da solardı
+
+### PM incelemesi (2026-08-08)
+- **Sözleşme sapması, dev bildirdi:** `home.tsx`e dokunuldu (§1 tablosunda yoktu). Gerekçe geçerli:
+  nudge kapısı hem `channel.ageGated` hem `guild.adultsOnly` istiyor, ikisi bir arada YALNIZ orada
+  var. Kabul edildi — ama kural "sapma gerekirse DUR ve sor"du; sonradan bildirmek ikinci en iyisi
+- ⚠️ **Kırılganlık notu:** nudge kapısı `startOrJoin`e parametre olarak taşınıyor ve bugün guild
+  sesine tek giriş var (`home.tsx`, kodda doğrulandı). İleride ikinci giriş yolu eklenip bayrak
+  geçilmezse uyarı **sessizce kaybolur** ve kaybolduğu fark edilmez (bir uyarının yokluğu göze
+  batmaz). İkinci giriş yolu açıldığında bu satır hatırlanacak
+- **Acil akış incelendi, üç şey doğru:** istek başarısız olsa bile kullanıcı aramadan çıkarılıyor ve
+  hata açıkça gösteriliyor (sessiz başarısızlık yok) · Android geri tuşu `closeFeedback`e bağlı ·
+  `emergencyPending` bir sonraki `startOrJoin`de sıfırlanıyor, takılı kalıp sonraki aramanın
+  gezinmesini kilitlemiyor
 
 ### DoD (cihazda — SAHİPTE)
 > Tam liste sözleşme §5'te. Kod tarafı (typecheck/lint/kapsam) tamamlandı; cihaz doğrulaması
