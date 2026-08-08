@@ -84,6 +84,31 @@ kurulunca **`canPublishCamera` kontrolüyle birlikte** uygulanır ve her yolda t
 
 ---
 
+## §3-R Video düzeni — REVİZYON (sahip kararı 2026-08-08, ilk turdan sonra)
+
+🔴 **§3'ün "video avatarın yerine çizilir" cümlesi YETERSİZDİ ve PM hatasıdır.** Uygulandığında karşı
+taraf 88 piksellik yuvarlak bir daire içinde görünüyor; görüntülü arama bu değil. Referans uygulamaya
+İLK turda bakılmalıydı ("revize turu eşiği" dersi). Sahip Discord düzenini seçti.
+
+**Yeni kural — düzen kamera durumundan türetilir, ayrı bir state tutulmaz:**
+
+- **Hiç kimsenin kamerası açık değilse:** bugünkü iki kutucuk düzeni **AYNEN** kalır. Sesli arama
+  görünümü değişmez (regresyon yasak).
+- **En az bir taraf kamera açtığında** düzen değişir:
+  - **Tam alan = karşı taraf.** Videosu varsa video, yoksa bugünkü avatar + ad (ortalanmış, büyük).
+    Mikrofon-kapalı rozeti ve "Çalıyor…" / "tek başınasın" göstergeleri bu alanda korunur.
+  - **Sağ üst köşede küçük kare = sen.** Yalnız **senin kameran açıkken** çizilir; kapalıyken köşe
+    kutusu **hiç yok** (boş yüzey açma kuralı). Ön kamerada aynalı.
+  - Kontrol çubuğu bugünkü yerinde, otomatik gizlenme davranışı **değişmez**.
+- **Konuşma halkası** tam alanda çizilmez (tek kişilik alanda anlamsız); köşe kutusunda ve iki-kutucuk
+  düzeninde bugünkü gibi kalır.
+- **Grup/guild dalına (`isGridCall`) DOKUNULMAZ.** Bu revizyon yalnız DM dalıdır (M4e/M4f kendi işleri).
+
+**Kapsam dışı (bilerek):** köşe kutusunun sürüklenebilir olması · köşeye dokununca tam alanla yer
+değiştirmesi · tam ekran/yatay mod. Discord'da var, bizde yok; istenirse ayrı kalem.
+
+---
+
 ## §4 Ön/arka kamera çevirme
 
 Kamera açıkken kontrol çubuğunda ikinci bir düğme: kamerayı çevir. LiveKit'in mevcut track'i yeniden
