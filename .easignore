@@ -41,3 +41,14 @@ build/
 *firebase-adminsdk*.json
 *serviceAccount*.json
 *service-account*.json
+
+# ─── 🔴 Native klasörler: BULUTA GİTMEZ (2026-08-08, PiP yaması bu yüzden derlemeye girmedi) ──
+# Bu dosya `.gitignore`ın yerine geçtiği için `mobile/.gitignore`daki `/android` girdisi EAS
+# arşivinde GEÇERSİZ. Yerelde `expo prebuild` çalıştırıldığı an `mobile/android/` oluşuyor ve
+# arşive giriyordu; EAS hazır native klasör görünce projeyi "bare" sayıp **prebuild adımını hiç
+# çalıştırmıyor**. Sonucu somut: `plugins/withDevMenuFabFix.js` (prebuild'de koşan config plugin)
+# bulutta hiç çalışmadı, dev-menu yaması derlemeye girmedi, PiP hata ekranı devam etti.
+# Yerel `node_modules` da yüklenmediği için yerelde yamalanmış kopya buluta ulaşmıyor — yani
+# yamanın tek yolu bulutta prebuild'in ÇALIŞMASI.
+/mobile/android/
+/mobile/ios/
