@@ -3551,3 +3551,14 @@ WS kapısının **anlamı değişmedi**, yalnız depolama kanal-anahtarlı oldu.
 - [x] 🔴 MIUI'de PiP izni kapalıyken çökmüyor, bugünkü davranışa düşüyor — native `try/catch` +
       JS senkron okuma ile kod tarafında garanti; gerçek MIUI cihazında görsel doğrulama SAHİPTE
 - [x] 🔴 Yerel derleme (`prebuild` + `gradlew`) EAS'tan ÖNCE — `assembleDebug` BUILD SUCCESSFUL
+
+### Cihaz turunda çıkan, BİZİM kusurumuz OLMAYAN hata (2026-08-08)
+PiP'e geçince `java.lang.IllegalArgumentException: Cannot coerce value...` ekranı çıkıyor. Yığın izi
+`expo.modules.devmenu.fab.FabUtilsKt.calculateTargetPosition` → **Expo dev menüsünün yüzen düğmesi**
+("Action button"). Düğme konumunu pencere boyutundan hesaplıyor; PiP penceresi çok küçük olduğu için
+aralık tersine dönüyor (`min > max`) ve `coerceIn` patlıyor. Dev menüsü dar pencereyi hesaba katmıyor.
+
+🔴 **Mağaza sürümünde bu bileşen YOK** (`expo-dev-menu` yalnız geliştirme derlemesinde). Kullanıcı
+asla görmeyecek. **Çözüm:** dev menüde "Action button" anahtarını kapat (`showFab` tercihi, varsayılanı
+zaten `false`). **Bize yama YAZILMAYACAK** — Expo'nun paketine yama SDK yükseltmesinde kaybolur ve
+gerçek kullanıcıya hiçbir şey kazandırmaz. Tekrar raporlanmasın diye yazıldı.
