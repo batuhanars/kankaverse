@@ -3592,3 +3592,15 @@ yükseltmesinde kaybolur ve gerçek kullanıcıya hiçbir şey kazandırmaz.
 ### DoD (cihazda — SAHİPTE)
 > Tam liste sözleşme §5'te. Kritik: metin kanalında bu üç alan **görünmemeli**, ses kanalında
 > görünmeli; oluşturma formu değişmemeli.
+
+---
+
+## Sprint R18 — Grup DM Menüsü: Düzenle + Grubu Sil — 2026-08-08 🟡 AÇILDI
+
+> Sözleşme: `contracts/SPRINT_R18_GROUP_DM_MENU_CONTRACT.md`. Tier yalnız `web/`; uçlar ve store
+> eylemleri hazır, eksik olan tek şey menüden erişim.
+
+- [ ] Bağlam menüsüne **Düzenle** (grup ayarlarını açar — yeni modal YAZILMAZ, mevcut panel açılır)
+- [ ] Bağlam menüsüne **Grubu Sil** (yalnız sahip görür, onaylı, geri alınamaz)
+- [ ] Etiket "Yeniden Adlandır" değil **"Düzenle"** (sahip kararı — ayar yüzeyi açılsın)
+- [ ] Yeniden adlandırma/silme mantığı kopyalanmadı, mevcut store eylemleri çağrıldı
