@@ -3675,3 +3675,13 @@ bilgi almaya girmiş oluyor, yazı doğru bilgi veriyor. Kapanmış karar, tekra
 - [ ] Dolu/yaş-kapılı hedefe taşımada kullanıcı **sebebi görüyor**
 > ⚠️ Kırmızı konsol kutusu (LiveKit `console.error`) yine çıkabilir — bağlantı gerçekten kopuyor.
 > Başarı ölçütü yukarıdaki dört madde; kutu mağaza sürümünde zaten yok.
+
+---
+
+## Sahip doğrulaması 2026-08-08 (akşam) — web yığını kapandı
+Sahip webde bakıp onayladı, ayrı ayrı işaretlemeye gerek kalmadı:
+- **R18** grup DM menüsü (Düzenle + Grubu Sil) ✅
+- **D50** eski mesaj yüklerken ekran zıplaması ✅
+- **Taşı alt menüsü** menünün sağında ayrı kutu ✅
+- **M4j** taşıma akışı ✅ (hedef kanal adı da sunucudan gelir hâle getirildi)
+- **M4i · M4g · M4p · M4t · R17 · R19** cihazda doğrulandı
