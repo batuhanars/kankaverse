@@ -718,19 +718,26 @@ export class VoiceService {
       }
     }
 
-    // Kaynaktan çıkar — best-effort. İstemci socket ile hedefe katılır (yeni token mint → mute/karantina yeniden uygulanır).
-    if (this.roomService) {
-      try {
-        await this.roomService.removeParticipant(channelId, targetUserId);
-      } catch {
-        // bağlı değil / oda yok → yine de yönlendirme event'i gider
-      }
-    }
-
+    // 🔴 SIRA ÖNEMLİ (sahip cihaz turu 2026-08-08, M4j sonrası): önce OLAY, sonra kick.
+    // Eskiden ters sıradaydı ve mobilde şu görülüyordu: LiveKit kopması socket olayından ÖNCE
+    // varıyor, istemci bunu beklenmedik kopma sanıp "Bağlantı kesildi." uyarısını gösteriyor,
+    // ardından taşıma bilgisi geliyordu. İki sinyal AYRI taşıma katmanlarından gidiyor (LiveKit
+    // sinyalleşmesi vs Socket.IO), yani varış sırası garanti değil — istemcide zamanlamayla
+    // kovalamak yerine kaynağında çözülüyor: istemci "taşınıyorum" bilgisini kick'ten önce alır,
+    // kendisi düzgünce ayrılıp hedefe katılır. Aşağıdaki `removeParticipant` artık yalnız
+    // **emniyet supabı**: olaya uymayan/çevrimdışı istemciyi odada bırakmaz.
     this.realtime.emitToUsers([targetUserId], 'voice.moved', {
       fromChannelId: channelId,
       toChannelId: targetChannelId,
     });
+
+    if (this.roomService) {
+      try {
+        await this.roomService.removeParticipant(channelId, targetUserId);
+      } catch {
+        // bağlı değil / oda yok → istemci olayı zaten aldı
+      }
+    }
   }
 
   /**
