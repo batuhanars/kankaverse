@@ -27,6 +27,10 @@ import {
   stopCallForegroundService,
   addCallForegroundActionListener,
 } from '@modules/call-foreground-service';
+// M4p sözleşme §2/§4 — `setPipCallActive` yalnız `MainActivity.onUserLeaveHint`in PiP'e girmeyi
+// DENEMESİ için bir bayrak (arama yokken davranış değişmez); `isPipCurrentlyActive` SENKRON native
+// okuma, yalnız `handleAppStateChange`'in 'background' dalında kullanılır (bkz. o fonksiyondaki yorum).
+import { setPipCallActive, isPipCurrentlyActive } from '@modules/picture-in-picture';
 import { t } from '@/i18n';
 
 /**
@@ -546,6 +550,12 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
         void handleAppStateChange(next, set, get);
       });
 
+      // M4p §2 — `MainActivity.onUserLeaveHint`in PiP'e girmeyi DENEMESİ için bayrak. Foreground
+      // service kurulumundan BAĞIMSIZ (o try/catch'in DIŞINDA, kendi başarısız/başarılı olması
+      // birbirini etkilemesin) — arama türünden bağımsız her `startOrJoin` (DM/grup/guild, sesli
+      // veya görüntülü) PiP'i etkinleştirir (§3: sesli aramada da PiP açılır).
+      void setPipCallActive(true);
+
       // §6 — bildirim/servis kurulumu KENDİ try/catch'inde: burada patlarsa (ör. sistem izni
       // reddetti) az önce başarıyla kurulan LiveKit bağlantısını AŞAĞIDAKİ catch'e düşürüp
       // yıkmamalı — arama sürer, yalnız bildirim eksik kalır (native taraftaki aynı felsefe).
@@ -618,6 +628,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     foregroundListenerRemove?.();
     foregroundListenerRemove = null;
     stopCallForegroundService().catch(() => {});
+    void setPipCallActive(false); // M4p §2 — `startOrJoin`teki `true` ile simetrik, kozmetik sıfırlama
     appStateSub?.remove(); // M4d §6 — foreground listener ile aynı yaşam döngüsü
     appStateSub = null;
 
@@ -831,11 +842,15 @@ function scheduleAloneCheckIfNeeded(get: () => VoiceState) {
 }
 
 /**
- * M4d §6 🔴 — bu sprintin asıl işi. Model: kamera GÖRÜNÜR ARAYÜZE bağlı, ses SERVİSE bağlı
- * (foreground service tipi `microphone`; Android 14+ kameranın arayüzsüz çalışması ayrı bir FGS tipi
- * + Play beyanı ister — PM kararı 2026-08-08: o yola girilmiyor, Discord da PiP'siz girmiyor). PiP
- * BU SPRINTTE YOK (M4p) — yani arka plana alınca karşı taraf görüntüyü kaybeder, bu KABUL EDİLMİŞ
- * ara durumdur, kusur değildir (sözleşme §6).
+ * M4d §6 — Model: kamera GÖRÜNÜR ARAYÜZE bağlı, ses SERVİSE bağlı (foreground service tipi
+ * `microphone`; Android 14+ kameranın arayüzsüz çalışması ayrı bir FGS tipi + Play beyanı ister —
+ * PM kararı 2026-08-08: o yola girilmiyor, Discord da PiP'siz girmiyor).
+ *
+ * 🔴 M4p sözleşme §4 — "arka plana alındı" tanımının PiP istisnası BURADA, tek satırla: PiP'teyken
+ * (`isPipCurrentlyActive()` — bkz. o fonksiyonun yorumu, SENKRON native okuma) aktivite sistemce
+ * GÖRÜNÜR sayıldığı için kamera durdurulmaz. PiP desteklenmiyorsa/izin kapalıysa (MIUI, §6) ya da
+ * kullanıcı PiP'i kapattıysa bu `false` döner ve aşağısı DEĞİŞMEDEN çalışır (bugünkü davranış).
+ * `cameraIntent`/`localCameraStopping`/öne dönüş dalına DOKUNULMADI — yalnız bu bir erken-çıkış.
  *
  * `cameraIntent` (modül değişkeni) burada yalnız OKUNUR, hiç YAZILMAZ — niyeti yalnız `toggleCamera`
  * değiştirir. Böylece "kullanıcı kapattı" ile "arka planda geçici durduruldu" birbirine karışmaz.
@@ -847,6 +862,7 @@ async function handleAppStateChange(
 ) {
   if (!room) return;
   if (next === 'background') {
+    if (isPipCurrentlyActive()) return; // M4p §4 — PiP'te aktivite görünür sayılır, kamera SÜRER
     if (!get().isCameraOn) return;
     // M4f §3.1 — bu unpublish de BİZDEN (bkz. `toggleCamera`teki aynı bayrak yorumu); `cameraIntent`
     // burada yine YAZILMAZ (üstteki yorum), yalnız sunucu kaynaklı unpublish dinleyicisi susturuluyor.

@@ -3542,10 +3542,12 @@ WS kapısının **anlamı değişmedi**, yalnız depolama kanal-anahtarlı oldu.
 > Sözleşme: `contracts/SPRINT_M4P_MOBILE_PIP_CONTRACT.md`. 🔴 **Native diff var → yeni dev build.**
 > M4 fazının son sprinti.
 
-- [ ] PiP: çağrı aktifken uygulamadan çıkınca sistem PiP penceresi
-- [ ] PiP içeriği kompakt: 1-1'de karşı taraf, grup/ortamda **konuşan** kişi; kontrol/metin yok
-- [ ] PiP'teyken kamera DURMUYOR (M4d §6'nın istisnası); PiP yoksa bugünkü davranış
-- [ ] FGS tipi `microphone` kalıyor — kamera FGS tipi eklenmiyor (Play beyanı, Discord da girmiyor)
-- [ ] **D44 zil sesi** bu derlemeye biniyor (kanal v4)
-- [ ] 🔴 MIUI'de PiP izni kapalıyken çökmüyor, bugünkü davranışa düşüyor
-- [ ] 🔴 Yerel derleme (`prebuild` + `gradlew`) EAS'tan ÖNCE
+- [x] PiP: çağrı aktifken uygulamadan çıkınca sistem PiP penceresi
+- [x] PiP içeriği kompakt: 1-1'de karşı taraf, grup/ortamda **konuşan** kişi; kontrol/metin yok
+- [x] PiP'teyken kamera DURMUYOR (M4d §6'nın istisnası); PiP yoksa bugünkü davranış
+- [x] FGS tipi `microphone` kalıyor — kamera FGS tipi eklenmiyor (Play beyanı, Discord da girmiyor)
+- [x] **D44 zil sesi** bu derlemeye biniyor (kanal v4) — zaten kod tarafında v4'tü (önceki sprint),
+      bu derleme yalnız taşıyor, yeni değişiklik yok
+- [x] 🔴 MIUI'de PiP izni kapalıyken çökmüyor, bugünkü davranışa düşüyor — native `try/catch` +
+      JS senkron okuma ile kod tarafında garanti; gerçek MIUI cihazında görsel doğrulama SAHİPTE
+- [x] 🔴 Yerel derleme (`prebuild` + `gradlew`) EAS'tan ÖNCE — `assembleDebug` BUILD SUCCESSFUL
