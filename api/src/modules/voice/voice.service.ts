@@ -397,6 +397,46 @@ export class VoiceService {
   }
 
   /**
+   * §2 (Sprint R19) — zaten YAYINDA olan track'i gerçekten kes. `updateParticipant` yalnız
+   * gelecekteki publish izinlerini (`canPublish`/`canPublishSources`) günceller; halihazırda
+   * yayınlanan bir track'e DOKUNMAZ — bu sprintin kök nedeni (§0: sahip cihazda susturdu, hedef
+   * konuşmaya/kameraya devam etti çünkü kesilme LiveKit'in yan etkisine bırakılmıştı).
+   * `mutePublishedTrack` LiveKit'e "bu track'i ŞİMDİ kes" der — izin değil, aksiyon.
+   *
+   * Best-effort, iki seviyeli: katılımcı bağlı değilse/oda yoksa `getParticipant` patlar → sessiz
+   * geç (henüz publish edilmiş bir şey yok, keseceğimiz track de yok). Katılımcı bulunduysa her
+   * track için AYRI dene — bir track'in mute çağrısı patlarsa diğerleri yine denenir.
+   *
+   * `predicate` verilmezse TÜM track'ler kesilir (sustur: ses+video+ekran). `stopBroadcast`
+   * yalnız mikrofon-DIŞI kaynakları geçiren bir predicate verir (§2: video/ekran keser, ses kalır).
+   */
+  private async forceMuteTracks(
+    channelId: string,
+    targetUserId: string,
+    predicate: (source: TrackSource) => boolean = () => true,
+  ): Promise<void> {
+    if (!this.roomService) return;
+
+    let participant: Awaited<ReturnType<RoomServiceClient['getParticipant']>>;
+    try {
+      participant = await this.roomService.getParticipant(channelId, targetUserId);
+    } catch {
+      return; // bağlı değil / oda yok → kesecek bir track de yok
+    }
+
+    const tracks = (participant.tracks ?? []).filter((t) => predicate(t.source));
+    await Promise.all(
+      tracks.map(async (t) => {
+        try {
+          await this.roomService!.mutePublishedTrack(channelId, targetUserId, t.sid, true);
+        } catch {
+          // tek track'in mute çağrısı patlarsa diğerleri yine denenir
+        }
+      }),
+    );
+  }
+
+  /**
    * R11 — Sustur (kalıcı/server-mute). Yetki: MUTE_MEMBERS. GUILD_VOICE + owner/self bloğu.
    * Kayıt kalıcıdır (mintToken zorlar); LiveKit updateParticipant best-effort (bağlı değilse sessiz geç).
    */
@@ -444,6 +484,11 @@ export class VoiceService {
       }
     }
 
+    // §2 (Sprint R19, §0 kusuru) — yukarıdaki updateParticipant yalnız GELECEKTEKİ publish
+    // izinlerini keser; hedef ZATEN yayındaysa (mikrofon açık, kamera açık) o track'ler bu
+    // çağrıyla kesilmez. Sustur TÜM track'leri (ses + video + ekran) zorla keser — predicate yok.
+    await this.forceMuteTracks(channelId, targetUserId);
+
     this.realtime.emitToRoom(channelId, 'voice.participant_muted', {
       channelId,
       userId: targetUserId,
@@ -460,6 +505,12 @@ export class VoiceService {
    * geliyordu (§0) — susturulup açılan kullanıcı, kamerası kapalı olması gereken bir kanalda bile video
    * yayınlayabiliyordu. Şimdi susturma kalkınca kullanıcı tam olarak kanalın/bağlamın o an izin verdiği
    * kaynaklara dönüyor — ne fazlası (sızıntı) ne eksiği (kamera düğmesinin geri gelmemesi kusuru).
+   *
+   * 🔴 §3 (Sprint R19) — BİLEREK `forceMuteTracks(..., muted:false)` YOK. `muteParticipant`'ın
+   * simetriği "zorla aç" DEĞİLDİR: hedef susturulmadan ÖNCE mikrofonunu kendi isteğiyle kapatmış
+   * olabilir; sunucunun izni (`canPublish`) geri vermesi "mikrofonunu aç" demek değildir. Yeniden
+   * yayın kararı istemcide kalır (R16/R16m). Bu satırı "simetrik olsun" diye EKLEME — kullanıcı
+   * iradesini ezer.
    */
   async unmuteParticipant(actorId: string, channelId: string, targetUserId: string): Promise<void> {
     this.assertEnabled();
@@ -491,6 +542,86 @@ export class VoiceService {
       channelId,
       userId: targetUserId,
     });
+  }
+
+  /**
+   * §4 D54 (Sprint R19) — kanal ayarı (ageGated/mediaEnabled) değiştiğinde O AN bağlı olan
+   * katılımcıların LiveKit izinleri tazelenir. Öncesinde değişiklik yalnız yeniden bağlanınca
+   * (bir sonraki mintToken) geçerli oluyordu — ayar SIKILAŞTIĞINDA (örn. mediaEnabled kapandı)
+   * bu gecikme T&S açığı: kamera zaten açık kullanıcı ayar kapandıktan sonra da yayına devam
+   * ederdi. Çağıran (ChannelsService.update) yalnız GUILD_VOICE + ilgili alan fiilen değiştiyse
+   * çağırır — bu metodun kendisi koşulsuz TÜM bağlı katılımcıları tazeler.
+   *
+   * Best-effort + hata toleranslı (contract §4): N katılımcı = N bağımsız deneme; biri patlarsa
+   * diğerleri sürer (`Promise.all` + katılımcı başına try/catch — D54'te tek bir kullanıcının
+   * hatası diğerlerini düşürmesin talebi burada karşılanır, `moveParticipant`'taki N-katılımcı
+   * desenlerinden farklı olarak per-item hata yutma).
+   *
+   * Zaten sunucu-susturulmuş (VoiceMute) katılımcıya `canPublishSources` YAZILMAZ — yalnız
+   * `canPublish:false` yeniden onaylanır (muteParticipant deseni, §0 tuzağı: `canPublish:false`
+   * iken kaynak listesinin içeriği LiveKit'te etkisiz). Track'leri zaten `muteParticipant`te
+   * kesilmişti; burada tekrar dokunmaya gerek yok.
+   *
+   * Susturulmamış katılımcı için: `resolveCanPublishSources` (R17 §2 paylaşılan hesap) yeni izni
+   * hesaplar VE `forceMuteTracks` — §2'nin AYNI §0 kusuru burada da geçerli olduğundan — yeni
+   * kaynak listesinde ARTIK yer almayan, halihazırda yayında olan track'i (örn. mediaEnabled
+   * kapanınca canlı kamera) zorla keser. Kaynaklar genişlediyse (ayar gevşetildi) filtre hiçbir
+   * track'i eşlemez — o zaman kesecek bir şey yok, istemci kendi kararıyla yeniden yayın açar.
+   */
+  async refreshChannelPermissions(channelId: string): Promise<void> {
+    if (!this.roomService) return;
+
+    let channel: Awaited<ReturnType<typeof this.requireGuildVoiceChannel>>;
+    try {
+      channel = await this.requireGuildVoiceChannel(channelId);
+    } catch {
+      return; // kanal yok / GUILD_VOICE değil → tazelenecek bir şey yok
+    }
+
+    let participants: Awaited<ReturnType<RoomServiceClient['listParticipants']>>;
+    try {
+      participants = await this.roomService.listParticipants(channelId);
+    } catch {
+      return; // oda henüz açılmadı / LiveKit erişilemez
+    }
+
+    await Promise.all(
+      participants.map(async (p) => {
+        try {
+          const muted = await this.isVoiceMuted(channelId, p.identity);
+          if (muted) {
+            await this.roomService!.updateParticipant(channelId, p.identity, undefined, {
+              canPublish: false,
+              canSubscribe: true,
+              canPublishData: false,
+            });
+            return; // track'leri zaten muteParticipant'ta kesilmişti
+          }
+
+          const canPublish = await this.resolveCanPublish(p.identity, channel.guildId);
+          const canPublishSources = await this.resolveCanPublishSources(
+            p.identity,
+            { ...channel, type: 'GUILD_VOICE' },
+            null, // GUILD_VOICE — DM diğer-üye kavramı yok
+          );
+          await this.roomService!.updateParticipant(channelId, p.identity, undefined, {
+            canPublish,
+            canSubscribe: true,
+            canPublishData: false,
+            canPublishSources,
+          });
+
+          // Ayar sıkılaştıysa zaten yayında olan (artık izinli olmayan) track'i zorla kes.
+          await this.forceMuteTracks(
+            channelId,
+            p.identity,
+            (source) => !canPublishSources.includes(source),
+          );
+        } catch {
+          // bir katılımcının hatası diğerlerini düşürmesin (contract §4)
+        }
+      }),
+    );
   }
 
   /**
@@ -641,6 +772,15 @@ export class VoiceService {
         // Katılımcı bağlı değil / LiveKit erişilemez → best-effort (R11 deseni)
       }
     }
+
+    // §2 (Sprint R19, §0 kusuru) — yukarıdaki updateParticipant yalnız GELECEKTEKİ publish
+    // izinlerini keser; hedef ZATEN kamera/ekran yayınlıyorsa o track'ler bu çağrıyla kesilmez.
+    // Yalnız mikrofon-DIŞI kaynakları zorla sustur — ses (mikrofon) KALIR, sustur'dan fark bu.
+    await this.forceMuteTracks(
+      channelId,
+      targetUserId,
+      (source) => source !== TrackSource.MICROPHONE,
+    );
 
     await this.prisma.auditLog.create({
       data: {

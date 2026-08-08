@@ -13,6 +13,9 @@ const mockReceive = jest.fn();
 const mockListParticipants = jest.fn();
 const mockUpdateParticipant = jest.fn();
 const mockRemoveParticipant = jest.fn();
+// §2/§4 (Sprint R19) — forceMuteTracks + refreshChannelPermissions'ın kullandığı yeni RoomServiceClient çağrıları.
+const mockGetParticipant = jest.fn();
+const mockMutePublishedTrack = jest.fn();
 let lastAccessTokenOpts: any = null;
 
 jest.mock('livekit-server-sdk', () => ({
@@ -25,6 +28,8 @@ jest.mock('livekit-server-sdk', () => ({
     listParticipants: mockListParticipants,
     updateParticipant: mockUpdateParticipant,
     removeParticipant: mockRemoveParticipant,
+    getParticipant: mockGetParticipant,
+    mutePublishedTrack: mockMutePublishedTrack,
   })),
   TrackSource: {
     MICROPHONE: 'MICROPHONE',
@@ -131,6 +136,10 @@ beforeEach(() => {
   prismaMock.channelMember.findMany.mockResolvedValue([]);
   // auditLog varsayılan: başarılı (R11B audit testleri)
   prismaMock.auditLog.create.mockResolvedValue({});
+  // §2/§4 (Sprint R19) — forceMuteTracks varsayılan: katılımcı bağlı ama track'i yok (no-op).
+  // Zorla-susturma testleri override eder (tracks dolu döner).
+  mockGetParticipant.mockResolvedValue({ tracks: [] });
+  mockMutePublishedTrack.mockResolvedValue({});
 });
 
 // ── VOICE_DISABLED ───────────────────────────────────────────────────────────
@@ -868,6 +877,67 @@ describe('VoiceService.muteParticipant', () => {
   });
 });
 
+// ── §2 (Sprint R19, §0 kusuru) — muteParticipant ZATEN YAYINDA olan track'leri zorla keser ───
+// Kök neden: updateParticipant yalnız gelecekteki publish iznini keser, halihazırda yayınlanan
+// track'e dokunmaz. Sahip cihaz turunda susturulan kullanıcı konuşmaya/kameraya devam etmişti.
+describe('VoiceService.muteParticipant — §2 zorla susturma (forceMuteTracks)', () => {
+  beforeEach(() => {
+    prismaMock.channel.findFirst.mockResolvedValue(gvChannel());
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+  });
+
+  it('hedef zaten ses+video+ekran yayınlıyor → sustur TÜM track sid’lerinde mutePublishedTrack(true) çağırır', async () => {
+    mockGetParticipant.mockResolvedValue({
+      tracks: [
+        { sid: 'trk-mic', source: 'MICROPHONE' },
+        { sid: 'trk-cam', source: 'CAMERA' },
+        { sid: 'trk-scr', source: 'SCREEN_SHARE' },
+      ],
+    });
+    const svc = makeService();
+    await svc.muteParticipant(USER_ID, CHANNEL_ID, TARGET_ID);
+
+    expect(mockGetParticipant).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID);
+    expect(mockMutePublishedTrack).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, 'trk-mic', true);
+    expect(mockMutePublishedTrack).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, 'trk-cam', true);
+    expect(mockMutePublishedTrack).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, 'trk-scr', true);
+    expect(mockMutePublishedTrack).toHaveBeenCalledTimes(3);
+  });
+
+  it('hedef yayında değil (track yok) → mutePublishedTrack hiç çağrılmaz', async () => {
+    mockGetParticipant.mockResolvedValue({ tracks: [] });
+    const svc = makeService();
+    await svc.muteParticipant(USER_ID, CHANNEL_ID, TARGET_ID);
+
+    expect(mockMutePublishedTrack).not.toHaveBeenCalled();
+  });
+
+  it('hedef bağlı değil (getParticipant patlar) → best-effort sessiz geç, kayıt yine de yazılır', async () => {
+    mockGetParticipant.mockRejectedValue(new Error('participant not found'));
+    const svc = makeService();
+    await expect(svc.muteParticipant(USER_ID, CHANNEL_ID, TARGET_ID)).resolves.toBeUndefined();
+    expect(prismaMock.voiceMute.upsert).toHaveBeenCalled();
+    expect(mockMutePublishedTrack).not.toHaveBeenCalled();
+  });
+
+  it('bir track’in mutePublishedTrack çağrısı patlarsa → diğer track yine denenir (best-effort)', async () => {
+    mockGetParticipant.mockResolvedValue({
+      tracks: [
+        { sid: 'trk-cam', source: 'CAMERA' },
+        { sid: 'trk-scr', source: 'SCREEN_SHARE' },
+      ],
+    });
+    mockMutePublishedTrack.mockImplementation((_room: string, _id: string, sid: string) => {
+      if (sid === 'trk-cam') return Promise.reject(new Error('mute failed'));
+      return Promise.resolve({});
+    });
+    const svc = makeService();
+    await expect(svc.muteParticipant(USER_ID, CHANNEL_ID, TARGET_ID)).resolves.toBeUndefined();
+    expect(mockMutePublishedTrack).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, 'trk-scr', true);
+  });
+});
+
 // ── R11: Susturmayı kaldır ──────────────────────────────────────────────────────
 describe('VoiceService.unmuteParticipant', () => {
   beforeEach(() => {
@@ -903,6 +973,19 @@ describe('VoiceService.unmuteParticipant', () => {
       channelId: CHANNEL_ID,
       userId: TARGET_ID,
     });
+  });
+
+  // 🔴 §3 (Sprint R19) — kırmızı çizgi regresyonu: susturma kalkınca track ZORLA AÇILMAZ.
+  // Hedef susturulmadan önce mikrofonunu kendi isteğiyle kapatmış olabilir; izin (canPublish)
+  // geri vermek "mikrofonunu aç" demek DEĞİL. mutePublishedTrack(..., false) HİÇ çağrılmamalı —
+  // bu çağrı "simetrik olsun" diye eklenirse kullanıcı iradesi ezilir.
+  it('§3: track’i zorla AÇMAZ — mutePublishedTrack hiç çağrılmaz (yalnız izin geri verilir)', async () => {
+    prismaMock.guildMember.findUnique.mockResolvedValue({ joinedAt: new Date(), role: 'MEMBER' });
+    const svc = makeService();
+    await svc.unmuteParticipant(USER_ID, CHANNEL_ID, TARGET_ID);
+
+    expect(mockMutePublishedTrack).not.toHaveBeenCalled();
+    expect(mockGetParticipant).not.toHaveBeenCalled();
   });
 
   it('yerleşik üye → unmute sonrası canPublish=true', async () => {
@@ -1431,6 +1514,31 @@ describe('VoiceService.stopBroadcast (R11B B2, R7)', () => {
     expect(callArg).not.toHaveProperty('canPublish');
   });
 
+  // §2 (Sprint R19, §0 kusuru) — yukarıdaki updateParticipant testi yalnız GELECEKTEKİ izni
+  // doğrular; bu blok hedef ZATEN yayındaysa (kamera/ekran açık) o track'in de kesildiğini kanıtlar.
+  it('§2: hedef zaten kamera+ekran yayınlıyor → yalnız o track’ler mutePublishedTrack(true) alır, mikrofon KESİLMEZ', async () => {
+    mockGetParticipant.mockResolvedValue({
+      tracks: [
+        { sid: 'trk-mic', source: 'MICROPHONE' },
+        { sid: 'trk-cam', source: 'CAMERA' },
+        { sid: 'trk-scr', source: 'SCREEN_SHARE' },
+      ],
+    });
+    const svc = makeService();
+    await svc.stopBroadcast(USER_ID, CHANNEL_ID, TARGET_ID);
+
+    expect(mockMutePublishedTrack).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, 'trk-cam', true);
+    expect(mockMutePublishedTrack).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, 'trk-scr', true);
+    // Kritik: mikrofon track'i force-mute edilmez (ses kalır — sustur'dan fark)
+    expect(mockMutePublishedTrack).not.toHaveBeenCalledWith(
+      CHANNEL_ID,
+      TARGET_ID,
+      'trk-mic',
+      true,
+    );
+    expect(mockMutePublishedTrack).toHaveBeenCalledTimes(2);
+  });
+
   it('başarı → AuditLog voice.stop_broadcast yazılır', async () => {
     const svc = makeService();
     await svc.stopBroadcast(USER_ID, CHANNEL_ID, TARGET_ID);
@@ -1464,6 +1572,156 @@ describe('VoiceService.stopBroadcast (R11B B2, R7)', () => {
     await expect(svc.stopBroadcast(USER_ID, CHANNEL_ID, TARGET_ID)).resolves.toBeUndefined();
     expect(prismaMock.auditLog.create).toHaveBeenCalled();
     expect(realtimeMock.emitToRoom).toHaveBeenCalled();
+  });
+});
+
+// ── §4 D54 (Sprint R19) — refreshChannelPermissions ──────────────────────────
+// Kanal ageGated/mediaEnabled değişince O AN bağlı katılımcıların LiveKit izinleri tazelenir.
+// ChannelsService.update tetikler (yalnız GUILD_VOICE + ilgili alan fiilen değiştiyse) — burada
+// VoiceService metodunun kendisi (koşulsuz tazeleme + best-effort + track zorla kesme) test edilir.
+describe('VoiceService.refreshChannelPermissions (§4 D54)', () => {
+  beforeEach(() => {
+    // Önceki describe bloklarındaki `mockUpdateParticipant.mockRejectedValue(...)` çağrıları
+    // (best-effort testleri) jest.clearAllMocks() ile TEMİZLENMEZ — yalnız çağrı geçmişi
+    // sıfırlanır, implementasyon kalır (mockClear vs mockReset farkı). Bu blok updateParticipant'ın
+    // başarıyla döndüğünü varsayan zincirleme etkileri (forceMuteTracks'in tetiklenmesi) test
+    // ettiğinden, dosya-genelindeki sızıntıdan izole olmak için burada açıkça sıfırlanır.
+    mockUpdateParticipant.mockResolvedValue({});
+  });
+
+  function refreshChannel(overrides: Record<string, unknown> = {}) {
+    return {
+      id: CHANNEL_ID,
+      type: 'GUILD_VOICE',
+      guildId: GUILD_ID,
+      ageGated: false,
+      mediaEnabled: false,
+      guild: { adultsOnly: false },
+      ...overrides,
+    };
+  }
+
+  it('kanal yok / GUILD_VOICE değil → sessiz no-op (listParticipants hiç çağrılmaz)', async () => {
+    prismaMock.channel.findFirst.mockResolvedValue(null);
+    const svc = makeService();
+    await expect(svc.refreshChannelPermissions(CHANNEL_ID)).resolves.toBeUndefined();
+    expect(mockListParticipants).not.toHaveBeenCalled();
+  });
+
+  it('LiveKit env eksik (roomService yok) → sessiz no-op', async () => {
+    const svc = makeService(
+      makeConfig({
+        'livekit.apiKey': undefined,
+        'livekit.apiSecret': undefined,
+        'livekit.url': undefined,
+      }),
+    );
+    await expect(svc.refreshChannelPermissions(CHANNEL_ID)).resolves.toBeUndefined();
+    expect(mockListParticipants).not.toHaveBeenCalled();
+  });
+
+  it('oda henüz açılmadı (listParticipants patlar) → sessiz no-op', async () => {
+    prismaMock.channel.findFirst.mockResolvedValue(refreshChannel());
+    mockListParticipants.mockRejectedValue(new Error('room not found'));
+    const svc = makeService();
+    await expect(svc.refreshChannelPermissions(CHANNEL_ID)).resolves.toBeUndefined();
+    expect(mockUpdateParticipant).not.toHaveBeenCalled();
+  });
+
+  it('mediaEnabled=true (gevşetildi) → susturulmamış katılımcının izni kamera+ekran içerecek şekilde tazelenir', async () => {
+    prismaMock.channel.findFirst.mockResolvedValue(refreshChannel({ mediaEnabled: true }));
+    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+    prismaMock.voiceMute.findUnique.mockResolvedValue(null); // susturulmamış
+    mockListParticipants.mockResolvedValue([{ identity: TARGET_ID }]);
+    mockGetParticipant.mockResolvedValue({ tracks: [] });
+
+    const svc = makeService(videoConfig());
+    await svc.refreshChannelPermissions(CHANNEL_ID);
+
+    expect(mockUpdateParticipant).toHaveBeenCalledWith(
+      CHANNEL_ID,
+      TARGET_ID,
+      undefined,
+      expect.objectContaining({
+        canPublish: true,
+        canPublishSources: expect.arrayContaining(['MICROPHONE', 'CAMERA', 'SCREEN_SHARE']),
+      }),
+    );
+  });
+
+  it('mediaEnabled=false (sıkılaştırıldı) → zaten yayında olan kamera track’i zorla kesilir, mikrofon dokunulmaz', async () => {
+    prismaMock.channel.findFirst.mockResolvedValue(refreshChannel({ mediaEnabled: false }));
+    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+    prismaMock.voiceMute.findUnique.mockResolvedValue(null);
+    mockListParticipants.mockResolvedValue([{ identity: TARGET_ID }]);
+    mockGetParticipant.mockResolvedValue({
+      tracks: [
+        { sid: 'trk-mic', source: 'MICROPHONE' },
+        { sid: 'trk-cam', source: 'CAMERA' },
+      ],
+    });
+
+    const svc = makeService(videoConfig());
+    await svc.refreshChannelPermissions(CHANNEL_ID);
+
+    expect(mockUpdateParticipant).toHaveBeenCalledWith(
+      CHANNEL_ID,
+      TARGET_ID,
+      undefined,
+      expect.objectContaining({ canPublishSources: ['MICROPHONE'] }),
+    );
+    // asıl kazanç: izin güncellemesi tek başına canlı kamera track'ini kesmez — zorla kes
+    expect(mockMutePublishedTrack).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, 'trk-cam', true);
+    expect(mockMutePublishedTrack).not.toHaveBeenCalledWith(
+      CHANNEL_ID,
+      TARGET_ID,
+      'trk-mic',
+      true,
+    );
+  });
+
+  it('zaten sunucu-susturulmuş katılımcı → yalnız canPublish:false yeniden yazılır, track’lerine dokunulmaz', async () => {
+    prismaMock.channel.findFirst.mockResolvedValue(refreshChannel({ mediaEnabled: true }));
+    mockListParticipants.mockResolvedValue([{ identity: TARGET_ID }]);
+    prismaMock.voiceMute.findUnique.mockResolvedValue({ id: 'vm-1' }); // susturulmuş
+
+    const svc = makeService(videoConfig());
+    await svc.refreshChannelPermissions(CHANNEL_ID);
+
+    expect(mockUpdateParticipant).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, undefined, {
+      canPublish: false,
+      canSubscribe: true,
+      canPublishData: false,
+    });
+    // muteParticipant'ta zaten kesilmişti — burada tekrar dokunulmaz
+    expect(mockGetParticipant).not.toHaveBeenCalled();
+    expect(mockMutePublishedTrack).not.toHaveBeenCalled();
+  });
+
+  it('bir katılımcının hatası diğerini düşürmez (N katılımcı = N bağımsız deneme, contract §4)', async () => {
+    prismaMock.channel.findFirst.mockResolvedValue(refreshChannel({ mediaEnabled: true }));
+    prismaMock.guildMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+    prismaMock.voiceMute.findUnique.mockResolvedValue(null);
+    mockListParticipants.mockResolvedValue([{ identity: 'ok-1' }, { identity: 'fail-1' }]);
+    mockUpdateParticipant.mockImplementation((_room: string, identity: string) => {
+      if (identity === 'fail-1') return Promise.reject(new Error('boom'));
+      return Promise.resolve({});
+    });
+
+    const svc = makeService(videoConfig());
+    await expect(svc.refreshChannelPermissions(CHANNEL_ID)).resolves.toBeUndefined();
+    expect(mockUpdateParticipant).toHaveBeenCalledWith(
+      CHANNEL_ID,
+      'ok-1',
+      undefined,
+      expect.any(Object),
+    );
+    expect(mockUpdateParticipant).toHaveBeenCalledWith(
+      CHANNEL_ID,
+      'fail-1',
+      undefined,
+      expect.any(Object),
+    );
   });
 });
 

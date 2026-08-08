@@ -58,12 +58,16 @@ const permissionsMock = {
 
 const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
 
+// D54 (Sprint R19) — ChannelsService.update GUILD_VOICE ageGated/mediaEnabled değişince çağırır.
+const voiceServiceMock = { refreshChannelPermissions: jest.fn() };
+
 function makeService() {
   return new ChannelsService(
     prismaMock as any,
     membershipMock as any,
     permissionsMock as any,
     realtimeMock as any,
+    voiceServiceMock as any,
   );
 }
 
@@ -79,6 +83,7 @@ function resetMocks() {
   prismaMock.channelMember.findMany.mockResolvedValue([]);
   // R14 — varsayılan: ortam bildirim tercihi kaydı yok (@everyone bastırma kapalı)
   prismaMock.notificationPref.findUnique.mockResolvedValue(null);
+  voiceServiceMock.refreshChannelPermissions.mockResolvedValue(undefined);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -334,6 +339,94 @@ describe('ChannelsService.update', () => {
       data: Record<string, unknown>;
     };
     expect(updateCall.data).not.toHaveProperty('mediaEnabled');
+  });
+});
+
+// ── ChannelsService.update — §4 D54 (Sprint R19): LiveKit izin tazeleme ───────
+describe('ChannelsService.update — D54 refreshChannelPermissions tetikleyicisi', () => {
+  let service: ChannelsService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    membershipMock.requireGuildMembership.mockResolvedValue({
+      guild: GUILD,
+      membership: OWNER_MEMBERSHIP,
+    });
+  });
+
+  it('GUILD_VOICE + mediaEnabled fiilen değişti (false → true) → refreshChannelPermissions çağrılır', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(
+      makeChannel({ type: 'GUILD_VOICE', mediaEnabled: false }),
+    );
+    prismaMock.channel.update.mockResolvedValue(
+      makeChannel({ type: 'GUILD_VOICE', mediaEnabled: true }),
+    );
+
+    await service.update(USER_ID, CHANNEL_ID, { mediaEnabled: true });
+
+    expect(voiceServiceMock.refreshChannelPermissions).toHaveBeenCalledWith(CHANNEL_ID);
+  });
+
+  it('GUILD_VOICE + ageGated fiilen değişti (false → true) → refreshChannelPermissions çağrılır', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(
+      makeChannel({ type: 'GUILD_VOICE', ageGated: false }),
+    );
+    prismaMock.channel.update.mockResolvedValue(
+      makeChannel({ type: 'GUILD_VOICE', ageGated: true }),
+    );
+
+    await service.update(USER_ID, CHANNEL_ID, { ageGated: true });
+
+    expect(voiceServiceMock.refreshChannelPermissions).toHaveBeenCalledWith(CHANNEL_ID);
+  });
+
+  it('GUILD_VOICE ama alan DTO’ya hiç geçirilmedi (yalnız name değişti) → refreshChannelPermissions ÇAĞRILMAZ', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(
+      makeChannel({ type: 'GUILD_VOICE', mediaEnabled: true }),
+    );
+    prismaMock.channel.update.mockResolvedValue(
+      makeChannel({ type: 'GUILD_VOICE', mediaEnabled: true, name: 'yeni' }),
+    );
+
+    await service.update(USER_ID, CHANNEL_ID, { name: 'yeni' });
+
+    expect(voiceServiceMock.refreshChannelPermissions).not.toHaveBeenCalled();
+  });
+
+  it('GUILD_VOICE + mediaEnabled DTO’da VAR ama değer aynı (true → true) → refreshChannelPermissions ÇAĞRILMAZ', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(
+      makeChannel({ type: 'GUILD_VOICE', mediaEnabled: true }),
+    );
+    prismaMock.channel.update.mockResolvedValue(makeChannel({ type: 'GUILD_VOICE', mediaEnabled: true }));
+
+    await service.update(USER_ID, CHANNEL_ID, { mediaEnabled: true });
+
+    expect(voiceServiceMock.refreshChannelPermissions).not.toHaveBeenCalled();
+  });
+
+  it('GUILD_TEXT kanalda mediaEnabled/ageGated değişse bile refreshChannelPermissions ÇAĞRILMAZ (yalnız GUILD_VOICE)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(
+      makeChannel({ type: 'GUILD_TEXT', ageGated: false }),
+    );
+    prismaMock.channel.update.mockResolvedValue(makeChannel({ type: 'GUILD_TEXT', ageGated: true }));
+
+    await service.update(USER_ID, CHANNEL_ID, { ageGated: true });
+
+    expect(voiceServiceMock.refreshChannelPermissions).not.toHaveBeenCalled();
+  });
+
+  it('refreshChannelPermissions hata fırlatırsa (LiveKit erişilemez) → update yine de başarıyla döner (best-effort)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(
+      makeChannel({ type: 'GUILD_VOICE', mediaEnabled: false }),
+    );
+    const updated = makeChannel({ type: 'GUILD_VOICE', mediaEnabled: true });
+    prismaMock.channel.update.mockResolvedValue(updated);
+    voiceServiceMock.refreshChannelPermissions.mockRejectedValue(new Error('livekit down'));
+
+    await expect(service.update(USER_ID, CHANNEL_ID, { mediaEnabled: true })).resolves.toMatchObject(
+      { mediaEnabled: true },
+    );
   });
 });
 
