@@ -388,7 +388,24 @@ export default function HomeScreen() {
         onEdit={(c) => {
           router.push({
             pathname: '/channel-edit',
-            params: { id: c.id, name: c.name ?? '', ageGated: String(c.ageGated) },
+            params: {
+              id: c.id,
+              name: c.name ?? '',
+              ageGated: String(c.ageGated),
+              // 🔴 PM düzeltmesi (2026-08-08) — bu üçü BURADAN HİÇ TAŞINMIYORDU ve `channel-edit`
+              // onları koşulsuz gönderdiği için ana ekrandan kaydetmek özel kanalı herkese açıyor,
+              // yavaş modu sıfırlıyor, kanalı kategorisinden düşürüyordu. Ekran tarafında da kapı
+              // kondu (parametre yoksa alan gönderilmez), burada da gerçek değerler taşınıyor.
+              isPrivate: String(c.isPrivate),
+              slowModeSeconds: String(c.slowModeSeconds),
+              categoryId: c.categoryId ?? '',
+              // M4g §3 — `type` taşınmazsa `channel-edit` ses alanlarını fail-closed'a düşürür;
+              // bu satır o düşüşü önler.
+              type: c.type,
+              userLimit: String(c.userLimit),
+              bitrate: String(c.bitrate),
+              mediaEnabled: String(c.mediaEnabled),
+            },
           });
         }}
       />

@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { channelsApi, normalizeChannelName } from '@/api/channels';
+import { ChannelType, channelsApi, normalizeChannelName } from '@/api/channels';
 import { categoriesApi, type CategoryDto } from '@/api/categories';
 import { ChipSelect } from '@/components/guild/ChipSelect';
 import { extractErrorMessage } from '@/api/errors';
@@ -60,13 +60,27 @@ export default function ChannelEditScreen() {
     slowModeSeconds?: string;
     categoryId?: string;
     guildId?: string;
+    // M4g §3 — yalnız ses kanalı ayarlarını göstermek/göndermek için gerekli. Route parametresi;
+    // kanal store'u yok (mobile/CLAUDE.md), o yüzden üç çağıran ekran bunu taşımak zorunda.
+    type?: string;
+    userLimit?: string;
+    bitrate?: string;
+    mediaEnabled?: string;
   }>();
+
+  // 🔴 Fail-closed (M4g §3, M4c dersi): `type` taşınmazsa (eski/eksik bir çağıran yolu) ses
+  // alanları hiç render edilmez ve hiç gönderilmez — bugünkü davranışa düşer. Yanlış kanala yanlış
+  // kontrol göstermektense hiç göstermemek.
+  const isVoiceChannel = params.type === ChannelType.GUILD_VOICE;
 
   const [name, setName] = useState(params.name ?? '');
   const [ageGated, setAgeGated] = useState(params.ageGated === 'true');
   const [isPrivate, setIsPrivate] = useState(params.isPrivate === 'true');
   const [slowMode, setSlowMode] = useState(Number(params.slowModeSeconds ?? '0') || 0);
   const [categoryId, setCategoryId] = useState<string | null>(params.categoryId || null);
+  const [userLimit, setUserLimit] = useState(params.userLimit ?? '0');
+  const [bitrate, setBitrate] = useState(params.bitrate ?? '64');
+  const [mediaEnabled, setMediaEnabled] = useState(params.mediaEnabled === 'true');
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -93,9 +107,23 @@ export default function ChannelEditScreen() {
       await channelsApi.update(params.id, {
         name,
         ageGated,
-        isPrivate,
-        slowModeSeconds: slowMode,
-        categoryId,
+        // 🔴 PM düzeltmesi (2026-08-08) — bu üçü ESKİDEN KOŞULSUZ gönderiliyordu ve çağıran ekran
+        // parametreyi taşımadığında state varsayılana düşüyordu: `isPrivate` false, `slowMode` 0,
+        // `categoryId` null. Sonuç, ana ekrandan bir ÖZEL kanalın ayarlarını açıp kaydetmek o kanalı
+        // SESSİZCE herkese açıyordu (yavaş mod da sıfırlanıyor, kanal kategorisinden düşüyordu).
+        // Artık dev'in ses alanları için kurduğu fail-closed desenin aynısı: parametre GELMEDİYSE
+        // alan gönderilmez, sunucudaki değer olduğu gibi kalır. Çağıran ekranlar da artık taşıyor —
+        // ama bu kapı, gelecekte yeni bir çağıran unuttuğunda da koruyor (M4c dersi).
+        ...(params.isPrivate !== undefined && { isPrivate }),
+        ...(params.slowModeSeconds !== undefined && { slowModeSeconds: slowMode }),
+        ...(params.categoryId !== undefined && { categoryId }),
+        // Fail-closed: `isVoiceChannel` false ise (type gelmedi ya da metin kanalı) bu üçü hiç
+        // gönderilmez — bilinmeyen/metin kanalına varsayılan ses değeri yazılmaz.
+        ...(isVoiceChannel && {
+          userLimit: Math.min(99, Math.max(0, Math.floor(Number(userLimit) || 0))),
+          bitrate: Math.min(96, Math.max(8, Math.floor(Number(bitrate) || 64))),
+          mediaEnabled,
+        }),
       });
       router.back();
     } catch (e) {
@@ -166,6 +194,48 @@ export default function ChannelEditScreen() {
           options={SLOW_MODES.map((s) => ({ value: s.seconds, label: t(s.key) }))}
         />
         <Text style={styles.hint}>{t('channel.slowModeDesc')}</Text>
+
+        {/* M4g §2/§3 — yalnız ses kanalı: userLimit/bitrate/mediaEnabled `isVoiceChannel` iken
+            render edilir (fail-closed, üstteki yoruma bkz). Girdi biçimi mevcut `name` TextInput'la
+            aynı desen — yeni girdi altyapısı yazılmadı. */}
+        {isVoiceChannel && (
+          <>
+            <Text style={styles.label}>{t('channel.userLimitLabel')}</Text>
+            <TextInput
+              value={userLimit}
+              onChangeText={setUserLimit}
+              placeholder={t('channel.userLimitPlaceholder')}
+              placeholderTextColor={theme.colors.textMuted}
+              style={styles.input}
+              keyboardType="number-pad"
+              returnKeyType="done"
+            />
+            <Text style={styles.hint}>{t('channel.userLimitHint')}</Text>
+
+            <Text style={styles.label}>{t('channel.bitrateLabel')}</Text>
+            <TextInput
+              value={bitrate}
+              onChangeText={setBitrate}
+              style={styles.input}
+              keyboardType="number-pad"
+              returnKeyType="done"
+            />
+            <Text style={styles.hint}>{t('channel.bitrateHint')}</Text>
+
+            {/* T&S (C7): açıklama metni gizlenmez/kısaltılmaz — mediaEnabledDesc olduğu gibi gösterilir. */}
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleText}>
+                <Text style={styles.toggleLabel}>{t('channel.mediaEnabledLabel')}</Text>
+                <Text style={styles.toggleDesc}>{t('channel.mediaEnabledDesc')}</Text>
+              </View>
+              <Switch
+                value={mediaEnabled}
+                onValueChange={setMediaEnabled}
+                trackColor={{ true: theme.colors.accent500, false: theme.colors.bgElevated }}
+              />
+            </View>
+          </>
+        )}
 
         <View style={styles.toggleRow}>
           <View style={styles.toggleText}>
