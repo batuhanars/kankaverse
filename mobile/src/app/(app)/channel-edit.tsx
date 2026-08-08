@@ -3,12 +3,14 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Pressable,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ChannelType, channelsApi, normalizeChannelName } from '@/api/channels';
 import { categoriesApi, type CategoryDto } from '@/api/categories';
@@ -52,6 +54,7 @@ const SLOW_MODES = [
 // (`/channels/:id/members`) ve ayrı yüzey ister; ekranda bu yüzden açıklaması yazıyor.
 export default function ChannelEditScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     id: string;
     name?: string;
@@ -154,7 +157,15 @@ export default function ChannelEditScreen() {
     <KeyboardAvoidingView style={styles.flex} behavior="padding">
       <Stack.Screen options={{ title: t('channel.editTitle') }} />
 
-      <View style={styles.body}>
+      {/* Sahip cihaz turu (2026-08-08) — M4g'nin üç yeni ses alanı (userLimit/bitrate/mediaEnabled)
+          formu kısa ekranlarda ekranın altına taştırdı, Kaydet/Sil düğmeleri görünmüyordu. Sabit
+          `View` yerine kaydırılabilir hâle getirildi. Alt boşluk SABİT değer değil — gerçek
+          `insets.bottom` (jest gezinme ~24dp / üç tuşlu ~48dp farkı `sheetInsets.ts`teki gibi burada
+          da geçerli): sabit bir sayı üç tuşlu cihazda yine yetmezdi. */}
+      <ScrollView
+        contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + theme.layout.panelGap }]}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.label}>{t('channel.nameLabel')}</Text>
         <TextInput
           value={name}
@@ -281,7 +292,7 @@ export default function ChannelEditScreen() {
         <Pressable onPress={() => setConfirmDelete(true)} style={styles.dangerButton}>
           <Text style={styles.dangerButtonText}>{t('channel.deleteButton')}</Text>
         </Pressable>
-      </View>
+      </ScrollView>
 
       {confirmDelete && (
         <ConfirmDialog

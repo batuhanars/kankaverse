@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { attachmentsApi } from '@/api/attachments';
 import { extractErrorMessage } from '@/api/errors';
@@ -64,7 +65,7 @@ export function AttachmentView({
   }, [attachment.id, isImage, isClean]);
 
   /**
-   * Sprint M3c R2 — dosyayı sistemde aç.
+   * Sprint M3c R2 — dosyayı aç.
    *
    * 🔴 Adres yine `GET /attachments/:id`'den alınır: erişim kontrolü (üyelik + yaş kapıları) ve
    * tarama kapısı SUNUCUDA. CLEAN olmayan ek zaten dokunulabilir değil; olsaydı bile sunucu 403
@@ -72,6 +73,12 @@ export function AttachmentView({
    *
    * Hangi türü açabileceğini tahmin etmeye çalışmıyoruz: onu sistem bilir, uydurma bir
    * "desteklenmiyor" listesi yanlış negatif üretirdi.
+   *
+   * D38 (PLAN.md) — eskiden `Linking.openURL` harici tarayıcıya devrediyordu, kullanıcı uygulamadan
+   * çıkıyordu. `expo-web-browser` zaten kurulu ve `app.json` plugins'te (yeni derleme gerekmedi).
+   * `WebBrowser.openBrowserAsync` uygulama-içi bir sekme açar, geri tuşu uygulamaya döner.
+   * ⚠️ Bu Chrome'un geçmiş/çerezlerini paylaşan bir sekme — ayrı bir izole ortam değil (D36 kaydı);
+   * D36 bu değişiklikle KAPANMIYOR.
    */
   async function openFile() {
     if (opening) return;
@@ -79,7 +86,7 @@ export function AttachmentView({
     setOpenError('');
     try {
       const { url } = await attachmentsApi.getUrl(attachment.id);
-      await Linking.openURL(url);
+      await WebBrowser.openBrowserAsync(url);
     } catch (e) {
       // Ham hata metni/durum kodu ekrana basılmaz; sunucunun Türkçe mesajı gösterilir.
       setOpenError(extractErrorMessage(e));
