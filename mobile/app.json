@@ -43,7 +43,9 @@
       [
         "expo-notifications",
         {
-          "sounds": ["./assets/sounds/incoming_call_channel.wav"]
+          "sounds": [
+            "./assets/sounds/incoming_call_channel.wav"
+          ]
         }
       ],
       [
@@ -74,7 +76,8 @@
         }
       ],
       "expo-asset",
-      "./modules/picture-in-picture/plugin/withPictureInPicture.js"
+      "./modules/picture-in-picture/plugin/withPictureInPicture.js",
+      "./plugins/withDevMenuFabFix"
     ],
     "experiments": {
       "typedRoutes": true,
