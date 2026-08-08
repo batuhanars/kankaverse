@@ -3427,12 +3427,18 @@ aynı turda düzeltilecek.
 > Sözleşme: `contracts/SPRINT_M4T_MOBILE_TS_PARITY_CONTRACT.md`. Sahip isteği: webde canlı olan iki
 > T&S yüzeyi mobilde hiç yok. Tier yalnız `mobile/`; sunucu tarafı hazır, native diff yok.
 
-- [ ] Kamera uyarısı (C7 §E2) — yalnız genel/açık ortam ses kanalında, kanal başına bir kez,
+- [x] Kamera uyarısı (C7 §E2) — yalnız genel/açık ortam ses kanalında, kanal başına bir kez,
       bellekte (kalıcı saklama YOK — webde de sessionStorage)
-- [ ] Acil buton (A4) — onay → `POST /emergency` → sunucu odadan çeker → geri bildirim ekranı
+- [x] Acil buton (A4) — onay → `POST /emergency` → sunucu odadan çeker → geri bildirim ekranı
       (metin beyanı isteğe bağlı, `PATCH /emergency/:id`)
-- [ ] 🔴 Acil basıldığında "Bağlantı kesildi." hata mesajı gösterilmiyor (sunucu attı, kusur değil)
-- [ ] 🔴 Acil buton otomatik gizlenmeye tabi değil — panik anındaki kullanıcı "ekrana dokun" adımını
+- [x] 🔴 Acil basıldığında "Bağlantı kesildi." hata mesajı gösterilmiyor (sunucu attı, kusur değil)
+- [x] 🔴 Acil buton otomatik gizlenmeye tabi değil — panik anındaki kullanıcı "ekrana dokun" adımını
       yapamaz
-- [ ] Yerleşim: arama ekranının üst barı (alt çubuk zaten beş düğme; acil kontrol yanlış düğmeye
+- [x] Yerleşim: arama ekranının üst barı (alt çubuk zaten beş düğme; acil kontrol yanlış düğmeye
       komşu olmamalı)
+
+### DoD (cihazda — SAHİPTE)
+> Tam liste sözleşme §5'te. Kod tarafı (typecheck/lint/kapsam) tamamlandı; cihaz doğrulaması
+> YAPILMADI (dev talimatı). En kritik maddeler: genel kanalda kamera uyarısı bir kez çıkıyor mu ·
+> yaş-kapılı/DM'de hiç çıkmıyor mu · acil buton kontrolü soluklaştıktan sonra da basılabiliyor mu ·
+> "Bağlantı kesildi." mesajı acilde görünmüyor mu.
