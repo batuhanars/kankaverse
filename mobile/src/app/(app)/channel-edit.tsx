@@ -15,6 +15,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { ChannelType, channelsApi, normalizeChannelName } from '@/api/channels';
 import { categoriesApi, type CategoryDto } from '@/api/categories';
 import { ChipSelect } from '@/components/guild/ChipSelect';
+import { Slider } from '@/components/guild/Slider';
 import { extractErrorMessage } from '@/api/errors';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { t } from '@/i18n';
@@ -81,8 +82,14 @@ export default function ChannelEditScreen() {
   const [isPrivate, setIsPrivate] = useState(params.isPrivate === 'true');
   const [slowMode, setSlowMode] = useState(Number(params.slowModeSeconds ?? '0') || 0);
   const [categoryId, setCategoryId] = useState<string | null>(params.categoryId || null);
-  const [userLimit, setUserLimit] = useState(params.userLimit ?? '0');
-  const [bitrate, setBitrate] = useState(params.bitrate ?? '64');
+  // M4k — sayı kutusundan kaydırıcıya geçti; state artık string değil sayı. Sunucu sınırlarıyla
+  // birebir (bkz. Slider'a verilen min/max), route parametresi aralık dışıysa burada da kırpılır.
+  const [userLimit, setUserLimit] = useState(() =>
+    Math.min(99, Math.max(0, Math.floor(Number(params.userLimit ?? '0') || 0))),
+  );
+  const [bitrate, setBitrate] = useState(() =>
+    Math.min(96, Math.max(8, Math.floor(Number(params.bitrate ?? '64') || 64))),
+  );
   const [mediaEnabled, setMediaEnabled] = useState(params.mediaEnabled === 'true');
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [busy, setBusy] = useState(false);
@@ -123,8 +130,10 @@ export default function ChannelEditScreen() {
         // Fail-closed: `isVoiceChannel` false ise (type gelmedi ya da metin kanalı) bu üçü hiç
         // gönderilmez — bilinmeyen/metin kanalına varsayılan ses değeri yazılmaz.
         ...(isVoiceChannel && {
-          userLimit: Math.min(99, Math.max(0, Math.floor(Number(userLimit) || 0))),
-          bitrate: Math.min(96, Math.max(8, Math.floor(Number(bitrate) || 64))),
+          // Kaydırıcı zaten aralık içinde tam sayı üretiyor; kırpma savunma derinliği olarak kalır
+          // (M4k §5 — DoD bunu koşuyor, kaydırıcı asla aralık dışına çıkarmasa da).
+          userLimit: Math.min(99, Math.max(0, Math.floor(userLimit))),
+          bitrate: Math.min(96, Math.max(8, Math.floor(bitrate))),
           mediaEnabled,
         }),
       });
@@ -211,25 +220,31 @@ export default function ChannelEditScreen() {
             aynı desen — yeni girdi altyapısı yazılmadı. */}
         {isVoiceChannel && (
           <>
-            <Text style={styles.label}>{t('channel.userLimitLabel')}</Text>
-            <TextInput
+            {/* M4k — sayı kutusundan kaydırıcıya (web pariteti). Aralık/adım sunucudaki
+                `@Min`/`@Max` ile birebir: limit 0-99/1, bit hızı 8-96/8 (web'in kendi step'i). */}
+            <Slider
+              label={t('channel.userLimitLabel')}
               value={userLimit}
-              onChangeText={setUserLimit}
-              placeholder={t('channel.userLimitPlaceholder')}
-              placeholderTextColor={theme.colors.textMuted}
-              style={styles.input}
-              keyboardType="number-pad"
-              returnKeyType="done"
+              min={0}
+              max={99}
+              step={1}
+              onValueChange={setUserLimit}
+              formatValue={(v) => (v > 0 ? String(v) : '∞')}
+              minLabel="∞"
+              maxLabel="99"
             />
             <Text style={styles.hint}>{t('channel.userLimitHint')}</Text>
 
-            <Text style={styles.label}>{t('channel.bitrateLabel')}</Text>
-            <TextInput
+            <Slider
+              label={t('channel.bitrateLabel')}
               value={bitrate}
-              onChangeText={setBitrate}
-              style={styles.input}
-              keyboardType="number-pad"
-              returnKeyType="done"
+              min={8}
+              max={96}
+              step={8}
+              onValueChange={setBitrate}
+              formatValue={(v) => `${v} kbps`}
+              minLabel="8 kbps"
+              maxLabel="96 kbps"
             />
             <Text style={styles.hint}>{t('channel.bitrateHint')}</Text>
 
