@@ -3323,6 +3323,23 @@ dokunmadı (doğru davranış).
       (`cameraIntent` ≠ `isCameraOn` ayrımı)
 - [x] T&S: kapı sunucuda, `canPublishCamera=false` iken düğme çizilmiyor (görünür-kilitli **değil** —
       1-1 DM'de açıklama karşı tarafın minör olduğunu ifşa ederdi, brief §5/G1)
+- [x] **§3-R düzen revizyonu** — video artık 88px avatar dairesinde değil: kamera açılınca tam alan
+      karşı taraf, sağ üst köşe kendi önizlemen. Kimsenin kamerası açık değilken iki-kutucuk düzeni
+      **aynen** duruyor (sesli arama regresyonsuz)
+
+### 🔴 PM dersi — referans uygulamaya İLK turda bak
+Sözleşmenin ilk §3'ü "video avatarın yerine çizilir" diyordu; dev harfiyen uyguladı ve sonuç görüntülü
+aramada karşı tarafın **88 piksellik daire** içinde görünmesi oldu. Discord'da 1-1 görüntülü arama tam
+alan. Sahip düzeni seçti, ikinci tur yazıldı. [[revize-turu-esigi]] tam bunu söylüyordu: referansa ilk
+turda bakılsaydı ikinci tur hiç olmayacaktı. Kusur dev'in değil sözleşmenindi.
+
+### PM incelemesinde yakalananlar (dev raporundan bağımsız)
+- "Bu aramada tek başınasın" yazısı tam-alan düzeninde ortalanmış kaplamaydı → tam alandaki avatar+ad
+  ile üst üste biniyordu, hem de en sık yaşanacak anda (görüntülü ara → karşı taraf henüz katılmadı).
+  Akışa alındı
+- Dev'in "köşe kutusu üst bardaki küçült ikonuyla çakışabilir" riski **doğrulanmadı**: üst bar akışta,
+  `focusArea` onun altından başlıyor
+- Dev web'de bir kusur buldu (`isCameraOn` publication kontrol edilmeden yazılıyor) → [[D51]]
 
 ### DoD (cihazda — SAHİPTE, iki hesap gerekiyor)
 > Tam liste sözleşme §10'da. Dört kritik madde: **(1)** görüntülü ara düğmesi aramayı kamera açık
