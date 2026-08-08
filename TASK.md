@@ -3341,8 +3341,15 @@ turda bakılsaydı ikinci tur hiç olmayacaktı. Kusur dev'in değil sözleşmen
   `focusArea` onun altından başlıyor
 - Dev web'de bir kusur buldu (`isCameraOn` publication kontrol edilmeden yazılıyor) → [[D51]]
 
-### DoD (cihazda — SAHİPTE, iki hesap gerekiyor)
-> Tam liste sözleşme §10'da. Dört kritik madde: **(1)** görüntülü ara düğmesi aramayı kamera açık
-> başlatıyor · **(2)** arka plana alınca ses sürüyor ve dönünce görüntü kendiliğinden geliyor ·
-> **(3)** izin reddi aramayı düşürmüyor · **(4)** kamerasız 1-1 DM araması, grup DM ve ortam sesli
-> kanalı **regresyonsuz**.
+### DoD (cihazda) — 🟢 SAHİP TURU GEÇTİ 2026-08-08 (bir madde hariç)
+Sahip iki yönde de denedi (mobil→web, web→mobil).
+- [x] **(1)** görüntülü ara düğmesi aramayı kamera açık başlatıyor
+- [x] **(2)** arka plana alınca ses sürüyor, dönünce görüntü kaldığı yerden devam ediyor
+- [ ] **(3)** izin reddi aramayı düşürmüyor — ⚠️ **TEST EDİLEMEDİ**: kamera izni cihazda zaten
+      verilmişti, dal hiç çalışmadı. Kodda yazılı ama cihazda görülmedi. İzin elle geri alınıp
+      denenecek ([[pm-kapsam-kisitlari-varsayimdir]]: görülmeyen dal geçmiş sayılmaz)
+- [x] **(4)** kamerasız 1-1 DM araması, grup DM ve ortam sesli kanalı regresyonsuz
+
+**Sahip ürün kararı:** aramayı kabul eden tarafın kamerası **otomatik açılmıyor**, tercihe bırakıldı
+(arayanın kamerası açılıyor — o zaten görüntülü aramayı başlatan taraf, açılmasaydı tezat olurdu).
+Karşı taraf kamerasını açmak istemeyebilir. Bu davranış bilinçli, kusur değil.
