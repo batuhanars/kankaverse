@@ -19,6 +19,20 @@ interface ParticipantMeta {
 }
 
 /**
+ * R17 §2 — resolveVideoSources / resolveCanPublishSources'ın ihtiyaç duyduğu kanal alanları.
+ * mintToken (requireChannelAccess) ve unmuteParticipant (requireGuildVoiceChannel) farklı
+ * Prisma select'lerden gelir ama ikisi de bu şekle uyar — tek tip, tek hesap (Rule of Three).
+ */
+interface VideoSourceChannel {
+  id: string;
+  type: string;
+  guildId: string | null;
+  ageGated?: boolean;
+  mediaEnabled?: boolean;
+  guild?: { adultsOnly: boolean } | null;
+}
+
+/**
  * VoiceService — LiveKit ses + video/ekran kanalları.
  * Sözleşme: contracts/SPRINT_V2_LIVEKIT_CONTRACT.md (audio) +
  *            contracts/SPRINT_C4_VIDEO_SCREEN_CONTRACT.md (video, BUILD-DARK).
@@ -165,9 +179,9 @@ export class VoiceService {
       });
     }
 
-    // Sprint C4 — video/ekran kaynak kararı (T&S, R7). BUILD-DARK: bayraklar false → []
-    const videoSources = await this.resolveVideoSources(userId, channel, otherDmUserId);
-    const canPublishSources = [TrackSource.MICROPHONE, ...videoSources];
+    // Sprint C4 — video/ekran kaynak kararı (T&S, R7). BUILD-DARK: bayraklar false → [].
+    // R17 §2 — paylaşılan hesap: resolveCanPublishSources (unmuteParticipant de AYNI metodu çağırır).
+    const canPublishSources = await this.resolveCanPublishSources(userId, channel, otherDmUserId);
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -242,8 +256,8 @@ export class VoiceService {
       url: this.url,
       canPublish,
       bitrate: channel.bitrate ?? 64,
-      canPublishCamera: videoSources.includes(TrackSource.CAMERA),
-      canPublishScreen: videoSources.includes(TrackSource.SCREEN_SHARE),
+      canPublishCamera: canPublishSources.includes(TrackSource.CAMERA),
+      canPublishScreen: canPublishSources.includes(TrackSource.SCREEN_SHARE),
     };
   }
 
@@ -284,14 +298,7 @@ export class VoiceService {
    */
   private async resolveVideoSources(
     userId: string,
-    channel: {
-      id: string;
-      type: string;
-      guildId: string | null;
-      ageGated?: boolean;
-      mediaEnabled?: boolean;
-      guild?: { adultsOnly: boolean } | null;
-    },
+    channel: VideoSourceChannel,
     otherDmUserId: string | null,
   ): Promise<TrackSource[]> {
     const cameraEnabled = this.config.get<boolean>('cameraEnabled') ?? false;
@@ -370,6 +377,26 @@ export class VoiceService {
   }
 
   /**
+   * R17 §2 — Tek doğruluk kaynağı: `canPublishSources` grant değeri (MICROPHONE +
+   * resolveVideoSources sonucu). `mintToken` VE `unmuteParticipant` AYNI metodu çağırır — hesap
+   * kopyalanmaz, paylaşılır (üçüncü kullanım yeri, Rule of Three burada tetiklendi).
+   *
+   * 🔴 LiveKit semantiği (§0 — bu sprintin kalbi): `updateParticipant`'a `canPublishSources` HİÇ
+   * gönderilmezse ya da boş dizi `[]` gönderilirse LiveKit bunu "HİÇBİRİ" değil "HEPSİ SERBEST" diye
+   * yorumlar. Bu yüzden `canPublish:true` yazan her çağrı (mint + unmute) kaynak listesini de MUTLAKA
+   * — ve bu kanalın/bağlamın T&S kararına göre — açıkça yazmak ZORUNDADIR. `canPublish:false` yazan
+   * çağrılarda (muteParticipant) sorun yok — kapı zaten kapalı, kaynak listesinin içeriği önemsiz.
+   */
+  private async resolveCanPublishSources(
+    userId: string,
+    channel: VideoSourceChannel,
+    otherDmUserId: string | null,
+  ): Promise<TrackSource[]> {
+    const videoSources = await this.resolveVideoSources(userId, channel, otherDmUserId);
+    return [TrackSource.MICROPHONE, ...videoSources];
+  }
+
+  /**
    * R11 — Sustur (kalıcı/server-mute). Yetki: MUTE_MEMBERS. GUILD_VOICE + owner/self bloğu.
    * Kayıt kalıcıdır (mintToken zorlar); LiveKit updateParticipant best-effort (bağlı değilse sessiz geç).
    */
@@ -398,6 +425,13 @@ export class VoiceService {
     });
 
     // LiveKit best-effort — katılımcı bağlı değilse / LiveKit yoksa sessiz geç (kayıt kaynak-of-truth).
+    // R17 §2 — `canPublishSources` BİLEREK gönderilmiyor. `canPublish:false` zaten her yayını kesiyor;
+    // sorun `canPublish:true` + boş/eksik `canPublishSources` kombinasyonunda çıkıyor (§0 — LiveKit
+    // boş diziyi "hepsi serbest" sayıyor). Burada `canPublish:false` olduğu için kaynak listesinin
+    // içeriği LiveKit tarafında etkisiz — yine de yanlışlıkla `canPublishSources: []` EKLEME: bir
+    // sonraki değişiklikte biri `canPublish`'i `true`'ya çevirirse o boş dizi sessizce "hepsi serbest"e
+    // döner. Kaynak listesi göndermek gerekirse (örn. mikrofon sesi duyulsun istenirse) daraltılmış bir
+    // liste (`[MICROPHONE]`, bkz. stopBroadcast) kullanılır — asla `[]`.
     if (this.roomService) {
       try {
         await this.roomService.updateParticipant(channelId, targetUserId, undefined, {
@@ -419,6 +453,13 @@ export class VoiceService {
   /**
    * R11 — Susturmayı kaldır. Yetki: MUTE_MEMBERS. Kayıt silinir; LiveKit canPublish GERİ VERİLİR
    * ama karantinaya saygı: resolveCanPublish (kör true DEĞİL).
+   *
+   * R17 §2 (🔴 T&S sızıntı düzeltmesi) — `canPublishSources` artık AYRICA yeniden hesaplanıp
+   * gönderiliyor (`resolveCanPublishSources`, mintToken ile PAYLAŞILAN hesap). Öncesinde bu alan hiç
+   * gönderilmiyordu; `canPublish:true` + eksik `canPublishSources` LiveKit'te "HEPSİ SERBEST" anlamına
+   * geliyordu (§0) — susturulup açılan kullanıcı, kamerası kapalı olması gereken bir kanalda bile video
+   * yayınlayabiliyordu. Şimdi susturma kalkınca kullanıcı tam olarak kanalın/bağlamın o an izin verdiği
+   * kaynaklara dönüyor — ne fazlası (sızıntı) ne eksiği (kamera düğmesinin geri gelmemesi kusuru).
    */
   async unmuteParticipant(actorId: string, channelId: string, targetUserId: string): Promise<void> {
     this.assertEnabled();
@@ -430,10 +471,16 @@ export class VoiceService {
     if (this.roomService) {
       try {
         const canPublish = await this.resolveCanPublish(targetUserId, channel.guildId);
+        const canPublishSources = await this.resolveCanPublishSources(
+          targetUserId,
+          { ...channel, type: 'GUILD_VOICE' }, // requireGuildVoiceChannel type'ı zaten doğruladı
+          null, // GUILD_VOICE — DM diğer-üye kavramı yok
+        );
         await this.roomService.updateParticipant(channelId, targetUserId, undefined, {
           canPublish,
           canSubscribe: true,
           canPublishData: false,
+          canPublishSources,
         });
       } catch {
         // bağlı değil / oda yok → bir sonraki mintToken doğru canPublish verir
@@ -744,13 +791,30 @@ export class VoiceService {
     }
   }
 
-  /** R11 — kanal GUILD_VOICE mı + guildId güvence. Değilse NOT_VOICE_CHANNEL/CHANNEL_NOT_FOUND. */
-  private async requireGuildVoiceChannel(
-    channelId: string,
-  ): Promise<{ id: string; guildId: string }> {
+  /**
+   * R11 — kanal GUILD_VOICE mı + guildId güvence. Değilse NOT_VOICE_CHANNEL/CHANNEL_NOT_FOUND.
+   * R17 §2 — ageGated/mediaEnabled/guild.adultsOnly da seçilir: unmuteParticipant bu alanları
+   * resolveCanPublishSources'a (VideoSourceChannel) geçirmek için kullanır; diğer çağıranlar
+   * (muteParticipant/stopBroadcast/disconnectParticipant/moveParticipant) yalnız guildId okur,
+   * ekstra alanlar zararsız — tek select, tek doğruluk kaynağı.
+   */
+  private async requireGuildVoiceChannel(channelId: string): Promise<{
+    id: string;
+    guildId: string;
+    ageGated: boolean;
+    mediaEnabled: boolean;
+    guild: { adultsOnly: boolean } | null;
+  }> {
     const channel = await this.prisma.channel.findFirst({
       where: { id: channelId, deletedAt: null },
-      select: { id: true, type: true, guildId: true },
+      select: {
+        id: true,
+        type: true,
+        guildId: true,
+        ageGated: true,
+        mediaEnabled: true,
+        guild: { select: { adultsOnly: true } },
+      },
     });
     if (!channel) {
       throw new BadRequestException({ message: 'Kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
@@ -761,7 +825,13 @@ export class VoiceService {
         error: 'NOT_VOICE_CHANNEL',
       });
     }
-    return { id: channel.id, guildId: channel.guildId };
+    return {
+      id: channel.id,
+      guildId: channel.guildId,
+      ageGated: channel.ageGated ?? false,
+      mediaEnabled: channel.mediaEnabled ?? false,
+      guild: channel.guild ?? null,
+    };
   }
 
   /** R11 — yetki kapısı (owner/ADMIN örtük geçer). Yetkisiz → 403 FORBIDDEN. */

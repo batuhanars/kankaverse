@@ -1124,6 +1124,7 @@
     "disconnectFailed": "Odadan çıkarma işlemi başarısız oldu.",
     "disconnectConfirm": "{username} adlı kullanıcıyı ses kanalından çıkarmak istediğinden emin misin?",
     "kickedToast": "Bir yetkili seni ses kanalından çıkardı.",
+    "cameraStoppedToast": "Kameran kapatıldı.",
     "viewProfile": "Profili Gör",
     "sendMessage": "Mesaj Gönder",
     "addFriend": "Kanka Ekle",

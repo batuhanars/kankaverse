@@ -7,10 +7,16 @@ import {
   Track,
   type RemoteTrack,
   type LocalVideoTrack,
+  type LocalTrackPublication,
   type RemoteTrackPublication,
   type Participant,
   type RemoteParticipant,
 } from 'livekit-client'
+// D52 (R17 §4) — `TrackSource` protobuf'un SAYISAL enum'ı (`@livekit/protocol`, livekit-client'ın
+// kendi bağımlılığı — yeni paket eklenmedi); `Track.Source` (livekit-client) STRING enum'dur
+// ("camera") ve `ParticipantPermission.canPublishSources`in taşıdığı değerlerle EŞLEŞMEZ. Aynı
+// tuzak mobile/src/stores/voice.ts'de not edildi (M4f §3.2) — burada da aynı ayrımı koru.
+import { TrackSource } from '@livekit/protocol'
 import { voiceApi, type VoiceParticipantDto } from '@/api/voice'
 import { useToastStore } from '@/stores/toast'
 import { useAuthStore } from '@/stores/auth'
@@ -146,6 +152,11 @@ export const useVoiceStore = defineStore('voice', () => {
   let room: Room | null = null
   // Görüntülü arama niyeti: join() sonrası kamera açılacaksa true (tek seferlik)
   let pendingCameraStart = false
+  // D52 (R17 §4) — `LocalTrackUnpublished` (kaynak Camera) SDK'nın BİZDEN mi (toggleCamera) yoksa
+  // SUNUCUDAN mı (moderatör stopBroadcast / mute → izin düşer) geldiğini AYIRT ETMEZ; ikisi de aynı
+  // olayı ateşler (referans: mobile/src/stores/voice.ts `localCameraStopping` — mantık taşındı, kod
+  // kopyalanmadı). Bu bayrak true iken gelen olay "zaten bizim işimiz", tekrar iş yapılmaz.
+  let localCameraStopping = false
   // Bağlı uzak ses elementleri (sağırlaştırma için muted toggle'lanır)
   const remoteAudioEls = new Set<HTMLMediaElement>()
   // Sağırlaştırma öncesi mute durumu (kaldırınca geri yükle)
@@ -221,7 +232,9 @@ export const useVoiceStore = defineStore('voice', () => {
     return serverMutedUserIdsByChannel.value[channelId] ?? new Set()
   }
   function isServerMuted(userId: string): boolean {
-    return connectedChannelId.value ? serverMutedUserIdsFor(connectedChannelId.value).has(userId) : false
+    return connectedChannelId.value
+      ? serverMutedUserIdsFor(connectedChannelId.value).has(userId)
+      : false
   }
 
   // ── #1: Yayın durumu (WS voice.broadcast_started/stopped) ───────────────────
@@ -340,8 +353,13 @@ export const useVoiceStore = defineStore('voice', () => {
         pendingCameraStart = false
         try {
           const pub = await room.localParticipant.setCameraEnabled(true)
-          isCameraOn.value = true
-          if (pub?.track) _addVideoTrack(room.localParticipant, pub.track as LocalVideoTrack)
+          // D51 — sunucu grant vermediğinde SDK publication DÖNDÜRMEYEBİLİR (aynı kontrol
+          // toggleCamera'da da var). `pub` yoksa `isCameraOn` true YAZILMAZ — düğme "açık" derken
+          // karşı tarafta hiçbir track olmaması bu satırla engellenir.
+          if (pub) {
+            isCameraOn.value = true
+            if (pub.track) _addVideoTrack(room.localParticipant, pub.track as LocalVideoTrack)
+          }
         } catch {
           // Kamera cihazı yok veya izin reddedildi — sessizce atla
         }
@@ -713,6 +731,20 @@ export const useVoiceStore = defineStore('voice', () => {
       s.delete(p.identity)
       mutedUserIds.value = s
     })
+    // D52 (R17 §4) 🔴 — yerel kamera track'i unpublish olduğunda (kaynak Camera) bunun BİZDEN
+    // (toggleCamera) mi yoksa SUNUCUDAN mı (R11 stopBroadcast/mute → canPublishSources düşer, LiveKit
+    // izni zorla düşürür) geldiğini SDK ayırt etmez — ikisi de aynı olayı ateşler. `localCameraStopping`
+    // true iken bu bizim az önceki kapanışımız (toggleCamera zaten kendi state'ini yazdı, burada ikinci
+    // kez iş yapılmaz). false iken gelen olay sunucu kaynaklı: R16 §3.2'nin video karşılığı — moderatör
+    // yayını durdurunca (`stopBroadcast`) veya susturunca web kullanıcısının kamera düğmesi eskiden
+    // "açık" göstermeye devam ediyordu (D52 kusuru). Kullanıcı gerekçe söylenmeden bilgilendirilir.
+    r.on(RoomEvent.LocalTrackUnpublished, (pub: LocalTrackPublication) => {
+      if (pub.source !== Track.Source.Camera) return
+      if (localCameraStopping) return
+      isCameraOn.value = false
+      _removeVideoTrack(r.localParticipant.identity, 'camera')
+      useToastStore().info(i18n.global.t('voice.cameraStoppedToast'))
+    })
     // R16 §3.2 🔴 — server-mute/unmute'in ses karşılığı (mobile M4f'te kamera için yazılanın aynı
     // deseni: `mobile/src/stores/voice.ts` `ParticipantPermissionsChanged` bloğu — mantık taşındı,
     // kod kopyalanmadı). Bugüne dek `canPublish` yalnız join()'de mint yanıtından bir kez okunuyordu;
@@ -722,6 +754,14 @@ export const useVoiceStore = defineStore('voice', () => {
     // şey değiştirmez (onların "susturuldu" rozeti serverMutedUserIdsByChannel + WS'ten gelir).
     r.on(RoomEvent.ParticipantPermissionsChanged, (_prev, participant: Participant) => {
       if (participant.identity !== r.localParticipant.identity) return
+      // D52 §4 🔴 — kamera izninin CANLI karşılığı. `canPublishSources` boş/eksik gelirse LiveKit'te
+      // "hepsi serbest" anlamına gelir (§0, R17 sözleşmesi) — ama istemci bunu ASLA "kamera izni var"
+      // diye OKUMAZ (permissive default'u burada benimsemiyoruz, savunma derinliği): yalnız dizi
+      // AÇIKÇA CAMERA içeriyorsa true. Boş dizi → false (fail-closed) — sunucu tarafı (§2) zaten
+      // canPublish:true olan her çağrıda kaynak listesini doğru yazıyor; bu satır ikinci bir kilit.
+      const nextCanPublishCamera =
+        participant.permissions?.canPublishSources?.includes(TrackSource.CAMERA) ?? false
+      canPublishCamera.value = nextCanPublishCamera
       const nextCanPublish = participant.permissions?.canPublish ?? false
       const wasCanPublish = canPublish.value
       canPublish.value = nextCanPublish
@@ -776,17 +816,28 @@ export const useVoiceStore = defineStore('voice', () => {
   async function toggleCamera() {
     if (!room || !canPublishCamera.value) return
     const next = !isCameraOn.value
+    if (!next) {
+      // D52 — bu unpublish BİZDEN: aşağıdaki `LocalTrackUnpublished` dinleyicisi aynı olayı sunucu
+      // kaynaklı unpublish (moderatör yayın-durdur/sustur) ile AYIRT EDEMEZ; bayrak "zaten
+      // hallettik" der, dinleyici tekrar iş yapmaz (referans: mobile aynı deseni kullanıyor).
+      localCameraStopping = true
+    }
     try {
       const pub = await room.localParticipant.setCameraEnabled(next)
-      isCameraOn.value = next
-      // Yerel kamera track'ini de listeye yansıt
-      if (next && pub?.track) {
-        _addVideoTrack(room.localParticipant, pub.track as LocalVideoTrack)
+      if (next) {
+        // D51 — sunucu grant vermediğinde SDK publication döndürmez; `pub` yoksa `isCameraOn` true
+        // YAZILMAZ (düğme "kamera açık" der, karşı tarafta hiçbir track olmaz durumu engellenir).
+        if (!pub) return
+        isCameraOn.value = true
+        if (pub.track) _addVideoTrack(room.localParticipant, pub.track as LocalVideoTrack)
       } else {
+        isCameraOn.value = false
         _removeVideoTrack(room.localParticipant.identity, 'camera')
       }
     } catch {
       // izin reddedildi veya cihaz yok; durumu değiştirme
+    } finally {
+      localCameraStopping = false
     }
   }
 

@@ -921,6 +921,71 @@ describe('VoiceService.unmuteParticipant', () => {
   });
 });
 
+// ── R17 §2: unmute sonrası canPublishSources — T&S sızıntı testleri ────────────
+// §0 kusuru: unmuteParticipant canPublishSources HİÇ göndermiyordu → LiveKit boş/eksik diziyi
+// "hepsi serbest" sayıyordu; susturulup açılan kullanıcı video izni olmayan kanalda bile kamera
+// yayınlayabiliyordu. Bu blok contract §2'nin üç zorunlu testinden ikisini karşılar.
+describe('VoiceService.unmuteParticipant — R17 §2 canPublishSources', () => {
+  beforeEach(() => {
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    // yerleşik üye → resolveCanPublish=true (karantina değil)
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      joinedAt: new Date(Date.now() - 48 * 3600 * 1000),
+      role: 'MEMBER',
+    });
+  });
+
+  it('video izni OLMAYAN kanalda (mediaEnabled=false) → susturması kalkan kullanıcı kamera kaynağı ALMAZ', async () => {
+    prismaMock.channel.findFirst.mockResolvedValue(
+      gvChannel({ ageGated: false, mediaEnabled: false, guild: { adultsOnly: false } }),
+    );
+    const svc = makeService(videoConfig()); // bayraklar açık — yalnız kanal kuralı kapalı
+
+    await svc.unmuteParticipant(USER_ID, CHANNEL_ID, TARGET_ID);
+
+    const call = mockUpdateParticipant.mock.calls[0][3] as { canPublishSources: string[] };
+    expect(call.canPublishSources).toEqual(['MICROPHONE']);
+    expect(call.canPublishSources).not.toContain('CAMERA');
+    expect(call.canPublishSources).not.toContain('SCREEN_SHARE');
+  });
+
+  it('video izni OLAN kanalda (mediaEnabled=true) → susturması kalkan kullanıcı kamera+ekran kaynağını GERİ ALIR', async () => {
+    prismaMock.channel.findFirst.mockResolvedValue(
+      gvChannel({ ageGated: false, mediaEnabled: true, guild: { adultsOnly: false } }),
+    );
+    const svc = makeService(videoConfig());
+
+    await svc.unmuteParticipant(USER_ID, CHANNEL_ID, TARGET_ID);
+
+    const call = mockUpdateParticipant.mock.calls[0][3] as { canPublishSources: string[] };
+    expect(call.canPublishSources).toEqual(
+      expect.arrayContaining(['MICROPHONE', 'CAMERA', 'SCREEN_SHARE', 'SCREEN_SHARE_AUDIO']),
+    );
+  });
+
+  // Regresyon (contract §2, 3. zorunlu test): mintToken ve unmuteParticipant AYNI paylaşılan hesabı
+  // (resolveCanPublishSources) çağırıyor — aynı kanal/bayrak koşullarında ikisi de AYNI kaynak
+  // setini üretmeli. Bu test gelecekte biri diğerinden kopyalanıp bağımsızlaşırsa (drift) kırılır.
+  it('regresyon — mintToken ve unmuteParticipant aynı mediaEnabled=true kanalda AYNI canPublishSources üretir', async () => {
+    const channel = gvChannel({ ageGated: false, mediaEnabled: true, guild: { adultsOnly: false } });
+    prismaMock.channel.findFirst.mockResolvedValue(channel);
+    membershipMock.requireChannelAccess.mockResolvedValue(channel);
+    prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
+
+    const svc = makeService(videoConfig());
+
+    const mintRes = await svc.mintToken(USER_ID, CHANNEL_ID);
+    const mintGrant = mockAddGrant.mock.calls[0][0] as { canPublishSources: string[] };
+
+    await svc.unmuteParticipant(USER_ID, CHANNEL_ID, TARGET_ID);
+    const unmuteCall = mockUpdateParticipant.mock.calls[0][3] as { canPublishSources: string[] };
+
+    expect(new Set(unmuteCall.canPublishSources)).toEqual(new Set(mintGrant.canPublishSources));
+    expect(mintRes.canPublishCamera).toBe(true);
+    expect(mintRes.canPublishScreen).toBe(true);
+  });
+});
+
 // ── R11: Taşı ───────────────────────────────────────────────────────────────────
 const TARGET_CHANNEL_ID = 'chan-2';
 describe('VoiceService.moveParticipant', () => {
