@@ -942,6 +942,39 @@ function wireRoom(
     if (participant.identity !== r.localParticipant.identity) return;
     const canCamera = participant.permissions?.canPublishSources.includes(TrackSource.CAMERA) ?? false;
     set({ canPublishCamera: canCamera });
+
+    // R16m 🔴 — aynı olayın SES karşılığı (kontrat `contracts/SPRINT_R16_VOICE_MUTE_STATE_CONTRACT.md`
+    // §3.2/§6; referans `web/src/stores/voice.ts` aynı bloğu — mantık taşındı, kod kopyalanmadı).
+    // `canPublish` bugüne dek yalnız `startOrJoin`de mint yanıtından BİR KEZ okunuyordu: moderatör
+    // susturmayı kaldırınca sunucu LiveKit iznini geri veriyordu ama istemci hiç haberdar olmuyordu
+    // (mikrofon düğmesi kalıcı pasif, susturulan yeniden bağlanmadan konuşamıyordu — sahibin bir
+    // hesabı tam bu durumda kilitli kaldı, kontrat §0).
+    const wasCanPublish = get().canPublish;
+    const nextCanPublish = participant.permissions?.canPublish ?? false;
+    set({ canPublish: nextCanPublish });
+    if (nextCanPublish && !wasCanPublish) {
+      // İzin geri geldi (susturma kaldırıldı). 🔴 `isMuted` BURADA yalnız OKUNUR — susturulmadan
+      // önceki kendi tercihi budur. `isMuted`e mobilde sunucu kaynaklı yazan başka bir yol YOK
+      // (yalnız kullanıcı eylemi `toggleMute` ve bağlantı-anı sonucu `startOrJoin` yazıyor) — burada
+      // güvenle "kullanıcının son isteği" olarak okunabilir. Kendi isteğiyle kapatmışsa (`isMuted`
+      // true) mikrofon AÇILMAZ: sunucu izni geri vermek "mikrofonunu aç" demek değildir (kontrat
+      // §3.2 🔴). `canPublish` artık true olduğu için düğme aktifleşir, kullanıcı isterse kendi
+      // `toggleMute`iyle açar.
+      if (!get().isMuted) {
+        void (async () => {
+          try {
+            await r.localParticipant.setMicrophoneEnabled(true);
+          } catch {
+            // Cihaz/izin sorunu — dinleyici kal, düğme aktif kalır (kullanıcı tekrar deneyebilir).
+            set({ isMuted: true });
+          }
+        })();
+      }
+    }
+    // else (izin düştü / susturuldu): `isMuted` KASITLI olarak değiştirilmez — kullanıcının kendi
+    // mikrofon tercihini bu anda dondurmuş oluruz, izin geri gelince yukarıdaki dal onu okur. LiveKit
+    // SFU izni düşünce zaten yerel track'i zorla unpublish eder (susturulduktan sonra ses gitmez);
+    // `canPublish=false` düğmeyi (`CallControls` `disabled`) pasifleştirir.
   });
   // M4d §3 — uzak kameranın asıl kazanım/kayıp yolu: katılımcı yayına başlayınca/bırakınca.
   // M4e §2 🔴 — `remoteCameraPublications` artık `participant.identity` (userId) anahtarlı ÇOĞUL

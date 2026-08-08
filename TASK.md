@@ -3502,7 +3502,7 @@ WS kapısının **anlamı değişmedi**, yalnız depolama kanal-anahtarlı oldu.
 > 🔴 **Sahip turu 2026-08-08 bunu ortaya çıkardı:** susturulan hesap MOBİLDE olduğu için, sunucu izni
 > geri verse de mobil öğrenmiyor; kullanıcı kanaldan çıkıp girmeden konuşamıyor. Kapsam kararı PM'e ait.
 
-- [ ] `ParticipantPermissionsChanged` (yerel katılımcı) → `canPublish` güncelleniyor
-- [ ] İzin geri geldiğinde mikrofon yeniden yayınlanıyor — **ama kullanıcı kendi isteğiyle
+- [x] `ParticipantPermissionsChanged` (yerel katılımcı) → `canPublish` güncelleniyor
+- [x] İzin geri geldiğinde mikrofon yeniden yayınlanıyor — **ama kullanıcı kendi isteğiyle
       kapatmışsa açılmıyor** (`isMuted` yalnız okunuyor; web'deki aynı ayrım)
-- [ ] İzin düştüğünde (susturulma anında) `canPublish=false` yansıyor, gösterge doğru metni veriyor
+- [x] İzin düştüğünde (susturulma anında) `canPublish=false` yansıyor, gösterge doğru metni veriyor
