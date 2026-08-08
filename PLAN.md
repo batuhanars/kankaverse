@@ -326,6 +326,21 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
       yeniden şekillenirdi). M4'ün başındaki "en ağır kısmı başa al" kararının tersten aynı mantığı.
       **Yeni sıra: M4e grup DM görüntülü → M4f ortam kanalı kamera → M4p PiP + D44 + o ana kadar
       birikmiş native ne varsa.**
+    - **📌 Mobil ses moderasyonu — boşluk kayda geçti (sahip sorusu 2026-08-08).** Sunucuda dört uç
+      hazır ve web hepsini kullanıyor: **sustur/kaldır** (MUTE_MEMBERS) · **başka kanala taşı**
+      (MOVE_MEMBERS) · **yayını durdur** (MUTE_MEMBERS, R11) · **kanaldan at**. **Mobilde hiçbiri
+      yok** — `mobile/src/api/` içinde bu uçların istemcisi bile yok. M4f yalnız *kesilmeye uyan*
+      tarafı yazıyor (moderatör webden keser, mobil uyar); mobilden moderatörlük yapılamıyor.
+      **PM görüşü: kapatılmalı.** Moderasyon **anlık bir eylem**, kurulum yapılandırması değil —
+      [[mobil-kapsam-web-de-kalabilir]] kuralı buna uymaz (o kural ağır tek-seferlik yapılandırma
+      içindi). **Sıra: M4p PiP'ten SONRA ayrı sprint** (M4 fazını kapatmak öncelikli; moderasyon
+      video yarısının parçası değil, yeni yetenek).
+    - **Kanal ayarları (mediaEnabled · userLimit · bitrate) mobilde AÇILMIYOR — bilinçli.** Sahip
+      2026-08-08'de sordu; ayrım net: **kuralların etkisi mobilde zaten işliyor** (`mediaEnabled`
+      kapalıysa sunucu `canPublishCamera=false` verir → kamera düğmesi çizilmez, yalnız ses kalır;
+      `userLimit` token mint'inde `enforceUserLimit` ile uygulanır → mobil dolu kanala giremez,
+      Türkçe hata görür). Eksik olan yalnız **ayarı mobilden değiştirmek** ve o, kurulum anında bir
+      kez yapılan yapılandırma → [[mobil-kapsam-web-de-kalabilir]] gereği webde kalır.
     - **D38 için not (M4d turunda fark edildi):** `expo-web-browser` paketi zaten kurulu ve `app.json`
       plugins'te, yani **mevcut APK'nın içinde**; kod hâlâ `Linking.openURL` kullanıyor. Yani D38 tek
       satırlık iş ve **yeni derleme beklemiyor** — "bir sonraki native derlemeye biner" kaydı bayat,
