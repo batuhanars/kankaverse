@@ -3402,6 +3402,14 @@ kullanıcı aramayı kaparken "Kameran kapatıldı" uyarısı alacaktı, üsteli
 uyarı DM ekranının üstünde belirecekti. `leave()` artık bayrağı en başta işaretliyor, dinleyici de
 `leaving`i ayrıca kontrol ediyor.
 
+### Cihaz turunda görülen, kusur OLMAYAN log (2026-08-08)
+Odadan atılan tarafta (mobil) `publisher data channel 'RELIABLE' closed unexpectedly` konsol hatası
+çıkıyor. **LiveKit'in kendi log'u**, bizim kodumuzdan değil: sunucu katılımcıyı odadan çıkarınca
+bağlantı aniden kopuyor, SDK bunu beklenmedik kapanma diye yazıyor. Zorla çıkarmada normal, akışı
+bozmuyor (atılma davranışı sahip turunda temiz geçti). Kırmızı kutu yalnız geliştirme derlemesinde
+(LogBox `console.error`ı yakalıyor); mağaza sürümünde kullanıcı görmez. **Susturulmayacak** —
+kütüphane log'unu bastırmak gerçek hataları da gizler. Tekrar raporlanmasın diye yazıldı.
+
 ### Web pariteti → [[D52]]
 Aynı üç maddenin hiçbiri webde yok (`LocalTrackUnpublished`/`ParticipantPermissionsChanged` grep: sıfır).
 Yayını durdurulan web kullanıcısının düğmesi "kamera açık" göstermeye devam ediyor. D51 ile aynı dosya,
