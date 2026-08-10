@@ -18,7 +18,7 @@ import {
 import { TrackSource } from '@livekit/protocol';
 import { AudioSession, AndroidAudioTypePresets } from '@livekit/react-native';
 import { voiceApi } from '@/api/voice';
-import { callInvite, callCancel, groupCallStart, groupCallCancel } from '@/realtime/socket';
+import { callInvite, callCancel, callAccept, groupCallStart, groupCallCancel } from '@/realtime/socket';
 import { useVoicePresenceStore } from '@/stores/voicePresence';
 import { extractErrorMessage, extractErrorCode } from '@/api/errors';
 import {
@@ -621,6 +621,22 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       // (web dersi: aggregate olay mute/unmute döngüsünde kaçıyor). Web `voice.ts:243-244` deseni.
       attachSpeaking(room.localParticipant, set);
       for (const p of room.remoteParticipants.values()) attachSpeaking(p, set);
+
+      // 🔴 Sahip cihaz turu 2026-08-10 — arayanin zili, aranan odaya girdigi halde SUSMUYORDU.
+      // Sebep: `voice:call_accept` YALNIZ bildirimin "Kabul" dugmesine bagliydi. Kullanici
+      // bildirime dokunup uygulamadan katilinca (ya da DM ekranindaki "Sese katil" ile) sinyal
+      // hic gitmiyor, arayan tarafta telefon calmaya devam ediyordu.
+      //
+      // Kural artik giris yolundan BAGIMSIZ: 1-1 DM aramasina BASLATAN OLMADAN katildiysak
+      // (`didInvite === false`), odaya girer girmez kabul sinyali gider. Bildirim dugmesinden
+      // gelen yol da ayni sinyali gonderiyor; ikinci kez gitmesi zararsiz (sunucu yalniz karsi
+      // tarafa `voice.call_accepted` relay ediyor, o da zili susturuyor — idempotent).
+      // Grup ve ortam kanallarinda gonderilmez: orada "kabul" diye bir kavram yok (grup sinyalleri
+      // `voice:group_call_*`, ortam kanalinda davet zaten yok).
+      // `alreadyOngoing === true` demek: bu aramayi biz baslatmadik, var olana katildik.
+      if (!isGuild && !isGroup && alreadyOngoing) {
+        callAccept(channelId);
+      }
 
       peerEverJoined = false;
       set({
