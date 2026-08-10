@@ -448,7 +448,7 @@
     "notificationsAll": "Tümü",
     "notificationsMentions": "Yalnız bahsetmeler",
     "notificationsNone": "Hiçbiri",
-    "suppressEveryone": "@everyone Bastır",
+    "suppressEveryone": "{'@'}everyone Bastır",
     "suppressEveryoneHint": "Bu ortamda herkese yapılan bahsetmeler seni bildirmez.",
     "suppressEvents": "Yeni Etkinlikleri Sustur",
     "suppressEventsHint": "Bu ortamda yeni etkinlik oluşturulduğunda bildirim alma.",
@@ -1637,7 +1637,7 @@
       "s6Body": "Türkiye Cumhuriyeti mevzuatına ve faaliyet gösterdiğimiz diğer ülkelerin ilgili düzenlemelerine uyarız. Yetkili makamlardan gelen usulüne uygun taleplere yanıt verir, çocuk istismarıyla ilgili soruşturmalarda iş birliği yaparız. Kullanıcı verilerini işlerken kişisel verilerin korunması mevzuatına bağlı kalırız, bunun ayrıntıları gizlilik politikamızda yer alır.",
       "s7Title": "Sorumluluk sahibimiz",
       "s7Intro": "Çocuk güvenliğiyle ilgili tüm bildirimler ve resmi başvurular için irtibat noktamız:",
-      "s7Email": "batuhan.ars@yahoo.com",
+      "s7Email": "batuhan.ars{'@'}yahoo.com",
       "s7Note": "Bu adrese ulaşan çocuk güvenliği bildirimleri, diğer taleplerin önüne alınır.",
       "s8Title": "Bu belgenin güncellenmesi",
       "s8Body": "Ürün büyüdükçe koruma yöntemlerimiz de gelişir. Bu belgeyi değişiklik oldukça günceller, güncelleme tarihini en üstte belirtiriz.",
@@ -1680,7 +1680,7 @@
       "s4Note": "Bu verilerin saklama süreleri ve kalıcı imhası üzerinde çalışıyoruz; kişisel verilerin korunması mevzuatı çerçevesinde netleştirildiğinde bu sayfa güncellenecektir.",
       "s5Title": "Sorularım var",
       "s5Intro": "Silme süreciyle ilgili sorularını ve taleplerini şu adrese iletebilirsin:",
-      "s5Email": "kankaverse@gmail.com",
+      "s5Email": "kankaverse{'@'}gmail.com",
       "backToLogin": "← Giriş sayfasına dön"
     }
   },
@@ -1728,7 +1728,7 @@
       "open": "Emoji ekle"
     },
     "mention": {
-      "everyoneLabel": "@everyone",
+      "everyoneLabel": "{'@'}everyone",
       "everyoneHint": "Bu kanaldaki herkese bildirim gider",
       "empty": "Eşleşen kimse yok"
     },
