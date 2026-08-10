@@ -1317,7 +1317,9 @@
     "channelMessage": "{actor}: {text}",
     "groupFallback": "Grup sohbeti",
     "channelFallback": "kanal",
-    "nativeTitle": "Kankaverse"
+    "nativeTitle": "Kankaverse",
+    "incomingCall": "{actor} seni arıyor.",
+    "incomingGroupCall": "{actor} grup aramasını başlattı."
   },
   "mention": {
     "unknown": "bilinmeyen",
