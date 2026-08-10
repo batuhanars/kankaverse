@@ -22,6 +22,26 @@ import type { VoiceParticipantDto } from '@/api/voice';
 // okur. Sabit token verilseydi ~15dk sonra reconnect bayat token'la el sıkışıp auth'ta düşerdi.
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:3001';
 
+// PM bulgusu (yayın engelleyici, 2026-08-10) — Socket.IO istemcisi `io(url, opts)`'a verilen adresin
+// YOL kısmını (varsa) NAMESPACE olarak yorumlar, sunucu adresi değil. `API_BASE` üretimde
+// `https://kankaverse.com/api` (HTTP istemcisinin `/api` öneki için) — bu adresle `io()` çağrılırsa
+// istemci `https://kankaverse.com` origin'ine bağlanıp `/api` NAMESPACE'ini ister; sunucuda öyle bir
+// namespace yok, el sıkışma sessizce hiç kurulmaz (`connect` asla ateşlenmez, `connect_error` de
+// önceden loglanmıyordu → tamamen sessiz). Dev ortamında `http://192.168.1.50:3001` yol içermediği
+// için varsayılan namespace'e düşüyordu, kusur yalnız üretimde görünür oluyordu.
+//
+// `URL` global'i RN/Hermes'te kısmi bir polyfilldır (whatwg-url'ün tamamı değil) ve yeni bağımlılık
+// eklemek bu turda yasak — regex ile `scheme://host[:port]` kısmı ayıklanır, yoldan bağımsız. Hem
+// `https://kankaverse.com/api` hem `https://kankaverse.com/api/` hem `http://192.168.1.50:3001` hem
+// `http://192.168.1.50:3001/` için doğru origin'i döner; eşleşmezse (beklenmeyen biçim) ham değeri
+// olduğu gibi geçirir — en kötü ihtimalle eski (bozuk) davranışa düşer, çökmez.
+function getSocketOrigin(apiBase: string): string {
+  const match = /^(https?:\/\/[^/]+)/i.exec(apiBase);
+  return match ? match[1] : apiBase;
+}
+
+const SOCKET_ORIGIN = getSocketOrigin(API_BASE);
+
 let socket: Socket | null = null;
 // Açık kanal — reconnect sonrası yeniden join + yeniden çekim için (contract §4.3, "boşluk bırakma yasağı").
 let activeChannelId: string | null = null;
@@ -81,11 +101,14 @@ function joinRoom(channelId: string, attempt = 0) {
 function ensureSocket(): Socket {
   if (socket) return socket;
 
-  socket = io(API_BASE, {
+  socket = io(SOCKET_ORIGIN, {
     autoConnect: false,
     // auth fonksiyon formu — bkz. dosya başı yorumu.
     auth: (cb: (data: { token: string }) => void) => cb({ token: getAccessToken() ?? '' }),
     transports: ['websocket'],
+    // `path` bilinçli olarak VERİLMEDİ — varsayılan `/socket.io` kalır (Caddy prod'da bu yolu API
+    // konteynerine yönlendiriyor). `SOCKET_ORIGIN`'in artık yol içermemesi bunu namespace'le
+    // KARIŞTIRMAZ: `path` ayrı bir seçenek, `io(url)`'daki url'nin yol kısmı ise namespace'tir.
   });
 
   socket.on('connect', () => {
@@ -103,8 +126,14 @@ function ensureSocket(): Socket {
     }
   });
 
+  // 🔴 Sessiz başarısızlık yasak (PM bulgusu 2026-08-10) — bu olay eskiden yalnız `err.message`
+  // basıyordu, adres basmıyordu. Bu turun kök nedeni ("adres yanlış namespace'e gidiyor") tam olarak
+  // bu yüzden gözden kaçtı: mesaj gönderme HTTP üzerinden çalıştığı için ekranda hiçbir şey bozuk
+  // görünmüyordu, tek iz bu konsol satırıydı ve neye bağlanmaya çalıştığını söylemiyordu. Artık
+  // denenen origin de yazılır ki bir sonraki "her şey API'de çalışıyor ama soket sessiz" turu
+  // dakikalar içinde teşhis edilsin.
   socket.on('connect_error', (err: Error) => {
-    if (__DEV__) console.warn('[WS] connect_error', err.message);
+    if (__DEV__) console.warn(`[WS] connect_error origin=${SOCKET_ORIGIN}:`, err.message);
   });
 
   // Bayat access token (~15dk) reconnect el sıkışmasında reddedilir. Kalıcı kapatma YERİNE
