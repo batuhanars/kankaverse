@@ -1781,7 +1781,15 @@
       "incomingGroupTitle": "Grup Araması",
       "incomingGroupBody": "{name} grup aramasına başladı",
       "joinAction": "Aramaya Katıl",
-      "incomingNotifChannel": "Gelen arama"
+      "incomingNotifChannel": "Gelen arama",
+      "moreOptions": "Diğer seçenekler",
+      "outputRow": "Ses çıkışı",
+      "inVoiceCount": "{n} kişi seste",
+      "notInVoiceHeader": "Seste olmayanlar",
+      "ringAction": "Çaldır",
+      "ringRateLimited": "Az önce çaldırdın, biraz bekle.",
+      "ringForbidden": "Bu kişiyi şu anda çaldıramıyorsun.",
+      "inviteFriendRow": "Bir arkadaşını davet et"
     },
     "voice": {
       "guildAloneTitle": "Bu kanalda ilk sensin.",
