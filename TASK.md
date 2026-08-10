@@ -3858,6 +3858,16 @@ kapalı kalırdı. Dev bunu gizlemek yerine raporladı.
    koyu/açık tema kusurundan çok **bayat ikon önbelleği ya da eski kurulum** gibi duruyor.
    Doğrulama: v5'i temiz kuran BAŞKA bir cihazda koyu temada bak; hâlâ çıkıyorsa gerçek tema kusuru.
 
+### 🔴 Dağıtım sonrası bayat parça sorunu (KÖK NEDEN, sınıf düzeyinde)
+- [ ] Uygulama açıkken dağıtım yapılırsa istemcinin elindeki sayfa ESKİ parça adlarını tutuyor;
+      kullanıcı o ana kadar girmediği bir ekrana tıklayınca parça çekilemiyor ve ekran hiç açılmıyor.
+      Kullanıcı için tablo "uygulama bozuldu"; hiçbir hata mesajı yok. Masaüstü tepside günlerce
+      açık kaldığı için orada KESİN tekrarlar, webde de sekme açık bırakanlarda olur.
+      Çözüm: Vite'ın `vite:preloadError` olayını dinleyip sayfayı BİR KEZ yenilemek (kendi kendini
+      onaran davranış). ⚠️ Döngü koruması şart: yenileme çözmediyse ikinci kez denenmemeli
+      (ör. sessionStorage bayrağı), yoksa uygulama sonsuz yenilenir.
+      Sahip cihazında doğrulandı 2026-08-10: "Disable cache" ile ortam ekranı açıldı.
+
 ### Masaüstü — ortam ekranına girilemiyor (2026-08-10 gecesi)
 - [ ] 🔴 Konsol: `/assets/GuildChannelView-*.js` ve `ChannelPanel-*.js` için `ERR_TOO_MANY_REDIRECTS`
       → `Failed to fetch dynamically imported module`. Sunucu tarafı TEMİZ doğrulandı (aynı dosyalar
