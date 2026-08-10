@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class PurgeJob {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    // deletedAt: null → zaten imha edilmiş kullanıcı bir daha adaya girmez (idempotency).
     const candidates = await this.prisma.user.findMany({
       where: { deletionRequestedAt: { lte: thirtyDaysAgo }, deletedAt: null },
       select: { id: true },
@@ -27,16 +29,75 @@ export class PurgeJob {
     const purgeEnabled = this.config.get<boolean>('purgeEnabled');
 
     if (!purgeEnabled) {
-      // PURGE_ENABLED=false (varsayılan): yalnızca logla, imha etme
+      // PURGE_ENABLED=false (varsayılan): yalnızca logla, imha etme — bugünkü davranış korunur.
       candidates.forEach((u) =>
-        this.logger.log(`Purge adayı (PURGE_ENABLED=false, R6 KVKK onayı bekleniyor): ${u.id}`),
+        this.logger.log(`Purge adayı imha edilmedi (PURGE_ENABLED=false, bayrak kapalı): ${u.id}`),
       );
       return;
     }
 
-    // PURGE_ENABLED=true: R6 KVKK + hukuk onayından sonra buraya gerçek imha gelecek
-    this.logger.warn(
-      `Purge GATED — PURGE_ENABLED=true ama kalıcı imha henüz uygulanmadı (R6 bekleniyor). Aday: ${candidates.length}`,
-    );
+    let purged = 0;
+    for (const candidate of candidates) {
+      try {
+        await this.purgeUser(candidate.id);
+        purged++;
+      } catch (err) {
+        this.logger.error(
+          `Purge başarısız (kullanıcı: ${candidate.id}): ${(err as Error).message}`,
+        );
+      }
+    }
+
+    this.logger.log(`${purged} kullanıcı imha edildi (asgari kimlik imhası, Sprint R6a §2).`);
+  }
+
+  /**
+   * Asgari kimlik imhası (Sprint R6a §2). Tek transaction: kimlik alanları temizlenir +
+   * Session/PushToken/NotificationPref/RecoveryCode satırları silinir.
+   *
+   * BİLEREK DOKUNULMAYANLAR (sözleşme §2): mesaj içerikleri, yüklenen dosyalar (Attachment),
+   * moderasyon/rapor/audit kayıtları, UserBlock. Bunların imhası R6'nın hukuk ayağına bağlı.
+   *
+   * 🔴 Sapma (R7 incelemesinde bakılmalı): sözleşme `birthDate` alanının null'a çekilmesini
+   * istiyor ama Prisma şemasında `birthDate` NOT NULL (`schema.prisma:108`, migration olmadan
+   * null yazılamaz). Bu alana bilerek dokunulmadı — nullable'a çevirmek şema migration'ı
+   * gerektirir ve bu sprint'in kapsamı dışında ("şema değişikliği gerekiyorsa dur ve bildir").
+   * Sahip karar verene kadar birthDate silinmiş hesapta olduğu gibi kalır.
+   *
+   * Not: `RecoveryCode` satırları da siliniyor — sözleşme §2.1'de "2FA alanları ... kurtarma
+   * kodları → kapalı/null" ifadesi var ama kurtarma kodları User üzerinde alan değil, ayrı
+   * `RecoveryCode` tablosunda satır; "kapalı/null" karşılığı bu satırların silinmesi olarak
+   * yorumlandı. Sözleşmenin §2.2 açık silme listesinde (Session/PushToken/NotificationPref)
+   * yer almıyor — R7 incelemesinde bu yorumun onaylanması gerekiyor.
+   */
+  private async purgeUser(userId: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          email: `deleted-${userId}@kankaverse.invalid`,
+          username: `silinmis_${userId}`,
+          // argon2id formatında değil → argon2.verify() asla eşleşmez; ayrıca login sorguları
+          // her yerde deletedAt: null filtreler, bu satıra zaten erişilemez.
+          passwordHash: randomBytes(32).toString('hex'),
+          // Sahip kararı 2026-08-10 (R7): `birthDate` şemada NOT NULL. Nullable'a çevirmek
+          // migration ister; kapalı testin hemen öncesinde şemaya dokunmamak için gerçek değerin
+          // ÜZERİNE sabit bir yer tutucu yazılıyor. Sonuç aynı: gerçek doğum tarihi geri
+          // getirilemez biçimde yok olur, satıra zaten `deletedAt` sonrası erişilmiyor.
+          birthDate: new Date('1970-01-01T00:00:00.000Z'),
+          avatarUrl: null,
+          bannerUrl: null,
+          bio: null,
+          twoFactorEnabled: false,
+          totpSecret: null,
+          deletedAt: new Date(),
+          deletionRequestedAt: null,
+        },
+      });
+      await tx.session.deleteMany({ where: { userId } });
+      await tx.pushToken.deleteMany({ where: { userId } });
+      await tx.notificationPref.deleteMany({ where: { userId } });
+      await tx.recoveryCode.deleteMany({ where: { userId } });
+    });
   }
 }
