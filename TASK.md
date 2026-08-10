@@ -3757,9 +3757,9 @@ kapalı kalırdı. Dev bunu gizlemek yerine raporladı.
 
 ### DoD (cihazda — SAHİPTE)
 - [x] Masaüstünden paylaşılan ekran telefonda **görünüyor** (sahip doğruladı 2026-08-10)
-- [ ] Ekranın **sesi** duyuluyor — 🔴 ilk denemede gelmedi, kök neden bulundu (§3.5: web ekran
-      sesini hiç yayınlamıyordu + Chrome'un ses kutusu işaretsizdi), düzeltildi, **yeniden sınanacak**
-- [ ] Kamera + ekran aynı anda karışmıyor
+- [x] Ekranın **sesi** duyuluyor — kök neden ikiliydi: web `{ audio: true }` vermiyordu (§3.5) VE
+      Chrome'un ses kutusu varsayılan işaretsiz geliyor. İkisi de kapandı, sahip doğruladı
+- [ ] Kamera + ekran aynı anda karışmıyor (ayrıca sınanmadı, düzen kodu ayrı map kullanıyor)
 - [x] Yan çevirince yatay doluyor, geri dönünce uygulama dikey kilitli kalıyor (sahip doğruladı)
 
 ### Addendum'lar (cihaz turundan SONRA eklendi)
@@ -3769,3 +3769,32 @@ kapalı kalırdı. Dev bunu gizlemek yerine raporladı.
 - [x] §3.6 PiP paylaşılan ekranı gösteriyor — **sahip doğruladı 2026-08-10**
 - [x] Görsel rötuşlar (sahip istekleri): tam ekran düğmesi sağ altta + arka plansız, tam ekran
       kontrollerine saydam zemin, acil buton dolu kırmızı
+
+
+---
+
+## Yayın engelleyici tur — 2026-08-10 (release derlemesi canlıya karşı)
+
+> Sahip Play kapalı testine göndermeden önce release APK'sını kendi cihazına kurup CANLI sunucuya
+> bağlandı. Çekirdek akışların çoğu çalışmadı. Üçü de "geliştirmede çalışıyordu" diye kapanmış
+> sayılan işlerdi; ders hafızaya yazıldı ([[release-yapilandirmasi-sinanmali]]).
+
+- [x] 🔴 **Soket release'de hiç bağlanmıyordu** — `io(API_BASE)` prod adresindeki `/api` yolunu
+      NAMESPACE sanıyordu. Mesaj alma, arama zili, gelen arama ekranı ve DM önizlemesi bu yüzden
+      ölüydü; mesaj GÖNDERME HTTP olduğu için sorun ekranda gizlendi. Origin ayıklanıyor,
+      `connect_error` artık denenen adresi de yazıyor
+- [x] 🔴 **Yerel release derlemesi LAN adresini gömüyordu** — `eas.json` env'i yalnız EAS'ta
+      geçerli. `.env.production` eklendi, pakette doğrulandı (LAN adresi sıfır kez geçiyor)
+- [x] 🔴 **Push bildirimleri üretimde kapalıydı** — `EXPO_PUSH_ENABLED` VPS `.env.production`
+      dosyasına hiç girmemişti, `push.service.ts` gönderime başlamadan sessizce dönüyordu.
+      Bayrak açıldı, API yeniden başlatıldı, konteyner içinde doğrulandı
+- [x] Play imzalama altyapısı: kendi upload anahtarımız (depo dışı), `withReleaseSigning` config
+      plugin'i, `versionCode`, imza ve gömülü adres pakette doğrulandı
+- [x] Marka ikonları: Expo varsayılanları (mavi açılış + şablon ikonu) çıktı; altıgen Canva'daki
+      vektörden 1000 piksele büyütülüp üretildi, üç katman + açılış görseli + favicon değişti
+- [x] Çocuk güvenliği standartları sayfası canlıda (`/cocuk-guvenligi`) — Play beyan formu için
+
+### Sahip doğrulaması (cihazda, 2026-08-10)
+- [x] Mesaj, arama ve bildirimler çalışıyor
+- [x] Uygulama ikonu pakete giriyor
+- [ ] Play kapalı test sürümü yüklendi ve testçilere açıldı
