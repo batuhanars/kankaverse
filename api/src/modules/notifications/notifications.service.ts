@@ -456,6 +456,8 @@ export class NotificationsService {
       channelId?: string | null;
       messageId?: string | null;
     };
+    androidChannelId: string;
+    priority: 'high';
   } {
     const actor = dto.actor?.username ?? 'Biri';
     let body: string;
@@ -490,6 +492,10 @@ export class NotificationsService {
         channelId: dto.channelId,
         messageId: dto.messageId,
       },
+      // 🔴 Sahip cihaz turu 2026-08-10 — kanal adı verilmezse FCM kendi yedek kanalını
+      // (önem DEFAULT) kullanıyor, bildirim ekranda BELİRMİYOR. `sendDmPush` ile aynı kanal.
+      androidChannelId: 'messages_v1',
+      priority: 'high' as const,
     };
   }
 }

@@ -88,6 +88,20 @@ async function readExpoPushToken(): Promise<string | null> {
       name: 'default',
       importance: Notifications.AndroidImportance.DEFAULT,
     });
+    // 🔴 Sahip cihaz turu 2026-08-10 — mesaj bildirimleri geliyordu ama EKRANDA BELİRMİYORDU.
+    // Sebep: sunucu mesaj push'ında kanal adı GÖNDERMİYORDU, FCM de kendi
+    // `fcm_fallback_notification_channel` kanalını kullanıyordu (önem DEFAULT → heads-up yok,
+    // sessizce bildirim gölgesine düşüyor). Cihazın `dumpsys notification` kaydında birebir
+    // bu görüldü. Aramalar etkilenmemişti çünkü onlar `incoming_call_v4` (önem MAX) ile gidiyor.
+    //
+    // ⚠️ Yeni kanal kimliği ZORUNLU: Android'de bir kanalın önemi kurulduktan SONRA
+    // değiştirilemez (bkz. `incomingCall.ts` aynı ders, `incoming_call_v4`e çıkma sebebi).
+    // Var olan `default` kanalının importance'ını yükseltmek, onu çoktan oluşturmuş cihazlarda
+    // HİÇBİR ŞEY yapmaz. Bu yüzden `default` olduğu gibi bırakılıyor, yenisi ayrıca açılıyor.
+    await Notifications.setNotificationChannelAsync('messages_v1', {
+      name: 'Mesajlar',
+      importance: Notifications.AndroidImportance.HIGH,
+    });
   }
 
   // app.json'daki `extra.eas.projectId` — hardcode YOK (contract §3).
