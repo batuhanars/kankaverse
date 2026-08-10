@@ -3716,3 +3716,56 @@ kapalı kalırdı. Dev bunu gizlemek yerine raporladı.
 - [ ] Taşı → hedefe geçiyor; dolu/yaş-kapılı hedefte **sebep** görünüyor
 - [ ] Odadan çıkar → onay çıkıyor, sonra hedef odadan düşüyor
 - [ ] Kendine ve ortam sahibine eylem görünmüyor
+
+---
+
+## Sprint M5a — Mobil Ses Paneli + Sahne Temizliği + Çaldır — 2026-08-10 (PM compose)
+
+> Sözleşme: `contracts/SPRINT_M5A_MOBILE_VOICE_PANEL_CONTRACT.md`. Tier `mobile/` + `api/` (tek WS
+> olayı). Native diff yok → yeni build gerekmez. Kaynak: sahip Discord mobil karşılaştırması.
+
+- [x] Grup DM sahnesinden `pendingMembers` (soluk kart) kaldırıldı; "Tek başınasın" koşulu sadeleşti
+- [x] Ses ekranına alt panel (`VoiceContextSheet`) — üç bağlam: 1-1 DM · grup DM · ortam ses kanalı
+- [x] Üst bardaki hoparlör ikonu üç noktaya döndü, çıkış seçimi panelin satırı oldu
+- [x] Sağırlaştır mobilde ilk kez (web `applyDeafen` hesabı taşındı, `preferDeafened` kapsam dışı)
+- [x] `api/`: `voice:group_call_ring` (tek kişiyi çaldır) — mevcut `voice.group_call_started` olayını yayar
+- [x] 🔴 Blok kontrolü **çağıran ↔ hedef çifti** için (grupta `requireNoDmBlock` rastgele üye seçiyor)
+- [x] 🔴 Hız sınırı: aynı hedefe 60 sn'de 1, aşımda Türkçe mesaj (backend `RATE_LIMITED` — Türkçe mesaj mobil istemcide)
+- [x] 1-1 DM'de Çaldır mevcut `voice:call_invite` ile (yeni uç yok)
+
+### DoD (cihazda — SAHİPTE)
+- [ ] Grup aramasında seste olmayanların kartı sahnede yok, panelde var
+- [ ] Çaldır karşı tarafı çaldırıyor; üst üste basınca sınır mesajı çıkıyor
+- [ ] Engellenen kişide Çaldır çalışmıyor, engellenme bilgisi sızmıyor
+- [ ] Sağırlaştır ses+mikrofonu kesiyor, kaldırınca eski hâline dönüyor
+- [ ] Kanal Ayarları / Davet et yalnız yetkiliye görünüyor
+
+---
+
+## Sprint M5b — Mobilde Ekran Paylaşımını İZLEME — 2026-08-10 (PM compose)
+
+> Sözleşme: `contracts/SPRINT_M5B_MOBILE_SCREEN_VIEW_CONTRACT.md`. Tier yalnız `mobile/`.
+> 🔴 Native diff VAR (`expo-screen-orientation`) → yeni dev build; EAS'tan önce yerel derleme şart.
+> Telefondan ekran YAYINLAMA kapsam dışı (MediaProjection + ayrı T&S turu).
+
+- [x] `remoteScreenPublications` (kameradan ayrı map); `wireRoom`daki beş kamera noktasına ekran dalı
+- [x] `frozenRef` + `leave()` yeni map'i kapsıyor (Fabric çökme sınıfı geri gelmesin)
+- [x] Spotlight düzeni: paylaşılan ekran üstte `contain`, katılımcı şeridi altta
+- [x] Tek odak kuralı: seçim korunur, yeni paylaşımda odak zıplamaz
+- [x] Tam ekran + yatay yalnız o görünümde; `app.json` global `orientation` `portrait` kalır
+- [x] Acil buton tam ekranda da erişilebilir
+
+### DoD (cihazda — SAHİPTE)
+- [x] Masaüstünden paylaşılan ekran telefonda **görünüyor** (sahip doğruladı 2026-08-10)
+- [ ] Ekranın **sesi** duyuluyor — 🔴 ilk denemede gelmedi, kök neden bulundu (§3.5: web ekran
+      sesini hiç yayınlamıyordu + Chrome'un ses kutusu işaretsizdi), düzeltildi, **yeniden sınanacak**
+- [ ] Kamera + ekran aynı anda karışmıyor
+- [x] Yan çevirince yatay doluyor, geri dönünce uygulama dikey kilitli kalıyor (sahip doğruladı)
+
+### Addendum'lar (cihaz turundan SONRA eklendi)
+- [x] §3.4 tam ekran kontrolleri: dokunma yerine düğme, alt çubuk tam ekranda, acil buton çubuğun
+      içinde, geri tuşu tam ekrandan çıkarır — **sahip "kusursuz çalışıyor" dedi 2026-08-10**
+- [x] §3.5 web ekran sesi yayını (`{ audio: true }`) — kod bitti, ses cihazda henüz doğrulanmadı
+- [x] §3.6 PiP paylaşılan ekranı gösteriyor — **sahip doğruladı 2026-08-10**
+- [x] Görsel rötuşlar (sahip istekleri): tam ekran düğmesi sağ altta + arka plansız, tam ekran
+      kontrollerine saydam zemin, acil buton dolu kırmızı
