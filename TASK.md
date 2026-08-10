@@ -3798,3 +3798,33 @@ kapalı kalırdı. Dev bunu gizlemek yerine raporladı.
 - [x] Mesaj, arama ve bildirimler çalışıyor
 - [x] Uygulama ikonu pakete giriyor
 - [ ] Play kapalı test sürümü yüklendi ve testçilere açıldı
+
+---
+
+## Play kapalı test hazırlığı — 2026-08-10 ✅ MAĞAZA TARAFI KAPANDI
+
+> Sahip tüm beyanları doldurdu, kontrol panelinde kırmızı madde kalmadı.
+> Paket: `versionCode 5` (1, 2, 3 ve 4 tüketildi — Play kullanılan numarayı geri vermiyor).
+
+- [x] Kendi upload anahtarımız + `withReleaseSigning` config plugin'i (parolalar depo dışında)
+- [x] `.env.production` (yerel release derlemesi `eas.json`u okumuyor, LAN adresi gömüyordu)
+- [x] Marka ikonları: beyaz zemin + turuncu altıgen; açılış ekranı kömür; bildirim küçük ikonu
+- [x] Yasal sayfalar canlıda: `/gizlilik` · `/kurallar` · `/cocuk-guvenligi` · `/hesap-silme`
+- [x] Asgari hesap silme gerçekten imha ediyor (R6a) + `PURGE_ENABLED=true` üretimde
+- [x] Beyanlar: finans yok · sağlık yok · ön plan hizmeti (mikrofon, video kanıtı) · fotoğraf izni
+      (uygulama içi ızgara gerekçesi) · oturum açma bilgileri (test hesabı) · hedef kitle 13-15 ·
+      veri güvenliği · içerik derecelendirme (13+/12+) · reklam kimliği YOK · çocuk güvenliği standartları
+- [x] Mağaza girişi: metinler, 512 ikon, 1024x500 afiş, ekran görüntüleri
+- [x] Masaüstü paketleri yayında: `kankaverse.com/indir/kankaverse-setup.exe` · `kankaverse.AppImage`
+
+### Sırada (sahipte)
+- [ ] Sürümü incelemeye gönder, kapalı testi 17 kişilik listeye aç
+- [ ] 🔴 Google'ın saydığı şey **kesintisiz 14 gün boyunca yüklü kalan 12 testçi** — testçilere
+      "silmeyin" demek şart
+
+### Bilerek ertelenenler (PLAN.md borç tablosunda)
+- D62 uygulama kapalıyken bildirimden aramayı REDDETME (kabul çalışıyor)
+- R6 tam imha (mesaj/dosya/moderasyon kayıtları — KVKK ayağı)
+- `SYSTEM_ALERT_WINDOW` izni gerçekten gerekli mi (kütüphaneden geliyor, Play dikkatini çekebilir)
+- Çocuk güvenliği sayfasındaki "iş birliği yaparız" ifadesi, Play beyanındaki "yetkililere rapor
+  veririz" taahhüdüyle birebir örtüşecek şekilde netleştirilebilir
