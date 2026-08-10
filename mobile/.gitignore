@@ -54,3 +54,9 @@ example
 
 # i18n — üretilmiş kopya (contract §6 kaçış yolu). Tek doğruluk kaynağı: ../web/src/i18n/tr.json
 src/i18n/tr.generated.json
+
+# 🔴 Istisna: `.env.production` depoya GIRER. Kok .gitignore `.env.*` diyor, burada geri aliniyor.
+# Icinde sir yok, yalniz canli adresler var. Olmazsa yerel `gradlew bundleRelease` `.env`deki
+# LAN IP'sini gomer ve testcinin telefonunda hicbir sey calismaz (eas.json'daki env YALNIZ EAS
+# bulut derlemesinde gecerlidir). Sessiz ve pahali bir hata sinifi; dosya bu yuzden paylasiliyor.
+!.env.production
