@@ -86,7 +86,15 @@ export class PushService {
       const tokens = await this.prisma.pushToken.findMany({
         where: { userId: { in: targets } },
       });
-      if (tokens.length === 0) return;
+      // 🔧 GEÇİCİ TANI (2026-08-10) — sahibin gerçek aramasında push'un gerçekten denenip
+      // denenmediğini görmek için. Sorun bulunup doğrulanınca BU SATIR SİLİNECEK.
+      this.logger.log(
+        `[TANI] push denendi: hedef=${targets.join(',')} token=${tokens.length} kanal=${payload.androidChannelId ?? '(yok)'} baslik=${payload.title ?? ''}`,
+      );
+      if (tokens.length === 0) {
+        this.logger.log(`[TANI] token YOK, gonderilmiyor: hedef=${targets.join(',')}`);
+        return;
+      }
 
       // M4a-3 §9.1 — yeni alanlar undefined kalırsa JSON.stringify onları atar; verilmediğinde
       // gövde bugünküyle birebir aynı kalır (regresyon güvencesi).
