@@ -20,6 +20,7 @@ import { PresenceService, ActiveStatus } from '../../../shared/presence/presence
 import { DmPermissionService } from '../../../shared/dm-permission/dm-permission.service';
 import { NotificationsService, isMuteActive } from '../../notifications/notifications.service';
 import { PushService } from '../../../shared/push/push.service';
+import { VoiceService } from '../../voice/voice.service';
 
 interface AuthSocket extends Socket {
   data: { userId: string; sessionId: string; username?: string };
@@ -32,6 +33,12 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   @WebSocketServer()
   server: Server;
 
+  // M5a §4.3 — `voice:group_call_ring` bellek-içi hız sınırı. Anahtar `callerId:targetId`;
+  // her çağrıda pencereyi (60 sn) aşmış kayıtlar süpürülür ki harita sınırsız büyümesin
+  // (tek instance yeterli — yeni altyapı/paket KURULMADI, sözleşme §4.3).
+  private readonly GROUP_CALL_RING_WINDOW_MS = 60_000;
+  private readonly groupCallRingTimestamps = new Map<string, number>();
+
   constructor(
     private jwtService: JwtService,
     private config: ConfigService,
@@ -42,6 +49,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private dmPermission: DmPermissionService,
     private notifications: NotificationsService,
     private push: PushService,
+    private voice: VoiceService,
   ) {}
 
   afterInit(server: Server) {
@@ -508,6 +516,95 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.realtime.emitToUser(m.userId, 'voice.group_call_canceled', { channelId });
     }
     return { ok: true };
+  }
+
+  /**
+   * Sprint M5a §4 — Grup DM içinde SESTE OLMAYAN tek bir üyeyi çaldırma (kişi başı zil).
+   * `handleGroupCallStart`in kardeşi: aynı `NOT_GROUP` + `requireChannelAccess` + üyelik
+   * ikilisinden geçer — kopya kapı yazılmadı. Yayılan olay BİLEREK `voice.group_call_started`
+   * (YENİ AD DEĞİL, §4.1): hedefteki gelen-arama akışı zaten bu olayı dinliyor; yeni bir olay adı
+   * hedef tarafta ikinci bir akış + iptal ayağını yeniden yazmayı gerektirirdi.
+   *
+   * 🔴 §4.2 — `requireNoDmBlock` burada BİLEREK KULLANILMAZ: o metot (`MembershipService`)
+   * grup kanalında `findFirst` ile RASTGELE bir üyeyi bulup blok kontrolü yapıyor — 3+ kişilik
+   * grupta yanlış çift. Burada blok doğrudan ÇAĞIRAN↔HEDEF çifti için, iki yönlü sorgulanır.
+   * Blok varsa jenerik `FORBIDDEN` — sebep söylenmez (G3: engellenme bilgisi sızmaz).
+   *
+   * 🔴 §4.3 — hız sınırı: aynı çağıran→hedef çifti 60 sn'de 1. Bellekte tutulur (yukarıdaki
+   * `groupCallRingTimestamps`), yeni altyapı kurulmadı.
+   *
+   * §4.4 — hedef zaten o ses odasındaysa (`VoiceService.getLiveParticipation`, LiveKit tarafı
+   * — tek doğruluk kaynağı, kopya presence sorgusu yazılmadı) ack yine `{ok:true}` ama olay
+   * YAYILMAZ (boşa zil yok). LiveKit'e erişilemezse (`null` döner) fail-open: bu yalnız bir
+   * ikinci savunma katmanı (istemci zaten odadakine "Çaldır" butonu çizmiyor), doğrulanamadığında
+   * zili engellemek yanlış taraf.
+   */
+  @SubscribeMessage('voice:group_call_ring')
+  async handleGroupCallRing(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { channelId: string; targetUserId: string },
+  ) {
+    const userId = socket.data.userId;
+    const { channelId, targetUserId } = payload;
+
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { type: true },
+    });
+    if (!channel || channel.type !== 'GROUP_DM') return { ok: false, error: 'NOT_GROUP' };
+
+    try {
+      await this.membership.requireChannelAccess(userId, channelId);
+    } catch {
+      return { ok: false, error: 'FORBIDDEN' };
+    }
+
+    // Hedef, kanalın üyesi mi (requireChannelAccess yalnız ÇAĞIRANI doğrular).
+    const targetMembership = await this.prisma.channelMember.findUnique({
+      where: { channelId_userId: { channelId, userId: targetUserId } },
+    });
+    if (!targetMembership) return { ok: false, error: 'FORBIDDEN' };
+
+    // §4.2 — çağıran↔hedef çifti, iki yönlü, doğrudan.
+    const block = await this.prisma.userBlock.findFirst({
+      where: {
+        OR: [
+          { blockerId: userId, blockedId: targetUserId },
+          { blockerId: targetUserId, blockedId: userId },
+        ],
+      },
+    });
+    if (block) return { ok: false, error: 'FORBIDDEN' };
+
+    if (this.isGroupCallRingRateLimited(userId, targetUserId)) {
+      return { ok: false, error: 'RATE_LIMITED' };
+    }
+
+    // §4.4 — hedef zaten odadaysa boşa zil çalma.
+    const live = await this.voice.getLiveParticipation(channelId, targetUserId);
+    if (live?.present) return { ok: true };
+
+    const username = socket.data.username ?? userId;
+    this.realtime.emitToUser(targetUserId, 'voice.group_call_started', {
+      channelId,
+      by: { id: userId, username },
+    });
+    return { ok: true };
+  }
+
+  /** §4.3 yardımcı — bkz. `groupCallRingTimestamps` alan yorumu. */
+  private isGroupCallRingRateLimited(callerId: string, targetId: string): boolean {
+    const now = Date.now();
+    for (const [key, ts] of this.groupCallRingTimestamps) {
+      if (now - ts > this.GROUP_CALL_RING_WINDOW_MS) this.groupCallRingTimestamps.delete(key);
+    }
+
+    const key = `${callerId}:${targetId}`;
+    const last = this.groupCallRingTimestamps.get(key);
+    if (last !== undefined && now - last < this.GROUP_CALL_RING_WINDOW_MS) return true;
+
+    this.groupCallRingTimestamps.set(key, now);
+    return false;
   }
 
   broadcastMessage(channelId: string, messageDto: unknown) {
