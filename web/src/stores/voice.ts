@@ -845,7 +845,15 @@ export const useVoiceStore = defineStore('voice', () => {
     if (!room || !canPublishScreen.value) return
     const next = !isScreenSharing.value
     try {
-      const pub = await room.localParticipant.setScreenShareEnabled(next)
+      // D-web-1 (§3.5 addendum): ekran sesini de iste. Kullanıcı tarayıcının paylaşım
+      // penceresinde ses kutusunu işaretlemezse `getDisplayMedia` ses track'i döndürmez —
+      // livekit-client bunu sessizce atlar (hata FIRLATMAZ), paylaşım sessiz sürer (fail-soft).
+      // Durdururken (next=false) SDK zaten hem ScreenShare hem ScreenShareAudio track'ini
+      // birlikte unpublish ediyor (LocalParticipant.setTrackEnabled), ayrı kod gerekmiyor.
+      const pub = await room.localParticipant.setScreenShareEnabled(
+        next,
+        next ? { audio: true } : undefined,
+      )
       isScreenSharing.value = next
       // Yerel ekran track'ini de listeye yansıt
       if (next && pub?.track) {
