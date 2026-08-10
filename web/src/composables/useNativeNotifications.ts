@@ -2,6 +2,7 @@ import { computed, watch, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useDmStore } from '@/stores/dm'
+import { useCallStore } from '@/stores/call'
 import { i18n } from '@/i18n'
 import type { NotificationDto } from '@/types'
 
@@ -20,10 +21,56 @@ import type { NotificationDto } from '@/types'
 export function useNativeNotifications() {
   const notificationsStore = useNotificationsStore()
   const dmStore = useDmStore()
+  const callStore = useCallStore()
   const router = useRouter()
   const { t } = i18n.global
 
-  // Yalnız Electron'da aktif et
+  // Gelen arama bildirimi — Electron VE düz tarayıcıda çalışır (ikisi de standart Notification
+  // API'sini destekler); mesaj toast'larının/rozetin aksine masaüstüne özel değil, bu yüzden
+  // aşağıdaki `isElectron` kapısından ÖNCE kurulur. `window.kankaverse` yoksa `focusWindow()`
+  // opsiyonel zincirle sessizce atlanır.
+  //
+  // Kaynak tek nokta: `callStore.incoming.channelId`. IncomingCallModal.vue AYNI alanı izliyor
+  // (zil sesi + 30sn oto-red için) — kabul/ret/zaman aşımı/arayan iptali/grup iptali HEPSİ
+  // `useCall.ts`/`useSocket.ts` üzerinden `callStore.clearIncoming()`e çıkıyor. Tek noktadan
+  // izlemek, her ölüm dalını ayrı ayrı dinlemek yerine bildirimi de aynı yaşam döngüsüne bağlar —
+  // mobilin "hayalet zil" kusurunun (M4z §F, ortada olmayan bir çağrı çalıyordu) bildirim
+  // karşılığını yapısal olarak imkansız kılar.
+  let callNotif: Notification | null = null
+  watch(
+    () => callStore.incoming?.channelId,
+    (id) => {
+      // Önceki bildirim her koşulda kapanır: yeni bir çağrı geldiğinde de, mevcut çağrı
+      // bittiğinde de (kabul/ret/iptal/zaman aşımı) — arkada asılı toast kalmasın.
+      callNotif?.close()
+      callNotif = null
+      if (!id || !document.hidden) return
+      // İzin istenmedi/reddedildiyse sessizce geç — kullanıcıyı izin istemiyle bombalama.
+      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+
+      const call = callStore.incoming
+      if (!call) return
+      const actor = call.caller.username
+      const body =
+        call.kind === 'group'
+          ? t('notification.incomingGroupCall', { actor })
+          : t('notification.incomingCall', { actor })
+
+      // `tag` aynı anda tek gelen-arama bildirimi kalmasını garanti eder (ikinci `new
+      // Notification` aynı tag'la öncekinin yerine geçer) — referansı da yine de tutuyoruz ki
+      // yukarıdaki erken `close()` çağrıları görsel olarak da anında kapatsın.
+      callNotif = new Notification(t('notification.nativeTitle'), {
+        body,
+        tag: 'kankaverse-incoming-call',
+      })
+      callNotif.onclick = () => {
+        window.kankaverse?.focusWindow()
+        void router.push({ name: 'dm', params: { channelId: call.channelId } })
+      }
+    },
+  )
+
+  // Yalnız Electron'da aktif et (mesaj toast + rozet)
   if (!window.kankaverse?.isElectron) return
 
   // Son bilinen items uzunluğu — artış = yeni bildirim geldi
