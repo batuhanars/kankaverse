@@ -30,7 +30,7 @@ kankaverse.com, www.kankaverse.com {
 	# buradan gelir; unutulursa landing'e düşer, SPA boot edemez (beyaz ekran). Landing kendi
 	# asset'lerini /_nuxt/'ta tutar → çakışma yok. Yeni app yolu VEYA web kök statik dosyası
 	# (ör. /splash-hexagon.png — açılış splash logosu) eklenince buraya da ekle, yoksa landing'e düşer.
-	@app path /assets/* /splash-hexagon.png /channels/* /dm/* /discover /discover/* /login /login/* /register /invite/* /settings/* /moderation /verify-email /forgot-password /reset-password /email/* /gizlilik
+	@app path /assets/* /splash-hexagon.png /channels/* /dm/* /discover /discover/* /login /login/* /register /invite/* /settings/* /moderation /verify-email /forgot-password /reset-password /email/* /gizlilik /kurallar /cocuk-guvenligi /hesap-silme /guvenlik-ipuclari
 	handle @app {
 		reverse_proxy web:80
 	}
