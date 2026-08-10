@@ -3828,3 +3828,24 @@ kapalı kalırdı. Dev bunu gizlemek yerine raporladı.
 - `SYSTEM_ALERT_WINDOW` izni gerçekten gerekli mi (kütüphaneden geliyor, Play dikkatini çekebilir)
 - Çocuk güvenliği sayfasındaki "iş birliği yaparız" ifadesi, Play beyanındaki "yetkililere rapor
   veririz" taahhüdüyle birebir örtüşecek şekilde netleştirilebilir
+
+---
+
+## Sıradaki tur — kapalı test geri bildirimleri (2026-08-10 akşamı, sahip notu)
+
+> İlk kapalı test turundan gelen üç madde. Üçü de `mobile/`. Sprint yarın compose edilecek.
+
+1. **Şifre göster düğmesi mobilde yok** — giriş ve kayıt ekranlarında şifre alanının yanında
+   göz simgesi yok; webde var, mobile hiç konmamış. Testçi şikayeti. Kayıt ekranındaki şifre
+   tekrar alanı da kapsama girer.
+2. **Sesli görüşmedeyken mesaj bildirimi headsup olmuyor** — bildirim geliyor ama yalnız durum
+   çubuğunda simge beliriyor, kullanıcı elle aşağı çekmek zorunda kalıyor. Uygulama ÖN PLANDA
+   olduğu için bildirim sunumu `setNotificationHandler`ın kararına düşüyor; banner kapalı
+   görünüyor. Beklenen: arama ekranındayken gelen mesaj banner olarak düşsün.
+3. **Arama ekranındaki sohbet düğmesinde okunmamış rozeti yok** — 1-1 ve grup DM aramasında,
+   o DM'e mesaj geldiğinde aksiyon çubuğundaki sohbet (baloncuk) düğmesinin üstünde kırmızı
+   bildirim rozeti görünsün. Sohbete girilince temizlensin.
+
+### Açık tasarım kararı (yarın sahibe sorulacak)
+- Rozet **nokta** mı olsun yoksa **sayı** mı? Mobil DM listesinde okunmamış sayısı zaten var;
+  arama ekranında sayı göstermek kalabalık yapabilir, nokta daha sakin durur.
