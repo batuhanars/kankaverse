@@ -79,6 +79,11 @@ const router = createRouter({
       name: 'cocuk-guvenligi',
       component: () => import('@/views/legal/CocukGuvenligiView.vue'),
     },
+    {
+      path: '/hesap-silme',
+      name: 'hesap-silme',
+      component: () => import('@/views/legal/HesapSilmeView.vue'),
+    },
     // C7 — ekran paylaşımı güvenlik ipuçları (§E3 nudge'dan yeni sekmede açılır; auth gerektirmez)
     {
       path: '/guvenlik-ipuclari',
