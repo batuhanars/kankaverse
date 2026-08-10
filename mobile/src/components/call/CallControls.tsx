@@ -35,12 +35,24 @@ interface Props {
   /** §4 — yalnız kamera AÇIKKEN çizilir (boş yüzey açma kuralı); kamera kapalıyken bu prop dolu
    *  gelse bile düğme çizilmez (`isCameraOn` de kontrol edilir). */
   onSwitchCamera?: () => void;
+  /**
+   * Sprint M5b §3.4 ADDENDUM 🔴 — yalnız ekran paylaşımı TAM EKRAN görünümündeyken dolu geçilir
+   * (`call.tsx` `screenFullscreen` true iken); dolu olduğunda çubuğa küçültme (tam ekrandan çık)
+   * düğmesi eklenir. Bileşen kendi tam ekran state'ini TUTMAZ — yalnız çağıranın verdiği callback'i
+   * tetikler (`call.tsx` `resetHideTimer` + `setScreenFullscreen(false)` çifti). `undefined` iken
+   * (normal görünüm VEYA ekran paylaşımı yok) düğme HİÇ ÇİZİLMEZ — normal görünüm regresyonu yok.
+   */
+  onExitFullscreen?: () => void;
 }
 
 /**
  * M4a-1 sözleşme §4 — alt kontrol çubuğu. M4d ile beşe çıkabiliyor: mikrofon · kamera ·
  * kamera çevir (yalnız kamera açıkken) · sohbet · kapat (§5). Dokunma hedefleri D37 dersiyle
  * ÖLÇÜLEREK sabit 56dp daire — beşe çıkınca KÜÇÜLTÜLMEZ, aralık daralır (§5 🔴).
+ *
+ * Sprint M5b §3.4 ADDENDUM — ekran paylaşımı tam ekran görünümünde altıya çıkabiliyor: yukarıdaki
+ * beşe `onExitFullscreen` (küçültme) eklenir. Aynı aralık-daraltma kuralı (`buttonCount`) burayı
+ * da kapsıyor — yeni bir eşik İCAT EDİLMEDİ.
  */
 export function CallControls({
   isMuted,
@@ -53,6 +65,7 @@ export function CallControls({
   isCameraOn,
   onToggleCamera,
   onSwitchCamera,
+  onExitFullscreen,
 }: Props) {
   // M4i §2 🔴 — ortam kanalında izin yokken de düğme çizilir (görünür-kilitli); DM/grup DM'de
   // `isGuildCall` false/undefined olduğu için `canPublishCamera=false` düğmeyi eskisi gibi gizler.
@@ -62,7 +75,8 @@ export function CallControls({
   // §5 🔴 D37 dersi — beş düğme (56dp + 24dp aralık) dar Android ekranlarında (~360dp) taşıyor;
   // düğme küçültülmez, aralık daraltılır (12dp — 56dp dairelerin kendisi zaten bol dokunma payı
   // veriyor, aradaki boşluğun daralması dokunma hedefini küçültmez).
-  const buttonCount = 2 + (onOpenChat ? 1 : 0) + (showCamera ? 1 : 0) + (showFlip ? 1 : 0);
+  const buttonCount =
+    2 + (onOpenChat ? 1 : 0) + (showCamera ? 1 : 0) + (showFlip ? 1 : 0) + (onExitFullscreen ? 1 : 0);
   const gap = buttonCount >= 5 ? 12 : 24;
 
   return (
@@ -116,6 +130,17 @@ export function CallControls({
           accessibilityLabel={t('mobile.call.chatAction')}
         >
           <Ionicons name="chatbubble" size={22} color={theme.colors.textPrimary} />
+        </Pressable>
+      )}
+
+      {onExitFullscreen && (
+        <Pressable
+          onPress={onExitFullscreen}
+          style={styles.circle}
+          accessibilityRole="button"
+          accessibilityLabel={t('voice.exitFullscreen')}
+        >
+          <Ionicons name="contract-outline" size={22} color={theme.colors.textPrimary} />
         </Pressable>
       )}
 
