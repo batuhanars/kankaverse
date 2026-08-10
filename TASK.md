@@ -3846,6 +3846,8 @@ kapalı kalırdı. Dev bunu gizlemek yerine raporladı.
    o DM'e mesaj geldiğinde aksiyon çubuğundaki sohbet (baloncuk) düğmesinin üstünde kırmızı
    bildirim rozeti görünsün. Sohbete girilince temizlensin.
 
-### Açık tasarım kararı (yarın sahibe sorulacak)
-- Rozet **nokta** mı olsun yoksa **sayı** mı? Mobil DM listesinde okunmamış sayısı zaten var;
-  arama ekranında sayı göstermek kalabalık yapabilir, nokta daha sakin durur.
+### Tasarım kararları (sahip onayladı 2026-08-10 akşamı)
+- Rozet **NOKTA** olacak, sayı değil. Arama ekranı zaten kalabalık; orada gereken bilgi "yeni bir
+  şey var", kaç tane olduğu değil. Sayıyı merak eden zaten sohbete giriyor.
+- Banner, kullanıcı O DM'in sohbet ekranındayken ÇIKMAZ (okuduğu mesaj için bildirim almasın);
+  arama ekranındayken çıkar, çünkü sohbet görünmüyor.
