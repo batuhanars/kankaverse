@@ -159,6 +159,10 @@ function getError(field: string): string | undefined {
         <RouterLink to="/gizlilik" style="color: var(--kv-text-muted); text-decoration: underline; text-underline-offset: 2px;">
           {{ t('legal.privacy.linkLabel') }}
         </RouterLink>
+        ·
+        <RouterLink to="/cocuk-guvenligi" style="color: var(--kv-text-muted); text-decoration: underline; text-underline-offset: 2px;">
+          {{ t('legal.childSafety.linkLabel') }}
+        </RouterLink>
       </p>
     </div>
   </div>
