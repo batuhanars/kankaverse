@@ -18,11 +18,13 @@ const prismaMock = {
   },
   session: { findFirst: jest.fn() },
   user: { findUnique: jest.fn(), findMany: jest.fn() },
-  channelMember: { findMany: jest.fn() },
+  channelMember: { findMany: jest.fn(), findUnique: jest.fn() },
   notificationPref: { findMany: jest.fn(), findUnique: jest.fn() },
   // R15 — rol bahsetmesi: preview'da rol adı çözümü + alıcı kümesi rol genişlemesi
   role: { findMany: jest.fn() },
   guildMemberRole: { findMany: jest.fn() },
+  // M5a §4 — voice:group_call_ring: çağıran↔hedef doğrudan blok sorgusu
+  userBlock: { findFirst: jest.fn() },
 };
 
 const jwtMock = { verify: jest.fn() };
@@ -62,6 +64,10 @@ const notificationsMock = {
 const pushSendToUsersMock = jest.fn();
 const pushMock = { sendToUsers: pushSendToUsersMock };
 
+// M5a §4.4 — voice:group_call_ring hedefin ODADA olup olmadığını burada sorar
+const voiceGetLiveParticipationMock = jest.fn();
+const voiceMock = { getLiveParticipation: voiceGetLiveParticipationMock };
+
 function makeGateway() {
   return new MessagesGateway(
     jwtMock as any,
@@ -73,6 +79,7 @@ function makeGateway() {
     dmPermissionMock as any,
     notificationsMock as any,
     pushMock as any,
+    voiceMock as any,
   );
 }
 
@@ -95,6 +102,9 @@ function resetMocks() {
   prismaMock.user.findMany.mockResolvedValue([]);
   // M3 §2.6 — varsayılan: push başarıyla "gönderildi" (fire-and-forget, hata yutulur)
   pushSendToUsersMock.mockResolvedValue(undefined);
+  // M5a §4 — varsayılan: blok yok, hedef odada değil (ring testleri override eder)
+  prismaMock.userBlock.findFirst.mockResolvedValue(null);
+  voiceGetLiveParticipationMock.mockResolvedValue({ present: false, streaming: false, video: false });
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -1244,6 +1254,185 @@ describe('MessagesGateway.handleGroupCallCancel (M4z §F)', () => {
     expect(emitToUserMock).toHaveBeenCalledWith(MEMBER_B, 'voice.group_call_started', {
       channelId: GROUP_ID,
       by: { id: STARTER_ID, username: 'baslatan' },
+    });
+  });
+});
+
+/**
+ * Sprint M5a §4 — `voice:group_call_ring` (kişi başı çaldırma).
+ * `handleGroupCallStart` ile AYNI NOT_GROUP + requireChannelAccess ikilisinden geçer; ama
+ * blok kontrolü requireNoDmBlock DEĞİL, çağıran↔hedef doğrudan çifti (§4.2) — ayrıca hedef-üyelik,
+ * hız sınırı (§4.3) ve "zaten odada" (§4.4) kapıları eklendi.
+ */
+describe('MessagesGateway.handleGroupCallRing (M5a §4)', () => {
+  let gateway: MessagesGateway;
+
+  const CALLER_ID = 'user-ring-caller';
+  const TARGET_ID = 'user-ring-target';
+  const OTHER_MEMBER_ID = 'user-ring-other';
+  const GROUP_ID = 'ch-group-ring';
+
+  function socketFor(userId: string) {
+    return { data: { userId, username: 'çağıranKanka' } } as any;
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    gateway = makeGateway();
+    prismaMock.channel.findUnique.mockResolvedValue({ type: 'GROUP_DM' });
+    prismaMock.channelMember.findUnique.mockResolvedValue({ userId: TARGET_ID });
+    prismaMock.userBlock.findFirst.mockResolvedValue(null);
+    voiceGetLiveParticipationMock.mockResolvedValue({
+      present: false,
+      streaming: false,
+      video: false,
+    });
+  });
+
+  it('kanal GROUP_DM değilse → NOT_GROUP, hiçbir kapı çağrılmaz', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({ type: 'DM' });
+
+    const res = await gateway.handleGroupCallRing(socketFor(CALLER_ID), {
+      channelId: GROUP_ID,
+      targetUserId: TARGET_ID,
+    });
+
+    expect(res).toEqual({ ok: false, error: 'NOT_GROUP' });
+    expect(membershipMock.requireChannelAccess).not.toHaveBeenCalled();
+    expect(emitToUserMock).not.toHaveBeenCalled();
+  });
+
+  it('kanal yoksa → NOT_GROUP', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(null);
+
+    const res = await gateway.handleGroupCallRing(socketFor(CALLER_ID), {
+      channelId: GROUP_ID,
+      targetUserId: TARGET_ID,
+    });
+
+    expect(res).toEqual({ ok: false, error: 'NOT_GROUP' });
+  });
+
+  it('çağıranın kanal erişimi yoksa (requireChannelAccess atar) → FORBIDDEN, yayılmaz', async () => {
+    membershipMock.requireChannelAccess.mockRejectedValue(new Error('no access'));
+
+    const res = await gateway.handleGroupCallRing(socketFor(CALLER_ID), {
+      channelId: GROUP_ID,
+      targetUserId: TARGET_ID,
+    });
+
+    expect(res).toEqual({ ok: false, error: 'FORBIDDEN' });
+    expect(emitToUserMock).not.toHaveBeenCalled();
+  });
+
+  it('hedef kanalın üyesi değilse → FORBIDDEN', async () => {
+    prismaMock.channelMember.findUnique.mockResolvedValue(null);
+
+    const res = await gateway.handleGroupCallRing(socketFor(CALLER_ID), {
+      channelId: GROUP_ID,
+      targetUserId: TARGET_ID,
+    });
+
+    expect(res).toEqual({ ok: false, error: 'FORBIDDEN' });
+    expect(emitToUserMock).not.toHaveBeenCalled();
+    expect(prismaMock.channelMember.findUnique).toHaveBeenCalledWith({
+      where: { channelId_userId: { channelId: GROUP_ID, userId: TARGET_ID } },
+    });
+  });
+
+  it('§4.2 — çağıran↔hedef arasında blok varsa (herhangi bir yön) → FORBIDDEN, sızıntı yok', async () => {
+    prismaMock.userBlock.findFirst.mockResolvedValue({ id: 'block-1' });
+
+    const res = await gateway.handleGroupCallRing(socketFor(CALLER_ID), {
+      channelId: GROUP_ID,
+      targetUserId: TARGET_ID,
+    });
+
+    expect(res).toEqual({ ok: false, error: 'FORBIDDEN' });
+    expect(emitToUserMock).not.toHaveBeenCalled();
+    // requireNoDmBlock (rastgele-üye kapısı) BİLEREK kullanılmıyor
+    expect(membershipMock.requireNoDmBlock).not.toHaveBeenCalled();
+    const where = prismaMock.userBlock.findFirst.mock.calls[0][0].where;
+    expect(where).toEqual({
+      OR: [
+        { blockerId: CALLER_ID, blockedId: TARGET_ID },
+        { blockerId: TARGET_ID, blockedId: CALLER_ID },
+      ],
+    });
+  });
+
+  it('§4.3 — ikinci çağrı (aynı çağıran→hedef, 60 sn içinde) → RATE_LIMITED', async () => {
+    const first = await gateway.handleGroupCallRing(socketFor(CALLER_ID), {
+      channelId: GROUP_ID,
+      targetUserId: TARGET_ID,
+    });
+    expect(first).toEqual({ ok: true });
+
+    const second = await gateway.handleGroupCallRing(socketFor(CALLER_ID), {
+      channelId: GROUP_ID,
+      targetUserId: TARGET_ID,
+    });
+
+    expect(second).toEqual({ ok: false, error: 'RATE_LIMITED' });
+    // yalnız ilk çağrıda emit edildi
+    expect(emitToUserMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('§4.3 — farklı bir hedefe çaldırma AYNI pencerede sınırlanmaz (çift bazlı)', async () => {
+    await gateway.handleGroupCallRing(socketFor(CALLER_ID), {
+      channelId: GROUP_ID,
+      targetUserId: TARGET_ID,
+    });
+
+    const res = await gateway.handleGroupCallRing(socketFor(CALLER_ID), {
+      channelId: GROUP_ID,
+      targetUserId: OTHER_MEMBER_ID,
+    });
+
+    expect(res).toEqual({ ok: true });
+    expect(emitToUserMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('§4.4 — hedef zaten odadaysa ack {ok:true} ama olay YAYILMAZ', async () => {
+    voiceGetLiveParticipationMock.mockResolvedValue({
+      present: true,
+      streaming: false,
+      video: false,
+    });
+
+    const res = await gateway.handleGroupCallRing(socketFor(CALLER_ID), {
+      channelId: GROUP_ID,
+      targetUserId: TARGET_ID,
+    });
+
+    expect(res).toEqual({ ok: true });
+    expect(emitToUserMock).not.toHaveBeenCalled();
+    expect(voiceGetLiveParticipationMock).toHaveBeenCalledWith(GROUP_ID, TARGET_ID);
+  });
+
+  it('§4.4 — LiveKit doğrulanamazsa (null) fail-open: yine de çaldırır', async () => {
+    voiceGetLiveParticipationMock.mockResolvedValue(null);
+
+    const res = await gateway.handleGroupCallRing(socketFor(CALLER_ID), {
+      channelId: GROUP_ID,
+      targetUserId: TARGET_ID,
+    });
+
+    expect(res).toEqual({ ok: true });
+    expect(emitToUserMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('mutlu yol — yalnız targetUserId a doğru olay + payload ile emit edilir', async () => {
+    const res = await gateway.handleGroupCallRing(socketFor(CALLER_ID), {
+      channelId: GROUP_ID,
+      targetUserId: TARGET_ID,
+    });
+
+    expect(res).toEqual({ ok: true });
+    expect(emitToUserMock).toHaveBeenCalledTimes(1);
+    expect(emitToUserMock).toHaveBeenCalledWith(TARGET_ID, 'voice.group_call_started', {
+      channelId: GROUP_ID,
+      by: { id: CALLER_ID, username: 'çağıranKanka' },
     });
   });
 });
