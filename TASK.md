@@ -3846,6 +3846,26 @@ kapalı kalırdı. Dev bunu gizlemek yerine raporladı.
    o DM'e mesaj geldiğinde aksiyon çubuğundaki sohbet (baloncuk) düğmesinin üstünde kırmızı
    bildirim rozeti görünsün. Sohbete girilince temizlensin.
 
+4. **Rail'de ortama uzun basma menüsü yok** — kullanıcı hangi ortamda olduğunu ve birden fazla
+   ortamı olduğunu göremiyor, kafası karışıyor (testçi geri bildirimi). Uzun basınca ortam adı +
+   sustur + bildirim ayarları paneli açılsın. ✅ `GuildMenuSheet.tsx` mobilde ZATEN VAR, kanal/DM
+   satırlarında uzun basma deseni de kurulu — sıfırdan yazılmayacak, rail'e bağlanacak.
+   ⚠️ PM notu: uzun basma GİZLİ bir hareket; "hangi ortamdayım" diye kafası karışan kullanıcı onu
+   keşfedemez. Menü gerekli ama görünür bir ipucu da gerekebilir, tasarım turunda bakılacak.
+5. **Bildirimde eski Expo ikonu görünüyor (koyu temada)** — sahip bildirim gölgesinde açık mavi
+   zeminli Expo chevron'unu gördü; açık temada marka ikonu geliyor. 🔬 Dikkat: gördüğü ikon bizim
+   ESKİ uyarlanabilir ikonumuzun birebir kendisi (Expo ön planı + `#E6F4FE` zemin), yani bu bir
+   koyu/açık tema kusurundan çok **bayat ikon önbelleği ya da eski kurulum** gibi duruyor.
+   Doğrulama: v5'i temiz kuran BAŞKA bir cihazda koyu temada bak; hâlâ çıkıyorsa gerçek tema kusuru.
+
+### Masaüstü — ortam ekranına girilemiyor (2026-08-10 gecesi)
+- [ ] 🔴 Konsol: `/assets/GuildChannelView-*.js` ve `ChannelPanel-*.js` için `ERR_TOO_MANY_REDIRECTS`
+      → `Failed to fetch dynamically imported module`. Sunucu tarafı TEMİZ doğrulandı (aynı dosyalar
+      curl ile 200 ve geçerli JS dönüyor, yönlendirme yok). Yani kusur istemcide. İlk şüpheli:
+      Chromium'un önbelleğe aldığı kalıcı yönlendirme (bugün Caddy @app listesini değiştirdik).
+      Sahip sert yenileme + site verisi temizleme deneyecek; geçmezse Network sekmesindeki
+      `Location` başlığına bakılacak. Konsolun sonunda bir de 502 var, aynı turda incelenecek.
+
 ### Tasarım kararları (sahip onayladı 2026-08-10 akşamı)
 - Rozet **NOKTA** olacak, sayı değil. Arama ekranı zaten kalabalık; orada gereken bilgi "yeni bir
   şey var", kaç tane olduğu değil. Sayıyı merak eden zaten sohbete giriyor.
