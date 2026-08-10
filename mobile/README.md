@@ -41,6 +41,32 @@ npx expo start
 
 Sonra `a` (Android emülatör). Cihaz doğrulaması M0'da **Expo Go** ile yapılır (dev build M2'de gelir).
 
+## Play Store release derlemesi (yerel, EAS'sız)
+
+İmzalama `plugins/withReleaseSigning.js` config plugin'i ile yapılır — `android/` gitignore'lu ve her
+`expo prebuild`de şablondan taze üretildiği için `android/app/build.gradle`'ı elle düzenlemek kalıcı
+değildir. Plugin `signingConfigs.release`'i **Gradle property'lerinden** (`KV_UPLOAD_STORE_FILE`,
+`KV_UPLOAD_STORE_PASSWORD`, `KV_UPLOAD_KEY_ALIAS`, `KV_UPLOAD_KEY_PASSWORD`, bu makinenin
+`~/.gradle/gradle.properties` dosyasında) koşullu olarak enjekte eder; property yoksa release
+bugünkü gibi debug anahtarıyla imzalanır, derleme patlamaz.
+
+```bash
+npx expo prebuild --platform android
+cd android && ./gradlew bundleRelease
+```
+
+Çıktı: `android/app/build/outputs/bundle/release/app-release.aab`.
+
+### `versionCode` artırma
+
+`app.json` → `expo.android.versionCode` — Play her yüklemede **kesinlikle artan** bir tam sayı ister
+(aynı `versionCode` ile ikinci bir yükleme reddedilir). `expo.version` (kullanıcıya görünen "1.0.0")
+ile karışmasın — ayrı alanlar, ayrı amaçlar. Her Play'e yüklemeden önce elle 1 artır:
+
+```jsonc
+"android": { "versionCode": 2 }
+```
+
 ## i18n — `tr.json` tek kaynak, ama üretilmiş kopya üzerinden okunur
 
 Tek doğruluk kaynağı **`../web/src/i18n/tr.json`**. Mobil bunu **import eder, elle kopyalamaz.**
