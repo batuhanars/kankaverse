@@ -5,7 +5,7 @@ import type { TrackPublication } from 'livekit-client';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
-type Variant = 'card' | 'full' | 'corner' | 'pip';
+type Variant = 'card' | 'full' | 'corner' | 'pip' | 'screen';
 
 interface Props {
   name: string;
@@ -30,6 +30,10 @@ interface Props {
   /** §3 — yalnız yerel ÖN kamera önizlemesinde true (kullanıcı kendini aynada gördüğü gibi görür;
    *  arka kameraya geçilince aynalama kalkar). Uzak taraf için hiç geçilmez. */
   mirror?: boolean;
+  /** §3.6 addendum — yalnız `'pip'` varyantında okunur: konu ekran paylaşımıysa `true`, `objectFit`
+   *  `'screen'` varyantıyla aynı gerekçeyle `contain` olur (kırpma metni/altyazıyı keser). Kamera/
+   *  avatar konusunda (varsayılan/`false`) davranış bugünküyle birebir aynı kalır: `cover`. */
+  isScreenShare?: boolean;
   /**
    * M4d §3-R — düzen kamera durumundan TÜRETİLİR (`call.tsx`), bu bileşen kendi başına bir düzen
    * state'i TUTMAZ; hangi varyantın çizileceğine çağıran taraf karar verir.
@@ -44,7 +48,16 @@ interface Props {
    *   halkası VAR (§3-R: "iki-kutucuk düzeninde bugünkü gibi kalır").
    * - `'pip'` — M4p sözleşme §3: sistem PiP penceresi (~150dp). Video/avatar TAM ALAN kaplar, ad/
    *   mikrofon rozeti/konuşma kenarlığı/"Çalıyor…" YOK ("kontrol yok, metin yok" kırmızı çizgisi) —
-   *   `CallPipOverlay`in TEK tükettiği varyant.
+   *   `CallPipOverlay`in TEK tükettiği varyant. §3.6 addendum — konu ekran paylaşımıysa `isScreenShare`
+   *   ile `objectFit` `'screen'` varyantındaki gibi `contain`'e döner (kamera durumu `cover` olarak
+   *   DEĞİŞMEDEN kalır, bkz. altındaki dal).
+   * - `'screen'` — Sprint M5b §3.1: paylaşılan EKRANIN sahnedeki/tam ekrandaki büyük görünümü.
+   *   `objectFit="contain"` (kamera kutucukları `cover` kullanıyor — ekranda kırpma metni/altyazıyı
+   *   keser, bkz. sözleşme §3.1). Video her zaman gerçek bir track taşıdığı için (yalnız gerçek
+   *   publication geldiğinde map'e girer, bkz. `stores/voice.ts` `wireRoom`) avatar/isim geri
+   *   dönüşü YOK — `hasVideo` false ise (kısa bir geçiş penceresi) boş koyu bir alan gösterilir.
+   *   Ad/mikrofon rozeti/konuşma halkası burada da YOK (`'pip'` ile aynı "kontrol yok" gerekçesi —
+   *   isim şeritteki karta zaten var, büyük alanda tekrar edilmez).
    */
   variant?: Variant;
 }
@@ -65,6 +78,7 @@ export function ParticipantTile({
   ringing,
   videoPublication,
   mirror,
+  isScreenShare,
   variant = 'card',
 }: Props) {
   const hasVideo = !!videoPublication?.track;
@@ -103,11 +117,28 @@ export function ParticipantTile({
     );
   }
 
+  if (variant === 'screen') {
+    return (
+      <View style={styles.screenWrap}>
+        {hasVideo ? (
+          <VideoTrack trackRef={trackRef} style={styles.screenVideo} objectFit="contain" />
+        ) : (
+          <View style={styles.screenPlaceholder} />
+        )}
+      </View>
+    );
+  }
+
   if (variant === 'pip') {
     return (
-      <View style={styles.pipWrap}>
+      <View style={[styles.pipWrap, isScreenShare && styles.pipScreenWrap]}>
         {hasVideo ? (
-          <VideoTrack trackRef={trackRef} style={styles.pipFill} mirror={mirror} objectFit="cover" />
+          <VideoTrack
+            trackRef={trackRef}
+            style={styles.pipFill}
+            mirror={mirror}
+            objectFit={isScreenShare ? 'contain' : 'cover'}
+          />
         ) : avatarUrl ? (
           <Image source={{ uri: avatarUrl }} style={styles.pipFill} />
         ) : (
@@ -335,10 +366,34 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 
+  // ── Sprint M5b §3.1 'screen' — paylaşılan ekranın büyük görünümü, TAM ALAN, contain ─────────
+  screenWrap: {
+    flex: 1,
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  screenVideo: {
+    width: '100%',
+    height: '100%',
+  },
+  screenPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000',
+  },
+
   // ── M4p §3 'pip' — sistem PiP penceresi, TAM ALAN, sıfır chrome ────────────
   pipWrap: {
     flex: 1,
     backgroundColor: theme.colors.bgElevated,
+  },
+  // §3.6 addendum — `contain` konu ekran paylaşımı olduğunda kenarlarda boşluk bırakır ('screen'
+  // varyantındaki gibi siyah dolgu, aksi halde `bgElevated` gri şeridi ekran içeriğiymiş gibi durur).
+  pipScreenWrap: {
+    backgroundColor: '#000',
   },
   pipFill: {
     width: '100%',

@@ -119,7 +119,7 @@ export function EmergencyButton() {
         accessibilityRole="button"
         accessibilityLabel={t('emergency.button')}
       >
-        <Ionicons name="shield-outline" size={16} color={theme.colors.danger} />
+        <Ionicons name="shield" size={16} color={theme.colors.textPrimary} />
         <Text style={styles.pillText}>{t('emergency.button')}</Text>
       </Pressable>
 
@@ -197,6 +197,10 @@ export function EmergencyButton() {
 }
 
 const styles = StyleSheet.create({
+  // Sahip kararı 2026-08-10 — dolu (opak) kırmızı, çerçeveli-saydam DEĞİL. Gerekçe: buton
+  // artık videonun üstünde de duruyor (tam ekran ekran paylaşımı); saydam zeminli ince çerçeve
+  // açık renkli bir sahnede kayboluyordu. Dolu zemin ayrıca T&S yönünde doğru taraf: acil çıkış
+  // yolu göze çarpmalı. İkon da dolu (`shield`), metin/ikon rengi zemine karşı `textPrimary`.
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -204,12 +208,10 @@ const styles = StyleSheet.create({
     height: 32,
     paddingHorizontal: 12,
     borderRadius: theme.radius.lg,
-    borderWidth: 1.5,
-    borderColor: theme.colors.danger,
-    backgroundColor: 'transparent',
+    backgroundColor: theme.colors.danger,
   },
   pillText: {
-    color: theme.colors.danger,
+    color: theme.colors.textPrimary,
     fontSize: theme.fontSize.sm,
     fontWeight: '700',
   },

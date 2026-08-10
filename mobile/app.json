@@ -76,6 +76,7 @@
         }
       ],
       "expo-asset",
+      "expo-screen-orientation",
       "./modules/picture-in-picture/plugin/withPictureInPicture.js",
       "./plugins/withDevMenuFabFix"
     ],

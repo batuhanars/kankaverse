@@ -41,7 +41,8 @@ import { t } from '@/i18n';
  * KOPYALANMADI: deafen/cihaz-seçim state'i hâlâ yok (kapsam dışı). 🔴 M4d ile 1-1 DM kamerası
  * eklendi (`canPublishCamera`/`isCameraOn`/`cameraFacing` + yerel/uzak publication); M4e ile grup
  * DM'e çoğullaştı (`remoteCameraPublications` userId-anahtarlı map, `toggleCamera` kapısı grup DM'i
- * de kapsıyor) — ekran paylaşımı ve guild kamerası (M4f) hâlâ YOK.
+ * de kapsıyor). M5b ile UZAK ekran paylaşımı İZLEME eklendi (`remoteScreenPublications` — kameradan
+ * AYRI userId-anahtarlı map); telefondan ekran YAYINLAMA hâlâ YOK (kapsam dışı, bkz. sözleşme §1).
  */
 
 export interface RoomMember {
@@ -149,6 +150,13 @@ interface VoiceState {
    */
   pendingCallScreen: boolean;
   isMuted: boolean;
+  /**
+   * Sprint M5a §3 — sağırlaştır (mobilde ilk kez). Web `stores/voice.ts` `isDeafened` pariteti:
+   * tüm UZAK ses track'leri kapalı + mikrofon susturulmuş. `preferMuted`in web'deki kalıcı tercih
+   * karşılığı (`preferDeafened`) BİLİNÇLİ OLARAK yok — sözleşme §3 "kapsam dışı" diyor, mobilde
+   * kalıcı tercih hiç yazılmaz, her oturum `false` başlar.
+   */
+  isDeafened: boolean;
   canPublish: boolean;
   /**
    * M4d §2/§7 — sunucunun DM'de video izni kararı (`resolveVideoSources`, R7 kapısı: iki taraf da
@@ -173,6 +181,14 @@ interface VoiceState {
    * tek-slot state AYRICA TUTULMAZ (D37/M3c dersi — gereksiz state = senkron kalma riski).
    */
   remoteCameraPublications: Record<string, RemoteTrackPublication>;
+  /**
+   * Sprint M5b §2 🔴 — uzak EKRAN paylaşımı, `remoteCameraPublications` ile AYNI şekil (userId
+   * anahtarlı) ama KASITLI OLARAK AYRI bir map. Aynı kullanıcı hem kamerasını hem ekranını açabilir
+   * (LiveKit'te iki farklı `Track.Source`); tek map kullansaydık biri diğerini ezerdi. Mobil
+   * telefondan ekran YAYINLAMAZ (kapsam dışı, sözleşme §1) — bu map yalnız UZAK katılımcılar için
+   * dolar, yerel bir karşılığı yok (`localCameraPublication` gibi bir `localScreenPublication` YOK).
+   */
+  remoteScreenPublications: Record<string, RemoteTrackPublication>;
   /**
    * §2 — DM başlığındaki "görüntülü ara" niyeti: `startOrJoin` bağlantı kurulduktan hemen sonra
    * yazar, `/call` mount effect'i tüketip temizler (`pendingCallScreen` ile aynı temizlenme
@@ -285,6 +301,16 @@ interface VoiceState {
   leave: (userInitiated?: boolean) => Promise<void>;
   toggleMute: () => Promise<void>;
   /**
+   * Sprint M5a §3 — web `stores/voice.ts` `applyDeafen`in taşınmış hâli (mantık taşındı, kod
+   * kopyalanmadı — reaktivite modeli farklı). Sağırlaştır → tüm uzak katılımcıların ses hacmi 0'a
+   * çekilir (LiveKit `RemoteParticipant.setVolume`, RN köprüsünde `attach`e gerek DUYMAZ — web'in
+   * `<audio>` elementi mute'lama yolunun mobil karşılığı yok, SDK bunu `_mediaStreamTrack._setVolume`
+   * ile native tarafta yapıyor) VE mikrofon susturulur (önceki durum `muteBeforeDeafen`de saklanır).
+   * Kaldırınca mikrofon SAĞIRLAŞTIRMADAN ÖNCEKİ durumuna döner — zaten susturulmuşsa (`muteBeforeDeafen
+   * === true`) susturulmuş KALIR, web'deki AYNI kural. `leave()` sıfırlar.
+   */
+  toggleDeafen: () => Promise<void>;
+  /**
    * M4d §2/§4/§6 — kamera aç/kapat. M4e §4 🔴 — kapı artık `callKind==='dm'` **VEYA** `'group'`;
    * guild kapalı kalır (M4d'de bilerek konmuştu, tamamen kaldırılmadı). İzin isteme deseni
    * `requestMicPermission` ile birebir aynı: reddedilirse `reason:'camera_denied'` döner, çağıran
@@ -364,6 +390,11 @@ let foregroundListenerRemove: (() => void) | null = null;
 // YAZAR — arka plan/ön plan geçişi yalnız OKUR (kullanıcının "kapattım" iradesiyle "arka planda
 // geçici durduruldu" birbirine karışmasın). `leave()` her oturumda sıfırlar.
 let cameraIntent = false;
+// M5a §3 🔴 — web `stores/voice.ts` `muteBeforeDeafen` pariteti (aynı isim, aynı iş): sağırlaştırma
+// ANINDAKİ mikrofon durumunu tutar. `toggleDeafen` yazar; kaldırınca yalnız bu `false` idiyse
+// (yani kullanıcı sağırlaşırken zaten susturulmamıştı) mikrofon geri açılır — susturulmuşsa
+// susturulmuş kalır (web'deki AYNI kural, `applyDeafen` yorumuna bkz.).
+let muteBeforeDeafen = false;
 // M4f §3.1 🔴 — "bu unpublish biz mi istedik" bayrağı (`leaving` ile aynı desen). LiveKit'in yerel
 // unpublish yolu TEK: kullanıcı düğmeye bastığında (`toggleCamera`) ve arka plana alındığında
 // (`handleAppStateChange`) da, sunucu R11 yayın-durdur ile izni düşürdüğünde de aynı
@@ -431,12 +462,14 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   movePending: false,
   pendingCallScreen: false,
   isMuted: false,
+  isDeafened: false,
   canPublish: false,
   canPublishCamera: false,
   isCameraOn: false,
   cameraFacing: 'user',
   localCameraPublication: null,
   remoteCameraPublications: {},
+  remoteScreenPublications: {},
   pendingCameraStart: false,
   roomParticipants: [],
   speakingUserIds: new Set(),
@@ -716,6 +749,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     autoEndWhenAlone = true; // §4 — kozmetik sıfırlama, bir sonraki `startOrJoin` zaten üzerine yazar
     currentPeerLabel = '';
     cameraIntent = false; // M4d §6 — yeni oturum eski niyeti hatırlamaz (diğer kozmetik sıfırlamalarla aynı ders)
+    muteBeforeDeafen = false; // M5a §3 — aynı ders, bir önceki oturumdan kalan sağırlaştırma-öncesi durum yeni oturumu kirletemez
     localCameraStopping = false; // M4f §3.1 — aynı kozmetik sıfırlama, bir önceki oturumdan kalamaz
     // Her oturum yeni bir `Room` nesnesi (yeni katılımcı kimlikleri) — bir sonraki `startOrJoin`
     // eski oturumdan kalma handler'larla karışmasın diye map burada temizlenir.
@@ -784,12 +818,14 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       isGeneralVoiceChannel: false,
       pendingCallScreen: false,
       isMuted: false,
+      isDeafened: false,
       canPublish: false,
       canPublishCamera: false,
       isCameraOn: false,
       cameraFacing: 'user',
       localCameraPublication: null,
       remoteCameraPublications: {},
+      remoteScreenPublications: {},
       pendingCameraStart: false,
       roomParticipants: [],
       speakingUserIds: new Set(),
@@ -809,8 +845,43 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       await room.localParticipant.setMicrophoneEnabled(!next);
       set({ isMuted: next });
       updateCallForegroundService(currentPeerLabel, next ? t('voice.unmute') : t('voice.mute')).catch(() => {});
+      // M5a §3 🔴 — web `toggleMute` pariteti: sağırken mikrofonu AÇMAK sağırlığı da kaldırır
+      // (Discord deseni). `toggleDeafen` burada güvenle çağrılabilir — `isMuted` az önce `false`
+      // yazıldığı için undeafen dalının mikrofon-geri-aç kontrolü (`!muteBeforeDeafen && isMuted`)
+      // zaten `false` bulur, ikinci bir `setMicrophoneEnabled` çağrısı yapmaz; yalnız uzak ses
+      // hacimlerini geri açar ve `isDeafened`i indirir.
+      if (next === false && get().isDeafened) await get().toggleDeafen();
     } catch {
       // izin/cihaz yoksa değiştirme
+    }
+  },
+
+  async toggleDeafen() {
+    if (!room) return;
+    const next = !get().isDeafened;
+    set({ isDeafened: next });
+    for (const p of room.remoteParticipants.values()) p.setVolume(next ? 0 : 1);
+    if (next) {
+      // Sağırlaştır → mikrofonu kapat (önceki durumu hatırla, web `applyDeafen` pariteti).
+      muteBeforeDeafen = get().isMuted;
+      if (get().canPublish && !get().isMuted) {
+        try {
+          await room.localParticipant.setMicrophoneEnabled(false);
+          set({ isMuted: true });
+        } catch {
+          // yoksay — sağırlık yine de uygulanmış sayılır (uzak ses hacimleri zaten sıfırlandı)
+        }
+      }
+    } else {
+      // Sağırlığı kaldır → mikrofon sağırlaştırma ÖNCESİ hâline döner (zaten susturulmuşsa kalır).
+      if (get().canPublish && !muteBeforeDeafen && get().isMuted) {
+        try {
+          await room.localParticipant.setMicrophoneEnabled(true);
+          set({ isMuted: false });
+        } catch {
+          // yoksay — kullanıcı düğmeden tekrar deneyebilir
+        }
+      }
     }
   },
 
@@ -1044,6 +1115,18 @@ function wireRoom(
     s.add(p.identity);
     set({ mutedUserIds: s });
   });
+  // Sprint M5b §2 🔴 — ekran paylaşımı dalı. Kamera `TrackMuted` dinleyicisi (yukarıda) SATIR SATIR
+  // değişmedi (M4e/M4f regresyon yasağı); LiveKit'in `EventEmitter`'ı aynı olaya birden fazla
+  // dinleyici bağlanmasına izin veriyor, o yüzden ekran işini KENDİ ayrı dinleyicisine yazmak
+  // kamera handler'ının içine dallanmaktan daha güvenli (kamera davranışına dokunma riski sıfır).
+  // Aynı "publication mute → map'ten düş" deseni, yalnız kaynak ScreenShare ve hedef map farklı.
+  r.on(RoomEvent.TrackMuted, (pub, p: Participant) => {
+    if (pub.kind !== Track.Kind.Video) return;
+    if (pub.source !== Track.Source.ScreenShare || p.identity === r.localParticipant.identity) return;
+    const next = { ...get().remoteScreenPublications };
+    delete next[p.identity];
+    set({ remoteScreenPublications: next });
+  });
   r.on(RoomEvent.TrackUnmuted, (pub, p: Participant) => {
     if (pub.kind === Track.Kind.Video) {
       if (pub.source === Track.Source.Camera && p.identity !== r.localParticipant.identity && pub.track) {
@@ -1056,6 +1139,15 @@ function wireRoom(
     const s = new Set(get().mutedUserIds);
     s.delete(p.identity);
     set({ mutedUserIds: s });
+  });
+  // Sprint M5b §2 🔴 — ekran karşılığı (bkz. yukarıdaki `TrackMuted` ekran dinleyicisi yorumu, aynı
+  // gerekçe: kamera `TrackUnmuted` dinleyicisi SATIR SATIR değişmedi, bu AYRI bir dinleyici).
+  r.on(RoomEvent.TrackUnmuted, (pub, p: Participant) => {
+    if (pub.kind !== Track.Kind.Video) return;
+    if (pub.source !== Track.Source.ScreenShare || p.identity === r.localParticipant.identity || !pub.track) return;
+    set({
+      remoteScreenPublications: { ...get().remoteScreenPublications, [p.identity]: pub as RemoteTrackPublication },
+    });
   });
   // M4f §3.1 🔴 — bu sprintin asıl işi. Yerel kamera track'i unpublish olduğunda (`LocalTrackUnpublished`,
   // kaynak Camera) SDK bunun BİZDEN mi (`toggleCamera`/arka plan) yoksa SUNUCUDAN mı (R11 yayın-durdur,
@@ -1136,11 +1228,30 @@ function wireRoom(
     delete next[participant.identity];
     set({ remoteCameraPublications: next });
   });
+  // Sprint M5b §2 🔴 — ekran paylaşımının asıl kazanım/kayıp yolu, kamera `TrackSubscribed`/
+  // `TrackUnsubscribed` dinleyicileriyle (yukarıda) BİREBİR aynı desen, AYRI dinleyiciler olarak
+  // eklendi (kamera satırları değişmedi). "İlk tarama" ayrı bir kod noktası GEREKTİRMİYOR: LiveKit
+  // bağlanma anında zaten var olan (bizden önce başlamış) yayınlar için de bu olayı ateşliyor —
+  // kamera bugün de aynı şekilde çalışıyor, manuel bir başlangıç taraması hiç yoktu.
+  r.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, pub: RemoteTrackPublication, participant: RemoteParticipant) => {
+    if (track.kind !== Track.Kind.Video || track.source !== Track.Source.ScreenShare) return;
+    set({ remoteScreenPublications: { ...get().remoteScreenPublications, [participant.identity]: pub } });
+  });
+  r.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, _pub: RemoteTrackPublication, participant: RemoteParticipant) => {
+    if (track.kind !== Track.Kind.Video || track.source !== Track.Source.ScreenShare) return;
+    const next = { ...get().remoteScreenPublications };
+    delete next[participant.identity];
+    set({ remoteScreenPublications: next });
+  });
   r.on(RoomEvent.ActiveSpeakersChanged, () => recomputeSpeaking(set));
   r.on(RoomEvent.ParticipantConnected, (p: RemoteParticipant) => {
     attachSpeaking(p, set);
     refreshRoomParticipants(set, get);
     scheduleAloneCheckIfNeeded(get);
+    // M5a §3 🔴 — sağırken katılan biri sessiz katılmalı. `RemoteParticipant.setVolume` katılımcının
+    // KENDİ `volumeMap`ine yazar (yeni nesne, önceki katılımcılardan devralmaz) — bu çağrı olmasa
+    // sağırlaştırma açıkken katılan kişi tam sesle duyulurdu.
+    if (get().isDeafened) p.setVolume(0);
   });
   r.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
     detachSpeaking(p);
@@ -1152,6 +1263,11 @@ function wireRoom(
     const next = { ...get().remoteCameraPublications };
     delete next[p.identity];
     set({ remoteCameraPublications: next });
+    // Sprint M5b §2 🔴 — ekran için AYNI temizlik (ayrılan kişi paylaşıyorduysa donuk kare
+    // kalmasın); yukarıdaki kamera satırları değişmeden, yalnız ek bir blok.
+    const nextScreen = { ...get().remoteScreenPublications };
+    delete nextScreen[p.identity];
+    set({ remoteScreenPublications: nextScreen });
   });
   r.on(RoomEvent.Disconnected, (reason?: unknown) => {
     // §3.3 🔴 — YALNIZ beklenmedik kopma (ağ/sunucu/A4/R11B). Ayrılışı biz başlattıysak

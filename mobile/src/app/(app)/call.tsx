@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, BackHandler, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { useVoiceStore, type RoomMember } from '@/stores/voice';
 import { useDmStore } from '@/stores/dm';
 import { useAuthStore } from '@/stores/auth';
@@ -11,8 +12,10 @@ import { useGuildPermission } from '@/hooks/useGuildPermission';
 import { guildsApi } from '@/api/guilds';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { ParticipantTile } from '@/components/call/ParticipantTile';
+import { ScreenShareStage } from '@/components/call/ScreenShareStage';
 import { CallControls } from '@/components/call/CallControls';
 import { OutputPickerSheet } from '@/components/call/OutputPickerSheet';
+import { VoiceContextSheet } from '@/components/call/VoiceContextSheet';
 import { EmergencyButton } from '@/components/call/EmergencyButton';
 import { CameraNudgeModal, shouldShowCameraNudge, markCameraNudgeShown } from '@/components/call/CameraNudgeModal';
 import { ParticipantModerationHost } from '@/components/call/ParticipantModerationHost';
@@ -77,6 +80,10 @@ export default function CallScreen() {
   // M4e §2 🔴 — userId anahtarlı çoğul map (tek kaynak). DM dalı da BURADAN türetir (aşağıda
   // `peerCameraPublication`), paralel bir tek-slot state TUTULMAZ.
   const remoteCameraPublications = useVoiceStore((s) => s.remoteCameraPublications);
+  // Sprint M5b §2 🔴 — kameradan AYRI map (bkz. `stores/voice.ts` alan yorumu). Bu ÇİĞ (dondurulmamış)
+  // değer yalnız odak/tam-ekran hesapları için (aşağıdaki effect'ler); RENDER'da `shown.remoteScreenPublications`
+  // kullanılır (`frozenRef` — kapanış animasyonu donması, camera ile AYNI desen).
+  const remoteScreenPublications = useVoiceStore((s) => s.remoteScreenPublications);
   const isGuildCall = callKind === 'guild';
   // 🔴 M4b sözleşme §4 — bu dosya sözleşmenin §1 dosya tablosunda YOK, ama DoD §10 "İkinci kişi
   // katılınca ızgarada iki kutucuk" maddesi N-katılımcılı grid'i zorunlu kılıyor: DM dalının
@@ -96,6 +103,10 @@ export default function CallScreen() {
   const serverMutedUserIds = useVoiceStore((s) => s.serverMutedUserIds);
   const canMute = useGuildPermission(isGuildCall ? guildId : null, 'MUTE_MEMBERS');
   const canMove = useGuildPermission(isGuildCall ? guildId : null, 'MOVE_MEMBERS');
+  // Sprint M5a §2 — alt panelin "Kanal Ayarları"/"Bir arkadaşını davet et" satırları. Aynı desen:
+  // guild dışında `guildId` zaten `null`, hook otomatik `false` döner (satırlar hiç çizilmez).
+  const canManageChannels = useGuildPermission(isGuildCall ? guildId : null, 'MANAGE_CHANNELS');
+  const canCreateInvite = useGuildPermission(isGuildCall ? guildId : null, 'CREATE_INVITE');
   // Sözleşme §2 — kendine ve ORTAM SAHİBİNE eylem gösterilmez. Tekil "bu guild'in sahibi kim" ucu
   // yok (`useGuildPermission` ile aynı gerekçe): üye olduğum ortamlar listesinden okunur.
   const [ownerId, setOwnerId] = useState<string | null>(null);
@@ -127,8 +138,16 @@ export default function CallScreen() {
   }
 
   const [outputSheetOpen, setOutputSheetOpen] = useState(false);
+  // Sprint M5a §2 — üç nokta panel açıklığı. Hoparlör düğmesi kalktı (çıkış seçimi artık panelin
+  // bir satırı, `VoiceContextSheet`'in `onOpenOutput`i bu iki state'i sırayla açıp kapatıyor).
+  const [contextSheetOpen, setContextSheetOpen] = useState(false);
   // Sprint M4t §2 — kamera nudge modalı görünürlüğü (kapı/hatırlama `CameraNudgeModal.tsx`te).
   const [cameraNudgeVisible, setCameraNudgeVisible] = useState(false);
+  // Sprint M5b §3.2 🔴 — tek odak kuralı: kullanıcının şeritten yaptığı seçim korunur (yeni bir
+  // paylaşım başlayınca zıplamaz). `null` = henüz seçim yok (aşağıdaki effect ilk paylaşımı yazar).
+  const [focusedScreenUserId, setFocusedScreenUserId] = useState<string | null>(null);
+  // Sprint M5b §3.3 — tam ekran izleme (üst bar/alt kontroller/şerit gizlenir + yatay yön açılır).
+  const [screenFullscreen, setScreenFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Bu ekran BU channelId'ye bağlıyken bir kez true olur; sonra `connectedChannelId` boşalırsa
@@ -146,6 +165,10 @@ export default function CallScreen() {
     cameraFacing: typeof cameraFacing;
     localCameraPublication: typeof localCameraPublication;
     remoteCameraPublications: typeof remoteCameraPublications;
+    // Sprint M5b §2 🔴 — kameradan AYRI (bkz. `stores/voice.ts`); atlanırsa kapanış animasyonu
+    // sürerken ekran-paylaşımı tile'ı da sökülür/yeniden kurulur — kamera için düzeltilen Fabric
+    // çökme sınıfının (M4d) AYNISI, yalnız kaynak farklı.
+    remoteScreenPublications: typeof remoteScreenPublications;
   }>({
     participants: [],
     canPublish: false,
@@ -153,6 +176,7 @@ export default function CallScreen() {
     cameraFacing: 'user',
     localCameraPublication: null,
     remoteCameraPublications: {},
+    remoteScreenPublications: {},
   });
 
   function resetHideTimer() {
@@ -204,6 +228,66 @@ export default function CallScreen() {
     Alert.alert(cameraStoppedNotice);
   }, [cameraStoppedNotice]);
 
+  // Sprint M5b §3.2 🔴 — tek odak kuralı. Paylaşan kimse yoksa odak boşalır; paylaşan varsa VE
+  // mevcut odak hâlâ paylaşıyorsa (kullanıcının kendi seçimi) DOKUNULMAZ — yeni bir paylaşım
+  // başladığında (`remoteScreenPublications` değişir ama `focusedScreenUserId` hâlâ listede) odak
+  // ZIPLAMAZ. Odak yalnız (a) hiç seçim yokken ilk paylaşıma veya (b) seçili kişi paylaşmayı
+  // bıraktığında kalan ilk paylaşıma düşer (§3.2: "odak kalan ilk paylaşıma düşer").
+  useEffect(() => {
+    const ids = Object.keys(remoteScreenPublications);
+    if (ids.length === 0) {
+      if (focusedScreenUserId !== null) setFocusedScreenUserId(null);
+      return;
+    }
+    if (!focusedScreenUserId || !ids.includes(focusedScreenUserId)) {
+      setFocusedScreenUserId(ids[0]);
+    }
+  }, [remoteScreenPublications, focusedScreenUserId]);
+
+  // Sprint M5b §3.3 🔴 — yatay yön yalnız BU görünümde: `app.json`daki global `"orientation":
+  // "portrait"` kilidi DEĞİŞMİYOR, yalnız tam ekran AÇIKKEN kaldırılıyor (fiziksel çevirmenin
+  // yatay/dikey doldurabilmesi için) — kapanınca dikey kilide GERİ dönülüyor.
+  useEffect(() => {
+    if (screenFullscreen) {
+      void ScreenOrientation.unlockAsync();
+    } else {
+      void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    }
+  }, [screenFullscreen]);
+
+  // Güvenlik ağı (bkz. yukarıdaki effect) — ekran HANGİ YOLDAN kapanırsa kapansın (geri tuşu,
+  // aramayı bitirme, `goneRef` navigasyonu) dikey kilit GERİ gelmeli; aksi halde uygulamanın geri
+  // kalanı (hepsi dikey varsayımıyla yazıldı) yatay kilitte takılı kalırdı.
+  useEffect(() => {
+    return () => {
+      void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+    };
+  }, []);
+
+  // Paylaşım(lar) biterken tam ekrandaysak boş/donuk bir video kalırdı — otomatik çık (§3.2
+  // "hiç kalmadıysa §3.1'deki eski düzene dönülür" kuralının tam ekran karşılığı).
+  useEffect(() => {
+    if (screenFullscreen && Object.keys(remoteScreenPublications).length === 0) {
+      setScreenFullscreen(false);
+    }
+  }, [screenFullscreen, remoteScreenPublications]);
+
+  // Sprint M5b §3.4 ADDENDUM 🔴 — Android donanım geri tuşu tam ekrandan ÇIKARIR, aramadan
+  // ÇIKARMAZ ("geri tuşunun aramayı kapatması kabul edilemez"). Dinleyici yalnız tam ekran
+  // AÇIKKEN kayıtlı: bağımlılık `screenFullscreen` her değiştiğinde önceki listener sökülüp
+  // (varsa) yenisi kurulur — kapalıyken dinleyici HİÇ kurulmaz, geri tuşunun bugünkü (bu
+  // ekranın dışındaki) davranışı DEĞİŞMEDEN kalır. Desen `event-form.tsx`teki adım-geri
+  // listener'ıyla AYNI (`BackHandler.addEventListener('hardwareBackPress', ...)` + `sub.remove()`).
+  useEffect(() => {
+    if (!screenFullscreen) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      resetHideTimer();
+      setScreenFullscreen(false);
+      return true; // varsayılan davranışı (ekrandan/aramadan çıkış) ENGELLER — yalnız tam ekrandan çıkar.
+    });
+    return () => sub.remove();
+  }, [screenFullscreen]);
+
   useEffect(() => {
     if (connectedChannelId === channelId) wasConnectedRef.current = true;
   }, [connectedChannelId, channelId]);
@@ -230,6 +314,10 @@ export default function CallScreen() {
     // gerekmiyor — hedefe katılınca `connectedChannelId` yeni kanala döner, ekran orada kalır.
     if (emergencyPending || movePending) return;
     goneRef.current = true;
+    // Sprint M5b §3.3 — tam ekrandan çıkarken kapanıyorsak burada da toparla (yukarıdaki unmount
+    // güvenlik ağı zaten dikey kilide döndürür, bu yalnız geçiş sırasında bir çerçevelik "hâlâ
+    // tam ekran chrome'u gizli" görüntüsünü önler).
+    if (screenFullscreen) setScreenFullscreen(false);
     // Kontrolleri gizleme sayacı da susturulur: kapanma sırasında tetiklenirse üst bar ve alt çubuk
     // sökülmekte olan yüzeyde unmount olur — dondurma ile aynı gerekçe.
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -269,11 +357,20 @@ export default function CallScreen() {
       cameraFacing,
       localCameraPublication,
       remoteCameraPublications,
+      remoteScreenPublications,
     };
   }
   const shown = isLeaving
     ? frozenRef.current
-    : { participants: roomParticipants, canPublish, isCameraOn, cameraFacing, localCameraPublication, remoteCameraPublications };
+    : {
+        participants: roomParticipants,
+        canPublish,
+        isCameraOn,
+        cameraFacing,
+        localCameraPublication,
+        remoteCameraPublications,
+        remoteScreenPublications,
+      };
 
   const localMember = shown.participants.find((p) => p.isLocal);
   const peerMember = shown.participants.find((p) => !p.isLocal);
@@ -298,24 +395,56 @@ export default function CallScreen() {
   const anyGroupCameraOn =
     (isGroupCall || isGuildCall) &&
     (shown.isCameraOn || Object.values(shown.remoteCameraPublications).some((p) => !!p?.track));
+  // Sprint M5b §3.1 🔴 — ekran paylaşımı sahnesi TÜM diğer düzenlerin ÖNÜNE geçer (aşağıdaki render
+  // ağacında ilk kontrol edilen dal budur — grid/tek-sütun/kamera-odaklı düzenlerin hiçbiri
+  // değiştirilmedi, yalnız önlerine yeni bir öncelik eklendi). `effectiveFocusId` odak state'i henüz
+  // ilk `useEffect` turunu almadan (bir render'lık pencere) de doğru tile'ı seçsin diye burada AYRICA
+  // hesaplanır — state'i beklemek bir kare boş/yanlış tile göstermek anlamına gelirdi.
+  const screenSharerIds = Object.keys(shown.remoteScreenPublications);
+  const effectiveFocusScreenId =
+    focusedScreenUserId && shown.remoteScreenPublications[focusedScreenUserId]
+      ? focusedScreenUserId
+      : screenSharerIds[0];
+  const focusedScreenPublication = effectiveFocusScreenId
+    ? (shown.remoteScreenPublications[effectiveFocusScreenId] ?? null)
+    : null;
+  const anyScreenShare = !!focusedScreenPublication;
   // Grup DM'de tek "karşı taraf" yok (N kişi) — başlık `peerName`e (ilk katılan kim ise o) değil,
   // grubun adına bağlanır (`stores/voice.ts` `startOrJoin` `kind==='group'`de `callChannelName`'i
   // guild gibi dolduruyor). DM dalında bu ifade `peerName`e eşit kalır — davranış DEĞİŞMEDİ.
   const nonGuildTitle = callKind === 'group' ? (callChannelName ?? peerName) : peerName;
 
-  // M4z §E — grup DM'de HENÜZ KATILMAMIŞ üyeler de soluk kart olarak çizilir ("kimi bekliyorum").
-  // 🔴 Yalnız `kind === 'group'`: bu ekranda guild ile aynı ızgara dalı paylaşılıyor ama guild'de
-  // "üye" = sunucudaki herkes demek olurdu (§E.1) — guild dalında liste HER ZAMAN boş kalır.
-  // Kaynak DM store'daki kanal kaydının `members` dizisi; yeni uç çağrılmaz.
-  // 🔴 Sıra kararlı: ada göre (TR), eşitlikte id'ye göre — biri katılınca kalan kartlar zıplamaz.
-  // Odadakiler her zaman önce çizilir, bekleyenler listenin SONUNA eklenir.
+  // Sprint M5a §2 — panelin başlık/alt başlık çifti. Sözleşme §2 tablosu: DM/grup DM'de alt başlık
+  // "odadakilerin adları" (üst bardaki gibi tek bir peerName değil, o an sahnedeki HERKESİN adı —
+  // kendisi dahil, sahne zaten kendi kutucuğunu da gösteriyor); guild'de üst bardaki ikinci satırla
+  // AYNI (`callGuildName`). Yeni bir hesap İCAT EDİLMEDİ — üst bardaki `nonGuildTitle`/`callChannelName`
+  // ile PAYLAŞILIYOR, panel yalnız guild dışında farklı bir alt başlık kullanıyor.
+  const panelTitle = isGuildCall ? (callChannelName ?? '') : nonGuildTitle;
+  const panelSubtitle = isGuildCall
+    ? (callGuildName ?? '')
+    : shown.participants.map((p) => p.username).join(', ');
+
+  // Sprint M5a §1 (sahne kuralı) 🔴 — bu liste ARTIK SAHNEDE ÇİZİLMİYOR. Eskiden (M4z §E) grup
+  // DM'de henüz katılmamış üyeler soluk kart olarak sahneye ekleniyordu; sözleşme bunu kalıcı
+  // olarak yasakladı ("sahne yalnız odadakileri çizer, kimin odada olmadığı bilgisi PANELDE
+  // durur"). Kaldırılan bilgi yok olmadı — aşağıdaki hesap AYNI kaynağı kullanmaya devam ediyor,
+  // yalnız tüketicisi değişti: artık `VoiceContextSheet`in "Seste olmayanlar + Çaldır" bölümünü
+  // besliyor (kaynak DM store'daki kanal kaydı; yeni uç çağrılmaz).
+  // 🔴 M5a §4 ile kapsam genişledi: eskiden yalnız `kind==='group'` doluyordu (1-1 DM'de karşı
+  // taraf zaten sahnede görünüyordu, panelden çaldırma yoktu). Sözleşme §2 tablosu artık 1-1
+  // DM'de de "karşı taraf yoksa" bu listeyi istiyor — DM dalı ayrı bir koşul olarak eklendi,
+  // grup dalı SATIR SATIR aynı kaldı. Guild dalında liste HER ZAMAN boş kalır (§6 kapsam dışı).
+  // 🔴 Sıra kararlı: grup dalında ada göre (TR), eşitlikte id'ye göre — biri katılınca kalan
+  // satırlar zıplamaz.
   const inRoomIds = new Set(shown.participants.map((p) => p.userId));
   const pendingMembers =
     callKind === 'group' && channel?.type === 'GROUP_DM'
       ? channel.members
           .filter((m) => m.id !== myUser?.id && !inRoomIds.has(m.id))
           .sort((a, b) => a.username.localeCompare(b.username, 'tr') || a.id.localeCompare(b.id))
-      : [];
+      : callKind === 'dm' && channel?.type === 'DM' && !inRoomIds.has(channel.otherUser.id)
+        ? [channel.otherUser]
+        : [];
 
   // 🔴 PM incelemesi (2026-08-06) — burada ÖNCEDEN `leave(true)` + `router.back()` art arda
   // çağrılıyordu. `leave()` içindeki await'ler (room.disconnect, AudioSession.stopAudioSession)
@@ -386,54 +515,66 @@ export default function CallScreen() {
         koşullu render ediliyordu; gizlenince alan düzenden TAMAMEN çıkıyor, ortadaki katılımcı
         kartı yukarı sıçrayıp altta boşluk kalıyordu. Blok artık HER ZAMAN mount'lu — yalnız
         `opacity`/`pointerEvents` değişiyor, alan (yükseklik + `paddingTop`) korunuyor.
+
+        Sprint M5b §3.3 🔴 — TEK istisna: ekran-paylaşımı tam ekran görünümü. Orada blok tamamen
+        UNMOUNT edilir (opacity değil) — "video uçtan uca" (§3.3) alanın kendisinin de boşalmasını
+        istiyor, `controlsVisible`in kozmetik gizlemesinden FARKLI bir talep.
+
+        Sprint M5b §3.4 ADDENDUM 🔴 — bu tam-unmount istisnası artık YALNIZ bu bloğa (üst bar) ait:
+        alt kontrol çubuğu (aşağıda, `CallControls`) tam ekranda ARTIK unmount OLMUYOR — sahip
+        cihaz turundan sonra tasarım revize edildi, bkz. o bloğun kendi yorumu.
       */}
-      <View
-        style={[styles.topBar, { paddingTop: insets.top + 8 }, !controlsVisible && styles.controlsHidden]}
-        pointerEvents={controlsVisible ? 'auto' : 'none'}
-      >
-        <Pressable
-          onPress={() => router.back()}
-          hitSlop={12}
-          accessibilityRole="button"
-          // "common.close" değil — bu düğme kapatmıyor, küçültüyor (§7); ekran görsel 11'deki
-          // aynı düğmeye karşılık geliyor. Hang-up etiketiyle aynı incelemede fark edildi.
-          accessibilityLabel={t('mobile.call.minimize')}
+      {!screenFullscreen && (
+        <View
+          style={[styles.topBar, { paddingTop: insets.top + 8 }, !controlsVisible && styles.controlsHidden]}
+          pointerEvents={controlsVisible ? 'auto' : 'none'}
         >
-          <Ionicons name="chevron-down" size={26} color={theme.colors.textPrimary} />
-        </Pressable>
-        {/* §5 — başlık kanal adı + ortam adı (guild) / karşı taraf adı (DM, tıklanınca sohbet açar). */}
-        {isGuildCall ? (
-          <View style={styles.topBarCenter}>
-            <Text style={styles.peerName} numberOfLines={1}>
-              {callChannelName ?? ''}
-            </Text>
-            <Text style={styles.duration} numberOfLines={1}>
-              {(callGuildName ?? '') + ' · ' + duration}
-            </Text>
-          </View>
-        ) : (
-          // DM VE grup DM ortak dal — grup DM'de `handleOpenChat` yine dolu (sohbet düğmesi §4'te
-          // "grup DM'de görünür" dediği için chat açma burada da doğru), yalnız gösterilen ad
-          // `nonGuildTitle` üzerinden (DM'de `peerName`e eşit, davranış DEĞİŞMEDİ).
-          <Pressable onPress={handleOpenChat} style={styles.topBarCenter} accessibilityRole="button">
-            <Text style={styles.peerName} numberOfLines={1}>
-              {nonGuildTitle}
-            </Text>
-            <Text style={styles.duration}>{duration}</Text>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            accessibilityRole="button"
+            // "common.close" değil — bu düğme kapatmıyor, küçültüyor (§7); ekran görsel 11'deki
+            // aynı düğmeye karşılık geliyor. Hang-up etiketiyle aynı incelemede fark edildi.
+            accessibilityLabel={t('mobile.call.minimize')}
+          >
+            <Ionicons name="chevron-down" size={26} color={theme.colors.textPrimary} />
           </Pressable>
-        )}
-        <Pressable
-          onPress={() => {
-            resetHideTimer();
-            setOutputSheetOpen(true);
-          }}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel={t('mobile.call.outputTitle')}
-        >
-          <Ionicons name="volume-high-outline" size={24} color={theme.colors.textPrimary} />
-        </Pressable>
-      </View>
+          {/* §5 — başlık kanal adı + ortam adı (guild) / karşı taraf adı (DM, tıklanınca sohbet açar). */}
+          {isGuildCall ? (
+            <View style={styles.topBarCenter}>
+              <Text style={styles.peerName} numberOfLines={1}>
+                {callChannelName ?? ''}
+              </Text>
+              <Text style={styles.duration} numberOfLines={1}>
+                {(callGuildName ?? '') + ' · ' + duration}
+              </Text>
+            </View>
+          ) : (
+            // DM VE grup DM ortak dal — grup DM'de `handleOpenChat` yine dolu (sohbet düğmesi §4'te
+            // "grup DM'de görünür" dediği için chat açma burada da doğru), yalnız gösterilen ad
+            // `nonGuildTitle` üzerinden (DM'de `peerName`e eşit, davranış DEĞİŞMEDİ).
+            <Pressable onPress={handleOpenChat} style={styles.topBarCenter} accessibilityRole="button">
+              <Text style={styles.peerName} numberOfLines={1}>
+                {nonGuildTitle}
+              </Text>
+              <Text style={styles.duration}>{duration}</Text>
+            </Pressable>
+          )}
+          {/* Sprint M5a §2 — hoparlör ikonu yerine üç nokta: çıkış seçimi artık panelin bir satırı
+              (`OutputPickerSheet` hâlâ o satırdan açılıyor, kendi Modal'ı DEĞİŞMEDİ). */}
+          <Pressable
+            onPress={() => {
+              resetHideTimer();
+              setContextSheetOpen(true);
+            }}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={t('mobile.call.moreOptions')}
+          >
+            <Ionicons name="ellipsis-horizontal" size={24} color={theme.colors.textPrimary} />
+          </Pressable>
+        </View>
+      )}
 
       {/*
         Sprint M4t §3.3 🔴 — acil buton OTOMATİK GİZLENMEYE TABİ DEĞİL: yukarıdaki `topBar`
@@ -441,12 +582,46 @@ export default function CallScreen() {
         o View'ın İÇİNE konsa fade'den kaçamazdı. Ayrı, hiçbir zaman soluklaşmayan bir satırda
         (aynı üst-bar bölgesinde, hemen altında) duruyor — panik anındaki kullanıcı "ekrana dokun,
         kontroller gelsin" adımını yapmadan basabiliyor.
-      */}
-      <View style={styles.emergencyRow} pointerEvents="box-none">
-        <EmergencyButton />
-      </View>
 
-      {isGridCall ? (
+        Sprint M5b §3.4 ADDENDUM 🔴 — bu SATIR SATIR aynı kalan davranış YALNIZ tam ekran KAPALIYKEN
+        geçerli (kontrat §3.4 madde 5: "Normal görünüm DEĞİŞMEZ"). Tam ekranda acil buton BURADA
+        DEĞİL, aşağıdaki `controls` sarmalayıcının İÇİNDE render edilir (kontrollerle birlikte
+        gizlenip görünür) — R7 gerekçe kaydı kontrat §3.4'te: bu bir T&S gevşetmesi, yalnız tam
+        ekran yüzeyine ait, sessizce yapılmadı.
+      */}
+      {!screenFullscreen && (
+        <View style={styles.emergencyRow} pointerEvents="box-none">
+          <EmergencyButton />
+        </View>
+      )}
+
+      {/*
+        Sprint M5b §3.1 🔴 — ekran paylaşımı sahnesi diğer TÜM düzenlerin (ızgara/kamera-odaklı/
+        klasik iki-kutucuk) ÖNÜNE geçer: odada en az bir paylaşım varken bu dal çizilir, aşağıdaki
+        `isGridCall`/`anyCameraOn` dalları SATIR SATIR değişmeden yerinde duruyor — yalnız bu yeni
+        kontrolün ARDINDAN sıraya giriyorlar (kimse paylaşmıyorsa bugünkü düzen aynen kalır, §3.1).
+      */}
+      {anyScreenShare ? (
+        <ScreenShareStage
+          participants={shown.participants}
+          focusedPublication={focusedScreenPublication}
+          screenPublications={shown.remoteScreenPublications}
+          cameraPublications={shown.remoteCameraPublications}
+          localCameraPublication={shown.localCameraPublication}
+          cameraFacing={shown.cameraFacing}
+          speakingUserIds={speakingUserIds}
+          mutedUserIds={mutedUserIds}
+          isMuted={isMuted}
+          fullscreen={screenFullscreen}
+          onToggleFullscreen={() => {
+            resetHideTimer();
+            setScreenFullscreen((v) => !v);
+          }}
+          onSelectFocus={setFocusedScreenUserId}
+          canModerate={canModerate}
+          onModerationTarget={setModerationTarget}
+        />
+      ) : isGridCall ? (
         anyGroupCameraOn ? (
           // M4e §3.1/§3.2 → M4f §2 🔴 — grup DM VE guild'de EN AZ BİR kamera açıkken iki sütunlu
           // ızgara (bakılan şey video aramasında yüz; tek-sütun tam-genişlik kartlar ekranda iki kişi
@@ -479,13 +654,10 @@ export default function CallScreen() {
                   />
                 </Pressable>
               ))}
-              {pendingMembers.map((m) => (
-                <View key={`pending:${m.id}`} style={styles.gridItem}>
-                  <ParticipantTile name={m.username} avatarUrl={m.avatarUrl} speaking={false} micOff={false} dimmed />
-                </View>
-              ))}
+              {/* Sprint M5a §1 — bekleyen üye kartları BURADAN kaldırıldı (bkz. `pendingMembers`
+                  yorumu). "Kimi bekliyorum" bilgisi artık yalnız panelde. */}
             </ScrollView>
-            {alone && pendingMembers.length === 0 && (
+            {alone && (
               <View style={styles.aloneNotice}>
                 <Text style={styles.aloneTitle}>{t('mobile.voice.guildAloneTitle')}</Text>
                 <Text style={styles.aloneSubtitle}>{t('mobile.voice.guildAloneSubtitle')}</Text>
@@ -529,25 +701,14 @@ export default function CallScreen() {
                   />
                 </Pressable>
               ))}
-              {/* M4z §E — bekleyen üyeler: aynı kutucuk, yalnız `dimmed`. Mikrofon/konuşma
-                  göstergesi YOK (o bilgi yok), `ringing` de YOK — grupta kimin telefonunun
-                  çaldığını bilmiyoruz (1-1 dalındaki "Çalıyor…" olduğu gibi duruyor). */}
-              {pendingMembers.map((m) => (
-                <ParticipantTile
-                  key={`pending:${m.id}`}
-                  name={m.username}
-                  avatarUrl={m.avatarUrl}
-                  speaking={false}
-                  micOff={false}
-                  dimmed
-                />
-              ))}
+              {/* Sprint M5a §1 🔴 — bekleyen üye kartları (eski M4z §E) BURADAN kaldırıldı: sahne
+                  kuralı artık kalıcı ("sahne yalnız odadakileri çizer"). Bu bilgi kaybolmadı,
+                  `VoiceContextSheet`in "Seste olmayanlar" bölümüne taşındı (üç nokta panelinden). */}
             </ScrollView>
-            {/* §E — "Arkadaşların katıldığında burada görünecekler" artık YALNIZ gerçekten boş
-                ekranda gösterilir. Bekleyen kartlar çizildiğinde o cümle kendi kendini yalanlıyordu:
-                üyeler zaten görünüyor. Ortam kanalında `pendingMembers` her zaman boş olduğu için
-                oradaki davranış değişmiyor. */}
-            {alone && pendingMembers.length === 0 && (
+            {/* §E'den kalan ders geçerli kalıyor: "Arkadaşların katıldığında burada görünecekler"
+                yalnız gerçekten boş ekranda gösterilir — artık pendingMembers'a bakmaya GEREK YOK
+                (sahnede zaten hiç çizilmiyor, çelişki riski kalmadı). */}
+            {alone && (
               <View style={styles.aloneNotice}>
                 <Text style={styles.aloneTitle}>{t('mobile.voice.guildAloneTitle')}</Text>
                 <Text style={styles.aloneSubtitle}>{t('mobile.voice.guildAloneSubtitle')}</Text>
@@ -631,11 +792,43 @@ export default function CallScreen() {
         </View>
       )}
 
-      {/* Aynı düzen-koruma gerekçesi — bkz. üst bar yorumu. */}
+      {/*
+        Aynı düzen-koruma gerekçesi — bkz. üst bar yorumu (blok HER ZAMAN mount'lu, `opacity`/
+        `pointerEvents` değişir). Sprint M5b §3.3 önceden bu bloğu da tam ekranda TAMAMEN unmount
+        ediyordu ("video uçtan uca") — §3.4 ADDENDUM bunu sahip cihaz turundan SONRA değiştirdi:
+        tam ekranda alt kontrol çubuğu (mevcut `CallControls`, YENİ BİLEŞEN YAZILMADI) artık
+        GÖRÜNÜR kalır ve mevcut `controlsVisible`/`CONTROLS_HIDE_MS` gizlenme kuralına tabidir
+        (yeni bir zamanlayıcı YOK). Tam ekranken kutu `controlsFullscreen` ile `position:'absolute'`
+        alıp videonun ÜZERİNE biner (bigTile zaten `bigTileFullscreen` ile uçtan uca); normal
+        görünümde eskisi gibi akışta (videonun ALTINDA) kalır — stil yalnız `screenFullscreen`
+        true iken eklenir, normal görünüm SATIR SATIR aynı.
+      */}
       <View
-        style={[styles.controls, { paddingBottom: insets.bottom + 16 }, !controlsVisible && styles.controlsHidden]}
+        style={[
+          styles.controls,
+          screenFullscreen && styles.controlsFullscreen,
+          { paddingBottom: insets.bottom + 16 },
+          !controlsVisible && styles.controlsHidden,
+        ]}
         pointerEvents={controlsVisible ? 'auto' : 'none'}
       >
+        {/*
+          Sprint M5b §3.4 ADDENDUM 🔴 — acil buton tam ekranda BURADA: kendi sabit satırında DEĞİL,
+          `CallControls` ile AYNI opacity/pointerEvents grubunun içinde (kontrollerle birlikte
+          gizlenip görünür). Normal görünümdeki (üstteki `emergencyRow`, hiç gizlenmeyen) satırla
+          KARIŞTIRILMASIN — bu yalnız tam ekrana özel, kontrat §3.4 R7 gerekçe kaydına bağlı bilinçli
+          bir T&S gevşetmesi.
+        */}
+        {screenFullscreen && (
+          <View style={styles.fullscreenEmergencyRow} pointerEvents="box-none">
+            <EmergencyButton />
+          </View>
+        )}
+        {/* Sahip cihaz turu 2026-08-10 — tam ekranda düğmeler videonun ÜSTÜNDE duruyor; açık bir
+            sahnede (beyaz ağırlıklı içerik) ikonlar kayboluyordu. Saydam bir zemin (`bgOverlay`,
+            mevcut token) okunurluğu garantiye alıyor. Sarmalayıcı View normal görünümde stilsiz —
+            düzeni etkilemez (varsayılan dikey akış, `CallControls` kendi satırını zaten ortalıyor). */}
+        <View style={screenFullscreen ? styles.fullscreenControlsPill : undefined}>
         <CallControls
           isMuted={isMuted}
           canPublish={shown.canPublish}
@@ -654,10 +847,35 @@ export default function CallScreen() {
           isCameraOn={shown.isCameraOn}
           onToggleCamera={handleToggleCamera}
           onSwitchCamera={handleSwitchCamera}
+          // Sprint M5b §3.4 ADDENDUM — yalnız tam ekranken dolu: küçültme düğmesini gösterir.
+          onExitFullscreen={
+            screenFullscreen
+              ? () => {
+                  resetHideTimer();
+                  setScreenFullscreen(false);
+                }
+              : undefined
+          }
         />
+        </View>
       </View>
 
       <OutputPickerSheet visible={outputSheetOpen} onClose={() => setOutputSheetOpen(false)} />
+      {/* Sprint M5a §2 — üç nokta paneli. `channelId` her zaman dolu (§0 dosya başındaki erken
+          `if (!channelId) return null` sayesinde). */}
+      <VoiceContextSheet
+        visible={contextSheetOpen}
+        onClose={() => setContextSheetOpen(false)}
+        channelId={channelId}
+        callKind={callKind}
+        guildId={guildId}
+        title={panelTitle}
+        subtitle={panelSubtitle}
+        canManageChannel={canManageChannels}
+        canInvite={canCreateInvite}
+        pendingMembers={pendingMembers}
+        onOpenOutput={() => setOutputSheetOpen(true)}
+      />
       {/* Sprint M4h — moderasyon paneli. `isServerMuted`/`isBroadcasting` RENDER ANINDA türetilir
           (sözleşme §3 — Host'un `onToggleMute` closure'ı bu değeri panel kapanmadan ÖNCE yakalar). */}
       <ParticipantModerationHost
@@ -806,5 +1024,33 @@ const styles = StyleSheet.create({
   },
   controls: {
     paddingTop: 12,
+  },
+  // Sprint M5b §3.4 ADDENDUM — tam ekranda kontrol çubuğu akıştan ÇIKIP videonun ÜZERİNE biner
+  // (`bigTileFullscreen` zaten videoyu uçtan uca yapmıştı — akışta bıraksaydık kontrol çubuğu
+  // videonun altına yer açar, "video uçtan uca" ilkesini bozardı). Normal görünümde bu stil hiç
+  // uygulanmaz (yalnız `screenFullscreen` true iken eklenir) — akıştaki eski konum DEĞİŞMEDİ.
+  controlsFullscreen: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  // Acil butonun tam ekrandaki satırı — `CallControls`in ÜSTÜNDE, aynı sarmalayıcının içinde
+  // (bkz. render'daki yorum). Normal görünümdeki `emergencyRow`dan (üst-bar altında, sağa yaslı,
+  // hiç gizlenmeyen) BİLİNÇLİ olarak ayrı bir stil — burada ortalanmış, `CallControls`in üstünde.
+  fullscreenEmergencyRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingBottom: 12,
+  },
+  // Tam ekranda düğmelerin altına saydam zemin (bkz. render'daki yorum). Renk ve yarıçap
+  // token'lardan: `bgOverlay` (rgba(0,0,0,0.6)) + `radius.lg` — yeni değer uydurulmadı.
+  // `alignSelf:'center'` şeridi içerik genişliğinde tutar; tam genişlik bir bar videoyu gereksiz örterdi.
+  fullscreenControlsPill: {
+    alignSelf: 'center',
+    backgroundColor: theme.colors.bgOverlay,
+    borderRadius: theme.radius.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
 });

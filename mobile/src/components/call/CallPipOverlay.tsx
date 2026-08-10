@@ -23,6 +23,12 @@ import { theme } from '@/theme';
  * §3 — içerik: 1-1 DM'de karşı taraf, grup DM/ortam kanalında KONUŞAN kişi (kimse konuşmuyorsa ilk
  * uzak katılımcı). Kendi görüntün hiçbir dalda YOK. Kontrol/metin/ızgara yok — `ParticipantTile`in
  * `'pip'` varyantı zaten bunu garanti ediyor (bkz. o bileşendeki yorum).
+ *
+ * §3.6 addendum (M5b sonrası, PM 2026-08-10) — odada ekran paylaşımı VARSA konu seçimi bunun ÖNÜNE
+ * geçer: DM/grup ayrımından ÖNCE `remoteScreenPublications` kontrol edilir. `call.tsx`teki kullanıcı
+ * odak state'i (§3.2, `focusedScreenUserId`) buraya TAŞINMAZ — PiP küçük bir pencere, oradan odak
+ * seçilemez; **ilk** paylaşım (`Object.keys` sırası, `call.tsx`teki "ilk paylaşıma düşer" yedeğiyle
+ * aynı yaklaşım) yeter. Paylaşım yoksa aşağıdaki DM/grup dalı bugünküyle SATIR SATIR aynıdır.
  */
 export function CallPipOverlay() {
   const connectedChannelId = useVoiceStore((s) => s.connectedChannelId);
@@ -30,6 +36,7 @@ export function CallPipOverlay() {
   const roomParticipants = useVoiceStore((s) => s.roomParticipants);
   const speakingUserIds = useVoiceStore((s) => s.speakingUserIds);
   const remoteCameraPublications = useVoiceStore((s) => s.remoteCameraPublications);
+  const remoteScreenPublications = useVoiceStore((s) => s.remoteScreenPublications);
   const channel = useDmStore((s) => s.channels.find((c) => c.id === connectedChannelId));
 
   const [isInPip, setIsInPip] = useState(false);
@@ -41,10 +48,24 @@ export function CallPipOverlay() {
   if (!isInPip || !connectedChannelId) return null;
 
   const remoteMembers = roomParticipants.filter((p) => !p.isLocal);
-  let subject: { name: string; avatarUrl: string | null; videoPublication: (typeof remoteCameraPublications)[string] | null } | null =
-    null;
+  let subject: {
+    name: string;
+    avatarUrl: string | null;
+    videoPublication: (typeof remoteCameraPublications)[string] | null;
+    isScreenShare: boolean;
+  } | null = null;
 
-  if (callKind === 'dm') {
+  const screenSharerId = Object.keys(remoteScreenPublications)[0] ?? null;
+  if (screenSharerId) {
+    // §3.6 — ekran paylaşımı varken DM/grup farkı önemsiz, konu her zaman paylaşılan ekran.
+    const sharer = remoteMembers.find((p) => p.userId === screenSharerId);
+    subject = {
+      name: sharer?.username ?? '',
+      avatarUrl: sharer?.avatarUrl ?? null,
+      videoPublication: remoteScreenPublications[screenSharerId] ?? null,
+      isScreenShare: true,
+    };
+  } else if (callKind === 'dm') {
     // §3 "1-1 DM: karşı tarafın videosu; kamerası kapalıysa avatarı" — `MiniCallWindow`daki AYNI
     // katılmadan-önce yedeği (`channel.otherUser`), henüz odaya düşmemiş karşı tarafı da kapsar.
     const peerFallback = channel?.type === 'DM' ? channel.otherUser : null;
@@ -55,6 +76,7 @@ export function CallPipOverlay() {
         name,
         avatarUrl: peerMember?.avatarUrl ?? peerFallback?.avatarUrl ?? null,
         videoPublication: peerMember ? (remoteCameraPublications[peerMember.userId] ?? null) : null,
+        isScreenShare: false,
       };
     }
   } else {
@@ -65,6 +87,7 @@ export function CallPipOverlay() {
         name: speaker.username,
         avatarUrl: speaker.avatarUrl,
         videoPublication: remoteCameraPublications[speaker.userId] ?? null,
+        isScreenShare: false,
       };
     }
   }
@@ -79,6 +102,7 @@ export function CallPipOverlay() {
           speaking={false}
           micOff={false}
           videoPublication={subject.videoPublication}
+          isScreenShare={subject.isScreenShare}
         />
       )}
     </View>

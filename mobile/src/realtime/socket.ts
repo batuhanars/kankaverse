@@ -423,6 +423,30 @@ export function groupCallStart(channelId: string): Promise<{ ok: boolean; error?
 }
 
 /**
+ * Sprint M5a sözleşme §4 — grup DM'de kişi başı çaldırma. `groupCallStart`in ack+timeout desenini
+ * BİREBİR izler (aynı 5sn timeout, aynı ack şekli); tek fark event adı ve ikinci bir gövde alanı
+ * (`targetUserId` — hedef tek kişi, `groupCallStart` tüm kanalı çalıyordu). Sunucu ack'i
+ * `{ok:false, error:'NOT_GROUP'|'FORBIDDEN'|'RATE_LIMITED'}` ile açımlıyor; istemci bu kodlara göre
+ * Türkçe mesaj seçer (`VoiceContextSheet`), `FORBIDDEN`de sebep söylenmez (G3, engel bilgisi sızmaz).
+ */
+export function groupCallRing(channelId: string, targetUserId: string): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    const s = ensureSocket();
+    let settled = false;
+    const done = (ack: { ok: boolean; error?: string }) => {
+      if (settled) return;
+      settled = true;
+      resolve(ack);
+    };
+    const timer = setTimeout(() => done({ ok: false, error: 'TIMEOUT' }), 5000);
+    s.emit('voice:group_call_ring', { channelId, targetUserId }, (ack: { ok: boolean; error?: string }) => {
+      clearTimeout(timer);
+      done(ack ?? { ok: false });
+    });
+  });
+}
+
+/**
  * §8'de M4a-1'e verilen tek istisna: odadan çıkarken karşı taraf henüz katılmadıysa bu da
  * gönderilir (arayan tarafın çalan telefonunu/web bekleme barını susturur). Best-effort, ack yok
  * (web `useSocket.ts callCancel` ile aynı — sunucu `{ok:true}` dönse de istemci beklemiyor).
