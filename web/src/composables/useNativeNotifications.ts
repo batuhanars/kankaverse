@@ -45,8 +45,13 @@ export function useNativeNotifications() {
       callNotif?.close()
       callNotif = null
       if (!id || !document.hidden) return
-      // İzin istenmedi/reddedildiyse sessizce geç — kullanıcıyı izin istemiyle bombalama.
-      if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+      // 🔴 Sahip cihaz turu 2026-08-10 — burada ÖNCE `permission !== 'granted'` kontrolü vardı ve
+      // masaüstünde arama bildirimi hiç çıkmıyordu. Sebep: Electron bildirimi izin istemeden
+      // gösterir ama `Notification.permission` çoğu zaman `default` döner; kontrol bildirimi
+      // daha doğmadan eliyordu. Kanıt: aynı dosyadaki MESAJ toast'ında böyle bir kontrol YOK ve
+      // o çalışıyordu. Kural artık yalnız AÇIKÇA reddedilmiş durumu eler; tarayıcıda izin
+      // verilmemişse `new Notification` zaten sessizce başarısız olur (aşağıdaki try/catch).
+      if (typeof Notification === 'undefined' || Notification.permission === 'denied') return
 
       const call = callStore.incoming
       if (!call) return
@@ -59,13 +64,20 @@ export function useNativeNotifications() {
       // `tag` aynı anda tek gelen-arama bildirimi kalmasını garanti eder (ikinci `new
       // Notification` aynı tag'la öncekinin yerine geçer) — referansı da yine de tutuyoruz ki
       // yukarıdaki erken `close()` çağrıları görsel olarak da anında kapatsın.
-      callNotif = new Notification(t('notification.nativeTitle'), {
-        body,
-        tag: 'kankaverse-incoming-call',
-      })
-      callNotif.onclick = () => {
-        window.kankaverse?.focusWindow()
-        void router.push({ name: 'dm', params: { channelId: call.channelId } })
+      // İzin `default` iken tarayıcılar `new Notification` çağrısında hata fırlatabiliyor
+      // (Electron fırlatmaz, gösterir). Gelen arama akışını bir bildirim hatası yüzünden
+      // patlatmak kabul edilemez: sarmalanıyor, başarısızlıkta zil + modal yoluna devam edilir.
+      try {
+        callNotif = new Notification(t('notification.nativeTitle'), {
+          body,
+          tag: 'kankaverse-incoming-call',
+        })
+        callNotif.onclick = () => {
+          window.kankaverse?.focusWindow()
+          void router.push({ name: 'dm', params: { channelId: call.channelId } })
+        }
+      } catch {
+        callNotif = null
       }
     },
   )
