@@ -71,11 +71,7 @@ if (!gotLock) {
 } else {
   app.on('second-instance', () => {
     // İkinci başlatmada mevcut pencereyi öne getir
-    if (win) {
-      if (win.isMinimized()) win.restore()
-      win.show()
-      win.focus()
-    }
+    bringToFront()
   })
 
   app.whenReady().then(() => {
@@ -183,12 +179,34 @@ if (!gotLock) {
 
     // macOS: Dock'tan uygulamaya tıklanınca (pencere yoksa veya gizliyse) göster
     app.on('activate', () => {
-      if (win) {
-        win.show()
-        win.focus()
-      }
+      bringToFront()
     })
   })
+}
+
+// ── Pencereyi öne getir (tek kaynak) ─────────────────────────────────────────
+/**
+ * Pencereyi kullanıcının önüne getirir. Beş yerden çağrılır: bildirim tıklaması (IPC),
+ * tepsi ikonu, tepsi menüsü, ikinci instance, macOS dock.
+ *
+ * 🔴 Sahip cihaz turu 2026-08-11 — bildirime tıklayınca uygulama "bazen" açılıyordu.
+ * Sebep: `show()` Windows'ta MİNİMİZE pencereyi geri getirmez, minimize bırakır. Tepsiye
+ * gizlenmiş pencerede (`hide()`) çalıştığı için kusur aralıklı görünüyordu. Sıra önemli:
+ *   1. restore() — minimize durumundan çık (show() bunu YAPMAZ)
+ *   2. show()    — tepsiye gizlenmişse görünür yap
+ *   3. odak      — Windows arka plandaki uygulamanın odak çalmasını reddeder; alwaysOnTop
+ *      darbesi pencereyi z-sırasının tepesine taşır, hemen geri alınır (kalıcı üstte-kal
+ *      davranışı istenmiyor, yalnız öne çıkma anı için).
+ */
+function bringToFront() {
+  if (!win || win.isDestroyed()) return
+  if (win.isMinimized()) win.restore()
+  if (!win.isVisible()) win.show()
+  if (process.platform === 'win32') {
+    win.setAlwaysOnTop(true)
+    win.setAlwaysOnTop(false)
+  }
+  win.focus()
 }
 
 // ── Ana pencere ──────────────────────────────────────────────────────────────
@@ -269,7 +287,7 @@ function applySetting(key, value) {
 
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
-    { label: 'Aç / Göster', click: () => { if (win) { win.show(); win.focus() } } },
+    { label: 'Aç / Göster', click: () => bringToFront() },
     { type: 'separator' },
     {
       label: 'Başlangıçta Başlat',
@@ -296,25 +314,19 @@ function createTray() {
   tray.setContextMenu(buildTrayMenu())
 
   // Windows/Linux: tray ikonuna sol tıklayınca pencereyi göster/gizle
+  // Minimize pencere Windows'ta hâlâ "visible" sayılır; salt isVisible'a bakan eski kod
+  // minimize haldeyken ikona basınca pencereyi geri getirmek yerine gizliyordu.
   tray.on('click', () => {
-    if (win) {
-      if (win.isVisible()) {
-        win.hide()
-      } else {
-        win.show()
-        win.focus()
-      }
-    }
+    if (!win || win.isDestroyed()) return
+    if (win.isVisible() && !win.isMinimized()) win.hide()
+    else bringToFront()
   })
 }
 
 // ── IPC kanalları ──────────────────────────────────────────────────────────────
 // Preload → renderer: pencereyi öne getir (native bildirim tıklaması)
 ipcMain.on('focus-window', () => {
-  if (win) {
-    win.show()
-    win.focus()
-  }
+  bringToFront()
 })
 
 // Masaüstü ayarları — renderer (web ayarlar UI) okur/yazar
