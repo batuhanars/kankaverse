@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/stores/auth';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -25,6 +26,7 @@ export default function LoginScreen() {
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const canSubmit = identifier.trim().length > 0 && password.length > 0 && !submitting;
@@ -73,15 +75,33 @@ export default function LoginScreen() {
 
         <View style={styles.field}>
           <Text style={styles.label}>{t('auth.password')}</Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder={t('auth.passwordPlaceholder')}
-            placeholderTextColor={theme.colors.textMuted}
-            secureTextEntry
-            autoCapitalize="none"
-            style={styles.input}
-          />
+          <View style={styles.passwordWrap}>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder={t('auth.passwordPlaceholder')}
+              placeholderTextColor={theme.colors.textMuted}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              style={[styles.input, styles.passwordInput]}
+            />
+            {/* §1 (M5c) — varsayılan gizli, kullanıcı isteyerek gösterir. Dokunma hedefi 44dp
+                (`theme.layout.inputMinHeight`), ikon 20px; MessageComposer'daki emoji ikonuyla
+                aynı mutlak-konum deseni. */}
+            <Pressable
+              onPress={() => setShowPassword((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? t('mobile.auth.hidePassword') : t('mobile.auth.showPassword')}
+              style={styles.passwordToggle}
+              hitSlop={4}
+            >
+              <Ionicons
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color={theme.colors.textSecondary}
+              />
+            </Pressable>
+          </View>
         </View>
 
         <Pressable onPress={() => router.push('/forgot-password')} style={styles.forgotPasswordWrap}>
@@ -161,6 +181,22 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     paddingHorizontal: 14,
     fontSize: theme.fontSize.base,
+  },
+  // Şifre kutusu — göster/gizle ikonu sağda mutlak konumlu (§1). `position: 'relative'` View
+  // varsayılanı olduğu için ayrıca belirtmeye gerek yok.
+  passwordWrap: {
+    justifyContent: 'center',
+  },
+  passwordInput: {
+    paddingRight: theme.layout.inputMinHeight,
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: 0,
+    width: theme.layout.inputMinHeight,
+    height: theme.layout.inputMinHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   forgotPasswordWrap: {
     alignItems: 'flex-end',

@@ -15,6 +15,14 @@ interface Props {
    * DEĞİŞMEDİ — yalnız guild çağıran taraf artık hiç geçmiyor.
    */
   onOpenChat?: () => void;
+  /**
+   * §3 (M5c, testçi geri bildirimi) — sohbet düğmesinde okunmamış işareti. Yalnız `onOpenChat`
+   * doluyken anlamlı (ortam ses kanalında zaten çizilmiyor, bu prop da orada kullanılmaz).
+   * 🔴 NOKTA, sayı DEĞİL (sahip kararı 2026-08-10) — arama ekranı zaten kalabalık, gereken bilgi
+   * "yeni bir şey var" kadarı. Kaynak `dm` store'daki kanalın `unread` alanı (`call.tsx`), yeni
+   * sayaç/store/endpoint YOK.
+   */
+  hasUnreadChat?: boolean;
   onHangUp: () => void;
   /**
    * M4d §5/§7 → M4e §4 → M4f §2 → M4i §2 🔴 — yalnız `onToggleCamera` de dolu VE (`canPublishCamera`
@@ -59,6 +67,7 @@ export function CallControls({
   canPublish,
   onToggleMute,
   onOpenChat,
+  hasUnreadChat,
   onHangUp,
   canPublishCamera,
   isGuildCall,
@@ -130,6 +139,7 @@ export function CallControls({
           accessibilityLabel={t('mobile.call.chatAction')}
         >
           <Ionicons name="chatbubble" size={22} color={theme.colors.textPrimary} />
+          {hasUnreadChat && <View style={styles.unreadDot} />}
         </Pressable>
       )}
 
@@ -194,5 +204,15 @@ const styles = StyleSheet.create({
   },
   hangUpIcon: {
     transform: [{ rotate: '135deg' }],
+  },
+  // §3 — düğmenin sağ üstü, sabit boyut (sayı değil nokta, büyümez).
+  unreadDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.danger,
   },
 });

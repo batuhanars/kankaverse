@@ -20,6 +20,9 @@ interface Props {
   guild: GuildSummaryDto;
   active: boolean;
   onPress: () => void;
+  /** Sprint M5c §4 — uzun basınca `GuildMenuSheet` açılır (testçi geri bildirimi: kullanıcı hangi
+   *  ortamda olduğunu ve birden fazla ortamı olduğunu göremiyordu). Kısa basış (`onPress`) DEĞİŞMEDİ. */
+  onLongPress?: () => void;
 }
 
 /**
@@ -35,7 +38,7 @@ interface Props {
  * yüzen panel deseni var (bkz. vault "Yüzen panel tasarım kararı") ve pip rail kenarına değil,
  * ikonun soluna serbestçe konuyor — o yüzden sözleşme burada "uçları yuvarlak" istedi (§4.1).
  */
-export function GuildRailItem({ guild, active, onPress }: Props) {
+export function GuildRailItem({ guild, active, onPress, onLongPress }: Props) {
   const unread = useUnreadStore((s) => s.guilds[guild.id]?.unread ?? 0);
   const mentions = useUnreadStore((s) => s.guilds[guild.id]?.mentions ?? 0);
   // Sprint M2b §5 R1-3 — rozet süzme: susturma TAM SESSİZLİKtir, ikisi de gizlenir. Susturulmamışken
@@ -58,7 +61,13 @@ export function GuildRailItem({ guild, active, onPress }: Props) {
   const clipId = `hexClip-${guild.id}`;
 
   return (
-    <Pressable onPress={onPress} style={styles.wrap} accessibilityRole="button" accessibilityLabel={guild.name}>
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={styles.wrap}
+      accessibilityRole="button"
+      accessibilityLabel={guild.name}
+    >
       {/* Sol pip — §4.1: aktifken dikey çubuk, pasif+okunmamışta nokta, ikisi de yoksa hiç. */}
       {active ? (
         <View style={styles.pipActive} />

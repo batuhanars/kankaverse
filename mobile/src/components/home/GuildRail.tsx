@@ -18,6 +18,9 @@ interface Props {
   onRetry: () => void;
   onSelectDm: () => void;
   onSelectGuild: (id: string) => void;
+  /** Sprint M5c §4 — ortam ikonuna uzun basınca `GuildMenuSheet` açılır. Kısa basış (`onSelectGuild`)
+   *  DEĞİŞMEDİ; bu ayrı bir eylem. */
+  onLongPressGuild: (id: string) => void;
   /** Sprint M1d §3 — ray "+" girişi: tek dokunuş → "Ortama Katıl" / "Ortam Kur" seçimi. */
   onAddGuild: () => void;
 }
@@ -32,7 +35,16 @@ const HEX_POINTS = hexPoints(SIZE);
 // Sprint M1a contract §2 — rail + sidebar gezinme mimarisi, kalıcı rail. M0'ın "Ortamların" tam-
 // ekranı kaldırıldı; ortam ikonları buraya taşındı. react-native-svg PM onaylı bağımlılık (dördüncü
 // PM düzeltmesi) — ortam ikonları artık gerçek altıgen maske ile çiziliyor (bkz. GuildRailItem).
-export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSelectGuild, onAddGuild }: Props) {
+export function GuildRail({
+  selection,
+  guilds,
+  state,
+  onRetry,
+  onSelectDm,
+  onSelectGuild,
+  onLongPressGuild,
+  onAddGuild,
+}: Props) {
   // Sprint M2b §10 R3-1 — sahip kararı: rail'in DM girişi bir ortam değil, oradan gelen HER mesaj
   // bahsetme muamelesi görür. Eski beyaz "en az bir okunmamış var mı" pip'i KALDIRILDI, yerine
   // `useTotalPing`in kullandığı AYNI sayı (`useDmUnreadCount`) kırmızı rozette gösterilir.
@@ -91,6 +103,7 @@ export function GuildRail({ selection, guilds, state, onRetry, onSelectDm, onSel
             guild={g}
             active={selection.type === 'guild' && selection.id === g.id}
             onPress={() => onSelectGuild(g.id)}
+            onLongPress={() => onLongPressGuild(g.id)}
           />
         ))}
 

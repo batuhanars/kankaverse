@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/stores/auth';
 import { authApi, type RegistrationModeDto } from '@/api/auth';
 import { BirthDateInput } from '@/components/auth/BirthDateInput';
@@ -35,6 +36,7 @@ export default function RegisterScreen() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [birthDate, setBirthDate] = useState('');
   const [inviteCode, setInviteCode] = useState('');
 
@@ -149,15 +151,33 @@ export default function RegisterScreen() {
 
             <View style={styles.field}>
               <Text style={styles.label}>{t('auth.password')}</Text>
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                placeholder={t('auth.passwordPlaceholder')}
-                placeholderTextColor={theme.colors.textMuted}
-                secureTextEntry
-                autoCapitalize="none"
-                style={styles.input}
-              />
+              <View style={styles.passwordWrap}>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder={t('auth.passwordPlaceholder')}
+                  placeholderTextColor={theme.colors.textMuted}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  style={[styles.input, styles.passwordInput]}
+                />
+                {/* §1 (M5c) — login.tsx ile aynı desen (varsayılan gizli, 44dp dokunma hedefi). */}
+                <Pressable
+                  onPress={() => setShowPassword((v) => !v)}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    showPassword ? t('mobile.auth.hidePassword') : t('mobile.auth.showPassword')
+                  }
+                  style={styles.passwordToggle}
+                  hitSlop={4}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={theme.colors.textSecondary}
+                  />
+                </Pressable>
+              </View>
             </View>
 
             <BirthDateInput onChange={setBirthDate} />
@@ -273,6 +293,21 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     paddingHorizontal: 14,
     fontSize: theme.fontSize.base,
+  },
+  // Şifre kutusu — göster/gizle ikonu sağda mutlak konumlu (§1, login.tsx ile aynı desen).
+  passwordWrap: {
+    justifyContent: 'center',
+  },
+  passwordInput: {
+    paddingRight: theme.layout.inputMinHeight,
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: 0,
+    width: theme.layout.inputMinHeight,
+    height: theme.layout.inputMinHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   error: {
     color: theme.colors.danger,

@@ -3948,6 +3948,57 @@ görülürse istenecek kanıt: Network sekmesinde `Location` başlığı + aynı
 
 ---
 
+---
+
+## Sprint M5c — Kapalı Test Geri Bildirimleri — 2026-08-11 ✅ KOD BİTTİ
+
+> Sözleşme: `contracts/SPRINT_M5C_MOBILE_TEST_FEEDBACK_CONTRACT.md`. Tier yalnız `mobile/`
+> (+ `web/src/i18n/tr.json` iki anahtar — i18n tek kaynak kuralı gereği). Native diff YOK.
+> PM sözleşmeyi yazdı, dev oturumu maddeleri tek tek uyguladı, PM iddiaları kaynak koddan doğruladı.
+
+- [x] **§1 Şifre göster** — giriş + kayıt, her alan bağımsız, 44dp dokunma hedefi korundu
+- [x] 🔬 **Dev sözleşmedeki hatayı yakaladı:** `register.tsx:173` şifre tekrar değil **davet kodu**
+      alanıymış. PM doğruladı, dev haklı. Kayıt ekranında şifre tekrarı hiç yok; **eklenmedi**
+      (testçi şikayeti değil, yeni özellik olurdu). İki kullanım için ortak bileşen de çıkarılmadı
+      (Rule of Three: ikide bekle)
+- [x] **§2 Banner** — kök neden `push.ts` `shouldShowBanner: isIncomingCall` idi, banner yalnız
+      gelen aramaya açıktı. Mesaj bildirimleri eklendi; kullanıcı O DM'in ekranındaysa çıkmıyor
+      (`activeDmChannelId`, mevcut alan). Ses hâlâ yalnız aramada
+- [x] 🔬 PM doğrulaması: `DM_MESSAGE` ve `MENTION` sabitleri `messages.gateway.ts`'te gerçekten
+      gönderilen değerler. Yanlış olsalardı banner **sessizce** hiç çıkmaz, ancak testçiden
+      öğrenirdik
+- [x] **§3 Nokta rozeti** — `CallControls`e `hasUnreadChat`, kaynak `dm` store `unread`. Yeni
+      sayaç/store/endpoint yok; sohbete girince kendiliğinden sönüyor
+- [x] **§4 Rail uzun basma** — `GuildMenuSheet` rail'e bağlandı
+- [x] 🔴 **PM ilk turu REDDETTİ:** uzun basış menüyü açarken kanal panelini de o ortama geçiriyordu.
+      Gerekçe kullanıcı tarafı: maddenin varlık sebebi "hangi ortamdayım" karışıklığı, uzun basınca
+      habersizce başka ortama düşmek onu artırır (referans uygulama da ortam değiştirmiyor).
+      Dev'in "ayrı state kapsam aşan refactor" gerekçesi ölçüldü ve reddedildi — aynı desen
+      `menuChannel` olarak dosyada zaten kuruluydu
+- [x] 🔴 **PM incelemede dev'in görmediği sessiz kusuru buldu:** rol yalnız SEÇİLİ ortam için
+      çekiliyordu. Menü seçimden ayrılınca, ziyaret edilmemiş bir ortama uzun basan ADMIN kendi
+      yönettiği ortamda Ayarlar/Davet/Kanal Oluştur'u göremezdi (`canManage` sessizce false).
+      Rol çekme effect'i menü ortamını da kapsayacak şekilde genelleştirildi
+- [x] **§5 Bildirim ikonu — KOD YAZILMADI (doğru karar).** Asset 288x288, opak piksellerin tamamı
+      beyaz, Android alfa kuralına uygun; `app.json` bağı doğru. Dün akşamki commit'le gelmiş, yani
+      görülen eski ikon o düzeltmeden önceki kurulum. Uygulama bugün tamamen kaldırılıp yeniden
+      kuruldu → yeniden bakılacak
+- [x] `typecheck` + `lint` temiz (PM bağımsız koştu) · `web` vue-tsc hâlâ bilinen 6 hata ·
+      yeni i18n anahtarlarında kaçırılmamış `@` yok (sayfa boşaltan tuzak)
+
+### DoD (cihazda — SAHİPTE, dev build + Metro hazır)
+- [ ] Giriş ve kayıt: göz ikonu şifreyi gösterip gizliyor, alanlar birbirinden bağımsız
+- [ ] Sesli görüşmedeyken DM gelince **banner düşüyor**, ses çalmıyor
+- [ ] O DM'in sohbet ekranındayken banner **çıkmıyor**
+- [ ] Aramada sohbet düğmesinde kırmızı nokta beliriyor, sohbete girince sönüyor
+- [ ] Rail'de **seçili olmayan** ortama uzun bas → menü açılıyor, **kanal paneli değişmiyor**
+- [ ] Menüden bir eylem (ör. Davet Et) doğru ortama gidiyor
+- [ ] Yönettiğin ama hiç açmadığın ortama uzun bas → Ayarlar/Davet görünüyor (ADMIN'de kısa gecikme)
+- [ ] Kısa basış ve sidebar başlığına dokunma eskisi gibi
+- [ ] Bildirim ikonu: temiz kurulumdan sonra koyu temada marka ikonu geliyor mu
+
+---
+
 ### Tasarım kararları (sahip onayladı 2026-08-10 akşamı)
 - Rozet **NOKTA** olacak, sayı değil. Arama ekranı zaten kalabalık; orada gereken bilgi "yeni bir
   şey var", kaç tane olduğu değil. Sayıyı merak eden zaten sohbete giriyor.
