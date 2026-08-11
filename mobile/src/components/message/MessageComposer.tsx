@@ -347,6 +347,11 @@ const styles = StyleSheet.create({
     height: theme.layout.inputMinHeight,
     alignItems: 'center',
     justifyContent: 'center',
+    // 44dp yuva, 24px ikonu ortaladığı için solda 10px boşluk bırakıyor; `inputBar`ın 16px
+    // dolgusuyla toplanınca ikon kenardan 26px içeride duruyor ve yazı alanını gereksiz
+    // daraltıyordu (sahip geri bildirimi 2026-08-11). Negatif pay yalnız GÖRSEL konumu sola
+    // çekiyor, dokunma hedefi 44dp kalıyor.
+    marginLeft: -8,
   },
   /** Gönderim sürerken: yuva duruyor ama düğme basılamaz olduğu belli oluyor. */
   iconButtonBusy: {
