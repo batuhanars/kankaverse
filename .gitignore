@@ -51,3 +51,6 @@ Thumbs.db
 design-refs/
 # Claude Code agent worktrees / yerel oturum dosyaları
 .claude/
+
+# Yerel arşivler (dosya gönderme testinde üretilenler dahil) — kaynak değil, depoya girmez
+*.zip
