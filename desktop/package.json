@@ -1,6 +1,6 @@
 {
   "name": "kankaverse-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Kankaverse masaüstü istemcisi",
   "main": "src/main.js",
   "scripts": {
@@ -32,12 +32,16 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
+      "shortcutName": "Kankaverse",
       "artifactName": "kankaverse-setup.${ext}"
     },
     "mac": {
       "target": "dmg",
       "icon": "build/icon.png",
       "category": "public.app-category.social-networking"
+    },
+    "dmg": {
+      "title": "Kankaverse"
     },
     "linux": {
       "target": "AppImage",
