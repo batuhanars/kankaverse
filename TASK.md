@@ -4105,6 +4105,39 @@ görülürse istenecek kanıt: Network sekmesinde `Location` başlığı + aynı
 
 ---
 
+---
+
+## Sürüm paketi v6 — cihazda canlıya karşı doğrulandı (2026-08-11)
+
+> `versionCode 6`, yerel `bundleRelease` + `assembleRelease`. Sahip release APK'sını kendi
+> cihazına kurup CANLI sunucuya karşı denedi (release-yapilandirmasi-sinanmali dersi uygulandı).
+
+- [x] Paket doğrulaması (PM, derleme sonrası): gömülü adres `https://kankaverse.com/api`,
+      **LAN adresi sıfır kez** geçiyor, `versionCode=6`
+- [x] Bugünkü işlerin pakette olduğu anahtar bazında doğrulandı (`showPassword`, `hidePassword`,
+      `updateAfterCall`, `chunkLoadFailed`)
+- [x] **Sahip: yapılan tüm değişiklikler APK'da sorunsuz çalışıyor**
+
+### 🔬 Bugünün üç yanlış alarmı — üçü de aynı kökten
+Kod suçsuzdu, ortam doğrulanmamıştı. Bir sonraki sürüm turunda ÖNCE bunlara bak:
+1. **Dünkü APK kuruldu** (dosya tarihi kontrol edilmemişti) → "değişiklikler yok" sanıldı.
+   `gradlew clean` bu projede ZARARLI (RN kütüphanelerinin üretilmiş native kodunu siliyor,
+   derleme patlıyor); eski çıktı şüphesi varsa `clean` değil **dosya tarihine** bak.
+2. **Bildirim izni verilmemişti** (`POST_NOTIFICATIONS granted=false`) — tam kaldırma sonrası
+   Android izni sıfırlıyor. Belirti aldatıcı: telefon TİTRİYOR ama bildirim yok, çünkü titreşim
+   uygulamanın kendi zili, bildirim ayrı katman. İzin akışının kendisi sağlam (veri silinip
+   yeniden girilince diyalog çıktı, testçilerde çalışacak).
+3. **PM yanlış desenle aradı**: paket i18n metinlerini kaçışlı sakladığı için düz Türkçe arama
+   "yok" sonucu verdi. Anahtar adıyla aranmalı.
+
+### Açık kalan metin kararı (sahip cevaplamadı)
+- [ ] Mobilde arama reddedilince `mobile.call.unreachable` "Şu anda ulaşılamıyor." diyor. PM görüşü:
+      reddedildi bilgisi GÖSTERİLMEMELİ (reddeden kişiyi ifşa eder, rahatsız edici kullanıcıya
+      "oradaydı, gördü, istemedi" sinyali verir — T&S ilkesi "mağdura çıkış yolu"). Ama mevcut metin
+      yanlış yönlendirici: teknik arıza/çevrimdışı ima ediyor. Öneri: **"Cevap alınamadı."** — hem
+      reddi hem cevapsızlığı hem gerçek bağlantı sorununu dürüstçe kapsar, kimseyi ifşa etmez.
+      Tek i18n anahtarı, ama yeniden derleme gerektirir (~7 dk).
+
 ### Tasarım kararları (sahip onayladı 2026-08-10 akşamı)
 - Rozet **NOKTA** olacak, sayı değil. Arama ekranı zaten kalabalık; orada gereken bilgi "yeni bir
   şey var", kaç tane olduğu değil. Sayıyı merak eden zaten sohbete giriyor.
