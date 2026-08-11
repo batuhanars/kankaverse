@@ -3920,6 +3920,34 @@ görülürse istenecek kanıt: Network sekmesinde `Location` başlığı + aynı
 
 ---
 
+---
+
+## Klavye payı — 3 tuşlu gezinme kusuru (D65) — 2026-08-11 ✅ CİHAZDA DOĞRULANDI
+
+> Tier yalnız `mobile/`. Testçi bildirimi: mesaj kutusunun bir kısmı klavyenin arkasında kalıyor.
+> Sahip cihazında sorun yoktu → "benim cihazımda çalışıyor" tuzağının bir örneği daha.
+
+- [x] 🔴 **Kök neden:** `keyboardPad`teki `+ panelGap` (sabit 16) bir tasarım boşluğu değil,
+      **gezinme çubuğu payının yerine geçmiş tesadüftü**. Kaydırma kipinde `insets.bottom` da 16
+      olduğu için formül doğru görünüyordu; 3 tuşlu gezinmede pay ~47'ye çıkıyor, sabit tepki
+      vermiyor, kutu aradaki fark kadar (~31dp) örtülüyordu
+- [x] Düzeltme tek satır: `kbGeom.h + theme.layout.panelGap` → `kbGeom.h + insets.bottom`
+- [x] Sahip kendi cihazında **gezinme kipini değiştirerek yeniden üretti** — testçiye bağımlı
+      olmayan yerel bir üretim kuruldu (ölçüm düzeneği geçiciydi, kaldırıldı)
+- [x] 🔬 **Ölçüm bir hipotezi çürüttü:** PM'in ilk önerdiği geometri formülü iki kipte de klavye
+      yüksekliğiyle aynı sonucu veriyordu (286.9 / 254.9), yani kusuru hiç kapatmazdı. Kodda
+      yazılıydı, ölçülmeden gönderilseydi dördüncü başarısız deneme olacaktı
+- [x] `+` düğmesi 8dp sola çekildi (44dp dokunma hedefi korundu) — yazı alanı o kadar genişledi
+- [x] `typecheck` + `lint` temiz · `api/`, `web/` diffi sıfır
+
+### Cihaz doğrulaması (sahip, 2026-08-11) — her iki gezinme kipinde
+- [x] Kaydırma kipi: örtüşme **0** (pay 303, eskisiyle birebir aynı → regresyon yok)
+- [x] 3 tuşlu kip: örtüşme **0** (pay 302.3, eskiden 31 eksikti)
+- [ ] Testçinin Redmi Note 9 cihazında doğrulama — yeni sürüm paketi gerekiyor, mobil geri
+      bildirim sprintiyle birlikte tek pakete binecek
+
+---
+
 ### Tasarım kararları (sahip onayladı 2026-08-10 akşamı)
 - Rozet **NOKTA** olacak, sayı değil. Arama ekranı zaten kalabalık; orada gereken bilgi "yeni bir
   şey var", kaç tane olduğu değil. Sayıyı merak eden zaten sohbete giriyor.

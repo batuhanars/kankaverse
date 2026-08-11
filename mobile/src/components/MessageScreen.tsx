@@ -232,7 +232,31 @@ export function MessageScreen({
   // güvenli alan payını zaten dışlıyor ve klavye gezinme çubuğunun hemen üstünde oturuyor, ikisi
   // sadeleşiyor. `- insets.bottom` çıkarmak payı İKİ KEZ düşürür (Deneme 4'te bu da denendi, eksik
   // kaldı). Formül bilerek koordinat sistemi İÇERMİYOR — üç denemeyi de bozan şey oydu.
-  const keyboardPad = keyboardVisible ? kbGeom.h + theme.layout.panelGap : 0;
+  //
+  // 🔴 Deneme 5 — DÜZELTME (kapalı test, 2026-08-11). Yukarıdaki ölçüm tek bir gezinme kipinde
+  // alındığı için eksikti. Testçide kutunun bir kısmı klavyenin arkasında kalıyordu; sahip kendi
+  // cihazında **gezinme kipini değiştirerek** yeniden üretti: aynı telefon, aynı klavye, tek
+  // değişen kip. Kaydırma hareketlerinde kutu klavyenin üstünde, 3 tuşlu gezinmede arkasında.
+  //
+  // Kök neden: `+ panelGap` (16) hiçbir zaman bir tasarım boşluğu değildi, **gezinme çubuğu payının
+  // yerine geçmiş bir tesadüftü**. Kaydırma kipinde `insets.bottom` da 16; ikisi eşit olduğu için
+  // formül doğruymuş gibi göründü ve tek kipte alınan ölçüm de onayladı.
+  //
+  // ÖLÇÜLEN (aynı cihaz, tek değişen gezinme kipi — 2026-08-11):
+  //   kaydırma : insets.bottom 16   · klavye 287 · pencere 822.9 → gereken pay 303
+  //   3 tuşlu  : insets.bottom 47.3 · klavye 255 · pencere 791.6 → gereken pay 302.3
+  //   → 3 tuşlu kipte OS klavyeyi 32 birim DAHA KISA bildiriyor (çubuk o alanı yiyor) ama pencere
+  //     de aynı miktarda küçülüyor. Sabit 16 bu değişime tepki vermediği için pay 31 eksik
+  //     kalıyordu; kutu tam o kadar örtülüyordu.
+  //
+  // 🔬 Not: "gereken pay = (ekran − klavye tepesi) − insets.bottom" formülü de denendi ve ÖLÇÜM
+  // ONU ÇÜRÜTTÜ — iki kipte de `klavye yüksekliği` ile aynı sonucu veriyor (286.9 / 254.9), yani
+  // kusuru hiç kapatmazdı. Dördüncü başarısız denemeyi önleyen şey ölçüm oldu, akıl yürütme değil.
+  //
+  // Bu yüzden sabit yerine payın kendisi kullanılıyor. Kaydırma kipinde sonuç eskisiyle BİREBİR
+  // AYNI (16 = 16) — çalışan yapılandırmayı bozma riski yok — 3 tuşlu kipte eksik pay kapanıyor.
+  // Her iki kipte de kutunun altı klavyenin tepesine tam oturuyor (örtüşme 0, ölçüldü).
+  const keyboardPad = keyboardVisible ? kbGeom.h + insets.bottom : 0;
   const bottomInset = keyboardVisible ? 0 : insets.bottom;
 
   return (
