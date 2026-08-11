@@ -5,6 +5,16 @@ import http from './http';
 // `identifier` — api/src/modules/auth/dto/login.dto.ts:11). Contract §2.7 dipnotu bunu emrediyor:
 // "DTO alan adları mevcut LoginDto / Login2faDto'dan birebir okunur; dev tahmin etmez, dosyaya bakar."
 
+// Web `web/src/types/index.ts` `DmPolicy` ile birebir — yeni backend enum değil, `toUserDto`
+// (api/src/modules/auth/utils/user-dto.util.ts) bugüne kadar dönüyordu, mobil tiplememişti.
+export const DmPolicy = {
+  EVERYONE: 'EVERYONE',
+  FRIENDS: 'FRIENDS',
+  NONE: 'NONE',
+} as const;
+// eslint-disable-next-line @typescript-eslint/no-redeclare -- enum-like const+type deseni, bkz. api/channels.ts
+export type DmPolicy = (typeof DmPolicy)[keyof typeof DmPolicy];
+
 export interface UserDto {
   id: string;
   username: string;
@@ -22,6 +32,9 @@ export interface UserDto {
   // TOTP alanını göstermesi buna bakar**: 2FA kapalıyken kod alanı çizilmez (sunucu `totpCode`'u
   // opsiyonel kabul ediyor), açıkken zorunlu gibi sunulur.
   twoFactorEnabled: boolean;
+  // DM gizlilik ayarı ekranı (dm-privacy.tsx) — `toUserDto` bunu da zaten dönüyordu (web C5'ten
+  // beri kullanıyor), mobil tiplememişti. Sıfır backend değişikliği.
+  dmPolicy: DmPolicy;
 }
 
 /**

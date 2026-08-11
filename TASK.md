@@ -4138,6 +4138,44 @@ Kod suçsuzdu, ortam doğrulanmamıştı. Bir sonraki sürüm turunda ÖNCE bunl
       reddi hem cevapsızlığı hem gerçek bağlantı sorununu dürüstçe kapsar, kimseyi ifşa etmez.
       Tek i18n anahtarı, ama yeniden derleme gerektirir (~7 dk).
 
+---
+
+## Revize turu son eklemeler — 2026-08-11 (akşam)
+
+- [x] **Bildirim izni görünürlüğü.** `readExpoPushToken` izin reddedilip Android "bir daha sorma"
+      bayrağı düşünce sessizce `return null` yapıyor. Bu davranış BİLİNÇLİ ve korundu (ısrar yok).
+      Eksik olan görünürlüktü: sahip bugün İKİ KEZ "push bildirimler gitmiş" diye kod aradı, halbuki
+      izin kapalıydı. Bildirimler sekmesine, yalnız izin kapalıyken çıkan uyarı şeridi + sistem
+      ayarlarını açan düğme eklendi (odakta tazeleniyor, izin verilip dönülünce kendiliğinden kayboluyor)
+- [x] **Sistem bildirim ayarları kısayolu** (`me.tsx`) — şerit yalnız izin kapalıyken çıkıyor, bu satır
+      HER ZAMAN duruyor: kullanıcı izin açıkken de ses/titreşim ayarını değiştirmek isteyebilir
+      (sahip talimatı, Discord referansı)
+- [x] **DM gizlilik ayarı (`dmPolicy`) mobile geldi.** Webde vardı, API destekliyordu
+      (`PATCH /users/me`), i18n metinleri hazırdı; mobilde HİÇ yoktu, yani mobil kullanıcı "bana
+      kimler mesaj atabilir" ayarını değiştiremiyordu. Yeni uç/store/bağımlılık YOK.
+      🔬 Dev, `SelectSheet` yerine açıklamalı seçenek kartı deseni seçti: "Herkes" aslında doğrudan
+      sohbet açmıyor, mesaj isteğine düşürüyor — açıklamasız bir gizlilik ayarı yanlış anlaşılır
+- [x] **Arama reddedilince doğru metin.** Mobil reddi genel `unreachable` kovasına atıyordu
+      ("Şu anda ulaşılamıyor" — teknik arıza ima ediyor). 🔬 PM ilk önerisi "reddi hiç gösterme"ydi
+      ve YANLIŞTI: web bu ayrımı zaten yapmış, `call.rejected` düz reddi söylüyor, `call.unreachable`
+      ise engellenme/ilişki durumunu SIZDIRMAMAK için nötr kalıyor. Mobil web'in anahtarını kullanıyor.
+      Ayrıca `unreachable` dört yerde paylaşılıyordu; metni değiştirmek üç yeri bozardı
+
+### Discord ayar listesi karşılaştırması (sahip 2026-08-11) — sonuç
+Sahip Discord mobil ayarlarının ekran görüntülerini getirdi. PM envanteri: **bizde karşılığı olup
+mobilden ulaşılamayan TEK madde `dmPolicy`'ydi**, o da eklendi. Eklenmeyenler ve sebepleri:
+- **Genel bildirim ayarı:** bizde yok, tercihlerimiz ortam/kanal bazlı ve zaten ulaşılabilir. Üst
+  seviye ekran yeni özellik olurdu
+- **Ses · Görünüm · Erişilebilirlik · Dil · Web Tarayıcısı · Uygulama Simgesi · Gelişmiş:** hiçbirinin
+  arkasında bizde ayar yok → boş yüzey açılmaz (`mobile/CLAUDE.md` kuralı)
+
+### 🔴 Yeni bulgu — ekran paylaşımında görüntü takılıyor (İNCELENMEDİ)
+- [ ] Sahip bir arkadaşına ekran paylaştı: **ses net, görüntü hafif takılıyor**. Sesin temiz olması
+      ağ/bant genişliği sorununu tek başına elemez ama video yayın ayarlarını birinci şüpheli yapar
+      (çözünürlük, kare hızı, bit hızı, simulcast/adaptive stream). Ölçülmeden dokunulmayacak:
+      LiveKit yayın parametreleri + gerçek bir oturumda istatistik. Tek kullanıcı raporu, tek ölçüm
+      yok — bugünün dersi gereği ikinci bir gözlem ve gerçek ölçüm olmadan ayar değiştirilmeyecek
+
 ### Tasarım kararları (sahip onayladı 2026-08-10 akşamı)
 - Rozet **NOKTA** olacak, sayı değil. Arama ekranı zaten kalabalık; orada gereken bilgi "yeni bir
   şey var", kaç tane olduğu değil. Sayıyı merak eden zaten sohbete giriyor.
