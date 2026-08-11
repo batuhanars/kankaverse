@@ -36,6 +36,13 @@ const membershipMock = {
   requireNoDmBlock: jest.fn(),
 };
 
+// R20 — özel kanalda "yönetici mi" sorusu artık PermissionsService.guildPrivilegedUserIds'e
+// devredilir (eskiden guildMember.role IN ['OWNER','ADMIN'] sorgusuydu — enum-ADMIN kaldırıldı).
+const guildPrivilegedUserIdsMock = jest.fn();
+const permissionsMock = {
+  guildPrivilegedUserIds: guildPrivilegedUserIdsMock,
+};
+
 const emitToUserMock = jest.fn();
 const realtimeMock = {
   setServer: jest.fn(),
@@ -74,6 +81,7 @@ function makeGateway() {
     configMock as any,
     prismaMock as any,
     membershipMock as any,
+    permissionsMock as any,
     realtimeMock as any,
     presenceMock as any,
     dmPermissionMock as any,
@@ -105,6 +113,8 @@ function resetMocks() {
   // M5a §4 — varsayılan: blok yok, hedef odada değil (ring testleri override eder)
   prismaMock.userBlock.findFirst.mockResolvedValue(null);
   voiceGetLiveParticipationMock.mockResolvedValue({ present: false, streaming: false, video: false });
+  // R20 — varsayılan: tam yetkili (OWNER/ADMINISTRATOR) kimse yok; özel kanal testleri override eder.
+  guildPrivilegedUserIdsMock.mockResolvedValue(new Set());
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -826,11 +836,12 @@ describe('MessagesGateway.notifyMentions', () => {
       expect(notificationsCreateMock).toHaveBeenCalledTimes(1);
     });
 
-    it("T&S regresyon: özel kanalda everyone yalnız kanal üyeleri + owner/admin'e gider (sızıntı yok)", async () => {
+    it("T&S regresyon: özel kanalda everyone yalnız kanal üyeleri + tam yetkiliye gider (sızıntı yok)", async () => {
       prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID, isPrivate: true });
       prismaMock.user.findMany.mockResolvedValue([]);
       prismaMock.channelMember.findMany.mockResolvedValue([{ userId: EVERYONE_ONLY_ID }]);
-      prismaMock.guildMember.findMany.mockResolvedValue([{ userId: AUTHOR_ID }]); // OWNER/ADMIN sorgusu
+      // R20: tam yetkili (OWNER/ADMINISTRATOR) kümesi artık PermissionsService'ten gelir.
+      guildPrivilegedUserIdsMock.mockResolvedValue(new Set([AUTHOR_ID]));
 
       await gateway.notifyMentions(CHANNEL_ID, makeEveryoneDto());
 
@@ -940,7 +951,7 @@ describe('MessagesGateway.notifyMentions — rol bahsetmesi (R15)', () => {
     });
     // Kanal üyesi yalnız ROLE_MEMBER_1; ROLE_MEMBER_2 rolde ama kanalda değil
     prismaMock.channelMember.findMany.mockResolvedValue([{ userId: ROLE_MEMBER_1 }]);
-    prismaMock.guildMember.findMany.mockResolvedValue([]); // OWNER/ADMIN yok
+    guildPrivilegedUserIdsMock.mockResolvedValue(new Set()); // tam yetkili yok
     prismaMock.guildMemberRole.findMany.mockResolvedValue(
       roleMembers({ userId: ROLE_MEMBER_1 }, { userId: ROLE_MEMBER_2 }),
     );

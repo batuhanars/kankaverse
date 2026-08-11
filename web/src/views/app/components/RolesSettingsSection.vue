@@ -253,7 +253,7 @@ const canEdit = computed(() => props.isOwner || can('MANAGE_ROLES'))
 // Zaten role atanmış bir bayrağı (kaldırma için) toggle'lamak serbest; yeni eklemek izin ister.
 function canToggleFlag(flag: string): boolean {
   if (!canEdit.value) return false
-  if (hasAll.value) return true // owner / enum-admin / ADMINISTRATOR-sahibi → her izni verebilir
+  if (hasAll.value) return true // owner / ADMINISTRATOR-sahibi → her izni verebilir
   if (can(flag)) return true // aktör bu izne sahip → verebilir
   return selectedRole.value?.permissions.includes(flag) ?? false // yoksa yalnız mevcut bayrağı kaldırabilir
 }

@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { guildsApi, type GuildSummaryDto } from '@/api/guilds';
-import { useAuthStore } from '@/stores/auth';
 import type { ChannelSummaryDto } from '@/api/channels';
 import type { DmChannelDto } from '@/api/dm';
 import { DmMenuHost } from '@/components/home/DmMenuHost';
@@ -20,6 +19,7 @@ import type { CategoryDto } from '@/api/categories';
 import { channelsApi, ChannelType } from '@/api/channels';
 import { useUnreadStore } from '@/stores/unread';
 import { useVoiceStore } from '@/stores/voice';
+import { useGuildPermission } from '@/hooks/useGuildPermission';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -30,7 +30,6 @@ import { theme } from '@/theme';
 export default function HomeScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ joinedGuildId?: string; refreshGuilds?: string }>();
-  const myUserId = useAuthStore((s) => s.user?.id ?? null);
   const [selection, setSelection] = useState<RailSelection>({ type: 'dm' });
 
   const [lastOpenedChannelId, setLastOpenedChannelId] = useState<string>();
@@ -53,12 +52,6 @@ export default function HomeScreen() {
   // dokunmak DM detay ekranını açar — M3b §2.1). Panelin İÇ akışı `DmMenuHost`ta — bu ekran yalnız
   // "hangi DM" bilgisini tutar.
   const [menuDm, setMenuDm] = useState<DmChannelDto | null>(null);
-
-  // Sprint M1d §6 — seçili ortamdaki kendi rolüm. Sunucuda "benim rolüm" diye ayrı bir uç YOK;
-  // web de (stores/channels.ts) üye listesini çekip kendini buluyor, mobil aynı yolu izler.
-  // **Yeni bir guild store AÇILMADI** (sözleşme §6): bu kayıt yalnız bu ekranın ihtiyacı, tek
-  // tüketicisi var. İkinci bir ekran rol bilmek zorunda kalırsa acı gerçektir → dur, PM'e sor.
-  const [myRoleByGuild, setMyRoleByGuild] = useState<Record<string, string>>({});
 
   // Sprint M4c §3 — ses kanalına katılma sürüyorken ikinci dokunuşu yutar (`dm/[id].tsx`
   // `callBusy` ile aynı desen).
@@ -105,36 +98,6 @@ export default function HomeScreen() {
     router.setParams({ joinedGuildId: undefined, refreshGuilds: undefined });
   }, [params.joinedGuildId, params.refreshGuilds, fetchGuilds, router]);
 
-  // Seçili ortamın (VE §4 ile birlikte: uzun basılıp menüsü açılan ortamın) rolünü çek — yalnız
-  // bir kez ortam başına, `myRoleByGuild[id]` zaten doluysa tekrar istek atılmaz. Hata SESSİZ: rol
-  // öğrenilemezse "Davet Et"/"Ayarlar" görünmez — yetkisiz kullanıcıya düğme göstermektense
-  // yetkiliye göstermemek daha az zararlı (fail-closed).
-  //
-  // 🔴 §4 genellemesi (PM revizesi) — menü artık `selection`dan bağımsız (`menuGuildId`), yani
-  // ziyaret edilmemiş bir ortama uzun basılabilir. Rol isteği eskiden yalnız `selection.id` için
-  // atılıyordu; menü ortamı da eklenmezse ADMIN olan ama o ortamı hiç açmamış bir kullanıcı,
-  // kendi yönettiği ortamda Ayarlar/Davet/Kanal Oluştur'u GÖRMEZ (`canManage` sessizce false döner).
-  // Sahiplik dalı (`guild.ownerId === myUserId`) zaten ağ isteği gerektirmiyor — burada kısa bir
-  // gecikme yalnız ADMIN rolünde olur, kabul edilebilir (fail-closed zaten böyle çalışıyor).
-  useEffect(() => {
-    if (!myUserId) return;
-    const selectedGuildId = selection.type === 'guild' ? selection.id : null;
-    const idsToFetch = [...new Set([selectedGuildId, menuGuildId].filter((id): id is string => !!id))].filter(
-      (id) => !myRoleByGuild[id],
-    );
-    idsToFetch.forEach((guildId) => {
-      guildsApi
-        .getMembers(guildId)
-        .then((members) => {
-          const me = members.find((m) => m.userId === myUserId);
-          if (me) setMyRoleByGuild((prev) => ({ ...prev, [guildId]: me.role }));
-        })
-        .catch(() => {
-          // sessiz
-        });
-    });
-  }, [selection, menuGuildId, myUserId, myRoleByGuild]);
-
   function retryGuilds() {
     setGuildState('loading');
     fetchGuilds();
@@ -150,18 +113,26 @@ export default function HomeScreen() {
     return guilds.find((g) => g.id === selection.id) ?? null;
   }, [guilds, selection]);
   const selectedGuildName = selectedGuild?.name ?? '';
+  const selectedGuildId = selection.type === 'guild' ? selection.id : null;
 
-  // Davet üretme yetkisi (sözleşme §2.4): OWNER veya ADMIN. OWNER `ownerId`'den anında bilinir,
-  // ADMIN için üye listesinden çözülen rol gerekir. Yetkisize düğme **hiç render edilmez**
+  // Davet üretme + ortam yönetimi yetkisi (sözleşme §2.4). Yetkisize düğme **hiç render edilmez**
   // (disabled gösterilmez — M1b grup yönetimi deseni). Sunucu da aynı kapıyı tutuyor (403);
   // buradaki kontrol yalnız UX.
-  const canManage = useMemo(() => {
-    if (selection.type !== 'guild') return false;
-    const guild = guilds.find((g) => g.id === selection.id);
-    if (guild && myUserId && guild.ownerId === myUserId) return true;
-    const role = myRoleByGuild[selection.id];
-    return role === 'OWNER' || role === 'ADMIN';
-  }, [guilds, selection, myUserId, myRoleByGuild]);
+  //
+  // 🔴 Sprint R20 (§0.1) — eskiden `myRoleByGuild` enum'una (`role === 'OWNER' || role === 'ADMIN'`)
+  // bakıyordu; enum-ADMIN katmanı kaldırıldığı için bu kısa devre `useGuildPermission`e devredildi
+  // (sahiplik + `ADMINISTRATOR` bayrağı — hook'un kendi hesabı, bkz. `hooks/useGuildPermission.ts`).
+  // `permission` olarak BİLİNÇLİ `'ADMINISTRATOR'` verildi: hook zaten `granted.has('ADMINISTRATOR')`u
+  // ayrıca kontrol ediyor, yani bu çağrı saf hâliyle "sahiplik VEYA ADMINISTRATOR bayrağı" anlamına
+  // gelir — eski OWNER/ADMIN ikilisinin BİREBİR karşılığı. Menüdeki tek tek eylemler (davet/kanal
+  // oluştur/kategori oluştur/bildirim) MANAGE_GUILD/MANAGE_CHANNELS/CREATE_INVITE gibi farklı
+  // granüler bayraklara ayrılabilirdi ama `canManage` tek bir bayrak olarak tüketiliyor (aynı sheet
+  // içinde birden çok eylemi gösterip gizliyor) — daha ince taneli bir ayrım bu ekranın mevcut
+  // tasarımını değiştirir, sözleşme bunu istemiyor.
+  //
+  // ⚠️ İki ayrı ortam için İKİ hook çağrısı (seçili + uzun basılan menü) — sözleşmenin izin verdiği
+  // kadar; üçüncü bir çağrı YOK.
+  const canManage = useGuildPermission(selectedGuildId, 'ADMINISTRATOR');
 
   // §4 (M5c, PM revizesi) — uzun basılan ortamın kendi verisi, `selection`dan bağımsız (rail'de
   // seçili OLMAYAN bir ortama uzun basılabilir). `selectedGuild`/`canManage` ile aynı hesap,
@@ -171,12 +142,7 @@ export default function HomeScreen() {
     [guilds, menuGuildId],
   );
   const menuGuildName = menuGuild?.name ?? '';
-  const menuGuildCanManage = useMemo(() => {
-    if (!menuGuildId) return false;
-    if (menuGuild && myUserId && menuGuild.ownerId === myUserId) return true;
-    const role = myRoleByGuild[menuGuildId];
-    return role === 'OWNER' || role === 'ADMIN';
-  }, [menuGuild, menuGuildId, myUserId, myRoleByGuild]);
+  const menuGuildCanManage = useGuildPermission(menuGuildId, 'ADMINISTRATOR');
 
   /**
    * Sprint M2a §4.5 — dolaşma deseni web `useGuildMenuActions.ts` `markGuildRead`'in birebir aynısı:
@@ -198,8 +164,8 @@ export default function HomeScreen() {
   }
 
   /** Ortam paneli §4.5 — "Okundu İşaretle" (web menüsünün 1. maddesi). Taze liste çekilir: bu
-   *  ekranın kendi state'i yok merkezi bir kanal store'u (M1d bilinçli kararı, bkz. `myRoleByGuild`
-   *  yorumu), tek tüketicili bir bulk-aksiyon için store lift etmek erken soyutlama olurdu. */
+   *  ekranın kendi state'i yok merkezi bir kanal store'u (M1d bilinçli kararı), tek tüketicili
+   *  bir bulk-aksiyon için store lift etmek erken soyutlama olurdu. */
   async function markGuildRead(guildId: string) {
     try {
       const list = await channelsApi.listByGuild(guildId);

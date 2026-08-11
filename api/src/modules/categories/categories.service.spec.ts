@@ -57,7 +57,9 @@ const USER_ID = 'user-1';
 const CATEGORY_ID = 'cat-1';
 
 const OWNER_MEMBERSHIP = { guildId: GUILD_ID, userId: USER_ID, role: 'OWNER' };
-const ADMIN_MEMBERSHIP = { guildId: GUILD_ID, userId: 'admin-1', role: 'ADMIN' };
+// R20: enum-ADMIN kaldırıldı. Bu fixture "izinli MEMBER" temsil eder — eskiden enum
+// role='ADMIN' idi, artık izin doğrudan permissionsMock.hasGuildPermission'dan gelir.
+const GRANTED_MEMBER_MEMBERSHIP = { guildId: GUILD_ID, userId: 'admin-1', role: 'MEMBER' };
 const MEMBER_MEMBERSHIP = { guildId: GUILD_ID, userId: 'member-1', role: 'MEMBER' };
 const GUILD = { id: GUILD_ID, deletedAt: null };
 
@@ -117,10 +119,10 @@ describe('CategoriesService.create', () => {
     expect(result).toMatchObject({ id: CATEGORY_ID, guildId: GUILD_ID, name: 'Yeni', position: 3 });
   });
 
-  it('ADMIN → kategori oluşturur', async () => {
+  it('izinli MEMBER (MANAGE_CHANNELS) → kategori oluşturur', async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD,
-      membership: ADMIN_MEMBERSHIP,
+      membership: GRANTED_MEMBER_MEMBERSHIP,
     });
     prismaMock.channelCategory.aggregate.mockResolvedValue({ _max: { position: null } });
     const created = makeCategory({ name: 'Admin Kategori', position: 0 });
@@ -343,11 +345,11 @@ describe('CategoriesService.remove', () => {
     expect(result).toBeNull();
   });
 
-  it('ADMIN → silme yetkisi var', async () => {
+  it('izinli MEMBER (MANAGE_CHANNELS) → silme yetkisi var', async () => {
     prismaMock.channelCategory.findUnique.mockResolvedValue(makeCategory());
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD,
-      membership: ADMIN_MEMBERSHIP,
+      membership: GRANTED_MEMBER_MEMBERSHIP,
     });
     prismaMock.$transaction.mockResolvedValue([]);
 

@@ -61,6 +61,8 @@ const permissionsMock = {
   hasGuildPermission: jest.fn().mockResolvedValue(true),
   requireMemberHierarchy: jest.fn().mockResolvedValue(undefined),
   requireRoleHierarchy: jest.fn().mockResolvedValue(undefined),
+  // R20 — enum-ADMIN kısa devresi kalktı; "tam yetkili mi" (OWNER/ADMINISTRATOR) artık bu tek kaynak.
+  hasFullAccess: jest.fn().mockResolvedValue(false),
 };
 
 const automodMock = {
@@ -99,6 +101,7 @@ function resetMocks() {
   permissionsMock.hasGuildPermission.mockResolvedValue(true);
   permissionsMock.requireMemberHierarchy.mockResolvedValue(undefined);
   permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
+  permissionsMock.hasFullAccess.mockResolvedValue(false);
   // Varsayılan: automod geçirir
   automodMock.check.mockReturnValue({ blocked: false });
   // Sprint 4B: BAN/MUTE yok (varsayılan — enforcement geçirir)
@@ -599,10 +602,6 @@ describe('MessagesService.create — yavaş mod', () => {
     reactions: [],
   };
 
-  const MEMBER_ROLE = { role: 'MEMBER' };
-  const OWNER_ROLE = { role: 'OWNER' };
-  const ADMIN_ROLE = { role: 'ADMIN' };
-
   beforeEach(() => {
     resetMocks();
     service = makeService();
@@ -627,7 +626,7 @@ describe('MessagesService.create — yavaş mod', () => {
   // ─────────────────────────────────────────────────────────────────────────
   it('slowMode açık + son mesaj yeni (5 sn önce, limit 10 sn) → 429 SLOW_MODE + retryAfter', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(SLOW_GUILD_CHANNEL); // slowModeSeconds: 10
-    prismaMock.guildMember.findUnique.mockResolvedValue(MEMBER_ROLE);
+    permissionsMock.hasFullAccess.mockResolvedValue(false); // MEMBER, tam yetkili değil
     // Son mesaj 5 saniye önce gönderilmiş → 5 saniye daha beklenmeli
     const recentDate = new Date(Date.now() - 5000);
     prismaMock.message.findFirst.mockResolvedValue({ createdAt: recentDate });
@@ -652,7 +651,7 @@ describe('MessagesService.create — yavaş mod', () => {
   // ─────────────────────────────────────────────────────────────────────────
   it('slowMode açık + son mesaj eski (20 sn önce, limit 10 sn) → geçer, mesaj oluşturulur', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(SLOW_GUILD_CHANNEL);
-    prismaMock.guildMember.findUnique.mockResolvedValue(MEMBER_ROLE);
+    permissionsMock.hasFullAccess.mockResolvedValue(false); // MEMBER, tam yetkili değil
     // Son mesaj 20 saniye önce → limit 10 sn → geçer
     const oldDate = new Date(Date.now() - 20000);
     prismaMock.message.findFirst.mockResolvedValue({ createdAt: oldDate });
@@ -668,7 +667,7 @@ describe('MessagesService.create — yavaş mod', () => {
   // ─────────────────────────────────────────────────────────────────────────
   it('slowMode açık + kullanıcının bu kanalda hiç mesajı yok → geçer', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(SLOW_GUILD_CHANNEL);
-    prismaMock.guildMember.findUnique.mockResolvedValue(MEMBER_ROLE);
+    permissionsMock.hasFullAccess.mockResolvedValue(false); // MEMBER, tam yetkili değil
     prismaMock.message.findFirst.mockResolvedValue(null); // hiç mesaj yok
     prismaMock.message.create.mockResolvedValue(CREATED_MSG);
 
@@ -682,7 +681,7 @@ describe('MessagesService.create — yavaş mod', () => {
   // ─────────────────────────────────────────────────────────────────────────
   it('slowMode açık + OWNER → yavaş mod bypass edilir, mesaj oluşturulur', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(SLOW_GUILD_CHANNEL);
-    prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_ROLE);
+    permissionsMock.hasFullAccess.mockResolvedValue(true);
     prismaMock.message.create.mockResolvedValue(CREATED_MSG);
 
     await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
@@ -692,11 +691,13 @@ describe('MessagesService.create — yavaş mod', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // slowMode açık + ADMIN → muaf
+  // R20 §0.1 regresyon kalkanı: enum GuildRole'ü MEMBER olan ama rolüne ADMINISTRATOR
+  // bayrağı atanmış bir üye de yavaş moddan muaf olmalı — "ADMIN mi" değil "tam yetkili mi"
+  // sorusu artık PermissionsService.hasFullAccess'ten (OWNER veya ADMINISTRATOR) gelir.
   // ─────────────────────────────────────────────────────────────────────────
-  it('slowMode açık + ADMIN → yavaş mod bypass edilir, mesaj oluşturulur', async () => {
+  it('slowMode açık + ADMINISTRATOR bayraklı role sahip MEMBER → yavaş mod bypass edilir', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(SLOW_GUILD_CHANNEL);
-    prismaMock.guildMember.findUnique.mockResolvedValue(ADMIN_ROLE);
+    permissionsMock.hasFullAccess.mockResolvedValue(true);
     prismaMock.message.create.mockResolvedValue(CREATED_MSG);
 
     await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
@@ -1865,7 +1866,7 @@ describe('MessagesService — resolveMentions (§3 + §4 T&S)', () => {
 // ── MessagesService.pinMessage / unpinMessage / findPins ─────────────────────
 
 const PIN_MSG_ID = 'msg-pin-1';
-const ADMIN_MEMBER = { role: 'ADMIN' };
+const ADMIN_MEMBER = { role: 'MEMBER' }; // R20: enum-ADMIN kaldırıldı; bu mock pin/unpin kodunda hiç okunmuyor (MANAGE_MESSAGES izni permissionsMock'tan gelir)
 const OWNER_MEMBER = { role: 'OWNER' };
 const REGULAR_MEMBER = { role: 'MEMBER' };
 

@@ -5,11 +5,14 @@ import { PermissionFlag, filterKnownPermissions } from '../../common/permissions
 /**
  * Guild izin çözümü — tek yetki kaynağı (Faz 3, R7-AĞIR).
  *
+ * R20 (Sprint R20, 2026-08-11): enum `ADMIN` katmanı KALDIRILDI — bir kullanıcıyı tam yetkili
+ * yapmanın tek yolu artık rol sistemi (`ADMINISTRATOR` bayraklı rol atamak). `GuildRole` enum'u
+ * yalnız `OWNER | MEMBER` içerir; "yönetici mi" sorusu yerine "şu izne sahip mi" sorulur.
+ *
  * hasGuildPermission(userId, guildId, flag) adımları:
  *  1. Üye değil → false (fail-closed).
  *  2. guild.ownerId === userId VEYA membership.role === 'OWNER' → true.
- *  3. membership.role === 'ADMIN' (enum geçiş-uyum) → true.
- *  4. Efektif izinler = @everyone izinleri ∪ üyenin atanmış rollerinin izinleri.
+ *  3. Efektif izinler = @everyone izinleri ∪ üyenin atanmış rollerinin izinleri.
  *     ADMINISTRATOR bayrağı efektif kümede → true. Aksi hâlde flag ∈ efektif.
  *
  * Hiyerarşi yardımcıları (§70-74):
@@ -26,7 +29,7 @@ export class PermissionsService {
 
   /**
    * Aktörün efektif izin kümesi + tam-yetki bayrağı.
-   *  - `all: true` → OWNER / enum-ADMIN (geçiş-uyum) / ADMINISTRATOR bayrağı: her izne sahip.
+   *  - `all: true` → OWNER / ADMINISTRATOR bayrağı: her izne sahip.
    *  - `all: false` → `flags` = @everyone ∪ atanmış rollerin bilinen bayrakları.
    * Fail-closed: guild/membership yok → `{ all: false, flags: boş }`.
    * `hasGuildPermission` ve "veremezsin" guard'ı (F1) bu tek kaynaktan türetilir (DRY).
@@ -52,8 +55,8 @@ export class PermissionsService {
     });
     if (!membership) return empty;
 
-    // OWNER (ownerId veya enum) + enum-ADMIN (geçiş-uyum) → tam yetki
-    if (guild.ownerId === userId || membership.role === 'OWNER' || membership.role === 'ADMIN') {
+    // OWNER (ownerId veya enum) → tam yetki
+    if (guild.ownerId === userId || membership.role === 'OWNER') {
       return { all: true, flags: new Set<PermissionFlag>() };
     }
 
@@ -88,15 +91,69 @@ export class PermissionsService {
     return all || flags.has(flag);
   }
 
+  /**
+   * R20 — tek-kullanıcı "tam yetkili mi" sorusu (OWNER veya ADMINISTRATOR bayraklı rol).
+   * Kaldırılan enum-ADMIN kısa devresinin yerini alan tek doğruluk kaynağı: eskiden
+   * `membership.role === 'OWNER' || membership.role === 'ADMIN'` diye sorulan her yerde bunun
+   * yerine bu metot çağrılır (slow-mode muafiyeti, özel kanal erişimi, üye listesi/arama
+   * görünürlüğü gibi "yönetici mi" sorularının hepsi aynı kurala bağlanır — kopya mantık yok).
+   */
+  async hasFullAccess(userId: string, guildId: string): Promise<boolean> {
+    return (await this.effectivePermissions(userId, guildId)).all;
+  }
+
+  /**
+   * R20 — TOPLU "tam yetkili mi" sorusu: guild'in TÜM üyeleri için tek sorgu setiyle hesaplar.
+   * `hasFullAccess`'i üye sayısı kadar çağırmak (N+1) yerine broadcast/görünürlük hesaplarında
+   * (özel kanal locked yayını, @everyone/rol bahsetmesi alıcı kümesi) bu kullanılır.
+   * Aynı kural: guild.ownerId === userId VEYA role === 'OWNER' VEYA ADMINISTRATOR ∈
+   * (@everyone izinleri ∪ atanmış rollerin izinleri) — `effectivePermissions` ile birebir.
+   */
+  async guildPrivilegedUserIds(guildId: string): Promise<Set<string>> {
+    const guild = await this.prisma.guild.findUnique({
+      where: { id: guildId, deletedAt: null },
+      select: { ownerId: true },
+    });
+    if (!guild) return new Set();
+
+    const everyoneRole = await this.prisma.role.findFirst({
+      where: { guildId, isEveryone: true },
+      select: { permissions: true },
+    });
+    const everyoneHasAdministrator = (everyoneRole?.permissions ?? []).includes('ADMINISTRATOR');
+
+    const members = await this.prisma.guildMember.findMany({
+      where: { guildId },
+      select: {
+        userId: true,
+        role: true,
+        roleLinks: { select: { role: { select: { permissions: true } } } },
+      },
+    });
+
+    const privileged = new Set<string>();
+    for (const m of members) {
+      if (m.userId === guild.ownerId || m.role === 'OWNER' || everyoneHasAdministrator) {
+        privileged.add(m.userId);
+        continue;
+      }
+      const hasAdministrator = m.roleLinks.some((rl) =>
+        rl.role.permissions.includes('ADMINISTRATOR'),
+      );
+      if (hasAdministrator) privileged.add(m.userId);
+    }
+    return privileged;
+  }
+
   // ─── Hiyerarşi yardımcıları ─────────────────────────────────────────────────
 
   /**
    * Üyenin hiyerarşi sıralamasındaki konumu.
    *  - OWNER → Infinity (hiyerarşi kontrolünden tamamen muaf).
-   *  - enum-ADMIN → Number.MAX_SAFE_INTEGER (geçiş-uyum, §70): tüm MEMBER+rollerin üstünde
-   *    ama OWNER'ın altında; ADMIN-vs-ADMIN beraberliği (>=) "yönetici yöneticiyi yönetemez"
-   *    eski davranışını korur.
-   *  - MEMBER → atanmış rollerin max position (yoksa 0 = @everyone seviyesi).
+   *  - MEMBER → atanmış rollerin max position (yoksa 0 = @everyone seviyesi). R20 sonrası
+   *    ADMINISTRATOR bayraklı bir rol de bu yoldan geçer: rolün `position`'ı hiyerarşiyi belirler,
+   *    bayrak hiyerarşiyi DELMEZ (yalnız izin kontrolünü geçer — requireRoleHierarchy/
+   *    requireMemberHierarchy hâlâ rol sıralamasına bakar).
    *  - Üye değil → -1 (hiyerarşi dışı).
    */
   async actorHighestPosition(userId: string, guildId: string): Promise<number> {
@@ -113,8 +170,6 @@ export class PermissionsService {
     if (!membership) return -1; // üye değil — hiyerarşi dışı
 
     if (membership.role === 'OWNER') return Infinity;
-
-    if (membership.role === 'ADMIN') return Number.MAX_SAFE_INTEGER; // enum geçiş-uyum muaf
 
     if (membership.roleLinks.length === 0) return 0;
 

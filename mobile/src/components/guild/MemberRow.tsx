@@ -10,8 +10,11 @@ import { theme } from '@/theme';
  * Rozetler `GuildMemberDto.roles` içinde HAZIR geliyor (ad + hex renk); rozet çizmek için ayrıca
  * `GET /guilds/:id/roles` çağrılmıyor.
  *
- * Ortam rolü (OWNER/ADMIN) ayrı bir rozet olarak gösterilir: özel rollerden farklı bir kavram
- * (hiyerarşi), rol listesine karıştırılmaz.
+ * Ortam rolü (OWNER) ayrı bir rozet olarak gösterilir: özel rollerden farklı bir kavram (hiyerarşi),
+ * rol listesine karıştırılmaz.
+ * 🔴 Sprint R20 — enum-ADMIN kaldırıldı; rozet artık YALNIZ OWNER için (`member.role.ADMIN` i18n
+ * anahtarı web tarafından silindi, web `GuildMemberRow.vue` de aynı şekilde yalnız OWNER'ı gösteriyor
+ * — iki istemci tutarlı). Yerine yeni bir rozet uydurulmadı.
  */
 interface Props {
   member: GuildMemberDto;
@@ -42,10 +45,13 @@ export function MemberRow({ member, onPress }: Props) {
         </Text>
 
         <View style={styles.badges}>
-          {member.role !== 'MEMBER' && (
+          {/* `member.role.OWNER` web'de zaten var. Eskiden `member.role.${member.role}` şablonu
+              ADMIN'i de kapsıyordu; enum-ADMIN kalktığı için (ve i18n anahtarı web'den silindiği
+              için) koşul BİLİNÇLİ olarak OWNER'a daraltıldı — aksi halde artık var olmayan bir
+              anahtara bakılırdı. */}
+          {member.role === 'OWNER' && (
             <View style={[styles.badge, styles.roleBadge]}>
-              {/* `member.role.OWNER` / `.ADMIN` web'de zaten var — yeni anahtar açılmadı. */}
-              <Text style={styles.roleBadgeText}>{t(`member.role.${member.role}`)}</Text>
+              <Text style={styles.roleBadgeText}>{t('member.role.OWNER')}</Text>
             </View>
           )}
           {shown.map((r) => (

@@ -94,7 +94,7 @@ const showReportGuild = ref(false)
 // Efektif izin (UX gating) — backend otorite kalır.
 const { can, canOpenSettings } = useGuildPermissions(() => guildsStore.activeGuildId ?? '')
 
-// Kategori + kanal yönetimi → MANAGE_CHANNELS (owner / enum-admin / ADMINISTRATOR dahil).
+// Kategori + kanal yönetimi → MANAGE_CHANNELS (owner / ADMINISTRATOR dahil; R20 enum-ADMIN kalktı).
 // İsim "isAdmin" geriye-uyum için korunur; tüm kanal-yönetimi ref'leri buradan beslenir.
 const isAdmin = computed(() => can('MANAGE_CHANNELS'))
 
@@ -217,7 +217,7 @@ watch(mentionChannels, (list) => {
 })
 
 // Efektif izin çözümü için roller + üyeler yüklü olmalı (granular yetki UI gating).
-// OWNER/enum-ADMIN yolu bunlar olmadan da çalışır; granular roller için gerekir.
+// Yalnız OWNER yolu bunlar olmadan da çalışır; granular roller + ADMINISTRATOR için gerekir.
 watch(
   activeGuildId,
   (id) => {
@@ -280,7 +280,7 @@ function voiceCount(channelId: string): number {
   return voiceStore.participantsFor(channelId).length
 }
 
-// ── Drag-reorder (native HTML5 DnD; yalnız OWNER/ADMIN) ──
+// ── Drag-reorder (native HTML5 DnD; yalnız MANAGE_CHANNELS sahibi) ──
 const dragChannelId = ref<string | null>(null)
 const dragCategoryId = ref<string | null>(null)
 const dragOverChannelId = ref<string | null>(null)
@@ -512,7 +512,7 @@ async function fetchGuildMembersForPicker() {
   }
 }
 
-// Guild üyeleri arasından henüz ekli olmayanlar (OWNER/ADMIN zaten erişir — göstermek opsiyonel ama ekleyemeyiz)
+// Guild üyeleri arasından henüz ekli olmayanlar (yönetim yetkisi olanlar zaten erişir — göstermek opsiyonel ama ekleyemeyiz)
 const eligibleToAdd = computed(() => {
   const channel = settingsTarget.value
   if (!channel) return []
@@ -1328,7 +1328,7 @@ onUnmounted(() => {
             >{{ cat.name }}</span>
           </button>
 
-          <!-- ADMIN: kategori menü butonu + kanal ekle -->
+          <!-- Yönetim yetkisi olanlar için: kategori menü butonu + kanal ekle -->
           <div v-if="isAdmin" class="shrink-0 flex items-center gap-0.5">
             <!-- Bu kategoriye kanal ekle (D: per-kategori "+", categoryId geçirir) -->
             <button
@@ -1876,7 +1876,7 @@ onUnmounted(() => {
         </p>
       </div>
 
-      <!-- ── Özel kanal üye yönetimi (kaydedilmiş özel + toggle açık + OWNER/ADMIN) ── -->
+      <!-- ── Özel kanal üye yönetimi (kaydedilmiş özel + toggle açık + yönetim yetkisi) ── -->
       <template v-if="settingsTarget.isPrivate && settingsIsPrivate && isAdmin">
         <div class="flex flex-col gap-3 pt-1">
           <!-- Bölüm başlığı -->

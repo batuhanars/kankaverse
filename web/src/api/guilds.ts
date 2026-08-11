@@ -79,7 +79,7 @@ export const guildsApi = {
   deleteGuild(guildId: string) {
     return http.delete<null>(`/guilds/${guildId}`)
   },
-  // Sprint V2 Guild Admin — Üye at / kick (OWNER veya ADMIN); opsiyonel sebep (max 512)
+  // Sprint V2 Guild Admin — Üye at / kick (OWNER veya KICK_MEMBERS izni); opsiyonel sebep (max 512)
   kickMember(guildId: string, userId: string, reason?: string) {
     return http.delete<null>(`/guilds/${guildId}/members/${userId}`, {
       data: reason ? { reason } : {},

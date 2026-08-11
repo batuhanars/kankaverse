@@ -24,7 +24,6 @@ import { PresignIconDto } from './dto/presign-icon.dto';
 import { SetIconDto } from './dto/set-icon.dto';
 import { PresignBannerDto } from '../../shared/media/dto/presign-banner.dto';
 import { SetMediaDto } from '../../shared/media/dto/set-media.dto';
-import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { BanMemberDto } from './dto/ban-member.dto';
 import { KickMemberDto } from './dto/kick-member.dto';
 import { InviteFriendDto } from './dto/invite-friend.dto';
@@ -89,7 +88,7 @@ export class GuildsController {
   @Get(':id/members')
   @ApiOperation({
     summary:
-      'Ortam üye listesini getir (yalnız üyeler görebilir); rol önceliği OWNER>ADMIN>MEMBER, sonra username',
+      'Ortam üye listesini getir (yalnız üyeler görebilir); rol önceliği OWNER>MEMBER, sonra username',
   })
   getMembers(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
     return this.guildsService.getMembers(user.id, guildId);
@@ -177,28 +176,12 @@ export class GuildsController {
     return this.guildsService.deleteGuild(user.id, guildId);
   }
 
-  // ─── §B: Rol değiştir ─────────────────────────────────────────────────────
-
-  @Patch(':id/members/:userId/role')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Üye rolünü değiştir (yalnız OWNER; ADMIN|MEMBER; OWNER rolü atılamaz).',
-  })
-  updateMemberRole(
-    @CurrentUser() user: { id: string },
-    @Param('id') guildId: string,
-    @Param('userId') targetUserId: string,
-    @Body() dto: UpdateMemberRoleDto,
-  ) {
-    return this.guildsService.updateMemberRole(user.id, guildId, targetUserId, dto);
-  }
-
   // ─── §C: Üye at (kick) ───────────────────────────────────────────────────
 
   @Delete(':id/members/:userId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Üyeyi ortamdan at (OWNER: ADMIN/MEMBER; ADMIN: yalnız MEMBER). Dönüş null.',
+    summary: 'Üyeyi ortamdan at (KICK_MEMBERS izni + üye hiyerarşisi). Dönüş null.',
   })
   kickMember(
     @CurrentUser() user: { id: string },
@@ -224,7 +207,7 @@ export class GuildsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Ortam sahipliğini devret (yalnız OWNER; hedef OWNER, eski sahip ADMIN olur). Dönüş null.',
+      'Ortam sahipliğini devret (yalnız OWNER; hedef OWNER, eski sahip MEMBER olur — yeni yetki verilmez). Dönüş null.',
   })
   transferOwnership(
     @CurrentUser() user: { id: string },
@@ -252,14 +235,14 @@ export class GuildsController {
   }
 
   @Get(':id/bans')
-  @ApiOperation({ summary: 'Yasaklı kullanıcılar listesi (OWNER/ADMIN).' })
+  @ApiOperation({ summary: 'Yasaklı kullanıcılar listesi (BAN_MEMBERS izni).' })
   listBans(@CurrentUser() user: { id: string }, @Param('id') guildId: string) {
     return this.guildsService.listBans(user.id, guildId);
   }
 
   @Delete(':id/bans/:userId')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Yasağı kaldır (OWNER/ADMIN). Dönüş null.' })
+  @ApiOperation({ summary: 'Yasağı kaldır (BAN_MEMBERS izni). Dönüş null.' })
   unbanMember(
     @CurrentUser() user: { id: string },
     @Param('id') guildId: string,

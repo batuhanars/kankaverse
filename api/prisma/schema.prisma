@@ -45,7 +45,6 @@ enum DmRequestStatus {
 
 enum GuildRole {
   OWNER
-  ADMIN
   MEMBER
 }
 

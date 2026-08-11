@@ -11,14 +11,13 @@ import { useMembersStore } from '@/stores/members'
  * yalnız "bu butonu/sekmeyi göster mi" kararı için aynı 4 adımı aynalar — CLAUDE.md:
  * "Frontend validasyon yalnız UX'tir; güvenlik otoritesi backend."
  *
- * Adımlar (backend ile birebir):
+ * Adımlar (backend ile birebir; R20 — enum-ADMIN kısa devresi kaldırıldı):
  *  1. guild.ownerId === ben → tüm izinler
- *  2. enum rolüm OWNER/ADMIN (geçiş-uyum) → tüm izinler
- *  3. efektif = @everyone.permissions ∪ atanmış rollerimin permissions
- *  4. efektif ADMINISTRATOR içeriyorsa → tüm izinler; aksi hâlde flag ∈ efektif
+ *  2. efektif = @everyone.permissions ∪ atanmış rollerimin permissions
+ *  3. efektif ADMINISTRATOR içeriyorsa → tüm izinler; aksi hâlde flag ∈ efektif
  *
- * NOT: roller + üyeler store'da yüklü olmalı (granular izinler için). OWNER/enum-ADMIN
- * yolu store yüklenmeden de çalışır (ownerId + myRoleByGuild yeterli) → fail-safe.
+ * NOT: roller + üyeler store'da yüklü olmalı (granular izinler + ADMINISTRATOR bayrağı için).
+ * Yalnız OWNER yolu store yüklenmeden de çalışır (ownerId yeterli) → fail-safe.
  */
 export function useGuildPermissions(guildId: () => string) {
   const authStore = useAuthStore()
@@ -51,11 +50,10 @@ export function useGuildPermissions(guildId: () => string) {
     return flags
   })
 
-  // Tüm izinlere sahip miyim (OWNER / enum-ADMIN / ADMINISTRATOR bayrağı)
+  // Tüm izinlere sahip miyim (OWNER / ADMINISTRATOR bayrağı) — R20: enum-ADMIN dalı kalktı,
+  // karar tamamen sahiplik + rollerin izin birleşimine devredildi (bkz. sprint contract §0.1).
   const hasAll = computed(() => {
     if (isOwner.value) return true
-    const enumRole = guildsStore.myRoleByGuild[gid.value]
-    if (enumRole === 'OWNER' || enumRole === 'ADMIN') return true
     return effectiveFlags.value.has('ADMINISTRATOR')
   })
 

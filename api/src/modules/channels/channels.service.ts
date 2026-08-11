@@ -73,9 +73,14 @@ export class ChannelsService {
   ): Promise<void> {
     const members = await this.prisma.guildMember.findMany({
       where: { guildId },
-      select: { userId: true, role: true },
+      select: { userId: true },
     });
     let channelMemberIds = new Set<string>();
+    // R20: "privileged" artık enum-ADMIN değil izin sistemi (OWNER/ADMINISTRATOR) — tek
+    // kaynak PermissionsService.guildPrivilegedUserIds (N+1 önler, üye başına sorgu açmaz).
+    const privilegedIds = channel.isPrivate
+      ? await this.permissions.guildPrivilegedUserIds(guildId)
+      : new Set<string>();
     if (channel.isPrivate) {
       const cms = await this.prisma.channelMember.findMany({
         where: { channelId: channel.id },
@@ -84,7 +89,7 @@ export class ChannelsService {
       channelMemberIds = new Set(cms.map((m) => m.userId));
     }
     for (const m of members) {
-      const privileged = m.role === 'OWNER' || m.role === 'ADMIN';
+      const privileged = privilegedIds.has(m.userId);
       const locked = channel.isPrivate && !privileged && !channelMemberIds.has(m.userId);
       this.realtime.emitToUser(m.userId, event, {
         guildId,
@@ -137,7 +142,7 @@ export class ChannelsService {
   }
 
   async findByGuild(userId: string, guildId: string) {
-    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
+    await this.membership.requireGuildMembership(userId, guildId);
 
     // Kanalları ve kullanıcının okuma kayıtlarını çek
     const channels = await this.prisma.channel.findMany({
@@ -151,9 +156,10 @@ export class ChannelsService {
       },
     });
 
-    // item 6: özel kanallar artık HERKESE görünür (locked). OWNER/ADMIN ve ChannelMember
-    // için locked=false (girebilir); diğer üyeler için locked=true (görür, giremez).
-    const isPrivileged = membership.role === 'OWNER' || membership.role === 'ADMIN';
+    // item 6: özel kanallar artık HERKESE görünür (locked). Tam yetkili (OWNER/ADMINISTRATOR)
+    // ve ChannelMember için locked=false (girebilir); diğer üyeler için locked=true (görür, giremez).
+    // R20: enum-ADMIN kısa devresi kalktı — izin sistemi (PermissionsService) tek kaynak.
+    const isPrivileged = await this.permissions.hasFullAccess(userId, guildId);
     let memberChannelIds = new Set<string>();
     if (!isPrivileged) {
       const channelMemberships = await this.prisma.channelMember.findMany({
@@ -558,12 +564,9 @@ export class ChannelsService {
     });
 
     // item 6: çıkarılan kullanıcının kilidi yeniden kapansın (özel kanal + yetkisizse).
+    // R20: "yetkili" enum-ADMIN değil izin sistemi (OWNER/ADMINISTRATOR).
     if (channel.isPrivate) {
-      const target = await this.prisma.guildMember.findUnique({
-        where: { guildId_userId: { guildId: channel.guildId, userId: targetUserId } },
-        select: { role: true },
-      });
-      const privileged = target?.role === 'OWNER' || target?.role === 'ADMIN';
+      const privileged = await this.permissions.hasFullAccess(targetUserId, channel.guildId);
       this.realtime.emitToUser(targetUserId, 'channel.updated', {
         guildId: channel.guildId,
         channel: toChannelDto(channel, 0, 0, !privileged),

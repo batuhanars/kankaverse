@@ -17,8 +17,8 @@ interface Section {
  * Sprint M2c contract §4.3 — "gruplama istemcide: üyenin en yüksek pozisyonlu rolüne göre başlık,
  * rolsüzler en altta". `position` DESC = en yetkili (bkz. `reorder.tsx` — roller sunucudan zaten bu
  * sırayla döner); bir üyenin BİRDEN FAZLA özel rolü olabilir, bu yüzden en yüksek `position` olan
- * ele alınır. Ortam hiyerarşisi (`member.role` OWNER/ADMIN) BURADA yok — o rozet `MemberRow`in
- * kendisinde, bu gruplama yalnız özel rolleri (`roles[]`) ayırıyor.
+ * ele alınır. Ortam hiyerarşisi (`member.role` OWNER) BURADA yok — o rozet `MemberRow`in kendisinde,
+ * bu gruplama yalnız özel rolleri (`roles[]`) ayırıyor.
  */
 function buildSections(members: GuildMemberDto[]): Section[] {
   const byKey = new Map<string, { role: RoleSummaryDto | null; members: GuildMemberDto[] }>();

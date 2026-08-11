@@ -29,7 +29,7 @@ const membersStore = useMembersStore()
 const rolesStore = useRolesStore()
 const { joinChannel, leaveChannel } = useSocket()
 
-// Mesaj yönetimi (pin + başkasının mesajını silme) → MANAGE_MESSAGES (owner/admin/ADMINISTRATOR dahil)
+// Mesaj yönetimi (pin + başkasının mesajını silme) → MANAGE_MESSAGES (owner/ADMINISTRATOR dahil)
 const { can } = useGuildPermissions(() => guildsStore.activeGuildId ?? '')
 const canManageMessages = computed(() => can('MANAGE_MESSAGES'))
 const canPin = canManageMessages

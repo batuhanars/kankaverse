@@ -11,12 +11,19 @@ const prismaMock = {
   userBlock: { findFirst: jest.fn() },
 };
 
+// R20 — özel kanal kapısında "yönetici mi" sorusu artık PermissionsService.hasFullAccess'e
+// devredilir (eskiden membership.role === 'OWNER' || membership.role === 'ADMIN' idi).
+const permissionsMock = {
+  hasFullAccess: jest.fn().mockResolvedValue(false),
+};
+
 function makeService() {
-  return new MembershipService(prismaMock as any);
+  return new MembershipService(prismaMock as any, permissionsMock as any);
 }
 
 function resetMocks() {
   jest.resetAllMocks();
+  permissionsMock.hasFullAccess.mockResolvedValue(false);
 }
 
 // ── Sabit fixtures ───────────────────────────────────────────────────────────
@@ -78,7 +85,6 @@ const PRIVATE_AGE_GATED_CHANNEL = {
   guild: GUILD,
 };
 const OWNER_MEMBERSHIP = { guildId: 'guild1', userId: 'owner1', role: 'OWNER' };
-const ADMIN_MEMBERSHIP = { guildId: 'guild1', userId: 'admin1', role: 'ADMIN' };
 
 // ── requireGuildMembership ───────────────────────────────────────────────────
 describe('MembershipService.requireGuildMembership', () => {
@@ -383,10 +389,11 @@ describe('MembershipService.requireChannelAccess — özel kanal (isPrivate)', (
     service = makeService();
   });
 
-  // OWNER/ADMIN her özel kanala erişir
+  // Tam yetkili (OWNER/ADMINISTRATOR) her özel kanala erişir — R20: PermissionsService.hasFullAccess
   it('özel kanal + OWNER → erişim verilir (ChannelMember kontrolü yapılmaz)', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(PRIVATE_CHANNEL);
     prismaMock.guildMember.findUnique.mockResolvedValue(OWNER_MEMBERSHIP);
+    permissionsMock.hasFullAccess.mockResolvedValue(true);
 
     const result = await service.requireChannelAccess('owner1', PRIVATE_CHANNEL.id);
     expect(result).toMatchObject({ id: PRIVATE_CHANNEL.id });
@@ -394,11 +401,15 @@ describe('MembershipService.requireChannelAccess — özel kanal (isPrivate)', (
     expect(prismaMock.channelMember.findUnique).not.toHaveBeenCalled();
   });
 
-  it('özel kanal + ADMIN → erişim verilir (ChannelMember kontrolü yapılmaz)', async () => {
+  // R20 §0.1 regresyon kalkanı: enum GuildRole'ü MEMBER olan ama rolüne ADMINISTRATOR bayrağı
+  // atanmış bir üye de özel kanala erişebilmeli — enum-ADMIN kısa devresi kalktı, karar
+  // PermissionsService.hasFullAccess'e (OWNER veya ADMINISTRATOR) devredildi.
+  it('özel kanal + ADMINISTRATOR bayraklı role sahip MEMBER → erişim verilir (ChannelMember kontrolü yapılmaz)', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(PRIVATE_CHANNEL);
-    prismaMock.guildMember.findUnique.mockResolvedValue(ADMIN_MEMBERSHIP);
+    prismaMock.guildMember.findUnique.mockResolvedValue(MEMBERSHIP); // enum role: MEMBER
+    permissionsMock.hasFullAccess.mockResolvedValue(true); // ama ADMINISTRATOR bayraklı rolü var
 
-    const result = await service.requireChannelAccess('admin1', PRIVATE_CHANNEL.id);
+    const result = await service.requireChannelAccess('user1', PRIVATE_CHANNEL.id);
     expect(result).toMatchObject({ id: PRIVATE_CHANNEL.id });
     expect(prismaMock.channelMember.findUnique).not.toHaveBeenCalled();
   });

@@ -170,14 +170,6 @@ function onRowLeave(e: MouseEvent) {
     >
       👑
     </span>
-    <!-- Rozet: yönetici -->
-    <span
-      v-else-if="member.role === 'ADMIN'"
-      class="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded"
-      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
-    >
-      {{ t('member.role.ADMIN') }}
-    </span>
 
     <!-- ⋯ İşlem menüsü butonu (moderasyon yetkisi olanlarda hover ile görünür; menü sağ-tıkla herkeste açılır).
          - ownerActive (kendi menü/kart açık) → görünür ve tıklanabilir kalır (Bug 1).

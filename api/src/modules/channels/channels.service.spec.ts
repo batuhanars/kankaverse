@@ -54,6 +54,9 @@ const permissionsMock = {
   hasGuildPermission: jest.fn().mockResolvedValue(true),
   requireMemberHierarchy: jest.fn().mockResolvedValue(undefined),
   requireRoleHierarchy: jest.fn().mockResolvedValue(undefined),
+  // R20 — enum-ADMIN kısa devresi kalktı; "tam yetkili mi" (OWNER/ADMINISTRATOR) artık bu ikisinden gelir.
+  hasFullAccess: jest.fn().mockResolvedValue(false),
+  guildPrivilegedUserIds: jest.fn().mockResolvedValue(new Set()),
 };
 
 const realtimeMock = { emitToUser: jest.fn(), emitToUsers: jest.fn(), emitToRoom: jest.fn() };
@@ -76,6 +79,8 @@ function resetMocks() {
   permissionsMock.hasGuildPermission.mockResolvedValue(true);
   permissionsMock.requireMemberHierarchy.mockResolvedValue(undefined);
   permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
+  permissionsMock.hasFullAccess.mockResolvedValue(false);
+  permissionsMock.guildPrivilegedUserIds.mockResolvedValue(new Set());
   // Realtime alıcı sorguları (varsayılan boş — emit no-op)
   prismaMock.guildMember.findMany.mockResolvedValue([]);
   // R15 §2.6: varsayılan — rol bağı yok (bireysel testler override eder)
@@ -93,7 +98,9 @@ const USER_ID = 'user-1';
 const CHANNEL_ID = 'ch-1';
 
 const OWNER_MEMBERSHIP = { guildId: GUILD_ID, userId: USER_ID, role: 'OWNER' };
-const ADMIN_MEMBERSHIP = { guildId: GUILD_ID, userId: 'admin-1', role: 'ADMIN' };
+// R20: enum-ADMIN kaldırıldı. Bu fixture "MANAGE_CHANNELS izni verilmiş MEMBER" temsil eder —
+// eskiden enum role='ADMIN' idi, artık izin doğrudan permissionsMock.hasGuildPermission'dan gelir.
+const GRANTED_MEMBER_MEMBERSHIP = { guildId: GUILD_ID, userId: 'admin-1', role: 'MEMBER' };
 const MEMBER_MEMBERSHIP = { guildId: GUILD_ID, userId: 'member-1', role: 'MEMBER' };
 const GUILD = { id: GUILD_ID, deletedAt: null };
 
@@ -178,10 +185,10 @@ describe('ChannelsService.create', () => {
     );
   });
 
-  it('ADMIN → kanal oluşturur', async () => {
+  it('MANAGE_CHANNELS izinli MEMBER → kanal oluşturur', async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD,
-      membership: ADMIN_MEMBERSHIP,
+      membership: GRANTED_MEMBER_MEMBERSHIP,
     });
     prismaMock.channel.aggregate.mockResolvedValue({ _max: { position: null } });
     const created = makeChannel({ name: 'admin-kanal', position: 0, ageGated: false });
@@ -293,11 +300,11 @@ describe('ChannelsService.update', () => {
     );
   });
 
-  it('ADMIN → güncelleme yetkisi var', async () => {
+  it('MANAGE_CHANNELS izinli MEMBER → güncelleme yetkisi var', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(makeChannel());
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD,
-      membership: ADMIN_MEMBERSHIP,
+      membership: GRANTED_MEMBER_MEMBERSHIP,
     });
     const updated = makeChannel({ name: 'admin-guncelledi' });
     prismaMock.channel.update.mockResolvedValue(updated);
@@ -494,11 +501,11 @@ describe('ChannelsService.remove', () => {
     expect(result).toBeNull();
   });
 
-  it('ADMIN → silme yetkisi var', async () => {
+  it('MANAGE_CHANNELS izinli MEMBER → silme yetkisi var', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(makeChannel());
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD,
-      membership: ADMIN_MEMBERSHIP,
+      membership: GRANTED_MEMBER_MEMBERSHIP,
     });
     prismaMock.channel.count.mockResolvedValue(3);
     prismaMock.channel.update.mockResolvedValue(makeChannel({ deletedAt: new Date() }));
@@ -879,6 +886,7 @@ describe('ChannelsService.findByGuild — isPrivate filtresi', () => {
       guild: GUILD,
       membership: OWNER_MEMBERSHIP,
     });
+    permissionsMock.hasFullAccess.mockResolvedValue(true);
     const publicCh = { ...makeChannel(), id: 'ch-pub', isPrivate: false, channelReads: [] };
     const privateCh = { ...makeChannel(), id: 'ch-priv', isPrivate: true, channelReads: [] };
     prismaMock.channel.findMany.mockResolvedValue([publicCh, privateCh]);
@@ -892,11 +900,14 @@ describe('ChannelsService.findByGuild — isPrivate filtresi', () => {
     expect(prismaMock.channelMember.findMany).not.toHaveBeenCalled();
   });
 
-  it('ADMIN → özel dahil tüm kanalları görür', async () => {
+  // R20: enum-ADMIN kaldırıldı — tam yetki artık rol sisteminden (ADMINISTRATOR bayrağı) gelir.
+  // MEMBER enum'lu ama ADMINISTRATOR bayraklı role sahip bir üye §0.1'in regresyon kalkanı.
+  it('MEMBER + ADMINISTRATOR bayraklı rol → özel dahil tüm kanalları görür', async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD,
-      membership: ADMIN_MEMBERSHIP,
+      membership: MEMBER_MEMBERSHIP,
     });
+    permissionsMock.hasFullAccess.mockResolvedValue(true);
     const publicCh = { ...makeChannel(), id: 'ch-pub', isPrivate: false, channelReads: [] };
     const privateCh = { ...makeChannel(), id: 'ch-priv', isPrivate: true, channelReads: [] };
     prismaMock.channel.findMany.mockResolvedValue([publicCh, privateCh]);
@@ -1007,11 +1018,11 @@ describe('ChannelsService.getChannelMembers', () => {
     expect(result[0]).toEqual({ id: TARGET_ID, username: 'kanka1', avatarUrl: null });
   });
 
-  it('ADMIN → özel kanalın üyelerini listeler', async () => {
+  it('MANAGE_CHANNELS izinli MEMBER → özel kanalın üyelerini listeler', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(makePrivateChannel());
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD,
-      membership: ADMIN_MEMBERSHIP,
+      membership: GRANTED_MEMBER_MEMBERSHIP,
     });
     prismaMock.channelMember.findMany.mockResolvedValue([]);
 
@@ -1334,11 +1345,11 @@ describe('ChannelsService.removeChannelMember', () => {
     });
   });
 
-  it('ADMIN → üyeyi çıkarabilir', async () => {
+  it('MANAGE_CHANNELS izinli MEMBER → üyeyi çıkarabilir', async () => {
     prismaMock.channel.findUnique.mockResolvedValue(makeChannel({ guildId: GUILD_ID }));
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD,
-      membership: ADMIN_MEMBERSHIP,
+      membership: GRANTED_MEMBER_MEMBERSHIP,
     });
     prismaMock.channelMember.deleteMany.mockResolvedValue({ count: 1 });
 

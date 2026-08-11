@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -6,7 +6,7 @@ import { channelsApi, type ChannelSummaryDto } from '@/api/channels';
 import { guildsApi, type GuildMemberDto } from '@/api/guilds';
 import { extractErrorMessage } from '@/api/errors';
 import { NotifTargetType } from '@/api/notifications';
-import { useAuthStore } from '@/stores/auth';
+import { useGuildPermission } from '@/hooks/useGuildPermission';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { SelectSheet } from '@/components/guild/SelectSheet';
 import { getMuteDurationOptions, muteMinutesFromValue } from '@/utils/notifPrefUi';
@@ -38,7 +38,6 @@ export default function ChannelDetailsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { channelId, guildId } = useLocalSearchParams<{ channelId: string; guildId: string }>();
-  const myUserId = useAuthStore((s) => s.user?.id);
 
   const [channel, setChannel] = useState<ChannelSummaryDto | null>(null);
   const [channelState, setChannelState] = useState<'loading' | 'error' | 'ready'>('loading');
@@ -94,13 +93,15 @@ export default function ChannelDetailsScreen() {
   }, [channelId, guildId]);
 
   // "canManage" — mevcut sidebar mantığıyla BİREBİR (`home.tsx` `canManage`, `GuildMenuSheet` /
-  // `ChannelMenuSheet` "Kanalı Düzenle"/"Davet Et" gating'i): OWNER veya ADMIN. `useGuildPermission`
-  // (granüler izin bayrağı) BİLİNÇLİ kullanılmadı — contract §4.2/§4.3 "mevcut canManage mantığı"
-  // diyor, o da uygulama genelinde hep bu hiyerarşi anlamına geliyor, izin bayrağı değil.
-  const canManage = useMemo(() => {
-    const me = members.find((m) => m.userId === myUserId);
-    return me?.role === 'OWNER' || me?.role === 'ADMIN';
-  }, [members, myUserId]);
+  // `ChannelMenuSheet` "Kanalı Düzenle"/"Davet Et" gating'i).
+  //
+  // 🔴 Sprint R20 (§0.1, PM talimatı 2026-08-11) — eskiden üye listesinden çözülen enum'a
+  // (`me?.role === 'OWNER' || me?.role === 'ADMIN'`) bakıyordu; enum-ADMIN katmanı kalktığı için
+  // `home.tsx`teki AYNI çeviri burada da uygulandı: `useGuildPermission(guildId, 'ADMINISTRATOR')`
+  // (sahiplik + ADMINISTRATOR bayrağı, hook'un kendi hesabı). Gerekçe aynı: tek bayrak birden fazla
+  // eylemi (Düzenle/Davet Et) birlikte gösterip gizliyor, granüler bir izne daraltmak davranışı
+  // değiştirirdi.
+  const canManage = useGuildPermission(guildId, 'ADMINISTRATOR');
 
   const muted = useNotificationPrefsStore((s) => s.isMuted(NotifTargetType.CHANNEL, channelId));
 
