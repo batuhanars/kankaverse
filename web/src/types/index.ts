@@ -54,6 +54,7 @@ export interface UserDto {
   bio: string | null // Sprint C5 — profil metni
   bannerColor: string | null // profil afiş rengi (preset anahtar veya null=varsayılan)
   dmPolicy: DmPolicy // Sprint C5 — Gizlilik sekmesi okur
+  readReceipts: boolean // C12 — okundu bilgisi paylaşımı (karşılıklı; kapatan karşı tarafınkini de göremez)
 }
 
 // Sprint 3 §5 — sosyal katman DTO'ları
@@ -102,6 +103,13 @@ export type DmChannelDto =
       // requestOutgoing = bu isteği ben mi başlattım (gönderen tarafı).
       requestStatus?: 'PENDING' | 'ACCEPTED' | null
       requestOutgoing?: boolean
+      // C12 §3.2 — İKİ AYRI ALAN, karıştırma:
+      //   receiptsEnabled: tik çizilecek mi (gizlilik kapısı: karşı taraf/ben kapatmışsam, bekleyen
+      //     istek, engel, grup DM → false ve gösterge HİÇ çizilmez).
+      //   otherReadAt    : karşı tarafın okuma anı; null = henüz hiç okumamış → TEK tik.
+      // Kararı sunucu verir (`readReceiptDecision`, R7), istemci sorgulamaz.
+      receiptsEnabled?: boolean
+      otherReadAt?: string | null
     }
   | {
       type: 'GROUP_DM'

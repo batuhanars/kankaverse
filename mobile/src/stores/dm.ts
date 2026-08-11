@@ -64,6 +64,8 @@ interface DmState {
   applyActivity: (payload: DmActivity) => Promise<void>;
   setActiveDm: (channelId: string | null) => void;
   clearUnread: (channelId: string) => void;
+  /** C12 §4.1 — WS `dm:read`: karşı taraf bu kanalı okudu, kanal başına tek tarih güncellenir. */
+  applyReadReceipt: (payload: { channelId: string; readAt: string }) => void;
   /** Sözleşme §3.2 — sıfırdan DM başlat. Sunucu kanal zaten varsa mevcut olanı döner; burada id'ye
    *  göre eşleştirilir (kopya kutucuk açılmaz). */
   createChannel: (userId: string) => Promise<DmChannelDto>;
@@ -177,6 +179,25 @@ export const useDmStore = create<DmState>((set, get) => ({
   clearUnread(channelId) {
     set((s) => ({
       channels: s.channels.map((c) => (c.id === channelId ? ({ ...c, unread: false } as DmChannelDto) : c)),
+    }));
+  },
+
+  /**
+   * C12 §4.1 — kanal başına TEK tarih tutulur, mesaj başına durum yok: `otherReadAt`ten büyük
+   * olmayan her kendi mesajım "görüldü" sayılır. Tek alan güncellemesi o sohbetteki bütün tikleri
+   * aynı anda doğru duruma geçirir.
+   *
+   * Gizlilik kararı SUNUCUDA (`visibleReadAt`, R7): görmeye hakkımız yoksa olay hiç gelmez.
+   * Burada ikinci bir süzgeç YOK — olsaydı kural iki yerde yaşar ve ikisi ayrışırdı.
+   */
+  applyReadReceipt({ channelId, readAt }) {
+    set((s) => ({
+      channels: s.channels.map((c) => {
+        if (c.id !== channelId || c.type !== 'DM') return c;
+        // Geriye gitme: yarış hâlinde eski bir olay yeni tarihi ezmesin.
+        if (c.otherReadAt && c.otherReadAt >= readAt) return c;
+        return { ...c, otherReadAt: readAt } as DmChannelDto;
+      }),
     }));
   },
 

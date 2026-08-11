@@ -16,6 +16,7 @@ import { BANNER_PRESET_KEYS, bannerBackground } from '@/utils/bannerColor'
 import { isMobile } from '@/composables/useResponsive'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvModal from '@/components/ui/KvModal.vue'
+import KvSwitch from '@/components/ui/KvSwitch.vue'
 import TwoFactorSection from './components/TwoFactorSection.vue'
 import SessionsSection from './components/SessionsSection.vue'
 import ChangePasswordSection from './components/ChangePasswordSection.vue'
@@ -335,6 +336,28 @@ async function selectPolicy(p: DmPolicy) {
     toast.error(err.response?.data?.message ?? t('toast.saveError'))
   } finally {
     savingPolicy.value = false
+  }
+}
+
+// ── C12 §2: Okundu bilgisi anahtarı ─────────────────────────────────────────
+// KARŞILIKLI: kapatan kendi okumasını paylaşmaz VE karşı tarafınkini de göremez. Karar sunucuda
+// (`visibleReadAt`, R7); burada yalnız tercih yazılıyor. Kullanıcıya karşılıklılık AÇIKÇA
+// söyleniyor (aşağıdaki açıklama metni) — sessizce uygulanan bir kural, kural değil sürprizdir.
+const savingReceipts = ref(false)
+const readReceipts = computed(() => authStore.user?.readReceipts ?? true)
+
+async function toggleReadReceipts(next: boolean) {
+  if (savingReceipts.value || next === readReceipts.value) return
+  savingReceipts.value = true
+  try {
+    const { data } = await usersApi.updateProfile({ readReceipts: next })
+    authStore.updateUser(data)
+    toast.success(t('toast.privacySaved'))
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message ?? t('toast.saveError'))
+  } finally {
+    savingReceipts.value = false
   }
 }
 </script>
@@ -793,6 +816,29 @@ async function selectPolicy(p: DmPolicy) {
                   <p v-else-if="policySaved" class="text-[12px] mt-3" style="color: var(--kv-success);">
                     {{ t('settings.dmPolicy.saved') }}
                   </p>
+                </section>
+
+                <!-- ── C12 §2: Okundu bilgisi ── -->
+                <section
+                  class="rounded-[var(--kv-radius-lg)] border p-5"
+                  style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                      <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+                        {{ t('settings.readReceipts.label') }}
+                      </h3>
+                      <!-- Karşılıklılık kuralı AÇIKÇA yazılı: sessizce uygulanan kural sürprizdir. -->
+                      <p class="text-[13px] mt-1" style="color: var(--kv-text-secondary);">
+                        {{ t('settings.readReceipts.description') }}
+                      </p>
+                    </div>
+                    <KvSwitch
+                      :model-value="readReceipts"
+                      :disabled="savingReceipts"
+                      @update:model-value="toggleReadReceipts"
+                    />
+                  </div>
                 </section>
               </div>
 

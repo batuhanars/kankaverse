@@ -1,4 +1,12 @@
-import { IsEnum, IsOptional, IsString, MaxLength, IsIn, ValidateIf } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+  IsIn,
+  ValidateIf,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { DmPolicy } from '@prisma/client';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -31,4 +39,13 @@ export class UpdateProfileDto {
   @ValidateIf((_, v) => v !== null)
   @IsIn(BANNER_PRESET_KEYS, { message: 'Geçersiz afiş rengi.' })
   bannerColor?: string | null;
+
+  // C12 §2 — okundu bilgisi paylaşımı. KARŞILIKLI: false yapan kendi okumasını paylaşmaz VE
+  // karşı tarafınkini göremez (karar `dm.service.ts` `visibleReadAt`, R7). Tek yönlü kullanım yok.
+  @ApiPropertyOptional({
+    description: 'Okundu bilgisi paylaşımı (karşılıklı: kapatan karşı tarafınkini de göremez).',
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'Okundu bilgisi tercihi geçersiz.' })
+  readReceipts?: boolean;
 }

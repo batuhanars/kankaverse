@@ -58,6 +58,45 @@ export const useDmStore = defineStore('dm', () => {
     if (ch) ch.unread = false
   }
 
+  /**
+   * C12 §4.1 — WS `dm:read`: karşı taraf bu kanalı okudu.
+   *
+   * Kanal başına TEK tarih tutuluyor, mesaj başına durum yok: `otherReadAt`ten büyük olmayan
+   * her kendi mesajım "görüldü" sayılır (`isSeen`). Bu yüzden tek bir alan güncellemesi o
+   * sohbetteki bütün tikleri aynı anda doğru duruma geçiriyor.
+   *
+   * Gizlilik kararı SUNUCUDA: görmeye hakkımız yoksa olay hiç gelmiyor (`visibleReadAt`, R7).
+   * Burada ek bir süzgeç yok; olsaydı kural iki yerde yaşardı.
+   */
+  function applyReadReceipt(payload: { channelId: string; readAt: string }) {
+    const ch = channels.value.find((c) => c.id === payload.channelId)
+    if (!ch || ch.type !== 'DM') return
+    // Geriye gitme: yarış hâlinde eski bir olay yeni tarihi ezmesin.
+    if (ch.otherReadAt && ch.otherReadAt >= payload.readAt) return
+    ch.otherReadAt = payload.readAt
+  }
+
+  /**
+   * C12 §4.2 — bir mesaj karşı tarafça görüldü mü. Yalnız KENDİ mesajlarım için anlamlı;
+   * çağıran zaten yazarı kontrol ediyor. `otherReadAt` null ise (karşı taraf henüz hiç okumamış)
+   * false döner — bu "gösterme" demek DEĞİL, "tek tik" demek (kapı `showsReceipts`te).
+   */
+  function isSeen(channelId: string, messageCreatedAt: string): boolean {
+    const ch = channels.value.find((c) => c.id === channelId)
+    if (!ch || ch.type !== 'DM' || !ch.otherReadAt) return false
+    return messageCreatedAt <= ch.otherReadAt
+  }
+
+  /**
+   * C12 §4.2 — bu kanalda tik çizilecek mi. Kaynak SUNUCUNUN gizlilik kararı (`receiptsEnabled`),
+   * "okuma var mı" DEĞİL. İlk sürüm `otherReadAt`e bakıyordu ve karşı taraf sohbeti bir kez bile
+   * açmadıysa tik hiç çizilmiyordu — ilk mesajda "İletildi" asla görünmüyordu (sahip bulgusu).
+   */
+  function showsReceipts(channelId: string): boolean {
+    const ch = channels.value.find((c) => c.id === channelId)
+    return !!ch && ch.type === 'DM' && ch.receiptsEnabled === true
+  }
+
   function removeChannel(channelId: string) {
     channels.value = channels.value.filter((c) => c.id !== channelId)
     if (activeDmChannelId.value === channelId) activeDmChannelId.value = null
@@ -202,6 +241,9 @@ export const useDmStore = defineStore('dm', () => {
     setActiveChannel,
     activeChannel,
     applyActivity,
+    applyReadReceipt,
+    isSeen,
+    showsReceipts,
     createGroup,
     addGroupMember,
     removeGroupMember,

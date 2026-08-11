@@ -10,6 +10,7 @@ import { useFriendsStore } from '@/stores/friends';
 import { useAuthStore } from '@/stores/auth';
 import { useVoiceStore } from '@/stores/voice';
 import { useVoicePresenceStore } from '@/stores/voicePresence';
+import { usePresenceStore, type PresenceStatus } from '@/stores/presence';
 import { presentIncomingCall, dismissIncomingCall } from '@/notifications/incomingCall';
 import { t } from '@/i18n';
 import type { MessageDto } from '@/api/messages';
@@ -198,6 +199,27 @@ function ensureSocket(): Socket {
     useTypingStore.getState().handleClear(data.channelId, data.userId);
   });
 
+  // ---- Kullanıcı durumu (çevrimiçi/boşta/rahatsız etmeyin) ----
+  // Sunucu bu iki olayı web için zaten yayınlıyordu ve `user:<id>` odası üzerinden mobile de
+  // geliyordu; dinleyen yoktu. Yeni endpoint/olay/şema YOK, yalnız var olanın tüketimi.
+  // Görünürlük kararı sunucuda (`PresenceService.canSeePresence`, R7): gelmeyen kişi görülemeyen
+  // kişidir, istemci bunu sorgulamaz.
+  socket.on('presence:snapshot', (payload: { states: { userId: string; status: PresenceStatus }[] }) => {
+    usePresenceStore.getState().applySnapshot(payload.states);
+  });
+
+  socket.on('presence:update', (payload: { userId: string; status: PresenceStatus }) => {
+    usePresenceStore.getState().applyUpdate(payload.userId, payload.status);
+  });
+
+  // Bağlantı koptuğunda harita SIFIRLANIR. Mobilde soket uygulama arka plana düştükçe kopuyor;
+  // temizlenmezse kullanıcı uygulamaya döndüğünde saatler önceki "Çevrimiçi" yazısını görür ve
+  // taze snapshot gelene kadar bu bir yalandır. Boş göstermek (bilmiyorum demek) yanlış
+  // göstermekten iyidir; snapshot yeniden bağlanınca zaten hemen doluyor.
+  socket.on('disconnect', () => {
+    usePresenceStore.getState().reset();
+  });
+
   // Handshake snapshot — Bildirimler sekmesi rozeti (contract §4.2).
   socket.on('notification:snapshot', (payload: { unreadCount: number }) => {
     useNotificationsStore.getState().applySnapshotUnreadCount(payload.unreadCount);
@@ -214,6 +236,12 @@ function ensureSocket(): Socket {
   });
 
   // C9 — bana yeni mesaj isteği geldi. Web'de de sessiz: yalnız rozet tazelenir.
+  // C12 §3.3 — karşı taraf DM'i okudu → gönderdiğim mesajların tiki çifte döner.
+  // Gizlilik süzgeci SUNUCUDA (`visibleReadAt`, R7): görmeye hakkımız yoksa olay hiç gelmez.
+  socket.on('dm:read', (data: { channelId: string; userId: string; readAt: string }) => {
+    useDmStore.getState().applyReadReceipt(data);
+  });
+
   socket.on('dm.request', () => {
     useDmStore.getState().refreshRequests();
   });
@@ -555,6 +583,9 @@ export function resetSocket(): void {
   // olur ve kendi unsubscribe'larını çağırır, ama bu kesin bir güvence değil — örn. React ağacı
   // temizlenmeden logout tetiklenirse sayaç sıfırlanmadan kalabilirdi).
   voiceChannelRefCounts.clear();
+  // Oturum düşünce durum haritası da gider. `disconnect` dinleyicisi bunu zaten yapardı ama
+  // `removeAllListeners()` yukarıda onu çoktan kaldırmış oluyor, o yüzden burada açıkça.
+  usePresenceStore.getState().reset();
 }
 
 /** Mesaj ekranı mount'ta manuel join (ack'li; 5sn timeout — web/useSocket.ts joinChannel deseni). */

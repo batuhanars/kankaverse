@@ -363,10 +363,16 @@ export class UsersService {
    * PATCH /users/me — kendi profil/gizlilik güncelle. Yalnız verilen alanlar değişir.
    */
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    const data: { bio?: string; dmPolicy?: DmPolicy; bannerColor?: string | null } = {};
+    const data: {
+      bio?: string;
+      dmPolicy?: DmPolicy;
+      bannerColor?: string | null;
+      readReceipts?: boolean;
+    } = {};
     if (dto.bio !== undefined) data.bio = dto.bio;
     if (dto.dmPolicy !== undefined) data.dmPolicy = dto.dmPolicy;
     if (dto.bannerColor !== undefined) data.bannerColor = dto.bannerColor;
+    if (dto.readReceipts !== undefined) data.readReceipts = dto.readReceipts;
 
     const user = await this.prisma.user.update({
       where: { id: userId },

@@ -62,6 +62,8 @@ export interface UpdateProfileDto {
   bannerColor?: string | null;
   /** DM gizlilik ayarı — web `usersApi.updateProfile({ dmPolicy })` ile birebir (aynı uç, PATCH /users/me). */
   dmPolicy?: DmPolicy;
+  /** C12 §2 — okundu bilgisi paylaşımı. KARŞILIKLI: kapatan karşı tarafınkini de göremez. */
+  readReceipts?: boolean;
 }
 
 /** `api/src/shared/media/image-upload.service.ts` `PresignResult` — birebir iki alan. */

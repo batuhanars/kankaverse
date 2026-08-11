@@ -111,6 +111,7 @@ model User {
   dmPolicy            DmPolicy           @default(FRIENDS)
   mediaPolicy         MediaPolicy        @default(FRIENDS)
   profileDiscoverable Boolean            @default(true)
+  readReceipts        Boolean            @default(true) // C12: okundu bilgisi paylaşımı (karşılıklı, sözleşme §2)
   emailVerifiedAt     DateTime?
   avatarUrl           String?
   bio                 String?

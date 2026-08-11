@@ -35,6 +35,12 @@ interface Props {
    * olmayan bir hedefe dokunma alanı uydurulmaz.
    */
   onPressAuthor?: () => void;
+  /**
+   * C12 §4.2 — okundu göstergesi: 'sent' tek tik, 'seen' çift tik, null/undefined = HİÇ çizme.
+   * Kararı ekran verir (1-1 DM); ortam kanalı ve grup DM bu prop'u hiç geçmez. "Takılı kalmış
+   * tek tik" görüntüsü bilerek yok: gösterge ya anlamlıdır ya da hiç yoktur.
+   */
+  receipt?: 'sent' | 'seen' | null;
   /** Tepki pill'ine dokunuş: kendi tepkimi kaldırır, başkasınınkine katılır (web ile aynı). */
   onToggleReaction?: (emoji: string) => void;
 }
@@ -47,6 +53,7 @@ export function MessageBubble({
   message,
   showAuthor,
   isMine,
+  receipt,
   resolveMention,
   resolveRole,
   highlighted,
@@ -150,6 +157,19 @@ export function MessageBubble({
           <AttachmentView key={a.id} attachment={a} interactive />
         ))}
 
+        {/* C12 §4.2 — okundu göstergesi. Sağa yaslı, saatle aynı ikincil renkte; görülünce Kor.
+            İkon tek başına bilgi taşımasın diye erişilebilirlik etiketi i18n'den geliyor. */}
+        {receipt ? (
+          <View style={styles.receiptRow}>
+            <Ionicons
+              name={receipt === 'seen' ? 'checkmark-done' : 'checkmark'}
+              size={14}
+              color={receipt === 'seen' ? theme.colors.accent500 : theme.colors.textMuted}
+              accessibilityLabel={t(`message.receipt.${receipt}`)}
+            />
+          </View>
+        ) : null}
+
         {/* Tepki pill'leri — sunucu emoji bazında TOPLAYARAK dönüyor (kim verdi listesi yok), o
             yüzden burada da yalnız emoji + sayı gösterilir. Kendi tepkim Kor kenarlıkla ayrışır. */}
         {reactions.length > 0 && (
@@ -202,6 +222,12 @@ const styles = StyleSheet.create({
   },
   replyDeleted: {
     fontStyle: 'italic',
+  },
+  // Gösterge sağa yaslı ve mesaj yüksekliğini kayda değer artırmıyor (tek satır, 14px ikon).
+  receiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 2,
   },
   reactionRow: {
     flexDirection: 'row',

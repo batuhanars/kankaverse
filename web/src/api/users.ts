@@ -6,6 +6,7 @@ export interface UpdateProfilePayload {
   bio?: string
   dmPolicy?: DmPolicy
   bannerColor?: string | null // profil afiş rengi preset anahtarı (veya null=varsayılan)
+  readReceipts?: boolean // C12 — okundu bilgisi paylaşımı (karşılıklı)
 }
 
 // Sprint C8 §5 — avatar/profil-afişi presign sonucu (ikon deseniyle aynı şekil)

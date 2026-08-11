@@ -11,12 +11,67 @@ import { CreateDmChannelDto } from './dto/create-dm-channel.dto';
 import { CreateGroupDmDto } from './dto/create-group-dm.dto';
 import { AddGroupMemberDto } from './dto/add-group-member.dto';
 import { RenameGroupDmDto } from './dto/rename-group-dm.dto';
+import { RealtimeService } from '../../shared/realtime/realtime.service';
+
+/**
+ * 🫀 C12 §3.2 — okundu bilgisi görünürlük kararı. **T&S karar fonksiyonu (R7), satır satır insan
+ * incelemesi zorunlu.**
+ *
+ * Bilerek SAF: sorgu yapmaz, yalnız verilen olgulardan karar üretir. İki çağıranı var (DTO alanı ve
+ * `dm:read` yayını) ve ikisinin de kuralı AYNI olmak zorunda; kuralı bir yerde gevşetip diğerinde
+ * sıkı bırakmak, olayı gönderip DTO'da gizlemek gibi sessiz bir tutarsızlık üretirdi.
+ *
+ * 🔴 İKİ AYRI SORU, İKİ AYRI CEVAP (ilk sürümün kusuru buydu — sahip bulgusu 2026-08-11):
+ *   `visible`: tik çizilecek mi? Bu bir GİZLİLİK/kanal-türü kararı.
+ *   `readAt` : karşı taraf ne zamana kadar okumuş? Bu bir VERİ.
+ * İlk sürüm ikisini tek bir `Date | null`a sıkıştırıyordu ve "henüz hiç okumamış" ile "gizlilik
+ * kapalı" aynı sonuca düşüyordu. Sonuç: karşı taraf sohbeti bir kez bile açmadıysa tik HİÇ
+ * çizilmiyordu — yani ilk mesajda "İletildi" asla görünmüyordu, ki tam da en çok görülmesi
+ * gereken an orası. Ayrımı koruyoruz: gizlilik açıksa tek tik ÇİZİLİR, okuma gelince çifte döner.
+ *
+ * Kural sırası (fail-closed — belirsizse görünmez):
+ *  1. 1-1 DM değil → görünmez. Grup DM'de "karşı taraf" tanımsız (C12 §8, karar C12c'de).
+ *  2. Bekleyen mesaj isteği (PENDING) → görünmez. Kabul edilmeden "okudu" demek isteği süzgeç
+ *     olmaktan çıkarır (C9'un amacı). Okuma gerçekleşmiş olsa bile paylaşılmaz.
+ *  3. Taraflardan biri diğerini engellemiş → görünmez.
+ *  4. Karşı taraf okundu bilgisini kapatmış → görünmez (kendi tercihi).
+ *  5. **Ben kapatmışsam → görünmez.** Karşılıklılık: paylaşmayan göremez. Bu madde kullanıcının
+ *     kendi aleyhine görünen tek maddedir ve bilinçlidir; tek yönlü kullanım yok.
+ *  6. Aksi hâlde görünür; `readAt` karşı tarafın okuma anıdır (hiç okumamışsa null → tek tik).
+ *
+ * Dönen tarih bir SIR DEĞİL: o sohbetin iki tarafından biri okumuş demek. Yine de mesaj başına
+ * değil kanal başına tek değer dönüyor (istemci mesaj.createdAt ile karşılaştırır).
+ */
+export interface ReadReceiptDecision {
+  /** Tik çizilecek mi. false → istemci göstergeyi HİÇ çizmez (yarım kalmış tik bırakmayız). */
+  visible: boolean;
+  /** Karşı tarafın okuma anı. `visible` true olsa bile hiç okumamışsa null (= tek tik). */
+  readAt: Date | null;
+}
+
+export function readReceiptDecision(input: {
+  isDm: boolean;
+  requestPending: boolean;
+  blockedEitherWay: boolean;
+  viewerReadReceipts: boolean;
+  otherReadReceipts: boolean;
+  otherLastReadAt: Date | null;
+}): ReadReceiptDecision {
+  const hidden: ReadReceiptDecision = { visible: false, readAt: null };
+  if (!input.isDm) return hidden;
+  if (input.requestPending) return hidden;
+  if (input.blockedEitherWay) return hidden;
+  if (!input.otherReadReceipts) return hidden;
+  if (!input.viewerReadReceipts) return hidden;
+  return { visible: true, readAt: input.otherLastReadAt ?? null };
+}
 
 @Injectable()
 export class DmService {
   constructor(
     private prisma: PrismaService,
     private dmPermission: DmPermissionService,
+    private realtime: RealtimeService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -511,6 +566,15 @@ export class DmService {
   // 1-1 DM yardımcıları
   // ─────────────────────────────────────────────────────────────────────────────
 
+  /**
+   * POST /dm/channels/:id/read — kendi `lastReadAt`imi şimdiye çeker.
+   *
+   * C12 §3.3: yazma bittikten sonra karşı tarafa `dm:read` yayınlanır ki gönderdiği mesajların
+   * tiki BEKLEMEDEN çift tike dönsün. Yayın kararı DTO ile aynı fonksiyondan (`readReceiptDecision`)
+   * geçer: görmeye hakkı yoksa olay HİÇ gönderilmez, "istemci nasılsa gizler" denmez.
+   *
+   * Grup DM'de yayın yok — `readReceiptDecision` grup için `visible: false` döner (C12 §8, karar C12c'de).
+   */
   async markRead(userId: string, channelId: string) {
     const member = await this.prisma.channelMember.findUnique({
       where: { channelId_userId: { channelId, userId } },
@@ -521,11 +585,71 @@ export class DmService {
         error: 'NOT_CHANNEL_MEMBER',
       });
     }
+    const readAt = new Date();
     await this.prisma.channelMember.update({
       where: { id: member.id },
-      data: { lastReadAt: new Date() },
+      data: { lastReadAt: readAt },
     });
+
+    await this.emitReadReceipt(channelId, userId, readAt);
     return null;
+  }
+
+  /**
+   * C12 §3.3 — `dm:read` yayını. Ayrı fonksiyon çünkü `markRead`in işi okuma yazmak; yayın
+   * başarısız olsa bile okuma yazılmış olmalı (aşağıdaki try/catch bunun için).
+   *
+   * 🔴 Buradaki gizlilik kararı `readReceiptDecision` ile ALINIR, elle tekrar yazılmaz. Dikkat: karar
+   * ALICININ gözünden veriliyor — `viewerReadReceipts` alıcının tercihi, `otherReadReceipts`
+   * okuyanın (benim) tercihim. Yön karıştırılırsa kapalı anahtar sızar.
+   */
+  private async emitReadReceipt(channelId: string, readerId: string, readAt: Date): Promise<void> {
+    try {
+      const channel = await this.prisma.channel.findUnique({
+        where: { id: channelId },
+        select: {
+          type: true,
+          dmRequestStatus: true,
+          members: {
+            select: { userId: true, user: { select: { readReceipts: true } } },
+          },
+        },
+      });
+      if (!channel || channel.type !== 'DM') return;
+
+      const reader = channel.members.find((m) => m.userId === readerId);
+      const recipient = channel.members.find((m) => m.userId !== readerId);
+      if (!reader || !recipient) return;
+
+      const block = await this.prisma.userBlock.findFirst({
+        where: {
+          OR: [
+            { blockerId: readerId, blockedId: recipient.userId },
+            { blockerId: recipient.userId, blockedId: readerId },
+          ],
+        },
+        select: { id: true },
+      });
+
+      const decision = readReceiptDecision({
+        isDm: true,
+        requestPending: channel.dmRequestStatus === 'PENDING',
+        blockedEitherWay: !!block,
+        viewerReadReceipts: recipient.user.readReceipts,
+        otherReadReceipts: reader.user.readReceipts,
+        otherLastReadAt: readAt,
+      });
+      if (!decision.visible) return;
+
+      this.realtime.emitToUser(recipient.userId, 'dm:read', {
+        channelId,
+        userId: readerId,
+        readAt: readAt.toISOString(),
+      });
+    } catch {
+      // Yayın kozmetiktir: okuma zaten yazıldı, bir sonraki `GET /dm/channels` doğru değeri taşır.
+      // Kullanıcının okuma işlemini bir soket hatası yüzünden 500'e çevirmek orantısız olurdu.
+    }
   }
 
   /**
@@ -586,9 +710,19 @@ export class DmService {
     otherUser: { id: string; username: string; avatarUrl: string | null },
     userId: string,
   ) {
-    const [membership, lastMsg, selfBlockRecord, otherBlockRecord, channelRow] = await Promise.all([
-      this.prisma.channelMember.findUnique({
-        where: { channelId_userId: { channelId, userId } },
+    const [members, lastMsg, selfBlockRecord, otherBlockRecord, channelRow] = await Promise.all([
+      // C12: tek sorguda İKİ üyelik + her iki tarafın `readReceipts` tercihi. Eskiden yalnız kendi
+      // üyeliğim `findUnique` ile çekiliyordu; karşı tarafın `lastReadAt`i ve iki tercih için üç ayrı
+      // sorgu eklemek yerine aynı sorgu genişletildi — kanal listesi bunu her kanal için çağırıyor,
+      // sorgu sayısı orada N ile çarpılıyor.
+      this.prisma.channelMember.findMany({
+        where: { channelId },
+        select: {
+          userId: true,
+          lastReadAt: true,
+          clearedAt: true,
+          user: { select: { readReceipts: true } },
+        },
       }),
       this.prisma.message.findFirst({
         where: { channelId, deletedAt: null },
@@ -612,6 +746,11 @@ export class DmService {
       }),
     ]);
 
+    // `membership` eskiden doğrudan sorgudan geliyordu; artık iki üyelik tek sorguda çekiliyor ve
+    // burada ayrıştırılıyor. `unread` hesabı DEĞİŞMEDİ (aynı alan, aynı karşılaştırma).
+    const membership = members.find((m) => m.userId === userId) ?? null;
+    const otherMember = members.find((m) => m.userId === otherUser.id) ?? null;
+
     const unread =
       lastMsg !== null &&
       (membership?.lastReadAt === null ||
@@ -619,6 +758,16 @@ export class DmService {
 
     const selfBlocked = !!selfBlockRecord;
     const canMessage = !selfBlocked && !otherBlockRecord;
+
+    // C12 §3.2 — karar tek yerde (`readReceiptDecision`), burada yalnız olgular toplanıyor.
+    const receipt = readReceiptDecision({
+      isDm: true, // bu fonksiyon yalnız 1-1 DM için çağrılıyor
+      requestPending: channelRow?.dmRequestStatus === 'PENDING',
+      blockedEitherWay: !!selfBlockRecord || !!otherBlockRecord,
+      viewerReadReceipts: membership?.user.readReceipts ?? false,
+      otherReadReceipts: otherMember?.user.readReceipts ?? false,
+      otherLastReadAt: otherMember?.lastReadAt ?? null,
+    });
 
     return {
       id: channelId,
@@ -644,6 +793,11 @@ export class DmService {
       // C9: null = normal DM · 'PENDING'/'ACCEPTED' = istek. requestOutgoing = bu isteği ben mi başlattım.
       requestStatus: channelRow?.dmRequestStatus ?? null,
       requestOutgoing: channelRow?.dmRequesterId === userId,
+      // C12 §3.2 — İKİ AYRI ALAN, birbirine karıştırılmamalı:
+      //   receiptsEnabled: tik çizilecek mi (gizlilik kapısı). false → istemci HİÇ çizmez.
+      //   otherReadAt   : karşı tarafın okuma anı; null = henüz hiç okumamış (tek tik).
+      receiptsEnabled: receipt.visible,
+      otherReadAt: receipt.readAt ? receipt.readAt.toISOString() : null,
     };
   }
 

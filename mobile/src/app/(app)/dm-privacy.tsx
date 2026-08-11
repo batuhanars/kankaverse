@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/stores/auth';
@@ -32,6 +32,29 @@ export default function DmPrivacyScreen() {
   // Web `UserSettingsView.vue` `currentPolicy` ile aynı düşme deseni (`?? DmPolicy.EVERYONE`) —
   // pratikte `dmPolicy` kayıt anında her zaman dolu (`auth.service.ts`), bu yalnız savunmacı.
   const currentPolicy = user?.dmPolicy ?? DmPolicy.EVERYONE;
+
+  // C12 §2 — okundu bilgisi anahtarı. Web'deki Gizlilik bölümüyle aynı uç (`PATCH /users/me`),
+  // aynı kural: KARŞILIKLI. Kapatan kendi okumasını paylaşmaz ve karşı tarafınkini de göremez;
+  // bu, açıklama metninde kullanıcıya AÇIKÇA söyleniyor (sessiz kural, kural değil sürprizdir).
+  // Kararın kendisi sunucuda (`visibleReadAt`, R7); burası yalnız tercihi yazıyor.
+  const [savingReceipts, setSavingReceipts] = useState(false);
+  const readReceipts = user?.readReceipts ?? true;
+
+  async function toggleReadReceipts(next: boolean) {
+    if (savingReceipts || next === readReceipts) return;
+    setSavingReceipts(true);
+    setErrorMessage('');
+    setSavedNotice('');
+    try {
+      const updated = await usersApi.updateProfile({ readReceipts: next });
+      useAuthStore.setState({ user: updated });
+      setSavedNotice(t('settings.dmPolicy.saved'));
+    } catch (e) {
+      setErrorMessage(extractErrorMessage(e));
+    } finally {
+      setSavingReceipts(false);
+    }
+  }
 
   async function selectPolicy(policy: DmPolicy) {
     if (policy === currentPolicy || saving) return;
@@ -86,6 +109,21 @@ export default function DmPrivacyScreen() {
           })}
         </View>
 
+        {/* C12 §2 — okundu bilgisi. Ayrı bir ekran açılmadı: ikisi de aynı gizlilik ailesinden. */}
+        <View style={styles.receiptCard}>
+          <View style={styles.optionText}>
+            <Text style={styles.optionTitle}>{t('settings.readReceipts.label')}</Text>
+            <Text style={styles.optionDesc}>{t('settings.readReceipts.description')}</Text>
+          </View>
+          <Switch
+            value={readReceipts}
+            onValueChange={toggleReadReceipts}
+            disabled={savingReceipts}
+            trackColor={{ true: theme.colors.accent500, false: theme.colors.bgRail }}
+            thumbColor={theme.colors.textPrimary}
+          />
+        </View>
+
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
         {savedNotice ? <Text style={styles.saved}>{savedNotice}</Text> : null}
       </ScrollView>
@@ -112,6 +150,18 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   options: { gap: 8 },
+  // Anahtar satırı: seçenek kartlarıyla aynı görsel aile, radyo yerine Switch.
+  receiptCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 20,
+    padding: 14,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.borderSubtle,
+    backgroundColor: theme.colors.bgElevated,
+  },
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
