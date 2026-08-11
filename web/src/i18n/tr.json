@@ -1385,7 +1385,9 @@
     "privacySaved": "Gizlilik tercihin güncellendi.",
     "rolesSaved": "Rol kaydedildi.",
     "saveError": "Kaydedilemedi, tekrar dene.",
-    "joinError": "Ortama katılınamadı, tekrar dene."
+    "joinError": "Ortama katılınamadı, tekrar dene.",
+    "updateAfterCall": "Uygulamanın yeni bir sürümü yayınlandı. Görüşme bitince otomatik yenilenecek.",
+    "chunkLoadFailed": "Bir ekran yüklenemedi. Sayfayı yenilemeyi dene, sürerse bize bildir."
   },
   "common": {
     "cancel": "İptal",

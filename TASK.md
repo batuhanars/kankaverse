@@ -3876,6 +3876,50 @@ kapalı kalırdı. Dev bunu gizlemek yerine raporladı.
       Sahip sert yenileme + site verisi temizleme deneyecek; geçmezse Network sekmesindeki
       `Location` başlığına bakılacak. Konsolun sonunda bir de 502 var, aynı turda incelenecek.
 
+---
+
+## Sprint D63 — Bayat Parça Öz-Onarımı — 2026-08-11 ✅ KOD BİTTİ
+
+> Sözleşme: `contracts/SPRINT_D63_STALE_CHUNK_CONTRACT.md`. Tier yalnız `web/`.
+> `api/`, `mobile/`, `desktop/` diffi sıfır.
+
+- [x] `web/src/lib/chunkReload.ts` — `vite:preloadError` dinleniyor, sayfa BİR KEZ yenileniyor
+- [x] 🔴 Döngü koruması: `sessionStorage` damgası, 15 sn içinde ikinci yenileme YOK
+      (yenileme çözmediyse hata toast'ı çıkıyor, sessiz kalmıyor)
+- [x] 🔴 **Aramadaki kullanıcı düşürülmüyor** (sahip onayladı 2026-08-11): `connectedChannelId`
+      doluysa yenileme ertelenir, bilgi toast'ı çıkar, arama biter bitmez kendi kendine onarır.
+      O dalda `preventDefault` çağrılmıyor: gezinme normal yolundan başarısız olsun, kullanıcı
+      bulunduğu ekranda kalsın
+- [x] i18n: `toast.updateAfterCall` + `toast.chunkLoadFailed` (kodda gömülü string yok)
+- [x] `nginx.conf` / `Caddyfile` DEĞİŞMEDİ — önbellek başlıkları zaten doğruydu, kusur istemcide
+- [x] `vue-tsc -b` bilinen 6 önceden-var hata (fazlası yok) · değişen dosyalarda lint temiz ·
+      `vite build` ✅
+
+- [x] 🔴 **§2.3 addendum (sınamadan SONRA, sahip onayladı):** yenileme aynı adrese değil HEDEFE
+      yapılıyor (`location.assign`). İlk hâl `location.reload()` idi ve ölçümde yetersiz çıktı:
+      import patlayınca gezinme commit edilmiyor, URL eski ekranda kalıyor, kullanıcı hedefe varmak
+      için **ikinci kez tıklamak** zorunda kalıyordu. Hedef `router.beforeEach`te tutuluyor
+
+### DoD — PM davranış sınaması ✅ (2026-08-11, derlenmiş pakete karşı ölçüldü)
+Sınama düzeneği: `vite preview`, açık sekme eski `index.html`i tutuyor, kaynak değiştirilip yeniden
+derlenerek parça hash'i değiştirildi (gerçek dağıtımın birebir taklidi).
+- [x] Eksik parçaya gidilince sayfa kendini bir kez onarıyor (`navType: reload`, damga yazıldı)
+- [x] **Tek tıklamayla hedef ekran açılıyor** (`path: /register`, başlık "Hesap Oluştur")
+- [x] 15 sn içinde ikinci hata → yenileme YOK, Türkçe toast çıkıyor
+- [x] Sonsuz yenileme döngüsü yok (§2.3 değişikliğinden sonra ayrı parçayla regresyon sınandı)
+- [ ] 🔬 **Sınanmayan tek dal: §2.2** (aramadayken erteleme + arama bitince onarım). İki hesap +
+      canlı ses oturumu gerektiriyor, sahip turunda doğrulanacak
+
+> Geçici sınama değişikliği geri alındı, `dist/` yeniden derlendi, preview sunucusu kapatıldı.
+
+### Ayrı kalem — masaüstü `ERR_TOO_MANY_REDIRECTS` (§7, bu sprintte kod yok)
+PM taradı: `desktop/src/main.js` içinde `webRequest`/`onBeforeRequest` türü hiçbir yönlendirme
+kancası YOK, sunucu tarafı da temiz doğrulanmıştı. Kaynak istemci önbelleğindeki eski kalıcı
+yönlendirme. Öz-onarım semptomu büyük olasılıkla kapatır ama kanıtlanmadı. Sahip turunda hâlâ
+görülürse istenecek kanıt: Network sekmesinde `Location` başlığı + aynı turdaki 502'nin isteği.
+
+---
+
 ### Tasarım kararları (sahip onayladı 2026-08-10 akşamı)
 - Rozet **NOKTA** olacak, sayı değil. Arama ekranı zaten kalabalık; orada gereken bilgi "yeni bir
   şey var", kaç tane olduğu değil. Sayıyı merak eden zaten sohbete giriyor.
