@@ -219,6 +219,18 @@ export async function syncPushToken(): Promise<void> {
   }
 }
 
+/**
+ * 🔴 Push kaydı yapıldı mı (sahip cihaz turu 2026-08-11). `syncPushToken` YALNIZ uygulama
+ * açılışında çalışıyordu; açılışta bildirim izni yoksa token hiç alınmıyor ve kimse yeniden
+ * denemiyordu. Kullanıcı sonradan sistem ayarlarından izin verince (ki bildirimler sekmesindeki
+ * uyarı şeridi tam olarak oraya yönlendiriyor) şerit kayboluyor, kullanıcı düzeldi sanıyor ama
+ * push ÖLÜ kalıyordu. Arama bildirimi çalışmaya devam ettiği için kusur daha da gizleniyordu:
+ * o bildirim uygulama içinde üretiliyor, sunucu push'una hiç ihtiyaç duymuyor.
+ */
+export function isPushTokenRegistered(): boolean {
+  return registeredToken !== null;
+}
+
 /** Çıkışta çağrılır (contract §3 "Çıkışta DELETE çağrılır — yoksa cihazı bırakan kullanıcının
  *  bildirimleri gelmeye devam eder"). Token hiç alınmadıysa no-op. */
 export async function clearPushToken(): Promise<void> {

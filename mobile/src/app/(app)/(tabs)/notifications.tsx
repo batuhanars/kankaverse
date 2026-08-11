@@ -1,8 +1,9 @@
-import { useCallback } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
 import { useNotificationsStore } from '@/stores/notifications';
 import type { NotificationDto } from '@/api/notifications';
 import { t } from '@/i18n';
@@ -38,6 +39,41 @@ function notificationText(n: NotificationDto): string {
     default:
       return actor;
   }
+}
+
+// Sahip bulgusu 2026-08-11 — `push.ts`'teki `readExpoPushToken` izin verilmemişken (özellikle
+// Android'in "bir daha sorma" bayrağı düşünce, `canAskAgain === false`) bilinçli olarak sessiz
+// `null` döner (contract'ın "ısrarlı ikinci sorma yok" kuralı). Sorun ısrar eksikliği değil,
+// GÖRÜNÜRLÜK eksikliği: sahip aynı günde iki kez "push gitmiyor" diye kod aradı, sebep OS izniydi.
+// Bu şerit yalnız izin YOKKEN görünür ve durumu OS'tan okur — `push.ts`'e dokunulmadı, istekte
+// bulunmuyor, yalnız mevcut durumu gösterip sistem ayarlarına yönlendiriyor. Odaklanmada yeniden
+// okunur ki kullanıcı ayarlardan izni açıp döndüğünde şerit kendiliğinden kaybolsun.
+function NotificationPermissionBanner() {
+  const [granted, setGranted] = useState<boolean | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      Notifications.getPermissionsAsync()
+        .then((res) => setGranted(res.status === 'granted'))
+        .catch(() => setGranted(null));
+    }, []),
+  );
+
+  // `granted === null` (henüz okunmadı ya da okuma başarısız oldu) sırasında da gösterilmez —
+  // yanlış-pozitif bir uyarı, gerçek bir izin sorunundan daha kötü bir kullanıcı deneyimidir.
+  if (granted !== false) return null;
+
+  return (
+    <View style={styles.permissionBanner}>
+      <Ionicons name="notifications-off-outline" size={18} color={theme.colors.warning} />
+      <View style={styles.permissionBannerBody}>
+        <Text style={styles.permissionBannerText}>{t('mobile.notificationsPermission.message')}</Text>
+        <Pressable onPress={() => void Linking.openSettings()}>
+          <Text style={styles.permissionBannerAction}>{t('mobile.notificationsPermission.action')}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
 }
 
 // Sprint M1a contract §5 ekran 5 — liste + okunmamış vurgusu + dokunuşta ilgili kanala git.
@@ -133,6 +169,7 @@ export default function NotificationsScreen() {
   return (
     <SafeAreaView style={styles.flex} edges={['top']}>
       <Text style={styles.title}>{t('notification.title')}</Text>
+      <NotificationPermissionBanner />
 
       {loading && items.length === 0 && (
         <View style={styles.center}>
@@ -217,6 +254,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.layout.panelGap,
     paddingTop: 8,
     paddingBottom: 12,
+  },
+  permissionBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginHorizontal: theme.layout.panelGap,
+    marginBottom: 12,
+    padding: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.warningSubtle,
+  },
+  permissionBannerBody: {
+    flex: 1,
+    gap: 4,
+  },
+  permissionBannerText: {
+    color: theme.colors.warning,
+    fontSize: theme.fontSize.xs,
+    lineHeight: 16,
+  },
+  permissionBannerAction: {
+    color: theme.colors.warning,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   center: {
     flex: 1,

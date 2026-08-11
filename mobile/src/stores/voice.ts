@@ -963,9 +963,14 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   handleCallAccepted(channelId) {
     if (get().connectedChannelId === channelId) set({ didInvite: false });
   },
+  // 🔴 Reddedilme, genel `unreachable` kovasına DÜŞMEZ (sahip turu 2026-08-11). Web bu ayrımı
+  // zaten yapıyor: `call.rejected` düz reddi açıkça söyler, `call.unreachable` ise engellenme/
+  // ilişki durumunu SIZDIRMAMAK için nötr kalır (bkz. web `useCall.ts` yorumları). Mobil ikisini
+  // tek metne yığdığı için reddedilmede "ulaşılamıyor" diyordu — yanlış yönlendirici, teknik arıza
+  // ima ediyordu. i18n ortak dosya olduğu için web'in anahtarı yeniden kullanıldı, yenisi açılmadı.
   handleCallRejected(channelId) {
     if (get().connectedChannelId !== channelId) return;
-    set({ disconnectReason: t('mobile.call.unreachable') });
+    set({ disconnectReason: t('call.rejected') });
     void get().leave(false);
   },
 

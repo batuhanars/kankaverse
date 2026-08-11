@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
 import { theme } from '@/theme';
 import { useAuthStore } from '@/stores/auth';
@@ -7,7 +8,7 @@ import { useFriendsStore } from '@/stores/friends';
 import { useUnreadStore } from '@/stores/unread';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { useBackgroundSocket } from '@/realtime/useBackgroundSocket';
-import { syncPushToken } from '@/notifications/push';
+import { syncPushToken, isPushTokenRegistered } from '@/notifications/push';
 import { ensureIncomingCallNotificationsSetup } from '@/notifications/incomingCall';
 
 // Auth guard — oturum sunucu tarafında düşerse (401 → refresh de başarısız, bkz. stores/auth.ts
@@ -49,7 +50,19 @@ export default function AppLayout() {
     // davranış) kanal/kategori henüz yokken düşen push'ta ses yanlış olur, düğmeler hiç çıkmaz.
     // `ensureIncomingCallNotificationsSetup` idempotent (`setupDone`), tekrar çağrı zararsız.
     void ensureIncomingCallNotificationsSetup();
+    // 🔴 Sahip cihaz turu 2026-08-11 — `syncPushToken` YALNIZ burada, yani uygulama açılışında
+    // çalışıyordu. Açılışta bildirim izni yoksa token hiç alınamıyor ve bir daha DENENMİYORDU:
+    // kullanıcı sonradan sistem ayarlarından izin verse bile (bildirimler sekmesindeki uyarı
+    // şeridi tam oraya yönlendiriyor) push ölü kalıyordu. Kusur çift gizliydi: şerit izin
+    // açılınca kaybolduğu için "düzeldi" görünüyor, arama bildirimi de çalışmaya devam ediyor
+    // (o uygulama içinde üretiliyor, sunucu push'una ihtiyacı yok) — yalnız MESAJ bildirimi ölü.
+    // Uygulama ön plana her döndüğünde, kayıt HENÜZ yapılmadıysa yeniden denenir. Kayıt varsa
+    // hiçbir şey yapılmaz, yani her dönüşte gereksiz istek atılmaz.
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && !isPushTokenRegistered()) void syncPushToken();
+    });
     return () => {
+      sub.remove();
       useDmStore.getState().setSessionUser(null);
       useFriendsStore.getState().reset();
       useUnreadStore.getState().reset();

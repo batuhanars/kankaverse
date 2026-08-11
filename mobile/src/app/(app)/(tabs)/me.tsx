@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -87,10 +87,26 @@ export default function MeScreen() {
           </View>
           {/* 🔴 Engellenenler satırı KALIR (sahip talimatı 2026-08-01) — profil yeniden
               düzenlenirken kaldırılmadı. */}
-          <Pressable onPress={() => router.push('/blocked-list')} style={styles.menuRow}>
+          <Pressable onPress={() => router.push('/blocked-list')} style={[styles.menuRow, styles.menuRowDivider]}>
             <Ionicons name="ban-outline" size={20} color={theme.colors.textSecondary} />
             <Text style={styles.menuLabel}>{t('friends.tabBlocked')}</Text>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </Pressable>
+          {/* DM gizlilik ayarı ("kimler mesaj atabilir") — web'de vardı, mobilde yoktu (PM
+              talimatı 2026-08-11); web'in "Gizlilik" tab başlığıyla aynı i18n anahtarı. */}
+          <Pressable onPress={() => router.push('/dm-privacy')} style={[styles.menuRow, styles.menuRowDivider]}>
+            <Ionicons name="chatbubble-ellipses-outline" size={20} color={theme.colors.textSecondary} />
+            <Text style={styles.menuLabel}>{t('settings.dmPolicy.label')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </Pressable>
+          {/* Sistem bildirim ayarlarına kısayol (sahip talimatı 2026-08-11, Discord referansı).
+              Bildirimler sekmesindeki uyarı şeridi YALNIZ izin kapalıyken çıkıyor; bu satır ise
+              HER ZAMAN duruyor, çünkü kullanıcı izni açıkken de ses/titreşim gibi sistem tarafı
+              ayarları değiştirmek isteyebilir. Uygulama içi ayar DEĞİL, sistem ayarlarını açar. */}
+          <Pressable onPress={() => void Linking.openSettings()} style={styles.menuRow}>
+            <Ionicons name="notifications-outline" size={20} color={theme.colors.textSecondary} />
+            <Text style={styles.menuLabel}>{t('mobile.notificationsPermission.systemRow')}</Text>
+            <Ionicons name="open-outline" size={16} color={theme.colors.textMuted} />
           </Pressable>
         </View>
 

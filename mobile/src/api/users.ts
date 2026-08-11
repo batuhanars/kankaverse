@@ -1,4 +1,5 @@
 import http from './http';
+import type { DmPolicy, UserDto } from './auth';
 
 // Sprint M1b contract §2 + §3.6 — `GET /users/:id/card` → `UserProfileCardDto`
 // (api/src/modules/users/users.service.ts). Backend DTO'su çok daha zengin (bio/banner/mutual/
@@ -59,6 +60,8 @@ export interface UpdateProfileDto {
    * `null` (marka varsayılanı). Bkz. `utils/bannerColor.ts` ve `api/src/common/banner-presets.ts`.
    */
   bannerColor?: string | null;
+  /** DM gizlilik ayarı — web `usersApi.updateProfile({ dmPolicy })` ile birebir (aynı uç, PATCH /users/me). */
+  dmPolicy?: DmPolicy;
 }
 
 /** `api/src/shared/media/image-upload.service.ts` `PresignResult` — birebir iki alan. */
@@ -83,8 +86,10 @@ export const usersApi = {
     return res.data;
   },
 
-  async updateProfile(dto: UpdateProfileDto): Promise<unknown> {
-    const res = await http.patch('/users/me', dto);
+  // Dönüş `toUserDto` (full user) — bio/afiş çağrıları bugüne kadar yoksaymıştı, dmPolicy ekranı
+  // (dm-privacy.tsx) güncel değeri store'a yazmak için gerçek tipe ihtiyaç duyuyor.
+  async updateProfile(dto: UpdateProfileDto): Promise<UserDto> {
+    const res = await http.patch<UserDto>('/users/me', dto);
     return res.data;
   },
 

@@ -1780,6 +1780,11 @@
       "empty": "Henüz bir ortamın yok.",
       "error": "Ortamlar yüklenemedi. Bağlanılamadı, tekrar dene."
     },
+    "notificationsPermission": {
+      "message": "Bildirim izni kapalı olduğu için mesaj, arama ve etiketlenme bildirimleri gelmiyor.",
+      "action": "Sistem ayarlarını aç",
+      "systemRow": "Sistem bildirim ayarları"
+    },
     "tabs": {
       "home": "Ana Sayfa",
       "me": "Sen"
