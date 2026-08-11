@@ -7,6 +7,7 @@ import { notificationsApi } from '@/api/notifications';
 import { resolvePushTarget } from '@/utils/pushNavigation';
 import { isChannelRinging } from '@/notifications/incomingCall';
 import { useGatedNotificationResponder } from '@/notifications/responseGate';
+import { useDmStore } from '@/stores/dm';
 
 /**
  * Sprint M3 §3 — mobil push istemci ayağı.
@@ -40,6 +41,18 @@ import { useGatedNotificationResponder } from '@/notifications/responseGate';
  * damgası basıyor, `api/` payload'ında bu alan YOK (ve eklenmeyecek). Bastırma artık YALNIZ
  * `source !== 'ws'` (yani "bu push, bizim yerel bildirimimiz değil") VE `isChannelRinging` ikisi
  * birden doğruyken tetikleniyor — kendi bildirimimiz zamanlamadan bağımsız her zaman geçer.
+ *
+ * 🔴 §2 (M5c, testçi geri bildirimi) — banner artık yalnız gelen aramada değil, mesaj
+ * bildirimlerinde de (`MENTION`/`DM_MESSAGE`) düşer: sesli görüşmedeyken veya başka bir ekrandayken
+ * gelen mesaj artık durum çubuğuna gizlice düşmüyor, kullanıcı elle çekmek zorunda kalmıyor.
+ * İSTİSNA (sahip kararı 2026-08-10): kullanıcı O DM'in kendi ekranındaysa banner çıkmaz — okuduğu
+ * mesaj için bildirim almak saçma. Sinyal `dm` store'daki `activeDmChannelId` (mevcut alan, yeni
+ * altyapı YOK). Bu alan yalnız DM kanallarını kapsadığı için ortam kanalı mesajları (`MENTION` +
+ * `guildId`) için istisna KENDİLİĞİNDEN uygulanmaz — `channelId` hiçbir zaman bir DM id'sine eşit
+ * olmayacağından karşılaştırma hep `false` döner; kullanıcı o kanaldayken de banner çıkabilir. Bunu
+ * daraltmak ayrı bir tasarım sorusu (bkz. contract §2 sınır koşulu), bu sprintin işi değil.
+ * Ses hâlâ YALNIZ aramada çalar (`shouldPlaySound: isIncomingCall`) — görüşme ortasında sesli mesaj
+ * bildirimi rahatsız edici olurdu, banner yeterli. `shouldSetBadge` değişmedi.
  */
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
@@ -52,8 +65,14 @@ Notifications.setNotificationHandler({
         return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false };
       }
     }
+
+    const isMessage = data?.type === 'MENTION' || data?.type === 'DM_MESSAGE';
+    const messageChannelId = typeof data?.channelId === 'string' ? data.channelId : null;
+    const isActiveDm =
+      isMessage && messageChannelId !== null && messageChannelId === useDmStore.getState().activeDmChannelId;
+
     return {
-      shouldShowBanner: isIncomingCall,
+      shouldShowBanner: isIncomingCall || (isMessage && !isActiveDm),
       shouldShowList: true,
       shouldPlaySound: isIncomingCall,
       shouldSetBadge: false,

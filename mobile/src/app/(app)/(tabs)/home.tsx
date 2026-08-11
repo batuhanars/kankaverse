@@ -38,7 +38,13 @@ export default function HomeScreen() {
   const [guildState, setGuildState] = useState<'loading' | 'error' | 'ready'>('loading');
   const [guilds, setGuilds] = useState<GuildSummaryDto[]>([]);
   const [addOpen, setAddOpen] = useState(false);
-  const [guildMenuOpen, setGuildMenuOpen] = useState(false);
+  // §4 (M5c, PM revizesi) — uzun basılan ortam. `menuChannel`/`menuDm` ile AYNI desen: panel
+  // `selection`dan BAĞIMSIZ kendi hedefini taşır, uzun basış rail'in mevcut seçimini DEĞİŞTİRMEZ.
+  // İlk sürüm `setSelection`i de çağırıyordu (kanal paneli de o ortama atlıyordu) — sahip bunu
+  // reddetti: uzun basışın amacı "hangi ortamdayım" karışıklığını gidermek, kullanıcıyı
+  // bulunduğu yerden habersizce koparmak değil (Discord referansı da böyle: uzun basış yalnız
+  // menü açar, ortam değiştirmez).
+  const [menuGuildId, setMenuGuildId] = useState<string | null>(null);
   // Uzun basılan kanal — panel bunun üzerinden açılır (sahip revizesi: uzun basış doğrudan
   // düzenleme ekranına atlamıyor, önce "ne yapabilirim" panelini gösteriyor).
   const [menuChannel, setMenuChannel] = useState<ChannelSummaryDto | null>(null);
@@ -99,23 +105,35 @@ export default function HomeScreen() {
     router.setParams({ joinedGuildId: undefined, refreshGuilds: undefined });
   }, [params.joinedGuildId, params.refreshGuilds, fetchGuilds, router]);
 
-  // Seçili ortamın rolünü çek (yalnız bir kez ortam başına). Hata SESSİZ: rol öğrenilemezse
-  // "Davet Et" görünmez — yetkisiz kullanıcıya düğme göstermektense yetkiliye göstermemek
-  // daha az zararlı (fail-closed).
+  // Seçili ortamın (VE §4 ile birlikte: uzun basılıp menüsü açılan ortamın) rolünü çek — yalnız
+  // bir kez ortam başına, `myRoleByGuild[id]` zaten doluysa tekrar istek atılmaz. Hata SESSİZ: rol
+  // öğrenilemezse "Davet Et"/"Ayarlar" görünmez — yetkisiz kullanıcıya düğme göstermektense
+  // yetkiliye göstermemek daha az zararlı (fail-closed).
+  //
+  // 🔴 §4 genellemesi (PM revizesi) — menü artık `selection`dan bağımsız (`menuGuildId`), yani
+  // ziyaret edilmemiş bir ortama uzun basılabilir. Rol isteği eskiden yalnız `selection.id` için
+  // atılıyordu; menü ortamı da eklenmezse ADMIN olan ama o ortamı hiç açmamış bir kullanıcı,
+  // kendi yönettiği ortamda Ayarlar/Davet/Kanal Oluştur'u GÖRMEZ (`canManage` sessizce false döner).
+  // Sahiplik dalı (`guild.ownerId === myUserId`) zaten ağ isteği gerektirmiyor — burada kısa bir
+  // gecikme yalnız ADMIN rolünde olur, kabul edilebilir (fail-closed zaten böyle çalışıyor).
   useEffect(() => {
-    if (selection.type !== 'guild' || !myUserId) return;
-    const guildId = selection.id;
-    if (myRoleByGuild[guildId]) return;
-    guildsApi
-      .getMembers(guildId)
-      .then((members) => {
-        const me = members.find((m) => m.userId === myUserId);
-        if (me) setMyRoleByGuild((prev) => ({ ...prev, [guildId]: me.role }));
-      })
-      .catch(() => {
-        // sessiz
-      });
-  }, [selection, myUserId, myRoleByGuild]);
+    if (!myUserId) return;
+    const selectedGuildId = selection.type === 'guild' ? selection.id : null;
+    const idsToFetch = [...new Set([selectedGuildId, menuGuildId].filter((id): id is string => !!id))].filter(
+      (id) => !myRoleByGuild[id],
+    );
+    idsToFetch.forEach((guildId) => {
+      guildsApi
+        .getMembers(guildId)
+        .then((members) => {
+          const me = members.find((m) => m.userId === myUserId);
+          if (me) setMyRoleByGuild((prev) => ({ ...prev, [guildId]: me.role }));
+        })
+        .catch(() => {
+          // sessiz
+        });
+    });
+  }, [selection, menuGuildId, myUserId, myRoleByGuild]);
 
   function retryGuilds() {
     setGuildState('loading');
@@ -144,6 +162,21 @@ export default function HomeScreen() {
     const role = myRoleByGuild[selection.id];
     return role === 'OWNER' || role === 'ADMIN';
   }, [guilds, selection, myUserId, myRoleByGuild]);
+
+  // §4 (M5c, PM revizesi) — uzun basılan ortamın kendi verisi, `selection`dan bağımsız (rail'de
+  // seçili OLMAYAN bir ortama uzun basılabilir). `selectedGuild`/`canManage` ile aynı hesap,
+  // yalnız `menuGuildId` üzerinden — iki kullanım (Rule of Three: üçüncüde çıkar, ikide bekle).
+  const menuGuild = useMemo(
+    () => guilds.find((g) => g.id === menuGuildId) ?? null,
+    [guilds, menuGuildId],
+  );
+  const menuGuildName = menuGuild?.name ?? '';
+  const menuGuildCanManage = useMemo(() => {
+    if (!menuGuildId) return false;
+    if (menuGuild && myUserId && menuGuild.ownerId === myUserId) return true;
+    const role = myRoleByGuild[menuGuildId];
+    return role === 'OWNER' || role === 'ADMIN';
+  }, [menuGuild, menuGuildId, myUserId, myRoleByGuild]);
 
   /**
    * Sprint M2a §4.5 — dolaşma deseni web `useGuildMenuActions.ts` `markGuildRead`'in birebir aynısı:
@@ -284,6 +317,9 @@ export default function HomeScreen() {
         onRetry={retryGuilds}
         onSelectDm={() => setSelection({ type: 'dm' })}
         onSelectGuild={(id) => setSelection({ type: 'guild', id })}
+        // §4 (M5c, PM revizesi) — uzun basış YALNIZ `menuGuildId`'yi set eder, `setSelection`
+        // ÇAĞRILMAZ: kısa basış davranışı ve rail'in seçimi bundan etkilenmez.
+        onLongPressGuild={(id) => setMenuGuildId(id)}
         onAddGuild={() => setAddOpen(true)}
       />
       {selection.type === 'dm' ? (
@@ -321,7 +357,9 @@ export default function HomeScreen() {
           selectedChannelId={lastOpenedChannelId}
           onOpenChannel={openChannel}
           guildBannerUrl={selectedGuild?.bannerUrl}
-          onOpenGuildMenu={() => setGuildMenuOpen(true)}
+          // §4 (M5c) — panel artık `menuGuildId` üzerinden çalışıyor (rail uzun basışıyla PAYLAŞILAN
+          // aynı state); burada `selection` zaten 'guild' (bu dal yalnız o zaman render edilir).
+          onOpenGuildMenu={() => setMenuGuildId(selection.id)}
           onEditChannel={(c) => setMenuChannel(c)}
           onEditCategory={(c) => setMenuCategory(c)}
           // Sprint M1g §2.1 — şerit aksiyonları. Davet MEVCUT ekrana gider (ortam panelindeki
@@ -413,49 +451,47 @@ export default function HomeScreen() {
         }}
       />
 
+      {/* §4 (M5c, PM revizesi) — `selection`dan bağımsız: `menuGuildId` rail'de seçili olmayan bir
+          ortam olabilir (uzun basış onu değiştirmiyor). Tüm eylemler `menuGuildId`den türetilir. */}
       <GuildMenuSheet
-        visible={guildMenuOpen}
-        guildName={selectedGuildName}
-        guildIconUrl={selectedGuild?.iconUrl}
-        guildDescription={selectedGuild?.description}
-        canManage={canManage}
-        onClose={() => setGuildMenuOpen(false)}
+        visible={!!menuGuildId}
+        guildName={menuGuildName}
+        guildIconUrl={menuGuild?.iconUrl}
+        guildDescription={menuGuild?.description}
+        canManage={menuGuildCanManage}
+        onClose={() => setMenuGuildId(null)}
         onMarkRead={() => {
-          setGuildMenuOpen(false);
-          if (selection.type === 'guild') void markGuildRead(selection.id);
+          const id = menuGuildId;
+          setMenuGuildId(null);
+          if (id) void markGuildRead(id);
         }}
         onInvite={() => {
-          setGuildMenuOpen(false);
-          if (selection.type === 'guild')
-            router.push({
-              pathname: '/guild-invite',
-              params: { id: selection.id, name: selectedGuildName },
-            });
+          const id = menuGuildId;
+          setMenuGuildId(null);
+          if (id) router.push({ pathname: '/guild-invite', params: { id, name: menuGuildName } });
         }}
         onSettings={() => {
-          setGuildMenuOpen(false);
-          if (selection.type === 'guild')
-            router.push({
-              pathname: '/guild-settings',
-              params: { id: selection.id, name: selectedGuildName },
-            });
+          const id = menuGuildId;
+          setMenuGuildId(null);
+          if (id) router.push({ pathname: '/guild-settings', params: { id, name: menuGuildName } });
         }}
         onCreateChannel={() => {
-          setGuildMenuOpen(false);
-          if (selection.type === 'guild')
-            router.push({ pathname: '/channel-new', params: { guildId: selection.id } });
+          const id = menuGuildId;
+          setMenuGuildId(null);
+          if (id) router.push({ pathname: '/channel-new', params: { guildId: id } });
         }}
         onCreateCategory={() => {
-          setGuildMenuOpen(false);
-          if (selection.type === 'guild')
-            router.push({ pathname: '/category-edit', params: { guildId: selection.id } });
+          const id = menuGuildId;
+          setMenuGuildId(null);
+          if (id) router.push({ pathname: '/category-edit', params: { guildId: id } });
         }}
         onNotifications={() => {
-          setGuildMenuOpen(false);
-          if (selection.type === 'guild')
+          const id = menuGuildId;
+          setMenuGuildId(null);
+          if (id)
             router.push({
               pathname: '/guild-notifications',
-              params: { guildId: selection.id, guildName: selectedGuildName },
+              params: { guildId: id, guildName: menuGuildName },
             });
         }}
       />

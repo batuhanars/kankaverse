@@ -837,6 +837,9 @@ export default function CallScreen() {
             void useVoiceStore.getState().toggleMute();
           }}
           onOpenChat={isGuildCall ? undefined : handleOpenChat}
+          // §3 (M5c) — `channel` zaten üstte `useDmStore`'dan çekiliyor (`unread` alanı hazır);
+          // ortam kanalında `onOpenChat` undefined olduğu için bu prop orada hiç kullanılmaz.
+          hasUnreadChat={channel?.unread}
           onHangUp={handleHangUp}
           // M4e §4 → M4f §2 → M4i §2 🔴 — kamera düğmesi kapısı `canPublishCamera` (`CallControls`in
           // `showCamera` hesabı bunu VE `onToggleCamera` doluluğunu kontrol ediyor); `isGuildCall`

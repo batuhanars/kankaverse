@@ -1812,6 +1812,10 @@
       "birthDateYearPlaceholder": "YYYY",
       "linkOpenError": "Bağlantı açılamadı. Lütfen tekrar dene."
     },
+    "auth": {
+      "showPassword": "Şifreyi göster",
+      "hidePassword": "Şifreyi gizle"
+    },
     "dm": {
       "muteLabel": "Konuşmayı Sustur",
       "voiceActive": "Seste {n} kişi var"
