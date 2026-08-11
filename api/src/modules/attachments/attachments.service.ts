@@ -11,14 +11,42 @@ import { StorageService } from '../../shared/storage/storage.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { PresignAttachmentDto } from './dto/presign-attachment.dto';
 
-// İzin verilen içerik tipleri (allowlist) — genişletme config değişikliğiyle gelir
+// İzin verilen içerik tipleri (allowlist) — genişletme config değişikliğiyle gelir.
+//
+// C12+ (sahip kararı 2026-08-11): düz metin ailesi ve arşivler eklendi. Gerekçe somuttu —
+// bir md dosyası yığınını zip'leyip göndermek istendi, ikisi de reddediliyordu.
+//
+// 🔴 Arşivlerin İÇİNE BAKAMIYORUZ. Zip kabul etmek "bir tür daha" değil, allowlist'i o dosya
+// için askıya almaktır: içinde exe de olabilir. Bilerek kabul edildi. Riski sınırlayan iki şey:
+// (1) mesaj ekleri PUBLIC DEĞİL — özel bucket, kısa ömürlü imzalı GET (`presignGet`), yani
+// kendi alan adımızda barındırılan bir indirme bağlantısı üretmiyoruz; (2) tarama açıldığında
+// (`SCAN`) arşivler bilinen bir kör nokta olarak kalacak, bu not oraya taşınmalı.
+//
+// 🔴 ASLA eklenmeyecekler: çalıştırılabilirler (exe, msi, bat, cmd, sh, apk, jar, scr, com, pif),
+// kısayol (lnk) ve tarayıcıda ÇALIŞAN türler (html, htm, svg, xml). Sonuncular bugün zararsız
+// görünüyor çünkü ekler imzalı URL'den iniyor; biri onları listeye eklerse indirmeye
+// `Content-Disposition: attachment` koymak ZORUNLU hale gelir (bugün konmuyor — görseller
+// sohbette satır içi gösterildiği için kasıtlı).
+//
+// Not: istemciler `application/x-zip-compressed` gibi platform türevlerini uzantıdan buradaki
+// kanonik türe çevirir (bkz. mobile `resolveContentType`, web `attachmentType.ts`).
 const ALLOWED_CONTENT_TYPES = new Set([
+  // Görsel
   'image/png',
   'image/jpeg',
   'image/gif',
   'image/webp',
+  // Belge
   'application/pdf',
+  // Düz metin ailesi (md/csv/json ayrı tür, log/yml/ini text/plain'e düşer)
   'text/plain',
+  'text/markdown',
+  'text/csv',
+  'application/json',
+  // Arşiv (içerik görünmez — yukarıdaki nota bak)
+  'application/zip',
+  'application/vnd.rar',
+  'application/x-7z-compressed',
 ]);
 
 /**

@@ -2,6 +2,7 @@
 import { ref, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { attachmentsApi } from '@/api/attachments'
+import { resolveContentType } from '@/utils/attachmentType'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 
@@ -38,11 +39,22 @@ onUnmounted(() => {
   uploadError.value = null
   uploading.value = true
 
+  // 🔴 `props.file.type` DOĞRUDAN gönderilemez: tarayıcı `.md`/`.log`/`.yml` için boş dize,
+  // `.zip` için `application/x-zip-compressed` bildiriyor ve sunucu ikisini de tanımıyordu
+  // (sahibin "md ve zip gönderemiyoruz" bulgusu). Ad düzeltmesi ortak util'de, gevşetme değil —
+  // tanınmayan uzantı burada da reddediliyor ve otorite yine sunucuda.
+  const contentType = resolveContentType(props.file.name, props.file.type)
+  if (!contentType) {
+    uploadError.value = t('attachment.errors.UNSUPPORTED_TYPE', t('attachment.errors.default'))
+    uploading.value = false
+    return
+  }
+
   let presignResult: { attachmentId: string; uploadUrl: string; storageKey: string }
   try {
     const res = await attachmentsApi.presign({
       filename: props.file.name,
-      contentType: props.file.type,
+      contentType,
       size: props.file.size,
     })
     presignResult = res.data

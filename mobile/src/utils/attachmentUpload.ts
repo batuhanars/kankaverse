@@ -29,6 +29,12 @@ export const ALLOWED_ATTACHMENT_TYPES = [
   'image/webp',
   'application/pdf',
   'text/plain',
+  'text/markdown',
+  'text/csv',
+  'application/json',
+  'application/zip',
+  'application/vnd.rar',
+  'application/x-7z-compressed',
 ] as const;
 
 /**
@@ -67,7 +73,21 @@ const EXTENSION_TYPES: Record<string, string> = {
   gif: 'image/gif',
   webp: 'image/webp',
   pdf: 'application/pdf',
+  // Düz metin ailesi. log/yml/yaml/ini için ayrı bir tür yok, hepsi text/plain — sunucunun
+  // listesini büyütmeden uzantıyı tanımanın doğru yolu bu (dosya gerçekten düz metin).
   txt: 'text/plain',
+  md: 'text/markdown',
+  csv: 'text/csv',
+  json: 'application/json',
+  log: 'text/plain',
+  yml: 'text/plain',
+  yaml: 'text/plain',
+  ini: 'text/plain',
+  // Arşiv. Uzantıdan türetmek burada ŞART: Android seçicisi zip için sık sık
+  // `application/x-zip-compressed` ya da boş tür bildiriyor, ikisi de allowlist'te değil.
+  zip: 'application/zip',
+  rar: 'application/vnd.rar',
+  '7z': 'application/x-7z-compressed',
 };
 
 /**
