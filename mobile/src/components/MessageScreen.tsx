@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { extractErrorMessage } from '@/api/errors';
 import type { MessageAuthorDto } from '@/api/messages';
@@ -167,20 +167,38 @@ export function MessageScreen({
       });
 
     markRead(channelId).catch(() => {});
-    // contract §4.3 — reconnect sonrası bu kanalın mesajları yeniden çekilir (boşluk bırakmaz).
-    setActiveChannel(channelId, fetchMessages);
     joinChannel(channelId).then((ack) => {
       if (__DEV__ && !ack.ok) console.warn('[MessageScreen] join başarısız:', ack.error);
     });
 
     return () => {
       cancelled = true;
-      setActiveChannel(null);
       leaveChannel(channelId);
       // typing:stop artık `useTypingEmitter`in kendi temizliğinde (aynı channelId'ye bağlı).
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
+
+  // 🔴 Kusur düzeltmesi (Sprint M5d §1 madde 2, sahip bulgusu 2026-08-11) — "bu kanal açık" kaydı
+  // (`setActiveChannel`) ÖNCEDEN yukarıdaki mount effect'in İÇİNDEYDİ. `dm/[id].tsx`teki KUSUR
+  // SINIFININ AYNISI: ortam içi arama ekranı bu ekranın ÜSTÜNE itilince (stack navigasyonu) alttaki
+  // ekran unmount OLMUYOR, yalnız odağı kaybediyor — kayıt mount'a bağlı olduğu için dolu kalıyordu ve
+  // `channel.activity`/`mention` dinleyicileri (`realtime/socket.ts:230,251`) hâlâ "kullanıcı bu
+  // kanalı okuyor" sanıp rozeti hiç basmıyordu (DM tarafındaki `stores/dm.ts:166` ile aynı belirti).
+  //
+  // CERRAHİ AYRIM (sözleşme §1 madde 2 uyarısı) — YALNIZ `setActiveChannel` buraya, odağa taşındı.
+  // `fetchMessages`/`markRead`/`joinChannel`/`leaveChannel` YUKARIDAKİ mount effect'te KALDI: odak
+  // kaybında odadan çıkılırsa (`leaveChannel`) WS odası terk edilir ve arama sırasında mesaj akışını
+  // keser — kusuru büyütürdü. Katılım/ayrılma ve ilk veri çekme bilerek mount'a bağlı bırakıldı.
+  // contract §4.3 — reconnect sonrası bu kanalın mesajları yeniden çekilir (boşluk bırakmaz); bu artık
+  // yalnız ekran ODAKTAYKEN geçerli (blur'da `onReconnectRefetch` da `null`'a döner, aşağıdaki
+  // `setActiveChannel(null)` ile — DM tarafındaki `setActiveDm(null)` simetrisiyle aynı desen).
+  useFocusEffect(
+    useCallback(() => {
+      setActiveChannel(channelId, fetchMessages);
+      return () => setActiveChannel(null);
+    }, [channelId, fetchMessages]),
+  );
 
   useEffect(() => {
     if (authUser) seedKnownUser(channelId, authUser.id, authUser.username);

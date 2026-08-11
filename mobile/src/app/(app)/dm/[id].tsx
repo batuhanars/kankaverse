@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { dmApi } from '@/api/dm';
 import { useAuthStore } from '@/stores/auth';
@@ -11,6 +11,7 @@ import { OngoingCallBanner } from '@/components/call/OngoingCallBanner';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ChatBackButton } from '@/components/ChatBackButton';
 import { channelTitle } from '@/utils/channelTitle';
+import { clearChannelNotifications } from '@/notifications/push';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -104,13 +105,34 @@ export default function DmScreen() {
   // Sözleşme §8.3 — bu DM açıkken gelen mesaj listede "okunmadı" işaretlenmez (web `activeDmChannelId`
   // ile aynı); ayrıca açılışta kutucuğun rozeti hemen düşer (sunucuya `markRead` MessageScreen'den
   // gidiyor, bu yalnız listenin yerel yansıması — bir sonraki `fetchAll`'ı beklemeden).
-  useEffect(() => {
-    if (!channelId) return;
-    const store = useDmStore.getState();
-    store.setActiveDm(channelId);
-    store.clearUnread(channelId);
-    return () => useDmStore.getState().setActiveDm(null);
-  }, [channelId]);
+  //
+  // 🔴 Kusur düzeltmesi (Sprint M5d §1, sahip bulgusu 2026-08-11): bu kayıt ÖNCEDEN `useEffect` ile
+  // MOUNT'a bağlıydı. Arama ekranı bu ekranın ÜSTÜNE itilince (stack navigasyonu) alttaki DM ekranı
+  // unmount OLMUYOR, yalnız odağı kaybediyor — `activeDmChannelId` dolu kaldığı için uygulama arama
+  // ekranındayken hâlâ "bu DM'i okuyor" sanıyordu: banner düşmüyordu (`notifications/push.ts` §2
+  // istisnası) ve liste rozeti hiç set edilmiyordu (`stores/dm.ts:166`). `useFocusEffect` (`home.tsx`
+  // /`me.tsx`/`notifications.tsx`'te zaten kullanılan desen) odak/blur'a simetrik çalışır: odağa
+  // gelince set + rozet temizle, odak GİDİNCE (blur VEYA unmount, ikisi de aynı temizleyiciyi tetikler)
+  // null'a dön — aynı DM'e geri dönüşte yeniden set edilir (sınır koşulu). `clearUnread` de buraya
+  // taşındı (sözleşme §1 madde 3 — zararsız, ekrana her dönüşte rozet düşer; sunucuya giden `markRead`
+  // sıklığı DEĞİŞMEDİ, o MessageScreen'in mount effect'inde kalıyor).
+  //
+  // 🔴 M5e §2 (sahip geri bildirimi 2026-08-11) — odağa gelince bu kanala ait, sistem bildirim
+  // tepsisinde gölgede bekleyen mesaj bildirimleri de düşürülür (`clearChannelNotifications`,
+  // `notifications/push.ts`). Yeni bir yaşam döngüsü mekanizması KURULMADI — aynı odak kancası
+  // kullanıldı (sözleşme "bugün eklenen odak kancası kullanılabilir" diyor). Yalnız bu kanalın
+  // DM_MESSAGE/MENTION bildirimleri hedeflenir; başka sohbetlerin ve arama bildirimlerinin
+  // etkilenmemesi `push.ts`teki filtreyle garanti edilir.
+  useFocusEffect(
+    useCallback(() => {
+      if (!channelId) return;
+      const store = useDmStore.getState();
+      store.setActiveDm(channelId);
+      store.clearUnread(channelId);
+      void clearChannelNotifications(channelId);
+      return () => useDmStore.getState().setActiveDm(null);
+    }, [channelId]),
+  );
 
   // M4a-1 sözleşme §3.1 — ses presence aboneliği. M4b'den beri 1-1 DM VE grup DM'de (`voiceEligible`);
   // grup DM kapsam dışı bırakılışı M4a'nın sınırıydı, bu sprintte kalktı. "Arama başlatma = katılma"
