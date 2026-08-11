@@ -4176,6 +4176,41 @@ mobilden ulaşılamayan TEK madde `dmPolicy`'ydi**, o da eklendi. Eklenmeyenler 
       LiveKit yayın parametreleri + gerçek bir oturumda istatistik. Tek kullanıcı raporu, tek ölçüm
       yok — bugünün dersi gereği ikinci bir gözlem ve gerçek ölçüm olmadan ayar değiştirilmeyecek
 
+---
+
+## 🔬 Bildirim tekilleştirmede yapısal sınır (2026-08-11, kayda geçti, ÇÖZÜLMEDİ)
+
+> Sahip bulgusu, sürüm paketi turunda. `tag` alanını eklediğimiz için ortaya çıktı; öncesinde her
+> mesaj ayrı satır olduğundan görünmüyordu. Sahibin teşhisi doğruydu, PM doğruladı.
+
+**Belirti:** Aynı sohbetten en fazla İKİ bildirim yan yana kalabiliyor. Uygulama içinden mesaj
+gelince biri, dışarıdan gelince öteki tazeleniyor; biri diğerinin yerine geçmiyor.
+
+**Kök neden:** İki yol, Android'in gözünde iki farklı kimlik.
+- Ön planda bildirimi BİZ kuruyoruz (`expo-notifications`). İstemci SDK'sı bildirime `tag`
+  atamayı SUNMUYOR (SDK 54 doğrulandı) → etiketsiz.
+- Arka planda/kapalıyken bildirimi FCM kuruyor ve sunucudaki `tag = channelId` alanını kullanıyor.
+- Android yer değiştirmeyi `(tag, id)` çiftine göre yapıyor → etiketli, etiketsizin yerine geçmez.
+
+**Neden bugün çözülmedi (PM kararı, sahip onayladı):**
+- İstemciye etiket verilemiyor (SDK sınırı).
+- Sunucuyu veri-yalnız push'a çevirip bildirimi her durumda istemcinin kurması tek aile yaratırdı
+  AMA D62 ödünleşmesine giriyor: uygulama tamamen kapalıyken agresif pil optimizasyonlu cihazlarda
+  (Xiaomi/Huawei) çalışacağı garanti değil ve bugün ÇALIŞAN bildirim yolunu riske atar.
+- Kalıntı sınırlı: en fazla BİR eski bildirim kalıyor, üst üste yığılma geri gelmiyor. Kullanıcı o
+  sohbete girince o kanalın bekleyenleri zaten temizleniyor (M5e §2) → kalıntı ilk açılışta yok oluyor.
+
+**Tetikleyici (ne zaman yeniden ele alınır):** testçilerden şikayet gelirse, ya da veri-yalnız push'a
+başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çözülür.
+
+### Ayrıca netleşen davranışlar (kusur DEĞİL, sahip sordu, PM doğruladı)
+- **Rail DM rozeti okunmamış DM SAYISINI sayıyor, mesaj sayısını değil** (`useDmUnreadCount`:
+  `dmChannels.filter(c => c.unread).length`). DM verisi sunucudan `unread: boolean` geliyor, sohbet
+  başına sayaç yok. Mesaj sayısı istenirse backend'in DM başına okunmamış sayısını dönmesi gerekir →
+  yeni alan + yeni hesap, yani yeni özellik. Karar sahipte, bugün yapılmadı.
+- **Ortam rozeti:** bahsetme kırmızı ve sayılı, normal mesaj beyaz nokta. Bilinçli: ortam
+  kanallarında yalnız bahsetme push ediliyor, normal mesaj yalnız görsel işaret bırakıyor.
+
 ### Tasarım kararları (sahip onayladı 2026-08-10 akşamı)
 - Rozet **NOKTA** olacak, sayı değil. Arama ekranı zaten kalabalık; orada gereken bilgi "yeni bir
   şey var", kaç tane olduğu değil. Sayıyı merak eden zaten sohbete giriyor.
