@@ -19,9 +19,10 @@ export const MediaPolicy = {
 } as const
 export type MediaPolicy = (typeof MediaPolicy)[keyof typeof MediaPolicy]
 
+// R20 — enum-ADMIN kaldırıldı (bkz. GuildMemberRole altındaki not); tam yetki artık
+// sahiplik + rol sisteminin ADMINISTRATOR bayrağı üzerinden çözülür.
 export const GuildRole = {
   OWNER: 'OWNER',
-  ADMIN: 'ADMIN',
   MEMBER: 'MEMBER',
 } as const
 export type GuildRole = (typeof GuildRole)[keyof typeof GuildRole]
@@ -306,9 +307,12 @@ export interface ChannelMemberDto {
 }
 
 // Sprint 7B — Ortam üye DTO
+// R20 (2026-08-11) — enum-ADMIN kaldırıldı: rol dışı ayrıcalıklı bir "yönetici" enum değeri
+// sessiz yetki yükselmesine yol açıyordu (sahiplik devri sonrası kalıcı ADMIN kalma vakası).
+// Kalan tek ayrıcalıklı katman OWNER; "tam yetkili yap" ihtiyacı artık rol sisteminin
+// ADMINISTRATOR bayrağıyla karşılanır (bkz. useGuildPermissions.ts).
 export const GuildMemberRole = {
   OWNER: 'OWNER',
-  ADMIN: 'ADMIN',
   MEMBER: 'MEMBER',
 } as const
 export type GuildMemberRole = (typeof GuildMemberRole)[keyof typeof GuildMemberRole]

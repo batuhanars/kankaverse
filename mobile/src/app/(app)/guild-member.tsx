@@ -4,6 +4,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { guildsApi, type GuildMemberDto } from '@/api/guilds';
 import { extractErrorMessage } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth';
+import { useGuildPermission } from '@/hooks/useGuildPermission';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -11,11 +12,14 @@ import { theme } from '@/theme';
 type Pending = 'kick' | 'ban' | 'transfer' | null;
 
 /**
- * Sprint M1e §2.4 — Üye ekranı: roller · ortam rolü · at · yasakla · sahipliği devret.
+ * Sprint M1e §2.4 — Üye ekranı: roller · at · yasakla · sahipliği devret.
+ * 🔴 Sprint R20 — "ortam rolü" (OWNER'ın üyeyi ADMIN yapması) burada TAŞINDI: enum-ADMIN katmanı
+ * kaldırıldı (`api/` §1.2 `PATCH .../role` ucu da düştü), tam yetki artık yalnız rol sisteminin
+ * `ADMINISTRATOR` bayrağıyla verilir (bkz. Ayarlar → Roller).
  *
- * 🔴 **Yetki kararı sunucudadır.** Hiyerarşi (OWNER > ADMIN > MEMBER) sunucuda uygulanıyor; burada
- * yapılan tek şey, çağıranın kendi yetkisine göre satırı **hiç render etmemek**. İstemci kararı
- * yeniden hesaplamıyor, gevşetmiyor; sunucu reddederse mesajı gösteriliyor.
+ * 🔴 **Yetki kararı sunucudadır.** Hiyerarşi (OWNER > MEMBER + izin bayrakları — Sprint R20) sunucuda
+ * uygulanıyor; burada yapılan tek şey, çağıranın kendi yetkisine göre satırı **hiç render etmemek**.
+ * İstemci kararı yeniden hesaplamıyor, gevşetmiyor; sunucu reddederse mesajı gösteriliyor.
  *
  * 🔴 **Takma ad alanı YOK**: `GuildMember`de böyle bir alan yok (izin anahtarları i18n'de duruyor
  * ama özellik hiç uygulanmamış). Discord'da var diye boş kutu konmadı.
@@ -54,13 +58,17 @@ export default function GuildMemberScreen() {
   const me = members.find((m) => m.userId === myUserId) ?? null;
   const isSelf = userId === myUserId;
   const iAmOwner = me?.role === 'OWNER';
-  const iAmAdmin = me?.role === 'ADMIN';
 
-  // Sunucu hiyerarşisinin aynası (yalnız GÖRÜNÜRLÜK için): OWNER, ADMIN ve MEMBER'a dokunabilir;
-  // ADMIN yalnız MEMBER'a. Kendine ve OWNER'a kimse dokunamaz.
-  const canModerate =
-    !!member && !isSelf && member.role !== 'OWNER' && (iAmOwner || (iAmAdmin && member.role === 'MEMBER'));
-  const canChangeGuildRole = !!member && !isSelf && iAmOwner && member.role !== 'OWNER';
+  // 🔴 Sprint R20 (§0.1, PM talimatı 2026-08-11) — aktör tarafı artık enum'a değil izne bakıyor:
+  // `useGuildPermission` sahipliği VE `ADMINISTRATOR` bayrağını zaten kendi içinde hesaplıyor, o
+  // yüzden burada AYRICA `iAmOwner ||` yazılmadı (yazsaydık aynı şeyi iki kere kontrol ederdik).
+  // Hedef koşulları (kendine/OWNER'a dokunulamaz) AYNEN kaldı — o kural aktörün kim olduğundan
+  // bağımsız. At ve Yasakla ayrı yetkiler (KICK_MEMBERS/BAN_MEMBERS): yalnız birine sahip biri
+  // yalnız o satırı görür, ikisi tek bir "canModerate" bayrağında BİRLEŞTİRİLMEDİ.
+  const canKickPermission = useGuildPermission(guildId, 'KICK_MEMBERS');
+  const canBanPermission = useGuildPermission(guildId, 'BAN_MEMBERS');
+  const canKick = !!member && !isSelf && member.role !== 'OWNER' && canKickPermission;
+  const canBan = !!member && !isSelf && member.role !== 'OWNER' && canBanPermission;
   const canTransfer = !!member && !isSelf && iAmOwner && member.role !== 'OWNER';
 
   async function run(action: () => Promise<unknown>, after: 'back' | 'reload') {
@@ -139,42 +147,25 @@ export default function GuildMemberScreen() {
 
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 
-        {/* Ortam rolü — yalnız OWNER değiştirebilir; yetkisizde satır HİÇ render edilmez. */}
-        {canChangeGuildRole && (
-          <>
-            <Text style={styles.groupLabel}>{t('member.actions.manageRoles')}</Text>
-            <View style={styles.group}>
-              <Pressable
-                style={styles.actionRow}
-                onPress={() =>
-                  run(
-                    () =>
-                      guildsApi.setMemberRole(
-                        guildId,
-                        userId,
-                        member.role === 'ADMIN' ? 'MEMBER' : 'ADMIN',
-                      ),
-                    'reload',
-                  )
-                }
-              >
-                <Text style={styles.actionText}>
-                  {member.role === 'ADMIN' ? t('member.role.MEMBER') : t('member.role.ADMIN')}
-                </Text>
-              </Pressable>
-            </View>
-          </>
-        )}
+        {/* 🔴 Sprint R20 — "ortam rolü" (OWNER → üyeyi ADMIN yap) satırı BURADAN kaldırıldı;
+            `setMemberRole` ucu backend'den de düştü (api/ §1.2). Tam yetki artık yalnız rol
+            sisteminin `ADMINISTRATOR` bayrağıyla verilir. */}
 
-        {canModerate && (
+        {/* Sprint R20 — At ve Yasakla AYRI izinlere bağlı (KICK_MEMBERS / BAN_MEMBERS); yalnız
+            birine sahip biri yalnız o satırı görür. Ayraç yalnız ikisi BİRLİKTE görünürken çizilir. */}
+        {(canKick || canBan) && (
           <View style={styles.group}>
-            <Pressable style={styles.actionRow} onPress={() => setPending('kick')}>
-              <Text style={[styles.actionText, styles.danger]}>{t('member.actions.kick')}</Text>
-            </Pressable>
-            <View style={styles.divider} />
-            <Pressable style={styles.actionRow} onPress={() => setPending('ban')}>
-              <Text style={[styles.actionText, styles.danger]}>{t('member.actions.ban')}</Text>
-            </Pressable>
+            {canKick && (
+              <Pressable style={styles.actionRow} onPress={() => setPending('kick')}>
+                <Text style={[styles.actionText, styles.danger]}>{t('member.actions.kick')}</Text>
+              </Pressable>
+            )}
+            {canKick && canBan && <View style={styles.divider} />}
+            {canBan && (
+              <Pressable style={styles.actionRow} onPress={() => setPending('ban')}>
+                <Text style={[styles.actionText, styles.danger]}>{t('member.actions.ban')}</Text>
+              </Pressable>
+            )}
           </View>
         )}
 

@@ -80,7 +80,9 @@ const GUILD_FIXTURE = {
 };
 
 const OWNER_MEMBERSHIP = { guildId: GUILD_ID, userId: OWNER_ID, role: GuildRole.OWNER };
-const ADMIN_MEMBERSHIP = { guildId: GUILD_ID, userId: ADMIN_ID, role: GuildRole.ADMIN };
+// R20: enum-ADMIN kaldırıldı. Bu fixture "izinli MEMBER" temsil eder — eskiden enum
+// role='ADMIN' idi, artık izin doğrudan permissionsMock.hasGuildPermission'dan gelir.
+const GRANTED_MEMBER_MEMBERSHIP = { guildId: GUILD_ID, userId: ADMIN_ID, role: GuildRole.MEMBER };
 const MEMBER_MEMBERSHIP = { guildId: GUILD_ID, userId: MEMBER_ID, role: GuildRole.MEMBER };
 
 const ROLE_FIXTURE = {
@@ -138,10 +140,10 @@ describe('RolesService.createRole', () => {
     expect(prismaMock.role.create).toHaveBeenCalledTimes(1);
   });
 
-  it('ADMIN → rol oluşturabilir', async () => {
+  it('izinli MEMBER (MANAGE_ROLES) → rol oluşturabilir', async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD_FIXTURE,
-      membership: ADMIN_MEMBERSHIP,
+      membership: GRANTED_MEMBER_MEMBERSHIP,
     });
     prismaMock.role.aggregate.mockResolvedValue({ _max: { position: 1 } });
     prismaMock.role.create.mockResolvedValue({ ...ROLE_FIXTURE, position: 2 });
@@ -460,7 +462,7 @@ describe('RolesService.assignRole', () => {
     prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE);
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD_FIXTURE,
-      membership: ADMIN_MEMBERSHIP,
+      membership: GRANTED_MEMBER_MEMBERSHIP,
     });
     // roleHierarchy geçer, memberHierarchy ihlal eder
     permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
@@ -619,7 +621,7 @@ describe('RolesService.removeRole', () => {
     prismaMock.role.findUnique.mockResolvedValue(ROLE_FIXTURE);
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD_FIXTURE,
-      membership: ADMIN_MEMBERSHIP,
+      membership: GRANTED_MEMBER_MEMBERSHIP,
     });
     // roleHierarchy geçer, memberHierarchy ihlal eder
     permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);

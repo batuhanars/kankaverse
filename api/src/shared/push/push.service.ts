@@ -26,6 +26,20 @@ export interface PushPayload {
   androidChannelId?: string;
   categoryId?: string;
   ttlSeconds?: number; // Expo `ttl`
+  /**
+   * Expo `tag` (Android'e özel) — "An identifier for replacing notifications already displayed
+   * on the device" (https://docs.expo.dev/push-notifications/sending-notifications/).
+   *
+   * Neden var: canlı kullanıcı geri bildirimi 2026-08-11 — yedi mesaj gölgede yedi ayrı bildirim
+   * satırı üretiyordu. Aynı sohbetin bildirimi öncekinin ÜSTÜNE yazılmalı (WhatsApp davranışı).
+   * İstemci tarafı bunu JS canlıyken zaten taklit ediyor (`mobile/.../push.ts`
+   * `dismissStaleChannelNotifications`) ama uygulama TAMAMEN kapalıyken FCM bildirimi JS'e hiç
+   * uğramadan gösterir; o boşluğu yalnız bu sunucu alanı kapatır.
+   *
+   * `collapseId` DEĞİL: o, iletim sırasında birleştirir; `tag` ise cihazda GÖRÜNEN bildirimin
+   * yerine geçer. Bize gereken ikincisi.
+   */
+  tag?: string;
 }
 
 interface ExpoTicket {
@@ -43,6 +57,7 @@ interface ExpoMessage {
   channelId?: string;
   categoryId?: string;
   ttl?: number;
+  tag?: string;
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -99,6 +114,7 @@ export class PushService {
         channelId: payload.androidChannelId,
         categoryId: payload.categoryId,
         ttl: payload.ttlSeconds,
+        tag: payload.tag,
       }));
 
       for (const batch of chunk(messages, CHUNK_SIZE)) {

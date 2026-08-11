@@ -22,7 +22,6 @@ import { SetIconDto } from './dto/set-icon.dto';
 import { SetMediaDto } from '../../shared/media/dto/set-media.dto';
 import { PresignBannerDto } from '../../shared/media/dto/presign-banner.dto';
 import { GuildMemberDto } from './dto/guild-member.dto';
-import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { InviteFriendDto } from './dto/invite-friend.dto';
 import { AuditLogEntryDto } from './dto/audit-log-entry.dto';
 import { Guild, GuildRole, NotifTargetType, NotificationLevel } from '@prisma/client';
@@ -93,8 +92,7 @@ function resolveChannelBadgeEffect(
 
 const ROLE_ORDER: Record<GuildRole, number> = {
   OWNER: 0,
-  ADMIN: 1,
-  MEMBER: 2,
+  MEMBER: 1,
 };
 
 /** GuildMember.roleLinks → GuildMemberDto.roles şekli (tek kaynak; @everyone örtük, atanmaz). */
@@ -547,102 +545,19 @@ export class GuildsService {
     return null;
   }
 
-  // ─── §B: Rol değiştir — yalnız OWNER (R7) ─────────────────────────────────
+  // ─── §C: Üye at (kick) — KICK_MEMBERS izni + hiyerarşi (R7 / R20) ────────
 
   /**
-   * PATCH /guilds/:id/members/:userId/role — yalnız OWNER.
-   *
-   * R7 yetki hiyerarşisi (satır satır incelenecek):
-   *  1. Actor OWNER kontrolü — ADMIN/MEMBER → 403 FORBIDDEN.
-   *  2. Hedef guild üyesi mi? → 404 NOT_GUILD_MEMBER.
-   *  3. Hedef OWNER mı? (kendi dahil) → 400 CANNOT_MODIFY_OWNER.
-   *  4. GuildMember.role güncelle (idempotent). AuditLog yaz. Dönüş: güncel üye DTO.
-   */
-  async updateMemberRole(
-    actorId: string,
-    guildId: string,
-    targetUserId: string,
-    dto: UpdateMemberRoleDto,
-  ): Promise<GuildMemberDto> {
-    // 1. Actor OWNER kontrolü (requireOwner guild var mı + OWNER rolü garantiler)
-    await this.requireOwner(actorId, guildId);
-
-    // 2. Hedef guild üyesi mi?
-    const targetMembership = await this.prisma.guildMember.findUnique({
-      where: { guildId_userId: { guildId, userId: targetUserId } },
-      include: { user: { select: { id: true, username: true, avatarUrl: true, bannerUrl: true } } },
-    });
-    if (!targetMembership) {
-      throw new NotFoundException({
-        message: 'Kullanıcı bu sunucunun üyesi değil.',
-        error: 'NOT_GUILD_MEMBER',
-      });
-    }
-
-    // 3. Hedef OWNER mı? (actor=OWNER, targetUserId=actor ya da başka OWNER)
-    if (targetMembership.role === GuildRole.OWNER) {
-      throw new BadRequestException({
-        message: 'Ortam sahibinin rolü değiştirilemez.',
-        error: 'CANNOT_MODIFY_OWNER',
-      });
-    }
-
-    // 4. Güncelle (idempotent — zaten o rolse no-op, update çalışır ama fark yok)
-    const updated = await this.prisma.guildMember.update({
-      where: { guildId_userId: { guildId, userId: targetUserId } },
-      data: { role: dto.role },
-      include: {
-        user: { select: { id: true, username: true, avatarUrl: true, bannerUrl: true } },
-        roleLinks: { include: { role: true } },
-      },
-    });
-
-    // AuditLog
-    await this.prisma.auditLog.create({
-      data: {
-        actorId,
-        action: 'guild.member_role_updated',
-        entityType: 'GuildMember',
-        entityId: updated.id,
-        metadata: {
-          guildId,
-          targetUserId,
-          newRole: dto.role,
-        },
-      },
-    });
-
-    const dto2: GuildMemberDto = {
-      userId: updated.user.id,
-      username: updated.user.username,
-      avatarUrl: updated.user.avatarUrl,
-      bannerUrl: updated.user.bannerUrl,
-      role: updated.role,
-      roles: mapRoleLinks(updated.roleLinks),
-    };
-
-    // REV-14 realtime: rol değişimini tüm üyelere yay (üye listesi anlık güncellensin)
-    this.realtime.emitToUsers(await this.guildMemberIds(guildId), 'guild.member_updated', {
-      guildId,
-      member: dto2,
-    });
-
-    return dto2;
-  }
-
-  // ─── §C: Üye at (kick) — OWNER/ADMIN hiyerarşi (R7) ──────────────────────
-
-  /**
-   * DELETE /guilds/:id/members/:userId — OWNER veya ADMIN at yetkisi (R7).
+   * DELETE /guilds/:id/members/:userId — KICK_MEMBERS izni gerekir (R7; R20'de enum-ADMIN
+   * kısa devresi kaldırıldı, karar izin sistemine devredildi).
    *
    * R7 yetki hiyerarşisi — yetki sızıntısı önlemek için sıra ÖNEMLİ:
-   *  1. Actor guild üyesi mi + rolü ne? (requireGuildMembership → {guild, membership})
-   *     Actor OWNER veya ADMIN değilse → 403 FORBIDDEN.
+   *  1. Actor guild üyesi mi + KICK_MEMBERS izni var mı? → yoksa 403 FORBIDDEN.
    *  2. Actor kendini mi atmaya çalışıyor? → 400 CANNOT_KICK_SELF.
    *  3. Hedef GuildMember kaydı var mı? → 404 NOT_GUILD_MEMBER.
    *  4. Hedef OWNER mı? → 400 CANNOT_KICK_OWNER.
-   *  5. Actor ADMIN ise ve hedef ADMIN → 403 FORBIDDEN
-   *     (ADMIN yalnız MEMBER atabilir; OWNER her rolü atabilir).
+   *  5. Üye hiyerarşisi: hedefin en yüksek rol position'ı aktörden düşük olmalı
+   *     (requireMemberHierarchy — OWNER muaf, ADMINISTRATOR bayrağı hiyerarşiyi DELMEZ).
    *  6. Tx: GuildMember sil + bu guild kanallarındaki ChannelMember kayıtlarını sil.
    *     AuditLog yaz. Dönüş null.
    */
@@ -767,7 +682,12 @@ export class GuildsService {
   }
 
   // ─── §E: Sahiplik devri (R7 — yalnız OWNER) ──────────────────────────────
-  /** POST /guilds/:id/members/:userId/transfer — hedef OWNER, eski sahip ADMIN olur (atomik). */
+  /**
+   * POST /guilds/:id/members/:userId/transfer — hedef OWNER, eski sahip MEMBER olur (atomik).
+   * Not: eski sahip ADMIN yapılmaz — devir kimseye yeni yetki VERMEZ, kişi yalnız kendi atanmış
+   * rolleriyle kalır. A→B→A gidiş-dönüşünde B'nin sıradan üye olarak kalması budur (bkz.
+   * contracts/SPRINT_M5D_DEVICE_ROUND_CONTRACT.md §2 — sessiz yetki yükselmesi kök nedeni).
+   */
   async transferOwnership(actorId: string, guildId: string, targetUserId: string): Promise<null> {
     await this.requireOwner(actorId, guildId);
     if (actorId === targetUserId) {
@@ -798,7 +718,7 @@ export class GuildsService {
       }),
       this.prisma.guildMember.update({
         where: { guildId_userId: { guildId, userId: actorId } },
-        data: { role: GuildRole.ADMIN },
+        data: { role: GuildRole.MEMBER },
         include: {
           user: { select: { id: true, username: true, avatarUrl: true } },
           roleLinks: { include: { role: true } },

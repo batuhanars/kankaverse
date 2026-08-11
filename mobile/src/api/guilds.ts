@@ -46,7 +46,9 @@ export interface InviteDto {
   createdAt: string;
 }
 
-export type GuildRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+// 🔴 Sprint R20 — enum-ADMIN katmanı kaldırıldı (api/ `schema.prisma` `enum GuildRole { OWNER MEMBER }`).
+// Bilinçli DAR tip: derleyici artık 'ADMIN' dalına dallanan HER yeri hata olarak gösterir.
+export type GuildRole = 'OWNER' | 'MEMBER';
 
 /**
  * Rol özeti — üye satırındaki rozet için. Sunucu `GuildMemberDto` içinde **hazır** dönüyor
@@ -179,14 +181,13 @@ export const guildsApi = {
   },
 
   // ─── M1e-A — ortam yönetimi ────────────────────────────────────────────────
-  // 🔴 Yetki hiyerarşisi SUNUCUDA (OWNER > ADMIN > MEMBER + izin bayrakları). İstemci yalnız kendi
-  // yetkisine göre satır gizler; kararı hesaplamaz, gevşetmez. Ret gelirse sunucunun mesajı gösterilir.
-
-  /** Yalnız OWNER; `ADMIN | MEMBER` (OWNER rolü bu uçla atanamaz — devir ayrı uçta). */
-  async setMemberRole(guildId: string, userId: string, role: 'ADMIN' | 'MEMBER'): Promise<GuildMemberDto> {
-    const res = await http.patch<GuildMemberDto>(`/guilds/${guildId}/members/${userId}/role`, { role });
-    return res.data;
-  },
+  // 🔴 Yetki hiyerarşisi SUNUCUDA (OWNER > MEMBER + izin bayrakları — Sprint R20, enum-ADMIN katmanı
+  // kaldırıldı). İstemci yalnız kendi yetkisine göre satır gizler; kararı hesaplamaz, gevşetmez.
+  // Ret gelirse sunucunun mesajı gösterilir.
+  //
+  // 🔴 Sprint R20 — `setMemberRole` (PATCH .../role) BURADAN SİLİNDİ: geriye atanabilir tek değer
+  // kalmıyor (ADMIN enum'dan düştü), rol vermek artık özel rol sisteminin işi. Uç da backend'den
+  // kaldırıldı (api/ §1.2).
 
   /** At (kick) — atılan kullanıcı davetle geri gelebilir. */
   async kickMember(guildId: string, userId: string): Promise<null> {
@@ -210,7 +211,7 @@ export const guildsApi = {
     return res.data;
   },
 
-  /** 🔴 Geri alınamaz: hedef OWNER olur, eski sahip ADMIN'e düşer. Çift onay ister (sözleşme §2.4). */
+  /** 🔴 Geri alınamaz: hedef OWNER olur, eski sahip MEMBER'e düşer. Çift onay ister (sözleşme §2.4). */
   async transferOwnership(guildId: string, userId: string): Promise<null> {
     const res = await http.post<null>(`/guilds/${guildId}/members/${userId}/transfer`);
     return res.data;
@@ -249,7 +250,7 @@ export const guildsApi = {
    * presign → PUT → PATCH `storageKey`.
    *
    * 🔴 **Yalnız OWNER** (`guilds.controller`: "yalnız OWNER"); presign ayrıca e-posta doğrulaması
-   * ister. ADMIN'e kalem gösterilmez.
+   * ister.
    * 🔴 **Ortam AFİŞİ mobilde düzenlenmez** — Discord mobilde de yok (sahip doğruladı), kural o
    * yüzden yalnız simge için gevşetildi.
    */

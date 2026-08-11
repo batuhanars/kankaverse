@@ -15,6 +15,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { MembershipService } from '../../../shared/membership/membership.service';
+import { PermissionsService } from '../../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../../shared/realtime/realtime.service';
 import { PresenceService, ActiveStatus } from '../../../shared/presence/presence.service';
 import { DmPermissionService } from '../../../shared/dm-permission/dm-permission.service';
@@ -44,6 +45,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private config: ConfigService,
     private prisma: PrismaService,
     private membership: MembershipService,
+    private permissions: PermissionsService,
     private realtime: RealtimeService,
     private presence: PresenceService,
     private dmPermission: DmPermissionService,
@@ -735,6 +737,12 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         title: author.username,
         body,
         data: { type: 'DM_MESSAGE', channelId },
+        // 🔴 Canlı kullanıcı geri bildirimi 2026-08-11 — aynı sohbetten gelen her mesaj gölgede
+        // AYRI bir bildirim satırı açıyordu (yedi mesaj = yedi satır). `tag` kanal başına sabit
+        // olduğu için yeni bildirim aynı sohbetin öncekinin YERİNE geçer (WhatsApp davranışı);
+        // farklı sohbetler ayrı kalır. İstemci tarafı bunu JS canlıyken zaten taklit ediyor,
+        // bu alan uygulama TAMAMEN kapalıyken kalan boşluğu kapatır (FCM bildirimi JS'e uğramaz).
+        tag: channelId,
         // 🔴 Sahip cihaz turu 2026-08-10 — kanal adı VERİLMEZSE FCM kendi yedek kanalını
         // (`fcm_fallback_notification_channel`, önem DEFAULT) kullanıyor ve bildirim ekranda
         // BELİRMİYOR, sessizce gölgeye düşüyor. Cihazın `dumpsys notification` kaydıyla
@@ -826,16 +834,14 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     });
 
     // İçerik önizlemesini görmeye yetkili üye kümesi (okuma erişimi + yaş kapısı).
+    // R20: enum-ADMIN kısa devresi kalktı — izin sistemi (OWNER/ADMINISTRATOR) tek kaynak.
     let eligible: Set<string>;
     if (channel.isPrivate) {
       const [cms, privileged] = await Promise.all([
         this.prisma.channelMember.findMany({ where: { channelId }, select: { userId: true } }),
-        this.prisma.guildMember.findMany({
-          where: { guildId, role: { in: ['OWNER', 'ADMIN'] } },
-          select: { userId: true },
-        }),
+        this.permissions.guildPrivilegedUserIds(guildId),
       ]);
-      let ids = [...cms.map((m) => m.userId), ...privileged.map((m) => m.userId)];
+      let ids = [...cms.map((m) => m.userId), ...privileged];
       if (needsAgeCheck) {
         const minors = new Set(guildMembers.filter((m) => m.user.isMinor).map((m) => m.userId));
         ids = ids.filter((id) => !minors.has(id));
@@ -947,20 +953,17 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     if ((mentionsEveryone || mentionRoles.length > 0) && guildId) {
       /**
-       * Özel kanalda GÖRÜNÜR küme: kanal üyeleri ∪ (OWNER/ADMIN). Toplu bahsetmelerin tamamı
-       * (everyone VE rol) bu kümeyle kesiştirilir — kanalı görmeyen üye, rolü yüzünden ping alıp
-       * kanalın varlığını öğrenemez. Sızıntı kapısı iki yolda da AYNI.
+       * Özel kanalda GÖRÜNÜR küme: kanal üyeleri ∪ tam yetkili (OWNER/ADMINISTRATOR — R20).
+       * Toplu bahsetmelerin tamamı (everyone VE rol) bu kümeyle kesiştirilir — kanalı görmeyen
+       * üye, rolü yüzünden ping alıp kanalın varlığını öğrenemez. Sızıntı kapısı iki yolda da AYNI.
        */
       let visibleSet: Set<string> | null = null;
       if (channel?.isPrivate) {
         const [cms, privileged] = await Promise.all([
           this.prisma.channelMember.findMany({ where: { channelId }, select: { userId: true } }),
-          this.prisma.guildMember.findMany({
-            where: { guildId, role: { in: ['OWNER', 'ADMIN'] } },
-            select: { userId: true },
-          }),
+          this.permissions.guildPrivilegedUserIds(guildId),
         ]);
-        visibleSet = new Set([...cms.map((m) => m.userId), ...privileged.map((m) => m.userId)]);
+        visibleSet = new Set([...cms.map((m) => m.userId), ...privileged]);
       }
 
       if (mentionsEveryone) {

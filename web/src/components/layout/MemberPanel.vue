@@ -231,8 +231,6 @@ function shouldShowMenu(member: GuildMemberDto): boolean {
   if (!canActOnMembers.value) return false
   if (member.userId === myUserId.value) return false
   if (member.role === 'OWNER') return false
-  // Enum-ADMIN hedefe yalnız OWNER aksiyon alabilir (backend hiyerarşisiyle uyumlu UI yaklaşığı)
-  if (!isOwner.value && member.role === 'ADMIN') return false
   return true
 }
 
@@ -247,7 +245,6 @@ function canKick(member: GuildMemberDto): boolean {
   if (member.userId === myUserId.value) return false
   if (member.role === 'OWNER') return false
   if (isOwner.value) return true
-  if (member.role === 'ADMIN') return false // enum-admin'i yalnız owner atabilir
   return can('KICK_MEMBERS')
 }
 
@@ -255,7 +252,6 @@ function canBan(member: GuildMemberDto): boolean {
   if (member.userId === myUserId.value) return false
   if (member.role === 'OWNER') return false
   if (isOwner.value) return true
-  if (member.role === 'ADMIN') return false
   return can('BAN_MEMBERS')
 }
 

@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PermissionsService } from '../permissions/permissions.service';
 
 /**
  * Üyelik/erişim yetki kontrolünün tek kaynağı (denetim #2 dersi: tekrar etme).
@@ -15,12 +16,16 @@ import { PrismaService } from '../../prisma/prisma.service';
  * isMinor sorgusuyla hem ageGated hem adultsOnly kapısı kontrol edilir (DRY).
  *
  * R7 (Sprint V2): isPrivate kanal erişim kapısı — yaş kapısından SONRA kontrol
- * edilir. isPrivate=true ise: (OWNER/ADMIN) VEYA ChannelMember kaydı olmak şart.
- * Aksi hâlde jenerik NOT_CHANNEL_MEMBER (durum sızıntısı yok).
+ * edilir. isPrivate=true ise: tam yetkili (OWNER/ADMINISTRATOR — R20, PermissionsService
+ * tek kaynak) VEYA ChannelMember kaydı olmak şart. Aksi hâlde jenerik NOT_CHANNEL_MEMBER
+ * (durum sızıntısı yok).
  */
 @Injectable()
 export class MembershipService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private permissions: PermissionsService,
+  ) {}
 
   /** Guild var mı + kullanıcı üye mi. Üyelik (role dahil) döner. */
   async requireGuildMembership(userId: string, guildId: string) {
@@ -89,9 +94,11 @@ export class MembershipService {
       }
 
       // R7 (Sprint V2): özel kanal kapısı — yaş kapısından SONRA uygulanır.
-      // OWNER/ADMIN her özel kanala erişir; MEMBER ancak ChannelMember kaydı varsa erişir.
+      // Tam yetkili (OWNER/ADMINISTRATOR) her özel kanala erişir; diğerleri ancak
+      // ChannelMember kaydı varsa erişir. R20: enum-ADMIN kısa devresi kalktı —
+      // izin sistemi (PermissionsService) tek kaynak.
       if (channel.isPrivate) {
-        const isPrivileged = membership.role === 'OWNER' || membership.role === 'ADMIN';
+        const isPrivileged = await this.permissions.hasFullAccess(userId, channel.guildId);
         if (!isPrivileged) {
           const channelMember = await this.prisma.channelMember.findUnique({
             where: { channelId_userId: { channelId: channel.id, userId } },

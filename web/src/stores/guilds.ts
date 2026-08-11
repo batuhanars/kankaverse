@@ -105,7 +105,8 @@ export const useGuildsStore = defineStore('guilds', () => {
     myRoleByGuild.value[guildId] = role
   }
 
-  /** Sprint V2 — mevcut aktif guild'de kullanıcı OWNER veya ADMIN mi? */
+  /** Sprint V2 — mevcut aktif guild'de kullanıcı OWNER mi? (R20: enum-ADMIN kaldırıldı;
+   *  rol-tabanlı tam yetki artık ADMINISTRATOR bayrağıyla çözülür, bkz. useGuildPermissions) */
   function isAdminInActiveGuild(userId: string): boolean {
     const guildId = activeGuildId.value
     if (!guildId) return false
@@ -114,7 +115,7 @@ export const useGuildsStore = defineStore('guilds', () => {
     if (guild && guild.ownerId === userId) return true
     // Önbellekteki rol
     const role = myRoleByGuild.value[guildId]
-    return role === 'OWNER' || role === 'ADMIN'
+    return role === 'OWNER'
   }
 
   /** Guild'in unreadCount'unu güncelle (WS channel.activity veya kanal okundu sonrası) */

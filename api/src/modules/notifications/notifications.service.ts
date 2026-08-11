@@ -458,6 +458,7 @@ export class NotificationsService {
     };
     androidChannelId: string;
     priority: 'high';
+    tag?: string;
   } {
     const actor = dto.actor?.username ?? 'Biri';
     let body: string;
@@ -496,6 +497,12 @@ export class NotificationsService {
       // (önem DEFAULT) kullanıyor, bildirim ekranda BELİRMİYOR. `sendDmPush` ile aynı kanal.
       androidChannelId: 'messages_v1',
       priority: 'high' as const,
+      // 🔴 Yığılma önleme (canlı geri bildirim 2026-08-11) — YALNIZ bahsetmede ve yalnız kanal
+      // biliniyorsa. `tag` cihazda görünen bildirimin YERİNE geçtiği için, kanal başına sabit
+      // olması aynı sohbetin bildirimlerini tek satıra indirir.
+      // 🔴 Diğer türlere (kanka isteği, davet, etkinlik) tag VERİLMEZ: onlar birbirinin yerine
+      // geçmemeli — iki ayrı kanka isteği tek satıra düşerse ikincisi kullanıcıdan gizlenmiş olur.
+      tag: dto.type === 'MENTION' && dto.channelId ? dto.channelId : undefined,
     };
   }
 }

@@ -335,13 +335,10 @@ export class MessagesService {
       });
     }
 
-    // Yavaş mod (slow mode): yalnızca guild kanallarında; OWNER/ADMIN muaf
+    // Yavaş mod (slow mode): yalnızca guild kanallarında; tam yetkili (OWNER/ADMINISTRATOR) muaf
+    // R20: enum-ADMIN kısa devresi kalktı — izin sistemi tek kaynak.
     if (channel.guildId && channel.slowModeSeconds > 0) {
-      const membership = await this.prisma.guildMember.findUnique({
-        where: { guildId_userId: { guildId: channel.guildId, userId } },
-        select: { role: true },
-      });
-      const isPrivileged = membership?.role === 'OWNER' || membership?.role === 'ADMIN';
+      const isPrivileged = await this.permissions.hasFullAccess(userId, channel.guildId);
       if (!isPrivileged) {
         const lastMessage = await this.prisma.message.findFirst({
           where: { channelId, authorId: userId, deletedAt: null },
@@ -872,8 +869,8 @@ export class MessagesService {
 
   /**
    * Sunucu-geneli mesaj arama — kullanıcının ERİŞEBİLDİĞİ guild metin kanallarında.
-   * Sızıntı-güvenli: yaş-kapılı/adultsOnly minöre kapalı; özel kanal yalnız OWNER/ADMIN
-   * veya ChannelMember'a. Sonuç kanal-gruplu döner (Discord-tarzı).
+   * Sızıntı-güvenli: yaş-kapılı/adultsOnly minöre kapalı; özel kanal yalnız tam yetkili
+   * (OWNER/ADMINISTRATOR) veya ChannelMember'a. Sonuç kanal-gruplu döner (Discord-tarzı).
    */
   async searchGuildMessages(
     userId: string,
@@ -881,7 +878,7 @@ export class MessagesService {
     q: string,
     opts?: { from?: string; mentions?: string; in?: string; has?: string },
   ) {
-    const { membership } = await this.membership.requireGuildMembership(userId, guildId);
+    await this.membership.requireGuildMembership(userId, guildId);
 
     // q opsiyonel: dolu ise ≥2 karakter şartı korunur, boşsa metin filtresi uygulanmaz.
     const trimmedQ = (q ?? '').trim();
@@ -912,7 +909,8 @@ export class MessagesService {
       select: { id: true, name: true, ageGated: true, isPrivate: true },
     });
 
-    const privileged = membership.role === 'OWNER' || membership.role === 'ADMIN';
+    // R20: enum-ADMIN kısa devresi kalktı — izin sistemi (OWNER/ADMINISTRATOR) tek kaynak.
+    const privileged = await this.permissions.hasFullAccess(userId, guildId);
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { isMinor: true },

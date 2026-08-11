@@ -127,10 +127,11 @@ describe('InvitesService.createInvite', () => {
     expect(result.guildId).toBe(GUILD_NORMAL.id);
   });
 
-  it('ADMIN → davet oluşturur', async () => {
+  // R20: enum-ADMIN kaldırıldı — bu izinli-MEMBER senaryosu artık permissionsMock.hasGuildPermission'dan gelir.
+  it('izinli MEMBER (CREATE_INVITE) → davet oluşturur', async () => {
     membershipMock.requireGuildMembership.mockResolvedValue({
       guild: GUILD_NORMAL,
-      membership: { role: 'ADMIN' },
+      membership: { role: 'MEMBER' },
     });
     prismaMock.invite.findUnique.mockResolvedValue(null);
     const inv = makeInvite();
