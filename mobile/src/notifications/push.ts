@@ -53,7 +53,59 @@ import { useDmStore } from '@/stores/dm';
  * daraltmak ayrı bir tasarım sorusu (bkz. contract §2 sınır koşulu), bu sprintin işi değil.
  * Ses hâlâ YALNIZ aramada çalar (`shouldPlaySound: isIncomingCall`) — görüşme ortasında sesli mesaj
  * bildirimi rahatsız edici olurdu, banner yeterli. `shouldSetBadge` değişmedi.
+ *
+ * 🔴 §1 (M5e, sahip geri bildirimi 2026-08-11) — yukarıdaki §2 notu yalnız `shouldShowBanner`ı
+ * ele almıştı, `shouldShowList` HER ZAMAN `true` kalıyordu. Banner düşmese bile bildirim gölgeye
+ * (sistem bildirim merkezi) giriyor ve kullanıcı o DM'in ekranındayken bile "gölgede bekleyen"
+ * bildirim yığılmaya katkı veriyordu. Artık `isActiveDm` iken liste de kapalı — o DM ekranındayken
+ * hiçbir şey gösterilmiyor (banner da liste de), tıpkı sesin zaten kapalı olması gibi. Gelen arama
+ * dalına dokunulmadı.
+ *
+ * 🔴 §3 (M5e) — Android'de aynı sohbetin bildirimini SDK 54'te tekilleştirmenin native/desteklenen
+ * yolu bir SUNUCU alanı: Expo Push API'nin Android'e özel `tag` alanı ("An identifier for replacing
+ * notifications already displayed on the device", https://docs.expo.dev/push-notifications/sending-notifications/)
+ * — bu, uygulama tamamen kapalıyken bile OS seviyesinde çalışır çünkü FCM bildirimi JS hiç
+ * çalışmadan otomatik gösterir. `expo-notifications` istemci SDK'sı (v54 sürümlü doküman,
+ * https://docs.expo.dev/versions/v54.0.0/sdk/notifications/) gelen bir push bildirimine BÖYLE bir
+ * kalıcı etiket/grup ATAMA yolu SUNMUYOR — `NotificationContentInput`/`NotificationContent`'in
+ * Android alanları yalnız `badge`/`color`/`priority`/`vibrate` (bkz. `Notifications.types.d.ts`),
+ * `tag`/`group` yok. Bu `api/` değişikliği gerektirir → sözleşme §4 gereği BU SPRINTTE YAPILMADI,
+ * PM'e raporlandı.
+ *
+ * İstemci SDK'sının sunduğu iki uç (`getPresentedNotificationsAsync` + `dismissNotificationAsync`)
+ * JS çalışırken (ön planda veya arka planda, süreç canlıyken) tray'i elle yönetmeye izin veriyor —
+ * bu yüzden burada YENİ bir mesaj bildirimi işlenirken AYNI kanalın eski bildirimleri elle
+ * düşürülüyor (`dismissStaleChannelNotifications`, aşağıda). Bu, "öncekinin üstüne yazma" görsel
+ * etkisini JS canlıyken taklit eder (eski düşer, yeni tek başına kalır) ama uygulama TAMAMEN
+ * kapalıyken (süreç yok) çalışmaz — o durumda FCM bildirimi JS'e hiç uğramadan doğrudan gösterir,
+ * yığılma boşluğu kapanmadan kalır (D62 ödünleşmesi gereği veri-yalnız push/native task bu sprintte
+ * denenmedi).
  */
+async function dismissStaleChannelNotifications(channelId: string, excludeIdentifier?: string): Promise<void> {
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    for (const n of presented) {
+      const data = n.request.content.data as Record<string, unknown> | undefined;
+      const isMessage = data?.type === 'MENTION' || data?.type === 'DM_MESSAGE';
+      if (isMessage && data?.channelId === channelId && n.request.identifier !== excludeIdentifier) {
+        await Notifications.dismissNotificationAsync(n.request.identifier);
+      }
+    }
+  } catch {
+    // sessiz — bildirim altyapısı ana akışı ASLA bloke etmez (dosyadaki genel ilke, bkz. syncPushToken)
+  }
+}
+
+/**
+ * §2 (M5e) — kullanıcı bir DM'i açtığında o kanala ait gölgede bekleyen mesaj bildirimlerini düşürür.
+ * `dm/[id].tsx`'teki odak kancasından (`useFocusEffect`, M5d §1) çağrılır — yeni bir yaşam döngüsü
+ * mekanizması KURULMADI, var olan tetikleyici kullanıldı. Yalnız `DM_MESSAGE`/`MENTION` tipini
+ * hedefler; arama bildirimleri (`incoming_call`) ve başka kanalların bildirimleri dokunulmadan kalır.
+ */
+export async function clearChannelNotifications(channelId: string): Promise<void> {
+  await dismissStaleChannelNotifications(channelId);
+}
+
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     const data = notification.request.content.data as Record<string, unknown> | undefined;
@@ -71,10 +123,29 @@ Notifications.setNotificationHandler({
     const isActiveDm =
       isMessage && messageChannelId !== null && messageChannelId === useDmStore.getState().activeDmChannelId;
 
+    // §3 — yeni bildirim ekrana düşmeden ÖNCE aynı kanalın eski bildirimlerini tray'den düşür
+    // (JS canlıyken çalışan kısmi yığılma önleme, yukarıdaki blok yorumuna bkz.).
+    if (isMessage && messageChannelId) {
+      await dismissStaleChannelNotifications(messageChannelId, notification.request.identifier);
+    }
+
     return {
       shouldShowBanner: isIncomingCall || (isMessage && !isActiveDm),
-      shouldShowList: true,
-      shouldPlaySound: isIncomingCall,
+      // §1 — o DM'in ekranındayken (isActiveDm) liste de kapalı: banner zaten düşmüyordu, artık
+      // gölgeye de girmiyor. Diğer tüm dallarda (arama, aktif olmayan DM/mention) davranış AYNI.
+      shouldShowList: isIncomingCall || !isActiveDm,
+      // 🔴 M5e ek (sahip kararı 2026-08-11, CİHAZDA ÖLÇÜLEREK bulundu) — mesaj bildirimlerinde de
+      // ses açık. Bu bir tercih değil, banner'ın ÖN KOŞULU: sessiz sunulan bildirimi Android
+      // "sessiz" sınıfına koyuyor (`dumpsys`: `sound=null defaults=0x0 groupKey=silent`) ve
+      // üstten İNDİRMİYOR — yalnız gölgeye giriyor. Kanal (`messages_v1`) önemi 4/HIGH ve renk
+      // doğruydu; tek fark sesti. Arka planda bildirimi FCM kurduğu için kanalın kendi sesini
+      // kullanıyor, o yüzden orada zaten iniyordu; tutarsızlığın kaynağı buydu.
+      //
+      // Önceki karar (yalnız aramada ses) "görüşme ortasında mesaj sesi rahatsız eder"
+      // varsayımına dayanıyordu; ölçüm bunun bedelini gösterdi: sessiz = görünmez. Sahip kararı:
+      // görünürlük ağır basıyor, rahatsız olan kullanıcı sohbeti kendi susturur.
+      // `isActiveDm` dalında zaten hiçbir şey gösterilmiyor → orada ses de çalmaz.
+      shouldPlaySound: isIncomingCall || (isMessage && !isActiveDm),
       shouldSetBadge: false,
     };
   },

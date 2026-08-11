@@ -3999,6 +3999,95 @@ görülürse istenecek kanıt: Network sekmesinde `Location` başlığı + aynı
 
 ---
 
+---
+
+## Sprint R20 — enum-ADMIN Katmanı Kaldırıldı — 2026-08-11 ✅ CİHAZDA DOĞRULANDI
+
+> Sözleşme: `contracts/SPRINT_R20_ADMIN_TIER_REMOVAL_CONTRACT.md`. Üç tier paralel.
+> 🔴 R7. Sahip iki davranış değişikliğini açıkça onayladı (aşağıda).
+> Kaynak: sahip sorusu "yetkileri rol üzerinden yönetiyoruz, rol dışında neden yönetici yetkisi var".
+
+- [x] 🔴 **Kök gerekçe:** iki paralel yetki sistemi vardı. Rol sistemi doğru çalışıyordu, kalıntı
+      enum'dan geliyordu. Kodun kendi yorumu bu katmanı zaten "enum geçiş-uyum" diye etiketlemişti
+- [x] `permissions.service.ts`e `hasFullAccess` + toplu `guildPrivilegedUserIds` eklendi; "yönetici
+      mi" soran her yer buraya bağlandı. 🔴 Hiçbir yerde `role === 'OWNER'`'a İNDİRGENMEDİ —
+      indirgenseydi rolüyle yönetici olanlar yetkisiz kalırdı (§0.1)
+- [x] 🔴 Dev, sözleşmede olmayan iki yeri kendi buldu: `messages.gateway.ts` özel kanal sızıntı
+      kapısı + toplu bahsetme alıcı kümesi. T&S yüzeyi, kaçsaydı özel kanal varlığı sızabilirdi
+- [x] `PATCH /guilds/:id/members/:userId/role` ucu + DTO silindi; mobil rol arayüzü kaldırıldı
+- [x] Migration iki adımlı (önce veri, sonra tip), yerelde gerçek `ADMIN` kaydıyla sınandı,
+      `migrate status` temiz · `build` ✅ · 1070 test ✅
+- [x] Mobilde tip daraltıldı (`GuildRole` → OWNER|MEMBER) → derleyici kalan dallanmaları kanıtladı
+
+### Sahip onayladığı davranış değişiklikleri (2026-08-11)
+- [x] **ADMINISTRATOR rolü artık özel kanalları görüyor** (önceden kapı doğrudan enum'a bakıyordu,
+      bayraklı rol giremiyordu). Gizlilik yüzeyinde bilinçli genişleme
+- [x] **ADMINISTRATOR artık hiyerarşinin tepesinde değil**, kendi rol konumuna göre sıralanıyor
+
+### Cihaz doğrulaması (sahip, 2026-08-11) — İKİ YÖN DE
+- [x] Yetkisiz kullanıcı ortam ayarlarını **göremiyor** (kalıntı yetki temizlendi, "Yönetici"
+      ibaresi gitti)
+- [x] 🔴 **Rolle yetki verilmiş kullanıcı kanal/kategori ekleme ve ayarları GÖREBİLİYOR** —
+      asıl riskli yön buydu, sessiz regresyon olmadığı doğrulandı
+
+### Borç (PLAN'a yazılacak)
+- `guildPrivilegedUserIds`, `effectivePermissions` kuralını ikinci kez uyguluyor (N+1'den kaçınmak
+  için). Gerekçe geçerli ama iki uygulama ayrışabilir — bugün kaldırdığımız kusurun doğduğu desen
+- İstemci sunucudaki rol hiyerarşisini yansıtmıyor: moderatör üstündeki kişiye at düğmesi görebilir,
+  sunucu reddeder (web `MemberPanel.canKick`)
+- `api/` tarafında `npm run build` + `npm test`, **spec dosyalarındaki tip hatalarını yakalamıyor**;
+  ayrı `npx tsc --noEmit` gerekiyor (webdeki `vue-tsc` dersinin api karşılığı). Dev bu taramayla
+  gerçek bir hata buldu, ayrıca `categories.service.spec.ts:408`de önceden var olan bir hata çıktı
+
+---
+
+## Sprint M5e — Bildirim Yığılması + Üstten İnme — 2026-08-11 ✅ CİHAZDA DOĞRULANDI
+
+> Sözleşme: `contracts/SPRINT_M5E_NOTIFICATION_STACKING_CONTRACT.md`. Kaynak: canlı kullanıcı.
+
+- [x] O DM'in ekranındayken bildirim **hiç gösterilmiyor** (M5c yalnız banner'ı kapatmıştı,
+      `shouldShowList` açık kaldığı için gölgeye giriyordu)
+- [x] Sohbete girince o kanalın bekleyen bildirimleri temizleniyor (M5d odak kancası yeniden
+      kullanıldı, yeni yaşam döngüsü kurulmadı)
+- [x] Yığılma: istemci JS canlıyken aynı kanalın eskilerini düşürüyor **+ sunucuda `tag` alanı**
+      (uygulama tamamen kapalıyken kalan boşluk). `tag` yalnız DM ve bahsetmede; kanka isteği,
+      davet, etkinlik bildirimlerine VERİLMEDİ (birbirinin yerine geçmemeli)
+- [x] 🔴 **Üstten inme (heads-up) kusuru CİHAZDA ÖLÇÜLEREK çözüldü.** Kanal önemi (4/HIGH), renk ve
+      kanal adı doğruydu; `dumpsys` `sound=null defaults=0x0 groupKey=silent` gösterdi. Android
+      sessiz sunulan bildirimi üstten İNDİRMİYOR. Sebep bizim `shouldPlaySound: isIncomingCall`
+      kararımızdı — "görüşmede ses rahatsız eder" varsayımı, bedeli "sessiz = görünmez" çıktı
+- [x] Sahip kararı: mesajda da ses açık. Gerekçe: bizim push hacmimiz zaten düşük (ortam
+      kanallarında yalnız bahsetme push ediliyor, Discord gibi her mesaj değil), rahatsız olan
+      kullanıcı sohbeti kendi susturur
+- [x] Sahip doğrulaması: uygulama açıkken, başka DM'deyken ve **sesli görüşmedeyken** bildirim
+      üstten iniyor, yığılma yok, o DM'in ekranındayken hiç gelmiyor
+
+---
+
+## Canlı kullanıcı geri bildirimi — bildirim yığılması (2026-08-11 öğlen)
+
+> Kaynak: canlıdaki bir kullanıcı, mağaza sürümü (`versionCode 5`). Ekran görüntüsüyle geldi.
+> 🔬 Yan bulgu: o ekran görüntüsünde **bildirim ikonu bizim turuncu altıgen**. Yani ikon mağaza
+> sürümünde DOĞRU; sahibin cihazındaki Expo simgesi geliştirme paketine özgü (bkz. ikon maddesi).
+
+- [ ] 🔴 **Bildirimler üst üste yığılıyor** — her mesaj yeni bir bildirim kaydı açıyor, yedi mesaj
+      yedi satır. Beklenen (WhatsApp): aynı sohbetin bildirimi öncekinin ÜSTÜNE yazsın, tek satır
+      kalsın. Bugün ne istemci ne sunucu tarafında sabit bir bildirim kimliği var
+      (`push.service.ts` payload'ında böyle bir alan yok).
+      ⚠️ Çözüm yolu **doğrulanmadan yazılmayacak**: sunucu tarafında birleştirme kimliği mi
+      gönderilecek, yoksa istemci veri-yalnız push alıp bildirimi sabit kimlikle kendisi mi kuracak?
+      İkincisi D62'deki aynı ödünleşmeye giriyor (uygulama tamamen kapalıyken agresif pil
+      optimizasyonlu cihazlarda çalışacağının garantisi yok). Expo SDK 54 dokümanı okunmadan karar
+      verilmeyecek (`mobile/AGENTS.md` kuralı).
+- [ ] 🔴 **Kullanıcı O DM'in ekranındayken bile bildirim geliyor** — M5c §2 banner'ı bastırıyor ama
+      `shouldShowList: true` olduğu için bildirim yine gölgeye düşüyor. O durumda **hiç
+      gösterilmemeli** (banner da liste de kapalı). Tek satırlık değişiklik ama M5c'nin eksik kalan
+      yarısı; o sprint yalnız banner'ı düşünmüştü.
+- [ ] Sohbete girilince o kanalın bekleyen bildirimleri **temizlensin** (WhatsApp davranışı).
+      Yukarıdaki iki maddeyle aynı aileden, birlikte ele alınmalı.
+
+---
+
 ### Tasarım kararları (sahip onayladı 2026-08-10 akşamı)
 - Rozet **NOKTA** olacak, sayı değil. Arama ekranı zaten kalabalık; orada gereken bilgi "yeni bir
   şey var", kaç tane olduğu değil. Sayıyı merak eden zaten sohbete giriyor.
