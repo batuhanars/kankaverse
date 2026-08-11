@@ -289,6 +289,12 @@ describe('AttachmentsService.presign — allowlist kapsamı', () => {
     'image/webp',
     'application/pdf',
     'text/plain',
+    'text/markdown',
+    'text/csv',
+    'application/json',
+    'application/zip',
+    'application/vnd.rar',
+    'application/x-7z-compressed',
   ];
 
   for (const ct of allowedTypes) {

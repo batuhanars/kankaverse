@@ -16,6 +16,7 @@ import { messagesApi } from '@/api/messages'
 import MessageItem from '@/components/shared/MessageItem.vue'
 import DateDivider from '@/components/shared/DateDivider.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
+import { ATTACHMENT_ACCEPT } from '@/utils/attachmentType'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import { isNewDay, dayDividerLabel } from '@/utils/dateSeparator'
 import type { MessageDto } from '@/types'
@@ -524,7 +525,7 @@ function resetComposerHeight() {
           ref="fileInputEl"
           type="file"
           class="hidden"
-          accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain"
+          :accept="ATTACHMENT_ACCEPT"
           @change="onFileSelected"
         />
         <!-- Ek (ataç) butonu -->

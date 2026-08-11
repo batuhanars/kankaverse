@@ -93,10 +93,16 @@ function onLogout() {
         <div class="flex items-center gap-2.5">
           <div class="relative shrink-0">
             <div
-              class="w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-bold text-white"
+              class="w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-bold text-white overflow-hidden"
               style="background-color: var(--kv-accent-500);"
             >
-              {{ authStore.user?.username.charAt(0).toUpperCase() }}
+              <img
+                v-if="authStore.user?.avatarUrl"
+                :src="authStore.user.avatarUrl"
+                :alt="authStore.user.username"
+                class="w-full h-full object-cover"
+              />
+              <span v-else>{{ authStore.user?.username.charAt(0).toUpperCase() }}</span>
             </div>
             <span
               class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 block"
@@ -182,7 +188,13 @@ function onLogout() {
             class="w-9 h-9 rounded-full flex items-center justify-center text-[14px] font-bold text-white overflow-hidden"
             style="background-color: var(--kv-accent-500);"
           >
-            {{ authStore.user?.username.charAt(0).toUpperCase() }}
+            <img
+              v-if="authStore.user?.avatarUrl"
+              :src="authStore.user.avatarUrl"
+              :alt="authStore.user.username"
+              class="w-full h-full object-cover"
+            />
+            <span v-else>{{ authStore.user?.username.charAt(0).toUpperCase() }}</span>
           </div>
           <span
             class="absolute bottom-0 right-0 w-[11px] h-[11px] rounded-full border-2 block"

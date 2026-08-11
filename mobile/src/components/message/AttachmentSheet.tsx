@@ -181,7 +181,12 @@ export function AttachmentSheet({ visible, onClose, existingCount, onConfirm }: 
   async function openDocumentPicker() {
     setError('');
     const result = await DocumentPicker.getDocumentAsync({
-      type: [...ALLOWED_ATTACHMENT_TYPES],
+      // `text/*` bilerek listeye EK olarak veriliyor: Android seçicisi türü MIME'a göre süzüyor ve
+      // `.md`/`.log`/`.yml` için cihazda kayıtlı bir MIME çoğu zaman yok, dosya soluk görünüp
+      // seçilemiyordu (sahibin "md gönderemiyoruz" bulgusu). Bu bir GEVŞETME DEĞİL: seçilen dosya
+      // yine `resolveContentType`ten geçiyor, tanınmayan uzantı `UNSUPPORTED_TYPE` ile reddediliyor
+      // ve otorite zaten sunucuda. Görünmeyen dosya yerine açık ret, kullanıcıya daha dürüst.
+      type: [...ALLOWED_ATTACHMENT_TYPES, 'text/*'],
       multiple: true,
       copyToCacheDirectory: true,
     });
