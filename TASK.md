@@ -4001,6 +4001,23 @@ görülürse istenecek kanıt: Network sekmesinde `Location` başlığı + aynı
 
 ---
 
+## Kullanıcı isteği — video yükleme (2026-08-11) — REDDEDİLDİ, gerekçesiyle
+
+> Bir kullanıcı video yükleme istedi. Sahip maliyet/kota endişesiyle temkinli yaklaştı.
+
+- [ ] **Açılmayacak.** Ama gerekçe maliyet DEĞİL, PM notu: R2'de çıkış trafiği ücretsiz, yani
+      servis etmek yakmaz. Ücretlenen depolama ve bir kez yüklenen dosya silinene dek yakmaya
+      devam eder (telefon videosu 200-500 MB, görselden iki-üç mertebe büyük). Bu çözülebilir bir
+      mühendislik problemi.
+- [ ] 🔴 **Asıl engel güvenlik:** yüklemeler `SCAN=false` ile açık, hiçbir içerik taraması yok.
+      Görselde bu bilinçli kabul edilmiş bir riskti; video o riski kat kat büyütür (hacim, tespit
+      zorluğu, barındırabileceği zararın ağırlığı). Play'e verilen çocuk güvenliği beyanıyla da
+      çelişir. **Tarama altyapısı gelmeden video açılmaz.**
+- [ ] Tartışılabilir ara çözüm (bugün DEĞİL): kısa süre + küçük boyut sınırı (ör. 15 sn / 25 MB),
+      yalnız onaylı yetişkinler arası. Sahip karar verirse ayrı sözleşme.
+
+---
+
 ## Sprint R20 — enum-ADMIN Katmanı Kaldırıldı — 2026-08-11 ✅ CİHAZDA DOĞRULANDI
 
 > Sözleşme: `contracts/SPRINT_R20_ADMIN_TIER_REMOVAL_CONTRACT.md`. Üç tier paralel.
