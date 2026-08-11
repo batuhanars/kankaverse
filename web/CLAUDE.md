@@ -116,10 +116,18 @@ oradan türetilir.
 Bu tier'da **otomatik test yok.** Elindeki tüm güvence şu üç adım ve üçü farklı şeyleri yakalıyor:
 
 ```
-npx vue-tsc -b     # tip denetimi — bilinen 6 ÖNCEDEN-VAR hata; fazlası senin
-npm run lint       # ESLint + prettier (D42'de kuruldu)
-npx vite build     # 🔴 ŞART: derleme
+npx vue-tsc -b                      # tip denetimi — bilinen 6 ÖNCEDEN-VAR hata; fazlası senin
+npx eslint <dokunduğun dosyalar>    # 🔴 depo geneli DEĞİL — aşağıyı oku
+npx vite build                      # 🔴 ŞART: derleme
 ```
+
+🔴 **`npm run lint` (depo geneli) YEŞİL DÖNMEZ ve dönmesi beklenmiyor.** Ölçüm 2026-08-11:
+186 dosyanın 54'ünde 152 hata var, yüzde 75'i `no-floating-promises`. Bu **dondurulmuş bir borç**
+(PLAN.md D64), bugünkü işinin kusuru değil. Depo genelini çalıştırıp çıkan yığını görünce
+"kırdım" sanma, panikleyip toplu `--fix` de ÇALIŞTIRMA — o borcu kapatmaz, gizler.
+
+Senden beklenen: **dokunduğun dosyalar temiz olacak.** Yeni kod borcu büyütmez, mevcut yığın
+ayrı bir turda tek tek okunarak kapanır.
 
 🔴 **`vue-tsc --noEmit` YALANCI YEŞİLDİR**, hiçbir şeyi denetlemez. Yalnız `-b` kullan.
 (2026-08-03: tanımsız bir değişkeni kaçırdı, web'de mesaj alanı çöktü.)
