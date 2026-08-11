@@ -4,7 +4,7 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { DmService } from './dm.service';
+import { DmService, readReceiptDecision } from './dm.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
 
@@ -46,12 +46,20 @@ const dmPermissionMock = {
   canDm: jest.fn(),
 };
 
+const realtimeMock = {
+  emitToUser: jest.fn(),
+};
+
 function makeService() {
-  return new DmService(prismaMock as any, dmPermissionMock as any);
+  return new DmService(prismaMock as any, dmPermissionMock as any, realtimeMock as any);
 }
 
 function resetMocks() {
   jest.resetAllMocks();
+  // C12: `toDmChannelDto` üyeleri artık `findMany` ile çekiyor. Bu sorguyu umursamayan bloklarda
+  // mock `undefined` dönüp `.find` patlıyordu; boş dizi güvenli varsayılan (üye bulunamaz → alanlar
+  // null/false). Okundu bilgisini SINAYAN testler kendi verisini vererek bunu ezer.
+  prismaMock.channelMember.findMany.mockResolvedValue([]);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────
@@ -240,6 +248,11 @@ describe("DmService.createGroupDm — D49 iki kişilik grup DM'e yönlenir", () 
 
   /** toDmChannelDto'nun yan sorgularını nötrle (blok yok, mesaj yok, istek yok). */
   function stubToDmChannelDto() {
+    // C12: iki üyelik tek `findMany` ile geliyor; `readReceipts` varsayılan açık (şema default).
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: CREATOR_ID, lastReadAt: null, clearedAt: null, user: { readReceipts: true } },
+      { userId: MEMBER_A, lastReadAt: null, clearedAt: null, user: { readReceipts: true } },
+    ]);
     prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm', lastReadAt: null });
     prismaMock.message.findFirst.mockResolvedValue(null);
     prismaMock.userBlock.findUnique.mockResolvedValue(null);
@@ -804,5 +817,64 @@ describe('DmService — C9 Mesaj İstekleri', () => {
         }),
       }),
     );
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// C12 §3.2 — okundu bilgisi görünürlük kararı (R7). Her madde ayrı sınanır:
+// bu fonksiyon iki yerden çağrılıyor (DTO + `dm:read` yayını) ve bir maddenin
+// sessizce düşmesi, kapalı bir gizlilik anahtarının sızması demek.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('readReceiptDecision — C12 §3.2 (R7)', () => {
+  const READ_AT = new Date('2026-08-11T18:00:00.000Z');
+
+  /** Her şeyin açık olduğu taban; her test yalnız sınadığı maddeyi bozar. */
+  const base = {
+    isDm: true,
+    requestPending: false,
+    blockedEitherWay: false,
+    viewerReadReceipts: true,
+    otherReadReceipts: true,
+    otherLastReadAt: READ_AT,
+  };
+
+  it('hepsi uygunsa görünür + okuma anını döner', () => {
+    expect(readReceiptDecision(base)).toEqual({ visible: true, readAt: READ_AT });
+  });
+
+  // 🔴 İlk sürümün kusuru (sahip bulgusu 2026-08-11): "hiç okumamış" ile "gizlilik kapalı" aynı
+  // sonuca düşüyordu ve karşı taraf sohbeti bir kez bile açmadıysa tik HİÇ çizilmiyordu. Yani
+  // ilk mesajda "İletildi" asla görünmüyordu. Bu test o kusurun geri gelmesini engelliyor.
+  it('karşı taraf hiç okumamışsa GÖRÜNÜR kalır, yalnız readAt null olur (tek tik)', () => {
+    expect(readReceiptDecision({ ...base, otherLastReadAt: null })).toEqual({
+      visible: true,
+      readAt: null,
+    });
+  });
+
+  it('grup DM → görünmez (karşı taraf tanımsız, C12c)', () => {
+    expect(readReceiptDecision({ ...base, isDm: false }).visible).toBe(false);
+  });
+
+  it('bekleyen mesaj isteği → görünmez (C9 süzgeci delinmesin)', () => {
+    expect(readReceiptDecision({ ...base, requestPending: true })).toEqual({ visible: false, readAt: null });
+  });
+
+  it('taraflardan biri engellemiş → görünmez', () => {
+    expect(readReceiptDecision({ ...base, blockedEitherWay: true })).toEqual({ visible: false, readAt: null });
+  });
+
+  it('karşı taraf okundu bilgisini kapatmış → görünmez', () => {
+    expect(readReceiptDecision({ ...base, otherReadReceipts: false })).toEqual({ visible: false, readAt: null });
+  });
+
+  it('KENDİM kapatmışsam → görünmez (karşılıklılık; paylaşmayan göremez)', () => {
+    expect(readReceiptDecision({ ...base, viewerReadReceipts: false })).toEqual({ visible: false, readAt: null });
+  });
+
+  it('iki tercih de kapalıysa → görünmez (tek maddeye bağlı kalmasın)', () => {
+    expect(
+      readReceiptDecision({ ...base, viewerReadReceipts: false, otherReadReceipts: false }).visible,
+    ).toBe(false);
   });
 });

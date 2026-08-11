@@ -39,6 +39,9 @@ const props = defineProps<{
   isMentioned?: boolean
   // Sprint V2 Pins: kullanıcı bu kanalda mesaj sabitleyebilir mi? (parent hesaplar)
   canPin?: boolean
+  // C12 §4.2 — okundu göstergesi: 'sent' tek tik, 'seen' çift tik, null/undefined = HİÇ çizme.
+  // Kararı parent verir (DM ekranı); ortam kanalı ve grup DM bu prop'u hiç geçmez.
+  receipt?: 'sent' | 'seen' | null
   // Faz 3: MANAGE_MESSAGES — başkasının mesajını silebilir mi?
   canManageMessages?: boolean
 }>()
@@ -303,6 +306,26 @@ const renderedContent = computed<string>(() => {
         <!-- Reaksiyon pill'leri -->
         <div v-if="message.reactions?.length" class="flex flex-wrap gap-1 mt-1">
           <slot name="reactions" />
+        </div>
+
+        <!-- C12 §4.2 — okundu göstergesi. YALNIZ kendi mesajımda ve YALNIZ sunucu bilgiyi
+             vermişse (`receipt` null ise hiç çizilmez: gizlilik kapalı, bekleyen istek, engel,
+             grup DM, ortam kanalı). "Takılı kalmış tek tik" görüntüsü bilerek yok — gösterge ya
+             anlamlıdır ya da hiç yoktur. İkon tek başına bilgi taşımasın diye `title` + `aria-label`
+             i18n'den geliyor. -->
+        <div v-if="receipt" class="flex justify-end mt-0.5 select-none">
+          <span
+            class="inline-flex items-center"
+            :style="`color: ${receipt === 'seen' ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)'};`"
+            :title="t(`message.receipt.${receipt}`)"
+            :aria-label="t(`message.receipt.${receipt}`)"
+            role="img"
+          >
+            <svg width="16" height="12" viewBox="0 0 20 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 6.5 4.5 10 11 2" />
+              <path v-if="receipt === 'seen'" d="M8 6.5 11.5 10 18 2" />
+            </svg>
+          </span>
         </div>
       </template>
     </div>

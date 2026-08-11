@@ -3,10 +3,12 @@ import { Alert, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { dmApi } from '@/api/dm';
+import type { MessageDto } from '@/api/messages';
 import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
 import { useVoiceStore } from '@/stores/voice';
 import { useVoicePresenceStore, type VoicePresenceParticipant } from '@/stores/voicePresence';
+import { usePresenceStore, selectStatus, type PresenceStatus } from '@/stores/presence';
 import { OngoingCallBanner } from '@/components/call/OngoingCallBanner';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ChatBackButton } from '@/components/ChatBackButton';
@@ -16,6 +18,15 @@ import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 const EMPTY_PRESENCE: VoicePresenceParticipant[] = [];
+
+// Web `UserCard.vue` presenceColor karşılığı; renkler token'dan, uydurulmuş değer yok.
+// `offline: null` bilinçli: satırın hiç çizilmemesi de bir "renk" seçimi değil, durumun kendisi.
+const PRESENCE_COLOR: Record<PresenceStatus, string | null> = {
+  online: theme.colors.online,
+  away: theme.colors.idle,
+  dnd: theme.colors.dnd,
+  offline: null,
+};
 
 // Sprint M1a contract §5 ekran 3 — DM mesaj ekranı: kanal ekranıyla "aynısı" (MessageScreen ortak
 // gövde) + başlıkta karşı tarafın adı/avatarı (dokunuş → salt okunur profil kartı, yalnız 1-1 DM'de
@@ -150,6 +161,42 @@ export default function DmScreen() {
   const isConnectedHere = useVoiceStore((s) => s.connectedChannelId === channelId);
   const [callBusy, setCallBusy] = useState(false);
 
+  // Başlıkta karşı tarafın durumu (sahip isteği 2026-08-11, WhatsApp deseni). Aktif olan HER durum
+  // yazılır (çevrimiçi/boşta/rahatsız etmeyin), yalnız çevrimdışıyken hiçbir şey yazılmaz. Sahip
+  // kararı: "boşta" göstermemek de bir şey söylüyor ve yanlış olanı söylüyor, kişi bağlı.
+  // Renk web'in presence paletiyle aynı (`UserCard.vue` presenceColor), token'dan geliyor.
+  // Grup DM'de yok: tek bir "karşı taraf" olmadığı için neyin durumu yazılacağı tanımsız.
+  // Kimin görülebildiğine SUNUCU karar veriyor (`PresenceService.canSeePresence`, R7): engellenen
+  // taraf ve arkadaş olmayan minör zaten hiç gelmez, burada ek bir kapı kurulmuyor.
+  const otherUserId = storeChannel?.type === 'DM' ? storeChannel.otherUser.id : params.otherUserId;
+  const otherStatus = usePresenceStore(selectStatus(isDm ? otherUserId : null));
+  const presenceColor = isDm ? PRESENCE_COLOR[otherStatus] : null;
+
+  /**
+   * C12 §4.2 — okundu göstergesi. null dönerse tik HİÇ çizilmez.
+   *
+   * Kurallar burada değil, sunucunun verdiği `otherReadAt`te toplanıyor (`visibleReadAt`, R7):
+   * alan null geldiyse `showsReceipts` false döner ve gösterge tamamen kaybolur. Bilinçli —
+   * "tek tikte donmuş" bir gösterge, gizliliğin kapalı olduğunu sızdırmadan yanlış bilgi verirdi.
+   * Grup DM'de de null: sunucu o kanalda `otherReadAt` göndermiyor.
+   */
+  // 🔴 Kaynak `storeChannel` (zaten reaktif abonelik) — `useDmStore.getState()` DEĞİL: anlık
+  // okuma yapan bir sürüm yazılmıştı ve `dm:read` gelince ekran yeniden çizilmediği için tik
+  // hiç güncellenmezdi. Store yeni kanal nesnesi ürettiği için buradaki bağımlılık tetikleniyor.
+  const receiptsEnabled = storeChannel?.type === 'DM' ? storeChannel.receiptsEnabled === true : false;
+  const otherReadAt = storeChannel?.type === 'DM' ? (storeChannel.otherReadAt ?? null) : null;
+
+  const receiptFor = useCallback(
+    (m: MessageDto): 'sent' | 'seen' | null => {
+      if (!myUserId || m.author.id !== myUserId) return null;
+      // Kapı gizlilik kararı; okuma olup olmaması tek/çift tiki seçer, göstergeyi gizlemez.
+      if (!receiptsEnabled) return null;
+      if (!otherReadAt) return 'sent';
+      return m.createdAt <= otherReadAt ? 'seen' : 'sent';
+    },
+    [myUserId, receiptsEnabled, otherReadAt],
+  );
+
   if (!channelId) return null;
 
   // 🔴 KUSUR 1 düzeltmesi (sahip bulgusu 2026-08-03, cihaz turu) — push'tan açılan DM'de başlıkta
@@ -172,7 +219,11 @@ export default function DmScreen() {
 
   const disabledNotice = isDm && !canMessage ? (selfBlocked ? t('dm.selfBlocked') : t('dm.cannotMessage')) : null;
 
-  const placeholder = isDm ? t('dm.placeholder', { user: title }) : t('dm.groupPlaceholder', { name: title });
+  // Placeholder kısa tutuluyor (sahip bulgusu 2026-08-11): web'in "{ad} kullanıcısına mesaj yaz"
+  // metni dar ekranda iki satıra sarıyor, boş kutu iki satır yükseliyor ve sağdaki emoji ikonu
+  // (son satıra yaslı, bilinçli) havada asılı duruyor. Ad zaten başlıkta yazıyor; kutuda tekrar
+  // etmesi bilgi katmıyor. Uzun kullanıcı adlarında da sarmaz — ad hiç girmiyor.
+  const placeholder = t('mobile.message.placeholder');
 
   // §3.1 — başlıktaki telefon düğmesi: kimse yoksa BAŞLATIR (davet + katıl), biri varsa KATILIR
   // (davet gönderilmez — §3.1 "tekrar çaldırmak spam olur"), biz zaten bağlıysak arama ekranına döner.
@@ -250,9 +301,16 @@ export default function DmScreen() {
                   <Text style={styles.headerAvatarText}>{title.charAt(0).toUpperCase()}</Text>
                 </View>
               )}
-              <Text style={styles.headerName} numberOfLines={1}>
-                {title}
-              </Text>
+              <View style={styles.headerTextWrap}>
+                <Text style={styles.headerName} numberOfLines={1}>
+                  {title}
+                </Text>
+                {presenceColor && (
+                  <Text style={[styles.headerPresence, { color: presenceColor }]} numberOfLines={1}>
+                    {t(`presence.${otherStatus}`)}
+                  </Text>
+                )}
+              </View>
             </Pressable>
           ),
         }}
@@ -265,6 +323,7 @@ export default function DmScreen() {
         mentionCandidates={mentionCandidates}
         jumpToMessageId={params.jumpTo}
         markRead={dmApi.markRead}
+        receiptFor={receiptFor}
         typingMode="simple"
         disabledNotice={disabledNotice}
         // M4a-1 sözleşme §3.1/§4 — telefon düğmesi + "sesli arama sürüyor" şeridi. M4b'den beri
@@ -361,6 +420,14 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.lg,
     fontWeight: '600',
+  },
+  // Ad + durum dikey; `flexShrink` olmadan uzun ad geri okunu ve sağdaki arama düğmelerini iterdi.
+  headerTextWrap: {
+    flexShrink: 1,
+  },
+  headerPresence: {
+    fontSize: theme.fontSize.xs,
+    marginTop: 1,
   },
   clearErrorBar: {
     position: 'absolute',

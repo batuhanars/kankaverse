@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { extractErrorMessage } from '@/api/errors';
-import type { MessageAuthorDto } from '@/api/messages';
+import type { MessageAuthorDto, MessageDto } from '@/api/messages';
 import { MessageBubble } from './MessageBubble';
 import { ProfileSheet } from './profile/ProfileSheet';
 import { MessageSearchModal } from './MessageSearchModal';
@@ -38,6 +38,11 @@ interface Props {
   channelId: string;
   placeholder: string;
   markRead: (channelId: string) => Promise<unknown>;
+  /**
+   * C12 §4.2 — bir mesajın okundu göstergesi. Verilmezse tik HİÇ çizilmez; ortam kanalı ve grup DM
+   * bu prop'u geçmiyor. Kararı ekran veriyor çünkü gizlilik kuralı kanal türüne bağlı (1-1 DM).
+   */
+  receiptFor?: (message: MessageDto) => 'sent' | 'seen' | null;
   typingMode: 'named' | 'simple';
   // T&S — DM engelli/izinsizse sunucu göndermede 403 döner; ama giriş kutusunu baştan devre dışı
   // bırakmak için sidebar'dan taşınan bilgi (contract §6 — sessizce gizlenmez, neden gösterilir).
@@ -95,6 +100,7 @@ export function MessageScreen({
   channelId,
   placeholder,
   markRead,
+  receiptFor,
   typingMode,
   disabledNotice,
   headerActions,
@@ -193,12 +199,20 @@ export function MessageScreen({
   // contract §4.3 — reconnect sonrası bu kanalın mesajları yeniden çekilir (boşluk bırakmaz); bu artık
   // yalnız ekran ODAKTAYKEN geçerli (blur'da `onReconnectRefetch` da `null`'a döner, aşağıdaki
   // `setActiveChannel(null)` ile — DM tarafındaki `setActiveDm(null)` simetrisiyle aynı desen).
+  // `isFocused` C12 §4.3 için: odak durumu zaten burada biliniyor, ayrı bir kanca/import
+  // (`useIsFocused`) açmaya gerek yok — tek kaynak bu efekt.
+  const [isFocused, setIsFocused] = useState(false);
   useFocusEffect(
     useCallback(() => {
       setActiveChannel(channelId, fetchMessages);
-      return () => setActiveChannel(null);
+      setIsFocused(true);
+      return () => {
+        setActiveChannel(null);
+        setIsFocused(false);
+      };
     }, [channelId, fetchMessages]),
   );
+
 
   useEffect(() => {
     if (authUser) seedKnownUser(channelId, authUser.id, authUser.username);
@@ -206,6 +220,28 @@ export function MessageScreen({
 
   // Liste verisi + kaydırma davranışı (gruplama · dibe yapışma · yeni mesaj sayacı · zıplama).
   const list = useMessageListController(channelId, authUser?.id, jumpToMessageId);
+  /**
+   * C12 §4.3 — ekran AÇIKKEN gelen mesaj da anında okundu işaretlenir.
+   *
+   * Bu olmadan özellik yarım kalıyor: `markRead` yalnız mount'ta çağrılıyordu, yani iki kişi de
+   * sohbete bakarken karşı tarafın tiki HİÇ çifte dönmezdi ve en sık yaşanacak senaryo tam olarak
+   * bu. Tetikleyici son mesajın KİMLİĞİ, uzunluk değil: geçmişe kaydırma da uzunluğu artırıyor ve
+   * o bir okuma olayı değil.
+   *
+   * Kendi mesajım tetiklemez (zaten okumuş sayılıyorum). Ekran odakta değilken de çağrılmaz —
+   * `isFocused` üstteki odak kancasıyla aynı kaynağa bakar; arka planda okunmuş saymak karşı
+   * tarafa yalan söylemek olurdu (aynı gerekçe web'de `document.visibilityState` ile).
+   */
+  const lastMessage = list.items[0]?.message;
+  const lastMessageId = lastMessage?.id;
+  useEffect(() => {
+    if (!lastMessageId || !lastMessage) return;
+    if (!isFocused) return;
+    if (lastMessage.author.id === authUser?.id) return;
+    markRead(channelId).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastMessageId, isFocused]);
+
   const { items, inverted } = list;
   // Mesaj paneli akışı (uzun basış · tepki · kopyala · sil) — M1d-C §2.4.
   const actions = useMessageActions(channelId);
@@ -351,6 +387,7 @@ export function MessageScreen({
                 message={item.message}
                 showAuthor={item.showAuthor}
                 isMine={item.message.author.id === authUser?.id}
+                receipt={receiptFor?.(item.message) ?? null}
                 resolveMention={(id) => resolveUsername(channelId, id)}
                 resolveRole={resolveRole}
                 highlighted={item.message.id === list.highlightId}

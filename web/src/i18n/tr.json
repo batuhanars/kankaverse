@@ -281,6 +281,10 @@
       "previewMemberSince": "Üyelik tarihi: {date}"
     },
     "saveError": "Kaydedilemedi. Lütfen tekrar dene.",
+    "readReceipts": {
+      "label": "Okundu bilgisi",
+      "description": "Mesajını okuduğunda karşı taraf bunu görsün. Kapatırsan senin okuduğun görünmez, ama sen de kimsenin okuduğunu göremezsin."
+    },
     "dmPolicy": {
       "label": "Direkt Mesaj İzni",
       "description": "Sana kimlerin mesaj gönderebileceğini seç.",
@@ -918,6 +922,10 @@
     "copyText": "Metni Kopyala",
     "delete": "Sil",
     "edited": "(düzenlendi)",
+    "receipt": {
+      "sent": "İletildi",
+      "seen": "Görüldü"
+    },
     "deleteConfirm": "Bu mesajı silmek istediğinden emin misin? Bu işlem geri alınamaz.",
     "editHint": "Enter kaydet · Esc iptal",
     "pin": "Sabitle",
@@ -1724,6 +1732,9 @@
       "empty": "Galeride fotoğraf bulunamadı.",
       "uploading": "Yükleniyor… {done}/{total}",
       "uploadFailed": "Dosya yüklenemedi, mesaj gönderilmedi. Tekrar deneyebilirsin."
+    },
+    "message": {
+      "placeholder": "Mesaj yaz"
     },
     "emoji": {
       "open": "Emoji ekle"

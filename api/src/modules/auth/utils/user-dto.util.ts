@@ -11,6 +11,8 @@ export function toUserDto(user: User) {
     bio: user.bio,
     bannerColor: user.bannerColor ?? null,
     dmPolicy: user.dmPolicy,
+    // C12: okundu bilgisi paylaşımı (karşılıklı). İstemci Gizlilik ekranında kendi durumunu okur.
+    readReceipts: user.readReceipts,
     isMinor: user.isMinor,
     verificationStatus: user.verificationStatus,
     createdAt: user.createdAt.toISOString(),

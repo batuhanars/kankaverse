@@ -17,6 +17,7 @@ import { messagesApi } from '@/api/messages'
 import { formatMentionsPlain } from '@/utils/mentions'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
+import { ATTACHMENT_ACCEPT } from '@/utils/attachmentType'
 import ReportModal from '@/components/shared/ReportModal.vue'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import MessageRow from '@/components/shared/MessageRow.vue'
@@ -28,6 +29,16 @@ import GroupManagePanel from './GroupManagePanel.vue'
 import { useAppShellNav } from '@/composables/useAppShellNav'
 import { isNewDay, dayDividerLabel } from '@/utils/dateSeparator'
 import type { DmChannelDto, MessageDto } from '@/types'
+import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
+
+// Web `UserCard.vue` presenceColor ile aynı palet; `offline: null` = satır hiç çizilmez.
+// (Mobil `dm/[id].tsx` PRESENCE_COLOR ile birebir aynı kural — iki istemci aynı şeyi söylesin.)
+const PRESENCE_COLOR: Record<PresenceStatus, string | null> = {
+  online: '#3DB46E',
+  away: '#E8A33D',
+  dnd: '#F23B4B',
+  offline: null,
+}
 
 // Yanıt state
 const replyingTo = ref<MessageDto | null>(null)
@@ -145,6 +156,17 @@ const mention = useMentionAutocomplete(
 // Tip yardımcıları
 const isGroup = computed(() => props.channel.type === 'GROUP_DM')
 const dmChannel = computed(() => props.channel.type === 'DM' ? props.channel : null)
+
+// Başlıkta karşı tarafın durumu (sahip isteği 2026-08-11 — mobil DM başlığıyla parite). DM
+// listesindeki yeşil baloncuk zaten var; bu onun yerine değil, adın altındaki AÇIK metin.
+// Aktif olan her durum yazılır (çevrimiçi/boşta/rahatsız etme), çevrimdışıyken hiçbir şey.
+// Görünürlük kararı sunucuda (`PresenceService.canSeePresence`, R7) — göremediğimiz kişinin
+// durumu store'a hiç düşmez, burada ek bir kapı yok.
+const presenceStore = usePresenceStore()
+const dmPresence = computed<PresenceStatus | null>(() =>
+  dmChannel.value ? presenceStore.getStatus(dmChannel.value.otherUser.id) : null,
+)
+const dmPresenceColor = computed(() => (dmPresence.value ? PRESENCE_COLOR[dmPresence.value] : null))
 const groupChannel = computed(() => props.channel.type === 'GROUP_DM' ? props.channel : null)
 
 // REV-5: 1-1 DM'de karşı taraf arkadaş değilse "Arkadaş ekle" göster.
@@ -311,6 +333,26 @@ watch(
     scrollToBottom()
   },
   { immediate: true },
+)
+
+// C12 §4.3 — bu DM AÇIKKEN gelen mesaj da anında okundu işaretlenir.
+//
+// Bu olmadan özellik yarım kalıyor: `markRead` yalnız kanal değişiminde çağrılıyordu, yani iki
+// kişi de sohbete bakarken karşı tarafın tiki HİÇ çifte dönmezdi (en sık yaşanacak senaryo tam
+// olarak bu). Tetikleyici son mesajın kimliği — uzunluk değil, çünkü eski mesaj yükleme (scroll
+// ile geçmişe gitme) de uzunluğu artırıyor ve o bir okuma olayı değil.
+//
+// Kendi mesajım tetiklemez (zaten okumuş sayılıyorum) ve sekme arkadaysa çağrılmaz: arka planda
+// okunmuş saymak, karşı tarafa yalan söylemek olurdu.
+watch(
+  () => messages.value[messages.value.length - 1]?.id,
+  (lastId) => {
+    if (!lastId) return
+    const last = messages.value[messages.value.length - 1]
+    if (!last || isMine(last)) return
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+    dmStore.markRead(props.channel.id).catch(() => {})
+  },
 )
 
 // REV-11: bu kanalda (1-1/grup) başkaları seste mi → ring yerine doğrudan "Sese Katıl"
@@ -480,6 +522,20 @@ function isMine(msg: MessageDto): boolean {
   return msg.author.id === authStore.user?.id
 }
 
+/**
+ * C12 §4.2 — bir mesajın okundu göstergesi. null dönerse tik HİÇ çizilmez.
+ *
+ * Kurallar burada değil, sunucunun verdiği `otherReadAt`te toplanıyor (`visibleReadAt`, R7):
+ * alan null geldiyse `showsReceipts` false döner ve gösterge tamamen kaybolur. Bu bilinçli —
+ * "tek tikte donmuş" bir gösterge, gizliliğin kapalı olduğunu sızdırmadan yanlış bilgi verirdi.
+ * Grup DM'de de null: sunucu o kanalda `otherReadAt` göndermiyor.
+ */
+function messageReceipt(msg: MessageDto): 'sent' | 'seen' | null {
+  if (!isMine(msg)) return null
+  if (!dmStore.showsReceipts(props.channel.id)) return null
+  return dmStore.isSeen(props.channel.id, msg.createdAt) ? 'seen' : 'sent'
+}
+
 // Sprint V2 Pins: DM/grup DM'de herkes sabitleyebilir (§2)
 const showDmPins = ref(false)
 
@@ -645,9 +701,18 @@ const dayLabels = computed<(string | null)[]>(() =>
             />
             <span v-else>{{ dmChannel.otherUser.username[0].toUpperCase() }}</span>
           </div>
-          <span class="flex-1 text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
-            {{ dmChannel.otherUser.username }}
-          </span>
+          <div class="flex-1 min-w-0 flex flex-col justify-center">
+            <span class="text-[15px] font-semibold truncate leading-[1.25]" style="color: var(--kv-text-primary);">
+              {{ dmChannel.otherUser.username }}
+            </span>
+            <span
+              v-if="dmPresenceColor && dmPresence"
+              class="text-[11px] truncate leading-[1.2]"
+              :style="`color: ${dmPresenceColor};`"
+            >
+              {{ t(`presence.${dmPresence}`) }}
+            </span>
+          </div>
           <!-- REV-5: arkadaş değilse "Arkadaş ekle" (Sprint 4A by-user; ret jenerik)
                M1d-0 R1 (2026-07-31): `xl:hidden` — bu düğme YALNIZ sağ profil paneli gizliyken görünür.
                Sahip "mobilde olduğu gibi web'de de ikinci kapıyı kaldıralım, profil kartından ekleniyor"
@@ -913,6 +978,7 @@ const dayLabels = computed<(string | null)[]>(() =>
           :mention-resolver="dmMentionResolver"
           :is-mentioned="isDmMentioned(msg)"
           :can-pin="true"
+          :receipt="messageReceipt(msg)"
           @reply="startReply"
           @forward="(m) => { forwardMsg = m; showForward = true }"
           @edit="startEdit"
@@ -1027,7 +1093,7 @@ const dayLabels = computed<(string | null)[]>(() =>
             ref="fileInputEl"
             type="file"
             class="hidden"
-            accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain"
+            :accept="ATTACHMENT_ACCEPT"
             @change="onFileSelected"
           />
 

@@ -166,7 +166,9 @@ export default function ChannelScreen() {
       />
       <MessageScreen
         channelId={id}
-        placeholder={t('message.inputPlaceholder', { channel: channelName })}
+        // Kısa placeholder — gerekçe DM ekranındaki notla aynı (uzun metin dar ekranda sarıyor,
+        // boş kutu iki satır yükseliyor). Kanal adı zaten başlıkta.
+        placeholder={t('mobile.message.placeholder')}
         markRead={channelsApi.markRead}
         typingMode="named"
         jumpToMessageId={jumpTo}

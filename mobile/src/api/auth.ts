@@ -35,6 +35,8 @@ export interface UserDto {
   // DM gizlilik ayarı ekranı (dm-privacy.tsx) — `toUserDto` bunu da zaten dönüyordu (web C5'ten
   // beri kullanıyor), mobil tiplememişti. Sıfır backend değişikliği.
   dmPolicy: DmPolicy;
+  /** C12 — okundu bilgisi paylaşımı (karşılıklı; kapatan karşı tarafınkini de göremez). */
+  readReceipts: boolean;
 }
 
 /**

@@ -200,6 +200,12 @@ export function useSocket() {
       },
     )
 
+    // C12 §3.3 — karşı taraf DM'i okudu → gönderdiğim mesajların tiki çifte döner.
+    // Gizlilik süzgeci SUNUCUDA (`visibleReadAt`, R7): görmeye hakkımız yoksa olay hiç gelmez.
+    socket.on('dm:read', (data: { channelId: string; userId: string; readAt: string }) => {
+      dmStore.applyReadReceipt(data)
+    })
+
     // C9 — bana yeni mesaj isteği geldi (sessiz: masaüstü toast YOK, yalnız "Mesaj İstekleri" rozeti güncellenir)
     socket.on('dm.request', () => {
       dmStore.fetchRequests().catch(() => {})

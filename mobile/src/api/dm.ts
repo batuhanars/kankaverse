@@ -21,6 +21,11 @@ export type DmChannelDto =
       // C9 — mesaj isteği: null = normal DM · 'PENDING'/'ACCEPTED' = istek.
       requestStatus?: 'PENDING' | 'ACCEPTED' | null;
       requestOutgoing?: boolean;
+      // C12 §3.2 — İKİ AYRI ALAN, karıştırma:
+      //   receiptsEnabled: tik çizilecek mi (gizlilik kapısı) → false ise gösterge HİÇ çizilmez.
+      //   otherReadAt    : karşı tarafın okuma anı; null = henüz hiç okumamış → TEK tik.
+      receiptsEnabled?: boolean;
+      otherReadAt?: string | null;
     }
   | {
       type: 'GROUP_DM';
