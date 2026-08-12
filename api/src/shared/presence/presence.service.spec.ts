@@ -34,32 +34,41 @@ describe('PresenceService', () => {
     service = makeService();
   });
 
-  // ── connect / disconnect sayaç mantığı ─────────────────────────────────────
-  describe('connect / disconnect — çok-sekme sayaç mantığı', () => {
+  // ── connect / disconnect — bağlantı başına durum ───────────────────────────
+  describe('connect / disconnect — çok-pencere mantığı', () => {
     it('ilk connect → status=online döner', () => {
-      const status = service.connect('user1');
+      const status = service.connect('user1', 'c1');
       expect(status).toBe('online');
     });
 
     it('2 connect + 1 disconnect → hâlâ online (nowOffline=false)', () => {
-      service.connect('user1');
-      service.connect('user1');
-      const nowOffline = service.disconnect('user1');
+      service.connect('user1', 'c1');
+      service.connect('user1', 'c2');
+      const nowOffline = service.disconnect('user1', 'c2');
       expect(nowOffline).toBe(false);
       expect(service.getStatus('user1')).toBe('online');
     });
 
     it('2 connect + 2 disconnect → offline (nowOffline=true)', () => {
-      service.connect('user1');
-      service.connect('user1');
-      service.disconnect('user1');
-      const nowOffline = service.disconnect('user1');
+      service.connect('user1', 'c1');
+      service.connect('user1', 'c2');
+      service.disconnect('user1', 'c1');
+      const nowOffline = service.disconnect('user1', 'c2');
       expect(nowOffline).toBe(true);
       expect(service.getStatus('user1')).toBe('offline');
     });
 
+    it('aynı bağlantı iki kez kapanırsa ikinci kapanış sayacı bozmaz', () => {
+      service.connect('user1', 'c1');
+      service.connect('user1', 'c2');
+      service.disconnect('user1', 'c2');
+      const nowOffline = service.disconnect('user1', 'c2');
+      expect(nowOffline).toBe(false);
+      expect(service.getStatus('user1')).toBe('online');
+    });
+
     it('bağlı değilken disconnect → false', () => {
-      const nowOffline = service.disconnect('ghost');
+      const nowOffline = service.disconnect('ghost', 'c1');
       expect(nowOffline).toBe(false);
     });
 
@@ -71,22 +80,89 @@ describe('PresenceService', () => {
   // ── setStatus ───────────────────────────────────────────────────────────────
   describe('setStatus', () => {
     it('bağlıyken durum günceller', () => {
-      service.connect('user1');
-      const result = service.setStatus('user1', 'dnd');
+      service.connect('user1', 'c1');
+      const result = service.setStatus('user1', 'dnd', { connectionId: 'c1' });
       expect(result).toBe('dnd');
       expect(service.getStatus('user1')).toBe('dnd');
     });
 
     it('bağlı değilken setStatus → offline döner, güncelleme olmaz', () => {
-      const result = service.setStatus('ghost', 'away');
+      const result = service.setStatus('ghost', 'away', { connectionId: 'c1' });
       expect(result).toBe('offline');
     });
 
-    it('connect sonrası setStatus away → away; tekrar connect → away korunur', () => {
-      service.connect('user1');
-      service.setStatus('user1', 'away');
-      service.connect('user1'); // ikinci sekme
+    it('manuel away hesap kapsamlıdır: yeni pencere açılsa bile korunur', () => {
+      service.connect('user1', 'c1');
+      service.setStatus('user1', 'away', { connectionId: 'c1' });
+      service.connect('user1', 'c2'); // ikinci pencere
       expect(service.getStatus('user1')).toBe('away');
+    });
+
+    it('manuel dnd, başka penceredeki hareketliliğe rağmen korunur', () => {
+      service.connect('user1', 'c1');
+      service.connect('user1', 'c2');
+      service.setStatus('user1', 'dnd', { connectionId: 'c1' });
+      service.setStatus('user1', 'online', { connectionId: 'c2', auto: true });
+      expect(service.getStatus('user1')).toBe('dnd');
+    });
+  });
+
+  /**
+   * 🔴 Sahip bulgusu 2026-08-12 — kusurun kendisi: tepside unutulmuş bir pencere hesabı
+   * boşta yapıyordu, öndeki aktif pencere düzeltemiyordu (bkz. PresenceService kusur notu).
+   */
+  describe('otomatik (hareketsizlik) durum — bağlantı başına', () => {
+    it('bir pencere boşta, öteki aktif → hesap çevrimiçi', () => {
+      service.connect('user1', 'tepsi');
+      service.connect('user1', 'aktif');
+      service.setStatus('user1', 'away', { connectionId: 'tepsi', auto: true });
+      expect(service.getStatus('user1')).toBe('online');
+    });
+
+    it('bütün pencereler boşta → hesap boşta', () => {
+      service.connect('user1', 'tepsi');
+      service.connect('user1', 'aktif');
+      service.setStatus('user1', 'away', { connectionId: 'tepsi', auto: true });
+      service.setStatus('user1', 'away', { connectionId: 'aktif', auto: true });
+      expect(service.getStatus('user1')).toBe('away');
+    });
+
+    it('aktif pencere kapanır, geriye boştaki kalırsa hesap boştaya düşer', () => {
+      service.connect('user1', 'tepsi');
+      service.connect('user1', 'aktif');
+      service.setStatus('user1', 'away', { connectionId: 'tepsi', auto: true });
+      const nowOffline = service.disconnect('user1', 'aktif');
+      expect(nowOffline).toBe(false);
+      expect(service.getStatus('user1')).toBe('away');
+    });
+
+    it('boştaki pencere tekrar aktifleşince hesap çevrimiçiye döner', () => {
+      service.connect('user1', 'c1');
+      service.setStatus('user1', 'away', { connectionId: 'c1', auto: true });
+      expect(service.getStatus('user1')).toBe('away');
+      service.setStatus('user1', 'online', { connectionId: 'c1', auto: true });
+      expect(service.getStatus('user1')).toBe('online');
+    });
+
+    it('otomasyon manuel seçimi EZEMEZ (dnd korunur)', () => {
+      service.connect('user1', 'c1');
+      service.setStatus('user1', 'dnd', { connectionId: 'c1' });
+      service.setStatus('user1', 'away', { connectionId: 'c1', auto: true });
+      expect(service.getStatus('user1')).toBe('dnd');
+    });
+
+    it('manuel çevrimiçi seçimi o pencerenin bayat boşta işaretini de temizler', () => {
+      service.connect('user1', 'c1');
+      service.setStatus('user1', 'away', { connectionId: 'c1', auto: true });
+      service.setStatus('user1', 'online', { connectionId: 'c1' });
+      expect(service.getStatus('user1')).toBe('online');
+    });
+
+    it('bağlantı kimliği olmayan otomasyon çağrısı hiçbir şeyi değiştirmez', () => {
+      service.connect('user1', 'c1');
+      const applied = service.setStatus('user1', 'away', { auto: true });
+      expect(applied).toBe('online');
+      expect(service.getStatus('user1')).toBe('online');
     });
   });
 
@@ -194,7 +270,7 @@ describe('PresenceService', () => {
       prismaMock.friendship.findFirst.mockResolvedValue({ id: 'fs1' });
 
       const service = makeService();
-      service.connect('friend1'); // friend1 online
+      service.connect('friend1', 'c1'); // friend1 online
 
       const result = await service.visibleOnlineFor('viewer1');
       expect(result).toHaveLength(1);
@@ -210,7 +286,7 @@ describe('PresenceService', () => {
       prismaMock.userBlock.findFirst.mockResolvedValue({ id: 'blk1' });
 
       const service = makeService();
-      service.connect('blocked1');
+      service.connect('blocked1', 'c1');
 
       const result = await service.visibleOnlineFor('viewer1');
       expect(result).toEqual([]);
@@ -234,7 +310,7 @@ describe('PresenceService', () => {
       prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm1' }); // ortak guild var
 
       const service = makeService();
-      service.connect('adult1'); // adult1 online
+      service.connect('adult1', 'c1'); // adult1 online
 
       const result = await service.visibleOnlineFor('viewer1');
       expect(result).toHaveLength(1);
@@ -250,7 +326,7 @@ describe('PresenceService', () => {
       prismaMock.friendship.findFirst.mockResolvedValue({ id: 'fs1' }); // arkadaş → kural 3 true
 
       const service = makeService();
-      service.connect('adultfriend1');
+      service.connect('adultfriend1', 'c1');
 
       const result = await service.visibleOnlineFor('minor1');
       expect(result).toHaveLength(1);

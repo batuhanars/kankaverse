@@ -29,11 +29,16 @@ export const usePresenceStore = defineStore('presence', () => {
   }
 
   /**
-   * Kendi efektif durumumuz. Kendi presence'ımız sunucudan GELMEZ (presence yalnız
-   * kitleye yayılır, kullanıcının kendisine değil) → statusMap[myId] ilk yüklemede boş
-   * kalır. O yüzden kendimiz için ASLA 'offline' dönmeyiz (bağlıyız):
+   * Kendi efektif durumumuz.
+   *
+   * 🔴 2026-08-12'den beri kendi durumumuz da sunucudan geliyor (`presence:update` artık
+   * kullanıcının kendi pencerelerine de yayınlanıyor) — yani `statusMap[myId]` hesabın GERÇEK
+   * etkin durumu. Öncesinde hiç gelmiyordu ve buradaki 'online' yedeği bir tahmindi; tepside
+   * unutulmuş bir pencere hesabı boşta yaparken bu ekran "çevrimiçi" diyordu (sahip bulgusu).
+   * Yedek yine de duruyor: ilk yüklemede olay gelmeden önce kısa bir an haritada kayıt yok ve
+   * bağlı olduğumuz için 'offline' demek yanlış olurdu.
    *  - manuel dnd/away → doğrudan o (bilinçli seçim, idle'ı ezer)
-   *  - manuel online → auto-idle güncellemesi (statusMap) varsa o, yoksa 'online'
+   *  - manuel online → sunucunun bildirdiği etkin durum, yoksa 'online'
    */
   function selfStatus(myId: string): PresenceStatus {
     if (manualStatus.value !== 'online') return manualStatus.value

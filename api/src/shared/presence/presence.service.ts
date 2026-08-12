@@ -3,10 +3,20 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 export type PresenceStatus = 'online' | 'away' | 'dnd' | 'offline';
 export type ActiveStatus = 'online' | 'away' | 'dnd';
+/**
+ * Bir BAĞLANTININ kendi başına söyleyebileceği tek şey: bu pencerenin başında biri var mı.
+ * `dnd` bilinçli olarak yok — o bir tercih, pencerenin değil hesabın niteliği (bkz. PresenceEntry).
+ */
+export type ConnectionStatus = 'online' | 'away';
 
 interface PresenceEntry {
-  connectionCount: number;
-  status: ActiveStatus;
+  /**
+   * Kullanıcının BİLEREK seçtiği durum (UserCard). Hesap kapsamlıdır: hangi pencereden seçilirse
+   * seçilsin hepsi için geçerlidir ve hareketsizlik onu EZEMEZ.
+   */
+  manual: ActiveStatus;
+  /** connectionId (socket.id) → o bağlantının hareketsizlik durumu. Boşalınca kayıt silinir. */
+  connections: Map<string, ConnectionStatus>;
 }
 
 /**
@@ -14,7 +24,7 @@ interface PresenceEntry {
  *
  * Bellek-içi presence (V1 tek-instance, PM kararı 2026-06-13). Şema/migration YOK.
  * Socket.IO Redis adapter yayını instance'lar arası dağıtır; çok-instance'a geçilince
- * yalnız connectionCount Redis'e taşınır (gelecek borç, over-engineering yapma).
+ * yalnız bağlantı kayıtları (`PresenceEntry`) Redis'e taşınır (gelecek borç, over-engineering yapma).
  *
  * canSeePresence kural sırası (fail-closed — R7 insan incelemesi zorunlu):
  *  1. viewerId === targetId → true (kendi durumunu görür)
@@ -38,27 +48,49 @@ export class PresenceService {
   // ── Bellek-içi durum yönetimi ───────────────────────────────────────────────
 
   /**
-   * Bağlantı ekle. İlk bağlantıda status=online; count döner (bilgi amaçlı).
-   * Dönüş: etkin presence durumu.
+   * 🔴 Kusur düzeltmesi (sahip bulgusu 2026-08-12, cihaz turu): durum ÖNCEDEN hesap başına TEK bir
+   * alandı (`{ connectionCount, status }`). Bir hesabın kaç penceresi varsa hepsi o tek alanı
+   * paylaşıyordu ve son yazan kazanıyordu — sistem tepsisinde unutulmuş bir masaüstü penceresi
+   * 5 dakika sonra "boşta" yazınca, kullanıcı başka bir pencerede aktif yazışıyor olsa bile
+   * herkese boşta görünüyordu. Öndeki pencere bunu düzeltemiyordu: web yalnız "boşta → aktif"
+   * GEÇİŞİNDE haber veriyor, hiç boşta olmamış bir pencerede o geçiş hiç yaşanmıyor. Kullanıcının
+   * kendi ekranı da yalan söylüyordu (kendi durumu sunucudan gelmiyor, istemci belleğinden okunuyor).
+   *
+   * Doğru model iki katmanlı ve ayrımın kendisi çözüm:
+   *  - `manual` (hesap): bilinçli seçim. Hareketsizlik bunu EZEMEZ — "rahatsız etmeyin" diyen biri
+   *    başka bir pencerede fare oynattı diye müsait sayılamaz.
+   *  - `connections` (bağlantı başına): yalnız "bu pencerenin başında biri var mı". Hesap, HERHANGİ
+   *    bir penceresi aktifse aktiftir. Tepsideki pencere boşta desin, elindeki telefon aktifse
+   *    kullanıcı oradadır.
+   *
+   * Dönüş: hesabın ETKİN durumu.
    */
-  connect(userId: string): ActiveStatus {
+  connect(userId: string, connectionId: string): ActiveStatus {
     const entry = this.state.get(userId);
     if (entry) {
-      entry.connectionCount++;
-      return entry.status;
+      entry.connections.set(connectionId, 'online');
+      return this.effective(entry);
     }
-    this.state.set(userId, { connectionCount: 1, status: 'online' });
-    return 'online';
+    const fresh: PresenceEntry = {
+      manual: 'online',
+      connections: new Map([[connectionId, 'online']]),
+    };
+    this.state.set(userId, fresh);
+    return this.effective(fresh);
   }
 
   /**
    * Bağlantı kapat. Dönüş: artık tamamen offline mi (true = son bağlantı kapandı).
+   *
+   * Kayıt son bağlantıyla birlikte SİLİNİR, yani `manual` seçimi de sıfırlanır — bu davranış
+   * eskisiyle aynı (bellek-içi presence oturum boyu yaşamıyor); istemci yeniden bağlanınca
+   * manuel seçimini geri uyguluyor (`useSocket.ts` connect kancası).
    */
-  disconnect(userId: string): boolean {
+  disconnect(userId: string, connectionId: string): boolean {
     const entry = this.state.get(userId);
     if (!entry) return false;
-    entry.connectionCount--;
-    if (entry.connectionCount <= 0) {
+    entry.connections.delete(connectionId);
+    if (entry.connections.size === 0) {
       this.state.delete(userId);
       return true;
     }
@@ -66,20 +98,56 @@ export class PresenceService {
   }
 
   /**
-   * Durum güncelle — yalnız bağlıyken (count > 0) işlev yapar.
-   * Dönüş: uygulanan durum (bağlı değilse 'offline' döner, güncelleme olmaz).
+   * Durum güncelle — yalnız bağlıyken işlev yapar.
+   * Dönüş: uygulanan ETKİN durum (bağlı değilse 'offline' döner, güncelleme olmaz).
+   *
+   * `auto: true` → hareketsizlik otomasyonu: yalnız İLGİLİ BAĞLANTIYI etkiler, hesabın manuel
+   * seçimine dokunmaz. `auto` verilmezse seçim MANUELDİR (hesap kapsamlı) — eski istemciler bu
+   * alanı hiç göndermiyor, onlar için davranış bugünküyle aynı kalır (geriye dönük uyum).
    */
-  setStatus(userId: string, status: ActiveStatus): PresenceStatus {
+  setStatus(
+    userId: string,
+    status: ActiveStatus,
+    opts?: { connectionId?: string; auto?: boolean },
+  ): PresenceStatus {
     const entry = this.state.get(userId);
     if (!entry) return 'offline';
-    entry.status = status;
-    return status;
+
+    if (opts?.auto) {
+      // 'dnd' bir bağlantının söyleyebileceği şey değil; otomasyon yalnız aktiflik bildirir.
+      if (status === 'dnd') return this.effective(entry);
+      const connectionId = opts.connectionId;
+      if (connectionId && entry.connections.has(connectionId)) {
+        entry.connections.set(connectionId, status);
+      }
+      return this.effective(entry);
+    }
+
+    entry.manual = status;
+    // Manuel "çevrimiçi" seçimi o pencerenin bayat 'away' işaretini de temizler: kullanıcı
+    // kutucuğa dokunacak kadar oradaysa o pencere hareketsiz değildir.
+    if (status === 'online' && opts?.connectionId && entry.connections.has(opts.connectionId)) {
+      entry.connections.set(opts.connectionId, 'online');
+    }
+    return this.effective(entry);
+  }
+
+  /**
+   * Hesabın etkin durumu: bilinçli seçim varsa o, yoksa "herhangi bir pencere aktif mi".
+   * Tek karar noktası — connect/setStatus/getStatus üçü de buradan geçiyor.
+   */
+  private effective(entry: PresenceEntry): ActiveStatus {
+    if (entry.manual !== 'online') return entry.manual;
+    for (const connectionStatus of entry.connections.values()) {
+      if (connectionStatus === 'online') return 'online';
+    }
+    return 'away';
   }
 
   /** Anlık durum. Bağlantısı yoksa 'offline'. */
   getStatus(userId: string): PresenceStatus {
     const entry = this.state.get(userId);
-    return entry ? entry.status : 'offline';
+    return entry ? this.effective(entry) : 'offline';
   }
 
   // ── T&S karar fonksiyonları (R7) ───────────────────────────────────────────
