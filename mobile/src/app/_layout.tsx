@@ -8,6 +8,7 @@ import { usePushNotificationResponder } from '@/notifications/push';
 import { useIncomingCallResponder } from '@/notifications/incomingCall';
 import { theme } from '@/theme';
 import { MiniCallWindow } from '@/components/call/MiniCallWindow';
+import { IncomingCallBanner } from '@/components/call/IncomingCallBanner';
 import { CallPipOverlay } from '@/components/call/CallPipOverlay';
 
 // 🔴 `registerGlobals()` BURADA DEĞİL, `mobile/index.js`'te (uygulama giriş noktası). Burada
@@ -56,6 +57,10 @@ export default function RootLayout() {
           konumlu bir bileşen (Discord'un yaptığı da bu). Kökte tek yerde mount edilir ki "uygulamanın
           her ekranında görünür" olsun; kendi içinde aramada değilken null döner (boş yüzey açmaz). */}
       <MiniCallWindow />
+      {/* Gelen aramanın uygulama-içi şeridi — yalnız bildirim izni kapalıyken çizilir (bileşenin
+          kendi dosya başı yorumu). Kökte mount edilme gerekçesi mini pencereyle aynı: çağrı hangi
+          ekranda yakalanırsa yakalansın görünmeli. */}
+      <IncomingCallBanner />
       {/* M4p sözleşme §2/§3 — sistem PiP penceresinin içeriği. `MiniCallWindow` ile aynı kökte
           mount edilme gerekçesi (bkz. bileşenin kendi dosya başı yorumu): PiP hangi ekran açıksa
           onu küçültür, içerik bu yüzden route'tan bağımsız kökte durmalı. */}

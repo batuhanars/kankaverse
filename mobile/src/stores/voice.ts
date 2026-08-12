@@ -57,6 +57,14 @@ export type AudioOutputId = 'speaker' | 'earpiece' | 'headset' | 'bluetooth';
 
 interface VoiceState {
   connectedChannelId: string | null;
+  /**
+   * Uygulama İÇİNDE gösterilecek gelen arama (kabul/reddet şeridi). Yalnız bildirim izni KAPALIYKEN
+   * dolar: izin varsa sunum sistem bildirimidir ve iki yüzey birden gösterilmez. Tek sahibi
+   * `notifications/incomingCall.ts` (`presentIncomingCall`/`dismissIncomingCall`) — oradaki modül
+   * durumunun reaktif aynası, ikinci bir doğruluk kaynağı değil.
+   */
+  incomingCall: { channelId: string; callerName: string; avatarUrl: string | null; isGroup: boolean } | null;
+  setIncomingCall: (next: VoiceState['incomingCall']) => void;
   connecting: boolean;
   connectedAt: number | null;
   /**
@@ -449,6 +457,8 @@ function toRoomMember(p: Participant, localIdentity: string | undefined): RoomMe
 
 export const useVoiceStore = create<VoiceState>((set, get) => ({
   connectedChannelId: null,
+  incomingCall: null,
+  setIncomingCall: (next) => set({ incomingCall: next }),
   connecting: false,
   connectedAt: null,
   isLeaving: false,

@@ -129,8 +129,17 @@ Notifications.setNotificationHandler({
       await dismissStaleChannelNotifications(messageChannelId, notification.request.identifier);
     }
 
+    // Gelen arama ön planda banner GÖSTERMEZ (sahip kararı 2026-08-12): uygulama açıkken sunum
+    // bizim kendi şeridimiz (`IncomingCallBanner`).
+    //
+    // 🔴 Ama asıl bastırma BURADA DEĞİL: bu handler yalnız GELEN bildirimleri süzüyor, zil
+    // bildirimi ise yerel olarak zamanlanıyor ve Android'de sistem tarafından doğrudan gönderilip
+    // JS'e hiç uğramıyor (cihazda ölçüldü — ilk denemede burayı false yapmak yetmedi). Gerçek
+    // bastırma kanalın öneminde: `incomingCall.ts` ön planda DEFAULT önemli ayrı bir kanal
+    // kullanıyor. Bu satır yine de doğru kalsın diye duruyor (sunucu push'u ön planda bu yoldan
+    // geçebilir); tek başına yeterli DEĞİL.
     return {
-      shouldShowBanner: isIncomingCall || (isMessage && !isActiveDm),
+      shouldShowBanner: isMessage && !isActiveDm,
       // §1 — o DM'in ekranındayken (isActiveDm) liste de kapalı: banner zaten düşmüyordu, artık
       // gölgeye de girmiyor. Diğer tüm dallarda (arama, aktif olmayan DM/mention) davranış AYNI.
       shouldShowList: isIncomingCall || !isActiveDm,
