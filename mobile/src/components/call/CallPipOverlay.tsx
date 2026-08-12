@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useVoiceStore } from '@/stores/voice';
-import { useDmStore } from '@/stores/dm';
 import { addPipModeChangeListener } from '@modules/picture-in-picture';
 import { ParticipantTile } from '@/components/call/ParticipantTile';
+import { useCallSubject } from '@/components/call/useCallSubject';
 import { theme } from '@/theme';
 
 /**
@@ -20,24 +20,13 @@ import { theme } from '@/theme';
  * olsun aynı kompakt görünümü TAM EKRAN kaplayıp altındaki her şeyi (chrome dahil) gizliyor —
  * PiP'in gördüğü tek şey bu.
  *
- * §3 — içerik: 1-1 DM'de karşı taraf, grup DM/ortam kanalında KONUŞAN kişi (kimse konuşmuyorsa ilk
- * uzak katılımcı). Kendi görüntün hiçbir dalda YOK. Kontrol/metin/ızgara yok — `ParticipantTile`in
- * `'pip'` varyantı zaten bunu garanti ediyor (bkz. o bileşendeki yorum).
- *
- * §3.6 addendum (M5b sonrası, PM 2026-08-10) — odada ekran paylaşımı VARSA konu seçimi bunun ÖNÜNE
- * geçer: DM/grup ayrımından ÖNCE `remoteScreenPublications` kontrol edilir. `call.tsx`teki kullanıcı
- * odak state'i (§3.2, `focusedScreenUserId`) buraya TAŞINMAZ — PiP küçük bir pencere, oradan odak
- * seçilemez; **ilk** paylaşım (`Object.keys` sırası, `call.tsx`teki "ilk paylaşıma düşer" yedeğiyle
- * aynı yaklaşım) yeter. Paylaşım yoksa aşağıdaki DM/grup dalı bugünküyle SATIR SATIR aynıdır.
+ * §3 içeriği (kimin gösterileceği) ARTIK `useCallSubject`te: aynı kuralı mini pencere de tüketiyor,
+ * iki yerde ayrı ayrı yaşarsa zamanla ayrışırlar (bkz. o dosyadaki not). Kural değişmedi, taşındı.
+ * Kontrol/metin/ızgara yok — `ParticipantTile`in `'pip'` varyantı zaten bunu garanti ediyor.
  */
 export function CallPipOverlay() {
   const connectedChannelId = useVoiceStore((s) => s.connectedChannelId);
-  const callKind = useVoiceStore((s) => s.callKind);
-  const roomParticipants = useVoiceStore((s) => s.roomParticipants);
-  const speakingUserIds = useVoiceStore((s) => s.speakingUserIds);
-  const remoteCameraPublications = useVoiceStore((s) => s.remoteCameraPublications);
-  const remoteScreenPublications = useVoiceStore((s) => s.remoteScreenPublications);
-  const channel = useDmStore((s) => s.channels.find((c) => c.id === connectedChannelId));
+  const subject = useCallSubject();
 
   const [isInPip, setIsInPip] = useState(false);
   useEffect(() => {
@@ -46,51 +35,6 @@ export function CallPipOverlay() {
   }, []);
 
   if (!isInPip || !connectedChannelId) return null;
-
-  const remoteMembers = roomParticipants.filter((p) => !p.isLocal);
-  let subject: {
-    name: string;
-    avatarUrl: string | null;
-    videoPublication: (typeof remoteCameraPublications)[string] | null;
-    isScreenShare: boolean;
-  } | null = null;
-
-  const screenSharerId = Object.keys(remoteScreenPublications)[0] ?? null;
-  if (screenSharerId) {
-    // §3.6 — ekran paylaşımı varken DM/grup farkı önemsiz, konu her zaman paylaşılan ekran.
-    const sharer = remoteMembers.find((p) => p.userId === screenSharerId);
-    subject = {
-      name: sharer?.username ?? '',
-      avatarUrl: sharer?.avatarUrl ?? null,
-      videoPublication: remoteScreenPublications[screenSharerId] ?? null,
-      isScreenShare: true,
-    };
-  } else if (callKind === 'dm') {
-    // §3 "1-1 DM: karşı tarafın videosu; kamerası kapalıysa avatarı" — `MiniCallWindow`daki AYNI
-    // katılmadan-önce yedeği (`channel.otherUser`), henüz odaya düşmemiş karşı tarafı da kapsar.
-    const peerFallback = channel?.type === 'DM' ? channel.otherUser : null;
-    const peerMember = remoteMembers[0];
-    const name = peerMember?.username ?? peerFallback?.username ?? '';
-    if (name) {
-      subject = {
-        name,
-        avatarUrl: peerMember?.avatarUrl ?? peerFallback?.avatarUrl ?? null,
-        videoPublication: peerMember ? (remoteCameraPublications[peerMember.userId] ?? null) : null,
-        isScreenShare: false,
-      };
-    }
-  } else {
-    // §3 "Grup DM / ortam kanalı: konuşan kişi. Kimse konuşmuyorsa ilk uzak katılımcı."
-    const speaker = remoteMembers.find((p) => speakingUserIds.has(p.userId)) ?? remoteMembers[0];
-    if (speaker) {
-      subject = {
-        name: speaker.username,
-        avatarUrl: speaker.avatarUrl,
-        videoPublication: remoteCameraPublications[speaker.userId] ?? null,
-        isScreenShare: false,
-      };
-    }
-  }
 
   return (
     <View style={styles.root}>

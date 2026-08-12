@@ -4,6 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePathname, useRouter } from 'expo-router';
 import { useVoiceStore } from '@/stores/voice';
 import { useDmStore } from '@/stores/dm';
+import { ParticipantTile } from '@/components/call/ParticipantTile';
+import { useCallSubject } from '@/components/call/useCallSubject';
 import { theme } from '@/theme';
 
 /**
@@ -19,6 +21,13 @@ import { theme } from '@/theme';
  * çalışmamıştır (asenkron gezinme) — o birkaç render'lık pencerede bu bileşen (`pathname` hâlâ
  * eski ekran) kısaca görünüp tam ekran açılınca kayboluyordu (flaş). `pendingCallScreen`
  * `stores/voice.ts`'te bu geçişi işaretliyor.
+ *
+ * 🔴 Sahip bulgusu (2026-08-12, cihaz turu) — görüntülü aramada yazmak için DM ekranına geçince
+ * bu kutu karşı tarafın AVATARINI gösteriyordu: karşı taraf kamerasını açmış, ekranını paylaşıyor
+ * olsa bile görüntü kayboluyordu ve arama sesli sanılıyordu. Artık görüntü VARSA görüntü çizilir
+ * (kamera ya da ekran paylaşımı — ayrımı `useCallSubject` yapıyor), yoksa bugünkü avatar/hoparlör
+ * davranışı SATIR SATIR aynı kalır. Seçim kuralı sistem PiP penceresiyle ORTAK (`useCallSubject`):
+ * iki küçük pencerenin farklı şey göstermesi için bir sebep yok.
  */
 export function MiniCallWindow() {
   const pathname = usePathname();
@@ -29,8 +38,13 @@ export function MiniCallWindow() {
   const roomParticipants = useVoiceStore((s) => s.roomParticipants);
   const speakingUserIds = useVoiceStore((s) => s.speakingUserIds);
   const channel = useDmStore((s) => s.channels.find((c) => c.id === connectedChannelId));
+  const subject = useCallSubject();
 
   if (!connectedChannelId || pathname === '/call' || pendingCallScreen) return null;
+
+  // Yalnız gerçek bir track varsa video sayılır — mute'lu publication `track`i temizliyor
+  // (`stores/voice.ts` `wireRoom`), yani kamerasını kapatan biri anında avatara döner.
+  const hasVideo = !!subject?.videoPublication?.track;
 
   const peer = channel?.type === 'DM' ? channel.otherUser : null;
   const peerMember = roomParticipants.find((p) => !p.isLocal);
@@ -47,27 +61,46 @@ export function MiniCallWindow() {
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/call', params: { channelId: connectedChannelId } })}
-      style={[styles.container, { top: insets.top + 8 }]}
+      style={[styles.container, hasVideo && styles.containerVideo, { top: insets.top + 8 }]}
       accessibilityRole="button"
     >
-      <View style={[styles.avatarWrap, speaking && styles.avatarSpeaking]}>
-        {avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback]}>
-            {alone || !initial ? (
-              <Ionicons name="volume-medium" size={22} color={theme.colors.accent500} />
-            ) : (
-              <Text style={styles.avatarFallbackText}>{initial}</Text>
-            )}
-          </View>
-        )}
-      </View>
+      {hasVideo && subject ? (
+        // `'pip'` varyantı: video/avatar tam alanı kaplar, üzerinde ad/rozet/kontrol YOK. Kutunun
+        // kendisi zaten dokunulabilir bir düğme (aramaya dön) — içine ikinci bir kontrol konmaz.
+        <ParticipantTile
+          variant="pip"
+          name={subject.name}
+          avatarUrl={subject.avatarUrl}
+          speaking={false}
+          micOff={false}
+          videoPublication={subject.videoPublication}
+          isScreenShare={subject.isScreenShare}
+        />
+      ) : (
+        <View style={[styles.avatarWrap, speaking && styles.avatarSpeaking]}>
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              {alone || !initial ? (
+                <Ionicons name="volume-medium" size={22} color={theme.colors.accent500} />
+              ) : (
+                <Text style={styles.avatarFallbackText}>{initial}</Text>
+              )}
+            </View>
+          )}
+        </View>
+      )}
     </Pressable>
   );
 }
 
 const SIZE = 56;
+// Videolu hâlde kutu büyür: 56'lık kareye sığdırılan bir kamera görüntüsünden kimin ne yaptığı
+// seçilemiyor. Kare oran bilinçli — telefon kamerası dikey, web kamerası/ekran paylaşımı yatay
+// geliyor; kare ikisini de simetrik kırpar, `'pip'` varyantı ekran paylaşımında zaten `contain`e
+// düşüp tamamını gösteriyor.
+const VIDEO_SIZE = 88;
 
 const styles = StyleSheet.create({
   container: {
@@ -87,6 +120,17 @@ const styles = StyleSheet.create({
     // sıra garantisi vermeyebilir). Görsel dil kenarlıkla kalıyor (tasarım sistemi — "Gölge YOK");
     // bu küçük boyutta elevation'ın kendi gölgesi zaten görünmeyecek kadar ince.
     elevation: 8,
+  },
+  // `overflow: hidden` yalnız videolu hâlde gerekiyor: video tam alanı kapladığı için köşeleri
+  // kutunun yarıçapına kırpılmalı (avatar zaten kendi içinde dairesel, taşmıyor).
+  containerVideo: {
+    width: VIDEO_SIZE,
+    height: VIDEO_SIZE,
+    overflow: 'hidden',
+    // `'pip'` varyantının kök View'i `flex: 1` — ana eksende (yükseklik) kendiliğinden büyür ama
+    // çapraz eksende kutu ortalama yaptığı için genişliği içeriğe göre 0 kalırdı (video hiç
+    // görünmezdi). `stretch` çapraz ekseni de kutuya eşitler.
+    alignItems: 'stretch',
   },
   avatarWrap: {
     width: 44,
