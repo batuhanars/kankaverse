@@ -101,12 +101,22 @@ export const useDmStore = create<DmState>((set, get) => ({
   async fetchAll() {
     try {
       const [list, requests] = await Promise.all([dmApi.listChannels(), dmApi.listRequests()]);
-      set({
-        channels: visibleChannels(list),
+      set((s) => ({
+        // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-08-12): açık DM'in rozeti sunucu yanıtıyla
+        // GERİ GELİYORDU. Sunucu `unread`i `lastReadAt`e göre hesaplıyor ve o an ekranda olan
+        // sohbete yeni mesaj düştüğünde (markRead henüz gitmemişken) `true` dönüyor; araya giren
+        // her `fetchAll` bu değeri listeye yazıyordu. Bir kez `true` olduktan sonra `applyActivity`
+        // onu bir daha düşürmediği için rozet sohbet açıkken bile takılı kalıyordu (liste noktası,
+        // ray sayacı, sekme rozeti, geri okundaki rozet — hepsi bu tek alandan besleniyor).
+        // Kural tek cümle: BAKMAKTA OLDUĞUN DM okunmamış değildir. Sunucu birazdan zaten aynı
+        // şeyi söyleyecek (`markRead` MessageScreen'den gidiyor), burada yalnız yarış kapatılıyor.
+        channels: visibleChannels(list).map((c) =>
+          c.id === s.activeDmChannelId ? ({ ...c, unread: false } as DmChannelDto) : c,
+        ),
         requestCount: requests.length,
-        state: 'ready',
+        state: 'ready' as LoadState,
         errorMessage: '',
-      });
+      }));
     } catch (e) {
       set({ state: 'error', errorMessage: extractErrorMessage(e) });
     }
@@ -164,8 +174,15 @@ export const useDmStore = create<DmState>((set, get) => ({
           pinnedAt: null,
         };
 
+    // Açık DM'de rozet HER ZAMAN düşer (`existing.unread` korunmaz): kanal zaten ekranda okunuyor
+    // ve bayrak bir yarış yüzünden (bkz. `fetchAll` notu) takılı kalmış olabilir — o durumda yeni
+    // mesaj gelmesi rozeti temizlemek için doğru an, çünkü ekran mesajı gösteriyor.
     const unread =
-      payload.senderId !== myId && payload.channelId !== activeDmChannelId ? true : existing.unread;
+      payload.channelId === activeDmChannelId
+        ? false
+        : payload.senderId !== myId
+          ? true
+          : existing.unread;
 
     const updated = { ...existing, lastMessage, unread } as DmChannelDto;
     const rest = channels.filter((_, i) => i !== idx);
