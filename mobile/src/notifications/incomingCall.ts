@@ -421,3 +421,26 @@ export function useIncomingCallResponder(): void {
     return () => sub.remove();
   }, []);
 }
+
+/**
+ * 🔴 Kusur duzeltmesi (sahip bulgusu 2026-08-12, cihaz turu): zil, aramaya BASKA bir kapidan
+ * girildiginde calmaya devam ediyordu. Bugune kadar dort bitis yolu vardi (kabul, reddet, zaman
+ * asimi, arayanin iptali) ve dordu de bildirimin KENDI dugmelerinden ya da WS olayindan geciyordu;
+ * DM ekranindaki "Katil" dugmesi ise dogrudan odaya baglaniyor, zilin haberi olmuyordu. Sahip bunu
+ * bildirim izni kapaliyken buldu: bildirim hic gorunmedigi icin tek sinyal titresimdi ve titresimi
+ * durduracak dugme de ekranda yoktu.
+ *
+ * Duzeltme kapiya degil KURALA baglandi: calan kanala baglandiysak zil susar. Bugunku "Katil"
+ * dugmesi de, sonradan eklenecek baska bir giris yolu da kendiliginden kapsanir.
+ *
+ * Abonelik modul seviyesinde (bu dosyadaki notification handler deseniyle ayni): React yasam
+ * dongusune bagli degil, cunku zil de degil. Ters yon (voice store'un bu modulu import etmesi)
+ * bilincli olarak secilmedi - `incomingCall.ts` zaten voice store'u import ediyor, o yon dongu
+ * kurardi (ayni gerekce `stores/dm.ts` friends notunda).
+ */
+useVoiceStore.subscribe((state, prev) => {
+  const channelId = state.connectedChannelId;
+  if (!channelId || channelId === prev.connectedChannelId) return;
+  if (!isChannelRinging(channelId)) return;
+  void dismissIncomingCall(channelId);
+});
