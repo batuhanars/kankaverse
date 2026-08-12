@@ -134,6 +134,16 @@ export default function DmScreen() {
   // kullanıldı (sözleşme "bugün eklenen odak kancası kullanılabilir" diyor). Yalnız bu kanalın
   // DM_MESSAGE/MENTION bildirimleri hedeflenir; başka sohbetlerin ve arama bildirimlerinin
   // etkilenmemesi `push.ts`teki filtreyle garanti edilir.
+  //
+  // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-08-12, cihaz turu — bildirimden açılan DM): bu ekran
+  // DM listesinin ÇEKİLMİŞ olduğunu varsayıyordu. Tek çekim noktası `DmSidebar`ın mount'u, yani Ana
+  // Sayfa sekmesi; bildirime dokunup uygulama kapalıyken açılınca rota doğrudan bu ekrana itiliyor
+  // ve o sekme hiç mount olmuyor. Sonuç zincirleme: `storeChannel` boş → başlıkta ad yok, avatar boş
+  // daire (push yolu yalnız `{ id }` taşıyor, düşülecek route param'ı da yok) VE `clearUnread`
+  // hiçbir şeye dokunmuyor → rozetler düşmüyor. Kullanıcı cevap yazınca `dm.message` olayı
+  // `applyActivity`yi tetikliyor, o da kanalı listede bulamayıp `fetchAll` çağırıyordu — "cevap
+  // verince ad geri geliyor" tam olarak buydu. Ekran artık kendi verisini garantiliyor: liste
+  // yoksa çeker, geldiğinde rozeti tekrar düşürür (`fetchAll` sunucudan gelen `unread`i yazıyor).
   useFocusEffect(
     useCallback(() => {
       if (!channelId) return;
@@ -141,6 +151,9 @@ export default function DmScreen() {
       store.setActiveDm(channelId);
       store.clearUnread(channelId);
       void clearChannelNotifications(channelId);
+      if (!store.channels.some((c) => c.id === channelId)) {
+        void store.fetchAll().then(() => useDmStore.getState().clearUnread(channelId));
+      }
       return () => useDmStore.getState().setActiveDm(null);
     }, [channelId]),
   );

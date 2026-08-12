@@ -37,6 +37,13 @@ export const useDmStore = defineStore('dm', () => {
   async function fetchChannels() {
     const res = await dmApi.getChannels()
     channels.value = res.data
+    // 🔴 Açık sohbetin rozeti sunucu yanıtıyla GERİ GELMESİN (mobilde sahip bulgusu
+    // 2026-08-12, aynı kusur sınıfı burada da duruyordu — `applyActivity` listede olmayan bir
+    // kanal görünce bu fonksiyonu çağırıyor). Sunucu `unread`i `lastReadAt`e göre hesaplıyor;
+    // o an ekranda olan sohbete yeni mesaj düştüğünde `markRead` henüz gitmemiş olabiliyor ve
+    // yanıt `true` dönüyor. Kural tek cümle: bakmakta olduğun sohbet okunmamış değildir.
+    const active = channels.value.find((c) => c.id === activeDmChannelId.value)
+    if (active) active.unread = false
   }
 
   async function openChannel(userId: string): Promise<DmChannelDto> {
@@ -155,11 +162,12 @@ export const useDmStore = defineStore('dm', () => {
 
       // Unread: kendi mesajım DEĞİLSE, aktif DM DEĞİLSE ve tercih susturmuyorsa set et
       const myId = authStore.user?.id
-      if (
-        opts?.countUnread !== false &&
-        payload.senderId !== myId &&
-        payload.channelId !== activeDmChannelId.value
-      ) {
+      if (payload.channelId === activeDmChannelId.value) {
+        // Açık sohbette rozet HER ZAMAN düşer: bayrak bir yarış yüzünden (bkz. `fetchChannels`
+        // notu) takılı kalmış olabilir ve yeni mesajın ekranda görünmesi onu temizlemek için
+        // doğru an. Önceden bu dal yalnız "set etme" diyordu, düşürmüyordu.
+        ch.unread = false
+      } else if (opts?.countUnread !== false && payload.senderId !== myId) {
         ch.unread = true
       }
     } else {

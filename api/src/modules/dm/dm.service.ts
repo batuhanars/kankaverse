@@ -235,6 +235,23 @@ export class DmService {
       });
     }
 
+    // 🔴 Sıralama (sahip bulgusu 2026-08-12, web + mobil): bu liste HİÇ sıralanmıyordu.
+    // Prisma `orderBy`sız bir sorguda satır sırasını garanti etmez; "en son mesaj gelen sohbet
+    // üstte" kuralı bu yüzden yalnız istemcilerin canlı `dm.message` yolunda (kanalı listenin
+    // başına taşıma) çalışıyor, her tazelemede sıra rastgele bir düzene dönüyordu. Kural artık
+    // TEK yerde, sunucuda: iki istemci de aynı sırayı alır, istemcide ikinci bir sıralama
+    // yazılmaz. Anahtar son mesajın tarihi; hiç mesajı olmayan sohbet (yeni açılmış, henüz
+    // yazılmamış) kanalın kendi oluşturma tarihine düşer — aksi hâlde en dibe çakılırdı.
+    const channelCreatedAt = new Map(
+      activeMemberships.map((m) => [m.channel.id, m.channel.createdAt.getTime()]),
+    );
+    const sortKey = (c: Record<string, unknown>): number => {
+      const lastMessage = c.lastMessage as { createdAt: string } | null;
+      if (lastMessage) return Date.parse(lastMessage.createdAt);
+      return channelCreatedAt.get(c.id as string) ?? 0;
+    };
+    result.sort((a, b) => sortKey(b) - sortKey(a));
+
     return result;
   }
 
