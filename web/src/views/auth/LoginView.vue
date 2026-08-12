@@ -130,20 +130,6 @@ function getError(field: string): string | undefined {
         </KvButton>
       </form>
 
-      <div class="my-4 flex items-center gap-3">
-        <div class="flex-1 h-px" style="background-color: var(--kv-border-subtle);" />
-        <span class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('auth.or') }}</span>
-        <div class="flex-1 h-px" style="background-color: var(--kv-border-subtle);" />
-      </div>
-      <button
-        disabled
-        class="w-full py-2.5 rounded-[var(--kv-radius-md)] border text-[14px] font-medium cursor-not-allowed opacity-50 flex items-center justify-center gap-2"
-        style="border-color: var(--kv-border-strong); color: var(--kv-text-muted);"
-        :title="t('auth.edevletComingSoon')"
-      >
-        {{ t('auth.edevletLogin') }}
-      </button>
-
       <p class="mt-6 text-center text-[13px]" style="color: var(--kv-text-muted);">
         {{ t('auth.noAccount') }}
         <RouterLink to="/register" class="font-medium" style="color: var(--kv-accent-500);">

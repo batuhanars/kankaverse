@@ -27,9 +27,6 @@
     "registerSubtitle": "Kankaverse'e katıl",
     "noAccount": "Hesabın yok mu?",
     "hasAccount": "Zaten hesabın var mı?",
-    "edevletLogin": "e-Devlet ile Giriş Yap",
-    "edevletComingSoon": "e-Devlet entegrasyonu yakında",
-    "or": "veya",
     "forgotPassword": "Şifremi unuttum",
     "errors": {
       "USERNAME_TAKEN": "Bu kullanıcı adı zaten kullanılıyor.",
