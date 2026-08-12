@@ -61,17 +61,17 @@ export function useNativeNotifications() {
           ? t('notification.incomingGroupCall', { actor })
           : t('notification.incomingCall', { actor })
 
-      // `tag` aynı anda tek gelen-arama bildirimi kalmasını garanti eder (ikinci `new
-      // Notification` aynı tag'la öncekinin yerine geçer) — referansı da yine de tutuyoruz ki
-      // yukarıdaki erken `close()` çağrıları görsel olarak da anında kapatsın.
+      // 🔴 `tag` KALDIRILDI (sahip bulgusu 2026-08-12): masaüstünde gelen arama bildirimine
+      // tıklayınca pencere açılmıyordu, mesaj bildiriminde ise açılıyordu. İki yol da aynı
+      // `focusWindow()` çağrısını yapıyor; aralarındaki TEK fark buydu. Windows'ta Electron
+      // etiketli bildirimi "öncekinin yerine geç" semantiğiyle kuruyor ve tıklama olayının
+      // teslimi bu yolda güvenilir değil. Kaybımız yok: "aynı anda tek arama bildirimi"
+      // garantisi etiketten değil, yukarıdaki koşulsuz `callNotif?.close()` satırından geliyor.
       // İzin `default` iken tarayıcılar `new Notification` çağrısında hata fırlatabiliyor
       // (Electron fırlatmaz, gösterir). Gelen arama akışını bir bildirim hatası yüzünden
       // patlatmak kabul edilemez: sarmalanıyor, başarısızlıkta zil + modal yoluna devam edilir.
       try {
-        callNotif = new Notification(t('notification.nativeTitle'), {
-          body,
-          tag: 'kankaverse-incoming-call',
-        })
+        callNotif = new Notification(t('notification.nativeTitle'), { body })
         callNotif.onclick = () => {
           window.kankaverse?.focusWindow()
           void router.push({ name: 'dm', params: { channelId: call.channelId } })
