@@ -559,8 +559,14 @@ export function useSocket() {
     clearTypingForChannel(channelId)
   }
 
-  function setPresence(status: PresenceStatus) {
-    socket?.emit('presence:set', { status })
+  /**
+   * `auto: true` yalnız hareketsizlik otomasyonu için (`useIdlePresence`): sunucu bunu hesabın
+   * seçimi olarak DEĞİL, yalnız bu pencerenin durumu olarak işler. Kullanıcının kutucuktan yaptığı
+   * seçim (UserCard) bayraksız gider ve hesap kapsamlı kalır — ayrım sunucudaki `PresenceService`
+   * kusur notunda anlatılıyor: tepside unutulmuş bir pencere bütün hesabı boşta gösteriyordu.
+   */
+  function setPresence(status: PresenceStatus, opts?: { auto?: boolean }) {
+    socket?.emit('presence:set', { status, auto: opts?.auto === true })
   }
 
   // ── DM sesli arama emitter'ları (ack'li olanlar 5sn timeout) ──

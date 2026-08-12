@@ -1,7 +1,6 @@
 import { watch } from 'vue'
 import { useIdle } from '@vueuse/core'
 import { usePresenceStore } from '@/stores/presence'
-import { useAuthStore } from '@/stores/auth'
 import { useSocket } from '@/composables/useSocket'
 
 /** Hareketsizlik eşiği: bu süre etkileşim olmazsa "Boşta"ya düş. */
@@ -18,10 +17,13 @@ const IDLE_TIMEOUT_MS = 5 * 60_000 // 5 dk
  *
  * NOT: Bu çevrimDIŞI düşmeyi çözmez (o reconnect/token işi — useSocket auth_error). Bu yalnız
  * "boşta" otomasyonu; ikisi birlikte "bir süre sonra çevrimdışı" şikâyetini kapatır.
+ *
+ * 🔴 Bu pencerenin boştalığı ARTIK hesabın boştalığı değil (2026-08-12): sunucu durumu bağlantı
+ * başına tutuyor ve hesap, herhangi bir penceresi aktifse aktif sayılıyor. Bu dosya yalnız
+ * "bu pencerenin başında biri var mı" sorusunu cevaplar; birleştirme sunucunun işi.
  */
 export function useIdlePresence() {
   const presenceStore = usePresenceStore()
-  const authStore = useAuthStore()
   const { setPresence } = useSocket()
   const { idle } = useIdle(IDLE_TIMEOUT_MS)
 
@@ -29,10 +31,13 @@ export function useIdlePresence() {
   let lastAuto: 'online' | 'away' | null = null
 
   function applyOwn(status: 'online' | 'away') {
-    setPresence(status)
-    // Sunucu 'presence:set'i yalnız kitleye yayar (kendine değil) → kendi UI'mızı optimistik güncelle
-    const myId = authStore.user?.id
-    if (myId) presenceStore.applyUpdate(myId, status)
+    // `auto: true` — bu bir OTOMASYON, kullanıcının seçimi değil: sunucu yalnız bu pencerenin
+    // durumunu günceller, hesabın manuel seçimine dokunmaz.
+    setPresence(status, { auto: true })
+    // 🔴 İyimser kendi-yazımı KALDIRILDI (sahip bulgusu 2026-08-12): bu pencerenin boşta olması
+    // artık hesabın boşta olduğu anlamına gelmiyor — başka bir pencere aktif olabilir. Doğru
+    // cevabı yalnız sunucu biliyor ve artık kullanıcının kendisine de yolluyor (`presence:update`,
+    // `messages.gateway.ts`). Buraya tahmin yazmak, düzeltmek için uğraştığımız yalanın ta kendisi.
   }
 
   watch(

@@ -84,13 +84,20 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       socket.join(`user:${payload.sub}`);
 
-      // Presence bağlantısı: count++ ve mevcut durumu al
+      // Presence bağlantısı: bu bağlantı kaydedilir ve hesabın ETKİN durumu alınır.
+      // `socket.id` bağlantı kimliği: durum artık bağlantı başına tutuluyor (bkz. PresenceService
+      // başındaki kusur notu) — hesabın durumu "en aktif pencere" kuralıyla hesaplanıyor.
       const userId = payload.sub;
-      const currentStatus = this.presence.connect(userId);
+      const currentStatus = this.presence.connect(userId, socket.id);
 
-      // İzinli kitleye presence:update yay (ilk bağlantıda online; sonraki sekmelerde mevcut durum)
+      // İzinli kitleye presence:update yay (ilk bağlantıda online; sonraki sekmelerde etkin durum).
+      // 🔴 Kullanıcının KENDİSİNE de yollanır: bugüne kadar kendi durumu hiç gelmiyordu ve her
+      // istemci onu kendi belleğinden tahmin ediyordu — tepsideki pencere "boşta" yazarken öndeki
+      // pencere kendini "çevrimiçi" gösteriyordu (sahip bulgusu 2026-08-12). Artık hesabın bütün
+      // pencereleri aynı gerçeği görür. Görünürlük kuralı ihlal edilmiyor: kullanıcı kendi
+      // durumunu zaten görebiliyor (`canSeePresence` kural 1).
       const audience = await this.presence.audienceFor(userId);
-      for (const recipientId of audience) {
+      for (const recipientId of [...audience, userId]) {
         this.realtime.emitToUser(recipientId, 'presence:update', { userId, status: currentStatus });
       }
 
@@ -112,15 +119,15 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const userId = socket.data?.userId;
     if (!userId) return; // auth olmamış socket — hiçbir şey yapma
 
-    const nowOffline = this.presence.disconnect(userId);
-    if (nowOffline) {
-      const audience = await this.presence.audienceFor(userId);
-      for (const recipientId of audience) {
-        this.realtime.emitToUser(recipientId, 'presence:update', {
-          userId,
-          status: 'offline',
-        });
-      }
+    const nowOffline = this.presence.disconnect(userId, socket.id);
+    // 🔴 Kapanan pencere son pencere olmayabilir ama hesabın ETKİN durumunu yine de değiştirebilir:
+    // aktif pencere kapanıp geriye yalnız boştaki bir pencere kaldıysa hesap artık boştadır.
+    // Eskiden yalnız "tamamen çevrimdışı" hâli yayınlanıyordu (durum hesap başına tekti, böyle bir
+    // ara hâl yoktu); bağlantı başına modelde bu yayın olmazsa kitle bayat kalırdı.
+    const status = nowOffline ? ('offline' as const) : this.presence.getStatus(userId);
+    const audience = await this.presence.audienceFor(userId);
+    for (const recipientId of [...audience, userId]) {
+      this.realtime.emitToUser(recipientId, 'presence:update', { userId, status });
     }
   }
 
@@ -275,10 +282,16 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     return { ok: true };
   }
 
+  /**
+   * `auto: true` — hareketsizlik otomasyonunun bildirimi (web `useIdlePresence`): YALNIZ bu
+   * bağlantıyı ilgilendirir, hesabın manuel seçimini değiştirmez. Alan yoksa seçim manueldir
+   * (kullanıcı kutucuktan seçti) ve hesap kapsamlıdır — eski istemciler bu alanı hiç göndermiyor,
+   * onlarda davranış değişmiyor.
+   */
   @SubscribeMessage('presence:set')
   async handlePresenceSet(
     @ConnectedSocket() socket: AuthSocket,
-    @MessageBody() payload: { status: ActiveStatus },
+    @MessageBody() payload: { status: ActiveStatus; auto?: boolean },
   ) {
     const userId = socket.data?.userId;
     if (!userId) return { ok: false };
@@ -288,15 +301,18 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       return { ok: false };
     }
 
-    const applied = this.presence.setStatus(userId, payload.status);
+    const applied = this.presence.setStatus(userId, payload.status, {
+      connectionId: socket.id,
+      auto: payload.auto === true,
+    });
     if (applied === 'offline') {
       // Bağlı değil — ack ile dön (güncelleme olmadı)
       return { ok: false };
     }
 
-    // İzinli kitleye yay
+    // İzinli kitleye + kullanıcının kendi pencerelerine yay (bkz. handleConnection notu).
     const audience = await this.presence.audienceFor(userId);
-    for (const recipientId of audience) {
+    for (const recipientId of [...audience, userId]) {
       this.realtime.emitToUser(recipientId, 'presence:update', {
         userId,
         status: applied,
