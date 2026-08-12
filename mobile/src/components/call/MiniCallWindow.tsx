@@ -60,7 +60,11 @@ export function MiniCallWindow() {
 
   return (
     <Pressable
-      onPress={() => router.push({ pathname: '/call', params: { channelId: connectedChannelId } })}
+      // 🔴 `push` DEĞİL `navigate` (sahip bulgusu 2026-08-12): arama ekranı yığında zaten varken
+      // (oradaki "mesaj yaz" düğmesi DM'i onun ÜSTÜNE itiyor) `push` ikinci bir kopya ekliyordu ve
+      // kapatma anında iki kopya birden geri gidip kullanıcıyı ölü ekranda bırakıyordu (bkz.
+      // `call.tsx` odak notu). `navigate` var olan ekrana geri döner, kopya üretmez.
+      onPress={() => router.navigate({ pathname: '/call', params: { channelId: connectedChannelId } })}
       style={[styles.container, hasVideo && styles.containerVideo, { top: insets.top + 8 }]}
       accessibilityRole="button"
     >
@@ -100,7 +104,11 @@ const SIZE = 56;
 // seçilemiyor. Kare oran bilinçli — telefon kamerası dikey, web kamerası/ekran paylaşımı yatay
 // geliyor; kare ikisini de simetrik kırpar, `'pip'` varyantı ekran paylaşımında zaten `contain`e
 // düşüp tamamını gösteriyor.
-const VIDEO_SIZE = 88;
+//
+// 88 → 120 (sahip isteği 2026-08-12, cihazda görüldükten sonra): 88'de karşı tarafın ne yaptığı
+// hâlâ seçilmiyordu. Videosuz hâl (avatar/hoparlör) 56'da KALIYOR — orada gösterilen şey zaten
+// bir simge, büyütmek bilgi katmaz, yalnız mesaj alanından yer çalar.
+const VIDEO_SIZE = 120;
 
 const styles = StyleSheet.create({
   container: {

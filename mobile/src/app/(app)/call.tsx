@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, BackHandler, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -301,9 +301,33 @@ export default function CallScreen() {
   // yüzeye görünüm eklemeye çalışıp `addViewAt: The specified child already has a parent` ile
   // patlıyordu (beyaz ekran). `connectedChannelId` dalı yalnız YEDEK: ekran, durum çoktan
   // temizlenmişken açık kalmışsa yine de kapanır.
+  /**
+   * 🔴 Kusur düzeltmesi (sahip bulgusu 2026-08-12, cihaz turu): "görüşme sürerken DM ekranına geç,
+   * mini pencereden aramaya dön, sonra kapat" akışında ses ve kamera düşüyor ama ekran DONMUŞ
+   * hâlde açık kalıyordu.
+   *
+   * Sebep yığında İKİ arama ekranı olması: bu ekrandaki "mesaj yaz" düğmesi DM'i arama ekranının
+   * ÜSTÜNE itiyor (`handleOpenChat`), mini pencere de oraya ikinci bir arama ekranı ekliyordu →
+   * `[call, dm, call']`. Stack'te alttaki ekranlar UNMOUNT OLMAZ, yalnız odağı kaybeder; kapatma
+   * anında iki kopyanın effect'i de çalışıp ikişer `router.back()` üretiyordu. İlki üstteki arama
+   * ekranını, ikincisi DM'i kapatıyor ve kullanıcı alttaki ölü kopyanın üstünde kalıyordu.
+   *
+   * `focused` bir REF değil STATE: ref güncellemesi effect'i yeniden çalıştırmaz ve alttaki kopya
+   * sırası gelip odağa geldiğinde kendini kapatamazdı. State ile sıra doğal biçimde kuruluyor —
+   * her ekran yalnız kendi odağındayken bir kez geri gider.
+   */
+  const [focused, setFocused] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      return () => setFocused(false);
+    }, []),
+  );
+
   const goneRef = useRef(false);
   useEffect(() => {
     if (goneRef.current || !wasConnectedRef.current) return;
+    if (!focused) return;
     if (!isLeaving && connectedChannelId !== null) return;
     // Sprint M4t §3 🔴 — acil akış sürüyorsa (`EmergencyButton` onaylandı, sunucu bizi henüz
     // çekmiş/çekmemiş olabilir) navigasyon ERTELENİR: ekran mount'lu kalır ki geri bildirim modalı
@@ -327,7 +351,7 @@ export default function CallScreen() {
     // Uyarı sökülme sırasında değil, bir sonraki tick'te ve DM ekranının üstünde açılır.
     if (reason) setTimeout(() => Alert.alert(reason), 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLeaving, connectedChannelId, emergencyPending, movePending]);
+  }, [isLeaving, connectedChannelId, emergencyPending, movePending, focused]);
 
   // Süre sayacı — `connectedAt`ten itibaren mm:ss (web `connectedAt` pariteti).
   const [now, setNow] = useState(Date.now());
