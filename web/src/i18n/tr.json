@@ -1890,6 +1890,7 @@
       "incomingGroupBody": "{name} grup aramasına başladı",
       "joinAction": "Aramaya Katıl",
       "incomingNotifChannel": "Gelen arama",
+      "incomingNotifChannelForeground": "Gelen arama (uygulama açıkken)",
       "moreOptions": "Diğer seçenekler",
       "outputRow": "Ses çıkışı",
       "inVoiceCount": "{n} kişi seste",

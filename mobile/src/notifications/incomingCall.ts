@@ -122,6 +122,20 @@ import { t } from '@/i18n';
 // aynı kimlikle çağrılınca sessizce hiçbir şey yapmaz. Ayar değişince kimlik de artırılır — bu yüzden
 // v3'e geçildi (v2: sessiz kanal, heads-up çıkarmıyordu, §9.2.1 KANIT).
 const CHANNEL_ID = 'incoming_call_v4';
+/**
+ * 🔴 ÖN PLAN KANALI (sahip bulgusu 2026-08-12, cihaz turu). Uygulama açıkken sunum bizim kendi
+ * şeridimiz; bildirim yalnız ZİL SESİ için kuruluyor ve görünmemesi gerekiyor. İlk denemede bu
+ * `push.ts`teki `setNotificationHandler` ile (`shouldShowBanner: false`) yapılmıştı — CİHAZDA
+ * ÇALIŞMADI: o handler uygulama önündeyken GELEN bildirimleri süzüyor, bizim zil bildirimimiz ise
+ * yerel olarak ZAMANLANAN bir bildirim ve Android'de sistem tarafından doğrudan gönderiliyor,
+ * JS'teki karar noktasına hiç uğramıyor. (Mesaj bildirimlerinde çalışmasının sebebi onların
+ * sunucudan gelmesi.)
+ *
+ * Karar bu yüzden işletim sistemi seviyesine taşındı: üstten inme davranışı KANALIN ÖNEMİNDEN
+ * geliyor. MAX/HIGH üstten iner, DEFAULT yalnız ses çalıp gölgeye düşer. Aynı ses, aynı zil-tonu
+ * akışı, yalnız önem farklı — yani sessiz mod/DND saygısı da aynen korunuyor.
+ */
+const FOREGROUND_CHANNEL_ID = 'incoming_call_quiet_v1';
 // §9.2.1b — sahip cihaz turunda ayarlarda İKİ ayrı "Gelen arama" kanalı birikmiş görüldü (v1 + v2,
 // aynı adla). Yeni kanal kurulurken eskiler silinir; kullanıcı ayarlarda hangisinin gerçek olduğunu
 // artık ayırt etmek zorunda kalmaz.
@@ -137,8 +151,9 @@ let setupDone = false;
 
 interface RingingCall {
   channelId: string;
-  notificationId: string;
+  notificationId: string | null;
   timeoutTimer: ReturnType<typeof setTimeout>;
+  /** Uygulama-içi şerit yolunda bildirim KURULMAZ; o durumda null (bkz. `presentIncomingCall`). */
 }
 
 /**
@@ -201,6 +216,21 @@ export async function ensureIncomingCallNotificationsSetup(): Promise<void> {
       contentType: Notifications.AndroidAudioContentType.SONIFICATION,
     },
   });
+  // Ön plan kanalı: yukarıdakiyle AYNI ses/titreşim/akış, yalnız önem DEFAULT — üstten inmez,
+  // gölgeye düşer. Ayarlarda ikinci bir satır olarak görünür; bilinçli, kullanıcı zilin uygulama
+  // açıkkenki halini ayrıca kısabilsin.
+  await Notifications.setNotificationChannelAsync(FOREGROUND_CHANNEL_ID, {
+    name: t('mobile.call.incomingNotifChannelForeground'),
+    importance: Notifications.AndroidImportance.DEFAULT,
+    sound: CHANNEL_SOUND_FILE,
+    enableVibrate: true,
+    vibrationPattern: VIBRATE_PATTERN,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    audioAttributes: {
+      usage: Notifications.AndroidAudioUsage.NOTIFICATION_RINGTONE,
+      contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+    },
+  });
   await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
     { identifier: 'reject', buttonTitle: t('call.reject'), options: { opensAppToForeground: false } },
     { identifier: 'accept', buttonTitle: t('mobile.call.joinAction'), options: { opensAppToForeground: true } },
@@ -210,7 +240,10 @@ export async function ensureIncomingCallNotificationsSetup(): Promise<void> {
 /** §9.2.5 — bu kanal için ZATEN bir bildirim çalıyor mu? `push.ts`'teki global handler foreground'da
  *  gelen ikinci kopyayı (WS + push aynı anda) bastırmak için okur. */
 export function isChannelRinging(channelId: string): boolean {
-  return current?.channelId === channelId;
+  // İki sunum yolu var (bildirim · izin kapalıyken uygulama-içi şerit) ve "bu kanal çalıyor mu"
+  // sorusunun tek cevabı olmalı: aramaya bağlanınca zili susturan kural (dosya sonundaki voice
+  // store aboneliği) da, yinelenen olayları eleyen kapı da buradan okuyor.
+  return current?.channelId === channelId || useVoiceStore.getState().incomingCall?.channelId === channelId;
 }
 
 /**
@@ -223,15 +256,89 @@ export async function presentIncomingCall(
   caller: { id: string; username: string; avatarUrl: string | null },
   options?: { kind?: IncomingCallKind },
 ): Promise<void> {
-  if (current?.channelId === channelId) return; // aynı çağrı — yinelenen event, no-op
-  if (current) await dismissIncomingCall(current.channelId);
+  if (isChannelRinging(channelId)) return; // aynı çağrı — yinelenen event, no-op
+  // Farklı bir kanaldan eş zamanlı ikinci arama: öncekinin yerini alır. Önceki hangi yolla
+  // sunulmuşsa (bildirim ya da uygulama-içi şerit) ortak çıkıştan kapanır.
+  const previous = current?.channelId ?? useVoiceStore.getState().incomingCall?.channelId ?? null;
+  if (previous) await dismissIncomingCall(previous);
 
-  await ensureIncomingCallNotificationsSetup();
+  // 🔴 İzin yoksa HİÇBİR sinyal verilmez (sahip kararı 2026-08-12, cihaz turu). Titreşim
+  // `Vibration.vibrate` ile JS tarafından geliyor ve bildirim iznine BAĞLI DEĞİL: izin kapalıyken
+  // bildirim hiç görünmüyor ama telefon titremeye devam ediyordu. Ortaya yüzü olmayan bir sinyal
+  // çıkıyordu — kullanıcı neyin titreştiğini bilmiyor, susturacak bir düğme de yok (sahip bunu yeni
+  // kurulumdan sonra yaşadı). Karar: kullanıcı bildirim istemediğini söylediyse uygulama sessiz kalır.
+  //
+  // Kabul edilen bedel: uygulama AÇIKKEN bile gelen çağrıdan haberin olmaz. Doğru çözüm ön plandayken
+  // uygulamanın kendi kabul/reddet yüzeyini çizmesi (bildirim izni sistem bildirimlerini kapatır,
+  // uygulamanın kendi ekranını değil) — yeni bir yüzey demek, ayrı bir işin konusu.
+  /**
+   * SUNUM KARARI (sahip kararı 2026-08-12) — iki eksen: uygulama önde mi, bildirim izni var mı.
+   *
+   *  | Uygulama | İzin | Sunum                                                        |
+   *  |----------|------|--------------------------------------------------------------|
+   *  | Önde     | Var  | Kendi şeridimiz + kanal sesi (bildirim kurulur, GÖRÜNMEZ)     |
+   *  | Önde     | Yok  | Kendi şeridimiz, sessiz                                       |
+   *  | Arkada   | Var  | Sistem bildirimi (bugünkü yol, kabul/reddet düğmeleriyle)     |
+   *  | Arkada   | Yok  | Hiçbir şey                                                    |
+   *
+   * Neden ön planda kendi yüzeyimiz: bildirim penceresini Android çiziyor — düğmesi, süresi,
+   * sırası bizim elimizde değil ve uygulamanın üstünü kapatıyor. Uygulama zaten açıkken bunu
+   * kullanmak için sebep yok (Discord/WhatsApp da böyle ayırıyor).
+   *
+   * Ön planda bildirim yine de KURULUR (izin varsa): zil sesi kanalın kendi sesinden geliyor ve o
+   * kanal `USAGE_NOTIFICATION_RINGTONE` ile kurulu, yani sessiz mod ve rahatsız etmeyin saygısını
+   * bedavaya taşıyor. Kendi ses çalarımızı yazmak bu saygıyı elle taşımak demekti (M4a-2'de o yol
+   * denenip bilinçle kaldırılmıştı). Görünmesini `push.ts` handler'ı bastırıyor — ses çalar,
+   * banner düşmez, ekranda yalnız bizim şeridimiz kalır.
+   *
+   * Son satır ("arkada + izin yok → hiçbir şey") sabahki kararın kalanı: gösterecek bir yüzey
+   * yokken titreşim vermek, kullanıcının neyin titreştiğini bilememesi demekti.
+   */
+  const permission = await Notifications.getPermissionsAsync();
+  const foreground = AppState.currentState === 'active';
+
+  if (foreground) {
+    useVoiceStore.getState().setIncomingCall({
+      channelId,
+      callerName: caller.username,
+      avatarUrl: caller.avatarUrl,
+      isGroup: options?.kind === 'group',
+    });
+  } else if (!permission.granted) {
+    return; // gösterecek yüzey yok → sessiz kal
+  }
 
   const kind: IncomingCallKind = options?.kind ?? 'dm';
-  const isGroup = kind === 'group';
 
-  const notificationId = await Notifications.scheduleNotificationAsync({
+  const notificationId = permission.granted
+    ? await scheduleRingNotification(channelId, caller, kind, foreground)
+    : null;
+
+  const timeoutTimer = setTimeout(() => {
+    void dismissIncomingCall(channelId); // §8.2 — 30 sn cevapsız, YALNIZ yerel temizlik (WS'e bir şey gönderilmez)
+  }, RING_TIMEOUT_MS);
+
+  current = { channelId, notificationId, timeoutTimer };
+  // §9.2.1 — izin varsa kanalın kendi sesi çalıyor; titreşim ayrıca JS'ten (ringer modundan
+  // bağımsız çalıştığı M4a-2'de doğrulandı). İzin yokken tek sinyal titreşim ama artık ekranda
+  // onu açıklayan bir şerit var — "yüzü olmayan sinyal" kuralı korunuyor.
+  Vibration.vibrate(VIBRATE_PATTERN, true);
+}
+
+/**
+ * Zil bildirimini kurar ve kimliğini döner. `presentIncomingCall`ten AYRILDI çünkü artık koşullu:
+ * ön planda yalnız SES için kuruluyor (görünmesini `push.ts` bastırıyor), arka planda ise tek
+ * sunum yüzeyi bu. İçeriği değişmedi, satır satır taşındı.
+ */
+async function scheduleRingNotification(
+  channelId: string,
+  caller: { id: string; username: string; avatarUrl: string | null },
+  kind: IncomingCallKind,
+  foreground: boolean,
+): Promise<string> {
+  await ensureIncomingCallNotificationsSetup();
+  const isGroup = kind === 'group';
+  return Notifications.scheduleNotificationAsync({
     content: {
       // §14.1 — "bildirim metni grubu belli etmeli": 1-1'de "Gelen Arama / <ad> seni arıyor!",
       // grupta "Grup Araması / <ad> grup aramasına başladı". Grubun ADI metne girmiyor: sunucunun
@@ -283,26 +390,23 @@ export async function presentIncomingCall(
     // sessizce yanlıştı; logcat'te "Couldn't get channel for the notifications - trigger is 'null'.
     // Fallback to '...' channel" satırıyla yakalandı. Doğru "hemen gönder" şekli
     // `ChannelAwareTriggerInput` (`{ channelId: string }`) — kanalı taşıyan, gecikmesiz trigger.
-    trigger: { channelId: CHANNEL_ID },
+    trigger: { channelId: foreground ? FOREGROUND_CHANNEL_ID : CHANNEL_ID },
   });
-
-  const timeoutTimer = setTimeout(() => {
-    void dismissIncomingCall(channelId); // §8.2 — 30 sn cevapsız, YALNIZ yerel temizlik (WS'e bir şey gönderilmez)
-  }, RING_TIMEOUT_MS);
-
-  current = { channelId, notificationId, timeoutTimer };
-  // §9.2.1 — kanalın kendi sesi zaten çalıyor (bildirim gösterilirken sistem otomatik çalar);
-  // titreşim ayrıca JS'ten (ringer modundan bağımsız çalıştığı M4a-2'de doğrulandı).
-  Vibration.vibrate(VIBRATE_PATTERN, true);
 }
 
 /** Dört bitiş yolunun (kabul · reddet · zaman aşımı · arayan iptal) ORTAK çıkışı. */
 export async function dismissIncomingCall(channelId: string): Promise<void> {
+  // Uygulama-içi şerit de bu ortak çıkıştan kapanır: kabul · reddet · zaman aşımı · arayanın
+  // iptali, dördü de buraya uğruyor.
+  if (useVoiceStore.getState().incomingCall?.channelId === channelId) {
+    useVoiceStore.getState().setIncomingCall(null);
+  }
   if (current?.channelId !== channelId) return;
   clearTimeout(current.timeoutTimer);
   const { notificationId } = current;
   current = null;
   Vibration.cancel();
+  if (!notificationId) return; // ön planda izin yokken bildirim hiç kurulmadı
   try {
     await Notifications.dismissNotificationAsync(notificationId);
   } catch {
@@ -345,6 +449,49 @@ async function clearStaleIncomingCallNotifications(): Promise<void> {
  * kendisi düşürür. Katılmadan önce soket hazır olması `callAccept`/`emitCallSignal`'in zaten
  * `ensureSocket()` kullanmasıyla garanti (2cdd1d3 dersi, `realtime/socket.ts`).
  */
+/**
+ * Reddetme kuralı — İKİ sunum yolunun ortak uygulaması (bildirim düğmesi · uygulama-içi şerit).
+ * §14.1: grupta reddet YALNIZ YEREL, sunucuya hiçbir şey gitmez (`voice:call_reject` grupta
+ * rastgele bir üyeye giderdi). 1-1'de sinyal gönderilir.
+ */
+export function rejectIncomingCall(channelId: string, isGroup: boolean): void {
+  void dismissIncomingCall(channelId);
+  if (isGroup) return;
+  callReject(channelId);
+}
+
+/**
+ * Kabul kuralı — İKİ sunum yolunun ortak uygulaması. Davet KESİNLİKLE gönderilmez (`invite: false`):
+ * arayan zaten odada, biz yalnız katılıyoruz. Grupta kabul de sunucuya gitmez (reddetle aynı
+ * `otherDmMember` gerekçesi). Bu gövde bildirim yanıtı işleyicisinden BURAYA taşındı, ikinci kez
+ * yazılmadı — aynı kuralın iki tüketicisi var, iki ayrı kopyası değil.
+ */
+export function acceptIncomingCall(channelId: string, callerName: string, isGroup: boolean): void {
+  void dismissIncomingCall(channelId);
+  if (!isGroup) callAccept(channelId);
+  // Grupta arama ekranının başlığı grubun adı olmalı; ad DM store'undan gelir (bildirim yükünde yok),
+  // store henüz yüklenmemişse başlatanın adına düşer.
+  const groupChannel = isGroup ? useDmStore.getState().channels.find((c) => c.id === channelId) : undefined;
+  const label = groupChannel ? channelTitle(groupChannel) : callerName;
+  void useVoiceStore
+    .getState()
+    .startOrJoin(channelId, label, { invite: false, kind: isGroup ? 'group' : 'dm' })
+    .then((res) => {
+      if (res.ok) {
+        router.push({ pathname: '/call', params: { channelId } });
+        return;
+      }
+      if (res.reason === 'mic_denied') {
+        Alert.alert(res.message ?? t('common.error'), undefined, [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('mobile.call.micPermissionSettings'), onPress: () => Linking.openSettings() },
+        ]);
+        return;
+      }
+      if (res.message) Alert.alert(res.message);
+    });
+}
+
 export function useIncomingCallResponder(): void {
   useGatedNotificationResponder((response) => {
     const data = response.notification.request.content.data as Record<string, unknown>;
@@ -360,13 +507,14 @@ export function useIncomingCallResponder(): void {
       // geçtiyse "alakasız eski arama reddedildi" sınıfı kusuru önlemek için sinyal DENENMEZ, yalnız
       // yerel temizlik yapılır (zaten no-op: `current` soğuk açılışta null).
       const age = Date.now() - response.notification.date;
-      void dismissIncomingCall(channelId);
-      // 🔴 §14.1 — grupta reddet YALNIZ YEREL: zil susar, bildirim kapanır, sunucuya HİÇBİR ŞEY
-      // gitmez (bkz. `IncomingCallKind` yorumu — `voice:call_reject` grupta rastgele bir üyeye
-      // giderdi). Bu satır 1-1 dalının ÖNÜNDE duruyor, o dal satır satır aynı kaldı.
-      if (isGroup) return;
-      if (age > RING_TIMEOUT_MS) return;
-      callReject(channelId);
+      // Yanıt 30 sn'den eskiyse (soğuk açılıştan gelen geç yanıt) sinyal DENENMEZ, yalnız yerel
+      // temizlik yapılır — "alakasız eski arama reddedildi" kusurunu önleyen kural, yalnız bu
+      // yola özgü olduğu için ortak `rejectIncomingCall`ın DIŞINDA duruyor.
+      if (age > RING_TIMEOUT_MS) {
+        void dismissIncomingCall(channelId);
+        return;
+      }
+      rejectIncomingCall(channelId, isGroup);
       return;
     }
 
@@ -378,36 +526,7 @@ export function useIncomingCallResponder(): void {
     }
 
     if (response.actionIdentifier === 'accept') {
-      void dismissIncomingCall(channelId);
-      // §14.1 — grupta kabul de sunucuya gitmez (reddetle aynı `otherDmMember` gerekçesi); 1-1
-      // dalı DEĞİŞMEDİ.
-      if (!isGroup) callAccept(channelId);
-      // Grupta arama ekranının başlığı grubun adı olmalı (`startOrJoin` `label`i `callChannelName`e
-      // yazıyor). Ad DM store'undan gelir; bildirim yükünde yok (bkz. `presentIncomingCall`
-      // başlığındaki not) — store henüz yüklenmemişse başlatanın adına düşer.
-      const groupChannel = isGroup ? useDmStore.getState().channels.find((c) => c.id === channelId) : undefined;
-      const label = groupChannel ? channelTitle(groupChannel) : callerName;
-      // §0.1/§8.2 — davet KESİNLİKLE gönderilmez (`invite: false`): arayan zaten odada, biz
-      // yalnız katılıyoruz. Presence store'a hiç bakılmıyor (dev'in DM ekranında olmadığı senaryo).
-      // Grupta da aynısı geçerli — `invite:false` grup dalında `voice:group_call_start`ı atlatır,
-      // yani KATILAN kimseyi yeniden çaldırmaz (§14.5 "sonradan katılan kimseyi çaldırmıyor").
-      void useVoiceStore
-        .getState()
-        .startOrJoin(channelId, label, { invite: false, kind: isGroup ? 'group' : 'dm' })
-        .then((res) => {
-          if (res.ok) {
-            router.push({ pathname: '/call', params: { channelId } });
-            return;
-          }
-          if (res.reason === 'mic_denied') {
-            Alert.alert(res.message ?? t('common.error'), undefined, [
-              { text: t('common.cancel'), style: 'cancel' },
-              { text: t('mobile.call.micPermissionSettings'), onPress: () => Linking.openSettings() },
-            ]);
-            return;
-          }
-          if (res.message) Alert.alert(res.message);
-        });
+      acceptIncomingCall(channelId, callerName, isGroup);
     }
   });
 
