@@ -81,6 +81,25 @@ import { useDmStore } from '@/stores/dm';
  * yığılma boşluğu kapanmadan kalır (D62 ödünleşmesi gereği veri-yalnız push/native task bu sprintte
  * denenmedi).
  */
+/**
+ * 🔴 Mesaj kanalı SÜRÜMLÜ ve SUNUCUYLA EŞLEŞMEK ZORUNDA (`api/src/modules/messages/gateway/
+ * messages.gateway.ts` + `api/src/modules/notifications/notifications.service.ts`
+ * `androidChannelId`). Android'de bir kanalın ayarları kurulduktan SONRA değiştirilemez
+ * (`setNotificationChannelAsync` aynı kimlikle çağrılınca sessizce hiçbir şey yapmaz, aynı ders
+ * `incomingCall.ts` `incoming_call_v4`); ayar değişince kimlik de artırılır.
+ *
+ * v1 → v2 sebebi (sahip bulgusu 2026-09-01): v1'de titreşim HİÇ AÇILMAMIŞTI. Android'de kanalın
+ * `enableVibration` varsayılanı KAPALI — yani zil modundayken yalnız ses çıkıyordu; titreşim
+ * modunda hissedilen titreme bizim ayarımız değil, sistemin sesi titreşime çevirmesiydi. Artık
+ * kanal `enableVibrate: true` ile kurulu → ses modunda ses VE titreşim birlikte gelir (WhatsApp
+ * davranışı), titreşim modunda davranış AYNI kalır (sistem sesi zaten susturur).
+ */
+const MESSAGE_CHANNEL_ID = 'messages_v2';
+const OLD_MESSAGE_CHANNEL_IDS = ['messages_v1'];
+/** Tek kısa titreşim — [gecikme, süre]. Aramanın döngülü ritmi (`incomingCall.ts`) bilerek DEĞİL:
+ *  mesaj bildirimi bir kez haber verir, ısrar etmez. */
+const MESSAGE_VIBRATE_PATTERN = [0, 250];
+
 async function dismissStaleChannelNotifications(channelId: string, excludeIdentifier?: string): Promise<void> {
   try {
     const presented = await Notifications.getPresentedNotificationsAsync();
@@ -146,7 +165,7 @@ Notifications.setNotificationHandler({
       // 🔴 M5e ek (sahip kararı 2026-08-11, CİHAZDA ÖLÇÜLEREK bulundu) — mesaj bildirimlerinde de
       // ses açık. Bu bir tercih değil, banner'ın ÖN KOŞULU: sessiz sunulan bildirimi Android
       // "sessiz" sınıfına koyuyor (`dumpsys`: `sound=null defaults=0x0 groupKey=silent`) ve
-      // üstten İNDİRMİYOR — yalnız gölgeye giriyor. Kanal (`messages_v1`) önemi 4/HIGH ve renk
+      // üstten İNDİRMİYOR — yalnız gölgeye giriyor. Kanal (`messages_v2`) önemi 4/HIGH ve renk
       // doğruydu; tek fark sesti. Arka planda bildirimi FCM kurduğu için kanalın kendi sesini
       // kullanıyor, o yüzden orada zaten iniyordu; tutarsızlığın kaynağı buydu.
       //
@@ -197,9 +216,24 @@ async function readExpoPushToken(): Promise<string | null> {
     // değiştirilemez (bkz. `incomingCall.ts` aynı ders, `incoming_call_v4`e çıkma sebebi).
     // Var olan `default` kanalının importance'ını yükseltmek, onu çoktan oluşturmuş cihazlarda
     // HİÇBİR ŞEY yapmaz. Bu yüzden `default` olduğu gibi bırakılıyor, yenisi ayrıca açılıyor.
-    await Notifications.setNotificationChannelAsync('messages_v1', {
+    //
+    // Eski sürüm silinir (aynı gerekçe `incomingCall.ts` §9.2.1b): yoksa ayarlarda aynı adla iki
+    // "Mesajlar" kanalı birikir, kullanıcı hangisinin gerçek olduğunu ayırt edemez.
+    for (const oldChannelId of OLD_MESSAGE_CHANNEL_IDS) {
+      try {
+        await Notifications.deleteNotificationChannelAsync(oldChannelId);
+      } catch {
+        // yoksay — zaten yoktu
+      }
+    }
+    await Notifications.setNotificationChannelAsync(MESSAGE_CHANNEL_ID, {
       name: 'Mesajlar',
       importance: Notifications.AndroidImportance.HIGH,
+      // 🔴 Sahip bulgusu 2026-09-01 — v1'de bu iki satır YOKTU (bkz. MESSAGE_CHANNEL_ID yorumu).
+      // Ses ve titreşim Android'de birbirini dışlamaz: kanal ikisini birden isteyebilir, sessiz/
+      // titreşim modu saygısı yine sistemde kalır (kanal ringer modunu EZEMEZ).
+      enableVibrate: true,
+      vibrationPattern: MESSAGE_VIBRATE_PATTERN,
     });
   }
 
