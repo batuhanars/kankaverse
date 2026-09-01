@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { FlatList, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import { FlatList, StyleSheet, useWindowDimensions } from 'react-native';
 import type { AttachmentDto } from '@/api/messages';
 import { AttachmentView } from '../AttachmentView';
 import { useChannelSearchTab } from '@/hooks/useChannelSearchTab';
@@ -30,6 +30,15 @@ interface Props {
  *
  * Sprint M3b §5.1 — `guildId` prop'u DÜŞTÜ: kanca artık kanal kapsamlı uca gidiyor, böylece aynı
  * sekme hem ortam kanalında hem DM'de çalışıyor (fork edilmedi, tek kaynak).
+ *
+ * 🔴 Dokunma davranışı değişti (sahip kararı 2026-09-01): hücreye dokunmak artık sohbet ekranına
+ * ATLAMIYOR, görseli TAM EKRAN açıyor (sohbetteki davranışın aynısı; WhatsApp'ın medya ızgarası da
+ * böyle). Bunun için dış `Pressable` kaldırıldı ve `AttachmentView` `interactive` geçiyor — iç içe
+ * iki dokunma hedefi bırakmamak şart, yoksa içteki kazanır ve dıştaki sessizce ölürdü (bileşenin
+ * kendi prop notu). Mesaja gitme yolu kaybolmadı, tam ekrandaki "Mesajda göster" düğmesine taşındı.
+ *
+ * Görsel olmayan hücreler (video) bu değişiklikle sohbetteki kuralı izler: dokununca sistemde/
+ * uygulama-içi sekmede açılır. Ayrı bir kural yazılmadı — tek davranış, iki yüzey.
  */
 export function ChannelMediaTab({ channelId, onOpenMessage }: Props) {
   const { state, messages, errorMessage, retry } = useChannelSearchTab(channelId, 'image');
@@ -59,9 +68,12 @@ export function ChannelMediaTab({ channelId, onOpenMessage }: Props) {
       contentContainerStyle={styles.list}
       columnWrapperStyle={styles.row}
       renderItem={({ item }) => (
-        <Pressable onPress={() => onOpenMessage(item.messageId)}>
-          <AttachmentView attachment={item.attachment} size={cellSize} />
-        </Pressable>
+        <AttachmentView
+          attachment={item.attachment}
+          size={cellSize}
+          interactive
+          onShowInChat={() => onOpenMessage(item.messageId)}
+        />
       )}
     />
   );
