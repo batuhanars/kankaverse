@@ -93,12 +93,30 @@ import { useDmStore } from '@/stores/dm';
  * modunda hissedilen titreme bizim ayarımız değil, sistemin sesi titreşime çevirmesiydi. Artık
  * kanal `enableVibrate: true` ile kurulu → ses modunda ses VE titreşim birlikte gelir (WhatsApp
  * davranışı), titreşim modunda davranış AYNI kalır (sistem sesi zaten susturur).
+ *
+ * v2 → v3 sebebi (aynı gün, cihaz turu): titreşim çalışıyordu ama TEK ve kısaydı; desen çift
+ * darbeye çıkarıldı (aşağıdaki `MESSAGE_VIBRATE_PATTERN`). Yalnız desen değişti diye kimlik
+ * artırmak israf gibi görünür ama şart: kanal ayarı sonradan değiştirilemiyor, v2'yi güncellemek
+ * onu çoktan oluşturmuş cihazlarda HİÇBİR ŞEY yapmazdı.
+ *
+ * ⚠️ MIUI kısıtı (kod kusuru DEĞİL, kovalamayın): Xiaomi aynı bildirim anahtarı için 15 sn
+ * içindeki İKİNCİ titreşimi iptal ediyor (`NotificationManagerServiceImpl: Cancel the recent
+ * frequently vibration in 15s`). DM push'u yığılmayı önlemek için `tag = channelId` gönderdiğinden
+ * aynı sohbetin ardışık mesajları tek anahtarı paylaşır, yani ilki titrer gerisi titremez. Ses
+ * çalmaya devam eder. WhatsApp da bu telefonda aynı davranır; sahip kararı (2026-09-01): olduğu
+ * gibi bırak, `tag`i kaldırmak yığılmayı geri getirirdi. Titreşim testi 15 sn'den uzun aralıklarla
+ * ya da farklı sohbetlerden yapılır.
  */
-const MESSAGE_CHANNEL_ID = 'messages_v2';
-const OLD_MESSAGE_CHANNEL_IDS = ['messages_v1'];
-/** Tek kısa titreşim — [gecikme, süre]. Aramanın döngülü ritmi (`incomingCall.ts`) bilerek DEĞİL:
- *  mesaj bildirimi bir kez haber verir, ısrar etmez. */
-const MESSAGE_VIBRATE_PATTERN = [0, 250];
+const MESSAGE_CHANNEL_ID = 'messages_v3';
+const OLD_MESSAGE_CHANNEL_IDS = ['messages_v1', 'messages_v2'];
+/**
+ * Çift kısa darbe — `[gecikme, titre, dur, titre]`. v2'de tek 250 ms'lik darbeydi ve sahip cihazda
+ * "çok kısa" buldu (2026-09-01): telefon cepteyken tek kısa titreşim kalabalık ortamda kaçıyor.
+ * WhatsApp'ın mesaj bildirimi de çift darbe, referans o. Aramanın döngülü ritmi
+ * (`incomingCall.ts`, 3 sn'de bir tekrar eden) bilerek DEĞİL: mesaj bir kez haber verir, ısrar
+ * etmez; ısrar eden titreşim çalan telefon hissi yaratır.
+ */
+const MESSAGE_VIBRATE_PATTERN = [0, 250, 150, 250];
 
 async function dismissStaleChannelNotifications(channelId: string, excludeIdentifier?: string): Promise<void> {
   try {
