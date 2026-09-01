@@ -99,6 +99,10 @@ import { useDmStore } from '@/stores/dm';
  * artırmak israf gibi görünür ama şart: kanal ayarı sonradan değiştirilemiyor, v2'yi güncellemek
  * onu çoktan oluşturmuş cihazlarda HİÇBİR ŞEY yapmazdı.
  *
+ * v3 → v4 sebebi (aynı gün, sahip onayından sonraki ince ayar): çift darbe doğruydu ama darbeler
+ * kısaydı, her biri uzatıldı. 🔴 DERS: desenin her denemesi bir kanal sürümü + sunucu deploy'u +
+ * yeni derleme demek. Bir dahaki sefere değeri cihazda TEK turda oturt, üç ayrı sürüm yakma.
+ *
  * ⚠️ MIUI kısıtı (kod kusuru DEĞİL, kovalamayın): Xiaomi aynı bildirim anahtarı için 15 sn
  * içindeki İKİNCİ titreşimi iptal ediyor (`NotificationManagerServiceImpl: Cancel the recent
  * frequently vibration in 15s`). DM push'u yığılmayı önlemek için `tag = channelId` gönderdiğinden
@@ -107,8 +111,8 @@ import { useDmStore } from '@/stores/dm';
  * gibi bırak, `tag`i kaldırmak yığılmayı geri getirirdi. Titreşim testi 15 sn'den uzun aralıklarla
  * ya da farklı sohbetlerden yapılır.
  */
-const MESSAGE_CHANNEL_ID = 'messages_v3';
-const OLD_MESSAGE_CHANNEL_IDS = ['messages_v1', 'messages_v2'];
+const MESSAGE_CHANNEL_ID = 'messages_v4';
+const OLD_MESSAGE_CHANNEL_IDS = ['messages_v1', 'messages_v2', 'messages_v3'];
 /**
  * Çift kısa darbe — `[gecikme, titre, dur, titre]`. v2'de tek 250 ms'lik darbeydi ve sahip cihazda
  * "çok kısa" buldu (2026-09-01): telefon cepteyken tek kısa titreşim kalabalık ortamda kaçıyor.
@@ -116,7 +120,7 @@ const OLD_MESSAGE_CHANNEL_IDS = ['messages_v1', 'messages_v2'];
  * (`incomingCall.ts`, 3 sn'de bir tekrar eden) bilerek DEĞİL: mesaj bir kez haber verir, ısrar
  * etmez; ısrar eden titreşim çalan telefon hissi yaratır.
  */
-const MESSAGE_VIBRATE_PATTERN = [0, 250, 150, 250];
+const MESSAGE_VIBRATE_PATTERN = [0, 350, 180, 350];
 
 async function dismissStaleChannelNotifications(channelId: string, excludeIdentifier?: string): Promise<void> {
   try {

@@ -497,7 +497,7 @@ export class NotificationsService {
       // (önem DEFAULT) kullanıyor, bildirim ekranda BELİRMİYOR. `sendDmPush` ile aynı kanal.
       // 🔴 v1 → v2 (sahip bulgusu 2026-09-01): kanal mobilde titreşim açılmadan kuruluydu; kanal
       // ayarı sonradan değiştirilemediği için kimlik artırıldı (gerekçe `sendDmPush` yorumunda).
-      androidChannelId: 'messages_v3',
+      androidChannelId: 'messages_v4',
       priority: 'high' as const,
       // 🔴 Yığılma önleme (canlı geri bildirim 2026-08-11) — YALNIZ bahsetmede ve yalnız kanal
       // biliniyorsa. `tag` cihazda görünen bildirimin YERİNE geçtiği için, kanal başına sabit
