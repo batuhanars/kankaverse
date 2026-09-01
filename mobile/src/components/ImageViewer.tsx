@@ -20,6 +20,8 @@ const MAX_SCALE = 4;
 /** Çift dokunuşun açtığı kademe. Tam MAX değil: bir dokunuşta sonuna kadar gitmek, kullanıcıyı
  *  geri çıkmak için ikinci bir jeste zorlar. */
 const DOUBLE_TAP_SCALE = 2.5;
+/** Dokunuş sayılmak için parmağın kayabileceği en fazla mesafe (dp). RNGH varsayılanı SINIRSIZ. */
+const TAP_SLOP = 12;
 
 function clamp(value: number, min: number, max: number): number {
   'worklet';
@@ -149,7 +151,9 @@ export function ImageViewer({ visible, url, errorMessage, onClose, onShowInChat 
 
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
-    .onEnd((e) => {
+    .maxDistance(TAP_SLOP)
+    .onEnd((e, success) => {
+      if (!success) return;
       if (scale.value > MIN_SCALE) {
         resetZoom();
         return;
@@ -165,7 +169,9 @@ export function ImageViewer({ visible, url, errorMessage, onClose, onShowInChat 
 
   const singleTap = Gesture.Tap()
     .numberOfTaps(1)
-    .onEnd(() => {
+    .maxDistance(TAP_SLOP)
+    .onEnd((_event, success) => {
+      if (!success) return;
       // Yakınlaştırılmışken tek dokunuş KAPATMAZ, önce 1x'e döner: yakınlaşmışken yanlışlıkla
       // ekrana dokunup görüntüleyiciden düşmek can sıkıcı olurdu.
       if (scale.value > MIN_SCALE) {
@@ -175,9 +181,26 @@ export function ImageViewer({ visible, url, errorMessage, onClose, onShowInChat 
       runOnJS(onClose)();
     });
 
-  // Çift dokunuş tek dokunuşu YENER (`Exclusive`), ikisi birden kıstırma/kaydırmayla aynı anda
-  // tanınabilir — dokunuş jestleri parmak kaydığında kendiliğinden düşer.
-  const gesture = Gesture.Simultaneous(pinch, pan, Gesture.Exclusive(doubleTap, singleTap));
+  /**
+   * Çift dokunuş tek dokunuşu yener (`Exclusive`); kıstırma ve kaydırma birbiriyle aynı anda
+   * çalışır (`Simultaneous`). İkisi arasında `Race` var: hangisi ÖNCE etkinleşirse diğeri iptal
+   * edilir.
+   *
+   * 🔴 Bu kurgu sahip bulgusundan sonra (2026-09-01, cihaz turu) düzeltildi. Önce hepsi tek bir
+   * `Simultaneous` içindeydi ve yakınlaştırma "kendi kendine geri dönüyordu". Sebep RNGH'nin
+   * `Tap` varsayılanları: dokunuşun izin verilen HAREKET mesafesi sınırsız, tek kısıt 500 ms'lik
+   * süre. Yani yarım saniyeden kısa süren HER sürükleme/kıstırma kalkışı geçerli bir "tek dokunuş"
+   * sayılıyor, o da yakınlaştırmayı sıfırlayan dala giriyordu. Üç kemer birden takıldı:
+   *  - `maxDistance(TAP_SLOP)` — parmak kaydıysa dokunuş değildir;
+   *  - `Race` — kaydırma/kıstırma etkinleşince dokunuşlar iptal olur;
+   *  - `onEnd`in `success` bayrağı — iptal edilen jestin `onEnd`i de çağrılıyor (kütüphane kaynağı
+   *    `eventReceiver.ts`: ACTIVE→CANCELLED geçişinde `onEnd(event, false)`), bayrak okunmazsa
+   *    `Race`in ta kendisi yeni bir sıfırlama sebebi olurdu.
+   */
+  const gesture = Gesture.Race(
+    Gesture.Simultaneous(pinch, pan),
+    Gesture.Exclusive(doubleTap, singleTap),
+  );
 
   const imageStyle = useAnimatedStyle(() => ({
     transform: [
