@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { Ionicons } from '@expo/vector-icons';
+import { ImageViewer } from './ImageViewer';
 import { attachmentsApi } from '@/api/attachments';
 import { extractErrorMessage } from '@/api/errors';
 import { ScanStatus, type AttachmentDto } from '@/api/messages';
@@ -15,6 +15,7 @@ export function AttachmentView({
   attachment,
   size,
   interactive = false,
+  onShowInChat,
 }: {
   attachment: AttachmentDto;
   /**
@@ -30,8 +31,17 @@ export function AttachmentView({
    * ZATEN bir `Pressable` içinde duruyor ve orada dokunuş "mesaja git" demek. Varsayılanı açık
    * yapsaydım iç içe iki dokunma hedefi olur, içteki kazanır ve o sekmelerdeki gezinme sessizce
    * bozulurdu. Yalnız mesaj balonu (`MessageBubble`) açık geçiyor.
+   *
+   * 🔴 Medya ızgarası (sahip kararı 2026-09-01) artık İSTİSNA: orada da dokunuş büyütüyor, dış
+   * `Pressable` kaldırıldı (bkz. `ChannelMediaTab`). "Mesaja git" kaybolmadı, tam ekrandaki
+   * düğmeye taşındı (`onShowInChat`). Dosyalar sekmesi eski davranışta kaldı.
    */
   interactive?: boolean;
+  /**
+   * Verilirse tam ekranda "Mesajda göster" düğmesi çıkar ve dokununca çağrılır. Yalnız medya
+   * ızgarası geçiyor — sohbette zaten mesajın yanındasın.
+   */
+  onShowInChat?: () => void;
 }) {
   const isImage = attachment.contentType.startsWith('image/');
   const isClean = attachment.scanStatus === ScanStatus.CLEAN;
@@ -164,40 +174,24 @@ export function AttachmentView({
           {thumbnail}
         </Pressable>
 
-        {/* Tam ekran görüntüleyici. Yakınlaştırma YOK: jest altyapısı kurulu değil (kökte
-            `GestureHandlerRootView` yok) ve eklemek yeni derleme ister — ayrı kalem. */}
-        <Modal
+        {/* Tam ekran görüntüleyici (yakınlaştırmalı) — sunum `ImageViewer`e taşındı; adres alma ve
+            T&S kapısı BURADA kaldı, o bileşen kendi başına hiçbir şey indirmiyor. */}
+        <ImageViewer
           visible={viewerOpen}
-          animationType="fade"
-          onRequestClose={() => setViewerOpen(false)}
-          statusBarTranslucent
-        >
-          <Pressable
-            style={styles.viewerBackdrop}
-            onPress={() => setViewerOpen(false)}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.close')}
-          >
-            {viewerError ? (
-              // 🔴 Sessiz siyah ekran YOK: adres alınamazsa sebebi yazılır. `ATTACHMENT_NOT_READY`
-              // ve `ATTACHMENT_BLOCKED` de bu yoldan gelir — kapının cevabı kullanıcıya görünür.
-              <Text style={styles.viewerError}>{viewerError}</Text>
-            ) : viewerUrl ? (
-              <Image source={{ uri: viewerUrl }} style={styles.viewerImage} resizeMode="contain" />
-            ) : (
-              <ActivityIndicator size="large" color={theme.colors.textMuted} />
-            )}
-          </Pressable>
-          {/* Zemine dokunmak da kapatıyor; görünür düğme keşfedilebilirlik ve ekran okuyucu için. */}
-          <Pressable
-            onPress={() => setViewerOpen(false)}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.close')}
-            style={styles.viewerClose}
-          >
-            <Ionicons name="close" size={26} color={theme.colors.textPrimary} />
-          </Pressable>
-        </Modal>
+          url={viewerUrl}
+          errorMessage={viewerError}
+          onClose={() => setViewerOpen(false)}
+          onShowInChat={
+            onShowInChat
+              ? () => {
+                  // Önce kapan: görüntüleyici açık kalırsa altta gezinme olur ve kullanıcı geri
+                  // dönünce hâlâ tam ekranda bulur kendini.
+                  setViewerOpen(false);
+                  onShowInChat();
+                }
+              : undefined
+          }
+        />
       </>
     );
   }
@@ -258,33 +252,6 @@ const styles = StyleSheet.create({
     height: 160,
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.bgElevated,
-  },
-  viewerBackdrop: {
-    flex: 1,
-    backgroundColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  viewerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  viewerError: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.base,
-    textAlign: 'center',
-    paddingHorizontal: theme.layout.panelGap * 2,
-  },
-  viewerClose: {
-    position: 'absolute',
-    top: 32,
-    right: 12,
-    width: theme.layout.inputMinHeight,
-    height: theme.layout.inputMinHeight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.layout.inputMinHeight / 2,
-    backgroundColor: theme.colors.bgOverlay,
   },
   fileBadge: {
     marginTop: 6,

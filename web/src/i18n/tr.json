@@ -1708,7 +1708,8 @@
   "mobile": {
     "attachment": {
       "viewImage": "Görseli büyüt",
-      "openFile": "Dosyayı aç"
+      "openFile": "Dosyayı aç",
+      "showInChat": "Mesajda göster"
     },
     "attach": {
       "open": "Ek ekle",
