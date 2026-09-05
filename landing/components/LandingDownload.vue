@@ -147,14 +147,22 @@ const ordered = computed(() => {
     padding-top: 28px;
     padding-bottom: 28px;
   }
-  .dl-btn {
-    flex: 1 1 0;
-    min-width: 150px;
+  /* 🔴 `.dl-actions` varsayılanda `flex-shrink: 0` — iki butonla sığıyordu ama
+     üçüncüsü eklenince blok dar ekranda kendi doğal genişliğinde (585px) kalıp
+     sayfayı sağa taşırdı (375px viewport'ta sağ kenar 609px). Mobilde eylem alanı
+     tam satır olur ve butonlar sığdıkları kadar bölüşür: ~390px'te birincil buton
+     tam satır + diğer ikisi altta yan yana, daha dar ekranda üçü de alt alta.
+     `min-width` bilerek 0: sabit bir taban genişlik dar ekranda taşmayı geri getirir. */
+  .dl-actions {
+    flex: 1 1 100%;
+    min-width: 0;
   }
-  /* Üç platform dar ekrana sığmıyor. Birincil buton (telefondan gelende Android)
-     tam satır olur, ikincil ikisi altta yan yana kalır. */
-  .dl-btn.kv-btn--primary {
-    flex-basis: 100%;
+  .dl-buttons {
+    width: 100%;
+  }
+  .dl-btn {
+    flex: 1 1 100%;
+    min-width: 0;
   }
 }
 </style>
