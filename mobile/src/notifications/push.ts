@@ -103,6 +103,10 @@ import { useDmStore } from '@/stores/dm';
  * kısaydı, her biri uzatıldı. 🔴 DERS: desenin her denemesi bir kanal sürümü + sunucu deploy'u +
  * yeni derleme demek. Bir dahaki sefere değeri cihazda TEK turda oturt, üç ayrı sürüm yakma.
  *
+ * v4 → v5 sebebi (2026-09-05, üretim çıkışı öncesi son tur): 350 ms'lik darbeler hâlâ kısa
+ * geldi, telefon cepteyken hissedilmiyordu. Darbeler 700 ms'ye çıkarıldı — bu kez pay bırakarak
+ * (yukarıdaki ders gereği "biraz daha" değil, iki katı), v6 turu açılmasın diye.
+ *
  * ⚠️ MIUI kısıtı (kod kusuru DEĞİL, kovalamayın): Xiaomi aynı bildirim anahtarı için 15 sn
  * içindeki İKİNCİ titreşimi iptal ediyor (`NotificationManagerServiceImpl: Cancel the recent
  * frequently vibration in 15s`). DM push'u yığılmayı önlemek için `tag = channelId` gönderdiğinden
@@ -111,16 +115,17 @@ import { useDmStore } from '@/stores/dm';
  * gibi bırak, `tag`i kaldırmak yığılmayı geri getirirdi. Titreşim testi 15 sn'den uzun aralıklarla
  * ya da farklı sohbetlerden yapılır.
  */
-const MESSAGE_CHANNEL_ID = 'messages_v4';
-const OLD_MESSAGE_CHANNEL_IDS = ['messages_v1', 'messages_v2', 'messages_v3'];
+const MESSAGE_CHANNEL_ID = 'messages_v5';
+const OLD_MESSAGE_CHANNEL_IDS = ['messages_v1', 'messages_v2', 'messages_v3', 'messages_v4'];
 /**
- * Çift kısa darbe — `[gecikme, titre, dur, titre]`. v2'de tek 250 ms'lik darbeydi ve sahip cihazda
- * "çok kısa" buldu (2026-09-01): telefon cepteyken tek kısa titreşim kalabalık ortamda kaçıyor.
+ * Çift UZUN darbe — `[gecikme, titre, dur, titre]`, toplam ~1,65 sn. v2'de tek 250 ms'lik darbeydi
+ * ve sahip cihazda "çok kısa" buldu (2026-09-01): telefon cepteyken tek kısa titreşim kalabalık
+ * ortamda kaçıyor. v4'teki 2x350 ms de yetmedi (2026-09-05), darbe başına 700 ms'ye çıkarıldı.
  * WhatsApp'ın mesaj bildirimi de çift darbe, referans o. Aramanın döngülü ritmi
  * (`incomingCall.ts`, 3 sn'de bir tekrar eden) bilerek DEĞİL: mesaj bir kez haber verir, ısrar
  * etmez; ısrar eden titreşim çalan telefon hissi yaratır.
  */
-const MESSAGE_VIBRATE_PATTERN = [0, 350, 180, 350];
+const MESSAGE_VIBRATE_PATTERN = [0, 700, 250, 700];
 
 async function dismissStaleChannelNotifications(channelId: string, excludeIdentifier?: string): Promise<void> {
   try {
