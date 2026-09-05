@@ -1,33 +1,41 @@
 <script setup lang="ts">
-// Masaüstü indirme bandı — hero'nun hemen altında, kullanıcı scroll etmeden görsün.
+// Uygulama indirme bandı — hero'nun hemen altında, kullanıcı scroll etmeden görsün.
 // Belirgin solid butonlar + OS ikonları. macOS henüz build edilmedi (yakında).
 // İkonlar web/DownloadAppModal ile aynı marka çizimleri.
 //
 // OS tespiti (SSG → yalnız client): ziyaretçinin işletim sistemine ait buton
-// birincil (kor) olur ve başa alınır; diğeri ikincil görünür kalır (gizlenmez —
+// birincil (kor) olur ve başa alınır; diğerleri ikincil görünür kalır (gizlenmez —
 // UA tespiti %100 değil, yanlış tespitte/farklı makinede kullanıcı strand olmasın).
 // Server'da os=null → varsayılan (Windows birincil) prerender edilir; mount sonrası
 // JS sırayı düzeltir, hydration uyuşmazlığı olmaz.
+//
+// 🔴 Android sırası ÖNCE gelmek zorunda: Android UA'sı 'linux' dizgesini de içerir,
+// linux kontrolü önde olsaydı her telefon Linux sayılırdı. Play sürümü yayına girene
+// kadar (2026-09-05) mobil ziyaretçiye gösterilecek paket yoktu ve bu bant ona
+// "Windows için indir" diyordu; artık telefondan gelen doğrudan mağazaya gidiyor.
 import { ref, computed, onMounted } from 'vue'
 
-const os = ref<'windows' | 'linux' | 'macos' | null>(null)
+const os = ref<'android' | 'windows' | 'linux' | 'macos' | null>(null)
 
 onMounted(() => {
   const ua = navigator.userAgent.toLowerCase()
-  if (ua.includes('win')) os.value = 'windows'
-  // Android UA'sı da 'linux' içerir → hariç tut (mobil, AppImage hedefi değil).
-  else if (ua.includes('linux') && !ua.includes('android')) os.value = 'linux'
+  if (ua.includes('android')) os.value = 'android'
+  else if (ua.includes('win')) os.value = 'windows'
+  else if (ua.includes('linux')) os.value = 'linux'
   else if (ua.includes('mac')) os.value = 'macos'
 })
 
 const platforms = [
-  { key: 'windows', label: 'Windows için indir', url: DOWNLOAD_WIN_URL },
-  { key: 'linux', label: 'Linux için indir', url: DOWNLOAD_LINUX_URL },
+  // `external` = kendi sunucumuzdan inen dosya değil, mağaza sayfası → `download` yok,
+  // yeni sekmede açılır (kullanıcı tanıtım sayfasını kaybetmesin).
+  { key: 'android', label: 'Android için indir', url: DOWNLOAD_ANDROID_URL, external: true },
+  { key: 'windows', label: 'Windows için indir', url: DOWNLOAD_WIN_URL, external: false },
+  { key: 'linux', label: 'Linux için indir', url: DOWNLOAD_LINUX_URL, external: false },
 ] as const
 
 // macOS/bilinmeyen → varsayılan Windows birincil (gösterecek mac build'i yok).
 const ordered = computed(() => {
-  const primaryKey = os.value === 'linux' ? 'linux' : 'windows'
+  const primaryKey = os.value && os.value !== 'macos' ? os.value : 'windows'
   return [...platforms]
     .sort((a, b) => (b.key === primaryKey ? 1 : 0) - (a.key === primaryKey ? 1 : 0))
     .map((p) => ({ ...p, primary: p.key === primaryKey }))
@@ -35,11 +43,11 @@ const ordered = computed(() => {
 </script>
 
 <template>
-  <section class="dl" aria-label="Masaüstü uygulamasını indir">
+  <section class="dl" aria-label="Kankaverse uygulamasını indir">
     <div class="kv-container dl-inner">
       <div class="dl-copy">
-        <span class="dl-eyebrow">Masaüstü uygulaması</span>
-        <h2 class="dl-title">Kankaverse'i bilgisayarına indir</h2>
+        <span class="dl-eyebrow">Uygulamayı indir</span>
+        <h2 class="dl-title">Kankaverse'i cihazına indir</h2>
         <p class="dl-sub">Tek tıkla kur, tarayıcı sekmesi açmadan bağlan.</p>
       </div>
 
@@ -51,9 +59,14 @@ const ordered = computed(() => {
             :href="p.url"
             class="kv-btn dl-btn"
             :class="p.primary ? 'kv-btn--primary' : 'dl-btn--neutral'"
-            download
+            :download="p.external ? undefined : ''"
+            :target="p.external ? '_blank' : undefined"
+            :rel="p.external ? 'noopener' : undefined"
           >
-            <svg v-if="p.key === 'windows'" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+            <svg v-if="p.key === 'android'" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+              <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.198l2.807 1.626a1 1 0 010 1.73l-2.808 1.626L15.198 12l2.5-2.491zM5.864 2.658L16.802 8.99l-2.303 2.303-8.635-8.635z" />
+            </svg>
+            <svg v-else-if="p.key === 'windows'" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
               <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801" />
             </svg>
             <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
@@ -62,7 +75,7 @@ const ordered = computed(() => {
             <span>{{ p.label }}</span>
           </a>
         </div>
-        <p class="dl-note">Windows 10/11 · Linux (AppImage). macOS yakında.</p>
+        <p class="dl-note">Android · Windows 10/11 · Linux (AppImage). macOS yakında.</p>
       </div>
     </div>
   </section>
@@ -137,6 +150,11 @@ const ordered = computed(() => {
   .dl-btn {
     flex: 1 1 0;
     min-width: 150px;
+  }
+  /* Üç platform dar ekrana sığmıyor. Birincil buton (telefondan gelende Android)
+     tam satır olur, ikincil ikisi altta yan yana kalır. */
+  .dl-btn.kv-btn--primary {
+    flex-basis: 100%;
   }
 }
 </style>

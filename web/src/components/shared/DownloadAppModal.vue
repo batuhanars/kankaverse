@@ -8,6 +8,7 @@ defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 
+const ANDROID_URL = 'https://play.google.com/store/apps/details?id=com.kankaverse.app'
 const WINDOWS_URL = 'https://kankaverse.com/indir/kankaverse-setup.exe'
 const LINUX_URL = 'https://kankaverse.com/indir/kankaverse.AppImage'
 
@@ -16,8 +17,11 @@ const LINUX_URL = 'https://kankaverse.com/indir/kankaverse.AppImage'
  * Yanlış pozitif verebilir (örn. Linux'ta Chromium userAgent'ı Mac gibi raporlayabilir)
  * ama bu yalnız görsel bir ipucu; tıklanabilirlik her koşulda korunur.
  */
-const detectedOs = computed<'windows' | 'linux' | 'macos' | null>(() => {
+const detectedOs = computed<'android' | 'windows' | 'linux' | 'macos' | null>(() => {
   const ua = navigator.userAgent.toLowerCase()
+  // 🔴 Android ÖNCE: Android UA'sı 'linux' dizgesini de içerir, sıra ters olsaydı
+  // her telefon Linux olarak vurgulanırdı (tanıtım sitesinde aynı kusur vardı).
+  if (ua.includes('android')) return 'android'
   if (ua.includes('win')) return 'windows'
   if (ua.includes('linux')) return 'linux'
   if (ua.includes('mac')) return 'macos'
@@ -25,6 +29,14 @@ const detectedOs = computed<'windows' | 'linux' | 'macos' | null>(() => {
 })
 
 const platforms = computed(() => [
+  // Android başta: tek mobil istemci ve en yeni çıkan paket. Mağaza sayfasına
+  // gider, kendi sunucumuzdan inen bir dosya değil.
+  {
+    key: 'android' as const,
+    label: t('download.android'),
+    url: ANDROID_URL,
+    available: true,
+  },
   {
     key: 'windows' as const,
     label: t('download.windows'),
@@ -70,9 +82,21 @@ const platforms = computed(() => [
         >
           <!-- Platform logosu (inline SVG) -->
           <span class="shrink-0 flex items-center justify-center w-8 h-8" style="color: var(--kv-text-secondary);">
+            <!-- Google Play logo -->
+            <svg
+              v-if="platform.key === 'android'"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.198l2.807 1.626a1 1 0 010 1.73l-2.808 1.626L15.198 12l2.5-2.491zM5.864 2.658L16.802 8.99l-2.303 2.303-8.635-8.635z" />
+            </svg>
+
             <!-- Windows logo -->
             <svg
-              v-if="platform.key === 'windows'"
+              v-else-if="platform.key === 'windows'"
               width="22"
               height="22"
               viewBox="0 0 24 24"
