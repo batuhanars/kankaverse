@@ -11,3 +11,8 @@ export const CONTACT_MAILTO = 'mailto:kankaverse@gmail.com'
 // (sürüm gömülmez → link her build'de aynı kalır). macOS (dmg) henüz build edilmedi.
 export const DOWNLOAD_WIN_URL = 'https://kankaverse.com/indir/kankaverse-setup.exe'
 export const DOWNLOAD_LINUX_URL = 'https://kankaverse.com/indir/kankaverse.AppImage'
+
+// Android — Play mağaza sayfası (üretim sürümü 2026-09-05'te yayınlandı, paket
+// `com.kankaverse.app`). Masaüstü linklerinin aksine kendi sunucumuzdan servis
+// EDİLMEZ: mağaza sayfasına gider, o yüzden `download` niteliği YOK, yeni sekmede açılır.
+export const DOWNLOAD_ANDROID_URL = 'https://play.google.com/store/apps/details?id=com.kankaverse.app'
