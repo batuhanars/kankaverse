@@ -150,8 +150,9 @@ const ordered = computed(() => {
   /* 🔴 `.dl-actions` varsayılanda `flex-shrink: 0` — iki butonla sığıyordu ama
      üçüncüsü eklenince blok dar ekranda kendi doğal genişliğinde (585px) kalıp
      sayfayı sağa taşırdı (375px viewport'ta sağ kenar 609px). Mobilde eylem alanı
-     tam satır olur ve butonlar sığdıkları kadar bölüşür: ~390px'te birincil buton
-     tam satır + diğer ikisi altta yan yana, daha dar ekranda üçü de alt alta.
+     tam satır olur ve her buton alt alta tam genişlik alır. İkincil ikisini yan yana
+     sıkıştırmak denendi ve bırakıldı: 320px'te butona ~122px düşüyor, "Windows için
+     indir" o genişliğe sığmıyor ve taşma metin seviyesinde geri geliyor.
      `min-width` bilerek 0: sabit bir taban genişlik dar ekranda taşmayı geri getirir. */
   .dl-actions {
     flex: 1 1 100%;
