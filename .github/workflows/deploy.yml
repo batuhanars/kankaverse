@@ -1,6 +1,9 @@
 name: Deploy to VPS
 
-# main'e her push'ta (ve elle tetiklemeyle) VPS'teki self-hosted runner deploy eder.
+# main'e her push'ta (ve elle tetiklemeyle):
+#   1) build: GitHub'ın runner'ında api/web/landing image'ları derlenip GHCR'ye itilir.
+#   2) deploy: VPS'teki self-hosted runner image'ları ÇEKER ve compose up yapar (sunucuda derleme YOK).
+# Neden: sunucuda build 18 GB cache biriktiriyordu ve küçük (2 GB RAM) kutuda OOM riski yaratıyordu.
 # Runner VPS'te çalışır → GitHub'a DIŞARI bağlanır (inbound SSH YOK; yurtdışı IP'lerden
 # SSH'ın düşürülmesi / fail2ban-geo sorunu bu modelde yaşanmaz).
 on:
@@ -13,33 +16,78 @@ concurrency:
   group: vps-deploy
   cancel-in-progress: false
 
-# Repo private → git pull GITHUB_TOKEN ile kimlik doğrular (aşağıda extraheader).
 permissions:
   contents: read
 
 jobs:
-  deploy:
-    runs-on: [self-hosted]
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        service: [api, web, landing]
     steps:
-      # actions/checkout YOK — mevcut /root/kankaverse klonu üzerinde çalışıyoruz
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.service }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/batuhanars/kankaverse-${{ matrix.service }}:${{ github.sha }}
+            ghcr.io/batuhanars/kankaverse-${{ matrix.service }}:latest
+          # web: VITE_API_URL prod'da boş (same-origin, Caddy /api'yi proxy'ler). Diğerleri arg'ı yok sayar.
+          build-args: |
+            VITE_API_URL=
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted]
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      # actions/checkout YOK — mevcut klon üzerinde çalışıyoruz
       # (.env.production orada; runner'ın _work klasörüne checkout istemiyoruz).
-      - name: Deploy (yerel — git pull + compose up)
+      - name: Deploy (git pull + image pull + compose up)
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_ACTOR: ${{ github.actor }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           set -e
           cd /home/deploy/kankaverse
           BEFORE=$(git rev-parse HEAD)
           # Repo private: https remote anonim pull edemiyor. Token'ı geçici Authorization
           # header'ı ile ver (URL'e gömme → ps/reflog sızıntısı yok). actions/checkout deseni.
+          # git pull hâlâ gerekli: docker-compose.prod.yml ve Caddyfile repodan okunuyor.
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           git -c http.extraheader="$AUTH_HEADER" pull origin main
           AFTER=$(git rev-parse HEAD)
-          docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+          COMPOSE="docker compose --env-file .env.production -f docker-compose.prod.yml"
+          # GHCR paketleri private → job token'ıyla giriş, çekince çıkış (token diskte kalmasın).
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
+          $COMPOSE pull api web landing
+          docker logout ghcr.io
+          $COMPOSE up -d --no-build
           # Caddyfile bind-mount: up -d caddy'yi yeniden YARATMAZ + `caddy reload` çalışan sürece
           # uygulamayabilir → Caddyfile değiştiyse konteyneri restart et (dosyayı sıfırdan okur).
           if git diff --name-only "$BEFORE" "$AFTER" | grep -q '^Caddyfile$'; then
             echo "Caddyfile değişti → caddy restart"
-            docker compose --env-file .env.production -f docker-compose.prod.yml restart caddy
+            $COMPOSE restart caddy
           fi
           docker image prune -f

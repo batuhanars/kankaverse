@@ -1,5 +1,6 @@
 # Kankaverse — PRODUCTION (VPS, tam self-host)
-# Çalıştır:  docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+# Çalıştır:  docker compose --env-file .env.production -f docker-compose.prod.yml pull && ... up -d --no-build
+# Acil durum (GHCR erişilemezse): ... up -d --build  → sunucuda derler
 # Servisler: postgres + redis (yalnız iç ağ, host'a AÇILMAZ) · api · web (static) · caddy (edge, otomatik TLS)
 # Ağır yük dışarıda: ses/video = LiveKit Cloud · dosya = R2/MinIO (UPLOADS_ENABLED açılınca)
 
@@ -33,6 +34,9 @@ services:
       retries: 5
 
   api:
+    # Image GitHub Actions'ta build edilip GHCR'ye itilir, VPS yalnız çeker (deploy.yml).
+    # build: bloğu yerel/acil durum için duruyor: `up -d --build` hâlâ sunucuda derler.
+    image: ghcr.io/batuhanars/kankaverse-api:${IMAGE_TAG:-latest}
     build:
       context: ./api
     restart: unless-stopped
@@ -45,6 +49,7 @@ services:
     # ports YOK — Caddy iç ağdan api:3000'e proxy'ler
 
   web:
+    image: ghcr.io/batuhanars/kankaverse-web:${IMAGE_TAG:-latest}
     build:
       context: ./web
       args:
@@ -55,6 +60,7 @@ services:
 
   landing:
     # Tanıtım sitesi (Nuxt SSG → statik nginx). API'ye konuşmaz; CTA'lar absolute URL → build-arg yok.
+    image: ghcr.io/batuhanars/kankaverse-landing:${IMAGE_TAG:-latest}
     build:
       context: ./landing
     restart: unless-stopped
