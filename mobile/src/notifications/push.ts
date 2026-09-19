@@ -107,6 +107,11 @@ import { useDmStore } from '@/stores/dm';
  * geldi, telefon cepteyken hissedilmiyordu. Darbeler 700 ms'ye çıkarıldı — bu kez pay bırakarak
  * (yukarıdaki ders gereği "biraz daha" değil, iki katı), v6 turu açılmasın diye.
  *
+ * v5 → v6 sebebi (Sprint M5f, 2026-09-19): kanal ilk kez GERÇEK bir ses taşıyor
+ * (`message_channel.wav`, bkz. `assets/sounds/`). Titreşim deseni bu turda DEĞİŞMEDİ — yalnız
+ * `sound` alanı eklendi, ama Android'de bir kanalın ayarları kurulduktan sonra değiştirilemediği
+ * (yukarıdaki genel ders) için bu da bir kimlik artırımı gerektiriyor.
+ *
  * ⚠️ MIUI kısıtı (kod kusuru DEĞİL, kovalamayın): Xiaomi aynı bildirim anahtarı için 15 sn
  * içindeki İKİNCİ titreşimi iptal ediyor (`NotificationManagerServiceImpl: Cancel the recent
  * frequently vibration in 15s`). DM push'u yığılmayı önlemek için `tag = channelId` gönderdiğinden
@@ -115,8 +120,8 @@ import { useDmStore } from '@/stores/dm';
  * gibi bırak, `tag`i kaldırmak yığılmayı geri getirirdi. Titreşim testi 15 sn'den uzun aralıklarla
  * ya da farklı sohbetlerden yapılır.
  */
-const MESSAGE_CHANNEL_ID = 'messages_v5';
-const OLD_MESSAGE_CHANNEL_IDS = ['messages_v1', 'messages_v2', 'messages_v3', 'messages_v4'];
+const MESSAGE_CHANNEL_ID = 'messages_v6';
+const OLD_MESSAGE_CHANNEL_IDS = ['messages_v1', 'messages_v2', 'messages_v3', 'messages_v4', 'messages_v5'];
 /**
  * Çift UZUN darbe — `[gecikme, titre, dur, titre]`, toplam ~1,65 sn. v2'de tek 250 ms'lik darbeydi
  * ve sahip cihazda "çok kısa" buldu (2026-09-01): telefon cepteyken tek kısa titreşim kalabalık
@@ -261,6 +266,9 @@ async function readExpoPushToken(): Promise<string | null> {
       // titreşim modu saygısı yine sistemde kalır (kanal ringer modunu EZEMEZ).
       enableVibrate: true,
       vibrationPattern: MESSAGE_VIBRATE_PATTERN,
+      // Sprint M5f §2 — v5→v6'nın TEK gerçek farkı: kanal artık kendi sesini taşıyor (sistem
+      // varsayılanı yerine). `app.json` `expo-notifications` plugin `sounds` dizisine eklendi.
+      sound: 'message_channel.wav',
     });
   }
 

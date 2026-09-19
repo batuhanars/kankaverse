@@ -9,6 +9,7 @@ import { useVoiceStore, type RoomMember } from '@/stores/voice';
 import { useDmStore } from '@/stores/dm';
 import { useAuthStore } from '@/stores/auth';
 import { useGuildPermission } from '@/hooks/useGuildPermission';
+import { useOutgoingCallRing } from '@/hooks/useOutgoingCallRing';
 import { guildsApi } from '@/api/guilds';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { ParticipantTile } from '@/components/call/ParticipantTile';
@@ -61,6 +62,16 @@ export default function CallScreen() {
   const callKind = useVoiceStore((s) => s.callKind);
   const callChannelName = useVoiceStore((s) => s.callChannelName);
   const callGuildName = useVoiceStore((s) => s.callGuildName);
+  // Sprint M5f §4 🔴 — giden arama zili. Koşul aşağıdaki `ringing={alone && didInvite &&
+  // callKind === 'dm'}` prop'larıyla (§4 kontratı: "İKİNCİ bir doğruluk kaynağı üretme, o koşulu
+  // kullan") AYNI FORMÜLDÜR — yalnız veri kaynağı HAM `roomParticipants` (donmuş `shown.participants`
+  // DEĞİL), çünkü bu bir Hook çağrısı ve React kuralı gereği aşağıdaki `if (!channelId) return null`
+  // erken çıkışından ÖNCE, HER render'da koşulsuz çalışmak zorunda (`shown` o satırdan SONRA
+  // hesaplanıyor). Pratikte fark yalnız kapanış animasyonunun (`isLeaving`) birkaç render'lık
+  // penceresinde olabilir; zil o an zaten `goneRef`in az sonra kapatacağı bir ekranda ve unmount'ta
+  // ayrıca susturuluyor (`useOutgoingCallRing` içindeki temizlik).
+  const isRingingDm = roomParticipants.length <= 1 && didInvite && callKind === 'dm';
+  useOutgoingCallRing(isRingingDm);
   // Sprint M4t §3 — acil akış sürerken otomatik `router.back()` ERTELENİR (bkz. aşağıdaki
   // `goneRef` effect'i + `stores/voice.ts` `emergencyPending` yorumu).
   const emergencyPending = useVoiceStore((s) => s.emergencyPending);

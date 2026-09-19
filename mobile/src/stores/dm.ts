@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { dmApi, type DmChannelDto } from '@/api/dm';
 import { extractErrorMessage } from '@/api/errors';
+import { playMessageTone } from '@/audio/messageTone';
 
 /** 3 yerde aynı "id'ye göre çıkar" tekrarı (clearChannel/leaveGroup/deleteGroup) — Rule of Three,
  *  dosya-içi özel yardımcıya çıkarıldı (dışa açılmaz, sözleşme kapsamı yalnız bu store). */
@@ -183,6 +184,14 @@ export const useDmStore = create<DmState>((set, get) => ({
         : payload.senderId !== myId
           ? true
           : existing.unread;
+
+    // Sprint M5f §3 — uygulama içi mesaj sesi. Rozet düşürme dalıyla AYNI ayrımı okur (kullanıcı
+    // tam bu DM ekranındayken · gönderen BAŞKASI): kendi mesajında çalmaz, başka bir kanalda/DM
+    // listesindeyken de çalmaz (M5e §1 kararını geri almaz — gösterilen bildirim yine yok, yalnız
+    // burada kısa bir ses var). Yeni bir tetikleyici KURULMADI, var olan koşul yeniden okundu.
+    if (payload.channelId === activeDmChannelId && payload.senderId !== myId) {
+      playMessageTone();
+    }
 
     const updated = { ...existing, lastMessage, unread } as DmChannelDto;
     const rest = channels.filter((_, i) => i !== idx);

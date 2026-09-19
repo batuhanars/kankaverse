@@ -20,7 +20,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 17,
+      "versionCode": 18,
       "permissions": [
         "android.permission.BLUETOOTH_CONNECT"
       ]
@@ -47,7 +47,8 @@
           "icon": "./assets/images/notification-icon.png",
           "color": "#FF6B3D",
           "sounds": [
-            "./assets/sounds/incoming_call_channel.wav"
+            "./assets/sounds/incoming_call_channel.wav",
+            "./assets/sounds/message_channel.wav"
           ]
         }
       ],
@@ -82,7 +83,8 @@
       "expo-screen-orientation",
       "./modules/picture-in-picture/plugin/withPictureInPicture.js",
       "./plugins/withDevMenuFabFix",
-      "./plugins/withReleaseSigning"
+      "./plugins/withReleaseSigning",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -498,7 +498,9 @@ export class NotificationsService {
       // 🔴 v1 → v2 (sahip bulgusu 2026-09-01): kanal mobilde titreşim açılmadan kuruluydu; kanal
       // ayarı sonradan değiştirilemediği için kimlik artırıldı (gerekçe `sendDmPush` yorumunda).
       // 🔴 v4 → v5 (2026-09-05): titreşim deseni uzatıldı; sunucu ile uygulama birlikte çıkar.
-      androidChannelId: 'messages_v5',
+      // 🔴 v5 → v6 (Sprint M5f, 2026-09-19): kanal ilk kez kendi sesini taşıyor; ses de
+      // sonradan değiştirilemeyen bir kanal ayarı (gerekçe `sendDmPush` yorumunda).
+      androidChannelId: 'messages_v6',
       priority: 'high' as const,
       // 🔴 Yığılma önleme (canlı geri bildirim 2026-08-11) — YALNIZ bahsetmede ve yalnız kanal
       // biliniyorsa. `tag` cihazda görünen bildirimin YERİNE geçtiği için, kanal başına sabit

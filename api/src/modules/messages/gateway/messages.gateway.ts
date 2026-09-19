@@ -762,7 +762,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         // 🔴 Sahip cihaz turu 2026-08-10 — kanal adı VERİLMEZSE FCM kendi yedek kanalını
         // (`fcm_fallback_notification_channel`, önem DEFAULT) kullanıyor ve bildirim ekranda
         // BELİRMİYOR, sessizce gölgeye düşüyor. Cihazın `dumpsys notification` kaydıyla
-        // doğrulandı. `messages_v5` mobilde önem HIGH ile kuruluyor (bkz. `notifications/push.ts`).
+        // doğrulandı. `messages_v6` mobilde önem HIGH ile kuruluyor (bkz. `notifications/push.ts`).
         //
         // 🔴 v1 → v2 (sahip bulgusu 2026-09-01): mobilde kanal titreşim AÇILMADAN kuruluydu, zil
         // modundayken yalnız ses çıkıyordu. Android'de kanal ayarı kurulduktan sonra
@@ -772,7 +772,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         // v4 → v5 (2026-09-05): titreşim deseni uzatıldı (mobil `MESSAGE_VIBRATE_PATTERN`).
         // ⚠️ Sunucu ile uygulama BİRLİKTE çıkar: eski derlemede v5 kanalı yok, Android
         // tanımadığı kanala gelen bildirimi hiç göstermez.
-        androidChannelId: 'messages_v5',
+        //
+        // v5 → v6 (Sprint M5f, 2026-09-19): kanal ilk kez kendi sesini taşıyor
+        // (`message_channel.wav`); ses de kurulduktan sonra değiştirilemeyen bir kanal ayarı.
+        androidChannelId: 'messages_v6',
         priority: 'high',
       })
       .catch(() => {});
