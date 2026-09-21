@@ -1154,7 +1154,8 @@
     "videoCall": "Görüntülü ara",
     "joinGroup": "Sese katıl",
     "unreachable": "Kullanıcıya ulaşılamadı.",
-    "rejected": "Arama reddedildi."
+    "rejected": "Arama reddedildi.",
+    "noAnswer": "Cevap vermedi."
   },
   "dm": {
     "sectionHeader": "MESAJLAR",

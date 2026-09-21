@@ -55,6 +55,11 @@ export default function CallScreen() {
   const isMuted = useVoiceStore((s) => s.isMuted);
   const canPublish = useVoiceStore((s) => s.canPublish);
   const didInvite = useVoiceStore((s) => s.didInvite);
+  // Sprint D71 §2 — 30 sn "Cevap vermedi." (`stores/voice.ts` `scheduleOutgoingRingTimeoutIfNeeded`
+  // yazıyor). `ringing`in AYNI `alone &&` kapısını kullanır (aşağıdaki iki `ParticipantTile`
+  // kullanımı) — karşı taraf sonradan "Katıl" ile girerse `alone` false olur, metin kendiliğinden
+  // kalkar (ikinci bir temizleme kodu YAZILMADI).
+  const noAnswer = useVoiceStore((s) => s.noAnswer);
   const isLeaving = useVoiceStore((s) => s.isLeaving);
   // M4f §3.3 — sunucu kaynaklı kamera kesilmesi bildirimi (`stores/voice.ts` `wireRoom` yazıyor,
   // `disconnectReason` ile AYNI desen: bir kez set edilir, aşağıdaki effect Alert ile gösterip temizler).
@@ -764,6 +769,7 @@ export default function CallScreen() {
             speaking={peerMember ? speakingUserIds.has(peerMember.userId) : false}
             micOff={peerMember ? mutedUserIds.has(peerMember.userId) : false}
             ringing={alone && didInvite && callKind === 'dm'}
+            noAnswer={alone && noAnswer && callKind === 'dm'}
             videoPublication={peerCameraPublication}
           />
           {shown.isCameraOn && (
@@ -816,6 +822,7 @@ export default function CallScreen() {
                koşul yine de AÇIKÇA yazılıyor — düzen seçimi ileride değişirse gösterge sessizce
                grupta belirmesin. */
             ringing={alone && didInvite && callKind === 'dm'}
+            noAnswer={alone && noAnswer && callKind === 'dm'}
           />
           {alone && (
             <View style={styles.aloneNotice}>

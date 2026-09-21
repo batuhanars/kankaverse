@@ -22,6 +22,13 @@ interface Props {
   /** §4 — davet gönderildi, karşı taraf henüz katılmadı: "Çalıyor…" göstergesi. */
   ringing?: boolean;
   /**
+   * Sprint D71 §1/§2 — 1-1 DM'de arayan tarafta 30 sn'de hâlâ çalıyorduysa: "Cevap vermedi."
+   * `ringing`in AYNI metin yuvasını kullanır (yeni bir yüzey EKLENMEDİ) — `true` iken bu, `ringing`in
+   * yerini alır (çağıran taraf `didInvite`i zaten `false` yaptığı için ikisi pratikte hiç aynı anda
+   * `true` olmaz, ama bileşen yine de `noAnswer`i önceliklendirir).
+   */
+  noAnswer?: boolean;
+  /**
    * M4d §3 — video track yayını varsa avatar YERİNE bu çizilir. Yalnız `.track` gerçekten varsa
    * video sayılır — publication'ın kendisi (mute'lu bir publication `track`i temizler, bkz.
    * `stores/voice.ts` `wireRoom`).
@@ -76,6 +83,7 @@ export function ParticipantTile({
   micOff,
   dimmed,
   ringing,
+  noAnswer,
   videoPublication,
   mirror,
   isScreenShare,
@@ -112,7 +120,12 @@ export function ParticipantTile({
             <Ionicons name="mic-off" size={16} color={theme.colors.textPrimary} />
           </View>
         )}
-        {ringing && <Text style={styles.fullRinging}>{t('mobile.call.ringing')}</Text>}
+        {/* Sprint D71 §2 — `noAnswer` AYNI yuvayı `ringing` ile paylaşır, önceliklidir. */}
+        {noAnswer ? (
+          <Text style={styles.fullRinging}>{t('call.noAnswer')}</Text>
+        ) : (
+          ringing && <Text style={styles.fullRinging}>{t('mobile.call.ringing')}</Text>
+        )}
       </View>
     );
   }
@@ -200,7 +213,12 @@ export function ParticipantTile({
       <Text style={styles.name} numberOfLines={1}>
         {name}
       </Text>
-      {ringing && <Text style={styles.ringing}>{t('mobile.call.ringing')}</Text>}
+      {/* Sprint D71 §2 — `noAnswer` AYNI yuvayı `ringing` ile paylaşır, önceliklidir. */}
+      {noAnswer ? (
+        <Text style={styles.ringing}>{t('call.noAnswer')}</Text>
+      ) : (
+        ringing && <Text style={styles.ringing}>{t('mobile.call.ringing')}</Text>
+      )}
     </View>
   );
 }

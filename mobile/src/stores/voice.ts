@@ -88,6 +88,19 @@ interface VoiceState {
    */
   didInvite: boolean;
   /**
+   * Sprint D71 §1/§2 🔴 — 1-1 DM aramasında ARAYAN tarafta 30 sn'de hâlâ çalıyorsa VE karşı taraf
+   * katılmadıysa `outgoingRingTimer` (modül değişkeni, `scheduleOutgoingRingTimeoutIfNeeded`) bu
+   * bayrağı `true` yapar; AYNI ateşlenmede `didInvite: false` de yazılır (`handleCallAccepted` ile
+   * AYNI anlam: "artık çalmıyor" — geri-zil (`useOutgoingCallRing`) ve "Çalıyor…" `didInvite`e bağlı
+   * olduğu için kendiliğinden kalkar, `call.tsx` değişmez). Gösterim `call.tsx`te `ParticipantTile`in
+   * "Çalıyor…" yazdığı AYNI metin yuvasına (`ringing` prop'unun yanına) `noAnswer` prop'u olarak
+   * geçirilir — yeni bir yüzey İCAT EDİLMEDİ. `alone &&` kapısı sayesinde karşı taraf sonradan
+   * "Katıl" ile girerse metin kendiliğinden kalkar (ikinci bir temizleme kodu GEREKMEZ). `leave()`
+   * sıfırlar; yeni `startOrJoin` de kozmetik olarak sıfırlar (diğer bayraklarla AYNI ders — bir
+   * önceki aramadan kalamaz).
+   */
+  noAnswer: boolean;
+  /**
    * 🔴 M4c sahip bulgusu (2026-08-07) — arama TÜRÜ artık route parametresi DEĞİL, burada. `/call`a
    * giren yol birden fazla (`home.tsx` katılım, `dm/[id].tsx` arama, bildirim kabulü,
    * `MiniCallWindow` yeniden açma) ve biri (`MiniCallWindow`) parametre taşımıyordu — ekran DM
@@ -423,11 +436,23 @@ const speakingHandlers = new Map<string, () => void>();
 
 const ALONE_TIMEOUT_NEVER_JOINED_MS = 3 * 60_000; // §3.3 — hiç kimse katılmadıysa (arayan bekliyor)
 const ALONE_TIMEOUT_LEFT_MS = 60_000; // §3.3 — biri katılıp sonra çıktıysa (web REV-12 pariteti)
+// Sprint D71 §1.1 — sabit. Aranan taraftaki ÜÇ 30 sn'ye atıfla (mobil `notifications/incomingCall.ts`
+// `RING_TIMEOUT_MS`, web `IncomingCallModal.vue` zaman aşımı, `api/` push `ttlSeconds`) birlikte
+// değişir — biri değişirse dördü de değişmeli, sayı buradan tek başına güncellenmez.
+const OUTGOING_RING_TIMEOUT_MS = 30_000;
+let outgoingRingTimer: ReturnType<typeof setTimeout> | null = null;
 
 function clearAloneTimer() {
   if (aloneTimer) {
     clearTimeout(aloneTimer);
     aloneTimer = null;
+  }
+}
+
+function clearOutgoingRingTimer() {
+  if (outgoingRingTimer) {
+    clearTimeout(outgoingRingTimer);
+    outgoingRingTimer = null;
   }
 }
 
@@ -463,6 +488,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   connectedAt: null,
   isLeaving: false,
   didInvite: false,
+  noAnswer: false,
   callKind: 'dm',
   callChannelName: null,
   callGuildName: null,
@@ -565,6 +591,9 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       // "Çalıyor…" göstergesinin grupta çıkmaması artık burada değil, `call.tsx`te kapılanıyor.
       // Guild: `alreadyOngoing` koşulsuz true → didInvite kalıcı false (davranış aynen korundu).
       didInvite: !alreadyOngoing,
+      // Sprint D71 §2 — kozmetik sıfırlama, bir önceki aramadan kalan "Cevap vermedi." yeni
+      // oturumu kirletemez (`pendingCameraStart`/`emergencyPending` ile AYNI ders).
+      noAnswer: false,
       pendingCallScreen: true,
       // M4d §7 — kozmetik sıfırlama, bir önceki oturumdan kalma bayrak yeni oturumu kirletemez
       // (`pendingCallScreen` ile aynı ders).
@@ -671,6 +700,10 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
 
       refreshRoomParticipants(set, get);
       scheduleAloneCheckIfNeeded(get);
+      // Sprint D71 §2 — giden arama zili 30 sn "Cevap vermedi." zaman aşımı. Fonksiyon kendi
+      // içinde `didInvite && callKind==='dm'` kapısını uyguluyor; guild/grup için çağırmak zararsız
+      // (hemen no-op döner) — çağrı yerini dallara ayırmaya GEREK YOK.
+      scheduleOutgoingRingTimeoutIfNeeded(channelId, set, get);
 
       // Sprint M4h §3 🔴 — server-mute hidrasyonu. Yalnız guild dalı (DM/GROUP_DM sunucuda her
       // zaman `mutedUserIds: []` döner, gereksiz istek atılmaz). Best-effort + geç-gelen yanıtın
@@ -767,6 +800,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     const channelId = get().connectedChannelId;
     const wasAlone = get().roomParticipants.length <= 1;
     clearAloneTimer();
+    clearOutgoingRingTimer(); // Sprint D71 §2 — leave() temizler (bkz. fonksiyon yorumu).
     if (pendingCallScreenTimer) {
       clearTimeout(pendingCallScreenTimer);
       pendingCallScreenTimer = null;
@@ -835,6 +869,7 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       connectedAt: null,
       isLeaving: false,
       didInvite: false,
+      noAnswer: false, // Sprint D71 §2 — diğer kozmetik sıfırlamalarla AYNI ders.
       // §7 — bir sonraki aramanın türünü bu oturumdan kalma değer belirlemesin (bugün
       // `autoEndWhenAlone`da aynı sınıfa dikkat edildi — burada aynı ders).
       callKind: 'dm',
@@ -1076,6 +1111,44 @@ function scheduleAloneCheckIfNeeded(get: () => VoiceState) {
   aloneTimer = setTimeout(() => {
     if (autoEndWhenAlone && get().roomParticipants.length === 1) void get().leave(false);
   }, timeout);
+}
+
+/**
+ * Sprint D71 §1/§2 🔴 — arayan tarafta 30 sn "Cevap vermedi." zamanlayıcısı. `scheduleAloneCheckIfNeeded`
+ * ile AYNI desen (modül zamanlayıcısı + `get()` ile ateşlenme anında yeniden kontrol) ama AYRI bir
+ * zamanlayıcı ve AYRI bir eşik (sabit 30 sn, yalnız-kalmanın 3dk/60sn'lik eşikleriyle KARIŞTIRILMAZ).
+ * Yalnız 1-1 DM'in BAŞLATAN tarafında kurulur (`didInvite && callKind==='dm'` — kapı fonksiyonun
+ * KENDİSİNDE, çağrı yeri guild/grup için de güvenle çağırabilir).
+ *
+ * §1 madde 3 — kabul/ret/karşı tarafın katılması/arayanın çıkması zamanlayıcıyı AÇIKÇA İPTAL ETMEZ
+ * (yalnız `leave()`/yeni `startOrJoin` — ki `startOrJoin` zaten var olan odadan önce `leave()`
+ * çağırır — temizler). Ateşlendiğinde ÜÇ koşul YENİDEN kontrol edilir: aynı kanaldayız, hâlâ
+ * `didInvite` (kabul edilmedi/reddedilmedi), karşı taraf odada değil (`roomParticipants.length`).
+ * Biri sağlanmıyorsa sessizce no-op — "zamanlayıcıyı etkisiz kılar" budur.
+ */
+function scheduleOutgoingRingTimeoutIfNeeded(
+  channelId: string,
+  set: (partial: Partial<VoiceState>) => void,
+  get: () => VoiceState,
+) {
+  clearOutgoingRingTimer();
+  if (!get().didInvite || get().callKind !== 'dm') return;
+  outgoingRingTimer = setTimeout(() => {
+    outgoingRingTimer = null;
+    if (get().connectedChannelId !== channelId) return;
+    if (!get().didInvite || get().callKind !== 'dm') return;
+    // PM incelemesi — karşı taraf zaten katıldıysa (ör. web'deki "Katıl", `call_accept` göndermez)
+    // "çalıyor"u sessizce bitir: yoksa sonradan çıktığında `alone && didInvite` "Çalıyor…"yu ve
+    // geri-zili yeniden açardı. Uyarı YOK.
+    if (get().roomParticipants.length > 1) {
+      set({ didInvite: false });
+      return;
+    }
+    // §1.2 — aranan taraf zaten 30 sn'de susuyor ama iki zamanlayıcı aynı anda başlamıyor (arayanınki
+    // ack'ten, arananınki olaydan) — iptal idempotent, kalan zili kesin kapatır.
+    callCancel(channelId);
+    set({ didInvite: false, noAnswer: true });
+  }, OUTGOING_RING_TIMEOUT_MS);
 }
 
 /**

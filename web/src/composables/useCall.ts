@@ -8,16 +8,26 @@ import { useCallSounds } from '@/composables/useCallSounds'
 /**
  * useCall — DM sesli arama akışı: "oda önce" (SPRINT_D39). Telefon düğmesi arayanı doğrudan odaya
  * sokar (ack.ok → join, beklemeden); karşı taraf çalar. `voice.call_accepted` yalnız "çalıyor"
- * göstergesini düşürür (useSocket.ts). Arayan-tarafı sabit zaman aşımı YOK — oda ömrünü
- * voiceStore'un yalnız-kalma ayrımı belirler (bkz. stores/voice.ts §4).
- * Sinyaller useSocket'te; ses voice store'da. Sözleşme: SPRINT_D39_WEB_CALL_MODEL_CONTRACT.md.
+ * göstergesini düşürür (useSocket.ts). Oda ömrü hâlâ yalnız-kalma ayrımına bağlı (bkz.
+ * stores/voice.ts §4) — 30 sn'lik zamanlayıcı (D71) yalnız ÇALMA süresini bitirir, odayı KAPATMAZ.
+ * Sinyaller useSocket'te; ses voice store'da. Sözleşme: SPRINT_D39_WEB_CALL_MODEL_CONTRACT.md,
+ * SPRINT_D71_CALL_NO_ANSWER_CONTRACT.md.
  */
+
+// D71 §1.1 — aranan taraftaki üç 30 sn'ye eş sabit: mobil `RING_TIMEOUT_MS`, web
+// `IncomingCallModal.vue` zil zaman aşımı, `api/` push `ttlSeconds: 30`. Sayılar birlikte değişir.
+const OUTGOING_RING_TIMEOUT_MS = 30_000
 
 // D39 §5 — geri-zil (ringback): eskiden OutgoingCallBar'ın watch'ındaydı, bar kalktığı için
 // sahipsiz kalırdı. Çağrı yaşam döngüsünün zaten sahibi burası (useCall). Detached effect scope:
 // useCall() hangi component'ten ilk çağrılırsa çağrılsın (DmConversation/IncomingCallModal), o
 // component unmount olsa da callStore.outgoing yaşadığı sürece bağımsız çalışmaya devam eder.
 let ringbackScope: ReturnType<typeof effectScope> | null = null
+
+// D71 §3 — arayan-taraf "cevap yok" zamanlayıcısı. `ringbackScope` deseninde modül seviyesinde
+// TEK zamanlayıcı: `startCall` component'ten bağımsız, çağrı ömrü boyunca yaşamalı. Yeni `startCall`
+// öncekini temizler (aynı kanala 30 sn içinde yeniden aranırsa eski zamanlayıcı yeniyi kesmez).
+let noAnswerTimer: ReturnType<typeof setTimeout> | null = null
 function ensureRingback() {
   if (ringbackScope) return
   ringbackScope = effectScope(true)
@@ -41,7 +51,7 @@ function ensureRingback() {
 }
 
 export function useCall() {
-  const { callInvite, groupCallStart, callAccept, callReject } = useSocket()
+  const { callInvite, groupCallStart, callAccept, callReject, callCancel } = useSocket()
   const callStore = useCallStore()
   const voiceStore = useVoiceStore()
   ensureRingback()
@@ -59,6 +69,26 @@ export function useCall() {
       autoEndWhenAlone: true,
       startWithCamera: opts?.startWithCamera,
     })
+
+    // D71 §1/§3 — 30 sn sonra hâlâ çalıyorsa "Cevap vermedi.": iptal sinyali gönder, "çalıyor"
+    // durumunu bitir (geri-zil + DmCallPanel'deki bekleyen kutucuk `outgoing`e bağlı olduğu için
+    // kendiliğinden kalkar), notice göster. Arayan ODADA KALIR — voiceStore.leave() ÇAĞRILMAZ.
+    // Ateşlenince durumu YENİDEN kontrol et: kabul/ret/karşı tarafın katılması/arayanın çıkması
+    // outgoing'i (başka bir yoldan) zaten temizlemişse burada no-op.
+    if (noAnswerTimer) clearTimeout(noAnswerTimer)
+    noAnswerTimer = setTimeout(() => {
+      noAnswerTimer = null
+      if (!callStore.isRinging(channelId)) return
+      // PM incelemesi — aranan DM'deki "Katıl" ile girdiyse `call_accept` gelmez, `outgoing` dolu
+      // kalır. Odada bizden başkası varsa görüşme sürüyor: "çalıyor"u sessizce bitir, uyarı YOK.
+      if (voiceStore.roomParticipants.length > 1) {
+        callStore.clearOutgoing()
+        return
+      }
+      callCancel(channelId)
+      callStore.clearOutgoing()
+      callStore.setNotice('noAnswer')
+    }, OUTGOING_RING_TIMEOUT_MS)
   }
 
   // İptal — kapanış tek nokta (§2/§11): voiceStore.leave() hâlâ çalıyorsak call_cancel'ı

@@ -27,6 +27,7 @@ const noticeText = computed(() => {
   if (!n) return ''
   if (n === 'unreachable') return t('call.unreachable')
   if (n === 'rejected') return t('call.rejected')
+  if (n === 'noAnswer') return t('call.noAnswer') // D71 §1/§3 — 30 sn cevapsız, arayan tarafta
   return ''
 })
 watch(() => callStore.notice, (n) => {
