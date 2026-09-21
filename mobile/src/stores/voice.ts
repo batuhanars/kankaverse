@@ -788,6 +788,25 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     appStateSub?.remove(); // M4d §6 — foreground listener ile aynı yaşam döngüsü
     appStateSub = null;
 
+    // §8 istisnası — davet gönderilmişti ve kimse katılmadıysa, çıkarken karşı tarafın
+    // çalan telefonunu/web bekleme barını da susturmak için call_cancel gönderilir.
+    //
+    // 🔴 M4z §F — grup dalı YANINDA, tek noktada (çağrı yerlerine serpilmez). İki fark:
+    //  - Event `voice:group_call_cancel` (1-1'inki grupta rastgele bir üyeye giderdi).
+    //  - `wasAlone` KOŞULU YOK: üç kişilik grupta B katılmışken C hâlâ çalıyor olabilir; başlatan
+    //    çıkarken C'nin zili de susmalı. Katılmış olan etkilenmez (iptal yalnız çalma sunumunu
+    //    kapatır, odadakinin bağlantısına dokunmaz — sözleşme §F.3).
+    // Guild'de `didInvite` kalıcı false olduğu için ortam ses kanalı iki dala da girmez.
+    //
+    // 🔴 M5g §2 — bu blok BİLEREK `room.disconnect()`ten ÖNCEYE taşındı (web `voice.ts:414` ile aynı
+    // sıra). LiveKit vedalaşması saniyeler sürebiliyor; iptal ondan SONRA gönderilseydi karşı taraf
+    // o süre boyunca çalmaya devam ederdi (M5g §0.A). `didInvite`/`callKind` aşağıdaki `set()` ile
+    // sıfırlanıyor, bu yüzden değerleri BURADA (gönderim anında) okunuyor.
+    if (channelId && get().didInvite) {
+      if (get().callKind === 'group') groupCallCancel(channelId);
+      else if (wasAlone) callCancel(channelId);
+    }
+
     if (room) {
       // 🔴 PM incelemesi (2026-08-08, M4j) — `disconnect()` BEKLEMELİ. O bekleme sırasında taşınma
       // akışı (`handleMoved`) yeni bir `Room` kurup modül değişkenini ÜZERİNE yazabiliyor; koşulsuz
@@ -805,20 +824,6 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       await AudioSession.stopAudioSession();
     } catch {
       // yoksay
-    }
-
-    // §8 istisnası — davet gönderilmişti ve kimse katılmadıysa, çıkarken karşı tarafın
-    // çalan telefonunu/web bekleme barını da susturmak için call_cancel gönderilir.
-    //
-    // 🔴 M4z §F — grup dalı YANINDA, tek noktada (çağrı yerlerine serpilmez). İki fark:
-    //  - Event `voice:group_call_cancel` (1-1'inki grupta rastgele bir üyeye giderdi).
-    //  - `wasAlone` KOŞULU YOK: üç kişilik grupta B katılmışken C hâlâ çalıyor olabilir; başlatan
-    //    çıkarken C'nin zili de susmalı. Katılmış olan etkilenmez (iptal yalnız çalma sunumunu
-    //    kapatır, odadakinin bağlantısına dokunmaz — sözleşme §F.3).
-    // Guild'de `didInvite` kalıcı false olduğu için ortam ses kanalı iki dala da girmez.
-    if (channelId && get().didInvite) {
-      if (get().callKind === 'group') groupCallCancel(channelId);
-      else if (wasAlone) callCancel(channelId);
     }
 
     // Dev-fix: LiveKit webhook'u yakalayamazsa diğer istemcilerin presence'ı güncellensin.

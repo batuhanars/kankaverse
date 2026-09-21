@@ -401,17 +401,46 @@ export async function dismissIncomingCall(channelId: string): Promise<void> {
   if (useVoiceStore.getState().incomingCall?.channelId === channelId) {
     useVoiceStore.getState().setIncomingCall(null);
   }
-  if (current?.channelId !== channelId) return;
-  clearTimeout(current.timeoutTimer);
-  const { notificationId } = current;
-  current = null;
-  Vibration.cancel();
-  if (!notificationId) return; // ön planda izin yokken bildirim hiç kurulmadı
-  try {
-    await Notifications.dismissNotificationAsync(notificationId);
-  } catch {
-    // yoksay — bildirim zaten kullanıcı tarafından temizlenmiş olabilir
+  if (current?.channelId === channelId) {
+    clearTimeout(current.timeoutTimer);
+    const { notificationId } = current;
+    current = null;
+    Vibration.cancel();
+    if (notificationId) {
+      try {
+        await Notifications.dismissNotificationAsync(notificationId);
+      } catch {
+        // yoksay — bildirim zaten kullanıcı tarafından temizlenmiş olabilir
+      }
+    }
   }
+
+  // 🔴 M5g §3 — EK OLARAK, bu kanalın EKRANDA duran BÜTÜN "Gelen Arama" bildirimleri kapatılır.
+  // `current` yalnız bu modülün WS yolundan kurduğu TEK bildirimi biliyor; FCM push'un kurduğu
+  // kopya (§0.B — ön planda iki bildirim yarışıyor) `current` ile hiç eşleşmiyordu ve iptal gelse
+  // bile çalmaya devam ediyordu. `source` (WS/FCM) fark etmez — `clearStaleIncomingCallNotifications`
+  // teki tarama deseni örnek alınır, hata yutulur. Bu tarama YUKARIDAKİ `current` denetiminden
+  // BİLEREK bağımsız çalışır: arka planda `current` hiç dolmamış olabilir (§0.C, bildirimi FCM
+  // kurduysa), o durumda bile push kopyası kapatılmalı.
+  // `void` ile çağrılan yerler var (socket.ts, zaman aşımı): liste okunamazsa hata YUTULUR,
+  // yakalanmamış rejection'a dönüşmez.
+  let presented: Notifications.Notification[];
+  try {
+    presented = await Notifications.getPresentedNotificationsAsync();
+  } catch {
+    return;
+  }
+  const matches = presented.filter((n) => {
+    const data = n.request.content.data as Record<string, unknown> | undefined;
+    return data?.type === NOTIFICATION_DATA_TYPE && data?.channelId === channelId;
+  });
+  await Promise.all(
+    matches.map((n) =>
+      Notifications.dismissNotificationAsync(n.request.identifier).catch(() => {
+        // yoksay — bildirim zaten kullanıcı tarafından temizlenmiş olabilir
+      }),
+    ),
+  );
 }
 
 /**
