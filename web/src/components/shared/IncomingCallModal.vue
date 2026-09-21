@@ -40,8 +40,13 @@ watch(
     if (timer) { clearTimeout(timer); timer = null }
     if (id) {
       startRingtone() // telefon çalıyormuş gibi (loop) — accept/reject/cancel/timeout durdurur
+      // 🔴 D71 cihaz turu (2026-09-21) — zaman aşımı YALNIZ yerel temizlik, sinyal GÖNDERMEZ
+      // (mobil `incomingCall.ts` §8.2 ile aynı). Eskiden `rejectCall` çağırıyordu: arayan "Arama
+      // reddedildi" görüp odadan atılıyordu, yani cevapsız kalan arama ret gibi yansıyordu (R7:
+      // bakmamak ile reddetmek ayırt edilmemeli). "Cevap vermedi"yi artık arayan kendi sayacıyla
+      // gösteriyor (useCall.ts OUTGOING_RING_TIMEOUT_MS).
       timer = setTimeout(() => {
-        if (callStore.incoming?.channelId === id) rejectCall(id)
+        if (callStore.incoming?.channelId === id) callStore.clearIncoming()
       }, 30_000)
     } else {
       stopRingtone()

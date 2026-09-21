@@ -65,16 +65,14 @@ export function useCall() {
       return
     }
     callStore.setOutgoing(channelId)
-    await voiceStore.join(channelId, {
-      autoEndWhenAlone: true,
-      startWithCamera: opts?.startWithCamera,
-    })
-
     // D71 §1/§3 — 30 sn sonra hâlâ çalıyorsa "Cevap vermedi.": iptal sinyali gönder, "çalıyor"
     // durumunu bitir (geri-zil + DmCallPanel'deki bekleyen kutucuk `outgoing`e bağlı olduğu için
     // kendiliğinden kalkar), notice göster. Arayan ODADA KALIR — voiceStore.leave() ÇAĞRILMAZ.
     // Ateşlenince durumu YENİDEN kontrol et: kabul/ret/karşı tarafın katılması/arayanın çıkması
     // outgoing'i (başka bir yoldan) zaten temizlemişse burada no-op.
+    // Cihaz turu (2026-09-21): sayaç join'den ÖNCE, davet onaylanır onaylanmaz kurulur. join'den
+    // sonra kurulunca odaya bağlanma süresi kadar (birkaç sn) aranan taraftan geç susuyordu.
+    // join başarısız olursa voiceStore.leave() outgoing'i temizler, zamanlayıcı no-op kalır.
     if (noAnswerTimer) clearTimeout(noAnswerTimer)
     noAnswerTimer = setTimeout(() => {
       noAnswerTimer = null
@@ -89,6 +87,11 @@ export function useCall() {
       callStore.clearOutgoing()
       callStore.setNotice('noAnswer')
     }, OUTGOING_RING_TIMEOUT_MS)
+
+    await voiceStore.join(channelId, {
+      autoEndWhenAlone: true,
+      startWithCamera: opts?.startWithCamera,
+    })
   }
 
   // İptal — kapanış tek nokta (§2/§11): voiceStore.leave() hâlâ çalıyorsak call_cancel'ı
