@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * IncomingCallModal — gelen sesli arama daveti (AppShell'de global).
- * callStore.incoming dolunca üstte modal; 30sn cevapsız → otomatik reddet.
+ * callStore.incoming dolunca üstte modal; 30sn cevapsız → zil yerelde susar, sinyal gitmez (D71).
  * M4b §14.1 — aynı sunum artık GRUP DM çağrısını da karşılıyor (`kind: 'group'`); yeni modal
  * yazılmadı. Grupta "reddet" yalnız yerel kapatmadır (sinyal yok — bkz. useCall.ts).
  */
@@ -22,12 +22,15 @@ let timer: ReturnType<typeof setTimeout> | null = null
 // 🔴 M4b §14.1 — `group:` dalı KALDIRILDI: grup DM artık pasif şeritle değil çalma sunumuyla
 // karşılanıyor (aşağıdaki modal). Dal zaten kırıktı — `call.groupStarted` anahtarı tr.json'da hiç
 // yoktu, vue-i18n anahtar yolunu ham basardı.
+// 🔴 D71 web kozmetiği (2026-09-21) — `noAnswer` dalı KALDIRILDI: 4 sn'lik alt şeritte fark
+// edilmiyordu. "Cevap vermedi." artık `DmCallPanel`deki bekleyen kutucukta kalıcı gösteriliyor
+// (bkz. stores/call.ts `noAnswerChannelId`, useCall.ts). `setNotice('noAnswer')` artık HİÇ
+// çağrılmıyor; `'unreachable'`/`'rejected'` dalları AYNEN kalıyor.
 const noticeText = computed(() => {
   const n = callStore.notice
   if (!n) return ''
   if (n === 'unreachable') return t('call.unreachable')
   if (n === 'rejected') return t('call.rejected')
-  if (n === 'noAnswer') return t('call.noAnswer') // D71 §1/§3 — 30 sn cevapsız, arayan tarafta
   return ''
 })
 watch(() => callStore.notice, (n) => {

@@ -35,9 +35,21 @@ export const useCallStore = defineStore('call', () => {
   const incoming = ref<IncomingCall | null>(null)
   // Nötr bilgi (ulaşılamadı / reddedildi) — engellenme/ilişki sızdırmaz
   const notice = ref<string>('')
+  /**
+   * 🔴 D71 kozmetik (2026-09-21) — "bu kanalda 30 sn cevap gelmedi" bilgisi. Eskiden yalnız
+   * `notice('noAnswer')` ile 4 sn'lik alt şeritte gösteriliyordu, fark edilmiyordu. Artık
+   * `DmCallPanel`deki bekleyen kutucuk (avatar) bu alana bakıp kalıcı "Cevap vermedi." etiketi
+   * basıyor — `isRinging` false olunca kutucuk tamamen kaybolmasın diye. Kapanış tek noktası
+   * `stores/voice.ts` `cancelRingingIfNeeded` (arayan odadan çıkınca temizlenir); yeni bir
+   * `setOutgoing` de temizler (aşağıda). `notice('noAnswer')` KULLANILMAZ (IncomingCallModal'daki
+   * alt şerit dalı kaldırıldı, bkz. useCall.ts).
+   */
+  const noAnswerChannelId = ref<string | null>(null)
 
   function setOutgoing(channelId: string, kind: 'dm' | 'group' = 'dm') {
     outgoing.value = { channelId, kind }
+    // Yeni arama, önceki "cevap vermedi" durumunu geçersiz kılar (aynı kanal yeniden aranmış olabilir).
+    if (noAnswerChannelId.value) noAnswerChannelId.value = null
   }
   function clearOutgoing() {
     outgoing.value = null
@@ -60,10 +72,18 @@ export const useCallStore = defineStore('call', () => {
     notice.value = ''
   }
 
+  function setNoAnswer(channelId: string) {
+    noAnswerChannelId.value = channelId
+  }
+  function clearNoAnswer() {
+    noAnswerChannelId.value = null
+  }
+
   return {
     outgoing,
     incoming,
     notice,
+    noAnswerChannelId,
     setOutgoing,
     clearOutgoing,
     isRinging,
@@ -71,5 +91,7 @@ export const useCallStore = defineStore('call', () => {
     clearIncoming,
     setNotice,
     clearNotice,
+    setNoAnswer,
+    clearNoAnswer,
   }
 })

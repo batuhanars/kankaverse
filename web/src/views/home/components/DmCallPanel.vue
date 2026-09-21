@@ -30,6 +30,10 @@ const members = computed<RoomMember[]>(() => (connected.value ? voiceStore.roomP
 
 // Bekleyen katılımcılar — biz odadayız, onlar henüz katılmadı. İki dal:
 //  - 1-1 DM (D39 §5): yalnız BİZ çalıyorken karşı taraf, "Çalıyor…" etiketiyle. Davranış aynen korundu.
+//    🔴 D71 kozmetik (2026-09-21) — zil susup 30 sn dolunca (`isRinging` false) kutucuk eskiden
+//    burada TAMAMEN kayboluyordu ("Cevap vermedi." yalnız 4 sn'lik alt şeritte çıkıyordu, fark
+//    edilmiyordu). Artık ikinci bir kapı: karşı taraf hâlâ odaya girmediyse ve bu kanal için
+//    `callStore.noAnswerChannelId` doluysa AYNI kutucuk "Cevap vermedi." etiketiyle kalır.
 //  - Grup DM (M4z §E): kanalın odada olmayan TÜM üyeleri, etiketsiz — grupta kimin telefonunun
 //    çaldığını bilmiyoruz, uydurmuyoruz. Kaynak DM store'daki kanal kaydı; yeni uç çağrılmaz.
 // Ortam ses kanalı bu panele hiç düşmez (VoiceRoomView) — guild dalı kapsam dışı (§E.1).
@@ -40,14 +44,29 @@ const pendingPeers = computed<Array<{ id: string; peer: PendingPeer }>>(() => {
   const dm = dmStore.channels.find((c) => c.id === props.channelId)
   if (!dm) return []
   if (dm.type === 'DM') {
-    if (!callStore.isRinging(props.channelId)) return []
     if (members.value.some((m) => m.userId === dm.otherUser.id)) return [] // zaten katıldı
-    return [
-      {
-        id: dm.otherUser.id,
-        peer: { username: dm.otherUser.username, avatarUrl: dm.otherUser.avatarUrl, ringing: true },
-      },
-    ]
+    if (callStore.isRinging(props.channelId)) {
+      return [
+        {
+          id: dm.otherUser.id,
+          peer: { username: dm.otherUser.username, avatarUrl: dm.otherUser.avatarUrl, ringing: true },
+        },
+      ]
+    }
+    if (callStore.noAnswerChannelId === props.channelId) {
+      return [
+        {
+          id: dm.otherUser.id,
+          peer: {
+            username: dm.otherUser.username,
+            avatarUrl: dm.otherUser.avatarUrl,
+            ringing: false,
+            noAnswer: true,
+          },
+        },
+      ]
+    }
+    return []
   }
   const meId = authStore.user?.id
   const inRoom = new Set(members.value.map((m) => m.userId))
@@ -256,6 +275,8 @@ async function toggleFullscreen() {
           </span>
           <!-- D39 §5: bekleyen katılımcı — yalnız 1-1'de "Çalıyor…" (grup üyesinde bu bilgi yok) -->
           <span v-if="tile.peer?.ringing" class="text-[11px]" style="color: var(--kv-text-muted);">{{ t('call.ringing') }}</span>
+          <!-- D71 kozmetik: zil susup 30 sn cevap gelmeyince aynı kutucuk kalıcı bu etikete geçer -->
+          <span v-else-if="tile.peer?.noAnswer" class="text-[11px]" style="color: var(--kv-text-muted);">{{ t('call.noAnswer') }}</span>
         </div>
       </div>
     </div>

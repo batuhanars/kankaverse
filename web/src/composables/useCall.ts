@@ -66,8 +66,12 @@ export function useCall() {
     }
     callStore.setOutgoing(channelId)
     // D71 §1/§3 — 30 sn sonra hâlâ çalıyorsa "Cevap vermedi.": iptal sinyali gönder, "çalıyor"
-    // durumunu bitir (geri-zil + DmCallPanel'deki bekleyen kutucuk `outgoing`e bağlı olduğu için
-    // kendiliğinden kalkar), notice göster. Arayan ODADA KALIR — voiceStore.leave() ÇAĞRILMAZ.
+    // durumunu bitir (geri-zil `outgoing`e bağlı olduğu için kendiliğinden kalkar), kanalı
+    // `callStore.noAnswerChannelId`e yaz. Arayan ODADA KALIR — voiceStore.leave() ÇAĞRILMAZ.
+    // 🔴 D71 web kozmetiği (2026-09-21) — eskiden `setNotice('noAnswer')` kullanılıyordu, yalnız
+    // 4 sn'lik alt şeritte görünüyordu ve fark edilmiyordu. Artık `DmCallPanel`deki bekleyen
+    // kutucuk (avatar) `noAnswerChannelId`e bakıp kalıcı "Cevap vermedi." gösteriyor — kutucuk
+    // `isRinging` false olunca kaybolmuyor. `setNotice` BURADA KULLANILMAZ (bkz. IncomingCallModal.vue).
     // Ateşlenince durumu YENİDEN kontrol et: kabul/ret/karşı tarafın katılması/arayanın çıkması
     // outgoing'i (başka bir yoldan) zaten temizlemişse burada no-op.
     // Cihaz turu (2026-09-21): sayaç join'den ÖNCE, davet onaylanır onaylanmaz kurulur. join'den
@@ -85,7 +89,7 @@ export function useCall() {
       }
       callCancel(channelId)
       callStore.clearOutgoing()
-      callStore.setNotice('noAnswer')
+      callStore.setNoAnswer(channelId)
     }, OUTGOING_RING_TIMEOUT_MS)
 
     await voiceStore.join(channelId, {

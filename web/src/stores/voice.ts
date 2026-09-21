@@ -48,10 +48,13 @@ export interface VideoTrackEntry {
 // DM kanalından bilinen ad/avatar. Yalnız DmCallPanel üretir.
 // M4z §E — artık ÇOĞUL kullanılır: 1-1'de tek karşı taraf, grup DM'de odada olmayan her üye.
 // `ringing` yalnız 1-1'de true (davet çalıyor); grup üyesi için "Çalıyor…" iddia edilmez — bilgi yok.
+// 🔴 D71 kozmetik (2026-09-21) — `noAnswer` yalnız 1-1'de, zil susup 30 sn dolduğunda true: kutucuk
+// kalır, "Çalıyor…" yerine "Cevap vermedi." basar. Grup dalı hiç doldurmaz (opsiyonel, undefined=false).
 export interface PendingPeer {
   username: string
   avatarUrl: string | null
   ringing: boolean
+  noAnswer?: boolean
 }
 
 // Kart ızgarası/sahnesi için kutucuk: video track'i olan tile video, olmayan avatar, katılmamış
@@ -388,6 +391,10 @@ export const useVoiceStore = defineStore('voice', () => {
   function cancelRingingIfNeeded(channelId: string | null) {
     if (!channelId) return
     const callStore = useCallStore()
+    // 🔴 D71 kozmetik (2026-09-21) — "cevap vermedi" bekleyen-kutucuk bilgisi de kapanış tek
+    // noktasında temizlenir: zil çoktan sustuysa (`isRinging` zaten false) aşağıdaki erken çıkış
+    // bunu atlardı, kutucuk bir sonraki DM açılışına kadar "Cevap vermedi." göstermeye devam ederdi.
+    if (callStore.noAnswerChannelId === channelId) callStore.clearNoAnswer()
     if (!callStore.isRinging(channelId)) return
     // 🔴 M4z §F — grup dalı da BURADAN geçer (yeni bir kapanış noktası açılmadı). Grupta koşul
     // "kimse katılmamışsa" DEĞİL: üç kişilik grupta biri katılmışken bir başkası hâlâ çalıyor
