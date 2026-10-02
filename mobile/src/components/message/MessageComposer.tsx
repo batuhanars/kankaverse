@@ -289,7 +289,7 @@ export function MessageComposer({
                 disabled={!canSend}
                 accessibilityRole="button"
                 accessibilityLabel={t('message.send')}
-                style={[styles.iconButton, !canSend && styles.iconButtonBusy]}
+                style={[styles.circleSlot, !canSend && styles.iconButtonBusy]}
               >
                 <View style={styles.circle}>
                   <Ionicons name="send" size={18} color={theme.colors.textPrimary} />
@@ -305,7 +305,7 @@ export function MessageComposer({
                 accessibilityRole="button"
                 accessibilityState={{ disabled: voice.disabled }}
                 accessibilityLabel={t('mobile.voice.record')}
-                style={[styles.iconButton, voice.disabled && styles.iconButtonBusy]}
+                style={[styles.circleSlot, voice.disabled && styles.iconButtonBusy]}
               >
                 <View style={styles.circle}>
                   <Ionicons name="mic" size={20} color={theme.colors.textPrimary} />
@@ -431,6 +431,14 @@ const styles = StyleSheet.create({
     // daraltıyordu (sahip geri bildirimi 2026-08-11). Negatif pay yalnız GÖRSEL konumu sola
     // çekiyor, dokunma hedefi 44dp kalıyor.
     marginLeft: -8,
+  },
+  // Sağdaki Kor daire yuvası. `iconButton`ın negatif sol payı SOL kenardaki "+" için; burada
+  // kullanılınca daire mesaj kutusuna yapışıyordu (sahip cihaz turu 2026-10-02).
+  circleSlot: {
+    height: theme.layout.inputMinHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
   },
   // §7.4 — gönder ve mikrofon AYNI yuvada, aynı görünümde: 40px Kor daire, beyaz ikon.
   circle: {

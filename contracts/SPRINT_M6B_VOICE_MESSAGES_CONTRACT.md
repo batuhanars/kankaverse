@@ -195,3 +195,49 @@ sesli mesajın metne çevrilmesi, video (M6c).
 - Mobil ve web'den gönderilen sesli mesajın dalgası iki istemcide de görünür ve benzer.
 - M6b-1'de gönderilmiş (waveform'suz) mesaj fallback desenle çizilir, çökmez.
 - `INVALID_WAVEFORM` testi.
+
+---
+
+## §8 REVİZYON 2 (2026-10-02, sahip cihaz turu 2) — oynatma kuralları + gönderim yalnız mobilde
+
+> Dalga formlu oynatıcı cihazda onaylandı. Üç kusur + bir kapsam kararı.
+
+### §8.1 Kapsam kararı: sesli mesaj GÖNDERMEK yalnız mobilde
+Sahip kararı (Discord ile aynı): web ve masaüstünde kayıt/gönderim KALKAR, **dinleme kalır**.
+- Web: `VoiceMicButton`, `VoiceRecordStrip`, `composables/useVoiceRecorder.ts` ve mesaj kutularındaki
+  (`MessageArea.vue`, `DmConversation.vue`) bağlantıları kaldırılır. Kullanılmayan i18n anahtarları
+  (`voiceMessage.record/cancel/send/recording/sending/limitReached/inCall/permissionDenied/unsupported/
+  recordFailed/uploadFailed`) silinir. `voiceMessage.label/play/pause/seek` ve
+  `voiceMessage.errors.EMAIL_NOT_VERIFIED` KALIR (oynatıcı ve ek yükleme kullanıyor).
+- `web/src/utils/waveform.ts`: yalnız oynatıcının kullandığı (`decodeWaveform`, `fallbackWaveform`)
+  kalır, `encodeWaveform`/`dbToByte` silinir.
+- API'de `audio/webm` allowlist'te KALIR (geriye dönük: tur 1'de web'den gönderilmiş mesajlar var).
+
+### §8.2 Bitince DUR (kusur)
+Android'de oynatıcı bitişte "çal" durumunda kalıyor, `seekTo(0)` sesi yeniden başlatıyor. Bitişte önce
+`pause()`, sonra `seekTo(0)`. Web'de de bitişte başa sarıldığında çalmadığı teyit edilir.
+
+### §8.3 Aynı anda tek ses (kusur)
+Mobilde iki sesli mesaj aynı anda çalabiliyor: önceki oynatıcıyı emirle durdurma (`claimPlayback` →
+`stopCurrent()`) güvenilir değil. Yeni model:
+- Tek bir merkezi durum: `currentId` (şu an çalan ek id'si). Mobilde mevcut store deseniyle (küçük bir
+  zustand store ya da modül-seviyesi abone olunabilir durum; `stores/voice` döngüsüne kenar EKLEME).
+- Bir oynatıcı çalmaya başlarken `currentId = kendi id`. Her oynatıcı `currentId`'yi izler; çalarken
+  `currentId !== kendi id` olursa **kendini** duraklatır (efekt tabanlı, emir değil).
+- Web'de `useExclusivePlayback` aynı modele çekilir (zaten çalışıyorsa yalnız teyit).
+
+### §8.4 Sıradakine otomatik geçiş (yeni)
+WhatsApp davranışı: bir sesli mesaj **sonuna kadar** çalıp bitince, aynı sohbette ondan sonraki (daha
+yeni) ilk sesli mesaj otomatik çalmaya başlar. Arada metin mesajları olabilir, atlanır. Sonraki yoksa
+durur. Kullanıcı elle duraklatırsa ya da konum değiştirip duraklatırsa geçiş olmaz.
+- Sıra: ekran, mesaj listesinden kronolojik sıralı ses eki id'lerini (yalnız CLEAN `audio/*`) merkezi
+  duruma kaydeder (`setQueue(channelId, ids)`). Biten oynatıcı `playNext(kendi id)` çağırır →
+  `currentId = sıradaki`, `autoplay = true`. Sıradaki oynatıcı bunu görünce kaynağını yükleyip çalar.
+- Sıradaki oynatıcı ekranda (FlatList'te) mount edilmemişse geçiş sessizce olmaz, hata verilmez.
+- Mobil ve web aynı davranış.
+
+### §8.5 DoD
+- Tek sesli mesaj: bitince durur, ▶'ye döner, tekrar başlamaz.
+- Üç ardışık sesli mesaj: ilki bitince ikinci, o bitince üçüncü çalar, üçüncüden sonra durur.
+- Biri çalarken diğerine basınca ilki anında durur.
+- Web'de mikrofon yok; telefondan gelen sesli mesaj web'de oynatıcıyla çalıyor.

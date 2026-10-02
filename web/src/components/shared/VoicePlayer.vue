@@ -1,7 +1,7 @@
 <!-- M6b §2/§5.1: sesli mesaj oynatıcısı. Gizli <audio> + kendi düğme/çubuk/süre (tarayıcı
      `controls` görünümü temaya uymuyor). Aynı anda tek ses: useExclusivePlayback. -->
 <script setup lang="ts">
-import { ref, computed, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { attachmentsApi } from '@/api/attachments'
 import { useExclusivePlayback } from '@/composables/useExclusivePlayback'
@@ -12,7 +12,8 @@ import type { AttachmentDto } from '@/types'
 const props = defineProps<{ attachment: AttachmentDto }>()
 
 const { t } = useI18n()
-const { claim, release } = useExclusivePlayback()
+const { currentId, play, stop, playNext, consumeAutoplay } = useExclusivePlayback()
+const myId = props.attachment.id
 
 // Presigned adres 300 sn ömürlü (AttachmentView ile aynı); duraklatılıp bırakılmış mesajda
 // ölü adrese basmamak için 240 sn'den eskiyse çalmadan önce tazelenir.
@@ -44,10 +45,6 @@ function barHeight(v: number): number {
 const timeLabel = computed(() =>
   formatClock(playing.value || currentMs.value > 0 ? currentMs.value : totalMs.value),
 )
-
-function pause() {
-  audioEl.value?.pause()
-}
 
 async function ensureFreshSrc(): Promise<boolean> {
   if (src.value && Date.now() - srcFetchedAt < URL_MAX_AGE_MS) return true
@@ -83,15 +80,12 @@ async function ensureFreshSrc(): Promise<boolean> {
   }
 }
 
-async function toggle() {
+async function startPlayback() {
   const el = audioEl.value
   if (!el || loading.value) return
-  if (playing.value) {
-    el.pause()
-    return
-  }
   if (!(await ensureFreshSrc())) return
-  claim(pause)
+  // Kaynak yüklenirken başkası devralmış olabilir
+  if (currentId.value !== myId) return
   try {
     await el.play()
   } catch {
@@ -99,19 +93,51 @@ async function toggle() {
   }
 }
 
+async function toggle() {
+  const el = audioEl.value
+  if (!el || loading.value) return
+  if (playing.value) {
+    el.pause()
+    return
+  }
+  play(myId)
+  await startPlayback()
+}
+
+// Efekt tabanlı "tek ses": başkası currentId olursa kendimi duraklat.
+// Otomatik geçiş: sıra bana geldiyse (autoplayId) başa alıp çal.
+watch(
+  currentId,
+  (id) => {
+    if (id !== myId) {
+      if (playing.value) audioEl.value?.pause()
+      return
+    }
+    if (consumeAutoplay(myId)) {
+      currentMs.value = 0
+      if (audioEl.value && src.value) audioEl.value.currentTime = 0
+      void startPlayback()
+    }
+  },
+  { immediate: true, flush: 'post' },
+)
+
 function onPlay() {
   playing.value = true
 }
 function onPause() {
   playing.value = false
-  release(pause)
+  // Elle duraklatma: sıra bende kalmasın (başkası devraldıysa dokunma). `ended` ayrıca gelir.
+  stop(myId)
 }
 function onEnded() {
-  // Bitince başa sar, düğme ▶'ya dönsün.
+  // §8.2: önce pause, sonra başa sar; başa sarma çalmayı yeniden başlatmaz.
+  const el = audioEl.value
+  el?.pause()
   playing.value = false
   currentMs.value = 0
-  if (audioEl.value) audioEl.value.currentTime = 0
-  release(pause)
+  if (el) el.currentTime = 0
+  playNext(myId)
 }
 function onTimeUpdate() {
   if (audioEl.value) currentMs.value = audioEl.value.currentTime * 1000
@@ -161,7 +187,7 @@ function onKeydown(e: KeyboardEvent) {
 
 onBeforeUnmount(() => {
   audioEl.value?.pause()
-  release(pause)
+  stop(myId)
 })
 </script>
 

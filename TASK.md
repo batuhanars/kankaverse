@@ -4250,3 +4250,5 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] §7.1 api `waveform`
 - [x] §7.2-§7.5 mobil
 - [x] §7.2-§7.5 web
+- [x] §8 mobil: bitince dur, tek ses, otomatik geçiş (2. cihaz turu bulguları)
+- [x] §8 web: kayıt kaldırıldı + aynı oynatma kuralları

@@ -1543,20 +1543,9 @@
   },
   "voiceMessage": {
     "label": "Sesli mesaj",
-    "record": "Sesli mesaj kaydet",
     "play": "Oynat",
     "pause": "Duraklat",
     "seek": "Konum",
-    "cancel": "Kaydı sil",
-    "send": "Gönder",
-    "recording": "Kaydediliyor",
-    "limitReached": "5 dakikalık sınıra ulaşıldı. Göndermek ya da silmek sana kalmış.",
-    "sending": "Gönderiliyor…",
-    "inCall": "Sesli aramadayken sesli mesaj kaydedilemez, mikrofon arama tarafından kullanılıyor.",
-    "permissionDenied": "Mikrofon izni verilmedi. Sesli mesaj kaydetmek için tarayıcı ayarlarından mikrofon iznini aç.",
-    "unsupported": "Bu tarayıcı ses kaydını desteklemiyor.",
-    "recordFailed": "Kayıt başlatılamadı. Mikrofonun bağlı ve kullanılabilir olduğundan emin ol.",
-    "uploadFailed": "Sesli mesaj gönderilemedi.",
     "errors": {
       "DURATION_TOO_LONG": "Sesli mesaj en fazla 5 dakika olabilir.",
       "EMAIL_NOT_VERIFIED": "Dosya ve sesli mesaj göndermek için e-postanı doğrulamalısın."

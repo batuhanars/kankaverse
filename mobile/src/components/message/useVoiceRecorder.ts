@@ -20,7 +20,17 @@ const NOTICE_MS = 5000;
 /** Canlı dalgada şeritte görünen son örnek sayısı. */
 const LIVE_BARS = 40;
 /** M6b §7.2 — seviye örneği için `metering` açık (dB), ~100 ms'de bir okunur. */
-const RECORDING_OPTIONS = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true };
+// Android kaynağı `voice_communication`: varsayılan `mic` ham sinyal veriyor, kayıtlar telefona
+// uzaklığa göre -18 ile -33 dB arası ölçüldü (sahip "ses az" dedi, 2026-10-02). Bu kaynak otomatik
+// kazanç + gürültü bastırma açar (WhatsApp/arama uygulamalarının kaynağı). Konuşma için stereo
+// gereksiz: tek kanal, 64 kbps (boyut yarıya iner, ses kalitesi konuşmada farksız).
+const RECORDING_OPTIONS = {
+  ...RecordingPresets.HIGH_QUALITY,
+  numberOfChannels: 1,
+  bitRate: 64000,
+  isMeteringEnabled: true,
+  android: { ...RecordingPresets.HIGH_QUALITY.android, audioSource: 'voice_communication' as const },
+};
 const SAMPLE_INTERVAL_MS = 100;
 
 /** `idle` → `recording` → (5:00'da) `limit`: kayıt durdu, gönder/sil bekleniyor. */

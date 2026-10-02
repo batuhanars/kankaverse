@@ -26,6 +26,8 @@ import { MessageEmpty, MessageError, MessageLoading } from './message/MessageSta
 import { MessageActionHost } from './message/MessageActionHost';
 import { useMessageActions } from './message/useMessageActions';
 import { useMessagesStore } from '@/stores/messages';
+import { useVoicePlaybackStore } from '@/stores/voicePlayback';
+import { ScanStatus } from '@/api/messages';
 import { useAuthStore } from '@/stores/auth';
 import { joinChannel, leaveChannel, setActiveChannel } from '@/realtime/socket';
 import { t } from '@/i18n';
@@ -246,6 +248,15 @@ export function MessageScreen({
   }, [lastMessageId, isFocused]);
 
   const { items, inverted } = list;
+  // M6b §8.4 — sesli mesaj otomatik geçişi için kronolojik (eski → yeni) CLEAN ses eki sırası.
+  useEffect(() => {
+    const ids = items.flatMap((it) =>
+      (it.message.attachments ?? [])
+        .filter((a) => a.contentType.startsWith('audio/') && a.scanStatus === ScanStatus.CLEAN)
+        .map((a) => a.id),
+    );
+    useVoicePlaybackStore.getState().setQueue(ids);
+  }, [items]);
   // Mesaj paneli akışı (uzun basış · tepki · kopyala · sil) — M1d-C §2.4.
   const actions = useMessageActions(channelId);
 

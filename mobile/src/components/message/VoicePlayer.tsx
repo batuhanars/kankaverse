@@ -5,7 +5,7 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { attachmentsApi } from '@/api/attachments';
 import { extractErrorMessage } from '@/api/errors';
 import type { AttachmentDto } from '@/api/messages';
-import { claimPlayback, releasePlayback } from '@/audio/voicePlayback';
+import { useVoicePlaybackStore } from '@/stores/voicePlayback';
 import { useCallAudioBusy } from '@/hooks/useCallAudioBusy';
 import { Waveform } from './Waveform';
 import { formatClock } from '@/utils/formatClock';
@@ -46,24 +46,26 @@ export function VoicePlayer({ attachment, isMine }: { attachment: AttachmentDto;
   const playing = status.playing;
   const fraction = scrub ?? (totalMs > 0 ? Math.min(1, (status.currentTime * 1000) / totalMs) : 0);
 
-  // "Başkası claim etti → dur" geri çağrısı. Kimliği SABİT olmalı (`claim`/`release` eşlemesi), içeriği
-  // her render'da güncel oyuncuyu kullanır.
-  const pauseRef = useRef<() => void>(() => {});
-  pauseRef.current = () => {
-    try {
-      player.pause();
-    } catch {
-      // oyuncu serbest bırakılmış olabilir
-    }
-  };
-  const stop = useRef(() => pauseRef.current()).current;
+  const myId = attachment.id;
+  const currentId = useVoicePlaybackStore((st) => st.currentId);
+  const autoplayId = useVoicePlaybackStore((st) => st.autoplayId);
 
-  // Bitince başa sar (düğme ▶'ye kendiliğinden döner: `playing` false).
+  // §8.3 — aynı anda tek ses, EFEKT tabanlı: çalarken `currentId` başkasına geçtiyse KENDİNİ duraklat.
+  useEffect(() => {
+    if (playing && currentId !== myId) player.pause();
+  }, [playing, currentId, myId, player]);
+
+  // §8.2 + §8.4 — bitişte önce `pause()` (Android bitişte "çal" durumunda kalıp `seekTo(0)` ile sesi
+  // yeniden başlatıyordu), sonra başa sar. Sona KADAR çaldıysa ve sıra bizdeyse sıradakine geç;
+  // elle duraklatma `didJustFinish` üretmez, dolayısıyla geçiş de olmaz.
   useEffect(() => {
     if (!status.didJustFinish) return;
-    releasePlayback(stop);
+    player.pause();
     void player.seekTo(0).catch(() => {});
-  }, [status.didJustFinish, player, stop]);
+    if (useVoicePlaybackStore.getState().currentId === myId) {
+      useVoicePlaybackStore.getState().playNext(myId);
+    }
+  }, [status.didJustFinish, player, myId]);
 
   // Arama başladı/geliyor: çalan ses durur (M5f zili ve LiveKit oturumuyla çakışmasın).
   useEffect(() => {
@@ -72,14 +74,13 @@ export function VoicePlayer({ attachment, isMine }: { attachment: AttachmentDto;
 
   useEffect(() => {
     return () => {
-      releasePlayback(stop);
       try {
         player.pause();
       } catch {
         // bileşen sökülüyor
       }
     };
-  }, [player, stop]);
+  }, [player]);
 
   async function ensureSource(): Promise<boolean> {
     if (sourceSet.current) return true;
@@ -105,14 +106,29 @@ export function VoicePlayer({ attachment, isMine }: { attachment: AttachmentDto;
       return;
     }
     if (inCall || ringing) return;
+    // Önce sahiplen: önceki oynatıcı bunu görüp kendini duraklatır (kaynak yüklenirken beklemez).
+    useVoicePlaybackStore.getState().claim(myId);
+    await startPlayback();
+  }
+
+  async function startPlayback() {
     if (!(await ensureSource())) return;
-    claimPlayback(stop);
     // Sonda kalmışsa baştan çal.
     if (status.duration > 0 && status.currentTime >= status.duration - 0.05) {
       await player.seekTo(0).catch(() => {});
     }
+    // Yükleme sırasında başkası sahiplendiyse çalma.
+    if (useVoicePlaybackStore.getState().currentId !== myId) return;
     player.play();
   }
+
+  // §8.4 — otomatik geçiş: sıra bize geldi, kaynağı yükleyip çal.
+  useEffect(() => {
+    if (autoplayId !== myId) return;
+    useVoicePlaybackStore.getState().clearAutoplay();
+    if (!inCall && !ringing) void startPlayback();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoplayId, myId]);
 
   async function seekToFraction(f: number) {
     if (totalMs <= 0 || !(await ensureSource())) return;
