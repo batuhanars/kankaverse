@@ -1,3 +1,4 @@
+import { previewFromAttachments } from '../../common/utils/attachment-preview.util';
 import {
   Injectable,
   ForbiddenException,
@@ -115,7 +116,11 @@ export class DmService {
               where: { deletedAt: null },
               orderBy: { createdAt: 'desc' },
               take: 1,
-              include: { author: { select: { id: true, username: true, avatarUrl: true } } },
+              include: {
+                author: { select: { id: true, username: true, avatarUrl: true } },
+                // Ek-yalnız önizleme için yalnız tür (son mesajın ekleri)
+                attachments: { select: { contentType: true } },
+              },
             },
           },
         },
@@ -185,7 +190,7 @@ export class DmService {
           ? {
               id: lastMsg.id,
               channelId: lastMsg.channelId,
-              content: lastMsg.content,
+              content: previewFromAttachments(lastMsg.content, lastMsg.attachments),
               replyToId: lastMsg.replyToId,
               author: {
                 id: lastMsg.author.id,
@@ -221,7 +226,7 @@ export class DmService {
           ? {
               id: lastMsg.id,
               channelId: lastMsg.channelId,
-              content: lastMsg.content,
+              content: previewFromAttachments(lastMsg.content, lastMsg.attachments),
               replyToId: lastMsg.replyToId,
               author: {
                 id: lastMsg.author.id,
@@ -744,7 +749,11 @@ export class DmService {
       this.prisma.message.findFirst({
         where: { channelId, deletedAt: null },
         orderBy: { createdAt: 'desc' },
-        include: { author: { select: { id: true, username: true, avatarUrl: true } } },
+        include: {
+          author: { select: { id: true, username: true, avatarUrl: true } },
+          // Ek-yalnız önizleme için yalnız tür (son mesajın ekleri)
+          attachments: { select: { contentType: true } },
+        },
       }),
       // G3: selfBlocked = yalnız "ben onu engelledim"
       this.prisma.userBlock.findUnique({
@@ -794,7 +803,7 @@ export class DmService {
         ? {
             id: lastMsg.id,
             channelId: lastMsg.channelId,
-            content: lastMsg.content,
+            content: previewFromAttachments(lastMsg.content, lastMsg.attachments),
             replyToId: lastMsg.replyToId,
             author: {
               id: lastMsg.author.id,
@@ -838,7 +847,11 @@ export class DmService {
           where: { deletedAt: null },
           orderBy: { createdAt: 'asc' },
           take: 1,
-          select: { content: true, createdAt: true },
+          select: {
+            content: true,
+            createdAt: true,
+            attachments: { select: { contentType: true } },
+          },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -853,7 +866,7 @@ export class DmService {
             avatarUrl: c.dmRequester.avatarUrl,
           }
         : null,
-      preview: c.messages[0]?.content ?? '',
+      preview: previewFromAttachments(c.messages[0]?.content, c.messages[0]?.attachments),
       createdAt: c.createdAt.toISOString(),
     }));
   }

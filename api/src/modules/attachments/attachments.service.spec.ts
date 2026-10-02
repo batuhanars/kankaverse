@@ -295,6 +295,9 @@ describe('AttachmentsService.presign — allowlist kapsamı', () => {
     'application/zip',
     'application/vnd.rar',
     'application/x-7z-compressed',
+    'audio/mp4',
+    'audio/webm',
+    'audio/mpeg',
   ];
 
   for (const ct of allowedTypes) {
@@ -312,5 +315,61 @@ describe('AttachmentsService.presign — allowlist kapsamı', () => {
   it('contentType "application/exe" → UNSUPPORTED_TYPE', async () => {
     const dto: PresignAttachmentDto = { filename: 'f', contentType: 'application/exe', size: 100 };
     await expect(service.presign(USER_ID, dto)).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+// ── M6b: sesli mesaj süresi ────────────────────────────────────────────────────
+describe('AttachmentsService.presign — durationMs (M6b)', () => {
+  let service: AttachmentsService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.attachment.create.mockResolvedValue({ id: 'att-1', storageKey: 'k.m4a' });
+    storageMock.presignPut.mockResolvedValue('https://upload');
+  });
+
+  const audio = (extra: Partial<PresignAttachmentDto> = {}): PresignAttachmentDto => ({
+    filename: 'ses.m4a',
+    contentType: 'audio/mp4',
+    size: 1000,
+    ...extra,
+  });
+
+  it('ses + durationMs → kaydedilir', async () => {
+    await service.presign(USER_ID, audio({ durationMs: 7300 }));
+    expect(prismaMock.attachment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ durationMs: 7300 }),
+    });
+  });
+
+  it('ses, durationMs yok → null', async () => {
+    await service.presign(USER_ID, audio());
+    expect(prismaMock.attachment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ durationMs: null }),
+    });
+  });
+
+  it('tam 300000 ms → kabul', async () => {
+    await expect(service.presign(USER_ID, audio({ durationMs: 300000 }))).resolves.toBeDefined();
+  });
+
+  it('300000 ms üstü → DURATION_TOO_LONG', async () => {
+    await expect(service.presign(USER_ID, audio({ durationMs: 300001 }))).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'DURATION_TOO_LONG' }),
+    });
+    expect(prismaMock.attachment.create).not.toHaveBeenCalled();
+  });
+
+  it('ses-dışı türde durationMs yok sayılır (kaydedilmez, sınır uygulanmaz)', async () => {
+    await service.presign(USER_ID, {
+      filename: 'a.png',
+      contentType: 'image/png',
+      size: 100,
+      durationMs: 999999,
+    });
+    expect(prismaMock.attachment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ durationMs: null }),
+    });
   });
 });

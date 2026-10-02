@@ -4,6 +4,7 @@ import { MessageComposer } from './MessageComposer';
 import { AttachmentSheet } from './AttachmentSheet';
 import { emojiPickerTheme } from './emojiPickerTheme';
 import { useEmojiInsert } from './useEmojiInsert';
+import { useVoiceRecorder } from './useVoiceRecorder';
 import type { useMessageComposer } from './useMessageComposer';
 import type { useMentionCompose } from './useMentionCompose';
 
@@ -24,6 +25,8 @@ interface Props {
   disabledNotice?: string | null;
   typingLabel: string | null;
   bottomInset: number;
+  /** M6b — kayıt, sohbet değişince iptal edilsin diye kanal kimliğini bilir. */
+  channelId: string;
 }
 
 export function ComposerHost({
@@ -33,11 +36,19 @@ export function ComposerHost({
   disabledNotice,
   typingLabel,
   bottomInset,
+  channelId,
 }: Props) {
   const [attachOpen, setAttachOpen] = useState(false);
   // `handleChangeText` fonksiyon bildirimi olduğu için burada kullanılabilir (hoisting); tersi
   // sırada yazılamazdı, çünkü o da `emoji`ye ihtiyaç duyuyor.
   const emoji = useEmojiInsert(composer.input, handleChangeText);
+  const recorder = useVoiceRecorder(channelId);
+
+  // M6b — biten kayıt mevcut ek hattıyla gider (içerik boş, tek ek); kısa kayıt `null` → sessizce atılır.
+  async function sendVoice() {
+    const draft = await recorder.finish();
+    if (draft) void composer.onSend([draft]);
+  }
 
   function handleChangeText(text: string) {
     // Emojinin tek-render'lık imleç kontrolü bırakılır — kullanıcı klavyeden yazarken imleci
@@ -78,6 +89,16 @@ export function ComposerHost({
         onRemoveAttachment={composer.removeAttachment}
         onOpenAttach={() => setAttachOpen(true)}
         onOpenEmoji={() => emoji.setOpen(true)}
+        voice={{
+          phase: recorder.phase,
+          elapsedMs: recorder.elapsedMs,
+          disabled: recorder.disabled,
+          notice: recorder.notice,
+          openSettings: recorder.openSettings,
+          onStart: () => void recorder.start(),
+          onCancel: () => void recorder.cancel(),
+          onSend: () => void sendVoice(),
+        }}
       />
 
       {/* Panel yalnız açıkken monte edilir: kapalıyken de dursaydı galeri izni ekran açılır açılmaz

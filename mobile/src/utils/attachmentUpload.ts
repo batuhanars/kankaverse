@@ -56,6 +56,8 @@ export interface DraftAttachment {
   filename: string;
   contentType: string;
   size: number;
+  /** M6b — sesli mesaj kaydının süresi (ms); presign'a taşınır. Diğer eklerde yok. */
+  durationMs?: number;
   /**
    * 🔴 Yüklenmiş ekin sunucudaki kimliği. Kısmi başarısızlıkta DOLU kalır: kullanıcı tekrar
    * denediğinde başarılı olanlar YENİDEN yüklenmez (aynı dosyayı ikinci kez yüklemek hem veri
@@ -125,6 +127,7 @@ export async function uploadDraftAttachment(draft: DraftAttachment): Promise<str
     filename: draft.filename,
     contentType: draft.contentType,
     size: draft.size,
+    ...(draft.durationMs ? { durationMs: draft.durationMs } : {}),
   });
 
   const res = await FileSystem.uploadAsync(presign.uploadUrl, draft.uri, {

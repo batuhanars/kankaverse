@@ -785,6 +785,61 @@ describe('DmService — C9 Mesaj İstekleri', () => {
     expect(prismaMock.userBlock.upsert).not.toHaveBeenCalled();
   });
 
+  it('getMessageRequests: ek-yalnız istek önizlemesi eklerden üretilir', async () => {
+    resetMocks();
+    const service = makeService();
+    const now = new Date('2026-07-06T10:00:00.000Z');
+    prismaMock.channel.findMany.mockResolvedValue([
+      {
+        id: CH,
+        createdAt: now,
+        dmRequester: { id: TARGET, username: 'isteyen', avatarUrl: null },
+        messages: [{ content: '', createdAt: now, attachments: [{ contentType: 'audio/mp4' }] }],
+      },
+    ]);
+
+    const res = await service.getMessageRequests(SENDER);
+
+    expect(res[0].preview).toBe('🎤 Sesli mesaj');
+  });
+
+  it('getDmChannels: ek-yalnız son mesaj içeriği eklerden üretilir (grup DM)', async () => {
+    resetMocks();
+    const service = makeService();
+    const now = new Date('2026-07-06T10:00:00.000Z');
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      {
+        lastReadAt: null,
+        clearedAt: null,
+        channel: {
+          id: CH,
+          type: 'GROUP_DM',
+          deletedAt: null,
+          name: 'g',
+          createdAt: now,
+          ownerId: SENDER,
+          members: [],
+          messages: [
+            {
+              id: 'm1',
+              channelId: CH,
+              content: '',
+              replyToId: null,
+              createdAt: now,
+              author: { id: TARGET, username: 'x', avatarUrl: null },
+              attachments: [{ contentType: 'image/png' }],
+            },
+          ],
+        },
+      },
+    ]);
+    prismaMock.userBlock.findMany.mockResolvedValue([]);
+
+    const res = await service.getDmChannels(SENDER);
+
+    expect((res[0] as any).lastMessage.content).toBe('📷 Görsel');
+  });
+
   it('getMessageRequests: bana gelen PENDING istekleri gönderen + önizleme ile döner', async () => {
     resetMocks();
     const service = makeService();
@@ -857,19 +912,31 @@ describe('readReceiptDecision — C12 §3.2 (R7)', () => {
   });
 
   it('bekleyen mesaj isteği → görünmez (C9 süzgeci delinmesin)', () => {
-    expect(readReceiptDecision({ ...base, requestPending: true })).toEqual({ visible: false, readAt: null });
+    expect(readReceiptDecision({ ...base, requestPending: true })).toEqual({
+      visible: false,
+      readAt: null,
+    });
   });
 
   it('taraflardan biri engellemiş → görünmez', () => {
-    expect(readReceiptDecision({ ...base, blockedEitherWay: true })).toEqual({ visible: false, readAt: null });
+    expect(readReceiptDecision({ ...base, blockedEitherWay: true })).toEqual({
+      visible: false,
+      readAt: null,
+    });
   });
 
   it('karşı taraf okundu bilgisini kapatmış → görünmez', () => {
-    expect(readReceiptDecision({ ...base, otherReadReceipts: false })).toEqual({ visible: false, readAt: null });
+    expect(readReceiptDecision({ ...base, otherReadReceipts: false })).toEqual({
+      visible: false,
+      readAt: null,
+    });
   });
 
   it('KENDİM kapatmışsam → görünmez (karşılıklılık; paylaşmayan göremez)', () => {
-    expect(readReceiptDecision({ ...base, viewerReadReceipts: false })).toEqual({ visible: false, readAt: null });
+    expect(readReceiptDecision({ ...base, viewerReadReceipts: false })).toEqual({
+      visible: false,
+      readAt: null,
+    });
   });
 
   it('iki tercih de kapalıysa → görünmez (tek maddeye bağlı kalmasın)', () => {

@@ -18,6 +18,8 @@ export interface AttachmentDto {
   contentType: string;
   size: number;
   scanStatus: ScanStatus;
+  /** M6b — yalnız ses ekinde dolu (ms); diğerlerinde null. */
+  durationMs?: number | null;
 }
 
 export interface ReplyPreviewDto {

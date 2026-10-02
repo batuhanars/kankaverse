@@ -17,6 +17,10 @@ import MessageItem from '@/components/shared/MessageItem.vue'
 import DateDivider from '@/components/shared/DateDivider.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import { ATTACHMENT_ACCEPT } from '@/utils/attachmentType'
+import VoiceMicButton from '@/components/shared/VoiceMicButton.vue'
+import VoiceRecordStrip from '@/components/shared/VoiceRecordStrip.vue'
+import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
+import { useVoiceStore } from '@/stores/voice'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import { isNewDay, dayDividerLabel } from '@/utils/dateSeparator'
 import type { MessageDto } from '@/types'
@@ -39,6 +43,14 @@ const { label: typingLabel } = useTypingLabel(() => channelId.value, t)
 
 const content = ref('')
 const sending = ref(false)
+
+// M6b — sesli mesaj kaydı. Aramadayken mikrofon arama tarafından kullanılıyor → kayıt kapalı.
+const voiceStore = useVoiceStore()
+const { state: recState, elapsedMs: recElapsed, start: startRec, cancel: cancelRec, finish: finishRec } =
+  useVoiceRecorder()
+const voiceDisabledReason = computed(() =>
+  voiceStore.connectedChannelId || voiceStore.connecting ? t('voiceMessage.inCall') : null,
+)
 const listEl = ref<HTMLElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
 const textareaEl = ref<HTMLTextAreaElement | null>(null)
@@ -304,6 +316,9 @@ async function loadMore() {
   }
 }
 
+// M6b §3: kayıt sırasında başka sohbete geçilirse kayıt iptal
+watch(channelId, () => cancelRec())
+
 // Dosya seçimi → modal aç
 function openFilePicker() {
   fileInputEl.value?.click()
@@ -344,6 +359,14 @@ async function onAttachmentSent({ attachmentId, caption }: { attachmentId: strin
         : t('common.error')
     }
   }
+}
+
+async function sendVoice() {
+  const target = channelId.value
+  const attachmentId = await finishRec()
+  // Yükleme sürerken kanal değiştiyse mesaj yanlış sohbete gitmesin.
+  if (!attachmentId || target !== channelId.value) return
+  await onAttachmentSent({ attachmentId, caption: '' })
 }
 
 async function send() {
@@ -520,6 +543,14 @@ function resetComposerHeight() {
         :class="replyingTo ? 'rounded-b-[var(--kv-radius-md)]' : 'rounded-[var(--kv-radius-md)]'"
         style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
       >
+        <VoiceRecordStrip
+          v-if="recState !== 'idle'"
+          :state="recState"
+          :elapsed-ms="recElapsed"
+          @cancel="cancelRec"
+          @send="sendVoice"
+        />
+        <template v-else>
         <!-- Gizli dosya input -->
         <input
           ref="fileInputEl"
@@ -624,6 +655,13 @@ function resetComposerHeight() {
             @select="onComposeEmojiSelect"
           />
         </div>
+        <!-- M6b: kutu boşken mikrofon -->
+        <VoiceMicButton
+          v-if="!content.trim()"
+          :disabled-reason="voiceDisabledReason"
+          @start="startRec"
+        />
+        </template>
       </div>
     </div>
   </div>

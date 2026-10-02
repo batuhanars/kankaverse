@@ -1541,6 +1541,26 @@
       "uploading": "Yükleniyor… {pct}%"
     }
   },
+  "voiceMessage": {
+    "label": "Sesli mesaj",
+    "record": "Sesli mesaj kaydet",
+    "play": "Oynat",
+    "pause": "Duraklat",
+    "seek": "Konum",
+    "cancel": "Kaydı sil",
+    "send": "Gönder",
+    "recording": "Kaydediliyor",
+    "limitReached": "5 dakikalık sınıra ulaşıldı. Göndermek ya da silmek sana kalmış.",
+    "sending": "Gönderiliyor…",
+    "inCall": "Sesli aramadayken sesli mesaj kaydedilemez, mikrofon arama tarafından kullanılıyor.",
+    "permissionDenied": "Mikrofon izni verilmedi. Sesli mesaj kaydetmek için tarayıcı ayarlarından mikrofon iznini aç.",
+    "unsupported": "Bu tarayıcı ses kaydını desteklemiyor.",
+    "recordFailed": "Kayıt başlatılamadı. Mikrofonun bağlı ve kullanılabilir olduğundan emin ol.",
+    "uploadFailed": "Sesli mesaj gönderilemedi.",
+    "errors": {
+      "DURATION_TOO_LONG": "Sesli mesaj en fazla 5 dakika olabilir."
+    }
+  },
   "legal": {
     "and": "ve",
     "consentTitle": "Kayıt olmadan önce",
@@ -1708,6 +1728,20 @@
     "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
   },
   "mobile": {
+    "voice": {
+      "record": "Sesli mesaj kaydet",
+      "cancel": "Kaydı sil",
+      "send": "Sesli mesajı gönder",
+      "recording": "Kaydediliyor",
+      "limitReached": "En fazla 5 dakika. Gönder ya da sil.",
+      "permissionDenied": "Mikrofon izni verilmedi, sesli mesaj kaydedilemiyor. İzni ayarlardan açabilirsin.",
+      "openSettings": "Ayarları aç",
+      "inCall": "Sesli aramadayken sesli mesaj kaydedilemez.",
+      "failed": "Kayıt başlatılamadı.",
+      "play": "Oynat",
+      "pause": "Duraklat",
+      "seek": "Konum"
+    },
     "attachment": {
       "viewImage": "Görseli büyüt",
       "openFile": "Dosyayı aç",

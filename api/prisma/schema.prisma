@@ -415,6 +415,7 @@ model Attachment {
   filename    String
   contentType String
   size        Int
+  durationMs  Int?       // yalnız ses ekinde dolu (sesli mesaj, M6b)
   scanStatus  ScanStatus @default(PENDING)
   createdAt   DateTime   @default(now())
 

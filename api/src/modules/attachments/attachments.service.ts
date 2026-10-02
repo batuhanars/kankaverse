@@ -38,6 +38,10 @@ const ALLOWED_CONTENT_TYPES = new Set([
   'image/webp',
   // Belge
   'application/pdf',
+  // Ses: sesli mesaj (M6b) + yüklenen ses dosyası
+  'audio/mp4',
+  'audio/webm',
+  'audio/mpeg',
   // Düz metin ailesi (md/csv/json ayrı tür, log/yml/ini text/plain'e düşer)
   'text/plain',
   'text/markdown',
@@ -54,6 +58,9 @@ const ALLOWED_CONTENT_TYPES = new Set([
  * cuid2 çakışmaz ve tahmin edilemez (rastgele). uuid de kullanılabilirdi;
  * cuid2 daha kısa ve URL dostu.
  */
+// Sesli mesaj üst sınırı: 5 dakika (M6b).
+const MAX_AUDIO_DURATION_MS = 300_000;
+
 function buildStorageKey(filename: string): string {
   const ext = filename.includes('.') ? filename.split('.').pop() : '';
   const id = randomUUID().replace(/-/g, '');
@@ -101,6 +108,15 @@ export class AttachmentsService {
       });
     }
 
+    // Süre yalnız ses ekinde anlamlı; diğer türlerde yok sayılır (kaydedilmez, sınır da uygulanmaz).
+    const isAudio = dto.contentType.startsWith('audio/');
+    if (isAudio && dto.durationMs !== undefined && dto.durationMs > MAX_AUDIO_DURATION_MS) {
+      throw new BadRequestException({
+        message: 'Sesli mesaj en fazla 5 dakika olabilir.',
+        error: 'DURATION_TOO_LONG',
+      });
+    }
+
     const storageKey = buildStorageKey(dto.filename);
 
     const attachment = await this.prisma.attachment.create({
@@ -110,6 +126,7 @@ export class AttachmentsService {
         filename: dto.filename,
         contentType: dto.contentType,
         size: dto.size,
+        durationMs: isAudio ? (dto.durationMs ?? null) : null,
         // scanStatus PENDING (default) — mesaj bağlanınca scan-gate devreye girer
       },
     });

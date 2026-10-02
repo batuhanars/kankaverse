@@ -17,7 +17,10 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { Attachment, Message, MessageReaction, Prisma, ScanStatus, User } from '@prisma/client';
 
-type AttachmentDto = Pick<Attachment, 'id' | 'filename' | 'contentType' | 'size' | 'scanStatus'>;
+type AttachmentDto = Pick<
+  Attachment,
+  'id' | 'filename' | 'contentType' | 'size' | 'scanStatus' | 'durationMs'
+>;
 
 type ReactionAggDto = { emoji: string; count: number; reactedByMe: boolean };
 
@@ -86,6 +89,7 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
       contentType: a.contentType,
       size: a.size,
       scanStatus: a.scanStatus,
+      durationMs: a.durationMs ?? null,
     })),
     reactions: reactionsAgg,
     mentions: msg.mentions ?? [],
@@ -301,7 +305,14 @@ export class MessagesService {
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
         attachments: {
-          select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+          select: {
+            id: true,
+            filename: true,
+            contentType: true,
+            size: true,
+            scanStatus: true,
+            durationMs: true,
+          },
         },
         // Reaksiyonları tek sorguda çek — N+1 yok; aggregation JS tarafında
         reactions: { select: { userId: true, emoji: true } },
@@ -476,7 +487,14 @@ export class MessagesService {
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
         attachments: {
-          select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+          select: {
+            id: true,
+            filename: true,
+            contentType: true,
+            size: true,
+            scanStatus: true,
+            durationMs: true,
+          },
         },
         reactions: { select: { userId: true, emoji: true } },
         replyTo: REPLY_TO_INCLUDE,
@@ -501,7 +519,14 @@ export class MessagesService {
       // Güncellenen attachment'ları mesaj DTO'suna yansıt
       const linkedAttachments = await this.prisma.attachment.findMany({
         where: { messageId: message.id },
-        select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+        select: {
+          id: true,
+          filename: true,
+          contentType: true,
+          size: true,
+          scanStatus: true,
+          durationMs: true,
+        },
       });
 
       return toMessageDto({ ...message, attachments: linkedAttachments, reactions: [] }, userId);
@@ -566,7 +591,14 @@ export class MessagesService {
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
         attachments: {
-          select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+          select: {
+            id: true,
+            filename: true,
+            contentType: true,
+            size: true,
+            scanStatus: true,
+            durationMs: true,
+          },
         },
         reactions: { select: { userId: true, emoji: true } },
         replyTo: REPLY_TO_INCLUDE,
@@ -829,7 +861,14 @@ export class MessagesService {
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
         attachments: {
-          select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+          select: {
+            id: true,
+            filename: true,
+            contentType: true,
+            size: true,
+            scanStatus: true,
+            durationMs: true,
+          },
         },
         reactions: { select: { userId: true, emoji: true } },
         replyTo: REPLY_TO_INCLUDE,
@@ -856,7 +895,14 @@ export class MessagesService {
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
         attachments: {
-          select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+          select: {
+            id: true,
+            filename: true,
+            contentType: true,
+            size: true,
+            scanStatus: true,
+            durationMs: true,
+          },
         },
         reactions: { select: { userId: true, emoji: true } },
         replyTo: REPLY_TO_INCLUDE,
@@ -952,7 +998,14 @@ export class MessagesService {
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
         attachments: {
-          select: { id: true, filename: true, contentType: true, size: true, scanStatus: true },
+          select: {
+            id: true,
+            filename: true,
+            contentType: true,
+            size: true,
+            scanStatus: true,
+            durationMs: true,
+          },
         },
         reactions: { select: { userId: true, emoji: true } },
         replyTo: REPLY_TO_INCLUDE,

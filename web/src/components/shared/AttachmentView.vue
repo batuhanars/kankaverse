@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { attachmentsApi } from '@/api/attachments'
 import { ScanStatus, type AttachmentDto } from '@/types'
 import ImageLightbox from './ImageLightbox.vue'
+import VoicePlayer from './VoicePlayer.vue'
 
 const props = defineProps<{
   attachment: AttachmentDto
@@ -21,6 +22,8 @@ const downloading = ref(false)
 const lightboxOpen = ref(false)
 
 const isImage = props.attachment.contentType.startsWith('image/')
+// M6b: sesli mesaj (ve yüklenen ses dosyası) → oynatıcı, dosya kartı değil
+const isAudio = props.attachment.contentType.startsWith('audio/')
 const isPdf = props.attachment.contentType === 'application/pdf'
 const isDoc =
   props.attachment.contentType === 'application/msword' ||
@@ -165,6 +168,19 @@ function formatBytes(bytes: number): string {
       @error="onImageError"
     />
   </div>
+
+  <!-- SES: CLEAN → oynatıcı; değilse görselle aynı durum kutusu -->
+  <template v-else-if="isAudio">
+    <VoicePlayer v-if="attachment.scanStatus === ScanStatus.CLEAN" :attachment="attachment" />
+    <div
+      v-else
+      class="flex items-center gap-2 mt-1.5 px-3 py-2 rounded-[var(--kv-radius-sm)] text-[13px]"
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+    >
+      <span>{{ isPending ? '⏳' : '🚫' }}</span>
+      <span>{{ isPending ? t('attachment.processing') : t('attachment.blocked') }}</span>
+    </div>
+  </template>
 
   <!-- DOSYA KARTI -->
   <div

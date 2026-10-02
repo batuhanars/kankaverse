@@ -155,7 +155,7 @@ export function MessageBubble({
           {/* Sprint M3c R2 — `interactive`: görsele dokun → tam ekran, dosyaya dokun → sistemde aç.
               CLEAN olmayan ekler dokunulamaz (bkz. `AttachmentView` prop notu). */}
           {message.attachments?.map((a) => (
-            <AttachmentView key={a.id} attachment={a} interactive />
+            <AttachmentView key={a.id} attachment={a} interactive isMine={isMine} />
           ))}
 
           <BubbleMeta message={message} isMine={isMine} receipt={receipt} />

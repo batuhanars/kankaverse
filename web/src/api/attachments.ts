@@ -9,6 +9,7 @@ export interface PresignPayload {
   filename: string
   contentType: string
   size: number
+  durationMs?: number // M6b — yalnız audio/* (1..300000)
 }
 
 export interface PresignResult {

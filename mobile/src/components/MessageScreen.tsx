@@ -425,6 +425,7 @@ export function MessageScreen({
         disabledNotice={disabledNotice}
         typingLabel={typing.label}
         bottomInset={bottomInset}
+        channelId={channelId}
       />
 
       <MessageActionHost

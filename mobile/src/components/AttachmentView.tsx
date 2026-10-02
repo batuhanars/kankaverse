@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { ImageViewer } from './ImageViewer';
+import { VoicePlayer } from './message/VoicePlayer';
 import { attachmentsApi } from '@/api/attachments';
 import { extractErrorMessage } from '@/api/errors';
 import { ScanStatus, type AttachmentDto } from '@/api/messages';
@@ -16,6 +17,7 @@ export function AttachmentView({
   size,
   interactive = false,
   onShowInChat,
+  isMine = false,
 }: {
   attachment: AttachmentDto;
   /**
@@ -42,6 +44,8 @@ export function AttachmentView({
    * ızgarası geçiyor — sohbette zaten mesajın yanındasın.
    */
   onShowInChat?: () => void;
+  /** M6b — oynatıcı rengi için: kendi baloncuğumda Kor zemin üstünde `accent400` (M6a §4). */
+  isMine?: boolean;
 }) {
   const isImage = attachment.contentType.startsWith('image/');
   const isClean = attachment.scanStatus === ScanStatus.CLEAN;
@@ -196,6 +200,12 @@ export function AttachmentView({
     );
   }
 
+  // M6b §2 — ses eki oynatıcı olarak çizilir (dosya kutusu olarak DEĞİL). CLEAN değilse oynatıcı
+  // çizilmez, aşağıdaki rozet kendi sebebini ("İşleniyor…" / "Bu içerik kaldırıldı.") yazar.
+  if (attachment.contentType.startsWith('audio/') && isClean) {
+    return <VoicePlayer attachment={attachment} isMine={isMine} />;
+  }
+
   // Görsel değil — dosya adı rozeti. CLEAN ise dokununca sistemde açılır.
   const canOpen = interactive && isClean;
   const badge = (
@@ -249,7 +259,7 @@ const styles = StyleSheet.create({
   image: {
     marginTop: 6,
     width: 220,
-    // M6a � dar ekranda (320dp) baloncu�un i� geni�li�i 220'nin alt�na inebiliyor, g�rsel ta�mas�n.
+    // M6a — dar ekranda (320dp) baloncuğun iç genişliği 220'nin altına inebiliyor, görsel taşmasın.
     maxWidth: '100%',
     height: 160,
     borderRadius: theme.radius.sm,

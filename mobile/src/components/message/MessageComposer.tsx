@@ -2,6 +2,8 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { Ionicons } from '@expo/vector-icons';
 import { MentionSuggestionList } from './MentionSuggestionList';
 import type { MentionCandidate } from './useMentionCompose';
+import { VoiceRecorderBar } from './VoiceRecorderBar';
+import type { VoicePhase } from './useVoiceRecorder';
 import type { DraftAttachment } from '@/utils/attachmentUpload';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -71,6 +73,22 @@ interface Props {
   onRemoveAttachment?: (key: string) => void;
   /** "Yükleniyor… 2/5" — boşsa şerit çizilmez. */
   uploadLabel?: string;
+  /**
+   * Sprint M6b §3 — sesli mesaj. Verilmezse mikrofon düğmesi hiç çizilmez. Mikrofon, kutu boşken ve
+   * ek yokken gönder düğmesinin YERİNDE durur; kayıt sürerken kutu `VoiceRecorderBar`a döner.
+   */
+  voice?: {
+    phase: VoicePhase;
+    elapsedMs: number;
+    /** Aramadayken true: düğme soluk, dokununca açıklama çıkar (gizlenmez). */
+    disabled: boolean;
+    /** Kısa açıklama (izin yok / aramada); boşsa çizilmez. */
+    notice: string;
+    openSettings: (() => void) | null;
+    onStart: () => void;
+    onCancel: () => void;
+    onSend: () => void;
+  };
 }
 
 export function MessageComposer({
@@ -96,6 +114,7 @@ export function MessageComposer({
   attachments,
   onRemoveAttachment,
   uploadLabel,
+  voice,
 }: Props) {
   // Sunucu ile aynı kural: en az bir ek varsa boş metinle de gönderilebilir (`EMPTY_MESSAGE`).
   const canSend = (!!value.trim() || !!attachments?.length) && !sending;
@@ -103,6 +122,9 @@ export function MessageComposer({
   // 🔴 Düzenleme modunda ek düğmesi YOK: `PATCH .../messages/:id` yalnız `content` alıyor, var olan
   // mesaja sonradan ek bağlanamıyor. Düğmeyi göstermek "ekledim ama gitmedi" hâli üretirdi.
   const showAttach = !!onOpenAttach && !editing;
+  const recording = !!voice && voice.phase !== 'idle';
+  // Mikrofon gönder düğmesinin yerinde: kutu boş, ek yok, düzenlemede değil, gönderim sürmüyor.
+  const showMic = !!voice && !canSend && !sending && !editing;
 
   return (
     <>
@@ -154,6 +176,16 @@ export function MessageComposer({
         <View style={[styles.inputBar, { paddingBottom: theme.layout.panelGap + bottomInset }]}>
           {sendError ? <Text style={styles.sendError}>{sendError}</Text> : null}
           {uploadLabel ? <Text style={styles.uploadLabel}>{uploadLabel}</Text> : null}
+          {voice?.notice ? (
+            <View style={styles.noticeRow}>
+              <Text style={styles.noticeText}>{voice.notice}</Text>
+              {voice.openSettings ? (
+                <Pressable onPress={voice.openSettings} accessibilityRole="button" hitSlop={8}>
+                  <Text style={styles.noticeLink}>{t('mobile.voice.openSettings')}</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
 
           {/* Sprint M3c §3 — gönderilmeyi bekleyen ekler. Gönderim hatasında bu şerit AYAKTA KALIR
               (seçim korunur), kullanıcı aynı seçimle tekrar deneyebilir. */}
@@ -192,6 +224,15 @@ export function MessageComposer({
             </ScrollView>
           )}
 
+          {recording && voice ? (
+            <VoiceRecorderBar
+              phase={voice.phase}
+              elapsedMs={voice.elapsedMs}
+              sending={sending}
+              onCancel={voice.onCancel}
+              onSend={voice.onSend}
+            />
+          ) : (
           <View style={styles.inputRow}>
             {showAttach && (
               <Pressable
@@ -251,7 +292,22 @@ export function MessageComposer({
                 <Ionicons name="send" size={20} color={theme.colors.accent500} />
               </Pressable>
             )}
+
+            {/* M6b §3 — mikrofon gönder düğmesinin yerinde (WhatsApp deseni). Aramadayken GİZLENMEZ,
+                soluk durur ve dokununca sebebini söyler (T&S kuralı: sessizce gizleme yok). */}
+            {showMic && voice && (
+              <Pressable
+                onPress={voice.onStart}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: voice.disabled }}
+                accessibilityLabel={t('mobile.voice.record')}
+                style={[styles.iconButton, voice.disabled && styles.iconButtonBusy]}
+              >
+                <Ionicons name="mic" size={22} color={theme.colors.textSecondary} />
+              </Pressable>
+            )}
           </View>
+          )}
         </View>
       )}
     </>
@@ -306,6 +362,23 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.xs,
     marginBottom: 6,
+  },
+  noticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 6,
+  },
+  noticeText: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+    flexShrink: 1,
+  },
+  noticeLink: {
+    color: theme.colors.accent500,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '600',
   },
   draftRow: {
     gap: 8,

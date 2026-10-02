@@ -270,6 +270,7 @@ export interface AttachmentDto {
   contentType: string
   size: number
   scanStatus: ScanStatus
+  durationMs?: number | null // M6b — yalnız ses ekinde dolu
 }
 
 export interface ReactionDto {

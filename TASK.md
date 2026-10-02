@@ -4233,3 +4233,17 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Emülatör turu (sahip + PM) — emülatör belleği yetmedi, doğrudan cihazda yapıldı
 - [x] Cihaz turu (sahip) — 2026-10-02 onaylandı. Açık öneri: kısa mesajda saati metnin yanına almak (sahip yanıtlamadı)
 
+---
+
+## Sprint M6b — Sesli mesaj — 2026-10-02
+
+> Sözleşme: `contracts/SPRINT_M6B_VOICE_MESSAGES_CONTRACT.md`. Sıra: api → mobile + web (paralel).
+
+- [ ] §1.1 `Attachment.durationMs` + migration (yerelde uygulandı)
+- [x] §1.2 presign: ses türleri + `durationMs` + 5 dk sınırı
+- [x] §1.3 ek-yalnız önizleme metni (DM push + DM listesi)
+- [x] §1.4 api testleri
+- [x] §4 mobil kayıt + oynatıcı
+- [x] §5 web kayıt + oynatıcı
+- [ ] §6 tip/lint/build temiz (üç tier)
+- [ ] Cihaz/tarayıcı turu (sahip + PM)

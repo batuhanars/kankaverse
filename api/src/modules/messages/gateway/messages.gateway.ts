@@ -1,3 +1,4 @@
+import { previewFromAttachments } from '../../../common/utils/attachment-preview.util';
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -688,10 +689,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       return;
     }
 
+    // Ek-yalnız mesajda gövde eklerden üretilir (ses/görsel/dosya); ek de yoksa eski '[dosya]'.
+    const rawContent = typeof messageDto['content'] === 'string' ? messageDto['content'] : '';
     const content =
-      typeof messageDto['content'] === 'string' && messageDto['content'].trim().length > 0
-        ? messageDto['content']
-        : '[dosya]';
+      previewFromAttachments(
+        rawContent,
+        messageDto['attachments'] as { contentType: string }[] | undefined,
+      ) || '[dosya]';
 
     const payload = {
       channelId,

@@ -18,6 +18,9 @@ import { formatMentionsPlain } from '@/utils/mentions'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import { ATTACHMENT_ACCEPT } from '@/utils/attachmentType'
+import VoiceMicButton from '@/components/shared/VoiceMicButton.vue'
+import VoiceRecordStrip from '@/components/shared/VoiceRecordStrip.vue'
+import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import ReportModal from '@/components/shared/ReportModal.vue'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import MessageRow from '@/components/shared/MessageRow.vue'
@@ -200,7 +203,10 @@ async function addFriendInDm() {
 }
 
 // Kanal değişince ekle-durumunu sıfırla (yeni DM açılınca buton tekrar değerlendirilsin)
-watch(() => props.channel.id, () => { addFriendSent.value = false })
+watch(() => props.channel.id, () => {
+  addFriendSent.value = false
+  cancelRec() // M6b §3: kayıt sırasında başka sohbete geçilirse iptal
+})
 
 // Grup adı: verilen ad yoksa üye adlarından üretilir
 const groupDisplayName = computed(() => {
@@ -215,6 +221,13 @@ const groupDisplayName = computed(() => {
 const content = ref('')
 const sending = ref(false)
 const sendError = ref('')
+
+// M6b — sesli mesaj kaydı. Aramadayken mikrofon arama tarafından kullanılıyor → kayıt kapalı.
+const { state: recState, elapsedMs: recElapsed, start: startRec, cancel: cancelRec, finish: finishRec } =
+  useVoiceRecorder()
+const voiceDisabledReason = computed(() =>
+  voiceStore.connectedChannelId || voiceStore.connecting ? t('voiceMessage.inCall') : null,
+)
 const listEl = ref<HTMLElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
 const realtimeError = ref(false)
@@ -462,6 +475,14 @@ async function onAttachmentSent({ attachmentId, caption }: { attachmentId: strin
   } catch {
     // hata sessizce yutulur — modal zaten kapandı
   }
+}
+
+async function sendVoice() {
+  const target = props.channel.id
+  const attachmentId = await finishRec()
+  // Yükleme sürerken sohbet değiştiyse mesaj yanlış sohbete gitmesin.
+  if (!attachmentId || target !== props.channel.id) return
+  await onAttachmentSent({ attachmentId, caption: '' })
 }
 
 async function send() {
@@ -1121,6 +1142,14 @@ const dayLabels = computed<(string | null)[]>(() =>
             :class="replyingTo ? 'rounded-b-[var(--kv-radius-md)]' : 'rounded-[var(--kv-radius-md)]'"
             style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
           >
+            <VoiceRecordStrip
+              v-if="recState !== 'idle'"
+              :state="recState"
+              :elapsed-ms="recElapsed"
+              @cancel="cancelRec"
+              @send="sendVoice"
+            />
+            <template v-else>
             <button
               type="button"
               class="shrink-0 w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
@@ -1193,6 +1222,13 @@ const dayLabels = computed<(string | null)[]>(() =>
                 @select="onDmComposeEmojiSelect"
               />
             </div>
+            <!-- M6b: kutu boşken mikrofon -->
+            <VoiceMicButton
+              v-if="!content.trim()"
+              :disabled-reason="voiceDisabledReason"
+              @start="startRec"
+            />
+            </template>
           </div>
         </div>
       </div>
