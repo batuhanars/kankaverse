@@ -337,6 +337,8 @@ export default function DmScreen() {
         jumpToMessageId={params.jumpTo}
         markRead={dmApi.markRead}
         receiptFor={receiptFor}
+        // M6a §2 — 1-1 DM'de avatar/ad yok (karşıdaki tek kişi belli); grup DM'de var.
+        showIdentity={isGroupDm}
         typingMode="simple"
         disabledNotice={disabledNotice}
         // M4a-1 sözleşme §3.1/§4 — telefon düğmesi + "sesli arama sürüyor" şeridi. M4b'den beri

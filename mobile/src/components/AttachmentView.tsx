@@ -249,6 +249,8 @@ const styles = StyleSheet.create({
   image: {
     marginTop: 6,
     width: 220,
+    // M6a — dar ekranda (320dp) baloncuðun iç geniþliði 220'nin altýna inebiliyor, görsel taþmasýn.
+    maxWidth: '100%',
     height: 160,
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.bgElevated,

@@ -91,6 +91,8 @@ interface Props {
    * Roller bölümünü hiç çizmez. Yeni istek/uç değil, mevcut ucun parametresi.
    */
   guildId?: string;
+  /** M6a §2 — baloncukta avatar + yazar adı gösterilsin mi. Varsayılan AÇIK; 1-1 DM `false` verir. */
+  showIdentity?: boolean;
 }
 
 // Sprint M1a — kanal VE DM mesaj ekranı için TEK gövde (contract §5 ekran 3: "aynısı"). İkisi de
@@ -106,6 +108,7 @@ export function MessageScreen({
   headerActions,
   topBanner,
   searchable = true,
+  showIdentity = true,
   jumpToMessageId,
   canPin = false,
   onOpenPins,
@@ -386,6 +389,7 @@ export function MessageScreen({
               <MessageBubble
                 message={item.message}
                 showAuthor={item.showAuthor}
+                showIdentity={showIdentity}
                 isMine={item.message.author.id === authUser?.id}
                 receipt={receiptFor?.(item.message) ?? null}
                 resolveMention={(id) => resolveUsername(channelId, id)}

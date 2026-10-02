@@ -21,6 +21,9 @@ export const colors = {
   accent500: '#FF6B3D',
   accent600: '#E5552A',
   accentSubtle: 'rgba(255, 107, 61, 0.12)',
+  // Sprint M6a §1 — kendi mesaj baloncuğu zemini. Kaynak: kankaverse-design-tokens.md `bubble-own`
+  // ("yalnız mobil"; web'de karşılığı yok, M6a ile eklendi).
+  bubbleOwn: '#4A2C22',
   // semantik
   danger: '#F23B4B',
   dangerSubtle: 'rgba(242, 59, 75, 0.12)',

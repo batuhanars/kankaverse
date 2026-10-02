@@ -4216,3 +4216,20 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
   şey var", kaç tane olduğu değil. Sayıyı merak eden zaten sohbete giriyor.
 - Banner, kullanıcı O DM'in sohbet ekranındayken ÇIKMAZ (okuduğu mesaj için bildirim almasın);
   arama ekranındayken çıkar, çünkü sohbet görünmüyor.
+
+---
+
+## Sprint M6a — Mobil sohbet baloncukları — 2026-10-02
+
+> Sözleşme: `contracts/SPRINT_M6A_MOBILE_CHAT_BUBBLES_CONTRACT.md`. Yalnız `mobile/`, saf JS.
+> Sıra (sahip onayı 2026-10-02): M6a baloncuk → M6b sesli mesaj → M6c video.
+
+- [x] §1 `bubbleOwn` token
+- [x] §2 sağlı sollu düzen + `showIdentity` prop (1-1 DM false, grup DM/kanal true)
+- [x] §3 baloncuk içi sıra + meta satırı + tepkiler dışarıda
+- [x] §4 kendi baloncuğumda Kor çakışmaları
+- [x] §5 regresyon listesi korunuyor
+- [x] §6 typecheck + lint temiz
+- [x] Emülatör turu (sahip + PM) — emülatör belleği yetmedi, doğrudan cihazda yapıldı
+- [x] Cihaz turu (sahip) — 2026-10-02 onaylandı. Açık öneri: kısa mesajda saati metnin yanına almak (sahip yanıtlamadı)
+
