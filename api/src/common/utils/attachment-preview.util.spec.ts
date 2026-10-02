@@ -11,6 +11,15 @@ describe('previewFromAttachments', () => {
     ).toBe('🎤 Sesli mesaj');
   });
 
+  it('boş içerik + video → 🎥 Video (görselden önce, sesten sonra)', () => {
+    expect(
+      previewFromAttachments('', [{ contentType: 'image/png' }, { contentType: 'video/mp4' }]),
+    ).toBe('🎥 Video');
+    expect(
+      previewFromAttachments('', [{ contentType: 'video/mp4' }, { contentType: 'audio/mp4' }]),
+    ).toBe('🎤 Sesli mesaj');
+  });
+
   it('boş içerik + görsel → 📷 Görsel', () => {
     expect(previewFromAttachments('', [{ contentType: 'image/jpeg' }])).toBe('📷 Görsel');
   });

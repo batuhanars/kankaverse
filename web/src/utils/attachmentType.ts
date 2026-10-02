@@ -30,6 +30,8 @@ const ALLOWED = new Set([
   'application/zip',
   'application/vnd.rar',
   'application/x-7z-compressed',
+  'video/mp4',
+  'video/webm',
 ])
 
 /** Uzantı → kanonik tür. log/yml/yaml/ini düz metin, ayrı bir türe ihtiyaçları yok. */
@@ -51,6 +53,8 @@ const BY_EXTENSION: Record<string, string> = {
   zip: 'application/zip',
   rar: 'application/vnd.rar',
   '7z': 'application/x-7z-compressed',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
 }
 
 /** Dosya seçicide gösterilecek `accept` değeri: türler + uzantılar (boş `File.type` yüzünden ikisi de). */

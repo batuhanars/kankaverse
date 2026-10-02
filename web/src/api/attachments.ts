@@ -11,6 +11,10 @@ export interface PresignPayload {
   size: number
   durationMs?: number // M6b — yalnız audio/* (1..300000)
   waveform?: string // M6b §7 — base64, 64 bayt, yalnız audio/*
+  // M6c — yalnız video/*
+  thumbnail?: string // base64 JPEG (data: öneksiz, ≤ 40000)
+  width?: number
+  height?: number
 }
 
 export interface PresignResult {

@@ -1,3 +1,4 @@
+import { MAX_VIDEO_MS } from '@/utils/videoPrepare';
 import {
   MAX_ATTACHMENT_BYTES,
   readFileSize,
@@ -25,9 +26,36 @@ export interface PickedFile {
   contentType?: string | null;
   /** Seçici boyutu biliyorsa (ImagePicker biliyor, MediaLibrary bilmiyor) tekrar okunmaz. */
   size?: number | null;
+  /** M6c — video seçimi. Süre/boyut seçiciden gelir (süre ms; MediaLibrary saniye verir, çağıran çevirir). */
+  isVideo?: boolean;
+  durationMs?: number | null;
+  width?: number | null;
+  height?: number | null;
 }
 
 export async function buildDraftAttachment(file: PickedFile): Promise<DraftResult> {
+  // M6c §3.2-§3.3 — video: 60 sn üstü seçilmez; tür/boyut kontrolü SIKIŞTIRMADAN SONRA (orijinal
+  // büyük olabilir, 25 MB sınırı sonuca uygulanır). Orijinal adı ne olursa olsun çıktı mp4.
+  if (file.isVideo) {
+    if (file.durationMs && file.durationMs > MAX_VIDEO_MS) {
+      return { ok: false, errorKey: 'mobile.video.tooLong' };
+    }
+    counter += 1;
+    return {
+      ok: true,
+      draft: {
+        key: `draft-${Date.now()}-${counter}`,
+        uri: file.uri,
+        filename: `video-${Date.now()}.mp4`,
+        contentType: 'video/mp4',
+        size: file.size && file.size > 0 ? file.size : 0,
+        isVideo: true,
+        durationMs: file.durationMs && file.durationMs > 0 ? Math.round(file.durationMs) : undefined,
+        width: file.width ?? undefined,
+        height: file.height ?? undefined,
+      },
+    };
+  }
   const filename = file.filename?.trim() || 'dosya';
   const contentType = resolveContentType(filename, file.contentType);
   if (!contentType) {

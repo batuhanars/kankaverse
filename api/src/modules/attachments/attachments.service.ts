@@ -42,6 +42,9 @@ const ALLOWED_CONTENT_TYPES = new Set([
   'audio/mp4',
   'audio/webm',
   'audio/mpeg',
+  // Video (M6c): quicktime/mov BİLEREK yok (Chrome HEVC .mov oynatamaz; mobil sıkıştırıcı mp4 üretir)
+  'video/mp4',
+  'video/webm',
   // Düz metin ailesi (md/csv/json ayrı tür, log/yml/ini text/plain'e düşer)
   'text/plain',
   'text/markdown',
@@ -60,8 +63,21 @@ const ALLOWED_CONTENT_TYPES = new Set([
  */
 // Sesli mesaj üst sınırı: 5 dakika (M6b).
 const MAX_AUDIO_DURATION_MS = 300_000;
+// Video üst sınırı: 60 saniye (M6c).
+const MAX_VIDEO_DURATION_MS = 60_000;
 // Dalga formu: 64 örnek, her biri 1 bayt (0-255).
 const WAVEFORM_SAMPLES = 64;
+
+function isValidThumbnail(b64: string): boolean {
+  const buf = Buffer.from(b64, 'base64');
+  // Bozuk base64'ü yakalamak için yeniden kodla (dolgu farkını yok say) + JPEG imzası (FF D8).
+  return (
+    buf.length >= 2 &&
+    buf[0] === 0xff &&
+    buf[1] === 0xd8 &&
+    buf.toString('base64').replace(/=+$/, '') === b64.replace(/=+$/, '')
+  );
+}
 
 function isValidWaveform(b64: string): boolean {
   // Buffer.from base64'te bozuk girdiyi sessizce atlar; yeniden kodlayıp karşılaştırarak yakalarız.
@@ -116,12 +132,27 @@ export class AttachmentsService {
       });
     }
 
-    // Süre yalnız ses ekinde anlamlı; diğer türlerde yok sayılır (kaydedilmez, sınır da uygulanmaz).
+    // Süre yalnız ses/video ekinde anlamlı; diğer türlerde yok sayılır (kaydedilmez, sınır da uygulanmaz).
     const isAudio = dto.contentType.startsWith('audio/');
+    const isVideo = dto.contentType.startsWith('video/');
     if (isAudio && dto.durationMs !== undefined && dto.durationMs > MAX_AUDIO_DURATION_MS) {
       throw new BadRequestException({
         message: 'Sesli mesaj en fazla 5 dakika olabilir.',
         error: 'DURATION_TOO_LONG',
+      });
+    }
+
+    if (isVideo && dto.durationMs !== undefined && dto.durationMs > MAX_VIDEO_DURATION_MS) {
+      throw new BadRequestException({
+        message: 'Video en fazla 60 saniye olabilir.',
+        error: 'VIDEO_TOO_LONG',
+      });
+    }
+
+    if (isVideo && dto.thumbnail !== undefined && !isValidThumbnail(dto.thumbnail)) {
+      throw new BadRequestException({
+        message: 'Video küçük resmi geçersiz.',
+        error: 'INVALID_THUMBNAIL',
       });
     }
 
@@ -141,8 +172,11 @@ export class AttachmentsService {
         filename: dto.filename,
         contentType: dto.contentType,
         size: dto.size,
-        durationMs: isAudio ? (dto.durationMs ?? null) : null,
+        durationMs: isAudio || isVideo ? (dto.durationMs ?? null) : null,
         waveform: isAudio ? (dto.waveform ?? null) : null,
+        thumbnail: isVideo ? (dto.thumbnail ?? null) : null,
+        width: isVideo ? (dto.width ?? null) : null,
+        height: isVideo ? (dto.height ?? null) : null,
         // scanStatus PENDING (default) — mesaj bağlanınca scan-gate devreye girer
       },
     });

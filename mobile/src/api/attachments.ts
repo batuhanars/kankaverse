@@ -16,6 +16,10 @@ export interface PresignAttachmentPayload {
   durationMs?: number;
   /** M6b §7 — 64 baytlık dalga, base64 (88 karakter). */
   waveform?: string;
+  /** M6c — yalnız videoda: base64 JPEG küçük resim + boyutlar. */
+  thumbnail?: string;
+  width?: number;
+  height?: number;
 }
 
 /** Presign yanıtı (`attachments.service.ts` `presign` dönüşü birebir). */

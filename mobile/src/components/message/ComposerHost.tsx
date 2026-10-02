@@ -109,6 +109,7 @@ export function ComposerHost({
           visible
           onClose={() => setAttachOpen(false)}
           existingCount={composer.attachments.length}
+          existingVideoCount={composer.attachments.filter((a) => a.isVideo).length}
           onConfirm={(drafts) => {
             setAttachOpen(false);
             void composer.onSend(drafts);

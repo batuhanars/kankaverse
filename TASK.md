@@ -4245,10 +4245,26 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] §1.4 api testleri
 - [x] §4 mobil kayıt + oynatıcı
 - [x] §5 web kayıt + oynatıcı
-- [ ] §6 tip/lint/build temiz (üç tier)
-- [ ] Cihaz/tarayıcı turu (sahip + PM) — 1. tur 2026-10-02: kayıt çalışıyor; oynatıcı tasarımı revize (§7), e-posta uyarı metni yanlış (§7.5)
+- [x] §6 tip/lint/build temiz (üç tier)
+- [x] Cihaz/tarayıcı turu (sahip + PM) — 3 tur, 2026-10-02 onaylandı. 1. tur 2026-10-02: kayıt çalışıyor; oynatıcı tasarımı revize (§7), e-posta uyarı metni yanlış (§7.5)
 - [x] §7.1 api `waveform`
 - [x] §7.2-§7.5 mobil
 - [x] §7.2-§7.5 web
 - [x] §8 mobil: bitince dur, tek ses, otomatik geçiş (2. cihaz turu bulguları)
 - [x] §8 web: kayıt kaldırıldı + aynı oynatma kuralları
+
+---
+
+## Sprint M6c — Video gönderme — 2026-10-02
+
+> Sözleşme: `contracts/SPRINT_M6C_VIDEO_MESSAGES_CONTRACT.md`. api → mobile + web. Mobilde yeni native
+> paket: yeni dev build şart. Mağaza sürümü bu sprint sonunda (M6a + M6b mobil ile birlikte).
+
+- [x] §1 api: video türleri, thumbnail/width/height, 60 sn sınırı, önizleme, testler
+- [x] §3.1 mobil paketler + uyumluluk teyidi
+- [x] §3.2-§3.4 mobil seçme, sıkıştırma, kart, oynatıcı
+- [x] §3.5 yerel prebuild + assembleDebug
+- [x] §4 web yükleme, kart, oynatma
+- [ ] §5 tip/lint/build temiz
+- [ ] Cihaz turu (sahip + PM)
+- [ ] Mağaza sürümü (versionCode + release paketi canlıya karşı cihazda denendi)

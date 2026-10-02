@@ -19,6 +19,8 @@ import type * as MediaLibrary from 'expo-media-library';
 import { useMediaLibrary } from './useMediaLibrary';
 import { buildDraftAttachment, type PickedFile } from './attachmentDraft';
 import { sheetBottomPadding } from '../home/sheetInsets';
+import { formatClock } from '@/utils/formatClock';
+import { MAX_VIDEO_MS } from '@/utils/videoPrepare';
 import {
   ALLOWED_ATTACHMENT_TYPES,
   MAX_ATTACHMENTS_PER_MESSAGE,
@@ -41,6 +43,8 @@ interface Props {
   onClose: () => void;
   /** Kutuda ZATEN bekleyen ek sayısı — 10 sınırı toplam üzerinden uygulanır (sunucu da öyle). */
   existingCount: number;
+  /** M6c — kutuda ZATEN bekleyen video sayısı (bir mesajda en fazla 1 video). */
+  existingVideoCount?: number;
   /** Seçim onaylandı: ekler kutuya eklenir ve mesaj gönderilir (sözleşme §1 "gönder düğmesi"). */
   onConfirm: (drafts: DraftAttachment[]) => void;
 }
@@ -58,7 +62,7 @@ interface Props {
  * kök ağaçta `GestureHandlerRootView` yok ve `Modal` Android'de ayrı bir pencerede çiziliyor —
  * gesture-handler o pencerede ayrıca sarmalanmadan çalışmıyor. Çekirdek çözüm bu riski taşımıyor.
  */
-export function AttachmentSheet({ visible, onClose, existingCount, onConfirm }: Props) {
+export function AttachmentSheet({ visible, onClose, existingCount, existingVideoCount = 0, onConfirm }: Props) {
   const { width, height } = useWindowDimensions();
   // Alt pay `sheetInsets` hesabından (gezinme çubuğu dersi orada yazılı); ÜST pay yalnız tam
   // ekranda gerekir: SDK 54 edge-to-edge ile panel durum çubuğunun altına da çiziliyor.
@@ -102,6 +106,17 @@ export function AttachmentSheet({ visible, onClose, existingCount, onConfirm }: 
       setError(t('mobile.attach.limit', { count: MAX_ATTACHMENTS_PER_MESSAGE }));
       return;
     }
+    // M6c §3.2 — video: 60 sn üstü seçilmez, bir mesajda en fazla 1 video. Kırpma YOK.
+    if (asset.mediaType === 'video') {
+      if (asset.duration * 1000 > MAX_VIDEO_MS) {
+        setError(t('mobile.video.tooLong'));
+        return;
+      }
+      if (existingVideoCount + selected.filter((a) => a.mediaType === 'video').length >= 1) {
+        setError(t('mobile.video.oneOnly'));
+        return;
+      }
+    }
     setSelected((prev) => [...prev, asset]);
   }
 
@@ -122,6 +137,10 @@ export function AttachmentSheet({ visible, onClose, existingCount, onConfirm }: 
         setError(t('mobile.attach.limit', { count: MAX_ATTACHMENTS_PER_MESSAGE }));
         return;
       }
+      if (existingVideoCount + files.filter((f) => f.isVideo).length > 1) {
+        setError(t('mobile.video.oneOnly'));
+        return;
+      }
       setBusy(true);
       try {
         const results = await Promise.all(files.map(buildDraftAttachment));
@@ -138,7 +157,7 @@ export function AttachmentSheet({ visible, onClose, existingCount, onConfirm }: 
         setBusy(false);
       }
     },
-    [onConfirm, existingCount],
+    [onConfirm, existingCount, existingVideoCount],
   );
 
   /**
@@ -149,7 +168,7 @@ export function AttachmentSheet({ visible, onClose, existingCount, onConfirm }: 
   async function openSystemPicker() {
     setError('');
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ['images', 'videos'],
       allowsMultipleSelection: true,
       selectionLimit: Math.max(remaining, 1),
       quality: 0.9,
@@ -161,6 +180,11 @@ export function AttachmentSheet({ visible, onClose, existingCount, onConfirm }: 
         filename: a.fileName,
         contentType: a.mimeType,
         size: a.fileSize,
+        // M6c — ImagePicker video süresini ms verir.
+        isVideo: a.type === 'video',
+        durationMs: a.type === 'video' ? a.duration : null,
+        width: a.width,
+        height: a.height,
       })),
     );
   }
@@ -213,7 +237,17 @@ export function AttachmentSheet({ visible, onClose, existingCount, onConfirm }: 
 
   /** `selected` seçim SIRASINI taşıyor (rozetteki numara da ondan) — sıra korunarak gönderilir. */
   async function sendSelected() {
-    await confirmFiles(selected.map((a) => ({ uri: a.uri, filename: a.filename })));
+    await confirmFiles(
+      selected.map((a) => ({
+        uri: a.uri,
+        filename: a.filename,
+        isVideo: a.mediaType === 'video',
+        // MediaLibrary süreyi SANİYE verir.
+        durationMs: a.mediaType === 'video' ? a.duration * 1000 : null,
+        width: a.width,
+        height: a.height,
+      })),
+    );
   }
 
   const cells = useMemo<Cell[]>(
@@ -393,6 +427,12 @@ export function AttachmentSheet({ visible, onClose, existingCount, onConfirm }: 
                     style={{ width: cellSize, height: cellSize }}
                   >
                     <Image source={{ uri: item.asset.uri }} style={styles.cellImage} resizeMode="cover" />
+                    {item.asset.mediaType === 'video' && (
+                      <View style={styles.cellDuration}>
+                        <Ionicons name="videocam" size={11} color={theme.colors.textPrimary} />
+                        <Text style={styles.cellDurationText}>{formatClock(item.asset.duration * 1000)}</Text>
+                      </View>
+                    )}
                     {index >= 0 && (
                       <View style={styles.selectedOverlay}>
                         <View style={styles.selectedBadge}>
@@ -562,6 +602,24 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: theme.colors.bgElevated,
+  },
+  // M6c — video karesinde sağ altta süre (WhatsApp/Discord ızgarası gibi).
+  cellDuration: {
+    position: 'absolute',
+    right: 4,
+    bottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: theme.radius.sm,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  cellDurationText: {
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '600',
   },
   selectedOverlay: {
     ...StyleSheet.absoluteFillObject,

@@ -18,6 +18,8 @@ interface VoicePlaybackState {
   /** Ekrandaki sohbetin kronolojik (eski → yeni) CLEAN ses eki id'leri. */
   queue: string[];
   claim: (id: string) => void;
+  /** Hiçbir ses çalmasın (örn. video açıldı): oynatıcılar `currentId` değişince kendini duraklatır. */
+  stopAll: () => void;
   clearAutoplay: () => void;
   setQueue: (ids: string[]) => void;
   /** Biten ek sonuna kadar çaldı: sıradaki varsa ona geç, yoksa dur. */
@@ -29,6 +31,7 @@ export const useVoicePlaybackStore = create<VoicePlaybackState>((set, get) => ({
   autoplayId: null,
   queue: [],
   claim: (id) => set({ currentId: id, autoplayId: null }),
+  stopAll: () => set({ currentId: null, autoplayId: null }),
   clearAutoplay: () => set({ autoplayId: null }),
   setQueue: (ids) => {
     const prev = get().queue;

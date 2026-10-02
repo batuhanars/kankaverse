@@ -6,6 +6,7 @@ import {
   uploadDraftAttachment,
   type DraftAttachment,
 } from '@/utils/attachmentUpload';
+import { prepareVideoDraft, VideoPrepareError } from '@/utils/videoPrepare';
 import { useMessagesStore } from '@/stores/messages';
 import { t } from '@/i18n';
 
@@ -103,6 +104,14 @@ export function useMessageComposer(
     for (let i = 0; i < drafts.length; i += 1) {
       if (drafts[i].uploadedId) continue;
       setUploadLabel(t('mobile.attach.uploading', { done: i + 1, total: drafts.length }));
+      // M6c §3.3 — video önce telefonda sıkıştırılır (yüzde etiketi), sonra yüklenir. Sonuç taslağa
+      // yazılır: hata sonrası tekrar denemede yeniden sıkıştırılmaz.
+      if (drafts[i].isVideo && !drafts[i].prepared) {
+        drafts[i] = await prepareVideoDraft(drafts[i], (pct) =>
+          setUploadLabel(t('mobile.video.preparing', { pct })),
+        );
+        setUploadLabel(t('mobile.attach.uploading', { done: i + 1, total: drafts.length }));
+      }
       // Hata FIRLARSA dizi o ana kadarki ilerlemeyi taşır (çağıran yakalayıp state'e yazar).
       drafts[i] = { ...drafts[i], uploadedId: await uploadDraftAttachment(drafts[i]) };
     }
@@ -152,12 +161,16 @@ export function useMessageComposer(
       // tekrar denemede yeniden yüklenmesinler.
       // M6b §7.5 — başarısız SESLİ MESAJ taslağı şeride "dosya çipi" olarak düşmez, atılır (yeniden
       // kaydedilir); hata mesajı yine gösterilir.
-      const keep = drafts.filter((d) => !d.isVoice);
+      // Hazırlanamayan/25 MB'ı aşan video da atılır (tekrar denemek aynı sonucu verir).
+      const prepareFailed = e instanceof VideoPrepareError;
+      const keep = drafts.filter((d) => !d.isVoice && !(prepareFailed && d.isVideo && !d.prepared));
       if (drafts.length) setAttachments(keep);
       // Depolamaya PUT hatasının envelope'ı yok → ham durum kodu ekrana basılmaz, ne olduğu yazılır.
       // Ek yüklemede doğrulanmamış e-posta için bağlama uygun metin (genel metin "Ortam oluşturmak…" diyor).
       setSendError(
-        isStorageUploadError(e)
+        e instanceof VideoPrepareError
+          ? t(e.key)
+          : isStorageUploadError(e)
           ? t('mobile.attach.uploadFailed')
           : drafts.length && extractErrorCode(e) === 'EMAIL_NOT_VERIFIED'
             ? t('voiceMessage.errors.EMAIL_NOT_VERIFIED')

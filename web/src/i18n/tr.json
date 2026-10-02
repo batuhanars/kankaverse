@@ -1541,6 +1541,16 @@
       "uploading": "Yükleniyor… {pct}%"
     }
   },
+  "video": {
+    "play": "Videoyu oynat",
+    "tooLong": "Video en fazla 60 saniye olabilir.",
+    "tooLarge": "Video çok büyük (en fazla 25 MB).",
+    "unreadable": "Bu video okunamadı. MP4 ya da WebM dene.",
+    "errors": {
+      "VIDEO_TOO_LONG": "Video en fazla 60 saniye olabilir.",
+      "INVALID_THUMBNAIL": "Video önizlemesi oluşturulamadı."
+    }
+  },
   "voiceMessage": {
     "label": "Sesli mesaj",
     "play": "Oynat",
@@ -1718,6 +1728,15 @@
     "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
   },
   "mobile": {
+    "video": {
+      "preparing": "Video hazırlanıyor %{pct}",
+      "tooLong": "Video en fazla 60 saniye olabilir.",
+      "oneOnly": "Bir mesaja en fazla 1 video ekleyebilirsin.",
+      "tooLarge": "Video sıkıştırıldıktan sonra bile 25 MB'ı aşıyor, gönderilemez.",
+      "prepareFailed": "Video hazırlanamadı.",
+      "play": "Videoyu oynat",
+      "viewer": "Video oynatıcı"
+    },
     "voice": {
       "record": "Sesli mesaj kaydet",
       "cancel": "Kaydı sil",

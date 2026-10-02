@@ -86,7 +86,9 @@
       "./plugins/withReleaseSigning",
       "./plugins/withGradleMemory",
       "./plugins/withoutMediaPlaybackService",
-      "expo-audio"
+      "expo-audio",
+      "expo-video",
+      "react-native-compressor"
     ],
     "experiments": {
       "typedRoutes": true,

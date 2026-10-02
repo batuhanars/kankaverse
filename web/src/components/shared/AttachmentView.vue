@@ -8,6 +8,7 @@ import { attachmentsApi } from '@/api/attachments'
 import { ScanStatus, type AttachmentDto } from '@/types'
 import ImageLightbox from './ImageLightbox.vue'
 import VoicePlayer from './VoicePlayer.vue'
+import VideoCard from './VideoCard.vue'
 
 const props = defineProps<{
   attachment: AttachmentDto
@@ -24,6 +25,8 @@ const lightboxOpen = ref(false)
 const isImage = props.attachment.contentType.startsWith('image/')
 // M6b: sesli mesaj (ve yüklenen ses dosyası) → oynatıcı, dosya kartı değil
 const isAudio = props.attachment.contentType.startsWith('audio/')
+// M6c: video → küçük resim kartı
+const isVideo = props.attachment.contentType.startsWith('video/')
 const isPdf = props.attachment.contentType === 'application/pdf'
 const isDoc =
   props.attachment.contentType === 'application/msword' ||
@@ -172,6 +175,19 @@ function formatBytes(bytes: number): string {
   <!-- SES: CLEAN → oynatıcı; değilse görselle aynı durum kutusu -->
   <template v-else-if="isAudio">
     <VoicePlayer v-if="attachment.scanStatus === ScanStatus.CLEAN" :attachment="attachment" />
+    <div
+      v-else
+      class="flex items-center gap-2 mt-1.5 px-3 py-2 rounded-[var(--kv-radius-sm)] text-[13px]"
+      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+    >
+      <span>{{ isPending ? '⏳' : '🚫' }}</span>
+      <span>{{ isPending ? t('attachment.processing') : t('attachment.blocked') }}</span>
+    </div>
+  </template>
+
+  <!-- VIDEO: CLEAN → kart; değilse görselle aynı durum kutusu -->
+  <template v-else-if="isVideo">
+    <VideoCard v-if="attachment.scanStatus === ScanStatus.CLEAN" :attachment="attachment" />
     <div
       v-else
       class="flex items-center gap-2 mt-1.5 px-3 py-2 rounded-[var(--kv-radius-sm)] text-[13px]"

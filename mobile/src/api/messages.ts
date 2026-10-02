@@ -22,6 +22,10 @@ export interface AttachmentDto {
   durationMs?: number | null;
   /** M6b §7 — 64 örnek (0-255), base64; yalnız ses ekinde, eski mesajlarda null. */
   waveform?: string | null;
+  /** M6c — yalnız video ekinde: küçük resim (base64 JPEG) ve boyutlar; diğerlerinde null. */
+  thumbnail?: string | null;
+  width?: number | null;
+  height?: number | null;
 }
 
 export interface ReplyPreviewDto {

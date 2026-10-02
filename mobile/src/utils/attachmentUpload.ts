@@ -63,6 +63,16 @@ export interface DraftAttachment {
   /** Sesli mesaj taslağı: başarısız gönderimde ek şeridine DÜŞMEZ, atılır (M6b §7.5). */
   isVoice?: boolean;
   /**
+   * M6c — video taslağı. `prepared` false iken `uri` ORİJİNAL video: gönderim hattı önce sıkıştırır
+   * ve küçük resmi üretir (`utils/videoPrepare.ts`), sonra yükler. Hazırlanan sonuç taslağa yazılır,
+   * böylece hata sonrası yeniden denemede tekrar sıkıştırılmaz.
+   */
+  isVideo?: boolean;
+  prepared?: boolean;
+  thumbnail?: string;
+  width?: number;
+  height?: number;
+  /**
    * 🔴 Yüklenmiş ekin sunucudaki kimliği. Kısmi başarısızlıkta DOLU kalır: kullanıcı tekrar
    * denediğinde başarılı olanlar YENİDEN yüklenmez (aynı dosyayı ikinci kez yüklemek hem veri
    * yakar hem sunucuda sahipsiz kayıt biriktirir).
@@ -133,6 +143,8 @@ export async function uploadDraftAttachment(draft: DraftAttachment): Promise<str
     size: draft.size,
     ...(draft.durationMs ? { durationMs: draft.durationMs } : {}),
     ...(draft.waveform ? { waveform: draft.waveform } : {}),
+    ...(draft.thumbnail ? { thumbnail: draft.thumbnail } : {}),
+    ...(draft.width && draft.height ? { width: draft.width, height: draft.height } : {}),
   });
 
   const res = await FileSystem.uploadAsync(presign.uploadUrl, draft.uri, {

@@ -272,6 +272,10 @@ export interface AttachmentDto {
   scanStatus: ScanStatus
   durationMs?: number | null // M6b — yalnız ses ekinde dolu
   waveform?: string | null // M6b §7 — base64, 64 bayt; yalnız ses ekinde
+  // M6c — yalnız video ekinde
+  thumbnail?: string | null // base64 JPEG, `data:` öneksiz
+  width?: number | null
+  height?: number | null
 }
 
 export interface ReactionDto {

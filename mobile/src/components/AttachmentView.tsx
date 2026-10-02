@@ -3,6 +3,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'rea
 import * as WebBrowser from 'expo-web-browser';
 import { ImageViewer } from './ImageViewer';
 import { VoicePlayer } from './message/VoicePlayer';
+import { VideoCard } from './message/VideoCard';
 import { attachmentsApi } from '@/api/attachments';
 import { extractErrorMessage } from '@/api/errors';
 import { ScanStatus, type AttachmentDto } from '@/api/messages';
@@ -204,6 +205,11 @@ export function AttachmentView({
   // çizilmez, aşağıdaki rozet kendi sebebini ("İşleniyor…" / "Bu içerik kaldırıldı.") yazar.
   if (attachment.contentType.startsWith('audio/') && isClean) {
     return <VoicePlayer attachment={attachment} isMine={isMine} />;
+  }
+
+  // M6c §2 — video küçük resim kartı olarak çizilir; CLEAN değilse aşağıdaki rozet sebebini yazar.
+  if (attachment.contentType.startsWith('video/') && isClean) {
+    return <VideoCard attachment={attachment} />;
   }
 
   // Görsel değil — dosya adı rozeti. CLEAN ise dokununca sistemde açılır.

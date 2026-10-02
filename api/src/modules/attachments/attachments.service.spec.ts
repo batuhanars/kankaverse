@@ -117,7 +117,7 @@ describe('AttachmentsService.presign', () => {
   it('izin verilmeyen contentType → BadRequestException UNSUPPORTED_TYPE', async () => {
     const dto: PresignAttachmentDto = {
       ...VALID_DTO,
-      contentType: 'video/mp4',
+      contentType: 'video/quicktime',
     };
 
     await expect(service.presign(USER_ID, dto)).rejects.toMatchObject({
@@ -298,6 +298,8 @@ describe('AttachmentsService.presign — allowlist kapsamı', () => {
     'audio/mp4',
     'audio/webm',
     'audio/mpeg',
+    'video/mp4',
+    'video/webm',
   ];
 
   for (const ct of allowedTypes) {
@@ -307,8 +309,8 @@ describe('AttachmentsService.presign — allowlist kapsamı', () => {
     });
   }
 
-  it('contentType "video/mp4" → UNSUPPORTED_TYPE', async () => {
-    const dto: PresignAttachmentDto = { filename: 'f', contentType: 'video/mp4', size: 100 };
+  it('contentType "video/quicktime" → UNSUPPORTED_TYPE', async () => {
+    const dto: PresignAttachmentDto = { filename: 'f', contentType: 'video/quicktime', size: 100 };
     await expect(service.presign(USER_ID, dto)).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -427,6 +429,85 @@ describe('AttachmentsService.presign — waveform (M6b §7)', () => {
     });
     expect(prismaMock.attachment.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ waveform: null }),
+    });
+  });
+});
+
+// ── M6c: video ─────────────────────────────────────────────────────────────────
+describe('AttachmentsService.presign — video (M6c)', () => {
+  let service: AttachmentsService;
+  const THUMB = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString('base64');
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.attachment.create.mockResolvedValue({ id: 'att-1', storageKey: 'k.mp4' });
+    storageMock.presignPut.mockResolvedValue('https://upload');
+  });
+
+  const video = (extra: Partial<PresignAttachmentDto> = {}): PresignAttachmentDto => ({
+    filename: 'v.mp4',
+    contentType: 'video/mp4',
+    size: 1000,
+    ...extra,
+  });
+
+  it('video + meta → hepsi kaydedilir', async () => {
+    await service.presign(
+      USER_ID,
+      video({ durationMs: 42000, thumbnail: THUMB, width: 1280, height: 720 }),
+    );
+    expect(prismaMock.attachment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        durationMs: 42000,
+        thumbnail: THUMB,
+        width: 1280,
+        height: 720,
+      }),
+    });
+  });
+
+  it('video, meta yok → null', async () => {
+    await service.presign(USER_ID, video());
+    expect(prismaMock.attachment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        durationMs: null,
+        thumbnail: null,
+        width: null,
+        height: null,
+      }),
+    });
+  });
+
+  it('60000 ms kabul, 60001 → VIDEO_TOO_LONG', async () => {
+    await expect(service.presign(USER_ID, video({ durationMs: 60000 }))).resolves.toBeDefined();
+    await expect(service.presign(USER_ID, video({ durationMs: 60001 }))).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'VIDEO_TOO_LONG' }),
+    });
+  });
+
+  it.each([
+    ['JPEG imzası yok', Buffer.from([1, 2, 3, 4]).toString('base64')],
+    ['base64 değil', '!!!!!!!!'],
+    ['boş', ''],
+  ])('thumbnail %s → INVALID_THUMBNAIL', async (_ad, bad) => {
+    await expect(service.presign(USER_ID, video({ thumbnail: bad }))).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'INVALID_THUMBNAIL' }),
+    });
+    expect(prismaMock.attachment.create).not.toHaveBeenCalled();
+  });
+
+  it('video-dışı türde thumbnail/width/height yok sayılır', async () => {
+    await service.presign(USER_ID, {
+      filename: 'a.png',
+      contentType: 'image/png',
+      size: 100,
+      thumbnail: 'bozuk',
+      width: 10,
+      height: 10,
+    });
+    expect(prismaMock.attachment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ thumbnail: null, width: null, height: null }),
     });
   });
 });

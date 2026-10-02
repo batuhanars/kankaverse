@@ -417,6 +417,9 @@ model Attachment {
   size        Int
   durationMs  Int?       // yalnız ses ekinde dolu (sesli mesaj, M6b)
   waveform    String?    // yalnız ses ekinde: 64 örnek (0-255) base64, 88 karakter (M6b §7)
+  thumbnail   String?    // yalnız video ekinde: küçük resim, base64 JPEG (M6c)
+  width       Int?       // yalnız video ekinde
+  height      Int?       // yalnız video ekinde
   scanStatus  ScanStatus @default(PENDING)
   createdAt   DateTime   @default(now())
 

@@ -3,6 +3,13 @@ import { ref, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { attachmentsApi } from '@/api/attachments'
 import { resolveContentType } from '@/utils/attachmentType'
+import {
+  isVideoType,
+  readVideoMeta,
+  VIDEO_MAX_BYTES,
+  VIDEO_MAX_MS,
+  type VideoMeta,
+} from '@/utils/videoMeta'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 
@@ -50,12 +57,40 @@ onUnmounted(() => {
     return
   }
 
+  // M6c §4.1: video → süre/boyut/küçük resim tarayıcıda çıkarılır; 60 sn / 25 MB aşımı gönderilmez.
+  let videoMeta: VideoMeta | null = null
+  if (isVideoType(contentType)) {
+    if (props.file.size > VIDEO_MAX_BYTES) {
+      uploadError.value = t('video.tooLarge')
+      uploading.value = false
+      return
+    }
+    try {
+      videoMeta = await readVideoMeta(props.file)
+    } catch {
+      uploadError.value = t('video.unreadable')
+      uploading.value = false
+      return
+    }
+    if (videoMeta.durationMs > VIDEO_MAX_MS) {
+      uploadError.value = t('video.tooLong')
+      uploading.value = false
+      return
+    }
+  }
+
   let presignResult: { attachmentId: string; uploadUrl: string; storageKey: string }
   try {
     const res = await attachmentsApi.presign({
       filename: props.file.name,
       contentType,
       size: props.file.size,
+      ...(videoMeta && {
+        durationMs: videoMeta.durationMs,
+        width: videoMeta.width,
+        height: videoMeta.height,
+        thumbnail: videoMeta.thumbnail ?? undefined,
+      }),
     })
     presignResult = res.data
   } catch (err: unknown) {
@@ -63,6 +98,8 @@ onUnmounted(() => {
     uploadError.value =
       code === 'EMAIL_NOT_VERIFIED'
         ? t('voiceMessage.errors.EMAIL_NOT_VERIFIED')
+        : code === 'VIDEO_TOO_LONG' || code === 'INVALID_THUMBNAIL'
+          ? t(`video.errors.${code}`)
         : code
       ? t(`attachment.errors.${code}`, t('attachment.errors.default'))
       : t('attachment.errors.default')

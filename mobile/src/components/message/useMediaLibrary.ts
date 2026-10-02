@@ -9,9 +9,8 @@ import * as MediaLibrary from 'expo-media-library';
  * sahip Discord'daki gömülü ızgarayı seçti. Bedeli bu dosya: bir izin makinesi + sayfalama +
  * kısmi erişim dalı. İtiraz sözleşmede kayıtlı, karar sahibin.
  *
- * 🔴 **Yalnız FOTOĞRAF listelenir.** Sunucunun ek allowlist'inde `video/*` YOK
- * (`attachments.service.ts` `ALLOWED_CONTENT_TYPES`); videoyu ızgarada göstermek, dokununca kesin
- * hata veren bir yüzey açmak olurdu.
+ * M6c: ızgara VİDEOYU da listeler (sunucu `video/mp4|webm` kabul ediyor; mobil gönderimde mp4'e
+ * sıkıştırıyor). Eskiden yalnız fotoğraftı çünkü allowlist'te video yoktu.
  */
 
 /**
@@ -50,7 +49,7 @@ export function useMediaLibrary(enabled: boolean) {
     }
     MediaLibrary.getAssetsAsync({
       first: PAGE_SIZE,
-      mediaType: ['photo'],
+      mediaType: ['photo', 'video'],
       sortBy: ['creationTime'],
       after: reset ? undefined : cursorRef.current,
     })
