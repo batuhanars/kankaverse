@@ -46,7 +46,7 @@ const sending = ref(false)
 
 // M6b — sesli mesaj kaydı. Aramadayken mikrofon arama tarafından kullanılıyor → kayıt kapalı.
 const voiceStore = useVoiceStore()
-const { state: recState, elapsedMs: recElapsed, start: startRec, cancel: cancelRec, finish: finishRec } =
+const { state: recState, elapsedMs: recElapsed, liveLevels: recLevels, start: startRec, cancel: cancelRec, finish: finishRec } =
   useVoiceRecorder()
 const voiceDisabledReason = computed(() =>
   voiceStore.connectedChannelId || voiceStore.connecting ? t('voiceMessage.inCall') : null,
@@ -547,6 +547,7 @@ function resetComposerHeight() {
           v-if="recState !== 'idle'"
           :state="recState"
           :elapsed-ms="recElapsed"
+          :levels="recLevels"
           @cancel="cancelRec"
           @send="sendVoice"
         />

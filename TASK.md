@@ -4246,4 +4246,7 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] §4 mobil kayıt + oynatıcı
 - [x] §5 web kayıt + oynatıcı
 - [ ] §6 tip/lint/build temiz (üç tier)
-- [ ] Cihaz/tarayıcı turu (sahip + PM)
+- [ ] Cihaz/tarayıcı turu (sahip + PM) — 1. tur 2026-10-02: kayıt çalışıyor; oynatıcı tasarımı revize (§7), e-posta uyarı metni yanlış (§7.5)
+- [x] §7.1 api `waveform`
+- [x] §7.2-§7.5 mobil
+- [x] §7.2-§7.5 web

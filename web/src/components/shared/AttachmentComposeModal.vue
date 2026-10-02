@@ -60,7 +60,10 @@ onUnmounted(() => {
     presignResult = res.data
   } catch (err: unknown) {
     const code = (err as { response?: { data?: { error?: string } } }).response?.data?.error
-    uploadError.value = code
+    uploadError.value =
+      code === 'EMAIL_NOT_VERIFIED'
+        ? t('voiceMessage.errors.EMAIL_NOT_VERIFIED')
+        : code
       ? t(`attachment.errors.${code}`, t('attachment.errors.default'))
       : t('attachment.errors.default')
     uploading.value = false

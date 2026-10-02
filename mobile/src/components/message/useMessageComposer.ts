@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { messagesApi, type MessageDto } from '@/api/messages';
-import { extractErrorMessage } from '@/api/errors';
+import { extractErrorCode, extractErrorMessage } from '@/api/errors';
 import {
   isStorageUploadError,
   uploadDraftAttachment,
@@ -150,9 +150,19 @@ export function useMessageComposer(
       // 🔴 Seçim burada KORUNUR (sözleşme §3): hata hangi adımda olursa olsun (yükleme ya da
       // mesaj gönderimi) taslaklar şeride geri konur — yüklenmiş olanlar `uploadedId`siyle, ki
       // tekrar denemede yeniden yüklenmesinler.
-      if (drafts.length) setAttachments(drafts);
+      // M6b §7.5 — başarısız SESLİ MESAJ taslağı şeride "dosya çipi" olarak düşmez, atılır (yeniden
+      // kaydedilir); hata mesajı yine gösterilir.
+      const keep = drafts.filter((d) => !d.isVoice);
+      if (drafts.length) setAttachments(keep);
       // Depolamaya PUT hatasının envelope'ı yok → ham durum kodu ekrana basılmaz, ne olduğu yazılır.
-      setSendError(isStorageUploadError(e) ? t('mobile.attach.uploadFailed') : extractErrorMessage(e));
+      // Ek yüklemede doğrulanmamış e-posta için bağlama uygun metin (genel metin "Ortam oluşturmak…" diyor).
+      setSendError(
+        isStorageUploadError(e)
+          ? t('mobile.attach.uploadFailed')
+          : drafts.length && extractErrorCode(e) === 'EMAIL_NOT_VERIFIED'
+            ? t('voiceMessage.errors.EMAIL_NOT_VERIFIED')
+            : extractErrorMessage(e),
+      );
     } finally {
       setUploadLabel('');
       setSending(false);

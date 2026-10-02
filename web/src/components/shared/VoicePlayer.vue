@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { attachmentsApi } from '@/api/attachments'
 import { useExclusivePlayback } from '@/composables/useExclusivePlayback'
 import { formatClock } from '@/utils/formatClock'
+import { decodeWaveform, fallbackWaveform } from '@/utils/waveform'
 import type { AttachmentDto } from '@/types'
 
 const props = defineProps<{ attachment: AttachmentDto }>()
@@ -32,6 +33,14 @@ const totalMs = computed(() => props.attachment.durationMs ?? mediaDurationMs.va
 const progress = computed(() =>
   totalMs.value > 0 ? Math.min(1, currentMs.value / totalMs.value) : 0,
 )
+// §7.2: waveform null/bozuksa id'den türetilen sabit desen (rastgele değil).
+const bars = computed(
+  () => decodeWaveform(props.attachment.waveform) ?? fallbackWaveform(props.attachment.id),
+)
+const playedBars = computed(() => Math.round(progress.value * bars.value.length))
+function barHeight(v: number): number {
+  return 3 + (v / 255) * 25 // en az 3px, en çok 28px
+}
 const timeLabel = computed(() =>
   formatClock(playing.value || currentMs.value > 0 ? currentMs.value : totalMs.value),
 )
@@ -159,7 +168,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="mt-1.5 inline-flex items-center gap-3 px-3 py-2 rounded-[var(--kv-radius-md)] w-full"
-    style="background-color: var(--kv-bg-elevated); max-width: 320px;"
+    style="background-color: var(--kv-bg-elevated); max-width: 340px;"
     role="group"
     :aria-label="t('voiceMessage.label')"
   >
@@ -193,41 +202,40 @@ onBeforeUnmount(() => {
       </svg>
     </button>
 
-    <!-- İlerleme çubuğu: geniş dokunma alanı (h-6), görünen çizgi ince -->
-    <div
-      ref="trackEl"
-      class="relative flex-1 min-w-0 h-6 flex items-center cursor-pointer touch-none"
-      role="slider"
-      tabindex="0"
-      :aria-label="t('voiceMessage.seek')"
-      aria-valuemin="0"
-      :aria-valuemax="Math.round(totalMs / 1000)"
-      :aria-valuenow="Math.round(currentMs / 1000)"
-      @pointerdown="onPointerDown"
-      @pointermove="onPointerMove"
-      @pointerup="onPointerUp"
-      @pointercancel="dragging = false"
-      @keydown="onKeydown"
-    >
-      <div class="w-full h-1 rounded-full" style="background-color: var(--kv-border-strong);">
-        <div
-          class="h-full rounded-full"
-          style="background-color: var(--kv-accent-500);"
-          :style="{ width: `${progress * 100}%` }"
+    <!-- Dalga: dokun/sürükle/ok tuşları = konum. Çalınan çubuklar griden Kor'a boyanır. -->
+    <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+      <div
+        ref="trackEl"
+        class="flex items-center justify-between h-8 cursor-pointer touch-none"
+        role="slider"
+        tabindex="0"
+        :aria-label="t('voiceMessage.seek')"
+        aria-valuemin="0"
+        :aria-valuemax="Math.round(totalMs / 1000)"
+        :aria-valuenow="Math.round(currentMs / 1000)"
+        @pointerdown="onPointerDown"
+        @pointermove="onPointerMove"
+        @pointerup="onPointerUp"
+        @pointercancel="dragging = false"
+        @keydown="onKeydown"
+      >
+        <span
+          v-for="(v, i) in bars"
+          :key="i"
+          class="block rounded-full shrink-0"
+          :style="{
+            width: '2.5px',
+            height: `${barHeight(v)}px`,
+            backgroundColor: i < playedBars ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)',
+          }"
         />
       </div>
-      <div
-        class="absolute w-3 h-3 rounded-full -translate-x-1/2"
-        style="background-color: var(--kv-accent-500);"
-        :style="{ left: `${progress * 100}%` }"
-      />
+      <span
+        class="text-[12px] tabular-nums"
+        :style="{ color: failed ? 'var(--kv-danger)' : 'var(--kv-text-muted)' }"
+      >
+        {{ failed ? t('attachment.notReady') : timeLabel }}
+      </span>
     </div>
-
-    <span
-      class="shrink-0 text-[12px] tabular-nums"
-      :style="{ color: failed ? 'var(--kv-danger)' : 'var(--kv-text-muted)' }"
-    >
-      {{ failed ? t('attachment.notReady') : timeLabel }}
-    </span>
   </div>
 </template>

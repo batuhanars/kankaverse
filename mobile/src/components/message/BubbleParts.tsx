@@ -47,14 +47,16 @@ interface MetaProps {
   message: MessageDto;
   isMine: boolean;
   receipt?: 'sent' | 'seen' | null;
+  /** Metnin son satırına oturur (bkz. `MetaSpacer`); yalnız metinle biten mesajda. */
+  inline?: boolean;
 }
 
 /** Sağa yaslı meta satırı: `düzenlendi` + saat + okundu ikonu (C12 §4.2: ikon ya anlamlıdır ya hiç). */
-export function BubbleMeta({ message, isMine, receipt }: MetaProps) {
+export function BubbleMeta({ message, isMine, receipt, inline }: MetaProps) {
   const color = isMine ? theme.colors.textSecondary : theme.colors.textMuted;
   const seenColor = isMine ? theme.colors.accent400 : theme.colors.accent500;
   return (
-    <View style={metaStyles.row}>
+    <View style={[metaStyles.row, inline && metaStyles.rowInline]}>
       {message.editedAt ? <Text style={[metaStyles.text, { color }]}>{t('message.edited')}</Text> : null}
       <Text style={[metaStyles.text, { color }]}>{formatClock(message.createdAt)}</Text>
       {receipt ? (
@@ -116,7 +118,33 @@ const quoteStyles = StyleSheet.create({
   },
 });
 
+// Saydam yer tutucu (WhatsApp hilesi): metnin SON satırına meta kadar boşluk ekler. Kısa mesajda
+// saat metnin yanına oturur; son satırda yer kalmazsa yer tutucu alt satıra kayar ve meta da onunla
+// iner. Aynı yazı boyutunda aynı metin, yani genişlik ölçmeden tutar. Okundu ikonu (14px + boşluk)
+// için birkaç bölünmez boşluk eklenir.
+// 🔴 Renk `transparent` DEĞİL baloncuk zemini: Android iç içe Text'te saydamı tam saydam çizmiyor,
+// gerçek saatin altında gölge gibi ikinci bir saat görünüyordu (sahip cihaz turu 2026-10-02).
+export function MetaSpacer({ message, receipt, isMine }: Omit<MetaProps, 'inline'>) {
+  const edited = message.editedAt ? `${t('message.edited')} ` : '';
+  const tick = receipt ? ' '.repeat(5) : '';
+  return (
+    <Text style={[metaStyles.spacer, { color: isMine ? theme.colors.bubbleOwn : theme.colors.bgElevated }]}>
+      {`  ${edited}${formatClock(message.createdAt)}${tick}`}
+    </Text>
+  );
+}
+
 const metaStyles = StyleSheet.create({
+  // Metinle aynı satıra oturan meta: baloncuğun sağ alt köşesine sabitlenir (iç dolguyla hizalı).
+  rowInline: {
+    position: 'absolute',
+    right: 8.5,
+    bottom: 4.5,
+    marginTop: 0,
+  },
+  spacer: {
+    fontSize: theme.fontSize.xs,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

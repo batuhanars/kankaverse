@@ -60,6 +60,14 @@ const ALLOWED_CONTENT_TYPES = new Set([
  */
 // Sesli mesaj üst sınırı: 5 dakika (M6b).
 const MAX_AUDIO_DURATION_MS = 300_000;
+// Dalga formu: 64 örnek, her biri 1 bayt (0-255).
+const WAVEFORM_SAMPLES = 64;
+
+function isValidWaveform(b64: string): boolean {
+  // Buffer.from base64'te bozuk girdiyi sessizce atlar; yeniden kodlayıp karşılaştırarak yakalarız.
+  const buf = Buffer.from(b64, 'base64');
+  return buf.length === WAVEFORM_SAMPLES && buf.toString('base64') === b64;
+}
 
 function buildStorageKey(filename: string): string {
   const ext = filename.includes('.') ? filename.split('.').pop() : '';
@@ -117,6 +125,13 @@ export class AttachmentsService {
       });
     }
 
+    if (isAudio && dto.waveform !== undefined && !isValidWaveform(dto.waveform)) {
+      throw new BadRequestException({
+        message: 'Ses dalgası verisi geçersiz.',
+        error: 'INVALID_WAVEFORM',
+      });
+    }
+
     const storageKey = buildStorageKey(dto.filename);
 
     const attachment = await this.prisma.attachment.create({
@@ -127,6 +142,7 @@ export class AttachmentsService {
         contentType: dto.contentType,
         size: dto.size,
         durationMs: isAudio ? (dto.durationMs ?? null) : null,
+        waveform: isAudio ? (dto.waveform ?? null) : null,
         // scanStatus PENDING (default) — mesaj bağlanınca scan-gate devreye girer
       },
     });

@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsInt, IsOptional, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsInt, IsOptional, Min, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class PresignAttachmentDto {
@@ -28,4 +28,14 @@ export class PresignAttachmentDto {
   @IsInt()
   @Min(1)
   durationMs?: number;
+
+  @ApiPropertyOptional({
+    example: 'AAECAwQF...',
+    description:
+      'Yalnız ses ekinde (audio/*): dalga formu, 64 örnek (0-255) base64 (88 karakter); ses dışında yok sayılır.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  waveform?: string;
 }

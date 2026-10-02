@@ -80,6 +80,7 @@ interface Props {
   voice?: {
     phase: VoicePhase;
     elapsedMs: number;
+    levels: number[];
     /** Aramadayken true: düğme soluk, dokununca açıklama çıkar (gizlenmez). */
     disabled: boolean;
     /** Kısa açıklama (izin yok / aramada); boşsa çizilmez. */
@@ -228,6 +229,7 @@ export function MessageComposer({
             <VoiceRecorderBar
               phase={voice.phase}
               elapsedMs={voice.elapsedMs}
+              levels={voice.levels}
               sending={sending}
               onCancel={voice.onCancel}
               onSend={voice.onSend}
@@ -289,7 +291,9 @@ export function MessageComposer({
                 accessibilityLabel={t('message.send')}
                 style={[styles.iconButton, !canSend && styles.iconButtonBusy]}
               >
-                <Ionicons name="send" size={20} color={theme.colors.accent500} />
+                <View style={styles.circle}>
+                  <Ionicons name="send" size={18} color={theme.colors.textPrimary} />
+                </View>
               </Pressable>
             )}
 
@@ -303,7 +307,9 @@ export function MessageComposer({
                 accessibilityLabel={t('mobile.voice.record')}
                 style={[styles.iconButton, voice.disabled && styles.iconButtonBusy]}
               >
-                <Ionicons name="mic" size={22} color={theme.colors.textSecondary} />
+                <View style={styles.circle}>
+                  <Ionicons name="mic" size={20} color={theme.colors.textPrimary} />
+                </View>
               </Pressable>
             )}
           </View>
@@ -425,6 +431,15 @@ const styles = StyleSheet.create({
     // daraltıyordu (sahip geri bildirimi 2026-08-11). Negatif pay yalnız GÖRSEL konumu sola
     // çekiyor, dokunma hedefi 44dp kalıyor.
     marginLeft: -8,
+  },
+  // §7.4 — gönder ve mikrofon AYNI yuvada, aynı görünümde: 40px Kor daire, beyaz ikon.
+  circle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.accent500,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   /** Gönderim sürerken: yuva duruyor ama düğme basılamaz olduğu belli oluyor. */
   iconButtonBusy: {

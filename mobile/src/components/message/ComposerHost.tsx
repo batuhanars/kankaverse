@@ -92,6 +92,7 @@ export function ComposerHost({
         voice={{
           phase: recorder.phase,
           elapsedMs: recorder.elapsedMs,
+          levels: recorder.levels,
           disabled: recorder.disabled,
           notice: recorder.notice,
           openSettings: recorder.openSettings,

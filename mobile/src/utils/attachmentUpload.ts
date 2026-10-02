@@ -58,6 +58,10 @@ export interface DraftAttachment {
   size: number;
   /** M6b — sesli mesaj kaydının süresi (ms); presign'a taşınır. Diğer eklerde yok. */
   durationMs?: number;
+  /** M6b §7 — kayıt sırasında örneklenen dalga (base64, 64 bayt). */
+  waveform?: string;
+  /** Sesli mesaj taslağı: başarısız gönderimde ek şeridine DÜŞMEZ, atılır (M6b §7.5). */
+  isVoice?: boolean;
   /**
    * 🔴 Yüklenmiş ekin sunucudaki kimliği. Kısmi başarısızlıkta DOLU kalır: kullanıcı tekrar
    * denediğinde başarılı olanlar YENİDEN yüklenmez (aynı dosyayı ikinci kez yüklemek hem veri
@@ -128,6 +132,7 @@ export async function uploadDraftAttachment(draft: DraftAttachment): Promise<str
     contentType: draft.contentType,
     size: draft.size,
     ...(draft.durationMs ? { durationMs: draft.durationMs } : {}),
+    ...(draft.waveform ? { waveform: draft.waveform } : {}),
   });
 
   const res = await FileSystem.uploadAsync(presign.uploadUrl, draft.uri, {

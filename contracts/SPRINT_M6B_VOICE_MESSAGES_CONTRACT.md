@@ -136,3 +136,62 @@ olarak DEĞİL.
 ## Kapsam dışı (bilinçli)
 Dalga formu, hız seçimi, basılı-tut + kaydır-kilitle jesti, kayıt önizleme (göndermeden dinleme),
 sesli mesajın metne çevrilmesi, video (M6c).
+
+---
+
+## §7 REVİZYON 1 (2026-10-02, sahip cihaz turu) — WhatsApp tarzı oynatıcı + dalga formu
+
+> İlk tur cihazda görüldü. Sahip isteği: oynatıcı WhatsApp gibi olsun, dalgalı ses görünümü oynadıkça
+> griden Kor'a boyansın; mikrofon ve oynat düğmesi Kor yuvarlak. §2'deki "dalga formu YOK" kalktı.
+
+### §7.1 API: `Attachment.waveform`
+- `waveform String?` + migration. İçerik: **64 örnek**, her biri 0-255 bayt, **base64** (88 karakter).
+  Yalnız `audio/*` ekte kaydedilir, diğerlerinde yok sayılır (`durationMs` ile aynı kural).
+- Presign DTO: opsiyonel `waveform` (`@IsOptional @IsString @MaxLength(128)`), serviste base64 çözülüp
+  tam 64 bayt değilse `400 INVALID_WAVEFORM`.
+- `AttachmentDto`: `waveform: string | null`. Mesaj sorgularındaki tüm attachment `select`lerine eklenir
+  (M6b'de `durationMs` için yapılan 7 yerin aynısı).
+
+### §7.2 Örnekleme (istemci)
+- Kayıt boyunca ~100 ms'de bir ses seviyesi örneği alınır (mobil: `expo-audio` kayıt seçeneğinde
+  `isMeteringEnabled: true`, durumdaki `metering` dB değeri; web: `AnalyserNode` RMS).
+- dB → 0-255: `-60 dB ve altı = 0`, `0 dB = 255`, arası doğrusal. Web RMS de aynı dB ölçeğine çevrilip
+  aynı formülden geçer (iki istemcinin dalgası benzer görünsün).
+- Bitince örnekler **64 kovaya** indirilir (her kovanın tepe değeri), base64 yapılıp presign'a gider.
+- Ortak yardımcı (iki istemcide ayrı ayrı, aynı formül): `encodeWaveform(samples: number[]) → string`,
+  `decodeWaveform(b64) → number[64]`.
+- **Fallback:** `waveform` null ise (M6b-1'de gönderilmiş mesajlar, ya da çözülemeyen veri) ek `id`'sinden
+  türetilen sabit, alçak genlikli bir desen çizilir. Rastgele DEĞİL, her açılışta aynı.
+
+### §7.3 Oynatıcı tasarımı (mobil + web aynı)
+- `[● Kor yuvarlak oynat düğmesi] [dalga formu] ` ve dalganın altında solda süre.
+- Oynat düğmesi: 36px daire, zemin `accent500`, içinde beyaz (`textPrimary`) ▶/⏸ ikonu.
+- Dalga: 64 dikey çubuk, genişlik ~2.5px, aralık ~1.5px, uçları yuvarlak, yükseklik örnekle orantılı
+  (en az 3px, en çok 28px). Çalınmamış kısım `textMuted`, çalınmış kısım Kor
+  (kendi baloncuğumda `accent400`, karşıda `accent500`). Boyama çalma ilerledikçe çubuk çubuk ilerler.
+- Dalgaya dokun/sürükle = konum değiştir (§2'deki çubuğun yerini alır, ayrı ilerleme çubuğu KALKAR).
+- Süre metni kuralı §2 ile aynı.
+
+### §7.4 Mikrofon ve gönder düğmesi
+- Mikrofon ve gönder **aynı yuvada, aynı görünümde**: 40px Kor daire (`accent500`), içinde beyaz ikon
+  (WhatsApp'ın yeşil dairesi gibi). Metin yazılınca ikon mikrofondan gönder okuna döner, daire kalır.
+- Aramadayken mikrofon dairesi soluk (opaklık ~0.4), dokununca açıklama (§3, değişmedi).
+- Kayıt şeridinde, kayıt sürerken **canlı dalga** (son örnekler sağa doğru akar), mevcut sayaçla birlikte.
+  Şeritteki gönder düğmesi de aynı Kor daire.
+- Web: mesaj kutusunda bugün gönder düğmesi yok (Enter gönderiyor), bu değişmez. Mikrofon Kor daire
+  olur, kayıt şeridindeki gönder de Kor daire.
+
+### §7.5 E-posta doğrulama uyarısı (hata düzeltmesi)
+- Ek yükleme `VerifiedEmailGuard` arkasında (önceden beri, kural KALIR). Doğrulanmamış hesapta presign
+  `403 EMAIL_NOT_VERIFIED` dönüyor ve istemciler genel `errors.EMAIL_NOT_VERIFIED` metnini
+  ("Ortam oluşturmak için…") gösteriyor. Yanlış bağlam, görsel yüklemede de aynı.
+- Düzeltme: ek/sesli mesaj gönderim hatasında `EMAIL_NOT_VERIFIED` için ayrı metin:
+  `"Dosya ve sesli mesaj göndermek için e-postanı doğrulamalısın."` (web `tr.json`'da yeni anahtar,
+  mobil de onu kullanır). Ortam oluşturmadaki metin değişmez.
+- Mobilde başarısız sesli mesaj taslağı ek şeridine "dosya" çipi olarak düşüyor. Bunun yerine: hata
+  mesajı gösterilir, taslak atılır (sesli mesaj yeniden kaydedilir; dosya çipi kafa karıştırıyor).
+
+### §7.6 DoD ekleri
+- Mobil ve web'den gönderilen sesli mesajın dalgası iki istemcide de görünür ve benzer.
+- M6b-1'de gönderilmiş (waveform'suz) mesaj fallback desenle çizilir, çökmez.
+- `INVALID_WAVEFORM` testi.

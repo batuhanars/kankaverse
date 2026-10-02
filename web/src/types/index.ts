@@ -271,6 +271,7 @@ export interface AttachmentDto {
   size: number
   scanStatus: ScanStatus
   durationMs?: number | null // M6b — yalnız ses ekinde dolu
+  waveform?: string | null // M6b §7 — base64, 64 bayt; yalnız ses ekinde
 }
 
 export interface ReactionDto {

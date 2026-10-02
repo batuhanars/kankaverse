@@ -14,6 +14,8 @@ export interface PresignAttachmentPayload {
   size: number;
   /** M6b — yalnız sesli mesajda, ms cinsinden tam sayı (1..300000). */
   durationMs?: number;
+  /** M6b §7 — 64 baytlık dalga, base64 (88 karakter). */
+  waveform?: string;
 }
 
 /** Presign yanıtı (`attachments.service.ts` `presign` dönüşü birebir). */

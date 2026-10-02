@@ -22,9 +22,9 @@ function onClick() {
 <template>
   <button
     type="button"
-    class="shrink-0 w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] self-center transition-colors"
+    class="shrink-0 w-10 h-10 flex items-center justify-center rounded-full self-center transition-opacity"
     :class="disabledReason ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:opacity-80'"
-    style="color: var(--kv-text-secondary);"
+    style="background-color: var(--kv-accent-500); color: #fff;"
     :aria-label="t('voiceMessage.record')"
     :aria-disabled="disabledReason ? 'true' : undefined"
     :title="disabledReason ?? t('voiceMessage.record')"

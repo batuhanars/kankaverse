@@ -3,9 +3,9 @@
 import { onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatClock } from '@/utils/formatClock'
-import type { RecorderState } from '@/composables/useVoiceRecorder'
+import { LIVE_BARS, type RecorderState } from '@/composables/useVoiceRecorder'
 
-const props = defineProps<{ state: RecorderState; elapsedMs: number }>()
+const props = defineProps<{ state: RecorderState; elapsedMs: number; levels: number[] }>()
 const emit = defineEmits<{ cancel: []; send: [] }>()
 
 const { t } = useI18n()
@@ -57,6 +57,15 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
           aria-hidden="true"
         />
         <span class="tabular-nums">{{ formatClock(elapsedMs) }}</span>
+        <!-- Canlı dalga: son örnekler sağa doğru akar -->
+        <div v-if="state === 'recording'" class="flex-1 min-w-0 flex items-center justify-end gap-[1.5px] h-7 overflow-hidden" aria-hidden="true">
+          <span
+            v-for="(v, i) in levels.slice(-LIVE_BARS)"
+            :key="i"
+            class="block rounded-full shrink-0"
+            :style="{ width: '2.5px', height: `${3 + (v / 255) * 25}px`, backgroundColor: 'var(--kv-accent-500)' }"
+          />
+        </div>
         <span v-if="state === 'limit'" class="text-[12px] truncate" style="color: var(--kv-text-muted);">
           {{ t('voiceMessage.limitReached') }}
         </span>
@@ -66,7 +75,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
 
     <button
       type="button"
-      class="shrink-0 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
+      class="shrink-0 w-10 h-10 rounded-full flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
       :class="state === 'uploading' ? 'opacity-40 pointer-events-none' : ''"
       style="background-color: var(--kv-accent-500); color: #fff;"
       :aria-label="t('voiceMessage.send')"

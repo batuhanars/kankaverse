@@ -10,9 +10,13 @@ import { ref, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { attachmentsApi } from '@/api/attachments'
 import { useToastStore } from '@/stores/toast'
+import { dbToByte, encodeWaveform } from '@/utils/waveform'
 
 export const MAX_RECORD_MS = 300_000
 const MIN_RECORD_MS = 1_000
+// §7.2: ~100 ms'de bir seviye örneği; canlı şerit son LIVE_BARS örneği gösterir.
+const SAMPLE_EVERY_MS = 100
+export const LIVE_BARS = 48
 
 export type RecorderState = 'idle' | 'recording' | 'limit' | 'uploading'
 
@@ -39,6 +43,8 @@ export function useVoiceRecorder() {
 
   const state = ref<RecorderState>('idle')
   const elapsedMs = ref(0)
+  /** Canlı dalga: son örnekler (0-255), sağa doğru akar. */
+  const liveLevels = ref<number[]>([])
 
   let recorder: MediaRecorder | null = null
   let stream: MediaStream | null = null
@@ -49,8 +55,46 @@ export function useVoiceRecorder() {
   let finalBlob: Blob | null = null
   let finalDurationMs = 0
   let stopped: Promise<void> | null = null
+  let audioCtx: AudioContext | null = null
+  let analyser: AnalyserNode | null = null
+  let sampleTimer: ReturnType<typeof setInterval> | null = null
+  let samples: number[] = []
+
+  function startSampling(s: MediaStream) {
+    try {
+      audioCtx = new AudioContext()
+      const source = audioCtx.createMediaStreamSource(s)
+      analyser = audioCtx.createAnalyser()
+      analyser.fftSize = 1024
+      source.connect(analyser)
+      const buf = new Float32Array(analyser.fftSize)
+      sampleTimer = setInterval(() => {
+        if (!analyser) return
+        analyser.getFloatTimeDomainData(buf)
+        let sum = 0
+        for (const v of buf) sum += v * v
+        const rms = Math.sqrt(sum / buf.length)
+        // RMS (0..1) → dB → aynı 0-255 formülü (mobil ile aynı ölçek)
+        const level = dbToByte(rms > 0 ? 20 * Math.log10(rms) : -Infinity)
+        samples.push(level)
+        liveLevels.value = [...liveLevels.value.slice(-(LIVE_BARS - 1)), level]
+      }, SAMPLE_EVERY_MS)
+    } catch {
+      // Analiz yoksa kayıt yine çalışır; waveform gönderilmez (fallback desen çizilir).
+      stopSampling()
+    }
+  }
+
+  function stopSampling() {
+    if (sampleTimer) clearInterval(sampleTimer)
+    sampleTimer = null
+    analyser = null
+    void audioCtx?.close().catch(() => undefined)
+    audioCtx = null
+  }
 
   function releaseStream() {
+    stopSampling()
     stream?.getTracks().forEach((tr) => tr.stop())
     stream = null
   }
@@ -78,6 +122,8 @@ export function useVoiceRecorder() {
     finalDurationMs = 0
     stopped = null
     elapsedMs.value = 0
+    samples = []
+    liveLevels.value = []
     state.value = 'idle'
   }
 
@@ -123,6 +169,9 @@ export function useVoiceRecorder() {
     try {
       canonical = picked.canonical
       chunks = []
+      samples = []
+      liveLevels.value = []
+      startSampling(stream)
       recorder = new MediaRecorder(stream, { mimeType: picked.mime })
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data)
@@ -176,6 +225,7 @@ export function useVoiceRecorder() {
         contentType: canonical,
         size: file.size,
         durationMs,
+        waveform: samples.length > 0 ? encodeWaveform(samples) : undefined,
       })
       await attachmentsApi.uploadToS3(data.uploadUrl, file)
       reset()
@@ -183,8 +233,8 @@ export function useVoiceRecorder() {
     } catch (err: unknown) {
       const code = (err as { response?: { data?: { error?: string } } }).response?.data?.error
       const msg =
-        code === 'DURATION_TOO_LONG'
-          ? t('voiceMessage.errors.DURATION_TOO_LONG')
+        code === 'DURATION_TOO_LONG' || code === 'EMAIL_NOT_VERIFIED'
+          ? t(`voiceMessage.errors.${code}`)
           : code
             ? t(`attachment.errors.${code}`, t('voiceMessage.uploadFailed'))
             : t('voiceMessage.uploadFailed')
@@ -196,5 +246,5 @@ export function useVoiceRecorder() {
 
   onBeforeUnmount(reset)
 
-  return { state, elapsedMs, start, cancel, finish }
+  return { state, elapsedMs, liveLevels, start, cancel, finish }
 }

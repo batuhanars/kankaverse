@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AttachmentView } from './AttachmentView';
-import { BubbleMeta, ReactionRow, ReplyQuote } from './message/BubbleParts';
+import { BubbleMeta, MetaSpacer, ReactionRow, ReplyQuote } from './message/BubbleParts';
 import { splitMentions } from '@/utils/mentions';
 import type { MessageDto } from '@/api/messages';
 import { t } from '@/i18n';
@@ -78,6 +78,8 @@ export function MessageBubble({
     !nameVisible;
   // Kendi baloncuğumda Kor zemin üstünde accent500 okunmuyor (§4) → accent400.
   const accent = isMine ? theme.colors.accent400 : theme.colors.accent500;
+  // Mesaj metinle bitiyorsa (ek yok) saat metnin son satırına oturur, kısa mesaj tek satır kalır.
+  const metaInline = displayContent.length > 0 && (message.attachments?.length ?? 0) === 0;
 
   return (
     <View
@@ -150,6 +152,7 @@ export function MessageBubble({
                   seg.text
                 ),
               )}
+              {metaInline && <MetaSpacer message={message} receipt={receipt} isMine={isMine} />}
             </Text>
           )}
           {/* Sprint M3c R2 — `interactive`: görsele dokun → tam ekran, dosyaya dokun → sistemde aç.
@@ -158,7 +161,7 @@ export function MessageBubble({
             <AttachmentView key={a.id} attachment={a} interactive isMine={isMine} />
           ))}
 
-          <BubbleMeta message={message} isMine={isMine} receipt={receipt} />
+          <BubbleMeta message={message} isMine={isMine} receipt={receipt} inline={metaInline} />
         </Pressable>
 
         {reactions.length > 0 && (

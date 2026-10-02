@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
@@ -7,13 +7,16 @@ import { extractErrorMessage } from '@/api/errors';
 import type { AttachmentDto } from '@/api/messages';
 import { claimPlayback, releasePlayback } from '@/audio/voicePlayback';
 import { useCallAudioBusy } from '@/hooks/useCallAudioBusy';
+import { Waveform } from './Waveform';
 import { formatClock } from '@/utils/formatClock';
+import { decodeWaveform, fallbackWaveform } from '@/utils/waveform';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 /**
- * Sprint M6b §2 — sesli mesaj oynatıcısı: [▶/⏸] [ilerleme çubuğu] [süre]. Dalga formu ve hız seçimi
- * YOK (sonraki tur).
+ * Sprint M6b §2/§7.3 — WhatsApp tarzı sesli mesaj oynatıcısı: [36px Kor daire ▶/⏸] [64 çubuklu dalga,
+ * çalındıkça griden Kor'a boyanır] ve dalganın altında süre. Dalgaya dokun/sürükle = konum değiştir
+ * (ayrı ilerleme çubuğu yok). Hız seçimi YOK (sonraki tur).
  *
  * 🔴 Adres GEÇ alınır: presigned GET ömrü 300 sn, mesaj listesi daha uzun açık kalabilir. Adres ilk
  * çalmada (kullanıcı niyetiyle) `GET /attachments/:id`'den alınır; T&S/tarama kapısı sunucuda.
@@ -33,6 +36,11 @@ export function VoicePlayer({ attachment, isMine }: { attachment: AttachmentDto;
   const sourceSet = useRef(false);
   const trackWidth = useRef(0);
 
+  // Dalga yoksa (M6b-1 mesajları / bozuk veri) ek id'sinden türetilen sabit desen — çökmez.
+  const levels = useMemo(
+    () => decodeWaveform(attachment.waveform) ?? fallbackWaveform(attachment.id),
+    [attachment.waveform, attachment.id],
+  );
   const accent = isMine ? theme.colors.accent400 : theme.colors.accent500;
   const totalMs = attachment.durationMs ?? (status.duration > 0 ? Math.round(status.duration * 1000) : 0);
   const playing = status.playing;
@@ -144,27 +152,26 @@ export function VoicePlayer({ attachment, isMine }: { attachment: AttachmentDto;
           style={styles.playButton}
         >
           {loading ? (
-            <ActivityIndicator size="small" color={accent} />
+            <ActivityIndicator size="small" color={theme.colors.textPrimary} />
           ) : (
-            <Ionicons name={playing ? 'pause' : 'play'} size={22} color={accent} />
+            <Ionicons name={playing ? 'pause' : 'play'} size={20} color={theme.colors.textPrimary} />
           )}
         </Pressable>
 
-        <View
-          style={styles.trackHit}
-          onLayout={(e) => {
-            trackWidth.current = e.nativeEvent.layout.width;
-          }}
-          accessibilityRole="adjustable"
-          accessibilityLabel={t('mobile.voice.seek')}
-          {...pan.panHandlers}
-        >
-          <View style={styles.track} pointerEvents="none">
-            <View style={[styles.fill, { width: `${fraction * 100}%`, backgroundColor: accent }]} />
+        <View style={styles.main}>
+          <View
+            style={styles.waveHit}
+            onLayout={(e) => {
+              trackWidth.current = e.nativeEvent.layout.width;
+            }}
+            accessibilityRole="adjustable"
+            accessibilityLabel={t('mobile.voice.seek')}
+            {...pan.panHandlers}
+          >
+            <Waveform levels={levels} progress={fraction} activeColor={accent} />
           </View>
+          <Text style={styles.time}>{formatClock(shownMs)}</Text>
         </View>
-
-        <Text style={styles.time}>{formatClock(shownMs)}</Text>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
@@ -175,36 +182,32 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    width: 230,
+    gap: 10,
+    width: 250,
     maxWidth: '100%',
     paddingVertical: 2,
     paddingHorizontal: 4,
   },
+  // §7.3 — 36px Kor daire, içinde beyaz ikon.
   playButton: {
     width: 36,
     height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.accent500,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Dokunma/sürükleme alanı çubuktan yüksek (44dp), çizilen çubuk ince.
-  trackHit: {
+  main: {
     flex: 1,
-    height: theme.layout.inputMinHeight,
-    justifyContent: 'center',
+    minWidth: 0,
   },
-  track: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: theme.colors.borderStrong,
-    overflow: 'hidden',
-  },
-  fill: {
-    height: 4,
+  // Sürükleme alanı dalgadan yüksek; dalga ortada kalır.
+  waveHit: {
+    height: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   time: {
-    minWidth: 34,
-    textAlign: 'right',
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xs,
     fontVariant: ['tabular-nums'],

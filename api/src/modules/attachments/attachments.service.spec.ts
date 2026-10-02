@@ -373,3 +373,60 @@ describe('AttachmentsService.presign — durationMs (M6b)', () => {
     });
   });
 });
+
+// ── M6b §7: dalga formu ────────────────────────────────────────────────────────
+describe('AttachmentsService.presign — waveform (M6b §7)', () => {
+  let service: AttachmentsService;
+  const WAVE = Buffer.alloc(64, 7).toString('base64'); // 64 bayt → 88 karakter
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.attachment.create.mockResolvedValue({ id: 'att-1', storageKey: 'k.m4a' });
+    storageMock.presignPut.mockResolvedValue('https://upload');
+  });
+
+  const audio = (waveform?: string): PresignAttachmentDto => ({
+    filename: 'ses.m4a',
+    contentType: 'audio/mp4',
+    size: 1000,
+    waveform,
+  });
+
+  it('ses + geçerli 64 baytlık waveform → kaydedilir', async () => {
+    await service.presign(USER_ID, audio(WAVE));
+    expect(prismaMock.attachment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ waveform: WAVE }),
+    });
+  });
+
+  it('ses, waveform yok → null', async () => {
+    await service.presign(USER_ID, audio());
+    expect(prismaMock.attachment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ waveform: null }),
+    });
+  });
+
+  it.each([
+    ['63 bayt', Buffer.alloc(63, 1).toString('base64')],
+    ['65 bayt', Buffer.alloc(65, 1).toString('base64')],
+    ['base64 değil', '!!!!'.repeat(22)],
+  ])('%s → INVALID_WAVEFORM', async (_ad, bad) => {
+    await expect(service.presign(USER_ID, audio(bad))).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'INVALID_WAVEFORM' }),
+    });
+    expect(prismaMock.attachment.create).not.toHaveBeenCalled();
+  });
+
+  it('ses-dışı türde waveform yok sayılır (geçersiz olsa da)', async () => {
+    await service.presign(USER_ID, {
+      filename: 'a.png',
+      contentType: 'image/png',
+      size: 100,
+      waveform: 'bozuk',
+    });
+    expect(prismaMock.attachment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ waveform: null }),
+    });
+  });
+});

@@ -19,7 +19,7 @@ import { Attachment, Message, MessageReaction, Prisma, ScanStatus, User } from '
 
 type AttachmentDto = Pick<
   Attachment,
-  'id' | 'filename' | 'contentType' | 'size' | 'scanStatus' | 'durationMs'
+  'id' | 'filename' | 'contentType' | 'size' | 'scanStatus' | 'durationMs' | 'waveform'
 >;
 
 type ReactionAggDto = { emoji: string; count: number; reactedByMe: boolean };
@@ -90,6 +90,7 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
       size: a.size,
       scanStatus: a.scanStatus,
       durationMs: a.durationMs ?? null,
+      waveform: a.waveform ?? null,
     })),
     reactions: reactionsAgg,
     mentions: msg.mentions ?? [],
@@ -312,6 +313,7 @@ export class MessagesService {
             size: true,
             scanStatus: true,
             durationMs: true,
+            waveform: true,
           },
         },
         // Reaksiyonları tek sorguda çek — N+1 yok; aggregation JS tarafında
@@ -494,6 +496,7 @@ export class MessagesService {
             size: true,
             scanStatus: true,
             durationMs: true,
+            waveform: true,
           },
         },
         reactions: { select: { userId: true, emoji: true } },
@@ -526,6 +529,7 @@ export class MessagesService {
           size: true,
           scanStatus: true,
           durationMs: true,
+          waveform: true,
         },
       });
 
@@ -598,6 +602,7 @@ export class MessagesService {
             size: true,
             scanStatus: true,
             durationMs: true,
+            waveform: true,
           },
         },
         reactions: { select: { userId: true, emoji: true } },
@@ -868,6 +873,7 @@ export class MessagesService {
             size: true,
             scanStatus: true,
             durationMs: true,
+            waveform: true,
           },
         },
         reactions: { select: { userId: true, emoji: true } },
@@ -902,6 +908,7 @@ export class MessagesService {
             size: true,
             scanStatus: true,
             durationMs: true,
+            waveform: true,
           },
         },
         reactions: { select: { userId: true, emoji: true } },
@@ -1005,6 +1012,7 @@ export class MessagesService {
             size: true,
             scanStatus: true,
             durationMs: true,
+            waveform: true,
           },
         },
         reactions: { select: { userId: true, emoji: true } },

@@ -223,7 +223,7 @@ const sending = ref(false)
 const sendError = ref('')
 
 // M6b — sesli mesaj kaydı. Aramadayken mikrofon arama tarafından kullanılıyor → kayıt kapalı.
-const { state: recState, elapsedMs: recElapsed, start: startRec, cancel: cancelRec, finish: finishRec } =
+const { state: recState, elapsedMs: recElapsed, liveLevels: recLevels, start: startRec, cancel: cancelRec, finish: finishRec } =
   useVoiceRecorder()
 const voiceDisabledReason = computed(() =>
   voiceStore.connectedChannelId || voiceStore.connecting ? t('voiceMessage.inCall') : null,
@@ -1146,6 +1146,7 @@ const dayLabels = computed<(string | null)[]>(() =>
               v-if="recState !== 'idle'"
               :state="recState"
               :elapsed-ms="recElapsed"
+          :levels="recLevels"
               @cancel="cancelRec"
               @send="sendVoice"
             />

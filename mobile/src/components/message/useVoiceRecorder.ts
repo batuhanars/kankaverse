@@ -9,6 +9,7 @@ import {
 } from 'expo-audio';
 import { useCallAudioBusy } from '@/hooks/useCallAudioBusy';
 import { readFileSize, type DraftAttachment } from '@/utils/attachmentUpload';
+import { dbToByte, encodeWaveform } from '@/utils/waveform';
 import { t } from '@/i18n';
 
 /** Sprint M6b §3 — kayıt üst sınırı (sunucu `DURATION_TOO_LONG` sınırıyla aynı: 300000 ms). */
@@ -16,6 +17,11 @@ export const MAX_VOICE_MS = 5 * 60 * 1000;
 /** 1 sn'den kısa kayıt yanlış dokunuş sayılır, sessizce atılır. */
 const MIN_VOICE_MS = 1000;
 const NOTICE_MS = 5000;
+/** Canlı dalgada şeritte görünen son örnek sayısı. */
+const LIVE_BARS = 40;
+/** M6b §7.2 — seviye örneği için `metering` açık (dB), ~100 ms'de bir okunur. */
+const RECORDING_OPTIONS = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true };
+const SAMPLE_INTERVAL_MS = 100;
 
 /** `idle` → `recording` → (5:00'da) `limit`: kayıt durdu, gönder/sil bekleniyor. */
 export type VoicePhase = 'idle' | 'recording' | 'limit';
@@ -31,8 +37,8 @@ export type VoicePhase = 'idle' | 'recording' | 'limit';
  * `channelId` değişirse ya da bileşen sökülürse kayıt iptal edilir (§3: başka sohbete geçilirse).
  */
 export function useVoiceRecorder(channelId: string) {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const recState = useAudioRecorderState(recorder, 200);
+  const recorder = useAudioRecorder(RECORDING_OPTIONS);
+  const recState = useAudioRecorderState(recorder, SAMPLE_INTERVAL_MS);
   const { inCall } = useCallAudioBusy();
 
   const [phase, setPhase] = useState<VoicePhase>('idle');
@@ -43,6 +49,10 @@ export function useVoiceRecorder(channelId: string) {
   /** Kayıt kendiliğinden (5:00) durunca dosya/süre burada bekler. */
   const finished = useRef<{ uri: string; durationMs: number } | null>(null);
   const phaseRef = useRef<VoicePhase>('idle');
+  /** Kayıt boyunca alınan seviye örnekleri (0-255); bitince 64 kovaya indirilip presign'a gider. */
+  const samples = useRef<number[]>([]);
+  /** Şeritteki canlı dalga için son örnekler. */
+  const [live, setLive] = useState<number[]>([]);
 
   const setPhaseBoth = useCallback((next: VoicePhase) => {
     phaseRef.current = next;
@@ -94,6 +104,8 @@ export function useVoiceRecorder(channelId: string) {
       await recorder.prepareToRecordAsync();
       recorder.record();
       finished.current = null;
+      samples.current = [];
+      setLive([]);
       setNotice('');
       setPhaseBoth('recording');
     } catch {
@@ -131,8 +143,20 @@ export function useVoiceRecorder(channelId: string) {
       contentType: 'audio/mp4',
       size: await readFileSize(result.uri),
       durationMs,
+      waveform: encodeWaveform(samples.current),
+      isVoice: true,
     };
   }, [setPhaseBoth, stopRecorder]);
+
+  // Seviye örneği: kayıt sürerken her durum güncellemesinde (~100 ms) bir kez.
+  useEffect(() => {
+    if (phase !== 'recording') return;
+    const level = dbToByte(recState.metering);
+    samples.current.push(level);
+    setLive((prev) => [...prev.slice(-(LIVE_BARS - 1)), level]);
+    // Yalnız süre ilerleyince örnekle (aynı durum iki kez gelirse çift örnek olmasın).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, recState.durationMillis]);
 
   // 5:00'a ulaşınca kayıt kendiliğinden durur ve GÖNDERİLMEZ; şerit gönder/sil bekler.
   useEffect(() => {
@@ -169,6 +193,7 @@ export function useVoiceRecorder(channelId: string) {
 
   return {
     phase,
+    levels: live,
     elapsedMs: phase === 'limit' ? MAX_VOICE_MS : recState.durationMillis,
     /** Mikrofon düğmesi devre dışı görünür mü (aramada). Dokununca `start` açıklamayı gösterir. */
     disabled: inCall,
