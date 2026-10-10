@@ -22,7 +22,7 @@ import { theme } from '@/theme';
  * çalmada (kullanıcı niyetiyle) `GET /attachments/:id`'den alınır; T&S/tarama kapısı sunucuda.
  * Çağıran (`AttachmentView`) `scanStatus === CLEAN` kapısını zaten geçirmiş olarak çizer.
  *
- * `isMine`: kendi baloncuğumda Kor zemin üstünde `accent500` okunmuyor → `accent400` (M6a §4).
+ * `isMine`: kendi baloncuğumda Kor zemin üstünde Kor okunmuyor → beyaz (bkz. tokens.ts bubbleOwn).
  */
 export function VoicePlayer({ attachment, isMine }: { attachment: AttachmentDto; isMine: boolean }) {
   const player = useAudioPlayer(null);
@@ -41,7 +41,7 @@ export function VoicePlayer({ attachment, isMine }: { attachment: AttachmentDto;
     () => decodeWaveform(attachment.waveform) ?? fallbackWaveform(attachment.id),
     [attachment.waveform, attachment.id],
   );
-  const accent = isMine ? theme.colors.accent400 : theme.colors.accent500;
+  const accent = isMine ? theme.colors.textPrimary : theme.colors.accent500;
   const totalMs = attachment.durationMs ?? (status.duration > 0 ? Math.round(status.duration * 1000) : 0);
   const playing = status.playing;
   const fraction = scrub ?? (totalMs > 0 ? Math.min(1, (status.currentTime * 1000) / totalMs) : 0);
@@ -165,12 +165,16 @@ export function VoicePlayer({ attachment, isMine }: { attachment: AttachmentDto;
           hitSlop={4}
           accessibilityRole="button"
           accessibilityLabel={playing ? t('mobile.voice.pause') : t('mobile.voice.play')}
-          style={styles.playButton}
+          style={[styles.playButton, isMine && styles.playButtonMine]}
         >
           {loading ? (
-            <ActivityIndicator size="small" color={theme.colors.textPrimary} />
+            <ActivityIndicator size="small" color={isMine ? theme.colors.bubbleOwn : theme.colors.textPrimary} />
           ) : (
-            <Ionicons name={playing ? 'pause' : 'play'} size={20} color={theme.colors.textPrimary} />
+            <Ionicons
+              name={playing ? 'pause' : 'play'}
+              size={20}
+              color={isMine ? theme.colors.bubbleOwn : theme.colors.textPrimary}
+            />
           )}
         </Pressable>
 
@@ -184,12 +188,17 @@ export function VoicePlayer({ attachment, isMine }: { attachment: AttachmentDto;
             accessibilityLabel={t('mobile.voice.seek')}
             {...pan.panHandlers}
           >
-            <Waveform levels={levels} progress={fraction} activeColor={accent} />
+            <Waveform
+              levels={levels}
+              progress={fraction}
+              activeColor={accent}
+              idleColor={isMine ? theme.colors.textSecondary : undefined}
+            />
           </View>
-          <Text style={styles.time}>{formatClock(shownMs)}</Text>
+          <Text style={[styles.time, isMine && styles.timeMine]}>{formatClock(shownMs)}</Text>
         </View>
       </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, isMine && styles.errorMine]}>{error}</Text> : null}
     </View>
   );
 }
@@ -213,6 +222,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // bubbleOwn üstünde Kor daire zeminden ayrışmıyor → beyaz daire, içinde baloncuk renginde ikon.
+  playButtonMine: {
+    backgroundColor: theme.colors.textPrimary,
+  },
   main: {
     flex: 1,
     minWidth: 0,
@@ -228,10 +241,17 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xs,
     fontVariant: ['tabular-nums'],
   },
+  timeMine: {
+    color: theme.colors.textBody,
+  },
   error: {
     color: theme.colors.danger,
     fontSize: theme.fontSize.xs,
     paddingHorizontal: 4,
     paddingBottom: 2,
+  },
+  // bubbleOwn üstünde danger ~2:1 kalıyor; hata metni okunsun diye beyaz.
+  errorMine: {
+    color: theme.colors.textPrimary,
   },
 });

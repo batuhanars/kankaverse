@@ -27,15 +27,15 @@ interface ReplyQuoteProps {
  *  silinmiş) sunucu yalnız `replyToId` döner; o durumda "Silinen mesaj" yazılır, satır gizlenmez. */
 export function ReplyQuote({ message, isMine, resolveMention, resolveRole }: ReplyQuoteProps) {
   return (
-    <View style={[quoteStyles.block, { borderLeftColor: isMine ? theme.colors.accent400 : theme.colors.accent500 }]}>
+    <View style={[quoteStyles.block, { borderLeftColor: isMine ? theme.colors.textPrimary : theme.colors.accent500 }]}>
       {message.replyTo ? (
-        <Text style={quoteStyles.text} numberOfLines={1}>
+        <Text style={[quoteStyles.text, isMine && quoteStyles.textMine]} numberOfLines={1}>
           <Text style={quoteStyles.author}>{message.replyTo.authorUsername}</Text>
           {'  '}
           {formatMentionsPlain(message.replyTo.content, resolveMention, t('mention.unknown'), resolveRole)}
         </Text>
       ) : (
-        <Text style={[quoteStyles.text, quoteStyles.deleted]} numberOfLines={1}>
+        <Text style={[quoteStyles.text, isMine && quoteStyles.textMine, quoteStyles.deleted]} numberOfLines={1}>
           {t('reply.deleted')}
         </Text>
       )}
@@ -53,8 +53,8 @@ interface MetaProps {
 
 /** Sağa yaslı meta satırı: `düzenlendi` + saat + okundu ikonu (C12 §4.2: ikon ya anlamlıdır ya hiç). */
 export function BubbleMeta({ message, isMine, receipt, inline }: MetaProps) {
-  const color = isMine ? theme.colors.textSecondary : theme.colors.textMuted;
-  const seenColor = isMine ? theme.colors.accent400 : theme.colors.accent500;
+  const color = isMine ? theme.colors.textBody : theme.colors.textMuted;
+  const seenColor = isMine ? theme.colors.textPrimary : theme.colors.accent500;
   return (
     <View style={[metaStyles.row, inline && metaStyles.rowInline]}>
       {message.editedAt ? <Text style={[metaStyles.text, { color }]}>{t('message.edited')}</Text> : null}
@@ -63,7 +63,7 @@ export function BubbleMeta({ message, isMine, receipt, inline }: MetaProps) {
         <Ionicons
           name={receipt === 'seen' ? 'checkmark-done' : 'checkmark'}
           size={14}
-          color={receipt === 'seen' ? seenColor : theme.colors.textMuted}
+          color={receipt === 'seen' ? seenColor : isMine ? theme.colors.textSecondary : theme.colors.textMuted}
           accessibilityLabel={t(`message.receipt.${receipt}`)}
         />
       ) : null}
@@ -108,6 +108,10 @@ const quoteStyles = StyleSheet.create({
   text: {
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xs,
+  },
+  // bubbleOwn üstünde textSecondary okunmuyor (bkz. tokens.ts bubbleOwn).
+  textMine: {
+    color: theme.colors.textBody,
   },
   author: {
     color: theme.colors.textPrimary,

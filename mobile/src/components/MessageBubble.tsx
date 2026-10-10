@@ -76,8 +76,8 @@ export function MessageBubble({
     !message.replyToId &&
     !message.pinnedAt &&
     !nameVisible;
-  // Kendi baloncuğumda Kor zemin üstünde accent500 okunmuyor (§4) → accent400.
-  const accent = isMine ? theme.colors.accent400 : theme.colors.accent500;
+  // Kendi baloncuğumda Kor zemin üstünde Kor okunmuyor (bkz. tokens.ts bubbleOwn) → beyaz.
+  const accent = isMine ? theme.colors.textPrimary : theme.colors.accent500;
   // Mesaj metinle bitiyorsa (ek yok) saat metnin son satırına oturur, kısa mesaj tek satır kalır.
   const metaInline = displayContent.length > 0 && (message.attachments?.length ?? 0) === 0;
 
@@ -277,9 +277,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accentSubtle,
     fontWeight: '500',
   },
-  // §4 — `accentSubtle` bubbleOwn üstünde görünmez, zemin yok.
+  // §4 — `accentSubtle` bubbleOwn üstünde görünmez, zemin yok; Kor metin de okunmuyor → beyaz + kalın.
   mentionMine: {
-    color: theme.colors.accent400,
+    color: theme.colors.textPrimary,
     fontWeight: '500',
   },
 });
