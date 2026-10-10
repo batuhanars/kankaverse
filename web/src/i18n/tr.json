@@ -1749,7 +1749,9 @@
       "failed": "Kayıt başlatılamadı.",
       "play": "Oynat",
       "pause": "Duraklat",
-      "seek": "Konum"
+      "seek": "Konum",
+      "guildAloneTitle": "Bu kanalda ilk sensin.",
+      "guildAloneSubtitle": "Arkadaşların katıldığında burada görünecekler."
     },
     "attachment": {
       "viewImage": "Görseli büyüt",
@@ -1942,10 +1944,6 @@
       "ringRateLimited": "Az önce çaldırdın, biraz bekle.",
       "ringForbidden": "Bu kişiyi şu anda çaldıramıyorsun.",
       "inviteFriendRow": "Bir arkadaşını davet et"
-    },
-    "voice": {
-      "guildAloneTitle": "Bu kanalda ilk sensin.",
-      "guildAloneSubtitle": "Arkadaşların katıldığında burada görünecekler."
     }
   }
 }
