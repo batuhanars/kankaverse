@@ -112,7 +112,8 @@ export function ComposerHost({
           existingVideoCount={composer.attachments.filter((a) => a.isVideo).length}
           onConfirm={(drafts) => {
             setAttachOpen(false);
-            void composer.onSend(drafts);
+            // M6c §3.3.b — gönderilmez, şeride düşer: kullanıcı açıklama yazıp kendisi gönderir.
+            composer.addAttachments(drafts);
           }}
         />
       )}

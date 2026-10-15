@@ -60,13 +60,31 @@ mimari + Expo SDK 54 ile uyumlu sürümünü doğrula (changelog/issue). Uyumsuz
 - Bir mesajda en fazla **1 video** (görsellerle karışık olabilir; ikinci video seçimi uyarıyla reddedilir).
 
 ### §3.3 Hazırlama + gönderme
-- `Video.compress(uri, { compressionMethod: 'auto' })` → mp4. İlerleme ek şeridindeki taslak kutusunda
+- `Video.compress(uri, { compressionMethod: 'auto', maxSize: 1280 })` → mp4. `maxSize` verilmezse paket
+  640px'e indiriyor ve tam ekranda pikselleşiyordu (revize 2026-10-15). Cihazda ölçüldü: 1080×1920
+  30,6 sn kaynak → 720×1280, 10,4 MB (~2,7 Mbps toplam) → 60 sn ≈ 21 MB, sınırın altında. 1920 seçilmedi:
+  paket orada 3,5 Mbps'e çıkabiliyor, 60 sn 25 MB'ı aşar. İlerleme ek şeridindeki taslak kutusunda
   yüzde olarak görünür ("Video hazırlanıyor %42", i18n). Gönder düğmesi hazırlama bitene dek bekler.
 - Sıkıştırma sonrası 25 MB'ı aşıyorsa gönderilmez, uyarı (i18n).
 - Küçük resim: `createVideoThumbnail` → en uzun kenar 320px JPEG'e küçült, base64 (≤ ~30 KB).
   `width/height` ve `durationMs` videonun meta verisinden.
 - Yükleme mevcut `attachmentUpload` hattıyla, yeni alanlar presign'a eklenerek.
 - Taslak iptal edilirse sıkıştırma iptal edilir (paket destekliyorsa) ve geçici dosya silinir.
+
+### §3.3.b Revize 2026-10-15 — kameradan video + açıklama (sahip onayı)
+- **Kameradan video:** Izgarada `Kamera` hücresinin yanına `Video` hücresi (izin reddedildi
+  görünümünde de ayrı düğme). `launchCameraAsync({ mediaTypes: ['videos'], videoMaxDuration: 60 })`.
+  🔴 Tek hücre yetmiyor: `expo-image-picker` Android'de karışık `mediaTypes`ta yalnız FOTO kamerasını açıyor
+  (`ImagePickerOptions.kt` → `ACTION_IMAGE_CAPTURE`). Sonuç `confirmFiles` hunisine `isVideo` ile girer;
+  60 sn / tek video / sıkıştırma kuralları aynen. Yeni paket ve yeni izin yok (ses kaydını sistem kamera
+  uygulaması yapar).
+- **Açıklama = mesaj metni, API değişmez** (web `AttachmentComposeModal` zaten böyle). 🔴 M3c'deki
+  "panel onayı = gönder" kuralı KALKTI: onaylanan ekler kutunun üstündeki taslak şeridine düşer, kullanıcı
+  isterse kutuya açıklama yazar ve gönder'e basar (Discord mobil davranışı). Panel düğmesi
+  `Gönder (n)` → `Ekle (n)`. Sesli mesaj hemen gitmeye devam eder (M6b). Şeritte video çipi kamera
+  ikonu ile çizilir (`Image` video dosyası çizemiyor).
+- **Mobil baloncukta metin eklerin ALTINDA** (sahip cihaz turu, WhatsApp düzeni); saat metnin son
+  satırına oturur. Web (Discord tarzı liste) metni üstte tutmaya devam eder.
 
 ### §3.4 Oynatma
 Karta dokununca tam ekran oynatıcı (mevcut `ImageViewer` deseni: modal, kapat düğmesi):

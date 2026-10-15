@@ -188,8 +188,9 @@ export function MessageComposer({
             </View>
           ) : null}
 
-          {/* Sprint M3c §3 — gönderilmeyi bekleyen ekler. Gönderim hatasında bu şerit AYAKTA KALIR
-              (seçim korunur), kullanıcı aynı seçimle tekrar deneyebilir. */}
+          {/* Sprint M3c §3 — gönderilmeyi bekleyen ekler. M6c §3.3.b'den beri panelden onaylanan
+              ekler de burada açıklama bekler. Gönderim hatasında şerit AYAKTA KALIR (seçim korunur),
+              kullanıcı aynı seçimle tekrar deneyebilir. */}
           {!!attachments?.length && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.draftRow}>
               {attachments.map((draft) => (
@@ -198,7 +199,12 @@ export function MessageComposer({
                     <Image source={{ uri: draft.uri }} style={styles.draftThumb} resizeMode="cover" />
                   ) : (
                     <View style={styles.draftThumb}>
-                      <Ionicons name="document-outline" size={20} color={theme.colors.textSecondary} />
+                      {/* `Image` video dosyasını çizemiyor; küçük resim gönderim anında üretiliyor. */}
+                      <Ionicons
+                        name={draft.isVideo ? 'videocam-outline' : 'document-outline'}
+                        size={20}
+                        color={theme.colors.textSecondary}
+                      />
                     </View>
                   )}
                   <Text style={styles.draftName} numberOfLines={1}>

@@ -36,7 +36,7 @@ const COLLAPSED_RATIO = 0.56;
 /** Sürükleme eşiği — bunun altındaki hareket kazara dokunuş sayılır. */
 const DRAG_THRESHOLD = 48;
 
-type Cell = { type: 'camera' } | { type: 'asset'; asset: MediaLibrary.Asset };
+type Cell = { type: 'camera' } | { type: 'video' } | { type: 'asset'; asset: MediaLibrary.Asset };
 
 interface Props {
   visible: boolean;
@@ -45,7 +45,7 @@ interface Props {
   existingCount: number;
   /** M6c — kutuda ZATEN bekleyen video sayısı (bir mesajda en fazla 1 video). */
   existingVideoCount?: number;
-  /** Seçim onaylandı: ekler kutuya eklenir ve mesaj gönderilir (sözleşme §1 "gönder düğmesi"). */
+  /** Seçim onaylandı: ekler kutunun taslak şeridine düşer, gönderilmez (M6c §3.3.b — açıklama için). */
   onConfirm: (drafts: DraftAttachment[]) => void;
 }
 
@@ -220,23 +220,40 @@ export function AttachmentSheet({ visible, onClose, existingCount, existingVideo
     );
   }
 
-  async function openCamera() {
+  /**
+   * Kamera: foto ya da video (M6c §3.3.b). 🔴 İki ayrı giriş şart: `expo-image-picker` Android'de
+   * karışık `mediaTypes` verilince yalnız FOTO kamerasını açıyor (`ACTION_IMAGE_CAPTURE`).
+   * Video kaydında 60 sn sınırı kamera uygulamasına iletilir; uymayan uygulama olursa huni yine reddeder.
+   */
+  async function openCamera(mode: 'photo' | 'video') {
     setError('');
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
       setError(t('mobile.attach.cameraDenied'));
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.9 });
+    const result =
+      mode === 'video'
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['videos'], videoMaxDuration: MAX_VIDEO_MS / 1000 })
+        : await ImagePicker.launchCameraAsync({ quality: 0.9 });
     if (result.canceled || !result.assets?.length) return;
     const shot = result.assets[0];
     await confirmFiles([
-      { uri: shot.uri, filename: shot.fileName ?? 'foto.jpg', contentType: shot.mimeType, size: shot.fileSize },
+      mode === 'video'
+        ? {
+            uri: shot.uri,
+            isVideo: true,
+            // ImagePicker süreyi ms verir (sistem seçicisiyle aynı).
+            durationMs: shot.duration,
+            width: shot.width,
+            height: shot.height,
+          }
+        : { uri: shot.uri, filename: shot.fileName ?? 'foto.jpg', contentType: shot.mimeType, size: shot.fileSize },
     ]);
   }
 
-  /** `selected` seçim SIRASINI taşıyor (rozetteki numara da ondan) — sıra korunarak gönderilir. */
-  async function sendSelected() {
+  /** `selected` seçim SIRASINI taşıyor (rozetteki numara da ondan) — sıra korunarak şeride eklenir. */
+  async function addSelected() {
     await confirmFiles(
       selected.map((a) => ({
         uri: a.uri,
@@ -251,7 +268,11 @@ export function AttachmentSheet({ visible, onClose, existingCount, existingVideo
   }
 
   const cells = useMemo<Cell[]>(
-    () => [{ type: 'camera' }, ...media.assets.map((asset) => ({ type: 'asset' as const, asset }))],
+    () => [
+      { type: 'camera' },
+      { type: 'video' },
+      ...media.assets.map((asset) => ({ type: 'asset' as const, asset })),
+    ],
     [media.assets],
   );
 
@@ -379,12 +400,20 @@ export function AttachmentSheet({ visible, onClose, existingCount, existingVideo
               </Pressable>
               {/* Kamera AYRI bir izindir: galeri reddedildi diye kamera yolu da kapanmaz. */}
               <Pressable
-                onPress={openCamera}
+                onPress={() => void openCamera('photo')}
                 accessibilityRole="button"
                 accessibilityLabel={t('mobile.attach.camera')}
                 style={styles.deniedButton}
               >
                 <Text style={styles.deniedButtonText}>{t('mobile.attach.camera')}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void openCamera('video')}
+                accessibilityRole="button"
+                accessibilityLabel={t('mobile.attach.recordVideo')}
+                style={styles.deniedButton}
+              >
+                <Text style={styles.deniedButtonText}>{t('mobile.attach.recordVideo')}</Text>
               </Pressable>
             </View>
           ) : (
@@ -392,7 +421,7 @@ export function AttachmentSheet({ visible, onClose, existingCount, existingVideo
               style={styles.grid}
               data={cells}
               numColumns={COLUMNS}
-              keyExtractor={(cell) => (cell.type === 'camera' ? 'camera' : cell.asset.id)}
+              keyExtractor={(cell) => (cell.type === 'asset' ? cell.asset.id : cell.type)}
               columnWrapperStyle={styles.gridRow}
               onEndReachedThreshold={0.5}
               onEndReached={media.loadMore}
@@ -404,16 +433,22 @@ export function AttachmentSheet({ visible, onClose, existingCount, existingVideo
                 )
               }
               renderItem={({ item }) => {
-                if (item.type === 'camera') {
+                if (item.type === 'camera' || item.type === 'video') {
+                  const isVideo = item.type === 'video';
+                  const label = t(isVideo ? 'mobile.attach.recordVideo' : 'mobile.attach.camera');
                   return (
                     <Pressable
-                      onPress={openCamera}
+                      onPress={() => void openCamera(isVideo ? 'video' : 'photo')}
                       accessibilityRole="button"
-                      accessibilityLabel={t('mobile.attach.camera')}
+                      accessibilityLabel={label}
                       style={[styles.cameraCell, { width: cellSize, height: cellSize }]}
                     >
-                      <Ionicons name="camera-outline" size={26} color={theme.colors.textSecondary} />
-                      <Text style={styles.cameraLabel}>{t('mobile.attach.camera')}</Text>
+                      <Ionicons
+                        name={isVideo ? 'videocam-outline' : 'camera-outline'}
+                        size={26}
+                        color={theme.colors.textSecondary}
+                      />
+                      <Text style={styles.cameraLabel}>{label}</Text>
                     </Pressable>
                   );
                 }
@@ -448,13 +483,13 @@ export function AttachmentSheet({ visible, onClose, existingCount, existingVideo
 
           {selected.length > 0 && (
             <Pressable
-              onPress={sendSelected}
+              onPress={addSelected}
               disabled={busy}
               accessibilityRole="button"
-              accessibilityLabel={t('mobile.attach.send', { count: selected.length })}
+              accessibilityLabel={t('mobile.attach.add', { count: selected.length })}
               style={[styles.sendButton, busy && styles.sendButtonDisabled]}
             >
-              <Text style={styles.sendButtonText}>{t('mobile.attach.send', { count: selected.length })}</Text>
+              <Text style={styles.sendButtonText}>{t('mobile.attach.add', { count: selected.length })}</Text>
             </Pressable>
           )}
         </View>

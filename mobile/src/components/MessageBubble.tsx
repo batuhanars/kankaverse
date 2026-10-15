@@ -78,8 +78,10 @@ export function MessageBubble({
     !nameVisible;
   // Kendi baloncuğumda Kor zemin üstünde Kor okunmuyor (bkz. tokens.ts bubbleOwn) → beyaz.
   const accent = isMine ? theme.colors.textPrimary : theme.colors.accent500;
-  // Mesaj metinle bitiyorsa (ek yok) saat metnin son satırına oturur, kısa mesaj tek satır kalır.
-  const metaInline = displayContent.length > 0 && (message.attachments?.length ?? 0) === 0;
+  const hasAttachments = (message.attachments?.length ?? 0) > 0;
+  // Metin her zaman baloncuğun son içeriği (ekler varsa onların ALTINDA, M6c §3.3.b sahip revizesi) →
+  // saat metnin son satırına oturur, kısa mesaj tek satır kalır.
+  const metaInline = displayContent.length > 0;
 
   return (
     <View
@@ -141,8 +143,15 @@ export function MessageBubble({
             />
           )}
 
+          {/* Sprint M3c R2 — `interactive`: görsele dokun → tam ekran, dosyaya dokun → sistemde aç.
+              CLEAN olmayan ekler dokunulamaz (bkz. `AttachmentView` prop notu). */}
+          {message.attachments?.map((a) => (
+            <AttachmentView key={a.id} attachment={a} interactive isMine={isMine} />
+          ))}
+
+          {/* Açıklama eklerin ALTINDA (sahip revizesi 2026-10-15, WhatsApp düzeni). */}
           {displayContent.length > 0 && (
-            <Text style={styles.content}>
+            <Text style={[styles.content, hasAttachments && styles.contentAfterAttachments]}>
               {mentionSegments.map((seg, i) =>
                 seg.isMention ? (
                   <Text key={i} style={isMine ? styles.mentionMine : styles.mention}>
@@ -155,11 +164,6 @@ export function MessageBubble({
               {metaInline && <MetaSpacer message={message} receipt={receipt} isMine={isMine} />}
             </Text>
           )}
-          {/* Sprint M3c R2 — `interactive`: görsele dokun → tam ekran, dosyaya dokun → sistemde aç.
-              CLEAN olmayan ekler dokunulamaz (bkz. `AttachmentView` prop notu). */}
-          {message.attachments?.map((a) => (
-            <AttachmentView key={a.id} attachment={a} interactive isMine={isMine} />
-          ))}
 
           <BubbleMeta message={message} isMine={isMine} receipt={receipt} inline={metaInline} />
         </Pressable>
@@ -269,6 +273,9 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.base,
     lineHeight: 20,
+  },
+  contentAfterAttachments: {
+    marginTop: 6,
   },
   // Web `.kv-mention` ile aynı dil: Kor metin + soluk Kor zemin. Yatay dolgu KONMADI — RN'de
   // iç içe `<Text>`in padding'i Android'de güvenilmez çiziliyor.

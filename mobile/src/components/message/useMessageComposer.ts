@@ -79,6 +79,15 @@ export function useMessageComposer(
     setSendError('');
   }
 
+  /**
+   * M6c §3.3.b — panelden onaylanan ekler şeride düşer, gönderilmez: kullanıcı kutuya açıklama yazıp
+   * kendisi gönderir. Açıklama ayrı bir alan değil, mesaj metnidir (API değişmedi).
+   */
+  function addAttachments(drafts: DraftAttachment[]) {
+    setAttachments((prev) => [...prev, ...drafts]);
+    setSendError('');
+  }
+
   function removeAttachment(key: string) {
     setAttachments((prev) => prev.filter((a) => a.key !== key));
     setSendError('');
@@ -90,8 +99,8 @@ export function useMessageComposer(
    * 🔴 **Görünür state'e HİÇ yazmaz.** Yüklenen kimlikler çağıranın verdiği diziye **yerinde**
    * işlenir; çağıran o diziyi yalnız HATA yolunda `setAttachments`e geçirir. Önceden burada
    * `setAttachments` vardı ve başarılı gönderimde taslak şeridi bir kare görünüp kayboluyordu
-   * (sahip bulgusu: "görsel bir anlığına kutuya düşüyor"). Şerit bir hata kurtarma yüzeyi;
-   * her şey yolunda giderken görünmesi için sebep yok.
+   * (sahip bulgusu: "görsel bir anlığına kutuya düşüyor"). M6c §3.3.b'den beri şerit gönderim
+   * öncesi de dolu (ekler orada açıklama bekliyor); başarıda `onSend` onu tek seferde boşaltır.
    *
    * 🔴 **Kısmi başarısızlık = mesaj GÖNDERİLMEZ** (sözleşme §3). Yarısı giden mesaj sessiz veri
    * kaybıdır. Başarılı olanların kimliği dizide KALIR: kullanıcı tekrar denediğinde aynı dosya
@@ -190,6 +199,7 @@ export function useMessageComposer(
     replyTo,
     editing,
     attachments,
+    addAttachments,
     removeAttachment,
     onChangeInput,
     onSend,
