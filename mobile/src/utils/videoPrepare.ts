@@ -8,6 +8,11 @@ export const MAX_VIDEO_MS = 60_000;
 /** Sunucu `thumbnail` üst sınırı 40000 karakter; ~30 KB hedefi için güvenli pay. */
 const THUMB_MAX_CHARS = 38_000;
 const THUMB_EDGE = 320;
+/**
+ * Sıkıştırma sonrası en uzun kenar (720p). Verilmezse paket 640'a indiriyor, tam ekranda pikselleşiyor.
+ * 1920 değil: paket orada 3,5 Mbps'e çıkabiliyor, 60 sn video 25 MB sınırını aşar.
+ */
+const VIDEO_MAX_EDGE = 1280;
 
 /** Hazırlama hatası: `key` kullanıcıya gösterilecek i18n anahtarı (ham hata metni ekrana basılmaz). */
 export class VideoPrepareError extends Error {
@@ -48,7 +53,7 @@ export async function prepareVideoDraft(
 ): Promise<DraftAttachment> {
   let uri: string;
   try {
-    uri = await Video.compress(draft.uri, { compressionMethod: 'auto' }, (p) => onProgress(Math.round(p * 100)));
+    uri = await Video.compress(draft.uri, { compressionMethod: 'auto', maxSize: VIDEO_MAX_EDGE }, (p) => onProgress(Math.round(p * 100)));
   } catch {
     throw new VideoPrepareError('mobile.video.prepareFailed');
   }
