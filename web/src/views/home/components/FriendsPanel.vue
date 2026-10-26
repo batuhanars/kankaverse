@@ -9,6 +9,7 @@ import KvButton from '@/components/ui/KvButton.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
 import { usePresenceStore } from '@/stores/presence'
+import { hoverAvatarSrc } from '@/utils/animatedMedia'
 
 const props = defineProps<{ initialTab?: 'all' | 'pending' | 'blocked' | 'add' }>()
 const emit = defineEmits<{ openDm: [channelId: string]; logout: [] }>()
@@ -18,6 +19,9 @@ const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
 const dmStore = useDmStore()
 const presenceStore = usePresenceStore()
+
+// C16 — Kankalar satırı hover'dayken hareketli avatar
+const hoveredFriendId = ref<string | null>(null)
 
 type Tab = 'all' | 'pending' | 'blocked' | 'add'
 const activeTab = ref<Tab>(props.initialTab ?? 'all')
@@ -217,11 +221,18 @@ width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
         <template v-for="(f, i) in filteredFriends" :key="f.friendshipId">
           <div
             class="group relative flex items-center gap-3 mx-2 px-3 py-3 rounded-[var(--kv-radius-md)] hover:bg-[var(--kv-bg-elevated)]"
+            @mouseenter="hoveredFriendId = f.friendshipId"
+            @mouseleave="hoveredFriendId = null"
           >
             <!-- Avatar + presence noktası -->
             <div class="relative shrink-0">
               <div class="w-10 h-10 rounded-full overflow-hidden" style="background-color: var(--kv-bg-elevated);">
-                <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
+                <img
+                  v-if="f.user.avatarUrl"
+                  :src="hoverAvatarSrc(f.user, hoveredFriendId === f.friendshipId) ?? f.user.avatarUrl"
+                  :alt="f.user.username"
+                  class="w-full h-full object-cover"
+                />
                 <span v-else class="w-full h-full flex items-center justify-center text-[14px] font-semibold" style="color: var(--kv-text-secondary);">
                   {{ f.user.username[0].toUpperCase() }}
                 </span>

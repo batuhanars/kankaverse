@@ -64,6 +64,7 @@ export interface FriendCodeUserDto {
   id: string
   username: string
   avatarUrl: string | null
+  avatarAnimatedUrl?: string | null // C16 — Kankalar ve DM listesinde aktif/hover'da canlanır
 }
 
 export interface FriendDto {
@@ -97,7 +98,7 @@ export type DmChannelDto =
   | {
       type: 'DM'
       id: string
-      otherUser: FriendCodeUserDto & { avatarAnimatedUrl?: string | null } // C16 — aktif/hover'da canlanır
+      otherUser: FriendCodeUserDto
       lastMessage: MessageDto | null
       unread: boolean
       canMessage: boolean

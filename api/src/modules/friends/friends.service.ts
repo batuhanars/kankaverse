@@ -12,8 +12,26 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { SendFriendRequestDto } from './dto/send-friend-request.dto';
 import { SendFriendRequestByUserDto } from './dto/send-friend-request-by-user.dto';
 
-function toFriendCodeUserDto(user: { id: string; username: string; avatarUrl: string | null }) {
-  return { id: user.id, username: user.username, avatarUrl: user.avatarUrl };
+// C16 — Kankalar listesinde satır hover'dayken hareketli avatar; arkadaşlık sorgularının ortak kullanıcı seçimi
+const FRIEND_USER_SELECT = {
+  id: true,
+  username: true,
+  avatarUrl: true,
+  avatarAnimatedUrl: true,
+} as const;
+
+function toFriendCodeUserDto(user: {
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+  avatarAnimatedUrl?: string | null;
+}) {
+  return {
+    id: user.id,
+    username: user.username,
+    avatarUrl: user.avatarUrl,
+    avatarAnimatedUrl: user.avatarAnimatedUrl ?? null,
+  };
 }
 
 @Injectable()
@@ -32,8 +50,8 @@ export class FriendsService {
         OR: [{ requesterId: userId }, { addresseeId: userId }],
       },
       include: {
-        requester: { select: { id: true, username: true, avatarUrl: true } },
-        addressee: { select: { id: true, username: true, avatarUrl: true } },
+        requester: { select: FRIEND_USER_SELECT },
+        addressee: { select: FRIEND_USER_SELECT },
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -55,8 +73,8 @@ export class FriendsService {
         OR: [{ requesterId: userId }, { addresseeId: userId }],
       },
       include: {
-        requester: { select: { id: true, username: true, avatarUrl: true } },
-        addressee: { select: { id: true, username: true, avatarUrl: true } },
+        requester: { select: FRIEND_USER_SELECT },
+        addressee: { select: FRIEND_USER_SELECT },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -116,8 +134,8 @@ export class FriendsService {
         where: { id: existing.id },
         data: { status: 'ACCEPTED' },
         include: {
-          requester: { select: { id: true, username: true, avatarUrl: true } },
-          addressee: { select: { id: true, username: true, avatarUrl: true } },
+          requester: { select: FRIEND_USER_SELECT },
+          addressee: { select: FRIEND_USER_SELECT },
         },
       });
       this.realtime.emitToUser(accepted.requesterId, 'friend.accept', {
@@ -148,8 +166,8 @@ export class FriendsService {
         where: { id: existing.id },
         data: { status: 'PENDING' },
         include: {
-          addressee: { select: { id: true, username: true, avatarUrl: true } },
-          requester: { select: { id: true, username: true, avatarUrl: true } },
+          addressee: { select: FRIEND_USER_SELECT },
+          requester: { select: FRIEND_USER_SELECT },
         },
       });
       this.realtime.emitToUser(target.id, 'friend.request', {
@@ -176,8 +194,8 @@ export class FriendsService {
     const request = await this.prisma.friendship.create({
       data: { requesterId: senderId, addresseeId: target.id },
       include: {
-        addressee: { select: { id: true, username: true, avatarUrl: true } },
-        requester: { select: { id: true, username: true, avatarUrl: true } },
+        addressee: { select: FRIEND_USER_SELECT },
+        requester: { select: FRIEND_USER_SELECT },
       },
     });
     this.realtime.emitToUser(target.id, 'friend.request', {
@@ -262,8 +280,8 @@ export class FriendsService {
       where: { id: requestId },
       data: { status: 'ACCEPTED' },
       include: {
-        requester: { select: { id: true, username: true, avatarUrl: true } },
-        addressee: { select: { id: true, username: true, avatarUrl: true } },
+        requester: { select: FRIEND_USER_SELECT },
+        addressee: { select: FRIEND_USER_SELECT },
       },
     });
     const result = {
