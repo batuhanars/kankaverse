@@ -4285,3 +4285,16 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Sahip canlı test (web, yerel) — 2026-10-26: GIF avatar + afiş, videodan avatar + afiş, oynatma, tüm maddeler geçti
 - [x] §6 mobil: native ayar, seçme, kesit, gösterim, yerel derleme — 2026-10-26 cihaz turu geçti (afiş önizleme taşması textureView ile düzeltildi)
 - [ ] Cihaz turu + mağaza sürümü
+
+## Sprint C13b — Avatar ve afişte konumlandırma — 2026-10-26
+
+> Sözleşme: `contracts/SPRINT_C13B_MEDIA_POSITIONING_CONTRACT.md`. api → web + mobil. Mobil yalnız JS.
+> Mağaza sürümü (versionCode 25) bu sprintle çıkar.
+
+- [x] §2 api: crop + oran düzeltmesi + sharp görsel girişi + ffmpeg crop filtresi + testler
+- [x] §3 web: MediaPositioner + tek modal (390/320 ölçümü sahipte)
+- [x] §4 mobil: MediaPositioner
+- [x] §5 build/test temiz (api 1168 test + Docker sharp; web vue-tsc -b bilinen 6 + vite build; mobil typecheck + lint)
+- [x] R7 insan incelemesi (sahip) — 2026-10-26 onaylandı
+- [x] Sahip canlı test (web) + cihaz turu (mobil) — 2026-10-26 yerel API, tüm maddeler geçti
+- [ ] Mağaza sürümü (release paketi canlıya karşı cihazda)

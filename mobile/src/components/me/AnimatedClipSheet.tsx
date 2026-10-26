@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { VideoView, useVideoPlayer } from 'expo-video';
-import type { AnimatedTarget } from '@/api/users';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useVideoPlayer } from 'expo-video';
+import type { AnimatedTarget, MediaCrop } from '@/api/users';
 import { extractErrorCode, extractErrorMessage } from '@/api/errors';
 import {
   ANIMATED_DEFAULT_MS,
@@ -12,17 +13,19 @@ import {
 } from '@/utils/animatedMedia';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
 import { RangeSlider } from './RangeSlider';
+import { MAX_ZOOM, MIN_ZOOM, MediaPositioner } from './MediaPositioner';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 /**
- * Sprint C13 §6.2-6.3: GIF önizleme veya video kesit seçici + yükleme (web `AnimatedClipModal`).
- * Akış: (gerekirse sıkıştır) → presign → PUT → işle. Sunucu hareketli WebP üretir.
+ * Sprint C13 §6.2-6.3 + C13b §4: konumlandırma (sürükle + yakınlaştır) ve GIF/video kesit seçici +
+ * yükleme (web `AnimatedClipModal`). Statik görsel de buraya girer. Akış: (gerekirse sıkıştır) →
+ * presign → PUT → işle (`crop` ile). Sunucu kırpar; GIF/video için hareketli WebP üretir.
  *
  * Kurallar web ile aynı: kesit 0,5 ile 6 sn, varsayılan 3 sn, seçili aralık döngüde oynar.
  * `ANIMATED_DISABLED` gelirse `onDisabled` çağrılır (üst ekran statik moda düşer).
  */
-export type ClipMedia = Extract<PickedProfileMedia, { kind: 'gif' | 'video' }>;
+export type ClipMedia = PickedProfileMedia;
 
 interface Props {
   media: ClipMedia | null;
@@ -41,7 +44,8 @@ export function AnimatedClipSheet({ media, target, onClose, onDone, onDisabled }
   const [busy, setBusy] = useState(false);
   return (
     <Modal transparent visible={!!media} animationType="slide" onRequestClose={() => !busy && onClose()}>
-      <View style={styles.backdrop}>
+      {/* Android'de Modal ayrı pencere: kökteki sarmalayıcı ulaşmaz, jestler sessizce çalışmaz. */}
+      <GestureHandlerRootView style={styles.backdrop}>
         <View style={[styles.sheet, { paddingBottom: sheetBottomPadding(bottomInset) }]}>
           {/* Her seçimde yeni örnek: kaydırıcı/oynatıcı durumu bir önceki dosyadan kalmasın. */}
           {media ? (
@@ -57,7 +61,7 @@ export function AnimatedClipSheet({ media, target, onClose, onDone, onDisabled }
             />
           ) : null}
         </View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -78,6 +82,27 @@ function ClipBody({
   const [phase, setPhase] = useState<'compress' | 'upload' | 'process'>('upload');
   const [pct, setPct] = useState(0);
   const [error, setError] = useState('');
+  const [zoom, setZoom] = useState(MIN_ZOOM);
+  const [crop, setCrop] = useState<MediaCrop | undefined>(undefined);
+  // Kaynağın gerçek boyutu: video seçiciden (dönme uygulanmış), görsel `Image.getSize`tan.
+  // Alınamazsa konumlandırma kapanır, crop gönderilmez (sunucu merkezden kırpar).
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(
+    media.kind === 'video' && media.width > 0 && media.height > 0 ? { w: media.width, h: media.height } : null,
+  );
+  const [dimsFailed, setDimsFailed] = useState(false);
+
+  useEffect(() => {
+    if (media.kind === 'video') return;
+    let alive = true;
+    Image.getSize(
+      media.uri,
+      (w, h) => alive && w > 0 && h > 0 && setDims({ w, h }),
+      () => alive && setDimsFailed(true),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [media]);
 
   const player = useVideoPlayer(isVideo ? media.uri : null, (p) => {
     p.muted = true;
@@ -136,6 +161,7 @@ function ClipBody({
       await uploadAnimated({
         target,
         media,
+        crop: dims ? crop : undefined,
         startMs: sliders ? Math.round(startS * 1000) : undefined,
         durationMs: sliders ? Math.round(effLen * 1000) : undefined,
         onPhase: (ph, p) => {
@@ -169,23 +195,44 @@ function ClipBody({
   return (
     <View style={styles.content}>
       <Text style={styles.title}>{t('profile.animated.title')}</Text>
-      <Text style={styles.hint}>{t(isVideo ? 'profile.animated.hintVideo' : 'profile.animated.hintGif')}</Text>
+      {media.kind !== 'static' ? (
+        <Text style={styles.hint}>{t(isVideo ? 'profile.animated.hintVideo' : 'profile.animated.hintGif')}</Text>
+      ) : null}
 
-      <View style={[styles.preview, target === 'AVATAR' ? styles.previewAvatar : styles.previewBanner]}>
-        {isVideo ? (
-          // Android'de varsayılan SurfaceView üst görünümün kırpmasını yok sayıyor: dikey video 5:2 afiş
-          // kutusundan taşıp panelin dışına çıkıyordu. TextureView normal görünüm gibi kırpılır.
-          <VideoView
-            player={player}
-            style={styles.fill}
-            contentFit="cover"
-            nativeControls={false}
-            surfaceType="textureView"
+      {dims ? (
+        <>
+          <MediaPositioner
+            source={isVideo ? { kind: 'video', player } : { kind: 'image', uri: media.uri }}
+            naturalWidth={dims.w}
+            naturalHeight={dims.h}
+            target={target}
+            zoom={zoom}
+            onZoomChange={setZoom}
+            onCropChange={setCrop}
+            disabled={busy}
           />
-        ) : (
-          <Image source={{ uri: media.uri }} style={styles.fill} resizeMode="cover" />
-        )}
-      </View>
+          <Text style={styles.hint}>{t('profile.animated.dragHint')}</Text>
+          <View>
+            <View style={styles.sliderRow}>
+              <Text style={styles.sliderLabel}>{t('profile.animated.zoom')}</Text>
+              <Text style={styles.sliderLabel}>{zoom.toFixed(1)}x</Text>
+            </View>
+            <RangeSlider
+              value={zoom}
+              min={MIN_ZOOM}
+              max={MAX_ZOOM}
+              step={0.05}
+              disabled={busy}
+              onChange={setZoom}
+              accessibilityLabel={t('profile.animated.zoom')}
+            />
+          </View>
+        </>
+      ) : dimsFailed ? (
+        <Text style={styles.hint}>{t('profile.animated.previewFailed')}</Text>
+      ) : (
+        <ActivityIndicator color={theme.colors.accent500} />
+      )}
 
       {isVideo && !sliders ? <Text style={styles.hint}>{t('profile.animated.previewFailed')}</Text> : null}
 
@@ -267,25 +314,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.sm,
     lineHeight: 18,
-  },
-  preview: {
-    overflow: 'hidden',
-    backgroundColor: theme.colors.bgElevated,
-  },
-  previewAvatar: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    alignSelf: 'center',
-  },
-  previewBanner: {
-    width: '100%',
-    aspectRatio: 5 / 2,
-    borderRadius: theme.radius.md,
-  },
-  fill: {
-    width: '100%',
-    height: '100%',
   },
   sliderRow: {
     flexDirection: 'row',

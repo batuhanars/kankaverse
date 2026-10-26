@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /** C13 — hareketli profil görseli presign gövdesi. contentType allowlist'i serviste (UNSUPPORTED_TYPE kodu için). */
@@ -9,7 +9,8 @@ export class PresignAnimatedDto {
 
   @ApiProperty({
     example: 'video/mp4',
-    description: 'image/gif, video/mp4, video/webm, video/quicktime',
+    description:
+      'image/gif, video/mp4, video/webm, video/quicktime, image/png, image/jpeg, image/webp',
   })
   @IsString()
   contentType: string;
@@ -39,4 +40,14 @@ export class ProcessAnimatedDto {
   @IsOptional()
   @IsNumber()
   durationMs?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Kaynağın genişlik/yüksekliğine oranla 0-1 kesirler: { x, y, width, height }. Yoksa merkezden kırpılır. ' +
+      'Değerler serviste doğrulanır (INVALID_CROP 400); oran hedefe sunucuda oturtulur.',
+    example: { x: 0.1, y: 0.25, width: 0.8, height: 0.32 },
+  })
+  @IsOptional()
+  @IsObject()
+  crop?: { x: number; y: number; width: number; height: number };
 }

@@ -27,5 +27,15 @@ export const ANIMATED_MIN_MS = 500
 export const ANIMATED_MAX_MS = 6000
 export const ANIMATED_DEFAULT_MS = 3000
 export const ANIMATED_GIF_MAX_BYTES = 15 * 1024 * 1024
+export const STATIC_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 export const ANIMATED_ACCEPT = 'image/gif,video/mp4,video/webm,video/quicktime'
-export const ANIMATED_TYPES = ANIMATED_ACCEPT.split(',')
+// C13b: statik görseller de konumlandırma modalına girer (aynı C13 uçları)
+export const ANIMATED_TYPES = [...STATIC_IMAGE_TYPES, ...ANIMATED_ACCEPT.split(',')]
+
+// C13b §2.1 — kırpma dikdörtgeni: kaynağın doğal boyutuna oranla 0..1 kesirler
+export interface CropFractions {
+  x: number
+  y: number
+  width: number
+  height: number
+}

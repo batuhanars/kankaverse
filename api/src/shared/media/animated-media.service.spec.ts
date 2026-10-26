@@ -1,3 +1,7 @@
+import { copyFileSync, mkdtempSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import sharp from 'sharp';
 import { AnimatedMediaService } from './animated-media.service';
 
 const UID = 'user-1';
@@ -48,7 +52,7 @@ describe('AnimatedMediaService (C13)', () => {
     });
     it('allowlist dışı tür → UNSUPPORTED_TYPE (prototip anahtarı dahil)', async () => {
       const s = make();
-      expect(await code(s.presign(UID, 'image/png', 100))).toBe('UNSUPPORTED_TYPE');
+      expect(await code(s.presign(UID, 'image/bmp', 100))).toBe('UNSUPPORTED_TYPE');
       expect(await code(s.presign(UID, 'toString', 100))).toBe('UNSUPPORTED_TYPE');
     });
     it('GIF 15 MB, video maxUploadMb üstü → FILE_TOO_LARGE', async () => {
@@ -62,6 +66,131 @@ describe('AnimatedMediaService (C13)', () => {
       const r = await make().presign(UID, 'video/quicktime', 1000);
       expect(r.stagingKey).toMatch(new RegExp(`^animated-staging/${UID}/[0-9a-f-]{36}\\.mov$`));
       expect(storageMock.presignPut).toHaveBeenCalledWith(r.stagingKey, 'video/quicktime');
+    });
+  });
+
+  describe('statik görsel (C13b)', () => {
+    it('bayrak kapalı + png/jpeg/webp presign GEÇER; gif/video ANIMATED_DISABLED', async () => {
+      storageMock.presignPut.mockResolvedValue('https://put');
+      const s = make({ animatedProfileEnabled: false });
+      for (const t of ['image/png', 'image/jpeg', 'image/webp']) {
+        expect((await s.presign(UID, t, 1000)).stagingKey).toMatch(/^animated-staging\//);
+      }
+      expect(await code(s.presign(UID, 'image/gif', 100))).toBe('ANIMATED_DISABLED');
+      expect(await code(s.presign(UID, 'video/mp4', 100))).toBe('ANIMATED_DISABLED');
+    });
+    it('uzantı jpeg→jpg; statik tavan 15 MB', async () => {
+      storageMock.presignPut.mockResolvedValue('https://put');
+      const s = make();
+      expect((await s.presign(UID, 'image/jpeg', 1000)).stagingKey).toMatch(/\.jpg$/);
+      expect(await code(s.presign(UID, 'image/png', 16 * 1024 * 1024))).toBe('FILE_TOO_LARGE');
+    });
+    it('uploads kapalıyken statik de UPLOADS_DISABLED', async () => {
+      const s = make({ uploadsEnabled: false });
+      expect(await code(s.presign(UID, 'image/png', 100))).toBe('UPLOADS_DISABLED');
+    });
+
+    async function pngFile(width = 400, height = 200) {
+      const f = join(mkdtempSync(join(tmpdir(), 'kv-spec-')), 'src.png');
+      writeFileSync(
+        f,
+        await sharp({ create: { width, height, channels: 3, background: '#f00' } })
+          .png()
+          .toBuffer(),
+      );
+      return f;
+    }
+    function stub(file: string) {
+      storageMock.headSize.mockResolvedValue(1000);
+      storageMock.downloadToFile.mockImplementation(async (_k: string, dest: string) => {
+        copyFileSync(file, dest);
+      });
+      storageMock.putPublic.mockResolvedValue(undefined);
+      storageMock.deletePublic.mockResolvedValue(undefined);
+      prismaMock.user.findUnique.mockResolvedValue({
+        avatarUrl: null,
+        avatarAnimatedUrl: null,
+        bannerUrl: null,
+        bannerAnimatedUrl: null,
+      });
+      prismaMock.user.update.mockImplementation(async ({ data }: any) => data);
+    }
+
+    it('bayrak kapalı + png process GEÇER: statik WebP 512x512, animated alan null', async () => {
+      stub(await pngFile());
+      const s = make({ animatedProfileEnabled: false });
+      const user: any = await s.process(UID, 'AVATAR', { stagingKey: KEY('png') });
+      expect(user.avatarAnimatedUrl).toBeNull();
+      expect(user.avatarUrl).toMatch(
+        /^http:\/\/cdn\/x\/avatars\/user-1\/[0-9a-f-]{36}-still\.webp$/,
+      );
+      expect(storageMock.putPublic).toHaveBeenCalledTimes(1);
+      const [, buf, type] = storageMock.putPublic.mock.calls[0];
+      expect(type).toBe('image/webp');
+      const meta = await sharp(buf).metadata();
+      expect([meta.format, meta.width, meta.height]).toEqual(['webp', 512, 512]);
+      expect(storageMock.delete).toHaveBeenCalledWith(KEY('png')); // staging temizliği
+    });
+    it('afiş 1200x480, crop uygulanır, bannerAnimatedUrl null', async () => {
+      stub(await pngFile(200, 400));
+      const user: any = await make().process(UID, 'BANNER', {
+        stagingKey: KEY('png'),
+        crop: { x: 0, y: 0, width: 1, height: 0.4 },
+      });
+      expect(user.bannerAnimatedUrl).toBeNull();
+      const meta = await sharp(storageMock.putPublic.mock.calls[0][1]).metadata();
+      expect([meta.width, meta.height]).toEqual([1200, 480]);
+    });
+    it('bayrak kapalı + gif process → ANIMATED_DISABLED (depolamaya gitmeden)', async () => {
+      const s = make({ animatedProfileEnabled: false });
+      expect(await code(s.process(UID, 'AVATAR', { stagingKey: KEY('gif') }))).toBe(
+        'ANIMATED_DISABLED',
+      );
+      expect(storageMock.headSize).not.toHaveBeenCalled();
+    });
+    it('geçersiz crop → INVALID_CROP, depolamaya gitmeden', async () => {
+      const s = make();
+      for (const crop of [
+        { x: -0.1, y: 0, width: 0.5, height: 0.5 },
+        { x: 0.6, y: 0, width: 0.6, height: 0.5 },
+        { x: 0, y: 0, width: NaN, height: 0.5 },
+        { x: 0, y: 0, width: 0, height: 0.5 },
+        'x' as any,
+      ]) {
+        expect(await code(s.process(UID, 'AVATAR', { stagingKey: KEY('png'), crop }))).toBe(
+          'INVALID_CROP',
+        );
+      }
+      expect(storageMock.headSize).not.toHaveBeenCalled();
+    });
+    it('SVG içeriği png uzantısıyla gelirse → INVALID_MEDIA (sharp biçim allowlist)', async () => {
+      const f = join(mkdtempSync(join(tmpdir(), 'kv-spec-')), 'x.png');
+      writeFileSync(
+        f,
+        '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4"/></svg>',
+      );
+      stub(f);
+      expect(await code(make().process(UID, 'AVATAR', { stagingKey: KEY('png') }))).toBe(
+        'INVALID_MEDIA',
+      );
+      expect(storageMock.putPublic).not.toHaveBeenCalled();
+    });
+    it('önceki -still.webp kendi değiştirmede silinir; C8 statik yüklemesine dokunulmaz', async () => {
+      stub(await pngFile());
+      prismaMock.user.findUnique.mockResolvedValue({
+        avatarUrl: 'http://cdn/x/avatars/user-1/old-still.webp',
+        avatarAnimatedUrl: null,
+      });
+      await make().process(UID, 'AVATAR', { stagingKey: KEY('png') });
+      expect(storageMock.deletePublic).toHaveBeenCalledWith('avatars/user-1/old-still.webp');
+
+      storageMock.deletePublic.mockClear();
+      prismaMock.user.findUnique.mockResolvedValue({
+        avatarUrl: 'http://cdn/x/avatars/user-1/c8-upload.png',
+        avatarAnimatedUrl: null,
+      });
+      await make().process(UID, 'AVATAR', { stagingKey: KEY('png') });
+      expect(storageMock.deletePublic).not.toHaveBeenCalled();
     });
   });
 

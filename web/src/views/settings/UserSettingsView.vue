@@ -13,7 +13,7 @@ import { usersApi } from '@/api/users'
 import { attachmentsApi } from '@/api/attachments'
 import { DmPolicy } from '@/types'
 import { BANNER_PRESET_KEYS, bannerBackground } from '@/utils/bannerColor'
-import { animatedOrStatic, ANIMATED_ACCEPT, ANIMATED_TYPES, ANIMATED_GIF_MAX_BYTES } from '@/utils/animatedMedia'
+import { animatedOrStatic, ANIMATED_ACCEPT, ANIMATED_TYPES, ANIMATED_GIF_MAX_BYTES, STATIC_IMAGE_TYPES } from '@/utils/animatedMedia'
 import type { AnimatedTarget } from '@/api/users'
 import { isMobile } from '@/composables/useResponsive'
 import KvButton from '@/components/ui/KvButton.vue'
@@ -142,9 +142,14 @@ const mediaAccept = computed(() =>
 
 // true dönerse dosya hareketli akışa devredildi (modal açıldı) ya da reddedildi; statik akış devam etmez
 function routeAnimated(file: File, target: AnimatedTarget, setError: (msg: string) => void): boolean {
-  if (animatedDisabled.value || !ANIMATED_TYPES.includes(file.type)) return false
-  if (file.type === 'image/gif' && file.size > ANIMATED_GIF_MAX_BYTES) {
-    setError(t('profile.animated.errorGifSize'))
+  if (!ANIMATED_TYPES.includes(file.type)) return false
+  // C13b: bayrak yalnız GIF/video girişini kapatır; statik görsel her zaman konumlandırma modalından gider
+  if (animatedDisabled.value && !STATIC_IMAGE_TYPES.includes(file.type)) {
+    setError(t('profile.animated.disabled'))
+    return true
+  }
+  if (file.type.startsWith('image/') && file.size > ANIMATED_GIF_MAX_BYTES) {
+    setError(t('profile.animated.errorImageSize'))
     return true
   }
   animatedTarget.value = target

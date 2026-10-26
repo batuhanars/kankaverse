@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
+import sharp from 'sharp';
 import { mkdtemp, readFile, rm, stat } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -26,7 +27,15 @@ import {
   AnimatedInputType,
   AnimatedTarget,
   MB,
+  STILL_IMAGE_TYPES,
+  STILL_MAX_INPUT_BYTES,
+  STILL_MAX_INPUT_PIXELS,
+  STILL_PROCESS_TIMEOUT_MS,
+  STILL_SIZE,
+  STILL_WEBP_QUALITY,
+  StillImageType,
 } from './animated.constants';
+import { CropFractions, fitCropToAspect, isValidCrop, PixelRect } from './crop-math';
 import { buildAnimatedArgs, buildProbeArgs, buildStaticArgs, ClipRange } from './ffmpeg-args';
 import { runBinary } from './run-binary';
 
@@ -37,11 +46,29 @@ const MAX_SOURCE_DIMENSION = 4096;
 
 interface ProbeResult {
   durationMs: number | null;
+  /** Görüntülenen (döndürme uygulanmış) kare boyutu: kırpma kesirleri buna göre pikselleşir. */
+  width: number;
+  height: number;
 }
+
+type InputType = AnimatedInputType | StillImageType;
+
+/** Hedefin en/boy oranı (genişlik / yükseklik): avatar 1, afiş 2.5. */
+const TARGET_ASPECT: Record<AnimatedTarget, number> = {
+  AVATAR: STILL_SIZE.AVATAR.width / STILL_SIZE.AVATAR.height,
+  BANNER: STILL_SIZE.BANNER.width / STILL_SIZE.BANNER.height,
+};
+
+/** sharp: libvips önbelleği kapalı (dosya tutmaz). Biçim allowlist'i renderStill'de metadata ile zorlanır. */
+sharp.cache(false);
+const STILL_SHARP_FORMATS = ['jpeg', 'png', 'webp'];
 
 /**
  * C13 — hareketli avatar / profil-afişi: GIF veya video kesiti → sunucuda hareketli WebP (+ statik kare).
- * R7: güvenilmeyen dosya sunucuda ffmpeg'e girer. Güvenlik kuralları `ffmpeg-args.ts` + `run-binary.ts`'te.
+ * C13b — statik görsel (PNG/JPEG/WebP) de bu hatta girer (sharp, yalnız statik WebP) ve her kaynakta
+ * kullanıcı kırpması (`crop`) uygulanır.
+ * R7: güvenilmeyen dosya sunucuda ffmpeg/sharp'a girer. ffmpeg kuralları `ffmpeg-args.ts` + `run-binary.ts`'te,
+ * kırpma matematiği `crop-math.ts`'te.
  */
 @Injectable()
 export class AnimatedMediaService {
@@ -65,18 +92,20 @@ export class AnimatedMediaService {
 
   /** POST /users/me/animated/presign — ÖZEL bucket'a staging anahtarı için presigned PUT. */
   async presign(userId: string, contentType: string, size: number) {
-    this.assertEnabled(userId);
+    const isStill = Object.prototype.hasOwnProperty.call(STILL_IMAGE_TYPES, contentType);
+    // C13b PM kararı: hareketli bayrağı yalnız GIF/video'yu kapatır; statik görsel yalnız uploadsEnabled'a tabi.
+    this.assertEnabled(userId, !isStill);
 
-    if (!Object.prototype.hasOwnProperty.call(ANIMATED_INPUT_TYPES, contentType)) {
+    if (!isStill && !Object.prototype.hasOwnProperty.call(ANIMATED_INPUT_TYPES, contentType)) {
       throw new BadRequestException({
-        message: 'Bu dosya türü desteklenmiyor. GIF, MP4, WebM veya MOV kullanın.',
+        message: 'Bu dosya türü desteklenmiyor. PNG, JPEG, WebP, GIF, MP4, WebM veya MOV kullanın.',
         error: 'UNSUPPORTED_TYPE',
       });
     }
-    const type = contentType as AnimatedInputType;
+    const type = contentType as InputType;
     this.assertSizeAllowed(type, size);
 
-    const stagingKey = `${ANIMATED_STAGING_PREFIX}/${userId}/${randomUUID()}.${ANIMATED_INPUT_TYPES[type].ext}`;
+    const stagingKey = `${ANIMATED_STAGING_PREFIX}/${userId}/${randomUUID()}.${this.extOf(type)}`;
     const uploadUrl = await this.storage.presignPut(stagingKey, contentType);
     return { uploadUrl, stagingKey };
   }
@@ -88,12 +117,24 @@ export class AnimatedMediaService {
   async process(
     userId: string,
     target: AnimatedTarget,
-    dto: { stagingKey: string; startMs?: number; durationMs?: number },
+    dto: {
+      stagingKey: string;
+      startMs?: number;
+      durationMs?: number;
+      crop?: CropFractions;
+    },
   ) {
-    // 1. Bayrak + uploadsEnabled + prefix
-    this.assertEnabled(userId);
+    // 1. Prefix + bayrak (yalnız GIF/video için) + uploadsEnabled + crop biçimi
     this.assertStagingKey(userId, dto.stagingKey);
     const contentType = this.contentTypeFromKey(dto.stagingKey);
+    const isStill = this.isStill(contentType);
+    this.assertEnabled(userId, !isStill);
+    if (dto.crop !== undefined && !isValidCrop(dto.crop)) {
+      throw new BadRequestException({
+        message: 'Seçilen alan geçersiz. Görseli yeniden konumlandır.',
+        error: 'INVALID_CROP',
+      });
+    }
 
     // Eşzamanlılık: dolu ise beklemeden ret. Sayaç, aşağıdaki finally'de düşer.
     if (this.active >= ANIMATED_MAX_CONCURRENCY) {
@@ -110,45 +151,26 @@ export class AnimatedMediaService {
       const size = await this.headOrInvalid(dto.stagingKey);
       this.assertSizeAllowed(contentType, size);
       workDir = await mkdtemp(join(tmpdir(), 'kv-animated-'));
-      const inputPath = join(workDir, `in.${ANIMATED_INPUT_TYPES[contentType].ext}`);
+      const inputPath = join(workDir, `in.${this.extOf(contentType)}`);
       await this.storage.downloadToFile(dto.stagingKey, inputPath, this.maxInputBytes(contentType));
 
-      // 3. ffprobe + kesit doğrulaması
-      const probe = await this.probe(contentType, inputPath);
-      const clip = this.resolveClip(contentType, probe, dto.startMs, dto.durationMs);
-
-      // 4-5. Dönüşüm (+ tavan aşılırsa bir kez düşük kalite)
-      const base = { contentType, target, clip, inputPath };
-      const animatedPath = join(workDir, 'out.webp');
-      const staticPath = join(workDir, 'out-static.webp');
-      const limit = ANIMATED_MAX_OUTPUT_BYTES[target];
-
-      await this.convert(
-        buildAnimatedArgs({ ...base, outputPath: animatedPath, quality: QUALITY_NORMAL }),
-      );
-      if ((await this.sizeOf(animatedPath)) > limit) {
-        await this.convert(
-          buildAnimatedArgs({ ...base, outputPath: animatedPath, quality: QUALITY_LOW }),
-        );
-        if ((await this.sizeOf(animatedPath)) > limit) {
-          throw new UnprocessableEntityException({
-            message: 'Görsel işlendikten sonra bile çok büyük. Daha kısa veya sade bir kesit dene.',
-            error: 'MEDIA_TOO_LARGE_AFTER_PROCESS',
-          });
-        }
-      }
-      await this.convert(
-        buildStaticArgs({ ...base, outputPath: staticPath, quality: QUALITY_NORMAL }),
-      );
-      await this.sizeOf(staticPath);
-
-      // 6. Public bucket'a iki dosya
+      // 3-6. Dönüşüm + public bucket. Statik görsel: sharp, tek dosya. GIF/video: ffmpeg, hareketli + statik çift.
       const prefix = ANIMATED_PREFIX[target];
       const id = randomUUID();
-      const animatedKey = `${prefix}/${userId}/${id}.webp`;
-      const staticKey = `${prefix}/${userId}/${id}-static.webp`;
-      await this.storage.putPublic(animatedKey, await readFile(animatedPath), 'image/webp');
-      await this.storage.putPublic(staticKey, await readFile(staticPath), 'image/webp');
+      let animatedKey: string | null = null;
+      let staticKey: string;
+      if (this.isStill(contentType)) {
+        staticKey = `${prefix}/${userId}/${id}-still.webp`;
+        const out = await this.renderStill(inputPath, target, dto.crop);
+        await this.storage.putPublic(staticKey, out, 'image/webp');
+      } else {
+        staticKey = `${prefix}/${userId}/${id}-static.webp`;
+        animatedKey = `${prefix}/${userId}/${id}.webp`;
+        await this.renderAnimated(contentType, target, inputPath, workDir, dto, {
+          animatedKey,
+          staticKey,
+        });
+      }
 
       // 7. DB (statik kare + hareketli adres). Önceki değerler 8. adım için okunur.
       const previous = await this.prisma.user.findUnique({
@@ -166,11 +188,11 @@ export class AnimatedMediaService {
           target === 'AVATAR'
             ? {
                 avatarUrl: this.publicUrl(staticKey),
-                avatarAnimatedUrl: this.publicUrl(animatedKey),
+                avatarAnimatedUrl: animatedKey ? this.publicUrl(animatedKey) : null,
               }
             : {
                 bannerUrl: this.publicUrl(staticKey),
-                bannerAnimatedUrl: this.publicUrl(animatedKey),
+                bannerAnimatedUrl: animatedKey ? this.publicUrl(animatedKey) : null,
               },
       });
 
@@ -195,8 +217,12 @@ export class AnimatedMediaService {
 
   // ─── Doğrulamalar ─────────────────────────────────────────────────────────
 
-  private assertEnabled(userId: string): void {
-    if (!this.canCreateAnimated({ id: userId })) {
+  /**
+   * `animated`: hareketli bayrağı da aranır (GIF/video). Statik görselde yalnız uploadsEnabled
+   * (C13b PM kararı: bayrak kapalıyken statik görsel konumlandırmayla yüklenebilir).
+   */
+  private assertEnabled(userId: string, animated: boolean): void {
+    if (animated && !this.canCreateAnimated({ id: userId })) {
       throw new ForbiddenException({
         message: 'Hareketli profil görseli şu an kapalı.',
         error: 'ANIMATED_DISABLED',
@@ -213,7 +239,7 @@ export class AnimatedMediaService {
   private assertStagingKey(userId: string, key: string): void {
     // Yol atlatma (../) ve beklenmeyen biçim: prefix + userId + uuid + izinli uzantı dışında hiçbir
     // şey kabul edilmez. userId cuid/uuid (regex özel karakteri içermez) ama yine de kaçırılır.
-    const exts = Object.values(ANIMATED_INPUT_TYPES)
+    const exts = [...Object.values(ANIMATED_INPUT_TYPES), ...Object.values(STILL_IMAGE_TYPES)]
       .map((t) => t.ext)
       .join('|');
     const safeUserId = userId.replace(/[^A-Za-z0-9-]/g, '\\$&');
@@ -229,20 +255,32 @@ export class AnimatedMediaService {
   }
 
   /** Girdi biçimi anahtarın uzantısından (presign'da contentType'tan üretilmişti) → zorlanan demuxer. */
-  private contentTypeFromKey(key: string): AnimatedInputType {
+  private contentTypeFromKey(key: string): InputType {
     const ext = key.split('.').pop();
     const entry = (
-      Object.entries(ANIMATED_INPUT_TYPES) as [AnimatedInputType, { ext: string }][]
+      Object.entries({ ...ANIMATED_INPUT_TYPES, ...STILL_IMAGE_TYPES }) as [
+        InputType,
+        { ext: string },
+      ][]
     ).find(([, v]) => v.ext === ext);
     return entry![0]; // assertStagingKey uzantıyı zaten allowlist'e bağladı
   }
 
-  private maxInputBytes(type: AnimatedInputType): number {
+  private isStill(type: InputType): type is StillImageType {
+    return Object.prototype.hasOwnProperty.call(STILL_IMAGE_TYPES, type);
+  }
+
+  private extOf(type: InputType): string {
+    return this.isStill(type) ? STILL_IMAGE_TYPES[type].ext : ANIMATED_INPUT_TYPES[type].ext;
+  }
+
+  private maxInputBytes(type: InputType): number {
+    if (this.isStill(type)) return STILL_MAX_INPUT_BYTES;
     if (type === 'image/gif') return ANIMATED_MAX_GIF_BYTES;
     return (this.config.get<number>('maxUploadMb') ?? 25) * MB;
   }
 
-  private assertSizeAllowed(type: AnimatedInputType, size: number): void {
+  private assertSizeAllowed(type: InputType, size: number): void {
     if (!Number.isFinite(size) || size <= 0 || size > this.maxInputBytes(type)) {
       throw new BadRequestException({
         message: `Dosya boyutu ${Math.round(this.maxInputBytes(type) / MB)} MB sınırını aşıyor.`,
@@ -299,6 +337,109 @@ export class AnimatedMediaService {
     return { startMs: start, durationMs: duration };
   }
 
+  // ─── Dönüşüm hatları ──────────────────────────────────────────────────────
+
+  /** GIF/video → hareketli WebP + statik kare (C13), kırpma C13b. Çıktıları public bucket'a yazar. */
+  private async renderAnimated(
+    contentType: AnimatedInputType,
+    target: AnimatedTarget,
+    inputPath: string,
+    workDir: string,
+    dto: { startMs?: number; durationMs?: number; crop?: CropFractions },
+    keys: { animatedKey: string; staticKey: string },
+  ): Promise<void> {
+    // ffprobe + kesit doğrulaması
+    const probe = await this.probe(contentType, inputPath);
+    const clip = this.resolveClip(contentType, probe, dto.startMs, dto.durationMs);
+    // Crop yoksa ffmpeg'in eski merkez kırpması (cropRect yok); varsa hedef oranına oturtulmuş piksel dikdörtgeni
+    const cropRect: PixelRect | undefined = dto.crop
+      ? fitCropToAspect(dto.crop, probe.width, probe.height, TARGET_ASPECT[target])
+      : undefined;
+
+    // Dönüşüm (+ tavan aşılırsa bir kez düşük kalite)
+    const base = { contentType, target, clip, inputPath, cropRect };
+    const animatedPath = join(workDir, 'out.webp');
+    const staticPath = join(workDir, 'out-static.webp');
+    const limit = ANIMATED_MAX_OUTPUT_BYTES[target];
+
+    await this.convert(
+      buildAnimatedArgs({ ...base, outputPath: animatedPath, quality: QUALITY_NORMAL }),
+    );
+    if ((await this.sizeOf(animatedPath)) > limit) {
+      await this.convert(
+        buildAnimatedArgs({ ...base, outputPath: animatedPath, quality: QUALITY_LOW }),
+      );
+      if ((await this.sizeOf(animatedPath)) > limit) {
+        throw new UnprocessableEntityException({
+          message: 'Görsel işlendikten sonra bile çok büyük. Daha kısa veya sade bir kesit dene.',
+          error: 'MEDIA_TOO_LARGE_AFTER_PROCESS',
+        });
+      }
+    }
+    await this.convert(
+      buildStaticArgs({ ...base, outputPath: staticPath, quality: QUALITY_NORMAL }),
+    );
+    await this.sizeOf(staticPath);
+
+    await this.storage.putPublic(keys.animatedKey, await readFile(animatedPath), 'image/webp');
+    await this.storage.putPublic(keys.staticKey, await readFile(staticPath), 'image/webp');
+  }
+
+  /**
+   * PNG/JPEG/WebP → statik WebP (sözleşme §2.3). Sıra: metadata (biçim allowlist + EXIF yönüne göre
+   * boyut) → rotate (EXIF yönünü uygula) → extract (kırp) → resize → webp. Metadata yazılmaz
+   * (`withMetadata` çağrılmaz, EXIF/GPS düşer). Zaman aşımında iş arka planda biter ama sonucu atılır.
+   */
+  private async renderStill(
+    inputPath: string,
+    target: AnimatedTarget,
+    crop?: CropFractions,
+  ): Promise<Buffer> {
+    const open = () =>
+      sharp(inputPath, { limitInputPixels: STILL_MAX_INPUT_PIXELS, failOn: 'error' });
+    const work = async (): Promise<Buffer> => {
+      const meta = await open().metadata();
+      if (
+        !meta.format ||
+        !STILL_SHARP_FORMATS.includes(meta.format) ||
+        !meta.width ||
+        !meta.height
+      ) {
+        throw new Error(`görsel biçimi geçersiz: ${meta.format}`);
+      }
+      // Kırpma kesirleri EXIF yönü UYGULANMIŞ boyuta göredir (istemci döndürülmüş görseli gösterir): 5-8 icin en/boy takası
+      const swap = (meta.orientation ?? 1) >= 5;
+      const rect = fitCropToAspect(
+        crop,
+        swap ? meta.height : meta.width,
+        swap ? meta.width : meta.height,
+        TARGET_ASPECT[target],
+      );
+      const { width, height } = STILL_SIZE[target];
+      return open()
+        .rotate()
+        .extract(rect)
+        .resize(width, height)
+        .webp({ quality: STILL_WEBP_QUALITY })
+        .toBuffer();
+    };
+
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('sharp zaman aşımı')), STILL_PROCESS_TIMEOUT_MS);
+      });
+      const out = await Promise.race([work(), timeout]);
+      if (out.length === 0) throw new Error('boş çıktı');
+      return out;
+    } catch (e) {
+      this.logger.warn(`sharp reddetti: ${(e as Error).message}`);
+      throw this.invalidMedia();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   // ─── ffmpeg ───────────────────────────────────────────────────────────────
 
   private async probe(type: AnimatedInputType, inputPath: string): Promise<ProbeResult> {
@@ -309,7 +450,13 @@ export class AnimatedMediaService {
         ANIMATED_PROCESS_TIMEOUT_MS,
       );
       const json = JSON.parse(out) as {
-        streams?: { codec_type?: string; width?: number; height?: number }[];
+        streams?: {
+          codec_type?: string;
+          width?: number;
+          height?: number;
+          side_data_list?: { rotation?: number }[];
+          tags?: { rotate?: string };
+        }[];
         format?: { duration?: string };
       };
       const video = json.streams?.find((s) => s.codec_type === 'video');
@@ -323,7 +470,20 @@ export class AnimatedMediaService {
         throw new Error('video akışı yok veya boyut geçersiz');
       }
       const seconds = Number(json.format?.duration);
-      return { durationMs: Number.isFinite(seconds) ? Math.floor(seconds * 1000) : null };
+      // ffmpeg döndürme üstverisini filtrelerden ÖNCE uygular (autorotate): crop görüntülenen boyuta göre.
+      const rotation = Math.abs(
+        Number(
+          video.side_data_list?.find((d) => d.rotation !== undefined)?.rotation ??
+            video.tags?.rotate ??
+            0,
+        ),
+      );
+      const swap = rotation % 180 === 90;
+      return {
+        durationMs: Number.isFinite(seconds) ? Math.floor(seconds * 1000) : null,
+        width: swap ? video.height : video.width,
+        height: swap ? video.width : video.height,
+      };
     } catch (e) {
       this.logger.warn(`ffprobe reddetti: ${(e as Error).message}`);
       throw this.invalidMedia();
@@ -377,7 +537,10 @@ export class AnimatedMediaService {
     prevStaticUrl?: string | null,
     prevAnimatedUrl?: string | null,
   ): Promise<void> {
-    if (!prevAnimatedUrl) return;
+    // Silinebilir: bu hattın ürettiği hareketli çift VEYA statik-görsel çıktısı (`-still.webp`).
+    // C8 statik yüklemesine (uuid.png|jpg|webp) dokunulmaz.
+    const prevIsStill = !!prevStaticUrl && /-still\.webp$/.test(prevStaticUrl);
+    if (!prevAnimatedUrl && !prevIsStill) return;
     const base = `${this.config.get<string>('s3.publicBaseUrl')!}/`;
     const owned = `${prefix}/${userId}/`;
     for (const url of [prevAnimatedUrl, prevStaticUrl]) {

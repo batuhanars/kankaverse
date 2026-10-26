@@ -3,7 +3,7 @@ import { AccessibilityInfo } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Image as CompressorImage, Video } from 'react-native-compressor';
-import { usersApi, type AnimatedTarget } from '@/api/users';
+import { usersApi, type AnimatedProcessPayload, type AnimatedTarget, type MediaCrop } from '@/api/users';
 import { MAX_IMAGE_BYTES } from '@/utils/imageUpload';
 
 /**
@@ -49,7 +49,7 @@ export function useReduceMotion(): boolean {
 export type PickedProfileMedia =
   | { kind: 'static'; uri: string; contentType: string; size: number }
   | { kind: 'gif'; uri: string; contentType: 'image/gif'; size: number }
-  | { kind: 'video'; uri: string; contentType: string; size: number; durationMs: number };
+  | { kind: 'video'; uri: string; contentType: string; size: number; durationMs: number; width: number; height: number };
 
 /** Desteklenmeyen video turu: `error` alani i18n anahtaridir (profile.animated.errorType). */
 export class AnimatedPickError extends Error {
@@ -108,10 +108,13 @@ export async function pickProfileMedia(allowAnimated = true): Promise<PickedProf
       contentType,
       size: asset.fileSize ?? (await fileSize(asset.uri)),
       durationMs: asset.duration ?? 0,
+      // Android'de secici donme bayragini boyuta uygular (portre video 1080x1920 gelir).
+      width: asset.width,
+      height: asset.height,
     };
   }
 
-  // Statik gorsel: C8 akisi. Sunucu yalniz jpeg/png/webp kabul eder.
+  // Statik gorsel (C13b: konumlandirma paneline girer). Sunucu yalniz jpeg/png/webp kabul eder.
   const staticType = ['image/jpeg', 'image/png', 'image/webp'].includes(contentType) ? contentType : 'image/jpeg';
   let uri = asset.uri;
   let size = asset.fileSize ?? (await fileSize(uri));
@@ -126,7 +129,9 @@ export async function pickProfileMedia(allowAnimated = true): Promise<PickedProf
 
 export interface AnimatedUploadInput {
   target: AnimatedTarget;
-  media: Extract<PickedProfileMedia, { kind: 'gif' | 'video' }>;
+  media: PickedProfileMedia;
+  /** C13b: konumlandirma kesirleri (kaynak boyutuna oranli). */
+  crop?: MediaCrop;
   /** Yalniz video. */
   startMs?: number;
   durationMs?: number;
@@ -135,7 +140,7 @@ export interface AnimatedUploadInput {
 
 /** presign, PUT, isle. Hata `error` kodunu tasiyan axios hatasi olarak yukari cikar. */
 export async function uploadAnimated(input: AnimatedUploadInput) {
-  const { target, media, startMs, durationMs, onPhase } = input;
+  const { target, media, crop, startMs, durationMs, onPhase } = input;
   let uri = media.uri;
   let contentType: string = media.contentType;
   let size = media.size;
@@ -170,6 +175,11 @@ export async function uploadAnimated(input: AnimatedUploadInput) {
   if (!res || res.status < 200 || res.status >= 300) throw new Error(`upload_failed_${res?.status ?? 0}`);
 
   onPhase('process', 100);
-  const payload = media.kind === 'video' && durationMs ? { stagingKey: presigned.stagingKey, startMs, durationMs } : { stagingKey: presigned.stagingKey };
+  const payload: AnimatedProcessPayload = { stagingKey: presigned.stagingKey };
+  if (media.kind === 'video' && durationMs) {
+    payload.startMs = startMs;
+    payload.durationMs = durationMs;
+  }
+  if (crop) payload.crop = crop;
   return target === 'AVATAR' ? usersApi.setAnimatedAvatar(payload) : usersApi.setAnimatedBanner(payload);
 }

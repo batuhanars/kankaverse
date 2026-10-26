@@ -115,7 +115,9 @@ export default function ProfileEditScreen() {
       return;
     }
     if (!image) return;
-    if (image.kind !== 'static') {
+    // C13b: statik görsel de konumlandırma panelinden geçer. Hareketli kapalıysa (animatedOff) sunucu
+    // aynı uçları kapatabileceği için eski C8 yoluna düşülür (konumlandırmasız).
+    if (image.kind !== 'static' || !animatedOff) {
       if (image.kind === 'gif' && image.size > ANIMATED_GIF_MAX_BYTES) {
         setErrorMessage(t('profile.animated.errorGifSize'));
         return;

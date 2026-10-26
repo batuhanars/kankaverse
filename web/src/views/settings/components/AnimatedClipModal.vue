@@ -1,20 +1,23 @@
 <script setup lang="ts">
 /**
- * AnimatedClipModal — Sprint C13 §5: GIF önizleme veya video kesit seçici + yükleme.
- * Akış: presign → S3 PUT → işle (sunucu hareketli WebP üretir). Sonuç UserDto olarak yukarı çıkar.
+ * AnimatedClipModal — Sprint C13 §5 + C13b §3: statik görsel, GIF veya video için konumlandırma
+ * (MediaPositioner) + video ise kesit seçici + yükleme.
+ * Akış: presign → S3 PUT → işle (sunucu kırpar/WebP üretir). Sonuç UserDto olarak yukarı çıkar.
  */
 import { ref, computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { usersApi, type AnimatedTarget } from '@/api/users'
+import { usersApi, type AnimatedTarget, type AnimatedProcessPayload } from '@/api/users'
 import { attachmentsApi } from '@/api/attachments'
 import {
   ANIMATED_MIN_MS,
   ANIMATED_MAX_MS,
   ANIMATED_DEFAULT_MS,
+  type CropFractions,
 } from '@/utils/animatedMedia'
 import type { UserDto } from '@/types'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
+import MediaPositioner from '@/components/shared/MediaPositioner.vue'
 
 const props = defineProps<{ file: File; target: AnimatedTarget }>()
 const emit = defineEmits<{ close: []; done: [user: UserDto]; disabled: [] }>()
@@ -26,7 +29,10 @@ const isVideo = props.file.type.startsWith('video/')
 const objectUrl = URL.createObjectURL(props.file)
 onUnmounted(() => URL.revokeObjectURL(objectUrl))
 
-const videoEl = ref<HTMLVideoElement | null>(null)
+const positioner = ref<{ videoEl: HTMLVideoElement | null } | null>(null)
+const videoEl = computed(() => positioner.value?.videoEl ?? null)
+const crop = ref<CropFractions | null>(null)
+const isGif = props.file.type === 'image/gif'
 const durationSec = ref(0) // 0 = bilinmiyor (önizlenemeyen video)
 const previewFailed = ref(false)
 const startSec = ref(0)
@@ -41,8 +47,9 @@ const phase = ref<'upload' | 'process'>('upload')
 const pct = ref(0)
 const error = ref('')
 
-function onMeta() {
-  const d = videoEl.value?.duration ?? 0
+function onMeta(info: { duration: number }) {
+  if (!isVideo) return
+  const d = info.duration
   if (!Number.isFinite(d) || d <= 0) {
     previewFailed.value = true
     return
@@ -84,9 +91,8 @@ async function submit() {
       pct.value = p
     })
     phase.value = 'process'
-    const payload: { stagingKey: string; startMs?: number; durationMs?: number } = {
-      stagingKey: presigned.stagingKey,
-    }
+    const payload: AnimatedProcessPayload = { stagingKey: presigned.stagingKey }
+    if (crop.value) payload.crop = crop.value
     if (isVideo && durationSec.value > 0) {
       payload.startMs = Math.round(startSec.value * 1000)
       payload.durationMs = Math.round(lenSec.value * 1000)
@@ -116,36 +122,27 @@ function close() {
   if (!busy.value) emit('close')
 }
 
-const shapeClass = computed(() =>
-  props.target === 'AVATAR' ? 'rounded-full aspect-square w-40 mx-auto' : 'rounded-[var(--kv-radius-md)] w-full',
-)
-const shapeStyle = computed(() => (props.target === 'BANNER' ? { aspectRatio: '5 / 2' } : {}))
 </script>
 
 <template>
   <KvModal :title="t('profile.animated.title')" @close="close">
     <div class="flex flex-col gap-4 min-w-0">
       <p class="text-[13px]" style="color: var(--kv-text-muted);">
-        {{ t(isVideo ? 'profile.animated.hintVideo' : 'profile.animated.hintGif') }}
+        {{ t(isVideo ? 'profile.animated.hintVideo' : isGif ? 'profile.animated.hintGif' : 'profile.animated.hintImage') }}
+        {{ t('profile.animated.dragHint') }}
       </p>
 
-      <div class="overflow-hidden shrink-0" :class="shapeClass" :style="shapeStyle">
-        <video
-          v-if="isVideo"
-          ref="videoEl"
-          :src="objectUrl"
-          class="w-full h-full object-cover"
-          style="background-color: var(--kv-bg-elevated);"
-          muted
-          autoplay
-          loop
-          playsinline
-          @loadedmetadata="onMeta"
-          @error="onVideoError"
-          @timeupdate="onTimeUpdate"
-        />
-        <img v-else :src="objectUrl" alt="" class="w-full h-full object-cover" />
-      </div>
+      <MediaPositioner
+        ref="positioner"
+        :src="objectUrl"
+        :kind="isVideo ? 'video' : 'image'"
+        :shape="target === 'AVATAR' ? 'circle' : 'banner'"
+        :disabled="busy"
+        @update:crop="crop = $event"
+        @meta="onMeta"
+        @error="onVideoError"
+        @timeupdate="onTimeUpdate"
+      />
 
       <template v-if="isVideo">
         <p v-if="previewFailed" class="text-[12px]" style="color: var(--kv-text-muted);">

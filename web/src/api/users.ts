@@ -27,6 +27,8 @@ export interface AnimatedProcessPayload {
   stagingKey: string
   startMs?: number // yalnız video
   durationMs?: number // yalnız video (500..6000)
+  // C13b §2.1: kaynağın doğal boyutuna oranla 0..1 kesirler; yoksa sunucu merkezden kırpar
+  crop?: { x: number; y: number; width: number; height: number }
 }
 
 export const usersApi = {

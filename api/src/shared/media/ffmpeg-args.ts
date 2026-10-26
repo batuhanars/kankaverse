@@ -7,6 +7,7 @@ import {
   AnimatedInputType,
   AnimatedTarget,
 } from './animated.constants';
+import { PixelRect } from './crop-math';
 
 /**
  * C13 R7 — ffmpeg/ffprobe argüman inşası (SAF fonksiyonlar, çalıştırma yok).
@@ -34,9 +35,29 @@ function secondsArg(ms: number, name: string): string {
   return (assertSafeNumber(ms, name) / 1000).toFixed(3);
 }
 
-/** Merkezden kırp + ölçekle (kırpma UI yok, D25). Sabit sayılardan inşa edilir. */
-function cropScaleFilter(target: AnimatedTarget): string {
+/** Argümana girecek piksel değeri: sonlu, negatif olmayan TAMSAYI. */
+function assertSafeInt(value: number, name: string): number {
+  if (!Number.isInteger(assertSafeNumber(value, name))) {
+    throw new Error(`ffmpeg argümanı geçersiz: ${name}`);
+  }
+  return value;
+}
+
+/**
+ * Kırp + ölçekle. C13b: `rect` (kullanıcının seçtiği, sunucuda hedef oranına oturtulmuş piksel
+ * dikdörtgeni) varsa `crop=W:H:X:Y,scale=w:h`; yoksa merkezden kırpma (eski istemciler).
+ * Tüm sayılar doğrulanmış tamsayı veya sabittir; kullanıcı metni filtreye girmez.
+ */
+function cropScaleFilter(target: AnimatedTarget, rect?: PixelRect): string {
   const { width, height } = ANIMATED_SIZE[target];
+  if (rect) {
+    const w = assertSafeInt(rect.width, 'crop.width');
+    const h = assertSafeInt(rect.height, 'crop.height');
+    if (w < 1 || h < 1) throw new Error('ffmpeg argümanı geçersiz: crop boyutu');
+    const x = assertSafeInt(rect.left, 'crop.left');
+    const y = assertSafeInt(rect.top, 'crop.top');
+    return `crop=${w}:${h}:${x}:${y},scale=${width}:${height}`;
+  }
   return `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`;
 }
 
@@ -56,7 +77,7 @@ export function buildProbeArgs(contentType: AnimatedInputType, inputPath: string
     '-select_streams',
     'v:0',
     '-show_entries',
-    'stream=codec_type,width,height:format=duration',
+    'stream=codec_type,width,height:stream_side_data=rotation:stream_tags=rotate:format=duration',
     '-of',
     'json',
     inputPath,
@@ -76,6 +97,8 @@ export interface ConvertArgsInput {
   outputPath: string;
   /** libwebp kalite (0-100). Düşük kaliteyle ikinci denemede küçültülür. */
   quality: number;
+  /** C13b: kullanıcı kırpması (kaynak pikseli, hedef oranında). Yoksa merkezden kırp. */
+  cropRect?: PixelRect;
 }
 
 /** Ortak giriş: günlük bayrakları + zorunlu biçim + protokol whitelist + kesit (giriş seçenekleri). */
@@ -101,7 +124,7 @@ function inputArgs(input: ConvertArgsInput): string[] {
   ];
 }
 
-/** Hareketli WebP: kesit → fps → merkez kırp → libwebp_anim, ses/altyazı/metadata yok. */
+/** Hareketli WebP: kesit → fps → kırp → ölçekle → libwebp_anim, ses/altyazı/metadata yok. */
 export function buildAnimatedArgs(input: ConvertArgsInput): string[] {
   const quality = Math.round(assertSafeNumber(input.quality, 'quality'));
   if (quality > 100) throw new Error('ffmpeg argümanı geçersiz: quality');
@@ -115,7 +138,7 @@ export function buildAnimatedArgs(input: ConvertArgsInput): string[] {
     '-map_metadata',
     '-1',
     '-vf',
-    `fps=${ANIMATED_FPS},${cropScaleFilter(input.target)}`,
+    `fps=${ANIMATED_FPS},${cropScaleFilter(input.target, input.cropRect)}`,
     '-c:v',
     'libwebp_anim',
     '-loop',
@@ -143,7 +166,7 @@ export function buildStaticArgs(input: ConvertArgsInput): string[] {
     '-map_metadata',
     '-1',
     '-vf',
-    cropScaleFilter(input.target),
+    cropScaleFilter(input.target, input.cropRect),
     '-frames:v',
     '1',
     '-c:v',

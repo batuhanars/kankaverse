@@ -86,8 +86,18 @@ export interface AnimatedPresignResult {
   stagingKey: string;
 }
 
+/** C13b §2.1: kaynagin genislik/yuksekligine oranla 0..1 kesirler. Oran duzeltmesini sunucu yapar. */
+export interface MediaCrop {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface AnimatedProcessPayload {
   stagingKey: string;
+  /** Opsiyonel; yoksa sunucu merkezden kirpar (eski davranis). */
+  crop?: MediaCrop;
   /** Yalniz video; GIF'te sunucu yok sayar. */
   startMs?: number;
   /** Yalniz video (500..6000). */

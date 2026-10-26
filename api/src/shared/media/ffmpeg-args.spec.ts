@@ -55,6 +55,37 @@ describe('ffmpeg-args (R7)', () => {
     );
   });
 
+  it('crop yoksa eski merkez kırpması (scale → crop)', () => {
+    expect(after(buildAnimatedArgs(base), '-vf')).toBe(
+      'fps=15,scale=256:256:force_original_aspect_ratio=increase,crop=256:256',
+    );
+  });
+
+  it('crop varsa filtre sırası fps → crop → scale (piksel tamsayıları)', () => {
+    const cropRect = { left: 120, top: 40, width: 200, height: 200 };
+    expect(after(buildAnimatedArgs({ ...base, cropRect }), '-vf')).toBe(
+      'fps=15,crop=200:200:120:40,scale=256:256',
+    );
+    expect(after(buildStaticArgs({ ...base, target: 'BANNER', cropRect }), '-vf')).toBe(
+      'crop=200:200:120:40,scale=720:288',
+    );
+  });
+
+  it('crop sayıları doğrulanır: tamsayı olmayan / negatif / sıfır boyut / string reddedilir', () => {
+    const bad = (cropRect: any) => () => buildAnimatedArgs({ ...base, cropRect });
+    expect(bad({ left: 0.5, top: 0, width: 10, height: 10 })).toThrow();
+    expect(bad({ left: -1, top: 0, width: 10, height: 10 })).toThrow();
+    expect(bad({ left: 0, top: 0, width: 0, height: 10 })).toThrow();
+    expect(bad({ left: NaN, top: 0, width: 10, height: 10 })).toThrow();
+    expect(bad({ left: '0:0,evil', top: 0, width: 10, height: 10 })).toThrow();
+  });
+
+  it('probe: döndürme üstverisi istenir', () => {
+    expect(after(buildProbeArgs('video/mp4', '/tmp/in.mp4'), '-show_entries')).toContain(
+      'stream_side_data=rotation',
+    );
+  });
+
   it('statik: tek kare, libwebp', () => {
     const a = buildStaticArgs(base);
     expect(after(a, '-frames:v')).toBe('1');

@@ -39,6 +39,29 @@ export const ANIMATED_INPUT_TYPES = {
 } as const;
 export type AnimatedInputType = keyof typeof ANIMATED_INPUT_TYPES;
 
+/**
+ * C13b: statik görsel girdileri (sharp hattı; ffmpeg'e girmez). Hareketli WebP girişi desteklenmez:
+ * `image/webp` statik kabul edilir, hareketli gelirse ilk kare alınır (sharp varsayılanı).
+ */
+export const STILL_IMAGE_TYPES = {
+  'image/png': { ext: 'png' },
+  'image/jpeg': { ext: 'jpg' },
+  'image/webp': { ext: 'webp' },
+} as const;
+export type StillImageType = keyof typeof STILL_IMAGE_TYPES;
+/** Statik görsel girdi tavanı. */
+export const STILL_MAX_INPUT_BYTES = 15 * MB;
+/** Statik çıktı boyutları (px): yüksek DPI için 2x. */
+export const STILL_SIZE: Record<AnimatedTarget, { width: number; height: number }> = {
+  AVATAR: { width: 512, height: 512 },
+  BANNER: { width: 1200, height: 480 },
+};
+export const STILL_WEBP_QUALITY = 85;
+/** sharp için çözülmüş piksel tavanı (decompression bomb). */
+export const STILL_MAX_INPUT_PIXELS = 8192 * 8192;
+/** sharp işlem zaman aşımı. */
+export const STILL_PROCESS_TIMEOUT_MS = 30_000;
+
 export const ANIMATED_STAGING_PREFIX = 'animated-staging';
 /** İş başına ffmpeg/ffprobe zaman aşımı. */
 export const ANIMATED_PROCESS_TIMEOUT_MS = 30_000;
