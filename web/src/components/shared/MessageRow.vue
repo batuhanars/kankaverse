@@ -19,6 +19,7 @@ import AttachmentView from './AttachmentView.vue'
 import MessageActionsMenu from './MessageActionsMenu.vue'
 import { formatMentionsPlain } from '@/utils/mentions'
 import { renderMessageHtml } from '@/utils/markdown'
+import { animatedOrStatic } from '@/utils/animatedMedia'
 import { useActiveMenu } from '@/composables/useActiveMenu'
 import type { MessageDto } from '@/types'
 
@@ -87,7 +88,16 @@ function formatTime(iso: string): string {
 }
 
 // Satır arka plan hover (inline style ile — Tailwind arbitrary değeri token taşımaz)
+// Sprint C16 — hareketli avatar yalnız satır hover'dayken yüklenir (reduced-motion → hep statik).
+const rowHovered = ref(false)
+const authorAvatarSrc = computed<string | null>(() => {
+  const a = props.message.author
+  if (!rowHovered.value) return a.avatarUrl
+  return animatedOrStatic({ avatarUrl: a.avatarUrl, bannerUrl: null, avatarAnimatedUrl: a.avatarAnimatedUrl }, 'avatar')
+})
+
 function onRowEnter(e: MouseEvent) {
+  rowHovered.value = true
   // Başka bir mesajın menüsü açıkken bu satır hover-vurgusu göstermesin.
   if (toolbarSuppressed.value) return
   ;(e.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'
@@ -95,6 +105,7 @@ function onRowEnter(e: MouseEvent) {
 }
 
 function onRowLeave(e: MouseEvent) {
+  rowHovered.value = false
   ;(e.currentTarget as HTMLElement).style.backgroundColor = ''
   showFollowTime.value = false
 }
@@ -172,8 +183,8 @@ const renderedContent = computed<string>(() => {
           style="background-color: var(--kv-accent-500);"
         >
           <img
-            v-if="message.author.avatarUrl"
-            :src="message.author.avatarUrl"
+            v-if="authorAvatarSrc"
+            :src="authorAvatarSrc"
             :alt="message.author.username"
             class="w-full h-full object-cover"
           />

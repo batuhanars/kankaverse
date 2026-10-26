@@ -7,6 +7,7 @@ import { useFriendsStore } from '@/stores/friends'
 import { useToastStore } from '@/stores/toast'
 import { renderMessageHtml } from '@/utils/markdown'
 import { bannerBackground } from '@/utils/bannerColor'
+import { animatedOrStatic } from '@/utils/animatedMedia'
 import FullProfileModal from '@/components/shared/FullProfileModal.vue'
 import ReportModal from '@/components/shared/ReportModal.vue'
 import type { FriendCodeUserDto, UserProfileCardDto } from '@/types'
@@ -32,6 +33,12 @@ watch(
     }
   },
   { immediate: true },
+)
+
+// Sprint C16 — panel her zaman hareketli; kart gelmeden önce prop'taki statik avatar
+const bannerSrc = computed(() => animatedOrStatic(card.value, 'banner'))
+const avatarSrc = computed(
+  () => animatedOrStatic(card.value, 'avatar') ?? props.otherUser.avatarUrl,
 )
 
 const bioHtml = computed(() =>
@@ -98,8 +105,8 @@ watch(() => props.otherUser.id, () => {
     <div class="relative shrink-0">
       <div class="h-[96px] relative overflow-hidden" :style="{ background: bannerBackground(card?.bannerColor ?? null) }">
         <img
-          v-if="card?.bannerUrl"
-          :src="card.bannerUrl"
+          v-if="bannerSrc"
+          :src="bannerSrc"
           alt=""
           class="absolute inset-0 w-full h-full object-cover"
         />
@@ -109,8 +116,8 @@ watch(() => props.otherUser.id, () => {
         style="border-color: var(--kv-bg-sidebar); background-color: var(--kv-accent-500);"
       >
         <img
-          v-if="otherUser.avatarUrl"
-          :src="otherUser.avatarUrl"
+          v-if="avatarSrc"
+          :src="avatarSrc"
           :alt="otherUser.username"
           class="w-full h-full object-cover"
         />

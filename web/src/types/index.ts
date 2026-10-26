@@ -304,6 +304,7 @@ export interface MessageDto {
     id: string
     username: string
     avatarUrl: string | null
+    avatarAnimatedUrl?: string | null // Sprint C16 — hover'da canlanır; yoksa statik
   }
   createdAt: string
   editedAt: string | null

@@ -4308,5 +4308,13 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] §3 mobil: galeriye kaydet (görsel + video)
 - [x] §4 build/test temiz (api 1181 test; web vue-tsc -b bilinen 6 + vite build; mobil typecheck + lint)
 - [x] R7 insan incelemesi (sahip) — 2026-10-26 onaylandı
-- [ ] Sahip turu (web + masaüstü + mobil)
-- [ ] Mağaza sürümü (versionCode 26)
+- [x] Sahip turu (web + masaüstü + mobil) — 2026-10-26 hepsi geçti (masaüstü canlıda)
+- [x] Mağaza sürümü — versionCode 26 release APK canlıya karşı cihazda denendi (galeriye kaydet), AAB sahipte Play yüklemesi için (2026-10-26)
+
+## Sprint C16 — Hareketli avatar: DM paneli + mesaj hover — 2026-10-26
+
+> Sözleşme: `contracts/SPRINT_C16_ANIMATED_AVATAR_SURFACES_CONTRACT.md`. api → web. Mobil kapsam dışı.
+
+- [x] §1 api: yazar select'i tek sabit + avatarAnimatedUrl (REST + WS)
+- [x] §2 web: DM paneli + mesaj avatarı hover
+- [x] Sahip turu (web, yerel) — 2026-10-26 DM paneli + hover (1-1 DM, grup DM, kanal, yeni mesaj) geçti

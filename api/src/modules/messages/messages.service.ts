@@ -13,6 +13,7 @@ import { MembershipService } from '../../shared/membership/membership.service';
 import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { AutomodService } from '../../shared/automod/automod.service';
 import { ModerationService } from '../../shared/moderation/moderation.service';
+import { MESSAGE_AUTHOR_SELECT } from '../../common/utils/message-author.select';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { Attachment, Message, MessageReaction, Prisma, ScanStatus, User } from '@prisma/client';
@@ -42,7 +43,7 @@ type ReplyToRaw =
   | null;
 
 type MessageWithAuthor = Message & {
-  author: Pick<User, 'id' | 'username' | 'avatarUrl'>;
+  author: Pick<User, 'id' | 'username' | 'avatarUrl' | 'avatarAnimatedUrl'>;
   attachments: AttachmentDto[];
   reactions?: Pick<MessageReaction, 'userId' | 'emoji'>[];
   replyTo?: ReplyToRaw;
@@ -91,6 +92,8 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
       id: msg.author.id,
       username: msg.author.username,
       avatarUrl: msg.author.avatarUrl,
+      // C16: hareketli WebP adresi (avatarUrl = statik kare). Eski önbellek/olayda alan yok → istemci statik.
+      avatarAnimatedUrl: msg.author.avatarAnimatedUrl ?? null,
     },
     attachments: msg.attachments.map((a) => ({
       id: a.id,
@@ -316,7 +319,7 @@ export class MessagesService {
         ...(Object.keys(createdAtFilter).length ? { createdAt: createdAtFilter } : {}),
       },
       include: {
-        author: { select: { id: true, username: true, avatarUrl: true } },
+        author: { select: MESSAGE_AUTHOR_SELECT },
         attachments: {
           select: {
             id: true,
@@ -502,7 +505,7 @@ export class MessagesService {
         mentionRoles,
       },
       include: {
-        author: { select: { id: true, username: true, avatarUrl: true } },
+        author: { select: MESSAGE_AUTHOR_SELECT },
         attachments: {
           select: {
             id: true,
@@ -614,7 +617,7 @@ export class MessagesService {
         mentionRoles,
       },
       include: {
-        author: { select: { id: true, username: true, avatarUrl: true } },
+        author: { select: MESSAGE_AUTHOR_SELECT },
         attachments: {
           select: {
             id: true,
@@ -888,7 +891,7 @@ export class MessagesService {
         ...(Object.keys(createdAtFilter).length ? { createdAt: createdAtFilter } : {}),
       },
       include: {
-        author: { select: { id: true, username: true, avatarUrl: true } },
+        author: { select: MESSAGE_AUTHOR_SELECT },
         attachments: {
           select: {
             id: true,
@@ -926,7 +929,7 @@ export class MessagesService {
         deletedAt: null,
       },
       include: {
-        author: { select: { id: true, username: true, avatarUrl: true } },
+        author: { select: MESSAGE_AUTHOR_SELECT },
         attachments: {
           select: {
             id: true,
@@ -1033,7 +1036,7 @@ export class MessagesService {
         ...(mentions ? { mentions: { has: mentions } } : {}),
       },
       include: {
-        author: { select: { id: true, username: true, avatarUrl: true } },
+        author: { select: MESSAGE_AUTHOR_SELECT },
         attachments: {
           select: {
             id: true,

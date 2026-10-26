@@ -304,6 +304,36 @@ describe('MessagesService.findMessages', () => {
     expect(result).toEqual([]);
     expect(prismaMock.message.findMany).not.toHaveBeenCalled();
   });
+
+  // C16 — mesaj yazarı hareketli avatar adresini taşır; select sabitle istenir
+  it('C16: yazar select avatarAnimatedUrl içerir ve DTO author.avatarAnimatedUrl döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    prismaMock.channelMember.findUnique.mockResolvedValue({ clearedAt: null });
+    const msg = makeMsg('m-anim', new Date('2026-10-26T10:00:00Z'));
+    msg.author = {
+      id: 'author-1',
+      username: 'kanka',
+      avatarUrl: 'https://cdn/s.webp',
+      avatarAnimatedUrl: 'https://cdn/a.webp',
+    } as typeof msg.author;
+    prismaMock.message.findMany.mockResolvedValue([msg]);
+
+    const result = await service.findMessages(USER_ID, CHANNEL_ID);
+
+    const include = prismaMock.message.findMany.mock.calls[0][0].include;
+    expect(include.author.select).toMatchObject({ avatarUrl: true, avatarAnimatedUrl: true });
+    expect(result[0].author.avatarAnimatedUrl).toBe('https://cdn/a.webp');
+  });
+
+  it('C16: yazarın hareketli avatarı yoksa author.avatarAnimatedUrl null', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    prismaMock.channelMember.findUnique.mockResolvedValue({ clearedAt: null });
+    prismaMock.message.findMany.mockResolvedValue([makeMsg('m-static', new Date())]);
+
+    const result = await service.findMessages(USER_ID, CHANNEL_ID);
+
+    expect(result[0].author.avatarAnimatedUrl).toBeNull();
+  });
 });
 
 // ── MessagesService.create — automod ────────────────────────────────────────
