@@ -34,5 +34,13 @@
 - [ ] web: DM paneli hareketli; mesaj avatarı hover'da canlanıyor (DM, grup DM, kanal); reduced-motion statik
 - [ ] Sahip turu (web + masaüstü)
 
+## §3b Ek (sahip 2026-10-26): sağdaki üye listeleri
+Sahip kararıyla **üye listeleri kapsama girdi** (§4'teki ilk yasak bu iki yüzey için kalktı):
+- Kanal/ortam üye paneli (`GET` ortam üyeleri, `guilds.service.ts getMembers` → `GuildMemberDto`) ve grup DM'nin
+  sağdaki katılımcı listesi (`dm.service.ts` DM kanal üyeleri select'i → ilgili DTO) opsiyonel
+  `avatarAnimatedUrl: string | null` taşır.
+- Web: bu iki listede satır hover'dayken hareketli, değilse statik; reduced-motion statik (mesaj satırıyla aynı kural).
+- Ses ve bildirim yüzeyleri yine statik.
+
 ## §4 Sapma kuralı
-Şunlar → DUR: üye listesi/ses/bildirim DTO'larına yayma · mobil değişiklik · şema değişikliği.
+Şunlar → DUR: ses/bildirim DTO'larına yayma · mobil değişiklik · şema değişikliği.

@@ -101,7 +101,7 @@ export class DmService {
    *
    * Discriminated union dönüşü:
    *  - 1-1 DM: type='DM', otherUser, canMessage, selfBlocked
-   *  - GROUP_DM: type='GROUP_DM', name, ownerId, members[{id,username,avatarUrl}]
+   *  - GROUP_DM: type='GROUP_DM', name, ownerId, members[{id,username,avatarUrl,avatarAnimatedUrl}]
    */
   async getDmChannels(userId: string) {
     const memberships = await this.prisma.channelMember.findMany({
@@ -110,7 +110,11 @@ export class DmService {
         channel: {
           include: {
             members: {
-              include: { user: { select: { id: true, username: true, avatarUrl: true } } },
+              include: {
+                user: {
+                  select: { id: true, username: true, avatarUrl: true, avatarAnimatedUrl: true },
+                },
+              },
             },
             messages: {
               where: { deletedAt: null },
@@ -221,6 +225,7 @@ export class DmService {
           id: cm.user.id,
           username: cm.user.username,
           avatarUrl: cm.user.avatarUrl,
+          avatarAnimatedUrl: cm.user.avatarAnimatedUrl,
         })),
         lastMessage: lastMsg
           ? {
@@ -398,7 +403,13 @@ export class DmService {
           name: dto.name ?? null,
         },
         include: {
-          members: { include: { user: { select: { id: true, username: true, avatarUrl: true } } } },
+          members: {
+            include: {
+              user: {
+                select: { id: true, username: true, avatarUrl: true, avatarAnimatedUrl: true },
+              },
+            },
+          },
         },
       });
       await tx.channelMember.createMany({
@@ -413,7 +424,9 @@ export class DmService {
     // Üye listesini taze çek (createMany sonrası include çalışmaz)
     const freshMembers = await this.prisma.channelMember.findMany({
       where: { channelId: channel.id },
-      include: { user: { select: { id: true, username: true, avatarUrl: true } } },
+      include: {
+        user: { select: { id: true, username: true, avatarUrl: true, avatarAnimatedUrl: true } },
+      },
     });
 
     return {
@@ -425,6 +438,7 @@ export class DmService {
         id: cm.user.id,
         username: cm.user.username,
         avatarUrl: cm.user.avatarUrl,
+        avatarAnimatedUrl: cm.user.avatarAnimatedUrl,
       })),
       lastMessage: null,
       unread: false,

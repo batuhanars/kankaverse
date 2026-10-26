@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
+import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import type { GuildMemberDto, RoleDto } from '@/types'
 import type { PresenceStatus } from '@/stores/presence'
 
@@ -101,12 +102,18 @@ function onRowClick(e: MouseEvent) {
 }
 
 // Hover-vurgu: başka üyenin overlay'i açıkken bastır; kendi overlay'i açıkken sabit kal.
+// Sprint C16 — hareketli avatar yalnız satır hover'dayken
+const rowHovered = ref(false)
+const avatarSrc = computed(() => hoverAvatarSrc(props.member, rowHovered.value))
+
 function onRowEnter(e: MouseEvent) {
+  rowHovered.value = true
   if (props.hoverSuppressed) return
   ;(e.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'
 }
 
 function onRowLeave(e: MouseEvent) {
+  rowHovered.value = false
   // Kendi overlay'i açıkken vurgu kalsın (kart/menü bu satıra çapalı).
   if (props.ownerActive) return
   ;(e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
@@ -137,8 +144,8 @@ function onRowLeave(e: MouseEvent) {
             : 'background-color: var(--kv-accent-500); color: #fff;'"
       >
         <img
-          v-if="member.avatarUrl"
-          :src="member.avatarUrl"
+          v-if="avatarSrc"
+          :src="avatarSrc"
           :alt="member.username"
           class="w-full h-full object-cover"
         />

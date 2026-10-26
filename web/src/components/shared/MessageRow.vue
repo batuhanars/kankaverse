@@ -19,7 +19,7 @@ import AttachmentView from './AttachmentView.vue'
 import MessageActionsMenu from './MessageActionsMenu.vue'
 import { formatMentionsPlain } from '@/utils/mentions'
 import { renderMessageHtml } from '@/utils/markdown'
-import { animatedOrStatic } from '@/utils/animatedMedia'
+import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import { useActiveMenu } from '@/composables/useActiveMenu'
 import type { MessageDto } from '@/types'
 
@@ -91,9 +91,7 @@ function formatTime(iso: string): string {
 // Sprint C16 — hareketli avatar yalnız satır hover'dayken yüklenir (reduced-motion → hep statik).
 const rowHovered = ref(false)
 const authorAvatarSrc = computed<string | null>(() => {
-  const a = props.message.author
-  if (!rowHovered.value) return a.avatarUrl
-  return animatedOrStatic({ avatarUrl: a.avatarUrl, bannerUrl: null, avatarAnimatedUrl: a.avatarAnimatedUrl }, 'avatar')
+  return hoverAvatarSrc(props.message.author, rowHovered.value)
 })
 
 function onRowEnter(e: MouseEvent) {

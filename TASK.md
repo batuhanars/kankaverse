@@ -4318,3 +4318,4 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] §1 api: yazar select'i tek sabit + avatarAnimatedUrl (REST + WS)
 - [x] §2 web: DM paneli + mesaj avatarı hover
 - [x] Sahip turu (web, yerel) — 2026-10-26 DM paneli + hover (1-1 DM, grup DM, kanal, yeni mesaj) geçti
+- [x] §3b ek: üye listeleri (ortam paneli + grup DM katılımcıları) hover'da hareketli — sahip kararıyla elle test edilmeden deploy (2026-10-26); tsc + 1183 test + vue-tsc temiz

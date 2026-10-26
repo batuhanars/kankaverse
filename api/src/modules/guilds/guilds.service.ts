@@ -506,7 +506,15 @@ export class GuildsService {
     const members = await this.prisma.guildMember.findMany({
       where: { guildId },
       include: {
-        user: { select: { id: true, username: true, avatarUrl: true, bannerUrl: true } },
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true,
+            avatarAnimatedUrl: true,
+            bannerUrl: true,
+          },
+        },
         roleLinks: {
           include: { role: true },
           orderBy: { role: { position: 'desc' } },
@@ -524,6 +532,7 @@ export class GuildsService {
         userId: m.user.id,
         username: m.user.username,
         avatarUrl: m.user.avatarUrl,
+        avatarAnimatedUrl: m.user.avatarAnimatedUrl,
         bannerUrl: m.user.bannerUrl,
         role: m.role,
         // @everyone örtük — roleLinks'te isEveryone=true olanlar çıkar (örtük olduğundan atanmaz zaten)

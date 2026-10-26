@@ -22,6 +22,15 @@ export function animatedOrStatic(
   return staticUrl
 }
 
+// Sprint C16 — liste/satır yüzeyleri: hareketli avatar yalnız satır hover'dayken (aksi halde statik).
+export function hoverAvatarSrc(
+  user: { avatarUrl: string | null; avatarAnimatedUrl?: string | null },
+  hovered: boolean,
+): string | null {
+  if (!hovered) return user.avatarUrl
+  return animatedOrStatic({ avatarUrl: user.avatarUrl, bannerUrl: null, avatarAnimatedUrl: user.avatarAnimatedUrl }, 'avatar')
+}
+
 // Sprint C13 §0 — kesit sabitleri (sözleşme §2.1 ile aynı; sunucu otorite)
 export const ANIMATED_MIN_MS = 500
 export const ANIMATED_MAX_MS = 6000

@@ -5,6 +5,7 @@ import { useDmStore } from '@/stores/dm'
 import { useAuthStore } from '@/stores/auth'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import UserCardPopover from '@/components/shared/UserCardPopover.vue'
+import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import type { GroupDmMemberDto } from '@/types'
 
 const props = defineProps<{
@@ -26,6 +27,9 @@ const authStore = useAuthStore()
 const isOwner = computed(() => authStore.user?.id === props.ownerId)
 
 // ── Kullanıcı kartı popover (üyeye sol-tık — mesaj-yazarı deseni) ───────────
+// Sprint C16 — hareketli avatar yalnız hover'daki satırda
+const hoveredMemberId = ref<string | null>(null)
+
 const showCard = ref(false)
 const cardUserId = ref('')
 const cardX = ref(0)
@@ -140,8 +144,8 @@ async function renameGroup() {
         v-for="member in sortedMembers"
         :key="member.id"
         class="group flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
-        @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
-        @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
+        @mouseenter="hoveredMemberId = member.id; ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
+        @mouseleave="hoveredMemberId = null; ($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
         @click="openCard(member.id, $event)"
       >
         <div
@@ -149,8 +153,8 @@ async function renameGroup() {
           style="background-color: var(--kv-accent-500);"
         >
           <img
-            v-if="member.avatarUrl"
-            :src="member.avatarUrl"
+            v-if="hoverAvatarSrc(member, hoveredMemberId === member.id)"
+            :src="hoverAvatarSrc(member, hoveredMemberId === member.id) as string"
             :alt="member.username"
             class="w-full h-full object-cover"
           />

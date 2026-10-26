@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GuildRole } from '@prisma/client';
 
 export class RoleSummaryDto {
@@ -27,6 +27,9 @@ export class GuildMemberDto {
 
   @ApiProperty({ example: 'https://cdn.example.com/avatar.png', nullable: true })
   avatarUrl: string | null;
+
+  @ApiPropertyOptional({ example: 'https://cdn.example.com/avatar.webp', nullable: true })
+  avatarAnimatedUrl?: string | null;
 
   @ApiProperty({ example: 'https://cdn.example.com/banner.png', nullable: true })
   bannerUrl: string | null;

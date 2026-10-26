@@ -89,6 +89,7 @@ export interface GroupDmMemberDto {
   id: string
   username: string
   avatarUrl: string | null
+  avatarAnimatedUrl?: string | null // Sprint C16 — satır hover'da canlanır; yoksa statik
 }
 
 // Sprint 12 §3 — DmChannelDto discriminated union: 1-1 DM | GROUP_DM
@@ -341,6 +342,7 @@ export interface GuildMemberDto {
   username: string
   avatarUrl: string | null
   bannerUrl: string | null // Sprint C8 — profil afişi (görsel); üye listesinde şu an gösterilmiyor
+  avatarAnimatedUrl?: string | null // Sprint C16 — satır hover'da canlanır; yoksa statik
   role: GuildMemberRole
   roles: { id: string; name: string; color: string; position: number; hoist: boolean }[]
 }
