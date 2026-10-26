@@ -4,6 +4,7 @@ import {
   Get,
   Body,
   Param,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -11,6 +12,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AttachmentsService } from './attachments.service';
 import { PresignAttachmentDto } from './dto/presign-attachment.dto';
+import { DownloadAttachmentQueryDto } from './dto/download-attachment-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from '../../common/guards/verified-email.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -37,7 +39,11 @@ export class AttachmentsController {
     summary:
       "[R7] Dosya indirme URL (erişim kontrolü + scan kapısı; redirect yok — presigned URL body'de döner)",
   })
-  getDownloadUrl(@CurrentUser() user: { id: string }, @Param('id') attachmentId: string) {
-    return this.attachmentsService.getDownloadUrl(user.id, attachmentId);
+  getDownloadUrl(
+    @CurrentUser() user: { id: string },
+    @Param('id') attachmentId: string,
+    @Query() query: DownloadAttachmentQueryDto,
+  ) {
+    return this.attachmentsService.getDownloadUrl(user.id, attachmentId, !!query.download);
   }
 }

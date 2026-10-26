@@ -12,6 +12,7 @@ import { Transform } from 'stream';
 import { pipeline } from 'stream/promises';
 import type { Readable } from 'stream';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { buildAttachmentContentDisposition } from '../../common/utils/content-disposition.util';
 
 // Presigned URL geçerlilik süresi (saniye) — kısa ömürlü
 const PRESIGN_EXPIRES_SECONDS = 300;
@@ -87,11 +88,18 @@ export class StorageService {
   /**
    * Dosya indirme için presigned GET URL üretir (kısa ömürlü).
    * İstemci bu URL'yi bearer header olmadan kullanır.
+   * C15: `downloadFilename` verilirse yanıt `Content-Disposition: attachment` taşır (tarayıcı indirir).
    */
-  async presignGet(key: string): Promise<string> {
+  async presignGet(key: string, opts?: { downloadFilename?: string }): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: this.bucket,
       Key: key,
+      ...(opts?.downloadFilename !== undefined && {
+        ResponseContentDisposition: buildAttachmentContentDisposition(
+          opts.downloadFilename,
+          'kankaverse-indirme',
+        ),
+      }),
     });
     const url = await getSignedUrl(this.client, command, {
       expiresIn: PRESIGN_EXPIRES_SECONDS,

@@ -4297,4 +4297,16 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] §5 build/test temiz (api 1168 test + Docker sharp; web vue-tsc -b bilinen 6 + vite build; mobil typecheck + lint)
 - [x] R7 insan incelemesi (sahip) — 2026-10-26 onaylandı
 - [x] Sahip canlı test (web) + cihaz turu (mobil) — 2026-10-26 yerel API, tüm maddeler geçti
-- [ ] Mağaza sürümü (release paketi canlıya karşı cihazda)
+- [x] Mağaza sürümü — versionCode 25 release APK canlıya karşı cihazda denendi (giriş, soket, konumlandırma, hareketli avatar), AAB sahipte Play yüklemesi için (2026-10-26)
+
+## Sprint C15 — Sohbet medyasını indirme — 2026-10-26
+
+> Sözleşme: `contracts/SPRINT_C15_MEDIA_DOWNLOAD_CONTRACT.md`. api → web + mobil. Mobil yalnız JS.
+
+- [x] §1 api: `download=1` + güvenli dosya adı + testler
+- [x] §2 web: ortak indirme yardımcısı + video kartı simgesi
+- [x] §3 mobil: galeriye kaydet (görsel + video)
+- [x] §4 build/test temiz (api 1181 test; web vue-tsc -b bilinen 6 + vite build; mobil typecheck + lint)
+- [x] R7 insan incelemesi (sahip) — 2026-10-26 onaylandı
+- [ ] Sahip turu (web + masaüstü + mobil)
+- [ ] Mağaza sürümü (versionCode 26)

@@ -10,6 +10,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../shared/storage/storage.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { PresignAttachmentDto } from './dto/presign-attachment.dto';
+import { extname } from 'path';
+import { sanitizeDownloadFilename } from '../../common/utils/content-disposition.util';
 
 // İzin verilen içerik tipleri (allowlist) — genişletme config değişikliğiyle gelir.
 //
@@ -200,7 +202,7 @@ export class AttachmentsService {
    *
    * Redirect DEĞİL (istemci auth header taşıyamadığı için presigned URL body'de döner).
    */
-  async getDownloadUrl(userId: string, attachmentId: string) {
+  async getDownloadUrl(userId: string, attachmentId: string, download = false) {
     const attachment = await this.prisma.attachment.findUnique({
       where: { id: attachmentId },
       include: { message: { select: { channelId: true } } },
@@ -238,6 +240,14 @@ export class AttachmentsService {
         message: 'Bu dosya henüz hazır değil, lütfen bekleyin.',
         error: 'ATTACHMENT_NOT_READY',
       });
+    }
+
+    // C15: download=1 → imzalı adres Content-Disposition: attachment taşır (erişim/scan kapısı YUKARIDA, değişmedi)
+    if (download) {
+      const fallback = `kankaverse-${attachment.id}${extname(attachment.storageKey)}`;
+      const downloadFilename = sanitizeDownloadFilename(attachment.filename, fallback);
+      const url = await this.storage.presignGet(attachment.storageKey, { downloadFilename });
+      return { url };
     }
 
     const url = await this.storage.presignGet(attachment.storageKey);

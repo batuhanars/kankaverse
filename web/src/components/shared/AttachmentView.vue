@@ -5,6 +5,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { attachmentsApi } from '@/api/attachments'
+import { downloadAttachment } from '@/utils/downloadAttachment'
 import { ScanStatus, type AttachmentDto } from '@/types'
 import ImageLightbox from './ImageLightbox.vue'
 import VoicePlayer from './VoicePlayer.vue'
@@ -104,6 +105,17 @@ async function openUrl() {
 
 // Görsel → lightbox. Açarken adres TAZELENİR: küçük önizleme dakikalar önce yüklenmiş olabilir ve
 // o adres artık ölü olabilir — büyütünce sessizce siyah kalırdı. Mobilde M3c R3'te aynısı yapıldı.
+// Dosya kartı "İndir": gerçek indirme (Content-Disposition: attachment)
+async function downloadFile() {
+  if (isActionDisabled.value) return
+  downloading.value = true
+  try {
+    await downloadAttachment(props.attachment.id)
+  } finally {
+    downloading.value = false
+  }
+}
+
 function openLightbox() {
   if (!imageUrl.value) return
   lightboxOpen.value = true
@@ -266,7 +278,7 @@ function formatBytes(bytes: number): string {
         class="text-[12px] px-2 py-1 rounded-[var(--kv-radius-sm)] transition-opacity cursor-pointer"
         style="color: var(--kv-accent-500);"
         :class="isActionDisabled ? 'opacity-40 pointer-events-none' : 'hover:opacity-80'"
-        @click="openUrl"
+        @click="downloadFile"
       >
         <span v-if="isPending">{{ t('attachment.processing') }}</span>
         <span v-else-if="isBlocked">{{ t('attachment.blocked') }}</span>
@@ -279,6 +291,7 @@ function formatBytes(bytes: number): string {
   <ImageLightbox
     v-if="lightboxOpen && imageUrl"
     :url="imageUrl"
+    :attachment-id="attachment.id"
     :filename="attachment.filename"
     @close="lightboxOpen = false"
   />

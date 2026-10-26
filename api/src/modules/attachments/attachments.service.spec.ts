@@ -256,6 +256,62 @@ describe('AttachmentsService.getDownloadUrl — [R7] erişim + scan kapısı', (
     expect(result).toEqual({ url: 'https://minio/presigned-get-url' });
   });
 
+  // C15: download=1 → presignGet downloadFilename ile; erişim/scan kapısı aynı
+  it('C15: download=true → presignGet kayıtlı dosya adıyla çağrılır', async () => {
+    prismaMock.attachment.findUnique.mockResolvedValue({
+      ...ATTACHMENT_FIXTURE,
+      filename: 'Şiir "1".png',
+    });
+    membershipMock.requireChannelAccess.mockResolvedValue({ id: CHANNEL_ID, guildId: 'g-1' });
+
+    const result = await service.getDownloadUrl(USER_ID, ATTACHMENT_ID, true);
+
+    expect(storageMock.presignGet).toHaveBeenCalledWith(ATTACHMENT_FIXTURE.storageKey, {
+      downloadFilename: 'Şiir 1.png',
+    });
+    expect(result).toEqual({ url: 'https://minio/presigned-get-url' });
+  });
+
+  it('C15: download=true + boş ad → kankaverse-<id> + storageKey uzantısı', async () => {
+    prismaMock.attachment.findUnique.mockResolvedValue({
+      ...ATTACHMENT_FIXTURE,
+      filename: '"/\\',
+      storageKey: 'abc123.mp4',
+    });
+    membershipMock.requireChannelAccess.mockResolvedValue({ id: CHANNEL_ID, guildId: 'g-1' });
+
+    await service.getDownloadUrl(USER_ID, ATTACHMENT_ID, true);
+
+    expect(storageMock.presignGet).toHaveBeenCalledWith('abc123.mp4', {
+      downloadFilename: `kankaverse-${ATTACHMENT_FIXTURE.id}.mp4`,
+    });
+  });
+
+  it('C15 [R7]: erişimi olmayan kullanıcı download=true ile de reddedilir', async () => {
+    prismaMock.attachment.findUnique.mockResolvedValue(ATTACHMENT_FIXTURE);
+    membershipMock.requireChannelAccess.mockRejectedValue(
+      new ForbiddenException({ message: 'Erişim yok.', error: 'NOT_CHANNEL_MEMBER' }),
+    );
+
+    await expect(service.getDownloadUrl(USER_ID, ATTACHMENT_ID, true)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(storageMock.presignGet).not.toHaveBeenCalled();
+  });
+
+  it('C15 [R7]: scan CLEAN değilse download=true da reddedilir', async () => {
+    prismaMock.attachment.findUnique.mockResolvedValue({
+      ...ATTACHMENT_FIXTURE,
+      scanStatus: 'PENDING',
+    });
+    membershipMock.requireChannelAccess.mockResolvedValue({ id: CHANNEL_ID, guildId: 'g-1' });
+
+    await expect(service.getDownloadUrl(USER_ID, ATTACHMENT_ID, true)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(storageMock.presignGet).not.toHaveBeenCalled();
+  });
+
   // ─────────────────────────────────────────────────────────────────────────
   // Attachment hiç yok → 404
   // ─────────────────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { useSaveToGallery, type SaveTarget } from './useSaveToGallery';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -18,13 +19,17 @@ export function VideoViewer({
   url,
   errorMessage,
   onClose,
+  saveTarget,
 }: {
   visible: boolean;
   url: string | null;
   errorMessage?: string;
   onClose: () => void;
+  /** C15 — verilirse "Galeriye kaydet" düğmesi çıkar. */
+  saveTarget?: SaveTarget;
 }) {
   const insets = useSafeAreaInsets();
+  const { save, saving } = useSaveToGallery(saveTarget);
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.root} accessibilityLabel={t('mobile.video.viewer')}>
@@ -35,6 +40,23 @@ export function VideoViewer({
         ) : (
           <ActivityIndicator color={theme.colors.textMuted} />
         )}
+        {saveTarget && url && !errorMessage ? (
+          <Pressable
+            onPress={() => void save()}
+            disabled={saving}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('mobile.media.save')}
+            accessibilityState={{ busy: saving }}
+            style={[styles.close, styles.save, { top: insets.top + 8 }]}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={theme.colors.textPrimary} />
+            ) : (
+              <Ionicons name="download-outline" size={24} color={theme.colors.textPrimary} />
+            )}
+          </Pressable>
+        ) : null}
         <Pressable
           onPress={onClose}
           hitSlop={10}
@@ -76,6 +98,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  save: {
+    right: 12 + 40 + 8,
   },
   error: {
     color: theme.colors.textSecondary,

@@ -1556,6 +1556,7 @@
     "blocked": "Bu içerik kaldırıldı.",
     "notReady": "Dosya henüz hazır değil.",
     "download": "İndir",
+    "downloadVideo": "Videoyu indir",
     "open": "Aç",
     "uploadFailed": "Yükleme başarısız.",
     "errors": {
@@ -1759,6 +1760,12 @@
     "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
   },
   "mobile": {
+    "media": {
+      "save": "Galeriye kaydet",
+      "saved": "Galeriye kaydedildi.",
+      "saveFailed": "Kaydedilemedi. Bir daha dene.",
+      "permissionDenied": "Galeriye kaydetmek için izin gerekiyor. İzni ayarlardan açabilirsin."
+    },
     "video": {
       "preparing": "Video hazırlanıyor %{pct}",
       "tooLong": "Video en fazla 60 saniye olabilir.",

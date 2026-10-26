@@ -61,7 +61,13 @@ export function VideoCard({ attachment }: { attachment: AttachmentDto }) {
         ) : null}
       </Pressable>
 
-      <VideoViewer visible={open} url={url} errorMessage={error} onClose={() => setOpen(false)} />
+      <VideoViewer
+        visible={open}
+        url={url}
+        errorMessage={error}
+        onClose={() => setOpen(false)}
+        saveTarget={attachment}
+      />
     </>
   );
 }

@@ -5,6 +5,7 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { attachmentsApi } from '@/api/attachments'
 import { useExclusivePlayback } from '@/composables/useExclusivePlayback'
+import { downloadAttachment } from '@/utils/downloadAttachment'
 import { formatClock } from '@/utils/formatClock'
 import type { AttachmentDto } from '@/types'
 
@@ -44,6 +45,20 @@ async function open() {
     failed.value = true
   } finally {
     loading.value = false
+  }
+}
+
+// C15: kartın köşesinde indirme (kart yalnız CLEAN iken render edilir; işleniyor/kaldırıldı'da görünmez)
+const downloading = ref(false)
+async function download() {
+  if (downloading.value) return
+  downloading.value = true
+  try {
+    await downloadAttachment(props.attachment.id)
+  } catch {
+    failed.value = true
+  } finally {
+    downloading.value = false
   }
 }
 
@@ -116,6 +131,20 @@ onBeforeUnmount(() => stop(myId))
       >
         {{ t('attachment.notReady') }}
       </span>
+    </button>
+    <!-- İndir: sol üst köşe (oynatıcı kontrolleri altta, süre sağ altta; çakışmaz) -->
+    <button
+      type="button"
+      class="absolute left-2 top-2 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer transition-opacity hover:opacity-80"
+      :class="downloading ? 'opacity-50 pointer-events-none' : ''"
+      style="background-color: rgba(0, 0, 0, 0.6); color: #fff;"
+      :aria-label="t('attachment.downloadVideo')"
+      :title="t('attachment.downloadVideo')"
+      @click.stop="download"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />
+      </svg>
     </button>
   </div>
 </template>

@@ -37,6 +37,13 @@ export function getUrl(id: string) {
   return http.get<AttachmentUrlResult>(`/attachments/${id}`)
 }
 
+// C15: download=true → imzalı adres Content-Disposition: attachment taşır (erişim/tarama kapısı aynı)
+export function getDownloadUrl(id: string, opts: { download: boolean } = { download: true }) {
+  return http.get<AttachmentUrlResult>(`/attachments/${id}`, {
+    params: opts.download ? { download: 1 } : undefined,
+  })
+}
+
 // Ham PUT — presigned URL'e doğrudan S3'e yükle.
 // Global axios instance KULLANILMAZ: envelope interceptor yok, Authorization header yok.
 // transformRequest: [(d) => d] — axios'un body'yi dönüştürmesini engeller (ham binary).
@@ -58,4 +65,4 @@ export function uploadToS3(
     .then(() => undefined)
 }
 
-export const attachmentsApi = { presign, getUrl, uploadToS3 }
+export const attachmentsApi = { presign, getUrl, getDownloadUrl, uploadToS3 }

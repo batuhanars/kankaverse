@@ -12,6 +12,7 @@ import {
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import { useSaveToGallery, type SaveTarget } from './message/useSaveToGallery';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -40,6 +41,8 @@ interface Props {
    * zaten mesajın içindesin, orada düğme anlamsız olurdu (bkz. `ChannelMediaTab`).
    */
   onShowInChat?: () => void;
+  /** C15 — verilirse üstte "Galeriye kaydet" düğmesi çıkar (adresi kendisi tazeler). */
+  saveTarget?: SaveTarget;
 }
 
 /**
@@ -62,8 +65,9 @@ interface Props {
  * yüzden `PanResponder`a düşmüştü). Kökte sarmalayıcı yok, eklenmedi de — bu pencere kendi
  * sarmalayıcısını taşıyor.
  */
-export function ImageViewer({ visible, url, errorMessage, onClose, onShowInChat }: Props) {
+export function ImageViewer({ visible, url, errorMessage, onClose, onShowInChat, saveTarget }: Props) {
   const { width, height } = useWindowDimensions();
+  const { save, saving } = useSaveToGallery(saveTarget);
 
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -246,6 +250,23 @@ export function ImageViewer({ visible, url, errorMessage, onClose, onShowInChat 
           <Ionicons name="close" size={26} color={theme.colors.textPrimary} />
         </Pressable>
 
+        {saveTarget && url && !errorMessage ? (
+          <Pressable
+            onPress={() => void save()}
+            disabled={saving}
+            accessibilityRole="button"
+            accessibilityLabel={t('mobile.media.save')}
+            accessibilityState={{ busy: saving }}
+            style={styles.save}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={theme.colors.textPrimary} />
+            ) : (
+              <Ionicons name="download-outline" size={24} color={theme.colors.textPrimary} />
+            )}
+          </Pressable>
+        ) : null}
+
         {onShowInChat ? (
           <Pressable onPress={onShowInChat} accessibilityRole="button" style={styles.showInChat}>
             <Ionicons name="chatbubble-outline" size={16} color={theme.colors.textPrimary} />
@@ -281,6 +302,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 32,
     right: 12,
+    width: theme.layout.inputMinHeight,
+    height: theme.layout.inputMinHeight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.layout.inputMinHeight / 2,
+    backgroundColor: theme.colors.bgOverlay,
+  },
+  save: {
+    position: 'absolute',
+    top: 32,
+    right: 12 + theme.layout.inputMinHeight + 8,
     width: theme.layout.inputMinHeight,
     height: theme.layout.inputMinHeight,
     alignItems: 'center',

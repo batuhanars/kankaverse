@@ -1,11 +1,13 @@
 <!-- Sprint 6.x: Görsel lightbox — uygulama içi tam ekran önizleme.
      Esc / dışına tıkla / ✕ ile kapanır. Gölge yok (tasarım sistemi). -->
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { downloadAttachment } from '@/utils/downloadAttachment'
 
 const props = defineProps<{
   url: string
+  attachmentId: string
   filename?: string
 }>()
 
@@ -24,12 +26,17 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
 })
 
-function download() {
-  const a = document.createElement('a')
-  a.href = props.url
-  a.download = props.filename ?? 'gorsel'
-  a.rel = 'noopener noreferrer'
-  a.click()
+const downloading = ref(false)
+async function download() {
+  if (downloading.value) return
+  downloading.value = true
+  try {
+    await downloadAttachment(props.attachmentId)
+  } catch {
+    // sessiz: adres alınamazsa görsel zaten ekranda, kullanıcı tekrar deneyebilir
+  } finally {
+    downloading.value = false
+  }
 }
 </script>
 
@@ -60,7 +67,8 @@ function download() {
 
       <!-- İndir butonu -->
       <button
-        class="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-[var(--kv-radius-sm)] text-[13px] font-medium cursor-pointer transition-opacity hover:opacity-80"
+        :disabled="downloading"
+        class="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-[var(--kv-radius-sm)] text-[13px] font-medium cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
         style="background-color: var(--kv-bg-elevated); color: var(--kv-accent-500);"
         @click="download"
       >

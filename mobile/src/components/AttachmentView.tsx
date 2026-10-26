@@ -186,6 +186,7 @@ export function AttachmentView({
           url={viewerUrl}
           errorMessage={viewerError}
           onClose={() => setViewerOpen(false)}
+          saveTarget={attachment}
           onShowInChat={
             onShowInChat
               ? () => {
