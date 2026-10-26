@@ -149,7 +149,7 @@ async function renameGroup() {
         @click="openCard(member.id, $event)"
       >
         <div
-          class="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-semibold text-white"
+          class="w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[14px] font-semibold text-white"
           style="background-color: var(--kv-accent-500);"
         >
           <img
@@ -160,7 +160,7 @@ async function renameGroup() {
           />
           <span v-else>{{ member.username[0].toUpperCase() }}</span>
         </div>
-        <span class="flex-1 text-[13px] truncate" style="color: var(--kv-text-primary);">
+        <span class="flex-1 text-[15px] font-medium truncate" style="color: var(--kv-text-primary);">
           {{ member.username }}
         </span>
         <!-- Taç: owner işareti -->

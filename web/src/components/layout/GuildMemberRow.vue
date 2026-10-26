@@ -136,7 +136,7 @@ function onRowLeave(e: MouseEvent) {
     <!-- Avatar + presence dot -->
     <div class="relative shrink-0">
       <div
-        class="w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-semibold overflow-hidden"
+        class="w-9 h-9 rounded-full flex items-center justify-center text-[14px] font-semibold overflow-hidden"
         :style="props.isOffline
           ? 'background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);'
           : props.roleColor
@@ -161,7 +161,7 @@ function onRowLeave(e: MouseEvent) {
     <!-- Kullanıcı adı -->
     <div class="flex-1 min-w-0">
       <span
-        class="block text-[14px] font-medium truncate"
+        class="block text-[15px] font-medium truncate"
         :style="props.isOffline ? 'color: var(--kv-text-muted);' : 'color: var(--kv-text-primary);'"
       >
         {{ member.username }}
