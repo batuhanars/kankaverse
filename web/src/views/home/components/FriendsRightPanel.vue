@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useFriendsStore } from '@/stores/friends'
 import { useDmStore } from '@/stores/dm'
 import { usePresenceStore } from '@/stores/presence'
+import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 
@@ -14,6 +15,9 @@ const { t } = useI18n()
 const friendsStore = useFriendsStore()
 const dmStore = useDmStore()
 const presenceStore = usePresenceStore()
+
+// C16 — Kankalar satırı hover'dayken hareketli avatar (çevrimiçi ve çevrimdışı grupları)
+const hoveredFriendId = ref<string | null>(null)
 
 type Tab = 'all' | 'pending' | 'blocked'
 const activeTab = ref<Tab>(props.initialTab ?? 'all')
@@ -137,6 +141,8 @@ async function runConfirm() {
               v-for="f in onlineFriends"
               :key="f.friendshipId"
               class="group relative flex items-center gap-2.5 px-3 mx-1 py-2.5 rounded-[var(--kv-radius-md)] hover:bg-[var(--kv-bg-elevated)]"
+              @mouseenter="hoveredFriendId = f.friendshipId"
+              @mouseleave="hoveredFriendId = null"
             >
               <!-- Avatar + presence noktası -->
               <div class="relative shrink-0">
@@ -144,7 +150,12 @@ async function runConfirm() {
                   class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-[12px] font-bold text-white"
                   style="background-color: var(--kv-accent-500);"
                 >
-                  <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
+                  <img
+                    v-if="f.user.avatarUrl"
+                    :src="hoverAvatarSrc(f.user, hoveredFriendId === f.friendshipId) ?? f.user.avatarUrl"
+                    :alt="f.user.username"
+                    class="w-full h-full object-cover"
+                  />
                   <span v-else>{{ f.user.username[0].toUpperCase() }}</span>
                 </div>
                 <PresenceDot
@@ -223,6 +234,8 @@ async function runConfirm() {
               v-for="f in offlineFriends"
               :key="f.friendshipId"
               class="group relative flex items-center gap-2.5 px-3 mx-1 py-2.5 rounded-[var(--kv-radius-md)] hover:bg-[var(--kv-bg-elevated)]"
+              @mouseenter="hoveredFriendId = f.friendshipId"
+              @mouseleave="hoveredFriendId = null"
             >
               <!-- Avatar + presence noktası -->
               <div class="relative shrink-0">
@@ -230,7 +243,12 @@ async function runConfirm() {
                   class="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-[12px] font-bold text-white"
                   style="background-color: var(--kv-accent-500);"
                 >
-                  <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
+                  <img
+                    v-if="f.user.avatarUrl"
+                    :src="hoverAvatarSrc(f.user, hoveredFriendId === f.friendshipId) ?? f.user.avatarUrl"
+                    :alt="f.user.username"
+                    class="w-full h-full object-cover"
+                  />
                   <span v-else>{{ f.user.username[0].toUpperCase() }}</span>
                 </div>
                 <PresenceDot
