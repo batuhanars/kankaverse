@@ -108,6 +108,11 @@ export default () => {
         'http://localhost:9000/kankaverse',
     },
     maxUploadMb: parseInt(process.env.MAX_UPLOAD_MB ?? '25', 10),
+    // C13 — hareketli avatar/afiş (GIF + videodan kesit → sunucuda hareketli WebP). Default KAPALI.
+    // Kapatma anahtarı + ileride abonelik kapısının takılacağı tek nokta (canCreateAnimated).
+    animatedProfileEnabled: process.env.ANIMATED_PROFILE_ENABLED === 'true',
+    ffmpegPath: process.env.FFMPEG_PATH ?? 'ffmpeg',
+    ffprobePath: process.env.FFPROBE_PATH ?? 'ffprobe',
     // LANSMAN: ATTACHMENT_SCAN_ENABLED=true + gerçek CSAM tarayıcı olmadan canlıya ALINMAZ (R5)
     attachmentScanEnabled: process.env.ATTACHMENT_SCAN_ENABLED === 'true',
     // Dosya yükleme feature-flag: CSAM tarayıcı yokken kapalı önizlemede false yapılabilir (D14)

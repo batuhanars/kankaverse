@@ -17,6 +17,7 @@ import { useGuildsStore } from '@/stores/guilds'
 import { useAuthStore } from '@/stores/auth'
 import { renderMessageHtml } from '@/utils/markdown'
 import { bannerBackground } from '@/utils/bannerColor'
+import { animatedOrStatic } from '@/utils/animatedMedia'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import type { UserProfileCardDto } from '@/types'
 
@@ -168,7 +169,7 @@ async function runConfirm() {
             <div class="h-36 relative overflow-hidden" :style="{ background: bannerBackground(card.bannerColor) }">
               <img
                 v-if="card.bannerUrl"
-                :src="card.bannerUrl"
+                :src="animatedOrStatic(card, 'banner') ?? card.bannerUrl"
                 alt=""
                 class="absolute inset-0 w-full h-full object-cover"
               />
@@ -178,7 +179,7 @@ async function runConfirm() {
                 class="w-[104px] h-[104px] rounded-full border-4 overflow-hidden flex items-center justify-center text-[34px] font-bold text-white"
                 style="border-color: var(--kv-bg-content); background-color: var(--kv-accent-500);"
               >
-                <img v-if="card.avatarUrl" :src="card.avatarUrl" :alt="card.username" class="w-full h-full object-cover" />
+                <img v-if="card.avatarUrl" :src="animatedOrStatic(card, 'avatar') ?? card.avatarUrl" :alt="card.username" class="w-full h-full object-cover" />
                 <span v-else>{{ card.username[0].toUpperCase() }}</span>
               </div>
             </div>

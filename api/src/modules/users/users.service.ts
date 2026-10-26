@@ -4,6 +4,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { toUserDto } from '../auth/utils/user-dto.util';
 import { ImageUploadService, PresignResult } from '../../shared/media/image-upload.service';
+import { AnimatedMediaService } from '../../shared/media/animated-media.service';
+import { PresignAnimatedDto, ProcessAnimatedDto } from '../../shared/media/dto/animated.dto';
 import { SetMediaDto } from '../../shared/media/dto/set-media.dto';
 import { DmPermissionService } from '../../shared/dm-permission/dm-permission.service';
 import { VoiceService } from '../voice/voice.service';
@@ -43,6 +45,9 @@ export interface UserProfileCardDto {
   username: string;
   avatarUrl: string | null;
   bannerUrl: string | null;
+  // C13: hareketli WebP adresleri (avatarUrl/bannerUrl = statik kare). Yalnız kart/profil DTO'sunda.
+  avatarAnimatedUrl: string | null;
+  bannerAnimatedUrl: string | null;
   friendStatus: 'none' | 'friends' | 'pending_in' | 'pending_out' | 'self';
   selfBlocked: boolean;
   bio: string | null;
@@ -65,6 +70,7 @@ export class UsersService {
     private imageUpload: ImageUploadService,
     private dmPermission: DmPermissionService,
     private voice: VoiceService,
+    private animatedMedia: AnimatedMediaService,
   ) {}
 
   /**
@@ -92,6 +98,8 @@ export class UsersService {
           username: true,
           avatarUrl: true,
           bannerUrl: true,
+          avatarAnimatedUrl: true,
+          bannerAnimatedUrl: true,
           bio: true,
           bannerColor: true,
           createdAt: true,
@@ -104,6 +112,8 @@ export class UsersService {
         username: me.username,
         avatarUrl: me.avatarUrl,
         bannerUrl: me.bannerUrl,
+        avatarAnimatedUrl: me.avatarAnimatedUrl,
+        bannerAnimatedUrl: me.bannerAnimatedUrl,
         friendStatus: 'self',
         selfBlocked: false,
         bio: me.bio,
@@ -124,6 +134,8 @@ export class UsersService {
         username: true,
         avatarUrl: true,
         bannerUrl: true,
+        avatarAnimatedUrl: true,
+        bannerAnimatedUrl: true,
         bio: true,
         bannerColor: true,
         createdAt: true,
@@ -265,6 +277,8 @@ export class UsersService {
       username: target.username,
       avatarUrl: target.avatarUrl,
       bannerUrl: target.bannerUrl,
+      avatarAnimatedUrl: target.avatarAnimatedUrl,
+      bannerAnimatedUrl: target.bannerAnimatedUrl,
       friendStatus,
       selfBlocked: !!callerBlock,
       bio: target.bio,
@@ -393,7 +407,8 @@ export class UsersService {
     const avatarUrl = this.resolveMediaUrl(userId, dto, 'avatars');
     const user = await this.prisma.user.update({
       where: { id: userId },
-      data: { avatarUrl },
+      // C13 değişmez kural: statik set/kaldır hareketli alanı null'lar (avatarUrl artık hareketlinin karesi değil).
+      data: { avatarUrl, avatarAnimatedUrl: null },
     });
     return toUserDto(user);
   }
@@ -410,8 +425,21 @@ export class UsersService {
     const bannerUrl = this.resolveMediaUrl(userId, dto, 'banners');
     const user = await this.prisma.user.update({
       where: { id: userId },
-      data: { bannerUrl },
+      data: { bannerUrl, bannerAnimatedUrl: null },
     });
+    return toUserDto(user);
+  }
+
+  // ─── C13: Hareketli avatar / afiş ─────────────────────────────────────────
+
+  /** POST /users/me/animated/presign — özel bucket staging. */
+  presignAnimated(userId: string, dto: PresignAnimatedDto) {
+    return this.animatedMedia.presign(userId, dto.contentType, dto.size);
+  }
+
+  /** POST /users/me/{avatar|banner}/animated — işle ve güncel kullanıcıyı dön. */
+  async setAnimated(userId: string, target: 'AVATAR' | 'BANNER', dto: ProcessAnimatedDto) {
+    const user = await this.animatedMedia.process(userId, target, dto);
     return toUserDto(user);
   }
 

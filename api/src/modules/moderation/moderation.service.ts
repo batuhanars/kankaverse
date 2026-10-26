@@ -197,14 +197,15 @@ export class ModerationModuleService {
           case MediaTarget.USER_AVATAR:
             await this.prisma.user.update({
               where: { id: dto.targetUserId },
-              data: { avatarUrl: null },
+              // C13 (R7): hareketli adres de düşer — yoksa takedown sonrası animasyon yayında kalır.
+              data: { avatarUrl: null, avatarAnimatedUrl: null },
             });
             break;
 
           case MediaTarget.USER_BANNER:
             await this.prisma.user.update({
               where: { id: dto.targetUserId },
-              data: { bannerUrl: null },
+              data: { bannerUrl: null, bannerAnimatedUrl: null },
             });
             break;
 

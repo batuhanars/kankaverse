@@ -10,11 +10,13 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { PresignAvatarDto } from '../../shared/media/dto/presign-avatar.dto';
 import { PresignBannerDto } from '../../shared/media/dto/presign-banner.dto';
+import { PresignAnimatedDto, ProcessAnimatedDto } from '../../shared/media/dto/animated.dto';
 import { SetMediaDto } from '../../shared/media/dto/set-media.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from '../../common/guards/verified-email.guard';
@@ -82,5 +84,33 @@ export class UsersController {
   @ApiOperation({ summary: 'Profil afişini güncelle veya kaldır. storageKey: null → afiş siler.' })
   setBanner(@CurrentUser() user: { id: string }, @Body() dto: SetMediaDto) {
     return this.usersService.setBanner(user.id, dto);
+  }
+
+  // ─── C13: Hareketli avatar / profil afişi (GIF veya videodan kesit → WebP) ───
+
+  @Post('me/animated/presign')
+  @UseGuards(VerifiedEmailGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Hareketli avatar/afiş kaynağı için özel bucket staging presign' })
+  presignAnimated(@CurrentUser() user: { id: string }, @Body() dto: PresignAnimatedDto) {
+    return this.usersService.presignAnimated(user.id, dto);
+  }
+
+  @Post('me/avatar/animated')
+  @UseGuards(VerifiedEmailGuard)
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 3600000 } })
+  @ApiOperation({ summary: 'Yüklenen GIF/videoyu hareketli avatara çevir (10/saat)' })
+  setAnimatedAvatar(@CurrentUser() user: { id: string }, @Body() dto: ProcessAnimatedDto) {
+    return this.usersService.setAnimated(user.id, 'AVATAR', dto);
+  }
+
+  @Post('me/banner/animated')
+  @UseGuards(VerifiedEmailGuard)
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 3600000 } })
+  @ApiOperation({ summary: 'Yüklenen GIF/videoyu hareketli profil afişine çevir (10/saat)' })
+  setAnimatedBanner(@CurrentUser() user: { id: string }, @Body() dto: ProcessAnimatedDto) {
+    return this.usersService.setAnimated(user.id, 'BANNER', dto);
   }
 }

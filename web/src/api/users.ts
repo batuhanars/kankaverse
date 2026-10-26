@@ -15,6 +15,20 @@ export interface MediaPresignResult {
   storageKey: string
 }
 
+// Sprint C13 §2.2 — hareketli avatar/afiş (GIF veya videodan kesit; sunucuda hareketli WebP'ye çevrilir)
+export type AnimatedTarget = 'AVATAR' | 'BANNER'
+
+export interface AnimatedPresignResult {
+  uploadUrl: string
+  stagingKey: string
+}
+
+export interface AnimatedProcessPayload {
+  stagingKey: string
+  startMs?: number // yalnız video
+  durationMs?: number // yalnız video (500..6000)
+}
+
 export const usersApi = {
   getCard: (userId: string, guildId?: string) =>
     http.get<UserProfileCardDto>(
@@ -31,4 +45,11 @@ export const usersApi = {
   bannerPresign: (contentType: string) =>
     http.post<MediaPresignResult>('/users/me/banner/presign', { contentType }),
   setBanner: (storageKey: string | null) => http.patch<UserDto>('/users/me/banner', { storageKey }),
+  // Sprint C13 §2.2 — presign → istemci PUT → işle
+  animatedPresign: (target: AnimatedTarget, contentType: string, size: number) =>
+    http.post<AnimatedPresignResult>('/users/me/animated/presign', { target, contentType, size }),
+  setAnimatedAvatar: (payload: AnimatedProcessPayload) =>
+    http.post<UserDto>('/users/me/avatar/animated', payload),
+  setAnimatedBanner: (payload: AnimatedProcessPayload) =>
+    http.post<UserDto>('/users/me/banner/animated', payload),
 }

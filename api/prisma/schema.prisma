@@ -117,6 +117,8 @@ model User {
   bio                 String?
   bannerColor         String?            // profil afiş rengi (preset anahtar; allowlist).
   bannerUrl           String?            // C8: profil afişi görseli (public URL; ikon deseni)
+  avatarAnimatedUrl   String?            // C13: hareketli WebP avatar (avatarUrl = aynı işlemin statik karesi)
+  bannerAnimatedUrl   String?            // C13: hareketli WebP profil afişi (bannerUrl = statik kare)
   deletedAt           DateTime?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt

@@ -11,6 +11,7 @@ import { StorageService } from './storage/storage.service';
 import { ModerationService } from './moderation/moderation.service';
 import { GuildJoinService } from './guild-join/guild-join.service';
 import { ImageUploadService } from './media/image-upload.service';
+import { AnimatedMediaService } from './media/animated-media.service';
 import { PushService } from './push/push.service';
 
 @Module({
@@ -27,6 +28,7 @@ import { PushService } from './push/push.service';
     ModerationService,
     GuildJoinService,
     ImageUploadService,
+    AnimatedMediaService,
     PushService,
   ],
   exports: [
@@ -42,6 +44,7 @@ import { PushService } from './push/push.service';
     ModerationService,
     GuildJoinService,
     ImageUploadService,
+    AnimatedMediaService,
     PushService,
   ],
 })

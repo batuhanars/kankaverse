@@ -42,6 +42,7 @@ function makeService() {
     new ImageUploadService(storageMock as any, configMock as any),
     dmPermissionMock as any,
     voiceMock as any,
+    {} as any, // AnimatedMediaService (bu spec'te kullanılmaz)
   );
 }
 
@@ -890,7 +891,7 @@ describe('UsersService.setAvatar / setBanner', () => {
     expect(result.avatarUrl).toBeNull();
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: 'u1' },
-      data: { avatarUrl: null },
+      data: { avatarUrl: null, avatarAnimatedUrl: null },
     });
   });
 
@@ -903,7 +904,7 @@ describe('UsersService.setAvatar / setBanner', () => {
 
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: 'u1' },
-      data: { avatarUrl: expectedUrl },
+      data: { avatarUrl: expectedUrl, avatarAnimatedUrl: null },
     });
     expect(result.avatarUrl).toBe(expectedUrl);
   });
@@ -915,7 +916,7 @@ describe('UsersService.setAvatar / setBanner', () => {
 
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: 'u1' },
-      data: { avatarUrl: null },
+      data: { avatarUrl: null, avatarAnimatedUrl: null },
     });
     expect(result.avatarUrl).toBeNull();
   });
@@ -940,7 +941,7 @@ describe('UsersService.setAvatar / setBanner', () => {
 
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: 'u1' },
-      data: { bannerUrl: expectedUrl },
+      data: { bannerUrl: expectedUrl, bannerAnimatedUrl: null },
     });
     expect(result.bannerUrl).toBe(expectedUrl);
   });
@@ -952,7 +953,7 @@ describe('UsersService.setAvatar / setBanner', () => {
 
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: 'u1' },
-      data: { bannerUrl: null },
+      data: { bannerUrl: null, bannerAnimatedUrl: null },
     });
     expect(result.bannerUrl).toBeNull();
   });

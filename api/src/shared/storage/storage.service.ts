@@ -5,7 +5,12 @@ import {
   DeleteObjectCommand,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3';
+import { createWriteStream } from 'fs';
+import { Transform } from 'stream';
+import { pipeline } from 'stream/promises';
+import type { Readable } from 'stream';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 // Presigned URL geçerlilik süresi (saniye) — kısa ömürlü
@@ -101,5 +106,49 @@ export class StorageService {
   async delete(key: string): Promise<void> {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
     this.logger.debug(`delete: key=${key}`);
+  }
+
+  // ─── C13: sunucu tarafı işleme (hareketli profil görseli) ────────────────
+
+  /** Özel bucket'taki nesnenin gerçek boyutu (bayt). Yoksa fırlatır. */
+  async headSize(key: string): Promise<number> {
+    const res = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+    return res.ContentLength ?? 0;
+  }
+
+  /**
+   * Özel bucket nesnesini yerel dosyaya indirir. `maxBytes` aşılırsa akış kesilir ve fırlatır
+   * (HEAD ile gerçek boyut zaten kontrol edildi; bu ikinci emniyet).
+   */
+  async downloadToFile(key: string, destPath: string, maxBytes: number): Promise<void> {
+    const res = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    let seen = 0;
+    const limiter = new Transform({
+      transform(chunk: Buffer, _enc, cb) {
+        seen += chunk.length;
+        if (seen > maxBytes) return cb(new Error('FILE_TOO_LARGE'));
+        cb(null, chunk);
+      },
+    });
+    await pipeline(res.Body as Readable, limiter, createWriteStream(destPath));
+  }
+
+  /** Sunucunun ürettiği nesneyi PUBLIC bucket'a yazar (profil görselleri). */
+  async putPublic(key: string, body: Buffer, contentType: string): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.publicBucket,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+      }),
+    );
+    this.logger.debug(`putPublic: bucket=${this.publicBucket} key=${key}`);
+  }
+
+  /** PUBLIC bucket'tan nesne sil (yalnız kullanıcının kendi değiştirmesinde; takedown'da ÇAĞRILMAZ). */
+  async deletePublic(key: string): Promise<void> {
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.publicBucket, Key: key }));
+    this.logger.debug(`deletePublic: key=${key}`);
   }
 }

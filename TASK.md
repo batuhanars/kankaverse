@@ -4265,6 +4265,23 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] §3.2-§3.4 mobil seçme, sıkıştırma, kart, oynatıcı
 - [x] §3.5 yerel prebuild + assembleDebug
 - [x] §4 web yükleme, kart, oynatma
-- [ ] §5 tip/lint/build temiz
-- [ ] Cihaz turu (sahip + PM)
-- [ ] Mağaza sürümü (versionCode + release paketi canlıya karşı cihazda denendi)
+- [x] §5 tip/lint/build temiz
+- [x] Cihaz turu (sahip + PM) — 2026-10-02 mobil + masaüstü onaylandı
+- [x] Mağaza sürümü — versionCode 22, release APK canlıya karşı cihazda denendi, AAB sahip tarafından Play'e yüklendi (2026-10-02). R8 (D68) bilerek dahil edilmedi: sürüm iki yeni native paket taşıyor
+
+## Sprint C13 — Hareketli avatar ve profil afişi — 2026-10-26
+
+> Sözleşme: `contracts/SPRINT_C13_ANIMATED_PROFILE_CONTRACT.md`. api → web → mobil. R7: takedown + işleme hattı
+> diff'i sahibe sunulur. Mobil native ayar taşır: yerel derleme şart.
+
+- [x] §1 şema + migration uygulandı
+- [x] §2.1 yapılandırma + Dockerfile ffmpeg
+- [x] §2.2-§2.3 presign + işleme endpoint'leri + ffmpeg hattı (güvenlik kuralları)
+- [x] §3 statik yol hareketli alanı null'luyor
+- [x] §4 R7 `MEDIA_REMOVE` iki alan
+- [x] §5 web: GIF + video kesit akışı + gösterim
+- [x] §7 tip/lint/build/test temiz (api 1145 test, nest build; web vue-tsc -b bilinen 6, vite build)
+- [x] R7 insan incelemesi (sahip) — 2026-10-26 onaylandı
+- [x] Sahip canlı test (web, yerel) — 2026-10-26: GIF avatar + afiş, videodan avatar + afiş, oynatma, tüm maddeler geçti
+- [ ] §6 mobil: native ayar, seçme, kesit, gösterim, yerel derleme
+- [ ] Cihaz turu + mağaza sürümü

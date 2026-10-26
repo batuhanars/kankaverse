@@ -44,6 +44,8 @@ export interface UserDto {
   email: string
   avatarUrl: string | null
   bannerUrl: string | null // Sprint C8 — profil afişi (görsel), bannerColor'ın üstünde gösterilir
+  avatarAnimatedUrl?: string | null // Sprint C13 — hareketli WebP; doluysa avatarUrl onun ilk karesidir
+  bannerAnimatedUrl?: string | null // Sprint C13
   isMinor: boolean
   verificationStatus: VerificationStatus
   createdAt: string
@@ -150,6 +152,8 @@ export interface UserProfileCardDto {
   username: string
   avatarUrl: string | null
   bannerUrl: string | null // Sprint C8 — profil afişi (görsel)
+  avatarAnimatedUrl?: string | null // Sprint C13 — yalnız kart/tam profil DTO'sunda (sözleşme §2.5)
+  bannerAnimatedUrl?: string | null // Sprint C13
   friendStatus: 'none' | 'friends' | 'pending_in' | 'pending_out' | 'self'
   selfBlocked: boolean
   bio: string | null // Sprint C5

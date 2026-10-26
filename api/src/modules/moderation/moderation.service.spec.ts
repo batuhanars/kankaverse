@@ -309,7 +309,7 @@ describe('ModerationModuleService.createAction — MEDIA_REMOVE (C8/R7)', () => 
 
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: TARGET_ID },
-      data: { avatarUrl: null },
+      data: { avatarUrl: null, avatarAnimatedUrl: null },
     });
     expect(prismaMock.guild.update).not.toHaveBeenCalled();
   });
@@ -324,7 +324,7 @@ describe('ModerationModuleService.createAction — MEDIA_REMOVE (C8/R7)', () => 
 
     expect(prismaMock.user.update).toHaveBeenCalledWith({
       where: { id: TARGET_ID },
-      data: { bannerUrl: null },
+      data: { bannerUrl: null, bannerAnimatedUrl: null },
     });
   });
 

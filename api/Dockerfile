@@ -17,6 +17,8 @@ RUN npm run build
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+# C13: hareketli avatar/afiş dönüşümü (ffmpeg + libwebp_anim). Doğrulama: ffmpeg -encoders | grep libwebp_anim
+RUN apk add --no-cache ffmpeg
 # node_modules build'den kopyalanır → prisma CLI (migrate deploy) + @prisma/client (generate edilmiş) hazır
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

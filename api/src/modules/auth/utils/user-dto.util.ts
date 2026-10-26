@@ -8,6 +8,9 @@ export function toUserDto(user: User) {
     email: user.email,
     avatarUrl: user.avatarUrl,
     bannerUrl: user.bannerUrl ?? null,
+    // C13: hareketli WebP adresleri (avatarUrl/bannerUrl statik kare kalır → eski istemciler kırılmaz)
+    avatarAnimatedUrl: user.avatarAnimatedUrl ?? null,
+    bannerAnimatedUrl: user.bannerAnimatedUrl ?? null,
     bio: user.bio,
     bannerColor: user.bannerColor ?? null,
     dmPolicy: user.dmPolicy,

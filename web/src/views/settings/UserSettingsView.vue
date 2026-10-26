@@ -13,6 +13,8 @@ import { usersApi } from '@/api/users'
 import { attachmentsApi } from '@/api/attachments'
 import { DmPolicy } from '@/types'
 import { BANNER_PRESET_KEYS, bannerBackground } from '@/utils/bannerColor'
+import { animatedOrStatic, ANIMATED_ACCEPT, ANIMATED_TYPES, ANIMATED_GIF_MAX_BYTES } from '@/utils/animatedMedia'
+import type { AnimatedTarget } from '@/api/users'
 import { isMobile } from '@/composables/useResponsive'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvModal from '@/components/ui/KvModal.vue'
@@ -27,6 +29,7 @@ import VoiceDevicesSection from './components/VoiceDevicesSection.vue'
 import PlatformInviteSection from './components/PlatformInviteSection.vue'
 import PlatformUsersSection from './components/PlatformUsersSection.vue'
 import MasaustuSection from './components/MasaustuSection.vue'
+import AnimatedClipModal from './components/AnimatedClipModal.vue'
 
 const props = defineProps<{ initialSection?: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -128,13 +131,48 @@ const MEDIA_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'] // GIF YO
 // CreateEventWizard'ın coverUploadsDisabled reaktif-gizleme deseniyle aynı sinyal).
 const mediaUploadsDisabled = ref(false)
 
+// Sprint C13 §5.2 — hareketli avatar/afiş (GIF + video kesit). ANIMATED_DISABLED 403 → statik moda düş
+// (UPLOADS_DISABLED deseni). Bayrak için ayrı uç yok; ilk denemede öğrenilir.
+const animatedDisabled = ref(false)
+const animatedFile = ref<File | null>(null)
+const animatedTarget = ref<AnimatedTarget>('AVATAR')
+const mediaAccept = computed(() =>
+  animatedDisabled.value ? 'image/png,image/jpeg,image/webp' : `image/png,image/jpeg,image/webp,${ANIMATED_ACCEPT}`,
+)
+
+// true dönerse dosya hareketli akışa devredildi (modal açıldı) ya da reddedildi; statik akış devam etmez
+function routeAnimated(file: File, target: AnimatedTarget, setError: (msg: string) => void): boolean {
+  if (animatedDisabled.value || !ANIMATED_TYPES.includes(file.type)) return false
+  if (file.type === 'image/gif' && file.size > ANIMATED_GIF_MAX_BYTES) {
+    setError(t('profile.animated.errorGifSize'))
+    return true
+  }
+  animatedTarget.value = target
+  animatedFile.value = file
+  return true
+}
+
+function onAnimatedDone(user: Parameters<typeof authStore.updateUser>[0]) {
+  authStore.updateUser(user)
+  animatedFile.value = null
+  toast.success(t('toast.profileSaved'))
+}
+
+function onAnimatedDisabled() {
+  animatedDisabled.value = true
+  const msg = t('profile.animated.disabled')
+  if (animatedTarget.value === 'AVATAR') avatarError.value = msg
+  else bannerImageError.value = msg
+  animatedFile.value = null
+}
+
 const avatarFileInput = ref<HTMLInputElement | null>(null)
 const avatarPreviewUrl = ref<string | null>(null)
 const avatarUploading = ref(false)
 const avatarUploadPct = ref(0)
 const avatarError = ref('')
 
-const avatarDisplayUrl = computed(() => avatarPreviewUrl.value ?? authStore.user?.avatarUrl ?? null)
+const avatarDisplayUrl = computed(() => avatarPreviewUrl.value ?? animatedOrStatic(authStore.user, 'avatar'))
 
 function triggerAvatarPicker() {
   if (avatarUploading.value) return
@@ -148,6 +186,7 @@ async function onAvatarFileChange(e: Event) {
   if (!file) return
 
   avatarError.value = ''
+  if (routeAnimated(file, 'AVATAR', (m) => (avatarError.value = m))) return
   if (!MEDIA_ACCEPTED_TYPES.includes(file.type)) {
     avatarError.value = t('settings.avatar.errorType')
     return
@@ -210,7 +249,7 @@ const bannerImageUploading = ref(false)
 const bannerImageUploadPct = ref(0)
 const bannerImageError = ref('')
 
-const bannerImageDisplayUrl = computed(() => bannerImagePreviewUrl.value ?? authStore.user?.bannerUrl ?? null)
+const bannerImageDisplayUrl = computed(() => bannerImagePreviewUrl.value ?? animatedOrStatic(authStore.user, 'banner'))
 
 function triggerBannerImagePicker() {
   if (bannerImageUploading.value) return
@@ -224,6 +263,7 @@ async function onBannerImageFileChange(e: Event) {
   if (!file) return
 
   bannerImageError.value = ''
+  if (routeAnimated(file, 'BANNER', (m) => (bannerImageError.value = m))) return
   if (!MEDIA_ACCEPTED_TYPES.includes(file.type)) {
     bannerImageError.value = t('settings.bannerImage.errorType')
     return
@@ -611,11 +651,20 @@ async function toggleReadReceipts(next: boolean) {
                     <input
                       ref="avatarFileInput"
                       type="file"
-                      accept="image/png,image/jpeg,image/webp"
+                      :accept="mediaAccept"
                       class="hidden"
                       @change="onAvatarFileChange"
                     />
                   </section>
+
+                  <AnimatedClipModal
+                    v-if="animatedFile"
+                    :file="animatedFile"
+                    :target="animatedTarget"
+                    @close="animatedFile = null"
+                    @done="onAnimatedDone"
+                    @disabled="onAnimatedDisabled"
+                  />
 
                   <!-- Görsel yükleme kapalıysa tek bir bilgi notu (avatar + afiş ortak bayrak) -->
                   <p v-if="mediaUploadsDisabled" class="text-[12px]" style="color: var(--kv-text-muted);">
@@ -688,7 +737,7 @@ async function toggleReadReceipts(next: boolean) {
                     <input
                       ref="bannerImageFileInput"
                       type="file"
-                      accept="image/png,image/jpeg,image/webp"
+                      :accept="mediaAccept"
                       class="hidden"
                       @change="onBannerImageFileChange"
                     />

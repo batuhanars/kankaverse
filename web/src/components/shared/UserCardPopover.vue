@@ -10,6 +10,7 @@ import { usersApi } from '@/api/users'
 import { friendsApi } from '@/api/friends'
 import { messagesApi } from '@/api/messages'
 import { bannerBackground } from '@/utils/bannerColor'
+import { animatedOrStatic } from '@/utils/animatedMedia'
 import ReportModal from './ReportModal.vue'
 import FullProfileModal from './FullProfileModal.vue'
 import type { UserProfileCardDto } from '@/types'
@@ -196,7 +197,7 @@ async function addFriend() {
         <!-- Banner + üstteki ikon aksiyonlar + banner'a binen avatar -->
         <div class="relative">
           <div class="h-[106px] relative overflow-hidden" :style="{ background: bannerBackground(card.bannerColor) }">
-            <img v-if="card.bannerUrl" :src="card.bannerUrl" alt="" class="absolute inset-0 w-full h-full object-cover" />
+            <img v-if="card.bannerUrl" :src="animatedOrStatic(card, 'banner') ?? card.bannerUrl" alt="" class="absolute inset-0 w-full h-full object-cover" />
           </div>
 
           <!-- Sağ üst ikon butonlar (kendi kartım değilse): +Kanka + ⋯ menü -->
@@ -250,7 +251,7 @@ async function addFriend() {
             class="absolute left-4 -bottom-8 z-10 w-[68px] h-[68px] rounded-full border-4 overflow-hidden flex items-center justify-center text-[24px] font-bold text-white"
             style="border-color: var(--kv-bg-elevated); background-color: var(--kv-accent-500);"
           >
-            <img v-if="card.avatarUrl" :src="card.avatarUrl" :alt="card.username" class="w-full h-full object-cover" />
+            <img v-if="card.avatarUrl" :src="animatedOrStatic(card, 'avatar') ?? card.avatarUrl" :alt="card.username" class="w-full h-full object-cover" />
             <span v-else>{{ card.username[0].toUpperCase() }}</span>
           </div>
         </div>

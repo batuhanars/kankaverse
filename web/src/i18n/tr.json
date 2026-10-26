@@ -295,6 +295,32 @@
     }
   },
   "profile": {
+    "animated": {
+      "title": "Hareketli görsel",
+      "hintGif": "GIF dosyanın ilk 6 saniyesi kullanılır. Görsel ortadan kırpılır.",
+      "hintVideo": "Videodan en fazla 6 saniyelik bir kesit seç. Görsel ortadan kırpılır.",
+      "start": "Başlangıç",
+      "length": "Süre",
+      "seconds": "{n} sn",
+      "previewFailed": "Bu video burada önizlenemiyor. İlk 6 saniyesi kullanılır.",
+      "use": "Kullan",
+      "uploading": "Yükleniyor… {pct}%",
+      "processing": "Hazırlanıyor…",
+      "errorType": "Desteklenmeyen dosya türü. PNG, JPEG, WebP, GIF veya video seç.",
+      "errorGifSize": "GIF dosyası 15 MB'ı aşamaz.",
+      "errorUpload": "Hareketli görsel hazırlanamadı. Lütfen tekrar dene.",
+      "disabled": "Hareketli görsel şu anda kapalı. Yalnızca düz görsel yükleyebilirsin.",
+      "errors": {
+        "ANIMATED_DISABLED": "Hareketli görsel şu anda kapalı.",
+        "UNSUPPORTED_TYPE": "Bu dosya türü desteklenmiyor.",
+        "FILE_TOO_LARGE": "Dosya çok büyük.",
+        "INVALID_STORAGE_KEY": "Yükleme doğrulanamadı. Lütfen tekrar dene.",
+        "INVALID_MEDIA": "Dosya okunamadı ya da bozuk. Başka bir dosya dene.",
+        "INVALID_RANGE": "Seçtiğin kesit geçersiz. Süre 0,5 ile 6 saniye arasında olmalı.",
+        "MEDIA_TOO_LARGE_AFTER_PROCESS": "Sonuç çok büyük çıktı. Daha kısa ya da sade bir kesit dene.",
+        "PROCESSING_BUSY": "Sunucu şu an yoğun. Biraz sonra tekrar dene."
+      }
+    },
     "bio": "Biyografi",
     "noBio": "Henüz bir şey yazmamış.",
     "memberSince": "Üyelik tarihi",
