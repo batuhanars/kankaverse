@@ -143,13 +143,13 @@ async function renameGroup() {
       <div
         v-for="member in sortedMembers"
         :key="member.id"
-        class="group flex items-center gap-2 px-2 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
+        class="group flex items-center gap-3 px-2 py-2 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
         @mouseenter="hoveredMemberId = member.id; ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
         @mouseleave="hoveredMemberId = null; ($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
         @click="openCard(member.id, $event)"
       >
         <div
-          class="w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[14px] font-semibold text-white"
+          class="w-10 h-10 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[15px] font-semibold text-white"
           style="background-color: var(--kv-accent-500);"
         >
           <img
@@ -160,7 +160,7 @@ async function renameGroup() {
           />
           <span v-else>{{ member.username[0].toUpperCase() }}</span>
         </div>
-        <span class="flex-1 text-[15px] font-medium truncate" style="color: var(--kv-text-primary);">
+        <span class="flex-1 text-[16px] font-medium truncate" style="color: var(--kv-text-primary);">
           {{ member.username }}
         </span>
         <!-- Taç: owner işareti -->
