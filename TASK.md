@@ -4283,5 +4283,5 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] §7 tip/lint/build/test temiz (api 1145 test, nest build; web vue-tsc -b bilinen 6, vite build)
 - [x] R7 insan incelemesi (sahip) — 2026-10-26 onaylandı
 - [x] Sahip canlı test (web, yerel) — 2026-10-26: GIF avatar + afiş, videodan avatar + afiş, oynatma, tüm maddeler geçti
-- [ ] §6 mobil: native ayar, seçme, kesit, gösterim, yerel derleme
+- [x] §6 mobil: native ayar, seçme, kesit, gösterim, yerel derleme — 2026-10-26 cihaz turu geçti (afiş önizleme taşması textureView ile düzeltildi)
 - [ ] Cihaz turu + mağaza sürümü

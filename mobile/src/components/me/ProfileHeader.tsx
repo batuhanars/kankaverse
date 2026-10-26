@@ -2,6 +2,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { UserCardDto } from '@/api/users';
 import { bannerColors } from '@/utils/bannerColor';
+import { animatedOrStatic, useReduceMotion } from '@/utils/animatedMedia';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -50,6 +51,10 @@ export function ProfileHeader({ username, avatarUrl, card, surfaceColor, showDet
   // için kısmen çalışıyor, 'cream'/'dark' gibi olanlar hiç çalışmıyordu. Artık web'le aynı
   // gradient eşlemesinden geçiyor.
   const [from, to] = bannerColors(card?.bannerColor);
+  // C13: hareketli adres varsa o (kart DTO'sundan), "animasyonları azalt" açıksa statik.
+  const reduceMotion = useReduceMotion();
+  const bannerSrc = animatedOrStatic(card?.bannerUrl, card?.bannerAnimatedUrl, reduceMotion);
+  const avatarSrc = animatedOrStatic(avatarUrl, card?.avatarAnimatedUrl, reduceMotion);
 
   return (
     <View>
@@ -59,14 +64,14 @@ export function ProfileHeader({ username, avatarUrl, card, surfaceColor, showDet
           Doğru çözüm bindirmeyi taşma olmadan kurmak: kapsayıcı afiş + taşma payı kadar YÜKSEK,
           avatar onun İÇİNDE mutlak konumlu. Böylece hiçbir şey ebeveyn sınırını aşmıyor. */}
       <View style={styles.header}>
-        {card?.bannerUrl ? (
-          <Image source={{ uri: card.bannerUrl }} style={styles.banner} resizeMode="cover" />
+        {bannerSrc ? (
+          <Image source={{ uri: bannerSrc }} style={styles.banner} resizeMode="cover" />
         ) : (
           <LinearGradient colors={[from, to]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner} />
         )}
 
-        {avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={[styles.avatar, !!surfaceColor && { borderColor: surfaceColor }]} />
+        {avatarSrc ? (
+          <Image source={{ uri: avatarSrc }} style={[styles.avatar, !!surfaceColor && { borderColor: surfaceColor }]} />
         ) : (
           // 🔴 Yedek avatar İKİ KATMAN (sahip bulgusu 2026-08-01): `accentSubtle` bir token ama
           // YARI SAYDAM (`rgba(255,107,61,0.12)`). Tek katman kullanılınca arkasındaki afiş

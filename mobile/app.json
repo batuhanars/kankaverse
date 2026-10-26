@@ -20,7 +20,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 24,
+      "versionCode": 25,
       "permissions": [
         "android.permission.BLUETOOTH_CONNECT"
       ]
@@ -85,6 +85,7 @@
       "./plugins/withDevMenuFabFix",
       "./plugins/withReleaseSigning",
       "./plugins/withGradleMemory",
+      "./plugins/withAnimatedWebp",
       "./plugins/withoutMediaPlaybackService",
       "expo-audio",
       "expo-video",

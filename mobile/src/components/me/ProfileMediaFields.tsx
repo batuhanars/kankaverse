@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { UserCardDto } from '@/api/users';
 import { bannerColors } from '@/utils/bannerColor';
+import { animatedOrStatic, useReduceMotion } from '@/utils/animatedMedia';
 import { theme } from '@/theme';
 
 /**
@@ -31,10 +32,13 @@ const AVATAR = 76;
 const OVERLAP = 36;
 
 export function ProfileMediaFields({ username, card, uploading, onEdit }: Props) {
+  const reduceMotion = useReduceMotion();
+  const bannerSrc = animatedOrStatic(card?.bannerUrl, card?.bannerAnimatedUrl, reduceMotion);
+  const avatarSrc = animatedOrStatic(card?.avatarUrl, card?.avatarAnimatedUrl, reduceMotion);
   return (
     <View style={styles.header}>
-      {card?.bannerUrl ? (
-        <Image source={{ uri: card.bannerUrl }} style={styles.banner} resizeMode="cover" />
+      {bannerSrc ? (
+        <Image source={{ uri: bannerSrc }} style={styles.banner} resizeMode="cover" />
       ) : (
         <LinearGradient
           colors={bannerColors(card?.bannerColor)}
@@ -53,7 +57,7 @@ export function ProfileMediaFields({ username, card, uploading, onEdit }: Props)
         )}
       </Pressable>
 
-      {avatarNode(username, card, styles)}
+      {avatarNode(username, avatarSrc, styles)}
 
       {/* Avatar kalemi — avatarın sağ üst köşesine binen küçük daire. */}
       <Pressable onPress={() => onEdit('avatar')} style={styles.avatarPencil} hitSlop={8}>
@@ -67,8 +71,8 @@ export function ProfileMediaFields({ username, card, uploading, onEdit }: Props)
   );
 }
 
-function avatarNode(username: string, card: UserCardDto | null, s: typeof styles) {
-  if (card?.avatarUrl) return <Image source={{ uri: card.avatarUrl }} style={s.avatar} />;
+function avatarNode(username: string, avatarSrc: string | null, s: typeof styles) {
+  if (avatarSrc) return <Image source={{ uri: avatarSrc }} style={s.avatar} />;
   return (
     <View style={[s.avatar, s.avatarFallback]}>
       <View style={s.avatarTint} />

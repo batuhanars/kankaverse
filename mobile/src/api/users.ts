@@ -39,6 +39,9 @@ export interface UserCardDto {
   bio: string | null;
   bannerUrl: string | null;
   bannerColor: string | null;
+  /** C13 §2.5: hareketli WebP adresleri; yoksa/null ise statik `avatarUrl`/`bannerUrl` kullanilir. */
+  avatarAnimatedUrl?: string | null;
+  bannerAnimatedUrl?: string | null;
   /** ISO tarih — TR biçiminde ("25 Ekim 2023") gösterilir. */
   memberSince: string;
   // Sprint M3b §3.2 — profil alt-paneli bu alanları çiziyor. Yine **yeni backend alanı değil**
@@ -74,6 +77,22 @@ export interface PresignResult {
 
 /** Sunucunun kabul ettiği görsel türleri (`ALLOWED_IMAGE_TYPE_SET`) — istemci listesi uydurmuyor. */
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+/** C13 §2.2: hareketli gorselin hedefi. */
+export type AnimatedTarget = 'AVATAR' | 'BANNER';
+
+export interface AnimatedPresignResult {
+  uploadUrl: string;
+  stagingKey: string;
+}
+
+export interface AnimatedProcessPayload {
+  stagingKey: string;
+  /** Yalniz video; GIF'te sunucu yok sayar. */
+  startMs?: number;
+  /** Yalniz video (500..6000). */
+  durationMs?: number;
+}
 
 export const usersApi = {
   /**
@@ -118,6 +137,24 @@ export const usersApi = {
 
   async setBanner(storageKey: string | null): Promise<unknown> {
     const res = await http.patch('/users/me/banner', { storageKey });
+    return res.data;
+  },
+
+  // C13 hareketli avatar/afis: presign, PUT (depolamaya), isle (sunucu hareketli WebP uretir).
+  // Hata kodlari (ANIMATED_DISABLED vb.) profile.animated.errors.* altinda Turkce karsilikli.
+
+  async animatedPresign(target: AnimatedTarget, contentType: string, size: number): Promise<AnimatedPresignResult> {
+    const res = await http.post<AnimatedPresignResult>('/users/me/animated/presign', { target, contentType, size });
+    return res.data;
+  },
+
+  async setAnimatedAvatar(payload: AnimatedProcessPayload): Promise<UserDto> {
+    const res = await http.post<UserDto>('/users/me/avatar/animated', payload);
+    return res.data;
+  },
+
+  async setAnimatedBanner(payload: AnimatedProcessPayload): Promise<UserDto> {
+    const res = await http.post<UserDto>('/users/me/banner/animated', payload);
     return res.data;
   },
 };

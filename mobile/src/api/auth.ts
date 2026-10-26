@@ -22,6 +22,9 @@ export interface UserDto {
   // Sprint M1a — "Sen" sekmesi + mesaj yazarı avatarı için eklendi (api/src/modules/auth/utils/
   // user-dto.util.ts `toUserDto` — M0'da tiplenmemiş alt kümeye ihtiyaç doğdu, genişletildi).
   avatarUrl: string | null;
+  /** C13: hareketli avatar (WebP); yalniz kendi profil DTO'sunda. */
+  avatarAnimatedUrl?: string | null;
+  bannerAnimatedUrl?: string | null;
   // Sprint M1b — Arkadaş Ekle ekranı "kendi kodum" için (`toUserDto` zaten dönüyor, sıfır backend;
   // sözleşme §2 kanıt notu). 6 karakter (`send-friend-request.dto.ts` `@Length(6,6)`).
   friendCode: string;

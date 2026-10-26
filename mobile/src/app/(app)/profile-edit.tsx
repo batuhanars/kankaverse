@@ -15,7 +15,14 @@ import { extractErrorMessage } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth';
 import { ProfileMediaFields, type MediaSlot } from '@/components/me/ProfileMediaFields';
 import { BannerSheet } from '@/components/me/BannerSheet';
-import { MAX_IMAGE_BYTES, pickImage, putImage } from '@/utils/imageUpload';
+import { MAX_IMAGE_BYTES, putImage } from '@/utils/imageUpload';
+import {
+  ANIMATED_GIF_MAX_BYTES,
+  AnimatedPickError,
+  pickProfileMedia,
+  type PickedProfileMedia,
+} from '@/utils/animatedMedia';
+import { AnimatedClipSheet, type ClipMedia } from '@/components/me/AnimatedClipSheet';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -55,6 +62,9 @@ export default function ProfileEditScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [savedNotice, setSavedNotice] = useState('');
   const [bannerSheet, setBannerSheet] = useState(false);
+  // C13: seçilen GIF/video kesit panelinde; ANIMATED_DISABLED gelirse bu oturumda statik moda düşülür.
+  const [clip, setClip] = useState<{ media: ClipMedia; slot: MediaSlot } | null>(null);
+  const [animatedOff, setAnimatedOff] = useState(false);
 
   const userId = user?.id;
   useFocusEffect(
@@ -97,8 +107,22 @@ export default function ProfileEditScreen() {
     setErrorMessage('');
     setSavedNotice('');
 
-    const image = await pickImage();
+    let image: PickedProfileMedia | null;
+    try {
+      image = await pickProfileMedia(!animatedOff);
+    } catch (e) {
+      if (e instanceof AnimatedPickError) setErrorMessage(t(e.key));
+      return;
+    }
     if (!image) return;
+    if (image.kind !== 'static') {
+      if (image.kind === 'gif' && image.size > ANIMATED_GIF_MAX_BYTES) {
+        setErrorMessage(t('profile.animated.errorGifSize'));
+        return;
+      }
+      setClip({ media: image, slot });
+      return;
+    }
     // Sunucu da reddeder ama kullanıcıyı yüklemeyi bekletip sonra reddetmek kötü tasarım.
     if (image.size > MAX_IMAGE_BYTES) {
       setErrorMessage(t('settings.avatar.errorSize'));
@@ -126,6 +150,13 @@ export default function ProfileEditScreen() {
     } finally {
       setUploading(null);
     }
+  }
+
+  /** Kesit paneli başarıyla bitti: kart + (avatarsa) oturum kullanıcısı tazelenir. */
+  async function onClipDone(slot: MediaSlot) {
+    setClip(null);
+    if (userId) setCard(await usersApi.getCard(userId).catch(() => card));
+    if (slot === 'avatar') await refreshUser().catch(() => {});
   }
 
   /**
@@ -215,6 +246,18 @@ export default function ProfileEditScreen() {
         onPickImage={() => {
           setBannerSheet(false);
           void onPickAndUpload('banner');
+        }}
+      />
+      <AnimatedClipSheet
+        media={clip?.media ?? null}
+        target={clip?.slot === 'banner' ? 'BANNER' : 'AVATAR'}
+        onClose={() => setClip(null)}
+        onDone={() => clip && void onClipDone(clip.slot)}
+        onDisabled={() => {
+          // Bayrak kapalı: statik moda düş, kullanıcıya söyle (C8 UPLOADS_DISABLED deseni).
+          setClip(null);
+          setAnimatedOff(true);
+          setErrorMessage(t('profile.animated.disabled'));
         }}
       />
     </KeyboardAvoidingView>
