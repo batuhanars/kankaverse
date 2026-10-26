@@ -23,6 +23,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import ReportModal from '@/components/shared/ReportModal.vue'
 import FullProfileModal from '@/components/shared/FullProfileModal.vue'
 import { formatMentionsPlain } from '@/utils/mentions'
+import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import type { DmChannelDto, UserProfileCardDto } from '@/types'
 
 const props = defineProps<{ activeChannelId: string | null }>()
@@ -144,6 +145,9 @@ function groupDisplayName(ch: Extract<DmChannelDto, { type: 'GROUP_DM' }>): stri
   if (names.length <= 3) return names.join(', ')
   return names.slice(0, 2).join(', ') + ` +${names.length - 2}`
 }
+
+// C16 — 1-1 DM avatarı aktif sohbette ve satır hover'dayken canlanır (Discord modeli)
+const hoveredDmId = ref<string | null>(null)
 
 // ── DM satırı context menüsü (SPRINT_DM_MENU §3) ──
 // Hedef, aktif DM değil **menünün açıldığı** satırdır (ChannelPanel `contextChannel` deseni).
@@ -383,6 +387,8 @@ async function confirmDeleteGroup() {
       v-for="ch in visibleChannels"
       :key="ch.id"
       class="group relative"
+      @mouseenter="hoveredDmId = ch.id"
+      @mouseleave="hoveredDmId = null"
       @contextmenu="onRowContext($event, ch)"
     >
       <button
@@ -401,7 +407,7 @@ async function confirmDeleteGroup() {
             <div class="w-8 h-8 rounded-full overflow-hidden" style="background-color: var(--kv-bg-content);">
               <img
                 v-if="ch.otherUser.avatarUrl"
-                :src="ch.otherUser.avatarUrl"
+                :src="hoverAvatarSrc(ch.otherUser, activeChannelId === ch.id || hoveredDmId === ch.id) ?? ch.otherUser.avatarUrl"
                 :alt="ch.otherUser.username"
                 class="w-full h-full object-cover"
               />

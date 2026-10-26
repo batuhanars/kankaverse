@@ -97,7 +97,7 @@ export type DmChannelDto =
   | {
       type: 'DM'
       id: string
-      otherUser: FriendCodeUserDto
+      otherUser: FriendCodeUserDto & { avatarAnimatedUrl?: string | null } // C16 — aktif/hover'da canlanır
       lastMessage: MessageDto | null
       unread: boolean
       canMessage: boolean

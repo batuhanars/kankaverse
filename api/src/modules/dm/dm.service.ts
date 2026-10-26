@@ -188,6 +188,7 @@ export class DmService {
               id: otherMember.user.id,
               username: otherMember.user.username,
               avatarUrl: otherMember.user.avatarUrl,
+              avatarAnimatedUrl: otherMember.user.avatarAnimatedUrl,
             }
           : null,
         lastMessage: lastMsg
@@ -279,7 +280,7 @@ export class DmService {
 
     const target = await this.prisma.user.findUnique({
       where: { id: targetId, deletedAt: null },
-      select: { id: true, username: true, avatarUrl: true },
+      select: { id: true, username: true, avatarUrl: true, avatarAnimatedUrl: true },
     });
     if (!target)
       throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
@@ -743,7 +744,12 @@ export class DmService {
 
   private async toDmChannelDto(
     channelId: string,
-    otherUser: { id: string; username: string; avatarUrl: string | null },
+    otherUser: {
+      id: string;
+      username: string;
+      avatarUrl: string | null;
+      avatarAnimatedUrl?: string | null;
+    },
     userId: string,
   ) {
     const [members, lastMsg, selfBlockRecord, otherBlockRecord, channelRow] = await Promise.all([
@@ -812,7 +818,13 @@ export class DmService {
     return {
       id: channelId,
       type: 'DM' as const,
-      otherUser: { id: otherUser.id, username: otherUser.username, avatarUrl: otherUser.avatarUrl },
+      otherUser: {
+        id: otherUser.id,
+        username: otherUser.username,
+        avatarUrl: otherUser.avatarUrl,
+        // C16: DM listesinde aktif sohbette ve hover'da canlanır
+        avatarAnimatedUrl: otherUser.avatarAnimatedUrl ?? null,
+      },
       lastMessage: lastMsg
         ? {
             id: lastMsg.id,
@@ -918,7 +930,7 @@ export class DmService {
     });
     const other = await this.prisma.user.findUnique({
       where: { id: channel.dmRequesterId! },
-      select: { id: true, username: true, avatarUrl: true },
+      select: { id: true, username: true, avatarUrl: true, avatarAnimatedUrl: true },
     });
     if (!other)
       throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
