@@ -122,7 +122,7 @@ function onRowLeave(e: MouseEvent) {
 
 <template>
   <div
-    class="group relative flex items-center gap-3 px-3 py-2 mx-1 rounded-[var(--kv-radius-sm)] cursor-pointer"
+    class="group relative flex items-center gap-3 px-3 py-1.5 mx-1 rounded-[var(--kv-radius-sm)] cursor-pointer"
     :class="{
       'opacity-50': props.isOffline && props.openMenuUserId !== props.member.userId,
       'z-30': props.openMenuUserId === props.member.userId,
@@ -136,7 +136,7 @@ function onRowLeave(e: MouseEvent) {
     <!-- Avatar + presence dot -->
     <div class="relative shrink-0">
       <div
-        class="w-10 h-10 rounded-full flex items-center justify-center text-[15px] font-semibold overflow-hidden"
+        class="w-9 h-9 rounded-full flex items-center justify-center text-[14px] font-semibold overflow-hidden"
         :style="props.isOffline
           ? 'background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);'
           : props.roleColor
@@ -154,14 +154,14 @@ function onRowLeave(e: MouseEvent) {
       <PresenceDot
         :status="props.presenceStatus"
         border-color="var(--kv-bg-sidebar)"
-        class="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5"
+        class="absolute -bottom-0.5 -right-0.5 w-3 h-3"
       />
     </div>
 
     <!-- Kullanıcı adı -->
     <div class="flex-1 min-w-0">
       <span
-        class="block text-[16px] font-medium truncate"
+        class="block text-[15px] font-medium truncate"
         :style="props.isOffline ? 'color: var(--kv-text-muted);' : 'color: var(--kv-text-primary);'"
       >
         {{ member.username }}
