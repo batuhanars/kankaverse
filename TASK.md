@@ -4342,7 +4342,7 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] §3 build/test temiz
 - [x] Sahip turu (mobil dev build) — 2026-10-27 geçti. ⚠ reşit olmayan hesapta 18+ süzmesi bu turda ayrıca teyit edilmedi (sunucu tarafı, C6'dan beri testli)
 - [x] Sahip turu (web) — 2026-10-27 geçti (masaüstü ve 390/320 ölçümü ayrıca bildirilmedi)
-- [ ] Mağaza sürümü (versionCode 27)
+- [x] Mağaza sürümü (versionCode 27) — release APK canlıya karşı cihazda geçti (giriş, DM + bildirim, Keşfet, hareketli simge/afiş), AAB sahipte Play yüklemesi için (2026-10-27)
 - [ ] 2 hafta sonra huni panelinde mobil ortama girme oranı
 
 ## Sprint C19 — Ortam simgesi ve afişi: hareketli + konumlandırma — 2026-10-27
@@ -4360,7 +4360,7 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [ ] vc26 (Play) ile hareketli simgeli ortamda çökme yok — canlı deploy sonrası
 - [x] Tur revizeleri (sahip, 2026-10-27): kendi kartında avatar hover · "Ortamlarım" kartları hover'da oynar · Keşfet'te üye kartının tamamı tıklanır ("Git" düğmesi kalktı) · mobil seçili simgede harf titremesi giderildi (statik altta, hareketli onLoad ile üstte) · mobil Keşfet rayda pusula ("+" menüsünden çıktı) · mobil Keşfet tek sütun afişli kart · mobil DM panelinde yatay kanka şeridi (statik avatar + durum noktası) · "Sunucuya Git" → "Ortama Git"
 - [x] §7 ek: ray/Keşfet/öneri hareketli (web + mobil)
-- [ ] Mağaza sürümü (C18 ile birlikte versionCode 27)
+- [x] Mağaza sürümü (C18 ile birlikte versionCode 27) — 2026-10-27
 
 ## Sprint C20 — Cihazlar arası okundu senkronu — 2026-10-27
 
