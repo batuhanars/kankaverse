@@ -42,6 +42,7 @@ export function MemberRow({ member, onPress }: Props) {
       <View style={styles.body}>
         <Text style={styles.username} numberOfLines={1}>
           {member.username}
+          {member.roleEmoji ? ` ${member.roleEmoji}` : ''}
         </Text>
 
         <View style={styles.badges}>

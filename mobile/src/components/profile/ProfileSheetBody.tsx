@@ -83,6 +83,7 @@ export function ProfileSheetBody({ username, avatarUrl, card, identityFooter }: 
                 <View style={[styles.roleDot, { backgroundColor: role.color }]} />
                 <Text style={styles.roleName} numberOfLines={1}>
                   {role.name}
+                  {role.unicodeEmoji ? ` ${role.unicodeEmoji}` : ''}
                 </Text>
               </View>
             ))}

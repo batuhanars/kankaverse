@@ -111,24 +111,3 @@ export const channelsApi = {
     return res.data;
   },
 };
-
-/**
- * Kanal adı normalizasyonu — sözleşme §11 "Tuzak 1".
- *
- * Sunucu deseni: `@Matches(/^[a-z0-9çğıöşü-]+$/)` + 2-50 karakter. "Genel Sohbet" yazan kullanıcı
- * ret alır. Kullanıcıya reddedilecek bir şey yazdırıp sonra hata göstermek kötü tasarım → girdi
- * YAZARKEN normalize edilir (Discord da böyle yapıyor).
- *
- * Türkçe küçültme `toLocaleLowerCase('tr')` ile: aksi hâlde "I" → "i" olur, oysa Türkçe'de "ı"dır
- * ve "İ" → "i̇" (birleşik) çıkardı. Desende "i" ve "ı" ikisi de geçerli, ama doğru harfe düşmeli.
- *
- * NOT: web'de bu normalize YOK (kullanıcının yazdığı olduğu gibi gidiyor, sunucu reddediyor) —
- * bugünkü davet-kodu-büyük-harf vakasıyla aynı sınıf. Web'e geri taşıma ayrı karardır.
- */
-export function normalizeChannelName(input: string): string {
-  return input
-    .toLocaleLowerCase('tr')
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9çğıöşü-]/g, '')
-    .slice(0, 50);
-}

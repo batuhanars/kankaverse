@@ -27,6 +27,8 @@ export interface UserCardRoleDto {
   id: string;
   name: string;
   color: string;
+  /** C21: rolün emojisi (rozette adın yanında) */
+  unicodeEmoji: string | null;
 }
 
 // C10 — kart zenginleştirme: ses durumu (hedef aktif bir GUILD_VOICE kanalındaysa + caller erişebiliyorsa).
@@ -314,7 +316,14 @@ export class UsersService {
         roleLinks: {
           select: {
             role: {
-              select: { id: true, name: true, color: true, position: true, isEveryone: true },
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                position: true,
+                isEveryone: true,
+                unicodeEmoji: true,
+              },
             },
           },
         },
@@ -326,7 +335,7 @@ export class UsersService {
       .map((l) => l.role)
       .filter((r) => !r.isEveryone)
       .sort((a, b) => b.position - a.position)
-      .map((r) => ({ id: r.id, name: r.name, color: r.color }));
+      .map((r) => ({ id: r.id, name: r.name, color: r.color, unicodeEmoji: r.unicodeEmoji }));
   }
 
   /**

@@ -22,6 +22,8 @@ export interface RoleDto {
   mentionable: boolean;
   permissions: string[];
   iconUrl: string | null;
+  /** C21 — tek emoji (yalnız görünüm); yoksa null. */
+  unicodeEmoji: string | null;
   isEveryone: boolean;
   isDefault: boolean;
   memberCount: number;
@@ -33,6 +35,8 @@ export interface CreateRoleBody {
   hoist?: boolean;
   mentionable?: boolean;
   permissions?: string[];
+  /** C21 — null = kaldır. */
+  unicodeEmoji?: string | null;
 }
 
 export const rolesApi = {

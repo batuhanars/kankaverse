@@ -28,6 +28,8 @@ const prismaMock = {
     findUnique: jest.fn(),
     findMany: jest.fn(),
   },
+  // C21: yazar roleEmoji sorgusu (varsayılan: emojili rol yok)
+  guildMemberRole: { findMany: jest.fn() },
   attachment: {
     findMany: jest.fn(),
     updateMany: jest.fn(),
@@ -99,6 +101,7 @@ function makeService() {
 
 function resetMocks() {
   jest.resetAllMocks();
+  prismaMock.guildMemberRole.findMany.mockResolvedValue([]);
   permissionsMock.hasGuildPermission.mockResolvedValue(true);
   permissionsMock.requireMemberHierarchy.mockResolvedValue(undefined);
   permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);

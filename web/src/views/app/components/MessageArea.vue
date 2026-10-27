@@ -19,6 +19,7 @@ import DateDivider from '@/components/shared/DateDivider.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import { ATTACHMENT_ACCEPT } from '@/utils/attachmentType'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
+import EmojiFaceIcon from '@/components/shared/EmojiFaceIcon.vue'
 import { isNewDay, dayDividerLabel } from '@/utils/dateSeparator'
 import type { MessageDto } from '@/types'
 
@@ -614,12 +615,11 @@ function resetComposerHeight() {
           <button
             ref="composeEmojiTriggerEl"
             type="button"
-            class="py-1 px-1 cursor-pointer hover:opacity-80 transition-opacity"
-            style="color: var(--kv-text-muted); font-size: 18px; line-height: 1;"
+            class="emoji-btn py-1 px-1 cursor-pointer flex items-center"
             :aria-label="t('message.emojiButton')"
             @click.stop="toggleEmojiPicker"
           >
-            😊
+            <EmojiFaceIcon :size="20" />
           </button>
           <!-- Teleport to body ile viewport-farkındalıklı konumlandırma -->
           <EmojiPicker

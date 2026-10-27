@@ -206,3 +206,14 @@ code, pre, .font-mono {
   outline-offset: 1px;
   animation: kv-speaking-pulse 1.4s ease-out infinite;
 }
+
+/* Emoji düğmeleri (mesaj kutusu, ad alanları; tepki düğmesiyle aynı dil): gri çizgi simge,
+   hover'da bir ton açılır. Simge `EmojiFaceIcon.vue`. Sahip kararı 2026-10-27. */
+.emoji-btn {
+  color: var(--kv-text-muted);
+  transition: color 0.15s;
+}
+.emoji-btn:hover,
+.emoji-btn:focus-visible {
+  color: var(--kv-text-secondary);
+}

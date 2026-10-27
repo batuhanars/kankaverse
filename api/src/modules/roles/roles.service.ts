@@ -13,6 +13,8 @@ import { filterKnownPermissions, PermissionFlag } from '../../common/permissions
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { RoleDto } from './dto/role.dto';
+import { GuildMemberDto } from '../guilds/dto/guild-member.dto';
+import { pickRoleEmoji } from '../../common/utils/role-emoji.util';
 
 /** Prisma Role kaydını RoleDto'ya dönüştürür. memberCount sorgu sonucu verilir. */
 function toRoleDto(
@@ -26,6 +28,7 @@ function toRoleDto(
     mentionable: boolean;
     permissions: string[];
     iconUrl: string | null;
+    unicodeEmoji: string | null;
     isEveryone: boolean;
     isDefault: boolean;
   },
@@ -41,6 +44,7 @@ function toRoleDto(
     mentionable: role.mentionable,
     permissions: role.permissions,
     iconUrl: role.iconUrl,
+    unicodeEmoji: role.unicodeEmoji,
     isEveryone: role.isEveryone,
     isDefault: role.isDefault,
     memberCount,
@@ -163,6 +167,7 @@ export class RolesService {
         hoist: dto.hoist ?? false,
         mentionable: dto.mentionable ?? false,
         permissions,
+        unicodeEmoji: dto.unicodeEmoji ?? null,
         isEveryone: false,
       },
     });
@@ -245,6 +250,7 @@ export class RolesService {
         ...(dto.color !== undefined && { color: dto.color }),
         ...(dto.hoist !== undefined && { hoist: dto.hoist }),
         ...(dto.mentionable !== undefined && { mentionable: dto.mentionable }),
+        ...(dto.unicodeEmoji !== undefined && { unicodeEmoji: dto.unicodeEmoji }),
         ...(dto.isDefault !== undefined && { isDefault: dto.isDefault }),
         ...(permissions !== undefined && { permissions }),
       },
@@ -304,11 +310,7 @@ export class RolesService {
     actorId: string,
     roleId: string,
     targetUserId: string,
-  ): Promise<
-    import('../guilds/dto/guild-member.dto').GuildMemberDto & {
-      roles: { id: string; name: string; color: string; position: number; hoist: boolean }[];
-    }
-  > {
+  ): Promise<GuildMemberDto> {
     const role = await this.findRoleOrFail(roleId);
     await this.requireManageRoles(actorId, role.guildId);
     // @everyone örtük — atama/çıkarma yasak (hiyerarşi kontrolünden önce fırlatır)
@@ -373,11 +375,7 @@ export class RolesService {
     actorId: string,
     roleId: string,
     targetUserId: string,
-  ): Promise<
-    import('../guilds/dto/guild-member.dto').GuildMemberDto & {
-      roles: { id: string; name: string; color: string; position: number; hoist: boolean }[];
-    }
-  > {
+  ): Promise<GuildMemberDto> {
     const role = await this.findRoleOrFail(roleId);
     await this.requireManageRoles(actorId, role.guildId);
     if (role.isEveryone) {
@@ -486,22 +484,32 @@ export class RolesService {
     user: { id: string; username: string; avatarUrl: string | null; bannerUrl: string | null };
     role: GuildRole;
     roleLinks: {
-      role: { id: string; name: string; color: string; position: number; hoist: boolean };
+      role: {
+        id: string;
+        name: string;
+        color: string;
+        position: number;
+        hoist: boolean;
+        unicodeEmoji: string | null;
+      };
     }[];
-  }) {
+  }): GuildMemberDto {
+    const roles = member.roleLinks.map((rl) => ({
+      id: rl.role.id,
+      name: rl.role.name,
+      color: rl.role.color,
+      position: rl.role.position,
+      hoist: rl.role.hoist,
+      unicodeEmoji: rl.role.unicodeEmoji,
+    }));
     return {
       userId: member.user.id,
       username: member.user.username,
       avatarUrl: member.user.avatarUrl,
       bannerUrl: member.user.bannerUrl,
       role: member.role,
-      roles: member.roleLinks.map((rl) => ({
-        id: rl.role.id,
-        name: rl.role.name,
-        color: rl.role.color,
-        position: rl.role.position,
-        hoist: rl.role.hoist,
-      })),
+      roles,
+      roleEmoji: pickRoleEmoji(roles),
     };
   }
 }

@@ -38,6 +38,8 @@ export interface MessageAuthorDto {
   id: string;
   username: string;
   avatarUrl: string | null;
+  /** C21 — ortam kanalında yazarın rol emojisi; DM'de null. */
+  roleEmoji?: string | null;
 }
 
 /**

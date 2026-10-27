@@ -120,7 +120,10 @@ export function MessageBubble({
         >
           {nameVisible && (
             <Pressable onPress={onPressAuthor} disabled={!onPressAuthor} accessibilityRole="button">
-              <Text style={styles.author}>{message.author.username}</Text>
+              <Text style={styles.author}>
+                {message.author.username}
+                {message.author.roleEmoji ? ` ${message.author.roleEmoji}` : ''}
+              </Text>
             </Pressable>
           )}
 

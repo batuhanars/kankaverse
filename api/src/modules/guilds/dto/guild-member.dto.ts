@@ -16,6 +16,9 @@ export class RoleSummaryDto {
 
   @ApiProperty({ example: false })
   hoist: boolean;
+
+  @ApiProperty({ example: '🛡️', nullable: true })
+  unicodeEmoji: string | null;
 }
 
 export class GuildMemberDto {
@@ -40,4 +43,8 @@ export class GuildMemberDto {
   /** Üyenin atanmış rolleri; position DESC. @everyone örtük olduğu için burada YER ALMAZ. */
   @ApiProperty({ type: [RoleSummaryDto] })
   roles: RoleSummaryDto[];
+
+  /** C21: emojisi olan en yüksek pozisyonlu rolün emojisi (tek kaynak sunucu); yoksa null. */
+  @ApiProperty({ example: '🛡️', nullable: true })
+  roleEmoji: string | null;
 }

@@ -21,6 +21,7 @@ import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.v
 import { ATTACHMENT_ACCEPT } from '@/utils/attachmentType'
 import ReportModal from '@/components/shared/ReportModal.vue'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
+import EmojiFaceIcon from '@/components/shared/EmojiFaceIcon.vue'
 import MessageRow from '@/components/shared/MessageRow.vue'
 import DateDivider from '@/components/shared/DateDivider.vue'
 import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
@@ -1182,12 +1183,11 @@ const dayLabels = computed<(string | null)[]>(() =>
               <button
                 ref="dmComposeEmojiTriggerEl"
                 type="button"
-                class="py-1 px-1 cursor-pointer hover:opacity-80 transition-opacity"
-                style="color: var(--kv-text-muted); font-size: 18px; line-height: 1;"
+                class="emoji-btn py-1 px-1 cursor-pointer flex items-center"
                 :aria-label="t('message.emojiButton')"
                 @click.stop="toggleComposeEmojiPicker"
               >
-                😊
+                <EmojiFaceIcon :size="20" />
               </button>
               <!-- Teleport to body ile viewport-farkındalıklı konumlandırma -->
               <EmojiPicker

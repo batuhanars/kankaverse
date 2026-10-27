@@ -4372,3 +4372,16 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] build/test temiz (api tsc bilinen 2; web vue-tsc bilinen 6 + vite build; mobil typecheck + lint)
 - [x] PLAN D62 dördüncü gerekçe
 - [x] Sahip turu (iki cihaz, yerel) — 2026-10-27 geçti
+
+## Sprint C21 — Kanal, kategori ve rol adlarında emoji — 2026-10-27
+
+> Sözleşme: `contracts/SPRINT_C21_EMOJI_NAMES_CONTRACT.md`. api → web + mobil. Şema: `Role.unicodeEmoji`. vc28.
+
+- [x] §1 şema + migration
+- [x] §2 api + testler
+- [x] §3 web
+- [x] §4 mobil
+- [x] build/test temiz
+- [x] Sahip turu (web + mobil) — 2026-10-27 geçti
+- [x] Tur revizeleri: "Kategorisiz kanal ekle" → "Kanal Ekle" · tüm emoji düğmeleri tepki düğmesi standardında gri çizgi simge (web `EmojiFaceIcon`, mobil `happy-outline`)
+- [ ] Mağaza sürümü (vc28)

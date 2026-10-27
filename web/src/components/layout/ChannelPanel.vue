@@ -24,7 +24,6 @@ import MuteDurationFlyout from '@/components/shared/MuteDurationFlyout.vue'
 import GuildSettingsView from '@/views/app/components/GuildSettingsView.vue'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
-import KvInput from '@/components/ui/KvInput.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import VoiceParticipantList from '@/components/shared/VoiceParticipantList.vue'
 import EventsModal from '@/views/app/components/EventsModal.vue'
@@ -32,6 +31,8 @@ import CreateEventWizard from '@/views/app/components/CreateEventWizard.vue'
 import InvitePeopleModal from '@/components/layout/InvitePeopleModal.vue'
 import ReportModal from '@/components/shared/ReportModal.vue'
 import { guildBannerSrc } from '@/utils/animatedMedia'
+import EmojiNameField from '@/components/shared/EmojiNameField.vue'
+import { normalizeChannelName } from '@/utils/channelName'
 import type { ChannelDto, CategoryDto, ChannelMemberDto, GuildMemberDto } from '@/types'
 
 const { t } = useI18n()
@@ -418,7 +419,7 @@ function openCreate(categoryId?: string | null) {
 }
 
 async function submitCreate() {
-  const name = createName.value.trim()
+  const name = normalizeChannelName(createName.value)
   if (!name) return
   const guildId = guildsStore.activeGuildId
   if (!guildId) return
@@ -581,7 +582,7 @@ watch(
 async function submitSettings() {
   const target = settingsTarget.value
   if (!target) return
-  const name = settingsName.value.trim()
+  const name = normalizeChannelName(settingsName.value)
   if (!name) return
   const guildId = guildsStore.activeGuildId
   if (!guildId) return
@@ -1588,8 +1589,9 @@ onUnmounted(() => {
     @close="showCreate = false"
   >
     <form class="flex flex-col gap-4" @submit.prevent="submitCreate">
-      <KvInput
+      <EmojiNameField
         v-model="createName"
+        channel-rule
         :label="t('channel.nameLabel')"
         :placeholder="t('channel.namePlaceholder')"
         :error="createError"
@@ -1693,7 +1695,7 @@ onUnmounted(() => {
         <KvButton type="button" variant="ghost" @click="showCreate = false">
           {{ t('common.cancel') }}
         </KvButton>
-        <KvButton type="submit" :loading="creating" :disabled="!createName.trim()">
+        <KvButton type="submit" :loading="creating" :disabled="!normalizeChannelName(createName)">
           {{ t('channel.createButton') }}
         </KvButton>
       </div>
@@ -1707,8 +1709,9 @@ onUnmounted(() => {
     @close="settingsTarget = null"
   >
     <form class="flex flex-col gap-4" @submit.prevent="submitSettings">
-      <KvInput
+      <EmojiNameField
         v-model="settingsName"
+        channel-rule
         :label="t('channel.nameLabel')"
         :placeholder="t('channel.namePlaceholder')"
         :error="settingsError"
@@ -2025,7 +2028,7 @@ onUnmounted(() => {
           <KvButton type="button" variant="ghost" @click="settingsTarget = null">
             {{ t('common.cancel') }}
           </KvButton>
-          <KvButton type="submit" :loading="settingsSaving" :disabled="!settingsName.trim()">
+          <KvButton type="submit" :loading="settingsSaving" :disabled="!normalizeChannelName(settingsName)">
             {{ t('channel.settingsButton') }}
           </KvButton>
         </div>
@@ -2064,7 +2067,7 @@ onUnmounted(() => {
     @close="showCreateCategory = false"
   >
     <form class="flex flex-col gap-4" @submit.prevent="submitCreateCategory">
-      <KvInput
+      <EmojiNameField
         v-model="createCategoryName"
         :label="t('category.nameLabel')"
         :placeholder="t('category.namePlaceholder')"
@@ -2089,7 +2092,7 @@ onUnmounted(() => {
     @close="renameTarget = null"
   >
     <form class="flex flex-col gap-4" @submit.prevent="submitRenameCategory">
-      <KvInput
+      <EmojiNameField
         v-model="renameName"
         :label="t('category.nameLabel')"
         :placeholder="t('category.namePlaceholder')"

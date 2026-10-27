@@ -660,6 +660,10 @@
       "deleteConfirmButton": "Sil",
       "everyoneNote": "Bu rol, ortamdaki tüm üyelere otomatik atanır. Adı ve hoist ayarı değiştirilemez.",
       "lockBadge": "Sistem",
+      "emojiLabel": "ROL EMOJİSİ",
+      "emojiHint": "Üyenin adının yanında görünür. Birden fazla rolü varsa en yüksek rolün emojisi gösterilir.",
+      "emojiPick": "Rol emojisi seç",
+      "emojiRemove": "Kaldır",
       "nameLabel": "ROL ADI",
       "namePlaceholder": "Rol adı gir",
       "colorLabel": "ROL RENGİ",
@@ -799,7 +803,7 @@
     "privateLabel": "Özel Kanal",
     "privateDesc": "Özel kanalı herkes görür ama yalnızca seçili kişiler ve yöneticiler girebilir.",
     "privateSaveHint": "Kanalı özel yaptıktan sonra kaydet; üyeleri sonra bu ekrandan yönetebilirsin.",
-    "addUncategorized": "Kategorisiz kanal ekle",
+    "addUncategorized": "Kanal Ekle",
     "errors": {
       "LAST_CHANNEL": "Son kanal silinemez. Ortamda en az bir kanal olmalıdır."
     },

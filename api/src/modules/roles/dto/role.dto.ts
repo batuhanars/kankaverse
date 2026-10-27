@@ -28,6 +28,9 @@ export class RoleDto {
   @ApiProperty({ example: null, nullable: true })
   iconUrl: string | null;
 
+  @ApiProperty({ example: '🛡️', nullable: true })
+  unicodeEmoji: string | null;
+
   @ApiProperty({ example: false })
   isEveryone: boolean;
 

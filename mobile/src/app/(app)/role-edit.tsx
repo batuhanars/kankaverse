@@ -16,6 +16,7 @@ import { rolesApi, type RoleDto } from '@/api/roles';
 import { extractErrorMessage } from '@/api/errors';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { RoleColorSheet } from '@/components/guild/RoleColorSheet';
+import { RoleEmojiRow } from '@/components/guild/RoleEmojiRow';
 import { SettingsRow } from '@/components/guild/SettingsRow';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -38,6 +39,7 @@ export default function RoleEditScreen() {
   const [role, setRole] = useState<RoleDto | null>(null);
   const [name, setName] = useState('');
   const [color, setColor] = useState('#99AAB5');
+  const [emoji, setEmoji] = useState(''); // C21 ('' = yok)
   const [hoist, setHoist] = useState(false);
   const [mentionable, setMentionable] = useState(false);
   const [colorSheet, setColorSheet] = useState(false);
@@ -55,6 +57,7 @@ export default function RoleEditScreen() {
           setRole(r);
           setName(r.name);
           setColor(r.color);
+          setEmoji(r.unicodeEmoji ?? '');
           setHoist(r.hoist);
           setMentionable(r.mentionable);
         })
@@ -67,6 +70,7 @@ export default function RoleEditScreen() {
     !!role &&
     (name.trim() !== role.name ||
       color.toLowerCase() !== role.color.toLowerCase() ||
+      emoji !== (role.unicodeEmoji ?? '') ||
       hoist !== role.hoist ||
       mentionable !== role.mentionable);
 
@@ -78,7 +82,9 @@ export default function RoleEditScreen() {
       // `@everyone`de ad ve hoist gönderilmez — sunucu reddediyor, göndermek gereksiz hata üretir.
       const updated = await rolesApi.update(
         params.id,
-        isEveryone ? { mentionable, color } : { name: name.trim(), color, hoist, mentionable },
+        isEveryone
+          ? { mentionable, color }
+          : { name: name.trim(), color, hoist, mentionable, unicodeEmoji: emoji || null },
       );
       setRole(updated);
     } catch (e) {
@@ -134,6 +140,8 @@ export default function RoleEditScreen() {
             />
           </>
         )}
+
+        {!isEveryone && <RoleEmojiRow value={emoji} onChange={setEmoji} />}
 
         <Text style={styles.label}>{t('guildSettings.roles.colorLabel')}</Text>
         <Pressable style={styles.colorRow} onPress={() => setColorSheet(true)}>

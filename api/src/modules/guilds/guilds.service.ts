@@ -21,7 +21,8 @@ import { PresignIconDto } from './dto/presign-icon.dto';
 import { SetIconDto } from './dto/set-icon.dto';
 import { SetMediaDto } from '../../shared/media/dto/set-media.dto';
 import { PresignBannerDto } from '../../shared/media/dto/presign-banner.dto';
-import { GuildMemberDto } from './dto/guild-member.dto';
+import { GuildMemberDto, RoleSummaryDto } from './dto/guild-member.dto';
+import { pickRoleEmoji } from '../../common/utils/role-emoji.util';
 import { InviteFriendDto } from './dto/invite-friend.dto';
 import { AuditLogEntryDto } from './dto/audit-log-entry.dto';
 import { Guild, GuildRole, NotifTargetType, NotificationLevel } from '@prisma/client';
@@ -101,15 +102,23 @@ const ROLE_ORDER: Record<GuildRole, number> = {
 /** GuildMember.roleLinks → GuildMemberDto.roles şekli (tek kaynak; @everyone örtük, atanmaz). */
 function mapRoleLinks(
   roleLinks?: {
-    role: { id: string; name: string; color: string; position: number; hoist: boolean };
+    role: {
+      id: string;
+      name: string;
+      color: string;
+      position: number;
+      hoist: boolean;
+      unicodeEmoji: string | null;
+    };
   }[],
-): { id: string; name: string; color: string; position: number; hoist: boolean }[] {
+): RoleSummaryDto[] {
   return (roleLinks ?? []).map((rl) => ({
     id: rl.role.id,
     name: rl.role.name,
     color: rl.role.color,
     position: rl.role.position,
     hoist: rl.role.hoist,
+    unicodeEmoji: rl.role.unicodeEmoji,
   }));
 }
 
@@ -532,16 +541,20 @@ export class GuildsService {
         if (roleDiff !== 0) return roleDiff;
         return a.user.username.localeCompare(b.user.username, 'tr');
       })
-      .map((m) => ({
-        userId: m.user.id,
-        username: m.user.username,
-        avatarUrl: m.user.avatarUrl,
-        avatarAnimatedUrl: m.user.avatarAnimatedUrl,
-        bannerUrl: m.user.bannerUrl,
-        role: m.role,
+      .map((m) => {
         // @everyone örtük — roleLinks'te isEveryone=true olanlar çıkar (örtük olduğundan atanmaz zaten)
-        roles: mapRoleLinks(m.roleLinks),
-      }));
+        const roles = mapRoleLinks(m.roleLinks);
+        return {
+          userId: m.user.id,
+          username: m.user.username,
+          avatarUrl: m.user.avatarUrl,
+          avatarAnimatedUrl: m.user.avatarAnimatedUrl,
+          bannerUrl: m.user.bannerUrl,
+          role: m.role,
+          roles,
+          roleEmoji: pickRoleEmoji(roles),
+        };
+      });
   }
 
   // ─── §A: Ortam silme — yalnız OWNER, soft-delete ──────────────────────────
@@ -743,6 +756,7 @@ export class GuildsService {
 
     const recipients = await this.guildMemberIds(guildId);
     for (const m of [newOwner, oldOwner]) {
+      const roles = mapRoleLinks(m.roleLinks);
       this.realtime.emitToUsers(recipients, 'guild.member_updated', {
         guildId,
         member: {
@@ -750,7 +764,8 @@ export class GuildsService {
           username: m.user.username,
           avatarUrl: m.user.avatarUrl,
           role: m.role,
-          roles: mapRoleLinks(m.roleLinks),
+          roles,
+          roleEmoji: pickRoleEmoji(roles),
         },
       });
     }

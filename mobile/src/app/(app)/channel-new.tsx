@@ -6,17 +6,15 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ChannelType, channelsApi, normalizeChannelName } from '@/api/channels';
+import { ChannelType, channelsApi } from '@/api/channels';
 import { extractErrorMessage } from '@/api/errors';
+import { EmojiNameInput } from '@/components/EmojiNameInput';
 import { t } from '@/i18n';
+import { isChannelNameSubmittable, normalizeChannelName, normalizeChannelNameLive } from '@/utils/channelName';
 import { theme } from '@/theme';
-
-// Sözleşme §11 sabiti — `create-channel.dto.ts`: @MinLength(2) @MaxLength(50).
-const NAME_MIN = 2;
 
 // Sprint M1d-B contract §10.1 + §11 — kanal oluştur. Ortam adı alt panelinden açılır.
 //
@@ -44,11 +42,13 @@ export default function NewChannelScreen() {
   // Girdi YAZARKEN normalize edilir (sözleşme §11 Tuzak 1) — kullanıcıya reddedilecek bir şey
   // yazdırıp sonra hata göstermek yerine geçerli olanı yazdırırız.
   function onChangeName(value: string) {
-    setName(normalizeChannelName(value));
+    setName(normalizeChannelNameLive(value));
     setErrorMessage('');
   }
 
-  const canSubmit = name.length >= NAME_MIN && !creating;
+  // C21: kayıtta baş/son tire temizlenir; en az 2 karakter + bir harf/rakam (kesin karar sunucuda).
+  const finalName = normalizeChannelName(name);
+  const canSubmit = isChannelNameSubmittable(finalName) && !creating;
 
   async function onCreate() {
     if (!canSubmit) return;
@@ -56,7 +56,7 @@ export default function NewChannelScreen() {
     setErrorMessage('');
     try {
       await channelsApi.create(params.guildId, {
-        name,
+        name: finalName,
         type,
         categoryId: params.categoryId ?? null,
         isPrivate,
@@ -76,14 +76,11 @@ export default function NewChannelScreen() {
 
       <View style={styles.body}>
         <Text style={styles.label}>{t('channel.nameLabel')}</Text>
-        <TextInput
+        <EmojiNameInput
           value={name}
           onChangeText={onChangeName}
           placeholder={t('channel.namePlaceholder')}
-          placeholderTextColor={theme.colors.textMuted}
-          style={styles.input}
           autoCapitalize="none"
-          autoCorrect={false}
           returnKeyType="done"
           onSubmitEditing={onCreate}
         />
@@ -206,16 +203,6 @@ const styles = StyleSheet.create({
   },
   typeChipTextActive: {
     color: theme.colors.accent500,
-  },
-  input: {
-    minHeight: theme.layout.inputMinHeight,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.bgElevated,
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.base,
-    paddingHorizontal: 12,
   },
   toggleRow: {
     flexDirection: 'row',

@@ -255,6 +255,7 @@ model Role {
   mentionable Boolean           @default(false)
   permissions String[]          @default([])
   iconUrl     String?
+  unicodeEmoji String? // C21: tek emoji, yalnız görünüm
   isEveryone  Boolean           @default(false)
   isDefault   Boolean           @default(false) // yeni katılan üyelere otomatik atanır (guild başına tek)
   createdAt   DateTime          @default(now())

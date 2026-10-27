@@ -5,18 +5,18 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { categoriesApi } from '@/api/categories';
 import { extractErrorMessage } from '@/api/errors';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { EmojiNameInput } from '@/components/EmojiNameInput';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
-// Sözleşme §11 — `CreateCategoryDto { name 1-50 }`. Kanal adının aksine kategori adında **desen
-// kısıtı YOK** (büyük harf ve boşluk serbest) → burada normalize edilmez.
+// Sözleşme §11 — `CreateCategoryDto { name 1-50 }` (C21: görünen karakter). Kanal adının aksine kategori
+// adında **desen kısıtı YOK** (büyük harf, boşluk ve emoji serbest) → burada normalize edilmez.
 const NAME_MAX = 50;
 
 // Sprint M1d-B — kategori oluştur / adlandır / sil. Tek ekran iki iş yapar: `id` parametresi varsa
@@ -33,7 +33,8 @@ export default function CategoryEditScreen() {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const trimmed = name.trim();
-  const canSubmit = trimmed.length > 0 && trimmed.length <= NAME_MAX && !busy;
+  // C21: emoji iki UTF-16 birimi; sayım kod noktasıyla (kesin karar sunucuda, grapheme).
+  const canSubmit = trimmed.length > 0 && [...trimmed].length <= NAME_MAX && !busy;
 
   async function onSubmit() {
     if (!canSubmit) return;
@@ -71,14 +72,10 @@ export default function CategoryEditScreen() {
 
       <View style={styles.body}>
         <Text style={styles.label}>{t('category.nameLabel')}</Text>
-        <TextInput
+        <EmojiNameInput
           value={name}
           onChangeText={setName}
           placeholder={t('category.namePlaceholder')}
-          placeholderTextColor={theme.colors.textMuted}
-          style={styles.input}
-          maxLength={NAME_MAX}
-          autoCorrect={false}
           returnKeyType="done"
           onSubmitEditing={onSubmit}
         />
@@ -134,16 +131,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xs,
     fontWeight: '700',
-  },
-  input: {
-    minHeight: theme.layout.inputMinHeight,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.bgElevated,
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.base,
-    paddingHorizontal: 12,
   },
   error: {
     color: theme.colors.danger,

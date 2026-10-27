@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { toGuildDto } from './guilds.service';
 import { DEFAULT_EVERYONE_PERMISSIONS } from '../../common/permissions';
+import { sanitizeChannelName } from '../../common/utils/channel-name.util';
 
 /**
  * DiscordImportService — Discord "Sunucu Şablonu" (Server Template) → Kankaverse Ortam.
@@ -57,18 +58,6 @@ function mapChannelType(type: number): 'GUILD_TEXT' | 'GUILD_VOICE' | 'CATEGORY'
     default: // forum (15), thread (10/11/12), media (16) ...
       return null;
   }
-}
-
-// Kanal adı kuralımız: küçük harf + rakam + tire (2-50). Discord adlarını normalize et.
-function normalizeChannelName(name: string): string {
-  let n = (name ?? '')
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[^a-z0-9]+/g, '-') // emoji/boşluk/aksanlı → tire
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-  if (n.length < 2) n = 'kanal';
-  return n.slice(0, 50);
 }
 
 function clampName(name: string, fallback: string): string {
@@ -252,7 +241,7 @@ export class DiscordImportService {
           data: {
             guildId: guild.id,
             type,
-            name: normalizeChannelName(c.name),
+            name: sanitizeChannelName(c.name),
             position: c.position ?? chPos++,
             categoryId,
             ageGated: !!c.nsfw,

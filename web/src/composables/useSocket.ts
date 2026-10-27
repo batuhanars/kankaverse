@@ -97,6 +97,11 @@ export function useSocket() {
   const callStore = useCallStore()
   const emergencyAlertsStore = useEmergencyAlertsStore()
 
+  /** C21: yalnız zaten yüklenmiş üye listesini tazeler (yüklenmemişse girince çekilir). */
+  function refreshLoadedMembers(guildId: string) {
+    if (membersStore.membersFor(guildId).length > 0) void membersStore.fetchMembers(guildId)
+  }
+
   function _joinRoom(channelId: string) {
     socket?.emit('channel:join', { channelId }, (ack: { ok: boolean; error?: string }) => {
       // Reconnect sonrası yeniden join ack'i artık yutulmuyor (denetim #4)
@@ -387,11 +392,19 @@ export function useSocket() {
       rolesStore.upsertRole(role.guildId, role)
     })
     socket.on('guild.role_updated', (role: RoleDto) => {
+      const prev = rolesStore.rolesFor(role.guildId).find((r) => r.id === role.id)
       rolesStore.upsertRole(role.guildId, role)
+      // C21: rol emojisi değişti → üyelerin sunucu-hesaplı roleEmoji'si bayatladı, listeyi tazele
+      if (prev && (prev.unicodeEmoji ?? null) !== (role.unicodeEmoji ?? null)) {
+        refreshLoadedMembers(role.guildId)
+      }
     })
     socket.on('guild.role_deleted', (data: { roleId: string }) => {
       const guildId = rolesStore.findGuildIdByRole(data.roleId)
-      if (guildId) rolesStore.removeRoleLocal(guildId, data.roleId)
+      if (guildId) {
+        rolesStore.removeRoleLocal(guildId, data.roleId)
+        refreshLoadedMembers(guildId)
+      }
     })
 
     // Sprint V3: Ortam etkinliği WS olayları (yalnız görünür üyelere yayınlanır — §7)

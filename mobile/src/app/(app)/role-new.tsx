@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { rolesApi } from '@/api/roles';
 import { extractErrorMessage } from '@/api/errors';
 import { RoleColorSheet } from '@/components/guild/RoleColorSheet';
+import { RoleEmojiRow } from '@/components/guild/RoleEmojiRow';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -33,6 +34,7 @@ export default function RoleNewScreen() {
 
   const [name, setName] = useState('');
   const [color, setColor] = useState(DEFAULT_COLOR);
+  const [emoji, setEmoji] = useState(''); // C21 ('' = yok)
   const [colorSheet, setColorSheet] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -44,7 +46,11 @@ export default function RoleNewScreen() {
     setBusy(true);
     setErrorMessage('');
     try {
-      const role = await rolesApi.create(params.guildId, { name: name.trim(), color });
+      const role = await rolesApi.create(params.guildId, {
+        name: name.trim(),
+        color,
+        ...(emoji && { unicodeEmoji: emoji }),
+      });
       // Oluşturduktan sonra rol ekranına: kullanıcı izin/üye eklemek isteyecek, listeye
       // döndürmek onu bir dokunuş daha uğraştırırdı.
       router.replace({ pathname: '/role-edit', params: { id: role.id, guildId: params.guildId } });
@@ -74,6 +80,8 @@ export default function RoleNewScreen() {
           returnKeyType="done"
           onSubmitEditing={onCreate}
         />
+
+        <RoleEmojiRow value={emoji} onChange={setEmoji} />
 
         <Text style={styles.label}>{t('guildSettings.roles.colorLabel')}</Text>
         <Pressable style={styles.colorRow} onPress={() => setColorSheet(true)}>

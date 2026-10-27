@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, Length, IsOptional, IsBoolean, IsArray, Matches } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsSingleEmoji } from '../../../common/utils/emoji-name.validators';
 
 export class CreateRoleDto {
   @ApiProperty({ example: 'Moderatör', minLength: 1, maxLength: 50 })
@@ -22,6 +24,17 @@ export class CreateRoleDto {
   @IsOptional()
   @IsBoolean()
   mentionable?: boolean;
+
+  @ApiProperty({
+    example: '🛡️',
+    required: false,
+    nullable: true,
+    description: 'Rol emojisi (tek emoji; null/boş = kaldır). Yalnız görünüm.',
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (value === '' ? null : value))
+  @IsSingleEmoji()
+  unicodeEmoji?: string | null;
 
   @ApiProperty({ example: ['VIEW_CHANNELS', 'CREATE_INVITE'], required: false, type: [String] })
   @IsOptional()

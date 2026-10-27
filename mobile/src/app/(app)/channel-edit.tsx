@@ -7,21 +7,20 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { ChannelType, channelsApi, normalizeChannelName } from '@/api/channels';
+import { ChannelType, channelsApi } from '@/api/channels';
 import { categoriesApi, type CategoryDto } from '@/api/categories';
 import { ChipSelect } from '@/components/guild/ChipSelect';
 import { Slider } from '@/components/guild/Slider';
 import { extractErrorMessage } from '@/api/errors';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { EmojiNameInput } from '@/components/EmojiNameInput';
 import { t } from '@/i18n';
+import { isChannelNameSubmittable, normalizeChannelName, normalizeChannelNameLive } from '@/utils/channelName';
 import { theme } from '@/theme';
-
-const NAME_MIN = 2;
 
 /**
  * Yavaş mod aralıkları — web'in i18n anahtarlarıyla birebir (`channel.slowMode*`). Serbest saniye
@@ -107,7 +106,9 @@ export default function ChannelEditScreen() {
     }, [params.guildId]),
   );
 
-  const canSubmit = name.length >= NAME_MIN && !busy;
+  // C21: kayıtta baş/son tire temizlenir; kesin karar sunucuda.
+  const finalName = normalizeChannelName(name);
+  const canSubmit = isChannelNameSubmittable(finalName) && !busy;
 
   async function onSave() {
     if (!canSubmit) return;
@@ -115,7 +116,7 @@ export default function ChannelEditScreen() {
     setErrorMessage('');
     try {
       await channelsApi.update(params.id, {
-        name,
+        name: finalName,
         ageGated,
         // 🔴 PM düzeltmesi (2026-08-08) — bu üçü ESKİDEN KOŞULSUZ gönderiliyordu ve çağıran ekran
         // parametreyi taşımadığında state varsayılana düşüyordu: `isPrivate` false, `slowMode` 0,
@@ -176,17 +177,14 @@ export default function ChannelEditScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.label}>{t('channel.nameLabel')}</Text>
-        <TextInput
+        <EmojiNameInput
           value={name}
           onChangeText={(v) => {
-            setName(normalizeChannelName(v));
+            setName(normalizeChannelNameLive(v));
             setErrorMessage('');
           }}
           placeholder={t('channel.namePlaceholder')}
-          placeholderTextColor={theme.colors.textMuted}
-          style={styles.input}
           autoCapitalize="none"
-          autoCorrect={false}
           returnKeyType="done"
           onSubmitEditing={onSave}
         />
@@ -334,16 +332,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xs,
     fontWeight: '700',
-  },
-  input: {
-    minHeight: theme.layout.inputMinHeight,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.bgElevated,
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.base,
-    paddingHorizontal: 12,
   },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   toggleText: { flex: 1, gap: 2 },

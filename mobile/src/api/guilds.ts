@@ -65,6 +65,7 @@ export interface RoleSummaryDto {
   color: string;
   position: number;
   hoist: boolean;
+  unicodeEmoji?: string | null;
 }
 
 /** M1e §0 — sunucudan birebir. `nickname` alanı YOK (özellik uygulanmamış, mobil de göstermez). */
@@ -75,6 +76,8 @@ export interface GuildMemberDto {
   bannerUrl: string | null;
   role: GuildRole;
   roles: RoleSummaryDto[];
+  /** C21 — emojisi olan en yüksek pozisyonlu rolün emojisi (sunucu hesaplar). */
+  roleEmoji?: string | null;
 }
 
 /** M1e-B §3.8 — `api/src/modules/guilds/dto/audit-log-entry.dto.ts`den birebir. */

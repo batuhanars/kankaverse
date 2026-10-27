@@ -7,6 +7,7 @@ export interface CreateRolePayload {
   hoist?: boolean
   mentionable?: boolean
   permissions?: string[]
+  unicodeEmoji?: string | null
 }
 
 export interface UpdateRolePayload {
@@ -15,6 +16,7 @@ export interface UpdateRolePayload {
   hoist?: boolean
   mentionable?: boolean
   permissions?: string[]
+  unicodeEmoji?: string | null // C21: null/boş = kaldır
   isDefault?: boolean // yeni üyelere otomatik atanan varsayılan rol (guild başına tek)
 }
 

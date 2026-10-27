@@ -464,6 +464,7 @@ describe('MessagesService enforcement — BAN/MUTE', () => {
     message: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn() },
     channelMember: { findUnique: jest.fn() },
     attachment: { findMany: jest.fn(), updateMany: jest.fn() },
+    guildMemberRole: { findMany: jest.fn() },
   };
 
   const GUILD_CHANNEL = { id: 'ch-g', guildId: 'guild-1' };
@@ -532,6 +533,7 @@ describe('MessagesService enforcement — BAN/MUTE', () => {
     membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
     moderationMock.hasActiveBan.mockResolvedValue(false);
     moderationMock.hasActiveMute.mockResolvedValue(false);
+    msgPrisma.guildMemberRole.findMany.mockResolvedValue([]);
     msgPrisma.message.create.mockResolvedValue({
       id: 'msg-ok',
       channelId: 'ch-g',

@@ -14,6 +14,7 @@ import { PermissionsService } from '../../shared/permissions/permissions.service
 import { AutomodService } from '../../shared/automod/automod.service';
 import { ModerationService } from '../../shared/moderation/moderation.service';
 import { MESSAGE_AUTHOR_SELECT } from '../../common/utils/message-author.select';
+import { loadRoleEmojis } from '../../common/utils/role-emoji.util';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { Attachment, Message, MessageReaction, Prisma, ScanStatus, User } from '@prisma/client';
@@ -94,6 +95,8 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
       avatarUrl: msg.author.avatarUrl,
       // C16: hareketli WebP adresi (avatarUrl = statik kare). Eski önbellek/olayda alan yok → istemci statik.
       avatarAnimatedUrl: msg.author.avatarAnimatedUrl ?? null,
+      // C21: ortam kanalı için sonradan `withRoleEmojis` doldurur; DM'de null kalır.
+      roleEmoji: null as string | null,
     },
     attachments: msg.attachments.map((a) => ({
       id: a.id,
@@ -342,7 +345,26 @@ export class MessagesService {
       take,
     });
 
-    return messages.map((msg) => toMessageDto(msg, userId));
+    return this.withRoleEmojis(
+      channel.guildId,
+      messages.map((msg) => toMessageDto(msg, userId)),
+    );
+  }
+
+  /**
+   * C21: ortam kanalı mesajlarının yazarlarına `roleEmoji` (emojisi olan en yüksek pozisyonlu rol)
+   * ekler. Tek sorgu; DM'de (guildId null) dokunmaz. DTO'ları yerinde günceller ve döndürür.
+   */
+  private async withRoleEmojis<T extends { author: { id: string; roleEmoji: string | null } }>(
+    guildId: string | null,
+    dtos: T[],
+  ): Promise<T[]> {
+    if (!guildId || dtos.length === 0) return dtos;
+    const emojis = await loadRoleEmojis(this.prisma, guildId, [
+      ...new Set(dtos.map((d) => d.author.id)),
+    ]);
+    for (const d of dtos) d.author.roleEmoji = emojis.get(d.author.id) ?? null;
+    return dtos;
   }
 
   async create(userId: string, channelId: string, dto: CreateMessageDto) {
@@ -576,10 +598,14 @@ export class MessagesService {
         },
       });
 
-      return toMessageDto({ ...message, attachments: linkedAttachments, reactions: [] }, userId);
+      const withFiles = toMessageDto(
+        { ...message, attachments: linkedAttachments, reactions: [] },
+        userId,
+      );
+      return (await this.withRoleEmojis(channel.guildId, [withFiles]))[0];
     }
 
-    return toMessageDto(message, userId);
+    return (await this.withRoleEmojis(channel.guildId, [toMessageDto(message, userId)]))[0];
   }
 
   async editMessage(userId: string, channelId: string, messageId: string, dto: UpdateMessageDto) {
@@ -656,7 +682,7 @@ export class MessagesService {
       },
     });
 
-    return toMessageDto(updated, userId);
+    return (await this.withRoleEmojis(channel.guildId, [toMessageDto(updated, userId)]))[0];
   }
 
   async deleteMessage(userId: string, channelId: string, messageId: string) {
@@ -934,12 +960,15 @@ export class MessagesService {
       take: 50,
     });
 
-    return messages.map((msg) => toMessageDto(msg, userId));
+    return this.withRoleEmojis(
+      channel.guildId,
+      messages.map((msg) => toMessageDto(msg, userId)),
+    );
   }
 
   async findPins(userId: string, channelId: string) {
     // requireChannelAccess: üyelik + yaş kapısı dahil
-    await this.membership.requireChannelAccess(userId, channelId);
+    const channel = await this.membership.requireChannelAccess(userId, channelId);
 
     const messages = await this.prisma.message.findMany({
       where: {
@@ -969,7 +998,10 @@ export class MessagesService {
       orderBy: { pinnedAt: 'desc' },
     });
 
-    return messages.map((msg) => toMessageDto(msg, userId));
+    return this.withRoleEmojis(
+      channel.guildId,
+      messages.map((msg) => toMessageDto(msg, userId)),
+    );
   }
 
   /**
@@ -1083,6 +1115,10 @@ export class MessagesService {
       if (!grouped.has(m.channelId)) grouped.set(m.channelId, []);
       grouped.get(m.channelId)!.push(toMessageDto(m, userId));
     }
+    await this.withRoleEmojis(
+      guildId,
+      [...grouped.values()].flat(),
+    );
     return [...grouped.entries()].map(([channelId, msgs]) => ({
       channelId,
       channelName: nameById.get(channelId) ?? '',

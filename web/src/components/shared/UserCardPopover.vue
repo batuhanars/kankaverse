@@ -321,7 +321,7 @@ async function addFriend() {
                 style="background-color: var(--kv-bg-content); color: var(--kv-text-body);"
               >
                 <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: r.color }" />
-                {{ r.name }}
+                {{ r.name }}<span v-if="r.unicodeEmoji">{{ r.unicodeEmoji }}</span>
               </span>
             </div>
           </div>

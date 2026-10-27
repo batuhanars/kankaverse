@@ -164,7 +164,7 @@ function onRowLeave(e: MouseEvent) {
         class="block text-[15px] font-medium truncate"
         :style="props.isOffline ? 'color: var(--kv-text-muted);' : 'color: var(--kv-text-primary);'"
       >
-        {{ member.username }}
+        {{ member.username }}<span v-if="member.roleEmoji" class="ml-1">{{ member.roleEmoji }}</span>
       </span>
     </div>
 

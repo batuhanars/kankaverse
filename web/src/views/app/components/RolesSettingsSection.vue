@@ -8,6 +8,7 @@ import { rolesApi } from '@/api/roles'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import KvButton from '@/components/ui/KvButton.vue'
+import RoleEmojiField from './RoleEmojiField.vue'
 import KvInput from '@/components/ui/KvInput.vue'
 import KvSwitch from '@/components/ui/KvSwitch.vue'
 import type { GuildDto, RoleDto } from '@/types'
@@ -160,6 +161,7 @@ const draftColor = ref('#99aab5')
 const draftHoist = ref(false)
 const draftMentionable = ref(false)
 const draftIsDefault = ref(false)
+const draftEmoji = ref('') // C21: rol emojisi ('' = yok)
 const draftPermissions = ref<string[]>([])
 
 // Seçili rol değişince taslakları sıfırla (bekleyen üye değişikliklerini de)
@@ -171,6 +173,7 @@ watch(selectedRoleId, () => {
   if (!role) return
   draftName.value = role.name
   draftColor.value = role.color
+  draftEmoji.value = role.unicodeEmoji ?? ''
   draftHoist.value = role.hoist
   draftMentionable.value = role.mentionable
   draftIsDefault.value = role.isDefault
@@ -189,6 +192,7 @@ const appearanceDirty = computed(() =>
   selectedRole.value !== null &&
   (draftName.value !== selectedRole.value.name ||
     draftColor.value !== selectedRole.value.color ||
+    draftEmoji.value !== (selectedRole.value.unicodeEmoji ?? '') ||
     draftHoist.value !== selectedRole.value.hoist ||
     draftMentionable.value !== selectedRole.value.mentionable ||
     draftIsDefault.value !== selectedRole.value.isDefault),
@@ -290,6 +294,7 @@ async function saveAll() {
         color: draftColor.value,
         mentionable: draftMentionable.value,
         permissions: draftPermissions.value,
+        unicodeEmoji: draftEmoji.value || null,
       }
       // @everyone: name/hoist/isDefault GÖNDERİLMEZ — backend bunları @everyone'da reddeder
       // (payload'da hoist olması mentionable kaydını da düşürüyordu — Görsel #36 bug'ı).
@@ -332,6 +337,7 @@ function reset() {
   if (!role) return
   draftName.value = role.name
   draftColor.value = role.color
+  draftEmoji.value = role.unicodeEmoji ?? ''
   draftHoist.value = role.hoist
   draftMentionable.value = role.mentionable
   draftIsDefault.value = role.isDefault
@@ -550,7 +556,7 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
         />
         <!-- Ad -->
         <span class="flex-1 text-[14px] font-medium truncate" style="color: var(--kv-text-primary);">
-          {{ role.name }}
+          {{ role.name }}<span v-if="role.unicodeEmoji" class="ml-1">{{ role.unicodeEmoji }}</span>
         </span>
         <!-- Varsayılan rol rozeti -->
         <span
@@ -675,7 +681,7 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
           @click="selectRole(role.id)"
         >
           <span class="shrink-0 w-3 h-3 rounded-full" :style="`background-color: ${role.color};`" />
-          <span class="flex-1 truncate font-medium">{{ role.name }}</span>
+          <span class="flex-1 truncate font-medium">{{ role.name }}<span v-if="role.unicodeEmoji" class="ml-1">{{ role.unicodeEmoji }}</span></span>
           <svg
             v-if="role.isEveryone"
             width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -776,6 +782,9 @@ const membersWithRole = computed(() => effectiveMemberIds.value.size)
               style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
             />
           </section>
+
+          <!-- ROL EMOJİSİ (C21) -->
+          <RoleEmojiField v-if="!selectedRole?.isEveryone" v-model="draftEmoji" :disabled="!canEdit" />
 
           <!-- ROL RENGİ -->
           <section>

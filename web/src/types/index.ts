@@ -138,6 +138,7 @@ export interface UserCardRoleDto {
   id: string
   name: string
   color: string
+  unicodeEmoji?: string | null // C21
 }
 export interface UserCardVoiceDto {
   channelId: string
@@ -311,6 +312,7 @@ export interface MessageDto {
     username: string
     avatarUrl: string | null
     avatarAnimatedUrl?: string | null // Sprint C16 — hover'da canlanır; yoksa statik
+    roleEmoji?: string | null // C21 — ortam kanalında yazarın rol emojisi; DM'de null
   }
   createdAt: string
   editedAt: string | null
@@ -349,7 +351,15 @@ export interface GuildMemberDto {
   bannerUrl: string | null // Sprint C8 — profil afişi (görsel); üye listesinde şu an gösterilmiyor
   avatarAnimatedUrl?: string | null // Sprint C16 — satır hover'da canlanır; yoksa statik
   role: GuildMemberRole
-  roles: { id: string; name: string; color: string; position: number; hoist: boolean }[]
+  roles: {
+    id: string
+    name: string
+    color: string
+    position: number
+    hoist: boolean
+    unicodeEmoji?: string | null
+  }[]
+  roleEmoji?: string | null // C21 — emojisi olan en yüksek pozisyonlu rolün emojisi (sunucu hesaplar)
 }
 
 // Sprint V3 — Rol DTO
@@ -363,6 +373,7 @@ export interface RoleDto {
   mentionable: boolean
   permissions: string[]
   iconUrl: string | null
+  unicodeEmoji?: string | null // C21 — tek emoji, yalnız görünüm
   isEveryone: boolean
   isDefault: boolean // yeni katılan üyelere otomatik atanan varsayılan rol (guild başına tek)
   memberCount: number

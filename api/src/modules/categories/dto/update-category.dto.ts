@@ -1,13 +1,13 @@
-import { IsString, MinLength, MaxLength, IsOptional, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
+import { GraphemeLength } from '../../../common/utils/emoji-name.validators';
 
 export class UpdateCategoryDto {
   @ApiPropertyOptional({ example: 'Yeni Ad', description: 'Kategori adı (1-50 karakter)' })
   @IsOptional()
   @IsString()
-  @MinLength(1, { message: 'Kategori adı en az 1 karakter olmalıdır.' })
-  @MaxLength(50, { message: 'Kategori adı en fazla 50 karakter olabilir.' })
+  @GraphemeLength(1, 50, 'Kategori adı')
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   name?: string;
 

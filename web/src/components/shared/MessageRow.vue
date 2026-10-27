@@ -209,7 +209,7 @@ const renderedContent = computed<string>(() => {
           class="text-[16px] font-semibold leading-snug"
           style="color: var(--kv-text-primary);"
         >
-          {{ message.author.username }}
+          {{ message.author.username }}<span v-if="message.author.roleEmoji" class="ml-1 font-normal">{{ message.author.roleEmoji }}</span>
         </span>
         <span class="text-[12px]" style="color: var(--kv-text-muted);">
           {{ formatTime(message.createdAt) }}

@@ -25,6 +25,7 @@ export interface UserCardRoleDto {
   id: string;
   name: string;
   color: string;
+  unicodeEmoji?: string | null;
 }
 
 export interface UserCardDto {
