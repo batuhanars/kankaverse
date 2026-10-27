@@ -4284,7 +4284,7 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] R7 insan incelemesi (sahip) — 2026-10-26 onaylandı
 - [x] Sahip canlı test (web, yerel) — 2026-10-26: GIF avatar + afiş, videodan avatar + afiş, oynatma, tüm maddeler geçti
 - [x] §6 mobil: native ayar, seçme, kesit, gösterim, yerel derleme — 2026-10-26 cihaz turu geçti (afiş önizleme taşması textureView ile düzeltildi)
-- [ ] Cihaz turu + mağaza sürümü
+- [x] Cihaz turu + mağaza sürümü — C13b/C15 ile çıktı (versionCode 25-26), vc26 Play incelemesinden geçti (2026-10-27)
 
 ## Sprint C13b — Avatar ve afişte konumlandırma — 2026-10-26
 
@@ -4319,3 +4319,14 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] §2 web: DM paneli + mesaj avatarı hover
 - [x] Sahip turu (web, yerel) — 2026-10-26 DM paneli + hover (1-1 DM, grup DM, kanal, yeni mesaj) geçti
 - [x] §3b ek: üye listeleri (ortam paneli + grup DM katılımcıları) hover'da hareketli — sahip kararıyla elle test edilmeden deploy (2026-10-26); tsc + 1183 test + vue-tsc temiz
+
+## Sprint C17 — Huni paneli — 2026-10-27
+
+> Sözleşme: `contracts/SPRINT_C17_FUNNEL_PANEL_CONTRACT.md`. api → web. Şema yok, mobil yok, R7-nötr.
+> Taban çizgisi (elle sorgu 2026-10-27): kayıt 49 → ortam 17 → mesaj 15; son 7 gün aktif 8.
+
+- [x] §1 api: `GET /admin/funnel` + DTO + testler
+- [x] §1 api: sorgu yerel DB'de çalıştırıldı, elle sayımla tutarlı
+- [ ] §2 web: Huni alt sekmesi + kohort seçici + 390/320 ölçümü
+- [x] §3 build/test temiz
+- [ ] Sahip turu (canlı)

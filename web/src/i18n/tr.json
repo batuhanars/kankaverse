@@ -170,6 +170,25 @@
         "full": "Dolmuş"
       }
     },
+    "funnel": {
+      "title": "Huni",
+      "cohort": { "0": "Tümü", "30": "Son 30 gün", "90": "Son 90 gün" },
+      "steps": {
+        "registered": "Kayıt oldu",
+        "joinedGuild": "Bir ortama girdi",
+        "sentMessage": "Mesaj yazdı",
+        "returnedNextDay": "Ertesi gün geri geldi",
+        "returnedAfter7Days": "Bir hafta sonra geri geldi",
+        "activeOn3Days": "En az 3 gün girdi"
+      },
+      "activityTitle": "Aktiflik",
+      "activeLast7Days": "Son 7 gün aktif",
+      "activeLast30Days": "Son 30 gün aktif",
+      "registeredLast7Days": "Son 7 gün kayıt",
+      "updatedAt": "Güncelleme: {time}",
+      "empty": "Bu aralıkta kayıt yok.",
+      "loadError": "Huni yüklenemedi."
+    },
     "users": {
       "title": "Kullanıcılar",
       "count": "{count} kayıt",

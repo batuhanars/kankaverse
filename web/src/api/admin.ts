@@ -37,6 +37,25 @@ export interface AdminUserDto {
   createdAt: string
 }
 
+// Huni paneli (Sprint C17): yalnız toplam sayılar
+export interface FunnelDto {
+  cohortDays: number
+  generatedAt: string
+  steps: {
+    registered: number
+    joinedGuild: number
+    sentMessage: number
+    returnedNextDay: number
+    returnedAfter7Days: number
+    activeOn3Days: number
+  }
+  activity: {
+    activeLast7Days: number
+    activeLast30Days: number
+    registeredLast7Days: number
+  }
+}
+
 export const adminApi = {
   createPlatformInvite(payload: CreatePlatformInvitePayload) {
     return http.post<PlatformInviteDto>('/admin/platform-invites', payload)
@@ -49,5 +68,8 @@ export const adminApi = {
   },
   listUsers() {
     return http.get<AdminUserDto[]>('/admin/users')
+  },
+  getFunnel(cohortDays: number) {
+    return http.get<FunnelDto>('/admin/funnel', { params: { cohortDays } })
   },
 }
