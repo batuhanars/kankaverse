@@ -13,7 +13,10 @@ import { Stack, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { extractErrorMessage } from '@/api/errors';
 import type { MessageAuthorDto, MessageDto } from '@/api/messages';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { MessageBubble } from './MessageBubble';
+import { SwipeToReply } from './message/SwipeToReply';
+import { EditMessageOverlay } from './message/EditMessageOverlay';
 import { ProfileSheet } from './profile/ProfileSheet';
 import { MessageSearchModal } from './MessageSearchModal';
 import { ComposerHost } from './message/ComposerHost';
@@ -324,11 +327,15 @@ export function MessageScreen({
   // Bu yüzden sabit yerine payın kendisi kullanılıyor. Kaydırma kipinde sonuç eskisiyle BİREBİR
   // AYNI (16 = 16) — çalışan yapılandırmayı bozma riski yok — 3 tuşlu kipte eksik pay kapanıyor.
   // Her iki kipte de kutunun altı klavyenin tepesine tam oturuyor (örtüşme 0, ölçüldü).
+  // Yanıtla'nın TEK giriş fonksiyonu: eylem paneli ve sağa kaydırma ikisi de buradan geçer.
+  const replyTo = (m: MessageDto) => composer.startReply(m);
+  // C27 — düzenleme kendi katmanında (kutudan bağımsız); sola kaydırma ve eylem paneli aynı girişi kullanır.
+  const [editTarget, setEditTarget] = useState<MessageDto | null>(null);
   const keyboardPad = keyboardVisible ? kbGeom.h + insets.bottom : 0;
   const bottomInset = keyboardVisible ? 0 : insets.bottom;
 
   return (
-    <View style={[styles.flex, { paddingBottom: keyboardPad }]}>
+    <GestureHandlerRootView style={[styles.flex, { paddingBottom: keyboardPad }]}>
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -397,6 +404,12 @@ export function MessageScreen({
             // normal sütun olur ve iki çevirme sadeleşir: ayraç mesajın üstünde.
             <View>
               {item.isDayStart && <DateSeparator iso={item.message.createdAt} />}
+              {/* C23 — Yanıtla her mesajda açık (eylem paneli de koşulsuz sunuyor); tek işlev. */}
+              <SwipeToReply
+                onReply={() => replyTo(item.message)}
+                // Düzenle yalnız kendi mesajımda: eylem panelindeki `isMine` koşuluyla aynı (yazar = ben).
+                onEdit={item.message.author.id === authUser?.id ? () => setEditTarget(item.message) : undefined}
+              >
               <MessageBubble
                 message={item.message}
                 showAuthor={item.showAuthor}
@@ -410,6 +423,7 @@ export function MessageScreen({
                 onPressAuthor={() => setProfileTarget(item.message.author)}
                 onToggleReaction={(emoji) => actions.toggleReaction(item.message, emoji)}
               />
+              </SwipeToReply>
             </View>
           )}
         />
@@ -445,14 +459,29 @@ export function MessageScreen({
         onReply={() => {
           const m = actions.target;
           actions.close();
-          if (m) composer.startReply(m);
+          if (m) replyTo(m);
         }}
         onEdit={() => {
           const m = actions.target;
           actions.close();
-          if (m) composer.startEdit(m);
+          if (m) setEditTarget(m);
         }}
       />
+
+      {editTarget && (
+        <EditMessageOverlay
+          message={editTarget}
+          channelId={channelId}
+          showIdentity={showIdentity}
+          resolveMention={(id) => resolveUsername(channelId, id)}
+          resolveRole={resolveRole}
+          mentionSource={mentionSource}
+          everyoneRoleId={everyoneRoleId}
+          keyboardPad={keyboardPad}
+          bottomInset={bottomInset}
+          onClose={() => setEditTarget(null)}
+        />
+      )}
 
       {profileTarget && (
         <ProfileSheet
@@ -474,7 +503,7 @@ export function MessageScreen({
           }}
         />
       )}
-    </View>
+    </GestureHandlerRootView>
   );
 }
 

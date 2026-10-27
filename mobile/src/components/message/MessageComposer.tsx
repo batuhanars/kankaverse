@@ -43,8 +43,6 @@ interface Props {
   replyToAuthor?: string | null;
   /** Yanıtlanan mesajın metni (kısaltılmış gösterilir). */
   replyToSnippet?: string | null;
-  /** Düzenleme modunda mıyız — şerit metni ona göre değişir. */
-  editing?: boolean;
   /** Modu iptal et (× düğmesi). */
   onCancelMode?: () => void;
   /**
@@ -104,7 +102,6 @@ export function MessageComposer({
   bottomInset,
   replyToAuthor,
   replyToSnippet,
-  editing,
   onCancelMode,
   mentionSuggestions,
   onMentionSelect,
@@ -119,13 +116,11 @@ export function MessageComposer({
 }: Props) {
   // Sunucu ile aynı kural: en az bir ek varsa boş metinle de gönderilebilir (`EMPTY_MESSAGE`).
   const canSend = (!!value.trim() || !!attachments?.length) && !sending;
-  const modeActive = editing || !!replyToAuthor;
-  // 🔴 Düzenleme modunda ek düğmesi YOK: `PATCH .../messages/:id` yalnız `content` alıyor, var olan
-  // mesaja sonradan ek bağlanamıyor. Düğmeyi göstermek "ekledim ama gitmedi" hâli üretirdi.
-  const showAttach = !!onOpenAttach && !editing;
+  const modeActive = !!replyToAuthor;
+  const showAttach = !!onOpenAttach;
   const recording = !!voice && voice.phase !== 'idle';
-  // Mikrofon gönder düğmesinin yerinde: kutu boş, ek yok, düzenlemede değil, gönderim sürmüyor.
-  const showMic = !!voice && !canSend && !sending && !editing;
+  // Mikrofon gönder düğmesinin yerinde: kutu boş, ek yok, gönderim sürmüyor.
+  const showMic = !!voice && !canSend && !sending;
 
   return (
     <>
@@ -136,9 +131,9 @@ export function MessageComposer({
         <View style={styles.modeRow}>
           <View style={styles.modeTextWrap}>
             <Text style={styles.modeLabel} numberOfLines={1}>
-              {editing ? t('message.edit') : t('reply.to', { author: replyToAuthor ?? '' })}
+              {t('reply.to', { author: replyToAuthor ?? '' })}
             </Text>
-            {!editing && replyToSnippet ? (
+            {replyToSnippet ? (
               <Text style={styles.modeSnippet} numberOfLines={1}>
                 {replyToSnippet}
               </Text>

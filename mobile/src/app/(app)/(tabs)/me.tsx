@@ -99,6 +99,12 @@ export default function MeScreen() {
             <Text style={styles.menuLabel}>{t('settings.dmPolicy.label')}</Text>
             <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
           </Pressable>
+          {/* C24: hızlı tepki şeridi düzenleme (mesaj panelindeki kalemle aynı ekran). */}
+          <Pressable onPress={() => router.push('/quick-reactions')} style={[styles.menuRow, styles.menuRowDivider]}>
+            <Ionicons name="happy-outline" size={20} color={theme.colors.textSecondary} />
+            <Text style={styles.menuLabel}>{t('mobile.quickReactions.title')}</Text>
+            <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          </Pressable>
           {/* Sistem bildirim ayarlarına kısayol (sahip talimatı 2026-08-11, Discord referansı).
               Bildirimler sekmesindeki uyarı şeridi YALNIZ izin kapalıyken çıkıyor; bu satır ise
               HER ZAMAN duruyor, çünkü kullanıcı izni açıkken de ses/titreşim gibi sistem tarafı

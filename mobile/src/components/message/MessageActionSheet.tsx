@@ -1,6 +1,7 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
+import { useQuickReactions } from '@/utils/quickReactions';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -8,8 +9,8 @@ import { theme } from '@/theme';
  * Sprint M1d-C §2.4 — mesaja uzun basınca açılan panel.
  *
  * Web'de bu aksiyonlar hover şeridinde (`MessageActionsMenu.vue`); dokunmatikte hover yok, karşılığı
- * uzun basıştır. **Hızlı emoji kümesi web'den okundu** (`QUICK_EMOJIS`), mobil kendi listesini
- * uydurmadı — iki istemcide aynı üç emoji.
+ * uzun basıştır. **Hızlı tepki şeridi hesaba bağlı** (C24): oturum kullanıcısının `quickReactions`ı,
+ * varsayılanın tek kaynağı sunucu; istemcide sabit liste yok.
  *
  * 🔴 Yetki sunucudadır, istemci taklit etmez: **düzenleme ve silme yalnız YAZARA açıktır**
  * (`messages.controller.ts`: "yalnız yazar"). Yetkisiz kullanıcıda bu satırlar **hiç render
@@ -21,19 +22,6 @@ import { theme } from '@/theme';
  * kavramı yok) · Uygulamalar · Mesaj Bağlantısını Kopyala (mobilde derin bağlantı yok) · Mesaj ID
  * (geliştirici modu yok).
  */
-/**
- * Hızlı tepki seti. Web'de üç emoji var (`MessageActionsMenu.vue` `QUICK_EMOJIS`) çünkü orası dar
- * bir hover şeridi; mobilde alt panel geniş ve üç emoji sağı boş bırakıyordu (sahip bulgusu
- * 2026-08-01) → **beşe çıkarıldı.**
- *
- * Eklenenler rastgele değil: onayla · sev · gül üçlüsüne **şaşır** ve **üzül** katılınca tepki
- * yelpazesi tamamlanıyor (olumlu / olumsuz / nötr karşılık). Emoji picker zaten yanında, bu şerit
- * yalnız en sık kullanılanların kısayolu.
- *
- * **Web de aynı beşliye çekildi** (sahip kararı, `MessageActionsMenu.vue` `QUICK_EMOJIS`) — iki
- * istemcide farklı tepki kısayolu olması zihinsel modeli bölerdi. İki liste birlikte değişir.
- */
-export const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢'];
 
 interface Props {
   visible: boolean;
@@ -45,6 +33,8 @@ interface Props {
   onToggleReaction: (emoji: string) => void;
   /** Şeridin sonundaki "+" — tam emoji listesini açar (web'deki picker'ın karşılığı). */
   onOpenPicker: () => void;
+  /** C24 — şeridin sonundaki kalem: hızlı tepkileri düzenleme ekranı. */
+  onEditQuickReactions: () => void;
   onReply: () => void;
   onForward: () => void;
   onEdit: () => void;
@@ -68,6 +58,7 @@ export function MessageActionSheet({
   onClose,
   onToggleReaction,
   onOpenPicker,
+  onEditQuickReactions,
   onReply,
   onForward,
   onEdit,
@@ -78,6 +69,7 @@ export function MessageActionSheet({
   onTogglePin,
 }: Props) {
   const bottomInset = useSheetInsets();
+  const quickEmojis = useQuickReactions();
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -91,7 +83,7 @@ export function MessageActionSheet({
           <View style={styles.content}>
             {/* Hızlı tepki şeridi — verdiğim tepki vurgulu; tekrar dokunmak kaldırır (web ile aynı). */}
             <View style={styles.emojiRow}>
-              {QUICK_EMOJIS.map((emoji) => {
+              {quickEmojis.map((emoji) => {
                 const mine = myEmojis.includes(emoji);
                 return (
                   <Pressable
@@ -114,6 +106,15 @@ export function MessageActionSheet({
                 accessibilityLabel={t('message.emojiButton')}
               >
                 <Ionicons name="happy-outline" size={26} color={theme.colors.textMuted} />
+              </Pressable>
+              <Pressable
+                onPress={onEditQuickReactions}
+                style={styles.editButton}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={t('mobile.quickReactions.edit')}
+              >
+                <Ionicons name="pencil-outline" size={16} color={theme.colors.textMuted} />
               </Pressable>
             </View>
 
@@ -206,6 +207,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.bgElevated,
+  },
+  // Kalem küçük sabit düğme: beş emoji + liste düğmesi şeridi doldurmaya devam eder.
+  editButton: {
+    width: 28,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emojiButtonActive: {
     backgroundColor: theme.colors.accentSubtle,

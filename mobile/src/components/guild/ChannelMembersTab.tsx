@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { GuildMemberDto, RoleSummaryDto } from '@/api/guilds';
 import { MemberRow } from './MemberRow';
 import { MessageError, MessageLoading } from '../message/MessageStates';
+import { usePresenceStore, type PresenceStatus } from '@/stores/presence';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -14,38 +15,52 @@ interface Section {
 }
 
 /**
- * Sprint M2c contract §4.3 — "gruplama istemcide: üyenin en yüksek pozisyonlu rolüne göre başlık,
- * rolsüzler en altta". `position` DESC = en yetkili (bkz. `reorder.tsx` — roller sunucudan zaten bu
- * sırayla döner); bir üyenin BİRDEN FAZLA özel rolü olabilir, bu yüzden en yüksek `position` olan
- * ele alınır. Ortam hiyerarşisi (`member.role` OWNER) BURADA yok — o rozet `MemberRow`in kendisinde,
- * bu gruplama yalnız özel rolleri (`roles[]`) ayırıyor.
+ * Sprint C26 contract §1 — web `MemberPanel.vue` `groups` ile birebir (M2c §4.3 yerine geçti):
+ * durum `offline` olmayanlar çevrimiçi (haritada yok = çevrimdışı). Çevrimiçiler YALNIZ `hoist` rolleri
+ * arasında en yüksek `position`lı role göre gruplanır (`position` DESC), hoist rolü olmayanlar
+ * `member.online`a düşer; tüm çevrimdışılar rolüne bakılmaksızın `member.offline` altında toplanır.
+ * Boş grup yazılmaz. Grup içi sıra girdi sırasıdır. Ortam hiyerarşisi rozeti `MemberRow`de.
  */
-function buildSections(members: GuildMemberDto[]): Section[] {
-  const byKey = new Map<string, { role: RoleSummaryDto | null; members: GuildMemberDto[] }>();
+function buildSections(
+  members: GuildMemberDto[],
+  statusMap: Record<string, PresenceStatus>,
+): Section[] {
+  const hoistGroups = new Map<string, { role: RoleSummaryDto; members: GuildMemberDto[] }>();
+  const noHoistOnline: GuildMemberDto[] = [];
+  const offline: GuildMemberDto[] = [];
+
   for (const m of members) {
-    const topRole =
-      m.roles.length > 0 ? m.roles.reduce((top, r) => (r.position > top.position ? r : top)) : null;
-    const key = topRole?.id ?? '__none__';
-    if (!byKey.has(key)) byKey.set(key, { role: topRole, members: [] });
-    byKey.get(key)!.members.push(m);
+    if ((statusMap[m.userId] ?? 'offline') === 'offline') {
+      offline.push(m);
+      continue;
+    }
+    const hoistRoles = m.roles.filter((r) => r.hoist);
+    if (hoistRoles.length === 0) {
+      noHoistOnline.push(m);
+      continue;
+    }
+    const top = hoistRoles.reduce((best, r) => (r.position > best.position ? r : best));
+    if (!hoistGroups.has(top.id)) hoistGroups.set(top.id, { role: top, members: [] });
+    hoistGroups.get(top.id)!.members.push(m);
   }
 
-  const sections: Section[] = [...byKey.values()]
-    .filter((g) => g.role)
-    .sort((a, b) => b.role!.position - a.role!.position)
+  const sections: Section[] = [...hoistGroups.values()]
+    .sort((a, b) => b.role.position - a.role.position)
     .map((g) => ({
-      key: g.role!.id,
-      title: t('member.hoistGroup', { name: g.role!.name, n: g.members.length }),
+      key: `hoist-${g.role.id}`,
+      title: t('member.hoistGroup', { name: g.role.name, n: g.members.length }),
       data: g.members,
     }));
 
-  const noRole = byKey.get('__none__');
-  if (noRole) {
+  if (noHoistOnline.length > 0) {
     sections.push({
-      key: '__none__',
-      title: t('mobile.channelDetails.noRoleGroup', { n: noRole.members.length }),
-      data: noRole.members,
+      key: 'online',
+      title: t('member.online', { n: noHoistOnline.length }),
+      data: noHoistOnline,
     });
+  }
+  if (offline.length > 0) {
+    sections.push({ key: 'offline', title: t('member.offline', { n: offline.length }), data: offline });
   }
   return sections;
 }
@@ -70,7 +85,8 @@ export function ChannelMembersTab({
   onInvite,
   onOpenMember,
 }: Props) {
-  const sections = useMemo(() => buildSections(members), [members]);
+  const statusMap = usePresenceStore((s) => s.statusMap);
+  const sections = useMemo(() => buildSections(members, statusMap), [members, statusMap]);
 
   if (state === 'loading') return <MessageLoading />;
   if (state === 'error') return <MessageError message={errorMessage} onRetry={onRetry} />;

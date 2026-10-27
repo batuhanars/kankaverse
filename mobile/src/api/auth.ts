@@ -42,6 +42,8 @@ export interface UserDto {
   dmPolicy: DmPolicy;
   /** C12 — okundu bilgisi paylaşımı (karşılıklı; kapatan karşı tarafınkini de göremez). */
   readReceipts: boolean;
+  /** C24 — hızlı tepki şeridi, her zaman 5 elemanlı etkin liste (kayıt yoksa sunucu varsayılanı). */
+  quickReactions: string[];
 }
 
 /**

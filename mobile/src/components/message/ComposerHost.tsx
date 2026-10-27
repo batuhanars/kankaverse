@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import EmojiPicker, { tr as emojiTr } from 'rn-emoji-keyboard';
 import { MessageComposer } from './MessageComposer';
 import { AttachmentSheet } from './AttachmentSheet';
-import { emojiPickerTheme } from './emojiPickerTheme';
+import { EmojiGifSheet } from './EmojiGifSheet';
 import { useEmojiInsert } from './useEmojiInsert';
 import { useVoiceRecorder } from './useVoiceRecorder';
 import type { useMessageComposer } from './useMessageComposer';
@@ -73,7 +72,6 @@ export function ComposerHost({
         bottomInset={bottomInset}
         replyToAuthor={composer.replyTo?.author.username}
         replyToSnippet={composer.replyTo?.content}
-        editing={!!composer.editing}
         onCancelMode={composer.cancelMode}
         mentionSuggestions={mention.visible ? mention.suggestions : undefined}
         onMentionSelect={(candidate) => {
@@ -118,17 +116,18 @@ export function ComposerHost({
         />
       )}
 
-      {/* Sprint M3c §4 — kutunun emoji seçicisi. Tepki seçicisiyle AYNI paket ve AYNI tema;
-          Discord'un GIF/Çıkartma sekmeleri bizde yok, sekme çubuğu da çizilmiyor.
-          Seçici açık kalır (`closeOnSelect` yok): arka arkaya emoji eklemek Discord'daki gibi. */}
-      <EmojiPicker
-        open={emoji.open}
+      {/* C23 — emoji düğmesi Emoji | GIF alt sayfası açar. Emoji sekmesi eski seçiciyle aynı
+          paket/tema ve açık kalır (arka arkaya emoji). Tepki seçici değişmedi. */}
+      <EmojiGifSheet
+        visible={emoji.open}
         onClose={() => emoji.setOpen(false)}
-        onEmojiSelected={(e) => emoji.insert(e.emoji)}
-        translation={emojiTr}
-        enableSearchBar
-        categoryPosition="top"
-        theme={emojiPickerTheme}
+        onEmojiSelected={emoji.insert}
+        showGif
+        existingCount={composer.attachments.length}
+        onGifDraft={(draft) => {
+          emoji.setOpen(false);
+          composer.addAttachments([draft]);
+        }}
       />
     </>
   );

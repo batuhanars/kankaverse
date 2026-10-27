@@ -11,15 +11,12 @@ import { useMessagesStore } from '@/stores/messages';
 import { t } from '@/i18n';
 
 /**
- * Giriş kutusunun durumu ve ÜÇ modu (M1d-C §2.4-§2.5): normal · **yanıtlıyorum** · **düzenliyorum**.
+ * Giriş kutusunun durumu ve iki modu (M1d-C §2.5): normal · **yanıtlıyorum**. Düzenleme C27'de kutudan
+ * çıktı (`EditMessageOverlay`, kendi durumu).
  *
  * `MessageScreen`den ayrıldı çünkü o dosya tam 300 satır eşiğindeydi ve bu iş kendi içinde kapalı:
  * metin, gönderim, hata ve mod tek yerde durunca "gönder tuşuna basınca ne olur" sorusunun cevabı
  * tek fonksiyonda okunuyor.
- *
- * 🔴 **Düzenleme ve yanıt aynı kutuyu paylaşır, aynı anda ikisi birden olamaz.** Yanıtlarken
- * düzenlemeye geçilirse yanıt hedefi düşer (ve tersi) — iki bağlamı üst üste bindirmek "neye
- * gönderiyorum" sorusunu belirsizleştirirdi.
  *
  * Sprint M3c §3 — ekler de burada: seçilen dosyalar taslak olarak bekler, gönderim anında
  * yüklenir ve `attachmentIds` ile mesaja bağlanır.
@@ -35,46 +32,26 @@ export function useMessageComposer(
   mentions?: { applyMentionTokens: (text: string) => string; clearPicked: () => void },
 ) {
   const appendMessage = useMessagesStore((s) => s.appendMessage);
-  const updateMessage = useMessagesStore((s) => s.updateMessage);
 
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
   const [replyTo, setReplyTo] = useState<MessageDto | null>(null);
-  const [editing, setEditing] = useState<MessageDto | null>(null);
   const [attachments, setAttachments] = useState<DraftAttachment[]>([]);
   /** Yükleme sırasında kutuda gösterilen ilerleme metni ("Yükleniyor… 2/5"); boşsa gösterilmez. */
   const [uploadLabel, setUploadLabel] = useState('');
 
   function onChangeInput(text: string) {
     setInput(text);
-    // Düzenlerken "yazıyor" yayınlanmaz: karşı taraf yeni mesaj bekler, oysa eski mesaj değişiyor.
-    if (!editing) typing.onInputChange(text);
+    typing.onInputChange(text);
   }
 
   function startReply(message: MessageDto) {
-    setEditing(null);
     setReplyTo(message);
   }
 
-  /**
-   * Düzenlemeye geçince kutu mevcut içerikle dolar — kullanıcı sıfırdan yazmaz.
-   *
-   * 🔴 Bekleyen ekler DÜŞÜRÜLMEZ ama gönderilmez de: düzenleme ucu (`PATCH .../messages/:id`)
-   * yalnız `content` alıyor, var olan bir mesaja sonradan ek bağlanamıyor. Kutu düzenleme modundayken
-   * ek düğmesi de gizlenir (bkz. `MessageComposer`), böylece "ekledim ama gitmedi" hâli oluşmaz.
-   */
-  function startEdit(message: MessageDto) {
-    setReplyTo(null);
-    setEditing(message);
-    setInput(message.content);
-    setSendError('');
-  }
-
-  /** Moddan çık: düzenlemede kutuyu da temizle, yanıtta yazılanı KORU (metin hâlâ geçerli). */
+  /** Yanıttan çık: kutudaki yazılan metin KORUNUR (hâlâ geçerli). */
   function cancelMode() {
-    if (editing) setInput('');
-    setEditing(null);
     setReplyTo(null);
     setSendError('');
   }
@@ -143,23 +120,15 @@ export function useMessageComposer(
     setSending(true);
     setSendError('');
     typing.stop();
-    // M2d — `@ad` → `<@userId>`, `@everyone` → `<@&roleId>`. Düzenlemede de uygulanır.
+    // M2d — `@ad` → `<@userId>`, `@everyone` → `<@&roleId>`. 
     const payload = mentions ? mentions.applyMentionTokens(trimmed) : trimmed;
     try {
-      if (editing) {
-        // Sunucu düzenlemeyi yalnız YAZARA açıyor; yetkisizde bu mod zaten başlatılmıyor.
-        const updated = await messagesApi.edit(channelId, editing.id, payload);
-        // WS `message.updated` de gelir; store aynı id'yi yerine koyduğu için mükerrer olmaz.
-        updateMessage(updated);
-        setEditing(null);
-      } else {
-        const attachmentIds = drafts.length ? await uploadAttachments(drafts) : undefined;
-        const message = await messagesApi.send(channelId, payload, replyTo?.id, attachmentIds);
-        appendMessage(message);
-        setReplyTo(null);
-        // Şerit zaten boşsa gereksiz render açılmasın (mutlu yol artık state'e hiç dokunmuyor).
-        setAttachments((prev) => (prev.length ? [] : prev));
-      }
+      const attachmentIds = drafts.length ? await uploadAttachments(drafts) : undefined;
+      const message = await messagesApi.send(channelId, payload, replyTo?.id, attachmentIds);
+      appendMessage(message);
+      setReplyTo(null);
+      // Şerit zaten boşsa gereksiz render açılmasın (mutlu yol artık state'e hiç dokunmuyor).
+      setAttachments((prev) => (prev.length ? [] : prev));
       setInput('');
       // Yalnız BAŞARIDA temizlenir: hata durumunda kullanıcı tekrar deneyecek, seçtiği
       // bahsetmeleri kaybetmesin (sözleşme §4.3).
@@ -197,14 +166,12 @@ export function useMessageComposer(
     sendError,
     uploadLabel,
     replyTo,
-    editing,
     attachments,
     addAttachments,
     removeAttachment,
     onChangeInput,
     onSend,
     startReply,
-    startEdit,
     cancelMode,
   };
 }

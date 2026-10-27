@@ -1,7 +1,8 @@
-import EmojiPicker, { tr as emojiTr } from 'rn-emoji-keyboard';
+import { useRouter } from 'expo-router';
 import { MessageActionSheet } from './MessageActionSheet';
 import { ForwardMessageModal } from './ForwardMessageModal';
-import { emojiPickerTheme } from './emojiPickerTheme';
+import { EmojiGifSheet } from './EmojiGifSheet';
+import { recordEmojiUse } from '@/utils/recentEmojis';
 import type { useMessageActions } from './useMessageActions';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { t } from '@/i18n';
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export function MessageActionHost({ actions, onReply, onEdit, canPin }: Props) {
+  const router = useRouter();
   return (
     <>
       <MessageActionSheet
@@ -34,6 +36,8 @@ export function MessageActionHost({ actions, onReply, onEdit, canPin }: Props) {
         onToggleReaction={(emoji) => {
           const m = actions.target;
           actions.close();
+          // Şerit dokunuşu da sık kullanılanlara sayılır (web ile aynı).
+          void recordEmojiUse(emoji);
           if (m) actions.toggleReaction(m, emoji);
         }}
         onReply={onReply}
@@ -44,6 +48,10 @@ export function MessageActionHost({ actions, onReply, onEdit, canPin }: Props) {
           if (m) void actions.copyText(m);
         }}
         onOpenPicker={actions.openPicker}
+        onEditQuickReactions={() => {
+          actions.close();
+          router.push('/quick-reactions');
+        }}
         onForward={actions.openForward}
         onDelete={() => {
           actions.setDeleteTarget(actions.target);
@@ -65,14 +73,13 @@ export function MessageActionHost({ actions, onReply, onEdit, canPin }: Props) {
           Sprint M3c §4 — tema nesnesi `emojiPickerTheme.ts`e taşındı: mesaj kutusundaki emoji
           düğmesi aynı seçiciyi kullanıyor, iki yerde aynı 20 satırlık renk bloğu tutulsaydı biri
           değişip diğeri unutulurdu. **Akış değişmedi**, yalnız renkler tek kaynağa bağlandı. */}
-      <EmojiPicker
-        open={actions.pickerOpen}
+      {/* C24: tam liste artık C23'ün `EmojiGifSheet`i (GIF sekmesi kapalı) — "Sık kullanılanlar" üstte,
+          mesaj kutusu seçicisiyle aynı liste. Seçilen emoji `pickEmoji` ile tepki olur ve sayfa kapanır. */}
+      <EmojiGifSheet
+        visible={actions.pickerOpen}
         onClose={actions.closePicker}
-        onEmojiSelected={(e) => actions.pickEmoji(e.emoji)}
-        translation={emojiTr}
-        enableSearchBar
-        categoryPosition="top"
-        theme={emojiPickerTheme}
+        onEmojiSelected={actions.pickEmoji}
+        showGif={false}
       />
 
       {actions.forwardTarget && (
