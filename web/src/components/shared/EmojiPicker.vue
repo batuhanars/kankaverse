@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import EmojiPickerLib, { type EmojiExt } from 'vue3-emoji-picker'
+import { getFrequentEmojis, recordEmojiUse } from '@/utils/frequentEmojis'
 // @ts-ignore — CSS side-effect import; no type declarations needed
 import 'vue3-emoji-picker/css'
 
@@ -11,15 +13,47 @@ defineOptions({ name: 'EmojiPicker' })
  * Verilirse Teleport to body + position:fixed ile viewport-farkındalıklı konumlandırma yapılır.
  * Verilmezse (eski kullanım): sıradan slot olarak render edilir (geriye dönük uyumlu).
  */
-const props = defineProps<{
-  anchorEl?: HTMLElement | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    anchorEl?: HTMLElement | null
+    // false: seçim "kullanım" sayılmaz (ör. hızlı tepki yuvası düzenleme)
+    trackFrequent?: boolean
+  }>(),
+  { anchorEl: undefined, trackFrequent: true },
+)
+
+const { t } = useI18n()
 
 const emit = defineEmits<{ select: [emoji: string] }>()
 
 function onSelect(emoji: EmojiExt) {
+  if (props.trackFrequent) recordEmojiUse(emoji.i)
   emit('select', emoji.i)
 }
+
+// Sık kullanılanlar (C24): kütüphanenin bellek-içi "recent" grubu yerine kalıcı liste.
+// Boşsa grup hiç verilmez → bölüm görünmez. Seçici her açılışta yeniden oluşur, liste taze okunur.
+const FREQUENT_KEY = 'frequent'
+const FREQUENT_ICON =
+  'data:image/svg+xml;base64,' +
+  btoa(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#a8a29a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>',
+  )
+
+function toPickerEmoji(char: string) {
+  const u = Array.from(char)
+    .map((c) => c.codePointAt(0)!.toString(16))
+    .join('-')
+  return { i: char, n: [char], r: u, t: 'neutral', u }
+}
+
+const frequent = getFrequentEmojis()
+const additionalGroups = frequent.length
+  ? { [FREQUENT_KEY]: frequent.map(toPickerEmoji) }
+  : {}
+const groupNames = { [FREQUENT_KEY]: t('reaction.frequent') }
+const groupIcons = { [FREQUENT_KEY]: FREQUENT_ICON }
+const groupOrder = frequent.length ? [FREQUENT_KEY] : []
 
 // --- Teleport konumlandırma ---
 const PANEL_W = 300
@@ -94,6 +128,10 @@ onUnmounted(() => {
       <EmojiPickerLib
         :native="true"
         theme="dark"
+        :additional-groups="additionalGroups"
+        :group-names="groupNames"
+        :group-icons="groupIcons"
+        :group-order="groupOrder"
         @select="onSelect"
       />
     </div>
@@ -104,6 +142,10 @@ onUnmounted(() => {
     <EmojiPickerLib
       :native="true"
       theme="dark"
+      :additional-groups="additionalGroups"
+      :group-names="groupNames"
+      :group-icons="groupIcons"
+      :group-order="groupOrder"
       @select="onSelect"
     />
   </div>

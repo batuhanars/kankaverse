@@ -10,7 +10,9 @@ const openPickerMessageId = moduleRef<string | null>(null)
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '@/stores/auth'
 import EmojiPicker from './EmojiPicker.vue'
+import { recordEmojiUse } from '@/utils/frequentEmojis'
 import EmojiFaceIcon from './EmojiFaceIcon.vue'
 
 defineOptions({ name: 'MessageActionsMenu' })
@@ -38,11 +40,11 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-// Hızlı reaksiyon seti (hover toolbar'ında gösterilir).
-// Sahip kararı 2026-08-01: mobilde üç emoji şeridin sağını boş bırakıyordu, beşe çıkarıldı ve
-// web de aynı beşliye çekildi — iki istemcide farklı tepki kısayolu olması zihinsel model bölerdi.
-// Sıra: onayla · sev · gül · şaşır · üzül (olumlu/olumsuz/nötr yelpaze).
-const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '😢']
+// Hızlı reaksiyon şeridi (C24): hesaba bağlı, sunucu etkin listeyi (her zaman 5) oturum kullanıcısında döner.
+// Alan bayat bir oturumda yoksa savunmacı olarak bugünkü varsayılan beşliye düşer.
+const FALLBACK_QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢']
+const authStore = useAuthStore()
+const quickEmojis = computed(() => authStore.user?.quickReactions ?? FALLBACK_QUICK_REACTIONS)
 
 // ⋯ daha-fazla açılır
 const showMore = ref(false)
@@ -131,6 +133,12 @@ function pickEmoji(emoji: string) {
   emit('addReaction', emoji)
 }
 
+// Şerit dokunuşu seçiciden geçmez; kullanım burada sayılır (seçici kendi seçimini kendisi yazar).
+function pickQuick(emoji: string) {
+  recordEmojiUse(emoji)
+  pickEmoji(emoji)
+}
+
 function onDocClick(e: MouseEvent) {
   const moreOpen = moreEl.value && moreEl.value.contains(e.target as Node)
   // Picker body'e Teleport edildiği için emojiEl.contains yetmez; .v3-emoji-picker ile de kontrol et.
@@ -169,11 +177,11 @@ onUnmounted(() => {
   >
     <!-- Hızlı reaksiyon emoji'leri -->
     <button
-      v-for="emoji in QUICK_EMOJIS"
+      v-for="emoji in quickEmojis"
       :key="emoji"
       class="w-8 h-8 flex items-center justify-center text-[16px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
       :title="emoji"
-      @click="pickEmoji(emoji)"
+      @click="pickQuick(emoji)"
     >
       {{ emoji }}
     </button>

@@ -19,9 +19,11 @@ import { formatMentionsPlain } from '@/utils/mentions'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import { ATTACHMENT_ACCEPT } from '@/utils/attachmentType'
+import { useComposerFileIntake } from '@/composables/useComposerFileIntake'
 import ReportModal from '@/components/shared/ReportModal.vue'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import EmojiFaceIcon from '@/components/shared/EmojiFaceIcon.vue'
+import GifIcon from '@/components/shared/GifIcon.vue'
 import MessageRow from '@/components/shared/MessageRow.vue'
 import DateDivider from '@/components/shared/DateDivider.vue'
 import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
@@ -219,6 +221,7 @@ const sending = ref(false)
 const sendError = ref('')
 const listEl = ref<HTMLElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
+const gifInputEl = ref<HTMLInputElement | null>(null)
 const realtimeError = ref(false)
 const unblocking = ref(false)
 const reportTargetId = ref<string | null>(null)
@@ -238,6 +241,8 @@ const { groupPanelVisible: showGroupPanel, toggleGroupPanel, closeGroupPanel } =
 
 // Sprint 5 R1 — modal akışı
 const composeFile = ref<File | null>(null)
+const intake = useComposerFileIntake({ composeFile, disabled: () => !!editState.value })
+const onFileSelected = intake.onFileSelected
 
 function openReportMessage(msgId: string) {
   reportTargetType.value = 'MESSAGE'
@@ -446,13 +451,9 @@ function openFilePicker() {
   fileInputEl.value?.click()
 }
 
-function onFileSelected(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!input) return
-  input.value = ''
-  if (!file) return
-  composeFile.value = file
+// GIF düğmesi: yalnız image/gif kabul eden ayrı seçici, sonrası aynı ek akışı
+function openGifPicker() {
+  gifInputEl.value?.click()
 }
 
 async function onAttachmentSent({ attachmentId, caption }: { attachmentId: string; caption: string }) {
@@ -683,9 +684,21 @@ const dayLabels = computed<(string | null)[]>(() =>
   <div class="flex flex-1 min-w-0 overflow-hidden gap-4">
     <!-- Ana sohbet alanı -->
     <div
-      class="flex flex-col flex-1 min-w-0 overflow-hidden mb-4 rounded-[var(--kv-radius-lg)]"
+      class="relative flex flex-col flex-1 min-w-0 overflow-hidden mb-4 rounded-[var(--kv-radius-lg)]"
       style="background-color: var(--kv-bg-content);"
+      @paste="intake.onPaste"
+    @dragenter="intake.onDragEnter"
+    @dragover="intake.onDragOver"
+    @dragleave="intake.onDragLeave"
+    @drop="intake.onDrop"
     >
+      <div
+        v-if="intake.dragging.value"
+        class="absolute inset-0 z-40 flex items-center justify-center pointer-events-none rounded-[var(--kv-radius-lg)]"
+        style="background-color: color-mix(in srgb, var(--kv-bg-rail) 75%, transparent); border: 2px dashed var(--kv-accent-500);"
+      >
+        <p class="text-[16px] font-semibold" style="color: var(--kv-text-primary);">{{ t('attachment.dropHint') }}</p>
+      </div>
       <!-- Başlık çubuğu -->
       <div
         class="flex items-center px-4 gap-3 shrink-0 border-b rounded-t-[var(--kv-radius-lg)]"
@@ -1100,6 +1113,13 @@ const dayLabels = computed<(string | null)[]>(() =>
             :accept="ATTACHMENT_ACCEPT"
             @change="onFileSelected"
           />
+          <input
+            ref="gifInputEl"
+            type="file"
+            class="hidden"
+            accept="image/gif"
+            @change="onFileSelected"
+          />
 
           <!-- Yanıt önizleme bandı -->
           <div
@@ -1178,6 +1198,16 @@ const dayLabels = computed<(string | null)[]>(() =>
                 @blur="stopTyping"
               />
             </div>
+            <!-- GIF butonu -->
+            <button
+              type="button"
+              class="emoji-btn shrink-0 self-center py-1 px-1 cursor-pointer flex items-center"
+              :aria-label="t('message.gifButton')"
+              :title="t('message.gifButton')"
+              @click="openGifPicker"
+            >
+              <GifIcon :size="20" />
+            </button>
             <!-- Emoji (😊) butonu -->
             <div class="relative shrink-0 self-center">
               <button

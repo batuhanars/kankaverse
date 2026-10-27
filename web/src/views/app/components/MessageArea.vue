@@ -18,8 +18,10 @@ import MessageItem from '@/components/shared/MessageItem.vue'
 import DateDivider from '@/components/shared/DateDivider.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import { ATTACHMENT_ACCEPT } from '@/utils/attachmentType'
+import { useComposerFileIntake } from '@/composables/useComposerFileIntake'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import EmojiFaceIcon from '@/components/shared/EmojiFaceIcon.vue'
+import GifIcon from '@/components/shared/GifIcon.vue'
 import { isNewDay, dayDividerLabel } from '@/utils/dateSeparator'
 import type { MessageDto } from '@/types'
 
@@ -43,6 +45,7 @@ const content = ref('')
 const sending = ref(false)
 const listEl = ref<HTMLElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
+const gifInputEl = ref<HTMLInputElement | null>(null)
 const textareaEl = ref<HTMLTextAreaElement | null>(null)
 const showEmojiPicker = ref(false)
 // Compose emoji picker tetikleyici butonu (Teleport konumlandırması için)
@@ -54,6 +57,8 @@ const slowModeSeconds = ref<number | null>(null)
 
 // Sprint 5 R1 — modal akışı (inline çentik kaldırıldı)
 const composeFile = ref<File | null>(null)
+const intake = useComposerFileIntake({ composeFile, disabled: () => !channelId.value })
+const onFileSelected = intake.onFileSelected
 
 // Yanıt state
 const replyingTo = ref<MessageDto | null>(null)
@@ -314,13 +319,9 @@ function openFilePicker() {
   fileInputEl.value?.click()
 }
 
-function onFileSelected(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!input) return
-  input.value = '' // sıfırla, aynı dosyayı tekrar seçmeye izin ver
-  if (!file) return
-  composeFile.value = file
+// GIF düğmesi: yalnız image/gif kabul eden ayrı seçici, sonrası aynı ek akışı
+function openGifPicker() {
+  gifInputEl.value?.click()
 }
 
 // Modal'dan gelen sent event'i → mesaj gönder
@@ -417,7 +418,22 @@ function resetComposerHeight() {
 </script>
 
 <template>
-  <div class="flex flex-col flex-1 min-w-0 min-h-0" style="background-color: var(--kv-bg-content);">
+  <div
+    class="relative flex flex-col flex-1 min-w-0 min-h-0"
+    style="background-color: var(--kv-bg-content);"
+    @paste="intake.onPaste"
+    @dragenter="intake.onDragEnter"
+    @dragover="intake.onDragOver"
+    @dragleave="intake.onDragLeave"
+    @drop="intake.onDrop"
+  >
+    <div
+      v-if="intake.dragging.value"
+      class="absolute inset-0 z-40 flex items-center justify-center pointer-events-none rounded-[var(--kv-radius-lg)]"
+      style="background-color: color-mix(in srgb, var(--kv-bg-rail) 75%, transparent); border: 2px dashed var(--kv-accent-500);"
+    >
+      <p class="text-[16px] font-semibold" style="color: var(--kv-text-primary);">{{ t('attachment.dropHint') }}</p>
+    </div>
     <div
       v-if="channelId && realtimeError"
       class="shrink-0 px-4 py-2 text-[13px] text-center"
@@ -533,6 +549,13 @@ function resetComposerHeight() {
           :accept="ATTACHMENT_ACCEPT"
           @change="onFileSelected"
         />
+        <input
+          ref="gifInputEl"
+          type="file"
+          class="hidden"
+          accept="image/gif"
+          @change="onFileSelected"
+        />
         <!-- Ek (ataç) butonu -->
         <button
           type="button"
@@ -610,6 +633,16 @@ function resetComposerHeight() {
             @blur="stopTyping"
           />
         </div>
+        <!-- GIF butonu -->
+        <button
+          type="button"
+          class="emoji-btn shrink-0 self-center py-1 px-1 cursor-pointer flex items-center"
+          :aria-label="t('message.gifButton')"
+          :title="t('message.gifButton')"
+          @click="openGifPicker"
+        >
+          <GifIcon :size="20" />
+        </button>
         <!-- Emoji (😊) butonu -->
         <div class="relative shrink-0 self-center">
           <button

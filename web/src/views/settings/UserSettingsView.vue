@@ -31,6 +31,7 @@ import PlatformInviteSection from './components/PlatformInviteSection.vue'
 import PlatformFunnelSection from './components/PlatformFunnelSection.vue'
 import PlatformUsersSection from './components/PlatformUsersSection.vue'
 import MasaustuSection from './components/MasaustuSection.vue'
+import QuickReactionsSection from './components/QuickReactionsSection.vue'
 import AnimatedClipModal from '@/components/shared/AnimatedClipModal.vue'
 
 const props = defineProps<{ initialSection?: string }>()
@@ -765,6 +766,9 @@ async function toggleReadReceipts(next: boolean) {
                       </button>
                     </div>
                   </section>
+
+                  <!-- C24 — hızlı tepki şeridi -->
+                  <QuickReactionsSection />
                 </div>
 
                 <!-- SAĞ: profil önizleme kartı (canlı draft; ortam ayarlarındaki gibi) -->

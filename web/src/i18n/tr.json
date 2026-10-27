@@ -297,6 +297,12 @@
       "previewMemberSince": "Üyelik tarihi: {date}"
     },
     "saveError": "Kaydedilemedi. Lütfen tekrar dene.",
+    "quickReactions": {
+      "label": "Hızlı tepkiler",
+      "description": "Mesajın üstünde çıkan beş tepki. Birine dokun, yerine istediğin emojiyi seç.",
+      "slot": "Tepki {n}: değiştir",
+      "reset": "Varsayılana dön"
+    },
     "readReceipts": {
       "label": "Okundu bilgisi",
       "description": "Mesajını okuduğunda karşı taraf bunu görsün. Kapatırsan senin okuduğun görünmez, ama sen de kimsenin okuduğunu göremezsin."
@@ -950,7 +956,8 @@
   "reaction": {
     "addReaction": "Reaksiyon ekle",
     "toggleTitle": "Reaksiyonu değiştir",
-    "morePicker": "Daha fazla emoji"
+    "morePicker": "Daha fazla emoji",
+    "frequent": "Sık kullanılanlar"
   },
   "reply": {
     "button": "Yanıtla",
@@ -963,6 +970,7 @@
   "message": {
     "inputPlaceholder": "#{channel} kanalına mesaj yaz",
     "emojiButton": "Emoji ekle",
+    "gifButton": "GIF gönder",
     "send": "Gönder",
     "loadMore": "Daha fazla yükle",
     "newMessages": "Yeni mesaj",
@@ -1447,6 +1455,7 @@
     "guildSaved": "Değişiklikler kaydedildi.",
     "profileSaved": "Profil güncellendi.",
     "privacySaved": "Gizlilik tercihin güncellendi.",
+    "quickReactionsSaved": "Hızlı tepkilerin güncellendi.",
     "rolesSaved": "Rol kaydedildi.",
     "saveError": "Kaydedilemedi, tekrar dene.",
     "joinError": "Ortama katılınamadı, tekrar dene.",
@@ -1597,6 +1606,8 @@
   },
   "attachment": {
     "addFile": "Dosya ekle",
+    "dropHint": "Dosyayı bırak, gönderelim",
+    "singleFileOnly": "Şimdilik tek dosya gönderebilirsin",
     "remove": "Eki kaldır",
     "processing": "İşleniyor…",
     "blocked": "Bu içerik kaldırıldı.",
@@ -1869,6 +1880,24 @@
     "emoji": {
       "open": "Emoji ekle"
     },
+    "editMessage": {
+      "title": "Mesajı düzenle",
+      "save": "Değişikliği kaydet"
+    },
+    "emojiGif": {
+      "tabEmoji": "Emoji",
+      "tabGif": "GIF",
+      "uploadGif": "GIF yükle",
+      "uploadGifHint": "Galerinden bir GIF seç",
+      "onlyGif": "Yalnız GIF seçebilirsin",
+      "recent": "Sık kullanılanlar"
+    },
+    "quickReactions": {
+      "title": "Hızlı tepkiler",
+      "hint": "Mesaja uzun basınca çıkan beş tepkiyi değiştirmek için bir emojiye dokun.",
+      "reset": "Varsayılana dön",
+      "edit": "Hızlı tepkileri düzenle"
+    },
     "mention": {
       "everyoneLabel": "{'@'}everyone",
       "everyoneHint": "Bu kanaldaki herkese bildirim gider",
@@ -1984,7 +2013,6 @@
       "tabFiles": "Dosyalar",
       "muteAction": "Sustur",
       "inviteMembers": "Üyeleri Davet Et",
-      "noRoleGroup": "Rolsüz — {n}",
       "notFound": "Kanal bulunamadı.",
       "membersEmpty": "Bu kanalda henüz üye yok.",
       "mediaEmpty": "Bu kanalda henüz görsel ya da video yok.",
