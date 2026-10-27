@@ -218,7 +218,8 @@ export class ModerationModuleService {
             }
             await this.prisma.guild.update({
               where: { id: dto.scope },
-              data: { bannerUrl: null },
+              // C19 (R7): hareketli afiş de düşer, yoksa takedown sonrası animasyon yayında kalır.
+              data: { bannerUrl: null, bannerAnimatedUrl: null },
             });
             break;
           }
@@ -232,7 +233,8 @@ export class ModerationModuleService {
             }
             await this.prisma.guild.update({
               where: { id: dto.scope },
-              data: { iconUrl: null },
+              // C19 (R7): hareketli simge de düşer.
+              data: { iconUrl: null, iconAnimatedUrl: null },
             });
             break;
           }

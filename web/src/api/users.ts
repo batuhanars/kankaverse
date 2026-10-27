@@ -16,7 +16,7 @@ export interface MediaPresignResult {
 }
 
 // Sprint C13 §2.2 — hareketli avatar/afiş (GIF veya videodan kesit; sunucuda hareketli WebP'ye çevrilir)
-export type AnimatedTarget = 'AVATAR' | 'BANNER'
+export type AnimatedTarget = 'AVATAR' | 'BANNER' | 'GUILD_ICON' | 'GUILD_BANNER'
 
 export interface AnimatedPresignResult {
   uploadUrl: string

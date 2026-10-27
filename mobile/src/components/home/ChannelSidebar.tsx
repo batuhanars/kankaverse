@@ -7,6 +7,7 @@ import { channelsApi, ChannelType, type ChannelSummaryDto } from '@/api/channels
 import { categoriesApi, type CategoryDto } from '@/api/categories';
 import { extractErrorMessage } from '@/api/errors';
 import { useUnreadStore } from '@/stores/unread';
+import { animatedOrStatic, useReduceMotion } from '@/utils/animatedMedia';
 import { CategorySection } from './CategorySection';
 import { ChannelRow } from './ChannelRow';
 import { t } from '@/i18n';
@@ -19,6 +20,8 @@ interface Props {
   guildName: string;
   /** Sprint M1d-B §10.3 — afiş GÖSTERİLİR, yüklenmez (yükleme yüzeyleri web/masaüstüne mahsus). */
   guildBannerUrl?: string | null;
+  /** C19: hareketli afis; normal `Image` oldugu icin azaltilmis hareket kapaliyken gosterilir. */
+  guildBannerAnimatedUrl?: string | null;
   selectedChannelId?: string;
   onOpenChannel: (channel: ChannelSummaryDto) => void;
   /** Ortam adına dokunuş → alt panel (§10.2). A yarısındaki tekil davet ikonunun yerini aldı. */
@@ -60,6 +63,7 @@ export function ChannelSidebar({
   guildId,
   guildName,
   guildBannerUrl,
+  guildBannerAnimatedUrl,
   selectedChannelId,
   onOpenChannel,
   onOpenGuildMenu,
@@ -69,6 +73,7 @@ export function ChannelSidebar({
   onInvite,
   onOpenEvents,
 }: Props) {
+  const reduceMotion = useReduceMotion();
   const [state, setState] = useState<LoadState>('loading');
   const [channels, setChannels] = useState<ChannelSummaryDto[]>([]);
   const [categories, setCategories] = useState<CategoryDto[]>([]);
@@ -172,10 +177,12 @@ export function ChannelSidebar({
     return out;
   }, [channels, categories, collapsed]);
 
+  const bannerSrc = animatedOrStatic(guildBannerUrl, guildBannerAnimatedUrl, reduceMotion);
+
   return (
     <View style={styles.flex}>
       {/* §10.3 — afiş varsa gösterilir. Yükleme yüzeyi YOK (web/masaüstüne mahsus). */}
-      {guildBannerUrl ? <Image source={{ uri: guildBannerUrl }} style={styles.banner} /> : null}
+      {bannerSrc ? <Image source={{ uri: bannerSrc }} style={styles.banner} /> : null}
 
       {/* §10.2 — ada dokun, alt panel açılsın. Chevron bunun tıklanabilir olduğunu söyler;
           A yarısındaki tekil davet ikonu kaldırıldı, aksiyonlar panele taşındı. */}

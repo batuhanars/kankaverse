@@ -198,7 +198,9 @@ export interface GuildDto {
   ownerId: string
   adultsOnly: boolean
   iconUrl: string | null
+  iconAnimatedUrl?: string | null // C19 — hareketli simge (WebP); iconUrl daima statik kare
   bannerUrl: string | null // Sprint C8 — ortam afişi (görsel), bannerColor'ın üstünde gösterilir
+  bannerAnimatedUrl?: string | null // C19 — hareketli afiş (WebP); bannerUrl daima statik kare
   description: string | null
   createdAt: string
   unreadCount: number
@@ -215,7 +217,9 @@ export interface DiscoveryGuildDto {
   id: string
   name: string
   iconUrl: string | null
+  iconAnimatedUrl?: string | null // C19
   bannerColor: string | null
+  bannerAnimatedUrl?: string | null // C19
   bannerUrl: string | null // C8 — yüklenmiş afiş görseli (varsa gösterilir, yoksa bannerColor gradient)
   description: string | null
   memberCount: number

@@ -30,6 +30,8 @@ export type ClipMedia = PickedProfileMedia;
 interface Props {
   media: ClipMedia | null;
   target: AnimatedTarget;
+  /** C19: ortam hedeflerinde (GUILD_ICON / GUILD_BANNER) zorunlu. */
+  guildId?: string;
   onClose: () => void;
   onDone: () => void;
   onDisabled: () => void;
@@ -39,7 +41,7 @@ const MIN_S = ANIMATED_MIN_MS / 1000;
 const MAX_S = ANIMATED_MAX_MS / 1000;
 const DEFAULT_S = ANIMATED_DEFAULT_MS / 1000;
 
-export function AnimatedClipSheet({ media, target, onClose, onDone, onDisabled }: Props) {
+export function AnimatedClipSheet({ media, target, guildId, onClose, onDone, onDisabled }: Props) {
   const bottomInset = useSheetInsets();
   const [busy, setBusy] = useState(false);
   return (
@@ -53,6 +55,7 @@ export function AnimatedClipSheet({ media, target, onClose, onDone, onDisabled }
               key={media.uri}
               media={media}
               target={target}
+              guildId={guildId}
               busy={busy}
               setBusy={setBusy}
               onClose={onClose}
@@ -69,6 +72,7 @@ export function AnimatedClipSheet({ media, target, onClose, onDone, onDisabled }
 function ClipBody({
   media,
   target,
+  guildId,
   busy,
   setBusy,
   onClose,
@@ -160,6 +164,7 @@ function ClipBody({
     try {
       await uploadAnimated({
         target,
+        guildId,
         media,
         crop: dims ? crop : undefined,
         startMs: sliders ? Math.round(startS * 1000) : undefined,

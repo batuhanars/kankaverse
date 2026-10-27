@@ -60,8 +60,10 @@ export class DiscoveryService {
       id: g.id,
       name: g.name,
       iconUrl: g.iconUrl,
+      iconAnimatedUrl: g.iconAnimatedUrl ?? null, // C19
       bannerColor: g.bannerColor ?? null,
       bannerUrl: g.bannerUrl ?? null,
+      bannerAnimatedUrl: g.bannerAnimatedUrl ?? null, // C19
       description: g.description ?? null,
       memberCount: g._count.members,
       tags: g.tags,

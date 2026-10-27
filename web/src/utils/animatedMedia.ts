@@ -31,6 +31,25 @@ export function hoverAvatarSrc(
   return animatedOrStatic({ avatarUrl: user.avatarUrl, bannerUrl: null, avatarAnimatedUrl: user.avatarAnimatedUrl }, 'avatar')
 }
 
+// Sprint C19 — ortam simgesi/afişi. iconUrl/bannerUrl daima statik kare; hareketli sürüm ayrı alanda.
+// Azaltılmış harekette her zaman statik. §7.1 (sahip kararı): ray simgesi yalnız seçili ortamda sürekli, diğerlerinde hover'da oynar; kart/afiş/önizleme sürekli.
+interface GuildMediaSource {
+  iconUrl: string | null
+  bannerUrl?: string | null
+  iconAnimatedUrl?: string | null
+  bannerAnimatedUrl?: string | null
+}
+
+export function guildIconSrc(guild: GuildMediaSource, playing: boolean): string | null {
+  if (playing && guild.iconAnimatedUrl && motion.value !== 'reduce') return guild.iconAnimatedUrl
+  return guild.iconUrl
+}
+
+export function guildBannerSrc(guild: GuildMediaSource): string | null {
+  if (guild.bannerAnimatedUrl && motion.value !== 'reduce') return guild.bannerAnimatedUrl
+  return guild.bannerUrl ?? null
+}
+
 // Sprint C13 §0 — kesit sabitleri (sözleşme §2.1 ile aynı; sunucu otorite)
 export const ANIMATED_MIN_MS = 500
 export const ANIMATED_MAX_MS = 6000

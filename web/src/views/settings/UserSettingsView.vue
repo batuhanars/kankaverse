@@ -30,7 +30,7 @@ import PlatformInviteSection from './components/PlatformInviteSection.vue'
 import PlatformFunnelSection from './components/PlatformFunnelSection.vue'
 import PlatformUsersSection from './components/PlatformUsersSection.vue'
 import MasaustuSection from './components/MasaustuSection.vue'
-import AnimatedClipModal from './components/AnimatedClipModal.vue'
+import AnimatedClipModal from '@/components/shared/AnimatedClipModal.vue'
 
 const props = defineProps<{ initialSection?: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -163,8 +163,8 @@ function routeAnimated(file: File, target: AnimatedTarget, setError: (msg: strin
   return true
 }
 
-function onAnimatedDone(user: Parameters<typeof authStore.updateUser>[0]) {
-  authStore.updateUser(user)
+function onAnimatedDone(result: unknown) {
+  authStore.updateUser(result as Parameters<typeof authStore.updateUser>[0])
   animatedFile.value = null
   toast.success(t('toast.profileSaved'))
 }

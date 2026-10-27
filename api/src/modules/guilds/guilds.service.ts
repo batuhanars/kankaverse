@@ -28,12 +28,13 @@ import { Guild, GuildRole, NotifTargetType, NotificationLevel } from '@prisma/cl
 import { DEFAULT_EVERYONE_PERMISSIONS } from '../../common/permissions';
 
 // İkon yüklemesi için izin verilen görsel tipler (allowlist)
-const ALLOWED_ICON_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+// GIF bilinçli YOK: ham GIF ikonu mobilde react-native-svg <Image> ile çizilince Android uygulamayı çökertiyor
+// (2026-10-27). Hareketli ikon C19'da C13 hattından (statik kare + ayrı hareketli alan) gelecek.
+const ALLOWED_ICON_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
 const ICON_EXT: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
-  'image/gif': 'gif',
   'image/webp': 'webp',
 };
 
@@ -49,7 +50,9 @@ export function toGuildDto(
     ownerId: guild.ownerId,
     adultsOnly: guild.adultsOnly,
     iconUrl: guild.iconUrl,
+    iconAnimatedUrl: guild.iconAnimatedUrl ?? null, // C19: hareketli simge; iconUrl daima statik
     bannerUrl: guild.bannerUrl ?? null,
+    bannerAnimatedUrl: guild.bannerAnimatedUrl ?? null, // C19
     description: guild.description ?? null,
     discoverable: guild.discoverable, // C6
     tags: guild.tags, // C6
@@ -449,7 +452,8 @@ export class GuildsService {
 
     const updated = await this.prisma.guild.update({
       where: { id: guildId },
-      data: { iconUrl },
+      // C19: eski yol statik; hareketli sürüm kaldırılır (yoksa yeni statikle eski animasyon çakışır)
+      data: { iconUrl, iconAnimatedUrl: null },
     });
 
     return toGuildDto(updated);
@@ -477,14 +481,14 @@ export class GuildsService {
 
     const updated = await this.prisma.guild.update({
       where: { id: guildId },
-      data: { bannerUrl },
+      data: { bannerUrl, bannerAnimatedUrl: null },
     });
 
     return toGuildDto(updated);
   }
 
   /** Ortak yardımcı: guild var mı + OWNER mı doğrular; değilse exception fırlatır */
-  private async requireOwner(userId: string, guildId: string) {
+  async requireOwner(userId: string, guildId: string) {
     const guild = await this.prisma.guild.findUnique({
       where: { id: guildId, deletedAt: null },
     });

@@ -11,7 +11,8 @@ import type { CropFractions } from '@/utils/animatedMedia'
 const props = defineProps<{
   src: string
   kind: 'image' | 'video'
-  shape: 'circle' | 'banner'
+  // banner = profil afişi 5:2; guildBanner = ortam afişi 2:1 (kanal paneli ~248x120)
+  shape: 'circle' | 'banner' | 'guildBanner'
   disabled?: boolean
 }>()
 const emit = defineEmits<{
@@ -21,6 +22,7 @@ const emit = defineEmits<{
   timeupdate: []
 }>()
 
+const ASPECT = { circle: '1 / 1', banner: '5 / 2', guildBanner: '2 / 1' } as const
 const ZOOM_MIN = 1
 const ZOOM_MAX = 4
 
@@ -167,7 +169,7 @@ defineExpose({ videoEl })
           : 'rounded-[var(--kv-radius-md)] w-full'
       "
       :style="{
-        aspectRatio: shape === 'circle' ? '1 / 1' : '5 / 2',
+        aspectRatio: ASPECT[shape],
         touchAction: 'none',
         cursor: ready && !disabled ? 'grab' : 'default',
         backgroundColor: 'var(--kv-bg-elevated)',

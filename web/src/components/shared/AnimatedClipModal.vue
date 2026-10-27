@@ -14,16 +14,20 @@ import {
   ANIMATED_DEFAULT_MS,
   type CropFractions,
 } from '@/utils/animatedMedia'
-import type { UserDto } from '@/types'
+import { guildsApi } from '@/api/guilds'
+import type { GuildDto, UserDto } from '@/types'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import MediaPositioner from '@/components/shared/MediaPositioner.vue'
 
-const props = defineProps<{ file: File; target: AnimatedTarget }>()
-const emit = defineEmits<{ close: []; done: [user: UserDto]; disabled: [] }>()
+// C19: GUILD_ICON / GUILD_BANNER hedeflerinde `guildId` zorunlu; sonuç GuildDto (diğerlerinde UserDto).
+const props = defineProps<{ file: File; target: AnimatedTarget; guildId?: string }>()
+const emit = defineEmits<{ close: []; done: [result: UserDto | GuildDto]; disabled: [] }>()
 
 const i18n = useI18n()
 const { t } = i18n
+
+const SHAPE = { AVATAR: 'circle', BANNER: 'banner', GUILD_ICON: 'circle', GUILD_BANNER: 'guildBanner' } as const
 
 const isVideo = props.file.type.startsWith('video/')
 const objectUrl = URL.createObjectURL(props.file)
@@ -79,6 +83,20 @@ function onLenInput() {
   restart()
 }
 
+function presign() {
+  if (props.guildId) return guildsApi.animatedPresign(props.guildId, props.file.type, props.file.size)
+  return usersApi.animatedPresign(props.target, props.file.type, props.file.size)
+}
+
+function process(payload: AnimatedProcessPayload) {
+  const gid = props.guildId
+  if (gid && props.target === 'GUILD_ICON') return guildsApi.processIcon(gid, payload)
+  if (gid && props.target === 'GUILD_BANNER') return guildsApi.processBanner(gid, payload)
+  return props.target === 'AVATAR'
+    ? usersApi.setAnimatedAvatar(payload)
+    : usersApi.setAnimatedBanner(payload)
+}
+
 async function submit() {
   if (busy.value) return
   busy.value = true
@@ -86,7 +104,7 @@ async function submit() {
   phase.value = 'upload'
   pct.value = 0
   try {
-    const { data: presigned } = await usersApi.animatedPresign(props.target, props.file.type, props.file.size)
+    const { data: presigned } = await presign()
     await attachmentsApi.uploadToS3(presigned.uploadUrl, props.file, (p) => {
       pct.value = p
     })
@@ -97,10 +115,7 @@ async function submit() {
       payload.startMs = Math.round(startSec.value * 1000)
       payload.durationMs = Math.round(lenSec.value * 1000)
     }
-    const { data } =
-      props.target === 'AVATAR'
-        ? await usersApi.setAnimatedAvatar(payload)
-        : await usersApi.setAnimatedBanner(payload)
+    const { data } = await process(payload)
     emit('done', data)
   } catch (err: unknown) {
     const e2 = err as { response?: { data?: { error?: string; message?: string } } }
@@ -136,7 +151,7 @@ function close() {
         ref="positioner"
         :src="objectUrl"
         :kind="isVideo ? 'video' : 'image'"
-        :shape="target === 'AVATAR' ? 'circle' : 'banner'"
+        :shape="SHAPE[target]"
         :disabled="busy"
         @update:crop="crop = $event"
         @meta="onMeta"

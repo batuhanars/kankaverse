@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Image as CompressorImage, Video } from 'react-native-compressor';
 import { usersApi, type AnimatedProcessPayload, type AnimatedTarget, type MediaCrop } from '@/api/users';
+import { guildsApi } from '@/api/guilds';
 import { MAX_IMAGE_BYTES } from '@/utils/imageUpload';
 
 /**
@@ -129,6 +130,8 @@ export async function pickProfileMedia(allowAnimated = true): Promise<PickedProf
 
 export interface AnimatedUploadInput {
   target: AnimatedTarget;
+  /** C19: GUILD_ICON / GUILD_BANNER hedeflerinde zorunlu. */
+  guildId?: string;
   media: PickedProfileMedia;
   /** C13b: konumlandirma kesirleri (kaynak boyutuna oranli). */
   crop?: MediaCrop;
@@ -140,7 +143,7 @@ export interface AnimatedUploadInput {
 
 /** presign, PUT, isle. Hata `error` kodunu tasiyan axios hatasi olarak yukari cikar. */
 export async function uploadAnimated(input: AnimatedUploadInput) {
-  const { target, media, crop, startMs, durationMs, onPhase } = input;
+  const { target, guildId, media, crop, startMs, durationMs, onPhase } = input;
   let uri = media.uri;
   let contentType: string = media.contentType;
   let size = media.size;
@@ -155,7 +158,9 @@ export async function uploadAnimated(input: AnimatedUploadInput) {
   }
 
   onPhase('upload', 0);
-  const presigned = await usersApi.animatedPresign(target, contentType, size);
+  const presigned = guildId
+    ? await guildsApi.animatedPresign(guildId, contentType, size)
+    : await usersApi.animatedPresign(target, contentType, size);
   const task = FileSystem.createUploadTask(
     presigned.uploadUrl,
     uri,
@@ -181,5 +186,7 @@ export async function uploadAnimated(input: AnimatedUploadInput) {
     payload.durationMs = durationMs;
   }
   if (crop) payload.crop = crop;
+  if (guildId && target === 'GUILD_ICON') return guildsApi.processIcon(guildId, payload);
+  if (guildId && target === 'GUILD_BANNER') return guildsApi.processBanner(guildId, payload);
   return target === 'AVATAR' ? usersApi.setAnimatedAvatar(payload) : usersApi.setAnimatedBanner(payload);
 }

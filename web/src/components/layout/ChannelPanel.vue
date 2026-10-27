@@ -31,6 +31,7 @@ import EventsModal from '@/views/app/components/EventsModal.vue'
 import CreateEventWizard from '@/views/app/components/CreateEventWizard.vue'
 import InvitePeopleModal from '@/components/layout/InvitePeopleModal.vue'
 import ReportModal from '@/components/shared/ReportModal.vue'
+import { guildBannerSrc } from '@/utils/animatedMedia'
 import type { ChannelDto, CategoryDto, ChannelMemberDto, GuildMemberDto } from '@/types'
 
 const { t } = useI18n()
@@ -110,7 +111,10 @@ const isOwner = computed(() => {
 
 // Sprint C8 — Ortam afişi (görsel): varsa kanal panelinin üstünde Discord-tarzı banner,
 // ortam adı afişin altına bindirilir. Afiş yoksa düz başlık barı kalır (placeholder yok).
-const activeGuildBannerUrl = computed(() => guildsStore.activeGuild()?.bannerUrl ?? null)
+const activeGuildBannerUrl = computed(() => {
+  const g = guildsStore.activeGuild()
+  return g ? guildBannerSrc(g) : null
+})
 
 // ── Katlama state (localStorage) ──
 function collapseKey(guildId: string, categoryId: string) {

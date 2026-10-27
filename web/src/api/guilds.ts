@@ -1,4 +1,5 @@
 import http from './axios'
+import type { AnimatedPresignResult, AnimatedProcessPayload } from './users'
 import type { GuildDto, ChannelDto, GuildMemberDto, CategoryDto, AuditLogEntryDto } from '@/types'
 
 export interface IconPresignResult {
@@ -67,6 +68,19 @@ export const guildsApi = {
   },
   setBanner(guildId: string, storageKey: string | null) {
     return http.patch<GuildDto>(`/guilds/${guildId}/banner`, { storageKey })
+  },
+  // Sprint C19 — hareketli / konumlandırılmış ortam simgesi ve afişi (profil C13 hattı, yalnız OWNER)
+  animatedPresign(guildId: string, contentType: string, size: number) {
+    return http.post<AnimatedPresignResult>(`/guilds/${guildId}/animated/presign`, {
+      contentType,
+      size,
+    })
+  },
+  processIcon(guildId: string, payload: AnimatedProcessPayload) {
+    return http.post<GuildDto>(`/guilds/${guildId}/icon/process`, payload)
+  },
+  processBanner(guildId: string, payload: AnimatedProcessPayload) {
+    return http.post<GuildDto>(`/guilds/${guildId}/banner/process`, payload)
   },
   // Sprint V2 — Kategori endpoint'leri (§4)
   getCategories(guildId: string) {

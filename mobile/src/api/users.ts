@@ -79,7 +79,7 @@ export interface PresignResult {
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 /** C13 §2.2: hareketli gorselin hedefi. */
-export type AnimatedTarget = 'AVATAR' | 'BANNER';
+export type AnimatedTarget = 'AVATAR' | 'BANNER' | 'GUILD_ICON' | 'GUILD_BANNER';
 
 export interface AnimatedPresignResult {
   uploadUrl: string;

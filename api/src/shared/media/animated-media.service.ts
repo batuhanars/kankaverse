@@ -12,6 +12,7 @@ import sharp from 'sharp';
 import { mkdtemp, readFile, rm, stat } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { Guild, User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import {
@@ -35,6 +36,7 @@ import {
   STILL_WEBP_QUALITY,
   StillImageType,
 } from './animated.constants';
+import { readPreviousMedia, writeMedia } from './animated-targets';
 import { CropFractions, fitCropToAspect, isValidCrop, PixelRect } from './crop-math';
 import { buildAnimatedArgs, buildProbeArgs, buildStaticArgs, ClipRange } from './ffmpeg-args';
 import { runBinary } from './run-binary';
@@ -53,10 +55,19 @@ interface ProbeResult {
 
 type InputType = AnimatedInputType | StillImageType;
 
+interface ProcessInput {
+  stagingKey: string;
+  startMs?: number;
+  durationMs?: number;
+  crop?: CropFractions;
+}
+
 /** Hedefin en/boy oranı (genişlik / yükseklik): avatar 1, afiş 2.5. */
 const TARGET_ASPECT: Record<AnimatedTarget, number> = {
   AVATAR: STILL_SIZE.AVATAR.width / STILL_SIZE.AVATAR.height,
   BANNER: STILL_SIZE.BANNER.width / STILL_SIZE.BANNER.height,
+  GUILD_ICON: STILL_SIZE.GUILD_ICON.width / STILL_SIZE.GUILD_ICON.height,
+  GUILD_BANNER: STILL_SIZE.GUILD_BANNER.width / STILL_SIZE.GUILD_BANNER.height,
 };
 
 /** sharp: libvips önbelleği kapalı (dosya tutmaz). Biçim allowlist'i renderStill'de metadata ile zorlanır. */
@@ -91,10 +102,11 @@ export class AnimatedMediaService {
   }
 
   /** POST /users/me/animated/presign — ÖZEL bucket'a staging anahtarı için presigned PUT. */
-  async presign(userId: string, contentType: string, size: number) {
+  /** `ownerId`: staging yolu kimliği (kullanıcı hedefinde userId, ortamda guildId); `actorId`: kapı için işlemi yapan kullanıcı. */
+  async presign(ownerId: string, contentType: string, size: number, actorId: string = ownerId) {
     const isStill = Object.prototype.hasOwnProperty.call(STILL_IMAGE_TYPES, contentType);
     // C13b PM kararı: hareketli bayrağı yalnız GIF/video'yu kapatır; statik görsel yalnız uploadsEnabled'a tabi.
-    this.assertEnabled(userId, !isStill);
+    this.assertEnabled(actorId, !isStill);
 
     if (!isStill && !Object.prototype.hasOwnProperty.call(ANIMATED_INPUT_TYPES, contentType)) {
       throw new BadRequestException({
@@ -105,7 +117,7 @@ export class AnimatedMediaService {
     const type = contentType as InputType;
     this.assertSizeAllowed(type, size);
 
-    const stagingKey = `${ANIMATED_STAGING_PREFIX}/${userId}/${randomUUID()}.${this.extOf(type)}`;
+    const stagingKey = `${ANIMATED_STAGING_PREFIX}/${ownerId}/${randomUUID()}.${this.extOf(type)}`;
     const uploadUrl = await this.storage.presignPut(stagingKey, contentType);
     return { uploadUrl, stagingKey };
   }
@@ -114,21 +126,24 @@ export class AnimatedMediaService {
    * İşleme hattı (sözleşme §2.3). Başarıda güncel User satırını döner; staging + geçici dizin
    * HER durumda temizlenir.
    */
+  process(ownerId: string, target: 'AVATAR' | 'BANNER', dto: ProcessInput): Promise<User>;
+  process(
+    ownerId: string,
+    target: 'GUILD_ICON' | 'GUILD_BANNER',
+    dto: ProcessInput,
+    actorId: string,
+  ): Promise<Guild>;
   async process(
-    userId: string,
+    ownerId: string,
     target: AnimatedTarget,
-    dto: {
-      stagingKey: string;
-      startMs?: number;
-      durationMs?: number;
-      crop?: CropFractions;
-    },
-  ) {
+    dto: ProcessInput,
+    actorId: string = ownerId,
+  ): Promise<User | Guild> {
     // 1. Prefix + bayrak (yalnız GIF/video için) + uploadsEnabled + crop biçimi
-    this.assertStagingKey(userId, dto.stagingKey);
+    this.assertStagingKey(ownerId, dto.stagingKey);
     const contentType = this.contentTypeFromKey(dto.stagingKey);
     const isStill = this.isStill(contentType);
-    this.assertEnabled(userId, !isStill);
+    this.assertEnabled(actorId, !isStill);
     if (dto.crop !== undefined && !isValidCrop(dto.crop)) {
       throw new BadRequestException({
         message: 'Seçilen alan geçersiz. Görseli yeniden konumlandır.',
@@ -160,12 +175,12 @@ export class AnimatedMediaService {
       let animatedKey: string | null = null;
       let staticKey: string;
       if (this.isStill(contentType)) {
-        staticKey = `${prefix}/${userId}/${id}-still.webp`;
+        staticKey = `${prefix}/${ownerId}/${id}-still.webp`;
         const out = await this.renderStill(inputPath, target, dto.crop);
         await this.storage.putPublic(staticKey, out, 'image/webp');
       } else {
-        staticKey = `${prefix}/${userId}/${id}-static.webp`;
-        animatedKey = `${prefix}/${userId}/${id}.webp`;
+        staticKey = `${prefix}/${ownerId}/${id}-static.webp`;
+        animatedKey = `${prefix}/${ownerId}/${id}.webp`;
         await this.renderAnimated(contentType, target, inputPath, workDir, dto, {
           animatedKey,
           staticKey,
@@ -173,36 +188,18 @@ export class AnimatedMediaService {
       }
 
       // 7. DB (statik kare + hareketli adres). Önceki değerler 8. adım için okunur.
-      const previous = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          avatarUrl: true,
-          avatarAnimatedUrl: true,
-          bannerUrl: true,
-          bannerAnimatedUrl: true,
-        },
-      });
-      const user = await this.prisma.user.update({
-        where: { id: userId },
-        data:
-          target === 'AVATAR'
-            ? {
-                avatarUrl: this.publicUrl(staticKey),
-                avatarAnimatedUrl: animatedKey ? this.publicUrl(animatedKey) : null,
-              }
-            : {
-                bannerUrl: this.publicUrl(staticKey),
-                bannerAnimatedUrl: animatedKey ? this.publicUrl(animatedKey) : null,
-              },
-      });
+      const previous = await readPreviousMedia(this.prisma, target, ownerId);
+      const row = await writeMedia(
+        this.prisma,
+        target,
+        ownerId,
+        this.publicUrl(staticKey),
+        animatedKey ? this.publicUrl(animatedKey) : null,
+      );
 
-      // 8. Kullanıcının KENDİ değiştirmesi: önceki hareketli + statik nesneleri sil.
-      if (target === 'AVATAR') {
-        await this.deletePrevious(userId, prefix, previous?.avatarUrl, previous?.avatarAnimatedUrl);
-      } else {
-        await this.deletePrevious(userId, prefix, previous?.bannerUrl, previous?.bannerAnimatedUrl);
-      }
-      return user;
+      // 8. Sahibin KENDİ değiştirmesi: önceki hareketli + statik nesneleri sil.
+      await this.deletePrevious(ownerId, prefix, previous.staticUrl, previous.animatedUrl);
+      return row;
     } finally {
       this.active--;
       // 9. Staging + geçici dizin her durumda

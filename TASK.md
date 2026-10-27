@@ -4327,6 +4327,37 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 
 - [x] §1 api: `GET /admin/funnel` + DTO + testler
 - [x] §1 api: sorgu yerel DB'de çalıştırıldı, elle sayımla tutarlı
-- [ ] §2 web: Huni alt sekmesi + kohort seçici + 390/320 ölçümü
+- [ ] §2 web: Huni alt sekmesi + kohort seçici (kod bitti; 390/320 ölçümü sahip turunda)
 - [x] §3 build/test temiz
-- [ ] Sahip turu (canlı)
+- [ ] Sahip turu (canlı) — 2026-10-27 deploy edildi (6fa3f4f), uç canlıda
+
+## Sprint C18 — Karşılama ve mobil Keşfet — 2026-10-27
+
+> Sözleşme: `contracts/SPRINT_C18_WELCOME_DISCOVER_CONTRACT.md`. mobil + web, api yok, R7-nötr.
+> Taban: mobilden gelenlerin %10'u ortama giriyor (web %50). Otomatik katılma yok.
+
+- [x] §1 mobil: discovery api + Keşfet ekranı
+- [x] §1 mobil: AddGuildSheet girişi + ortamsız ana ekran öneri bloğu
+- [x] §2 web: Keşfet kutucuğu + öneri bloğu + ortak katılma composable'ı
+- [x] §3 build/test temiz
+- [x] Sahip turu (mobil dev build) — 2026-10-27 geçti. ⚠ reşit olmayan hesapta 18+ süzmesi bu turda ayrıca teyit edilmedi (sunucu tarafı, C6'dan beri testli)
+- [x] Sahip turu (web) — 2026-10-27 geçti (masaüstü ve 390/320 ölçümü ayrıca bildirilmedi)
+- [ ] Mağaza sürümü (versionCode 27)
+- [ ] 2 hafta sonra huni panelinde mobil ortama girme oranı
+
+## Sprint C19 — Ortam simgesi ve afişi: hareketli + konumlandırma — 2026-10-27
+
+> Sözleşme: `contracts/SPRINT_C19_GUILD_ANIMATED_MEDIA_CONTRACT.md`. api → web + mobil. R7: takedown + işleme hattı.
+> Ön koşul (acil önlem, ayrı commit): ham GIF ortam simgesi Android'de uygulamayı çökertiyordu → ikon allowlist'inden GIF çıkarıldı.
+
+- [x] §1 şema + migration, `migrate status` temiz
+- [x] §2 api: uçlar + DTO + takedown + veri onarımı + testler
+- [x] §3 web: akış + gösterim
+- [x] §4 mobil: akış, SVG yüzeyleri statik
+- [x] build/test temiz
+- [x] R7 insan incelemesi (sahip) — 2026-10-27 onaylandı; imha işine hareketli avatar/afiş temizliği eklendi (sahip onayı)
+- [x] Sahip turu web + mobil (yerel) — 2026-10-27 geçti, GIF'ler oynuyor
+- [ ] vc26 (Play) ile hareketli simgeli ortamda çökme yok — canlı deploy sonrası
+- [x] Tur revizeleri (sahip, 2026-10-27): kendi kartında avatar hover · "Ortamlarım" kartları hover'da oynar · Keşfet'te üye kartının tamamı tıklanır ("Git" düğmesi kalktı) · mobil seçili simgede harf titremesi giderildi (statik altta, hareketli onLoad ile üstte) · mobil Keşfet rayda pusula ("+" menüsünden çıktı) · mobil Keşfet tek sütun afişli kart · mobil DM panelinde yatay kanka şeridi (statik avatar + durum noktası) · "Sunucuya Git" → "Ortama Git"
+- [x] §7 ek: ray/Keşfet/öneri hareketli (web + mobil)
+- [ ] Mağaza sürümü (C18 ile birlikte versionCode 27)

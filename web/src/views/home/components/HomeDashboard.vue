@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useGuildsStore } from '@/stores/guilds'
 import { guildsApi } from '@/api/guilds'
 import { bannerBackground } from '@/utils/bannerColor'
+import { guildBannerSrc, guildIconSrc } from '@/utils/animatedMedia'
+import { discoveryApi } from '@/api/discovery'
+import { useDiscoverJoin } from '@/composables/useDiscoverJoin'
+import DiscoverGuildCard from '@/views/discover/components/DiscoverGuildCard.vue'
+import type { DiscoveryGuildDto } from '@/types'
 
 const emit = defineEmits<{
   addFriend: []
@@ -17,10 +23,25 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const authStore = useAuthStore()
 const guildsStore = useGuildsStore()
+const router = useRouter()
+const { joiningId, joinGuild, goToGuild } = useDiscoverJoin()
+
+// Sprint C18: ortamı olmayan kullanıcıya Keşfet'in ilk 3'ü (sunucu üye sayısına göre sıralıyor).
+// Otomatik katılma yok. Liste boş/hatalıysa blok çizilmez, eski boş metin kalır.
+const suggested = ref<DiscoveryGuildDto[]>([])
+async function loadSuggested() {
+  try {
+    const res = await discoveryApi.listGuilds()
+    suggested.value = res.data.items.slice(0, 3)
+  } catch {
+    suggested.value = []
+  }
+}
 
 // Discord göçü bayrağı — yalnız açıkken "Discord'tan İçeri Aktar" hızlı aksiyonu görünür (ServerModal ile aynı kapı).
 const discordImportEnabled = ref(false)
 onMounted(async () => {
+  if (!guildsStore.guilds.length) void loadSuggested()
   try {
     const res = await guildsApi.discordImportStatus()
     discordImportEnabled.value = res.data.enabled === true
@@ -28,6 +49,9 @@ onMounted(async () => {
     discordImportEnabled.value = false
   }
 })
+
+// C19: "Ortamlarım" kartında simge + afiş kart hover'dayken oynar (Keşfet ile aynı kural)
+const hoveredGuildId = ref<string | null>(null)
 
 // "Ağu 2025" — kuruluş tarihi kısa etiketi
 function createdLabel(iso: string): string {
@@ -56,8 +80,7 @@ class="flex-1 min-w-0 flex flex-col mb-4 rounded-[var(--kv-radius-lg)] overflow-
       <div>
         <p class="section-label">{{ t('home.quickActions') }}</p>
         <div
-          class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-          :class="discordImportEnabled ? 'xl:grid-cols-4' : ''"
+          class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
         >
 
           <!-- Kanka Ekle -->
@@ -105,6 +128,20 @@ class="flex-1 min-w-0 flex flex-col mb-4 rounded-[var(--kv-radius-lg)] overflow-
             </div>
           </button>
 
+          <!-- Ortam Keşfet (her zaman görünür) -->
+          <button class="tile-btn" @click="router.push({ name: 'discover' })">
+            <div class="tile-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--kv-accent-500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+              </svg>
+            </div>
+            <div>
+              <p class="tile-title">{{ t('home.discoverOrtam') }}</p>
+              <p class="tile-desc">{{ t('home.discoverOrtamDesc') }}</p>
+            </div>
+          </button>
+
           <!-- Discord'tan İçeri Aktar (yalnız göç bayrağı açıkken) -->
           <button v-if="discordImportEnabled" class="tile-btn" @click="emit('importOrtam')">
             <div class="tile-icon">
@@ -127,9 +164,36 @@ class="flex-1 min-w-0 flex flex-col mb-4 rounded-[var(--kv-radius-lg)] overflow-
       <div>
         <p class="section-label">{{ t('home.myOrtamlar') }}</p>
 
-        <p v-if="!guildsStore.guilds.length" class="empty-text">
-          {{ t('home.noOrtam') }}
-        </p>
+        <div v-if="!guildsStore.guilds.length">
+          <p class="empty-text">{{ t('home.noOrtam') }}</p>
+          <!-- Öneri bloğu: yalnız ortamı yokken; ortama girince guilds dolunca kendiliğinden kaybolur -->
+          <div v-if="suggested.length" class="mt-4">
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <p class="text-[14px] font-semibold" style="color: var(--kv-text-primary);">
+                {{ t('home.suggestedTitle') }}
+              </p>
+              <button
+                type="button"
+                class="text-[13px] font-medium cursor-pointer"
+                style="color: var(--kv-accent-500);"
+                @click="router.push({ name: 'discover' })"
+              >
+                {{ t('home.seeAll') }}
+              </button>
+            </div>
+            <div class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <DiscoverGuildCard
+                v-for="g in suggested"
+                :key="g.id"
+                :guild="g"
+                :joining="joiningId === g.id"
+                animate="always"
+                @join="joinGuild(g)"
+                @open="goToGuild(g.id)"
+              />
+            </div>
+          </div>
+        </div>
 
         <div v-else class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           <button
@@ -137,19 +201,23 @@ class="flex-1 min-w-0 flex flex-col mb-4 rounded-[var(--kv-radius-lg)] overflow-
             :key="guild.id"
             class="ortam-card"
             @click="emit('openGuild', guild.id)"
+            @mouseenter="hoveredGuildId = guild.id"
+            @mouseleave="hoveredGuildId = null"
+            @focus="hoveredGuildId = guild.id"
+            @blur="hoveredGuildId = null"
           >
             <!-- Afiş (görsel varsa üstte; yoksa renk/gradient) + altıgen simge -->
             <div class="ortam-card__banner" :style="{ background: bannerBackground(guild.bannerColor) }">
               <img
                 v-if="guild.bannerUrl"
-                :src="guild.bannerUrl"
+                :src="hoveredGuildId === guild.id ? guildBannerSrc(guild) ?? guild.bannerUrl : guild.bannerUrl"
                 alt=""
                 class="absolute inset-0 w-full h-full object-cover"
               />
               <div class="ortam-card__icon">
                 <img
                   v-if="guild.iconUrl"
-                  :src="guild.iconUrl"
+                  :src="guildIconSrc(guild, hoveredGuildId === guild.id) ?? guild.iconUrl"
                   :alt="guild.name"
                   class="w-full h-full object-cover"
                 />

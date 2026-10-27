@@ -8,16 +8,17 @@ import { useGuildsStore } from '@/stores/guilds'
 import { useMembersStore } from '@/stores/members'
 import { useToastStore } from '@/stores/toast'
 import { guildsApi, type GuildBanDto } from '@/api/guilds'
-import { attachmentsApi } from '@/api/attachments'
 import { invitesApi } from '@/api/invites'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
 import KvNumberInput from '@/components/ui/KvNumberInput.vue'
 import KvSwitch from '@/components/ui/KvSwitch.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import GuildMediaSection from './GuildMediaSection.vue'
 import RolesSettingsSection from './RolesSettingsSection.vue'
 import AuditLogSection from './AuditLogSection.vue'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
+import { guildBannerSrc, guildIconSrc } from '@/utils/animatedMedia'
 import { BANNER_PRESET_KEYS, bannerBackground } from '@/utils/bannerColor'
 import type { InviteDto, GuildDto } from '@/types'
 
@@ -50,12 +51,6 @@ onMounted(() => {
 })
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)
-  if (pendingIconPreviewUrl.value) {
-    URL.revokeObjectURL(pendingIconPreviewUrl.value)
-  }
-  if (pendingBannerPreviewUrl.value) {
-    URL.revokeObjectURL(pendingBannerPreviewUrl.value)
-  }
 })
 
 // ── Birleşik taslak state ─────────────────────────────────────────────────
@@ -99,15 +94,6 @@ function removeTag(tag: string) {
   draftTags.value = draftTags.value.filter((t) => t !== tag)
 }
 
-const pendingIconFile = ref<File | null>(null)
-const pendingIconRemove = ref(false)
-const pendingIconPreviewUrl = ref<string | null>(null)
-
-// ── Sprint C8 — Ortam afişi (görsel) taslağı ───────────────────────────────
-const pendingBannerFile = ref<File | null>(null)
-const pendingBannerRemove = ref(false)
-const pendingBannerPreviewUrl = ref<string | null>(null)
-
 // ── Dirty hesaplama ───────────────────────────────────────────────────────
 const isDirty = computed(() => {
   if (draftName.value.trim() !== props.guild.name) return true
@@ -116,27 +102,15 @@ const isDirty = computed(() => {
   if (draftBannerColor.value !== props.guild.bannerColor) return true
   if (!tagsEqual(draftTags.value, props.guild.tags)) return true
   if (draftDiscoverable.value !== props.guild.discoverable) return true
-  if (pendingIconFile.value !== null) return true
-  if (pendingIconRemove.value) return true
-  if (pendingBannerFile.value !== null) return true
-  if (pendingBannerRemove.value) return true
   return false
 })
 
-// ── İkon yükleme ──────────────────────────────────────────────────────────
-const iconFileInput = ref<HTMLInputElement | null>(null)
-const iconError = ref('')
+// C19: simge/afiş artık GuildMediaSection'da anında uygulanır (kaydet butonundan bağımsız).
 const saving = ref(false)
-const iconUploadPct = ref(0)
 
-const ICON_MAX_BYTES = 2 * 1024 * 1024
-const ICON_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-
-const previewIconUrl = computed<string | null>(() => {
-  if (pendingIconFile.value) return pendingIconPreviewUrl.value
-  if (pendingIconRemove.value) return null
-  return props.guild.iconUrl ?? null
-})
+// Ayarlar önizlemesi hareketli gösterir (azaltılmış harekette statik)
+const previewIconUrl = computed<string | null>(() => guildIconSrc(props.guild, true))
+const previewBannerImageUrl = computed<string | null>(() => guildBannerSrc(props.guild))
 
 function guildInitial(name: string): string {
   return name
@@ -167,119 +141,10 @@ const previewMemberCount = computed(() => {
   return list.length > 0 ? list.length : null
 })
 
-function triggerIconPicker() {
-  iconFileInput.value?.click()
-}
-
-function onIconFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-
-  if (!ICON_ACCEPTED_TYPES.includes(file.type)) {
-    iconError.value = t('guildSettings.iconErrorType')
-    input.value = ''
-    return
-  }
-  if (file.size > ICON_MAX_BYTES) {
-    iconError.value = t('guildSettings.iconErrorSize')
-    input.value = ''
-    return
-  }
-
-  if (pendingIconPreviewUrl.value) {
-    URL.revokeObjectURL(pendingIconPreviewUrl.value)
-  }
-
-  iconError.value = ''
-  pendingIconFile.value = file
-  pendingIconRemove.value = false
-  pendingIconPreviewUrl.value = URL.createObjectURL(file)
-  input.value = ''
-}
-
-function cancelPendingIcon() {
-  if (pendingIconPreviewUrl.value) {
-    URL.revokeObjectURL(pendingIconPreviewUrl.value)
-    pendingIconPreviewUrl.value = null
-  }
-  pendingIconFile.value = null
-  pendingIconRemove.value = false
-  iconError.value = ''
-}
-
-function markIconForRemoval() {
-  cancelPendingIcon()
-  pendingIconRemove.value = true
-}
-
-// ── Sprint C8 — Ortam afişi (görsel) yükleme ───────────────────────────────
-// GIF YOK (statik görsel yükleme — sözleşme §0 KİLİTLİ KARAR). İkonun aksine gif desteklenmez.
-const bannerFileInput = ref<HTMLInputElement | null>(null)
-const bannerError = ref('')
-const bannerUploadPct = ref(0)
-
-const BANNER_MAX_BYTES = 2 * 1024 * 1024
-const BANNER_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-
-const previewBannerImageUrl = computed<string | null>(() => {
-  if (pendingBannerFile.value) return pendingBannerPreviewUrl.value
-  if (pendingBannerRemove.value) return null
-  return props.guild.bannerUrl ?? null
-})
-
-function triggerBannerPicker() {
-  bannerFileInput.value?.click()
-}
-
-function onBannerFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-
-  if (!BANNER_ACCEPTED_TYPES.includes(file.type)) {
-    bannerError.value = t('guildSettings.bannerImageErrorType')
-    input.value = ''
-    return
-  }
-  if (file.size > BANNER_MAX_BYTES) {
-    bannerError.value = t('guildSettings.bannerImageErrorSize')
-    input.value = ''
-    return
-  }
-
-  if (pendingBannerPreviewUrl.value) {
-    URL.revokeObjectURL(pendingBannerPreviewUrl.value)
-  }
-
-  bannerError.value = ''
-  pendingBannerFile.value = file
-  pendingBannerRemove.value = false
-  pendingBannerPreviewUrl.value = URL.createObjectURL(file)
-  input.value = ''
-}
-
-function cancelPendingBanner() {
-  if (pendingBannerPreviewUrl.value) {
-    URL.revokeObjectURL(pendingBannerPreviewUrl.value)
-    pendingBannerPreviewUrl.value = null
-  }
-  pendingBannerFile.value = null
-  pendingBannerRemove.value = false
-  bannerError.value = ''
-}
-
-function markBannerForRemoval() {
-  cancelPendingBanner()
-  pendingBannerRemove.value = true
-}
-
 // ── Birleşik kaydet ──────────────────────────────────────────────────────
 async function saveAll() {
   if (!isDirty.value) return
   saving.value = true
-  iconUploadPct.value = 0
-  bannerUploadPct.value = 0
 
   try {
     const patch: {
@@ -303,45 +168,6 @@ async function saveAll() {
       updated = await guildsStore.updateGuild(props.guild.id, patch)
     }
 
-    if (pendingIconFile.value) {
-      const file = pendingIconFile.value
-      const presignRes = await guildsApi.iconPresign(props.guild.id, file.type)
-      const { uploadUrl, storageKey } = presignRes.data
-      await attachmentsApi.uploadToS3(uploadUrl, file, (pct) => {
-        iconUploadPct.value = pct
-      })
-      updated = await guildsStore.updateGuildIcon(props.guild.id, storageKey)
-    } else if (pendingIconRemove.value) {
-      updated = await guildsStore.updateGuildIcon(props.guild.id, null)
-    }
-
-    if (pendingIconPreviewUrl.value) {
-      URL.revokeObjectURL(pendingIconPreviewUrl.value)
-      pendingIconPreviewUrl.value = null
-    }
-    pendingIconFile.value = null
-    pendingIconRemove.value = false
-
-    // ── Sprint C8 — Ortam afişi (görsel) ──
-    if (pendingBannerFile.value) {
-      const file = pendingBannerFile.value
-      const presignRes = await guildsApi.bannerPresign(props.guild.id, file.type)
-      const { uploadUrl, storageKey } = presignRes.data
-      await attachmentsApi.uploadToS3(uploadUrl, file, (pct) => {
-        bannerUploadPct.value = pct
-      })
-      updated = await guildsStore.updateGuildBanner(props.guild.id, storageKey)
-    } else if (pendingBannerRemove.value) {
-      updated = await guildsStore.updateGuildBanner(props.guild.id, null)
-    }
-
-    if (pendingBannerPreviewUrl.value) {
-      URL.revokeObjectURL(pendingBannerPreviewUrl.value)
-      pendingBannerPreviewUrl.value = null
-    }
-    pendingBannerFile.value = null
-    pendingBannerRemove.value = false
-
     if (updated) emit('updated', updated)
     toast.success(t('toast.guildSaved'))
   } catch (e: unknown) {
@@ -349,8 +175,6 @@ async function saveAll() {
     toast.error(err.response?.data?.message ?? t('toast.saveError'))
   } finally {
     saving.value = false
-    iconUploadPct.value = 0
-    bannerUploadPct.value = 0
   }
 }
 
@@ -363,19 +187,9 @@ function resetDrafts() {
   draftTags.value = [...props.guild.tags]
   draftDiscoverable.value = props.guild.discoverable
   newTagInput.value = ''
-  cancelPendingIcon()
-  cancelPendingBanner()
 }
 
 function handleClose() {
-  if (pendingIconPreviewUrl.value) {
-    URL.revokeObjectURL(pendingIconPreviewUrl.value)
-    pendingIconPreviewUrl.value = null
-  }
-  if (pendingBannerPreviewUrl.value) {
-    URL.revokeObjectURL(pendingBannerPreviewUrl.value)
-    pendingBannerPreviewUrl.value = null
-  }
   emit('close')
 }
 
@@ -799,107 +613,8 @@ function confirmNavDiscard() {
               />
             </section>
 
-            <!-- Ortam simgesi (inline önizleme kaldırıldı — sağ önizleme kartı gösteriyor) -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.iconSection') }}
-              </h3>
-              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.iconHint') }}
-              </p>
-              <div class="flex flex-col gap-2">
-                <div v-if="!pendingIconFile && !pendingIconRemove" class="flex gap-2">
-                  <KvButton size="sm" :disabled="saving" @click="triggerIconPicker">
-                    {{ t('guildSettings.iconUpload') }}
-                  </KvButton>
-                  <KvButton
-                    v-if="guild.iconUrl"
-                    size="sm"
-                    variant="danger"
-                    :disabled="saving"
-                    @click="markIconForRemoval"
-                  >
-                    {{ t('guildSettings.iconRemove') }}
-                  </KvButton>
-                </div>
-
-                <div v-else class="flex flex-col gap-1.5">
-                  <p class="text-[12px]" style="color: var(--kv-text-muted);">
-                    <span v-if="pendingIconFile">{{ t('guildSettings.iconPending') }}</span>
-                    <span v-else>{{ t('guildSettings.iconRemovePending') }}</span>
-                  </p>
-                  <div class="flex gap-2">
-                    <KvButton size="sm" :disabled="saving" @click="triggerIconPicker">
-                      {{ t('guildSettings.iconUpload') }}
-                    </KvButton>
-                    <KvButton size="sm" variant="danger" :disabled="saving" @click="cancelPendingIcon">
-                      {{ t('guildSettings.iconCancelPending') }}
-                    </KvButton>
-                  </div>
-                </div>
-
-                <p v-if="iconError" class="text-[12px]" style="color: var(--kv-danger);">{{ iconError }}</p>
-              </div>
-
-              <input
-                ref="iconFileInput"
-                type="file"
-                accept="image/*"
-                class="hidden"
-                @change="onIconFileChange"
-              />
-            </section>
-
-            <!-- ── Sprint C8: Ortam Afişi (görsel) ── -->
-            <section>
-              <h3 class="text-[13px] font-semibold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.bannerImageSection') }}
-              </h3>
-              <p class="text-[12px] mb-3" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.bannerImageHint') }}
-              </p>
-              <div class="flex flex-col gap-2">
-                <div v-if="!pendingBannerFile && !pendingBannerRemove" class="flex gap-2">
-                  <KvButton size="sm" :disabled="saving" @click="triggerBannerPicker">
-                    {{ t('guildSettings.bannerImageUpload') }}
-                  </KvButton>
-                  <KvButton
-                    v-if="guild.bannerUrl"
-                    size="sm"
-                    variant="danger"
-                    :disabled="saving"
-                    @click="markBannerForRemoval"
-                  >
-                    {{ t('guildSettings.bannerImageRemove') }}
-                  </KvButton>
-                </div>
-
-                <div v-else class="flex flex-col gap-1.5">
-                  <p class="text-[12px]" style="color: var(--kv-text-muted);">
-                    <span v-if="pendingBannerFile">{{ t('guildSettings.bannerImagePending') }}</span>
-                    <span v-else>{{ t('guildSettings.bannerImageRemovePending') }}</span>
-                  </p>
-                  <div class="flex gap-2">
-                    <KvButton size="sm" :disabled="saving" @click="triggerBannerPicker">
-                      {{ t('guildSettings.bannerImageUpload') }}
-                    </KvButton>
-                    <KvButton size="sm" variant="danger" :disabled="saving" @click="cancelPendingBanner">
-                      {{ t('guildSettings.bannerImageCancelPending') }}
-                    </KvButton>
-                  </div>
-                </div>
-
-                <p v-if="bannerError" class="text-[12px]" style="color: var(--kv-danger);">{{ bannerError }}</p>
-              </div>
-
-              <input
-                ref="bannerFileInput"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                class="hidden"
-                @change="onBannerFileChange"
-              />
-            </section>
+            <!-- C19: simge + afiş (statik/hareketli, konumlandırma) -->
+            <GuildMediaSection :guild="guild" :disabled="saving" @updated="emit('updated', $event)" />
 
             <!-- ── Sprint C6: Afiş (renk/gradient preset swatch) ── -->
             <section>
@@ -1049,19 +764,6 @@ function confirmNavDiscard() {
               </div>
             </section>
 
-            <!-- İkon/afiş yükleme ilerleme durumu (hata/başarı artık toast'ta) -->
-            <div
-              v-if="saving && (iconUploadPct > 0 || bannerUploadPct > 0)"
-              class="mt-2 pt-4 border-t flex flex-col gap-1"
-              style="border-color: var(--kv-border-subtle);"
-            >
-              <p v-if="iconUploadPct > 0" class="text-[12px]" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.iconUploading', { pct: iconUploadPct }) }}
-              </p>
-              <p v-if="bannerUploadPct > 0" class="text-[12px]" style="color: var(--kv-text-muted);">
-                {{ t('guildSettings.bannerImageUploading', { pct: bannerUploadPct }) }}
-              </p>
-            </div>
             </div><!-- /SOL kolon -->
 
             <!-- ── SAĞ kolon: Ortam profil önizleme kartı (sticky, canlı draft) ── -->

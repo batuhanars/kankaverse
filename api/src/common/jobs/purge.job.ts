@@ -87,6 +87,10 @@ export class PurgeJob {
           birthDate: new Date('1970-01-01T00:00:00.000Z'),
           avatarUrl: null,
           bannerUrl: null,
+          // C13 hareketli sürümleri de düşer (C19 sırasında bulunan eksik; yoksa silinen hesabın
+          // hareketli avatarı/afişi yayında kalır).
+          avatarAnimatedUrl: null,
+          bannerAnimatedUrl: null,
           bio: null,
           twoFactorEnabled: false,
           totpSecret: null,

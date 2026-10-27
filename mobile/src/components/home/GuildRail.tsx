@@ -23,6 +23,8 @@ interface Props {
   onLongPressGuild: (id: string) => void;
   /** Sprint M1d §3 — ray "+" girişi: tek dokunuş → "Ortama Katıl" / "Ortam Kur" seçimi. */
   onAddGuild: () => void;
+  /** Keşfet: "+" düğmesinin altında pusula (web ServerRail ile aynı yer, sahip kararı 2026-10-27). */
+  onDiscover: () => void;
 }
 
 const SIZE = 48;
@@ -44,6 +46,7 @@ export function GuildRail({
   onSelectGuild,
   onLongPressGuild,
   onAddGuild,
+  onDiscover,
 }: Props) {
   // Sprint M2b §10 R3-1 — sahip kararı: rail'in DM girişi bir ortam değil, oradan gelen HER mesaj
   // bahsetme muamelesi görür. Eski beyaz "en az bir okunmamış var mı" pip'i KALDIRILDI, yerine
@@ -127,6 +130,23 @@ export function GuildRail({
           </Svg>
           <View style={styles.addIcon}>
             <Ionicons name="add" size={26} color={theme.colors.accent500} />
+          </View>
+        </Pressable>
+
+        {/* Keşfet — "+" ile aynı altıgen silüet; simge nötr (web `hex--discover` gibi). Önce "+"
+            menüsünün üçüncü seçeneğiydi, sahip bulamadı: mobilde ortama girme oranı %10 iken giriş
+            görünür olmalı. */}
+        <Pressable
+          onPress={onDiscover}
+          style={styles.addButton}
+          accessibilityRole="button"
+          accessibilityLabel={t('discover.railTooltip')}
+        >
+          <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+            <Polygon points={HEX_POINTS} fill={theme.colors.bgElevated} />
+          </Svg>
+          <View style={styles.addIcon}>
+            <Ionicons name="compass-outline" size={24} color={theme.colors.textSecondary} />
           </View>
         </Pressable>
       </ScrollView>

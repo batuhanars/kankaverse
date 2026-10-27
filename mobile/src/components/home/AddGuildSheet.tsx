@@ -10,6 +10,7 @@ interface Props {
   onJoin: () => void;
 }
 
+// Sprint C18: üçüncü seçenek "Ortam keşfet" (mobilde Keşfet'e tek giriş değil, ana ekran öneri bloğu da var).
 // Sprint M1d-A §3 — ray "+" düğmesinin açtığı seçici; web `ServerModal` `choose` adımının mobil
 // karşılığı. Ray 72dp olduğu için "Katıl" ve "Kur" ayrı ayrı iki ray düğmesi yapılmadı.
 // `home.tsx`'ten ayrı dosyaya çıkarıldı (300 satır eşiği).

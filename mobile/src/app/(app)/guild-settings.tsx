@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { guildsApi, type GuildSummaryDto } from '@/api/guilds';
@@ -7,7 +7,8 @@ import { extractErrorMessage } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { SettingsRow } from '@/components/guild/SettingsRow';
-import { MAX_IMAGE_BYTES, pickImage, putImage } from '@/utils/imageUpload';
+import { animatedOrStatic, useReduceMotion } from '@/utils/animatedMedia';
+import { useGuildMediaEdit } from '@/components/guild/useGuildMediaEdit';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -18,8 +19,8 @@ import { theme } from '@/theme';
  * 🔴 KONMAYANLAR (Discord'da var, bizde YOK): Moderasyon/AutoMod · Entegrasyonlar · Emoji ·
  * Topluluk · Güvenlik · Şablonlar. Bunlar için ne uç ne kavram var.
  *
- * 🔴 İkon/afiş **gösterilir, yüklenmez** (M1d §10.3 kalıcı kuralı; sahip istisnası yalnız
- * kullanıcının kendi profiliydi). Bu yüzden başlıktaki ikonda kalem YOK.
+ * C19: ortam simgesi ve afişi **yalnız OWNER** için yüklenir/değiştirilir (M1d §10.3 kuralı bu sözleşmeyle
+ * gevşetildi). Akış `profile-edit.tsx` ile aynı: seç, konumlandır / kesit seç, yükle.
  *
  * Bölümlerin bir kısmı B yarısında geliyor (Genel · Roller · Davetler · Denetim Kaydı · Ortamı Sil);
  * **hedefi olmayan satır bu ekrana konmaz** — boş yüzey açma kuralı.
@@ -34,45 +35,24 @@ export default function GuildSettingsScreen() {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [uploadingIcon, setUploadingIcon] = useState(false);
+  const reduceMotion = useReduceMotion();
 
   // Ortam listesi tek kaynak: ad/ikon buradan okunur (route parametresi yalnız ilk kare için).
-  useFocusEffect(
-    useCallback(() => {
-      guildsApi
-        .list()
-        .then((list) => setGuild(list.find((g) => g.id === guildId) ?? null))
-        .catch(() => {});
-    }, [guildId]),
-  );
+  const loadGuild = useCallback(() => {
+    guildsApi
+      .list()
+      .then((list) => setGuild(list.find((g) => g.id === guildId) ?? null))
+      .catch(() => {});
+  }, [guildId]);
+  useFocusEffect(loadGuild);
+  const media = useGuildMediaEdit(guildId, loadGuild);
+
+  // Normal <Image>: hareketli sürüm burada güvenle gösterilir (ray gibi SVG yüzeyleri YALNIZ statik okur).
+  const iconSrc = animatedOrStatic(guild?.iconUrl, guild?.iconAnimatedUrl, reduceMotion);
+  const bannerSrc = animatedOrStatic(guild?.bannerUrl, guild?.bannerAnimatedUrl, reduceMotion);
 
   const isOwner = !!guild && !!myUserId && guild.ownerId === myUserId;
   const name = guild?.name ?? params.name ?? '';
-
-  /** Seç → presign → PUT → PATCH. Profil görselleriyle birebir aynı akış, aynı yardımcılar. */
-  async function onPickIcon() {
-    if (uploadingIcon) return;
-    setErrorMessage('');
-
-    const image = await pickImage();
-    if (!image) return;
-    if (image.size > MAX_IMAGE_BYTES) {
-      setErrorMessage(t('settings.avatar.errorSize'));
-      return;
-    }
-
-    setUploadingIcon(true);
-    try {
-      const presign = await guildsApi.presignIcon(guildId, image.contentType);
-      await putImage(presign, image);
-      const updated = await guildsApi.setIcon(guildId, presign.storageKey);
-      setGuild(updated);
-    } catch (e) {
-      setErrorMessage(extractErrorMessage(e) || t('guildSettings.iconErrorUpload'));
-    } finally {
-      setUploadingIcon(false);
-    }
-  }
 
   async function onConfirmLeave() {
     setLeaving(true);
@@ -97,10 +77,11 @@ export default function GuildSettingsScreen() {
       <Stack.Screen options={{ title: t('guildSettings.title') }} />
 
       <ScrollView contentContainerStyle={styles.body}>
+        {bannerSrc ? <Image source={{ uri: bannerSrc }} style={styles.banner} /> : null}
         <View style={styles.header}>
           <View>
-            {guild?.iconUrl ? (
-              <Image source={{ uri: guild.iconUrl }} style={styles.icon} />
+            {iconSrc ? (
+              <Image source={{ uri: iconSrc }} style={styles.icon} />
             ) : (
               <View style={[styles.icon, styles.iconFallback]}>
                 <Text style={styles.iconFallbackText}>{name.charAt(0).toUpperCase()}</Text>
@@ -109,15 +90,10 @@ export default function GuildSettingsScreen() {
 
             {/* 🔴 Kalem YALNIZ SAHİBE (sahip kararı 2026-08-01): simge uçları `yalnız OWNER`
                 istiyor, ADMIN'e gösterilse dokunduğunda 403 alırdı.
-                Ortam AFİŞİ mobilde düzenlenmez — Discord mobilde de yok; kural yalnız simge
-                için gevşetildi (M1d §10.3 afiş kısmıyla yürürlükte). */}
+                C19: afiş de aynı akışla ve aynı kuralla (yalnız OWNER) aşağıdaki satırdan düzenlenir. */}
             {isOwner && (
-              <Pressable onPress={onPickIcon} style={styles.iconPencil} hitSlop={8}>
-                {uploadingIcon ? (
-                  <ActivityIndicator color={theme.colors.textPrimary} size="small" />
-                ) : (
-                  <Ionicons name="pencil" size={14} color={theme.colors.textPrimary} />
-                )}
+              <Pressable onPress={() => void media.pick('GUILD_ICON')} style={styles.iconPencil} hitSlop={8}>
+                <Ionicons name="pencil" size={14} color={theme.colors.textPrimary} />
               </Pressable>
             )}
           </View>
@@ -131,6 +107,13 @@ export default function GuildSettingsScreen() {
         <View style={styles.group}>
           {/* Genel ayarlar (ad · açıklama · 18+ · keşfet · etiketler · ortamı sil) uçları
               **yalnız OWNER** kabul ediyor → satır ADMIN'e render edilmez. */}
+          {isOwner && (
+            <SettingsRow
+              icon="image-outline"
+              label={t('mobile.guildSettings.bannerTitle')}
+              onPress={() => void media.pick('GUILD_BANNER')}
+            />
+          )}
           {isOwner && (
             <SettingsRow
               icon="settings-outline"
@@ -183,7 +166,7 @@ export default function GuildSettingsScreen() {
           />
         </View>
 
-        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        {errorMessage || media.error ? <Text style={styles.error}>{errorMessage || media.error}</Text> : null}
 
         {/* Ayrılma her üyeye açık; OWNER'da sunucu reddeder ve sebebi yukarıda görünür. */}
         <View style={styles.group}>
@@ -200,6 +183,8 @@ export default function GuildSettingsScreen() {
             cümle olursa hangisi doğru diye sorulur). */}
         {isOwner ? <Text style={styles.hint}>{t('mobile.guildSettings.leaveOwnerHint')}</Text> : null}
       </ScrollView>
+
+      {media.sheet}
 
       {leaveOpen && (
         <ConfirmDialog
@@ -222,6 +207,13 @@ const styles = StyleSheet.create({
   body: {
     padding: theme.layout.panelGap,
     paddingBottom: theme.layout.panelGap * 2,
+  },
+  // C19: ortam afişi ~2:1 (kanal paneli ile aynı oran).
+  banner: {
+    width: '100%',
+    aspectRatio: 2,
+    borderRadius: theme.radius.lg,
+    marginBottom: theme.layout.panelGap,
   },
   header: {
     alignItems: 'center',

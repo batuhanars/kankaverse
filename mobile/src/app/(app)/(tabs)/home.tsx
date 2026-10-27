@@ -11,6 +11,7 @@ import { GuildRail, type RailSelection } from '@/components/home/GuildRail';
 import { DmSidebar } from '@/components/home/DmSidebar';
 import { ChannelSidebar } from '@/components/home/ChannelSidebar';
 import { GuildMenuSheet } from '@/components/home/GuildMenuSheet';
+import { SuggestedGuilds } from '@/components/discover/SuggestedGuilds';
 import { AddGuildSheet } from '@/components/home/AddGuildSheet';
 import { ChannelMenuHost } from '@/components/home/ChannelMenuHost';
 import { CategoryMenuSheet } from '@/components/home/CategoryMenuSheet';
@@ -287,6 +288,7 @@ export default function HomeScreen() {
         // ÇAĞRILMAZ: kısa basış davranışı ve rail'in seçimi bundan etkilenmez.
         onLongPressGuild={(id) => setMenuGuildId(id)}
         onAddGuild={() => setAddOpen(true)}
+        onDiscover={() => router.push('/discover')}
       />
       {selection.type === 'dm' ? (
         <View style={styles.dmPane}>
@@ -296,6 +298,9 @@ export default function HomeScreen() {
             onOpenRequests={() => router.push('/dm-requests')}
             onOpenSearch={() => router.push('/search')}
             onOpenAddFriend={() => router.push('/friends-add')}
+            // Sprint C18 — yalnız ortamı olmayan kullanıcıya. `guildState === 'ready'` şartı: liste
+            // yüklenirken (ya da hata verdiyse) "ortamın yok" yanlış okunup blok flaş etmesin.
+            welcome={guildState === 'ready' && guilds.length === 0 ? <SuggestedGuilds /> : null}
           />
           {/* Sözleşme §13/1 — FAB, eski "Mesajlar" başlığı yanındaki "+"nın yerini alıyor (o
               DmSidebar'dan kaldırıldı). Kor dolgu, gölge YOK (web/CLAUDE.md tasarım sistemi: katman
@@ -323,6 +328,7 @@ export default function HomeScreen() {
           selectedChannelId={lastOpenedChannelId}
           onOpenChannel={openChannel}
           guildBannerUrl={selectedGuild?.bannerUrl}
+          guildBannerAnimatedUrl={selectedGuild?.bannerAnimatedUrl}
           // §4 (M5c) — panel artık `menuGuildId` üzerinden çalışıyor (rail uzun basışıyla PAYLAŞILAN
           // aynı state); burada `selection` zaten 'guild' (bu dal yalnız o zaman render edilir).
           onOpenGuildMenu={() => setMenuGuildId(selection.id)}

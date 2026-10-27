@@ -7,7 +7,10 @@ import { AnimatedMediaService } from './animated-media.service';
 const UID = 'user-1';
 const KEY = (ext = 'mp4') => `animated-staging/${UID}/550e8400-e29b-41d4-a716-446655440000.${ext}`;
 
-const prismaMock = { user: { findUnique: jest.fn(), update: jest.fn() } };
+const prismaMock = {
+  user: { findUnique: jest.fn(), update: jest.fn() },
+  guild: { findUnique: jest.fn(), update: jest.fn() },
+};
 const storageMock = {
   presignPut: jest.fn(),
   headSize: jest.fn(),
@@ -271,6 +274,101 @@ describe('AnimatedMediaService (C13)', () => {
       expect(err(0, 6001)).toBe('INVALID_RANGE');
       expect(err(1.5, 3000)).toBe('INVALID_RANGE');
       expect(err(0, 3000)).toBeUndefined();
+    });
+  });
+
+  describe('ortam hedefleri (C19)', () => {
+    const GID = 'guild-1';
+    const GKEY = (ext = 'png') =>
+      `animated-staging/${GID}/550e8400-e29b-41d4-a716-446655440000.${ext}`;
+
+    async function png(width = 400, height = 200) {
+      const f = join(mkdtempSync(join(tmpdir(), 'kv-spec-')), 'src.png');
+      writeFileSync(
+        f,
+        await sharp({ create: { width, height, channels: 3, background: '#0f0' } })
+          .png()
+          .toBuffer(),
+      );
+      return f;
+    }
+    function stubGuild(file: string, previous: Record<string, unknown> = {}) {
+      storageMock.headSize.mockResolvedValue(1000);
+      storageMock.downloadToFile.mockImplementation(async (_k: string, dest: string) => {
+        copyFileSync(file, dest);
+      });
+      storageMock.putPublic.mockResolvedValue(undefined);
+      storageMock.deletePublic.mockResolvedValue(undefined);
+      prismaMock.guild.findUnique.mockResolvedValue({
+        iconUrl: null,
+        iconAnimatedUrl: null,
+        bannerUrl: null,
+        bannerAnimatedUrl: null,
+        ...previous,
+      });
+      prismaMock.guild.update.mockImplementation(async ({ data }: any) => data);
+    }
+
+    it('presign: staging yolu guildId altında, kapı işlemi yapan kullanıcıya göre', async () => {
+      storageMock.presignPut.mockResolvedValue('https://put');
+      const r = await make().presign(GID, 'image/gif', 1000, UID);
+      expect(r.stagingKey).toMatch(new RegExp(`^animated-staging/${GID}/[0-9a-f-]{36}\\.gif$`));
+      const off = make({ animatedProfileEnabled: false });
+      expect(await code(off.presign(GID, 'image/gif', 100, UID))).toBe('ANIMATED_DISABLED');
+    });
+
+    it('GUILD_ICON statik: icons/<guildId>/ altında -still.webp 512x512, hareketli alan null', async () => {
+      stubGuild(await png());
+      const g: any = await make().process(GID, 'GUILD_ICON', { stagingKey: GKEY() }, UID);
+      expect(g.iconAnimatedUrl).toBeNull();
+      expect(g.iconUrl).toMatch(/^http:\/\/cdn\/x\/icons\/guild-1\/[0-9a-f-]{36}-still\.webp$/);
+      expect(prismaMock.user.update).not.toHaveBeenCalled();
+      const meta = await sharp(storageMock.putPublic.mock.calls[0][1]).metadata();
+      expect([meta.width, meta.height]).toEqual([512, 512]);
+    });
+
+    it('GUILD_BANNER statik: guild-banners/ altında 1200x600 (2:1), bannerAnimatedUrl null', async () => {
+      stubGuild(await png(400, 400));
+      const g: any = await make().process(GID, 'GUILD_BANNER', { stagingKey: GKEY() }, UID);
+      expect(g.bannerAnimatedUrl).toBeNull();
+      expect(g.bannerUrl).toContain('/guild-banners/guild-1/');
+      const meta = await sharp(storageMock.putPublic.mock.calls[0][1]).metadata();
+      expect([meta.width, meta.height]).toEqual([1200, 600]);
+    });
+
+    it('hareketli girdi + bayrak kapalı → ANIMATED_DISABLED; statik bayraksız geçer', async () => {
+      const off = make({ animatedProfileEnabled: false });
+      expect(await code(off.process(GID, 'GUILD_ICON', { stagingKey: GKEY('gif') }, UID))).toBe(
+        'ANIMATED_DISABLED',
+      );
+      expect(storageMock.headSize).not.toHaveBeenCalled();
+      stubGuild(await png());
+      const g: any = await off.process(GID, 'GUILD_ICON', { stagingKey: GKEY() }, UID);
+      expect(g.iconUrl).toBeTruthy();
+    });
+
+    it('kullanıcı sahipli staging anahtarı ortam işine kabul edilmez', async () => {
+      expect(await code(make().process(GID, 'GUILD_ICON', { stagingKey: KEY('png') }, UID))).toBe(
+        'INVALID_STORAGE_KEY',
+      );
+    });
+
+    it('önceki hareketli çift yalnız kendi ortam prefix inden silinir', async () => {
+      stubGuild(await png(), {
+        iconUrl: 'http://cdn/x/icons/guild-1/old-static.webp',
+        iconAnimatedUrl: 'http://cdn/x/icons/guild-1/old.webp',
+      });
+      await make().process(GID, 'GUILD_ICON', { stagingKey: GKEY() }, UID);
+      expect(storageMock.deletePublic).toHaveBeenCalledWith('icons/guild-1/old.webp');
+      expect(storageMock.deletePublic).toHaveBeenCalledWith('icons/guild-1/old-static.webp');
+
+      storageMock.deletePublic.mockClear();
+      stubGuild(await png(), {
+        iconUrl: 'http://cdn/x/icons/other-guild/x-static.webp',
+        iconAnimatedUrl: 'http://cdn/x/icons/other-guild/x.webp',
+      });
+      await make().process(GID, 'GUILD_ICON', { stagingKey: GKEY() }, UID);
+      expect(storageMock.deletePublic).not.toHaveBeenCalled();
     });
   });
 

@@ -80,6 +80,12 @@ export const useGuildsStore = defineStore('guilds', () => {
     return res.data
   }
 
+  // C19: hareketli medya işleme ucu GuildDto döner; listedeki kaydı yerinde güncelle
+  function applyGuild(guild: GuildDto) {
+    const idx = guilds.value.findIndex((g) => g.id === guild.id)
+    if (idx !== -1) guilds.value[idx] = { ...guilds.value[idx], ...guild }
+  }
+
   async function deleteGuild(id: string): Promise<void> {
     await guildsApi.deleteGuild(id)
     guilds.value = guilds.value.filter((g) => g.id !== id)
@@ -167,6 +173,7 @@ export const useGuildsStore = defineStore('guilds', () => {
     updateGuild,
     updateGuildIcon,
     updateGuildBanner,
+    applyGuild,
     deleteGuild,
     removeGuildLocal,
     setActiveGuild,

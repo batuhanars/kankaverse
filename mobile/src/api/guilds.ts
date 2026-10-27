@@ -1,7 +1,7 @@
 import http from './http';
 // Presign sonucu kullanıcı görselleriyle AYNI şekil (`{ uploadUrl, storageKey }`) — ikinci bir tip
 // tanımlanmadı, sunucuda da tek `PresignResult` var.
-import type { PresignResult } from './users';
+import type { AnimatedPresignResult, AnimatedProcessPayload, PresignResult } from './users';
 
 // Sprint M0 contract §8, ekran 3 — yalnız "ikon + ad" gösteriliyor; DTO'nun tamamı (web
 // GuildDto — web/src/types/index.ts) M0'da tüketilmiyor, bu yüzden yalnız kullanılan alt küme
@@ -13,9 +13,13 @@ export interface GuildSummaryDto {
   id: string;
   name: string;
   iconUrl: string | null;
+  /** C19: hareketli simge (WebP). `iconUrl` daima statik kare; SVG yuzeyleri (ray) YALNIZ statigi okur. */
+  iconAnimatedUrl?: string | null;
   ownerId: string;
   // M1d-B §10.3 — afiş mobilde GÖSTERİLİR (yüklenmez). Sunucu `toGuildDto`'da zaten dönüyordu.
   bannerUrl: string | null;
+  /** C19: hareketli afis (WebP); normal `Image` yuzeylerinde azaltilmis hareket kapaliyken gosterilir. */
+  bannerAnimatedUrl?: string | null;
   // M1e-B — Genel ayarlar ekranı için. Hepsi `toGuildDto`'da ZATEN dönüyordu, tiplenmemişti.
   adultsOnly: boolean;
   description: string | null;
@@ -256,6 +260,22 @@ export const guildsApi = {
    */
   async presignIcon(guildId: string, contentType: string): Promise<PresignResult> {
     const res = await http.post<PresignResult>(`/guilds/${guildId}/icon/presign`, { contentType });
+    return res.data;
+  },
+
+  /** C19: ortam simgesi/afisi kaynagi icin ozel bucket staging presign (yalniz OWNER). */
+  async animatedPresign(guildId: string, contentType: string, size: number): Promise<AnimatedPresignResult> {
+    const res = await http.post<AnimatedPresignResult>(`/guilds/${guildId}/animated/presign`, { contentType, size });
+    return res.data;
+  },
+
+  async processIcon(guildId: string, payload: AnimatedProcessPayload): Promise<GuildSummaryDto> {
+    const res = await http.post<GuildSummaryDto>(`/guilds/${guildId}/icon/process`, payload);
+    return res.data;
+  },
+
+  async processBanner(guildId: string, payload: AnimatedProcessPayload): Promise<GuildSummaryDto> {
+    const res = await http.post<GuildSummaryDto>(`/guilds/${guildId}/banner/process`, payload);
     return res.data;
   },
 

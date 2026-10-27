@@ -16,6 +16,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { GuildsService } from './guilds.service';
+import { GuildAnimatedMediaService } from './guild-animated-media.service';
+import { PresignGuildAnimatedDto } from './dto/presign-guild-animated.dto';
+import { ProcessAnimatedDto } from '../../shared/media/dto/animated.dto';
+import { Throttle } from '@nestjs/throttler';
 import { DiscordImportService } from './discord-import.service';
 import { ImportDiscordTemplateDto } from './dto/import-discord-template.dto';
 import { CreateGuildDto } from './dto/create-guild.dto';
@@ -38,6 +42,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class GuildsController {
   constructor(
     private guildsService: GuildsService,
+    private guildAnimated: GuildAnimatedMediaService,
     private discordImport: DiscordImportService,
     private config: ConfigService,
   ) {}
@@ -155,6 +160,46 @@ export class GuildsController {
     @Body() dto: SetMediaDto,
   ) {
     return this.guildsService.setBanner(user.id, guildId, dto);
+  }
+
+  // ─── C19: Hareketli / konumlandırılmış ortam simgesi ve afişi (C13 hattı, yalnız OWNER) ───
+
+  @Post(':id/animated/presign')
+  @UseGuards(VerifiedEmailGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Ortam simgesi/afişi kaynağı için özel bucket staging presign (yalnız OWNER)' })
+  presignAnimated(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Body() dto: PresignGuildAnimatedDto,
+  ) {
+    return this.guildAnimated.presign(user.id, guildId, dto);
+  }
+
+  @Post(':id/icon/process')
+  @UseGuards(VerifiedEmailGuard)
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 3600000 } })
+  @ApiOperation({ summary: 'Yüklenen görsel/GIF/videoyu ortam simgesine çevir (yalnız OWNER, 10/saat)' })
+  processIcon(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Body() dto: ProcessAnimatedDto,
+  ) {
+    return this.guildAnimated.process(user.id, guildId, 'GUILD_ICON', dto);
+  }
+
+  @Post(':id/banner/process')
+  @UseGuards(VerifiedEmailGuard)
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 3600000 } })
+  @ApiOperation({ summary: 'Yüklenen görsel/GIF/videoyu ortam afişine çevir (yalnız OWNER, 10/saat)' })
+  processBanner(
+    @CurrentUser() user: { id: string },
+    @Param('id') guildId: string,
+    @Body() dto: ProcessAnimatedDto,
+  ) {
+    return this.guildAnimated.process(user.id, guildId, 'GUILD_BANNER', dto);
   }
 
   @Post(':id/join-discovery')

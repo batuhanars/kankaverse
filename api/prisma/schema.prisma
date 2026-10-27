@@ -209,11 +209,13 @@ model Guild {
   owner     User        @relation("GuildOwner", fields: [ownerId], references: [id])
   adultsOnly Boolean    @default(false)
   iconUrl   String?
+  iconAnimatedUrl String?                  // C19: hareketli simge (WebP); iconUrl daima statik kare kalır
   description String?
   discoverable Boolean  @default(false)   // C6: Keşfet opt-in (default kapalı)
   tags        String[]  @default([])       // C6: ilgi etiketleri (max 5; servis doğrular)
   bannerColor String?                      // C6: preset renk anahtarı (allowlist; görsel değil)
   bannerUrl   String?                      // C8: ortam afişi görseli (public URL; ikon deseni)
+  bannerAnimatedUrl String?                // C19: hareketli afiş (WebP); bannerUrl daima statik kare kalır
   deletedAt DateTime?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt

@@ -26,6 +26,8 @@ function toGuildDto(guild: Guild) {
     ownerId: guild.ownerId,
     adultsOnly: guild.adultsOnly,
     iconUrl: guild.iconUrl,
+    iconAnimatedUrl: guild.iconAnimatedUrl ?? null, // C19
+    bannerAnimatedUrl: guild.bannerAnimatedUrl ?? null, // C19
     createdAt: guild.createdAt.toISOString(),
   };
 }

@@ -36,6 +36,8 @@ interface Props {
 
 const AVATAR_SIZE = 180;
 const BANNER_RATIO = 5 / 2;
+/** C19: ortam afisi kanal panelinde ~2:1 gorunur (profil afisi 5:2'den farkli). */
+const GUILD_BANNER_RATIO = 2;
 
 function clamp(v: number, lo: number, hi: number) {
   'worklet';
@@ -156,11 +158,15 @@ export function MediaPositioner({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
 
-  const isAvatar = target === 'AVATAR';
+  const isAvatar = target === 'AVATAR' || target === 'GUILD_ICON';
   return (
     <View
       onLayout={onLayout}
-      style={[styles.frame, isAvatar ? styles.frameAvatar : styles.frameBanner]}
+      style={[
+        styles.frame,
+        isAvatar ? styles.frameAvatar : styles.frameBanner,
+        target === 'GUILD_BANNER' && styles.frameGuildBanner,
+      ]}
     >
       {ready ? (
         <GestureDetector gesture={gesture}>
@@ -205,6 +211,9 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: BANNER_RATIO,
     borderRadius: theme.radius.md,
+  },
+  frameGuildBanner: {
+    aspectRatio: GUILD_BANNER_RATIO,
   },
   media: {
     position: 'absolute',

@@ -339,7 +339,7 @@ describe('ModerationModuleService.createAction — MEDIA_REMOVE (C8/R7)', () => 
 
     expect(prismaMock.guild.update).toHaveBeenCalledWith({
       where: { id: GUILD_ID },
-      data: { bannerUrl: null },
+      data: { bannerUrl: null, bannerAnimatedUrl: null }, // C19: hareketli alan da düşer
     });
     expect(prismaMock.user.update).not.toHaveBeenCalled();
   });
@@ -355,7 +355,7 @@ describe('ModerationModuleService.createAction — MEDIA_REMOVE (C8/R7)', () => 
 
     expect(prismaMock.guild.update).toHaveBeenCalledWith({
       where: { id: GUILD_ID },
-      data: { iconUrl: null },
+      data: { iconUrl: null, iconAnimatedUrl: null }, // C19: hareketli alan da düşer
     });
   });
 

@@ -11,11 +11,17 @@ export class DiscoveryGuildDto {
   @ApiProperty({ nullable: true })
   iconUrl: string | null;
 
+  @ApiProperty({ nullable: true, description: 'C19 hareketli simge (WebP); iconUrl daima statik' })
+  iconAnimatedUrl: string | null;
+
   @ApiProperty({ nullable: true })
   bannerColor: string | null;
 
   @ApiProperty({ nullable: true })
   bannerUrl: string | null; // C8 — yüklenmiş afiş görseli (varsa kartta gösterilir, yoksa bannerColor gradient)
+
+  @ApiProperty({ nullable: true, description: 'C19 hareketli afiş (WebP); bannerUrl daima statik' })
+  bannerAnimatedUrl: string | null;
 
   @ApiProperty({ nullable: true })
   description: string | null;

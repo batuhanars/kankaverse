@@ -17,6 +17,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import NotifLevelFlyout from '@/components/shared/NotifLevelFlyout.vue'
 import MuteDurationFlyout from '@/components/shared/MuteDurationFlyout.vue'
 import { NotificationLevel, NotifTargetType, type GuildDto } from '@/types'
+import { guildIconSrc } from '@/utils/animatedMedia'
 import DownloadAppModal from '@/components/shared/DownloadAppModal.vue'
 import hexagonLogo from '@/assets/brand/kankaverse-hexagon.png'
 
@@ -230,6 +231,18 @@ function hideTooltip() {
   tooltipVisible.value = false
 }
 
+
+// C19 §7.1: seçili ortamın simgesi sürekli oynar, diğerleri hover'da (C16 deseni)
+const hoveredGuildId = ref<string | null>(null)
+function onGuildEnter(event: MouseEvent, guild: GuildDto) {
+  hoveredGuildId.value = guild.id
+  showTooltip(event, guild.name)
+}
+function onGuildLeave() {
+  hoveredGuildId.value = null
+  hideTooltip()
+}
+
 function goHome() {
   router.push({ name: 'app' })
 }
@@ -310,8 +323,8 @@ function badgeLabel(count: number): string {
         class="guild-btn"
         @click="selectGuild(guild)"
         @contextmenu.prevent="openGuildContext($event, guild)"
-        @mouseenter="showTooltip($event, guild.name)"
-        @mouseleave="hideTooltip"
+        @mouseenter="onGuildEnter($event, guild)"
+        @mouseleave="onGuildLeave"
       >
         <!-- guild-icon-wrap: hover sınıfı eklemek için sarmalayıcı -->
         <span
@@ -324,7 +337,7 @@ function badgeLabel(count: number): string {
           <span class="hex">
             <img
               v-if="guild.iconUrl"
-              :src="guild.iconUrl"
+              :src="guildIconSrc(guild, guildsStore.activeGuildId === guild.id || hoveredGuildId === guild.id) ?? undefined"
               :alt="guild.name"
               class="hex-img"
             />

@@ -5,22 +5,16 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import { useDebounceFn } from '@vueuse/core'
 import { useGuildsStore } from '@/stores/guilds'
-import { useChannelsStore } from '@/stores/channels'
-import { useAuthStore } from '@/stores/auth'
-import { useToastStore } from '@/stores/toast'
 import { discoveryApi } from '@/api/discovery'
+import { useDiscoverJoin } from '@/composables/useDiscoverJoin'
 import DiscoverGuildCard from './components/DiscoverGuildCard.vue'
 import type { DiscoveryGuildDto, DiscoveryTagDto } from '@/types'
 
 const { t } = useI18n()
-const router = useRouter()
 const guildsStore = useGuildsStore()
-const channelsStore = useChannelsStore()
-const authStore = useAuthStore()
-const toast = useToastStore()
+const { joiningId, joinGuild, goToGuild } = useDiscoverJoin()
 
 // Zaten üyesi olduğum ortamlar → keşfette "Katıl" yerine "Sunucuya Git" (Görsel #35)
 const myGuildIds = computed(() => new Set(guildsStore.guilds.map((g) => g.id)))
@@ -34,7 +28,6 @@ const nextCursor = ref<string | null>(null)
 const loading = ref(false)
 const loadingMore = ref(false)
 const loadError = ref('')
-const joiningId = ref<string | null>(null)
 
 async function loadTags() {
   try {
@@ -90,39 +83,6 @@ function onSearchInput() {
 function toggleTag(tag: string) {
   activeTag.value = activeTag.value === tag ? null : tag
   loadGuilds()
-}
-
-/** Bir ortama git (kanalları yükle, ilk kanala yönlendir) — join sonrası / zaten üye. */
-async function goToGuild(guildId: string) {
-  if (!channelsStore.channelsForGuild(guildId).length) {
-    await channelsStore.fetchChannelsAndCategories(guildId, authStore.user?.id)
-  }
-  const channels = channelsStore.channelsForGuild(guildId)
-  if (channels.length > 0) {
-    router.push({ name: 'channel', params: { guildId, channelId: channels[0].id } })
-  } else {
-    guildsStore.setActiveGuild(guildId)
-    channelsStore.setActiveChannel(null)
-    router.push({ name: 'app' })
-  }
-}
-
-async function joinGuild(guild: DiscoveryGuildDto) {
-  joiningId.value = guild.id
-  try {
-    await guildsStore.joinDiscovery(guild.id)
-    await goToGuild(guild.id)
-  } catch (e: unknown) {
-    const err = e as { response?: { data?: { error?: string; message?: string } } }
-    // Zaten üye → hata değil; o ortama git.
-    if (err.response?.data?.error === 'ALREADY_MEMBER') {
-      await goToGuild(guild.id)
-      return
-    }
-    toast.error(err.response?.data?.message ?? t('toast.joinError'))
-  } finally {
-    joiningId.value = null
-  }
 }
 
 onMounted(() => {

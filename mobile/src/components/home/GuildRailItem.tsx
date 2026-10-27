@@ -1,7 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { ClipPath, Defs, Image as SvgImage, Polygon, Text as SvgText } from 'react-native-svg';
 import type { GuildSummaryDto } from '@/api/guilds';
-import { hexPoints } from '../hexShape';
+import { HexGuildIcon } from '../guild/HexGuildIcon';
 import { useUnreadStore } from '@/stores/unread';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { NotificationLevel } from '@/api/notifications';
@@ -9,7 +8,6 @@ import { badgeLabel } from '@/utils/badgeLabel';
 import { theme } from '@/theme';
 
 const SIZE = 48;
-const HEX_POINTS = hexPoints(SIZE);
 // Sprint M2b §10 R3-2 — susturulmuş ortam ikonu soluk çizilir (Discord deseni: kullanıcı susturduğunu
 // unutup "neden hiçbir şey gelmiyor" diye sormasın). Web'de bir opaklık TOKENI yok (`theme` içine
 // uydurulmadı — mobile/CLAUDE.md "web'de olmayan token uydurma"); bu değer, uygulamadaki "devre dışı"
@@ -53,13 +51,6 @@ export function GuildRailItem({ guild, active, onPress, onLongPress }: Props) {
   const muted = useNotificationPrefsStore((s) => s.effectiveMuted('GUILD', guild.id));
   const showUnreadPip = level === NotificationLevel.ALL && !muted;
   const showMentionBadge = level !== NotificationLevel.NONE && !muted;
-  const fallbackLetter = guild.name.charAt(0).toUpperCase();
-  // 🔴 Küçük düzeltme (bu dosyaya taşınırken fark edildi): eski clipId yalnız BAŞ HARFE bağlıydı
-  // (`hexClip-${fallbackLetter}`) — iki ortamın adı aynı harfle başlıyorsa (ör. "Mavi"/"Mor") aynı
-  // SVG `<ClipPath id>` DOM'da tekrarlanır, tarayıcı/RN SVG bunu tanımsız bırakabilir. `guild.id`
-  // eklenerek benzersizleştirildi; görsel semantik değişmedi, yalnız olası çakışma giderildi.
-  const clipId = `hexClip-${guild.id}`;
-
   return (
     <Pressable
       onPress={onPress}
@@ -78,43 +69,20 @@ export function GuildRailItem({ guild, active, onPress, onLongPress }: Props) {
       <View style={styles.hexWrap}>
         {/* §10 R3-2 — yalnız AKTİF MUTE soluklaştırır; `NONE` seviyesi "bildirim istemiyorum"
             demektir, "bu ortamı yok say" değil, o yüzden `level`e bakılmaz, yalnız `muted`. */}
-        <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} opacity={muted ? MUTED_ICON_OPACITY : 1}>
-          <Defs>
-            <ClipPath id={clipId}>
-              <Polygon points={HEX_POINTS} />
-            </ClipPath>
-          </Defs>
-          {/* Yedek katman HER ZAMAN çizilir (sahip bulgusu 2026-07-30) — bkz. GuildRail tarihçesi. */}
-          <Polygon points={HEX_POINTS} fill={theme.colors.accentSubtle} />
-          <SvgText
-            x={SIZE / 2}
-            y={SIZE / 2}
-            textAnchor="middle"
-            alignmentBaseline="central"
-            fontSize={theme.fontSize.lg}
-            fontWeight="700"
-            fill={theme.colors.accent500}
-          >
-            {fallbackLetter}
-          </SvgText>
-          {guild.iconUrl ? (
-            <SvgImage
-              href={{ uri: guild.iconUrl }}
-              x={0}
-              y={0}
-              width={SIZE}
-              height={SIZE}
-              preserveAspectRatio="xMidYMid slice"
-              clipPath={`url(#${clipId})`}
-            />
-          ) : null}
-          <Polygon
-            points={HEX_POINTS}
-            fill="none"
-            stroke={active ? theme.colors.accent500 : 'transparent'}
-            strokeWidth={2}
+        {/* C19 §7: hareketli simge normal RN Image ile; altıgen dışı köşeler zemin (bgRail) rengiyle örtülür.
+            Rozet/pip bu katmanın DIŞINDA, mutlak konumlu: yerleri değişmedi. */}
+        <View style={{ opacity: muted ? MUTED_ICON_OPACITY : 1 }}>
+          <HexGuildIcon
+            size={SIZE}
+            name={guild.name}
+            iconUrl={guild.iconUrl}
+            iconAnimatedUrl={guild.iconAnimatedUrl}
+            backgroundColor={theme.colors.bgRail}
+            // C19 §7.1: yalnız seçili ortamın simgesi oynar; diğerleri statik (düşük segment cihazda çok sayıda canlı WebP'den kaçınmak için).
+            animate={active}
+            active={active}
           />
-        </Svg>
+        </View>
 
         {/* Bahsetme rozeti — §4.1: yalnız `unreadMentionCount > 0`, sağ-altta. M2b §5 R1-3: `NONE`'da
             veya susturulmuşken gizli. */}

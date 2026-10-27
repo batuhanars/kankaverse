@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FriendsStrip } from './FriendsStrip';
 import { Ionicons } from '@expo/vector-icons';
 import { type DmChannelDto } from '@/api/dm';
 import { DmRow } from './DmRow';
@@ -23,6 +24,8 @@ interface Props {
   // Sözleşme §8.1-A/4 (M1a fast-follow, ekranlarıyla birlikte M1b'de teslim edildi) + §3.2/3.3.
   onOpenSearch: () => void;
   onOpenAddFriend: () => void;
+  /** Sprint C18 — ortamı olmayan kullanıcı için öneri bloğu (home.tsx karar verir); yoksa null. */
+  welcome?: ReactNode;
 }
 
 function avatarSource(ch: DmChannelDto): string | null {
@@ -33,7 +36,7 @@ function avatarSource(ch: DmChannelDto): string | null {
 // girişi (rozetli). C9 kuralı web/DmList.vue ile aynı: bekleyen giden istek (`requestStatus ===
 // 'PENDING'`) normal listede GÖRÜNMEZ, istek kutusuna gider (dev deneyimi: gönderenin ekranında
 // kendi bekleyen isteği iki kez görünmesin).
-export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, onOpenAddFriend }: Props) {
+export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, onOpenAddFriend, welcome }: Props) {
   const authUser = useAuthStore((s) => s.user);
   // Sözleşme §8.3 — liste artık `dm` store'undan okunur (soket katmanı oraya yazıyor). Yerel
   // state'te tutulurken canlı güncelleme tutunacak bir yer bulamıyordu.
@@ -120,6 +123,9 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
         </Pressable>
       </View>
 
+      {/* Sahip isteği 2026-10-27 — yatay kanka şeridi (yalnız avatar + durum noktası). */}
+      <FriendsStrip onOpenDm={onOpenDm} />
+
       {/* Kanka isteği satırı — sahip bulgusu 2026-07-30: gelen istek YALNIZ "Kanka Ekle" ekranının
           içinde görünüyordu, sahip nereden kabul edeceğini bulamadı ("ben takıldıysam kullanıcı da
           takılır"). Rozet Bildirimler sekmesinde çıkıyor, eylem başka ekranda — kopukluk buydu.
@@ -138,6 +144,8 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
           <Text style={styles.requestText}>{t('notification.messageRequests', { n: requestCount })}</Text>
         </Pressable>
       )}
+
+      {welcome}
 
       {state === 'loading' && (
         <View style={styles.center}>

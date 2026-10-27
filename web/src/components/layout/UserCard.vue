@@ -8,6 +8,7 @@ import VoiceConnectedBar from '@/components/layout/VoiceConnectedBar.vue'
 import { useSocket } from '@/composables/useSocket'
 import { useAudioDevices } from '@/composables/useAudioDevices'
 import { onClickOutside } from '@vueuse/core'
+import { hoverAvatarSrc } from '@/utils/animatedMedia'
 
 const emit = defineEmits<{ logout: []; openSettings: [section?: string] }>()
 const { t } = useI18n()
@@ -36,6 +37,9 @@ const showMuted = computed(() => (inVoice.value ? voiceStore.isMuted : voiceStor
 const showDeafened = computed(() => (inVoice.value ? voiceStore.isDeafened : voiceStore.preferDeafened))
 
 const cardRef = ref<HTMLElement | null>(null)
+// C16 deseni: kendi avatarın da yalnız tetikleyici hover'dayken oynar.
+const triggerHovered = ref(false)
+const triggerAvatarSrc = computed(() => (authStore.user ? hoverAvatarSrc(authStore.user, triggerHovered.value) : null))
 const showPopover = ref(false)
 
 onClickOutside(cardRef, () => { showPopover.value = false; devicePopover.value = null })
@@ -181,6 +185,8 @@ function onLogout() {
       <button
         class="flex items-center gap-2.5 flex-1 min-w-0 overflow-hidden cursor-pointer text-left rounded-[var(--kv-radius-md)] px-1.5 py-1 -mx-1.5 -my-1 transition-colors hover:bg-[var(--kv-bg-content)]"
         @click="devicePopover = null; showPopover = !showPopover"
+        @mouseenter="triggerHovered = true"
+        @mouseleave="triggerHovered = false"
       >
         <!-- Avatar + presence dot -->
         <div class="relative shrink-0">
@@ -189,9 +195,9 @@ function onLogout() {
             style="background-color: var(--kv-accent-500);"
           >
             <img
-              v-if="authStore.user?.avatarUrl"
-              :src="authStore.user.avatarUrl"
-              :alt="authStore.user.username"
+              v-if="triggerAvatarSrc"
+              :src="triggerAvatarSrc"
+              :alt="authStore.user?.username"
               class="w-full h-full object-cover"
             />
             <span v-else>{{ authStore.user?.username.charAt(0).toUpperCase() }}</span>

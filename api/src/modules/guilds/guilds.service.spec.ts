@@ -332,7 +332,7 @@ describe('GuildsService.setIcon', () => {
 
     expect(prismaMock.guild.update).toHaveBeenCalledWith({
       where: { id: GUILD_ID },
-      data: { iconUrl: expectedIconUrl },
+      data: { iconUrl: expectedIconUrl, iconAnimatedUrl: null },
     });
     expect(result.iconUrl).toBe(expectedIconUrl);
   });
@@ -383,7 +383,7 @@ describe('GuildsService.setIcon', () => {
 
     expect(prismaMock.guild.update).toHaveBeenCalledWith({
       where: { id: GUILD_ID },
-      data: { iconUrl: null },
+      data: { iconUrl: null, iconAnimatedUrl: null },
     });
     expect(result.iconUrl).toBeNull();
   });
@@ -399,7 +399,7 @@ describe('GuildsService.setIcon', () => {
 
     expect(prismaMock.guild.update).toHaveBeenCalledWith({
       where: { id: GUILD_ID },
-      data: { iconUrl: null },
+      data: { iconUrl: null, iconAnimatedUrl: null },
     });
     expect(result.iconUrl).toBeNull();
   });
@@ -541,7 +541,7 @@ describe('GuildsService.setBanner', () => {
 
     expect(prismaMock.guild.update).toHaveBeenCalledWith({
       where: { id: GUILD_ID },
-      data: { bannerUrl: expectedBannerUrl },
+      data: { bannerUrl: expectedBannerUrl, bannerAnimatedUrl: null },
     });
     expect(result.bannerUrl).toBe(expectedBannerUrl);
   });
@@ -557,7 +557,7 @@ describe('GuildsService.setBanner', () => {
 
     expect(prismaMock.guild.update).toHaveBeenCalledWith({
       where: { id: GUILD_ID },
-      data: { bannerUrl: null },
+      data: { bannerUrl: null, bannerAnimatedUrl: null },
     });
     expect(result.bannerUrl).toBeNull();
   });
