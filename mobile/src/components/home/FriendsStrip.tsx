@@ -1,15 +1,24 @@
-import { useMemo, useRef } from 'react';
-import { Alert, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useFriendsStore } from '@/stores/friends';
-import { useDmStore } from '@/stores/dm';
-import { usePresenceStore, type PresenceStatus } from '@/stores/presence';
-import type { DmChannelDto } from '@/api/dm';
-import type { FriendDto } from '@/api/friends';
-import { extractErrorMessage } from '@/api/errors';
-import { theme } from '@/theme';
+import { useMemo, useRef } from "react";
+import {
+  Alert,
+  FlatList,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useFriendsStore } from "@/stores/friends";
+import { useDmStore } from "@/stores/dm";
+import { usePresenceStore, type PresenceStatus } from "@/stores/presence";
+import type { DmChannelDto } from "@/api/dm";
+import type { FriendDto } from "@/api/friends";
+import { extractErrorMessage } from "@/api/errors";
+import { theme } from "@/theme";
 
 const AVATAR = 48;
 const DOT = 14;
+const TILE_PAD = 10;
 
 // Web `UserCard.vue` presenceColor ile aynı palet (token). Çevrimdışı da gri nokta alır: şeritte
 // "durum yok" ile "çevrimdışı" ayrımı olmasın, her avatar aynı dili konuşsun.
@@ -21,7 +30,12 @@ const PRESENCE_COLOR: Record<PresenceStatus, string> = {
 };
 
 // Çevrimiçi olanlar öne: şerit "şu an kim burada" sorusunu ilk bakışta cevaplasın.
-const ORDER: Record<PresenceStatus, number> = { online: 0, away: 1, dnd: 2, offline: 3 };
+const ORDER: Record<PresenceStatus, number> = {
+  online: 0,
+  away: 1,
+  dnd: 2,
+  offline: 3,
+};
 
 interface Props {
   onOpenDm: (channel: DmChannelDto) => void;
@@ -29,7 +43,7 @@ interface Props {
 
 /**
  * Sahip isteği 2026-10-27 — DM panelinde "Kanka Ekle" ile DM listesi arasında yatay kanka şeridi.
- * Yalnız avatar (ad yok, kart yok) + sağ altta durum noktası. Dokununca o kankayla DM açılır.
+ * Her kanka gri zeminli yuvarlak köşeli kendi kartında: yalnız avatar (ad yok) + sağ altta durum noktası. Dokununca o kankayla DM açılır.
  *
  * Avatarlar bilinçli STATİK (`avatarAnimatedUrl` kullanılmaz): Discord da bu listede oynatmıyor;
  * yan yana onlarca hareketli avatar dikkat dağıtır, pil yer (ray kararıyla aynı gerekçe).
@@ -44,9 +58,9 @@ export function FriendsStrip({ onOpenDm }: Props) {
   const sorted = useMemo(
     () =>
       [...friends].sort((a, b) => {
-        const sa = ORDER[statusMap[a.user.id] ?? 'offline'];
-        const sb = ORDER[statusMap[b.user.id] ?? 'offline'];
-        return sa - sb || a.user.username.localeCompare(b.user.username, 'tr');
+        const sa = ORDER[statusMap[a.user.id] ?? "offline"];
+        const sb = ORDER[statusMap[b.user.id] ?? "offline"];
+        return sa - sb || a.user.username.localeCompare(b.user.username, "tr");
       }),
     [friends, statusMap],
   );
@@ -80,16 +94,29 @@ export function FriendsStrip({ onOpenDm }: Props) {
           accessibilityLabel={item.user.username}
           style={styles.item}
         >
-          {item.user.avatarUrl ? (
-            <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.fallback]}>
-              <Text style={styles.fallbackText}>{item.user.username.charAt(0).toUpperCase()}</Text>
-            </View>
-          )}
-          <View
-            style={[styles.dot, { backgroundColor: PRESENCE_COLOR[statusMap[item.user.id] ?? 'offline'] }]}
-          />
+          <View style={styles.avatarWrap}>
+            {item.user.avatarUrl ? (
+              <Image
+                source={{ uri: item.user.avatarUrl }}
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={[styles.avatar, styles.fallback]}>
+                <Text style={styles.fallbackText}>
+                  {item.user.username.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View
+              style={[
+                styles.dot,
+                {
+                  backgroundColor:
+                    PRESENCE_COLOR[statusMap[item.user.id] ?? "offline"],
+                },
+              ]}
+            />
+          </View>
         </Pressable>
       )}
     />
@@ -97,29 +124,36 @@ export function FriendsStrip({ onOpenDm }: Props) {
 }
 
 const styles = StyleSheet.create({
-  strip: { flexGrow: 0 },
-  content: { paddingHorizontal: theme.layout.panelGap, paddingBottom: 10, gap: 10 },
-  item: { width: AVATAR, height: AVATAR },
+  // Sahip revizesi 2026-10-27: Discord gibi HER kanka kendi kartında (gri zemin, yuvarlak köşe);
+  // şeridin kendisi zeminsiz. Alt boşluk DM listesinden ayrım için.
+  strip: { flexGrow: 0, marginTop: 6, marginBottom: 16 },
+  content: { paddingHorizontal: theme.layout.panelGap, gap: 8 },
+  item: {
+    padding: TILE_PAD,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.bgElevated,
+  },
+  avatarWrap: { width: AVATAR, height: AVATAR },
   avatar: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2 },
   fallback: {
     backgroundColor: theme.colors.accent500,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   fallbackText: {
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.base,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   // Panel zemini renginde halka: nokta avatarın üstünden ayrışsın (web avatar noktasıyla aynı desen).
   dot: {
-    position: 'absolute',
+    position: "absolute",
     right: -1,
     bottom: -1,
     width: DOT,
     height: DOT,
     borderRadius: DOT / 2,
     borderWidth: 3,
-    borderColor: theme.colors.bgSidebar,
+    borderColor: theme.colors.bgElevated,
   },
 });

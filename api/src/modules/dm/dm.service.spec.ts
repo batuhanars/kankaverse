@@ -20,6 +20,7 @@ const prismaMock = {
     update: jest.fn(),
   },
   channelMember: {
+    update: jest.fn(),
     findMany: jest.fn(),
     findUnique: jest.fn(),
     findFirst: jest.fn(),
@@ -604,6 +605,38 @@ describe('DmService — GROUP_DM mesaj T&S semantiği', () => {
     // ACCEPTED friendship → true
     prismaMock.friendship.findFirst.mockResolvedValue({ id: 'f-accepted' });
     expect(await service.isMutualFriend('a', 'b')).toBe(true);
+  });
+});
+
+// ── C20: markRead → read:self ─────────────────────────────────────────────────
+describe('DmService.markRead — C20 read:self', () => {
+  beforeEach(() => resetMocks());
+
+  it('read:self YALNIZ okuyana gider; karşı tarafa hiçbir olay gitmez', async () => {
+    const service = makeService();
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'm-1' });
+    prismaMock.channelMember.update.mockResolvedValue({});
+
+    await service.markRead('u-reader', 'ch-1');
+
+    const selfCalls = realtimeMock.emitToUser.mock.calls.filter((c) => c[1] === 'read:self');
+    expect(selfCalls).toHaveLength(1);
+    expect(selfCalls[0][0]).toBe('u-reader');
+    expect(selfCalls[0][2]).toEqual(
+      expect.objectContaining({ channelId: 'ch-1', guildId: null, readAt: expect.any(String) }),
+    );
+    // Başka kullanıcıya read:self yok
+    expect(
+      realtimeMock.emitToUser.mock.calls.every((c) => c[1] !== 'read:self' || c[0] === 'u-reader'),
+    ).toBe(true);
+  });
+
+  it('üye değilse read:self yayınlanmaz', async () => {
+    const service = makeService();
+    prismaMock.channelMember.findUnique.mockResolvedValue(null);
+
+    await expect(service.markRead('u-x', 'ch-1')).rejects.toThrow();
+    expect(realtimeMock.emitToUser).not.toHaveBeenCalled();
   });
 });
 

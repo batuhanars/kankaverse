@@ -166,9 +166,12 @@ export const useChannelsStore = defineStore('channels', () => {
     activeChannelId.value = id
   }
 
-  /** Kanalı okundu işaretle: POST /channels/:id/read → optimistik 0 + sunucudan otoritatif tazele */
-  async function markChannelRead(channelId: string, guildId?: string): Promise<void> {
-    // Optimistik: önce local'i sıfırla (anlık his)
+  /**
+   * Kanalı YALNIZ yerelde okundu yap (API çağrısı yok): unread + okunmamış-bahsetme sıfırlanır,
+   * guild sayacı yeniden hesaplanır. İki çağıranı var: `markChannelRead` (optimistik, ardından POST)
+   * ve C20 `read:self` (başka cihazım okudu, sunucu zaten yazdı). Çözülen guildId'yi döner.
+   */
+  function applyChannelReadLocal(channelId: string, guildId?: string): string | undefined {
     let resolvedGuildId = guildId
     for (const [loopGuildId, channels] of Object.entries(channelsByGuild.value)) {
       const idx = channels.findIndex((c) => c.id === channelId)
@@ -187,6 +190,12 @@ export const useChannelsStore = defineStore('channels', () => {
         new CustomEvent('kv:guild:recheck-unread', { detail: { guildId: resolvedGuildId } }),
       )
     }
+    return resolvedGuildId
+  }
+
+  /** Kanalı okundu işaretle: POST /channels/:id/read → optimistik 0 + sunucudan otoritatif tazele */
+  async function markChannelRead(channelId: string, guildId?: string): Promise<void> {
+    const resolvedGuildId = applyChannelReadLocal(channelId, guildId)
     try {
       await channelsApi.markRead(channelId)
       // Sunucu-otoritesi: POST başarılı → kanalları sunucudan tazele; guild sayacını gerçek toplamdan güncelle
@@ -212,6 +221,11 @@ export const useChannelsStore = defineStore('channels', () => {
     } catch {
       return // başarısızsa optimistik sıfırlama yapma
     }
+    applyAllReadLocal()
+  }
+
+  /** Tüm kanal + guild rozetlerini YALNIZ yerelde sıfırla (API yok; C20 `read:self` de kullanır). */
+  function applyAllReadLocal(): void {
     // Yüklü tüm kanalları sıfırla
     for (const gid of Object.keys(channelsByGuild.value)) {
       channelsByGuild.value[gid] = channelsByGuild.value[gid].map((c) =>
@@ -356,6 +370,8 @@ export const useChannelsStore = defineStore('channels', () => {
     setActiveChannel,
     markChannelRead,
     markAllRead,
+    applyChannelReadLocal,
+    applyAllReadLocal,
     markChannelUnread,
     totalUnreadForGuild,
     markChannelMentioned,

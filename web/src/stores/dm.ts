@@ -65,6 +65,12 @@ export const useDmStore = defineStore('dm', () => {
     if (ch) ch.unread = false
   }
 
+  /** C20 — başka cihazım bu DM'i okudu (WS `read:self`): yalnız yerel bayrak, API yok. */
+  function applyReadSelf(channelId: string) {
+    const ch = channels.value.find((c) => c.id === channelId)
+    if (ch) ch.unread = false
+  }
+
   /**
    * C12 §4.1 — WS `dm:read`: karşı taraf bu kanalı okudu.
    *
@@ -167,7 +173,10 @@ export const useDmStore = defineStore('dm', () => {
         // notu) takılı kalmış olabilir ve yeni mesajın ekranda görünmesi onu temizlemek için
         // doğru an. Önceden bu dal yalnız "set etme" diyordu, düşürmüyordu.
         ch.unread = false
-      } else if (opts?.countUnread !== false && payload.senderId !== myId) {
+      } else if (payload.senderId === myId) {
+        // C20: cevapladım = okudum (başka cihazımdan gönderdim; sunucu işaretçiyi ilerletti).
+        ch.unread = false
+      } else if (opts?.countUnread !== false) {
         ch.unread = true
       }
     } else {
@@ -245,6 +254,7 @@ export const useDmStore = defineStore('dm', () => {
     fetchChannels,
     openChannel,
     markRead,
+    applyReadSelf,
     removeChannel,
     setActiveChannel,
     activeChannel,

@@ -181,9 +181,9 @@ export const useDmStore = create<DmState>((set, get) => ({
     const unread =
       payload.channelId === activeDmChannelId
         ? false
-        : payload.senderId !== myId
-          ? true
-          : existing.unread;
+        : payload.senderId === myId
+          ? false // C20: cevapladım = okudum (başka cihazımdan gönderdim; sunucu işaretçiyi ilerletti)
+          : true;
 
     // Sprint M5f §3 — uygulama içi mesaj sesi. Rozet düşürme dalıyla AYNI ayrımı okur (kullanıcı
     // tam bu DM ekranındayken · gönderen BAŞKASI): kendi mesajında çalmaz, başka bir kanalda/DM

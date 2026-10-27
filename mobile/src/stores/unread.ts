@@ -53,6 +53,8 @@ interface UnreadState {
    * toplamından düşülür ve diğer kanalların meşru rozetini yanlışlıkla sıfırlar.
    */
   clearChannel: (channelId: string, guildId: string) => void;
+  /** C20 — başka cihazdan "tümünü okundu" (`read:self` + `channelIds`): bütün kanal/ortam sayaçları sıfır. */
+  clearAll: () => void;
   /** Oturum sonu — bir sonraki kullanıcı öncekinin rozetlerini görmesin (dm/friends store'daki
    *  aynı `reset()` deseni, (app)/_layout.tsx unmount'unda çağrılır). */
   reset: () => void;
@@ -137,6 +139,13 @@ export const useUnreadStore = create<UnreadState>((set) => ({
         },
       };
     });
+  },
+
+  clearAll() {
+    set((s) => ({
+      channels: Object.fromEntries(Object.keys(s.channels).map((id) => [id, { unread: 0, mentions: 0 }])),
+      guilds: Object.fromEntries(Object.keys(s.guilds).map((id) => [id, { unread: 0, mentions: 0 }])),
+    }));
   },
 
   reset() {

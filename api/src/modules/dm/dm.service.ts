@@ -628,8 +628,29 @@ export class DmService {
       data: { lastReadAt: readAt },
     });
 
+    // C20: kendi diğer cihazlarım (yalnız okuyan; karşı tarafa GİTMEZ).
+    this.emitReadSelf(userId, { channelId, guildId: null, readAt });
     await this.emitReadReceipt(channelId, userId, readAt);
     return null;
+  }
+
+  /**
+   * C20 — `read:self`: okumayı yapan kullanıcının KENDİ soketlerine (diğer cihazlar). Karşı tarafa
+   * asla gitmez, bu yüzden gizlilik kararı (`readReceiptDecision`) gerekmez. Hata okumayı bozmaz.
+   */
+  private emitReadSelf(
+    userId: string,
+    payload: { channelId: string; guildId: string | null; readAt: Date },
+  ): void {
+    try {
+      this.realtime.emitToUser(userId, 'read:self', {
+        channelId: payload.channelId,
+        guildId: payload.guildId,
+        readAt: payload.readAt.toISOString(),
+      });
+    } catch {
+      // kozmetik: bir sonraki liste çekimi doğru değeri taşır
+    }
   }
 
   /**

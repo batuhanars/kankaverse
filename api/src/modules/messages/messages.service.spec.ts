@@ -22,6 +22,7 @@ const prismaMock = {
   channelMember: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
+    updateMany: jest.fn(),
   },
   guildMember: {
     findUnique: jest.fn(),
@@ -417,6 +418,40 @@ describe('MessagesService.create — automod', () => {
 
     expect(automodMock.check).not.toHaveBeenCalled();
     expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+  });
+
+  // C20: göndermek = okumak
+  it('C20: DM gönderimi → gönderenin lastReadAt mesaj anına ilerler (tek updateMany)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    prismaMock.message.create.mockResolvedValue({ ...CREATED_MSG, channelId: CHANNEL_ID });
+
+    await service.create(USER_ID, CHANNEL_ID, DTO);
+
+    expect(prismaMock.channelMember.updateMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.channelMember.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({ channelId: CHANNEL_ID, userId: USER_ID }),
+      data: { lastReadAt: CREATED_MSG.createdAt },
+    });
+  });
+
+  it('C20: işaretçi yazımı patlasa da mesaj gönderimi başarılı', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    prismaMock.message.create.mockResolvedValue({ ...CREATED_MSG, channelId: CHANNEL_ID });
+    prismaMock.channelMember.updateMany.mockRejectedValue(new Error('db'));
+
+    const result = await service.create(USER_ID, CHANNEL_ID, DTO);
+    expect(result.id).toBe('msg-1');
+  });
+
+  it('C20: ortam kanalı gönderimi → okuma işaretçisi sorgusu YOK (kusur yok, dokunulmaz)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    automodMock.check.mockReturnValue({ blocked: false });
+    prismaMock.message.create.mockResolvedValue(CREATED_MSG);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
+    expect(prismaMock.channelMember.updateMany).not.toHaveBeenCalled();
   });
 
   it('DM kanalı + automod blocked mock olsa bile → automod çağrılmaz → mesaj oluşturulur', async () => {

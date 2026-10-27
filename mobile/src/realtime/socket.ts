@@ -12,6 +12,7 @@ import { useVoiceStore } from '@/stores/voice';
 import { useVoicePresenceStore } from '@/stores/voicePresence';
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence';
 import { presentIncomingCall, dismissIncomingCall } from '@/notifications/incomingCall';
+import { clearChannelNotifications } from '@/notifications/push';
 import { t } from '@/i18n';
 import type { MessageDto } from '@/api/messages';
 import type { FriendDto, FriendRequestDto } from '@/api/friends';
@@ -233,6 +234,23 @@ function ensureSocket(): Socket {
 
   socket.on('dm.message', (data: { channelId: string; lastMessage: { content: string; createdAt: string }; senderId: string }) => {
     useDmStore.getState().applyActivity(data);
+  });
+
+  // C20 — başka cihazım okudu / cevapladı (yalnız kendi soketlerime gelir). DM ise rozet düşer ve
+  // (uygulama açıkken) o sohbetin çekmecedeki bildirimleri temizlenir (M5e yardımcısı); ortam
+  // kanalıysa mevcut `clearChannel` yolu. `channelIds` = "tümünü okundu".
+  socket.on('read:self', (data: { channelId?: string; channelIds?: string[]; guildId: string | null }) => {
+    if (data.channelIds) {
+      useUnreadStore.getState().clearAll();
+      return;
+    }
+    if (!data.channelId) return;
+    if (data.guildId) {
+      useUnreadStore.getState().clearChannel(data.channelId, data.guildId);
+    } else {
+      useDmStore.getState().clearUnread(data.channelId);
+    }
+    void clearChannelNotifications(data.channelId);
   });
 
   // C9 — bana yeni mesaj isteği geldi. Web'de de sessiz: yalnız rozet tazelenir.

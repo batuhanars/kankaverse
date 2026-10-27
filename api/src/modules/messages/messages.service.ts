@@ -525,6 +525,25 @@ export class MessagesService {
       },
     });
 
+    // C20: DM/grup DM'de göndermek = okumak. Gönderenin okuma işaretçisi mesajın anına ilerler;
+    // yoksa diğer cihaz listeyi çekince kendi mesajı "okunmamış" görünür. Tek updateMany (ek sorgu 1).
+    // `dm:read` YAYINLANMAZ (C12: tik "okudu" demek, "cevap yazdı" değil). Ortam kanalında kusur yok:
+    // okunmamış sayımı `authorId != ben` ile kendi mesajını zaten saymıyor, dokunulmaz.
+    if (!channel.guildId) {
+      try {
+        await this.prisma.channelMember.updateMany({
+          where: {
+            channelId,
+            userId,
+            OR: [{ lastReadAt: null }, { lastReadAt: { lt: message.createdAt } }],
+          },
+          data: { lastReadAt: message.createdAt },
+        });
+      } catch {
+        // işaretçi kozmetik; mesaj gönderimini bozmaz
+      }
+    }
+
     // Attachment'ları mesaja bağla + scan-gate uygula
     if (hasAttachments) {
       // LANSMAN: ATTACHMENT_SCAN_ENABLED=true + gerçek CSAM tarayıcı bağlanmadan canlıya ALINMAZ (R5)

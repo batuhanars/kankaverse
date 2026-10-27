@@ -19,6 +19,9 @@ const prismaMock = {
   },
   channelRead: {
     upsert: jest.fn(),
+    updateMany: jest.fn(),
+    findMany: jest.fn(),
+    createMany: jest.fn(),
   },
   channelMember: {
     findMany: jest.fn(),
@@ -405,7 +408,9 @@ describe('ChannelsService.update — D54 refreshChannelPermissions tetikleyicisi
     prismaMock.channel.findUnique.mockResolvedValue(
       makeChannel({ type: 'GUILD_VOICE', mediaEnabled: true }),
     );
-    prismaMock.channel.update.mockResolvedValue(makeChannel({ type: 'GUILD_VOICE', mediaEnabled: true }));
+    prismaMock.channel.update.mockResolvedValue(
+      makeChannel({ type: 'GUILD_VOICE', mediaEnabled: true }),
+    );
 
     await service.update(USER_ID, CHANNEL_ID, { mediaEnabled: true });
 
@@ -416,7 +421,9 @@ describe('ChannelsService.update — D54 refreshChannelPermissions tetikleyicisi
     prismaMock.channel.findUnique.mockResolvedValue(
       makeChannel({ type: 'GUILD_TEXT', ageGated: false }),
     );
-    prismaMock.channel.update.mockResolvedValue(makeChannel({ type: 'GUILD_TEXT', ageGated: true }));
+    prismaMock.channel.update.mockResolvedValue(
+      makeChannel({ type: 'GUILD_TEXT', ageGated: true }),
+    );
 
     await service.update(USER_ID, CHANNEL_ID, { ageGated: true });
 
@@ -431,9 +438,9 @@ describe('ChannelsService.update — D54 refreshChannelPermissions tetikleyicisi
     prismaMock.channel.update.mockResolvedValue(updated);
     voiceServiceMock.refreshChannelPermissions.mockRejectedValue(new Error('livekit down'));
 
-    await expect(service.update(USER_ID, CHANNEL_ID, { mediaEnabled: true })).resolves.toMatchObject(
-      { mediaEnabled: true },
-    );
+    await expect(
+      service.update(USER_ID, CHANNEL_ID, { mediaEnabled: true }),
+    ).resolves.toMatchObject({ mediaEnabled: true });
   });
 });
 
@@ -642,6 +649,34 @@ describe('ChannelsService.markRead', () => {
       }),
     );
     expect(result).toBeNull();
+  });
+
+  it('C20: markRead → read:self yalnız okuyana, guildId ile', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue({ id: CHANNEL_ID, guildId: 'g-1' });
+    prismaMock.channelRead.upsert.mockResolvedValue({});
+
+    await service.markRead(USER_ID, CHANNEL_ID);
+
+    expect(realtimeMock.emitToUser).toHaveBeenCalledTimes(1);
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(
+      USER_ID,
+      'read:self',
+      expect.objectContaining({
+        channelId: CHANNEL_ID,
+        guildId: 'g-1',
+        readAt: expect.any(String),
+      }),
+    );
+  });
+
+  it('C20: yayın patlasa da markRead başarılı', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue({ id: CHANNEL_ID, guildId: 'g-1' });
+    prismaMock.channelRead.upsert.mockResolvedValue({});
+    realtimeMock.emitToUser.mockImplementation(() => {
+      throw new Error('ws');
+    });
+
+    await expect(service.markRead(USER_ID, CHANNEL_ID)).resolves.toBeNull();
   });
 });
 
@@ -1469,5 +1504,28 @@ describe('ChannelsService.findByGuild — @everyone bastırma kanal rozeti (R14)
       targetType: 'GUILD',
       targetId: GUILD_ID,
     });
+  });
+});
+
+// ── C20: read-all → read:self ────────────────────────────────────────────────
+
+describe('ChannelsService.markAllRead — C20 read:self', () => {
+  it('tek olayla channelIds taşır, yalnız okuyana gider', async () => {
+    resetMocks();
+    const service = makeService();
+    prismaMock.guildMember.findMany.mockResolvedValue([{ guildId: 'g-1' }]);
+    prismaMock.channel.findMany.mockResolvedValue([{ id: 'c-1' }, { id: 'c-2' }]);
+    prismaMock.channelRead.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.channelRead.findMany.mockResolvedValue([{ channelId: 'c-1' }]);
+    prismaMock.channelRead.createMany.mockResolvedValue({ count: 1 });
+
+    await service.markAllRead(USER_ID);
+
+    expect(realtimeMock.emitToUser).toHaveBeenCalledTimes(1);
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(
+      USER_ID,
+      'read:self',
+      expect.objectContaining({ channelIds: ['c-1', 'c-2'], guildId: null }),
+    );
   });
 });

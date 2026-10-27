@@ -231,13 +231,25 @@ export class ChannelsService {
 
   /** POST /channels/:id/read — kanaldaki son mesajı okundu işaretle */
   async markRead(userId: string, channelId: string) {
-    await this.membership.requireChannelAccess(userId, channelId);
+    const channel = await this.membership.requireChannelAccess(userId, channelId);
 
+    const readAt = new Date();
     await this.prisma.channelRead.upsert({
       where: { userId_channelId: { userId, channelId } },
-      update: { lastReadAt: new Date() },
-      create: { userId, channelId, lastReadAt: new Date() },
+      update: { lastReadAt: readAt },
+      create: { userId, channelId, lastReadAt: readAt },
     });
+
+    // C20: kendi diğer cihazlarıma (yalnız okuyan). Yayın hatası okumayı bozmaz.
+    try {
+      this.realtime.emitToUser(userId, 'read:self', {
+        channelId,
+        guildId: channel?.guildId ?? null,
+        readAt: readAt.toISOString(),
+      });
+    } catch {
+      // kozmetik
+    }
 
     return null;
   }
@@ -278,6 +290,17 @@ export class ChannelsService {
         data: missing.map((channelId) => ({ userId, channelId, lastReadAt: now })),
         skipDuplicates: true,
       });
+    }
+
+    // C20: kendi diğer cihazlarıma tek olayla (yalnız okuyan).
+    try {
+      this.realtime.emitToUser(userId, 'read:self', {
+        channelIds,
+        guildId: null,
+        readAt: now.toISOString(),
+      });
+    } catch {
+      // kozmetik
     }
 
     return null;

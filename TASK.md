@@ -4361,3 +4361,14 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Tur revizeleri (sahip, 2026-10-27): kendi kartında avatar hover · "Ortamlarım" kartları hover'da oynar · Keşfet'te üye kartının tamamı tıklanır ("Git" düğmesi kalktı) · mobil seçili simgede harf titremesi giderildi (statik altta, hareketli onLoad ile üstte) · mobil Keşfet rayda pusula ("+" menüsünden çıktı) · mobil Keşfet tek sütun afişli kart · mobil DM panelinde yatay kanka şeridi (statik avatar + durum noktası) · "Sunucuya Git" → "Ortama Git"
 - [x] §7 ek: ray/Keşfet/öneri hareketli (web + mobil)
 - [ ] Mağaza sürümü (C18 ile birlikte versionCode 27)
+
+## Sprint C20 — Cihazlar arası okundu senkronu — 2026-10-27
+
+> Sözleşme: `contracts/SPRINT_C20_CROSS_DEVICE_READ_CONTRACT.md`. api → web + mobil. Şema yok. vc27'ye girer.
+> Kök sebep: DM'de göndermek gönderenin `lastReadAt`ini ilerletmiyordu. Ortam kanalında kusur yok.
+
+- [x] api: göndermek DM işaretçisini ilerletiyor + `read:self` yayını + testler (1204 test)
+- [x] web + mobil: `read:self` ve kendi `dm.message`'ım unread düşürüyor; mobilde açık uygulamada bildirim temizleniyor
+- [x] build/test temiz (api tsc bilinen 2; web vue-tsc bilinen 6 + vite build; mobil typecheck + lint)
+- [x] PLAN D62 dördüncü gerekçe
+- [x] Sahip turu (iki cihaz, yerel) — 2026-10-27 geçti
