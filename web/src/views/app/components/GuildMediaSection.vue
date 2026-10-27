@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * GuildMediaSection (Sprint C19): ortam simgesi ve afişi. Profil düzenlemedeki akışın aynısı:
- * dosya seç, AnimatedClipModal (statik görsel = konumlandırma, GIF/video = kesit + konum), anında uygulanır.
+ * "Değiştir" → MediaSourceDialog (C22: görsel / GIF-video; Kaldır sayfada, yalnız görsel varken), AnimatedClipModal (statik görsel = konumlandırma, GIF/video = kesit + konum), anında uygulanır.
  * Kaldırma da anında (eski PATCH ucu; hareketli alanı da temizler).
  */
 import { ref, computed } from 'vue'
@@ -10,12 +10,9 @@ import { useGuildsStore } from '@/stores/guilds'
 import { useToastStore } from '@/stores/toast'
 import KvButton from '@/components/ui/KvButton.vue'
 import AnimatedClipModal from '@/components/shared/AnimatedClipModal.vue'
-import {
-  ANIMATED_ACCEPT,
-  ANIMATED_TYPES,
-  ANIMATED_GIF_MAX_BYTES,
-  STATIC_IMAGE_TYPES,
-} from '@/utils/animatedMedia'
+import MediaSourceDialog from '@/components/shared/MediaSourceDialog.vue'
+import { useAuthStore } from '@/stores/auth'
+import { ANIMATED_TYPES, ANIMATED_GIF_MAX_BYTES } from '@/utils/animatedMedia'
 import type { AnimatedTarget } from '@/api/users'
 import type { GuildDto } from '@/types'
 
@@ -25,6 +22,7 @@ const emit = defineEmits<{ updated: [guild: GuildDto] }>()
 const { t } = useI18n()
 const guildsStore = useGuildsStore()
 const toast = useToastStore()
+const authStore = useAuthStore()
 
 type Kind = 'icon' | 'banner'
 // i18n anahtar öneki: guildSettings.{prefix}Section|Hint|Upload|Remove
@@ -33,14 +31,22 @@ const KINDS: { kind: Kind; target: AnimatedTarget; prefix: string }[] = [
   { kind: 'banner', target: 'GUILD_BANNER', prefix: 'bannerImage' },
 ]
 
-const animatedDisabled = ref(false)
-const accept = computed(() =>
-  animatedDisabled.value
-    ? STATIC_IMAGE_TYPES.join(',')
-    : `${STATIC_IMAGE_TYPES.join(',')},${ANIMATED_ACCEPT}`,
+// Hareketli kapısı sunucudan gelir (C22); tahmin yok
+const animatedAllowed = computed(() => authStore.user?.animatedAllowed === true)
+
+// choiceKind pencere kapanınca da kalır: dosya seçici pencere kapandıktan sonra yanıt verir
+const choiceKind = ref<Kind>('icon')
+const choiceOpen = ref(false)
+const choiceTarget = computed(() => KINDS.find((k) => k.kind === choiceKind.value)!)
+const choiceTitle = computed(() =>
+  t(choiceKind.value === 'icon' ? 'media.source.title.guildIcon' : 'media.source.title.guildBanner'),
 )
 
-const inputs = ref<Record<Kind, HTMLInputElement | null>>({ icon: null, banner: null })
+function openChoice(kind: Kind) {
+  choiceKind.value = kind
+  choiceOpen.value = true
+}
+
 const errors = ref<Record<Kind, string>>({ icon: '', banner: '' })
 const clipFile = ref<File | null>(null)
 const clipTarget = ref<AnimatedTarget>('GUILD_ICON')
@@ -50,18 +56,11 @@ function hasMedia(kind: Kind): boolean {
   return kind === 'icon' ? !!props.guild.iconUrl : !!props.guild.bannerUrl
 }
 
-function onPick(kind: Kind, target: AnimatedTarget, event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) return
+function onPick(file: File) {
+  const { kind, target } = choiceTarget.value
   errors.value[kind] = ''
   if (!ANIMATED_TYPES.includes(file.type)) {
     errors.value[kind] = t('profile.animated.errorType')
-    return
-  }
-  if (animatedDisabled.value && !STATIC_IMAGE_TYPES.includes(file.type)) {
-    errors.value[kind] = t('profile.animated.disabled')
     return
   }
   if (file.type.startsWith('image/') && file.size > ANIMATED_GIF_MAX_BYTES) {
@@ -81,7 +80,6 @@ function onDone(result: unknown) {
 }
 
 function onClipDisabled() {
-  animatedDisabled.value = true
   errors.value[clipTarget.value === 'GUILD_ICON' ? 'icon' : 'banner'] = t('profile.animated.disabled')
   clipFile.value = null
 }
@@ -115,28 +113,24 @@ async function remove(kind: Kind) {
         {{ t(`guildSettings.${k.prefix}Hint`) }}
       </p>
       <div class="flex flex-wrap gap-2">
-        <KvButton size="sm" :disabled="disabled || busy" @click="inputs[k.kind]?.click()">
+        <KvButton size="sm" :disabled="disabled || busy" @click="openChoice(k.kind)">
           {{ t(`guildSettings.${k.prefix}Upload`) }}
         </KvButton>
-        <KvButton
-          v-if="hasMedia(k.kind)"
-          size="sm"
-          variant="danger"
-          :disabled="disabled || busy"
-          @click="remove(k.kind)"
-        >
+        <!-- Kaldır sayfada, yalnız görsel varken (sahip kararı 2026-10-27: pencere yalnız yükleme yeri) -->
+        <KvButton v-if="hasMedia(k.kind)" size="sm" variant="danger" :disabled="disabled || busy" @click="remove(k.kind)">
           {{ t(`guildSettings.${k.prefix}Remove`) }}
         </KvButton>
       </div>
       <p v-if="errors[k.kind]" class="text-[12px] mt-2" style="color: var(--kv-danger);">{{ errors[k.kind] }}</p>
-      <input
-        :ref="(el) => (inputs[k.kind] = el as HTMLInputElement | null)"
-        type="file"
-        :accept="accept"
-        class="hidden"
-        @change="onPick(k.kind, k.target, $event)"
-      />
     </section>
+
+    <MediaSourceDialog
+      :open="choiceOpen"
+      :title="choiceTitle"
+      :animated-allowed="animatedAllowed"
+      @close="choiceOpen = false"
+      @file="onPick"
+    />
 
     <AnimatedClipModal
       v-if="clipFile"

@@ -20,6 +20,7 @@ import * as QRCode from 'qrcode';
 import { AuthTokenType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../../shared/email/email.service';
+import { AnimatedMediaService } from '../../shared/media/animated-media.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { Login2faDto } from './dto/login-2fa.dto';
@@ -79,7 +80,13 @@ export class AuthService implements OnModuleInit {
     private jwtService: JwtService,
     private config: ConfigService,
     private emailService: EmailService,
+    private animatedMedia: AnimatedMediaService,
   ) {}
+
+  /** C22: UserDto + hareketli yükleme kapısı (tek kaynak canCreateAnimated). */
+  private userDto(user: User) {
+    return toUserDto(user, this.animatedMedia.canCreateAnimated(user));
+  }
 
   async onModuleInit() {
     this.dummyHash = await argon2.hash('dummy-timing-placeholder', ARGON2_OPTIONS);
@@ -184,7 +191,7 @@ export class AuthService implements OnModuleInit {
       user.email,
       clientType,
     );
-    return { user: toUserDto(user), accessToken, refreshToken };
+    return { user: this.userDto(user), accessToken, refreshToken };
   }
 
   /**
@@ -300,7 +307,7 @@ export class AuthService implements OnModuleInit {
       user.email,
       clientType,
     );
-    return { type: 'session', user: toUserDto(user), accessToken, refreshToken };
+    return { type: 'session', user: this.userDto(user), accessToken, refreshToken };
   }
 
   async login2fa(dto: Login2faDto, ip?: string, clientType?: 'mobile' | null) {
@@ -351,7 +358,7 @@ export class AuthService implements OnModuleInit {
       user.email,
       clientType,
     );
-    return { user: toUserDto(user), accessToken, refreshToken };
+    return { user: this.userDto(user), accessToken, refreshToken };
   }
 
   /**
@@ -469,7 +476,7 @@ export class AuthService implements OnModuleInit {
         error: 'ACCOUNT_DELETION_PENDING',
       });
     }
-    return toUserDto(user);
+    return this.userDto(user);
   }
 
   // ── E-posta doğrulama (2A) ─────────────────────────────────────────────────
@@ -490,7 +497,7 @@ export class AuthService implements OnModuleInit {
       where: { id: user.id },
       data: { emailVerifiedAt: new Date() },
     });
-    return { user: toUserDto(updated) };
+    return { user: this.userDto(updated) };
   }
 
   async resendVerification(userId: string) {
@@ -734,7 +741,7 @@ export class AuthService implements OnModuleInit {
       where: { id: userId },
       data: { username: newUsername },
     });
-    return { user: toUserDto(updated) };
+    return { user: this.userDto(updated) };
   }
 
   async changeEmail(userId: string, dto: ChangeEmailDto) {
@@ -778,7 +785,7 @@ export class AuthService implements OnModuleInit {
       where: { id: token.userId },
       data: { email: token.payload, emailVerifiedAt: new Date() },
     });
-    return { user: toUserDto(updated) };
+    return { user: this.userDto(updated) };
   }
 
   async undoEmailChange(rawToken: string) {

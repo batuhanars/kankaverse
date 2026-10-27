@@ -67,3 +67,11 @@ export interface CropFractions {
   width: number
   height: number
 }
+
+// Sprint C22: seçim penceresinde "GIF / video yükle" yanındaki "Yeni" etiketi bu tarihte (14 gün) kendiliğinden kalkar.
+// Mobil aynı sabiti kendi animatedMedia.ts dosyasında tutar; değiştirirsen ikisini birlikte güncelle.
+export const ANIMATED_NEW_BADGE_UNTIL = '2026-11-10'
+export const STATIC_ACCEPT = STATIC_IMAGE_TYPES.join(',')
+export function showAnimatedNewBadge(now: Date = new Date()): boolean {
+  return now.getTime() < new Date(`${ANIMATED_NEW_BADGE_UNTIL}T00:00:00`).getTime()
+}

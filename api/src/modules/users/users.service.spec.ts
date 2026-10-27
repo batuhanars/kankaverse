@@ -42,7 +42,7 @@ function makeService() {
     new ImageUploadService(storageMock as any, configMock as any),
     dmPermissionMock as any,
     voiceMock as any,
-    {} as any, // AnimatedMediaService (bu spec'te kullanılmaz)
+    { canCreateAnimated: () => true } as any, // AnimatedMediaService (yalniz C22 animatedAllowed icin)
   );
 }
 

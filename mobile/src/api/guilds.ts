@@ -20,6 +20,8 @@ export interface GuildSummaryDto {
   bannerUrl: string | null;
   /** C19: hareketli afis (WebP); normal `Image` yuzeylerinde azaltilmis hareket kapaliyken gosterilir. */
   bannerAnimatedUrl?: string | null;
+  /** C6 afiş rengi preset anahtarı; afiş görseli yokken gradyan (`bannerColors`). */
+  bannerColor?: string | null;
   // M1e-B — Genel ayarlar ekranı için. Hepsi `toGuildDto`'da ZATEN dönüyordu, tiplenmemişti.
   adultsOnly: boolean;
   description: string | null;
@@ -285,6 +287,12 @@ export const guildsApi = {
   /** `storageKey: null` → simgeyi kaldır. */
   async setIcon(guildId: string, storageKey: string | null): Promise<GuildSummaryDto> {
     const res = await http.patch<GuildSummaryDto>(`/guilds/${guildId}/icon`, { storageKey });
+    return res.data;
+  },
+
+  /** `storageKey: null` → afişi kaldır (web ile aynı uç; hareketli alanı da temizler). */
+  async setBanner(guildId: string, storageKey: string | null): Promise<GuildSummaryDto> {
+    const res = await http.patch<GuildSummaryDto>(`/guilds/${guildId}/banner`, { storageKey });
     return res.data;
   },
 };

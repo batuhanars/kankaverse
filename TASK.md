@@ -4385,3 +4385,17 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Sahip turu (web + mobil) — 2026-10-27 geçti
 - [x] Tur revizeleri: "Kategorisiz kanal ekle" → "Kanal Ekle" · tüm emoji düğmeleri tepki düğmesi standardında gri çizgi simge (web `EmojiFaceIcon`, mobil `happy-outline`)
 - [ ] Mağaza sürümü (vc28)
+
+## Sprint C22 — Görsel / GIF-video seçim penceresi — 2026-10-27
+
+> Sözleşme: `contracts/SPRINT_C22_MEDIA_SOURCE_CHOICE_CONTRACT.md`. api (bir alan) → web + mobil. vc29.
+> Sebep: hareketli yükleme bulunamıyordu (sahibin arkadaşı); ileride ücretlendirme için ayrı giriş.
+
+- [x] §1 api: `animatedAllowed` + test
+- [x] §2 web: dört giriş noktası pencereden
+- [x] §3 mobil: dört giriş noktası sayfadan
+- [x] build/test temiz
+- [x] R7 (oturum DTO'suna yalnız `animatedAllowed` alanı) — sahip deploy talimatıyla onayladı 2026-10-27
+- [x] Sahip turu (web + mobil) — 2026-10-27 geçti
+- [x] Tur revizeleri: web'de Kaldır pencereden çıktı, sayfada yalnız görsel varken (mobilde alt sayfada kalır) · mobil ortam ayarları profil düzeninde (afiş + üstüne binen simge, kalemler; "Ortam Afişi" satırı kalktı)
+- [x] Mağaza sürümü (vc29) — AAB derlendi 2026-10-27

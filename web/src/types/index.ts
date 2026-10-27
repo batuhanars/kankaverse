@@ -52,6 +52,7 @@ export interface UserDto {
   emailVerified: boolean
   twoFactorEnabled: boolean // Sprint 2B
   friendCode: string // Sprint 3
+  animatedAllowed?: boolean // Sprint C22 — hareketli (GIF/video) yükleme kapısı; sunucu yine otorite
   isModerator?: boolean // Sprint 4B — backend toUserDto'da eklenmesi gerekir
   bio: string | null // Sprint C5 — profil metni
   bannerColor: string | null // profil afiş rengi (preset anahtar veya null=varsayılan)

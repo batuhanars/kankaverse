@@ -80,6 +80,14 @@ async function fileSize(uri: string, fallback = 0): Promise<number> {
   }
 }
 
+export type ProfileMediaMode = 'static' | 'animated';
+
+/** C22: "Yeni" etiketi bu tarihte (14 gun) kendiliginden kalkar. Web `ANIMATED_NEW_BADGE_UNTIL` ile ayni. */
+export const ANIMATED_NEW_BADGE_UNTIL = '2026-11-10';
+export function showAnimatedNewBadge(now: Date = new Date()): boolean {
+  return now.getTime() < new Date(`${ANIMATED_NEW_BADGE_UNTIL}T00:00:00`).getTime();
+}
+
 /**
  * Galeriden gorsel VEYA video sec.
  *
@@ -88,20 +96,29 @@ async function fileSize(uri: string, fallback = 0): Promise<number> {
  * oldugu gibi gelir. Bunun sonucu: statik gorsel eskiden `quality: 0.9` ile gelirdi, simdi
  * orijinal boyutta gelir; 2 MB sinirini asarsa burada sikistirilir (C8 sinirinin aynisi).
  */
-export async function pickProfileMedia(allowAnimated = true): Promise<PickedProfileMedia | null> {
+/** C22: `mode` secim sayfasindaki secenegi belirler: 'static' yalniz PNG/JPEG/WebP, 'animated' yalniz GIF/video. */
+export async function pickProfileMedia(mode: ProfileMediaMode): Promise<PickedProfileMedia | null> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) return null;
 
-  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: allowAnimated ? ['images', 'videos'] : ['images'] });
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: mode === 'animated' ? ['images', 'videos'] : ['images'],
+  });
   if (result.canceled || !result.assets?.length) return null;
 
   const asset = result.assets[0];
   const contentType = guessType(asset);
+  const isGif = contentType === 'image/gif';
+  const isVideo = asset.type === 'video' || contentType.startsWith('video/');
 
-  if (allowAnimated && contentType === 'image/gif') {
-    return { kind: 'gif', uri: asset.uri, contentType, size: asset.fileSize ?? (await fileSize(asset.uri)) };
+  // Secici GIF'i "gorsel" olarak da listeler; yanlis secenekten gelen dosya acik bir mesajla reddedilir.
+  if (mode === 'static' && isGif) throw new AnimatedPickError('media.source.errorStaticOnly');
+  if (mode === 'animated' && !isGif && !isVideo) throw new AnimatedPickError('media.source.errorAnimatedOnly');
+
+  if (isGif) {
+    return { kind: 'gif', uri: asset.uri, contentType: 'image/gif', size: asset.fileSize ?? (await fileSize(asset.uri)) };
   }
-  if (allowAnimated && (asset.type === 'video' || contentType.startsWith('video/'))) {
+  if (isVideo) {
     if (!ANIMATED_VIDEO_TYPES.includes(contentType)) throw new AnimatedPickError('profile.animated.errorType');
     return {
       kind: 'video',

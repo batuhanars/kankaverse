@@ -1453,6 +1453,25 @@
     "updateAfterCall": "Uygulamanın yeni bir sürümü yayınlandı. Görüşme bitince otomatik yenilenecek.",
     "chunkLoadFailed": "Bir ekran yüklenemedi. Sayfayı yenilemeyi dene, sürerse bize bildir."
   },
+  "media": {
+    "source": {
+      "title": {
+        "avatar": "Profil fotoğrafını değiştir",
+        "banner": "Profil afişini değiştir",
+        "guildIcon": "Ortam simgesini değiştir",
+        "guildBanner": "Ortam afişini değiştir"
+      },
+      "image": "Görsel yükle",
+      "imageHint": "PNG, JPEG veya WebP",
+      "animated": "GIF / video yükle",
+      "animatedHint": "Hareketli, en fazla 6 saniye",
+      "animatedOff": "Şu an kullanılamıyor",
+      "newBadge": "Yeni",
+      "remove": "Kaldır",
+      "errorAnimatedOnly": "Bu hareketli bir dosya değil. Görsel için \"Görsel yükle\" seçeneğini kullan.",
+      "errorStaticOnly": "Hareketli dosyalar için \"GIF / video yükle\" seçeneğini kullan."
+    }
+  },
   "common": {
     "cancel": "İptal",
     "close": "Kapat",
@@ -1891,7 +1910,6 @@
     "guildSettings": {
       "channelsTitle": "Kanallar",
       "generalTitle": "Genel Ayarlar",
-      "bannerTitle": "Ortam Afişi",
       "invitesEmpty": "Aktif davet yok. Yeni bir davet oluşturabilirsin.",
       "inviteRevokeConfirm": "{code} kodlu daveti iptal etmek istediğine emin misin? Bu kodla kimse katılamaz.",
       "edit": "Düzenle",

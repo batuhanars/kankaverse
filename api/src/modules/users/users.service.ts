@@ -401,7 +401,7 @@ export class UsersService {
       where: { id: userId },
       data,
     });
-    return toUserDto(user);
+    return toUserDto(user, this.animatedMedia.canCreateAnimated(user));
   }
 
   // ─── C8: Avatar (self) ────────────────────────────────────────────────────
@@ -419,7 +419,7 @@ export class UsersService {
       // C13 değişmez kural: statik set/kaldır hareketli alanı null'lar (avatarUrl artık hareketlinin karesi değil).
       data: { avatarUrl, avatarAnimatedUrl: null },
     });
-    return toUserDto(user);
+    return toUserDto(user, this.animatedMedia.canCreateAnimated(user));
   }
 
   // ─── C8: Profil afişi (self) ──────────────────────────────────────────────
@@ -436,7 +436,7 @@ export class UsersService {
       where: { id: userId },
       data: { bannerUrl, bannerAnimatedUrl: null },
     });
-    return toUserDto(user);
+    return toUserDto(user, this.animatedMedia.canCreateAnimated(user));
   }
 
   // ─── C13: Hareketli avatar / afiş ─────────────────────────────────────────
@@ -449,7 +449,7 @@ export class UsersService {
   /** POST /users/me/{avatar|banner}/animated — işle ve güncel kullanıcıyı dön. */
   async setAnimated(userId: string, target: 'AVATAR' | 'BANNER', dto: ProcessAnimatedDto) {
     const user = await this.animatedMedia.process(userId, target, dto);
-    return toUserDto(user);
+    return toUserDto(user, this.animatedMedia.canCreateAnimated(user));
   }
 
   /**

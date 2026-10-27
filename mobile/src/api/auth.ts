@@ -25,6 +25,8 @@ export interface UserDto {
   /** C13: hareketli avatar (WebP); yalniz kendi profil DTO'sunda. */
   avatarAnimatedUrl?: string | null;
   bannerAnimatedUrl?: string | null;
+  /** C22: hareketli (GIF/video) yükleme kapısı; sunucu `canCreateAnimated`. Yoksa kapalı sayılır. */
+  animatedAllowed?: boolean;
   // Sprint M1b — Arkadaş Ekle ekranı "kendi kodum" için (`toUserDto` zaten dönüyor, sıfır backend;
   // sözleşme §2 kanıt notu). 6 karakter (`send-friend-request.dto.ts` `@Length(6,6)`).
   friendCode: string;

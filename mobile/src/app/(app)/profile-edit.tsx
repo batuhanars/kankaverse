@@ -15,14 +15,15 @@ import { extractErrorMessage } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth';
 import { ProfileMediaFields, type MediaSlot } from '@/components/me/ProfileMediaFields';
 import { BannerSheet } from '@/components/me/BannerSheet';
-import { MAX_IMAGE_BYTES, putImage } from '@/utils/imageUpload';
 import {
   ANIMATED_GIF_MAX_BYTES,
   AnimatedPickError,
   pickProfileMedia,
   type PickedProfileMedia,
+  type ProfileMediaMode,
 } from '@/utils/animatedMedia';
 import { AnimatedClipSheet, type ClipMedia } from '@/components/me/AnimatedClipSheet';
+import { MediaSourceSheet } from '@/components/me/MediaSourceSheet';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -62,9 +63,12 @@ export default function ProfileEditScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [savedNotice, setSavedNotice] = useState('');
   const [bannerSheet, setBannerSheet] = useState(false);
-  // C13: seçilen GIF/video kesit panelinde; ANIMATED_DISABLED gelirse bu oturumda statik moda düşülür.
+  // C13: seçilen görsel/GIF/video konumlandırma-kesit panelinde.
   const [clip, setClip] = useState<{ media: ClipMedia; slot: MediaSlot } | null>(null);
-  const [animatedOff, setAnimatedOff] = useState(false);
+  // C22: "Değiştir" önce seçim sayfasını açar; slot sayfa kapanınca da kalır (seçici/kaldırma sonradan çalışır).
+  const [sourceSlot, setSourceSlot] = useState<MediaSlot>('avatar');
+  const [sourceOpen, setSourceOpen] = useState(false);
+  const animatedAllowed = useAuthStore((s) => s.user?.animatedAllowed === true);
 
   const userId = user?.id;
   useFocusEffect(
@@ -101,54 +105,46 @@ export default function ProfileEditScreen() {
     }
   }
 
-  /** Seç → presign → PUT → PATCH. Her adımın hatası sunucunun mesajıyla gösterilir. */
-  async function onPickAndUpload(slot: MediaSlot) {
+  function openSource(slot: MediaSlot) {
     if (uploading) return;
+    setSourceSlot(slot);
+    setSourceOpen(true);
+  }
+
+  /** Seç (görsel ya da GIF/video, sayfadaki seçeneğe göre) → konumlandırma / kesit paneli. */
+  async function onPick(mode: ProfileMediaMode) {
+    setSourceOpen(false);
     setErrorMessage('');
     setSavedNotice('');
 
     let image: PickedProfileMedia | null;
     try {
-      image = await pickProfileMedia(!animatedOff);
+      image = await pickProfileMedia(mode);
     } catch (e) {
       if (e instanceof AnimatedPickError) setErrorMessage(t(e.key));
       return;
     }
     if (!image) return;
-    // C13b: statik görsel de konumlandırma panelinden geçer. Hareketli kapalıysa (animatedOff) sunucu
-    // aynı uçları kapatabileceği için eski C8 yoluna düşülür (konumlandırmasız).
-    if (image.kind !== 'static' || !animatedOff) {
-      if (image.kind === 'gif' && image.size > ANIMATED_GIF_MAX_BYTES) {
-        setErrorMessage(t('profile.animated.errorGifSize'));
-        return;
-      }
-      setClip({ media: image, slot });
+    if (image.kind === 'gif' && image.size > ANIMATED_GIF_MAX_BYTES) {
+      setErrorMessage(t('profile.animated.errorGifSize'));
       return;
     }
-    // Sunucu da reddeder ama kullanıcıyı yüklemeyi bekletip sonra reddetmek kötü tasarım.
-    if (image.size > MAX_IMAGE_BYTES) {
-      setErrorMessage(t('settings.avatar.errorSize'));
-      return;
-    }
+    setClip({ media: image, slot: sourceSlot });
+  }
 
+  /** Mevcut görseli kaldırır (sunucu hareketli alanı da temizler). */
+  async function onRemove() {
+    const slot = sourceSlot;
+    setSourceOpen(false);
+    setErrorMessage('');
     setUploading(slot);
     try {
-      const presign =
-        slot === 'avatar'
-          ? await usersApi.presignAvatar(image.contentType)
-          : await usersApi.presignBanner(image.contentType);
-      await putImage(presign, image);
-      if (slot === 'avatar') await usersApi.setAvatar(presign.storageKey);
-      else await usersApi.setBanner(presign.storageKey);
-
+      if (slot === 'avatar') await usersApi.setAvatar(null);
+      else await usersApi.setBanner(null);
       if (userId) setCard(await usersApi.getCard(userId));
-      // Avatar oturum kullanıcısında da duruyor (rail/başlıklar oradan okuyor) → tazele.
       if (slot === 'avatar') await refreshUser().catch(() => {});
     } catch (e) {
-      setErrorMessage(
-        extractErrorMessage(e) ||
-          (slot === 'avatar' ? t('settings.avatar.errorUpload') : t('settings.bannerImage.errorUpload')),
-      );
+      setErrorMessage(extractErrorMessage(e));
     } finally {
       setUploading(null);
     }
@@ -215,9 +211,8 @@ export default function ProfileEditScreen() {
           username={user.username}
           card={card}
           uploading={uploading}
-          // Afişte önce panel açılır (renk mi görsel mi); avatarda doğrudan galeri — avatarın
-          // rengi yok, araya bir soru koymak gereksiz dokunuş olurdu.
-          onEdit={(slot) => (slot === 'banner' ? setBannerSheet(true) : onPickAndUpload('avatar'))}
+          // Afişte önce renk/görsel paneli, avatarda doğrudan kaynak seçim sayfası (C22).
+          onEdit={(slot) => (slot === 'banner' ? setBannerSheet(true) : openSource('avatar'))}
         />
 
         {/* Biyografi */}
@@ -247,8 +242,17 @@ export default function ProfileEditScreen() {
         onPickColor={onPickBannerColor}
         onPickImage={() => {
           setBannerSheet(false);
-          void onPickAndUpload('banner');
+          openSource('banner');
         }}
+      />
+      <MediaSourceSheet
+        visible={sourceOpen}
+        title={t(sourceSlot === 'avatar' ? 'media.source.title.avatar' : 'media.source.title.banner')}
+        animatedAllowed={animatedAllowed}
+        canRemove={sourceSlot === 'avatar' ? !!card?.avatarUrl : !!card?.bannerUrl}
+        onClose={() => setSourceOpen(false)}
+        onPick={(mode) => void onPick(mode)}
+        onRemove={() => void onRemove()}
       />
       <AnimatedClipSheet
         media={clip?.media ?? null}
@@ -256,9 +260,8 @@ export default function ProfileEditScreen() {
         onClose={() => setClip(null)}
         onDone={() => clip && void onClipDone(clip.slot)}
         onDisabled={() => {
-          // Bayrak kapalı: statik moda düş, kullanıcıya söyle (C8 UPLOADS_DISABLED deseni).
+          // Sunucu reddetti: sebebi söyle. Kapı artık sunucudan okunur (C22), tahmin yok.
           setClip(null);
-          setAnimatedOff(true);
           setErrorMessage(t('profile.animated.disabled'));
         }}
       />

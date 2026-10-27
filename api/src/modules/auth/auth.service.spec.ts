@@ -53,7 +53,13 @@ function makePrismaMock() {
 
 function makeService(prismaMock: ReturnType<typeof makePrismaMock>) {
   const jwtService = new JwtService();
-  return new AuthService(prismaMock as any, jwtService, configMock as any, emailServiceMock as any);
+  return new AuthService(
+    prismaMock as any,
+    jwtService,
+    configMock as any,
+    emailServiceMock as any,
+    { canCreateAnimated: jest.fn().mockReturnValue(true) } as any,
+  );
 }
 
 function signRefreshToken(

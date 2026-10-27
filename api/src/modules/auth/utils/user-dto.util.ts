@@ -1,7 +1,7 @@
 import { User } from '@prisma/client';
 
 /** Prisma User → istemciye dönen UserDto. passwordHash/totpSecret vb. hassas alanlar ASLA dahil edilmez. */
-export function toUserDto(user: User) {
+export function toUserDto(user: User, animatedAllowed: boolean) {
   return {
     id: user.id,
     username: user.username,
@@ -23,5 +23,7 @@ export function toUserDto(user: User) {
     twoFactorEnabled: user.twoFactorEnabled,
     isModerator: user.isModerator,
     friendCode: user.friendCode,
+    // C22: hareketli yükleme kapısı (AnimatedMediaService.canCreateAnimated). İstemci arayüzü içindir; sunucu yine otoritedir.
+    animatedAllowed,
   };
 }
