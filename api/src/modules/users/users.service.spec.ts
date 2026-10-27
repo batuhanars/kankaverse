@@ -149,6 +149,21 @@ describe('UsersService', () => {
       expect(callArg.data).not.toHaveProperty('bio');
     });
 
+    it('quickReactions data objesine yazılır; boş dizi sıfırlama olarak geçer (C24)', async () => {
+      prismaMock.user.update.mockResolvedValue({
+        id: 'u1',
+        createdAt: CREATED_AT,
+        emailVerifiedAt: null,
+        quickReactions: [],
+      });
+      const res = await service.updateProfile('u1', { quickReactions: [] });
+      expect(prismaMock.user.update).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data: { quickReactions: [] },
+      });
+      expect(res.quickReactions).toEqual(['👍', '❤️', '😂', '😮', '😢']);
+    });
+
     it('boş dto → boş data (hiçbir alan değişmez)', async () => {
       prismaMock.user.update.mockResolvedValue({
         id: 'u1',

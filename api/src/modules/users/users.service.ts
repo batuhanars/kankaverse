@@ -391,11 +391,13 @@ export class UsersService {
       dmPolicy?: DmPolicy;
       bannerColor?: string | null;
       readReceipts?: boolean;
+      quickReactions?: string[];
     } = {};
     if (dto.bio !== undefined) data.bio = dto.bio;
     if (dto.dmPolicy !== undefined) data.dmPolicy = dto.dmPolicy;
     if (dto.bannerColor !== undefined) data.bannerColor = dto.bannerColor;
     if (dto.readReceipts !== undefined) data.readReceipts = dto.readReceipts;
+    if (dto.quickReactions !== undefined) data.quickReactions = dto.quickReactions;
 
     const user = await this.prisma.user.update({
       where: { id: userId },

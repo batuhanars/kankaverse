@@ -11,6 +11,7 @@ import { Transform } from 'class-transformer';
 import { DmPolicy } from '@prisma/client';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { BANNER_PRESET_KEYS } from '../../../common/banner-presets';
+import { DEFAULT_QUICK_REACTIONS, IsQuickReactions } from '../../../common/quick-reactions';
 
 /**
  * PATCH /users/me body. Yalnız verilen alanlar güncellenir (undefined → değişmez).
@@ -48,4 +49,14 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsBoolean({ message: 'Okundu bilgisi tercihi geçersiz.' })
   readReceipts?: boolean;
+
+  // C24: hızlı tepki şeridi. Boş dizi = varsayılana dön; aksi halde tam 5 farklı tek-emoji.
+  @ApiPropertyOptional({
+    type: [String],
+    example: DEFAULT_QUICK_REACTIONS,
+    description: 'Hızlı tepkiler: boş dizi (varsayılana dön) veya tam 5 farklı emoji.',
+  })
+  @IsOptional()
+  @IsQuickReactions()
+  quickReactions?: string[];
 }

@@ -1,4 +1,5 @@
 import { User } from '@prisma/client';
+import { effectiveQuickReactions } from '../../../common/quick-reactions';
 
 /** Prisma User → istemciye dönen UserDto. passwordHash/totpSecret vb. hassas alanlar ASLA dahil edilmez. */
 export function toUserDto(user: User, animatedAllowed: boolean) {
@@ -16,6 +17,8 @@ export function toUserDto(user: User, animatedAllowed: boolean) {
     dmPolicy: user.dmPolicy,
     // C12: okundu bilgisi paylaşımı (karşılıklı). İstemci Gizlilik ekranında kendi durumunu okur.
     readReceipts: user.readReceipts,
+    // C24: etkin hızlı tepki şeridi (kayıtlı ya da varsayılan beşli).
+    quickReactions: effectiveQuickReactions(user.quickReactions),
     isMinor: user.isMinor,
     verificationStatus: user.verificationStatus,
     createdAt: user.createdAt.toISOString(),

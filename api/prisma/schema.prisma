@@ -112,6 +112,7 @@ model User {
   mediaPolicy         MediaPolicy        @default(FRIENDS)
   profileDiscoverable Boolean            @default(true)
   readReceipts        Boolean            @default(true) // C12: okundu bilgisi paylaşımı (karşılıklı, sözleşme §2)
+  quickReactions      String[]           @default([]) // C24: hızlı tepki şeridi; boş = varsayılan beşli
   emailVerifiedAt     DateTime?
   avatarUrl           String?
   bio                 String?
