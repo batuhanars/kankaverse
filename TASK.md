@@ -4386,6 +4386,60 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Tur revizeleri: "Kategorisiz kanal ekle" → "Kanal Ekle" · tüm emoji düğmeleri tepki düğmesi standardında gri çizgi simge (web `EmojiFaceIcon`, mobil `happy-outline`)
 - [ ] Mağaza sürümü (vc28)
 
+## Sprint C27 — Mobilde düzenleme ortada açılan ekranda — 2026-10-27
+
+> Sözleşme: `contracts/SPRINT_C27_MOBILE_EDIT_OVERLAY_CONTRACT.md`. Yalnız mobil, vc31. Yanıt şeridi değişmez.
+> Sebep: sahip fikri (WhatsApp düzenleme deseni); yan kazanç: düzenlemeye geçmek kutudaki taslağı silmiyor.
+
+- [x] mobil: Düzenle + sola kaydırma → ortada düzenleme ekranı (balon önizleme + alt alan)
+- [x] mobil: kutunun düzenleme modu kalktı, taslak korunuyor
+- [x] typecheck/lint temiz
+- [x] Sahip turu (telefon) — 2026-10-27 geçti
+
+## Sprint C26 — Mobil üye listesi gruplaması web ile eşit — 2026-10-27
+
+> Sözleşme: `contracts/SPRINT_C26_MOBILE_MEMBER_GROUPS_CONTRACT.md`. Yalnız mobil, vc31. M2c §4.3 kuralını değiştirir.
+> Sebep: sahip bulgusu (mobilde "Rolsüz", web'de hoist rol + Çevrimiçi/Çevrimdışı).
+
+- [x] mobil: hoist rol grupları + Çevrimiçi + Çevrimdışı (web kuralı)
+- [x] typecheck/lint temiz
+- [x] Sahip turu (web ve telefonda aynı liste) — 2026-10-27 geçti
+
+## Sprint C25 — Yapıştırarak ve sürükle-bırakla dosya ekleme (web) — 2026-10-27
+
+> Sözleşme: `contracts/SPRINT_C25_PASTE_DROP_ATTACH_CONTRACT.md`. Yalnız web (masaüstü aynı web'i yükler).
+> Sebep: sahip isteği (ekran görüntüsünü Ctrl+V ile yapıştırma, dosya sürükle-bırak).
+
+- [x] web: Ctrl+V ile dosya/ekran görüntüsü → ek akışı (kanal + DM)
+- [x] web: sürükle-bırak katmanı → ek akışı (kanal + DM)
+- [x] web: dosya alımı tek composable'da; alan dışına bırakma sayfayı terk etmiyor
+- [x] build temiz
+- [x] Sahip turu (tarayıcı) — 2026-10-27 geçti (masaüstü uygulamasında alan dışına bırakma ayrıca denenmedi)
+
+## Sprint C24 — Düzenlenebilir hızlı tepkiler + seçicide sık kullanılanlar — 2026-10-27
+
+> Sözleşme: `contracts/SPRINT_C24_EMOJI_FAVORITES_CONTRACT.md`. api → web + mobil. vc31 (C23 ile aynı sürüm).
+> Sebep: sahip isteği (WhatsApp deseni); hızlı tepki varsayılan kalır ama kullanıcı düzenler.
+
+- [x] §1 api: `User.quickReactions` + PATCH doğrulama + DTO + test + migration uygulandı
+- [x] §2 web: şerit sunucudan + ayarlarda düzenleme + sık kullanılanlar
+- [x] §3 mobil: şerit sunucudan + düzenleme + sık kullanılanlar
+- [x] build/test temiz
+- [x] R7 (`toUserDto`'ya `quickReactions`) — sahip deploy talimatıyla onayladı 2026-10-27
+- [x] Sahip turu (web + telefon) — 2026-10-27 geçti
+
+## Sprint C23 — Sohbette ayrı GIF girişi + mobilde kaydırarak alıntı — 2026-10-27
+
+> Sözleşme: `contracts/SPRINT_C23_GIF_TAB_SWIPE_REPLY_CONTRACT.md`. Yalnız web + mobil (api yok). vc31.
+> Sebep: sohbette GIF bulunamıyordu; mobilde alıntı için kısa yol isteği. GIF kütüphanesi (Klipy) sonraki sprint.
+
+- [x] §1 web: emoji yanında GIF düğmesi (yalnız image/gif → mevcut ek akışı); simge Discord deseni (dolu kutu, oyulmuş GIF)
+- [x] §2 mobil: Emoji | GIF sekmeli alt sayfa (GIF = yalnız yükleme)
+- [x] §2 mobil: sağa kaydırarak alıntı
+- [x] build/test temiz
+- [x] Sahip turu (web + telefon) — 2026-10-27 geçti
+- [ ] Mağaza sürümü (vc31)
+
 ## Sprint C22 — Görsel / GIF-video seçim penceresi — 2026-10-27
 
 > Sözleşme: `contracts/SPRINT_C22_MEDIA_SOURCE_CHOICE_CONTRACT.md`. api (bir alan) → web + mobil. vc29.
