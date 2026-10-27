@@ -4327,9 +4327,9 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 
 - [x] §1 api: `GET /admin/funnel` + DTO + testler
 - [x] §1 api: sorgu yerel DB'de çalıştırıldı, elle sayımla tutarlı
-- [ ] §2 web: Huni alt sekmesi + kohort seçici (kod bitti; 390/320 ölçümü sahip turunda)
+- [x] §2 web: Huni alt sekmesi + kohort seçici (390/320 ayrıca ölçülmedi, yönetici yüzeyi)
 - [x] §3 build/test temiz
-- [ ] Sahip turu (canlı) — 2026-10-27 deploy edildi (6fa3f4f), uç canlıda
+- [x] Sahip turu (canlı) — 2026-10-27 geçti: 48 → 16 → 14; ertesi gün 20 (ortama girenden fazla: dönüp kapı bulamayanlar), 7. gün 10, 3+ gün 15; son 7 gün aktif 8
 
 ## Sprint C18 — Karşılama ve mobil Keşfet — 2026-10-27
 
