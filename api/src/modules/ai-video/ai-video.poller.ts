@@ -4,7 +4,8 @@ import { AiVideoGeneration, AiVideoStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../shared/storage/storage.service';
 import {
-  AI_DOWNLOAD_ATTEMPTS,
+  AI_DOWNLOAD_GIVEUP_MS,
+  AI_DOWNLOAD_RETRY_DELAYS_MS,
   AI_JOB_TIMEOUT_MS,
   AI_OUTPUT_MAX_BYTES,
   AI_POLL_INTERVAL_MS,
@@ -13,6 +14,7 @@ import {
   AiVideoError,
 } from './ai-video.constants';
 import { mapPikaErrorCode } from './ai-video.mapper';
+import { AiVideoRecoveryService } from './ai-video-recovery.service';
 import { PikaClient, PikaJob } from './pika.client';
 
 /** Maliyet henüz kesinleşmemiş tamamlanmış işler için yeniden okuma penceresi / aralığı. */
@@ -31,9 +33,13 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(AiVideoPoller.name);
   private timer: NodeJS.Timeout | null = null;
   private running = false;
-  /** Bellek içi: satırın ilk görüldüğü an (zaman aşımı) ve indirme deneme sayısı. Yeniden başlatmada sıfırlanır. */
-  private readonly firstSeen = new Map<string, number>();
+  /**
+   * Bellek içi: indirme deneme sayısı + son deneme anı (yalnız yeniden deneme aralığı için). Yeniden
+   * başlatmada sıfırlanır → hemen yeniden dener, zararsız. İş zaman aşımı ve 24 sa sayacı DB'den
+   * (createdAt / providerCompletedAt) türer, yeniden başlatmaya dayanıklıdır.
+   */
   private readonly downloadFails = new Map<string, number>();
+  private readonly downloadLastTry = new Map<string, number>();
   private readonly billingNextAt = new Map<string, number>();
 
   constructor(
@@ -41,6 +47,7 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
     private storage: StorageService,
     private pika: PikaClient,
     private config: ConfigService,
+    private recovery: AiVideoRecoveryService,
   ) {}
 
   onApplicationBootstrap() {
@@ -58,6 +65,7 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
     if (this.running) return;
     this.running = true;
     try {
+      await this.recovery.maybeRecover(now);
       const rows = await this.prisma.aiVideoGeneration.findMany({
         where: {
           providerJobId: { not: null },
@@ -84,9 +92,16 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
   private async processRow(row: AiVideoGeneration, now: number): Promise<void> {
     if (row.status === AiVideoStatus.COMPLETED) return this.recheckBilling(row, now);
 
-    const seen = this.firstSeen.get(row.id) ?? now;
-    this.firstSeen.set(row.id, seen);
-    if (now - seen > AI_JOB_TIMEOUT_MS) return this.fail(row.id, AiVideoError.TIMEOUT);
+    const downloading = row.providerCompletedAt !== null;
+    if (downloading) {
+      if (now - row.providerCompletedAt!.getTime() > AI_DOWNLOAD_GIVEUP_MS) {
+        return this.fail(row.id, AiVideoError.DOWNLOAD_FAILED);
+      }
+      if (!this.retryDue(row.id, now)) return;
+    } else if (now - row.createdAt.getTime() > AI_JOB_TIMEOUT_MS) {
+      // İş zaman aşımı yalnız Pika queued/running iken işler; indirme aşamasında işlemez.
+      return this.fail(row.id, AiVideoError.TIMEOUT);
+    }
 
     const job = await this.pika.getJob(row.providerJobId!);
     if (job.status === 'completed') return this.complete(row, job, now);
@@ -100,27 +115,51 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
+  /** Maliyet indirmeden bağımsız yazılır; indirme başarısızsa satır RUNNING + DOWNLOAD_PENDING kalır. */
   private async complete(row: AiVideoGeneration, job: PikaJob, now: number): Promise<void> {
-    if (!job.outputUrl) return this.downloadFailed(row.id);
+    const cost = this.settledCost(job);
+    const costData = cost !== null ? { costMicroUsd: cost } : {};
     const outputKey = `${AI_VIDEO_PREFIX}/${row.userId}/${row.id}.mp4`;
     try {
+      if (!job.outputUrl) throw new Error('çıktı adresi yok');
       const bytes = await this.pika.downloadVideo(job.outputUrl, AI_OUTPUT_MAX_BYTES);
       await this.storage.putPrivate(outputKey, bytes, 'video/mp4');
     } catch (err) {
       this.logger.warn(`çıktı indirilemedi: id=${row.id} ${(err as Error).message}`);
-      return this.downloadFailed(row.id);
+      this.downloadFails.set(row.id, (this.downloadFails.get(row.id) ?? 0) + 1);
+      this.downloadLastTry.set(row.id, now);
+      await this.prisma.aiVideoGeneration.update({
+        where: { id: row.id },
+        data: {
+          status: AiVideoStatus.RUNNING,
+          errorCode: AiVideoError.DOWNLOAD_PENDING,
+          providerCompletedAt: row.providerCompletedAt ?? new Date(now),
+          ...costData,
+        },
+      });
+      return;
     }
-    const cost = this.settledCost(job);
     await this.prisma.aiVideoGeneration.update({
       where: { id: row.id },
       data: {
         status: AiVideoStatus.COMPLETED,
         outputKey,
+        errorCode: null,
         completedAt: new Date(now),
-        ...(cost !== null && { costMicroUsd: cost }),
+        providerCompletedAt: row.providerCompletedAt ?? new Date(now),
+        ...costData,
       },
     });
     this.forget(row.id);
+  }
+
+  /** Artan aralık (1, 2, 5, 10 dk ...): son deneme bellek içi; kayıt yoksa (yeniden başlatma) hemen. */
+  private retryDue(id: string, now: number): boolean {
+    const last = this.downloadLastTry.get(id);
+    if (last === undefined) return true;
+    const delays = AI_DOWNLOAD_RETRY_DELAYS_MS;
+    const idx = Math.min((this.downloadFails.get(id) ?? 1) - 1, delays.length - 1);
+    return now - last >= delays[idx];
   }
 
   /** Maliyet `pending`/`unavailable` ise tamamlanmış satır sonraki turlarda yeniden okunur. */
@@ -137,12 +176,6 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
     } else if (job.billing?.state === 'unavailable') {
       this.billingNextAt.set(row.id, now + BILLING_UNAVAILABLE_RETRY_MS);
     }
-  }
-
-  private async downloadFailed(id: string): Promise<void> {
-    const fails = (this.downloadFails.get(id) ?? 0) + 1;
-    this.downloadFails.set(id, fails);
-    if (fails >= AI_DOWNLOAD_ATTEMPTS) await this.fail(id, AiVideoError.PROVIDER_ERROR);
   }
 
   private settledCost(job: PikaJob): number | null {
@@ -163,7 +196,7 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   private forget(id: string): void {
-    this.firstSeen.delete(id);
     this.downloadFails.delete(id);
+    this.downloadLastTry.delete(id);
   }
 }

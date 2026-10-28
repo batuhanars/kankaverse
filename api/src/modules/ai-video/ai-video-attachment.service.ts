@@ -49,7 +49,7 @@ export class AiVideoAttachmentService {
       });
     }
     const row = await this.prisma.aiVideoGeneration.findFirst({
-      where: { id: generationId, userId },
+      where: { id: generationId, userId, deletedAt: null },
     });
     if (!row) throw new NotFoundException('Üretim bulunamadı.');
     if (row.status !== AiVideoStatus.COMPLETED || !row.outputKey) {

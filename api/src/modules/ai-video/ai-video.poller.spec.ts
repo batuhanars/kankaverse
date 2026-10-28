@@ -8,6 +8,8 @@ function setup(rowOver: Record<string, unknown> = {}) {
     status: AiVideoStatus.QUEUED,
     providerJobId: 'media_1',
     costMicroUsd: null,
+    createdAt: new Date(),
+    providerCompletedAt: null,
     ...rowOver,
   };
   const prisma = {
@@ -19,8 +21,15 @@ function setup(rowOver: Record<string, unknown> = {}) {
   const storage = { putPrivate: jest.fn().mockResolvedValue(undefined) };
   const pika = { getJob: jest.fn(), downloadVideo: jest.fn() };
   const config = { get: () => true };
-  const poller = new AiVideoPoller(prisma as any, storage as any, pika as any, config as any);
-  return { poller, prisma, storage, pika };
+  const recovery = { maybeRecover: jest.fn().mockResolvedValue(undefined) };
+  const poller = new AiVideoPoller(
+    prisma as any,
+    storage as any,
+    pika as any,
+    config as any,
+    recovery as any,
+  );
+  return { poller, prisma, storage, pika, recovery };
 }
 const lastUpdate = (p: ReturnType<typeof setup>) =>
   p.prisma.aiVideoGeneration.update.mock.calls.at(-1)![0].data;
@@ -92,26 +101,72 @@ describe('AiVideoPoller durum esleme', () => {
     expect(lastUpdate(t)).toEqual({ costMicroUsd: 190_000 });
   });
 
-  it('indirme 3 kez basarisiz: FAILED AI_VIDEO_PROVIDER_ERROR', async () => {
+  it('indirme basarisiz: FAILED degil, RUNNING + DOWNLOAD_PENDING, maliyet yazilir, aralik artar', async () => {
     const s = setup({ status: AiVideoStatus.RUNNING });
+    s.pika.getJob.mockResolvedValue({
+      status: 'completed',
+      outputUrl: 'u',
+      billing: { state: 'settled', chargeMicroUsd: 200_000 },
+    });
+    s.pika.downloadVideo.mockRejectedValue(new Error('net'));
+    const t0 = Date.now();
+    await s.poller.tick(t0);
+    expect(lastUpdate(s)).toMatchObject({
+      status: AiVideoStatus.RUNNING,
+      errorCode: 'AI_VIDEO_DOWNLOAD_PENDING',
+      costMicroUsd: 200_000,
+    });
+    expect(lastUpdate(s).providerCompletedAt).toBeInstanceOf(Date);
+    const pending = {
+      id: 'g1',
+      userId: 'u1',
+      status: AiVideoStatus.RUNNING,
+      providerJobId: 'media_1',
+      costMicroUsd: 200_000,
+      createdAt: new Date(t0),
+      providerCompletedAt: new Date(t0),
+    };
+    (s.prisma.aiVideoGeneration.findMany as jest.Mock).mockResolvedValue([pending]);
+    s.pika.getJob.mockClear();
+    await s.poller.tick(t0 + 30_000);
+    expect(s.pika.getJob).not.toHaveBeenCalled();
+    s.pika.downloadVideo.mockResolvedValue(Buffer.from('mp4'));
+    await s.poller.tick(t0 + 61_000);
+    expect(lastUpdate(s)).toMatchObject({ status: AiVideoStatus.COMPLETED, errorCode: null });
+  });
+
+  it('indirme asamasinda is zaman asimi islemez; completed + 24 saat: DOWNLOAD_FAILED', async () => {
+    const t0 = Date.now();
+    const s = setup({
+      status: AiVideoStatus.RUNNING,
+      createdAt: new Date(t0 - 3 * 3600_000),
+      providerCompletedAt: new Date(t0 - 3 * 3600_000),
+    });
     s.pika.getJob.mockResolvedValue({ status: 'completed', outputUrl: 'u', billing: null });
     s.pika.downloadVideo.mockRejectedValue(new Error('net'));
-    await s.poller.tick();
-    await s.poller.tick();
-    expect(s.prisma.aiVideoGeneration.update).not.toHaveBeenCalled();
-    await s.poller.tick();
-    expect(lastUpdate(s)).toMatchObject({
+    await s.poller.tick(t0);
+    expect(lastUpdate(s)).toMatchObject({ errorCode: 'AI_VIDEO_DOWNLOAD_PENDING' });
+
+    const f = setup({
+      status: AiVideoStatus.RUNNING,
+      providerCompletedAt: new Date(t0 - 24 * 3600_000 - 1),
+    });
+    await f.poller.tick(t0);
+    expect(lastUpdate(f)).toMatchObject({
       status: AiVideoStatus.FAILED,
-      errorCode: 'AI_VIDEO_PROVIDER_ERROR',
+      errorCode: 'AI_VIDEO_DOWNLOAD_FAILED',
     });
   });
 
-  it('15 dakikayi gecen is: FAILED AI_VIDEO_TIMEOUT', async () => {
-    const s = setup();
-    s.pika.getJob.mockResolvedValue({ status: 'running', billing: null });
+  it('60 dakikayi gecen is (createdAt): FAILED AI_VIDEO_TIMEOUT; 59 dk hala yoklanir', async () => {
     const t0 = Date.now();
+    const ok = setup({ createdAt: new Date(t0 - 59 * 60_000) });
+    ok.pika.getJob.mockResolvedValue({ status: 'running', billing: null });
+    await ok.poller.tick(t0);
+    expect(ok.pika.getJob).toHaveBeenCalled();
+    const s = setup({ createdAt: new Date(t0 - 60 * 60_000 - 1) });
     await s.poller.tick(t0);
-    await s.poller.tick(t0 + 15 * 60_000 + 1);
+    expect(s.recovery.maybeRecover).toHaveBeenCalledWith(t0);
     expect(lastUpdate(s)).toMatchObject({
       status: AiVideoStatus.FAILED,
       errorCode: 'AI_VIDEO_TIMEOUT',

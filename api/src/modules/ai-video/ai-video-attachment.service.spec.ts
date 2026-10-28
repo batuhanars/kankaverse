@@ -42,7 +42,7 @@ describe('AiVideoAttachmentService.createFromGeneration [R7]', () => {
     const { service, prisma, storage } = setup();
     expect(await service.createFromGeneration('u1', 'g1')).toEqual({ attachmentId: 'att1' });
     expect(prisma.aiVideoGeneration.findFirst).toHaveBeenCalledWith({
-      where: { id: 'g1', userId: 'u1' },
+      where: { id: 'g1', userId: 'u1', deletedAt: null },
     });
     const destKey = storage.copy.mock.calls[0][1] as string;
     expect(storage.copy).toHaveBeenCalledWith('ai-video/u1/g1.mp4', destKey);

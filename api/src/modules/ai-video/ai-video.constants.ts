@@ -9,10 +9,14 @@ export const AI_OUTPUT_MAX_BYTES = 50 * MB;
 export const AI_PROMPT_MAX = 1000;
 /** Teklif (estimate) önbellek ömrü; önbellek tek instance bellek içi (C14b §6). */
 export const AI_ESTIMATE_TTL_MS = 10 * 60 * 1000;
-/** Yoklayıcı: iş bu süreyi aşarsa AI_VIDEO_TIMEOUT. */
-export const AI_JOB_TIMEOUT_MS = 15 * 60 * 1000;
+/** Yoklayıcı: iş bu süreyi aşarsa AI_VIDEO_TIMEOUT (yavaş kuyruk için geniş; sonradan tamamlanan kurtarılır). */
+export const AI_JOB_TIMEOUT_MS = 60 * 60 * 1000;
 export const AI_POLL_INTERVAL_MS = 5000;
-export const AI_DOWNLOAD_ATTEMPTS = 3;
+/** C14c: indirme yeniden deneme aralıkları (dk; sonuncusu tekrarlanır) ve Pika completed sonrası pes etme süresi. */
+export const AI_DOWNLOAD_RETRY_DELAYS_MS = [1, 2, 5, 10].map((m) => m * 60_000);
+export const AI_DOWNLOAD_GIVEUP_MS = 24 * 60 * 60 * 1000;
+export const AI_RECOVERY_INTERVAL_MS = 60 * 60 * 1000;
+export const AI_RECOVERY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 export const AI_RECENT_LIMIT = 10;
 
 export const AI_INPUT_TYPES: Record<string, string> = {
@@ -30,6 +34,9 @@ export const AiVideoError = {
   CONTENT_REJECTED: 'AI_VIDEO_CONTENT_REJECTED',
   INSUFFICIENT_BALANCE: 'AI_VIDEO_INSUFFICIENT_BALANCE',
   TIMEOUT: 'AI_VIDEO_TIMEOUT',
+  DOWNLOAD_PENDING: 'AI_VIDEO_DOWNLOAD_PENDING',
+  DOWNLOAD_FAILED: 'AI_VIDEO_DOWNLOAD_FAILED',
+  BUSY: 'AI_VIDEO_BUSY',
 } as const;
 
 /** Bugünkü harcamaya sayılan durumlar için yardımcı. */

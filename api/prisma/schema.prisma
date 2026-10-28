@@ -749,6 +749,8 @@ model AiVideoGeneration {
   outputKey     String? // özel bucket: ai-video/{userId}/{id}.mp4
   createdAt     DateTime      @default(now())
   completedAt   DateTime?
+  providerCompletedAt DateTime? // Pika completed gorulen an (indirme 24 sa sayaci)
+  deletedAt     DateTime? // yumusak silme: satir harcama kaydi olarak kalir
   attachments   Attachment[]
 
   @@index([userId, createdAt])

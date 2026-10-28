@@ -39,6 +39,8 @@ interface RawJob {
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
+const DOWNLOAD_IDLE_MS = 30_000;
+const DOWNLOAD_TOTAL_MS = 30 * 60_000;
 
 /**
  * Pika HTTP istemcisi (yalnız `fetch`). API anahtarı yalnız `X-API-Key` başlığında Pika sunucusuna gider;
@@ -53,7 +55,7 @@ export class PikaClient {
   }
 
   private async request(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'DELETE',
     path: string,
     body?: unknown,
     extraHeaders?: Record<string, string>,
@@ -142,22 +144,50 @@ export class PikaClient {
     return job;
   }
 
-  /** Çıktı videosunu akışla indirir; `maxBytes` aşılırsa fırlatır. Anahtar GÖNDERİLMEZ. */
-  async downloadVideo(url: string, maxBytes: number): Promise<Buffer> {
-    const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
-    if (!res.ok || !res.body) throw new PikaError(res.status, `Çıktı indirme ${res.status}`);
-    const type = res.headers.get('content-type') ?? '';
-    if (!type.startsWith('video/mp4') && !type.startsWith('application/octet-stream')) {
-      throw new PikaError(res.status, `Beklenmeyen çıktı türü: ${type}`);
+  /** İş medyasını Pika'da siler (204; tekrar güvenli). 404 başarı sayılır; diğer hatalar fırlatır. */
+  async deleteJob(jobId: string): Promise<void> {
+    const { status, json } = await this.request(
+      'DELETE',
+      `/v1/media/jobs/${encodeURIComponent(jobId)}`,
+    );
+    if (status !== 204 && status !== 404) this.fail(status, json);
+  }
+
+  /**
+   * Çıktı videosunu akışla indirir; `maxBytes` aşılırsa fırlatır. Anahtar GÖNDERİLMEZ.
+   * C14c: toplam süre değil BOŞTA kalma zaman aşımı (yavaş CDN ~28 KB/s verir): `idleMs` boyunca bayt
+   * gelmezse keser, her chunk sayacı sıfırlar; `totalMs` mutlak üst sınır.
+   */
+  async downloadVideo(
+    url: string,
+    maxBytes: number,
+    idleMs: number = DOWNLOAD_IDLE_MS,
+    totalMs: number = DOWNLOAD_TOTAL_MS,
+  ): Promise<Buffer> {
+    const ctrl = new AbortController();
+    let idle = setTimeout(() => ctrl.abort(), idleMs);
+    const total = setTimeout(() => ctrl.abort(), totalMs);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal });
+      if (!res.ok || !res.body) throw new PikaError(res.status, `Çıktı indirme ${res.status}`);
+      const type = res.headers.get('content-type') ?? '';
+      if (!type.startsWith('video/mp4') && !type.startsWith('application/octet-stream')) {
+        throw new PikaError(res.status, `Beklenmeyen çıktı türü: ${type}`);
+      }
+      const chunks: Buffer[] = [];
+      let seen = 0;
+      for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+        clearTimeout(idle);
+        idle = setTimeout(() => ctrl.abort(), idleMs);
+        seen += chunk.length;
+        if (seen > maxBytes) throw new PikaError(res.status, 'Çıktı çok büyük');
+        chunks.push(Buffer.from(chunk));
+      }
+      return Buffer.concat(chunks);
+    } finally {
+      clearTimeout(idle);
+      clearTimeout(total);
     }
-    const chunks: Buffer[] = [];
-    let seen = 0;
-    for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
-      seen += chunk.length;
-      if (seen > maxBytes) throw new PikaError(res.status, 'Çıktı çok büyük');
-      chunks.push(Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks);
   }
 }
 

@@ -61,6 +61,7 @@ export class AiVideoService {
         durations: m.durations,
         resolutions: m.resolutions,
         supportsImage: true,
+        audio: m.audio,
       })),
       dailyCapUsd: this.dailyCapMicro() / MICRO,
       todaySpentUsd: usd(await this.todaySpentMicro(userId)),
@@ -122,7 +123,7 @@ export class AiVideoService {
 
   async list(userId: string) {
     const rows = await this.prisma.aiVideoGeneration.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       take: AI_RECENT_LIMIT,
     });
@@ -248,7 +249,9 @@ export class AiVideoService {
   }
 
   private async findOwned(userId: string, id: string): Promise<AiVideoGeneration> {
-    const row = await this.prisma.aiVideoGeneration.findFirst({ where: { id, userId } });
+    const row = await this.prisma.aiVideoGeneration.findFirst({
+      where: { id, userId, deletedAt: null },
+    });
     if (!row) throw new NotFoundException('Üretim bulunamadı.');
     return row;
   }

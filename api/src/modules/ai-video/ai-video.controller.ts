@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -12,6 +13,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AiVideoService } from './ai-video.service';
 import { AiVideoInputService } from './ai-video-input.service';
+import { AiVideoDeleteService } from './ai-video-delete.service';
 import { AiVideoAttachmentService } from './ai-video-attachment.service';
 import { CreateAiVideoDto, EstimateAiVideoDto, PresignAiInputDto } from './dto/ai-video.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -32,6 +34,7 @@ export class AiVideoController {
     private service: AiVideoService,
     private attachments: AiVideoAttachmentService,
     private input: AiVideoInputService,
+    private deletion: AiVideoDeleteService,
   ) {}
 
   @Post('input/presign')
@@ -83,5 +86,18 @@ export class AiVideoController {
   @ApiOperation({ summary: 'Tek üretimin durumu (diyalog yoklar)' })
   get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.get(user.id, id);
+  }
+
+  @Delete()
+  @ApiOperation({ summary: 'Silinebilir (QUEUED/RUNNING olmayan) tüm üretimlerimi sil' })
+  deleteAll(@CurrentUser() user: AuthUser) {
+    return this.deletion.deleteAll(user.id);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Tek üretimi sil (sürerken 409 AI_VIDEO_BUSY)' })
+  deleteOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.deletion.deleteOne(user.id, id);
   }
 }

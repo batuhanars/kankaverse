@@ -21,6 +21,8 @@ export const AI_VIDEO_MESSAGES: Record<string, string> = {
     'Bu istem içerik kurallarına takıldı. İstemi değiştirip tekrar dene.',
   [AiVideoError.INSUFFICIENT_BALANCE]: 'Pika bakiyesi bitti.',
   [AiVideoError.TIMEOUT]: 'Üretim çok uzun sürdü ve iptal edildi.',
+  [AiVideoError.DOWNLOAD_FAILED]: 'Video üretildi ama kaydedilemedi.',
+  [AiVideoError.BUSY]: 'Üretim sürerken silinemez.',
 };
 
 export const usd = (micro: number): number => micro / MICRO;

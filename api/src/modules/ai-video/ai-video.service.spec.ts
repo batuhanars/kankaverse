@@ -352,3 +352,32 @@ describe('AiVideoService.get / sumSpentMicro', () => {
     ).toBe(590_000);
   });
 });
+
+describe('AiVideoService C14c', () => {
+  it('options: modelde audio doner', async () => {
+    const s = setup();
+    const o = await s.service.options('u1');
+    expect(o.models.map((m) => [m.key, m.audio])).toEqual([
+      ['pika-2.5', 'none'],
+      ['wan-3.0', 'default'],
+      ['kling-3.0-turbo', 'always'],
+    ]);
+  });
+
+  it('liste ve tek okuma silinmisleri suzer; todaySpent suzmez (silinmis harcama sayilir)', async () => {
+    const s = setup();
+    await s.service.list('u1');
+    expect(s.prisma.aiVideoGeneration.findMany.mock.calls[0][0].where).toMatchObject({
+      deletedAt: null,
+    });
+    await s.service.get('u1', 'g1');
+    expect(s.prisma.aiVideoGeneration.findFirst.mock.calls.at(-1)![0].where).toMatchObject({
+      deletedAt: null,
+    });
+    s.prisma.aiVideoGeneration.findMany.mockClear();
+    await s.service.options('u1');
+    expect(s.prisma.aiVideoGeneration.findMany.mock.calls[0][0].where).not.toHaveProperty(
+      'deletedAt',
+    );
+  });
+});

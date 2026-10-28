@@ -8,6 +8,8 @@ export interface AiVideoModelSpec {
   resolutions: string[];
   durationField: string;
   imageField: string;
+  /** Ses: none = sessiz, default = varsayılan açık, always = her zaman sesli. */
+  audio: 'none' | 'default' | 'always';
   /** Her gövdeye eklenen sabit alanlar. */
   fixed: Record<string, unknown>;
 }
@@ -21,16 +23,18 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     resolutions: ['480p', '720p'],
     durationField: 'duration_s',
     imageField: 'image',
+    audio: 'none',
     fixed: {},
   },
   {
     key: 'wan-3.0',
     label: 'Wan 3.0',
     apiBase: 'alibaba/wan3.0-video',
-    durations: [5, 10],
+    durations: [5, 10, 15, 20, 30],
     resolutions: ['480p', '720p'],
     durationField: 'duration',
     imageField: 'first_frame_url',
+    audio: 'default',
     fixed: { watermark: false },
   },
   {
@@ -41,6 +45,7 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     resolutions: ['720p'],
     durationField: 'duration',
     imageField: 'image_url',
+    audio: 'always',
     fixed: {},
   },
 ];
