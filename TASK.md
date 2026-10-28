@@ -4386,6 +4386,16 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Tur revizeleri: "Kategorisiz kanal ekle" → "Kanal Ekle" · tüm emoji düğmeleri tepki düğmesi standardında gri çizgi simge (web `EmojiFaceIcon`, mobil `happy-outline`)
 - [ ] Mağaza sürümü (vc28)
 
+## Sprint C14c — Yapay zeka video: dayanıklı indirme + kurtarma, silme, ses bilgisi — 2026-10-28
+
+> Sözleşme: `contracts/SPRINT_C14C_AI_VIDEO_RECOVERY_DELETE_CONTRACT.md`. api → web. R7-nötr.
+> Sebep: ödenmiş video kayboldu (Pika CDN yavaş obje, 120 sn indirme sınırı) + sahip silme isteği + ses karışıklığı.
+
+- [x] §1-3 api: idle zaman aşımı, indirme bekleyen durum, maliyet indirmeden bağımsız, kurtarma (açılış + saatlik, TIMEOUT dahil, iş zaman aşımı 60 dk), silme (Pika DELETE dahil), `audio`, §3b Wan 30 sn; 67 test
+- [ ] Canlıda kurtarma: kayıp böcek videosu geri geldi, maliyet yazılı
+- [x] §4 web: ses etiketleri, tek sil + Temizle (ConfirmDialog), Kaydediliyor durumu
+- [ ] Sahip turu
+
 ## Sprint C14b — Yapay zeka video ekranı (model/süre, canlı maliyet, Kaydet / Kaydet ve gönder, rozet) — 2026-10-28
 
 > Sözleşme: `contracts/SPRINT_C14B_AI_VIDEO_STUDIO_CONTRACT.md`. api → web. Mobil yok. R7: üretimden ek oluşturma + rozet.
