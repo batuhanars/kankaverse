@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { AiVideoSheet } from '../aiVideo/AiVideoSheet';
+import { useAuthStore } from '@/stores/auth';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
-import { showAnimatedNewBadge, type ProfileMediaMode } from '@/utils/animatedMedia';
+import { showAnimatedNewBadge, type PickedProfileMedia, type ProfileMediaMode } from '@/utils/animatedMedia';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -18,11 +21,17 @@ interface Props {
   onClose: () => void;
   onPick: (mode: ProfileMediaMode) => void;
   onRemove: () => void;
+  /** C14d: yapay zeka videosu "Kullan" ile indirildi; çağıran hareketli kesit akışına verir. */
+  onAiVideo?: (media: Extract<PickedProfileMedia, { kind: 'video' }>) => void;
 }
 
-export function MediaSourceSheet({ visible, title, animatedAllowed, canRemove, onClose, onPick, onRemove }: Props) {
+export function MediaSourceSheet({ visible, title, animatedAllowed, canRemove, onClose, onPick, onRemove, onAiVideo }: Props) {
   const bottomInset = useSheetInsets();
+  const [aiOpen, setAiOpen] = useState(false);
+  // C14d: kapı yalnız arayüz; sunucu otorite. Açık listede değilse seçenek hiç görünmez.
+  const aiAllowed = useAuthStore((s) => s.user?.aiVideoAllowed === true) && !!onAiVideo;
   return (
+    <>
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={[styles.sheet, { paddingBottom: sheetBottomPadding(bottomInset) }]} onPress={() => {}}>
@@ -57,6 +66,23 @@ export function MediaSourceSheet({ visible, title, animatedAllowed, canRemove, o
             </View>
           </Pressable>
 
+          {aiAllowed ? (
+            <Pressable
+              style={styles.option}
+              onPress={() => {
+                // İki Modal üst üste açılmasın: seçim sayfası kapanır, sonra yapay zeka sayfası açılır.
+                onClose();
+                setAiOpen(true);
+              }}
+            >
+              <Ionicons name="sparkles-outline" size={22} color={theme.colors.textSecondary} />
+              <View style={styles.optionBody}>
+                <Text style={styles.optionTitle}>{t('media.source.aiVideo')}</Text>
+                <Text style={styles.optionDesc}>{t('media.source.aiVideoHint')}</Text>
+              </View>
+            </Pressable>
+          ) : null}
+
           {canRemove ? (
             <Pressable style={styles.option} onPress={onRemove}>
               <Ionicons name="trash-outline" size={22} color={theme.colors.danger} />
@@ -66,6 +92,18 @@ export function MediaSourceSheet({ visible, title, animatedAllowed, canRemove, o
         </Pressable>
       </Pressable>
     </Modal>
+    {aiAllowed ? (
+      <AiVideoSheet
+        visible={aiOpen}
+        mode="media"
+        onClose={() => setAiOpen(false)}
+        onUse={(media) => {
+          setAiOpen(false);
+          onAiVideo?.(media);
+        }}
+      />
+    ) : null}
+    </>
   );
 }
 

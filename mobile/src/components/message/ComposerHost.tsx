@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { useAuthStore } from '@/stores/auth';
+import { AiVideoSheet } from '../aiVideo/AiVideoSheet';
+import type { DraftAttachment } from '@/utils/attachmentUpload';
 import { MessageComposer } from './MessageComposer';
 import { AttachmentSheet } from './AttachmentSheet';
 import { EmojiGifSheet } from './EmojiGifSheet';
@@ -38,6 +41,9 @@ export function ComposerHost({
   channelId,
 }: Props) {
   const [attachOpen, setAttachOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  // C14d — kapı yalnız arayüz; sunucu otorite. Açık listede değilse giriş hiç görünmez.
+  const aiVideoAllowed = useAuthStore((s) => s.user?.aiVideoAllowed === true);
   // `handleChangeText` fonksiyon bildirimi olduğu için burada kullanılabilir (hoisting); tersi
   // sırada yazılamazdı, çünkü o da `emoji`ye ihtiyaç duyuyor.
   const emoji = useEmojiInsert(composer.input, handleChangeText);
@@ -47,6 +53,22 @@ export function ComposerHost({
   async function sendVoice() {
     const draft = await recorder.finish();
     if (draft) void composer.onSend([draft]);
+  }
+
+  // C14d — "Kaydet ve gönder": ek zaten sunucuda üretildi (`uploadedId`), yükleme atlanır; açık yanıt ve
+  // yazılı metin mevcut gönderim yoluyla (`onSend`) birlikte gider, hata olursa şeritte kalır.
+  function sendAiVideo(attachmentId: string) {
+    setAiOpen(false);
+    const draft: DraftAttachment = {
+      key: `ai-${attachmentId}`,
+      uri: '',
+      filename: 'yapay-zeka-video.mp4',
+      contentType: 'video/mp4',
+      size: 0,
+      isVideo: true,
+      uploadedId: attachmentId,
+    };
+    void composer.onSend([draft]);
   }
 
   function handleChangeText(text: string) {
@@ -87,6 +109,7 @@ export function ComposerHost({
         onRemoveAttachment={composer.removeAttachment}
         onOpenAttach={() => setAttachOpen(true)}
         onOpenEmoji={() => emoji.setOpen(true)}
+        onOpenAiVideo={aiVideoAllowed ? () => setAiOpen(true) : undefined}
         voice={{
           phase: recorder.phase,
           elapsedMs: recorder.elapsedMs,
@@ -114,6 +137,10 @@ export function ComposerHost({
             composer.addAttachments(drafts);
           }}
         />
+      )}
+
+      {aiVideoAllowed && (
+        <AiVideoSheet visible={aiOpen} mode="chat" onClose={() => setAiOpen(false)} onSend={sendAiVideo} />
       )}
 
       {/* C23 — emoji düğmesi Emoji | GIF alt sayfası açar. Emoji sekmesi eski seçiciyle aynı

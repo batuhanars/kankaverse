@@ -66,6 +66,8 @@ interface Props {
   onOpenAttach?: () => void;
   /** Sprint M3c §4 — emoji seçiciyi aç. Verilmezse düğme çizilmez. */
   onOpenEmoji?: () => void;
+  /** C14d — yapay zeka video (yalnız açık listedeki hesapta verilir; verilmezse düğme çizilmez). */
+  onOpenAiVideo?: () => void;
   /** Gönderilmeyi bekleyen ekler — kutunun üstünde şerit olarak görünür. */
   attachments?: DraftAttachment[];
   onRemoveAttachment?: (key: string) => void;
@@ -109,6 +111,7 @@ export function MessageComposer({
   selection,
   onOpenAttach,
   onOpenEmoji,
+  onOpenAiVideo,
   attachments,
   onRemoveAttachment,
   uploadLabel,
@@ -256,13 +259,23 @@ export function MessageComposer({
                 onChangeText={onChangeText}
                 placeholder={placeholder}
                 placeholderTextColor={theme.colors.textMuted}
-                style={styles.input}
+                style={[styles.input, onOpenAiVideo && onOpenEmoji && { paddingRight: EMOJI_SLOT * 2 }]}
                 multiline
                 selection={selection ?? undefined}
                 onSelectionChange={(e) =>
                   onSelectionChange?.(e.nativeEvent.selection.start, e.nativeEvent.selection.end)
                 }
               />
+              {onOpenAiVideo && (
+                <Pressable
+                  onPress={onOpenAiVideo}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('aiVideo.button')}
+                  style={[styles.emojiButton, onOpenEmoji && { right: EMOJI_SLOT }]}
+                >
+                  <Ionicons name="sparkles-outline" size={22} color={theme.colors.accent500} />
+                </Pressable>
+              )}
               {onOpenEmoji && (
                 <Pressable
                   onPress={onOpenEmoji}

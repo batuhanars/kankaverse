@@ -4386,6 +4386,16 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Tur revizeleri: "Kategorisiz kanal ekle" → "Kanal Ekle" · tüm emoji düğmeleri tepki düğmesi standardında gri çizgi simge (web `EmojiFaceIcon`, mobil `happy-outline`)
 - [ ] Mağaza sürümü (vc28)
 
+## Sprint C14d — Yapay zeka video, mobil — 2026-10-28
+
+> Sözleşme: `contracts/SPRINT_C14D_AI_VIDEO_MOBILE_CONTRACT.md`. Yalnız mobil, JS (native yok), vc33. R7-nötr.
+> Sebep: sahip kararı (aynı gün "yalnız web" dedikten sonra değişti). Erişim: sahip + Emir + Sena (admin değil).
+
+- [x] mobil: alt sayfa (form/önizleme/son üretimler), mesaj kutusu ✨ girişi, MediaSourceSheet "Yapay zeka ile üret", rozet, Galeriye kaydet / Kaydet ve gönder / Kullan, sil + Temizle; typecheck + lint temiz; vc33
+- [ ] Sunucu: `AI_VIDEO_USER_IDS`'e iki hesap (sahip komutu)
+- [ ] Sahip cihaz turu (§5): klavye + üç tuşlu çubukta alt şerit, Kullan → kesit, Kaydet ve gönder → rozet
+- [ ] Release AAB canlıya karşı cihazda → Play
+
 ## Sprint C14c — Yapay zeka video: dayanıklı indirme + kurtarma, silme, ses bilgisi — 2026-10-28
 
 > Sözleşme: `contracts/SPRINT_C14C_AI_VIDEO_RECOVERY_DELETE_CONTRACT.md`. api → web. R7-nötr.

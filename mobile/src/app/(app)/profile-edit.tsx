@@ -253,6 +253,7 @@ export default function ProfileEditScreen() {
         onClose={() => setSourceOpen(false)}
         onPick={(mode) => void onPick(mode)}
         onRemove={() => void onRemove()}
+        onAiVideo={(media) => setClip({ media, slot: sourceSlot })}
       />
       <AnimatedClipSheet
         media={clip?.media ?? null}

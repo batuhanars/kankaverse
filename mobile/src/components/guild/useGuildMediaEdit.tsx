@@ -81,6 +81,7 @@ export function useGuildMediaEdit(
         onClose={() => setChoiceOpen(false)}
         onPick={(mode) => void pickFile(mode)}
         onRemove={() => void remove()}
+        onAiVideo={(media) => setClip({ media, target: choice })}
       />
       <AnimatedClipSheet
         media={clip?.media ?? null}

@@ -26,6 +26,8 @@ export interface AttachmentDto {
   thumbnail?: string | null;
   width?: number | null;
   height?: number | null;
+  /** C14d — yapay zeka ile üretilmiş video (sunucu kaynaklı); rozet gösterilir. */
+  aiGenerated?: boolean;
 }
 
 export interface ReplyPreviewDto {

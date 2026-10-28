@@ -51,6 +51,12 @@ export function VideoCard({ attachment }: { attachment: AttachmentDto }) {
             resizeMode="cover"
           />
         ) : null}
+        {attachment.aiGenerated ? (
+          <View style={styles.aiBadge}>
+            <Ionicons name="sparkles" size={11} color={theme.colors.textPrimary} />
+            <Text style={styles.aiBadgeText}>{t('attachment.aiGenerated')}</Text>
+          </View>
+        ) : null}
         <View style={styles.playCircle}>
           <Ionicons name="play" size={24} color={theme.colors.textPrimary} />
         </View>
@@ -91,6 +97,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  aiBadge: {
+    position: 'absolute',
+    left: 6,
+    top: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.bgOverlay,
+  },
+  aiBadgeText: { color: theme.colors.textPrimary, fontSize: theme.fontSize.xs, fontWeight: '600' },
   duration: {
     position: 'absolute',
     right: 6,

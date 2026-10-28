@@ -32,19 +32,18 @@ function extensionFor(target: SaveTarget): string {
 }
 
 /**
- * Sprint C15 §3 — sohbet medyasını galeriye kaydet.
+ * Sprint C15 §3 — adresi çözülen medyayı galeriye kaydet (çekirdek; C14d'de ortaklaştırıldı).
  *
  * Akış: izin (yalnız yazma) → TAZE adres → önbelleğe indir → `saveToLibraryAsync` → önbellek dosyasını sil.
- * Adres her kayıtta `GET /attachments/:id`'den yeniden alınır: presigned GET 300 sn ömürlü, görüntüleyici
- * saatlerce açık kalabilir; ayrıca erişim ve tarama kapısı sunucuda ikinci kez doğrulanır.
  * `saving` bayrağı çift tetiklemeyi engeller (state gecikmeli olduğu için ref ile de korunur).
+ * Dönüş: kaydedildi mi (çağıran, kaydın başarısına bağlı akış kurabilsin diye).
  */
-export function useSaveToGallery(target: SaveTarget | undefined) {
+export function useGalleryDownload() {
   const [saving, setSaving] = useState(false);
   const busyRef = useRef(false);
 
-  const save = useCallback(async () => {
-    if (!target || busyRef.current) return;
+  const run = useCallback(async (resolveUrl: () => Promise<string>, cacheName: string): Promise<boolean> => {
+    if (busyRef.current) return false;
     busyRef.current = true;
     setSaving(true);
     let localUri: string | null = null;
@@ -52,27 +51,48 @@ export function useSaveToGallery(target: SaveTarget | undefined) {
       const permission = await MediaLibrary.requestPermissionsAsync(true);
       if (!permission.granted) {
         Alert.alert(t('mobile.media.permissionDenied'));
-        return;
+        return false;
       }
-      const { url } = await attachmentsApi.getUrl(target.id);
+      const url = await resolveUrl();
       const dir = FileSystem.cacheDirectory;
       if (!dir) throw new Error('no cache dir');
-      const dest = `${dir}kv-save-${target.id}.${extensionFor(target)}`;
+      const dest = `${dir}${cacheName}`;
       localUri = dest;
       const result = await FileSystem.downloadAsync(url, dest);
       if (result.status < 200 || result.status >= 300) throw new Error(`download ${result.status}`);
       await MediaLibrary.saveToLibraryAsync(dest);
       Alert.alert(t('mobile.media.saved'));
+      return true;
     } catch (e) {
       // Sunucu reddi (ATTACHMENT_BLOCKED vb.) Türkçe mesajıyla gelir; diğer hatalar genel metin.
       const message = extractErrorMessage(e);
       Alert.alert(message && message !== t('common.error') ? message : t('mobile.media.saveFailed'));
+      return false;
     } finally {
       if (localUri) await FileSystem.deleteAsync(localUri, { idempotent: true }).catch(() => {});
       busyRef.current = false;
       setSaving(false);
     }
-  }, [target]);
+  }, []);
+
+  return { run, saving };
+}
+
+/**
+ * Sohbet ekini galeriye kaydet. Adres her kayıtta `GET /attachments/:id`'den yeniden alınır: presigned GET
+ * 300 sn ömürlü, görüntüleyici saatlerce açık kalabilir; ayrıca erişim ve tarama kapısı sunucuda ikinci
+ * kez doğrulanır.
+ */
+export function useSaveToGallery(target: SaveTarget | undefined) {
+  const { run, saving } = useGalleryDownload();
+
+  const save = useCallback(async () => {
+    if (!target) return;
+    await run(
+      async () => (await attachmentsApi.getUrl(target.id)).url,
+      `kv-save-${target.id}.${extensionFor(target)}`,
+    );
+  }, [target, run]);
 
   return { save, saving };
 }
