@@ -452,7 +452,7 @@ function resetComposerHeight() {
         <div v-if="hasMore" class="flex justify-center py-2">
           <button
             class="text-[13px] hover:underline cursor-pointer"
-            style="color: var(--kv-info);"
+            style="color: var(--kv-accent-400);"
             @click="loadMore"
           >
             {{ t('message.loadMore') }}
