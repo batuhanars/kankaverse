@@ -4386,6 +4386,18 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Tur revizeleri: "Kategorisiz kanal ekle" → "Kanal Ekle" · tüm emoji düğmeleri tepki düğmesi standardında gri çizgi simge (web `EmojiFaceIcon`, mobil `happy-outline`)
 - [ ] Mağaza sürümü (vc28)
 
+## Sprint C14b — Yapay zeka video ekranı (model/süre, canlı maliyet, Kaydet / Kaydet ve gönder, rozet) — 2026-10-28
+
+> Sözleşme: `contracts/SPRINT_C14B_AI_VIDEO_STUDIO_CONTRACT.md`. api → web. Mobil yok. R7: üretimden ek oluşturma + rozet.
+> Sebep: sahip ekran taslağı + ilk canlı deneme ("Sohbete ekle" CORS'a takıldı).
+
+- [x] §1-2 api: model tablosu, options/estimate/tek çağrıda üretim, üretimden ek, `aiGenerated`, migration, testler (PM incelemesi: ek yolu UPLOADS_ENABLED'a bağlandı + sunucuda ffmpeg ile poster/boyut; 367 test)
+- [x] R7: §2.4 ek oluşturma + `aiGenerated` — sahip onayladı 2026-10-28
+- [x] §3 web: yeni diyalog düzeni + Kaydet / Kaydet ve gönder + rozet; vue-tsc (bilinen 6) + build temiz. **390/320 ölçülmedi → sahip turunda**
+- [ ] Bilinen kısıt: "Kaydet ve gönder"de mesaj gönderme hatası DM'de sessiz (mevcut `onAttachmentSent` davranışı); açık yanıt varsa video yanıt olarak gider
+- [ ] Sahip: `.env.production`'a `AI_VIDEO_MODELS` · R2 özel bucket CORS'a GET
+- [ ] Sahip turu (§5)
+
 ## Sprint C14 — Yapay zeka ile video üretimi (yalnız sahip) — 2026-10-28
 
 > Sözleşme: `contracts/SPRINT_C14_AI_VIDEO_CONTRACT.md`. api → web. Mobil yok. R7: erişim kapısı + üçüncü tarafa veri.
