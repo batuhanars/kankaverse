@@ -25,7 +25,7 @@ export default function QuickReactionsScreen() {
     setError('');
     try {
       const updated = await usersApi.updateProfile({ quickReactions: next });
-      useAuthStore.setState({ user: updated });
+      useAuthStore.getState().updateUser(updated);
     } catch (e) {
       setError(extractErrorMessage(e));
     } finally {

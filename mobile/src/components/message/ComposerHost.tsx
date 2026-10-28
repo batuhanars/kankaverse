@@ -117,7 +117,7 @@ export function ComposerHost({
       )}
 
       {/* C23 — emoji düğmesi Emoji | GIF alt sayfası açar. Emoji sekmesi eski seçiciyle aynı
-          paket/tema ve açık kalır (arka arkaya emoji). Tepki seçici değişmedi. */}
+          paket/tema; bir emoji seçilince sayfa KAPANIR (sahip isteği, C23). Tepki seçici değişmedi. */}
       <EmojiGifSheet
         visible={emoji.open}
         onClose={() => emoji.setOpen(false)}

@@ -1607,6 +1607,7 @@
   "attachment": {
     "addFile": "Dosya ekle",
     "dropHint": "Dosyayı bırak, gönderelim",
+    "alreadyAttached": "Zaten bir dosya ekli, önce onu gönder ya da kaldır",
     "singleFileOnly": "Şimdilik tek dosya gönderebilirsin",
     "remove": "Eki kaldır",
     "processing": "İşleniyor…",

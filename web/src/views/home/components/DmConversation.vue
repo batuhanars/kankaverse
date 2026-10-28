@@ -687,10 +687,10 @@ const dayLabels = computed<(string | null)[]>(() =>
       class="relative flex flex-col flex-1 min-w-0 overflow-hidden mb-4 rounded-[var(--kv-radius-lg)]"
       style="background-color: var(--kv-bg-content);"
       @paste="intake.onPaste"
-    @dragenter="intake.onDragEnter"
-    @dragover="intake.onDragOver"
-    @dragleave="intake.onDragLeave"
-    @drop="intake.onDrop"
+      @dragenter="intake.onDragEnter"
+      @dragover="intake.onDragOver"
+      @dragleave="intake.onDragLeave"
+      @drop="intake.onDrop"
     >
       <div
         v-if="intake.dragging.value"

@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { StyleSheet, Vibration, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -42,15 +42,26 @@ export function SwipeToReply({ onReply, onEdit, children }: Props) {
   const translateX = useSharedValue(0);
   const passed = useSharedValue(false);
 
+  // Jest her render'da yeniden kurulmasın: işleyiciler ref'te, jest yalnız yön var/yok'a bağlı.
+  // (Satır içi `() => replyTo(...)` her render yeni kimlik; deps'e girerse Pan sürekli yeniden kurulurdu.)
+  const replyRef = useRef(onReply);
+  const editRef = useRef(onEdit);
+  replyRef.current = onReply;
+  editRef.current = onEdit;
+  const fireReply = useCallback(() => replyRef.current?.(), []);
+  const fireEdit = useCallback(() => editRef.current?.(), []);
+  const canReply = !!onReply;
+  const canEdit = !!onEdit;
+
   const gesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(!!onReply || !!onEdit)
+        .enabled(canReply || canEdit)
         .activeOffsetX([-15, 15])
         .failOffsetY([-10, 10])
         .onUpdate((e) => {
           // Yön işlevi yoksa o yöne sürükleme 0'a kenetlenir (boş).
-          const x = Math.min(Math.max(e.translationX, onEdit ? -MAX_DRAG : 0), onReply ? MAX_DRAG : 0);
+          const x = Math.min(Math.max(e.translationX, canEdit ? -MAX_DRAG : 0), canReply ? MAX_DRAG : 0);
           translateX.value = x;
           if (Math.abs(x) >= TRIGGER && !passed.value) {
             passed.value = true;
@@ -61,14 +72,14 @@ export function SwipeToReply({ onReply, onEdit, children }: Props) {
         })
         .onEnd(() => {
           if (!passed.value) return;
-          if (translateX.value > 0 && onReply) runOnJS(onReply)();
-          else if (translateX.value < 0 && onEdit) runOnJS(onEdit)();
+          if (translateX.value > 0 && canReply) runOnJS(fireReply)();
+          else if (translateX.value < 0 && canEdit) runOnJS(fireEdit)();
         })
         .onFinalize(() => {
           passed.value = false;
           translateX.value = withSpring(0, { damping: 18, stiffness: 220 });
         }),
-    [onReply, onEdit, translateX, passed],
+    [canReply, canEdit, fireReply, fireEdit, translateX, passed],
   );
 
   const bubbleStyle = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));

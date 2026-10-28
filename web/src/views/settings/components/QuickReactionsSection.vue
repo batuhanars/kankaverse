@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useQuickReactions } from '@/composables/useQuickReactions'
 import { useToastStore } from '@/stores/toast'
 import { usersApi } from '@/api/users'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
@@ -9,14 +10,12 @@ import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 defineOptions({ name: 'QuickReactionsSection' })
 
 // C24 — hızlı tepki şeridi: 5 yuva, yuvaya tık → seçici → PATCH /users/me.
-// Alan bayat bir oturumda yoksa sunucu varsayılanıyla aynı beşli gösterilir (yalnız görünüm).
-const FALLBACK = ['👍', '❤️', '😂', '😮', '😢']
 
 const { t } = useI18n()
 const authStore = useAuthStore()
 const toast = useToastStore()
 
-const slots = computed(() => authStore.user?.quickReactions ?? FALLBACK)
+const slots = useQuickReactions()
 const saving = ref(false)
 const openIndex = ref<number | null>(null)
 const slotEls = ref<HTMLElement[]>([])

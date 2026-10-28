@@ -26,7 +26,11 @@ export function useComposerFileIntake(options: {
 
   /** Tek giriş kapısı: ilk dosyayı al, türü doğrula, ek akışına yaz. */
   function takeFiles(files: ArrayLike<File>) {
-    if (files.length === 0 || isDisabled() || options.composeFile.value) return
+    if (files.length === 0 || isDisabled()) return
+    if (options.composeFile.value) {
+      toast.info(t('attachment.alreadyAttached'))
+      return
+    }
     const file = files[0]
     if (files.length > 1) toast.info(t('attachment.singleFileOnly'))
     if (!resolveContentType(file.name, file.type)) {
@@ -46,6 +50,8 @@ export function useComposerFileIntake(options: {
   function onPaste(e: ClipboardEvent) {
     const files = e.clipboardData?.files
     if (!files || files.length === 0 || isDisabled()) return // yalnız metin: davranış değişmez
+    // Excel/Word hem görsel hem metin koyar: metin varsa normal yapıştırma çalışsın.
+    if (e.clipboardData?.types.includes('text/plain')) return
     e.preventDefault()
     takeFiles(Array.from(files))
   }

@@ -34,6 +34,7 @@ function onSelect(emoji: EmojiExt) {
 // Sık kullanılanlar (C24): kütüphanenin bellek-içi "recent" grubu yerine kalıcı liste.
 // Boşsa grup hiç verilmez → bölüm görünmez. Seçici her açılışta yeniden oluşur, liste taze okunur.
 const FREQUENT_KEY = 'frequent'
+// Sabit stroke rengi bilerek: data URI içinde CSS değişkenleri (var(--kv-*)) çözülmez.
 const FREQUENT_ICON =
   'data:image/svg+xml;base64,' +
   btoa(

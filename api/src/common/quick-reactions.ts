@@ -10,7 +10,9 @@ export function effectiveQuickReactions(stored: string[] | null | undefined): st
   return stored && stored.length > 0 ? stored : [...DEFAULT_QUICK_REACTIONS];
 }
 
+// Keycap emojiler (1️⃣) bilerek reddedilir: içerdikleri rakam HAS_ALNUM'a takılır.
 const HAS_ALNUM = /[\p{L}\p{N}]/u;
+const SEGMENTER = new Intl.Segmenter('en', { granularity: 'grapheme' });
 const HAS_EMOJI = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
 
 /** Tek bir emoji grafemi mi (boş değil, <=32, harf/rakam yok). */
@@ -19,8 +21,7 @@ export function isSingleEmoji(value: unknown): boolean {
     return false;
   }
   if (HAS_ALNUM.test(value) || !HAS_EMOJI.test(value)) return false;
-  const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
-  return [...segmenter.segment(value)].length === 1;
+  return [...SEGMENTER.segment(value)].length === 1;
 }
 
 /** Boş dizi (= varsayılana dön) YA DA tam 5 benzersiz tek-emoji. */

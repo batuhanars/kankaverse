@@ -66,13 +66,6 @@ export function MessageActionHost({ actions, onReply, onEdit, canPin }: Props) {
         }}
       />
 
-      {/* Tam emoji listesi — `rn-emoji-keyboard` (PM onaylı bağımlılık: MIT, SIFIR bağımlılık,
-          native modül yok → Expo Go'da çalışır, dev build gerektirmez).
-          Kategori adları ve arama metni kütüphanenin KENDİ Türkçe paketinden (`tr`) geliyor;
-          bizim tr.json'a emoji kategorisi kopyalanmadı.
-          Sprint M3c §4 — tema nesnesi `emojiPickerTheme.ts`e taşındı: mesaj kutusundaki emoji
-          düğmesi aynı seçiciyi kullanıyor, iki yerde aynı 20 satırlık renk bloğu tutulsaydı biri
-          değişip diğeri unutulurdu. **Akış değişmedi**, yalnız renkler tek kaynağa bağlandı. */}
       {/* C24: tam liste artık C23'ün `EmojiGifSheet`i (GIF sekmesi kapalı) — "Sık kullanılanlar" üstte,
           mesaj kutusu seçicisiyle aynı liste. Seçilen emoji `pickEmoji` ile tepki olur ve sayfa kapanır. */}
       <EmojiGifSheet

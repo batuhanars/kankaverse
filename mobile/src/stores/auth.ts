@@ -38,6 +38,8 @@ interface AuthState {
   logout: () => Promise<void>;
   /** 2FA ekranından girişe geri dönerken challenge + hata state'ini temizler. */
   clearChallenge: () => void;
+  /** Sunucudan dönen güncel kullanıcıyı store'a yazar (profil/ayar kaydı sonrası). */
+  updateUser: (user: UserDto) => void;
 }
 
 // Tek uçuş bootstrap (PM bulgusu 2026-07-29): kök layout'taki effect dev'de (StrictMode +
@@ -152,6 +154,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearChallenge() {
     set({ challenge: null, errorMessage: null });
+  },
+
+  updateUser(user) {
+    set({ user });
   },
 }));
 

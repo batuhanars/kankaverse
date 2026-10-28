@@ -4438,7 +4438,7 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] §2 mobil: sağa kaydırarak alıntı
 - [x] build/test temiz
 - [x] Sahip turu (web + telefon) — 2026-10-27 geçti
-- [ ] Mağaza sürümü (vc31)
+- [x] Mağaza sürümü (vc32; 31 Play'de önceden kullanılmıştı) — AAB derlendi 2026-10-27
 
 ## Sprint C22 — Görsel / GIF-video seçim penceresi — 2026-10-27
 

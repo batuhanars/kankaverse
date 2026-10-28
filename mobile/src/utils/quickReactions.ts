@@ -6,8 +6,6 @@ import { useAuthStore } from '@/stores/auth';
  */
 const FALLBACK_QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢'];
 
-export const QUICK_REACTION_COUNT = 5;
-
 export function useQuickReactions(): string[] {
   return useAuthStore((s) => s.user?.quickReactions) ?? FALLBACK_QUICK_REACTIONS;
 }

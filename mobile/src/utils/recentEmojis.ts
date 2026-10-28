@@ -28,7 +28,14 @@ async function read(): Promise<Store> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : null;
-    return parsed && typeof parsed === 'object' ? (parsed as Store) : {};
+    if (!parsed || typeof parsed !== 'object') return {};
+    // Bozuk girdiyi at (web getFrequentEmojis ile aynı): sayı olmayan puan/zaman NaN sıralaması doğurur.
+    const clean: Store = {};
+    for (const [emoji, e] of Object.entries(parsed as Record<string, unknown>)) {
+      const v = e as Partial<Entry> | null;
+      if (v && Number.isFinite(v.s) && Number.isFinite(v.t)) clean[emoji] = { s: v.s as number, t: v.t as number };
+    }
+    return clean;
   } catch {
     return {};
   }

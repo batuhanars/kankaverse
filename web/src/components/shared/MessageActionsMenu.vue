@@ -10,7 +10,7 @@ const openPickerMessageId = moduleRef<string | null>(null)
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useAuthStore } from '@/stores/auth'
+import { useQuickReactions } from '@/composables/useQuickReactions'
 import EmojiPicker from './EmojiPicker.vue'
 import { recordEmojiUse } from '@/utils/frequentEmojis'
 import EmojiFaceIcon from './EmojiFaceIcon.vue'
@@ -41,10 +41,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 // Hızlı reaksiyon şeridi (C24): hesaba bağlı, sunucu etkin listeyi (her zaman 5) oturum kullanıcısında döner.
-// Alan bayat bir oturumda yoksa savunmacı olarak bugünkü varsayılan beşliye düşer.
-const FALLBACK_QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢']
-const authStore = useAuthStore()
-const quickEmojis = computed(() => authStore.user?.quickReactions ?? FALLBACK_QUICK_REACTIONS)
+const quickEmojis = useQuickReactions()
 
 // ⋯ daha-fazla açılır
 const showMore = ref(false)
