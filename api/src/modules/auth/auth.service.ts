@@ -46,6 +46,7 @@ import {
 } from './utils/auth-token.util';
 import { validateBirthDate, calculateIsMinor } from './utils/birthdate.util';
 import { toUserDto } from './utils/user-dto.util';
+import { canUseAiVideo } from '../ai-video/ai-video-access';
 import { encryptSecret, decryptSecret } from '../../common/utils/crypto.util';
 import { generateFriendCode } from './utils/friend-code.util';
 
@@ -83,9 +84,13 @@ export class AuthService implements OnModuleInit {
     private animatedMedia: AnimatedMediaService,
   ) {}
 
-  /** C22: UserDto + hareketli yükleme kapısı (tek kaynak canCreateAnimated). */
+  /** C22/C14: UserDto + hareketli yükleme ve yapay zeka video kapıları (tek kaynak fonksiyonlar). */
   private userDto(user: User) {
-    return toUserDto(user, this.animatedMedia.canCreateAnimated(user));
+    return toUserDto(
+      user,
+      this.animatedMedia.canCreateAnimated(user),
+      canUseAiVideo(this.config, user),
+    );
   }
 
   async onModuleInit() {

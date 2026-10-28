@@ -24,6 +24,7 @@ import { EventsModule } from './modules/events/events.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
 import { PlatformInvitesModule } from './modules/platform-invites/platform-invites.module';
+import { AiVideoModule } from './modules/ai-video/ai-video.module';
 import { PlatformUsersModule } from './modules/platform-users/platform-users.module';
 import { EmergencyModule } from './modules/emergency/emergency.module';
 import configuration from './config/configuration';
@@ -55,6 +56,7 @@ import configuration from './config/configuration';
     DiscoveryModule,
     PlatformInvitesModule,
     PlatformUsersModule,
+    AiVideoModule,
     EmergencyModule,
   ],
   providers: [

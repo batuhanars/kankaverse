@@ -90,7 +90,10 @@ export class StorageService {
    * İstemci bu URL'yi bearer header olmadan kullanır.
    * C15: `downloadFilename` verilirse yanıt `Content-Disposition: attachment` taşır (tarayıcı indirir).
    */
-  async presignGet(key: string, opts?: { downloadFilename?: string }): Promise<string> {
+  async presignGet(
+    key: string,
+    opts?: { downloadFilename?: string; expiresIn?: number },
+  ): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: this.bucket,
       Key: key,
@@ -102,7 +105,7 @@ export class StorageService {
       }),
     });
     const url = await getSignedUrl(this.client, command, {
-      expiresIn: PRESIGN_EXPIRES_SECONDS,
+      expiresIn: opts?.expiresIn ?? PRESIGN_EXPIRES_SECONDS,
     });
     this.logger.debug(`presignGet: key=${key}`);
     return url;
@@ -139,6 +142,30 @@ export class StorageService {
       },
     });
     await pipeline(res.Body as Readable, limiter, createWriteStream(destPath));
+  }
+
+  // ─── C14: yapay zeka videosu (özel bucket, bellek içi küçük nesneler) ────
+
+  /** Sunucunun ürettiği nesneyi ÖZEL bucket'a yazar. */
+  async putPrivate(key: string, body: Buffer, contentType: string): Promise<void> {
+    await this.client.send(
+      new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }),
+    );
+    this.logger.debug(`putPrivate: key=${key}`);
+  }
+
+  /** Özel bucket nesnesini belleğe okur; `maxBytes` aşılırsa fırlatır (yalnız küçük nesneler). */
+  async getBuffer(key: string, maxBytes: number): Promise<Buffer> {
+    const res = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    const chunks: Buffer[] = [];
+    let seen = 0;
+    for await (const chunk of res.Body as Readable) {
+      const buf = chunk as Buffer;
+      seen += buf.length;
+      if (seen > maxBytes) throw new Error('FILE_TOO_LARGE');
+      chunks.push(buf);
+    }
+    return Buffer.concat(chunks);
   }
 
   /** Sunucunun ürettiği nesneyi PUBLIC bucket'a yazar (profil görselleri). */

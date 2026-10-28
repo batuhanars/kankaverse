@@ -17,3 +17,10 @@ describe('toUserDto animatedAllowed (C22)', () => {
     expect(toUserDto(USER, false).animatedAllowed).toBe(false);
   });
 });
+
+describe('toUserDto aiVideoAllowed (C14)', () => {
+  it('varsayilan false, acikken true doner', () => {
+    expect(toUserDto(USER, false).aiVideoAllowed).toBe(false);
+    expect(toUserDto(USER, false, true).aiVideoAllowed).toBe(true);
+  });
+});

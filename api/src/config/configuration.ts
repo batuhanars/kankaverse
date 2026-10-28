@@ -130,6 +130,20 @@ export default () => {
     // Sprint M3 — Expo Push gönderimi feature-flag. Default false → PushService no-op
     // (dev build/FCM kimlik bilgisi olmadan sessizce devre dışı; §2.3).
     expoPushEnabled: process.env.EXPO_PUSH_ENABLED === 'true',
+    // C14 — yapay zeka ile video üretimi (Pika). Para harcar: yalnız açık liste (AI_VIDEO_USER_IDS) + bayrak + anahtar.
+    // PIKA_API_KEY yalnız sunucuda; hiçbir yanıtta/logda görünmez. Varsayılan KAPALI.
+    aiVideo: {
+      enabled: process.env.AI_VIDEO_ENABLED === 'true',
+      apiKey: process.env.PIKA_API_KEY ?? '',
+      apiUrl: (process.env.PIKA_API_URL ?? 'https://api.dev.pika.art').replace(/\/+$/, ''),
+      model: process.env.AI_VIDEO_MODEL ?? 'pika/pika-2.5',
+      resolution: process.env.AI_VIDEO_RESOLUTION ?? '720p',
+      dailyCapUsd: parseFloat(process.env.AI_VIDEO_DAILY_CAP_USD ?? '3'),
+      userIds: (process.env.AI_VIDEO_USER_IDS ?? '')
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0),
+    },
     // Kayıt modu — kapalı-test fazı (Sprint Closed-Registration)
     // 'open' (default): kayıt açık, davet kodu yok sayılır.
     // 'invite': yalnız geçerli davet koduyla kayıt.

@@ -159,6 +159,7 @@ model User {
   notificationsActed  Notification[]     @relation("NotificationActor")
   notificationPrefs   NotificationPref[] @relation("UserNotificationPrefs")
   pushTokens          PushToken[]
+  aiVideoGenerations  AiVideoGeneration[]
 }
 
 model AuthToken {
@@ -717,4 +718,35 @@ model PlatformInvite {
   createdAt  DateTime  @default(now())
 
   @@index([creatorId])
+}
+
+// ─── C14: yapay zeka ile video üretimi (yalnız açık liste; kredi/cüzdan yok, yalnız harcama kaydı) ───
+enum AiVideoStatus {
+  QUOTED
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model AiVideoGeneration {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  model         String // tam api_id, ör. "pika/pika-2.5/image-to-video"
+  prompt        String // <= 1000
+  inputKey      String? // özel bucket: ai-input/{userId}/{uuid}.{ext}; yalnız görselden üretimde
+  resolution    String // "720p"
+  durationS     Int // 5
+  quoteMicroUsd Int // gönderim öncesi teklif
+  costMicroUsd  Int? // Pika billing.state=settled olunca
+  providerJobId String? // Pika "media_..." id
+  status        AiVideoStatus @default(QUOTED)
+  errorCode     String? // Pika error.code ya da bizim kodumuz
+  outputKey     String? // özel bucket: ai-video/{userId}/{id}.mp4
+  createdAt     DateTime      @default(now())
+  completedAt   DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status])
 }

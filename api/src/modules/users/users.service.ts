@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DmPolicy } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
+import { DmPolicy, User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { toUserDto } from '../auth/utils/user-dto.util';
+import { canUseAiVideo } from '../ai-video/ai-video-access';
 import { ImageUploadService, PresignResult } from '../../shared/media/image-upload.service';
 import { AnimatedMediaService } from '../../shared/media/animated-media.service';
 import { PresignAnimatedDto, ProcessAnimatedDto } from '../../shared/media/dto/animated.dto';
@@ -73,7 +75,17 @@ export class UsersService {
     private dmPermission: DmPermissionService,
     private voice: VoiceService,
     private animatedMedia: AnimatedMediaService,
+    private config: ConfigService,
   ) {}
+
+  /** C22/C14: UserDto + hareketli yükleme ve yapay zeka video kapıları. */
+  private userDto(user: User) {
+    return toUserDto(
+      user,
+      this.animatedMedia.canCreateAnimated(user),
+      canUseAiVideo(this.config, user),
+    );
+  }
 
   /**
    * GET /users/:id/card — Kullanıcı detay kartı (mesaj yazarına/avatarına tıkla → popover).
@@ -403,7 +415,7 @@ export class UsersService {
       where: { id: userId },
       data,
     });
-    return toUserDto(user, this.animatedMedia.canCreateAnimated(user));
+    return this.userDto(user);
   }
 
   // ─── C8: Avatar (self) ────────────────────────────────────────────────────
@@ -421,7 +433,7 @@ export class UsersService {
       // C13 değişmez kural: statik set/kaldır hareketli alanı null'lar (avatarUrl artık hareketlinin karesi değil).
       data: { avatarUrl, avatarAnimatedUrl: null },
     });
-    return toUserDto(user, this.animatedMedia.canCreateAnimated(user));
+    return this.userDto(user);
   }
 
   // ─── C8: Profil afişi (self) ──────────────────────────────────────────────
@@ -438,7 +450,7 @@ export class UsersService {
       where: { id: userId },
       data: { bannerUrl, bannerAnimatedUrl: null },
     });
-    return toUserDto(user, this.animatedMedia.canCreateAnimated(user));
+    return this.userDto(user);
   }
 
   // ─── C13: Hareketli avatar / afiş ─────────────────────────────────────────
@@ -451,7 +463,7 @@ export class UsersService {
   /** POST /users/me/{avatar|banner}/animated — işle ve güncel kullanıcıyı dön. */
   async setAnimated(userId: string, target: 'AVATAR' | 'BANNER', dto: ProcessAnimatedDto) {
     const user = await this.animatedMedia.process(userId, target, dto);
-    return toUserDto(user, this.animatedMedia.canCreateAnimated(user));
+    return this.userDto(user);
   }
 
   /**

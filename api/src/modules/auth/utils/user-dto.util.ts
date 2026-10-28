@@ -2,7 +2,7 @@ import { User } from '@prisma/client';
 import { effectiveQuickReactions } from '../../../common/quick-reactions';
 
 /** Prisma User → istemciye dönen UserDto. passwordHash/totpSecret vb. hassas alanlar ASLA dahil edilmez. */
-export function toUserDto(user: User, animatedAllowed: boolean) {
+export function toUserDto(user: User, animatedAllowed: boolean, aiVideoAllowed = false) {
   return {
     id: user.id,
     username: user.username,
@@ -28,5 +28,7 @@ export function toUserDto(user: User, animatedAllowed: boolean) {
     friendCode: user.friendCode,
     // C22: hareketli yükleme kapısı (AnimatedMediaService.canCreateAnimated). İstemci arayüzü içindir; sunucu yine otoritedir.
     animatedAllowed,
+    // C14: yapay zeka video kapısı (canUseAiVideo, guard ile AYNI fonksiyon). Arayüz ipucu; sunucu otoritedir.
+    aiVideoAllowed,
   };
 }
