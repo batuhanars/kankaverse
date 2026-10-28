@@ -61,6 +61,13 @@ Sahip "30 sn'ye kadar" istedi; sınır modelde (Pika teklifiyle doğrulandı):
 - §1 indirme mutlak üst sınırı 15 dk → **30 dk** (30 sn video 10-15 MB; yavaş CDN ~28 KB/s ≈ 9 dk). Idle 30 sn aynen.
 Web değişmez (seçenekler options'tan gelir).
 
+## §3c Tek model: Wan 3.0 (sahip 2026-10-28)
+Sahip Pika 2.5 ve Kling'i beğenmedi; ileride liste genişleyebilir.
+- api: `AI_VIDEO_MODELS` boşken varsayılan `wan-3.0` (`configuration.ts`, `.env.example`). Model tablosu değişmez.
+- web: options'ta tek model varsa model açılır listesi gösterilmez; yerine tek satır "Wan 3.0 · sesli" bilgi metni.
+  Çözünürlük + süre seçicileri aynen. Birden çok model olunca bugünkü liste döner.
+- Sunucu `.env.production`: `AI_VIDEO_MODELS=wan-3.0` (sahip).
+
 ## §4 Web
 1. **Seçici:** model listesinde ses bilgisi ("Pika 2.5 · sessiz", "Wan 3.0 · sesli", "Kling 3.0 Turbo · sesli"), i18n.
 2. **Son üretimler:** satır sağında küçük çöp kutusu simgesi (satır tıklamasından ayrı, `@click.stop`), QUEUED/RUNNING'de
