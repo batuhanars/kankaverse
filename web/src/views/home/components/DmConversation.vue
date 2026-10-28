@@ -24,6 +24,7 @@ import ReportModal from '@/components/shared/ReportModal.vue'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import EmojiFaceIcon from '@/components/shared/EmojiFaceIcon.vue'
 import GifIcon from '@/components/shared/GifIcon.vue'
+import AiVideoButton from '@/components/shared/AiVideoButton.vue'
 import MessageRow from '@/components/shared/MessageRow.vue'
 import DateDivider from '@/components/shared/DateDivider.vue'
 import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
@@ -1198,6 +1199,7 @@ const dayLabels = computed<(string | null)[]>(() =>
                 @blur="stopTyping"
               />
             </div>
+            <AiVideoButton @file="(f) => intake.takeFiles([f])" />
             <!-- GIF butonu -->
             <button
               type="button"

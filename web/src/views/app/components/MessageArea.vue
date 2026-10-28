@@ -22,6 +22,7 @@ import { useComposerFileIntake } from '@/composables/useComposerFileIntake'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
 import EmojiFaceIcon from '@/components/shared/EmojiFaceIcon.vue'
 import GifIcon from '@/components/shared/GifIcon.vue'
+import AiVideoButton from '@/components/shared/AiVideoButton.vue'
 import { isNewDay, dayDividerLabel } from '@/utils/dateSeparator'
 import type { MessageDto } from '@/types'
 
@@ -633,6 +634,7 @@ function resetComposerHeight() {
             @blur="stopTyping"
           />
         </div>
+        <AiVideoButton @file="(f) => intake.takeFiles([f])" />
         <!-- GIF butonu -->
         <button
           type="button"

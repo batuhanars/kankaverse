@@ -1462,6 +1462,47 @@
     "updateAfterCall": "Uygulamanın yeni bir sürümü yayınlandı. Görüşme bitince otomatik yenilenecek.",
     "chunkLoadFailed": "Bir ekran yüklenemedi. Sayfayı yenilemeyi dene, sürerse bize bildir."
   },
+  "aiVideo": {
+    "title": "Yapay zeka ile video üret",
+    "button": "Yapay zeka ile üret",
+    "amount": "{amount} $",
+    "promptLabel": "Ne üretilsin?",
+    "promptPlaceholder": "Örnek: Yağmurlu bir gecede neon ışıklı sokakta yürüyen kedi",
+    "imageAdd": "Görsel ekle",
+    "imageChange": "Görseli değiştir",
+    "imageRemove": "Kaldır",
+    "imageHint": "İsteğe bağlı. PNG, JPEG veya WebP, en fazla 10 MB. 5 saniyelik video üretilir.",
+    "seePrice": "Fiyatı gör",
+    "quoteLine": "Bu üretim yaklaşık {price}.",
+    "spentLine": "Bugün {spent} / {cap} harcandı.",
+    "generate": "Üret",
+    "queued": "Sırada",
+    "running": "Üretiliyor... {sec} sn",
+    "newOne": "Yeni üretim",
+    "useInChat": "Sohbete ekle",
+    "useAsMedia": "Kullan",
+    "recent": "Son üretimler",
+    "fromImage": "Görselden üretim",
+    "status": {
+      "QUOTED": "Teklif alındı",
+      "QUEUED": "Sırada",
+      "RUNNING": "Üretiliyor",
+      "COMPLETED": "Hazır",
+      "FAILED": "Başarısız"
+    },
+    "errors": {
+      "generic": "Bir şeyler ters gitti. Biraz sonra tekrar dene.",
+      "download": "Video indirilemedi. Tekrar dene.",
+      "imageType": "Yalnızca PNG, JPEG veya WebP görsel kullanılabilir.",
+      "imageSize": "Görsel en fazla 10 MB olabilir.",
+      "AI_VIDEO_DAILY_CAP": "Bugünkü harcama tavanına ulaşıldı.",
+      "AI_VIDEO_QUOTE_EXPIRED": "Fiyat teklifinin süresi doldu. Yeniden fiyat al.",
+      "AI_VIDEO_PROVIDER_ERROR": "Video üretim hizmeti şu an yanıt vermiyor. Biraz sonra tekrar dene.",
+      "AI_VIDEO_CONTENT_REJECTED": "Bu istem içerik kurallarına takıldı. İstemi değiştirip tekrar dene.",
+      "AI_VIDEO_INSUFFICIENT_BALANCE": "Pika bakiyesi bitti.",
+      "AI_VIDEO_TIMEOUT": "Üretim çok uzun sürdü ve iptal edildi."
+    }
+  },
   "media": {
     "source": {
       "title": {
@@ -1475,6 +1516,8 @@
       "animated": "GIF / video yükle",
       "animatedHint": "Hareketli, en fazla 6 saniye",
       "animatedOff": "Şu an kullanılamıyor",
+      "aiVideo": "Yapay zeka ile üret",
+      "aiVideoHint": "İstemden 5 saniyelik hareketli video",
       "newBadge": "Yeni",
       "remove": "Kaldır",
       "errorAnimatedOnly": "Bu hareketli bir dosya değil. Görsel için \"Görsel yükle\" seçeneğini kullan.",

@@ -6,20 +6,34 @@
  * Kapı (`animatedAllowed`) yalnız arayüzdür; sunucu yine otoritedir.
  */
 import { useI18n } from 'vue-i18n'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import KvModal from '@/components/ui/KvModal.vue'
+import AiVideoDialog from '@/components/shared/AiVideoDialog.vue'
+import { useAuthStore } from '@/stores/auth'
 import { ANIMATED_ACCEPT, STATIC_ACCEPT, showAnimatedNewBadge } from '@/utils/animatedMedia'
 
 defineProps<{ open: boolean; title: string; animatedAllowed: boolean }>()
 const emit = defineEmits<{ close: []; file: [file: File] }>()
 
 const { t } = useI18n()
+const aiVideoAllowed = computed(() => useAuthStore().user?.aiVideoAllowed === true) // C14: yoksa seçenek HİÇ görünmez
+const aiOpen = ref(false)
 const staticInput = ref<HTMLInputElement | null>(null)
 const animatedInput = ref<HTMLInputElement | null>(null)
 
 function choose(kind: 'static' | 'animated') {
   emit('close')
   ;(kind === 'static' ? staticInput : animatedInput).value?.click()
+}
+
+function chooseAi() {
+  emit('close')
+  aiOpen.value = true
+}
+
+function onAiUse(file: File) {
+  aiOpen.value = false
+  emit('file', file)
 }
 
 function onChange(event: Event) {
@@ -67,8 +81,20 @@ const optionClass =
           </span>
         </span>
       </button>
+
+      <button v-if="aiVideoAllowed" type="button" :class="optionClass" @click="chooseAi">
+        <svg class="shrink-0" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kv-text-secondary);" aria-hidden="true">
+          <path d="m12 3 1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
+          <path d="M19 15v4M17 17h4" />
+        </svg>
+        <span class="min-w-0">
+          <span class="block text-[15px] font-medium" style="color: var(--kv-text-primary);">{{ t('media.source.aiVideo') }}</span>
+          <span class="block text-[12px]" style="color: var(--kv-text-muted);">{{ t('media.source.aiVideoHint') }}</span>
+        </span>
+      </button>
     </div>
   </KvModal>
+  <AiVideoDialog v-if="aiOpen" :use-label="t('aiVideo.useAsMedia')" @close="aiOpen = false" @use="onAiUse" />
 
   <input ref="staticInput" type="file" :accept="STATIC_ACCEPT" class="hidden" @change="onChange" />
   <input ref="animatedInput" type="file" :accept="ANIMATED_ACCEPT" class="hidden" @change="onChange" />

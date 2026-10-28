@@ -96,5 +96,14 @@ export function useComposerFileIntake(options: {
     window.removeEventListener('drop', blockStrayFileDrag)
   })
 
-  return { dragging, onFileSelected, onPaste, onDragEnter, onDragOver, onDragLeave, onDrop }
+  return {
+    dragging,
+    takeFiles,
+    onFileSelected,
+    onPaste,
+    onDragEnter,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+  }
 }
