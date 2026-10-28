@@ -12,6 +12,7 @@ import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import AiVideoOptions from '@/components/shared/AiVideoOptions.vue'
 import AiVideoCostBar from '@/components/shared/AiVideoCostBar.vue'
+import AiVideoRecentList from '@/components/shared/AiVideoRecentList.vue'
 import AiVideoPreviewModal from '@/components/shared/AiVideoPreviewModal.vue'
 import { useAiVideo } from '@/composables/useAiVideo'
 import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo'
@@ -36,9 +37,10 @@ const STALE_MS = 10 * 60 * 1000 // presigned adres 15 dk; 10 dk sonra tazele
 const canSubmit = computed(
   () => !ai.busy.value && (ai.prompt.value.trim().length > 0 || !!ai.image.value),
 )
-const statusText = computed(() =>
-  ai.job.value?.status === 'QUEUED' ? t('aiVideo.queued') : t('aiVideo.running', { sec: ai.elapsedSec.value }),
-)
+const statusText = computed(() => {
+  if (ai.saving.value) return t('aiVideo.saving')
+  return ai.job.value?.status === 'QUEUED' ? t('aiVideo.queued') : t('aiVideo.running', { sec: ai.elapsedSec.value })
+})
 const failed = computed(() => ai.job.value?.status === 'FAILED')
 const otherRecent = computed(() => ai.recent.value.filter((r) => r.id !== ai.job.value?.id))
 
@@ -118,6 +120,17 @@ async function onRecent(r: AiVideoDto) {
   else if (r.status === 'QUEUED' || r.status === 'RUNNING') ai.open(r)
 }
 
+/** Silinen satır önizlemedeyse önizleme kapanır, forma dönülür. */
+async function onRemove(id: string) {
+  await ai.remove(id)
+  if (previewRow.value?.id === id && !ai.recent.value.some((r) => r.id === id)) newOne()
+}
+
+async function onClear() {
+  await ai.clearAll()
+  newOne()
+}
+
 /** Kullan (media): önizlenen satırın videosu → File → çağıran. Kaydet ve gönder (chat): ek üret → çağıran gönderir. */
 async function onPrimary() {
   const row = await currentRow()
@@ -144,6 +157,7 @@ async function onPrimary() {
     @save="onSave"
     @primary="onPrimary"
     @new="newOne"
+    @delete="previewRow && onRemove(previewRow.id)"
   />
   <KvModal v-else :title="t('aiVideo.title')" @close="emit('close')">
     <div class="flex flex-col gap-4 min-w-0 overflow-y-auto">
@@ -217,28 +231,13 @@ async function onPrimary() {
 
       <p v-if="ai.error.value" class="text-[13px]" style="color: var(--kv-danger);">{{ ai.error.value }}</p>
 
-      <!-- Son üretimler: eylem düğmesi yok; satır yalnız yönlendirir (§4b-4) -->
-      <section v-if="otherRecent.length" class="min-w-0">
-        <h3 class="text-[13px] font-semibold mb-2" style="color: var(--kv-text-secondary);">{{ t('aiVideo.recent') }}</h3>
-        <ul class="flex flex-col gap-1">
-          <li v-for="r in otherRecent" :key="r.id" class="min-w-0">
-            <component
-              :is="r.status === 'COMPLETED' || r.status === 'QUEUED' || r.status === 'RUNNING' ? 'button' : 'div'"
-              :type="r.status === 'FAILED' ? undefined : 'button'"
-              class="block w-full text-left rounded-[var(--kv-radius-sm)] px-2 py-1.5 min-w-0"
-              :class="r.status === 'FAILED' ? '' : 'transition-colors hover:bg-[var(--kv-bg-elevated)] cursor-pointer'"
-              @click="onRecent(r)"
-            >
-              <span class="block truncate text-[13px]" style="color: var(--kv-text-primary);">
-                {{ r.prompt || t('aiVideo.fromImage') }}
-              </span>
-              <span class="block text-[11px]" :style="{ color: r.status === 'FAILED' ? 'var(--kv-danger)' : 'var(--kv-text-muted)' }">
-                {{ r.status === 'FAILED' ? ai.errorText(r.errorCode) : t(`aiVideo.status.${r.status}`) }}
-              </span>
-            </component>
-          </li>
-        </ul>
-      </section>
+      <AiVideoRecentList
+        :rows="otherRecent"
+        :status-label="ai.statusLabel"
+        @open="onRecent"
+        @remove="onRemove"
+        @clear="onClear"
+      />
     </div>
   </KvModal>
 </template>

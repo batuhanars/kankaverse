@@ -25,6 +25,7 @@ export interface AiVideoModelOption {
   durations: number[]
   resolutions: string[]
   supportsImage: boolean
+  audio: 'none' | 'default' | 'always'
 }
 
 export interface AiVideoOptionsDto {
@@ -60,6 +61,12 @@ export const aiVideoApi = {
   },
   list() {
     return http.get<AiVideoDto[]>('/ai-video')
+  },
+  remove(id: string) {
+    return http.delete(`/ai-video/${id}`)
+  },
+  removeAll() {
+    return http.delete<{ deleted: number }>('/ai-video')
   },
   get(id: string) {
     return http.get<AiVideoDto>(`/ai-video/${id}`)

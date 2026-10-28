@@ -1490,6 +1490,14 @@
     "previewTitle": "Üretilen video",
     "useAsMedia": "Kullan",
     "recent": "Son üretimler",
+    "audioNone": "{label} · sessiz",
+    "audioOn": "{label} · sesli",
+    "saving": "Kaydediliyor...",
+    "delete": "Sil",
+    "deleteOne": "Üretimi sil",
+    "clearAll": "Temizle",
+    "clearTitle": "Son üretimleri temizle",
+    "clearConfirm": "Son üretimlerin hepsi silinsin mi? Sohbete gönderdiklerin kalır.",
     "fromImage": "Görselden üretim",
     "status": {
       "QUOTED": "Teklif alındı",
@@ -1510,7 +1518,9 @@
       "AI_VIDEO_PROVIDER_ERROR": "Video üretim hizmeti şu an yanıt vermiyor. Biraz sonra tekrar dene.",
       "AI_VIDEO_CONTENT_REJECTED": "Bu istem içerik kurallarına takıldı. İstemi değiştirip tekrar dene.",
       "AI_VIDEO_INSUFFICIENT_BALANCE": "Pika bakiyesi bitti.",
-      "AI_VIDEO_TIMEOUT": "Üretim çok uzun sürdü ve iptal edildi."
+      "AI_VIDEO_TIMEOUT": "Üretim çok uzun sürdü ve iptal edildi.",
+      "AI_VIDEO_DOWNLOAD_FAILED": "Video kaydedilemedi. Yeni bir üretim başlat.",
+      "AI_VIDEO_BUSY": "Bu üretim şu an işleniyor. Biraz sonra tekrar dene."
     }
   },
   "media": {

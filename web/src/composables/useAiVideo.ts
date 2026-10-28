@@ -15,7 +15,10 @@ const KNOWN_ERRORS = [
   'AI_VIDEO_CONTENT_REJECTED',
   'AI_VIDEO_INSUFFICIENT_BALANCE',
   'AI_VIDEO_TIMEOUT',
+  'AI_VIDEO_DOWNLOAD_FAILED',
+  'AI_VIDEO_BUSY',
 ]
+const DOWNLOAD_PENDING = 'AI_VIDEO_DOWNLOAD_PENDING' // iç işaret: RUNNING satırda video kaydediliyor
 
 /**
  * Yapay zeka video üretim akışı (Sprint C14 §3.1, C14b §3.1): oluştur (tek çağrı) → 4 sn yoklama → sonuç.
@@ -36,6 +39,7 @@ export function useAiVideo() {
   let tickTimer: ReturnType<typeof setInterval> | null = null
 
   const working = computed(() => job.value?.status === 'QUEUED' || job.value?.status === 'RUNNING')
+  const saving = computed(() => job.value?.errorCode === DOWNLOAD_PENDING)
   const elapsedSec = computed(() =>
     job.value
       ? Math.max(0, Math.floor((now.value - new Date(job.value.createdAt).getTime()) / 1000))
@@ -114,6 +118,37 @@ export function useAiVideo() {
     }
   }
 
+  /** Tek satırı siler (onaysız). Sohbete gönderilmiş ekler etkilenmez. */
+  async function remove(id: string) {
+    error.value = ''
+    try {
+      await aiVideoApi.remove(id)
+      recent.value = recent.value.filter((r) => r.id !== id)
+      if (job.value?.id === id) reset()
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  /** Son üretimlerin hepsini siler (çağıran onay alır). */
+  async function clearAll() {
+    error.value = ''
+    try {
+      await aiVideoApi.removeAll()
+      recent.value = []
+      reset()
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  /** Satır durum metni: kaydedilen RUNNING satır "Kaydediliyor". */
+  function statusLabel(r: AiVideoDto): string {
+    if (r.status === 'FAILED') return errorText(r.errorCode)
+    if (r.errorCode === DOWNLOAD_PENDING) return t('aiVideo.saving')
+    return t(`aiVideo.status.${r.status}`)
+  }
+
   /** Bitmiş sonucu (bu oturumdan ya da "Son üretimler"den) diyalogda açar. */
   function open(row: AiVideoDto) {
     error.value = ''
@@ -179,11 +214,15 @@ export function useAiVideo() {
     busy,
     error,
     working,
+    saving,
     elapsedSec,
     errorText,
     submit,
     open,
     reset,
+    remove,
+    clearAll,
+    statusLabel,
     toFile,
     save,
     saveAndAttach,

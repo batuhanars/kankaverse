@@ -17,7 +17,7 @@ const props = defineProps<{
   error: string
   modelLabel?: string
 }>()
-const emit = defineEmits<{ close: []; save: []; primary: []; new: [] }>()
+const emit = defineEmits<{ close: []; save: []; primary: []; new: []; delete: [] }>()
 const { t } = useI18n()
 
 const meta = computed(() =>
@@ -45,6 +45,7 @@ const meta = computed(() =>
       <div class="flex flex-wrap items-center gap-2">
         <AiVideoResultActions :mode="mode" :busy="busy" @save="emit('save')" @primary="emit('primary')" />
         <KvButton variant="ghost" :disabled="busy" @click="emit('new')">{{ t('aiVideo.newOne') }}</KvButton>
+        <KvButton variant="danger" :disabled="busy" @click="emit('delete')">{{ t('aiVideo.delete') }}</KvButton>
       </div>
     </div>
   </KvModal>
