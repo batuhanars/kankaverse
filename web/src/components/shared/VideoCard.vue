@@ -132,10 +132,19 @@ onBeforeUnmount(() => stop(myId))
         {{ t('attachment.notReady') }}
       </span>
     </button>
-    <!-- İndir: sol üst köşe (oynatıcı kontrolleri altta, süre sağ altta; çakışmaz) -->
+    <!-- C14b: yapay zeka rozeti sol üstte (sunucu kaynaklı aiGenerated) -->
+    <span
+      v-if="attachment.aiGenerated"
+      class="absolute left-2 top-2 max-w-[60%] px-1.5 py-0.5 rounded text-[11px] flex items-center gap-1 pointer-events-none"
+      style="background-color: rgba(0, 0, 0, 0.6); color: #fff;"
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m12 3 1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /></svg>
+      <span class="truncate">{{ t('attachment.aiGenerated') }}</span>
+    </span>
+    <!-- İndir: sağ üst köşe (oynatıcı kontrolleri altta, süre sağ altta; çakışmaz) -->
     <button
       type="button"
-      class="absolute left-2 top-2 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer transition-opacity hover:opacity-80"
+      class="absolute right-2 top-2 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer transition-opacity hover:opacity-80"
       :class="downloading ? 'opacity-50 pointer-events-none' : ''"
       style="background-color: rgba(0, 0, 0, 0.6); color: #fff;"
       :aria-label="t('attachment.downloadVideo')"

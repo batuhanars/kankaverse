@@ -1,12 +1,16 @@
 import { computed, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { aiVideoApi, type AiVideoDto, type AiVideoQuoteDto } from '@/api/aiVideo'
+import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo'
 import { attachmentsApi } from '@/api/attachments'
+import { useAiVideoForm } from '@/composables/useAiVideoForm'
+import { saveFromUrl } from '@/utils/saveFromUrl'
 
 const POLL_MS = 4000
 const KNOWN_ERRORS = [
   'AI_VIDEO_DAILY_CAP',
-  'AI_VIDEO_QUOTE_EXPIRED',
+  'AI_VIDEO_INVALID_OPTION',
+  'AI_VIDEO_NOT_READY',
+  'UPLOADS_DISABLED',
   'AI_VIDEO_PROVIDER_ERROR',
   'AI_VIDEO_CONTENT_REJECTED',
   'AI_VIDEO_INSUFFICIENT_BALANCE',
@@ -14,14 +18,15 @@ const KNOWN_ERRORS = [
 ]
 
 /**
- * Yapay zeka video üretim akışı (Sprint C14 §3.1): teklif → onay → 4 sn yoklama → sonuç.
+ * Yapay zeka video üretim akışı (Sprint C14 §3.1, C14b §3.1): oluştur (tek çağrı) → 4 sn yoklama → sonuç.
  * Yoklama bileşen sökülünce durur. Hata metni koda göre i18n'den, bilinmeyende sunucu mesajından.
  */
 export function useAiVideo() {
   const { t } = useI18n()
   const prompt = ref('')
   const image = ref<File | null>(null)
-  const quote = ref<AiVideoQuoteDto | null>(null)
+  const withImage = computed(() => !!image.value)
+  const form = useAiVideoForm(withImage)
   const job = ref<AiVideoDto | null>(null)
   const recent = ref<AiVideoDto[]>([])
   const busy = ref(false)
@@ -90,28 +95,20 @@ export function useAiVideo() {
     return data.inputKey
   }
 
-  async function getQuote() {
+  async function submit() {
     error.value = ''
     busy.value = true
     try {
       const inputKey = image.value ? await uploadInput(image.value) : undefined
-      quote.value = (await aiVideoApi.quote(prompt.value, inputKey)).data
+      const sel = {
+        model: form.model.value,
+        resolution: form.resolution.value,
+        durationS: form.durationS.value,
+      }
+      track((await aiVideoApi.create(sel, prompt.value, inputKey)).data)
+      void form.loadOptions() // bugünkü harcama güncellensin
     } catch (e) {
       fail(e)
-    } finally {
-      busy.value = false
-    }
-  }
-
-  async function submit() {
-    if (!quote.value) return
-    error.value = ''
-    busy.value = true
-    try {
-      track((await aiVideoApi.submit(quote.value.generationId)).data)
-    } catch (e) {
-      fail(e)
-      quote.value = null // süresi dolmuş ya da tavan: yeniden teklif al
     } finally {
       busy.value = false
     }
@@ -127,7 +124,6 @@ export function useAiVideo() {
   function reset() {
     stop()
     job.value = null
-    quote.value = null
     error.value = ''
   }
 
@@ -149,13 +145,35 @@ export function useAiVideo() {
     }
   }
 
+  /** Kaydet: sunucunun indirme adresi (fetch yok). */
+  function save(row: AiVideoDto) {
+    if (row.downloadUrl) saveFromUrl(row.downloadUrl)
+  }
+
+  /** Kaydet ve gönder: indir + bekleyen ek üret. Dönen kimliği çağıran mevcut mesaj yoluna verir. */
+  async function saveAndAttach(row: AiVideoDto): Promise<string | null> {
+    busy.value = true
+    error.value = ''
+    try {
+      const { data } = await aiVideoApi.createAttachment(row.id)
+      save(row)
+      return data.attachmentId
+    } catch (e) {
+      fail(e)
+      return null
+    } finally {
+      busy.value = false
+    }
+  }
+
   void refreshRecent()
   onUnmounted(stop)
 
   return {
     prompt,
     image,
-    quote,
+    form,
+    withImage,
     job,
     recent,
     busy,
@@ -163,10 +181,11 @@ export function useAiVideo() {
     working,
     elapsedSec,
     errorText,
-    getQuote,
     submit,
     open,
     reset,
     toFile,
+    save,
+    saveAndAttach,
   }
 }

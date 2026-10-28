@@ -1,23 +1,23 @@
 <script setup lang="ts">
 /**
  * AiVideoButton (Sprint C14 §3.2-1): mesaj kutusunun "Yapay zeka ile üret" girişi (kanal + DM ortak).
- * Yalnız `aiVideoAllowed === true` iken render olur (kilitli iskele yok). Üretilen dosya `file` ile çıkar,
- * çağıran mevcut ek hattına (takeFiles) verir.
+ * Yalnız `aiVideoAllowed === true` iken render olur (kilitli iskele yok). C14b: "Kaydet ve gönder" bekleyen ek
+ * üretir; `attachment` ile kimliği çıkar, çağıran MEVCUT mesaj gönderme yoluna (onAttachmentSent) verir.
  */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import AiVideoDialog from '@/components/shared/AiVideoDialog.vue'
 
-const emit = defineEmits<{ file: [file: File] }>()
+const emit = defineEmits<{ attachment: [attachmentId: string] }>()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const allowed = computed(() => authStore.user?.aiVideoAllowed === true)
 const open = ref(false)
 
-function onUse(file: File) {
+function onSend(attachmentId: string) {
   open.value = false
-  emit('file', file)
+  emit('attachment', attachmentId)
 }
 </script>
 
@@ -35,5 +35,5 @@ function onUse(file: File) {
       <path d="M19 15v4M17 17h4" />
     </svg>
   </button>
-  <AiVideoDialog v-if="open" :use-label="t('aiVideo.useInChat')" @close="open = false" @use="onUse" />
+  <AiVideoDialog v-if="open" mode="chat" @close="open = false" @send="onSend" />
 </template>

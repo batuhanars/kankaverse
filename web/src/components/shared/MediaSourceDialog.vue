@@ -94,7 +94,7 @@ const optionClass =
       </button>
     </div>
   </KvModal>
-  <AiVideoDialog v-if="aiOpen" :use-label="t('aiVideo.useAsMedia')" @close="aiOpen = false" @use="onAiUse" />
+  <AiVideoDialog v-if="aiOpen" mode="media" @close="aiOpen = false" @use="onAiUse" />
 
   <input ref="staticInput" type="file" :accept="STATIC_ACCEPT" class="hidden" @change="onChange" />
   <input ref="animatedInput" type="file" :accept="ANIMATED_ACCEPT" class="hidden" @change="onChange" />

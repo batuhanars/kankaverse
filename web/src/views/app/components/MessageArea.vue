@@ -634,7 +634,7 @@ function resetComposerHeight() {
             @blur="stopTyping"
           />
         </div>
-        <AiVideoButton @file="(f) => intake.takeFiles([f])" />
+        <AiVideoButton @attachment="(id) => onAttachmentSent({ attachmentId: id, caption: '' })" />
         <!-- GIF butonu -->
         <button
           type="button"

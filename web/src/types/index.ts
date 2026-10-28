@@ -290,6 +290,7 @@ export interface AttachmentDto {
   thumbnail?: string | null // base64 JPEG, `data:` öneksiz
   width?: number | null
   height?: number | null
+  aiGenerated?: boolean // C14b: yapay zeka ile üretildi (sunucu türetir)
 }
 
 export interface ReactionDto {
