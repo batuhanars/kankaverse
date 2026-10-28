@@ -25,7 +25,7 @@ function onSend(attachmentId: string) {
   <button
     v-if="allowed"
     type="button"
-    class="emoji-btn shrink-0 self-center py-1 px-1 cursor-pointer flex items-center"
+    class="emoji-btn ai-btn shrink-0 self-center py-1 px-1 cursor-pointer flex items-center"
     :aria-label="t('aiVideo.button')"
     :title="t('aiVideo.button')"
     @click="open = true"

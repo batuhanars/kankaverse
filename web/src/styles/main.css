@@ -217,4 +217,12 @@ code, pre, .font-mono {
 .emoji-btn:focus-visible {
   color: var(--kv-text-secondary);
 }
+/* Yapay zeka girişi fark edilsin diye Kor (sahip kararı 2026-10-28); emoji/GIF nötr kalır. */
+.emoji-btn.ai-btn {
+  color: var(--kv-accent-500);
+}
+.emoji-btn.ai-btn:hover,
+.emoji-btn.ai-btn:focus-visible {
+  color: var(--kv-accent-400);
+}
 
