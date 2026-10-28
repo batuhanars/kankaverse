@@ -137,7 +137,7 @@ export default () => {
       apiKey: process.env.PIKA_API_KEY ?? '',
       apiUrl: (process.env.PIKA_API_URL ?? 'https://api.dev.pika.art').replace(/\/+$/, ''),
       // C14b: açık model anahtarları (tablo ai-video.models.ts); eski AI_VIDEO_MODEL/RESOLUTION kalktı
-      models: (process.env.AI_VIDEO_MODELS ?? 'pika-2.5')
+      models: (process.env.AI_VIDEO_MODELS ?? 'wan-3.0')
         .split(',')
         .map((k) => k.trim())
         .filter((k) => k.length > 0),
