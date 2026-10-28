@@ -4386,6 +4386,19 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Tur revizeleri: "Kategorisiz kanal ekle" → "Kanal Ekle" · tüm emoji düğmeleri tepki düğmesi standardında gri çizgi simge (web `EmojiFaceIcon`, mobil `happy-outline`)
 - [ ] Mağaza sürümü (vc28)
 
+## Sprint C14 — Yapay zeka ile video üretimi (yalnız sahip) — 2026-10-28
+
+> Sözleşme: `contracts/SPRINT_C14_AI_VIDEO_CONTRACT.md`. api → web. Mobil yok. R7: erişim kapısı + üçüncü tarafa veri.
+> Sebep: sahip planı (C13 sonrası). Kullanıcıya açma ayrı karar (§8).
+
+- [x] §1-2 api: model + migration uygulandı, uç noktalar, kapı, yoklayıcı, testler, build temiz (PM incelemesi: gönderimde ağ hatası → aynı Idempotency-Key ile 2 yeniden deneme eklendi, 37 test)
+- [x] R7: kapı + `aiVideoAllowed` + Pika'ya giden veri — sahip onayladı 2026-10-28
+- [x] §3 web: diyalog + mesaj kutusu ve seçim penceresi girişleri, vue-tsc/lint/build (390/320px ölçülmedi → sahip turunda)
+- [ ] Canlıda ilk sınanacak: "Kullan" özel bucket'a tarayıcıdan `fetch` atan İLK yol; R2 CORS kuralında GET yoksa indirme düşer → Cloudflare R2 CORS'a GET ekle
+- [x] Sahip ödevi: Pika hesabı + API anahtarı + bakiye 10 $ · sunucu env (§4) — anahtar sunucudan doğrulandı (bakiye uç noktası 200)
+- [ ] Sahip turu (canlı): metinden → sohbete; görselden → profil fotoğrafı; tavan mesajı; başka hesapta giriş yok
+- [ ] Harcama satırları Pika paneliyle tutarlı
+
 ## Sprint C27 — Mobilde düzenleme ortada açılan ekranda — 2026-10-27
 
 > Sözleşme: `contracts/SPRINT_C27_MOBILE_EDIT_OVERLAY_CONTRACT.md`. Yalnız mobil, vc31. Yanıt şeridi değişmez.
