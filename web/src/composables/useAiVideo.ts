@@ -128,12 +128,12 @@ export function useAiVideo() {
   }
 
   /** Presigned adresten videoyu File'a çevirir (sözleşme §3.1). */
-  async function toFile(): Promise<File | null> {
-    if (!job.value?.videoUrl) return null
+  async function toFile(row: AiVideoDto): Promise<File | null> {
+    if (!row.videoUrl) return null
     busy.value = true
     error.value = ''
     try {
-      const res = await fetch(job.value.videoUrl)
+      const res = await fetch(row.videoUrl)
       if (!res.ok) throw new Error('download')
       const blob = await res.blob()
       return new File([blob], 'ai-video.mp4', { type: 'video/mp4' })

@@ -121,6 +121,19 @@ hesapta giriş yok.
 - `.env.production`: `AI_VIDEO_MODELS=pika-2.5,wan-3.0,kling-3.0-turbo` eklenir (sahip). Eski iki anahtar yoksa sorun yok.
 - R2 özel bucket CORS'a `GET` (yalnız "Kullan" yolu için; sohbet ve kaydet yolları gerektirmez).
 
+## §4b Revize 1 (sahip turu 2026-10-28) — web, api yok
+
+Bulgu: böcek videosu bitince sonuç düğmeleri ile "Son üretimler"deki kedi satırının düğmeleri aynı ekrandaydı; sahip
+kedi satırınınkine bastı, kedi gönderildi (DB: ek `aiGenerationId` = kedi). Sunucu doğru; düzen belirsizdi.
+1. **Çipler kalkar** (§0-5 iptal): istem zaten belirtir. `AiVideoChips.vue` + i18n anahtarları silinir.
+2. **Ayrı önizleme penceresi** `AiVideoPreviewModal.vue`: video + istem metni (2 satır, kesilir) + model/süre küçük satırı +
+   bağlama göre düğmeler (§0-6). Üretim COMPLETED olunca üretim penceresi bu pencereye **geçer** (ikisi aynı anda açık
+   değil). Önizlemeden "Yeni üretim" → forma dön.
+3. **Üretim penceresi** yalnız form + ilerleme + hata. Sonuç düğmeleri burada YOK.
+4. **"Son üretimler" satırlarında düğme YOK.** Tamamlanan satıra tıklama → o satırın önizleme penceresi; süren satır →
+   ilerleme görünümü (yoklama); başarısız satır hata metniyle, tıklanmaz.
+5. Ekranda aynı anda yalnız bir videonun düğmeleri bulunur (değişmez kural).
+
 ## §5 DoD
 - [ ] api §1-2 + migration uygulandı + testler + build
 - [ ] R7: §2.4 ek oluşturma + `aiGenerated` türetimi sahibe sunuldu

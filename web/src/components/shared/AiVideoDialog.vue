@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * AiVideoDialog (Sprint C14b §3.1): model/çözünürlük/süre + istem (+ isteğe bağlı görsel) → video üretir.
- * Akış mantığı `useAiVideo`/`useAiVideoForm`da; burası yalnız görünüm. Sonuç düğmeleri bağlama göre:
+ * İki görünüm, aynı anda biri: `form` (seçici/istem/ilerleme/son üretimler, düğmesiz) ve `preview` (tek videonun
+ * düğmeleri, §4b). Önizlenen satır açık `previewRow`da tutulur. Akış mantığı `useAiVideo`/`useAiVideoForm`da; burası yalnız görünüm. Sonuç düğmeleri bağlama göre:
  * mode=chat → `send` (attachmentId, çağıran mevcut mesaj yoluna verir) · mode=media → `use` (File).
  * Kapı yalnız arayüz; sunucu otorite.
  */
@@ -10,11 +11,10 @@ import { useI18n } from 'vue-i18n'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import AiVideoOptions from '@/components/shared/AiVideoOptions.vue'
-import AiVideoChips from '@/components/shared/AiVideoChips.vue'
 import AiVideoCostBar from '@/components/shared/AiVideoCostBar.vue'
-import AiVideoResultActions from '@/components/shared/AiVideoResultActions.vue'
+import AiVideoPreviewModal from '@/components/shared/AiVideoPreviewModal.vue'
 import { useAiVideo } from '@/composables/useAiVideo'
-import type { AiVideoDto } from '@/api/aiVideo'
+import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo'
 
 const props = defineProps<{ mode: 'chat' | 'media' }>()
 const emit = defineEmits<{ close: []; use: [file: File]; send: [attachmentId: string] }>()
@@ -28,6 +28,10 @@ const previewUrl = ref<string | null>(null)
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const PROMPT_MAX = 1000
+const view = ref<'form' | 'preview'>('form')
+const previewRow = ref<AiVideoDto | null>(null)
+let previewOpenedAt = 0
+const STALE_MS = 10 * 60 * 1000 // presigned adres 15 dk; 10 dk sonra tazele
 
 const canSubmit = computed(
   () => !ai.busy.value && (ai.prompt.value.trim().length > 0 || !!ai.image.value),
@@ -35,7 +39,6 @@ const canSubmit = computed(
 const statusText = computed(() =>
   ai.job.value?.status === 'QUEUED' ? t('aiVideo.queued') : t('aiVideo.running', { sec: ai.elapsedSec.value }),
 )
-const done = computed(() => ai.job.value?.status === 'COMPLETED' && !!ai.job.value.videoUrl)
 const failed = computed(() => ai.job.value?.status === 'FAILED')
 const otherRecent = computed(() => ai.recent.value.filter((r) => r.id !== ai.job.value?.id))
 
@@ -58,16 +61,69 @@ function onImage(e: Event) {
   }
 }
 
-function addChip(text: string) {
-  const base = ai.prompt.value.trim().replace(/[,\s]+$/, '')
-  ai.prompt.value = (base ? `${base}, ${text}` : text).slice(0, PROMPT_MAX)
+const modelLabel = computed(() =>
+  form.options.value?.models.find((m) => m.key === previewRow.value?.model)?.label,
+)
+
+function showPreview(row: AiVideoDto) {
+  ai.error.value = ''
+  previewRow.value = row
+  previewOpenedAt = Date.now()
+  view.value = 'preview'
 }
 
-/** Kullan (media): C14 davranışı, dosyaya çevir → çağıranın kesit akışı. Kaydet ve gönder (chat): ek üret → çağıran gönderir. */
-async function onPrimary(row: AiVideoDto) {
+/** Presigned adresler tazelensin diye satırı sunucudan çeker; olmazsa eldeki satır yedek. */
+async function refreshed(row: AiVideoDto): Promise<AiVideoDto> {
+  try {
+    return (await aiVideoApi.get(row.id)).data
+  } catch {
+    return row
+  }
+}
+
+/** Eylemden hemen önce: önizleme 10 dk'dan eskiyse satırı tazele. */
+async function currentRow(): Promise<AiVideoDto | null> {
+  const row = previewRow.value
+  if (!row) return null
+  if (Date.now() - previewOpenedAt < STALE_MS) return row
+  const fresh = await refreshed(row)
+  previewRow.value = fresh
+  previewOpenedAt = Date.now()
+  return fresh
+}
+
+async function onSave() {
+  const row = await currentRow()
+  if (row) ai.save(row)
+}
+
+// Yoklamayla biten üretim önizlemeye geçer (form kapanır).
+watch(
+  () => ai.job.value?.status,
+  (s) => {
+    const row = ai.job.value
+    if (s === 'COMPLETED' && row?.videoUrl) showPreview(row)
+  },
+)
+
+function newOne() {
+  ai.reset()
+  previewRow.value = null
+  view.value = 'form'
+}
+
+/** Satır tıklaması: biten → önizleme; süren → formda ilerleme. Başarısız satır tıklanmaz. */
+async function onRecent(r: AiVideoDto) {
+  if (r.status === 'COMPLETED' && r.videoUrl) showPreview(await refreshed(r))
+  else if (r.status === 'QUEUED' || r.status === 'RUNNING') ai.open(r)
+}
+
+/** Kullan (media): önizlenen satırın videosu → File → çağıran. Kaydet ve gönder (chat): ek üret → çağıran gönderir. */
+async function onPrimary() {
+  const row = await currentRow()
+  if (!row) return
   if (props.mode === 'media') {
-    if (ai.job.value?.id !== row.id) ai.open(row)
-    const file = await ai.toFile()
+    const file = await ai.toFile(row)
     if (file) emit('use', file)
     return
   }
@@ -77,37 +133,32 @@ async function onPrimary(row: AiVideoDto) {
 </script>
 
 <template>
-  <KvModal :title="t('aiVideo.title')" @close="emit('close')">
+  <AiVideoPreviewModal
+    v-if="view === 'preview' && previewRow"
+    :row="previewRow"
+    :mode="mode"
+    :busy="ai.busy.value"
+    :error="ai.error.value"
+    :model-label="modelLabel"
+    @close="emit('close')"
+    @save="onSave"
+    @primary="onPrimary"
+    @new="newOne"
+  />
+  <KvModal v-else :title="t('aiVideo.title')" @close="emit('close')">
     <div class="flex flex-col gap-4 min-w-0 overflow-y-auto">
-      <!-- Sonuç / ilerleme -->
+      <!-- İlerleme / hata -->
       <template v-if="ai.job.value">
-        <video
-          v-if="done"
-          :src="ai.job.value.videoUrl"
-          class="w-full rounded-[var(--kv-radius-md)] bg-black max-h-[40vh]"
-          controls
-          autoplay
-          loop
-          muted
-          playsinline
-        />
-        <template v-else-if="ai.working.value">
+        <template v-if="ai.working.value">
           <p class="text-[14px]" style="color: var(--kv-text-secondary);">{{ statusText }}</p>
           <p class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('aiVideo.waitNote') }}</p>
         </template>
-        <p v-else-if="failed" class="text-[13px]" style="color: var(--kv-danger);">
-          {{ ai.errorText(ai.job.value.errorCode) }}
-        </p>
-        <div class="flex flex-wrap items-center gap-2">
-          <AiVideoResultActions
-            v-if="done"
-            :mode="mode"
-            :busy="ai.busy.value"
-            @save="ai.save(ai.job.value!)"
-            @primary="onPrimary(ai.job.value!)"
-          />
-          <KvButton v-if="!ai.working.value" variant="ghost" @click="ai.reset">{{ t('aiVideo.newOne') }}</KvButton>
-        </div>
+        <template v-else>
+          <p v-if="failed" class="text-[13px]" style="color: var(--kv-danger);">
+            {{ ai.errorText(ai.job.value.errorCode) }}
+          </p>
+          <div><KvButton variant="ghost" @click="newOne">{{ t('aiVideo.newOne') }}</KvButton></div>
+        </template>
       </template>
 
       <!-- Form -->
@@ -136,7 +187,6 @@ async function onPrimary(row: AiVideoDto) {
             class="w-full resize-none rounded-[var(--kv-radius-md)] px-3 py-2 text-[14px] outline-none border border-[var(--kv-border-subtle)] bg-[var(--kv-bg-content)]"
             style="color: var(--kv-text-primary);"
           />
-          <AiVideoChips @pick="addChip" />
         </div>
 
         <div class="flex flex-wrap items-center gap-2 min-w-0">
@@ -167,15 +217,17 @@ async function onPrimary(row: AiVideoDto) {
 
       <p v-if="ai.error.value" class="text-[13px]" style="color: var(--kv-danger);">{{ ai.error.value }}</p>
 
-      <!-- Son üretimler: diyalog kapansa da ödenmiş sonuç kaybolmaz -->
+      <!-- Son üretimler: eylem düğmesi yok; satır yalnız yönlendirir (§4b-4) -->
       <section v-if="otherRecent.length" class="min-w-0">
         <h3 class="text-[13px] font-semibold mb-2" style="color: var(--kv-text-secondary);">{{ t('aiVideo.recent') }}</h3>
         <ul class="flex flex-col gap-1">
           <li v-for="r in otherRecent" :key="r.id" class="min-w-0">
-            <button
-              type="button"
-              class="w-full text-left rounded-[var(--kv-radius-sm)] px-2 py-1.5 transition-colors hover:bg-[var(--kv-bg-elevated)] cursor-pointer min-w-0"
-              @click="ai.open(r)"
+            <component
+              :is="r.status === 'COMPLETED' || r.status === 'QUEUED' || r.status === 'RUNNING' ? 'button' : 'div'"
+              :type="r.status === 'FAILED' ? undefined : 'button'"
+              class="block w-full text-left rounded-[var(--kv-radius-sm)] px-2 py-1.5 min-w-0"
+              :class="r.status === 'FAILED' ? '' : 'transition-colors hover:bg-[var(--kv-bg-elevated)] cursor-pointer'"
+              @click="onRecent(r)"
             >
               <span class="block truncate text-[13px]" style="color: var(--kv-text-primary);">
                 {{ r.prompt || t('aiVideo.fromImage') }}
@@ -183,10 +235,7 @@ async function onPrimary(row: AiVideoDto) {
               <span class="block text-[11px]" :style="{ color: r.status === 'FAILED' ? 'var(--kv-danger)' : 'var(--kv-text-muted)' }">
                 {{ r.status === 'FAILED' ? ai.errorText(r.errorCode) : t(`aiVideo.status.${r.status}`) }}
               </span>
-            </button>
-            <div v-if="r.status === 'COMPLETED' && r.downloadUrl" class="px-2 pb-1.5">
-              <AiVideoResultActions :mode="mode" :busy="ai.busy.value" @save="ai.save(r)" @primary="onPrimary(r)" />
-            </div>
+            </component>
           </li>
         </ul>
       </section>

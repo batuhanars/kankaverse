@@ -1476,14 +1476,6 @@
     "resolutionLabel": "Çözünürlük",
     "durationLabel": "Süre",
     "durationOption": "{sec} sn",
-    "chipsLabel": "İstem önerileri",
-    "chips": {
-      "cinematic": "Sinematik",
-      "sunset": "Gün batımı",
-      "smile": "Gülümseme",
-      "slowMotion": "Ağır çekim",
-      "neonNight": "Neon gece"
-    },
     "estimate": "Tahmini maliyet ({sec} sn)",
     "estimateFailed": "Teklif alınamadı",
     "spentLine": "Bugün {spent} / {cap}",
@@ -1495,6 +1487,7 @@
     "queued": "Sırada",
     "running": "Üretiliyor... {sec} sn",
     "newOne": "Yeni üretim",
+    "previewTitle": "Üretilen video",
     "useAsMedia": "Kullan",
     "recent": "Son üretimler",
     "fromImage": "Görselden üretim",
