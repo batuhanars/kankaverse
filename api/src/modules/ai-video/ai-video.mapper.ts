@@ -1,4 +1,5 @@
 import { AiVideoGeneration, AiVideoStatus } from '@prisma/client';
+import { modelKeyOfApiId } from './ai-video.models';
 import { ACTIVE_STATUSES, AiVideoError, MICRO } from './ai-video.constants';
 
 /** Pika `error.code` → bizim hata kodumuz (istemci i18n'i koda göre). Bilinmeyen her şey PROVIDER_ERROR. */
@@ -12,7 +13,8 @@ export function mapPikaErrorCode(code: string | null | undefined): string {
 /** Kullanıcıya Türkçe mesaj (exception için). Ham Pika mesajı ASLA iletilmez. */
 export const AI_VIDEO_MESSAGES: Record<string, string> = {
   [AiVideoError.DAILY_CAP]: 'Bugünkü yapay zeka video harcama tavanına ulaşıldı.',
-  [AiVideoError.QUOTE_EXPIRED]: 'Fiyat teklifinin süresi doldu. Yeniden fiyat al.',
+  [AiVideoError.INVALID_OPTION]: 'Seçilen model, süre veya çözünürlük geçerli değil.',
+  [AiVideoError.NOT_READY]: 'Video henüz hazır değil.',
   [AiVideoError.PROVIDER_ERROR]:
     'Video üretim hizmeti şu an yanıt vermiyor. Biraz sonra tekrar dene.',
   [AiVideoError.CONTENT_REJECTED]:
@@ -38,16 +40,22 @@ export function sumSpentMicro(
   return total;
 }
 
-export function toAiVideoDto(row: AiVideoGeneration, videoUrl?: string) {
+export function toAiVideoDto(
+  row: AiVideoGeneration,
+  urls?: { videoUrl: string; downloadUrl: string },
+) {
   return {
     id: row.id,
     status: row.status,
+    model: modelKeyOfApiId(row.model),
+    resolution: row.resolution,
+    durationS: row.durationS,
     prompt: row.prompt,
     hasInput: row.inputKey !== null,
     quoteUsd: usd(row.quoteMicroUsd),
     costUsd: row.costMicroUsd === null ? null : usd(row.costMicroUsd),
     errorCode: row.errorCode,
     createdAt: row.createdAt.toISOString(),
-    ...(videoUrl !== undefined && { videoUrl }),
+    ...(urls !== undefined && urls),
   };
 }

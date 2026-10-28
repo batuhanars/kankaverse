@@ -6,6 +6,7 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  CopyObjectCommand,
 } from '@aws-sdk/client-s3';
 import { createWriteStream } from 'fs';
 import { Transform } from 'stream';
@@ -166,6 +167,19 @@ export class StorageService {
       chunks.push(buf);
     }
     return Buffer.concat(chunks);
+  }
+
+  /** Özel bucket içinde nesneyi sunucu tarafında kopyalar (C14b: üretim videosu → mesaj eki anahtarı). */
+  async copy(srcKey: string, destKey: string): Promise<void> {
+    const encoded = srcKey.split('/').map(encodeURIComponent).join('/');
+    await this.client.send(
+      new CopyObjectCommand({
+        Bucket: this.bucket,
+        Key: destKey,
+        CopySource: `${this.bucket}/${encoded}`,
+      }),
+    );
+    this.logger.debug(`copy: ${srcKey} -> ${destKey}`);
   }
 
   /** Sunucunun ürettiği nesneyi PUBLIC bucket'a yazar (profil görselleri). */

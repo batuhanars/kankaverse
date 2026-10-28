@@ -87,7 +87,7 @@ function isValidWaveform(b64: string): boolean {
   return buf.length === WAVEFORM_SAMPLES && buf.toString('base64') === b64;
 }
 
-function buildStorageKey(filename: string): string {
+export function buildStorageKey(filename: string): string {
   const ext = filename.includes('.') ? filename.split('.').pop() : '';
   const id = randomUUID().replace(/-/g, '');
   return ext ? `${id}.${ext}` : id;

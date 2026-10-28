@@ -11,7 +11,9 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AiVideoService } from './ai-video.service';
-import { PresignAiInputDto, QuoteAiVideoDto } from './dto/ai-video.dto';
+import { AiVideoInputService } from './ai-video-input.service';
+import { AiVideoAttachmentService } from './ai-video-attachment.service';
+import { CreateAiVideoDto, EstimateAiVideoDto, PresignAiInputDto } from './dto/ai-video.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from '../../common/guards/verified-email.guard';
 import { AiVideoAccessGuard } from './ai-video-access.guard';
@@ -26,27 +28,49 @@ type AuthUser = { id: string };
 @Throttle({ default: { limit: 30, ttl: 60000 } })
 @Controller('ai-video')
 export class AiVideoController {
-  constructor(private service: AiVideoService) {}
+  constructor(
+    private service: AiVideoService,
+    private attachments: AiVideoAttachmentService,
+    private input: AiVideoInputService,
+  ) {}
 
   @Post('input/presign')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Görselden üretim için girdi görselinin presigned PUT adresi' })
   presign(@CurrentUser() user: AuthUser, @Body() dto: PresignAiInputDto) {
-    return this.service.presignInput(user.id, dto.contentType, dto.size);
+    return this.input.presignInput(user.id, dto.contentType, dto.size);
   }
 
-  @Post('quote')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Ücretsiz fiyat teklifi al (QUOTED satır açar, harcama yok)' })
-  quote(@CurrentUser() user: AuthUser, @Body() dto: QuoteAiVideoDto) {
-    return this.service.quote(user.id, dto.prompt, dto.inputKey);
+  @Get('options')
+  @ApiOperation({
+    summary: 'Açık modeller, süre/çözünürlük seçenekleri, günlük tavan ve bugünkü harcama',
+  })
+  options(@CurrentUser() user: AuthUser) {
+    return this.service.options(user.id);
   }
 
-  @Post(':id/submit')
+  @Post('estimate')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Teklifi onayla ve üretimi başlat (para harcar)' })
-  submit(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.service.submit(user.id, id);
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  @ApiOperation({ summary: "Pika'nın gerçek teklifi (satır oluşturmaz, 10 dk önbellek)" })
+  estimate(@Body() dto: EstimateAiVideoDto) {
+    return this.service.estimate(dto);
+  }
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Teklif + günlük tavan + gönderim tek çağrıda (para harcar)' })
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreateAiVideoDto) {
+    return this.service.create(user.id, dto);
+  }
+
+  @Post(':id/attachment')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Tamamlanan üretimden bekleyen ek üret (mesaj göndermez; istemci mesaj yoluna verir)',
+  })
+  attachment(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.attachments.createFromGeneration(user.id, id);
   }
 
   @Get()

@@ -136,8 +136,11 @@ export default () => {
       enabled: process.env.AI_VIDEO_ENABLED === 'true',
       apiKey: process.env.PIKA_API_KEY ?? '',
       apiUrl: (process.env.PIKA_API_URL ?? 'https://api.dev.pika.art').replace(/\/+$/, ''),
-      model: process.env.AI_VIDEO_MODEL ?? 'pika/pika-2.5',
-      resolution: process.env.AI_VIDEO_RESOLUTION ?? '720p',
+      // C14b: açık model anahtarları (tablo ai-video.models.ts); eski AI_VIDEO_MODEL/RESOLUTION kalktı
+      models: (process.env.AI_VIDEO_MODELS ?? 'pika-2.5')
+        .split(',')
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0),
       dailyCapUsd: parseFloat(process.env.AI_VIDEO_DAILY_CAP_USD ?? '3'),
       userIds: (process.env.AI_VIDEO_USER_IDS ?? '')
         .split(',')

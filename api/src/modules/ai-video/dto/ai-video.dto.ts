@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { AI_INPUT_MAX_BYTES, AI_INPUT_TYPES, AI_PROMPT_MAX } from '../ai-video.constants';
 
 export class PresignAiInputDto {
@@ -17,7 +17,42 @@ export class PresignAiInputDto {
   size!: number;
 }
 
-export class QuoteAiVideoDto {
+export class EstimateAiVideoDto {
+  @ApiProperty({ example: 'pika-2.5' })
+  @IsString()
+  @MaxLength(40)
+  model!: string;
+
+  @ApiProperty({ example: '720p' })
+  @IsString()
+  @MaxLength(10)
+  resolution!: string;
+
+  @ApiProperty({ example: 5 })
+  @IsInt()
+  durationS!: number;
+
+  @ApiProperty({ description: 'Görselden üretim mi (fiyat görsele değil api yoluna bağlı)' })
+  @IsBoolean()
+  withImage!: boolean;
+}
+
+/** `POST /ai-video`: teklif + tavan + gönderim tek çağrıda (C14b §2.2). */
+export class CreateAiVideoDto {
+  @ApiProperty({ example: 'pika-2.5' })
+  @IsString()
+  @MaxLength(40)
+  model!: string;
+
+  @ApiProperty({ example: '720p' })
+  @IsString()
+  @MaxLength(10)
+  resolution!: string;
+
+  @ApiProperty({ example: 5 })
+  @IsInt()
+  durationS!: number;
+
   @ApiProperty({ maxLength: AI_PROMPT_MAX, description: 'Görselden üretimde boş olabilir' })
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()

@@ -1,5 +1,6 @@
 import { AiVideoStatus } from '@prisma/client';
 import { AiVideoService } from './ai-video.service';
+import { AiVideoInputService } from './ai-video-input.service';
 import { PikaError } from './pika.client';
 import { sumSpentMicro } from './ai-video.mapper';
 
@@ -17,7 +18,7 @@ function setup(rowOver: Record<string, unknown> = {}, spentRows: unknown[] = [])
     quoteMicroUsd: 200_000,
     costMicroUsd: null,
     providerJobId: null,
-    status: AiVideoStatus.QUOTED,
+    status: AiVideoStatus.QUEUED,
     errorCode: null,
     outputKey: null,
     createdAt: new Date(),
@@ -26,10 +27,11 @@ function setup(rowOver: Record<string, unknown> = {}, spentRows: unknown[] = [])
   };
   const prisma = {
     aiVideoGeneration: {
-      create: jest.fn().mockResolvedValue(row),
+      create: jest
+        .fn()
+        .mockImplementation(({ data }) => ({ ...row, ...data, inputKey: data.inputKey ?? null })),
       findMany: jest.fn().mockResolvedValue(spentRows),
       findFirst: jest.fn().mockResolvedValue(row),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest.fn().mockImplementation(({ data }) => ({ ...row, ...data })),
     },
   };
@@ -40,8 +42,7 @@ function setup(rowOver: Record<string, unknown> = {}, spentRows: unknown[] = [])
     presignPut: jest.fn(),
   };
   const values: Record<string, unknown> = {
-    'aiVideo.model': 'pika/pika-2.5',
-    'aiVideo.resolution': '720p',
+    'aiVideo.models': ['pika-2.5', 'wan-3.0', 'kling-3.0-turbo'],
     'aiVideo.dailyCapUsd': 3,
   };
   const config = { get: (k: string) => values[k] };
@@ -53,87 +54,44 @@ function setup(rowOver: Record<string, unknown> = {}, spentRows: unknown[] = [])
       .mockResolvedValue({ uploadUrl: 'https://up', headers: {}, url: 'https://pika/img' }),
     putUpload: jest.fn().mockResolvedValue(undefined),
   };
-  const service = new AiVideoService(prisma as any, storage as any, config as any, pika as any);
+  const input = new AiVideoInputService(storage as any, pika as any);
+  const service = new AiVideoService(
+    prisma as any,
+    storage as any,
+    config as any,
+    pika as any,
+    input,
+  );
   jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
-  return { service, prisma, storage, pika };
+  return { service, prisma, storage, pika, values };
 }
 
-describe('AiVideoService.quote', () => {
-  it('metinden uretim: text-to-video teklifi, QUOTED satir', async () => {
+const dto = (over: Record<string, unknown> = {}) => ({
+  model: 'pika-2.5',
+  resolution: '720p',
+  durationS: 5,
+  prompt: 'kedi',
+  ...over,
+});
+
+describe('AiVideoService.create (teklif + tavan + gonderim)', () => {
+  it('metinden uretim: text-to-video teklifi, tek cagrida QUEUED satir + gonderim', async () => {
     const { service, pika, prisma } = setup();
-    const res = await service.quote('u1', 'kedi');
+    await service.create('u1', dto());
     expect(pika.quote).toHaveBeenCalledWith('pika/pika-2.5/text-to-video', {
       prompt: 'kedi',
       resolution: '720p',
       duration_s: 5,
     });
-    expect(prisma.aiVideoGeneration.create).toHaveBeenCalled();
-    expect(res).toEqual({ generationId: 'g1', quoteUsd: 0.2, todaySpentUsd: 0, dailyCapUsd: 3 });
-  });
-
-  it('baska kullanicinin inputKey degeri reddedilir, Pika cagrilmaz', async () => {
-    const { service, pika } = setup();
-    await expect(service.quote('u1', '', `ai-input/u2/${UUID}.png`)).rejects.toMatchObject({
-      response: { error: 'INVALID_STORAGE_KEY' },
+    expect(prisma.aiVideoGeneration.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        model: 'pika/pika-2.5/text-to-video',
+        status: AiVideoStatus.QUEUED,
+        durationS: 5,
+        resolution: '720p',
+        quoteMicroUsd: 200_000,
+      }),
     });
-    expect(pika.quote).not.toHaveBeenCalled();
-  });
-
-  it('yol atlatma ve bos istem reddedilir', async () => {
-    const { service } = setup();
-    await expect(service.quote('u1', '', `ai-input/u1/../x/${UUID}.png`)).rejects.toBeDefined();
-    await expect(service.quote('u1', '')).rejects.toMatchObject({
-      response: { error: 'AI_VIDEO_PROMPT_REQUIRED' },
-    });
-  });
-
-  it('gorselden uretim: image-to-video, prompt bos olabilir, kullanici gorseli teklife gitmez', async () => {
-    const { service, pika } = setup();
-    await service.quote('u1', '', `ai-input/u1/${UUID}.png`);
-    const [apiId, body] = pika.quote.mock.calls[0];
-    expect(apiId).toBe('pika/pika-2.5/image-to-video');
-    expect(body.prompt).toBeUndefined();
-    expect(body.image).toContain('example.com');
-  });
-
-  it('tavan asimi: AI_VIDEO_DAILY_CAP, satir acilmaz', async () => {
-    const { service, prisma } = setup({}, [
-      { status: AiVideoStatus.COMPLETED, costMicroUsd: 2_900_000, quoteMicroUsd: 200_000 },
-    ]);
-    await expect(service.quote('u1', 'kedi')).rejects.toMatchObject({
-      response: { error: 'AI_VIDEO_DAILY_CAP' },
-    });
-    expect(prisma.aiVideoGeneration.create).not.toHaveBeenCalled();
-  });
-});
-
-describe('AiVideoService.submit', () => {
-  it('teklif suresi (30 dk) dolmus: AI_VIDEO_QUOTE_EXPIRED', async () => {
-    const { service, pika } = setup({ createdAt: new Date(Date.now() - 31 * 60_000) });
-    await expect(service.submit('u1', 'g1')).rejects.toMatchObject({
-      response: { error: 'AI_VIDEO_QUOTE_EXPIRED' },
-    });
-    expect(pika.submit).not.toHaveBeenCalled();
-  });
-
-  it('QUOTED olmayan satir: 409', async () => {
-    const { service } = setup({ status: AiVideoStatus.QUEUED });
-    await expect(service.submit('u1', 'g1')).rejects.toMatchObject({ status: 409 });
-  });
-
-  it('gonderimde tavan yeniden denetlenir', async () => {
-    const { service, pika } = setup({}, [
-      { status: AiVideoStatus.RUNNING, costMicroUsd: null, quoteMicroUsd: 2_900_000 },
-    ]);
-    await expect(service.submit('u1', 'g1')).rejects.toMatchObject({
-      response: { error: 'AI_VIDEO_DAILY_CAP' },
-    });
-    expect(pika.submit).not.toHaveBeenCalled();
-  });
-
-  it('basari: Idempotency-Key satir id, providerJobId yazilir', async () => {
-    const { service, pika, prisma } = setup();
-    await service.submit('u1', 'g1');
     expect(pika.submit).toHaveBeenCalledWith(
       'pika/pika-2.5/text-to-video',
       { prompt: 'kedi', resolution: '720p', duration_s: 5 },
@@ -145,15 +103,110 @@ describe('AiVideoService.submit', () => {
     });
   });
 
-  it('gorselli gonderim: ozel bucket okunur, Pika yuklemesinden donen adres image olur', async () => {
-    const { service, pika, storage } = setup({
-      model: 'pika/pika-2.5/image-to-video',
-      inputKey: `ai-input/u1/${UUID}.png`,
+  it.each([
+    ['pika-2.5', 'pika/pika-2.5/text-to-video', 10, '480p', { duration_s: 10 }, 'image'],
+    [
+      'wan-3.0',
+      'alibaba/wan3.0-video/text-to-video',
+      10,
+      '480p',
+      { duration: 10, watermark: false },
+      'first_frame_url',
+    ],
+    [
+      'kling-3.0-turbo',
+      'kling/kling-3.0-turbo/text-to-video',
+      15,
+      '720p',
+      { duration: 15 },
+      'image_url',
+    ],
+  ])(
+    '%s: govde alan adlari tablodan (metin + gorsel)',
+    async (key, apiId, d, res, extra, imgField) => {
+      const text = setup();
+      await text.service.create('u1', dto({ model: key, durationS: d, resolution: res }));
+      expect(text.pika.submit.mock.calls[0][0]).toBe(apiId);
+      expect(text.pika.submit.mock.calls[0][1]).toEqual({
+        prompt: 'kedi',
+        resolution: res,
+        ...extra,
+      });
+
+      const inputKey = `ai-input/u1/${UUID}.png`;
+      const img = setup({ inputKey });
+      await img.service.create(
+        'u1',
+        dto({ model: key, durationS: d, resolution: res, prompt: '', inputKey }),
+      );
+      expect(img.pika.submit.mock.calls[0][0]).toBe(
+        apiId.replace('text-to-video', 'image-to-video'),
+      );
+      const body = img.pika.submit.mock.calls[0][1];
+      expect(body[imgField]).toBe('https://pika/img');
+      expect(body.prompt).toBeUndefined();
+      expect(img.pika.quote.mock.calls[0][1][imgField]).toContain('example.com');
+    },
+  );
+
+  it.each([
+    ['bilinmeyen model', { model: 'sora' }],
+    ['modelde olmayan sure', { model: 'kling-3.0-turbo', durationS: 7 }],
+    ['modelde olmayan cozunurluk', { model: 'kling-3.0-turbo', resolution: '480p' }],
+    ['1080p yok', { resolution: '1080p' }],
+  ])('gecersiz secenek (%s): 400 AI_VIDEO_INVALID_OPTION, Pika cagrilmaz', async (_n, over) => {
+    const { service, pika, prisma } = setup();
+    await expect(service.create('u1', dto(over))).rejects.toMatchObject({
+      status: 400,
+      response: { error: 'AI_VIDEO_INVALID_OPTION' },
     });
-    await service.submit('u1', 'g1');
+    expect(pika.quote).not.toHaveBeenCalled();
+    expect(prisma.aiVideoGeneration.create).not.toHaveBeenCalled();
+  });
+
+  it('env ile kapali model secilemez', async () => {
+    const { service, values } = setup();
+    values['aiVideo.models'] = ['pika-2.5'];
+    await expect(service.create('u1', dto({ model: 'wan-3.0' }))).rejects.toMatchObject({
+      response: { error: 'AI_VIDEO_INVALID_OPTION' },
+    });
+  });
+
+  it('baska kullanicinin inputKey degeri reddedilir, Pika cagrilmaz', async () => {
+    const { service, pika } = setup();
+    await expect(
+      service.create('u1', dto({ prompt: '', inputKey: `ai-input/u2/${UUID}.png` })),
+    ).rejects.toMatchObject({ response: { error: 'INVALID_STORAGE_KEY' } });
+    expect(pika.quote).not.toHaveBeenCalled();
+  });
+
+  it('yol atlatma ve bos istem reddedilir', async () => {
+    const { service } = setup();
+    await expect(
+      service.create('u1', dto({ prompt: '', inputKey: `ai-input/u1/../x/${UUID}.png` })),
+    ).rejects.toBeDefined();
+    await expect(service.create('u1', dto({ prompt: '' }))).rejects.toMatchObject({
+      response: { error: 'AI_VIDEO_PROMPT_REQUIRED' },
+    });
+  });
+
+  it('tavan asimi: AI_VIDEO_DAILY_CAP, satir acilmaz, gonderilmez', async () => {
+    const { service, prisma, pika } = setup({}, [
+      { status: AiVideoStatus.COMPLETED, costMicroUsd: 2_900_000, quoteMicroUsd: 200_000 },
+    ]);
+    await expect(service.create('u1', dto())).rejects.toMatchObject({
+      response: { error: 'AI_VIDEO_DAILY_CAP' },
+    });
+    expect(prisma.aiVideoGeneration.create).not.toHaveBeenCalled();
+    expect(pika.submit).not.toHaveBeenCalled();
+  });
+
+  it('gorselli gonderim: ozel bucket okunur, Pika yuklemesine gider', async () => {
+    const inputKey = `ai-input/u1/${UUID}.png`;
+    const { service, pika, storage } = setup({ inputKey });
+    await service.create('u1', dto({ prompt: '', inputKey }));
     expect(storage.getBuffer).toHaveBeenCalled();
     expect(pika.createUpload).toHaveBeenCalledWith('image/png', 3);
-    expect(pika.submit.mock.calls[0][1].image).toBe('https://pika/img');
   });
 
   it.each([
@@ -163,7 +216,7 @@ describe('AiVideoService.submit', () => {
   ])('Pika aninda reddederse (%s) satir FAILED + kod %s', async (pikaCode, ours) => {
     const { service, pika, prisma } = setup();
     pika.submit.mockResolvedValue({ id: 'media_9', status: 'failed', errorCode: pikaCode });
-    await expect(service.submit('u1', 'g1')).rejects.toMatchObject({ response: { error: ours } });
+    await expect(service.create('u1', dto())).rejects.toMatchObject({ response: { error: ours } });
     expect(prisma.aiVideoGeneration.update).toHaveBeenCalledWith({
       where: { id: 'g1' },
       data: { status: AiVideoStatus.FAILED, errorCode: ours, providerJobId: 'media_9' },
@@ -173,19 +226,60 @@ describe('AiVideoService.submit', () => {
   it('Pika ag hatasi: satir FAILED PROVIDER_ERROR', async () => {
     const { service, pika } = setup();
     pika.submit.mockRejectedValue(new Error('Pika 500'));
-    await expect(service.submit('u1', 'g1')).rejects.toMatchObject({
+    await expect(service.create('u1', dto())).rejects.toMatchObject({
       response: { error: 'AI_VIDEO_PROVIDER_ERROR' },
     });
   });
 });
 
-describe('AiVideoService.submit yeniden deneme', () => {
+describe('AiVideoService.estimate / options', () => {
+  it('satir olusturmaz, onbellekler, withImage ayri anahtar', async () => {
+    const { service, pika, prisma } = setup();
+    const q = { model: 'pika-2.5', resolution: '720p', durationS: 5, withImage: false };
+    expect(await service.estimate(q)).toEqual({ quoteUsd: 0.2 });
+    await service.estimate(q);
+    expect(pika.quote).toHaveBeenCalledTimes(1);
+    expect(pika.quote).toHaveBeenCalledWith('pika/pika-2.5/text-to-video', {
+      prompt: 'x',
+      resolution: '720p',
+      duration_s: 5,
+    });
+    await service.estimate({ ...q, withImage: true });
+    expect(pika.quote).toHaveBeenCalledTimes(2);
+    expect(pika.quote.mock.calls[1][0]).toBe('pika/pika-2.5/image-to-video');
+    expect(prisma.aiVideoGeneration.create).not.toHaveBeenCalled();
+  });
+
+  it('gecersiz secenek 400', async () => {
+    const { service } = setup();
+    await expect(
+      service.estimate({
+        model: 'kling-3.0-turbo',
+        resolution: '480p',
+        durationS: 5,
+        withImage: false,
+      }),
+    ).rejects.toMatchObject({ response: { error: 'AI_VIDEO_INVALID_OPTION' } });
+  });
+
+  it('options: acik modeller + tavan + bugunku harcama', async () => {
+    const { service } = setup({}, [
+      { status: AiVideoStatus.RUNNING, costMicroUsd: null, quoteMicroUsd: 400_000 },
+    ]);
+    const res = await service.options('u1');
+    expect(res.models.map((m) => m.key)).toEqual(['pika-2.5', 'wan-3.0', 'kling-3.0-turbo']);
+    expect(res.models[2]).toMatchObject({ durations: [5, 10, 15], resolutions: ['720p'] });
+    expect(res).toMatchObject({ dailyCapUsd: 3, todaySpentUsd: 0.4 });
+  });
+});
+
+describe('AiVideoService.create yeniden deneme', () => {
   it('ilk cagri ag hatasi, ikincisi is doner: QUEUED + providerJobId, ayni anahtar', async () => {
     const { service, pika, prisma } = setup();
     pika.submit
       .mockRejectedValueOnce(new Error('fetch failed'))
       .mockResolvedValueOnce({ id: 'media_2', status: 'queued' });
-    await service.submit('u1', 'g1');
+    await service.create('u1', dto());
     expect(pika.submit).toHaveBeenCalledTimes(2);
     expect(pika.submit.mock.calls.map((c) => c[2])).toEqual(['g1', 'g1']);
     expect(prisma.aiVideoGeneration.update).toHaveBeenCalledWith({
@@ -197,7 +291,7 @@ describe('AiVideoService.submit yeniden deneme', () => {
   it('uc ag hatasi: FAILED PROVIDER_ERROR', async () => {
     const { service, pika, prisma } = setup();
     pika.submit.mockRejectedValue(new Error('timeout'));
-    await expect(service.submit('u1', 'g1')).rejects.toMatchObject({
+    await expect(service.create('u1', dto())).rejects.toMatchObject({
       response: { error: 'AI_VIDEO_PROVIDER_ERROR' },
     });
     expect(pika.submit).toHaveBeenCalledTimes(3);
@@ -212,14 +306,14 @@ describe('AiVideoService.submit yeniden deneme', () => {
     pika.submit
       .mockRejectedValueOnce(new PikaError(502, 'Pika 502'))
       .mockResolvedValueOnce({ id: 'media_3', status: 'queued' });
-    await service.submit('u1', 'g1');
+    await service.create('u1', dto());
     expect(pika.submit).toHaveBeenCalledTimes(2);
   });
 
   it('422 duz hata: tek cagri, FAILED', async () => {
     const { service, pika, prisma } = setup();
     pika.submit.mockRejectedValue(new PikaError(422, 'Pika 422'));
-    await expect(service.submit('u1', 'g1')).rejects.toBeDefined();
+    await expect(service.create('u1', dto())).rejects.toBeDefined();
     expect(pika.submit).toHaveBeenCalledTimes(1);
     expect(prisma.aiVideoGeneration.update).toHaveBeenCalledWith({
       where: { id: 'g1' },
@@ -231,9 +325,19 @@ describe('AiVideoService.submit yeniden deneme', () => {
 describe('AiVideoService.get / sumSpentMicro', () => {
   it('COMPLETED satir presigned videoUrl tasir, digerleri tasimaz', async () => {
     const done = setup({ status: AiVideoStatus.COMPLETED, outputKey: 'ai-video/u1/g1.mp4' });
-    expect(await done.service.get('u1', 'g1')).toMatchObject({ videoUrl: 'https://signed' });
+    expect(await done.service.get('u1', 'g1')).toMatchObject({
+      videoUrl: 'https://signed',
+      downloadUrl: 'https://signed',
+      model: 'pika-2.5',
+      resolution: '720p',
+      durationS: 5,
+    });
+    expect(done.storage.presignGet).toHaveBeenCalledWith('ai-video/u1/g1.mp4', {
+      expiresIn: 900,
+      downloadFilename: 'kankaverse-yz-g1.mp4',
+    });
     const queued = setup({ status: AiVideoStatus.RUNNING });
-    expect(await queued.service.get('u1', 'g1')).not.toHaveProperty('videoUrl');
+    expect(await queued.service.get('u1', 'g1')).not.toHaveProperty('downloadUrl');
   });
 
   it('harcama: kesin ucret onceliklidir; FAILED ve QUOTED sayilmaz', () => {

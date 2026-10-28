@@ -31,6 +31,7 @@ type AttachmentDto = Pick<
   | 'thumbnail'
   | 'width'
   | 'height'
+  | 'aiGenerationId'
 >;
 
 type ReactionAggDto = { emoji: string; count: number; reactedByMe: boolean };
@@ -109,6 +110,8 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
       thumbnail: a.thumbnail ?? null,
       width: a.width ?? null,
       height: a.height ?? null,
+      // C14b: sunucu kaynaklı "Yapay zeka" rozeti (istemci bayrak gönderemez; Attachment.aiGenerationId'den türer)
+      aiGenerated: (a.aiGenerationId ?? null) !== null,
     })),
     reactions: reactionsAgg,
     mentions: msg.mentions ?? [],
@@ -335,6 +338,7 @@ export class MessagesService {
             thumbnail: true,
             width: true,
             height: true,
+            aiGenerationId: true,
           },
         },
         // Reaksiyonları tek sorguda çek — N+1 yok; aggregation JS tarafında
@@ -540,6 +544,7 @@ export class MessagesService {
             thumbnail: true,
             width: true,
             height: true,
+            aiGenerationId: true,
           },
         },
         reactions: { select: { userId: true, emoji: true } },
@@ -595,6 +600,7 @@ export class MessagesService {
           thumbnail: true,
           width: true,
           height: true,
+          aiGenerationId: true,
         },
       });
 
@@ -675,6 +681,7 @@ export class MessagesService {
             thumbnail: true,
             width: true,
             height: true,
+            aiGenerationId: true,
           },
         },
         reactions: { select: { userId: true, emoji: true } },
@@ -949,6 +956,7 @@ export class MessagesService {
             thumbnail: true,
             width: true,
             height: true,
+            aiGenerationId: true,
           },
         },
         reactions: { select: { userId: true, emoji: true } },
@@ -990,6 +998,7 @@ export class MessagesService {
             thumbnail: true,
             width: true,
             height: true,
+            aiGenerationId: true,
           },
         },
         reactions: { select: { userId: true, emoji: true } },
@@ -1100,6 +1109,7 @@ export class MessagesService {
             thumbnail: true,
             width: true,
             height: true,
+            aiGenerationId: true,
           },
         },
         reactions: { select: { userId: true, emoji: true } },
@@ -1115,10 +1125,7 @@ export class MessagesService {
       if (!grouped.has(m.channelId)) grouped.set(m.channelId, []);
       grouped.get(m.channelId)!.push(toMessageDto(m, userId));
     }
-    await this.withRoleEmojis(
-      guildId,
-      [...grouped.values()].flat(),
-    );
+    await this.withRoleEmojis(guildId, [...grouped.values()].flat());
     return [...grouped.entries()].map(([channelId, msgs]) => ({
       channelId,
       channelName: nameById.get(channelId) ?? '',

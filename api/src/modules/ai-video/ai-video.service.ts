@@ -1,22 +1,16 @@
 import {
   BadGatewayException,
   BadRequestException,
-  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'crypto';
 import { AiVideoGeneration, AiVideoStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../shared/storage/storage.service';
 import {
-  AI_DURATION_S,
-  AI_INPUT_MAX_BYTES,
-  AI_INPUT_PREFIX,
-  AI_INPUT_TYPES,
-  AI_QUOTE_TTL_MS,
+  AI_ESTIMATE_TTL_MS,
   AI_SUBMIT_RETRY_DELAYS_MS,
   AI_RECENT_LIMIT,
   AiVideoError,
@@ -29,6 +23,9 @@ import {
   toAiVideoDto,
   usd,
 } from './ai-video.mapper';
+import { AI_VIDEO_MODEL_TABLE, AiVideoModelSpec, apiIdOf, buildPikaBody } from './ai-video.models';
+import { CreateAiVideoDto, EstimateAiVideoDto } from './dto/ai-video.dto';
+import { AiVideoInputService } from './ai-video-input.service';
 import { PikaClient, PikaError, PikaJob } from './pika.client';
 
 /** Türkiye UTC+3 (DST yok): "bugün" Türkiye gününe göre. */
@@ -36,97 +33,84 @@ const TR_OFFSET_MS = 3 * 60 * 60 * 1000;
 const DAY_MS = 86_400_000;
 const QUOTE_PLACEHOLDER_IMAGE = 'https://example.com/quote-placeholder.png';
 const VIDEO_URL_TTL_S = 15 * 60;
-const INPUT_EXT_PATTERN = Object.values(AI_INPUT_TYPES).join('|');
-const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 
 /**
- * C14 — yapay zeka video üretimi: teklif → gönderim → durum/liste. Erişim kapısı controller'daki
+ * C14/C14b — yapay zeka video üretimi: seçenekler, teklif (estimate), tek çağrıda teklif+tavan+gönderim, durum/liste. Erişim kapısı controller'daki
  * AiVideoAccessGuard'dadır (burada tekrar edilmez). Durumun doğruluk kaynağı DB satırı; ilerlemeyi
  * AiVideoPoller yürütür.
  */
 @Injectable()
 export class AiVideoService {
   private readonly logger = new Logger(AiVideoService.name);
+  private readonly estimateCache = new Map<string, { micro: number; expiresAt: number }>();
 
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
     private config: ConfigService,
     private pika: PikaClient,
+    private input: AiVideoInputService,
   ) {}
 
-  async presignInput(userId: string, contentType: string, size: number) {
-    const ext = AI_INPUT_TYPES[contentType];
-    if (!ext || size > AI_INPUT_MAX_BYTES) {
-      throw new BadRequestException({
-        message: 'Yalnızca en çok 10 MB boyutunda PNG, JPEG veya WebP görsel kullanılabilir.',
-        error: 'UNSUPPORTED_TYPE',
-      });
-    }
-    const inputKey = `${AI_INPUT_PREFIX}/${userId}/${randomUUID()}.${ext}`;
-    const uploadUrl = await this.storage.presignPut(inputKey, contentType);
-    return { uploadUrl, inputKey };
+  /** Açık modeller + seçenekleri + bugünkü harcama (diyalog açılışında). */
+  async options(userId: string) {
+    return {
+      models: this.enabledModels().map((m) => ({
+        key: m.key,
+        label: m.label,
+        durations: m.durations,
+        resolutions: m.resolutions,
+        supportsImage: true,
+      })),
+      dailyCapUsd: this.dailyCapMicro() / MICRO,
+      todaySpentUsd: usd(await this.todaySpentMicro(userId)),
+    };
   }
 
-  async quote(userId: string, prompt: string, inputKey?: string) {
-    if (inputKey === undefined && prompt.length === 0) {
+  /** Satır oluşturmaz; 10 dk bellek önbelleği. İstem fiyata etki etmez (yer tutucu gider). */
+  async estimate(dto: EstimateAiVideoDto) {
+    const spec = this.resolveSpec(dto.model, dto.resolution, dto.durationS);
+    const cacheKey = `${spec.key}|${dto.resolution}|${dto.durationS}|${dto.withImage}`;
+    const hit = this.estimateCache.get(cacheKey);
+    if (hit && hit.expiresAt > Date.now()) return { quoteUsd: usd(hit.micro) };
+
+    const micro = await this.quoteMicro(spec, dto, dto.withImage, dto.withImage ? undefined : 'x');
+    this.estimateCache.set(cacheKey, { micro, expiresAt: Date.now() + AI_ESTIMATE_TTL_MS });
+    return { quoteUsd: usd(micro) };
+  }
+
+  /** Teklif (yeniden alınır, önbellekten değil) + tavan + gönderim tek çağrıda. */
+  async create(userId: string, dto: CreateAiVideoDto) {
+    const spec = this.resolveSpec(dto.model, dto.resolution, dto.durationS);
+    if (dto.inputKey === undefined && dto.prompt.length === 0) {
       throw new BadRequestException({
         message: 'İstem boş olamaz.',
         error: 'AI_VIDEO_PROMPT_REQUIRED',
       });
     }
-    if (inputKey !== undefined) await this.assertInputKey(userId, inputKey);
+    const withImage = dto.inputKey !== undefined;
+    if (dto.inputKey !== undefined) await this.input.assertInputKey(userId, dto.inputKey);
 
-    const model = this.apiId(inputKey !== undefined);
-    const resolution = this.config.get<string>('aiVideo.resolution')!;
-    const quoteMicroUsd = await this.callPika(() =>
-      this.pika.quote(model, this.quoteBody(prompt, resolution, inputKey !== undefined)),
-    );
-
-    const spent = await this.todaySpentMicro(userId);
-    this.assertUnderCap(spent, quoteMicroUsd);
+    const quoteMicroUsd = await this.quoteMicro(spec, dto, withImage, dto.prompt);
+    this.assertUnderCap(await this.todaySpentMicro(userId), quoteMicroUsd);
 
     const row = await this.prisma.aiVideoGeneration.create({
       data: {
         userId,
-        model,
-        prompt,
-        inputKey,
-        resolution,
-        durationS: AI_DURATION_S,
+        model: apiIdOf(spec, withImage),
+        prompt: dto.prompt,
+        inputKey: dto.inputKey,
+        resolution: dto.resolution,
+        durationS: dto.durationS,
         quoteMicroUsd,
+        status: AiVideoStatus.QUEUED,
       },
     });
-    return {
-      generationId: row.id,
-      quoteUsd: usd(quoteMicroUsd),
-      todaySpentUsd: usd(spent),
-      dailyCapUsd: this.dailyCapMicro() / MICRO,
-    };
-  }
-
-  async submit(userId: string, id: string) {
-    const row = await this.findOwned(userId, id);
-    if (row.status !== AiVideoStatus.QUOTED) throw this.alreadySubmitted();
-    if (Date.now() - row.createdAt.getTime() > AI_QUOTE_TTL_MS) {
-      throw new ConflictException({
-        message: AI_VIDEO_MESSAGES[AiVideoError.QUOTE_EXPIRED],
-        error: AiVideoError.QUOTE_EXPIRED,
-      });
-    }
-    this.assertUnderCap(await this.todaySpentMicro(userId), row.quoteMicroUsd);
-
-    // Çift gönderimi engelle: QUOTED -> QUEUED atomik talep (Idempotency-Key ikinci emniyet).
-    const claimed = await this.prisma.aiVideoGeneration.updateMany({
-      where: { id, userId, status: AiVideoStatus.QUOTED },
-      data: { status: AiVideoStatus.QUEUED },
-    });
-    if (claimed.count === 0) throw this.alreadySubmitted();
 
     let job: PikaJob;
     try {
       // Görsel yükleme ücretsiz ve gönderimden önce: yeniden deneme kapsamı dışında.
-      const body = await this.submitBody(row);
+      const body = await this.submitBody(row, spec);
       job = await this.submitWithRetry(row, body);
     } catch (err) {
       await this.markFailed(row.id, AiVideoError.PROVIDER_ERROR);
@@ -193,69 +177,50 @@ export class AiVideoService {
     return this.present(updated);
   }
 
-  /** Görselden üretimde: özel bucket'tan oku, Pika yüklemesine koy, dönen adres `image` olur. */
-  private async submitBody(row: AiVideoGeneration): Promise<Record<string, unknown>> {
-    const body = this.pikaBody(row.prompt, row.resolution);
-    if (row.inputKey === null) return body;
-    const contentType = this.contentTypeOf(row.inputKey);
-    const bytes = await this.storage.getBuffer(row.inputKey, AI_INPUT_MAX_BYTES);
-    const upload = await this.pika.createUpload(contentType, bytes.length);
-    await this.pika.putUpload(upload, bytes, contentType);
-    return { ...body, image: upload.url };
+  /** Görselden üretimde: özel bucket'tan oku, Pika yüklemesine koy, dönen adres modelin görsel alanı olur. */
+  private async submitBody(
+    row: AiVideoGeneration,
+    spec: AiVideoModelSpec,
+  ): Promise<Record<string, unknown>> {
+    const opts = { prompt: row.prompt, resolution: row.resolution, durationS: row.durationS };
+    if (row.inputKey === null) return buildPikaBody(spec, opts);
+    return buildPikaBody(spec, { ...opts, image: await this.input.uploadToPika(row.inputKey) });
   }
 
-  /** Pika'ya giden TEK gövde şekli (teklif ve gönderim aynı alanları taşır; görsel adresi gönderimde eklenir). */
-  private pikaBody(prompt: string, resolution: string): Record<string, unknown> {
-    return {
-      ...(prompt.length > 0 && { prompt }),
-      resolution,
-      duration_s: AI_DURATION_S,
-    };
+  /**
+   * Pika teklifi image-to-video'da görsel alanını ŞART koşar; fiyat görsele bağlı değil, yer tutucu adres
+   * gider (kullanıcı görseli teklife gitmez).
+   */
+  private quoteMicro(
+    spec: AiVideoModelSpec,
+    o: { resolution: string; durationS: number },
+    withImage: boolean,
+    prompt?: string,
+  ): Promise<number> {
+    const body = buildPikaBody(spec, {
+      prompt,
+      resolution: o.resolution,
+      durationS: o.durationS,
+      image: withImage ? QUOTE_PLACEHOLDER_IMAGE : undefined,
+    });
+    return this.callPika(() => this.pika.quote(apiIdOf(spec, withImage), body));
   }
 
-  /** Pika teklifi image-to-video'da `image` alanını ŞART koşar; fiyat görsele bağlı değil, yer tutucu adres gider (kullanıcı görseli teklife gitmez). */
-  private quoteBody(prompt: string, resolution: string, withImage: boolean) {
-    const body = this.pikaBody(prompt, resolution);
-    return withImage ? { ...body, image: QUOTE_PLACEHOLDER_IMAGE } : body;
+  private enabledModels(): AiVideoModelSpec[] {
+    const keys = this.config.get<string[]>('aiVideo.models') ?? [];
+    return AI_VIDEO_MODEL_TABLE.filter((m) => keys.includes(m.key));
   }
 
-  private apiId(withImage: boolean): string {
-    const base = this.config.get<string>('aiVideo.model')!;
-    return `${base}/${withImage ? 'image-to-video' : 'text-to-video'}`;
-  }
-
-  /** `ai-input/{userId}/{uuid}.{ext}` biçimi + sahiplik öneki + nesne var + boyut (C13 assertStagingKey deseni). */
-  private async assertInputKey(userId: string, key: string): Promise<void> {
-    const safeUserId = userId.replace(/[^A-Za-z0-9-]/g, '\\$&');
-    const re = new RegExp(
-      `^${AI_INPUT_PREFIX}/${safeUserId}/${UUID_PATTERN}\\.(${INPUT_EXT_PATTERN})$`,
-    );
-    if (!re.test(key)) {
+  /** Açık model + tabloda olan süre/çözünürlük; aksi 400 AI_VIDEO_INVALID_OPTION. */
+  private resolveSpec(model: string, resolution: string, durationS: number): AiVideoModelSpec {
+    const spec = this.enabledModels().find((m) => m.key === model);
+    if (!spec || !spec.resolutions.includes(resolution) || !spec.durations.includes(durationS)) {
       throw new BadRequestException({
-        message: 'Geçersiz storage anahtarı.',
-        error: 'INVALID_STORAGE_KEY',
+        message: AI_VIDEO_MESSAGES[AiVideoError.INVALID_OPTION],
+        error: AiVideoError.INVALID_OPTION,
       });
     }
-    let size: number;
-    try {
-      size = await this.storage.headSize(key);
-    } catch {
-      throw new BadRequestException({
-        message: 'Görsel bulunamadı. Yeniden yükle.',
-        error: 'INVALID_STORAGE_KEY',
-      });
-    }
-    if (size > AI_INPUT_MAX_BYTES) {
-      throw new BadRequestException({
-        message: 'Görsel en fazla 10 MB olabilir.',
-        error: 'FILE_TOO_LARGE',
-      });
-    }
-  }
-
-  private contentTypeOf(key: string): string {
-    const ext = key.slice(key.lastIndexOf('.') + 1);
-    return Object.entries(AI_INPUT_TYPES).find(([, e]) => e === ext)![0];
+    return spec;
   }
 
   private dailyCapMicro(): number {
@@ -290,21 +255,20 @@ export class AiVideoService {
 
   private async present(row: AiVideoGeneration) {
     if (row.status !== AiVideoStatus.COMPLETED || !row.outputKey) return toAiVideoDto(row);
-    const url = await this.storage.presignGet(row.outputKey, { expiresIn: VIDEO_URL_TTL_S });
-    return toAiVideoDto(row, url);
+    const [videoUrl, downloadUrl] = await Promise.all([
+      this.storage.presignGet(row.outputKey, { expiresIn: VIDEO_URL_TTL_S }),
+      this.storage.presignGet(row.outputKey, {
+        expiresIn: VIDEO_URL_TTL_S,
+        downloadFilename: `kankaverse-yz-${row.id}.mp4`,
+      }),
+    ]);
+    return toAiVideoDto(row, { videoUrl, downloadUrl });
   }
 
   private markFailed(id: string, errorCode: string) {
     return this.prisma.aiVideoGeneration.update({
       where: { id },
       data: { status: AiVideoStatus.FAILED, errorCode },
-    });
-  }
-
-  private alreadySubmitted() {
-    return new ConflictException({
-      message: 'Bu üretim zaten gönderildi.',
-      error: 'AI_VIDEO_ALREADY_SUBMITTED',
     });
   }
 

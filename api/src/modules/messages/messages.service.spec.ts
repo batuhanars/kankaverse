@@ -554,6 +554,25 @@ describe('MessagesService.create — attachment linking + scan-gate', () => {
     expect(result.id).toBe('msg-att-1');
   });
 
+  // C14b: rozet sunucu kaynaklı — Attachment.aiGenerationId'den türer, normal yüklemede false
+  it('aiGenerated: aiGenerationId dolu ek true, normal yükleme false', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.create.mockResolvedValue(CREATED_MSG_WITH_ATT);
+    prismaMock.attachment.updateMany.mockResolvedValue({ count: 2 });
+    prismaMock.attachment.findMany.mockResolvedValueOnce(VALID_ATTACHMENTS).mockResolvedValueOnce([
+      { ...LINKED_ATTACHMENTS[0], aiGenerationId: 'gen-1' },
+      { ...LINKED_ATTACHMENTS[1], aiGenerationId: null },
+    ]);
+
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: 'x',
+      attachmentIds: ATTACHMENT_IDS,
+    });
+
+    expect(result.attachments.map((a) => a.aiGenerated)).toEqual([true, false]);
+    expect(result.attachments[0]).not.toHaveProperty('aiGenerationId');
+  });
+
   // ─────────────────────────────────────────────────────────────────────────
   // Scan-gate: disabled → CLEAN olarak bağlanır
   // ─────────────────────────────────────────────────────────────────────────
