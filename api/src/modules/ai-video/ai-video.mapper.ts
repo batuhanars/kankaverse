@@ -13,7 +13,7 @@ export function mapPikaErrorCode(code: string | null | undefined): string {
 /** Kullanıcıya Türkçe mesaj (exception için). Ham Pika mesajı ASLA iletilmez. */
 export const AI_VIDEO_MESSAGES: Record<string, string> = {
   [AiVideoError.DAILY_CAP]: 'Bugünkü yapay zeka video harcama tavanına ulaşıldı.',
-  [AiVideoError.INVALID_OPTION]: 'Seçilen model, süre veya çözünürlük geçerli değil.',
+  [AiVideoError.INVALID_OPTION]: 'Seçilen model, süre, çözünürlük veya ölçü geçerli değil.',
   [AiVideoError.NOT_READY]: 'Video henüz hazır değil.',
   [AiVideoError.PROVIDER_ERROR]:
     'Video üretim hizmeti şu an yanıt vermiyor. Biraz sonra tekrar dene.',
@@ -52,6 +52,7 @@ export function toAiVideoDto(
     model: modelKeyOfApiId(row.model),
     resolution: row.resolution,
     durationS: row.durationS,
+    aspectRatio: row.aspectRatio,
     prompt: row.prompt,
     hasInput: row.inputKey !== null,
     quoteUsd: usd(row.quoteMicroUsd),

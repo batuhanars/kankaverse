@@ -60,6 +60,7 @@ export class AiVideoService {
         label: m.label,
         durations: m.durations,
         resolutions: m.resolutions,
+        aspectRatios: m.aspectRatios,
         supportsImage: true,
         audio: m.audio,
       })),
@@ -70,8 +71,8 @@ export class AiVideoService {
 
   /** Satır oluşturmaz; 10 dk bellek önbelleği. İstem fiyata etki etmez (yer tutucu gider). */
   async estimate(dto: EstimateAiVideoDto) {
-    const spec = this.resolveSpec(dto.model, dto.resolution, dto.durationS);
-    const cacheKey = `${spec.key}|${dto.resolution}|${dto.durationS}|${dto.withImage}`;
+    const spec = this.resolveSpec(dto, dto.withImage);
+    const cacheKey = `${spec.key}|${dto.resolution}|${dto.durationS}|${dto.withImage}|${dto.aspectRatio ?? ''}`;
     const hit = this.estimateCache.get(cacheKey);
     if (hit && hit.expiresAt > Date.now()) return { quoteUsd: usd(hit.micro) };
 
@@ -82,14 +83,14 @@ export class AiVideoService {
 
   /** Teklif (yeniden alınır, önbellekten değil) + tavan + gönderim tek çağrıda. */
   async create(userId: string, dto: CreateAiVideoDto) {
-    const spec = this.resolveSpec(dto.model, dto.resolution, dto.durationS);
+    const withImage = dto.inputKey !== undefined;
+    const spec = this.resolveSpec(dto, withImage);
     if (dto.inputKey === undefined && dto.prompt.length === 0) {
       throw new BadRequestException({
         message: 'İstem boş olamaz.',
         error: 'AI_VIDEO_PROMPT_REQUIRED',
       });
     }
-    const withImage = dto.inputKey !== undefined;
     if (dto.inputKey !== undefined) await this.input.assertInputKey(userId, dto.inputKey);
 
     const quoteMicroUsd = await this.quoteMicro(spec, dto, withImage, dto.prompt);
@@ -103,6 +104,7 @@ export class AiVideoService {
         inputKey: dto.inputKey,
         resolution: dto.resolution,
         durationS: dto.durationS,
+        aspectRatio: dto.aspectRatio,
         quoteMicroUsd,
         status: AiVideoStatus.QUEUED,
       },
@@ -183,7 +185,12 @@ export class AiVideoService {
     row: AiVideoGeneration,
     spec: AiVideoModelSpec,
   ): Promise<Record<string, unknown>> {
-    const opts = { prompt: row.prompt, resolution: row.resolution, durationS: row.durationS };
+    const opts = {
+      prompt: row.prompt,
+      resolution: row.resolution,
+      durationS: row.durationS,
+      aspectRatio: row.aspectRatio ?? undefined,
+    };
     if (row.inputKey === null) return buildPikaBody(spec, opts);
     return buildPikaBody(spec, { ...opts, image: await this.input.uploadToPika(row.inputKey) });
   }
@@ -194,7 +201,7 @@ export class AiVideoService {
    */
   private quoteMicro(
     spec: AiVideoModelSpec,
-    o: { resolution: string; durationS: number },
+    o: { resolution: string; durationS: number; aspectRatio?: string },
     withImage: boolean,
     prompt?: string,
   ): Promise<number> {
@@ -202,6 +209,7 @@ export class AiVideoService {
       prompt,
       resolution: o.resolution,
       durationS: o.durationS,
+      aspectRatio: o.aspectRatio,
       image: withImage ? QUOTE_PLACEHOLDER_IMAGE : undefined,
     });
     return this.callPika(() => this.pika.quote(apiIdOf(spec, withImage), body));
@@ -212,10 +220,20 @@ export class AiVideoService {
     return AI_VIDEO_MODEL_TABLE.filter((m) => keys.includes(m.key));
   }
 
-  /** Açık model + tabloda olan süre/çözünürlük; aksi 400 AI_VIDEO_INVALID_OPTION. */
-  private resolveSpec(model: string, resolution: string, durationS: number): AiVideoModelSpec {
-    const spec = this.enabledModels().find((m) => m.key === model);
-    if (!spec || !spec.resolutions.includes(resolution) || !spec.durations.includes(durationS)) {
+  /** Açık model + tabloda olan süre/çözünürlük/ölçü; aksi 400 AI_VIDEO_INVALID_OPTION. */
+  private resolveSpec(
+    o: { model: string; resolution: string; durationS: number; aspectRatio?: string },
+    withImage: boolean,
+  ): AiVideoModelSpec {
+    const spec = this.enabledModels().find((m) => m.key === o.model);
+    const ratios = spec?.aspectRatios[withImage ? 'image' : 'text'];
+    const ratioOk = o.aspectRatio === undefined || ratios?.includes(o.aspectRatio) === true;
+    if (
+      !spec ||
+      !spec.resolutions.includes(o.resolution) ||
+      !spec.durations.includes(o.durationS) ||
+      !ratioOk
+    ) {
       throw new BadRequestException({
         message: AI_VIDEO_MESSAGES[AiVideoError.INVALID_OPTION],
         error: AiVideoError.INVALID_OPTION,

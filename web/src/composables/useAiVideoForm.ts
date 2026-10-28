@@ -12,6 +12,7 @@ export function useAiVideoForm(withImage: Ref<boolean>) {
   const model = ref('')
   const resolution = ref('')
   const durationS = ref(0)
+  const aspectRatio = ref('') // '' = Otomatik (alan gönderilmez)
   const estimateUsd = ref<number | null>(null)
   const estimating = ref(false)
   const estimateFailed = ref(false)
@@ -20,6 +21,10 @@ export function useAiVideoForm(withImage: Ref<boolean>) {
 
   const current = computed<AiVideoModelOption | null>(
     () => options.value?.models.find((m) => m.key === model.value) ?? null,
+  )
+  /** Seçili model + görsel durumuna göre ölçü listesi (sunucudan; görselde boş olabilir). */
+  const aspectRatios = computed(
+    () => current.value?.aspectRatios[withImage.value ? 'image' : 'text'] ?? [],
   )
   const remainingUsd = computed(() =>
     options.value ? Math.max(0, options.value.dailyCapUsd - options.value.todaySpentUsd) : 0,
@@ -34,6 +39,11 @@ export function useAiVideoForm(withImage: Ref<boolean>) {
     if (!m) return
     if (!m.resolutions.includes(resolution.value)) resolution.value = m.resolutions[0]
     if (!m.durations.includes(durationS.value)) durationS.value = m.durations[0]
+    resetAspectIfInvalid()
+  }
+
+  function resetAspectIfInvalid() {
+    if (aspectRatio.value && !aspectRatios.value.includes(aspectRatio.value)) aspectRatio.value = ''
   }
 
   async function loadOptions() {
@@ -53,7 +63,12 @@ export function useAiVideoForm(withImage: Ref<boolean>) {
     estimateFailed.value = false
     try {
       const { data } = await aiVideoApi.estimate(
-        { model: model.value, resolution: resolution.value, durationS: durationS.value },
+        {
+          model: model.value,
+          resolution: resolution.value,
+          durationS: durationS.value,
+          ...(aspectRatio.value && { aspectRatio: aspectRatio.value }),
+        },
         withImage.value,
       )
       if (id === seq) estimateUsd.value = data.quoteUsd
@@ -64,7 +79,8 @@ export function useAiVideoForm(withImage: Ref<boolean>) {
     }
   }
 
-  watch([model, resolution, durationS, withImage], () => {
+  watch(withImage, resetAspectIfInvalid)
+  watch([model, resolution, durationS, aspectRatio, withImage], () => {
     if (!model.value || !resolution.value || !durationS.value) return
     if (timer) clearTimeout(timer)
     estimating.value = true
@@ -82,6 +98,8 @@ export function useAiVideoForm(withImage: Ref<boolean>) {
     model,
     resolution,
     durationS,
+    aspectRatio,
+    aspectRatios,
     current,
     estimateUsd,
     estimating,

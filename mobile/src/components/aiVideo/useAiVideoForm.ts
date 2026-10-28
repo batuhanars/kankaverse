@@ -13,6 +13,7 @@ export function useAiVideoForm(withImage: boolean) {
   const [model, setModel] = useState('');
   const [resolution, setResolution] = useState('');
   const [durationS, setDurationS] = useState(0);
+  const [aspectRatio, setAspectRatio] = useState(''); // '' = Otomatik (alan gönderilmez)
   const [estimateUsd, setEstimateUsd] = useState<number | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [estimateFailed, setEstimateFailed] = useState(false);
@@ -21,6 +22,8 @@ export function useAiVideoForm(withImage: boolean) {
   const loaded = useRef(false);
 
   const current: AiVideoModelOption | null = options?.models.find((m) => m.key === model) ?? null;
+  // Liste sunucudan; model ya da görsel durumu değişince ve seçili ölçü listede yoksa Otomatik'e döner.
+  const aspectRatios = current?.aspectRatios[withImage ? 'image' : 'text'] ?? [];
   const remainingUsd = options ? Math.max(0, options.dailyCapUsd - options.todaySpentUsd) : 0;
   const overCap = estimateUsd !== null && estimateUsd > remainingUsd;
 
@@ -53,6 +56,11 @@ export function useAiVideoForm(withImage: boolean) {
     };
   }, [loadOptions]);
 
+  const ratiosKey = aspectRatios.join(',');
+  useEffect(() => {
+    setAspectRatio((a) => (a && !ratiosKey.split(',').includes(a) ? '' : a));
+  }, [ratiosKey]);
+
   useEffect(() => {
     if (!model || !resolution || !durationS) return;
     const id = ++seq.current;
@@ -60,7 +68,10 @@ export function useAiVideoForm(withImage: boolean) {
     setEstimateFailed(false);
     const timer = setTimeout(async () => {
       try {
-        const { quoteUsd } = await aiVideoApi.estimate({ model, resolution, durationS }, withImage);
+        const { quoteUsd } = await aiVideoApi.estimate(
+          { model, resolution, durationS, ...(aspectRatio && { aspectRatio }) },
+          withImage,
+        );
         if (id === seq.current) setEstimateUsd(quoteUsd);
       } catch {
         if (id === seq.current) setEstimateFailed(true);
@@ -69,13 +80,15 @@ export function useAiVideoForm(withImage: boolean) {
       }
     }, ESTIMATE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [model, resolution, durationS, withImage]);
+  }, [model, resolution, durationS, aspectRatio, withImage]);
 
   return {
     options,
     model,
     resolution,
     durationS,
+    aspectRatio,
+    aspectRatios,
     current,
     estimateUsd,
     estimating,
@@ -83,6 +96,7 @@ export function useAiVideoForm(withImage: boolean) {
     overCap,
     setResolution,
     setDurationS,
+    setAspectRatio,
     loadOptions,
     pickModel: (key: string) => options && pickModel(key, options),
   };

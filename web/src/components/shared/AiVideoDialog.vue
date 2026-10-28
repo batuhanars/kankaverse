@@ -183,37 +183,41 @@ async function onPrimary() {
           :model="form.model.value"
           :resolution="form.resolution.value"
           :duration-s="form.durationS.value"
+          :aspect-ratio="form.aspectRatio.value"
+          :aspect-ratios="form.aspectRatios.value"
+          :with-image="ai.withImage.value"
           @update:model="form.pickModel"
           @update:resolution="form.resolution.value = $event"
           @update:duration-s="form.durationS.value = $event"
-        />
+          @update:aspect-ratio="form.aspectRatio.value = $event"
+        >
+          <div class="w-full flex flex-wrap items-center gap-2 min-w-0">
+            <img v-if="previewUrl" :src="previewUrl" alt="" class="h-12 w-12 shrink-0 rounded-[var(--kv-radius-sm)] object-cover" />
+            <KvButton size="sm" variant="ghost" class="border border-[var(--kv-border-subtle)]" @click="fileInput?.click()">
+              {{ ai.image.value ? t('aiVideo.imageChange') : t('aiVideo.imageAdd') }}
+            </KvButton>
+            <KvButton v-if="ai.image.value" size="sm" variant="ghost" class="border border-[var(--kv-border-subtle)]" @click="ai.image.value = null">
+              {{ t('aiVideo.imageRemove') }}
+            </KvButton>
+            <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="onImage" />
+          </div>
+          <p class="w-full text-[12px] -mt-2" style="color: var(--kv-text-muted);">{{ t('aiVideo.imageHint') }}</p>
 
-        <div>
-          <label class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);" for="ai-video-prompt">
-            {{ t('aiVideo.promptLabel') }}
-          </label>
-          <textarea
-            id="ai-video-prompt"
-            v-model="ai.prompt.value"
-            rows="3"
-            :maxlength="PROMPT_MAX"
-            :placeholder="t('aiVideo.promptPlaceholder')"
-            class="w-full resize-none rounded-[var(--kv-radius-md)] px-3 py-2 text-[14px] outline-none border border-[var(--kv-border-subtle)] bg-[var(--kv-bg-content)]"
-            style="color: var(--kv-text-primary);"
-          />
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2 min-w-0">
-          <img v-if="previewUrl" :src="previewUrl" alt="" class="h-12 w-12 shrink-0 rounded-[var(--kv-radius-sm)] object-cover" />
-          <KvButton size="sm" variant="ghost" @click="fileInput?.click()">
-            {{ ai.image.value ? t('aiVideo.imageChange') : t('aiVideo.imageAdd') }}
-          </KvButton>
-          <KvButton v-if="ai.image.value" size="sm" variant="ghost" @click="ai.image.value = null">
-            {{ t('aiVideo.imageRemove') }}
-          </KvButton>
-          <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="onImage" />
-        </div>
-        <p class="text-[12px] -mt-2" style="color: var(--kv-text-muted);">{{ t('aiVideo.imageHint') }}</p>
+          <div class="w-full">
+            <label class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);" for="ai-video-prompt">
+              {{ t('aiVideo.promptLabel') }}
+            </label>
+            <textarea
+              id="ai-video-prompt"
+              v-model="ai.prompt.value"
+              rows="3"
+              :maxlength="PROMPT_MAX"
+              :placeholder="t('aiVideo.promptPlaceholder')"
+              class="w-full resize-none rounded-[var(--kv-radius-md)] px-3 py-2 text-[14px] outline-none border border-[var(--kv-border-subtle)] bg-[var(--kv-bg-content)]"
+              style="color: var(--kv-text-primary);"
+            />
+          </div>
+        </AiVideoOptions>
 
         <AiVideoCostBar
           :duration-s="form.durationS.value"

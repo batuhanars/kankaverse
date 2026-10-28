@@ -83,7 +83,12 @@ export function useAiVideo() {
     setBusy(true);
     try {
       const inputKey = imageState.image ? await imageState.upload(imageState.image) : undefined;
-      const sel = { model: form.model, resolution: form.resolution, durationS: form.durationS };
+      const sel = {
+        model: form.model,
+        resolution: form.resolution,
+        durationS: form.durationS,
+        ...(form.aspectRatio && { aspectRatio: form.aspectRatio }),
+      };
       track(await aiVideoApi.create(sel, prompt, inputKey));
       void form.loadOptions(); // bugünkü harcama güncellensin
     } catch (e) {

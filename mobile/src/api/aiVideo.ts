@@ -10,6 +10,8 @@ export interface AiVideoDto {
   model: string;
   resolution: string;
   durationS: number;
+  /** null = Otomatik. */
+  aspectRatio: string | null;
   prompt: string;
   hasInput: boolean;
   quoteUsd: number;
@@ -27,6 +29,8 @@ export interface AiVideoModelOption {
   label: string;
   durations: number[];
   resolutions: string[];
+  /** Görselde boş liste = ölçü görselden alınır. */
+  aspectRatios: { text: string[]; image: string[] };
   supportsImage: boolean;
   audio: 'none' | 'default' | 'always';
 }
@@ -41,6 +45,8 @@ export interface AiVideoSelection {
   model: string;
   resolution: string;
   durationS: number;
+  /** Yoksa Otomatik. */
+  aspectRatio?: string;
 }
 
 export const aiVideoApi = {

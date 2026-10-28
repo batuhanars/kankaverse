@@ -4386,6 +4386,16 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Tur revizeleri: "Kategorisiz kanal ekle" → "Kanal Ekle" · tüm emoji düğmeleri tepki düğmesi standardında gri çizgi simge (web `EmojiFaceIcon`, mobil `happy-outline`)
 - [ ] Mağaza sürümü (vc28)
 
+## Sprint C14f — Yapay zeka video: ölçü seçimi + Wan 25 sn — 2026-10-28
+
+> Sözleşme: `contracts/SPRINT_C14F_AI_VIDEO_ASPECT_RATIO_CONTRACT.md`. api + web + mobil (JS), vc35. Sahip isteği.
+
+- [x] api: model tablosu ölçü + Wan 25, DTO/doğrulama, aspectRatio kolonu + migration uygulandı, testler
+- [x] web: Ölçü seçici (Otomatik, modele/görsele göre liste)
+- [x] mobil: Ölçü seçici, versionCode 35
+- [x] build/test/vue-tsc -b/typecheck/lint temiz
+- [ ] Sahip turu (web + telefon)
+
 ## Sprint C28 — Mobilde durum noktası (mesaj avatarı + grup DM üyeleri) — 2026-10-28
 
 > Sözleşme: `contracts/SPRINT_C28_MOBILE_PRESENCE_DOTS_CONTRACT.md`. Yalnız mobil (JS), vc34. R7-nötr.

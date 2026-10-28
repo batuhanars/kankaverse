@@ -108,6 +108,7 @@ export function useAiVideo() {
         model: form.model.value,
         resolution: form.resolution.value,
         durationS: form.durationS.value,
+        ...(form.aspectRatio.value && { aspectRatio: form.aspectRatio.value }),
       }
       track((await aiVideoApi.create(sel, prompt.value, inputKey)).data)
       void form.loadOptions() // bugünkü harcama güncellensin

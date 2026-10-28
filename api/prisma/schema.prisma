@@ -741,6 +741,7 @@ model AiVideoGeneration {
   inputKey      String? // özel bucket: ai-input/{userId}/{uuid}.{ext}; yalnız görselden üretimde
   resolution    String // "720p"
   durationS     Int // 5
+  aspectRatio   String? // C14f: "16:9"; null = Otomatik (alan sağlayıcıya gönderilmez)
   quoteMicroUsd Int // gönderim öncesi teklif
   costMicroUsd  Int? // Pika billing.state=settled olunca
   providerJobId String? // Pika "media_..." id

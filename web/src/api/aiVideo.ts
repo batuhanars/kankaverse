@@ -9,6 +9,7 @@ export interface AiVideoDto {
   model: string
   resolution: string
   durationS: number
+  aspectRatio: string | null // null = Otomatik
   prompt: string
   hasInput: boolean
   quoteUsd: number
@@ -24,6 +25,7 @@ export interface AiVideoModelOption {
   label: string
   durations: number[]
   resolutions: string[]
+  aspectRatios: { text: string[]; image: string[] } // görselde boş = ölçü görselden alınır
   supportsImage: boolean
   audio: 'none' | 'default' | 'always'
 }
@@ -38,6 +40,7 @@ export interface AiVideoSelection {
   model: string
   resolution: string
   durationS: number
+  aspectRatio?: string // yoksa Otomatik
 }
 
 export const aiVideoApi = {

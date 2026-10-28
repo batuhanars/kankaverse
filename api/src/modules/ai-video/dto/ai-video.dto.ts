@@ -35,6 +35,15 @@ export class EstimateAiVideoDto {
   @ApiProperty({ description: 'Görselden üretim mi (fiyat görsele değil api yoluna bağlı)' })
   @IsBoolean()
   withImage!: boolean;
+
+  @ApiPropertyOptional({
+    example: '16:9',
+    description: 'Yoksa Otomatik (alan sağlayıcıya gönderilmez)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  aspectRatio?: string;
 }
 
 /** `POST /ai-video`: teklif + tavan + gönderim tek çağrıda (C14b §2.2). */
@@ -64,4 +73,13 @@ export class CreateAiVideoDto {
   @IsString()
   @MaxLength(300)
   inputKey?: string;
+
+  @ApiPropertyOptional({
+    example: '16:9',
+    description: 'Yoksa Otomatik (alan sağlayıcıya gönderilmez)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  aspectRatio?: string;
 }

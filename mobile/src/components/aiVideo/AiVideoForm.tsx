@@ -9,22 +9,34 @@ const PROMPT_MAX = 1000;
 const audioLabel = (m: { audio: string; label: string }) =>
   t(m.audio === 'none' ? 'aiVideo.audioNone' : 'aiVideo.audioOn', { label: m.label });
 
-/** Model satırı + çözünürlük/süre seçicileri (web `AiVideoOptions`). Tek modelde seçici yok, satır var. */
-function Options({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
+/** Bilinmeyen sağlayıcı değeri arayüzü kırmaz: etiket yoksa oranın kendisi yazılır. */
+const ratioLabel = (r: string) => {
+  const key = `aiVideo.ratio.r${r.replace(':', 'x')}`;
+  const label = t(key);
+  return label === key ? r : label; // t eksik anahtarda anahtarı döner
+};
+
+/** Model satırı (web `AiVideoOptions` üst kısmı). Tek modelde seçici yok, satır var. */
+function ModelRow({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
   const { form } = ai;
   const models = form.options?.models ?? [];
+  if (models.length === 1) return <Text style={styles.model}>{audioLabel(models[0])}</Text>;
+  if (models.length === 0) return null;
+  return (
+    <Segmented
+      label={t('aiVideo.modelLabel')}
+      options={models.map((m) => ({ value: m.key, text: audioLabel(m) }))}
+      value={form.model}
+      onChange={form.pickModel}
+    />
+  );
+}
+
+/** Çözünürlük/süre/ölçü seçicileri (web `AiVideoOptions` alt kısmı). */
+function Options({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
+  const { form } = ai;
   return (
     <View style={styles.group}>
-      {models.length === 1 ? (
-        <Text style={styles.model}>{audioLabel(models[0])}</Text>
-      ) : models.length > 1 ? (
-        <Segmented
-          label={t('aiVideo.modelLabel')}
-          options={models.map((m) => ({ value: m.key, text: audioLabel(m) }))}
-          value={form.model}
-          onChange={form.pickModel}
-        />
-      ) : null}
       {form.current ? (
         <>
           <Segmented
@@ -39,30 +51,30 @@ function Options({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
             value={form.durationS}
             onChange={form.setDurationS}
           />
+          <Segmented
+            label={t('aiVideo.aspectLabel')}
+            options={[
+              { value: '', text: t('aiVideo.aspectAuto') },
+              ...form.aspectRatios.map((r) => ({ value: r, text: ratioLabel(r) })),
+            ]}
+            value={form.aspectRatio}
+            onChange={form.setAspectRatio}
+          />
+          {ai.image.image && form.aspectRatios.length === 0 ? (
+            <Text style={styles.hint}>{t('aiVideo.aspectFromImage')}</Text>
+          ) : null}
         </>
       ) : null}
     </View>
   );
 }
 
-/** İstem + isteğe bağlı görsel (web `AiVideoDialog` form gövdesi). */
+/** C14f sahip sırası: model, görsel, istem, seçenekler (web `AiVideoDialog` form gövdesi). */
 export function AiVideoForm({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
   const { image } = ai;
   return (
     <View style={styles.group}>
-      <Options ai={ai} />
-      <View style={styles.field}>
-        <Text style={styles.label}>{t('aiVideo.promptLabel')}</Text>
-        <TextInput
-          value={ai.prompt}
-          onChangeText={ai.setPrompt}
-          maxLength={PROMPT_MAX}
-          multiline
-          placeholder={t('aiVideo.promptPlaceholder')}
-          placeholderTextColor={theme.colors.textMuted}
-          style={styles.input}
-        />
-      </View>
+      <ModelRow ai={ai} />
       <View style={styles.imageRow}>
         {image.image ? <Image source={{ uri: image.image.uri }} style={styles.thumb} resizeMode="cover" /> : null}
         <Pressable onPress={() => void image.pick()} style={styles.ghost} accessibilityRole="button">
@@ -75,6 +87,19 @@ export function AiVideoForm({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
         ) : null}
       </View>
       <Text style={styles.hint}>{t('aiVideo.imageHint')}</Text>
+      <View style={styles.field}>
+        <Text style={styles.label}>{t('aiVideo.promptLabel')}</Text>
+        <TextInput
+          value={ai.prompt}
+          onChangeText={ai.setPrompt}
+          maxLength={PROMPT_MAX}
+          multiline
+          placeholder={t('aiVideo.promptPlaceholder')}
+          placeholderTextColor={theme.colors.textMuted}
+          style={styles.input}
+        />
+      </View>
+      <Options ai={ai} />
     </View>
   );
 }

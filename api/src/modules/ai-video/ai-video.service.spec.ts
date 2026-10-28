@@ -15,6 +15,7 @@ function setup(rowOver: Record<string, unknown> = {}, spentRows: unknown[] = [])
     inputKey: null,
     resolution: '720p',
     durationS: 5,
+    aspectRatio: null,
     quoteMicroUsd: 200_000,
     costMicroUsd: null,
     providerJobId: null,
@@ -207,6 +208,49 @@ describe('AiVideoService.create (teklif + tavan + gonderim)', () => {
     await service.create('u1', dto({ prompt: '', inputKey }));
     expect(storage.getBuffer).toHaveBeenCalled();
     expect(pika.createUpload).toHaveBeenCalledWith('image/png', 3);
+  });
+
+  it('olcu: govdeye modelin alan adiyla girer, Otomatik ve onbellek anahtari', async () => {
+    const { service, pika, prisma } = setup({ aspectRatio: '9:16' });
+    await service.create('u1', dto({ aspectRatio: '9:16' }));
+    expect(pika.quote).toHaveBeenCalledWith(
+      'pika/pika-2.5/text-to-video',
+      expect.objectContaining({ aspect_ratio: '9:16' }),
+    );
+    expect(prisma.aiVideoGeneration.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ aspectRatio: '9:16' }),
+    });
+    expect(pika.submit.mock.calls[0][1]).toMatchObject({ aspect_ratio: '9:16' });
+
+    const auto = setup();
+    await auto.service.create('u1', dto());
+    expect(auto.pika.submit.mock.calls[0][1]).not.toHaveProperty('aspect_ratio');
+    expect(auto.pika.submit.mock.calls[0][1]).not.toHaveProperty('ratio');
+  });
+
+  it('olcu: Wan ratio alanini kullanir, 25 sn kabul', async () => {
+    const { service, pika } = setup({ aspectRatio: '3:4' });
+    await service.create('u1', dto({ model: 'wan-3.0', durationS: 25, aspectRatio: '3:4' }));
+    expect(pika.submit.mock.calls[0][1]).toMatchObject({ ratio: '3:4', duration: 25 });
+  });
+
+  it.each([
+    ['modelde olmayan olcu', { aspectRatio: '3:4' }],
+    [
+      'Kling 4:3 yok',
+      { model: 'kling-3.0-turbo', durationS: 5, resolution: '720p', aspectRatio: '4:3' },
+    ],
+    [
+      'Pika gorselli uretimde olcu yok',
+      { aspectRatio: '16:9', prompt: '', inputKey: `ai-input/u1/${UUID}.png` },
+    ],
+  ])('gecersiz olcu (%s): 400, Pika cagrilmaz', async (_n, over) => {
+    const { service, pika } = setup();
+    await expect(service.create('u1', dto(over))).rejects.toMatchObject({
+      status: 400,
+      response: { error: 'AI_VIDEO_INVALID_OPTION' },
+    });
+    expect(pika.quote).not.toHaveBeenCalled();
   });
 
   it.each([

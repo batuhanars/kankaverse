@@ -3,6 +3,7 @@
  * AiVideoOptions (Sprint C14b §3.1-2/3): model açılır listesi, çözünürlük + süre parçalı seçicileri, istem çipleri.
  * Seçim durumu `useAiVideoForm`da; burası yalnız görünüm. Dar ekranda satırlar sarar (flex-wrap).
  */
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { AiVideoModelOption } from '@/api/aiVideo'
 
@@ -12,17 +13,28 @@ const props = defineProps<{
   model: string
   resolution: string
   durationS: number
+  aspectRatio: string // '' = Otomatik
+  aspectRatios: string[]
+  withImage: boolean
 }>()
 const emit = defineEmits<{
   'update:model': [key: string]
   'update:resolution': [value: string]
   'update:durationS': [value: number]
+  'update:aspectRatio': [value: string]
 }>()
 
-const { t } = useI18n()
+const i18n = useI18n()
+const t = i18n.t
+/** Bilinmeyen sağlayıcı değeri arayüzü kırmaz: etiket yoksa oranın kendisi yazılır. */
+const ratioLabel = (r: string) => {
+  const key = `aiVideo.ratio.r${r.replace(":", "x")}`
+  return i18n.te(key) ? t(key) : r
+}
+const lockedAuto = computed(() => props.withImage && props.aspectRatios.length === 0)
 const segBase =
-  'px-3 py-1.5 text-[13px] cursor-pointer transition-colors border border-[var(--kv-border-subtle)] first:rounded-l-[var(--kv-radius-sm)] last:rounded-r-[var(--kv-radius-sm)] -ml-px first:ml-0'
-const segOn = 'bg-[var(--kv-accent-500)] text-white border-[var(--kv-accent-500)] relative z-10'
+  'px-3 py-1.5 text-[13px] cursor-pointer transition-colors border border-[var(--kv-border-subtle)] rounded-[var(--kv-radius-sm)]'
+const segOn = 'bg-[var(--kv-accent-500)] text-white border-[var(--kv-accent-500)]'
 const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:bg-[var(--kv-bg-elevated)]'
 </script>
 
@@ -47,9 +59,12 @@ const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:
       </select>
     </div>
 
-    <div v-if="current" class="min-w-0">
+    <!-- C14f: görsel + istem model bilgisinin altında, seçeneklerin üstünde (sahip sırası) -->
+    <slot />
+
+    <div v-if="current" class="min-w-0 w-full">
       <span class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);">{{ t('aiVideo.resolutionLabel') }}</span>
-      <div class="inline-flex" role="radiogroup" :aria-label="t('aiVideo.resolutionLabel')">
+      <div class="flex flex-wrap gap-1.5" role="radiogroup" :aria-label="t('aiVideo.resolutionLabel')">
         <button
           v-for="r in current.resolutions"
           :key="r"
@@ -64,9 +79,9 @@ const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:
       </div>
     </div>
 
-    <div v-if="current" class="min-w-0">
+    <div v-if="current" class="min-w-0 w-full">
       <span class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);">{{ t('aiVideo.durationLabel') }}</span>
-      <div class="inline-flex" role="radiogroup" :aria-label="t('aiVideo.durationLabel')">
+      <div class="flex flex-wrap gap-1.5" role="radiogroup" :aria-label="t('aiVideo.durationLabel')">
         <button
           v-for="d in current.durations"
           :key="d"
@@ -79,6 +94,34 @@ const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:
           {{ t('aiVideo.durationOption', { sec: d }) }}
         </button>
       </div>
+    </div>
+
+    <div v-if="current" class="min-w-0 w-full">
+      <span class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);">{{ t('aiVideo.aspectLabel') }}</span>
+      <div class="flex flex-wrap gap-1.5" role="radiogroup" :aria-label="t('aiVideo.aspectLabel')">
+        <button
+          type="button"
+          role="radio"
+          :aria-checked="aspectRatio === ''"
+          :disabled="lockedAuto"
+          :class="[segBase, aspectRatio === '' ? segOn : segOff, lockedAuto && 'cursor-not-allowed opacity-70']"
+          @click="emit('update:aspectRatio', '')"
+        >
+          {{ t('aiVideo.aspectAuto') }}
+        </button>
+        <button
+          v-for="r in aspectRatios"
+          :key="r"
+          type="button"
+          role="radio"
+          :aria-checked="r === aspectRatio"
+          :class="[segBase, r === aspectRatio ? segOn : segOff]"
+          @click="emit('update:aspectRatio', r)"
+        >
+          {{ ratioLabel(r) }}
+        </button>
+      </div>
+      <p v-if="lockedAuto" class="text-[12px] mt-1" style="color: var(--kv-text-muted);">{{ t('aiVideo.aspectFromImage') }}</p>
     </div>
   </div>
 </template>
