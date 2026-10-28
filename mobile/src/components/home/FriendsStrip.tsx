@@ -14,21 +14,14 @@ import { usePresenceStore, type PresenceStatus } from "@/stores/presence";
 import type { DmChannelDto } from "@/api/dm";
 import type { FriendDto } from "@/api/friends";
 import { extractErrorMessage } from "@/api/errors";
+import { PresenceDot } from "@/components/PresenceDot";
 import { theme } from "@/theme";
 
 const AVATAR = 48;
 const DOT = 14;
 const TILE_PAD = 10;
 
-// Web `UserCard.vue` presenceColor ile aynı palet (token). Çevrimdışı da gri nokta alır: şeritte
-// "durum yok" ile "çevrimdışı" ayrımı olmasın, her avatar aynı dili konuşsun.
-const PRESENCE_COLOR: Record<PresenceStatus, string> = {
-  online: theme.colors.online,
-  away: theme.colors.idle,
-  dnd: theme.colors.dnd,
-  offline: theme.colors.offline,
-};
-
+// Çevrimdışı da gri nokta alır: şeritte "durum yok" ile "çevrimdışı" ayrımı olmasın.
 // Çevrimiçi olanlar öne: şerit "şu an kim burada" sorusunu ilk bakışta cevaplasın.
 const ORDER: Record<PresenceStatus, number> = {
   online: 0,
@@ -107,14 +100,11 @@ export function FriendsStrip({ onOpenDm }: Props) {
                 </Text>
               </View>
             )}
-            <View
-              style={[
-                styles.dot,
-                {
-                  backgroundColor:
-                    PRESENCE_COLOR[statusMap[item.user.id] ?? "offline"],
-                },
-              ]}
+            <PresenceDot
+              status={statusMap[item.user.id] ?? "offline"}
+              size={DOT}
+              ringWidth={3}
+              ringColor={theme.colors.bgElevated}
             />
           </View>
         </Pressable>
@@ -144,16 +134,5 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.base,
     fontWeight: "700",
-  },
-  // Panel zemini renginde halka: nokta avatarın üstünden ayrışsın (web avatar noktasıyla aynı desen).
-  dot: {
-    position: "absolute",
-    right: -1,
-    bottom: -1,
-    width: DOT,
-    height: DOT,
-    borderRadius: DOT / 2,
-    borderWidth: 3,
-    borderColor: theme.colors.bgElevated,
   },
 });

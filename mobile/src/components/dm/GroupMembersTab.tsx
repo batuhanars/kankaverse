@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Image, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
+import { usePresenceStore } from '@/stores/presence';
+import { PresenceDot } from '../PresenceDot';
 import type { DmChannelDto, DmParticipantDto } from '@/api/dm';
 import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
@@ -47,11 +49,25 @@ export function GroupMembersTab({ channel }: Props) {
   const [actionError, setActionError] = useState('');
 
   const isOwner = authUser?.id === channel.ownerId;
-  const sortedMembers = [...channel.members].sort((a, b) => {
-    if (a.id === channel.ownerId) return -1;
-    if (b.id === channel.ownerId) return 1;
-    return 0;
-  });
+  const statusMap = usePresenceStore((s) => s.statusMap);
+  const sections = useMemo(() => {
+    // Sahip önce (bugünkü sıra); bölümlere ayırma sırayı bozmaz. Grup DM'de rol/hoist yok.
+    const sorted = [...channel.members].sort((a, b) => {
+      if (a.id === channel.ownerId) return -1;
+      if (b.id === channel.ownerId) return 1;
+      return 0;
+    });
+    const online = sorted.filter((m) => (statusMap[m.id] ?? 'offline') !== 'offline');
+    const offline = sorted.filter((m) => (statusMap[m.id] ?? 'offline') === 'offline');
+    const result: { key: string; title: string; data: DmParticipantDto[] }[] = [];
+    if (online.length > 0) {
+      result.push({ key: 'online', title: t('member.online', { n: online.length }), data: online });
+    }
+    if (offline.length > 0) {
+      result.push({ key: 'offline', title: t('member.offline', { n: offline.length }), data: offline });
+    }
+    return result;
+  }, [channel.members, channel.ownerId, statusMap]);
 
   async function onRemoveMember() {
     if (!removeTarget) return;
@@ -71,10 +87,12 @@ export function GroupMembersTab({ channel }: Props) {
     <View style={styles.flex}>
       {actionError ? <Text style={styles.error}>{actionError}</Text> : null}
 
-      <FlatList
-        data={sortedMembers}
+      <SectionList
+        sections={sections}
         keyExtractor={(m) => m.id}
         contentContainerStyle={styles.list}
+        stickySectionHeadersEnabled={false}
+        renderSectionHeader={({ section }) => <Text style={styles.sectionTitle}>{section.title}</Text>}
         renderItem={({ item }) => (
           // Kendi satırım paneli açmaz (kendimi engelleyemem/çıkaramam) — dokunulabilirlik de verilmez.
           <Pressable
@@ -82,13 +100,21 @@ export function GroupMembersTab({ channel }: Props) {
             disabled={item.id === authUser?.id}
             style={styles.memberRow}
           >
-            {item.avatarUrl ? (
-              <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Text style={styles.avatarFallbackText}>{item.username.charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
+            <View style={styles.avatar}>
+              {item.avatarUrl ? (
+                <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <View style={[styles.avatarImage, styles.avatarFallback]}>
+                  <Text style={styles.avatarFallbackText}>{item.username.charAt(0).toUpperCase()}</Text>
+                </View>
+              )}
+              {/* Bu listede çevrimdışı da gri nokta alır (C28 §2.2); bölüm başlığı zaten durumu söylüyor. */}
+              <PresenceDot
+                status={statusMap[item.id] ?? 'offline'}
+                size={12}
+                ringColor={theme.colors.bgContent}
+              />
+            </View>
             <Text style={styles.memberName} numberOfLines={1}>
               {item.username}
             </Text>
@@ -142,7 +168,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 8,
   },
-  avatar: { width: 32, height: 32, borderRadius: 16 },
+  avatar: { width: 32, height: 32 },
+  avatarImage: { width: 32, height: 32, borderRadius: 16 },
+  sectionTitle: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 8,
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
   avatarFallback: {
     backgroundColor: theme.colors.accentSubtle,
     alignItems: 'center',

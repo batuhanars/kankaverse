@@ -8,7 +8,8 @@ import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
 import { useVoiceStore } from '@/stores/voice';
 import { useVoicePresenceStore, type VoicePresenceParticipant } from '@/stores/voicePresence';
-import { usePresenceStore, selectStatus, type PresenceStatus } from '@/stores/presence';
+import { usePresenceStore, selectStatus } from '@/stores/presence';
+import { PRESENCE_COLOR } from '@/components/PresenceDot';
 import { OngoingCallBanner } from '@/components/call/OngoingCallBanner';
 import { MessageScreen } from '@/components/MessageScreen';
 import { ChatBackButton } from '@/components/ChatBackButton';
@@ -19,14 +20,6 @@ import { theme } from '@/theme';
 
 const EMPTY_PRESENCE: VoicePresenceParticipant[] = [];
 
-// Web `UserCard.vue` presenceColor karşılığı; renkler token'dan, uydurulmuş değer yok.
-// `offline: null` bilinçli: satırın hiç çizilmemesi de bir "renk" seçimi değil, durumun kendisi.
-const PRESENCE_COLOR: Record<PresenceStatus, string | null> = {
-  online: theme.colors.online,
-  away: theme.colors.idle,
-  dnd: theme.colors.dnd,
-  offline: null,
-};
 
 // Sprint M1a contract §5 ekran 3 — DM mesaj ekranı: kanal ekranıyla "aynısı" (MessageScreen ortak
 // gövde) + başlıkta karşı tarafın adı/avatarı (dokunuş → salt okunur profil kartı, yalnız 1-1 DM'de
@@ -183,7 +176,8 @@ export default function DmScreen() {
   // taraf ve arkadaş olmayan minör zaten hiç gelmez, burada ek bir kapı kurulmuyor.
   const otherUserId = storeChannel?.type === 'DM' ? storeChannel.otherUser.id : params.otherUserId;
   const otherStatus = usePresenceStore(selectStatus(isDm ? otherUserId : null));
-  const presenceColor = isDm ? PRESENCE_COLOR[otherStatus] : null;
+  // Çevrimdışıda başlıkta durum yazısı yok (null).
+  const presenceColor = isDm && otherStatus !== 'offline' ? PRESENCE_COLOR[otherStatus] : null;
 
   /**
    * C12 §4.2 — okundu göstergesi. null dönerse tik HİÇ çizilmez.

@@ -4386,6 +4386,17 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Tur revizeleri: "Kategorisiz kanal ekle" → "Kanal Ekle" · tüm emoji düğmeleri tepki düğmesi standardında gri çizgi simge (web `EmojiFaceIcon`, mobil `happy-outline`)
 - [ ] Mağaza sürümü (vc28)
 
+## Sprint C28 — Mobilde durum noktası (mesaj avatarı + grup DM üyeleri) — 2026-10-28
+
+> Sözleşme: `contracts/SPRINT_C28_MOBILE_PRESENCE_DOTS_CONTRACT.md`. Yalnız mobil (JS), vc34. R7-nötr.
+> Sebep: kullanıcı isteği (grup DM ve kanalda kimin çevrimiçi olduğu anlaşılmıyor).
+
+- [x] mobil: mesaj avatarında durum noktası (offline'da nokta yok)
+- [x] mobil: grup DM Üyeler sekmesi Çevrimiçi/Çevrimdışı + nokta
+- [x] mobil: ortak PresenceDot (Rule of Three)
+- [x] typecheck/lint temiz, versionCode 34
+- [x] Sahip turu (telefon) — 2026-10-28 geçti
+
 ## Sprint C14d — Yapay zeka video, mobil — 2026-10-28
 
 > Sözleşme: `contracts/SPRINT_C14D_AI_VIDEO_MOBILE_CONTRACT.md`. Yalnız mobil, JS (native yok), vc33. R7-nötr.

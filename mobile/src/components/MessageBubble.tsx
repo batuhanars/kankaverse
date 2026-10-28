@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AttachmentView } from './AttachmentView';
+import { PresenceDot } from './PresenceDot';
+import { usePresenceStore, selectStatus } from '@/stores/presence';
 import { BubbleMeta, MetaSpacer, ReactionRow, ReplyQuote } from './message/BubbleParts';
 import { splitMentions } from '@/utils/mentions';
 import type { MessageDto } from '@/api/messages';
@@ -9,6 +11,7 @@ import { theme } from '@/theme';
 
 const AVATAR_SIZE = 34;
 const AVATAR_GAP = 8;
+const DOT_SIZE = 12;
 
 interface Props {
   message: MessageDto;
@@ -67,6 +70,8 @@ export function MessageBubble({
   const displayContent = mentionSegments.map((seg) => seg.text).join('');
   const reactions = message.reactions ?? [];
 
+  // C28 — yalnız bu yazarın durumuna abone (tüm haritaya değil); liste performansı.
+  const authorStatus = usePresenceStore(selectStatus(message.author.id));
   const identityVisible = showIdentity && !isMine;
   const nameVisible = identityVisible && showAuthor;
   // Ek-yalnız mesajda görsel baloncuğu doldursun diye iç dolgu 4px'e iner (§3.5).
@@ -97,10 +102,22 @@ export function MessageBubble({
             onPress={onPressAuthor}
             disabled={!onPressAuthor}
             accessibilityRole="button"
-            accessibilityLabel={message.author.username}
+            accessibilityLabel={
+              authorStatus === 'offline'
+                ? message.author.username
+                : `${message.author.username}, ${t(`presence.${authorStatus}`)}`
+            }
             style={styles.avatar}
           >
             <Text style={styles.avatarText}>{message.author.username.charAt(0).toUpperCase()}</Text>
+            {/* Çevrimdışıda nokta YOK (C28 §1.2): gizli görünürlük de istemciye çevrimdışı gelir. */}
+            {authorStatus !== 'offline' && (
+              <PresenceDot
+                status={authorStatus}
+                size={DOT_SIZE}
+                ringColor={theme.colors.bgContent}
+              />
+            )}
           </Pressable>
         ) : (
           <View style={styles.avatarSpacer} />
