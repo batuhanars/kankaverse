@@ -20,7 +20,7 @@ function setup(rows: unknown[]) {
     },
   };
   const storage = { delete: jest.fn().mockResolvedValue(undefined) };
-  const pika = { deleteJob: jest.fn().mockResolvedValue(undefined) };
+  const pika = { deleteJob: jest.fn().mockResolvedValue(undefined), discardPartial: jest.fn() };
   const service = new AiVideoDeleteService(prisma as any, storage as any, pika as any);
   return { service, prisma, storage, pika };
 }

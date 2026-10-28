@@ -43,6 +43,7 @@ export class AiVideoDeleteService {
   }
 
   private async purge(row: AiVideoGeneration): Promise<void> {
+    this.pika.discardPartial(row.id);
     await this.safely(`çıktı objesi id=${row.id}`, row.outputKey, (k) => this.storage.delete(k));
     await this.safely(`girdi objesi id=${row.id}`, row.inputKey, (k) => this.storage.delete(k));
     await this.safely(`Pika işi id=${row.id}`, row.providerJobId, (j) => this.pika.deleteJob(j));

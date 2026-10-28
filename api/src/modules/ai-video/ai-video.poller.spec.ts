@@ -16,10 +16,11 @@ function setup(rowOver: Record<string, unknown> = {}) {
     aiVideoGeneration: {
       findMany: jest.fn().mockResolvedValue([row]),
       update: jest.fn().mockResolvedValue({}),
+      findUnique: jest.fn().mockResolvedValue({ deletedAt: null }),
     },
   };
   const storage = { putPrivate: jest.fn().mockResolvedValue(undefined) };
-  const pika = { getJob: jest.fn(), downloadVideo: jest.fn() };
+  const pika = { getJob: jest.fn(), downloadVideo: jest.fn(), discardPartial: jest.fn() };
   const config = { get: () => true };
   const recovery = { maybeRecover: jest.fn().mockResolvedValue(undefined) };
   const poller = new AiVideoPoller(
@@ -39,6 +40,7 @@ describe('AiVideoPoller durum esleme', () => {
     const s = setup();
     s.pika.getJob.mockResolvedValue({ status: 'running', billing: null });
     await s.poller.tick();
+    await s.poller.whenIdle();
     expect(lastUpdate(s)).toEqual({ status: AiVideoStatus.RUNNING });
   });
 
@@ -46,6 +48,7 @@ describe('AiVideoPoller durum esleme', () => {
     const s = setup();
     s.pika.getJob.mockResolvedValue({ status: 'queued', billing: null });
     await s.poller.tick();
+    await s.poller.whenIdle();
     expect(s.prisma.aiVideoGeneration.update).not.toHaveBeenCalled();
   });
 
@@ -57,6 +60,7 @@ describe('AiVideoPoller durum esleme', () => {
     const s = setup();
     s.pika.getJob.mockResolvedValue({ status: 'failed', errorCode: code, billing: null });
     await s.poller.tick();
+    await s.poller.whenIdle();
     expect(lastUpdate(s)).toMatchObject({ status: AiVideoStatus.FAILED, errorCode: ours });
   });
 
@@ -69,6 +73,7 @@ describe('AiVideoPoller durum esleme', () => {
     });
     s.pika.downloadVideo.mockResolvedValue(Buffer.from('mp4'));
     await s.poller.tick();
+    await s.poller.whenIdle();
     expect(s.storage.putPrivate).toHaveBeenCalledWith(
       'ai-video/u1/g1.mp4',
       expect.any(Buffer),
@@ -90,6 +95,7 @@ describe('AiVideoPoller durum esleme', () => {
     });
     s.pika.downloadVideo.mockResolvedValue(Buffer.from('mp4'));
     await s.poller.tick();
+    await s.poller.whenIdle();
     expect(lastUpdate(s)).not.toHaveProperty('costMicroUsd');
 
     const t = setup({ status: AiVideoStatus.COMPLETED });
@@ -98,6 +104,7 @@ describe('AiVideoPoller durum esleme', () => {
       billing: { state: 'settled', chargeMicroUsd: 190_000 },
     });
     await t.poller.tick();
+    await t.poller.whenIdle();
     expect(lastUpdate(t)).toEqual({ costMicroUsd: 190_000 });
   });
 
@@ -111,6 +118,7 @@ describe('AiVideoPoller durum esleme', () => {
     s.pika.downloadVideo.mockRejectedValue(new Error('net'));
     const t0 = Date.now();
     await s.poller.tick(t0);
+    await s.poller.whenIdle();
     expect(lastUpdate(s)).toMatchObject({
       status: AiVideoStatus.RUNNING,
       errorCode: 'AI_VIDEO_DOWNLOAD_PENDING',
@@ -129,10 +137,88 @@ describe('AiVideoPoller durum esleme', () => {
     (s.prisma.aiVideoGeneration.findMany as jest.Mock).mockResolvedValue([pending]);
     s.pika.getJob.mockClear();
     await s.poller.tick(t0 + 30_000);
+    await s.poller.whenIdle();
     expect(s.pika.getJob).not.toHaveBeenCalled();
     s.pika.downloadVideo.mockResolvedValue(Buffer.from('mp4'));
     await s.poller.tick(t0 + 61_000);
+    await s.poller.whenIdle();
     expect(lastUpdate(s)).toMatchObject({ status: AiVideoStatus.COMPLETED, errorCode: null });
+  });
+
+  it('C14e: indirme uretim kimligiyle anahtarlanir; basari ve vazgecmede kismi tampon atilir', async () => {
+    const t0 = Date.now();
+    const s = setup({ status: AiVideoStatus.RUNNING });
+    s.pika.getJob.mockResolvedValue({ status: 'completed', outputUrl: 'u', billing: null });
+    s.pika.downloadVideo.mockResolvedValue(Buffer.from('mp4'));
+    await s.poller.tick(t0);
+    await s.poller.whenIdle();
+    expect(s.pika.downloadVideo).toHaveBeenCalledWith(
+      'u',
+      expect.any(Number),
+      undefined,
+      undefined,
+      'g1',
+    );
+    expect(s.pika.discardPartial).toHaveBeenCalledWith('g1');
+
+    const f = setup({
+      status: AiVideoStatus.RUNNING,
+      providerCompletedAt: new Date(t0 - 24 * 3600_000 - 1),
+    });
+    await f.poller.tick(t0);
+    await f.poller.whenIdle();
+    expect(f.pika.discardPartial).toHaveBeenCalledWith('g1');
+  });
+
+  describe('C14e arka plan indirme', () => {
+    const done = { status: 'completed', outputUrl: 'u', billing: null };
+    const hang = () => {
+      let release!: (b: Buffer) => void;
+      const p = new Promise<Buffer>((r) => (release = r));
+      return { p, release };
+    };
+
+    it('tur indirme sürerken doner; ikinci tur ayni id icin ikinci indirme baslatmaz', async () => {
+      const s = setup({ status: AiVideoStatus.RUNNING });
+      s.pika.getJob.mockResolvedValue(done);
+      const h = hang();
+      s.pika.downloadVideo.mockReturnValue(h.p);
+      await s.poller.tick();
+      await s.poller.tick();
+      expect(s.pika.downloadVideo).toHaveBeenCalledTimes(1);
+      expect(s.pika.getJob).toHaveBeenCalledTimes(1);
+      expect(s.prisma.aiVideoGeneration.update).not.toHaveBeenCalled();
+      h.release(Buffer.from('mp4'));
+      await s.poller.whenIdle();
+      expect(lastUpdate(s)).toMatchObject({ status: AiVideoStatus.COMPLETED });
+    });
+
+    it('indirme sirasinda silinen satir yuklenmez ve COMPLETED olmaz', async () => {
+      const s = setup({ status: AiVideoStatus.RUNNING });
+      s.pika.getJob.mockResolvedValue(done);
+      const h = hang();
+      s.pika.downloadVideo.mockReturnValue(h.p);
+      await s.poller.tick();
+      s.prisma.aiVideoGeneration.findUnique.mockResolvedValue({ deletedAt: new Date() });
+      h.release(Buffer.from('mp4'));
+      await s.poller.whenIdle();
+      expect(s.storage.putPrivate).not.toHaveBeenCalled();
+      expect(s.prisma.aiVideoGeneration.update).not.toHaveBeenCalled();
+      expect(s.pika.discardPartial).toHaveBeenCalledWith('g1');
+    });
+
+    it('satir hic yoksa da yuklenmez; is bitince inFlight temizlenir', async () => {
+      const s = setup({ status: AiVideoStatus.RUNNING });
+      s.pika.getJob.mockResolvedValue(done);
+      s.pika.downloadVideo.mockResolvedValue(Buffer.from('mp4'));
+      s.prisma.aiVideoGeneration.findUnique.mockResolvedValue(null);
+      await s.poller.tick();
+      await s.poller.whenIdle();
+      expect(s.storage.putPrivate).not.toHaveBeenCalled();
+      await s.poller.tick();
+      await s.poller.whenIdle();
+      expect(s.pika.downloadVideo).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('indirme asamasinda is zaman asimi islemez; completed + 24 saat: DOWNLOAD_FAILED', async () => {
@@ -145,6 +231,7 @@ describe('AiVideoPoller durum esleme', () => {
     s.pika.getJob.mockResolvedValue({ status: 'completed', outputUrl: 'u', billing: null });
     s.pika.downloadVideo.mockRejectedValue(new Error('net'));
     await s.poller.tick(t0);
+    await s.poller.whenIdle();
     expect(lastUpdate(s)).toMatchObject({ errorCode: 'AI_VIDEO_DOWNLOAD_PENDING' });
 
     const f = setup({
@@ -152,6 +239,7 @@ describe('AiVideoPoller durum esleme', () => {
       providerCompletedAt: new Date(t0 - 24 * 3600_000 - 1),
     });
     await f.poller.tick(t0);
+    await f.poller.whenIdle();
     expect(lastUpdate(f)).toMatchObject({
       status: AiVideoStatus.FAILED,
       errorCode: 'AI_VIDEO_DOWNLOAD_FAILED',
@@ -163,9 +251,11 @@ describe('AiVideoPoller durum esleme', () => {
     const ok = setup({ createdAt: new Date(t0 - 59 * 60_000) });
     ok.pika.getJob.mockResolvedValue({ status: 'running', billing: null });
     await ok.poller.tick(t0);
+    await ok.poller.whenIdle();
     expect(ok.pika.getJob).toHaveBeenCalled();
     const s = setup({ createdAt: new Date(t0 - 60 * 60_000 - 1) });
     await s.poller.tick(t0);
+    await s.poller.whenIdle();
     expect(s.recovery.maybeRecover).toHaveBeenCalledWith(t0);
     expect(lastUpdate(s)).toMatchObject({
       status: AiVideoStatus.FAILED,

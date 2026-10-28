@@ -40,6 +40,9 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
    */
   private readonly downloadFails = new Map<string, number>();
   private readonly downloadLastTry = new Map<string, number>();
+  /** C14e: arka planda indirilen satır kimlikleri (tur bu satırları atlar) ve bekleme için işler. */
+  private readonly inFlight = new Set<string>();
+  private readonly tasks = new Set<Promise<void>>();
   private readonly billingNextAt = new Map<string, number>();
 
   constructor(
@@ -92,6 +95,7 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
   private async processRow(row: AiVideoGeneration, now: number): Promise<void> {
     if (row.status === AiVideoStatus.COMPLETED) return this.recheckBilling(row, now);
 
+    if (this.inFlight.has(row.id)) return;
     const downloading = row.providerCompletedAt !== null;
     if (downloading) {
       if (now - row.providerCompletedAt!.getTime() > AI_DOWNLOAD_GIVEUP_MS) {
@@ -115,14 +119,40 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  /** Maliyet indirmeden bağımsız yazılır; indirme başarısızsa satır RUNNING + DOWNLOAD_PENDING kalır. */
-  private async complete(row: AiVideoGeneration, job: PikaJob, now: number): Promise<void> {
+  /**
+   * C14e: indirme turu bloklamaz; arka planda koşar, `inFlight` aynı satır için ikinci indirmeyi engeller.
+   * Maliyet indirmeden bağımsız yazılır; indirme başarısızsa satır RUNNING + DOWNLOAD_PENDING kalır.
+   */
+  private complete(row: AiVideoGeneration, job: PikaJob, now: number): void {
+    const task = this.downloadAndStore(row, job, now)
+      .catch((err: Error) => this.logger.warn(`indirme işi hatası: id=${row.id} ${err.message}`))
+      .finally(() => {
+        this.inFlight.delete(row.id);
+        this.tasks.delete(task);
+      });
+    this.inFlight.add(row.id);
+    this.tasks.add(task);
+  }
+
+  /** Arka plan işleri bitene dek bekler (yalnız test/kapatma yardımcısı). */
+  async whenIdle(): Promise<void> {
+    while (this.tasks.size > 0) await Promise.all([...this.tasks]);
+  }
+
+  private async downloadAndStore(row: AiVideoGeneration, job: PikaJob, now: number): Promise<void> {
     const cost = this.settledCost(job);
     const costData = cost !== null ? { costMicroUsd: cost } : {};
     const outputKey = `${AI_VIDEO_PREFIX}/${row.userId}/${row.id}.mp4`;
     try {
       if (!job.outputUrl) throw new Error('çıktı adresi yok');
-      const bytes = await this.pika.downloadVideo(job.outputUrl, AI_OUTPUT_MAX_BYTES);
+      const bytes = await this.pika.downloadVideo(
+        job.outputUrl,
+        AI_OUTPUT_MAX_BYTES,
+        undefined,
+        undefined,
+        row.id,
+      );
+      if (await this.isGone(row.id)) return this.forget(row.id);
       await this.storage.putPrivate(outputKey, bytes, 'video/mp4');
     } catch (err) {
       this.logger.warn(`çıktı indirilemedi: id=${row.id} ${(err as Error).message}`);
@@ -151,6 +181,15 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
       },
     });
     this.forget(row.id);
+  }
+
+  /** İndirme sürerken satır silindi mi (deletedAt dolu ya da satır yok)? */
+  private async isGone(id: string): Promise<boolean> {
+    const cur = await this.prisma.aiVideoGeneration.findUnique({
+      where: { id },
+      select: { deletedAt: true },
+    });
+    return cur === null || cur.deletedAt !== null;
   }
 
   /** Artan aralık (1, 2, 5, 10 dk ...): son deneme bellek içi; kayıt yoksa (yeniden başlatma) hemen. */
@@ -198,5 +237,6 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
   private forget(id: string): void {
     this.downloadFails.delete(id);
     this.downloadLastTry.delete(id);
+    this.pika.discardPartial(id);
   }
 }

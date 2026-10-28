@@ -40,7 +40,21 @@ interface RawJob {
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const DOWNLOAD_IDLE_MS = 30_000;
-const DOWNLOAD_TOTAL_MS = 30 * 60_000;
+const DOWNLOAD_TOTAL_MS = 60 * 60_000;
+/** C14e: deneme içinde art arda ilerlemesiz yeniden bağlanma üst sınırı. */
+const MAX_STALLED_RECONNECTS = 5;
+
+/** Tek denemenin mutlak süre sınırı: dolunca etkin bağlantı kesilir, yeniden bağlanılmaz. */
+interface Clock {
+  expired: boolean;
+  abort: (() => void) | null;
+}
+
+/** Kaldığı yerden indirme için kısmi tampon. */
+interface PartialDownload {
+  chunks: Buffer[];
+  size: number;
+}
 
 /**
  * Pika HTTP istemcisi (yalnız `fetch`). API anahtarı yalnız `X-API-Key` başlığında Pika sunucusuna gider;
@@ -48,6 +62,9 @@ const DOWNLOAD_TOTAL_MS = 30 * 60_000;
  */
 @Injectable()
 export class PikaClient {
+  /** C14e: süreç belleğinde, üretim kimliği anahtarlı kısmi indirmeler (üst sınır AI_OUTPUT_MAX_BYTES/iş). */
+  private readonly partials = new Map<string, PartialDownload>();
+
   constructor(private config: ConfigService) {}
 
   private get baseUrl(): string {
@@ -155,40 +172,106 @@ export class PikaClient {
 
   /**
    * Çıktı videosunu akışla indirir; `maxBytes` aşılırsa fırlatır. Anahtar GÖNDERİLMEZ.
-   * C14c: toplam süre değil BOŞTA kalma zaman aşımı (yavaş CDN ~28 KB/s verir): `idleMs` boyunca bayt
-   * gelmezse keser, her chunk sayacı sıfırlar; `totalMs` mutlak üst sınır.
+   * C14c: toplam süre değil BOŞTA kalma zaman aşımı (yavaş CDN ~28 KB/s verir).
+   * C14e: kopma/boşta kalmada `Range` ile kaldığı yerden sürer; `key` verilirse kısmi tampon denemeler arası
+   * (süreç belleğinde) kalır. Başarıda ya da `discardPartial` ile atılır. `totalMs` tek denemenin mutlak sınırı.
    */
   async downloadVideo(
     url: string,
     maxBytes: number,
     idleMs: number = DOWNLOAD_IDLE_MS,
     totalMs: number = DOWNLOAD_TOTAL_MS,
+    key?: string,
+  ): Promise<Buffer> {
+    const part = (key && this.partials.get(key)) || { chunks: [], size: 0 };
+    if (key) this.partials.set(key, part);
+    const clock: Clock = { expired: false, abort: null };
+    const total = setTimeout(() => {
+      clock.expired = true;
+      clock.abort?.();
+    }, totalMs);
+    let stalls = 0;
+    try {
+      for (;;) {
+        const before = part.size;
+        try {
+          const buf = await this.pull(url, part, maxBytes, idleMs, clock);
+          if (key) this.partials.delete(key);
+          return buf;
+        } catch (err) {
+          if (err instanceof PikaError) {
+            if (key && (err.httpStatus < 400 || err.httpStatus === 416)) this.partials.delete(key);
+            throw err;
+          }
+          stalls = part.size > before ? 0 : stalls + 1;
+          if (clock.expired || stalls >= MAX_STALLED_RECONNECTS) throw err;
+        }
+      }
+    } finally {
+      clearTimeout(total);
+    }
+  }
+
+  /** Anahtarlı kısmi indirme tamponunu atar (başarısızlık/silme yolu). */
+  discardPartial(key: string): void {
+    this.partials.delete(key);
+  }
+
+  /** Tek bağlantı: kısmi varsa `Range` ister, gelen baytları `part`a ekler. Kopmada düz hata fırlar. */
+  private async pull(
+    url: string,
+    part: PartialDownload,
+    maxBytes: number,
+    idleMs: number,
+    clock: Clock,
   ): Promise<Buffer> {
     const ctrl = new AbortController();
     let idle = setTimeout(() => ctrl.abort(), idleMs);
-    const total = setTimeout(() => ctrl.abort(), totalMs);
+    clock.abort = () => ctrl.abort();
     try {
-      const res = await fetch(url, { signal: ctrl.signal });
+      const headers = part.size > 0 ? { Range: `bytes=${part.size}-` } : undefined;
+      const res = await fetch(url, { signal: ctrl.signal, headers });
       if (!res.ok || !res.body) throw new PikaError(res.status, `Çıktı indirme ${res.status}`);
       const type = res.headers.get('content-type') ?? '';
       if (!type.startsWith('video/mp4') && !type.startsWith('application/octet-stream')) {
         throw new PikaError(res.status, `Beklenmeyen çıktı türü: ${type}`);
       }
-      const chunks: Buffer[] = [];
-      let seen = 0;
+      const expected = readExpectedTotal(res, part);
       for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
         clearTimeout(idle);
         idle = setTimeout(() => ctrl.abort(), idleMs);
-        seen += chunk.length;
-        if (seen > maxBytes) throw new PikaError(res.status, 'Çıktı çok büyük');
-        chunks.push(Buffer.from(chunk));
+        if (part.size + chunk.length > maxBytes) throw new PikaError(res.status, 'Çıktı çok büyük');
+        part.chunks.push(Buffer.from(chunk));
+        part.size += chunk.length;
       }
-      return Buffer.concat(chunks);
+      if (expected !== null && part.size > expected) {
+        throw new PikaError(res.status, 'Çıktı boyutu uyuşmuyor');
+      }
+      if (expected !== null && part.size < expected) throw new Error('Bağlantı erken kapandı');
+      return Buffer.concat(part.chunks);
     } finally {
       clearTimeout(idle);
-      clearTimeout(total);
+      clock.abort = null;
     }
   }
+}
+
+/**
+ * Beklenen toplam bayt: 206 → `content-range` toplamı (başlangıç tamponla örtüşmeli); 200 → baştan
+ * (tampon sıfırlanır) ve `content-length`. Bilinmiyorsa null.
+ */
+function readExpectedTotal(res: Response, part: PartialDownload): number | null {
+  if (res.status === 206) {
+    const m = /^bytes (\d+)-\d+\/(\d+)$/.exec(res.headers.get('content-range') ?? '');
+    if (m && Number(m[1]) !== part.size) {
+      throw new PikaError(res.status, 'Beklenmeyen aralık başlangıcı');
+    }
+    return m ? Number(m[2]) : null;
+  }
+  part.chunks = [];
+  part.size = 0;
+  const len = Number(res.headers.get('content-length'));
+  return Number.isFinite(len) && len > 0 ? len : null;
 }
 
 function toJob(json: unknown): PikaJob | null {
