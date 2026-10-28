@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue'
+import { ref, watch, nextTick, computed, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useMessagesStore } from '@/stores/messages'
 import { useDmStore } from '@/stores/dm'
@@ -21,10 +21,7 @@ import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.v
 import { ATTACHMENT_ACCEPT } from '@/utils/attachmentType'
 import { useComposerFileIntake } from '@/composables/useComposerFileIntake'
 import ReportModal from '@/components/shared/ReportModal.vue'
-import EmojiPicker from '@/components/shared/EmojiPicker.vue'
-import EmojiFaceIcon from '@/components/shared/EmojiFaceIcon.vue'
-import GifIcon from '@/components/shared/GifIcon.vue'
-import AiVideoButton from '@/components/shared/AiVideoButton.vue'
+import ComposerBar from '@/components/shared/ComposerBar.vue'
 import MessageRow from '@/components/shared/MessageRow.vue'
 import DateDivider from '@/components/shared/DateDivider.vue'
 import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
@@ -75,11 +72,9 @@ const showDeleteConfirm = ref(false)
 const deleteTargetId = ref<string | null>(null)
 const deleteLoading = ref(false)
 
-// Compose picker
-const showComposeEmojiPicker = ref(false)
-const dmTextareaEl = ref<HTMLTextAreaElement | null>(null)
-// Compose emoji picker tetikleyici butonu (Teleport konumlandırması için)
-const dmComposeEmojiTriggerEl = ref<HTMLElement | null>(null)
+// Giriş satırı bileşeni; textarea'ya ComposerBar'ın expose ettiği ref üzerinden erişilir
+const composerEl = ref<{ textarea: HTMLTextAreaElement | null } | null>(null)
+const dmTextareaEl = computed(() => composerEl.value?.textarea ?? null)
 
 async function pickDmEmoji(msg: MessageDto, emoji: string) {
   try {
@@ -614,14 +609,8 @@ const inputPlaceholder = computed(() => {
 const canMessage = computed(() => isGroup.value || (dmChannel.value?.canMessage ?? false))
 const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
 
-// Compose emoji picker
-function toggleComposeEmojiPicker(e: MouseEvent) {
-  e.stopPropagation()
-  showComposeEmojiPicker.value = !showComposeEmojiPicker.value
-}
-
+// Compose emoji picker (aç/kapa ComposerBar'da; imlece yerleştirme burada)
 function onDmComposeEmojiSelect(emoji: string) {
-  showComposeEmojiPicker.value = false
   const el = dmTextareaEl.value
   if (!el) {
     content.value += emoji
@@ -637,21 +626,7 @@ function onDmComposeEmojiSelect(emoji: string) {
   })
 }
 
-// Compose emoji picker dışı tıklamada kapat
-// Picker body'e Teleport edildiği için DOM'da .v3-emoji-picker sınıfından tanıyoruz.
-function onDmPickerDocClick(e: MouseEvent) {
-  if (dmComposeEmojiTriggerEl.value?.contains(e.target as Node)) return
-  const pickerInDom = (e.target as Element)?.closest?.('.v3-emoji-picker')
-  if (!pickerInDom) {
-    showComposeEmojiPicker.value = false
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('click', onDmPickerDocClick)
-})
 onUnmounted(() => {
-  document.removeEventListener('click', onDmPickerDocClick)
   voiceUnsubscribe(props.channel.id)
 })
 
@@ -1141,94 +1116,20 @@ const dayLabels = computed<(string | null)[]>(() =>
             </button>
           </div>
 
-          <div
-            class="flex items-center gap-2 px-4 border"
-            :class="replyingTo ? 'rounded-b-[var(--kv-radius-md)]' : 'rounded-[var(--kv-radius-md)]'"
-            style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); min-height: 44px;"
-          >
-            <button
-              type="button"
-              class="shrink-0 w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
-              style="color: var(--kv-text-secondary);"
-              :aria-label="t('attachment.addFile')"
-              :title="t('attachment.addFile')"
-              @mouseenter="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-primary)'"
-              @mouseleave="($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-secondary)'"
-              @click="openFilePicker"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-              </svg>
-            </button>
-            <!-- Sprint V2: mention autocomplete — relative sarmalayıcı popover için -->
-            <div class="relative flex-1 min-w-0">
-              <div
-                v-if="mention.showPopover.value"
-                class="absolute bottom-full left-0 mb-1 z-50 min-w-[200px] max-w-[320px] overflow-hidden rounded-[var(--kv-radius-md)] border"
-                style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
-                @mousedown.prevent
-              >
-                <div
-                  v-for="(member, idx) in mention.suggestions.value"
-                  :key="member.id"
-                  class="flex items-center gap-2 px-3 py-2 cursor-pointer text-[14px]"
-                  :style="idx === mention.activeIndex.value
-                    ? 'background-color: var(--kv-accent-subtle); color: var(--kv-text-primary);'
-                    : 'color: var(--kv-text-secondary);'"
-                  @click="mention.selectSuggestion(member)"
-                >
-                  <div
-                    class="w-6 h-6 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-semibold text-white"
-                    style="background-color: var(--kv-accent-500);"
-                  >
-                    <img v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.username" class="w-full h-full object-cover" />
-                    <span v-else>{{ member.username[0].toUpperCase() }}</span>
-                  </div>
-                  <span class="font-medium">@{{ member.username }}</span>
-                </div>
-              </div>
-              <textarea
-                ref="dmTextareaEl"
-                v-model="content"
-                rows="1"
-                :placeholder="inputPlaceholder"
-                class="w-full bg-transparent text-[15px] resize-none outline-none"
-                style="max-height: 50vh; font-family: var(--kv-font-ui); color: var(--kv-text-primary); line-height: 1.5; padding-top: 10px; padding-bottom: 10px;"
-                @keydown="onKeydown"
-                @input="onDmTextareaInput"
-                @blur="stopTyping"
-              />
-            </div>
-            <AiVideoButton @attachment="(id) => onAttachmentSent({ attachmentId: id, caption: '' })" />
-            <!-- GIF butonu -->
-            <button
-              type="button"
-              class="emoji-btn shrink-0 self-center py-1 px-1 cursor-pointer flex items-center"
-              :aria-label="t('message.gifButton')"
-              :title="t('message.gifButton')"
-              @click="openGifPicker"
-            >
-              <GifIcon :size="20" />
-            </button>
-            <!-- Emoji (😊) butonu -->
-            <div class="relative shrink-0 self-center">
-              <button
-                ref="dmComposeEmojiTriggerEl"
-                type="button"
-                class="emoji-btn py-1 px-1 cursor-pointer flex items-center"
-                :aria-label="t('message.emojiButton')"
-                @click.stop="toggleComposeEmojiPicker"
-              >
-                <EmojiFaceIcon :size="20" />
-              </button>
-              <!-- Teleport to body ile viewport-farkındalıklı konumlandırma -->
-              <EmojiPicker
-                v-if="showComposeEmojiPicker"
-                :anchor-el="dmComposeEmojiTriggerEl"
-                @select="onDmComposeEmojiSelect"
-              />
-            </div>
-          </div>
+          <ComposerBar
+            ref="composerEl"
+            v-model="content"
+            :placeholder="inputPlaceholder"
+            :mention="mention"
+            :rounded-bottom-only="!!replyingTo"
+            @keydown="onKeydown"
+            @input="onDmTextareaInput"
+            @blur="stopTyping"
+            @pick-file="openFilePicker"
+            @pick-gif="openGifPicker"
+            @emoji="onDmComposeEmojiSelect"
+            @ai-attachment="(id) => onAttachmentSent({ attachmentId: id, caption: '' })"
+          />
         </div>
       </div>
     </div>
