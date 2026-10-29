@@ -6,6 +6,7 @@ import { useDmStore } from '@/stores/dm'
 import { usePresenceStore } from '@/stores/presence'
 import { useActivityStore } from '@/stores/activity'
 import { hoverAvatarSrc } from '@/utils/animatedMedia'
+import MarqueeText from '@/components/shared/MarqueeText.vue'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 
@@ -171,14 +172,14 @@ async function runConfirm() {
               </div>
 
               <!-- Ad + durum -->
-              <div class="flex-1 min-w-0 cursor-pointer" @click="openDm(f.user.id)">
+              <div class="flex-1 min-w-0 cursor-pointer group-hover:pr-16" @click="openDm(f.user.id)">
                 <p class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</p>
-                <p class="text-[11px]" :style="{ color: presenceStatusColor(f.user.id) }">{{ presenceStatusLabel(f.user.id) }}</p>
+                <MarqueeText class="text-[11px]" :style="{ color: presenceStatusColor(f.user.id) }" :text="presenceStatusLabel(f.user.id)" />
               </div>
 
               <!-- Hover aksiyonlar -->
               <div
-                class="flex items-center gap-1 shrink-0 transition-opacity"
+                class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full transition-opacity"
                 :class="openMenuId === f.friendshipId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
               >
                 <button
@@ -264,14 +265,14 @@ async function runConfirm() {
               </div>
 
               <!-- Ad + durum -->
-              <div class="flex-1 min-w-0 cursor-pointer" @click="openDm(f.user.id)">
+              <div class="flex-1 min-w-0 cursor-pointer group-hover:pr-16" @click="openDm(f.user.id)">
                 <p class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</p>
-                <p class="text-[11px]" style="color: var(--kv-text-muted);">{{ presenceStatusLabel(f.user.id) }}</p>
+                <MarqueeText class="text-[11px]" style="color: var(--kv-text-muted);" :text="presenceStatusLabel(f.user.id)" />
               </div>
 
               <!-- Hover aksiyonlar -->
               <div
-                class="flex items-center gap-1 shrink-0 transition-opacity"
+                class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full transition-opacity"
                 :class="openMenuId === f.friendshipId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
               >
                 <button

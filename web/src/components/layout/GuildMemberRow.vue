@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MarqueeText from '@/components/shared/MarqueeText.vue'
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
@@ -168,13 +169,12 @@ function onRowLeave(e: MouseEvent) {
       >
         {{ member.username }}<span v-if="member.roleEmoji" class="ml-1">{{ member.roleEmoji }}</span>
       </span>
-      <span
+      <MarqueeText
         v-if="props.gameName && !props.isOffline"
-        class="block text-[11px] truncate leading-tight"
+        class="text-[11px] leading-tight"
         style="color: var(--kv-text-muted);"
-      >
-        {{ t('activity.playing', { game: props.gameName }) }}
-      </span>
+        :text="t('activity.playing', { game: props.gameName })"
+      />
     </div>
 
     <!-- Taç: sahip -->

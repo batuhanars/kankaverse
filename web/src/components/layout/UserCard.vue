@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
 import { useActivityStore } from '@/stores/activity'
 import { useVoiceStore } from '@/stores/voice'
+import MarqueeText from '@/components/shared/MarqueeText.vue'
 import VoiceConnectedBar from '@/components/layout/VoiceConnectedBar.vue'
 import { useSocket } from '@/composables/useSocket'
 import { useAudioDevices } from '@/composables/useAudioDevices'
@@ -86,7 +87,7 @@ function onLogout() {
 </script>
 
 <template>
-  <div ref="cardRef" class="relative z-10 p-0 md:px-2 md:pb-4 md:pt-4 shrink-0">
+  <div ref="cardRef" class="relative z-10 p-0 md:px-2 md:pb-4 md:pt-4 shrink-0 w-0 min-w-full">
 
     <!-- Upward popover -->
     <div
@@ -215,13 +216,13 @@ function onLogout() {
           <span class="text-[14px] font-semibold truncate leading-[1.3]" style="color: var(--kv-text-primary);">
             {{ authStore.user?.username }}
           </span>
-          <span class="text-[12px] truncate leading-[1.2]" :style="`color: ${presenceColor(currentPresence)};`">
-            {{
-              activityStore.myGame() && currentPresence !== 'offline'
-                ? t('activity.playing', { game: activityStore.myGame()?.name })
-                : t(`presence.${currentPresence}`)
-            }}
-          </span>
+          <MarqueeText
+            class="text-[12px] leading-[1.2]"
+            :style="`color: ${presenceColor(currentPresence)};`"
+            :text="activityStore.myGame() && currentPresence !== 'offline'
+              ? t('activity.playing', { game: activityStore.myGame()?.name })
+              : t(`presence.${currentPresence}`)"
+          />
         </div>
       </button>
 

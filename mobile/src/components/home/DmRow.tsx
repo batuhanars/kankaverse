@@ -17,8 +17,6 @@ interface Props {
   /** Son mesaj önizlemesi; "yazıyor" varsa o ezer. */
   preview: string;
   typing: boolean;
-  /** C31b: 1-1 DM'de karşı taraf oyun oynuyorsa adı; "yazıyor"dan sonra, son mesajdan önce gelir. */
-  gameName?: string | null;
   unread: boolean;
   /** Sözleşme M4b §13.2 — ses göstergesi için. Yalnız grup DM'de anlamlı; abonelik (mount/unmount)
    *  `DmSidebar`in işi, burası yalnız store'dan OKUR (ChannelRow'un M4c §6 deseniyle aynı ayrım). */
@@ -33,7 +31,6 @@ export function DmRow({
   avatarUrl,
   preview,
   typing,
-  gameName,
   unread,
   channelId,
   isGroup,
@@ -64,10 +61,6 @@ export function DmRow({
         {typing ? (
           <Text style={styles.typing} numberOfLines={1}>
             {t('typing.simple')}
-          </Text>
-        ) : gameName ? (
-          <Text style={styles.playing} numberOfLines={1}>
-            {t('activity.playing', { game: gameName })}
           </Text>
         ) : preview ? (
           <Text style={styles.preview} numberOfLines={1}>
@@ -125,11 +118,6 @@ const styles = StyleSheet.create({
   },
   preview: {
     color: theme.colors.textMuted,
-    fontSize: theme.fontSize.xs,
-    marginTop: 1,
-  },
-  playing: {
-    color: theme.colors.success,
     fontSize: theme.fontSize.xs,
     marginTop: 1,
   },
