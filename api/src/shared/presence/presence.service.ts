@@ -23,8 +23,9 @@ interface PresenceEntry {
    * C31b §2.3 — connectionId → o bağlantının bildirdiği `Game.id`. Hesabın etkin oyunu EN SON set
    * edilen bağlantınınki (set'te önce silinip sonra yazılır, Map ekleme sırası = güncellik sırası).
    * Bağlantı düşünce kaydı silinir. Şema yok (presence ile aynı ilke).
+   * C31e: `startedAt` (epoch ms) oyun DEĞİŞİNCE yenilenir, aynı oyun tekrar set edilince korunur.
    */
-  games: Map<string, string>;
+  games: Map<string, { gameId: string; startedAt: number }>;
 }
 
 /**
@@ -163,8 +164,12 @@ export class PresenceService {
   setGame(userId: string, connectionId: string, gameId: string | null): boolean {
     const entry = this.state.get(userId);
     if (!entry || !entry.connections.has(connectionId)) return false;
+    const previous = entry.games.get(connectionId);
     entry.games.delete(connectionId);
-    if (gameId) entry.games.set(connectionId, gameId);
+    if (gameId) {
+      const startedAt = previous?.gameId === gameId ? previous.startedAt : Date.now();
+      entry.games.set(connectionId, { gameId, startedAt });
+    }
     return true;
   }
 
@@ -178,10 +183,15 @@ export class PresenceService {
    * (§2.5: rahatsız etmeyin diyen oyununu da yaymaz).
    */
   activeGameId(userId: string): string | null {
+    return this.activeGame(userId)?.gameId ?? null;
+  }
+
+  /** C31e: etkin oyunun kimliği + başlangıç zamanı (epoch ms). */
+  private activeGame(userId: string): { gameId: string; startedAt: number } | null {
     const entry = this.state.get(userId);
     if (!entry || this.effective(entry) === 'dnd') return null;
-    let latest: string | null = null;
-    for (const gameId of entry.games.values()) latest = gameId;
+    let latest: { gameId: string; startedAt: number } | null = null;
+    for (const game of entry.games.values()) latest = game;
     return latest;
   }
 
@@ -341,12 +351,13 @@ export class PresenceService {
   }
 
   /** Şu an yayılabilir oyun: dnd/çevrimdışı/ayar kapalı/gizli oyun → null. */
-  async currentGameFor(userId: string): Promise<ResolvedGame | null> {
-    const gameId = this.activeGameId(userId);
-    if (!gameId) return null;
+  async currentGameFor(userId: string): Promise<(ResolvedGame & { startedAt: string }) | null> {
+    const active = this.activeGame(userId);
+    if (!active) return null;
     const gate = await this.activityGate(userId);
     if (!gate || !gate.enabled) return null;
-    return this.games.visibleById(gameId);
+    const game = await this.games.visibleById(active.gameId);
+    return game ? { ...game, startedAt: new Date(active.startedAt).toISOString() } : null;
   }
 
   /**
@@ -440,6 +451,8 @@ export class PresenceService {
       gameId?: string;
       gameName?: string;
       gameIconUrl?: string | null;
+      gameStartedAt?: string;
+      gameStoreUrl?: string | null;
     }>
   > {
     const candidateSet = await this.candidatePool(viewerId);
@@ -459,14 +472,18 @@ export class PresenceService {
           gameId?: string;
           gameName?: string;
           gameIconUrl?: string | null;
+          gameStartedAt?: string;
+          gameStoreUrl?: string | null;
         } = { userId: candidateId, status: candidateStatus };
-        const gameId = this.activeGameId(candidateId);
-        if (gameId && (await this.activityConditions(viewerId, candidateId))) {
-          const game = await this.games.visibleById(gameId);
+        const active = this.activeGame(candidateId);
+        if (active && (await this.activityConditions(viewerId, candidateId))) {
+          const game = await this.games.visibleById(active.gameId);
           if (game) {
             state.gameId = game.id;
             state.gameName = game.name;
             state.gameIconUrl = game.iconUrl;
+            state.gameStartedAt = new Date(active.startedAt).toISOString();
+            state.gameStoreUrl = game.storeUrl;
           }
         }
         return state;

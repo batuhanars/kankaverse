@@ -1,5 +1,5 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { canUseAiVideo } from './ai-video-access';
+import { canPreviewAiVideo, canUseAiVideo } from './ai-video-access';
 import { AiVideoAccessGuard } from './ai-video-access.guard';
 
 function cfg(over: Record<string, unknown> = {}) {
@@ -29,6 +29,32 @@ describe('canUseAiVideo (R7 kapisi)', () => {
   });
   it('minor: listede olsa bile red', () => {
     expect(canUseAiVideo(cfg(), { id: 'u1', isMinor: true })).toBe(false);
+  });
+});
+
+describe('canPreviewAiVideo (C33 pasif tanitim)', () => {
+  it('minor: false (listede olsa bile)', () => {
+    expect(canPreviewAiVideo(cfg(), { isMinor: true })).toBe(false);
+  });
+  it('bayrak kapali: false', () => {
+    expect(canPreviewAiVideo(cfg({ 'aiVideo.enabled': false }), { isMinor: false })).toBe(false);
+  });
+  it('yetiskin listede degil: preview true, allowed false', () => {
+    const c = cfg({ 'aiVideo.userIds': ['x'] });
+    const adult = { id: 'u9', isMinor: false };
+    expect(canPreviewAiVideo(c, adult)).toBe(true);
+    expect(canUseAiVideo(c, adult)).toBe(false);
+  });
+  it('yetiskin listede: ikisi de true', () => {
+    expect(canPreviewAiVideo(cfg(), ADULT)).toBe(true);
+    expect(canUseAiVideo(cfg(), ADULT)).toBe(true);
+  });
+  it('guard davranisi degismedi: listede olmayan yetiskin preview gorse de 403', async () => {
+    const g = new AiVideoAccessGuard(cfg({ 'aiVideo.userIds': ['x'] }), {
+      user: { findUnique: jest.fn().mockResolvedValue({ id: 'u9', isMinor: false }) },
+    } as any);
+    const ctx = { switchToHttp: () => ({ getRequest: () => ({ user: { id: 'u9' } }) }) } as any;
+    await expect(g.canActivate(ctx)).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
 

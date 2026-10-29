@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * AiVideoButton (Sprint C14 §3.2-1): mesaj kutusunun "Yapay zeka ile üret" girişi (kanal + DM ortak).
- * Yalnız `aiVideoAllowed === true` iken render olur (kilitli iskele yok). C14b: "Kaydet ve gönder" bekleyen ek
+ * `aiVideoAllowed` ya da `aiVideoPreview` (C33 pasif tanıtım) iken render olur; minörde ikisi de false. C14b: "Kaydet ve gönder" bekleyen ek
  * üretir; `attachment` ile kimliği çıkar, çağıran MEVCUT mesaj gönderme yoluna (onAttachmentSent) verir.
  */
 import { computed, ref } from 'vue'
@@ -12,7 +12,10 @@ import AiVideoDialog from '@/components/shared/AiVideoDialog.vue'
 const emit = defineEmits<{ attachment: [attachmentId: string] }>()
 const { t } = useI18n()
 const authStore = useAuthStore()
-const allowed = computed(() => authStore.user?.aiVideoAllowed === true)
+// C33: izinli ya da pasif tanıtım (reşit + bayrak açık). Kilitliyken pencere açılır ama hiç istek atılmaz.
+const allowed = computed(
+  () => authStore.user?.aiVideoAllowed === true || authStore.user?.aiVideoPreview === true,
+)
 const open = ref(false)
 
 function onSend(attachmentId: string) {

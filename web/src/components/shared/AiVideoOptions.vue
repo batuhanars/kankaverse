@@ -40,7 +40,7 @@ const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:
 
 <template>
   <div class="flex flex-wrap items-end gap-x-4 gap-y-3 min-w-0">
-    <div class="min-w-0 w-full">
+    <div v-if="models.length" class="min-w-0 w-full">
       <label v-if="props.models.length !== 1" class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);" for="ai-video-model">
         {{ t('aiVideo.modelLabel') }}
       </label>

@@ -8,6 +8,10 @@ export interface GameActivity {
   name: string
   /** C31c: sunucunun kendi depoladığı oyun logosu; yoksa null (genel oyun kolu simgesi). */
   iconUrl: string | null
+  /** C31e: oyunun başladığı an (ISO); canlı geçen süre buradan hesaplanır. */
+  startedAt: string | null
+  /** C31e: yalnız Steam oyunlarında mağaza sayfası, diğerlerinde null. */
+  storeUrl: string | null
 }
 
 /**
@@ -25,22 +29,43 @@ export const useActivityStore = defineStore('activity', () => {
       gameId?: string
       gameName?: string
       gameIconUrl?: string | null
+      gameStartedAt?: string
+      gameStoreUrl?: string | null
     }>,
   ) {
     for (const key of Object.keys(byUser)) delete byUser[key]
     for (const s of states) {
       if (s.gameId && s.gameName) {
-        byUser[s.userId] = { gameId: s.gameId, name: s.gameName, iconUrl: s.gameIconUrl ?? null }
+        byUser[s.userId] = {
+          gameId: s.gameId,
+          name: s.gameName,
+          iconUrl: s.gameIconUrl ?? null,
+          startedAt: s.gameStartedAt ?? null,
+          storeUrl: s.gameStoreUrl ?? null,
+        }
       }
     }
   }
 
   function applyUpdate(
     userId: string,
-    game: { id: string; name: string; iconUrl?: string | null } | null,
+    game: {
+      id: string
+      name: string
+      iconUrl?: string | null
+      startedAt?: string
+      storeUrl?: string | null
+    } | null,
   ) {
-    if (game) byUser[userId] = { gameId: game.id, name: game.name, iconUrl: game.iconUrl ?? null }
-    else delete byUser[userId]
+    if (game) {
+      byUser[userId] = {
+        gameId: game.id,
+        name: game.name,
+        iconUrl: game.iconUrl ?? null,
+        startedAt: game.startedAt ?? null,
+        storeUrl: game.storeUrl ?? null,
+      }
+    } else delete byUser[userId]
   }
 
   function getGame(userId: string): GameActivity | null {

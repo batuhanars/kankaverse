@@ -46,7 +46,7 @@ import {
 } from './utils/auth-token.util';
 import { validateBirthDate, calculateIsMinor } from './utils/birthdate.util';
 import { toUserDto } from './utils/user-dto.util';
-import { canUseAiVideo } from '../ai-video/ai-video-access';
+import { canPreviewAiVideo, canUseAiVideo } from '../ai-video/ai-video-access';
 import { encryptSecret, decryptSecret } from '../../common/utils/crypto.util';
 import { generateFriendCode } from './utils/friend-code.util';
 
@@ -90,6 +90,7 @@ export class AuthService implements OnModuleInit {
       user,
       this.animatedMedia.canCreateAnimated(user),
       canUseAiVideo(this.config, user),
+      canPreviewAiVideo(this.config, user),
     );
   }
 

@@ -4,7 +4,7 @@ import { DmPolicy, User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { toUserDto } from '../auth/utils/user-dto.util';
-import { canUseAiVideo } from '../ai-video/ai-video-access';
+import { canPreviewAiVideo, canUseAiVideo } from '../ai-video/ai-video-access';
 import { ImageUploadService, PresignResult } from '../../shared/media/image-upload.service';
 import { AnimatedMediaService } from '../../shared/media/animated-media.service';
 import { PresignAnimatedDto, ProcessAnimatedDto } from '../../shared/media/dto/animated.dto';
@@ -86,6 +86,7 @@ export class UsersService {
       user,
       this.animatedMedia.canCreateAnimated(user),
       canUseAiVideo(this.config, user),
+      canPreviewAiVideo(this.config, user),
     );
   }
 

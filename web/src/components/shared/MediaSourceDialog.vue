@@ -16,7 +16,11 @@ defineProps<{ open: boolean; title: string; animatedAllowed: boolean }>()
 const emit = defineEmits<{ close: []; file: [file: File] }>()
 
 const { t } = useI18n()
-const aiVideoAllowed = computed(() => useAuthStore().user?.aiVideoAllowed === true) // C14: yoksa seçenek HİÇ görünmez
+// C14/C33: izinli ya da pasif tanıtım (aiVideoPreview); ikisi de yoksa (minör, bayrak kapalı) seçenek HİÇ görünmez
+const aiVideoAllowed = computed(() => {
+  const u = useAuthStore().user
+  return u?.aiVideoAllowed === true || u?.aiVideoPreview === true
+})
 const aiOpen = ref(false)
 const staticInput = ref<HTMLInputElement | null>(null)
 const animatedInput = ref<HTMLInputElement | null>(null)

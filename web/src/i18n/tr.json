@@ -360,6 +360,12 @@
         "PROCESSING_BUSY": "Sunucu şu an yoğun. Biraz sonra tekrar dene."
       }
     },
+    "activity": {
+      "tab": "Etkinlik",
+      "current": "Mevcut Etkinlik",
+      "playing": "Oynuyor",
+      "viewOnSteam": "Steam'de gör"
+    },
     "bio": "Biyografi",
     "noBio": "Henüz bir şey yazmamış.",
     "memberSince": "Üyelik tarihi",
@@ -1502,7 +1508,8 @@
   "aiVideo": {
     "title": "Yapay zeka ile video üret",
     "button": "Yapay zeka ile üret",
-    "amount": "{amount} $",
+    "credits": "{amount} kredi",
+    "lockedNote": "Yapay zeka ile video yakında herkese açılacak.",
     "promptLabel": "Ne üretilsin?",
     "promptPlaceholder": "Örnek: Yağmurlu bir gecede neon ışıklı sokakta yürüyen kedi",
     "imageAdd": "Görsel ekle",
@@ -1525,8 +1532,8 @@
     },
     "estimate": "Tahmini maliyet ({sec} sn)",
     "estimateFailed": "Teklif alınamadı",
-    "spentLine": "Bugün {spent} / {cap}",
-    "overCap": "Bu üretim günlük tavanı aşar.",
+    "spentLine": "Bugün {spent} / {cap} kredi",
+    "overCap": "Bu üretim günlük kredi sınırını aşar.",
     "generate": "Oluştur",
     "waitNote": "Birkaç dakika sürebilir. Pencereyi kapatabilirsin, sonuç Son üretimler'de kalır.",
     "save": "Kaydet",
@@ -1558,7 +1565,7 @@
       "download": "Video indirilemedi. Tekrar dene.",
       "imageType": "Yalnızca PNG, JPEG veya WebP görsel kullanılabilir.",
       "imageSize": "Görsel en fazla 10 MB olabilir.",
-      "AI_VIDEO_DAILY_CAP": "Bugünkü harcama tavanına ulaşıldı.",
+      "AI_VIDEO_DAILY_CAP": "Bugünkü yapay zeka video kredi sınırına ulaşıldı.",
       "AI_VIDEO_INVALID_OPTION": "Seçilen model, süre veya çözünürlük geçerli değil.",
       "AI_VIDEO_NOT_READY": "Video henüz hazır değil.",
       "UPLOADS_DISABLED": "Dosya yükleme şu an kapalı.",

@@ -1,18 +1,20 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
-import { formatUsd } from './formatUsd';
+import { formatCreditNumber, formatCredits } from './formatCredits';
 
 interface Props {
   durationS: number;
-  estimateUsd: number | null;
+  estimateCredits: number | null;
   estimating: boolean;
   estimateFailed: boolean;
   overCap: boolean;
-  todaySpentUsd: number;
-  dailyCapUsd: number;
+  spentTodayCredits: number;
+  dailyCapCredits: number;
   canSubmit: boolean;
   busy: boolean;
+  /** C33: pasif tanıtım; Oluştur kapalı + "yakında" notu, tahmin satırı yok. */
+  locked?: boolean;
   onSubmit: () => void;
 }
 
@@ -21,20 +23,25 @@ interface Props {
  * tavanı aşacaksa düğme kapalı + neden yazılı. Sunucu yine otorite.
  */
 export function AiVideoCostBar(p: Props) {
-  const disabled = !p.canSubmit || p.estimating || p.estimateUsd === null || p.overCap || p.busy;
+  const disabled =
+    !!p.locked || !p.canSubmit || p.estimating || p.estimateCredits === null || p.overCap || p.busy;
   return (
     <View style={styles.bar}>
       <View style={styles.row}>
-        <View style={styles.info}>
-          <Text style={styles.label}>{t('aiVideo.estimate', { sec: p.durationS })}</Text>
-          {p.estimateUsd !== null ? (
-            <Text style={[styles.amount, p.estimating && styles.dim]}>{formatUsd(p.estimateUsd)}</Text>
-          ) : p.estimateFailed ? (
-            <Text style={styles.failed}>{t('aiVideo.estimateFailed')}</Text>
-          ) : (
-            <Text style={styles.amount}>...</Text>
-          )}
-        </View>
+        {p.locked ? (
+          <View style={styles.info} />
+        ) : (
+          <View style={styles.info}>
+            <Text style={styles.label}>{t('aiVideo.estimate', { sec: p.durationS })}</Text>
+            {p.estimateCredits !== null ? (
+              <Text style={[styles.amount, p.estimating && styles.dim]}>{formatCredits(p.estimateCredits)}</Text>
+            ) : p.estimateFailed ? (
+              <Text style={styles.failed}>{t('aiVideo.estimateFailed')}</Text>
+            ) : (
+              <Text style={styles.amount}>...</Text>
+            )}
+          </View>
+        )}
         <Pressable
           onPress={p.onSubmit}
           disabled={disabled}
@@ -50,8 +57,12 @@ export function AiVideoCostBar(p: Props) {
         </Pressable>
       </View>
       <Text style={styles.spent}>
-        {t('aiVideo.spentLine', { spent: formatUsd(p.todaySpentUsd), cap: formatUsd(p.dailyCapUsd) })}
+        {t('aiVideo.spentLine', {
+          spent: formatCreditNumber(p.spentTodayCredits),
+          cap: formatCreditNumber(p.dailyCapCredits),
+        })}
       </Text>
+      {p.locked ? <Text style={styles.lockedNote}>{t('aiVideo.lockedNote')}</Text> : null}
       {p.overCap ? <Text style={styles.failed}>{t('aiVideo.overCap')}</Text> : null}
     </View>
   );
@@ -66,6 +77,7 @@ const styles = StyleSheet.create({
   dim: { opacity: 0.4 },
   failed: { color: theme.colors.danger, fontSize: theme.fontSize.sm },
   spent: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs },
+  lockedNote: { color: theme.colors.textSecondary, fontSize: theme.fontSize.sm },
   button: {
     minWidth: 110,
     minHeight: theme.layout.inputMinHeight,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo';
+import { useAuthStore } from '@/stores/auth';
 import { t } from '@/i18n';
 import { aiVideoErrorText, aiVideoFailText, DOWNLOAD_PENDING } from './aiVideoErrors';
 import { useAiVideoForm } from './useAiVideoForm';
@@ -21,7 +22,9 @@ export function useAiVideo() {
   const [error, setError] = useState('');
   const [now, setNow] = useState(Date.now());
   const imageState = useAiVideoImage(setError);
-  const form = useAiVideoForm(!!imageState.image);
+  // C33: pasif tanıtım. Kilitliyken (izin listesi dışı) hiçbir yapay zeka ucuna istek atılmaz.
+  const locked = useAuthStore((s) => s.user?.aiVideoAllowed !== true);
+  const form = useAiVideoForm(!!imageState.image, locked);
   const jobRef = useRef<AiVideoDto | null>(null);
   const alive = useRef(true);
 
@@ -30,13 +33,14 @@ export function useAiVideo() {
   const elapsedSec = job ? Math.max(0, Math.floor((now - new Date(job.createdAt).getTime()) / 1000)) : 0;
 
   const refreshRecent = useCallback(async () => {
+    if (locked) return;
     try {
       const rows = await aiVideoApi.list();
       if (alive.current) setRecent(rows);
     } catch {
       /* son üretimler yardımcı bölüm; hata sessiz */
     }
-  }, []);
+  }, [locked]);
 
   const poll = useCallback(async () => {
     const cur = jobRef.current;
@@ -79,6 +83,7 @@ export function useAiVideo() {
   }
 
   async function submit() {
+    if (locked) return;
     setError('');
     setBusy(true);
     try {
@@ -141,6 +146,7 @@ export function useAiVideo() {
   }
 
   return {
+    locked,
     prompt,
     setPrompt,
     image: imageState,

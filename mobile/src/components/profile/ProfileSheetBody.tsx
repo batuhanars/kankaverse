@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import type { UserCardDto } from '@/api/users';
 import { ProfileHeader } from '../me/ProfileHeader';
-import { useActivityStore, selectGameName } from '@/stores/activity';
+import { useActivityStore, selectGame } from '@/stores/activity';
+import { ProfileGameCard } from './ProfileGameCard';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -44,7 +45,7 @@ export function ProfileSheetBody({ username, avatarUrl, card, identityFooter }: 
   const mutualGuilds = card?.mutualGuilds ?? [];
   const mutualFriends = card?.mutualFriends ?? [];
   const roles = card?.roles ?? [];
-  const gameName = useActivityStore(selectGameName(card?.id));
+  const game = useActivityStore(selectGame(card?.id));
 
   return (
     <View>
@@ -58,9 +59,9 @@ export function ProfileSheetBody({ username, avatarUrl, card, identityFooter }: 
       />
 
       {/* C31b: oynadığı oyun. Kullanıcı çevrimdışıysa sunucu zaten null yayar; görünürlük kararı sunucuda. */}
-      {gameName ? (
+      {game ? (
         <View style={styles.section}>
-          <Text style={styles.value}>{t('activity.playing', { game: gameName })}</Text>
+          <ProfileGameCard game={game} />
         </View>
       ) : null}
 

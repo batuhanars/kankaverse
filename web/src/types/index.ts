@@ -53,6 +53,7 @@ export interface UserDto {
   twoFactorEnabled: boolean // Sprint 2B
   friendCode: string // Sprint 3
   animatedAllowed?: boolean // Sprint C22 — hareketli (GIF/video) yükleme kapısı; sunucu yine otorite
+  aiVideoPreview?: boolean // Sprint C33 — pasif tanıtım (reşit + bayrak açık): düğme görünür, pencere kilitli, istek atılmaz
   aiVideoAllowed?: boolean // Sprint C14 — yapay zeka video üretimi kapısı (yalnız açık liste); sunucu yine otorite
   isModerator?: boolean // Sprint 4B — backend toUserDto'da eklenmesi gerekir
   bio: string | null // Sprint C5 — profil metni

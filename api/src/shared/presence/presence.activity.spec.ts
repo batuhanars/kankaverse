@@ -70,7 +70,14 @@ const realtimeMock = { emitToUser: jest.fn() };
 const gamesMock = {
   visibleById: jest.fn((id: string) =>
     Promise.resolve(
-      id === 'hidden-game' ? null : { id, name: `Oyun ${id}`, iconUrl: `https://cdn/${id}.webp` },
+      id === 'hidden-game'
+        ? null
+        : {
+            id,
+            name: `Oyun ${id}`,
+            iconUrl: `https://cdn/${id}.webp`,
+            storeUrl: id === 'g-steam' ? 'https://store.steampowered.com/app/10' : null,
+          },
     ),
   ),
 };
@@ -132,6 +139,32 @@ describe('PresenceService — oyun etkinliği (C31b)', () => {
       expect(service.activeGameId('adult')).toBeNull();
       service.setStatus('adult', 'online', { connectionId: 'c1' });
       expect(service.activeGameId('adult')).toBe('g-a');
+    });
+
+    describe('startedAt (C31e)', () => {
+      afterEach(() => jest.useRealTimers());
+
+      it('oyun değişince yenilenir, aynı oyun tekrar set edilince korunur', async () => {
+        jest.useFakeTimers().setSystemTime(new Date('2026-10-29T10:00:00.000Z'));
+        service.connect('adult', 'c1');
+        service.setGame('adult', 'c1', 'g-a');
+        jest.setSystemTime(new Date('2026-10-29T10:05:00.000Z'));
+        service.setGame('adult', 'c1', 'g-a');
+        expect((await service.currentGameFor('adult'))?.startedAt).toBe('2026-10-29T10:00:00.000Z');
+        jest.setSystemTime(new Date('2026-10-29T10:10:00.000Z'));
+        service.setGame('adult', 'c1', 'g-b');
+        expect((await service.currentGameFor('adult'))?.startedAt).toBe('2026-10-29T10:10:00.000Z');
+      });
+
+      it('storeUrl oyun nesnesiyle taşınır (Steam dolu, diğeri null)', async () => {
+        service.connect('adult', 'c1');
+        service.setGame('adult', 'c1', 'g-steam');
+        expect((await service.currentGameFor('adult'))?.storeUrl).toBe(
+          'https://store.steampowered.com/app/10',
+        );
+        service.setGame('adult', 'c1', 'g-a');
+        expect((await service.currentGameFor('adult'))?.storeUrl).toBeNull();
+      });
     });
 
     it('clearGames bütün bağlantıların oyununu siler', () => {
@@ -215,7 +248,13 @@ describe('PresenceService — oyun etkinliği (C31b)', () => {
         'activity:update',
         {
           userId: 'adult',
-          game: { id: 'g-a', name: 'Oyun g-a', iconUrl: 'https://cdn/g-a.webp' },
+          game: {
+            id: 'g-a',
+            name: 'Oyun g-a',
+            iconUrl: 'https://cdn/g-a.webp',
+            storeUrl: null,
+            startedAt: expect.any(String),
+          },
         },
       ]);
       expect(sent.map((s) => s[0])).toContain('adult');
@@ -258,6 +297,8 @@ describe('PresenceService — oyun etkinliği (C31b)', () => {
           gameId: 'g-a',
           gameName: 'Oyun g-a',
           gameIconUrl: 'https://cdn/g-a.webp',
+          gameStartedAt: expect.any(String),
+          gameStoreUrl: null,
         },
       ]);
       users['adult'].showGameActivity = false;

@@ -285,6 +285,8 @@ export function useSocket() {
           gameId?: string
           gameName?: string
           gameIconUrl?: string | null
+          gameStartedAt?: string
+          gameStoreUrl?: string | null
         }>
       }) => {
         presenceStore.applySnapshot(payload.states)
@@ -297,7 +299,13 @@ export function useSocket() {
       'activity:update',
       (payload: {
         userId: string
-        game: { id: string; name: string; iconUrl?: string | null } | null
+        game: {
+          id: string
+          name: string
+          iconUrl?: string | null
+          startedAt?: string
+          storeUrl?: string | null
+        } | null
       }) => {
         activityStore.applyUpdate(payload.userId, payload.game)
       },

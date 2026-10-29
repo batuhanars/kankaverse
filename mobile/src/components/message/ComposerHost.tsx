@@ -42,8 +42,10 @@ export function ComposerHost({
 }: Props) {
   const [attachOpen, setAttachOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
-  // C14d — kapı yalnız arayüz; sunucu otorite. Açık listede değilse giriş hiç görünmez.
-  const aiVideoAllowed = useAuthStore((s) => s.user?.aiVideoAllowed === true);
+  // C14d/C33 — kapı yalnız arayüz; sunucu otorite. İzinli ya da pasif tanıtım (aiVideoPreview); ikisi de yoksa giriş hiç görünmez.
+  const aiVideoAllowed = useAuthStore(
+    (s) => s.user?.aiVideoAllowed === true || s.user?.aiVideoPreview === true,
+  );
   // `handleChangeText` fonksiyon bildirimi olduğu için burada kullanılabilir (hoisting); tersi
   // sırada yazılamazdı, çünkü o da `emoji`ye ihtiyaç duyuyor.
   const emoji = useEmojiInsert(composer.input, handleChangeText);

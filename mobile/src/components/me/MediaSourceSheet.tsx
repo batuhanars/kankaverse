@@ -28,8 +28,9 @@ interface Props {
 export function MediaSourceSheet({ visible, title, animatedAllowed, canRemove, onClose, onPick, onRemove, onAiVideo }: Props) {
   const bottomInset = useSheetInsets();
   const [aiOpen, setAiOpen] = useState(false);
-  // C14d: kapı yalnız arayüz; sunucu otorite. Açık listede değilse seçenek hiç görünmez.
-  const aiAllowed = useAuthStore((s) => s.user?.aiVideoAllowed === true) && !!onAiVideo;
+  // C14d/C33: kapı yalnız arayüz; sunucu otorite. İzinli ya da pasif tanıtım (aiVideoPreview); ikisi de yoksa seçenek hiç görünmez.
+  const aiAllowed =
+    useAuthStore((s) => s.user?.aiVideoAllowed === true || s.user?.aiVideoPreview === true) && !!onAiVideo;
   return (
     <>
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>

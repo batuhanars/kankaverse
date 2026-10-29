@@ -21,6 +21,8 @@ import {
   mapPikaErrorCode,
   sumSpentMicro,
   toAiVideoDto,
+  toCredits,
+  DEFAULT_CREDIT_MICRO_USD,
   usd,
 } from './ai-video.mapper';
 import { AI_VIDEO_MODEL_TABLE, AiVideoModelSpec, apiIdOf, buildPikaBody } from './ai-video.models';
@@ -54,6 +56,7 @@ export class AiVideoService {
 
   /** Açık modeller + seçenekleri + bugünkü harcama (diyalog açılışında). */
   async options(userId: string) {
+    const spentMicro = await this.todaySpentMicro(userId);
     return {
       models: this.enabledModels().map((m) => ({
         key: m.key,
@@ -65,7 +68,9 @@ export class AiVideoService {
         audio: m.audio,
       })),
       dailyCapUsd: this.dailyCapMicro() / MICRO,
-      todaySpentUsd: usd(await this.todaySpentMicro(userId)),
+      todaySpentUsd: usd(spentMicro),
+      dailyCapCredits: toCredits(this.dailyCapMicro(), this.creditMicro()),
+      spentTodayCredits: toCredits(spentMicro, this.creditMicro()),
     };
   }
 
@@ -74,11 +79,15 @@ export class AiVideoService {
     const spec = this.resolveSpec(dto, dto.withImage);
     const cacheKey = `${spec.key}|${dto.resolution}|${dto.durationS}|${dto.withImage}|${dto.aspectRatio ?? ''}`;
     const hit = this.estimateCache.get(cacheKey);
-    if (hit && hit.expiresAt > Date.now()) return { quoteUsd: usd(hit.micro) };
+    if (hit && hit.expiresAt > Date.now()) return this.estimateBody(hit.micro);
 
     const micro = await this.quoteMicro(spec, dto, dto.withImage, dto.withImage ? undefined : 'x');
     this.estimateCache.set(cacheKey, { micro, expiresAt: Date.now() + AI_ESTIMATE_TTL_MS });
-    return { quoteUsd: usd(micro) };
+    return this.estimateBody(micro);
+  }
+
+  private estimateBody(micro: number) {
+    return { quoteUsd: usd(micro), estimateCredits: toCredits(micro, this.creditMicro()) };
   }
 
   /** Teklif (yeniden alınır, önbellekten değil) + tavan + gönderim tek çağrıda. */
@@ -242,6 +251,10 @@ export class AiVideoService {
     return spec;
   }
 
+  private creditMicro(): number {
+    return this.config.get<number>('aiVideo.creditMicroUsd') ?? DEFAULT_CREDIT_MICRO_USD;
+  }
+
   private dailyCapMicro(): number {
     return Math.round((this.config.get<number>('aiVideo.dailyCapUsd') ?? 0) * MICRO);
   }
@@ -275,7 +288,8 @@ export class AiVideoService {
   }
 
   private async present(row: AiVideoGeneration) {
-    if (row.status !== AiVideoStatus.COMPLETED || !row.outputKey) return toAiVideoDto(row);
+    if (row.status !== AiVideoStatus.COMPLETED || !row.outputKey)
+      return toAiVideoDto(row, this.creditMicro());
     const [videoUrl, downloadUrl] = await Promise.all([
       this.storage.presignGet(row.outputKey, { expiresIn: VIDEO_URL_TTL_S }),
       this.storage.presignGet(row.outputKey, {
@@ -283,7 +297,7 @@ export class AiVideoService {
         downloadFilename: `kankaverse-yz-${row.id}.mp4`,
       }),
     ]);
-    return toAiVideoDto(row, { videoUrl, downloadUrl });
+    return toAiVideoDto(row, this.creditMicro(), { videoUrl, downloadUrl });
   }
 
   private markFailed(id: string, errorCode: string) {

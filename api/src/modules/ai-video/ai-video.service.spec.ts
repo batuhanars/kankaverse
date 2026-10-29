@@ -2,7 +2,7 @@ import { AiVideoStatus } from '@prisma/client';
 import { AiVideoService } from './ai-video.service';
 import { AiVideoInputService } from './ai-video-input.service';
 import { PikaError } from './pika.client';
-import { sumSpentMicro } from './ai-video.mapper';
+import { sumSpentMicro, toCredits } from './ai-video.mapper';
 
 const UUID = '123e4567-e89b-42d3-a456-426614174000';
 
@@ -280,7 +280,7 @@ describe('AiVideoService.estimate / options', () => {
   it('satir olusturmaz, onbellekler, withImage ayri anahtar', async () => {
     const { service, pika, prisma } = setup();
     const q = { model: 'pika-2.5', resolution: '720p', durationS: 5, withImage: false };
-    expect(await service.estimate(q)).toEqual({ quoteUsd: 0.2 });
+    expect(await service.estimate(q)).toEqual({ quoteUsd: 0.2, estimateCredits: 20 });
     await service.estimate(q);
     expect(pika.quote).toHaveBeenCalledTimes(1);
     expect(pika.quote).toHaveBeenCalledWith('pika/pika-2.5/text-to-video', {
@@ -313,7 +313,12 @@ describe('AiVideoService.estimate / options', () => {
     const res = await service.options('u1');
     expect(res.models.map((m) => m.key)).toEqual(['pika-2.5', 'wan-3.0', 'kling-3.0-turbo']);
     expect(res.models[2]).toMatchObject({ durations: [5, 10, 15], resolutions: ['720p'] });
-    expect(res).toMatchObject({ dailyCapUsd: 3, todaySpentUsd: 0.4 });
+    expect(res).toMatchObject({
+      dailyCapUsd: 3,
+      todaySpentUsd: 0.4,
+      dailyCapCredits: 300,
+      spentTodayCredits: 40,
+    });
   });
 });
 
@@ -423,5 +428,15 @@ describe('AiVideoService C14c', () => {
     expect(s.prisma.aiVideoGeneration.findMany.mock.calls[0][0].where).not.toHaveProperty(
       'deletedAt',
     );
+  });
+});
+
+describe('toCredits (C33 kredi donusturucu)', () => {
+  it('1 kredi = 10000 mikro-USD; yukari yuvarlar', () => {
+    expect(toCredits(0, 10_000)).toBe(0);
+    expect(toCredits(450_000, 10_000)).toBe(45);
+    expect(toCredits(450_001, 10_000)).toBe(46);
+    expect(toCredits(1, 10_000)).toBe(1);
+    expect(toCredits(3_000_000, 10_000)).toBe(300);
   });
 });

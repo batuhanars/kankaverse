@@ -14,8 +14,9 @@ export interface AiVideoDto {
   aspectRatio: string | null;
   prompt: string;
   hasInput: boolean;
-  quoteUsd: number;
-  costUsd: number | null;
+  /** C33: kullanıcıya görünen birim kredi (USD alanları arayüzde kullanılmaz). */
+  quoteCredits: number;
+  costCredits: number | null;
   errorCode: string | null;
   createdAt: string;
   /** Yalnız COMPLETED, presigned GET 15 dk. */
@@ -37,8 +38,8 @@ export interface AiVideoModelOption {
 
 export interface AiVideoOptionsDto {
   models: AiVideoModelOption[];
-  dailyCapUsd: number;
-  todaySpentUsd: number;
+  dailyCapCredits: number;
+  spentTodayCredits: number;
 }
 
 export interface AiVideoSelection {
@@ -61,7 +62,7 @@ export const aiVideoApi = {
     return (await http.get<AiVideoOptionsDto>('/ai-video/options')).data;
   },
   async estimate(sel: AiVideoSelection, withImage: boolean) {
-    return (await http.post<{ quoteUsd: number }>('/ai-video/estimate', { ...sel, withImage })).data;
+    return (await http.post<{ estimateCredits: number }>('/ai-video/estimate', { ...sel, withImage })).data;
   },
   async create(sel: AiVideoSelection, prompt: string, inputKey?: string) {
     return (await http.post<AiVideoDto>('/ai-video', { ...sel, prompt, ...(inputKey ? { inputKey } : {}) })).data;

@@ -158,14 +158,15 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
           <View style={[styles.footer, { paddingBottom: keyboard ? 12 : sheetBottomPadding(bottomInset) }]}>
             <AiVideoCostBar
               durationS={form.durationS}
-              estimateUsd={form.estimateUsd}
+              estimateCredits={form.estimateCredits}
               estimating={form.estimating}
               estimateFailed={form.estimateFailed}
               overCap={form.overCap}
-              todaySpentUsd={form.options?.todaySpentUsd ?? 0}
-              dailyCapUsd={form.options?.dailyCapUsd ?? 0}
+              spentTodayCredits={form.options?.spentTodayCredits ?? 0}
+              dailyCapCredits={form.options?.dailyCapCredits ?? 0}
               canSubmit={canSubmit}
               busy={ai.busy}
+              locked={ai.locked}
               onSubmit={() => void ai.submit()}
             />
           </View>

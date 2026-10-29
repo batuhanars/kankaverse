@@ -18,6 +18,10 @@ import { useAuthStore } from '@/stores/auth'
 import { renderMessageHtml } from '@/utils/markdown'
 import { bannerBackground } from '@/utils/bannerColor'
 import { animatedOrStatic } from '@/utils/animatedMedia'
+import { useActivityStore } from '@/stores/activity'
+import { formatElapsed } from '@/utils/formatElapsed'
+import GameLogo from '@/components/shared/GameLogo.vue'
+import GamepadIcon from '@/components/shared/GamepadIcon.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import type { UserProfileCardDto } from '@/types'
 
@@ -57,8 +61,29 @@ async function openDmWith(userId: string) {
   } catch { /* yoksay */ }
 }
 
-type Tab = 'friends' | 'guilds'
-const activeTab = ref<Tab>('friends')
+// C31e: kişinin görünür oyunu varsa "Etkinlik" sekmesi başa eklenir ve modal onunla açılır.
+const activityStore = useActivityStore()
+const game = computed(() => activityStore.getGame(props.card.id))
+
+type Tab = 'activity' | 'friends' | 'guilds'
+const pickedTab = ref<Tab | null>(game.value ? 'activity' : 'friends')
+// Oyun bitince etkinlik sekmesi kaybolur, ortak kankalara düşer.
+const activeTab = computed<Tab>({
+  get: () => (pickedTab.value === 'activity' && !game.value ? 'friends' : (pickedTab.value ?? 'friends')),
+  set: (v) => { pickedTab.value = v },
+})
+
+// Canlı geçen süre: saniyede bir güncellenir, bileşen kapanınca temizlenir.
+const now = ref(Date.now())
+const timer = setInterval(() => { now.value = Date.now() }, 1000)
+onUnmounted(() => clearInterval(timer))
+const elapsed = computed(() =>
+  game.value?.startedAt ? formatElapsed(now.value - new Date(game.value.startedAt).getTime()) : null,
+)
+
+function openStore(url: string) {
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
 
 const bioHtml = computed(() =>
   props.card.bio ? renderMessageHtml(props.card.bio, () => undefined, '') : '',
@@ -264,6 +289,17 @@ async function runConfirm() {
           <div class="px-6 pt-6 shrink-0">
             <div class="flex gap-1 border-b" style="border-color: var(--kv-border-subtle);">
               <button
+                v-if="game"
+                type="button"
+                class="px-3 py-2.5 text-[13px] font-semibold cursor-pointer transition-colors -mb-px border-b-2"
+                :style="activeTab === 'activity'
+                  ? 'color: var(--kv-text-primary); border-color: var(--kv-accent-500);'
+                  : 'color: var(--kv-text-muted); border-color: transparent;'"
+                @click="activeTab = 'activity'"
+              >
+                {{ t('profile.activity.tab') }}
+              </button>
+              <button
                 type="button"
                 class="px-3 py-2.5 text-[13px] font-semibold cursor-pointer transition-colors -mb-px border-b-2"
                 :style="activeTab === 'friends'
@@ -288,8 +324,36 @@ async function runConfirm() {
 
           <!-- Liste -->
           <div class="flex-1 overflow-y-auto px-4 py-3">
+            <!-- Etkinlik -->
+            <div v-if="activeTab === 'activity' && game" class="px-2 py-2">
+              <h3 class="text-[11px] font-bold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
+                {{ t('profile.activity.current') }}
+              </h3>
+              <div class="rounded-[var(--kv-radius-md)] p-4 flex items-center gap-4" style="background-color: var(--kv-bg-elevated);">
+                <GameLogo :icon-url="game.iconUrl" :size="64" />
+                <div class="min-w-0 flex-1">
+                  <p class="text-[11px] font-bold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+                    {{ t('profile.activity.playing') }}
+                  </p>
+                  <p class="text-[16px] font-semibold truncate" style="color: var(--kv-text-primary);">{{ game.name }}</p>
+                  <p v-if="elapsed" class="mt-1 flex items-center gap-1.5 text-[13px] tabular-nums" style="color: var(--kv-text-body);">
+                    <GamepadIcon :size="14" />{{ elapsed }}
+                  </p>
+                </div>
+                <button
+                  v-if="game.storeUrl"
+                  type="button"
+                  class="shrink-0 py-1.5 px-4 rounded-[var(--kv-radius-md)] text-[13px] font-medium cursor-pointer transition-opacity hover:opacity-80"
+                  style="background-color: var(--kv-bg-content); color: var(--kv-text-secondary);"
+                  @click="openStore(game.storeUrl)"
+                >
+                  {{ t('profile.activity.viewOnSteam') }}
+                </button>
+              </div>
+            </div>
+
             <!-- Ortak Kankalar -->
-            <div v-if="activeTab === 'friends'">
+            <div v-else-if="activeTab === 'friends'">
               <p v-if="card.mutualFriends.length === 0" class="text-[13px] px-2 py-4" style="color: var(--kv-text-muted);">
                 {{ t('profile.noMutualFriends') }}
               </p>

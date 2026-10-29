@@ -7,14 +7,15 @@ const ESTIMATE_DELAY_MS = 400;
  * Sprint C14d (web `useAiVideoForm` eşdeğeri): model / çözünürlük / süre seçimi (options'tan) ve
  * 400 ms gecikmeli canlı teklif. İstek yarışında yalnız SON isteğin sonucu yazılır (seq sayacı).
  * Sayfa kapanınca (bileşen sökülünce) bekleyen zamanlayıcı ve uçuştaki istek etkisiz kalır.
+ * C33: `locked` (pasif tanıtım) iken HİÇBİR istek atılmaz (options/estimate yok; 403 gürültüsü olmaz).
  */
-export function useAiVideoForm(withImage: boolean) {
+export function useAiVideoForm(withImage: boolean, locked = false) {
   const [options, setOptions] = useState<AiVideoOptionsDto | null>(null);
   const [model, setModel] = useState('');
   const [resolution, setResolution] = useState('');
   const [durationS, setDurationS] = useState(0);
   const [aspectRatio, setAspectRatio] = useState(''); // '' = Otomatik (alan gönderilmez)
-  const [estimateUsd, setEstimateUsd] = useState<number | null>(null);
+  const [estimateCredits, setEstimateCredits] = useState<number | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [estimateFailed, setEstimateFailed] = useState(false);
   const seq = useRef(0);
@@ -24,8 +25,8 @@ export function useAiVideoForm(withImage: boolean) {
   const current: AiVideoModelOption | null = options?.models.find((m) => m.key === model) ?? null;
   // Liste sunucudan; model ya da görsel durumu değişince ve seçili ölçü listede yoksa Otomatik'e döner.
   const aspectRatios = current?.aspectRatios[withImage ? 'image' : 'text'] ?? [];
-  const remainingUsd = options ? Math.max(0, options.dailyCapUsd - options.todaySpentUsd) : 0;
-  const overCap = estimateUsd !== null && estimateUsd > remainingUsd;
+  const remainingCredits = options ? Math.max(0, options.dailyCapCredits - options.spentTodayCredits) : 0;
+  const overCap = estimateCredits !== null && estimateCredits > remainingCredits;
 
   const pickModel = useCallback((key: string, from: AiVideoOptionsDto) => {
     const m = from.models.find((x) => x.key === key);
@@ -36,6 +37,7 @@ export function useAiVideoForm(withImage: boolean) {
   }, []);
 
   const loadOptions = useCallback(async () => {
+    if (locked) return;
     try {
       const data = await aiVideoApi.options();
       if (!alive.current) return;
@@ -45,7 +47,7 @@ export function useAiVideoForm(withImage: boolean) {
     } catch {
       /* seçenekler yüklenmezse form boş kalır; hata kullanıcıya üretim denemesinde döner */
     }
-  }, [pickModel]);
+  }, [pickModel, locked]);
 
   useEffect(() => {
     alive.current = true;
@@ -62,17 +64,17 @@ export function useAiVideoForm(withImage: boolean) {
   }, [ratiosKey]);
 
   useEffect(() => {
-    if (!model || !resolution || !durationS) return;
+    if (locked || !model || !resolution || !durationS) return;
     const id = ++seq.current;
     setEstimating(true);
     setEstimateFailed(false);
     const timer = setTimeout(async () => {
       try {
-        const { quoteUsd } = await aiVideoApi.estimate(
+        const { estimateCredits: credits } = await aiVideoApi.estimate(
           { model, resolution, durationS, ...(aspectRatio && { aspectRatio }) },
           withImage,
         );
-        if (id === seq.current) setEstimateUsd(quoteUsd);
+        if (id === seq.current) setEstimateCredits(credits);
       } catch {
         if (id === seq.current) setEstimateFailed(true);
       } finally {
@@ -80,7 +82,7 @@ export function useAiVideoForm(withImage: boolean) {
       }
     }, ESTIMATE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [model, resolution, durationS, aspectRatio, withImage]);
+  }, [model, resolution, durationS, aspectRatio, withImage, locked]);
 
   return {
     options,
@@ -90,7 +92,7 @@ export function useAiVideoForm(withImage: boolean) {
     aspectRatio,
     aspectRatios,
     current,
-    estimateUsd,
+    estimateCredits,
     estimating,
     estimateFailed,
     overCap,

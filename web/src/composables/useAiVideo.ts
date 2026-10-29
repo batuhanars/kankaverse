@@ -2,6 +2,7 @@ import { computed, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo'
 import { attachmentsApi } from '@/api/attachments'
+import { useAuthStore } from '@/stores/auth'
 import { useAiVideoForm } from '@/composables/useAiVideoForm'
 import { saveFromUrl } from '@/utils/saveFromUrl'
 
@@ -29,7 +30,9 @@ export function useAiVideo() {
   const prompt = ref('')
   const image = ref<File | null>(null)
   const withImage = computed(() => !!image.value)
-  const form = useAiVideoForm(withImage)
+  // C33: pasif tanıtım. Kilitliyken (izin listesi dışı) hiçbir yapay zeka ucuna istek atılmaz.
+  const locked = useAuthStore().user?.aiVideoAllowed !== true
+  const form = useAiVideoForm(withImage, locked)
   const job = ref<AiVideoDto | null>(null)
   const recent = ref<AiVideoDto[]>([])
   const busy = ref(false)
@@ -64,6 +67,7 @@ export function useAiVideo() {
   }
 
   async function refreshRecent() {
+    if (locked) return
     try {
       recent.value = (await aiVideoApi.list()).data
     } catch {
@@ -100,6 +104,7 @@ export function useAiVideo() {
   }
 
   async function submit() {
+    if (locked) return
     error.value = ''
     busy.value = true
     try {
@@ -202,10 +207,11 @@ export function useAiVideo() {
     }
   }
 
-  void refreshRecent()
+  if (!locked) void refreshRecent()
   onUnmounted(stop)
 
   return {
+    locked,
     prompt,
     image,
     form,

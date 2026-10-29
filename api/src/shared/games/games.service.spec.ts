@@ -57,6 +57,7 @@ describe('GamesService (C31b §1)', () => {
       id: 'curated_valorant',
       name: 'Valorant',
       iconUrl: null,
+      storeUrl: null,
     });
     expect(prismaMock.game.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -70,7 +71,12 @@ describe('GamesService (C31b §1)', () => {
   it('steam: ad istemciden ALINMAZ, mağazadan gelen ad yazılır', async () => {
     fetchMock.mockResolvedValue(steamResponse('730', 'Counter-Strike 2'));
     const game = await service.resolve('steam:730', { userId: 'u1', epicName: 'SAHTE AD' });
-    expect(game).toEqual({ id: 'new-730', name: 'Counter-Strike 2', iconUrl: null });
+    expect(game).toEqual({
+      id: 'new-730',
+      name: 'Counter-Strike 2',
+      iconUrl: null,
+      storeUrl: 'https://store.steampowered.com/app/730',
+    });
     // simge arka planda aranır (cevabı bekletmez)
     expect(iconsMock.ensure).toHaveBeenCalledTimes(1);
     expect(prismaMock.game.create).toHaveBeenCalledWith(
@@ -113,6 +119,7 @@ describe('GamesService (C31b §1)', () => {
       id: 'g1',
       name: 'CS2',
       iconUrl: 'https://cdn/x.webp',
+      storeUrl: 'https://store.steampowered.com/app/730',
     });
     prismaMock.game.findUnique.mockResolvedValue({ id: 'g1', name: 'CS2', hidden: true });
     expect(await service.resolve('steam:730', { userId: 'u1' })).toBeNull();
@@ -146,7 +153,7 @@ describe('GamesService (C31b §1)', () => {
       iconUrl: null,
     });
     const second = await service.resolve(ref, { userId: 'u2', epicName: 'Başka Ad' });
-    expect(second).toEqual({ id: 'e1', name: 'Fortnite', iconUrl: null });
+    expect(second).toEqual({ id: 'e1', name: 'Fortnite', iconUrl: null, storeUrl: null });
     // Epic için simge araması yok
     expect(iconsMock.ensure).not.toHaveBeenCalled();
     expect(prismaMock.game.create).toHaveBeenCalledTimes(1);
@@ -164,6 +171,7 @@ describe('GamesService (C31b §1)', () => {
       id: 'e1',
       name: 'Kazanan',
       iconUrl: null,
+      storeUrl: null,
     });
   });
 

@@ -209,7 +209,15 @@ function ensureSocket(): Socket {
   socket.on(
     'presence:snapshot',
     (payload: {
-      states: { userId: string; status: PresenceStatus; gameId?: string; gameName?: string }[];
+      states: {
+        userId: string;
+        status: PresenceStatus;
+        gameId?: string;
+        gameName?: string;
+        gameIconUrl?: string | null;
+        gameStartedAt?: string;
+        gameStoreUrl?: string | null;
+      }[];
     }) => {
       usePresenceStore.getState().applySnapshot(payload.states);
       // C31b: oyun satırı aynı snapshot'ın içinde gelir (görünürlük sunucuda).
@@ -220,7 +228,16 @@ function ensureSocket(): Socket {
   // C31b: "oynuyor" güncellemesi. game=null → oyun yok / ayar kapandı / dnd / çevrimdışı.
   socket.on(
     'activity:update',
-    (payload: { userId: string; game: { id: string; name: string } | null }) => {
+    (payload: {
+      userId: string;
+      game: {
+        id: string;
+        name: string;
+        iconUrl?: string | null;
+        startedAt?: string;
+        storeUrl?: string | null;
+      } | null;
+    }) => {
       useActivityStore.getState().applyUpdate(payload.userId, payload.game);
     },
   );

@@ -12,7 +12,7 @@ export function mapPikaErrorCode(code: string | null | undefined): string {
 
 /** Kullanıcıya Türkçe mesaj (exception için). Ham Pika mesajı ASLA iletilmez. */
 export const AI_VIDEO_MESSAGES: Record<string, string> = {
-  [AiVideoError.DAILY_CAP]: 'Bugünkü yapay zeka video harcama tavanına ulaşıldı.',
+  [AiVideoError.DAILY_CAP]: 'Bugünkü yapay zeka video kredi sınırına ulaşıldı.',
   [AiVideoError.INVALID_OPTION]: 'Seçilen model, süre, çözünürlük veya ölçü geçerli değil.',
   [AiVideoError.NOT_READY]: 'Video henüz hazır değil.',
   [AiVideoError.PROVIDER_ERROR]:
@@ -26,6 +26,14 @@ export const AI_VIDEO_MESSAGES: Record<string, string> = {
 };
 
 export const usd = (micro: number): number => micro / MICRO;
+
+/** 1 kredi kaç mikro-USD (varsayılan 10000 = 0,01 $). Tahmin, harcama ve tavan AYNI dönüştürücüden geçer. */
+export const DEFAULT_CREDIT_MICRO_USD = 10_000;
+
+/** Mikro-USD → kredi, yukarı yuvarlanır (0 mikro = 0 kredi; en küçük ücret en az 1 kredi görünür). */
+export function toCredits(micro: number, creditMicroUsd: number): number {
+  return Math.ceil(micro / creditMicroUsd);
+}
 
 /** Bugünkü harcama (mikro-USD): kesin ücret varsa o, yoksa bekleyen/tamamlanmış için teklif; FAILED ücretsizdir. */
 export function sumSpentMicro(
@@ -44,6 +52,7 @@ export function sumSpentMicro(
 
 export function toAiVideoDto(
   row: AiVideoGeneration,
+  creditMicroUsd: number,
   urls?: { videoUrl: string; downloadUrl: string },
 ) {
   return {
@@ -57,6 +66,8 @@ export function toAiVideoDto(
     hasInput: row.inputKey !== null,
     quoteUsd: usd(row.quoteMicroUsd),
     costUsd: row.costMicroUsd === null ? null : usd(row.costMicroUsd),
+    quoteCredits: toCredits(row.quoteMicroUsd, creditMicroUsd),
+    costCredits: row.costMicroUsd === null ? null : toCredits(row.costMicroUsd, creditMicroUsd),
     errorCode: row.errorCode,
     createdAt: row.createdAt.toISOString(),
     ...(urls !== undefined && urls),

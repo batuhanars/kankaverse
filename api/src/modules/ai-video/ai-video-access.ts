@@ -15,3 +15,12 @@ export function canUseAiVideo(
   const ids = config.get<string[]>('aiVideo.userIds') ?? [];
   return ids.includes(user.id);
 }
+
+/**
+ * C33 — pasif tanıtım (YALNIZ arayüz ipucu; sunucu otoritesi `canUseAiVideo` + guard, ikisi DEĞİŞMEDİ).
+ * Reşit olan herkes düğmeyi görür (kilitli modda); minör asla. Bayrak kapalıysa kimse görmez.
+ * Kilitli istemci hiçbir yapay zeka ucunu çağırmaz; çağırırsa guard bugünkü gibi reddeder.
+ */
+export function canPreviewAiVideo(config: ConfigService, user: { isMinor: boolean }): boolean {
+  return !user.isMinor && config.get<boolean>('aiVideo.enabled') === true;
+}

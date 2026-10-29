@@ -124,7 +124,7 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
       </View>
 
       {/* Sahip isteği 2026-10-27 — yatay kanka şeridi (yalnız avatar + durum noktası). */}
-      <FriendsStrip onOpenDm={onOpenDm} />
+      <FriendsStrip />
 
       {/* Kanka isteği satırı — sahip bulgusu 2026-07-30: gelen istek YALNIZ "Kanka Ekle" ekranının
           içinde görünüyordu, sahip nereden kabul edeceğini bulamadı ("ben takıldıysam kullanıcı da

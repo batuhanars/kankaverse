@@ -207,6 +207,7 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
 | D81 | **Mobil düzenleme ekranında bahsetmeler ham `<@id>` görünüyor** (C27 öncesinden kalan davranış; düzenleme kutudayken de böyleydi) | mobil | C27 dev raporu / 2026-10-27 | düşük-orta (kullanıcı kendi mesajında anlamsız kod görüyor) | **ertelendi** → düzenleme açılırken token'ları `@ad`a çevir, kaydederken `applyMentionTokens` zaten geri çeviriyor |
 | D82 | **Silinen mesajın eki hâlâ indirilebiliyor.** `getDownloadUrl` (`attachments.service.ts`) bağlı mesajın `deletedAt`ine bakmıyor; kullanıcı silmesi ve moderasyon CONTENT_REMOVE yalnız mesajı soft-delete ediyor, ek satırı ve obje duruyor. Ek kimliğini bilen kanal üyesi imzalı adresi almaya devam eder | api | C30 dev raporu / 2026-10-29 | **yüksek (R7: moderasyonun kaldırdığı görsel erişilebilir kalıyor)** | **çözüldü 2026-10-29** (C30 commit'i, sahip R7 onayı) |
 | D83 | **Moderasyonda mesaj eki kaldırma yolu yok; FLAGGED'ı yazan kod yok.** MEDIA_REMOVE yalnız avatar/afiş/ikon; C30 kopyaları `sourceAttachmentId` ile bulunabilir ama yayma yok | api | C30 dev raporu / 2026-10-29 | orta (tarayıcı bağlanana dek ek engelleme fiilen yok) | **ertelendi** → ek takedown aksiyonu (FLAGGED yaz + kopyalara yay); tarama/lansman kapısında |
+| D84 | **Yapay zeka DTO'larında USD alanları duruyor** (`quoteUsd`, `costUsd`, `dailyCapUsd`, `todaySpentUsd`); C33 ile istemciler yalnız kredi okuyor, alanlar sahadaki eski mobil sürümler için tutuldu | api | C33 / 2026-10-29 | düşük | **ertelendi** → vc39 yaygınlaşınca alanları kaldır |
 
 ---
 

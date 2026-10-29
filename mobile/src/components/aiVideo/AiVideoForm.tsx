@@ -77,7 +77,13 @@ export function AiVideoForm({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
       <ModelRow ai={ai} />
       <View style={styles.imageRow}>
         {image.image ? <Image source={{ uri: image.image.uri }} style={styles.thumb} resizeMode="cover" /> : null}
-        <Pressable onPress={() => void image.pick()} style={styles.ghost} accessibilityRole="button">
+        <Pressable
+          onPress={() => void image.pick()}
+          disabled={ai.locked}
+          style={[styles.ghost, ai.locked && styles.off]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: ai.locked }}
+        >
           <Text style={styles.ghostText}>{image.image ? t('aiVideo.imageChange') : t('aiVideo.imageAdd')}</Text>
         </Pressable>
         {image.image ? (
@@ -96,7 +102,8 @@ export function AiVideoForm({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
           multiline
           placeholder={t('aiVideo.promptPlaceholder')}
           placeholderTextColor={theme.colors.textMuted}
-          style={styles.input}
+          editable={!ai.locked}
+          style={[styles.input, ai.locked && styles.off]}
         />
       </View>
       <Options ai={ai} />
@@ -132,5 +139,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgElevated,
   },
   ghostText: { color: theme.colors.textSecondary, fontSize: theme.fontSize.md, fontWeight: '600' },
+  off: { opacity: 0.5 },
   hint: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs, marginTop: -6 },
 });

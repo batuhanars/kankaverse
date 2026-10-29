@@ -6,14 +6,15 @@ const ESTIMATE_DELAY_MS = 400
 /**
  * Yapay zeka video formu (Sprint C14b §3.1): model / çözünürlük / süre seçimi (options'tan) ve
  * 400 ms gecikmeli canlı teklif. İstek yarışında yalnız SON isteğin sonucu yazılır.
+ * C33: `locked` (pasif tanıtım) iken HİÇBİR istek atılmaz (options/estimate yok; 403 gürültüsü olmaz).
  */
-export function useAiVideoForm(withImage: Ref<boolean>) {
+export function useAiVideoForm(withImage: Ref<boolean>, locked = false) {
   const options = ref<AiVideoOptionsDto | null>(null)
   const model = ref('')
   const resolution = ref('')
   const durationS = ref(0)
   const aspectRatio = ref('') // '' = Otomatik (alan gönderilmez)
-  const estimateUsd = ref<number | null>(null)
+  const estimateCredits = ref<number | null>(null)
   const estimating = ref(false)
   const estimateFailed = ref(false)
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -26,11 +27,13 @@ export function useAiVideoForm(withImage: Ref<boolean>) {
   const aspectRatios = computed(
     () => current.value?.aspectRatios[withImage.value ? 'image' : 'text'] ?? [],
   )
-  const remainingUsd = computed(() =>
-    options.value ? Math.max(0, options.value.dailyCapUsd - options.value.todaySpentUsd) : 0,
+  const remainingCredits = computed(() =>
+    options.value
+      ? Math.max(0, options.value.dailyCapCredits - options.value.spentTodayCredits)
+      : 0,
   )
   const overCap = computed(
-    () => estimateUsd.value !== null && estimateUsd.value > remainingUsd.value,
+    () => estimateCredits.value !== null && estimateCredits.value > remainingCredits.value,
   )
 
   function pickModel(key: string) {
@@ -47,6 +50,7 @@ export function useAiVideoForm(withImage: Ref<boolean>) {
   }
 
   async function loadOptions() {
+    if (locked) return
     try {
       const { data } = await aiVideoApi.options()
       const first = !options.value
@@ -58,6 +62,7 @@ export function useAiVideoForm(withImage: Ref<boolean>) {
   }
 
   async function runEstimate() {
+    if (locked) return
     const id = ++seq
     estimating.value = true
     estimateFailed.value = false
@@ -71,7 +76,7 @@ export function useAiVideoForm(withImage: Ref<boolean>) {
         },
         withImage.value,
       )
-      if (id === seq) estimateUsd.value = data.quoteUsd
+      if (id === seq) estimateCredits.value = data.estimateCredits
     } catch {
       if (id === seq) estimateFailed.value = true
     } finally {
@@ -81,6 +86,7 @@ export function useAiVideoForm(withImage: Ref<boolean>) {
 
   watch(withImage, resetAspectIfInvalid)
   watch([model, resolution, durationS, aspectRatio, withImage], () => {
+    if (locked) return
     if (!model.value || !resolution.value || !durationS.value) return
     if (timer) clearTimeout(timer)
     estimating.value = true
@@ -101,10 +107,10 @@ export function useAiVideoForm(withImage: Ref<boolean>) {
     aspectRatio,
     aspectRatios,
     current,
-    estimateUsd,
+    estimateCredits,
     estimating,
     estimateFailed,
-    remainingUsd,
+    remainingCredits,
     overCap,
     pickModel,
     loadOptions,

@@ -24,3 +24,10 @@ describe('toUserDto aiVideoAllowed (C14)', () => {
     expect(toUserDto(USER, false, true).aiVideoAllowed).toBe(true);
   });
 });
+
+describe('toUserDto aiVideoPreview (C33)', () => {
+  it('varsayilan false; verilirse true', () => {
+    expect(toUserDto(USER, false).aiVideoPreview).toBe(false);
+    expect(toUserDto(USER, false, false, true).aiVideoPreview).toBe(true);
+  });
+});

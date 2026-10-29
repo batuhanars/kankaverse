@@ -193,7 +193,7 @@ async function onPrimary() {
         >
           <div class="w-full flex flex-wrap items-center gap-2 min-w-0">
             <img v-if="previewUrl" :src="previewUrl" alt="" class="h-12 w-12 shrink-0 rounded-[var(--kv-radius-sm)] object-cover" />
-            <KvButton size="sm" variant="ghost" class="border border-[var(--kv-border-subtle)]" @click="fileInput?.click()">
+            <KvButton size="sm" variant="ghost" class="border border-[var(--kv-border-subtle)]" :disabled="ai.locked" @click="fileInput?.click()">
               {{ ai.image.value ? t('aiVideo.imageChange') : t('aiVideo.imageAdd') }}
             </KvButton>
             <KvButton v-if="ai.image.value" size="sm" variant="ghost" class="border border-[var(--kv-border-subtle)]" @click="ai.image.value = null">
@@ -212,8 +212,9 @@ async function onPrimary() {
               v-model="ai.prompt.value"
               rows="3"
               :maxlength="PROMPT_MAX"
+              :disabled="ai.locked"
               :placeholder="t('aiVideo.promptPlaceholder')"
-              class="w-full resize-none rounded-[var(--kv-radius-md)] px-3 py-2 text-[14px] outline-none border border-[var(--kv-border-subtle)] bg-[var(--kv-bg-content)]"
+              class="w-full resize-none disabled:opacity-60 disabled:cursor-not-allowed rounded-[var(--kv-radius-md)] px-3 py-2 text-[14px] outline-none border border-[var(--kv-border-subtle)] bg-[var(--kv-bg-content)]"
               style="color: var(--kv-text-primary);"
             />
           </div>
@@ -221,14 +222,15 @@ async function onPrimary() {
 
         <AiVideoCostBar
           :duration-s="form.durationS.value"
-          :estimate-usd="form.estimateUsd.value"
+          :estimate-credits="form.estimateCredits.value"
           :estimating="form.estimating.value"
           :estimate-failed="form.estimateFailed.value"
           :over-cap="form.overCap.value"
-          :today-spent-usd="form.options.value?.todaySpentUsd ?? 0"
-          :daily-cap-usd="form.options.value?.dailyCapUsd ?? 0"
+          :spent-today-credits="form.options.value?.spentTodayCredits ?? 0"
+          :daily-cap-credits="form.options.value?.dailyCapCredits ?? 0"
           :can-submit="canSubmit"
           :busy="ai.busy.value"
+          :locked="ai.locked"
           @submit="ai.submit"
         />
       </template>

@@ -9,6 +9,8 @@ export interface ResolvedGame {
   name: string;
   /** C31c: sunucunun kendi depoladığı 64x64 simge; yoksa null. */
   iconUrl: string | null;
+  /** C31e: yalnız STEAM kaynağında mağaza sayfası, diğerlerinde null. */
+  storeUrl: string | null;
 }
 
 export interface CuratedGame {
@@ -28,6 +30,13 @@ const EPIC_NAME_MAX = 64;
 const UNSAFE_NAME_CHARS = /[\u0000-\u001f\u007f‎‏‪-‮⁦-⁩]/;
 const STEAM_APPID = /^\d{1,10}$/;
 const EPIC_CATALOG_ID = /^[A-Za-z0-9]{8,64}$/;
+
+/** C31e: mağaza bağlantısı yalnız Steam'de (appid regex'ten geçmiş, tabloda doğrulanmış). */
+export function storeUrlFor(source: string, externalId: string | null): string | null {
+  return source === 'STEAM' && externalId && STEAM_APPID.test(externalId)
+    ? `https://store.steampowered.com/app/${externalId}`
+    : null;
+}
 
 /**
  * C31b §1 — oyun tablosu ve üç kaynak (Steam + Epic + elle liste).
@@ -105,10 +114,15 @@ export class GamesService {
   async visibleById(id: string): Promise<ResolvedGame | null> {
     const game = await this.prisma.game.findUnique({
       where: { id },
-      select: { id: true, name: true, hidden: true, iconUrl: true },
+      select: { id: true, name: true, hidden: true, iconUrl: true, source: true, externalId: true },
     });
     if (!game || game.hidden) return null;
-    return { id: game.id, name: game.name, iconUrl: game.iconUrl };
+    return {
+      id: game.id,
+      name: game.name,
+      iconUrl: game.iconUrl,
+      storeUrl: storeUrlFor(game.source, game.externalId),
+    };
   }
 
   // ── Kaynaklar ───────────────────────────────────────────────────────────────
@@ -120,7 +134,7 @@ export class GamesService {
     });
     if (!game) return null;
     this.icons.ensure({ ...game, source: 'CURATED' });
-    return { id: game.id, name: game.name, iconUrl: game.iconUrl };
+    return { id: game.id, name: game.name, iconUrl: game.iconUrl, storeUrl: null };
   }
 
   private async resolveSteam(appId: string, userId: string): Promise<ResolvedGame | null> {
@@ -128,7 +142,12 @@ export class GamesService {
     if (existing) {
       if (existing.hidden) return null;
       this.icons.ensure({ ...existing, source: 'STEAM', externalId: appId });
-      return { id: existing.id, name: existing.name, iconUrl: existing.iconUrl };
+      return {
+        id: existing.id,
+        name: existing.name,
+        iconUrl: existing.iconUrl,
+        storeUrl: storeUrlFor('STEAM', appId),
+      };
     }
     if (!this.takeNewRecordSlot(userId)) return null;
 
@@ -154,7 +173,7 @@ export class GamesService {
     if (existing) {
       return existing.hidden
         ? null
-        : { id: existing.id, name: existing.name, iconUrl: existing.iconUrl };
+        : { id: existing.id, name: existing.name, iconUrl: existing.iconUrl, storeUrl: null };
     }
 
     if (typeof epicName !== 'string') return null;
@@ -181,16 +200,22 @@ export class GamesService {
     name: string,
   ): Promise<ResolvedGame | null> {
     try {
-      return await this.prisma.game.create({
+      const row = await this.prisma.game.create({
         data: { source, externalId, name },
         select: { id: true, name: true, iconUrl: true },
       });
+      return { ...row, storeUrl: storeUrlFor(source, externalId) };
     } catch (err) {
       // Eşzamanlı iki istek aynı oyunu açtı: kazananın kaydı geçerli (ilk gelen kilitlenir).
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         const winner = await this.findExternal(source, externalId);
         return winner && !winner.hidden
-          ? { id: winner.id, name: winner.name, iconUrl: winner.iconUrl }
+          ? {
+              id: winner.id,
+              name: winner.name,
+              iconUrl: winner.iconUrl,
+              storeUrl: storeUrlFor(source, externalId),
+            }
           : null;
       }
       throw err;
