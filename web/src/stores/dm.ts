@@ -96,8 +96,30 @@ export const useDmStore = defineStore('dm', () => {
    */
   function isSeen(channelId: string, messageCreatedAt: string): boolean {
     const ch = channels.value.find((c) => c.id === channelId)
-    if (!ch || ch.type !== 'DM' || !ch.otherReadAt) return false
-    return messageCreatedAt <= ch.otherReadAt
+    if (!ch) return false
+    // C34: grupta çift tik = uygun üyelerin HEPSİ okudu (`groupAllReadAt`)
+    const readAt = ch.type === 'DM' ? ch.otherReadAt : ch.groupAllReadAt
+    if (!readAt) return false
+    return messageCreatedAt <= readAt
+  }
+
+  /**
+   * C34 — WS `dm:groupRead`: bir grup üyesi okudu; sunucu BU izleyicinin gözünden güncel toplu durumu
+   * yollar (bireysel okuma anı/okuyan kimliği yok). Kapı ve zaman sunucudan olduğu gibi alınır.
+   */
+  function applyGroupReadReceipt(payload: {
+    channelId: string
+    receiptsEnabled: boolean
+    groupAllReadAt: string | null
+  }) {
+    const ch = channels.value.find((c) => c.id === payload.channelId)
+    if (!ch || ch.type !== 'GROUP_DM') return
+    ch.receiptsEnabled = payload.receiptsEnabled
+    // Geriye gitme: yarış hâlinde eski olay yeni tarihi ezmesin (kapı kapanınca null serbest).
+    if (payload.groupAllReadAt && ch.groupAllReadAt && ch.groupAllReadAt > payload.groupAllReadAt) {
+      return
+    }
+    ch.groupAllReadAt = payload.groupAllReadAt
   }
 
   /**
@@ -107,7 +129,7 @@ export const useDmStore = defineStore('dm', () => {
    */
   function showsReceipts(channelId: string): boolean {
     const ch = channels.value.find((c) => c.id === channelId)
-    return !!ch && ch.type === 'DM' && ch.receiptsEnabled === true
+    return !!ch && ch.receiptsEnabled === true
   }
 
   function removeChannel(channelId: string) {
@@ -261,6 +283,7 @@ export const useDmStore = defineStore('dm', () => {
     applyActivity,
     applyReadReceipt,
     isSeen,
+    applyGroupReadReceipt,
     showsReceipts,
     createGroup,
     addGroupMember,

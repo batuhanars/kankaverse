@@ -35,6 +35,10 @@ export type DmChannelDto =
       members: DmParticipantDto[];
       lastMessage: MessageDto | null;
       unread: boolean;
+      // C34 — grup okundu: receiptsEnabled gizlilik kapısı; groupAllReadAt = uygun üyelerin HEPSİ
+      // en az bu ana kadar okudu (biri hiç okumadıysa null → tek tik). Bireysel okuma anı yoktur.
+      receiptsEnabled?: boolean;
+      groupAllReadAt?: string | null;
     };
 
 export interface MessageRequestDto {

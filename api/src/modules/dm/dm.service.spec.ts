@@ -4,7 +4,7 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { DmService, readReceiptDecision } from './dm.service';
+import { DmService, readReceiptDecision, groupReadReceiptDecision } from './dm.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
 
@@ -886,8 +886,28 @@ describe('DmService — C9 Mesaj İstekleri', () => {
         dmRequestStatus: null,
         createdAt: now,
         members: [
-          { userId: SENDER, lastReadAt: null, user: { id: SENDER, username: 's', avatarUrl: null, avatarAnimatedUrl: null, readReceipts: selfReceipts } },
-          { userId: TARGET, lastReadAt: readAt, user: { id: TARGET, username: 't', avatarUrl: null, avatarAnimatedUrl: null, readReceipts: otherReceipts } },
+          {
+            userId: SENDER,
+            lastReadAt: null,
+            user: {
+              id: SENDER,
+              username: 's',
+              avatarUrl: null,
+              avatarAnimatedUrl: null,
+              readReceipts: selfReceipts,
+            },
+          },
+          {
+            userId: TARGET,
+            lastReadAt: readAt,
+            user: {
+              id: TARGET,
+              username: 't',
+              avatarUrl: null,
+              avatarAnimatedUrl: null,
+              readReceipts: otherReceipts,
+            },
+          },
         ],
         messages: [],
       },
@@ -1030,5 +1050,185 @@ describe('readReceiptDecision — C12 §3.2 (R7)', () => {
     expect(
       readReceiptDecision({ ...base, viewerReadReceipts: false, otherReadReceipts: false }).visible,
     ).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// C34 §1 — GRUP DM okundu kararı (R7). Bireysel lastReadAt yanıta asla çıkmaz.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('groupReadReceiptDecision — C34 §1 (R7)', () => {
+  const T1 = new Date('2026-10-29T10:00:00.000Z');
+  const T2 = new Date('2026-10-29T10:05:00.000Z');
+  const T3 = new Date('2026-10-29T10:09:00.000Z');
+  const m = (
+    lastReadAt: Date | null,
+    over: Partial<{ readReceipts: boolean; blockedEitherWay: boolean }> = {},
+  ) => ({
+    readReceipts: true,
+    blockedEitherWay: false,
+    lastReadAt,
+    ...over,
+  });
+
+  it('herkes okuduysa all = en küçük', () => {
+    expect(
+      groupReadReceiptDecision({ viewerReadReceipts: true, members: [m(T2), m(T1), m(T3)] }),
+    ).toEqual({ visible: true, allReadAt: T1 });
+  });
+
+  it('hiç okumayan üye varken all null, some okuyanların en büyüğü', () => {
+    expect(
+      groupReadReceiptDecision({ viewerReadReceipts: true, members: [m(T2), m(null)] }),
+    ).toEqual({ visible: true, allReadAt: null });
+  });
+
+  it('kimse okumadıysa ikisi de null ama görünür (gri tek tik değil, bekleyen)', () => {
+    expect(
+      groupReadReceiptDecision({ viewerReadReceipts: true, members: [m(null), m(null)] }),
+    ).toEqual({ visible: true, allReadAt: null });
+  });
+
+  it('ayarı kapalı üye hesaba katılmaz (ne all bekler ne some olur)', () => {
+    expect(
+      groupReadReceiptDecision({
+        viewerReadReceipts: true,
+        members: [m(T3), m(null, { readReceipts: false })],
+      }),
+    ).toEqual({ visible: true, allReadAt: T3 });
+  });
+
+  it('engelli üye hesaba katılmaz', () => {
+    expect(
+      groupReadReceiptDecision({
+        viewerReadReceipts: true,
+        members: [m(T2), m(T1, { blockedEitherWay: true })],
+      }),
+    ).toEqual({ visible: true, allReadAt: T2 });
+  });
+
+  it('izleyicinin kendi ayarı kapalıysa görünmez ve zaman sızmaz', () => {
+    expect(groupReadReceiptDecision({ viewerReadReceipts: false, members: [m(T1)] })).toEqual({
+      visible: false,
+      allReadAt: null,
+    });
+  });
+
+  it('uygun üye yoksa görünmez', () => {
+    expect(
+      groupReadReceiptDecision({
+        viewerReadReceipts: true,
+        members: [m(T1, { readReceipts: false }), m(T2, { blockedEitherWay: true })],
+      }),
+    ).toEqual({ visible: false, allReadAt: null });
+    expect(groupReadReceiptDecision({ viewerReadReceipts: true, members: [] }).visible).toBe(false);
+  });
+
+  it('çıktıda bireysel okuma anı alanı yok (yalnız iki anahtar)', () => {
+    const out = groupReadReceiptDecision({ viewerReadReceipts: true, members: [m(T1), m(T2)] });
+    expect(Object.keys(out).sort()).toEqual(['allReadAt', 'visible']);
+  });
+});
+
+describe('DmService — C34 grup okundu: liste ucu ve canlı yayın', () => {
+  const U = 'u-viewer';
+  const A = 'u-a';
+  const B = 'u-b';
+  const GCH = 'g-1';
+  const t = (s: string) => new Date(`2026-10-29T${s}.000Z`);
+  const mem = (userId: string, lastReadAt: Date | null, readReceipts = true) => ({
+    userId,
+    lastReadAt,
+    user: { id: userId, username: userId, avatarUrl: null, avatarAnimatedUrl: null, readReceipts },
+  });
+  const groupRow = (members: any[]) => ({
+    lastReadAt: null,
+    clearedAt: null,
+    channel: {
+      id: GCH,
+      type: 'GROUP_DM',
+      name: 'g',
+      ownerId: U,
+      deletedAt: null,
+      dmRequestStatus: null,
+      createdAt: t('10:00:00'),
+      members,
+      messages: [],
+    },
+  });
+
+  it('liste: grup satırı toplu iki zaman taşır, bireysel okuma anı yok', async () => {
+    resetMocks();
+    const service = makeService();
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      groupRow([mem(U, null), mem(A, t('10:05:00')), mem(B, t('10:08:00'))]),
+    ]);
+    prismaMock.userBlock.findMany.mockResolvedValue([]);
+    const res = (await service.getDmChannels(U)) as any[];
+    expect(res[0].receiptsEnabled).toBe(true);
+    expect(res[0].groupAllReadAt).toBe(t('10:05:00').toISOString());
+    expect(res[0].groupSomeReadAt).toBeUndefined();
+    expect(res[0].members[0].lastReadAt).toBeUndefined();
+    expect(res[0].members.every((x: any) => x.readReceipts === undefined)).toBe(true);
+  });
+
+  it('liste: engelli üye ve kapalı üye sayılmaz, izleyici kapalıysa receiptsEnabled false', async () => {
+    resetMocks();
+    const service = makeService();
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      groupRow([mem(U, null), mem(A, t('10:05:00')), mem(B, t('10:08:00'), false)]),
+    ]);
+    prismaMock.userBlock.findMany
+      .mockResolvedValueOnce([{ blockedId: A }])
+      .mockResolvedValueOnce([]);
+    const res = (await service.getDmChannels(U)) as any[];
+    // A engelli, B kapalı: uygun üye kalmadı
+    expect(res[0].receiptsEnabled).toBe(false);
+    expect(res[0].groupAllReadAt).toBeNull();
+    expect(res[0].groupSomeReadAt).toBeUndefined();
+
+    resetMocks();
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      groupRow([mem(U, null, false), mem(A, t('10:05:00'))]),
+    ]);
+    prismaMock.userBlock.findMany.mockResolvedValue([]);
+    const res2 = (await makeService().getDmChannels(U)) as any[];
+    expect(res2[0].receiptsEnabled).toBe(false);
+  });
+
+  it('markRead grupta: diğer her üyeye kendi gözünden dm:groupRead, okuyana değil, kimlik/bireysel an yok', async () => {
+    resetMocks();
+    const service = makeService();
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'm-1' });
+    prismaMock.channelMember.update.mockResolvedValue({});
+    prismaMock.channel.findUnique.mockResolvedValue({
+      type: 'GROUP_DM',
+      dmRequestStatus: null,
+      members: [],
+    });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      mem(U, t('10:09:00')),
+      mem(A, t('10:05:00')),
+      mem(B, null, false),
+    ]);
+    prismaMock.userBlock.findMany.mockResolvedValue([]);
+
+    await service.markRead(U, GCH);
+
+    const calls = realtimeMock.emitToUser.mock.calls.filter((c) => c[1] === 'dm:groupRead');
+    expect(calls.map((c) => c[0]).sort()).toEqual([A, B].sort());
+    // A'nın gözünden: uygun üye yalnız U (B kapalı) → all = some = U'nun okuması
+    const toA = calls.find((c) => c[0] === A)![2];
+    expect(toA).toEqual({
+      channelId: GCH,
+      receiptsEnabled: true,
+      groupAllReadAt: t('10:09:00').toISOString(),
+    });
+    // B kendi ayarını kapattı: görmez
+    const toB = calls.find((c) => c[0] === B)![2];
+    expect(toB.receiptsEnabled).toBe(false);
+    expect(toB.groupAllReadAt).toBeNull();
+    expect(toB.groupSomeReadAt).toBeUndefined();
+    // 1-1 olayı grupta gitmez
+    expect(realtimeMock.emitToUser.mock.calls.some((c) => c[1] === 'dm:read')).toBe(false);
   });
 });

@@ -518,12 +518,11 @@ function isMine(msg: MessageDto): boolean {
  * Kurallar burada değil, sunucunun verdiği `otherReadAt`te toplanıyor (`visibleReadAt`, R7):
  * alan null geldiyse `showsReceipts` false döner ve gösterge tamamen kaybolur. Bu bilinçli —
  * "tek tikte donmuş" bir gösterge, gizliliğin kapalı olduğunu sızdırmadan yanlış bilgi verirdi.
- * Grup DM'de de null: sunucu o kanalda `otherReadAt` göndermiyor.
+ * Grup DM (C34): çift tik = uygun üyelerin HEPSİ okudu (`groupAllReadAt`); ara durum yok.
+ * Yalnız iki durum: 'sent' (gönderildi) ve 'seen' (okundu). Ortam kanalında tik yok (bu bileşen DM'e özel).
  */
 function messageReceipt(msg: MessageDto): 'sent' | 'seen' | null {
   if (!isMine(msg)) return null
-  // Okundu bilgisi yalnız 1-1 DM'de; grup DM'de gösterge yok.
-  if (props.channel.type !== 'DM') return null
   // Sahip kararı 2026-10-29: gizlilik kapısı kapalıysa gösterge gizlenmez, tek tik "gönderildi" kalır
   // (okuma anı sunucudan zaten gelmez, bilgi sızmaz).
   if (!dmStore.showsReceipts(props.channel.id)) return 'sent'

@@ -119,6 +119,13 @@ code, pre, .font-mono {
   margin-bottom: 0;
 }
 
+/* C34: okundu tiki / (düzenlendi) metnin SON satırının sonuna aksın diye son paragraf satır içine alınır
+   (blok-içinde-satır-içi ayrımı: kv-md satır içi, son <p> satır içi, ondan sonra gelen simge aynı satırda). */
+.kv-md.kv-md-tail,
+.kv-md.kv-md-tail > p:last-child {
+  display: inline;
+}
+
 /* Satır içi kod */
 .kv-md code {
   font-family: var(--kv-font-mono);

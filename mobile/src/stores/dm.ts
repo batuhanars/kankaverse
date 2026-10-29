@@ -67,6 +67,11 @@ interface DmState {
   clearUnread: (channelId: string) => void;
   /** C12 §4.1 — WS `dm:read`: karşı taraf bu kanalı okudu, kanal başına tek tarih güncellenir. */
   applyReadReceipt: (payload: { channelId: string; readAt: string }) => void;
+  applyGroupReadReceipt: (payload: {
+    channelId: string;
+    receiptsEnabled: boolean;
+    groupAllReadAt: string | null;
+  }) => void;
   /** Sözleşme §3.2 — sıfırdan DM başlat. Sunucu kanal zaten varsa mevcut olanı döner; burada id'ye
    *  göre eşleştirilir (kopya kutucuk açılmaz). */
   createChannel: (userId: string) => Promise<DmChannelDto>;
@@ -223,6 +228,21 @@ export const useDmStore = create<DmState>((set, get) => ({
         // Geriye gitme: yarış hâlinde eski bir olay yeni tarihi ezmesin.
         if (c.otherReadAt && c.otherReadAt >= readAt) return c;
         return { ...c, otherReadAt: readAt } as DmChannelDto;
+      }),
+    }));
+  },
+
+  /**
+   * C34 — WS `dm:groupRead`: grup üyesi okudu; sunucu bu izleyicinin gözünden toplu durumu yollar
+   * (bireysel okuma anı yok). Kapı ve zaman sunucudan olduğu gibi alınır, burada ikinci süzgeç yok.
+   */
+  applyGroupReadReceipt({ channelId, receiptsEnabled, groupAllReadAt }) {
+    set((s) => ({
+      channels: s.channels.map((c) => {
+        if (c.id !== channelId || c.type !== 'GROUP_DM') return c;
+        // Geriye gitme: yarış hâlinde eski olay yeni tarihi ezmesin.
+        if (groupAllReadAt && c.groupAllReadAt && c.groupAllReadAt > groupAllReadAt) return c;
+        return { ...c, receiptsEnabled, groupAllReadAt } as DmChannelDto;
       }),
     }));
   },

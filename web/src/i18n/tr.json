@@ -1007,8 +1007,8 @@
     "delete": "Sil",
     "edited": "(düzenlendi)",
     "receipt": {
-      "sent": "İletildi",
-      "seen": "Görüldü"
+      "sent": "Gönderildi",
+      "seen": "Okundu"
     },
     "deleteConfirm": "Bu mesajı silmek istediğinden emin misin? Bu işlem geri alınamaz.",
     "editHint": "Enter kaydet · Esc iptal",

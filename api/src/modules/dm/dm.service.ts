@@ -67,6 +67,50 @@ export function readReceiptDecision(input: {
   return { visible: true, readAt: input.otherLastReadAt ?? null };
 }
 
+/**
+ * 🫀 C34 §1 — GRUP DM okundu durumu kararı. **T&S karar fonksiyonu (R7), satır satır insan
+ * incelemesi zorunlu.** `readReceiptDecision` (1-1) DEĞİŞMEDİ; bu ayrı ve saf bir kardeşi.
+ *
+ * Grupta "karşı taraf" tek kişi değil. İzleyiciye YALNIZ tek toplu zaman verilir:
+ *   `allReadAt` = uygun üyelerin `lastReadAt`lerinin EN KÜÇÜĞÜ (biri hiç okumadıysa null) → "herkes okudu"
+ * Sahip kararı 2026-10-29: "bazıları okudu" ara durumu YOK; en-büyük zaman hesaplanmaz ve gönderilmez.
+ * 🔴 Bireysel `lastReadAt` bu fonksiyonun çıktısında HİÇ bulunmaz: kim okudu sorusu cevaplanamaz
+ * (OUT: "kim okudu" listesi).
+ *
+ * Uygun üye (izleyici HARİÇ olarak çağıran filtreler): `readReceipts` açık VE izleyiciyle iki yönde
+ * de engel ilişkisi yok. Kapalı/engelli üye hiç sayılmaz: ne `all` kapısını bekletir ne `some`a girer.
+ *
+ * Fail-closed:
+ *  - İzleyicinin kendi `readReceipts`'i kapalıysa → görünmez (karşılıklılık, C12 madde 5 ile aynı).
+ *  - Uygun üye yoksa → görünmez, iki zaman null.
+ */
+export interface GroupReadReceiptDecision {
+  /** Çift tik çizilecek mi. false → istemci grupta yalnız gri tek tik çizer. */
+  visible: boolean;
+  allReadAt: Date | null;
+}
+
+export function groupReadReceiptDecision(input: {
+  viewerReadReceipts: boolean;
+  /** İzleyici HARİÇ diğer üyeler. */
+  members: Array<{
+    readReceipts: boolean;
+    blockedEitherWay: boolean;
+    lastReadAt: Date | null;
+  }>;
+}): GroupReadReceiptDecision {
+  const hidden: GroupReadReceiptDecision = { visible: false, allReadAt: null };
+  if (!input.viewerReadReceipts) return hidden;
+
+  const eligible = input.members.filter((m) => m.readReceipts && !m.blockedEitherWay);
+  if (eligible.length === 0) return hidden;
+
+  const times = eligible.map((m) => m.lastReadAt?.getTime() ?? null);
+  const readTimes = times.filter((t): t is number => t !== null);
+  const allReadAt = readTimes.length === times.length ? new Date(Math.min(...readTimes)) : null;
+  return { visible: true, allReadAt };
+}
+
 @Injectable()
 export class DmService {
   constructor(
@@ -153,13 +197,20 @@ export class DmService {
       .map((m) => m.channel.members.find((cm) => cm.userId !== userId)?.userId)
       .filter((id): id is string => !!id);
 
+    // C34: grup üyeleri de aynı toplu blok sorgusuna katılır (grup okundu kararı için); 1-1 kararı
+    // yalnız `otherUserIds` üzerinden okunur, davranışı değişmez.
+    const groupMemberIds = groupMemberships.flatMap((m) =>
+      m.channel.members.filter((cm) => cm.userId !== userId).map((cm) => cm.userId),
+    );
+    const blockLookupIds = [...otherUserIds, ...groupMemberIds];
+
     const [blockedByMeRecords, blockedByOtherRecords] = await Promise.all([
       this.prisma.userBlock.findMany({
-        where: { blockerId: userId, blockedId: { in: otherUserIds } },
+        where: { blockerId: userId, blockedId: { in: blockLookupIds } },
         select: { blockedId: true },
       }),
       this.prisma.userBlock.findMany({
-        where: { blockedId: userId, blockerId: { in: otherUserIds } },
+        where: { blockedId: userId, blockerId: { in: blockLookupIds } },
         select: { blockerId: true },
       }),
     ]);
@@ -240,6 +291,19 @@ export class DmService {
       const unread =
         lastMsg !== null && (m.lastReadAt === null || lastMsg.createdAt > m.lastReadAt);
 
+      // C34 §1: grup okundu kararı; bireysel lastReadAt yanıta YAZILMAZ, yalnız toplu tek zaman.
+      const groupReceipt = groupReadReceiptDecision({
+        viewerReadReceipts:
+          m.channel.members.find((cm) => cm.userId === userId)?.user.readReceipts ?? false,
+        members: m.channel.members
+          .filter((cm) => cm.userId !== userId)
+          .map((cm) => ({
+            readReceipts: cm.user.readReceipts,
+            blockedEitherWay: selfBlockedSet.has(cm.userId) || blockedMeSet.has(cm.userId),
+            lastReadAt: cm.lastReadAt,
+          })),
+      });
+
       result.push({
         id: m.channel.id,
         type: 'GROUP_DM' as const,
@@ -266,6 +330,8 @@ export class DmService {
             }
           : null,
         unread,
+        receiptsEnabled: groupReceipt.visible,
+        groupAllReadAt: groupReceipt.allReadAt ? groupReceipt.allReadAt.toISOString() : null,
       });
     }
 
@@ -633,7 +699,7 @@ export class DmService {
    * tiki BEKLEMEDEN çift tike dönsün. Yayın kararı DTO ile aynı fonksiyondan (`readReceiptDecision`)
    * geçer: görmeye hakkı yoksa olay HİÇ gönderilmez, "istemci nasılsa gizler" denmez.
    *
-   * Grup DM'de yayın yok — `readReceiptDecision` grup için `visible: false` döner (C12 §8, karar C12c'de).
+   * Grup DM'de yayın `dm:groupRead` (C34, `emitGroupReadReceipt`); 1-1 `readReceiptDecision` grup için hep `visible: false`.
    */
   async markRead(userId: string, channelId: string) {
     const member = await this.prisma.channelMember.findUnique({
@@ -696,7 +762,13 @@ export class DmService {
           },
         },
       });
-      if (!channel || channel.type !== 'DM') return;
+      if (!channel) return;
+      // C34: grup DM'de karar çok kişili ve ayrı fonksiyonda; 1-1 yolu aşağıda AYNEN.
+      if (channel.type === 'GROUP_DM') {
+        await this.emitGroupReadReceipt(channelId, readerId);
+        return;
+      }
+      if (channel.type !== 'DM') return;
 
       const reader = channel.members.find((m) => m.userId === readerId);
       const recipient = channel.members.find((m) => m.userId !== readerId);
@@ -730,6 +802,51 @@ export class DmService {
     } catch {
       // Yayın kozmetiktir: okuma zaten yazıldı, bir sonraki `GET /dm/channels` doğru değeri taşır.
       // Kullanıcının okuma işlemini bir soket hatası yüzünden 500'e çevirmek orantısız olurdu.
+    }
+  }
+
+  /**
+   * C34 §1.4 — grup DM'de bir üye okuyunca DİĞER her üyeye, O ÜYENİN gözünden güncel toplu durum
+   * (`dm:groupRead`). Karar `groupReadReceiptDecision` ile alınır; payload'da bireysel okuma anı
+   * YOKTUR (okuyanın kimliği bile gitmez, istemci yalnız toplu tek zamanı değiştirir). Okuyanın
+   * kendisine gitmez: kendi okuması kendi tikini değiştirmez. Hata okumayı bozmaz (çağıran try/catch).
+   */
+  private async emitGroupReadReceipt(channelId: string, readerId: string): Promise<void> {
+    const members = await this.prisma.channelMember.findMany({
+      where: { channelId },
+      select: {
+        userId: true,
+        lastReadAt: true,
+        user: { select: { readReceipts: true } },
+      },
+    });
+    const ids = members.map((m) => m.userId);
+    const blocks = await this.prisma.userBlock.findMany({
+      where: { blockerId: { in: ids }, blockedId: { in: ids } },
+      select: { blockerId: true, blockedId: true },
+    });
+    const isBlocked = (a: string, b: string) =>
+      blocks.some(
+        (x) => (x.blockerId === a && x.blockedId === b) || (x.blockerId === b && x.blockedId === a),
+      );
+
+    for (const viewer of members) {
+      if (viewer.userId === readerId) continue;
+      const decision = groupReadReceiptDecision({
+        viewerReadReceipts: viewer.user.readReceipts,
+        members: members
+          .filter((m) => m.userId !== viewer.userId)
+          .map((m) => ({
+            readReceipts: m.user.readReceipts,
+            blockedEitherWay: isBlocked(viewer.userId, m.userId),
+            lastReadAt: m.lastReadAt,
+          })),
+      });
+      this.realtime.emitToUser(viewer.userId, 'dm:groupRead', {
+        channelId,
+        receiptsEnabled: decision.visible,
+        groupAllReadAt: decision.allReadAt ? decision.allReadAt.toISOString() : null,
+      });
     }
   }
 

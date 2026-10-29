@@ -238,6 +238,14 @@ export function useSocket() {
       dmStore.applyReadReceipt(data)
     })
 
+    // C34 — grup DM'de bir üye okudu: toplu "herkes okudu" zamanı (sunucu bu izleyicinin gözünden hesaplar)
+    socket.on(
+      'dm:groupRead',
+      (data: { channelId: string; receiptsEnabled: boolean; groupAllReadAt: string | null }) => {
+        dmStore.applyGroupReadReceipt(data)
+      },
+    )
+
     // C9 — bana yeni mesaj isteği geldi (sessiz: masaüstü toast YOK, yalnız "Mesaj İstekleri" rozeti güncellenir)
     socket.on('dm.request', () => {
       dmStore.fetchRequests().catch(() => {})

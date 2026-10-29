@@ -136,6 +136,10 @@ export type DmChannelDto =
       members: GroupDmMemberDto[]
       lastMessage: MessageDto | null
       unread: boolean
+      // C34 — grup okundu: receiptsEnabled gizlilik kapısı; groupAllReadAt = uygun üyelerin HEPSİ
+      // en az bu ana kadar okudu (biri hiç okumadıysa null → tek tik). Bireysel okuma anı yoktur.
+      receiptsEnabled?: boolean
+      groupAllReadAt?: string | null
     }
 
 // C9 — Mesaj İsteği (arkadaş olmayan birinin gönderdiği bekleyen DM isteği)

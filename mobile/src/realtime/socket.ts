@@ -294,6 +294,14 @@ function ensureSocket(): Socket {
     useDmStore.getState().applyReadReceipt(data);
   });
 
+  // C34 — grup DM'de bir üye okudu: toplu "herkes okudu" zamanı (sunucu bu izleyicinin gözünden hesaplar)
+  socket.on(
+    'dm:groupRead',
+    (data: { channelId: string; receiptsEnabled: boolean; groupAllReadAt: string | null }) => {
+      useDmStore.getState().applyGroupReadReceipt(data);
+    },
+  );
+
   socket.on('dm.request', () => {
     useDmStore.getState().refreshRequests();
   });

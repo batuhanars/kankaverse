@@ -185,28 +185,28 @@ export default function DmScreen() {
    * Kurallar burada değil, sunucunun verdiği `otherReadAt`te toplanıyor (`visibleReadAt`, R7):
    * alan null geldiyse `showsReceipts` false döner ve gösterge tamamen kaybolur. Bilinçli —
    * "tek tikte donmuş" bir gösterge, gizliliğin kapalı olduğunu sızdırmadan yanlış bilgi verirdi.
-   * Grup DM'de de null: sunucu o kanalda `otherReadAt` göndermiyor.
+   * Grup DM (C34): çift tik = uygun üyelerin HEPSİ okudu (`groupAllReadAt`); yalnız iki durum.
    */
   // 🔴 Kaynak `storeChannel` (zaten reaktif abonelik) — `useDmStore.getState()` DEĞİL: anlık
   // okuma yapan bir sürüm yazılmıştı ve `dm:read` gelince ekran yeniden çizilmediği için tik
   // hiç güncellenmezdi. Store yeni kanal nesnesi ürettiği için buradaki bağımlılık tetikleniyor.
-  const receiptsEnabled = storeChannel?.type === 'DM' ? storeChannel.receiptsEnabled === true : false;
-  const otherReadAt = storeChannel?.type === 'DM' ? (storeChannel.otherReadAt ?? null) : null;
+  const receiptsEnabled = storeChannel ? storeChannel.receiptsEnabled === true : false;
+  const otherReadAt = storeChannel
+    ? ((storeChannel.type === 'DM' ? storeChannel.otherReadAt : storeChannel.groupAllReadAt) ?? null)
+    : null;
 
   const receiptFor = useCallback(
     (m: MessageDto): 'sent' | 'seen' | null => {
       if (!myUserId || m.author.id !== myUserId) return null;
       // C29 iyimser gönderim: henüz sunucuya ulaşmamış mesajda tik yok (soluk görünüm yeterli).
       if (m.id.startsWith('pending:')) return null;
-      // Okundu bilgisi yalnız 1-1 DM'de; grup DM'de gösterge yok.
-      if (isGroupDm) return null;
       // Sahip kararı 2026-10-29: gizlilik kapısı kapalıysa (ayar, engel, istek) gösterge GİZLENMEZ,
       // tek tik "gönderildi" kalır. Okuma bilgisi sızmaz: otherReadAt zaten sunucudan null gelir.
       if (!receiptsEnabled) return 'sent';
       if (!otherReadAt) return 'sent';
       return m.createdAt <= otherReadAt ? 'seen' : 'sent';
     },
-    [myUserId, isGroupDm, receiptsEnabled, otherReadAt],
+    [myUserId, receiptsEnabled, otherReadAt],
   );
 
   if (!channelId) return null;

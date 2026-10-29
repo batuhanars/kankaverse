@@ -16,6 +16,7 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AttachmentView from './AttachmentView.vue'
+import ReceiptTick from './ReceiptTick.vue'
 import MessageActionsMenu from './MessageActionsMenu.vue'
 import { formatMentionsPlain } from '@/utils/mentions'
 import { renderMessageHtml } from '@/utils/markdown'
@@ -85,6 +86,8 @@ onUnmounted(() => clearActive(overlayKey.value))
 
 // C29 — geçici (iyimser) mesaj: menü/tepki/düzenle/sil/sabitle/yanıtla/ilet KAPALI, yalnız Tekrar dene / Sil.
 const isLocal = computed(() => !!props.message.localStatus)
+// C34: tik yalnız gönderilmiş (yerel/bekleyen olmayan) mesajda; sunucu bilgi vermediyse (`receipt` null) hiç çizilmez.
+const showReceipt = computed(() => !!props.receipt && !isLocal.value)
 
 // Takip mesajına hover'da saat gösterimi
 const showFollowTime = ref(false)
@@ -280,45 +283,46 @@ const renderedContent = computed<string>(() => {
               Sprint V2 Markdown: v-html yalnız DOMPurify sanitize edilmiş HTML alır.
               Ham içerik asla doğrudan v-html'e girmez (renderMessageHtml bunu garantiler).
             -->
-            <div
-              class="kv-md px-3 pb-3 pt-1.5 text-[16px] break-words"
-              style="color: var(--kv-text-primary);"
-              v-html="renderedContent"
-            />
+            <div class="px-3 pb-3 pt-1.5 text-[16px] break-words">
+              <div
+                class="kv-md"
+                :class="{ 'kv-md-tail': showReceipt }"
+                style="color: var(--kv-text-primary);"
+                v-html="renderedContent"
+              /><ReceiptTick v-if="showReceipt && receipt" :receipt="receipt" />
+            </div>
           </div>
         </template>
         <template v-else>
-          <!-- Yalnız metin: markdown render (güvenli v-html) -->
-          <div
-            v-if="message.content"
-            class="kv-md text-[16px] break-words"
-            style="color: var(--kv-text-primary);"
-            v-html="renderedContent"
-          />
-          <!-- Takip mesajında (başlık yok) "(düzenlendi)" metni + pin rozeti gövde dışında -->
-          <template v-if="!isGroupStart && message.content">
-            <span
+          <!-- Yalnız metin: markdown render (güvenli v-html). C34: tik, (düzenlendi)/pin ile birlikte
+               metnin SON satırının sonuna satır içi akar (kv-md-tail son paragrafı satır içine alır). -->
+          <div v-if="message.content" class="text-[16px] break-words">
+            <div
+              class="kv-md"
+              :class="{ 'kv-md-tail': showReceipt }"
+              style="color: var(--kv-text-primary);"
+              v-html="renderedContent"
+            /><template v-if="!isGroupStart"><span
               v-if="message.editedAt"
               class="text-[11px] ml-1"
               style="color: var(--kv-text-muted);"
-            >
-              {{ t('message.edited') }}
-            </span>
-            <span
+            >{{ t('message.edited') }}</span><span
               v-if="message.pinnedAt"
               class="text-[11px] ml-1 select-none"
               style="color: var(--kv-text-muted);"
               :title="t('message.pinnedMessages')"
-            >
-              📌
-            </span>
-          </template>
+            >📌</span></template><ReceiptTick v-if="showReceipt && receipt" :receipt="receipt" />
+          </div>
           <!-- Yalnız ek (açıklamasız) -->
           <AttachmentView
             v-for="att in message.attachments"
             :key="att.id"
             :attachment="att"
           />
+          <!-- Metinsiz mesajda tik, ekin altındaki son satırın sonunda -->
+          <div v-if="showReceipt && receipt && !message.content" class="mt-0.5 text-[16px] leading-none">
+            <ReceiptTick :receipt="receipt" />
+          </div>
         </template>
 
         <!-- Reaksiyon pill'leri -->
@@ -326,25 +330,6 @@ const renderedContent = computed<string>(() => {
           <slot name="reactions" />
         </div>
 
-        <!-- C12 §4.2 — okundu göstergesi. YALNIZ kendi mesajımda ve YALNIZ sunucu bilgiyi
-             vermişse (`receipt` null ise hiç çizilmez: gizlilik kapalı, bekleyen istek, engel,
-             grup DM, ortam kanalı). "Takılı kalmış tek tik" görüntüsü bilerek yok — gösterge ya
-             anlamlıdır ya da hiç yoktur. İkon tek başına bilgi taşımasın diye `title` + `aria-label`
-             i18n'den geliyor. -->
-        <div v-if="receipt && !isLocal" class="flex justify-end mt-0.5 select-none">
-          <span
-            class="inline-flex items-center"
-            :style="`color: ${receipt === 'seen' ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)'};`"
-            :title="t(`message.receipt.${receipt}`)"
-            :aria-label="t(`message.receipt.${receipt}`)"
-            role="img"
-          >
-            <svg width="16" height="12" viewBox="0 0 20 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M1 6.5 4.5 10 11 2" />
-              <path v-if="receipt === 'seen'" d="M8 6.5 11.5 10 18 2" />
-            </svg>
-          </span>
-        </div>
       </template>
 
       <!-- C29: gönderilemedi satırı (tehlike rengi) + Tekrar dene · Sil -->

@@ -54,7 +54,6 @@ interface MetaProps {
 /** Sağa yaslı meta satırı: `düzenlendi` + saat + okundu ikonu (C12 §4.2: ikon ya anlamlıdır ya hiç). */
 export function BubbleMeta({ message, isMine, receipt, inline }: MetaProps) {
   const color = isMine ? theme.colors.textBody : theme.colors.textMuted;
-  const seenColor = isMine ? theme.colors.textPrimary : theme.colors.accent500;
   return (
     <View style={[metaStyles.row, inline && metaStyles.rowInline]}>
       {message.editedAt ? <Text style={[metaStyles.text, { color }]}>{t('message.edited')}</Text> : null}
@@ -63,7 +62,7 @@ export function BubbleMeta({ message, isMine, receipt, inline }: MetaProps) {
         <Ionicons
           name={receipt === 'seen' ? 'checkmark-done' : 'checkmark'}
           size={14}
-          color={receipt === 'seen' ? seenColor : isMine ? theme.colors.textSecondary : theme.colors.textMuted}
+          color={color}
           accessibilityLabel={t(`message.receipt.${receipt}`)}
         />
       ) : null}
