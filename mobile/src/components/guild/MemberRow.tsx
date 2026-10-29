@@ -48,7 +48,7 @@ export function MemberRow({ member, gameName, onPress }: Props) {
         </Text>
         {gameName ? (
           <View style={styles.playingRow}>
-            <Ionicons name="game-controller-outline" size={12} color={theme.colors.textSecondary} />
+            <Ionicons name="game-controller" size={12} color={theme.colors.online} />
             <Text style={styles.playing} numberOfLines={1}>
               {gameName}
             </Text>

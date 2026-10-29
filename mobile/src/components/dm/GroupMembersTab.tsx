@@ -125,9 +125,9 @@ export function GroupMembersTab({ channel }: Props) {
               {gameByUser[item.id] && (statusMap[item.id] ?? 'offline') !== 'offline' ? (
                 <View style={styles.memberPlayingRow}>
                   <Ionicons
-                    name="game-controller-outline"
+                    name="game-controller"
                     size={12}
-                    color={theme.colors.textSecondary}
+                    color={theme.colors.online}
                   />
                   <Text style={styles.memberPlaying} numberOfLines={1}>
                     {gameByUser[item.id].name}
