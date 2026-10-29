@@ -1,6 +1,6 @@
 # SPRINT C31c: Oyun yüzeyleri (logo, kart şeridi, Şimdi Aktif, yayın penceresi)
 
-> Durum: **SÖZLEŞME YAZILDI + SAHİP ONAYI (2026-10-29).** PM compose (Opus). **api + web (+ masaüstü yalnız mevcut köprü) +
+> Durum: **TAMAMLANDI (2026-10-29), sahip turu geçti** (logo, şerit, Şimdi Aktif, yayın penceresi, kayan yazı; oyun kolu simgesi dolgulu yeşil). PM compose (Opus). **api + web (+ masaüstü yalnız mevcut köprü) +
 > mobil yalnız renk.** C31b sahip turundan doğdu, Discord ekran görüntüleri referans (bilgi düzeni; görsel kopya değil, kendi
 > token'larımız). **R7-nötr olmalı:** oyun görünürlük kuralı (C31b §2) DEĞİŞMEZ, yayın kapıları DEĞİŞMEZ. Sapma ihtiyacı → DUR.
 

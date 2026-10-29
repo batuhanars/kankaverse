@@ -1,6 +1,6 @@
 # SPRINT C32: Sesli mesaj ses seviyesi eşitleme
 
-> Durum: **SÖZLEŞME YAZILDI + SAHİP ONAYI (2026-10-29).** PM compose (Opus). **Yalnız api** (+ canlıda bir kez geriye dönük komut).
+> Durum: **TAMAMLANDI (2026-10-29), sahip turu geçti.** Canlıda backfill: 13 işlendi, 0 atlandı, 0 hatalı. TP -2 (PM, sahip turu öncesi). PM compose (Opus). **Yalnız api** (+ canlıda bir kez geriye dönük komut).
 > R7-nötr (erişim/görünürlük kuralı yok). Sahip: "masaüstünden dinliyorum, ses çok kısık, sonuna kadar açmak zorunda kalıyorum".
 
 ---
