@@ -33,6 +33,23 @@ contextBridge.exposeInMainWorld('kankaverse', {
     return () => ipcRenderer.removeListener('update:ready', handler)
   },
 
+  /**
+   * C31b: algılanan oyun değişince cb({ ref, epicName? } | null). Süreç listesi/yol çıkmaz, yalnız ref.
+   * Abonelikten çıkış fonksiyonu döner.
+   */
+  onGameActivity: (cb) => {
+    const handler = (_event, activity) => cb(activity)
+    ipcRenderer.on('game:activity', handler)
+    ipcRenderer.send('game:request-current')
+    return () => ipcRenderer.removeListener('game:activity', handler)
+  },
+
+  /** C31b: sunucudaki elle oyun listesini algılayıcıya ver ([{ id, executables }]). */
+  setGameList: (list) => ipcRenderer.send('games:set-list', list),
+
+  /** C31b: ekran seçici bu adı içeren pencereyi seçili açsın (null temizler). */
+  setShareHint: (name) => ipcRenderer.send('share:set-hint', name),
+
   /** İndirilen güncellemeyi kurup uygulamayı yeniden başlatır. */
   installUpdate: () => ipcRenderer.send('update:install'),
 })

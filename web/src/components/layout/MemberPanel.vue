@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { usePresenceStore } from '@/stores/presence'
+import { useActivityStore } from '@/stores/activity'
 import { useAuthStore } from '@/stores/auth'
 import { useMembersStore } from '@/stores/members'
 import { useRolesStore } from '@/stores/roles'
@@ -23,6 +24,7 @@ import type { GuildMemberDto, RoleDto } from '@/types'
 const { t } = useI18n()
 const guildsStore = useGuildsStore()
 const presenceStore = usePresenceStore()
+const activityStore = useActivityStore()
 const authStore = useAuthStore()
 const membersStore = useMembersStore()
 const rolesStore = useRolesStore()
@@ -436,6 +438,7 @@ async function confirmTransfer() {
           :key="member.userId"
           :member="member"
           :presence-status="presenceStore.getStatus(member.userId)"
+          :game-name="activityStore.getGame(member.userId)?.name ?? null"
           :is-offline="group.key === 'offline'"
           :open-menu-user-id="openMenuUserId"
           :role-loading="roleLoading"

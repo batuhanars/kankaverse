@@ -5,10 +5,12 @@
  *
  * C7: kamera/ekran toggle'larına nudge kapısı eklendi (§E2/§E3).
  */
+import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useVoiceStore } from '@/stores/voice'
 import { voiceBroadcast } from '@/composables/useSocket'
 import { useVoiceNudge } from '@/composables/useVoiceNudge'
+import { useActivityStore } from '@/stores/activity'
 import EmergencyButton from '@/components/shared/EmergencyButton.vue'
 import CameraNudgeModal from '@/components/shared/CameraNudgeModal.vue'
 import ScreenNudgeModal from '@/components/shared/ScreenNudgeModal.vue'
@@ -16,6 +18,7 @@ import ScreenNudgeModal from '@/components/shared/ScreenNudgeModal.vue'
 const { t } = useI18n()
 const voiceStore = useVoiceStore()
 const nudge = useVoiceNudge()
+const activityStore = useActivityStore()
 
 // ── C7: Kamera toggle (nudge kapılı) ─────────────────────────────────────────
 async function handleToggleCamera() {
@@ -46,6 +49,36 @@ async function onScreenNudgeConfirm() {
   nudge.confirmScreenNudge()
   await doToggleScreen()
 }
+
+// ── C31b §4.6: oyunu yayınla ───────────────────────────────────────────────
+// Düğme yalnız masaüstü köprüsü varsa, kullanıcı bir oyun oynuyorsa ve ekran paylaşım düğmesi
+// zaten etkinse görünür. Yeni bir yol AÇILMAZ: ipucu verilir, ardından mevcut akış (nudge ve
+// adultsOnly/ageGated/mediaEnabled kapıları dahil) aynen çalışır; seçici yine kullanıcı onayı bekler.
+const myGame = computed(() => activityStore.myGame())
+const canOfferGameStream = computed(
+  () =>
+    !!window.kankaverse?.setShareHint &&
+    voiceStore.canPublishScreen &&
+    !voiceStore.isScreenSharing &&
+    myGame.value !== null,
+)
+
+async function handleShareGame() {
+  if (!myGame.value) return
+  window.kankaverse?.setShareHint?.(myGame.value.name)
+  await handleToggleScreen()
+}
+
+// Bildirime tıklanınca (useGameActivity) bekleyen istek: bu çubuk görünür olunca tüketilir.
+watch(
+  () => activityStore.pendingShare,
+  (pending) => {
+    if (!pending) return
+    activityStore.pendingShare = false
+    if (canOfferGameStream.value) void handleShareGame()
+  },
+  { immediate: true },
+)
 
 /** Gerçek ekran paylaşım toggle + yayın sinyali (#1). */
 async function doToggleScreen() {
@@ -159,6 +192,16 @@ async function doToggleScreen() {
       </svg>
     </button>
   </div>
+  <!-- C31b: oynanan oyunu yayınla (yalnız masaüstü) -->
+  <button
+    v-if="canOfferGameStream && myGame"
+    type="button"
+    class="max-w-full truncate text-[12px] font-medium px-3 py-1 rounded-full cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+    style="color: var(--kv-accent-400); background-color: var(--kv-bg-elevated);"
+    @click="handleShareGame()"
+  >
+    {{ t('activity.streamGame', { game: myGame.name }) }}
+  </button>
   </div>
 
   <!-- C7 §E2 — Kamera nudge modalı (genel/açık GUILD_VOICE, ilk açış) -->

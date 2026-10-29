@@ -5,6 +5,7 @@ import type { GuildMemberDto, RoleSummaryDto } from '@/api/guilds';
 import { MemberRow } from './MemberRow';
 import { MessageError, MessageLoading } from '../message/MessageStates';
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence';
+import { useActivityStore } from '@/stores/activity';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -86,6 +87,7 @@ export function ChannelMembersTab({
   onOpenMember,
 }: Props) {
   const statusMap = usePresenceStore((s) => s.statusMap);
+  const gameByUser = useActivityStore((s) => s.byUser);
   const sections = useMemo(() => buildSections(members, statusMap), [members, statusMap]);
 
   if (state === 'loading') return <MessageLoading />;
@@ -112,7 +114,15 @@ export function ChannelMembersTab({
       }
       renderSectionHeader={({ section }) => <Text style={styles.sectionTitle}>{section.title}</Text>}
       renderItem={({ item }) => (
-        <MemberRow member={item} onPress={() => onOpenMember(item.userId, item.username)} />
+        <MemberRow
+          member={item}
+          gameName={
+            (statusMap[item.userId] ?? 'offline') !== 'offline'
+              ? (gameByUser[item.userId]?.name ?? null)
+              : null
+          }
+          onPress={() => onOpenMember(item.userId, item.username)}
+        />
       )}
       ListEmptyComponent={<Text style={styles.empty}>{t('mobile.channelDetails.membersEmpty')}</Text>}
     />

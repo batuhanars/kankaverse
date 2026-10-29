@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useFriendsStore } from '@/stores/friends'
 import { useDmStore } from '@/stores/dm'
 import { usePresenceStore } from '@/stores/presence'
+import { useActivityStore } from '@/stores/activity'
 import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
@@ -15,6 +16,7 @@ const { t } = useI18n()
 const friendsStore = useFriendsStore()
 const dmStore = useDmStore()
 const presenceStore = usePresenceStore()
+const activityStore = useActivityStore()
 
 // C16 — Kankalar satırı hover'dayken hareketli avatar (çevrimiçi ve çevrimdışı grupları)
 const hoveredFriendId = ref<string | null>(null)
@@ -45,6 +47,9 @@ const offlineFriends = computed(() =>
 
 function presenceStatusLabel(userId: string): string {
   const status = presenceStore.getStatus(userId)
+  // C31b: çevrimiçiyken oyun varsa durum yerine "X oynuyor" (çevrimdışına oyun gelmez).
+  const game = status === 'offline' ? null : activityStore.getGame(userId)
+  if (game) return t('activity.playing', { game: game.name })
   return t(`presence.${status}`)
 }
 

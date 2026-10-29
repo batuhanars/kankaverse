@@ -11,6 +11,8 @@ const { t } = useI18n()
 const props = defineProps<{
   member: GuildMemberDto
   presenceStatus: PresenceStatus
+  /** C31b: oynanan oyunun adı (sunucudan); yoksa satır çizilmez. */
+  gameName?: string | null
   isOffline: boolean
   openMenuUserId: string | null
   roleLoading: string | null
@@ -165,6 +167,13 @@ function onRowLeave(e: MouseEvent) {
         :style="props.isOffline ? 'color: var(--kv-text-muted);' : 'color: var(--kv-text-primary);'"
       >
         {{ member.username }}<span v-if="member.roleEmoji" class="ml-1">{{ member.roleEmoji }}</span>
+      </span>
+      <span
+        v-if="props.gameName && !props.isOffline"
+        class="block text-[11px] truncate leading-tight"
+        style="color: var(--kv-text-muted);"
+      >
+        {{ t('activity.playing', { game: props.gameName }) }}
       </span>
     </div>
 

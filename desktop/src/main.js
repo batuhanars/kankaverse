@@ -1,9 +1,16 @@
 const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, session, desktopCapturer } = require('electron')
 const path = require('path')
 const fs = require('fs')
+const { createGameDetector } = require('./game-detector')
 
 // Şu an açık olan picker penceresi (eşzamanlı isteği engeller)
 let pickerWin = null
+
+// C31b: yayın önerisi ipucu (web setShareHint) — bir sonraki ekran seçici açılışında kullanılıp temizlenir.
+let shareHint = null
+// C31b: algılanan son oyun ({ ref, epicName? } | null); sayfa yenilenince web'e geri verilir.
+let currentGame = null
+let gameDetector = null
 
 // Windows bildirim kimliği (AppUserModelID). Ayarlanmazsa Windows toast başlığı
 // Electron varsayılanını gösterir: "electron.app.Kankaverse". electron-builder NSIS
@@ -92,6 +99,7 @@ if (!gotLock) {
     createWindow()
     createTray()
     setupAutoUpdate()
+    setupGameDetection()
 
     // Ekran paylaşımı (getDisplayMedia) — kullanıcı picker penceresiyle kaynak seçer.
     session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
@@ -136,7 +144,9 @@ if (!gotLock) {
                 name: s.name,
                 thumbnail: s.thumbnail?.toDataURL() ?? null,
               }))
-              pickerWin.webContents.send('picker:sources', payload)
+              // C31b §3.4: ipucu yalnız bu açılış için geçerli; seçici yine kullanıcı onayı bekler.
+              pickerWin.webContents.send('picker:sources', { sources: payload, hint: shareHint })
+              shareHint = null
             }
           })
 
@@ -237,6 +247,7 @@ function createWindow() {
 
   // İndirme sayfa yüklenmeden bittiyse ya da sayfa yenilendiyse bant kaybolmasın: her yüklemede tekrar bildir.
   win.webContents.on('did-finish-load', () => {
+    if (currentGame) win.webContents.send('game:activity', currentGame)
     if (downloadedVersion) win.webContents.send('update:ready', { version: downloadedVersion })
   })
 
@@ -360,6 +371,29 @@ function setupAutoUpdate() {
   setInterval(checkForUpdates, UPDATE_CHECK_INTERVAL_MS)
 }
 
+// ── Oyun algılama (C31b §3) ───────────────────────────────────────────────────
+// Yalnız Windows. Elle liste sunucudan gelir ama JWT Bearer ile korunduğu için (çerez yetmez)
+// web istemcisi çekip köprüden verir; son başarılı liste userData/games.json'da saklanır.
+function gamesCachePath() {
+  return path.join(app.getPath('userData'), 'games.json')
+}
+
+function setupGameDetection() {
+  if (process.platform !== 'win32') return
+  gameDetector = createGameDetector({
+    onChange: (activity) => {
+      currentGame = activity
+      if (win && !win.isDestroyed()) win.webContents.send('game:activity', activity)
+    },
+  })
+  try {
+    gameDetector.setCuratedList(JSON.parse(fs.readFileSync(gamesCachePath(), 'utf-8')))
+  } catch {
+    // Önbellek yok/bozuk: web ilk listeyi getirene kadar yalnız Steam + Epic algılanır.
+  }
+  gameDetector.start()
+}
+
 // ── IPC kanalları ──────────────────────────────────────────────────────────────
 // Web "Yeniden başlat" dedi → kur. isQuitting: tepsiye-kapanma (close→hide) devreye girmesin.
 ipcMain.on('update:install', () => {
@@ -368,6 +402,25 @@ ipcMain.on('update:install', () => {
   // (isSilent, isForceRunAfter): kurulum oneClick=false olduğu için varsayılan çağrı sihirbazı yeniden
   // açıyordu (sahip turu 2026-10-29). Güncelleme sessiz kurulur, uygulama kendiliğinden açılır.
   autoUpdater.quitAndInstall(true, true)
+})
+
+// Web elle oyun listesini getirdi → algılayıcıya ver + önbelleğe yaz (hata → son başarılı liste).
+ipcMain.on('games:set-list', (_event, list) => {
+  if (!gameDetector || !Array.isArray(list)) return
+  gameDetector.setCuratedList(list)
+  try {
+    fs.writeFileSync(gamesCachePath(), JSON.stringify(list))
+  } catch (e) {
+    console.error('[oyun-algılama] liste yazılamadı:', e)
+  }
+})
+// Web abone olunca mevcut oyunu ister (abonelik, algılamadan sonra kurulmuş olabilir).
+ipcMain.on('game:request-current', () => {
+  if (win && !win.isDestroyed() && currentGame) win.webContents.send('game:activity', currentGame)
+})
+// Yayın önerisi: ekran seçici bu pencere adını içeren kaynağı seçili açsın.
+ipcMain.on('share:set-hint', (_event, name) => {
+  shareHint = typeof name === 'string' && name.length > 0 ? name.slice(0, 100) : null
 })
 
 // Preload → renderer: pencereyi öne getir (native bildirim tıklaması)

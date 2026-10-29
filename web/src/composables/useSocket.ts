@@ -13,6 +13,7 @@ import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import type { GuildMemberDto, ChannelDto, CategoryDto, RoleDto } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useRolesStore } from '@/stores/roles'
+import { useActivityStore } from '@/stores/activity'
 import { useEventsStore } from '@/stores/events'
 import { useVoiceStore, setLeaveWhileRingingHandler, type VoiceParticipant } from '@/stores/voice'
 import { useCallStore, type IncomingCall } from '@/stores/call'
@@ -65,6 +66,14 @@ export function voiceUnsubscribe(channelId: string) {
 export function voiceBroadcast(channelId: string, active: boolean) {
   socket?.emit('voice:broadcast', { channelId, active })
 }
+// C31b §4.1 — masaüstünün algıladığı oyun. Son değer saklanır: yeniden bağlanınca (sunucu presence'ı
+// sıfırlar) ve "oyunumu göster" ayarı açılınca tekrar gönderilir. Ad gönderilmez, yalnız ref.
+export type ActivityPayload = { ref: string; epicName?: string } | { ref: null }
+let lastActivity: ActivityPayload | null = null
+export function sendActivity(payload: ActivityPayload) {
+  lastActivity = payload
+  socket?.emit('activity:set', payload)
+}
 // auth_error sonrası art arda tazele-dene sayacı (sonsuz döngü koruması; başarılı connect'te sıfırlanır)
 let authRetryCount = 0
 
@@ -96,6 +105,7 @@ export function useSocket() {
   const voiceStore = useVoiceStore()
   const callStore = useCallStore()
   const emergencyAlertsStore = useEmergencyAlertsStore()
+  const activityStore = useActivityStore()
 
   /** C21: yalnız zaten yüklenmiş üye listesini tazeler (yüklenmemişse girince çekilir). */
   function refreshLoadedMembers(guildId: string) {
@@ -144,6 +154,8 @@ export function useSocket() {
       if (manual !== 'online') {
         socket?.emit('presence:set', { status: manual })
       }
+      // C31b: sunucu bağlantı başına oyunu da unuttu → son algılananı geri bildir.
+      if (lastActivity) socket?.emit('activity:set', lastActivity)
     })
 
     socket.on('disconnect', () => {
@@ -266,8 +278,24 @@ export function useSocket() {
 
     socket.on(
       'presence:snapshot',
-      (payload: { states: Array<{ userId: string; status: PresenceStatus }> }) => {
+      (payload: {
+        states: Array<{
+          userId: string
+          status: PresenceStatus
+          gameId?: string
+          gameName?: string
+        }>
+      }) => {
         presenceStore.applySnapshot(payload.states)
+        activityStore.applySnapshot(payload.states)
+      },
+    )
+
+    // C31b: "oynuyor" satırı. game=null → oyun yok / ayar kapandı / dnd / çevrimdışı.
+    socket.on(
+      'activity:update',
+      (payload: { userId: string; game: { id: string; name: string } | null }) => {
+        activityStore.applyUpdate(payload.userId, payload.game)
       },
     )
 

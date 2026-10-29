@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Image, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
 import { usePresenceStore } from '@/stores/presence';
+import { useActivityStore } from '@/stores/activity';
 import { PresenceDot } from '../PresenceDot';
 import type { DmChannelDto, DmParticipantDto } from '@/api/dm';
 import { useAuthStore } from '@/stores/auth';
@@ -50,6 +51,7 @@ export function GroupMembersTab({ channel }: Props) {
 
   const isOwner = authUser?.id === channel.ownerId;
   const statusMap = usePresenceStore((s) => s.statusMap);
+  const gameByUser = useActivityStore((s) => s.byUser);
   const sections = useMemo(() => {
     // Sahip önce (bugünkü sıra); bölümlere ayırma sırayı bozmaz. Grup DM'de rol/hoist yok.
     const sorted = [...channel.members].sort((a, b) => {
@@ -115,9 +117,16 @@ export function GroupMembersTab({ channel }: Props) {
                 ringColor={theme.colors.bgContent}
               />
             </View>
-            <Text style={styles.memberName} numberOfLines={1}>
-              {item.username}
-            </Text>
+            <View style={styles.memberTexts}>
+              <Text style={styles.memberName} numberOfLines={1}>
+                {item.username}
+              </Text>
+              {gameByUser[item.id] && (statusMap[item.id] ?? 'offline') !== 'offline' ? (
+                <Text style={styles.memberPlaying} numberOfLines={1}>
+                  {t('activity.playing', { game: gameByUser[item.id].name })}
+                </Text>
+              ) : null}
+            </View>
             {item.id === channel.ownerId ? (
               <Text style={styles.ownerBadge}>👑</Text>
             ) : isOwner ? (
@@ -190,8 +199,12 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xs,
     fontWeight: '700',
   },
+  memberTexts: { flex: 1, minWidth: 0 },
+  memberPlaying: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+  },
   memberName: {
-    flex: 1,
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.base,
     fontWeight: '500',

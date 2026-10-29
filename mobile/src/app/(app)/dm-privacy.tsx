@@ -56,6 +56,28 @@ export default function DmPrivacyScreen() {
     }
   }
 
+  // C31b §5 — "Oynadığım oyunu göster". Ayar hesaba ait (mobilde algılama yok ama masaüstündeki
+  // oyunun kimlere görüneceğini buradan da yönetirsin). Varsayılanı sunucu hesaplar
+  // (`gameActivityEffective`: yetişkin açık, minör kapalı); istemci yeniden hesaplamaz.
+  const [savingGame, setSavingGame] = useState(false);
+  const gameActivity = user?.gameActivityEffective ?? false;
+
+  async function toggleGameActivity(next: boolean) {
+    if (savingGame || next === gameActivity) return;
+    setSavingGame(true);
+    setErrorMessage('');
+    setSavedNotice('');
+    try {
+      const updated = await usersApi.updateProfile({ showGameActivity: next });
+      useAuthStore.setState({ user: updated });
+      setSavedNotice(t('settings.dmPolicy.saved'));
+    } catch (e) {
+      setErrorMessage(extractErrorMessage(e));
+    } finally {
+      setSavingGame(false);
+    }
+  }
+
   async function selectPolicy(policy: DmPolicy) {
     if (policy === currentPolicy || saving) return;
     setSaving(policy);
@@ -119,6 +141,21 @@ export default function DmPrivacyScreen() {
             value={readReceipts}
             onValueChange={toggleReadReceipts}
             disabled={savingReceipts}
+            trackColor={{ true: theme.colors.accent500, false: theme.colors.bgRail }}
+            thumbColor={theme.colors.textPrimary}
+          />
+        </View>
+
+        {/* C31b §5 — oyun etkinliği paylaşımı. Okundu bilgisiyle aynı aile: tek anahtar satırı. */}
+        <View style={styles.receiptCard}>
+          <View style={styles.optionText}>
+            <Text style={styles.optionTitle}>{t('settings.gameActivity.label')}</Text>
+            <Text style={styles.optionDesc}>{t('settings.gameActivity.description')}</Text>
+          </View>
+          <Switch
+            value={gameActivity}
+            onValueChange={toggleGameActivity}
+            disabled={savingGame}
             trackColor={{ true: theme.colors.accent500, false: theme.colors.bgRail }}
             thumbColor={theme.colors.textPrimary}
           />

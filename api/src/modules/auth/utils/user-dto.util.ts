@@ -17,6 +17,10 @@ export function toUserDto(user: User, animatedAllowed: boolean, aiVideoAllowed =
     dmPolicy: user.dmPolicy,
     // C12: okundu bilgisi paylaşımı (karşılıklı). İstemci Gizlilik ekranında kendi durumunu okur.
     readReceipts: user.readReceipts,
+    // C31b: oyun paylaşımı. `showGameActivity` ham ayar (null = hiç dokunmadı), `gameActivityEffective`
+    // yaşa göre varsayılan uygulanmış hâl (yetişkin açık, minör kapalı) — istemci yeniden hesaplamaz.
+    showGameActivity: user.showGameActivity,
+    gameActivityEffective: user.showGameActivity ?? !user.isMinor,
     // C24: etkin hızlı tepki şeridi (kayıtlı ya da varsayılan beşli).
     quickReactions: effectiveQuickReactions(user.quickReactions),
     isMinor: user.isMinor,

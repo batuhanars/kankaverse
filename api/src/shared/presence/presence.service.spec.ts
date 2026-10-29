@@ -8,8 +8,11 @@ const prismaMock = {
   guildMember: { findFirst: jest.fn(), findMany: jest.fn() },
 };
 
+const realtimeMock = { emitToUser: jest.fn() };
+const gamesMock = { visibleById: jest.fn() };
+
 function makeService() {
-  return new PresenceService(prismaMock as any);
+  return new PresenceService(prismaMock as any, realtimeMock as any, gamesMock as any);
 }
 
 function resetMocks() {

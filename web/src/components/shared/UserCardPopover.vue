@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDmStore } from '@/stores/dm'
+import { useActivityStore } from '@/stores/activity'
 import { useToastStore } from '@/stores/toast'
 import { useAppModals } from '@/composables/useAppModals'
 import { usersApi } from '@/api/users'
@@ -27,6 +28,7 @@ const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
 const dmStore = useDmStore()
+const activityStore = useActivityStore()
 const toast = useToastStore()
 const { openUserSettings } = useAppModals()
 
@@ -260,6 +262,15 @@ async function addFriend() {
         <div class="px-4 pt-11 pb-4">
           <p class="text-[17px] font-bold truncate" style="color: var(--kv-text-primary);">
             {{ card.username }}
+          </p>
+
+          <!-- C31b: oynadığı oyun (sunucu görünürlüğe karar verir; burada filtre yok) -->
+          <p
+            v-if="activityStore.getGame(card.id)"
+            class="text-[12px] mt-0.5 truncate"
+            style="color: var(--kv-online);"
+          >
+            {{ t('activity.playing', { game: activityStore.getGame(card.id)?.name }) }}
           </p>
 
           <!-- Statü rozeti (kanka / bekleyen) -->

@@ -17,6 +17,8 @@ interface Props {
   /** Son mesaj önizlemesi; "yazıyor" varsa o ezer. */
   preview: string;
   typing: boolean;
+  /** C31b: 1-1 DM'de karşı taraf oyun oynuyorsa adı; "yazıyor"dan sonra, son mesajdan önce gelir. */
+  gameName?: string | null;
   unread: boolean;
   /** Sözleşme M4b §13.2 — ses göstergesi için. Yalnız grup DM'de anlamlı; abonelik (mount/unmount)
    *  `DmSidebar`in işi, burası yalnız store'dan OKUR (ChannelRow'un M4c §6 deseniyle aynı ayrım). */
@@ -26,7 +28,18 @@ interface Props {
   onLongPress: () => void;
 }
 
-export function DmRow({ name, avatarUrl, preview, typing, unread, channelId, isGroup, onPress, onLongPress }: Props) {
+export function DmRow({
+  name,
+  avatarUrl,
+  preview,
+  typing,
+  gameName,
+  unread,
+  channelId,
+  isGroup,
+  onPress,
+  onLongPress,
+}: Props) {
   // Sözleşme M4b §13.2 — "yalnız grup DM": 1-1 DM'de "seste" zaten arama demektir (telefon
   // düğmesi + "sesli arama sürüyor" şeridi o akışı zaten karşılıyor), ikinci bir yüzey gürültü
   // olur. `ChannelRow`ün M4c §6 deseniyle AYNI görsel dil (hoparlör ikonu + sayı, accent renk);
@@ -51,6 +64,10 @@ export function DmRow({ name, avatarUrl, preview, typing, unread, channelId, isG
         {typing ? (
           <Text style={styles.typing} numberOfLines={1}>
             {t('typing.simple')}
+          </Text>
+        ) : gameName ? (
+          <Text style={styles.playing} numberOfLines={1}>
+            {t('activity.playing', { game: gameName })}
           </Text>
         ) : preview ? (
           <Text style={styles.preview} numberOfLines={1}>
@@ -108,6 +125,11 @@ const styles = StyleSheet.create({
   },
   preview: {
     color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+    marginTop: 1,
+  },
+  playing: {
+    color: theme.colors.success,
     fontSize: theme.fontSize.xs,
     marginTop: 1,
   },

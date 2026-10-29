@@ -68,6 +68,8 @@ export interface UpdateProfileDto {
   dmPolicy?: DmPolicy;
   /** C12 §2 — okundu bilgisi paylaşımı. KARŞILIKLI: kapatan karşı tarafınkini de göremez. */
   readReceipts?: boolean;
+  /** C31b §2 — "Oynadığım oyunu göster". Varsayılanı sunucu yaşa göre hesaplar (`gameActivityEffective`). */
+  showGameActivity?: boolean;
   /** C24 — boş dizi = varsayılana dön, aksi hâlde TAM 5 emoji (tekrarsız). */
   quickReactions?: string[];
 }

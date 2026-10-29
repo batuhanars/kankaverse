@@ -13,6 +13,7 @@ import { GuildJoinService } from './guild-join/guild-join.service';
 import { ImageUploadService } from './media/image-upload.service';
 import { AnimatedMediaService } from './media/animated-media.service';
 import { PushService } from './push/push.service';
+import { GamesService } from './games/games.service';
 
 @Module({
   providers: [
@@ -30,6 +31,7 @@ import { PushService } from './push/push.service';
     ImageUploadService,
     AnimatedMediaService,
     PushService,
+    GamesService,
   ],
   exports: [
     EmailService,
@@ -46,6 +48,7 @@ import { PushService } from './push/push.service';
     ImageUploadService,
     AnimatedMediaService,
     PushService,
+    GamesService,
   ],
 })
 export class SharedModule {}

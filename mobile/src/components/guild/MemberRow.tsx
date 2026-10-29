@@ -18,13 +18,15 @@ import { theme } from '@/theme';
  */
 interface Props {
   member: GuildMemberDto;
+  /** C31b: oynadığı oyunun adı (sunucudan; görünürlük sunucuda). Yoksa satır çizilmez. */
+  gameName?: string | null;
   onPress: () => void;
 }
 
 /** Satır taşmasın: fazlası "+N". */
 const MAX_BADGES = 3;
 
-export function MemberRow({ member, onPress }: Props) {
+export function MemberRow({ member, gameName, onPress }: Props) {
   const shown = member.roles.slice(0, MAX_BADGES);
   const rest = member.roles.length - shown.length;
 
@@ -44,6 +46,11 @@ export function MemberRow({ member, onPress }: Props) {
           {member.username}
           {member.roleEmoji ? ` ${member.roleEmoji}` : ''}
         </Text>
+        {gameName ? (
+          <Text style={styles.playing} numberOfLines={1}>
+            {t('activity.playing', { game: gameName })}
+          </Text>
+        ) : null}
 
         <View style={styles.badges}>
           {/* `member.role.OWNER` web'de zaten var. Eskiden `member.role.${member.role}` şablonu
@@ -106,6 +113,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     gap: 4,
+  },
+  playing: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
   },
   username: {
     color: theme.colors.textPrimary,

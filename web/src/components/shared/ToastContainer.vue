@@ -74,6 +74,17 @@ function accentColor(type: ToastType): string {
             {{ toast.message }}
           </p>
 
+          <!-- Eylem (opsiyonel) -->
+          <button
+            v-if="toast.action"
+            type="button"
+            class="shrink-0 self-center text-[13px] font-medium px-2 py-1 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-content)]"
+            style="color: var(--kv-accent-400);"
+            @click="toast.action.run(); toastStore.dismiss(toast.id)"
+          >
+            {{ toast.action.label }}
+          </button>
+
           <!-- Kapat -->
           <button
             type="button"

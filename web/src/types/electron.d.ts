@@ -12,6 +12,12 @@ interface DesktopSettings {
   closeToTray: boolean
 }
 
+/** Masaüstünün algıladığı oyun: ad değil referans (ad sunucudan gelir). */
+interface GameActivityRef {
+  ref: string
+  epicName?: string
+}
+
 interface KankaverseElectronBridge {
   /** Electron masaüstü istemcisinde çalışıldığını belirtir. */
   isElectron: true
@@ -27,6 +33,12 @@ interface KankaverseElectronBridge {
   onUpdateReady?: (cb: (info: { version: string }) => void) => () => void
   /** İndirilen güncellemeyi kurup uygulamayı yeniden başlatır. Eski kurulumlarda yok. */
   installUpdate?: () => void
+  /** C31b: algılanan oyun değişince çağrılır ({ ref, epicName? } | null); abonelikten çıkış döner. 1.2.0 öncesinde yok. */
+  onGameActivity?: (cb: (activity: GameActivityRef | null) => void) => () => void
+  /** C31b: sunucudaki elle oyun listesini algılayıcıya verir. */
+  setGameList?: (list: Array<{ id: string; executables: string[] }>) => void
+  /** C31b: ekran seçici bu adı içeren pencereyi seçili açsın (null temizler). */
+  setShareHint?: (name: string | null) => void
 }
 
 declare global {

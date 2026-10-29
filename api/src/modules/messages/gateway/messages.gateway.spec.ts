@@ -55,9 +55,17 @@ const presenceMock = {
   audienceFor: jest.fn().mockResolvedValue([]),
   visibleOnlineFor: jest.fn().mockResolvedValue([]),
   setStatus: jest.fn(),
+  // C31b
+  activeGameId: jest.fn(),
+  setGame: jest.fn(),
+  gameActivityEnabled: jest.fn(),
+  broadcastActivity: jest.fn(),
 };
 
 const dmPermissionMock = { canDm: jest.fn() };
+
+// C31b — oyun çözümleme (activity:set)
+const gamesMock = { resolve: jest.fn() };
 
 const notificationsCreateMock = jest.fn();
 const notificationsShouldNotifyMock = jest.fn();
@@ -88,6 +96,7 @@ function makeGateway() {
     notificationsMock as any,
     pushMock as any,
     voiceMock as any,
+    gamesMock as any,
   );
 }
 
@@ -112,7 +121,11 @@ function resetMocks() {
   pushSendToUsersMock.mockResolvedValue(undefined);
   // M5a §4 — varsayılan: blok yok, hedef odada değil (ring testleri override eder)
   prismaMock.userBlock.findFirst.mockResolvedValue(null);
-  voiceGetLiveParticipationMock.mockResolvedValue({ present: false, streaming: false, video: false });
+  voiceGetLiveParticipationMock.mockResolvedValue({
+    present: false,
+    streaming: false,
+    video: false,
+  });
   // R20 — varsayılan: tam yetkili (OWNER/ADMINISTRATOR) kimse yok; özel kanal testleri override eder.
   guildPrivilegedUserIdsMock.mockResolvedValue(new Set());
 }
@@ -836,7 +849,7 @@ describe('MessagesGateway.notifyMentions', () => {
       expect(notificationsCreateMock).toHaveBeenCalledTimes(1);
     });
 
-    it("T&S regresyon: özel kanalda everyone yalnız kanal üyeleri + tam yetkiliye gider (sızıntı yok)", async () => {
+    it('T&S regresyon: özel kanalda everyone yalnız kanal üyeleri + tam yetkiliye gider (sızıntı yok)', async () => {
       prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID, isPrivate: true });
       prismaMock.user.findMany.mockResolvedValue([]);
       prismaMock.channelMember.findMany.mockResolvedValue([{ userId: EVERYONE_ONLY_ID }]);
@@ -1444,6 +1457,76 @@ describe('MessagesGateway.handleGroupCallRing (M5a §4)', () => {
     expect(emitToUserMock).toHaveBeenCalledWith(TARGET_ID, 'voice.group_call_started', {
       channelId: GROUP_ID,
       by: { id: CALLER_ID, username: 'çağıranKanka' },
+    });
+  });
+});
+
+describe('MessagesGateway.handleActivitySet (C31b §2.4)', () => {
+  let gateway: MessagesGateway;
+  const socket = (id = 'sock-1') =>
+    ({ id, data: { userId: 'u1', sessionId: 's1', username: 'kanka' } }) as any;
+
+  beforeEach(() => {
+    resetMocks();
+    gateway = makeGateway();
+    presenceMock.gameActivityEnabled.mockResolvedValue(true);
+    presenceMock.setGame.mockReturnValue(true);
+    presenceMock.broadcastActivity.mockResolvedValue(undefined);
+    gamesMock.resolve.mockResolvedValue({ id: 'g1', name: 'Valorant' });
+    // önce null, sonra g1 (set edildikten sonra)
+    presenceMock.activeGameId.mockReturnValueOnce(null).mockReturnValue('g1');
+  });
+
+  it('geçerli ref → tablodaki kimlikle kaydeder ve yayar', async () => {
+    const res = await gateway.handleActivitySet(socket(), { ref: 'curated:g1' });
+    expect(res).toEqual({ ok: true });
+    expect(gamesMock.resolve).toHaveBeenCalledWith('curated:g1', {
+      userId: 'u1',
+      epicName: undefined,
+    });
+    expect(presenceMock.setGame).toHaveBeenCalledWith('u1', 'sock-1', 'g1');
+    expect(presenceMock.broadcastActivity).toHaveBeenCalledWith('u1');
+  });
+
+  it('bilinmeyen / hidden ref (resolve null) → ok:false, kayıt ve yayın yok', async () => {
+    gamesMock.resolve.mockResolvedValue(null);
+    const res = await gateway.handleActivitySet(socket(), { ref: 'curated:yok' });
+    expect(res).toEqual({ ok: false });
+    expect(presenceMock.setGame).not.toHaveBeenCalled();
+    expect(presenceMock.broadcastActivity).not.toHaveBeenCalled();
+  });
+
+  it('ayar kapalıyken çözümleme bile yapılmaz, kayıt yok', async () => {
+    presenceMock.gameActivityEnabled.mockResolvedValue(false);
+    const res = await gateway.handleActivitySet(socket(), { ref: 'steam:730' });
+    expect(res).toEqual({ ok: false });
+    expect(gamesMock.resolve).not.toHaveBeenCalled();
+    expect(presenceMock.setGame).not.toHaveBeenCalled();
+  });
+
+  it('ref:null oyunu siler (ayar kapalı olsa da silmeye izin var)', async () => {
+    presenceMock.gameActivityEnabled.mockResolvedValue(false);
+    presenceMock.activeGameId.mockReset();
+    presenceMock.activeGameId.mockReturnValueOnce('g1').mockReturnValue(null);
+    const res = await gateway.handleActivitySet(socket(), { ref: null });
+    expect(res).toEqual({ ok: true });
+    expect(presenceMock.setGame).toHaveBeenCalledWith('u1', 'sock-1', null);
+    expect(presenceMock.broadcastActivity).toHaveBeenCalledWith('u1');
+  });
+
+  it('bağlantı başına dakikada 10 sınırı; başka bağlantı etkilenmez', async () => {
+    presenceMock.activeGameId.mockReset();
+    presenceMock.activeGameId.mockReturnValue('g1');
+    for (let i = 0; i < 10; i++) {
+      expect(await gateway.handleActivitySet(socket('a'), { ref: 'curated:g1' })).toEqual({
+        ok: true,
+      });
+    }
+    expect(await gateway.handleActivitySet(socket('a'), { ref: 'curated:g1' })).toEqual({
+      ok: false,
+    });
+    expect(await gateway.handleActivitySet(socket('b'), { ref: 'curated:g1' })).toEqual({
+      ok: true,
     });
   });
 });

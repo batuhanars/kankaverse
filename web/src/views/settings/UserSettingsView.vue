@@ -386,6 +386,27 @@ async function selectPolicy(p: DmPolicy) {
 const savingReceipts = ref(false)
 const readReceipts = computed(() => authStore.user?.readReceipts ?? true)
 
+// ── C31b §4.4: "Oynadığım oyunu göster" ─────────────────────────────────────
+// Varsayılanı sunucu yaşa göre hesaplar (`gameActivityEffective`: yetişkin açık, minör kapalı);
+// istemci yeniden hesaplamaz. Ayar hesaba ait: masaüstü dışında da görünür.
+const savingGameActivity = ref(false)
+const gameActivity = computed(() => authStore.user?.gameActivityEffective ?? false)
+
+async function toggleGameActivity(next: boolean) {
+  if (savingGameActivity.value || next === gameActivity.value) return
+  savingGameActivity.value = true
+  try {
+    const { data } = await usersApi.updateProfile({ showGameActivity: next })
+    authStore.updateUser(data)
+    toast.success(t('toast.privacySaved'))
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message ?? t('toast.saveError'))
+  } finally {
+    savingGameActivity.value = false
+  }
+}
+
 async function toggleReadReceipts(next: boolean) {
   if (savingReceipts.value || next === readReceipts.value) return
   savingReceipts.value = true
@@ -884,6 +905,28 @@ async function toggleReadReceipts(next: boolean) {
                       :model-value="readReceipts"
                       :disabled="savingReceipts"
                       @update:model-value="toggleReadReceipts"
+                    />
+                  </div>
+                </section>
+
+                <!-- ── C31b §4.4: Oynadığım oyunu göster ── -->
+                <section
+                  class="rounded-[var(--kv-radius-lg)] border p-5"
+                  style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                      <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+                        {{ t('settings.gameActivity.label') }}
+                      </h3>
+                      <p class="text-[13px] mt-1" style="color: var(--kv-text-secondary);">
+                        {{ t('settings.gameActivity.description') }}
+                      </p>
+                    </div>
+                    <KvSwitch
+                      :model-value="gameActivity"
+                      :disabled="savingGameActivity"
+                      @update:model-value="toggleGameActivity"
                     />
                   </div>
                 </section>

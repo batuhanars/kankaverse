@@ -7,6 +7,7 @@ export interface UpdateProfilePayload {
   dmPolicy?: DmPolicy
   bannerColor?: string | null // profil afiş rengi preset anahtarı (veya null=varsayılan)
   readReceipts?: boolean // C12 — okundu bilgisi paylaşımı (karşılıklı)
+  showGameActivity?: boolean // C31b — "Oynadığım oyunu göster"
   quickReactions?: string[] // C24 — tam 5 emoji; boş dizi = varsayılana dön
 }
 

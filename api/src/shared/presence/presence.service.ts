@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
+import { GamesService, ResolvedGame } from '../games/games.service';
 
 export type PresenceStatus = 'online' | 'away' | 'dnd' | 'offline';
 export type ActiveStatus = 'online' | 'away' | 'dnd';
@@ -17,6 +19,12 @@ interface PresenceEntry {
   manual: ActiveStatus;
   /** connectionId (socket.id) → o bağlantının hareketsizlik durumu. Boşalınca kayıt silinir. */
   connections: Map<string, ConnectionStatus>;
+  /**
+   * C31b §2.3 — connectionId → o bağlantının bildirdiği `Game.id`. Hesabın etkin oyunu EN SON set
+   * edilen bağlantınınki (set'te önce silinip sonra yazılır, Map ekleme sırası = güncellik sırası).
+   * Bağlantı düşünce kaydı silinir. Şema yok (presence ile aynı ilke).
+   */
+  games: Map<string, string>;
 }
 
 /**
@@ -43,7 +51,11 @@ export class PresenceService {
   /** Yalnız bağlı kullanıcılar; bağlantısı olmayanlar map'te bulunmaz. */
   private readonly state = new Map<string, PresenceEntry>();
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private realtime: RealtimeService,
+    private games: GamesService,
+  ) {}
 
   // ── Bellek-içi durum yönetimi ───────────────────────────────────────────────
 
@@ -74,6 +86,7 @@ export class PresenceService {
     const fresh: PresenceEntry = {
       manual: 'online',
       connections: new Map([[connectionId, 'online']]),
+      games: new Map(),
     };
     this.state.set(userId, fresh);
     return this.effective(fresh);
@@ -90,6 +103,7 @@ export class PresenceService {
     const entry = this.state.get(userId);
     if (!entry) return false;
     entry.connections.delete(connectionId);
+    entry.games.delete(connectionId);
     if (entry.connections.size === 0) {
       this.state.delete(userId);
       return true;
@@ -130,6 +144,35 @@ export class PresenceService {
       entry.connections.set(opts.connectionId, 'online');
     }
     return this.effective(entry);
+  }
+
+  /**
+   * C31b — bağlantının oyununu kaydet/sil (`null`). Bağlantı kayıtlı değilse false (yok sayılır).
+   * Görünürlük BURADA değil: kayıt yalnız bellektir, kimin göreceği `canSeeActivity`'de.
+   */
+  setGame(userId: string, connectionId: string, gameId: string | null): boolean {
+    const entry = this.state.get(userId);
+    if (!entry || !entry.connections.has(connectionId)) return false;
+    entry.games.delete(connectionId);
+    if (gameId) entry.games.set(connectionId, gameId);
+    return true;
+  }
+
+  /** Ayar kapatılınca bütün bağlantıların oyun kaydı silinir (yeniden açınca bayat oyun sızmasın). */
+  clearGames(userId: string): void {
+    this.state.get(userId)?.games.clear();
+  }
+
+  /**
+   * Hesabın etkin oyun kimliği: en son set edilen bağlantınınki. `dnd`'de ve çevrimdışıyken null
+   * (§2.5: rahatsız etmeyin diyen oyununu da yaymaz).
+   */
+  activeGameId(userId: string): string | null {
+    const entry = this.state.get(userId);
+    if (!entry || this.effective(entry) === 'dnd') return null;
+    let latest: string | null = null;
+    for (const gameId of entry.games.values()) latest = gameId;
+    return latest;
   }
 
   /**
@@ -212,6 +255,104 @@ export class PresenceService {
     return false;
   }
 
+  // ── C31b §2.5 — oyun etkinliği görünürlüğü (R7) ────────────────────────────
+
+  /** Hedefin oyun paylaşım ayarı ve yaşı. Kayıt yoksa null (fail-closed). */
+  private async activityGate(
+    targetId: string,
+  ): Promise<{ enabled: boolean; isMinor: boolean } | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetId },
+      select: { isMinor: true, showGameActivity: true },
+    });
+    if (!user) return null;
+    // null = yaşa göre varsayılan: yetişkin açık, minör kapalı (sözleşme §0).
+    return { enabled: user.showGameActivity ?? !user.isMinor, isMinor: user.isMinor };
+  }
+
+  /** Etkin "oyunumu göster" ayarı (sunucu otoritesi: istemci değeri hiçbir yerde güvenilmez). */
+  async gameActivityEnabled(userId: string): Promise<boolean> {
+    const gate = await this.activityGate(userId);
+    return gate?.enabled ?? false;
+  }
+
+  private async areFriends(a: string, b: string): Promise<boolean> {
+    const friendship = await this.prisma.friendship.findFirst({
+      where: {
+        status: 'ACCEPTED',
+        OR: [
+          { requesterId: a, addresseeId: b },
+          { requesterId: b, addresseeId: a },
+        ],
+      },
+      select: { id: true },
+    });
+    return friendship !== null;
+  }
+
+  /**
+   * `canSeePresence`'ın ÜZERİNE binen ek şartlar (presence kuralı çağıran tarafta zaten geçti):
+   *  a. viewer === target → true (kendi oyununu görür; ayar kapalıysa zaten kaydedilmez/yayılmaz)
+   *  b. hedefin etkin ayarı kapalı → false
+   *  c. hedef minör → yalnız karşılıklı kanka (canSeePresence kural 3-4 ile örtüşür; savunma derinliği)
+   */
+  private async activityConditions(viewerId: string, targetId: string): Promise<boolean> {
+    if (viewerId === targetId) return true;
+    const gate = await this.activityGate(targetId);
+    if (!gate || !gate.enabled) return false;
+    if (gate.isMinor) return this.areFriends(viewerId, targetId);
+    return true;
+  }
+
+  /**
+   * canSeeActivity(viewer, target) = canSeePresence(viewer, target) && etkinAyar(target)
+   *   && (target.isMinor ? karşılıklıKanka : true)
+   *
+   * Yeni bir görünürlük kuralı DEĞİL: presence kuralının (engel, kanka, minör, ortak ortam) tamamı
+   * `canSeePresence`'tan aynen geçer, buraya yalnız ek şartlar gelir. Fail-closed.
+   * `dnd`/çevrimdışı hâli bellek tarafında (`activeGameId`) ele alınır, ilişki kuralı değildir.
+   */
+  async canSeeActivity(viewerId: string, targetId: string): Promise<boolean> {
+    if (!(await this.canSeePresence(viewerId, targetId))) return false;
+    return this.activityConditions(viewerId, targetId);
+  }
+
+  /**
+   * userId'nin OYUNUNU görmeye izinli kullanıcılar: presence kitlesi (`audienceFor` → canSeePresence)
+   * ∩ ek şartlar. Aynı kuralın kitle yönüdür; ayar ve yaş hedefe ait olduğundan bir kez okunur.
+   */
+  async activityAudienceFor(userId: string): Promise<string[]> {
+    const gate = await this.activityGate(userId);
+    if (!gate || !gate.enabled) return [];
+    const audience = await this.audienceFor(userId);
+    if (!gate.isMinor) return audience;
+    const friendFlags = await Promise.all(audience.map((id) => this.areFriends(id, userId)));
+    return audience.filter((_, i) => friendFlags[i]);
+  }
+
+  /** Şu an yayılabilir oyun: dnd/çevrimdışı/ayar kapalı/gizli oyun → null. */
+  async currentGameFor(userId: string): Promise<ResolvedGame | null> {
+    const gameId = this.activeGameId(userId);
+    if (!gameId) return null;
+    const gate = await this.activityGate(userId);
+    if (!gate || !gate.enabled) return null;
+    return this.games.visibleById(gameId);
+  }
+
+  /**
+   * `activity:update { userId, game }` yayını. Oyun VARSA yalnız `activityAudienceFor` kitlesine
+   * (+ kullanıcının kendi pencerelerine); oyun YOKSA (kapatıldı, ayar kapandı, dnd, bağlantı koptu)
+   * daha geniş presence kitlesine gider: "oyun yok" bilgisi bir şey ifşa etmez, bayat satırı
+   * ise herkesten temizler.
+   */
+  async broadcastActivity(userId: string): Promise<void> {
+    const game = await this.currentGameFor(userId);
+    const audience = game ? await this.activityAudienceFor(userId) : await this.audienceFor(userId);
+    for (const recipientId of [...audience, userId]) {
+      this.realtime.emitToUser(recipientId, 'activity:update', { userId, game });
+    }
+  }
+
   /**
    * userId'nin arkadaşları ∪ ortak-guild üyeleri — presence görünürlük
    * kararları için aday havuzu. userId'nin kendisi dahil değil.
@@ -284,7 +425,7 @@ export class PresenceService {
    */
   async visibleOnlineFor(
     viewerId: string,
-  ): Promise<Array<{ userId: string; status: ActiveStatus }>> {
+  ): Promise<Array<{ userId: string; status: ActiveStatus; gameId?: string; gameName?: string }>> {
     const candidateSet = await this.candidatePool(viewerId);
 
     const results = await Promise.all(
@@ -295,12 +436,21 @@ export class PresenceService {
         const canSee = await this.canSeePresence(viewerId, candidateId);
         if (!canSee) return null;
 
-        return { userId: candidateId, status: candidateStatus };
+        // C31b: oyun satırı aynı kuraldan geçer (presence geçti + ek şartlar), ad tablodan gelir.
+        const state: { userId: string; status: ActiveStatus; gameId?: string; gameName?: string } =
+          { userId: candidateId, status: candidateStatus };
+        const gameId = this.activeGameId(candidateId);
+        if (gameId && (await this.activityConditions(viewerId, candidateId))) {
+          const game = await this.games.visibleById(gameId);
+          if (game) {
+            state.gameId = game.id;
+            state.gameName = game.name;
+          }
+        }
+        return state;
       }),
     );
 
-    return results.filter(
-      (entry): entry is { userId: string; status: ActiveStatus } => entry !== null,
-    );
+    return results.filter((entry): entry is NonNullable<typeof entry> => entry !== null);
   }
 }

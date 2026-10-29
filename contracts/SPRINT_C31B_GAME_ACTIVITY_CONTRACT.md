@@ -1,6 +1,6 @@
 # SPRINT C31b: Oyun algılama ("oynuyor" durumu + yayın önerisi)
 
-> Durum: **SÖZLEŞME YAZILDI (2026-10-29), sahip onayı bekliyor. C31a sahip turu geçmeden başlamaz.** PM compose (Opus).
+> Durum: **KODLANDI + R7 SAHİP ONAYI (2026-10-29)**, sahip turu bekliyor. Sapmalar: elle liste web üzerinden masaüstüne (Bearer), Epic eşleme kurulum klasörü altı, snapshot `gameName`, DM satırında "oynuyor" önizlemesi (sahip onaylı), oyun kapanınca null presence kitlesine (sahip onaylı). Metin2/Zula/Wolfteam/Point Blank dosya adı doğrulanamadı, listede yok. PM compose (Opus).
 > **api + desktop + web + mobil.** **R7: presence görünürlük karar yüzeyi** (`canSeePresence` etrafına yeni veri) →
 > §2 sahibe satır satır sunulur.
 

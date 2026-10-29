@@ -27,6 +27,7 @@ import { PlatformInvitesModule } from './modules/platform-invites/platform-invit
 import { AiVideoModule } from './modules/ai-video/ai-video.module';
 import { PlatformUsersModule } from './modules/platform-users/platform-users.module';
 import { EmergencyModule } from './modules/emergency/emergency.module';
+import { GamesModule } from './modules/games/games.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -58,6 +59,7 @@ import configuration from './config/configuration';
     PlatformUsersModule,
     AiVideoModule,
     EmergencyModule,
+    GamesModule,
   ],
   providers: [
     {

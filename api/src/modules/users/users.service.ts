@@ -11,6 +11,7 @@ import { PresignAnimatedDto, ProcessAnimatedDto } from '../../shared/media/dto/a
 import { SetMediaDto } from '../../shared/media/dto/set-media.dto';
 import { DmPermissionService } from '../../shared/dm-permission/dm-permission.service';
 import { VoiceService } from '../voice/voice.service';
+import { PresenceService } from '../../shared/presence/presence.service';
 
 export interface MutualFriendDto {
   id: string;
@@ -76,6 +77,7 @@ export class UsersService {
     private voice: VoiceService,
     private animatedMedia: AnimatedMediaService,
     private config: ConfigService,
+    private presence: PresenceService,
   ) {}
 
   /** C22/C14: UserDto + hareketli yükleme ve yapay zeka video kapıları. */
@@ -404,17 +406,26 @@ export class UsersService {
       bannerColor?: string | null;
       readReceipts?: boolean;
       quickReactions?: string[];
+      showGameActivity?: boolean;
     } = {};
     if (dto.bio !== undefined) data.bio = dto.bio;
     if (dto.dmPolicy !== undefined) data.dmPolicy = dto.dmPolicy;
     if (dto.bannerColor !== undefined) data.bannerColor = dto.bannerColor;
     if (dto.readReceipts !== undefined) data.readReceipts = dto.readReceipts;
     if (dto.quickReactions !== undefined) data.quickReactions = dto.quickReactions;
+    if (dto.showGameActivity !== undefined) data.showGameActivity = dto.showGameActivity;
 
     const user = await this.prisma.user.update({
       where: { id: userId },
       data,
     });
+    // C31b §2.6: ayar değişince oyun satırı hemen güncellenir. Kapanırsa bellekteki oyun silinir
+    // (yeniden açınca bayat oyun sızmasın) ve `activity:update { game: null }` yayılır; açılırsa
+    // masaüstünün o an bildirdiği oyun (varsa) kitleye çıkar.
+    if (dto.showGameActivity !== undefined) {
+      if (dto.showGameActivity === false) this.presence.clearGames(userId);
+      await this.presence.broadcastActivity(userId);
+    }
     return this.userDto(user);
   }
 

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
+import { useActivityStore } from '@/stores/activity'
 import { useVoiceStore } from '@/stores/voice'
 import VoiceConnectedBar from '@/components/layout/VoiceConnectedBar.vue'
 import { useSocket } from '@/composables/useSocket'
@@ -14,6 +15,7 @@ const emit = defineEmits<{ logout: []; openSettings: [section?: string] }>()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const presenceStore = usePresenceStore()
+const activityStore = useActivityStore()
 const voiceStore = useVoiceStore()
 const { setPresence } = useSocket()
 
@@ -214,7 +216,11 @@ function onLogout() {
             {{ authStore.user?.username }}
           </span>
           <span class="text-[12px] truncate leading-[1.2]" :style="`color: ${presenceColor(currentPresence)};`">
-            {{ t(`presence.${currentPresence}`) }}
+            {{
+              activityStore.myGame() && currentPresence !== 'offline'
+                ? t('activity.playing', { game: activityStore.myGame()?.name })
+                : t(`presence.${currentPresence}`)
+            }}
           </span>
         </div>
       </button>

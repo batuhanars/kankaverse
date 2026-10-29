@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useVoiceStore } from '@/stores/voice';
 import { useVoicePresenceStore } from '@/stores/voicePresence';
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence';
+import { useActivityStore } from '@/stores/activity';
 import { presentIncomingCall, dismissIncomingCall } from '@/notifications/incomingCall';
 import { clearChannelNotifications } from '@/notifications/push';
 import { t } from '@/i18n';
@@ -205,9 +206,24 @@ function ensureSocket(): Socket {
   // geliyordu; dinleyen yoktu. Yeni endpoint/olay/şema YOK, yalnız var olanın tüketimi.
   // Görünürlük kararı sunucuda (`PresenceService.canSeePresence`, R7): gelmeyen kişi görülemeyen
   // kişidir, istemci bunu sorgulamaz.
-  socket.on('presence:snapshot', (payload: { states: { userId: string; status: PresenceStatus }[] }) => {
-    usePresenceStore.getState().applySnapshot(payload.states);
-  });
+  socket.on(
+    'presence:snapshot',
+    (payload: {
+      states: { userId: string; status: PresenceStatus; gameId?: string; gameName?: string }[];
+    }) => {
+      usePresenceStore.getState().applySnapshot(payload.states);
+      // C31b: oyun satırı aynı snapshot'ın içinde gelir (görünürlük sunucuda).
+      useActivityStore.getState().applySnapshot(payload.states);
+    },
+  );
+
+  // C31b: "oynuyor" güncellemesi. game=null → oyun yok / ayar kapandı / dnd / çevrimdışı.
+  socket.on(
+    'activity:update',
+    (payload: { userId: string; game: { id: string; name: string } | null }) => {
+      useActivityStore.getState().applyUpdate(payload.userId, payload.game);
+    },
+  );
 
   socket.on('presence:update', (payload: { userId: string; status: PresenceStatus }) => {
     usePresenceStore.getState().applyUpdate(payload.userId, payload.status);
@@ -219,6 +235,7 @@ function ensureSocket(): Socket {
   // göstermekten iyidir; snapshot yeniden bağlanınca zaten hemen doluyor.
   socket.on('disconnect', () => {
     usePresenceStore.getState().reset();
+    useActivityStore.getState().reset();
   });
 
   // Handshake snapshot — Bildirimler sekmesi rozeti (contract §4.2).
@@ -604,6 +621,7 @@ export function resetSocket(): void {
   // Oturum düşünce durum haritası da gider. `disconnect` dinleyicisi bunu zaten yapardı ama
   // `removeAllListeners()` yukarıda onu çoktan kaldırmış oluyor, o yüzden burada açıkça.
   usePresenceStore.getState().reset();
+  useActivityStore.getState().reset();
 }
 
 /** Mesaj ekranı mount'ta manuel join (ack'li; 5sn timeout — web/useSocket.ts joinChannel deseni). */

@@ -6,6 +6,7 @@ import { useDmStore } from '@/stores/dm'
 import { useFriendsStore } from '@/stores/friends'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { usePresenceStore } from '@/stores/presence'
+import { useActivityStore } from '@/stores/activity'
 import { useAuthStore } from '@/stores/auth'
 import { useToastStore } from '@/stores/toast'
 import { useVoiceStore } from '@/stores/voice'
@@ -35,6 +36,7 @@ const dmStore = useDmStore()
 const friendsStore = useFriendsStore()
 const prefsStore = useNotificationPrefsStore()
 const presenceStore = usePresenceStore()
+const activityStore = useActivityStore()
 const authStore = useAuthStore()
 const toast = useToastStore()
 const voiceStore = useVoiceStore()
@@ -489,6 +491,14 @@ async function confirmDeleteGroup() {
             style="color: var(--kv-accent-500);"
           >
             {{ t('typing.simple') }}
+          </p>
+          <!-- C31b: 1-1 DM'de karşı taraf oyun oynuyorsa son mesaj yerine "X oynuyor" -->
+          <p
+            v-else-if="ch.type === 'DM' && activityStore.getGame(ch.otherUser.id)"
+            class="text-[12px] truncate"
+            style="color: var(--kv-online);"
+          >
+            {{ t('activity.playing', { game: activityStore.getGame(ch.otherUser.id)?.name }) }}
           </p>
           <p v-else-if="ch.lastMessage" class="text-[12px] truncate" style="color: var(--kv-text-muted);">
             {{ formatLastMessage(ch, ch.lastMessage.content) }}

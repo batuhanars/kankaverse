@@ -27,7 +27,7 @@ btnShare.addEventListener('click', () => {
 })
 
 // main'den kaynak listesi geldiğinde render et
-window.pickerBridge.onSources((sources) => {
+window.pickerBridge.onSources(({ sources, hint }) => {
   loading.remove()
 
   const screens = sources.filter((s) => s.id.startsWith('screen:'))
@@ -35,7 +35,23 @@ window.pickerBridge.onSources((sources) => {
 
   renderGroup('Ekranlar', screens)
   renderGroup('Pencereler', windows)
+
+  if (hint) preselectByHint(hint)
 })
+
+/**
+ * C31b §3.4: yayın önerisi — adı ipucunu (büyük/küçük harf duyarsız) içeren İLK kaynak seçili gelir.
+ * Bulunamazsa bugünkü davranış (hiçbiri seçili değil). Paylaşım yine kullanıcı onayıyla başlar.
+ */
+function preselectByHint(hint) {
+  const needle = hint.toLowerCase()
+  const match = [...document.querySelectorAll('.card')].find((card) =>
+    (card.querySelector('.card-name')?.title ?? '').toLowerCase().includes(needle),
+  )
+  if (!match) return
+  selectCard(match, match.dataset.id)
+  match.scrollIntoView({ block: 'nearest' })
+}
 
 /**
  * Bir grubu başlık + grid olarak içeriğe ekler.

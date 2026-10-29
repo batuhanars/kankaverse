@@ -113,6 +113,7 @@ model User {
   profileDiscoverable Boolean            @default(true)
   readReceipts        Boolean            @default(true) // C12: okundu bilgisi paylaşımı (karşılıklı, sözleşme §2)
   quickReactions      String[]           @default([]) // C24: hızlı tepki şeridi; boş = varsayılan beşli
+  showGameActivity    Boolean?           // C31b §2: "Oynadığım oyunu göster". null = yaşa göre varsayılan (yetişkin açık, minör kapalı)
   emailVerifiedAt     DateTime?
   avatarUrl           String?
   bio                 String?
@@ -160,6 +161,26 @@ model User {
   notificationPrefs   NotificationPref[] @relation("UserNotificationPrefs")
   pushTokens          PushToken[]
   aiVideoGenerations  AiVideoGeneration[]
+}
+
+enum GameSource {
+  STEAM
+  EPIC
+  CURATED
+}
+
+// C31b §1: oyun algılama tablosu. Ad HİÇBİR ZAMAN istemciden alınmaz (Steam: sunucu mağazadan çeker,
+// Epic: ilk kayıtta automod süzgecinden geçen ad kilitlenir, CURATED: migration seed'i).
+model Game {
+  id          String     @id @default(cuid())
+  name        String
+  source      GameSource
+  externalId  String?    // STEAM: appid · EPIC: catalogItemId · CURATED: slug
+  executables String[]   @default([]) // yalnız CURATED: masaüstü eşleme için küçük harf süreç adları
+  hidden      Boolean    @default(false) // admin kaldırdı: yayılmaz, tekrar eklenmez
+  createdAt   DateTime   @default(now())
+
+  @@unique([source, externalId])
 }
 
 model AuthToken {

@@ -7,6 +7,8 @@ export interface Toast {
   id: number
   type: ToastType
   message: string
+  /** İsteğe bağlı tek eylem düğmesi (örn. "Ayarlara git"); tıklanınca toast kapanır. */
+  action?: { label: string; run: () => void }
 }
 
 /** Otomatik kapanma süresi (ms). */
@@ -22,12 +24,16 @@ export const useToastStore = defineStore('toast', () => {
   let counter = 0
   const timers = new Map<number, ReturnType<typeof setTimeout>>()
 
-  function push(type: ToastType, message: string): number {
+  function push(
+    type: ToastType,
+    message: string,
+    opts?: { action?: Toast['action']; durationMs?: number },
+  ): number {
     const id = ++counter
-    toasts.value.push({ id, type, message })
+    toasts.value.push({ id, type, message, action: opts?.action })
     timers.set(
       id,
-      setTimeout(() => dismiss(id), AUTO_DISMISS_MS),
+      setTimeout(() => dismiss(id), opts?.durationMs ?? AUTO_DISMISS_MS),
     )
     return id
   }
@@ -43,7 +49,8 @@ export const useToastStore = defineStore('toast', () => {
 
   const success = (message: string) => push('success', message)
   const error = (message: string) => push('error', message)
-  const info = (message: string) => push('info', message)
+  const info = (message: string, opts?: { action?: Toast['action']; durationMs?: number }) =>
+    push('info', message, opts)
 
   return { toasts, success, error, info, dismiss }
 })

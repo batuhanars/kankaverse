@@ -308,6 +308,10 @@
       "slot": "Tepki {n}: değiştir",
       "reset": "Varsayılana dön"
     },
+    "gameActivity": {
+      "label": "Oynadığım oyunu göster",
+      "description": "Oynadığın oyun, kanka listende ve ortak ortamlarındaki üye listesinde adının altında görünür. Reşit olmayan hesaplarda bu kapalı gelir, açsan da yalnız kankaların görür."
+    },
     "readReceipts": {
       "label": "Okundu bilgisi",
       "description": "Mesajını okuduğunda karşı taraf bunu görsün. Kapatırsan senin okuduğun görünmez, ama sen de kimsenin okuduğunu göremezsin."
@@ -1461,6 +1465,13 @@
       "ownership_transferred": "{actor}, sahipliği {target} adlı kullanıcıya devretti",
       "fallback": "{actor} bir işlem yaptı"
     }
+  },
+  "activity": {
+    "playing": "{game} oynuyor",
+    "streamGame": "{game} oyununu yayınla",
+    "gameOpened": "{game} açıldı. Kankalarına yayınlamak ister misin?",
+    "note": "Oynadığın oyun kankalarına ve ortak ortamlarındaki kişilere görünüyor. Ayarlardan kapatabilirsin.",
+    "noteAction": "Ayarlara git"
   },
   "toast": {
     "close": "Kapat",

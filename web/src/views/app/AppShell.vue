@@ -21,6 +21,7 @@ import { useIdlePresence } from '@/composables/useIdlePresence'
 import { useAppModals } from '@/composables/useAppModals'
 import { useAppShellNav } from '@/composables/useAppShellNav'
 import { useNativeNotifications } from '@/composables/useNativeNotifications'
+import { useGameActivity } from '@/composables/useGameActivity'
 import { isMobile, isWide } from '@/composables/useResponsive'
 import ServerRail from '@/components/layout/ServerRail.vue'
 import UserCard from '@/components/layout/UserCard.vue'
@@ -61,6 +62,9 @@ useIdlePresence()
 // Electron native bildirim katmanı: görünür-değilken yeni bildirim → OS toast.
 // Yalnız window.kankaverse?.isElectron=true iken aktif; tarayıcıda no-op.
 useNativeNotifications()
+
+// C31b: masaüstü oyun algılama köprüsü ("oynuyor" durumu + yayın önerisi). Köprü yoksa no-op.
+useGameActivity()
 
 // Drawer açıkken body scroll-lock. Watch: isMobile değişince veya drawer kapanınca temizle.
 watch(

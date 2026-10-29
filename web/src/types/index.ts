@@ -59,6 +59,8 @@ export interface UserDto {
   bannerColor: string | null // profil afiş rengi (preset anahtar veya null=varsayılan)
   dmPolicy: DmPolicy // Sprint C5 — Gizlilik sekmesi okur
   quickReactions?: string[] // Sprint C24 — hızlı tepki şeridi (etkin liste, her zaman 5); bayat oturumda yok olabilir
+  showGameActivity?: boolean | null // C31b — ham ayar (null = hiç dokunulmadı)
+  gameActivityEffective?: boolean // C31b — yaşa göre varsayılan uygulanmış hâl (sunucu hesaplar)
   readReceipts: boolean // C12 — okundu bilgisi paylaşımı (karşılıklı; kapatan karşı tarafınkini de göremez)
 }
 

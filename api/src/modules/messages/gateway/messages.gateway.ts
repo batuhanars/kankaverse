@@ -23,6 +23,7 @@ import { DmPermissionService } from '../../../shared/dm-permission/dm-permission
 import { NotificationsService, isMuteActive } from '../../notifications/notifications.service';
 import { PushService } from '../../../shared/push/push.service';
 import { VoiceService } from '../../voice/voice.service';
+import { GamesService } from '../../../shared/games/games.service';
 
 interface AuthSocket extends Socket {
   data: { userId: string; sessionId: string; username?: string };
@@ -41,6 +42,12 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   private readonly GROUP_CALL_RING_WINDOW_MS = 60_000;
   private readonly groupCallRingTimestamps = new Map<string, number>();
 
+  // C31b §2.4 — `activity:set` hız sınırı: BAĞLANTI başına dakikada 10 (yanıp sönen süreç spamı).
+  // Anahtar socket.id, değer son pencere içindeki zaman damgaları; bağlantı kopunca silinir.
+  private readonly ACTIVITY_SET_WINDOW_MS = 60_000;
+  private readonly ACTIVITY_SET_MAX = 10;
+  private readonly activitySetTimestamps = new Map<string, number[]>();
+
   constructor(
     private jwtService: JwtService,
     private config: ConfigService,
@@ -53,6 +60,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private notifications: NotificationsService,
     private push: PushService,
     private voice: VoiceService,
+    private games: GamesService,
   ) {}
 
   afterInit(server: Server) {
@@ -120,6 +128,9 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const userId = socket.data?.userId;
     if (!userId) return; // auth olmamış socket — hiçbir şey yapma
 
+    this.activitySetTimestamps.delete(socket.id);
+    // C31b: kapanan bağlantının oyunu hesabın etkin oyunuydu mu? Silinmeden ÖNCE bakılır.
+    const gameBefore = this.presence.activeGameId(userId);
     const nowOffline = this.presence.disconnect(userId, socket.id);
     // 🔴 Kapanan pencere son pencere olmayabilir ama hesabın ETKİN durumunu yine de değiştirebilir:
     // aktif pencere kapanıp geriye yalnız boştaki bir pencere kaldıysa hesap artık boştadır.
@@ -129,6 +140,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const audience = await this.presence.audienceFor(userId);
     for (const recipientId of [...audience, userId]) {
       this.realtime.emitToUser(recipientId, 'presence:update', { userId, status });
+    }
+    // Bağlantı koptu: etkin oyun değiştiyse (başka pencerenin oyunu ya da hiç) kitleye bildir.
+    if (gameBefore !== this.presence.activeGameId(userId)) {
+      await this.presence.broadcastActivity(userId);
     }
   }
 
@@ -302,6 +317,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       return { ok: false };
     }
 
+    const gameBefore = this.presence.activeGameId(userId);
     const applied = this.presence.setStatus(userId, payload.status, {
       connectionId: socket.id,
       auto: payload.auto === true,
@@ -320,6 +336,55 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       });
     }
 
+    // C31b §2.5: dnd'ye girince oyun gizlenir, dnd'den çıkınca geri gelir.
+    if (gameBefore !== this.presence.activeGameId(userId)) {
+      await this.presence.broadcastActivity(userId);
+    }
+
+    return { ok: true };
+  }
+
+  /**
+   * C31b §2.4 — masaüstünün algıladığı oyunu bildirir. `{ ref, epicName? }` ya da `{ ref: null }`.
+   * Yayılan değer HER ZAMAN tablodaki `Game.id` + `name`'dir; istemcinin söylediği ad hiçbir yerde
+   * kullanılmaz (Epic adı yalnız ilk kayıtta, GamesService kapısından geçerek). Ayar sunucuda
+   * kontrol edilir: kapalıysa kaydedilmez ve yayılmaz. Görünürlük kararı PresenceService'te.
+   */
+  @SubscribeMessage('activity:set')
+  async handleActivitySet(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { ref?: unknown; epicName?: unknown },
+  ) {
+    const userId = socket.data?.userId;
+    if (!userId) return { ok: false };
+
+    // Hız sınırı: bağlantı başına dakikada ACTIVITY_SET_MAX.
+    const now = Date.now();
+    const recent = (this.activitySetTimestamps.get(socket.id) ?? []).filter(
+      (t) => now - t < this.ACTIVITY_SET_WINDOW_MS,
+    );
+    if (recent.length >= this.ACTIVITY_SET_MAX) return { ok: false };
+    recent.push(now);
+    this.activitySetTimestamps.set(socket.id, recent);
+
+    const before = this.presence.activeGameId(userId);
+
+    if (payload?.ref === null) {
+      if (!this.presence.setGame(userId, socket.id, null)) return { ok: false };
+    } else {
+      // Ayar kapalıysa çözümleme de yapılmaz (Steam/Epic için tabloya yeni kayıt açılmasın).
+      if (!(await this.presence.gameActivityEnabled(userId))) return { ok: false };
+      const game = await this.games.resolve(payload?.ref, {
+        userId,
+        epicName: payload?.epicName,
+      });
+      if (!game) return { ok: false };
+      if (!this.presence.setGame(userId, socket.id, game.id)) return { ok: false };
+    }
+
+    if (before !== this.presence.activeGameId(userId)) {
+      await this.presence.broadcastActivity(userId);
+    }
     return { ok: true };
   }
 

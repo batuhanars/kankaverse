@@ -9,6 +9,7 @@ import { useDmStore } from '@/stores/dm';
 import { useVoiceStore } from '@/stores/voice';
 import { useVoicePresenceStore, type VoicePresenceParticipant } from '@/stores/voicePresence';
 import { usePresenceStore, selectStatus } from '@/stores/presence';
+import { useActivityStore, selectGameName } from '@/stores/activity';
 import { PRESENCE_COLOR } from '@/components/PresenceDot';
 import { OngoingCallBanner } from '@/components/call/OngoingCallBanner';
 import { MessageScreen } from '@/components/MessageScreen';
@@ -176,6 +177,8 @@ export default function DmScreen() {
   // taraf ve arkadaş olmayan minör zaten hiç gelmez, burada ek bir kapı kurulmuyor.
   const otherUserId = storeChannel?.type === 'DM' ? storeChannel.otherUser.id : params.otherUserId;
   const otherStatus = usePresenceStore(selectStatus(isDm ? otherUserId : null));
+  // C31b: karşı taraf çevrimiçiyken oyun oynuyorsa durum yerine "X oynuyor" (görünürlük sunucuda).
+  const otherGame = useActivityStore(selectGameName(isDm ? otherUserId : null));
   // Çevrimdışıda başlıkta durum yazısı yok (null).
   const presenceColor = isDm && otherStatus !== 'offline' ? PRESENCE_COLOR[otherStatus] : null;
 
@@ -314,7 +317,9 @@ export default function DmScreen() {
                 </Text>
                 {presenceColor && (
                   <Text style={[styles.headerPresence, { color: presenceColor }]} numberOfLines={1}>
-                    {t(`presence.${otherStatus}`)}
+                    {otherGame && otherStatus !== 'offline'
+                      ? t('activity.playing', { game: otherGame })
+                      : t(`presence.${otherStatus}`)}
                   </Text>
                 )}
               </View>

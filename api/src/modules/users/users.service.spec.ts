@@ -44,6 +44,7 @@ function makeService() {
     voiceMock as any,
     { canCreateAnimated: () => true } as any, // AnimatedMediaService (yalniz C22 animatedAllowed icin)
     { get: () => undefined } as any, // ConfigService (C14 aiVideoAllowed: kapali)
+    { clearGames: jest.fn(), broadcastActivity: jest.fn() } as any, // PresenceService (C31b)
   );
 }
 

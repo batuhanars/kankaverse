@@ -50,6 +50,13 @@ export class UpdateProfileDto {
   @IsBoolean({ message: 'Okundu bilgisi tercihi geçersiz.' })
   readReceipts?: boolean;
 
+  // C31b §2: "Oynadığım oyunu göster". Verilmezse değişmez; sunucu varsayılanı yaşa göre hesaplar
+  // (me cevabındaki `gameActivityEffective`), istemci yeniden hesaplamaz.
+  @ApiPropertyOptional({ description: 'Oynadığım oyunu göster (kapalıysa oyun yayılmaz).' })
+  @IsOptional()
+  @IsBoolean({ message: 'Oyun paylaşım tercihi geçersiz.' })
+  showGameActivity?: boolean;
+
   // C24: hızlı tepki şeridi. Boş dizi = varsayılana dön; aksi halde tam 5 farklı tek-emoji.
   @ApiPropertyOptional({
     type: [String],

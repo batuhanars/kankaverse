@@ -11,6 +11,7 @@ import { useTypingStore } from '@/stores/typing';
 import { resolvePref, useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { NotificationLevel } from '@/api/notifications';
 import { useVoicePresenceStore } from '@/stores/voicePresence';
+import { useActivityStore } from '@/stores/activity';
 import { formatMentionsPlain } from '@/utils/mentions';
 import { channelTitle } from '@/utils/channelTitle';
 import { t } from '@/i18n';
@@ -50,6 +51,8 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
   const errorMessage = useDmStore((s) => s.errorMessage);
   const fetchAll = useDmStore((s) => s.fetchAll);
   const typingByChannel = useTypingStore((s) => s.byChannel);
+  // C31b: 1-1 DM satırında karşı tarafın oynadığı oyun (görünürlük sunucuda).
+  const gameByUser = useActivityStore((s) => s.byUser);
   // Sprint M2b §10 R2-2 — DM/grup DM'de de §5 süzgeci: hedef susturulmuşsa veya `NONE` ise
   // okunmamış nokta gösterilmez. `resolvePref` guildId'siz çağrılır (DM'in bağlı bir ortamı yok).
   const notifPrefs = useNotificationPrefsStore((s) => s.prefs);
@@ -191,6 +194,7 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
                 avatarUrl={avatar}
                 preview={preview}
                 typing={typing}
+                gameName={item.type === 'DM' ? (gameByUser[item.otherUser.id]?.name ?? null) : null}
                 unread={showUnread}
                 channelId={item.id}
                 isGroup={item.type === 'GROUP_DM'}
