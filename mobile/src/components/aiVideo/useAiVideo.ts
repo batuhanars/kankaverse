@@ -22,7 +22,7 @@ export function useAiVideo() {
   const [error, setError] = useState('');
   const [now, setNow] = useState(Date.now());
   const imageState = useAiVideoImage(setError);
-  // C33: pasif tanıtım. Kilitliyken (izin listesi dışı) hiçbir yapay zeka ucuna istek atılmaz.
+  // C33: pasif tanıtım. Kilitliyken yalnız options çağrılır.
   const locked = useAuthStore((s) => s.user?.aiVideoAllowed !== true);
   const form = useAiVideoForm(!!imageState.image, locked);
   const jobRef = useRef<AiVideoDto | null>(null);

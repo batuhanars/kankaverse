@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -18,7 +19,8 @@ import { AiVideoAttachmentService } from './ai-video-attachment.service';
 import { CreateAiVideoDto, EstimateAiVideoDto, PresignAiInputDto } from './dto/ai-video.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from '../../common/guards/verified-email.guard';
-import { AiVideoAccessGuard } from './ai-video-access.guard';
+import { AiVideoAccessGuard, AiVideoPreviewOk } from './ai-video-access.guard';
+import type { AiVideoRequest } from './ai-video-access.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 type AuthUser = { id: string };
@@ -45,11 +47,12 @@ export class AiVideoController {
   }
 
   @Get('options')
+  @AiVideoPreviewOk()
   @ApiOperation({
     summary: 'Açık modeller, süre/çözünürlük seçenekleri, günlük tavan ve bugünkü harcama',
   })
-  options(@CurrentUser() user: AuthUser) {
-    return this.service.options(user.id);
+  options(@CurrentUser() user: AuthUser, @Req() req: AiVideoRequest) {
+    return this.service.options(user.id, req.aiVideoAllowed !== false);
   }
 
   @Post('estimate')

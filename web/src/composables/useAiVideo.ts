@@ -30,7 +30,7 @@ export function useAiVideo() {
   const prompt = ref('')
   const image = ref<File | null>(null)
   const withImage = computed(() => !!image.value)
-  // C33: pasif tanıtım. Kilitliyken (izin listesi dışı) hiçbir yapay zeka ucuna istek atılmaz.
+  // C33: pasif tanıtım. Kilitliyken yalnız options çağrılır; estimate, geçmiş, yükleme atılmaz.
   const locked = useAuthStore().user?.aiVideoAllowed !== true
   const form = useAiVideoForm(withImage, locked)
   const job = ref<AiVideoDto | null>(null)

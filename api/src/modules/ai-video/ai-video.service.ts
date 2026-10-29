@@ -54,9 +54,13 @@ export class AiVideoService {
     private input: AiVideoInputService,
   ) {}
 
-  /** Açık modeller + seçenekleri + bugünkü harcama (diyalog açılışında). */
-  async options(userId: string) {
-    const spentMicro = await this.todaySpentMicro(userId);
+  /**
+   * Açık modeller + seçenekleri + bugünkü harcama (diyalog açılışında).
+   * `allowed=false` (kilitli tanıtım): harcama/tavan alanları 0, DB'ye gidilmez; Pika çağrılmaz.
+   */
+  async options(userId: string, allowed = true) {
+    const spentMicro = allowed ? await this.todaySpentMicro(userId) : 0;
+    const capMicro = allowed ? this.dailyCapMicro() : 0;
     return {
       models: this.enabledModels().map((m) => ({
         key: m.key,
@@ -67,9 +71,9 @@ export class AiVideoService {
         supportsImage: true,
         audio: m.audio,
       })),
-      dailyCapUsd: this.dailyCapMicro() / MICRO,
+      dailyCapUsd: capMicro / MICRO,
       todaySpentUsd: usd(spentMicro),
-      dailyCapCredits: toCredits(this.dailyCapMicro(), this.creditMicro()),
+      dailyCapCredits: toCredits(capMicro, this.creditMicro()),
       spentTodayCredits: toCredits(spentMicro, this.creditMicro()),
     };
   }

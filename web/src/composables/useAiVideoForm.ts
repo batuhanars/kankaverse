@@ -6,7 +6,8 @@ const ESTIMATE_DELAY_MS = 400
 /**
  * Yapay zeka video formu (Sprint C14b §3.1): model / çözünürlük / süre seçimi (options'tan) ve
  * 400 ms gecikmeli canlı teklif. İstek yarışında yalnız SON isteğin sonucu yazılır.
- * C33: `locked` (pasif tanıtım) iken HİÇBİR istek atılmaz (options/estimate yok; 403 gürültüsü olmaz).
+ * C33: `locked` (pasif tanıtım) iken yalnız `options` çağrılır (sunucu kilitliye açık, tutarlar 0); estimate atılmaz
+ * (403 gürültüsü ve Pika çağrısı olmaz). Geçmiş ve yükleme de useAiVideo'da kilitli.
  */
 export function useAiVideoForm(withImage: Ref<boolean>, locked = false) {
   const options = ref<AiVideoOptionsDto | null>(null)
@@ -50,7 +51,6 @@ export function useAiVideoForm(withImage: Ref<boolean>, locked = false) {
   }
 
   async function loadOptions() {
-    if (locked) return
     try {
       const { data } = await aiVideoApi.options()
       const first = !options.value

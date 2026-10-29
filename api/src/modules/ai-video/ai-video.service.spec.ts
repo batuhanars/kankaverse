@@ -403,6 +403,21 @@ describe('AiVideoService.get / sumSpentMicro', () => {
 });
 
 describe('AiVideoService C14c', () => {
+  it('options: kilitli (allowed=false): tutarlar 0, modeller gelir, Pika cagrilmaz', async () => {
+    const { service, pika } = setup({}, [
+      { status: AiVideoStatus.RUNNING, costMicroUsd: null, quoteMicroUsd: 400_000 },
+    ]);
+    const res = await service.options('u1', false);
+    expect(res.models.length).toBeGreaterThan(0);
+    expect(res).toMatchObject({
+      dailyCapUsd: 0,
+      todaySpentUsd: 0,
+      dailyCapCredits: 0,
+      spentTodayCredits: 0,
+    });
+    expect(pika.quote).not.toHaveBeenCalled();
+  });
+
   it('options: modelde audio doner', async () => {
     const s = setup();
     const o = await s.service.options('u1');

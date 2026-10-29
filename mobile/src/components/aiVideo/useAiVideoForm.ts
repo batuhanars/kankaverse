@@ -7,7 +7,8 @@ const ESTIMATE_DELAY_MS = 400;
  * Sprint C14d (web `useAiVideoForm` eşdeğeri): model / çözünürlük / süre seçimi (options'tan) ve
  * 400 ms gecikmeli canlı teklif. İstek yarışında yalnız SON isteğin sonucu yazılır (seq sayacı).
  * Sayfa kapanınca (bileşen sökülünce) bekleyen zamanlayıcı ve uçuştaki istek etkisiz kalır.
- * C33: `locked` (pasif tanıtım) iken HİÇBİR istek atılmaz (options/estimate yok; 403 gürültüsü olmaz).
+ * C33: `locked` (pasif tanıtım) iken yalnız `options` çağrılır (sunucu kilitliye açık, tutarlar 0); estimate atılmaz
+ * (403 gürültüsü ve Pika çağrısı olmaz). Geçmiş ve yükleme de useAiVideo'da kilitli.
  */
 export function useAiVideoForm(withImage: boolean, locked = false) {
   const [options, setOptions] = useState<AiVideoOptionsDto | null>(null);
@@ -37,7 +38,6 @@ export function useAiVideoForm(withImage: boolean, locked = false) {
   }, []);
 
   const loadOptions = useCallback(async () => {
-    if (locked) return;
     try {
       const data = await aiVideoApi.options();
       if (!alive.current) return;
@@ -47,7 +47,7 @@ export function useAiVideoForm(withImage: boolean, locked = false) {
     } catch {
       /* seçenekler yüklenmezse form boş kalır; hata kullanıcıya üretim denemesinde döner */
     }
-  }, [pickModel, locked]);
+  }, [pickModel]);
 
   useEffect(() => {
     alive.current = true;

@@ -45,3 +45,18 @@
   isteği yok · minör test hesabında düğme yok · sahip hesabında tutarlar kredi, üretim çalışıyor, tavan kredi diliyle.
 
 **OUT:** kredi satışı/paketler/Play Billing · kullanıcı başına bakiye · USD alanlarının kaldırılması · izin listesinin genişletilmesi.
+
+## §5 Ek (2026-10-29)
+Sahip isteği: kilitli modda da model bilgisi ve seçenekler görünsün, üretim kapalı kalsın.
+
+1. **api (R7-hafif):** `GET /ai-video/options` ucu `canUseAiVideo || canPreviewAiVideo` ile açıldı. `AiVideoAccessGuard` işaretli uçta
+   (`@AiVideoPreviewOk()` metadata, yalnız `options`) preview'u da kabul eder; işaretsiz tüm uçlarda (estimate, generate, input/presign,
+   geçmiş, attachment, silme) davranış AYNEN `canUseAiVideo`. Guard isteğe `aiVideoAllowed` bırakır; `AiVideoService.options(userId, allowed)`
+   `allowed=false` iken `spentToday*` ve `dailyCap*` alanlarını 0 döner (DB'ye gidilmez). `options` Pika'yı çağırmaz (yalnız yapılandırma + DB).
+2. **web + mobil:** kilitli modda `loadOptions` çağrılır; model bilgisi, çözünürlük, süre ve en-boy seçicileri etkin. İstem alanı ve görsel
+   ekleme kapalı, Oluştur kapalı, "Bugün 0 / 0 kredi" + not aynen. Tahmin (estimate), geçmiş ve yükleme istekleri kilitli modda HİÇ atılmaz.
+3. **Bulgu (değiştirilmedi):** `POST /ai-video/estimate` fiyatı kendi tablomuzdan DEĞİL, `quoteMicro` ile Pika'nın gerçek teklifinden alır
+   (10 dk bellek önbelleği). Bu yüzden kilitli istemci estimate atmaz ve uç `canUseAiVideo`'da kalır.
+4. Mobil `app.json` versionCode 39 → 40.
+5. Testler: guard (preview-ok uçta listede olmayan yetişkin geçer ve `aiVideoAllowed=false`, minör ve bayrak kapalıyken 403, işaretsiz uçta 403),
+   servis (`options(…, false)` tutarlar 0, Pika çağrılmaz).
