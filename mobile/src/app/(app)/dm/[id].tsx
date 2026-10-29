@@ -196,12 +196,17 @@ export default function DmScreen() {
   const receiptFor = useCallback(
     (m: MessageDto): 'sent' | 'seen' | null => {
       if (!myUserId || m.author.id !== myUserId) return null;
-      // Kapı gizlilik kararı; okuma olup olmaması tek/çift tiki seçer, göstergeyi gizlemez.
-      if (!receiptsEnabled) return null;
+      // C29 iyimser gönderim: henüz sunucuya ulaşmamış mesajda tik yok (soluk görünüm yeterli).
+      if (m.id.startsWith('pending:')) return null;
+      // Okundu bilgisi yalnız 1-1 DM'de; grup DM'de gösterge yok.
+      if (isGroupDm) return null;
+      // Sahip kararı 2026-10-29: gizlilik kapısı kapalıysa (ayar, engel, istek) gösterge GİZLENMEZ,
+      // tek tik "gönderildi" kalır. Okuma bilgisi sızmaz: otherReadAt zaten sunucudan null gelir.
+      if (!receiptsEnabled) return 'sent';
       if (!otherReadAt) return 'sent';
       return m.createdAt <= otherReadAt ? 'seen' : 'sent';
     },
-    [myUserId, receiptsEnabled, otherReadAt],
+    [myUserId, isGroupDm, receiptsEnabled, otherReadAt],
   );
 
   if (!channelId) return null;

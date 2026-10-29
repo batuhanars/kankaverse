@@ -873,6 +873,60 @@ describe('DmService — C9 Mesaj İstekleri', () => {
     expect((res[0] as any).lastMessage.content).toBe('📷 Görsel');
   });
 
+  describe('getDmChannels: okundu alanları (liste ucu, sahip bulgusu 2026-10-29)', () => {
+    const now = new Date('2026-10-29T10:00:00.000Z');
+    const readAt = new Date('2026-10-29T10:05:00.000Z');
+    const dmRow = (selfReceipts: boolean, otherReceipts: boolean) => ({
+      lastReadAt: null,
+      clearedAt: null,
+      channel: {
+        id: CH,
+        type: 'DM',
+        deletedAt: null,
+        dmRequestStatus: null,
+        createdAt: now,
+        members: [
+          { userId: SENDER, lastReadAt: null, user: { id: SENDER, username: 's', avatarUrl: null, avatarAnimatedUrl: null, readReceipts: selfReceipts } },
+          { userId: TARGET, lastReadAt: readAt, user: { id: TARGET, username: 't', avatarUrl: null, avatarAnimatedUrl: null, readReceipts: otherReceipts } },
+        ],
+        messages: [],
+      },
+    });
+
+    it('iki taraf da açıksa receiptsEnabled + otherReadAt döner', async () => {
+      resetMocks();
+      const service = makeService();
+      prismaMock.channelMember.findMany.mockResolvedValue([dmRow(true, true)]);
+      prismaMock.userBlock.findMany.mockResolvedValue([]);
+      const res = (await service.getDmChannels(SENDER)) as any[];
+      expect(res[0].receiptsEnabled).toBe(true);
+      expect(res[0].otherReadAt).toBe(readAt.toISOString());
+      expect(res[0].otherUser.readReceipts).toBeUndefined();
+    });
+
+    it('karşı taraf kapattıysa tik yok ve okuma anı sızmaz', async () => {
+      resetMocks();
+      const service = makeService();
+      prismaMock.channelMember.findMany.mockResolvedValue([dmRow(true, false)]);
+      prismaMock.userBlock.findMany.mockResolvedValue([]);
+      const res = (await service.getDmChannels(SENDER)) as any[];
+      expect(res[0].receiptsEnabled).toBe(false);
+      expect(res[0].otherReadAt).toBeNull();
+    });
+
+    it('engel varsa tik yok', async () => {
+      resetMocks();
+      const service = makeService();
+      prismaMock.channelMember.findMany.mockResolvedValue([dmRow(true, true)]);
+      prismaMock.userBlock.findMany
+        .mockResolvedValueOnce([{ blockedId: TARGET }])
+        .mockResolvedValueOnce([]);
+      const res = (await service.getDmChannels(SENDER)) as any[];
+      expect(res[0].receiptsEnabled).toBe(false);
+      expect(res[0].otherReadAt).toBeNull();
+    });
+  });
+
   it('getMessageRequests: bana gelen PENDING istekleri gönderen + önizleme ile döner', async () => {
     resetMocks();
     const service = makeService();

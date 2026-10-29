@@ -522,7 +522,11 @@ function isMine(msg: MessageDto): boolean {
  */
 function messageReceipt(msg: MessageDto): 'sent' | 'seen' | null {
   if (!isMine(msg)) return null
-  if (!dmStore.showsReceipts(props.channel.id)) return null
+  // Okundu bilgisi yalnız 1-1 DM'de; grup DM'de gösterge yok.
+  if (props.channel.type !== 'DM') return null
+  // Sahip kararı 2026-10-29: gizlilik kapısı kapalıysa gösterge gizlenmez, tek tik "gönderildi" kalır
+  // (okuma anı sunucudan zaten gelmez, bilgi sızmaz).
+  if (!dmStore.showsReceipts(props.channel.id)) return 'sent'
   return dmStore.isSeen(props.channel.id, msg.createdAt) ? 'seen' : 'sent'
 }
 

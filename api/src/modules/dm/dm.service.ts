@@ -112,7 +112,14 @@ export class DmService {
             members: {
               include: {
                 user: {
-                  select: { id: true, username: true, avatarUrl: true, avatarAnimatedUrl: true },
+                  // readReceipts: C12 okundu kararı için (çıktıya yazılmaz, aşağıdaki DTO'lar elle kuruluyor)
+                  select: {
+                    id: true,
+                    username: true,
+                    avatarUrl: true,
+                    avatarAnimatedUrl: true,
+                    readReceipts: true,
+                  },
                 },
               },
             },
@@ -180,6 +187,20 @@ export class DmService {
       const anyBlock = otherId ? selfBlockedSet.has(otherId) || blockedMeSet.has(otherId) : false;
       const canMessage = !anyBlock;
 
+      // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-10-29): okundu alanları yalnız tek kanal DTO'sunda
+      // (`toDmChannelDto`) vardı, liste ucu göndermiyordu. Sohbet listeden açılınca istemci
+      // `receiptsEnabled`i bulamıyor ve tik HİÇ çizilmiyordu. Karar aynı tek fonksiyondan geçer.
+      // PENDING istek kanalları bu listeye zaten girmiyor (yukarıdaki süzgeç).
+      const selfMember = m.channel.members.find((cm) => cm.userId === userId);
+      const receipt = readReceiptDecision({
+        isDm: true,
+        requestPending: false,
+        blockedEitherWay: anyBlock,
+        viewerReadReceipts: selfMember?.user.readReceipts ?? false,
+        otherReadReceipts: otherMember?.user.readReceipts ?? false,
+        otherLastReadAt: otherMember?.lastReadAt ?? null,
+      });
+
       result.push({
         id: m.channel.id,
         type: 'DM' as const,
@@ -208,6 +229,8 @@ export class DmService {
         unread,
         canMessage,
         selfBlocked,
+        receiptsEnabled: receipt.visible,
+        otherReadAt: receipt.readAt ? receipt.readAt.toISOString() : null,
       });
     }
 
