@@ -240,8 +240,14 @@ export function MessageScreen({
    * Kendi mesajım tetiklemez (zaten okumuş sayılıyorum). Ekran odakta değilken de çağrılmaz —
    * `isFocused` üstteki odak kancasıyla aynı kaynağa bakar; arka planda okunmuş saymak karşı
    * tarafa yalan söylemek olurdu (aynı gerekçe web'de `document.visibilityState` ile).
+   *
+   * 🔴 Kusur düzeltmesi (sahip bulgusu 2026-10-29): burada `list.items[0]` okunuyordu ama `items`
+   * ESKİDEN YENİYE sıralı (`useMessageListController`), yani [0] en ESKİ mesaj ve yeni mesajla hiç
+   * değişmiyor. Sonuç: ekran açıkken gelen mesaj sunucuda hiç okundu sayılmadı (yeniden açılışta
+   * kırmızı nokta, karşı tarafın tiki tek kaldı, okunmamış mesaj için gecikmeli push). Son mesaj
+   * dizinin SONUNDA.
    */
-  const lastMessage = list.items[0]?.message;
+  const lastMessage = list.items[list.items.length - 1]?.message;
   const lastMessageId = lastMessage?.id;
   useEffect(() => {
     if (!lastMessageId || !lastMessage) return;
