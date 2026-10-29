@@ -14,6 +14,7 @@ import { ImageUploadService } from './media/image-upload.service';
 import { AnimatedMediaService } from './media/animated-media.service';
 import { PushService } from './push/push.service';
 import { GamesService } from './games/games.service';
+import { GameIconService } from './games/game-icon.service';
 
 @Module({
   providers: [
@@ -32,6 +33,7 @@ import { GamesService } from './games/games.service';
     AnimatedMediaService,
     PushService,
     GamesService,
+    GameIconService,
   ],
   exports: [
     EmailService,
@@ -49,6 +51,7 @@ import { GamesService } from './games/games.service';
     AnimatedMediaService,
     PushService,
     GamesService,
+    GameIconService,
   ],
 })
 export class SharedModule {}

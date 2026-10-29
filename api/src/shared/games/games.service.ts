@@ -2,13 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AutomodService } from '../automod/automod.service';
+import { GameIconService } from './game-icon.service';
 
 export interface ResolvedGame {
   id: string;
   name: string;
+  /** C31c: sunucunun kendi depoladığı 64x64 simge; yoksa null. */
+  iconUrl: string | null;
 }
 
-export interface CuratedGame extends ResolvedGame {
+export interface CuratedGame {
+  id: string;
+  name: string;
   executables: string[];
 }
 
@@ -45,7 +50,13 @@ export class GamesService {
   constructor(
     private prisma: PrismaService,
     private automod: AutomodService,
+    private icons: GameIconService,
   ) {}
+
+  /** C31c: simge arka planda yazılınca haber ver (presence yeniden yayar). */
+  onIconReady(listener: (gameId: string) => void): void {
+    this.icons.onIconReady(listener);
+  }
 
   /** GET /games/curated — yalnız CURATED, masaüstü eşleme için. 1 saat önbellek. */
   async listCurated(): Promise<CuratedGame[]> {
@@ -58,8 +69,9 @@ export class GamesService {
       select: { id: true, name: true, executables: true },
       orderBy: { name: 'asc' },
     });
-    this.curatedCache = { at: now, list: rows };
-    return rows;
+    const list = rows.map(({ id, name, executables }) => ({ id, name, executables }));
+    this.curatedCache = { at: now, list };
+    return list;
   }
 
   /**
@@ -93,24 +105,31 @@ export class GamesService {
   async visibleById(id: string): Promise<ResolvedGame | null> {
     const game = await this.prisma.game.findUnique({
       where: { id },
-      select: { id: true, name: true, hidden: true },
+      select: { id: true, name: true, hidden: true, iconUrl: true },
     });
     if (!game || game.hidden) return null;
-    return { id: game.id, name: game.name };
+    return { id: game.id, name: game.name, iconUrl: game.iconUrl };
   }
 
   // ── Kaynaklar ───────────────────────────────────────────────────────────────
 
-  private resolveCurated(id: string): Promise<ResolvedGame | null> {
-    return this.prisma.game.findFirst({
+  private async resolveCurated(id: string): Promise<ResolvedGame | null> {
+    const game = await this.prisma.game.findFirst({
       where: { id, source: 'CURATED', hidden: false },
-      select: { id: true, name: true },
+      select: { id: true, name: true, iconUrl: true, externalId: true },
     });
+    if (!game) return null;
+    this.icons.ensure({ ...game, source: 'CURATED' });
+    return { id: game.id, name: game.name, iconUrl: game.iconUrl };
   }
 
   private async resolveSteam(appId: string, userId: string): Promise<ResolvedGame | null> {
     const existing = await this.findExternal('STEAM', appId);
-    if (existing) return existing.hidden ? null : { id: existing.id, name: existing.name };
+    if (existing) {
+      if (existing.hidden) return null;
+      this.icons.ensure({ ...existing, source: 'STEAM', externalId: appId });
+      return { id: existing.id, name: existing.name, iconUrl: existing.iconUrl };
+    }
     if (!this.takeNewRecordSlot(userId)) return null;
 
     let pending = this.steamInflight.get(appId);
@@ -120,7 +139,9 @@ export class GamesService {
     }
     const name = await pending;
     if (!name) return null;
-    return this.createExternal('STEAM', appId, name);
+    const created = await this.createExternal('STEAM', appId, name);
+    if (created) this.icons.ensure({ ...created, source: 'STEAM', externalId: appId });
+    return created;
   }
 
   private async resolveEpic(
@@ -130,7 +151,11 @@ export class GamesService {
   ): Promise<ResolvedGame | null> {
     // Tabloda varsa TABLODAKİ ad kullanılır: ilk gelen kilitlenir, sonraki farklı ad yok sayılır.
     const existing = await this.findExternal('EPIC', catalogId);
-    if (existing) return existing.hidden ? null : { id: existing.id, name: existing.name };
+    if (existing) {
+      return existing.hidden
+        ? null
+        : { id: existing.id, name: existing.name, iconUrl: existing.iconUrl };
+    }
 
     if (typeof epicName !== 'string') return null;
     const name = epicName.trim();
@@ -146,7 +171,7 @@ export class GamesService {
   private findExternal(source: 'STEAM' | 'EPIC', externalId: string) {
     return this.prisma.game.findUnique({
       where: { source_externalId: { source, externalId } },
-      select: { id: true, name: true, hidden: true },
+      select: { id: true, name: true, hidden: true, iconUrl: true },
     });
   }
 
@@ -158,13 +183,15 @@ export class GamesService {
     try {
       return await this.prisma.game.create({
         data: { source, externalId, name },
-        select: { id: true, name: true },
+        select: { id: true, name: true, iconUrl: true },
       });
     } catch (err) {
       // Eşzamanlı iki istek aynı oyunu açtı: kazananın kaydı geçerli (ilk gelen kilitlenir).
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         const winner = await this.findExternal(source, externalId);
-        return winner && !winner.hidden ? { id: winner.id, name: winner.name } : null;
+        return winner && !winner.hidden
+          ? { id: winner.id, name: winner.name, iconUrl: winner.iconUrl }
+          : null;
       }
       throw err;
     }

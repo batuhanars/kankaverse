@@ -23,6 +23,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useCallStore } from '@/stores/call'
 import { useCallSounds } from '@/composables/useCallSounds'
 import { i18n } from '@/i18n'
+import { recordRecentVoiceChannel } from '@/utils/recentVoiceChannels'
 
 export interface VoiceParticipant {
   userId: string
@@ -307,6 +308,7 @@ export const useVoiceStore = defineStore('voice', () => {
 
       connectedChannelId.value = channelId
       connectedAt.value = Date.now() // REV-13: süre sayacı başlangıcı
+      recordRecentVoiceChannel(channelId) // C31c: yayın penceresinin "Son kanallar" listesi
       useCallSounds().playConnect() // bağlandı blibi (her ses kanalına katılımda — Discord gibi)
 
       // İyimser self-add: sunucu mintToken'da emit yapar ama WS gecikmesi veya

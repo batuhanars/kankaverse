@@ -268,7 +268,7 @@ async function addFriend() {
           <p
             v-if="activityStore.getGame(card.id)"
             class="text-[12px] mt-0.5 truncate"
-            style="color: var(--kv-online);"
+            style="color: var(--kv-text-secondary);"
           >
             {{ t('activity.playing', { game: activityStore.getGame(card.id)?.name }) }}
           </p>

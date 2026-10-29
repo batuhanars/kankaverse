@@ -38,6 +38,8 @@
   /* ölçü / layout */
   --kv-rail-width: 72px;
   --kv-panel-width: 264px;
+  /* C31c: Kankalar sağ paneli (Şimdi Aktif kartları için daha geniş) */
+  --kv-friends-panel-width: 340px;
   --kv-header-height: 64px;
   --kv-panel-gap: 16px;
   --kv-input-min-height: 44px;

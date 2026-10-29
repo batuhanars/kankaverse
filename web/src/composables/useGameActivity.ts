@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useChannelsStore } from '@/stores/channels'
 import { useToastStore } from '@/stores/toast'
 import { useVoiceStore } from '@/stores/voice'
+import { canOfferGameStream } from '@/utils/screenShare'
 
 const GAME_LIST_REFRESH_MS = 6 * 60 * 60 * 1000
 const NOTE_SEEN_KEY = 'kv_game_activity_note_seen'
@@ -130,8 +131,12 @@ export function useGameActivity() {
     if (offeredFor === game.gameId) return
     if (
       !voiceStore.connectedChannelId ||
-      !voiceStore.canPublishScreen ||
-      voiceStore.isScreenSharing
+      !canOfferGameStream({
+        hasBridge: !!bridge,
+        canPublishScreen: voiceStore.canPublishScreen,
+        isScreenSharing: voiceStore.isScreenSharing,
+        hasGame: true,
+      })
     )
       return
     // Oyun öndeyken uygulama arkada kalır; pencere odaktaysa düğme zaten ortada, rahatsız etme.

@@ -10,9 +10,10 @@ const prismaMock = {
   },
 };
 const automodMock = { check: jest.fn() };
+const iconsMock = { ensure: jest.fn(), onIconReady: jest.fn() };
 
 function makeService() {
-  return new GamesService(prismaMock as any, automodMock as any);
+  return new GamesService(prismaMock as any, automodMock as any, iconsMock as any);
 }
 
 function steamResponse(appId: string, name: string, type = 'game') {
@@ -31,7 +32,7 @@ describe('GamesService (C31b §1)', () => {
     automodMock.check.mockReturnValue({ blocked: false });
     prismaMock.game.findUnique.mockResolvedValue(null);
     prismaMock.game.create.mockImplementation(({ data }) =>
-      Promise.resolve({ id: `new-${data.externalId}`, name: data.name }),
+      Promise.resolve({ id: `new-${data.externalId}`, name: data.name, iconUrl: null }),
     );
     fetchMock = jest.fn();
     global.fetch = fetchMock as any;
@@ -46,10 +47,16 @@ describe('GamesService (C31b §1)', () => {
   });
 
   it('curated: yalnız tablodaki, gizli olmayan CURATED kaydı çözülür', async () => {
-    prismaMock.game.findFirst.mockResolvedValue({ id: 'curated_valorant', name: 'Valorant' });
+    prismaMock.game.findFirst.mockResolvedValue({
+      id: 'curated_valorant',
+      name: 'Valorant',
+      iconUrl: null,
+      externalId: 'valorant',
+    });
     expect(await service.resolve('curated:curated_valorant', { userId: 'u1' })).toEqual({
       id: 'curated_valorant',
       name: 'Valorant',
+      iconUrl: null,
     });
     expect(prismaMock.game.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -63,7 +70,9 @@ describe('GamesService (C31b §1)', () => {
   it('steam: ad istemciden ALINMAZ, mağazadan gelen ad yazılır', async () => {
     fetchMock.mockResolvedValue(steamResponse('730', 'Counter-Strike 2'));
     const game = await service.resolve('steam:730', { userId: 'u1', epicName: 'SAHTE AD' });
-    expect(game).toEqual({ id: 'new-730', name: 'Counter-Strike 2' });
+    expect(game).toEqual({ id: 'new-730', name: 'Counter-Strike 2', iconUrl: null });
+    // simge arka planda aranır (cevabı bekletmez)
+    expect(iconsMock.ensure).toHaveBeenCalledTimes(1);
     expect(prismaMock.game.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: { source: 'STEAM', externalId: '730', name: 'Counter-Strike 2' },
@@ -94,8 +103,17 @@ describe('GamesService (C31b §1)', () => {
   });
 
   it('steam: tabloda varsa mağazaya gidilmez; hidden ise null', async () => {
-    prismaMock.game.findUnique.mockResolvedValue({ id: 'g1', name: 'CS2', hidden: false });
-    expect(await service.resolve('steam:730', { userId: 'u1' })).toEqual({ id: 'g1', name: 'CS2' });
+    prismaMock.game.findUnique.mockResolvedValue({
+      id: 'g1',
+      name: 'CS2',
+      hidden: false,
+      iconUrl: 'https://cdn/x.webp',
+    });
+    expect(await service.resolve('steam:730', { userId: 'u1' })).toEqual({
+      id: 'g1',
+      name: 'CS2',
+      iconUrl: 'https://cdn/x.webp',
+    });
     prismaMock.game.findUnique.mockResolvedValue({ id: 'g1', name: 'CS2', hidden: true });
     expect(await service.resolve('steam:730', { userId: 'u1' })).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
@@ -121,9 +139,16 @@ describe('GamesService (C31b §1)', () => {
     const ref = 'epic:abcdef1234567890abcdef1234567890';
     const first = await service.resolve(ref, { userId: 'u1', epicName: 'Fortnite' });
     expect(first?.name).toBe('Fortnite');
-    prismaMock.game.findUnique.mockResolvedValue({ id: 'e1', name: 'Fortnite', hidden: false });
+    prismaMock.game.findUnique.mockResolvedValue({
+      id: 'e1',
+      name: 'Fortnite',
+      hidden: false,
+      iconUrl: null,
+    });
     const second = await service.resolve(ref, { userId: 'u2', epicName: 'Başka Ad' });
-    expect(second).toEqual({ id: 'e1', name: 'Fortnite' });
+    expect(second).toEqual({ id: 'e1', name: 'Fortnite', iconUrl: null });
+    // Epic için simge araması yok
+    expect(iconsMock.ensure).not.toHaveBeenCalled();
     expect(prismaMock.game.create).toHaveBeenCalledTimes(1);
   });
 
@@ -134,10 +159,11 @@ describe('GamesService (C31b §1)', () => {
     );
     prismaMock.game.findUnique
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'e1', name: 'Kazanan', hidden: false });
+      .mockResolvedValueOnce({ id: 'e1', name: 'Kazanan', hidden: false, iconUrl: null });
     expect(await service.resolve(ref, { userId: 'u1', epicName: 'Kaybeden' })).toEqual({
       id: 'e1',
       name: 'Kazanan',
+      iconUrl: null,
     });
   });
 
@@ -166,9 +192,13 @@ describe('GamesService (C31b §1)', () => {
   });
 
   it('listCurated 1 saat önbelleğe alınır', async () => {
-    prismaMock.game.findMany.mockResolvedValue([{ id: 'c1', name: 'A', executables: ['a.exe'] }]);
+    prismaMock.game.findMany.mockResolvedValue([
+      { id: 'c1', name: 'A', executables: ['a.exe'], iconUrl: 'https://cdn/a.webp' },
+    ]);
+    const list = await service.listCurated();
     await service.listCurated();
-    await service.listCurated();
+    // GET /games/curated değişmez: simge sızmaz
+    expect(list).toEqual([{ id: 'c1', name: 'A', executables: ['a.exe'] }]);
     expect(prismaMock.game.findMany).toHaveBeenCalledTimes(1);
   });
 });

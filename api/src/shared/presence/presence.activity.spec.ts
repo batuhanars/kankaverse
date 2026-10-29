@@ -69,7 +69,9 @@ const prismaMock = {
 const realtimeMock = { emitToUser: jest.fn() };
 const gamesMock = {
   visibleById: jest.fn((id: string) =>
-    Promise.resolve(id === 'hidden-game' ? null : { id, name: `Oyun ${id}` }),
+    Promise.resolve(
+      id === 'hidden-game' ? null : { id, name: `Oyun ${id}`, iconUrl: `https://cdn/${id}.webp` },
+    ),
   ),
 };
 
@@ -211,7 +213,10 @@ describe('PresenceService — oyun etkinliği (C31b)', () => {
       expect(sent).toContainEqual([
         'viewer',
         'activity:update',
-        { userId: 'adult', game: { id: 'g-a', name: 'Oyun g-a' } },
+        {
+          userId: 'adult',
+          game: { id: 'g-a', name: 'Oyun g-a', iconUrl: 'https://cdn/g-a.webp' },
+        },
       ]);
       expect(sent.map((s) => s[0])).toContain('adult');
     });
@@ -247,7 +252,13 @@ describe('PresenceService — oyun etkinliği (C31b)', () => {
       service.setGame('adult', 'c1', 'g-a');
       let states = await service.visibleOnlineFor('viewer');
       expect(states).toEqual([
-        { userId: 'adult', status: 'online', gameId: 'g-a', gameName: 'Oyun g-a' },
+        {
+          userId: 'adult',
+          status: 'online',
+          gameId: 'g-a',
+          gameName: 'Oyun g-a',
+          gameIconUrl: 'https://cdn/g-a.webp',
+        },
       ]);
       users['adult'].showGameActivity = false;
       states = await service.visibleOnlineFor('viewer');

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import MarqueeText from '@/components/shared/MarqueeText.vue'
+import GameLine from '@/components/shared/GameLine.vue'
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
@@ -169,11 +169,10 @@ function onRowLeave(e: MouseEvent) {
       >
         {{ member.username }}<span v-if="member.roleEmoji" class="ml-1">{{ member.roleEmoji }}</span>
       </span>
-      <MarqueeText
+      <GameLine
         v-if="props.gameName && !props.isOffline"
         class="text-[11px] leading-tight"
-        style="color: var(--kv-text-muted);"
-        :text="t('activity.playing', { game: props.gameName })"
+        :name="props.gameName"
       />
     </div>
 

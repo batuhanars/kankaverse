@@ -1471,7 +1471,21 @@
     "streamGame": "{game} oyununu yayınla",
     "gameOpened": "{game} açıldı. Kankalarına yayınlamak ister misin?",
     "note": "Oynadığın oyun kankalarına ve ortak ortamlarındaki kişilere görünüyor. Ayarlardan kapatabilirsin.",
-    "noteAction": "Ayarlara git"
+    "noteAction": "Ayarlara git",
+    "broadcast": {
+      "title": "Oyunu yayınla",
+      "search": "Yayın yapmak için bir ses kanalı ara",
+      "recent": "Son kanallar",
+      "all": "Ses kanalları",
+      "results": "Sonuçlar",
+      "empty": "Yayın yapabileceğin bir ses kanalı yok.",
+      "noResults": "Eşleşen kanal bulunamadı.",
+      "joinFailed": "Ses kanalına katılınamadı.",
+      "notAllowed": "Bu kanalda ekran paylaşımı kapalı."
+    },
+    "nowActive": "Şimdi Aktif",
+    "nowActiveEmpty": "Şu an oyun oynayan kanka yok.",
+    "streamButton": "Yayınla"
   },
   "toast": {
     "close": "Kapat",

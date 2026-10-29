@@ -47,9 +47,12 @@ export function MemberRow({ member, gameName, onPress }: Props) {
           {member.roleEmoji ? ` ${member.roleEmoji}` : ''}
         </Text>
         {gameName ? (
-          <Text style={styles.playing} numberOfLines={1}>
-            {t('activity.playing', { game: gameName })}
-          </Text>
+          <View style={styles.playingRow}>
+            <Ionicons name="game-controller-outline" size={12} color={theme.colors.textSecondary} />
+            <Text style={styles.playing} numberOfLines={1}>
+              {gameName}
+            </Text>
+          </View>
         ) : null}
 
         <View style={styles.badges}>
@@ -114,8 +117,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: 4,
   },
+  playingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   playing: {
-    color: theme.colors.textMuted,
+    flex: 1,
+    color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xs,
   },
   username: {

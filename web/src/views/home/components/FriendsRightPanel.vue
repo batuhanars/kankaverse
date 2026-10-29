@@ -7,6 +7,8 @@ import { usePresenceStore } from '@/stores/presence'
 import { useActivityStore } from '@/stores/activity'
 import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import MarqueeText from '@/components/shared/MarqueeText.vue'
+import GameLine from '@/components/shared/GameLine.vue'
+import GameLogo from '@/components/shared/GameLogo.vue'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 
@@ -47,12 +49,21 @@ const offlineFriends = computed(() =>
 )
 
 function presenceStatusLabel(userId: string): string {
-  const status = presenceStore.getStatus(userId)
-  // C31b: çevrimiçiyken oyun varsa durum yerine "X oynuyor" (çevrimdışına oyun gelmez).
-  const game = status === 'offline' ? null : activityStore.getGame(userId)
-  if (game) return t('activity.playing', { game: game.name })
-  return t(`presence.${status}`)
+  return t(`presence.${presenceStore.getStatus(userId)}`)
 }
+
+// C31b/C31c: çevrimiçiyken oyun varsa durum yerine oyun satırı (simge + ad); çevrimdışına oyun gelmez.
+function gameOf(userId: string) {
+  return presenceStore.getStatus(userId) === 'offline' ? null : activityStore.getGame(userId)
+}
+
+/** C31c §3.1: Şimdi Aktif = oyun oynayan kankalar (kaynak yalnız activity store; görünürlük sunucuda süzüldü). */
+const nowActive = computed(() =>
+  onlineFriends.value.flatMap((f) => {
+    const game = gameOf(f.user.id)
+    return game ? [{ friend: f, game }] : []
+  }),
+)
 
 function presenceStatusColor(userId: string): string {
   const status = presenceStore.getStatus(userId)
@@ -96,7 +107,7 @@ async function runConfirm() {
 
   <aside
     class="shrink-0 flex flex-col overflow-hidden relative rounded-none mb-0 mr-0 xl:rounded-[var(--kv-radius-lg)] xl:mb-4 xl:mr-4"
-    style="width: var(--kv-panel-width); background-color: var(--kv-bg-sidebar);"
+    style="width: var(--kv-friends-panel-width); max-width: 100vw; background-color: var(--kv-bg-sidebar);"
   >
     <!-- Başlık + sekmeler -->
     <div class="px-4 pt-5 pb-0 shrink-0 border-b" style="border-color: var(--kv-border-subtle);">
@@ -135,6 +146,49 @@ async function runConfirm() {
         >{{ t('friends.noFriends') }}</p>
 
         <template v-else>
+          <!-- C31c §3: Şimdi Aktif (oyun oynayan kankalar) -->
+          <p
+            class="px-4 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-widest"
+            style="color: var(--kv-text-muted);"
+          >
+            {{ t('activity.nowActive') }}
+          </p>
+          <p
+            v-if="!nowActive.length"
+            class="px-4 pb-1 text-[12px]"
+            style="color: var(--kv-text-muted);"
+          >
+            {{ t('activity.nowActiveEmpty') }}
+          </p>
+          <div v-else class="px-3 grid gap-2">
+            <button
+              v-for="a in nowActive"
+              :key="a.friend.friendshipId"
+              type="button"
+              class="group flex items-center gap-2.5 min-w-0 px-3 py-2 rounded-[var(--kv-radius-md)] cursor-pointer text-left"
+              style="background-color: var(--kv-bg-elevated);"
+              @click="openDm(a.friend.user.id)"
+            >
+              <div
+                class="w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[13px] font-bold text-white"
+                style="background-color: var(--kv-accent-500);"
+              >
+                <img
+                  v-if="a.friend.user.avatarUrl"
+                  :src="a.friend.user.avatarUrl"
+                  :alt="a.friend.user.username"
+                  class="w-full h-full object-cover"
+                />
+                <span v-else>{{ a.friend.user.username[0].toUpperCase() }}</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary);">{{ a.friend.user.username }}</p>
+                <MarqueeText class="text-[12px]" style="color: var(--kv-text-secondary);" :text="a.game.name" />
+              </div>
+              <GameLogo :icon-url="a.game.iconUrl" :size="32" />
+            </button>
+          </div>
+
           <!-- Çevrimiçi grup -->
           <template v-if="onlineFriends.length">
             <p
@@ -172,14 +226,15 @@ async function runConfirm() {
               </div>
 
               <!-- Ad + durum -->
-              <div class="flex-1 min-w-0 cursor-pointer group-hover:pr-16" @click="openDm(f.user.id)">
+              <div class="flex-1 min-w-0 cursor-pointer" @click="openDm(f.user.id)">
                 <p class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</p>
-                <MarqueeText class="text-[11px]" :style="{ color: presenceStatusColor(f.user.id) }" :text="presenceStatusLabel(f.user.id)" />
+                <GameLine v-if="gameOf(f.user.id)" class="text-[11px]" :name="gameOf(f.user.id)!.name" />
+                <MarqueeText v-else class="text-[11px]" :style="{ color: presenceStatusColor(f.user.id) }" :text="presenceStatusLabel(f.user.id)" />
               </div>
 
               <!-- Hover aksiyonlar -->
               <div
-                class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full transition-opacity"
+                class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full transition-opacity bg-[var(--kv-bg-elevated)]"
                 :class="openMenuId === f.friendshipId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
               >
                 <button
@@ -265,14 +320,14 @@ async function runConfirm() {
               </div>
 
               <!-- Ad + durum -->
-              <div class="flex-1 min-w-0 cursor-pointer group-hover:pr-16" @click="openDm(f.user.id)">
+              <div class="flex-1 min-w-0 cursor-pointer" @click="openDm(f.user.id)">
                 <p class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</p>
                 <MarqueeText class="text-[11px]" style="color: var(--kv-text-muted);" :text="presenceStatusLabel(f.user.id)" />
               </div>
 
               <!-- Hover aksiyonlar -->
               <div
-                class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full transition-opacity"
+                class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-full transition-opacity bg-[var(--kv-bg-elevated)]"
                 :class="openMenuId === f.friendshipId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
               >
                 <button

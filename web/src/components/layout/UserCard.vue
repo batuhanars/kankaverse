@@ -6,6 +6,9 @@ import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
 import { useActivityStore } from '@/stores/activity'
 import { useVoiceStore } from '@/stores/voice'
 import MarqueeText from '@/components/shared/MarqueeText.vue'
+import GameLine from '@/components/shared/GameLine.vue'
+import GameLogo from '@/components/shared/GameLogo.vue'
+import GameBroadcastModal from '@/components/shared/GameBroadcastModal.vue'
 import VoiceConnectedBar from '@/components/layout/VoiceConnectedBar.vue'
 import { useSocket } from '@/composables/useSocket'
 import { useAudioDevices } from '@/composables/useAudioDevices'
@@ -44,6 +47,13 @@ const cardRef = ref<HTMLElement | null>(null)
 const triggerHovered = ref(false)
 const triggerAvatarSrc = computed(() => (authStore.user ? hoverAvatarSrc(authStore.user, triggerHovered.value) : null))
 const showPopover = ref(false)
+
+// C31c §2: oyun varken kartın üstünde logolu şerit; Yayınla yalnız masaüstünde (köprü varsa).
+const myGame = computed(() =>
+  currentPresence.value === 'offline' ? null : activityStore.myGame(),
+)
+const canBroadcast = !!window.kankaverse?.setShareHint
+const showBroadcast = ref(false)
 
 onClickOutside(cardRef, () => { showPopover.value = false; devicePopover.value = null })
 
@@ -182,6 +192,29 @@ function onLogout() {
            ayrı "Aranıyor" barı kalktı, "Çalıyor…" göstergesi ses odası görünümünde (VoiceTile). -->
       <VoiceConnectedBar />
 
+      <!-- C31c §2: oyun şeridi (oyun yoksa hiç yok; kart genişliğini aşmaz) -->
+      <div
+        v-if="myGame"
+        class="flex items-center gap-2.5 px-3 py-2 border-b min-w-0"
+        style="border-color: var(--kv-border-subtle);"
+      >
+        <GameLogo :icon-url="myGame.iconUrl" :size="28" />
+        <MarqueeText
+          :text="myGame.name"
+          class="flex-1 text-[13px] font-semibold"
+          style="color: var(--kv-text-primary);"
+        />
+        <button
+          v-if="canBroadcast"
+          type="button"
+          class="shrink-0 px-3 py-1 text-[12px] font-semibold rounded-[var(--kv-radius-sm)] cursor-pointer transition-opacity hover:opacity-90"
+          style="background-color: var(--kv-accent-500); color: #fff;"
+          @click="showBroadcast = true"
+        >
+          {{ t('activity.streamButton') }}
+        </button>
+      </div>
+
       <!-- Kullanıcı pill satırı (kendi border/rounding'i yok; kapsayıcı sağlıyor) -->
       <div class="w-full flex items-center gap-2.5 px-3 py-3">
       <!-- Menü tetikleyici: avatar + ad (kendi hover'ı; kart geneli hover yok) -->
@@ -216,12 +249,12 @@ function onLogout() {
           <span class="text-[14px] font-semibold truncate leading-[1.3]" style="color: var(--kv-text-primary);">
             {{ authStore.user?.username }}
           </span>
+          <GameLine v-if="myGame" class="text-[12px] leading-[1.2]" :name="myGame.name" />
           <MarqueeText
+            v-else
             class="text-[12px] leading-[1.2]"
             :style="`color: ${presenceColor(currentPresence)};`"
-            :text="activityStore.myGame() && currentPresence !== 'offline'
-              ? t('activity.playing', { game: activityStore.myGame()?.name })
-              : t(`presence.${currentPresence}`)"
+            :text="t(`presence.${currentPresence}`)"
           />
         </div>
       </button>
@@ -296,6 +329,8 @@ function onLogout() {
       </div>
       </div>
     </div>
+
+    <GameBroadcastModal v-if="showBroadcast" @close="showBroadcast = false" />
 
     <!-- ── Hızlı cihaz popover'ı (giriş/çıkış) — bara binen, yukarı açılır ── -->
     <div

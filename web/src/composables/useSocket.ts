@@ -284,6 +284,7 @@ export function useSocket() {
           status: PresenceStatus
           gameId?: string
           gameName?: string
+          gameIconUrl?: string | null
         }>
       }) => {
         presenceStore.applySnapshot(payload.states)
@@ -294,7 +295,10 @@ export function useSocket() {
     // C31b: "oynuyor" satırı. game=null → oyun yok / ayar kapandı / dnd / çevrimdışı.
     socket.on(
       'activity:update',
-      (payload: { userId: string; game: { id: string; name: string } | null }) => {
+      (payload: {
+        userId: string
+        game: { id: string; name: string; iconUrl?: string | null } | null
+      }) => {
         activityStore.applyUpdate(payload.userId, payload.game)
       },
     )

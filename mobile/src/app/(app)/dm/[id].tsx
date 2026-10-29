@@ -316,7 +316,19 @@ export default function DmScreen() {
                   {title}
                 </Text>
                 {presenceColor && (
-                  <Text style={[styles.headerPresence, { color: presenceColor }]} numberOfLines={1}>
+                  <Text
+                    style={[
+                      styles.headerPresence,
+                      // C31c: oyun yazısı normal yazı rengi (yeşil yalnız çevrimiçi göstergesi).
+                      {
+                        color:
+                          otherGame && otherStatus !== 'offline'
+                            ? theme.colors.textSecondary
+                            : presenceColor,
+                      },
+                    ]}
+                    numberOfLines={1}
+                  >
                     {otherGame && otherStatus !== 'offline'
                       ? t('activity.playing', { game: otherGame })
                       : t(`presence.${otherStatus}`)}

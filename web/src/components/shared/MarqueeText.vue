@@ -1,45 +1,56 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 // Tek satır metin: sığmazsa düz kırpılır ("…" yok); fareyle üzerine gelince GERÇEKTEN taşıyorsa
-// sola kayıp son kelimeyi gösterir, hover bitince başa döner. Kapsayıcı genişliği metne bağlı
-// değildir (ebeveyn flex zincirini genişletmez). Hareketsiz tercih edenlerde yalnız `title`.
+// metin sola kayıp sonunu gösterir, hover bitince başa döner. Kayan şey iç `span`'dır
+// (`transform: translateX`), kapsayıcı genişliği metne bağlı değildir. Tetikleyici: en yakın
+// `.group` satırı (satırın herhangi bir yerine gelmek yeter), yoksa metnin kendisi.
+// Hareketsiz tercih edenlerde yalnız `title`.
 const props = defineProps<{ text: string }>()
 
 const PX_PER_SEC = 40
 const MIN_SEC = 1.5
 const BACK_SEC = 0.4
 
-const el = ref<HTMLElement | null>(null)
+const outer = ref<HTMLElement | null>(null)
+const inner = ref<HTMLElement | null>(null)
+let host: HTMLElement | null = null
 
 function start() {
-  const node = el.value
-  if (!node || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-  const dist = node.scrollWidth - node.clientWidth
+  const o = outer.value
+  const i = inner.value
+  if (!o || !i || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  const dist = i.scrollWidth - o.clientWidth
   if (dist <= 0) return
-  node.style.transition = `text-indent ${Math.max(MIN_SEC, dist / PX_PER_SEC)}s linear`
-  node.style.textIndent = `-${dist}px`
+  i.style.transition = `transform ${Math.max(MIN_SEC, dist / PX_PER_SEC)}s linear`
+  i.style.transform = `translateX(-${dist}px)`
 }
 
 function stop() {
-  const node = el.value
-  if (!node) return
-  node.style.transition = `text-indent ${BACK_SEC}s ease-out`
-  node.style.textIndent = '0px'
+  const i = inner.value
+  if (!i) return
+  i.style.transition = `transform ${BACK_SEC}s ease-out`
+  i.style.transform = 'translateX(0)'
 }
+
+onMounted(() => {
+  host = outer.value?.closest<HTMLElement>('.group') ?? outer.value
+  host?.addEventListener('mouseenter', start)
+  host?.addEventListener('mouseleave', stop)
+})
+
+onBeforeUnmount(() => {
+  host?.removeEventListener('mouseenter', start)
+  host?.removeEventListener('mouseleave', stop)
+})
 </script>
 
 <template>
-  <span
-    ref="el"
-    class="mq block min-w-0 max-w-full overflow-hidden whitespace-nowrap"
-    :title="props.text"
-    @mouseenter="start"
-    @mouseleave="stop"
-  >{{ props.text }}</span>
+  <span ref="outer" class="mq block min-w-0 max-w-full overflow-hidden whitespace-nowrap" :title="props.text">
+    <span ref="inner" class="mq-inner inline-block whitespace-nowrap">{{ props.text }}</span>
+  </span>
 </template>
 
 <style scoped>
-/* Üç nokta yok: metin göründüğü yere kadar düz kırpılır (sahip kararı). */
-.mq { text-overflow: clip; }
+.mq-inner { will-change: transform; }
 </style>

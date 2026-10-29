@@ -80,7 +80,7 @@ function onSelectDm(channelId: string) {
          <1280'de basis rezervi yok — çan + toggle sağda, arama normal ortalanır. -->
     <div
       class="flex justify-end items-center gap-1"
-      :style="isWide ? 'flex: 1 1 calc(var(--kv-panel-width) + 2rem);' : 'flex: 1;'"
+      :style="isWide ? 'flex: 1 1 calc(var(--kv-friends-panel-width) + 2rem);' : 'flex: 1;'"
     >
       <NotificationBell />
       <!-- Kankalar toggle — yalnız <1280: panel overlay olduğunda açmak için. ≥1280'de panel zaten inline → toggle gizli. -->

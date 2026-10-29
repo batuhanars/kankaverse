@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Image, Pressable, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { usePresenceStore } from '@/stores/presence';
 import { useActivityStore } from '@/stores/activity';
 import { PresenceDot } from '../PresenceDot';
@@ -122,9 +123,16 @@ export function GroupMembersTab({ channel }: Props) {
                 {item.username}
               </Text>
               {gameByUser[item.id] && (statusMap[item.id] ?? 'offline') !== 'offline' ? (
-                <Text style={styles.memberPlaying} numberOfLines={1}>
-                  {t('activity.playing', { game: gameByUser[item.id].name })}
-                </Text>
+                <View style={styles.memberPlayingRow}>
+                  <Ionicons
+                    name="game-controller-outline"
+                    size={12}
+                    color={theme.colors.textSecondary}
+                  />
+                  <Text style={styles.memberPlaying} numberOfLines={1}>
+                    {gameByUser[item.id].name}
+                  </Text>
+                </View>
               ) : null}
             </View>
             {item.id === channel.ownerId ? (
@@ -200,8 +208,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   memberTexts: { flex: 1, minWidth: 0 },
+  memberPlayingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   memberPlaying: {
-    color: theme.colors.textMuted,
+    flex: 1,
+    color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xs,
   },
   memberName: {

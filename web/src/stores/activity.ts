@@ -6,6 +6,8 @@ import { useAuthStore } from '@/stores/auth'
 export interface GameActivity {
   gameId: string
   name: string
+  /** C31c: sunucunun kendi depoladığı oyun logosu; yoksa null (genel oyun kolu simgesi). */
+  iconUrl: string | null
 }
 
 /**
@@ -17,15 +19,27 @@ export const useActivityStore = defineStore('activity', () => {
   const byUser = reactive<Record<string, GameActivity>>({})
 
   /** Snapshot tam durumdur: önceki kayıtlar bayat olabilir, hepsi yeniden kurulur. */
-  function applySnapshot(states: Array<{ userId: string; gameId?: string; gameName?: string }>) {
+  function applySnapshot(
+    states: Array<{
+      userId: string
+      gameId?: string
+      gameName?: string
+      gameIconUrl?: string | null
+    }>,
+  ) {
     for (const key of Object.keys(byUser)) delete byUser[key]
     for (const s of states) {
-      if (s.gameId && s.gameName) byUser[s.userId] = { gameId: s.gameId, name: s.gameName }
+      if (s.gameId && s.gameName) {
+        byUser[s.userId] = { gameId: s.gameId, name: s.gameName, iconUrl: s.gameIconUrl ?? null }
+      }
     }
   }
 
-  function applyUpdate(userId: string, game: { id: string; name: string } | null) {
-    if (game) byUser[userId] = { gameId: game.id, name: game.name }
+  function applyUpdate(
+    userId: string,
+    game: { id: string; name: string; iconUrl?: string | null } | null,
+  ) {
+    if (game) byUser[userId] = { gameId: game.id, name: game.name, iconUrl: game.iconUrl ?? null }
     else delete byUser[userId]
   }
 

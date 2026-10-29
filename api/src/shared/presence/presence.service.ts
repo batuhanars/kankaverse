@@ -55,7 +55,17 @@ export class PresenceService {
     private prisma: PrismaService,
     private realtime: RealtimeService,
     private games: GamesService,
-  ) {}
+  ) {
+    // C31c: simge sonradan yazılınca oynayanlara güncel oyun nesnesi aynı kitleye yeniden yayılır
+    // (kitle kuralı değişmez, `broadcastActivity` aynı süzgeçten geçer).
+    this.games.onIconReady?.((gameId) => void this.rebroadcastGame(gameId));
+  }
+
+  private async rebroadcastGame(gameId: string): Promise<void> {
+    for (const userId of [...this.state.keys()]) {
+      if (this.activeGameId(userId) === gameId) await this.broadcastActivity(userId);
+    }
+  }
 
   // ── Bellek-içi durum yönetimi ───────────────────────────────────────────────
 
@@ -423,9 +433,15 @@ export class PresenceService {
    *
    * Dönen dizi yalnız aktif (online/away/dnd) kullanıcıları içerir.
    */
-  async visibleOnlineFor(
-    viewerId: string,
-  ): Promise<Array<{ userId: string; status: ActiveStatus; gameId?: string; gameName?: string }>> {
+  async visibleOnlineFor(viewerId: string): Promise<
+    Array<{
+      userId: string;
+      status: ActiveStatus;
+      gameId?: string;
+      gameName?: string;
+      gameIconUrl?: string | null;
+    }>
+  > {
     const candidateSet = await this.candidatePool(viewerId);
 
     const results = await Promise.all(
@@ -437,14 +453,20 @@ export class PresenceService {
         if (!canSee) return null;
 
         // C31b: oyun satırı aynı kuraldan geçer (presence geçti + ek şartlar), ad tablodan gelir.
-        const state: { userId: string; status: ActiveStatus; gameId?: string; gameName?: string } =
-          { userId: candidateId, status: candidateStatus };
+        const state: {
+          userId: string;
+          status: ActiveStatus;
+          gameId?: string;
+          gameName?: string;
+          gameIconUrl?: string | null;
+        } = { userId: candidateId, status: candidateStatus };
         const gameId = this.activeGameId(candidateId);
         if (gameId && (await this.activityConditions(viewerId, candidateId))) {
           const game = await this.games.visibleById(gameId);
           if (game) {
             state.gameId = game.id;
             state.gameName = game.name;
+            state.gameIconUrl = game.iconUrl;
           }
         }
         return state;

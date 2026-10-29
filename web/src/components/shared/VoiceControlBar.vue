@@ -11,6 +11,7 @@ import { useVoiceStore } from '@/stores/voice'
 import { voiceBroadcast } from '@/composables/useSocket'
 import { useVoiceNudge } from '@/composables/useVoiceNudge'
 import { useActivityStore } from '@/stores/activity'
+import { canOfferGameStream as canOfferStream } from '@/utils/screenShare'
 import EmergencyButton from '@/components/shared/EmergencyButton.vue'
 import CameraNudgeModal from '@/components/shared/CameraNudgeModal.vue'
 import ScreenNudgeModal from '@/components/shared/ScreenNudgeModal.vue'
@@ -55,12 +56,13 @@ async function onScreenNudgeConfirm() {
 // zaten etkinse görünür. Yeni bir yol AÇILMAZ: ipucu verilir, ardından mevcut akış (nudge ve
 // adultsOnly/ageGated/mediaEnabled kapıları dahil) aynen çalışır; seçici yine kullanıcı onayı bekler.
 const myGame = computed(() => activityStore.myGame())
-const canOfferGameStream = computed(
-  () =>
-    !!window.kankaverse?.setShareHint &&
-    voiceStore.canPublishScreen &&
-    !voiceStore.isScreenSharing &&
-    myGame.value !== null,
+const canOfferGameStream = computed(() =>
+  canOfferStream({
+    hasBridge: !!window.kankaverse?.setShareHint,
+    canPublishScreen: voiceStore.canPublishScreen,
+    isScreenSharing: voiceStore.isScreenSharing,
+    hasGame: myGame.value !== null,
+  }),
 )
 
 async function handleShareGame() {

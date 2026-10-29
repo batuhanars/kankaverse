@@ -178,6 +178,7 @@ model Game {
   externalId  String?    // STEAM: appid · EPIC: catalogItemId · CURATED: slug
   executables String[]   @default([]) // yalnız CURATED: masaüstü eşleme için küçük harf süreç adları
   hidden      Boolean    @default(false) // admin kaldırdı: yayılmaz, tekrar eklenmez
+  iconUrl     String?    // C31c: sunucunun Steam'den alıp 64x64 WebP yaptığı kendi (cdn) adresimiz
   createdAt   DateTime   @default(now())
 
   @@unique([source, externalId])
