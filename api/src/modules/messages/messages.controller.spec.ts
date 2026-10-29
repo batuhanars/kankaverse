@@ -13,8 +13,9 @@ function makeController() {
     notifyChannelActivity: jest.fn().mockResolvedValue(undefined),
     notifyMentions: jest.fn().mockResolvedValue(undefined),
   };
-  const controller = new MessagesController(service as any, gateway as any);
-  return { controller, service, gateway };
+  const audioNormalize = { enqueueFromMessage: jest.fn() };
+  const controller = new MessagesController(service as any, gateway as any, audioNormalize as any);
+  return { controller, service, gateway, audioNormalize };
 }
 
 describe('MessagesController.sendMessage — C29', () => {
@@ -67,6 +68,15 @@ describe('MessagesController.sendMessage — C29', () => {
     const result = await controller.sendMessage({ id: 'u1' }, 'ch-1', { content: 'selam' });
 
     expect(result).toBe(MESSAGE);
+  });
+
+  it('C32: mesaj döndükten sonra ses eşitleme sıraya alınır', async () => {
+    const { controller, audioNormalize } = makeController();
+
+    const result = await controller.sendMessage({ id: 'u1' }, 'ch-1', { content: 'selam' });
+
+    expect(result).toBe(MESSAGE);
+    expect(audioNormalize.enqueueFromMessage).toHaveBeenCalledWith(MESSAGE);
   });
 
   it('bildirim hatası cevabı bozmaz ve loglanır', async () => {

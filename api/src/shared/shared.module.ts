@@ -15,6 +15,7 @@ import { AnimatedMediaService } from './media/animated-media.service';
 import { PushService } from './push/push.service';
 import { GamesService } from './games/games.service';
 import { GameIconService } from './games/game-icon.service';
+import { AudioNormalizeService } from './media/audio-normalize.service';
 
 @Module({
   providers: [
@@ -34,6 +35,7 @@ import { GameIconService } from './games/game-icon.service';
     PushService,
     GamesService,
     GameIconService,
+    AudioNormalizeService,
   ],
   exports: [
     EmailService,
@@ -52,6 +54,7 @@ import { GameIconService } from './games/game-icon.service';
     PushService,
     GamesService,
     GameIconService,
+    AudioNormalizeService,
   ],
 })
 export class SharedModule {}

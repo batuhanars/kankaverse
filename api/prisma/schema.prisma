@@ -453,6 +453,7 @@ model Attachment {
   aiGenerationId String?  // C14b: yapay zeka üretiminden gelen ek (sunucu kaynaklı rozet); aynı üretim çok ek olabilir
   aiGeneration   AiVideoGeneration? @relation(fields: [aiGenerationId], references: [id])
   sourceAttachmentId String? // C30: iletme kopyasının kaynağı (düz alan, ilişki yok); moderasyon kopyaları bulabilsin
+  audioNormalizedAt DateTime? // C32: ses seviyesi eşitleme yapıldıysa dolu (idempotency)
   createdAt   DateTime   @default(now())
 
   @@index([messageId])

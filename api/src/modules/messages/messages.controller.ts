@@ -15,6 +15,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { MessagesService } from './messages.service';
 import { MessagesGateway } from './gateway/messages.gateway';
+import { AudioNormalizeService } from '../../shared/media/audio-normalize.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { AddReactionDto } from './dto/add-reaction.dto';
@@ -31,6 +32,7 @@ export class MessagesController {
   constructor(
     private messagesService: MessagesService,
     private messagesGateway: MessagesGateway,
+    private audioNormalize: AudioNormalizeService,
   ) {}
 
   @Get()
@@ -84,6 +86,8 @@ export class MessagesController {
     void this.notifyAfterSend(channelId, message).catch((err: unknown) =>
       this.logger.error(`Gönderim sonrası bildirim hatası (kanal ${channelId})`, err),
     );
+    // C32: sesli mesaj ses seviyesi eşitleme arka planda (kuyruk, eşzamanlılık 1); cevabı bekletmez.
+    this.audioNormalize.enqueueFromMessage(message);
     return message;
   }
 
