@@ -1,6 +1,6 @@
 # SPRINT C31a: Masaüstü otomatik güncelleme
 
-> Durum: **SÖZLEŞME YAZILDI (2026-10-29), sahip onayı bekliyor.** PM compose (Opus). **Yalnız desktop** (+ DEPLOY belgesi).
+> Durum: **TAMAMLANDI (2026-10-29), sahip turu geçti** (1.1.0 → 1.1.1 bantla güncellendi; sihirbaz yeniden açılıyordu, `quitAndInstall(true, true)` ile düzeltildi, 1.2.0 ile çıkar). PM compose (Opus). **Yalnız desktop** (+ DEPLOY belgesi).
 > **R7-nötr** (istemci kabuğu, auth/T&S karar fonksiyonu yok). C31b oyun algılamanın ön koşulu: masaüstü ana süreci
 > değiştiren her özellik yeni kurulum dosyası ister, güncelleme olmadan herkes elle indirmek zorunda kalır.
 

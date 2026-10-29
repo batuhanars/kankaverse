@@ -365,7 +365,9 @@ function setupAutoUpdate() {
 ipcMain.on('update:install', () => {
   if (!autoUpdater) return
   isQuitting = true
-  autoUpdater.quitAndInstall()
+  // (isSilent, isForceRunAfter): kurulum oneClick=false olduğu için varsayılan çağrı sihirbazı yeniden
+  // açıyordu (sahip turu 2026-10-29). Güncelleme sessiz kurulur, uygulama kendiliğinden açılır.
+  autoUpdater.quitAndInstall(true, true)
 })
 
 // Preload → renderer: pencereyi öne getir (native bildirim tıklaması)
