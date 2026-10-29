@@ -25,6 +25,7 @@ import { isMobile, isWide } from '@/composables/useResponsive'
 import ServerRail from '@/components/layout/ServerRail.vue'
 import UserCard from '@/components/layout/UserCard.vue'
 import EmailVerificationBanner from '@/components/shared/EmailVerificationBanner.vue'
+import DesktopUpdateBanner from '@/components/shared/DesktopUpdateBanner.vue'
 import ServerModal from './components/ServerModal.vue'
 import FriendAddModal from '@/views/home/components/FriendAddModal.vue'
 import IncomingCallModal from '@/components/shared/IncomingCallModal.vue'
@@ -137,6 +138,7 @@ onUnmounted(() => {
 
 <template>
   <div class="flex flex-col h-full overflow-hidden" style="background-color: var(--kv-bg-rail);">
+    <DesktopUpdateBanner />
     <EmailVerificationBanner v-if="authStore.user && !authStore.user.emailVerified" />
 
     <!--

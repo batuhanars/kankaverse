@@ -1,6 +1,6 @@
 {
   "name": "kankaverse-desktop",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Kankaverse masaüstü istemcisi",
   "main": "src/main.js",
   "scripts": {
@@ -21,7 +21,10 @@
       "src/**/*"
     ],
     "extraResources": [
-      { "from": "build/icon.png", "to": "icon.png" }
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
     ],
     "win": {
       "target": "nsis",
@@ -48,6 +51,13 @@
       "icon": "build/icon.png",
       "category": "Network",
       "artifactName": "kankaverse.${ext}"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://kankaverse.com/indir/"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

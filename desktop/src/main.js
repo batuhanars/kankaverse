@@ -91,6 +91,7 @@ if (!gotLock) {
     applyOpenAtLogin()
     createWindow()
     createTray()
+    setupAutoUpdate()
 
     // Ekran paylaşımı (getDisplayMedia) — kullanıcı picker penceresiyle kaynak seçer.
     session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
@@ -234,6 +235,11 @@ function createWindow() {
 
   win.loadURL(APP_URL)
 
+  // İndirme sayfa yüklenmeden bittiyse ya da sayfa yenilendiyse bant kaybolmasın: her yüklemede tekrar bildir.
+  win.webContents.on('did-finish-load', () => {
+    if (downloadedVersion) win.webContents.send('update:ready', { version: downloadedVersion })
+  })
+
   // startMinimized kapalıysa hazır olunca göster; açıksa tepside (arka planda) başla.
   win.once('ready-to-show', () => {
     if (!settings.startMinimized) win.show()
@@ -288,6 +294,7 @@ function applySetting(key, value) {
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     { label: 'Aç / Göster', click: () => bringToFront() },
+    { label: `Sürüm ${app.getVersion()}`, enabled: false },
     { type: 'separator' },
     {
       label: 'Başlangıçta Başlat',
@@ -302,6 +309,7 @@ function buildTrayMenu() {
       click: (mi) => applySetting('closeToTray', mi.checked),
     },
     { type: 'separator' },
+    { label: 'Güncellemeleri denetle', click: () => checkForUpdates() },
     { label: 'Çıkış', click: () => { isQuitting = true; app.quit() } },
   ])
 }
@@ -323,7 +331,43 @@ function createTray() {
   })
 }
 
+// ── Otomatik güncelleme (electron-updater, generic provider = kendi VPS) ──────────
+// Yalnız paketli üründe. Bildirimli: indirme arka planda, kurulum kullanıcı "Yeniden başlat"
+// deyince veya uygulamadan çıkınca. Hata kullanıcıya gösterilmez (ağ yoksa sessiz devam).
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
+let autoUpdater = null
+// İndirilip kuruluma hazır sürüm (yoksa null); sayfa yeniden yüklenince bandı geri getirmek için.
+let downloadedVersion = null
+
+function checkForUpdates() {
+  if (!autoUpdater) return
+  autoUpdater.checkForUpdates().catch((e) => console.error('[güncelleme] denetim hatası:', e))
+}
+
+function setupAutoUpdate() {
+  if (!app.isPackaged) return
+  ;({ autoUpdater } = require('electron-updater'))
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-downloaded', (info) => {
+    downloadedVersion = info.version
+    if (win && !win.isDestroyed()) win.webContents.send('update:ready', { version: info.version })
+  })
+  autoUpdater.on('error', (e) => console.error('[güncelleme] hata:', e))
+
+  checkForUpdates()
+  setInterval(checkForUpdates, UPDATE_CHECK_INTERVAL_MS)
+}
+
 // ── IPC kanalları ──────────────────────────────────────────────────────────────
+// Web "Yeniden başlat" dedi → kur. isQuitting: tepsiye-kapanma (close→hide) devreye girmesin.
+ipcMain.on('update:install', () => {
+  if (!autoUpdater) return
+  isQuitting = true
+  autoUpdater.quitAndInstall()
+})
+
 // Preload → renderer: pencereyi öne getir (native bildirim tıklaması)
 ipcMain.on('focus-window', () => {
   bringToFront()

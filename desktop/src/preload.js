@@ -22,4 +22,17 @@ contextBridge.exposeInMainWorld('kankaverse', {
 
   /** Tek bir masaüstü ayarını değiştir; güncel ayar nesnesini döndürür. */
   setDesktopSetting: (key, value) => ipcRenderer.invoke('desktop:set-setting', key, value),
+
+  /**
+   * Yeni sürüm indirilip kuruluma hazır olunca çağrılır → cb({ version }).
+   * Abonelikten çıkış fonksiyonu döner. (Ham ipcRenderer olayı web'e sızdırılmaz.)
+   */
+  onUpdateReady: (cb) => {
+    const handler = (_event, info) => cb(info)
+    ipcRenderer.on('update:ready', handler)
+    return () => ipcRenderer.removeListener('update:ready', handler)
+  },
+
+  /** İndirilen güncellemeyi kurup uygulamayı yeniden başlatır. */
+  installUpdate: () => ipcRenderer.send('update:install'),
 })

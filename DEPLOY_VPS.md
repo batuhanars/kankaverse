@@ -219,6 +219,21 @@ Artık yalnız davet koduyla kayıt olunur. DB zaten temiz (fresh) → ayrı pur
 
 ---
 
+## 11b. Masaüstü sürüm yayını (otomatik güncelleme)
+
+Masaüstü istemci `electron-updater` ile `https://kankaverse.com/indir/latest.yml` dosyasına bakar (6 saatte bir + açılışta).
+Web kodu canlıdan geldiği için yalnız `desktop/src/` (main, preload, picker) değişince yeni sürüm yayınlanır.
+
+1. `desktop/package.json` içinde `version` değerini ARTIR. Artmazsa güncelleyici "yeni sürüm yok" der.
+2. `cd desktop && npm run dist` → `dist/` altında `kankaverse-setup.exe`, `kankaverse-setup.exe.blockmap`, `latest.yml`.
+3. Üç dosyayı VPS'te `/home/deploy/kankaverse/downloads/` klasörüne koy. **Sıra önemli:** önce `.exe` ve `.blockmap`,
+   EN SON `latest.yml` (yarım yüklemede istemci henüz olmayan dosyayı istemesin).
+4. Doğrula: `curl -s https://kankaverse.com/indir/latest.yml` yeni sürümü göstermeli.
+
+Not: 1.0.1 ve öncesi kurulumlarda güncelleyici yoktur; bir kez elle yeniden indirmeleri gerekir.
+
+---
+
 ## 12. Railway / Vercel devre dışı (VPS sağlamca çalıştıktan SONRA)
 - Birkaç gün VPS'i izle; stabilse Railway api servisini ve Vercel projesini durdur/sil.
 - DNS'te eski Vercel/Railway custom domain kayıtları kaldıysa temizle (yalnız VPS A kayıtları kalsın).

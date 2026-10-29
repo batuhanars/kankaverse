@@ -23,6 +23,10 @@ interface KankaverseElectronBridge {
   getDesktopSettings: () => Promise<DesktopSettings>
   /** Tek bir masaüstü ayarını değiştir; güncel ayarları döndürür. */
   setDesktopSetting: (key: keyof DesktopSettings, value: boolean) => Promise<DesktopSettings>
+  /** Yeni sürüm indirilince çağrılır; abonelikten çıkış fonksiyonu döner. Eski kurulumlarda yok. */
+  onUpdateReady?: (cb: (info: { version: string }) => void) => () => void
+  /** İndirilen güncellemeyi kurup uygulamayı yeniden başlatır. Eski kurulumlarda yok. */
+  installUpdate?: () => void
 }
 
 declare global {

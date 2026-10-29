@@ -269,6 +269,21 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
 
 ### Track F — İstemciler (sahip sırası: Electron masaüstü → RN mobil)
 - **F1 Electron masaüstü** — 🟡 **AKTİF (sözleşme yazıldı 2026-06-18):** `contracts/SPRINT_ELECTRON_CONTRACT.md`. **Load-remote** (pencere `https://kankaverse.com` yükler — bundle YOK; cookie `sameSite=lax` korunur, sahip onaylı). v1: tray+kapat-tepsiye + tek-instance + **native OS bildirimi** (web `Notification` API → Electron toast, görünür-değilken) + Windows installer. **R7-nötr** (istemci kabuğu). **v2'ye ertelendi:** B2 etkinlik hatırlatması (önce sunucu reminder job), electron-updater, Mac/Linux build, PWA bildirim.
+  - **F1 v2 masaüstü (sahip kararı 2026-10-29):** 🟡 **SÖZLEŞMELER YAZILDI.** (1) **C31a otomatik güncelleme**
+    `contracts/SPRINT_C31A_DESKTOP_UPDATER_CONTRACT.md` (electron-updater, kendi VPS, bildirimli; yukarıdaki v2 ertelemesinden
+    buraya taşındı). (2) **C31b oyun algılama** `contracts/SPRINT_C31B_GAME_ACTIVITY_CONTRACT.md` ("oynuyor" durumu + yayın
+    önerisi; R7 presence yüzeyi). C31a sahip turu geçmeden C31b başlamaz. **Bilinçli bahis:** masaüstü oranı düşük çıksa da
+    yapılır, gerekçe yoğun kullanıcının (oyun, birlikte izleme, pair programming, ders) masaüstünde olması.
+    **REDDEDİLDİ:** oyun içi konuşanlar paneli. Enjeksiyon hile korumasına (Vanguard) takılır, kullanıcı ban yer. Ayrı saydam
+    pencere de bu turda yok.
+  - **Entegrasyon yol haritası (sözleşmesiz, sıra):** (1) gelen webhook (kanala adresle mesaj, okuma yetkisi yok) ·
+    (2) Steam/Twitch/Kick hesap bağlama + ortama "yayına başladı" duyurusu (T&S: minörün bağlı hesapları başkasına görünmez,
+    platform dışına taşıma yolu) · (3) eğik çizgi komutları (bot yalnız kendine yazılanı görür), gerçek talep gelince ·
+    (4) mesaj okuyan tam bot belki hiç (minörlü ortamda üçüncü taraf okuma + KVKK). Herkese açık API bir sözdür: açıldıktan
+    sonra iç yapı serbestçe değişemez, sürümleme ve belge ister.
+    **Spotify "dinliyor" PARK (sahip 2026-10-29):** resmî Web API kitleye açılamaz (2025 geniş erişim şartı: kayıtlı şirket +
+    ~250k MAU; geliştirme modu birkaç elle eklenen kullanıcı). Tek yol masaüstünde pencere başlığından yerel algılama (kırılgan,
+    serbest metin = automod + ayrı ayar). Açılırsa C31b altyapısıyla küçük ek sprint.
 - **F2 RN mobil** — 🟢 **KOD BAŞLADI (sahip kararı 2026-07-28).** Brief: `knowledge/projects/kankaverse/kankaverse-mobil-brief.md`. Stack **React Native + Expo** (Flutter kararı ADR 2026-07-02 ile revize; dooit kanıtıyla kesin). Aynı OpenAPI hattından TS client (Dart codegen düştü). Faz haritası M0-M5 (iskele → metin → push → ses → medya → mağaza); Android-first, mevcut bireysel Play hesabı, Apple ertelendi.
   - **M0 iskele** — 🟡 AKTİF: `contracts/SPRINT_M0_MOBILE_CONTRACT.md`. Yeni `mobile/` tier + giriş/2FA/oturum kalıcılığı + ortam listesi. Backend dokunuşu: **bearer refresh teslimi** (`Session.clientType` kapısı) — **R7**. DoD: cihazda giriş yapıp ortam listesini gören uygulama.
   - **M1-M5** — sözleşmeleri sırası gelince yazılır. **M2 (push) = Play kapalı testinin başladığı faz.** **M1 kapsamına kayıt + şifre sıfırlama ekranı dahil** (M0'dan çıkarıldı, M5'e bırakılamaz: kayıt ekranı olmayan uygulama Play incelemesinden geçmez, kapalı testte 12 testçiyi web'e mecbur eder).

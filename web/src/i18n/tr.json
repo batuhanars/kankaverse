@@ -69,6 +69,11 @@
       "newPasswordMin": "Şifre en az 8 karakter olmalıdır."
     }
   },
+  "desktopUpdate": {
+    "message": "Kankaverse güncellendi. Yeniden başlatınca yeni sürüm açılır.",
+    "restart": "Yeniden başlat",
+    "dismiss": "Kapat"
+  },
   "emailVerification": {
     "bannerMessage": "E-postanı henüz doğrulamadın. Bazı özellikler kısıtlı.",
     "resend": "Tekrar gönder",
