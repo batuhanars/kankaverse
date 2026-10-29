@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useMembersStore } from '@/stores/members'
 import { useRolesStore } from '@/stores/roles'
 import { useSocket } from '@/composables/useSocket'
+import { useOptimisticSend } from '@/composables/useOptimisticSend'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
 import { useJumpToMessage } from '@/composables/useMessageJump'
@@ -31,6 +32,7 @@ const authStore = useAuthStore()
 const membersStore = useMembersStore()
 const rolesStore = useRolesStore()
 const { joinChannel, leaveChannel } = useSocket()
+const optimistic = useOptimisticSend()
 
 // Mesaj yönetimi (pin + başkasının mesajını silme) → MANAGE_MESSAGES (owner/ADMINISTRATOR dahil)
 const { can } = useGuildPermissions(() => guildsStore.activeGuildId ?? '')
@@ -40,7 +42,6 @@ const { onInput: onTypingInput, stopTyping } = useTyping(() => channelId.value)
 const { label: typingLabel } = useTypingLabel(() => channelId.value, t)
 
 const content = ref('')
-const sending = ref(false)
 const listEl = ref<HTMLElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
 const gifInputEl = ref<HTMLInputElement | null>(null)
@@ -329,44 +330,22 @@ async function onAttachmentSent({ attachmentId, caption }: { attachmentId: strin
   }
 }
 
-async function send() {
+function send() {
   const hasText = content.value.trim()
-  if (!hasText || !channelId.value || sending.value) return
+  if (!hasText || !channelId.value) return
   stopTyping()
   sendError.value = ''
   slowModeSeconds.value = null
-  sending.value = true
   // Sprint V2: @username → <@userId> dönüşümü gönderimden önce
   const text = mention.applyMentionTokens(content.value.trim())
   mention.clearPending()
   content.value = ''
-  nextTick(resetComposerHeight) // REV-2: gönderince büyüyen textarea normale dönsün
-  const replyId = replyingTo.value?.id
+  void nextTick(resetComposerHeight) // REV-2: gönderince büyüyen textarea normale dönsün
+  const reply = replyingTo.value
   replyingTo.value = null
-  try {
-    const { data } = await messagesApi.send(channelId.value, text, replyId)
-    // Yerel eko: WS broadcast'i beklemeden gönderenin ekranına yaz. appendMessage
-    // id'ye göre dedup yapar (messages.ts:35) → broadcast geldiğinde çiftlemez.
-    stickToBottom = true // kendi mesajım → her zaman dibe kay
-    messagesStore.appendMessage(data)
-  } catch (e: unknown) {
-    content.value = text
-    const err = e as { response?: { data?: { error?: string; message?: string; retryAfter?: number } } }
-    const errCode = err.response?.data?.error
-    if (errCode === 'SLOW_MODE') {
-      const retry = err.response?.data?.retryAfter
-      slowModeSeconds.value = typeof retry === 'number' ? retry : null
-      sendError.value = slowModeSeconds.value !== null
-        ? t('message.errors.SLOW_MODE_RETRY', { seconds: slowModeSeconds.value })
-        : t('message.errors.SLOW_MODE')
-    } else {
-      sendError.value = errCode
-        ? (t(`message.errors.${errCode}`) || err.response?.data?.message || t('common.error'))
-        : t('common.error')
-    }
-  } finally {
-    sending.value = false
-  }
+  stickToBottom = true // kendi mesajım → her zaman dibe kay
+  // C29: geçici mesaj anında listeye girer; sonuç/hata mesajın kendi altında gösterilir.
+  optimistic.sendText(channelId.value, text, reply, (s) => (slowModeSeconds.value = s))
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -443,7 +422,7 @@ function resetComposerHeight() {
           {{ t('message.noMessages') }}
         </p>
 
-        <template v-for="(msg, index) in messages" :key="msg.id">
+        <template v-for="(msg, index) in messages" :key="msg.nonce ?? msg.id">
           <!-- C11: gün değişiminde ayraç (Bugün · Dün · 25 Ekim 2026) -->
           <DateDivider v-if="dayLabels[index]" :label="dayLabels[index] || ''" />
           <MessageItem
@@ -454,6 +433,8 @@ function resetComposerHeight() {
             :can-manage-messages="canManageMessages"
             :guild-id="guildsStore.activeGuildId ?? undefined"
             @reply="setReplyingTo"
+            @retry="optimistic.retry"
+            @discard="optimistic.discard"
           />
         </template>
       </template>

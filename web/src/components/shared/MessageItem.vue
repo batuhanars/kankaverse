@@ -24,7 +24,12 @@ const props = defineProps<{
   // C10: guild kanalında ise → kullanıcı kartı rol rozetlerini bu ortam bağlamında gösterir
   guildId?: string
 }>()
-const emit = defineEmits<{ reply: [message: MessageDto] }>()
+const emit = defineEmits<{
+  reply: [message: MessageDto]
+  // C29: başarısız geçici mesaj
+  retry: [message: MessageDto]
+  discard: [message: MessageDto]
+}>()
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -231,6 +236,8 @@ onUnmounted(() => {
     @add-reaction="addReaction"
     @pin="pinMessage"
     @unpin="unpinMessage"
+    @retry="emit('retry', $event)"
+    @discard="emit('discard', $event)"
   >
     <!-- Düzenleme modu -->
     <template #editing>

@@ -10,6 +10,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AttachmentsService } from './attachments.service';
 import { PresignAttachmentDto } from './dto/presign-attachment.dto';
 import { DownloadAttachmentQueryDto } from './dto/download-attachment-query.dto';
@@ -32,6 +33,18 @@ export class AttachmentsController {
   })
   presign(@CurrentUser() user: { id: string }, @Body() dto: PresignAttachmentDto) {
     return this.attachmentsService.presign(user.id, dto);
+  }
+
+  @Post(':id/forward')
+  @UseGuards(VerifiedEmailGuard)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary:
+      '[R7] Mesaj ekini iletmek için kopyala (kaynak kanal erişimi + scan kapısı; yeni bekleyen ek döner, mesaj göndermez)',
+  })
+  forward(@CurrentUser() user: { id: string }, @Param('id') attachmentId: string) {
+    return this.attachmentsService.forward(user.id, attachmentId);
   }
 
   @Get(':id')

@@ -3370,3 +3370,37 @@ describe('MessagesService — rol bahsetmesi kapıları (R15 §2.2, R2 revizyonu
     expect(permissionsMock.hasGuildPermission).not.toHaveBeenCalled();
   });
 });
+
+// ── C29: nonce yankısı ────────────────────────────────────────────────────────
+
+describe('MessagesService.create — C29 nonce yankısı', () => {
+  let service: MessagesService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.create.mockResolvedValue(
+      makeMsg('msg-n-1', new Date('2026-10-29T10:00:00Z')),
+    );
+  });
+
+  it('nonce gelirse cevapta aynen döner ve DB create verisine yazılmaz', async () => {
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: 'selam',
+      nonce: 'abc-123',
+    });
+
+    expect(result.nonce).toBe('abc-123');
+    const createArg = prismaMock.message.create.mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(createArg.data).not.toHaveProperty('nonce');
+  });
+
+  it('nonce yoksa alan hiç yok', async () => {
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, { content: 'selam' });
+
+    expect('nonce' in result).toBe(false);
+  });
+});

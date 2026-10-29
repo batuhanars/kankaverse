@@ -56,6 +56,9 @@ const emit = defineEmits<{
   addReaction: [messageId: string, emoji: string]
   pin: [messageId: string]
   unpin: [messageId: string]
+  // C29: başarısız geçici mesajın tek eylemleri
+  retry: [message: MessageDto]
+  discard: [message: MessageDto]
 }>()
 
 const { t } = useI18n()
@@ -79,6 +82,9 @@ const toolbarSuppressed = computed(() => isSuppressed(overlayKey.value))
 
 // Satır sökülürken (örn. mesaj silindi) açık overlay sahipliğini bırak.
 onUnmounted(() => clearActive(overlayKey.value))
+
+// C29 — geçici (iyimser) mesaj: menü/tepki/düzenle/sil/sabitle/yanıtla/ilet KAPALI, yalnız Tekrar dene / Sil.
+const isLocal = computed(() => !!props.message.localStatus)
 
 // Takip mesajına hover'da saat gösterimi
 const showFollowTime = ref(false)
@@ -145,7 +151,7 @@ const renderedContent = computed<string>(() => {
          - BAŞKA mesajın menüsü açıksa (toolbarSuppressed) → hover ile bile gizli kalır.
          - Aksi halde → normal hover davranışı. -->
     <div
-      v-if="!isEditing"
+      v-if="!isEditing && !isLocal"
       class="absolute -top-3 right-4 transition-opacity"
       :class="isMenuOpen
         ? 'opacity-100 z-40'
@@ -202,7 +208,10 @@ const renderedContent = computed<string>(() => {
     </div>
 
     <!-- Sağ: içerik sütunu -->
-    <div class="flex-1 min-w-0">
+    <div
+      class="flex-1 min-w-0"
+      :style="message.localStatus === 'sending' ? 'opacity: 0.55;' : ''"
+    >
       <!-- Grup başı başlık: kullanıcı adı + saat + (düzenlendi) + pin rozeti -->
       <div v-if="isGroupStart" class="flex items-baseline gap-2 mb-0.5">
         <span
@@ -313,7 +322,7 @@ const renderedContent = computed<string>(() => {
         </template>
 
         <!-- Reaksiyon pill'leri -->
-        <div v-if="message.reactions?.length" class="flex flex-wrap gap-1 mt-1">
+        <div v-if="message.reactions?.length && !isLocal" class="flex flex-wrap gap-1 mt-1">
           <slot name="reactions" />
         </div>
 
@@ -322,7 +331,7 @@ const renderedContent = computed<string>(() => {
              grup DM, ortam kanalı). "Takılı kalmış tek tik" görüntüsü bilerek yok — gösterge ya
              anlamlıdır ya da hiç yoktur. İkon tek başına bilgi taşımasın diye `title` + `aria-label`
              i18n'den geliyor. -->
-        <div v-if="receipt" class="flex justify-end mt-0.5 select-none">
+        <div v-if="receipt && !isLocal" class="flex justify-end mt-0.5 select-none">
           <span
             class="inline-flex items-center"
             :style="`color: ${receipt === 'seen' ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)'};`"
@@ -337,6 +346,24 @@ const renderedContent = computed<string>(() => {
           </span>
         </div>
       </template>
+
+      <!-- C29: gönderilemedi satırı (tehlike rengi) + Tekrar dene · Sil -->
+      <div
+        v-if="message.localStatus === 'failed'"
+        class="flex flex-wrap items-center gap-x-2 mt-0.5 text-[12px]"
+        style="color: var(--kv-danger);"
+        role="alert"
+      >
+        <span>{{ t('message.local.failed') }}<template v-if="message.localError"> · {{ message.localError }}</template></span>
+        <span aria-hidden="true">·</span>
+        <button type="button" class="underline cursor-pointer hover:opacity-80" @click="emit('retry', message)">
+          {{ t('message.local.retry') }}
+        </button>
+        <span aria-hidden="true">·</span>
+        <button type="button" class="underline cursor-pointer hover:opacity-80" @click="emit('discard', message)">
+          {{ t('message.local.discard') }}
+        </button>
+      </div>
     </div>
   </div>
 </template>

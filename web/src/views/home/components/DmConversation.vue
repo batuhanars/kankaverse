@@ -6,6 +6,7 @@ import { useDmStore } from '@/stores/dm'
 import { useAuthStore } from '@/stores/auth'
 import { useFriendsStore } from '@/stores/friends'
 import { useSocket, voiceSubscribe, voiceUnsubscribe } from '@/composables/useSocket'
+import { useOptimisticSend } from '@/composables/useOptimisticSend'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
 import { useJumpToMessage } from '@/composables/useMessageJump'
@@ -107,6 +108,7 @@ const props = defineProps<{
 const emit = defineEmits<{ deleted: []; toggleProfile: [] }>()
 
 const { t } = useI18n()
+const optimistic = useOptimisticSend()
 const messagesStore = useMessagesStore()
 const dmStore = useDmStore()
 const authStore = useAuthStore()
@@ -213,7 +215,6 @@ const groupDisplayName = computed(() => {
 })
 
 const content = ref('')
-const sending = ref(false)
 const sendError = ref('')
 const listEl = ref<HTMLElement | null>(null)
 const fileInputEl = ref<HTMLInputElement | null>(null)
@@ -465,35 +466,23 @@ async function onAttachmentSent({ attachmentId, caption }: { attachmentId: strin
   }
 }
 
-async function send() {
+function send() {
   const hasText = content.value.trim()
   // Grup kanallarında canMessage kontrolü yok (backend kontrol eder)
   const canSend = isGroup.value || dmChannel.value?.canMessage
-  if (!hasText || sending.value || !canSend) return
+  if (!hasText || !canSend) return
   stopTyping()
   sendError.value = ''
-  sending.value = true
   // Sprint V2: @username → <@userId> dönüşümü gönderimden önce
   const text = mention.applyMentionTokens(content.value.trim())
   mention.clearPending()
   content.value = ''
-  nextTick(resetComposerHeight) // REV-2: gönderince büyüyen textarea normale dönsün
-  const replyId = replyingTo.value?.id
+  void nextTick(resetComposerHeight) // REV-2: gönderince büyüyen textarea normale dönsün
+  const reply = replyingTo.value
   replyingTo.value = null
-  try {
-    const { data } = await messagesApi.send(props.channel.id, text, replyId)
-    stickToBottom = true // kendi mesajım → her zaman dibe kay
-    messagesStore.appendMessage(data)
-  } catch (e: unknown) {
-    content.value = text
-    const err = e as { response?: { data?: { error?: string; message?: string } } }
-    const errCode = err.response?.data?.error
-    sendError.value = errCode
-      ? (t(`message.errors.${errCode}`) !== `message.errors.${errCode}` ? t(`message.errors.${errCode}`) : (err.response?.data?.message ?? t('common.error')))
-      : t('common.error')
-  } finally {
-    sending.value = false
-  }
+  stickToBottom = true // kendi mesajım → her zaman dibe kay
+  // C29: geçici mesaj anında listeye girer; sonuç/hata mesajın kendi altında gösterilir.
+  optimistic.sendText(props.channel.id, text, reply)
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -960,7 +949,7 @@ const dayLabels = computed<(string | null)[]>(() =>
           {{ t('dm.empty') }}
         </p>
 
-        <template v-for="(msg, index) in messages" :key="msg.id">
+        <template v-for="(msg, index) in messages" :key="msg.nonce ?? msg.id">
         <!-- C11: gün değişiminde ayraç (Bugün · Dün · 25 Ekim 2026) -->
         <DateDivider v-if="dayLabels[index]" :label="dayLabels[index] || ''" />
         <MessageRow
@@ -980,6 +969,8 @@ const dayLabels = computed<(string | null)[]>(() =>
           @add-reaction="(_msgId, emoji) => pickDmEmoji(msg, emoji)"
           @pin="onPinMessage"
           @unpin="onUnpinMessage"
+          @retry="optimistic.retry"
+          @discard="optimistic.discard"
         >
           <!-- Inline düzenleme modu (kendi mesajı) -->
           <template #editing>

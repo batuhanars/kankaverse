@@ -17,6 +17,7 @@ const storageMock = {
   presignPut: jest.fn(),
   presignGet: jest.fn(),
   delete: jest.fn(),
+  copy: jest.fn(),
 };
 
 const membershipMock = {
@@ -177,6 +178,18 @@ describe('AttachmentsService.getDownloadUrl — [R7] erişim + scan kapısı', (
     await expect(service.getDownloadUrl(USER_ID, ATTACHMENT_ID)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('[R7] D82: bağlı mesaj silinmiş → NotFoundException, URL üretilmez', async () => {
+    prismaMock.attachment.findUnique.mockResolvedValue({
+      ...ATTACHMENT_FIXTURE,
+      message: { ...ATTACHMENT_FIXTURE.message, deletedAt: new Date() },
+    });
+
+    await expect(service.getDownloadUrl(USER_ID, ATTACHMENT_ID)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(storageMock.presignGet).not.toHaveBeenCalled();
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -565,5 +578,145 @@ describe('AttachmentsService.presign — video (M6c)', () => {
     expect(prismaMock.attachment.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ thumbnail: null, width: null, height: null }),
     });
+  });
+});
+
+// ── C30: iletme için ek kopyalama [R7] ────────────────────────────────────────
+
+describe('AttachmentsService.forward — [R7] kopya + erişim/scan kapısı', () => {
+  let service: AttachmentsService;
+
+  const SOURCE = {
+    id: ATTACHMENT_ID,
+    uploaderId: 'someone-else',
+    messageId: MESSAGE_ID,
+    storageKey: 'abc123.png',
+    filename: 'foto.png',
+    contentType: 'image/png',
+    size: 2048,
+    durationMs: 1500,
+    waveform: 'wf',
+    thumbnail: 'th',
+    width: 640,
+    height: 480,
+    aiGenerationId: 'ai-gen-1',
+    scanStatus: 'CLEAN',
+    message: { channelId: CHANNEL_ID, deletedAt: null },
+  };
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.attachment.findUnique.mockResolvedValue(SOURCE);
+    membershipMock.requireChannelAccess.mockResolvedValue({});
+    storageMock.copy.mockResolvedValue(undefined);
+    prismaMock.attachment.create.mockResolvedValue({ id: 'copy-1' });
+  });
+
+  it('mutlu yol: kopya alanları + sourceAttachmentId + aiGenerationId taşınır, messageId null, uploader ileten', async () => {
+    const result = await service.forward(USER_ID, ATTACHMENT_ID);
+
+    expect(result).toEqual({ attachmentId: 'copy-1' });
+    expect(membershipMock.requireChannelAccess).toHaveBeenCalledWith(USER_ID, CHANNEL_ID);
+    const [srcKey, destKey] = storageMock.copy.mock.calls[0] as [string, string];
+    expect(srcKey).toBe('abc123.png');
+    expect(destKey).not.toBe(srcKey);
+    expect(destKey).toMatch(/\.png$/);
+    expect(prismaMock.attachment.create).toHaveBeenCalledWith({
+      data: {
+        uploaderId: USER_ID,
+        messageId: null,
+        storageKey: destKey,
+        filename: 'foto.png',
+        contentType: 'image/png',
+        size: 2048,
+        durationMs: 1500,
+        waveform: 'wf',
+        thumbnail: 'th',
+        width: 640,
+        height: 480,
+        aiGenerationId: 'ai-gen-1',
+        sourceAttachmentId: ATTACHMENT_ID,
+        scanStatus: 'CLEAN',
+      },
+      select: { id: true },
+    });
+  });
+
+  it('tarama açıkken kopya PENDING başlar (yükleme hattı kuralı)', async () => {
+    configMock.get.mockImplementation((key: string) => {
+      const values: Record<string, unknown> = {
+        maxUploadMb: 25,
+        attachmentScanEnabled: true,
+        uploadsEnabled: true,
+      };
+      return values[key];
+    });
+    service = makeService();
+
+    await service.forward(USER_ID, ATTACHMENT_ID);
+
+    expect(prismaMock.attachment.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ scanStatus: 'PENDING' }) }),
+    );
+  });
+
+  it('uploads kapalı → 403 UPLOADS_DISABLED, hiçbir şeye dokunmaz', async () => {
+    configMock.get.mockImplementation((key: string) =>
+      key === 'uploadsEnabled' ? false : key === 'maxUploadMb' ? 25 : false,
+    );
+    service = makeService();
+
+    await expect(service.forward(USER_ID, ATTACHMENT_ID)).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'UPLOADS_DISABLED' }),
+    });
+    expect(prismaMock.attachment.findUnique).not.toHaveBeenCalled();
+    expect(storageMock.copy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['ek yok', null],
+    ['mesaja bağlı değil', { ...SOURCE, messageId: null, message: null }],
+    [
+      'bağlı mesaj silinmiş',
+      { ...SOURCE, message: { channelId: CHANNEL_ID, deletedAt: new Date() } },
+    ],
+  ])('%s → 404 ATTACHMENT_NOT_FOUND', async (_ad, row) => {
+    prismaMock.attachment.findUnique.mockResolvedValue(row);
+
+    await expect(service.forward(USER_ID, ATTACHMENT_ID)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.forward(USER_ID, ATTACHMENT_ID)).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'ATTACHMENT_NOT_FOUND' }),
+    });
+    expect(storageMock.copy).not.toHaveBeenCalled();
+    expect(prismaMock.attachment.create).not.toHaveBeenCalled();
+  });
+
+  it('kaynak kanala erişimi olmayan kullanıcı reddedilir, kopya oluşmaz', async () => {
+    membershipMock.requireChannelAccess.mockRejectedValue(new ForbiddenException());
+
+    await expect(service.forward(USER_ID, ATTACHMENT_ID)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(storageMock.copy).not.toHaveBeenCalled();
+    expect(prismaMock.attachment.create).not.toHaveBeenCalled();
+  });
+
+  it('FLAGGED → 403 ATTACHMENT_BLOCKED', async () => {
+    prismaMock.attachment.findUnique.mockResolvedValue({ ...SOURCE, scanStatus: 'FLAGGED' });
+
+    await expect(service.forward(USER_ID, ATTACHMENT_ID)).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'ATTACHMENT_BLOCKED' }),
+    });
+    expect(storageMock.copy).not.toHaveBeenCalled();
+  });
+
+  it('PENDING → 403 ATTACHMENT_NOT_READY', async () => {
+    prismaMock.attachment.findUnique.mockResolvedValue({ ...SOURCE, scanStatus: 'PENDING' });
+
+    await expect(service.forward(USER_ID, ATTACHMENT_ID)).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'ATTACHMENT_NOT_READY' }),
+    });
+    expect(prismaMock.attachment.create).not.toHaveBeenCalled();
   });
 });

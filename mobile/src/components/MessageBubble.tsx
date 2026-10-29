@@ -41,6 +41,9 @@ interface Props {
   receipt?: 'sent' | 'seen' | null;
   /** Tepki pill'ine dokunuş: kendi tepkimi kaldırır, başkasınınkine katılır (web ile aynı). */
   onToggleReaction?: (emoji: string) => void;
+  /** C29: basarisiz gecici mesajin "Tekrar dene" / "Sil" eylemleri. */
+  onRetry?: () => void;
+  onDiscard?: () => void;
 }
 
 // Sprint M6a — WhatsApp tarzı sağlı sollu baloncuk (web/masaüstü düz liste olarak kalır). Öbekleme
@@ -58,6 +61,8 @@ export function MessageBubble({
   onLongPress,
   onPressAuthor,
   onToggleReaction,
+  onRetry,
+  onDiscard,
 }: Props) {
   // M2d R1 — bahsetmeler vurgulu boyanır (web `.kv-mention` karşılığı). Düz karşılık, boş içerikte
   // metin bloğunu hiç render etmemek için (ek-yalnız mesajlar).
@@ -69,6 +74,8 @@ export function MessageBubble({
   );
   const displayContent = mentionSegments.map((seg) => seg.text).join('');
   const reactions = message.reactions ?? [];
+  // C29: gecici mesaj: yalniz Tekrar dene / Sil; menu, tepki, okundu tiki yok.
+  const isLocal = !!message.localStatus;
 
   // C28 — yalnız bu yazarın durumuna abone (tüm haritaya değil); liste performansı.
   const authorStatus = usePresenceStore(selectStatus(message.author.id));
@@ -125,10 +132,11 @@ export function MessageBubble({
 
       <View style={[styles.column, isMine ? styles.columnMine : styles.columnTheirs]}>
         <Pressable
-          onLongPress={onLongPress}
+          onLongPress={isLocal ? undefined : onLongPress}
           delayLongPress={350}
           style={[
             styles.bubble,
+            message.localStatus === 'sending' && styles.bubbleSending,
             isMine ? styles.bubbleMine : styles.bubbleTheirs,
             showAuthor && (isMine ? styles.cornerFirstMine : styles.cornerFirstTheirs),
             attachmentOnly && styles.bubbleAttachmentOnly,
@@ -181,14 +189,29 @@ export function MessageBubble({
                   seg.text
                 ),
               )}
-              {metaInline && <MetaSpacer message={message} receipt={receipt} isMine={isMine} />}
+              {metaInline && <MetaSpacer message={message} receipt={isLocal ? null : receipt} isMine={isMine} />}
             </Text>
           )}
 
-          <BubbleMeta message={message} isMine={isMine} receipt={receipt} inline={metaInline} />
+          <BubbleMeta message={message} isMine={isMine} receipt={isLocal ? null : receipt} inline={metaInline} />
         </Pressable>
 
-        {reactions.length > 0 && (
+        {message.localStatus === 'failed' && (
+          <View style={styles.failedRow} accessibilityRole="alert">
+            <Text style={styles.failedText}>
+              {t('message.local.failed')}
+              {message.localError ? ` · ${message.localError}` : ''}
+            </Text>
+            <Pressable onPress={onRetry} hitSlop={8} accessibilityRole="button">
+              <Text style={styles.failedAction}>{t('message.local.retry')}</Text>
+            </Pressable>
+            <Pressable onPress={onDiscard} hitSlop={8} accessibilityRole="button">
+              <Text style={styles.failedAction}>{t('message.local.discard')}</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {!isLocal && reactions.length > 0 && (
           <ReactionRow reactions={reactions} isMine={isMine} onToggleReaction={onToggleReaction} />
         )}
       </View>
@@ -269,6 +292,28 @@ const styles = StyleSheet.create({
   },
   cornerFirstTheirs: {
     borderTopLeftRadius: theme.radius.sm,
+  },
+  // C29: gonderiliyor = %55 opaklik, baska isaret yok (spinner/yanip sonme yok).
+  bubbleSending: {
+    opacity: 0.55,
+  },
+  failedRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 2,
+  },
+  failedText: {
+    color: theme.colors.danger,
+    fontSize: theme.fontSize.xs,
+  },
+  failedAction: {
+    color: theme.colors.danger,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   bubbleHighlighted: {
     borderColor: theme.colors.accent500,

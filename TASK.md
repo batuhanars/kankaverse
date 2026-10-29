@@ -4386,6 +4386,30 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Tur revizeleri: "Kategorisiz kanal ekle" → "Kanal Ekle" · tüm emoji düğmeleri tepki düğmesi standardında gri çizgi simge (web `EmojiFaceIcon`, mobil `happy-outline`)
 - [ ] Mağaza sürümü (vc28)
 
+## Sprint C29 — Mesajın anında görünmesi (iyimser gönderim) — 2026-10-29
+
+> Sözleşme: `contracts/SPRINT_C29_OPTIMISTIC_SEND_CONTRACT.md`. api → web → mobil. R7-nötr.
+> Sebep: sahip isteği (Gönder'e basınca gecikme gözüne çarpıyor).
+
+- [x] api: `nonce` yankısı (HTTP + WS), notify'lar cevabı bloklamıyor, testler
+- [x] web: geçici mesaj, nonce eşleştirme, Gönderilemedi / Tekrar dene / Sil, ortak composable
+- [x] mobil: aynı davranış, versionCode +1
+- [x] POST süresi önce/sonra ölçüldü (yerel ~23 → ~19 ms)
+- [x] build/test/vue-tsc -b/typecheck/lint temiz
+- [x] Sahip turu (web + telefon) — 2026-10-29 geçti
+
+## Sprint C30 — Ekli mesajı iletme (görsel, video, dosya) — 2026-10-29
+
+> Sözleşme: `contracts/SPRINT_C30_FORWARD_ATTACHMENTS_CONTRACT.md`. api → web → mobil. **R7: yeni ek kopyalama yolu.**
+> Sebep: sahip isteği (görsel iletilince düz yazı gidiyor).
+
+- [x] api: `POST /attachments/:id/forward`, `sourceAttachmentId` + migration uygulandı, testler
+- [x] api: §1.6 bulgusu (silinen mesajın eki, moderasyon eki kaldırma) PM'e raporlandı
+- [x] R7: §1 diff'i + D82 düzeltmesi (`getDownloadUrl` silinmiş mesaj kapısı) sahip onayladı 2026-10-29
+- [x] web + mobil: önizleme, ek kopyalayıp gönderme, mobilde dosya adını yazı gönderme kalktı
+- [x] build/test/vue-tsc -b/typecheck/lint temiz
+- [x] Sahip turu — 2026-10-29 geçti
+
 ## Sprint C14f — Yapay zeka video: ölçü seçimi + Wan 25 sn — 2026-10-28
 
 > Sözleşme: `contracts/SPRINT_C14F_AI_VIDEO_ASPECT_RATIO_CONTRACT.md`. api + web + mobil (JS), vc35. Sahip isteği.

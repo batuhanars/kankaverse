@@ -47,4 +47,15 @@ export const attachmentsApi = {
     const res = await http.post<AttachmentPresignResult>('/attachments/presign', payload);
     return res.data;
   },
+
+  /**
+   * C30 [R7] - mesaj ekini iletmek icin SUNUCUDA kopyalar (`POST /attachments/:id/forward`) ve ileten
+   * kullanicinin yeni bekleyen ek kimligini doner; mesaj GONDERMEZ. Istemci bu kimligi normal
+   * `messagesApi.send(..., attachmentIds)` ile hedefe baglar. Kapilar (kaynak kanal erisimi, tarama,
+   * uploads bayragi) sunucuda; ret mesajinin Turkcesi `extractErrorMessage` ile gosterilir.
+   */
+  async forward(id: string): Promise<{ attachmentId: string }> {
+    const res = await http.post<{ attachmentId: string }>(`/attachments/${id}/forward`);
+    return res.data;
+  },
 };

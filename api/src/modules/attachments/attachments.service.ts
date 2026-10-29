@@ -96,6 +96,7 @@ export function buildStorageKey(filename: string): string {
 @Injectable()
 export class AttachmentsService {
   private readonly maxUploadBytes: number;
+  private readonly scanEnabled: boolean;
 
   constructor(
     private prisma: PrismaService,
@@ -105,6 +106,7 @@ export class AttachmentsService {
   ) {
     const maxMb = config.get<number>('maxUploadMb') ?? 25;
     this.maxUploadBytes = maxMb * 1024 * 1024;
+    this.scanEnabled = config.get<boolean>('attachmentScanEnabled') ?? false;
   }
 
   /**
@@ -193,6 +195,89 @@ export class AttachmentsService {
   }
 
   /**
+   * POST /attachments/:id/forward  (C30)
+   * [R7] Mesajdaki bir eki, iletecek kullanıcıya ait YENİ bir bekleyen ek olarak kopyalar.
+   *
+   * Neden kopya: `storageKey` tekil ve ek tek mesaja bağlanır; aynı satırı ikinci mesaja
+   * bağlamak şemayı bozar. İstemci dönen `attachmentId`'yi normal `POST /channels/:id/messages`
+   * ile gönderir — hedef kanal kapıları (ban, susturma, blok, mesaj isteği, yavaş mod, canDm)
+   * ORADA uygulanır; bu uç hiçbirini baypas etmez ve mesaj GÖNDERMEZ.
+   *
+   * Kapı sırası (hepsi `getDownloadUrl` ile aynı anlam; yeni gevşetme yok):
+   *   1. UPLOADS_ENABLED kapalıysa 403 (presign ile aynı)
+   *   2. Ek yok / mesaja bağlı değil / bağlı mesaj silinmiş → 404 (silinmiş mesajın eki iletilemez)
+   *   3. Kaynak kanala erişim (üyelik + minör/adultsOnly) — erişemeyen, ekin varlığını öğrenemez
+   *   4. scanStatus CLEAN değilse 403 (FLAGGED → ATTACHMENT_BLOCKED, diğeri → ATTACHMENT_NOT_READY)
+   *
+   * Kopya kaynağını `sourceAttachmentId` ile kaydeder: asıl içeriğe uygulanan bir müdahalede
+   * (moderasyon) kopyalar bulunabilsin. `aiGenerationId` taşınır: "Yapay zeka" rozeti iletilince
+   * de görünür kalır (şeffaflık).
+   */
+  async forward(userId: string, attachmentId: string) {
+    if (!this.config.get<boolean>('uploadsEnabled')) {
+      throw new ForbiddenException({
+        message: 'Dosya yükleme şu an kapalı.',
+        error: 'UPLOADS_DISABLED',
+      });
+    }
+
+    const source = await this.prisma.attachment.findUnique({
+      where: { id: attachmentId },
+      include: { message: { select: { channelId: true, deletedAt: true } } },
+    });
+
+    if (!source || !source.messageId || !source.message || source.message.deletedAt !== null) {
+      throw new NotFoundException({
+        message: 'Dosya bulunamadı.',
+        error: 'ATTACHMENT_NOT_FOUND',
+      });
+    }
+
+    // [R7] Kaynak kanal erişimi: üyelik + minör/adultsOnly kapıları (getDownloadUrl ile aynı çağrı)
+    await this.membership.requireChannelAccess(userId, source.message.channelId);
+
+    if (source.scanStatus === 'FLAGGED') {
+      throw new ForbiddenException({
+        message: 'Bu dosya güvenlik kontrolünden geçemedi.',
+        error: 'ATTACHMENT_BLOCKED',
+      });
+    }
+
+    if (source.scanStatus !== 'CLEAN') {
+      throw new ForbiddenException({
+        message: 'Bu dosya henüz hazır değil, lütfen bekleyin.',
+        error: 'ATTACHMENT_NOT_READY',
+      });
+    }
+
+    const storageKey = buildStorageKey(source.filename);
+    await this.storage.copy(source.storageKey, storageKey);
+
+    const copy = await this.prisma.attachment.create({
+      data: {
+        uploaderId: userId,
+        messageId: null,
+        storageKey,
+        filename: source.filename,
+        contentType: source.contentType,
+        size: source.size,
+        durationMs: source.durationMs,
+        waveform: source.waveform,
+        thumbnail: source.thumbnail,
+        width: source.width,
+        height: source.height,
+        aiGenerationId: source.aiGenerationId,
+        sourceAttachmentId: source.id,
+        // Yükleme hattıyla aynı kural; mesaja bağlanırken messages.service yeniden uygular.
+        scanStatus: this.scanEnabled ? 'PENDING' : 'CLEAN',
+      },
+      select: { id: true },
+    });
+
+    return { attachmentId: copy.id };
+  }
+
+  /**
    * GET /attachments/:id
    * [R7] Erişim kapısı sırası:
    *   1. Attachment + mesaj varlık kontrolü (messageId null → 404 henüz iliştirilmemiş)
@@ -205,7 +290,7 @@ export class AttachmentsService {
   async getDownloadUrl(userId: string, attachmentId: string, download = false) {
     const attachment = await this.prisma.attachment.findUnique({
       where: { id: attachmentId },
-      include: { message: { select: { channelId: true } } },
+      include: { message: { select: { channelId: true, deletedAt: true } } },
     });
 
     if (!attachment) {
@@ -215,8 +300,9 @@ export class AttachmentsService {
       });
     }
 
-    // messageId null → henüz iliştirilmemiş; erişim yok
-    if (!attachment.messageId || !attachment.message) {
+    // messageId null → henüz iliştirilmemiş; erişim yok.
+    // D82 (R7): bağlı mesaj silinmişse (kullanıcı silmesi veya moderasyon CONTENT_REMOVE) ek de servis edilmez.
+    if (!attachment.messageId || !attachment.message || attachment.message.deletedAt) {
       throw new NotFoundException({
         message: 'Dosya bulunamadı.',
         error: 'ATTACHMENT_NOT_FOUND',

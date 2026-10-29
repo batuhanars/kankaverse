@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { messagesApi, type MessageDto } from '@/api/messages';
+import { attachmentsApi } from '@/api/attachments';
 import { extractErrorMessage } from '@/api/errors';
 import { useDmStore } from '@/stores/dm';
 import { channelTitle } from '@/utils/channelTitle';
@@ -21,9 +23,11 @@ import { theme } from '@/theme';
 /**
  * Mesajı ilet — web `ForwardMessageModal.vue`nin mobil karşılığı.
  *
- * 🔴 **İletme ayrı bir uç DEĞİL** (web'de de değil): mesajın METNİ seçilen DM'e yeni bir mesaj
- * olarak gönderilir (`messagesApi.send`). Yani "iletildi" diye bir sunucu kavramı yok, alıcı normal
- * bir mesaj görür. Uydurma uç aramaya gerek yok, aynı davranış birebir taşındı.
+ * İletme yeni bir mesaj olarak gider (alıcı normal bir mesaj görür, "iletildi" etiketi yok).
+ *
+ * C30: ekler sunucuda KOPYALANIR (`attachmentsApi.forward` -> yeni ek kimligi), sonra normal gonderimle
+ * (`attachmentIds`) hedefe baglanir; istemci dosyayi indirip yeniden yuklemez. Eskiden metin bos ise
+ * DOSYA ADI metin olarak gidiyordu (gorsel yazi oluyordu); bu davranis KALDIRILDI.
  *
  * Hedef listesi **mevcut DM kanalları** (web ile aynı): yeni sohbet başlatma yolu buraya konmadı,
  * o "Yeni Mesaj" ekranının işi.
@@ -45,8 +49,31 @@ export function ForwardMessageModal({ message, onClose }: Props) {
   const [sentIds, setSentIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // İletilecek metin: içerik; boşsa (yalnız ek taşıyan mesaj) ilk ekin dosya adı — web ile aynı.
-  const forwardText = message.content.trim() || message.attachments?.[0]?.filename || '';
+  const forwardText = message.content.trim();
+  const attachments = message.attachments ?? [];
+  const first = attachments[0] ?? null;
+  // Metin de ek de yoksa iletilecek bir sey yok (bugunku bos durum).
+  const hasContent = !!forwardText || attachments.length > 0;
+
+  // Onizleme kucuk resmi: video icin mesajdaki kare, gorsel icin sunucudan kisa omurlu adres.
+  const [previewUri, setPreviewUri] = useState<string | null>(
+    first?.contentType.startsWith('video/') && first.thumbnail
+      ? `data:image/jpeg;base64,${first.thumbnail}`
+      : null,
+  );
+  useEffect(() => {
+    if (!first || !first.contentType.startsWith('image/') || first.scanStatus !== 'CLEAN') return;
+    let cancelled = false;
+    attachmentsApi
+      .getUrl(first.id)
+      .then((res) => {
+        if (!cancelled) setPreviewUri(res.url);
+      })
+      .catch(() => {}); // onizleme kozmetik; iletme kapisi sunucuda
+    return () => {
+      cancelled = true;
+    };
+  }, [first]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLocaleLowerCase('tr');
@@ -55,11 +82,19 @@ export function ForwardMessageModal({ message, onClose }: Props) {
   }, [channels, query]);
 
   async function forwardTo(channelId: string) {
-    if (sendingId || sentIds.includes(channelId) || !forwardText) return;
+    if (sendingId || sentIds.includes(channelId) || !hasContent) return;
     setSendingId(channelId);
     setErrorMessage('');
     try {
-      await messagesApi.send(channelId, forwardText);
+      // Her hedef kendi kopyalarini alir (ek tek mesaja baglanir). Paralel kopya; biri reddedilirse
+      // hedef "gonderildi" isaretlenmez (kopyalanip baglanmayan ek sahipsiz kalir, presign'daki gibi).
+      const copies = await Promise.all(attachments.map((a) => attachmentsApi.forward(a.id)));
+      await messagesApi.send(
+        channelId,
+        forwardText,
+        undefined,
+        copies.map((c) => c.attachmentId),
+      );
       setSentIds((prev) => [...prev, channelId]);
     } catch (e) {
       setErrorMessage(extractErrorMessage(e));
@@ -80,9 +115,31 @@ export function ForwardMessageModal({ message, onClose }: Props) {
           <View style={styles.content}>
             <Text style={styles.title}>{t('message.forwardTitle')}</Text>
 
-            <Text style={styles.preview} numberOfLines={2}>
-              {forwardText || t('message.forwardEmpty')}
-            </Text>
+            {forwardText ? (
+              <Text style={styles.preview} numberOfLines={2}>
+                {forwardText}
+              </Text>
+            ) : null}
+            {first ? (
+              <View style={styles.attachmentPreview}>
+                {previewUri ? (
+                  <Image source={{ uri: previewUri }} style={styles.thumb} />
+                ) : (
+                  <View style={[styles.thumb, styles.thumbIcon]}>
+                    <Ionicons name="document-outline" size={20} color={theme.colors.textMuted} />
+                  </View>
+                )}
+                <Text style={styles.attachmentName} numberOfLines={1}>
+                  {first.filename}
+                </Text>
+                {attachments.length > 1 ? (
+                  <Text style={styles.preview}>
+                    {t('message.forwardMoreFiles', { n: attachments.length - 1 })}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+            {!hasContent ? <Text style={styles.preview}>{t('message.forwardEmpty')}</Text> : null}
 
             <TextInput
               value={query}
@@ -108,7 +165,7 @@ export function ForwardMessageModal({ message, onClose }: Props) {
                   return (
                     <Pressable
                       onPress={() => forwardTo(item.id)}
-                      disabled={sent || !!sendingId || !forwardText}
+                      disabled={sent || !!sendingId || !hasContent}
                       style={styles.row}
                     >
                       <Text style={styles.rowName} numberOfLines={1}>
@@ -167,6 +224,26 @@ const styles = StyleSheet.create({
   },
   preview: {
     color: theme.colors.textMuted,
+    fontSize: theme.fontSize.sm,
+  },
+  attachmentPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  thumb: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.bgElevated,
+  },
+  thumbIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentName: {
+    flexShrink: 1,
+    color: theme.colors.textSecondary,
     fontSize: theme.fontSize.sm,
   },
   input: {

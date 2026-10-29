@@ -123,6 +123,15 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
   };
 }
 
+/**
+ * C29 — iyimser gönderim eşleştirmesi: istemcinin gönderdiği `nonce` yalnız `create()` dönüşüne
+ * (HTTP cevabı + `message.created` yayını) aynen taşınır. DB'ye yazılmaz; liste/arama/düzenleme
+ * uçlarında hiç dönmez. Nonce yoksa alan eklenmez.
+ */
+function withNonce<T extends object>(dto: T, nonce?: string): T & { nonce?: string } {
+  return nonce ? { ...dto, nonce } : dto;
+}
+
 // replyTo include fragmanı — tüm sorgularda aynı şekil kullanılır
 /**
  * R15 §2.4 — tek mesajda en fazla 3 farklı rol etiketlenebilir. Kullanıcı bahsetmesindeki ≤10
@@ -608,10 +617,13 @@ export class MessagesService {
         { ...message, attachments: linkedAttachments, reactions: [] },
         userId,
       );
-      return (await this.withRoleEmojis(channel.guildId, [withFiles]))[0];
+      return withNonce((await this.withRoleEmojis(channel.guildId, [withFiles]))[0], dto.nonce);
     }
 
-    return (await this.withRoleEmojis(channel.guildId, [toMessageDto(message, userId)]))[0];
+    return withNonce(
+      (await this.withRoleEmojis(channel.guildId, [toMessageDto(message, userId)]))[0],
+      dto.nonce,
+    );
   }
 
   async editMessage(userId: string, channelId: string, messageId: string, dto: UpdateMessageDto) {

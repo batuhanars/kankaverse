@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { MessagesService } from './messages.service';
@@ -25,6 +26,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard)
 @Controller('channels/:id/messages')
 export class MessagesController {
+  private readonly logger = new Logger(MessagesController.name);
+
   constructor(
     private messagesService: MessagesService,
     private messagesGateway: MessagesGateway,
@@ -77,10 +80,21 @@ export class MessagesController {
   ) {
     const message = await this.messagesService.create(user.id, channelId, dto);
     this.messagesGateway.broadcastMessage(channelId, message);
+    // C29: bildirimler gönderenin cevabını bekletmez; hata yutulmaz, loglanır.
+    void this.notifyAfterSend(channelId, message).catch((err: unknown) =>
+      this.logger.error(`Gönderim sonrası bildirim hatası (kanal ${channelId})`, err),
+    );
+    return message;
+  }
+
+  /** Davranış değişmez (kim ne bildirim alır): üçü eskisi gibi sırayla çalışır, yalnız arka planda. */
+  private async notifyAfterSend(
+    channelId: string,
+    message: Record<string, unknown>,
+  ): Promise<void> {
     await this.messagesGateway.notifyDmActivity(channelId, message);
     await this.messagesGateway.notifyChannelActivity(channelId, message);
     await this.messagesGateway.notifyMentions(channelId, message);
-    return message;
   }
 
   @Patch(':messageId')

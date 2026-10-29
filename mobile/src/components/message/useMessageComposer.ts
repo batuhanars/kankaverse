@@ -8,6 +8,7 @@ import {
 } from '@/utils/attachmentUpload';
 import { prepareVideoDraft, VideoPrepareError } from '@/utils/videoPrepare';
 import { useMessagesStore } from '@/stores/messages';
+import { sendOptimisticText } from './useOptimisticSend';
 import { t } from '@/i18n';
 
 /**
@@ -117,6 +118,18 @@ export function useMessageComposer(
     const trimmed = input.trim();
     // Sunucu ile aynı kural (`EMPTY_MESSAGE`): en az bir ek varsa boş metin geçerli.
     if ((!trimmed && drafts.length === 0) || sending) return;
+    // C29: yalniz metin (+ yanit) iyimser gonderilir. Gecici mesaj aninda listeye girer, kutu hemen
+    // temizlenir, `sending` kilidi YOK (art arda yazilabilir); hata mesajin kendi altinda gosterilir.
+    // Ekli gonderim asagidaki bugunku akista kalir.
+    if (drafts.length === 0) {
+      typing.stop();
+      sendOptimisticText(channelId, mentions ? mentions.applyMentionTokens(trimmed) : trimmed, replyTo);
+      setReplyTo(null);
+      setSendError('');
+      setInput('');
+      mentions?.clearPicked();
+      return;
+    }
     setSending(true);
     setSendError('');
     typing.stop();

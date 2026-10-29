@@ -20,6 +20,10 @@ interface MessagesState {
   fetchInitial: (channelId: string) => Promise<void>;
   fetchOlder: (channelId: string) => Promise<void>;
   appendMessage: (message: MessageDto) => void;
+  /** C29 — geçici (iyimser) mesaj yaşam döngüsü; yalnız bellekte. */
+  addPending: (message: MessageDto) => void;
+  patchPending: (channelId: string, nonce: string, patch: Partial<MessageDto>) => void;
+  removePending: (channelId: string, nonce: string) => void;
   updateMessage: (message: MessageDto) => void;
   /** WS tepki olayının yansıması — sunucu yalnız delta yayar, toplamı istemci tutar. */
   /** M1h — sabitleme durumu (soket deltası). `pinnedAt` null ise sabitleme kalkmış demektir. */
@@ -52,7 +56,14 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     const fetched = await messagesApi.list(channelId);
     const ascending = [...fetched].reverse();
     set((s) => ({
-      byChannel: { ...s.byChannel, [channelId]: { messages: ascending, hasMore: fetched.length === 50 } },
+      byChannel: {
+        ...s.byChannel,
+        [channelId]: {
+          // C29: yerel geçici/başarısız mesajlar sunucu listesinde yok; yenilemede kaybolmasın.
+          messages: [...ascending, ...(s.byChannel[channelId]?.messages ?? []).filter((m) => m.localStatus)],
+          hasMore: fetched.length === 50,
+        },
+      },
       knownUsers: learnAuthors(channelId, fetched, s.knownUsers),
     }));
   },
@@ -78,6 +89,23 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
   appendMessage(message) {
     set((s) => {
       const current = s.byChannel[message.channelId]?.messages ?? [];
+      // C29: aynı nonce'lu geçici mesaj varsa YERİNDE gerçeğiyle değiştir (sıra kaymaz). HTTP cevabı
+      // ve WS yayını hangisi önce gelirse gelsin tek mesaj kalır: ikincisi aşağıdaki id dedup'a takılır.
+      if (message.nonce) {
+        const pendingIdx = current.findIndex((m) => m.localStatus && m.nonce === message.nonce);
+        if (pendingIdx !== -1) {
+          const next = [...current];
+          if (current.some((m) => m.id === message.id)) next.splice(pendingIdx, 1);
+          else next[pendingIdx] = message;
+          return {
+            byChannel: {
+              ...s.byChannel,
+              [message.channelId]: { ...s.byChannel[message.channelId], messages: next },
+            },
+            knownUsers: learnAuthors(message.channelId, [message], s.knownUsers),
+          };
+        }
+      }
       if (current.find((m) => m.id === message.id)) {
         return s; // mükerrer (kendi gönderdiğim + WS echo)
       }
@@ -90,6 +118,48 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
           },
         },
         knownUsers: learnAuthors(message.channelId, [message], s.knownUsers),
+      };
+    });
+  },
+
+  addPending(message) {
+    set((s) => {
+      const state = s.byChannel[message.channelId];
+      return {
+        byChannel: {
+          ...s.byChannel,
+          [message.channelId]: {
+            messages: [...(state?.messages ?? []), message],
+            hasMore: state?.hasMore ?? false,
+          },
+        },
+      };
+    });
+  },
+
+  patchPending(channelId, nonce, patch) {
+    set((s) => {
+      const current = s.byChannel[channelId]?.messages;
+      const idx = current?.findIndex((m) => m.localStatus && m.nonce === nonce) ?? -1;
+      if (!current || idx === -1) return s;
+      const next = [...current];
+      next[idx] = { ...current[idx], ...patch };
+      return { byChannel: { ...s.byChannel, [channelId]: { ...s.byChannel[channelId], messages: next } } };
+    });
+  },
+
+  removePending(channelId, nonce) {
+    set((s) => {
+      const current = s.byChannel[channelId]?.messages;
+      if (!current) return s;
+      return {
+        byChannel: {
+          ...s.byChannel,
+          [channelId]: {
+            ...s.byChannel[channelId],
+            messages: current.filter((m) => !(m.localStatus && m.nonce === nonce)),
+          },
+        },
       };
     });
   },

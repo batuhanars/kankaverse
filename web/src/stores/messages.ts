@@ -15,7 +15,9 @@ export const useMessagesStore = defineStore('messages', () => {
     const reversed = [...fetched].reverse()
 
     if (!before) {
-      messagesByChannel.value[channelId] = reversed
+      // C29: yerel geçici/başarısız mesajlar sunucu listesinde yok; yenilemede kaybolmasın.
+      const local = (messagesByChannel.value[channelId] ?? []).filter((m) => m.localStatus)
+      messagesByChannel.value[channelId] = [...reversed, ...local]
     } else {
       // Daha eski mesajları başa ekle
       messagesByChannel.value[channelId] = [
@@ -30,12 +32,41 @@ export const useMessagesStore = defineStore('messages', () => {
     const list = messagesByChannel.value[message.channelId]
     if (!list) {
       messagesByChannel.value[message.channelId] = [message]
-    } else {
-      // Mükerrer önleme
-      if (!list.find((m) => m.id === message.id)) {
-        list.push(message)
+      return
+    }
+    // C29: aynı nonce'lu geçici mesaj varsa YERİNDE gerçeğiyle değiştir (sıra kaymaz).
+    // HTTP cevabı ve WS yayını hangisi önce gelirse gelsin tek mesaj kalır: ikincisi id dedup'a takılır.
+    if (message.nonce) {
+      const pendingIdx = list.findIndex((m) => m.localStatus && m.nonce === message.nonce)
+      if (pendingIdx !== -1) {
+        if (list.some((m) => m.id === message.id)) list.splice(pendingIdx, 1)
+        else list[pendingIdx] = message
+        return
       }
     }
+    // Mükerrer önleme
+    if (!list.find((m) => m.id === message.id)) {
+      list.push(message)
+    }
+  }
+
+  // C29 — geçici (iyimser) mesaj yaşam döngüsü; yalnız bellekte.
+  function addPending(message: MessageDto) {
+    const list = messagesByChannel.value[message.channelId]
+    if (list) list.push(message)
+    else messagesByChannel.value[message.channelId] = [message]
+  }
+
+  function patchPending(channelId: string, nonce: string, patch: Partial<MessageDto>) {
+    const list = messagesByChannel.value[channelId]
+    const idx = list?.findIndex((m) => m.localStatus && m.nonce === nonce) ?? -1
+    if (list && idx !== -1) list[idx] = { ...list[idx], ...patch }
+  }
+
+  function removePending(channelId: string, nonce: string) {
+    const list = messagesByChannel.value[channelId]
+    const idx = list?.findIndex((m) => m.localStatus && m.nonce === nonce) ?? -1
+    if (list && idx !== -1) list.splice(idx, 1)
   }
 
   // Sprint 6.2: mesaj düzenleme WS / HTTP yanıtı
@@ -112,6 +143,9 @@ export const useMessagesStore = defineStore('messages', () => {
     messagesForChannel,
     fetchMessages,
     appendMessage,
+    addPending,
+    patchPending,
+    removePending,
     updateMessage,
     removeMessage,
     applyReaction,

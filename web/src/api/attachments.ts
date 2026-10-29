@@ -65,4 +65,9 @@ export function uploadToS3(
     .then(() => undefined)
 }
 
-export const attachmentsApi = { presign, getUrl, getDownloadUrl, uploadToS3 }
+// C30: mesaj ekini iletmek için kopyala → yeni bekleyen ek (mesaj göndermez; istemci attachmentIds ile gönderir)
+export function forward(id: string) {
+  return http.post<{ attachmentId: string }>(`/attachments/${id}/forward`)
+}
+
+export const attachmentsApi = { presign, getUrl, getDownloadUrl, uploadToS3, forward }

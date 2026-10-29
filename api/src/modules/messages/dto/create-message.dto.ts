@@ -27,4 +27,14 @@ export class CreateMessageDto {
   @ArrayMaxSize(10, { message: 'Bir mesaja en fazla 10 dosya eklenebilir.' })
   @IsString({ each: true })
   attachmentIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'İstemci eşleştirme anahtarı (iyimser gönderim). Veritabanına yazılmaz; cevap ve message.created yayınında aynen yankılanır.',
+    maxLength: 64,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  nonce?: string;
 }

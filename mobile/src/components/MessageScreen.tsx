@@ -23,6 +23,7 @@ import { ComposerHost } from './message/ComposerHost';
 import { DateSeparator } from './message/DateSeparator';
 import { useTypingEmitter } from './message/useTypingEmitter';
 import { useMessageComposer } from './message/useMessageComposer';
+import { discardOptimistic, retryOptimistic } from './message/useOptimisticSend';
 import { useMentionCompose, type MentionCandidate } from './message/useMentionCompose';
 import { useMessageListController } from './message/useMessageListController';
 import { MessageEmpty, MessageError, MessageLoading } from './message/MessageStates';
@@ -378,7 +379,7 @@ export function MessageScreen({
         <FlatList
           ref={list.listRef}
           data={inverted}
-          keyExtractor={(item) => item.message.id}
+          keyExtractor={(item) => item.message.nonce ?? item.message.id}
           inverted
           contentContainerStyle={styles.list}
           onScroll={list.onListScroll}
@@ -406,9 +407,14 @@ export function MessageScreen({
               {item.isDayStart && <DateSeparator iso={item.message.createdAt} />}
               {/* C23 — Yanıtla her mesajda açık (eylem paneli de koşulsuz sunuyor); tek işlev. */}
               <SwipeToReply
-                onReply={() => replyTo(item.message)}
+                // C29: gecici/basarisiz mesajda kaydirarak yanit/duzenle kapali (iki islev de yok = jest kapali).
+                onReply={item.message.localStatus ? undefined : () => replyTo(item.message)}
                 // Düzenle yalnız kendi mesajımda: eylem panelindeki `isMine` koşuluyla aynı (yazar = ben).
-                onEdit={item.message.author.id === authUser?.id ? () => setEditTarget(item.message) : undefined}
+                onEdit={
+                  !item.message.localStatus && item.message.author.id === authUser?.id
+                    ? () => setEditTarget(item.message)
+                    : undefined
+                }
               >
               <MessageBubble
                 message={item.message}
@@ -422,6 +428,8 @@ export function MessageScreen({
                 onLongPress={() => actions.open(item.message)}
                 onPressAuthor={() => setProfileTarget(item.message.author)}
                 onToggleReaction={(emoji) => actions.toggleReaction(item.message, emoji)}
+                onRetry={() => retryOptimistic(item.message)}
+                onDiscard={() => discardOptimistic(item.message)}
               />
               </SwipeToReply>
             </View>

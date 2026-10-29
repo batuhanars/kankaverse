@@ -999,7 +999,14 @@
     "forwarded": "Mesaj iletildi.",
     "forwardedShort": "İletildi ✓",
     "forwardEmpty": "(boş mesaj)",
+    "forwardMoreFiles": "+{n} dosya",
     "forwardNoChannels": "İletecek bir DM yok. Önce bir kankayla sohbet başlat.",
+    "local": {
+      "failed": "Gönderilemedi",
+      "retry": "Tekrar dene",
+      "discard": "Sil",
+      "offline": "Bağlantı yok, gönderilemedi"
+    },
     "dateDivider": {
       "today": "Bugün",
       "yesterday": "Dün"

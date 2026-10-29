@@ -8,11 +8,19 @@ export const messagesApi = {
     return http.get<MessageDto[]>(`/channels/${channelId}/messages`, { params })
   },
   // Sprint 5 §4: content opsiyonel (≥1 attachment varsa boş içerik geçerli); attachmentIds opsiyonel
-  send(channelId: string, content: string, replyToId?: string, attachmentIds?: string[]) {
+  // C29: nonce yalnız iyimser (metin) gönderimde verilir; sunucu aynen yankılar.
+  send(
+    channelId: string,
+    content: string,
+    replyToId?: string,
+    attachmentIds?: string[],
+    nonce?: string,
+  ) {
     return http.post<MessageDto>(`/channels/${channelId}/messages`, {
       content: content || undefined,
       replyToId,
       attachmentIds: attachmentIds?.length ? attachmentIds : undefined,
+      nonce,
     })
   },
   // Sprint 6.2: mesaj düzenleme (kendi mesajı)

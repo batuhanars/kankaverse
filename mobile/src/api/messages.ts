@@ -107,6 +107,11 @@ export interface MessageDto {
   mentionsEveryone?: boolean;
   pinnedAt: string | null;
   reactions?: ReactionDto[];
+  /** C29 — sunucu, istekteki `nonce`'u cevapta ve `message.created`'da aynen yankılar. */
+  nonce?: string;
+  /** C29 — YALNIZ yerel (sunucudan gelmez): geçici (iyimser) mesajın durumu ve hata metni. */
+  localStatus?: 'sending' | 'failed';
+  localError?: string;
 }
 
 export const messagesApi = {
@@ -130,11 +135,14 @@ export const messagesApi = {
     content: string,
     replyToId?: string,
     attachmentIds?: string[],
+    /** C29 — yalnız iyimser (metin) gönderimde; sunucu aynen yankılar. */
+    nonce?: string,
   ): Promise<MessageDto> {
     const res = await http.post<MessageDto>(`/channels/${channelId}/messages`, {
       ...(content ? { content } : {}),
       ...(replyToId ? { replyToId } : {}),
       ...(attachmentIds?.length ? { attachmentIds } : {}),
+      ...(nonce ? { nonce } : {}),
     });
     return res.data;
   },

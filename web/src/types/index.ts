@@ -328,6 +328,11 @@ export interface MessageDto {
   // hesaplanır: "bana rolümden bahsedildi" bandı ve rol çipi bunu kullanır.
   mentionRoles?: string[]
   pinnedAt: string | null // Sprint V2 Pins — dolu ise sabitlenen mesaj
+  // C29 — iyimser gönderim: sunucu `nonce`'u cevapta ve message.created'da aynen yankılar.
+  nonce?: string
+  // C29 — YALNIZ yerel (sunucudan gelmez): geçici mesajın durumu ve hata metni.
+  localStatus?: 'sending' | 'failed'
+  localError?: string
 }
 
 // Sprint V2 — Özel kanal üye DTO (GET/POST /channels/:id/members)
