@@ -3,7 +3,8 @@ import { useI18n } from 'vue-i18n'
 
 /**
  * C34 — okundu tiki: mesaj metninin sonuna AKAN küçük satır içi simge (ayrı satır açmaz).
- * Yalnız iki durum: 'sent' tek tik (gönderildi), 'seen' çift tik (okundu). Renk nötr (ikincil yazı);
+ * Yalnız iki durum: 'sent' tek tik (gönderildi, ikincil yazı rengi), 'seen' çift tik (okundu, Kor).
+ * Kor yalnız web'de: mobilde kendi baloncuk zaten Kor olduğu için orada nötr (sahip kararı 2026-10-29);
  * ikon tek başına bilgi taşımasın diye `title` + `aria-label` i18n'den gelir.
  */
 defineProps<{ receipt: 'sent' | 'seen' }>()
@@ -13,7 +14,7 @@ const { t } = useI18n()
 <template>
   <span
     class="kv-receipt-tick ml-1 select-none"
-    style="color: var(--kv-text-muted);"
+    :style="`color: ${receipt === 'seen' ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)'};`"
     :title="t(`message.receipt.${receipt}`)"
     :aria-label="t(`message.receipt.${receipt}`)"
     role="img"
