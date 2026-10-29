@@ -11,6 +11,10 @@ import GameLine from '@/components/shared/GameLine.vue'
 import GameLogo from '@/components/shared/GameLogo.vue'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import FullProfileModal from '@/components/shared/FullProfileModal.vue'
+import { usersApi } from '@/api/users'
+import { useToastStore } from '@/stores/toast'
+import type { UserProfileCardDto } from '@/types'
 
 const props = defineProps<{ initialTab?: 'all' | 'pending' | 'blocked' }>()
 const emit = defineEmits<{ addFriend: []; openDm: [channelId: string] }>()
@@ -20,6 +24,7 @@ const friendsStore = useFriendsStore()
 const dmStore = useDmStore()
 const presenceStore = usePresenceStore()
 const activityStore = useActivityStore()
+const toast = useToastStore()
 
 // C16 — Kankalar satırı hover'dayken hareketli avatar (çevrimiçi ve çevrimdışı grupları)
 const hoveredFriendId = ref<string | null>(null)
@@ -81,6 +86,19 @@ async function openDm(userId: string) {
     emit('openDm', channel.id)
   } finally {
     dmLoading.value = null
+  }
+}
+
+// Satıra tıklayınca tam profil (sahip kararı 2026-10-29); DM'e mesaj düğmesinden ya da modaldan gidilir.
+const profileCard = ref<UserProfileCardDto | null>(null)
+
+async function openProfile(userId: string) {
+  openMenuId.value = null
+  try {
+    const { data } = await usersApi.getCard(userId)
+    profileCard.value = data
+  } catch {
+    toast.error(t('common.error'))
   }
 }
 
@@ -167,7 +185,7 @@ async function runConfirm() {
               type="button"
               class="group flex items-center gap-2.5 min-w-0 px-3 py-2 rounded-[var(--kv-radius-md)] cursor-pointer text-left"
               style="background-color: var(--kv-bg-elevated);"
-              @click="openDm(a.friend.user.id)"
+              @click="openProfile(a.friend.user.id)"
             >
               <div
                 class="w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[13px] font-bold text-white"
@@ -226,7 +244,7 @@ async function runConfirm() {
               </div>
 
               <!-- Ad + durum -->
-              <div class="flex-1 min-w-0 cursor-pointer" @click="openDm(f.user.id)">
+              <div class="flex-1 min-w-0 cursor-pointer" @click="openProfile(f.user.id)">
                 <p class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</p>
                 <GameLine v-if="gameOf(f.user.id)" class="text-[11px]" :name="gameOf(f.user.id)!.name" />
                 <MarqueeText v-else class="text-[11px]" :style="{ color: presenceStatusColor(f.user.id) }" :text="presenceStatusLabel(f.user.id)" />
@@ -320,7 +338,7 @@ async function runConfirm() {
               </div>
 
               <!-- Ad + durum -->
-              <div class="flex-1 min-w-0 cursor-pointer" @click="openDm(f.user.id)">
+              <div class="flex-1 min-w-0 cursor-pointer" @click="openProfile(f.user.id)">
                 <p class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</p>
                 <MarqueeText class="text-[11px]" style="color: var(--kv-text-muted);" :text="presenceStatusLabel(f.user.id)" />
               </div>
@@ -496,6 +514,13 @@ async function runConfirm() {
         {{ t('home.addFriendBtn') }}
       </button>
     </div>
+
+    <FullProfileModal
+      v-if="profileCard"
+      :card="profileCard"
+      @close="profileCard = null"
+      @open-dm="(id: string) => { profileCard = null; emit('openDm', id) }"
+    />
 
     <ConfirmDialog
       v-if="confirmState.show"

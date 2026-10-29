@@ -20,6 +20,12 @@ const STEAM_ICON_BASE = 'https://cdn.fastly.steamstatic.com/steamcommunity/publi
 const FETCH_TIMEOUT_MS = 5000;
 const MAX_ICON_BYTES = 256 * 1024;
 const ICON_SIZE = 64;
+/**
+ * Steam simgesinin kenarında koyu çerçeve var (32 px kaynakta ölçüm: 0. satır/sütun ort. parlaklık ~1-2,
+ * 1. satır/sütun ~9, içerik 2. pikselde başlıyor, parlaklık 40-90). Her kenardan kenarın %6'sı (32 px'te
+ * 2 px, en az 1) kırpılır; yoksa yuvarlak köşemizle birlikte "arkada siyah kutu" görünür.
+ */
+const BORDER_CROP_RATIO = 0.06;
 const ICON_PREFIX = 'game-icons';
 const ICON_HASH = /^[0-9a-f]{40}$/;
 
@@ -124,13 +130,24 @@ export class GameIconService implements OnApplicationBootstrap {
     if (!hash) return null;
     const raw = await this.downloadIcon(appId, hash);
     if (!raw) return null;
-    const webp = await sharp(raw, { limitInputPixels: 1024 * 1024 })
+    const webp = await (await this.cropBorder(raw))
       .resize(ICON_SIZE, ICON_SIZE, { fit: 'cover' })
       .webp({ quality: 85 })
       .toBuffer();
     const key = `${ICON_PREFIX}/${randomUUID()}.webp`;
     await this.storage.putPublic(key, webp, 'image/webp');
     return `${this.config.get<string>('s3.publicBaseUrl')!}/${key}`;
+  }
+
+  /** Kenarlardan oransal kırpılmış sharp hattı (kaynak çok küçükse kırpma atlanır). */
+  private async cropBorder(raw: Buffer): Promise<sharp.Sharp> {
+    const opts = { limitInputPixels: 1024 * 1024 };
+    const { width = 0, height = 0 } = await sharp(raw, opts).metadata();
+    const dx = Math.max(1, Math.round(width * BORDER_CROP_RATIO));
+    const dy = Math.max(1, Math.round(height * BORDER_CROP_RATIO));
+    const img = sharp(raw, opts);
+    if (width <= dx * 2 + 1 || height <= dy * 2 + 1) return img;
+    return img.extract({ left: dx, top: dy, width: width - dx * 2, height: height - dy * 2 });
   }
 
   private async fetchIconHash(appId: string): Promise<string | null> {

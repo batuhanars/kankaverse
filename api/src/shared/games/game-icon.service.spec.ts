@@ -59,6 +59,35 @@ describe('GameIconService (C31c §1)', () => {
     expect(url).toBe(`https://cdn.example.com/${key}`);
   });
 
+  it('kenardaki koyu çerçeve kırpılır (32 px kaynakta her kenardan 2 px)', async () => {
+    const buf = await sharp({
+      create: { width: 32, height: 32, channels: 3, background: '#000000' },
+    })
+      .composite([
+        {
+          input: await sharp({
+            create: { width: 28, height: 28, channels: 3, background: '#ffffff' },
+          })
+            .png()
+            .toBuffer(),
+          left: 2,
+          top: 2,
+        },
+      ])
+      .png()
+      .toBuffer();
+    fetchMock.mockResolvedValueOnce(itemsResponse(HASH)).mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ 'content-type': 'image/png', 'content-length': String(buf.length) }),
+      arrayBuffer: () =>
+        Promise.resolve(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length)),
+    });
+    await service.fetchAndStore('1');
+    const body = storageMock.putPublic.mock.calls[0][1];
+    const { data } = await sharp(body).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect(Math.min(...data)).toBeGreaterThan(240);
+  });
+
   it('başarısızlık yolları null: karma yok / geçersiz karma / image olmayan içerik / HTTP hatası', async () => {
     fetchMock.mockResolvedValueOnce(itemsResponse(undefined));
     expect(await service.fetchAndStore('1')).toBeNull();

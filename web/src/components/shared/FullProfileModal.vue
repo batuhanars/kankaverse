@@ -349,7 +349,7 @@ async function runConfirm() {
                 {{ t('profile.activity.current') }}
               </h3>
               <div class="rounded-[var(--kv-radius-md)] p-4 flex items-center gap-4" style="background-color: var(--kv-bg-elevated);">
-                <GameLogo :icon-url="game.iconUrl" :size="64" />
+                <GameLogo :icon-url="game.iconUrl" :size="40" />
                 <div class="min-w-0 flex-1">
                   <p class="text-[11px] font-bold uppercase tracking-widest" style="color: var(--kv-text-muted);">
                     {{ t('profile.activity.playing') }}

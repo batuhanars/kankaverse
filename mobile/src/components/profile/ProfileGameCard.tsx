@@ -6,7 +6,7 @@ import { formatElapsed } from '@/utils/formatElapsed';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
-const LOGO = 64;
+const LOGO = 40;
 
 /** C31e: oyun başlangıcından beri geçen süre, saniyede bir tazelenir; bileşen kalkınca zamanlayıcı temizlenir. */
 function useElapsed(startedAt: string | null): string | null {

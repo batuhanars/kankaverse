@@ -68,3 +68,11 @@
 
 **OUT:** Şimdi Aktif'te sesli kanaldakiler (R7 yüzeyi, ayrı karar) · Epic ve Steam karşılığı olmayan elle liste oyunlarına logo ·
 mobilde logo/Şimdi Aktif · SD/HD · oyun simgesi yönetim ekranı · müzik/Spotify kartı.
+
+## §7 Ek (2026-10-29): logo kırpma ve boyut
+
+Sahip turundan düzeltme (§1 oyun logosu).
+
+1. **Kenar kırpma:** Steam `community_icon` (32x32 JPEG) kenarında koyu çerçeve taşıyor; yuvarlak köşemizle "logonun arkasında siyah kutu" görünüyordu. `GameIconService` simgeyi işlerken (sharp) önce her kenardan kenarın %6'sını (en az 1 px; 32 px kaynakta 2 px) `extract` eder, sonra 64x64 WebP üretir. Ölçüm (appid 1466860): 0. satır/sütun ort. parlaklık ~1-2, 1. satır/sütun ~9 (JPEG halkalanması), içerik 2. pikselde başlıyor (parlaklık 40-90). 2 px yeterli; kırpma sonrası kenar piksellerinin ort. parlaklığı 54 (en koyu 24), siyah bant yok.
+2. **Yeniden üretim:** migration `20261029200000_c31c_game_icon_regen` mevcut `Game.iconUrl` değerlerini NULL yapar. CURATED eşlemeliler açılışta (`backfillCurated`), STEAM oyunları ilk resolve'da (`ensure`, iconUrl null ise) yeniden üretilir.
+3. **Görüntüleme boyutu en fazla 40 px** (kaynak 64 px olduğundan 56-64 px bulanıktı): web Etkinlik kartı logosu 64 → 40; mobil `FriendsStrip` logo kutusu 56 → 40, `ProfileGameCard` 64 → 40. Yuvarlak köşe oranı korundu. Diğer web `GameLogo` kullanımları (24/28/32) değişmedi.

@@ -12,7 +12,7 @@ import { theme } from "@/theme";
 const AVATAR = 48;
 const DOT = 14;
 const TILE_PAD = 10;
-const LOGO = 56;
+const LOGO = 40;
 const GAME_TEXT_WIDTH = 84;
 
 // Çevrimdışı da gri nokta alır: şeritte "durum yok" ile "çevrimdışı" ayrımı olmasın.
