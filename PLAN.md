@@ -270,7 +270,7 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
 
 ### Track F — İstemciler (sahip sırası: Electron masaüstü → RN mobil)
 - **F1 Electron masaüstü** — 🟡 **AKTİF (sözleşme yazıldı 2026-06-18):** `contracts/SPRINT_ELECTRON_CONTRACT.md`. **Load-remote** (pencere `https://kankaverse.com` yükler — bundle YOK; cookie `sameSite=lax` korunur, sahip onaylı). v1: tray+kapat-tepsiye + tek-instance + **native OS bildirimi** (web `Notification` API → Electron toast, görünür-değilken) + Windows installer. **R7-nötr** (istemci kabuğu). **v2'ye ertelendi:** B2 etkinlik hatırlatması (önce sunucu reminder job), electron-updater, Mac/Linux build, PWA bildirim.
-  - **F1 v2 masaüstü (sahip kararı 2026-10-29):** 🟡 **SÖZLEŞMELER YAZILDI.** (1) **C31a otomatik güncelleme**
+  - **F1 v2 masaüstü (sahip kararı 2026-10-29):** ✅ **TAMAMLANDI 2026-10-29** (C31a güncelleyici, C31b algılama, C31c yüzeyler, C31d mobil şerit, C31e profil kartı, C31f son etkinlik; ayrıca C32 sesli mesaj eşitleme, C33 yapay zeka kredi + pasif tanıtım). Mobil vc40 derlendi, sahip Play'e entegrasyonlar bitince gönderecek. Sıradaki: gelen webhook → Steam/Twitch/Kick bağlama. (1) **C31a otomatik güncelleme**
     `contracts/SPRINT_C31A_DESKTOP_UPDATER_CONTRACT.md` (electron-updater, kendi VPS, bildirimli; yukarıdaki v2 ertelemesinden
     buraya taşındı). (2) **C31b oyun algılama** `contracts/SPRINT_C31B_GAME_ACTIVITY_CONTRACT.md` ("oynuyor" durumu + yayın
     önerisi; R7 presence yüzeyi). C31a sahip turu geçmeden C31b başlamaz. **Bilinçli bahis:** masaüstü oranı düşük çıksa da
