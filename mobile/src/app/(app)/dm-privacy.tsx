@@ -78,6 +78,26 @@ export default function DmPrivacyScreen() {
     }
   }
 
+  // C31f — "Son oynadığım oyunlar" (7 gün saklanır). Minör hesapta satır hiç çizilmez (sunucu da reddeder).
+  const [savingRecent, setSavingRecent] = useState(false);
+  const recentActivity = user?.showRecentActivity ?? false;
+
+  async function toggleRecentActivity(next: boolean) {
+    if (savingRecent || next === recentActivity) return;
+    setSavingRecent(true);
+    setErrorMessage('');
+    setSavedNotice('');
+    try {
+      const updated = await usersApi.updateProfile({ showRecentActivity: next });
+      useAuthStore.setState({ user: updated });
+      setSavedNotice(next ? t('settings.dmPolicy.saved') : t('settings.recentActivity.deleted'));
+    } catch (e) {
+      setErrorMessage(extractErrorMessage(e));
+    } finally {
+      setSavingRecent(false);
+    }
+  }
+
   async function selectPolicy(policy: DmPolicy) {
     if (policy === currentPolicy || saving) return;
     setSaving(policy);
@@ -160,6 +180,23 @@ export default function DmPrivacyScreen() {
             thumbColor={theme.colors.textPrimary}
           />
         </View>
+
+        {/* C31f — son etkinlik. Yalnız reşit hesap görür. */}
+        {user.isMinor === false ? (
+          <View style={styles.receiptCard}>
+            <View style={styles.optionText}>
+              <Text style={styles.optionTitle}>{t('settings.recentActivity.label')}</Text>
+              <Text style={styles.optionDesc}>{t('settings.recentActivity.description')}</Text>
+            </View>
+            <Switch
+              value={recentActivity}
+              onValueChange={toggleRecentActivity}
+              disabled={savingRecent}
+              trackColor={{ true: theme.colors.accent500, false: theme.colors.bgRail }}
+              thumbColor={theme.colors.textPrimary}
+            />
+          </View>
+        ) : null}
 
         {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
         {savedNotice ? <Text style={styles.saved}>{savedNotice}</Text> : null}

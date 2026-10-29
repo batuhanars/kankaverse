@@ -10,6 +10,7 @@ const prismaMock = {
   pushToken: { deleteMany: jest.fn() },
   notificationPref: { deleteMany: jest.fn() },
   recoveryCode: { deleteMany: jest.fn() },
+  recentGame: { deleteMany: jest.fn() },
   $transaction: jest.fn(),
 };
 
@@ -30,9 +31,10 @@ function resetMocks() {
   prismaMock.pushToken.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.notificationPref.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.recoveryCode.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.recentGame.deleteMany.mockResolvedValue({ count: 0 });
   // Varsayılan: interaktif transaction, tx = prismaMock'un kendisi
-  prismaMock.$transaction.mockImplementation(async (fn: (tx: typeof prismaMock) => Promise<unknown>) =>
-    fn(prismaMock),
+  prismaMock.$transaction.mockImplementation(
+    async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock),
   );
 }
 

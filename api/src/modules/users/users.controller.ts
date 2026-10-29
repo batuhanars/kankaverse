@@ -48,6 +48,15 @@ export class UsersController {
     return this.usersService.getUserCard(user.id, targetId, guildId);
   }
 
+  @Get(':id/recent-activity')
+  @ApiOperation({
+    summary:
+      'Son etkinlik (son 7 günde oynanan oyunlar). Hedefin ayarı kapalı ya da görünürlük yoksa boş dizi.',
+  })
+  getRecentActivity(@CurrentUser() user: { id: string }, @Param('id') targetId: string) {
+    return this.usersService.getRecentActivity(user.id, targetId);
+  }
+
   // ─── C8: Avatar (self) ────────────────────────────────────────────────────
 
   @Post('me/avatar/presign')

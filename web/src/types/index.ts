@@ -62,7 +62,14 @@ export interface UserDto {
   quickReactions?: string[] // Sprint C24 — hızlı tepki şeridi (etkin liste, her zaman 5); bayat oturumda yok olabilir
   showGameActivity?: boolean | null // C31b — ham ayar (null = hiç dokunulmadı)
   gameActivityEffective?: boolean // C31b — yaşa göre varsayılan uygulanmış hâl (sunucu hesaplar)
+  showRecentActivity?: boolean // C31f — son oynanan oyunlar ayarı (varsayılan kapalı; minörde hep false)
   readReceipts: boolean // C12 — okundu bilgisi paylaşımı (karşılıklı; kapatan karşı tarafınkini de göremez)
+}
+
+// C31f — GET /users/:id/recent-activity satırı
+export interface RecentGameDto {
+  game: { id: string; name: string; iconUrl: string | null; storeUrl: string | null }
+  lastPlayedAt: string
 }
 
 // Sprint 3 §5 — sosyal katman DTO'ları

@@ -407,6 +407,26 @@ async function toggleGameActivity(next: boolean) {
   }
 }
 
+// ── C31f: "Son oynadığım oyunlar" ────────────────────────────────────────────
+// Varsayılan kapalı. Minör hesapta ayar hiç görünmez (sunucu da true kabul etmez).
+const savingRecentActivity = ref(false)
+const recentActivity = computed(() => authStore.user?.showRecentActivity ?? false)
+
+async function toggleRecentActivity(next: boolean) {
+  if (savingRecentActivity.value || next === recentActivity.value) return
+  savingRecentActivity.value = true
+  try {
+    const { data } = await usersApi.updateProfile({ showRecentActivity: next })
+    authStore.updateUser(data)
+    toast.success(next ? t('toast.privacySaved') : t('settings.recentActivity.deleted'))
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message ?? t('toast.saveError'))
+  } finally {
+    savingRecentActivity.value = false
+  }
+}
+
 async function toggleReadReceipts(next: boolean) {
   if (savingReceipts.value || next === readReceipts.value) return
   savingReceipts.value = true
@@ -927,6 +947,29 @@ async function toggleReadReceipts(next: boolean) {
                       :model-value="gameActivity"
                       :disabled="savingGameActivity"
                       @update:model-value="toggleGameActivity"
+                    />
+                  </div>
+                </section>
+
+                <!-- ── C31f: Son oynadığım oyunlar (yalnız reşit hesap) ── -->
+                <section
+                  v-if="!authStore.user?.isMinor"
+                  class="rounded-[var(--kv-radius-lg)] border p-5"
+                  style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                      <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+                        {{ t('settings.recentActivity.label') }}
+                      </h3>
+                      <p class="text-[13px] mt-1" style="color: var(--kv-text-secondary);">
+                        {{ t('settings.recentActivity.description') }}
+                      </p>
+                    </div>
+                    <KvSwitch
+                      :model-value="recentActivity"
+                      :disabled="savingRecentActivity"
+                      @update:model-value="toggleRecentActivity"
                     />
                   </div>
                 </section>

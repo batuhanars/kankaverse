@@ -312,6 +312,11 @@
       "label": "Oynadığım oyunu göster",
       "description": "Oynadığın oyun, kanka listende ve ortak ortamlarındaki üye listesinde adının altında görünür. Reşit olmayan hesaplarda bu kapalı gelir, açsan da yalnız kankaların görür."
     },
+    "recentActivity": {
+      "label": "Son oynadığım oyunlar",
+      "description": "Son 7 günde oynadığın oyunlar, oyun etkinliğini görebilen kişilerin gördüğü profilinde listelenir. Yalnız oyunun adı ve en son ne zaman oynadığın saklanır, kaç saat oynadığın tutulmaz. Kapatırsan geçmişin hemen silinir.",
+      "deleted": "Geçmişin silindi."
+    },
     "readReceipts": {
       "label": "Okundu bilgisi",
       "description": "Mesajını okuduğunda karşı taraf bunu görsün. Kapatırsan senin okuduğun görünmez, ama sen de kimsenin okuduğunu göremezsin."
@@ -364,6 +369,11 @@
       "tab": "Etkinlik",
       "current": "Mevcut Etkinlik",
       "playing": "Oynuyor",
+      "recent": "Son Etkinlik",
+      "justNow": "az önce",
+      "minutesAgo": "{n} dakika önce",
+      "hoursAgo": "{n} saat önce",
+      "daysAgo": "{n} gün önce",
       "viewOnSteam": "Steam'de gör"
     },
     "bio": "Biyografi",
@@ -1791,6 +1801,8 @@
       "s2Item2": "gönderdiğin mesajlar, paylaştığın dosyalar/görseller, ortam/kanal/DM katılımların.",
       "s2Item3Label": "Kullanım/güvenlik:",
       "s2Item3": "oturum bilgisi, cihaz/bağlantı verisi (kötüye kullanım önleme + güvenlik).",
+      "s2Item4Label": "Son oynanan oyunlar:",
+      "s2Item4": "yalnız \"Son oynadığım oyunlar\" ayarını kendin açarsan, son 7 günde oynadığın oyunların adı ve en son ne zaman oynadığın saklanır. Amaç, bunu profilinde göstermektir. Ayar varsayılan olarak kapalıdır. Kaç saat oynadığın ya da hangi saatlerde oynadığın kaydedilmez. 7 günü geçen kayıtlar kendiliğinden silinir. Ayarı kapatırsan ya da hesabını silersen geçmişin hemen silinir. Reşit olmayan hesaplardan bu veri hiçbir şekilde toplanmaz.",
       "s3Title": "3. Şifreleme ve erişim (ŞEFFAFLIK)",
       "s3Item1": "Uçtan-uca şifreleme (E2EE) YOKTUR. İçerik, moderasyon ve güvenlik (özellikle çocuk güvenliği) amacıyla sunucu tarafında erişilebilir. Bunu açıkça beyan ediyoruz.",
       "s3Item2": "İçeriğe erişim yetkili moderasyon süreçleriyle sınırlıdır.",

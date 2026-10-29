@@ -114,6 +114,7 @@ model User {
   readReceipts        Boolean            @default(true) // C12: okundu bilgisi paylaşımı (karşılıklı, sözleşme §2)
   quickReactions      String[]           @default([]) // C24: hızlı tepki şeridi; boş = varsayılan beşli
   showGameActivity    Boolean?           // C31b §2: "Oynadığım oyunu göster". null = yaşa göre varsayılan (yetişkin açık, minör kapalı)
+  showRecentActivity  Boolean            @default(false) // C31f: "Son oynadığım oyunlar" (7 gün saklanır). Varsayılan KAPALI; minör asla true olamaz
   emailVerifiedAt     DateTime?
   avatarUrl           String?
   bio                 String?
@@ -160,6 +161,7 @@ model User {
   notificationsActed  Notification[]     @relation("NotificationActor")
   notificationPrefs   NotificationPref[] @relation("UserNotificationPrefs")
   pushTokens          PushToken[]
+  recentGames         RecentGame[]
   aiVideoGenerations  AiVideoGeneration[]
 }
 
@@ -180,8 +182,23 @@ model Game {
   hidden      Boolean    @default(false) // admin kaldırdı: yayılmaz, tekrar eklenmez
   iconUrl     String?    // C31c: sunucunun Steam'den alıp 64x64 WebP yaptığı kendi (cdn) adresimiz
   createdAt   DateTime   @default(now())
+  recentGames RecentGame[]
 
   @@unique([source, externalId])
+}
+
+/// C31f: son oynanan oyun. Oturum/süre günlüğü DEĞİL: kişi başına oyun başına yalnız son oynama anı (upsert).
+/// 7 günden eski satır günlük job ile silinir; ayar kapanınca ve hesap imhasında hemen silinir.
+model RecentGame {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId       String
+  game         Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  lastPlayedAt DateTime
+
+  @@unique([userId, gameId])
+  @@index([lastPlayedAt])
 }
 
 model AuthToken {

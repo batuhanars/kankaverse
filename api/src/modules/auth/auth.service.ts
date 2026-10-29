@@ -831,8 +831,11 @@ export class AuthService implements OnModuleInit {
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: userId },
-        data: { deletionRequestedAt: new Date() },
+        // C31f: son oynanan oyunlar 30 günlük bekleme beklenmeden HEMEN silinir ve ayar kapanır
+        // (gizlilik metni "hesabını silersen geçmişin hemen silinir" diyor; ayar kapalıyken yazım da durur).
+        data: { deletionRequestedAt: new Date(), showRecentActivity: false },
       }),
+      this.prisma.recentGame.deleteMany({ where: { userId } }),
       this.prisma.session.updateMany({
         where: { userId, revokedAt: null },
         data: { revokedAt: new Date() },

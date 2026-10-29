@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DmPolicy, User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -12,6 +12,8 @@ import { SetMediaDto } from '../../shared/media/dto/set-media.dto';
 import { DmPermissionService } from '../../shared/dm-permission/dm-permission.service';
 import { VoiceService } from '../voice/voice.service';
 import { PresenceService } from '../../shared/presence/presence.service';
+import { storeUrlFor } from '../../shared/games/games.service';
+import { RECENT_GAME_RETENTION_DAYS } from '../../common/jobs/recent-game-purge.job';
 
 export interface MutualFriendDto {
   id: string;
@@ -67,6 +69,10 @@ export interface UserProfileCardDto {
   // C10 — hedef aktif seste + caller erişebiliyorsa; aksi hâlde null.
   voiceStatus: UserCardVoiceDto | null;
 }
+
+/** C31f: son etkinlik saklama süresi (gün) ve profilde gösterilen en fazla oyun. */
+export const RECENT_ACTIVITY_DAYS = RECENT_GAME_RETENTION_DAYS;
+const RECENT_ACTIVITY_MAX = 10;
 
 @Injectable()
 export class UsersService {
@@ -408,6 +414,7 @@ export class UsersService {
       readReceipts?: boolean;
       quickReactions?: string[];
       showGameActivity?: boolean;
+      showRecentActivity?: boolean;
     } = {};
     if (dto.bio !== undefined) data.bio = dto.bio;
     if (dto.dmPolicy !== undefined) data.dmPolicy = dto.dmPolicy;
@@ -415,11 +422,28 @@ export class UsersService {
     if (dto.readReceipts !== undefined) data.readReceipts = dto.readReceipts;
     if (dto.quickReactions !== undefined) data.quickReactions = dto.quickReactions;
     if (dto.showGameActivity !== undefined) data.showGameActivity = dto.showGameActivity;
+    if (dto.showRecentActivity !== undefined) {
+      data.showRecentActivity = dto.showRecentActivity;
+      // C31f (R7/KVKK): minör için ayar AÇILAMAZ (sunucu otoritesi; istemci gizlese bile).
+      if (dto.showRecentActivity) {
+        const self = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { isMinor: true },
+        });
+        if (!self || self.isMinor) {
+          throw new ForbiddenException('Bu özellik hesabın için kullanılamaz.');
+        }
+      }
+    }
 
     const user = await this.prisma.user.update({
       where: { id: userId },
       data,
     });
+    // C31f: son etkinlik ayarı ya da oyun paylaşımı kapanınca kayıtlı geçmiş HEMEN silinir.
+    if (dto.showRecentActivity === false || dto.showGameActivity === false) {
+      await this.prisma.recentGame.deleteMany({ where: { userId } });
+    }
     // C31b §2.6: ayar değişince oyun satırı hemen güncellenir. Kapanırsa bellekteki oyun silinir
     // (yeniden açınca bayat oyun sızmasın) ve `activity:update { game: null }` yayılır; açılırsa
     // masaüstünün o an bildirdiği oyun (varsa) kitleye çıkar.
@@ -428,6 +452,41 @@ export class UsersService {
       await this.presence.broadcastActivity(userId);
     }
     return this.userDto(user);
+  }
+
+  /**
+   * C31f — GET /users/:id/recent-activity. Görünürlük: hedefin `showRecentActivity` açık VE
+   * `canSeeActivity` (C31b kuralı, kopya kural yok; kendi profilinde kendisi görür). Değilse boş
+   * dizi: varlık/ayar sızdırmaz. 7 günden eski (job henüz silmemiş olsa bile) ve gizli oyun dönmez.
+   */
+  async getRecentActivity(viewerId: string, targetId: string) {
+    const target = await this.prisma.user.findUnique({
+      where: { id: targetId },
+      select: { showRecentActivity: true, isMinor: true },
+    });
+    if (!target || !target.showRecentActivity || target.isMinor) return [];
+    if (!(await this.presence.canSeeActivity(viewerId, targetId))) return [];
+    const since = new Date(Date.now() - RECENT_ACTIVITY_DAYS * 24 * 60 * 60 * 1000);
+    const rows = await this.prisma.recentGame.findMany({
+      where: { userId: targetId, lastPlayedAt: { gte: since }, game: { hidden: false } },
+      orderBy: { lastPlayedAt: 'desc' },
+      take: RECENT_ACTIVITY_MAX,
+      select: {
+        lastPlayedAt: true,
+        game: {
+          select: { id: true, name: true, iconUrl: true, source: true, externalId: true },
+        },
+      },
+    });
+    return rows.map((row) => ({
+      game: {
+        id: row.game.id,
+        name: row.game.name,
+        iconUrl: row.game.iconUrl,
+        storeUrl: storeUrlFor(row.game.source, row.game.externalId),
+      },
+      lastPlayedAt: row.lastPlayedAt.toISOString(),
+    }));
   }
 
   // ─── C8: Avatar (self) ────────────────────────────────────────────────────

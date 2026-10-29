@@ -11,6 +11,7 @@ const prismaMock = {
   friendship: { findFirst: jest.fn(), findMany: jest.fn() },
   userBlock: { findUnique: jest.fn() },
   voiceSession: { findFirst: jest.fn() }, // C10 — kart ses durumu
+  recentGame: { deleteMany: jest.fn(), findMany: jest.fn() }, // C31f
 };
 
 // C10 — canDm (inline mesaj kutusu kapısı) + VoiceService (ses durumu) mock'ları

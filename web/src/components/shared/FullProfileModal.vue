@@ -23,7 +23,8 @@ import { formatElapsed } from '@/utils/formatElapsed'
 import GameLogo from '@/components/shared/GameLogo.vue'
 import GamepadIcon from '@/components/shared/GamepadIcon.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
-import type { UserProfileCardDto } from '@/types'
+import { usersApi } from '@/api/users'
+import type { RecentGameDto, UserProfileCardDto } from '@/types'
 
 const props = defineProps<{ card: UserProfileCardDto }>()
 const emit = defineEmits<{ close: []; openDm: [channelId: string] }>()
@@ -65,11 +66,28 @@ async function openDmWith(userId: string) {
 const activityStore = useActivityStore()
 const game = computed(() => activityStore.getGame(props.card.id))
 
+// C31f: son 7 günde oynananlar. Ayar kapalı/görünürlük yoksa sunucu boş dizi verir; hata da boş sayılır.
+const recentGames = ref<RecentGameDto[]>([])
+const hasActivity = computed(() => !!game.value || recentGames.value.length > 0)
+onMounted(async () => {
+  try {
+    recentGames.value = (await usersApi.getRecentActivity(props.card.id)).data
+  } catch { /* son etkinlik ikincil bilgi: yüklenemezse sekme yalnız mevcut oyunla çalışır */ }
+})
+const relativeFormat = new Intl.RelativeTimeFormat('tr', { numeric: 'auto' })
+function relativeTime(iso: string): string {
+  const minutes = Math.round((new Date(iso).getTime() - now.value) / 60000)
+  if (Math.abs(minutes) < 60) return relativeFormat.format(Math.min(minutes, -1), 'minute')
+  const hours = Math.round(minutes / 60)
+  if (Math.abs(hours) < 24) return relativeFormat.format(hours, 'hour')
+  return relativeFormat.format(Math.round(hours / 24), 'day')
+}
+
 type Tab = 'activity' | 'friends' | 'guilds'
 const pickedTab = ref<Tab | null>(game.value ? 'activity' : 'friends')
-// Oyun bitince etkinlik sekmesi kaybolur, ortak kankalara düşer.
+// Etkinlik kalmayınca (oyun bitti, son etkinlik de yok) sekme kaybolur, ortak kankalara düşer.
 const activeTab = computed<Tab>({
-  get: () => (pickedTab.value === 'activity' && !game.value ? 'friends' : (pickedTab.value ?? 'friends')),
+  get: () => (pickedTab.value === 'activity' && !hasActivity.value ? 'friends' : (pickedTab.value ?? 'friends')),
   set: (v) => { pickedTab.value = v },
 })
 
@@ -289,7 +307,7 @@ async function runConfirm() {
           <div class="px-6 pt-6 shrink-0">
             <div class="flex gap-1 border-b" style="border-color: var(--kv-border-subtle);">
               <button
-                v-if="game"
+                v-if="hasActivity"
                 type="button"
                 class="px-3 py-2.5 text-[13px] font-semibold cursor-pointer transition-colors -mb-px border-b-2"
                 :style="activeTab === 'activity'
@@ -325,7 +343,8 @@ async function runConfirm() {
           <!-- Liste -->
           <div class="flex-1 overflow-y-auto px-4 py-3">
             <!-- Etkinlik -->
-            <div v-if="activeTab === 'activity' && game" class="px-2 py-2">
+            <div v-if="activeTab === 'activity'" class="px-2 py-2">
+              <template v-if="game">
               <h3 class="text-[11px] font-bold uppercase tracking-widest mb-3" style="color: var(--kv-text-muted);">
                 {{ t('profile.activity.current') }}
               </h3>
@@ -350,6 +369,25 @@ async function runConfirm() {
                   {{ t('profile.activity.viewOnSteam') }}
                 </button>
               </div>
+              </template>
+
+              <template v-if="recentGames.length > 0">
+                <h3 class="text-[11px] font-bold uppercase tracking-widest mb-3" :class="{ 'mt-5': game }" style="color: var(--kv-text-muted);">
+                  {{ t('profile.activity.recent') }}
+                </h3>
+                <ul class="flex flex-col gap-1">
+                  <li
+                    v-for="item in recentGames"
+                    :key="item.game.id"
+                    class="flex items-center gap-3 px-3 py-2 rounded-[var(--kv-radius-md)]"
+                    style="background-color: var(--kv-bg-elevated);"
+                  >
+                    <GameLogo :icon-url="item.game.iconUrl" :size="32" />
+                    <span class="min-w-0 flex-1 truncate text-[14px] font-medium" style="color: var(--kv-text-primary);">{{ item.game.name }}</span>
+                    <span class="shrink-0 text-[12px]" style="color: var(--kv-text-muted);">{{ relativeTime(item.lastPlayedAt) }}</span>
+                  </li>
+                </ul>
+              </template>
             </div>
 
             <!-- Ortak Kankalar -->

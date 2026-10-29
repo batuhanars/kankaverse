@@ -1,5 +1,5 @@
 import http from './axios'
-import type { UserProfileCardDto, UserDto, DmPolicy } from '@/types'
+import type { UserProfileCardDto, UserDto, DmPolicy, RecentGameDto } from '@/types'
 
 // Sprint C5 §2 — PATCH /users/me body (yalnız verilen alanlar güncellenir)
 export interface UpdateProfilePayload {
@@ -8,6 +8,7 @@ export interface UpdateProfilePayload {
   bannerColor?: string | null // profil afiş rengi preset anahtarı (veya null=varsayılan)
   readReceipts?: boolean // C12 — okundu bilgisi paylaşımı (karşılıklı)
   showGameActivity?: boolean // C31b — "Oynadığım oyunu göster"
+  showRecentActivity?: boolean // C31f — "Son oynadığım oyunlar" (7 gün saklanır; minörde sunucu 403 verir)
   quickReactions?: string[] // C24 — tam 5 emoji; boş dizi = varsayılana dön
 }
 
@@ -39,6 +40,9 @@ export const usersApi = {
       `/users/${userId}/card`,
       guildId ? { params: { guildId } } : undefined,
     ),
+  // C31f — son 7 günde oynanan oyunlar (ayar kapalı ya da görünürlük yoksa boş dizi)
+  getRecentActivity: (userId: string) =>
+    http.get<RecentGameDto[]>(`/users/${userId}/recent-activity`),
   // Sprint C5 §2 — kendi profil/gizlilik güncelle → güncel UserDto
   updateProfile: (payload: UpdateProfilePayload) => http.patch<UserDto>('/users/me', payload),
   // Sprint C8 §5 — avatar (self, VerifiedEmail)

@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
-import type { UserCardDto } from '@/api/users';
+import { usersApi, type RecentGameDto, type UserCardDto } from '@/api/users';
+import { formatAgo } from '@/utils/formatAgo';
 import { ProfileHeader } from '../me/ProfileHeader';
 import { useActivityStore, selectGame } from '@/stores/activity';
 import { ProfileGameCard } from './ProfileGameCard';
@@ -47,6 +48,25 @@ export function ProfileSheetBody({ username, avatarUrl, card, identityFooter }: 
   const roles = card?.roles ?? [];
   const game = useActivityStore(selectGame(card?.id));
 
+  // C31f: son 7 günde oynananlar. Ayar kapalı/görünürlük yoksa sunucu boş dizi verir; hata da boş sayılır.
+  const [recentGames, setRecentGames] = useState<RecentGameDto[]>([]);
+  const cardId = card?.id;
+  useEffect(() => {
+    if (!cardId) return;
+    let cancelled = false;
+    usersApi
+      .getRecentActivity(cardId)
+      .then((rows) => {
+        if (!cancelled) setRecentGames(rows);
+      })
+      .catch(() => {
+        /* ikincil bilgi: yüklenemezse bölüm çizilmez */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cardId]);
+
   return (
     <View>
       <ProfileHeader
@@ -62,6 +82,27 @@ export function ProfileSheetBody({ username, avatarUrl, card, identityFooter }: 
       {game ? (
         <View style={styles.section}>
           <ProfileGameCard game={game} />
+        </View>
+      ) : null}
+
+      {recentGames.length > 0 ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('profile.activity.recent')}</Text>
+          {recentGames.map((item) => (
+            <View key={item.game.id} style={styles.mutualRow}>
+              {item.game.iconUrl ? (
+                <Image source={{ uri: item.game.iconUrl }} style={styles.mutualIcon} />
+              ) : (
+                <View style={[styles.mutualIcon, styles.mutualIconFallback]}>
+                  <Text style={styles.mutualIconText}>{item.game.name.charAt(0).toUpperCase()}</Text>
+                </View>
+              )}
+              <Text style={styles.mutualName} numberOfLines={1}>
+                {item.game.name}
+              </Text>
+              <Text style={styles.ago}>{formatAgo(item.lastPlayedAt)}</Text>
+            </View>
+          ))}
         </View>
       ) : null}
 
@@ -154,6 +195,7 @@ const ICON = 28;
 const GUTTER = theme.layout.panelGap * 1.5;
 
 const styles = StyleSheet.create({
+  ago: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs },
   // İkon şeridi adın hemen altında, kimlik kartının içinde (R3 §3.2.1/3).
   identityFooter: {
     paddingHorizontal: GUTTER,

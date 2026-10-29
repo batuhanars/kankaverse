@@ -50,6 +50,10 @@ export interface UserDto {
   showGameActivity?: boolean | null;
   /** C31b — yaşa göre varsayılan uygulanmış hâl (yetişkin açık, minör kapalı); istemci yeniden hesaplamaz. */
   gameActivityEffective?: boolean;
+  /** C31f — reşit değil mi; sunucu zaten dönüyordu (`toUserDto`). Minörde son etkinlik ayarı hiç çizilmez. */
+  isMinor?: boolean;
+  /** C31f — son oynanan oyunlar ayarı (varsayılan kapalı; minörde hep false). */
+  showRecentActivity?: boolean;
   /** C24 — hızlı tepki şeridi, her zaman 5 elemanlı etkin liste (kayıt yoksa sunucu varsayılanı). */
   quickReactions: string[];
 }

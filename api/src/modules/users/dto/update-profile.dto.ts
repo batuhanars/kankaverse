@@ -57,6 +57,14 @@ export class UpdateProfileDto {
   @IsBoolean({ message: 'Oyun paylaşım tercihi geçersiz.' })
   showGameActivity?: boolean;
 
+  // C31f: "Son oynadığım oyunlar" (7 gün saklanır). Varsayılan kapalı; minör için sunucu 403 verir.
+  @ApiPropertyOptional({
+    description: 'Son oynadığım oyunları profilimde göster (yalnız yetişkin).',
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'Son etkinlik tercihi geçersiz.' })
+  showRecentActivity?: boolean;
+
   // C24: hızlı tepki şeridi. Boş dizi = varsayılana dön; aksi halde tam 5 farklı tek-emoji.
   @ApiPropertyOptional({
     type: [String],

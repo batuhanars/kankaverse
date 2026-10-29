@@ -102,6 +102,8 @@ export class PurgeJob {
       await tx.pushToken.deleteMany({ where: { userId } });
       await tx.notificationPref.deleteMany({ where: { userId } });
       await tx.recoveryCode.deleteMany({ where: { userId } });
+      // C31f (KVKK): son oynanan oyun geçmişi hesap imhasında silinir.
+      await tx.recentGame.deleteMany({ where: { userId } });
     });
   }
 }

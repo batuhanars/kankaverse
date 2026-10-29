@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { GamesService, ResolvedGame } from '../games/games.service';
@@ -49,6 +49,8 @@ interface PresenceEntry {
  */
 @Injectable()
 export class PresenceService {
+  private readonly logger = new Logger(PresenceService.name);
+
   /** Yalnız bağlı kullanıcılar; bağlantısı olmayanlar map'te bulunmaz. */
   private readonly state = new Map<string, PresenceEntry>();
 
@@ -113,6 +115,9 @@ export class PresenceService {
   disconnect(userId: string, connectionId: string): boolean {
     const entry = this.state.get(userId);
     if (!entry) return false;
+    // C31f: kopan bağlantının oyunu "son oynanan" olarak yazılır (dnd'de yazılmaz, bkz. recordRecentGame).
+    const ended = entry.games.get(connectionId);
+    if (ended) this.recordRecentGame(userId, ended.gameId, this.effective(entry));
     entry.connections.delete(connectionId);
     entry.games.delete(connectionId);
     if (entry.connections.size === 0) {
@@ -165,12 +170,45 @@ export class PresenceService {
     const entry = this.state.get(userId);
     if (!entry || !entry.connections.has(connectionId)) return false;
     const previous = entry.games.get(connectionId);
+    // C31f: biten ya da DEĞİŞEN oyun "son oynanan" olarak yazılır; aynı oyunun yeniden bildirimi yazılmaz.
+    if (previous && previous.gameId !== gameId) {
+      this.recordRecentGame(userId, previous.gameId, this.effective(entry));
+    }
     entry.games.delete(connectionId);
     if (gameId) {
       const startedAt = previous?.gameId === gameId ? previous.startedAt : Date.now();
       entry.games.set(connectionId, { gameId, startedAt });
     }
     return true;
+  }
+
+  /**
+   * C31f (R7/KVKK) — bir oyunun SON OYNANMA anını kalıcı yazar. Fire-and-forget: presence akışını
+   * bloklamaz, hata yutulur ve loglanır. Yazım şartları sunucu otoritesidir, istemci değeri sayılmaz:
+   *  - kullanıcı minör DEĞİL, `showRecentActivity` açık ve oyun paylaşımı etkin (`showGameActivity ?? !isMinor`)
+   *  - anlık durum `dnd` DEĞİL (rahatsız etmeyin diyen oyununu hiçbir yoldan yaymaz, §2.5 ile tutarlı)
+   * Biri yanlışsa HİÇ yazılmaz. Süre/oturum tutulmaz: (userId, gameId) başına tek satır, yalnız zaman damgası.
+   */
+  private recordRecentGame(userId: string, gameId: string, status: ActiveStatus): void {
+    if (status === 'dnd') return;
+    void this.writeRecentGame(userId, gameId).catch((err: unknown) =>
+      this.logger.warn(`Son etkinlik yazılamadı (${userId}): ${(err as Error).message}`),
+    );
+  }
+
+  private async writeRecentGame(userId: string, gameId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isMinor: true, showRecentActivity: true, showGameActivity: true },
+    });
+    if (!user || user.isMinor || !user.showRecentActivity) return;
+    if (!(user.showGameActivity ?? !user.isMinor)) return;
+    const lastPlayedAt = new Date();
+    await this.prisma.recentGame.upsert({
+      where: { userId_gameId: { userId, gameId } },
+      create: { userId, gameId, lastPlayedAt },
+      update: { lastPlayedAt },
+    });
   }
 
   /** Ayar kapatılınca bütün bağlantıların oyun kaydı silinir (yeniden açınca bayat oyun sızmasın). */

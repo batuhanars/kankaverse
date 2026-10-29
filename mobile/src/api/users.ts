@@ -70,6 +70,8 @@ export interface UpdateProfileDto {
   readReceipts?: boolean;
   /** C31b §2 — "Oynadığım oyunu göster". Varsayılanı sunucu yaşa göre hesaplar (`gameActivityEffective`). */
   showGameActivity?: boolean;
+  /** C31f — "Son oynadığım oyunlar" (7 gün saklanır). Varsayılan kapalı; minörde sunucu 403 verir. */
+  showRecentActivity?: boolean;
   /** C24 — boş dizi = varsayılana dön, aksi hâlde TAM 5 emoji (tekrarsız). */
   quickReactions?: string[];
 }
@@ -109,7 +111,19 @@ export interface AnimatedProcessPayload {
   durationMs?: number;
 }
 
+/** C31f — `GET /users/:id/recent-activity` satırı. */
+export interface RecentGameDto {
+  game: { id: string; name: string; iconUrl: string | null; storeUrl: string | null };
+  lastPlayedAt: string;
+}
+
 export const usersApi = {
+  /** C31f — son 7 günde oynananlar; ayar kapalı ya da görünürlük yoksa sunucu boş dizi döner. */
+  async getRecentActivity(userId: string): Promise<RecentGameDto[]> {
+    const res = await http.get<RecentGameDto[]>(`/users/${userId}/recent-activity`);
+    return res.data;
+  },
+
   /**
    * `guildId` opsiyonel — verilirse sunucu **rol rozetlerini** doldurur
    * (`users.controller.ts` `@Query('guildId')`, C10). Verilmezse `roles: []` döner ve panel o

@@ -26,6 +26,8 @@ export function toUserDto(
     // yaşa göre varsayılan uygulanmış hâl (yetişkin açık, minör kapalı) — istemci yeniden hesaplamaz.
     showGameActivity: user.showGameActivity,
     gameActivityEffective: user.showGameActivity ?? !user.isMinor,
+    // C31f: son etkinlik (7 gün) ayarı; minörde her zaman false.
+    showRecentActivity: user.showRecentActivity && !user.isMinor,
     // C24: etkin hızlı tepki şeridi (kayıtlı ya da varsayılan beşli).
     quickReactions: effectiveQuickReactions(user.quickReactions),
     isMinor: user.isMinor,
