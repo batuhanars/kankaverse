@@ -282,6 +282,11 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     platform dışına taşıma yolu) · (3) eğik çizgi komutları (bot yalnız kendine yazılanı görür), gerçek talep gelince ·
     (4) mesaj okuyan tam bot belki hiç (minörlü ortamda üçüncü taraf okuma + KVKK). Herkese açık API bir sözdür: açıldıktan
     sonra iç yapı serbestçe değişemez, sürümleme ve belge ister.
+    **Kapsamlı bot sistemi ŞİMDİ YOK (sahip + PM 2026-10-29):** geliştirici kullanıcının olduğu yere gelir (46 hesap), açık API
+    kalıcı söz, okuyan bot = minörlü ortamda üçüncü taraf veri işleme. Yerine **yerleşik "bot işleri"** adayı: hoş geldin mesajı +
+    otomatik rol, tepkiyle rol, anket, çekiliş (yayın duyurusu hesap bağlamayla). Bot sistemi eşiği: yerleşiklerin karşılamadığı somut
+    topluluk talebi ya da birkaç yüz aktif kullanıcı; açılırsa önce yalnız eğik çizgi komutları. Büyüme kaldıracı olarak D1 (Discord'dan
+    taşıma) bot sisteminden önce konuşulmalı. **Sıra: C35 webhook (Discord biçimiyle uyumlu) → hesap bağlama.**
     **Spotify "dinliyor" PARK (sahip 2026-10-29):** resmî Web API kitleye açılamaz (2025 geniş erişim şartı: kayıtlı şirket +
     ~250k MAU; geliştirme modu birkaç elle eklenen kullanıcı). Tek yol masaüstünde pencere başlığından yerel algılama (kırılgan,
     serbest metin = automod + ayrı ayar). Açılırsa C31b altyapısıyla küçük ek sprint.
