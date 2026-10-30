@@ -14,6 +14,7 @@ const WEBHOOK = {
   createdById: 'creator-1',
   deletedAt: null as Date | null,
   lastUsedAt: null as Date | null,
+  kind: 'USER' as 'USER' | 'STREAM_ANNOUNCE',
 };
 const CHANNEL = { id: 'ch-1', guildId: 'g-1', type: 'GUILD_TEXT', guild: { deletedAt: null } };
 
@@ -67,6 +68,16 @@ async function errorOf(p: Promise<unknown>): Promise<HttpException> {
   throw new Error('hata bekleniyordu');
 }
 const codeOf = (e: HttpException) => (e.getResponse() as { error: string }).error;
+
+describe('WebhookExecService.execute — C36 sistem yönetimli webhook', () => {
+  it('STREAM_ANNOUNCE türü doğru token ile bile 404 WEBHOOK_NOT_FOUND', async () => {
+    prismaMock.webhook.findUnique.mockResolvedValue({ ...WEBHOOK, kind: 'STREAM_ANNOUNCE' });
+    const err = await errorOf(service.execute('wh-1', TOKEN, { content: 'x' }, '1.1.1.1'));
+    expect(err.getStatus()).toBe(404);
+    expect(codeOf(err)).toBe('WEBHOOK_NOT_FOUND');
+    expect(messagesMock.createWebhookMessage).not.toHaveBeenCalled();
+  });
+});
 
 describe('WebhookExecService.execute — token (§2.2)', () => {
   it('doğru token → mesaj yazılır, { id } döner, yayın yapılır', async () => {

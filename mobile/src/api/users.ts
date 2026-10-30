@@ -52,6 +52,8 @@ export interface UserCardDto {
   /** `canDm` otoritesi — "Mesaj" düğmesinin kapısı. İstemci kendi kafasına göre hesaplamaz. */
   canMessage: boolean;
   roles: UserCardRoleDto[];
+  /** C36 §6: bağlı Kick/Twitch hesapları (yalnız showOnProfile). Eski sunucuda alan yok, bu yüzden isteğe bağlı. */
+  connections?: { provider: 'kick' | 'twitch'; username: string; url: string }[];
   // 🔴 `voiceStatus` BİLİNÇLİ tiplenmedi: mobilde ses M4'te geliyor, bu sprintte çizilmiyor ve
   // çizilmeyecek bir alanı tiplemek "yakında" vaadi olurdu. Panelin düzeni o satır sonradan
   // aksiyonların ALTINA girince bozulmayacak şekilde kuruldu (bkz. ProfileSheet).

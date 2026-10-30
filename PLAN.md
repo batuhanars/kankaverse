@@ -291,6 +291,13 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     yönetim yalnız web, mobil çizim vc41). R7: token + yürütme kapıları. ✅ **TAMAMLANDI 2026-10-30 (6b65d4c), sahip turu geçti** (web+masaüstü, token yenileme 404, oturumda gerçek IP; mobil çizim vc41 ile) (204, düz @everyone,
     trust proxy). **C35 ertelenenleri:** webhook mesajı bildiriminde başlık "Biri" (actor yok) · mobilde yöneticinin webhook mesajını
     silmesi · ayrılmış ad homoglif taklidi (Kiril) · hız sınırı bellek içi (çok örnekte Redis'e) · arama/sabit panellerinde BOT rozeti.
+    🟡 **C36 SÖZLEŞME YAZILDI 2026-10-30:** `contracts/SPRINT_C36_STREAM_LINK_ANNOUNCE_CONTRACT.md`. **Sahip kararları:** Kick + Twitch (Kick öncelikli; 2026-10-30 Twitch sonradan eklendi
+    , Türk yayıncılar Kick'e kaydı; Steam/Epic yalnız profil rozeti verir, sonraki tur) · minör bağlayamaz · kumar/yetişkin yayın yalnız 18+
+    ortamda duyurulur (okunamazsa riskli) · duyuru çift rızalı (yönetici kanalı açar, yayıncı ortam başına kendisi açar) · duyuru C35
+    webhook mesajı olarak. **YouTube:** yerleşik bağlama yok, kullanıcılar otomasyon servisi + C35 webhook ile çözer; talep olursa bakılır.
+    ⏭️ **C37 (sözleşme C36 bitince):** Steam (OpenID; rozet + Steam Web API ile "oynuyor" durumu, masaüstü uygulaması olmayan
+    web/mobil kullanıcıda da; C31b görünürlük kuralları aynen) + Battle.net (OAuth; yalnız BattleTag rozeti, Blizzard herkese açık
+    "oynuyor" API sunmuyor). Epic sonra: marka incelemesi süreci var, herkese açık oynuyor verisi yok, yalnız rozet.
     **Spotify "dinliyor" PARK (sahip 2026-10-29):** resmî Web API kitleye açılamaz (2025 geniş erişim şartı: kayıtlı şirket +
     ~250k MAU; geliştirme modu birkaç elle eklenen kullanıcı). Tek yol masaüstünde pencere başlığından yerel algılama (kırılgan,
     serbest metin = automod + ayrı ayar). Açılırsa C31b altyapısıyla küçük ek sprint.

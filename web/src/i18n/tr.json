@@ -229,6 +229,7 @@
     "tabProfile": "Profil",
     "tabVoice": "Ses",
     "tabPrivacy": "Gizlilik",
+    "tabConnections": "Bağlantılar",
     "tabDesktop": "Masaüstü",
     "tabAdmin": "Admin",
     "desktop": {
@@ -1468,6 +1469,46 @@
     "loadError": "Ortamlar yüklenemedi. Lütfen tekrar dene.",
     "joinError": "Ortama katılınamadı. Lütfen tekrar dene."
   },
+  "connections": {
+    "intro": "Diğer platformlardaki hesaplarını bağla. Profilinde görünsün, yayına başladığında Ortamların haberdar olsun.",
+    "addTitle": "Yeni bağlantı ekle",
+    "addAria": "{platform} hesabını bağla",
+    "linking": "Yönlendiriliyor...",
+    "linkedBadge": "Bağlı",
+    "showOnProfile": "Profilimde göster",
+    "unlinkAria": "{platform} bağlantısını kopar",
+    "unlinkTitle": "Bağlantıyı kopar",
+    "unlinkMessage": "{platform} hesabın bağlantısı koparılsın mı? Profilinden kalkar ve yayın duyuruların durur.",
+    "unlinkConfirm": "Kopar",
+    "announceTitle": "Yayınlarımı duyuran Ortamlar",
+    "announceHint": "Açtığın Ortamlarda yayına başladığında kanala duyuru düşer. Kapatınca duyuru durur.",
+    "announceEmpty": "Üyesi olduğun Ortamlarda yayın duyurusu açık değil.",
+    "announceSwitch": "Duyur",
+    "noProviders": "Şu an bağlanabilecek bir platform yok.",
+    "result": {
+      "linked": "Hesabın bağlandı.",
+      "taken": "Bu hesap başka bir kullanıcıya bağlı.",
+      "error": "Hesap bağlanamadı. Biraz sonra tekrar dene."
+    },
+    "profileTitle": "Bağlantılar"
+  },
+  "streamAnnounce": {
+    "title": "Yayın duyuruları",
+    "info": "Duyuru yalnız bu Ortamda yayınlarının duyurulmasını kendisi açan üyeler için yapılır. Kick ve Twitch desteklenir.",
+    "enabled": "Yayın duyurularını aç",
+    "channelLabel": "Duyuru kanalı",
+    "channelPlaceholder": "Bir kanal seç",
+    "roleLabel": "Bahsedilecek rol (isteğe bağlı)",
+    "roleNone": "Rol bahsetme",
+    "save": "Kaydet",
+    "saved": "Yayın duyurusu ayarı kaydedildi.",
+    "remove": "Kaldır",
+    "removeTitle": "Yayın duyurusunu kaldır",
+    "removeMessage": "Bu Ortamda yayın duyuruları kapatılsın ve ayar silinsin mi?",
+    "validation": {
+      "channelRequired": "Bir kanal seç."
+    }
+  },
   "webhooks": {
     "intro": "Webhook, bir araca verdiğin adresle bir kanala mesaj yazdırır. Sunucu izleme, oyun sunucusu eklentileri, otomasyon servisleri ve kendi betiklerin için uygundur.",
     "howToTitle": "Nasıl kullanılır?",
@@ -1842,6 +1883,8 @@
       "s2Item3Label": "Kullanım/güvenlik:",
       "s2Item3": "oturum bilgisi, cihaz/bağlantı verisi (kötüye kullanım önleme + güvenlik).",
       "s2Item4Label": "Son oynanan oyunlar:",
+      "s2Item5Label": "Bağlı yayın hesapları:",
+      "s2Item5": "Kick ya da Twitch hesabını kendin bağlarsan, o hesabın kimliği ve kullanıcı adı saklanır. Yayına başladığını ilgili platformdan öğreniriz ve yalnız senin izin verdiğin Ortamlarda duyururuz. Bu platformların erişim anahtarı saklanmaz. Bağlantıyı istediğin an koparabilirsin, koparınca bu bilgiler silinir. Reşit olmayan hesaplar hesap bağlayamaz.",
       "s2Item4": "yalnız \"Son oynadığım oyunlar\" ayarını kendin açarsan, son 7 günde oynadığın oyunların adı ve en son ne zaman oynadığın saklanır. Amaç, bunu profilinde göstermektir. Ayar varsayılan olarak kapalıdır. Kaç saat oynadığın ya da hangi saatlerde oynadığın kaydedilmez. 7 günü geçen kayıtlar kendiliğinden silinir. Ayarı kapatırsan ya da hesabını silersen geçmişin hemen silinir. Reşit olmayan hesaplardan bu veri hiçbir şekilde toplanmaz.",
       "s3Title": "3. Şifreleme ve erişim (ŞEFFAFLIK)",
       "s3Item1": "Uçtan-uca şifreleme (E2EE) YOKTUR. İçerik, moderasyon ve güvenlik (özellikle çocuk güvenliği) amacıyla sunucu tarafında erişilebilir. Bunu açıkça beyan ediyoruz.",

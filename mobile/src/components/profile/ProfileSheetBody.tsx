@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { usersApi, type RecentGameDto, type UserCardDto } from '@/api/users';
 import { formatAgo } from '@/utils/formatAgo';
 import { ProfileHeader } from '../me/ProfileHeader';
 import { useActivityStore, selectGame } from '@/stores/activity';
 import { ProfileGameCard } from './ProfileGameCard';
+import { PlatformLogo } from './PlatformLogo';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -46,6 +47,7 @@ export function ProfileSheetBody({ username, avatarUrl, card, identityFooter }: 
   const mutualGuilds = card?.mutualGuilds ?? [];
   const mutualFriends = card?.mutualFriends ?? [];
   const roles = card?.roles ?? [];
+  const connections = card?.connections ?? [];
   const game = useActivityStore(selectGame(card?.id));
 
   // C31f: son 7 günde oynananlar. Ayar kapalı/görünürlük yoksa sunucu boş dizi verir; hata da boş sayılır.
@@ -122,6 +124,29 @@ export function ProfileSheetBody({ username, avatarUrl, card, identityFooter }: 
           <Text style={styles.value}>{formatMemberSince(card.memberSince)}</Text>
         </View>
       ) : null}
+
+      {/* C36 §6.3: bağlı Kick/Twitch hesapları. Dokununca dış tarayıcı; gösterim yalnız, bağlama web'de. */}
+      {connections.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('connections.profileTitle')}</Text>
+          {connections.map((c) => (
+            <Pressable
+              key={c.provider}
+              accessibilityRole="link"
+              accessibilityLabel={c.username}
+              onPress={() => {
+                if (/^https:\/\//i.test(c.url)) void Linking.openURL(c.url);
+              }}
+              style={styles.mutualRow}
+            >
+              <PlatformLogo provider={c.provider} size={ICON * 0.7} />
+              <Text style={styles.mutualName} numberOfLines={1}>
+                {c.username}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       {roles.length > 0 && (
         <View style={styles.section}>

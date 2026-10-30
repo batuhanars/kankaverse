@@ -12,6 +12,7 @@ const prismaMock = {
   userBlock: { findUnique: jest.fn() },
   voiceSession: { findFirst: jest.fn() }, // C10 — kart ses durumu
   recentGame: { deleteMany: jest.fn(), findMany: jest.fn() }, // C31f
+  externalAccount: { findMany: jest.fn() }, // C36 — kart bağlantıları
 };
 
 // C10 — canDm (inline mesaj kutusu kapısı) + VoiceService (ses durumu) mock'ları
@@ -76,6 +77,7 @@ function resetMocks() {
   prismaMock.userBlock.findUnique.mockResolvedValue(null);
   prismaMock.user.findMany.mockResolvedValue([]);
   prismaMock.voiceSession.findFirst.mockResolvedValue(null);
+  prismaMock.externalAccount.findMany.mockResolvedValue([]);
   dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
   voiceMock.getLiveParticipation.mockResolvedValue({
     present: false,
@@ -267,6 +269,33 @@ describe('UsersService', () => {
       expect(card).not.toHaveProperty('isMinor');
       expect(card).not.toHaveProperty('birthDate');
       expect(card).not.toHaveProperty('verificationStatus');
+    });
+
+    it('C36: kartta yalnız showOnProfile bağlantıları sorgulanır ve adresle döner', async () => {
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: 'u1',
+        username: 'kanka',
+        avatarUrl: null,
+        bannerUrl: null,
+        avatarAnimatedUrl: null,
+        bannerAnimatedUrl: null,
+        bio: null,
+        bannerColor: null,
+        createdAt: CREATED_AT,
+      });
+      prismaMock.externalAccount.findMany.mockResolvedValue([
+        { provider: 'KICK', username: 'Yayin_ci' },
+        { provider: 'TWITCH', username: 'Yayinci' },
+      ]);
+      const card = await service.getUserCard('u1', 'u1');
+      expect(prismaMock.externalAccount.findMany.mock.calls[0][0].where).toEqual({
+        userId: 'u1',
+        showOnProfile: true,
+      });
+      expect(card.connections).toEqual([
+        { provider: 'kick', username: 'Yayin_ci', url: 'https://kick.com/yayin-ci' },
+        { provider: 'twitch', username: 'Yayinci', url: 'https://twitch.tv/yayinci' },
+      ]);
     });
 
     it('kendi kartı (self) → bio/memberSince döner, mutual listeler boş', async () => {
@@ -724,6 +753,55 @@ describe('UsersService', () => {
       voiceMock.getLiveParticipation.mockResolvedValue(null);
       const card = await service.getUserCard(CALLER, TARGET);
       expect(card.voiceStatus).toBeNull();
+    });
+  });
+
+  // ── C36: profil kartı bağlantıları ve görüntüleyen yaşı (T&S) ───────────────
+  describe('getUserCard — connections (minör görüntüleyene hiç gönderilmez)', () => {
+    const CALLER = 'caller-1';
+    const TARGET = 'target-1';
+    const ACCOUNTS = [{ provider: 'KICK', username: 'Yayinci' }];
+
+    function setViewer(isMinor: boolean) {
+      prismaMock.user.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
+        Promise.resolve(
+          where.id === CALLER
+            ? { id: CALLER, isMinor }
+            : {
+                id: TARGET,
+                username: 'hedef',
+                avatarUrl: null,
+                bio: null,
+                createdAt: CREATED_AT,
+              },
+        ),
+      );
+      prismaMock.guildMember.findFirst.mockResolvedValue({ id: 'gm1' }); // erişim kapısı geçsin
+      prismaMock.externalAccount.findMany.mockResolvedValue(ACCOUNTS);
+    }
+
+    it('yetişkin görüntüleyen bağlantıları görür', async () => {
+      setViewer(false);
+      const card = await service.getUserCard(CALLER, TARGET);
+      expect(card.connections).toEqual([
+        { provider: 'kick', username: 'Yayinci', url: 'https://kick.com/yayinci' },
+      ]);
+    });
+
+    it('minör görüntüleyen boş dizi alır ve hesaplar hiç sorgulanmaz', async () => {
+      setViewer(true);
+      const card = await service.getUserCard(CALLER, TARGET);
+      expect(card.connections).toEqual([]);
+      expect(prismaMock.externalAccount.findMany).not.toHaveBeenCalled();
+    });
+
+    it('showOnProfile=false hesaplar yetişkin görüntüleyene de sorgu düzeyinde hariç', async () => {
+      setViewer(false);
+      await service.getUserCard(CALLER, TARGET);
+      expect(prismaMock.externalAccount.findMany.mock.calls[0][0].where).toEqual({
+        userId: TARGET,
+        showOnProfile: true,
+      });
     });
   });
 

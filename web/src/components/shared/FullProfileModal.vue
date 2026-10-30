@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProfileConnections from '@/components/shared/ProfileConnections.vue'
 /**
  * FullProfileModal — başkasının tam profil modalı (Sprint C5 §5).
  * Avatar (varsayılan) · username · bio (güvenli markdown render, linkler tıklanabilir) ·
@@ -296,6 +297,10 @@ async function runConfirm() {
                   </h3>
                   <p class="text-[13px]" style="color: var(--kv-text-body);">{{ memberSinceLabel }}</p>
                 </section>
+                <template v-if="card.connections && card.connections.length > 0">
+                  <div class="h-px" style="background-color: var(--kv-border-subtle);" />
+                  <ProfileConnections :connections="card.connections" />
+                </template>
               </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProfileConnections from '@/components/shared/ProfileConnections.vue'
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -160,6 +161,10 @@ watch(() => props.otherUser.id, () => {
           </h3>
           <p class="text-[13px]" style="color: var(--kv-text-body);">{{ memberSinceLabel }}</p>
         </section>
+        <template v-if="card.connections && card.connections.length > 0">
+          <div class="h-px" style="background-color: var(--kv-border-subtle);" />
+          <ProfileConnections :connections="card.connections" />
+        </template>
       </div>
 
       <!-- Ortak ortam/kanka satırları → tam profili açar -->

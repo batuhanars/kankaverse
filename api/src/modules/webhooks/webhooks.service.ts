@@ -85,7 +85,7 @@ export class WebhooksService {
   async list(userId: string, guildId: string) {
     await this.requireManage(userId, guildId);
     const rows = await this.prisma.webhook.findMany({
-      where: { guildId, deletedAt: null },
+      where: { guildId, deletedAt: null, kind: 'USER' }, // C36: sistem yönetimli webhook listede yok
       orderBy: { createdAt: 'asc' },
       include: { createdBy: { select: { id: true, username: true } } },
     });
@@ -210,7 +210,9 @@ export class WebhooksService {
   }
 
   private async findActive(guildId: string, id: string): Promise<Webhook> {
-    const row = await this.prisma.webhook.findFirst({ where: { id, guildId, deletedAt: null } });
+    const row = await this.prisma.webhook.findFirst({
+      where: { id, guildId, deletedAt: null, kind: 'USER' },
+    });
     if (!row) {
       throw new NotFoundException({
         message: 'Webhook bulunamadı.',
@@ -237,7 +239,9 @@ export class WebhooksService {
   }
 
   private async assertChannelCapacity(channelId: string): Promise<void> {
-    const active = await this.prisma.webhook.count({ where: { channelId, deletedAt: null } });
+    const active = await this.prisma.webhook.count({
+      where: { channelId, deletedAt: null, kind: 'USER' },
+    });
     if (active >= MAX_ACTIVE_PER_CHANNEL) {
       throw new ConflictException({
         message: `Bir kanalda en fazla ${MAX_ACTIVE_PER_CHANNEL} webhook olabilir.`,

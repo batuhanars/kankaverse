@@ -12,5 +12,6 @@ import { WebhookRateLimiter } from './webhook-rate-limiter';
   imports: [SharedModule, MessagesModule],
   controllers: [WebhooksController, WebhookExecController],
   providers: [WebhooksService, WebhookExecService, WebhookRateLimiter],
+  exports: [WebhooksService], // C36: duyuru göndericisi resolveSender kapısını yeniden kullanır
 })
 export class WebhooksModule {}

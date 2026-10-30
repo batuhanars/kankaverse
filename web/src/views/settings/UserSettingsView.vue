@@ -32,6 +32,8 @@ import PlatformFunnelSection from './components/PlatformFunnelSection.vue'
 import PlatformUsersSection from './components/PlatformUsersSection.vue'
 import MasaustuSection from './components/MasaustuSection.vue'
 import QuickReactionsSection from './components/QuickReactionsSection.vue'
+import ConnectionsSection from './components/ConnectionsSection.vue'
+import { integrationsApi } from '@/api/integrations'
 import AnimatedClipModal from '@/components/shared/AnimatedClipModal.vue'
 
 const props = defineProps<{ initialSection?: string }>()
@@ -41,8 +43,8 @@ const { t } = useI18n()
 const authStore = useAuthStore()
 const toast = useToastStore()
 
-type NavSection = 'hesap' | 'profil' | 'ses' | 'gizlilik' | 'masaustu' | 'admin'
-const VALID_SECTIONS: NavSection[] = ['profil', 'hesap', 'ses', 'gizlilik', 'masaustu', 'admin']
+type NavSection = 'hesap' | 'profil' | 'ses' | 'gizlilik' | 'baglantilar' | 'masaustu' | 'admin'
+const VALID_SECTIONS: NavSection[] = ['profil', 'hesap', 'ses', 'gizlilik', 'baglantilar', 'masaustu', 'admin']
 // Masaüstü (Electron) istemcisinde ek sekme — tarayıcıda gizli.
 const isElectron = window.kankaverse?.isElectron === true
 const activeSection = ref<NavSection>(
@@ -57,9 +59,24 @@ const baseNavItems: { key: NavSection; labelKey: string }[] = [
   { key: 'gizlilik', labelKey: 'settings.tabPrivacy' },
 ]
 
+const connectionsAvailable = ref(false)
+onMounted(async () => {
+  if (authStore.user?.isMinor) return
+  try {
+    const [providers, accounts] = await Promise.all([integrationsApi.providers(), integrationsApi.list()])
+    connectionsAvailable.value = Object.values(providers.data).some(Boolean) || accounts.data.length > 0
+  } catch {
+    connectionsAvailable.value = false
+  }
+})
+
 // Admin sekmesi: yalnız isModerator kullanıcıya göster
 const navItems = computed(() => {
   const items = [...baseNavItems]
+  // C36: Bağlantılar yalnız yetişkine ve yalnız bağlanabilir platform ya da bağlı hesap varsa görünür (minörde hiç)
+  if (!authStore.user?.isMinor && connectionsAvailable.value) {
+    items.push({ key: 'baglantilar', labelKey: 'settings.tabConnections' })
+  }
   if (isElectron) items.push({ key: 'masaustu', labelKey: 'settings.tabDesktop' })
   if (authStore.user?.isModerator) items.push({ key: 'admin', labelKey: 'settings.tabAdmin' })
   return items
@@ -855,6 +872,10 @@ async function toggleReadReceipts(next: boolean) {
               </div>
 
               <!-- ── Masaüstü ── (yalnız Electron istemcisi) -->
+              <div v-else-if="activeSection === 'baglantilar' && !authStore.user?.isMinor">
+                <ConnectionsSection />
+              </div>
+
               <div v-else-if="activeSection === 'masaustu' && isElectron">
                 <MasaustuSection />
               </div>

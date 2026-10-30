@@ -227,7 +227,7 @@ describe('WebhooksService yönetim (§4)', () => {
       response: { error: 'WEBHOOK_NOT_FOUND' },
     });
     expect(prismaMock.webhook.findFirst).toHaveBeenCalledWith({
-      where: { id: 'x', guildId: 'g-1', deletedAt: null },
+      where: { id: 'x', guildId: 'g-1', deletedAt: null, kind: 'USER' },
     });
   });
 

@@ -9,7 +9,7 @@
  * Drawer state: useAppShellNav singleton.
  */
 import { onMounted, onUnmounted, watch, ref, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
@@ -33,6 +33,7 @@ import IncomingCallModal from '@/components/shared/IncomingCallModal.vue'
 import UserSettingsView from '@/views/settings/UserSettingsView.vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
@@ -45,6 +46,20 @@ const {
   // Birleşik kullanıcı ayarları modalı (UserCard + UserCardPopover "kendi profili" açar)
   showUserSettings, userSettingsSection, openUserSettings,
 } = useAppModals()
+
+// C36: OAuth geri dönüşü /settings/connections → Ayarlar modalı Bağlantılar bölümünde açılır.
+// Kapanınca adres ana ekrana döner (modal kapalıyken bu adreste kalmak anlamsız).
+watch(
+  () => route.name,
+  (name) => {
+    if (name === 'settings-connections') openUserSettings('baglantilar')
+  },
+  { immediate: true },
+)
+function closeUserSettings() {
+  showUserSettings.value = false
+  if (route.name === 'settings-connections') void router.replace({ name: 'app' })
+}
 
 // Router watch'ı kurar (her route değişiminde drawer'ları kapat).
 const { leftDrawerOpen, closeLeftDrawer, rightPanelVisible, closeRightPanel } = useAppShellNav()
@@ -201,7 +216,7 @@ onUnmounted(() => {
     <ServerModal v-if="showServerModal" :initial-step="serverModalStep" @close="closeServerModal" />
     <FriendAddModal v-if="showAddFriendModal" @close="closeAddFriend" />
     <!-- Birleşik kullanıcı ayarları modalı -->
-    <UserSettingsView v-if="showUserSettings" :initial-section="userSettingsSection" @close="showUserSettings = false" />
+    <UserSettingsView v-if="showUserSettings" :initial-section="userSettingsSection" @close="closeUserSettings" />
     <!-- Gelen DM sesli arama (global) -->
     <IncomingCallModal />
   </div>

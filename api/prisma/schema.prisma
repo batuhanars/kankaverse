@@ -164,6 +164,8 @@ model User {
   recentGames         RecentGame[]
   aiVideoGenerations  AiVideoGeneration[]
   webhooksCreated     Webhook[]
+  externalAccounts    ExternalAccount[]
+  streamAnnounceOptIns StreamAnnounceOptIn[]
 }
 
 enum GameSource {
@@ -460,9 +462,76 @@ model Webhook {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   messages    Message[]
+  kind        WebhookKind @default(USER) // C36: STREAM_ANNOUNCE = sistem yönetimli, yürütme ucu her zaman 404
+  streamAnnounceConfig StreamAnnounceConfig?
 
   @@index([channelId])
   @@index([guildId])
+}
+
+enum WebhookKind {
+  USER
+  STREAM_ANNOUNCE
+}
+
+// ─── C36: Kick + Twitch hesap bağlama ve "yayına başladı" duyurusu ───────────
+
+enum ExternalProvider {
+  KICK
+  TWITCH
+}
+
+// Dış platform erişim/yenileme token'ı SAKLANMAZ (§2.4): yalnız kimlik + kullanıcı adı.
+model ExternalAccount {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+  provider        ExternalProvider
+  externalId      String
+  username        String
+  showOnProfile   Boolean          @default(true)
+  lastLiveAt      DateTime?
+  lastAnnouncedAt DateTime?
+  linkedAt        DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([provider, externalId])
+  @@unique([userId, provider])
+}
+
+// OAuth state (= id), tek kullanımlık, 10 dk ömür.
+model ExternalLinkState {
+  id           String           @id
+  userId       String
+  provider     ExternalProvider
+  codeVerifier String
+  expiresAt    DateTime
+
+  @@index([expiresAt])
+}
+
+model StreamAnnounceConfig {
+  id            String   @id @default(cuid())
+  guildId       String   @unique
+  channelId     String
+  webhookId     String   @unique
+  webhook       Webhook  @relation(fields: [webhookId], references: [id])
+  mentionRoleId String?
+  enabled       Boolean  @default(true)
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model StreamAnnounceOptIn {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, userId])
+  @@index([userId])
 }
 
 model MessageReaction {

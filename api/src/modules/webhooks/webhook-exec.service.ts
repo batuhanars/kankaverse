@@ -137,7 +137,8 @@ export class WebhookExecService {
    */
   private async authenticate(webhookId: string, token: string) {
     const webhook = await this.prisma.webhook.findUnique({ where: { id: webhookId } });
-    const live = webhook && webhook.deletedAt === null ? webhook : null;
+    // C36 §1.6: STREAM_ANNOUNCE (sistem yönetimli) webhook'u bu uçtan HER ZAMAN 404
+    const live = webhook && webhook.deletedAt === null && webhook.kind === 'USER' ? webhook : null;
     const matches = webhookTokenMatches(token, live ? live.tokenHash : null);
     if (!live || !matches) this.notFound();
     return live;

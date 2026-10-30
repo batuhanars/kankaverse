@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProfileConnections from '@/components/shared/ProfileConnections.vue'
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -301,6 +302,10 @@ async function addFriend() {
               <h3 class="text-[10px] font-bold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">{{ t('userCard.memberSincePrefix') }}</h3>
               <p class="text-[13px]" style="color: var(--kv-text-body);">{{ memberSinceLabel }}</p>
             </div>
+            <template v-if="card.connections && card.connections.length > 0">
+              <div class="h-px" style="background-color: var(--kv-border-subtle);" />
+              <ProfileConnections :connections="card.connections" />
+            </template>
           </div>
 
           <!-- C10: Ses durumu (tıkla → o ortam ses kanalına git) -->

@@ -23,6 +23,10 @@ async function bootstrap() {
   // Nest'in JSON parser'ı application/webhook+json'ı zaten ayrıştırmaz; burada her tipi Buffer'a alıyoruz.
   app.use('/voice/webhook', express.raw({ type: () => true }));
 
+  // C36: Kick/Twitch olay imzası HAM gövde üzerinden doğrulanır → bu iki yolda JSON parse etme, Buffer bırak.
+  app.use('/integrations/kick/webhook', express.raw({ type: () => true, limit: '256kb' }));
+  app.use('/integrations/twitch/webhook', express.raw({ type: () => true, limit: '256kb' }));
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

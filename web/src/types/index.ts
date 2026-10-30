@@ -184,6 +184,34 @@ export interface UserProfileCardDto {
   canMessage: boolean // C10 — inline mesaj kutusu kapısı (canDm)
   roles: UserCardRoleDto[] // C10 — yalnız guildId bağlamında dolu
   voiceStatus: UserCardVoiceDto | null // C10 — hedef aktif seste + erişim varsa
+  connections?: ProfileConnectionDto[] // C36 — bağlı Kick/Twitch hesapları (yalnız showOnProfile)
+}
+
+// ── C36: Kick + Twitch hesap bağlama ve yayın duyurusu ───────────────────────
+export type StreamProviderKey = 'kick' | 'twitch'
+
+export interface ProfileConnectionDto {
+  provider: StreamProviderKey
+  username: string
+  url: string
+}
+
+export interface ExternalAccountDto extends ProfileConnectionDto {
+  showOnProfile: boolean
+  linkedAt: string
+}
+
+export interface AnnounceGuildDto {
+  guildId: string
+  name: string
+  iconUrl: string | null
+  optedIn: boolean
+}
+
+export interface StreamAnnounceConfigDto {
+  channelId: string
+  mentionRoleId: string | null
+  enabled: boolean
 }
 
 export interface SessionDto {

@@ -142,6 +142,16 @@ const router = createRouter({
           },
           props: { default: true },
         },
+        // C36 — OAuth geri dönüşü (/settings/connections?link=...): arkada ana ekran, üstünde Ayarlar >
+        // Bağlantılar modalı (AppShell rota adını izleyip açar). Caddy @app listesinde /settings/* var.
+        {
+          path: 'settings/connections',
+          name: 'settings-connections',
+          components: {
+            default: () => import('@/views/home/HomeView.vue'),
+            sidebar: () => import('@/views/home/components/HomeSidebar.vue'),
+          },
+        },
         // Sprint C6 — Keşfet (Ortam Keşfi). Sidebar slot = DiscoverSidebar (canonical rail|sidebar|içerik ızgarası).
         {
           path: 'discover',

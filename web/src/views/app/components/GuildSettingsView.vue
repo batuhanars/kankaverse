@@ -18,6 +18,7 @@ import GuildMediaSection from './GuildMediaSection.vue'
 import RolesSettingsSection from './RolesSettingsSection.vue'
 import AuditLogSection from './AuditLogSection.vue'
 import WebhooksSection from './WebhooksSection.vue'
+import StreamAnnounceCard from './StreamAnnounceCard.vue'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { guildBannerSrc, guildIconSrc } from '@/utils/animatedMedia'
 import { BANNER_PRESET_KEYS, bannerBackground } from '@/utils/bannerColor'
@@ -948,7 +949,8 @@ function confirmNavDiscard() {
           </div>
 
           <!-- ── Webhook'lar bölümü (C35, MANAGE_WEBHOOKS) ── -->
-          <div v-else-if="activeSection === 'webhooklar'">
+          <div v-else-if="activeSection === 'webhooklar'" class="flex flex-col gap-6">
+            <StreamAnnounceCard :guild-id="guild.id" />
             <WebhooksSection :guild-id="guild.id" />
           </div>
 

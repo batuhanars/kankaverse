@@ -13,6 +13,7 @@ import { DmPermissionService } from '../../shared/dm-permission/dm-permission.se
 import { VoiceService } from '../voice/voice.service';
 import { PresenceService } from '../../shared/presence/presence.service';
 import { storeUrlFor } from '../../shared/games/games.service';
+import { externalAccountUrl } from '../integrations/channel-url.util';
 import { RECENT_GAME_RETENTION_DAYS } from '../../common/jobs/recent-game-purge.job';
 
 export interface MutualFriendDto {
@@ -68,6 +69,14 @@ export interface UserProfileCardDto {
   roles: UserCardRoleDto[];
   // C10 — hedef aktif seste + caller erişebiliyorsa; aksi hâlde null.
   voiceStatus: UserCardVoiceDto | null;
+  // C36 §6: bağlı Kick/Twitch hesapları (yalnız showOnProfile). Kartı görebilen herkese görünür.
+  connections: UserCardConnectionDto[];
+}
+
+export interface UserCardConnectionDto {
+  provider: 'kick' | 'twitch';
+  username: string;
+  url: string;
 }
 
 /** C31f: son etkinlik saklama süresi (gün) ve profilde gösterilen en fazla oyun. */
@@ -147,6 +156,7 @@ export class UsersService {
         canMessage: false, // kendine mesaj yok
         roles: guildId ? await this.getGuildRoles(guildId, callerId, callerId) : [],
         voiceStatus: null, // kendi ses durumunu kartta göstermeyiz
+        connections: await this.getConnections(callerId, callerId),
       };
     }
 
@@ -281,19 +291,22 @@ export class UsersService {
     // Erişim kapısı geçti → ek profil verisi (yeni sızıntı yok: yalnız viewer'ın KENDİ
     // arkadaş/sunucularıyla kesişim; minör/yaş alanı hiçbir şekilde dönmez).
     // C10: canMessage (inline kutu kapısı), roller (guild bağlamında) ve ses durumu paralel toplanır.
-    const [mutualFriends, mutualGuilds, canDm, roles, voiceStatus] = await Promise.all([
-      canSeeMutuals
-        ? this.getMutualFriends(callerId, targetId)
-        : Promise.resolve<MutualFriendDto[]>([]),
-      canSeeMutuals
-        ? this.getMutualGuilds(callerId, targetId)
-        : Promise.resolve<MutualGuildDto[]>([]),
-      this.dmPermission.canDm(callerId, targetId),
-      guildId
-        ? this.getGuildRoles(guildId, targetId, callerId)
-        : Promise.resolve<UserCardRoleDto[]>([]),
-      this.getVoiceStatus(callerId, targetId),
-    ]);
+    const [mutualFriends, mutualGuilds, canDm, roles, voiceStatus, connections] = await Promise.all(
+      [
+        canSeeMutuals
+          ? this.getMutualFriends(callerId, targetId)
+          : Promise.resolve<MutualFriendDto[]>([]),
+        canSeeMutuals
+          ? this.getMutualGuilds(callerId, targetId)
+          : Promise.resolve<MutualGuildDto[]>([]),
+        this.dmPermission.canDm(callerId, targetId),
+        guildId
+          ? this.getGuildRoles(guildId, targetId, callerId)
+          : Promise.resolve<UserCardRoleDto[]>([]),
+        this.getVoiceStatus(callerId, targetId),
+        this.getConnections(callerId, targetId),
+      ],
+    );
 
     return {
       id: target.id,
@@ -312,7 +325,31 @@ export class UsersService {
       canMessage: canDm.allowed,
       roles,
       voiceStatus,
+      connections,
     };
+  }
+
+  /**
+   * C36 §6.1 (T&S, sahip kararı): bağlı hesaplar MİNÖR GÖRÜNTÜLEYENE hiç gönderilmez (platform dışı çıkış
+   * yolu). Karar sunucuda verilir, istemciye güvenilmez; fail-closed: görüntüleyen okunamazsa boş.
+   * Hedefin `showOnProfile=false` hesapları her zaman gizli.
+   */
+  private async getConnections(viewerId: string, userId: string): Promise<UserCardConnectionDto[]> {
+    const viewer = await this.prisma.user.findUnique({
+      where: { id: viewerId, deletedAt: null },
+      select: { isMinor: true },
+    });
+    if (!viewer || viewer.isMinor) return [];
+    const rows = await this.prisma.externalAccount.findMany({
+      where: { userId, showOnProfile: true },
+      orderBy: { linkedAt: 'asc' },
+      select: { provider: true, username: true },
+    });
+    return rows.map((row) => ({
+      provider: row.provider === 'KICK' ? 'kick' : 'twitch',
+      username: row.username,
+      url: externalAccountUrl(row.provider, row.username),
+    }));
   }
 
   /**

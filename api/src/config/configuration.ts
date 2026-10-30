@@ -60,6 +60,38 @@ export default () => {
     }
   }
 
+  // C36: Kick/Twitch hesap bağlama. Bayrak açıkken kimlik bilgisi eksikse fail-fast (yarım yapılandırma
+  // sessizce "bağlama çalışmıyor" demektir). Bayrak kapalıyken hiçbiri gerekmez (build-dark).
+  const streamLinkRequired: Record<string, readonly string[]> = {
+    KICK: ['KICK_CLIENT_ID', 'KICK_CLIENT_SECRET', 'KICK_REDIRECT_URI'],
+    TWITCH: [
+      'TWITCH_CLIENT_ID',
+      'TWITCH_CLIENT_SECRET',
+      'TWITCH_REDIRECT_URI',
+      'TWITCH_EVENTSUB_SECRET',
+    ],
+  };
+  for (const [provider, keys] of Object.entries(streamLinkRequired)) {
+    if (process.env[`${provider}_ENABLED`] !== 'true') continue;
+    for (const key of keys) {
+      if (!process.env[key]) {
+        throw new Error(`FATAL: ${provider}_ENABLED=true iken '${key}' zorunludur.`);
+      }
+    }
+  }
+  const eventsubSecret = process.env.TWITCH_EVENTSUB_SECRET;
+  if (
+    process.env.TWITCH_ENABLED === 'true' &&
+    (!eventsubSecret || eventsubSecret.length < 10 || eventsubSecret.length > 100)
+  ) {
+    throw new Error('FATAL: TWITCH_EVENTSUB_SECRET 10-100 karakter olmalıdır (Twitch kuralı).');
+  }
+  const csv = (raw: string | undefined) =>
+    (raw ?? '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
+
   return {
     port: parseInt(process.env.PORT ?? '3001', 10),
     database: {
@@ -148,6 +180,26 @@ export default () => {
         .split(',')
         .map((id) => id.trim())
         .filter((id) => id.length > 0),
+    },
+    // C36 — Kick + Twitch hesap bağlama ve "yayına başladı" duyurusu. Varsayılan KAPALI (sağlayıcı başına).
+    // Erişim/yenileme token'ı SAKLANMAZ; yalnız uygulama kimlik bilgileri burada durur (yalnız sunucu).
+    streamLink: {
+      kick: {
+        enabled: process.env.KICK_ENABLED === 'true',
+        clientId: process.env.KICK_CLIENT_ID ?? '',
+        clientSecret: process.env.KICK_CLIENT_SECRET ?? '',
+        redirectUri: process.env.KICK_REDIRECT_URI ?? '',
+        // Ek kumar kategorisi kimlikleri (ad deseni zaten kodda; bu liste yalnız genişletir)
+        gamblingCategoryIds: csv(process.env.KICK_GAMBLING_CATEGORY_IDS),
+      },
+      twitch: {
+        enabled: process.env.TWITCH_ENABLED === 'true',
+        clientId: process.env.TWITCH_CLIENT_ID ?? '',
+        clientSecret: process.env.TWITCH_CLIENT_SECRET ?? '',
+        redirectUri: process.env.TWITCH_REDIRECT_URI ?? '',
+        eventsubSecret: eventsubSecret ?? '',
+        gamblingCategoryIds: csv(process.env.TWITCH_GAMBLING_CATEGORY_IDS),
+      },
     },
     // Kayıt modu — kapalı-test fazı (Sprint Closed-Registration)
     // 'open' (default): kayıt açık, davet kodu yok sayılır.
