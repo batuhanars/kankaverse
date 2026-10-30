@@ -20,7 +20,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 41,
+      "versionCode": 42,
       "permissions": [
         "android.permission.BLUETOOTH_CONNECT"
       ]
@@ -87,6 +87,23 @@
       "./plugins/withGradleMemory",
       "./plugins/withAnimatedWebp",
       "./plugins/withoutMediaPlaybackService",
+      [
+        "expo-share-intent",
+        {
+          "disableIOS": true,
+          "androidIntentFilters": [
+            "image/*",
+            "video/*",
+            "text/plain",
+            "application/*"
+          ],
+          "androidMultiIntentFilters": [
+            "image/*",
+            "video/*",
+            "application/*"
+          ]
+        }
+      ],
       "expo-audio",
       "expo-video",
       "react-native-compressor"

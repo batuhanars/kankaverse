@@ -5,6 +5,7 @@ import { Redirect, useRouter, type Href } from 'expo-router';
 import { channelsApi, ChannelType } from '@/api/channels';
 import { dmApi } from '@/api/dm';
 import { useAuthStore } from '@/stores/auth';
+import { useShareIntentStore } from '@/stores/shareIntent';
 import { dmRouteParams } from '@/utils/dmRoute';
 import {
   forgetChannel,
@@ -101,8 +102,18 @@ export default function Index() {
       `[resume] gate userId=${userId ? 'yes' : 'no'} notifPresent=${notif.present} notifStale=${notif.stale}${notif.present ? ` notifDate=${String(Notifications.getLastNotificationResponse()?.notification.date)}` : ''}`,
     );
   }
+  // C41 - Paylaşımla açılış açık hedeflidir (C38 §0.7): "kaldığın yerden aç" uygulanmaz.
+  const sharePending = useShareIntentStore((s) => s.payload !== null);
   const mayResume =
-    status === 'authenticated' && !!userId && !resumeAttempted && !(notif.present && !notif.stale);
+    status === 'authenticated' &&
+    !!userId &&
+    !resumeAttempted &&
+    !sharePending &&
+    !(notif.present && !notif.stale);
+
+  useEffect(() => {
+    if (status === 'authenticated' && sharePending) resumeAttempted = true;
+  }, [status, sharePending]);
 
   useEffect(() => {
     if (!mayResume || !userId) return;
@@ -119,8 +130,11 @@ export default function Index() {
       if (result === 'timeout') console.log('[resume] result=timeout');
       // Yarışı kaldır: burada YALNIZ /home'a replace. Hedef tek seferlik tüketilen değişkene konur,
       // home.tsx odaklanınca (navigasyon hazır) push eder.
-      setResumedGuild(target?.guildId ?? null);
-      setPendingTarget(target?.href ?? null);
+      // C41 - çözümleme sürerken paylaşım geldiyse hedef YOK SAYILIR (/share'i ezmesin); yine de
+      // /home'a replace edilir ki (app) layout mount olup paylaşıma yönlendirsin.
+      const shareArrived = useShareIntentStore.getState().payload !== null;
+      setResumedGuild(shareArrived ? null : (target?.guildId ?? null));
+      setPendingTarget(shareArrived ? null : (target?.href ?? null));
       router.replace('/home');
       console.log(`[resume] replaced home, pendingTarget=${target ? 'set' : 'none'}`);
     });

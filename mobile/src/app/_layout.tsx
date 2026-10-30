@@ -6,6 +6,7 @@ import * as SystemUI from 'expo-system-ui';
 import { useAuthStore } from '@/stores/auth';
 import { usePushNotificationResponder } from '@/notifications/push';
 import { useIncomingCallResponder } from '@/notifications/incomingCall';
+import { useShareIntentCapture } from '@/hooks/useShareIntentCapture';
 import { theme } from '@/theme';
 import { MiniCallWindow } from '@/components/call/MiniCallWindow';
 import { IncomingCallBanner } from '@/components/call/IncomingCallBanner';
@@ -24,6 +25,9 @@ export default function RootLayout() {
   // M4a-2 sözleşme §8 — gelen arama bildirimi (Reddet/Aramaya Katıl/gövde). Aynı mount noktası,
   // aynı native response akışı (bkz. notifications/incomingCall.ts dosya başı yorumu).
   useIncomingCallResponder();
+  // C41 - Android paylaşım menüsünden gelen içerik (soğuk/sıcak) bellek deposuna alınır; yönlendirme
+  // `(app)/_layout.tsx`te (oturum + gezinme hazır olunca).
+  useShareIntentCapture();
 
   // 🔴 Sistem gezinme çubuğu ilk açılışta BEYAZ görünüyordu (sahip bulgusu 2026-08-01); login
   // ekranına çıkıp dönünce düzeliyordu. Sebep: SDK 54'te edge-to-edge açık olduğu için gezinme

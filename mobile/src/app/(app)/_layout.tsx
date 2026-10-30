@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
-import { Redirect, Stack } from 'expo-router';
+import { Redirect, Stack, usePathname, useRouter } from 'expo-router';
 import { theme } from '@/theme';
 import { useAuthStore } from '@/stores/auth';
+import { useShareIntentStore } from '@/stores/shareIntent';
 import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
 import { useUnreadStore } from '@/stores/unread';
@@ -22,6 +23,18 @@ export default function AppLayout() {
   const status = useAuthStore((s) => s.status);
   const userId = useAuthStore((s) => s.user?.id);
   useBackgroundSocket();
+
+  // C41 - Paylaşım geldiyse (soğuk ya da sıcak) `/share`e git. Bu layout yalnız (app) rotaları
+  // mount olunca vardır: gezinme hazır, ve kimliksizse aşağıdaki guard girişe yollar, girişten
+  // sonra bu effect yeniden koşar ve paylaşım hâlâ bellekte durur. Zaten /share'deysek tekrar itme.
+  const router = useRouter();
+  const pathname = usePathname();
+  const sharePayloadId = useShareIntentStore((s) => s.payload?.id ?? null);
+  useEffect(() => {
+    if (status !== 'authenticated' || sharePayloadId === null || pathname === '/share') return;
+    const timer = setTimeout(() => router.push('/share'), 0);
+    return () => clearTimeout(timer);
+  }, [status, sharePayloadId, pathname, router]);
 
   // Sözleşme §8.3 — DM store'u oturum kapsamlıdır: `useBackgroundSocket` ile aynı gerekçeyle burada
   // bağlanır. Mount = oturum başı (id yazılır, `applyActivity` "bu mesaj benim mi"yi bilir),
@@ -90,6 +103,7 @@ export default function AppLayout() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="dm-requests" />
+      <Stack.Screen name="share" />
       {/* M4a-1 sözleşme §4 — arama ekranı "tam ekran modal". Kendi başlığını çizer (headerShown
           false); Android donanım geri tuşu varsayılan pop davranışıyla küçültme ile AYNI sonucu
           verir (arama bağlı kalır, mini pencere belirir) — ayrı bir BackHandler gerekmiyor. */}

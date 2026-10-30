@@ -2139,6 +2139,23 @@
       "uploading": "Yükleniyor… {done}/{total}",
       "uploadFailed": "Dosya yüklenemedi, mesaj gönderilmedi. Tekrar deneyebilirsin."
     },
+    "share": {
+      "title": "Nereye gönderilsin?",
+      "searchPlaceholder": "Kanka, grup ya da kanal ara",
+      "sectionChats": "Sohbetler",
+      "notePlaceholder": "Not ekle (isteğe bağlı)",
+      "textPlaceholder": "Mesaj",
+      "send": "Gönder",
+      "sending": "Gönderiliyor…",
+      "noTargets": "Gönderilecek bir sohbet bulunamadı.",
+      "truncated": "En fazla {count} dosya gönderilebilir, ilk {count} dosya alındı.",
+      "partialTitle": "Mesaj gönderildi ama şu dosyalar gönderilemedi:",
+      "failedTitle": "Şu dosyalar gönderilemedi, mesaj gönderilmedi:",
+      "openChat": "Sohbeti aç",
+      "fileFallback": "Dosya",
+      "sizeMb": "{size} MB",
+      "sizeKb": "{size} KB"
+    },
     "message": {
       "placeholder": "Mesaj yaz"
     },
