@@ -1,6 +1,6 @@
 # SPRINT C35: Gelen webhook (adresle kanala mesaj, Discord biçimiyle uyumlu alt küme)
 
-> Durum: **SÖZLEŞME YAZILDI + SAHİP ONAYI (2026-10-30)** (§0.3 yazar modeli, §0.4 harici görsel yok, §3.4 kullanıcı bahsetmesi çözülmez dahil). PM compose (Opus). **api + web + mobil.**
+> Durum: **CANLI 2026-10-30 (6b65d4c), R7 sahip onaylı, sahip turu bekliyor.** Sözleşme onayı 2026-10-30 (§0.3 yazar modeli, §0.4 harici görsel yok, §3.4 kullanıcı bahsetmesi çözülmez dahil). PM compose (Opus). **api + web + mobil.**
 > **R7: auth katmanı.** Gizli token ile kimliksiz istek mesaj yazdırıyor → §2 (token üretimi, saklama, doğrulama, yürütme ucu)
 > ve §3'teki kapılar satır satır sahibe sunulur. Mesaj yazarı modeli (§1.2) T&S kararıdır, sahip onayı şart.
 
