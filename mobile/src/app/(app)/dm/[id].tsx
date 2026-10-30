@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { dmApi } from '@/api/dm';
 import type { MessageDto } from '@/api/messages';
 import { useAuthStore } from '@/stores/auth';
-import { saveDm } from '@/utils/resumeLastScreen';
+import { clearLast } from '@/utils/resumeLastScreen';
 import { useDmStore } from '@/stores/dm';
 import { useVoiceStore } from '@/stores/voice';
 import { useVoicePresenceStore, type VoicePresenceParticipant } from '@/stores/voicePresence';
@@ -152,9 +152,9 @@ export default function DmScreen() {
     }, [channelId]),
   );
 
-  // C38 — kaldığın yerden aç: son DM / grup DM kimliği (yalnız id) kaydedilir.
+  // C38 — mobilde DM / grup DM geri yüklenmez (gizlilik): son sohbet temizlenir.
   useEffect(() => {
-    if (channelId && myUserId) void saveDm(myUserId, channelId);
+    if (myUserId) void clearLast(myUserId);
   }, [channelId, myUserId]);
 
   // M4a-1 sözleşme §3.1 — ses presence aboneliği. M4b'den beri 1-1 DM VE grup DM'de (`voiceEligible`);

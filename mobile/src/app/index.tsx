@@ -9,6 +9,7 @@ import { dmRouteParams } from '@/utils/dmRoute';
 import {
   forgetChannel,
   getLastTarget,
+  setPendingTarget,
   setResumedGuild,
 } from '@/utils/resumeLastScreen';
 import { t } from '@/i18n';
@@ -16,7 +17,20 @@ import { theme } from '@/theme';
 
 // C38 — soğuk açılışta bir kez denenir (çıkış/giriş sonrası Index yeniden mount olursa tekrarlanmaz).
 let resumeAttempted = false;
-const RESUME_TIMEOUT_MS = 5000;
+const RESUME_TIMEOUT_MS = 10000;
+// Süreç başlangıcı (modül yüklenme anı): önceki oturumdan kalan bayat bildirim yanıtını ayıklamak için.
+const PROCESS_START_MS = Date.now();
+const STALE_RESPONSE_MS = 60_000;
+
+/** Bu süreçte (yakın zamanda) verilmiş bir bildirim yanıtı var mı? Bayat yanıt kaydı ENGELLEMEZ. */
+function freshNotificationResponse(): { present: boolean; stale: boolean } {
+  const last = Notifications.getLastNotificationResponse();
+  if (!last) return { present: false, stale: false };
+  const raw = last.notification.date;
+  const ms = raw < 1e12 ? raw * 1000 : raw; // saniye ya da ms gelebilir
+  const stale = ms < PROCESS_START_MS - STALE_RESPONSE_MS;
+  return { present: true, stale };
+}
 
 interface ResumeTarget {
   href: Href;
@@ -35,21 +49,26 @@ function httpStatus(e: unknown): number | undefined {
  */
 async function resolveTarget(userId: string): Promise<ResumeTarget | null> {
   const last = await getLastTarget(userId);
+  console.log(`[resume] record=${last ? last.kind : 'none'}`);
   if (!last) return null;
   try {
     if (last.kind === 'dm') {
       const dm = (await dmApi.listChannels()).find((c) => c.id === last.channelId);
       if (!dm) {
+        console.log('[resume] result=forget (dm not in list)');
         await forgetChannel(userId, last.channelId);
         return null;
       }
+      console.log('[resume] result=ok dm');
       return { href: dmRouteParams(dm) };
     }
     const ch = (await channelsApi.listByGuild(last.guildId)).find((c) => c.id === last.channelId);
     if (!ch || ch.type !== ChannelType.GUILD_TEXT || ch.locked) {
+      console.log('[resume] result=forget (channel missing/not text/locked)');
       await forgetChannel(userId, last.channelId);
       return null;
     }
+    console.log('[resume] result=ok channel');
     return {
       href: {
         pathname: '/channel/[id]',
@@ -59,6 +78,7 @@ async function resolveTarget(userId: string): Promise<ResumeTarget | null> {
     };
   } catch (e) {
     const status = httpStatus(e);
+    console.log(`[resume] result=${status === 403 || status === 404 ? 'forget' : 'network'} status=${status ?? 'none'}`);
     if (status === 403 || status === 404) await forgetChannel(userId, last.channelId);
     return null;
   }
@@ -75,23 +95,37 @@ export default function Index() {
   // C38 — bildirimle açılışta kayıt YOK SAYILIR: bildirim yönlendirmesi (notifications/responseGate)
   // kendi hedefine gider, burada ikinci bir push çakışırdı. Sorgu render'da yapılır ki bildirim
   // açılışında ilk kare doğrudan /home Redirect'i versin (sıralama: önce bu kapı, sonra gate).
+  const notif = freshNotificationResponse();
+  if (status === 'authenticated' && !resumeAttempted) {
+    console.log(
+      `[resume] gate userId=${userId ? 'yes' : 'no'} notifPresent=${notif.present} notifStale=${notif.stale}${notif.present ? ` notifDate=${String(Notifications.getLastNotificationResponse()?.notification.date)}` : ''}`,
+    );
+  }
   const mayResume =
-    status === 'authenticated' &&
-    !!userId &&
-    !resumeAttempted &&
-    !Notifications.getLastNotificationResponse();
+    status === 'authenticated' && !!userId && !resumeAttempted && !(notif.present && !notif.stale);
 
   useEffect(() => {
     if (!mayResume || !userId) return;
     resumeAttempted = true;
+    console.log(
+      `[resume] start mayResume=true notifPresent=${notif.present} notifStale=${notif.stale}`,
+    );
     setResuming(true);
-    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), RESUME_TIMEOUT_MS));
-    void Promise.race([resolveTarget(userId), timeout]).then((target) => {
-      // Ana ekran altta kalır (geri tuşu ana ekrana döner, uygulamadan çıkmaz); üstüne sohbet itilir.
+    const timeout = new Promise<'timeout'>((resolve) =>
+      setTimeout(() => resolve('timeout'), RESUME_TIMEOUT_MS),
+    );
+    void Promise.race([resolveTarget(userId), timeout]).then((result) => {
+      const target = result === 'timeout' ? null : result;
+      if (result === 'timeout') console.log('[resume] result=timeout');
+      // Yarışı kaldır: burada YALNIZ /home'a replace. Hedef tek seferlik tüketilen değişkene konur,
+      // home.tsx odaklanınca (navigasyon hazır) push eder.
       setResumedGuild(target?.guildId ?? null);
+      setPendingTarget(target?.href ?? null);
       router.replace('/home');
-      if (target) router.push(target.href);
+      console.log(`[resume] replaced home, pendingTarget=${target ? 'set' : 'none'}`);
     });
+    // notif yalnız log için; effect'i yeniden kurmasın
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mayResume, userId, router]);
 
   if (status === 'authenticated' && !mayResume && !resuming) {

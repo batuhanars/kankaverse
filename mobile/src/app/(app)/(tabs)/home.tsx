@@ -22,7 +22,7 @@ import { useUnreadStore } from '@/stores/unread';
 import { useVoiceStore } from '@/stores/voice';
 import { useGuildPermission } from '@/hooks/useGuildPermission';
 import { dmRouteParams } from '@/utils/dmRoute';
-import { getGuildChannelMap, takeResumedGuild } from '@/utils/resumeLastScreen';
+import { clearLast, getGuildChannelMap, setLastToGuild, takePendingTarget, takeResumedGuild } from '@/utils/resumeLastScreen';
 import { useAuthStore } from '@/stores/auth';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -100,6 +100,28 @@ export default function HomeScreen() {
   // değiştirebildiği için parametreyle haber vermek yetmez (hangi alanın değiştiğini bilmek
   // gerekirdi) — odaklanmada tazelemek doğru çözüm. Bildirimler sekmesindeki (M1d-0 R1-b) aynı ders.
   useFocusEffect(fetchGuilds);
+
+  // C38 — ana ekran odaktayken son sohbet: DM listesi görünümünde yok (DM geri yüklenmez), ortam
+  // kanal listesi görünümünde o ortamın son kanalı. Kanal ekranı açılınca kendi kaydını yazar.
+  const selectionGuildId = selection.type === 'guild' ? selection.id : null;
+  useFocusEffect(
+    useCallback(() => {
+      if (!myUserId) return;
+      if (selectionGuildId) void setLastToGuild(myUserId, selectionGuildId);
+      else void clearLast(myUserId);
+    }, [myUserId, selectionGuildId]),
+  );
+
+  // C38 — soğuk açılışta Index'in çözdüğü son sohbet: ana ekran odaklandığında (navigasyon hazır)
+  // bir kez push edilir; geri tuşu bu ekrana döner. Bildirim/derin bağlantı yolunda hedef yoktur.
+  useFocusEffect(
+    useCallback(() => {
+      const target = takePendingTarget();
+      if (!target) return;
+      console.log('[resume] push from home');
+      router.push(target);
+    }, [router]),
+  );
 
   // Katılma/kurma ekranları buraya parametreyle döner (sözleşme §6: ray tazelenir, yeni store yok).
   // `joinedGuildId` → listeyi tazele + o ortamı seç. `refreshGuilds` → yalnız tazele (ALREADY_MEMBER

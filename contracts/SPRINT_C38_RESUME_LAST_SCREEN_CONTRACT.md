@@ -54,3 +54,16 @@
 
 **OUT:** kaydırma konumu (mesaj listesinde nerede kalındığı) · cihazlar arası senkron (sunucuda saklama) · ayar/pencere geri getirme ·
 taslak mesaj saklama.
+
+---
+
+## §4 Ek (2026-10-30, cihaz turu)
+
+**Kök neden (mobil, "son kanal açılmıyor, ana ekran geliyor"):** iki ayrı kusur, ikisi de düzeltildi.
+1. Her soğuk açılışta `Notifications.getLastNotificationResponse()` tarihsiz/`date=0` bayat bir bildirim yanıtı döndürüyordu; C38 kapısı bunu "bildirimle açılış" sanıp kaydı yok sayıyordu (`mayResume` hep false). Çözüm: `notification.date` süreç başlangıcından 60 sn'den eskiyse bayat say, kaydı engelleme (`app/index.tsx`, yalnız C38 kapısı).
+2. `router.replace('/home')` ile `router.push(hedef)` aynı tikte verilince push yutuluyordu. Çözüm: Index yalnız `/home`'a replace eder, çözülen hedef tek seferlik değişkene (`setPendingTarget`) konur, `home.tsx` odaklanınca push eder.
+Ek: doğrulama zaman aşımı 5 sn -> 10 sn. Teşhis için `[resume]` log satırları (kimlik yok) bırakıldı.
+
+**Karar (sahip + PM, yalnız mobil; web/masaüstü değişmedi):** DM ve grup DM mobilde geri yüklenmez. Gerekçe gizlilik (Discord mobil davranışı): telefon başkasının elindeyken özel konuşma açılmasın. `dm/[id]` ekranı ve ana ekran DM görünümü son sohbeti temizler; ana ekranda ortam kanal listesi görünürken son sohbet o ortamın son kanalı olur. Sonuç tablosu: ortam kanalı -> o kanal · ortam kanal listesi -> ortamın son kanalı · DM / grup DM -> ana ekran · ana ekran DM listesi -> ana ekran. Bildirimle açılış değişmez.
+
+**Borç:** `notifications/responseGate.ts` aynı bayat bildirim yanıtını okuyor ve tarih süzgeci yok. Şu an zararsız görünüyor (cihaz turunda eski bildirim hedefi açılmadı) ama bayat yanıt `data.type` süzgecinden geçerse eski hedefe gitme riski var. Ayrı iş olarak tarih süzgeci eklenmeli.

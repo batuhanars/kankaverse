@@ -1,3 +1,4 @@
+import type { Href } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
@@ -66,9 +67,23 @@ export async function saveTextChannel(
   await write(userId, rec);
 }
 
-export async function saveDm(userId: string, channelId: string): Promise<void> {
+/**
+ * Mobilde DM / grup DM geri yüklenmez (gizlilik: telefon başkasının elindeyken özel konuşma
+ * açılmasın). DM ekranı ve ana ekran DM görünümü son sohbeti "yok"a çeker; ortam haritası kalır.
+ */
+export async function clearLast(userId: string): Promise<void> {
   const rec = await read(userId);
-  rec.last = { kind: 'dm', channelId };
+  if (!rec.last) return;
+  delete rec.last;
+  await write(userId, rec);
+}
+
+/** Ana ekranda ortam kanal listesi görünümü: son sohbet = o ortamın son kanalı (haritada yoksa yok). */
+export async function setLastToGuild(userId: string, guildId: string): Promise<void> {
+  const rec = await read(userId);
+  const channelId = rec.guilds[guildId];
+  if (channelId) rec.last = { kind: 'channel', guildId, channelId };
+  else delete rec.last;
   await write(userId, rec);
 }
 
@@ -97,4 +112,18 @@ export function takeResumedGuild(): string | null {
   const g = resumedGuildId;
   resumedGuildId = null;
   return g;
+}
+
+// Soğuk açılışta çözülen sohbet rotası: Index yalnız /home'a replace eder, home odaklanınca bunu
+// push eder (replace ile push'un aynı tikte yarışması yutuluyordu). Bir kez tüketilir.
+let pendingTarget: Href | null = null;
+
+export function setPendingTarget(href: Href | null): void {
+  pendingTarget = href;
+}
+
+export function takePendingTarget(): Href | null {
+  const h = pendingTarget;
+  pendingTarget = null;
+  return h;
 }

@@ -131,6 +131,7 @@ export default function ChannelScreen() {
   // kaydedilmez). guildId yoksa (bildirim/arama yolu) ortam haritası kurulamaz, kayıt atlanır.
   useEffect(() => {
     if (id && guildId && myUserId) void saveTextChannel(myUserId, guildId, id);
+    else console.log(`[resume] save skipped id=${!!id} guildId=${!!guildId} user=${!!myUserId}`);
   }, [id, guildId, myUserId]);
 
   if (!id) return null;
