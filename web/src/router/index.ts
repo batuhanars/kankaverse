@@ -1,5 +1,6 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, START_LOCATION } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { resumeRoute } from '@/lib/resumeLastScreen'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -171,7 +172,7 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach(async (to) => {
+router.beforeEach(async (to, from) => {
   const auth = useAuthStore()
 
   if (!auth.ready) {
@@ -185,6 +186,21 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresGuest && auth.isAuthenticated()) {
     return { name: 'app' }
+  }
+
+  // C38 — kaldığın yerden aç. YALNIZ "açık hedefsiz soğuk açılış": sayfanın ilk navigasyonu (from =
+  // START_LOCATION), hedef tam '/channels/@me' (masaüstü APP_URL'si bu), bir yönlendirmeden gelmiyor
+  // (bilinmeyen yol catch-all'u, login/guest dönüşü değil) ve sorgu/hash yok. Bildirim tıklaması, davet,
+  // yer imli/yazılmış kanal adresi zaten başka bir yola düşer; açılıştan sonra kullanıcının ana ekrana
+  // dönüşü ise START_LOCATION olmadığı için yönlendirilmez.
+  if (
+    from === START_LOCATION &&
+    to.name === 'app' &&
+    !to.redirectedFrom &&
+    to.fullPath === '/channels/@me' &&
+    auth.user
+  ) {
+    return resumeRoute(auth.user.id) ?? undefined
   }
 })
 

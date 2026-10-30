@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { dmApi } from '@/api/dm';
 import type { MessageDto } from '@/api/messages';
 import { useAuthStore } from '@/stores/auth';
+import { saveDm } from '@/utils/resumeLastScreen';
 import { useDmStore } from '@/stores/dm';
 import { useVoiceStore } from '@/stores/voice';
 import { useVoicePresenceStore, type VoicePresenceParticipant } from '@/stores/voicePresence';
@@ -150,6 +151,11 @@ export default function DmScreen() {
       return () => useDmStore.getState().setActiveDm(null);
     }, [channelId]),
   );
+
+  // C38 — kaldığın yerden aç: son DM / grup DM kimliği (yalnız id) kaydedilir.
+  useEffect(() => {
+    if (channelId && myUserId) void saveDm(myUserId, channelId);
+  }, [channelId, myUserId]);
 
   // M4a-1 sözleşme §3.1 — ses presence aboneliği. M4b'den beri 1-1 DM VE grup DM'de (`voiceEligible`);
   // grup DM kapsam dışı bırakılışı M4a'nın sınırıydı, bu sprintte kalktı. "Arama başlatma = katılma"

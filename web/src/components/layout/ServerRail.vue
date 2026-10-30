@@ -5,6 +5,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useAuthStore } from '@/stores/auth'
+import { pickChannelForGuild } from '@/lib/resumeLastScreen'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { useGuildMenuActions } from '@/composables/useGuildMenuActions'
 import { useMenuCoordinator } from '@/composables/useMenuCoordinator'
@@ -258,7 +259,7 @@ async function selectGuild(guild: GuildDto) {
   }
   const channels = channelsStore.channelsForGuild(guild.id)
   if (channels.length > 0) {
-    router.push({ name: 'channel', params: { guildId: guild.id, channelId: channels[0].id } })
+    router.push({ name: 'channel', params: { guildId: guild.id, channelId: pickChannelForGuild(authStore.user?.id, guild.id, channels) ?? channels[0].id } })
   } else {
     // Kanal yok — guild'i aktif yap ama kanal route'u açma
     guildsStore.setActiveGuild(guild.id)

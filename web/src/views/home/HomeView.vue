@@ -11,6 +11,7 @@ import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { pickChannelForGuild } from '@/lib/resumeLastScreen'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
@@ -55,7 +56,7 @@ async function openGuild(guildId: string) {
   }
   const channels = channelsStore.channelsForGuild(guildId)
   if (channels.length > 0) {
-    router.push({ name: 'channel', params: { guildId, channelId: channels[0].id } })
+    router.push({ name: 'channel', params: { guildId, channelId: pickChannelForGuild(authStore.user?.id, guildId, channels) ?? channels[0].id } })
   } else {
     guildsStore.setActiveGuild(guildId)
     channelsStore.setActiveChannel(null)

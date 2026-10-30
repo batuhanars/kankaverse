@@ -2,6 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { pickChannelForGuild } from '@/lib/resumeLastScreen'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
@@ -10,6 +12,7 @@ const emit = defineEmits<{ close: []; selectDm: [channelId: string] }>()
 
 const { t } = useI18n()
 const router = useRouter()
+const authStore = useAuthStore()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
@@ -79,7 +82,7 @@ async function selectGuild(guildId: string) {
   }
   const channels = channelsStore.channelsForGuild(guildId)
   if (channels.length) {
-    router.push({ name: 'channel', params: { guildId, channelId: channels[0].id } })
+    router.push({ name: 'channel', params: { guildId, channelId: pickChannelForGuild(authStore.user?.id, guildId, channels) ?? channels[0].id } })
   } else {
     guildsStore.setActiveGuild(guildId)
     channelsStore.setActiveChannel(null)

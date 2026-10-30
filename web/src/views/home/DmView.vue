@@ -5,6 +5,8 @@
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { forgetChannel, saveDm } from '@/lib/resumeLastScreen'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
@@ -19,6 +21,7 @@ const props = defineProps<{ channelId: string }>()
 
 const { t } = useI18n()
 const router = useRouter()
+const authStore = useAuthStore()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
@@ -54,9 +57,11 @@ async function sync(channelId: string) {
     }
   }
   if (!dmStore.channels.find((c) => c.id === channelId)) {
+    if (authStore.user) forgetChannel(authStore.user.id, channelId) // C38 — erişilemeyen DM kaydı silinir
     await router.replace({ name: 'app' })
     return
   }
+  if (authStore.user) saveDm(authStore.user.id, channelId) // C38
 
   guildsStore.setActiveGuild(null)
   const prev = channelsStore.activeChannelId

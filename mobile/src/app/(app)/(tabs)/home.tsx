@@ -22,6 +22,8 @@ import { useUnreadStore } from '@/stores/unread';
 import { useVoiceStore } from '@/stores/voice';
 import { useGuildPermission } from '@/hooks/useGuildPermission';
 import { dmRouteParams } from '@/utils/dmRoute';
+import { getGuildChannelMap, takeResumedGuild } from '@/utils/resumeLastScreen';
+import { useAuthStore } from '@/stores/auth';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -31,9 +33,21 @@ import { theme } from '@/theme';
 export default function HomeScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ joinedGuildId?: string; refreshGuilds?: string }>();
-  const [selection, setSelection] = useState<RailSelection>({ type: 'dm' });
+  // C38 — soğuk açılışta son sohbet bir ortam kanalıysa ana ekran o ortam seçili açılır (geri tuşuyla
+  // dönülen yer); aksi halde bugünkü gibi DM. Değer `app/index.tsx` doğrulamasından geçmiştir.
+  const [selection, setSelection] = useState<RailSelection>(() => {
+    const resumed = takeResumedGuild();
+    return resumed ? { type: 'guild', id: resumed } : { type: 'dm' };
+  });
 
-  const [lastOpenedChannelId, setLastOpenedChannelId] = useState<string>();
+  // C38 §2.3 — ortam başına son açılan kanal (vurgu için; OTOMATİK AÇILMAZ). Eskiden tek bir
+  // "son açılan kanal" vardı, ortam değişince kayboluyordu; artık kalıcı harita.
+  const myUserId = useAuthStore((s) => s.user?.id);
+  const [lastChannelByGuild, setLastChannelByGuild] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!myUserId) return;
+    void getGuildChannelMap(myUserId).then((map) => setLastChannelByGuild((cur) => ({ ...map, ...cur })));
+  }, [myUserId]);
 
   const [guildState, setGuildState] = useState<'loading' | 'error' | 'ready'>('loading');
   const [guilds, setGuilds] = useState<GuildSummaryDto[]>([]);
@@ -209,7 +223,7 @@ export default function HomeScreen() {
     }
     // Sözleşme §8.1-A/1 — vurgu için "en son açılan kanal" burada tutulur (ChannelSidebar ortam
     // değişiminde remount olduğu için kendi içinde tutamaz; ayrıca kanal ekranı ayrı bir route).
-    setLastOpenedChannelId(channel.id);
+    if (channel.guildId) setLastChannelByGuild((cur) => ({ ...cur, [channel.guildId as string]: channel.id }));
     // `guildId` M1h ile eklendi: kanal ekranı sabitleme yetkisini (MANAGE_MESSAGES) bunun
     // üzerinden hesaplıyor. Kanal nesnesi zaten taşıyor, ek istek yok.
     router.push({
@@ -325,7 +339,7 @@ export default function HomeScreen() {
           key={selection.id}
           guildId={selection.id}
           guildName={selectedGuildName}
-          selectedChannelId={lastOpenedChannelId}
+          selectedChannelId={lastChannelByGuild[selection.id]}
           onOpenChannel={openChannel}
           guildBannerUrl={selectedGuild?.bannerUrl}
           guildBannerAnimatedUrl={selectedGuild?.bannerAnimatedUrl}

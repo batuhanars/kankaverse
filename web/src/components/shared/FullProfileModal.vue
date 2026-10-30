@@ -16,6 +16,7 @@ import { useDmStore } from '@/stores/dm'
 import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
 import { useAuthStore } from '@/stores/auth'
+import { pickChannelForGuild } from '@/lib/resumeLastScreen'
 import { renderMessageHtml } from '@/utils/markdown'
 import { bannerBackground } from '@/utils/bannerColor'
 import { animatedOrStatic } from '@/utils/animatedMedia'
@@ -45,7 +46,7 @@ async function goToGuild(guildId: string) {
   }
   const channels = channelsStore.channelsForGuild(guildId)
   if (channels.length > 0) {
-    router.push({ name: 'channel', params: { guildId, channelId: channels[0].id } })
+    router.push({ name: 'channel', params: { guildId, channelId: pickChannelForGuild(authStore.user?.id, guildId, channels) ?? channels[0].id } })
   } else {
     guildsStore.setActiveGuild(guildId)
     channelsStore.setActiveChannel(null)

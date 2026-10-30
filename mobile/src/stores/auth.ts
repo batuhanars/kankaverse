@@ -12,6 +12,7 @@ import {
 } from '@/api/http';
 import { resetSocket } from '@/realtime/socket';
 import { clearPushToken } from '@/notifications/push';
+import { clearResume } from '@/utils/resumeLastScreen';
 
 export type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated';
 export type LoginResult = 'ok' | 'challenge' | 'error';
@@ -145,6 +146,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // token TEMİZLENMEDEN önce çağrılır — uç `Authorization` ister (kendi token'ını sil), sıra
       // değişirse 401 alır ve token sunucuda asılı kalır.
       await clearPushToken();
+      // C38 — kaldığın yerden aç kaydı çıkışta silinir (kullanıcı kimliği silinmeden önce).
+      await clearResume(get().user?.id);
       clearAccessToken();
       await clearRefreshToken();
       resetSocket();

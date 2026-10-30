@@ -9,6 +9,7 @@ import { MessageScreen } from '@/components/MessageScreen';
 import { ChatBackButton } from '@/components/ChatBackButton';
 import { useGuildPermission } from '@/hooks/useGuildPermission';
 import { useAuthStore } from '@/stores/auth';
+import { saveTextChannel } from '@/utils/resumeLastScreen';
 import { useUnreadStore } from '@/stores/unread';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -125,6 +126,12 @@ export default function ChannelScreen() {
   useEffect(() => {
     if (id && guildId) useUnreadStore.getState().clearChannel(id, guildId);
   }, [id, guildId]);
+
+  // C38 — kaldığın yerden aç: bu ekran yalnız metin kanalıdır (sesli kanal /call'a gider, hiç
+  // kaydedilmez). guildId yoksa (bildirim/arama yolu) ortam haritası kurulamaz, kayıt atlanır.
+  useEffect(() => {
+    if (id && guildId && myUserId) void saveTextChannel(myUserId, guildId, id);
+  }, [id, guildId, myUserId]);
 
   if (!id) return null;
   // KUSUR 2 — `name` yoksa (push/bildirim yolu) yukarıdaki `resolvedName`'e düş; o da yoksa (henüz

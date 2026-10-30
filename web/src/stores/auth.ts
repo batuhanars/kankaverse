@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { authApi, type LoginPayload, type RegisterPayload } from '@/api/auth'
 import { setAccessToken, clearAccessToken } from '@/api/axios'
+import { clearResume } from '@/lib/resumeLastScreen'
 import type { UserDto, LoginChallengeDto } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -48,6 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await authApi.logout()
     } finally {
+      clearResume(user.value?.id)
       clearAccessToken()
       user.value = null
     }
@@ -62,6 +64,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Tüm oturum kapatıldığında (hesap silme vb.) API çağrısı olmadan local state temizler
   function clearAuth() {
+    clearResume(user.value?.id)
     clearAccessToken()
     user.value = null
   }
