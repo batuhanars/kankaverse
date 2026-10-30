@@ -20,6 +20,7 @@ import AuditLogSection from './AuditLogSection.vue'
 import WebhooksSection from './WebhooksSection.vue'
 import StreamAnnounceCard from './StreamAnnounceCard.vue'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
+import { inviteUrl } from '@/utils/inviteLink'
 import { guildBannerSrc, guildIconSrc } from '@/utils/animatedMedia'
 import { BANNER_PRESET_KEYS, bannerBackground } from '@/utils/bannerColor'
 import type { InviteDto, GuildDto } from '@/types'
@@ -204,10 +205,21 @@ const createdInvite = ref<InviteDto | null>(null)
 
 const inviteLink = computed(() => {
   if (!createdInvite.value) return ''
-  return `${window.location.origin}/invite/${createdInvite.value.code}`
+  return inviteUrl(createdInvite.value.code)
 })
 
 const { copy, copied } = useClipboard({ source: inviteLink })
+
+// Liste satırı kopyalama: tam bağlantı, kısa süreli "Kopyalandı"
+const { copy: copyText } = useClipboard()
+const copiedCode = ref<string | null>(null)
+async function copyInvite(code: string) {
+  await copyText(inviteUrl(code))
+  copiedCode.value = code
+  setTimeout(() => {
+    if (copiedCode.value === code) copiedCode.value = null
+  }, 1500)
+}
 
 async function createInvite() {
   creatingInvite.value = true
@@ -891,13 +903,19 @@ function confirmNavDiscard() {
                   class="flex items-center gap-3 px-3 py-2 rounded-[var(--kv-radius-md)] border"
                   style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
                 >
-                  <code class="flex-1 text-[13px] font-mono" style="color: var(--kv-text-primary);">{{ inv.code }}</code>
+                  <div class="flex-1 min-w-0 flex flex-col">
+                    <span class="text-[13px] font-mono truncate" style="color: var(--kv-text-primary);">{{ inviteUrl(inv.code) }}</span>
+                    <code class="text-[11px] font-mono" style="color: var(--kv-text-muted);">{{ inv.code }}</code>
+                  </div>
                   <span class="text-[12px] shrink-0" style="color: var(--kv-text-muted);">
                     {{ t('invite.usesCount', { uses: inv.uses, max: inv.maxUses ?? '∞' }) }}
                   </span>
                   <span class="text-[12px] shrink-0" style="color: var(--kv-text-muted);">
                     {{ formatExpiry(inv.expiresAt) }}
                   </span>
+                  <KvButton size="sm" @click="copyInvite(inv.code)">
+                    {{ copiedCode === inv.code ? t('invite.copied') : t('invite.copy') }}
+                  </KvButton>
                   <KvButton size="sm" variant="danger" @click="revokeTarget = inv">
                     {{ t('invite.revoke') }}
                   </KvButton>

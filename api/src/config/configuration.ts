@@ -176,6 +176,8 @@ export default () => {
       dailyCapUsd: parseFloat(process.env.AI_VIDEO_DAILY_CAP_USD ?? '3'),
       // C33: kullanıcıya görünen birim "kredi"; 1 kredi = bu kadar mikro-USD (10000 = 0,01 $)
       creditMicroUsd: parseInt(process.env.AI_VIDEO_CREDIT_MICRO_USD ?? '10000', 10) || 10000,
+      // C39: kilitli kullanıcıya "Ortama katıl" düğmesi için davet kodu. boş env değeri varsayılana düşer
+      accessInviteCode: process.env.AI_VIDEO_ACCESS_INVITE_CODE?.trim() || 'QGJVTH5K',
       userIds: (process.env.AI_VIDEO_USER_IDS ?? '')
         .split(',')
         .map((id) => id.trim())

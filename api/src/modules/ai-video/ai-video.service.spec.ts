@@ -416,6 +416,15 @@ describe('AiVideoService C14c', () => {
       spentTodayCredits: 0,
     });
     expect(pika.quote).not.toHaveBeenCalled();
+    expect(res.accessInviteCode).toBeNull(); // kod yapilandirilmamis
+  });
+
+  it('options: kod yalniz kilitli kullaniciya doner', async () => {
+    const s = setup();
+    (s.service as unknown as { config: { get: (k: string) => unknown } }).config.get = (k) =>
+      k === 'aiVideo.accessInviteCode' ? 'ABC123' : k === 'aiVideo.models' ? ['pika-2.5'] : undefined;
+    expect((await s.service.options('u1', false)).accessInviteCode).toBe('ABC123');
+    expect((await s.service.options('u1', true)).accessInviteCode).toBeNull();
   });
 
   it('options: modelde audio doner', async () => {

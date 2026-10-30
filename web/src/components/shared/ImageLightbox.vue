@@ -7,7 +7,7 @@ import { downloadAttachment } from '@/utils/downloadAttachment'
 
 const props = defineProps<{
   url: string
-  attachmentId: string
+  attachmentId?: string // yoksa indirme düğmesi çıkmaz (C39: başkasının avatarı)
   filename?: string
 }>()
 
@@ -15,20 +15,23 @@ const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 
+// Pencere yakalama aşamasında dinler: başka bir modalın içinden açıldığında Esc yalnız görüntüleyiciyi kapatır
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') emit('close')
+  if (e.key !== 'Escape') return
+  e.stopPropagation()
+  emit('close')
 }
 
 onMounted(() => {
-  document.addEventListener('keydown', onKeydown)
+  window.addEventListener('keydown', onKeydown, true)
 })
 onUnmounted(() => {
-  document.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('keydown', onKeydown, true)
 })
 
 const downloading = ref(false)
 async function download() {
-  if (downloading.value) return
+  if (downloading.value || !props.attachmentId) return
   downloading.value = true
   try {
     await downloadAttachment(props.attachmentId)
@@ -45,14 +48,14 @@ async function download() {
     <div
       class="fixed inset-0 z-50 flex items-center justify-center"
       style="background-color: var(--kv-bg-overlay);"
-      @click.self="emit('close')"
+      @click.self.stop="emit('close')"
     >
       <!-- Kapat butonu -->
       <button
         class="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-[20px] cursor-pointer transition-opacity hover:opacity-70"
         style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
         :aria-label="t('common.close')"
-        @click="emit('close')"
+        @click.stop="emit('close')"
       >
         ✕
       </button>
@@ -67,6 +70,7 @@ async function download() {
 
       <!-- İndir butonu -->
       <button
+        v-if="attachmentId"
         :disabled="downloading"
         class="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-[var(--kv-radius-sm)] text-[13px] font-medium cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-50"
         style="background-color: var(--kv-bg-elevated); color: var(--kv-accent-500);"

@@ -40,6 +40,8 @@ export interface AiVideoOptionsDto {
   models: AiVideoModelOption[];
   dailyCapCredits: number;
   spentTodayCredits: number;
+  /** C39: yalnız kilitli kullanıcıya dolu. */
+  accessInviteCode?: string | null;
 }
 
 export interface AiVideoSelection {

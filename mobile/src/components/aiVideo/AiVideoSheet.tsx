@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import type { AiVideoDto } from '@/api/aiVideo';
 import type { PickedProfileMedia } from '@/utils/animatedMedia';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -66,6 +67,7 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
   const bottomInset = useSheetInsets();
   const keyboard = useKeyboardVisible();
   const ai = useAiVideo();
+  const router = useRouter();
   const [confirmClear, setConfirmClear] = useState(false);
   const actions = useAiVideoActions({
     mode,
@@ -77,6 +79,13 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
   const { row } = actions;
   const form = ai.form;
   const modelLabel = form.options?.models.find((m) => m.key === row?.model)?.label;
+  // C39: kilitli kullanıcı mevcut davet akışına (join-guild, kod parametreli davetiye modu) gider; sayfa kapanır
+  function joinAccessGuild() {
+    const inviteCode = form.options?.accessInviteCode;
+    if (!inviteCode) return;
+    onClose();
+    router.push({ pathname: '/join-guild', params: { code: inviteCode } });
+  }
   const canSubmit = !ai.busy && (ai.prompt.trim().length > 0 || !!ai.image.image);
   const others = ai.recent.filter((r) => r.id !== ai.job?.id);
 
@@ -167,6 +176,8 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
               canSubmit={canSubmit}
               busy={ai.busy}
               locked={ai.locked}
+              inviteCode={form.options?.accessInviteCode ?? null}
+              onJoin={joinAccessGuild}
               onSubmit={() => void ai.submit()}
             />
           </View>

@@ -1,8 +1,10 @@
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { UserCardDto } from '@/api/users';
 import { bannerColors } from '@/utils/bannerColor';
 import { animatedOrStatic, useReduceMotion } from '@/utils/animatedMedia';
+import { ImageViewer } from '../ImageViewer';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -38,6 +40,8 @@ interface Props {
    * yerde kalsın diye tek bayrakla ayrıldı.
    */
   showDetails?: boolean;
+  /** C39 §3: avatara dokununca tam ekran görüntüleyici açılır (avatar yoksa dokunulmaz). İndir düğmesi yok. */
+  enlargeAvatar?: boolean;
 }
 
 /** Kök CLAUDE.md — TR tarih biçimi "25 Ekim 2023". */
@@ -45,7 +49,8 @@ function formatMemberSince(iso: string): string {
   return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-export function ProfileHeader({ username, avatarUrl, card, surfaceColor, showDetails = true }: Props) {
+export function ProfileHeader({ username, avatarUrl, card, surfaceColor, showDetails = true, enlargeAvatar = false }: Props) {
+  const [avatarOpen, setAvatarOpen] = useState(false);
   // 🔴 `bannerColor` bir CSS rengi DEĞİL, preset anahtarı ('blue', 'cream'…). Önce düz
   // `backgroundColor` olarak veriliyordu; 'blue' gibi bazı anahtarlar CSS renk adına denk geldiği
   // için kısmen çalışıyor, 'cream'/'dark' gibi olanlar hiç çalışmıyordu. Artık web'le aynı
@@ -71,7 +76,15 @@ export function ProfileHeader({ username, avatarUrl, card, surfaceColor, showDet
         )}
 
         {avatarSrc ? (
-          <Image source={{ uri: avatarSrc }} style={[styles.avatar, !!surfaceColor && { borderColor: surfaceColor }]} />
+          <Pressable
+            onPress={() => setAvatarOpen(true)}
+            disabled={!enlargeAvatar}
+            accessibilityRole={enlargeAvatar ? 'button' : undefined}
+            accessibilityLabel={enlargeAvatar ? t('profile.enlargeAvatar') : undefined}
+            style={styles.avatarSlot}
+          >
+            <Image source={{ uri: avatarSrc }} style={[styles.avatarImage, !!surfaceColor && { borderColor: surfaceColor }]} />
+          </Pressable>
         ) : (
           // 🔴 Yedek avatar İKİ KATMAN (sahip bulgusu 2026-08-01): `accentSubtle` bir token ama
           // YARI SAYDAM (`rgba(255,107,61,0.12)`). Tek katman kullanılınca arkasındaki afiş
@@ -85,6 +98,10 @@ export function ProfileHeader({ username, avatarUrl, card, surfaceColor, showDet
           </View>
         )}
       </View>
+
+      {enlargeAvatar ? (
+        <ImageViewer visible={avatarOpen} url={avatarSrc} onClose={() => setAvatarOpen(false)} />
+      ) : null}
 
       <View style={styles.body}>
         <Text style={styles.username}>{username}</Text>
@@ -125,6 +142,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: theme.layout.panelGap * 1.5,
     top: BANNER_H - OVERLAP,
+    width: AVATAR,
+    height: AVATAR,
+    borderRadius: AVATAR / 2,
+    borderWidth: 4,
+    borderColor: theme.colors.bgContent,
+  },
+  // Dokunma alanı + konum; görsel dairenin kendisi (kenarlık/yuvarlak) avatarImage'da.
+  avatarSlot: {
+    position: 'absolute',
+    left: theme.layout.panelGap * 1.5,
+    top: BANNER_H - OVERLAP,
+    width: AVATAR,
+    height: AVATAR,
+  },
+  avatarImage: {
     width: AVATAR,
     height: AVATAR,
     borderRadius: AVATAR / 2,

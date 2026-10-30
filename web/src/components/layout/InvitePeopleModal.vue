@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@vueuse/core'
+import { inviteUrl } from '@/utils/inviteLink'
 import { invitesApi } from '@/api/invites'
 import { friendsApi } from '@/api/friends'
 import { guildsApi } from '@/api/guilds'
@@ -21,10 +22,7 @@ const toast = useToastStore()
 const creating = ref(true)
 const inviteCode = ref<string | null>(null)
 
-// GuildSettingsView ile BİREBİR aynı format: origin + /invite/:code
-const inviteLink = computed(() =>
-  inviteCode.value ? `${window.location.origin}/invite/${inviteCode.value}` : '',
-)
+const inviteLink = computed(() => (inviteCode.value ? inviteUrl(inviteCode.value) : ''))
 
 const { copy, copied } = useClipboard({ source: inviteLink })
 

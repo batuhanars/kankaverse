@@ -22,6 +22,7 @@ import { bannerBackground } from '@/utils/bannerColor'
 import { animatedOrStatic } from '@/utils/animatedMedia'
 import { useActivityStore } from '@/stores/activity'
 import { formatElapsed } from '@/utils/formatElapsed'
+import ImageLightbox from '@/components/shared/ImageLightbox.vue'
 import GameLogo from '@/components/shared/GameLogo.vue'
 import GamepadIcon from '@/components/shared/GamepadIcon.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
@@ -70,6 +71,7 @@ const game = computed(() => activityStore.getGame(props.card.id))
 
 // C31f: son 7 günde oynananlar. Ayar kapalı/görünürlük yoksa sunucu boş dizi verir; hata da boş sayılır.
 const recentGames = ref<RecentGameDto[]>([])
+const avatarOpen = ref(false)
 const hasActivity = computed(() => !!game.value || recentGames.value.length > 0)
 onMounted(async () => {
   try {
@@ -222,7 +224,13 @@ async function runConfirm() {
             <div class="absolute left-6 -bottom-12 z-10">
               <div
                 class="w-[104px] h-[104px] rounded-full border-4 overflow-hidden flex items-center justify-center text-[34px] font-bold text-white"
+                :class="card.avatarUrl ? 'cursor-pointer' : ''"
                 style="border-color: var(--kv-bg-content); background-color: var(--kv-accent-500);"
+                :role="card.avatarUrl ? 'button' : undefined"
+                :tabindex="card.avatarUrl ? 0 : undefined"
+                :aria-label="card.avatarUrl ? t('profile.enlargeAvatar') : undefined"
+                @click="card.avatarUrl && (avatarOpen = true)"
+                @keydown.enter.prevent="card.avatarUrl && (avatarOpen = true)"
               >
                 <img v-if="card.avatarUrl" :src="animatedOrStatic(card, 'avatar') ?? card.avatarUrl" :alt="card.username" class="w-full h-full object-cover" />
                 <span v-else>{{ card.username[0].toUpperCase() }}</span>
@@ -451,6 +459,13 @@ async function runConfirm() {
         </div>
       </div>
     </div>
+
+    <ImageLightbox
+      v-if="avatarOpen && card.avatarUrl"
+      :url="animatedOrStatic(card, 'avatar') ?? card.avatarUrl"
+      :filename="card.username"
+      @close="avatarOpen = false"
+    />
 
     <ConfirmDialog
       v-if="confirmState.show"

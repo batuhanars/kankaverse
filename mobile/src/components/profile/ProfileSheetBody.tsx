@@ -78,6 +78,7 @@ export function ProfileSheetBody({ username, avatarUrl, card, identityFooter }: 
         surfaceColor={theme.colors.bgSidebar}
         // bio + üyelik tarihi aşağıda başlıklı bölüm olarak çiziliyor (R3 yerleşimi).
         showDetails={false}
+        enlargeAvatar
       />
 
       {/* C31b: oynadığı oyun. Kullanıcı çevrimdışıysa sunucu zaten null yayar; görünürlük kararı sunucuda. */}

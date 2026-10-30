@@ -8,6 +8,7 @@
  */
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import AiVideoOptions from '@/components/shared/AiVideoOptions.vue'
@@ -19,6 +20,15 @@ import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo'
 
 const props = defineProps<{ mode: 'chat' | 'media' }>()
 const emit = defineEmits<{ close: []; use: [file: File]; send: [attachmentId: string] }>()
+const router = useRouter()
+
+// C39: kilitli kullanıcı davet ekranına gider (mevcut /invite/:code akışı), pencere kapanır
+function joinAccessGuild() {
+  const code = form.options.value?.accessInviteCode
+  if (!code) return
+  emit('close')
+  void router.push(`/invite/${code}`)
+}
 
 const { t } = useI18n()
 const ai = useAiVideo()
@@ -231,7 +241,9 @@ async function onPrimary() {
           :can-submit="canSubmit"
           :busy="ai.busy.value"
           :locked="ai.locked"
+          :invite-code="form.options.value?.accessInviteCode ?? null"
           @submit="ai.submit"
+          @join="joinAccessGuild"
         />
       </template>
 

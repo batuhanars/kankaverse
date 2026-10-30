@@ -18,8 +18,9 @@ const props = defineProps<{
   canSubmit: boolean
   busy: boolean
   locked?: boolean // C33: pasif tanıtım, Oluştur kapalı + "yakında" notu
+  inviteCode?: string | null // C39: doluysa not davet metnine döner + "Ortama katıl" düğmesi
 }>()
-const emit = defineEmits<{ submit: [] }>()
+const emit = defineEmits<{ submit: []; join: [] }>()
 
 const { t, n } = useI18n()
 const num = (v: number) => n(v, { maximumFractionDigits: 0 })
@@ -56,7 +57,16 @@ const disabled = computed(
     <p class="text-[12px]" style="color: var(--kv-text-muted);">
       {{ t('aiVideo.spentLine', { spent: num(spentTodayCredits), cap: num(dailyCapCredits) }) }}
     </p>
-    <p v-if="locked" class="text-[13px]" style="color: var(--kv-text-secondary);">{{ t('aiVideo.lockedNote') }}</p>
+    <template v-if="locked">
+      <p class="text-[13px]" style="color: var(--kv-text-secondary);">
+        {{ inviteCode ? t('aiVideo.lockedNoteInvite') : t('aiVideo.lockedNote') }}
+      </p>
+      <div v-if="inviteCode" class="pt-1">
+        <KvButton size="sm" variant="ghost" class="border border-[var(--kv-border-subtle)]" @click="emit('join')">
+          {{ t('aiVideo.joinGuild') }}
+        </KvButton>
+      </div>
+    </template>
     <p v-if="overCap" class="text-[12px]" style="color: var(--kv-danger);">{{ t('aiVideo.overCap') }}</p>
   </div>
 </template>

@@ -5,21 +5,9 @@ import * as Clipboard from 'expo-clipboard';
 import { guildsApi } from '@/api/guilds';
 import { extractErrorMessage } from '@/api/errors';
 import { InviteFriendsSection } from '@/components/guild/InviteFriendsSection';
+import { inviteLink } from '@/utils/inviteLink';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
-
-/**
- * Paylaşılan davet linki — **web ile birebir aynı format** (`InvitePeopleModal.vue`:
- * `origin + /invite/:code`). Mobil yeni bir link formatı UYDURMAZ; iki istemci aynı linki üretir,
- * yoksa aynı davetin iki farklı görüntüsü ortaya çıkar.
- *
- * Kök `EXPO_PUBLIC_WEB_URL` (M1c'de yasal sayfalar için eklenmişti) — `EXPO_PUBLIC_API_URL` ile
- * KARIŞTIRILMAZ: davet linki insanın tarayıcıda açacağı adrestir, API adresi değil.
- */
-function inviteLink(code: string): string {
-  const base = (process.env.EXPO_PUBLIC_WEB_URL ?? '').replace(/\/+$/, '');
-  return `${base}/invite/${code}`;
-}
 
 // Sprint M1d contract §2.4 — davet üret & paylaş. Yalnız OWNER/ADMIN'e açılır; bu ekrana giden
 // düğme ChannelSidebar'da zaten yetkiye göre render ediliyor (yetkisize disabled düğme gösterilmez).

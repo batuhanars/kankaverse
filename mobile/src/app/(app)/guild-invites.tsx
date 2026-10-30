@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { guildsApi, type InviteDto } from '@/api/guilds';
 import { extractErrorMessage } from '@/api/errors';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { inviteLink } from '@/utils/inviteLink';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -83,7 +84,7 @@ export default function GuildInvitesScreen() {
   }
 
   async function copy(code: string) {
-    await Clipboard.setStringAsync(code);
+    await Clipboard.setStringAsync(inviteLink(code));
     setCopied(code);
   }
 
@@ -136,6 +137,7 @@ export default function GuildInvitesScreen() {
           renderItem={({ item }) => (
             <View style={styles.row}>
               <Pressable style={styles.rowBody} onPress={() => copy(item.code)}>
+                <Text style={styles.link} numberOfLines={1}>{inviteLink(item.code)}</Text>
                 <Text style={styles.code}>{item.code}</Text>
                 <Text style={styles.meta}>{summary(item)}</Text>
                 {copied === item.code ? <Text style={styles.copied}>{t('invite.copied')}</Text> : null}
@@ -189,12 +191,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   rowBody: { flex: 1, minWidth: 0 },
-  code: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.base,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
+  link: { color: theme.colors.textPrimary, fontSize: theme.fontSize.base, fontWeight: '600' },
+  code: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs, marginTop: 2, letterSpacing: 1 },
   meta: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs, marginTop: 2 },
   copied: { color: theme.colors.accent500, fontSize: theme.fontSize.xs, marginTop: 2 },
   revoke: { padding: 4 },

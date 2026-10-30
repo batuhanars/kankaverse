@@ -75,6 +75,10 @@ export class AiVideoService {
       todaySpentUsd: usd(spentMicro),
       dailyCapCredits: toCredits(capMicro, this.creditMicro()),
       spentTodayCredits: toCredits(spentMicro, this.creditMicro()),
+      // C39: yalnız kilitli (allowed=false) iken; erişimli kullanıcıya gereksiz
+      accessInviteCode: allowed
+        ? null
+        : (this.config.get<string | null>('aiVideo.accessInviteCode') ?? null),
     };
   }
 

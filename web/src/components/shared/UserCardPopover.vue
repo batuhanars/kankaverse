@@ -14,6 +14,7 @@ import { messagesApi } from '@/api/messages'
 import { bannerBackground } from '@/utils/bannerColor'
 import { animatedOrStatic } from '@/utils/animatedMedia'
 import ReportModal from './ReportModal.vue'
+import ImageLightbox from '@/components/shared/ImageLightbox.vue'
 import FullProfileModal from './FullProfileModal.vue'
 import type { UserProfileCardDto } from '@/types'
 
@@ -115,6 +116,7 @@ const added = ref(false)
 const errorMsg = ref('')
 const showReportModal = ref(false)
 const showFullProfile = ref(false)
+const avatarOpen = ref(false)
 let errorTimer: ReturnType<typeof setTimeout> | null = null
 
 // Kendi profilini şikayet etme
@@ -148,7 +150,7 @@ function onDocClick(e: MouseEvent) {
   // Tam profil / rapor modalı açıkken popover dışı-tıklama ile kapanmamalı:
   // bu modaller Teleport ile popoverEl DIŞINDA render olur; içlerine tıklama
   // yanlışlıkla popover'ı (ve child modalı) kapatırdı. Modal kendi kapanışını yönetir.
-  if (showFullProfile.value || showReportModal.value) return
+  if (showFullProfile.value || showReportModal.value || avatarOpen.value) return
   if (popoverEl.value && !popoverEl.value.contains(e.target as Node)) {
     emit('close')
   }
@@ -252,7 +254,13 @@ async function addFriend() {
           <!-- Avatar (banner'a binen; absolute → kırpılmaz) -->
           <div
             class="absolute left-4 -bottom-8 z-10 w-[68px] h-[68px] rounded-full border-4 overflow-hidden flex items-center justify-center text-[24px] font-bold text-white"
+            :class="card.avatarUrl ? 'cursor-pointer' : ''"
             style="border-color: var(--kv-bg-elevated); background-color: var(--kv-accent-500);"
+            :role="card.avatarUrl ? 'button' : undefined"
+            :tabindex="card.avatarUrl ? 0 : undefined"
+            :aria-label="card.avatarUrl ? t('profile.enlargeAvatar') : undefined"
+            @click="card.avatarUrl && (avatarOpen = true)"
+            @keydown.enter.prevent="card.avatarUrl && (avatarOpen = true)"
           >
             <img v-if="card.avatarUrl" :src="animatedOrStatic(card, 'avatar') ?? card.avatarUrl" :alt="card.username" class="w-full h-full object-cover" />
             <span v-else>{{ card.username[0].toUpperCase() }}</span>
@@ -394,6 +402,14 @@ async function addFriend() {
     target-type="USER"
     :target-id="card.id"
     @close="showReportModal = false; emit('close')"
+  />
+
+  <!-- Avatar büyütme (C39) -->
+  <ImageLightbox
+    v-if="avatarOpen && card?.avatarUrl"
+    :url="animatedOrStatic(card, 'avatar') ?? card.avatarUrl"
+    :filename="card.username"
+    @close="avatarOpen = false"
   />
 
   <!-- Tam profil modalı -->

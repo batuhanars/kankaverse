@@ -5,7 +5,7 @@
  * bağlı hesap kartları (kopar x + "Profilimde göster"), altta "Yayınlarımı duyuran Ortamlar".
  * Bağlama OAuth ile yapılır: sunucu adresi verir, tarayıcı platforma gider, geri dönüşte `?link=` sonucu gelir.
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { integrationsApi, streamAnnounceApi } from '@/api/integrations'
@@ -28,6 +28,9 @@ const announceGuilds = ref<AnnounceGuildDto[]>([])
 const loading = ref(true)
 const loadError = ref(false)
 const linking = ref<StreamProviderKey | null>(null)
+// C39 §1: masaüstünde bağlama sistem tarayıcısında biter; bekleyen platform odak dönünce kontrol edilir
+const isDesktop = !!window.kankaverse
+const awaiting = ref<StreamProviderKey | null>(null)
 const unlinkTarget = ref<ExternalAccountDto | null>(null)
 const busy = ref(false)
 
@@ -72,6 +75,13 @@ async function startLink(provider: StreamProviderKey) {
   linking.value = provider
   try {
     const { data } = await integrationsApi.link(provider)
+    if (isDesktop) {
+      // Uygulama penceresi platform girişinde kararıyordu; adres sistem tarayıcısında açılır
+      window.open(data.url, '_blank')
+      awaiting.value = provider
+      linking.value = null
+      return
+    }
     window.location.assign(data.url)
   } catch (e: unknown) {
     toast.error(apiMessage(e))
@@ -116,7 +126,34 @@ async function toggleAnnounce(guild: AnnounceGuildDto, value: boolean) {
   }
 }
 
+// Masaüstü: pencere tekrar görününce bağlı hesapları sessizce yenile; bekleyen hesap geldiyse bant "bağlandı"
+async function checkAwaiting() {
+  const target = awaiting.value
+  if (!target || document.visibilityState === 'hidden') return
+  try {
+    const acc = await integrationsApi.list()
+    if (acc.data.some((a) => a.provider === target)) {
+      awaiting.value = null
+      resultBanner.value = 'linked'
+      await load()
+    }
+  } catch {
+    /* sessiz; sonraki odakta tekrar denenir */
+  }
+}
+
+const onReturn = () => void checkAwaiting()
+
+onBeforeUnmount(() => {
+  window.removeEventListener('focus', onReturn)
+  document.removeEventListener('visibilitychange', onReturn)
+})
+
 onMounted(async () => {
+  if (isDesktop) {
+    window.addEventListener('focus', onReturn)
+    document.addEventListener('visibilitychange', onReturn)
+  }
   // Geri dönüş sonucu: ?link=linked|taken|error&provider=kick (bilgi bandı, sonra adres temizlenir)
   const link = route.query.link
   if (link === 'linked' || link === 'taken' || link === 'error') {
@@ -140,6 +177,15 @@ onMounted(async () => {
         : 'background-color: var(--kv-bg-elevated); border-color: var(--kv-danger); color: var(--kv-danger);'"
     >
       {{ t(`connections.result.${resultBanner}`) }}
+    </p>
+
+    <p
+      v-if="awaiting"
+      role="status"
+      class="px-3 py-2 text-[13px] rounded-[var(--kv-radius-md)] border"
+      style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
+    >
+      {{ t('connections.awaitingBrowser') }}
     </p>
 
     <p v-if="loading" class="text-[14px]" style="color: var(--kv-text-muted);">{{ t('common.loading') }}</p>

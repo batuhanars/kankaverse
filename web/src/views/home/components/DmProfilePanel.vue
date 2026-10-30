@@ -10,6 +10,7 @@ import { renderMessageHtml } from '@/utils/markdown'
 import { bannerBackground } from '@/utils/bannerColor'
 import { animatedOrStatic } from '@/utils/animatedMedia'
 import FullProfileModal from '@/components/shared/FullProfileModal.vue'
+import ImageLightbox from '@/components/shared/ImageLightbox.vue'
 import ReportModal from '@/components/shared/ReportModal.vue'
 import type { FriendCodeUserDto, UserProfileCardDto } from '@/types'
 
@@ -57,6 +58,7 @@ const memberSinceLabel = computed(() =>
 )
 
 const showFullProfile = ref(false)
+const avatarOpen = ref(false)
 
 function onOpenDm(channelId: string) {
   showFullProfile.value = false
@@ -114,7 +116,13 @@ watch(() => props.otherUser.id, () => {
       </div>
       <div
         class="absolute left-5 -bottom-9 z-10 w-[76px] h-[76px] rounded-full border-4 overflow-hidden flex items-center justify-center text-[26px] font-bold text-white"
+        :class="avatarSrc ? 'cursor-pointer' : ''"
         style="border-color: var(--kv-bg-sidebar); background-color: var(--kv-accent-500);"
+        :role="avatarSrc ? 'button' : undefined"
+        :tabindex="avatarSrc ? 0 : undefined"
+        :aria-label="avatarSrc ? t('profile.enlargeAvatar') : undefined"
+        @click="avatarSrc && (avatarOpen = true)"
+        @keydown.enter.prevent="avatarSrc && (avatarOpen = true)"
       >
         <img
           v-if="avatarSrc"
@@ -242,6 +250,13 @@ watch(() => props.otherUser.id, () => {
       :card="card"
       @close="showFullProfile = false"
       @open-dm="onOpenDm"
+    />
+
+    <ImageLightbox
+      v-if="avatarOpen && avatarSrc"
+      :url="avatarSrc"
+      :filename="otherUser.username"
+      @close="avatarOpen = false"
     />
 
     <ReportModal
