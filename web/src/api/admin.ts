@@ -56,6 +56,27 @@ export interface FunnelDto {
   }
 }
 
+// C40: yapay zeka video erişim hakkı (yalnız isModerator). `note` yalnız admin içindir, kullanıcıya dönmez.
+export type AiGrantStatus = 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'REVOKED'
+
+export interface AiVideoGrantRowDto {
+  user: { id: string; username: string }
+  budgetCredits: number
+  spentCredits: number
+  startsAt: string
+  expiresAt: string | null
+  revokedAt: string | null
+  status: AiGrantStatus
+  note: string | null
+  grantedBy: { id: string; username: string }
+}
+
+export interface UpsertAiVideoGrantPayload {
+  budgetCredits: number // 1-100000
+  expiresAt?: string | null // ISO; yok/null = süresiz
+  note?: string // ≤200
+}
+
 export const adminApi = {
   createPlatformInvite(payload: CreatePlatformInvitePayload) {
     return http.post<PlatformInviteDto>('/admin/platform-invites', payload)
@@ -68,6 +89,15 @@ export const adminApi = {
   },
   listUsers() {
     return http.get<AdminUserDto[]>('/admin/users')
+  },
+  listAiVideoGrants() {
+    return http.get<AiVideoGrantRowDto[]>('/admin/ai-video/grants')
+  },
+  upsertAiVideoGrant(userId: string, payload: UpsertAiVideoGrantPayload) {
+    return http.put<AiVideoGrantRowDto>(`/admin/ai-video/grants/${userId}`, payload)
+  },
+  revokeAiVideoGrant(userId: string) {
+    return http.delete<null>(`/admin/ai-video/grants/${userId}`)
   },
   getFunnel(cohortDays: number) {
     return http.get<FunnelDto>('/admin/funnel', { params: { cohortDays } })

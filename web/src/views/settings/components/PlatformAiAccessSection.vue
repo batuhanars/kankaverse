@@ -1,0 +1,150 @@
+<script setup lang="ts">
+/**
+ * PlatformAiAccessSection — Admin yapay zeka video erişim hakları (C40).
+ * Yalnız isModerator kullanıcıya UserSettingsView admin sekmesinden erişilir; dışarıdan guard'lanır.
+ * Liste + "Erişim ver" / "Yenile" (AiGrantFormModal) + onaylı "İptal et". Not yalnız burada görünür.
+ */
+import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { adminApi } from '@/api/admin'
+import type { AiVideoGrantRowDto, AiGrantStatus } from '@/api/admin'
+import { useToastStore } from '@/stores/toast'
+import KvButton from '@/components/ui/KvButton.vue'
+import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import AiGrantFormModal from './AiGrantFormModal.vue'
+
+const { t } = useI18n()
+const toast = useToastStore()
+
+const rows = ref<AiVideoGrantRowDto[]>([])
+const loading = ref(false)
+const loadError = ref('')
+
+async function load() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    rows.value = (await adminApi.listAiVideoGrants()).data
+  } catch {
+    loadError.value = t('admin.aiAccess.loadError')
+  } finally {
+    loading.value = false
+  }
+}
+onMounted(() => void load())
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+function statusColor(s: AiGrantStatus): string {
+  return s === 'ACTIVE' ? 'var(--kv-online, #3DB46E)' : 'var(--kv-text-muted)'
+}
+
+// ── Ver / yenile ──
+const formOpen = ref(false)
+const renewing = ref<AiVideoGrantRowDto | null>(null)
+function openForm(row: AiVideoGrantRowDto | null) {
+  renewing.value = row
+  formOpen.value = true
+}
+async function onSaved() {
+  formOpen.value = false
+  await load()
+}
+
+// ── İptal ──
+const revokeTarget = ref<AiVideoGrantRowDto | null>(null)
+const revoking = ref(false)
+async function confirmRevoke() {
+  if (!revokeTarget.value) return
+  revoking.value = true
+  try {
+    await adminApi.revokeAiVideoGrant(revokeTarget.value.user.id)
+    toast.success(t('admin.aiAccess.revokeSuccess'))
+    revokeTarget.value = null
+    await load()
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message ?? t('admin.aiAccess.revokeError'))
+  } finally {
+    revoking.value = false
+  }
+}
+</script>
+
+<template>
+  <div class="flex flex-col gap-4 max-w-2xl">
+    <div class="flex items-center justify-between">
+      <h3 class="text-[13px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
+        {{ t('admin.aiAccess.title') }}
+      </h3>
+      <KvButton size="sm" @click="openForm(null)">{{ t('admin.aiAccess.give') }}</KvButton>
+    </div>
+
+    <p v-if="loading" class="text-[13px] py-4" style="color: var(--kv-text-muted);">{{ t('common.loading') }}</p>
+    <p v-else-if="loadError" class="text-[13px]" style="color: var(--kv-danger);">{{ loadError }}</p>
+    <p v-else-if="rows.length === 0" class="text-[13px] py-4" style="color: var(--kv-text-muted);">
+      {{ t('admin.aiAccess.empty') }}
+    </p>
+
+    <div
+      v-else
+      class="rounded-[var(--kv-radius-lg)] overflow-hidden divide-y divide-[color:var(--kv-border-subtle)]"
+      style="background-color: var(--kv-bg-sidebar);"
+    >
+      <div v-for="r in rows" :key="r.user.id" class="flex items-center gap-3 px-4 py-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-[14px] font-semibold" style="color: var(--kv-text-primary);">{{ r.user.username }}</span>
+            <span
+              class="text-[11px] font-semibold px-1.5 py-0.5 rounded"
+              :style="{ color: statusColor(r.status), backgroundColor: 'var(--kv-bg-elevated)' }"
+            >
+              {{ t(`admin.aiAccess.status.${r.status}`) }}
+            </span>
+          </div>
+          <div class="flex items-center gap-3 mt-0.5 flex-wrap">
+            <span class="text-[12px] tabular-nums" style="color: var(--kv-text-muted);">
+              {{ t('admin.aiAccess.creditsValue', { spent: r.spentCredits, budget: r.budgetCredits }) }}
+            </span>
+            <span class="text-[12px]" style="color: var(--kv-text-muted);">
+              {{ r.expiresAt ? formatDate(r.expiresAt) : t('admin.aiAccess.noExpiry') }}
+            </span>
+            <span v-if="r.note" class="text-[12px] truncate max-w-[200px]" :title="r.note" style="color: var(--kv-text-muted);">
+              {{ r.note }}
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
+          style="color: var(--kv-accent-400);"
+          @click="openForm(r)"
+        >
+          {{ t('admin.aiAccess.renew') }}
+        </button>
+        <button
+          v-if="r.status !== 'REVOKED'"
+          type="button"
+          class="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
+          style="color: var(--kv-danger);"
+          @click="revokeTarget = r"
+        >
+          {{ t('admin.aiAccess.revoke') }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <AiGrantFormModal v-if="formOpen" :renewing="renewing" @close="formOpen = false" @saved="onSaved" />
+
+  <ConfirmDialog
+    v-if="revokeTarget"
+    :title="t('admin.aiAccess.revokeConfirmTitle')"
+    :message="t('admin.aiAccess.revokeConfirmMessage', { username: revokeTarget.user.username })"
+    :confirm-label="t('admin.aiAccess.revoke')"
+    :loading="revoking"
+    @confirm="confirmRevoke"
+    @cancel="revokeTarget = null"
+  />
+</template>

@@ -6,6 +6,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import KvButton from '@/components/ui/KvButton.vue'
+import type { AiVideoGrantInfo } from '@/api/aiVideo'
 
 const props = defineProps<{
   durationS: number
@@ -19,12 +20,22 @@ const props = defineProps<{
   busy: boolean
   locked?: boolean // C33: pasif tanıtım, Oluştur kapalı + "yakında" notu
   inviteCode?: string | null // C39: doluysa not davet metnine döner + "Ortama katıl" düğmesi
+  grant?: AiVideoGrantInfo | null // C40: admin hakkıyla erişene kalan kredi satırı
 }>()
 const emit = defineEmits<{ submit: []; join: [] }>()
 
 const { t, n } = useI18n()
 const num = (v: number) => n(v, { maximumFractionDigits: 0 })
 const credits = (v: number) => t('aiVideo.credits', { amount: num(v) })
+const grantExpiry = computed(() =>
+  props.grant?.expiresAt
+    ? new Date(props.grant.expiresAt).toLocaleDateString('tr-TR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : null,
+)
 const disabled = computed(
   () =>
     props.locked ||
@@ -56,6 +67,10 @@ const disabled = computed(
     </div>
     <p class="text-[12px]" style="color: var(--kv-text-muted);">
       {{ t('aiVideo.spentLine', { spent: num(spentTodayCredits), cap: num(dailyCapCredits) }) }}
+    </p>
+    <p v-if="grant && !locked" class="text-[12px]" style="color: var(--kv-text-muted);">
+      {{ t('aiVideo.grantLine', { remaining: num(grant.remainingCredits), budget: num(grant.budgetCredits) }) }}
+      <template v-if="grantExpiry"> · {{ t('aiVideo.grantExpiry', { date: grantExpiry }) }}</template>
     </p>
     <template v-if="locked">
       <p class="text-[13px]" style="color: var(--kv-text-secondary);">

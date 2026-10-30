@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -22,12 +23,14 @@ import {
   sumSpentMicro,
   toAiVideoDto,
   toCredits,
+  floorCredits,
   DEFAULT_CREDIT_MICRO_USD,
   usd,
 } from './ai-video.mapper';
 import { AI_VIDEO_MODEL_TABLE, AiVideoModelSpec, apiIdOf, buildPikaBody } from './ai-video.models';
 import { CreateAiVideoDto, EstimateAiVideoDto } from './dto/ai-video.dto';
 import { AiVideoInputService } from './ai-video-input.service';
+import { findActiveAiVideoGrant, isAiVideoEnvListed } from './ai-video-grant';
 import { PikaClient, PikaError, PikaJob } from './pika.client';
 
 /** Türkiye UTC+3 (DST yok): "bugün" Türkiye gününe göre. */
@@ -61,6 +64,7 @@ export class AiVideoService {
   async options(userId: string, allowed = true) {
     const spentMicro = allowed ? await this.todaySpentMicro(userId) : 0;
     const capMicro = allowed ? this.dailyCapMicro() : 0;
+    const grant = allowed ? await this.grantView(userId) : null;
     return {
       models: this.enabledModels().map((m) => ({
         key: m.key,
@@ -75,11 +79,41 @@ export class AiVideoService {
       todaySpentUsd: usd(spentMicro),
       dailyCapCredits: toCredits(capMicro, this.creditMicro()),
       spentTodayCredits: toCredits(spentMicro, this.creditMicro()),
+      // C40: yalnız admin hakkıyla erişene (env listesindekine ve kilitliye null). Not asla dönmez.
+      grant,
       // C39: yalnız kilitli (allowed=false) iken; erişimli kullanıcıya gereksiz
       accessInviteCode: allowed
         ? null
         : (this.config.get<string | null>('aiVideo.accessInviteCode') ?? null),
     };
+  }
+
+  /** C40: kullanıcıya dönen hak özeti. Env listesindekilerde ve hak yokken null. */
+  private async grantView(userId: string) {
+    if (isAiVideoEnvListed(this.config, userId)) return null;
+    const active = await findActiveAiVideoGrant(this.prisma, userId);
+    if (!active) return null;
+    const credit = this.creditMicro();
+    return {
+      remainingCredits: floorCredits(active.remainingMicro, credit),
+      budgetCredits: floorCredits(active.grant.budgetMicroUsd, credit),
+      expiresAt: active.grant.expiresAt?.toISOString() ?? null,
+    };
+  }
+
+  /**
+   * C40 bütçe kapısı (R7): tahmin kalan bütçeyi aşarsa 403. Env listesindekilere uygulanmaz.
+   * Günlük tavan ayrıca geçerli (ikisinden küçüğü bağlar).
+   */
+  private async assertUnderBudget(userId: string, quoteMicro: number): Promise<void> {
+    if (isAiVideoEnvListed(this.config, userId)) return;
+    const active = await findActiveAiVideoGrant(this.prisma, userId);
+    if (!active || quoteMicro > active.remainingMicro) {
+      throw new ForbiddenException({
+        message: AI_VIDEO_MESSAGES[AiVideoError.BUDGET_EXCEEDED],
+        error: AiVideoError.BUDGET_EXCEEDED,
+      });
+    }
   }
 
   /** Satır oluşturmaz; 10 dk bellek önbelleği. İstem fiyata etki etmez (yer tutucu gider). */
@@ -112,6 +146,7 @@ export class AiVideoService {
 
     const quoteMicroUsd = await this.quoteMicro(spec, dto, withImage, dto.prompt);
     this.assertUnderCap(await this.todaySpentMicro(userId), quoteMicroUsd);
+    await this.assertUnderBudget(userId, quoteMicroUsd);
 
     const row = await this.prisma.aiVideoGeneration.create({
       data: {

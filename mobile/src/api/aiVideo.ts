@@ -41,7 +41,10 @@ export interface AiVideoOptionsDto {
   dailyCapCredits: number;
   spentTodayCredits: number;
   /** C39: yalnız kilitli kullanıcıya dolu. */
+  /** C39: web/masaüstü kullanır; mobilde kullanılmaz (C40, Play kuralı). */
   accessInviteCode?: string | null;
+  /** C40: admin hakkı özeti; mobilde henüz gösterilmez (sözleşme: mobil yalnız metin). */
+  grant?: { remainingCredits: number; budgetCredits: number; expiresAt: string | null } | null;
 }
 
 export interface AiVideoSelection {

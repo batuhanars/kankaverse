@@ -8,11 +8,13 @@ import { AiVideoPoller } from './ai-video.poller';
 import { AiVideoAccessGuard } from './ai-video-access.guard';
 import { AiVideoDeleteService } from './ai-video-delete.service';
 import { AiVideoRecoveryService } from './ai-video-recovery.service';
+import { AiVideoGrantsController } from './ai-video-grants.controller';
+import { AiVideoGrantsService } from './ai-video-grants.service';
 import { PikaClient } from './pika.client';
 
 @Module({
   imports: [SharedModule],
-  controllers: [AiVideoController],
+  controllers: [AiVideoController, AiVideoGrantsController],
   providers: [
     AiVideoService,
     AiVideoAttachmentService,
@@ -21,6 +23,7 @@ import { PikaClient } from './pika.client';
     AiVideoDeleteService,
     AiVideoRecoveryService,
     AiVideoAccessGuard,
+    AiVideoGrantsService,
     PikaClient,
   ],
 })

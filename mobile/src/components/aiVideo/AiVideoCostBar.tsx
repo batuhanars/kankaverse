@@ -15,9 +15,8 @@ interface Props {
   busy: boolean;
   /** C33: pasif tanıtım; Oluştur kapalı + "yakında" notu, tahmin satırı yok. */
   locked?: boolean;
-  /** C39: doluysa kilit notu davet metnine döner + "Ortama katıl" düğmesi. */
-  inviteCode?: string | null;
-  onJoin?: () => void;
+  /** C40: admin hakkıyla erişene kalan kredi satırı (env listesindekine null). */
+  grant?: { remainingCredits: number; budgetCredits: number; expiresAt: string | null } | null;
   onSubmit: () => void;
 }
 
@@ -28,6 +27,13 @@ interface Props {
 export function AiVideoCostBar(p: Props) {
   const disabled =
     !!p.locked || !p.canSubmit || p.estimating || p.estimateCredits === null || p.overCap || p.busy;
+  const expiry = p.grant?.expiresAt
+    ? new Date(p.grant.expiresAt).toLocaleDateString('tr-TR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : null;
   return (
     <View style={styles.bar}>
       <View style={styles.row}>
@@ -65,15 +71,18 @@ export function AiVideoCostBar(p: Props) {
           cap: formatCreditNumber(p.dailyCapCredits),
         })}
       </Text>
-      {p.locked ? (
-        <Text style={styles.lockedNote}>
-          {p.inviteCode ? t('aiVideo.lockedNoteInvite') : t('aiVideo.lockedNote')}
+      {p.grant && !p.locked ? (
+        <Text style={styles.spent}>
+          {t('aiVideo.grantLine', {
+            remaining: formatCreditNumber(p.grant.remainingCredits),
+            budget: formatCreditNumber(p.grant.budgetCredits),
+          })}
+          {expiry ? ` · ${t('aiVideo.grantExpiry', { date: expiry })}` : ''}
         </Text>
       ) : null}
-      {p.locked && p.inviteCode ? (
-        <Pressable onPress={p.onJoin} accessibilityRole="button" style={styles.joinButton}>
-          <Text style={styles.joinText}>{t('aiVideo.joinGuild')}</Text>
-        </Pressable>
+      {p.locked ? (
+        // C40 (Play kuralı): nötr not, davet/yönlendirme yok. Web/masaüstü C39 notunu korur.
+        <Text style={styles.lockedNote}>{t('aiVideo.lockedNoteMobile')}</Text>
       ) : null}
       {p.overCap ? <Text style={styles.failed}>{t('aiVideo.overCap')}</Text> : null}
     </View>
@@ -90,17 +99,6 @@ const styles = StyleSheet.create({
   failed: { color: theme.colors.danger, fontSize: theme.fontSize.sm },
   spent: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs },
   lockedNote: { color: theme.colors.textSecondary, fontSize: theme.fontSize.sm },
-  joinButton: {
-    alignSelf: 'flex-start',
-    minHeight: theme.layout.inputMinHeight,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderSubtle,
-  },
-  joinText: { color: theme.colors.textPrimary, fontSize: theme.fontSize.base, fontWeight: '600' },
   button: {
     minWidth: 110,
     minHeight: theme.layout.inputMinHeight,

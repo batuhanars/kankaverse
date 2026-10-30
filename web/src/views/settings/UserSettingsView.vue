@@ -30,6 +30,7 @@ import VoiceDevicesSection from './components/VoiceDevicesSection.vue'
 import PlatformInviteSection from './components/PlatformInviteSection.vue'
 import PlatformFunnelSection from './components/PlatformFunnelSection.vue'
 import PlatformUsersSection from './components/PlatformUsersSection.vue'
+import PlatformAiAccessSection from './components/PlatformAiAccessSection.vue'
 import MasaustuSection from './components/MasaustuSection.vue'
 import QuickReactionsSection from './components/QuickReactionsSection.vue'
 import ConnectionsSection from './components/ConnectionsSection.vue'
@@ -83,12 +84,13 @@ const navItems = computed(() => {
 })
 
 // ── Admin alt-geçişi: kullanıcılar (varsayılan) / davetler ──
-type AdminSub = 'kullanicilar' | 'davetler' | 'huni'
+type AdminSub = 'kullanicilar' | 'davetler' | 'huni' | 'yapayzeka'
 const adminSub = ref<AdminSub>('kullanicilar')
 const adminSubLabel = computed<Record<AdminSub, string>>(() => ({
   kullanicilar: t('admin.users.title'),
   davetler: t('admin.platformInvite.listTitle'),
   huni: t('admin.funnel.title'),
+  yapayzeka: t('admin.aiAccess.title'),
 }))
 
 // ── Hesap düzenleme modalları (Discord-tarzı: satır + "Düzenle" → modal) ──
@@ -1001,7 +1003,7 @@ async function toggleReadReceipts(next: boolean) {
                 <!-- Alt-geçiş: kullanıcılar / davetler -->
                 <div class="flex items-center gap-1 self-start rounded-[var(--kv-radius-md)] p-1" style="background-color: var(--kv-bg-sidebar);">
                   <button
-                    v-for="sub in (['kullanicilar', 'davetler', 'huni'] as const)"
+                    v-for="sub in (['kullanicilar', 'davetler', 'huni', 'yapayzeka'] as const)"
                     :key="sub"
                     type="button"
                     class="px-3 py-1.5 rounded-[var(--kv-radius-sm)] text-[13px] font-medium cursor-pointer transition-colors"
@@ -1016,6 +1018,7 @@ async function toggleReadReceipts(next: boolean) {
 
                 <PlatformUsersSection v-if="adminSub === 'kullanicilar'" />
                 <PlatformFunnelSection v-else-if="adminSub === 'huni'" />
+                <PlatformAiAccessSection v-else-if="adminSub === 'yapayzeka'" />
                 <PlatformInviteSection v-else />
               </div>
 

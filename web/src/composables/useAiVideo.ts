@@ -2,6 +2,7 @@ import { computed, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo'
 import { attachmentsApi } from '@/api/attachments'
+import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
 import { useAiVideoForm } from '@/composables/useAiVideoForm'
 import { saveFromUrl } from '@/utils/saveFromUrl'
@@ -9,6 +10,7 @@ import { saveFromUrl } from '@/utils/saveFromUrl'
 const POLL_MS = 4000
 const KNOWN_ERRORS = [
   'AI_VIDEO_DAILY_CAP',
+  'AI_VIDEO_BUDGET_EXCEEDED',
   'AI_VIDEO_INVALID_OPTION',
   'AI_VIDEO_NOT_READY',
   'UPLOADS_DISABLED',
@@ -31,7 +33,8 @@ export function useAiVideo() {
   const image = ref<File | null>(null)
   const withImage = computed(() => !!image.value)
   // C33: pasif tanıtım. Kilitliyken yalnız options çağrılır; estimate, geçmiş, yükleme atılmaz.
-  const locked = useAuthStore().user?.aiVideoAllowed !== true
+  const authStore = useAuthStore()
+  const locked = authStore.user?.aiVideoAllowed !== true
   const form = useAiVideoForm(withImage, locked)
   const job = ref<AiVideoDto | null>(null)
   const recent = ref<AiVideoDto[]>([])
@@ -54,10 +57,20 @@ export function useAiVideo() {
     return fallback || t('aiVideo.errors.generic')
   }
 
+  /** C40: kredi/süre bitmiş olabilir; kullanıcıyı yenile ki bir sonraki açılışta kilitli mod doğru gelsin. */
+  async function refreshAccess() {
+    try {
+      authStore.updateUser((await authApi.me()).data)
+    } catch {
+      /* geçici hata: bir sonraki yenilemede düzelir */
+    }
+  }
+
   function fail(e: unknown) {
     const data = (e as { response?: { data?: { error?: string; message?: string } } }).response
       ?.data
     error.value = errorText(data?.error, data?.message)
+    if (data?.error === 'AI_VIDEO_BUDGET_EXCEEDED') void refreshAccess()
   }
 
   function stop() {
@@ -116,7 +129,8 @@ export function useAiVideo() {
         ...(form.aspectRatio.value && { aspectRatio: form.aspectRatio.value }),
       }
       track((await aiVideoApi.create(sel, prompt.value, inputKey)).data)
-      void form.loadOptions() // bugünkü harcama güncellensin
+      void form.loadOptions() // bugünkü harcama ve kalan kredi güncellensin
+      void refreshAccess() // bütçe bu üretimle bittiyse kilitli moda düşsün
     } catch (e) {
       fail(e)
     } finally {

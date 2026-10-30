@@ -3,6 +3,7 @@ import { extractErrorCode, extractErrorMessage } from '@/api/errors';
 
 const KNOWN_ERRORS = [
   'AI_VIDEO_DAILY_CAP',
+  'AI_VIDEO_BUDGET_EXCEEDED',
   'AI_VIDEO_INVALID_OPTION',
   'AI_VIDEO_NOT_READY',
   'UPLOADS_DISABLED',

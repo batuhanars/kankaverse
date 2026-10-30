@@ -163,6 +163,8 @@ model User {
   pushTokens          PushToken[]
   recentGames         RecentGame[]
   aiVideoGenerations  AiVideoGeneration[]
+  aiVideoGrant        AiVideoGrant?        @relation("AiVideoGrantUser")
+  aiVideoGrantsGiven  AiVideoGrant[]        @relation("AiVideoGrantBy")
   webhooksCreated     Webhook[]
   externalAccounts    ExternalAccount[]
   streamAnnounceOptIns StreamAnnounceOptIn[]
@@ -867,6 +869,22 @@ enum AiVideoStatus {
   RUNNING
   COMPLETED
   FAILED
+}
+
+/// C40: admin panelinden verilen yapay zeka video erisim hakki (kredi butcesi + istege bagli bitis). Kullanici basina tek kayit.
+model AiVideoGrant {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  user           User      @relation("AiVideoGrantUser", fields: [userId], references: [id])
+  budgetMicroUsd Int
+  startsAt       DateTime  @default(now())
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  grantedById    String
+  grantedBy      User      @relation("AiVideoGrantBy", fields: [grantedById], references: [id])
+  note           String? // yalniz admin icin; kullaniciya ASLA donmez
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
 
 model AiVideoGeneration {

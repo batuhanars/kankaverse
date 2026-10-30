@@ -27,6 +27,7 @@ function setup(rowOver: Record<string, unknown> = {}, spentRows: unknown[] = [])
     ...rowOver,
   };
   const prisma = {
+    aiVideoGrant: { findUnique: jest.fn().mockResolvedValue(null) },
     aiVideoGeneration: {
       create: jest
         .fn()
@@ -45,6 +46,7 @@ function setup(rowOver: Record<string, unknown> = {}, spentRows: unknown[] = [])
   const values: Record<string, unknown> = {
     'aiVideo.models': ['pika-2.5', 'wan-3.0', 'kling-3.0-turbo'],
     'aiVideo.dailyCapUsd': 3,
+    'aiVideo.userIds': ['u1'],
   };
   const config = { get: (k: string) => values[k] };
   const pika = {
@@ -422,7 +424,11 @@ describe('AiVideoService C14c', () => {
   it('options: kod yalniz kilitli kullaniciya doner', async () => {
     const s = setup();
     (s.service as unknown as { config: { get: (k: string) => unknown } }).config.get = (k) =>
-      k === 'aiVideo.accessInviteCode' ? 'ABC123' : k === 'aiVideo.models' ? ['pika-2.5'] : undefined;
+      k === 'aiVideo.accessInviteCode'
+        ? 'ABC123'
+        : k === 'aiVideo.models'
+          ? ['pika-2.5']
+          : undefined;
     expect((await s.service.options('u1', false)).accessInviteCode).toBe('ABC123');
     expect((await s.service.options('u1', true)).accessInviteCode).toBeNull();
   });
@@ -462,5 +468,66 @@ describe('toCredits (C33 kredi donusturucu)', () => {
     expect(toCredits(450_001, 10_000)).toBe(46);
     expect(toCredits(1, 10_000)).toBe(1);
     expect(toCredits(3_000_000, 10_000)).toBe(300);
+  });
+});
+
+describe('C40 butce kapisi ve hak ozeti', () => {
+  const grantRow = (over: Record<string, unknown> = {}) => ({
+    userId: 'u2',
+    budgetMicroUsd: 500_000,
+    startsAt: new Date('2026-10-01T00:00:00Z'),
+    expiresAt: null,
+    revokedAt: null,
+    ...over,
+  });
+  function grantSetup(grant: unknown, spentRows: unknown[] = []) {
+    const t = setup({}, spentRows);
+    t.prisma.aiVideoGrant.findUnique.mockResolvedValue(grant);
+    return t;
+  }
+
+  it('env listesindeki kullanici: butce kapisi yok, grant null', async () => {
+    const { service, prisma } = setup();
+    await service.create('u1', dto());
+    expect(prisma.aiVideoGrant.findUnique).not.toHaveBeenCalled();
+    expect((await service.options('u1')).grant).toBeNull();
+  });
+
+  it('hak yeterli: uretim gecer; options kalan kredi ve butce doner, not donmez', async () => {
+    const { service } = grantSetup({ ...grantRow(), note: 'IBAN 120 TL' }, []);
+    await expect(service.create('u2', dto())).resolves.toBeDefined();
+    const o = await service.options('u2');
+    expect(o.grant).toEqual({ remainingCredits: 50, budgetCredits: 50, expiresAt: null });
+    expect(JSON.stringify(o)).not.toContain('IBAN');
+  });
+
+  it('tahmin kalan butceyi asarsa 403 AI_VIDEO_BUDGET_EXCEEDED, satir olusmaz', async () => {
+    const spent = [
+      { status: AiVideoStatus.COMPLETED, costMicroUsd: 400_000, quoteMicroUsd: 400_000 },
+    ];
+    const { service, prisma } = grantSetup(grantRow(), spent);
+    await expect(service.create('u2', dto())).rejects.toMatchObject({
+      status: 403,
+      response: { error: 'AI_VIDEO_BUDGET_EXCEEDED', message: 'Kredin bu video için yetmiyor.' },
+    });
+    expect(prisma.aiVideoGeneration.create).not.toHaveBeenCalled();
+  });
+
+  it('iptal edilmis / suresi dolmus hak: 403 ve options grant null', async () => {
+    for (const over of [{ revokedAt: new Date() }, { expiresAt: new Date(Date.now() - 1000) }]) {
+      const { service } = grantSetup(grantRow(over));
+      await expect(service.create('u2', dto())).rejects.toMatchObject({ status: 403 });
+      expect((await service.options('u2')).grant).toBeNull();
+    }
+  });
+
+  it('harcanan startsAt sonrasi sorgulanir', async () => {
+    const { service, prisma } = grantSetup(grantRow());
+    await service.options('u2');
+    expect(prisma.aiVideoGeneration.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 'u2', createdAt: { gte: new Date('2026-10-01T00:00:00Z') } },
+      }),
+    );
   });
 });

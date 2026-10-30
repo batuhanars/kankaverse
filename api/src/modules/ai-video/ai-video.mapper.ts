@@ -13,6 +13,7 @@ export function mapPikaErrorCode(code: string | null | undefined): string {
 /** Kullanıcıya Türkçe mesaj (exception için). Ham Pika mesajı ASLA iletilmez. */
 export const AI_VIDEO_MESSAGES: Record<string, string> = {
   [AiVideoError.DAILY_CAP]: 'Bugünkü yapay zeka video kredi sınırına ulaşıldı.',
+  [AiVideoError.BUDGET_EXCEEDED]: 'Kredin bu video için yetmiyor.',
   [AiVideoError.INVALID_OPTION]: 'Seçilen model, süre, çözünürlük veya ölçü geçerli değil.',
   [AiVideoError.NOT_READY]: 'Video henüz hazır değil.',
   [AiVideoError.PROVIDER_ERROR]:
@@ -33,6 +34,16 @@ export const DEFAULT_CREDIT_MICRO_USD = 10_000;
 /** Mikro-USD → kredi, yukarı yuvarlanır (0 mikro = 0 kredi; en küçük ücret en az 1 kredi görünür). */
 export function toCredits(micro: number, creditMicroUsd: number): number {
   return Math.ceil(micro / creditMicroUsd);
+}
+
+/** Kredi -> mikro-USD (toCredits'in tersi; admin hak bütçesi bu dönüştürücüden geçer). */
+export function fromCredits(credits: number, creditMicroUsd: number): number {
+  return credits * creditMicroUsd;
+}
+
+/** Kalan bütçe kredisi: aşağı yuvarlanır (kullanıcıya olduğundan fazla kredi vaat etme). */
+export function floorCredits(micro: number, creditMicroUsd: number): number {
+  return Math.floor(micro / creditMicroUsd);
 }
 
 /** Bugünkü harcama (mikro-USD): kesin ücret varsa o, yoksa bekleyen/tamamlanmış için teklif; FAILED ücretsizdir. */

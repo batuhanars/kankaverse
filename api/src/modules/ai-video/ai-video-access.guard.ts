@@ -40,7 +40,7 @@ export class AiVideoAccessGuard implements CanActivate {
           select: { id: true, isMinor: true },
         })
       : null;
-    const allowed = !!user && canUseAiVideo(this.config, user);
+    const allowed = !!user && (await canUseAiVideo(this.config, this.prisma, user));
     const previewOk =
       !!user &&
       this.reflector.get<boolean>(AI_VIDEO_PREVIEW_OK, context.getHandler()) === true &&

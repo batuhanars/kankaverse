@@ -242,6 +242,7 @@ async function onPrimary() {
           :busy="ai.busy.value"
           :locked="ai.locked"
           :invite-code="form.options.value?.accessInviteCode ?? null"
+          :grant="form.options.value?.grant ?? null"
           @submit="ai.submit"
           @join="joinAccessGuild"
         />

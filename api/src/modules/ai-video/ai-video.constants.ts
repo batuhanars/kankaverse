@@ -28,6 +28,7 @@ export const AI_INPUT_TYPES: Record<string, string> = {
 /** Bizim hata kodlarımız (sözleşme §2.3/§2.4). */
 export const AiVideoError = {
   DAILY_CAP: 'AI_VIDEO_DAILY_CAP',
+  BUDGET_EXCEEDED: 'AI_VIDEO_BUDGET_EXCEEDED',
   INVALID_OPTION: 'AI_VIDEO_INVALID_OPTION',
   NOT_READY: 'AI_VIDEO_NOT_READY',
   PROVIDER_ERROR: 'AI_VIDEO_PROVIDER_ERROR',

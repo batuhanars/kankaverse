@@ -85,11 +85,11 @@ export class AuthService implements OnModuleInit {
   ) {}
 
   /** C22/C14: UserDto + hareketli yükleme ve yapay zeka video kapıları (tek kaynak fonksiyonlar). */
-  private userDto(user: User) {
+  private async userDto(user: User) {
     return toUserDto(
       user,
       this.animatedMedia.canCreateAnimated(user),
-      canUseAiVideo(this.config, user),
+      await canUseAiVideo(this.config, this.prisma, user),
       canPreviewAiVideo(this.config, user),
     );
   }
@@ -197,7 +197,7 @@ export class AuthService implements OnModuleInit {
       user.email,
       clientType,
     );
-    return { user: this.userDto(user), accessToken, refreshToken };
+    return { user: await this.userDto(user), accessToken, refreshToken };
   }
 
   /**
@@ -313,7 +313,7 @@ export class AuthService implements OnModuleInit {
       user.email,
       clientType,
     );
-    return { type: 'session', user: this.userDto(user), accessToken, refreshToken };
+    return { type: 'session', user: await this.userDto(user), accessToken, refreshToken };
   }
 
   async login2fa(dto: Login2faDto, ip?: string, clientType?: 'mobile' | null) {
@@ -364,7 +364,7 @@ export class AuthService implements OnModuleInit {
       user.email,
       clientType,
     );
-    return { user: this.userDto(user), accessToken, refreshToken };
+    return { user: await this.userDto(user), accessToken, refreshToken };
   }
 
   /**
@@ -482,7 +482,7 @@ export class AuthService implements OnModuleInit {
         error: 'ACCOUNT_DELETION_PENDING',
       });
     }
-    return this.userDto(user);
+    return await this.userDto(user);
   }
 
   // ── E-posta doğrulama (2A) ─────────────────────────────────────────────────
@@ -503,7 +503,7 @@ export class AuthService implements OnModuleInit {
       where: { id: user.id },
       data: { emailVerifiedAt: new Date() },
     });
-    return { user: this.userDto(updated) };
+    return { user: await this.userDto(updated) };
   }
 
   async resendVerification(userId: string) {
@@ -747,7 +747,7 @@ export class AuthService implements OnModuleInit {
       where: { id: userId },
       data: { username: newUsername },
     });
-    return { user: this.userDto(updated) };
+    return { user: await this.userDto(updated) };
   }
 
   async changeEmail(userId: string, dto: ChangeEmailDto) {
@@ -791,7 +791,7 @@ export class AuthService implements OnModuleInit {
       where: { id: token.userId },
       data: { email: token.payload, emailVerifiedAt: new Date() },
     });
-    return { user: this.userDto(updated) };
+    return { user: await this.userDto(updated) };
   }
 
   async undoEmailChange(rawToken: string) {

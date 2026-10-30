@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo';
+import { authApi } from '@/api/auth';
+import { extractErrorCode } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth';
 import { t } from '@/i18n';
 import { aiVideoErrorText, aiVideoFailText, DOWNLOAD_PENDING } from './aiVideoErrors';
@@ -82,6 +84,15 @@ export function useAiVideo() {
     setJob(row);
   }
 
+  /** C40: kredi/süre bitmiş olabilir; oturumu yenile ki bir sonraki açılışta kilitli mod doğru gelsin (web ile aynı). */
+  async function refreshAccess() {
+    try {
+      useAuthStore.getState().updateUser(await authApi.me());
+    } catch {
+      /* geçici hata: bir sonraki yenilemede düzelir */
+    }
+  }
+
   async function submit() {
     if (locked) return;
     setError('');
@@ -95,9 +106,11 @@ export function useAiVideo() {
         ...(form.aspectRatio && { aspectRatio: form.aspectRatio }),
       };
       track(await aiVideoApi.create(sel, prompt, inputKey));
-      void form.loadOptions(); // bugünkü harcama güncellensin
+      void form.loadOptions(); // bugünkü harcama ve kalan kredi güncellensin
+      void refreshAccess(); // bütçe bu üretimle bittiyse kilitli moda düşsün
     } catch (e) {
       setError(aiVideoFailText(e));
+      if (extractErrorCode(e) === 'AI_VIDEO_BUDGET_EXCEEDED') void refreshAccess();
     } finally {
       setBusy(false);
     }

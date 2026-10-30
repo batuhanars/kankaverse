@@ -13,6 +13,8 @@ const prismaMock = {
   voiceSession: { findFirst: jest.fn() }, // C10 — kart ses durumu
   recentGame: { deleteMany: jest.fn(), findMany: jest.fn() }, // C31f
   externalAccount: { findMany: jest.fn() }, // C36 — kart bağlantıları
+  aiVideoGrant: { findUnique: jest.fn() }, // C40
+  aiVideoGeneration: { findMany: jest.fn() }, // C40
 };
 
 // C10 — canDm (inline mesaj kutusu kapısı) + VoiceService (ses durumu) mock'ları
@@ -47,6 +49,23 @@ function makeService() {
     { canCreateAnimated: () => true } as any, // AnimatedMediaService (yalniz C22 animatedAllowed icin)
     { get: () => undefined } as any, // ConfigService (C14 aiVideoAllowed: kapali)
     { clearGames: jest.fn(), broadcastActivity: jest.fn() } as any, // PresenceService (C31b)
+  );
+}
+
+function makeServiceWithAi() {
+  const values: Record<string, unknown> = {
+    'aiVideo.enabled': true,
+    'aiVideo.apiKey': 'k',
+    'aiVideo.userIds': [],
+  };
+  return new UsersService(
+    prismaMock as any,
+    new ImageUploadService(storageMock as any, configMock as any),
+    dmPermissionMock as any,
+    voiceMock as any,
+    { canCreateAnimated: () => true } as any,
+    { get: (k: string) => values[k] } as any,
+    { clearGames: jest.fn(), broadcastActivity: jest.fn() } as any,
   );
 }
 
@@ -93,6 +112,52 @@ describe('UsersService', () => {
   beforeEach(() => {
     resetMocks();
     service = makeService();
+  });
+
+  // C40 (R7): userDto async; DTO'daki aiVideoAllowed Promise degil, gercek boolean olmali.
+  describe('aiVideoAllowed (C40 admin hakki)', () => {
+    const base = {
+      id: 'u1',
+      username: 'kanka',
+      email: 'k@x.tr',
+      avatarUrl: null,
+      bio: null,
+      dmPolicy: 'EVERYONE',
+      isMinor: false,
+      verificationStatus: 'NONE',
+      createdAt: CREATED_AT,
+      emailVerifiedAt: null,
+      twoFactorEnabled: false,
+      isModerator: false,
+      friendCode: 'ABC123',
+    };
+    const grant = {
+      userId: 'u1',
+      budgetMicroUsd: 500_000,
+      startsAt: CREATED_AT,
+      expiresAt: null,
+      revokedAt: null,
+    };
+
+    it('etkin hak: aiVideoAllowed tam olarak true (await unutulmamis)', async () => {
+      prismaMock.user.update.mockResolvedValue(base);
+      prismaMock.aiVideoGrant.findUnique.mockResolvedValue(grant);
+      prismaMock.aiVideoGeneration.findMany.mockResolvedValue([]);
+      const res = await makeServiceWithAi().updateProfile('u1', { bio: 'x' });
+      expect(res.aiVideoAllowed).toBe(true);
+    });
+    it('iptal edilmis hak: false; minor: false', async () => {
+      prismaMock.user.update.mockResolvedValue(base);
+      prismaMock.aiVideoGrant.findUnique.mockResolvedValue({ ...grant, revokedAt: new Date() });
+      expect((await makeServiceWithAi().updateProfile('u1', { bio: 'x' })).aiVideoAllowed).toBe(
+        false,
+      );
+      prismaMock.user.update.mockResolvedValue({ ...base, isMinor: true });
+      prismaMock.aiVideoGrant.findUnique.mockResolvedValue(grant);
+      expect((await makeServiceWithAi().updateProfile('u1', { bio: 'x' })).aiVideoAllowed).toBe(
+        false,
+      );
+    });
   });
 
   // ── PATCH /users/me ────────────────────────────────────────────────────────

@@ -96,11 +96,11 @@ export class UsersService {
   ) {}
 
   /** C22/C14: UserDto + hareketli yükleme ve yapay zeka video kapıları. */
-  private userDto(user: User) {
+  private async userDto(user: User) {
     return toUserDto(
       user,
       this.animatedMedia.canCreateAnimated(user),
-      canUseAiVideo(this.config, user),
+      await canUseAiVideo(this.config, this.prisma, user),
       canPreviewAiVideo(this.config, user),
     );
   }
@@ -488,7 +488,7 @@ export class UsersService {
       if (dto.showGameActivity === false) this.presence.clearGames(userId);
       await this.presence.broadcastActivity(userId);
     }
-    return this.userDto(user);
+    return await this.userDto(user);
   }
 
   /**
@@ -541,7 +541,7 @@ export class UsersService {
       // C13 değişmez kural: statik set/kaldır hareketli alanı null'lar (avatarUrl artık hareketlinin karesi değil).
       data: { avatarUrl, avatarAnimatedUrl: null },
     });
-    return this.userDto(user);
+    return await this.userDto(user);
   }
 
   // ─── C8: Profil afişi (self) ──────────────────────────────────────────────
@@ -558,7 +558,7 @@ export class UsersService {
       where: { id: userId },
       data: { bannerUrl, bannerAnimatedUrl: null },
     });
-    return this.userDto(user);
+    return await this.userDto(user);
   }
 
   // ─── C13: Hareketli avatar / afiş ─────────────────────────────────────────
@@ -571,7 +571,7 @@ export class UsersService {
   /** POST /users/me/{avatar|banner}/animated — işle ve güncel kullanıcıyı dön. */
   async setAnimated(userId: string, target: 'AVATAR' | 'BANNER', dto: ProcessAnimatedDto) {
     const user = await this.animatedMedia.process(userId, target, dto);
-    return this.userDto(user);
+    return await this.userDto(user);
   }
 
   /**
