@@ -1469,9 +1469,9 @@
     "joinError": "Ortama katılınamadı. Lütfen tekrar dene."
   },
   "webhooks": {
-    "intro": "Webhook, bir araca verdiğin adresle bir kanala mesaj yazdırır. Derleme sistemleri, bildirim betikleri ve Discord webhook adresi bekleyen araçlar için uygundur.",
+    "intro": "Webhook, bir araca verdiğin adresle bir kanala mesaj yazdırır. Sunucu izleme, oyun sunucusu eklentileri, otomasyon servisleri ve kendi betiklerin için uygundur.",
     "howToTitle": "Nasıl kullanılır?",
-    "howTo": "Oluşturduğun adresi, Discord webhook adresi bekleyen aracın ayarına yapıştır. Araç adres dışında bir şey değiştirmeden mesajı bu kanala yazar. Mesajlar BOT rozetiyle görünür. Gelen mesajlar düzenlenemez; yöneticiler silebilir.",
+    "howTo": "Discord webhook desteği olan çoğu araç bu adresle de çalışır: aracın webhook ayarına Discord adresi yerine bu adresi yapıştır. Yalnız Discord adresini kabul eden araçlarda çalışmaz. Dosya ve görsel gönderilmez. Mesajlar BOT rozetiyle görünür, düzenlenemez, yöneticiler silebilir.",
     "validation": {
       "nameRequired": "Webhook adı gerekli.",
       "nameTooLong": "Webhook adı en fazla 32 karakter olabilir.",
