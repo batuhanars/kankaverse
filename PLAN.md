@@ -294,7 +294,9 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     🟡 **C36 SÖZLEŞME YAZILDI 2026-10-30:** `contracts/SPRINT_C36_STREAM_LINK_ANNOUNCE_CONTRACT.md`. **Sahip kararları:** Kick + Twitch (Kick öncelikli; 2026-10-30 Twitch sonradan eklendi
     , Türk yayıncılar Kick'e kaydı; Steam/Epic yalnız profil rozeti verir, sonraki tur) · minör bağlayamaz · kumar/yetişkin yayın yalnız 18+
     ortamda duyurulur (okunamazsa riskli) · duyuru çift rızalı (yönetici kanalı açar, yayıncı ortam başına kendisi açar) · duyuru C35
-    webhook mesajı olarak. **YouTube:** yerleşik bağlama yok, kullanıcılar otomasyon servisi + C35 webhook ile çözer; talep olursa bakılır.
+    webhook mesajı olarak. **CANLI 2026-10-30 (fb8db69), Kick açık, Twitch kapalı, sahip turu bekliyor.** C38 kaldığın yerden aç (1051e0c) ve C39 küçük düzeltmeler (4b5122b) canlı.
+    **Borç (C39):** masaüstünde `will-navigate` yok, dış adrese `location.assign` uygulama penceresini kaçırıyor (C39 yalnız Kick yolunu düzeltti; genel koruma desktop sürümüyle) · hareketli avatar 256px, büyük görünümde bulanık.
+    **YouTube:** yerleşik bağlama yok, kullanıcılar otomasyon servisi + C35 webhook ile çözer; talep olursa bakılır.
     ⏭️ **C37 (sözleşme C36 bitince):** Steam (OpenID; rozet + Steam Web API ile "oynuyor" durumu, masaüstü uygulaması olmayan
     web/mobil kullanıcıda da; C31b görünürlük kuralları aynen) + Battle.net (OAuth; yalnız BattleTag rozeti, Blizzard herkese açık
     "oynuyor" API sunmuyor). Epic sonra: marka incelemesi süreci var, herkese açık oynuyor verisi yok, yalnız rozet.
