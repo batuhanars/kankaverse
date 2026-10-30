@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AiVideoGrant } from '@prisma/client';
+import { AiVideoGrant, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DEFAULT_CREDIT_MICRO_USD, fromCredits, toCredits } from './ai-video.mapper';
 import { grantStatus, spentSinceMicro } from './ai-video-grant';
@@ -111,7 +111,7 @@ export class AiVideoGrantsService {
     actorId: string,
     action: string,
     userId: string,
-    metadata: Record<string, unknown>,
+    metadata: Prisma.InputJsonObject,
   ) {
     return this.prisma.auditLog.create({
       data: { actorId, action, entityType: 'user', entityId: userId, metadata: metadata },
