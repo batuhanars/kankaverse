@@ -731,7 +731,7 @@ describe('ChannelsService.findByGuild — unreadCount', () => {
         where: expect.objectContaining({
           channelId: CHANNEL_ID,
           deletedAt: null,
-          authorId: { not: USER_ID },
+          NOT: { authorId: USER_ID, webhookId: null },
         }),
       }),
     );
@@ -756,7 +756,7 @@ describe('ChannelsService.findByGuild — unreadCount', () => {
     );
   });
 
-  it('kendi mesajları sayılmaz → authorId: { not: userId } filtresi', async () => {
+  it('kendi mesajları sayılmaz (webhook mesajı hariç) → NOT { authorId, webhookId: null } filtresi', async () => {
     prismaMock.channel.findMany.mockResolvedValue([makeChannelWithRead(null)]);
     prismaMock.message.count.mockResolvedValue(0);
 
@@ -765,7 +765,7 @@ describe('ChannelsService.findByGuild — unreadCount', () => {
     expect(prismaMock.message.count).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          authorId: { not: USER_ID },
+          NOT: { authorId: USER_ID, webhookId: null },
         }),
       }),
     );

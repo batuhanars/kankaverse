@@ -34,12 +34,25 @@ export class ReportsService {
     const priority = calcPriority(dto.reason);
 
     // §0 KURUL: contextSnapshot = YALNIZCA minimal referans — içerik yok
-    const contextSnapshot = {
+    const contextSnapshot: Record<string, string> = {
       targetType: dto.targetType,
       targetId: dto.targetId,
       reason: dto.reason,
       reportedAt: new Date().toISOString(),
     };
+
+    // C35 §5.1: webhook mesajı raporu webhook kimliğini ve SORUMLU üyeyi (oluşturan) taşır; moderatör
+    // "webhook mesajı, sorumlu: X" görür. İçerik yakalanmaz (KURUL §0 değişmedi), yalnız iki referans.
+    if (dto.targetType === 'MESSAGE') {
+      const target = await this.prisma.message.findUnique({
+        where: { id: dto.targetId },
+        select: { webhookId: true, authorId: true },
+      });
+      if (target?.webhookId) {
+        contextSnapshot.webhookId = target.webhookId;
+        contextSnapshot.responsibleUserId = target.authorId;
+      }
+    }
 
     const report = await this.prisma.report.create({
       data: {

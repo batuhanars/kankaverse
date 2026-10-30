@@ -39,7 +39,7 @@ type ReactionAggDto = { emoji: string; count: number; reactedByMe: boolean };
 type ReplyToDto = { id: string; content: string; authorUsername: string } | null;
 
 type ReplyToRaw =
-  | (Pick<Message, 'id' | 'content' | 'deletedAt'> & {
+  | (Pick<Message, 'id' | 'content' | 'deletedAt' | 'webhookId' | 'webhookName'> & {
       author: Pick<User, 'username'>;
     })
   | null;
@@ -57,7 +57,9 @@ type MessageWithAuthor = Message & {
 function buildReplyToDto(raw: ReplyToRaw): ReplyToDto {
   if (!raw || raw.deletedAt !== null) return null;
   const snippet = raw.content.trim().length > 0 ? raw.content.slice(0, 100) : '[dosya]';
-  return { id: raw.id, content: snippet, authorUsername: raw.author.username };
+  // C35 §5.1: webhook mesajına yanıtta oluşturanın adı sızmaz, webhook'un görünen adı gösterilir
+  const authorUsername = raw.webhookId ? (raw.webhookName ?? '') : raw.author.username;
+  return { id: raw.id, content: snippet, authorUsername };
 }
 
 function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
@@ -90,15 +92,26 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
     replyTo: buildReplyToDto(msg.replyTo ?? null),
     editedAt: msg.editedAt ? msg.editedAt.toISOString() : null,
     pinnedAt: msg.pinnedAt ? msg.pinnedAt.toISOString() : null,
-    author: {
-      id: msg.author.id,
-      username: msg.author.username,
-      avatarUrl: msg.author.avatarUrl,
-      // C16: hareketli WebP adresi (avatarUrl = statik kare). Eski önbellek/olayda alan yok → istemci statik.
-      avatarAnimatedUrl: msg.author.avatarAnimatedUrl ?? null,
-      // C21: ortam kanalı için sonradan `withRoleEmojis` doldurur; DM'de null kalır.
-      roleEmoji: null as string | null,
-    },
+    author: msg.webhookId
+      ? {
+          // C35 §5.1: görünen kimlik webhook'tan gelir; oluşturanın (authorId) id'si DTO'ya ASLA girmez.
+          id: msg.webhookId,
+          username: msg.webhookName ?? '',
+          avatarUrl: null as string | null,
+          avatarAnimatedUrl: null as string | null,
+          roleEmoji: null as string | null,
+        }
+      : {
+          id: msg.author.id,
+          username: msg.author.username,
+          avatarUrl: msg.author.avatarUrl,
+          // C16: hareketli WebP adresi (avatarUrl = statik kare). Eski önbellek/olayda alan yok → istemci statik.
+          avatarAnimatedUrl: msg.author.avatarAnimatedUrl ?? null,
+          // C21: ortam kanalı için sonradan `withRoleEmojis` doldurur; DM'de null kalır.
+          roleEmoji: null as string | null,
+        },
+    webhook: msg.webhookId ? { id: msg.webhookId } : null,
+    embeds: msg.webhookId ? ((msg.embeds ?? null) as unknown[] | null) : null,
     attachments: msg.attachments.map((a) => ({
       id: a.id,
       filename: a.filename,
@@ -139,11 +152,16 @@ function withNonce<T extends object>(dto: T, nonce?: string): T & { nonce?: stri
  */
 const MAX_ROLE_MENTIONS = 3;
 
+/** Düz metin `@everyone` (kelime/`<@&`/`@@` içinde değil); `@here` eşleşmez. Yalnız webhook yolu kullanır. */
+const PLAIN_EVERYONE_RE = /(?<![\w@<&])@everyone(?!\w)/;
+
 const REPLY_TO_INCLUDE = {
   select: {
     id: true,
     content: true,
     deletedAt: true,
+    webhookId: true,
+    webhookName: true,
     author: { select: { username: true } },
   },
 } as const;
@@ -164,6 +182,96 @@ export class MessagesService {
   }
 
   /**
+   * R7 Enforcement çekirdeği (C35 §3 ile ORTAK): global BAN ve kapsam-duyarlı MUTE → mesaj yazamaz.
+   * `create()` gönderenin kendi kimliğiyle, webhook yürütmesi OLUŞTURANIN kimliğiyle çağırır;
+   * iki yolun kapısı tek yerde durur, ayrı kopya yok.
+   */
+  async assertSenderUnrestricted(userId: string, guildId: string | null): Promise<void> {
+    if (await this.moderation.hasActiveBan(userId)) {
+      throw new ForbiddenException({
+        message: 'Hesabınız kısıtlandığı için mesaj gönderemezsiniz.',
+        error: 'USER_BANNED',
+      });
+    }
+    if (await this.moderation.hasActiveMute(userId, guildId)) {
+      throw new ForbiddenException({
+        message: 'Bu kanalda mesaj gönderme yetkiniz kısıtlandı.',
+        error: 'USER_MUTED',
+      });
+    }
+  }
+
+  /**
+   * Automod çekirdeği (C35 §3 ile ORTAK): verilen her metin ayrı ayrı `automod.check`'ten geçer;
+   * biri takılırsa 400 MESSAGE_BLOCKED. Boş metinler atlanır. `create()` yalnız `content` verir,
+   * webhook `content` + `username` + embed metinlerini verir.
+   */
+  assertTextsAllowed(texts: string[]): void {
+    for (const text of texts) {
+      if (text.trim().length === 0) continue;
+      if (this.automod.check(text).blocked) {
+        throw new BadRequestException({
+          message: 'Mesajınız topluluk kurallarına uygun değil.',
+          error: 'MESSAGE_BLOCKED',
+        });
+      }
+    }
+  }
+
+  /**
+   * C35 §3 — webhook mesajını yazar ve istemci DTO'suna çevirir (ortak `toMessageDto` + `withRoleEmojis`).
+   * `authorId` = webhook'u oluşturan üye (§0.3); DTO'daki görünen kimlik webhook'tan gelir.
+   * Kapılar (yetki, ban/mute, automod, bahsetme) ÇAĞIRANDA uygulanır; burası yalnız yazım + şekil.
+   */
+  async createWebhookMessage(
+    channel: { id: string; guildId: string | null },
+    data: {
+      creatorId: string;
+      webhookId: string;
+      webhookName: string;
+      content: string;
+      embeds: Prisma.InputJsonValue | null;
+      mentionsEveryone: boolean;
+      mentionRoles: string[];
+    },
+  ) {
+    const message = await this.prisma.message.create({
+      data: {
+        channelId: channel.id,
+        authorId: data.creatorId,
+        content: data.content,
+        mentions: [], // §3.4: kullanıcı bahsetmesi webhook'ta çözülmez
+        mentionsEveryone: data.mentionsEveryone,
+        mentionRoles: data.mentionRoles,
+        webhookId: data.webhookId,
+        webhookName: data.webhookName,
+        embeds: data.embeds ?? Prisma.DbNull,
+      },
+      include: {
+        author: { select: MESSAGE_AUTHOR_SELECT },
+        attachments: {
+          select: {
+            id: true,
+            filename: true,
+            contentType: true,
+            size: true,
+            scanStatus: true,
+            durationMs: true,
+            waveform: true,
+            thumbnail: true,
+            width: true,
+            height: true,
+            aiGenerationId: true,
+          },
+        },
+        reactions: { select: { userId: true, emoji: true } },
+        replyTo: REPLY_TO_INCLUDE,
+      },
+    });
+    return (await this.withRoleEmojis(channel.guildId, [toMessageDto(message)]))[0];
+  }
+
+  /**
    * §3 + §4 — Mention token parse + erişim doğrulaması (T&S / R7 incelemesi)
    *
    * 1. content içinden <@userId> token'larını regex ile topla, tekilleştir.
@@ -178,7 +286,7 @@ export class MessagesService {
    * @param channel — requireChannelAccess'in döndürdüğü guild-include'lu kanal objesi.
    *   Çağıranlar (create, editMessage) bu objeyi zaten elde ediyor; ayrı bayrak sorgusu yapılmaz.
    */
-  private async resolveMentions(
+  async resolveMentions(
     channel: {
       id: string;
       guildId: string | null;
@@ -187,6 +295,9 @@ export class MessagesService {
     },
     content: string,
     senderId: string,
+    // C35 §3.4: webhook'ta kullanıcı bahsetmesi (<@id>) çözülmez → `false` ile kullanıcı sorgusu hiç açılmaz.
+    // C35: `plainEveryone` yalnız webhook yolunda — düz metin `@everyone` (token değil) toplu bahsetme sayılır.
+    opts: { resolveUsers?: boolean; plainEveryone?: boolean } = {},
   ): Promise<{ mentions: string[]; mentionsEveryone: boolean; mentionRoles: string[] }> {
     /**
      * Adım 0 — ROL token'ları (`<@&roleId>`). R15 §2.2 kapı modeli (R2 revizyonu, 2026-08-03):
@@ -219,6 +330,15 @@ export class MessagesService {
     let roleMatch: RegExpExecArray | null;
     while ((roleMatch = ROLE_MENTION_REGEX.exec(content)) !== null) {
       roleTokenIds.add(roleMatch[1]);
+    }
+    // Webhook istemcileri (Discord biçimi) everyone rolünün id'sini bilemez; düz `@everyone` metni
+    // aynı iki kapıdan (rol mentionable + MENTION_EVERYONE) geçerek tokenla aynı sonucu verir. `@here` çözülmez.
+    if (opts.plainEveryone && channel.guildId !== null && PLAIN_EVERYONE_RE.test(content)) {
+      const everyoneRole = await this.prisma.role.findFirst({
+        where: { guildId: channel.guildId, isEveryone: true },
+        select: { id: true },
+      });
+      if (everyoneRole) roleTokenIds.add(everyoneRole.id);
     }
     // DM/grup DM'de rol diye bir şey yok → çözüm hiç çalıştırılmaz (bugünkü davranış).
     if (roleTokenIds.size > 0 && channel.guildId !== null) {
@@ -255,6 +375,8 @@ export class MessagesService {
         }
       }
     }
+
+    if (opts.resolveUsers === false) return { mentions: [], mentionsEveryone, mentionRoles };
 
     // Adım 1: kullanıcı token parse + tekilleştir (<@&...> bu regex'e takılmaz: & sınıfta yok)
     const MENTION_REGEX = /<@([a-zA-Z0-9_-]+)>/g;
@@ -383,23 +505,8 @@ export class MessagesService {
   async create(userId: string, channelId: string, dto: CreateMessageDto) {
     const channel = await this.membership.requireChannelAccess(userId, channelId);
 
-    // R7 Enforcement: BAN (global) → mesaj gönderme yasak
-    const hasBan = await this.moderation.hasActiveBan(userId);
-    if (hasBan) {
-      throw new ForbiddenException({
-        message: 'Hesabınız kısıtlandığı için mesaj gönderemezsiniz.',
-        error: 'USER_BANNED',
-      });
-    }
-
-    // R7 Enforcement: MUTE (scope-aware) → bu kanalda mesaj gönderme yasak
-    const hasMute = await this.moderation.hasActiveMute(userId, channel.guildId ?? null);
-    if (hasMute) {
-      throw new ForbiddenException({
-        message: 'Bu kanalda mesaj gönderme yetkiniz kısıtlandı.',
-        error: 'USER_MUTED',
-      });
-    }
+    // R7 Enforcement: BAN (global) + MUTE (scope-aware) — webhook yürütmesiyle ORTAK çekirdek (C35 §3)
+    await this.assertSenderUnrestricted(userId, channel.guildId ?? null);
 
     // Yavaş mod (slow mode): yalnızca guild kanallarında; tam yetkili (OWNER/ADMINISTRATOR) muaf
     // R20: enum-ADMIN kısa devresi kalktı — izin sistemi tek kaynak.
@@ -407,7 +514,8 @@ export class MessagesService {
       const isPrivileged = await this.permissions.hasFullAccess(userId, channel.guildId);
       if (!isPrivileged) {
         const lastMessage = await this.prisma.message.findFirst({
-          where: { channelId, authorId: userId, deletedAt: null },
+          // C35: webhook mesajı oluşturanın yavaş mod süresini yemez (authorId = oluşturan ama gönderen o değil)
+          where: { channelId, authorId: userId, webhookId: null, deletedAt: null },
           orderBy: { createdAt: 'desc' },
           select: { createdAt: true },
         });
@@ -468,15 +576,7 @@ export class MessagesService {
 
     // Automod: guild kanalı mesajlarında içerik filtresi (DM hariç — özel alan)
     // Sıfır DB, sıfır kayıt — sadece block-on-send.
-    if (channel.guildId && hasContent) {
-      const { blocked } = this.automod.check(dto.content!);
-      if (blocked) {
-        throw new BadRequestException({
-          message: 'Mesajınız topluluk kurallarına uygun değil.',
-          error: 'MESSAGE_BLOCKED',
-        });
-      }
-    }
+    if (channel.guildId && hasContent) this.assertTextsAllowed([dto.content!]);
 
     // replyToId doğrulama: var + silinmemiş + AYNI kanal
     if (dto.replyToId) {
@@ -637,6 +737,14 @@ export class MessagesService {
       throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'MESSAGE_NOT_FOUND' });
     }
 
+    // C35 §4.6: webhook mesajı düzenlenemez (oluşturan dahil)
+    if (message.webhookId) {
+      throw new ForbiddenException({
+        message: 'Webhook mesajları düzenlenemez.',
+        error: 'WEBHOOK_MESSAGE_READONLY',
+      });
+    }
+
     if (message.authorId !== userId) {
       throw new ForbiddenException({
         message: 'Bu mesajı düzenleme yetkiniz yok.',
@@ -653,15 +761,7 @@ export class MessagesService {
     }
 
     // Automod: guild kanalı içerik filtresi
-    if (channel.guildId) {
-      const { blocked } = this.automod.check(dto.content);
-      if (blocked) {
-        throw new BadRequestException({
-          message: 'Mesajınız topluluk kurallarına uygun değil.',
-          error: 'MESSAGE_BLOCKED',
-        });
-      }
-    }
+    if (channel.guildId) this.assertTextsAllowed([dto.content]);
 
     // §3: mention token parse + erişim doğrulaması (§4 T&S) — edit'te yeniden hesapla
     const { mentions, mentionsEveryone, mentionRoles } = await this.resolveMentions(
@@ -725,11 +825,19 @@ export class MessagesService {
           error: 'NOT_MESSAGE_AUTHOR',
         });
       }
-      const canManage = await this.permissions.hasGuildPermission(
+      let canManage = await this.permissions.hasGuildPermission(
         userId,
         channel.guildId,
         'MANAGE_MESSAGES',
       );
+      // C35 §4.6: webhook mesajını MANAGE_WEBHOOKS sahibi de silebilir
+      if (!canManage && message.webhookId) {
+        canManage = await this.permissions.hasGuildPermission(
+          userId,
+          channel.guildId,
+          'MANAGE_WEBHOOKS',
+        );
+      }
       if (!canManage) {
         throw new ForbiddenException({
           message: 'Bu mesajı silme yetkiniz yok.',
@@ -1104,7 +1212,8 @@ export class MessagesService {
         // Dolu filtreler AND'lenir; boş olanlar where'e hiç girmez.
         // q + has ortak helper'dan (kanal ucuyla aynı mantık — §5.1)
         ...this.buildSearchContentFilter(safeQ, has),
-        ...(from ? { authorId: from } : {}),
+        // C35: webhook mesajının authorId'si oluşturan; `from` süzgeci oluşturanı webhook mesajlarından ele vermesin
+        ...(from ? { authorId: from, webhookId: null } : {}),
         ...(mentions ? { mentions: { has: mentions } } : {}),
       },
       include: {

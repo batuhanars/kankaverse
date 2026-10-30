@@ -163,6 +163,7 @@ model User {
   pushTokens          PushToken[]
   recentGames         RecentGame[]
   aiVideoGenerations  AiVideoGeneration[]
+  webhooksCreated     Webhook[]
 }
 
 enum GameSource {
@@ -434,9 +435,34 @@ model Message {
   updatedAt   DateTime          @updatedAt
   attachments Attachment[]
   reactions   MessageReaction[]
+  // C35: gelen webhook mesajı. authorId = webhook'u oluşturan üye (hesap verebilirlik insanda, §0.3);
+  // görünen kimlik webhookName'den gelir. Normal mesajda üçü de null.
+  webhookId   String?
+  webhook     Webhook?          @relation(fields: [webhookId], references: [id], onDelete: Restrict)
+  webhookName String?           // gönderim anındaki görünen ad (anlık görüntü; username mesaj başına ezilebilir)
+  embeds      Json?             // C35 §2.5: doğrulanmış embed listesi (yalnız izinli alanlar)
 
   @@index([channelId, createdAt])
   @@index([channelId, pinnedAt])
+}
+
+/// C35: gelen webhook. Token yalnız SHA-256 hash olarak saklanır; silme yumuşak (mesajlar kimliği korur).
+model Webhook {
+  id          String    @id @default(cuid())
+  guildId     String
+  channelId   String
+  name        String
+  tokenHash   String
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  deletedAt   DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  messages    Message[]
+
+  @@index([channelId])
+  @@index([guildId])
 }
 
 model MessageReaction {

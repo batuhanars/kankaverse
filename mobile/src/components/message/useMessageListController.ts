@@ -46,6 +46,8 @@ function buildRenderItems(messages: MessageDto[]): RenderItem[] {
       isDayStart ||
       !prev ||
       prev.author.id !== message.author.id ||
+      // C35: ayni webhook mesaj basina farkli `username` gonderebilir; farkli ad = yeni oyun/grup
+      (!!message.webhook && prev.author.username !== message.author.username) ||
       new Date(message.createdAt).getTime() - new Date(prev.createdAt).getTime() > FIVE_MIN;
     return { message, showAuthor, isDayStart };
   });

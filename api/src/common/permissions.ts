@@ -24,6 +24,7 @@ export const PERMISSION_FLAGS = [
   'MOVE_MEMBERS',
   'PRIORITY_SPEAKER',
   'MANAGE_EVENTS',
+  'MANAGE_WEBHOOKS',
 ] as const;
 
 export type PermissionFlag = (typeof PERMISSION_FLAGS)[number];

@@ -31,7 +31,7 @@ export function funnelQuery(cohortDays: number): Prisma.Sql {
     SELECT
       count(*) FILTER (WHERE u.in_cohort) registered,
       count(*) FILTER (WHERE u.in_cohort AND EXISTS (SELECT 1 FROM "GuildMember" g WHERE g."userId" = u.id)) joined_guild,
-      count(*) FILTER (WHERE u.in_cohort AND EXISTS (SELECT 1 FROM "Message" m WHERE m."authorId" = u.id)) sent_message,
+      count(*) FILTER (WHERE u.in_cohort AND EXISTS (SELECT 1 FROM "Message" m WHERE m."authorId" = u.id AND m."webhookId" IS NULL)) sent_message,
       count(*) FILTER (WHERE u.in_cohort AND r.ret1) returned_next_day,
       count(*) FILTER (WHERE u.in_cohort AND r.ret7) returned_after_7_days,
       count(*) FILTER (WHERE u.in_cohort AND r.days >= 3) active_on_3_days,

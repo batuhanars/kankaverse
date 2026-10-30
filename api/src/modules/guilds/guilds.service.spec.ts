@@ -618,7 +618,7 @@ describe('GuildsService.findMyGuilds — unreadCount', () => {
     expect(result[0].unreadCount).toBe(5);
 
     const callArg = prismaMock.message.count.mock.calls[0][0];
-    expect(callArg.where).toMatchObject({ authorId: { not: OWNER_ID } });
+    expect(callArg.where).toMatchObject({ NOT: { authorId: OWNER_ID, webhookId: null } });
     expect(callArg.where).not.toHaveProperty('createdAt');
   });
 

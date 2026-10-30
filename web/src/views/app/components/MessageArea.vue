@@ -37,6 +37,8 @@ const optimistic = useOptimisticSend()
 // Mesaj yönetimi (pin + başkasının mesajını silme) → MANAGE_MESSAGES (owner/ADMINISTRATOR dahil)
 const { can } = useGuildPermissions(() => guildsStore.activeGuildId ?? '')
 const canManageMessages = computed(() => can('MANAGE_MESSAGES'))
+// C35 §4.6: webhook mesajini MANAGE_WEBHOOKS sahibi de silebilir
+const canManageWebhooks = computed(() => can('MANAGE_WEBHOOKS'))
 const canPin = canManageMessages
 const { onInput: onTypingInput, stopTyping } = useTyping(() => channelId.value)
 const { label: typingLabel } = useTypingLabel(() => channelId.value, t)
@@ -91,6 +93,8 @@ function isGroupStart(index: number): boolean {
   const prev = messages.value[index - 1]
   if (isNewDay(cur.createdAt, prev.createdAt)) return true
   if (cur.author.id !== prev.author.id) return true
+  // C35: ayni webhook mesaj basina farkli `username` gonderebilir; farkli ad = yeni grup
+  if (cur.webhook && cur.author.username !== prev.author.username) return true
   const diffMs = new Date(cur.createdAt).getTime() - new Date(prev.createdAt).getTime()
   return diffMs > 7 * 60 * 1000
 }
@@ -430,7 +434,7 @@ function resetComposerHeight() {
             :is-group-start="isGroupStart(index)"
             :guild-members="guildMembers"
             :can-pin="canPin"
-            :can-manage-messages="canManageMessages"
+            :can-manage-messages="canManageMessages || (!!msg.webhook && canManageWebhooks)"
             :guild-id="guildsStore.activeGuildId ?? undefined"
             @reply="setReplyingTo"
             @retry="optimistic.retry"

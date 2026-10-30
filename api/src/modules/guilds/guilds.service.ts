@@ -291,7 +291,8 @@ export class GuildsService {
             const base = {
               channelId: ch.id,
               deletedAt: null,
-              authorId: { not: userId }, // kendi mesajları sayma
+              // kendi mesajları sayma; C35: webhook mesajı oluşturanın kendi mesajı SAYILMAZ
+              NOT: { authorId: userId, webhookId: null },
               ...(lastRead !== null && { createdAt: { gt: lastRead } }),
             };
             // @everyone yalnız genel kanallarda rail-rozetine sayılır; özel kanalda üye-olmayana

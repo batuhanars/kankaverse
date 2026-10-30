@@ -319,6 +319,30 @@ export interface ReplyPreviewDto {
   authorUsername: string
 }
 
+// C35 §2.5 - webhook mesajındaki embed (yalniz izinli alanlar; gorsel alani yok)
+export interface MessageEmbed {
+  title?: string
+  description?: string
+  url?: string
+  color?: number
+  author?: { name: string; url?: string }
+  fields?: { name: string; value: string; inline: boolean }[]
+  footer?: { text: string }
+  timestamp?: string
+}
+
+// C35 §4.1 - Webhook yonetim DTO'su (token/ozet ASLA donmez; `url` yalniz olusturma/yenileme cevabinda)
+export interface WebhookDto {
+  id: string
+  name: string
+  channelId: string
+  createdBy: { id: string; username: string }
+  disabled: boolean
+  lastUsedAt: string | null
+  createdAt: string
+  url?: string
+}
+
 export interface MessageDto {
   id: string
   channelId: string
@@ -342,6 +366,9 @@ export interface MessageDto {
   // hesaplanır: "bana rolümden bahsedildi" bandı ve rol çipi bunu kullanır.
   mentionRoles?: string[]
   pinnedAt: string | null // Sprint V2 Pins — dolu ise sabitlenen mesaj
+  // C35 - gelen webhook mesaji: author webhook kimligidir (olusturanin id'si yok); eski sunucuda alan yok
+  webhook?: { id: string } | null
+  embeds?: MessageEmbed[] | null
   // C29 — iyimser gönderim: sunucu `nonce`'u cevapta ve message.created'da aynen yankılar.
   nonce?: string
   // C29 — YALNIZ yerel (sunucudan gelmez): geçici mesajın durumu ve hata metni.

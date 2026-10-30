@@ -1,6 +1,7 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
+import { maskWebhookPath } from '../utils/webhook-path.util';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -12,6 +13,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Sunucu hatası oluştu.';
     let error = 'INTERNAL_ERROR';
+    let retryAfter: number | undefined;
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -22,6 +24,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         const raw = r.message;
         message = Array.isArray(raw) ? raw.join(', ') : ((raw as string) ?? message);
         error = (r.error as string) ?? this.defaultError(statusCode);
+        if (error === 'WEBHOOK_RATE_LIMITED' && typeof r.retryAfter === 'number') {
+          retryAfter = r.retryAfter;
+        }
       } else {
         message = res;
         error = this.defaultError(statusCode);
@@ -34,13 +39,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       }
     }
 
+    if (retryAfter !== undefined) response.setHeader('Retry-After', String(retryAfter));
+
     response.status(statusCode).json({
       success: false,
       statusCode,
       message,
       error,
+      // C35 §2.7: Discord biçimi `retry_after` (saniye, sayı) + `retryAfter`; yalnız webhook hız sınırında
+      ...(retryAfter !== undefined ? { retryAfter, retry_after: retryAfter } : {}),
       timestamp: new Date().toISOString(),
-      path: request.url,
+      // C35 §2.3: gelen webhook adresindeki gizli token hata gövdesinde asla yansımaz
+      path: maskWebhookPath(request.url),
     });
   }
 

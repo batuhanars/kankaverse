@@ -21,6 +21,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { VoiceModule } from './modules/voice/voice.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { EventsModule } from './modules/events/events.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
 import { PlatformInvitesModule } from './modules/platform-invites/platform-invites.module';
@@ -53,6 +54,7 @@ import configuration from './config/configuration';
     VoiceModule,
     RolesModule,
     EventsModule,
+    WebhooksModule,
     NotificationsModule,
     DiscoveryModule,
     PlatformInvitesModule,

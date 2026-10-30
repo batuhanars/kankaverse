@@ -31,6 +31,7 @@ const DISCORD_PERM_BITS: { bit: bigint; flag: string }[] = [
   { bit: 1n << 24n, flag: 'MOVE_MEMBERS' },
   { bit: 1n << 8n, flag: 'PRIORITY_SPEAKER' },
   { bit: 1n << 33n, flag: 'MANAGE_EVENTS' },
+  { bit: 1n << 29n, flag: 'MANAGE_WEBHOOKS' },
 ];
 
 function mapPermissions(permissions: string | undefined): string[] {

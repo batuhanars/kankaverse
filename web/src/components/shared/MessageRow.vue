@@ -18,6 +18,7 @@ import { useI18n } from 'vue-i18n'
 import AttachmentView from './AttachmentView.vue'
 import ReceiptTick from './ReceiptTick.vue'
 import MessageActionsMenu from './MessageActionsMenu.vue'
+import MessageEmbeds from './MessageEmbeds.vue'
 import { formatMentionsPlain } from '@/utils/mentions'
 import { renderMessageHtml } from '@/utils/markdown'
 import { hoverAvatarSrc } from '@/utils/animatedMedia'
@@ -83,6 +84,9 @@ const toolbarSuppressed = computed(() => isSuppressed(overlayKey.value))
 
 // Satır sökülürken (örn. mesaj silindi) açık overlay sahipliğini bırak.
 onUnmounted(() => clearActive(overlayKey.value))
+
+// C35: gelen webhook mesajı: BOT rozeti + varsayılan bot simgesi; yazar bir kullanıcı değil (kart açılmaz)
+const isWebhook = computed(() => !!props.message.webhook)
 
 // C29 — geçici (iyimser) mesaj: menü/tepki/düzenle/sil/sabitle/yanıtla/ilet KAPALI, yalnız Tekrar dene / Sil.
 const isLocal = computed(() => !!props.message.localStatus)
@@ -189,8 +193,25 @@ const renderedContent = computed<string>(() => {
           class="w-10 h-10 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[15px] font-semibold text-white"
           style="background-color: var(--kv-accent-500);"
         >
+          <svg
+            v-if="isWebhook"
+            viewBox="0 0 24 24"
+            class="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="4" y="8" width="16" height="12" rx="3" />
+            <path d="M12 8V4" />
+            <circle cx="12" cy="3.5" r="1" />
+            <circle cx="9" cy="14" r="1" fill="currentColor" />
+            <circle cx="15" cy="14" r="1" fill="currentColor" />
+          </svg>
           <img
-            v-if="authorAvatarSrc"
+            v-else-if="authorAvatarSrc"
             :src="authorAvatarSrc"
             :alt="message.author.username"
             class="w-full h-full object-cover"
@@ -223,6 +244,11 @@ const renderedContent = computed<string>(() => {
         >
           {{ message.author.username }}<span v-if="message.author.roleEmoji" class="ml-1 font-normal">{{ message.author.roleEmoji }}</span>
         </span>
+        <span
+          v-if="isWebhook"
+          class="self-center px-1.5 rounded-[var(--kv-radius-sm)] text-[10px] font-bold uppercase leading-4 select-none"
+          style="background-color: var(--kv-accent-500); color: #fff;"
+        >{{ t('message.botBadge') }}</span>
         <span class="text-[12px]" style="color: var(--kv-text-muted);">
           {{ formatTime(message.createdAt) }}
         </span>
@@ -324,6 +350,14 @@ const renderedContent = computed<string>(() => {
             <ReceiptTick :receipt="receipt" />
           </div>
         </template>
+
+        <!-- C35: webhook embed kartları (yalnız izinli alanlar, görsel yok) -->
+        <MessageEmbeds
+          v-if="message.embeds?.length"
+          :embeds="message.embeds"
+          :mention-resolver="mentionResolver"
+          :role-resolver="roleResolver"
+        />
 
         <!-- Reaksiyon pill'leri -->
         <div v-if="message.reactions?.length && !isLocal" class="flex flex-wrap gap-1 mt-1">

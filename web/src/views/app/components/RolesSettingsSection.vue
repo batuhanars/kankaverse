@@ -78,7 +78,7 @@ const activeTab = ref<Tab>('appearance')
 const PERMISSION_GROUPS: { key: string; flags: string[] }[] = [
   { key: 'general', flags: ['VIEW_CHANNELS', 'MANAGE_CHANNELS', 'MANAGE_ROLES', 'MANAGE_GUILD', 'MANAGE_EMOJIS', 'CREATE_INVITE'] },
   { key: 'membership', flags: ['KICK_MEMBERS', 'BAN_MEMBERS', 'CHANGE_NICKNAME', 'MANAGE_NICKNAMES'] },
-  { key: 'message', flags: ['MANAGE_MESSAGES', 'MENTION_EVERYONE'] },
+  { key: 'message', flags: ['MANAGE_MESSAGES', 'MENTION_EVERYONE', 'MANAGE_WEBHOOKS'] },
   { key: 'voice', flags: ['MUTE_MEMBERS', 'MOVE_MEMBERS', 'PRIORITY_SPEAKER'] },
 ]
 

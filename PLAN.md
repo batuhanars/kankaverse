@@ -287,6 +287,10 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
     otomatik rol, tepkiyle rol, anket, çekiliş (yayın duyurusu hesap bağlamayla). Bot sistemi eşiği: yerleşiklerin karşılamadığı somut
     topluluk talebi ya da birkaç yüz aktif kullanıcı; açılırsa önce yalnız eğik çizgi komutları. Büyüme kaldıracı olarak D1 (Discord'dan
     taşıma) bot sisteminden önce konuşulmalı. **Sıra: C35 webhook (Discord biçimiyle uyumlu) → hesap bağlama.**
+    🟡 **C35 SÖZLEŞME YAZILDI 2026-10-30:** `contracts/SPRINT_C35_INCOMING_WEBHOOK_CONTRACT.md` (yazar = oluşturan üye, harici görsel yok,
+    yönetim yalnız web, mobil çizim vc41). R7: token + yürütme kapıları. **Kodlandı, düzeltme turu sürüyor** (204, düz @everyone,
+    trust proxy). **C35 ertelenenleri:** webhook mesajı bildiriminde başlık "Biri" (actor yok) · mobilde yöneticinin webhook mesajını
+    silmesi · ayrılmış ad homoglif taklidi (Kiril) · hız sınırı bellek içi (çok örnekte Redis'e) · arama/sabit panellerinde BOT rozeti.
     **Spotify "dinliyor" PARK (sahip 2026-10-29):** resmî Web API kitleye açılamaz (2025 geniş erişim şartı: kayıtlı şirket +
     ~250k MAU; geliştirme modu birkaç elle eklenen kullanıcı). Tek yol masaüstünde pencere başlığından yerel algılama (kırılgan,
     serbest metin = automod + ayrı ayar). Açılırsa C31b altyapısıyla küçük ek sprint.

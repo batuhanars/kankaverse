@@ -1153,7 +1153,9 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       // Kaynak resolveMentions çıktısı (zaten minör/yaş/erişim süzülü) — yeni erişim sorgusu YOK.
       await this.notifications.create(mentionedUserId, {
         type: 'MENTION',
-        actorId: author.id,
+        // C35: webhook mesajında author.id bir webhook kimliği (User değil → FK ihlali) ve
+        // oluşturanı ele vermemeli; kalıcı bildirim aktörsüz yazılır.
+        actorId: messageDto['webhook'] ? undefined : author.id,
         guildId: guildId ?? undefined,
         channelId,
         messageId: messageDto['id'] as string,

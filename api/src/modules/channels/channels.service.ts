@@ -206,7 +206,8 @@ export class ChannelsService {
         const base = {
           channelId: ch.id,
           deletedAt: null,
-          authorId: { not: userId }, // kendi mesajları sayma
+          // kendi mesajları sayma; C35: webhook mesajı oluşturanın kendi mesajı SAYILMAZ (herkes için okunmamış)
+          NOT: { authorId: userId, webhookId: null },
           ...(lastRead !== null && { createdAt: { gt: lastRead } }),
         };
         // REV-4: okunmamış bahsetme — beni içeren mention VEYA @everyone toplu bahsetme.

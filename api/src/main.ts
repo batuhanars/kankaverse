@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
@@ -9,7 +10,12 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Prod'da api yalnız Caddy'nin arkasında (compose'da yalnız caddy 80/443 yayınlıyor): tek proxy atlaması
+  // güvenilir, `req.ip` X-Forwarded-For'daki gerçek istemci olur (aksi hâlde herkes Caddy IP'si sayılır ve
+  // IP bazlı hız sınırları ortak kova olur). Api portu dışa AÇILIRSA XFF istemci tarafından sahtelenir.
+  app.set('trust proxy', 1);
 
   app.use(cookieParser());
 

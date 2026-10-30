@@ -15,5 +15,7 @@ import { MessagesGateway } from './gateway/messages.gateway';
   imports: [JwtModule.register({}), SharedModule, NotificationsModule, VoiceModule],
   controllers: [MessagesController, PinsController, GuildSearchController],
   providers: [MessagesService, MessagesGateway],
+  // C35: WebhooksModule ortak çekirdeği (kapılar, DTO, yayın) bu iki servisten kullanır
+  exports: [MessagesService, MessagesGateway],
 })
 export class MessagesModule {}

@@ -93,6 +93,18 @@ export interface GuildSearchGroupDto {
   messages: MessageDto[];
 }
 
+/** C35 §2.5 - gelen webhook embed'i (yalniz izinli alanlar; gorsel alani yok). */
+export interface MessageEmbed {
+  title?: string;
+  description?: string;
+  url?: string;
+  color?: number;
+  author?: { name: string; url?: string };
+  fields?: { name: string; value: string; inline: boolean }[];
+  footer?: { text: string };
+  timestamp?: string;
+}
+
 export interface MessageDto {
   id: string;
   channelId: string;
@@ -107,6 +119,9 @@ export interface MessageDto {
   mentionsEveryone?: boolean;
   pinnedAt: string | null;
   reactions?: ReactionDto[];
+  /** C35 - gelen webhook mesaji: `author` webhook kimligidir (oluşturanın id'si yok). Eski sunucuda alan yok. */
+  webhook?: { id: string } | null;
+  embeds?: MessageEmbed[] | null;
   /** C29 — sunucu, istekteki `nonce`'u cevapta ve `message.created`'da aynen yankılar. */
   nonce?: string;
   /** C29 — YALNIZ yerel (sunucudan gelmez): geçici (iyimser) mesajın durumu ve hata metni. */

@@ -97,7 +97,7 @@ export const PERMISSION_GROUPS = [
   {
     // Anahtar web'deki `permsGroups.message` ile aynı olmalı — başlık oradan okunuyor.
     key: 'message',
-    flags: ['MANAGE_MESSAGES', 'MANAGE_EVENTS', 'MENTION_EVERYONE'],
+    flags: ['MANAGE_MESSAGES', 'MANAGE_EVENTS', 'MENTION_EVERYONE', 'MANAGE_WEBHOOKS'],
   },
   {
     key: 'voice',

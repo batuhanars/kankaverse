@@ -68,7 +68,8 @@ export function useGuildPermissions(guildId: () => string) {
       can('MANAGE_GUILD') ||
       can('MANAGE_ROLES') ||
       can('CREATE_INVITE') ||
-      can('BAN_MEMBERS'),
+      can('BAN_MEMBERS') ||
+      can('MANAGE_WEBHOOKS'),
   )
 
   return { isOwner, can, hasAll, canOpenSettings }

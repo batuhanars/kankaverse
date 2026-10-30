@@ -4,6 +4,7 @@ import { AttachmentView } from './AttachmentView';
 import { PresenceDot } from './PresenceDot';
 import { usePresenceStore, selectStatus } from '@/stores/presence';
 import { BubbleMeta, MetaSpacer, ReactionRow, ReplyQuote } from './message/BubbleParts';
+import { EmbedCards } from './message/EmbedCard';
 import { splitMentions } from '@/utils/mentions';
 import type { MessageDto } from '@/api/messages';
 import { t } from '@/i18n';
@@ -74,6 +75,9 @@ export function MessageBubble({
   );
   const displayContent = mentionSegments.map((seg) => seg.text).join('');
   const reactions = message.reactions ?? [];
+  // C35: gelen webhook mesaji: BOT rozeti + varsayilan bot simgesi; yazar kullanici degil, profil acilmaz.
+  const isWebhook = !!message.webhook;
+  const embeds = message.embeds ?? [];
   // C29: gecici mesaj: yalniz Tekrar dene / Sil; menu, tepki, okundu tiki yok.
   const isLocal = !!message.localStatus;
 
@@ -107,7 +111,7 @@ export function MessageBubble({
         (showAuthor ? (
           <Pressable
             onPress={onPressAuthor}
-            disabled={!onPressAuthor}
+            disabled={!onPressAuthor || isWebhook}
             accessibilityRole="button"
             accessibilityLabel={
               authorStatus === 'offline'
@@ -116,7 +120,11 @@ export function MessageBubble({
             }
             style={styles.avatar}
           >
-            <Text style={styles.avatarText}>{message.author.username.charAt(0).toUpperCase()}</Text>
+            {isWebhook ? (
+              <Ionicons name="hardware-chip-outline" size={18} color={theme.colors.accent500} />
+            ) : (
+              <Text style={styles.avatarText}>{message.author.username.charAt(0).toUpperCase()}</Text>
+            )}
             {/* Çevrimdışıda nokta YOK (C28 §1.2): gizli görünürlük de istemciye çevrimdışı gelir. */}
             {authorStatus !== 'offline' && (
               <PresenceDot
@@ -144,12 +152,20 @@ export function MessageBubble({
           ]}
         >
           {nameVisible && (
-            <Pressable onPress={onPressAuthor} disabled={!onPressAuthor} accessibilityRole="button">
-              <Text style={styles.author}>
-                {message.author.username}
-                {message.author.roleEmoji ? ` ${message.author.roleEmoji}` : ''}
-              </Text>
-            </Pressable>
+            <View style={styles.authorRow}>
+              <Pressable
+                onPress={onPressAuthor}
+                disabled={!onPressAuthor || isWebhook}
+                accessibilityRole="button"
+                style={styles.authorName}
+              >
+                <Text style={styles.author}>
+                  {message.author.username}
+                  {message.author.roleEmoji ? ` ${message.author.roleEmoji}` : ''}
+                </Text>
+              </Pressable>
+              {isWebhook && <Text style={styles.botBadge}>{t('message.botBadge')}</Text>}
+            </View>
           )}
 
           {/* Sabitlenmiş rozeti (sahip revizesi 2026-08-01): sabitlemek görülebilir bir sonuç üretir.
@@ -176,6 +192,10 @@ export function MessageBubble({
           {message.attachments?.map((a) => (
             <AttachmentView key={a.id} attachment={a} interactive isMine={isMine} />
           ))}
+
+          {isWebhook && embeds.length > 0 && (
+            <EmbedCards embeds={embeds} resolveMention={resolveMention} resolveRole={resolveRole} />
+          )}
 
           {/* Açıklama eklerin ALTINDA (sahip revizesi 2026-10-15, WhatsApp düzeni). */}
           {displayContent.length > 0 && (
@@ -318,11 +338,29 @@ const styles = StyleSheet.create({
   bubbleHighlighted: {
     borderColor: theme.colors.accent500,
   },
+  authorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  authorName: {
+    flexShrink: 1,
+  },
   author: {
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xs,
     fontWeight: '600',
-    marginBottom: 2,
+  },
+  // C35: BOT rozeti (web ile ayni dil: Kor zemin, beyaz metin)
+  botBadge: {
+    color: theme.colors.textPrimary,
+    backgroundColor: theme.colors.accent500,
+    fontSize: 10,
+    fontWeight: '700',
+    paddingHorizontal: 5,
+    borderRadius: theme.radius.sm,
+    overflow: 'hidden',
   },
   pinnedRow: {
     flexDirection: 'row',

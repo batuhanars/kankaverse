@@ -610,6 +610,7 @@
       "davetler": "Davetler",
       "yasaklar": "Yasaklar",
       "denetim": "Denetim Kaydı",
+      "webhooklar": "Webhook'lar",
       "ortamiSil": "Ortamı Sil"
     },
     "nameSection": "Ortam Adı",
@@ -765,6 +766,7 @@
         "MANAGE_NICKNAMES": { "label": "Takma Adları Yönet", "desc": "Diğer üyelerin takma adlarını değiştir." },
         "MANAGE_MESSAGES": { "label": "Mesajları Yönet", "desc": "Başkalarının mesajlarını sil ve sabitle." },
         "MANAGE_EVENTS": { "label": "Etkinlikleri Yönet", "desc": "Ortam etkinliği oluştur, düzenle ve sil." },
+        "MANAGE_WEBHOOKS": { "label": "Webhook'ları Yönet", "desc": "Kanallara dışarıdan mesaj yazan webhook adreslerini oluştur, yenile ve sil." },
         "MENTION_EVERYONE": { "label": "Herkesi Bahset", "desc": "{'@'}everyone etiketiyle tüm üyeleri bahsedebilir." },
         "MUTE_MEMBERS": { "label": "Sesi Kapat", "desc": "Sesli kanallarda üyelerin sesini kapat." },
         "MOVE_MEMBERS": { "label": "Üyeleri Taşı", "desc": "Üyeleri sesli kanallar arasında taşı veya çıkar." },
@@ -1006,6 +1008,7 @@
     "copyText": "Metni Kopyala",
     "delete": "Sil",
     "edited": "(düzenlendi)",
+    "botBadge": "BOT",
     "receipt": {
       "sent": "Gönderildi",
       "seen": "Okundu"
@@ -1464,6 +1467,43 @@
     "loadMore": "Daha Fazla Göster",
     "loadError": "Ortamlar yüklenemedi. Lütfen tekrar dene.",
     "joinError": "Ortama katılınamadı. Lütfen tekrar dene."
+  },
+  "webhooks": {
+    "intro": "Webhook, bir araca verdiğin adresle bir kanala mesaj yazdırır. Derleme sistemleri, bildirim betikleri ve Discord webhook adresi bekleyen araçlar için uygundur.",
+    "howToTitle": "Nasıl kullanılır?",
+    "howTo": "Oluşturduğun adresi, Discord webhook adresi bekleyen aracın ayarına yapıştır. Araç adres dışında bir şey değiştirmeden mesajı bu kanala yazar. Mesajlar BOT rozetiyle görünür. Gelen mesajlar düzenlenemez; yöneticiler silebilir.",
+    "validation": {
+      "nameRequired": "Webhook adı gerekli.",
+      "nameTooLong": "Webhook adı en fazla 32 karakter olabilir.",
+      "channelRequired": "Bir kanal seç."
+    },
+    "createTitle": "Yeni webhook",
+    "nameLabel": "Ad",
+    "namePlaceholder": "Örn. Derleme Botu",
+    "channelLabel": "Kanal",
+    "channelPlaceholder": "Kanal seç",
+    "createButton": "Oluştur",
+    "listTitle": "Webhook'lar",
+    "empty": "Bu ortamda henüz webhook yok.",
+    "revealTitle": "{name} için adres hazır",
+    "revealWarning": "Bu adresi gizli tut, bilen herkes bu kanala yazabilir. Adres yalnızca şimdi gösterilir; kaybedersen token'ı yenile.",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı",
+    "hideUrl": "Adresi gizle",
+    "disabled": "Devre dışı",
+    "disabledHint": "Oluşturanın yetkisi kalmadı. Token'ı yenileyerek webhook'u üstlenebilirsin.",
+    "createdBy": "Oluşturan: {name}",
+    "lastUsed": "Son kullanım: {when}",
+    "neverUsed": "Hiç kullanılmadı",
+    "edit": "Düzenle",
+    "editTitle": "Webhook'u düzenle",
+    "saved": "Webhook kaydedildi.",
+    "resetToken": "Token'ı yenile",
+    "resetTitle": "Token yenilensin mi?",
+    "resetMessage": "{name} için yeni bir adres üretilecek. Eski adres hemen çalışmaz olur ve webhook senin sorumluluğuna geçer.",
+    "delete": "Sil",
+    "deleteTitle": "Webhook silinsin mi?",
+    "deleteMessage": "{name} silinecek. Adresi kullanan araçlar artık mesaj yazamaz. Gönderilmiş mesajlar kalır."
   },
   "audit": {
     "title": "Denetim Kaydı",
