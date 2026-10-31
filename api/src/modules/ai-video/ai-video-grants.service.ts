@@ -8,7 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AiVideoGrant, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { DEFAULT_CREDIT_MICRO_USD, fromCredits, toCredits } from './ai-video.mapper';
+import { DEFAULT_CREDIT_MICRO_USD, floorCredits, fromCredits, toCredits } from './ai-video.mapper';
 import { grantStatus, lockAiVideoUser, spentSinceMicro } from './ai-video-grant';
 import { ACTIVE_STATUSES } from './ai-video.constants';
 import { AiVideoGrantRowDto, UpsertAiVideoGrantDto } from './dto/ai-video-grant.dto';
@@ -108,9 +108,14 @@ export class AiVideoGrantsService {
           });
         }
         // Kalan = bütçe - kullanılan (`spentSinceMicro`, kapı ile aynı kural); iptal edilmiş hak devretmez.
+        // Yalnız tam kredi devreder: gerçek ücretler küsuratlı, bütçe tam kredi kalsın (iki ekran aynı sayıyı göstersin).
         if (existing.revokedAt === null) {
           const spent = await spentSinceMicro(tx, userId, existing.startsAt);
-          carried = Math.max(0, existing.budgetMicroUsd - spent);
+          const credit = this.creditMicro();
+          carried = fromCredits(
+            floorCredits(Math.max(0, existing.budgetMicroUsd - spent), credit),
+            credit,
+          );
         }
       }
       const budgetMicroUsd = enteredMicro + carried;
@@ -173,9 +178,10 @@ export class AiVideoGrantsService {
     const credit = this.creditMicro();
     return {
       user: r.user,
-      budgetCredits: toCredits(r.budgetMicroUsd, credit),
+      // Kullanıcı ekranıyla aynı yuvarlama: bütçe/kalan aşağı, kullanılan yukarı.
+      budgetCredits: floorCredits(r.budgetMicroUsd, credit),
       spentCredits: toCredits(spentMicro, credit),
-      remainingCredits: toCredits(Math.max(0, r.budgetMicroUsd - spentMicro), credit),
+      remainingCredits: floorCredits(Math.max(0, r.budgetMicroUsd - spentMicro), credit),
       startsAt: r.startsAt.toISOString(),
       expiresAt: r.expiresAt?.toISOString() ?? null,
       revokedAt: r.revokedAt?.toISOString() ?? null,
