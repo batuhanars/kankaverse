@@ -8,7 +8,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { aiGrantSchema, endOfLocalDay } from '@/lib/validation/aiVideoGrant'
+import { aiGrantSchema } from '@/lib/validation/aiVideoGrant'
 import { adminApi } from '@/api/admin'
 import type { AdminUserDto, AiVideoGrantRowDto } from '@/api/admin'
 import { useToastStore } from '@/stores/toast'
@@ -30,12 +30,10 @@ const form = useForm({
   initialValues: {
     userId: props.renewing?.user.id ?? '',
     budgetCredits: props.renewing?.budgetCredits,
-    expiresOn: '',
     note: props.renewing?.note ?? '',
   },
 })
 const [budget] = form.defineField('budgetCredits')
-const [expiresOn] = form.defineField('expiresOn')
 const [note] = form.defineField('note')
 
 function fieldError(field: string): string | undefined {
@@ -69,7 +67,7 @@ const save = form.handleSubmit(async (v) => {
   try {
     await adminApi.upsertAiVideoGrant(v.userId, {
       budgetCredits: v.budgetCredits,
-      expiresAt: v.expiresOn ? endOfLocalDay(v.expiresOn).toISOString() : null,
+      expiresAt: null, // bitiş tarihi kalktı (sahip 2026-10-31); yenileme eski bitişi de temizler
       ...(v.note && { note: v.note }),
     })
     toast.success(t('admin.aiAccess.form.saved'))
@@ -99,21 +97,11 @@ const save = form.handleSubmit(async (v) => {
         />
       </div>
 
-      <div class="flex gap-3">
-        <div class="flex-1">
-          <KvNumberInput v-model="budget" :label="t('admin.aiAccess.form.credits')" :min="1" :max="100000" />
-          <p v-if="fieldError('budgetCredits')" class="text-[12px] mt-1" style="color: var(--kv-danger);">
-            {{ fieldError('budgetCredits') }}
-          </p>
-        </div>
-        <div class="flex-1">
-          <KvInput
-            v-model="expiresOn"
-            type="date"
-            :label="t('admin.aiAccess.form.expiresAt')"
-            :error="fieldError('expiresOn')"
-          />
-        </div>
+      <div>
+        <KvNumberInput v-model="budget" :label="t('admin.aiAccess.form.credits')" :min="1" :max="100000" />
+        <p v-if="fieldError('budgetCredits')" class="text-[12px] mt-1" style="color: var(--kv-danger);">
+          {{ fieldError('budgetCredits') }}
+        </p>
       </div>
 
       <KvInput

@@ -172,7 +172,6 @@
         "userPlaceholder": "Kullanıcı adıyla ara",
         "noMatch": "Eşleşen yetişkin kullanıcı yok.",
         "credits": "KREDİ",
-        "expiresAt": "BİTİŞ TARİHİ (isteğe bağlı)",
         "note": "NOT (yalnız admin görür)",
         "notePlaceholder": "Kullanıcıya hiç gösterilmez",
         "renewHint": "Yenileme yeni bir dönem başlatır: kullanılan kredi sıfırdan sayılır.",
@@ -181,7 +180,6 @@
         "saveError": "Erişim hakkı kaydedilemedi.",
         "userRequired": "Bir kullanıcı seç.",
         "creditsRequired": "Kredi 1 ile 100000 arasında tam sayı olmalı.",
-        "expiryPast": "Bitiş tarihi gelecekte olmalı.",
         "noteTooLong": "Not en fazla 200 karakter olabilir."
       },
       "revokeConfirmTitle": "Erişimi iptal et",
