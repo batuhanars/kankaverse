@@ -41,15 +41,15 @@ export function useAiVideo() {
   const saving = job?.errorCode === DOWNLOAD_PENDING;
   const elapsedSec = job ? Math.max(0, Math.floor((now - new Date(job.createdAt).getTime()) / 1000)) : 0;
 
+  // C44: kendi üretimleri hak istemez; kilitli (hakkı biten) kullanıcı da Son üretimler'i görür
   const refreshRecent = useCallback(async () => {
-    if (locked) return;
     try {
       const rows = await aiVideoApi.list();
       if (alive.current) setRecent(rows);
     } catch {
       /* son üretimler yardımcı bölüm; hata sessiz */
     }
-  }, [locked]);
+  }, []);
 
   const poll = useCallback(async () => {
     const cur = jobRef.current;

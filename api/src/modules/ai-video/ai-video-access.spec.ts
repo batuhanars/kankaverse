@@ -1,7 +1,12 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { canPreviewAiVideo, canUseAiVideo } from './ai-video-access';
-import { AI_VIDEO_PREVIEW_OK, AiVideoAccessGuard } from './ai-video-access.guard';
+import {
+  AI_VIDEO_OWN_DATA,
+  AI_VIDEO_PREVIEW_OK,
+  AiVideoAccessGuard,
+} from './ai-video-access.guard';
+import { AiVideoController } from './ai-video.controller';
 
 function cfg(over: Record<string, unknown> = {}) {
   const values: Record<string, unknown> = {
@@ -266,5 +271,65 @@ describe('C40 admin hakki (canUseAiVideo async)', () => {
     };
     const g = new AiVideoAccessGuard(NOT_LISTED, prisma, new Reflector());
     await expect(g.canActivate(ctxFor())).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
+describe('C44 kendi-verim uclari (hak istemez)', () => {
+  function run(config: any, user: any, granted = false) {
+    const handler = function own() {};
+    Reflect.defineMetadata(AI_VIDEO_OWN_DATA, true, handler);
+    const req: any = { user: { id: 'u9' } };
+    const prisma = {
+      user: { findUnique: jest.fn().mockResolvedValue(user) },
+      aiVideoGrant: {
+        findUnique: jest.fn().mockResolvedValue(granted ? GRANTED.aiVideoGrant : null),
+      },
+    } as any;
+    const g = new AiVideoAccessGuard(config, prisma, new Reflector());
+    const ctx = {
+      switchToHttp: () => ({ getRequest: () => req }),
+      getHandler: () => handler,
+    } as any;
+    return { p: g.canActivate(ctx), prisma };
+  }
+  it('hakki biten / hic olmayan yetiskin gecer; hak sorgulanmaz', async () => {
+    const { p, prisma } = run(cfg(), { id: 'u9', isMinor: false });
+    await expect(p).resolves.toBe(true);
+    expect(prisma.aiVideoGrant.findUnique).not.toHaveBeenCalled();
+  });
+  it('apiKey bos olsa da gecer (hak/anahtar istemez, yalniz bayrak)', async () => {
+    await expect(run(cfg({ 'aiVideo.apiKey': '' }), { id: 'u9', isMinor: false }).p).resolves.toBe(
+      true,
+    );
+  });
+  it('minor red (hakli olsa bile)', async () => {
+    await expect(run(cfg(), { id: 'u9', isMinor: true }, true).p).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+  it('bayrak kapali red', async () => {
+    const off = cfg({ 'aiVideo.enabled': false });
+    await expect(run(off, { id: 'u9', isMinor: false }, true).p).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+  it('kullanici yok red', async () => {
+    await expect(run(cfg(), null).p).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
+describe('C44 uc -> kapi haritasi (controller metadata)', () => {
+  const proto = AiVideoController.prototype as any;
+  const own = (name: string) => Reflect.getMetadata(AI_VIDEO_OWN_DATA, proto[name]) === true;
+  it('para harcayan uc uc hak kapisinda kalir (isaretsiz)', () => {
+    for (const n of ['presign', 'estimate', 'create']) expect(own(n)).toBe(false);
+  });
+  it('options hak istemeyen onizleme ucu, kendi-verim degil', () => {
+    expect(own('options')).toBe(false);
+    expect(Reflect.getMetadata(AI_VIDEO_PREVIEW_OK, proto.options)).toBe(true);
+  });
+  it('liste/oku/ek/sil ucleri hak istemez', () => {
+    for (const n of ['list', 'get', 'attachment', 'deleteAll', 'deleteOne'])
+      expect(own(n)).toBe(true);
   });
 });

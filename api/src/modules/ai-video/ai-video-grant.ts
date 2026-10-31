@@ -28,6 +28,14 @@ export async function spentSinceMicro(
   return sumSpentMicro(rows);
 }
 
+/**
+ * C43/C44: kullanıcıya özgü advisory kilit (transaction sonunda kendiliğinden düşer). Rezerv (`reserveRow`) ve
+ * hak yenileme (devir hesabı) AYNI anahtarı kullanır; birbirini bekler, rezerv kaçmaz.
+ */
+export async function lockAiVideoUser(tx: Prisma.TransactionClient, userId: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('ai-video:' || ${userId}))`;
+}
+
 /** Hak durumu etiketi (admin listesi): iptal > süresi doldu > bitti > etkin. */
 export function grantStatus(
   grant: Pick<AiVideoGrant, 'revokedAt' | 'expiresAt' | 'budgetMicroUsd'>,

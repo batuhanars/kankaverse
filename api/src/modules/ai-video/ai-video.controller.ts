@@ -19,13 +19,16 @@ import { AiVideoAttachmentService } from './ai-video-attachment.service';
 import { CreateAiVideoDto, EstimateAiVideoDto, PresignAiInputDto } from './dto/ai-video.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { VerifiedEmailGuard } from '../../common/guards/verified-email.guard';
-import { AiVideoAccessGuard, AiVideoPreviewOk } from './ai-video-access.guard';
+import { AiVideoAccessGuard, AiVideoOwnData, AiVideoPreviewOk } from './ai-video-access.guard';
 import type { AiVideoRequest } from './ai-video-access.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 type AuthUser = { id: string };
 
-/** C14 — yalnız açık listedeki hesaplar (AiVideoAccessGuard, R7); diğerlerine jenerik 403. */
+/**
+ * C14 — varsayılan: hak sahibi hesaplar (AiVideoAccessGuard, R7); diğerlerine jenerik 403.
+ * C44: liste/oku/ek/sil uçları `@AiVideoOwnData()` ile hak istemez (kendi verisi); para harcayan 3 uç kapıda kalır.
+ */
 @ApiTags('ai-video')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, VerifiedEmailGuard, AiVideoAccessGuard)
@@ -71,6 +74,7 @@ export class AiVideoController {
   }
 
   @Post(':id/attachment')
+  @AiVideoOwnData()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Tamamlanan üretimden bekleyen ek üret (mesaj göndermez; istemci mesaj yoluna verir)',
@@ -80,24 +84,28 @@ export class AiVideoController {
   }
 
   @Get()
+  @AiVideoOwnData()
   @ApiOperation({ summary: 'Son 10 üretim' })
   list(@CurrentUser() user: AuthUser) {
     return this.service.list(user.id);
   }
 
   @Get(':id')
+  @AiVideoOwnData()
   @ApiOperation({ summary: 'Tek üretimin durumu (diyalog yoklar)' })
   get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.get(user.id, id);
   }
 
   @Delete()
+  @AiVideoOwnData()
   @ApiOperation({ summary: 'Silinebilir (QUEUED/RUNNING olmayan) tüm üretimlerimi sil' })
   deleteAll(@CurrentUser() user: AuthUser) {
     return this.deletion.deleteAll(user.id);
   }
 
   @Delete(':id')
+  @AiVideoOwnData()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Tek üretimi sil (sürerken 409 AI_VIDEO_BUSY)' })
   deleteOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {

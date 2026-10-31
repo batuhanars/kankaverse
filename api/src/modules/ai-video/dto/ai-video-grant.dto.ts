@@ -39,6 +39,8 @@ export class AiVideoGrantRowDto {
   @ApiProperty() user!: { id: string; username: string };
   @ApiProperty() budgetCredits!: number;
   @ApiProperty() spentCredits!: number;
+  @ApiProperty({ description: 'max(0, bütçe - kullanılan); yenilemede devredilecek kredi' })
+  remainingCredits!: number;
   @ApiProperty() startsAt!: string;
   @ApiProperty({ nullable: true }) expiresAt!: string | null;
   @ApiProperty({ nullable: true }) revokedAt!: string | null;

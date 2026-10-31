@@ -34,7 +34,7 @@ export function useAiVideo() {
   const { t } = useI18n()
   const prompt = ref('')
   const error = ref('')
-  // C33: pasif tanıtım. Kilitliyken yalnız options çağrılır; estimate, geçmiş, yükleme atılmaz.
+  // C33: pasif tanıtım. Kilitliyken options + kendi üretimleri (liste/sil) çağrılır; estimate, oluşturma, yükleme atılmaz.
   const authStore = useAuthStore()
   const locked = authStore.user?.aiVideoAllowed !== true
   // C42: ekler (görsel + video + ses). Sınırlar seçili modelin `references` bilgisinden; form daha sonra kurulur (tembel okuma).
@@ -93,8 +93,8 @@ export function useAiVideo() {
     pollTimer = tickTimer = null
   }
 
+  // C44: kendi üretimleri hak istemez; kilitli (hakkı biten) kullanıcı da Son üretimler'i görür
   async function refreshRecent() {
-    if (locked) return
     try {
       recent.value = (await aiVideoApi.list()).data
     } catch {
@@ -235,7 +235,7 @@ export function useAiVideo() {
     }
   }
 
-  if (!locked) void refreshRecent()
+  void refreshRecent()
   onUnmounted(stop)
 
   return {

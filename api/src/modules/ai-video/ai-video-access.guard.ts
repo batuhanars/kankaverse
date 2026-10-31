@@ -15,6 +15,14 @@ import { canPreviewAiVideo, canUseAiVideo } from './ai-video-access';
 export const AI_VIDEO_PREVIEW_OK = 'aiVideoPreviewOk';
 export const AiVideoPreviewOk = () => SetMetadata(AI_VIDEO_PREVIEW_OK, true);
 
+/**
+ * C44: işaretli uç hak (grant) istemez; yalnız oturum + e-posta + reşit olma + bayrak (`canPreviewAiVideo`).
+ * Yalnız kullanıcının KENDİ ürettiklerine dokunan, para harcamayan uçlar işaretlenir (liste/oku/ek/sil);
+ * sahiplik serviste zorunlu. Varsayılan KATI: işaretsiz uç hak ister (yeni uç kendiliğinden açılmaz).
+ */
+export const AI_VIDEO_OWN_DATA = 'aiVideoOwnData';
+export const AiVideoOwnData = () => SetMetadata(AI_VIDEO_OWN_DATA, true);
+
 /** Guard'ın isteğe bıraktığı bayrak: kullanıcı gerçekten `canUseAiVideo` mi (tutar alanlarını sıfırlamak için). */
 export type AiVideoRequest = AuthenticatedRequest & { aiVideoAllowed?: boolean };
 
@@ -40,6 +48,13 @@ export class AiVideoAccessGuard implements CanActivate {
           select: { id: true, isMinor: true },
         })
       : null;
+    const ownData = this.reflector.get<boolean>(AI_VIDEO_OWN_DATA, context.getHandler()) === true;
+    if (ownData) {
+      if (!user || !canPreviewAiVideo(this.config, user)) {
+        throw new ForbiddenException({ message: 'Yetersiz yetki.', error: 'FORBIDDEN' });
+      }
+      return true;
+    }
     const allowed = !!user && (await canUseAiVideo(this.config, this.prisma, user));
     const previewOk =
       !!user &&

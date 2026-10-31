@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { AiVideoStatus } from '@prisma/client';
 import { AiVideoService } from './ai-video.service';
 import { AiVideoInputService } from './ai-video-input.service';
@@ -492,6 +493,22 @@ describe('AiVideoService C14c', () => {
     expect(s.prisma.aiVideoGeneration.findMany.mock.calls[0][0].where).not.toHaveProperty(
       'deletedAt',
     );
+  });
+});
+
+describe('C44 sahiplik (hak istemeyen uclar kendi verisiyle sinirli)', () => {
+  it('liste ve tek okuma userId ile suzer; baskasinin satiri 404', async () => {
+    const s = setup();
+    await s.service.list('u1');
+    expect(s.prisma.aiVideoGeneration.findMany.mock.calls[0][0].where).toMatchObject({
+      userId: 'u1',
+    });
+    s.prisma.aiVideoGeneration.findFirst.mockResolvedValue(null);
+    await expect(s.service.get('u2', 'g1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(s.prisma.aiVideoGeneration.findFirst.mock.calls.at(-1)![0].where).toMatchObject({
+      id: 'g1',
+      userId: 'u2',
+    });
   });
 });
 

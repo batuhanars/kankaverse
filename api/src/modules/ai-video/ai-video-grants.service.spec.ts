@@ -15,9 +15,15 @@ function setup(user: unknown) {
       update: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
     },
-    aiVideoGeneration: { findMany: jest.fn().mockResolvedValue([]) },
+    aiVideoGeneration: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
+    $executeRaw: jest.fn().mockResolvedValue(1),
+    $transaction: jest.fn(),
   };
+  prisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(prisma));
   const config = { get: () => undefined }; // kredi = varsayilan 10000 mikro-USD
   return { prisma, service: new AiVideoGrantsService(prisma as any, config as any) };
 }
@@ -36,7 +42,7 @@ describe('AiVideoGrantsService (C40 admin)', () => {
         actorId: 'admin1',
         action: 'ai_video.grant',
         entityId: 'u2',
-        metadata: { budgetCredits: 50, expiresAt: null, note: 'IBAN' },
+        metadata: { budgetCredits: 50, carriedCredits: 0, expiresAt: null, note: 'IBAN' },
       }),
     });
   });
@@ -86,5 +92,93 @@ describe('AiVideoGrantsService (C40 admin)', () => {
     });
     prisma.aiVideoGrant.findUnique.mockResolvedValue(null);
     await expect(service.revoke('a', 'u2')).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('AiVideoGrantsService C44 yenilemede kalan kredi devri', () => {
+  const U = { id: 'u2', isMinor: false, deletedAt: null };
+  // 100 kredi = 1_000_000 mikro-USD; startsAt gecmis
+  const existing = (over: Record<string, unknown> = {}) => ({
+    userId: 'u2',
+    budgetMicroUsd: 1_000_000,
+    startsAt: new Date('2026-10-01T00:00:00Z'),
+    expiresAt: null,
+    revokedAt: null,
+    ...over,
+  });
+  const spent = (credits: number) => [
+    { status: 'COMPLETED', costMicroUsd: credits * 10_000, quoteMicroUsd: credits * 10_000 },
+  ];
+
+  it('98 harcandi (kalan 2) + 100 girildi: butce 102, startsAt sifirlanir, audit carriedCredits 2', async () => {
+    const { prisma, service } = setup(U);
+    prisma.aiVideoGrant.findUnique.mockResolvedValue(existing());
+    prisma.aiVideoGeneration.findMany.mockResolvedValue(spent(98));
+    const row = await service.upsert('admin1', 'u2', { budgetCredits: 100 });
+    const args = prisma.aiVideoGrant.upsert.mock.calls[0][0];
+    expect(args.update.budgetMicroUsd).toBe(1_020_000);
+    expect(args.update.startsAt.getTime()).toBeGreaterThan(Date.now() - 5000);
+    expect(row.budgetCredits).toBe(102);
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({ budgetCredits: 100, carriedCredits: 2 }),
+      }),
+    });
+    expect(prisma.$executeRaw).toHaveBeenCalled(); // kilit alindi
+  });
+
+  it('tamami harcandi: devir 0, butce girilen kadar', async () => {
+    const { prisma, service } = setup(U);
+    prisma.aiVideoGrant.findUnique.mockResolvedValue(existing());
+    prisma.aiVideoGeneration.findMany.mockResolvedValue(spent(100));
+    await service.upsert('a', 'u2', { budgetCredits: 100 });
+    expect(prisma.aiVideoGrant.upsert.mock.calls[0][0].update.budgetMicroUsd).toBe(1_000_000);
+  });
+
+  it('iptal edilmis hak devretmez', async () => {
+    const { prisma, service } = setup(U);
+    prisma.aiVideoGrant.findUnique.mockResolvedValue(existing({ revokedAt: new Date() }));
+    prisma.aiVideoGeneration.findMany.mockResolvedValue(spent(10));
+    await service.upsert('a', 'u2', { budgetCredits: 100 });
+    expect(prisma.aiVideoGrant.upsert.mock.calls[0][0].update.budgetMicroUsd).toBe(1_000_000);
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({ carriedCredits: 0 }),
+      }),
+    });
+  });
+
+  it('suren uretim varken 409, yazilmaz', async () => {
+    const { prisma, service } = setup(U);
+    prisma.aiVideoGrant.findUnique.mockResolvedValue(existing());
+    prisma.aiVideoGeneration.findFirst.mockResolvedValue({ id: 'g9' });
+    await expect(service.upsert('a', 'u2', { budgetCredits: 100 })).rejects.toMatchObject({
+      status: 409,
+    });
+    expect(prisma.aiVideoGrant.upsert).not.toHaveBeenCalled();
+  });
+
+  it('INT4 tavani toplam uzerinden: girilen kucuk ama toplam asarsa 400', async () => {
+    const { prisma, service } = setup(U);
+    prisma.aiVideoGrant.findUnique.mockResolvedValue(existing({ budgetMicroUsd: 2_147_000_000 }));
+    await expect(service.upsert('a', 'u2', { budgetCredits: 100_000 })).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(prisma.aiVideoGrant.upsert).not.toHaveBeenCalled();
+  });
+
+  it('liste satiri remainingCredits tasir', async () => {
+    const { prisma, service } = setup(U);
+    prisma.aiVideoGrant.findMany.mockResolvedValue([
+      {
+        ...existing(),
+        user: { id: 'u2', username: 'k' },
+        grantedBy: { id: 'a', username: 'a' },
+        note: null,
+      },
+    ]);
+    prisma.aiVideoGeneration.findMany.mockResolvedValue(spent(98));
+    const [r] = await service.list();
+    expect(r.remainingCredits).toBe(2);
   });
 });

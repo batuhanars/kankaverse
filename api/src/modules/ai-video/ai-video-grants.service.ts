@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -8,7 +9,8 @@ import { ConfigService } from '@nestjs/config';
 import { AiVideoGrant, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DEFAULT_CREDIT_MICRO_USD, fromCredits, toCredits } from './ai-video.mapper';
-import { grantStatus, spentSinceMicro } from './ai-video-grant';
+import { grantStatus, lockAiVideoUser, spentSinceMicro } from './ai-video-grant';
+import { ACTIVE_STATUSES } from './ai-video.constants';
 import { AiVideoGrantRowDto, UpsertAiVideoGrantDto } from './dto/ai-video-grant.dto';
 
 const INT4_MAX = 2_147_483_647;
@@ -65,31 +67,57 @@ export class AiVideoGrantsService {
         error: 'AI_VIDEO_GRANT_EXPIRY_PAST',
       });
     }
-    const budgetMicroUsd = fromCredits(dto.budgetCredits, this.creditMicro());
-    if (budgetMicroUsd > INT4_MAX) {
-      throw new BadRequestException({
-        message: 'Kredi çok büyük.',
-        error: 'AI_VIDEO_GRANT_TOO_BIG',
-      });
-    }
+    const enteredMicro = fromCredits(dto.budgetCredits, this.creditMicro());
     const note = dto.note ? dto.note : null;
-    // Yeniden verme = yeni dönem: startsAt sıfırlanır (harcanan yeniden 0'dan sayılır), iptal kalkar.
-    const data = {
-      budgetMicroUsd,
-      startsAt: new Date(),
-      expiresAt,
-      revokedAt: null,
-      grantedById: actorId,
-      note,
-    };
-    const saved = await this.prisma.aiVideoGrant.upsert({
-      where: { userId },
-      create: { userId, ...data },
-      update: data,
-      include: USERS_INCLUDE,
+    const { saved, carriedMicro } = await this.prisma.$transaction(async (tx) => {
+      // C44: devir hesabı kullanıcıya özgü kilit altında (süren üretimin rezervi kaçmasın)
+      await lockAiVideoUser(tx, userId);
+      const existing = await tx.aiVideoGrant.findUnique({ where: { userId } });
+      let carried = 0;
+      if (existing) {
+        const active = await tx.aiVideoGeneration.findFirst({
+          where: { userId, status: { in: ACTIVE_STATUSES } },
+          select: { id: true },
+        });
+        if (active) {
+          throw new ConflictException({
+            message: 'Kullanıcının süren bir üretimi var. Bitince yenile.',
+            error: 'AI_VIDEO_GRANT_RENEW_BUSY',
+          });
+        }
+        // Kalan = bütçe - kullanılan (`spentSinceMicro`, kapı ile aynı kural); iptal edilmiş hak devretmez.
+        if (existing.revokedAt === null) {
+          const spent = await spentSinceMicro(tx, userId, existing.startsAt);
+          carried = Math.max(0, existing.budgetMicroUsd - spent);
+        }
+      }
+      const budgetMicroUsd = enteredMicro + carried;
+      if (budgetMicroUsd > INT4_MAX) {
+        throw new BadRequestException({
+          message: 'Kredi çok büyük.',
+          error: 'AI_VIDEO_GRANT_TOO_BIG',
+        });
+      }
+      // Yeniden verme = yeni dönem: startsAt sıfırlanır (harcanan yeniden 0'dan sayılır), iptal kalkar.
+      const data = {
+        budgetMicroUsd,
+        startsAt: new Date(),
+        expiresAt,
+        revokedAt: null,
+        grantedById: actorId,
+        note,
+      };
+      const row = await tx.aiVideoGrant.upsert({
+        where: { userId },
+        create: { userId, ...data },
+        update: data,
+        include: USERS_INCLUDE,
+      });
+      return { saved: row, carriedMicro: carried };
     });
     await this.audit(actorId, 'ai_video.grant', userId, {
       budgetCredits: dto.budgetCredits,
+      carriedCredits: toCredits(carriedMicro, this.creditMicro()),
       expiresAt: expiresAt?.toISOString() ?? null,
       note,
     });
@@ -125,6 +153,7 @@ export class AiVideoGrantsService {
       user: r.user,
       budgetCredits: toCredits(r.budgetMicroUsd, credit),
       spentCredits: toCredits(spentMicro, credit),
+      remainingCredits: toCredits(Math.max(0, r.budgetMicroUsd - spentMicro), credit),
       startsAt: r.startsAt.toISOString(),
       expiresAt: r.expiresAt?.toISOString() ?? null,
       revokedAt: r.revokedAt?.toISOString() ?? null,

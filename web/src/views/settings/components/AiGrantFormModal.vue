@@ -36,6 +36,16 @@ const form = useForm({
 const [budget] = form.defineField('budgetCredits')
 const [note] = form.defineField('note')
 
+// C44: yenilemede kalan kredi yeni limite eklenir (önizleme; otorite backend)
+const carryHint = computed(() => {
+  const r = props.renewing
+  if (!r) return ''
+  if (r.status === 'REVOKED') return t('admin.aiAccess.form.revokedNoCarry')
+  if (r.remainingCredits <= 0) return ''
+  const total = r.remainingCredits + (Number(budget.value) || 0)
+  return t('admin.aiAccess.form.carryOver', { n: r.remainingCredits, total })
+})
+
 function fieldError(field: string): string | undefined {
   const msg = (form.errors.value as Record<string, string | undefined>)[field]
   if (!msg) return undefined
@@ -110,6 +120,7 @@ const save = form.handleSubmit(async (v) => {
         :placeholder="t('admin.aiAccess.form.notePlaceholder')"
         :error="fieldError('note')"
       />
+      <p v-if="carryHint" class="text-[12px]" style="color: var(--kv-text-secondary);">{{ carryHint }}</p>
       <p v-if="renewing" class="text-[12px]" style="color: var(--kv-text-muted);">
         {{ t('admin.aiAccess.form.renewHint') }}
       </p>

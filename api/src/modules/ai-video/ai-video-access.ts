@@ -12,16 +12,17 @@ export async function canUseAiVideo(
   prisma: PrismaService,
   user: { id: string; isMinor: boolean },
 ): Promise<boolean> {
-  if (user.isMinor) return false; // Pika şartı 18+; admin hakkı minöre geçmez
-  if (config.get<boolean>('aiVideo.enabled') !== true) return false;
+  // Pika şartı 18+; admin hakkı minöre geçmez. Minör + bayrak kontrolü canPreviewAiVideo'da TEK yerde.
+  if (!canPreviewAiVideo(config, user)) return false;
   if (!config.get<string>('aiVideo.apiKey')) return false;
   // C40/C43: tek erişim kaynağı panelden tanımlı hak (kredi bütçesi + isteğe bağlı bitiş).
   return (await findActiveAiVideoGrant(prisma, user.id)) !== null;
 }
 
 /**
- * C33 — pasif tanıtım (YALNIZ arayüz ipucu; sunucu otoritesi `canUseAiVideo` + guard, ikisi DEĞİŞMEDİ).
- * Reşit olan herkes düğmeyi görür (kilitli modda); minör asla. Bayrak kapalıysa kimse görmez.
+ * Minör + özellik bayrağı kapısı: hem `canUseAiVideo`nun ilk iki adımı hem C33 tanıtımı hem de C44 "kendi
+ * verim" uçları (hak istemez) bu TEK fonksiyona bağlı; kopyası yok.
+ * C33 — pasif tanıtım (arayüz ipucu). Reşit olan herkes düğmeyi görür (kilitli modda); minör asla. Bayrak kapalıysa kimse görmez.
  * Kilitli istemci hiçbir yapay zeka ucunu çağırmaz; çağırırsa guard bugünkü gibi reddeder.
  */
 export function canPreviewAiVideo(config: ConfigService, user: { isMinor: boolean }): boolean {

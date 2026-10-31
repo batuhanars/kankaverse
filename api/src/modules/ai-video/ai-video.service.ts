@@ -44,7 +44,12 @@ import { AiVideoReferenceService, parseReferences } from './ai-video-references.
 import { CreateAiVideoDto, EstimateAiVideoDto } from './dto/ai-video.dto';
 import type { AiInputKind } from './ai-video.constants';
 import { AiVideoInputService } from './ai-video-input.service';
-import { ActiveAiVideoGrant, AiVideoDb, findActiveAiVideoGrant } from './ai-video-grant';
+import {
+  ActiveAiVideoGrant,
+  AiVideoDb,
+  findActiveAiVideoGrant,
+  lockAiVideoUser,
+} from './ai-video-grant';
 import { PikaClient, PikaError, PikaJob } from './pika.client';
 
 /** Türkiye UTC+3 (DST yok): "bugün" Türkiye gününe göre. */
@@ -224,7 +229,7 @@ export class AiVideoService {
     data: Prisma.AiVideoGenerationUncheckedCreateInput,
   ): Promise<AiVideoGeneration> {
     return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('ai-video:' || ${userId}))`;
+      await lockAiVideoUser(tx, userId);
       const active = await tx.aiVideoGeneration.findFirst({
         where: { userId, status: { in: ACTIVE_STATUSES } },
         select: { id: true },

@@ -63,6 +63,7 @@ export interface AiVideoGrantRowDto {
   user: { id: string; username: string }
   budgetCredits: number
   spentCredits: number
+  remainingCredits: number // max(0, bütçe - kullanılan): yenilemede devredilecek
   startsAt: string
   expiresAt: string | null
   revokedAt: string | null
