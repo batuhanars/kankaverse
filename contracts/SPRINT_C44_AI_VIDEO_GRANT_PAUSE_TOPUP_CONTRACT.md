@@ -26,6 +26,14 @@ Bu yüzden (1) geçici durdurup açmak kullanıcıya bütçeyi yeniden verir, (2
 - Hak satırında durum rozeti (Askıda dahil), **Askıya al / Sürdür** anahtarı (onay penceresi yok, tersine çevrilebilir) ve **Kredi ekle** (küçük form, sayı).
 - "Ver/Yenile" yanında kısa not: "Yenilemek kullanılan krediyi sıfırlar."
 
+## §3b Hakkı biten kullanıcının kendi videoları (PM incelemesi 2026-10-31)
+`AiVideoController` sınıf düzeyinde `AiVideoAccessGuard` taşıyor: kredi bitince, süre dolunca ya da askıya alınınca kullanıcı
+**kendi** üretimlerini listeleyemiyor, indiremiyor, sohbete ekleyemiyor ve SİLEMİYOR. Satın alıp kullandığı içeriğe erişim kaybı +
+kendi verisini silememe (KVKK). Karar: `GET /ai-video`, `GET /ai-video/:id`, `DELETE /ai-video`, `DELETE /ai-video/:id` ve
+`POST /ai-video/:id/attachment` hak yerine yalnız oturum + e-posta doğrulama + reşit olmama ister (sahiplik kontrolü servisteki
+`findOwned` ile zaten var). Para harcayan uçlar (`presign`, `estimate`, `POST /ai-video`) kapı arkasında kalır. Formda hakkı olmayan
+kullanıcı kilitli modda Son üretimler'i görmeye devam eder. R7 kapsamında.
+
 ## §4 OUT
 Pika bakiyesi gösterimi (sonraki, kullanıcı artınca) · kullanıcıya bildirim · çoklu hak geçmişi.
 
