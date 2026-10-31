@@ -48,10 +48,12 @@ async function loadBalance() {
     balanceLoading.value = false
   }
 }
-onMounted(() => {
-  void load()
-  void loadBalance()
-})
+// Bakiye kartındaki "harcanmamış" toplamı tablodan türediği için ikisi hep birlikte çekilir.
+async function refreshAll() {
+  await Promise.all([load(), loadBalance()])
+}
+const refreshing = computed(() => loading.value || balanceLoading.value)
+onMounted(() => void refreshAll())
 
 const nf = new Intl.NumberFormat('tr-TR')
 const usdFormat = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -78,7 +80,7 @@ function openForm(row: AiVideoGrantRowDto | null) {
 }
 async function onSaved() {
   formOpen.value = false
-  await load()
+  await refreshAll()
 }
 
 // ── İptal ──
@@ -91,7 +93,7 @@ async function confirmRevoke() {
     await adminApi.revokeAiVideoGrant(revokeTarget.value.user.id)
     toast.success(t('admin.aiAccess.revokeSuccess'))
     revokeTarget.value = null
-    await load()
+    await refreshAll()
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
     toast.error(err.response?.data?.message ?? t('admin.aiAccess.revokeError'))
@@ -107,7 +109,12 @@ async function confirmRevoke() {
       <h3 class="text-[13px] font-semibold uppercase tracking-widest" style="color: var(--kv-text-muted);">
         {{ t('admin.aiAccess.title') }}
       </h3>
-      <KvButton size="sm" @click="openForm(null)">{{ t('admin.aiAccess.give') }}</KvButton>
+      <div class="flex items-center gap-2">
+        <KvButton size="sm" variant="ghost" :disabled="refreshing" @click="refreshAll">
+          {{ t('admin.aiAccess.refresh') }}
+        </KvButton>
+        <KvButton size="sm" @click="openForm(null)">{{ t('admin.aiAccess.give') }}</KvButton>
+      </div>
     </div>
 
     <div
@@ -135,12 +142,9 @@ async function confirmRevoke() {
         </template>
         <p v-else class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('common.loading') }}</p>
       </div>
-      <KvButton size="sm" :disabled="balanceLoading" @click="loadBalance">
-        {{ t('admin.aiAccess.balance.refresh') }}
-      </KvButton>
     </div>
 
-    <p v-if="loading" class="text-[13px] py-4" style="color: var(--kv-text-muted);">{{ t('common.loading') }}</p>
+    <p v-if="loading && rows.length === 0" class="text-[13px] py-4" style="color: var(--kv-text-muted);">{{ t('common.loading') }}</p>
     <p v-else-if="loadError" class="text-[13px]" style="color: var(--kv-danger);">{{ loadError }}</p>
     <p v-else-if="rows.length === 0" class="text-[13px] py-4" style="color: var(--kv-text-muted);">
       {{ t('admin.aiAccess.empty') }}

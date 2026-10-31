@@ -193,9 +193,9 @@
         "outstanding": "Kullanıcılara verilmiş, henüz harcanmamış: {credits} kredi",
         "short": "Bakiye verilen kredileri karşılamıyor.",
         "updatedAt": "Son güncelleme: {time}",
-        "error": "Bakiye alınamadı.",
-        "refresh": "Yenile"
-      }
+        "error": "Bakiye alınamadı."
+      },
+      "refresh": "Yenile"
     },
     "platformInvite": {
       "createTitle": "Davet Oluştur",
