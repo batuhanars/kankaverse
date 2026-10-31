@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { aiVideoApi, type AiVideoModelOption, type AiVideoOptionsDto } from '@/api/aiVideo';
+import { aiVideoApi, type AiVideoModelOption, type AiVideoOptionsDto, type AiVideoRefKind } from '@/api/aiVideo';
+import type { RefMode } from './aiVideoRefs';
 
 const ESTIMATE_DELAY_MS = 400;
 
@@ -10,7 +11,7 @@ const ESTIMATE_DELAY_MS = 400;
  * C33: `locked` (pasif tanıtım) iken yalnız `options` çağrılır (sunucu kilitliye açık, tutarlar 0); estimate atılmaz
  * (403 gürültüsü ve Pika çağrısı olmaz). Geçmiş ve yükleme de useAiVideo'da kilitli.
  */
-export function useAiVideoForm(withImage: boolean, locked = false) {
+export function useAiVideoForm(mode: RefMode, kinds: AiVideoRefKind[], locked = false) {
   const [options, setOptions] = useState<AiVideoOptionsDto | null>(null);
   const [model, setModel] = useState('');
   const [resolution, setResolution] = useState('');
@@ -25,7 +26,10 @@ export function useAiVideoForm(withImage: boolean, locked = false) {
 
   const current: AiVideoModelOption | null = options?.models.find((m) => m.key === model) ?? null;
   // Liste sunucudan; model ya da görsel durumu değişince ve seçili ölçü listede yoksa Otomatik'e döner.
-  const aspectRatios = current?.aspectRatios[withImage ? 'image' : 'text'] ?? [];
+  // C42: referans kipinde liste omni ölçüleridir (`references.aspectRatios`).
+  const aspectRatios =
+    mode === 'reference' ? (current?.references?.aspectRatios ?? []) : (current?.aspectRatios[mode] ?? []);
+  const kindsKey = kinds.join(',');
   const remainingCredits = options ? Math.max(0, options.dailyCapCredits - options.spentTodayCredits) : 0;
   const overCap = estimateCredits !== null && estimateCredits > remainingCredits;
 
@@ -72,7 +76,7 @@ export function useAiVideoForm(withImage: boolean, locked = false) {
       try {
         const { estimateCredits: credits } = await aiVideoApi.estimate(
           { model, resolution, durationS, ...(aspectRatio && { aspectRatio }) },
-          withImage,
+          mode === 'reference' ? { mode, kinds } : { mode },
         );
         if (id === seq.current) setEstimateCredits(credits);
       } catch {
@@ -82,7 +86,8 @@ export function useAiVideoForm(withImage: boolean, locked = false) {
       }
     }, ESTIMATE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [model, resolution, durationS, aspectRatio, withImage, locked]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- kinds yerine kararlı kindsKey
+  }, [model, resolution, durationS, aspectRatio, mode, kindsKey, locked]);
 
   return {
     options,

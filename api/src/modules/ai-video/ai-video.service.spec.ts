@@ -1,6 +1,7 @@
 import { AiVideoStatus } from '@prisma/client';
 import { AiVideoService } from './ai-video.service';
 import { AiVideoInputService } from './ai-video-input.service';
+import { AiVideoReferenceService } from './ai-video-references.service';
 import { PikaError } from './pika.client';
 import { sumSpentMicro, toCredits } from './ai-video.mapper';
 
@@ -64,6 +65,7 @@ function setup(rowOver: Record<string, unknown> = {}, spentRows: unknown[] = [])
     config as any,
     pika as any,
     input,
+    new AiVideoReferenceService(storage as any, input, config as any),
   );
   jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
   return { service, prisma, storage, pika, values };
@@ -180,6 +182,14 @@ describe('AiVideoService.create (teklif + tavan + gonderim)', () => {
     await expect(
       service.create('u1', dto({ prompt: '', inputKey: `ai-input/u2/${UUID}.png` })),
     ).rejects.toMatchObject({ response: { error: 'INVALID_STORAGE_KEY' } });
+    expect(pika.quote).not.toHaveBeenCalled();
+  });
+
+  it('C42: gorselden video yolu (inputKey) video anahtarini reddeder, Pika cagrilmaz', async () => {
+    const { service, pika } = setup();
+    await expect(
+      service.create('u1', dto({ prompt: '', inputKey: `ai-input/u1/${UUID}.mp4` })),
+    ).rejects.toMatchObject({ response: { error: 'AI_VIDEO_INVALID_OPTION' } });
     expect(pika.quote).not.toHaveBeenCalled();
   });
 

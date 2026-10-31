@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo';
+import { aiVideoApi, type AiVideoDto, type AiVideoReferencesOption } from '@/api/aiVideo';
 import { authApi } from '@/api/auth';
 import { extractErrorCode } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth';
 import { t } from '@/i18n';
 import { aiVideoErrorText, aiVideoFailText, DOWNLOAD_PENDING } from './aiVideoErrors';
 import { useAiVideoForm } from './useAiVideoForm';
-import { useAiVideoImage } from './useAiVideoImage';
+import { retagPrompt } from './aiVideoRefs';
+import { useAiVideoRefs } from './useAiVideoRefs';
 
 const POLL_MS = 4000;
 
@@ -23,10 +24,14 @@ export function useAiVideo() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [now, setNow] = useState(Date.now());
-  const imageState = useAiVideoImage(setError);
+  // Ek hook'u seçenekleri çağrı anında okur (seçenekler form hook'undan gelir, sıra döngüsünü kırar).
+  const refsOption = useRef<AiVideoReferencesOption | null>(null);
+  const refs = useAiVideoRefs(() => refsOption.current, setError);
   // C33: pasif tanıtım. Kilitliyken yalnız options çağrılır.
   const locked = useAuthStore((s) => s.user?.aiVideoAllowed !== true);
-  const form = useAiVideoForm(!!imageState.image, locked);
+  const kinds = refs.items.map((i) => i.kind);
+  const form = useAiVideoForm(refs.mode, kinds, locked);
+  refsOption.current = form.current?.references ?? null;
   const jobRef = useRef<AiVideoDto | null>(null);
   const alive = useRef(true);
 
@@ -98,14 +103,20 @@ export function useAiVideo() {
     setError('');
     setBusy(true);
     try {
-      const inputKey = imageState.image ? await imageState.upload(imageState.image) : undefined;
+      // Tek görsel: eski `inputKey` yolu; başka her bileşim `references` (sıra = eklenme sırası).
+      const input =
+        refs.mode === 'image'
+          ? { inputKey: refs.items[0].key }
+          : refs.mode === 'reference'
+            ? { references: refs.items.map((i) => ({ kind: i.kind, key: i.key! })) }
+            : {};
       const sel = {
         model: form.model,
         resolution: form.resolution,
         durationS: form.durationS,
         ...(form.aspectRatio && { aspectRatio: form.aspectRatio }),
       };
-      track(await aiVideoApi.create(sel, prompt, inputKey));
+      track(await aiVideoApi.create(sel, prompt, input));
       void form.loadOptions(); // bugünkü harcama ve kalan kredi güncellensin
       void refreshAccess(); // bütçe bu üretimle bittiyse kilitli moda düşsün
     } catch (e) {
@@ -153,6 +164,12 @@ export function useAiVideo() {
     track(row);
   }
 
+  /** Eki kaldırır; o eke ait etiketleri istemden siler, sonrakileri yeniden numaralar. */
+  function removeRef(id: string) {
+    const gone = refs.remove(id);
+    if (gone) setPrompt((p) => retagPrompt(p, gone.kind, gone.n));
+  }
+
   function reset() {
     track(null);
     setError('');
@@ -162,7 +179,8 @@ export function useAiVideo() {
     locked,
     prompt,
     setPrompt,
-    image: imageState,
+    refs,
+    removeRef,
     form,
     job,
     recent,

@@ -1,8 +1,22 @@
 /** C14b §1 — Pika model tablosu (tek kaynak). Gövde alan adları buradan gelir; servis model adına göre dallanmaz. */
+/** C42: istek kipi. text/image = mevcut uçlar; reference = çoklu referans (omni) ucu. */
+export type AiVideoMode = 'text' | 'image' | 'reference';
+
+/** C42 §1.1: çoklu referans yeteneği (yoksa null). Sınırlar bizim tavanımız, sağlayıcınınkinden küçük. */
+export interface AiVideoReferenceSpec {
+  apiFunction: string;
+  fields: { image: string; video: string; audio: string };
+  max: { image: number; video: number; audio: number };
+  videoTotalMaxS: number;
+  videoMaxS: number;
+  audioMaxS: number;
+  aspectRatios: string[];
+}
+
 export interface AiVideoModelSpec {
   key: string;
   label: string;
-  /** `api_id` = `${apiBase}/${text-to-video|image-to-video}` */
+  /** `api_id` = `${apiBase}/${text-to-video|image-to-video|references.apiFunction}` */
   apiBase: string;
   durations: number[];
   resolutions: string[];
@@ -15,6 +29,7 @@ export interface AiVideoModelSpec {
   audio: 'none' | 'default' | 'always';
   /** Her gövdeye eklenen sabit alanlar. */
   fixed: Record<string, unknown>;
+  references: AiVideoReferenceSpec | null;
 }
 
 export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
@@ -30,6 +45,7 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     imageField: 'image',
     audio: 'none',
     fixed: {},
+    references: null,
   },
   {
     key: 'wan-3.0',
@@ -46,6 +62,19 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     imageField: 'first_frame_url',
     audio: 'default',
     fixed: { watermark: false },
+    references: {
+      apiFunction: 'omni-video',
+      fields: {
+        image: 'reference_image_urls',
+        video: 'reference_video_urls',
+        audio: 'reference_audio_urls',
+      },
+      max: { image: 4, video: 2, audio: 2 },
+      videoTotalMaxS: 15,
+      videoMaxS: 15,
+      audioMaxS: 30,
+      aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+    },
   },
   {
     key: 'kling-3.0-turbo',
@@ -59,6 +88,7 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     imageField: 'image_url',
     audio: 'always',
     fixed: {},
+    references: null,
   },
 ];
 
@@ -69,8 +99,17 @@ export const findModelSpec = (key: string): AiVideoModelSpec | undefined =>
 export const modelKeyOfApiId = (apiId: string): string =>
   AI_VIDEO_MODEL_TABLE.find((m) => apiId.startsWith(`${m.apiBase}/`))?.key ?? apiId;
 
-export const apiIdOf = (spec: AiVideoModelSpec, withImage: boolean): string =>
-  `${spec.apiBase}/${withImage ? 'image-to-video' : 'text-to-video'}`;
+export const apiIdOf = (spec: AiVideoModelSpec, mode: AiVideoMode): string => {
+  if (mode === 'reference') return `${spec.apiBase}/${spec.references!.apiFunction}`;
+  return `${spec.apiBase}/${mode === 'image' ? 'image-to-video' : 'text-to-video'}`;
+};
+
+/** Referans adresleri türe göre (C42); alanlar `spec.references.fields`ten, boş tür gövdeye girmez. */
+export interface AiVideoReferenceUrls {
+  image: string[];
+  video: string[];
+  audio: string[];
+}
 
 /** Pika'ya giden gövde (teklif ve gönderim aynı alanlar; görsel adresi `image` verilirse eklenir). */
 export function buildPikaBody(
@@ -81,6 +120,7 @@ export function buildPikaBody(
     durationS: number;
     image?: string;
     aspectRatio?: string;
+    referenceUrls?: AiVideoReferenceUrls;
   },
 ): Record<string, unknown> {
   return {
@@ -89,6 +129,28 @@ export function buildPikaBody(
     [spec.durationField]: opts.durationS,
     ...(opts.aspectRatio !== undefined && { [spec.aspectField]: opts.aspectRatio }),
     ...(opts.image !== undefined && { [spec.imageField]: opts.image }),
+    ...(opts.referenceUrls !== undefined && referenceFields(spec, opts.referenceUrls)),
     ...spec.fixed,
   };
+}
+
+function referenceFields(spec: AiVideoModelSpec, urls: AiVideoReferenceUrls) {
+  const fields = spec.references!.fields;
+  return Object.fromEntries(
+    (['image', 'video', 'audio'] as const)
+      .filter((kind) => urls[kind].length > 0)
+      .map((kind) => [fields[kind], urls[kind]]),
+  );
+}
+
+const QUOTE_PLACEHOLDER_BASE = 'https://example.com/quote-placeholder';
+const QUOTE_PLACEHOLDER_EXT = { image: 'png', video: 'mp4', audio: 'mp3' } as const;
+
+/** Teklif gövdesi için yer tutucu referans adresleri (kullanıcı dosyası teklife gitmez; fiyat yalnız "video var mı"ya bağlı). */
+export function quotePlaceholderUrls(kinds: ('image' | 'video' | 'audio')[]): AiVideoReferenceUrls {
+  const urls: AiVideoReferenceUrls = { image: [], video: [], audio: [] };
+  kinds.forEach((kind, i) => {
+    urls[kind].push(`${QUOTE_PLACEHOLDER_BASE}-${i + 1}.${QUOTE_PLACEHOLDER_EXT[kind]}`);
+  });
+  return urls;
 }

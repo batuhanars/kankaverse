@@ -40,15 +40,12 @@ const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:
 
 <template>
   <div class="flex flex-wrap items-end gap-x-4 gap-y-3 min-w-0">
-    <div v-if="models.length" class="min-w-0 w-full">
-      <label v-if="props.models.length !== 1" class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);" for="ai-video-model">
+    <!-- C42 §2: tek model açıkken model adı ve sesli/sessiz bilgisi gösterilmez; seçici yalnız birden çok modelde -->
+    <div v-if="models.length > 1" class="min-w-0 w-full">
+      <label class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);" for="ai-video-model">
         {{ t('aiVideo.modelLabel') }}
       </label>
-      <p v-if="models.length === 1" class="text-[14px]" style="color: var(--kv-text-primary);">
-        {{ t(models[0].audio === 'none' ? 'aiVideo.audioNone' : 'aiVideo.audioOn', { label: models[0].label }) }}
-      </p>
       <select
-        v-else
         id="ai-video-model"
         :value="model"
         class="w-full rounded-[var(--kv-radius-md)] px-3 py-2 text-[14px] outline-none border border-[var(--kv-border-subtle)] bg-[var(--kv-bg-content)] cursor-pointer"

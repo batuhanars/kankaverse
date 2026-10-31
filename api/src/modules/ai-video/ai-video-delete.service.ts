@@ -5,6 +5,7 @@ import { StorageService } from '../../shared/storage/storage.service';
 import { ACTIVE_STATUSES, AiVideoError } from './ai-video.constants';
 import { AI_VIDEO_MESSAGES } from './ai-video.mapper';
 import { PikaClient } from './pika.client';
+import { parseReferences } from './ai-video-references.service';
 
 /**
  * C14c §2 silme: çıktı/girdi objeleri + Pika işi silinir, satır YUMUŞAK silinir (deletedAt); harcama kaydı ve
@@ -46,6 +47,9 @@ export class AiVideoDeleteService {
     this.pika.discardPartial(row.id);
     await this.safely(`çıktı objesi id=${row.id}`, row.outputKey, (k) => this.storage.delete(k));
     await this.safely(`girdi objesi id=${row.id}`, row.inputKey, (k) => this.storage.delete(k));
+    for (const ref of parseReferences(row.references)) {
+      await this.safely(`referans objesi id=${row.id}`, ref.key, (k) => this.storage.delete(k));
+    }
     await this.safely(`Pika işi id=${row.id}`, row.providerJobId, (j) => this.pika.deleteJob(j));
     await this.prisma.aiVideoGeneration.update({
       where: { id: row.id },

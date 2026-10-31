@@ -1,10 +1,10 @@
 import { computed, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo'
-import { attachmentsApi } from '@/api/attachments'
 import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
 import { useAiVideoForm } from '@/composables/useAiVideoForm'
+import { useAiVideoRefs } from '@/composables/useAiVideoRefs'
 import { saveFromUrl } from '@/utils/saveFromUrl'
 
 const POLL_MS = 4000
@@ -20,6 +20,8 @@ const KNOWN_ERRORS = [
   'AI_VIDEO_TIMEOUT',
   'AI_VIDEO_DOWNLOAD_FAILED',
   'AI_VIDEO_BUSY',
+  'AI_VIDEO_INPUT_TOO_LONG',
+  'AI_VIDEO_PROMPT_REQUIRED',
 ]
 const DOWNLOAD_PENDING = 'AI_VIDEO_DOWNLOAD_PENDING' // iç işaret: RUNNING satırda video kaydediliyor
 
@@ -30,16 +32,22 @@ const DOWNLOAD_PENDING = 'AI_VIDEO_DOWNLOAD_PENDING' // iç işaret: RUNNING sat
 export function useAiVideo() {
   const { t } = useI18n()
   const prompt = ref('')
-  const image = ref<File | null>(null)
-  const withImage = computed(() => !!image.value)
+  const error = ref('')
   // C33: pasif tanıtım. Kilitliyken yalnız options çağrılır; estimate, geçmiş, yükleme atılmaz.
   const authStore = useAuthStore()
   const locked = authStore.user?.aiVideoAllowed !== true
-  const form = useAiVideoForm(withImage, locked)
+  // C42: ekler (görsel + video + ses). Sınırlar seçili modelin `references` bilgisinden; form daha sonra kurulur (tembel okuma).
+  const refs = useAiVideoRefs(
+    () => form.current.value?.references,
+    prompt,
+    (m) => (error.value = m),
+  )
+  const withImage = refs.singleImage
+  const referenceKinds = computed(() => (refs.referenceMode.value ? refs.kinds.value : null))
+  const form = useAiVideoForm(withImage, referenceKinds, locked)
   const job = ref<AiVideoDto | null>(null)
   const recent = ref<AiVideoDto[]>([])
   const busy = ref(false)
-  const error = ref('')
   const now = ref(Date.now())
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let tickTimer: ReturnType<typeof setInterval> | null = null
@@ -110,25 +118,25 @@ export function useAiVideo() {
     pollTimer = setInterval(() => void poll(), POLL_MS)
   }
 
-  async function uploadInput(file: File): Promise<string> {
-    const { data } = await aiVideoApi.presignInput(file.type, file.size)
-    await attachmentsApi.uploadToS3(data.uploadUrl, file)
-    return data.inputKey
-  }
-
   async function submit() {
     if (locked) return
     error.value = ''
     busy.value = true
     try {
-      const inputKey = image.value ? await uploadInput(image.value) : undefined
+      const uploaded = refs.uploaded()
+      // Tek görsel → eski yol (inputKey); diğer her bileşim → references (§0 kip kuralı)
+      const input = refs.singleImage.value
+        ? { inputKey: uploaded[0].key }
+        : uploaded.length
+          ? { references: uploaded }
+          : {}
       const sel = {
         model: form.model.value,
         resolution: form.resolution.value,
         durationS: form.durationS.value,
         ...(form.aspectRatio.value && { aspectRatio: form.aspectRatio.value }),
       }
-      track((await aiVideoApi.create(sel, prompt.value, inputKey)).data)
+      track((await aiVideoApi.create(sel, prompt.value, input)).data)
       void form.loadOptions() // bugünkü harcama ve kalan kredi güncellensin
       void refreshAccess() // bütçe bu üretimle bittiyse kilitli moda düşsün
     } catch (e) {
@@ -227,7 +235,7 @@ export function useAiVideo() {
   return {
     locked,
     prompt,
-    image,
+    refs,
     form,
     withImage,
     job,

@@ -12,6 +12,8 @@ interface Props {
   spentTodayCredits: number;
   dailyCapCredits: number;
   canSubmit: boolean;
+  /** C42: girdi videosu da ücretlenir; tahmin en yüksek tutar notu. */
+  hasVideo?: boolean;
   busy: boolean;
   /** C33: pasif tanıtım; Oluştur kapalı + "yakında" notu, tahmin satırı yok. */
   locked?: boolean;
@@ -65,6 +67,7 @@ export function AiVideoCostBar(p: Props) {
           )}
         </Pressable>
       </View>
+      {p.hasVideo && !p.locked ? <Text style={styles.spent}>{t('mobile.aiVideoRefs.videoCostNote')}</Text> : null}
       <Text style={styles.spent}>
         {t('aiVideo.spentLine', {
           spent: formatCreditNumber(p.spentTodayCredits),

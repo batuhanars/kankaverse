@@ -1,20 +1,52 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-import { AI_INPUT_MAX_BYTES, AI_INPUT_TYPES, AI_PROMPT_MAX } from '../ai-video.constants';
+import { Transform, Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import {
+  AI_INPUT_ANY_MAX_BYTES,
+  AI_INPUT_KINDS,
+  AI_INPUT_TYPES,
+  AI_PROMPT_MAX,
+} from '../ai-video.constants';
+import type { AiInputKind } from '../ai-video.constants';
 
 export class PresignAiInputDto {
   @ApiProperty({ enum: Object.keys(AI_INPUT_TYPES) })
   @IsIn(Object.keys(AI_INPUT_TYPES), {
-    message: 'Yalnızca PNG, JPEG veya WebP görsel kullanılabilir.',
+    message: 'Bu dosya türü kullanılamaz.',
   })
   contentType!: string;
 
-  @ApiProperty({ description: 'Bayt cinsinden boyut (en çok 10 MB)' })
+  @ApiProperty({
+    description: 'Bayt cinsinden boyut (görsel/ses en çok 10 MB, video en çok 50 MB)',
+  })
   @IsInt()
   @Min(1)
-  @Max(AI_INPUT_MAX_BYTES, { message: 'Görsel en fazla 10 MB olabilir.' })
+  @Max(AI_INPUT_ANY_MAX_BYTES, { message: 'Dosya çok büyük.' })
   size!: number;
+}
+
+/** C42: referans türü ve girdi anahtarı (sıra = istemdeki numara sırası, türü içinde). */
+export class AiVideoReferenceDto {
+  @ApiProperty({ enum: AI_INPUT_KINDS })
+  @IsIn(AI_INPUT_KINDS)
+  kind!: AiInputKind;
+
+  @ApiProperty({ description: 'presign yanıtındaki inputKey' })
+  @IsString()
+  @MaxLength(300)
+  key!: string;
 }
 
 export class EstimateAiVideoDto {
@@ -35,6 +67,17 @@ export class EstimateAiVideoDto {
   @ApiProperty({ description: 'Görselden üretim mi (fiyat görsele değil api yoluna bağlı)' })
   @IsBoolean()
   withImage!: boolean;
+
+  @ApiPropertyOptional({
+    enum: AI_INPUT_KINDS,
+    isArray: true,
+    description: 'C42: verilirse kip referanstır (omni), withImage yok sayılır. Her ek bir tür.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @IsIn(AI_INPUT_KINDS, { each: true })
+  referenceKinds?: AiInputKind[];
 
   @ApiPropertyOptional({
     example: '16:9',
@@ -73,6 +116,17 @@ export class CreateAiVideoDto {
   @IsString()
   @MaxLength(300)
   inputKey?: string;
+
+  @ApiPropertyOptional({
+    type: [AiVideoReferenceDto],
+    description: 'C42: çoklu referans (omni). inputKey ile birlikte verilemez.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @ValidateNested({ each: true })
+  @Type(() => AiVideoReferenceDto)
+  references?: AiVideoReferenceDto[];
 
   @ApiPropertyOptional({
     example: '16:9',

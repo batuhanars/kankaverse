@@ -20,6 +20,23 @@ export interface AiVideoDto {
   downloadUrl?: string // yalnız COMPLETED, Content-Disposition: attachment
 }
 
+// C42: referans (görsel + video + ses) kipi; Pika/Kling için model öğesinde `references: null`
+export type AiVideoRefKind = 'image' | 'video' | 'audio'
+
+export interface AiVideoReferencesOption {
+  max: Record<AiVideoRefKind, number>
+  videoTotalMaxS: number
+  videoMaxS: number
+  audioMaxS: number
+  aspectRatios: string[]
+  inputTypes: Record<AiVideoRefKind, string[]>
+}
+
+export interface AiVideoReferenceInput {
+  kind: AiVideoRefKind
+  key: string
+}
+
 export interface AiVideoModelOption {
   key: string
   label: string
@@ -28,6 +45,7 @@ export interface AiVideoModelOption {
   aspectRatios: { text: string[]; image: string[] } // görselde boş = ölçü görselden alınır
   supportsImage: boolean
   audio: 'none' | 'default' | 'always'
+  references: AiVideoReferencesOption | null
 }
 
 // C40: admin hakkı özeti (kalan/bütçe kredi + isteğe bağlı bitiş)
@@ -62,11 +80,26 @@ export const aiVideoApi = {
   options() {
     return http.get<AiVideoOptionsDto>('/ai-video/options')
   },
-  estimate(sel: AiVideoSelection, withImage: boolean) {
-    return http.post<{ estimateCredits: number }>('/ai-video/estimate', { ...sel, withImage })
+  /** `referenceKinds` verilirse kip referanstır ve `withImage` yok sayılır (C42). */
+  estimate(sel: AiVideoSelection, withImage: boolean, referenceKinds?: AiVideoRefKind[]) {
+    return http.post<{ estimateCredits: number }>('/ai-video/estimate', {
+      ...sel,
+      withImage,
+      ...(referenceKinds && { referenceKinds }),
+    })
   },
-  create(sel: AiVideoSelection, prompt: string, inputKey?: string) {
-    return http.post<AiVideoDto>('/ai-video', { ...sel, prompt, ...(inputKey && { inputKey }) })
+  /** Tek görsel → `inputKey` (eski yol); aksi halde `references`. İkisi birlikte gönderilmez. */
+  create(
+    sel: AiVideoSelection,
+    prompt: string,
+    input: { inputKey?: string; references?: AiVideoReferenceInput[] } = {},
+  ) {
+    return http.post<AiVideoDto>('/ai-video', {
+      ...sel,
+      prompt,
+      ...(input.inputKey && { inputKey: input.inputKey }),
+      ...(input.references && { references: input.references }),
+    })
   },
   createAttachment(id: string) {
     return http.post<{ attachmentId: string }>(`/ai-video/${id}/attachment`)

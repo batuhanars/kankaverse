@@ -8,6 +8,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   outputKey: 'ai-video/u1/g1.mp4',
   inputKey: 'ai-input/u1/a.png',
   providerJobId: 'media_1',
+  references: null,
   ...over,
 });
 
@@ -53,6 +54,21 @@ describe('AiVideoDeleteService', () => {
       userId: 'u2',
       deletedAt: null,
     });
+  });
+
+  it('C42: tum referans anahtarlari silinir, biri patlasa digerleri silinir', async () => {
+    const references = [
+      { kind: 'image', key: 'ai-input/u1/r1.png' },
+      { kind: 'video', key: 'ai-input/u1/r2.mp4' },
+      { kind: 'audio', key: 'ai-input/u1/r3.mp3' },
+    ];
+    const s = setup([row({ inputKey: null, references })]);
+    s.storage.delete.mockImplementation((k: string) =>
+      k.endsWith('.mp4') ? Promise.reject(new Error('s3')) : Promise.resolve(),
+    );
+    await s.service.deleteOne('u1', 'g1');
+    for (const r of references) expect(s.storage.delete).toHaveBeenCalledWith(r.key);
+    expect(s.prisma.aiVideoGeneration.update).toHaveBeenCalledTimes(1);
   });
 
   it('obje ve Pika silme hatasi islemi dusurmez', async () => {

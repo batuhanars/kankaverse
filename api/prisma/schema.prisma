@@ -894,6 +894,7 @@ model AiVideoGeneration {
   model         String // tam api_id, ör. "pika/pika-2.5/image-to-video"
   prompt        String // <= 1000
   inputKey      String? // özel bucket: ai-input/{userId}/{uuid}.{ext}; yalnız görselden üretimde
+  references    Json? // C42: [{ kind: image|video|audio, key }] sırasıyla; null = referans yok
   resolution    String // "720p"
   durationS     Int // 5
   aspectRatio   String? // C14f: "16:9"; null = Otomatik (alan sağlayıcıya gönderilmez)

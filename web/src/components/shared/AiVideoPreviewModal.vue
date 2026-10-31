@@ -21,7 +21,7 @@ const emit = defineEmits<{ close: []; save: []; primary: []; new: []; delete: []
 const { t } = useI18n()
 
 const meta = computed(() =>
-  [props.modelLabel || props.row.model, t('aiVideo.durationOption', { sec: props.row.durationS }), props.row.resolution].join(' · '),
+  [props.modelLabel, t('aiVideo.durationOption', { sec: props.row.durationS }), props.row.resolution].filter(Boolean).join(' · '),
 )
 </script>
 

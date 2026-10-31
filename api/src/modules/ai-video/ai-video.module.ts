@@ -3,6 +3,7 @@ import { SharedModule } from '../../shared/shared.module';
 import { AiVideoController } from './ai-video.controller';
 import { AiVideoService } from './ai-video.service';
 import { AiVideoInputService } from './ai-video-input.service';
+import { AiVideoReferenceService } from './ai-video-references.service';
 import { AiVideoAttachmentService } from './ai-video-attachment.service';
 import { AiVideoPoller } from './ai-video.poller';
 import { AiVideoAccessGuard } from './ai-video-access.guard';
@@ -19,6 +20,7 @@ import { PikaClient } from './pika.client';
     AiVideoService,
     AiVideoAttachmentService,
     AiVideoInputService,
+    AiVideoReferenceService,
     AiVideoPoller,
     AiVideoDeleteService,
     AiVideoRecoveryService,

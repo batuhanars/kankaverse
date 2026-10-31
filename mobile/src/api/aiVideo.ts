@@ -25,6 +25,26 @@ export interface AiVideoDto {
   downloadUrl?: string;
 }
 
+export type AiVideoRefKind = 'image' | 'video' | 'audio';
+
+/** C42: çoklu referans sınırları ve kabul edilen türler (Pika/Kling için null). */
+export interface AiVideoReferencesOption {
+  max: Record<AiVideoRefKind, number>;
+  videoTotalMaxS: number;
+  videoMaxS: number;
+  audioMaxS: number;
+  aspectRatios: string[];
+  inputTypes: Record<AiVideoRefKind, string[]>;
+}
+
+export interface AiVideoReferenceInput {
+  kind: AiVideoRefKind;
+  key: string;
+}
+
+/** Teklif kipi: tek görsel `image`, başka her ek bileşimi `reference` (C42 §0 kip kuralı). */
+export type AiVideoEstimateMode = { mode: 'text' | 'image' } | { mode: 'reference'; kinds: AiVideoRefKind[] };
+
 export interface AiVideoModelOption {
   key: string;
   label: string;
@@ -34,6 +54,7 @@ export interface AiVideoModelOption {
   aspectRatios: { text: string[]; image: string[] };
   supportsImage: boolean;
   audio: 'none' | 'default' | 'always';
+  references: AiVideoReferencesOption | null;
 }
 
 export interface AiVideoOptionsDto {
@@ -66,11 +87,23 @@ export const aiVideoApi = {
   async options() {
     return (await http.get<AiVideoOptionsDto>('/ai-video/options')).data;
   },
-  async estimate(sel: AiVideoSelection, withImage: boolean) {
-    return (await http.post<{ estimateCredits: number }>('/ai-video/estimate', { ...sel, withImage })).data;
+  async estimate(sel: AiVideoSelection, kip: AiVideoEstimateMode) {
+    const extra = kip.mode === 'reference' ? { referenceKinds: kip.kinds } : { withImage: kip.mode === 'image' };
+    return (await http.post<{ estimateCredits: number }>('/ai-video/estimate', { ...sel, ...extra })).data;
   },
-  async create(sel: AiVideoSelection, prompt: string, inputKey?: string) {
-    return (await http.post<AiVideoDto>('/ai-video', { ...sel, prompt, ...(inputKey ? { inputKey } : {}) })).data;
+  /** Tek görsel: eski `inputKey` yolu. Diğer her ek bileşimi: `references` (ikisi birlikte gönderilmez). */
+  async create(
+    sel: AiVideoSelection,
+    prompt: string,
+    input: { inputKey?: string; references?: AiVideoReferenceInput[] } = {},
+  ) {
+    const body = {
+      ...sel,
+      prompt,
+      ...(input.inputKey ? { inputKey: input.inputKey } : {}),
+      ...(input.references?.length ? { references: input.references } : {}),
+    };
+    return (await http.post<AiVideoDto>('/ai-video', body)).data;
   },
   async createAttachment(id: string) {
     return (await http.post<{ attachmentId: string }>(`/ai-video/${id}/attachment`)).data;

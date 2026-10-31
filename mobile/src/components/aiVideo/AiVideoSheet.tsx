@@ -77,7 +77,9 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
   const { row } = actions;
   const form = ai.form;
   const modelLabel = form.options?.models.find((m) => m.key === row?.model)?.label;
-  const canSubmit = !ai.busy && (ai.prompt.trim().length > 0 || !!ai.image.image);
+  // Boş istem yalnız tek görsel kipinde serbest (referans kipinde sunucu 400 AI_VIDEO_PROMPT_REQUIRED).
+  const promptOk = ai.prompt.trim().length > 0 || ai.refs.mode === 'image';
+  const canSubmit = !ai.busy && promptOk && !ai.refs.uploading && !ai.refs.failed;
   const others = ai.recent.filter((r) => r.id !== ai.job?.id);
 
   // Yoklamayla biten üretim önizlemeye geçer (form kapanır).
@@ -165,6 +167,7 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
               spentTodayCredits={form.options?.spentTodayCredits ?? 0}
               dailyCapCredits={form.options?.dailyCapCredits ?? 0}
               canSubmit={canSubmit}
+              hasVideo={ai.refs.items.some((i) => i.kind === 'video')}
               busy={ai.busy}
               locked={ai.locked}
               grant={form.options?.grant ?? null}

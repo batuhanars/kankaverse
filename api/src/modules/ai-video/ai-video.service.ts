@@ -16,19 +16,32 @@ import {
   AI_RECENT_LIMIT,
   AiVideoError,
   MICRO,
+  inputTypeOfKey,
 } from './ai-video.constants';
 import {
   AI_VIDEO_MESSAGES,
   mapPikaErrorCode,
   sumSpentMicro,
   toAiVideoDto,
+  toReferencesOption,
   toCredits,
   floorCredits,
   DEFAULT_CREDIT_MICRO_USD,
   usd,
 } from './ai-video.mapper';
-import { AI_VIDEO_MODEL_TABLE, AiVideoModelSpec, apiIdOf, buildPikaBody } from './ai-video.models';
+import {
+  AI_VIDEO_MODEL_TABLE,
+  AiVideoMode,
+  AiVideoModelSpec,
+  AiVideoReferenceUrls,
+  apiIdOf,
+  buildPikaBody,
+  quotePlaceholderUrls,
+} from './ai-video.models';
+import { countKinds, translatePromptTags } from './ai-video-prompt-tags';
+import { AiVideoReferenceService, parseReferences } from './ai-video-references.service';
 import { CreateAiVideoDto, EstimateAiVideoDto } from './dto/ai-video.dto';
+import type { AiInputKind } from './ai-video.constants';
 import { AiVideoInputService } from './ai-video-input.service';
 import { findActiveAiVideoGrant, isAiVideoEnvListed } from './ai-video-grant';
 import { PikaClient, PikaError, PikaJob } from './pika.client';
@@ -55,6 +68,7 @@ export class AiVideoService {
     private config: ConfigService,
     private pika: PikaClient,
     private input: AiVideoInputService,
+    private references: AiVideoReferenceService,
   ) {}
 
   /**
@@ -73,6 +87,7 @@ export class AiVideoService {
         resolutions: m.resolutions,
         aspectRatios: m.aspectRatios,
         supportsImage: true,
+        references: toReferencesOption(m.references),
         audio: m.audio,
       })),
       dailyCapUsd: capMicro / MICRO,
@@ -118,12 +133,21 @@ export class AiVideoService {
 
   /** Satır oluşturmaz; 10 dk bellek önbelleği. İstem fiyata etki etmez (yer tutucu gider). */
   async estimate(dto: EstimateAiVideoDto) {
-    const spec = this.resolveSpec(dto, dto.withImage);
-    const cacheKey = `${spec.key}|${dto.resolution}|${dto.durationS}|${dto.withImage}|${dto.aspectRatio ?? ''}`;
+    const kinds = dto.referenceKinds;
+    const mode: AiVideoMode = kinds ? 'reference' : dto.withImage ? 'image' : 'text';
+    const spec = this.resolveSpec(dto, mode);
+    if (kinds) this.assertReferenceCounts(spec, kinds);
+    // C42: referans kipinde fiyat yalnız "video var mı"ya bağlı (§0), anahtar buna göre.
+    const shape = kinds ? `ref${kinds.includes('video')}` : dto.withImage;
+    const cacheKey = `${spec.key}|${dto.resolution}|${dto.durationS}|${shape}|${dto.aspectRatio ?? ''}`;
     const hit = this.estimateCache.get(cacheKey);
     if (hit && hit.expiresAt > Date.now()) return this.estimateBody(hit.micro);
 
-    const micro = await this.quoteMicro(spec, dto, dto.withImage, dto.withImage ? undefined : 'x');
+    const micro = await this.quoteMicro(spec, dto, {
+      mode,
+      prompt: mode === 'image' ? undefined : 'x',
+      referenceKinds: kinds,
+    });
     this.estimateCache.set(cacheKey, { micro, expiresAt: Date.now() + AI_ESTIMATE_TTL_MS });
     return this.estimateBody(micro);
   }
@@ -134,26 +158,41 @@ export class AiVideoService {
 
   /** Teklif (yeniden alınır, önbellekten değil) + tavan + gönderim tek çağrıda. */
   async create(userId: string, dto: CreateAiVideoDto) {
-    const withImage = dto.inputKey !== undefined;
-    const spec = this.resolveSpec(dto, withImage);
+    const refs = dto.references;
+    if (refs !== undefined && dto.inputKey !== undefined) throw this.invalidOption();
+    const mode: AiVideoMode = refs ? 'reference' : dto.inputKey !== undefined ? 'image' : 'text';
+    const spec = this.resolveSpec(dto, mode);
     if (dto.inputKey === undefined && dto.prompt.length === 0) {
       throw new BadRequestException({
         message: 'İstem boş olamaz.',
         error: 'AI_VIDEO_PROMPT_REQUIRED',
       });
     }
-    if (dto.inputKey !== undefined) await this.input.assertInputKey(userId, dto.inputKey);
+    // C42 §1.4: var olmayan referansa etiket, dosya indirmeden (ffprobe) önce reddedilir.
+    const kinds: AiInputKind[] = refs?.map((r) => r.kind) ?? (dto.inputKey ? ['image'] : []);
+    const prompt = translatePromptTags(dto.prompt, mode, countKinds(kinds));
+    if (dto.inputKey !== undefined) {
+      await this.input.assertInputKey(userId, dto.inputKey);
+      // Görselden video yolu yalnız görsel kabul eder (video/ses anahtarı ilk kare olamaz).
+      if (inputTypeOfKey(dto.inputKey)?.[1].kind !== 'image') throw this.invalidOption();
+    }
+    if (refs) await this.references.validate(userId, spec.references!, refs);
 
-    const quoteMicroUsd = await this.quoteMicro(spec, dto, withImage, dto.prompt);
+    const quoteMicroUsd = await this.quoteMicro(spec, dto, {
+      mode,
+      prompt,
+      referenceKinds: refs && kinds,
+    });
     this.assertUnderCap(await this.todaySpentMicro(userId), quoteMicroUsd);
     await this.assertUnderBudget(userId, quoteMicroUsd);
 
     const row = await this.prisma.aiVideoGeneration.create({
       data: {
         userId,
-        model: apiIdOf(spec, withImage),
+        model: apiIdOf(spec, mode),
         prompt: dto.prompt,
         inputKey: dto.inputKey,
+        references: refs?.map(({ kind, key }) => ({ kind, key })),
         resolution: dto.resolution,
         durationS: dto.durationS,
         aspectRatio: dto.aspectRatio,
@@ -232,39 +271,52 @@ export class AiVideoService {
     return this.present(updated);
   }
 
-  /** Görselden üretimde: özel bucket'tan oku, Pika yüklemesine koy, dönen adres modelin görsel alanı olur. */
+  /**
+   * Girdili üretimde: özel bucket'tan oku, Pika yüklemesine koy, dönen adres modelin ilgili alanı olur.
+   * İstemdeki @etiketler burada çevrilir (satırda ham istem durur; yeniden deneme aynı sonucu üretir).
+   */
   private async submitBody(
     row: AiVideoGeneration,
     spec: AiVideoModelSpec,
   ): Promise<Record<string, unknown>> {
+    const refs = parseReferences(row.references);
+    const mode: AiVideoMode = refs.length > 0 ? 'reference' : row.inputKey ? 'image' : 'text';
+    const kinds: AiInputKind[] =
+      refs.length > 0 ? refs.map((r) => r.kind) : row.inputKey ? ['image'] : [];
     const opts = {
-      prompt: row.prompt,
+      prompt: translatePromptTags(row.prompt, mode, countKinds(kinds)),
       resolution: row.resolution,
       durationS: row.durationS,
       aspectRatio: row.aspectRatio ?? undefined,
     };
+    if (mode === 'reference') {
+      const referenceUrls: AiVideoReferenceUrls = { image: [], video: [], audio: [] };
+      for (const ref of refs) referenceUrls[ref.kind].push(await this.input.uploadToPika(ref.key));
+      return buildPikaBody(spec, { ...opts, referenceUrls });
+    }
     if (row.inputKey === null) return buildPikaBody(spec, opts);
     return buildPikaBody(spec, { ...opts, image: await this.input.uploadToPika(row.inputKey) });
   }
 
   /**
-   * Pika teklifi image-to-video'da görsel alanını ŞART koşar; fiyat görsele bağlı değil, yer tutucu adres
-   * gider (kullanıcı görseli teklife gitmez).
+   * Pika teklifi görsel/referans alanlarını ŞART koşar; fiyat dosyaya bağlı değil (referansta yalnız "video var mı"),
+   * yer tutucu adres gider (kullanıcı dosyası teklife gitmez).
    */
   private quoteMicro(
     spec: AiVideoModelSpec,
     o: { resolution: string; durationS: number; aspectRatio?: string },
-    withImage: boolean,
-    prompt?: string,
+    q: { mode: AiVideoMode; prompt?: string; referenceKinds?: AiInputKind[] },
   ): Promise<number> {
     const body = buildPikaBody(spec, {
-      prompt,
+      prompt: q.prompt,
       resolution: o.resolution,
       durationS: o.durationS,
       aspectRatio: o.aspectRatio,
-      image: withImage ? QUOTE_PLACEHOLDER_IMAGE : undefined,
+      image: q.mode === 'image' ? QUOTE_PLACEHOLDER_IMAGE : undefined,
+      referenceUrls:
+        q.mode === 'reference' ? quotePlaceholderUrls(q.referenceKinds ?? []) : undefined,
     });
-    return this.callPika(() => this.pika.quote(apiIdOf(spec, withImage), body));
+    return this.callPika(() => this.pika.quote(apiIdOf(spec, q.mode), body));
   }
 
   private enabledModels(): AiVideoModelSpec[] {
@@ -275,23 +327,37 @@ export class AiVideoService {
   /** Açık model + tabloda olan süre/çözünürlük/ölçü; aksi 400 AI_VIDEO_INVALID_OPTION. */
   private resolveSpec(
     o: { model: string; resolution: string; durationS: number; aspectRatio?: string },
-    withImage: boolean,
+    mode: AiVideoMode,
   ): AiVideoModelSpec {
     const spec = this.enabledModels().find((m) => m.key === o.model);
-    const ratios = spec?.aspectRatios[withImage ? 'image' : 'text'];
+    const ratios = mode === 'reference' ? spec?.references?.aspectRatios : spec?.aspectRatios[mode];
     const ratioOk = o.aspectRatio === undefined || ratios?.includes(o.aspectRatio) === true;
     if (
       !spec ||
       !spec.resolutions.includes(o.resolution) ||
       !spec.durations.includes(o.durationS) ||
+      (mode === 'reference' && !spec.references) ||
       !ratioOk
     ) {
-      throw new BadRequestException({
-        message: AI_VIDEO_MESSAGES[AiVideoError.INVALID_OPTION],
-        error: AiVideoError.INVALID_OPTION,
-      });
+      throw this.invalidOption();
     }
     return spec;
+  }
+
+  /** Teklif için tür sayıları: en az 1, tür başına tavan aşılmaz (dosya yok, süre denetimi create'te). */
+  private assertReferenceCounts(spec: AiVideoModelSpec, kinds: AiInputKind[]): void {
+    const c = countKinds(kinds);
+    const max = spec.references!.max;
+    if (kinds.length === 0 || c.image > max.image || c.video > max.video || c.audio > max.audio) {
+      throw this.invalidOption();
+    }
+  }
+
+  private invalidOption() {
+    return new BadRequestException({
+      message: AI_VIDEO_MESSAGES[AiVideoError.INVALID_OPTION],
+      error: AiVideoError.INVALID_OPTION,
+    });
   }
 
   private creditMicro(): number {

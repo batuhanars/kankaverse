@@ -21,6 +21,7 @@ const props = defineProps<{
   locked?: boolean // C33: pasif tanıtım, Oluştur kapalı + "yakında" notu
   inviteCode?: string | null // C39: doluysa not davet metnine döner + "Ortama katıl" düğmesi
   grant?: AiVideoGrantInfo | null // C40: admin hakkıyla erişene kalan kredi satırı
+  hasVideo?: boolean // C42: girdi videosu da ücretlendirilir notu
 }>()
 const emit = defineEmits<{ submit: []; join: [] }>()
 
@@ -65,6 +66,7 @@ const disabled = computed(
       </div>
       <KvButton :disabled="disabled" :loading="busy" @click="emit('submit')">{{ t('aiVideo.generate') }}</KvButton>
     </div>
+    <p v-if="hasVideo && !locked" class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('aiVideo.refs.videoCostNote') }}</p>
     <p class="text-[12px]" style="color: var(--kv-text-muted);">
       {{ t('aiVideo.spentLine', { spent: num(spentTodayCredits), cap: num(dailyCapCredits) }) }}
     </p>

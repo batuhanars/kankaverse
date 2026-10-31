@@ -6,12 +6,14 @@
  * mode=chat → `send` (attachmentId, çağıran mevcut mesaj yoluna verir) · mode=media → `use` (File).
  * Kapı yalnız arayüz; sunucu otorite.
  */
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import AiVideoOptions from '@/components/shared/AiVideoOptions.vue'
+import AiVideoRefStrip from '@/components/shared/AiVideoRefStrip.vue'
+import AiVideoPromptBox from '@/components/shared/AiVideoPromptBox.vue'
 import AiVideoCostBar from '@/components/shared/AiVideoCostBar.vue'
 import AiVideoRecentList from '@/components/shared/AiVideoRecentList.vue'
 import AiVideoPreviewModal from '@/components/shared/AiVideoPreviewModal.vue'
@@ -33,19 +35,21 @@ function joinAccessGuild() {
 const { t } = useI18n()
 const ai = useAiVideo()
 const form = ai.form
-const fileInput = ref<HTMLInputElement | null>(null)
-const previewUrl = ref<string | null>(null)
+const refs = ai.refs
 
-const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp']
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const PROMPT_MAX = 1000
 const view = ref<'form' | 'preview'>('form')
 const previewRow = ref<AiVideoDto | null>(null)
 let previewOpenedAt = 0
 const STALE_MS = 10 * 60 * 1000 // presigned adres 15 dk; 10 dk sonra tazele
 
+// Boş istem yalnız tek görsel (inputKey) kipinde serbest; referans kipinde sunucu 400 döner (C42)
 const canSubmit = computed(
-  () => !ai.busy.value && (ai.prompt.value.trim().length > 0 || !!ai.image.value),
+  () =>
+    !ai.busy.value &&
+    !refs.uploading.value &&
+    refs.allReady.value &&
+    (ai.prompt.value.trim().length > 0 || refs.singleImage.value),
 )
 const statusText = computed(() => {
   if (ai.saving.value) return t('aiVideo.saving')
@@ -54,27 +58,11 @@ const statusText = computed(() => {
 const failed = computed(() => ai.job.value?.status === 'FAILED')
 const otherRecent = computed(() => ai.recent.value.filter((r) => r.id !== ai.job.value?.id))
 
-watch(ai.image, (f) => {
-  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
-  previewUrl.value = f ? URL.createObjectURL(f) : null
-})
-onUnmounted(() => previewUrl.value && URL.revokeObjectURL(previewUrl.value))
-
-function onImage(e: Event) {
-  const input = e.target as HTMLInputElement
-  const f = input.files?.[0]
-  input.value = ''
-  if (!f) return
-  if (!IMAGE_TYPES.includes(f.type)) ai.error.value = t('aiVideo.errors.imageType')
-  else if (f.size > MAX_IMAGE_BYTES) ai.error.value = t('aiVideo.errors.imageSize')
-  else {
-    ai.error.value = ''
-    ai.image.value = f
-  }
-}
-
+// C42 §2: tek model açıkken model adı gösterilmez
 const modelLabel = computed(() =>
-  form.options.value?.models.find((m) => m.key === previewRow.value?.model)?.label,
+  (form.options.value?.models.length ?? 0) > 1
+    ? form.options.value?.models.find((m) => m.key === previewRow.value?.model)?.label
+    : undefined,
 )
 
 function showPreview(row: AiVideoDto) {
@@ -201,31 +189,27 @@ async function onPrimary() {
           @update:duration-s="form.durationS.value = $event"
           @update:aspect-ratio="form.aspectRatio.value = $event"
         >
-          <div class="w-full flex flex-wrap items-center gap-2 min-w-0">
-            <img v-if="previewUrl" :src="previewUrl" alt="" class="h-12 w-12 shrink-0 rounded-[var(--kv-radius-sm)] object-cover" />
-            <KvButton size="sm" variant="ghost" class="border border-[var(--kv-border-subtle)]" :disabled="ai.locked" @click="fileInput?.click()">
-              {{ ai.image.value ? t('aiVideo.imageChange') : t('aiVideo.imageAdd') }}
-            </KvButton>
-            <KvButton v-if="ai.image.value" size="sm" variant="ghost" class="border border-[var(--kv-border-subtle)]" @click="ai.image.value = null">
-              {{ t('aiVideo.imageRemove') }}
-            </KvButton>
-            <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="onImage" />
-          </div>
-          <p class="w-full text-[12px] -mt-2" style="color: var(--kv-text-muted);">{{ t('aiVideo.imageHint') }}</p>
+          <AiVideoRefStrip
+            :items="refs.items.value"
+            :counts="refs.counts.value"
+            :limits="refs.limits.value"
+            :accept="refs.accept.value"
+            :single-image="refs.singleImage.value"
+            :locked="ai.locked"
+            @add="refs.addFiles"
+            @remove="refs.remove"
+          />
 
           <div class="w-full">
             <label class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);" for="ai-video-prompt">
               {{ t('aiVideo.promptLabel') }}
             </label>
-            <textarea
-              id="ai-video-prompt"
+            <AiVideoPromptBox
               v-model="ai.prompt.value"
-              rows="3"
+              :items="refs.items.value"
               :maxlength="PROMPT_MAX"
               :disabled="ai.locked"
               :placeholder="t('aiVideo.promptPlaceholder')"
-              class="w-full resize-none disabled:opacity-60 disabled:cursor-not-allowed rounded-[var(--kv-radius-md)] px-3 py-2 text-[14px] outline-none border border-[var(--kv-border-subtle)] bg-[var(--kv-bg-content)]"
-              style="color: var(--kv-text-primary);"
             />
           </div>
         </AiVideoOptions>
@@ -243,6 +227,7 @@ async function onPrimary() {
           :locked="ai.locked"
           :invite-code="form.options.value?.accessInviteCode ?? null"
           :grant="form.options.value?.grant ?? null"
+          :has-video="refs.hasVideo.value"
           @submit="ai.submit"
           @join="joinAccessGuild"
         />

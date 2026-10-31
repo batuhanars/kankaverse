@@ -1,5 +1,10 @@
 import { computed, onUnmounted, ref, watch, type Ref } from 'vue'
-import { aiVideoApi, type AiVideoModelOption, type AiVideoOptionsDto } from '@/api/aiVideo'
+import {
+  aiVideoApi,
+  type AiVideoModelOption,
+  type AiVideoOptionsDto,
+  type AiVideoRefKind,
+} from '@/api/aiVideo'
 
 const ESTIMATE_DELAY_MS = 400
 
@@ -8,8 +13,13 @@ const ESTIMATE_DELAY_MS = 400
  * 400 ms gecikmeli canlı teklif. İstek yarışında yalnız SON isteğin sonucu yazılır.
  * C33: `locked` (pasif tanıtım) iken yalnız `options` çağrılır (sunucu kilitliye açık, tutarlar 0); estimate atılmaz
  * (403 gürültüsü ve Pika çağrısı olmaz). Geçmiş ve yükleme de useAiVideo'da kilitli.
+ * C42: `referenceKinds` doluysa kip referanstır (ölçü listesi ve teklif buna göre); null = metin ya da tek görsel.
  */
-export function useAiVideoForm(withImage: Ref<boolean>, locked = false) {
+export function useAiVideoForm(
+  withImage: Ref<boolean>,
+  referenceKinds: Ref<AiVideoRefKind[] | null>,
+  locked = false,
+) {
   const options = ref<AiVideoOptionsDto | null>(null)
   const model = ref('')
   const resolution = ref('')
@@ -24,10 +34,11 @@ export function useAiVideoForm(withImage: Ref<boolean>, locked = false) {
   const current = computed<AiVideoModelOption | null>(
     () => options.value?.models.find((m) => m.key === model.value) ?? null,
   )
-  /** Seçili model + görsel durumuna göre ölçü listesi (sunucudan; görselde boş olabilir). */
-  const aspectRatios = computed(
-    () => current.value?.aspectRatios[withImage.value ? 'image' : 'text'] ?? [],
-  )
+  /** Seçili model + kipe göre ölçü listesi (sunucudan; görselde boş olabilir). */
+  const aspectRatios = computed(() => {
+    if (referenceKinds.value) return current.value?.references?.aspectRatios ?? []
+    return current.value?.aspectRatios[withImage.value ? 'image' : 'text'] ?? []
+  })
   const remainingCredits = computed(() =>
     options.value
       ? Math.max(0, options.value.dailyCapCredits - options.value.spentTodayCredits)
@@ -75,6 +86,7 @@ export function useAiVideoForm(withImage: Ref<boolean>, locked = false) {
           ...(aspectRatio.value && { aspectRatio: aspectRatio.value }),
         },
         withImage.value,
+        referenceKinds.value ?? undefined,
       )
       if (id === seq) estimateCredits.value = data.estimateCredits
     } catch {
@@ -84,14 +96,17 @@ export function useAiVideoForm(withImage: Ref<boolean>, locked = false) {
     }
   }
 
-  watch(withImage, resetAspectIfInvalid)
-  watch([model, resolution, durationS, aspectRatio, withImage], () => {
-    if (locked) return
-    if (!model.value || !resolution.value || !durationS.value) return
-    if (timer) clearTimeout(timer)
-    estimating.value = true
-    timer = setTimeout(() => void runEstimate(), ESTIMATE_DELAY_MS)
-  })
+  watch([withImage, referenceKinds], resetAspectIfInvalid)
+  watch(
+    [model, resolution, durationS, aspectRatio, withImage, () => referenceKinds.value?.join()],
+    () => {
+      if (locked) return
+      if (!model.value || !resolution.value || !durationS.value) return
+      if (timer) clearTimeout(timer)
+      estimating.value = true
+      timer = setTimeout(() => void runEstimate(), ESTIMATE_DELAY_MS)
+    },
+  )
 
   void loadOptions()
   onUnmounted(() => {

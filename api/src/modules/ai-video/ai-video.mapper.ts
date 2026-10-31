@@ -1,6 +1,6 @@
 import { AiVideoGeneration, AiVideoStatus } from '@prisma/client';
-import { modelKeyOfApiId } from './ai-video.models';
-import { ACTIVE_STATUSES, AiVideoError, MICRO } from './ai-video.constants';
+import { AiVideoReferenceSpec, modelKeyOfApiId } from './ai-video.models';
+import { ACTIVE_STATUSES, AiVideoError, aiInputTypesOf, MICRO } from './ai-video.constants';
 
 /** Pika `error.code` → bizim hata kodumuz (istemci i18n'i koda göre). Bilinmeyen her şey PROVIDER_ERROR. */
 export function mapPikaErrorCode(code: string | null | undefined): string {
@@ -15,6 +15,7 @@ export const AI_VIDEO_MESSAGES: Record<string, string> = {
   [AiVideoError.DAILY_CAP]: 'Bugünkü yapay zeka video kredi sınırına ulaşıldı.',
   [AiVideoError.BUDGET_EXCEEDED]: 'Kredin bu video için yetmiyor.',
   [AiVideoError.INVALID_OPTION]: 'Seçilen model, süre, çözünürlük veya ölçü geçerli değil.',
+  [AiVideoError.INPUT_TOO_LONG]: 'Video en fazla 15 saniye, sesler en fazla 30 saniye olabilir.',
   [AiVideoError.NOT_READY]: 'Video henüz hazır değil.',
   [AiVideoError.PROVIDER_ERROR]:
     'Video üretim hizmeti şu an yanıt vermiyor. Biraz sonra tekrar dene.',
@@ -25,6 +26,21 @@ export const AI_VIDEO_MESSAGES: Record<string, string> = {
   [AiVideoError.DOWNLOAD_FAILED]: 'Video üretildi ama kaydedilemedi.',
   [AiVideoError.BUSY]: 'Üretim sürerken silinemez.',
 };
+
+/** `GET /ai-video/options` → model.references: istemci sınırları ve kabul edilen türleri buradan okur (C42 §1.7). */
+export const toReferencesOption = (r: AiVideoReferenceSpec | null) =>
+  r && {
+    max: r.max,
+    videoTotalMaxS: r.videoTotalMaxS,
+    videoMaxS: r.videoMaxS,
+    audioMaxS: r.audioMaxS,
+    aspectRatios: r.aspectRatios,
+    inputTypes: {
+      image: aiInputTypesOf('image'),
+      video: aiInputTypesOf('video'),
+      audio: aiInputTypesOf('audio'),
+    },
+  };
 
 export const usd = (micro: number): number => micro / MICRO;
 
@@ -61,6 +77,9 @@ export function sumSpentMicro(
   return total;
 }
 
+/** C42: `references` Json?; dolu dizi = referanslı üretim. */
+export const hasReferences = (refs: unknown): boolean => Array.isArray(refs) && refs.length > 0;
+
 export function toAiVideoDto(
   row: AiVideoGeneration,
   creditMicroUsd: number,
@@ -74,7 +93,7 @@ export function toAiVideoDto(
     durationS: row.durationS,
     aspectRatio: row.aspectRatio,
     prompt: row.prompt,
-    hasInput: row.inputKey !== null,
+    hasInput: row.inputKey !== null || hasReferences(row.references),
     quoteUsd: usd(row.quoteMicroUsd),
     costUsd: row.costMicroUsd === null ? null : usd(row.costMicroUsd),
     quoteCredits: toCredits(row.quoteMicroUsd, creditMicroUsd),

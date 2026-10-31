@@ -1,27 +1,18 @@
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
+import { AiVideoAttachments } from './AiVideoAttachments';
+import { AiVideoPrompt } from './AiVideoPrompt';
 import { Segmented } from './Segmented';
 import type { useAiVideo } from './useAiVideo';
 
-const PROMPT_MAX = 1000;
-
-const audioLabel = (m: { audio: string; label: string }) =>
-  t(m.audio === 'none' ? 'aiVideo.audioNone' : 'aiVideo.audioOn', { label: m.label });
-
-/** Bilinmeyen sağlayıcı değeri arayüzü kırmaz: etiket yoksa oranın kendisi yazılır. */
-const ratioLabel = (r: string) => {
-  const key = `aiVideo.ratio.r${r.replace(':', 'x')}`;
-  const label = t(key);
-  return label === key ? r : label; // t eksik anahtarda anahtarı döner
-};
-
-/** Model satırı (web `AiVideoOptions` üst kısmı). Tek modelde seçici yok, satır var. */
+/** Birden çok model açıksa seçici (etiket + sesli/sessiz); tek modelde bilgi gösterilmez (C42 §2). */
 function ModelRow({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
   const { form } = ai;
   const models = form.options?.models ?? [];
-  if (models.length === 1) return <Text style={styles.model}>{audioLabel(models[0])}</Text>;
-  if (models.length === 0) return null;
+  if (models.length < 2) return null;
+  const audioLabel = (m: { audio: string; label: string }) =>
+    t(m.audio === 'none' ? 'aiVideo.audioNone' : 'aiVideo.audioOn', { label: m.label });
   return (
     <Segmented
       label={t('aiVideo.modelLabel')}
@@ -31,6 +22,13 @@ function ModelRow({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
     />
   );
 }
+
+/** Bilinmeyen sağlayıcı değeri arayüzü kırmaz: etiket yoksa oranın kendisi yazılır. */
+const ratioLabel = (r: string) => {
+  const key = `aiVideo.ratio.r${r.replace(':', 'x')}`;
+  const label = t(key);
+  return label === key ? r : label; // t eksik anahtarda anahtarı döner
+};
 
 /** Çözünürlük/süre/ölçü seçicileri (web `AiVideoOptions` alt kısmı). */
 function Options({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
@@ -60,7 +58,7 @@ function Options({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
             value={form.aspectRatio}
             onChange={form.setAspectRatio}
           />
-          {ai.image.image && form.aspectRatios.length === 0 ? (
+          {ai.refs.mode === 'image' && form.aspectRatios.length === 0 ? (
             <Text style={styles.hint}>{t('aiVideo.aspectFromImage')}</Text>
           ) : null}
         </>
@@ -69,41 +67,35 @@ function Options({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
   );
 }
 
-/** C14f sahip sırası: model, görsel, istem, seçenekler (web `AiVideoDialog` form gövdesi). */
+/** C42 sırası: model (yalnız çoklu), ekler, istem (@ ile), seçenekler. */
 export function AiVideoForm({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
-  const { image } = ai;
+  const { refs } = ai;
+  const refsOption = ai.form.current?.references ?? null;
   return (
     <View style={styles.group}>
       <ModelRow ai={ai} />
-      <View style={styles.imageRow}>
-        {image.image ? <Image source={{ uri: image.image.uri }} style={styles.thumb} resizeMode="cover" /> : null}
-        <Pressable
-          onPress={() => void image.pick()}
+      {refsOption ? (
+        <AiVideoAttachments
+          refs={refsOption}
+          items={refs.items}
+          labels={refs.labels}
+          thumbs={refs.thumbs}
+          mode={refs.mode}
           disabled={ai.locked}
-          style={[styles.ghost, ai.locked && styles.off]}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: ai.locked }}
-        >
-          <Text style={styles.ghostText}>{image.image ? t('aiVideo.imageChange') : t('aiVideo.imageAdd')}</Text>
-        </Pressable>
-        {image.image ? (
-          <Pressable onPress={image.clear} style={styles.ghost} accessibilityRole="button">
-            <Text style={styles.ghostText}>{t('aiVideo.imageRemove')}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-      <Text style={styles.hint}>{t('aiVideo.imageHint')}</Text>
+          onPickMedia={() => void refs.pickMedia()}
+          onPickAudio={() => void refs.pickAudio()}
+          onRemove={ai.removeRef}
+        />
+      ) : null}
       <View style={styles.field}>
         <Text style={styles.label}>{t('aiVideo.promptLabel')}</Text>
-        <TextInput
+        <AiVideoPrompt
           value={ai.prompt}
-          onChangeText={ai.setPrompt}
-          maxLength={PROMPT_MAX}
-          multiline
-          placeholder={t('aiVideo.promptPlaceholder')}
-          placeholderTextColor={theme.colors.textMuted}
+          onChange={ai.setPrompt}
+          items={refs.items}
+          labels={refs.labels}
+          thumbs={refs.thumbs}
           editable={!ai.locked}
-          style={[styles.input, ai.locked && styles.off]}
         />
       </View>
       <Options ai={ai} />
@@ -113,32 +105,7 @@ export function AiVideoForm({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
 
 const styles = StyleSheet.create({
   group: { gap: 14 },
-  model: { color: theme.colors.textPrimary, fontSize: theme.fontSize.md },
   field: { gap: 6 },
   label: { color: theme.colors.textSecondary, fontSize: theme.fontSize.sm, fontWeight: '600' },
-  input: {
-    minHeight: 88,
-    maxHeight: 160,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    backgroundColor: theme.colors.bgContent,
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.base,
-    padding: 12,
-    textAlignVertical: 'top',
-  },
-  imageRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
-  thumb: { width: 48, height: 48, borderRadius: theme.radius.sm },
-  ghost: {
-    minHeight: theme.layout.inputMinHeight,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.bgElevated,
-  },
-  ghostText: { color: theme.colors.textSecondary, fontSize: theme.fontSize.md, fontWeight: '600' },
-  off: { opacity: 0.5 },
   hint: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs, marginTop: -6 },
 });

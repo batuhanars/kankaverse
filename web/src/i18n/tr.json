@@ -1653,10 +1653,37 @@
     "grantExpiry": "Bitiş: {date}",
     "promptLabel": "Ne üretilsin?",
     "promptPlaceholder": "Örnek: Yağmurlu bir gecede neon ışıklı sokakta yürüyen kedi",
-    "imageAdd": "Görsel ekle",
-    "imageChange": "Görseli değiştir",
-    "imageRemove": "Kaldır",
-    "imageHint": "İsteğe bağlı. PNG, JPEG veya WebP, en fazla 10 MB.",
+    "refs": {
+      "add": "Dosya ekle",
+      "addHint": "Görsel, video veya ses ekleyebilirsin.",
+      "counter": "{image}/{imageMax} görsel · {video}/{videoMax} video · {audio}/{audioMax} ses",
+      "remove": "Kaldır",
+      "uploading": "Yükleniyor...",
+      "uploadFailed": "Dosya yüklenemedi. Kaldırıp tekrar dene.",
+      "modeSingle": "Video bu görselden başlar.",
+      "modeReference": "Eklediklerin videoda referans olarak kullanılır. İstemde {'@'} ile hangisini nerede istediğini belirt.",
+      "rule": "Başkasının yüzünü veya sesini izni olmadan kullanma.",
+      "videoCostNote": "Girdi videosu da ücretlendirilir. Tahmin en yüksek tutardır, gerçek ücret video süresine göre daha az olabilir.",
+      "tagButton": "Eklenen dosyalardan etiket seç",
+      "tagDisabled": "Önce dosya ekle",
+      "tagList": "Eklenen dosyalar",
+      "errors": {
+        "type": "Bu dosya türü desteklenmiyor. Görsel, video veya ses ekleyebilirsin.",
+        "size": {
+          "image": "Görsel en fazla {mb} MB olabilir.",
+          "video": "Video en fazla {mb} MB olabilir.",
+          "audio": "Ses en fazla {mb} MB olabilir."
+        },
+        "full": {
+          "image": "En fazla {max} görsel ekleyebilirsin.",
+          "video": "En fazla {max} video ekleyebilirsin.",
+          "audio": "En fazla {max} ses ekleyebilirsin."
+        },
+        "videoLong": "Video en fazla {sec} saniye olabilir.",
+        "videoTotal": "Videoların toplamı en fazla {sec} saniye olabilir.",
+        "audioLong": "Ses en fazla {sec} saniye olabilir."
+      }
+    },
     "modelLabel": "Model",
     "resolutionLabel": "Çözünürlük",
     "durationLabel": "Süre",
@@ -1704,8 +1731,6 @@
     "errors": {
       "generic": "Bir şeyler ters gitti. Biraz sonra tekrar dene.",
       "download": "Video indirilemedi. Tekrar dene.",
-      "imageType": "Yalnızca PNG, JPEG veya WebP görsel kullanılabilir.",
-      "imageSize": "Görsel en fazla 10 MB olabilir.",
       "AI_VIDEO_DAILY_CAP": "Bugünkü yapay zeka video kredi sınırına ulaşıldı.",
       "AI_VIDEO_BUDGET_EXCEEDED": "Kredin bu video için yetmiyor.",
       "AI_VIDEO_INVALID_OPTION": "Seçilen model, süre veya çözünürlük geçerli değil.",
@@ -1716,7 +1741,9 @@
       "AI_VIDEO_INSUFFICIENT_BALANCE": "Pika bakiyesi bitti.",
       "AI_VIDEO_TIMEOUT": "Üretim çok uzun sürdü ve iptal edildi.",
       "AI_VIDEO_DOWNLOAD_FAILED": "Video kaydedilemedi. Yeni bir üretim başlat.",
-      "AI_VIDEO_BUSY": "Bu üretim şu an işleniyor. Biraz sonra tekrar dene."
+      "AI_VIDEO_BUSY": "Bu üretim şu an işleniyor. Biraz sonra tekrar dene.",
+      "AI_VIDEO_INPUT_TOO_LONG": "Video en fazla 15 saniye, sesler en fazla 30 saniye olabilir.",
+      "AI_VIDEO_PROMPT_REQUIRED": "Referans eklediğinde istem yazman gerekir."
     }
   },
   "media": {
@@ -2082,6 +2109,30 @@
     "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
   },
   "mobile": {
+    "aiVideoRefs": {
+      "add": "Dosya ekle",
+      "addMedia": "Görsel veya video",
+      "addAudio": "Ses",
+      "hint": "İstersen görsel, video veya ses ekle.",
+      "counter": "{image}/{imageMax} görsel · {video}/{videoMax} video · {audio}/{audioMax} ses",
+      "modeImage": "Video bu görselden başlar.",
+      "modeReference": "Eklediklerin videoda referans olarak kullanılır. İstemde {'@'} ile hangisini nerede istediğini belirt.",
+      "rule": "Başkasının yüzünü veya sesini izni olmadan kullanma.",
+      "videoCostNote": "Girdi videosu da ücretlendirilir. Tahmin en yüksek tutardır, gerçek ücret video süresine göre daha az olabilir.",
+      "remove": "{label} ekini kaldır",
+      "atButton": "Ek etiketle",
+      "atNeedsFile": "Önce dosya ekle",
+      "uploadFailed": "Yüklenemedi. Kaldırıp tekrar ekle.",
+      "errors": {
+        "full": "Bu türde daha fazla dosya eklenemez.",
+        "type": "Bu dosya türü desteklenmiyor.",
+        "size": "Dosya çok büyük. Görsel ve ses en fazla 10 MB, video en fazla 50 MB olabilir.",
+        "tooLong": "Video en fazla {video} saniye, sesler en fazla {audio} saniye olabilir.",
+        "totalLong": "Videoların toplam süresi en fazla {total} saniye olabilir.",
+        "AI_VIDEO_INPUT_TOO_LONG": "Video en fazla 15 saniye, sesler en fazla 30 saniye olabilir.",
+        "AI_VIDEO_PROMPT_REQUIRED": "Dosya referansı varken istem yazmalısın."
+      }
+    },
     "media": {
       "save": "Galeriye kaydet",
       "saved": "Galeriye kaydedildi.",
