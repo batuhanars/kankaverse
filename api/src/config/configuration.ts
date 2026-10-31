@@ -162,7 +162,7 @@ export default () => {
     // Sprint M3 — Expo Push gönderimi feature-flag. Default false → PushService no-op
     // (dev build/FCM kimlik bilgisi olmadan sessizce devre dışı; §2.3).
     expoPushEnabled: process.env.EXPO_PUSH_ENABLED === 'true',
-    // C14 — yapay zeka ile video üretimi (Pika). Para harcar: yalnız açık liste (AI_VIDEO_USER_IDS) + bayrak + anahtar.
+    // C14 — yapay zeka ile video üretimi (Pika). Para harcar: yalnız panelden tanımlı hak (C43) + bayrak + anahtar.
     // PIKA_API_KEY yalnız sunucuda; hiçbir yanıtta/logda görünmez. Varsayılan KAPALI.
     aiVideo: {
       enabled: process.env.AI_VIDEO_ENABLED === 'true',
@@ -173,15 +173,10 @@ export default () => {
         .split(',')
         .map((k) => k.trim())
         .filter((k) => k.length > 0),
-      dailyCapUsd: parseFloat(process.env.AI_VIDEO_DAILY_CAP_USD ?? '3'),
       // C33: kullanıcıya görünen birim "kredi"; 1 kredi = bu kadar mikro-USD (10000 = 0,01 $)
       creditMicroUsd: parseInt(process.env.AI_VIDEO_CREDIT_MICRO_USD ?? '10000', 10) || 10000,
       // C39: kilitli kullanıcıya "Ortama katıl" düğmesi için davet kodu. boş env değeri varsayılana düşer
       accessInviteCode: process.env.AI_VIDEO_ACCESS_INVITE_CODE?.trim() || 'QGJVTH5K',
-      userIds: (process.env.AI_VIDEO_USER_IDS ?? '')
-        .split(',')
-        .map((id) => id.trim())
-        .filter((id) => id.length > 0),
     },
     // C36 — Kick + Twitch hesap bağlama ve "yayına başladı" duyurusu. Varsayılan KAPALI (sağlayıcı başına).
     // Erişim/yenileme token'ı SAKLANMAZ; yalnız uygulama kimlik bilgileri burada durur (yalnız sunucu).

@@ -1,27 +1,28 @@
 import {
   BadGatewayException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AiVideoGeneration, AiVideoStatus } from '@prisma/client';
+import { AiVideoGeneration, AiVideoStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../../shared/storage/storage.service';
 import {
   AI_ESTIMATE_TTL_MS,
   AI_SUBMIT_RETRY_DELAYS_MS,
   AI_RECENT_LIMIT,
+  ACTIVE_STATUSES,
   AiVideoError,
-  MICRO,
   inputTypeOfKey,
 } from './ai-video.constants';
 import {
   AI_VIDEO_MESSAGES,
   mapPikaErrorCode,
-  sumSpentMicro,
+  fromCredits,
   toAiVideoDto,
   toReferencesOption,
   toCredits,
@@ -43,12 +44,10 @@ import { AiVideoReferenceService, parseReferences } from './ai-video-references.
 import { CreateAiVideoDto, EstimateAiVideoDto } from './dto/ai-video.dto';
 import type { AiInputKind } from './ai-video.constants';
 import { AiVideoInputService } from './ai-video-input.service';
-import { findActiveAiVideoGrant, isAiVideoEnvListed } from './ai-video-grant';
+import { ActiveAiVideoGrant, AiVideoDb, findActiveAiVideoGrant } from './ai-video-grant';
 import { PikaClient, PikaError, PikaJob } from './pika.client';
 
 /** Türkiye UTC+3 (DST yok): "bugün" Türkiye gününe göre. */
-const TR_OFFSET_MS = 3 * 60 * 60 * 1000;
-const DAY_MS = 86_400_000;
 const QUOTE_PLACEHOLDER_IMAGE = 'https://example.com/quote-placeholder.png';
 const VIDEO_URL_TTL_S = 15 * 60;
 
@@ -72,13 +71,17 @@ export class AiVideoService {
   ) {}
 
   /**
-   * Açık modeller + seçenekleri + bugünkü harcama (diyalog açılışında).
-   * `allowed=false` (kilitli tanıtım): harcama/tavan alanları 0, DB'ye gidilmez; Pika çağrılmaz.
+   * Açık modeller + seçenekleri + hak özeti (diyalog açılışında).
+   * `allowed=false` (kilitli tanıtım): hak/tutar alanları 0/null, DB'ye gidilmez; Pika çağrılmaz.
    */
   async options(userId: string, allowed = true) {
-    const spentMicro = allowed ? await this.todaySpentMicro(userId) : 0;
-    const capMicro = allowed ? this.dailyCapMicro() : 0;
-    const grant = allowed ? await this.grantView(userId) : null;
+    const credit = this.creditMicro();
+    const active = allowed ? await findActiveAiVideoGrant(this.prisma, userId) : null;
+    const grant = this.grantView(active, credit);
+    // Geri uyum (vc42 ve öncesi "Bugün {spent} / {cap}" satırı + kalan = cap - spent): hak varsa bütçe/kullanılan,
+    // yoksa 0 (hak yokken istemci zaten kilitli modda). D84'te kalkacak.
+    const legacyCap = grant?.budgetCredits ?? 0;
+    const legacySpent = grant?.usedCredits ?? 0;
     return {
       models: this.enabledModels().map((m) => ({
         key: m.key,
@@ -90,11 +93,11 @@ export class AiVideoService {
         references: toReferencesOption(m.references),
         audio: m.audio,
       })),
-      dailyCapUsd: capMicro / MICRO,
-      todaySpentUsd: usd(spentMicro),
-      dailyCapCredits: toCredits(capMicro, this.creditMicro()),
-      spentTodayCredits: toCredits(spentMicro, this.creditMicro()),
-      // C40: yalnız admin hakkıyla erişene (env listesindekine ve kilitliye null). Not asla dönmez.
+      dailyCapUsd: usd(fromCredits(legacyCap, credit)),
+      todaySpentUsd: usd(fromCredits(legacySpent, credit)),
+      dailyCapCredits: legacyCap,
+      spentTodayCredits: legacySpent,
+      // C40/C43: etkin hak varsa kullanılan/bütçe/kalan; yoksa (ya da kilitliyse) null. Not asla dönmez.
       grant,
       // C39: yalnız kilitli (allowed=false) iken; erişimli kullanıcıya gereksiz
       accessInviteCode: allowed
@@ -103,26 +106,27 @@ export class AiVideoService {
     };
   }
 
-  /** C40: kullanıcıya dönen hak özeti. Env listesindekilerde ve hak yokken null. */
-  private async grantView(userId: string) {
-    if (isAiVideoEnvListed(this.config, userId)) return null;
-    const active = await findActiveAiVideoGrant(this.prisma, userId);
+  /** C43: kullanıcıya dönen hak özeti. Kullanılan yukarı, kalan/bütçe aşağı yuvarlanır. */
+  private grantView(active: ActiveAiVideoGrant | null, credit: number) {
     if (!active) return null;
-    const credit = this.creditMicro();
+    const budgetCredits = floorCredits(active.grant.budgetMicroUsd, credit);
     return {
+      usedCredits: Math.min(budgetCredits, toCredits(active.spentMicro, credit)),
+      budgetCredits,
       remainingCredits: floorCredits(active.remainingMicro, credit),
-      budgetCredits: floorCredits(active.grant.budgetMicroUsd, credit),
       expiresAt: active.grant.expiresAt?.toISOString() ?? null,
     };
   }
 
   /**
-   * C40 bütçe kapısı (R7): tahmin kalan bütçeyi aşarsa 403. Env listesindekilere uygulanmaz.
-   * Günlük tavan ayrıca geçerli (ikisinden küçüğü bağlar).
+   * C40/C43 bütçe kapısı (R7): etkin hak yoksa ya da tahmin kalan bütçeyi aşarsa 403. İstisna yok.
    */
-  private async assertUnderBudget(userId: string, quoteMicro: number): Promise<void> {
-    if (isAiVideoEnvListed(this.config, userId)) return;
-    const active = await findActiveAiVideoGrant(this.prisma, userId);
+  private async assertUnderBudget(
+    db: AiVideoDb,
+    userId: string,
+    quoteMicro: number,
+  ): Promise<void> {
+    const active = await findActiveAiVideoGrant(db, userId);
     if (!active || quoteMicro > active.remainingMicro) {
       throw new ForbiddenException({
         message: AI_VIDEO_MESSAGES[AiVideoError.BUDGET_EXCEEDED],
@@ -156,7 +160,7 @@ export class AiVideoService {
     return { quoteUsd: usd(micro), estimateCredits: toCredits(micro, this.creditMicro()) };
   }
 
-  /** Teklif (yeniden alınır, önbellekten değil) + tavan + gönderim tek çağrıda. */
+  /** Teklif (yeniden alınır, önbellekten değil) + bütçe kapısı + gönderim tek çağrıda. */
   async create(userId: string, dto: CreateAiVideoDto) {
     const refs = dto.references;
     if (refs !== undefined && dto.inputKey !== undefined) throw this.invalidOption();
@@ -183,22 +187,17 @@ export class AiVideoService {
       prompt,
       referenceKinds: refs && kinds,
     });
-    this.assertUnderCap(await this.todaySpentMicro(userId), quoteMicroUsd);
-    await this.assertUnderBudget(userId, quoteMicroUsd);
-
-    const row = await this.prisma.aiVideoGeneration.create({
-      data: {
-        userId,
-        model: apiIdOf(spec, mode),
-        prompt: dto.prompt,
-        inputKey: dto.inputKey,
-        references: refs?.map(({ kind, key }) => ({ kind, key })),
-        resolution: dto.resolution,
-        durationS: dto.durationS,
-        aspectRatio: dto.aspectRatio,
-        quoteMicroUsd,
-        status: AiVideoStatus.QUEUED,
-      },
+    const row = await this.reserveRow(userId, quoteMicroUsd, {
+      userId,
+      model: apiIdOf(spec, mode),
+      prompt: dto.prompt,
+      inputKey: dto.inputKey,
+      references: refs?.map(({ kind, key }) => ({ kind, key })),
+      resolution: dto.resolution,
+      durationS: dto.durationS,
+      aspectRatio: dto.aspectRatio,
+      quoteMicroUsd,
+      status: AiVideoStatus.QUEUED,
     });
 
     let job: PikaJob;
@@ -212,6 +211,33 @@ export class AiVideoService {
       throw this.errorFor(AiVideoError.PROVIDER_ERROR);
     }
     return this.afterSubmit(row, job);
+  }
+
+  /**
+   * C43 (R7): kullanıcıya özgü advisory kilit altında tek transaction: aktif (QUEUED/RUNNING) üretim varsa 409,
+   * yoksa bütçe kapısı (aynı transaction), sonra QUEUED satırı yazılır. Eşzamanlı ikinci istek kilitte bekler,
+   * ilk satırı görüp reddedilir (bütçe yarışı da kapanır). Pika gönderimi transaction DIŞINDA (kilit ağ çağrısı tutmaz).
+   */
+  private async reserveRow(
+    userId: string,
+    quoteMicro: number,
+    data: Prisma.AiVideoGenerationUncheckedCreateInput,
+  ): Promise<AiVideoGeneration> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('ai-video:' || ${userId}))`;
+      const active = await tx.aiVideoGeneration.findFirst({
+        where: { userId, status: { in: ACTIVE_STATUSES } },
+        select: { id: true },
+      });
+      if (active) {
+        throw new ConflictException({
+          message: AI_VIDEO_MESSAGES[AiVideoError.IN_PROGRESS],
+          error: AiVideoError.IN_PROGRESS,
+        });
+      }
+      await this.assertUnderBudget(tx, userId, quoteMicro);
+      return tx.aiVideoGeneration.create({ data });
+    });
   }
 
   async list(userId: string) {
@@ -362,30 +388,6 @@ export class AiVideoService {
 
   private creditMicro(): number {
     return this.config.get<number>('aiVideo.creditMicroUsd') ?? DEFAULT_CREDIT_MICRO_USD;
-  }
-
-  private dailyCapMicro(): number {
-    return Math.round((this.config.get<number>('aiVideo.dailyCapUsd') ?? 0) * MICRO);
-  }
-
-  private assertUnderCap(spentMicro: number, quoteMicro: number): void {
-    if (spentMicro + quoteMicro > this.dailyCapMicro()) {
-      throw new BadRequestException({
-        message: AI_VIDEO_MESSAGES[AiVideoError.DAILY_CAP],
-        error: AiVideoError.DAILY_CAP,
-      });
-    }
-  }
-
-  private async todaySpentMicro(userId: string): Promise<number> {
-    const dayStart = new Date(
-      Math.floor((Date.now() + TR_OFFSET_MS) / DAY_MS) * DAY_MS - TR_OFFSET_MS,
-    );
-    const rows = await this.prisma.aiVideoGeneration.findMany({
-      where: { userId, createdAt: { gte: dayStart } },
-      select: { status: true, costMicroUsd: true, quoteMicroUsd: true },
-    });
-    return sumSpentMicro(rows);
   }
 
   private async findOwned(userId: string, id: string): Promise<AiVideoGeneration> {

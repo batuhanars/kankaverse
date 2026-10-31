@@ -110,13 +110,25 @@ function setup() {
     completedAt: null,
   };
   const prisma = {
-    aiVideoGrant: { findUnique: jest.fn().mockResolvedValue(null) },
+    aiVideoGrant: {
+      findUnique: jest.fn().mockResolvedValue({
+        userId: 'u1',
+        budgetMicroUsd: 1_000_000_000,
+        startsAt: new Date('2026-10-01T00:00:00Z'),
+        expiresAt: null,
+        revokedAt: null,
+      }),
+    },
     aiVideoGeneration: {
       create: jest.fn().mockImplementation(({ data }) => ({ ...row, ...data })),
       findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null), // C43: aktif üretim yok
       update: jest.fn().mockImplementation(({ data }) => ({ ...row, ...data })),
     },
+    $executeRaw: jest.fn().mockResolvedValue(1),
+    $transaction: jest.fn(),
   };
+  prisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(prisma));
   const storage = {
     headSize: jest.fn().mockResolvedValue(1000),
     getBuffer: jest.fn().mockResolvedValue(Buffer.from('x')),
@@ -124,8 +136,6 @@ function setup() {
   };
   const values: Record<string, unknown> = {
     'aiVideo.models': ['pika-2.5', 'wan-3.0'],
-    'aiVideo.dailyCapUsd': 3,
-    'aiVideo.userIds': ['u1'],
   };
   const config = { get: (k: string) => values[k] };
   let uploads = 0;

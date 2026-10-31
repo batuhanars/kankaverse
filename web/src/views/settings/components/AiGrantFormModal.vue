@@ -16,6 +16,8 @@ import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import KvInput from '@/components/ui/KvInput.vue'
 import KvNumberInput from '@/components/ui/KvNumberInput.vue'
+import AiGrantUserPicker from './AiGrantUserPicker.vue'
+import type { PickerUser } from './AiGrantUserPicker.vue'
 
 const props = defineProps<{ renewing?: AiVideoGrantRowDto | null }>()
 const emit = defineEmits<{ close: []; saved: [] }>()
@@ -44,15 +46,10 @@ function fieldError(field: string): string | undefined {
 
 // ── Kullanıcı seçimi ──
 const users = ref<AdminUserDto[]>([])
-const query = ref(props.renewing?.user.username ?? '')
 const pickedId = computed(() => form.values.userId ?? '')
-const matches = computed(() => {
-  const q = query.value.trim().toLowerCase()
-  if (!q || props.renewing) return []
-  return users.value
-    .filter((u) => !u.isMinor && u.username.toLowerCase().includes(q))
-    .slice(0, 6)
-})
+const pickerUsers = computed<PickerUser[]>(() =>
+  props.renewing ? [props.renewing.user] : users.value.filter((u) => !u.isMinor),
+)
 
 onMounted(async () => {
   if (props.renewing) return
@@ -62,14 +59,6 @@ onMounted(async () => {
     users.value = []
   }
 })
-
-function pick(u: AdminUserDto) {
-  form.setFieldValue('userId', u.id)
-  query.value = u.username
-}
-function onQuery() {
-  if (!props.renewing) form.setFieldValue('userId', '') // yazarken seçim düşer; listeden yeniden seçilir
-}
 
 // ── Kaydet ──
 const saving = ref(false)
@@ -101,32 +90,13 @@ const save = form.handleSubmit(async (v) => {
   >
     <form class="flex flex-col gap-3" @submit.prevent="save">
       <div class="flex flex-col gap-1.5">
-        <KvInput
-          v-model="query"
-          :label="t('admin.aiAccess.form.user')"
-          :placeholder="t('admin.aiAccess.form.userPlaceholder')"
+        <AiGrantUserPicker
+          :users="pickerUsers"
+          :model-value="pickedId"
+          :disabled="!!renewing"
           :error="fieldError('userId')"
-          @input="onQuery"
+          @update:model-value="form.setFieldValue('userId', $event)"
         />
-        <div
-          v-if="!renewing && query.trim() && !pickedId"
-          class="rounded-[var(--kv-radius-md)] overflow-hidden"
-          style="background-color: var(--kv-bg-sidebar);"
-        >
-          <button
-            v-for="u in matches"
-            :key="u.id"
-            type="button"
-            class="block w-full text-left px-3 py-2 text-[13px] cursor-pointer hover:bg-[var(--kv-bg-elevated)]"
-            style="color: var(--kv-text-primary);"
-            @click="pick(u)"
-          >
-            {{ u.username }}
-          </button>
-          <p v-if="!matches.length" class="px-3 py-2 text-[12px]" style="color: var(--kv-text-muted);">
-            {{ t('admin.aiAccess.form.noMatch') }}
-          </p>
-        </div>
       </div>
 
       <div class="flex gap-3">

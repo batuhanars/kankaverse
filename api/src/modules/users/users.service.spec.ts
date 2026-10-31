@@ -56,7 +56,6 @@ function makeServiceWithAi() {
   const values: Record<string, unknown> = {
     'aiVideo.enabled': true,
     'aiVideo.apiKey': 'k',
-    'aiVideo.userIds': [],
   };
   return new UsersService(
     prismaMock as any,

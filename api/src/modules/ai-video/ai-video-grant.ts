@@ -1,7 +1,9 @@
-import { ConfigService } from '@nestjs/config';
-import { AiVideoGrant } from '@prisma/client';
+import { AiVideoGrant, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { sumSpentMicro } from './ai-video.mapper';
+
+/** Sorgu istemcisi: normal bağlantı ya da transaction (C43: bütçe kapısı kilit transaction'ında çalışır). */
+export type AiVideoDb = PrismaService | Prisma.TransactionClient;
 
 /** C40: etkin hak + harcanan/kalan (mikro-USD). */
 export type ActiveAiVideoGrant = {
@@ -10,17 +12,12 @@ export type ActiveAiVideoGrant = {
   remainingMicro: number;
 };
 
-/** Env açık listesi (`AI_VIDEO_USER_IDS`): hak kaydı gerekmez, bütçe kapısı uygulanmaz. */
-export function isAiVideoEnvListed(config: ConfigService, userId: string): boolean {
-  return (config.get<string[]>('aiVideo.userIds') ?? []).includes(userId);
-}
-
 /**
  * Hakkın harcananı = kullanıcının `startsAt` SONRASINDAKİ üretimlerinin kesinleşmiş (costMicroUsd) ya da
- * rezerve (teklif) toplamı. Günlük tavanın kullandığı `sumSpentMicro` ile AYNI kaynak/kural (FAILED ve QUOTED sayılmaz).
+ * rezerve (teklif) toplamı. `sumSpentMicro` kuralı (FAILED ve QUOTED sayılmaz).
  */
 export async function spentSinceMicro(
-  prisma: PrismaService,
+  prisma: AiVideoDb,
   userId: string,
   since: Date,
 ): Promise<number> {
@@ -44,11 +41,12 @@ export function grantStatus(
 }
 
 /**
+ * C43 (R7): kapı, bütçe ve gösterim için TEK kural (env açık listesi kalktı; hak yoksa erişim yok).
  * Etkin hak: kayıt var, iptal edilmemiş, süresi dolmamış, harcanan < bütçe. Yoksa null.
  * İptal/süre dolumu DB'ye gitmeden elenir (harcama sorgusu yalnız canlı hak için).
  */
 export async function findActiveAiVideoGrant(
-  prisma: PrismaService,
+  prisma: AiVideoDb,
   userId: string,
   now = new Date(),
 ): Promise<ActiveAiVideoGrant | null> {

@@ -36,6 +36,8 @@ export function useAiVideo() {
   const alive = useRef(true);
 
   const working = job?.status === 'QUEUED' || job?.status === 'RUNNING';
+  // C43: kişi başı tek eşzamanlı üretim; sunucu yine 409 verir, bu yalnız erken uyarı.
+  const inProgress = working || recent.some((r) => r.status === 'QUEUED' || r.status === 'RUNNING');
   const saving = job?.errorCode === DOWNLOAD_PENDING;
   const elapsedSec = job ? Math.max(0, Math.floor((now - new Date(job.createdAt).getTime()) / 1000)) : 0;
 
@@ -189,6 +191,7 @@ export function useAiVideo() {
     error,
     setError,
     working,
+    inProgress,
     saving,
     elapsedSec,
     submit,

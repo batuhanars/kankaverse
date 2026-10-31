@@ -39,14 +39,6 @@ export function useAiVideoForm(
     if (referenceKinds.value) return current.value?.references?.aspectRatios ?? []
     return current.value?.aspectRatios[withImage.value ? 'image' : 'text'] ?? []
   })
-  const remainingCredits = computed(() =>
-    options.value
-      ? Math.max(0, options.value.dailyCapCredits - options.value.spentTodayCredits)
-      : 0,
-  )
-  const overCap = computed(
-    () => estimateCredits.value !== null && estimateCredits.value > remainingCredits.value,
-  )
 
   function pickModel(key: string) {
     model.value = key
@@ -125,8 +117,6 @@ export function useAiVideoForm(
     estimateCredits,
     estimating,
     estimateFailed,
-    remainingCredits,
-    overCap,
     pickModel,
     loadOptions,
   }

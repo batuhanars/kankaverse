@@ -7,53 +7,103 @@ function cfg(over: Record<string, unknown> = {}) {
   const values: Record<string, unknown> = {
     'aiVideo.enabled': true,
     'aiVideo.apiKey': 'k',
-    'aiVideo.userIds': ['u1'],
     ...over,
   };
   return { get: (k: string) => values[k] } as any;
 }
 const ADULT = { id: 'u1', isMinor: false };
+// C43: erisimin tek kaynagi hak; GRANTED = etkin hakli kullanici
+const GRANTED = {
+  aiVideoGrant: {
+    findUnique: jest.fn().mockResolvedValue({
+      userId: 'u1',
+      budgetMicroUsd: 500_000,
+      startsAt: new Date('2026-10-01T00:00:00Z'),
+      expiresAt: null,
+      revokedAt: null,
+    }),
+  },
+  aiVideoGeneration: { findMany: jest.fn().mockResolvedValue([]) },
+} as any;
 const NO_GRANT = { aiVideoGrant: { findUnique: jest.fn().mockResolvedValue(null) } } as any;
 
 describe('canUseAiVideo (R7 kapisi)', () => {
-  it('bayrak + anahtar + liste + yetiskin: izin', async () => {
-    expect(await canUseAiVideo(cfg(), NO_GRANT, ADULT)).toBe(true);
+  it('bayrak + anahtar + etkin hak + yetiskin: izin', async () => {
+    expect(await canUseAiVideo(cfg(), GRANTED, ADULT)).toBe(true);
   });
   it('bayrak kapali: red', async () => {
-    expect(await canUseAiVideo(cfg({ 'aiVideo.enabled': false }), NO_GRANT, ADULT)).toBe(false);
+    expect(await canUseAiVideo(cfg({ 'aiVideo.enabled': false }), GRANTED, ADULT)).toBe(false);
   });
   it('anahtar bos: red', async () => {
-    expect(await canUseAiVideo(cfg({ 'aiVideo.apiKey': '' }), NO_GRANT, ADULT)).toBe(false);
+    expect(await canUseAiVideo(cfg({ 'aiVideo.apiKey': '' }), GRANTED, ADULT)).toBe(false);
   });
-  it('listede degil: red (bos liste = kimse)', async () => {
-    expect(await canUseAiVideo(cfg({ 'aiVideo.userIds': ['x'] }), NO_GRANT, ADULT)).toBe(false);
-    expect(await canUseAiVideo(cfg({ 'aiVideo.userIds': [] }), NO_GRANT, ADULT)).toBe(false);
+  it('hak yok: red (AI_VIDEO_USER_IDS env tanimli olsa bile etkisiz)', async () => {
+    process.env.AI_VIDEO_USER_IDS = 'u1';
+    try {
+      expect(await canUseAiVideo(cfg(), NO_GRANT, ADULT)).toBe(false);
+    } finally {
+      delete process.env.AI_VIDEO_USER_IDS;
+    }
   });
-  it('minor: listede olsa bile red', async () => {
-    expect(await canUseAiVideo(cfg(), NO_GRANT, { id: 'u1', isMinor: true })).toBe(false);
+  it('minor: etkin hak olsa bile red', async () => {
+    expect(await canUseAiVideo(cfg(), GRANTED, { id: 'u1', isMinor: true })).toBe(false);
+  });
+});
+
+describe('canUseAiVideo C43 (hak durumlari)', () => {
+  const withGrant = (over: Record<string, unknown>, spent: unknown[] = []) =>
+    ({
+      aiVideoGrant: {
+        findUnique: jest.fn().mockResolvedValue({
+          userId: 'u1',
+          budgetMicroUsd: 500_000,
+          startsAt: new Date('2026-10-01T00:00:00Z'),
+          expiresAt: null,
+          revokedAt: null,
+          ...over,
+        }),
+      },
+      aiVideoGeneration: { findMany: jest.fn().mockResolvedValue(spent) },
+    }) as any;
+  it('etkin hak: izin', async () => {
+    expect(await canUseAiVideo(cfg(), withGrant({}), ADULT)).toBe(true);
+  });
+  it('suresi dolmus hak: kapi kapali', async () => {
+    const p = withGrant({ expiresAt: new Date(Date.now() - 1000) });
+    expect(await canUseAiVideo(cfg(), p, ADULT)).toBe(false);
+  });
+  it('iptal edilmis hak: kapi kapali', async () => {
+    expect(await canUseAiVideo(cfg(), withGrant({ revokedAt: new Date() }), ADULT)).toBe(false);
+  });
+  it('butcesi biten hak: kapi kapali', async () => {
+    const spent = [{ status: 'COMPLETED', costMicroUsd: 500_000, quoteMicroUsd: 500_000 }];
+    expect(await canUseAiVideo(cfg(), withGrant({}, spent), ADULT)).toBe(false);
+  });
+  it('hak yok: kapi kapali', async () => {
+    expect(await canUseAiVideo(cfg(), NO_GRANT, ADULT)).toBe(false);
   });
 });
 
 describe('canPreviewAiVideo (C33 pasif tanitim)', () => {
-  it('minor: false (listede olsa bile)', () => {
+  it('minor: false (hakli olsa bile)', () => {
     expect(canPreviewAiVideo(cfg(), { isMinor: true })).toBe(false);
   });
   it('bayrak kapali: false', () => {
     expect(canPreviewAiVideo(cfg({ 'aiVideo.enabled': false }), { isMinor: false })).toBe(false);
   });
-  it('yetiskin listede degil: preview true, allowed false', async () => {
-    const c = cfg({ 'aiVideo.userIds': ['x'] });
+  it('yetiskin hakki yok: preview true, allowed false', async () => {
+    const c = cfg();
     const adult = { id: 'u9', isMinor: false };
     expect(canPreviewAiVideo(c, adult)).toBe(true);
     expect(await canUseAiVideo(c, NO_GRANT, adult)).toBe(false);
   });
-  it('yetiskin listede: ikisi de true', async () => {
+  it('yetiskin hakli: ikisi de true', async () => {
     expect(canPreviewAiVideo(cfg(), ADULT)).toBe(true);
-    expect(await canUseAiVideo(cfg(), NO_GRANT, ADULT)).toBe(true);
+    expect(await canUseAiVideo(cfg(), GRANTED, ADULT)).toBe(true);
   });
-  it('guard davranisi degismedi: listede olmayan yetiskin preview gorse de 403', async () => {
+  it('guard davranisi degismedi: hakki olmayan yetiskin preview gorse de 403', async () => {
     const g = new AiVideoAccessGuard(
-      cfg({ 'aiVideo.userIds': ['x'] }),
+      cfg(),
       {
         user: { findUnique: jest.fn().mockResolvedValue({ id: 'u9', isMinor: false }) },
         aiVideoGrant: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -69,7 +119,7 @@ describe('canPreviewAiVideo (C33 pasif tanitim)', () => {
 });
 
 describe('AiVideoAccessGuard preview-ok ucu (C33 ek)', () => {
-  function run(config: any, user: any) {
+  function run(config: any, user: any, granted = false) {
     const handler = function opts() {};
     Reflect.defineMetadata(AI_VIDEO_PREVIEW_OK, true, handler);
     const req: any = { user: { id: 'u9' } };
@@ -77,7 +127,7 @@ describe('AiVideoAccessGuard preview-ok ucu (C33 ek)', () => {
       config,
       {
         user: { findUnique: jest.fn().mockResolvedValue(user) },
-        aiVideoGrant: { findUnique: jest.fn().mockResolvedValue(null) },
+        ...(granted ? GRANTED : NO_GRANT),
       } as any,
       new Reflector(),
     );
@@ -87,14 +137,14 @@ describe('AiVideoAccessGuard preview-ok ucu (C33 ek)', () => {
     } as any;
     return { p: g.canActivate(ctx), req };
   }
-  const c = cfg({ 'aiVideo.userIds': ['x'] });
-  it('listede olmayan yetiskin: preview-ok uca girer, aiVideoAllowed false', async () => {
+  const c = cfg();
+  it('hakki olmayan yetiskin: preview-ok uca girer, aiVideoAllowed false', async () => {
     const { p, req } = run(c, { id: 'u9', isMinor: false });
     await expect(p).resolves.toBe(true);
     expect(req.aiVideoAllowed).toBe(false);
   });
-  it('listedeki yetiskin: aiVideoAllowed true', async () => {
-    const { p, req } = run(cfg(), { id: 'u1', isMinor: false });
+  it('hakli yetiskin: aiVideoAllowed true', async () => {
+    const { p, req } = run(cfg(), { id: 'u1', isMinor: false }, true);
     await expect(p).resolves.toBe(true);
     expect(req.aiVideoAllowed).toBe(true);
   });
@@ -102,7 +152,7 @@ describe('AiVideoAccessGuard preview-ok ucu (C33 ek)', () => {
     await expect(run(c, { id: 'u9', isMinor: true }).p).rejects.toBeInstanceOf(ForbiddenException);
   });
   it('bayrak kapali: 403', async () => {
-    const off = cfg({ 'aiVideo.enabled': false, 'aiVideo.userIds': ['x'] });
+    const off = cfg({ 'aiVideo.enabled': false });
     await expect(run(off, { id: 'u9', isMinor: false }).p).rejects.toBeInstanceOf(
       ForbiddenException,
     );
@@ -115,14 +165,14 @@ describe('AiVideoAccessGuard', () => {
       switchToHttp: () => ({ getRequest: () => ({ user }) }),
       getHandler: () => function plain() {},
     }) as unknown as ExecutionContext;
-  const prisma = (row: unknown) =>
+  const prisma = (row: unknown, granted = false) =>
     ({
       user: { findUnique: jest.fn().mockResolvedValue(row) },
-      aiVideoGrant: { findUnique: jest.fn().mockResolvedValue(null) },
+      ...(granted ? GRANTED : NO_GRANT),
     }) as any;
 
   it('izinli kullanici gecer', async () => {
-    const g = new AiVideoAccessGuard(cfg(), prisma(ADULT), new Reflector());
+    const g = new AiVideoAccessGuard(cfg(), prisma(ADULT, true), new Reflector());
     await expect(g.canActivate(ctx({ id: 'u1', isModerator: false }))).resolves.toBe(true);
   });
   it('moderator tek basina yetmez: jenerik 403 FORBIDDEN', async () => {
@@ -131,10 +181,10 @@ describe('AiVideoAccessGuard', () => {
       response: { error: 'FORBIDDEN' },
     });
   });
-  it('minor listede olsa red; kullanici yoksa red', async () => {
+  it('minor hakli olsa red; kullanici yoksa red', async () => {
     const minor = new AiVideoAccessGuard(
       cfg(),
-      prisma({ id: 'u1', isMinor: true }),
+      prisma({ id: 'u1', isMinor: true }, true),
       new Reflector(),
     );
     await expect(minor.canActivate(ctx({ id: 'u1' }))).rejects.toBeInstanceOf(ForbiddenException);
@@ -145,7 +195,7 @@ describe('AiVideoAccessGuard', () => {
 });
 
 describe('C40 admin hakki (canUseAiVideo async)', () => {
-  const NOT_LISTED = cfg({ 'aiVideo.userIds': [] });
+  const NOT_LISTED = cfg();
   const U = { id: 'u7', isMinor: false };
   const prismaWith = (grant: unknown, rows: unknown[] = []) =>
     ({
@@ -193,15 +243,10 @@ describe('C40 admin hakki (canUseAiVideo async)', () => {
     expect(prisma.aiVideoGrant.findUnique).not.toHaveBeenCalled();
   });
   it('bayrak kapali ya da anahtar bos: hak olsa da red', async () => {
-    const off = cfg({ 'aiVideo.userIds': [], 'aiVideo.enabled': false });
+    const off = cfg({ 'aiVideo.enabled': false });
     expect(await canUseAiVideo(off, prismaWith(grant()), U)).toBe(false);
-    const noKey = cfg({ 'aiVideo.userIds': [], 'aiVideo.apiKey': '' });
+    const noKey = cfg({ 'aiVideo.apiKey': '' });
     expect(await canUseAiVideo(noKey, prismaWith(grant()), U)).toBe(false);
-  });
-  it('env listesindeki hak sorgusuna gitmez', async () => {
-    const prisma = prismaWith(null);
-    expect(await canUseAiVideo(cfg(), prisma, ADULT)).toBe(true);
-    expect(prisma.aiVideoGrant.findUnique).not.toHaveBeenCalled();
   });
   it('guard ile fonksiyon ayni sonucu verir (hakli kullanici)', async () => {
     const prisma = { ...prismaWith(grant()), user: { findUnique: jest.fn().mockResolvedValue(U) } };

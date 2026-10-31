@@ -50,6 +50,7 @@ export interface AiVideoModelOption {
 
 // C40: admin hakkı özeti (kalan/bütçe kredi + isteğe bağlı bitiş)
 export interface AiVideoGrantInfo {
+  usedCredits: number
   remainingCredits: number
   budgetCredits: number
   expiresAt: string | null
@@ -57,10 +58,8 @@ export interface AiVideoGrantInfo {
 
 export interface AiVideoOptionsDto {
   models: AiVideoModelOption[]
-  dailyCapCredits: number
-  spentTodayCredits: number
   accessInviteCode?: string | null // C39: yalnız kilitli kullanıcıya dolu
-  grant?: AiVideoGrantInfo | null // C40: yalnız admin hakkıyla erişene (env listesindekine null)
+  grant?: AiVideoGrantInfo | null // C40/C43: hak varsa (env listesinde olsa da); hak yoksa null
 }
 
 export interface AiVideoSelection {

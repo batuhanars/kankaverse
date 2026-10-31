@@ -11,6 +11,7 @@ const POLL_MS = 4000
 const KNOWN_ERRORS = [
   'AI_VIDEO_DAILY_CAP',
   'AI_VIDEO_BUDGET_EXCEEDED',
+  'AI_VIDEO_IN_PROGRESS',
   'AI_VIDEO_INVALID_OPTION',
   'AI_VIDEO_NOT_READY',
   'UPLOADS_DISABLED',
@@ -53,6 +54,11 @@ export function useAiVideo() {
   let tickTimer: ReturnType<typeof setInterval> | null = null
 
   const working = computed(() => job.value?.status === 'QUEUED' || job.value?.status === 'RUNNING')
+  // C43: kişi başı tek eşzamanlı üretim; sunucu yine 409 verir, bu yalnız erken uyarı.
+  const inProgress = computed(
+    () =>
+      working.value || recent.value.some((r) => r.status === 'QUEUED' || r.status === 'RUNNING'),
+  )
   const saving = computed(() => job.value?.errorCode === DOWNLOAD_PENDING)
   const elapsedSec = computed(() =>
     job.value
@@ -243,6 +249,7 @@ export function useAiVideo() {
     busy,
     error,
     working,
+    inProgress,
     saving,
     elapsedSec,
     errorText,

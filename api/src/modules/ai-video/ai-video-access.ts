@@ -1,22 +1,21 @@
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
-import { findActiveAiVideoGrant, isAiVideoEnvListed } from './ai-video-grant';
+import { findActiveAiVideoGrant } from './ai-video-grant';
 
 /**
  * R7 — yapay zeka video kapısının TEK noktası (para harcar, kullanıcı içeriği üçüncü tarafa gider).
  * Guard (sunucu otoritesi) ve oturum DTO'sundaki `aiVideoAllowed` (arayüz ipucu) AYNI fonksiyonu çağırır.
- * Bayrak + anahtar + (açık liste VEYA etkin admin hakkı) + reşit olmama kapısı (C40: async); isModerator BİLEREK yetmez (yetki kendiliğinden yayılmasın).
+ * Bayrak + anahtar + etkin admin hakkı + reşit olmama kapısı (C40: async); isModerator BİLEREK yetmez (yetki kendiliğinden yayılmasın).
  */
 export async function canUseAiVideo(
   config: ConfigService,
   prisma: PrismaService,
   user: { id: string; isMinor: boolean },
 ): Promise<boolean> {
-  if (user.isMinor) return false; // Pika şartı 18+; env listesi de admin hakkı da minöre geçmez
+  if (user.isMinor) return false; // Pika şartı 18+; admin hakkı minöre geçmez
   if (config.get<boolean>('aiVideo.enabled') !== true) return false;
   if (!config.get<string>('aiVideo.apiKey')) return false;
-  if (isAiVideoEnvListed(config, user.id)) return true;
-  // C40: admin hakkı (kredi bütçesi + isteğe bağlı bitiş). Env listesindekiler bu sorguya hiç gitmez.
+  // C40/C43: tek erişim kaynağı panelden tanımlı hak (kredi bütçesi + isteğe bağlı bitiş).
   return (await findActiveAiVideoGrant(prisma, user.id)) !== null;
 }
 

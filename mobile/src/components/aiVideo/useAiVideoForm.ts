@@ -30,8 +30,6 @@ export function useAiVideoForm(mode: RefMode, kinds: AiVideoRefKind[], locked = 
   const aspectRatios =
     mode === 'reference' ? (current?.references?.aspectRatios ?? []) : (current?.aspectRatios[mode] ?? []);
   const kindsKey = kinds.join(',');
-  const remainingCredits = options ? Math.max(0, options.dailyCapCredits - options.spentTodayCredits) : 0;
-  const overCap = estimateCredits !== null && estimateCredits > remainingCredits;
 
   const pickModel = useCallback((key: string, from: AiVideoOptionsDto) => {
     const m = from.models.find((x) => x.key === key);
@@ -100,7 +98,6 @@ export function useAiVideoForm(mode: RefMode, kinds: AiVideoRefKind[], locked = 
     estimateCredits,
     estimating,
     estimateFailed,
-    overCap,
     setResolution,
     setDurationS,
     setAspectRatio,

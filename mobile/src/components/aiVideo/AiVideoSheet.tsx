@@ -163,10 +163,8 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
               estimateCredits={form.estimateCredits}
               estimating={form.estimating}
               estimateFailed={form.estimateFailed}
-              overCap={form.overCap}
-              spentTodayCredits={form.options?.spentTodayCredits ?? 0}
-              dailyCapCredits={form.options?.dailyCapCredits ?? 0}
               canSubmit={canSubmit}
+              inProgress={ai.inProgress}
               hasVideo={ai.refs.items.some((i) => i.kind === 'video')}
               busy={ai.busy}
               locked={ai.locked}

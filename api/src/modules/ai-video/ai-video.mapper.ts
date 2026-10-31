@@ -14,6 +14,7 @@ export function mapPikaErrorCode(code: string | null | undefined): string {
 export const AI_VIDEO_MESSAGES: Record<string, string> = {
   [AiVideoError.DAILY_CAP]: 'Bugünkü yapay zeka video kredi sınırına ulaşıldı.',
   [AiVideoError.BUDGET_EXCEEDED]: 'Kredin bu video için yetmiyor.',
+  [AiVideoError.IN_PROGRESS]: 'Bir üretimin zaten sürüyor. Bitince yenisini başlatabilirsin.',
   [AiVideoError.INVALID_OPTION]: 'Seçilen model, süre, çözünürlük veya ölçü geçerli değil.',
   [AiVideoError.INPUT_TOO_LONG]: 'Video en fazla 15 saniye, sesler en fazla 30 saniye olabilir.',
   [AiVideoError.NOT_READY]: 'Video henüz hazır değil.',

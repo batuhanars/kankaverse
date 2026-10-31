@@ -7,7 +7,11 @@ import { sumSpentMicro, toCredits } from './ai-video.mapper';
 
 const UUID = '123e4567-e89b-42d3-a456-426614174000';
 
-function setup(rowOver: Record<string, unknown> = {}, spentRows: unknown[] = []) {
+function setup(
+  rowOver: Record<string, unknown> = {},
+  spentRows: unknown[] = [],
+  activeRow: unknown = null, // C43: kullanıcının QUEUED/RUNNING satırı (kilit içi sorgu)
+) {
   const row = {
     id: 'g1',
     userId: 'u1',
@@ -28,16 +32,33 @@ function setup(rowOver: Record<string, unknown> = {}, spentRows: unknown[] = [])
     ...rowOver,
   };
   const prisma = {
-    aiVideoGrant: { findUnique: jest.fn().mockResolvedValue(null) },
+    // C43: erişimin tek kaynağı hak; varsayılan geniş bir etkin hak (testler bütçeyi ayrıca sınar)
+    aiVideoGrant: {
+      findUnique: jest.fn().mockResolvedValue({
+        userId: 'u1',
+        budgetMicroUsd: 1_000_000_000,
+        startsAt: new Date('2026-10-01T00:00:00Z'),
+        expiresAt: null,
+        revokedAt: null,
+      }),
+    },
     aiVideoGeneration: {
       create: jest
         .fn()
         .mockImplementation(({ data }) => ({ ...row, ...data, inputKey: data.inputKey ?? null })),
       findMany: jest.fn().mockResolvedValue(spentRows),
-      findFirst: jest.fn().mockResolvedValue(row),
+      // C43: `status` filtreli sorgu = aktif üretim kontrolü; diğerleri findOwned
+      findFirst: jest
+        .fn()
+        .mockImplementation((a: { where?: { status?: unknown } }) =>
+          Promise.resolve(a?.where?.status ? activeRow : row),
+        ),
       update: jest.fn().mockImplementation(({ data }) => ({ ...row, ...data })),
     },
+    $executeRaw: jest.fn().mockResolvedValue(1),
+    $transaction: jest.fn(),
   };
+  prisma.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(prisma));
   const storage = {
     headSize: jest.fn().mockResolvedValue(1000),
     getBuffer: jest.fn().mockResolvedValue(Buffer.from('img')),
@@ -46,8 +67,6 @@ function setup(rowOver: Record<string, unknown> = {}, spentRows: unknown[] = [])
   };
   const values: Record<string, unknown> = {
     'aiVideo.models': ['pika-2.5', 'wan-3.0', 'kling-3.0-turbo'],
-    'aiVideo.dailyCapUsd': 3,
-    'aiVideo.userIds': ['u1'],
   };
   const config = { get: (k: string) => values[k] };
   const pika = {
@@ -203,15 +222,13 @@ describe('AiVideoService.create (teklif + tavan + gonderim)', () => {
     });
   });
 
-  it('tavan asimi: AI_VIDEO_DAILY_CAP, satir acilmaz, gonderilmez', async () => {
+  it('C43: gunluk tavan yok; ayni gun cok harcamis ama hakki yeten kullanici reddedilmez', async () => {
     const { service, prisma, pika } = setup({}, [
-      { status: AiVideoStatus.COMPLETED, costMicroUsd: 2_900_000, quoteMicroUsd: 200_000 },
+      { status: AiVideoStatus.COMPLETED, costMicroUsd: 9_000_000, quoteMicroUsd: 200_000 },
     ]);
-    await expect(service.create('u1', dto())).rejects.toMatchObject({
-      response: { error: 'AI_VIDEO_DAILY_CAP' },
-    });
-    expect(prisma.aiVideoGeneration.create).not.toHaveBeenCalled();
-    expect(pika.submit).not.toHaveBeenCalled();
+    await expect(service.create('u1', dto())).resolves.toBeDefined();
+    expect(prisma.aiVideoGeneration.create).toHaveBeenCalled();
+    expect(pika.submit).toHaveBeenCalled();
   });
 
   it('gorselli gonderim: ozel bucket okunur, Pika yuklemesine gider', async () => {
@@ -318,18 +335,18 @@ describe('AiVideoService.estimate / options', () => {
     ).rejects.toMatchObject({ response: { error: 'AI_VIDEO_INVALID_OPTION' } });
   });
 
-  it('options: acik modeller + tavan + bugunku harcama', async () => {
+  it('options: acik modeller + hak ozeti + eski alanlar hakla eslesir', async () => {
     const { service } = setup({}, [
       { status: AiVideoStatus.RUNNING, costMicroUsd: null, quoteMicroUsd: 400_000 },
     ]);
     const res = await service.options('u1');
     expect(res.models.map((m) => m.key)).toEqual(['pika-2.5', 'wan-3.0', 'kling-3.0-turbo']);
     expect(res.models[2]).toMatchObject({ durations: [5, 10, 15], resolutions: ['720p'] });
+    expect(res.grant).toMatchObject({ usedCredits: 40, budgetCredits: 100_000 });
     expect(res).toMatchObject({
-      dailyCapUsd: 3,
-      todaySpentUsd: 0.4,
-      dailyCapCredits: 300,
+      dailyCapCredits: 100_000,
       spentTodayCredits: 40,
+      todaySpentUsd: 0.4,
     });
   });
 });
@@ -453,8 +470,15 @@ describe('AiVideoService C14c', () => {
     ]);
   });
 
-  it('liste ve tek okuma silinmisleri suzer; todaySpent suzmez (silinmis harcama sayilir)', async () => {
+  it('liste ve tek okuma silinmisleri suzer; hak harcamasi suzmez (silinmis harcama sayilir)', async () => {
     const s = setup();
+    s.prisma.aiVideoGrant.findUnique.mockResolvedValue({
+      userId: 'u1',
+      budgetMicroUsd: 500_000,
+      startsAt: new Date('2026-10-01T00:00:00Z'),
+      expiresAt: null,
+      revokedAt: null,
+    });
     await s.service.list('u1');
     expect(s.prisma.aiVideoGeneration.findMany.mock.calls[0][0].where).toMatchObject({
       deletedAt: null,
@@ -496,18 +520,73 @@ describe('C40 butce kapisi ve hak ozeti', () => {
     return t;
   }
 
-  it('env listesindeki kullanici: butce kapisi yok, grant null', async () => {
-    const { service, prisma } = setup();
-    await service.create('u1', dto());
-    expect(prisma.aiVideoGrant.findUnique).not.toHaveBeenCalled();
+  it('hak yok: 403, env degiskeni tanimli olsa bile etkisiz; options grant null ve eski alanlar 0', async () => {
+    process.env.AI_VIDEO_USER_IDS = 'u7';
+    try {
+      const { service, prisma } = grantSetup(null);
+      await expect(service.create('u7', dto())).rejects.toMatchObject({
+        status: 403,
+        response: { error: 'AI_VIDEO_BUDGET_EXCEEDED' },
+      });
+      expect(prisma.aiVideoGeneration.create).not.toHaveBeenCalled();
+      const o = await service.options('u7');
+      expect(o.grant).toBeNull();
+      expect(o).toMatchObject({ dailyCapCredits: 0, spentTodayCredits: 0 });
+    } finally {
+      delete process.env.AI_VIDEO_USER_IDS;
+    }
+  });
+
+  it('etkin hak: butce uygulanir, options hak ozeti doner', async () => {
+    const spent = [
+      { status: AiVideoStatus.COMPLETED, costMicroUsd: 400_000, quoteMicroUsd: 400_000 },
+    ];
+    const { service, prisma } = grantSetup(grantRow({ userId: 'u1' }), spent);
+    await expect(service.create('u1', dto())).rejects.toMatchObject({
+      status: 403,
+      response: { error: 'AI_VIDEO_BUDGET_EXCEEDED' },
+    });
+    expect(prisma.aiVideoGeneration.create).not.toHaveBeenCalled();
+    const o = await service.options('u1');
+    expect(o.grant).toMatchObject({ usedCredits: 40, budgetCredits: 50, remainingCredits: 10 });
+  });
+
+  it('suresi dolmus hak: 403, options grant null', async () => {
+    const { service } = grantSetup(
+      grantRow({ userId: 'u1', expiresAt: new Date(Date.now() - 1000) }),
+    );
+    await expect(service.create('u1', dto())).rejects.toMatchObject({ status: 403 });
     expect((await service.options('u1')).grant).toBeNull();
+  });
+
+  it('usedCredits yukari yuvarlanir; geri uyum alanlari hakla eslesir', async () => {
+    const spent = [{ status: AiVideoStatus.RUNNING, costMicroUsd: null, quoteMicroUsd: 350_001 }];
+    const { service } = grantSetup(grantRow(), spent);
+    const o = await service.options('u2');
+    expect(o.grant).toEqual({
+      usedCredits: 36,
+      budgetCredits: 50,
+      remainingCredits: 14,
+      expiresAt: null,
+    });
+    expect(o).toMatchObject({
+      dailyCapCredits: 50,
+      spentTodayCredits: 36,
+      dailyCapUsd: 0.5,
+      todaySpentUsd: 0.36,
+    });
   });
 
   it('hak yeterli: uretim gecer; options kalan kredi ve butce doner, not donmez', async () => {
     const { service } = grantSetup({ ...grantRow(), note: 'IBAN 120 TL' }, []);
     await expect(service.create('u2', dto())).resolves.toBeDefined();
     const o = await service.options('u2');
-    expect(o.grant).toEqual({ remainingCredits: 50, budgetCredits: 50, expiresAt: null });
+    expect(o.grant).toEqual({
+      usedCredits: 0,
+      remainingCredits: 50,
+      budgetCredits: 50,
+      expiresAt: null,
+    });
     expect(JSON.stringify(o)).not.toContain('IBAN');
   });
 
@@ -539,5 +618,77 @@ describe('C40 butce kapisi ve hak ozeti', () => {
         where: { userId: 'u2', createdAt: { gte: new Date('2026-10-01T00:00:00Z') } },
       }),
     );
+  });
+});
+
+describe('C43 kisi basi tek eszamanli uretim', () => {
+  it.each([AiVideoStatus.QUEUED, AiVideoStatus.RUNNING])(
+    '%s uretim varken 409 AI_VIDEO_IN_PROGRESS, satir yazilmaz, Pika cagrilmaz',
+    async (st) => {
+      const { service, prisma, pika } = setup({}, [], { id: 'g0', status: st });
+      await expect(service.create('u1', dto())).rejects.toMatchObject({
+        status: 409,
+        response: { error: 'AI_VIDEO_IN_PROGRESS' },
+      });
+      expect(prisma.aiVideoGeneration.create).not.toHaveBeenCalled();
+      expect(pika.submit).not.toHaveBeenCalled();
+    },
+  );
+
+  it('aktif sorgusu yalniz QUEUED/RUNNING sayar (tamamlanmis/basarisiz engellemez)', async () => {
+    const { service, prisma } = setup();
+    await expect(service.create('u1', dto())).resolves.toBeDefined();
+    expect(prisma.aiVideoGeneration.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: 'u1',
+          status: { in: [AiVideoStatus.QUEUED, AiVideoStatus.RUNNING] },
+        },
+      }),
+    );
+  });
+
+  it('transaction icinde kullanici kilidi alinir; kilit > aktif kontrol > butce > yazim sirasi', async () => {
+    const order: string[] = [];
+    const { service, prisma } = setup();
+    prisma.$executeRaw.mockImplementation(() => {
+      order.push('lock');
+      return Promise.resolve(1);
+    });
+    prisma.aiVideoGeneration.findFirst.mockImplementation(() => {
+      order.push('active');
+      return Promise.resolve(null);
+    });
+    prisma.aiVideoGrant.findUnique.mockImplementation(() => {
+      order.push('budget');
+      return Promise.resolve({
+        userId: 'u1',
+        budgetMicroUsd: 1_000_000_000,
+        startsAt: new Date('2026-10-01T00:00:00Z'),
+        expiresAt: null,
+        revokedAt: null,
+      });
+    });
+    const origCreate = prisma.aiVideoGeneration.create.getMockImplementation()!;
+    prisma.aiVideoGeneration.create.mockImplementation((a: unknown) => {
+      order.push('write');
+      return origCreate(a);
+    });
+    await service.create('u1', dto());
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['lock', 'active', 'budget', 'write']);
+    // kilit parametreli etiketli sorgu (string birlestirme yok): ilk arguman TemplateStringsArray, ikincisi userId
+    const call = prisma.$executeRaw.mock.calls[0] as unknown[];
+    expect(call[1]).toBe('u1');
+    expect(String((call[0] as string[]).join('?'))).toContain('pg_advisory_xact_lock');
+  });
+
+  it('butce kapisi transaction icinde: yetmezse 403 ve satir yazilmaz', async () => {
+    const { service, prisma } = setup({}, [
+      { status: AiVideoStatus.COMPLETED, costMicroUsd: 999_900_000, quoteMicroUsd: 1 },
+    ]);
+    await expect(service.create('u1', dto())).rejects.toMatchObject({ status: 403 });
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.aiVideoGeneration.create).not.toHaveBeenCalled();
   });
 });

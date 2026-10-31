@@ -8,27 +8,27 @@ interface Props {
   estimateCredits: number | null;
   estimating: boolean;
   estimateFailed: boolean;
-  overCap: boolean;
-  spentTodayCredits: number;
-  dailyCapCredits: number;
   canSubmit: boolean;
+  /** C43: etkin (QUEUED/RUNNING) üretim varken Oluştur kapalı + not. */
+  inProgress?: boolean;
   /** C42: girdi videosu da ücretlenir; tahmin en yüksek tutar notu. */
   hasVideo?: boolean;
   busy: boolean;
   /** C33: pasif tanıtım; Oluştur kapalı + "yakında" notu, tahmin satırı yok. */
   locked?: boolean;
-  /** C40: admin hakkıyla erişene kalan kredi satırı (env listesindekine null). */
-  grant?: { remainingCredits: number; budgetCredits: number; expiresAt: string | null } | null;
+  /** C40/C43: hakla erişene kullanılan/tanımlanan kredi satırı (hak yoksa null, satır yok). */
+  grant?: { usedCredits: number; remainingCredits: number; budgetCredits: number; expiresAt: string | null } | null;
   onSubmit: () => void;
 }
 
 /**
- * Canlı teklif + bugünkü harcama + "Oluştur" (web `AiVideoCostBar`). Yüklenirken eski tutar soluk;
- * tavanı aşacaksa düğme kapalı + neden yazılı. Sunucu yine otorite.
+ * Canlı teklif + hak satırı + "Oluştur" (web `AiVideoCostBar`). Yüklenirken eski tutar soluk;
+ * teklif kalan krediyi aşıyorsa düğme kapalı + neden yazılı. Sunucu yine otorite (C43: günlük tavan yok).
  */
 export function AiVideoCostBar(p: Props) {
+  const notEnough = !!p.grant && p.estimateCredits !== null && p.estimateCredits > p.grant.remainingCredits;
   const disabled =
-    !!p.locked || !p.canSubmit || p.estimating || p.estimateCredits === null || p.overCap || p.busy;
+    !!p.locked || !!p.inProgress || !p.canSubmit || p.estimating || p.estimateCredits === null || notEnough || p.busy;
   const expiry = p.grant?.expiresAt
     ? new Date(p.grant.expiresAt).toLocaleDateString('tr-TR', {
         day: 'numeric',
@@ -68,16 +68,10 @@ export function AiVideoCostBar(p: Props) {
         </Pressable>
       </View>
       {p.hasVideo && !p.locked ? <Text style={styles.spent}>{t('mobile.aiVideoRefs.videoCostNote')}</Text> : null}
-      <Text style={styles.spent}>
-        {t('aiVideo.spentLine', {
-          spent: formatCreditNumber(p.spentTodayCredits),
-          cap: formatCreditNumber(p.dailyCapCredits),
-        })}
-      </Text>
       {p.grant && !p.locked ? (
         <Text style={styles.spent}>
           {t('aiVideo.grantLine', {
-            remaining: formatCreditNumber(p.grant.remainingCredits),
+            used: formatCreditNumber(p.grant.usedCredits),
             budget: formatCreditNumber(p.grant.budgetCredits),
           })}
           {expiry ? ` · ${t('aiVideo.grantExpiry', { date: expiry })}` : ''}
@@ -87,7 +81,8 @@ export function AiVideoCostBar(p: Props) {
         // C40 (Play kuralı): nötr not, davet/yönlendirme yok. Web/masaüstü C39 notunu korur.
         <Text style={styles.lockedNote}>{t('aiVideo.lockedNoteMobile')}</Text>
       ) : null}
-      {p.overCap ? <Text style={styles.failed}>{t('aiVideo.overCap')}</Text> : null}
+      {p.inProgress && !p.locked ? <Text style={styles.spent}>{t('aiVideo.inProgress')}</Text> : null}
+      {notEnough && !p.locked ? <Text style={styles.failed}>{t('aiVideo.grantNotEnough')}</Text> : null}
     </View>
   );
 }

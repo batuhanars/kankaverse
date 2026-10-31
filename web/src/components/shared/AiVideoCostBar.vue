@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * AiVideoCostBar (Sprint C14b §3.1-5): canlı teklif + bugünkü harcama + "Oluştur".
- * Yüklenirken eski tutar soluk; tavanı aşacaksa düğme kapalı + neden yazılı. Tutarlar kredi (C33).
+ * AiVideoCostBar (Sprint C14b §3.1-5): canlı teklif + hak (kullanılan/tanımlanan kredi) + "Oluştur".
+ * Yüklenirken eski tutar soluk; teklif kalan krediyi aşıyorsa düğme kapalı + neden yazılı (C43: günlük tavan yok). Tutarlar kredi (C33).
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -13,14 +13,12 @@ const props = defineProps<{
   estimateCredits: number | null
   estimating: boolean
   estimateFailed: boolean
-  overCap: boolean
-  spentTodayCredits: number
-  dailyCapCredits: number
   canSubmit: boolean
   busy: boolean
   locked?: boolean // C33: pasif tanıtım, Oluştur kapalı + "yakında" notu
   inviteCode?: string | null // C39: doluysa not davet metnine döner + "Ortama katıl" düğmesi
-  grant?: AiVideoGrantInfo | null // C40: admin hakkıyla erişene kalan kredi satırı
+  grant?: AiVideoGrantInfo | null // C40/C43: hakla erişene kullanılan/tanımlanan kredi satırı (hak yoksa satır yok)
+  inProgress?: boolean // C43: etkin üretim varken Oluştur kapalı + not
   hasVideo?: boolean // C42: girdi videosu da ücretlendirilir notu
 }>()
 const emit = defineEmits<{ submit: []; join: [] }>()
@@ -37,13 +35,19 @@ const grantExpiry = computed(() =>
       })
     : null,
 )
+// Erken uyarı; sunucu yine 403 verir.
+const notEnough = computed(
+  () =>
+    !!props.grant && props.estimateCredits !== null && props.estimateCredits > props.grant.remainingCredits,
+)
 const disabled = computed(
   () =>
     props.locked ||
+    props.inProgress ||
     !props.canSubmit ||
     props.estimating ||
     props.estimateCredits === null ||
-    props.overCap,
+    notEnough.value,
 )
 </script>
 
@@ -67,11 +71,8 @@ const disabled = computed(
       <KvButton :disabled="disabled" :loading="busy" @click="emit('submit')">{{ t('aiVideo.generate') }}</KvButton>
     </div>
     <p v-if="hasVideo && !locked" class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('aiVideo.refs.videoCostNote') }}</p>
-    <p class="text-[12px]" style="color: var(--kv-text-muted);">
-      {{ t('aiVideo.spentLine', { spent: num(spentTodayCredits), cap: num(dailyCapCredits) }) }}
-    </p>
     <p v-if="grant && !locked" class="text-[12px]" style="color: var(--kv-text-muted);">
-      {{ t('aiVideo.grantLine', { remaining: num(grant.remainingCredits), budget: num(grant.budgetCredits) }) }}
+      {{ t('aiVideo.grantLine', { used: num(grant.usedCredits), budget: num(grant.budgetCredits) }) }}
       <template v-if="grantExpiry"> · {{ t('aiVideo.grantExpiry', { date: grantExpiry }) }}</template>
     </p>
     <template v-if="locked">
@@ -84,6 +85,7 @@ const disabled = computed(
         </KvButton>
       </div>
     </template>
-    <p v-if="overCap" class="text-[12px]" style="color: var(--kv-danger);">{{ t('aiVideo.overCap') }}</p>
+    <p v-if="inProgress && !locked" class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('aiVideo.inProgress') }}</p>
+    <p v-if="notEnough && !locked" class="text-[12px]" style="color: var(--kv-danger);">{{ t('aiVideo.grantNotEnough') }}</p>
   </div>
 </template>
