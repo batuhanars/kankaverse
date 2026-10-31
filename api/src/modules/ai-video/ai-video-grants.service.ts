@@ -48,6 +48,28 @@ export class AiVideoGrantsService {
     return Promise.all(rows.map((r) => this.toRow(r)));
   }
 
+  /** C45: etkin (iptal/süre dolumu/bitti hariç) hakların kalan bütçesi toplamı, mikro-USD. */
+  async outstandingMicro(): Promise<number> {
+    const now = new Date();
+    const grants = await this.prisma.aiVideoGrant.findMany({
+      where: { revokedAt: null },
+      select: {
+        userId: true,
+        startsAt: true,
+        expiresAt: true,
+        revokedAt: true,
+        budgetMicroUsd: true,
+      },
+    });
+    const left = await Promise.all(
+      grants.map(async (g) => {
+        const spent = await spentSinceMicro(this.prisma, g.userId, g.startsAt);
+        return grantStatus(g, spent, now) === 'ACTIVE' ? Math.max(0, g.budgetMicroUsd - spent) : 0;
+      }),
+    );
+    return left.reduce((a, b) => a + b, 0);
+  }
+
   async upsert(actorId: string, userId: string, dto: UpsertAiVideoGrantDto) {
     const target = await this.prisma.user.findUnique({
       where: { id: userId },

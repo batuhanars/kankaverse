@@ -4,10 +4,10 @@
  * Yalnız isModerator kullanıcıya UserSettingsView admin sekmesinden erişilir; dışarıdan guard'lanır.
  * Liste + "Erişim ver" / "Yenile" (AiGrantFormModal) + onaylı "İptal et". Not yalnız burada görünür.
  */
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminApi } from '@/api/admin'
-import type { AiVideoGrantRowDto, AiGrantStatus } from '@/api/admin'
+import type { AiVideoGrantRowDto, AiGrantStatus, AiVideoBalanceDto } from '@/api/admin'
 import { useToastStore } from '@/stores/toast'
 import KvButton from '@/components/ui/KvButton.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
@@ -31,7 +31,36 @@ async function load() {
     loading.value = false
   }
 }
-onMounted(() => void load())
+
+// ── Pika bakiyesi (C45) ──
+const balance = ref<AiVideoBalanceDto | null>(null)
+const balanceLoading = ref(false)
+const balanceError = ref(false)
+
+async function loadBalance() {
+  balanceLoading.value = true
+  balanceError.value = false
+  try {
+    balance.value = (await adminApi.getAiVideoBalance()).data
+  } catch {
+    balanceError.value = true
+  } finally {
+    balanceLoading.value = false
+  }
+}
+onMounted(() => {
+  void load()
+  void loadBalance()
+})
+
+const nf = new Intl.NumberFormat('tr-TR')
+const usdFormat = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const balanceShort = computed(() => !!balance.value && balance.value.outstandingCredits > balance.value.balanceCredits)
+const fetchedTime = computed(() =>
+  balance.value
+    ? new Date(balance.value.fetchedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }).replace(':', '.')
+    : '',
+)
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -79,6 +108,36 @@ async function confirmRevoke() {
         {{ t('admin.aiAccess.title') }}
       </h3>
       <KvButton size="sm" @click="openForm(null)">{{ t('admin.aiAccess.give') }}</KvButton>
+    </div>
+
+    <div
+      class="flex items-start gap-3 rounded-[var(--kv-radius-lg)] px-4 py-3"
+      style="background-color: var(--kv-bg-sidebar);"
+    >
+      <div class="flex-1 min-w-0">
+        <p v-if="balanceError" class="text-[14px] font-semibold" style="color: var(--kv-danger);">
+          {{ t('admin.aiAccess.balance.error') }}
+        </p>
+        <template v-else-if="balance">
+          <p class="text-[16px] font-semibold tabular-nums" style="color: var(--kv-text-primary);">
+            {{ t('admin.aiAccess.balance.label', { usd: usdFormat.format(balance.balanceUsd), credits: nf.format(balance.balanceCredits) }) }}
+          </p>
+          <p
+            class="text-[13px] mt-0.5 tabular-nums"
+            :style="{ color: balanceShort ? 'var(--kv-warning)' : 'var(--kv-text-muted)' }"
+          >
+            {{ t('admin.aiAccess.balance.outstanding', { credits: nf.format(balance.outstandingCredits) }) }}
+            <template v-if="balanceShort"> {{ t('admin.aiAccess.balance.short') }}</template>
+          </p>
+          <p class="text-[11px] mt-1" style="color: var(--kv-text-muted);">
+            {{ t('admin.aiAccess.balance.updatedAt', { time: fetchedTime }) }}
+          </p>
+        </template>
+        <p v-else class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('common.loading') }}</p>
+      </div>
+      <KvButton size="sm" :disabled="balanceLoading" @click="loadBalance">
+        {{ t('admin.aiAccess.balance.refresh') }}
+      </KvButton>
     </div>
 
     <p v-if="loading" class="text-[13px] py-4" style="color: var(--kv-text-muted);">{{ t('common.loading') }}</p>

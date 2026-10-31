@@ -72,6 +72,14 @@ export interface AiVideoGrantRowDto {
   grantedBy: { id: string; username: string }
 }
 
+// C45: Pika bakiyesi (yalnız admin). 60 sn sunucu önbelleği; fetchedAt önbellekteki an.
+export interface AiVideoBalanceDto {
+  balanceUsd: number
+  balanceCredits: number
+  outstandingCredits: number // etkin hakların kalan kredi toplamı
+  fetchedAt: string
+}
+
 export interface UpsertAiVideoGrantPayload {
   budgetCredits: number // 1-100000
   expiresAt?: string | null // ISO; yok/null = süresiz
@@ -90,6 +98,9 @@ export const adminApi = {
   },
   listUsers() {
     return http.get<AdminUserDto[]>('/admin/users')
+  },
+  getAiVideoBalance() {
+    return http.get<AiVideoBalanceDto>('/admin/ai-video/balance')
   },
   listAiVideoGrants() {
     return http.get<AiVideoGrantRowDto[]>('/admin/ai-video/grants')

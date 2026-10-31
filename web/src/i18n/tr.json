@@ -187,7 +187,15 @@
       "revokeConfirmTitle": "Erişimi iptal et",
       "revokeConfirmMessage": "{username} kullanıcısının yapay zeka erişimi iptal edilsin mi?",
       "revokeSuccess": "Erişim iptal edildi.",
-      "revokeError": "Erişim iptal edilemedi."
+      "revokeError": "Erişim iptal edilemedi.",
+      "balance": {
+        "label": "Pika bakiyesi: {usd} $ · {credits} kredi",
+        "outstanding": "Kullanıcılara verilmiş, henüz harcanmamış: {credits} kredi",
+        "short": "Bakiye verilen kredileri karşılamıyor.",
+        "updatedAt": "Son güncelleme: {time}",
+        "error": "Bakiye alınamadı.",
+        "refresh": "Yenile"
+      }
     },
     "platformInvite": {
       "createTitle": "Davet Oluştur",

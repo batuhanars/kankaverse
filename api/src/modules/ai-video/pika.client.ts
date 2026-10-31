@@ -108,6 +108,14 @@ export class PikaClient {
     return micro;
   }
 
+  /** C45: harcanabilir toplam bakiye (`balance_micro_usd`, ön ödemeli + hediye kredi). Ücretsiz. */
+  async getBalance(): Promise<{ balanceMicroUsd: number }> {
+    const { status, json } = await this.request('GET', '/billing/balance');
+    const micro = (json as { balance_micro_usd?: unknown } | null)?.balance_micro_usd;
+    if (status !== 200 || typeof micro !== 'number') this.fail(status, json);
+    return { balanceMicroUsd: micro };
+  }
+
   /** Görsel için presigned yükleme alır (`{ upload_url, headers, url }`). */
   async createUpload(contentType: string, sizeBytes: number): Promise<PikaUpload> {
     const { status, json } = await this.request('POST', '/v1/media/uploads', {
