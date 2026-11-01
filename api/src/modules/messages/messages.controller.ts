@@ -136,13 +136,20 @@ export class MessagesController {
     @Param('messageId') messageId: string,
     @Body() dto: AddReactionDto,
   ) {
-    await this.messagesService.addReaction(user.id, channelId, messageId, dto.emoji);
-    this.messagesGateway.broadcastReaction(channelId, 'reaction.added', {
-      messageId,
+    const changed = await this.messagesService.addReaction(
+      user.id,
       channelId,
-      emoji: dto.emoji,
-      userId: user.id,
-    });
+      messageId,
+      dto.emoji,
+    );
+    // Durum değişmediyse yayın yok: istemciler sayacı delta ile günceller, boş yayın sayacı bozar
+    if (changed)
+      this.messagesGateway.broadcastReaction(channelId, 'reaction.added', {
+        messageId,
+        channelId,
+        emoji: dto.emoji,
+        userId: user.id,
+      });
     return null;
   }
 
@@ -155,13 +162,15 @@ export class MessagesController {
     @Param('messageId') messageId: string,
     @Param('emoji') emoji: string,
   ) {
-    await this.messagesService.removeReaction(user.id, channelId, messageId, emoji);
-    this.messagesGateway.broadcastReaction(channelId, 'reaction.removed', {
-      messageId,
-      channelId,
-      emoji,
-      userId: user.id,
-    });
+    const changed = await this.messagesService.removeReaction(user.id, channelId, messageId, emoji);
+    // Durum değişmediyse yayın yok: istemciler sayacı delta ile günceller, boş yayın sayacı bozar
+    if (changed)
+      this.messagesGateway.broadcastReaction(channelId, 'reaction.removed', {
+        messageId,
+        channelId,
+        emoji,
+        userId: user.id,
+      });
     return null;
   }
 

@@ -862,14 +862,14 @@ export class MessagesService {
       throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'MESSAGE_NOT_FOUND' });
     }
 
-    // Idempotent: zaten varsa no-op (upsert)
-    await this.prisma.messageReaction.upsert({
-      where: { messageId_userId_emoji: { messageId, userId, emoji } },
-      create: { messageId, userId, emoji },
-      update: {},
+    // Idempotent: zaten varsa no-op. Dönen değer gerçekten satır eklendi mi; çağıran yalnız o zaman
+    // `reaction.added` yayar (istemciler sayacı delta ile artırıyor, boş yayın sayacı şişiriyordu).
+    const { count } = await this.prisma.messageReaction.createMany({
+      data: [{ messageId, userId, emoji }],
+      skipDuplicates: true,
     });
 
-    return null;
+    return count > 0;
   }
 
   async removeReaction(userId: string, channelId: string, messageId: string, emoji: string) {
@@ -880,12 +880,12 @@ export class MessagesService {
       throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'MESSAGE_NOT_FOUND' });
     }
 
-    // No-op: kayıt yoksa hata fırlama (deleteMany = 0 affected → ok)
-    await this.prisma.messageReaction.deleteMany({
+    // No-op: kayıt yoksa hata fırlatma. Dönen değer gerçekten satır silindi mi (yayın kararı çağıranda).
+    const { count } = await this.prisma.messageReaction.deleteMany({
       where: { messageId, userId, emoji },
     });
 
-    return null;
+    return count > 0;
   }
 
   // ── PIN ortak yetki yardımcısı ──────────────────────────────────────────────

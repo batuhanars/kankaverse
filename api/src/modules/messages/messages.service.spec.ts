@@ -35,7 +35,7 @@ const prismaMock = {
     updateMany: jest.fn(),
   },
   messageReaction: {
-    upsert: jest.fn(),
+    createMany: jest.fn(),
     deleteMany: jest.fn(),
   },
   guild: {
@@ -1159,35 +1159,31 @@ describe('MessagesService.addReaction', () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Başarılı ekleme: upsert çağrılır, null döner
   // ─────────────────────────────────────────────────────────────────────────
-  it('geçerli mesaj + emoji → upsert çağrılır, null döner', async () => {
+  it('geçerli mesaj + emoji → satır eklenir, true döner', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
     prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
-    prismaMock.messageReaction.upsert.mockResolvedValue({});
+    prismaMock.messageReaction.createMany.mockResolvedValue({ count: 1 });
 
     const result = await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
 
-    expect(prismaMock.messageReaction.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { messageId_userId_emoji: { messageId: MSG_ID, userId: USER_ID, emoji: EMOJI } },
-        create: { messageId: MSG_ID, userId: USER_ID, emoji: EMOJI },
-        update: {},
-      }),
-    );
-    expect(result).toBeNull();
+    expect(prismaMock.messageReaction.createMany).toHaveBeenCalledWith({
+      data: [{ messageId: MSG_ID, userId: USER_ID, emoji: EMOJI }],
+      skipDuplicates: true,
+    });
+    expect(result).toBe(true);
   });
 
   // ─────────────────────────────────────────────────────────────────────────
   // İdempotent: ikinci çağrı da upsert eder, hata fırlatmaz
   // ─────────────────────────────────────────────────────────────────────────
-  it('aynı emoji iki kez eklense bile hata fırlatmaz (idempotent)', async () => {
+  it('aynı emoji zaten varsa hata fırlatmaz ve false döner (yayın yapılmasın)', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
     prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
-    prismaMock.messageReaction.upsert.mockResolvedValue({});
+    prismaMock.messageReaction.createMany.mockResolvedValue({ count: 0 });
 
-    await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
-    await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
+    const result = await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
 
-    expect(prismaMock.messageReaction.upsert).toHaveBeenCalledTimes(2);
+    expect(result).toBe(false);
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1207,7 +1203,7 @@ describe('MessagesService.addReaction', () => {
     expect(thrown).toBeInstanceOf(NotFoundException);
     const response = thrown!.getResponse() as { error: string };
     expect(response.error).toBe('MESSAGE_NOT_FOUND');
-    expect(prismaMock.messageReaction.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.messageReaction.createMany).not.toHaveBeenCalled();
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1221,7 +1217,7 @@ describe('MessagesService.addReaction', () => {
     await expect(
       service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(prismaMock.messageReaction.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.messageReaction.createMany).not.toHaveBeenCalled();
   });
 });
 
@@ -1248,7 +1244,7 @@ describe('MessagesService.removeReaction', () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Başarılı kaldırma: deleteMany çağrılır, null döner
   // ─────────────────────────────────────────────────────────────────────────
-  it('geçerli mesaj + emoji → deleteMany çağrılır, null döner', async () => {
+  it('geçerli mesaj + emoji → deleteMany çağrılır, true döner', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
     prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
     prismaMock.messageReaction.deleteMany.mockResolvedValue({ count: 1 });
@@ -1258,13 +1254,13 @@ describe('MessagesService.removeReaction', () => {
     expect(prismaMock.messageReaction.deleteMany).toHaveBeenCalledWith({
       where: { messageId: MSG_ID, userId: USER_ID, emoji: EMOJI },
     });
-    expect(result).toBeNull();
+    expect(result).toBe(true);
   });
 
   // ─────────────────────────────────────────────────────────────────────────
   // No-op: reaksiyon yoksa deleteMany count=0, hata fırlatmaz
   // ─────────────────────────────────────────────────────────────────────────
-  it('reaksiyon yoksa deleteMany 0 döner, hata fırlatmaz (no-op)', async () => {
+  it('reaksiyon yoksa hata fırlatmaz ve false döner (no-op, yayın yok)', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
     prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
     prismaMock.messageReaction.deleteMany.mockResolvedValue({ count: 0 });
@@ -1272,7 +1268,7 @@ describe('MessagesService.removeReaction', () => {
     const result = await service.removeReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
 
     expect(prismaMock.messageReaction.deleteMany).toHaveBeenCalledTimes(1);
-    expect(result).toBeNull();
+    expect(result).toBe(false);
   });
 
   // ─────────────────────────────────────────────────────────────────────────
