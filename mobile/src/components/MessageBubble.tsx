@@ -7,6 +7,7 @@ import { PresenceDot } from './PresenceDot';
 import { usePresenceStore, selectStatus } from '@/stores/presence';
 import { BubbleMeta, MetaSpacer, ReactionRow, ReplyQuote } from './message/BubbleParts';
 import { EmbedCards } from './message/EmbedCard';
+import { BUBBLE_TAP_MAX_DURATION_MS } from './message/MediaPressable';
 import { splitMentions } from '@/utils/mentions';
 import type { MessageDto } from '@/api/messages';
 import { t } from '@/i18n';
@@ -15,6 +16,8 @@ import { theme } from '@/theme';
 const AVATAR_SIZE = 34;
 const AVATAR_GAP = 8;
 const DOT_SIZE = 12;
+/** İki dokunuş arası sınır; medyanın tek dokunuşu da bu kadar bekler. */
+const DOUBLE_TAP_MAX_DELAY_MS = 250;
 
 interface Props {
   message: MessageDto;
@@ -47,8 +50,8 @@ interface Props {
   /** C46 — tepki pilne uzun basış: kimler tepki verdi paneli. */
   onShowReactions?: () => void;
   /**
-   * C46 §6.1 — metin alanına çift dokunma (hızlı tepkinin ilki). Yalnız metin bloğuna bağlanır:
-   * görsel/video/ses/dosya/gömme kartlarının kendi dokunmaları ve uzun basış bu jestten etkilenmez.
+   * C46 §6.1 — baloncuğa çift dokunma (hızlı tepkinin ilki). Metin ve medya dahil tüm baloncuk;
+   * medyanın tek dokunuşu bu jest başarısız olunca çalışır (`MediaPressable`).
    * Verilmezse (yerel mesaj) jest hiç kurulmaz.
    */
   onDoubleTap?: () => void;
@@ -78,8 +81,7 @@ export function MessageBubble({
   onDiscard,
 }: Props) {
   // Jest her render'da yeniden kurulmasın: işleyici ref'te (mesajın `reactedByMe` kararı çağıranda,
-  // en güncel mesajla verilir), jest yalnız var/yok'a bağlı. Tek dokunuşa ek gecikme YOK: yalnız
-  // çift dokunuş jesti var, tek dokunuşa bağlı bir eylem bekletilmiyor.
+  // en güncel mesajla verilir), jest yalnız var/yok'a bağlı.
   const doubleTapRef = useRef(onDoubleTap);
   doubleTapRef.current = onDoubleTap;
   const hasDoubleTap = !!onDoubleTap;
@@ -89,6 +91,8 @@ export function MessageBubble({
         .enabled(hasDoubleTap)
         .numberOfTaps(2)
         .maxDistance(12)
+        .maxDelay(DOUBLE_TAP_MAX_DELAY_MS)
+        .maxDuration(BUBBLE_TAP_MAX_DURATION_MS)
         // JS thread'inde çalışır: ref'in `.current`ı worklet'e kopyalanmaz, hep en güncel işleyici.
         .runOnJS(true)
         .onEnd((_e, success) => {
@@ -171,6 +175,7 @@ export function MessageBubble({
         ))}
 
       <View style={[styles.column, isMine ? styles.columnMine : styles.columnTheirs]}>
+        <GestureDetector gesture={doubleTap}>
         <Pressable
           onLongPress={isLocal ? undefined : onLongPress}
           delayLongPress={350}
@@ -222,7 +227,13 @@ export function MessageBubble({
           {/* Sprint M3c R2 — `interactive`: görsele dokun → tam ekran, dosyaya dokun → sistemde aç.
               CLEAN olmayan ekler dokunulamaz (bkz. `AttachmentView` prop notu). */}
           {message.attachments?.map((a) => (
-            <AttachmentView key={a.id} attachment={a} interactive isMine={isMine} />
+            <AttachmentView
+              key={a.id}
+              attachment={a}
+              interactive
+              isMine={isMine}
+              doubleTap={hasDoubleTap ? doubleTap : undefined}
+            />
           ))}
 
           {isWebhook && embeds.length > 0 && (
@@ -231,26 +242,23 @@ export function MessageBubble({
 
           {/* Açıklama eklerin ALTINDA (sahip revizesi 2026-10-15, WhatsApp düzeni). */}
           {displayContent.length > 0 && (
-            <GestureDetector gesture={doubleTap}>
-              <View collapsable={false}>
-                <Text style={[styles.content, hasAttachments && styles.contentAfterAttachments]}>
-                  {mentionSegments.map((seg, i) =>
-                    seg.isMention ? (
-                      <Text key={i} style={isMine ? styles.mentionMine : styles.mention}>
-                        {seg.text}
-                      </Text>
-                    ) : (
-                      seg.text
-                    ),
-                  )}
-                  {metaInline && <MetaSpacer message={message} receipt={isLocal ? null : receipt} isMine={isMine} />}
-                </Text>
-              </View>
-            </GestureDetector>
+            <Text style={[styles.content, hasAttachments && styles.contentAfterAttachments]}>
+              {mentionSegments.map((seg, i) =>
+                seg.isMention ? (
+                  <Text key={i} style={isMine ? styles.mentionMine : styles.mention}>
+                    {seg.text}
+                  </Text>
+                ) : (
+                  seg.text
+                ),
+              )}
+              {metaInline && <MetaSpacer message={message} receipt={isLocal ? null : receipt} isMine={isMine} />}
+            </Text>
           )}
 
           <BubbleMeta message={message} isMine={isMine} receipt={isLocal ? null : receipt} inline={metaInline} />
         </Pressable>
+        </GestureDetector>
 
         {message.localStatus === 'failed' && (
           <View style={styles.failedRow} accessibilityRole="alert">

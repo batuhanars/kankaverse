@@ -196,13 +196,20 @@ export class MessagesController {
   ) {
     const changed = await this.messagesService.removeReaction(user.id, channelId, messageId, emoji);
     // Durum değişmediyse yayın yok: istemciler sayacı delta ile günceller, boş yayın sayacı bozar
-    if (changed)
+    if (changed) {
       this.messagesGateway.broadcastReaction(channelId, 'reaction.removed', {
         messageId,
         channelId,
         emoji,
         userId: user.id,
       });
+      // C46 §4b.3: DM liste göstergesini temizle; fire-and-forget, hata yutulmaz loglanır.
+      void this.reactionNotifier
+        .notifyRemoved(user.id, channelId, messageId, emoji)
+        .catch((err: unknown) =>
+          this.logger.error(`Tepki göstergesi temizleme hatası (mesaj ${messageId})`, err),
+        );
+    }
     return null;
   }
 

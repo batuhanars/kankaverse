@@ -62,6 +62,20 @@
 6. Testler: kendi mesajı yok, engel yok, kapalı ayar yok, sessiz kanal yok, tekrar süzgeci, değiştirmede ikinci bildirim yok,
    DM'de çan kaydı yok, ortamda var.
 
+## §4b DM listesinde tepki (sahip revizesi 2026-11-01) 🔴 R7
+Mesaj sahibinin DM/grup satırında okunmamış noktası + alt satırda "{actor} {emoji} tepkisi bıraktı". Sıralama DEĞİŞMEZ. Yenilemede kaybolmaz.
+1. Şema: `ChannelMember.lastReaction Json?` = `{ actorId, actorUsername, emoji, messageId, at }` (ISO). Tek additive migration.
+2. Yazma: `notifyAdded` içinde §4.1 süzgeçlerinin hepsinden geçtikten sonra, tekrar süzgecinden ÖNCE, yalnız DM/grup (`guildId` null): yazarın üyelik satırına yazılır + WS
+   `user:<authorId>` odasına `dm.reaction` `{ channelId, lastReaction }`. Tekrar süzgeci yalnız push ve `reaction.notify`i keser; liste satırı her zaman güncel kalır.
+3. Temizleme: `DELETE` gerçekten silince, yazarın `lastReaction`ı aynı `actorId + messageId + emoji` ise null yapılır + `dm.reaction` `{ channelId, lastReaction: null }`.
+   Mesaj silinmesi temizlemez: liste DTO'su koşulu aşağıdadır, mesaj geçersizse istemciye taşınmaz gerek yok (basit tut).
+4. Liste DTO'su (`GET /dm/channels`, 1-1 ve grup): `lastReaction: {actorId, actorUsername, emoji, messageId, at} | null`. Yalnız şunlar doğruysa dolu:
+   `at > lastReadAt` (veya lastReadAt null) VE `at > lastMessage.createdAt` VE aktör engelli değil (iki yön). Doluysa `unread: true`. Süzgeç sunucuda, istemciye tekrar yazılmaz.
+5. Web + mobil: `dm.reaction` → satırın `lastReaction`ını yaz. null değilse ve kanal açık sohbet DEĞİLSE `unread=true`; açık sohbetse `lastReaction` yazılmaz, mevcut okundu çağrısı gider.
+   null gelirse `lastReaction` temizlenir, `unread` değişmez (yenilemede sunucu doğrusunu söyler). `markRead`, `read:self` ve `dm.message`/`applyActivity` `lastReaction`ı temizler.
+6. Satır metni `dm.reactionPreview` = "{actor} {emoji} tepkisi bıraktı". `lastReaction` doluyken son mesaj önizlemesinin yerine geçer; yazıyor göstergesi önceliğini korur.
+7. Testler: DM'de yazma + olay; ortamda yazma yok; süzgeçle elenen durumda yazma yok; tekrar süzgecinde yazma var push yok; silmede temizleme ve farklı mesajda temizlememe; liste DTO'su dört koşul.
+
 ## §5 Web
 1. Mevcut tepki akışı: başkasının pili → `add` (sunucu benimkini değiştirir); kendi pilim → `remove`; menü/seçici → `add`.
    İstemci ek mantık gerektirmez; WS olayları sayacı yönetir. Seçicide kişinin mevcut emojisi vurgulu.
@@ -76,8 +90,9 @@
 7. i18n: `reaction.whoReacted`, `reaction.tooltip` (çoğul), `reaction.all`, `notification.reaction`, ayar etiketi/açıklaması. Uzun çizgi yok.
 
 ## §6 Mobil (vc45)
-1. **Çift dokunma:** `MessageBubble` metin alanında `Gesture.Tap().numberOfTaps(2)` (gesture-handler zaten kurulu, yeni paket yok).
-   Uzun basma ve yazar adına dokunma korunur; görsel/video/ses/bağlantı öğelerinin kendi dokunmaları korunur (çift dokunma onlarda yok).
+1. **Çift dokunma:** `MessageBubble` baloncuğun tamamında `Gesture.Tap().numberOfTaps(2)` (gesture-handler zaten kurulu, yeni paket yok).
+   Sahip revizesi 2026-11-01: görsel, video, ses ve dosya dahil. Medyanın tek dokunuşu çift dokunma başarısız olunca çalışır (~250 ms gecikme).
+   Uzun basma ve yazar adına dokunma korunur. Sesli mesaj dalgasında dokunma konum değiştirmeye devam eder.
    Emoji = kişinin etkin hızlı tepki listesinin ilki (`utils/quickReactions`). Kişinin mesajda tepkisi varsa no-op. Yerel/gönderilmemiş mesajda yok.
    Küçük geri bildirim: hafif titreşim (`expo-haptics` kuruluysa; değilse yok, yeni paket EKLENMEZ).
 2. **Kimler tepki verdi:** pile uzun basma + mesaj eylem panelinde "Tepkileri gör" → alt panel (mevcut sheet deseni): yatay emoji

@@ -873,6 +873,81 @@ describe('DmService — C9 Mesaj İstekleri', () => {
     expect((res[0] as any).lastMessage.content).toBe('📷 Görsel');
   });
 
+  it('getDmChannels: lastReaction dolu ve unread true; engelli aktörde ve okunmuşta null (C46 §4b)', async () => {
+    const msgAt = new Date('2026-11-01T09:00:00.000Z');
+    const reaction = {
+      actorId: TARGET,
+      actorUsername: 'x',
+      emoji: '👍',
+      messageId: 'm1',
+      at: '2026-11-01T10:00:00.000Z',
+    };
+    const row = (lastReadAt: Date | null) => ({
+      lastReadAt,
+      clearedAt: null,
+      lastReaction: reaction,
+      channel: {
+        id: CH,
+        type: 'GROUP_DM',
+        deletedAt: null,
+        name: 'g',
+        createdAt: msgAt,
+        ownerId: SENDER,
+        members: [
+          {
+            userId: TARGET,
+            lastReadAt: null,
+            user: {
+              id: TARGET,
+              username: 'x',
+              avatarUrl: null,
+              avatarAnimatedUrl: null,
+              readReceipts: false,
+            },
+          },
+        ],
+        messages: [
+          {
+            id: 'm1',
+            channelId: CH,
+            content: 'a',
+            replyToId: null,
+            createdAt: msgAt,
+            author: { id: SENDER, username: 's', avatarUrl: null },
+            attachments: [],
+          },
+        ],
+      },
+    });
+
+    resetMocks();
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      row(new Date('2026-11-01T09:30:00.000Z')),
+    ]);
+    prismaMock.userBlock.findMany.mockResolvedValue([]);
+    let res = (await makeService().getDmChannels(SENDER)) as any[];
+    expect(res[0].lastReaction).toEqual(reaction);
+    expect(res[0].unread).toBe(true);
+
+    // okunmuş (lastReadAt sonra)
+    resetMocks();
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      row(new Date('2026-11-01T10:30:00.000Z')),
+    ]);
+    prismaMock.userBlock.findMany.mockResolvedValue([]);
+    res = (await makeService().getDmChannels(SENDER)) as any[];
+    expect(res[0].lastReaction).toBeNull();
+
+    // aktör engelli (benim engelim)
+    resetMocks();
+    prismaMock.channelMember.findMany.mockResolvedValue([row(null)]);
+    prismaMock.userBlock.findMany
+      .mockResolvedValueOnce([{ blockedId: TARGET }])
+      .mockResolvedValueOnce([]);
+    res = (await makeService().getDmChannels(SENDER)) as any[];
+    expect(res[0].lastReaction).toBeNull();
+  });
+
   describe('getDmChannels: okundu alanları (liste ucu, sahip bulgusu 2026-10-29)', () => {
     const now = new Date('2026-10-29T10:00:00.000Z');
     const readAt = new Date('2026-10-29T10:05:00.000Z');

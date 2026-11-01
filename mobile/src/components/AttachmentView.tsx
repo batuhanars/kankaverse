@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
+import type { GestureType } from 'react-native-gesture-handler';
 import * as WebBrowser from 'expo-web-browser';
 import { ImageViewer } from './ImageViewer';
+import { MediaPressable } from './message/MediaPressable';
 import { VoicePlayer } from './message/VoicePlayer';
 import { VideoCard } from './message/VideoCard';
 import { attachmentsApi } from '@/api/attachments';
@@ -19,6 +21,7 @@ export function AttachmentView({
   interactive = false,
   onShowInChat,
   isMine = false,
+  doubleTap,
 }: {
   attachment: AttachmentDto;
   /**
@@ -47,6 +50,8 @@ export function AttachmentView({
   onShowInChat?: () => void;
   /** M6b — oynatıcı rengi için: kendi baloncuğumda Kor zemin üstünde `accent400` (M6a §4). */
   isMine?: boolean;
+  /** C46 §6.1 — baloncuğun çift dokunma jesti; verilince ekin tek dokunuşu onun başarısızlığını bekler. */
+  doubleTap?: GestureType;
 }) {
   const isImage = attachment.contentType.startsWith('image/');
   const isClean = attachment.scanStatus === ScanStatus.CLEAN;
@@ -171,13 +176,14 @@ export function AttachmentView({
 
     return (
       <>
-        <Pressable
+        <MediaPressable
+          doubleTap={doubleTap}
           onPress={openViewer}
           accessibilityRole="imagebutton"
           accessibilityLabel={t('mobile.attachment.viewImage')}
         >
           {thumbnail}
-        </Pressable>
+        </MediaPressable>
 
         {/* Tam ekran görüntüleyici (yakınlaştırmalı) — sunum `ImageViewer`e taşındı; adres alma ve
             T&S kapısı BURADA kaldı, o bileşen kendi başına hiçbir şey indirmiyor. */}
@@ -205,12 +211,12 @@ export function AttachmentView({
   // M6b §2 — ses eki oynatıcı olarak çizilir (dosya kutusu olarak DEĞİL). CLEAN değilse oynatıcı
   // çizilmez, aşağıdaki rozet kendi sebebini ("İşleniyor…" / "Bu içerik kaldırıldı.") yazar.
   if (attachment.contentType.startsWith('audio/') && isClean) {
-    return <VoicePlayer attachment={attachment} isMine={isMine} />;
+    return <VoicePlayer attachment={attachment} isMine={isMine} doubleTap={doubleTap} />;
   }
 
   // M6c §2 — video küçük resim kartı olarak çizilir; CLEAN değilse aşağıdaki rozet sebebini yazar.
   if (attachment.contentType.startsWith('video/') && isClean) {
-    return <VideoCard attachment={attachment} />;
+    return <VideoCard attachment={attachment} doubleTap={doubleTap} />;
   }
 
   // Görsel değil — dosya adı rozeti. CLEAN ise dokununca sistemde açılır.
@@ -236,9 +242,14 @@ export function AttachmentView({
 
   return (
     <View>
-      <Pressable onPress={openFile} accessibilityRole="button" accessibilityLabel={t('mobile.attachment.openFile')}>
+      <MediaPressable
+        doubleTap={doubleTap}
+        onPress={() => void openFile()}
+        accessibilityRole="button"
+        accessibilityLabel={t('mobile.attachment.openFile')}
+      >
         {badge}
-      </Pressable>
+      </MediaPressable>
       {openError ? <Text style={styles.openError}>{openError}</Text> : null}
     </View>
   );

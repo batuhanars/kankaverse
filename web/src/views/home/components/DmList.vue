@@ -490,6 +490,13 @@ async function confirmDeleteGroup() {
           >
             {{ t('typing.simple') }}
           </p>
+          <p
+            v-else-if="ch.lastReaction && dmShowUnread(ch)"
+            class="text-[12px] truncate"
+            style="color: var(--kv-text-muted);"
+          >
+            {{ t('dm.reactionPreview', { actor: ch.lastReaction.actorUsername, emoji: ch.lastReaction.emoji }) }}
+          </p>
           <p v-else-if="ch.lastMessage" class="text-[12px] truncate" style="color: var(--kv-text-muted);">
             {{ formatLastMessage(ch, ch.lastMessage.content) }}
           </p>

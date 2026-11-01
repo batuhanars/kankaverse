@@ -67,7 +67,7 @@ enum EventLocationType {
 }
 
 enum EventRecurrence {
-  NONE      // MVP — yalnız bu kullanılır
+  NONE // MVP — yalnız bu kullanılır
   DAILY
   WEEKLY
   MONTHLY
@@ -101,75 +101,75 @@ enum NotifTargetType {
 }
 
 model User {
-  id                  String             @id @default(cuid())
-  username            String             @unique
-  email               String             @unique
-  passwordHash        String
-  birthDate           DateTime
-  isMinor             Boolean
-  isModerator         Boolean            @default(false)
-  verificationStatus  VerificationStatus @default(NONE)
-  dmPolicy            DmPolicy           @default(FRIENDS)
-  mediaPolicy         MediaPolicy        @default(FRIENDS)
-  profileDiscoverable Boolean            @default(true)
-  readReceipts        Boolean            @default(true) // C12: okundu bilgisi paylaşımı (karşılıklı, sözleşme §2)
-  reactionNotifications Boolean          @default(true) // C46: mesajıma bırakılan tepki bildirimi (varsayılan açık)
-  quickReactions      String[]           @default([]) // C24: hızlı tepki şeridi; boş = varsayılan beşli
-  showGameActivity    Boolean?           // C31b §2: "Oynadığım oyunu göster". null = yaşa göre varsayılan (yetişkin açık, minör kapalı)
-  showRecentActivity  Boolean            @default(false) // C31f: "Son oynadığım oyunlar" (7 gün saklanır). Varsayılan KAPALI; minör asla true olamaz
-  emailVerifiedAt     DateTime?
-  avatarUrl           String?
-  bio                 String?
-  bannerColor         String?            // profil afiş rengi (preset anahtar; allowlist).
-  bannerUrl           String?            // C8: profil afişi görseli (public URL; ikon deseni)
-  avatarAnimatedUrl   String?            // C13: hareketli WebP avatar (avatarUrl = aynı işlemin statik karesi)
-  bannerAnimatedUrl   String?            // C13: hareketli WebP profil afişi (bannerUrl = statik kare)
-  deletedAt           DateTime?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  twoFactorEnabled    Boolean            @default(false)
-  totpSecret          String?
-  deletionRequestedAt DateTime?
-  friendCode          String          @unique
+  id                     String                @id @default(cuid())
+  username               String                @unique
+  email                  String                @unique
+  passwordHash           String
+  birthDate              DateTime
+  isMinor                Boolean
+  isModerator            Boolean               @default(false)
+  verificationStatus     VerificationStatus    @default(NONE)
+  dmPolicy               DmPolicy              @default(FRIENDS)
+  mediaPolicy            MediaPolicy           @default(FRIENDS)
+  profileDiscoverable    Boolean               @default(true)
+  readReceipts           Boolean               @default(true) // C12: okundu bilgisi paylaşımı (karşılıklı, sözleşme §2)
+  reactionNotifications  Boolean               @default(true) // C46: mesajıma bırakılan tepki bildirimi (varsayılan açık)
+  quickReactions         String[]              @default([]) // C24: hızlı tepki şeridi; boş = varsayılan beşli
+  showGameActivity       Boolean? // C31b §2: "Oynadığım oyunu göster". null = yaşa göre varsayılan (yetişkin açık, minör kapalı)
+  showRecentActivity     Boolean               @default(false) // C31f: "Son oynadığım oyunlar" (7 gün saklanır). Varsayılan KAPALI; minör asla true olamaz
+  emailVerifiedAt        DateTime?
+  avatarUrl              String?
+  bio                    String?
+  bannerColor            String? // profil afiş rengi (preset anahtar; allowlist).
+  bannerUrl              String? // C8: profil afişi görseli (public URL; ikon deseni)
+  avatarAnimatedUrl      String? // C13: hareketli WebP avatar (avatarUrl = aynı işlemin statik karesi)
+  bannerAnimatedUrl      String? // C13: hareketli WebP profil afişi (bannerUrl = statik kare)
+  deletedAt              DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  twoFactorEnabled       Boolean               @default(false)
+  totpSecret             String?
+  deletionRequestedAt    DateTime?
+  friendCode             String                @unique
   // Platform davet sistemi (kapalı-kayıt fazı — Sprint Closed-Registration)
-  platformInviteId    String?            // hangi davetle kaydoldu (audit / güven grafiği); null = open-mode kaydı
-  platformInvite      PlatformInvite?    @relation("RedeemedPlatformInvite", fields: [platformInviteId], references: [id])
-  createdPlatformInvites PlatformInvite[] @relation("PlatformInviteCreator")
-  sessions            Session[]
-  memberships         GuildMember[]
-  ownedGuilds         Guild[]            @relation("GuildOwner")
-  messages            Message[]
-  authTokens          AuthToken[]
-  recoveryCodes       RecoveryCode[]
-  friendshipsSent     Friendship[]       @relation("FriendRequester")
-  friendshipsReceived Friendship[]       @relation("FriendAddressee")
-  blocksMade          UserBlock[]        @relation("Blocker")
-  blocksReceived      UserBlock[]        @relation("Blocked")
-  channelMemberships  ChannelMember[]
-  ownedChannels       Channel[]          @relation("ChannelOwner")
-  dmRequestChannels   Channel[]          @relation("DmRequester") // C9: başlattığı mesaj isteği kanalları
-  createdInvites      Invite[]           @relation("InviteCreator")
-  attachments         Attachment[]
-  reportsFiled        Report[]           @relation("Reporter")
-  reportResolutions   Report[]           @relation("ReportResolver")
-  moderationActions   ModerationAction[] @relation("ModeratorActions")
-  moderationTargets   ModerationAction[] @relation("ModerationTargets")
-  auditLogs           AuditLog[]         @relation("AuditActor")
-  channelReads        ChannelRead[]
-  voiceSessions       VoiceSession[]
-  createdEvents       GuildEvent[]       @relation("EventCreator")
-  eventInterests      GuildEventInterest[]
-  notifications       Notification[]     @relation("UserNotifications")
-  notificationsActed  Notification[]     @relation("NotificationActor")
-  notificationPrefs   NotificationPref[] @relation("UserNotificationPrefs")
-  pushTokens          PushToken[]
-  recentGames         RecentGame[]
-  aiVideoGenerations  AiVideoGeneration[]
-  aiVideoGrant        AiVideoGrant?        @relation("AiVideoGrantUser")
-  aiVideoGrantsGiven  AiVideoGrant[]        @relation("AiVideoGrantBy")
-  webhooksCreated     Webhook[]
-  externalAccounts    ExternalAccount[]
-  streamAnnounceOptIns StreamAnnounceOptIn[]
+  platformInviteId       String? // hangi davetle kaydoldu (audit / güven grafiği); null = open-mode kaydı
+  platformInvite         PlatformInvite?       @relation("RedeemedPlatformInvite", fields: [platformInviteId], references: [id])
+  createdPlatformInvites PlatformInvite[]      @relation("PlatformInviteCreator")
+  sessions               Session[]
+  memberships            GuildMember[]
+  ownedGuilds            Guild[]               @relation("GuildOwner")
+  messages               Message[]
+  authTokens             AuthToken[]
+  recoveryCodes          RecoveryCode[]
+  friendshipsSent        Friendship[]          @relation("FriendRequester")
+  friendshipsReceived    Friendship[]          @relation("FriendAddressee")
+  blocksMade             UserBlock[]           @relation("Blocker")
+  blocksReceived         UserBlock[]           @relation("Blocked")
+  channelMemberships     ChannelMember[]
+  ownedChannels          Channel[]             @relation("ChannelOwner")
+  dmRequestChannels      Channel[]             @relation("DmRequester") // C9: başlattığı mesaj isteği kanalları
+  createdInvites         Invite[]              @relation("InviteCreator")
+  attachments            Attachment[]
+  reportsFiled           Report[]              @relation("Reporter")
+  reportResolutions      Report[]              @relation("ReportResolver")
+  moderationActions      ModerationAction[]    @relation("ModeratorActions")
+  moderationTargets      ModerationAction[]    @relation("ModerationTargets")
+  auditLogs              AuditLog[]            @relation("AuditActor")
+  channelReads           ChannelRead[]
+  voiceSessions          VoiceSession[]
+  createdEvents          GuildEvent[]          @relation("EventCreator")
+  eventInterests         GuildEventInterest[]
+  notifications          Notification[]        @relation("UserNotifications")
+  notificationsActed     Notification[]        @relation("NotificationActor")
+  notificationPrefs      NotificationPref[]    @relation("UserNotificationPrefs")
+  pushTokens             PushToken[]
+  recentGames            RecentGame[]
+  aiVideoGenerations     AiVideoGeneration[]
+  aiVideoGrant           AiVideoGrant?         @relation("AiVideoGrantUser")
+  aiVideoGrantsGiven     AiVideoGrant[]        @relation("AiVideoGrantBy")
+  webhooksCreated        Webhook[]
+  externalAccounts       ExternalAccount[]
+  streamAnnounceOptIns   StreamAnnounceOptIn[]
 }
 
 enum GameSource {
@@ -181,14 +181,14 @@ enum GameSource {
 // C31b §1: oyun algılama tablosu. Ad HİÇBİR ZAMAN istemciden alınmaz (Steam: sunucu mağazadan çeker,
 // Epic: ilk kayıtta automod süzgecinden geçen ad kilitlenir, CURATED: migration seed'i).
 model Game {
-  id          String     @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
   source      GameSource
-  externalId  String?    // STEAM: appid · EPIC: catalogItemId · CURATED: slug
-  executables String[]   @default([]) // yalnız CURATED: masaüstü eşleme için küçük harf süreç adları
-  hidden      Boolean    @default(false) // admin kaldırdı: yayılmaz, tekrar eklenmez
-  iconUrl     String?    // C31c: sunucunun Steam'den alıp 64x64 WebP yaptığı kendi (cdn) adresimiz
-  createdAt   DateTime   @default(now())
+  externalId  String? // STEAM: appid · EPIC: catalogItemId · CURATED: slug
+  executables String[]     @default([]) // yalnız CURATED: masaüstü eşleme için küçük harf süreç adları
+  hidden      Boolean      @default(false) // admin kaldırdı: yayılmaz, tekrar eklenmez
+  iconUrl     String? // C31c: sunucunun Steam'den alıp 64x64 WebP yaptığı kendi (cdn) adresimiz
+  createdAt   DateTime     @default(now())
   recentGames RecentGame[]
 
   @@unique([source, externalId])
@@ -214,7 +214,7 @@ model AuthToken {
   user      User          @relation(fields: [userId], references: [id])
   type      AuthTokenType
   tokenHash String
-  payload   String?       // EMAIL_CHANGE: hedef e-posta; EMAIL_CHANGE_UNDO: eski e-posta
+  payload   String? // EMAIL_CHANGE: hedef e-posta; EMAIL_CHANGE_UNDO: eski e-posta
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime      @default(now())
@@ -242,7 +242,7 @@ model Session {
   tokenFamily      String
   device           String?
   ip               String?
-  clientType       String?   // 'mobile' | null (=web/desktop, geriye dönük uyum) — M0 bearer refresh teslimi
+  clientType       String? // 'mobile' | null (=web/desktop, geriye dönük uyum) — M0 bearer refresh teslimi
   lastActiveAt     DateTime  @default(now())
   revokedAt        DateTime?
   createdAt        DateTime  @default(now())
@@ -251,29 +251,29 @@ model Session {
 }
 
 model Guild {
-  id        String      @id @default(cuid())
-  name      String
-  ownerId   String
-  owner     User        @relation("GuildOwner", fields: [ownerId], references: [id])
-  adultsOnly Boolean    @default(false)
-  iconUrl   String?
-  iconAnimatedUrl String?                  // C19: hareketli simge (WebP); iconUrl daima statik kare kalır
-  description String?
-  discoverable Boolean  @default(false)   // C6: Keşfet opt-in (default kapalı)
-  tags        String[]  @default([])       // C6: ilgi etiketleri (max 5; servis doğrular)
-  bannerColor String?                      // C6: preset renk anahtarı (allowlist; görsel değil)
-  bannerUrl   String?                      // C8: ortam afişi görseli (public URL; ikon deseni)
-  bannerAnimatedUrl String?                // C19: hareketli afiş (WebP); bannerUrl daima statik kare kalır
-  deletedAt DateTime?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  members   GuildMember[]
-  channels  Channel[]
-  invites   Invite[]
-  categories ChannelCategory[]
-  bans      GuildBan[]
-  roles     Role[]
-  events    GuildEvent[]
+  id                String            @id @default(cuid())
+  name              String
+  ownerId           String
+  owner             User              @relation("GuildOwner", fields: [ownerId], references: [id])
+  adultsOnly        Boolean           @default(false)
+  iconUrl           String?
+  iconAnimatedUrl   String? // C19: hareketli simge (WebP); iconUrl daima statik kare kalır
+  description       String?
+  discoverable      Boolean           @default(false) // C6: Keşfet opt-in (default kapalı)
+  tags              String[]          @default([]) // C6: ilgi etiketleri (max 5; servis doğrular)
+  bannerColor       String? // C6: preset renk anahtarı (allowlist; görsel değil)
+  bannerUrl         String? // C8: ortam afişi görseli (public URL; ikon deseni)
+  bannerAnimatedUrl String? // C19: hareketli afiş (WebP); bannerUrl daima statik kare kalır
+  deletedAt         DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  members           GuildMember[]
+  channels          Channel[]
+  invites           Invite[]
+  categories        ChannelCategory[]
+  bans              GuildBan[]
+  roles             Role[]
+  events            GuildEvent[]
 
   @@index([discoverable])
 }
@@ -293,22 +293,22 @@ model GuildMember {
 }
 
 model Role {
-  id          String            @id @default(cuid())
-  guildId     String
-  guild       Guild             @relation(fields: [guildId], references: [id])
-  name        String
-  color       String            @default("#99AAB5")
-  position    Int               @default(0)
-  hoist       Boolean           @default(false)
-  mentionable Boolean           @default(false)
-  permissions String[]          @default([])
-  iconUrl     String?
+  id           String            @id @default(cuid())
+  guildId      String
+  guild        Guild             @relation(fields: [guildId], references: [id])
+  name         String
+  color        String            @default("#99AAB5")
+  position     Int               @default(0)
+  hoist        Boolean           @default(false)
+  mentionable  Boolean           @default(false)
+  permissions  String[]          @default([])
+  iconUrl      String?
   unicodeEmoji String? // C21: tek emoji, yalnız görünüm
-  isEveryone  Boolean           @default(false)
-  isDefault   Boolean           @default(false) // yeni katılan üyelere otomatik atanır (guild başına tek)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  memberLinks GuildMemberRole[]
+  isEveryone   Boolean           @default(false)
+  isDefault    Boolean           @default(false) // yeni katılan üyelere otomatik atanır (guild başına tek)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  memberLinks  GuildMemberRole[]
 
   @@index([guildId])
 }
@@ -361,7 +361,7 @@ model Channel {
   categoryId      String?
   category        ChannelCategory? @relation(fields: [categoryId], references: [id])
   name            String?
-  ownerId         String?          // GROUP_DM: oluşturan kullanıcı; 1-1 DM + guild kanallarında null
+  ownerId         String? // GROUP_DM: oluşturan kullanıcı; 1-1 DM + guild kanallarında null
   owner           User?            @relation("ChannelOwner", fields: [ownerId], references: [id])
   ageGated        Boolean          @default(false)
   isPrivate       Boolean          @default(false)
@@ -372,7 +372,7 @@ model Channel {
   mediaEnabled    Boolean          @default(false) // C7: admin per-channel kamera/ekran toggle (GUILD_VOICE); default OFF
   // C9 — 1-1 DM mesaj isteği: null = normal/legacy (kabul edilmiş sayılır); PENDING = istek bekliyor.
   dmRequestStatus DmRequestStatus? // yalnız type=DM
-  dmRequesterId   String?          // isteği başlatan (PENDING/ACCEPTED-via-request'te dolu)
+  dmRequesterId   String? // isteği başlatan (PENDING/ACCEPTED-via-request'te dolu)
   dmRequester     User?            @relation("DmRequester", fields: [dmRequesterId], references: [id])
   deletedAt       DateTime?
   createdAt       DateTime         @default(now())
@@ -406,47 +406,47 @@ model VoiceSession {
 // R11 — Ses kanalı kalıcı sustur (server-mute). Per-kanal kayıt; mintToken bunu kontrol eder
 // → kullanıcı çıkıp tekrar katılsa da susturulmuş kalır. Sözleşme: SPRINT_R11_VOICE_MODERATION_CONTRACT.md.
 model VoiceMute {
-  id         String   @id @default(cuid())
-  channelId  String
-  userId     String
-  guildId    String
-  mutedById  String
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  channelId String
+  userId    String
+  guildId   String
+  mutedById String
+  createdAt DateTime @default(now())
 
   @@unique([channelId, userId])
   @@index([channelId])
 }
 
 model Message {
-  id          String            @id @default(cuid())
-  channelId   String
-  channel     Channel           @relation(fields: [channelId], references: [id])
-  authorId    String
-  author      User              @relation(fields: [authorId], references: [id])
-  content     String
-  mentions    String[]          @default([])   // §2: bahsedilen + doğrulanmış userId listesi (tekilleştirilmiş, ≤10)
-  mentionsEveryone Boolean       @default(false) // @everyone toplu bahsetme (everyone rolü mentionable ise tüm üyelere bildirir)
+  id               String            @id @default(cuid())
+  channelId        String
+  channel          Channel           @relation(fields: [channelId], references: [id])
+  authorId         String
+  author           User              @relation(fields: [authorId], references: [id])
+  content          String
+  mentions         String[]          @default([]) // §2: bahsedilen + doğrulanmış userId listesi (tekilleştirilmiş, ≤10)
+  mentionsEveryone Boolean           @default(false) // @everyone toplu bahsetme (everyone rolü mentionable ise tüm üyelere bildirir)
   // R15 — bahsedilen ROL id'leri (≤3, everyone rolü HARİÇ; o `mentionsEveryone`e yazılır).
   // 🔴 Üye id'leri AÇILMAZ: rol üyeliği sonradan değişir, mesaja gömülü üye listesi yanlış tarihe
   // donardı. Alıcı kümesi okuma anında çözülür (@everyone'da da aynı karar verilmişti).
-  mentionRoles String[]          @default([])
-  replyToId   String?
-  replyTo     Message?          @relation("MessageReply", fields: [replyToId], references: [id])
-  replies     Message[]         @relation("MessageReply")
-  editedAt    DateTime?
-  deletedAt   DateTime?
-  pinnedAt    DateTime?         // null = sabit değil; dolu = sabitlenme zamanı
-  pinnedById  String?           // sabitleyen userId (scalar — FK/relation YOK, audit/görünüm için)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  attachments Attachment[]
-  reactions   MessageReaction[]
+  mentionRoles     String[]          @default([])
+  replyToId        String?
+  replyTo          Message?          @relation("MessageReply", fields: [replyToId], references: [id])
+  replies          Message[]         @relation("MessageReply")
+  editedAt         DateTime?
+  deletedAt        DateTime?
+  pinnedAt         DateTime? // null = sabit değil; dolu = sabitlenme zamanı
+  pinnedById       String? // sabitleyen userId (scalar — FK/relation YOK, audit/görünüm için)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  attachments      Attachment[]
+  reactions        MessageReaction[]
   // C35: gelen webhook mesajı. authorId = webhook'u oluşturan üye (hesap verebilirlik insanda, §0.3);
   // görünen kimlik webhookName'den gelir. Normal mesajda üçü de null.
-  webhookId   String?
-  webhook     Webhook?          @relation(fields: [webhookId], references: [id], onDelete: Restrict)
-  webhookName String?           // gönderim anındaki görünen ad (anlık görüntü; username mesaj başına ezilebilir)
-  embeds      Json?             // C35 §2.5: doğrulanmış embed listesi (yalnız izinli alanlar)
+  webhookId        String?
+  webhook          Webhook?          @relation(fields: [webhookId], references: [id], onDelete: Restrict)
+  webhookName      String? // gönderim anındaki görünen ad (anlık görüntü; username mesaj başına ezilebilir)
+  embeds           Json? // C35 §2.5: doğrulanmış embed listesi (yalnız izinli alanlar)
 
   @@index([channelId, createdAt])
   @@index([channelId, pinnedAt])
@@ -454,19 +454,19 @@ model Message {
 
 /// C35: gelen webhook. Token yalnız SHA-256 hash olarak saklanır; silme yumuşak (mesajlar kimliği korur).
 model Webhook {
-  id          String    @id @default(cuid())
-  guildId     String
-  channelId   String
-  name        String
-  tokenHash   String
-  createdById String
-  createdBy   User      @relation(fields: [createdById], references: [id])
-  deletedAt   DateTime?
-  lastUsedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  messages    Message[]
-  kind        WebhookKind @default(USER) // C36: STREAM_ANNOUNCE = sistem yönetimli, yürütme ucu her zaman 404
+  id                   String                @id @default(cuid())
+  guildId              String
+  channelId            String
+  name                 String
+  tokenHash            String
+  createdById          String
+  createdBy            User                  @relation(fields: [createdById], references: [id])
+  deletedAt            DateTime?
+  lastUsedAt           DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  messages             Message[]
+  kind                 WebhookKind           @default(USER) // C36: STREAM_ANNOUNCE = sistem yönetimli, yürütme ucu her zaman 404
   streamAnnounceConfig StreamAnnounceConfig?
 
   @@index([channelId])
@@ -551,26 +551,26 @@ model MessageReaction {
 }
 
 model Attachment {
-  id          String     @id @default(cuid())
-  uploaderId  String
-  uploader    User       @relation(fields: [uploaderId], references: [id])
-  messageId   String?    // mesaja iliştirilince set (önce PENDING, presign anında null olabilir)
-  message     Message?   @relation(fields: [messageId], references: [id])
-  storageKey  String     @unique  // S3 objesi anahtarı
-  filename    String
-  contentType String
-  size        Int
-  durationMs  Int?       // yalnız ses ekinde dolu (sesli mesaj, M6b)
-  waveform    String?    // yalnız ses ekinde: 64 örnek (0-255) base64, 88 karakter (M6b §7)
-  thumbnail   String?    // yalnız video ekinde: küçük resim, base64 JPEG (M6c)
-  width       Int?       // yalnız video ekinde
-  height      Int?       // yalnız video ekinde
-  scanStatus  ScanStatus @default(PENDING)
-  aiGenerationId String?  // C14b: yapay zeka üretiminden gelen ek (sunucu kaynaklı rozet); aynı üretim çok ek olabilir
-  aiGeneration   AiVideoGeneration? @relation(fields: [aiGenerationId], references: [id])
+  id                 String             @id @default(cuid())
+  uploaderId         String
+  uploader           User               @relation(fields: [uploaderId], references: [id])
+  messageId          String? // mesaja iliştirilince set (önce PENDING, presign anında null olabilir)
+  message            Message?           @relation(fields: [messageId], references: [id])
+  storageKey         String             @unique // S3 objesi anahtarı
+  filename           String
+  contentType        String
+  size               Int
+  durationMs         Int? // yalnız ses ekinde dolu (sesli mesaj, M6b)
+  waveform           String? // yalnız ses ekinde: 64 örnek (0-255) base64, 88 karakter (M6b §7)
+  thumbnail          String? // yalnız video ekinde: küçük resim, base64 JPEG (M6c)
+  width              Int? // yalnız video ekinde
+  height             Int? // yalnız video ekinde
+  scanStatus         ScanStatus         @default(PENDING)
+  aiGenerationId     String? // C14b: yapay zeka üretiminden gelen ek (sunucu kaynaklı rozet); aynı üretim çok ek olabilir
+  aiGeneration       AiVideoGeneration? @relation(fields: [aiGenerationId], references: [id])
   sourceAttachmentId String? // C30: iletme kopyasının kaynağı (düz alan, ilişki yok); moderasyon kopyaları bulabilsin
-  audioNormalizedAt DateTime? // C32: ses seviyesi eşitleme yapıldıysa dolu (idempotency)
-  createdAt   DateTime   @default(now())
+  audioNormalizedAt  DateTime? // C32: ses seviyesi eşitleme yapıldıysa dolu (idempotency)
+  createdAt          DateTime           @default(now())
 
   @@index([messageId])
   @@index([aiGenerationId])
@@ -604,14 +604,15 @@ model UserBlock {
 }
 
 model ChannelMember {
-  id         String    @id @default(cuid())
-  channelId  String
-  channel    Channel   @relation(fields: [channelId], references: [id])
-  userId     String
-  user       User      @relation(fields: [userId], references: [id])
-  lastReadAt DateTime?
-  clearedAt  DateTime? // G4: kullanıcı DM'i inbox'tan temizledi; mesaj KAYDEDILIR, bu tarihten öncesi gizlenir
-  createdAt  DateTime  @default(now())
+  id           String    @id @default(cuid())
+  channelId    String
+  channel      Channel   @relation(fields: [channelId], references: [id])
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  lastReadAt   DateTime?
+  clearedAt    DateTime? // G4: kullanıcı DM'i inbox'tan temizledi; mesaj KAYDEDILIR, bu tarihten öncesi gizlenir
+  lastReaction Json? // C46 §4b: {actorId, actorUsername, emoji, messageId, at}; DM liste satırı göstergesi
+  createdAt    DateTime  @default(now())
 
   @@unique([channelId, userId])
   @@index([userId])
@@ -619,15 +620,15 @@ model ChannelMember {
 
 model Invite {
   id        String    @id @default(cuid())
-  code      String    @unique          // kısa, paylaşılabilir, URL-safe (8-char)
+  code      String    @unique // kısa, paylaşılabilir, URL-safe (8-char)
   guildId   String
   guild     Guild     @relation(fields: [guildId], references: [id])
   creatorId String
   creator   User      @relation("InviteCreator", fields: [creatorId], references: [id])
-  maxUses   Int?                        // null = sınırsız
+  maxUses   Int? // null = sınırsız
   uses      Int       @default(0)
-  expiresAt DateTime?                   // null = süresiz
-  deletedAt DateTime?                   // iptal (revoke)
+  expiresAt DateTime? // null = süresiz
+  deletedAt DateTime? // iptal (revoke)
   createdAt DateTime  @default(now())
 
   @@index([guildId])
@@ -700,7 +701,7 @@ model ModerationAction {
   targetUserId    String
   targetUser      User          @relation("ModerationTargets", fields: [targetUserId], references: [id])
   type            ModActionType
-  scope           String?       // guildId | null = global
+  scope           String? // guildId | null = global
   reason          String
   relatedReportId String?
   expiresAt       DateTime?
@@ -713,7 +714,7 @@ model AuditLog {
   id         String   @id @default(cuid())
   actorId    String
   actor      User     @relation("AuditActor", fields: [actorId], references: [id])
-  action     String   // "moderation.ban", "moderation.mute", "report.resolve", ...
+  action     String // "moderation.ban", "moderation.mute", "report.resolve", ...
   entityType String
   entityId   String
   metadata   Json?
@@ -741,32 +742,32 @@ model ChannelRead {
 // recurrence/status/coverImageId şema-foresight (sahip onaylı yarın); MVP'de motor YOK.
 
 model GuildEvent {
-  id               String            @id @default(cuid())
-  guildId          String
-  guild            Guild             @relation(fields: [guildId], references: [id], onDelete: Cascade)
-  creatorId        String
-  creator          User              @relation("EventCreator", fields: [creatorId], references: [id])
+  id        String @id @default(cuid())
+  guildId   String
+  guild     Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  creatorId String
+  creator   User   @relation("EventCreator", fields: [creatorId], references: [id])
 
-  name             String            // "Etkinlik Konusu" (zorunlu)
-  description      String?           // markdown (mevcut markdown render boru hattı)
+  name        String // "Etkinlik Konusu" (zorunlu)
+  description String? // markdown (mevcut markdown render boru hattı)
 
   locationType     EventLocationType
-  channelId        String?           // VOICE_CHANNEL ise zorunlu
+  channelId        String? // VOICE_CHANNEL ise zorunlu
   channel          Channel?          @relation(fields: [channelId], references: [id], onDelete: SetNull)
-  externalLocation String?           // EXTERNAL ise zorunlu (metin/konum/link, düz metin)
+  externalLocation String? // EXTERNAL ise zorunlu (metin/konum/link, düz metin)
 
-  startAt          DateTime
-  endAt            DateTime?         // opsiyonel
+  startAt DateTime
+  endAt   DateTime? // opsiyonel
 
-  recurrence       EventRecurrence   @default(NONE)   // motor yarın
-  status           EventStatus       @default(SCHEDULED) // otomatik geçiş yarın
-  coverImageId     String?           // Attachment (yarın); MVP null
+  recurrence   EventRecurrence @default(NONE) // motor yarın
+  status       EventStatus     @default(SCHEDULED) // otomatik geçiş yarın
+  coverImageId String? // Attachment (yarın); MVP null
 
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  deletedAt        DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  interests        GuildEventInterest[]
+  interests GuildEventInterest[]
 
   @@index([guildId, startAt])
 }
@@ -783,43 +784,43 @@ model GuildEventInterest {
 }
 
 model Notification {
-  id        String           @id @default(cuid())
-  userId    String           // ALICI
-  user      User             @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
-  type      NotificationType
+  id     String           @id @default(cuid())
+  userId String // ALICI
+  user   User             @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  type   NotificationType
 
-  actorId   String?          // tetikleyen (mesaj yazarı / istek gönderen) — User
-  actor     User?            @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId String? // tetikleyen (mesaj yazarı / istek gönderen) — User
+  actor   User?   @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
 
-  guildId   String?          // mention bağlamı (navigasyon)
-  channelId String?          // mention: zıplama hedefi kanal
-  messageId String?          // mention: zıplama hedefi mesaj
-  preview   String?          // mention metni anlık görüntüsü (≤120; mesaj sonradan silinse de kalır)
+  guildId   String? // mention bağlamı (navigasyon)
+  channelId String? // mention: zıplama hedefi kanal
+  messageId String? // mention: zıplama hedefi mesaj
+  preview   String? // mention metni anlık görüntüsü (≤120; mesaj sonradan silinse de kalır)
 
-  readAt    DateTime?        // null = okunmamış
-  createdAt DateTime         @default(now())
+  readAt    DateTime? // null = okunmamış
+  createdAt DateTime  @default(now())
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
 }
 
 model NotificationPref {
-  id         String            @id @default(cuid())
-  userId     String
-  user       User              @relation("UserNotificationPrefs", fields: [userId], references: [id], onDelete: Cascade)
-  targetType NotifTargetType
-  targetId   String            // GUILD → guildId, CHANNEL → channelId
-  muted      Boolean           @default(false)
-  mutedUntil DateTime?         // null + muted=true → süresiz; geçmişse mute sona ermiş (bildir)
-  level      NotificationLevel @default(ALL)
+  id                   String            @id @default(cuid())
+  userId               String
+  user                 User              @relation("UserNotificationPrefs", fields: [userId], references: [id], onDelete: Cascade)
+  targetType           NotifTargetType
+  targetId             String // GUILD → guildId, CHANNEL → channelId
+  muted                Boolean           @default(false)
+  mutedUntil           DateTime? // null + muted=true → süresiz; geçmişse mute sona ermiş (bildir)
+  level                NotificationLevel @default(ALL)
   // R14 — yalnız targetType=GUILD satırında anlamlı (setPref kanal hedefinde 400 INVALID_PREF_TARGET).
   // Kanal düzeyi bilinçli DIŞARIDA: kayıt-bazlı override zinciri (channelPref ?? guildPref) bastırmayı
   // sessizce geri getirirdi (sözleşme R14 §2.2).
-  suppressEveryone Boolean      @default(false) // @everyone genişlemesinden gelen bildirim/rozet bastırılır
-  suppressEvents   Boolean      @default(false) // EVENT_CREATED bildirimi üretilmez
+  suppressEveryone     Boolean           @default(false) // @everyone genişlemesinden gelen bildirim/rozet bastırılır
+  suppressEvents       Boolean           @default(false) // EVENT_CREATED bildirimi üretilmez
   // R15 — rol genişlemesinden gelen bildirim/rozet bastırılır (doğrudan bahsetme her zaman geçer)
-  suppressRoleMentions Boolean  @default(false)
-  updatedAt  DateTime          @updatedAt
+  suppressRoleMentions Boolean           @default(false)
+  updatedAt            DateTime          @updatedAt
 
   @@unique([userId, targetType, targetId])
   @@index([userId])
@@ -850,12 +851,12 @@ model PushToken {
 
 model PlatformInvite {
   id         String    @id @default(cuid())
-  code       String    @unique          // 8-char URL-safe base32 (short-code.util)
-  note       String?                    // admin memo: kime/niçin verildi (opsiyonel)
-  maxUses    Int?                       // null = sınırsız
+  code       String    @unique // 8-char URL-safe base32 (short-code.util)
+  note       String? // admin memo: kime/niçin verildi (opsiyonel)
+  maxUses    Int? // null = sınırsız
   uses       Int       @default(0)
-  expiresAt  DateTime?                  // null = süresiz
-  disabledAt DateTime?                  // soft-iptal (revoke)
+  expiresAt  DateTime? // null = süresiz
+  disabledAt DateTime? // soft-iptal (revoke)
   creatorId  String
   creator    User      @relation("PlatformInviteCreator", fields: [creatorId], references: [id])
   redeemers  User[]    @relation("RedeemedPlatformInvite")
@@ -890,27 +891,27 @@ model AiVideoGrant {
 }
 
 model AiVideoGeneration {
-  id            String        @id @default(cuid())
-  userId        String
-  user          User          @relation(fields: [userId], references: [id])
-  model         String // tam api_id, ör. "pika/pika-2.5/image-to-video"
-  prompt        String // <= 1000
-  inputKey      String? // özel bucket: ai-input/{userId}/{uuid}.{ext}; yalnız görselden üretimde
-  references    Json? // C42: [{ kind: image|video|audio, key }] sırasıyla; null = referans yok
-  resolution    String // "720p"
-  durationS     Int // 5
-  aspectRatio   String? // C14f: "16:9"; null = Otomatik (alan sağlayıcıya gönderilmez)
-  quoteMicroUsd Int // gönderim öncesi teklif
-  costMicroUsd  Int? // Pika billing.state=settled olunca
-  providerJobId String? // Pika "media_..." id
-  status        AiVideoStatus @default(QUOTED)
-  errorCode     String? // Pika error.code ya da bizim kodumuz
-  outputKey     String? // özel bucket: ai-video/{userId}/{id}.mp4
-  createdAt     DateTime      @default(now())
-  completedAt   DateTime?
+  id                  String        @id @default(cuid())
+  userId              String
+  user                User          @relation(fields: [userId], references: [id])
+  model               String // tam api_id, ör. "pika/pika-2.5/image-to-video"
+  prompt              String // <= 1000
+  inputKey            String? // özel bucket: ai-input/{userId}/{uuid}.{ext}; yalnız görselden üretimde
+  references          Json? // C42: [{ kind: image|video|audio, key }] sırasıyla; null = referans yok
+  resolution          String // "720p"
+  durationS           Int // 5
+  aspectRatio         String? // C14f: "16:9"; null = Otomatik (alan sağlayıcıya gönderilmez)
+  quoteMicroUsd       Int // gönderim öncesi teklif
+  costMicroUsd        Int? // Pika billing.state=settled olunca
+  providerJobId       String? // Pika "media_..." id
+  status              AiVideoStatus @default(QUOTED)
+  errorCode           String? // Pika error.code ya da bizim kodumuz
+  outputKey           String? // özel bucket: ai-video/{userId}/{id}.mp4
+  createdAt           DateTime      @default(now())
+  completedAt         DateTime?
   providerCompletedAt DateTime? // Pika completed gorulen an (indirme 24 sa sayaci)
-  deletedAt     DateTime? // yumusak silme: satir harcama kaydi olarak kalir
-  attachments   Attachment[]
+  deletedAt           DateTime? // yumusak silme: satir harcama kaydi olarak kalir
+  attachments         Attachment[]
 
   @@index([userId, createdAt])
   @@index([status])

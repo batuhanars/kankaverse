@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { dmApi } from '@/api/dm'
 import { useAuthStore } from '@/stores/auth'
-import type { DmChannelDto, GroupDmMemberDto, MessageRequestDto } from '@/types'
+import type { DmChannelDto, DmLastReactionDto, GroupDmMemberDto, MessageRequestDto } from '@/types'
 
 export const useDmStore = defineStore('dm', () => {
   const channels = ref<DmChannelDto[]>([])
@@ -43,7 +43,10 @@ export const useDmStore = defineStore('dm', () => {
     // o an ekranda olan sohbete yeni mesaj düştüğünde `markRead` henüz gitmemiş olabiliyor ve
     // yanıt `true` dönüyor. Kural tek cümle: bakmakta olduğun sohbet okunmamış değildir.
     const active = channels.value.find((c) => c.id === activeDmChannelId.value)
-    if (active) active.unread = false
+    if (active) {
+      active.unread = false
+      active.lastReaction = null
+    }
   }
 
   async function openChannel(userId: string): Promise<DmChannelDto> {
@@ -62,13 +65,40 @@ export const useDmStore = defineStore('dm', () => {
   async function markRead(channelId: string) {
     await dmApi.markRead(channelId)
     const ch = channels.value.find((c) => c.id === channelId)
-    if (ch) ch.unread = false
+    if (ch) {
+      ch.unread = false
+      ch.lastReaction = null
+    }
   }
 
   /** C20 — başka cihazım bu DM'i okudu (WS `read:self`): yalnız yerel bayrak, API yok. */
   function applyReadSelf(channelId: string) {
     const ch = channels.value.find((c) => c.id === channelId)
-    if (ch) ch.unread = false
+    if (ch) {
+      ch.unread = false
+      ch.lastReaction = null
+    }
+  }
+
+  /**
+   * C46 §4b — WS `dm.reaction`: mesajıma tepki geldi / tepki geri alındı. Süzgeç SUNUCUDA
+   * (aktör, engel, sessiz kanal, tekrar); burada ikinci bir kural yok. Sıralama DEĞİŞMEZ.
+   * - null: yalnız göstergeyi temizle, `unread` değişmez (yenilemede sunucu doğrusunu söyler).
+   * - açık sohbet: göstergeyi yazma, mevcut okundu çağrısı git (satır okunmuş kalır).
+   */
+  function applyReaction(channelId: string, lastReaction: DmLastReactionDto | null) {
+    const ch = channels.value.find((c) => c.id === channelId)
+    if (!ch) return
+    if (lastReaction === null) {
+      ch.lastReaction = null
+      return
+    }
+    if (channelId === activeDmChannelId.value) {
+      markRead(channelId).catch(() => {})
+      return
+    }
+    ch.lastReaction = lastReaction
+    ch.unread = true
   }
 
   /**
@@ -166,6 +196,8 @@ export const useDmStore = defineStore('dm', () => {
 
     if (idx !== -1) {
       const ch = channels.value[idx]
+      // Yeni mesaj tepki göstergesinin yerini alır (§4b.5)
+      ch.lastReaction = null
       // lastMessage alanlarını güncelle (MessageDto uyumlu — eksik alanlar korunur)
       if (ch.lastMessage) {
         ch.lastMessage.content = payload.lastMessage.content
@@ -277,6 +309,7 @@ export const useDmStore = defineStore('dm', () => {
     openChannel,
     markRead,
     applyReadSelf,
+    applyReaction,
     removeChannel,
     setActiveChannel,
     activeChannel,

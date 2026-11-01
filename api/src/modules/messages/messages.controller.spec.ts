@@ -14,7 +14,10 @@ function makeController() {
     notifyMentions: jest.fn().mockResolvedValue(undefined),
   };
   const audioNormalize = { enqueueFromMessage: jest.fn() };
-  const reactionNotifier = { notifyAdded: jest.fn().mockResolvedValue(undefined) };
+  const reactionNotifier = {
+    notifyAdded: jest.fn().mockResolvedValue(undefined),
+    notifyRemoved: jest.fn().mockResolvedValue(undefined),
+  };
   const controller = new MessagesController(
     service as any,
     gateway as any,
@@ -171,5 +174,38 @@ describe('MessagesController.addReaction — C46', () => {
     await expect(
       controller.addReaction({ id: 'u1' }, 'ch-1', 'msg-1', { emoji: '👍' }),
     ).resolves.toBeNull();
+  });
+});
+
+describe('MessagesController.removeReaction — C46 §4b', () => {
+  function setup(changed: boolean) {
+    const ctx = makeController();
+    (ctx.service as any).removeReaction = jest.fn().mockResolvedValue(changed);
+    (ctx.gateway as any).broadcastReaction = jest.fn();
+    return ctx;
+  }
+
+  it('gerçekten silince temizleme tetiklenir', async () => {
+    const { controller, reactionNotifier } = setup(true);
+    await controller.removeReaction({ id: 'u1' }, 'ch-1', 'msg-1', '👍');
+    expect(reactionNotifier.notifyRemoved).toHaveBeenCalledWith('u1', 'ch-1', 'msg-1', '👍');
+  });
+
+  it('değişiklik yoksa tetiklenmez', async () => {
+    const { controller, reactionNotifier } = setup(false);
+    await controller.removeReaction({ id: 'u1' }, 'ch-1', 'msg-1', '👍');
+    expect(reactionNotifier.notifyRemoved).not.toHaveBeenCalled();
+  });
+
+  it('temizleme hatası isteği düşürmez', async () => {
+    const spy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    const { controller, reactionNotifier } = setup(true);
+    reactionNotifier.notifyRemoved.mockRejectedValue(new Error('boom'));
+    await expect(
+      controller.removeReaction({ id: 'u1' }, 'ch-1', 'msg-1', '👍'),
+    ).resolves.toBeNull();
+    await new Promise((r) => setImmediate(r));
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

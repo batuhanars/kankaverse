@@ -177,14 +177,19 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
             const avatar = avatarSource(item);
             const name = channelTitle(item);
             const typing = (typingByChannel[item.id]?.length ?? 0) > 0;
-            const preview = item.lastMessage
-              ? formatMentionsPlain(item.lastMessage.content, resolver(item), t('mention.unknown'))
-              : '';
-            // §5 R2-2 — susturulmuş veya `NONE` hedefte nokta gösterilmez (okunmamış HESABI
-            // bozulmaz, yalnız gösterim; `clearUnread`/soket katmanı ham veriyi değiştirmeye devam eder).
+            // C46 §4b.6 — tepki göstergesi doluyken son mesaj önizlemesinin yerine geçer
+            // (susturulmuş/NONE satırda geçmez: görünüm aynı kalır).
             const resolved = resolvePref(notifPrefs, 'CHANNEL', item.id);
             const showUnread =
               item.unread && resolved.level !== NotificationLevel.NONE && !resolved.muted;
+            const preview =
+              item.lastReaction && showUnread
+                ? t('dm.reactionPreview', { actor: item.lastReaction.actorUsername, emoji: item.lastReaction.emoji })
+                : item.lastMessage
+                  ? formatMentionsPlain(item.lastMessage.content, resolver(item), t('mention.unknown'))
+                  : '';
+            // §5 R2-2 — susturulmuş veya `NONE` hedefte nokta gösterilmez (okunmamış HESABI
+            // bozulmaz, yalnız gösterim; `clearUnread`/soket katmanı ham veriyi değiştirmeye devam eder).
             return (
               <DmRow
                 name={name}

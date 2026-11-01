@@ -13,6 +13,7 @@ const prismaMock = {
   message: { findUnique: jest.fn() },
   user: { findUnique: jest.fn() },
   userBlock: { findFirst: jest.fn() },
+  channelMember: { updateMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
 };
 const membershipMock = { requireChannelAccess: jest.fn() };
 const notificationsMock = { shouldNotifyChannel: jest.fn(), create: jest.fn() };
@@ -55,12 +56,14 @@ function setHappyPath(guildId: string | null = GUILD) {
   notificationsMock.create.mockResolvedValue({});
   pushMock.sendToUsers.mockResolvedValue(undefined);
   gatewayMock.resolveMentionPreview.mockImplementation((t: string) => Promise.resolve(t));
+  prismaMock.channelMember.updateMany.mockResolvedValue({ count: 1 });
 }
 
 function expectNoNotification() {
   expect(notificationsMock.create).not.toHaveBeenCalled();
   expect(pushMock.sendToUsers).not.toHaveBeenCalled();
   expect(realtimeMock.emitToUser).not.toHaveBeenCalled();
+  expect(prismaMock.channelMember.updateMany).not.toHaveBeenCalled();
 }
 
 describe('ReactionNotifierService.notifyAdded — C46 §4', () => {
@@ -130,7 +133,10 @@ describe('ReactionNotifierService.notifyAdded — C46 §4', () => {
     await service.notifyAdded(ACTOR, CH, MSG, '👍');
 
     expect(pushMock.sendToUsers.mock.calls[0][1].body).toBe('aktor mesajına 👍 bıraktı.');
-    expect(realtimeMock.emitToUser.mock.calls[0][2].preview).toBe('👍');
+    const notify = realtimeMock.emitToUser.mock.calls.find(
+      (c: unknown[]) => c[1] === 'reaction.notify',
+    );
+    expect(notify[2].preview).toBe('👍');
   });
 
   it('ek-yalnız mesajda önizleme eklerden üretilir', async () => {
@@ -294,5 +300,114 @@ describe('ReactionNotifierService.notifyAdded — C46 §4', () => {
 
     await expect(service.notifyAdded(ACTOR, CH, MSG, '👍')).resolves.toBeUndefined();
     expectNoNotification();
+  });
+});
+
+describe('ReactionNotifier C46 §4b — DM liste göstergesi', () => {
+  let service: ReactionNotifierService;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    service = makeService();
+  });
+
+  const lastReactionCall = () => prismaMock.channelMember.updateMany.mock.calls[0][0];
+  const dmReactionEmits = () =>
+    realtimeMock.emitToUser.mock.calls.filter((c: unknown[]) => c[1] === 'dm.reaction');
+
+  it('DM: üyelik satırına yazar ve dm.reaction yayınlar', async () => {
+    setHappyPath(null);
+    await service.notifyAdded(ACTOR, CH, MSG, '👍');
+    const call = lastReactionCall();
+    expect(call.where).toEqual({ channelId: CH, userId: AUTHOR });
+    expect(call.data.lastReaction).toMatchObject({
+      actorId: ACTOR,
+      actorUsername: 'aktor',
+      emoji: '👍',
+      messageId: MSG,
+    });
+    const emits = dmReactionEmits();
+    expect(emits).toHaveLength(1);
+    expect(emits[0][0]).toBe(AUTHOR);
+    expect(emits[0][2].channelId).toBe(CH);
+    expect(emits[0][2].lastReaction.emoji).toBe('👍');
+  });
+
+  it('ortam: yazma ve dm.reaction yok', async () => {
+    setHappyPath(GUILD);
+    await service.notifyAdded(ACTOR, CH, MSG, '👍');
+    expect(prismaMock.channelMember.updateMany).not.toHaveBeenCalled();
+    expect(dmReactionEmits()).toHaveLength(0);
+  });
+
+  it('süzgeçle elenen durumlarda yazma yok (kendi mesajı, ayar kapalı, engel, sessiz kanal)', async () => {
+    setHappyPath(null);
+    await service.notifyAdded(AUTHOR, CH, MSG, '👍');
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      deletedAt: null,
+      reactionNotifications: false,
+    });
+    await service.notifyAdded(ACTOR, CH, MSG, '👍');
+    prismaMock.userBlock.findFirst.mockResolvedValueOnce({ id: 'b' });
+    await service.notifyAdded(ACTOR, CH, MSG, '👍');
+    notificationsMock.shouldNotifyChannel.mockResolvedValueOnce(false);
+    await service.notifyAdded(ACTOR, CH, MSG, '👍');
+    expectNoNotification();
+  });
+
+  it('tekrar süzgecinde satır YAZILIR ama push ve reaction.notify gitmez', async () => {
+    setHappyPath(null);
+    redisMock.setIfAbsent.mockResolvedValue(false);
+    await service.notifyAdded(ACTOR, CH, MSG, '👍');
+    expect(prismaMock.channelMember.updateMany).toHaveBeenCalledTimes(1);
+    expect(dmReactionEmits()).toHaveLength(1);
+    expect(pushMock.sendToUsers).not.toHaveBeenCalled();
+    expect(
+      realtimeMock.emitToUser.mock.calls.some((c: unknown[]) => c[1] === 'reaction.notify'),
+    ).toBe(false);
+  });
+
+  it('yazma hatası bildirimi düşürmez', async () => {
+    setHappyPath(null);
+    prismaMock.channelMember.updateMany.mockRejectedValue(new Error('db'));
+    await service.notifyAdded(ACTOR, CH, MSG, '👍');
+    expect(pushMock.sendToUsers).toHaveBeenCalled();
+  });
+
+  describe('notifyRemoved', () => {
+    const stored = {
+      actorId: ACTOR,
+      actorUsername: 'aktor',
+      emoji: '👍',
+      messageId: MSG,
+      at: '2026-11-01T10:00:00.000Z',
+    };
+    beforeEach(() => {
+      prismaMock.message.findUnique.mockResolvedValue({ authorId: AUTHOR });
+      prismaMock.channelMember.update.mockResolvedValue({});
+    });
+
+    it('aynı aktör+mesaj+emoji ise temizler ve null yayınlar', async () => {
+      prismaMock.channelMember.findUnique.mockResolvedValue({ lastReaction: stored });
+      await service.notifyRemoved(ACTOR, CH, MSG, '👍');
+      expect(prismaMock.channelMember.update).toHaveBeenCalledTimes(1);
+      expect(realtimeMock.emitToUser).toHaveBeenCalledWith(AUTHOR, 'dm.reaction', {
+        channelId: CH,
+        lastReaction: null,
+      });
+    });
+
+    it.each([
+      ['farklı mesaj', { ...stored, messageId: 'other' }],
+      ['farklı emoji', { ...stored, emoji: '❤️' }],
+      ['farklı aktör', { ...stored, actorId: 'x' }],
+      ['bozuk veri', { foo: 1 }],
+      ['boş', null],
+    ])('%s: temizlemez', async (_n, value) => {
+      prismaMock.channelMember.findUnique.mockResolvedValue({ lastReaction: value });
+      await service.notifyRemoved(ACTOR, CH, MSG, '👍');
+      expect(prismaMock.channelMember.update).not.toHaveBeenCalled();
+      expect(realtimeMock.emitToUser).not.toHaveBeenCalled();
+    });
   });
 });

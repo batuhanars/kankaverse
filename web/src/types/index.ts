@@ -107,6 +107,15 @@ export interface GroupDmMemberDto {
   avatarAnimatedUrl?: string | null // Sprint C16 — satır hover'da canlanır; yoksa statik
 }
 
+// C46 §4b — DM/grup satırı tepki göstergesi (sunucu süzer: okunmamış, son mesajdan yeni, aktör engelsiz)
+export interface DmLastReactionDto {
+  actorId: string
+  actorUsername: string
+  emoji: string
+  messageId: string
+  at: string
+}
+
 // Sprint 12 §3 — DmChannelDto discriminated union: 1-1 DM | GROUP_DM
 export type DmChannelDto =
   | {
@@ -115,6 +124,7 @@ export type DmChannelDto =
       otherUser: FriendCodeUserDto
       lastMessage: MessageDto | null
       unread: boolean
+      lastReaction?: DmLastReactionDto | null
       canMessage: boolean
       selfBlocked: boolean
       // C9 — mesaj isteği: null = normal DM · 'PENDING'/'ACCEPTED' = istek.
@@ -137,6 +147,7 @@ export type DmChannelDto =
       members: GroupDmMemberDto[]
       lastMessage: MessageDto | null
       unread: boolean
+      lastReaction?: DmLastReactionDto | null
       // C34 — grup okundu: receiptsEnabled gizlilik kapısı; groupAllReadAt = uygun üyelerin HEPSİ
       // en az bu ana kadar okudu (biri hiç okumadıysa null → tek tik). Bireysel okuma anı yoktur.
       receiptsEnabled?: boolean

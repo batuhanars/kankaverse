@@ -31,7 +31,14 @@ import {
 import { invalidateReactionUsers } from '@/composables/useReactionUsers'
 import { REACTION_NOTIFY_EVENT, type ReactionNotifyPayload } from '@/utils/reactionNotification'
 import { maybeFireDmToast, maybeFireChannelToast } from '@/composables/useMessageToasts'
-import type { MessageDto, FriendRequestDto, FriendDto, EventDto, NotificationDto } from '@/types'
+import type {
+  MessageDto,
+  FriendRequestDto,
+  FriendDto,
+  EventDto,
+  NotificationDto,
+  DmLastReactionDto,
+} from '@/types'
 
 let socket: Socket | null = null
 let refCount = 0
@@ -231,6 +238,14 @@ export function useSocket() {
         if (!data.channelId) return
         if (data.guildId) channelsStore.applyChannelReadLocal(data.channelId, data.guildId)
         else dmStore.applyReadSelf(data.channelId)
+      },
+    )
+
+    // C46 §4b — DM/grup satırında tepki göstergesi (süzgeç sunucuda)
+    socket.on(
+      'dm.reaction',
+      (data: { channelId: string; lastReaction: DmLastReactionDto | null }) => {
+        dmStore.applyReaction(data.channelId, data.lastReaction)
       },
     )
 

@@ -9,6 +9,15 @@ export interface DmParticipantDto {
   avatarUrl: string | null;
 }
 
+// C46 §4b — DM/grup satırı tepki göstergesi (sunucu süzer: okunmamış, son mesajdan yeni, aktör engelsiz)
+export interface DmLastReactionDto {
+  actorId: string;
+  actorUsername: string;
+  emoji: string;
+  messageId: string;
+  at: string;
+}
+
 export type DmChannelDto =
   | {
       type: 'DM';
@@ -16,6 +25,7 @@ export type DmChannelDto =
       otherUser: DmParticipantDto;
       lastMessage: MessageDto | null;
       unread: boolean;
+      lastReaction?: DmLastReactionDto | null;
       canMessage: boolean;
       selfBlocked: boolean;
       // C9 — mesaj isteği: null = normal DM · 'PENDING'/'ACCEPTED' = istek.
@@ -35,6 +45,7 @@ export type DmChannelDto =
       members: DmParticipantDto[];
       lastMessage: MessageDto | null;
       unread: boolean;
+      lastReaction?: DmLastReactionDto | null;
       // C34 — grup okundu: receiptsEnabled gizlilik kapısı; groupAllReadAt = uygun üyelerin HEPSİ
       // en az bu ana kadar okudu (biri hiç okumadıysa null → tek tik). Bireysel okuma anı yoktur.
       receiptsEnabled?: boolean;

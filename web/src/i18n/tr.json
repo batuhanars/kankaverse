@@ -1336,7 +1336,8 @@
     "unmute": "Susturmayı Kaldır",
     "menuTitle": "Sohbet menüsü",
     "profilePanel": "Profil",
-    "voiceActive": "Seste {n} kişi var"
+    "voiceActive": "Seste {n} kişi var",
+    "reactionPreview": "{actor} {emoji} tepkisi bıraktı"
   },
   "group": {
     "createButton": "Grup Oluştur",

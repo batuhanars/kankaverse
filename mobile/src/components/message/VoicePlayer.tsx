@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, PanResponder, StyleSheet, Text, View } from 'react-native';
+import type { GestureType } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { MediaPressable } from './MediaPressable';
 import { attachmentsApi } from '@/api/attachments';
 import { extractErrorMessage } from '@/api/errors';
 import type { AttachmentDto } from '@/api/messages';
@@ -24,7 +26,15 @@ import { theme } from '@/theme';
  *
  * `isMine`: kendi baloncuğumda Kor zemin üstünde Kor okunmuyor → beyaz (bkz. tokens.ts bubbleOwn).
  */
-export function VoicePlayer({ attachment, isMine }: { attachment: AttachmentDto; isMine: boolean }) {
+export function VoicePlayer({
+  attachment,
+  isMine,
+  doubleTap,
+}: {
+  attachment: AttachmentDto;
+  isMine: boolean;
+  doubleTap?: GestureType;
+}) {
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
   const { inCall, ringing } = useCallAudioBusy();
@@ -160,7 +170,8 @@ export function VoicePlayer({ attachment, isMine }: { attachment: AttachmentDto;
   return (
     <View>
       <View style={styles.row}>
-        <Pressable
+        <MediaPressable
+          doubleTap={doubleTap}
           onPress={() => void togglePlay()}
           hitSlop={4}
           accessibilityRole="button"
@@ -176,7 +187,7 @@ export function VoicePlayer({ attachment, isMine }: { attachment: AttachmentDto;
               color={isMine ? theme.colors.bubbleOwn : theme.colors.textPrimary}
             />
           )}
-        </Pressable>
+        </MediaPressable>
 
         <View style={styles.main}>
           <View

@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import type { GestureType } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import { MediaPressable } from './MediaPressable';
 import { VideoViewer } from './VideoViewer';
 import { attachmentsApi } from '@/api/attachments';
 import { extractErrorMessage } from '@/api/errors';
@@ -17,7 +19,7 @@ import { theme } from '@/theme';
  * Çağıran (`AttachmentView`) `scanStatus === CLEAN` kapısını geçirmiş olarak çizer. Adres dokunuş
  * anında alınır (presigned GET 300 sn ömürlü; kart saatlerce açık kalabilir).
  */
-export function VideoCard({ attachment }: { attachment: AttachmentDto }) {
+export function VideoCard({ attachment, doubleTap }: { attachment: AttachmentDto; doubleTap?: GestureType }) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -38,7 +40,8 @@ export function VideoCard({ attachment }: { attachment: AttachmentDto }) {
 
   return (
     <>
-      <Pressable
+      <MediaPressable
+        doubleTap={doubleTap}
         onPress={openViewer}
         accessibilityRole="button"
         accessibilityLabel={t('mobile.video.play')}
@@ -65,7 +68,7 @@ export function VideoCard({ attachment }: { attachment: AttachmentDto }) {
             <Text style={styles.durationText}>{formatClock(attachment.durationMs)}</Text>
           </View>
         ) : null}
-      </Pressable>
+      </MediaPressable>
 
       <VideoViewer
         visible={open}

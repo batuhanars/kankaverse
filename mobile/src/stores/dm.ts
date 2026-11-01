@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { dmApi, type DmChannelDto } from '@/api/dm';
+import { dmApi, type DmChannelDto, type DmLastReactionDto } from '@/api/dm';
 import { extractErrorMessage } from '@/api/errors';
 import { playMessageTone } from '@/audio/messageTone';
 
@@ -65,6 +65,8 @@ interface DmState {
   applyActivity: (payload: DmActivity) => Promise<void>;
   setActiveDm: (channelId: string | null) => void;
   clearUnread: (channelId: string) => void;
+  /** C46 §4b — WS `dm.reaction`: satırın tepki göstergesini yazar/temizler. Süzgeç sunucuda. */
+  applyReaction: (channelId: string, lastReaction: DmLastReactionDto | null) => void;
   /** C12 §4.1 — WS `dm:read`: karşı taraf bu kanalı okudu, kanal başına tek tarih güncellenir. */
   applyReadReceipt: (payload: { channelId: string; readAt: string }) => void;
   applyGroupReadReceipt: (payload: {
@@ -117,7 +119,7 @@ export const useDmStore = create<DmState>((set, get) => ({
         // Kural tek cümle: BAKMAKTA OLDUĞUN DM okunmamış değildir. Sunucu birazdan zaten aynı
         // şeyi söyleyecek (`markRead` MessageScreen'den gidiyor), burada yalnız yarış kapatılıyor.
         channels: visibleChannels(list).map((c) =>
-          c.id === s.activeDmChannelId ? ({ ...c, unread: false } as DmChannelDto) : c,
+          c.id === s.activeDmChannelId ? ({ ...c, unread: false, lastReaction: null } as DmChannelDto) : c,
         ),
         requestCount: requests.length,
         state: 'ready' as LoadState,
@@ -198,7 +200,8 @@ export const useDmStore = create<DmState>((set, get) => ({
       playMessageTone();
     }
 
-    const updated = { ...existing, lastMessage, unread } as DmChannelDto;
+    // Yeni mesaj tepki göstergesinin yerini alır (C46 §4b.5)
+    const updated = { ...existing, lastMessage, unread, lastReaction: null } as DmChannelDto;
     const rest = channels.filter((_, i) => i !== idx);
     set({ channels: [updated, ...rest] });
   },
@@ -209,7 +212,29 @@ export const useDmStore = create<DmState>((set, get) => ({
 
   clearUnread(channelId) {
     set((s) => ({
-      channels: s.channels.map((c) => (c.id === channelId ? ({ ...c, unread: false } as DmChannelDto) : c)),
+      channels: s.channels.map((c) =>
+        c.id === channelId ? ({ ...c, unread: false, lastReaction: null } as DmChannelDto) : c,
+      ),
+    }));
+  },
+
+  applyReaction(channelId, lastReaction) {
+    if (lastReaction === null) {
+      // Yalnız göstergeyi temizle; `unread` değişmez (yenilemede sunucu doğrusunu söyler).
+      set((s) => ({
+        channels: s.channels.map((c) => (c.id === channelId ? ({ ...c, lastReaction: null } as DmChannelDto) : c)),
+      }));
+      return;
+    }
+    if (channelId === get().activeDmChannelId) {
+      // Açık sohbet: gösterge yazılmaz, mevcut okundu çağrısı gider (MessageScreen ile aynı uç).
+      void dmApi.markRead(channelId).catch(() => {});
+      return;
+    }
+    set((s) => ({
+      channels: s.channels.map((c) =>
+        c.id === channelId ? ({ ...c, lastReaction, unread: true } as DmChannelDto) : c,
+      ),
     }));
   },
 

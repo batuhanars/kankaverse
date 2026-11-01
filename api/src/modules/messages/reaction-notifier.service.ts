@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { PushService } from '../../shared/push/push.service';
@@ -7,6 +8,7 @@ import { RedisService } from '../../shared/redis/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MessagesGateway } from './gateway/messages.gateway';
 import { previewFromAttachments } from '../../common/utils/attachment-preview.util';
+import { LastReaction, parseLastReaction } from '../../common/utils/last-reaction.util';
 import {
   REACTION_PREVIEW_MAX,
   buildReactionPushBody,
@@ -79,18 +81,31 @@ export class ReactionNotifierService {
     // Sessize alma / NONE: ortamda kanal+ortam tercihi, DM'de kanal tercihi (DM push ile aynı süzgeç).
     if (!(await this.notifications.shouldNotifyChannel(authorId, guildId, channelId))) return;
 
-    // Tekrar süzgeci EN SON: yalnız gerçekten gönderilecekse anahtar tüketilir. Redis hatasında
-    // bildirim atlanır (spam riskine karşı muhafazakâr); tepkinin kendisi etkilenmez.
-    const first = await this.redis
-      .setIfAbsent(`rxn:notif:${messageId}:${actorId}`, REACTION_NOTIF_DEDUPE_TTL_SECONDS)
-      .catch(() => false);
-    if (!first) return;
-
     const actor = await this.prisma.user.findUnique({
       where: { id: actorId },
       select: { id: true, username: true, avatarUrl: true },
     });
     if (!actor) return;
+
+    // C46 §4b: DM/grup liste satırı göstergesi. Tüm süzgeçlerden geçti, tekrar süzgecinden ÖNCE:
+    // tekrar süzgeci yalnız push ve `reaction.notify`i keser, satır her zaman güncel kalır.
+    // Hata bildirimi (push) akışını düşürmez.
+    if (!guildId) {
+      await this.writeLastReaction(authorId, channelId, {
+        actorId,
+        actorUsername: actor.username,
+        emoji,
+        messageId,
+        at: new Date().toISOString(),
+      }).catch(() => undefined);
+    }
+
+    // Tekrar süzgeci: yalnız gerçekten gönderilecekse anahtar tüketilir. Redis hatasında
+    // bildirim atlanır (spam riskine karşı muhafazakâr); tepkinin kendisi etkilenmez.
+    const first = await this.redis
+      .setIfAbsent(`rxn:notif:${messageId}:${actorId}`, REACTION_NOTIF_DEDUPE_TTL_SECONDS)
+      .catch(() => false);
+    if (!first) return;
 
     const text = await this.gateway.resolveMentionPreview(
       previewFromAttachments(message.content, message.attachments),
@@ -126,5 +141,47 @@ export class ReactionNotifierService {
       messageId,
       preview,
     });
+  }
+
+  /** C46 §4b.2: yazarın üyelik satırına yaz + `dm.reaction` yayınla. */
+  private async writeLastReaction(authorId: string, channelId: string, lastReaction: LastReaction) {
+    const res = await this.prisma.channelMember.updateMany({
+      where: { channelId, userId: authorId },
+      data: { lastReaction: lastReaction as unknown as Prisma.InputJsonValue },
+    });
+    if (res.count === 0) return;
+    this.realtime.emitToUser(authorId, 'dm.reaction', { channelId, lastReaction });
+  }
+
+  /**
+   * C46 §4b.3: tepki gerçekten silindiğinde, yazarın göstergesi AYNI aktör+mesaj+emoji ise temizlenir.
+   * Çağıran fire-and-forget çağırır. Mesaj silinmesi temizlemez (liste DTO'su koşulu yeter).
+   */
+  async notifyRemoved(actorId: string, channelId: string, messageId: string, emoji: string) {
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      select: { authorId: true },
+    });
+    const authorId = message?.authorId;
+    if (!authorId || authorId === actorId) return;
+
+    const member = await this.prisma.channelMember.findUnique({
+      where: { channelId_userId: { channelId, userId: authorId } },
+      select: { lastReaction: true },
+    });
+    const current = parseLastReaction(member?.lastReaction);
+    if (
+      !current ||
+      current.actorId !== actorId ||
+      current.messageId !== messageId ||
+      current.emoji !== emoji
+    ) {
+      return;
+    }
+    await this.prisma.channelMember.update({
+      where: { channelId_userId: { channelId, userId: authorId } },
+      data: { lastReaction: Prisma.DbNull },
+    });
+    this.realtime.emitToUser(authorId, 'dm.reaction', { channelId, lastReaction: null });
   }
 }

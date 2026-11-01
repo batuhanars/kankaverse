@@ -16,6 +16,7 @@ import { presentIncomingCall, dismissIncomingCall } from '@/notifications/incomi
 import { clearChannelNotifications } from '@/notifications/push';
 import { t } from '@/i18n';
 import type { MessageDto } from '@/api/messages';
+import type { DmLastReactionDto } from '@/api/dm';
 import type { FriendDto, FriendRequestDto } from '@/api/friends';
 import type { VoiceParticipantDto } from '@/api/voice';
 
@@ -268,6 +269,11 @@ function ensureSocket(): Socket {
 
   socket.on('dm.message', (data: { channelId: string; lastMessage: { content: string; createdAt: string }; senderId: string }) => {
     useDmStore.getState().applyActivity(data);
+  });
+
+  // C46 §4b — DM/grup satırında tepki göstergesi (süzgeç sunucuda)
+  socket.on('dm.reaction', (data: { channelId: string; lastReaction: DmLastReactionDto | null }) => {
+    useDmStore.getState().applyReaction(data.channelId, data.lastReaction);
   });
 
   // C20 — başka cihazım okudu / cevapladı (yalnız kendi soketlerime gelir). DM ise rozet düşer ve

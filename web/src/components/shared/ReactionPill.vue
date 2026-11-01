@@ -5,8 +5,9 @@
  */
 import { ref, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import UserAvatar from './UserAvatar.vue'
 import { getReactionUsers } from '@/composables/useReactionUsers'
-import type { ReactionDto } from '@/types'
+import type { ReactionDto, ReactionGroupDto } from '@/types'
 
 const props = defineProps<{
   reaction: ReactionDto
@@ -23,6 +24,7 @@ const MAX_NAMES = 3
 
 const tip = ref('')
 const tipStyle = ref('')
+const tipUsers = ref<ReactionGroupDto['users']>([])
 let timer: ReturnType<typeof setTimeout> | null = null
 let hovering = false
 
@@ -41,6 +43,7 @@ async function loadTip(el: HTMLElement) {
     if (!hovering || !group) return
     const text = buildTip(group.users, group.count)
     if (!text) return
+    tipUsers.value = group.users.slice(0, MAX_NAMES)
     const r = el.getBoundingClientRect()
     // Pilin üstünde, ekran kenarlarına sıkıştırılmış (fixed: kaydırılan liste kırpmasın)
     const left = Math.max(8, Math.min(r.left, window.innerWidth - 248))
@@ -85,11 +88,21 @@ onUnmounted(onLeave)
   <Teleport to="body">
     <div
       v-if="tip"
-      class="fixed z-[60] max-w-[240px] px-2.5 py-1.5 rounded-[var(--kv-radius-md)] border text-[12px] pointer-events-none"
+      class="fixed z-[60] max-w-[240px] flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--kv-radius-md)] border text-[12px] pointer-events-none"
       :style="`${tipStyle}background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); color: var(--kv-text-primary);`"
       role="tooltip"
     >
-      {{ tip }}
+      <span class="flex shrink-0 -space-x-1.5">
+        <UserAvatar
+          v-for="u in tipUsers"
+          :key="u.id"
+          :username="u.username"
+          :avatar-url="u.avatarUrl"
+          size="sm"
+          class="ring-2 ring-[var(--kv-bg-elevated)]"
+        />
+      </span>
+      <span class="min-w-0">{{ tip }}</span>
     </div>
   </Teleport>
 </template>

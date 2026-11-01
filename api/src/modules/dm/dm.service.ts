@@ -12,6 +12,7 @@ import { CreateDmChannelDto } from './dto/create-dm-channel.dto';
 import { CreateGroupDmDto } from './dto/create-group-dm.dto';
 import { AddGroupMemberDto } from './dto/add-group-member.dto';
 import { RenameGroupDmDto } from './dto/rename-group-dm.dto';
+import { visibleLastReaction } from '../../common/utils/last-reaction.util';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 
 /**
@@ -231,8 +232,15 @@ export class DmService {
         if (!hasNewMessage) continue;
       }
 
+      const lastReaction = visibleLastReaction({
+        raw: m.lastReaction,
+        lastReadAt: m.lastReadAt,
+        lastMessageAt: lastMsg?.createdAt ?? null,
+        blockedEitherWay: (id) => selfBlockedSet.has(id) || blockedMeSet.has(id),
+      });
       const unread =
-        lastMsg !== null && (m.lastReadAt === null || lastMsg.createdAt > m.lastReadAt);
+        lastReaction !== null ||
+        (lastMsg !== null && (m.lastReadAt === null || lastMsg.createdAt > m.lastReadAt));
       const otherId = otherMember?.user.id;
       const selfBlocked = otherId ? selfBlockedSet.has(otherId) : false;
       const anyBlock = otherId ? selfBlockedSet.has(otherId) || blockedMeSet.has(otherId) : false;
@@ -278,6 +286,7 @@ export class DmService {
             }
           : null,
         unread,
+        lastReaction,
         canMessage,
         selfBlocked,
         receiptsEnabled: receipt.visible,
@@ -288,8 +297,15 @@ export class DmService {
     // GROUP_DM kanalları
     for (const m of groupMemberships) {
       const lastMsg = m.channel.messages[0] ?? null;
+      const lastReaction = visibleLastReaction({
+        raw: m.lastReaction,
+        lastReadAt: m.lastReadAt,
+        lastMessageAt: lastMsg?.createdAt ?? null,
+        blockedEitherWay: (id) => selfBlockedSet.has(id) || blockedMeSet.has(id),
+      });
       const unread =
-        lastMsg !== null && (m.lastReadAt === null || lastMsg.createdAt > m.lastReadAt);
+        lastReaction !== null ||
+        (lastMsg !== null && (m.lastReadAt === null || lastMsg.createdAt > m.lastReadAt));
 
       // C34 §1: grup okundu kararı; bireysel lastReadAt yanıta YAZILMAZ, yalnız toplu tek zaman.
       const groupReceipt = groupReadReceiptDecision({
@@ -330,6 +346,7 @@ export class DmService {
             }
           : null,
         unread,
+        lastReaction,
         receiptsEnabled: groupReceipt.visible,
         groupAllReadAt: groupReceipt.allReadAt ? groupReceipt.allReadAt.toISOString() : null,
       });
