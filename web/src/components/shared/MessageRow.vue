@@ -18,6 +18,7 @@ import { useI18n } from 'vue-i18n'
 import AttachmentView from './AttachmentView.vue'
 import ReceiptTick from './ReceiptTick.vue'
 import MessageActionsMenu from './MessageActionsMenu.vue'
+import MessageContextMenu from './MessageContextMenu.vue'
 import MessageEmbeds from './MessageEmbeds.vue'
 import { formatMentionsPlain } from '@/utils/mentions'
 import { renderMessageHtml } from '@/utils/markdown'
@@ -94,6 +95,50 @@ const isLocal = computed(() => !!props.message.localStatus)
 // C34: tik yalnız gönderilmiş (yerel/bekleyen olmayan) mesajda; sunucu bilgi vermediyse (`receipt` null) hiç çizilmez.
 const showReceipt = computed(() => !!props.receipt && !isLocal.value)
 
+// Sağ tık menüsü: görünürlük kuralları ⋯ menüsüyle aynı.
+const canCopy = computed(() => !!props.message.content)
+const canEdit = computed(() => props.isMine && !!props.message.content)
+const canDelete = computed(() => props.isMine || !!props.canManageMessages)
+const ctxMenu = ref<{ x: number; y: number; selection: string } | null>(null)
+
+/** Satır içinde seçili metin; menüye tıklayınca seçim kaybolabildiği için açılışta okunur. */
+function selectionIn(row: HTMLElement): string {
+  const sel = window.getSelection()
+  if (!sel || sel.isCollapsed) return ''
+  return row.contains(sel.anchorNode) && row.contains(sel.focusNode) ? sel.toString() : ''
+}
+
+function onRowContext(e: MouseEvent) {
+  // Düzenleme kutusunda ve eylemi olmayan satırda tarayıcının/masaüstünün kendi menüsü kalır.
+  if (props.isEditing || isLocal.value || (!canCopy.value && !canDelete.value)) return
+  e.preventDefault()
+  // Belgedeki kapatıcılara ulaşmasın: aynı satırda yeniden sağ tık menüyü kapatmak yerine taşır.
+  e.stopPropagation()
+  actionsMenuRef.value?.closeAll()
+  ctxMenu.value = {
+    x: e.clientX,
+    y: e.clientY,
+    selection: selectionIn(e.currentTarget as HTMLElement),
+  }
+}
+
+/** Seçim varsa seçili kısım, yoksa bahsetmeleri okunur hale getirilmiş mesaj metni kopyalanır. */
+async function copyText(selection = '') {
+  const text =
+    selection ||
+    formatMentionsPlain(
+      props.message.content,
+      (id) => props.mentionResolver?.(id),
+      t('mention.unknown'),
+      (roleId) => props.roleResolver?.(roleId)?.name,
+    )
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    // Pano izni yoksa yapılacak bir şey yok; menü zaten kapandı.
+  }
+}
+
 // Takip mesajına hover'da saat gösterimi
 const showFollowTime = ref(false)
 
@@ -153,7 +198,22 @@ const renderedContent = computed<string>(() => {
     :style="isMentioned ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);' : ''"
     @mouseenter="onRowEnter"
     @mouseleave="onRowLeave"
+    @contextmenu="onRowContext"
   >
+    <MessageContextMenu
+      v-if="ctxMenu"
+      :x="ctxMenu.x"
+      :y="ctxMenu.y"
+      :message-id="message.id"
+      :can-copy="canCopy"
+      :can-edit="canEdit"
+      :can-delete="canDelete"
+      @close="ctxMenu = null"
+      @copy="copyText(ctxMenu?.selection)"
+      @edit="emit('edit', message)"
+      @delete="emit('delete', message.id)"
+    />
+
     <!-- Hover araç çubuğu: -top-3 right-4, yalnız düzenleme modunda gizli.
          - Bu mesajın menüsü açıksa (emoji picker / ⋯) → grup-hover'dan bağımsız görünür kalır (z-40).
          - BAŞKA mesajın menüsü açıksa (toolbarSuppressed) → hover ile bile gizli kalır.
@@ -179,6 +239,7 @@ const renderedContent = computed<string>(() => {
         @reply="emit('reply', message)"
         @forward="emit('forward', message)"
         @edit="emit('edit', message)"
+        @copy="copyText()"
         @delete="emit('delete', message.id)"
         @report="emit('report', message.id)"
         @add-reaction="(emoji) => emit('addReaction', message.id, emoji)"

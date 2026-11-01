@@ -82,7 +82,11 @@ export function useAiVideoForm(
       )
       if (id === seq) estimateCredits.value = data.estimateCredits
     } catch {
-      if (id === seq) estimateFailed.value = true
+      if (id === seq) {
+        // Eski tutar ekranda kalmasın: seçim değişti, bayat teklifle Oluştur'a basılamaz.
+        estimateCredits.value = null
+        estimateFailed.value = true
+      }
     } finally {
       if (id === seq) estimating.value = false
     }

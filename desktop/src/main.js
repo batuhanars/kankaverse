@@ -220,6 +220,24 @@ function bringToFront() {
   win.focus()
 }
 
+// Sağ tık düzenleme menüsü: düzenlenebilir alanda tam liste, salt okunur seçili metinde yalnız Kopyala.
+function editMenuTemplate(params) {
+  const flags = params.editFlags
+  if (params.isEditable) {
+    return [
+      { role: 'undo', label: 'Geri al', enabled: flags.canUndo },
+      { role: 'redo', label: 'Yinele', enabled: flags.canRedo },
+      { type: 'separator' },
+      { role: 'cut', label: 'Kes', enabled: flags.canCut },
+      { role: 'copy', label: 'Kopyala', enabled: flags.canCopy },
+      { role: 'paste', label: 'Yapıştır', enabled: flags.canPaste },
+      { type: 'separator' },
+      { role: 'selectAll', label: 'Tümünü seç', enabled: flags.canSelectAll },
+    ]
+  }
+  return params.selectionText ? [{ role: 'copy', label: 'Kopyala', enabled: flags.canCopy }] : []
+}
+
 // ── Ana pencere ──────────────────────────────────────────────────────────────
 function createWindow() {
   const iconPath = resolveIconPath()
@@ -270,6 +288,13 @@ function createWindow() {
     } else if ((mod && input.shift && key === 'i') || input.key === 'F12') {
       win.webContents.toggleDevTools()
     }
+  })
+
+  // Electron'un varsayılan sağ tık menüsü yok: yazı alanlarında ve seçili metinde temel düzenleme menüsü.
+  // Mesaj satırları kendi menüsünü açar (web preventDefault eder), bu olay orada hiç tetiklenmez.
+  win.webContents.on('context-menu', (_event, params) => {
+    const template = editMenuTemplate(params)
+    if (template.length) Menu.buildFromTemplate(template).popup({ window: win })
   })
 
   // Harici linkleri (rel="external", target="_blank" vb.) sistem tarayıcısında aç.

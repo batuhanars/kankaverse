@@ -135,8 +135,8 @@ export function AiVideoPrompt({ value, onChange, items, labels, thumbs, editable
 const styles = StyleSheet.create({
   wrap: { gap: 6 },
   input: {
-    minHeight: 88,
-    maxHeight: 160,
+    minHeight: 120,
+    maxHeight: 200,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.borderStrong,

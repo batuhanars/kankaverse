@@ -78,7 +78,11 @@ export function useAiVideoForm(mode: RefMode, kinds: AiVideoRefKind[], locked = 
         );
         if (id === seq.current) setEstimateCredits(credits);
       } catch {
-        if (id === seq.current) setEstimateFailed(true);
+        if (id === seq.current) {
+          // Eski tutar ekranda kalmasın: seçim değişti, bayat teklifle Oluştur'a basılamaz.
+          setEstimateCredits(null);
+          setEstimateFailed(true);
+        }
       } finally {
         if (id === seq.current) setEstimating(false);
       }

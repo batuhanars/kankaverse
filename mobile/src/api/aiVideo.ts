@@ -86,8 +86,10 @@ export const aiVideoApi = {
     return (await http.get<AiVideoOptionsDto>('/ai-video/options')).data;
   },
   async estimate(sel: AiVideoSelection, kip: AiVideoEstimateMode) {
-    const extra = kip.mode === 'reference' ? { referenceKinds: kip.kinds } : { withImage: kip.mode === 'image' };
-    return (await http.post<{ estimateCredits: number }>('/ai-video/estimate', { ...sel, ...extra })).data;
+    // `withImage` DTO'da zorunlu: referans kipinde de gider (sunucu orada yok sayar), yoksa teklif 400 ile düşer.
+    const extra = kip.mode === 'reference' ? { referenceKinds: kip.kinds } : {};
+    const body = { ...sel, withImage: kip.mode === 'image', ...extra };
+    return (await http.post<{ estimateCredits: number }>('/ai-video/estimate', body)).data;
   },
   /** Tek görsel: eski `inputKey` yolu. Diğer her ek bileşimi: `references` (ikisi birlikte gönderilmez). */
   async create(

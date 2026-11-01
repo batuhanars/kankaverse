@@ -86,6 +86,11 @@ export function useAiVideo() {
     };
   }, [refreshRecent]);
 
+  // Sabit alandaki hata seçime aitti: kullanıcı süreyi/çözünürlüğü/ekleri değiştirince artık geçerli değil.
+  useEffect(() => {
+    setError('');
+  }, [form.model, form.resolution, form.durationS, form.aspectRatio, refs.items.length]);
+
   function track(row: AiVideoDto | null) {
     jobRef.current = row;
     setJob(row);

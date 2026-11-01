@@ -14,6 +14,8 @@ interface Props {
   /** C42: girdi videosu da ücretlenir; tahmin en yüksek tutar notu. */
   hasVideo?: boolean;
   busy: boolean;
+  /** Sunucudan dönen hata (ör. yetersiz kredi): form uzun olduğu için düğmenin yanında, sabit alanda gösterilir. */
+  error?: string;
   /** C33: pasif tanıtım; Oluştur kapalı + "yakında" notu, tahmin satırı yok. */
   locked?: boolean;
   /** C40/C43: hakla erişene kullanılan/tanımlanan kredi satırı (hak yoksa null, satır yok). */
@@ -83,6 +85,11 @@ export function AiVideoCostBar(p: Props) {
       ) : null}
       {p.inProgress && !p.locked ? <Text style={styles.spent}>{t('aiVideo.inProgress')}</Text> : null}
       {notEnough && !p.locked ? <Text style={styles.failed}>{t('aiVideo.grantNotEnough')}</Text> : null}
+      {p.error ? (
+        <Text style={styles.failed} accessibilityLiveRegion="polite">
+          {p.error}
+        </Text>
+      ) : null}
     </View>
   );
 }

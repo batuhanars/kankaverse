@@ -145,7 +145,8 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
               ) : (
                 <AiVideoForm ai={ai} />
               )}
-              {ai.error ? <Text style={styles.error}>{ai.error}</Text> : null}
+              {/* Form açıkken hata alttaki sabit alanda (AiVideoCostBar); ilerleme görünümünde o alan yok. */}
+              {ai.job && ai.error ? <Text style={styles.error}>{ai.error}</Text> : null}
               <AiVideoRecentList
                 rows={others}
                 statusLabel={ai.statusLabel}
@@ -167,6 +168,7 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
               inProgress={ai.inProgress}
               hasVideo={ai.refs.items.some((i) => i.kind === 'video')}
               busy={ai.busy}
+              error={ai.error}
               locked={ai.locked}
               grant={form.options?.grant ?? null}
               onSubmit={() => void ai.submit()}

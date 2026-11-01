@@ -33,6 +33,7 @@ const emit = defineEmits<{
   reply: []
   forward: []
   edit: []
+  copy: []
   delete: []
   report: []
   addReaction: [emoji: string]
@@ -61,7 +62,6 @@ const emojiTriggerEl = ref<HTMLElement | null>(null)
 
 // Parent'ın araç çubuğunu görünür tutması için: herhangi bir menü açıkken true
 const menuOpen = computed(() => showEmojiPicker.value || showMore.value)
-defineExpose({ menuOpen })
 
 function closeAll() {
   showMore.value = false
@@ -71,6 +71,7 @@ function closeAll() {
     openPickerMessageId.value = null
   }
 }
+defineExpose({ menuOpen, closeAll })
 
 function onReply() {
   closeAll()
@@ -85,6 +86,11 @@ function onForward() {
 function onEdit() {
   closeAll()
   emit('edit')
+}
+
+function onCopy() {
+  closeAll()
+  emit('copy')
 }
 
 function onDelete() {
@@ -260,6 +266,19 @@ onUnmounted(() => {
         >
           <span class="text-[15px] shrink-0">😀</span>
           <span>{{ t('reaction.viewReactions') }}</span>
+        </button>
+
+        <!-- Kopyala (metni olan her mesaj) -->
+        <button
+          v-if="hasContent"
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
+          style="color: var(--kv-text-primary);"
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
+          @click="onCopy"
+        >
+          <span class="text-[15px] shrink-0">📋</span>
+          <span>{{ t('message.copy') }}</span>
         </button>
 
         <!-- Düzenle (yalnız kendi + içerik varsa) -->
