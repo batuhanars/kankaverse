@@ -12,6 +12,18 @@ import { ScanStatus, type AttachmentDto } from '@/api/messages';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
+/** Sohbette görsel genişliği (VideoCard ile aynı) ve çok dikey görselin (uzun ekran görüntüsü) yükseklik sınırı. */
+const CHAT_IMAGE_WIDTH = 220;
+const CHAT_IMAGE_MAX_HEIGHT = 360;
+// Görsel boyutu sunucuda yok, ilk yüklemede öğrenilir. Liste satırı geri gelince kutu yeniden zıplamasın.
+const knownRatios = new Map<string, number>();
+
+/** Görselin tamamını oranını bozmadan gösteren ölçü; sınırı aşan dikey görsel daralır, kırpılmaz. */
+function fitStyle(ratio: number) {
+  const width = Math.min(CHAT_IMAGE_WIDTH, CHAT_IMAGE_MAX_HEIGHT * ratio);
+  return { width, height: undefined, aspectRatio: ratio };
+}
+
 // Sprint M1a contract §5.5 (🔴 T&S kapısı) — web/src/components/shared/AttachmentView.vue ile
 // BİREBİR aynı kural: mesajdaki ek nesnesi URL içermez, adres GET /attachments/:id'den alınır.
 // scanStatus CLEAN değilse görsel YÜKLENMEZ. Bu bir T&S kapısıdır — kapıyı istemcide gevşetme.
@@ -61,6 +73,7 @@ export function AttachmentView({
 
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [ratio, setRatio] = useState(() => knownRatios.get(attachment.id) ?? null);
   const [viewerOpen, setViewerOpen] = useState(false);
   // Tam ekran KENDİ adresini alır (küçük resminkini yeniden kullanmaz) — sebebi `openViewer`de.
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
@@ -171,7 +184,20 @@ export function AttachmentView({
       );
     }
 
-    const thumbnail = <Image source={{ uri: imageUrl }} style={[styles.image, sizeStyle]} resizeMode="cover" />;
+    // Sprint M2c ızgarası (`size`) kare hücrede kırpar; sohbette görselin tamamı görünür.
+    const thumbnail = (
+      <Image
+        source={{ uri: imageUrl }}
+        style={[styles.image, size ? sizeStyle : ratio ? fitStyle(ratio) : null]}
+        resizeMode={size ? 'cover' : 'contain'}
+        onLoad={(e) => {
+          const { width, height } = e.nativeEvent.source;
+          if (size || !width || !height) return;
+          knownRatios.set(attachment.id, width / height);
+          setRatio(width / height);
+        }}
+      />
+    );
     if (!interactive) return thumbnail;
 
     return (
@@ -276,7 +302,7 @@ const styles = StyleSheet.create({
   },
   image: {
     marginTop: 6,
-    width: 220,
+    width: CHAT_IMAGE_WIDTH,
     // M6a — dar ekranda (320dp) baloncuğun iç genişliği 220'nin altına inebiliyor, görsel taşmasın.
     maxWidth: '100%',
     height: 160,
