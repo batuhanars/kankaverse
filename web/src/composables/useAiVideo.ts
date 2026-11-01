@@ -38,11 +38,7 @@ export function useAiVideo() {
   const authStore = useAuthStore()
   const locked = authStore.user?.aiVideoAllowed !== true
   // C42: ekler (görsel + video + ses). Sınırlar seçili modelin `references` bilgisinden; form daha sonra kurulur (tembel okuma).
-  const refs = useAiVideoRefs(
-    () => form.current.value?.references,
-    prompt,
-    (m) => (error.value = m),
-  )
+  const refs = useAiVideoRefs(() => form.current.value?.references, prompt)
   const withImage = refs.singleImage
   const referenceKinds = computed(() => (refs.referenceMode.value ? refs.kinds.value : null))
   const form = useAiVideoForm(withImage, referenceKinds, locked)

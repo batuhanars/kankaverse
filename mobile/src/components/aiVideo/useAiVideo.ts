@@ -26,7 +26,7 @@ export function useAiVideo() {
   const [now, setNow] = useState(Date.now());
   // Ek hook'u seçenekleri çağrı anında okur (seçenekler form hook'undan gelir, sıra döngüsünü kırar).
   const refsOption = useRef<AiVideoReferencesOption | null>(null);
-  const refs = useAiVideoRefs(() => refsOption.current, setError);
+  const refs = useAiVideoRefs(() => refsOption.current);
   // C33: pasif tanıtım. Kilitliyken yalnız options çağrılır.
   const locked = useAuthStore((s) => s.user?.aiVideoAllowed !== true);
   const kinds = refs.items.map((i) => i.kind);

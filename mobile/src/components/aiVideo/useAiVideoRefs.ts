@@ -36,8 +36,10 @@ function limitParams(refs: AiVideoReferencesOption): Record<string, number> {
  * yükleme bitmeden "Oluştur" pasif. Tür/boyut/süre denetimi erken uyarıdır, otorite sunucu.
  * Sınırlar ve kabul edilen türler `references` (options) kaynağından gelir (`getRefs`, çağrı anında okunur), sabit liste tutulmaz.
  */
-export function useAiVideoRefs(getRefs: () => AiVideoReferencesOption | null, onError: (message: string) => void) {
+export function useAiVideoRefs(getRefs: () => AiVideoReferencesOption | null) {
   const [items, setItems] = useState<RefItem[]>([]);
+  // Ön denetim hatası "Dosya ekle" düğmesinin altında gösterilir (formun dibinde kalınca mobilde görünmüyordu)
+  const [addError, setAddError] = useState('');
   const itemsRef = useRef<RefItem[]>([]);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
 
@@ -78,7 +80,7 @@ export function useAiVideoRefs(getRefs: () => AiVideoReferencesOption | null, on
   async function add(cands: Candidate[]) {
     const refs = getRefs();
     if (!refs || !cands.length) return;
-    onError('');
+    setAddError('');
     let message = '';
     for (const c of cands) {
       const d = await describe(c);
@@ -96,7 +98,7 @@ export function useAiVideoRefs(getRefs: () => AiVideoReferencesOption | null, on
       }
       void upload(item);
     }
-    if (message) onError(message);
+    if (message) setAddError(message);
   }
 
   /** Galeri: görsel + video birlikte (expo-image-picker). Seçim sınırı kalan görsel+video yuvası. */
@@ -105,7 +107,7 @@ export function useAiVideoRefs(getRefs: () => AiVideoReferencesOption | null, on
     if (!refs) return;
     const used = itemsRef.current.filter((i) => i.kind !== 'audio').length;
     const slots = refs.max.image + refs.max.video - used;
-    if (slots <= 0) return onError(t(DENIAL_KEY.full));
+    if (slots <= 0) return setAddError(t(DENIAL_KEY.full));
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images', 'videos'],
       allowsMultipleSelection: true,
@@ -139,6 +141,7 @@ export function useAiVideoRefs(getRefs: () => AiVideoReferencesOption | null, on
     const cur = itemsRef.current;
     const idx = cur.findIndex((i) => i.id === id);
     if (idx < 0) return null;
+    setAddError('');
     const kind = cur[idx].kind;
     const n = cur.slice(0, idx + 1).filter((i) => i.kind === kind).length;
     commit(cur.filter((i) => i.id !== id));
@@ -148,6 +151,7 @@ export function useAiVideoRefs(getRefs: () => AiVideoReferencesOption | null, on
   return {
     items,
     thumbs,
+    addError,
     labels: labelsOf(items),
     mode: modeOf(items),
     uploading: items.some((i) => i.status === 'uploading'),

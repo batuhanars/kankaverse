@@ -81,6 +81,7 @@ export function AiVideoForm({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
           labels={refs.labels}
           thumbs={refs.thumbs}
           mode={refs.mode}
+          error={refs.addError}
           disabled={ai.locked}
           onPickMedia={() => void refs.pickMedia()}
           onPickAudio={() => void refs.pickAudio()}

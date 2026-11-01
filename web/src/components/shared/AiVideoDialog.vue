@@ -195,6 +195,7 @@ async function onPrimary() {
             :limits="refs.limits.value"
             :accept="refs.accept.value"
             :single-image="refs.singleImage.value"
+            :error="refs.addError.value"
             :locked="ai.locked"
             @add="refs.addFiles"
             @remove="refs.remove"

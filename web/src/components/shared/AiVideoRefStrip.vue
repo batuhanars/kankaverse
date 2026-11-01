@@ -26,6 +26,8 @@ defineProps<{
   limits: AiVideoReferencesOption
   accept: string
   singleImage: boolean
+  /** Ön denetim hatası (boyut, süre, tür, sayı): düğmenin hemen altında, kaydırmadan görünsün. */
+  error?: string
   locked?: boolean
 }>()
 const emit = defineEmits<{ add: [files: File[]]; remove: [uid: number] }>()
@@ -57,6 +59,7 @@ const sec = (v: number) => t('aiVideo.durationOption', { sec: Math.round(v) })
       </span>
       <input ref="input" type="file" multiple :accept="accept" class="hidden" @change="onPick" />
     </div>
+    <p v-if="error" role="alert" class="text-[13px]" style="color: var(--kv-danger);">{{ error }}</p>
 
     <ul v-if="items.length" class="flex gap-2 overflow-x-auto pb-1 min-w-0 list-none p-0 m-0">
       <li

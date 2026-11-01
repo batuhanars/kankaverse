@@ -55,10 +55,11 @@ function readDuration(url: string, kind: AiVideoRefKind): Promise<number | null>
 export function useAiVideoRefs(
   spec: () => AiVideoReferencesOption | null | undefined,
   prompt: Ref<string>,
-  setError: (message: string) => void,
 ) {
   const { t } = useI18n()
   const list = ref<AiVideoRef[]>([])
+  // Ön denetim hatası "Dosya ekle" düğmesinin altında gösterilir (formun dibinde kalınca dar ekranda görünmüyordu)
+  const addError = ref('')
   let uidSeq = 0
 
   const limits = computed(() => spec() ?? IMAGE_ONLY)
@@ -138,7 +139,7 @@ export function useAiVideoRefs(
   }
 
   async function addFiles(files: File[]) {
-    setError('')
+    addError.value = ''
     for (const file of files) {
       const kind = kindOf(file)
       const previewUrl = URL.createObjectURL(file)
@@ -147,7 +148,7 @@ export function useAiVideoRefs(
       const problem = check(kind, file, durationS)
       if (problem || !kind) {
         URL.revokeObjectURL(previewUrl)
-        setError(problem)
+        addError.value = problem
         continue
       }
       const uid = ++uidSeq
@@ -168,6 +169,7 @@ export function useAiVideoRefs(
   function remove(uid: number) {
     const idx = list.value.findIndex((r) => r.uid === uid)
     if (idx < 0) return
+    addError.value = ''
     const [gone] = list.value.splice(idx, 1)
     const n = list.value.slice(0, idx).filter((r) => r.kind === gone.kind).length + 1
     URL.revokeObjectURL(gone.previewUrl)
@@ -183,6 +185,7 @@ export function useAiVideoRefs(
 
   return {
     items,
+    addError,
     counts,
     kinds,
     limits,

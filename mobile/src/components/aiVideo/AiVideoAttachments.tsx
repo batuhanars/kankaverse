@@ -12,6 +12,8 @@ interface Props {
   labels: string[];
   thumbs: Record<string, string>;
   mode: RefMode;
+  /** Ön denetim hatası (boyut, süre, tür, sayı): düğmenin hemen altında, kaydırmadan görünsün. */
+  error: string;
   disabled: boolean;
   onPickMedia: () => void;
   onPickAudio: () => void;
@@ -59,7 +61,7 @@ function Card({ item, label, thumb, onRemove }: { item: RefItem; label: string; 
 }
 
 /** C42 §3.1/2/4/7: Dosya ekle, ek şeridi, sayaç, kip açıklaması ve kural notu. */
-export function AiVideoAttachments({ refs, items, labels, thumbs, mode, disabled, onPickMedia, onPickAudio, onRemove }: Props) {
+export function AiVideoAttachments({ refs, items, labels, thumbs, mode, error, disabled, onPickMedia, onPickAudio, onRemove }: Props) {
   const [menu, setMenu] = useState(false);
   const count = (k: RefItem['kind']) => items.filter((i) => i.kind === k).length;
   const mediaFull = count('image') >= refs.max.image && count('video') >= refs.max.video;
@@ -76,6 +78,11 @@ export function AiVideoAttachments({ refs, items, labels, thumbs, mode, disabled
         <Ionicons name="attach" size={18} color={theme.colors.textSecondary} />
         <Text style={styles.ghostText}>{t('mobile.aiVideoRefs.add')}</Text>
       </Pressable>
+      {error ? (
+        <Text style={styles.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
       {menu ? (
         <View style={styles.menu}>
           <Pressable
@@ -209,6 +216,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: theme.colors.bgOverlay,
   },
+  error: { color: theme.colors.danger, fontSize: theme.fontSize.sm },
   hint: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs },
   note: { color: theme.colors.textSecondary, fontSize: theme.fontSize.sm },
 });
