@@ -9,6 +9,7 @@ export interface UpdateProfilePayload {
   readReceipts?: boolean // C12 — okundu bilgisi paylaşımı (karşılıklı)
   showGameActivity?: boolean // C31b — "Oynadığım oyunu göster"
   showRecentActivity?: boolean // C31f — "Son oynadığım oyunlar" (7 gün saklanır; minörde sunucu 403 verir)
+  reactionNotifications?: boolean // C46 — tepki bildirimi anahtarı
   quickReactions?: string[] // C24 — tam 5 emoji; boş dizi = varsayılana dön
 }
 

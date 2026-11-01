@@ -20,6 +20,7 @@ export function resolvePushTarget(data: Record<string, unknown>): Href | null {
 
   switch (type) {
     case 'MENTION':
+    case 'REACTION': // C46 §6.3: tepki bildirimi bahsetmeyle aynı hedef (ortam kanalı ya da DM)
       if (!channelId) return null;
       // `onItemPress` ile aynı hedef: guild kanalıysa kanal ekranı, yoksa DM.
       // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-08-03, cihaz turu) — `guildId` BİLİNÇLİ olarak

@@ -2,6 +2,8 @@ import { useRouter } from 'expo-router';
 import { MessageActionSheet } from './MessageActionSheet';
 import { ForwardMessageModal } from './ForwardMessageModal';
 import { EmojiGifSheet } from './EmojiGifSheet';
+import { ReactionsSheet } from './ReactionsSheet';
+import type { MessageAuthorDto } from '@/api/messages';
 import { recordEmojiUse } from '@/utils/recentEmojis';
 import type { useMessageActions } from './useMessageActions';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -22,9 +24,11 @@ interface Props {
   onEdit: () => void;
   /** Sprint M1h — sabitleme yetkisi (ortamda `MANAGE_MESSAGES`, DM/grupta her üye). */
   canPin: boolean;
+  /** C46 — "Tepkileri gör" panelinde kişiye dokunuş: çağıran ekran profil panelini açar. */
+  onOpenProfile: (user: MessageAuthorDto) => void;
 }
 
-export function MessageActionHost({ actions, onReply, onEdit, canPin }: Props) {
+export function MessageActionHost({ actions, onReply, onEdit, canPin, onOpenProfile }: Props) {
   const router = useRouter();
   return (
     <>
@@ -39,6 +43,10 @@ export function MessageActionHost({ actions, onReply, onEdit, canPin }: Props) {
           // Şerit dokunuşu da sık kullanılanlara sayılır (web ile aynı).
           void recordEmojiUse(emoji);
           if (m) actions.toggleReaction(m, emoji);
+        }}
+        hasReactions={(actions.target?.reactions?.length ?? 0) > 0}
+        onShowReactions={() => {
+          if (actions.target) actions.openReactions(actions.target);
         }}
         onReply={onReply}
         onEdit={onEdit}
@@ -74,6 +82,19 @@ export function MessageActionHost({ actions, onReply, onEdit, canPin }: Props) {
         onEmojiSelected={actions.pickEmoji}
         showGif={false}
       />
+
+      {actions.reactionsTarget && (
+        <ReactionsSheet
+          channelId={actions.reactionsTarget.channelId}
+          message={actions.reactionsTarget}
+          onClose={actions.closeReactions}
+          onSelectUser={(user) => {
+            // Aynı anda tek modal: panel kapanır, sonra profil açılır.
+            actions.closeReactions();
+            onOpenProfile(user);
+          }}
+        />
+      )}
 
       {actions.forwardTarget && (
         <ForwardMessageModal message={actions.forwardTarget} onClose={actions.closeForward} />

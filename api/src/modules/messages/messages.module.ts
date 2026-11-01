@@ -5,6 +5,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { VoiceModule } from '../voice/voice.module';
 import { MessagesController, PinsController, GuildSearchController } from './messages.controller';
 import { MessagesService } from './messages.service';
+import { ReactionNotifierService } from './reaction-notifier.service';
 import { MessagesGateway } from './gateway/messages.gateway';
 
 // SharedModule ModerationService'i export eder — enforcement bağlantısı buradan gelir
@@ -14,7 +15,7 @@ import { MessagesGateway } from './gateway/messages.gateway';
 @Module({
   imports: [JwtModule.register({}), SharedModule, NotificationsModule, VoiceModule],
   controllers: [MessagesController, PinsController, GuildSearchController],
-  providers: [MessagesService, MessagesGateway],
+  providers: [MessagesService, MessagesGateway, ReactionNotifierService],
   // C35: WebhooksModule ortak çekirdeği (kapılar, DTO, yayın) bu iki servisten kullanır
   exports: [MessagesService, MessagesGateway],
 })

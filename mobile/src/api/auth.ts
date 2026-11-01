@@ -56,6 +56,8 @@ export interface UserDto {
   showRecentActivity?: boolean;
   /** C24 — hızlı tepki şeridi, her zaman 5 elemanlı etkin liste (kayıt yoksa sunucu varsayılanı). */
   quickReactions: string[];
+  /** C46 — tepki bildirimleri (varsayılan açık; eski sunucuda alan yok → açık say). */
+  reactionNotifications?: boolean;
 }
 
 /**

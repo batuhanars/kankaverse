@@ -8,6 +8,7 @@ import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
 import { useMessageJump } from '@/composables/useMessageJump'
+import { reactionEmoji, reactionPreviewText } from '@/utils/reactionNotification'
 import type { NotificationDto } from '@/types'
 
 const { t } = useI18n()
@@ -77,9 +78,16 @@ function notificationText(n: NotificationDto): string {
     case 'EVENT_CREATED':
       // R14 — metin mobille BİREBİR (tek kaynak tr.json)
       return t('notification.eventCreated', { actor, event: n.preview ?? '' })
+    case 'REACTION':
+      return t('notification.reaction', { actor, emoji: reactionEmoji(n.preview) })
     default:
       return actor
   }
+}
+
+// Satırın alt metni: REACTION'da önizleme emojiyi taşır (metne gitti), kalanı gösterilir
+function notificationPreview(n: NotificationDto): string {
+  return n.type === 'REACTION' ? reactionPreviewText(n.preview) : (n.preview ?? '')
 }
 
 // Türk yereli görece zaman ("5 dk önce")
@@ -119,7 +127,7 @@ async function onItemClick(n: NotificationDto) {
   showNotifications.value = false
   void notificationsStore.markRead(n.id)
 
-  if (n.type === 'MENTION' && n.channelId) {
+  if ((n.type === 'MENTION' || n.type === 'REACTION') && n.channelId) {
     // Guild kanalı → channel route; DM (guildId null) → dm route. Sonra mesaja zıpla.
     if (n.guildId) {
       router.push({ name: 'channel', params: { guildId: n.guildId, channelId: n.channelId } })
@@ -253,11 +261,11 @@ async function onItemClick(n: NotificationDto) {
             <!-- Mention önizlemesi (varsa) — GUILD_INVITE'ta preview davet kodudur, gösterilmez;
                  EVENT_CREATED'ta preview etkinlik adı ve zaten metnin içinde geçiyor (tekrar etmesin) -->
             <p
-              v-if="item.preview && item.type !== 'GUILD_INVITE' && item.type !== 'EVENT_CREATED'"
+              v-if="notificationPreview(item) && item.type !== 'GUILD_INVITE' && item.type !== 'EVENT_CREATED'"
               class="text-[12px] leading-snug mt-0.5 truncate"
               style="color: var(--kv-text-muted);"
             >
-              {{ item.preview }}
+              {{ notificationPreview(item) }}
             </p>
             <p class="text-[11px] mt-1" style="color: var(--kv-text-muted);">
               {{ relativeTime(item.createdAt) }}

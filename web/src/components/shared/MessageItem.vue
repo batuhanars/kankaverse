@@ -10,6 +10,8 @@ import UserCardPopover from './UserCardPopover.vue'
 import ReportModal from './ReportModal.vue'
 import ForwardMessageModal from './ForwardMessageModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
+import ReactionPill from './ReactionPill.vue'
+import ReactionsModal from './ReactionsModal.vue'
 import type { MessageDto, GuildMemberDto } from '@/types'
 
 const props = defineProps<{
@@ -82,6 +84,8 @@ const cardY = ref(0)
 const showReportModal = ref(false)
 // İlet (forward) modalı
 const showForward = ref(false)
+// C46: kimler tepki verdi penceresi
+const showReactions = ref(false)
 
 // Düzenleme durumu
 const editing = ref(false)
@@ -234,6 +238,7 @@ onUnmounted(() => {
     @delete="openDeleteConfirm"
     @report="showReportModal = true"
     @add-reaction="addReaction"
+    @view-reactions="showReactions = true"
     @pin="pinMessage"
     @unpin="unpinMessage"
     @retry="emit('retry', $event)"
@@ -268,19 +273,14 @@ onUnmounted(() => {
 
     <!-- Reaksiyon pill'leri (guild kanalı) -->
     <template #reactions>
-      <button
+      <ReactionPill
         v-for="reaction in message.reactions"
         :key="reaction.emoji"
-        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[13px] cursor-pointer transition-colors border"
-        :style="reaction.reactedByMe
-          ? 'background-color: var(--kv-accent-subtle); border-color: var(--kv-accent-500); color: var(--kv-accent-500);'
-          : 'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'"
-        :title="t('reaction.toggleTitle')"
-        @click.stop="toggleReaction(reaction.emoji, reaction.reactedByMe)"
-      >
-        <span>{{ reaction.emoji }}</span>
-        <span class="text-[12px] font-medium">{{ reaction.count }}</span>
-      </button>
+        :reaction="reaction"
+        :channel-id="message.channelId"
+        :message-id="message.id"
+        @toggle="toggleReaction(reaction.emoji, reaction.reactedByMe)"
+      />
     </template>
   </MessageRow>
 
@@ -300,6 +300,15 @@ onUnmounted(() => {
     target-type="MESSAGE"
     :target-id="message.id"
     @close="showReportModal = false"
+  />
+
+  <!-- C46: kimler tepki verdi -->
+  <ReactionsModal
+    v-if="showReactions"
+    :channel-id="message.channelId"
+    :message-id="message.id"
+    :guild-id="guildId"
+    @close="showReactions = false"
   />
 
   <!-- Mesaj ilet (forward) modalı -->

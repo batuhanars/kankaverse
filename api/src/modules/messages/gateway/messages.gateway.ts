@@ -864,7 +864,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
    * `guildId` null ise (DM) rol sorgusu atlanır — DM'de rol kavramı yok; token yine de gelirse
    * (savunmacı) nötr "@rol" karşılığı döner.
    */
-  private async resolveMentionPreview(content: string, guildId: string | null): Promise<string> {
+  async resolveMentionPreview(content: string, guildId: string | null): Promise<string> {
     const userIds = Array.from(content.matchAll(/<@([a-zA-Z0-9_-]+)>/g)).map((m) => m[1]);
     const roleIds = Array.from(content.matchAll(/<@&([a-zA-Z0-9_-]+)>/g)).map((m) => m[1]);
 

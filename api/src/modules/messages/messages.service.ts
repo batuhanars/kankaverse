@@ -34,6 +34,9 @@ type AttachmentDto = Pick<
   | 'aiGenerationId'
 >;
 
+/** C46: addReaction sonucu; `removed`/`added` doluysa o emoji için olay yayınlanır. */
+export type ReactionChange = { removed: string | null; added: string | null };
+
 type ReactionAggDto = { emoji: string; count: number; reactedByMe: boolean };
 
 type ReplyToDto = { id: string; content: string; authorUsername: string } | null;
@@ -151,6 +154,7 @@ function withNonce<T extends object>(dto: T, nonce?: string): T & { nonce?: stri
  * kuralının kardeşi: rol bahsetmesi kişi başına değil GRUP başına ping ürettiği için sınır daha dar.
  */
 const MAX_ROLE_MENTIONS = 3;
+const REACTION_LIST_LIMIT = 200; // C46 §3.1
 
 /** Düz metin `@everyone` (kelime/`<@&`/`@@` içinde değil); `@here` eşleşmez. Yalnız webhook yolu kullanır. */
 const PLAIN_EVERYONE_RE = /(?<![\w@<&])@everyone(?!\w)/;
@@ -854,31 +858,46 @@ export class MessagesService {
     return null;
   }
 
-  async addReaction(userId: string, channelId: string, messageId: string, emoji: string) {
+  /**
+   * C46: kişi başı mesaj başına TEK tepki. Tek transaction:
+   *  - aynı emoji zaten var → değişiklik yok;
+   *  - başka emoji var → eskisi silinir, yenisi eklenir (`removed` = eski, `added` = yeni);
+   *  - hiç yok → eklenir.
+   * Yarışta (P2002) bir kez yeniden denenir; yine çakışırsa "değişiklik yok" sayılır.
+   * Çağıran yayını buna göre yapar: önce `reaction.removed`, sonra `reaction.added`.
+   */
+  async addReaction(
+    userId: string,
+    channelId: string,
+    messageId: string,
+    emoji: string,
+  ): Promise<ReactionChange> {
     await this.membership.requireChannelAccess(userId, channelId);
+    await this.requireLiveMessage(channelId, messageId);
 
-    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
-    if (!message || message.deletedAt !== null) {
-      throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'MESSAGE_NOT_FOUND' });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const existing = await tx.messageReaction.findUnique({
+            where: { messageId_userId: { messageId, userId } },
+          });
+          if (existing?.emoji === emoji) return { removed: null, added: null };
+          if (existing) await tx.messageReaction.deleteMany({ where: { id: existing.id } });
+          await tx.messageReaction.create({ data: { messageId, userId, emoji } });
+          return { removed: existing?.emoji ?? null, added: emoji };
+        });
+      } catch (err) {
+        const isRace = err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+        if (!isRace) throw err;
+      }
     }
-
-    // Idempotent: zaten varsa no-op. Dönen değer gerçekten satır eklendi mi; çağıran yalnız o zaman
-    // `reaction.added` yayar (istemciler sayacı delta ile artırıyor, boş yayın sayacı şişiriyordu).
-    const { count } = await this.prisma.messageReaction.createMany({
-      data: [{ messageId, userId, emoji }],
-      skipDuplicates: true,
-    });
-
-    return count > 0;
+    return { removed: null, added: null };
   }
 
   async removeReaction(userId: string, channelId: string, messageId: string, emoji: string) {
     await this.membership.requireChannelAccess(userId, channelId);
 
-    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
-    if (!message || message.deletedAt !== null) {
-      throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'MESSAGE_NOT_FOUND' });
-    }
+    await this.requireLiveMessage(channelId, messageId);
 
     // No-op: kayıt yoksa hata fırlatma. Dönen değer gerçekten satır silindi mi (yayın kararı çağıranda).
     const { count } = await this.prisma.messageReaction.deleteMany({
@@ -886,6 +905,62 @@ export class MessagesService {
     });
 
     return count > 0;
+  }
+
+  /**
+   * C46 §3 — kimler hangi emojiyle tepki verdi. Erişim: `requireChannelAccess` (mesajı görebilen
+   * listeyi görür, yeni ifşa yok). En fazla 200 satır okunur; fazlası `count`ta görünmez, listede yok.
+   * Gruplar ilk tepki zamanına göre, kişiler `createdAt` artan.
+   */
+  async listReactions(userId: string, channelId: string, messageId: string) {
+    await this.membership.requireChannelAccess(userId, channelId);
+    await this.requireLiveMessage(channelId, messageId);
+
+    // `count` tüm satırları sayar (200 sınırı yalnız okunan kişi listesine uygulanır).
+    const [totals, rows] = await Promise.all([
+      this.prisma.messageReaction.groupBy({
+        by: ['emoji'],
+        where: { messageId },
+        _count: { _all: true },
+        _min: { createdAt: true },
+      }),
+      this.prisma.messageReaction.findMany({
+        where: { messageId },
+        orderBy: { createdAt: 'asc' },
+        take: REACTION_LIST_LIMIT,
+        select: { emoji: true, userId: true },
+      }),
+    ]);
+    if (totals.length === 0) return [];
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: [...new Set(rows.map((r) => r.userId))] } },
+      select: MESSAGE_AUTHOR_SELECT,
+    });
+    const userById = new Map(users.map((u) => [u.id, u]));
+
+    const usersByEmoji = new Map<string, typeof users>();
+    for (const r of rows) {
+      const user = userById.get(r.userId);
+      if (!user) continue;
+      usersByEmoji.set(r.emoji, [...(usersByEmoji.get(r.emoji) ?? []), user]);
+    }
+
+    return [...totals]
+      .sort((x, y) => (x._min.createdAt?.getTime() ?? 0) - (y._min.createdAt?.getTime() ?? 0))
+      .map((t) => ({
+        emoji: t.emoji,
+        count: t._count._all,
+        users: usersByEmoji.get(t.emoji) ?? [],
+      }));
+  }
+
+  private async requireLiveMessage(channelId: string, messageId: string) {
+    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
+    if (!message || message.deletedAt !== null || message.channelId !== channelId) {
+      throw new NotFoundException({ message: 'Mesaj bulunamadı.', error: 'MESSAGE_NOT_FOUND' });
+    }
+    return message;
   }
 
   // ── PIN ortak yetki yardımcısı ──────────────────────────────────────────────

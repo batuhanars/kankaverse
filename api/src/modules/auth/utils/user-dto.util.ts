@@ -22,6 +22,8 @@ export function toUserDto(
     dmPolicy: user.dmPolicy,
     // C12: okundu bilgisi paylaşımı (karşılıklı). İstemci Gizlilik ekranında kendi durumunu okur.
     readReceipts: user.readReceipts,
+    // C46: mesajıma bırakılan tepkilerin bildirimi (varsayılan açık).
+    reactionNotifications: user.reactionNotifications,
     // C31b: oyun paylaşımı. `showGameActivity` ham ayar (null = hiç dokunmadı), `gameActivityEffective`
     // yaşa göre varsayılan uygulanmış hâl (yetişkin açık, minör kapalı) — istemci yeniden hesaplamaz.
     showGameActivity: user.showGameActivity,

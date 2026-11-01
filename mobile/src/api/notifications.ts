@@ -14,6 +14,8 @@ export const NotificationType = {
   GUILD_INVITE: 'GUILD_INVITE',
   // Sprint R14 — ortamda yeni etkinlik oluşturuldu (`preview` = etkinlik adı)
   EVENT_CREATED: 'EVENT_CREATED',
+  // C46 — mesajına tepki verildi (`preview` = emoji + mesaj önizlemesi)
+  REACTION: 'REACTION',
 } as const;
 // eslint-disable-next-line @typescript-eslint/no-redeclare -- enum-like const+type deseni, bkz. api/channels.ts
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];

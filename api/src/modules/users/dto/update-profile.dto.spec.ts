@@ -54,3 +54,20 @@ describe('toUserDto.quickReactions (C24)', () => {
     ).toEqual(saved);
   });
 });
+
+describe('reactionNotifications (C46)', () => {
+  it('boolean kabul edilir', async () => {
+    const dto = plainToInstance(UpdateProfileDto, { reactionNotifications: false });
+    expect(await validate(dto)).toHaveLength(0);
+  });
+  it('boolean olmayan reddedilir', async () => {
+    const dto = plainToInstance(UpdateProfileDto, { reactionNotifications: 'hayir' });
+    expect((await validate(dto)).length).toBeGreaterThan(0);
+  });
+  it('toUserDto alanı döner', () => {
+    const base = { createdAt: new Date(), emailVerifiedAt: null, quickReactions: [] };
+    expect(
+      toUserDto({ ...base, reactionNotifications: false } as never, false).reactionNotifications,
+    ).toBe(false);
+  });
+});

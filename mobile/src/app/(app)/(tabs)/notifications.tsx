@@ -22,11 +22,21 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' });
 }
 
+/** Metin satırının altındaki önizleme; davet kodu ve etkinlik adı gösterilmez, tepkide emoji metinde. */
+function previewLine(n: NotificationDto): string | null {
+  if (!n.preview || n.type === 'GUILD_INVITE' || n.type === 'EVENT_CREATED') return null;
+  if (n.type !== 'REACTION') return n.preview;
+  return n.preview.split(' ').slice(1).join(' ') || null;
+}
+
 function notificationText(n: NotificationDto): string {
   const actor = n.actor?.username ?? t('notification.someone');
   switch (n.type) {
     case 'MENTION':
       return t('notification.mention', { actor });
+    case 'REACTION':
+      // C46 §1.4: preview = "emoji + boşluk + mesaj önizlemesi"
+      return t('notification.reaction', { actor, emoji: n.preview?.split(' ')[0] ?? '' });
     case 'FRIEND_REQUEST':
       return t('notification.friendRequest', { actor });
     case 'FRIEND_ACCEPT':
@@ -142,7 +152,7 @@ export default function NotificationsScreen() {
       if (n.guildId) router.push({ pathname: '/guild-events', params: { guildId: n.guildId } });
       return;
     }
-    if (n.type !== 'MENTION' || !n.channelId) return;
+    if ((n.type !== 'MENTION' && n.type !== 'REACTION') || !n.channelId) return;
     if (n.guildId) {
       // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-08-03, cihaz turu — push'tan açılan kanal). Push
       // yolu (`pushNavigation.ts`) aynı kusuru taşıyordu ve orada düzeltildi; burada da `guildId`
@@ -201,7 +211,7 @@ export default function NotificationsScreen() {
               item.type === 'FRIEND_ACCEPT' ||
               (item.type === 'GUILD_INVITE' && !!item.preview) ||
               (item.type === 'EVENT_CREATED' && !!item.guildId) ||
-              (item.type === 'MENTION' && !!item.channelId);
+              ((item.type === 'MENTION' || item.type === 'REACTION') && !!item.channelId);
             return (
               <Pressable
                 disabled={!clickable}
@@ -225,9 +235,9 @@ export default function NotificationsScreen() {
                 <View style={styles.rowBody}>
                   <Text style={styles.text}>{notificationText(item)}</Text>
                   {/* EVENT_CREATED'ta preview etkinlik adı ve zaten metnin içinde — tekrar etmesin */}
-                  {item.preview && item.type !== 'GUILD_INVITE' && item.type !== 'EVENT_CREATED' ? (
+                  {previewLine(item) ? (
                     <Text style={styles.preview} numberOfLines={1}>
-                      {item.preview}
+                      {previewLine(item)}
                     </Text>
                   ) : null}
                   <Text style={styles.time}>{relativeTime(item.createdAt)}</Text>

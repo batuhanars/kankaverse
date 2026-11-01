@@ -27,6 +27,9 @@ export function useMessageActions(channelId: string) {
   // İletme de ayrı modal, aynı sebeple ayrı hedef.
   const [forwardTarget, setForwardTarget] = useState<MessageDto | null>(null);
 
+  // C46: "Tepkileri gör" paneli de ayrı modal (iç içe modal güvenilmez); hedef ayrı tutulur.
+  const [reactionsTarget, setReactionsTarget] = useState<MessageDto | null>(null);
+
   function open(message: MessageDto) {
     setTarget(message);
   }
@@ -42,6 +45,18 @@ export function useMessageActions(channelId: string) {
       ? messagesApi.removeReaction(channelId, message.id, emoji)
       : messagesApi.addReaction(channelId, message.id, emoji);
     void call.catch(() => {});
+  }
+
+  /**
+   * C46 §6.1 — çift dokunma. YALNIZ EKLER: kişinin bu mesajda zaten herhangi bir tepkisi varsa
+   * hiçbir şey olmaz (yanlışlıkla değiştirme/silme yok; kişi başı tek tepki). Karar mesajın
+   * `reactedByMe` bilgisiyle verilir; yazma yine yalnız WS olayından (iyimser güncelleme yok).
+   * Yerel/gönderilmemiş mesajda çağıran taraf zaten bağlamaz.
+   */
+  function quickReact(message: MessageDto, emoji: string | undefined) {
+    if (!emoji || message.localStatus) return;
+    if (message.reactions?.some((r) => r.reactedByMe)) return;
+    void messagesApi.addReaction(channelId, message.id, emoji).catch(() => {});
   }
 
   /** Panelden tam listeye geç: paneli kapat, hedefi picker'a devret. */
@@ -100,6 +115,13 @@ export function useMessageActions(channelId: string) {
     open,
     close,
     toggleReaction,
+    quickReact,
+    reactionsTarget,
+    openReactions: (message: MessageDto) => {
+      setReactionsTarget(message);
+      setTarget(null);
+    },
+    closeReactions: () => setReactionsTarget(null),
     pickerOpen: !!pickerTarget,
     openPicker,
     closePicker: () => setPickerTarget(null),

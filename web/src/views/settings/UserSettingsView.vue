@@ -446,6 +446,25 @@ async function toggleRecentActivity(next: boolean) {
   }
 }
 
+// ── C46 §4.5: Tepki bildirimleri (varsayılan açık; alıcı süzgeci sunucuda) ──
+const savingReactionNotif = ref(false)
+const reactionNotifications = computed(() => authStore.user?.reactionNotifications ?? true)
+
+async function toggleReactionNotifications(next: boolean) {
+  if (savingReactionNotif.value || next === reactionNotifications.value) return
+  savingReactionNotif.value = true
+  try {
+    const { data } = await usersApi.updateProfile({ reactionNotifications: next })
+    authStore.updateUser(data)
+    toast.success(t('toast.privacySaved'))
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message ?? t('toast.saveError'))
+  } finally {
+    savingReactionNotif.value = false
+  }
+}
+
 async function toggleReadReceipts(next: boolean) {
   if (savingReceipts.value || next === readReceipts.value) return
   savingReceipts.value = true
@@ -948,6 +967,28 @@ async function toggleReadReceipts(next: boolean) {
                       :model-value="readReceipts"
                       :disabled="savingReceipts"
                       @update:model-value="toggleReadReceipts"
+                    />
+                  </div>
+                </section>
+
+                <!-- ── C46 §4.5: Tepki bildirimleri ── -->
+                <section
+                  class="rounded-[var(--kv-radius-lg)] border p-5"
+                  style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
+                >
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                      <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+                        {{ t('settings.reactionNotifications.label') }}
+                      </h3>
+                      <p class="text-[13px] mt-1" style="color: var(--kv-text-secondary);">
+                        {{ t('settings.reactionNotifications.description') }}
+                      </p>
+                    </div>
+                    <KvSwitch
+                      :model-value="reactionNotifications"
+                      :disabled="savingReactionNotif"
+                      @update:model-value="toggleReactionNotifications"
                     />
                   </div>
                 </section>

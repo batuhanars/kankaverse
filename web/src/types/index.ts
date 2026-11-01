@@ -63,6 +63,7 @@ export interface UserDto {
   showGameActivity?: boolean | null // C31b — ham ayar (null = hiç dokunulmadı)
   gameActivityEffective?: boolean // C31b — yaşa göre varsayılan uygulanmış hâl (sunucu hesaplar)
   showRecentActivity?: boolean // C31f — son oynanan oyunlar ayarı (varsayılan kapalı; minörde hep false)
+  reactionNotifications?: boolean // C46 — tepki bildirimleri (varsayılan açık); bayat oturumda yok olabilir
   readReceipts: boolean // C12 — okundu bilgisi paylaşımı (karşılıklı; kapatan karşı tarafınkini de göremez)
 }
 
@@ -341,6 +342,13 @@ export interface ReactionDto {
   reactedByMe: boolean
 }
 
+// C46 §3 — GET /channels/:id/messages/:messageId/reactions satırı
+export interface ReactionGroupDto {
+  emoji: string
+  count: number
+  users: { id: string; username: string; avatarUrl: string | null }[]
+}
+
 export interface ReplyPreviewDto {
   id: string
   content: string
@@ -528,6 +536,8 @@ export const NotificationType = {
   GUILD_INVITE: 'GUILD_INVITE',
   // Sprint R14 — ortamda yeni etkinlik oluşturuldu
   EVENT_CREATED: 'EVENT_CREATED',
+  // Sprint C46 — mesajına tepki bırakıldı
+  REACTION: 'REACTION',
 } as const
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType]
 

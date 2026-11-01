@@ -312,6 +312,35 @@ describe('NotificationsService', () => {
       expect(payload.body).toContain('Oyun Gecesi');
     });
 
+    it('C46: REACTION push gövdesi emoji + önizleme taşır, tag verilmez', async () => {
+      prismaMock.notification.createManyAndReturn.mockResolvedValue([
+        makeRow({ id: 'n1', type: 'REACTION', preview: '❤️ selam millet' }),
+      ]);
+      prismaMock.user.findMany.mockResolvedValue([
+        { id: ACTOR_ID, username: 'aktor', avatarUrl: null },
+      ]);
+
+      await service.createMany([USER_ID], { type: 'REACTION', preview: '❤️ selam millet' });
+
+      const payload = pushSendToUsersMock.mock.calls[0][1];
+      expect(payload.body).toBe('aktor mesajına ❤️ bıraktı: selam millet');
+      expect(payload.data.type).toBe('REACTION');
+      expect(payload.tag).toBeUndefined();
+    });
+
+    it('C46: REACTION önizlemesiz → kısa gövde', async () => {
+      prismaMock.notification.createManyAndReturn.mockResolvedValue([
+        makeRow({ id: 'n1', type: 'REACTION', preview: '👍' }),
+      ]);
+      prismaMock.user.findMany.mockResolvedValue([
+        { id: ACTOR_ID, username: 'aktor', avatarUrl: null },
+      ]);
+
+      await service.createMany([USER_ID], { type: 'REACTION', preview: '👍' });
+
+      expect(pushSendToUsersMock.mock.calls[0][1].body).toBe('aktor mesajına 👍 bıraktı.');
+    });
+
     it('boş alıcı listesi → push.sendToUsers çağrılmaz', async () => {
       await service.createMany([], { type: 'EVENT_CREATED' });
 

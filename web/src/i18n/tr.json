@@ -369,6 +369,10 @@
       "description": "Son 7 günde oynadığın oyunlar, oyun etkinliğini görebilen kişilerin gördüğü profilinde listelenir. Yalnız oyunun adı ve en son ne zaman oynadığın saklanır, kaç saat oynadığın tutulmaz. Kapatırsan geçmişin hemen silinir.",
       "deleted": "Geçmişin silindi."
     },
+    "reactionNotifications": {
+      "label": "Tepki bildirimleri",
+      "description": "Biri mesajına tepki bıraktığında haberin olsun. Kapatırsan tepkiler için bildirim ve anlık bildirim gelmez."
+    },
     "readReceipts": {
       "label": "Okundu bilgisi",
       "description": "Mesajını okuduğunda karşı taraf bunu görsün. Kapatırsan senin okuduğun görünmez, ama sen de kimsenin okuduğunu göremezsin."
@@ -1037,7 +1041,12 @@
     "addReaction": "Reaksiyon ekle",
     "toggleTitle": "Reaksiyonu değiştir",
     "morePicker": "Daha fazla emoji",
-    "frequent": "Sık kullanılanlar"
+    "frequent": "Sık kullanılanlar",
+    "whoReacted": "Tepkiler",
+    "viewReactions": "Tepkileri gör",
+    "tooltip": "{names} ve {n} kişi daha",
+    "all": "Tümü",
+    "empty": "Henüz tepki yok."
   },
   "reply": {
     "button": "Yanıtla",
@@ -1467,6 +1476,7 @@
     "friendRequests": "{n} yeni kankalık isteğin var.",
     "guildInvite": "{actor} seni {guild} ortamına davet etti.",
     "eventCreated": "{actor} yeni bir etkinlik oluşturdu: {event}",
+    "reaction": "{actor} mesajına {emoji} bıraktı.",
     "markAllRead": "Tümünü okundu işaretle",
     "loadMore": "Yükleniyor…",
     "now": "az önce",

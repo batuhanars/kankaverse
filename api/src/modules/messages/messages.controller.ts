@@ -15,6 +15,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { MessagesService } from './messages.service';
 import { MessagesGateway } from './gateway/messages.gateway';
+import { ReactionNotifierService } from './reaction-notifier.service';
 import { AudioNormalizeService } from '../../shared/media/audio-normalize.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
@@ -33,6 +34,7 @@ export class MessagesController {
     private messagesService: MessagesService,
     private messagesGateway: MessagesGateway,
     private audioNormalize: AudioNormalizeService,
+    private reactionNotifier: ReactionNotifierService,
   ) {}
 
   @Get()
@@ -127,29 +129,59 @@ export class MessagesController {
     return null;
   }
 
+  @Get(':messageId/reactions')
+  @ApiOperation({
+    summary: 'Mesaja tepki bırakanlar: emoji gruplarına göre kişi listesi (en fazla 200 satır)',
+  })
+  listReactions(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Param('messageId') messageId: string,
+  ) {
+    return this.messagesService.listReactions(user.id, channelId, messageId);
+  }
+
   @Post(':messageId/reactions')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Mesaja emoji reaksiyonu ekle (idempotent)' })
+  @ApiOperation({
+    summary:
+      'Mesaja emoji tepkisi bırak (kişi başı TEK tepki: farklı emoji eskisinin yerine geçer)',
+  })
   async addReaction(
     @CurrentUser() user: { id: string },
     @Param('id') channelId: string,
     @Param('messageId') messageId: string,
     @Body() dto: AddReactionDto,
   ) {
-    const changed = await this.messagesService.addReaction(
+    const { removed, added } = await this.messagesService.addReaction(
       user.id,
       channelId,
       messageId,
       dto.emoji,
     );
-    // Durum değişmediyse yayın yok: istemciler sayacı delta ile günceller, boş yayın sayacı bozar
-    if (changed)
+    // Durum değişmediyse yayın yok. Değiştirmede sıra: önce eskinin kalkışı, sonra yenisi
+    // (eski istemciler kaldır+ekle çiftini doğru sayar).
+    if (removed)
+      this.messagesGateway.broadcastReaction(channelId, 'reaction.removed', {
+        messageId,
+        channelId,
+        emoji: removed,
+        userId: user.id,
+      });
+    if (added) {
       this.messagesGateway.broadcastReaction(channelId, 'reaction.added', {
         messageId,
         channelId,
-        emoji: dto.emoji,
+        emoji: added,
         userId: user.id,
       });
+      // C46 §4: bildirim tepki isteğini bekletmez ve ASLA düşürmez; hata yutulmaz, loglanır.
+      void this.reactionNotifier
+        .notifyAdded(user.id, channelId, messageId, added)
+        .catch((err: unknown) =>
+          this.logger.error(`Tepki bildirimi hatası (mesaj ${messageId})`, err),
+        );
+    }
     return null;
   }
 

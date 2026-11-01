@@ -449,6 +449,7 @@ export class UsersService {
       dmPolicy?: DmPolicy;
       bannerColor?: string | null;
       readReceipts?: boolean;
+      reactionNotifications?: boolean;
       quickReactions?: string[];
       showGameActivity?: boolean;
       showRecentActivity?: boolean;
@@ -457,6 +458,8 @@ export class UsersService {
     if (dto.dmPolicy !== undefined) data.dmPolicy = dto.dmPolicy;
     if (dto.bannerColor !== undefined) data.bannerColor = dto.bannerColor;
     if (dto.readReceipts !== undefined) data.readReceipts = dto.readReceipts;
+    if (dto.reactionNotifications !== undefined)
+      data.reactionNotifications = dto.reactionNotifications;
     if (dto.quickReactions !== undefined) data.quickReactions = dto.quickReactions;
     if (dto.showGameActivity !== undefined) data.showGameActivity = dto.showGameActivity;
     if (dto.showRecentActivity !== undefined) {

@@ -45,14 +45,29 @@ export interface MessageAuthorDto {
 }
 
 /**
- * Sunucu tepkileri emoji bazında TOPLAYARAK döner (`messages.service.ts` `ReactionAggDto`) — kim
- * tepki vermiş listesi gelmez, yalnız sayı ve "ben verdim mi". İstemci de bu yüzden "kimler" diye
- * bir yüzey açmaz; olmayan veriyi bekleyen tasarım yapılmaz.
+ * Sunucu tepkileri emoji bazında TOPLAYARAK döner (`messages.service.ts` `ReactionAggDto`): mesaj
+ * listesinde yalnız sayı ve "ben verdim mi" gelir. "Kimler tepki verdi" ayrı uçtan çekilir
+ * (`messagesApi.listReactions`, C46 §3). Kişi başı mesaj başına TEK tepki vardır (C46 §0.1).
  */
 export interface ReactionDto {
   emoji: string;
   count: number;
   reactedByMe: boolean;
+}
+
+/** C46 §3 — bir tepkiyi veren kişi (mevcut kullanıcı özet şekli). */
+export interface ReactionUserDto {
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+  displayName?: string | null;
+}
+
+/** C46 §3 — `GET .../reactions` grubu. `users` en fazla 200 satırla sınırlı; `count` gerçek toplam. */
+export interface ReactionGroupDto {
+  emoji: string;
+  count: number;
+  users: ReactionUserDto[];
 }
 
 /**
@@ -231,7 +246,10 @@ export const messagesApi = {
     return res.data;
   },
 
-  /** Idempotent: aynı emoji ikinci kez eklenirse sunucu no-op yapar. */
+  /**
+   * Idempotent: aynı emoji ikinci kez eklenirse sunucu no-op yapar. C46: kişinin mesajda BAŞKA
+   * emojisi varsa sunucu eskisini kaldırıp yenisini ekler (WS: `reaction.removed` sonra `reaction.added`).
+   */
   async addReaction(channelId: string, messageId: string, emoji: string): Promise<null> {
     const res = await http.post<null>(`/channels/${channelId}/messages/${messageId}/reactions`, { emoji });
     return res.data;
@@ -242,6 +260,12 @@ export const messagesApi = {
     const res = await http.delete<null>(
       `/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
     );
+    return res.data;
+  },
+
+  /** C46 §3 — kimler tepki verdi. Envelope `data` = `ReactionGroupDto[]`. */
+  async listReactions(channelId: string, messageId: string): Promise<ReactionGroupDto[]> {
+    const res = await http.get<ReactionGroupDto[]>(`/channels/${channelId}/messages/${messageId}/reactions`);
     return res.data;
   },
 };

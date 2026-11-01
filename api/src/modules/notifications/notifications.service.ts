@@ -7,6 +7,10 @@ import { PushService } from '../../shared/push/push.service';
 import { CreateNotificationData, NotificationDto } from './dto/notification.dto';
 import { NotificationPrefDto, SetNotificationPrefDto } from './dto/notification-pref.dto';
 import { CreatePushTokenDto } from './dto/push-token.dto';
+import {
+  buildReactionPushBody,
+  splitReactionPreview,
+} from '../../common/utils/reaction-notification.util';
 
 const MAX_LIMIT = 50;
 
@@ -480,6 +484,12 @@ export class NotificationsService {
           ? `${actor} yeni bir etkinlik oluşturdu: ${dto.preview}`
           : `${actor} yeni bir etkinlik oluşturdu.`;
         break;
+      case 'REACTION': {
+        // C46: preview = emoji + " " + mesaj önizlemesi. `tag` VERİLMEZ (tepkiler birbirinin yerine geçmez).
+        const { emoji, text } = splitReactionPreview(dto.preview);
+        body = buildReactionPushBody(actor, emoji, text);
+        break;
+      }
       default:
         body = actor;
     }

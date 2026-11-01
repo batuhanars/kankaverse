@@ -1,5 +1,5 @@
 import http from './axios'
-import type { MessageDto } from '@/types'
+import type { MessageDto, ReactionGroupDto } from '@/types'
 
 export const messagesApi = {
   list(channelId: string, before?: string, limit = 50) {
@@ -34,6 +34,10 @@ export const messagesApi = {
   // Sprint V2: reaksiyon ekle
   addReaction(channelId: string, messageId: string, emoji: string) {
     return http.post<null>(`/channels/${channelId}/messages/${messageId}/reactions`, { emoji })
+  },
+  // C46 §3: kimler tepki verdi (emoji grupları, ilk tepki zamanına göre)
+  listReactions(channelId: string, messageId: string) {
+    return http.get<ReactionGroupDto[]>(`/channels/${channelId}/messages/${messageId}/reactions`)
   },
   // Sprint V2: reaksiyon kaldır
   removeReaction(channelId: string, messageId: string, emoji: string) {

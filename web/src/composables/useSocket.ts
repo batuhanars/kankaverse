@@ -28,6 +28,8 @@ import {
   handleTypingClear,
   clearTypingForChannel,
 } from '@/composables/useTyping'
+import { invalidateReactionUsers } from '@/composables/useReactionUsers'
+import { REACTION_NOTIFY_EVENT, type ReactionNotifyPayload } from '@/utils/reactionNotification'
 import { maybeFireDmToast, maybeFireChannelToast } from '@/composables/useMessageToasts'
 import type { MessageDto, FriendRequestDto, FriendDto, EventDto, NotificationDto } from '@/types'
 
@@ -335,6 +337,7 @@ export function useSocket() {
     socket.on(
       'reaction.added',
       (data: { messageId: string; channelId: string; emoji: string; userId: string }) => {
+        invalidateReactionUsers(data.messageId)
         messagesStore.applyReaction(
           data.messageId,
           data.emoji,
@@ -348,6 +351,7 @@ export function useSocket() {
     socket.on(
       'reaction.removed',
       (data: { messageId: string; channelId: string; emoji: string; userId: string }) => {
+        invalidateReactionUsers(data.messageId)
         messagesStore.applyReaction(
           data.messageId,
           data.emoji,
@@ -357,6 +361,12 @@ export function useSocket() {
         )
       },
     )
+
+    // C46 §4.3: DM'de mesaj sahibine tepki bildirimi (çan kaydı yok). Masaüstü bildirimi
+    // useNativeNotifications'ta; iki katman arası bağ pencere olayıdır (ortak store gerekmez).
+    socket.on('reaction.notify', (data: ReactionNotifyPayload) => {
+      window.dispatchEvent(new CustomEvent(REACTION_NOTIFY_EVENT, { detail: data }))
+    })
 
     // Sprint V2 Pins: sabitleme WS olayları (§5)
     socket.on(

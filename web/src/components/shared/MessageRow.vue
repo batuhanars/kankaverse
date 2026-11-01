@@ -56,6 +56,7 @@ const emit = defineEmits<{
   delete: [messageId: string]
   report: [messageId: string]
   addReaction: [messageId: string, emoji: string]
+  viewReactions: [messageId: string]
   pin: [messageId: string]
   unpin: [messageId: string]
   // C29: başarısız geçici mesajın tek eylemleri
@@ -174,12 +175,14 @@ const renderedContent = computed<string>(() => {
         :is-pinned="!!message.pinnedAt"
         :can-pin="canPin ?? false"
         :can-manage-messages="canManageMessages ?? false"
+        :has-reactions="!!message.reactions?.length"
         @reply="emit('reply', message)"
         @forward="emit('forward', message)"
         @edit="emit('edit', message)"
         @delete="emit('delete', message.id)"
         @report="emit('report', message.id)"
         @add-reaction="(emoji) => emit('addReaction', message.id, emoji)"
+        @view-reactions="emit('viewReactions', message.id)"
         @pin="emit('pin', message.id)"
         @unpin="emit('unpin', message.id)"
       />

@@ -76,6 +76,8 @@ export interface UpdateProfileDto {
   showRecentActivity?: boolean;
   /** C24 — boş dizi = varsayılana dön, aksi hâlde TAM 5 emoji (tekrarsız). */
   quickReactions?: string[];
+  /** C46 — mesajıma tepki verilince bildirim al (varsayılan açık). */
+  reactionNotifications?: boolean;
 }
 
 /** `api/src/shared/media/image-upload.service.ts` `PresignResult` — birebir iki alan. */

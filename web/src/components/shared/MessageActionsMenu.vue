@@ -25,6 +25,8 @@ const props = defineProps<{
   canPin: boolean
   // Faz 3: MANAGE_MESSAGES — başkasının mesajını da silebilir
   canManageMessages?: boolean
+  // C46: mesajda tepki varsa ⋯ menüsünde "Tepkileri gör"
+  hasReactions?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -34,6 +36,7 @@ const emit = defineEmits<{
   delete: []
   report: []
   addReaction: [emoji: string]
+  viewReactions: []
   pin: []
   unpin: []
 }>()
@@ -92,6 +95,11 @@ function onDelete() {
 function onReport() {
   closeAll()
   emit('report')
+}
+
+function onViewReactions() {
+  closeAll()
+  emit('viewReactions')
 }
 
 function onPin() {
@@ -241,6 +249,19 @@ onUnmounted(() => {
         class="absolute top-full right-0 mt-1 z-50 rounded-[var(--kv-radius-md)] py-1 min-w-[160px]"
         style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
       >
+        <!-- C46: Tepkileri gör (yalnız tepki varsa) -->
+        <button
+          v-if="hasReactions"
+          class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
+          style="color: var(--kv-text-primary);"
+          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
+          @click="onViewReactions"
+        >
+          <span class="text-[15px] shrink-0">😀</span>
+          <span>{{ t('reaction.viewReactions') }}</span>
+        </button>
+
         <!-- Düzenle (yalnız kendi + içerik varsa) -->
         <button
           v-if="isMine && hasContent"

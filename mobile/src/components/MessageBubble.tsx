@@ -1,4 +1,6 @@
+import { useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { AttachmentView } from './AttachmentView';
 import { PresenceDot } from './PresenceDot';
@@ -42,6 +44,14 @@ interface Props {
   receipt?: 'sent' | 'seen' | null;
   /** Tepki pill'ine dokunuş: kendi tepkimi kaldırır, başkasınınkine katılır (web ile aynı). */
   onToggleReaction?: (emoji: string) => void;
+  /** C46 — tepki pilne uzun basış: kimler tepki verdi paneli. */
+  onShowReactions?: () => void;
+  /**
+   * C46 §6.1 — metin alanına çift dokunma (hızlı tepkinin ilki). Yalnız metin bloğuna bağlanır:
+   * görsel/video/ses/dosya/gömme kartlarının kendi dokunmaları ve uzun basış bu jestten etkilenmez.
+   * Verilmezse (yerel mesaj) jest hiç kurulmaz.
+   */
+  onDoubleTap?: () => void;
   /** C29: basarisiz gecici mesajin "Tekrar dene" / "Sil" eylemleri. */
   onRetry?: () => void;
   onDiscard?: () => void;
@@ -62,9 +72,31 @@ export function MessageBubble({
   onLongPress,
   onPressAuthor,
   onToggleReaction,
+  onShowReactions,
+  onDoubleTap,
   onRetry,
   onDiscard,
 }: Props) {
+  // Jest her render'da yeniden kurulmasın: işleyici ref'te (mesajın `reactedByMe` kararı çağıranda,
+  // en güncel mesajla verilir), jest yalnız var/yok'a bağlı. Tek dokunuşa ek gecikme YOK: yalnız
+  // çift dokunuş jesti var, tek dokunuşa bağlı bir eylem bekletilmiyor.
+  const doubleTapRef = useRef(onDoubleTap);
+  doubleTapRef.current = onDoubleTap;
+  const hasDoubleTap = !!onDoubleTap;
+  const doubleTap = useMemo(
+    () =>
+      Gesture.Tap()
+        .enabled(hasDoubleTap)
+        .numberOfTaps(2)
+        .maxDistance(12)
+        // JS thread'inde çalışır: ref'in `.current`ı worklet'e kopyalanmaz, hep en güncel işleyici.
+        .runOnJS(true)
+        .onEnd((_e, success) => {
+          if (success) doubleTapRef.current?.();
+        }),
+    [hasDoubleTap],
+  );
+
   // M2d R1 — bahsetmeler vurgulu boyanır (web `.kv-mention` karşılığı). Düz karşılık, boş içerikte
   // metin bloğunu hiç render etmemek için (ek-yalnız mesajlar).
   const mentionSegments = splitMentions(
@@ -199,18 +231,22 @@ export function MessageBubble({
 
           {/* Açıklama eklerin ALTINDA (sahip revizesi 2026-10-15, WhatsApp düzeni). */}
           {displayContent.length > 0 && (
-            <Text style={[styles.content, hasAttachments && styles.contentAfterAttachments]}>
-              {mentionSegments.map((seg, i) =>
-                seg.isMention ? (
-                  <Text key={i} style={isMine ? styles.mentionMine : styles.mention}>
-                    {seg.text}
-                  </Text>
-                ) : (
-                  seg.text
-                ),
-              )}
-              {metaInline && <MetaSpacer message={message} receipt={isLocal ? null : receipt} isMine={isMine} />}
-            </Text>
+            <GestureDetector gesture={doubleTap}>
+              <View collapsable={false}>
+                <Text style={[styles.content, hasAttachments && styles.contentAfterAttachments]}>
+                  {mentionSegments.map((seg, i) =>
+                    seg.isMention ? (
+                      <Text key={i} style={isMine ? styles.mentionMine : styles.mention}>
+                        {seg.text}
+                      </Text>
+                    ) : (
+                      seg.text
+                    ),
+                  )}
+                  {metaInline && <MetaSpacer message={message} receipt={isLocal ? null : receipt} isMine={isMine} />}
+                </Text>
+              </View>
+            </GestureDetector>
           )}
 
           <BubbleMeta message={message} isMine={isMine} receipt={isLocal ? null : receipt} inline={metaInline} />
@@ -232,7 +268,12 @@ export function MessageBubble({
         )}
 
         {!isLocal && reactions.length > 0 && (
-          <ReactionRow reactions={reactions} isMine={isMine} onToggleReaction={onToggleReaction} />
+          <ReactionRow
+            reactions={reactions}
+            isMine={isMine}
+            onToggleReaction={onToggleReaction}
+            onLongPressReaction={onShowReactions}
+          />
         )}
       </View>
     </View>

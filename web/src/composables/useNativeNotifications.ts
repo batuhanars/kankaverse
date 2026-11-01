@@ -1,8 +1,15 @@
-import { computed, watch, ref } from 'vue'
+import { computed, watch, ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotificationsStore } from '@/stores/notifications'
 import { useDmStore } from '@/stores/dm'
 import { useCallStore } from '@/stores/call'
+import { useMessageJump } from '@/composables/useMessageJump'
+import {
+  REACTION_NOTIFY_EVENT,
+  reactionEmoji,
+  reactionPreviewText,
+  type ReactionNotifyPayload,
+} from '@/utils/reactionNotification'
 import { i18n } from '@/i18n'
 import type { NotificationDto } from '@/types'
 
@@ -23,6 +30,7 @@ export function useNativeNotifications() {
   const dmStore = useDmStore()
   const callStore = useCallStore()
   const router = useRouter()
+  const { requestJump } = useMessageJump()
   const { t } = i18n.global
 
   // Gelen arama bildirimi — Electron VE düz tarayıcıda çalışır (ikisi de standart Notification
@@ -119,6 +127,32 @@ export function useNativeNotifications() {
     { immediate: true },
   )
 
+  // C46 §4.3: DM'de tepki (çan kaydı yok) — useSocket `reaction.notify` olayını pencereye yayar.
+  const onReactionNotify = ((e: CustomEvent<ReactionNotifyPayload>) => {
+    if (!document.hidden) return
+    const d = e.detail
+    const body = _reactionBody(d.actor.username, d.emoji, reactionPreviewText(d.preview, d.emoji))
+    _showToast(body, () => {
+      void router.push({ name: 'dm', params: { channelId: d.channelId } })
+      requestJump(d.channelId, d.messageId)
+    })
+  }) as EventListener
+  window.addEventListener(REACTION_NOTIFY_EVENT, onReactionNotify)
+  onUnmounted(() => window.removeEventListener(REACTION_NOTIFY_EVENT, onReactionNotify))
+
+  function _reactionBody(actor: string, emoji: string, preview: string): string {
+    const text = t('notification.reaction', { actor, emoji })
+    return preview ? `${text} ${preview}` : text
+  }
+
+  function _showToast(body: string, onClick: () => void) {
+    const notif = new Notification(t('notification.nativeTitle'), { body })
+    notif.onclick = () => {
+      window.kankaverse?.focusWindow()
+      onClick()
+    }
+  }
+
   function _fireToast(dto: NotificationDto) {
     const actor = dto.actor?.username ?? t('notification.someone')
     const guild = dto.guildName ?? ''
@@ -141,6 +175,11 @@ export function useNativeNotifications() {
         // R14 — masaüstü toast'ta sessizce düşmesin; metin çandakiyle aynı anahtardan
         body = t('notification.eventCreated', { actor, event: dto.preview ?? '' })
         break
+      case 'REACTION': {
+        const emoji = reactionEmoji(dto.preview)
+        body = _reactionBody(actor, emoji, reactionPreviewText(dto.preview, emoji))
+        break
+      }
       default:
         body = actor
     }
@@ -161,6 +200,17 @@ export function useNativeNotifications() {
   function _navigate(dto: NotificationDto) {
     if (dto.type === 'MENTION' && dto.guildId && dto.channelId) {
       router.push({ name: 'channel', params: { guildId: dto.guildId, channelId: dto.channelId } })
+    } else if (dto.type === 'REACTION' && dto.channelId) {
+      // Bahsetme yolu: ortam kanalı ya da DM'e git, sonra mesaja zıpla
+      if (dto.guildId) {
+        void router.push({
+          name: 'channel',
+          params: { guildId: dto.guildId, channelId: dto.channelId },
+        })
+      } else {
+        void router.push({ name: 'dm', params: { channelId: dto.channelId } })
+      }
+      if (dto.messageId) requestJump(dto.channelId, dto.messageId)
     } else if (dto.type === 'FRIEND_REQUEST' || dto.type === 'FRIEND_ACCEPT') {
       router.push({ name: 'app' }) // HomeView → kankaları göster
     } else if (dto.type === 'GUILD_INVITE' && dto.guildId) {

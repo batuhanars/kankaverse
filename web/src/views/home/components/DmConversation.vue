@@ -26,6 +26,8 @@ import ComposerBar from '@/components/shared/ComposerBar.vue'
 import MessageRow from '@/components/shared/MessageRow.vue'
 import DateDivider from '@/components/shared/DateDivider.vue'
 import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
+import ReactionPill from '@/components/shared/ReactionPill.vue'
+import ReactionsModal from '@/components/shared/ReactionsModal.vue'
 import PinsPopover from '@/components/shared/PinsPopover.vue'
 import SearchPopover from '@/components/shared/SearchPopover.vue'
 import GroupManagePanel from './GroupManagePanel.vue'
@@ -48,6 +50,8 @@ const replyingTo = ref<MessageDto | null>(null)
 
 // İlet (forward) modalı
 const showForward = ref(false)
+// C46: kimler tepki verdi penceresi (hedef mesaj kimliği)
+const reactionsMsgId = ref<string | null>(null)
 const forwardMsg = ref<MessageDto | null>(null)
 
 function startReply(msg: MessageDto) {
@@ -970,6 +974,7 @@ const dayLabels = computed<(string | null)[]>(() =>
           @delete="openDeleteConfirm"
           @report="openReportMessage"
           @add-reaction="(_msgId, emoji) => pickDmEmoji(msg, emoji)"
+          @view-reactions="reactionsMsgId = msg.id"
           @pin="onPinMessage"
           @unpin="onUnpinMessage"
           @retry="optimistic.retry"
@@ -1000,19 +1005,15 @@ const dayLabels = computed<(string | null)[]>(() =>
 
           <!-- Reaksiyon pill'leri -->
           <template #reactions>
-            <button
+            <ReactionPill
               v-for="reaction in msg.reactions"
               :key="reaction.emoji"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] cursor-pointer transition-colors border"
-              :style="reaction.reactedByMe
-                ? 'background-color: var(--kv-accent-subtle); border-color: var(--kv-accent-500); color: var(--kv-accent-500);'
-                : 'background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle); color: var(--kv-text-secondary);'"
-              :title="t('reaction.toggleTitle')"
-              @click.stop="toggleDmReaction(msg, reaction.emoji, reaction.reactedByMe)"
-            >
-              <span>{{ reaction.emoji }}</span>
-              <span class="font-medium">{{ reaction.count }}</span>
-            </button>
+              compact
+              :reaction="reaction"
+              :channel-id="props.channel.id"
+              :message-id="msg.id"
+              @toggle="toggleDmReaction(msg, reaction.emoji, reaction.reactedByMe)"
+            />
           </template>
         </MessageRow>
         </template>
@@ -1171,5 +1172,12 @@ const dayLabels = computed<(string | null)[]>(() =>
     v-if="showForward && forwardMsg"
     :message="forwardMsg"
     @close="showForward = false"
+  />
+
+  <ReactionsModal
+    v-if="reactionsMsgId"
+    :channel-id="channel.id"
+    :message-id="reactionsMsgId"
+    @close="reactionsMsgId = null"
   />
 </template>

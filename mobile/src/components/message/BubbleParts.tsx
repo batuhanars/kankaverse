@@ -74,17 +74,20 @@ interface ReactionRowProps {
   reactions: NonNullable<MessageDto['reactions']>;
   isMine: boolean;
   onToggleReaction?: (emoji: string) => void;
+  /** C46 — pile uzun basış "kimler tepki verdi" panelini açar. */
+  onLongPressReaction?: () => void;
 }
 
-/** Tepki pill'leri — baloncuğun DIŞINDA, hizasında. Sunucu emoji bazında TOPLAYARAK dönüyor (kim
- *  verdi listesi yok), o yüzden yalnız emoji + sayı. Kendi tepkim Kor kenarlıkla ayrışır. */
-export function ReactionRow({ reactions, isMine, onToggleReaction }: ReactionRowProps) {
+/** Tepki pill'leri — baloncuğun DIŞINDA, hizasında. Mesaj listesi emoji bazında TOPLU gelir (yalnız
+ *  emoji + sayı); kimlerin verdiği uzun basışla ayrı panelde (C46). Kendi tepkim Kor kenarlıkla ayrışır. */
+export function ReactionRow({ reactions, isMine, onToggleReaction, onLongPressReaction }: ReactionRowProps) {
   return (
     <View style={[reactionStyles.row, { justifyContent: isMine ? 'flex-end' : 'flex-start' }]}>
       {reactions.map((r) => (
         <Pressable
           key={r.emoji}
           onPress={() => onToggleReaction?.(r.emoji)}
+          onLongPress={onLongPressReaction}
           style={[reactionStyles.pill, r.reactedByMe && reactionStyles.pillMine]}
         >
           <Text style={reactionStyles.emoji}>{r.emoji}</Text>

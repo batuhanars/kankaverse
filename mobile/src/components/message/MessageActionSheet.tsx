@@ -31,6 +31,9 @@ interface Props {
   myEmojis: string[];
   onClose: () => void;
   onToggleReaction: (emoji: string) => void;
+  /** C46 — mesajda tepki varsa "Tepkileri gör" satırı çizilir. */
+  hasReactions: boolean;
+  onShowReactions: () => void;
   /** Şeridin sonundaki "+" — tam emoji listesini açar (web'deki picker'ın karşılığı). */
   onOpenPicker: () => void;
   /** C24 — şeridin sonundaki kalem: hızlı tepkileri düzenleme ekranı. */
@@ -57,6 +60,8 @@ export function MessageActionSheet({
   myEmojis,
   onClose,
   onToggleReaction,
+  hasReactions,
+  onShowReactions,
   onOpenPicker,
   onEditQuickReactions,
   onReply,
@@ -146,6 +151,12 @@ export function MessageActionSheet({
                   <Text style={styles.optionText}>
                     {isPinned ? t('message.unpin') : t('message.pin')}
                   </Text>
+                </Pressable>
+              )}
+              {hasReactions && (
+                <Pressable style={styles.option} onPress={onShowReactions}>
+                  <Ionicons name="happy-outline" size={20} color={theme.colors.textSecondary} />
+                  <Text style={styles.optionText}>{t('reaction.viewReactions')}</Text>
                 </Pressable>
               )}
               <Pressable style={styles.option} onPress={onCopy}>

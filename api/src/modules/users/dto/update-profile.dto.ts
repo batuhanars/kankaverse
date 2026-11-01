@@ -65,6 +65,12 @@ export class UpdateProfileDto {
   @IsBoolean({ message: 'Son etkinlik tercihi geçersiz.' })
   showRecentActivity?: boolean;
 
+  // C46 §4.5: mesajıma bırakılan tepkinin bildirimi (varsayılan açık).
+  @ApiPropertyOptional({ description: 'Mesajıma bırakılan tepkiler için bildirim al.' })
+  @IsOptional()
+  @IsBoolean({ message: 'Tepki bildirimi tercihi geçersiz.' })
+  reactionNotifications?: boolean;
+
   // C24: hızlı tepki şeridi. Boş dizi = varsayılana dön; aksi halde tam 5 farklı tek-emoji.
   @ApiPropertyOptional({
     type: [String],

@@ -29,6 +29,7 @@ import { useMessageListController } from './message/useMessageListController';
 import { MessageEmpty, MessageError, MessageLoading } from './message/MessageStates';
 import { MessageActionHost } from './message/MessageActionHost';
 import { useMessageActions } from './message/useMessageActions';
+import { useQuickReactions } from '@/utils/quickReactions';
 import { useMessagesStore } from '@/stores/messages';
 import { useVoicePlaybackStore } from '@/stores/voicePlayback';
 import { ScanStatus } from '@/api/messages';
@@ -269,6 +270,8 @@ export function MessageScreen({
   }, [items]);
   // Mesaj paneli akışı (uzun basış · tepki · kopyala · sil) — M1d-C §2.4.
   const actions = useMessageActions(channelId);
+  // C46: çift dokunma = etkin hızlı tepki listesinin ilki.
+  const quickEmojis = useQuickReactions();
 
   const insets = useSafeAreaInsets();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
@@ -434,6 +437,10 @@ export function MessageScreen({
                 onLongPress={() => actions.open(item.message)}
                 onPressAuthor={() => setProfileTarget(item.message.author)}
                 onToggleReaction={(emoji) => actions.toggleReaction(item.message, emoji)}
+                onShowReactions={() => actions.openReactions(item.message)}
+                onDoubleTap={
+                  item.message.localStatus ? undefined : () => actions.quickReact(item.message, quickEmojis[0])
+                }
                 onRetry={() => retryOptimistic(item.message)}
                 onDiscard={() => discardOptimistic(item.message)}
               />
@@ -470,6 +477,7 @@ export function MessageScreen({
       <MessageActionHost
         canPin={canPin}
         actions={actions}
+        onOpenProfile={setProfileTarget}
         onReply={() => {
           const m = actions.target;
           actions.close();

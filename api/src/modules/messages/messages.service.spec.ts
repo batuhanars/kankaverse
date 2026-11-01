@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 // ForbiddenException alias for reaction tests
 const FE = ForbiddenException;
+import { Prisma } from '@prisma/client';
 import { MessagesService } from './messages.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
@@ -37,7 +38,13 @@ const prismaMock = {
   messageReaction: {
     createMany: jest.fn(),
     deleteMany: jest.fn(),
+    findUnique: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    groupBy: jest.fn(),
   },
+  // C46: addReaction tek transaction; mock tx = prismaMock
+  $transaction: jest.fn(),
   guild: {
     findUnique: jest.fn(),
   },
@@ -47,6 +54,7 @@ const prismaMock = {
   },
   user: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
   },
   // R15 — rol bahsetmesi kapı çözümü
   role: {
@@ -102,6 +110,7 @@ function makeService() {
 function resetMocks() {
   jest.resetAllMocks();
   prismaMock.guildMemberRole.findMany.mockResolvedValue([]);
+  prismaMock.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(prismaMock));
   permissionsMock.hasGuildPermission.mockResolvedValue(true);
   permissionsMock.requireMemberHierarchy.mockResolvedValue(undefined);
   permissionsMock.requireRoleHierarchy.mockResolvedValue(undefined);
@@ -1141,6 +1150,7 @@ describe('MessagesService.addReaction', () => {
 
   const MSG_ID = 'msg-react-1';
   const EMOJI = '👍';
+  const HEART = '❤️';
 
   function makeExistingMsg(deletedAt: Date | null = null) {
     return {
@@ -1151,46 +1161,105 @@ describe('MessagesService.addReaction', () => {
     };
   }
 
+  function p2002() {
+    return new Prisma.PrismaClientKnownRequestError('dup', {
+      code: 'P2002',
+      clientVersion: 'test',
+    });
+  }
+
   beforeEach(() => {
     resetMocks();
     service = makeService();
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Başarılı ekleme: upsert çağrılır, null döner
-  // ─────────────────────────────────────────────────────────────────────────
-  it('geçerli mesaj + emoji → satır eklenir, true döner', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
     prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
-    prismaMock.messageReaction.createMany.mockResolvedValue({ count: 1 });
+  });
+
+  it('hiç tepki yoksa eklenir → { removed: null, added }', async () => {
+    prismaMock.messageReaction.findUnique.mockResolvedValue(null);
+    prismaMock.messageReaction.create.mockResolvedValue({});
 
     const result = await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
 
-    expect(prismaMock.messageReaction.createMany).toHaveBeenCalledWith({
-      data: [{ messageId: MSG_ID, userId: USER_ID, emoji: EMOJI }],
-      skipDuplicates: true,
+    expect(prismaMock.messageReaction.create).toHaveBeenCalledWith({
+      data: { messageId: MSG_ID, userId: USER_ID, emoji: EMOJI },
     });
-    expect(result).toBe(true);
+    expect(prismaMock.messageReaction.deleteMany).not.toHaveBeenCalled();
+    expect(result).toEqual({ removed: null, added: EMOJI });
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // İdempotent: ikinci çağrı da upsert eder, hata fırlatmaz
-  // ─────────────────────────────────────────────────────────────────────────
-  it('aynı emoji zaten varsa hata fırlatmaz ve false döner (yayın yapılmasın)', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
-    prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg());
-    prismaMock.messageReaction.createMany.mockResolvedValue({ count: 0 });
+  it('aynı emoji zaten varsa değişiklik yok → { removed: null, added: null }', async () => {
+    prismaMock.messageReaction.findUnique.mockResolvedValue({ id: 'r1', emoji: EMOJI });
 
     const result = await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ removed: null, added: null });
+    expect(prismaMock.messageReaction.create).not.toHaveBeenCalled();
+    expect(prismaMock.messageReaction.deleteMany).not.toHaveBeenCalled();
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Silinmiş mesaj → 404 MESSAGE_NOT_FOUND
-  // ─────────────────────────────────────────────────────────────────────────
+  it('başka emoji varsa eskisi silinir, yenisi eklenir (tek tx) → { removed: eski, added: yeni }', async () => {
+    prismaMock.messageReaction.findUnique.mockResolvedValue({ id: 'r1', emoji: HEART });
+    prismaMock.messageReaction.deleteMany.mockResolvedValue({ count: 1 });
+    prismaMock.messageReaction.create.mockResolvedValue({});
+
+    const result = await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
+
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.messageReaction.deleteMany).toHaveBeenCalledWith({ where: { id: 'r1' } });
+    expect(prismaMock.messageReaction.create).toHaveBeenCalledWith({
+      data: { messageId: MSG_ID, userId: USER_ID, emoji: EMOJI },
+    });
+    expect(result).toEqual({ removed: HEART, added: EMOJI });
+  });
+
+  it('yarış (P2002): bir kez yeniden dener ve ikinci denemede başarılı olur', async () => {
+    prismaMock.messageReaction.findUnique.mockResolvedValue(null);
+    prismaMock.messageReaction.create.mockRejectedValueOnce(p2002()).mockResolvedValueOnce({});
+
+    const result = await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
+
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ removed: null, added: EMOJI });
+  });
+
+  it('yarış (P2002) ikinci denemede de çakışırsa değişiklik yok sayılır, hata fırlatmaz', async () => {
+    prismaMock.messageReaction.findUnique.mockResolvedValue(null);
+    prismaMock.messageReaction.create.mockRejectedValue(p2002());
+
+    const result = await service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI);
+
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ removed: null, added: null });
+  });
+
+  it('P2002 dışındaki hata olduğu gibi fırlatılır (yeniden deneme yok)', async () => {
+    prismaMock.messageReaction.findUnique.mockResolvedValue(null);
+    prismaMock.messageReaction.create.mockRejectedValue(new Error('db down'));
+
+    await expect(service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI)).rejects.toThrow(
+      'db down',
+    );
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('mesaj yoldaki kanala ait değilse 404: erişilen kanal üzerinden başka kanala tepki yok', async () => {
+    prismaMock.message.findUnique.mockResolvedValue({
+      ...makeExistingMsg(),
+      channelId: 'ch-private-other',
+    });
+
+    await expect(
+      service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.removeReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.messageReaction.deleteMany).not.toHaveBeenCalled();
+  });
+
   it('silinmiş mesaj → NotFoundException MESSAGE_NOT_FOUND', async () => {
-    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
     prismaMock.message.findUnique.mockResolvedValue(makeExistingMsg(new Date()));
 
     let thrown: NotFoundException | undefined;
@@ -1203,12 +1272,9 @@ describe('MessagesService.addReaction', () => {
     expect(thrown).toBeInstanceOf(NotFoundException);
     const response = thrown!.getResponse() as { error: string };
     expect(response.error).toBe('MESSAGE_NOT_FOUND');
-    expect(prismaMock.messageReaction.createMany).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // requireChannelAccess: yetkisiz erişim → servis zaten hata fırlatır (kontrolü delege eder)
-  // ─────────────────────────────────────────────────────────────────────────
   it('requireChannelAccess hata fırlatırsa → propgate edilir', async () => {
     membershipMock.requireChannelAccess.mockRejectedValue(
       new FE({ message: 'Erişim yok.', error: 'CHANNEL_FORBIDDEN' }),
@@ -1217,7 +1283,109 @@ describe('MessagesService.addReaction', () => {
     await expect(
       service.addReaction(USER_ID, GUILD_CHANNEL_ID, MSG_ID, EMOJI),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(prismaMock.messageReaction.createMany).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('MessagesService.listReactions', () => {
+  let service: MessagesService;
+
+  const MSG_ID = 'msg-react-3';
+  const u = (id: string) => ({
+    id,
+    username: id,
+    avatarUrl: null,
+    avatarAnimatedUrl: null,
+  });
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValue({
+      id: MSG_ID,
+      channelId: GUILD_CHANNEL_ID,
+      deletedAt: null,
+    });
+  });
+
+  it('emoji gruplarını ilk tepki zamanına göre, kişileri createdAt artan sırayla döner', async () => {
+    prismaMock.messageReaction.groupBy.mockResolvedValue([
+      { emoji: '👍', _count: { _all: 1 }, _min: { createdAt: new Date('2026-01-02') } },
+      { emoji: '❤️', _count: { _all: 2 }, _min: { createdAt: new Date('2026-01-01') } },
+    ]);
+    prismaMock.messageReaction.findMany.mockResolvedValue([
+      { emoji: '❤️', userId: 'ali' },
+      { emoji: '👍', userId: 'veli' },
+      { emoji: '❤️', userId: 'ayse' },
+    ]);
+    prismaMock.user.findMany.mockResolvedValue([u('ali'), u('veli'), u('ayse')]);
+
+    const result = await service.listReactions(USER_ID, GUILD_CHANNEL_ID, MSG_ID);
+
+    expect(result).toEqual([
+      { emoji: '❤️', count: 2, users: [u('ali'), u('ayse')] },
+      { emoji: '👍', count: 1, users: [u('veli')] },
+    ]);
+    expect(prismaMock.messageReaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 200, orderBy: { createdAt: 'asc' } }),
+    );
+  });
+
+  it('count 200 sınırını aşan satırları da sayar, liste okunan kadardır', async () => {
+    prismaMock.messageReaction.groupBy.mockResolvedValue([
+      { emoji: '👍', _count: { _all: 450 }, _min: { createdAt: new Date('2026-01-01') } },
+    ]);
+    prismaMock.messageReaction.findMany.mockResolvedValue([{ emoji: '👍', userId: 'ali' }]);
+    prismaMock.user.findMany.mockResolvedValue([u('ali')]);
+
+    const result = await service.listReactions(USER_ID, GUILD_CHANNEL_ID, MSG_ID);
+
+    expect(result[0].count).toBe(450);
+    expect(result[0].users).toHaveLength(1);
+  });
+
+  it('tepki yoksa boş dizi', async () => {
+    prismaMock.messageReaction.groupBy.mockResolvedValue([]);
+    prismaMock.messageReaction.findMany.mockResolvedValue([]);
+
+    expect(await service.listReactions(USER_ID, GUILD_CHANNEL_ID, MSG_ID)).toEqual([]);
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('silinmiş mesaj → 404 MESSAGE_NOT_FOUND', async () => {
+    prismaMock.message.findUnique.mockResolvedValue({
+      id: MSG_ID,
+      channelId: GUILD_CHANNEL_ID,
+      deletedAt: new Date(),
+    });
+
+    await expect(service.listReactions(USER_ID, GUILD_CHANNEL_ID, MSG_ID)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('mesaj başka kanaldaysa → 404 (kanal erişimi ile mesaj eşleşmeli)', async () => {
+    prismaMock.message.findUnique.mockResolvedValue({
+      id: MSG_ID,
+      channelId: 'baska-kanal',
+      deletedAt: null,
+    });
+
+    await expect(service.listReactions(USER_ID, GUILD_CHANNEL_ID, MSG_ID)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('kanala erişimi yoksa → erişim hatası propagate (mesaj sorgulanmaz)', async () => {
+    membershipMock.requireChannelAccess.mockRejectedValue(
+      new FE({ message: 'Erişim yok.', error: 'NOT_CHANNEL_MEMBER' }),
+    );
+
+    await expect(service.listReactions(USER_ID, GUILD_CHANNEL_ID, MSG_ID)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(prismaMock.message.findUnique).not.toHaveBeenCalled();
   });
 });
 

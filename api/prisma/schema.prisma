@@ -86,6 +86,7 @@ enum NotificationType {
   FRIEND_ACCEPT
   GUILD_INVITE
   EVENT_CREATED // R14 — ortamda yeni etkinlik oluşturuldu
+  REACTION // C46 — mesajına tepki bırakıldı (ortam: çan kaydı + push; DM: yalnız push)
 }
 
 enum NotificationLevel {
@@ -112,6 +113,7 @@ model User {
   mediaPolicy         MediaPolicy        @default(FRIENDS)
   profileDiscoverable Boolean            @default(true)
   readReceipts        Boolean            @default(true) // C12: okundu bilgisi paylaşımı (karşılıklı, sözleşme §2)
+  reactionNotifications Boolean          @default(true) // C46: mesajıma bırakılan tepki bildirimi (varsayılan açık)
   quickReactions      String[]           @default([]) // C24: hızlı tepki şeridi; boş = varsayılan beşli
   showGameActivity    Boolean?           // C31b §2: "Oynadığım oyunu göster". null = yaşa göre varsayılan (yetişkin açık, minör kapalı)
   showRecentActivity  Boolean            @default(false) // C31f: "Son oynadığım oyunlar" (7 gün saklanır). Varsayılan KAPALI; minör asla true olamaz
@@ -544,7 +546,7 @@ model MessageReaction {
   emoji     String
   createdAt DateTime @default(now())
 
-  @@unique([messageId, userId, emoji])
+  @@unique([messageId, userId]) // C46: kişi başı mesaj başına TEK tepki
   @@index([messageId])
 }
 
