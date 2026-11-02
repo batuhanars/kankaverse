@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -67,6 +67,8 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
   const keyboard = useKeyboardVisible();
   const ai = useAiVideo();
   const [confirmClear, setConfirmClear] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const promptY = useRef(0);
   const actions = useAiVideoActions({
     mode,
     setBusy: ai.setBusy,
@@ -121,7 +123,12 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
             <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
           </Pressable>
         </View>
+        {/* Sayfa klavyeyle küçülünce istem görünür alana alınır. Kaydırma küçülmeden önce yapılsa sınıra takılırdı. */}
         <ScrollView
+          ref={scrollRef}
+          onLayout={() => {
+            if (keyboard && !row && !ai.job) scrollRef.current?.scrollTo({ y: promptY.current, animated: true });
+          }}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.body}
           showsVerticalScrollIndicator={false}
@@ -143,7 +150,7 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
               {ai.job ? (
                 <AiVideoProgress job={ai.job} working={ai.working} saving={ai.saving} elapsedSec={ai.elapsedSec} onNew={newOne} />
               ) : (
-                <AiVideoForm ai={ai} />
+                <AiVideoForm ai={ai} onPromptLayout={(y) => (promptY.current = y)} />
               )}
               {/* Form açıkken hata alttaki sabit alanda (AiVideoCostBar); ilerleme görünümünde o alan yok. */}
               {ai.job && ai.error ? <Text style={styles.error}>{ai.error}</Text> : null}
@@ -195,6 +202,8 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: theme.colors.bgOverlay, justifyContent: 'flex-end' },
   tap: { flex: 1 },
   sheet: {
+    // Klavye alanı daraltınca sayfa da küçülür; yoksa üstü ekrandan taşar (istem yarım kalıyordu).
+    flexShrink: 1,
     backgroundColor: theme.colors.bgSidebar,
     borderTopLeftRadius: theme.radius.lg,
     borderTopRightRadius: theme.radius.lg,

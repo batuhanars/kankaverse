@@ -68,7 +68,14 @@ function Options({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
 }
 
 /** C42 sırası: model (yalnız çoklu), ekler, istem (@ ile), seçenekler. */
-export function AiVideoForm({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
+export function AiVideoForm({
+  ai,
+  onPromptLayout,
+}: {
+  ai: ReturnType<typeof useAiVideo>;
+  /** İstem alanının form içindeki üst konumu; form kaydırma içeriğinin en üstünde olduğundan kaydırma konumuyla aynı. */
+  onPromptLayout?: (y: number) => void;
+}) {
   const { refs } = ai;
   const refsOption = ai.form.current?.references ?? null;
   return (
@@ -88,7 +95,7 @@ export function AiVideoForm({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
           onRemove={ai.removeRef}
         />
       ) : null}
-      <View style={styles.field}>
+      <View style={styles.field} onLayout={(e) => onPromptLayout?.(e.nativeEvent.layout.y)}>
         <Text style={styles.label}>{t('aiVideo.promptLabel')}</Text>
         <AiVideoPrompt
           value={ai.prompt}
