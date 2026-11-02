@@ -5,6 +5,10 @@
 > **C44 ile ilişki:** C44 taslağındaki "Kredi ekle" sahip kararıyla düşmüştü ("tek araç Yenile"). Sahip 2026-11-02'de bilinçli olarak
 > tersine çevirdi: yanlış verilen krediyi düşürmek gerekiyor, artırma da aynı araçta olsun. Ek kredi SATIŞI ve abonelik hâlâ OUT.
 
+> **Revize (2026-11-03, sahip kararı):** tek düğme denendi, geri dönüldü. Arayüz: `Yenile` + `Düş` + `İptal et`. §2.2 ve §2.3 bu şekilde geçersiz:
+> Yenile her durumda görünür (etkin ve bitmiş hakta kalan devreder, iptal edilmişte devretmez, C44 kuralı); Düş yalnız `ACTIVE` ve kalan > 0 iken; İptal et `REVOKED` dışında.
+> Pencere yalnız düşer, `Ekle` yok. API §1 değişmedi; uç artıyı kabul etmeyi sürdürür ama arayüz göndermez.
+
 ## §0 Sorun ve karar
 Tek bütçe aracı `PUT` Yenile. O yalnız artırır, yeni dönem açar (harcanan sıfırlanır), süren üretimde 409 verir, küsuratı düşürür,
 boş not gelirse notu siler. Yanlışlıkla fazla verilen kredi geri alınamıyor (iptal + yenile dışında; o da geçmişi siler).

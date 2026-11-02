@@ -15,9 +15,8 @@ export const aiGrantSchema = z.object({
   note: z.string().trim().max(200, 'admin.aiAccess.form.noteTooLong').optional(),
 })
 
-// C47: kredi ayarla. Miktar her zaman pozitif, yon `mode` ile; sunucuya isaretli `deltaCredits` gider.
+// C47: kredi dus. Miktar pozitif girilir; sunucuya eksi `deltaCredits` gider.
 export const aiGrantAdjustSchema = z.object({
-  mode: z.enum(['ADD', 'REDUCE']),
   amount: z
     .number({ error: 'admin.aiAccess.adjust.amountInvalid' })
     .int('admin.aiAccess.adjust.amountInvalid')

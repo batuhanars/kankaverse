@@ -185,19 +185,17 @@
         "noteTooLong": "Not en fazla 200 karakter olabilir."
       },
       "adjust": {
-        "title": "Kredi ayarla",
+        "action": "Düş",
+        "title": "Kredi düş",
         "user": "KULLANICI",
-        "modeLabel": "İŞLEM",
-        "add": "Ekle",
-        "reduce": "Düş",
         "amount": "MİKTAR (KREDİ)",
         "preview": "Kalan {before} → {after}",
         "tooMuch": "Kalan krediden fazlası düşülemez. Kalan: {remaining}.",
         "amountInvalid": "Miktar 1 ile 100000 arasında tam sayı olmalı.",
-        "hint": "Yeni dönem açılmaz; harcanan kredi ve bitiş değişmez.",
-        "save": "Uygula",
-        "saved": "Kredi ayarlandı.",
-        "saveError": "Kredi ayarlanamadı."
+        "hint": "Yeni dönem açılmaz; kullanılan kredi değişmez.",
+        "save": "Düş",
+        "saved": "Kredi düşüldü.",
+        "saveError": "Kredi düşülemedi."
       },
       "revokeConfirmTitle": "Erişimi iptal et",
       "revokeConfirmMessage": "{username} kullanıcısının yapay zeka erişimi iptal edilsin mi?",

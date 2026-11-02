@@ -84,14 +84,13 @@ async function onSaved() {
   await refreshAll()
 }
 
-// ── Kredi ayarla (C47): yalnız etkin / biten hak; dönem açmaz ──
+// ── Kredi düş (C47): yalnız düşülecek kredisi olan etkin hak; dönem açmaz ──
 const adjusting = ref<AiVideoGrantRowDto | null>(null)
 async function onAdjusted() {
   adjusting.value = null
   await refreshAll()
 }
-const canAdjust = (r: AiVideoGrantRowDto) => r.status === 'ACTIVE' || r.status === 'EXHAUSTED'
-const canRenew = (r: AiVideoGrantRowDto) => r.status === 'EXPIRED' || r.status === 'REVOKED'
+const canReduce = (r: AiVideoGrantRowDto) => r.status === 'ACTIVE' && r.remainingCredits > 0
 const takenUserIds = computed(() => rows.value.map((r) => r.user.id))
 
 // ── İptal ──
@@ -190,22 +189,21 @@ async function confirmRevoke() {
           </div>
         </div>
         <button
-          v-if="canAdjust(r)"
-          type="button"
-          class="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
-          style="color: var(--kv-accent-400);"
-          @click="adjusting = r"
-        >
-          {{ t('admin.aiAccess.adjust.title') }}
-        </button>
-        <button
-          v-if="canRenew(r)"
           type="button"
           class="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
           style="color: var(--kv-accent-400);"
           @click="openForm(r)"
         >
           {{ t('admin.aiAccess.renew') }}
+        </button>
+        <button
+          v-if="canReduce(r)"
+          type="button"
+          class="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
+          style="color: var(--kv-accent-400);"
+          @click="adjusting = r"
+        >
+          {{ t('admin.aiAccess.adjust.action') }}
         </button>
         <button
           v-if="r.status !== 'REVOKED'"

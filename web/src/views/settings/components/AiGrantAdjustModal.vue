@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * AiGrantAdjustModal — etkin hakta krediyi ekle / düş (C47, yalnız isModerator; dışarıdan guard'lanır).
- * Dönem açmaz. Düşürmede kalandan fazlası istenemez (UX; otorite backend). `note` yalnız admin içindir.
+ * AiGrantAdjustModal: etkin hakta kredi düşer (C47, yalnız isModerator; dışarıdan guard'lanır).
+ * Dönem açmaz. Kalandan fazlası istenemez (UX; otorite backend). `note` yalnız admin içindir.
+ * Ekleme arayüzde yok: kredi artırmanın yolu Yenile (kalan yeni döneme devreder).
  */
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -24,17 +25,19 @@ const toast = useToastStore()
 
 const form = useForm({
   validationSchema: toTypedSchema(aiGrantAdjustSchema),
-  initialValues: { mode: 'ADD' as 'ADD' | 'REDUCE', amount: undefined, note: '' },
+  initialValues: { amount: undefined, note: '' },
 })
-const [mode] = form.defineField('mode')
 const [amount] = form.defineField('amount')
 const [note] = form.defineField('note')
 
 const remaining = computed(() => props.grant.remainingCredits)
-const delta = computed(() => (mode.value === 'REDUCE' ? -1 : 1) * (Number(amount.value) || 0))
-const tooMuch = computed(() => mode.value === 'REDUCE' && (Number(amount.value) || 0) > remaining.value)
+const entered = computed(() => Number(amount.value) || 0)
+const tooMuch = computed(() => entered.value > remaining.value)
+// Önizleme yalnız geçerli miktarda: boşken "307 → 307", fazla girişte eksi değer göstermesin.
 const preview = computed(() =>
-  t('admin.aiAccess.adjust.preview', { before: remaining.value, after: remaining.value + delta.value }),
+  entered.value > 0 && !tooMuch.value
+    ? t('admin.aiAccess.adjust.preview', { before: remaining.value, after: remaining.value - entered.value })
+    : '',
 )
 
 function fieldError(field: string): string | undefined {
@@ -51,7 +54,7 @@ const save = form.handleSubmit(async (v) => {
   saveError.value = ''
   try {
     await adminApi.adjustAiVideoGrant(props.grant.user.id, {
-      deltaCredits: (v.mode === 'REDUCE' ? -1 : 1) * v.amount,
+      deltaCredits: -v.amount,
       ...(v.note && { note: v.note }),
     })
     toast.success(t('admin.aiAccess.adjust.saved'))
@@ -75,20 +78,6 @@ const save = form.handleSubmit(async (v) => {
         <span class="text-[14px]" style="color: var(--kv-text-primary);">{{ grant.user.username }}</span>
       </div>
 
-      <div class="flex flex-col gap-1.5">
-        <span class="text-[11px] font-semibold uppercase tracking-wide" style="color: var(--kv-text-secondary);">
-          {{ t('admin.aiAccess.adjust.modeLabel') }}
-        </span>
-        <div class="flex gap-2">
-          <KvButton size="sm" :variant="mode === 'ADD' ? 'primary' : 'ghost'" @click="mode = 'ADD'">
-            {{ t('admin.aiAccess.adjust.add') }}
-          </KvButton>
-          <KvButton size="sm" :variant="mode === 'REDUCE' ? 'primary' : 'ghost'" @click="mode = 'REDUCE'">
-            {{ t('admin.aiAccess.adjust.reduce') }}
-          </KvButton>
-        </div>
-      </div>
-
       <div>
         <KvNumberInput v-model="amount" :label="t('admin.aiAccess.adjust.amount')" :min="1" :max="100000" />
         <p v-if="fieldError('amount')" class="text-[12px] mt-1" style="color: var(--kv-danger);">
@@ -103,7 +92,7 @@ const save = form.handleSubmit(async (v) => {
         :error="fieldError('note')"
       />
 
-      <p class="text-[14px] font-semibold tabular-nums" style="color: var(--kv-text-primary);">{{ preview }}</p>
+      <p v-if="preview" class="text-[14px] font-semibold tabular-nums" style="color: var(--kv-text-primary);">{{ preview }}</p>
       <p v-if="tooMuch" class="text-[12px]" style="color: var(--kv-danger);">
         {{ t('admin.aiAccess.adjust.tooMuch', { remaining }) }}
       </p>
