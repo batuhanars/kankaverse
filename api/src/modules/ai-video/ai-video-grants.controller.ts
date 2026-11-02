@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Post,
   Put,
   UseGuards,
 } from '@nestjs/common';
@@ -14,7 +15,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PlatformAdminGuard } from '../../common/guards/platform-admin.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AiVideoGrantsService } from './ai-video-grants.service';
-import { UpsertAiVideoGrantDto } from './dto/ai-video-grant.dto';
+import { AdjustAiVideoGrantDto, UpsertAiVideoGrantDto } from './dto/ai-video-grant.dto';
 
 /** C40 (R7) — yapay zeka video erişim hakları; yalnız platform admini. */
 @ApiTags('admin')
@@ -38,6 +39,17 @@ export class AiVideoGrantsController {
     @Body() dto: UpsertAiVideoGrantDto,
   ) {
     return this.service.upsert(admin.id, userId, dto);
+  }
+
+  @Post(':userId/adjust')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '[Admin] Etkin hakta krediyi ekle / düş (dönem açmaz)' })
+  adjust(
+    @CurrentUser() admin: { id: string },
+    @Param('userId') userId: string,
+    @Body() dto: AdjustAiVideoGrantDto,
+  ) {
+    return this.service.adjust(admin.id, userId, dto);
   }
 
   @Delete(':userId')

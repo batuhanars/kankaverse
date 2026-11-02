@@ -8,6 +8,7 @@ import {
   Max,
   MaxLength,
   Min,
+  NotEquals,
   ValidateIf,
 } from 'class-validator';
 
@@ -26,6 +27,27 @@ export class UpsertAiVideoGrantDto {
   @ValidateIf((o: UpsertAiVideoGrantDto) => o.expiresAt !== undefined && o.expiresAt !== null)
   @IsISO8601()
   expiresAt?: string | null;
+
+  @ApiPropertyOptional({ maxLength: AI_GRANT_NOTE_MAX, description: 'Yalnız admin içindir' })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(AI_GRANT_NOTE_MAX)
+  note?: string;
+}
+
+/** `POST /admin/ai-video/grants/:userId/adjust`: etkin hakta bütçeyi göreli değiştirir (dönem açmaz). */
+export class AdjustAiVideoGrantDto {
+  @ApiProperty({
+    minimum: -AI_GRANT_MAX_CREDITS,
+    maximum: AI_GRANT_MAX_CREDITS,
+    description: 'Artı = ekle, eksi = düş; 0 geçersiz',
+  })
+  @IsInt()
+  @Min(-AI_GRANT_MAX_CREDITS)
+  @Max(AI_GRANT_MAX_CREDITS)
+  @NotEquals(0)
+  deltaCredits!: number;
 
   @ApiPropertyOptional({ maxLength: AI_GRANT_NOTE_MAX, description: 'Yalnız admin içindir' })
   @IsOptional()

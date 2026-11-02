@@ -11,7 +11,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { DEFAULT_CREDIT_MICRO_USD, floorCredits, fromCredits, toCredits } from './ai-video.mapper';
 import { grantStatus, lockAiVideoUser, spentSinceMicro } from './ai-video-grant';
 import { ACTIVE_STATUSES } from './ai-video.constants';
-import { AiVideoGrantRowDto, UpsertAiVideoGrantDto } from './dto/ai-video-grant.dto';
+import {
+  AdjustAiVideoGrantDto,
+  AiVideoGrantRowDto,
+  UpsertAiVideoGrantDto,
+} from './dto/ai-video-grant.dto';
 
 const INT4_MAX = 2_147_483_647;
 
@@ -151,6 +155,77 @@ export class AiVideoGrantsService {
     return this.toRow(saved);
   }
 
+  /**
+   * C47 (R7): etkin hakta bütçeyi göreli değiştirir; dönem açmaz (startsAt/expiresAt/revokedAt/grantedBy sabit).
+   * Düşürme her zaman serbest (kapatmak güvenli yön) ama bütçe harcananın altına inmez; artırma minöre kapalı.
+   */
+  async adjust(actorId: string, userId: string, dto: AdjustAiVideoGrantDto) {
+    const credit = this.creditMicro();
+    const deltaMicro = fromCredits(dto.deltaCredits, credit);
+    const note = dto.note ? dto.note : null;
+    const { saved, beforeMicro, afterMicro } = await this.prisma.$transaction(async (tx) => {
+      await lockAiVideoUser(tx, userId);
+      const existing = await tx.aiVideoGrant.findUnique({ where: { userId } });
+      if (!existing) throw new NotFoundException('Erişim hakkı bulunamadı.');
+      const now = new Date();
+      if (existing.revokedAt !== null || (existing.expiresAt && existing.expiresAt <= now)) {
+        throw new ConflictException({
+          message: 'Bu hak için Yenile kullan.',
+          error: 'AI_VIDEO_GRANT_NOT_ADJUSTABLE',
+        });
+      }
+      const spent = await spentSinceMicro(tx, userId, existing.startsAt);
+      const remaining = Math.max(0, existing.budgetMicroUsd - spent);
+      if (deltaMicro > 0) {
+        await this.assertCanGrow(tx, userId);
+      } else if (-deltaMicro > remaining) {
+        throw new BadRequestException({
+          message: 'Kalan krediden fazlası düşülemez.',
+          error: 'AI_VIDEO_GRANT_REDUCE_TOO_MUCH',
+        });
+      }
+      const budgetMicroUsd = existing.budgetMicroUsd + deltaMicro;
+      if (budgetMicroUsd > INT4_MAX) {
+        throw new BadRequestException({
+          message: 'Kredi çok büyük.',
+          error: 'AI_VIDEO_GRANT_TOO_BIG',
+        });
+      }
+      const row = await tx.aiVideoGrant.update({
+        where: { userId },
+        data: { budgetMicroUsd, ...(note !== null && { note }) },
+        include: USERS_INCLUDE,
+      });
+      return {
+        saved: row,
+        beforeMicro: existing.budgetMicroUsd,
+        afterMicro: budgetMicroUsd,
+      };
+    });
+    await this.audit(actorId, 'ai_video.adjust', userId, {
+      deltaCredits: dto.deltaCredits,
+      beforeCredits: floorCredits(beforeMicro, credit),
+      afterCredits: floorCredits(afterMicro, credit),
+      note,
+    });
+    return this.toRow(saved);
+  }
+
+  /** Artırmada hedef silinmiş ya da reşit değilse reddeder (düşürmede çağrılmaz). */
+  private async assertCanGrow(tx: Prisma.TransactionClient, userId: string): Promise<void> {
+    const target = await tx.user.findUnique({
+      where: { id: userId },
+      select: { isMinor: true, deletedAt: true },
+    });
+    if (!target || target.deletedAt !== null) throw new NotFoundException('Kullanıcı bulunamadı.');
+    if (target.isMinor) {
+      throw new ForbiddenException({
+        message: 'Reşit olmayan kullanıcıya yapay zeka erişimi verilemez.',
+        error: 'MINOR_NOT_ALLOWED',
+      });
+    }
+  }
+
   async revoke(actorId: string, userId: string): Promise<void> {
     const grant = await this.prisma.aiVideoGrant.findUnique({ where: { userId } });
     if (!grant) throw new NotFoundException('Erişim hakkı bulunamadı.');
@@ -162,12 +237,7 @@ export class AiVideoGrantsService {
     });
   }
 
-  private audit(
-    actorId: string,
-    action: string,
-    userId: string,
-    metadata: Prisma.InputJsonObject,
-  ) {
+  private audit(actorId: string, action: string, userId: string, metadata: Prisma.InputJsonObject) {
     return this.prisma.auditLog.create({
       data: { actorId, action, entityType: 'user', entityId: userId, metadata: metadata },
     });

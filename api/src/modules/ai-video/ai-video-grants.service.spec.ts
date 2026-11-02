@@ -1,3 +1,6 @@
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { AdjustAiVideoGrantDto } from './dto/ai-video-grant.dto';
 import { AiVideoGrantsService } from './ai-video-grants.service';
 
 function setup(user: unknown) {
@@ -211,5 +214,157 @@ describe('AiVideoGrantsService C44 yenilemede kalan kredi devri', () => {
     prisma.aiVideoGeneration.findMany.mockResolvedValue(spent(98));
     const [r] = await service.list();
     expect(r.remainingCredits).toBe(2);
+  });
+});
+
+describe('AiVideoGrantsService C47 adjust (kredi ekle / dus)', () => {
+  const U = { id: 'u2', isMinor: false, deletedAt: null };
+  const START = new Date('2026-10-01T00:00:00Z');
+  // 100 kredi = 1_000_000 mikro-USD
+  const existing = (over: Record<string, unknown> = {}) => ({
+    userId: 'u2',
+    budgetMicroUsd: 1_000_000,
+    startsAt: START,
+    expiresAt: null,
+    revokedAt: null,
+    note: 'eski',
+    ...over,
+  });
+  const spent = (credits: number) => [
+    { status: 'COMPLETED', costMicroUsd: credits * 10_000, quoteMicroUsd: credits * 10_000 },
+  ];
+  function arrange(user: unknown, grant: unknown, gens: unknown[] = []) {
+    const s = setup(user);
+    s.prisma.aiVideoGrant.findUnique.mockResolvedValue(grant);
+    s.prisma.aiVideoGeneration.findMany.mockResolvedValue(gens);
+    s.prisma.aiVideoGrant.update.mockImplementation(({ data }) => ({
+      ...(grant as object),
+      ...data,
+      user: { id: 'u2', username: 'k' },
+      grantedBy: { id: 'a0', username: 'a' },
+    }));
+    return s;
+  }
+
+  it('arttirir: butce +50, donem acmaz, kilit alinir, audit metadata', async () => {
+    const { prisma, service } = arrange(U, existing(), spent(20));
+    const row = await service.adjust('admin1', 'u2', { deltaCredits: 50, note: 'duzeltme' });
+    const arg = prisma.aiVideoGrant.update.mock.calls[0][0];
+    expect(arg.data).toEqual({ budgetMicroUsd: 1_500_000, note: 'duzeltme' });
+    expect(arg.data.startsAt).toBeUndefined();
+    expect(row.budgetCredits).toBe(150);
+    expect(row.remainingCredits).toBe(130);
+    expect(prisma.$executeRaw).toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'ai_video.adjust',
+        entityId: 'u2',
+        metadata: { deltaCredits: 50, beforeCredits: 100, afterCredits: 150, note: 'duzeltme' },
+      }),
+    });
+  });
+
+  it('dusurur: butce -30, not gelmediyse korunur, startsAt degismez', async () => {
+    const { prisma, service } = arrange(U, existing(), spent(20));
+    const row = await service.adjust('a', 'u2', { deltaCredits: -30 });
+    const arg = prisma.aiVideoGrant.update.mock.calls[0][0];
+    expect(arg.data).toEqual({ budgetMicroUsd: 700_000 });
+    expect(row.budgetCredits).toBe(70);
+    expect(row.remainingCredits).toBe(50);
+    expect(row.startsAt).toBe(START.toISOString());
+    expect(row.note).toBe('eski');
+  });
+
+  it('kalanin tamamini dusurmek: EXHAUSTED', async () => {
+    const { service } = arrange(U, existing(), spent(20));
+    const row = await service.adjust('a', 'u2', { deltaCredits: -80 });
+    expect(row.remainingCredits).toBe(0);
+    expect(row.status).toBe('EXHAUSTED');
+  });
+
+  it('kalandan fazla dusme 400 AI_VIDEO_GRANT_REDUCE_TOO_MUCH, yazilmaz', async () => {
+    const { prisma, service } = arrange(U, existing(), spent(20));
+    await expect(service.adjust('a', 'u2', { deltaCredits: -81 })).rejects.toMatchObject({
+      status: 400,
+      response: { error: 'AI_VIDEO_GRANT_REDUCE_TOO_MUCH' },
+    });
+    expect(prisma.aiVideoGrant.update).not.toHaveBeenCalled();
+  });
+
+  it('suren uretim (rezerv) varken dusurme calisir, rezerv harcanan sayilir', async () => {
+    const reserved = [{ status: 'RUNNING', costMicroUsd: null, quoteMicroUsd: 200_000 }];
+    const { prisma, service } = arrange(U, existing(), reserved);
+    prisma.aiVideoGeneration.findFirst.mockResolvedValue({ id: 'g9' });
+    await service.adjust('a', 'u2', { deltaCredits: -80 });
+    await expect(service.adjust('a', 'u2', { deltaCredits: -81 })).rejects.toMatchObject({
+      status: 400,
+    });
+  });
+
+  it('iptal edilmis ve suresi dolmus hak: 409 AI_VIDEO_GRANT_NOT_ADJUSTABLE', async () => {
+    for (const over of [{ revokedAt: new Date() }, { expiresAt: new Date('2020-01-01') }]) {
+      const { prisma, service } = arrange(U, existing(over));
+      await expect(service.adjust('a', 'u2', { deltaCredits: 5 })).rejects.toMatchObject({
+        status: 409,
+        response: { error: 'AI_VIDEO_GRANT_NOT_ADJUSTABLE' },
+      });
+      expect(prisma.aiVideoGrant.update).not.toHaveBeenCalled();
+    }
+  });
+
+  it('kayit yok: 404', async () => {
+    const { service } = arrange(U, null);
+    await expect(service.adjust('a', 'u2', { deltaCredits: 5 })).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  it('minore artirma 403, minorden dusurme calisir', async () => {
+    const minor = { id: 'u2', isMinor: true, deletedAt: null };
+    const a = arrange(minor, existing());
+    await expect(a.service.adjust('a', 'u2', { deltaCredits: 5 })).rejects.toMatchObject({
+      status: 403,
+      response: { error: 'MINOR_NOT_ALLOWED' },
+    });
+    expect(a.prisma.aiVideoGrant.update).not.toHaveBeenCalled();
+    const b = arrange(minor, existing());
+    await b.service.adjust('a', 'u2', { deltaCredits: -5 });
+    expect(b.prisma.aiVideoGrant.update).toHaveBeenCalled();
+  });
+
+  it('silinmis kullaniciya artirma 404', async () => {
+    const { service } = arrange({ id: 'u2', isMinor: false, deletedAt: new Date() }, existing());
+    await expect(service.adjust('a', 'u2', { deltaCredits: 5 })).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  it('INT4 tavani: 400 AI_VIDEO_GRANT_TOO_BIG', async () => {
+    const { prisma, service } = arrange(U, existing({ budgetMicroUsd: 2_147_000_000 }));
+    await expect(service.adjust('a', 'u2', { deltaCredits: 100_000 })).rejects.toMatchObject({
+      status: 400,
+      response: { error: 'AI_VIDEO_GRANT_TOO_BIG' },
+    });
+    expect(prisma.aiVideoGrant.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('AdjustAiVideoGrantDto (C47)', () => {
+  const check = async (body: object) => {
+    const dto = plainToInstance(AdjustAiVideoGrantDto, body);
+    return (await validate(dto)).length;
+  };
+  it('0, tam sayi olmayan ve aralik disi reddedilir', async () => {
+    expect(await check({ deltaCredits: 0 })).toBeGreaterThan(0);
+    expect(await check({ deltaCredits: 1.5 })).toBeGreaterThan(0);
+    expect(await check({ deltaCredits: 100_001 })).toBeGreaterThan(0);
+    expect(await check({ deltaCredits: -100_001 })).toBeGreaterThan(0);
+    expect(await check({ deltaCredits: 'x' })).toBeGreaterThan(0);
+    expect(await check({ deltaCredits: -5, note: 'a'.repeat(201) })).toBeGreaterThan(0);
+  });
+  it('gecerli: -100000, 100000, 7 ve not', async () => {
+    expect(await check({ deltaCredits: -100_000 })).toBe(0);
+    expect(await check({ deltaCredits: 100_000 })).toBe(0);
+    expect(await check({ deltaCredits: 7, note: ' x ' })).toBe(0);
   });
 });

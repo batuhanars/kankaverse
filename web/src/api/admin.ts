@@ -86,6 +86,12 @@ export interface UpsertAiVideoGrantPayload {
   note?: string // ≤200
 }
 
+// C47: etkin hakta bütçeyi göreli değiştirir (dönem açmaz). Artı = ekle, eksi = düş.
+export interface AdjustAiVideoGrantPayload {
+  deltaCredits: number // -100000..100000, 0 geçersiz
+  note?: string // ≤200
+}
+
 export const adminApi = {
   createPlatformInvite(payload: CreatePlatformInvitePayload) {
     return http.post<PlatformInviteDto>('/admin/platform-invites', payload)
@@ -107,6 +113,9 @@ export const adminApi = {
   },
   upsertAiVideoGrant(userId: string, payload: UpsertAiVideoGrantPayload) {
     return http.put<AiVideoGrantRowDto>(`/admin/ai-video/grants/${userId}`, payload)
+  },
+  adjustAiVideoGrant(userId: string, payload: AdjustAiVideoGrantPayload) {
+    return http.post<AiVideoGrantRowDto>(`/admin/ai-video/grants/${userId}/adjust`, payload)
   },
   revokeAiVideoGrant(userId: string) {
     return http.delete<null>(`/admin/ai-video/grants/${userId}`)

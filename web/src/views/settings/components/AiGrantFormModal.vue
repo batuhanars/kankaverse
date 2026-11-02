@@ -19,7 +19,9 @@ import KvNumberInput from '@/components/ui/KvNumberInput.vue'
 import AiGrantUserPicker from './AiGrantUserPicker.vue'
 import type { PickerUser } from './AiGrantUserPicker.vue'
 
-const props = defineProps<{ renewing?: AiVideoGrantRowDto | null }>()
+// takenUserIds: listede satırı olan kullanıcılar. Yeni verme seçicisinde gösterilmez (etkin haktaki
+// kullanıcıya fark ettirmeden yeni dönem açılmasın, C47); onların yolu Kredi ayarla / Yenile.
+const props = defineProps<{ renewing?: AiVideoGrantRowDto | null; takenUserIds?: string[] }>()
 const emit = defineEmits<{ close: []; saved: [] }>()
 const i18n = useI18n()
 const { t } = i18n
@@ -29,7 +31,7 @@ const form = useForm({
   validationSchema: toTypedSchema(aiGrantSchema),
   initialValues: {
     userId: props.renewing?.user.id ?? '',
-    budgetCredits: props.renewing?.budgetCredits,
+    budgetCredits: undefined, // yenilemede boş açılır: mevcut bütçeyle dolu olsa Kaydet limiti ikiye katlardı (C47)
     note: props.renewing?.note ?? '',
   },
 })
@@ -56,7 +58,7 @@ function fieldError(field: string): string | undefined {
 const users = ref<AdminUserDto[]>([])
 const pickedId = computed(() => form.values.userId ?? '')
 const pickerUsers = computed<PickerUser[]>(() =>
-  props.renewing ? [props.renewing.user] : users.value.filter((u) => !u.isMinor),
+  props.renewing ? [props.renewing.user] : users.value.filter((u) => !u.isMinor && !props.takenUserIds?.includes(u.id)),
 )
 
 onMounted(async () => {

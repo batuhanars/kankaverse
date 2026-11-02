@@ -12,6 +12,7 @@ import { useToastStore } from '@/stores/toast'
 import KvButton from '@/components/ui/KvButton.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import AiGrantFormModal from './AiGrantFormModal.vue'
+import AiGrantAdjustModal from './AiGrantAdjustModal.vue'
 
 const { t } = useI18n()
 const toast = useToastStore()
@@ -82,6 +83,16 @@ async function onSaved() {
   formOpen.value = false
   await refreshAll()
 }
+
+// ── Kredi ayarla (C47): yalnız etkin / biten hak; dönem açmaz ──
+const adjusting = ref<AiVideoGrantRowDto | null>(null)
+async function onAdjusted() {
+  adjusting.value = null
+  await refreshAll()
+}
+const canAdjust = (r: AiVideoGrantRowDto) => r.status === 'ACTIVE' || r.status === 'EXHAUSTED'
+const canRenew = (r: AiVideoGrantRowDto) => r.status === 'EXPIRED' || r.status === 'REVOKED'
+const takenUserIds = computed(() => rows.value.map((r) => r.user.id))
 
 // ── İptal ──
 const revokeTarget = ref<AiVideoGrantRowDto | null>(null)
@@ -179,6 +190,16 @@ async function confirmRevoke() {
           </div>
         </div>
         <button
+          v-if="canAdjust(r)"
+          type="button"
+          class="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
+          style="color: var(--kv-accent-400);"
+          @click="adjusting = r"
+        >
+          {{ t('admin.aiAccess.adjust') }}
+        </button>
+        <button
+          v-if="canRenew(r)"
           type="button"
           class="shrink-0 text-[12px] font-medium px-3 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
           style="color: var(--kv-accent-400);"
@@ -199,7 +220,14 @@ async function confirmRevoke() {
     </div>
   </div>
 
-  <AiGrantFormModal v-if="formOpen" :renewing="renewing" @close="formOpen = false" @saved="onSaved" />
+  <AiGrantFormModal
+    v-if="formOpen"
+    :renewing="renewing"
+    :taken-user-ids="takenUserIds"
+    @close="formOpen = false"
+    @saved="onSaved"
+  />
+  <AiGrantAdjustModal v-if="adjusting" :grant="adjusting" @close="adjusting = null" @saved="onAdjusted" />
 
   <ConfirmDialog
     v-if="revokeTarget"
