@@ -196,7 +196,7 @@ async function confirmRevoke() {
           style="color: var(--kv-accent-400);"
           @click="adjusting = r"
         >
-          {{ t('admin.aiAccess.adjust') }}
+          {{ t('admin.aiAccess.adjust.title') }}
         </button>
         <button
           v-if="canRenew(r)"
