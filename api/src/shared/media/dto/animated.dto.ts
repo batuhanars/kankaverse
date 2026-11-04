@@ -43,7 +43,8 @@ export class ProcessAnimatedDto {
 
   @ApiPropertyOptional({
     description:
-      'Kaynağın genişlik/yüksekliğine oranla 0-1 kesirler: { x, y, width, height }. Yoksa merkezden kırpılır. ' +
+      'Kaynağın genişlik/yüksekliğine oranla kesirler: { x, y, width, height }. Yoksa merkezden kırpılır. ' +
+      'Normalde 0-1; uzaklaştırmada pencere kaynağı kapsar (width/height > 1, x/y <= 0), boş alan saydam kalır. ' +
       'Değerler serviste doğrulanır (INVALID_CROP 400); oran hedefe sunucuda oturtulur.',
     example: { x: 0.1, y: 0.25, width: 0.8, height: 0.32 },
   })

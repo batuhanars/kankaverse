@@ -5,6 +5,7 @@
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useClipboard } from '@vueuse/core'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import AiVideoResultActions from '@/components/shared/AiVideoResultActions.vue'
@@ -19,6 +20,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ close: []; save: []; primary: []; new: []; delete: [] }>()
 const { t } = useI18n()
+const { copy, copied } = useClipboard({ legacy: true })
 
 const meta = computed(() =>
   [props.modelLabel, t('aiVideo.durationOption', { sec: props.row.durationS }), props.row.resolution].filter(Boolean).join(' · '),
@@ -37,9 +39,14 @@ const meta = computed(() =>
         muted
         playsinline
       />
-      <p class="line-clamp-2 break-words text-[14px]" style="color: var(--kv-text-primary);">
+      <p class="whitespace-pre-wrap break-words select-text text-[14px]" style="color: var(--kv-text-primary);">
         {{ row.prompt || t('aiVideo.fromImage') }}
       </p>
+      <div v-if="row.prompt">
+        <KvButton variant="ghost" @click="copy(row.prompt)">
+          {{ copied ? t('aiVideo.promptCopied') : t('aiVideo.copyPrompt') }}
+        </KvButton>
+      </div>
       <p class="text-[12px] min-w-0 break-words" style="color: var(--kv-text-muted);">{{ meta }}</p>
       <p v-if="error" class="text-[13px]" style="color: var(--kv-danger);">{{ error }}</p>
       <div class="flex flex-wrap items-center gap-2">

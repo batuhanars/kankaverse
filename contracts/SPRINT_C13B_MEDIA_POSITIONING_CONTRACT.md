@@ -58,6 +58,10 @@ Değişiklik YOK. Migration YOK.
   **merkezi korunarak** küçültülerek oturtulur, kaynak sınırına kıstırılır. İstemcinin yuvarlama hatası
   böylece reddedilmez, düzeltilir.
 - `crop` yoksa C13 davranışı: merkezden kırp (eski istemciler için).
+- **Revizyon 2026-11-04 (uzaklaştırma):** bir eksende pencere kaynaktan büyük olabilir: `width > 1`, `x <= 0`,
+  `x+width >= 1` (y için aynı). Alt sınır kaynağın tamamının sığdığı yakınlaştırma; istemci zorlar, sunucuda çıktı
+  boyutu zaten sabit. Sunucu kaynağı küçültüp tuvale yerleştirir, boş alan **saydam** kalır (dört hedefte de):
+  sharp `extend`, ffmpeg `crop → scale → format=yuva420p → pad`. Yalnız bir kenarı taşan pencere `INVALID_CROP`.
 
 ### §2.2 Görsel girişi
 - Presign allowlist'ine `image/png`, `image/jpeg`, `image/webp` eklenir. Girdi tavanı 15 MB.

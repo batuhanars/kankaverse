@@ -7,7 +7,7 @@ import {
   AnimatedInputType,
   AnimatedTarget,
 } from './animated.constants';
-import { PixelRect } from './crop-math';
+import { CanvasPad, PixelRect } from './crop-math';
 
 /**
  * C13 R7 — ffmpeg/ffprobe argüman inşası (SAF fonksiyonlar, çalıştırma yok).
@@ -43,12 +43,24 @@ function assertSafeInt(value: number, name: string): number {
   return value;
 }
 
+/** Uzaklaştırma: kaynağı iç boyuta küçült, tuvale yerleştir, kalan alan saydam (alfa kanalı önce açılır). */
+function scalePadFilter(pad: CanvasPad, width: number, height: number): string {
+  const w = assertSafeInt(pad.innerWidth, 'pad.innerWidth');
+  const h = assertSafeInt(pad.innerHeight, 'pad.innerHeight');
+  const x = assertSafeInt(pad.left, 'pad.left');
+  const y = assertSafeInt(pad.top, 'pad.top');
+  if (w < 1 || h < 1 || x + w > width || y + h > height) {
+    throw new Error('ffmpeg argümanı geçersiz: pad boyutu');
+  }
+  return `scale=${w}:${h},format=yuva420p,pad=${width}:${height}:${x}:${y}:color=black@0`;
+}
+
 /**
  * Kırp + ölçekle. C13b: `rect` (kullanıcının seçtiği, sunucuda hedef oranına oturtulmuş piksel
  * dikdörtgeni) varsa `crop=W:H:X:Y,scale=w:h`; yoksa merkezden kırpma (eski istemciler).
  * Tüm sayılar doğrulanmış tamsayı veya sabittir; kullanıcı metni filtreye girmez.
  */
-function cropScaleFilter(target: AnimatedTarget, rect?: PixelRect): string {
+function cropScaleFilter(target: AnimatedTarget, rect?: PixelRect, pad?: CanvasPad): string {
   const { width, height } = ANIMATED_SIZE[target];
   if (rect) {
     const w = assertSafeInt(rect.width, 'crop.width');
@@ -56,7 +68,10 @@ function cropScaleFilter(target: AnimatedTarget, rect?: PixelRect): string {
     if (w < 1 || h < 1) throw new Error('ffmpeg argümanı geçersiz: crop boyutu');
     const x = assertSafeInt(rect.left, 'crop.left');
     const y = assertSafeInt(rect.top, 'crop.top');
-    return `crop=${w}:${h}:${x}:${y},scale=${width}:${height}`;
+    const crop = `crop=${w}:${h}:${x}:${y}`;
+    return pad
+      ? `${crop},${scalePadFilter(pad, width, height)}`
+      : `${crop},scale=${width}:${height}`;
   }
   return `scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`;
 }
@@ -99,6 +114,8 @@ export interface ConvertArgsInput {
   quality: number;
   /** C13b: kullanıcı kırpması (kaynak pikseli, hedef oranında). Yoksa merkezden kırp. */
   cropRect?: PixelRect;
+  /** Uzaklaştırma: kırpılan kaynağın tuval yerleşimi (yalnız cropRect ile). */
+  pad?: CanvasPad;
 }
 
 /** Ortak giriş: günlük bayrakları + zorunlu biçim + protokol whitelist + kesit (giriş seçenekleri). */
@@ -138,7 +155,7 @@ export function buildAnimatedArgs(input: ConvertArgsInput): string[] {
     '-map_metadata',
     '-1',
     '-vf',
-    `fps=${ANIMATED_FPS},${cropScaleFilter(input.target, input.cropRect)}`,
+    `fps=${ANIMATED_FPS},${cropScaleFilter(input.target, input.cropRect, input.pad)}`,
     '-c:v',
     'libwebp_anim',
     '-loop',
@@ -166,7 +183,7 @@ export function buildStaticArgs(input: ConvertArgsInput): string[] {
     '-map_metadata',
     '-1',
     '-vf',
-    cropScaleFilter(input.target, input.cropRect),
+    cropScaleFilter(input.target, input.cropRect, input.pad),
     '-frames:v',
     '1',
     '-c:v',

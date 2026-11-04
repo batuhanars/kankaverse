@@ -8,15 +8,16 @@ import { theme } from '@/theme';
 
 /**
  * Sprint C13b §4: avatar/afis konumlandirma. Hedef oraninda sabit cerceve (avatar daire, afis 5:2),
- * icinde kaynak; surukle + yakinlastir (1x-4x). Kaynak cerceveyi her zaman doldurur ("cover" tabani),
- * kenardan tasamaz. Cikti sozlesme §2.1 kesirleri (kaynagin gercek boyutuna orani); kirpmayi sunucu yapar.
+ * icinde kaynak; surukle + yakinlastir/uzaklastir. Taban 1x kaynak cerceveyi doldurur ("cover"), alt sinir
+ * kaynagin tamaminin sigdigi deger (`minZoom`), ust sinir 4x. Cikti sozlesme §2.1 kesirleri (kaynagin gercek
+ * boyutuna orani); uzaklastirinca pencere kaynaktan buyur (width > 1, x < 0), bos alani sunucu saydam birakir.
  *
  * 🔴 `GestureHandlerRootView` BURADA degil, ust `Modal`da: Android'de Modal ayri pencere ve kokteki
  * sarmalayici ona ulasmaz (bkz. `ImageViewer`). Bu bilesen onu bekler.
  * 🔴 Video onizlemesinde `surfaceType="textureView"` SART: SurfaceView donusumle tasinan/kirpilan
  * goruntuyu yok sayar, video cerceveden tasar (C13 cihaz turu dersi).
  */
-export const MIN_ZOOM = 1;
+export const BASE_ZOOM = 1;
 export const MAX_ZOOM = 4;
 
 export type PositionerSource = { kind: 'image'; uri: string } | { kind: 'video'; player: VideoPlayer };
@@ -39,9 +40,26 @@ const BANNER_RATIO = 5 / 2;
 /** C19: ortam afisi kanal panelinde ~2:1 gorunur (profil afisi 5:2'den farkli). */
 const GUILD_BANNER_RATIO = 2;
 
+function frameRatio(target: AnimatedTarget) {
+  if (target === 'BANNER') return BANNER_RATIO;
+  return target === 'GUILD_BANNER' ? GUILD_BANNER_RATIO : 1;
+}
+
+/** Kaynagin tamaminin cerceveye sigdigi yakinlastirma ("contain" / "cover"). */
+export function minZoom(target: AnimatedTarget, naturalWidth: number, naturalHeight: number) {
+  const r = frameRatio(target) / (naturalWidth / naturalHeight);
+  return Math.min(r, 1 / r);
+}
+
 function clamp(v: number, lo: number, hi: number) {
   'worklet';
   return Math.min(hi, Math.max(lo, v));
+}
+
+/** Kaynak cerceveden buyukse cerceve kaynagin icinde, kucukse kaynak cercevenin icinde kalir. */
+function panLimit(displayed: number, frame: number) {
+  'worklet';
+  return Math.abs(displayed - frame) / 2;
 }
 
 interface Geometry {
@@ -57,10 +75,10 @@ function computeCrop(g: Geometry, z: number, tx: number, ty: number): MediaCrop 
   'worklet';
   const dw = g.bw * z;
   const dh = g.bh * z;
-  const width = Math.min(1, g.fw / dw);
-  const height = Math.min(1, g.fh / dh);
-  const x = clamp(((dw - g.fw) / 2 - tx) / dw, 0, 1 - width);
-  const y = clamp(((dh - g.fh) / 2 - ty) / dh, 0, 1 - height);
+  const width = g.fw / dw;
+  const height = g.fh / dh;
+  const x = clamp(((dw - g.fw) / 2 - tx) / dw, Math.min(0, 1 - width), Math.max(0, 1 - width));
+  const y = clamp(((dh - g.fh) / 2 - ty) / dh, Math.min(0, 1 - height), Math.max(0, 1 - height));
   return { x, y, width, height };
 }
 
@@ -75,12 +93,12 @@ export function MediaPositioner({
   disabled,
 }: Props) {
   const [frame, setFrame] = useState({ w: 0, h: 0 });
-  const scale = useSharedValue(MIN_ZOOM);
+  const scale = useSharedValue(BASE_ZOOM);
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
   // Jest baslangic degerleri; pinch ve pan AYRI cift kullanir (ikisi ayni anda etkin, ortak olursa
   // ikincinin onStart'i birincinin tabanini ezip goruntuyu ziplatir).
-  const pinchScale = useSharedValue(MIN_ZOOM);
+  const pinchScale = useSharedValue(BASE_ZOOM);
   const pinchX = useSharedValue(0);
   const pinchY = useSharedValue(0);
   const panX = useSharedValue(0);
@@ -91,6 +109,7 @@ export function MediaPositioner({
   const ready = frame.w > 0 && frame.h > 0 && naturalWidth > 0 && naturalHeight > 0;
   const cover = ready ? Math.max(frame.w / naturalWidth, frame.h / naturalHeight) : 1;
   const g: Geometry = { fw: frame.w, fh: frame.h, bw: naturalWidth * cover, bh: naturalHeight * cover };
+  const lowest = ready ? minZoom(target, naturalWidth, naturalHeight) : BASE_ZOOM;
 
   function onLayout(e: LayoutChangeEvent) {
     const { width, height } = e.nativeEvent.layout;
@@ -100,10 +119,10 @@ export function MediaPositioner({
   // Cerceve olculunce ve kaynak/zoom degisince: sinira kistir, kesiti bildir.
   useEffect(() => {
     if (!ready) return;
-    const z = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+    const z = clamp(zoom, lowest, MAX_ZOOM);
     scale.value = z;
-    const mx = Math.max(0, (g.bw * z - g.fw) / 2);
-    const my = Math.max(0, (g.bh * z - g.fh) / 2);
+    const mx = panLimit(g.bw * z, g.fw);
+    const my = panLimit(g.bh * z, g.fh);
     tx.value = clamp(tx.value, -mx, mx);
     ty.value = clamp(ty.value, -my, my);
     onCropChange(computeCrop(g, z, tx.value, ty.value));
@@ -127,11 +146,11 @@ export function MediaPositioner({
       focalY.value = e.focalY - g.fh / 2;
     })
     .onUpdate((e) => {
-      const next = clamp(pinchScale.value * e.scale, MIN_ZOOM, MAX_ZOOM);
+      const next = clamp(pinchScale.value * e.scale, lowest, MAX_ZOOM);
       const ratio = next / pinchScale.value;
       // Parmaklarin ortasindaki nokta yerinde kalsin (ImageViewer ile ayni turetme), sonra sinira kistir.
-      const mx = Math.max(0, (g.bw * next - g.fw) / 2);
-      const my = Math.max(0, (g.bh * next - g.fh) / 2);
+      const mx = panLimit(g.bw * next, g.fw);
+      const my = panLimit(g.bh * next, g.fh);
       scale.value = next;
       tx.value = clamp(focalX.value * (1 - ratio) + ratio * pinchX.value, -mx, mx);
       ty.value = clamp(focalY.value * (1 - ratio) + ratio * pinchY.value, -my, my);
@@ -145,8 +164,8 @@ export function MediaPositioner({
       panY.value = ty.value;
     })
     .onUpdate((e) => {
-      const mx = Math.max(0, (g.bw * scale.value - g.fw) / 2);
-      const my = Math.max(0, (g.bh * scale.value - g.fh) / 2);
+      const mx = panLimit(g.bw * scale.value, g.fw);
+      const my = panLimit(g.bh * scale.value, g.fh);
       tx.value = clamp(panX.value + e.translationX, -mx, mx);
       ty.value = clamp(panY.value + e.translationY, -my, my);
     })
@@ -160,17 +179,18 @@ export function MediaPositioner({
 
   const isAvatar = target === 'AVATAR' || target === 'GUILD_ICON';
   return (
-    <View
-      onLayout={onLayout}
-      style={[
-        styles.frame,
-        isAvatar ? styles.frameAvatar : styles.frameBanner,
-        target === 'GUILD_BANNER' && styles.frameGuildBanner,
-      ]}
-    >
-      {ready ? (
-        <GestureDetector gesture={gesture}>
-          {/* Taban boyut zoom 1'deki "cover" boyutu, cercevede ortali; zoom donusumle (merkez etrafinda). */}
+    // Jest cercevede: uzaklastirinca kaynak cerceveyi doldurmaz, bosluga dokunus da calismali.
+    <GestureDetector gesture={gesture}>
+      <View
+        onLayout={onLayout}
+        style={[
+          styles.frame,
+          isAvatar ? styles.frameAvatar : styles.frameBanner,
+          target === 'GUILD_BANNER' && styles.frameGuildBanner,
+        ]}
+      >
+        {ready ? (
+          /* Taban boyut zoom 1'deki "cover" boyutu, cercevede ortali; zoom donusumle (merkez etrafinda). */
           <Animated.View
             style={[
               styles.media,
@@ -190,9 +210,9 @@ export function MediaPositioner({
               <Image source={{ uri: source.uri }} style={styles.fill} resizeMode="stretch" />
             )}
           </Animated.View>
-        </GestureDetector>
-      ) : null}
-    </View>
+        ) : null}
+      </View>
+    </GestureDetector>
   );
 }
 

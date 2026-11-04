@@ -24,6 +24,7 @@ import {
   ANIMATED_MIN_CLIP_MS,
   ANIMATED_PREFIX,
   ANIMATED_PROCESS_TIMEOUT_MS,
+  ANIMATED_SIZE,
   ANIMATED_STAGING_PREFIX,
   AnimatedInputType,
   AnimatedTarget,
@@ -37,7 +38,14 @@ import {
   StillImageType,
 } from './animated.constants';
 import { readPreviousMedia, writeMedia } from './animated-targets';
-import { CropFractions, fitCropToAspect, isValidCrop, PixelRect } from './crop-math';
+import {
+  CropFractions,
+  fitCropToAspect,
+  isValidCrop,
+  isZoomedOut,
+  PixelRect,
+  placeZoomedOutCrop,
+} from './crop-math';
 import { buildAnimatedArgs, buildProbeArgs, buildStaticArgs, ClipRange } from './ffmpeg-args';
 import { runBinary } from './run-binary';
 
@@ -349,12 +357,18 @@ export class AnimatedMediaService {
     const probe = await this.probe(contentType, inputPath);
     const clip = this.resolveClip(contentType, probe, dto.startMs, dto.durationMs);
     // Crop yoksa ffmpeg'in eski merkez kırpması (cropRect yok); varsa hedef oranına oturtulmuş piksel dikdörtgeni
-    const cropRect: PixelRect | undefined = dto.crop
-      ? fitCropToAspect(dto.crop, probe.width, probe.height, TARGET_ASPECT[target])
-      : undefined;
+    const placed =
+      dto.crop && isZoomedOut(dto.crop)
+        ? placeZoomedOutCrop(dto.crop, probe.width, probe.height, ANIMATED_SIZE[target])
+        : undefined;
+    const cropRect: PixelRect | undefined =
+      placed?.rect ??
+      (dto.crop
+        ? fitCropToAspect(dto.crop, probe.width, probe.height, TARGET_ASPECT[target])
+        : undefined);
 
     // Dönüşüm (+ tavan aşılırsa bir kez düşük kalite)
-    const base = { contentType, target, clip, inputPath, cropRect };
+    const base = { contentType, target, clip, inputPath, cropRect, pad: placed?.pad };
     const animatedPath = join(workDir, 'out.webp');
     const staticPath = join(workDir, 'out-static.webp');
     const limit = ANIMATED_MAX_OUTPUT_BYTES[target];
@@ -406,13 +420,26 @@ export class AnimatedMediaService {
       }
       // Kırpma kesirleri EXIF yönü UYGULANMIŞ boyuta göredir (istemci döndürülmüş görseli gösterir): 5-8 icin en/boy takası
       const swap = (meta.orientation ?? 1) >= 5;
-      const rect = fitCropToAspect(
-        crop,
-        swap ? meta.height : meta.width,
-        swap ? meta.width : meta.height,
-        TARGET_ASPECT[target],
-      );
+      const srcWidth = swap ? meta.height : meta.width;
+      const srcHeight = swap ? meta.width : meta.height;
       const { width, height } = STILL_SIZE[target];
+      if (crop && isZoomedOut(crop)) {
+        const { rect, pad } = placeZoomedOutCrop(crop, srcWidth, srcHeight, { width, height });
+        return open()
+          .rotate()
+          .extract(rect)
+          .resize(pad.innerWidth, pad.innerHeight, { fit: 'fill' })
+          .extend({
+            left: pad.left,
+            top: pad.top,
+            right: width - pad.innerWidth - pad.left,
+            bottom: height - pad.innerHeight - pad.top,
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          })
+          .webp({ quality: STILL_WEBP_QUALITY })
+          .toBuffer();
+      }
+      const rect = fitCropToAspect(crop, srcWidth, srcHeight, TARGET_ASPECT[target]);
       return open()
         .rotate()
         .extract(rect)

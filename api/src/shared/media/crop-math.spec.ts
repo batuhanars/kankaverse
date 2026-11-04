@@ -1,6 +1,62 @@
-import { fitCropToAspect, isValidCrop } from './crop-math';
+import { fitCropToAspect, isValidCrop, isZoomedOut, placeZoomedOutCrop } from './crop-math';
 
 describe('crop-math (C13b R7)', () => {
+  describe('uzaklaştırma', () => {
+    // 1000x1000 kaynak, 5:2 tuval, tamamı sığacak kadar küçültülmüş ve ortalanmış pencere
+    const fit = { x: -0.75, y: 0, width: 2.5, height: 1 };
+
+    it('kaynağı kapsayan pencere geçerli, yalnız bir kenarı taşan geçersiz', () => {
+      expect(isValidCrop(fit)).toBe(true);
+      expect(isValidCrop({ x: -0.2, y: 0.2, width: 1.43, height: 0.57 })).toBe(true);
+      expect(isValidCrop({ x: -0.5, y: 0, width: 1.2, height: 1 })).toBe(false);
+      expect(isValidCrop({ x: 0.1, y: 0, width: 2, height: 1 })).toBe(false);
+      expect(isValidCrop({ x: -1, y: -1, width: 20000, height: 1 })).toBe(false);
+    });
+
+    it('normal kırpma uzaklaştırma sayılmaz', () => {
+      expect(isZoomedOut({ x: 0, y: 0, width: 1, height: 1 })).toBe(false);
+      expect(isZoomedOut({ x: 0, y: 0, width: 1.0001, height: 0.4 })).toBe(false);
+      expect(isZoomedOut(fit)).toBe(true);
+    });
+
+    it('tam sığdırma: kaynağın tamamı alınır, tuvalde ortalanır', () => {
+      expect(placeZoomedOutCrop(fit, 1000, 1000, { width: 1200, height: 480 })).toEqual({
+        rect: { left: 0, top: 0, width: 1000, height: 1000 },
+        pad: { innerWidth: 480, innerHeight: 480, left: 360, top: 0 },
+      });
+    });
+
+    it('sola yaslı: boşluk yalnız sağda', () => {
+      const { pad } = placeZoomedOutCrop({ ...fit, x: 0 }, 1000, 1000, { width: 1200, height: 480 });
+      expect(pad.left).toBe(0);
+      expect(pad.innerWidth).toBe(480);
+    });
+
+    it('ara değer: bir eksende boşluk, öteki eksende kırpma', () => {
+      const { rect, pad } = placeZoomedOutCrop(
+        { x: -0.25, y: 0.2, width: 1.5, height: 0.6 },
+        1000,
+        1000,
+        { width: 1200, height: 480 },
+      );
+      expect(rect).toEqual({ left: 0, top: 200, width: 1000, height: 600 });
+      expect(pad).toEqual({ innerWidth: 800, innerHeight: 480, left: 200, top: 0 });
+    });
+
+    it('aşırı oranlı kaynakta bile en az 2 piksel ve tuval içinde kalır', () => {
+      const { rect, pad } = placeZoomedOutCrop(
+        { x: -2047, y: 0, width: 4096, height: 1 },
+        1,
+        4096,
+        { width: 256, height: 256 },
+      );
+      expect(rect.width).toBeGreaterThanOrEqual(1);
+      expect(pad.innerWidth).toBeGreaterThanOrEqual(2);
+      expect(pad.left + pad.innerWidth).toBeLessThanOrEqual(256);
+      expect(pad.top + pad.innerHeight).toBeLessThanOrEqual(256);
+    });
+  });
+
   describe('isValidCrop', () => {
     const ok = { x: 0.1, y: 0.25, width: 0.8, height: 0.32 };
     it('geçerli kesirler', () => {

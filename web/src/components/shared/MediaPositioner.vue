@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
- * MediaPositioner: Sprint C13b §3. Sabit oranlı çerçevede kaynağı sürükle + yakınlaştır (1x-4x).
- * Kaynak çerçeveyi her zaman doldurur ("cover" tabanı), sınırdan taşmaz. Çıktı `crop`: kaynağın
- * doğal boyutuna oranla 0..1 kesirler (sunucu otorite, sözleşme §2.1). Kırpmayı sunucu yapar;
+ * MediaPositioner: Sprint C13b §3. Sabit oranlı çerçevede kaynağı sürükle + yakınlaştır/uzaklaştır.
+ * Taban 1x = kaynak çerçeveyi doldurur ("cover"); alt sınır kaynağın tamamının sığdığı değer, üst sınır 4x.
+ * Çıktı `crop`: kaynağın doğal boyutuna oranla kesirler (sunucu otorite, sözleşme §2.1). Uzaklaştırınca
+ * pencere kaynaktan büyür (width > 1, x < 0), boş alanı sunucu saydam bırakır. Kırpmayı sunucu yapar;
  * burada yalnız dikdörtgen hesaplanır, kaynak CSS ile konumlanır.
  */
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
@@ -23,7 +24,6 @@ const emit = defineEmits<{
 }>()
 
 const ASPECT = { circle: '1 / 1', banner: '5 / 2', guildBanner: '2 / 1' } as const
-const ZOOM_MIN = 1
 const ZOOM_MAX = 4
 
 const frameEl = ref<HTMLElement | null>(null)
@@ -42,13 +42,24 @@ const ready = computed(() => nw.value > 0 && nh.value > 0 && fw.value > 0 && fh.
 const scale = computed(() => (ready.value ? Math.max(fw.value / nw.value, fh.value / nh.value) * zoom.value : 1))
 const dw = computed(() => nw.value * scale.value)
 const dh = computed(() => nh.value * scale.value)
+// Alt sınır: kaynağın tamamının çerçeveye sığdığı yakınlaştırma ("contain" / "cover")
+const zoomMin = computed(() => {
+  if (!ready.value) return 1
+  const r = (fw.value / nw.value) / (fh.value / nh.value)
+  return Math.min(r, 1 / r)
+})
 
+function between(value: number, a: number, b: number) {
+  return Math.min(Math.max(a, b), Math.max(Math.min(a, b), value))
+}
+
+// Kaynak çerçeveden büyükse çerçeve kaynağın içinde, küçükse kaynak çerçevenin içinde kalır.
 function clampCenter() {
   if (!ready.value) return
   const hx = fw.value / 2 / dw.value
   const hy = fh.value / 2 / dh.value
-  cx.value = Math.min(1 - hx, Math.max(hx, cx.value))
-  cy.value = Math.min(1 - hy, Math.max(hy, cy.value))
+  cx.value = between(cx.value, hx, 1 - hx)
+  cy.value = between(cy.value, hy, 1 - hy)
 }
 
 const mediaStyle = computed(() => {
@@ -63,17 +74,17 @@ const mediaStyle = computed(() => {
 
 const crop = computed<CropFractions | null>(() => {
   if (!ready.value) return null
-  const width = Math.min(1, fw.value / dw.value)
-  const height = Math.min(1, fh.value / dh.value)
-  const x = Math.min(1 - width, Math.max(0, cx.value - width / 2))
-  const y = Math.min(1 - height, Math.max(0, cy.value - height / 2))
+  const width = fw.value / dw.value
+  const height = fh.value / dh.value
+  const x = between(cx.value - width / 2, 0, 1 - width)
+  const y = between(cy.value - height / 2, 0, 1 - height)
   return { x, y, width, height }
 })
 watch(crop, (c) => emit('update:crop', c), { immediate: true })
 
 function setZoom(z: number) {
   if (!ready.value) return
-  zoom.value = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z))
+  zoom.value = Math.min(ZOOM_MAX, Math.max(zoomMin.value, z))
   clampCenter()
 }
 
@@ -217,7 +228,7 @@ defineExpose({ videoEl })
       <input
         :value="zoom"
         type="range"
-        :min="ZOOM_MIN"
+        :min="zoomMin"
         :max="ZOOM_MAX"
         step="0.01"
         :disabled="disabled"

@@ -13,7 +13,7 @@ import {
 } from '@/utils/animatedMedia';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
 import { RangeSlider } from './RangeSlider';
-import { MAX_ZOOM, MIN_ZOOM, MediaPositioner } from './MediaPositioner';
+import { BASE_ZOOM, MAX_ZOOM, MediaPositioner, minZoom } from './MediaPositioner';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -86,7 +86,7 @@ function ClipBody({
   const [phase, setPhase] = useState<'compress' | 'upload' | 'process'>('upload');
   const [pct, setPct] = useState(0);
   const [error, setError] = useState('');
-  const [zoom, setZoom] = useState(MIN_ZOOM);
+  const [zoom, setZoom] = useState(BASE_ZOOM);
   const [crop, setCrop] = useState<MediaCrop | undefined>(undefined);
   // Kaynağın gerçek boyutu: video seçiciden (dönme uygulanmış), görsel `Image.getSize`tan.
   // Alınamazsa konumlandırma kapanır, crop gönderilmez (sunucu merkezden kırpar).
@@ -224,7 +224,7 @@ function ClipBody({
             </View>
             <RangeSlider
               value={zoom}
-              min={MIN_ZOOM}
+              min={minZoom(target, dims.w, dims.h)}
               max={MAX_ZOOM}
               step={0.05}
               disabled={busy}

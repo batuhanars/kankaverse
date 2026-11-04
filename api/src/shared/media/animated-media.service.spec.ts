@@ -144,6 +144,27 @@ describe('AnimatedMediaService (C13)', () => {
       const meta = await sharp(storageMock.putPublic.mock.calls[0][1]).metadata();
       expect([meta.width, meta.height]).toEqual([1200, 480]);
     });
+    it('uzaklaştırılmış JPEG kaynak: tuval boyutu korunur, kenarlar saydam, orta dolu', async () => {
+      const f = join(mkdtempSync(join(tmpdir(), 'kv-spec-')), 'src.jpg');
+      writeFileSync(
+        f,
+        await sharp({ create: { width: 400, height: 400, channels: 3, background: '#f00' } })
+          .jpeg()
+          .toBuffer(),
+      );
+      stub(f);
+      await make().process(UID, 'BANNER', {
+        stagingKey: KEY('jpg'),
+        crop: { x: -0.75, y: 0, width: 2.5, height: 1 },
+      });
+      const out = sharp(storageMock.putPublic.mock.calls[0][1]).ensureAlpha();
+      const { data, info } = await out.raw().toBuffer({ resolveWithObject: true });
+      expect([info.width, info.height]).toEqual([1200, 480]);
+      const alphaAt = (x: number, y: number) => data[(y * info.width + x) * info.channels + 3];
+      expect(alphaAt(10, 240)).toBe(0);
+      expect(alphaAt(1190, 240)).toBe(0);
+      expect(alphaAt(600, 240)).toBe(255);
+    });
     it('bayrak kapalı + gif process → ANIMATED_DISABLED (depolamaya gitmeden)', async () => {
       const s = make({ animatedProfileEnabled: false });
       expect(await code(s.process(UID, 'AVATAR', { stagingKey: KEY('gif') }))).toBe(

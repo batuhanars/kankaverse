@@ -71,6 +71,27 @@ describe('ffmpeg-args (R7)', () => {
     );
   });
 
+  it('uzaklaştırma: crop → scale → alfa → saydam pad', () => {
+    const input = {
+      ...base,
+      target: 'BANNER' as const,
+      cropRect: { left: 0, top: 0, width: 500, height: 500 },
+      pad: { innerWidth: 288, innerHeight: 288, left: 216, top: 0 },
+    };
+    const filter = 'crop=500:500:0:0,scale=288:288,format=yuva420p,pad=720:288:216:0:color=black@0';
+    expect(after(buildAnimatedArgs(input), '-vf')).toBe(`fps=15,${filter}`);
+    expect(after(buildStaticArgs(input), '-vf')).toBe(filter);
+  });
+
+  it('pad sayıları doğrulanır: tuvalden taşan / tamsayı olmayan reddedilir', () => {
+    const cropRect = { left: 0, top: 0, width: 10, height: 10 };
+    const bad = (pad: any) => () => buildAnimatedArgs({ ...base, cropRect, pad });
+    expect(bad({ innerWidth: 256, innerHeight: 256, left: 2, top: 0 })).toThrow();
+    expect(bad({ innerWidth: 1.5, innerHeight: 256, left: 0, top: 0 })).toThrow();
+    expect(bad({ innerWidth: 0, innerHeight: 256, left: 0, top: 0 })).toThrow();
+    expect(bad({ innerWidth: '2:evil', innerHeight: 256, left: 0, top: 0 })).toThrow();
+  });
+
   it('crop sayıları doğrulanır: tamsayı olmayan / negatif / sıfır boyut / string reddedilir', () => {
     const bad = (cropRect: any) => () => buildAnimatedArgs({ ...base, cropRect });
     expect(bad({ left: 0.5, top: 0, width: 10, height: 10 })).toThrow();

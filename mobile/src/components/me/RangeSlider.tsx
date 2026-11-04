@@ -33,7 +33,8 @@ export function RangeSlider({ value, min, max, step = 0.1, disabled, onChange, a
       const ratio = Math.min(1, Math.max(0, x / s.width));
       const raw = s.min + ratio * (s.max - s.min);
       const stepped = Math.round(raw / s.step) * s.step;
-      s.onChange(Math.min(s.max, Math.max(s.min, Number(stepped.toFixed(2)))));
+      // Sol uç tam alt sınır: alt sınır adımın katı olmayabilir (uzaklaştırmada kaynağın sığdığı değer).
+      s.onChange(ratio === 0 ? s.min : Math.min(s.max, Math.max(s.min, Number(stepped.toFixed(2)))));
     }
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
