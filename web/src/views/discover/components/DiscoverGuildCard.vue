@@ -13,11 +13,12 @@ import type { DiscoveryGuildDto } from '@/types'
 const props = defineProps<{
   guild: DiscoveryGuildDto
   joining: boolean
+  canDelete?: boolean // C48: platform yöneticisi (isModerator) → sil düğmesi
   isMember?: boolean // zaten üyeyim → kartın tamamı tıklanır, ortama gider (sahip kararı 2026-10-27)
   // C19 §7.1: 'hover' = kart üzerine gelince/odaklanınca simge+afiş oynar; 'always' = sürekli (öneri bloğu)
   animate?: 'always' | 'hover'
 }>()
-const emit = defineEmits<{ join: []; open: [] }>()
+const emit = defineEmits<{ join: []; open: []; delete: [] }>()
 
 const { t } = useI18n()
 
@@ -136,10 +137,30 @@ function guildInitial(name: string): string {
         <span class="text-[12px] font-medium" style="color: var(--kv-text-muted);">
           {{ t('discover.memberCount', { count: guild.memberCount }) }}
         </span>
-        <!-- Üye değilse Katıl; üyeyse düğme yok, kartın tamamı ortama götürür -->
-        <KvButton v-if="!isMember" size="sm" :loading="joining" @click="$emit('join')">
-          {{ t('discover.join') }}
-        </KvButton>
+        <div class="flex items-center gap-2">
+          <!-- C48: yalnız platform yöneticisi; kartın katıl/aç davranışını tetiklemez -->
+          <button
+            v-if="canDelete"
+            type="button"
+            class="flex items-center justify-center rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors hover:bg-[var(--kv-bg-elevated)]"
+            style="width: 30px; height: 30px; color: var(--kv-danger);"
+            :title="t('discover.adminDelete.action')"
+            :aria-label="t('discover.adminDelete.action')"
+            @click.stop="$emit('delete')"
+            @keydown.enter.stop
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6M14 11v6" />
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+            </svg>
+          </button>
+          <!-- Üye değilse Katıl; üyeyse düğme yok, kartın tamamı ortama götürür -->
+          <KvButton v-if="!isMember" size="sm" :loading="joining" @click="$emit('join')">
+            {{ t('discover.join') }}
+          </KvButton>
+        </div>
       </div>
     </div>
   </article>

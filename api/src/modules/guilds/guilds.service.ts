@@ -25,8 +25,12 @@ import { GuildMemberDto, RoleSummaryDto } from './dto/guild-member.dto';
 import { pickRoleEmoji } from '../../common/utils/role-emoji.util';
 import { InviteFriendDto } from './dto/invite-friend.dto';
 import { AuditLogEntryDto } from './dto/audit-log-entry.dto';
+import { AdminGuildDto } from './dto/admin-guild.dto';
 import { Guild, GuildRole, NotifTargetType, NotificationLevel } from '@prisma/client';
 import { DEFAULT_EVERYONE_PERMISSIONS } from '../../common/permissions';
+
+/** Admin ortam listesi büyümeyi sınırlar (platform-users MAX_ROWS kalıbı). */
+const ADMIN_LIST_MAX_ROWS = 500;
 
 // İkon yüklemesi için izin verilen görsel tipler (allowlist)
 // GIF bilinçli YOK: ham GIF ikonu mobilde react-native-svg <Image> ile çizilince Android uygulamayı çökertiyor
@@ -570,6 +574,95 @@ export class GuildsService {
     });
 
     return null;
+  }
+
+  /** GET /admin/guilds — C48 Rev 1: silinmemiş tüm ortamlar, en yeni önce (en çok 500). */
+  async adminListGuilds(): Promise<AdminGuildDto[]> {
+    const guilds = await this.prisma.guild.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: ADMIN_LIST_MAX_ROWS,
+      select: {
+        id: true,
+        name: true,
+        iconUrl: true,
+        ownerId: true,
+        discoverable: true,
+        createdAt: true,
+        owner: { select: { username: true } },
+        _count: { select: { members: true } },
+      },
+    });
+    return guilds.map((g) => ({
+      id: g.id,
+      name: g.name,
+      iconUrl: g.iconUrl,
+      ownerId: g.ownerId,
+      ownerUsername: g.owner.username,
+      memberCount: g._count.members,
+      discoverable: g.discoverable,
+      createdAt: g.createdAt.toISOString(),
+    }));
+  }
+
+  /**
+   * DELETE /admin/guilds/:id — C48 (R7): platform yöneticisi herhangi bir ortamı siler.
+   * Yetki PlatformAdminGuard'da (controller sınıfı); burada OWNER denetimi YOK. Soft-delete
+   * `deleteGuild` ile aynı (deletedAt = now); soft-delete + AuditLog aynı işlemde (atomik).
+   */
+  async adminDeleteGuild(actorId: string, guildId: string): Promise<null> {
+    const guild = await this.prisma.guild.findUnique({
+      where: { id: guildId, deletedAt: null },
+      select: { name: true, ownerId: true, discoverable: true },
+    });
+    if (!guild) {
+      throw new NotFoundException({ message: 'Ortam bulunamadı.', error: 'GUILD_NOT_FOUND' });
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.guild.update({ where: { id: guildId }, data: { deletedAt: new Date() } }),
+      this.prisma.auditLog.create({
+        data: {
+          actorId,
+          action: 'admin.guild_delete',
+          entityType: 'guild',
+          entityId: guildId,
+          metadata: {
+            name: guild.name,
+            ownerId: guild.ownerId,
+            discoverable: guild.discoverable,
+          },
+        },
+      }),
+    ]);
+
+    return null;
+  }
+
+  /**
+   * POST /admin/guilds/:id/join — C48 Rev 2 (R7): platform yöneticisi Keşfet'te olmayan ortama da katılır.
+   * `discoverable` şartı YOK; yaş/ban/zaten-üye kapıları GuildJoinService'te (TEK kaynak) aynen çalışır,
+   * yönetici için baypas edilmez. MEMBER olarak girer (gizli giriş yok). Audit katılımdan sonra yazılır.
+   */
+  async adminJoinGuild(actorId: string, guildId: string) {
+    const guild = await this.prisma.guild.findUnique({ where: { id: guildId, deletedAt: null } });
+    if (!guild) {
+      throw new NotFoundException({ message: 'Ortam bulunamadı.', error: 'GUILD_NOT_FOUND' });
+    }
+
+    await this.guildJoin.joinGuild(actorId, guild);
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: 'admin.guild_join',
+        entityType: 'guild',
+        entityId: guildId,
+        metadata: { name: guild.name, ownerId: guild.ownerId, discoverable: guild.discoverable },
+      },
+    });
+
+    return toGuildDto(guild);
   }
 
   // ─── §C: Üye at (kick) — KICK_MEMBERS izni + hiyerarşi (R7 / R20) ────────

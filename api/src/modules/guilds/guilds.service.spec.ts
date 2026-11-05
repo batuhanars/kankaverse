@@ -10,6 +10,7 @@ import { ImageUploadService } from '../../shared/media/image-upload.service';
 const prismaMock = {
   guild: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
     update: jest.fn(),
     create: jest.fn(),
   },
@@ -919,6 +920,102 @@ describe('GuildsService.deleteGuild — §A', () => {
   });
 });
 
+// ── C48: GuildsService.adminDeleteGuild ──────────────────────────────────────
+
+describe('GuildsService.adminDeleteGuild — C48 (R7)', () => {
+  let service: GuildsService;
+  const ADMIN_ACTOR = 'user-platform-admin';
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.$transaction.mockResolvedValue([{}, {}]);
+    prismaMock.auditLog.create.mockReturnValue('audit-op');
+    prismaMock.guild.update.mockReturnValue('update-op');
+  });
+
+  it('OWNER olmayan aktör siler: soft-delete + audit aynı tx, null döner', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue({
+      name: 'Test Ortamı',
+      ownerId: OWNER_ID,
+      discoverable: true,
+    });
+
+    const result = await service.adminDeleteGuild(ADMIN_ACTOR, GUILD_ID);
+
+    expect(result).toBeNull();
+    expect(prismaMock.guildMember.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.guild.update).toHaveBeenCalledWith({
+      where: { id: GUILD_ID },
+      data: { deletedAt: expect.any(Date) },
+    });
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        actorId: ADMIN_ACTOR,
+        action: 'admin.guild_delete',
+        entityType: 'guild',
+        entityId: GUILD_ID,
+        metadata: { name: 'Test Ortamı', ownerId: OWNER_ID, discoverable: true },
+      },
+    });
+    expect(prismaMock.$transaction).toHaveBeenCalledWith(['update-op', 'audit-op']);
+  });
+
+  it('olmayan ya da silinmiş ortam → 404 GUILD_NOT_FOUND, yazma yok', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(null);
+
+    await expect(service.adminDeleteGuild(ADMIN_ACTOR, GUILD_ID)).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'GUILD_NOT_FOUND' }),
+    });
+    expect(prismaMock.guild.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: GUILD_ID, deletedAt: null } }),
+    );
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('GuildsService.adminListGuilds — C48 Rev 1', () => {
+  it('silinmişleri dışlar, createdAt desc sıralar, üye sayısını eşler', async () => {
+    resetMocks();
+    const service = makeService();
+    prismaMock.guild.findMany.mockResolvedValue([
+      {
+        id: 'g2',
+        name: 'Yeni',
+        iconUrl: null,
+        ownerId: 'u1',
+        discoverable: false,
+        createdAt: new Date('2026-11-02T10:00:00.000Z'),
+        owner: { username: 'sahip1' },
+        _count: { members: 7 },
+      },
+    ]);
+
+    const result = await service.adminListGuilds();
+
+    expect(prismaMock.guild.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }),
+    );
+    expect(result).toEqual([
+      {
+        id: 'g2',
+        name: 'Yeni',
+        iconUrl: null,
+        ownerId: 'u1',
+        ownerUsername: 'sahip1',
+        memberCount: 7,
+        discoverable: false,
+        createdAt: '2026-11-02T10:00:00.000Z',
+      },
+    ]);
+  });
+});
+
 // R20: §B (PATCH /guilds/:id/members/:userId/role) kaldırıldı — rol vermek artık rol
 // sisteminin işi (ADMINISTRATOR bayraklı rol atamak), enum'da geriye atanabilir tek değer
 // (ADMIN) kalmadığı için uç anlamsızlaştı. Bu ID, aşağıdaki kickMember/transferOwnership/
@@ -1408,6 +1505,62 @@ describe('GuildsService.joinDiscovery — C6 (discoverable + Sprint 7A gate)', (
     expect(result.id).toBe(GUILD_ID);
     expect(result.discoverable).toBe(true);
     expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('GuildsService.adminJoinGuild — C48 Rev 2 (R7)', () => {
+  let service: GuildsService;
+  const HIDDEN_GUILD = { ...GUILD_FIXTURE, discoverable: false };
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.guildBan.findUnique.mockResolvedValue(null);
+    prismaMock.auditLog.create.mockResolvedValue({});
+  });
+
+  it('discoverable=false ortama katılır, GuildDto döner ve audit yazar', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(HIDDEN_GUILD);
+    prismaMock.guildMember.findUnique
+      .mockResolvedValueOnce(null) // gate: zaten-üye değil
+      .mockResolvedValueOnce(null); // notifyMemberJoined erken çıkış
+    prismaMock.$transaction.mockResolvedValue([{ id: 'gm-new' }]);
+
+    const result = await service.adminJoinGuild('admin1', GUILD_ID);
+
+    expect(result.id).toBe(GUILD_ID);
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        actorId: 'admin1',
+        action: 'admin.guild_join',
+        entityType: 'guild',
+        entityId: GUILD_ID,
+        metadata: {
+          name: HIDDEN_GUILD.name,
+          ownerId: HIDDEN_GUILD.ownerId,
+          discoverable: false,
+        },
+      },
+    });
+  });
+
+  it('olmayan/silinmiş ortam → 404 GUILD_NOT_FOUND', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(null);
+    await expect(service.adminJoinGuild('admin1', GUILD_ID)).rejects.toMatchObject({
+      response: expect.objectContaining({ error: 'GUILD_NOT_FOUND' }),
+    });
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('ban kapısı yönetici için de çalışır → 403 GUILD_BANNED, audit yok', async () => {
+    prismaMock.guild.findUnique.mockResolvedValue(HIDDEN_GUILD);
+    prismaMock.guildBan.findUnique.mockResolvedValue({ guildId: GUILD_ID, userId: 'admin1' });
+    await expect(service.adminJoinGuild('admin1', GUILD_ID)).rejects.toMatchObject({
+      response: { error: 'GUILD_BANNED' },
+    });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
   });
 });
 

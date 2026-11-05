@@ -30,6 +30,7 @@ import VoiceDevicesSection from './components/VoiceDevicesSection.vue'
 import PlatformInviteSection from './components/PlatformInviteSection.vue'
 import PlatformFunnelSection from './components/PlatformFunnelSection.vue'
 import PlatformUsersSection from './components/PlatformUsersSection.vue'
+import PlatformGuildsSection from './components/PlatformGuildsSection.vue'
 import PlatformAiAccessSection from './components/PlatformAiAccessSection.vue'
 import MasaustuSection from './components/MasaustuSection.vue'
 import QuickReactionsSection from './components/QuickReactionsSection.vue'
@@ -84,10 +85,11 @@ const navItems = computed(() => {
 })
 
 // ── Admin alt-geçişi: kullanıcılar (varsayılan) / davetler ──
-type AdminSub = 'kullanicilar' | 'davetler' | 'huni' | 'yapayzeka'
+type AdminSub = 'kullanicilar' | 'ortamlar' | 'davetler' | 'huni' | 'yapayzeka'
 const adminSub = ref<AdminSub>('kullanicilar')
 const adminSubLabel = computed<Record<AdminSub, string>>(() => ({
   kullanicilar: t('admin.users.title'),
+  ortamlar: t('admin.guilds.title'),
   davetler: t('admin.platformInvite.listTitle'),
   huni: t('admin.funnel.title'),
   yapayzeka: t('admin.aiAccess.title'),
@@ -1044,7 +1046,7 @@ async function toggleReadReceipts(next: boolean) {
                 <!-- Alt-geçiş: kullanıcılar / davetler -->
                 <div class="flex items-center gap-1 self-start rounded-[var(--kv-radius-md)] p-1" style="background-color: var(--kv-bg-sidebar);">
                   <button
-                    v-for="sub in (['kullanicilar', 'davetler', 'huni', 'yapayzeka'] as const)"
+                    v-for="sub in (['kullanicilar', 'ortamlar', 'davetler', 'huni', 'yapayzeka'] as const)"
                     :key="sub"
                     type="button"
                     class="px-3 py-1.5 rounded-[var(--kv-radius-sm)] text-[13px] font-medium cursor-pointer transition-colors"
@@ -1058,6 +1060,7 @@ async function toggleReadReceipts(next: boolean) {
                 </div>
 
                 <PlatformUsersSection v-if="adminSub === 'kullanicilar'" />
+                <PlatformGuildsSection v-else-if="adminSub === 'ortamlar'" />
                 <PlatformFunnelSection v-else-if="adminSub === 'huni'" />
                 <PlatformAiAccessSection v-else-if="adminSub === 'yapayzeka'" />
                 <PlatformInviteSection v-else />

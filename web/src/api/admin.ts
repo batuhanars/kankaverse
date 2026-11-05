@@ -1,5 +1,6 @@
 // Sprint Kapalı-Kayıt — Platform davet yönetimi (yalnız isModerator)
 import http from './axios'
+import type { GuildDto } from '@/types'
 
 export interface PlatformInviteDto {
   id: string
@@ -16,6 +17,18 @@ export interface CreatePlatformInvitePayload {
   maxUses?: number // 1-10000; yoksa sınırsız
   expiresInHours?: number // 1-8760; yoksa süresiz
   note?: string // ≤200 karakter; admin notu
+}
+
+// C48 Rev 1: admin ortam listesi satırı (yalnız isModerator)
+export interface AdminGuildDto {
+  id: string
+  name: string
+  iconUrl: string | null
+  ownerId: string
+  ownerUsername: string
+  memberCount: number
+  discoverable: boolean
+  createdAt: string // ISO
 }
 
 // Admin kullanıcı genel-bakış satırı (yalnız isModerator). Hassas alanlar backend'de saklı.
@@ -119,6 +132,17 @@ export const adminApi = {
   },
   revokeAiVideoGrant(userId: string) {
     return http.delete<null>(`/admin/ai-video/grants/${userId}`)
+  },
+  listGuilds() {
+    return http.get<AdminGuildDto[]>('/admin/guilds')
+  },
+  // C48 Rev 2: yönetici ortama (Keşfet'te olmasa da) üye olarak katılır
+  joinGuild(guildId: string) {
+    return http.post<GuildDto>(`/admin/guilds/${guildId}/join`)
+  },
+  // C48: platform yöneticisi ortamı siler (soft-delete)
+  deleteGuild(guildId: string) {
+    return http.delete<null>(`/admin/guilds/${guildId}`)
   },
   getFunnel(cohortDays: number) {
     return http.get<FunnelDto>('/admin/funnel', { params: { cohortDays } })

@@ -7,6 +7,11 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDebounceFn } from '@vueuse/core'
 import { useGuildsStore } from '@/stores/guilds'
+import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
+import { adminApi } from '@/api/admin'
+import KvModal from '@/components/ui/KvModal.vue'
+import KvButton from '@/components/ui/KvButton.vue'
 import { discoveryApi } from '@/api/discovery'
 import { useDiscoverJoin } from '@/composables/useDiscoverJoin'
 import DiscoverGuildCard from './components/DiscoverGuildCard.vue'
@@ -14,6 +19,8 @@ import type { DiscoveryGuildDto, DiscoveryTagDto } from '@/types'
 
 const { t } = useI18n()
 const guildsStore = useGuildsStore()
+const authStore = useAuthStore()
+const toast = useToastStore()
 const { joiningId, joinGuild, goToGuild } = useDiscoverJoin()
 
 // Zaten üyesi olduğum ortamlar → keşfette "Katıl" yerine "Sunucuya Git" (Görsel #35)
@@ -71,6 +78,28 @@ async function loadMore() {
     // sayfalama hatası — sessizce geç, buton kalır
   } finally {
     loadingMore.value = false
+  }
+}
+
+// C48: platform yöneticisi Keşfet'ten ortam siler (onay penceresi + yerel çıkarma)
+const isPlatformAdmin = computed(() => !!authStore.user?.isModerator)
+const deleteTarget = ref<DiscoveryGuildDto | null>(null)
+const deleting = ref(false)
+
+async function confirmAdminDelete() {
+  const target = deleteTarget.value
+  if (!target || deleting.value) return
+  deleting.value = true
+  try {
+    await adminApi.deleteGuild(target.id)
+    items.value = items.value.filter((g) => g.id !== target.id)
+    toast.info(t('discover.adminDelete.done', { name: target.name }))
+    deleteTarget.value = null
+  } catch (e: unknown) {
+    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
+    toast.error(msg ?? t('discover.adminDelete.error'))
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -174,8 +203,10 @@ onMounted(() => {
               :guild="g"
               :joining="joiningId === g.id"
               :is-member="myGuildIds.has(g.id)"
+              :can-delete="isPlatformAdmin"
               @join="joinGuild(g)"
               @open="goToGuild(g.id)"
+              @delete="deleteTarget = g"
             />
           </div>
 
@@ -195,4 +226,18 @@ onMounted(() => {
       </div>
     </div>
   </div>
+
+  <!-- C48: ortam silme onayı (yalnız platform yöneticisi) -->
+  <KvModal v-if="deleteTarget" :title="t('discover.adminDelete.title')" @close="deleteTarget = null">
+    <p class="text-[14px] font-medium mb-1" style="color: var(--kv-text-primary);">{{ deleteTarget.name }}</p>
+    <p class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('discover.adminDelete.body') }}</p>
+    <div class="flex justify-end gap-2 mt-5">
+      <KvButton type="button" variant="ghost" :disabled="deleting" @click="deleteTarget = null">
+        {{ t('common.cancel') }}
+      </KvButton>
+      <KvButton type="button" variant="danger" :loading="deleting" @click="confirmAdminDelete">
+        {{ t('discover.adminDelete.confirm') }}
+      </KvButton>
+    </div>
+  </KvModal>
 </template>

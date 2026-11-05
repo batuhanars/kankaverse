@@ -258,6 +258,29 @@
       "empty": "Bu aralıkta kayıt yok.",
       "loadError": "Huni yüklenemedi."
     },
+    "guilds": {
+      "title": "Ortamlar",
+      "count": "{count} ortam",
+      "refresh": "Yenile",
+      "search": "Ortam adı ya da sahip ara",
+      "empty": "Henüz ortam yok.",
+      "noResults": "Aramaya uyan ortam yok.",
+      "loadError": "Ortamlar yüklenemedi.",
+      "colGuild": "Ortam",
+      "colOwner": "Sahip",
+      "colMembers": "Üye",
+      "colCreated": "Oluşturulma",
+      "badgeDiscoverable": "Keşfet'te",
+      "memberCount": "{count} üye",
+      "delete": "Ortamı sil",
+      "deleteTitle": "Ortam silinsin mi?",
+      "deleteBody": "Bu ortam silinecek ve Keşfet'ten kalkacak.",
+      "deleteConfirm": "Sil",
+      "deleted": "{name} silindi.",
+      "deleteError": "Ortam silinemedi.",
+      "join": "Katıl",
+      "joinError": "Ortama katılınamadı."
+    },
     "users": {
       "title": "Kullanıcılar",
       "count": "{count} kayıt",
@@ -1543,6 +1566,14 @@
     "empty": "Henüz keşfedilecek ortam yok.",
     "emptyHint": "Aramanı değiştir ya da bir etiket filtresini kaldır.",
     "loadMore": "Daha Fazla Göster",
+    "adminDelete": {
+      "action": "Ortamı sil",
+      "title": "Ortam silinsin mi?",
+      "body": "Bu ortam silinecek ve Keşfet'ten kalkacak.",
+      "confirm": "Sil",
+      "done": "{name} silindi.",
+      "error": "Ortam silinemedi."
+    },
     "loadError": "Ortamlar yüklenemedi. Lütfen tekrar dene.",
     "joinError": "Ortama katılınamadı. Lütfen tekrar dene."
   },

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdminGuildsController } from './admin-guilds.controller';
 import { GuildsController } from './guilds.controller';
 import { GuildsService } from './guilds.service';
 import { GuildAnimatedMediaService } from './guild-animated-media.service';
@@ -9,7 +10,7 @@ import { InvitesModule } from '../invites/invites.module';
 
 @Module({
   imports: [SharedModule, NotificationsModule, InvitesModule],
-  controllers: [GuildsController],
+  controllers: [GuildsController, AdminGuildsController],
   providers: [GuildsService, GuildAnimatedMediaService, DiscordImportService],
 })
 export class GuildsModule {}
