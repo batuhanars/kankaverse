@@ -38,8 +38,6 @@ export function ConsentModal({ visible, loading, onCancel, onConfirm }: Props) {
         <View style={styles.card}>
           <Text style={styles.title}>{t('legal.consentTitle')}</Text>
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-            <Text style={styles.paragraph}>{t('legal.consentAccess')}</Text>
-            <Text style={styles.paragraph}>{t('legal.consentScanning')}</Text>
             <Text style={styles.paragraphMuted}>
               {t('legal.consentAgreePre')}{' '}
               <Text style={styles.link} onPress={() => openLegalLink('/kurallar')}>
@@ -102,12 +100,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 4,
-  },
-  paragraph: {
-    color: theme.colors.textBody,
-    fontSize: theme.fontSize.sm,
-    lineHeight: 20,
-    marginBottom: 12,
   },
   paragraphMuted: {
     color: theme.colors.textSecondary,
