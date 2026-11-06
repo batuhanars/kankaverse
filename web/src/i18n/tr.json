@@ -1710,6 +1710,7 @@
     "button": "Yapay zeka ile üret",
     "credits": "{amount} kredi",
     "lockedNote": "Yapay zeka ile video yakında herkese açılacak.",
+    "verifyEmailNote": "Yapay zeka ile video için önce e-postanı doğrulamalısın.",
     "lockedNoteInvite": "Yapay zeka ile video şu an yalnız erişim verilen kullanıcılara açık. En az 100 kredilik erişim alabilirsin. Bilgi için Kankaverse Belediyesi ortamına katılıp yöneticilerle görüşebilirsin.",
     "joinGuild": "Ortama katıl",
     "grantLine": "Kullanılan {used} / {budget} kredi",

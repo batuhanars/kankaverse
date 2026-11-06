@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { authApi } from '@/api/auth';
-import { extractErrorMessage } from '@/api/errors';
+import { extractErrorCode, extractErrorMessage } from '@/api/errors';
+import { useAuthStore } from '@/stores/auth';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -22,6 +23,16 @@ export function EmailVerificationBanner() {
       await authApi.resendVerification();
       setSent(true);
     } catch (e) {
+      // Başka cihazda doğrulandıysa yerel bayrak bayat: oturumu tazele, şerit kendiliğinden kalkar
+      // (artık her ekranda durduğu için uygulama yeniden açılana dek asılı kalmasın).
+      if (extractErrorCode(e) === 'EMAIL_ALREADY_VERIFIED') {
+        try {
+          useAuthStore.getState().updateUser(await authApi.me());
+          return;
+        } catch {
+          /* tazeleme olmazsa sunucu mesajı gösterilir */
+        }
+      }
       // `EMAIL_ALREADY_VERIFIED` dahil TÜM sunucu mesajları olduğu gibi gösterilir (kod bazlı
       // dallanma yok) — web'in `EMAIL_ALREADY_VERIFIED` özel-durumu burada atlanmadı: o mesaj
       // zaten "e-postan doğrulanmış" bilgisini taşıyor, kullanıcı için yeterince açık.

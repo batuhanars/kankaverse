@@ -18,6 +18,8 @@ interface Props {
   error?: string;
   /** C33: hakkı yok; Oluştur kapalı, tahmin satırı yok, 0 kredi satırı görünür. */
   locked?: boolean;
+  /** E-posta doğrulanmamış: kredi satırı yerine doğrulama notu. */
+  unverified?: boolean;
   /** C40/C43: hakla erişene kullanılan/tanımlanan kredi satırı (hak yoksa null, satır yok). */
   grant?: { usedCredits: number; remainingCredits: number; budgetCredits: number; expiresAt: string | null } | null;
   onSubmit: () => void;
@@ -28,9 +30,11 @@ interface Props {
  * teklif kalan krediyi aşıyorsa düğme kapalı + neden yazılı. Sunucu yine otorite (C43: günlük tavan yok).
  */
 export function AiVideoCostBar(p: Props) {
+  // Kilitli ya da doğrulanmamış: tahmin/hak satırları gizli, Oluştur kapalı.
+  const quiet = !!p.locked || !!p.unverified;
   const notEnough = !!p.grant && p.estimateCredits !== null && p.estimateCredits > p.grant.remainingCredits;
   const disabled =
-    !!p.locked || !!p.inProgress || !p.canSubmit || p.estimating || p.estimateCredits === null || notEnough || p.busy;
+    quiet || !!p.inProgress || !p.canSubmit || p.estimating || p.estimateCredits === null || notEnough || p.busy;
   const expiry = p.grant?.expiresAt
     ? new Date(p.grant.expiresAt).toLocaleDateString('tr-TR', {
         day: 'numeric',
@@ -41,7 +45,7 @@ export function AiVideoCostBar(p: Props) {
   return (
     <View style={styles.bar}>
       <View style={styles.row}>
-        {p.locked ? (
+        {quiet ? (
           <View style={styles.info} />
         ) : (
           <View style={styles.info}>
@@ -69,8 +73,8 @@ export function AiVideoCostBar(p: Props) {
           )}
         </Pressable>
       </View>
-      {p.hasVideo && !p.locked ? <Text style={styles.spent}>{t('mobile.aiVideoRefs.videoCostNote')}</Text> : null}
-      {p.grant && !p.locked ? (
+      {p.hasVideo && !quiet ? <Text style={styles.spent}>{t('mobile.aiVideoRefs.videoCostNote')}</Text> : null}
+      {p.grant && !quiet ? (
         <Text style={styles.spent}>
           {t('aiVideo.grantLine', {
             used: formatCreditNumber(p.grant.usedCredits),
@@ -79,15 +83,18 @@ export function AiVideoCostBar(p: Props) {
           {expiry ? ` · ${t('aiVideo.grantExpiry', { date: expiry })}` : ''}
         </Text>
       ) : null}
-      {p.locked ? (
+      {p.unverified ? (
+        // Doğrulanmamış hesapta sunucu seçenekleri de vermiyor (VerifiedEmailGuard); boş formun sebebi yazılır.
+        <Text style={styles.failed}>{t('aiVideo.verifyEmailNote')}</Text>
+      ) : p.locked ? (
         // Hakkı olmayan kullanıcı formu normal görür, kredisi 0. Play kuralı: davet/ödeme yönlendirmesi yok.
         <>
           <Text style={styles.spent}>{t('aiVideo.grantLine', { used: formatCreditNumber(0), budget: formatCreditNumber(0) })}</Text>
           <Text style={styles.failed}>{t('aiVideo.grantNotEnough')}</Text>
         </>
       ) : null}
-      {p.inProgress && !p.locked ? <Text style={styles.spent}>{t('aiVideo.inProgress')}</Text> : null}
-      {notEnough && !p.locked ? <Text style={styles.failed}>{t('aiVideo.grantNotEnough')}</Text> : null}
+      {p.inProgress && !quiet ? <Text style={styles.spent}>{t('aiVideo.inProgress')}</Text> : null}
+      {notEnough && !quiet ? <Text style={styles.failed}>{t('aiVideo.grantNotEnough')}</Text> : null}
       {p.error ? (
         <Text style={styles.failed} accessibilityLiveRegion="polite">
           {p.error}

@@ -7,6 +7,7 @@ import { guildsApi, type GuildSummaryDto } from '@/api/guilds';
 import type { ChannelSummaryDto } from '@/api/channels';
 import type { DmChannelDto } from '@/api/dm';
 import { DmMenuHost } from '@/components/home/DmMenuHost';
+import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
 import { GuildRail, type RailSelection } from '@/components/home/GuildRail';
 import { DmSidebar } from '@/components/home/DmSidebar';
 import { ChannelSidebar } from '@/components/home/ChannelSidebar';
@@ -43,6 +44,7 @@ export default function HomeScreen() {
   // C38 §2.3 — ortam başına son açılan kanal (vurgu için; OTOMATİK AÇILMAZ). Eskiden tek bir
   // "son açılan kanal" vardı, ortam değişince kayboluyordu; artık kalıcı harita.
   const myUserId = useAuthStore((s) => s.user?.id);
+  const emailUnverified = useAuthStore((s) => s.user?.emailVerified === false);
   const [lastChannelByGuild, setLastChannelByGuild] = useState<Record<string, string>>({});
   useEffect(() => {
     if (!myUserId) return;
@@ -312,7 +314,10 @@ export default function HomeScreen() {
     // PM bulgusu #2: rail/sidebar başlıkları durum çubuğunun altına giriyordu (mesaj ekranı native
     // Stack başlığı sayesinde güvende, bu ekranın headerShown:false — kendi üst inset'ini vermesi
     // gerekiyor). me.tsx/notifications.tsx ile aynı desen: SafeAreaView edges=['top'].
-    <SafeAreaView style={styles.row} edges={['top']}>
+    <SafeAreaView style={styles.screen} edges={['top']}>
+      {/* Doğrulanmamış hesaba her açılışta görünen şerit (web AppShell karşılığı); rail+panelin üstünde, tam genişlik. */}
+      {emailUnverified ? <EmailVerificationBanner /> : null}
+      <View style={styles.row}>
       <GuildRail
         selection={selection}
         guilds={guilds}
@@ -387,6 +392,7 @@ export default function HomeScreen() {
           }
         />
       )}
+      </View>
 
       <CategoryMenuSheet
         visible={!!menuCategory}
@@ -535,10 +541,13 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: theme.colors.bgContent,
+  },
   row: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: theme.colors.bgContent,
   },
   dmPane: {
     flex: 1,

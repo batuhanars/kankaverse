@@ -20,6 +20,7 @@ import { EditMessageOverlay } from './message/EditMessageOverlay';
 import { ProfileSheet } from './profile/ProfileSheet';
 import { MessageSearchModal } from './MessageSearchModal';
 import { ComposerHost } from './message/ComposerHost';
+import { EmailVerificationBanner } from './EmailVerificationBanner';
 import { DateSeparator } from './message/DateSeparator';
 import { useTypingEmitter } from './message/useTypingEmitter';
 import { useMessageComposer } from './message/useMessageComposer';
@@ -126,6 +127,7 @@ export function MessageScreen({
   guildId,
 }: Props) {
   const authUser = useAuthStore((s) => s.user);
+  const emailUnverified = authUser?.emailVerified === false;
   const fetchInitial = useMessagesStore((s) => s.fetchInitial);
   const seedKnownUser = useMessagesStore((s) => s.seedKnownUser);
   const resolveUsername = useMessagesStore((s) => s.resolveUsername);
@@ -378,6 +380,8 @@ export function MessageScreen({
         }}
       />
 
+      {/* Doğrulanmamış hesap sohbette de görsün (web AppShell şeridi karşılığı); dosya/sesli mesaj burada reddediliyor. */}
+      {emailUnverified ? <EmailVerificationBanner /> : null}
       {topBanner}
 
       {loadState === 'loading' && <MessageLoading />}

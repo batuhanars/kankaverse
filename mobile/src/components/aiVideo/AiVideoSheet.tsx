@@ -13,7 +13,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import type { AiVideoDto } from '@/api/aiVideo';
 import type { PickedProfileMedia } from '@/utils/animatedMedia';
+import { useAuthStore } from '@/stores/auth';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { EmailVerificationBanner } from '../EmailVerificationBanner';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -66,6 +68,7 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
   const bottomInset = useSheetInsets();
   const keyboard = useKeyboardVisible();
   const ai = useAiVideo();
+  const unverified = useAuthStore((s) => s.user?.emailVerified === false);
   const [confirmClear, setConfirmClear] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const promptY = useRef(0);
@@ -123,6 +126,7 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
             <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
           </Pressable>
         </View>
+        {unverified ? <EmailVerificationBanner /> : null}
         {/* Sayfa klavyeyle küçülünce istem görünür alana alınır. Kaydırma küçülmeden önce yapılsa sınıra takılırdı. */}
         <ScrollView
           ref={scrollRef}
@@ -177,6 +181,7 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
               busy={ai.busy}
               error={ai.error}
               locked={ai.locked}
+              unverified={unverified}
               grant={form.options?.grant ?? null}
               onSubmit={() => void ai.submit()}
             />
