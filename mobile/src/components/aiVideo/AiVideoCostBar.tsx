@@ -16,7 +16,7 @@ interface Props {
   busy: boolean;
   /** Sunucudan dönen hata (ör. yetersiz kredi): form uzun olduğu için düğmenin yanında, sabit alanda gösterilir. */
   error?: string;
-  /** C33: pasif tanıtım; Oluştur kapalı + "yakında" notu, tahmin satırı yok. */
+  /** C33: hakkı yok; Oluştur kapalı, tahmin satırı yok, 0 kredi satırı görünür. */
   locked?: boolean;
   /** C40/C43: hakla erişene kullanılan/tanımlanan kredi satırı (hak yoksa null, satır yok). */
   grant?: { usedCredits: number; remainingCredits: number; budgetCredits: number; expiresAt: string | null } | null;
@@ -80,8 +80,11 @@ export function AiVideoCostBar(p: Props) {
         </Text>
       ) : null}
       {p.locked ? (
-        // C40 (Play kuralı): nötr not, davet/yönlendirme yok. Web/masaüstü C39 notunu korur.
-        <Text style={styles.lockedNote}>{t('aiVideo.lockedNoteMobile')}</Text>
+        // Hakkı olmayan kullanıcı formu normal görür, kredisi 0. Play kuralı: davet/ödeme yönlendirmesi yok.
+        <>
+          <Text style={styles.spent}>{t('aiVideo.grantLine', { used: formatCreditNumber(0), budget: formatCreditNumber(0) })}</Text>
+          <Text style={styles.failed}>{t('aiVideo.grantNotEnough')}</Text>
+        </>
       ) : null}
       {p.inProgress && !p.locked ? <Text style={styles.spent}>{t('aiVideo.inProgress')}</Text> : null}
       {notEnough && !p.locked ? <Text style={styles.failed}>{t('aiVideo.grantNotEnough')}</Text> : null}
@@ -103,7 +106,6 @@ const styles = StyleSheet.create({
   dim: { opacity: 0.4 },
   failed: { color: theme.colors.danger, fontSize: theme.fontSize.sm },
   spent: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs },
-  lockedNote: { color: theme.colors.textSecondary, fontSize: theme.fontSize.sm },
   button: {
     minWidth: 110,
     minHeight: theme.layout.inputMinHeight,

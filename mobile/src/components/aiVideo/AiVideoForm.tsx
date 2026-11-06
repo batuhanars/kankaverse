@@ -103,7 +103,7 @@ export function AiVideoForm({
           items={refs.items}
           labels={refs.labels}
           thumbs={refs.thumbs}
-          editable={!ai.locked}
+          editable
         />
       </View>
       <Options ai={ai} />

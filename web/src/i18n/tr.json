@@ -1712,7 +1712,6 @@
     "lockedNote": "Yapay zeka ile video yakında herkese açılacak.",
     "lockedNoteInvite": "Yapay zeka ile video şu an yalnız erişim verilen kullanıcılara açık. En az 100 kredilik erişim alabilirsin. Bilgi için Kankaverse Belediyesi ortamına katılıp yöneticilerle görüşebilirsin.",
     "joinGuild": "Ortama katıl",
-    "lockedNoteMobile": "Yapay zeka ile video şu an yalnız davetli kullanıcılara açık.",
     "grantLine": "Kullanılan {used} / {budget} kredi",
     "inProgress": "Bir üretimin zaten sürüyor. Bitince yenisini başlatabilirsin.",
     "grantNotEnough": "Kalan kredin bu video için yetmiyor.",
