@@ -37,7 +37,6 @@ const ai = useAiVideo()
 const form = ai.form
 const refs = ai.refs
 
-const PROMPT_MAX = 1000
 const view = ref<'form' | 'preview'>('form')
 const previewRow = ref<AiVideoDto | null>(null)
 let previewOpenedAt = 0
@@ -208,7 +207,6 @@ async function onPrimary() {
             <AiVideoPromptBox
               v-model="ai.prompt.value"
               :items="refs.items.value"
-              :maxlength="PROMPT_MAX"
               :disabled="ai.locked"
               :placeholder="t('aiVideo.promptPlaceholder')"
             />

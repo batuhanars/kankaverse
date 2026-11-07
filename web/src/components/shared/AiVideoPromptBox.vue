@@ -21,7 +21,6 @@ interface PromptRef {
 const props = defineProps<{
   modelValue: string
   items: PromptRef[]
-  maxlength: number
   disabled?: boolean
   placeholder?: string
 }>()
@@ -84,7 +83,7 @@ function pick(item: PromptRef) {
   const insert = `@${item.label} `
   const text = el.value.slice(0, start) + insert + el.value.slice(pos)
   open.value = false
-  if (text.length <= props.maxlength) setText(text, start + insert.length)
+  setText(text, start + insert.length)
 }
 
 /** `@` düğmesi: imleç konumuna `@` ekler ve listeyi açar. */
@@ -95,7 +94,6 @@ function insertAt() {
   const needSpace = pos > 0 && !/\s/.test(el.value[pos - 1])
   const insert = needSpace ? ' @' : '@'
   const text = el.value.slice(0, pos) + insert + el.value.slice(el.selectionEnd)
-  if (text.length > props.maxlength) return
   setText(text, pos + insert.length)
   query.value = ''
   active.value = 0
@@ -142,7 +140,6 @@ function onKeydown(e: KeyboardEvent) {
         ref="ta"
         :value="modelValue"
         rows="5"
-        :maxlength="maxlength"
         :disabled="disabled"
         :placeholder="placeholder"
         :class="[pad, 'relative block w-full field-sizing-content min-h-[140px] max-h-60 resize-none overflow-y-auto bg-transparent outline-none disabled:cursor-not-allowed']"

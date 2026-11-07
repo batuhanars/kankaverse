@@ -5,7 +5,6 @@ import { t } from '@/i18n';
 import { theme } from '@/theme';
 import type { RefItem } from './aiVideoRefs';
 
-const PROMPT_MAX = 1000;
 const TAG_CHARS = /^[\p{L}\d]*$/u;
 
 interface Props {
@@ -65,7 +64,7 @@ export function AiVideoPrompt({ value, onChange, items, labels, thumbs, editable
 
   function pressAt() {
     const pos = sel.start;
-    const next = `${value.slice(0, pos)}@${value.slice(sel.end)}`.slice(0, PROMPT_MAX);
+    const next = `${value.slice(0, pos)}@${value.slice(sel.end)}`;
     onChange(next);
     setAt(pos);
     place(pos + 1);
@@ -74,7 +73,7 @@ export function AiVideoPrompt({ value, onChange, items, labels, thumbs, editable
   function pick(label: string) {
     if (at === null) return;
     const insert = `@${label} `;
-    const next = `${value.slice(0, at)}${insert}${value.slice(sel.start)}`.slice(0, PROMPT_MAX);
+    const next = `${value.slice(0, at)}${insert}${value.slice(sel.start)}`;
     onChange(next);
     setAt(null);
     place(Math.min(at + insert.length, next.length));
@@ -107,7 +106,6 @@ export function AiVideoPrompt({ value, onChange, items, labels, thumbs, editable
             setForced(null);
           }}
           selection={forced ?? undefined}
-          maxLength={PROMPT_MAX}
           multiline
           placeholder={t('aiVideo.promptPlaceholder')}
           placeholderTextColor={theme.colors.textMuted}
