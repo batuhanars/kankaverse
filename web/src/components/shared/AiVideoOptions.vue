@@ -88,7 +88,7 @@ const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:
           id="ai-video-duration"
           :value="durationS"
           class="w-full rounded-[var(--kv-radius-md)] px-3 py-2 text-[14px] outline-none border border-[var(--kv-border-subtle)] bg-[var(--kv-bg-content)] cursor-pointer"
-          style="color: var(--kv-text-primary);"
+          style="color: var(--kv-text-primary); color-scheme: dark; scrollbar-color: var(--kv-text-muted) var(--kv-bg-content);"
           @change="emit('update:durationS', Number(($event.target as HTMLSelectElement).value))"
         >
           <option v-for="d in current.durations" :key="d" :value="d">{{ t('aiVideo.durationOption', { sec: d }) }}</option>
