@@ -108,7 +108,7 @@ export class CreateAiVideoDto {
   @ApiProperty({ maxLength: AI_PROMPT_MAX, description: 'Görselden üretimde boş olabilir' })
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @MaxLength(AI_PROMPT_MAX, { message: 'İstem en fazla 1000 karakter olabilir.' })
+  @MaxLength(AI_PROMPT_MAX, { message: 'İstem çok uzun.' })
   prompt!: string;
 
   @ApiPropertyOptional({ description: 'presign yanıtındaki inputKey (görselden üretim)' })

@@ -8,7 +8,8 @@ export const AI_INPUT_MAX_BYTES = 10 * MB;
 export const AI_OUTPUT_MAX_BYTES = 50 * MB;
 /** C42: süre denetimi payı (sn); kapsayıcı süresi birkaç yüz ms taşabilir. */
 export const AI_INPUT_DURATION_TOLERANCE_S = 0.5;
-export const AI_PROMPT_MAX = 1000;
+/** İstem güvenlik tavanı; istemciler sınır göstermez, yalnız kötüye kullanıma karşı. */
+export const AI_PROMPT_MAX = 10000;
 /** Teklif (estimate) önbellek ömrü; önbellek tek instance bellek içi (C14b §6). */
 export const AI_ESTIMATE_TTL_MS = 10 * 60 * 1000;
 /** Yoklayıcı: iş bu süreyi aşarsa AI_VIDEO_TIMEOUT (yavaş kuyruk için geniş; sonradan tamamlanan kurtarılır). */

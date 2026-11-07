@@ -895,7 +895,7 @@ model AiVideoGeneration {
   userId              String
   user                User          @relation(fields: [userId], references: [id])
   model               String // tam api_id, ör. "pika/pika-2.5/image-to-video"
-  prompt              String // <= 1000
+  prompt              String // <= AI_PROMPT_MAX (10000)
   inputKey            String? // özel bucket: ai-input/{userId}/{uuid}.{ext}; yalnız görselden üretimde
   references          Json? // C42: [{ kind: image|video|audio, key }] sırasıyla; null = referans yok
   resolution          String // "720p"
