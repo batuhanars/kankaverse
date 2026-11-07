@@ -176,7 +176,7 @@ describe('AiVideoService.create (teklif + tavan + gonderim)', () => {
 
   it.each([
     ['bilinmeyen model', { model: 'sora' }],
-    ['modelde olmayan sure', { model: 'kling-3.0-turbo', durationS: 7 }],
+    ['modelde olmayan sure', { model: 'kling-3.0-turbo', durationS: 16 }],
     ['modelde olmayan cozunurluk', { model: 'kling-3.0-turbo', resolution: '480p' }],
     ['1080p yok', { resolution: '1080p' }],
   ])('gecersiz secenek (%s): 400 AI_VIDEO_INVALID_OPTION, Pika cagrilmaz', async (_n, over) => {
@@ -342,7 +342,7 @@ describe('AiVideoService.estimate / options', () => {
     ]);
     const res = await service.options('u1');
     expect(res.models.map((m) => m.key)).toEqual(['pika-2.5', 'wan-3.0', 'kling-3.0-turbo']);
-    expect(res.models[2]).toMatchObject({ durations: [5, 10, 15], resolutions: ['720p'] });
+    expect(res.models[2]).toMatchObject({ durations: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolutions: ['720p'] });
     expect(res.grant).toMatchObject({ usedCredits: 40, budgetCredits: 100_000 });
     expect(res).toMatchObject({
       dailyCapCredits: 100_000,

@@ -32,6 +32,10 @@ export interface AiVideoModelSpec {
   references: AiVideoReferenceSpec | null;
 }
 
+/** 2026-11-07: Wan 2-30, Kling 3-15 tam sayı kabul ediyor (teklif ucuyla sınandı); arayüz 5'ten başlar. */
+const secondsRange = (from: number, to: number): number[] =>
+  Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
 export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
   {
     key: 'pika-2.5',
@@ -51,7 +55,7 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     key: 'wan-3.0',
     label: 'Wan 3.0',
     apiBase: 'alibaba/wan3.0-video',
-    durations: [5, 10, 15, 20, 25, 30],
+    durations: secondsRange(5, 30),
     resolutions: ['480p', '720p'],
     aspectField: 'ratio',
     aspectRatios: {
@@ -80,7 +84,7 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     key: 'kling-3.0-turbo',
     label: 'Kling 3.0 Turbo',
     apiBase: 'kling/kling-3.0-turbo',
-    durations: [5, 10, 15],
+    durations: secondsRange(5, 15),
     resolutions: ['720p'],
     aspectField: 'aspect_ratio',
     aspectRatios: { text: ['16:9', '9:16', '1:1'], image: [] },
