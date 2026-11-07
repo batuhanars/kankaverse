@@ -22,6 +22,7 @@ import { useAppModals } from '@/composables/useAppModals'
 import { useAppShellNav } from '@/composables/useAppShellNav'
 import { useNativeNotifications } from '@/composables/useNativeNotifications'
 import { useGameActivity } from '@/composables/useGameActivity'
+import { usePauseMediaWhenHidden } from '@/composables/usePauseMediaWhenHidden'
 import { isMobile, isWide } from '@/composables/useResponsive'
 import ServerRail from '@/components/layout/ServerRail.vue'
 import UserCard from '@/components/layout/UserCard.vue'
@@ -80,6 +81,9 @@ useNativeNotifications()
 
 // C31b: masaüstü oyun algılama köprüsü ("oynuyor" durumu + yayın önerisi). Köprü yoksa no-op.
 useGameActivity()
+
+// Masaüstü: pencere tepsiye gizlenince/simge durumunda çalan mesaj medyası durur (arama sesi sürer).
+usePauseMediaWhenHidden()
 
 // Drawer açıkken body scroll-lock. Watch: isMobile değişince veya drawer kapanınca temizle.
 watch(
