@@ -1,5 +1,6 @@
 <script setup lang="ts">
-defineProps<{ title?: string }>()
+/** wide: md+'da 448 yerine 672px (çok alanlı formlar, örn. yapay zeka video). */
+defineProps<{ title?: string; wide?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 </script>
 
@@ -19,8 +20,9 @@ const emit = defineEmits<{ close: [] }>()
       <div
         class="relative w-full flex flex-col
                h-full rounded-none
-               md:h-auto md:max-w-md md:max-h-[85vh] md:rounded-[var(--kv-radius-lg)]
+               md:h-auto md:max-h-[85vh] md:rounded-[var(--kv-radius-lg)]
                bg-[var(--kv-bg-sidebar)] border border-[var(--kv-border-subtle)] p-6"
+        :class="wide ? 'md:max-w-2xl' : 'md:max-w-md'"
         role="dialog"
         aria-modal="true"
       >

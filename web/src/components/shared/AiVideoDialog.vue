@@ -157,7 +157,7 @@ async function onPrimary() {
     @new="newOne"
     @delete="previewRow && onRemove(previewRow.id)"
   />
-  <KvModal v-else :title="t('aiVideo.title')" @close="emit('close')">
+  <KvModal v-else wide :title="t('aiVideo.title')" @close="emit('close')">
     <div class="flex flex-col gap-4 min-w-0 overflow-y-auto">
       <!-- İlerleme / hata -->
       <template v-if="ai.job.value">
