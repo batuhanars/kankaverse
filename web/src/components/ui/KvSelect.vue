@@ -93,7 +93,7 @@ const model = defineModel<string>()
             </svg>
           </SelectScrollUpButton>
 
-          <SelectViewport class="p-1">
+          <SelectViewport class="kv-select-viewport p-1">
             <SelectItem
               v-for="opt in options"
               :key="opt.value"
@@ -137,5 +137,25 @@ const model = defineModel<string>()
 }
 .select-content {
   overflow-y: auto;
+}
+</style>
+
+<!--
+  reka-ui listenin kaydırma çubuğunu gizliyor (`[data-reka-select-viewport] { scrollbar-width: none }`).
+  Uzun listede (yıllar, yapay zeka video süresi) kaydırılabildiği belli olsun diye görünür, koyu temaya
+  uygun bir çubuk (sahip bulgusu 2026-11-07). Sınıf + nitelik seçicisi reka'nın kuralından özgül.
+  Scoped değil: içerik Portal ile body'ye taşınıyor.
+-->
+<style>
+.kv-select-viewport[data-reka-select-viewport] {
+  scrollbar-width: thin;
+  scrollbar-color: var(--kv-text-muted) transparent;
+}
+.kv-select-viewport[data-reka-select-viewport]::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+}
+.kv-select-viewport[data-reka-select-viewport]::-webkit-scrollbar-thumb {
+  background-color: var(--kv-text-muted);
 }
 </style>

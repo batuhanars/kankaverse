@@ -6,6 +6,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { AiVideoModelOption } from '@/api/aiVideo'
+import KvSelect from '@/components/ui/KvSelect.vue'
 
 const props = defineProps<{
   models: AiVideoModelOption[]
@@ -33,6 +34,9 @@ const ratioLabel = (r: string) => {
 }
 /** Bundan uzun süre listesi açılır listeyle seçilir (düğmeler satırları şişirir). */
 const DURATION_BUTTONS_MAX = 6
+const durationOptions = computed(() =>
+  (props.current?.durations ?? []).map((d) => ({ value: String(d), label: t('aiVideo.durationOption', { sec: d }) })),
+)
 const lockedAuto = computed(() => props.withImage && props.aspectRatios.length === 0)
 const segBase =
   'px-3 py-1.5 text-[13px] cursor-pointer transition-colors border border-[var(--kv-border-subtle)] rounded-[var(--kv-radius-sm)]'
@@ -81,18 +85,13 @@ const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:
     <div v-if="current" class="min-w-0 w-full">
       <!-- 2026-11-07: uzun süre listesi (Wan 5-30) düğme olarak sığmıyor → açılır liste; kısa listede düğmeler kalır -->
       <template v-if="current.durations.length > DURATION_BUTTONS_MAX">
-        <label class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);" for="ai-video-duration">
-          {{ t('aiVideo.durationLabel') }}
-        </label>
-        <select
-          id="ai-video-duration"
-          :value="durationS"
-          class="w-full rounded-[var(--kv-radius-md)] px-3 py-2 text-[14px] outline-none border border-[var(--kv-border-subtle)] bg-[var(--kv-bg-content)] cursor-pointer"
-          style="color: var(--kv-text-primary); color-scheme: dark; scrollbar-color: var(--kv-text-muted) var(--kv-bg-content);"
-          @change="emit('update:durationS', Number(($event.target as HTMLSelectElement).value))"
-        >
-          <option v-for="d in current.durations" :key="d" :value="d">{{ t('aiVideo.durationOption', { sec: d }) }}</option>
-        </select>
+        <span class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);">{{ t('aiVideo.durationLabel') }}</span>
+        <!-- reka-ui listesi: tarayıcının açılır menüsü kaydırma çubuğunu koyu temada görünür çizmiyordu -->
+        <KvSelect
+          :model-value="String(durationS)"
+          :options="durationOptions"
+          @update:model-value="(v) => v && emit('update:durationS', Number(v))"
+        />
       </template>
       <span v-else class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);">{{ t('aiVideo.durationLabel') }}</span>
       <div v-if="current.durations.length <= DURATION_BUTTONS_MAX" class="flex flex-wrap gap-1.5" role="radiogroup" :aria-label="t('aiVideo.durationLabel')">
