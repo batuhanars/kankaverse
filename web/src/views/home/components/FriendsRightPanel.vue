@@ -7,7 +7,6 @@ import { usePresenceStore } from '@/stores/presence'
 import { useActivityStore } from '@/stores/activity'
 import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import MarqueeText from '@/components/shared/MarqueeText.vue'
-import GameLine from '@/components/shared/GameLine.vue'
 import GameLogo from '@/components/shared/GameLogo.vue'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
@@ -69,6 +68,9 @@ const nowActive = computed(() =>
     return game ? [{ friend: f, game }] : []
   }),
 )
+
+/** Oyun oynayan kanka yalnız Şimdi Aktif'te görünür; oyunu bırakınca Çevrimiçi'ye döner. */
+const onlineNotPlaying = computed(() => onlineFriends.value.filter((f) => !gameOf(f.user.id)))
 
 function presenceStatusColor(userId: string): string {
   const status = presenceStore.getStatus(userId)
@@ -208,15 +210,15 @@ async function runConfirm() {
           </div>
 
           <!-- Çevrimiçi grup -->
-          <template v-if="onlineFriends.length">
+          <template v-if="onlineNotPlaying.length">
             <p
               class="px-4 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-widest"
               style="color: var(--kv-text-muted);"
             >
-              {{ t('home.onlineSection', { count: onlineFriends.length }) }}
+              {{ t('home.onlineSection', { count: onlineNotPlaying.length }) }}
             </p>
             <div
-              v-for="f in onlineFriends"
+              v-for="f in onlineNotPlaying"
               :key="f.friendshipId"
               class="group relative flex items-center gap-2.5 px-3 mx-1 py-2.5 rounded-[var(--kv-radius-md)] hover:bg-[var(--kv-bg-elevated)]"
               @mouseenter="hoveredFriendId = f.friendshipId"
@@ -246,8 +248,7 @@ async function runConfirm() {
               <!-- Ad + durum -->
               <div class="flex-1 min-w-0 cursor-pointer" @click="openProfile(f.user.id)">
                 <p class="text-[13px] font-medium truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</p>
-                <GameLine v-if="gameOf(f.user.id)" class="text-[11px]" :name="gameOf(f.user.id)!.name" />
-                <MarqueeText v-else class="text-[11px]" :style="{ color: presenceStatusColor(f.user.id) }" :text="presenceStatusLabel(f.user.id)" />
+                <MarqueeText class="text-[11px]" :style="{ color: presenceStatusColor(f.user.id) }" :text="presenceStatusLabel(f.user.id)" />
               </div>
 
               <!-- Hover aksiyonlar -->
