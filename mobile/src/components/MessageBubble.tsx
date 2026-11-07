@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { AttachmentView } from './AttachmentView';
@@ -9,6 +9,7 @@ import { BubbleMeta, MetaSpacer, ReactionRow, ReplyQuote } from './message/Bubbl
 import { EmbedCards } from './message/EmbedCard';
 import { BUBBLE_TAP_MAX_DURATION_MS } from './message/MediaPressable';
 import { splitMentions } from '@/utils/mentions';
+import { splitLinks } from '@/utils/links';
 import type { MessageDto } from '@/api/messages';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -249,7 +250,22 @@ export function MessageBubble({
                     {seg.text}
                   </Text>
                 ) : (
-                  seg.text
+                  // Bağlantılar dokunulabilir (web linkify karşılığı); yalnız http/https açılır.
+                  splitLinks(seg.text).map((part, j) =>
+                    part.url ? (
+                      <Text
+                        key={`${i}-${j}`}
+                        style={[styles.link, isMine && styles.linkMine]}
+                        onPress={() => void Linking.openURL(part.url!)}
+                        onLongPress={isLocal ? undefined : onLongPress}
+                        accessibilityRole="link"
+                      >
+                        {part.text}
+                      </Text>
+                    ) : (
+                      part.text
+                    ),
+                  )
                 ),
               )}
               {metaInline && <MetaSpacer message={message} receipt={isLocal ? null : receipt} isMine={isMine} />}
@@ -435,6 +451,14 @@ const styles = StyleSheet.create({
     color: theme.colors.accent500,
     backgroundColor: theme.colors.accentSubtle,
     fontWeight: '500',
+  },
+  link: {
+    color: theme.colors.accent500,
+    textDecorationLine: 'underline',
+  },
+  // Kendi baloncuğumda Kor zemin üstünde Kor okunmuyor → beyaz, alt çizgi bağlantıyı belli eder.
+  linkMine: {
+    color: theme.colors.textPrimary,
   },
   // §4 — `accentSubtle` bubbleOwn üstünde görünmez, zemin yok; Kor metin de okunmuyor → beyaz + kalın.
   mentionMine: {
