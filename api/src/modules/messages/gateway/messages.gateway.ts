@@ -734,7 +734,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   async notifyDmActivity(channelId: string, messageDto: Record<string, unknown>) {
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId },
-      select: { guildId: true, dmRequestStatus: true, dmRequesterId: true },
+      select: { guildId: true, type: true, dmRequestStatus: true, dmRequesterId: true },
     });
 
     // Guild kanalı → çık
@@ -780,6 +780,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       members.map((m) => m.userId),
       messageDto,
       content,
+      channel.type === 'DM',
     );
   }
 
@@ -799,8 +800,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     memberIds: string[],
     messageDto: Record<string, unknown>,
     content: string,
+    isOneToOne = false,
   ): Promise<void> {
-    const author = messageDto['author'] as { id: string; username: string };
+    const author = messageDto['author'] as {
+      id: string;
+      username: string;
+      avatarUrl?: string | null;
+    };
     const mentioned = new Set((messageDto['mentions'] as string[] | undefined) ?? []);
     const recipients = memberIds.filter((id) => id !== author.id && !mentioned.has(id));
     if (recipients.length === 0) return;
@@ -822,6 +828,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         title: author.username,
         body,
         data: { type: 'DM_MESSAGE', channelId },
+        // 2026-11-08: 1-1 DM'de karşı kullanıcının (yazarın) statik avatarı. Grup DM'de görsel yok.
+        imageUrl: isOneToOne ? (author.avatarUrl ?? null) : null,
         // 🔴 Canlı kullanıcı geri bildirimi 2026-08-11 — aynı sohbetten gelen her mesaj gölgede
         // AYRI bir bildirim satırı açıyordu (yedi mesaj = yedi satır). `tag` kanal başına sabit
         // olduğu için yeni bildirim aynı sohbetin öncekinin YERİNE geçer (WhatsApp davranışı);
@@ -1036,7 +1044,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId },
-      select: { name: true },
+      select: { name: true, guild: { select: { name: true, iconUrl: true } } },
     });
     const content =
       previewFromAttachments(
@@ -1047,7 +1055,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     await this.push
       .sendToUsers(allowed, {
-        title: channel?.name ? `#${channel.name}` : author.username,
+        // Hangi ortamdan geldiği başlıkta da yazsın: "#genel · Ortam Adı" (simgesi olmayan ortam için şart).
+        title: [channel?.name ? `#${channel.name}` : author.username, channel?.guild?.name]
+          .filter(Boolean)
+          .join(' · '),
         body: `${author.username}: ${preview}`,
         data: {
           type: 'CHANNEL_MESSAGE',
@@ -1057,6 +1068,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         },
         // DM push'u ile aynı gerekçe: aynı kanalın yeni mesajı öncekinin yerine geçer, gölge şişmez.
         tag: channelId,
+        // 2026-11-08: hangi ortamdan geldiği sağdaki ortam simgesinden anlaşılsın.
+        imageUrl: channel?.guild?.iconUrl ?? null,
         // Sunucu ile mobil kanal kimliği BİREBİR aynı kalmalı (bkz. sendDmPush notları).
         androidChannelId: 'messages_v6',
         priority: 'high',

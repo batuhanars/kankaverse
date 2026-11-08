@@ -71,7 +71,9 @@ export class NotificationsService {
 
     const dto = await this.toNotificationDto(notification);
     this.realtime.emitToUser(userId, 'notification', dto);
-    this.push.sendToUsers([userId], this.toPushPayload(dto)).catch(() => {});
+    // Görsel sorgusu tek satır ve ucuz; push gönderimi yine fire-and-forget.
+    const imageUrl = await this.pushImageFor(dto).catch(() => null);
+    this.push.sendToUsers([userId], { ...this.toPushPayload(dto), imageUrl }).catch(() => {});
     return dto;
   }
 
@@ -107,7 +109,8 @@ export class NotificationsService {
     // M3 §2.4 — tek payload tüm alıcılara (data/preview ortak; createMany'nin kendi tanımı gereği
     // her satır aynı CreateNotificationData'dan üretildi). Fire-and-forget (bkz. create() notu).
     if (dtos.length > 0) {
-      this.push.sendToUsers(targets, this.toPushPayload(dtos[0])).catch(() => {});
+      const imageUrl = await this.pushImageFor(dtos[0]).catch(() => null);
+      this.push.sendToUsers(targets, { ...this.toPushPayload(dtos[0]), imageUrl }).catch(() => {});
     }
     return dtos;
   }
@@ -440,6 +443,19 @@ export class NotificationsService {
         createdAt: n.createdAt.toISOString(),
       };
     });
+  }
+
+  /**
+   * Bildirimin sağındaki görsel (sahip kararı 2026-11-08): ortama bağlı bildirimde (bahsetme,
+   * tepki, etkinlik, davet) ortamın statik simgesi. Ortamsız bildirimde görsel yok. Simge yoksa null.
+   */
+  private async pushImageFor(dto: NotificationDto): Promise<string | null> {
+    if (!dto.guildId) return null;
+    const guild = await this.prisma.guild.findUnique({
+      where: { id: dto.guildId },
+      select: { iconUrl: true },
+    });
+    return guild?.iconUrl ?? null;
   }
 
   /**

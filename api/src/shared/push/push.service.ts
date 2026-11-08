@@ -40,6 +40,13 @@ export interface PushPayload {
    * yerine geçer. Bize gereken ikincisi.
    */
   tag?: string;
+  /**
+   * Bildirimin sağındaki görsel (sahip kararı 2026-11-08): ortamdan gelen bildirimde ortam simgesi,
+   * 1-1 DM'de karşı kullanıcının avatarı. Grup DM'de görsel yok. Expo `richContent.image` ("Android will show the image
+   * out of the box", https://docs.expo.dev/push-notifications/sending-notifications/). Herkese açık
+   * cdn adresi olmalı, cihaz kendisi indiriyor. Yoksa alan hiç gönderilmez.
+   */
+  imageUrl?: string | null;
 }
 
 interface ExpoTicket {
@@ -58,6 +65,7 @@ interface ExpoMessage {
   categoryId?: string;
   ttl?: number;
   tag?: string;
+  richContent?: { image: string };
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -115,6 +123,7 @@ export class PushService {
         categoryId: payload.categoryId,
         ttl: payload.ttlSeconds,
         tag: payload.tag,
+        ...(payload.imageUrl ? { richContent: { image: payload.imageUrl } } : {}),
       }));
 
       for (const batch of chunk(messages, CHUNK_SIZE)) {

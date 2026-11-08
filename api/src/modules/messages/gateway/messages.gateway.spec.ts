@@ -324,6 +324,26 @@ describe('MessagesGateway.notifyChannelActivity', () => {
       expect(pushSendToUsersMock.mock.calls[0][0]).toContain(MEMBER_1_ID);
     });
 
+    it('ortam simgesi görsel, ortam adı başlıkta gider', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue({
+        guildId: GUILD_ID,
+        name: 'genel',
+        guild: {
+          adultsOnly: false,
+          name: 'Kankalar',
+          iconUrl: 'https://cdn.kankaverse.com/icons/g.webp',
+        },
+      });
+
+      await gateway.notifyChannelActivity(CHANNEL_ID, makeMessageDto());
+
+      expect(pushSendToUsersMock.mock.calls[0][1].title).toBe('#genel · Kankalar');
+
+      expect(pushSendToUsersMock.mock.calls[0][1].imageUrl).toBe(
+        'https://cdn.kankaverse.com/icons/g.webp',
+      );
+    });
+
     it('doğrudan bahsedilen bu yoldan push almaz (MENTION yolu gönderiyor)', async () => {
       const dto = { ...makeMessageDto(), mentions: [MEMBER_1_ID] };
 
@@ -405,6 +425,25 @@ describe('MessagesGateway.notifyDmActivity — push (M3 §2.6)', () => {
 
     expect(notificationsShouldNotifyMock).toHaveBeenCalledWith(DM_MEMBER_ID, null, DM_CHANNEL_ID);
     expect(pushSendToUsersMock).not.toHaveBeenCalled();
+  });
+
+  it('1-1 DM: yazarın avatarı görsel olarak gider; grup DM: görsel yok', async () => {
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: DM_MEMBER_ID },
+    ]);
+    notificationsShouldNotifyMock.mockResolvedValue(true);
+    const dto = makeDmMessageDto({
+      author: { id: AUTHOR_ID, username: 'yazar', avatarUrl: 'https://cdn.kankaverse.com/a.webp' },
+    });
+
+    prismaMock.channel.findUnique.mockResolvedValue({ guildId: null, type: 'DM' });
+    await gateway.notifyDmActivity(DM_CHANNEL_ID, dto);
+    prismaMock.channel.findUnique.mockResolvedValue({ guildId: null, type: 'GROUP_DM' });
+    await gateway.notifyDmActivity(DM_CHANNEL_ID, dto);
+
+    expect(pushSendToUsersMock.mock.calls[0][1].imageUrl).toBe('https://cdn.kankaverse.com/a.webp');
+    expect(pushSendToUsersMock.mock.calls[1][1].imageUrl).toBeNull();
   });
 
   it('yazara push gitmez (alıcı kümesinden filtrelenir)', async () => {
