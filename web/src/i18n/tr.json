@@ -1773,6 +1773,8 @@
     "estimate": "Tahmini maliyet ({sec} sn)",
     "estimateFailed": "Teklif alınamadı",
     "generate": "Oluştur",
+    "backgroundNote": "Videon arka planda üretiliyor, bitince bildirim gelecek.",
+    "activeIndicator": "Üretim sürüyor",
     "waitNote": "Birkaç dakika sürebilir. Pencereyi kapatabilirsin, sonuç Son üretimler'de kalır.",
     "save": "Kaydet",
     "saveAndSend": "Kaydet ve gönder",

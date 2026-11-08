@@ -4,10 +4,12 @@
  * `aiVideoAllowed` ya da `aiVideoPreview` (C33 pasif tanıtım) iken render olur; minörde ikisi de false. C14b: "Kaydet ve gönder" bekleyen ek
  * üretir; `attachment` ile kimliği çıkar, çağıran MEVCUT mesaj gönderme yoluna (onAttachmentSent) verir.
  */
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import AiVideoDialog from '@/components/shared/AiVideoDialog.vue'
+import AiVideoActiveDot from '@/components/shared/AiVideoActiveDot.vue'
+import { restoreActive } from '@/composables/useAiVideoViewer'
 
 const emit = defineEmits<{ attachment: [attachmentId: string] }>()
 const { t } = useI18n()
@@ -17,6 +19,12 @@ const allowed = computed(
   () => authStore.user?.aiVideoAllowed === true || authStore.user?.aiVideoPreview === true,
 )
 const open = ref(false)
+
+// C49 R3: açılışta süren üretim varsa gösterge yansın (kullanıcı başına bir kez, tek list çağrısı)
+onMounted(() => {
+  const id = authStore.user?.id
+  if (allowed.value && id) void restoreActive(id)
+})
 
 function onSend(attachmentId: string) {
   open.value = false
@@ -28,7 +36,7 @@ function onSend(attachmentId: string) {
   <button
     v-if="allowed"
     type="button"
-    class="emoji-btn ai-btn shrink-0 self-center py-1 px-1 cursor-pointer flex items-center"
+    class="emoji-btn ai-btn relative shrink-0 self-center py-1 px-1 cursor-pointer flex items-center"
     :aria-label="t('aiVideo.button')"
     :title="t('aiVideo.button')"
     @click="open = true"
@@ -37,6 +45,7 @@ function onSend(attachmentId: string) {
       <path d="m12 3 1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
       <path d="M19 15v4M17 17h4" />
     </svg>
+    <AiVideoActiveDot class="absolute top-0 right-0" />
   </button>
   <AiVideoDialog v-if="open" mode="chat" @close="open = false" @send="onSend" />
 </template>

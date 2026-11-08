@@ -104,7 +104,7 @@ async function onSave() {
 }
 
 // C49: açık diyalog sayacı (AI_VIDEO_* masaüstü bildirimi açıkken bastırılır) + bildirimden gelen satırı aç.
-const { openCount } = useAiVideoViewer()
+const { openCount, activeId } = useAiVideoViewer()
 onMounted(async () => {
   openCount.value++
   if (!props.initialId) return
@@ -116,7 +116,11 @@ onMounted(async () => {
     /* bulunamadı: normal form */
   }
 })
-onUnmounted(() => openCount.value--)
+onUnmounted(() => {
+  openCount.value--
+  // C49 R3: etkin üretim varken kapatılırsa üretimin sürdüğü söylenir (bitmişse activeId zaten boş)
+  if (activeId.value) toast.info(t('aiVideo.backgroundNote'))
+})
 
 // Yoklamayla biten üretim önizlemeye geçer (form kapanır).
 watch(

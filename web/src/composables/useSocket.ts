@@ -20,6 +20,7 @@ import { useCallStore, type IncomingCall } from '@/stores/call'
 import { useEmergencyAlertsStore, type EmergencyAlert } from '@/stores/emergencyAlerts'
 import { useCallSounds } from '@/composables/useCallSounds'
 import { useToastStore } from '@/stores/toast'
+import { useAiVideoViewer } from '@/composables/useAiVideoViewer'
 import { i18n } from '@/i18n'
 import { getAccessToken, refreshAccessToken } from '@/api/axios'
 import {
@@ -286,6 +287,10 @@ export function useSocket() {
     // Bell'in TEK kaynağı; friend.*/mention'a paralel, T&S-süzülmüş tetikleyicilerden doğar.
     socket.on('notification', (dto: NotificationDto) => {
       notificationsStore.handleIncoming(dto)
+      // C49 R3: üretim bitti/başarısız → giriş butonundaki "sürüyor" göstergesi söner
+      if (dto.type === 'AI_VIDEO_READY' || dto.type === 'AI_VIDEO_FAILED') {
+        useAiVideoViewer().clearActive()
+      }
     })
 
     socket.on(

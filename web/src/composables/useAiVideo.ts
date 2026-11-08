@@ -5,6 +5,7 @@ import { authApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
 import { useAiVideoForm } from '@/composables/useAiVideoForm'
 import { useAiVideoRefs } from '@/composables/useAiVideoRefs'
+import { useAiVideoViewer, syncActiveFromRows } from '@/composables/useAiVideoViewer'
 import { saveFromUrl } from '@/utils/saveFromUrl'
 
 const POLL_MS = 4000
@@ -43,6 +44,7 @@ export function useAiVideo() {
   const withImage = refs.singleImage
   const referenceKinds = computed(() => (refs.referenceMode.value ? refs.kinds.value : null))
   const form = useAiVideoForm(withImage, referenceKinds, locked)
+  const { setActive, clearActive } = useAiVideoViewer()
   const job = ref<AiVideoDto | null>(null)
   const recent = ref<AiVideoDto[]>([])
   const busy = ref(false)
@@ -94,6 +96,7 @@ export function useAiVideo() {
   async function refreshRecent() {
     try {
       recent.value = (await aiVideoApi.list()).data
+      syncActiveFromRows(recent.value) // global "sürüyor" durumu aynı yanıttan (ek istek yok)
     } catch {
       /* son üretimler yardımcı bölüm; hata sessiz */
     }
@@ -108,6 +111,7 @@ export function useAiVideo() {
     }
     if (!working.value) {
       stop()
+      clearActive(job.value.id)
       void refreshRecent()
     }
   }
@@ -115,7 +119,11 @@ export function useAiVideo() {
   function track(row: AiVideoDto) {
     stop()
     job.value = row
-    if (!working.value) return
+    if (!working.value) {
+      clearActive(row.id)
+      return
+    }
+    setActive(row.id)
     now.value = Date.now()
     tickTimer = setInterval(() => (now.value = Date.now()), 1000)
     pollTimer = setInterval(() => void poll(), POLL_MS)
@@ -155,6 +163,7 @@ export function useAiVideo() {
     try {
       await aiVideoApi.remove(id)
       recent.value = recent.value.filter((r) => r.id !== id)
+      clearActive(id)
       if (job.value?.id === id) reset()
     } catch (e) {
       fail(e)
@@ -167,6 +176,7 @@ export function useAiVideo() {
     try {
       await aiVideoApi.removeAll()
       recent.value = []
+      clearActive()
       reset()
     } catch (e) {
       fail(e)
@@ -232,7 +242,11 @@ export function useAiVideo() {
     }
   }
 
-  void refreshRecent()
+  // Açılışta süren üretim varsa seçili gelsin (ilerleme ekranı); kullanıcı başka satır açtıysa dokunulmaz
+  void refreshRecent().then(() => {
+    const running = recent.value.find((r) => r.status === 'QUEUED' || r.status === 'RUNNING')
+    if (running && !job.value) track(running)
+  })
   void refreshAccess() // admin kredi tanımlamış olabilir; oturum açılışındaki kullanıcı bayat kalmasın
   onUnmounted(stop)
 

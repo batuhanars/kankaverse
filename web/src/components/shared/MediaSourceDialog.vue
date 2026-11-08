@@ -9,6 +9,7 @@ import { useI18n } from 'vue-i18n'
 import { computed, ref } from 'vue'
 import KvModal from '@/components/ui/KvModal.vue'
 import AiVideoDialog from '@/components/shared/AiVideoDialog.vue'
+import AiVideoActiveDot from '@/components/shared/AiVideoActiveDot.vue'
 import { useAuthStore } from '@/stores/auth'
 import { ANIMATED_ACCEPT, STATIC_ACCEPT, showAnimatedNewBadge } from '@/utils/animatedMedia'
 
@@ -92,7 +93,7 @@ const optionClass =
           <path d="M19 15v4M17 17h4" />
         </svg>
         <span class="min-w-0">
-          <span class="block text-[15px] font-medium" style="color: var(--kv-text-primary);">{{ t('media.source.aiVideo') }}</span>
+          <span class="flex items-center gap-2 text-[15px] font-medium" style="color: var(--kv-text-primary);">{{ t('media.source.aiVideo') }}<AiVideoActiveDot /></span>
           <span class="block text-[12px]" style="color: var(--kv-text-muted);">{{ t('media.source.aiVideoHint') }}</span>
         </span>
       </button>
