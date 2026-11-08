@@ -10,12 +10,15 @@ function setup(rowOver: Record<string, unknown> = {}) {
     costMicroUsd: null,
     createdAt: new Date(),
     providerCompletedAt: null,
+    prompt: 'kedi  dans\n eder',
+    deletedAt: null,
     ...rowOver,
   };
   const prisma = {
     aiVideoGeneration: {
       findMany: jest.fn().mockResolvedValue([row]),
       update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       findUnique: jest.fn().mockResolvedValue({ deletedAt: null }),
     },
   };
@@ -23,17 +26,32 @@ function setup(rowOver: Record<string, unknown> = {}) {
   const pika = { getJob: jest.fn(), downloadVideo: jest.fn(), discardPartial: jest.fn() };
   const config = { get: () => true };
   const recovery = { maybeRecover: jest.fn().mockResolvedValue(undefined) };
+  const notifications = { create: jest.fn().mockResolvedValue({}) };
   const poller = new AiVideoPoller(
     prisma as any,
     storage as any,
     pika as any,
     config as any,
     recovery as any,
+    notifications as any,
   );
-  return { poller, prisma, storage, pika, recovery };
+  return { poller, prisma, storage, pika, recovery, notifications };
 }
-const lastUpdate = (p: ReturnType<typeof setup>) =>
-  p.prisma.aiVideoGeneration.update.mock.calls.at(-1)![0].data;
+/** Son yazma: `update` ve `updateMany` çağrılarından çağrı sırasına göre sonuncusu. */
+const lastUpdate = (p: ReturnType<typeof setup>) => {
+  const { update, updateMany } = p.prisma.aiVideoGeneration;
+  const all = [
+    ...update.mock.calls.map((c: any, i: number) => [
+      update.mock.invocationCallOrder[i],
+      c[0].data,
+    ]),
+    ...updateMany.mock.calls.map((c: any, i: number) => [
+      updateMany.mock.invocationCallOrder[i],
+      c[0].data,
+    ]),
+  ].sort((a: any, b: any) => a[0] - b[0]);
+  return all.at(-1)![1];
+};
 
 describe('AiVideoPoller durum esleme', () => {
   it('running -> RUNNING', async () => {
@@ -261,5 +279,132 @@ describe('AiVideoPoller durum esleme', () => {
       status: AiVideoStatus.FAILED,
       errorCode: 'AI_VIDEO_TIMEOUT',
     });
+  });
+});
+
+describe('AiVideoPoller C49 bildirim', () => {
+  const done = {
+    status: 'completed',
+    outputUrl: 'u',
+    billing: { state: 'settled', chargeMicroUsd: 1 },
+  };
+
+  it('basari: AI_VIDEO_READY bir kez, onizleme sadelesir', async () => {
+    const s = setup({ status: AiVideoStatus.RUNNING });
+    s.pika.getJob.mockResolvedValue(done);
+    s.pika.downloadVideo.mockResolvedValue(Buffer.from('mp4'));
+    await s.poller.tick();
+    await s.poller.whenIdle();
+    expect(s.notifications.create).toHaveBeenCalledTimes(1);
+    expect(s.notifications.create).toHaveBeenCalledWith('u1', {
+      type: 'AI_VIDEO_READY',
+      aiVideoId: 'g1',
+      preview: 'kedi dans eder',
+    });
+  });
+
+  it('kurtarilmis satir (RUNNING + DOWNLOAD_PENDING) tamamlaninca READY', async () => {
+    const s = setup({
+      status: AiVideoStatus.RUNNING,
+      errorCode: 'AI_VIDEO_DOWNLOAD_PENDING',
+      providerCompletedAt: new Date(),
+    });
+    s.pika.getJob.mockResolvedValue(done);
+    s.pika.downloadVideo.mockResolvedValue(Buffer.from('mp4'));
+    await s.poller.tick();
+    await s.poller.whenIdle();
+    expect(s.notifications.create.mock.calls[0][1].type).toBe('AI_VIDEO_READY');
+  });
+
+  it('gecis baska yerde olmus (count 0): bildirim yok', async () => {
+    const s = setup({ status: AiVideoStatus.RUNNING });
+    s.prisma.aiVideoGeneration.updateMany.mockResolvedValue({ count: 0 });
+    s.pika.getJob.mockResolvedValue(done);
+    s.pika.downloadVideo.mockResolvedValue(Buffer.from('mp4'));
+    await s.poller.tick();
+    await s.poller.whenIdle();
+    expect(s.notifications.create).not.toHaveBeenCalled();
+  });
+
+  it('indirme basarisiz (DOWNLOAD_PENDING): bildirim yok', async () => {
+    const s = setup({ status: AiVideoStatus.RUNNING });
+    s.pika.getJob.mockResolvedValue(done);
+    s.pika.downloadVideo.mockRejectedValue(new Error('net'));
+    await s.poller.tick();
+    await s.poller.whenIdle();
+    expect(s.notifications.create).not.toHaveBeenCalled();
+  });
+
+  it('fail: AI_VIDEO_FAILED bir kez', async () => {
+    const s = setup();
+    s.pika.getJob.mockResolvedValue({
+      status: 'failed',
+      errorCode: 'provider_error',
+      billing: null,
+    });
+    await s.poller.tick();
+    await s.poller.whenIdle();
+    expect(s.notifications.create).toHaveBeenCalledTimes(1);
+    expect(s.notifications.create.mock.calls[0][1]).toMatchObject({
+      type: 'AI_VIDEO_FAILED',
+      aiVideoId: 'g1',
+    });
+  });
+
+  it('bos istem: preview alani yok', async () => {
+    const s = setup({ prompt: '   ' });
+    s.pika.getJob.mockResolvedValue({
+      status: 'failed',
+      errorCode: 'provider_error',
+      billing: null,
+    });
+    await s.poller.tick();
+    expect(s.notifications.create.mock.calls[0][1]).not.toHaveProperty('preview');
+  });
+
+  it('uzun istem 120 karakterde ... ile kesilir', async () => {
+    const s = setup({ prompt: 'a'.repeat(300) });
+    s.pika.getJob.mockResolvedValue({
+      status: 'failed',
+      errorCode: 'provider_error',
+      billing: null,
+    });
+    await s.poller.tick();
+    const preview = s.notifications.create.mock.calls[0][1].preview as string;
+    expect(preview).toHaveLength(120);
+    expect(preview.endsWith('…')).toBe(true);
+  });
+
+  it('silinmis satir (satirda ya da canli sorguda): bildirim yok', async () => {
+    const a = setup({ deletedAt: new Date() });
+    a.pika.getJob.mockResolvedValue({
+      status: 'failed',
+      errorCode: 'provider_error',
+      billing: null,
+    });
+    await a.poller.tick();
+    expect(a.notifications.create).not.toHaveBeenCalled();
+
+    const b = setup();
+    b.prisma.aiVideoGeneration.findUnique.mockResolvedValue({ deletedAt: new Date() });
+    b.pika.getJob.mockResolvedValue({
+      status: 'failed',
+      errorCode: 'provider_error',
+      billing: null,
+    });
+    await b.poller.tick();
+    expect(b.notifications.create).not.toHaveBeenCalled();
+  });
+
+  it('bildirim hatasi poller i dusurmez, satir yine terminal yazilir', async () => {
+    const s = setup();
+    s.notifications.create.mockRejectedValue(new Error('push patladi'));
+    s.pika.getJob.mockResolvedValue({
+      status: 'failed',
+      errorCode: 'provider_error',
+      billing: null,
+    });
+    await expect(s.poller.tick()).resolves.toBeUndefined();
+    expect(lastUpdate(s)).toMatchObject({ status: AiVideoStatus.FAILED });
   });
 });

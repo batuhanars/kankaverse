@@ -13,10 +13,11 @@ import { AiVideoGrantsController } from './ai-video-grants.controller';
 import { AiVideoGrantsService } from './ai-video-grants.service';
 import { AiVideoBalanceController } from './ai-video-balance.controller';
 import { AiVideoBalanceService } from './ai-video-balance.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { PikaClient } from './pika.client';
 
 @Module({
-  imports: [SharedModule],
+  imports: [SharedModule, NotificationsModule],
   controllers: [AiVideoController, AiVideoGrantsController, AiVideoBalanceController],
   providers: [
     AiVideoService,

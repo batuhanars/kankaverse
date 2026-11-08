@@ -87,6 +87,8 @@ enum NotificationType {
   GUILD_INVITE
   EVENT_CREATED // R14 — ortamda yeni etkinlik oluşturuldu
   REACTION // C46 — mesajına tepki bırakıldı (ortam: çan kaydı + push; DM: yalnız push)
+  AI_VIDEO_READY // C49 — yapay zeka video arka planda tamamlandı
+  AI_VIDEO_FAILED // C49 — yapay zeka video arka planda başarısız oldu (kredi düşülmedi)
 }
 
 enum NotificationLevel {
@@ -796,6 +798,7 @@ model Notification {
   channelId String? // mention: zıplama hedefi kanal
   messageId String? // mention: zıplama hedefi mesaj
   preview   String? // mention metni anlık görüntüsü (≤120; mesaj sonradan silinse de kalır)
+  aiVideoId String? // C49: AI_VIDEO_* bildirimlerinde üretim kimliği (ilişkisiz; satır soft-delete)
 
   readAt    DateTime? // null = okunmamış
   createdAt DateTime  @default(now())

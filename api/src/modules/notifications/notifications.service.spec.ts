@@ -146,6 +146,63 @@ describe('NotificationsService', () => {
       expect(dto.actor).toBeNull();
     });
 
+    // ── C49 — yapay zeka video bildirimleri ────────────────────────────────────
+    describe('AI_VIDEO_*', () => {
+      it.each([
+        ['AI_VIDEO_READY', 'Videon hazır: kedi', 'Videon hazır.'],
+        [
+          'AI_VIDEO_FAILED',
+          'Videon üretilemedi, kredin düşülmedi: kedi',
+          'Videon üretilemedi, kredin düşülmedi.',
+        ],
+      ])('%s: DTO aiVideoId, push başlığı/gövdesi/tag/data', async (type, withPrev, without) => {
+        prismaMock.notification.create.mockResolvedValue(
+          makeRow({
+            type,
+            actorId: null,
+            guildId: null,
+            channelId: null,
+            messageId: null,
+            preview: 'kedi',
+            aiVideoId: 'v1',
+          }),
+        );
+        const dto = await service.create(USER_ID, {
+          type: type as any,
+          aiVideoId: 'v1',
+          preview: 'kedi',
+        });
+        expect(prismaMock.notification.create.mock.calls[0][0].data.aiVideoId).toBe('v1');
+        expect(dto.aiVideoId).toBe('v1');
+        const payload = pushSendToUsersMock.mock.calls[0][1];
+        expect(payload.title).toBe('Yapay zeka video');
+        expect(payload.body).toBe(withPrev);
+        expect(payload.tag).toBe('v1');
+        expect(payload.data).toMatchObject({ type, aiVideoId: 'v1' });
+        expect(payload.androidChannelId).toBe('messages_v6');
+
+        prismaMock.notification.create.mockResolvedValue(
+          makeRow({
+            type,
+            actorId: null,
+            guildId: null,
+            channelId: null,
+            messageId: null,
+            preview: null,
+            aiVideoId: 'v1',
+          }),
+        );
+        await service.create(USER_ID, { type: type as any, aiVideoId: 'v1' });
+        expect(pushSendToUsersMock.mock.calls[1][1].body).toBe(without);
+      });
+
+      it('diğer tiplerde aiVideoId null', async () => {
+        prismaMock.notification.create.mockResolvedValue(makeRow({ aiVideoId: null }));
+        const dto = await service.create(USER_ID, { type: 'MENTION' });
+        expect(dto.aiVideoId).toBeNull();
+      });
+    });
+
     // ── M3 §2.4 — push, kalıcı bildirim üretilen noktaya takılı ────────────────
     it('persist sonrası push.sendToUsers([userId], payload) çağrılır (aynı alıcı, yeni süzgeç yok)', async () => {
       prismaMock.notification.create.mockResolvedValue(makeRow());

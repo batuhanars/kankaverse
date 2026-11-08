@@ -10,6 +10,7 @@ export interface NotificationDto {
   channelId: string | null;
   messageId: string | null;
   preview: string | null; // GUILD_INVITE: davet KODU (frontend /invite/${preview} kurar)
+  aiVideoId: string | null; // C49: AI_VIDEO_READY/FAILED için üretim kimliği, diğer tiplerde null
   readAt: string | null; // null = okunmamış
   createdAt: string;
 }
@@ -22,4 +23,5 @@ export interface CreateNotificationData {
   channelId?: string;
   messageId?: string;
   preview?: string;
+  aiVideoId?: string;
 }

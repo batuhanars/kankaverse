@@ -1,7 +1,8 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AiVideoGeneration, AiVideoStatus } from '@prisma/client';
+import { AiVideoGeneration, AiVideoStatus, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { StorageService } from '../../shared/storage/storage.service';
 import {
   AI_DOWNLOAD_GIVEUP_MS,
@@ -16,6 +17,15 @@ import {
 import { mapPikaErrorCode } from './ai-video.mapper';
 import { AiVideoRecoveryService } from './ai-video-recovery.service';
 import { PikaClient, PikaJob } from './pika.client';
+
+const PREVIEW_MAX = 120;
+
+/** İstem → bildirim önizlemesi: boşluklar sadeleşir, 120 karakteri aşarsa `…` ile kesilir; boşsa null. */
+export function promptPreview(prompt: string): string | null {
+  const text = prompt.replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  return text.length > PREVIEW_MAX ? `${text.slice(0, PREVIEW_MAX - 1)}…` : text;
+}
 
 /** Maliyet henüz kesinleşmemiş tamamlanmış işler için yeniden okuma penceresi / aralığı. */
 const BILLING_RECHECK_WINDOW_MS = 60 * 60 * 1000;
@@ -51,6 +61,7 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
     private pika: PikaClient,
     private config: ConfigService,
     private recovery: AiVideoRecoveryService,
+    private notifications: NotificationsService,
   ) {}
 
   onApplicationBootstrap() {
@@ -99,18 +110,18 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
     const downloading = row.providerCompletedAt !== null;
     if (downloading) {
       if (now - row.providerCompletedAt!.getTime() > AI_DOWNLOAD_GIVEUP_MS) {
-        return this.fail(row.id, AiVideoError.DOWNLOAD_FAILED);
+        return this.fail(row, AiVideoError.DOWNLOAD_FAILED);
       }
       if (!this.retryDue(row.id, now)) return;
     } else if (now - row.createdAt.getTime() > AI_JOB_TIMEOUT_MS) {
       // İş zaman aşımı yalnız Pika queued/running iken işler; indirme aşamasında işlemez.
-      return this.fail(row.id, AiVideoError.TIMEOUT);
+      return this.fail(row, AiVideoError.TIMEOUT);
     }
 
     const job = await this.pika.getJob(row.providerJobId!);
     if (job.status === 'completed') return this.complete(row, job, now);
     if (job.status === 'failed') {
-      await this.fail(row.id, mapPikaErrorCode(job.errorCode), this.settledCost(job));
+      await this.fail(row, mapPikaErrorCode(job.errorCode), this.settledCost(job));
       return;
     }
     const next = job.status === 'running' ? AiVideoStatus.RUNNING : AiVideoStatus.QUEUED;
@@ -169,8 +180,9 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
       });
       return;
     }
-    await this.prisma.aiVideoGeneration.update({
-      where: { id: row.id },
+    // C49: yalnız satır hâlâ QUEUED/RUNNING ise geçiş bizim; bildirim tam bir kez bu geçişe bağlı.
+    const moved = await this.prisma.aiVideoGeneration.updateMany({
+      where: { id: row.id, status: { in: ACTIVE_STATUSES } },
       data: {
         status: AiVideoStatus.COMPLETED,
         outputKey,
@@ -180,6 +192,7 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
         ...costData,
       },
     });
+    if (moved.count > 0) await this.notifyDone(row, NotificationType.AI_VIDEO_READY);
     this.forget(row.id);
   }
 
@@ -221,9 +234,13 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
     return job.billing?.state === 'settled' ? job.billing.chargeMicroUsd : null;
   }
 
-  private async fail(id: string, errorCode: string, cost: number | null = null): Promise<void> {
-    await this.prisma.aiVideoGeneration.update({
-      where: { id },
+  private async fail(
+    row: AiVideoGeneration,
+    errorCode: string,
+    cost: number | null = null,
+  ): Promise<void> {
+    const moved = await this.prisma.aiVideoGeneration.updateMany({
+      where: { id: row.id, status: { in: ACTIVE_STATUSES } },
       data: {
         status: AiVideoStatus.FAILED,
         errorCode,
@@ -231,7 +248,29 @@ export class AiVideoPoller implements OnApplicationBootstrap, OnModuleDestroy {
         ...(cost !== null && { costMicroUsd: cost }),
       },
     });
-    this.forget(id);
+    if (moved.count > 0) await this.notifyDone(row, NotificationType.AI_VIDEO_FAILED);
+    this.forget(row.id);
+  }
+
+  /**
+   * C49: arka plan geçişinde kullanıcıya çan + soket + push. Silinmiş satır sessiz kalır; bildirim hatası
+   * poller'ı ASLA bozmaz (yutulur, loglanır).
+   */
+  private async notifyDone(
+    row: AiVideoGeneration,
+    type: 'AI_VIDEO_READY' | 'AI_VIDEO_FAILED',
+  ): Promise<void> {
+    try {
+      if (row.deletedAt || (await this.isGone(row.id))) return;
+      const preview = promptPreview(row.prompt);
+      await this.notifications.create(row.userId, {
+        type,
+        aiVideoId: row.id,
+        ...(preview !== null && { preview }),
+      });
+    } catch (err) {
+      this.logger.warn(`bildirim üretilemedi: id=${row.id} ${(err as Error).message}`);
+    }
   }
 
   private forget(id: string): void {

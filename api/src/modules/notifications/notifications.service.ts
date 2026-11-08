@@ -66,6 +66,7 @@ export class NotificationsService {
         channelId: data.channelId ?? null,
         messageId: data.messageId ?? null,
         preview: data.preview ?? null,
+        aiVideoId: data.aiVideoId ?? null,
       },
     });
 
@@ -100,6 +101,7 @@ export class NotificationsService {
         channelId: data.channelId ?? null,
         messageId: data.messageId ?? null,
         preview: data.preview ?? null,
+        aiVideoId: data.aiVideoId ?? null,
       })),
     });
 
@@ -400,6 +402,7 @@ export class NotificationsService {
       channelId: n.channelId,
       messageId: n.messageId,
       preview: n.preview,
+      aiVideoId: n.aiVideoId,
       readAt: n.readAt ? n.readAt.toISOString() : null,
       createdAt: n.createdAt.toISOString(),
     };
@@ -439,6 +442,7 @@ export class NotificationsService {
         channelId: n.channelId,
         messageId: n.messageId,
         preview: n.preview,
+        aiVideoId: n.aiVideoId,
         readAt: n.readAt ? n.readAt.toISOString() : null,
         createdAt: n.createdAt.toISOString(),
       };
@@ -475,6 +479,7 @@ export class NotificationsService {
       guildId?: string | null;
       channelId?: string | null;
       messageId?: string | null;
+      aiVideoId?: string | null;
     };
     androidChannelId: string;
     priority: 'high';
@@ -506,18 +511,29 @@ export class NotificationsService {
         body = buildReactionPushBody(actor, emoji, text);
         break;
       }
+      case 'AI_VIDEO_READY':
+        body = dto.preview ? `Videon hazır: ${dto.preview}` : 'Videon hazır.';
+        break;
+      case 'AI_VIDEO_FAILED':
+        body = dto.preview
+          ? `Videon üretilemedi, kredin düşülmedi: ${dto.preview}`
+          : 'Videon üretilemedi, kredin düşülmedi.';
+        break;
       default:
         body = actor;
     }
+    const isAiVideo = dto.type === 'AI_VIDEO_READY' || dto.type === 'AI_VIDEO_FAILED';
 
     return {
-      title: actor,
+      // C49: aktörü olmayan yapay zeka video bildiriminde 'Biri' yazılmaz.
+      title: isAiVideo ? 'Yapay zeka video' : actor,
       body,
       data: {
         type: dto.type,
         guildId: dto.guildId,
         channelId: dto.channelId,
         messageId: dto.messageId,
+        ...(isAiVideo && { aiVideoId: dto.aiVideoId }),
       },
       // 🔴 Sahip cihaz turu 2026-08-10 — kanal adı verilmezse FCM kendi yedek kanalını
       // (önem DEFAULT) kullanıyor, bildirim ekranda BELİRMİYOR. `sendDmPush` ile aynı kanal.
@@ -533,7 +549,12 @@ export class NotificationsService {
       // olması aynı sohbetin bildirimlerini tek satıra indirir.
       // 🔴 Diğer türlere (kanka isteği, davet, etkinlik) tag VERİLMEZ: onlar birbirinin yerine
       // geçmemeli — iki ayrı kanka isteği tek satıra düşerse ikincisi kullanıcıdan gizlenmiş olur.
-      tag: dto.type === 'MENTION' && dto.channelId ? dto.channelId : undefined,
+      // C49: AI video'da tag = aiVideoId; kurtarılan READY aynı üretimin FAILED bildirimini değiştirir.
+      tag: isAiVideo
+        ? (dto.aiVideoId ?? undefined)
+        : dto.type === 'MENTION' && dto.channelId
+          ? dto.channelId
+          : undefined,
     };
   }
 }
