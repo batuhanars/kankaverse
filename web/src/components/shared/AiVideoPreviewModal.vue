@@ -14,7 +14,7 @@ import type { AiVideoDto } from '@/api/aiVideo'
 
 const props = defineProps<{
   row: AiVideoDto
-  mode: 'chat' | 'media'
+  mode: 'chat' | 'media' | 'view'
   busy: boolean
   error: string
   modelLabel?: string

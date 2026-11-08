@@ -36,7 +36,8 @@ export function useAiVideo() {
   const error = ref('')
   // C33: pasif tanıtım. Kilitliyken options + kendi üretimleri (liste/sil) çağrılır; estimate, oluşturma, yükleme atılmaz.
   const authStore = useAuthStore()
-  const locked = authStore.user?.aiVideoAllowed !== true
+  // Reaktif: açılışta tazelenen kullanıcıda hak gelmişse form kilitten çıkar (kredi sayfa yenilemeden görünür).
+  const locked = computed(() => authStore.user?.aiVideoAllowed !== true)
   // C42: ekler (görsel + video + ses). Sınırlar seçili modelin `references` bilgisinden; form daha sonra kurulur (tembel okuma).
   const refs = useAiVideoRefs(() => form.current.value?.references, prompt)
   const withImage = refs.singleImage
@@ -121,7 +122,7 @@ export function useAiVideo() {
   }
 
   async function submit() {
-    if (locked) return
+    if (locked.value) return
     error.value = ''
     busy.value = true
     try {
@@ -232,6 +233,7 @@ export function useAiVideo() {
   }
 
   void refreshRecent()
+  void refreshAccess() // admin kredi tanımlamış olabilir; oturum açılışındaki kullanıcı bayat kalmasın
   onUnmounted(stop)
 
   return {

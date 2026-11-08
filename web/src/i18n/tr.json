@@ -1515,6 +1515,9 @@
     "guildInvite": "{actor} seni {guild} ortamına davet etti.",
     "eventCreated": "{actor} yeni bir etkinlik oluşturdu: {event}",
     "reaction": "{actor} mesajına {emoji} bıraktı.",
+    "aiVideoReady": "Videon hazır",
+    "aiVideoFailed": "Videon üretilemedi, kredin düşülmedi",
+    "aiVideoTitle": "Yapay zeka video",
     "markAllRead": "Tümünü okundu işaretle",
     "loadMore": "Yükleniyor…",
     "now": "az önce",
@@ -1706,6 +1709,9 @@
     "chunkLoadFailed": "Bir ekran yüklenemedi. Sayfayı yenilemeyi dene, sürerse bize bildir."
   },
   "aiVideo": {
+    "sendTargetTitle": "Nereye gönderilsin?",
+    "noSendTargets": "Gönderilecek bir sohbet ya da kanal yok.",
+    "sent": "Gönderildi",
     "title": "Yapay zeka ile video üret",
     "button": "Yapay zeka ile üret",
     "credits": "{amount} kredi",

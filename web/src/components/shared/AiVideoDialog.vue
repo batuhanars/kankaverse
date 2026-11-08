@@ -3,10 +3,11 @@
  * AiVideoDialog (Sprint C14b §3.1): model/çözünürlük/süre + istem (+ isteğe bağlı görsel) → video üretir.
  * İki görünüm, aynı anda biri: `form` (seçici/istem/ilerleme/son üretimler, düğmesiz) ve `preview` (tek videonun
  * düğmeleri, §4b). Önizlenen satır açık `previewRow`da tutulur. Akış mantığı `useAiVideo`/`useAiVideoForm`da; burası yalnız görünüm. Sonuç düğmeleri bağlama göre:
- * mode=chat → `send` (attachmentId, çağıran mevcut mesaj yoluna verir) · mode=media → `use` (File).
+ * mode=chat → `send` (attachmentId, çağıran mevcut mesaj yoluna verir) · mode=media → `use` (File) ·
+ * mode=view (C49, bildirimden; `initialId` o satırı açar) → Kaydet ve gönder: hedef seçici (DM/grup DM) → seçilene ek'li mesaj.
  * Kapı yalnız arayüz; sunucu otorite.
  */
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import KvModal from '@/components/ui/KvModal.vue'
@@ -17,12 +18,17 @@ import AiVideoPromptBox from '@/components/shared/AiVideoPromptBox.vue'
 import AiVideoCostBar from '@/components/shared/AiVideoCostBar.vue'
 import AiVideoRecentList from '@/components/shared/AiVideoRecentList.vue'
 import AiVideoPreviewModal from '@/components/shared/AiVideoPreviewModal.vue'
+import AiVideoSendTargetModal from '@/components/shared/AiVideoSendTargetModal.vue'
 import { useAiVideo } from '@/composables/useAiVideo'
+import { useAiVideoViewer } from '@/composables/useAiVideoViewer'
 import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo'
+import { messagesApi } from '@/api/messages'
+import { useToastStore } from '@/stores/toast'
 
-const props = defineProps<{ mode: 'chat' | 'media' }>()
+const props = defineProps<{ mode: 'chat' | 'media' | 'view'; initialId?: string }>()
 const emit = defineEmits<{ close: []; use: [file: File]; send: [attachmentId: string] }>()
 const router = useRouter()
+const toast = useToastStore()
 
 // C39: kilitli kullanıcı davet ekranına gider (mevcut /invite/:code akışı), pencere kapanır
 function joinAccessGuild() {
@@ -39,6 +45,7 @@ const refs = ai.refs
 
 const view = ref<'form' | 'preview'>('form')
 const previewRow = ref<AiVideoDto | null>(null)
+const picking = ref(false) // C49 R1: view kipinde hedef seçici açık
 let previewOpenedAt = 0
 const STALE_MS = 10 * 60 * 1000 // presigned adres 15 dk; 10 dk sonra tazele
 
@@ -96,6 +103,21 @@ async function onSave() {
   if (row) ai.save(row)
 }
 
+// C49: açık diyalog sayacı (AI_VIDEO_* masaüstü bildirimi açıkken bastırılır) + bildirimden gelen satırı aç.
+const { openCount } = useAiVideoViewer()
+onMounted(async () => {
+  openCount.value++
+  if (!props.initialId) return
+  // Tamamlanmışsa önizleme açık gelir; başarısız/bulunamadı/silinmiş ise normal form + Son üretimler.
+  try {
+    const row = (await aiVideoApi.get(props.initialId)).data
+    if (row.status === 'COMPLETED' && row.videoUrl) showPreview(row)
+  } catch {
+    /* bulunamadı: normal form */
+  }
+})
+onUnmounted(() => openCount.value--)
+
 // Yoklamayla biten üretim önizlemeye geçer (form kapanır).
 watch(
   () => ai.job.value?.status,
@@ -132,6 +154,10 @@ async function onClear() {
 async function onPrimary() {
   const row = await currentRow()
   if (!row) return
+  if (props.mode === 'view') {
+    picking.value = true // C49 R1: önce hedef seçilir; gönderim onPickTarget'ta
+    return
+  }
   if (props.mode === 'media') {
     const file = await ai.toFile(row)
     if (file) emit('use', file)
@@ -139,6 +165,28 @@ async function onPrimary() {
   }
   const id = await ai.saveAndAttach(row)
   if (id) emit('send', id)
+}
+
+/**
+ * C49 R1 (view): seçilen DM/gruba, chat kipindeki yolla aynı: ek üret + kaydet → normal mesaj gönderimi (attachmentIds).
+ * Kapılar sunucuda; ret mesajı toast'ta, seçici açık kalır.
+ */
+async function onPickTarget(channelId: string) {
+  const row = previewRow.value
+  if (!row || ai.busy.value) return
+  const attachmentId = await ai.saveAndAttach(row)
+  if (!attachmentId) {
+    if (ai.error.value) toast.error(ai.error.value)
+    return
+  }
+  try {
+    await messagesApi.send(channelId, '', undefined, [attachmentId])
+    toast.success(t('aiVideo.sent'))
+    emit('close')
+  } catch (e: unknown) {
+    const msg = (e as { response?: { data?: { message?: string } } }).response?.data?.message
+    toast.error(msg ?? t('toast.saveError'))
+  }
 }
 </script>
 
@@ -155,6 +203,12 @@ async function onPrimary() {
     @primary="onPrimary"
     @new="newOne"
     @delete="previewRow && onRemove(previewRow.id)"
+  />
+  <AiVideoSendTargetModal
+    v-if="picking && view === 'preview' && previewRow"
+    :busy="ai.busy.value"
+    @close="picking = false"
+    @pick="onPickTarget"
   />
   <KvModal v-else wide :title="t('aiVideo.title')" @close="emit('close')">
     <div class="flex flex-col gap-4 min-w-0 overflow-y-auto">
@@ -195,7 +249,7 @@ async function onPrimary() {
             :accept="refs.accept.value"
             :single-image="refs.singleImage.value"
             :error="refs.addError.value"
-            :locked="ai.locked"
+            :locked="ai.locked.value"
             @add="refs.addFiles"
             @remove="refs.remove"
           />
@@ -207,7 +261,7 @@ async function onPrimary() {
             <AiVideoPromptBox
               v-model="ai.prompt.value"
               :items="refs.items.value"
-              :disabled="ai.locked"
+              :disabled="ai.locked.value"
               :placeholder="t('aiVideo.promptPlaceholder')"
             />
           </div>
@@ -221,7 +275,7 @@ async function onPrimary() {
           :can-submit="canSubmit"
           :in-progress="ai.inProgress.value"
           :busy="ai.busy.value"
-          :locked="ai.locked"
+          :locked="ai.locked.value"
           :invite-code="form.options.value?.accessInviteCode ?? null"
           :grant="form.options.value?.grant ?? null"
           :has-video="refs.hasVideo.value"

@@ -4,6 +4,7 @@ import { useNotificationsStore } from '@/stores/notifications'
 import { useDmStore } from '@/stores/dm'
 import { useCallStore } from '@/stores/call'
 import { useMessageJump } from '@/composables/useMessageJump'
+import { useAiVideoViewer } from '@/composables/useAiVideoViewer'
 import {
   REACTION_NOTIFY_EVENT,
   reactionEmoji,
@@ -32,6 +33,7 @@ export function useNativeNotifications() {
   const router = useRouter()
   const { requestJump } = useMessageJump()
   const { t } = i18n.global
+  const { openCount: aiVideoOpenCount, openView: openAiVideoView } = useAiVideoViewer()
 
   // Gelen arama bildirimi — Electron VE düz tarayıcıda çalışır (ikisi de standart Notification
   // API'sini destekler); mesaj toast'larının/rozetin aksine masaüstüne özel değil, bu yüzden
@@ -154,6 +156,9 @@ export function useNativeNotifications() {
   }
 
   function _fireToast(dto: NotificationDto) {
+    const isAiVideo = dto.type === 'AI_VIDEO_READY' || dto.type === 'AI_VIDEO_FAILED'
+    // C49 — yapay zeka video diyaloğu açıkken açılır bildirim yok (çan kaydı kalır)
+    if (isAiVideo && aiVideoOpenCount.value > 0) return
     const actor = dto.actor?.username ?? t('notification.someone')
     const guild = dto.guildName ?? ''
 
@@ -180,11 +185,18 @@ export function useNativeNotifications() {
         body = _reactionBody(actor, emoji, reactionPreviewText(dto.preview, emoji))
         break
       }
+      case 'AI_VIDEO_READY':
+        body = t('notification.aiVideoReady')
+        break
+      case 'AI_VIDEO_FAILED':
+        body = t('notification.aiVideoFailed')
+        break
       default:
         body = actor
     }
+    if (isAiVideo && dto.preview) body = `${body}: ${dto.preview}`
 
-    const title = t('notification.nativeTitle')
+    const title = isAiVideo ? t('notification.aiVideoTitle') : t('notification.nativeTitle')
     const notif = new Notification(title, {
       body,
       // Electron'da /src/assets/brand/... yolu yerine ana domain'deki favicon kullanılır.
@@ -215,6 +227,8 @@ export function useNativeNotifications() {
       router.push({ name: 'app' }) // HomeView → kankaları göster
     } else if (dto.type === 'GUILD_INVITE' && dto.guildId) {
       router.push({ name: 'app' }) // davet; invite akışı ayrı
+    } else if ((dto.type === 'AI_VIDEO_READY' || dto.type === 'AI_VIDEO_FAILED') && dto.aiVideoId) {
+      openAiVideoView(dto.aiVideoId) // C49 — çandaki bell diyaloğu açar
     } else {
       // Hedef bilinmiyorsa sadece pencereyi öne getir (yönlendirme olmadan)
     }

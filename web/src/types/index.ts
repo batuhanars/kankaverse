@@ -549,6 +549,9 @@ export const NotificationType = {
   EVENT_CREATED: 'EVENT_CREATED',
   // Sprint C46 — mesajına tepki bırakıldı
   REACTION: 'REACTION',
+  // Sprint C49 — yapay zeka video bitti / üretilemedi
+  AI_VIDEO_READY: 'AI_VIDEO_READY',
+  AI_VIDEO_FAILED: 'AI_VIDEO_FAILED',
 } as const
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType]
 
@@ -561,6 +564,7 @@ export interface NotificationDto {
   channelId: string | null
   messageId: string | null
   preview: string | null
+  aiVideoId: string | null
   readAt: string | null
   createdAt: string
 }

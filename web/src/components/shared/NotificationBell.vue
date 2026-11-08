@@ -8,6 +8,8 @@ import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
 import { useMessageJump } from '@/composables/useMessageJump'
+import { useAiVideoViewer } from '@/composables/useAiVideoViewer'
+import AiVideoDialog from '@/components/shared/AiVideoDialog.vue'
 import { reactionEmoji, reactionPreviewText } from '@/utils/reactionNotification'
 import type { NotificationDto } from '@/types'
 
@@ -18,6 +20,8 @@ const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
 const { requestJump } = useMessageJump()
+// C49 — bildirimden açılan yapay zeka video görüntüleyicisi (durum modül düzeyinde; tek host burası)
+const { viewId: aiVideoViewId, openView, closeView } = useAiVideoViewer()
 
 // C9 — bekleyen mesaj istekleri çanda da görünür (rozete dahil + panelde üstte satır).
 const requestCount = computed(() => dmStore.requestCount)
@@ -80,6 +84,10 @@ function notificationText(n: NotificationDto): string {
       return t('notification.eventCreated', { actor, event: n.preview ?? '' })
     case 'REACTION':
       return t('notification.reaction', { actor, emoji: reactionEmoji(n.preview) })
+    case 'AI_VIDEO_READY':
+      return t('notification.aiVideoReady')
+    case 'AI_VIDEO_FAILED':
+      return t('notification.aiVideoFailed')
     default:
       return actor
   }
@@ -148,6 +156,9 @@ async function onItemClick(n: NotificationDto) {
     // R14 — ortamın etkinlikler yüzeyi. Bildirimde etkinlik ID'si yok (preview = ad),
     // o yüzden kart vurgusu yapılmaz; `?events=1` yalnız modalı açar (ChannelPanel yakalar).
     await openGuildEvents(n.guildId)
+  } else if ((n.type === 'AI_VIDEO_READY' || n.type === 'AI_VIDEO_FAILED') && n.aiVideoId) {
+    // C49 — sonuç açık gelsin: görüntüleme kipinde diyalog (aşağıda mount edilir)
+    openView(n.aiVideoId)
   }
 }
 </script>
@@ -286,5 +297,7 @@ async function onItemClick(n: NotificationDto) {
         </div>
       </div>
     </div>
+
+    <AiVideoDialog v-if="aiVideoViewId" mode="view" :initial-id="aiVideoViewId" @close="closeView" />
   </div>
 </template>

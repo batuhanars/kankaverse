@@ -18,7 +18,7 @@ const ESTIMATE_DELAY_MS = 400
 export function useAiVideoForm(
   withImage: Ref<boolean>,
   referenceKinds: Ref<AiVideoRefKind[] | null>,
-  locked = false,
+  locked: Readonly<Ref<boolean>> = ref(false),
 ) {
   const options = ref<AiVideoOptionsDto | null>(null)
   const model = ref('')
@@ -65,7 +65,7 @@ export function useAiVideoForm(
   }
 
   async function runEstimate() {
-    if (locked) return
+    if (locked.value) return
     const id = ++seq
     estimating.value = true
     estimateFailed.value = false
@@ -94,9 +94,17 @@ export function useAiVideoForm(
 
   watch([withImage, referenceKinds], resetAspectIfInvalid)
   watch(
-    [model, resolution, durationS, aspectRatio, withImage, () => referenceKinds.value?.join()],
+    [
+      model,
+      resolution,
+      durationS,
+      aspectRatio,
+      withImage,
+      () => referenceKinds.value?.join(),
+      locked,
+    ],
     () => {
-      if (locked) return
+      if (locked.value) return
       if (!model.value || !resolution.value || !durationS.value) return
       if (timer) clearTimeout(timer)
       estimating.value = true

@@ -7,23 +7,21 @@
  * mesaj gönderimiyle (`attachmentIds`) hedefe bağlanır. İstemci dosyayı indirip yeniden yüklemez.
  * Kapılar (kaynak kanal erişimi, tarama, hedef kanal kuralları) sunucuda; ret mesajı toast'ta.
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useDmStore } from '@/stores/dm'
 import { useToastStore } from '@/stores/toast'
 import { messagesApi } from '@/api/messages'
 import { attachmentsApi } from '@/api/attachments'
 import KvModal from '@/components/ui/KvModal.vue'
+import DmTargetList from '@/components/shared/DmTargetList.vue'
 import { ScanStatus, type MessageDto, type DmChannelDto } from '@/types'
 
 const props = defineProps<{ message: MessageDto }>()
 const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
-const dmStore = useDmStore()
 const toast = useToastStore()
 
-const query = ref('')
 const sendingId = ref<string | null>(null)
 const sentIds = ref<Set<string>>(new Set())
 
@@ -46,22 +44,6 @@ if (att0?.contentType.startsWith('video/') && att0.thumbnail) {
     .catch(() => {}) // önizleme kozmetik; iletme kapısı sunucuda
 }
 
-function channelName(c: DmChannelDto): string {
-  if (c.type === 'DM') return c.otherUser.username
-  return c.name || c.members.map((m) => m.username).join(', ')
-}
-function channelAvatar(c: DmChannelDto): string | null {
-  return c.type === 'DM' ? c.otherUser.avatarUrl : null
-}
-function channelInitial(c: DmChannelDto): string {
-  return channelName(c).charAt(0).toUpperCase()
-}
-
-const filtered = computed(() => {
-  const q = query.value.trim().toLowerCase()
-  return dmStore.channels.filter((c) => !q || channelName(c).toLowerCase().includes(q))
-})
-
 async function forwardTo(c: DmChannelDto) {
   if (sendingId.value || sentIds.value.has(c.id) || !hasContent.value) return
   sendingId.value = c.id
@@ -80,10 +62,6 @@ async function forwardTo(c: DmChannelDto) {
     sendingId.value = null
   }
 }
-
-onMounted(() => {
-  if (!dmStore.channels.length) dmStore.fetchChannels().catch(() => {})
-})
 </script>
 
 <template>
@@ -114,44 +92,13 @@ onMounted(() => {
         <p v-if="!hasContent">{{ t('message.forwardEmpty') }}</p>
       </div>
 
-      <!-- Arama -->
-      <input
-        v-model="query"
-        type="text"
-        class="w-full px-3 py-2 rounded-[var(--kv-radius-md)] text-[14px] outline-none border"
-        style="background-color: var(--kv-bg-content); color: var(--kv-text-primary); border-color: var(--kv-border-strong);"
-        :placeholder="t('message.forwardSearch')"
+      <DmTargetList
+        :disabled="!hasContent"
+        :sending-id="sendingId"
+        :sent-ids="sentIds"
+        :sent-label="t('message.forwardedShort')"
+        @pick="forwardTo"
       />
-
-      <!-- DM listesi -->
-      <div class="max-h-72 overflow-y-auto flex flex-col -mx-1">
-        <button
-          v-for="c in filtered"
-          :key="c.id"
-          class="flex items-center gap-2.5 px-2 py-2 rounded-[var(--kv-radius-md)] text-left transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          :disabled="!hasContent || sendingId === c.id"
-          @click="forwardTo(c)"
-        >
-          <div
-            class="w-8 h-8 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-semibold text-white"
-            style="background-color: var(--kv-accent-500);"
-          >
-            <img v-if="channelAvatar(c)" :src="channelAvatar(c)!" :alt="channelName(c)" class="w-full h-full object-cover" />
-            <span v-else>{{ channelInitial(c) }}</span>
-          </div>
-          <span class="flex-1 truncate text-[14px]" style="color: var(--kv-text-primary);">{{ channelName(c) }}</span>
-          <span
-            v-if="sentIds.has(c.id)"
-            class="shrink-0 text-[12px] font-medium"
-            style="color: var(--kv-online, #3DB46E);"
-          >{{ t('message.forwardedShort') }}</span>
-          <span v-else-if="sendingId === c.id" class="shrink-0 text-[12px]" style="color: var(--kv-text-muted);">…</span>
-        </button>
-
-        <p v-if="!filtered.length" class="px-2 py-4 text-[13px]" style="color: var(--kv-text-muted);">
-          {{ t('message.forwardNoChannels') }}
-        </p>
-      </div>
     </div>
   </KvModal>
 </template>
