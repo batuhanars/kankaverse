@@ -4,10 +4,11 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { notificationsApi } from '@/api/notifications';
-import { resolvePushTarget } from '@/utils/pushNavigation';
+import { resolveAiVideoId, resolvePushTarget } from '@/utils/pushNavigation';
 import { isChannelRinging } from '@/notifications/incomingCall';
 import { useGatedNotificationResponder } from '@/notifications/responseGate';
 import { useDmStore } from '@/stores/dm';
+import { useAiVideoViewerStore } from '@/stores/aiVideoViewer';
 import { getActiveChannelId } from '@/realtime/socket';
 
 /**
@@ -177,6 +178,13 @@ Notifications.setNotificationHandler({
       }
     }
 
+    // C49: yapay zeka video bildirimi. Herhangi bir AiVideoSheet açıkken (sohbet/medya/view) hiçbir şey
+    // gösterilmez (kullanıcı zaten o sayfada, çan kaydı kalır); kapalıyken mesaj bildirimleri gibi düşer.
+    if (data?.type === 'AI_VIDEO_READY' || data?.type === 'AI_VIDEO_FAILED') {
+      const show = useAiVideoViewerStore.getState().sheetOpen === 0;
+      return { shouldShowBanner: show, shouldShowList: show, shouldPlaySound: show, shouldSetBadge: false };
+    }
+
     const isMessage = isMessageType(data?.type);
     const messageChannelId = typeof data?.channelId === 'string' ? data.channelId : null;
     // "Aktif sohbet": açık DM ya da açık ortam kanalı. Kullanıcı o kanalı okurken bildirim gösterilmez.
@@ -336,6 +344,13 @@ export async function clearPushToken(): Promise<void> {
 
 function handleNotificationResponse(response: Notifications.NotificationResponse): void {
   const data = response.notification.request.content.data as Record<string, unknown>;
+  // C49: video bildirimi rota değil, görüntüleyici sayfasını açar (host `(app)` düzeyinde; soğuk açılışta
+  // bu çağrı zaten kapıdan (nav hazır + oturum belli) geçtikten sonra gelir, host mount olunca store'u okur).
+  const aiVideoId = resolveAiVideoId(data);
+  if (aiVideoId) {
+    useAiVideoViewerStore.getState().open(aiVideoId);
+    return;
+  }
   const target = resolvePushTarget(data);
   // Hedef çözülemiyorsa yalnız uygulamayı aç (§3) — router.push ÇAĞRILMAZ, zaten açık olan
   // ekranda kalınır (kırık navigasyon vaat etme).

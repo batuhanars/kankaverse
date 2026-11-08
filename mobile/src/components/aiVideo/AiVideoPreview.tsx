@@ -8,7 +8,7 @@ import { theme } from '@/theme';
 
 interface Props {
   row: AiVideoDto;
-  mode: 'chat' | 'media';
+  mode: 'chat' | 'media' | 'view';
   busy: boolean;
   error: string;
   modelLabel?: string;
@@ -74,7 +74,7 @@ export function AiVideoPreview({ row, mode, busy, error, modelLabel, onSave, onP
           {busy ? (
             <ActivityIndicator color={theme.colors.textPrimary} />
           ) : (
-            <Text style={styles.primaryText}>{t(mode === 'chat' ? 'aiVideo.saveAndSend' : 'aiVideo.useAsMedia')}</Text>
+            <Text style={styles.primaryText}>{t(mode === 'media' ? 'aiVideo.useAsMedia' : 'aiVideo.saveAndSend')}</Text>
           )}
         </Pressable>
         <Pressable onPress={onNew} disabled={busy} style={[styles.btn, styles.ghost, busy && styles.off]} accessibilityRole="button">

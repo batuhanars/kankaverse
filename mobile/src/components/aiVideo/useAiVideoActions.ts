@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getVideoMetaData } from 'react-native-compressor';
 import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo';
+import { messagesApi } from '@/api/messages';
 import { t } from '@/i18n';
 import type { PickedProfileMedia } from '@/utils/animatedMedia';
 import { useGalleryDownload } from '../message/useSaveToGallery';
@@ -13,7 +14,7 @@ const STALE_MS = 10 * 60 * 1000;
 type UsedVideo = Extract<PickedProfileMedia, { kind: 'video' }>;
 
 interface Options {
-  mode: 'chat' | 'media';
+  mode: 'chat' | 'media' | 'view';
   setBusy: (busy: boolean) => void;
   setError: (message: string) => void;
   /** chat: oluşturulan bekleyen ekin kimliği; çağıran mevcut mesaj gönderme yoluna verir. */
@@ -95,6 +96,7 @@ export function useAiVideoActions({ mode, setBusy, setError, onSend, onUse }: Op
   }
 
   async function primary() {
+    if (mode === 'view') return; // C49 R1: view'da birincil düğme hedef seçiciyi açar (SheetBody), gönderim `sendTo`
     const r = await currentRow();
     if (!r) return;
     setBusy(true);
@@ -114,5 +116,22 @@ export function useAiVideoActions({ mode, setBusy, setError, onSend, onUse }: Op
     }
   }
 
-  return { row, show, showFresh, save, primary, savingGallery: gallery.saving };
+  /**
+   * C49 R1: view kipinde seçilen hedefe gönderim. Chat kipiyle aynı iki adım (ek oluştur + galeriye kaydet),
+   * sonra mesaj gönderme çağrısı hedef kanal kimliğiyle (`messagesApi.send`, yeni uç yok). Hata metnini döner.
+   */
+  async function sendTo(channelId: string): Promise<string | null> {
+    const r = await currentRow();
+    if (!r) return null;
+    try {
+      const { attachmentId } = await aiVideoApi.createAttachment(r.id);
+      await saveRow(r);
+      await messagesApi.send(channelId, '', undefined, [attachmentId]);
+      return null;
+    } catch (e) {
+      return aiVideoFailText(e);
+    }
+  }
+
+  return { row, show, showFresh, save, primary, sendTo, savingGallery: gallery.saving };
 }

@@ -13,6 +13,18 @@ import { useAiVideoRefs } from './useAiVideoRefs';
 const POLL_MS = 4000;
 
 /**
+ * Hak bayrağı (`aiVideoAllowed`) yalnız uygulama açılışında çekiliyor. Sayfa açılınca ve kredi/süre
+ * bitebilecek anlarda kullanıcı tazelenir: admin kredi tanımladıysa uygulamayı yeniden başlatmadan görünür (web ile aynı).
+ */
+async function refreshAccess() {
+  try {
+    useAuthStore.getState().updateUser(await authApi.me());
+  } catch {
+    /* geçici hata: bir sonraki yenilemede düzelir */
+  }
+}
+
+/**
  * Sprint C14d (web `useAiVideo` eşdeğeri): oluştur (tek çağrı) → 4 sn yoklama → sonuç.
  * Yoklama sayfa kapanınca (bileşen sökülünce) durur; uygulama arka plandan dönünce hemen bir tur atılır.
  * Hata metni koda göre i18n'den, bilinmeyende sunucu mesajından.
@@ -81,6 +93,7 @@ export function useAiVideo() {
   useEffect(() => {
     alive.current = true;
     void refreshRecent();
+    void refreshAccess();
     return () => {
       alive.current = false;
     };
@@ -94,15 +107,6 @@ export function useAiVideo() {
   function track(row: AiVideoDto | null) {
     jobRef.current = row;
     setJob(row);
-  }
-
-  /** C40: kredi/süre bitmiş olabilir; oturumu yenile ki bir sonraki açılışta kilitli mod doğru gelsin (web ile aynı). */
-  async function refreshAccess() {
-    try {
-      useAuthStore.getState().updateUser(await authApi.me());
-    } catch {
-      /* geçici hata: bir sonraki yenilemede düzelir */
-    }
   }
 
   async function submit() {

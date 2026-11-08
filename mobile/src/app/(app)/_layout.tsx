@@ -8,6 +8,7 @@ import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
 import { useUnreadStore } from '@/stores/unread';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
+import { AiVideoViewerHost } from '@/components/aiVideo/AiVideoViewerHost';
 import { useBackgroundSocket } from '@/realtime/useBackgroundSocket';
 import { syncPushToken, isPushTokenRegistered } from '@/notifications/push';
 import { ensureIncomingCallNotificationsSetup } from '@/notifications/incomingCall';
@@ -88,6 +89,7 @@ export default function AppLayout() {
   }
 
   return (
+    <>
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: theme.colors.bgSidebar },
@@ -109,5 +111,7 @@ export default function AppLayout() {
           verir (arama bağlı kalır, mini pencere belirir) — ayrı bir BackHandler gerekmiyor. */}
       <Stack.Screen name="call" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
     </Stack>
+    <AiVideoViewerHost />
+    </>
   );
 }

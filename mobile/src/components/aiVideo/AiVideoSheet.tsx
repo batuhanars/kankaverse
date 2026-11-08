@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -11,9 +12,10 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import type { AiVideoDto } from '@/api/aiVideo';
+import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo';
 import type { PickedProfileMedia } from '@/utils/animatedMedia';
 import { useAuthStore } from '@/stores/auth';
+import { useAiVideoViewerStore } from '@/stores/aiVideoViewer';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmailVerificationBanner } from '../EmailVerificationBanner';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
@@ -22,6 +24,7 @@ import { theme } from '@/theme';
 import { AiVideoCostBar } from './AiVideoCostBar';
 import { AiVideoForm } from './AiVideoForm';
 import { AiVideoPreview } from './AiVideoPreview';
+import { AiVideoTargetPicker } from './AiVideoTargetPicker';
 import { AiVideoProgress } from './AiVideoProgress';
 import { AiVideoRecentList } from './AiVideoRecentList';
 import { useAiVideo } from './useAiVideo';
@@ -29,8 +32,13 @@ import { useAiVideoActions } from './useAiVideoActions';
 
 interface Props {
   visible: boolean;
-  /** chat: mesaj kutusundan (Kaydet ve gönder) · media: profil/ortam görseli (Kullan). */
-  mode: 'chat' | 'media';
+  /**
+   * chat: mesaj kutusundan (Kaydet ve gönder) · media: profil/ortam görseli (Kullan) ·
+   * view: bildirimden (C49): izle + kaydet + hedef seçip gönder (R1), kullan yok.
+   */
+  mode: 'chat' | 'media' | 'view';
+  /** view: açılışta bu üretim getirilir; tamamlanmışsa önizleme açık gelir. */
+  initialId?: string | null;
   onClose: () => void;
   onSend?: (attachmentId: string) => void;
   onUse?: (media: Extract<PickedProfileMedia, { kind: 'video' }>) => void;
@@ -56,21 +64,46 @@ function useKeyboardVisible(): boolean {
  * Gövde yalnız sayfa AÇIKKEN monte edilir: kapanınca yoklama durur, seçenekler sayfa her açılışında tazelenir.
  */
 export function AiVideoSheet({ visible, ...rest }: Props) {
+  // Android geri tuşu: önce iç katman (hedef seçici) kapanır, işlenmediyse sayfa.
+  const backRef = useRef<() => boolean>(() => false);
   return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={rest.onClose}>
-      {visible ? <SheetBody {...rest} /> : null}
+    <Modal
+      transparent
+      visible={visible}
+      animationType="slide"
+      onRequestClose={() => {
+        if (!backRef.current()) rest.onClose();
+      }}
+    >
+      {visible ? <SheetBody {...rest} backRef={backRef} /> : null}
     </Modal>
   );
 }
 
-function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
+function SheetBody({
+  mode,
+  initialId,
+  onClose,
+  onSend,
+  onUse,
+  backRef,
+}: Omit<Props, 'visible'> & { backRef: MutableRefObject<() => boolean> }) {
   const { height } = useWindowDimensions();
   const bottomInset = useSheetInsets();
   const keyboard = useKeyboardVisible();
   const ai = useAiVideo();
   const unverified = useAuthStore((s) => s.user?.emailVerified === false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [sendingTo, setSendingTo] = useState(false);
+  const [pickError, setPickError] = useState('');
   const scrollRef = useRef<ScrollView>(null);
+  backRef.current = () => {
+    if (!picking) return false;
+    setPicking(false);
+    setPickError('');
+    return true;
+  };
   const promptY = useRef(0);
   const actions = useAiVideoActions({
     mode,
@@ -80,6 +113,30 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
     onUse: (m) => onUse?.(m),
   });
   const { row } = actions;
+
+  // C49: açık sayfa sayısı (sohbet/medya/view hepsi). Ön plan bildirim süzgeci okur.
+  useEffect(() => {
+    useAiVideoViewerStore.getState().sheetOpened();
+    return () => useAiVideoViewerStore.getState().sheetClosed();
+  }, []);
+
+  // C49: bildirimden gelen kimlik. COMPLETED ise önizleme açık gelir; FAILED/süren/bulunamadı ise normal form.
+  useEffect(() => {
+    if (!initialId) return;
+    let cancelled = false;
+    aiVideoApi
+      .get(initialId)
+      .then((r) => {
+        if (!cancelled && r.status === 'COMPLETED' && r.videoUrl) actions.show(r);
+      })
+      .catch(() => {
+        /* silinmiş ya da ağ hatası: normal form açık kalır */
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- yalnız kimlik değişince
+  }, [initialId]);
   const form = ai.form;
   const modelLabel = form.options?.models.find((m) => m.key === row?.model)?.label;
   // Boş istem yalnız tek görsel kipinde serbest (referans kipinde sunucu 400 AI_VIDEO_PROMPT_REQUIRED).
@@ -93,6 +150,21 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
     if (doneRow) actions.show(doneRow);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- yalnız biten satır değişince
   }, [doneRow?.id]);
+
+  /** C49 R1: seçilen hedefe gönder; başarıda seçici + sayfa kapanır, kısa bilgi. */
+  async function sendToTarget(channelId: string) {
+    setSendingTo(true);
+    setPickError('');
+    const err = await actions.sendTo(channelId);
+    setSendingTo(false);
+    if (err) {
+      setPickError(err);
+      return;
+    }
+    setPicking(false);
+    onClose();
+    Alert.alert(t('aiVideo.sent'));
+  }
 
   function newOne() {
     ai.reset();
@@ -145,7 +217,7 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
               error={ai.error}
               modelLabel={modelLabel}
               onSave={() => void actions.save()}
-              onPrimary={() => void actions.primary()}
+              onPrimary={() => (mode === 'view' ? setPicking(true) : void actions.primary())}
               onNew={newOne}
               onDelete={() => void onRemove(row.id)}
             />
@@ -190,6 +262,17 @@ function SheetBody({ mode, onClose, onSend, onUse }: Omit<Props, 'visible'>) {
           <View style={{ height: keyboard ? 12 : sheetBottomPadding(bottomInset) }} />
         )}
       </View>
+      {picking ? (
+        <AiVideoTargetPicker
+          sending={sendingTo}
+          error={pickError}
+          onSend={(target) => void sendToTarget(target.id)}
+          onClose={() => {
+            setPicking(false);
+            setPickError('');
+          }}
+        />
+      ) : null}
       {confirmClear ? (
         <ConfirmDialog
           title={t('aiVideo.clearTitle')}

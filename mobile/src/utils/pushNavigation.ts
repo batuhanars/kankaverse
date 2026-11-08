@@ -54,6 +54,15 @@ export function resolvePushTarget(data: Record<string, unknown>): Href | null {
   }
 }
 
+/**
+ * C49: yapay zeka video bildirimi (push dokunuşu) görüntüleyiciyi açar. Bu bir rota değil, store
+ * eylemi olduğu için `resolvePushTarget` (Href) yerine ayrı çözülür; kimlik yoksa null (yalnız uygulama açılır).
+ */
+export function resolveAiVideoId(data: Record<string, unknown>): string | null {
+  if (data.type !== 'AI_VIDEO_READY' && data.type !== 'AI_VIDEO_FAILED') return null;
+  return normalizeId(data.aiVideoId);
+}
+
 /** M4a-2 (`notifications/incomingCall.ts`) de aynı hedefi kullanır: bildirim gövdesine dokununca
  *  o DM'e gidiliyor — push'un DM hedefiyle aynı çözümleme, kopya yok. */
 export function dmTarget(channelId: string): Href {

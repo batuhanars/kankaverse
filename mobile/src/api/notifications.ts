@@ -16,6 +16,9 @@ export const NotificationType = {
   EVENT_CREATED: 'EVENT_CREATED',
   // C46 — mesajına tepki verildi (`preview` = emoji + mesaj önizlemesi)
   REACTION: 'REACTION',
+  // C49 — yapay zeka video arka planda bitti / üretilemedi (`preview` = istem, `aiVideoId` dolu)
+  AI_VIDEO_READY: 'AI_VIDEO_READY',
+  AI_VIDEO_FAILED: 'AI_VIDEO_FAILED',
 } as const;
 // eslint-disable-next-line @typescript-eslint/no-redeclare -- enum-like const+type deseni, bkz. api/channels.ts
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
@@ -34,6 +37,7 @@ export interface NotificationDto {
   guildName?: string | null;
   channelId: string | null;
   messageId: string | null;
+  aiVideoId: string | null;
   preview: string | null;
   readAt: string | null;
   createdAt: string;

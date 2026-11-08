@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { useNotificationsStore } from '@/stores/notifications';
+import { useAiVideoViewerStore } from '@/stores/aiVideoViewer';
 import type { NotificationDto } from '@/api/notifications';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -43,6 +44,10 @@ function notificationText(n: NotificationDto): string {
       return t('notification.friendAccept', { actor });
     case 'GUILD_INVITE':
       return t('notification.guildInvite', { actor, guild: n.guildName ?? t('invite.unknownGuild') });
+    case 'AI_VIDEO_READY':
+      return t('notification.aiVideoReady');
+    case 'AI_VIDEO_FAILED':
+      return t('notification.aiVideoFailed');
     case 'EVENT_CREATED':
       // Sprint R14 §3.2 — `preview` = etkinlik adı (web NotificationBell ile AYNI anahtar)
       return t('notification.eventCreated', { actor, event: n.preview ?? '' });
@@ -130,6 +135,11 @@ export default function NotificationsScreen() {
     // Kanka isteği bildirimi artık ÖLÜ DEĞİL (sahip bulgusu 2026-07-30). M1a'da tıklanamazdı çünkü
     // gidilecek bir yer yoktu; M1b Arkadaş Ekle ekranını getirdi, hedef artık var. Sahip tam olarak
     // burada takıldı: rozet Bildirimler'de çıkıyor, dokununca hiçbir şey olmuyordu.
+    // C49 — yapay zeka video: görüntüleyici sayfası o üretim açık gelir (rota değil, `(app)` host'u).
+    if (n.type === 'AI_VIDEO_READY' || n.type === 'AI_VIDEO_FAILED') {
+      if (n.aiVideoId) useAiVideoViewerStore.getState().open(n.aiVideoId);
+      return;
+    }
     if (n.type === 'FRIEND_REQUEST') {
       router.push('/friends-add');
       return;
@@ -211,6 +221,7 @@ export default function NotificationsScreen() {
               item.type === 'FRIEND_ACCEPT' ||
               (item.type === 'GUILD_INVITE' && !!item.preview) ||
               (item.type === 'EVENT_CREATED' && !!item.guildId) ||
+              ((item.type === 'AI_VIDEO_READY' || item.type === 'AI_VIDEO_FAILED') && !!item.aiVideoId) ||
               ((item.type === 'MENTION' || item.type === 'REACTION') && !!item.channelId);
             return (
               <Pressable
@@ -222,6 +233,10 @@ export default function NotificationsScreen() {
                 {item.type === 'EVENT_CREATED' ? (
                   <View style={[styles.avatar, styles.avatarFallback]}>
                     <Ionicons name="calendar-outline" size={18} color={theme.colors.textSecondary} />
+                  </View>
+                ) : item.type === 'AI_VIDEO_READY' || item.type === 'AI_VIDEO_FAILED' ? (
+                  <View style={[styles.avatar, styles.avatarFallback]}>
+                    <Ionicons name="videocam-outline" size={18} color={theme.colors.textSecondary} />
                   </View>
                 ) : item.actor?.avatarUrl ? (
                   <Image source={{ uri: item.actor.avatarUrl }} style={styles.avatar} />
