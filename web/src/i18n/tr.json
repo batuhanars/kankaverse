@@ -1787,6 +1787,7 @@
     "fromImage": "Görselden üretim",
     "copyPrompt": "Metni kopyala",
     "promptCopied": "Kopyalandı",
+    "promptCopyFailed": "Kopyalanamadı",
     "status": {
       "QUOTED": "Teklif alındı",
       "QUEUED": "Sırada",
