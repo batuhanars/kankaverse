@@ -8,7 +8,7 @@ const openPickerMessageId = moduleRef<string | null>(null)
 </script>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useQuickReactions } from '@/composables/useQuickReactions'
 import EmojiPicker from './EmojiPicker.vue'
@@ -126,6 +126,37 @@ function toggleMore(e: MouseEvent) {
   }
   showQuickEmoji.value = false
   showMore.value = !showMore.value
+  if (showMore.value) void placeMoreMenu()
+}
+
+// ⋯ menüsü varsayılan aşağı açılır. Mesaj listenin dibindeyse (mesaj kutusuna yakın) aşağıda yer
+// kalmaz ve menü kutunun altına girip kaydırmadan görünmez; o zaman yukarı açılır.
+const moreMenuEl = ref<HTMLElement | null>(null)
+const moreOpensUp = ref(false)
+
+/** En yakın dikey kaydırma kabı; liste kabının alt kenarı mesaj kutusunun üst kenarıdır. */
+function scrollParentRect(el: HTMLElement): { top: number; bottom: number } {
+  let node = el.parentElement
+  while (node) {
+    const oy = getComputedStyle(node).overflowY
+    if (oy === 'auto' || oy === 'scroll') return node.getBoundingClientRect()
+    node = node.parentElement
+  }
+  return { top: 0, bottom: window.innerHeight }
+}
+
+async function placeMoreMenu() {
+  moreOpensUp.value = false
+  await nextTick()
+  const trigger = moreEl.value
+  const menu = moreMenuEl.value
+  if (!trigger || !menu) return
+  const t = trigger.getBoundingClientRect()
+  const bounds = scrollParentRect(trigger)
+  const h = menu.offsetHeight + 4
+  const spaceBelow = bounds.bottom - t.bottom
+  const spaceAbove = t.top - bounds.top
+  moreOpensUp.value = spaceBelow < h && spaceAbove > spaceBelow
 }
 
 function toggleEmojiPicker(e: MouseEvent) {
@@ -252,7 +283,9 @@ onUnmounted(() => {
       <!-- Daha fazla açılır menüsü -->
       <div
         v-if="showMore"
-        class="absolute top-full right-0 mt-1 z-50 rounded-[var(--kv-radius-md)] py-1 min-w-[160px]"
+        ref="moreMenuEl"
+        class="absolute right-0 z-50 rounded-[var(--kv-radius-md)] py-1 min-w-[160px]"
+        :class="moreOpensUp ? 'bottom-full mb-1' : 'top-full mt-1'"
         style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle);"
       >
         <!-- C46: Tepkileri gör (yalnız tepki varsa) -->

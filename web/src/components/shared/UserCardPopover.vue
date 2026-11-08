@@ -85,7 +85,7 @@ async function sendInline() {
     const channel = await dmStore.openChannel(props.userId)
     await messagesApi.send(channel.id, text)
     draft.value = ''
-    router.push({ name: 'dm', params: { channelId: channel.id } })
+    void router.push({ name: 'dm', params: { channelId: channel.id } })
     emit('close')
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
@@ -99,7 +99,7 @@ async function sendInline() {
 function goToVoice() {
   if (!card.value?.voiceStatus) return
   const v = card.value.voiceStatus
-  router.push({ name: 'channel', params: { guildId: v.guildId, channelId: v.channelId } })
+  void router.push({ name: 'channel', params: { guildId: v.guildId, channelId: v.channelId } })
   emit('close')
 }
 
@@ -122,10 +122,15 @@ let errorTimer: ReturnType<typeof setTimeout> | null = null
 // Kendi profilini şikayet etme
 const isSelf = computed(() => props.userId === authStore.user?.id)
 
+// Kartın GERÇEK yüksekliği: sabit tahmin (eski 420) afiş + bio + rol + mesaj kutusu olan kartta
+// tutmuyordu, alt satırdaki üyenin kartı ekranın altından taşıyordu. İçerik yüklendikçe ölçülür.
+const cardHeight = ref(420)
+let resizeObserver: ResizeObserver | null = null
+
 const posStyle = computed(() => {
-  const W = 300, H = 420
+  const W = 300
   const left = Math.max(8, Math.min(props.x, window.innerWidth - W - 8))
-  const top = Math.max(8, Math.min(props.y + 8, window.innerHeight - H - 8))
+  const top = Math.max(8, Math.min(props.y + 8, window.innerHeight - cardHeight.value - 8))
   return `top:${top}px;left:${left}px;`
 })
 
@@ -156,8 +161,17 @@ function onDocClick(e: MouseEvent) {
   }
 }
 
-onMounted(() => setTimeout(() => document.addEventListener('click', onDocClick), 50))
+onMounted(() => {
+  setTimeout(() => document.addEventListener('click', onDocClick), 50)
+  if (popoverEl.value) {
+    resizeObserver = new ResizeObserver(() => {
+      if (popoverEl.value) cardHeight.value = popoverEl.value.offsetHeight
+    })
+    resizeObserver.observe(popoverEl.value)
+  }
+})
 onUnmounted(() => {
+  resizeObserver?.disconnect()
   document.removeEventListener('click', onDocClick)
   if (errorTimer) clearTimeout(errorTimer)
 })
@@ -165,7 +179,7 @@ onUnmounted(() => {
 function onOpenDm(channelId: string) {
   showFullProfile.value = false
   emit('close')
-  router.push({ name: 'dm', params: { channelId } })
+  void router.push({ name: 'dm', params: { channelId } })
 }
 
 async function addFriend() {

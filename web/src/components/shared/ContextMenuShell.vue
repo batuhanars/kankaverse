@@ -45,7 +45,11 @@ function clampToViewport() {
   if (!el || isMobile.value) return
   const rect = el.getBoundingClientRect()
   left.value = Math.max(EDGE, Math.min(props.x, window.innerWidth - rect.width - EDGE))
-  top.value = Math.max(EDGE, Math.min(props.y, window.innerHeight - rect.height - EDGE))
+  // Varsayılan imlecin altına açılır; altta yer yoksa imlecin ÜSTÜNE çevrilir (yalnız kaydırmak
+  // menüyü imlecin üstüne bindiriyordu). Üstte de yer yoksa eski sıkıştırma devreye girer.
+  const fitsBelow = props.y + rect.height <= window.innerHeight - EDGE
+  const preferred = fitsBelow ? props.y : props.y - rect.height
+  top.value = Math.max(EDGE, Math.min(preferred, window.innerHeight - rect.height - EDGE))
 }
 
 const posStyle = computed(() =>
