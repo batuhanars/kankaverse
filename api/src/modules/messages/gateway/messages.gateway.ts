@@ -10,7 +10,7 @@ import {
   OnGatewayInit,
 } from '@nestjs/websockets';
 import { HttpException } from '@nestjs/common';
-import { NotifTargetType } from '@prisma/client';
+import { NotifTargetType, NotificationLevel } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -974,6 +974,94 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         eligible.has(member.userId) ? richPayload : basePayload,
       );
     }
+
+    await this.sendChannelPush(guildId, channelId, eligible, messageDto, rawContent);
+  }
+
+  /**
+   * Ortam kanalındaki düz mesaj için push (sahip kararı 2026-11-08). Önceden ortam mesajı yalnız
+   * bahsetmede telefona düşüyordu; artık bildirim seviyesi "Herkes" (ALL) olan üyeye her mesaj gider.
+   * "Yalnız bahsetmeler" / "Hiçbiri" / susturma tercihleri aynen geçerli, kullanıcı kapatabilir.
+   *
+   * Alıcı kümesi `eligible` (kanalı okuyabilen + yaş kapısından geçen), yeni bir erişim kararı YOK:
+   * okuyamayan üyeye önizleme taşıyan push gitmez. Yazar ve doğrudan bahsedilenler çıkarılır
+   * (onlar `notifyMentions` yolundan MENTION push'u alıyor, aynı mesaj iki kez düşmesin).
+   * @everyone / rol bahsetmesi içeren mesajda bu yol HİÇ çalışmaz: o mesajın bildirimi bahsetme
+   * yolunun işi ve oradaki `suppressEveryone`/`suppressRoleMentions` tercihleri burada delinmemeli.
+   *
+   * Tercih çözümü `shouldNotifyChannel` ile aynı zincir (kanal kaydı → ortam kaydı → varsayılan ALL)
+   * ama TEK sorguda; ek olarak seviye ALL değilse gönderilmez. Ortam susturması kanal kaydı olsa da
+   * uygulanır (web masaüstü toast'ının `isMuted('GUILD')` kontrolüyle aynı).
+   */
+  private async sendChannelPush(
+    guildId: string,
+    channelId: string,
+    eligible: Set<string>,
+    messageDto: Record<string, unknown>,
+    rawContent: string,
+  ): Promise<void> {
+    if (messageDto['mentionsEveryone']) return;
+    if (((messageDto['mentionRoles'] as string[] | undefined) ?? []).length > 0) return;
+
+    const author = messageDto['author'] as { id: string; username: string };
+    const mentioned = new Set((messageDto['mentions'] as string[] | undefined) ?? []);
+    const candidates = [...eligible].filter((id) => id !== author.id && !mentioned.has(id));
+    if (candidates.length === 0) return;
+
+    const prefs = await this.prisma.notificationPref.findMany({
+      where: {
+        userId: { in: candidates },
+        OR: [
+          { targetType: NotifTargetType.CHANNEL, targetId: channelId },
+          { targetType: NotifTargetType.GUILD, targetId: guildId },
+        ],
+      },
+      select: { userId: true, targetType: true, muted: true, mutedUntil: true, level: true },
+    });
+    const channelPrefs = new Map<string, (typeof prefs)[number]>();
+    const guildPrefs = new Map<string, (typeof prefs)[number]>();
+    for (const p of prefs) {
+      (p.targetType === NotifTargetType.CHANNEL ? channelPrefs : guildPrefs).set(p.userId, p);
+    }
+
+    const allowed = candidates.filter((id) => {
+      const guildPref = guildPrefs.get(id);
+      if (guildPref && isMuteActive(guildPref.muted, guildPref.mutedUntil)) return false;
+      const effective = channelPrefs.get(id) ?? guildPref;
+      if (!effective) return true; // kayıt yok → varsayılan ALL
+      if (isMuteActive(effective.muted, effective.mutedUntil)) return false;
+      return effective.level === NotificationLevel.ALL;
+    });
+    if (allowed.length === 0) return;
+
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { name: true },
+    });
+    const content =
+      previewFromAttachments(
+        rawContent,
+        messageDto['attachments'] as { contentType: string }[] | undefined,
+      ) || '[dosya]';
+    const preview = await this.resolveMentionPreview(content, guildId);
+
+    await this.push
+      .sendToUsers(allowed, {
+        title: channel?.name ? `#${channel.name}` : author.username,
+        body: `${author.username}: ${preview}`,
+        data: {
+          type: 'CHANNEL_MESSAGE',
+          guildId,
+          channelId,
+          messageId: messageDto['id'] as string,
+        },
+        // DM push'u ile aynı gerekçe: aynı kanalın yeni mesajı öncekinin yerine geçer, gölge şişmez.
+        tag: channelId,
+        // Sunucu ile mobil kanal kimliği BİREBİR aynı kalmalı (bkz. sendDmPush notları).
+        androidChannelId: 'messages_v6',
+        priority: 'high',
+      })
+      .catch(() => {});
   }
 
   /**

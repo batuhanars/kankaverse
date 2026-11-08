@@ -254,6 +254,114 @@ describe('MessagesGateway.notifyChannelActivity', () => {
 
     expect(emitToUserMock).not.toHaveBeenCalled();
   });
+
+  // ── 2026-11-08: ortam kanalı düz mesaj push'u (seviye ALL) ──
+  describe('düz mesaj push', () => {
+    beforeEach(() => {
+      prismaMock.channel.findUnique.mockResolvedValue({ guildId: GUILD_ID, name: 'genel' });
+      prismaMock.guildMember.findMany.mockResolvedValue([
+        { userId: AUTHOR_ID, user: { isMinor: false } },
+        { userId: MEMBER_1_ID, user: { isMinor: false } },
+        { userId: MEMBER_2_ID, user: { isMinor: false } },
+      ]);
+    });
+
+    it('tercih kaydı yok → varsayılan ALL, yazar hariç herkese CHANNEL_MESSAGE push', async () => {
+      await gateway.notifyChannelActivity(CHANNEL_ID, makeMessageDto());
+
+      expect(pushSendToUsersMock).toHaveBeenCalledTimes(1);
+      const [recipients, payload] = pushSendToUsersMock.mock.calls[0];
+      expect(recipients.sort()).toEqual([MEMBER_1_ID, MEMBER_2_ID].sort());
+      expect(payload).toMatchObject({
+        title: '#genel',
+        body: 'author: Merhaba!',
+        data: { type: 'CHANNEL_MESSAGE', guildId: GUILD_ID, channelId: CHANNEL_ID },
+        tag: CHANNEL_ID,
+        androidChannelId: 'messages_v6',
+      });
+    });
+
+    it('MENTIONS / NONE / susturulmuş → push yok; kanal kaydı ortam kaydını ezer', async () => {
+      prismaMock.notificationPref.findMany.mockResolvedValue([
+        // MEMBER_1: ortam ALL ama kanal MENTIONS → kanal kazanır, push yok
+        { userId: MEMBER_1_ID, targetType: 'GUILD', muted: false, mutedUntil: null, level: 'ALL' },
+        {
+          userId: MEMBER_1_ID,
+          targetType: 'CHANNEL',
+          muted: false,
+          mutedUntil: null,
+          level: 'MENTIONS',
+        },
+        // MEMBER_2: ortam susturulmuş, kanal ALL olsa da push yok
+        { userId: MEMBER_2_ID, targetType: 'GUILD', muted: true, mutedUntil: null, level: 'ALL' },
+        {
+          userId: MEMBER_2_ID,
+          targetType: 'CHANNEL',
+          muted: false,
+          mutedUntil: null,
+          level: 'ALL',
+        },
+      ]);
+
+      await gateway.notifyChannelActivity(CHANNEL_ID, makeMessageDto());
+
+      expect(pushSendToUsersMock).not.toHaveBeenCalled();
+    });
+
+    it('süresi geçmiş susturma → push gider', async () => {
+      prismaMock.notificationPref.findMany.mockResolvedValue([
+        {
+          userId: MEMBER_1_ID,
+          targetType: 'GUILD',
+          muted: true,
+          mutedUntil: new Date(Date.now() - 60_000),
+          level: 'ALL',
+        },
+      ]);
+
+      await gateway.notifyChannelActivity(CHANNEL_ID, makeMessageDto());
+
+      expect(pushSendToUsersMock.mock.calls[0][0]).toContain(MEMBER_1_ID);
+    });
+
+    it('doğrudan bahsedilen bu yoldan push almaz (MENTION yolu gönderiyor)', async () => {
+      const dto = { ...makeMessageDto(), mentions: [MEMBER_1_ID] };
+
+      await gateway.notifyChannelActivity(CHANNEL_ID, dto);
+
+      expect(pushSendToUsersMock.mock.calls[0][0]).toEqual([MEMBER_2_ID]);
+    });
+
+    it('@everyone veya rol bahsetmesi içeren mesaj → bu yol çalışmaz', async () => {
+      await gateway.notifyChannelActivity(CHANNEL_ID, {
+        ...makeMessageDto(),
+        mentionsEveryone: true,
+      });
+      await gateway.notifyChannelActivity(CHANNEL_ID, {
+        ...makeMessageDto(),
+        mentionRoles: ['role-1'],
+      });
+
+      expect(pushSendToUsersMock).not.toHaveBeenCalled();
+    });
+
+    it('yaş-kapılı kanalda minör push almaz (önizleme sızmaz)', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue({
+        guildId: GUILD_ID,
+        name: 'genel',
+        ageGated: true,
+      });
+      prismaMock.guildMember.findMany.mockResolvedValue([
+        { userId: AUTHOR_ID, user: { isMinor: false } },
+        { userId: MEMBER_1_ID, user: { isMinor: false } },
+        { userId: MEMBER_2_ID, user: { isMinor: true } },
+      ]);
+
+      await gateway.notifyChannelActivity(CHANNEL_ID, makeMessageDto());
+
+      expect(pushSendToUsersMock.mock.calls[0][0]).toEqual([MEMBER_1_ID]);
+    });
+  });
 });
 
 // ── MessagesGateway.notifyDmActivity — M3 §2.6 DM push ───────────────────────
