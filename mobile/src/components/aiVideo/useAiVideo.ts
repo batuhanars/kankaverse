@@ -4,6 +4,7 @@ import { aiVideoApi, type AiVideoDto, type AiVideoReferencesOption } from '@/api
 import { authApi } from '@/api/auth';
 import { extractErrorCode } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth';
+import { syncActiveAiVideo, useAiVideoViewerStore } from '@/stores/aiVideoViewer';
 import { t } from '@/i18n';
 import { aiVideoErrorText, aiVideoFailText, DOWNLOAD_PENDING } from './aiVideoErrors';
 import { useAiVideoForm } from './useAiVideoForm';
@@ -57,7 +58,10 @@ export function useAiVideo() {
   const refreshRecent = useCallback(async () => {
     try {
       const rows = await aiVideoApi.list();
-      if (alive.current) setRecent(rows);
+      if (alive.current) {
+        setRecent(rows);
+        syncActiveAiVideo(rows);
+      }
     } catch {
       /* son üretimler yardımcı bölüm; hata sessiz */
     }
@@ -71,7 +75,11 @@ export function useAiVideo() {
       if (!alive.current || jobRef.current?.id !== cur.id) return;
       jobRef.current = next;
       setJob(next);
-      if (next.status !== 'QUEUED' && next.status !== 'RUNNING') void refreshRecent();
+      if (next.status !== 'QUEUED' && next.status !== 'RUNNING') {
+        const store = useAiVideoViewerStore.getState();
+        if (store.activeId === next.id) store.setActive(null);
+        void refreshRecent();
+      }
     } catch {
       /* geçici ağ hatası, sonraki turda yeniden dene */
     }
@@ -127,7 +135,9 @@ export function useAiVideo() {
         durationS: form.durationS,
         ...(form.aspectRatio && { aspectRatio: form.aspectRatio }),
       };
-      track(await aiVideoApi.create(sel, prompt, input));
+      const created = await aiVideoApi.create(sel, prompt, input);
+      track(created);
+      if (created.status === 'QUEUED' || created.status === 'RUNNING') useAiVideoViewerStore.getState().setActive(created.id);
       void form.loadOptions(); // bugünkü harcama ve kalan kredi güncellensin
       void refreshAccess(); // bütçe bu üretimle bittiyse kilitli moda düşsün
     } catch (e) {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AiVideoSheet } from '../aiVideo/AiVideoSheet';
+import { AiVideoSparkles } from '../aiVideo/AiVideoSparkles';
 import { useAuthStore } from '@/stores/auth';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
 import { showAnimatedNewBadge, type PickedProfileMedia, type ProfileMediaMode } from '@/utils/animatedMedia';
@@ -76,7 +77,7 @@ export function MediaSourceSheet({ visible, title, animatedAllowed, canRemove, o
                 setAiOpen(true);
               }}
             >
-              <Ionicons name="sparkles-outline" size={22} color={theme.colors.textSecondary} />
+              <AiVideoSparkles size={22} color={theme.colors.textSecondary} />
               <View style={styles.optionBody}>
                 <Text style={styles.optionTitle}>{t('media.source.aiVideo')}</Text>
                 <Text style={styles.optionDesc}>{t('media.source.aiVideoHint')}</Text>

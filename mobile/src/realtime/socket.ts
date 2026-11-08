@@ -4,6 +4,7 @@ import { getAccessToken, refreshAccessToken } from '@/api/http';
 import { useMessagesStore } from '@/stores/messages';
 import { useTypingStore } from '@/stores/typing';
 import { useNotificationsStore } from '@/stores/notifications';
+import { useAiVideoViewerStore } from '@/stores/aiVideoViewer';
 import { useDmStore } from '@/stores/dm';
 import { useUnreadStore } from '@/stores/unread';
 import { useFriendsStore } from '@/stores/friends';
@@ -334,7 +335,9 @@ function ensureSocket(): Socket {
 
   // Kalıcı bildirim (Sprint C1) — rozet + liste anlık. `notification` olayı Bildirimler sekmesi
   // rozetinin TEK kaynağı kalır (aşağıdaki `mention` dinleyicisi ona YAZMAZ — bkz. not).
-  socket.on('notification', () => {
+  socket.on('notification', (n?: { type?: string }) => {
+    // C49 R3: süren yapay zeka video üretimi bitti/başarısız oldu → giriş göstergesi söner.
+    if (n?.type === 'AI_VIDEO_READY' || n?.type === 'AI_VIDEO_FAILED') useAiVideoViewerStore.getState().setActive(null);
     const store = useNotificationsStore.getState();
     store.refreshUnreadCount();
     store.fetchFirstPage();

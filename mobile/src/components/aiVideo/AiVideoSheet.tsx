@@ -8,6 +8,8 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  Platform,
+  ToastAndroid,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -115,10 +117,27 @@ function SheetBody({
   const { row } = actions;
 
   // C49: açık sayfa sayısı (sohbet/medya/view hepsi). Ön plan bildirim süzgeci okur.
+  // C49 R3: sayfa kapanırken süren üretim varsa kısa bilgi (ToastAndroid; iOS'ta Alert yedeği).
   useEffect(() => {
     useAiVideoViewerStore.getState().sheetOpened();
-    return () => useAiVideoViewerStore.getState().sheetClosed();
+    return () => {
+      const store = useAiVideoViewerStore.getState();
+      store.sheetClosed();
+      if (store.activeId === null) return;
+      if (Platform.OS === 'android') ToastAndroid.show(t('aiVideo.backgroundNote'), ToastAndroid.LONG);
+      else Alert.alert(t('aiVideo.backgroundNote'));
+    };
   }, []);
+
+  // C49 R3: süren üretim varsa form onu ilerleme ekranı olarak açar (liste yüklenince bir kez).
+  const autoOpened = useRef(false);
+  const activeRow = ai.recent.find((r) => r.status === 'QUEUED' || r.status === 'RUNNING');
+  useEffect(() => {
+    if (autoOpened.current || !activeRow || ai.job) return;
+    autoOpened.current = true;
+    ai.open(activeRow);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- yalnız süren satır bulununca
+  }, [activeRow?.id]);
 
   // C49: bildirimden gelen kimlik. COMPLETED ise önizleme açık gelir; FAILED/süren/bulunamadı ise normal form.
   useEffect(() => {

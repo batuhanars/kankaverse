@@ -1,5 +1,6 @@
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { AiVideoSparkles } from '../aiVideo/AiVideoSparkles';
 import { MentionSuggestionList } from './MentionSuggestionList';
 import type { MentionCandidate } from './useMentionCompose';
 import { VoiceRecorderBar } from './VoiceRecorderBar';
@@ -273,7 +274,7 @@ export function MessageComposer({
                   accessibilityLabel={t('aiVideo.button')}
                   style={[styles.emojiButton, onOpenEmoji && { right: EMOJI_SLOT }]}
                 >
-                  <Ionicons name="sparkles-outline" size={22} color={theme.colors.accent500} />
+                  <AiVideoSparkles size={22} color={theme.colors.accent500} />
                 </Pressable>
               )}
               {onOpenEmoji && (

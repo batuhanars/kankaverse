@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import { Redirect, Stack, usePathname, useRouter } from 'expo-router';
 import { theme } from '@/theme';
 import { useAuthStore } from '@/stores/auth';
+import { restoreActiveAiVideo, useAiVideoViewerStore } from '@/stores/aiVideoViewer';
 import { useShareIntentStore } from '@/stores/shareIntent';
 import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
@@ -72,8 +73,12 @@ export default function AppLayout() {
     // (o uygulama içinde üretiliyor, sunucu push'una ihtiyacı yok) — yalnız MESAJ bildirimi ölü.
     // Uygulama ön plana her döndüğünde, kayıt HENÜZ yapılmadıysa yeniden denenir. Kayıt varsa
     // hiçbir şey yapılmaz, yani her dönüşte gereksiz istek atılmaz.
+    // C49 R3: süren yapay zeka video üretimi göstergesi - açılışta ve her ön plana dönüşte tek liste çağrısı.
+    void restoreActiveAiVideo();
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && !isPushTokenRegistered()) void syncPushToken();
+      if (state !== 'active') return;
+      if (!isPushTokenRegistered()) void syncPushToken();
+      void restoreActiveAiVideo();
     });
     return () => {
       sub.remove();
@@ -81,6 +86,7 @@ export default function AppLayout() {
       useFriendsStore.getState().reset();
       useUnreadStore.getState().reset();
       useNotificationPrefsStore.getState().reset();
+      useAiVideoViewerStore.getState().setActive(null);
     };
   }, [userId]);
 
