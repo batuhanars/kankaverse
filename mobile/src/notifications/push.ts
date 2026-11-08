@@ -8,6 +8,7 @@ import { resolvePushTarget } from '@/utils/pushNavigation';
 import { isChannelRinging } from '@/notifications/incomingCall';
 import { useGatedNotificationResponder } from '@/notifications/responseGate';
 import { useDmStore } from '@/stores/dm';
+import { getActiveChannelId } from '@/realtime/socket';
 
 /**
  * Sprint M3 §3 — mobil push istemci ayağı.
@@ -132,13 +133,20 @@ const OLD_MESSAGE_CHANNEL_IDS = ['messages_v1', 'messages_v2', 'messages_v3', 'm
  */
 const MESSAGE_VIBRATE_PATTERN = [0, 700, 250, 700];
 
+/**
+ * Mesaj bildirimi sayılan push tipleri. `CHANNEL_MESSAGE` (2026-11-08): ortam kanalındaki düz mesaj,
+ * bildirim seviyesi "Herkes" olan üyeye gider; banner/ses/tepsi temizliği DM ve bahsetmeyle aynı.
+ */
+function isMessageType(type: unknown): boolean {
+  return type === 'MENTION' || type === 'DM_MESSAGE' || type === 'CHANNEL_MESSAGE';
+}
+
 async function dismissStaleChannelNotifications(channelId: string, excludeIdentifier?: string): Promise<void> {
   try {
     const presented = await Notifications.getPresentedNotificationsAsync();
     for (const n of presented) {
       const data = n.request.content.data as Record<string, unknown> | undefined;
-      const isMessage = data?.type === 'MENTION' || data?.type === 'DM_MESSAGE';
-      if (isMessage && data?.channelId === channelId && n.request.identifier !== excludeIdentifier) {
+      if (isMessageType(data?.type) && data?.channelId === channelId && n.request.identifier !== excludeIdentifier) {
         await Notifications.dismissNotificationAsync(n.request.identifier);
       }
     }
@@ -169,10 +177,14 @@ Notifications.setNotificationHandler({
       }
     }
 
-    const isMessage = data?.type === 'MENTION' || data?.type === 'DM_MESSAGE';
+    const isMessage = isMessageType(data?.type);
     const messageChannelId = typeof data?.channelId === 'string' ? data.channelId : null;
+    // "Aktif sohbet": açık DM ya da açık ortam kanalı. Kullanıcı o kanalı okurken bildirim gösterilmez.
     const isActiveDm =
-      isMessage && messageChannelId !== null && messageChannelId === useDmStore.getState().activeDmChannelId;
+      isMessage &&
+      messageChannelId !== null &&
+      (messageChannelId === useDmStore.getState().activeDmChannelId ||
+        messageChannelId === getActiveChannelId());
 
     // §3 — yeni bildirim ekrana düşmeden ÖNCE aynı kanalın eski bildirimlerini tray'den düşür
     // (JS canlıyken çalışan kısmi yığılma önleme, yukarıdaki blok yorumuna bkz.).

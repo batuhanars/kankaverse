@@ -71,6 +71,13 @@ const voiceChannelRefCounts = new Map<string, number>();
 export function setActiveChannel(channelId: string | null, refetch?: () => void): void {
   activeChannelId = channelId;
   onReconnectRefetch = refetch ?? null;
+  // Kanal açılınca o kanalın tepside bekleyen mesaj bildirimleri düşer (DM ekranının odak davranışı).
+  if (channelId) void clearChannelNotifications(channelId);
+}
+
+/** Push handler'ı için: kullanıcı şu an hangi ortam kanalını okuyor (yoksa null). */
+export function getActiveChannelId(): string | null {
+  return activeChannelId;
 }
 
 // Kök neden (PM bulgusu — "[WS] reconnect yeniden-join başarısız: FORBIDDEN"): bu fonksiyon yalnız

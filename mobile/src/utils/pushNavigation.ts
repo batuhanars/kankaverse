@@ -32,6 +32,10 @@ export function resolvePushTarget(data: Record<string, unknown>): Href | null {
       return guildId
         ? { pathname: '/channel/[id]', params: { id: channelId, name: '', guildId } }
         : dmTarget(channelId);
+    case 'CHANNEL_MESSAGE':
+      // 2026-11-08: ortam kanalı düz mesajı, sunucu guildId'yi her zaman gönderiyor.
+      if (!channelId || !guildId) return null;
+      return { pathname: '/channel/[id]', params: { id: channelId, name: '', guildId } };
     case 'DM_MESSAGE':
       // M3 §2.6 — DM push'u kalıcı bildirim ÜRETMEZ, yalnız push gider; hedef her zaman DM ekranı.
       if (!channelId) return null;
