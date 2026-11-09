@@ -14,4 +14,7 @@
 // deterministik.
 require('@livekit/react-native').registerGlobals();
 
+// SPIKE: data-only push gorevi, headless baslangicta da yuklenmeli.
+require('./src/notifications/dataOnlyPushSpike');
+
 require('expo-router/entry');
