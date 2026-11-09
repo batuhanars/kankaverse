@@ -1529,3 +1529,52 @@ describe('ChannelsService.markAllRead — C20 read:self', () => {
     );
   });
 });
+
+// ── C50 §2.4: okundu → kapalı telefondaki v2 bildirimini sil ────────────────────
+describe('ChannelsService — C50 okundu push', () => {
+  function makeWithPush(push: unknown) {
+    return new ChannelsService(
+      prismaMock as any,
+      membershipMock as any,
+      permissionsMock as any,
+      realtimeMock as any,
+      voiceServiceMock as any,
+      push as any,
+    );
+  }
+
+  it('markRead → notifyRead(okuyan, [kanal])', async () => {
+    resetMocks();
+    const push = { notifyRead: jest.fn().mockResolvedValue(undefined) };
+    membershipMock.requireChannelAccess.mockResolvedValue({ id: CHANNEL_ID, guildId: 'g-1' });
+    prismaMock.channelRead.upsert.mockResolvedValue({});
+
+    await makeWithPush(push).markRead(USER_ID, CHANNEL_ID);
+
+    expect(push.notifyRead).toHaveBeenCalledWith(USER_ID, [CHANNEL_ID]);
+  });
+
+  it('markAllRead → tüm channelIds tek notifyRead çağrısında', async () => {
+    resetMocks();
+    const push = { notifyRead: jest.fn().mockResolvedValue(undefined) };
+    prismaMock.guildMember.findMany.mockResolvedValue([{ guildId: 'g-1' }]);
+    prismaMock.channel.findMany.mockResolvedValue([{ id: 'c-1' }, { id: 'c-2' }]);
+    prismaMock.channelRead.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.channelRead.findMany.mockResolvedValue([{ channelId: 'c-1' }]);
+    prismaMock.channelRead.createMany.mockResolvedValue({ count: 1 });
+
+    await makeWithPush(push).markAllRead(USER_ID);
+
+    expect(push.notifyRead).toHaveBeenCalledTimes(1);
+    expect(push.notifyRead).toHaveBeenCalledWith(USER_ID, ['c-1', 'c-2']);
+  });
+
+  it('notifyRead reddederse okuma bozulmaz', async () => {
+    resetMocks();
+    const push = { notifyRead: jest.fn().mockRejectedValue(new Error('x')) };
+    membershipMock.requireChannelAccess.mockResolvedValue({ id: CHANNEL_ID, guildId: 'g-1' });
+    prismaMock.channelRead.upsert.mockResolvedValue({});
+
+    await expect(makeWithPush(push).markRead(USER_ID, CHANNEL_ID)).resolves.toBeNull();
+  });
+});

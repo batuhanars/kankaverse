@@ -5,6 +5,9 @@ import { createClient } from 'redis';
 /** Yalnız kullandığımız yüzey (node-redis'in genel tip karmaşasından kaçınmak için). */
 interface Client {
   set(key: string, value: string, options: { NX: true; EX: number }): Promise<string | null>;
+  set(key: string, value: string, options: { EX: number }): Promise<string | null>;
+  mGet(keys: string[]): Promise<(string | null)[]>;
+  del(keys: string[]): Promise<number>;
   quit(): Promise<unknown>;
 }
 
@@ -25,6 +28,22 @@ export class RedisService implements OnModuleDestroy {
     const client = await this.getClient();
     const res = await client.set(key, '1', { NX: true, EX: ttlSeconds });
     return res === 'OK';
+  }
+
+  /** `SET key 1 EX ttl`: işaret koyar (varsa süresini tazeler). Redis hatası fırlatır. */
+  async setMarker(key: string, ttlSeconds: number): Promise<void> {
+    const client = await this.getClient();
+    await client.set(key, '1', { EX: ttlSeconds });
+  }
+
+  /** Verilen anahtarlardan VAR olanları siler ve o anahtarların listesini döner. Redis hatası fırlatır. */
+  async takeMarkers(keys: string[]): Promise<string[]> {
+    if (keys.length === 0) return [];
+    const client = await this.getClient();
+    const values = await client.mGet(keys);
+    const present = keys.filter((_, i) => values[i] !== null);
+    if (present.length > 0) await client.del(present);
+    return present;
   }
 
   private getClient(): Promise<Client> {

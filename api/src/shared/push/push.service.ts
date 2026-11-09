@@ -1,6 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
+import {
+  V2_PENDING_TTL_SECONDS,
+  V2_READ_MAX_IDS,
+  V2MessageData,
+  V2ReadData,
+  v2PendingKey,
+} from './push-v2';
 
 // Expo Push API — sözleşme §2.3: https://exp.host/--/api/v2/push/send, ≤100 mesaj/istek.
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
@@ -47,6 +55,11 @@ export interface PushPayload {
    * kapalıyken Firebase'de büyük resim oluyordu. Veri-yalnız push'ta istemci bunu sol avatar olarak çizecek.
    */
   imageUrl?: string | null;
+  /**
+   * C50 — veri-yalnız mesaj bildirimi. Çağıran v1 alanlarını (title/body/...) VE bunu birlikte verir;
+   * token başına hangisinin gideceğini `sendToUsers` seçer (bayrak + token.format + allowlist).
+   */
+  v2?: V2MessageData;
 }
 
 interface ExpoTicket {
@@ -58,7 +71,7 @@ interface ExpoTicket {
 interface ExpoMessage {
   to: string;
   title?: string;
-  body: string;
+  body?: string; // v2 (veri-yalnız) mesajda yok
   data: unknown;
   priority?: 'default' | 'high';
   channelId?: string;
@@ -92,10 +105,24 @@ export class PushService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    // C50: opsiyonel; yoksa okundu işareti tutulmaz, v1 yolu etkilenmez.
+    @Optional() private redis?: RedisService,
   ) {}
 
   private get enabled(): boolean {
     return this.config.get<boolean>('expoPushEnabled') === true;
+  }
+
+  /** C50 — v2 (veri-yalnız) mesaj push'u bayrağı. Çağıranlar v2 alanlarını yalnız bu açıkken üretir. */
+  get v2Enabled(): boolean {
+    return this.config.get<boolean>('pushV2Enabled') === true;
+  }
+
+  /** v2 bayrağı açık VE (allowlist boş VEYA kullanıcı listede). */
+  private v2AllowedFor(userId: string): boolean {
+    if (!this.v2Enabled) return false;
+    const allow = this.config.get<string[]>('pushV2UserIds') ?? [];
+    return allow.length === 0 || allow.includes(userId);
   }
 
   async sendToUsers(userIds: string[], payload: PushPayload): Promise<void> {
@@ -112,19 +139,34 @@ export class PushService {
 
       // M4a-3 §9.1 — yeni alanlar undefined kalırsa JSON.stringify onları atar; verilmediğinde
       // gövde bugünküyle birebir aynı kalır (regresyon güvencesi).
-      const messages: ExpoMessage[] = tokens.map((t) => ({
-        to: t.token,
-        title: payload.title,
-        body: payload.body,
-        data: payload.data,
-        priority: payload.priority,
-        channelId: payload.androidChannelId,
-        categoryId: payload.categoryId,
-        ttl: payload.ttlSeconds,
-        tag: payload.tag,
-        // imageUrl bilerek richContent'e BAĞLANMIYOR (2026-11-09): uygulama kapalıyken Firebase onu
-        // büyük resim olarak başlıkla gövde arasına yayıyor. Avatar veri-yalnız push'ta istemcide çizilecek.
-      }));
+      const v2Users = new Set<string>();
+      const messages: ExpoMessage[] = tokens.map((t) => {
+        // C50 — kural: bayrak ∧ token.format=2 ∧ v2 verilmiş ∧ (allowlist boş ∨ alıcı listede).
+        if (payload.v2 && t.format === 2 && this.v2AllowedFor(t.userId)) {
+          v2Users.add(t.userId);
+          return {
+            to: t.token,
+            data: payload.v2,
+            priority: 'high' as const,
+            ttl: payload.ttlSeconds,
+          };
+        }
+        return {
+          to: t.token,
+          title: payload.title,
+          body: payload.body,
+          data: payload.data,
+          priority: payload.priority,
+          channelId: payload.androidChannelId,
+          categoryId: payload.categoryId,
+          ttl: payload.ttlSeconds,
+          tag: payload.tag,
+          // imageUrl bilerek richContent'e BAĞLANMIYOR (2026-11-09): uygulama kapalıyken Firebase onu
+          // büyük resim olarak başlıkla gövde arasına yayıyor. Avatar veri-yalnız push'ta istemcide çizilecek.
+        };
+      });
+
+      await this.markPending(v2Users, payload.v2?.conversationId);
 
       for (const batch of chunk(messages, CHUNK_SIZE)) {
         await this.sendBatch(batch);
@@ -132,6 +174,58 @@ export class PushService {
     } catch (err) {
       // Token sorgusu dahi patlasa ana akış bozulmaz — yalnız logla.
       this.logger.warn(`Push token sorgusu başarısız: ${(err as Error).message}`);
+    }
+  }
+
+  /** C50 §2.4 — v2 gönderilen kullanıcı/sohbet için işaret; "başka cihazda okundu" push'u buna bakar. */
+  private async markPending(userIds: Set<string>, conversationId?: string): Promise<void> {
+    if (!this.redis || !conversationId || userIds.size === 0) return;
+    const redis = this.redis;
+    await Promise.all(
+      [...userIds].map((uid) =>
+        redis.setMarker(v2PendingKey(uid, conversationId), V2_PENDING_TTL_SECONDS).catch((err) => {
+          this.logger.warn(`Push işareti yazılamadı: ${(err as Error).message}`);
+        }),
+      ),
+    );
+  }
+
+  /**
+   * C50 §2.4 — başka cihazda okundu: işareti olan sohbetler için kullanıcının v2 tokenlarına
+   * `{ v:2, kind:'read', conversationIds }` gider, işaret silinir. İşaret yoksa push YOK.
+   * Hata ana akışı bozmaz (burada yutulur + loglanır).
+   */
+  async notifyRead(userId: string, conversationIds: string[]): Promise<void> {
+    if (!this.enabled || !this.v2Enabled || !this.redis) return;
+    const ids = [...new Set(conversationIds)];
+    if (ids.length === 0) return;
+
+    try {
+      const taken = await this.redis.takeMarkers(ids.map((id) => v2PendingKey(userId, id)));
+      if (taken.length === 0) return;
+      const prefix = v2PendingKey(userId, '');
+      const pendingIds = taken.map((k) => k.slice(prefix.length));
+
+      const tokens = await this.prisma.pushToken.findMany({ where: { userId, format: 2 } });
+      if (tokens.length === 0) return;
+
+      for (let i = 0; i < pendingIds.length; i += V2_READ_MAX_IDS) {
+        const data: V2ReadData = {
+          v: 2,
+          kind: 'read',
+          conversationIds: pendingIds.slice(i, i + V2_READ_MAX_IDS),
+        };
+        const messages: ExpoMessage[] = tokens.map((t) => ({
+          to: t.token,
+          data,
+          priority: 'high' as const,
+        }));
+        for (const batch of chunk(messages, CHUNK_SIZE)) {
+          await this.sendBatch(batch);
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Okundu push'u başarısız: ${(err as Error).message}`);
     }
   }
 

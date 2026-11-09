@@ -4,11 +4,13 @@ import {
   ConflictException,
   BadRequestException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
+import { PushService } from '../../shared/push/push.service';
 import { VoiceService } from '../voice/voice.service';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
@@ -50,6 +52,8 @@ export class ChannelsService {
     private permissions: PermissionsService,
     private realtime: RealtimeService,
     private voiceService: VoiceService,
+    // C50: opsiyonel (okundu push'u); yoksa yalnız soket yayını yapılır.
+    @Optional() private push?: PushService,
   ) {}
 
   /** MANAGE_CHANNELS iznini kontrol et; yoksa 403 FORBIDDEN */
@@ -251,6 +255,8 @@ export class ChannelsService {
     } catch {
       // kozmetik
     }
+    // C50 §2.4: kapalı telefondaki v2 bildirimini sil (işaret yoksa push yok). Hata okumayı bozmaz.
+    this.push?.notifyRead(userId, [channelId]).catch(() => {});
 
     return null;
   }
@@ -303,6 +309,8 @@ export class ChannelsService {
     } catch {
       // kozmetik
     }
+    // C50 §2.4: işaretli kanalların v2 bildirimleri tek mesajda silinir (en çok 50 id/mesaj).
+    this.push?.notifyRead(userId, channelIds).catch(() => {});
 
     return null;
   }

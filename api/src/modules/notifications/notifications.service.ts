@@ -4,6 +4,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { PushService } from '../../shared/push/push.service';
+import {
+  V2MessageData,
+  channelConversationTitle,
+  clampV2Text,
+  v2Timestamp,
+} from '../../shared/push/push-v2';
 import { CreateNotificationData, NotificationDto } from './dto/notification.dto';
 import { NotificationPrefDto, SetNotificationPrefDto } from './dto/notification-pref.dto';
 import { CreatePushTokenDto } from './dto/push-token.dto';
@@ -74,7 +80,10 @@ export class NotificationsService {
     this.realtime.emitToUser(userId, 'notification', dto);
     // Görsel sorgusu tek satır ve ucuz; push gönderimi yine fire-and-forget.
     const imageUrl = await this.pushImageFor(dto).catch(() => null);
-    this.push.sendToUsers([userId], { ...this.toPushPayload(dto), imageUrl }).catch(() => {});
+    const v2 = await this.mentionV2(dto).catch(() => undefined);
+    this.push
+      .sendToUsers([userId], { ...this.toPushPayload(dto), imageUrl, ...(v2 && { v2 }) })
+      .catch(() => {});
     return dto;
   }
 
@@ -239,11 +248,14 @@ export class NotificationsService {
         token: dto.token,
         platform: dto.platform,
         deviceName: dto.deviceName ?? null,
+        format: dto.format ?? 1,
       },
       update: {
         userId,
         platform: dto.platform,
         deviceName: dto.deviceName ?? null,
+        // C50: yeni sürüme geçen cihaz 2 olur; verilmezse 1 (eski sürüme dönen cihaz v1'e düşer).
+        format: dto.format ?? 1,
         lastUsedAt: new Date(),
       },
     });
@@ -447,6 +459,45 @@ export class NotificationsService {
         createdAt: n.createdAt.toISOString(),
       };
     });
+  }
+
+  /**
+   * C50 — MENTION için veri-yalnız push biçimi. Yalnız v2 bayrağı açıkken ve gönderen/önizleme
+   * bilinirken üretilir (aksi halde `undefined` → v1 yolu); kanal bilgisi için TEK sorgu.
+   * Webhook mesajı aktörsüz yazıldığı için (C35) v2 üretilmez, v1 bildirimi gider.
+   */
+  private async mentionV2(dto: NotificationDto): Promise<V2MessageData | undefined> {
+    if (!this.push.v2Enabled) return undefined;
+    if (dto.type !== 'MENTION' || !dto.channelId || !dto.actor || !dto.preview) return undefined;
+
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: dto.channelId },
+      select: { type: true, name: true, guild: { select: { name: true, iconUrl: true } } },
+    });
+    if (!channel) return undefined;
+
+    const isOneToOne = channel.type === 'DM';
+    const inGuild = !!dto.guildId;
+    return {
+      v: 2,
+      kind: 'message',
+      type: 'MENTION',
+      conversationId: dto.channelId,
+      guildId: dto.guildId,
+      messageId: dto.messageId,
+      senderId: dto.actor.id,
+      senderName: dto.actor.username,
+      senderAvatarUrl: dto.actor.avatarUrl ?? null,
+      isGroup: !isOneToOne,
+      conversationTitle: inGuild
+        ? channelConversationTitle(channel.name, channel.guild?.name, dto.actor.username)
+        : isOneToOne
+          ? null
+          : (channel.name ?? null),
+      conversationIconUrl: inGuild ? (channel.guild?.iconUrl ?? null) : null,
+      text: clampV2Text(dto.preview),
+      timestamp: v2Timestamp(dto.createdAt),
+    };
   }
 
   /**

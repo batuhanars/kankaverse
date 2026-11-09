@@ -30,6 +30,7 @@ const prismaMock = {
     findUnique: jest.fn(),
     findMany: jest.fn(),
   },
+  channel: { findUnique: jest.fn() },
 };
 
 const emitToUserMock = jest.fn();
@@ -235,6 +236,124 @@ describe('NotificationsService', () => {
       });
       expect(payload.body).toContain('aktor');
       expect(payload.body).toContain('@kanka selam');
+    });
+
+    // ── C50: MENTION için veri-yalnız (v2) alanları ──
+    describe('C50 v2 alanları', () => {
+      afterEach(() => {
+        delete (pushMock as any).v2Enabled;
+      });
+
+      const mentionInput = {
+        type: 'MENTION' as const,
+        actorId: ACTOR_ID,
+        guildId: 'guild-1',
+        channelId: 'ch-1',
+        messageId: 'msg-1',
+        preview: '@kanka selam',
+      };
+
+      beforeEach(() => {
+        prismaMock.notification.create.mockResolvedValue(makeRow());
+        prismaMock.user.findUnique.mockResolvedValue({
+          id: ACTOR_ID,
+          username: 'aktor',
+          avatarUrl: 'https://cdn/a.png',
+        });
+      });
+
+      async function flush() {
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      }
+
+      it('bayrak kapalı → v2 yok, kanal sorgusu yok', async () => {
+        await service.create(USER_ID, mentionInput);
+        await flush();
+
+        expect(pushSendToUsersMock.mock.calls[0][1].v2).toBeUndefined();
+        expect(prismaMock.channel.findUnique).not.toHaveBeenCalled();
+      });
+
+      it('ortam kanalı bahsetmesi: başlık "#kanal · Ortam", ortam simgesi, isGroup true', async () => {
+        (pushMock as any).v2Enabled = true;
+        prismaMock.channel.findUnique.mockResolvedValue({
+          type: 'GUILD_TEXT',
+          name: 'genel',
+          guild: { name: 'Ortam', iconUrl: 'https://cdn/g.png' },
+        });
+
+        await service.create(USER_ID, mentionInput);
+        await flush();
+
+        expect(pushSendToUsersMock.mock.calls[0][1].v2).toEqual({
+          v: 2,
+          kind: 'message',
+          type: 'MENTION',
+          conversationId: 'ch-1',
+          guildId: 'guild-1',
+          messageId: 'msg-1',
+          senderId: ACTOR_ID,
+          senderName: 'aktor',
+          senderAvatarUrl: 'https://cdn/a.png',
+          isGroup: true,
+          conversationTitle: '#genel · Ortam',
+          conversationIconUrl: 'https://cdn/g.png',
+          text: '@kanka selam',
+          timestamp: new Date('2026-06-16T10:00:00.000Z').getTime(),
+        });
+      });
+
+      it('1-1 DM bahsetmesi: isGroup false, başlık ve simge null', async () => {
+        (pushMock as any).v2Enabled = true;
+        prismaMock.notification.create.mockResolvedValue(makeRow({ guildId: null }));
+        prismaMock.channel.findUnique.mockResolvedValue({ type: 'DM', name: null, guild: null });
+
+        await service.create(USER_ID, { ...mentionInput, guildId: undefined });
+        await flush();
+
+        expect(pushSendToUsersMock.mock.calls[0][1].v2).toMatchObject({
+          guildId: null,
+          isGroup: false,
+          conversationTitle: null,
+          conversationIconUrl: null,
+        });
+      });
+
+      it('grup DM bahsetmesi: başlık grup adı, simge null', async () => {
+        (pushMock as any).v2Enabled = true;
+        prismaMock.notification.create.mockResolvedValue(makeRow({ guildId: null }));
+        prismaMock.channel.findUnique.mockResolvedValue({
+          type: 'GROUP_DM',
+          name: 'Takım',
+          guild: null,
+        });
+
+        await service.create(USER_ID, { ...mentionInput, guildId: undefined });
+        await flush();
+
+        expect(pushSendToUsersMock.mock.calls[0][1].v2).toMatchObject({
+          isGroup: true,
+          conversationTitle: 'Takım',
+          conversationIconUrl: null,
+        });
+      });
+
+      it('200 karakteri aşan önizleme … ile kısalır', async () => {
+        (pushMock as any).v2Enabled = true;
+        prismaMock.notification.create.mockResolvedValue(makeRow({ preview: 'a'.repeat(300) }));
+        prismaMock.channel.findUnique.mockResolvedValue({
+          type: 'GUILD_TEXT',
+          name: 'g',
+          guild: null,
+        });
+
+        await service.create(USER_ID, { ...mentionInput, preview: 'a'.repeat(300) });
+        await flush();
+
+        const text = pushSendToUsersMock.mock.calls[0][1].v2.text as string;
+        expect(text.length).toBe(200);
+        expect(text.endsWith('…')).toBe(true);
+      });
     });
 
     it('push.sendToUsers reddederse bile create() normal dto döner (ana akış bozulmaz)', async () => {
@@ -748,14 +867,30 @@ describe('NotificationsService', () => {
           token: 'ExponentPushToken[abc]',
           platform: 'android',
           deviceName: 'Pixel',
+          format: 1,
         },
         update: {
           userId: USER_ID,
           platform: 'android',
           deviceName: 'Pixel',
+          format: 1,
           lastUsedAt: expect.any(Date),
         },
       });
+    });
+
+    it('C50: format 2 verilirse hem create hem update dalına yazılır', async () => {
+      prismaMock.pushToken.upsert.mockResolvedValue({});
+
+      await service.registerPushToken(USER_ID, {
+        token: 'ExponentPushToken[abc]',
+        platform: 'android',
+        format: 2,
+      });
+
+      const call = prismaMock.pushToken.upsert.mock.calls[0][0];
+      expect(call.create.format).toBe(2);
+      expect(call.update.format).toBe(2);
     });
 
     it('deviceName verilmezse null yazılır', async () => {

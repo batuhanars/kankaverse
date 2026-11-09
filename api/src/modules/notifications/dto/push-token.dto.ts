@@ -24,4 +24,14 @@ export class CreatePushTokenDto {
   @IsString()
   @MaxLength(200)
   deviceName?: string;
+
+  @ApiPropertyOptional({
+    enum: [1, 2],
+    example: 2,
+    description:
+      'Push biçimi. 1 (varsayılan) = title/body; 2 = veri-yalnız mesaj bildirimi (C50, istemci kendisi çizer).',
+  })
+  @IsOptional()
+  @IsIn([1, 2], { message: 'Geçersiz push biçimi.' })
+  format?: 1 | 2;
 }

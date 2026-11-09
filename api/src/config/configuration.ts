@@ -162,6 +162,13 @@ export default () => {
     // Sprint M3 — Expo Push gönderimi feature-flag. Default false → PushService no-op
     // (dev build/FCM kimlik bilgisi olmadan sessizce devre dışı; §2.3).
     expoPushEnabled: process.env.EXPO_PUSH_ENABLED === 'true',
+    // C50 — veri-yalnız mesaj push'u (v2). Varsayılan KAPALI: kapalıyken herkes bugünkü biçimi alır.
+    // PUSH_V2_USER_IDS doluysa yalnız o kullanıcılara (kademeli açılış); boşsa v2 destekleyen herkese.
+    pushV2Enabled: process.env.PUSH_V2_ENABLED === 'true',
+    pushV2UserIds: (process.env.PUSH_V2_USER_IDS ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0),
     // C14 — yapay zeka ile video üretimi (Pika). Para harcar: yalnız panelden tanımlı hak (C43) + bayrak + anahtar.
     // PIKA_API_KEY yalnız sunucuda; hiçbir yanıtta/logda görünmez. Varsayılan KAPALI.
     aiVideo: {

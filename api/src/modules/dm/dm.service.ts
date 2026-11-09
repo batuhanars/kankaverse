@@ -5,6 +5,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DmPermissionService } from '../../shared/dm-permission/dm-permission.service';
@@ -14,6 +15,7 @@ import { AddGroupMemberDto } from './dto/add-group-member.dto';
 import { RenameGroupDmDto } from './dto/rename-group-dm.dto';
 import { visibleLastReaction } from '../../common/utils/last-reaction.util';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
+import { PushService } from '../../shared/push/push.service';
 
 /**
  * 🫀 C12 §3.2 — okundu bilgisi görünürlük kararı. **T&S karar fonksiyonu (R7), satır satır insan
@@ -118,6 +120,8 @@ export class DmService {
     private prisma: PrismaService,
     private dmPermission: DmPermissionService,
     private realtime: RealtimeService,
+    // C50: opsiyonel (okundu push'u); yoksa yalnız soket yayını yapılır.
+    @Optional() private push?: PushService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -757,6 +761,8 @@ export class DmService {
     } catch {
       // kozmetik: bir sonraki liste çekimi doğru değeri taşır
     }
+    // C50 §2.4: kapalı telefondaki v2 bildirimini sil (işaret yoksa push yok). Hata okumayı bozmaz.
+    this.push?.notifyRead(userId, [payload.channelId]).catch(() => {});
   }
 
   /**

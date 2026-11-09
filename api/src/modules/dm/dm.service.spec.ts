@@ -1307,3 +1307,38 @@ describe('DmService — C34 grup okundu: liste ucu ve canlı yayın', () => {
     expect(realtimeMock.emitToUser.mock.calls.some((c) => c[1] === 'dm:read')).toBe(false);
   });
 });
+
+// ── C50 §2.4: markRead → kapalı telefondaki v2 bildirimini sil ──────────────────
+describe('DmService.markRead — C50 okundu push', () => {
+  beforeEach(() => resetMocks());
+
+  it('PushService.notifyRead(okuyan, [kanal]) çağrılır', async () => {
+    const push = { notifyRead: jest.fn().mockResolvedValue(undefined) };
+    const service = new DmService(
+      prismaMock as any,
+      dmPermissionMock as any,
+      realtimeMock as any,
+      push as any,
+    );
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'm-1' });
+    prismaMock.channelMember.update.mockResolvedValue({});
+
+    await service.markRead('u-reader', 'ch-1');
+
+    expect(push.notifyRead).toHaveBeenCalledWith('u-reader', ['ch-1']);
+  });
+
+  it('notifyRead reddederse okuma bozulmaz', async () => {
+    const push = { notifyRead: jest.fn().mockRejectedValue(new Error('x')) };
+    const service = new DmService(
+      prismaMock as any,
+      dmPermissionMock as any,
+      realtimeMock as any,
+      push as any,
+    );
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'm-1' });
+    prismaMock.channelMember.update.mockResolvedValue({});
+
+    await expect(service.markRead('u-reader', 'ch-1')).resolves.toBeNull();
+  });
+});

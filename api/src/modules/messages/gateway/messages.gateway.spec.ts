@@ -281,6 +281,52 @@ describe('MessagesGateway.notifyChannelActivity', () => {
       });
     });
 
+    // ── C50 §1: ortam mesajı v2 alanları ──
+    describe('C50 v2', () => {
+      afterEach(() => {
+        delete (pushMock as any).v2Enabled;
+      });
+
+      it('bayrak kapalı → payload.v2 yok', async () => {
+        await gateway.notifyChannelActivity(CHANNEL_ID, makeMessageDto());
+        expect(pushSendToUsersMock.mock.calls[0][1].v2).toBeUndefined();
+      });
+
+      it('bayrak açık → "#kanal · Ortam" başlığı, ortam simgesi, yalnız önizleme (ad öneki yok)', async () => {
+        (pushMock as any).v2Enabled = true;
+        prismaMock.channel.findUnique.mockResolvedValue({
+          guildId: GUILD_ID,
+          name: 'genel',
+          guild: { name: 'Ortam', iconUrl: 'https://cdn/g.png' },
+        });
+        const dto = makeMessageDto();
+        (dto['author'] as Record<string, unknown>)['avatarUrl'] = 'https://cdn/a.png';
+
+        await gateway.notifyChannelActivity(CHANNEL_ID, dto);
+
+        const payload = pushSendToUsersMock.mock.calls[0][1];
+        expect(payload.v2).toEqual({
+          v: 2,
+          kind: 'message',
+          type: 'CHANNEL_MESSAGE',
+          conversationId: CHANNEL_ID,
+          guildId: GUILD_ID,
+          messageId: 'msg-1',
+          senderId: AUTHOR_ID,
+          senderName: 'author',
+          senderAvatarUrl: 'https://cdn/a.png',
+          isGroup: true,
+          conversationTitle: '#genel · Ortam',
+          conversationIconUrl: 'https://cdn/g.png',
+          text: 'Merhaba!',
+          timestamp: new Date(dto['createdAt'] as string).getTime(),
+        });
+        // v1 alanları yerinde ve aynı
+        expect(payload.title).toBe('#genel · Ortam');
+        expect(payload.body).toBe('author: Merhaba!');
+      });
+    });
+
     it('MENTIONS / NONE / susturulmuş → push yok; kanal kaydı ortam kaydını ezer', async () => {
       prismaMock.notificationPref.findMany.mockResolvedValue([
         // MEMBER_1: ortam ALL ama kanal MENTIONS → kanal kazanır, push yok
@@ -544,6 +590,79 @@ describe('MessagesGateway.notifyDmActivity — push (M3 §2.6)', () => {
     await gateway.notifyDmActivity(CHANNEL_ID, makeDmMessageDto({ channelId: CHANNEL_ID }));
 
     expect(pushSendToUsersMock).not.toHaveBeenCalled();
+  });
+
+  // ── C50 §1: DM v2 alanları ──
+  describe('C50 v2', () => {
+    afterEach(() => {
+      delete (pushMock as any).v2Enabled;
+    });
+
+    function dmChannel(type: string, name: string | null) {
+      return { guildId: null, type, name, dmRequestStatus: null, dmRequesterId: null };
+    }
+
+    it('bayrak kapalı → payload.v2 yok', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue(dmChannel('DM', null));
+      prismaMock.channelMember.findMany.mockResolvedValue([
+        { userId: AUTHOR_ID },
+        { userId: DM_MEMBER_ID },
+      ]);
+
+      await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
+
+      expect(pushSendToUsersMock.mock.calls[0][1].v2).toBeUndefined();
+    });
+
+    it('1-1 DM → isGroup false, conversationTitle null, simge null, avatar yazardan', async () => {
+      (pushMock as any).v2Enabled = true;
+      prismaMock.channel.findUnique.mockResolvedValue(dmChannel('DM', null));
+      prismaMock.channelMember.findMany.mockResolvedValue([
+        { userId: AUTHOR_ID },
+        { userId: DM_MEMBER_ID },
+      ]);
+      const dto = makeDmMessageDto({
+        author: { id: AUTHOR_ID, username: 'yazar', avatarUrl: 'https://cdn/a.png' },
+      });
+
+      await gateway.notifyDmActivity(DM_CHANNEL_ID, dto);
+
+      expect(pushSendToUsersMock.mock.calls[0][1].v2).toEqual({
+        v: 2,
+        kind: 'message',
+        type: 'DM_MESSAGE',
+        conversationId: DM_CHANNEL_ID,
+        guildId: null,
+        messageId: 'msg-dm-1',
+        senderId: AUTHOR_ID,
+        senderName: 'yazar',
+        senderAvatarUrl: 'https://cdn/a.png',
+        isGroup: false,
+        conversationTitle: null,
+        conversationIconUrl: null,
+        text: 'selam nasılsın',
+        timestamp: new Date(dto['createdAt'] as string).getTime(),
+      });
+    });
+
+    it('grup DM → isGroup true, conversationTitle grup adı, simge null', async () => {
+      (pushMock as any).v2Enabled = true;
+      prismaMock.channel.findUnique.mockResolvedValue(dmChannel('GROUP_DM', 'Takım'));
+      prismaMock.channelMember.findMany.mockResolvedValue([
+        { userId: AUTHOR_ID },
+        { userId: GROUP_MEMBER_1 },
+      ]);
+
+      await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
+
+      expect(pushSendToUsersMock.mock.calls[0][1].v2).toMatchObject({
+        type: 'DM_MESSAGE',
+        isGroup: true,
+        conversationTitle: 'Takım',
+        conversationIconUrl: null,
+        senderAvatarUrl: null,
+      });
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────

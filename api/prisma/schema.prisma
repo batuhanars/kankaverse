@@ -842,6 +842,8 @@ model PushToken {
   token      String   @unique // Expo push token (ExponentPushToken[...])
   platform   String // 'android' | 'ios' — bugün yalnız android yazılır
   deviceName String? // kullanıcıya gösterilmez; teşhis için
+  // C50: push biçimi. 1 = bugünkü title/body; 2 = veri-yalnız (istemci bildirimi kendisi çizer).
+  format     Int      @default(1)
   createdAt  DateTime @default(now())
   lastUsedAt DateTime @default(now())
 

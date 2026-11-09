@@ -22,6 +22,12 @@ import { PresenceService, ActiveStatus } from '../../../shared/presence/presence
 import { DmPermissionService } from '../../../shared/dm-permission/dm-permission.service';
 import { NotificationsService, isMuteActive } from '../../notifications/notifications.service';
 import { PushService } from '../../../shared/push/push.service';
+import {
+  V2MessageData,
+  channelConversationTitle,
+  clampV2Text,
+  v2Timestamp,
+} from '../../../shared/push/push-v2';
 import { VoiceService } from '../../voice/voice.service';
 import { GamesService } from '../../../shared/games/games.service';
 
@@ -734,7 +740,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   async notifyDmActivity(channelId: string, messageDto: Record<string, unknown>) {
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId },
-      select: { guildId: true, type: true, dmRequestStatus: true, dmRequesterId: true },
+      select: {
+        guildId: true,
+        type: true,
+        name: true,
+        dmRequestStatus: true,
+        dmRequesterId: true,
+      },
     });
 
     // Guild kanalı → çık
@@ -781,6 +793,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       messageDto,
       content,
       channel.type === 'DM',
+      channel.name ?? null,
     );
   }
 
@@ -801,6 +814,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     messageDto: Record<string, unknown>,
     content: string,
     isOneToOne = false,
+    groupName: string | null = null,
   ): Promise<void> {
     const author = messageDto['author'] as {
       id: string;
@@ -823,8 +837,29 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     // ile AYNI yardımcıdan (resolveMentionPreview) geçmiş, token'ları çözülmüş metinle gider.
     const body = await this.resolveMentionPreview(content, null);
 
+    // C50 — veri-yalnız biçim; bayrak kapalıyken hiç üretilmez (v1 gövdesi birebir aynı kalır).
+    const v2: V2MessageData | undefined = this.push.v2Enabled
+      ? {
+          v: 2,
+          kind: 'message',
+          type: 'DM_MESSAGE',
+          conversationId: channelId,
+          guildId: null,
+          messageId: (messageDto['id'] as string | undefined) ?? null,
+          senderId: author.id,
+          senderName: author.username,
+          senderAvatarUrl: author.avatarUrl ?? null,
+          isGroup: !isOneToOne,
+          conversationTitle: isOneToOne ? null : groupName,
+          conversationIconUrl: null, // Channel'da simge alanı yok
+          text: clampV2Text(body),
+          timestamp: v2Timestamp(messageDto['createdAt']),
+        }
+      : undefined;
+
     await this.push
       .sendToUsers(allowed, {
+        ...(v2 && { v2 }),
         title: author.username,
         body,
         data: { type: 'DM_MESSAGE', channelId },
@@ -1011,7 +1046,11 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (messageDto['mentionsEveryone']) return;
     if (((messageDto['mentionRoles'] as string[] | undefined) ?? []).length > 0) return;
 
-    const author = messageDto['author'] as { id: string; username: string };
+    const author = messageDto['author'] as {
+      id: string;
+      username: string;
+      avatarUrl?: string | null;
+    };
     const mentioned = new Set((messageDto['mentions'] as string[] | undefined) ?? []);
     const candidates = [...eligible].filter((id) => id !== author.id && !mentioned.has(id));
     if (candidates.length === 0) return;
@@ -1052,13 +1091,33 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         messageDto['attachments'] as { contentType: string }[] | undefined,
       ) || '[dosya]';
     const preview = await this.resolveMentionPreview(content, guildId);
+    // Hangi ortamdan geldiği başlıkta da yazsın: "#genel · Ortam Adı" (simgesi olmayan ortam için şart).
+    const title = channelConversationTitle(channel?.name, channel?.guild?.name, author.username);
+
+    // C50 — veri-yalnız biçim (bkz. sendDmPush notu). Ortamda `text` yalnız önizleme; ad `senderName`de.
+    const v2: V2MessageData | undefined = this.push.v2Enabled
+      ? {
+          v: 2,
+          kind: 'message',
+          type: 'CHANNEL_MESSAGE',
+          conversationId: channelId,
+          guildId,
+          messageId: (messageDto['id'] as string | undefined) ?? null,
+          senderId: author.id,
+          senderName: author.username,
+          senderAvatarUrl: author.avatarUrl ?? null,
+          isGroup: true,
+          conversationTitle: title,
+          conversationIconUrl: channel?.guild?.iconUrl ?? null,
+          text: clampV2Text(preview),
+          timestamp: v2Timestamp(messageDto['createdAt']),
+        }
+      : undefined;
 
     await this.push
       .sendToUsers(allowed, {
-        // Hangi ortamdan geldiği başlıkta da yazsın: "#genel · Ortam Adı" (simgesi olmayan ortam için şart).
-        title: [channel?.name ? `#${channel.name}` : author.username, channel?.guild?.name]
-          .filter(Boolean)
-          .join(' · '),
+        ...(v2 && { v2 }),
+        title,
         body: `${author.username}: ${preview}`,
         data: {
           type: 'CHANNEL_MESSAGE',
