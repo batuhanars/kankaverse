@@ -162,7 +162,7 @@ object ConversationNotifier {
 
   /**
    * SPIKE: gorunen sohbet bildiriminin sonuna "ben"den (Person null) bir mesaj ekler; bildirim, eylemler
-   * ve dokunma intent'i korunur (recoverBuilder). Bildirim yoksa false (kullanici kapatmis).
+   * ve dokunma intent'i korunur (Builder(context, notification)). Bildirim yoksa false (kullanici kapatmis).
    * Ayni cagri hata gostergesi icin de kullanilir (JS metni hazirlar). Yeniden notify, RemoteInput'un
    * donen halkasini da kapatir.
    */
@@ -183,7 +183,7 @@ object ConversationNotifier {
     old.conversationTitle?.let { style.conversationTitle = it }
     val own = NotificationCompat.MessagingStyle.Message(text, timestamp, null as Person?)
     (old.messages + own).sortedBy { it.timestamp }.takeLast(MAX_MESSAGES).forEach { style.addMessage(it) }
-    val rebuilt = NotificationCompat.Builder.recoverBuilder(context, active.notification)
+    val rebuilt = NotificationCompat.Builder(context, active.notification)
       .setStyle(style)
       .setContentText(text)
       .setWhen(timestamp)
