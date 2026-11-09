@@ -14,4 +14,7 @@
 // deterministik.
 require('@livekit/react-native').registerGlobals();
 
+// C50: veri-yalniz mesaj push gorevi, headless baslangicta da yuklenmeli.
+require('./src/notifications/conversationPush');
+
 require('expo-router/entry');

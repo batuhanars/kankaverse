@@ -101,6 +101,8 @@ export interface RegisterPushTokenBody {
   token: string;
   platform: 'android' | 'ios';
   deviceName?: string;
+  /** C50: 2 = cihaz veri-yalnız mesaj push'u (v2) çizebilir. Verilmezse sunucu 1 sayar. */
+  format?: 1 | 2;
 }
 
 export const notificationsApi = {

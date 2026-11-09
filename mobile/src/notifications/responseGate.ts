@@ -1,7 +1,13 @@
 import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useNavigationContainerRef } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
+import {
+  addConversationTapListener,
+  getInitialConversationTap,
+  type ConversationTap,
+} from '../../modules/conversation-notification';
 
 /**
  * Sprint M3 §3 (`notifications/push.ts` KUSUR 1/KUSUR 2 düzeltmesi) ile aynı problemin ortak
@@ -28,15 +34,58 @@ import { useAuthStore } from '@/stores/auth';
 export function useGatedNotificationResponder(
   onResponse: (response: Notifications.NotificationResponse) => void,
 ): void {
+  useGatedDelivery<Notifications.NotificationResponse>((deliver) => {
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(deliver);
+    // expo-notifications birden çok `addNotificationResponseReceivedListener` abonesini destekler;
+    // `getLastNotificationResponse()` bir GETTER'dır, tüketmez — push.ts ve incomingCall.ts kendi
+    // filtrelerine göre aynı soğuk-açılış yanıtını BAĞIMSIZ işler, çakışma olmaz.
+    const last = Notifications.getLastNotificationResponse();
+    if (last) deliver(last);
+    return () => responseSubscription.remove();
+  }, onResponse);
+}
+
+/**
+ * C50: yerel sohbet bildirimine (native modül) dokunma, aynı kapıdan geçer. Soğuk açılış
+ * `getInitialConversationTap`, sıcak dokunma modül olayı; uygulama öne gelince de bir kez daha
+ * bakılır (activity yeniden oluşmuşsa olay kaçmış olabilir). Native taraf intent ekstralarını
+ * tükettiği için aynı dokunuş iki kez gelmez.
+ */
+export function useGatedConversationTap(onTap: (tap: ConversationTap) => void): void {
+  useGatedDelivery<ConversationTap>((deliver) => {
+    const unsubscribeTap = addConversationTapListener(deliver);
+    const checkInitial = () => {
+      const initial = getInitialConversationTap();
+      if (initial) deliver(initial);
+    };
+    checkInitial();
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkInitial();
+    });
+    return () => {
+      unsubscribeTap();
+      appState.remove();
+    };
+  }, onTap);
+}
+
+type GateSource<T> = (deliver: (item: T) => void) => () => void;
+
+/**
+ * Kapının ortak çekirdeği: `source` teslim edilecek öğeleri üretir (abonelik + soğuk açılış) ve
+ * temizleme fonksiyonu döner; kapı navigasyon hazır ve auth 'booting' değilken `onItem`i çağırır.
+ */
+function useGatedDelivery<T>(source: GateSource<T>, onItem: (item: T) => void): void {
   const navigationRef = useNavigationContainerRef();
   // Çağıranın her render'da yeni bir fonksiyon geçirmesi effect'i yeniden kurmasın diye ref'te
-  // tutulur; abonelik yalnız `navigationRef` değişince yeniden kurulur (aşağıdaki push.ts/
-  // incomingCall.ts'teki gibi genelde hiç değişmez).
-  const onResponseRef = useRef(onResponse);
-  onResponseRef.current = onResponse;
+  // tutulur; abonelik yalnız `navigationRef` değişince yeniden kurulur.
+  const onItemRef = useRef(onItem);
+  onItemRef.current = onItem;
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
 
   useEffect(() => {
-    let pending: Notifications.NotificationResponse | null = null;
+    let pending: { item: T } | null = null;
 
     const tryFlush = () => {
       if (!pending) return;
@@ -51,33 +100,26 @@ export function useGatedNotificationResponder(
         return;
       }
 
-      const response = pending;
+      const { item } = pending;
       pending = null;
-      onResponseRef.current(response);
+      onItemRef.current(item);
     };
 
-    const respond = (response: Notifications.NotificationResponse) => {
-      pending = response;
+    const deliver = (item: T) => {
+      pending = { item };
       tryFlush();
     };
 
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener(respond);
+    const cleanupSource = sourceRef.current(deliver);
     // 'ready' — react-navigation'ın NavigationContainer gerçekten mount olduğunda ATEŞLEDİĞİ event;
     // `assertIsReady()`'nin baktığı `isReady()` ile aynı andan hemen sonra gelir.
     const unsubscribeReady = navigationRef.addListener('ready', tryFlush);
     // `useAuthStore`'un vanilla `subscribe`'ı: 'booting' → 'authenticated'/'unauthenticated' geçişini
-    // React render döngüsüne bağlı olmadan yakalar (bu bir hook değil, effect içinde plain subscribe).
+    // React render döngüsüne bağlı olmadan yakalar.
     const unsubscribeAuth = useAuthStore.subscribe(tryFlush);
 
-    // expo-notifications birden çok `addNotificationResponseReceivedListener` abonesini destekler
-    // (her ikisi de aynı native event'i alır); `getLastNotificationResponse()` bir GETTER'dır,
-    // tüketmez — push.ts ve incomingCall.ts kendi filtrelerine göre aynı soğuk-açılış yanıtını
-    // BAĞIMSIZ olarak burada işleyebilir, çakışma olmaz (her biri kendi `data.type`'ını süzer).
-    const last = Notifications.getLastNotificationResponse();
-    if (last) respond(last);
-
     return () => {
-      responseSubscription.remove();
+      cleanupSource();
       unsubscribeReady();
       unsubscribeAuth();
     };

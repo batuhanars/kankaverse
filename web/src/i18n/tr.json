@@ -2408,6 +2408,9 @@
     "notif": {
       "unmute": "Susturmayı Kaldır"
     },
+    "notifications": {
+      "me": "Ben"
+    },
     "guildNotifications": {
       "muteLabel": "{name} ortamını sustur",
       "muteDesc": "Ortam susturulduğunda, senden bahsedilmediği sürece okunmamış göstergesi görünmez ve bildirim gelmez."
