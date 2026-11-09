@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { EmojiKeyboard, tr as emojiTr } from 'rn-emoji-keyboard';
+import { EmojiKeyboard, emojisByCategory, tr as emojiTr, type EmojisByCategory } from 'rn-emoji-keyboard';
 import { emojiPickerTheme } from './emojiPickerTheme';
 import { buildDraftAttachment } from './attachmentDraft';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
@@ -29,6 +29,20 @@ interface Props {
 const SHEET_RATIO = 0.6;
 
 /**
+ * Sık kullanılanlar kütüphanenin İLK kategorisi olarak verilir (sahip 2026-11-09): ikon çubuğunun
+ * altında, kütüphanenin kendi ızgarasında görünür. Kütüphanenin yerleşik "recent" deposu yalnız sırayı
+ * bilir ve global tek depodur; bizim sıklık × yakınlık listemizi `emojisByCategory` ile veriyoruz.
+ * `name` bilerek emojinin kendisi: arama adı/anahtar kelimeyi tarar, kopya bu yüzden aramada çıkmaz
+ * ve ızgara anahtarı (name) gerçek emojiyle çakışmaz.
+ */
+function withRecent(recent: string[]): EmojisByCategory[] {
+  if (recent.length === 0) return emojisByCategory;
+  const known = new Map(emojisByCategory.flatMap((c) => c.data).map((e) => [e.emoji, e.v]));
+  const data = recent.map((emoji) => ({ emoji, name: emoji, v: known.get(emoji) ?? '1.0', toneEnabled: false }));
+  return [{ title: 'recently_used', data } as EmojisByCategory, ...emojisByCategory];
+}
+
+/**
  * C23 §0.2 — mesaj kutusu emoji düğmesinin açtığı iki sekmeli alt sayfa (Emoji | GIF).
  *
  * Emoji sekmesi eski `EmojiPicker` modal'ının içeriğiyle aynı (aynı tema/dil/son kullanılanlar;
@@ -51,6 +65,8 @@ export function EmojiGifSheet({ visible, onClose, onEmojiSelected, showGif, exis
   useEffect(() => {
     if (visible && useRecent) void loadRecentEmojis().then(setRecent);
   }, [visible, useRecent]);
+  const categories = useMemo(() => withRecent(recent), [recent]);
+  const emojiTranslation = useMemo(() => ({ ...emojiTr, recently_used: t('mobile.emojiGif.recent') }), []);
 
   function pick(emoji: string) {
     if (useRecent) void recordEmojiUse(emoji);
@@ -128,21 +144,10 @@ export function EmojiGifSheet({ visible, onClose, onEmojiSelected, showGif, exis
 
           {activeTab === 'emoji' ? (
             <View style={styles.body}>
-              {recent.length > 0 && (
-                <View style={styles.recent}>
-                  <Text style={styles.recentTitle}>{t('mobile.emojiGif.recent')}</Text>
-                  <View style={styles.recentRow}>
-                    {recent.map((emoji) => (
-                      <Pressable key={emoji} onPress={() => pick(emoji)} style={styles.recentItem}>
-                        <Text style={styles.recentEmoji}>{emoji}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              )}
               <EmojiKeyboard
                 onEmojiSelected={(e) => pick(e.emoji)}
-                translation={emojiTr}
+                translation={emojiTranslation}
+                emojisByCategory={categories}
                 enableSearchBar
                 categoryPosition="top"
                 theme={emojiPickerTheme}
@@ -208,12 +213,6 @@ const styles = StyleSheet.create({
   tabText: { color: theme.colors.textSecondary, fontSize: theme.fontSize.md, fontWeight: '600' },
   tabTextActive: { color: theme.colors.accent500 },
   body: { flex: 1 },
-  recent: { paddingHorizontal: theme.layout.panelGap, paddingBottom: 6 },
-  recentTitle: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs, fontWeight: '600', marginBottom: 4 },
-  recentRow: { flexDirection: 'row', flexWrap: 'wrap' },
-  // 8 sütun x 2 satır = 16; sabit yüzde genişlik dar ekranda da taşmaz.
-  recentItem: { width: '12.5%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
-  recentEmoji: { fontSize: 24 },
   gifBody: { paddingHorizontal: theme.layout.panelGap, paddingTop: 4, gap: 10 },
   row: {
     flexDirection: 'row',

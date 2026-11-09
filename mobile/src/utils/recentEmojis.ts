@@ -8,7 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * küçük yardımcı). Tepki seçici ve mesaj kutusu seçicisi AYNI anahtarı okur/yazar.
  */
 const KEY = 'kv_recent_emojis_v1';
-export const RECENT_EMOJI_LIMIT = 16;
+/** Seçicide 3 satır (sahip 2026-11-09). */
+export const RECENT_EMOJI_LIMIT = 24;
 const HALF_LIFE_MS = 14 * 24 * 60 * 60 * 1000;
 const MAX_STORED = 60;
 

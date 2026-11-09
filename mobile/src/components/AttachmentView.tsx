@@ -12,16 +12,27 @@ import { ScanStatus, type AttachmentDto } from '@/api/messages';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
-/** Sohbette görsel genişliği (sahip 2026-11-09: 220 küçük kaldı, detay görünsün diye 280, sonra biraz geri 250) ve çok dikey görselin (uzun ekran görüntüsü) yükseklik sınırı. */
-const CHAT_IMAGE_WIDTH = 250;
+/**
+ * Sohbette görsel genişliği ve çok dikey görselin (uzun ekran görüntüsü) yükseklik sınırı.
+ * Sahip 2026-11-09: 280 → 250 → 220'ye döndü. "Küçük" şikâyetinin asıl sebebi genişlik değil, ilk
+ * girişte kalan 160'lık yükseklikti (bkz. `fitStyle`).
+ */
+const CHAT_IMAGE_WIDTH = 220;
 const CHAT_IMAGE_MAX_HEIGHT = 380;
 // Görsel boyutu sunucuda yok, ilk yüklemede öğrenilir. Liste satırı geri gelince kutu yeniden zıplamasın.
 const knownRatios = new Map<string, number>();
 
-/** Görselin tamamını oranını bozmadan gösteren ölçü; sınırı aşan dikey görsel daralır, kırpılmaz. */
+/**
+ * Görselin tamamını oranını bozmadan gösteren ölçü; sınırı aşan dikey görsel daralır, kırpılmaz.
+ *
+ * 🔴 Yükseklik HER ZAMAN sayı. Eskiden `height: undefined` + `aspectRatio` veriliyordu: oran ilk
+ * yüklemede gelince stil güncellemesinde `undefined` önceki 160'ı SİLMEDİ, genişlik+yükseklik birlikte
+ * dolu olunca `aspectRatio` yok sayıldı ve görsel 160'a sığdırılıp küçük kaldı. Geri dönünce oran baştan
+ * bilindiği için 160 hiç yazılmıyor, doğru çıkıyordu (sahip 2026-11-09, üç tur sürdü).
+ */
 function fitStyle(ratio: number) {
   const width = Math.min(CHAT_IMAGE_WIDTH, CHAT_IMAGE_MAX_HEIGHT * ratio);
-  return { width, height: undefined, aspectRatio: ratio };
+  return { width, height: width / ratio };
 }
 
 // Sprint M1a contract §5.5 (🔴 T&S kapısı) — web/src/components/shared/AttachmentView.vue ile
@@ -303,7 +314,7 @@ const styles = StyleSheet.create({
   image: {
     marginTop: 6,
     width: CHAT_IMAGE_WIDTH,
-    // M6a — dar ekranda (320dp) baloncuğun iç genişliği 220'nin altına inebiliyor, görsel taşmasın.
+    // M6a — dar ekranda (320dp) baloncuğun iç genişliği görsel genişliğinin altına inebiliyor, taşmasın.
     maxWidth: '100%',
     height: 160,
     borderRadius: theme.radius.sm,

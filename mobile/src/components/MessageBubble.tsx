@@ -385,7 +385,8 @@ const styles = StyleSheet.create({
   },
   author: {
     color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.xs,
+    // Sahip 2026-11-09: xs okunmuyordu, bir tık büyütüldü.
+    fontSize: theme.fontSize.sm,
     fontWeight: '600',
   },
   // C35: BOT rozeti (web ile ayni dil: Kor zemin, beyaz metin)
