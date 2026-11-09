@@ -78,4 +78,22 @@ describe('CallSignalService', () => {
     expect(realtimeMock.emitToUser).not.toHaveBeenCalled();
     expect(pushMock.sendCallEnd).not.toHaveBeenCalled();
   });
+
+  it('accept/reject: eylemi yapanin kendi soketlerine de voice.call_canceled gider', async () => {
+    await make().accept(CH, CALLEE);
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(CALLEE, 'voice.call_canceled', {
+      channelId: CH,
+    });
+    realtimeMock.emitToUser.mockClear();
+    await make().reject(CH, CALLEE);
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(CALLEE, 'voice.call_canceled', {
+      channelId: CH,
+    });
+    expect(realtimeMock.emitToUser).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancel: eylemi yapana ek olay yok (yalnizca callee)', async () => {
+    await make().cancel(CH, CALLER);
+    expect(realtimeMock.emitToUser).toHaveBeenCalledTimes(1);
+  });
 });

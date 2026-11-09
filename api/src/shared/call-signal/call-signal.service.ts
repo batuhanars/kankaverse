@@ -41,6 +41,8 @@ export class CallSignalService {
     const other = await this.otherDmMember(channelId, userId);
     if (!other) return false;
     this.realtime.emitToUser(other, 'voice.call_accepted', { channelId });
+    // C53 Revize 3: ayni hesabin diger oturumlari (web/masaustu) da zili birakir. Kapi gecildikten sonra.
+    this.realtime.emitToUser(userId, 'voice.call_canceled', { channelId });
     void this.push.sendCallEnd(userId, channelId);
     return true;
   }
@@ -50,6 +52,8 @@ export class CallSignalService {
     const other = await this.otherDmMember(channelId, userId);
     if (!other) return false;
     this.realtime.emitToUser(other, 'voice.call_rejected', { channelId });
+    // C53 Revize 3: ayni hesabin diger oturumlari (web/masaustu) da zili birakir. Kapi gecildikten sonra.
+    this.realtime.emitToUser(userId, 'voice.call_canceled', { channelId });
     void this.push.sendCallEnd(userId, channelId);
     return true;
   }

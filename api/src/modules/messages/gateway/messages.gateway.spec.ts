@@ -1851,6 +1851,7 @@ describe('MessagesGateway arama sinyalleri (C53)', () => {
     const res = await gateway.handleCallReject(sock(CALLEE), { channelId: DM });
     expect(res).toEqual({ ok: true });
     expect(emitToUserMock).toHaveBeenCalledWith(CALLER, 'voice.call_rejected', { channelId: DM });
+    expect(emitToUserMock).toHaveBeenCalledWith(CALLEE, 'voice.call_canceled', { channelId: DM });
     expect(pushSendCallEndMock).toHaveBeenCalledWith(CALLEE, DM);
   });
 
@@ -1864,6 +1865,7 @@ describe('MessagesGateway arama sinyalleri (C53)', () => {
   it('call_accept: arayana olay + callee cihazlarına call_end', async () => {
     await gateway.handleCallAccept(sock(CALLEE), { channelId: DM });
     expect(emitToUserMock).toHaveBeenCalledWith(CALLER, 'voice.call_accepted', { channelId: DM });
+    expect(emitToUserMock).toHaveBeenCalledWith(CALLEE, 'voice.call_canceled', { channelId: DM });
     expect(pushSendCallEndMock).toHaveBeenCalledWith(CALLEE, DM);
   });
 
