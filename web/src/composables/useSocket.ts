@@ -84,6 +84,21 @@ export function sendActivity(payload: ActivityPayload) {
   lastActivity = payload
   socket?.emit('activity:set', payload)
 }
+
+/** Yapay zeka video bitti/başarısız: hazırsa "İzle" düğmeli bilgi, başarısızsa hata toast'ı. */
+function showAiVideoDoneToast(dto: NotificationDto, openView: (id: string) => void) {
+  const { t } = i18n.global
+  const toast = useToastStore()
+  if (dto.type === 'AI_VIDEO_FAILED') {
+    toast.error(t('aiVideo.doneToastFailed'))
+    return
+  }
+  const id = dto.aiVideoId
+  toast.info(t('aiVideo.doneToastReady'), {
+    durationMs: 8000,
+    action: id ? { label: t('aiVideo.doneToastWatch'), run: () => openView(id) } : undefined,
+  })
+}
 // auth_error sonrası art arda tazele-dene sayacı (sonsuz döngü koruması; başarılı connect'te sıfırlanır)
 let authRetryCount = 0
 
@@ -289,7 +304,13 @@ export function useSocket() {
       notificationsStore.handleIncoming(dto)
       // C49 R3: üretim bitti/başarısız → giriş butonundaki "sürüyor" göstergesi söner
       if (dto.type === 'AI_VIDEO_READY' || dto.type === 'AI_VIDEO_FAILED') {
-        useAiVideoViewer().clearActive()
+        const viewer = useAiVideoViewer()
+        viewer.clearActive()
+        // Mobil eşi (socket.ts C56 §4): pencere görünür + video diyaloğu kapalıysa uygulama içi toast.
+        // Pencere gizliyken Electron OS bildirimi (useNativeNotifications) devrede, çift bildirim olmaz.
+        if (!document.hidden && viewer.openCount.value === 0) {
+          showAiVideoDoneToast(dto, viewer.openView)
+        }
       }
     })
 
