@@ -6,6 +6,7 @@ import { MentionSuggestionList } from './MentionSuggestionList';
 import { EmojiGifSheet } from './EmojiGifSheet';
 import { useEmojiInsert } from './useEmojiInsert';
 import { useMentionCompose, type MentionCandidate } from './useMentionCompose';
+import { expandMentionsForEdit } from '@/utils/mentions';
 import { messagesApi, type MessageDto } from '@/api/messages';
 import { extractErrorMessage } from '@/api/errors';
 import { useMessagesStore } from '@/stores/messages';
@@ -53,15 +54,21 @@ export function EditMessageOverlay({
   onClose,
 }: Props) {
   const updateMessage = useMessagesStore((s) => s.updateMessage);
-  const [value, setValue] = useState(message.content);
+  // C54 — token'lar görüntülemedeki çözücülerle `@ad`a çevrilir; yalnız ilk açılışta hesaplanır.
+  const [initial] = useState(() => expandMentionsForEdit(message.content, resolveMention, resolveRole));
+  const [value, setValue] = useState(initial.text);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   // İlk açılışta imleç sonda; kullanıcı dokununca kontrol bırakılır (Android IME ile kavga etmesin).
   const [initialSel, setInitialSel] = useState<{ start: number; end: number } | null>({
-    start: message.content.length,
-    end: message.content.length,
+    start: initial.text.length,
+    end: initial.text.length,
   });
   const mention = useMentionCompose(mentionSource, everyoneRoleId);
+  useEffect(() => {
+    mention.seedPicked(initial.users, initial.roles);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- yalnız açılışta tohumla
+  }, []);
   const emoji = useEmojiInsert(value, handleChange);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -84,7 +91,7 @@ export function EditMessageOverlay({
   const trimmed = value.trim();
   // Sunucu kuralıyla aynı: ek varsa boş metin geçerli. Değişmediyse kaydedilecek bir şey yok.
   const hasAttachments = (message.attachments?.length ?? 0) > 0;
-  const canSave = !saving && trimmed !== message.content.trim() && (!!trimmed || hasAttachments);
+  const canSave = !saving && trimmed !== initial.text.trim() && (!!trimmed || hasAttachments);
 
   async function save() {
     if (!canSave) return;
