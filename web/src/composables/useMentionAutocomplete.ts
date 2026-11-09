@@ -49,6 +49,17 @@ function findMentionQuery(
 
 const MAX_SUGGESTIONS = 8
 
+/**
+ * C54 — bahsetme adının bittiği yer: ardından harf/rakam/_ GELMEMELİ (kullanıcı adı kümesi
+ * [a-zA-Z0-9_], bkz. register.dto). Boşluk, satır sonu, metin sonu VE noktalama (`@ali,`) sınırdır.
+ */
+const NAME_END = String.raw`(?![\p{L}\p{N}_])`
+
+/** En uzun ad önce: `@Dev.Ops` varken kısa `Dev` onu yarıda kesmesin. */
+function longestFirst(map: Map<string, string>): Array<[string, string]> {
+  return [...map.entries()].sort((a, b) => b[0].length - a[0].length)
+}
+
 export function useMentionAutocomplete(
   members: { value: MentionMember[] } | (() => MentionMember[]),
   getContent: () => string,
@@ -191,18 +202,18 @@ export function useMentionAutocomplete(
      */
     const roleId = everyoneRoleId?.() ?? null
     if (roleId) {
-      result = result.replace(/@everyone(?=\s|$)/g, `<@&${roleId}>`)
+      result = result.replace(new RegExp(`@everyone${NAME_END}`, 'gu'), `<@&${roleId}>`)
     }
     // R15 — rol adları: YALNIZ listeden seçilenler (kullanıcı adlarındaki kuralın aynısı).
     // Serbest yazılan `@Moderatör` çevrilmez: rol adı serbest metinle çakışabilir ve yanlış
     // gruba ping atmak kişiye yanlış ping atmaktan daha gürültülü olurdu.
-    for (const [roleName, id] of pendingRoles.value.entries()) {
-      const regex = new RegExp(`@${escapeRegex(roleName)}(?=\\s|$)`, 'g')
+    for (const [roleName, id] of longestFirst(pendingRoles.value)) {
+      const regex = new RegExp(`@${escapeRegex(roleName)}${NAME_END}`, 'gu')
       result = result.replace(regex, `<@&${id}>`)
     }
-    for (const [username, userId] of pendingMentions.value.entries()) {
+    for (const [username, userId] of longestFirst(pendingMentions.value)) {
       // Tam kelime eşleşmesi: @username arkasında kelime-sınırı (boşluk, satır sonu, metin sonu)
-      const regex = new RegExp(`@${escapeRegex(username)}(?=\\s|$)`, 'g')
+      const regex = new RegExp(`@${escapeRegex(username)}${NAME_END}`, 'gu')
       result = result.replace(regex, `<@${userId}>`)
     }
     return result
