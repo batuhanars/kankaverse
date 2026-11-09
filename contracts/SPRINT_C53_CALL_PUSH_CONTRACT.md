@@ -67,6 +67,9 @@ DoD: spec'ler yeşil, `tsc -p tsconfig.build.json` temiz. Migration yok.
 ### §3.4 Sürüm
 C52 ile **aynı vc60**. PM derler (kısa yol, `cmp` doğrulamalı).
 
+## §3.5 Web (Revize 2, 2026-11-09 cihaz turu bulgusu)
+Arayanın web'deki giden arama zili bugün YALNIZ `voice.call_accepted` soket olayıyla duruyor (`web/src/composables/useSocket.ts` ~575); karşı taraf odaya girse bile sinyal kaybolduysa zil 30 sn çalıyor (`useCall.ts` ~84 zamanlayıcısı). Sağlamlaştırma: giden arama sürerken **odada çağıran dışında bir katılımcı belirdiği anda** giden arama durumu temizlenir ve zil susar (kabul sinyali gelmese de). Mevcut kabul/ret/iptal yolları değişmez. Grup aramasında giden zil davranışı neyse ona dokunulmaz (yalnız 1-1).
+
 ## §4 Açılış
 Sunucu önce gider (bayrak zaten açık; v2 arama yalnız `format: 2` cihazlara, yani vc59+). vc59'da `kind:'call'`'u tanımayan görev hiçbir şey göstermez → **vc59 telefonlarda kapalı uygulamada arama sessiz kalır.** vc59 dağıtılmadı (yalnız sahip telefonu), dolayısıyla sunucu ile vc60 aynı gün çıkar; sahip telefonu vc60'a geçene kadar etkilenir. Play'e vc59 hiç gitmez, doğrudan vc60 gider.
 
