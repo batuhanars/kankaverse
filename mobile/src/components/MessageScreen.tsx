@@ -421,7 +421,10 @@ export function MessageScreen({
               {/* C23 — Yanıtla her mesajda açık (eylem paneli de koşulsuz sunuyor); tek işlev. */}
               <SwipeToReply
                 // C29: gecici/basarisiz mesajda kaydirarak yanit/duzenle kapali (iki islev de yok = jest kapali).
-                onReply={item.message.localStatus ? undefined : () => replyTo(item.message)}
+                // C57: mesaj kutusu kapalıysa (salt okunur kanal, yazılamayan DM) yanıt da yok.
+                onReply={
+                  item.message.localStatus || disabledNotice ? undefined : () => replyTo(item.message)
+                }
                 // Düzenle yalnız kendi mesajımda: eylem panelindeki `isMine` koşuluyla aynı (yazar = ben).
                 onEdit={
                   !item.message.localStatus && item.message.author.id === authUser?.id
@@ -482,11 +485,15 @@ export function MessageScreen({
         canPin={canPin}
         actions={actions}
         onOpenProfile={setProfileTarget}
-        onReply={() => {
-          const m = actions.target;
-          actions.close();
-          if (m) replyTo(m);
-        }}
+        onReply={
+          disabledNotice
+            ? undefined
+            : () => {
+                const m = actions.target;
+                actions.close();
+                if (m) replyTo(m);
+              }
+        }
         onEdit={() => {
           const m = actions.target;
           actions.close();

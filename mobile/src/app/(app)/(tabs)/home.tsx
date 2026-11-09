@@ -460,6 +460,7 @@ export default function HomeScreen() {
               userLimit: String(c.userLimit),
               bitrate: String(c.bitrate),
               mediaEnabled: String(c.mediaEnabled),
+              readOnly: String(c.readOnly),
             },
           });
         }}

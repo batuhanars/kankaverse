@@ -449,6 +449,7 @@ const settingsName = ref('')
 const settingsAgeGated = ref(false)
 const settingsIsPrivate = ref(false) // sonradan özel yap/kaldır
 const settingsMediaEnabled = ref(false) // C7 — GUILD_VOICE medya toggle
+const settingsReadOnly = ref(false) // C57 — salt okunur metin kanalı
 const settingsSlowMode = ref(0)
 const settingsUserLimit = ref<number | null>(0) // R10 — ses kanalı kullanıcı limiti (0 = sınırsız)
 const settingsBitrate = ref(64) // R10 — ses kanalı bit hızı (kbps, 8–96)
@@ -471,6 +472,7 @@ function openSettings(channel: ChannelDto) {
   settingsAgeGated.value = channel.ageGated ?? false
   settingsIsPrivate.value = channel.isPrivate ?? false
   settingsMediaEnabled.value = channel.mediaEnabled ?? false
+  settingsReadOnly.value = channel.readOnly ?? false
   settingsSlowMode.value = channel.slowModeSeconds ?? 0
   settingsUserLimit.value = channel.userLimit ?? 0
   settingsBitrate.value = channel.bitrate ?? 64
@@ -589,11 +591,15 @@ async function submitSettings() {
   settingsSaving.value = true
   settingsError.value = ''
   try {
-    const payload: { name?: string; ageGated?: boolean; isPrivate?: boolean; slowModeSeconds?: number; userLimit?: number; bitrate?: number; mediaEnabled?: boolean } = {}
+    const payload: { name?: string; ageGated?: boolean; isPrivate?: boolean; slowModeSeconds?: number; userLimit?: number; bitrate?: number; mediaEnabled?: boolean; readOnly?: boolean } = {}
     if (name !== target.name) payload.name = name
     if (settingsAgeGated.value !== (target.ageGated ?? false)) payload.ageGated = settingsAgeGated.value
     if (settingsIsPrivate.value !== (target.isPrivate ?? false)) payload.isPrivate = settingsIsPrivate.value
     if (settingsSlowMode.value !== (target.slowModeSeconds ?? 0)) payload.slowModeSeconds = settingsSlowMode.value
+    // C57 — salt okunur (yalnız GUILD_TEXT)
+    if (target.type === 'GUILD_TEXT' && settingsReadOnly.value !== (target.readOnly ?? false)) {
+      payload.readOnly = settingsReadOnly.value
+    }
     // R10 + C7 — ses kanalı ayarları (yalnız GUILD_VOICE)
     if (target.type === 'GUILD_VOICE') {
       const limit = Math.min(99, Math.max(0, Math.floor(settingsUserLimit.value || 0)))
@@ -1796,6 +1802,33 @@ onUnmounted(() => {
           <span
             class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200"
             :class="settingsAgeGated ? 'translate-x-5' : 'translate-x-0'"
+          />
+        </button>
+      </div>
+
+      <!-- C57 — Salt okunur toggle (yalnız metin kanalları) -->
+      <div
+        v-if="settingsTarget.type === 'GUILD_TEXT'"
+        class="flex items-center justify-between gap-4 px-3 py-3 rounded-[var(--kv-radius-md)] border"
+        style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);"
+      >
+        <div class="flex-1 min-w-0">
+          <p class="text-[14px] font-medium" style="color: var(--kv-text-primary);">
+            {{ t('channel.readOnlyLabel') }}
+          </p>
+          <p class="text-[12px] mt-0.5" style="color: var(--kv-text-muted);">
+            {{ t('channel.readOnlyDesc') }}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
+          :style="settingsReadOnly ? 'background-color: var(--kv-accent-500);' : 'background-color: var(--kv-bg-rail);'"
+          @click="settingsReadOnly = !settingsReadOnly"
+        >
+          <span
+            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200"
+            :class="settingsReadOnly ? 'translate-x-5' : 'translate-x-0'"
           />
         </button>
       </div>

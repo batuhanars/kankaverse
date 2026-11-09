@@ -39,6 +39,7 @@ export function toChannelDto(
     userLimit: channel.userLimit,
     bitrate: channel.bitrate, // R10 — ses kanalı bit hızı (kbps)
     mediaEnabled: channel.mediaEnabled, // C7 — admin per-channel kamera/ekran toggle
+    readOnly: channel.readOnly, // C57 — salt okunur metin kanalı
     unreadCount,
     unreadMentionCount, // REV-4: okunmamış bahsetme (kendimi @işaret eden, lastReadAt sonrası)
   };
@@ -341,6 +342,7 @@ export class ChannelsService {
         ...(dto.userLimit !== undefined && { userLimit: dto.userLimit }),
         ...(dto.bitrate !== undefined && { bitrate: dto.bitrate }),
         ...(dto.mediaEnabled !== undefined && { mediaEnabled: dto.mediaEnabled }),
+        ...(dto.readOnly !== undefined && { readOnly: dto.readOnly }),
         // categoryId: undefined → dokunma; null → kategorisiz; string → ata.
         // ('in dto' KULLANMA: class-transformer gönderilmeyen alanı undefined anahtar olarak
         //  ekler → her güncellemede kanalı yanlışlıkla kategoriden çıkarırdı.)

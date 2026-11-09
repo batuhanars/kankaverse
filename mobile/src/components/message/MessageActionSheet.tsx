@@ -38,7 +38,8 @@ interface Props {
   onOpenPicker: () => void;
   /** C24 — şeridin sonundaki kalem: hızlı tepkileri düzenleme ekranı. */
   onEditQuickReactions: () => void;
-  onReply: () => void;
+  /** Verilmezse Yanıtla satırı çizilmez (C57: salt okunur kanal, yazılamayan sohbet). */
+  onReply?: () => void;
   onForward: () => void;
   onEdit: () => void;
   onCopy: () => void;
@@ -124,11 +125,13 @@ export function MessageActionSheet({
             </View>
 
             <View style={styles.group}>
-              <Pressable style={styles.option} onPress={onReply}>
-                <Ionicons name="arrow-undo-outline" size={20} color={theme.colors.textSecondary} />
-                {/* `reply.button` web'de zaten "Yanıtla" — yeni anahtar açılmadı. */}
-                <Text style={styles.optionText}>{t('reply.button')}</Text>
-              </Pressable>
+              {onReply && (
+                <Pressable style={styles.option} onPress={onReply}>
+                  <Ionicons name="arrow-undo-outline" size={20} color={theme.colors.textSecondary} />
+                  {/* `reply.button` web'de zaten "Yanıtla" — yeni anahtar açılmadı. */}
+                  <Text style={styles.optionText}>{t('reply.button')}</Text>
+                </Pressable>
+              )}
               {/* İlet — web'de var (`ForwardMessageModal.vue`), parite gereği mobile de geldi.
                   Ayrı bir uç DEĞİL: mesajın metni seçilen DM'e yeni mesaj olarak gönderilir. */}
               <Pressable style={styles.option} onPress={onForward}>

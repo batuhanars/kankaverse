@@ -93,6 +93,7 @@ export const useChannelsStore = defineStore('channels', () => {
       userLimit?: number
       bitrate?: number
       mediaEnabled?: boolean
+      readOnly?: boolean
     },
   ): Promise<ChannelDto> {
     const res = await channelsApi.update(channelId, payload)

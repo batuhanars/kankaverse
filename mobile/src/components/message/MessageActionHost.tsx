@@ -18,8 +18,8 @@ import { t } from '@/i18n';
  */
 interface Props {
   actions: ReturnType<typeof useMessageActions>;
-  /** Yanıtla — giriş kutusuna alıntı şeridi koyar. */
-  onReply: () => void;
+  /** Yanıtla — giriş kutusuna alıntı şeridi koyar. Verilmezse seçenek gizlenir (yazılamayan sohbet). */
+  onReply?: () => void;
   /** Düzenle — giriş kutusunu düzenleme moduna alır. */
   onEdit: () => void;
   /** Sprint M1h — sabitleme yetkisi (ortamda `MANAGE_MESSAGES`, DM/grupta her üye). */

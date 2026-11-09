@@ -48,6 +48,8 @@ const props = defineProps<{
   receipt?: 'sent' | 'seen' | null
   // Faz 3: MANAGE_MESSAGES — başkasının mesajını silebilir mi?
   canManageMessages?: boolean
+  // C57: false → Yanıtla gizlenir (salt okunur kanal). Verilmezse true.
+  canReply?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -235,6 +237,7 @@ const renderedContent = computed<string>(() => {
         :is-pinned="!!message.pinnedAt"
         :can-pin="canPin ?? false"
         :can-manage-messages="canManageMessages ?? false"
+        :can-reply="canReply !== false"
         :has-reactions="!!message.reactions?.length"
         @reply="emit('reply', message)"
         @forward="emit('forward', message)"

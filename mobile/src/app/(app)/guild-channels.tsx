@@ -69,6 +69,7 @@ export default function GuildChannelsScreen() {
         userLimit: String(c.userLimit),
         bitrate: String(c.bitrate),
         mediaEnabled: String(c.mediaEnabled),
+        readOnly: String(c.readOnly),
       },
     });
   }

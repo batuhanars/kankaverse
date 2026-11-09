@@ -512,6 +512,22 @@ export class MessagesService {
     // R7 Enforcement: BAN (global) + MUTE (scope-aware) — webhook yürütmesiyle ORTAK çekirdek (C35 §3)
     await this.assertSenderUnrestricted(userId, channel.guildId ?? null);
 
+    // C57: salt okunur kanal. Yalnız kanal yönetme yetkisi olan (OWNER/ADMINISTRATOR dahil) yazar.
+    // Webhook yolu bu kapıdan geçmez (webhook'u zaten MANAGE_WEBHOOKS sahibi kurar).
+    if (channel.guildId && channel.readOnly) {
+      const canWrite = await this.permissions.hasGuildPermission(
+        userId,
+        channel.guildId,
+        'MANAGE_CHANNELS',
+      );
+      if (!canWrite) {
+        throw new ForbiddenException({
+          message: 'Bu kanala yalnız yetkililer yazabilir.',
+          error: 'CHANNEL_READ_ONLY',
+        });
+      }
+    }
+
     // Yavaş mod (slow mode): yalnızca guild kanallarında; tam yetkili (OWNER/ADMINISTRATOR) muaf
     // R20: enum-ADMIN kısa devresi kalktı — izin sistemi tek kaynak.
     if (channel.guildId && channel.slowModeSeconds > 0) {

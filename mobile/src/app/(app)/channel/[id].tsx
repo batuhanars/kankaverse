@@ -31,6 +31,9 @@ export default function ChannelScreen() {
    * göstermemek.
    */
   const canPin = useGuildPermission(guildId, 'MANAGE_MESSAGES');
+  // C57: salt okunur kanal. Yazamayan üye kutu yerine bilgi satırı görür (sunucu otorite).
+  const canManageChannels = useGuildPermission(guildId, 'MANAGE_CHANNELS');
+  const [readOnly, setReadOnly] = useState(false);
 
   /**
    * Sprint M2d §3.1 — bahsetme öneri kaynağı. Ekran açılışında BİR KEZ çekilir; `@` yazınca
@@ -75,12 +78,14 @@ export default function ChannelScreen() {
     // `name` boş dize olarak da gelebilir (bildirimler/push yolu `name: ''` geçiyor) — `!name` ikisini
     // de yakalar. `name` doluysa (sidebar'dan gelişte) tekrar çekilmez, sözleşme "ekstra istek yok"
     // ilkesi burada da geçerli.
-    if (!guildId || name) return;
+    // C57: `readOnly` route param'ında yok, bu yüzden ad doluyken de liste çekilir (tek istek).
+    if (!guildId) return;
     channelsApi
       .listByGuild(guildId)
       .then((list) => {
         const found = list.find((c) => c.id === id);
-        if (found?.name) setResolvedName(found.name);
+        if (!name && found?.name) setResolvedName(found.name);
+        setReadOnly(found?.readOnly ?? false);
       })
       .catch(() => {});
   }, [guildId, name, id]);
@@ -181,6 +186,7 @@ export default function ChannelScreen() {
         typingMode="named"
         jumpToMessageId={jumpTo}
         canPin={canPin}
+        disabledNotice={readOnly && !canManageChannels ? t('channel.readOnlyNotice') : null}
         // M3b §3.2 — profil alt-panelinin rol rozetleri için ortam bağlamı. Bu ekran `guildId`
         // olmadan da açılabiliyor (bildirim/arama yolu); o durumda panel Roller bölümünü çizmez.
         guildId={guildId}

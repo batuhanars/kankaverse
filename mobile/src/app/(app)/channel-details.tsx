@@ -198,6 +198,7 @@ export default function ChannelDetailsScreen() {
                   userLimit: String(channel.userLimit),
                   bitrate: String(channel.bitrate),
                   mediaEnabled: String(channel.mediaEnabled),
+                  readOnly: String(channel.readOnly),
                 },
               })
             }

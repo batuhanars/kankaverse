@@ -40,6 +40,11 @@ const canManageMessages = computed(() => can('MANAGE_MESSAGES'))
 // C35 §4.6: webhook mesajini MANAGE_WEBHOOKS sahibi de silebilir
 const canManageWebhooks = computed(() => can('MANAGE_WEBHOOKS'))
 const canPin = canManageMessages
+// C57: salt okunur kanal. Yazamayan üye mesaj kutusu yerine bilgi satırı görür, yanıtla düğmesi gizlenir.
+// Sunucu otorite (CHANNEL_READ_ONLY); bu yalnız UX.
+const canWrite = computed(
+  () => !channelsStore.activeChannel()?.readOnly || can('MANAGE_CHANNELS'),
+)
 const { onInput: onTypingInput, stopTyping } = useTyping(() => channelId.value)
 const { label: typingLabel } = useTypingLabel(() => channelId.value, t)
 
@@ -436,6 +441,7 @@ function resetComposerHeight() {
             :can-pin="canPin"
             :can-manage-messages="canManageMessages || (!!msg.webhook && canManageWebhooks)"
             :guild-id="guildsStore.activeGuildId ?? undefined"
+            :can-reply="canWrite"
             @reply="setReplyingTo"
             @retry="optimistic.retry"
             @discard="optimistic.discard"
@@ -461,7 +467,15 @@ function resetComposerHeight() {
     </button>
     </div>
 
-    <div v-if="channelId" class="shrink-0 px-4 pb-6 pt-2">
+    <!-- C57: salt okunur kanalda yazamayan üye -->
+    <div
+      v-if="channelId && !canWrite"
+      class="shrink-0 mx-4 mb-6 mt-2 px-4 py-3 rounded-[var(--kv-radius-md)] border text-[13px] text-center"
+      style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+    >
+      {{ t('channel.readOnlyNotice') }}
+    </div>
+    <div v-else-if="channelId" class="shrink-0 px-4 pb-6 pt-2">
       <!-- Gönderme hatası (örn. MESSAGE_BLOCKED) -->
       <div
         v-if="sendError"

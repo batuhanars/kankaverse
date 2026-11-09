@@ -743,6 +743,40 @@ describe('MessagesService.create — yavaş mod', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
+  // C57: salt okunur kanal
+  // ─────────────────────────────────────────────────────────────────────────
+  it('C57: salt okunur kanal + MANAGE_CHANNELS yok → 403 CHANNEL_READ_ONLY, mesaj yazılmaz', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue({ ...GUILD_CHANNEL, readOnly: true });
+    permissionsMock.hasGuildPermission.mockResolvedValue(false);
+
+    let thrown: any;
+    try {
+      await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
+    } catch (e) {
+      thrown = e;
+    }
+
+    expect(thrown.getStatus()).toBe(403);
+    expect(thrown.getResponse().error).toBe('CHANNEL_READ_ONLY');
+    expect(permissionsMock.hasGuildPermission).toHaveBeenCalledWith(
+      USER_ID,
+      'guild-xyz',
+      'MANAGE_CHANNELS',
+    );
+    expect(prismaMock.message.create).not.toHaveBeenCalled();
+  });
+
+  it('C57: salt okunur kanal + MANAGE_CHANNELS var → mesaj oluşturulur', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue({ ...GUILD_CHANNEL, readOnly: true });
+    permissionsMock.hasGuildPermission.mockResolvedValue(true);
+    prismaMock.message.create.mockResolvedValue(CREATED_MSG);
+
+    await service.create(USER_ID, GUILD_CHANNEL_ID, DTO);
+
+    expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
   // slowMode açık + son mesaj ESKİ → geçer
   // ─────────────────────────────────────────────────────────────────────────
   it('slowMode açık + son mesaj eski (20 sn önce, limit 10 sn) → geçer, mesaj oluşturulur', async () => {

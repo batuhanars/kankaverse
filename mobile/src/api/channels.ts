@@ -40,6 +40,8 @@ export interface ChannelSummaryDto {
   userLimit: number;
   bitrate: number;
   mediaEnabled: boolean;
+  // C57 — salt okunur metin kanalı; yalnız MANAGE_CHANNELS yazar (sunucu otorite).
+  readOnly: boolean;
 }
 
 export const channelsApi = {
@@ -99,6 +101,7 @@ export const channelsApi = {
       userLimit?: number;
       bitrate?: number;
       mediaEnabled?: boolean;
+      readOnly?: boolean;
     },
   ): Promise<ChannelSummaryDto> {
     const res = await http.patch<ChannelSummaryDto>(`/channels/${channelId}`, body);

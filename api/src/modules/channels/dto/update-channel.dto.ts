@@ -79,4 +79,13 @@ export class UpdateChannelDto {
   @IsOptional()
   @IsBoolean()
   mediaEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description:
+      'C57: salt okunur metin kanalı (GUILD_TEXT). Açıkken yalnız kanal yönetme yetkisi olanlar mesaj yazar; diğerleri okur',
+  })
+  @IsOptional()
+  @IsBoolean()
+  readOnly?: boolean;
 }

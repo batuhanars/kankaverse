@@ -24,6 +24,8 @@ const props = defineProps<{
   canPin?: boolean
   // Faz 3: MANAGE_MESSAGES — başkasının mesajını silebilir mi?
   canManageMessages?: boolean
+  // C57: salt okunur kanalda yazamayan üyede false (Yanıtla gizlenir). Verilmezse true.
+  canReply?: boolean
   // C10: guild kanalında ise → kullanıcı kartı rol rozetlerini bu ortam bağlamında gösterir
   guildId?: string
 }>()
@@ -258,6 +260,7 @@ onUnmounted(() => {
     :is-mentioned="isMentioned"
     :can-pin="canPin ?? false"
     :can-manage-messages="canManageMessages ?? false"
+    :can-reply="canReply !== false"
     @reply="emit('reply', $event)"
     @forward="showForward = true"
     @edit="startEdit"

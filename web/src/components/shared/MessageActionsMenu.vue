@@ -27,6 +27,8 @@ const props = defineProps<{
   canManageMessages?: boolean
   // C46: mesajda tepki varsa ⋯ menüsünde "Tepkileri gör"
   hasReactions?: boolean
+  // C57: salt okunur kanalda yazamayan üyede false
+  canReply?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -250,6 +252,7 @@ onUnmounted(() => {
 
     <!-- ↩ Yanıtla -->
     <button
+      v-if="canReply !== false"
       class="w-8 h-8 flex items-center justify-center text-[15px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
       style="color: var(--kv-text-muted);"
       :title="t('reply.button')"

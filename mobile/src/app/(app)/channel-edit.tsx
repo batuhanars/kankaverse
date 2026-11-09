@@ -69,6 +69,8 @@ export default function ChannelEditScreen() {
     userLimit?: string;
     bitrate?: string;
     mediaEnabled?: string;
+    // C57 — yalnız metin kanalı; taşınmazsa anahtar hiç gösterilmez/gönderilmez (fail-closed).
+    readOnly?: string;
   }>();
 
   // 🔴 Fail-closed (M4g §3, M4c dersi): `type` taşınmazsa (eski/eksik bir çağıran yolu) ses
@@ -90,6 +92,8 @@ export default function ChannelEditScreen() {
     Math.min(96, Math.max(8, Math.floor(Number(params.bitrate ?? '64') || 64))),
   );
   const [mediaEnabled, setMediaEnabled] = useState(params.mediaEnabled === 'true');
+  const showReadOnly = params.type === ChannelType.GUILD_TEXT && params.readOnly !== undefined;
+  const [readOnly, setReadOnly] = useState(params.readOnly === 'true');
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [busy, setBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -128,6 +132,7 @@ export default function ChannelEditScreen() {
         ...(params.isPrivate !== undefined && { isPrivate }),
         ...(params.slowModeSeconds !== undefined && { slowModeSeconds: slowMode }),
         ...(params.categoryId !== undefined && { categoryId }),
+        ...(showReadOnly && { readOnly }),
         // Fail-closed: `isVoiceChannel` false ise (type gelmedi ya da metin kanalı) bu üçü hiç
         // gönderilmez — bilinmeyen/metin kanalına varsayılan ses değeri yazılmaz.
         ...(isVoiceChannel && {
@@ -259,6 +264,20 @@ export default function ChannelEditScreen() {
               />
             </View>
           </>
+        )}
+
+        {showReadOnly && (
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleText}>
+              <Text style={styles.toggleLabel}>{t('channel.readOnlyLabel')}</Text>
+              <Text style={styles.toggleDesc}>{t('channel.readOnlyDesc')}</Text>
+            </View>
+            <Switch
+              value={readOnly}
+              onValueChange={setReadOnly}
+              trackColor={{ true: theme.colors.accent500, false: theme.colors.bgElevated }}
+            />
+          </View>
         )}
 
         <View style={styles.toggleRow}>

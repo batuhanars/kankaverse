@@ -372,6 +372,7 @@ model Channel {
   userLimit       Int              @default(0) // GUILD_VOICE kullanıcı limiti; 0 = sınırsız
   bitrate         Int              @default(64) // GUILD_VOICE ses bit hızı (kbps, 8–96); istemci publish'te uygular
   mediaEnabled    Boolean          @default(false) // C7: admin per-channel kamera/ekran toggle (GUILD_VOICE); default OFF
+  readOnly        Boolean          @default(false) // C57: salt okunur metin kanalı; yalnız MANAGE_CHANNELS yazar
   // C9 — 1-1 DM mesaj isteği: null = normal/legacy (kabul edilmiş sayılır); PENDING = istek bekliyor.
   dmRequestStatus DmRequestStatus? // yalnız type=DM
   dmRequesterId   String? // isteği başlatan (PENDING/ACCEPTED-via-request'te dolu)
