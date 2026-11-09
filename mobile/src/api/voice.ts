@@ -44,6 +44,15 @@ export const voiceApi = {
     return res.data;
   },
 
+  /**
+   * C53: 1-1 aramayı reddet (soket `voice:call_reject` ile aynı sunucu mantığı). Uygulama kapalıyken
+   * soket yokken arka plan görevi bunu kullanır. Üye değilse sunucu `{ ok: false }` döner.
+   */
+  async rejectCall(channelId: string): Promise<{ ok: boolean }> {
+    const res = await http.post<{ ok: boolean }>(`/voice/calls/${channelId}/reject`);
+    return res.data;
+  },
+
   // ── Sprint M4h — ses kanalı moderasyonu (R11/R11B, R7'den geçti; istemci yalnız uç çağırır) ──
   // Uçlar `api/src/modules/voice/voice.controller.ts` (`VoiceModerationController`/`VoiceInspectController`)
   // ile birebir; envelope zaten `http.ts`te açılıyor, `data: null` dönüyor.

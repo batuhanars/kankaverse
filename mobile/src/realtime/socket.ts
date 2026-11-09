@@ -627,6 +627,11 @@ function emitCallSignal(event: 'voice:call_accept' | 'voice:call_reject', channe
   }
 }
 
+/** C53: soket şu an bağlı mı? (Bağlı değilken arama reddi HTTP ucuna düşer.) */
+export function isSocketConnected(): boolean {
+  return socket?.connected === true;
+}
+
 export function callAccept(channelId: string): void {
   emitCallSignal('voice:call_accept', channelId);
 }
