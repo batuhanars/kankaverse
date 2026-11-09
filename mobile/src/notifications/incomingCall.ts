@@ -4,7 +4,9 @@ import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useVoiceStore } from '@/stores/voice';
 import { useDmStore } from '@/stores/dm';
-import { callAccept, callReject } from '@/realtime/socket';
+import { callAccept, callReject, isSocketConnected } from '@/realtime/socket';
+import { getAccessToken, refreshAccessToken } from '@/api/http';
+import { voiceApi } from '@/api/voice';
 import { channelTitle } from '@/utils/channelTitle';
 import { dmTarget } from '@/utils/pushNavigation';
 import { useGatedNotificationResponder } from '@/notifications/responseGate';
@@ -170,6 +172,9 @@ interface RingingCall {
 type IncomingCallKind = 'dm' | 'group';
 
 let current: RingingCall | null = null;
+
+const REJECT_DEDUPE_MS = 10_000;
+let lastReject: { channelId: string; at: number } | null = null;
 
 /**
  * §9.2.2 — kanal + kategori kurulumu artık uygulama AÇILIŞINDA bir kez çağrılır (`(app)/_layout.tsx`,
@@ -486,7 +491,29 @@ async function clearStaleIncomingCallNotifications(): Promise<void> {
 export function rejectIncomingCall(channelId: string, isGroup: boolean): void {
   void dismissIncomingCall(channelId);
   if (isGroup) return;
-  callReject(channelId);
+  // C53: arka plan görevi ve bildirim yanıtı dinleyicisi AYNI JS ortamında aynı reddi iki kez
+  // getirebilir; kısa pencerede ikinci sinyal atlanır.
+  const now = Date.now();
+  if (lastReject?.channelId === channelId && now - lastReject.at < REJECT_DEDUPE_MS) {
+    return;
+  }
+  lastReject = { channelId, at: now };
+  // Tek fonksiyon, iki yol: soket bağlıysa soketle, değilse (uygulama kapalı/arka plan) HTTP ile.
+  if (isSocketConnected()) {
+    callReject(channelId);
+    return;
+  }
+  void rejectOverHttp(channelId);
+}
+
+async function rejectOverHttp(channelId: string): Promise<void> {
+  try {
+    if (!getAccessToken()) await refreshAccessToken();
+    await voiceApi.rejectCall(channelId);
+  } catch {
+    lastReject = null; // sonraki yol (bekleyen yanıt dinleyicisi) yeniden deneyebilsin
+    // Kullanıcı reddetmek istedi: zil zaten kapandı; sunucuya ulaşılamadıysa arayan zaman aşımını bekler.
+  }
 }
 
 /**

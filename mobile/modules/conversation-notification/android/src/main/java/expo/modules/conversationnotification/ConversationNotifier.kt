@@ -18,6 +18,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
+import androidx.core.app.RemoteInput
 import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -35,10 +36,15 @@ object ConversationNotifier {
   private const val MAX_MESSAGES = 10
 
   // Dokunma intent ekstralari (JS'e consumeTap ile tasinir).
-  private const val EXTRA_CONVERSATION_ID = "kv_conversation_id"
-  private const val EXTRA_TYPE = "kv_type"
-  private const val EXTRA_GUILD_ID = "kv_guild_id"
+  internal const val EXTRA_CONVERSATION_ID = "kv_conversation_id"
+  internal const val EXTRA_TYPE = "kv_type"
+  internal const val EXTRA_GUILD_ID = "kv_guild_id"
   private const val EXTRA_MESSAGE_ID = "kv_message_id"
+
+  private val tapCounter = java.util.concurrent.atomic.AtomicLong()
+
+  /** RemoteInput sonuc anahtari (Cevapla eylemi). */
+  internal const val REPLY_KEY = "kv_reply_text"
 
   fun show(context: Context, p: Map<String, Any?>) {
     val conversationId = p["conversationId"] as? String ?: return
@@ -64,7 +70,7 @@ object ConversationNotifier {
       .setImportant(true)
     if (avatar != null) senderBuilder.setIcon(IconCompat.createWithBitmap(avatar))
     val sender = senderBuilder.build()
-    val me = Person.Builder().setName(meName).setKey("me").build()
+    val me = buildMe(meName, if (isGroup) p["meAvatarUrl"] as? String else null)
 
     val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     val notifId = conversationId.hashCode()
@@ -114,6 +120,9 @@ object ConversationNotifier {
       .setShowWhen(true)
       .setAutoCancel(true)
     if (contentIntent != null) builder.setContentIntent(contentIntent)
+    (p["replyLabel"] as? String)?.let { label ->
+      builder.addAction(buildReplyAction(context, notifId, label, conversationId, type, guildId))
+    }
     if (color != null) builder.setColor(color)
     // Android <11 icin sol tarafta buyuk ikon.
     if (conversationIcon != null) builder.setLargeIcon(conversationIcon)
@@ -122,6 +131,101 @@ object ConversationNotifier {
       NotificationManagerCompat.from(context).notify(conversationId, notifId, builder.build())
     } catch (e: SecurityException) {
       Log.w(TAG, "POST_NOTIFICATIONS izni yok", e)
+    }
+  }
+
+  /** "Ben" kisisi; kendi statik avatari verilirse daire kirpilip simge olur (yalniz grup/ortam). */
+  private fun buildMe(name: String, avatarUrl: String?): Person {
+    val b = Person.Builder().setName(name).setKey("me")
+    val icon = avatarUrl?.let { downloadCircle(it) }
+    if (icon != null) b.setIcon(IconCompat.createWithBitmap(icon))
+    return b.build()
+  }
+
+  /**
+   * Cevapla eylemi. PendingIntent FLAG_MUTABLE olmak ZORUNDA (RemoteInput sonucu intent'e yazilir,
+   * Android 12+); mutable oldugu icin intent ACIK (component'li) kurulur, ekstralar sabit.
+   */
+  private fun buildReplyAction(
+    context: Context,
+    notifId: Int,
+    label: String,
+    conversationId: String,
+    type: String?,
+    guildId: String?,
+  ): NotificationCompat.Action {
+    val intent = Intent(context, QuickReplyReceiver::class.java)
+      .putExtra(EXTRA_CONVERSATION_ID, conversationId)
+    type?.let { intent.putExtra(EXTRA_TYPE, it) }
+    guildId?.let { intent.putExtra(EXTRA_GUILD_ID, it) }
+    val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+      (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
+    val pending = PendingIntent.getBroadcast(context, notifId, intent, flags)
+    val remoteInput = RemoteInput.Builder(REPLY_KEY).setLabel(label).build()
+    return NotificationCompat.Action.Builder(smallIconRes(context), label, pending)
+      .addRemoteInput(remoteInput)
+      .setAllowGeneratedReplies(false)
+      .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+      .setShowsUserInterface(false)
+      .build()
+  }
+
+  /**
+   * Gorunen sohbet bildiriminin sonuna "ben"den (Person null) bir mesaj ekler; eylemler ve dokunma
+   * intent'i acikca korunur. Bildirim yoksa false (kullanici kapatmis).
+   * Ayni cagri hata gostergesi icin de kullanilir (JS metni hazirlar). Yeniden notify, RemoteInput'un
+   * donen halkasini da kapatir.
+   */
+  fun appendOwnReply(
+    context: Context,
+    conversationId: String,
+    text: String,
+    timestamp: Long,
+    meAvatarUrl: String?,
+  ): Boolean {
+    val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    val notifId = conversationId.hashCode()
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
+    val active = (try {
+      manager.activeNotifications.firstOrNull { it.id == notifId && it.tag == conversationId }
+    } catch (e: Exception) {
+      Log.w(TAG, "aktif bildirimler okunamadi", e)
+      null
+    }) ?: return false
+    val old = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active.notification)
+      ?: return false
+    // Grup/ortamda "ben" kisisi kendi avatariyla yeniden kurulur (eski Person simgesi tasinmayabilir);
+    // 1-1'de Android satir avatari cizmez, eski kisi aynen kalir.
+    val me = if (old.isGroupConversation) {
+      buildMe(old.user.name?.toString() ?: "", meAvatarUrl)
+    } else {
+      old.user
+    }
+    val style = NotificationCompat.MessagingStyle(me)
+    style.isGroupConversation = old.isGroupConversation
+    old.conversationTitle?.let { style.conversationTitle = it }
+    val own = NotificationCompat.MessagingStyle.Message(text, timestamp, null as Person?)
+    (old.messages + own).sortedBy { it.timestamp }.takeLast(MAX_MESSAGES).forEach { style.addMessage(it) }
+    val source = active.notification
+    val builder = NotificationCompat.Builder(context, source)
+      .setStyle(style)
+      .setContentText(text)
+      .setWhen(timestamp)
+      .setOnlyAlertOnce(true)
+    // Yapicinin kopyalamasina guvenme: dokunma intent'i ve Cevapla eylemi acikca tasinir (C52 §2).
+    // Ayni PendingIntent'ler yeniden kullanilir (ekstralar ve RemoteInput sabit).
+    source.contentIntent?.let { builder.setContentIntent(it) }
+    builder.clearActions()
+    for (i in 0 until NotificationCompat.getActionCount(source)) {
+      NotificationCompat.getAction(source, i)?.let { builder.addAction(it) }
+    }
+    val rebuilt = builder.build()
+    return try {
+      NotificationManagerCompat.from(context).notify(conversationId, notifId, rebuilt)
+      true
+    } catch (e: SecurityException) {
+      Log.w(TAG, "POST_NOTIFICATIONS izni yok", e)
+      false
     }
   }
 
@@ -142,6 +246,8 @@ object ConversationNotifier {
       "type" to intent.getStringExtra(EXTRA_TYPE),
       "guildId" to intent.getStringExtra(EXTRA_GUILD_ID),
       "messageId" to intent.getStringExtra(EXTRA_MESSAGE_ID),
+      // JS ayni dokunusu (olay + getInitialTap) iki kez islemesin diye artan kimlik.
+      "tapId" to tapCounter.incrementAndGet().toDouble(),
     )
     intent.removeExtra(EXTRA_CONVERSATION_ID)
     intent.removeExtra(EXTRA_TYPE)

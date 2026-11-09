@@ -17,4 +17,9 @@ require('@livekit/react-native').registerGlobals();
 // C50: veri-yalniz mesaj push gorevi, headless baslangicta da yuklenmeli.
 require('./src/notifications/conversationPush');
 
+// C52: bildirimden Cevapla headless gorevi (kok duzeyde kayit sart).
+const { AppRegistry } = require('react-native');
+const { runQuickReply } = require('./src/notifications/quickReply');
+AppRegistry.registerHeadlessTask('KvQuickReply', () => runQuickReply);
+
 require('expo-router/entry');

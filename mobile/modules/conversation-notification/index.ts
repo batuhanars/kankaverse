@@ -20,15 +20,21 @@ export type ConversationNotificationParams = {
   notificationChannelId: string;
   /** "Ben" kişisinin adı (i18n mobile.notifications.me). */
   meName: string;
+  /** Kendi statik avatar adresi (grup/ortam bildiriminde "ben" satırları için); yoksa null. */
+  meAvatarUrl?: string | null;
   /** Vurgu rengi (app.json expo-notifications.color). */
   color: string | null;
   /** Dokunma yönlendirmesi için geri taşınır. */
   type: string | null;
   guildId: string | null;
   messageId: string | null;
+  /** Cevapla eyleminin etiketi (i18n mobile.notifications.reply); yoksa eylem eklenmez. */
+  replyLabel?: string | null;
 };
 
 export type ConversationTap = {
+  /** Native artan kimlik: ayni dokunus olay + getInitialTap ile iki kez gelirse tekillestirilir. */
+  tapId?: number;
   conversationId: string;
   type: string | null;
   guildId: string | null;
@@ -40,6 +46,12 @@ type TapEvents = { onTap: (tap: ConversationTap) => void };
 declare class NativeConversationNotificationModule extends NativeModule<TapEvents> {
   show(params: ConversationNotificationParams): Promise<void>;
   dismiss(conversationId: string): Promise<void>;
+  appendOwnReply?(
+    conversationId: string,
+    text: string,
+    timestamp: number,
+    meAvatarUrl: string | null,
+  ): Promise<boolean>;
   getInitialTap(): ConversationTap | null;
 }
 
@@ -70,6 +82,16 @@ export function showConversationNotification(params: ConversationNotificationPar
 
 export function dismissConversationNotification(conversationId: string): Promise<void> {
   return native?.dismiss(conversationId) ?? Promise.resolve();
+}
+
+/** bildirime "ben"den mesaj ekler. Bildirim yoksa/modül eskiyse false. */
+export function appendOwnReplyToNotification(
+  conversationId: string,
+  text: string,
+  timestamp: number,
+  meAvatarUrl: string | null = null,
+): Promise<boolean> {
+  return native?.appendOwnReply?.(conversationId, text, timestamp, meAvatarUrl) ?? Promise.resolve(false);
 }
 
 /** Uygulamayı bildirime dokunarak açan intent (soğuk açılış); bir kez teslim edilir. */

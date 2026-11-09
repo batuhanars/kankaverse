@@ -10,6 +10,7 @@ import {
   showConversationNotification,
 } from '../../modules/conversation-notification';
 import { MESSAGE_CHANNEL_ID } from './push';
+import { loadOwnAvatarUrl } from './ownAvatar';
 
 /**
  * C50 — veri-yalnız (v2) mesaj push'u. Sunucu v2 destekleyen cihaza `title`/`body` olmadan yalnız
@@ -132,8 +133,65 @@ function logUndecodable(error: unknown, data: unknown): void {
   if (__DEV__) console.warn('[conversationPush] çözülemedi', error ? String(error) : '', JSON.stringify(data));
 }
 
+/**
+ * C53: gelen arama modülü görev İÇİNDE yüklenir (D70: açılışta modül gövdesi sorunu; `index.js`
+ * kök importlarına eklenmez). Dinamik require, modülü yalnız bir arama olayında değerlendirir.
+ */
+function incomingCallModule(): typeof import('./incomingCall') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require('./incomingCall') as typeof import('./incomingCall');
+}
+
+const CALL_DATA_TYPE = 'incoming_call';
+
+type CallResponse = { actionIdentifier: string; channelId: string; isGroup: boolean };
+
+/**
+ * Bildirim düğmesi yanıtı (expo-notifications 0.32 `NotificationSerializer.toBundle(response)`):
+ * `{ actionIdentifier, userText?, notification: { date, request: { identifier, trigger,
+ * content: { title, body, categoryIdentifier, data? | dataString? } } } }`. Yerel (JS'ten
+ * `scheduleNotificationAsync`) bildirimin `data`sı `content.dataString` altında JSON metni gelir.
+ */
+function parseCallResponse(raw: unknown): CallResponse | null {
+  const top = asObject(raw);
+  const actionIdentifier = top && str(top.actionIdentifier);
+  if (!top || !actionIdentifier) return null;
+  const content = asObject(asObject(asObject(top.notification)?.request)?.content);
+  const payload = asObject(content?.data) ?? asObject(content?.dataString);
+  if (!payload || payload.type !== CALL_DATA_TYPE) return null;
+  const channelId = str(payload.channelId);
+  if (!channelId) return null;
+  return { actionIdentifier, channelId, isGroup: payload.callKind === 'group' };
+}
+
+async function handleCall(p: Record<string, unknown>): Promise<boolean> {
+  const callChannelId = str(p.callChannelId);
+  if (p.kind === 'call_end') {
+    if (callChannelId) await incomingCallModule().dismissIncomingCall(callChannelId);
+    return true;
+  }
+  if (p.kind !== 'call') return false;
+  const callerId = str(p.callerId);
+  if (!callChannelId || !callerId) return true;
+  await incomingCallModule().presentIncomingCall(
+    callChannelId,
+    { id: callerId, username: str(p.callerName) ?? '', avatarUrl: str(p.callerAvatarUrl) },
+    { kind: p.isGroup === true || p.isGroup === 'true' ? 'group' : 'dm' },
+  );
+  return true;
+}
+
 TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
   try {
+    const response = parseCallResponse(data);
+    if (response) {
+      // Düğme yanıtı yalnız uygulama ön planda değilken görevi çalıştırır. `accept` uygulamayı açar,
+      // bekleyen yanıtı `useIncomingCallResponder` işler; burada yapılacak bir şey yok.
+      if (response.actionIdentifier === 'reject') {
+        incomingCallModule().rejectIncomingCall(response.channelId, response.isGroup);
+      }
+      return;
+    }
     const p = extractV2(data);
     if (!p) {
       // v1 biçimi zaten expo/Firebase yolundan gösteriliyor; yalnız teşhis için.
@@ -144,6 +202,7 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
       await Promise.all(parseRead(p).conversationIds.map((id) => dismissConversationNotification(id)));
       return;
     }
+    if (await handleCall(p)) return;
     if (p.kind !== 'message') return;
     const m = parseMessage(p);
     if (!m) {
@@ -156,6 +215,8 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
       groupInitial: groupInitialOf(m),
       notificationChannelId: MESSAGE_CHANNEL_ID,
       meName: t('mobile.notifications.me'),
+      meAvatarUrl: m.isGroup ? await loadOwnAvatarUrl() : null,
+      replyLabel: t('mobile.notifications.reply'),
       color: accentColor(),
     });
   } catch (e) {

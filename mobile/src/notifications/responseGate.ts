@@ -51,12 +51,34 @@ export function useGatedNotificationResponder(
  * bakılır (activity yeniden oluşmuşsa olay kaçmış olabilir). Native taraf intent ekstralarını
  * tükettiği için aynı dokunuş iki kez gelmez.
  */
+/**
+ * C52 cihaz turu kök nedeni: yerel (Kotlin) sohbet bildirimi expo bildirimi değildir;
+ * `getLastNotificationResponse()` boş döner ve açılış ekranı (`app/index.tsx`) "kaldığın yerden aç"
+ * kaydını sürdürüp tap'in `router.push`ının ÜSTÜNE `router.replace` yapıyordu. Dokunuş görülünce bu
+ * bayrak açılır; açılış ekranı kaydı sürdürmez (bildirimle açılışta v1 ile aynı davranış).
+ */
+let nativeTapSeen = false;
+export function hasNativeConversationTap(): boolean {
+  return nativeTapSeen;
+}
+
 export function useGatedConversationTap(onTap: (tap: ConversationTap) => void): void {
   useGatedDelivery<ConversationTap>((deliver) => {
-    const unsubscribeTap = addConversationTapListener(deliver);
+    // C52: native ayni dokunusu hem olay hem getInitialTap ile verebilir; tapId ile bir kez islenir.
+    let lastTapId: number | undefined;
+    const deliverOnce = (source: string) => (tap: ConversationTap) => {
+      if (tap.tapId !== undefined && tap.tapId === lastTapId) {
+        return;
+      }
+      lastTapId = tap.tapId;
+      nativeTapSeen = true;
+      deliver(tap);
+    };
+    const unsubscribeTap = addConversationTapListener(deliverOnce('event'));
+    const deliverInitial = deliverOnce('initial');
     const checkInitial = () => {
       const initial = getInitialConversationTap();
-      if (initial) deliver(initial);
+      if (initial) deliverInitial(initial);
     };
     checkInitial();
     const appState = AppState.addEventListener('change', (state) => {
@@ -89,10 +111,15 @@ function useGatedDelivery<T>(source: GateSource<T>, onItem: (item: T) => void): 
 
     const tryFlush = () => {
       if (!pending) return;
-      if (!navigationRef.isReady()) return;
+      if (!navigationRef.isReady()) {
+        return;
+      }
 
       const status = useAuthStore.getState().status;
-      if (status === 'booting') return; // oturum kararı henüz yok — auth guard bizi ezer, bekle
+      if (status === 'booting') {
+        // oturum kararı henüz yok — auth guard bizi ezer, bekle
+        return;
+      }
 
       if (status === 'unauthenticated') {
         // Oturum yok — kullanıcı elle giriş yapacak, eski hedefe sürpriz atlama YOK.

@@ -614,17 +614,12 @@ export function groupCallCancel(channelId: string): void {
 function emitCallSignal(event: 'voice:call_accept' | 'voice:call_reject', channelId: string): void {
   const s = ensureSocket();
   if (!s.connected) s.connect();
-  let acked = false;
-  s.emit(event, { channelId }, () => {
-    acked = true;
-    if (__DEV__) console.log(`[voice] ${event} ack alindi`);
-  });
-  if (__DEV__) {
-    console.log(`[voice] ${event} gonderildi, connected=${s.connected}`);
-    setTimeout(() => {
-      if (!acked) console.warn(`[voice] ${event} ACK GELMEDI — sunucuya ulasmamis olabilir`);
-    }, 3000);
-  }
+  s.emit(event, { channelId }, () => {});
+}
+
+/** C53: soket şu an bağlı mı? (Bağlı değilken arama reddi HTTP ucuna düşer.) */
+export function isSocketConnected(): boolean {
+  return socket?.connected === true;
 }
 
 export function callAccept(channelId: string): void {

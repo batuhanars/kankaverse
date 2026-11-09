@@ -2410,7 +2410,9 @@
       "unmute": "Susturmayı Kaldır"
     },
     "notifications": {
-      "me": "Ben"
+      "me": "Ben",
+      "reply": "Cevapla",
+      "replyFailed": "Gönderilemedi"
     },
     "guildNotifications": {
       "muteLabel": "{name} ortamını sustur",

@@ -1,2 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!-- Hizli cevap: bildirim Cevapla eylemi -> receiver -> headless JS servisi. -->
+    <receiver
+      android:name="expo.modules.conversationnotification.QuickReplyReceiver"
+      android:exported="false" />
+    <service
+      android:name="expo.modules.conversationnotification.QuickReplyService"
+      android:exported="false" />
+  </application>
 </manifest>

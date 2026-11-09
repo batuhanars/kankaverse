@@ -395,5 +395,7 @@ function handleConversationTap(tap: ConversationTap): void {
     channelId: tap.conversationId,
     messageId: tap.messageId,
   });
-  if (target) router.push(target);
+  if (target) {
+    router.push(target);
+  }
 }
