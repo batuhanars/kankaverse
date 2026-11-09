@@ -14,6 +14,7 @@ class QuickReplyService : HeadlessJsTaskService() {
   override fun getTaskConfig(intent: Intent?): HeadlessJsTaskConfig? {
     val extras = intent?.extras ?: return null
     val data = Arguments.createMap().apply {
+      putString("action", extras.getString(ConversationNotifier.EXTRA_ACTION) ?: ConversationNotifier.ACTION_REPLY)
       putString("conversationId", extras.getString(ConversationNotifier.EXTRA_CONVERSATION_ID))
       putString("text", extras.getString(EXTRA_TEXT))
       putString("type", extras.getString(ConversationNotifier.EXTRA_TYPE))

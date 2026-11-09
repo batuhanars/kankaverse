@@ -217,6 +217,8 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
       meName: t('mobile.notifications.me'),
       meAvatarUrl: m.isGroup ? await loadOwnAvatarUrl() : null,
       replyLabel: t('mobile.notifications.reply'),
+      markReadLabel: t('mobile.notifications.markRead'),
+      muteLabel: t('mobile.notifications.mute'),
       color: accentColor(),
     });
   } catch (e) {

@@ -2412,6 +2412,8 @@
     "notifications": {
       "me": "Ben",
       "reply": "Cevapla",
+      "markRead": "Okundu olarak işaretle",
+      "mute": "Sessize al",
       "replyFailed": "Gönderilemedi"
     },
     "guildNotifications": {
