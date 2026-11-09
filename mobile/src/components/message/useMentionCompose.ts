@@ -166,25 +166,37 @@ export function useMentionCompose(
    */
   const applyMentionTokens = useCallback(
     (text: string): string => {
-      let result = text;
-      if (everyoneRoleId) {
-        result = result.replace(/@everyone(?=\s|$)/g, `<@&${everyoneRoleId}>`);
-      }
+      // C54 — tek geçiş: ad → token tablosu. Önceki "ad + boşluk/son" kuralı `@ali,` gibi noktalama
+      // bitişik bahsetmeyi düz metinde bırakıyordu. Sınır artık kullanıcı adı karakter kümesi
+      // (`[A-Za-z0-9_]`) dışındaki herhangi bir karakter; EN UZUN ad önce denenir (`@ali.x` rolü
+      // `@ali`den önce eşleşsin). Tek geçiş, üretilen `<@id>` içinin yeniden eşlenmesini engeller.
+      const table = new Map<string, string>();
+      if (everyoneRoleId) table.set('everyone', `<@&${everyoneRoleId}>`);
       // R15 — rol adları YALNIZ listeden seçilenler çevrilir (@everyone'daki "elle yazma da
       // çalışır" kuralı rollere TAŞINMADI: rol adı serbest metinle çakışabilir ve yanlış gruba
       // ping atmak, yanlış kişiye ping atmaktan daha gürültülü. Web ile birebir aynı karar).
       for (const [roleName, roleId] of pickedRolesRef.current.entries()) {
-        const regex = new RegExp(`@${escapeRegex(roleName)}(?=\\s|$)`, 'g');
-        result = result.replace(regex, `<@&${roleId}>`);
+        if (!table.has(roleName)) table.set(roleName, `<@&${roleId}>`);
       }
       for (const [username, userId] of pickedRef.current.entries()) {
-        const regex = new RegExp(`@${escapeRegex(username)}(?=\\s|$)`, 'g');
-        result = result.replace(regex, `<@${userId}>`);
+        if (!table.has(username)) table.set(username, `<@${userId}>`);
       }
-      return result;
+      if (!table.size) return text;
+      const names = [...table.keys()].sort((a, b) => b.length - a.length).map(escapeRegex);
+      const regex = new RegExp(`@(${names.join('|')})(?![A-Za-z0-9_])`, 'g');
+      return text.replace(regex, (_m, name: string) => table.get(name) ?? _m);
     },
     [everyoneRoleId],
   );
+
+  /**
+   * C54 — düzenlemeye girerken çözülen etiketleri seçilmiş-bahsetme haritalarına önceden doldurur;
+   * böylece kullanıcının dokunmadığı `@ad`'lar kaydederken geri token olur.
+   */
+  const seedPicked = useCallback((users: Map<string, string>, roles: Map<string, string>) => {
+    for (const [name, id] of users) pickedRef.current.set(name, id);
+    for (const [name, id] of roles) pickedRolesRef.current.set(name, id);
+  }, []);
 
   /** Gönderim BAŞARILI olunca çağrılır. Hatada çağrılmaz — kullanıcı bahsetmelerini kaybetmesin. */
   const clearPicked = useCallback(() => {
@@ -202,7 +214,8 @@ export function useMentionCompose(
       close,
       applyMentionTokens,
       clearPicked,
+      seedPicked,
     }),
-    [suggestions, visible, onChangeText, onSelectionChange, select, close, applyMentionTokens, clearPicked],
+    [suggestions, visible, onChangeText, onSelectionChange, select, close, applyMentionTokens, clearPicked, seedPicked],
   );
 }
