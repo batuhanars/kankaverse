@@ -14,7 +14,7 @@ const { activeId } = useAiVideoViewer()
   <span
     v-if="activeId"
     class="inline-block w-[9px] h-[9px] rounded-full border-[1.5px]"
-    style="background: var(--kv-accent-500); border-color: var(--kv-bg-elevated);"
+    style="background: var(--kv-danger); border-color: var(--kv-bg-elevated);"
     role="img"
     :aria-label="t('aiVideo.activeIndicator')"
     :title="t('aiVideo.activeIndicator')"
