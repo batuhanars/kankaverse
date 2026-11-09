@@ -70,7 +70,7 @@ object ConversationNotifier {
       .setImportant(true)
     if (avatar != null) senderBuilder.setIcon(IconCompat.createWithBitmap(avatar))
     val sender = senderBuilder.build()
-    val me = Person.Builder().setName(meName).setKey("me").build()
+    val me = buildMe(meName, if (isGroup) p["meAvatarUrl"] as? String else null)
 
     val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     val notifId = conversationId.hashCode()
@@ -134,6 +134,15 @@ object ConversationNotifier {
     }
   }
 
+  /** "Ben" kisisi; kendi statik avatari verilirse daire kirpilip simge olur (yalniz grup/ortam). */
+  private fun buildMe(name: String, avatarUrl: String?): Person {
+    val b = Person.Builder().setName(name).setKey("me")
+    val icon = avatarUrl?.let { downloadCircle(it) }
+    Log.i(TAG, "me avatar requested=${avatarUrl != null} loaded=${icon != null}")
+    if (icon != null) b.setIcon(IconCompat.createWithBitmap(icon))
+    return b.build()
+  }
+
   /**
    * Cevapla eylemi. PendingIntent FLAG_MUTABLE olmak ZORUNDA (RemoteInput sonucu intent'e yazilir,
    * Android 12+); mutable oldugu icin intent ACIK (component'li) kurulur, ekstralar sabit.
@@ -168,7 +177,13 @@ object ConversationNotifier {
    * Ayni cagri hata gostergesi icin de kullanilir (JS metni hazirlar). Yeniden notify, RemoteInput'un
    * donen halkasini da kapatir.
    */
-  fun appendOwnReply(context: Context, conversationId: String, text: String, timestamp: Long): Boolean {
+  fun appendOwnReply(
+    context: Context,
+    conversationId: String,
+    text: String,
+    timestamp: Long,
+    meAvatarUrl: String?,
+  ): Boolean {
     val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     val notifId = conversationId.hashCode()
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
@@ -180,7 +195,14 @@ object ConversationNotifier {
     }) ?: return false
     val old = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active.notification)
       ?: return false
-    val style = NotificationCompat.MessagingStyle(old.user)
+    // Grup/ortamda "ben" kisisi kendi avatariyla yeniden kurulur (eski Person simgesi tasinmayabilir);
+    // 1-1'de Android satir avatari cizmez, eski kisi aynen kalir.
+    val me = if (old.isGroupConversation) {
+      buildMe(old.user.name?.toString() ?: "", meAvatarUrl)
+    } else {
+      old.user
+    }
+    val style = NotificationCompat.MessagingStyle(me)
     style.isGroupConversation = old.isGroupConversation
     old.conversationTitle?.let { style.conversationTitle = it }
     val own = NotificationCompat.MessagingStyle.Message(text, timestamp, null as Person?)

@@ -10,6 +10,7 @@ import {
   showConversationNotification,
 } from '../../modules/conversation-notification';
 import { MESSAGE_CHANNEL_ID } from './push';
+import { loadOwnAvatarUrl } from './ownAvatar';
 
 /**
  * C50 — veri-yalnız (v2) mesaj push'u. Sunucu v2 destekleyen cihaza `title`/`body` olmadan yalnız
@@ -219,6 +220,7 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
       groupInitial: groupInitialOf(m),
       notificationChannelId: MESSAGE_CHANNEL_ID,
       meName: t('mobile.notifications.me'),
+      meAvatarUrl: m.isGroup ? await loadOwnAvatarUrl() : null,
       replyLabel: t('mobile.notifications.reply'),
       color: accentColor(),
     });

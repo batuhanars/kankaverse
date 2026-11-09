@@ -20,6 +20,8 @@ export type ConversationNotificationParams = {
   notificationChannelId: string;
   /** "Ben" kişisinin adı (i18n mobile.notifications.me). */
   meName: string;
+  /** Kendi statik avatar adresi (grup/ortam bildiriminde "ben" satırları için); yoksa null. */
+  meAvatarUrl?: string | null;
   /** Vurgu rengi (app.json expo-notifications.color). */
   color: string | null;
   /** Dokunma yönlendirmesi için geri taşınır. */
@@ -44,7 +46,12 @@ type TapEvents = { onTap: (tap: ConversationTap) => void };
 declare class NativeConversationNotificationModule extends NativeModule<TapEvents> {
   show(params: ConversationNotificationParams): Promise<void>;
   dismiss(conversationId: string): Promise<void>;
-  appendOwnReply?(conversationId: string, text: string, timestamp: number): Promise<boolean>;
+  appendOwnReply?(
+    conversationId: string,
+    text: string,
+    timestamp: number,
+    meAvatarUrl: string | null,
+  ): Promise<boolean>;
   getInitialTap(): ConversationTap | null;
 }
 
@@ -82,8 +89,9 @@ export function appendOwnReplyToNotification(
   conversationId: string,
   text: string,
   timestamp: number,
+  meAvatarUrl: string | null = null,
 ): Promise<boolean> {
-  return native?.appendOwnReply?.(conversationId, text, timestamp) ?? Promise.resolve(false);
+  return native?.appendOwnReply?.(conversationId, text, timestamp, meAvatarUrl) ?? Promise.resolve(false);
 }
 
 /** Uygulamayı bildirime dokunarak açan intent (soğuk açılış); bir kez teslim edilir. */

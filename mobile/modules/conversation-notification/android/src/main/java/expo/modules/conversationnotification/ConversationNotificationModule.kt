@@ -44,10 +44,10 @@ class ConversationNotificationModule : Module() {
     }
 
     // Hizli cevap: bildirime "ben"den mesaj ekler (yanit gitti / gonderilemedi gostergesi).
-    AsyncFunction("appendOwnReply") { conversationId: String, text: String, timestamp: Double ->
+    AsyncFunction("appendOwnReply") { conversationId: String, text: String, timestamp: Double, meAvatarUrl: String? ->
       val context = appContext.reactContext
       if (context != null) {
-        ConversationNotifier.appendOwnReply(context, conversationId, text, timestamp.toLong())
+        ConversationNotifier.appendOwnReply(context, conversationId, text, timestamp.toLong(), meAvatarUrl)
       } else {
         false
       }
