@@ -70,10 +70,6 @@ async function sync(channelId: string) {
   dmStore.setActiveChannel(channelId)
 }
 
-function toHome() {
-  router.push({ name: 'app' })
-}
-
 watch(() => props.channelId, (id) => sync(id), { immediate: true })
 </script>
 
@@ -97,7 +93,6 @@ watch(() => props.channelId, (id) => sync(id), { immediate: true })
         :channel="activeDmChannel"
         :profile-panel-open="rightPanelVisible"
         @toggle-profile="toggleRightPanel"
-        @deleted="toHome"
       />
       <!-- Profil paneli yalnızca 1-1 DM için.
            ≥1280: bugünkü inline davranış aynen (koşulsuz açık).

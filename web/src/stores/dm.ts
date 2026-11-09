@@ -284,9 +284,10 @@ export const useDmStore = defineStore('dm', () => {
 
   async function renameGroup(groupId: string, name: string) {
     const res = await dmApi.renameGroup(groupId, name)
-    const updated = res.data
+    // Sunucu yalnız { id, name } döner; kaydın yerine yazma, adı birleştir (C51)
     const idx = channels.value.findIndex((c) => c.id === groupId)
-    if (idx !== -1) channels.value[idx] = updated
+    if (idx !== -1)
+      channels.value[idx] = { ...channels.value[idx], name: res.data.name } as DmChannelDto
   }
 
   // Grup üyesi listesini store'da güncelle (WS veya optimistik güncelleme için)

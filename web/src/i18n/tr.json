@@ -1402,6 +1402,7 @@
     "deleteError": "Grup silinemedi.",
     "editGroup": "Düzenle",
     "renameGroup": "Yeniden Adlandır",
+    "settingsTitle": "Grup Ayarları",
     "renameTitle": "Grubu Yeniden Adlandır",
     "renameLabel": "Yeni ad",
     "renamePlaceholder": "Grup adı…",

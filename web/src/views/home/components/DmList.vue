@@ -12,7 +12,6 @@ import { useVoiceStore } from '@/stores/voice'
 import { voiceSubscribe, voiceUnsubscribe } from '@/composables/useSocket'
 import { useTyping } from '@/composables/useTyping'
 import { useResponsive } from '@/composables/useResponsive'
-import { useAppShellNav } from '@/composables/useAppShellNav'
 import { useDmMenuActions } from '@/composables/useDmMenuActions'
 import { usersApi } from '@/api/users'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
@@ -20,6 +19,7 @@ import ContextMenuShell from '@/components/shared/ContextMenuShell.vue'
 import MuteDurationFlyout from '@/components/shared/MuteDurationFlyout.vue'
 import NotifLevelFlyout from '@/components/shared/NotifLevelFlyout.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import GroupSettingsModal from './GroupSettingsModal.vue'
 import ReportModal from '@/components/shared/ReportModal.vue'
 import FullProfileModal from '@/components/shared/FullProfileModal.vue'
 import { formatMentionsPlain } from '@/utils/mentions'
@@ -39,7 +39,6 @@ const authStore = useAuthStore()
 const toast = useToastStore()
 const voiceStore = useVoiceStore()
 const { isMobile } = useResponsive()
-const { openGroupPanel } = useAppShellNav()
 const { typingUsersForChannel } = useTyping(() => null)
 
 // C9: bekleyen mesaj isteği kanalları normal DM listesinde GÖRÜNMEZ (istek kutusuna gider).
@@ -300,20 +299,14 @@ async function doAddGroupMember(userId: string) {
   }
 }
 
-// ── Grup DM: Düzenle (Sprint R18 §2 — YENİ MODAL YOK. Grup ayarları yüzeyi zaten
-// `GroupManagePanel.vue`; menü yalnız açar, gerekiyorsa önce gruba geçer. Panel state'i
-// `useAppShellNav`in paylaşılan singleton'ında (`DmConversation` da aynısını okuyor) —
-// router.push'in `afterEach` hook'u state'i breakpoint varsayılanına döndürüyor, bu yüzden
-// `openGroupPanel()` navigasyon TAMAMLANDIKTAN SONRA çağrılıyor; sıra tersine çevrilirse
-// zorla-açma anında ezilir. ──
-async function openGroupSettings() {
+// ── Grup DM: Düzenle (C51 — yerinde ayar modalı; yönlendirme yok, aktif sohbet değişmez).
+// Yalnız SAHİBE görünür (aşağıdaki `isGroupOwner`; kapı sunucuda zaten var). ──
+const settingsTarget = ref<GroupDmChannel | null>(null)
+
+function openGroupSettings() {
   const group = menuGroup.value
   closeMenu()
-  if (!group) return
-  if (props.activeChannelId !== group.id) {
-    await router.push({ name: 'dm', params: { channelId: group.id } })
-  }
-  openGroupPanel()
+  if (group) settingsTarget.value = group
 }
 
 // ── Grup DM: Gruptan Ayrıl (İş 2 — panelden taşındı, akış aynı: `dmStore.leaveGroup`) ──
@@ -346,7 +339,7 @@ async function confirmLeaveGroup() {
 // Onay deseni `leaveGroupTarget`/`confirmLeaveGroup` ile birebir aynı; mantık kopyalanmadı,
 // yalnız `dmStore.deleteGroup` çağrılıyor. İstemci `ownerId` kontrolü yalnız GİZLEME amaçlı —
 // kapı sunucuda (owner-only uç) zaten var, burada ikinci bir yetki üretilmiyor. ──
-const canDeleteGroup = computed(
+const isGroupOwner = computed(
   () => !!menuGroup.value && menuGroup.value.ownerId === authStore.user?.id,
 )
 
@@ -566,9 +559,8 @@ async function confirmDeleteGroup() {
       <span>{{ t('group.addMember') }}</span>
     </button>
 
-    <!-- 2c. Düzenle (yalnız grup DM — Sprint R18: `GroupManagePanel.vue`i açar, mantık orada
-         kalıyor, ikinci kopya yok) -->
-    <button v-if="menuGroup" class="kv-ctx__item" role="menuitem" @click="openGroupSettings">
+    <!-- 2c. Düzenle (yalnız grup SAHİBİ — C51: ayar modalını açar) -->
+    <button v-if="isGroupOwner" class="kv-ctx__item" role="menuitem" @click="openGroupSettings">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       <span>{{ t('group.editGroup') }}</span>
     </button>
@@ -614,7 +606,7 @@ async function confirmDeleteGroup() {
 
     <!-- 7c. Grubu Sil (yalnız SAHİP, en altta ayrı bir ayırıcıyla — Sprint R18 §3: geri
          alınamaz ve yalnız kendini değil tüm üyeleri etkiler, en yıkıcı aksiyon) -->
-    <template v-if="canDeleteGroup">
+    <template v-if="isGroupOwner">
       <div class="kv-ctx__divider" />
       <button class="kv-ctx__item kv-ctx__item--danger" role="menuitem" @click="askDeleteGroup">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
@@ -622,6 +614,14 @@ async function confirmDeleteGroup() {
       </button>
     </template>
   </ContextMenuShell>
+
+  <!-- Grup ayarları modalı (C51) -->
+  <GroupSettingsModal
+    v-if="settingsTarget"
+    :group-id="settingsTarget.id"
+    :group-name="settingsTarget.name"
+    @close="settingsTarget = null"
+  />
 
   <!-- Sohbeti temizle onayı (mevcut metin/akış) -->
   <ConfirmDialog

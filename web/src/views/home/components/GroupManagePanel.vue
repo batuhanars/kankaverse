@@ -10,15 +10,12 @@ import type { GroupDmMemberDto } from '@/types'
 
 const props = defineProps<{
   groupId: string
-  groupName: string | null
   ownerId: string
   members: GroupDmMemberDto[]
 }>()
-// İş 2 (2026-08-03): "Üye Ekle" + "Ayrıl" düğmeleri DM satırı sağ-tık menüsüne taşındı
-// (`DmList.vue`); panel yalnız üye listesi + owner'a özgü aksiyonları (yeniden adlandır/sil)
-// tutuyor. `left` bu yüzden artık hiç emit edilmiyor — zincir (`DmConversation`/`DmView`)
-// birlikte temizlendi (dead wiring bırakılmadı).
-const emit = defineEmits<{ close: []; deleted: [] }>()
+// Üye Ekle, Ayrıl, Düzenle (ad) ve Grubu Sil DM satırı sağ-tık menüsünde (`DmList.vue`,
+// C51); panel yalnız üye listesi + üye çıkarma (sahip) tutuyor.
+const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 const dmStore = useDmStore()
@@ -74,44 +71,6 @@ async function removeMember() {
   } finally {
     removing.value = false
     removeMemberTarget.value = null
-  }
-}
-
-// --- Sil (owner) ---
-const showDeleteConfirm = ref(false)
-const deleting = ref(false)
-
-async function deleteGroup() {
-  deleting.value = true
-  try {
-    await dmStore.deleteGroup(props.groupId)
-    emit('deleted')
-  } catch {
-    // sessiz hata
-  } finally {
-    deleting.value = false
-    showDeleteConfirm.value = false
-  }
-}
-
-// --- Yeniden adlandır (owner) ---
-const showRename = ref(false)
-const renameValue = ref(props.groupName ?? '')
-const renaming = ref(false)
-const renameError = ref('')
-
-async function renameGroup() {
-  const name = renameValue.value.trim()
-  if (!name || renaming.value) return
-  renameError.value = ''
-  renaming.value = true
-  try {
-    await dmStore.renameGroup(props.groupId, name)
-    showRename.value = false
-  } catch {
-    renameError.value = t('group.renameError')
-  } finally {
-    renaming.value = false
   }
 }
 </script>
@@ -185,90 +144,7 @@ async function renameGroup() {
         </button>
       </div>
     </div>
-
-    <!-- Aksiyonlar — "Üye Ekle" ve "Ayrıl" DM satırı sağ-tık menüsüne taşındı (İş 2, 2026-08-03;
-         bkz. `DmList.vue`). Yalnız owner-özel aksiyonlar kaldı; owner değilse bölüm tümden
-         gizlenir (iki düğme çıkınca boş bir dip bırakmasın). -->
-    <div v-if="isOwner" class="px-3 pb-4 pt-2 shrink-0 border-t space-y-1" style="border-color: var(--kv-border-subtle);">
-      <!-- Yeniden Adlandır (owner) -->
-      <button
-        class="w-full text-left px-3 py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium cursor-pointer transition-colors"
-        style="color: var(--kv-text-secondary);"
-        @mouseenter="($event.target as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
-        @mouseleave="($event.target as HTMLElement).style.backgroundColor = 'transparent'"
-        @click="showRename = true; renameValue = groupName ?? ''"
-      >
-        ✏️ {{ t('group.renameGroup') }}
-      </button>
-
-      <!-- Grubu Sil (owner) -->
-      <button
-        class="w-full text-left px-3 py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium cursor-pointer transition-colors"
-        style="color: var(--kv-text-muted);"
-        @mouseenter="($event.target as HTMLElement).style.color = 'var(--kv-danger)'"
-        @mouseleave="($event.target as HTMLElement).style.color = 'var(--kv-text-muted)'"
-        @click="showDeleteConfirm = true"
-      >
-        🗑 {{ t('group.deleteGroup') }}
-      </button>
-    </div>
   </aside>
-
-  <!-- Yeniden adlandır mini-modal -->
-  <div
-    v-if="showRename"
-    class="fixed inset-0 z-50 flex items-center justify-center"
-    style="background-color: rgba(0,0,0,0.5);"
-    @click.self="showRename = false"
-  >
-    <div
-      class="w-[360px] rounded-[var(--kv-radius-lg)] overflow-hidden"
-      style="background-color: var(--kv-bg-sidebar);"
-    >
-      <div class="flex items-center justify-between px-4 py-3 border-b" style="border-color: var(--kv-border-subtle);">
-        <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">{{ t('group.renameTitle') }}</h3>
-        <button class="text-[18px] cursor-pointer hover:opacity-70" style="color: var(--kv-text-muted);" @click="showRename = false">✕</button>
-      </div>
-      <div class="px-4 py-4">
-        <label class="block text-[11px] font-semibold uppercase tracking-wide mb-1" style="color: var(--kv-text-muted);">
-          {{ t('group.renameLabel') }}
-        </label>
-        <input
-          v-model="renameValue"
-          maxlength="50"
-          :placeholder="t('group.renamePlaceholder')"
-          class="w-full px-3 py-2 rounded-[var(--kv-radius-md)] text-[14px] outline-none border"
-          style="background-color: var(--kv-bg-content); border-color: var(--kv-border-strong); color: var(--kv-text-primary);"
-          @keydown.enter="renameGroup"
-        />
-        <p v-if="renameError" class="text-[13px] mt-1" style="color: var(--kv-danger);">{{ renameError }}</p>
-      </div>
-      <div class="flex justify-end gap-2 px-4 pb-4">
-        <button
-          class="px-4 py-2 text-[14px] rounded-[var(--kv-radius-md)] cursor-pointer hover:opacity-80"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
-          @click="showRename = false"
-        >{{ t('common.cancel') }}</button>
-        <button
-          class="px-4 py-2 text-[14px] font-semibold rounded-[var(--kv-radius-md)] cursor-pointer hover:opacity-90 transition-opacity"
-          :class="!renameValue.trim() || renaming ? 'opacity-50 cursor-not-allowed' : ''"
-          style="background-color: var(--kv-accent-500); color: #fff;"
-          :disabled="!renameValue.trim() || renaming"
-          @click="renameGroup"
-        >{{ t('group.renameAction') }}</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Sil onayı (owner) -->
-  <ConfirmDialog
-    v-if="showDeleteConfirm"
-    :message="t('group.deleteConfirm')"
-    :confirm-label="t('group.deleteAction')"
-    :loading="deleting"
-    @confirm="deleteGroup"
-    @cancel="showDeleteConfirm = false"
-  />
 
   <!-- Üye çıkar onayı (owner) -->
   <ConfirmDialog

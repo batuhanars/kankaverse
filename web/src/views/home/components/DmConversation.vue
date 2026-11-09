@@ -109,7 +109,7 @@ const props = defineProps<{
   profilePanelOpen?: boolean
 }>()
 // `left` kalktı: GroupManagePanel artık hiç emit etmiyor (İş 2 — ayrıl DM satırı menüsüne taşındı).
-const emit = defineEmits<{ deleted: []; toggleProfile: [] }>()
+const emit = defineEmits<{ toggleProfile: [] }>()
 
 const { t } = useI18n()
 const optimistic = useOptimisticSend()
@@ -1133,11 +1133,9 @@ const dayLabels = computed<(string | null)[]>(() =>
     <GroupManagePanel
       v-if="isGroup && showGroupPanel && groupChannel"
       :group-id="groupChannel.id"
-      :group-name="groupChannel.name"
       :owner-id="groupChannel.ownerId"
       :members="groupChannel.members"
       @close="closeGroupPanel"
-      @deleted="emit('deleted')"
     />
   </div>
 
