@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AUTOMOD_WORDS } from '../../config/automod-words';
+import { AUTOMOD_SAFE_PREFIXES, AUTOMOD_WORDS } from '../../config/automod-words';
 
 export interface AutomodResult {
   blocked: boolean;
@@ -32,11 +32,13 @@ export interface AutomodResult {
 export class AutomodService {
   private readonly bannedWords: string[]; // tek kelime — prefix eşleşmesi
   private readonly bannedPhrases: string[]; // çok kelime — substring eşleşmesi
+  private readonly safePrefixes: string[]; // masum kök — tek kelime eşleşmesini atlatır
 
   constructor() {
     const normalized = AUTOMOD_WORDS.map((w) => this.normalize(w));
     this.bannedWords = normalized.filter((w) => w.length > 0 && !w.includes(' '));
     this.bannedPhrases = normalized.filter((w) => w.includes(' '));
+    this.safePrefixes = AUTOMOD_SAFE_PREFIXES.map((w) => this.normalize(w));
   }
 
   check(content: string): AutomodResult {
@@ -49,9 +51,16 @@ export class AutomodService {
 
     // Tek kelime → token başı (prefix). `ı` normalize'de korunduğu için token
     // sınıfına dahil; gerisi a-z0-9.
-    const tokens = normalized.split(/[^a-z0-9ı]+/).filter(Boolean);
+    // Masum kök istisnası (`şikayet` → `sikayet`): kök SİLİNİR, kalan kısım yine denetlenir.
+    // Tümden serbest bırakmak kaçış yolu olurdu (kökün ardına küfür yapıştırmak).
+    const tokens = normalized.split(/[^a-z0-9ı]+/).filter(Boolean).map((t) => this.stripSafePrefix(t));
     const blocked = tokens.some((token) => this.bannedWords.some((word) => token.startsWith(word)));
     return { blocked };
+  }
+
+  private stripSafePrefix(token: string): string {
+    const safe = this.safePrefixes.find((s) => token.startsWith(s));
+    return safe ? token.slice(safe.length) : token;
   }
 
   private normalize(text: string): string {
