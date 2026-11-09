@@ -17,4 +17,11 @@ require('@livekit/react-native').registerGlobals();
 // C50: veri-yalniz mesaj push gorevi, headless baslangicta da yuklenmeli.
 require('./src/notifications/conversationPush');
 
+// SPIKE quick-reply: JS runtime kimligi (UI ve headless ayni runtime mi?) + Cevapla headless gorevi.
+// Release testinde de gorunsun diye __DEV__ arkasinda DEGIL.
+globalThis.__kvRuntimeId = globalThis.__kvRuntimeId ?? Math.random().toString(36).slice(2, 8);
+const { AppRegistry } = require('react-native');
+const { runQuickReply } = require('./src/notifications/quickReplySpike');
+AppRegistry.registerHeadlessTask('KvQuickReply', () => runQuickReply);
+
 require('expo-router/entry');

@@ -18,6 +18,11 @@ android {
   }
 }
 
+dependencies {
+  // QuickReplyService HeadlessJsTaskService'ten turer (expo-modules-core react-android'i `implementation` aldigi icin burada acik).
+  compileOnly 'com.facebook.react:react-android'
+}
+
 repositories {
   mavenCentral()
 }

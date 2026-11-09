@@ -156,6 +156,7 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
       groupInitial: groupInitialOf(m),
       notificationChannelId: MESSAGE_CHANNEL_ID,
       meName: t('mobile.notifications.me'),
+      replyLabel: t('mobile.notifications.reply'),
       color: accentColor(),
     });
   } catch (e) {

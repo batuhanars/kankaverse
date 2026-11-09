@@ -18,6 +18,16 @@ class ConversationNotificationModule : Module() {
       }
     }
 
+    // SPIKE quick-reply: bildirime "ben"den mesaj ekler (yanit gitti / gonderilemedi gostergesi).
+    AsyncFunction("appendOwnReply") { conversationId: String, text: String, timestamp: Double ->
+      val context = appContext.reactContext
+      if (context != null) {
+        ConversationNotifier.appendOwnReply(context, conversationId, text, timestamp.toLong())
+      } else {
+        false
+      }
+    }
+
     AsyncFunction("dismiss") { conversationId: String ->
       val context = appContext.reactContext
       if (context != null) {

@@ -8,6 +8,7 @@ import { usePushNotificationResponder } from '@/notifications/push';
 import { useIncomingCallResponder } from '@/notifications/incomingCall';
 import { useShareIntentCapture } from '@/hooks/useShareIntentCapture';
 import { theme } from '@/theme';
+import { getRuntimeId } from '@/notifications/quickReplySpike';
 import { MiniCallWindow } from '@/components/call/MiniCallWindow';
 import { IncomingCallBanner } from '@/components/call/IncomingCallBanner';
 import { CallPipOverlay } from '@/components/call/CallPipOverlay';
@@ -46,6 +47,11 @@ export default function RootLayout() {
   // Contract §4 — açılışta secure store'daki refresh ile sessiz bootstrap (splash boyunca sürer).
   // bootstrap() kendi içinde tek-uçuşa indirgenmiştir (bkz. stores/auth.ts bootstrapPromise) —
   // bu effect dev'de (StrictMode/Fast Refresh) birden çok tetiklense bile gerçek iş bir kez olur.
+  useEffect(() => {
+    // SPIKE quick-reply: UI runtime kimligi (release'te de gorunur).
+    console.log('[spike-reply] ui runtime', getRuntimeId());
+  }, []);
+
   useEffect(() => {
     bootstrap();
   }, [bootstrap]);
