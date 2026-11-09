@@ -3,6 +3,7 @@ import { ref, watch, nextTick, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import EmojiPickerLib, { type EmojiExt } from 'vue3-emoji-picker'
 import { getFrequentEmojis, recordEmojiUse } from '@/utils/frequentEmojis'
+import { useEmojiPickerActiveGroup } from '@/composables/useEmojiPickerActiveGroup'
 // @ts-ignore — CSS side-effect import; no type declarations needed
 import 'vue3-emoji-picker/css'
 
@@ -25,6 +26,9 @@ const props = withDefaults(
 const { t } = useI18n()
 
 const emit = defineEmits<{ select: [emoji: string] }>()
+
+const root = ref<HTMLElement | null>(null)
+useEmojiPickerActiveGroup(root)
 
 function onSelect(emoji: EmojiExt) {
   if (props.trackFrequent) recordEmojiUse(emoji.i)
@@ -125,7 +129,7 @@ onUnmounted(() => {
 <template>
   <!-- Teleport modunda (anchorEl verilmişse): body'e Teleport et, position:fixed -->
   <Teleport v-if="anchorEl" to="body">
-    <div class="kv-emoji-picker" :style="style" @click.stop>
+    <div ref="root" class="kv-emoji-picker" :style="style" @click.stop>
       <EmojiPickerLib
         :native="true"
         theme="dark"
@@ -139,7 +143,7 @@ onUnmounted(() => {
   </Teleport>
 
   <!-- Geriye dönük uyumlu mod (anchorEl yoksa): normal akışta render -->
-  <div v-else class="kv-emoji-picker" @click.stop>
+  <div v-else ref="root" class="kv-emoji-picker" @click.stop>
     <EmojiPickerLib
       :native="true"
       theme="dark"
@@ -173,5 +177,33 @@ onUnmounted(() => {
   /* makul boyut + iç scroll */
   height: 360px;
   width: 300px;
+}
+
+/*
+  Aktif kategori (sahip 2026-11-09): tıklanan/görünen grubun ikonu Kor. Kütüphanenin ikonu <img>,
+  rengi değişmiyor; görsel maske olarak çizilir (adres `--kv-icon`, bkz. useEmojiPickerActiveGroup).
+*/
+.kv-emoji-picker :deep(.v3-header .v3-groups .v3-group) {
+  opacity: 1;
+  padding: 4px 0;
+  border-radius: var(--kv-radius-sm);
+}
+.kv-emoji-picker :deep(.v3-header .v3-groups .v3-group img) {
+  visibility: hidden;
+}
+.kv-emoji-picker :deep(.v3-header .v3-groups .v3-group span) {
+  background-color: var(--kv-text-muted);
+  -webkit-mask: var(--kv-icon) center / 1em no-repeat;
+  mask: var(--kv-icon) center / 1em no-repeat;
+  transition: background-color 0.15s;
+}
+.kv-emoji-picker :deep(.v3-header .v3-groups .v3-group:hover span) {
+  background-color: var(--kv-text-secondary);
+}
+.kv-emoji-picker :deep(.v3-header .v3-groups .v3-group.kv-active) {
+  background-color: var(--kv-accent-subtle);
+}
+.kv-emoji-picker :deep(.v3-header .v3-groups .v3-group.kv-active span) {
+  background-color: var(--kv-accent-500);
 }
 </style>
