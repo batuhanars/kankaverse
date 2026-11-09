@@ -613,18 +613,22 @@ export function groupCallCancel(channelId: string): void {
  */
 function emitCallSignal(event: 'voice:call_accept' | 'voice:call_reject', channelId: string): void {
   const s = ensureSocket();
-  if (!s.connected) s.connect();
-  let acked = false;
-  s.emit(event, { channelId }, () => {
-    acked = true;
-    if (__DEV__) console.log(`[voice] ${event} ack alindi`);
-  });
-  if (__DEV__) {
-    console.log(`[voice] ${event} gonderildi, connected=${s.connected}`);
-    setTimeout(() => {
-      if (!acked) console.warn(`[voice] ${event} ACK GELMEDI — sunucuya ulasmamis olabilir`);
-    }, 3000);
+  const startedAt = Date.now();
+  // C52 cihaz turu: kayıtlar release'te de açık (arayan tarafta zil susmuyordu; tahmin değil ölçüm).
+  console.log(`[call] ${event} emit`, channelId, 'connected', s.connected, 'access?', !!getAccessToken());
+  if (!s.connected) {
+    s.connect();
+    s.once('connect', () => console.log(`[call] ${event} socket baglandi`, Date.now() - startedAt, 'ms'));
+    s.once('connect_error', (e: Error) => console.log(`[call] ${event} connect_error`, e.message));
   }
+  let acked = false;
+  s.emit(event, { channelId }, (ack: unknown) => {
+    acked = true;
+    console.log(`[call] ${event} ack`, JSON.stringify(ack), Date.now() - startedAt, 'ms');
+  });
+  setTimeout(() => {
+    if (!acked) console.log(`[call] ${event} ACK GELMEDI 5sn`, 'connected', s.connected);
+  }, 5000);
 }
 
 /** C53: soket şu an bağlı mı? (Bağlı değilken arama reddi HTTP ucuna düşer.) */

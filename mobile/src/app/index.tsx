@@ -13,6 +13,7 @@ import {
   setPendingTarget,
   setResumedGuild,
 } from '@/utils/resumeLastScreen';
+import { hasNativeConversationTap } from '@/notifications/responseGate';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -104,16 +105,20 @@ export default function Index() {
   }
   // C41 - Paylaşımla açılış açık hedeflidir (C38 §0.7): "kaldığın yerden aç" uygulanmaz.
   const sharePending = useShareIntentStore((s) => s.payload !== null);
+  // C52: yerel sohbet bildirimine dokunarak açılış da açık hedeflidir (expo yanıtı olmadığı için
+  // `notif.present` bunu görmez); aksi halde kayıt sürdürme tap'in push'unu `replace` ile ezer.
+  const nativeTap = hasNativeConversationTap();
   const mayResume =
     status === 'authenticated' &&
     !!userId &&
     !resumeAttempted &&
     !sharePending &&
+    !nativeTap &&
     !(notif.present && !notif.stale);
 
   useEffect(() => {
-    if (status === 'authenticated' && sharePending) resumeAttempted = true;
-  }, [status, sharePending]);
+    if (status === 'authenticated' && (sharePending || nativeTap)) resumeAttempted = true;
+  }, [status, sharePending, nativeTap]);
 
   useEffect(() => {
     if (!mayResume || !userId) return;

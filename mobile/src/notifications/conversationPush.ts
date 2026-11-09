@@ -165,6 +165,7 @@ function parseCallResponse(raw: unknown): CallResponse | null {
 
 async function handleCall(p: Record<string, unknown>): Promise<boolean> {
   const callChannelId = str(p.callChannelId);
+  if (p.kind === 'call' || p.kind === 'call_end') console.log('[call] task:', p.kind, callChannelId);
   if (p.kind === 'call_end') {
     if (callChannelId) await incomingCallModule().dismissIncomingCall(callChannelId);
     return true;
@@ -183,7 +184,11 @@ async function handleCall(p: Record<string, unknown>): Promise<boolean> {
 TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
   try {
     const response = parseCallResponse(data);
+    if (!response && asObject(data)?.actionIdentifier !== undefined) {
+      console.log('[call] task: yanit ayristirilamadi (arama degil ya da veri yok)', JSON.stringify(data));
+    }
     if (response) {
+      console.log('[call] task: yanit', response.actionIdentifier, response.channelId, 'group', response.isGroup);
       // Düğme yanıtı yalnız uygulama ön planda değilken görevi çalıştırır. `accept` uygulamayı açar,
       // bekleyen yanıtı `useIncomingCallResponder` işler; burada yapılacak bir şey yok.
       if (response.actionIdentifier === 'reject') {
