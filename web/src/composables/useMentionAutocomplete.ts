@@ -17,6 +17,7 @@
  *   - pendingMentions                        → { username → userId } haritası (gönderimde kullanılır)
  */
 import { ref, computed } from 'vue'
+import { resolveMentionsForEdit } from '@/utils/mentions'
 
 export interface MentionMember {
   id: string
@@ -211,6 +212,21 @@ export function useMentionAutocomplete(
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
 
+  /**
+   * C54 — düzenlemeye giriş: token'ları ada çevirir ve çözülenleri pending haritalarına önceden
+   * doldurur; böylece kullanıcının dokunmadığı etiketler applyMentionTokens ile geri token olur.
+   */
+  function prepareEdit(
+    content: string,
+    resolveUser: (id: string) => string | undefined,
+    resolveRole: (roleId: string) => { name: string; isEveryone?: boolean } | undefined,
+  ): string {
+    const r = resolveMentionsForEdit(content, resolveUser, resolveRole)
+    pendingMentions.value = new Map(r.users)
+    pendingRoles.value = new Map(r.roles)
+    return r.text
+  }
+
   function clearPending() {
     pendingMentions.value = new Map()
     pendingRoles.value = new Map()
@@ -232,6 +248,7 @@ export function useMentionAutocomplete(
     onKeydown,
     selectSuggestion,
     applyMentionTokens,
+    prepareEdit,
     clearPending,
     closePopover,
   }

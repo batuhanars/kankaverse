@@ -36,3 +36,41 @@ export function formatMentionsPlain(
       return '@' + (resolve(id) ?? fallback)
     })
 }
+
+export interface EditMentionResolved {
+  text: string
+  /** @kullanıcıAdı → userId (composer'ın pendingMentions biçimi) */
+  users: Array<[string, string]>
+  /** rolAdı → roleId (composer'ın pendingRoles biçimi, '@'siz) */
+  roles: Array<[string, string]>
+}
+
+/**
+ * C54 — düzenlemeye girerken token'ları okunur ada çevirir (görüntülemedeki çözümleyicilerle).
+ * Çözülemeyen token (silinmiş kullanıcı/rol) OLDUĞU GİBİ kalır ki kaydederken kaybolmasın.
+ * everyone rolü '@everyone' metni olur ve haritaya girmez (geri çevirisini composer'ın
+ * everyoneRoleId yolu yapar).
+ */
+export function resolveMentionsForEdit(
+  content: string,
+  resolveUser: (id: string) => string | undefined,
+  resolveRole: (roleId: string) => { name: string; isEveryone?: boolean } | undefined,
+): EditMentionResolved {
+  const users: Array<[string, string]> = []
+  const roles: Array<[string, string]> = []
+  const text = content
+    .replace(ROLE_MENTION_RE, (match, roleId: string) => {
+      const role = resolveRole(roleId)
+      if (!role) return match
+      if (role.isEveryone) return '@everyone'
+      roles.push([role.name, roleId])
+      return prefixRoleName(role.name)
+    })
+    .replace(MENTION_RE, (match, id: string) => {
+      const name = resolveUser(id)
+      if (!name) return match
+      users.push([name, id])
+      return `@${name}`
+    })
+  return { text, users, roles }
+}

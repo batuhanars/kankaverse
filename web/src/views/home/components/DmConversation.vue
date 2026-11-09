@@ -137,12 +137,15 @@ const dmMentionMembers = computed(() => {
 })
 
 // Sprint V2: mention çözücü — userId → username (DM katılımcıları)
-function dmMentionResolver(userId: string): string {
+function dmUserName(userId: string): string | undefined {
   const member = dmMentionMembers.value.find((m) => m.id === userId)
   if (member) return member.username
   // Gönderen kendisi de olabilir
   if (userId === authStore.user?.id) return authStore.user.username
-  return t('mention.unknown')
+  return undefined
+}
+function dmMentionResolver(userId: string): string {
+  return dmUserName(userId) ?? t('mention.unknown')
 }
 
 // Sprint V2: kendi-bahsedilme vurgusu (DM bağlamı)
@@ -158,6 +161,17 @@ const mention = useMentionAutocomplete(
   () => dmTextareaEl.value?.selectionStart ?? 0,
   (pos) => { nextTick(() => { dmTextareaEl.value?.setSelectionRange(pos, pos) }) },
 )
+
+// C54: düzenleme kutusu için token<->ad dönüşümü (composer'dan ayrı örnek; pending haritaları karışmasın)
+const editMention = useMentionAutocomplete(
+  () => [],
+  () => editState.value?.content ?? '',
+  (v) => { if (editState.value) editState.value.content = v },
+  () => 0,
+  () => {},
+)
+// Değişmeden kaydedilirse sunucuya gönderilmez
+let editInitial = ''
 
 // Tip yardımcıları
 const isGroup = computed(() => props.channel.type === 'GROUP_DM')
@@ -252,7 +266,9 @@ function openReportMessage(msgId: string) {
 
 // Sprint 6.2: düzenleme fonksiyonları
 function startEdit(msg: MessageDto) {
-  editState.value = { messageId: msg.id, content: msg.content, loading: false, error: '' }
+  const text = editMention.prepareEdit(msg.content, dmUserName, () => undefined)
+  editInitial = text
+  editState.value = { messageId: msg.id, content: text, loading: false, error: '' }
   nextTick(() => {
     if (editTextareaEl.value) {
       editTextareaEl.value.focus()
@@ -271,10 +287,14 @@ async function saveEdit() {
   const state = editState.value
   const trimmed = state.content.trim()
   if (!trimmed) return
+  if (state.content === editInitial) {
+    cancelEdit()
+    return
+  }
   state.loading = true
   state.error = ''
   try {
-    const { data } = await messagesApi.editMessage(props.channel.id, state.messageId, trimmed)
+    const { data } = await messagesApi.editMessage(props.channel.id, state.messageId, editMention.applyMentionTokens(trimmed))
     messagesStore.updateMessage(data)
     editState.value = null
   } catch (e: unknown) {

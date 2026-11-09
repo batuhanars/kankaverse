@@ -12,6 +12,7 @@ import ForwardMessageModal from './ForwardMessageModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import ReactionPill from './ReactionPill.vue'
 import ReactionsModal from './ReactionsModal.vue'
+import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
 import type { MessageDto, GuildMemberDto } from '@/types'
 
 const props = defineProps<{
@@ -74,6 +75,22 @@ const isMentioned = computed(() => {
   }
   return false
 })
+
+// C54: düzenleme kutusu için token<->ad dönüşümü (composer'ın aynı fonksiyonları; popover kullanılmaz)
+const editMention = useMentionAutocomplete(
+  () => [],
+  () => editContent.value,
+  (v) => { editContent.value = v },
+  () => 0,
+  () => {},
+  () => {
+    if (!props.guildId) return null
+    const everyone = rolesStore.rolesFor(props.guildId).find((r) => r.isEveryone)
+    return everyone?.mentionable ? everyone.id : null
+  },
+)
+// Düzenleme başlangıç metni: değişmeden kaydedilirse sunucuya gönderilmez
+let editInitial = ''
 
 // Kullanıcı kartı popover (yazar adına tıklama — MessageRow gelecekte emit ile bağlanabilir)
 const showCard = ref(false)
@@ -145,7 +162,12 @@ function closeCard() {
 
 // Düzenleme
 function startEdit() {
-  editContent.value = props.message.content
+  editContent.value = editMention.prepareEdit(
+    props.message.content,
+    (id) => props.guildMembers?.find((m) => m.userId === id)?.username,
+    (id) => (props.guildId ? rolesStore.rolesFor(props.guildId).find((r) => r.id === id) : undefined),
+  )
+  editInitial = editContent.value
   editError.value = ''
   editing.value = true
   nextTick(() => {
@@ -165,13 +187,17 @@ function cancelEdit() {
 async function saveEdit() {
   const trimmed = editContent.value.trim()
   if (!trimmed || editLoading.value) return
+  if (editContent.value === editInitial) {
+    cancelEdit()
+    return
+  }
   editLoading.value = true
   editError.value = ''
   try {
     const { data } = await messagesApi.editMessage(
       props.message.channelId,
       props.message.id,
-      trimmed,
+      editMention.applyMentionTokens(trimmed),
     )
     messagesStore.updateMessage(data)
     editing.value = false
