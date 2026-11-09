@@ -8,13 +8,16 @@ import { t } from '@/i18n';
  * kullanımda dolduğu için burada tek kaynağa çıkarıldı (web `MuteDurationFlyout.vue` karşılığı).
  */
 
+/** C55: bildirimden "Sessize al" süresi (dakika); süre listesindeki 8 saat seçeneğiyle aynı sabit. */
+export const NOTIFICATION_QUICK_MUTE_MINUTES = 480;
+
 /** `SelectSheet` süre seçenekleri — sözleşme §4.5, i18n anahtarları zaten var. `'forever'` = süresiz. */
 export function getMuteDurationOptions(): SelectOption[] {
   return [
     { value: '15', label: t('guildMenu.mute15m') },
     { value: '60', label: t('guildMenu.mute1h') },
     { value: '180', label: t('guildMenu.mute3h') },
-    { value: '480', label: t('guildMenu.mute8h') },
+    { value: String(NOTIFICATION_QUICK_MUTE_MINUTES), label: t('guildMenu.mute8h') },
     { value: '1440', label: t('guildMenu.mute24h') },
     { value: 'forever', label: t('guildMenu.muteForever') },
   ];

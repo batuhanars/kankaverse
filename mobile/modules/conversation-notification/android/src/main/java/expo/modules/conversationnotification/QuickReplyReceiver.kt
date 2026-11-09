@@ -8,20 +8,29 @@ import androidx.core.app.RemoteInput
 import com.facebook.react.HeadlessJsTaskService
 
 /**
- * Bildirimdeki Cevapla eyleminin hedefi. Yazilan metni RemoteInput'tan okur ve headless JS servisini
+ * Bildirimdeki Cevapla / Okundu / Sessize al eylemlerinin hedefi. Yazilan metni RemoteInput'tan okur ve headless JS servisini
  * baslatir (uygulama oldurulmus olsa da JS calisir). Is mantigi yok: gonderme JS'te.
  */
 class QuickReplyReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
-    val text = RemoteInput.getResultsFromIntent(intent)
-      ?.getCharSequence(ConversationNotifier.REPLY_KEY)?.toString()?.trim()
     val conversationId = intent.getStringExtra(ConversationNotifier.EXTRA_CONVERSATION_ID)
-    if (text.isNullOrEmpty() || conversationId == null) return
+    val action = intent.getStringExtra(ConversationNotifier.EXTRA_ACTION) ?: ConversationNotifier.ACTION_REPLY
+    val text = if (action == ConversationNotifier.ACTION_REPLY) {
+      RemoteInput.getResultsFromIntent(intent)
+        ?.getCharSequence(ConversationNotifier.REPLY_KEY)?.toString()?.trim()
+    } else {
+      null
+    }
+    if (conversationId == null) return
+    if (action == ConversationNotifier.ACTION_REPLY && text.isNullOrEmpty()) return
+    // C55: okundu / sessize al'da bildirim ag istegini beklemeden HEMEN kapanir (anlik geri bildirim).
+    if (action != ConversationNotifier.ACTION_REPLY) ConversationNotifier.dismiss(context, conversationId)
 
     val service = Intent(context, QuickReplyService::class.java)
       .putExtra(ConversationNotifier.EXTRA_CONVERSATION_ID, conversationId)
       .putExtra(ConversationNotifier.EXTRA_TYPE, intent.getStringExtra(ConversationNotifier.EXTRA_TYPE))
       .putExtra(ConversationNotifier.EXTRA_GUILD_ID, intent.getStringExtra(ConversationNotifier.EXTRA_GUILD_ID))
+      .putExtra(ConversationNotifier.EXTRA_ACTION, action)
       .putExtra(QuickReplyService.EXTRA_TEXT, text)
     // Servis ayaga kalkana kadar islemci uyumasin (HeadlessJsTaskService dokumani: receiver'dan baslatirken sart).
     HeadlessJsTaskService.acquireWakeLockNow(context)

@@ -30,6 +30,10 @@ export type ConversationNotificationParams = {
   messageId: string | null;
   /** Cevapla eyleminin etiketi (i18n mobile.notifications.reply); yoksa eylem eklenmez. */
   replyLabel?: string | null;
+  /** C55: "Okundu olarak işaretle" eyleminin etiketi (i18n mobile.notifications.markRead); yoksa eklenmez. */
+  markReadLabel?: string | null;
+  /** C55: "Sessize al" eyleminin etiketi (i18n mobile.notifications.mute); yoksa eklenmez. */
+  muteLabel?: string | null;
 };
 
 export type ConversationTap = {

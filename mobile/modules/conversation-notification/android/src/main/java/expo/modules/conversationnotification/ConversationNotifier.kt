@@ -46,6 +46,12 @@ object ConversationNotifier {
   /** RemoteInput sonuc anahtari (Cevapla eylemi). */
   internal const val REPLY_KEY = "kv_reply_text"
 
+  // C55: eylem turu (alici -> JS). Eski bildirimlerde ekstra yoktur; yoklukta "reply" sayilir.
+  internal const val EXTRA_ACTION = "kv_action"
+  internal const val ACTION_REPLY = "reply"
+  internal const val ACTION_MARK_READ = "markRead"
+  internal const val ACTION_MUTE = "mute"
+
   fun show(context: Context, p: Map<String, Any?>) {
     val conversationId = p["conversationId"] as? String ?: return
     val title = p["conversationTitle"] as? String
@@ -123,6 +129,22 @@ object ConversationNotifier {
     (p["replyLabel"] as? String)?.let { label ->
       builder.addAction(buildReplyAction(context, notifId, label, conversationId, type, guildId))
     }
+    (p["markReadLabel"] as? String)?.let { label ->
+      builder.addAction(
+        buildSimpleAction(
+          context, label, conversationId, type, guildId, ACTION_MARK_READ,
+          NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ,
+        ),
+      )
+    }
+    (p["muteLabel"] as? String)?.let { label ->
+      builder.addAction(
+        buildSimpleAction(
+          context, label, conversationId, type, guildId, ACTION_MUTE,
+          NotificationCompat.Action.SEMANTIC_ACTION_MUTE,
+        ),
+      )
+    }
     if (color != null) builder.setColor(color)
     // Android <11 icin sol tarafta buyuk ikon.
     if (conversationIcon != null) builder.setLargeIcon(conversationIcon)
@@ -156,6 +178,7 @@ object ConversationNotifier {
   ): NotificationCompat.Action {
     val intent = Intent(context, QuickReplyReceiver::class.java)
       .putExtra(EXTRA_CONVERSATION_ID, conversationId)
+      .putExtra(EXTRA_ACTION, ACTION_REPLY)
     type?.let { intent.putExtra(EXTRA_TYPE, it) }
     guildId?.let { intent.putExtra(EXTRA_GUILD_ID, it) }
     val flags = PendingIntent.FLAG_UPDATE_CURRENT or
@@ -166,6 +189,36 @@ object ConversationNotifier {
       .addRemoteInput(remoteInput)
       .setAllowGeneratedReplies(false)
       .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+      .setShowsUserInterface(false)
+      .build()
+  }
+
+  /**
+   * Okundu / Sessize al eylemi (C55). RemoteInput yok: IMMUTABLE, acik bilesen. Ayni aliciya giden
+   * uc PendingIntent'in birbirine karismamasi icin sohbet + eylem basina ayri request code ve
+   * ayri intent action verilir (intent esitligi ekstralara bakmaz).
+   */
+  private fun buildSimpleAction(
+    context: Context,
+    label: String,
+    conversationId: String,
+    type: String?,
+    guildId: String?,
+    action: String,
+    semantic: Int,
+  ): NotificationCompat.Action {
+    val intent = Intent(context, QuickReplyReceiver::class.java)
+      .setAction("kv.notification.$action")
+      .putExtra(EXTRA_CONVERSATION_ID, conversationId)
+      .putExtra(EXTRA_ACTION, action)
+    type?.let { intent.putExtra(EXTRA_TYPE, it) }
+    guildId?.let { intent.putExtra(EXTRA_GUILD_ID, it) }
+    val requestCode = "$conversationId:$action".hashCode()
+    val pending = PendingIntent.getBroadcast(
+      context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+    return NotificationCompat.Action.Builder(smallIconRes(context), label, pending)
+      .setSemanticAction(semantic)
       .setShowsUserInterface(false)
       .build()
   }
