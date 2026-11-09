@@ -28,6 +28,9 @@
 - Çevrimiçi olmayan cihaz: istek zaman aşımına düşer (mevcut 15 sn), "Gönderilemedi". Kuyruk/yeniden deneme YOK.
 - Deneme logları (`[spike-reply]`, `__kvRuntimeId`, `_layout.tsx` logu) KALDIRILIR.
 
+## §2.1 Kendi avatarım (Revize 1, 2026-11-09 sahip turu)
+Grup DM ve ortam bildiriminde "ben" satırlarına varsayılan simge geliyor. "Ben" `Person`'una kullanıcının kendi statik avatarı (daire kırpılmış) verilir. 1-1'de Android satır avatarı göstermiyor; değişiklik yok. Uygulama kapalıyken kullanıcı bilgisi bellekte olmadığı için avatar adresi oturum açıkken (auth store kullanıcısı yüklenince/değişince) AsyncStorage'a yazılır, görev oradan okur. Yalnız herkese açık avatar adresi; token/kişisel veri YOK. Çıkışta silinir. Avatar yoksa bugünkü gibi simgesiz.
+
 ## §3 Sürüm
 versionCode 60. Release APK PM tarafından kısa yol kopyasında, kaynakla `cmp` eşitlemesi doğrulanarak derlenir; APK'da yeni sınıflar aranır ([[kisa-yol-derleme-kopyasi]]). Dev APK derlemez.
 
