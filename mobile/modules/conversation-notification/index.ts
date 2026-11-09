@@ -12,6 +12,8 @@ export type ConversationNotificationParams = {
   senderName: string;
   senderAvatarUrl: string | null;
   conversationIconUrl: string | null;
+  /** Simgesiz grup için çizilecek baş harf (yoksa null); grupta gönderen avatarı asla simge olmaz. */
+  groupInitial: string | null;
   text: string;
   timestamp: number;
   /** Mevcut mesaj bildirim kanalı (push.ts MESSAGE_CHANNEL_ID). */

@@ -12,6 +12,7 @@ import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
+import android.graphics.Typeface
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -81,7 +82,11 @@ object ConversationNotifier {
     messages.forEach { style.addMessage(it) }
 
     val shortcutId = SHORTCUT_PREFIX + conversationId
-    pushShortcut(context, shortcutId, title ?: senderName, sender, convIcon ?: avatar)
+    // Sohbet simgesi: grupta grup simgesi ya da baş harf (gönderen avatarı ASLA), 1-1'de gönderen avatarı.
+    val groupInitial = p["groupInitial"] as? String
+    val conversationIcon: Bitmap? =
+      if (isGroup) convIcon ?: groupInitial?.let { drawInitial(it, color) } else convIcon ?: avatar
+    pushShortcut(context, shortcutId, title ?: senderName, sender, conversationIcon)
 
     val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)
     launch?.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -111,8 +116,7 @@ object ConversationNotifier {
     if (contentIntent != null) builder.setContentIntent(contentIntent)
     if (color != null) builder.setColor(color)
     // Android <11 icin sol tarafta buyuk ikon.
-    val large = convIcon ?: avatar
-    if (large != null) builder.setLargeIcon(large)
+    if (conversationIcon != null) builder.setLargeIcon(conversationIcon)
 
     try {
       NotificationManagerCompat.from(context).notify(conversationId, notifId, builder.build())
@@ -203,6 +207,24 @@ object ConversationNotifier {
       Log.w(TAG, "gorsel indirilemedi: $url", e)
       null
     }
+  }
+
+  /** Simgesiz grup için daire: verilen renkle dolu, ortada beyaz kalın baş harf. Renk yoksa nötr gri. */
+  private fun drawInitial(letter: String, fill: Int?): Bitmap {
+    val size = 192
+    val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(out)
+    val bg = Paint(Paint.ANTI_ALIAS_FLAG)
+    bg.color = fill ?: Color.GRAY
+    canvas.drawCircle(size / 2f, size / 2f, size / 2f, bg)
+    val fg = Paint(Paint.ANTI_ALIAS_FLAG)
+    fg.color = Color.WHITE
+    fg.typeface = Typeface.DEFAULT_BOLD
+    fg.textSize = size * 0.45f
+    fg.textAlign = Paint.Align.CENTER
+    val y = size / 2f - (fg.descent() + fg.ascent()) / 2f
+    canvas.drawText(letter, size / 2f, y, fg)
+    return out
   }
 
   private fun circle(src: Bitmap): Bitmap {

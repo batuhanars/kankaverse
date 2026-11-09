@@ -95,6 +95,20 @@ function parseRead(p: Record<string, unknown>): ReadData {
   return { conversationIds: ids.filter((i): i is string => typeof i === 'string' && i.length > 0) };
 }
 
+/**
+ * Simgesiz grup için baş harf: başlık "#kanal · Ortam" ise Ortam adı, değilse tüm başlık; baştaki
+ * '#' atılır, ilk grafem büyük harfe (tr-TR) çevrilir. Çizimi Kotlin yapar, karar burada.
+ */
+function groupInitialOf(m: MessageData): string | null {
+  if (!m.isGroup || m.conversationIconUrl || !m.conversationTitle) return null;
+  const title = m.conversationTitle;
+  const sep = ' · ';
+  const idx = title.lastIndexOf(sep);
+  const name = (idx >= 0 ? title.slice(idx + sep.length) : title).replace(/^#/, '').trim();
+  const first = Array.from(name)[0];
+  return first ? first.toLocaleUpperCase('tr-TR') : null;
+}
+
 /** Vurgu rengi tek kaynak: app.json `expo-notifications` eklenti ayarı. */
 function accentColor(): string | null {
   for (const plugin of appConfig.expo.plugins as unknown[]) {
@@ -139,6 +153,7 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
     if (isConversationInView(m.conversationId)) return;
     await showConversationNotification({
       ...m,
+      groupInitial: groupInitialOf(m),
       notificationChannelId: MESSAGE_CHANNEL_ID,
       meName: t('mobile.notifications.me'),
       color: accentColor(),
