@@ -650,48 +650,50 @@ async function confirmDeleteGroup() {
   />
 
   <!-- Grup: üye ekle mini-modal (İş 2 — GroupManagePanel'den taşındı, aynı akış/görünüm) -->
-  <div
-    v-if="addMemberTarget"
-    class="fixed inset-0 z-50 flex items-center justify-center"
-    style="background-color: rgba(0,0,0,0.5);"
-    @click.self="closeAddMember"
-  >
+  <Teleport to="body">
     <div
-      class="w-[360px] max-h-[60vh] flex flex-col rounded-[var(--kv-radius-lg)] overflow-hidden"
-      style="background-color: var(--kv-bg-sidebar);"
+      v-if="addMemberTarget"
+      class="fixed inset-0 z-50 flex items-center justify-center"
+      style="background-color: rgba(0,0,0,0.5);"
+      @click.self="closeAddMember"
     >
-      <div class="flex items-center justify-between px-4 py-3 border-b shrink-0" style="border-color: var(--kv-border-subtle);">
-        <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
-          {{ t('group.addMemberTitle') }}
-        </h3>
-        <button class="text-[18px] cursor-pointer hover:opacity-70" style="color: var(--kv-text-muted);" @click="closeAddMember">✕</button>
-      </div>
-      <div class="flex-1 overflow-y-auto px-3 py-2">
-        <p v-if="!addableFriends.length" class="text-[13px] px-2 py-3" style="color: var(--kv-text-muted);">
-          {{ t('group.noFriends') }}
-        </p>
-        <button
-          v-for="f in addableFriends"
-          :key="f.user.id"
-          class="w-full flex items-center gap-3 px-2 py-2 rounded-[var(--kv-radius-md)] cursor-pointer transition-colors text-left"
-          :class="addingMemberId === f.user.id ? 'opacity-50 pointer-events-none' : ''"
-          @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
-          @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
-          @click="doAddGroupMember(f.user.id)"
-        >
-          <div
-            class="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-semibold text-white"
-            style="background-color: var(--kv-accent-500);"
+      <div
+        class="w-[360px] max-h-[60vh] flex flex-col rounded-[var(--kv-radius-lg)] overflow-hidden"
+        style="background-color: var(--kv-bg-sidebar);"
+      >
+        <div class="flex items-center justify-between px-4 py-3 border-b shrink-0" style="border-color: var(--kv-border-subtle);">
+          <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+            {{ t('group.addMemberTitle') }}
+          </h3>
+          <button class="text-[18px] cursor-pointer hover:opacity-70" style="color: var(--kv-text-muted);" @click="closeAddMember">✕</button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-3 py-2">
+          <p v-if="!addableFriends.length" class="text-[13px] px-2 py-3" style="color: var(--kv-text-muted);">
+            {{ t('group.noFriends') }}
+          </p>
+          <button
+            v-for="f in addableFriends"
+            :key="f.user.id"
+            class="w-full flex items-center gap-3 px-2 py-2 rounded-[var(--kv-radius-md)] cursor-pointer transition-colors text-left"
+            :class="addingMemberId === f.user.id ? 'opacity-50 pointer-events-none' : ''"
+            @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
+            @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
+            @click="doAddGroupMember(f.user.id)"
           >
-            <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
-            <span v-else>{{ f.user.username[0].toUpperCase() }}</span>
-          </div>
-          <span class="text-[14px] truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</span>
-        </button>
-        <p v-if="addMemberError" class="text-[13px] px-2 mt-1" style="color: var(--kv-danger);">{{ addMemberError }}</p>
+            <div
+              class="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-semibold text-white"
+              style="background-color: var(--kv-accent-500);"
+            >
+              <img v-if="f.user.avatarUrl" :src="f.user.avatarUrl" :alt="f.user.username" class="w-full h-full object-cover" />
+              <span v-else>{{ f.user.username[0].toUpperCase() }}</span>
+            </div>
+            <span class="text-[14px] truncate" style="color: var(--kv-text-primary);">{{ f.user.username }}</span>
+          </button>
+          <p v-if="addMemberError" class="text-[13px] px-2 mt-1" style="color: var(--kv-danger);">{{ addMemberError }}</p>
+        </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 
   <!-- Grup: gruptan ayrıl onayı (İş 2 — GroupManagePanel'den taşındı, aynı metin/akış) -->
   <ConfirmDialog
