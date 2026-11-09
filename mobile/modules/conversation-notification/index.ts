@@ -41,12 +41,25 @@ declare class NativeConversationNotificationModule extends NativeModule<TapEvent
   getInitialTap(): ConversationTap | null;
 }
 
-const native =
+const loaded =
   Platform.OS === 'android'
     ? requireOptionalNativeModule<NativeConversationNotificationModule>('ConversationNotification')
     : null;
 
-/** Yerel modül yüklü mü (eski/uyumsuz derlemede false). Push kaydında `format: 2` buna bağlı. */
+/**
+ * 🔴 2026-11-09 cihaz bulgusu: derleme klasöründe Kotlin modülü eski kalınca paket yeni JS + eski native
+ * ile çıktı, `getInitialTap` yoktu ve uygulama açılışta çöktü. Modül ancak beklenen TÜM fonksiyonları
+ * taşıyorsa kullanılır; eksikse yokmuş gibi davranılır (cihaz `format: 1` kalır, v1 bildirimleri alır).
+ */
+const native =
+  loaded &&
+  typeof loaded.show === 'function' &&
+  typeof loaded.dismiss === 'function' &&
+  typeof loaded.getInitialTap === 'function'
+    ? loaded
+    : null;
+
+/** Yerel modül yüklü ve uyumlu mu (eski/uyumsuz derlemede false). Push kaydında `format: 2` buna bağlı. */
 export const isConversationNotificationAvailable = native !== null;
 
 export function showConversationNotification(params: ConversationNotificationParams): Promise<void> {
