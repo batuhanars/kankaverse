@@ -41,6 +41,8 @@ object ConversationNotifier {
   internal const val EXTRA_GUILD_ID = "kv_guild_id"
   private const val EXTRA_MESSAGE_ID = "kv_message_id"
 
+  private val tapCounter = java.util.concurrent.atomic.AtomicLong()
+
   /** RemoteInput sonuc anahtari (Cevapla eylemi). */
   internal const val REPLY_KEY = "kv_reply_text"
 
@@ -161,8 +163,8 @@ object ConversationNotifier {
   }
 
   /**
-   * SPIKE: gorunen sohbet bildiriminin sonuna "ben"den (Person null) bir mesaj ekler; bildirim, eylemler
-   * ve dokunma intent'i korunur (Builder(context, notification)). Bildirim yoksa false (kullanici kapatmis).
+   * Gorunen sohbet bildiriminin sonuna "ben"den (Person null) bir mesaj ekler; eylemler ve dokunma
+   * intent'i acikca korunur. Bildirim yoksa false (kullanici kapatmis).
    * Ayni cagri hata gostergesi icin de kullanilir (JS metni hazirlar). Yeniden notify, RemoteInput'un
    * donen halkasini da kapatir.
    */
@@ -183,12 +185,20 @@ object ConversationNotifier {
     old.conversationTitle?.let { style.conversationTitle = it }
     val own = NotificationCompat.MessagingStyle.Message(text, timestamp, null as Person?)
     (old.messages + own).sortedBy { it.timestamp }.takeLast(MAX_MESSAGES).forEach { style.addMessage(it) }
-    val rebuilt = NotificationCompat.Builder(context, active.notification)
+    val source = active.notification
+    val builder = NotificationCompat.Builder(context, source)
       .setStyle(style)
       .setContentText(text)
       .setWhen(timestamp)
       .setOnlyAlertOnce(true)
-      .build()
+    // Yapicinin kopyalamasina guvenme: dokunma intent'i ve Cevapla eylemi acikca tasinir (C52 §2).
+    // Ayni PendingIntent'ler yeniden kullanilir (ekstralar ve RemoteInput sabit).
+    source.contentIntent?.let { builder.setContentIntent(it) }
+    builder.clearActions()
+    for (i in 0 until NotificationCompat.getActionCount(source)) {
+      NotificationCompat.getAction(source, i)?.let { builder.addAction(it) }
+    }
+    val rebuilt = builder.build()
     return try {
       NotificationManagerCompat.from(context).notify(conversationId, notifId, rebuilt)
       true
@@ -215,6 +225,8 @@ object ConversationNotifier {
       "type" to intent.getStringExtra(EXTRA_TYPE),
       "guildId" to intent.getStringExtra(EXTRA_GUILD_ID),
       "messageId" to intent.getStringExtra(EXTRA_MESSAGE_ID),
+      // JS ayni dokunusu (olay + getInitialTap) iki kez islemesin diye artan kimlik.
+      "tapId" to tapCounter.incrementAndGet().toDouble(),
     )
     intent.removeExtra(EXTRA_CONVERSATION_ID)
     intent.removeExtra(EXTRA_TYPE)

@@ -1,13 +1,38 @@
 package expo.modules.conversationnotification
 
+import android.content.Intent
+import android.util.Log
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 class ConversationNotificationModule : Module() {
+  /**
+   * Native tarafta ilk gorulen dokunus burada bekler; JS `getInitialTap` ile alir ve temizler.
+   * C52 koku: veri-yalniz push JS'i ekransiz uyandirmisken MainActivity calisan runtime'in ustune
+   * olusur; `onNewIntent` tetiklenmez ve JS mount aninda `currentActivity` henuz yoktur. Dokunus bu
+   * yuzden etkinlik one gelirken (OnActivityEntersForeground) yakalanir.
+   */
+  @Volatile private var pendingTap: Map<String, Any?>? = null
+
+  private fun capture(source: String, intent: Intent?, emit: Boolean) {
+    val hasExtra = intent?.hasExtra(ConversationNotifier.EXTRA_CONVERSATION_ID) == true
+    Log.i(TAG, "capture source=$source intent=${intent != null} extras=$hasExtra")
+    val context = appContext.reactContext
+    if (context == null || intent == null || !hasExtra) return
+    val tap = ConversationNotifier.consumeTap(context, intent) ?: return
+    pendingTap = tap
+    Log.i(TAG, "stored source=$source conversationId=${tap["conversationId"]} tapId=${tap["tapId"]}")
+    if (emit) {
+      sendEvent("onTap", tap)
+      Log.i(TAG, "emitted source=$source tapId=${tap["tapId"]}")
+    }
+  }
+
   override fun definition() = ModuleDefinition {
     Name("ConversationNotification")
 
-    // Bildirime dokunma: uygulama zaten acikken (singleTask) yeni intent bu olayi uretir.
+    // Bildirime dokunma olayi (JS dinleyicisi varsa); ayni dokunus getInitialTap ile de gelebilir,
+    // JS tarafi tapId ile tekilleştirir.
     Events("onTap")
 
     // Map ile alinir: alan sozlesmesi index.ts ConversationNotificationParams.
@@ -18,7 +43,7 @@ class ConversationNotificationModule : Module() {
       }
     }
 
-    // SPIKE quick-reply: bildirime "ben"den mesaj ekler (yanit gitti / gonderilemedi gostergesi).
+    // Hizli cevap: bildirime "ben"den mesaj ekler (yanit gitti / gonderilemedi gostergesi).
     AsyncFunction("appendOwnReply") { conversationId: String, text: String, timestamp: Double ->
       val context = appContext.reactContext
       if (context != null) {
@@ -35,18 +60,25 @@ class ConversationNotificationModule : Module() {
       }
     }
 
-    // Soguk acilis: uygulamayi bildirime dokunarak acan intent'in ekstralari (bir kez okunur, tuketilir).
+    // Bekleyen dokunus (yoksa etkinligin intent'i); bir kez teslim edilir, sonra temizlenir.
     Function("getInitialTap") {
-      val context = appContext.reactContext
-      val intent = appContext.currentActivity?.intent
-      if (context != null && intent != null) ConversationNotifier.consumeTap(context, intent) else null
+      if (pendingTap == null) capture("getInitialTap", appContext.currentActivity?.intent, false)
+      val tap = pendingTap
+      pendingTap = null
+      Log.i(TAG, "getInitialTap delivered=${tap != null} tapId=${tap?.get("tapId")}")
+      tap
+    }
+
+    OnActivityEntersForeground {
+      capture("foreground", appContext.currentActivity?.intent, true)
     }
 
     OnNewIntent { intent ->
-      val context = appContext.reactContext
-      if (context != null) {
-        ConversationNotifier.consumeTap(context, intent)?.let { sendEvent("onTap", it) }
-      }
+      capture("newIntent", intent, true)
     }
+  }
+
+  private companion object {
+    const val TAG = "ConversationTap"
   }
 }

@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <application>
-    <!-- SPIKE quick-reply: bildirim Cevapla eylemi -> receiver -> headless JS servisi. -->
+    <!-- Hizli cevap: bildirim Cevapla eylemi -> receiver -> headless JS servisi. -->
     <receiver
       android:name="expo.modules.conversationnotification.QuickReplyReceiver"
       android:exported="false" />

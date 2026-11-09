@@ -26,11 +26,13 @@ export type ConversationNotificationParams = {
   type: string | null;
   guildId: string | null;
   messageId: string | null;
-  /** SPIKE quick-reply: Cevapla eyleminin etiketi (i18n mobile.notifications.reply); yoksa eylem eklenmez. */
+  /** Cevapla eyleminin etiketi (i18n mobile.notifications.reply); yoksa eylem eklenmez. */
   replyLabel?: string | null;
 };
 
 export type ConversationTap = {
+  /** Native artan kimlik: ayni dokunus olay + getInitialTap ile iki kez gelirse tekillestirilir. */
+  tapId?: number;
   conversationId: string;
   type: string | null;
   guildId: string | null;
@@ -75,7 +77,7 @@ export function dismissConversationNotification(conversationId: string): Promise
   return native?.dismiss(conversationId) ?? Promise.resolve();
 }
 
-/** SPIKE quick-reply: bildirime "ben"den mesaj ekler. Bildirim yoksa/modül eskiyse false. */
+/** bildirime "ben"den mesaj ekler. Bildirim yoksa/modül eskiyse false. */
 export function appendOwnReplyToNotification(
   conversationId: string,
   text: string,

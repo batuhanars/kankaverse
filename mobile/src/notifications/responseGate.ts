@@ -53,10 +53,22 @@ export function useGatedNotificationResponder(
  */
 export function useGatedConversationTap(onTap: (tap: ConversationTap) => void): void {
   useGatedDelivery<ConversationTap>((deliver) => {
-    const unsubscribeTap = addConversationTapListener(deliver);
+    // C52: native ayni dokunusu hem olay hem getInitialTap ile verebilir; tapId ile bir kez islenir.
+    let lastTapId: number | undefined;
+    const deliverOnce = (source: string) => (tap: ConversationTap) => {
+      if (tap.tapId !== undefined && tap.tapId === lastTapId) {
+        console.log('[tap] drop duplicate', source, tap.tapId);
+        return;
+      }
+      lastTapId = tap.tapId;
+      console.log('[tap] deliver', source, tap.tapId, tap.conversationId);
+      deliver(tap);
+    };
+    const unsubscribeTap = addConversationTapListener(deliverOnce('event'));
+    const deliverInitial = deliverOnce('initial');
     const checkInitial = () => {
       const initial = getInitialConversationTap();
-      if (initial) deliver(initial);
+      if (initial) deliverInitial(initial);
     };
     checkInitial();
     const appState = AppState.addEventListener('change', (state) => {
@@ -96,6 +108,7 @@ function useGatedDelivery<T>(source: GateSource<T>, onItem: (item: T) => void): 
 
       if (status === 'unauthenticated') {
         // Oturum yok — kullanıcı elle giriş yapacak, eski hedefe sürpriz atlama YOK.
+        console.log('[tap] gate drop: unauthenticated');
         pending = null;
         return;
       }
