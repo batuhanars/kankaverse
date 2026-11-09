@@ -2184,6 +2184,10 @@
     "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
   },
   "mobile": {
+    "aiVideo": {
+      "toastReady": "Videon hazır. Bildirimler sekmesinden izleyebilirsin.",
+      "toastFailed": "Videon üretilemedi, kredin düşülmedi."
+    },
     "aiVideoRefs": {
       "add": "Dosya ekle",
       "addMedia": "Görsel veya video",

@@ -122,8 +122,39 @@ code, pre, .font-mono {
 /* C34: okundu tiki / (düzenlendi) metnin SON satırının sonuna aksın diye son paragraf satır içine alınır
    (blok-içinde-satır-içi ayrımı: kv-md satır içi, son <p> satır içi, ondan sonra gelen simge aynı satırda). */
 .kv-md.kv-md-tail,
-.kv-md.kv-md-tail > p:last-child {
+.kv-md.kv-md-tail > p:last-child,
+.kv-md.kv-md-tail > :is(h1, h2, h3):last-child {
   display: inline;
+}
+
+/* C56: başlıklar (h4-h6 markdown.ts'te h3'e kıstırılır) */
+.kv-md h1,
+.kv-md h2,
+.kv-md h3 {
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--kv-text-primary);
+  margin: 0.5em 0 0.25em 0;
+}
+
+.kv-md h1 {
+  font-size: 22px;
+}
+
+.kv-md h2 {
+  font-size: 18px;
+}
+
+.kv-md h3 {
+  font-size: 16px;
+}
+
+.kv-md > :is(h1, h2, h3):first-child {
+  margin-top: 0;
+}
+
+.kv-md > :is(h1, h2, h3):last-child {
+  margin-bottom: 0;
 }
 
 /* Satır içi kod */

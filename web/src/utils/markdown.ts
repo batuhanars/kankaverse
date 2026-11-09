@@ -11,9 +11,10 @@
  *  - Markdown + DOMPurify sonrası yer-tutucular stilli mention span'lerine dönüştürülür.
  *  - Yer-tutucu formatı: \x02MENTION:id\x03  (Unicode kontrol char — kullanıcı metniyle çakışmaz)
  *
- * Desteklenen subset (§1 — başlık/tablo/resim KAPALI):
+ * Desteklenen subset (§1 — tablo/resim KAPALI; başlık C56'dan beri AÇIK):
  *   **kalın** · *italik* · ~~üstü çizili~~ · `satıriçi kod` · ```kod bloğu```
  *   > alıntı · liste (- / * / 1.) · linkler (http/https) · satır sonu
+ *   # H1 · ## H2 · ### H3 (#### ve ötesi h3'e kıstırılır; alt satır `---` setext biçimi KAPALI)
  *
  * Sprint V2 Markdown Contract §0-§4 uyumlu.
  */
@@ -31,8 +32,20 @@ const md = new MarkdownIt({
   breaks: true, // tek satır sonu → <br>
 })
 
-// Başlık kurallarını devre dışı bırak (# H1 / ## H2 …)
-md.disable('heading')
+// Başlıklar açık (# / ## / ###); setext biçimi (`Metin` + alt satır `---` / `===`) kapalı —
+// alt satıra çizgi yazan kullanıcı yanlışlıkla dev başlık üretmesin.
+md.disable('lheading')
+// h4-h6 → h3: derin başlık kanalı kaplamasın (yalnız etiket değişir; içerik aynı)
+md.core.ruler.push('clamp_headings', (state) => {
+  for (const token of state.tokens) {
+    if (
+      (token.type === 'heading_open' || token.type === 'heading_close') &&
+      /^h[4-6]$/.test(token.tag)
+    ) {
+      token.tag = 'h3'
+    }
+  }
+})
 // Tablo ve resim kurallarını devre dışı bırak
 md.disable('image')
 // Not: markdown-it çekirdeğinde 'table' ayrı kural; eklenmemişse disable sessizce geçer
@@ -96,6 +109,9 @@ const PURIFY_CONFIG: DOMPurifyConfig = {
     'br',
     'p',
     'span',
+    'h1',
+    'h2',
+    'h3',
   ],
   ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
 }

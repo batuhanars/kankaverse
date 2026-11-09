@@ -7,13 +7,14 @@ import {
   IsNotEmpty,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { MESSAGE_CONTENT_MAX } from '../messages.constants';
 
 export class CreateMessageDto {
-  @ApiPropertyOptional({ example: 'Merhaba kankaverse!' })
+  @ApiPropertyOptional({ example: 'Merhaba kankaverse!', maxLength: MESSAGE_CONTENT_MAX })
   @IsOptional()
   @IsString()
   @IsNotEmpty({ message: 'Mesaj içeriği boş string olamaz.' })
-  @MaxLength(4000, { message: 'Mesaj en fazla 4000 karakter olabilir.' })
+  @MaxLength(MESSAGE_CONTENT_MAX, { message: 'Mesaj en fazla 16.000 karakter olabilir.' })
   content?: string;
 
   @ApiPropertyOptional()

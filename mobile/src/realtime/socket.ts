@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, AppState, Platform, ToastAndroid } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 import { getAccessToken, refreshAccessToken } from '@/api/http';
 import { useMessagesStore } from '@/stores/messages';
@@ -337,7 +337,18 @@ function ensureSocket(): Socket {
   // rozetinin TEK kaynağı kalır (aşağıdaki `mention` dinleyicisi ona YAZMAZ — bkz. not).
   socket.on('notification', (n?: { type?: string }) => {
     // C49 R3: süren yapay zeka video üretimi bitti/başarısız oldu → giriş göstergesi söner.
-    if (n?.type === 'AI_VIDEO_READY' || n?.type === 'AI_VIDEO_FAILED') useAiVideoViewerStore.getState().setActive(null);
+    if (n?.type === 'AI_VIDEO_READY' || n?.type === 'AI_VIDEO_FAILED') {
+      const viewer = useAiVideoViewerStore.getState();
+      viewer.setActive(null);
+      // C56 §4: üretim sayfası kapalı + uygulama ön planda + Android → dokunulamaz toast. Ön plan sistem
+      // banner'ı `push.ts` handler'ında bastırılır (çift bildirim olmasın); çan kaydı aşağıda yenilenir.
+      if (Platform.OS === 'android' && viewer.sheetOpen === 0 && AppState.currentState === 'active') {
+        ToastAndroid.show(
+          t(n.type === 'AI_VIDEO_READY' ? 'mobile.aiVideo.toastReady' : 'mobile.aiVideo.toastFailed'),
+          ToastAndroid.LONG,
+        );
+      }
+    }
     const store = useNotificationsStore.getState();
     store.refreshUnreadCount();
     store.fetchFirstPage();

@@ -37,6 +37,7 @@
     "expo-video": "~3.0.16",
     "expo-web-browser": "~15.0.11",
     "livekit-client": "2.21.0",
+    "markdown-it": "^14.3.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -54,6 +55,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@types/markdown-it": "^14.2.0",
     "@types/react": "~19.1.10",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~10.0.0",

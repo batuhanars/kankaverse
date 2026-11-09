@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { AttachmentView } from './AttachmentView';
@@ -8,8 +8,8 @@ import { usePresenceStore, selectStatus } from '@/stores/presence';
 import { BubbleMeta, MetaSpacer, ReactionRow, ReplyQuote } from './message/BubbleParts';
 import { EmbedCards } from './message/EmbedCard';
 import { BUBBLE_TAP_MAX_DURATION_MS } from './message/MediaPressable';
-import { splitMentions } from '@/utils/mentions';
-import { splitLinks } from '@/utils/links';
+import { MarkdownText } from './message/MarkdownText';
+import { endsWithTextBlock, parseMarkdown } from '@/utils/markdown';
 import type { MessageDto } from '@/api/messages';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -102,15 +102,10 @@ export function MessageBubble({
     [hasDoubleTap],
   );
 
-  // M2d R1 — bahsetmeler vurgulu boyanır (web `.kv-mention` karşılığı). Düz karşılık, boş içerikte
-  // metin bloğunu hiç render etmemek için (ek-yalnız mesajlar).
-  const mentionSegments = splitMentions(
-    message.content,
-    resolveMention,
-    t('mention.unknown'),
-    resolveRole,
-  );
-  const displayContent = mentionSegments.map((seg) => seg.text).join('');
+  // C56 — içerik markdown olarak çizilir (`MarkdownText`); bahsetme vurgusu orada. Ağaç yalnız içeriğe
+  // bağlı önbelleklenir; boş içerikte metin bloğu hiç çizilmez (ek-yalnız mesajlar).
+  const hasContent = message.content.length > 0;
+  const mdBlocks = useMemo(() => parseMarkdown(message.content), [message.content]);
   const reactions = message.reactions ?? [];
   // C35: gelen webhook mesaji: BOT rozeti + varsayilan bot simgesi; yazar kullanici degil, profil acilmaz.
   const isWebhook = !!message.webhook;
@@ -124,7 +119,7 @@ export function MessageBubble({
   const nameVisible = identityVisible && showAuthor;
   // Ek-yalnız mesajda görsel baloncuğu doldursun diye iç dolgu 4px'e iner (§3.5).
   const attachmentOnly =
-    displayContent.length === 0 &&
+    !hasContent &&
     (message.attachments?.length ?? 0) > 0 &&
     !message.replyToId &&
     !message.pinnedAt &&
@@ -134,7 +129,8 @@ export function MessageBubble({
   const hasAttachments = (message.attachments?.length ?? 0) > 0;
   // Metin her zaman baloncuğun son içeriği (ekler varsa onların ALTINDA, M6c §3.3.b sahip revizesi) →
   // saat metnin son satırına oturur, kısa mesaj tek satır kalır.
-  const metaInline = displayContent.length > 0;
+  // Son blok liste/alıntı/kod ise saat o bloğun içine oturamaz → ayrı meta satırı (inline=false).
+  const metaInline = hasContent && endsWithTextBlock(mdBlocks);
 
   return (
     <View
@@ -242,34 +238,19 @@ export function MessageBubble({
           )}
 
           {/* Açıklama eklerin ALTINDA (sahip revizesi 2026-10-15, WhatsApp düzeni). */}
-          {displayContent.length > 0 && (
-            <Text style={[styles.content, hasAttachments && styles.contentAfterAttachments]}>
-              {mentionSegments.map((seg, i) =>
-                seg.isMention ? (
-                  <Text key={i} style={isMine ? styles.mentionMine : styles.mention}>
-                    {seg.text}
-                  </Text>
-                ) : (
-                  // Bağlantılar dokunulabilir (web linkify karşılığı); yalnız http/https açılır.
-                  splitLinks(seg.text).map((part, j) =>
-                    part.url ? (
-                      <Text
-                        key={`${i}-${j}`}
-                        style={[styles.link, isMine && styles.linkMine]}
-                        onPress={() => void Linking.openURL(part.url!)}
-                        onLongPress={isLocal ? undefined : onLongPress}
-                        accessibilityRole="link"
-                      >
-                        {part.text}
-                      </Text>
-                    ) : (
-                      part.text
-                    ),
-                  )
-                ),
-              )}
-              {metaInline && <MetaSpacer message={message} receipt={isLocal ? null : receipt} isMine={isMine} />}
-            </Text>
+          {hasContent && (
+            <MarkdownText
+              content={message.content}
+              isMine={isMine}
+              resolveMention={resolveMention}
+              resolveRole={resolveRole}
+              onLongPress={isLocal ? undefined : onLongPress}
+              textStyle={styles.content}
+              style={hasAttachments ? styles.contentAfterAttachments : undefined}
+              trailing={
+                metaInline ? <MetaSpacer message={message} receipt={isLocal ? null : receipt} isMine={isMine} /> : undefined
+              }
+            />
           )}
 
           <BubbleMeta message={message} isMine={isMine} receipt={isLocal ? null : receipt} inline={metaInline} />
@@ -444,25 +425,5 @@ const styles = StyleSheet.create({
   },
   contentAfterAttachments: {
     marginTop: 6,
-  },
-  // Web `.kv-mention` ile aynı dil: Kor metin + soluk Kor zemin. Yatay dolgu KONMADI — RN'de
-  // iç içe `<Text>`in padding'i Android'de güvenilmez çiziliyor.
-  mention: {
-    color: theme.colors.accent500,
-    backgroundColor: theme.colors.accentSubtle,
-    fontWeight: '500',
-  },
-  link: {
-    color: theme.colors.accent500,
-    textDecorationLine: 'underline',
-  },
-  // Kendi baloncuğumda Kor zemin üstünde Kor okunmuyor → beyaz, alt çizgi bağlantıyı belli eder.
-  linkMine: {
-    color: theme.colors.textPrimary,
-  },
-  // §4 — `accentSubtle` bubbleOwn üstünde görünmez, zemin yok; Kor metin de okunmuyor → beyaz + kalın.
-  mentionMine: {
-    color: theme.colors.textPrimary,
-    fontWeight: '500',
   },
 });

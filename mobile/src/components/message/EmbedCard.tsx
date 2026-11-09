@@ -1,11 +1,10 @@
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { formatMentionsPlain } from '@/utils/mentions';
+import { MarkdownText } from './MarkdownText';
 import type { MessageEmbed } from '@/api/messages';
-import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 // C35 §5.4 - gelen webhook embed karti (yalniz cizim; yonetim web'de). Gorsel alani yoktur (sunucu atar,
-// §0.4). Tum metinler duz <Text>: ham HTML/markdown calistirilmaz. Baglanti yalniz http(s):// ise acilir.
+// §0.4). Aciklama web gibi markdown (MarkdownText, html kapali); diger alanlar duz <Text>. Baglanti yalniz http(s):// ise acilir.
 
 interface Props {
   embeds: MessageEmbed[];
@@ -46,9 +45,13 @@ export function EmbedCards({ embeds, resolveMention, resolveRole }: Props) {
               </Pressable>
             ) : null}
             {e.description ? (
-              <Text style={styles.description}>
-                {formatMentionsPlain(e.description, resolveMention, t('mention.unknown'), resolveRole)}
-              </Text>
+              <MarkdownText
+                content={e.description}
+                isMine={false}
+                resolveMention={resolveMention}
+                resolveRole={resolveRole}
+                textStyle={styles.description}
+              />
             ) : null}
             {e.fields?.length ? (
               <View style={styles.fields}>

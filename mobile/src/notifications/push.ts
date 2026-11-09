@@ -189,11 +189,12 @@ Notifications.setNotificationHandler({
       }
     }
 
-    // C49: yapay zeka video bildirimi. Herhangi bir AiVideoSheet açıkken (sohbet/medya/view) hiçbir şey
-    // gösterilmez (kullanıcı zaten o sayfada, çan kaydı kalır); kapalıyken mesaj bildirimleri gibi düşer.
+    // C49/C56: yapay zeka video bildirimi. Bu handler YALNIZ uygulama ön plandayken çalışır: orada sistem
+    // banner'ı/sesi/tepsi kaydı hiç gösterilmez (ön planda bildirimi socket `notification` dinleyicisi
+    // Android toast'ı ile verir, çan kaydı kalır). Arka plan/kapalı: FCM bildirimi sistem çizer, bu
+    // handler'a uğramaz, davranış değişmedi.
     if (data?.type === 'AI_VIDEO_READY' || data?.type === 'AI_VIDEO_FAILED') {
-      const show = useAiVideoViewerStore.getState().sheetOpen === 0;
-      return { shouldShowBanner: show, shouldShowList: show, shouldPlaySound: show, shouldSetBadge: false };
+      return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false };
     }
 
     const isMessage = isMessageType(data?.type);
