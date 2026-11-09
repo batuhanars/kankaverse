@@ -28,6 +28,7 @@ import {
   clampV2Text,
   v2Timestamp,
 } from '../../../shared/push/push-v2';
+import { CallSignalService } from '../../../shared/call-signal/call-signal.service';
 import { VoiceService } from '../../voice/voice.service';
 import { GamesService } from '../../../shared/games/games.service';
 
@@ -67,6 +68,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private push: PushService,
     private voice: VoiceService,
     private games: GamesService,
+    private callSignal: CallSignalService,
   ) {}
 
   afterInit(server: Server) {
@@ -397,18 +399,6 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   // ── Sprint V2 — DM sesli arama sinyalizasyonu (gate SUNUCUDA; sözleşme SPRINT_V2_DM_CALL_CONTRACT.md) ──
   // R7: davet gate'i ring YAYILMADAN ÖNCE; jenerik DM_NOT_ALLOWED (engellenme/ilişki sızmaz).
 
-  // R7 (DM-1): çağıran kanalın üyesi DEĞİLSE null → sahte accept/reject/cancel relay'i engellenir.
-  // Tek sorgu hem üyelik doğrular hem karşı tarafı bulur (DRY; dört handler de kapı kazanır).
-  private async otherDmMember(channelId: string, userId: string): Promise<string | null> {
-    const members = await this.prisma.channelMember.findMany({
-      where: { channelId },
-      select: { userId: true },
-    });
-    if (!members.some((m) => m.userId === userId)) return null; // çağıran üye değil
-    const other = members.find((m) => m.userId !== userId);
-    return other?.userId ?? null;
-  }
-
   @SubscribeMessage('voice:call_invite')
   async handleCallInvite(
     @ConnectedSocket() socket: AuthSocket,
@@ -425,7 +415,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     // C9: bekleyen mesaj isteği kanalında arama yok (kabul edilene dek).
     if (channel.dmRequestStatus === 'PENDING') return { ok: false, error: 'DM_NOT_ALLOWED' };
 
-    const calleeId = await this.otherDmMember(channelId, userId);
+    const calleeId = await this.callSignal.otherDmMember(channelId, userId);
     if (!calleeId) return { ok: false, error: 'DM_NOT_ALLOWED' };
 
     // DAVET GATE'İ — ring callee'ye ULAŞMADAN ÖNCE (yabancı/block/yeni-hesap/minör-yabancı elenir)
@@ -487,6 +477,15 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         androidChannelId: 'incoming_call_v4',
         categoryId: 'incoming_call',
         ttlSeconds: 30,
+        // C53 §2.1 - v2 cihazlara veri-yalnizca arama (anahtar callChannelId, asla channelId).
+        v2: {
+          v: 2,
+          kind: 'call',
+          callChannelId: channelId,
+          callerId: userId,
+          callerName,
+          callerAvatarUrl: caller?.avatarUrl ?? null,
+        },
       })
       .catch(() => {});
 
@@ -498,9 +497,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() socket: AuthSocket,
     @MessageBody() payload: { channelId: string },
   ) {
-    const other = await this.otherDmMember(payload.channelId, socket.data.userId);
-    if (other)
-      this.realtime.emitToUser(other, 'voice.call_accepted', { channelId: payload.channelId });
+    await this.callSignal.accept(payload.channelId, socket.data.userId);
     return { ok: true };
   }
 
@@ -509,9 +506,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() socket: AuthSocket,
     @MessageBody() payload: { channelId: string },
   ) {
-    const other = await this.otherDmMember(payload.channelId, socket.data.userId);
-    if (other)
-      this.realtime.emitToUser(other, 'voice.call_rejected', { channelId: payload.channelId });
+    await this.callSignal.reject(payload.channelId, socket.data.userId);
     return { ok: true };
   }
 
@@ -520,9 +515,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() socket: AuthSocket,
     @MessageBody() payload: { channelId: string },
   ) {
-    const other = await this.otherDmMember(payload.channelId, socket.data.userId);
-    if (other)
-      this.realtime.emitToUser(other, 'voice.call_canceled', { channelId: payload.channelId });
+    await this.callSignal.cancel(payload.channelId, socket.data.userId);
     return { ok: true };
   }
 

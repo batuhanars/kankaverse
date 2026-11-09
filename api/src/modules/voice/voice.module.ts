@@ -7,6 +7,7 @@ import {
   VoiceWebhookController,
   VoiceInspectController,
 } from './voice.controller';
+import { VoiceCallsController } from './voice-calls.controller';
 import { VoiceService } from './voice.service';
 
 // SharedModule MembershipService + RealtimeService export eder (erişim kapısı + WS yayını).
@@ -17,6 +18,7 @@ import { VoiceService } from './voice.service';
     VoiceModerationController,
     VoiceWebhookController,
     VoiceInspectController,
+    VoiceCallsController,
   ],
   providers: [VoiceService],
   exports: [VoiceService], // A4: EmergencyModule self-pull + bağlam yakalama için VoiceService'i kullanır

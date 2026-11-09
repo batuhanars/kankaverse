@@ -1,0 +1,71 @@
+import { CallSignalService } from './call-signal.service';
+
+const prismaMock = { channelMember: { findMany: jest.fn() } };
+const realtimeMock = { emitToUser: jest.fn() };
+const pushMock = { sendCallEnd: jest.fn() };
+
+const CH = 'dm-1';
+const CALLER = 'caller';
+const CALLEE = 'callee';
+
+function make() {
+  return new CallSignalService(prismaMock as any, realtimeMock as any, pushMock as any);
+}
+
+describe('CallSignalService', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    pushMock.sendCallEnd.mockResolvedValue(undefined);
+    prismaMock.channelMember.findMany.mockResolvedValue([{ userId: CALLER }, { userId: CALLEE }]);
+  });
+
+  describe('otherDmMember (R7 kapısı)', () => {
+    it('üye çağıran → karşı taraf', async () => {
+      expect(await make().otherDmMember(CH, CALLEE)).toBe(CALLER);
+    });
+    it('üye olmayan çağıran → null', async () => {
+      expect(await make().otherDmMember(CH, 'yabanci')).toBeNull();
+    });
+    it('kanal yok (üye listesi boş) → null', async () => {
+      prismaMock.channelMember.findMany.mockResolvedValue([]);
+      expect(await make().otherDmMember(CH, CALLEE)).toBeNull();
+    });
+  });
+
+  it('reject: üye → arayana call_rejected + callee kendi cihazlarına call_end', async () => {
+    expect(await make().reject(CH, CALLEE)).toBe(true);
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(CALLER, 'voice.call_rejected', {
+      channelId: CH,
+    });
+    expect(pushMock.sendCallEnd).toHaveBeenCalledWith(CALLEE, CH);
+  });
+
+  it('reject: üye değil → false, olay ve push yok', async () => {
+    expect(await make().reject(CH, 'yabanci')).toBe(false);
+    expect(realtimeMock.emitToUser).not.toHaveBeenCalled();
+    expect(pushMock.sendCallEnd).not.toHaveBeenCalled();
+  });
+
+  it('accept: arayana call_accepted + callee kendi cihazlarına call_end', async () => {
+    expect(await make().accept(CH, CALLEE)).toBe(true);
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(CALLER, 'voice.call_accepted', {
+      channelId: CH,
+    });
+    expect(pushMock.sendCallEnd).toHaveBeenCalledWith(CALLEE, CH);
+  });
+
+  it('cancel: callee call_canceled alır + callee tokenlarına call_end', async () => {
+    expect(await make().cancel(CH, CALLER)).toBe(true);
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(CALLEE, 'voice.call_canceled', {
+      channelId: CH,
+    });
+    expect(pushMock.sendCallEnd).toHaveBeenCalledWith(CALLEE, CH);
+  });
+
+  it('accept/cancel: üye değil → olay ve push yok', async () => {
+    expect(await make().accept(CH, 'yabanci')).toBe(false);
+    expect(await make().cancel(CH, 'yabanci')).toBe(false);
+    expect(realtimeMock.emitToUser).not.toHaveBeenCalled();
+    expect(pushMock.sendCallEnd).not.toHaveBeenCalled();
+  });
+});

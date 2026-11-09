@@ -33,6 +33,23 @@ export interface V2ReadData {
   conversationIds: string[];
 }
 
+/** C53 — gelen 1-1 arama. Anahtar `callChannelId` (asla `channelId`: expo-notifications onu Android kanalı sanır). */
+export interface V2CallData {
+  v: 2;
+  kind: 'call';
+  callChannelId: string;
+  callerId: string;
+  callerName: string;
+  callerAvatarUrl: string | null;
+}
+
+/** C53 — arama bitti (iptal / başka cihazda kabul-ret): istemci zili kapatır. */
+export interface V2CallEndData {
+  v: 2;
+  kind: 'call_end';
+  callChannelId: string;
+}
+
 /** Redis anahtarı: bu kullanıcıya bu sohbet için v2 bildirimi gönderildi (okundu push'u buna bakar). */
 export function v2PendingKey(userId: string, conversationId: string): string {
   return `push:pending:${userId}:${conversationId}`;

@@ -5,6 +5,8 @@ import { RedisService } from '../redis/redis.service';
 import {
   V2_PENDING_TTL_SECONDS,
   V2_READ_MAX_IDS,
+  V2CallData,
+  V2CallEndData,
   V2MessageData,
   V2ReadData,
   v2PendingKey,
@@ -59,7 +61,7 @@ export interface PushPayload {
    * C50 — veri-yalnız mesaj bildirimi. Çağıran v1 alanlarını (title/body/...) VE bunu birlikte verir;
    * token başına hangisinin gideceğini `sendToUsers` seçer (bayrak + token.format + allowlist).
    */
-  v2?: V2MessageData;
+  v2?: V2MessageData | V2CallData;
 }
 
 interface ExpoTicket {
@@ -166,7 +168,10 @@ export class PushService {
         };
       });
 
-      await this.markPending(v2Users, payload.v2?.conversationId);
+      await this.markPending(
+        v2Users,
+        payload.v2?.kind === 'message' ? payload.v2.conversationId : undefined,
+      );
 
       for (const batch of chunk(messages, CHUNK_SIZE)) {
         await this.sendBatch(batch);
@@ -226,6 +231,30 @@ export class PushService {
       }
     } catch (err) {
       this.logger.warn(`Okundu push'u başarısız: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * C53 §2.2 - arama bitti: kullanicinin YALNIZ v2 tokenlarina `{ v:2, kind:'call_end', callChannelId }`
+   * (veri-yalnizca, ttl 30). Bayrak kapaliysa / allowlist disindaysa no-op; v1 cihazlar bugunku davranista kalir.
+   */
+  async sendCallEnd(userId: string, callChannelId: string): Promise<void> {
+    if (!this.enabled || !this.v2AllowedFor(userId)) return;
+    try {
+      const tokens = await this.prisma.pushToken.findMany({ where: { userId, format: 2 } });
+      if (tokens.length === 0) return;
+      const data: V2CallEndData = { v: 2, kind: 'call_end', callChannelId };
+      const messages: ExpoMessage[] = tokens.map((t) => ({
+        to: t.token,
+        data,
+        priority: 'high' as const,
+        ttl: 30,
+      }));
+      for (const batch of chunk(messages, CHUNK_SIZE)) {
+        await this.sendBatch(batch);
+      }
+    } catch (err) {
+      this.logger.warn(`Arama bitti push'u başarısız: ${(err as Error).message}`);
     }
   }
 

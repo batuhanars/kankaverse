@@ -456,3 +456,111 @@ describe('PushService C50 v2', () => {
     });
   });
 });
+
+// ── C53 — veri-yalnız arama push'u ────────────────────────────────────────────
+describe('PushService C53 arama', () => {
+  const CALL = {
+    v: 2 as const,
+    kind: 'call' as const,
+    callChannelId: 'dm-1',
+    callerId: 'caller',
+    callerName: 'arayan',
+    callerAvatarUrl: null,
+  };
+  const PAYLOAD = {
+    title: 'Gelen Arama',
+    body: 'arayan seni arıyor!',
+    data: { type: 'incoming_call', channelId: 'dm-1', callerId: 'caller', callerName: 'arayan' },
+    priority: 'high' as const,
+    androidChannelId: 'incoming_call_v4',
+    categoryId: 'incoming_call',
+    ttlSeconds: 30,
+    v2: CALL,
+  };
+  const redisMock = { setMarker: jest.fn(), takeMarkers: jest.fn() };
+
+  function make(opts: { v2?: boolean; allow?: string[] } = {}) {
+    const values: Record<string, unknown> = {
+      expoPushEnabled: true,
+      pushV2Enabled: opts.v2 ?? false,
+      pushV2UserIds: opts.allow ?? [],
+    };
+    const config = { get: jest.fn((k: string) => values[k]) };
+    return new PushService(prismaMock as any, config as any, redisMock as any);
+  }
+  function sent(): any[] {
+    return JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+  }
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    (global as any).fetch = jest.fn().mockResolvedValue({ ok: true, json: () => ({ data: [] }) });
+  });
+
+  it('v2 token: gövdede title/body yok, callChannelId var, ttl 30, işaret yazılmaz', async () => {
+    prismaMock.pushToken.findMany.mockResolvedValue([
+      { token: 'ExponentPushToken[a]', userId: 'u1', format: 2 },
+    ]);
+    await make({ v2: true }).sendToUsers(['u1'], PAYLOAD);
+
+    const m = sent()[0];
+    expect(m.title).toBeUndefined();
+    expect(m.body).toBeUndefined();
+    expect(m.data).toEqual(CALL);
+    expect(m.data.channelId).toBeUndefined();
+    expect(m.ttl).toBe(30);
+    expect(redisMock.setMarker).not.toHaveBeenCalled();
+  });
+
+  it('v1 token (format 1) → bugünkü arama push gövdesi birebir', async () => {
+    prismaMock.pushToken.findMany.mockResolvedValue([
+      { token: 'ExponentPushToken[a]', userId: 'u1', format: 1 },
+    ]);
+    await make({ v2: true }).sendToUsers(['u1'], PAYLOAD);
+
+    const m = sent()[0];
+    expect(m.title).toBe('Gelen Arama');
+    expect(m.data.type).toBe('incoming_call');
+    expect(m.channelId).toBe('incoming_call_v4');
+    expect(m.categoryId).toBe('incoming_call');
+    expect(m.ttl).toBe(30);
+  });
+
+  describe('sendCallEnd', () => {
+    it('yalnız v2 tokenlarına call_end gider', async () => {
+      prismaMock.pushToken.findMany.mockResolvedValue([
+        { token: 'ExponentPushToken[a]', userId: 'u1', format: 2 },
+      ]);
+      await make({ v2: true }).sendCallEnd('u1', 'dm-1');
+
+      expect(prismaMock.pushToken.findMany).toHaveBeenCalledWith({
+        where: { userId: 'u1', format: 2 },
+      });
+      expect(sent()).toEqual([
+        {
+          to: 'ExponentPushToken[a]',
+          data: { v: 2, kind: 'call_end', callChannelId: 'dm-1' },
+          priority: 'high',
+          ttl: 30,
+        },
+      ]);
+    });
+
+    it('bayrak kapalı → no-op', async () => {
+      await make({ v2: false }).sendCallEnd('u1', 'dm-1');
+      expect(prismaMock.pushToken.findMany).not.toHaveBeenCalled();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('allowlist dışı kullanıcı → no-op', async () => {
+      await make({ v2: true, allow: ['x'] }).sendCallEnd('u1', 'dm-1');
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('v2 token yoksa fetch yok; hata fırlatmaz', async () => {
+      prismaMock.pushToken.findMany.mockResolvedValue([]);
+      await expect(make({ v2: true }).sendCallEnd('u1', 'dm-1')).resolves.toBeUndefined();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+  });
+});

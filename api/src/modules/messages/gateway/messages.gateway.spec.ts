@@ -6,6 +6,7 @@
  */
 
 import { MessagesGateway } from './messages.gateway';
+import { CallSignalService } from '../../../shared/call-signal/call-signal.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
 
@@ -77,7 +78,8 @@ const notificationsMock = {
 
 // M3 §2.6 — DM push
 const pushSendToUsersMock = jest.fn();
-const pushMock = { sendToUsers: pushSendToUsersMock };
+const pushSendCallEndMock = jest.fn();
+const pushMock = { sendToUsers: pushSendToUsersMock, sendCallEnd: pushSendCallEndMock };
 
 // M5a §4.4 — voice:group_call_ring hedefin ODADA olup olmadığını burada sorar
 const voiceGetLiveParticipationMock = jest.fn();
@@ -97,6 +99,8 @@ function makeGateway() {
     pushMock as any,
     voiceMock as any,
     gamesMock as any,
+    // C53: WS ve HTTP aynı CallSignalService'ten geçer; burada gerçek servis aynı mock'larla çalışır.
+    new CallSignalService(prismaMock as any, realtimeMock as any, pushMock as any),
   );
 }
 
@@ -119,6 +123,7 @@ function resetMocks() {
   prismaMock.user.findMany.mockResolvedValue([]);
   // M3 §2.6 — varsayılan: push başarıyla "gönderildi" (fire-and-forget, hata yutulur)
   pushSendToUsersMock.mockResolvedValue(undefined);
+  pushSendCallEndMock.mockResolvedValue(undefined);
   // M5a §4 — varsayılan: blok yok, hedef odada değil (ring testleri override eder)
   prismaMock.userBlock.findFirst.mockResolvedValue(null);
   voiceGetLiveParticipationMock.mockResolvedValue({
@@ -1794,5 +1799,69 @@ describe('MessagesGateway.handleActivitySet (C31b §2.4)', () => {
     expect(await gateway.handleActivitySet(socket('b'), { ref: 'curated:g1' })).toEqual({
       ok: true,
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// C53 - arama v2 push + accept/reject/cancel ortak servis yolundan geçer
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('MessagesGateway arama sinyalleri (C53)', () => {
+  let gateway: MessagesGateway;
+  const CALLER = 'user-caller';
+  const CALLEE = 'user-callee';
+  const DM = 'ch-dm-c53';
+  const sock = (userId: string) => ({ data: { userId } }) as any;
+
+  beforeEach(() => {
+    resetMocks();
+    gateway = makeGateway();
+    prismaMock.channel.findUnique.mockResolvedValue({ type: 'DM', dmRequestStatus: null });
+    prismaMock.channelMember.findMany.mockResolvedValue([{ userId: CALLER }, { userId: CALLEE }]);
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
+    prismaMock.user.findUnique.mockResolvedValue({
+      username: 'arayan',
+      avatarUrl: 'https://cdn/a.png',
+    });
+  });
+
+  it('call_invite push yükü v2 arama verisini taşır (callChannelId, channelId DEĞİL)', async () => {
+    await gateway.handleCallInvite(sock(CALLER), { channelId: DM });
+    const payload = pushSendToUsersMock.mock.calls[0][1];
+    expect(payload.v2).toEqual({
+      v: 2,
+      kind: 'call',
+      callChannelId: DM,
+      callerId: CALLER,
+      callerName: 'arayan',
+      callerAvatarUrl: 'https://cdn/a.png',
+    });
+    expect(payload.v2.channelId).toBeUndefined();
+    expect(payload.ttlSeconds).toBe(30);
+  });
+
+  it('call_reject: üye → olay + call_end; ack {ok:true}', async () => {
+    const res = await gateway.handleCallReject(sock(CALLEE), { channelId: DM });
+    expect(res).toEqual({ ok: true });
+    expect(emitToUserMock).toHaveBeenCalledWith(CALLER, 'voice.call_rejected', { channelId: DM });
+    expect(pushSendCallEndMock).toHaveBeenCalledWith(CALLEE, DM);
+  });
+
+  it('call_reject: üye değil → olay yok, call_end yok; ack yine {ok:true}', async () => {
+    const res = await gateway.handleCallReject(sock('yabanci'), { channelId: DM });
+    expect(res).toEqual({ ok: true });
+    expect(emitToUserMock).not.toHaveBeenCalled();
+    expect(pushSendCallEndMock).not.toHaveBeenCalled();
+  });
+
+  it('call_accept: arayana olay + callee cihazlarına call_end', async () => {
+    await gateway.handleCallAccept(sock(CALLEE), { channelId: DM });
+    expect(emitToUserMock).toHaveBeenCalledWith(CALLER, 'voice.call_accepted', { channelId: DM });
+    expect(pushSendCallEndMock).toHaveBeenCalledWith(CALLEE, DM);
+  });
+
+  it('call_cancel: callee olay alır + callee tokenlarına call_end', async () => {
+    await gateway.handleCallCancel(sock(CALLER), { channelId: DM });
+    expect(emitToUserMock).toHaveBeenCalledWith(CALLEE, 'voice.call_canceled', { channelId: DM });
+    expect(pushSendCallEndMock).toHaveBeenCalledWith(CALLEE, DM);
   });
 });
