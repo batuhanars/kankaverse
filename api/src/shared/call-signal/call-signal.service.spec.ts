@@ -1,6 +1,6 @@
 import { CallSignalService } from './call-signal.service';
 
-const prismaMock = { channelMember: { findMany: jest.fn() } };
+const prismaMock = { channel: { findUnique: jest.fn() }, channelMember: { findMany: jest.fn() } };
 const realtimeMock = { emitToUser: jest.fn() };
 const pushMock = { sendCallEnd: jest.fn() };
 
@@ -16,6 +16,7 @@ describe('CallSignalService', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     pushMock.sendCallEnd.mockResolvedValue(undefined);
+    prismaMock.channel.findUnique.mockResolvedValue({ type: 'DM' });
     prismaMock.channelMember.findMany.mockResolvedValue([{ userId: CALLER }, { userId: CALLEE }]);
   });
 
@@ -26,7 +27,16 @@ describe('CallSignalService', () => {
     it('üye olmayan çağıran → null', async () => {
       expect(await make().otherDmMember(CH, 'yabanci')).toBeNull();
     });
-    it('kanal yok (üye listesi boş) → null', async () => {
+    it('grup DM → null (arama yalnız 1-1 DM, sahte relay yok)', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue({ type: 'GROUP_DM' });
+      expect(await make().otherDmMember(CH, CALLEE)).toBeNull();
+      expect(prismaMock.channelMember.findMany).not.toHaveBeenCalled();
+    });
+    it('kanal yok → null', async () => {
+      prismaMock.channel.findUnique.mockResolvedValue(null);
+      expect(await make().otherDmMember(CH, CALLEE)).toBeNull();
+    });
+    it('üye listesi boş → null', async () => {
       prismaMock.channelMember.findMany.mockResolvedValue([]);
       expect(await make().otherDmMember(CH, CALLEE)).toBeNull();
     });

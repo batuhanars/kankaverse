@@ -466,6 +466,8 @@ describe('PushService C53 arama', () => {
     callerId: 'caller',
     callerName: 'arayan',
     callerAvatarUrl: null,
+    isGroup: false,
+    groupName: null,
   };
   const PAYLOAD = {
     title: 'Gelen Arama',
@@ -562,5 +564,47 @@ describe('PushService C53 arama', () => {
       await expect(make({ v2: true }).sendCallEnd('u1', 'dm-1')).resolves.toBeUndefined();
       expect(global.fetch).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('PushService C53 sendCallV2 (grup)', () => {
+  const DATA = {
+    v: 2 as const,
+    kind: 'call' as const,
+    callChannelId: 'g-1',
+    callerId: 'c',
+    callerName: 'arayan',
+    callerAvatarUrl: null,
+    isGroup: true,
+    groupName: 'Takim',
+  };
+  function make(v2: boolean, allow: string[] = []) {
+    const values: Record<string, unknown> = {
+      expoPushEnabled: true,
+      pushV2Enabled: v2,
+      pushV2UserIds: allow,
+    };
+    return new PushService(prismaMock as any, { get: jest.fn((k: string) => values[k]) } as any);
+  }
+  beforeEach(() => {
+    jest.resetAllMocks();
+    (global as any).fetch = jest.fn().mockResolvedValue({ ok: true, json: () => ({ data: [] }) });
+  });
+
+  it('yalniz v2 tokenlara veri-yalniz gider (v1 yok), ttl 30', async () => {
+    prismaMock.pushToken.findMany.mockResolvedValue([{ token: 'ExponentPushToken[a]' }]);
+    await make(true).sendCallV2(['u1', 'u1', 'u2'], DATA);
+    expect(prismaMock.pushToken.findMany).toHaveBeenCalledWith({
+      where: { userId: { in: ['u1', 'u2'] }, format: 2 },
+    });
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(body).toEqual([{ to: 'ExponentPushToken[a]', data: DATA, priority: 'high', ttl: 30 }]);
+  });
+
+  it('bayrak kapali / allowlist disi -> no-op', async () => {
+    await make(false).sendCallV2(['u1'], DATA);
+    await make(true, ['x']).sendCallV2(['u1'], DATA);
+    expect(prismaMock.pushToken.findMany).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });

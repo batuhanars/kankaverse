@@ -41,6 +41,9 @@ export interface V2CallData {
   callerId: string;
   callerName: string;
   callerAvatarUrl: string | null;
+  /** 1-1: false + groupName null. Grup DM: true + kanal adi (yoksa null). */
+  isGroup: boolean;
+  groupName: string | null;
 }
 
 /** C53 — arama bitti (iptal / başka cihazda kabul-ret): istemci zili kapatır. */

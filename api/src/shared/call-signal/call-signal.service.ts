@@ -20,6 +20,13 @@ export class CallSignalService {
 
   // R7 (DM-1): çağıran kanalın üyesi DEĞİLSE null → sahte accept/reject/cancel relay'i engellenir.
   async otherDmMember(channelId: string, userId: string): Promise<string | null> {
+    // R7 (C53 sahip onayı bekliyor): arama yalnız 1-1 DM'de var. Grup DM'de "karşı taraf" rastgele ilk
+    // üye olurdu (sahte call_rejected/accepted/canceled); kapı daraltılır, genişletilmez.
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { type: true },
+    });
+    if (channel?.type !== 'DM') return null;
     const members = await this.prisma.channelMember.findMany({
       where: { channelId },
       select: { userId: true },

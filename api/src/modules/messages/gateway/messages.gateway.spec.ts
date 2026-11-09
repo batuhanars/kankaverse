@@ -79,7 +79,12 @@ const notificationsMock = {
 // M3 §2.6 — DM push
 const pushSendToUsersMock = jest.fn();
 const pushSendCallEndMock = jest.fn();
-const pushMock = { sendToUsers: pushSendToUsersMock, sendCallEnd: pushSendCallEndMock };
+const pushSendCallV2Mock = jest.fn();
+const pushMock = {
+  sendToUsers: pushSendToUsersMock,
+  sendCallEnd: pushSendCallEndMock,
+  sendCallV2: pushSendCallV2Mock,
+};
 
 // M5a §4.4 — voice:group_call_ring hedefin ODADA olup olmadığını burada sorar
 const voiceGetLiveParticipationMock = jest.fn();
@@ -124,6 +129,7 @@ function resetMocks() {
   // M3 §2.6 — varsayılan: push başarıyla "gönderildi" (fire-and-forget, hata yutulur)
   pushSendToUsersMock.mockResolvedValue(undefined);
   pushSendCallEndMock.mockResolvedValue(undefined);
+  pushSendCallV2Mock.mockResolvedValue(undefined);
   // M5a §4 — varsayılan: blok yok, hedef odada değil (ring testleri override eder)
   prismaMock.userBlock.findFirst.mockResolvedValue(null);
   voiceGetLiveParticipationMock.mockResolvedValue({
@@ -1834,6 +1840,8 @@ describe('MessagesGateway arama sinyalleri (C53)', () => {
       callerId: CALLER,
       callerName: 'arayan',
       callerAvatarUrl: 'https://cdn/a.png',
+      isGroup: false,
+      groupName: null,
     });
     expect(payload.v2.channelId).toBeUndefined();
     expect(payload.ttlSeconds).toBe(30);
@@ -1863,5 +1871,156 @@ describe('MessagesGateway arama sinyalleri (C53)', () => {
     await gateway.handleCallCancel(sock(CALLER), { channelId: DM });
     expect(emitToUserMock).toHaveBeenCalledWith(CALLEE, 'voice.call_canceled', { channelId: DM });
     expect(pushSendCallEndMock).toHaveBeenCalledWith(CALLEE, DM);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// C53 §2.5 - grup DM aramasi push'u
+// ═══════════════════════════════════════════════════════════════════════════════
+describe('MessagesGateway grup arama push (C53 §2.5)', () => {
+  let gateway: MessagesGateway;
+  const CALLER = 'g-caller';
+  const M1 = 'g-m1';
+  const M2 = 'g-m2';
+  const GCH = 'ch-group-c53';
+  const sock = (userId: string) => ({ data: { userId, username: 'arayan' } }) as any;
+  const flush = () => new Promise((r) => setImmediate(r));
+
+  beforeEach(() => {
+    resetMocks();
+    gateway = makeGateway();
+    prismaMock.channel.findUnique.mockResolvedValue({ type: 'GROUP_DM', name: 'Takim' });
+    membershipMock.requireChannelAccess.mockResolvedValue(undefined);
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    prismaMock.channelMember.findMany.mockResolvedValue([{ userId: M1 }, { userId: M2 }]);
+    prismaMock.user.findUnique.mockResolvedValue({ avatarUrl: null });
+    pushSendCallV2Mock.mockResolvedValue(undefined);
+  });
+
+  const V2 = {
+    v: 2,
+    kind: 'call',
+    callChannelId: GCH,
+    callerId: CALLER,
+    callerName: 'arayan',
+    callerAvatarUrl: null,
+    isGroup: true,
+    groupName: 'Takim',
+  };
+
+  it('start: soket kumesi (cagiran haric) icin v2 call push, v1 push YOK', async () => {
+    await gateway.handleGroupCallStart(sock(CALLER), { channelId: GCH });
+    await flush();
+    expect(pushSendCallV2Mock).toHaveBeenCalledWith([M1, M2], V2);
+    expect(pushSendToUsersMock).not.toHaveBeenCalled();
+  });
+
+  it('start: kanal adi yoksa groupName null', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({ type: 'GROUP_DM', name: null });
+    await gateway.handleGroupCallStart(sock(CALLER), { channelId: GCH });
+    await flush();
+    expect(pushSendCallV2Mock.mock.calls[0][1].groupName).toBeNull();
+  });
+
+  it('start: kanali etkin susturan uye elenir; suresi gecmis susturma elenmez', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      { userId: M1, muted: true, mutedUntil: null },
+      { userId: M2, muted: true, mutedUntil: new Date(Date.now() - 60_000) },
+    ]);
+    await gateway.handleGroupCallStart(sock(CALLER), { channelId: GCH });
+    await flush();
+    expect(pushSendCallV2Mock).toHaveBeenCalledWith([M2], V2);
+  });
+
+  it('start: herkes susturmussa push yok', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      { userId: M1, muted: true, mutedUntil: null },
+      { userId: M2, muted: true, mutedUntil: null },
+    ]);
+    await gateway.handleGroupCallStart(sock(CALLER), { channelId: GCH });
+    await flush();
+    expect(pushSendCallV2Mock).not.toHaveBeenCalled();
+  });
+
+  it('start: kapi reddederse (FORBIDDEN / NOT_GROUP) push yok', async () => {
+    membershipMock.requireNoDmBlock.mockRejectedValue(new Error('blok'));
+    expect(await gateway.handleGroupCallStart(sock(CALLER), { channelId: GCH })).toEqual({
+      ok: false,
+      error: 'FORBIDDEN',
+    });
+    prismaMock.channel.findUnique.mockResolvedValue({ type: 'DM', name: null });
+    expect(await gateway.handleGroupCallStart(sock(CALLER), { channelId: GCH })).toEqual({
+      ok: false,
+      error: 'NOT_GROUP',
+    });
+    await flush();
+    expect(pushSendCallV2Mock).not.toHaveBeenCalled();
+  });
+
+  it('cancel: soket kumesindeki her uyeye call_end (susturma suzgeci yok)', async () => {
+    prismaMock.notificationPref.findMany.mockResolvedValue([
+      { userId: M1, muted: true, mutedUntil: null },
+    ]);
+    await gateway.handleGroupCallCancel(sock(CALLER), { channelId: GCH });
+    expect(pushSendCallEndMock).toHaveBeenCalledTimes(2);
+    expect(pushSendCallEndMock).toHaveBeenCalledWith(M1, GCH);
+    expect(pushSendCallEndMock).toHaveBeenCalledWith(M2, GCH);
+  });
+
+  it('cancel: kapi reddederse call_end yok', async () => {
+    membershipMock.requireChannelAccess.mockRejectedValue(new Error('uye degil'));
+    await gateway.handleGroupCallCancel(sock(CALLER), { channelId: GCH });
+    expect(pushSendCallEndMock).not.toHaveBeenCalled();
+  });
+
+  describe('ring', () => {
+    beforeEach(() => {
+      prismaMock.channelMember.findUnique.mockResolvedValue({ userId: M1 });
+    });
+
+    it('tum kontrollerden sonra hedefe tek v2 push', async () => {
+      const res = await gateway.handleGroupCallRing(sock(CALLER), {
+        channelId: GCH,
+        targetUserId: M1,
+      });
+      await flush();
+      expect(res).toEqual({ ok: true });
+      expect(pushSendCallV2Mock).toHaveBeenCalledWith([M1], V2);
+    });
+
+    it('hedef kanali susturmus -> push yok, ack yine ok', async () => {
+      prismaMock.notificationPref.findMany.mockResolvedValue([
+        { userId: M1, muted: true, mutedUntil: null },
+      ]);
+      const res = await gateway.handleGroupCallRing(sock(CALLER), {
+        channelId: GCH,
+        targetUserId: M1,
+      });
+      await flush();
+      expect(res).toEqual({ ok: true });
+      expect(pushSendCallV2Mock).not.toHaveBeenCalled();
+    });
+
+    it('hedef uye degil / engel / zaten odada -> push yok', async () => {
+      prismaMock.channelMember.findUnique.mockResolvedValueOnce(null);
+      await gateway.handleGroupCallRing(sock(CALLER), { channelId: GCH, targetUserId: 'x' });
+      prismaMock.userBlock.findFirst.mockResolvedValueOnce({ id: 'b' });
+      await gateway.handleGroupCallRing(sock(CALLER), { channelId: GCH, targetUserId: M1 });
+      voiceGetLiveParticipationMock.mockResolvedValueOnce({ present: true });
+      await gateway.handleGroupCallRing(sock('g-caller-2'), { channelId: GCH, targetUserId: M1 });
+      await flush();
+      expect(pushSendCallV2Mock).not.toHaveBeenCalled();
+    });
+  });
+
+  it('1-1 invite v2 isGroup:false, groupName:null tasir', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({ type: 'DM', dmRequestStatus: null });
+    prismaMock.channelMember.findMany.mockResolvedValue([{ userId: CALLER }, { userId: M1 }]);
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
+    prismaMock.user.findUnique.mockResolvedValue({ username: 'arayan', avatarUrl: null });
+    await gateway.handleCallInvite(sock(CALLER), { channelId: GCH });
+    const v2 = pushSendToUsersMock.mock.calls[0][1].v2;
+    expect(v2.isGroup).toBe(false);
+    expect(v2.groupName).toBeNull();
   });
 });

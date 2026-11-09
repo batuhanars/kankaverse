@@ -258,6 +258,32 @@ export class PushService {
     }
   }
 
+  /**
+   * C53 §2.5 - grup DM aramasi: YALNIZ v2 tokenlarina `kind:'call'` (v1 cihazlara grup push'u YOK,
+   * bugun de yoktu). Bayrak kapaliysa / allowlist disindaysa o alici atlanir. ttl 30.
+   */
+  async sendCallV2(userIds: string[], data: V2CallData): Promise<void> {
+    if (!this.enabled || !this.v2Enabled) return;
+    const targets = [...new Set(userIds)].filter((id) => this.v2AllowedFor(id));
+    if (targets.length === 0) return;
+    try {
+      const tokens = await this.prisma.pushToken.findMany({
+        where: { userId: { in: targets }, format: 2 },
+      });
+      const messages: ExpoMessage[] = tokens.map((t) => ({
+        to: t.token,
+        data,
+        priority: 'high' as const,
+        ttl: 30,
+      }));
+      for (const batch of chunk(messages, CHUNK_SIZE)) {
+        await this.sendBatch(batch);
+      }
+    } catch (err) {
+      this.logger.warn(`Grup arama push'u başarısız: ${(err as Error).message}`);
+    }
+  }
+
   private async sendBatch(batch: ExpoMessage[]): Promise<void> {
     try {
       const res = await fetch(EXPO_PUSH_URL, {

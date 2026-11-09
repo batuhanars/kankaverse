@@ -485,6 +485,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
           callerId: userId,
           callerName,
           callerAvatarUrl: caller?.avatarUrl ?? null,
+          isGroup: false,
+          groupName: null,
         },
       })
       .catch(() => {});
@@ -529,7 +531,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId },
-      select: { type: true },
+      select: { type: true, name: true },
     });
     if (!channel || channel.type !== 'GROUP_DM') return { ok: false, error: 'NOT_GROUP' };
 
@@ -551,6 +553,14 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         by: { id: userId, username },
       });
     }
+    // C53 §2.5 - soket olayini alan AYNI kume (cagiran haric); ek suzgec yalniz susturma.
+    this.pushGroupCall(
+      channelId,
+      channel.name ?? null,
+      members.map((m) => m.userId),
+      userId,
+      username,
+    );
     return { ok: true };
   }
 
@@ -597,6 +607,9 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     });
     for (const m of members) {
       this.realtime.emitToUser(m.userId, 'voice.group_call_canceled', { channelId });
+      // C53 §2.5 - soket olayini alan AYNI kume; v2 tokenlarina call_end (susturma suzgeci YOK:
+      // zili kapatmak her zaman guvenli).
+      void this.push.sendCallEnd(m.userId, channelId);
     }
     return { ok: true };
   }
@@ -632,7 +645,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     const channel = await this.prisma.channel.findUnique({
       where: { id: channelId },
-      select: { type: true },
+      select: { type: true, name: true },
     });
     if (!channel || channel.type !== 'GROUP_DM') return { ok: false, error: 'NOT_GROUP' };
 
@@ -672,7 +685,52 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       channelId,
       by: { id: userId, username },
     });
+    // C53 §2.5 - tum kontrollerden sonra, soket olayinin gittigi tek hedefe ayni push (susturma kurali gecerli).
+    this.pushGroupCall(channelId, channel.name ?? null, [targetUserId], userId, username);
     return { ok: true };
+  }
+
+  /**
+   * C53 §2.5 - grup aramasi v2 push'u (fire-and-forget). Alici listesi cagirandan GELIR (soket olayiyla
+   * ayni kume); burada yeni "kime gitsin" karari yok, yalniz o kanali ETKIN susturanlar elenir (1-1 invite
+   * ile ayni `isMuteActive` ilkesi). Susturma nötr: cagirana bir sey sizmaz. v1 token'lara hicbir sey gitmez.
+   */
+  private pushGroupCall(
+    channelId: string,
+    groupName: string | null,
+    recipientIds: string[],
+    callerId: string,
+    callerName: string,
+  ): void {
+    if (recipientIds.length === 0) return;
+    void (async () => {
+      const prefs = await this.prisma.notificationPref.findMany({
+        where: {
+          userId: { in: recipientIds },
+          targetType: NotifTargetType.CHANNEL,
+          targetId: channelId,
+        },
+      });
+      const muted = new Set(
+        prefs.filter((p) => isMuteActive(p.muted, p.mutedUntil)).map((p) => p.userId),
+      );
+      const targets = recipientIds.filter((id) => !muted.has(id));
+      if (targets.length === 0) return;
+      const caller = await this.prisma.user.findUnique({
+        where: { id: callerId },
+        select: { avatarUrl: true },
+      });
+      await this.push.sendCallV2(targets, {
+        v: 2,
+        kind: 'call',
+        callChannelId: channelId,
+        callerId,
+        callerName,
+        callerAvatarUrl: caller?.avatarUrl ?? null,
+        isGroup: true,
+        groupName,
+      });
+    })().catch(() => {});
   }
 
   /** §4.3 yardımcı — bkz. `groupCallRingTimestamps` alan yorumu. */
