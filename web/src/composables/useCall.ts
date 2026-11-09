@@ -47,6 +47,16 @@ function ensureRingback() {
         else stopRingback()
       },
     )
+    // C53 §3.5 — sağlamlaştırma: 1-1 giden arama çalarken odada bizden başkası belirdiği anda
+    // (kabul sinyali kaybolsa bile) giden durumu temizlenir; geri-zil yukarıdaki watch ile susar.
+    // Aynı temizleme yolu (clearOutgoing) kullanılır; grup (kind 'group') etkilenmez.
+    const voiceStore = useVoiceStore()
+    watch(
+      () => callStore.outgoing?.kind === 'dm' && voiceStore.roomParticipants.length > 1,
+      (othersJoined) => {
+        if (othersJoined) callStore.clearOutgoing()
+      },
+    )
   })
 }
 
