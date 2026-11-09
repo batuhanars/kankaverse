@@ -8,8 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  Platform,
-  ToastAndroid,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -18,6 +16,7 @@ import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo';
 import type { PickedProfileMedia } from '@/utils/animatedMedia';
 import { useAuthStore } from '@/stores/auth';
 import { useAiVideoViewerStore } from '@/stores/aiVideoViewer';
+import { showToast } from '@/stores/toast';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmailVerificationBanner } from '../EmailVerificationBanner';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
@@ -117,15 +116,14 @@ function SheetBody({
   const { row } = actions;
 
   // C49: açık sayfa sayısı (sohbet/medya/view hepsi). Ön plan bildirim süzgeci okur.
-  // C49 R3: sayfa kapanırken süren üretim varsa kısa bilgi (ToastAndroid; iOS'ta Alert yedeği).
+  // C49 R3: sayfa kapanırken süren üretim varsa kısa bilgi (uygulama içi toast, iki platformda aynı).
   useEffect(() => {
     useAiVideoViewerStore.getState().sheetOpened();
     return () => {
       const store = useAiVideoViewerStore.getState();
       store.sheetClosed();
       if (store.activeId === null) return;
-      if (Platform.OS === 'android') ToastAndroid.show(t('aiVideo.backgroundNote'), ToastAndroid.LONG);
-      else Alert.alert(t('aiVideo.backgroundNote'));
+      showToast(t('aiVideo.backgroundNote'));
     };
   }, []);
 

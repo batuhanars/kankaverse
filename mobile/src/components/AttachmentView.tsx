@@ -12,9 +12,9 @@ import { ScanStatus, type AttachmentDto } from '@/api/messages';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
-/** Sohbette görsel genişliği (VideoCard ile aynı) ve çok dikey görselin (uzun ekran görüntüsü) yükseklik sınırı. */
-const CHAT_IMAGE_WIDTH = 220;
-const CHAT_IMAGE_MAX_HEIGHT = 360;
+/** Sohbette görsel genişliği (sahip 2026-11-09: 220 küçük kaldı, detay görünsün diye 280, sonra biraz geri 250) ve çok dikey görselin (uzun ekran görüntüsü) yükseklik sınırı. */
+const CHAT_IMAGE_WIDTH = 250;
+const CHAT_IMAGE_MAX_HEIGHT = 380;
 // Görsel boyutu sunucuda yok, ilk yüklemede öğrenilir. Liste satırı geri gelince kutu yeniden zıplamasın.
 const knownRatios = new Map<string, number>();
 

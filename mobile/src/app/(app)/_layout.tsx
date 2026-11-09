@@ -10,6 +10,7 @@ import { useFriendsStore } from '@/stores/friends';
 import { useUnreadStore } from '@/stores/unread';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { AiVideoViewerHost } from '@/components/aiVideo/AiVideoViewerHost';
+import { AppToast } from '@/components/AppToast';
 import { useBackgroundSocket } from '@/realtime/useBackgroundSocket';
 import { syncPushToken, isPushTokenRegistered } from '@/notifications/push';
 import { ensureIncomingCallNotificationsSetup } from '@/notifications/incomingCall';
@@ -118,6 +119,7 @@ export default function AppLayout() {
       <Stack.Screen name="call" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
     </Stack>
     <AiVideoViewerHost />
+    <AppToast />
     </>
   );
 }

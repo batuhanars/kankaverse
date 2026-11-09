@@ -1,10 +1,11 @@
-import { Alert, AppState, Platform, ToastAndroid } from 'react-native';
+import { Alert, AppState } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 import { getAccessToken, refreshAccessToken } from '@/api/http';
 import { useMessagesStore } from '@/stores/messages';
 import { useTypingStore } from '@/stores/typing';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useAiVideoViewerStore } from '@/stores/aiVideoViewer';
+import { showToast } from '@/stores/toast';
 import { useDmStore } from '@/stores/dm';
 import { useUnreadStore } from '@/stores/unread';
 import { useFriendsStore } from '@/stores/friends';
@@ -335,18 +336,22 @@ function ensureSocket(): Socket {
 
   // Kalıcı bildirim (Sprint C1) — rozet + liste anlık. `notification` olayı Bildirimler sekmesi
   // rozetinin TEK kaynağı kalır (aşağıdaki `mention` dinleyicisi ona YAZMAZ — bkz. not).
-  socket.on('notification', (n?: { type?: string }) => {
+  socket.on('notification', (n?: { type?: string; aiVideoId?: string | null }) => {
     // C49 R3: süren yapay zeka video üretimi bitti/başarısız oldu → giriş göstergesi söner.
     if (n?.type === 'AI_VIDEO_READY' || n?.type === 'AI_VIDEO_FAILED') {
       const viewer = useAiVideoViewerStore.getState();
       viewer.setActive(null);
-      // C56 §4: üretim sayfası kapalı + uygulama ön planda + Android → dokunulamaz toast. Ön plan sistem
-      // banner'ı `push.ts` handler'ında bastırılır (çift bildirim olmasın); çan kaydı aşağıda yenilenir.
-      if (Platform.OS === 'android' && viewer.sheetOpen === 0 && AppState.currentState === 'active') {
-        ToastAndroid.show(
-          t(n.type === 'AI_VIDEO_READY' ? 'mobile.aiVideo.toastReady' : 'mobile.aiVideo.toastFailed'),
-          ToastAndroid.LONG,
-        );
+      // C56 §4: üretim sayfası kapalı + uygulama ön planda → uygulama içi toast (hazırsa "İzle" düğmeli,
+      // görüntüleyiciyi açar). Ön plan sistem banner'ı `push.ts` handler'ında bastırılır (çift bildirim
+      // olmasın); çan kaydı aşağıda yenilenir.
+      if (viewer.sheetOpen === 0 && AppState.currentState === 'active') {
+        const id = n.aiVideoId;
+        if (n.type === 'AI_VIDEO_FAILED') showToast(t('aiVideo.doneToastFailed'));
+        else
+          showToast(
+            t('aiVideo.doneToastReady'),
+            id ? { label: t('aiVideo.doneToastWatch'), run: () => viewer.open(id) } : undefined,
+          );
       }
     }
     const store = useNotificationsStore.getState();

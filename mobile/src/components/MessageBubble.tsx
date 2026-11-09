@@ -14,9 +14,8 @@ import type { MessageDto } from '@/api/messages';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
-const AVATAR_SIZE = 34;
-const AVATAR_GAP = 8;
-const DOT_SIZE = 12;
+const AVATAR_SIZE = 30;
+const DOT_SIZE = 11;
 /** İki dokunuş arası sınır; medyanın tek dokunuşu da bu kadar bekler. */
 const DOUBLE_TAP_MAX_DELAY_MS = 250;
 
@@ -140,36 +139,6 @@ export function MessageBubble({
         showAuthor ? styles.rowNewGroup : styles.rowSameGroup,
       ]}
     >
-      {identityVisible &&
-        (showAuthor ? (
-          <Pressable
-            onPress={onPressAuthor}
-            disabled={!onPressAuthor || isWebhook}
-            accessibilityRole="button"
-            accessibilityLabel={
-              authorStatus === 'offline'
-                ? message.author.username
-                : `${message.author.username}, ${t(`presence.${authorStatus}`)}`
-            }
-            style={styles.avatar}
-          >
-            {isWebhook ? (
-              <Ionicons name="hardware-chip-outline" size={18} color={theme.colors.accent500} />
-            ) : (
-              <Text style={styles.avatarText}>{message.author.username.charAt(0).toUpperCase()}</Text>
-            )}
-            {/* Çevrimdışıda nokta YOK (C28 §1.2): gizli görünürlük de istemciye çevrimdışı gelir. */}
-            {authorStatus !== 'offline' && (
-              <PresenceDot
-                status={authorStatus}
-                size={DOT_SIZE}
-                ringColor={theme.colors.bgContent}
-              />
-            )}
-          </Pressable>
-        ) : (
-          <View style={styles.avatarSpacer} />
-        ))}
 
       <View style={[styles.column, isMine ? styles.columnMine : styles.columnTheirs]}>
         <GestureDetector gesture={doubleTap}>
@@ -187,13 +156,37 @@ export function MessageBubble({
         >
           {nameVisible && (
             <View style={styles.authorRow}>
+              {/* Sahip revizesi 2026-11-09: avatar baloncuğun dışında, uzun mesajda en altta kalıyordu;
+                  artık baloncuğun içinde adın yanında. Avatar + ad tek dokunma hedefi (profil). */}
               <Pressable
                 onPress={onPressAuthor}
                 disabled={!onPressAuthor || isWebhook}
                 accessibilityRole="button"
+                accessibilityLabel={
+                  authorStatus === 'offline'
+                    ? message.author.username
+                    : `${message.author.username}, ${t(`presence.${authorStatus}`)}`
+                }
                 style={styles.authorName}
               >
-                <Text style={styles.author}>
+                <View style={styles.avatar}>
+                  {isWebhook ? (
+                    <Ionicons name="hardware-chip-outline" size={17} color={theme.colors.accent500} />
+                  ) : (
+                    <Text style={styles.avatarText}>
+                      {message.author.username.charAt(0).toUpperCase()}
+                    </Text>
+                  )}
+                  {/* Çevrimdışıda nokta YOK (C28 §1.2): gizli görünürlük de istemciye çevrimdışı gelir. */}
+                  {authorStatus !== 'offline' && (
+                    <PresenceDot
+                      status={authorStatus}
+                      size={DOT_SIZE}
+                      ringColor={theme.colors.bgElevated}
+                    />
+                  )}
+                </View>
+                <Text style={styles.author} numberOfLines={1}>
                   {message.author.username}
                   {message.author.roleEmoji ? ` ${message.author.roleEmoji}` : ''}
                 </Text>
@@ -310,17 +303,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accentSubtle,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: AVATAR_GAP,
-    alignSelf: 'flex-end',
   },
   avatarText: {
     color: theme.colors.accent500,
     fontSize: theme.fontSize.sm,
     fontWeight: '700',
-  },
-  // Öbeğin devamında avatarla aynı genişlik: baloncuklar hizalı kalsın.
-  avatarSpacer: {
-    width: AVATAR_SIZE + AVATAR_GAP,
   },
   // Baloncuk en fazla satır genişliğinin %80'i; kısa mesajda içeriği kadar daralır.
   column: {
@@ -392,6 +379,9 @@ const styles = StyleSheet.create({
   },
   authorName: {
     flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   author: {
     color: theme.colors.textSecondary,

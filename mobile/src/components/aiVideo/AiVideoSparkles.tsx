@@ -4,7 +4,7 @@ import { useAiVideoViewerStore } from '@/stores/aiVideoViewer';
 import { theme } from '@/theme';
 
 /**
- * C49 R3: yapay zeka video giriş simgesi. Süren (QUEUED/RUNNING) üretim varken sağ üstte küçük Kor nokta
+ * C49 R3: yapay zeka video giriş simgesi. Süren (QUEUED/RUNNING) üretim varken sağ üstte küçük kırmızı nokta (sahip 2026-11-09: Kor yerine kırmızı)
  * ("sürüyor"). Durumun tek kaynağı `aiVideoViewer` store'u; ek yoklama yok.
  */
 export function AiVideoSparkles({ size, color }: { size: number; color: string }) {
@@ -25,7 +25,7 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 5,
-    backgroundColor: theme.colors.accent500,
+    backgroundColor: theme.colors.danger,
     borderWidth: 1.5,
     borderColor: theme.colors.bgSidebar,
   },
