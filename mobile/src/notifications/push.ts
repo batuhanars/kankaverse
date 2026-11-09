@@ -297,7 +297,7 @@ async function readExpoPushToken(): Promise<string | null> {
   if (typeof projectId !== 'string' || projectId.length === 0) return null;
 
   const token = await Notifications.getExpoPushTokenAsync({ projectId });
-  if (__DEV__) console.log('[spike-push] token', token.data);
+  console.log('[spike-push] token', token.data);
   return token.data;
 }
 
