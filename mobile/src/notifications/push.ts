@@ -6,7 +6,12 @@ import { router } from 'expo-router';
 import { notificationsApi } from '@/api/notifications';
 import { resolveAiVideoId, resolvePushTarget } from '@/utils/pushNavigation';
 import { isChannelRinging } from '@/notifications/incomingCall';
-import { useGatedNotificationResponder } from '@/notifications/responseGate';
+import { useGatedConversationTap, useGatedNotificationResponder } from '@/notifications/responseGate';
+import {
+  dismissConversationNotification,
+  isConversationNotificationAvailable,
+  type ConversationTap,
+} from '../../modules/conversation-notification';
 import { useDmStore } from '@/stores/dm';
 import { useAiVideoViewerStore } from '@/stores/aiVideoViewer';
 import { getActiveChannelId } from '@/realtime/socket';
@@ -122,7 +127,7 @@ import { getActiveChannelId } from '@/realtime/socket';
  * gibi bırak, `tag`i kaldırmak yığılmayı geri getirirdi. Titreşim testi 15 sn'den uzun aralıklarla
  * ya da farklı sohbetlerden yapılır.
  */
-const MESSAGE_CHANNEL_ID = 'messages_v6';
+export const MESSAGE_CHANNEL_ID = 'messages_v6';
 const OLD_MESSAGE_CHANNEL_IDS = ['messages_v1', 'messages_v2', 'messages_v3', 'messages_v4', 'messages_v5'];
 /**
  * Çift UZUN darbe — `[gecikme, titre, dur, titre]`, toplam ~1,65 sn. v2'de tek 250 ms'lik darbeydi
@@ -164,6 +169,12 @@ async function dismissStaleChannelNotifications(channelId: string, excludeIdenti
  */
 export async function clearChannelNotifications(channelId: string): Promise<void> {
   await dismissStaleChannelNotifications(channelId);
+  // C50: veri-yalnız yolla çizilen yerel sohbet bildirimi de (aynı kanal kimliği) temizlenir.
+  try {
+    await dismissConversationNotification(channelId);
+  } catch {
+    // sessiz — bildirim altyapısı ana akışı bloke etmez
+  }
 }
 
 Notifications.setNotificationHandler({
@@ -297,7 +308,6 @@ async function readExpoPushToken(): Promise<string | null> {
   if (typeof projectId !== 'string' || projectId.length === 0) return null;
 
   const token = await Notifications.getExpoPushTokenAsync({ projectId });
-  console.log('[spike-push] token', token.data);
   return token.data;
 }
 
@@ -312,6 +322,8 @@ export async function syncPushToken(): Promise<void> {
       token,
       platform: Platform.OS === 'ios' ? 'ios' : 'android',
       deviceName: Device.deviceName ?? undefined,
+      // C50: yerel sohbet bildirimi modülü yüklüyse sunucu veri-yalnız (v2) push yollayabilir.
+      format: isConversationNotificationAvailable ? 2 : 1,
     });
   } catch {
     // sessiz — bkz. yukarıdaki not
@@ -372,4 +384,16 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
  */
 export function usePushNotificationResponder(): void {
   useGatedNotificationResponder(handleNotificationResponse);
+  // C50: yerel sohbet bildirimine dokunma aynı kapıdan geçer, hedef aynı `resolvePushTarget`.
+  useGatedConversationTap(handleConversationTap);
+}
+
+function handleConversationTap(tap: ConversationTap): void {
+  const target = resolvePushTarget({
+    type: tap.type,
+    guildId: tap.guildId,
+    channelId: tap.conversationId,
+    messageId: tap.messageId,
+  });
+  if (target) router.push(target);
 }
