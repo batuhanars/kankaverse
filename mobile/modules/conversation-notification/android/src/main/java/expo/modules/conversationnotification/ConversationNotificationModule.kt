@@ -16,15 +16,12 @@ class ConversationNotificationModule : Module() {
 
   private fun capture(source: String, intent: Intent?, emit: Boolean) {
     val hasExtra = intent?.hasExtra(ConversationNotifier.EXTRA_CONVERSATION_ID) == true
-    Log.i(TAG, "capture source=$source intent=${intent != null} extras=$hasExtra")
     val context = appContext.reactContext
     if (context == null || intent == null || !hasExtra) return
     val tap = ConversationNotifier.consumeTap(context, intent) ?: return
     pendingTap = tap
-    Log.i(TAG, "stored source=$source conversationId=${tap["conversationId"]} tapId=${tap["tapId"]}")
     if (emit) {
       sendEvent("onTap", tap)
-      Log.i(TAG, "emitted source=$source tapId=${tap["tapId"]}")
     }
   }
 
@@ -65,7 +62,6 @@ class ConversationNotificationModule : Module() {
       if (pendingTap == null) capture("getInitialTap", appContext.currentActivity?.intent, false)
       val tap = pendingTap
       pendingTap = null
-      Log.i(TAG, "getInitialTap delivered=${tap != null} tapId=${tap?.get("tapId")}")
       tap
     }
 

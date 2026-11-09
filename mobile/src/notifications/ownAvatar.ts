@@ -12,7 +12,6 @@ const KEY = 'kv.ownAvatarUrl';
 export async function loadOwnAvatarUrl(): Promise<string | null> {
   try {
     const url = await AsyncStorage.getItem(KEY);
-    console.log('[ownAvatar] load', url ? 'present' : 'none');
     return url && url.length > 0 ? url : null;
   } catch {
     return null;
@@ -23,7 +22,6 @@ async function persist(url: string | null): Promise<void> {
   try {
     if (url) await AsyncStorage.setItem(KEY, url);
     else await AsyncStorage.removeItem(KEY);
-    console.log('[ownAvatar] persisted', url ? 'set' : 'cleared');
   } catch {
     // bildirim simgesi kozmetik; yazılamazsa varsayılan simge kalır
   }

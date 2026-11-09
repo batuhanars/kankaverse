@@ -16,7 +16,6 @@ class QuickReplyReceiver : BroadcastReceiver() {
     val text = RemoteInput.getResultsFromIntent(intent)
       ?.getCharSequence(ConversationNotifier.REPLY_KEY)?.toString()?.trim()
     val conversationId = intent.getStringExtra(ConversationNotifier.EXTRA_CONVERSATION_ID)
-    Log.i(TAG, "onReceive conversationId=$conversationId textLen=${text?.length}")
     if (text.isNullOrEmpty() || conversationId == null) return
 
     val service = Intent(context, QuickReplyService::class.java)

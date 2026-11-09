@@ -495,14 +495,11 @@ export function rejectIncomingCall(channelId: string, isGroup: boolean): void {
   // getirebilir; kısa pencerede ikinci sinyal atlanır.
   const now = Date.now();
   if (lastReject?.channelId === channelId && now - lastReject.at < REJECT_DEDUPE_MS) {
-    console.log('[call] reject skipped (duplicate)', channelId);
     return;
   }
   lastReject = { channelId, at: now };
   // Tek fonksiyon, iki yol: soket bağlıysa soketle, değilse (uygulama kapalı/arka plan) HTTP ile.
-  const connected = isSocketConnected();
-  console.log('[call] reject', channelId, 'socketConnected', connected);
-  if (connected) {
+  if (isSocketConnected()) {
     callReject(channelId);
     return;
   }
@@ -511,13 +508,9 @@ export function rejectIncomingCall(channelId: string, isGroup: boolean): void {
 
 async function rejectOverHttp(channelId: string): Promise<void> {
   try {
-    console.log('[call] http reject start', channelId, 'access?', !!getAccessToken());
     if (!getAccessToken()) await refreshAccessToken();
-    const res = await voiceApi.rejectCall(channelId);
-    console.log('[call] http reject result ok=', res.ok);
-  } catch (e) {
-    const status = (e as { response?: { status?: number } }).response?.status;
-    console.log('[call] http reject FAILED status', status ?? String((e as Error)?.message ?? e));
+    await voiceApi.rejectCall(channelId);
+  } catch {
     lastReject = null; // sonraki yol (bekleyen yanıt dinleyicisi) yeniden deneyebilsin
     // Kullanıcı reddetmek istedi: zil zaten kapandı; sunucuya ulaşılamadıysa arayan zaman aşımını bekler.
   }
@@ -530,7 +523,6 @@ async function rejectOverHttp(channelId: string): Promise<void> {
  * yazılmadı — aynı kuralın iki tüketicisi var, iki ayrı kopyası değil.
  */
 export function acceptIncomingCall(channelId: string, callerName: string, isGroup: boolean): void {
-  console.log('[call] accept', channelId, 'group', isGroup);
   void dismissIncomingCall(channelId);
   if (!isGroup) callAccept(channelId);
   // Grupta arama ekranının başlığı grubun adı olmalı; ad DM store'undan gelir (bildirim yükünde yok),

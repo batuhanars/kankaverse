@@ -68,12 +68,10 @@ export function useGatedConversationTap(onTap: (tap: ConversationTap) => void): 
     let lastTapId: number | undefined;
     const deliverOnce = (source: string) => (tap: ConversationTap) => {
       if (tap.tapId !== undefined && tap.tapId === lastTapId) {
-        console.log('[tap] drop duplicate', source, tap.tapId);
         return;
       }
       lastTapId = tap.tapId;
       nativeTapSeen = true;
-      console.log('[tap] deliver', source, tap.tapId, tap.conversationId);
       deliver(tap);
     };
     const unsubscribeTap = addConversationTapListener(deliverOnce('event'));
@@ -114,27 +112,23 @@ function useGatedDelivery<T>(source: GateSource<T>, onItem: (item: T) => void): 
     const tryFlush = () => {
       if (!pending) return;
       if (!navigationRef.isReady()) {
-        console.log('[tap] gate wait: navigation not ready');
         return;
       }
 
       const status = useAuthStore.getState().status;
       if (status === 'booting') {
         // oturum kararı henüz yok — auth guard bizi ezer, bekle
-        console.log('[tap] gate wait: auth booting');
         return;
       }
 
       if (status === 'unauthenticated') {
         // Oturum yok — kullanıcı elle giriş yapacak, eski hedefe sürpriz atlama YOK.
-        console.log('[tap] gate drop: unauthenticated');
         pending = null;
         return;
       }
 
       const { item } = pending;
       pending = null;
-      console.log('[tap] gate flush: calling handler');
       onItemRef.current(item);
     };
 

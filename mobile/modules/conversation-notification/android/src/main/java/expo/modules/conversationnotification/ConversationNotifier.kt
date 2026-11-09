@@ -138,7 +138,6 @@ object ConversationNotifier {
   private fun buildMe(name: String, avatarUrl: String?): Person {
     val b = Person.Builder().setName(name).setKey("me")
     val icon = avatarUrl?.let { downloadCircle(it) }
-    Log.i(TAG, "me avatar requested=${avatarUrl != null} loaded=${icon != null}")
     if (icon != null) b.setIcon(IconCompat.createWithBitmap(icon))
     return b.build()
   }

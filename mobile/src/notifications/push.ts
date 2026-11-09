@@ -395,9 +395,7 @@ function handleConversationTap(tap: ConversationTap): void {
     channelId: tap.conversationId,
     messageId: tap.messageId,
   });
-  console.log('[tap] handler target', target ? JSON.stringify(target) : 'null', 'type', tap.type);
   if (target) {
     router.push(target);
-    console.log('[tap] router.push called');
   }
 }
