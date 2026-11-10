@@ -1,6 +1,6 @@
 import { UnprocessableEntityException } from '@nestjs/common';
 
-export const MIN_AGE = 13;
+export const MIN_AGE = 15;
 export const MAX_AGE = 120;
 
 /** Doğum tarihinden bugüne tam yaş (T&S yaş kapısı). Saf fonksiyon — 2B yaş-günü job'ı da kullanır. */
@@ -18,7 +18,7 @@ export function calculateIsMinor(birthDate: Date): boolean {
 
 /**
  * Kayıt doğum tarihini doğrular (otorite backend, brief §8 / contract §12).
- * Geçersiz/gelecek/aşırı yaş → INVALID_BIRTHDATE; 13 altı → UNDERAGE.
+ * Geçersiz/gelecek/aşırı yaş → INVALID_BIRTHDATE; 15 altı → UNDERAGE (TR 15 yaş altı yasağı, 2026-11-01).
  */
 export function validateBirthDate(raw: string): Date {
   const birthDate = new Date(raw);
@@ -43,7 +43,7 @@ export function validateBirthDate(raw: string): Date {
   }
   if (age < MIN_AGE) {
     throw new UnprocessableEntityException({
-      message: 'Kayıt için en az 13 yaşında olmalısın.',
+      message: 'Kayıt için en az 15 yaşında olmalısın.',
       error: 'UNDERAGE',
     });
   }
