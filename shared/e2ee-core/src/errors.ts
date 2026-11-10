@@ -12,15 +12,19 @@ export class RandomUnavailableError extends E2eeError {}
 
 /** Grupta (ya da KeyPackage'ta) sunucu listesinde olmayan bir cihaz var. */
 export class UnknownDeviceError extends E2eeError {
-  constructor(readonly deviceId: string) {
+  readonly deviceId: string
+  constructor(deviceId: string) {
     super(`Tanınmayan cihaz: ${deviceId}`)
+    this.deviceId = deviceId
   }
 }
 
 /** Cihaz listede var ama imza anahtarı kayıtlı anahtarla bayt-bayt aynı değil. */
 export class DeviceKeyMismatchError extends E2eeError {
-  constructor(readonly deviceId: string) {
+  readonly deviceId: string
+  constructor(deviceId: string) {
     super(`Cihaz imza anahtarı kayıtlıyla uyuşmuyor: ${deviceId}`)
+    this.deviceId = deviceId
   }
 }
 
@@ -29,11 +33,12 @@ export class InvalidCredentialError extends E2eeError {}
 
 /** Uygulama mesajını gönderen yaprak, sunucunun bildirdiği senderDeviceId ile aynı değil. */
 export class SenderMismatchError extends E2eeError {
-  constructor(
-    readonly expected: string,
-    readonly actual: string,
-  ) {
+  readonly expected: string
+  readonly actual: string
+  constructor(expected: string, actual: string) {
     super(`Gönderen cihaz uyuşmuyor: beklenen ${expected}, gelen ${actual}`)
+    this.expected = expected
+    this.actual = actual
   }
 }
 

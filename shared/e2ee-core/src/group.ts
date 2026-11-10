@@ -60,10 +60,13 @@ export interface ProcessCommitResult {
 
 export class Group {
   /** @internal Kurma/katılma yolları kullanır; uygulama kodu `createGroup`/`joinFromWelcome` çağırır. */
-  constructor(
-    readonly provider: CryptoProvider,
-    private state: ClientState,
-  ) {}
+  readonly provider: CryptoProvider
+  private state: ClientState
+
+  constructor(provider: CryptoProvider, state: ClientState) {
+    this.provider = provider
+    this.state = state
+  }
 
   get epoch(): number {
     return epochOf(this.state)

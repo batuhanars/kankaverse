@@ -31,14 +31,26 @@ export class Device {
   /** Bu cihazın tüm MLS işleri bu kuyruktan geçmeli (sözleşme §1.7). */
   readonly queue = new SerialQueue()
 
+  readonly provider: CryptoProvider
+  /** Sunucuya kaydedilecek Ed25519 açık anahtar (32 bayt). */
+  readonly signaturePublicKey: Uint8Array
+  private readonly signaturePrivateKey: Uint8Array
+  private id: string | null
+  private entries: KeyPackageEntry[]
+
   private constructor(
-    readonly provider: CryptoProvider,
-    /** Sunucuya kaydedilecek Ed25519 açık anahtar (32 bayt). */
-    readonly signaturePublicKey: Uint8Array,
-    private readonly signaturePrivateKey: Uint8Array,
-    private id: string | null,
-    private entries: KeyPackageEntry[],
-  ) {}
+    provider: CryptoProvider,
+    signaturePublicKey: Uint8Array,
+    signaturePrivateKey: Uint8Array,
+    id: string | null,
+    entries: KeyPackageEntry[],
+  ) {
+    this.provider = provider
+    this.signaturePublicKey = signaturePublicKey
+    this.signaturePrivateKey = signaturePrivateKey
+    this.id = id
+    this.entries = entries
+  }
 
   static async create(provider: CryptoProvider): Promise<Device> {
     const { signKey, publicKey } = await (await provider.loadSuite()).signature.keygen()
