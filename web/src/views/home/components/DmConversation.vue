@@ -19,6 +19,7 @@ import { messagesApi } from '@/api/messages'
 import { formatMentionsPlain } from '@/utils/mentions'
 import { canModerateGroupTarget, groupRoleOf } from '@/utils/groupRoles'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import ScrollToBottomButton from '@/components/shared/ScrollToBottomButton.vue'
 import ReplyQuote from '@/components/shared/ReplyQuote.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import { ATTACHMENT_ACCEPT } from '@/utils/attachmentType'
@@ -373,6 +374,8 @@ watch(
     voiceSubscribe(id)
     stickToBottom = true
     scrollToBottom()
+    // Önceki kanaldan kalan "en alta in" düğmesi yeni kanalda asılı kalmasın
+    showScrollDown.value = false
   },
   { immediate: true },
 )
@@ -427,11 +430,16 @@ let stickToBottom = true
 let loadingOlder = false
 // REV-9: yukarıda geçmiş okurken gelen yeni mesaj sayısı → sağ-alt "aşağı in" butonu rozeti
 const newMessageCount = ref(0)
+// "En alta in" düğmesi: dipten bu kadar (px) uzaklaşınca görünür; küçük kaydırmada çıkmasın.
+const SCROLL_DOWN_THRESHOLD = 300
+const showScrollDown = ref(false)
 function onListScroll() {
   const el = listEl.value
   if (!el) return
-  stickToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+  const distance = el.scrollHeight - el.scrollTop - el.clientHeight
+  stickToBottom = distance < 120
   if (stickToBottom) newMessageCount.value = 0
+  showScrollDown.value = distance > SCROLL_DOWN_THRESHOLD
 }
 
 watch(() => messages.value.length, async (n, o) => {
@@ -457,7 +465,7 @@ function scrollToBottom() {
 function jumpToBottom() {
   stickToBottom = true
   newMessageCount.value = 0
-  scrollToBottom()
+  listEl.value?.scrollTo({ top: listEl.value.scrollHeight, behavior: 'smooth' })
 }
 
 // D50 — "daha fazla yükle" başa ekleme yapar; scrollTop sabit kalırsa görünüm eklenen
@@ -1052,21 +1060,12 @@ const dayLabels = computed<(string | null)[]>(() =>
         </template>
       </div>
 
-      <!-- REV-9: yeni mesaj geldiğinde (yukarıdayken) aşağı-in butonu + gelen mesaj sayısı -->
-      <button
-        v-if="newMessageCount > 0"
-        class="absolute right-4 bottom-3 z-10 flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full cursor-pointer transition-opacity hover:opacity-90 shadow-lg"
-        style="background-color: var(--kv-accent-500); color: #ffffff;"
+      <!-- En alta in: yukarı kaydırınca görünür; yukarıdayken gelen mesaj sayısı rozette (REV-9) -->
+      <ScrollToBottomButton
+        v-if="showScrollDown || newMessageCount > 0"
+        :count="newMessageCount"
         @click="jumpToBottom"
-      >
-        <span class="flex items-center justify-center text-[11px] font-bold rounded-full" style="min-width: 18px; height: 18px; background-color: var(--kv-danger);">
-          {{ newMessageCount > 99 ? '99+' : newMessageCount }}
-        </span>
-        <span class="text-[12px] font-semibold">{{ t('message.newMessages') }}</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </button>
+      />
       </div>
 
       <!-- Mesaj input / Engel bandı -->

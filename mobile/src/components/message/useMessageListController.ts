@@ -27,6 +27,9 @@ const MAX_JUMP_FETCH_ATTEMPTS = 20;
 
 const HIGHLIGHT_MS = 2500;
 
+/** "En alta in" düğmesi dipten bu kadar uzaklaşınca görünür (web ile aynı eşik); küçük kaydırmada çıkmaz. */
+const SCROLL_DOWN_THRESHOLD = 300;
+
 /**
  * Ardışık mesajları grupla: aynı yazarın 5 dakika içindeki mesajlarında başlık (avatar + ad + saat)
  * tekrar edilmez. Liste verisinin kendisi olduğu için bu dosyada — ekran yalnız render eder.
@@ -75,6 +78,9 @@ export function useMessageListController(
   const atBottomRef = useRef(true);
   const prevCountRef = useRef(0);
   const [newMessageCount, setNewMessageCount] = useState(0);
+  // Kaydırma olayı saniyede onlarca kez gelir; durum yalnız eşik geçilince değişsin diye ref ile kıyaslanır.
+  const [scrolledUp, setScrolledUp] = useState(false);
+  const scrolledUpRef = useRef(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
 
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -96,6 +102,8 @@ export function useMessageListController(
     atBottomRef.current = true;
     prevCountRef.current = 0;
     setNewMessageCount(0);
+    scrolledUpRef.current = false;
+    setScrolledUp(false);
   }, [channelId]);
 
   // Web REV-1/REV-9 semantiği: dipteysem yeni mesajda otomatik kay; yukarıda geçmiş okuyorsam
@@ -163,8 +171,14 @@ export function useMessageListController(
   );
 
   function onListScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    atBottomRef.current = e.nativeEvent.contentOffset.y < STICK_THRESHOLD;
+    const y = e.nativeEvent.contentOffset.y;
+    atBottomRef.current = y < STICK_THRESHOLD;
     if (atBottomRef.current && newMessageCount > 0) setNewMessageCount(0);
+    const up = y > SCROLL_DOWN_THRESHOLD;
+    if (up !== scrolledUpRef.current) {
+      scrolledUpRef.current = up;
+      setScrolledUp(up);
+    }
   }
 
   function onEndReached(ready: boolean) {
@@ -178,6 +192,7 @@ export function useMessageListController(
     inverted,
     listRef,
     newMessageCount,
+    scrolledUp,
     jumpToBottom,
     loadingOlder,
     highlightId,

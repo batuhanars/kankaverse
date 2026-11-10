@@ -1103,6 +1103,7 @@
     }
   },
   "message": {
+    "scrollToBottom": "En alta in",
     "inputPlaceholder": "#{channel} kanalına mesaj yaz",
     "emojiButton": "Emoji ekle",
     "gifButton": "GIF gönder",

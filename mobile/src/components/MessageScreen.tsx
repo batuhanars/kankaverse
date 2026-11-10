@@ -5,7 +5,6 @@ import {
   Keyboard,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +28,7 @@ import { useMentionCompose, type MentionCandidate } from './message/useMentionCo
 import { useMessageListController } from './message/useMessageListController';
 import { MessageEmpty, MessageError, MessageLoading } from './message/MessageStates';
 import { MessageActionHost } from './message/MessageActionHost';
+import { ScrollToBottomButton } from './message/ScrollToBottomButton';
 import { useMessageActions } from './message/useMessageActions';
 import { useQuickReactions } from '@/utils/quickReactions';
 import { useMessagesStore } from '@/stores/messages';
@@ -396,6 +396,8 @@ export function MessageScreen({
       {loadState === 'ready' && items.length === 0 && <MessageEmpty />}
 
       {loadState === 'ready' && items.length > 0 && (
+        // Liste kabı: "en alta in" düğmesi listenin sağ altına (mesaj kutusunun üstüne) oturur.
+        <View style={styles.listWrap}>
         <FlatList
           ref={list.listRef}
           data={inverted}
@@ -465,19 +467,13 @@ export function MessageScreen({
             </View>
           )}
         />
+        {/* En alta in: geçmişe kaydırınca görünür; yukarıdayken gelen mesaj sayısı rozette (REV-9). */}
+        {(list.scrolledUp || list.newMessageCount > 0) && (
+          <ScrollToBottomButton count={list.newMessageCount} onPress={list.jumpToBottom} />
+        )}
+        </View>
       )}
 
-      {/* "Aşağı in" düğmesi — yalnız yukarıda geçmiş okurken yeni mesaj geldiyse görünür (web
-          MessageArea.vue REV-9 karşılığı). Boş yüzey değil: sayaç sıfırken hiç render edilmez. */}
-      {list.newMessageCount > 0 && (
-        <Pressable onPress={list.jumpToBottom} style={styles.newMessagePill}>
-          <Text style={styles.newMessagePillCount}>
-            {list.newMessageCount > 99 ? '99+' : list.newMessageCount}
-          </Text>
-          <Text style={styles.newMessagePillText}>{t('message.newMessages')}</Text>
-          <Ionicons name="arrow-down" size={14} color={theme.colors.textPrimary} />
-        </Pressable>
-      )}
 
       {/* Sprint M3c — kutu + ek paneli + emoji seçici tek yerleşimde (`ComposerHost`); ekran yalnız
           bağlamı geçirir. Kutunun kendi iç akışı (taslak ekler, imleç, seçiciler) ekranın işi değil. */}
@@ -568,25 +564,7 @@ const styles = StyleSheet.create({
   loadMore: {
     marginVertical: 10,
   },
-  newMessagePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    gap: 6,
-    marginBottom: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    backgroundColor: theme.colors.accent500,
-  },
-  newMessagePillCount: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.xs,
-    fontWeight: '700',
-  },
-  newMessagePillText: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.sm,
-    fontWeight: '600',
+  listWrap: {
+    flex: 1,
   },
 });
