@@ -1,5 +1,5 @@
 // Cihaz kaydı ve KeyPackage stoku (E1 §2.3).
-import { createDevice, webProvider, type Device } from '@kankaverse/e2ee-core'
+import { createDevice, type CryptoProvider, type Device } from '@kankaverse/e2ee-core'
 import { toB64 } from './b64'
 import type { E2eeApi } from './context'
 import type { LocalStore } from './localStore'
@@ -15,8 +15,12 @@ export class DeviceBrokenError extends Error {}
  * zinciriyle tekrar çağrı aynı deviceId'yi döner. Yeni girişte yerel depo zaten silinmiştir (auth.login),
  * bu yüzden "yerelde cihaz var ama sunucu başka kimlik verdi" yalnız bozuk durumdur ve açıkça reddedilir.
  */
-export async function ensureDevice(api: E2eeApi, store: LocalStore): Promise<Device> {
-  const device = (await store.loadDevice()) ?? (await createDevice(webProvider))
+export async function ensureDevice(
+  api: E2eeApi,
+  store: LocalStore,
+  provider: CryptoProvider,
+): Promise<Device> {
+  const device = (await store.loadDevice()) ?? (await createDevice(provider))
   const { data } = await api.registerDevice(toB64(device.signaturePublicKey))
   // Kimlik değişirse credential'lar yanlış kimliği taşırdı: sessizce devam yerine dur.
   if (device.deviceId !== null && device.deviceId !== data.deviceId) throw new DeviceBrokenError()

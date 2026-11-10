@@ -4,7 +4,7 @@
  * Bu durumlarda mesajlaşma durur; sessizce devam edilmez, kullanıcı nedenini görür.
  */
 import { useI18n } from 'vue-i18n'
-import type { WarningKind } from '@/lib/e2ee/context'
+import type { WarningKind } from '@kankaverse/e2ee-client'
 
 defineProps<{ kind: WarningKind }>()
 

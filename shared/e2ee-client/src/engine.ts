@@ -1,17 +1,25 @@
 // E2EE motoru: tek kullanıcı için cihaz, gruplar ve mesaj çözme/şifreleme. Tüm MLS durum işlemleri
-// runExclusive'den geçer (sekmeler arası Web Lock + sekme içi SerialQueue, E1 §1.7).
-// Ağ (`api`) enjekte edilir: testler sahte sunucuyla, uygulama gerçek axios istemcisiyle çalışır.
-import { textPayload } from '@kankaverse/e2ee-core'
+// `withLock`'tan geçer (E1 §1.7). Ağ, depo, kilit ve sağlayıcı enjekte edilir (ports.ts): testler sahte
+// sunucuyla, web ve mobil kendi adaptörleriyle çalışır.
+import { RandomUnavailableError, textPayload } from '@kankaverse/e2ee-core'
 import { fromB64, toB64 } from './b64'
 import { groupForSend, openChannel, syncChannel, type ChannelInfo } from './channelSync'
-import { runExclusive, type E2eeApi, type E2eeContext, type WarningKind } from './context'
+import type { E2eeContext } from './context'
 import { DeviceBrokenError, ensureDevice } from './deviceSetup'
 import { Hydrator, type OwnPlain, type Resolution, type WireMessage } from './hydrate'
 import { digestOf, LocalStore, type StoredStatus } from './localStore'
+import type { E2eeApi, EngineDeps, Vault, WarningHandler, WithLock } from './ports'
 import { processWelcomes } from './welcomes'
-import { destroyOtherVaults, Vault } from './vault'
 
-export type WarningHandler = (channelId: string, kind: WarningKind) => void
+export type { WarningHandler }
+
+/** Güvenli rastgelelik yoksa motor BAŞLAMAZ (§5): anahtarlar tahmin edilebilir olurdu. */
+function assertRandom(): void {
+  const g = (globalThis as { crypto?: { getRandomValues?: unknown } }).crypto
+  if (typeof g?.getRandomValues !== 'function') {
+    throw new RandomUnavailableError('crypto.getRandomValues yok: E2EE başlatılamaz')
+  }
+}
 
 /** Hydrate çıktısına eklenen alanlar: düz metin `content`'e yazılır, çözülemeyenin durumu işaretlenir. */
 export interface Hydrated {
@@ -32,40 +40,43 @@ export class E2eeEngine {
   private api: E2eeApi
   private store: LocalStore
   private vault: Vault
+  private withLock: WithLock
   private onWarn: WarningHandler
+  private log: (message: string, error?: unknown) => void
+  private yieldToUi: EngineDeps['yieldToUi']
+  private metric: EngineDeps['metric']
   private own: OwnPlain = new Map()
 
-  private constructor(userId: string, api: E2eeApi, vault: Vault, onWarn: WarningHandler) {
+  private constructor(userId: string, deps: EngineDeps, vault: Vault) {
     this.userId = userId
-    this.api = api
+    this.api = deps.api
     this.vault = vault
-    this.store = new LocalStore(vault)
-    this.onWarn = onWarn
+    this.store = new LocalStore(vault, deps.provider)
+    this.withLock = deps.withLock
+    this.onWarn = deps.onWarn
+    this.log = deps.log ?? ((m, e) => console.error(m, e))
+    this.yieldToUi = deps.yieldToUi
+    this.metric = deps.metric
   }
 
-  /** `null` = bu hesap için E2EE kapalı (bayrak/izin listesi) ya da cihaz kurulamadı (uyarı ayrıca verilir). */
-  static async start(
-    userId: string,
-    api: E2eeApi,
-    onWarn: WarningHandler,
-  ): Promise<E2eeEngine | null> {
-    const { data } = await api.status()
+  /** `null` = bu hesap için E2EE kapalı (bayrak/izin listesi). Cihaz kurulamazsa hata (uyarı ayrıca verilir). */
+  static async start(userId: string, deps: EngineDeps): Promise<E2eeEngine | null> {
+    assertRandom()
+    const { data } = await deps.api.status()
     if (!data.enabled) return null
-    // Aynı tarayıcıdaki başka hesapların kalıntısı bu kullanıcıya karışmasın / sızmasın (hesap değişimi).
-    await destroyOtherVaults(userId)
-    const vault = await Vault.open(userId)
-    const engine = new E2eeEngine(userId, api, vault, onWarn)
+    const vault = await deps.openVault(userId)
+    const engine = new E2eeEngine(userId, deps, vault)
     try {
-      await engine.run(() => ensureDevice(api, engine.store))
+      await engine.run(() => ensureDevice(deps.api, engine.store, deps.provider))
     } catch (e) {
-      if (e instanceof DeviceBrokenError) onWarn('', 'device-broken')
+      if (e instanceof DeviceBrokenError) deps.onWarn('', 'device-broken')
       throw e
     }
     return engine
   }
 
   private run<T>(task: (ctx: E2eeContext) => Promise<T>): Promise<T> {
-    return runExclusive(this.userId, () => task(this.context()))
+    return this.withLock(`kv-e2ee:${this.userId}`, () => task(this.context()))
   }
 
   private context(): E2eeContext {
@@ -74,6 +85,8 @@ export class E2eeEngine {
       api: this.api,
       store: this.store,
       warn: this.onWarn,
+      yieldToUi: this.yieldToUi,
+      metric: this.metric,
       getDevice: async () => {
         device ??= await this.store.loadDevice()
         if (!device) throw new DeviceBrokenError('Yerel cihaz yok')
@@ -114,7 +127,7 @@ export class E2eeEngine {
       const sealed = await group.encrypt(textPayload(text, Date.now()))
       // Şifreleme anahtarı tüketir: POST başarısız olsa bile durum geri alınamaz, hemen diske.
       await ctx.store.saveGroup(channelId, group)
-      this.own.set(await digestOf(sealed.ciphertext), text)
+      this.own.set(digestOf(sealed.ciphertext), text)
       return { ciphertext: toB64(sealed.ciphertext), epoch: sealed.epoch }
     })
   }
@@ -123,7 +136,7 @@ export class E2eeEngine {
   rememberSent(msg: WireMessage): Promise<void> {
     return this.run(async (ctx) => {
       if (!msg.ciphertext) return
-      const digest = await digestOf(fromB64(msg.ciphertext))
+      const digest = digestOf(fromB64(msg.ciphertext))
       const body = this.own.get(digest)
       if (body === undefined) return
       await ctx.store.saveMessage({
@@ -186,7 +199,7 @@ export class E2eeEngine {
     try {
       resolved = await hydrator.resolveAll(asc)
     } catch (e) {
-      console.error('[e2ee] çözme durdu', e) // uyarı guardUntrusted'da verildi; kalanlar "çözülemedi" görünür
+      this.log('[e2ee] çözme durdu', e) // uyarı guardUntrusted'da verildi; kalanlar "çözülemedi" görünür
     }
     return asc.flatMap((m) => this.apply(m, resolved.get(m.id)))
   }

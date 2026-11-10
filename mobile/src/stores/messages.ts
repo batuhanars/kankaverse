@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { messagesApi, type MessageDto } from '@/api/messages';
+import { hydratePage, openE2eeChannel, syncE2eeChannel } from '@/stores/e2ee';
 
 // web/src/stores/messages.ts deseni birebir taşındı — backend `desc` (yeni→eski) döner, store
 // ASC (eski→yeni) tutar; ekranlar kendi render sırasına göre çevirir. `setMessages` ilk sayfa,
@@ -40,6 +41,9 @@ interface MessagesState {
   resolveUsername: (channelId: string, userId: string) => string | undefined;
 }
 
+/** Şifreli sayfa için daha eski sayfa yükleyici (motor MLS sırası için gerekirse geriye gider). */
+const olderLoader = (channelId: string) => (before: string) => messagesApi.list(channelId, before);
+
 function learnAuthors(channelId: string, messages: MessageDto[], known: Record<string, Record<string, string>>) {
   const map = { ...(known[channelId] ?? {}) };
   for (const m of messages) {
@@ -53,7 +57,11 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
   knownUsers: {},
 
   async fetchInitial(channelId) {
-    const fetched = await messagesApi.list(channelId);
+    // E1: şifreli DM'de önce Welcome'lar işlenir ki mesajlar doğru epoch'ta çözülsün (şifresizde no-op).
+    await openE2eeChannel(channelId);
+    const raw = await messagesApi.list(channelId);
+    const fetched = await hydratePage(channelId, raw, olderLoader(channelId));
+    void syncE2eeChannel(channelId); // mesajlar çözüldükten SONRA commit senkronu (sıra önemli)
     const ascending = [...fetched].reverse();
     set((s) => ({
       byChannel: {
@@ -61,7 +69,7 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
         [channelId]: {
           // C29: yerel geçici/başarısız mesajlar sunucu listesinde yok; yenilemede kaybolmasın.
           messages: [...ascending, ...(s.byChannel[channelId]?.messages ?? []).filter((m) => m.localStatus)],
-          hasMore: fetched.length === 50,
+          hasMore: raw.length === 50,
         },
       },
       knownUsers: learnAuthors(channelId, fetched, s.knownUsers),
@@ -72,14 +80,15 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     const current = get().byChannel[channelId];
     const oldest = current?.messages[0];
     if (!oldest) return;
-    const fetched = await messagesApi.list(channelId, oldest.id);
+    const raw = await messagesApi.list(channelId, oldest.id);
+    const fetched = await hydratePage(channelId, raw, olderLoader(channelId));
     const ascending = [...fetched].reverse();
     set((s) => {
       const existing = s.byChannel[channelId]?.messages ?? [];
       return {
         byChannel: {
           ...s.byChannel,
-          [channelId]: { messages: [...ascending, ...existing], hasMore: fetched.length === 50 },
+          [channelId]: { messages: [...ascending, ...existing], hasMore: raw.length === 50 },
         },
         knownUsers: learnAuthors(channelId, fetched, s.knownUsers),
       };

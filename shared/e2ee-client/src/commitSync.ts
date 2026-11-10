@@ -5,7 +5,7 @@ import {
   UnknownDeviceError,
   type Group,
 } from '@kankaverse/e2ee-core'
-import type { E2eeCommitRow } from '@/api/e2ee'
+import type { E2eeCommitRow } from './ports'
 import { fromB64 } from './b64'
 import type { E2eeContext } from './context'
 import { devicesOf, type ChannelDevices } from './registry'

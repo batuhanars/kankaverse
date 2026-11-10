@@ -1,3 +1,4 @@
+import { DeviceRemovedError, GroupNotReadyError } from '@kankaverse/e2ee-client';
 import { t } from '@/i18n';
 
 interface ErrorEnvelope {
@@ -10,6 +11,9 @@ interface ErrorEnvelope {
  * envelope kuralı: `message` gösterilir, `error` kodu loglanır). Ham hata metni ekrana basılmaz.
  */
 export function extractErrorMessage(err: unknown): string {
+  // E1: yerel şifreleme hataları ağ hatası değildir (sunucu yanıtı yok): doğru sebep gösterilir.
+  if (err instanceof GroupNotReadyError) return t('e2ee.errors.notReady');
+  if (err instanceof DeviceRemovedError) return t('e2ee.errors.deviceRemoved');
   const response = (err as { response?: { data?: ErrorEnvelope } }).response;
   if (response?.data?.error && __DEV__) {
     console.warn(`[api] hata kodu: ${response.data.error}`);

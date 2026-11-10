@@ -21,6 +21,9 @@ import { MessageSearchModal } from './MessageSearchModal';
 import { ComposerHost } from './message/ComposerHost';
 import { EmailVerificationBanner } from './EmailVerificationBanner';
 import { DateSeparator } from './message/DateSeparator';
+import { E2eeDivider } from './message/E2eeDivider';
+import { E2eeWarningBanner } from './message/E2eeWarningBanner';
+import { useE2eeChannelView } from './message/useE2eeChannelView';
 import { useTypingEmitter } from './message/useTypingEmitter';
 import { useMessageComposer } from './message/useMessageComposer';
 import { discardOptimistic, retryOptimistic } from './message/useOptimisticSend';
@@ -268,6 +271,10 @@ export function MessageScreen({
   }, [lastMessageId, isFocused]);
 
   const { items, inverted } = list;
+  // E1: kilit, uyarı bandı ve "bu noktadan sonra şifreli" ayracı (şifresiz kanalda hiçbiri görünmez).
+  const plainMessages = useMemo(() => items.map((it) => it.message), [items]);
+  const hasMoreOlder = useMessagesStore((s) => s.byChannel[channelId]?.hasMore ?? false);
+  const e2eeView = useE2eeChannelView(channelId, plainMessages, hasMoreOlder);
   // M6b §8.4 — sesli mesaj otomatik geçişi için kronolojik (eski → yeni) CLEAN ses eki sırası.
   useEffect(() => {
     const ids = items.flatMap((it) =>
@@ -359,6 +366,14 @@ export function MessageScreen({
         options={{
           headerRight: () => (
             <View style={styles.headerActionsRow}>
+              {e2eeView.encrypted && (
+                <Ionicons
+                  name="lock-closed"
+                  size={16}
+                  color={theme.colors.textMuted}
+                  accessibilityLabel={t('e2ee.lockTitle')}
+                />
+              )}
               {headerActions}
               {/* Sprint M1h — Sabitlenenler. Yalnız ekran bir yüzey verdiyse çizilir; düğme
                   koyup hiçbir yere götürmemek "boş yüzey" olurdu. */}
@@ -390,6 +405,7 @@ export function MessageScreen({
       {/* Doğrulanmamış hesap sohbette de görsün (web AppShell şeridi karşılığı); dosya/sesli mesaj burada reddediliyor. */}
       {emailUnverified ? <EmailVerificationBanner /> : null}
       {topBanner}
+      {e2eeView.warning ? <E2eeWarningBanner kind={e2eeView.warning} /> : null}
 
       {loadState === 'loading' && <MessageLoading />}
       {loadState === 'error' && <MessageError message={errorMessage} onRetry={retryLoad} />}
@@ -415,6 +431,8 @@ export function MessageScreen({
               list.listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.4 });
             }, 60);
           }}
+          // Inverted listede başlık görsel olarak EN ALTTA durur: henüz şifreli mesaj yokken ayraç sonda.
+          ListHeaderComponent={e2eeView.dividerAtEnd ? <E2eeDivider /> : null}
           ListFooterComponent={
             list.loadingOlder ? <ActivityIndicator color={theme.colors.textMuted} style={styles.loadMore} /> : null
           }
@@ -427,6 +445,7 @@ export function MessageScreen({
             // normal sütun olur ve iki çevirme sadeleşir: ayraç mesajın üstünde.
             <View>
               {item.isDayStart && <DateSeparator iso={item.message.createdAt} />}
+              {item.message.id === e2eeView.dividerBeforeId && <E2eeDivider />}
               {/* C23 — Yanıtla her mesajda açık (eylem paneli de koşulsuz sunuyor); tek işlev. */}
               <SwipeToReply
                 // C29: gecici/basarisiz mesajda kaydirarak yanit/duzenle kapali (iki islev de yok = jest kapali).

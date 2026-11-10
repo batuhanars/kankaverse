@@ -39,6 +39,8 @@ export interface ReplyPreviewDto {
   authorUsername: string;
   /** Eski önbellek/olayda alan yok → yalnız metin. */
   attachment?: ReplyAttachmentDto | null;
+  /** E1 — YALNIZ yerel: alıntılanan mesaj şifreli ve düz metni bu cihazda yok ("Şifreli mesaj" gösterilir). */
+  e2eeUnknown?: boolean;
 }
 
 export interface MessageAuthorDto {
@@ -147,6 +149,15 @@ export interface MessageDto {
   /** C29 — YALNIZ yerel (sunucudan gelmez): geçici (iyimser) mesajın durumu ve hata metni. */
   localStatus?: 'sending' | 'failed';
   localError?: string;
+  /**
+   * E1 — şifreli DM mesajı: sunucu yalnız şifreliyse `encrypted:true` + ciphertext + senderDeviceId verir
+   * (content ''). Düz metin istemcide çözülüp `content`'e yazılır; `ciphertext` ekran durumunda tutulmaz.
+   */
+  encrypted?: boolean;
+  ciphertext?: string;
+  senderDeviceId?: string | null;
+  /** E1 — YALNIZ yerel: çözme sonucu. 'ok' dışı = metin yok, baloncuk durum cümlesi gösterir. */
+  e2eeStatus?: 'ok' | 'unsupported' | 'undecryptable';
 }
 
 export const messagesApi = {
@@ -238,6 +249,32 @@ export const messagesApi = {
   /** `GET /channels/:id/pins` — `pinnedAt desc`. **Kanal başına**, ortam geneli uç yok. */
   async listPins(channelId: string): Promise<MessageDto[]> {
     const res = await http.get<MessageDto[]>(`/channels/${channelId}/pins`);
+    return res.data;
+  },
+
+  /** E1: şifreli DM mesajı. `content` GÖNDERİLMEZ (sunucu 409 E2EE_REQUIRED); ciphertext base64. */
+  async sendEncrypted(
+    channelId: string,
+    cipher: { ciphertext: string; epoch: number },
+    replyToId?: string,
+    nonce?: string,
+    attachmentIds?: string[],
+  ): Promise<MessageDto> {
+    const res = await http.post<MessageDto>(`/channels/${channelId}/messages`, {
+      ...cipher,
+      ...(replyToId ? { replyToId } : {}),
+      ...(nonce ? { nonce } : {}),
+      ...(attachmentIds?.length ? { attachmentIds } : {}),
+    });
+    return res.data;
+  },
+
+  async editEncrypted(
+    channelId: string,
+    messageId: string,
+    cipher: { ciphertext: string; epoch: number },
+  ): Promise<MessageDto> {
+    const res = await http.patch<MessageDto>(`/channels/${channelId}/messages/${messageId}`, cipher);
     return res.data;
   },
 

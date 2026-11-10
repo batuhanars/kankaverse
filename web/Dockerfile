@@ -4,7 +4,7 @@
 # repoda bilinen/önceden var olan tip hataları (VoiceVideoGrid/stores) build'i bloklar. Deploy vite build kullanır.
 
 # E1 §6.1: build context KÖK dizindir (`docker build -f web/Dockerfile .`). Neden: web, MLS çekirdeğini
-# (`shared/e2ee-core`) kaynağından derler; context ./web olsaydı `../shared` imaja girmezdi.
+# (`shared/e2ee-core`, `shared/e2ee-client`) kaynağından derler; context ./web olsaydı `../shared` imaja girmezdi.
 # Bağlam filtresi: web/Dockerfile.dockerignore (yalnız web/ ve shared/e2ee-core girer).
 
 # ── Build ──────────────────────────────────────────────────────────────────
@@ -14,6 +14,8 @@ WORKDIR /app
 COPY shared/e2ee-core/package*.json ./shared/e2ee-core/
 RUN cd shared/e2ee-core && npm ci --omit=dev
 COPY shared/e2ee-core/src ./shared/e2ee-core/src
+# Ortak istemci motoru (E1 §6.3): çalışma bağımlılığı yok, yalnız kaynak; çekirdeği alias ile çözer.
+COPY shared/e2ee-client/src ./shared/e2ee-client/src
 WORKDIR /app/web
 COPY web/package*.json ./
 RUN npm ci

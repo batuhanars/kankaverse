@@ -12,6 +12,10 @@
 // `import` yerine `require` bilinçli: ESM import'ları hoist edilir, aralarına konan kod SONRA çalışır
 // — yani `registerGlobals()`in expo-router'dan önce çalışacağı garanti edilemezdi. CommonJS sırası
 // deterministik.
+// E1 §5: guvenli rastgelelik (expo-crypto) EN ONCE. livekit'in `crypto.randomUUID` polyfill'i
+// (Math.random) kripto icin kullanilmaz; o yalniz randomUUID ekler, getRandomValues'a dokunmaz.
+require('./src/e2ee/bootRandom').bootSecureRandom();
+
 require('@livekit/react-native').registerGlobals();
 
 // C50: veri-yalniz mesaj push gorevi, headless baslangicta da yuklenmeli.

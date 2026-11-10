@@ -1,0 +1,11 @@
+// e2ee-client: platformdan bağımsız istemci motoru (E1 §6.3). Web ve mobil yalnız adaptör yazar (ports.ts).
+export { E2eeEngine, type Hydrated, type SentCipher } from './engine'
+export { GroupNotReadyError, type E2eeContext } from './context'
+export { DeviceRemovedError, type ChannelInfo } from './channelSync'
+export { DeviceBrokenError } from './deviceSetup'
+export { serialLock } from './lock'
+export { e2eeErrorCode } from './errors'
+export { fromB64, toB64 } from './b64'
+export type { StoredStatus, StoredMessage } from './localStore'
+export type { WireMessage } from './hydrate'
+export type * from './ports'

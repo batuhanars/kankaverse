@@ -1,7 +1,6 @@
 // Testler için bellekte sahte E2EE sunucusu: sözleşme §2 uçlarının kurallarını (atomik KeyPackage, epoch kapısı,
 // iptal edilen cihazın 403'ü) taklit eder. Gerçek HTTP kanıtı ayrıca scripts/e2ee-e2e ile alınır.
-import type { E2eeApi } from '../context'
-import type { E2eeChannelState } from '@/api/e2ee'
+import type { E2eeApi, E2eeChannelState } from '../src/ports'
 
 interface Dev {
   id: string
@@ -14,13 +13,20 @@ interface Dev {
 }
 
 const fail = (status: number, error: string, extra: object = {}) =>
-  Object.assign(new Error(error), { response: { status, data: { error, ...extra } } })
+  Object.assign(new Error(error), {
+    response: { status, data: { error, ...extra } },
+  })
 
 export class FakeServer {
   devices = new Map<string, Dev>()
   members = new Map<string, string[]>()
   groups = new Map<string, { epoch: number; groupId: string; createdAt: string }>()
-  handshakes: { channelId: string; epoch: number; sender: string; commit: string }[] = []
+  handshakes: {
+    channelId: string
+    epoch: number
+    sender: string
+    commit: string
+  }[] = []
   welcomes: {
     id: string
     channelId: string
@@ -61,7 +67,14 @@ export class FakeServer {
           return ok({ deviceId: existing.id })
         }
         const id = `dev${++this.seq}`
-        this.devices.set(id, { id, userId, family, key, revokedAt: null, kps: [] })
+        this.devices.set(id, {
+          id,
+          userId,
+          family,
+          key,
+          revokedAt: null,
+          kps: [],
+        })
         return ok({ deviceId: id })
       },
       available: () => ok({ available: active().kps.length }),
@@ -93,7 +106,11 @@ export class FakeServer {
       ) => {
         const me = active()
         if (this.groups.has(channelId)) throw fail(409, 'E2EE_GROUP_EXISTS')
-        this.groups.set(channelId, { epoch: 1, groupId, createdAt: new Date().toISOString() })
+        this.groups.set(channelId, {
+          epoch: 1,
+          groupId,
+          createdAt: new Date().toISOString(),
+        })
         this.handshakes.push({ channelId, epoch: 0, sender: me.id, commit })
         this.addWelcomes(channelId, 1, welcomes)
         return ok({ epoch: 1 })
@@ -121,7 +138,11 @@ export class FakeServer {
         const rows = this.handshakes
           .filter((h) => h.channelId === channelId && h.epoch >= since)
           .sort((a, b) => a.epoch - b.epoch)
-          .map((h) => ({ epoch: h.epoch, commit: h.commit, senderDeviceId: h.sender }))
+          .map((h) => ({
+            epoch: h.epoch,
+            commit: h.commit,
+            senderDeviceId: h.sender,
+          }))
         return ok(rows)
       },
       welcomes: () => {
@@ -129,7 +150,12 @@ export class FakeServer {
         return ok(
           this.welcomes
             .filter((w) => w.target === me.id && !w.done)
-            .map((w) => ({ id: w.id, channelId: w.channelId, epoch: w.epoch, welcome: w.welcome })),
+            .map((w) => ({
+              id: w.id,
+              channelId: w.channelId,
+              epoch: w.epoch,
+              welcome: w.welcome,
+            })),
         )
       },
       ackWelcome: (id: string) => {

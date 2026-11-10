@@ -185,7 +185,9 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
             const preview =
               item.lastReaction && showUnread
                 ? t('dm.reactionPreview', { actor: item.lastReaction.actorUsername, emoji: item.lastReaction.emoji })
-                : item.lastMessage
+                : item.lastMessage?.encrypted
+                  ? t('e2ee.preview') // E1: sunucu içerik taşımaz; E3'e kadar genel önizleme
+                  : item.lastMessage
                   ? formatMentionsPlain(item.lastMessage.content, resolver(item), t('mention.unknown'))
                   : '';
             // §5 R2-2 — susturulmuş veya `NONE` hedefte nokta gösterilmez (okunmamış HESABI

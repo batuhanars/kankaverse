@@ -1,6 +1,6 @@
 // Sunucunun kanal durumundan çekirdeğin beklediği cihaz listelerini türetir (E1 §3.3).
 import type { ExpectedDevice } from '@kankaverse/e2ee-core'
-import type { E2eeChannelState } from '@/api/e2ee'
+import type { E2eeChannelState } from './ports'
 import { fromB64 } from './b64'
 
 export interface ChannelDevices {
@@ -22,7 +22,10 @@ export function devicesOf(state: E2eeChannelState): ChannelDevices {
   const revokedAt = new Map<string, number>()
   for (const member of state.members) {
     for (const d of member.devices) {
-      const device = { deviceId: d.deviceId, signatureKey: fromB64(d.signatureKey) }
+      const device = {
+        deviceId: d.deviceId,
+        signatureKey: fromB64(d.signatureKey),
+      }
       registered.push(device)
       if (d.revokedAt) revokedAt.set(d.deviceId, Date.parse(d.revokedAt))
       else active.push(device)

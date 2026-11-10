@@ -8,6 +8,7 @@ import { useEmojiInsert } from './useEmojiInsert';
 import { useMentionCompose, type MentionCandidate } from './useMentionCompose';
 import { expandMentionsForEdit } from '@/utils/mentions';
 import { messagesApi, type MessageDto } from '@/api/messages';
+import { editEncryptedMessage } from '@/stores/e2ee';
 import { extractErrorMessage } from '@/api/errors';
 import { useMessagesStore } from '@/stores/messages';
 import { t } from '@/i18n';
@@ -99,7 +100,12 @@ export function EditMessageOverlay({
     setError('');
     try {
       // Sunucu düzenlemeyi yalnız YAZARA açıyor; yetkisizde bu ekran zaten açılmıyor.
-      const updated = await messagesApi.edit(channelId, message.id, mention.applyMentionTokens(trimmed));
+      const text = mention.applyMentionTokens(trimmed);
+      // E1: şifreli mesaj düzenlemesi yeni ciphertext ile gider (PATCH ciphertext), düz içerik sunucuya gitmez.
+      const updated = message.encrypted
+        ? await editEncryptedMessage(channelId, message.id, text)
+        : await messagesApi.edit(channelId, message.id, text);
+      if (!updated) throw new Error('E2EE_EDIT_EMPTY');
       // WS `message.updated` de gelir; store aynı id'yi yerine koyduğu için mükerrer olmaz.
       updateMessage(updated);
       onClose();

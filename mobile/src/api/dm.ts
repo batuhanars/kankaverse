@@ -58,6 +58,8 @@ export interface MessageRequestDto {
   channelId: string;
   requester: DmParticipantDto | null;
   preview: string;
+  /** E1 — yalnız şifreliyse true: önizleme "Şifreli mesaj" gösterilir. */
+  encrypted?: boolean;
   createdAt: string;
 }
 

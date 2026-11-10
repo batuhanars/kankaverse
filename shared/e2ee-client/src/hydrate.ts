@@ -21,7 +21,8 @@ export interface WireMessage {
 
 /** Ekranda gösterilecek karar: kayıt (gösterilir), 'hidden' (iptal cihazdan, gösterilmez) ya da henüz yok. */
 type Resolution =
-  | { kind: 'record'; record: StoredMessage }
+  /** `fresh`: bu çağrıda MLS ile çözüldü (depodan okunmadı); ağır iş, ölçülür ve arayüze nefes verilir. */
+  | { kind: 'record'; record: StoredMessage; fresh?: boolean }
   | { kind: 'hidden' }
   /** Şimdilik çözülemedi ama kalıcı yazılmadı (grup yok / kendi mesajımız): sonra çözülebilir. */
   | { kind: 'unavailable' }
@@ -56,7 +57,7 @@ export class Hydrator {
   async isResolved(m: WireMessage): Promise<boolean> {
     if (!m.encrypted || !m.ciphertext) return true
     const stored = await this.ctx.store.loadMessage(m.id)
-    return stored?.digest === (await digestOf(fromB64(m.ciphertext)))
+    return stored?.digest === digestOf(fromB64(m.ciphertext))
   }
 
   private isHidden(m: WireMessage): boolean {
@@ -69,7 +70,7 @@ export class Hydrator {
 
   private async resolveOne(m: WireMessage, final: boolean): Promise<Resolution> {
     const ct = fromB64(m.ciphertext!)
-    const digest = await digestOf(ct)
+    const digest = digestOf(ct)
     const stored = await this.ctx.store.loadMessage(m.id)
     if (stored?.digest === digest) return { kind: 'record', record: stored }
     await this.init()
@@ -109,7 +110,7 @@ export class Hydrator {
   ): Promise<Resolution> {
     const record = { id: m.id, channelId: m.channelId, status, body, digest }
     await this.ctx.store.saveMessage(record)
-    return { kind: 'record', record }
+    return { kind: 'record', record, fresh: true }
   }
 
   /** `msgs` eskiden yeniye sıralı olmalı: MLS aynı gönderenin mesajlarını sırayla çözmeyi bekler. */
@@ -117,11 +118,19 @@ export class Hydrator {
     const out = new Map<string, Resolution>()
     const todo = msgs.filter((m) => m.encrypted && m.ciphertext)
     const retry: WireMessage[] = []
+    const t0 = Date.now()
+    let fresh = 0
     for (const m of todo) {
       const r = await this.resolveOne(m, false)
       if (r.kind === 'pending') retry.push(m)
       else out.set(m.id, r)
+      if (r.kind === 'record' && r.fresh) {
+        fresh++
+        if (fresh === 10) this.ctx.metric?.('hydrate-first-10', Date.now() - t0, fresh)
+        await this.ctx.yieldToUi?.()
+      }
     }
+    if (fresh > 0) this.ctx.metric?.('hydrate-total', Date.now() - t0, fresh)
     if (retry.length > 0) await this.catchUpThenFinalize(retry, out)
     return out
   }
@@ -136,6 +145,8 @@ export class Hydrator {
   }
 }
 
-const pending = (final: boolean): Resolution => ({ kind: final ? 'unavailable' : 'pending' })
+const pending = (final: boolean): Resolution => ({
+  kind: final ? 'unavailable' : 'pending',
+})
 
 export type { Resolution }

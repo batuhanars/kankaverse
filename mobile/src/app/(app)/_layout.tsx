@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth';
 import { restoreActiveAiVideo, useAiVideoViewerStore } from '@/stores/aiVideoViewer';
 import { useShareIntentStore } from '@/stores/shareIntent';
 import { useDmStore } from '@/stores/dm';
+import { initE2ee } from '@/stores/e2ee';
 import { useFriendsStore } from '@/stores/friends';
 import { useUnreadStore } from '@/stores/unread';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
@@ -50,6 +51,8 @@ export default function AppLayout() {
   useEffect(() => {
     if (!userId) return;
     useDmStore.getState().setSessionUser(userId);
+    // E1: bayrak açıksa cihaz kaydı + KeyPackage + bekleyen Welcome (arka planda; arayüzü bekletmez).
+    void initE2ee(userId);
     // Kanka isteklerini oturum başında BİR KEZ çek — sidebar'daki "kanka isteği" satırı (sahip
     // bulgusu 2026-07-30) aksi halde "Kanka Ekle" ekranına girilmeden 0 kalırdı. Sonraki
     // güncellemeler `friend.*` WS olaylarından geliyor, tekrar çekim gerekmiyor.
