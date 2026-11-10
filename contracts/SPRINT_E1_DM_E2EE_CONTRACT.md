@@ -1,6 +1,6 @@
 # SPRINT E1: 1-1 DM uçtan uca şifreleme (metin)
 
-> Durum: **TASARIM KİLİTLİ (2026-11-10, sahip onayı).** PM compose (Opus). **core + api + web + mobil.**
+> Durum: **TASARIM KİLİTLİ (2026-11-10, sahip onayı). Rev.1 (aynı gün, adım 1 bulguları: ağaç Welcome içinde, geçmiş commit kuralı, çekirdek API kesinleşti, paketleme).** PM compose (Opus). **core + api + web + mobil.**
 > Yol haritası: E0 deneme ✅ → **E1 bu sprint** → E2 grup DM → E3 push/hızlı cevap → E4 şikâyet (franking) → E5 yedek → E6 medya → E7 doğrulama/yerel arama → E8 aramalar.
 > 🔴 **R7 bölgesi, tamamı.** Hiçbir parça sahibin satır satır incelemesi olmadan main'e girmez.
 > Başlangıç noktası: dal `spike/e2ee-mls` (e66659c). Deneme kodu üretime **kopyalanmaz**, referanstır.
@@ -75,8 +75,7 @@ model E2eeWelcome {
   channelId     String
   epoch         Int      // cihazın katılacağı epoch
   targetDeviceId String
-  welcome       Bytes    // opak MLS Welcome
-  ratchetTree   Bytes    // açık ağaç (E0 bulgusu: Welcome ile ayrıca iletilmeli)
+  welcome       Bytes    // opak MLS Welcome (ağaç içinde, ratchet_tree uzantısı; Rev.1)
   deliveredAt   DateTime?
   createdAt     DateTime @default(now())
   @@index([targetDeviceId, deliveredAt])
@@ -103,11 +102,11 @@ Migration yaz, yerel DB'ye uygula, `prisma migrate status` temiz, `prisma genera
 ### §2.4 Grup kurma ve değişiklikler
 | Uç | Gövde | Kural |
 |---|---|---|
-| `GET /e2ee/channels/:channelId` | → `{ encrypted, epoch, groupId, createdAt, members: [{ userId, deviceIds }] }` | `members` = kanal üyelerinin **aktif** cihazları (istemci gruptaki yaprakları buna göre doğrular, §3.3). Şifreli değilse `encrypted:false, epoch:null`. |
-| `POST /e2ee/channels/:channelId/group` | `{ groupId, commit, welcomes: [{ deviceId, welcome, ratchetTree }] }` | Grubu kurar (epoch 0'dan 1'e). §2.2 kuralı sağlanmalı, yoksa 422 `E2EE_NOT_ELIGIBLE`. Grup zaten varsa 409 `E2EE_GROUP_EXISTS` (iki taraf aynı anda kurarsa kaybeden, kazananın Welcome'ını bekler). Tek transaction: `E2eeGroup` + `E2eeHandshake(epoch 0)` + Welcome'lar. |
+| `GET /e2ee/channels/:channelId` | → `{ encrypted, epoch, groupId, createdAt, members: [{ userId, devices: [{ deviceId, signatureKey, revokedAt }] }] }` | `devices` = kanal üyelerinin **iptal edilmişler dahil** tüm cihazları (Rev.1, §3.3 geçmiş commit kuralı için). Şifreli değilse `encrypted:false, epoch:null`. |
+| `POST /e2ee/channels/:channelId/group` | `{ groupId, commit, welcomes: [{ deviceId, welcome }] }` | Grubu kurar (epoch 0'dan 1'e). §2.2 kuralı sağlanmalı, yoksa 422 `E2EE_NOT_ELIGIBLE`. Grup zaten varsa 409 `E2EE_GROUP_EXISTS` (iki taraf aynı anda kurarsa kaybeden, kazananın Welcome'ını bekler). Tek transaction: `E2eeGroup` + `E2eeHandshake(epoch 0)` + Welcome'lar. |
 | `POST /e2ee/channels/:channelId/commits` | `{ epoch, commit, welcomes?: [...] }` | Kabul ⇔ `epoch === group.epoch`; kabulde `group.epoch++` (tek satır koşullu `UPDATE`, yarış güvenli). Aksi 409 `E2EE_EPOCH_CONFLICT` + `{ currentEpoch }`: istemci eksik commit'leri çeker, uygular, kendi değişikliğini gerekiyorsa yeniden üretir (E0 teyit). |
 | `GET /e2ee/channels/:channelId/commits?since=N` | → `[{ epoch, commit, senderDeviceId }]` | Epoch sırasıyla, en çok 100. |
-| `GET /e2ee/welcomes` | → `[{ id, channelId, epoch, welcome, ratchetTree }]` | Çağıran cihazın bekleyenleri. `POST /e2ee/welcomes/:id/ack` → `deliveredAt`. |
+| `GET /e2ee/welcomes` | → `[{ id, channelId, epoch, welcome }]` | Çağıran cihazın bekleyenleri. `POST /e2ee/welcomes/:id/ack` → `deliveredAt`. |
 
 **Kim ekler/çıkarır (E1, 1-1):** grubu ilk mesajı gönderecek cihaz kurar; kanaldaki tüm aktif cihazları (kendi diğer cihazları dahil) ekler. Sonradan cihaz eklenince ya da iptal edilince sunucu kanaldaki üyelere `e2ee:devices-changed` yayar; **çevrimiçi olan herhangi bir üye cihaz** eksik cihazı ekleyen / iptal edileni çıkaran commit'i gönderir. Yarışı epoch kuralı çözer (biri kazanır, diğeri commit'i işleyince farkın kapandığını görür).
 
@@ -134,7 +133,7 @@ DoD: spec'ler yeşil, `prisma generate` + `tsc -p tsconfig.build.json` temiz, `m
 ## §3 Çekirdek: `shared/e2ee-core/`
 
 ### §3.1 API (istemcinin gördüğü tek yüz)
-`createDevice()`, `exportKeyPackages(n)`, `createGroup(members)`, `joinFromWelcome(welcome, ratchetTree)`, `addDevices(keyPackages)`, `removeDevices(deviceIds)`, `processCommit(commit)`, `encrypt(payload)`, `decrypt(ciphertext)`, `serialize()/deserialize()`. Hepsi saf; ağ ve depolama çekirdekte YOK (istemci verir). Kripto sağlayıcısı enjekte edilir (web: varsayılan WebCrypto; mobil: saf noble).
+**(Rev.1, `feat/e2ee-core` d379ee8 ile kilitlendi)** `createDevice(provider)` → `Device` (`assignDeviceId`, `exportKeyPackages(n)`, `exportLastResortKeyPackage()`, `serialize`); `createGroup(device, { groupId, members, keyPackages })` → `{ group, pending }`; `joinFromWelcome(device, welcome, members)`; `Group`: `addDevices(keyPackages, members)`, `removeDevices(ids, members)` → bekleyen commit, sunucu kabul edince `confirmCommit(pending)`, 409'da pending atılır (yerel durum ilerlemez); `processCommit(commit, members)`, `encrypt(payload)`, `decrypt(ct, expectedSenderDeviceId)` (beklenen gönderen **zorunlu**), `serialize/deserialize`. Hepsi saf; ağ ve depolama çekirdekte YOK (istemci verir). Kripto sağlayıcısı enjekte edilir (web: varsayılan WebCrypto; mobil: saf noble).
 
 ### §3.2 Şifreli yük biçimi (sürümlü)
 MLS uygulama mesajının düz içeriği UTF-8 JSON: `{ "v": 1, "t": "text", "body": string, "sentAt": number }`. Bilinmeyen `v` → "Bu mesajı görmek için uygulamayı güncelle". E4 franking alanı `v: 2` ile eklenecek.
@@ -143,6 +142,8 @@ MLS uygulama mesajının düz içeriği UTF-8 JSON: `{ "v": 1, "t": "text", "bod
 - Credential: `BasicCredential`, kimlik = `deviceId` (UTF-8). **Test kimlik doğrulama servisi üretimde YASAK.**
 - Gruptaki her yaprak: `deviceId` sunucunun `members` listesinde VE yaprağın imza anahtarı o cihazın kayıtlı `signatureKey`'i ile bayt-bayt aynı. Değilse commit/Welcome **reddedilir** ve kullanıcıya "Bu sohbette tanınmayan bir cihaz var" uyarısı gösterilir (mesajlaşma durur, sessizce devam etmez).
 - Gelen uygulama mesajında gönderen yaprağın `deviceId`'si, sunucunun bildirdiği `senderDeviceId` ile aynı olmalı.
+- **Geçmiş commit kuralı (Rev.1):** geride kalmış cihaz eski commit'leri sırayla işlerken, sonradan iptal edilmiş bir cihazın eklendiği commit'e rastlayabilir. Doğrulama listesi = kanal üyesi kullanıcıların **kayıtlı tüm cihazları** (iptal edilmişler dahil, `GET /e2ee/channels/:id`); kimlik ve imza anahtarı yine bayt-bayt eşleşmeli. Kayıtlı olmayan cihaz her zaman reddedilir. Güncel epoch'a gelince gruptaki iptal edilmiş yaprak kalırsa cihaz onu çıkaran commit'i gönderir; iptal edilmiş cihazın mesajı (`senderDeviceId` iptal) çözülse bile **gösterilmez**.
+- **Ağaç (Rev.1):** ratchet tree Welcome'ın şifreli GroupInfo'sunda taşınır (`ratchet_tree` uzantısı, RFC 9420 §12.4.3.3); sunucuya ayrı gitmez.
 
 ### §3.4 Testler (çekirdek)
 E0 senaryolarının üretim API'siyle karşılığı (1-1 iki cihazlı, cihaz ekleme/çıkarma, serileştirme, epoch çakışması, sırasız mesaj, tekrar çözme reddi), §3.3 reddi (sahte yaprak, anahtar uyuşmazlığı), web sağlayıcı ↔ mobil sağlayıcı çapraz uyum, **RFC 9180 vektörleri**.
@@ -173,6 +174,12 @@ E0 senaryolarının üretim API'siyle karşılığı (1-1 iki cihazlı, cihaz ek
 5. **R7 incelemesi 3** (istemci akışları) → merge, prod'a bayrak açık + izin listesi yalnız sahip ve test hesapları.
 
 **Cihaz turu DoD (sahip):** iki hesap, A'da web + telefon, B'de telefon: ilk mesajda grup kurulur, üç cihaz da çözer; A yeni tarayıcıda giriş yapınca o cihaz eklenir, eski mesajları "bu cihaz eklenmeden önce" görür, yenileri çözer; A bir oturumu kapatınca o cihaz gruptan çıkar ve yeni mesajı alamaz; uygulama kapatılıp açılınca geçmiş yerelden gelir; şifreli DM'de düz gönderim mümkün değil (sunucu reddeder); izin listesi dışı kullanıcıyla DM düz kalır.
+
+## §6.1 Paketleme (Rev.1, adım 1 bulgusu)
+- **Web:** `vite.config.ts` alias `@kankaverse/e2ee-core` → `../shared/e2ee-core/src/index.ts` + `server.fs.allow: ['..']`; `tsconfig.app.json` `paths`. 🔴 Prod imajı: `web/Dockerfile` context'i `./web`, `../shared` imaja girmez. Adım 3'te web imajının context'i kök yapılır (`-f web/Dockerfile`, `COPY shared/e2ee-core`), CI `deploy.yml` buna göre; push sonrası CI'ın koştuğu teyit edilir.
+- **Mobil:** `metro.config.js` `watchFolders` + `extraNodeModules` (rapordaki kesin ayar), `tsconfig.json` `paths`. Kısa yol kopyasında `shared/` kardeş dizin olarak kopyalanır. EAS bulut derlemesinin `../shared`'ı alıp almadığı adım 4'te doğrulanır (yerel gradlew önce).
+- Her iki istemcide derleme öncesi `shared/e2ee-core` içinde `npm ci`.
+- **Küçük borç:** `CryptoProvider.loadSuite()` imzasında ts-mls tipi görünüyor (`@internal`); adım 2-3 sırasında çekirdeğin kendi tipiyle sarılır.
 
 ## §7 Açık sorular (PM önerisiyle, sahip itiraz etmezse geçerli)
 - **Masaüstü (Electron):** web koduyla aynı, IndexedDB. Electron `safeStorage` ile güçlendirme sonra (borç D-E2EE-1).
