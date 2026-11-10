@@ -23,6 +23,28 @@ export const messagesApi = {
       nonce,
     })
   },
+  // E1: şifreli DM mesajı. content GÖNDERİLMEZ (sunucu 409 E2EE_REQUIRED); ciphertext base64.
+  sendEncrypted(
+    channelId: string,
+    cipher: { ciphertext: string; epoch: number },
+    replyToId?: string,
+    nonce?: string,
+    attachmentIds?: string[],
+  ) {
+    return http.post<MessageDto>(`/channels/${channelId}/messages`, {
+      ...cipher,
+      replyToId,
+      nonce,
+      attachmentIds: attachmentIds?.length ? attachmentIds : undefined,
+    })
+  },
+  editEncrypted(
+    channelId: string,
+    messageId: string,
+    cipher: { ciphertext: string; epoch: number },
+  ) {
+    return http.patch<MessageDto>(`/channels/${channelId}/messages/${messageId}`, cipher)
+  },
   // Sprint 6.2: mesaj düzenleme (kendi mesajı)
   editMessage(channelId: string, messageId: string, content: string) {
     return http.patch<MessageDto>(`/channels/${channelId}/messages/${messageId}`, { content })

@@ -186,7 +186,7 @@ export const useDmStore = defineStore('dm', () => {
   async function applyActivity(
     payload: {
       channelId: string
-      lastMessage: { content: string; createdAt: string }
+      lastMessage: { content: string; createdAt: string; encrypted?: boolean }
       senderId: string
     },
     opts?: { countUnread?: boolean },
@@ -201,6 +201,7 @@ export const useDmStore = defineStore('dm', () => {
       // lastMessage alanlarını güncelle (MessageDto uyumlu — eksik alanlar korunur)
       if (ch.lastMessage) {
         ch.lastMessage.content = payload.lastMessage.content
+        ch.lastMessage.encrypted = payload.lastMessage.encrypted // E1: yalnız şifreliyse true
         ch.lastMessage.createdAt = payload.lastMessage.createdAt
       } else {
         // Önceki lastMessage null idi — minimal şekle yaz
@@ -208,6 +209,7 @@ export const useDmStore = defineStore('dm', () => {
           id: '',
           channelId: payload.channelId,
           content: payload.lastMessage.content,
+          encrypted: payload.lastMessage.encrypted,
           replyToId: null,
           author: { id: payload.senderId, username: '', avatarUrl: null },
           createdAt: payload.lastMessage.createdAt,

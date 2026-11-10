@@ -173,7 +173,9 @@ function onRowLeave(e: MouseEvent) {
 
 // Yanıt alıntısı: bahsetmeler okunur ada çevrilmiş düz metin + tıklayınca alıntılanan mesaja git.
 const replyText = computed(() =>
-  props.message.replyTo
+  props.message.replyTo?.e2eeUnknown
+    ? t('e2ee.encryptedQuote') // E1: alıntılanan şifreli mesajın düz metni bu cihazda yok
+    : props.message.replyTo
     ? formatMentionsPlain(
         props.message.replyTo.content,
         (id) => props.mentionResolver?.(id),
@@ -418,6 +420,14 @@ const renderedContent = computed<string>(() => {
               :title="t('message.pinnedMessages')"
             >📌</span></template><ReceiptTick v-if="showReceipt && receipt" :receipt="receipt" />
           </div>
+          <!-- E1: çözülemeyen / bilinmeyen sürümlü şifreli mesaj (metin yok, durum cümlesi) -->
+          <p
+            v-if="!message.content && message.e2eeStatus && message.e2eeStatus !== 'ok'"
+            class="text-[14px] italic"
+            style="color: var(--kv-text-muted);"
+          >
+            {{ message.e2eeStatus === 'unsupported' ? t('e2ee.unsupported') : t('e2ee.beforeDevice') }}
+          </p>
           <!-- Yalnız ek (açıklamasız) -->
           <AttachmentView
             v-for="att in message.attachments"

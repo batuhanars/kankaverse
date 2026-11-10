@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { messagesApi } from '@/api/messages'
+import { useE2eeStore } from '@/stores/e2ee'
 import type { MessageDto } from '@/types'
 
 export const useMessagesStore = defineStore('messages', () => {
@@ -11,7 +12,12 @@ export const useMessagesStore = defineStore('messages', () => {
 
   async function fetchMessages(channelId: string, before?: string) {
     const res = await messagesApi.list(channelId, before)
-    const fetched = res.data // desc sırada gelir, UI için ters çevir
+    // E1: şifreli mesajlar çözülür (düz metin `content`'e yazılır); şifresiz liste aynen geçer.
+    const fetched = await useE2eeStore().hydrateHistory(
+      channelId,
+      res.data, // desc sırada gelir, UI için ters çevir
+      async (olderThan) => (await messagesApi.list(channelId, olderThan)).data,
+    )
     const reversed = [...fetched].reverse()
 
     if (!before) {
@@ -25,7 +31,7 @@ export const useMessagesStore = defineStore('messages', () => {
         ...(messagesByChannel.value[channelId] ?? []),
       ]
     }
-    hasMoreByChannel.value[channelId] = fetched.length === 50
+    hasMoreByChannel.value[channelId] = res.data.length === 50
   }
 
   function appendMessage(message: MessageDto) {
@@ -79,6 +85,7 @@ export const useMessagesStore = defineStore('messages', () => {
       list[idx] = {
         ...list[idx],
         content: dto.content,
+        e2eeStatus: dto.e2eeStatus, // E1: düzenlenen şifreli mesajın çözme durumu
         editedAt: dto.editedAt,
         mentions: dto.mentions,
         mentionsEveryone: dto.mentionsEveryone,

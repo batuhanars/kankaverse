@@ -28,7 +28,17 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        service: [api, web, landing]
+        # web: context kök (E1 §6.1: ../shared/e2ee-core imaja girmeli); api ve landing aynen ./<servis>.
+        include:
+          - service: api
+            context: ./api
+            file: ./api/Dockerfile
+          - service: web
+            context: .
+            file: ./web/Dockerfile
+          - service: landing
+            context: ./landing
+            file: ./landing/Dockerfile
     steps:
       - uses: actions/checkout@v4
 
@@ -42,7 +52,8 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: ./${{ matrix.service }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           platforms: linux/amd64
           push: true
           tags: |

@@ -10,7 +10,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToastStore } from '@/stores/toast'
-import { messagesApi } from '@/api/messages'
+import { useE2eeStore } from '@/stores/e2ee'
 import { attachmentsApi } from '@/api/attachments'
 import KvModal from '@/components/ui/KvModal.vue'
 import DmTargetList from '@/components/shared/DmTargetList.vue'
@@ -44,7 +44,7 @@ async function forwardTo(c: DmChannelDto) {
     // hedef "gönderildi" işaretlenmez (kopyalanıp bağlanmayan ek sahipsiz kalır, presign'daki gibi).
     const copies = await Promise.all(attachments.value.map((a) => attachmentsApi.forward(a.id)))
     const attachmentIds = copies.map((r) => r.data.attachmentId)
-    await messagesApi.send(c.id, forwardText.value, undefined, attachmentIds)
+    await useE2eeStore().send(c.id, forwardText.value, undefined, attachmentIds)
     sentIds.value = new Set([...sentIds.value, c.id])
     toast.success(t('message.forwarded'))
   } catch (e: unknown) {

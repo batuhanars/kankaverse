@@ -1,0 +1,180 @@
+import { defineStore } from 'pinia'
+import { ref, shallowRef } from 'vue'
+import { e2eeApi } from '@/api/e2ee'
+import { messagesApi } from '@/api/messages'
+import { useDmStore } from '@/stores/dm'
+import type { ChannelInfo } from '@/lib/e2ee/channelSync'
+import type { WarningKind } from '@/lib/e2ee/context'
+import { E2eeEngine, type SentCipher } from '@/lib/e2ee/engine'
+import { destroyAllVaults } from '@/lib/e2ee/vault'
+import type { MessageDto } from '@/types'
+
+/**
+ * E1 web istemcisi için tek giriş. Motor (lib/e2ee) arayüzden bağımsızdır; burası onu Pinia'ya ve
+ * mevcut mesaj akışına (iyimser gönderim, soket, liste) bağlar. E2EE kapalıysa (bayrak/izin listesi) motor
+ * yoktur ve hiçbir şeyi değiştirmez: şifresiz mesajlar olduğu gibi geçer.
+ */
+export const useE2eeStore = defineStore('e2ee', () => {
+  const engine = shallowRef<E2eeEngine | null>(null)
+  const warnings = ref<Record<string, WarningKind>>({})
+  const channels = ref<Record<string, ChannelInfo>>({})
+  let ready: Promise<void> = Promise.resolve()
+
+  const setWarning = (channelId: string, kind: WarningKind) => {
+    warnings.value[channelId] = kind
+  }
+
+  /** Girişten sonra bir kez: durum → cihaz kaydı → KeyPackage → bekleyen Welcome'lar. */
+  function init(userId: string): Promise<void> {
+    if (engine.value?.userId === userId) return ready
+    ready = (async () => {
+      try {
+        engine.value = await E2eeEngine.start(userId, e2eeApi, setWarning)
+        await engine.value?.onWelcome()
+      } catch (e) {
+        console.error('[e2ee] başlatılamadı', e)
+      }
+    })()
+    return ready
+  }
+
+  /** Çıkış / yeni giriş / hesap silme: bu tarayıcıdaki TÜM şifreli yerel depolar silinir. */
+  async function wipe(): Promise<void> {
+    const current = engine.value
+    engine.value = null
+    channels.value = {}
+    warnings.value = {}
+    ready = Promise.resolve()
+    try {
+      await current?.destroy()
+      await destroyAllVaults()
+    } catch (e) {
+      console.error('[e2ee] yerel depo silinemedi', e)
+    }
+  }
+
+  const isOneToOneDm = (channelId: string) =>
+    useDmStore().channels.some((c) => c.id === channelId && c.type === 'DM')
+
+  async function openChannel(channelId: string): Promise<void> {
+    await ready
+    if (!engine.value || !isOneToOneDm(channelId)) return
+    try {
+      channels.value[channelId] = await engine.value.open(channelId)
+    } catch (e) {
+      console.error('[e2ee] kanal açılamadı', e)
+    }
+  }
+
+  /** Mesajlar çözüldükten sonra: eksik commit'leri işle, üyelik farkını kapat (yerel grup yoksa no-op). */
+  async function syncChannel(channelId: string): Promise<void> {
+    await ready
+    if (!engine.value || !isOneToOneDm(channelId)) return
+    await engine.value.onGroupChanged(channelId).catch((e) => console.error('[e2ee] senkron', e))
+  }
+
+  /** Şifreli mesaj çözülemiyorsa (motor yok/hata) ekranda "çözülemedi" durumu çıksın, boş balon değil. */
+  const undecryptable = (m: MessageDto): MessageDto =>
+    m.encrypted ? { ...m, content: '', ciphertext: undefined, e2eeStatus: 'undecryptable' } : m
+
+  /** Yanıt alıntısı şifreli mesaja aitse (sunucu içeriği boş) düz metni yerel depodan getirir. */
+  async function fillQuote(m: MessageDto): Promise<MessageDto> {
+    const r = m.replyTo
+    if (!r || r.content !== '' || r.attachment || !engine.value) return m
+    const text = await engine.value.quoteText(r.id)
+    return { ...m, replyTo: text === null ? { ...r, e2eeUnknown: true } : { ...r, content: text } }
+  }
+
+  async function hydrate(channelId: string, asc: MessageDto[]): Promise<MessageDto[]> {
+    await ready
+    if (!asc.some((m) => m.encrypted)) return Promise.all(asc.map(fillQuote))
+    const out = engine.value
+      ? await engine.value.hydrate(channelId, asc).catch(() => asc.map(undecryptable))
+      : asc.map(undecryptable)
+    return Promise.all(out.map(fillQuote))
+  }
+
+  /** Tek mesaj (soket/HTTP yankısı). İptal cihazdan gelen mesaj elenir (null). */
+  async function hydrateOne(m: MessageDto): Promise<MessageDto | null> {
+    return (await hydrate(m.channelId, [m]))[0] ?? null
+  }
+
+  async function hydrateHistory(
+    channelId: string,
+    descPage: MessageDto[],
+    loadOlder: (beforeId: string) => Promise<MessageDto[]>,
+  ): Promise<MessageDto[]> {
+    await ready
+    if (!engine.value || !descPage.some((m) => m.encrypted)) {
+      return [...(await hydrate(channelId, [...descPage].reverse()))].reverse()
+    }
+    try {
+      const out = await engine.value.hydrateHistory(channelId, descPage, loadOlder)
+      return Promise.all(out.map(fillQuote))
+    } catch {
+      return descPage.map(undecryptable)
+    }
+  }
+
+  /** Gönderim öncesi: şifreli yük, ya da `null` (şifresiz DM / E2EE kapalı: çağıran düz gönderir). */
+  async function prepareSend(channelId: string, text: string): Promise<SentCipher | null> {
+    await ready
+    if (!engine.value || !isOneToOneDm(channelId)) return null
+    return engine.value.encrypt(channelId, text)
+  }
+
+  /** Sunucu şifreli mesajı kabul etti: düz metni yerele yaz, ekran için çözülmüş hali döndür. */
+  async function afterSend(data: MessageDto): Promise<MessageDto | null> {
+    if (!data.encrypted) return data
+    await engine.value?.rememberSent(data)
+    if (!channels.value[data.channelId]?.encrypted) void openChannel(data.channelId) // ayraç zamanı
+    return hydrateOne(data)
+  }
+
+  /**
+   * DM'e (ya da herhangi bir kanala) mesaj gönderir: şifreli DM ise şifreler, değilse bugünkü düz yol.
+   * Tüm DM gönderim noktaları buradan geçer ki hiçbiri şifreli kanala düz içerik göndermeye kalkmasın.
+   * Dönen mesaj ekranda gösterilecek (çözülmüş) halidir.
+   */
+  async function send(
+    channelId: string,
+    text: string,
+    replyToId?: string,
+    attachmentIds?: string[],
+    nonce?: string,
+  ): Promise<MessageDto> {
+    const cipher = await prepareSend(channelId, text)
+    const { data } = cipher
+      ? await messagesApi.sendEncrypted(channelId, cipher, replyToId, nonce, attachmentIds)
+      : await messagesApi.send(channelId, text, replyToId, attachmentIds, nonce)
+    return (await afterSend(data)) ?? data
+  }
+
+  /** Şifreli mesajı düzenle (PATCH ciphertext). */
+  async function editEncrypted(
+    channelId: string,
+    messageId: string,
+    text: string,
+  ): Promise<MessageDto | null> {
+    await ready
+    const cipher = await engine.value?.encrypt(channelId, text)
+    if (!cipher) throw new Error('Şifreli düzenleme için grup yok')
+    const { data } = await messagesApi.editEncrypted(channelId, messageId, cipher)
+    return afterSend(data)
+  }
+
+  return {
+    engine,
+    warnings,
+    channels,
+    init,
+    wipe,
+    openChannel,
+    syncChannel,
+    hydrate,
+    hydrateOne,
+    hydrateHistory,
+    send,
+    editEncrypted,
+  }
+})

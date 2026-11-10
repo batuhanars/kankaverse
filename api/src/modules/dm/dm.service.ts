@@ -1108,6 +1108,7 @@ export class DmService {
           take: 1,
           select: {
             content: true,
+            encrypted: true,
             createdAt: true,
             attachments: { select: { contentType: true } },
           },
@@ -1126,6 +1127,8 @@ export class DmService {
           }
         : null,
       preview: previewFromAttachments(c.messages[0]?.content, c.messages[0]?.attachments),
+      // E1: yalnız şifreliyse alan var (lastMessage kalıbı); istemci "🔒 Şifreli mesaj" gösterir.
+      ...(c.messages[0]?.encrypted ? { encrypted: true as const } : {}),
       createdAt: c.createdAt.toISOString(),
     }));
   }

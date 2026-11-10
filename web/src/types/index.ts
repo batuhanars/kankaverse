@@ -161,6 +161,7 @@ export interface MessageRequestDto {
   channelId: string
   requester: { id: string; username: string; avatarUrl: string | null } | null
   preview: string
+  encrypted?: boolean // E1 — yalnız şifreliyse true: önizleme "Şifreli mesaj"
   createdAt: string
 }
 
@@ -374,6 +375,8 @@ export interface ReplyPreviewDto {
   content: string
   authorUsername: string
   attachment?: ReplyAttachmentDto | null // eski önbellek/olayda alan yok → yalnız metin
+  // E1 — YALNIZ yerel: alıntılanan mesaj şifreli ve düz metni bu cihazda yok ("Şifreli mesaj" gösterilir).
+  e2eeUnknown?: boolean
 }
 
 // C35 §2.5 - webhook mesajındaki embed (yalniz izinli alanlar; gorsel alani yok)
@@ -431,6 +434,13 @@ export interface MessageDto {
   // C29 — YALNIZ yerel (sunucudan gelmez): geçici mesajın durumu ve hata metni.
   localStatus?: 'sending' | 'failed'
   localError?: string
+  // E1 — şifreli DM mesajı: sunucu yalnız şifreliyse `encrypted:true` + ciphertext + senderDeviceId verir
+  // (content ''). Düz metin istemcide çözülüp `content`'e yazılır; `ciphertext` ekran durumunda tutulmaz.
+  encrypted?: boolean
+  ciphertext?: string
+  senderDeviceId?: string | null
+  // E1 — YALNIZ yerel: çözme sonucu. 'ok' dışı = metin yok, arayüz durum metni gösterir.
+  e2eeStatus?: 'ok' | 'unsupported' | 'undecryptable'
 }
 
 // Sprint V2 — Özel kanal üye DTO (GET/POST /channels/:id/members)

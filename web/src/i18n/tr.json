@@ -1156,7 +1156,9 @@
       "CHANNEL_READ_ONLY": "Bu kanala yalnız yetkililer yazabilir.",
       "SLOW_MODE": "Yavaş mod açık — biraz bekleyin.",
       "SLOW_MODE_RETRY": "Yavaş mod açık — {seconds} sn bekleyin.",
-      "PIN_LIMIT": "Bu kanalda en fazla 50 mesaj sabitlenebilir."
+      "PIN_LIMIT": "Bu kanalda en fazla 50 mesaj sabitlenebilir.",
+      "E2EE_REQUIRED": "Bu sohbet uçtan uca şifreli. Bu oturumda şifreleme hazır değil, çıkış yapıp tekrar giriş yap.",
+      "E2EE_DEVICE_REQUIRED": "Bu oturumda şifreleme cihazı yok. Çıkış yapıp tekrar giriş yap."
     }
   },
   "member": {
@@ -1475,6 +1477,24 @@
     "sectionGroups": "Gruplar",
     "empty": "Sonuç bulunamadı.",
     "tip": "TÜYO: Ortamlar için ortam adını, DM için {'@'} ile başlayın."
+  },
+  "e2ee": {
+    "lockTitle": "Uçtan uca şifreli",
+    "divider": "Bu noktadan sonra mesajlar uçtan uca şifreli",
+    "beforeDevice": "Bu mesaj bu cihaz eklenmeden önce gönderildi",
+    "unsupported": "Görmek için uygulamayı güncelle",
+    "preview": "🔒 Şifreli mesaj",
+    "encryptedQuote": "Şifreli mesaj",
+    "searchNote": "Şifreli mesajlar bu cihazda henüz aranamıyor",
+    "warning": {
+      "unknown-device": "Bu sohbette tanınmayan bir cihaz var. Güvenliğin için mesajlaşma durduruldu.",
+      "removed": "Bu cihaz bu sohbetten çıkarıldı. Yeni mesaj gönderemez ve alamazsın.",
+      "device-broken": "Bu cihazın şifreleme anahtarı oturumunla uyuşmuyor. Çıkış yapıp tekrar giriş yap."
+    },
+    "errors": {
+      "notReady": "Sohbet şifreleniyor, birkaç saniye sonra tekrar dene.",
+      "deviceRemoved": "Bu cihaz bu sohbetten çıkarıldı."
+    }
   },
   "messageSearch": {
     "buttonTitle": "Mesajlarda Ara",

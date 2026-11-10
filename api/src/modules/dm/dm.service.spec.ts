@@ -933,6 +933,25 @@ describe('DmService — C9 Mesaj İstekleri', () => {
     expect(res[0].preview).toBe('🎤 Sesli mesaj');
   });
 
+  it('getMessageRequests: şifreli ilk mesajda encrypted:true döner, şifresizde alan yoktur (E1)', async () => {
+    resetMocks();
+    const service = makeService();
+    const now = new Date('2026-07-06T10:00:00.000Z');
+    const base = {
+      createdAt: now,
+      dmRequester: { id: TARGET, username: 'isteyen', avatarUrl: null },
+    };
+    prismaMock.channel.findMany.mockResolvedValue([
+      { id: 'c-enc', ...base, messages: [{ content: '', encrypted: true, createdAt: now }] },
+      { id: 'c-plain', ...base, messages: [{ content: 'selam', encrypted: false, createdAt: now }] },
+    ]);
+
+    const res = await service.getMessageRequests(SENDER);
+
+    expect(res[0]).toMatchObject({ channelId: 'c-enc', preview: '', encrypted: true });
+    expect(res[1]).not.toHaveProperty('encrypted');
+  });
+
   it('getDmChannels: ek-yalnız son mesaj içeriği eklerden üretilir (grup DM)', async () => {
     resetMocks();
     const service = makeService();

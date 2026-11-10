@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { authApi, type LoginPayload, type RegisterPayload } from '@/api/auth'
 import { setAccessToken, clearAccessToken } from '@/api/axios'
 import { clearResume } from '@/lib/resumeLastScreen'
+import { useE2eeStore } from '@/stores/e2ee'
 import type { UserDto, LoginChallengeDto } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -20,8 +21,13 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // E1: yeni giriş = yeni oturum zinciri = yeni şifreleme cihazı. Eski oturumdan kalan yerel şifreli
+  // depo bu oturuma ait değildir (cihaz kimliği/anahtarı uyuşmaz) ve başka hesaba ait olabilir: silinir.
+  const wipeE2ee = () => useE2eeStore().wipe()
+
   async function register(payload: RegisterPayload) {
     const res = await authApi.register(payload)
+    await wipeE2ee()
     setAccessToken(res.data.accessToken)
     user.value = res.data.user
   }
@@ -34,6 +40,7 @@ export const useAuthStore = defineStore('auth', () => {
       return data
     }
     const authData = data
+    await wipeE2ee()
     setAccessToken(authData.accessToken)
     user.value = authData.user
     return null
@@ -41,6 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function loginTwoFa(challengeToken: string, code: string) {
     const res = await authApi.loginTwoFa(challengeToken, code)
+    await wipeE2ee()
     setAccessToken(res.data.accessToken)
     user.value = res.data.user
   }
@@ -52,6 +60,7 @@ export const useAuthStore = defineStore('auth', () => {
       clearResume(user.value?.id)
       clearAccessToken()
       user.value = null
+      await wipeE2ee() // çıkışta tüm yerel şifreli depo silinir (E1 §4)
     }
   }
 
@@ -67,6 +76,7 @@ export const useAuthStore = defineStore('auth', () => {
     clearResume(user.value?.id)
     clearAccessToken()
     user.value = null
+    void wipeE2ee()
   }
 
   return {

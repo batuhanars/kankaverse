@@ -6,7 +6,8 @@
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@kankaverse/e2ee-core": ["../shared/e2ee-core/src/index.ts"]
     },
 
     /* Linting */
