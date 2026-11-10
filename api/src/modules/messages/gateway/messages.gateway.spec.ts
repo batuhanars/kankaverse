@@ -503,6 +503,45 @@ describe('MessagesGateway.notifyDmActivity — push (M3 §2.6)', () => {
     expect(pushSendToUsersMock.mock.calls[1][1].imageUrl).toBeNull();
   });
 
+  it('E1: şifreli DM mesajında push gövdesi ve dm.message önizlemesi sabit genel metin (içerik sızmaz)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({ guildId: null, type: 'DM' });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: DM_MEMBER_ID },
+    ]);
+    notificationsShouldNotifyMock.mockResolvedValue(true);
+
+    await gateway.notifyDmActivity(
+      DM_CHANNEL_ID,
+      makeDmMessageDto({ content: '', encrypted: true, ciphertext: 'AAAA' }),
+    );
+
+    expect(pushSendToUsersMock.mock.calls[0][1].body).toBe('🔒 Yeni mesaj');
+    expect(emitToUserMock).toHaveBeenCalledWith(
+      DM_MEMBER_ID,
+      'dm.message',
+      expect.objectContaining({
+        lastMessage: expect.objectContaining({ content: '🔒 Yeni mesaj', encrypted: true }),
+      }),
+    );
+  });
+
+  it('E1: şifresiz mesajda dm.message lastMessage encrypted alanı taşımaz', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({ guildId: null, type: 'DM' });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: DM_MEMBER_ID },
+    ]);
+    notificationsShouldNotifyMock.mockResolvedValue(true);
+
+    await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
+
+    const payload = emitToUserMock.mock.calls.find((c) => c[1] === 'dm.message')![2] as {
+      lastMessage: Record<string, unknown>;
+    };
+    expect('encrypted' in payload.lastMessage).toBe(false);
+  });
+
   it('yazara push gitmez (alıcı kümesinden filtrelenir)', async () => {
     prismaMock.channel.findUnique.mockResolvedValue({
       guildId: null,

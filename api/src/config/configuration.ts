@@ -169,6 +169,13 @@ export default () => {
       .split(',')
       .map((id) => id.trim())
       .filter((id) => id.length > 0),
+    // E1 — DM uçtan uca şifreleme. Varsayılan KAPALI. E2EE_USER_IDS dolu = yalnız o kullanıcılar uygun.
+    // 🔴 Boş liste = herkes; sözleşme §0 kapısı (E1+E2+E3+E4) tamamlanmadan prod'da YASAK.
+    e2eeEnabled: process.env.E2EE_ENABLED === 'true',
+    e2eeUserIds: (process.env.E2EE_USER_IDS ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0),
     // C14 — yapay zeka ile video üretimi (Pika). Para harcar: yalnız panelden tanımlı hak (C43) + bayrak + anahtar.
     // PIKA_API_KEY yalnız sunucuda; hiçbir yanıtta/logda görünmez. Varsayılan KAPALI.
     aiVideo: {

@@ -5,9 +5,13 @@ import {
   IsArray,
   ArrayMaxSize,
   IsNotEmpty,
+  IsBase64,
+  IsInt,
+  Min,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { MESSAGE_CONTENT_MAX } from '../messages.constants';
+import { E2EE_CIPHERTEXT_MAX_B64 } from '../../e2ee/e2ee.constants';
 
 export class CreateMessageDto {
   @ApiPropertyOptional({ example: 'Merhaba kankaverse!', maxLength: MESSAGE_CONTENT_MAX })
@@ -16,6 +20,23 @@ export class CreateMessageDto {
   @IsNotEmpty({ message: 'Mesaj içeriği boş string olamaz.' })
   @MaxLength(MESSAGE_CONTENT_MAX, { message: 'Mesaj en fazla 16.000 karakter olabilir.' })
   content?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'E1: şifreli DM mesajı (base64, ≤32 KB). Şifreli kanalda ZORUNLU ve `content` verilmemeli (409 E2EE_REQUIRED); şifresiz kanalda 422 E2EE_NOT_ENCRYPTED.',
+    maxLength: E2EE_CIPHERTEXT_MAX_B64,
+  })
+  @IsOptional()
+  @IsString()
+  @IsBase64(undefined, { message: 'Geçerli bir base64 değeri gerekli.' })
+  @MaxLength(E2EE_CIPHERTEXT_MAX_B64, { message: 'Şifreli mesaj en fazla 32 KB olabilir.' })
+  ciphertext?: string;
+
+  @ApiPropertyOptional({ description: 'E1: şifrelemede kullanılan MLS epoch (bilgi amaçlı)' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  epoch?: number;
 
   @ApiPropertyOptional()
   @IsOptional()

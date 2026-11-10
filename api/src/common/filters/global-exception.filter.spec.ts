@@ -25,6 +25,23 @@ describe('GlobalExceptionFilter (C35)', () => {
     expect(JSON.stringify(body)).not.toContain('SECRETTOKEN');
   });
 
+  it('E1: epoch çakışmasında currentEpoch gövdede döner', () => {
+    const { body, status } = run(
+      new HttpException({ message: 'm', error: 'E2EE_EPOCH_CONFLICT', currentEpoch: 7 }, 409),
+      '/e2ee/channels/c/commits',
+    );
+    expect(status).toHaveBeenCalledWith(409);
+    expect(body).toMatchObject({ success: false, error: 'E2EE_EPOCH_CONFLICT', currentEpoch: 7 });
+  });
+
+  it('currentEpoch yalnız E2EE_EPOCH_CONFLICT için taşınır', () => {
+    const { body } = run(
+      new HttpException({ message: 'm', error: 'OTHER', currentEpoch: 7 }, 409),
+      '/x',
+    );
+    expect('currentEpoch' in body).toBe(false);
+  });
+
   it('diğer yollar değişmez', () => {
     const { body } = run(new NotFoundException(), '/auth/login');
     expect(body.path).toBe('/auth/login');

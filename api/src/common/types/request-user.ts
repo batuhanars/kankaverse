@@ -7,6 +7,8 @@ export interface RequestUser {
   id: string;
   username: string;
   sessionId: string;
+  /** Refresh rotasyonunda sabit oturum zinciri (E1: E2EE cihazı buna bağlı). */
+  tokenFamily: string;
   emailVerifiedAt: Date | null;
   isModerator: boolean;
 }

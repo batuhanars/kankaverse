@@ -286,6 +286,7 @@ export class DmService {
               channelId: lastMsg.channelId,
               content: previewFromAttachments(lastMsg.content, lastMsg.attachments),
               replyToId: lastMsg.replyToId,
+              ...(lastMsg.encrypted ? { encrypted: true } : {}),
               author: {
                 id: lastMsg.author.id,
                 username: lastMsg.author.username,
@@ -348,6 +349,7 @@ export class DmService {
               channelId: lastMsg.channelId,
               content: previewFromAttachments(lastMsg.content, lastMsg.attachments),
               replyToId: lastMsg.replyToId,
+              ...(lastMsg.encrypted ? { encrypted: true } : {}),
               author: {
                 id: lastMsg.author.id,
                 username: lastMsg.author.username,
@@ -1061,6 +1063,7 @@ export class DmService {
             channelId: lastMsg.channelId,
             content: previewFromAttachments(lastMsg.content, lastMsg.attachments),
             replyToId: lastMsg.replyToId,
+            ...(lastMsg.encrypted ? { encrypted: true } : {}),
             author: {
               id: lastMsg.author.id,
               username: lastMsg.author.username,

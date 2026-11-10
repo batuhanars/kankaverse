@@ -22,6 +22,7 @@ import { UpdateMessageDto } from './dto/update-message.dto';
 import { AddReactionDto } from './dto/add-reaction.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { RequestUser } from '../../common/types/request-user';
 
 @ApiTags('messages')
 @ApiBearerAuth()
@@ -78,11 +79,11 @@ export class MessagesController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Mesaj gönder (WS broadcast tetikler)' })
   async sendMessage(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: RequestUser,
     @Param('id') channelId: string,
     @Body() dto: CreateMessageDto,
   ) {
-    const message = await this.messagesService.create(user.id, channelId, dto);
+    const message = await this.messagesService.create(user.id, channelId, dto, user.tokenFamily);
     this.messagesGateway.broadcastMessage(channelId, message);
     // C29: bildirimler gönderenin cevabını bekletmez; hata yutulmaz, loglanır.
     void this.notifyAfterSend(channelId, message).catch((err: unknown) =>
@@ -106,12 +107,18 @@ export class MessagesController {
   @Patch(':messageId')
   @ApiOperation({ summary: 'Mesajı düzenle — yalnız yazar (WS message.updated yayar)' })
   async editMessage(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: RequestUser,
     @Param('id') channelId: string,
     @Param('messageId') messageId: string,
     @Body() dto: UpdateMessageDto,
   ) {
-    const message = await this.messagesService.editMessage(user.id, channelId, messageId, dto);
+    const message = await this.messagesService.editMessage(
+      user.id,
+      channelId,
+      messageId,
+      dto,
+      user.tokenFamily,
+    );
     this.messagesGateway.broadcastMessageUpdate(channelId, message);
     return message;
   }

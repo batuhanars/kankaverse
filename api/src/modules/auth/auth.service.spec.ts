@@ -48,8 +48,12 @@ function makePrismaMock() {
       create: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   };
 }
+
+// E1: cihaz iptali bağımlılığı (davranış testleri e2ee-revocation.spec.ts ve aşağıdaki E1 bloğunda)
+const e2eeMock = { revokeOps: jest.fn().mockResolvedValue([]), announce: jest.fn() };
 
 function makeService(prismaMock: ReturnType<typeof makePrismaMock>) {
   const jwtService = new JwtService();
@@ -59,6 +63,7 @@ function makeService(prismaMock: ReturnType<typeof makePrismaMock>) {
     configMock as any,
     emailServiceMock as any,
     { canCreateAnimated: jest.fn().mockReturnValue(true) } as any,
+    e2eeMock as any,
   );
 }
 
@@ -249,5 +254,133 @@ describe('AuthService.refresh — bearer teslim kapısı', () => {
       response: { error: 'INVALID_REFRESH' },
     });
     expect(prismaMock.session.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+// ── E1 §2.6: oturum iptali <-> E2EE cihaz iptali (R7) ────────────────────────
+
+describe('AuthService — E1 E2EE cihaz iptali', () => {
+  const ARGON = { type: argon2.argon2id, memoryCost: 19456, timeCost: 2 };
+
+  function setup() {
+    const prismaMock = {
+      ...makePrismaMock(),
+      user: { findUnique: jest.fn(), update: jest.fn().mockReturnValue('USER_UPD') },
+      recentGame: { deleteMany: jest.fn().mockReturnValue('RG_DEL') },
+    };
+    return { prismaMock, service: makeService(prismaMock as any), jwt: new JwtService() };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    e2eeMock.revokeOps.mockResolvedValue([]);
+  });
+
+  it('refresh ROTASYONU cihazı iptal etmez; yeni oturum AYNI tokenFamily ile açılır (cihaz zincire bağlı)', async () => {
+    const { prismaMock, service, jwt } = setup();
+    const raw = signRefreshToken(jwt, { sub: 'u1', sessionId: 's1', family: 'fam-1' });
+    prismaMock.session.findUnique.mockResolvedValue({
+      id: 's1',
+      userId: 'u1',
+      tokenFamily: 'fam-1',
+      refreshTokenHash: await argon2.hash(raw, ARGON),
+      clientType: null,
+      revokedAt: null,
+    });
+    prismaMock.session.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.session.create.mockResolvedValue({});
+
+    await service.refresh(raw, '1.2.3.4', true);
+
+    expect(e2eeMock.revokeOps).not.toHaveBeenCalled();
+    expect(e2eeMock.announce).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.session.create.mock.calls[0][0].data.tokenFamily).toBe('fam-1');
+  });
+
+  it('refresh yeniden kullanımı (bilinmeyen oturum) → aile iptali + cihaz iptali AYNI transaction', async () => {
+    const { prismaMock, service, jwt } = setup();
+    const raw = signRefreshToken(jwt, { sub: 'u1', sessionId: 'yok', family: 'fam-1' });
+    prismaMock.session.findUnique.mockResolvedValue(null);
+
+    await expect(service.refresh(raw, '1.2.3.4', true)).rejects.toMatchObject({
+      response: { error: 'REFRESH_REUSE_DETECTED' },
+    });
+    expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ families: ['fam-1'] });
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(e2eeMock.announce).toHaveBeenCalledWith({ families: ['fam-1'] });
+  });
+
+  it('geçersiz refresh token (hash uyuşmaz) → oturumun ailesi için cihaz iptali', async () => {
+    const { prismaMock, service, jwt } = setup();
+    const raw = signRefreshToken(jwt, { sub: 'u1', sessionId: 's1', family: 'fam-1' });
+    prismaMock.session.findUnique.mockResolvedValue({
+      id: 's1',
+      userId: 'u1',
+      tokenFamily: 'fam-1',
+      refreshTokenHash: await argon2.hash('baska-token', ARGON),
+      clientType: null,
+      revokedAt: null,
+    });
+    prismaMock.session.update.mockResolvedValue({});
+    await expect(service.refresh(raw, '1.2.3.4', true)).rejects.toMatchObject({
+      response: { error: 'INVALID_REFRESH' },
+    });
+    expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ families: ['fam-1'] });
+  });
+
+  it('çıkış → oturumun zinciri için cihaz iptali + yayın', async () => {
+    const { prismaMock, service } = setup();
+    prismaMock.session.update.mockReturnValue('SES_UPD');
+    await service.logout('s1');
+    expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ sessionId: 's1' });
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(e2eeMock.announce).toHaveBeenCalledWith({ sessionId: 's1' });
+  });
+
+  it('oturumlarımdan kapatma → o oturumun ailesi', async () => {
+    const { prismaMock, service } = setup();
+    (prismaMock.session as any).findFirst = jest
+      .fn()
+      .mockResolvedValue({ id: 's2', tokenFamily: 'fam-2' });
+    prismaMock.session.update.mockReturnValue('SES_UPD');
+    await service.revokeSession('u1', 's2');
+    expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ families: ['fam-2'] });
+  });
+
+  it('diğer oturumları kapat → kullanıcının tüm cihazları, mevcut oturumun zinciri hariç', async () => {
+    const { prismaMock, service } = setup();
+    prismaMock.session.updateMany.mockReturnValue('SES_UPD');
+    await service.revokeOtherSessions('u1', 's-now');
+    expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ userId: 'u1', exceptSessionId: 's-now' });
+  });
+
+  it('parola değişimi → mevcut oturum hariç toplu iptal; parola + oturum + cihaz tek transaction', async () => {
+    const { prismaMock, service } = setup();
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'u1',
+      passwordHash: await argon2.hash('eski-sifre-123', ARGON),
+      twoFactorEnabled: false,
+    });
+    prismaMock.session.updateMany.mockReturnValue('SES_UPD');
+    await service.changePassword('u1', 's-now', {
+      currentPassword: 'eski-sifre-123',
+      newPassword: 'yeni-sifre-456',
+    } as never);
+    expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ userId: 'u1', exceptSessionId: 's-now' });
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('hesap silme talebi → kullanıcının tüm cihazları', async () => {
+    const { prismaMock, service } = setup();
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'u1',
+      passwordHash: await argon2.hash('sifre-12345', ARGON),
+      twoFactorEnabled: false,
+    });
+    prismaMock.session.updateMany.mockReturnValue('SES_UPD');
+    await service.deleteAccount('u1', { currentPassword: 'sifre-12345' } as never);
+    expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ userId: 'u1' });
+    expect(e2eeMock.announce).toHaveBeenCalledWith({ userId: 'u1' });
   });
 });

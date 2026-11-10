@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { revokeUserDevicesInTx } from '../../modules/e2ee/e2ee-revocation.service';
 
 @Injectable()
 export class PurgeJob {
@@ -98,6 +99,7 @@ export class PurgeJob {
           deletionRequestedAt: null,
         },
       });
+      await revokeUserDevicesInTx(tx, userId); // E1: E2EE cihazlari iptal + KeyPackage silme
       await tx.session.deleteMany({ where: { userId } });
       await tx.pushToken.deleteMany({ where: { userId } });
       await tx.notificationPref.deleteMany({ where: { userId } });

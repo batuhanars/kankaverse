@@ -33,7 +33,8 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangeEmailDto } from './dto/change-email.dto';
 import { ChangeUsernameDto } from './dto/change-username.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
-import { User } from '@prisma/client';
+import { Prisma, User } from '@prisma/client';
+import { E2eeRevocationService, RevokeScope } from '../e2ee/e2ee-revocation.service';
 import { randomUUID } from 'crypto';
 import {
   generateAuthToken,
@@ -82,7 +83,21 @@ export class AuthService implements OnModuleInit {
     private config: ConfigService,
     private emailService: EmailService,
     private animatedMedia: AnimatedMediaService,
+    private e2ee: E2eeRevocationService,
   ) {}
+
+  /**
+   * 🔴 R7 / E1 §2.6 — zinciri GERÇEKTEN bitiren her oturum iptali bu yardımcıdan geçer: oturum işlemi +
+   * bağlı E2EE cihaz iptali (KeyPackage silme dahil) AYNI transaction; `e2ee:devices-changed` commit sonrası.
+   * Refresh rotasyonu (`refresh()` içindeki `claim`) BİLEREK buradan geçmez: zincir sürer, cihaz kalır.
+   */
+  private async revokeWithDevices(
+    scope: RevokeScope,
+    ...sessionOps: Prisma.PrismaPromise<unknown>[]
+  ): Promise<void> {
+    await this.prisma.$transaction([...sessionOps, ...(await this.e2ee.revokeOps(scope))]);
+    void this.e2ee.announce(scope);
+  }
 
   /** C22/C14: UserDto + hareketli yükleme ve yapay zeka video kapıları (tek kaynak fonksiyonlar). */
   private async userDto(user: User) {
@@ -397,10 +412,13 @@ export class AuthService implements OnModuleInit {
     const session = await this.prisma.session.findUnique({ where: { id: payload.sessionId } });
 
     if (!session) {
-      await this.prisma.session.updateMany({
-        where: { tokenFamily: payload.family, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
+      await this.revokeWithDevices(
+        { families: [payload.family] },
+        this.prisma.session.updateMany({
+          where: { tokenFamily: payload.family, revokedAt: null },
+          data: { revokedAt: new Date() },
+        }),
+      );
       throw new UnauthorizedException({
         message: 'Yenileme tokeni yeniden kullanımı tespit edildi.',
         error: 'REFRESH_REUSE_DETECTED',
@@ -425,10 +443,13 @@ export class AuthService implements OnModuleInit {
           error: 'INVALID_REFRESH',
         });
       }
-      await this.prisma.session.updateMany({
-        where: { tokenFamily: session.tokenFamily, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
+      await this.revokeWithDevices(
+        { families: [session.tokenFamily] },
+        this.prisma.session.updateMany({
+          where: { tokenFamily: session.tokenFamily, revokedAt: null },
+          data: { revokedAt: new Date() },
+        }),
+      );
       throw new UnauthorizedException({
         message: 'Yenileme tokeni yeniden kullanımı tespit edildi.',
         error: 'REFRESH_REUSE_DETECTED',
@@ -436,10 +457,10 @@ export class AuthService implements OnModuleInit {
     }
 
     if (!tokenValid) {
-      await this.prisma.session.update({
-        where: { id: session.id },
-        data: { revokedAt: new Date() },
-      });
+      await this.revokeWithDevices(
+        { families: [session.tokenFamily] },
+        this.prisma.session.update({ where: { id: session.id }, data: { revokedAt: new Date() } }),
+      );
       throw new UnauthorizedException({
         message: 'Geçersiz yenileme tokeni.',
         error: 'INVALID_REFRESH',
@@ -468,7 +489,10 @@ export class AuthService implements OnModuleInit {
   }
 
   async logout(sessionId: string) {
-    await this.prisma.session.update({ where: { id: sessionId }, data: { revokedAt: new Date() } });
+    await this.revokeWithDevices(
+      { sessionId },
+      this.prisma.session.update({ where: { id: sessionId }, data: { revokedAt: new Date() } }),
+    );
   }
 
   async me(userId: string) {
@@ -540,7 +564,8 @@ export class AuthService implements OnModuleInit {
     const token = await this.consumeAuthToken(dto.token, AuthTokenType.PASSWORD_RESET);
     const newHash = await argon2.hash(dto.newPassword, ARGON2_OPTIONS);
 
-    await this.prisma.$transaction([
+    await this.revokeWithDevices(
+      { userId: token.userId },
       this.prisma.user.update({
         where: { id: token.userId },
         data: { passwordHash: newHash, emailVerifiedAt: new Date() },
@@ -549,7 +574,7 @@ export class AuthService implements OnModuleInit {
         where: { userId: token.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       }),
-    ]);
+    );
     return null;
   }
 
@@ -684,15 +709,21 @@ export class AuthService implements OnModuleInit {
       throw new NotFoundException({ message: 'Oturum bulunamadı.', error: 'SESSION_NOT_FOUND' });
     }
 
-    await this.prisma.session.update({ where: { id: sessionId }, data: { revokedAt: new Date() } });
+    await this.revokeWithDevices(
+      { families: [session.tokenFamily] },
+      this.prisma.session.update({ where: { id: sessionId }, data: { revokedAt: new Date() } }),
+    );
     return null;
   }
 
   async revokeOtherSessions(userId: string, currentSessionId: string) {
-    await this.prisma.session.updateMany({
-      where: { userId, revokedAt: null, id: { not: currentSessionId } },
-      data: { revokedAt: new Date() },
-    });
+    await this.revokeWithDevices(
+      { userId, exceptSessionId: currentSessionId },
+      this.prisma.session.updateMany({
+        where: { userId, revokedAt: null, id: { not: currentSessionId } },
+        data: { revokedAt: new Date() },
+      }),
+    );
     return null;
   }
 
@@ -706,14 +737,15 @@ export class AuthService implements OnModuleInit {
 
     const newHash = await argon2.hash(dto.newPassword, ARGON2_OPTIONS);
 
-    await this.prisma.$transaction([
+    await this.revokeWithDevices(
+      { userId, exceptSessionId: sessionId },
       this.prisma.user.update({ where: { id: userId }, data: { passwordHash: newHash } }),
       // Mevcut oturum korunur, diğerleri düşer
       this.prisma.session.updateMany({
         where: { userId, revokedAt: null, id: { not: sessionId } },
         data: { revokedAt: new Date() },
       }),
-    ]);
+    );
     return null;
   }
 
@@ -801,7 +833,8 @@ export class AuthService implements OnModuleInit {
       throw new BadRequestException({ message: 'Geçersiz token.', error: 'INVALID_TOKEN' });
     }
 
-    await this.prisma.$transaction([
+    await this.revokeWithDevices(
+      { userId: token.userId },
       this.prisma.user.update({
         where: { id: token.userId },
         data: { email: token.payload },
@@ -816,7 +849,7 @@ export class AuthService implements OnModuleInit {
         where: { userId: token.userId, type: AuthTokenType.EMAIL_CHANGE, usedAt: null },
         data: { usedAt: new Date() },
       }),
-    ]);
+    );
     return null;
   }
 
@@ -828,7 +861,8 @@ export class AuthService implements OnModuleInit {
 
     await this.verifyReauth(user, dto.currentPassword, dto.totpCode);
 
-    await this.prisma.$transaction([
+    await this.revokeWithDevices(
+      { userId },
       this.prisma.user.update({
         where: { id: userId },
         // C31f: son oynanan oyunlar 30 günlük bekleme beklenmeden HEMEN silinir ve ayar kapanır
@@ -840,7 +874,7 @@ export class AuthService implements OnModuleInit {
         where: { userId, revokedAt: null },
         data: { revokedAt: new Date() },
       }),
-    ]);
+    );
     return null;
   }
 

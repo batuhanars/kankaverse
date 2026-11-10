@@ -138,6 +138,7 @@ model User {
   platformInvite         PlatformInvite?       @relation("RedeemedPlatformInvite", fields: [platformInviteId], references: [id])
   createdPlatformInvites PlatformInvite[]      @relation("PlatformInviteCreator")
   sessions               Session[]
+  e2eeDevices            E2eeDevice[]
   memberships            GuildMember[]
   ownedGuilds            Guild[]               @relation("GuildOwner")
   messages               Message[]
@@ -450,6 +451,10 @@ model Message {
   webhook          Webhook?          @relation(fields: [webhookId], references: [id], onDelete: Restrict)
   webhookName      String? // gönderim anındaki görünen ad (anlık görüntü; username mesaj başına ezilebilir)
   embeds           Json? // C35 §2.5: doğrulanmış embed listesi (yalnız izinli alanlar)
+  // E1 (DM E2EE): şifreli mesajda content='' ve mentions=[]; ciphertext opak MLS uygulama mesajı.
+  encrypted        Boolean           @default(false)
+  ciphertext       Bytes?
+  senderDeviceId   String?
 
   @@index([channelId, createdAt])
   @@index([channelId, pinnedAt])
@@ -922,4 +927,65 @@ model AiVideoGeneration {
 
   @@index([userId, createdAt])
   @@index([status])
+}
+
+// ─── E1: 1-1 DM uçtan uca şifreleme (MLS). Sunucu içerik görmez; yalnız sırayı tutar ───
+// Sözleşme: contracts/SPRINT_E1_DM_E2EE_CONTRACT.md §2.1 (Rev.2: cihaz oturum ZİNCİRİNE bağlı)
+
+model E2eeDevice {
+  id           String           @id @default(cuid())
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenFamily  String           @unique // refresh rotasyonunda sabit; zincir bitince cihaz iptal (§2.6)
+  platform     String // 'web' | 'android'
+  signatureKey Bytes // MLS leaf imza açık anahtarı (Ed25519, 32 bayt)
+  createdAt    DateTime         @default(now())
+  lastSeenAt   DateTime         @default(now())
+  revokedAt    DateTime?
+  keyPackages  E2eeKeyPackage[]
+
+  @@index([userId])
+}
+
+model E2eeKeyPackage {
+  id         String     @id @default(cuid())
+  deviceId   String
+  device     E2eeDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  data       Bytes // serileştirilmiş KeyPackage (opak)
+  lastResort Boolean    @default(false)
+  consumedAt DateTime?
+  createdAt  DateTime   @default(now())
+
+  @@index([deviceId, consumedAt])
+}
+
+model E2eeGroup {
+  channelId   String   @id // 1 kanal = 1 MLS grubu
+  groupId     Bytes // MLS group_id (istemci üretir, 32 bayt rastgele)
+  epoch       Int // sunucunun kabul ettiği son epoch
+  createdById String // ilk grubu kuran cihaz (deviceId)
+  createdAt   DateTime @default(now()) // ayraç zamanı
+}
+
+model E2eeHandshake {
+  id             String   @id @default(cuid())
+  channelId      String
+  epoch          Int // bu commit'in uygulandığı epoch (kabulden önceki değer)
+  senderDeviceId String
+  commit         Bytes // opak MLS commit
+  createdAt      DateTime @default(now())
+
+  @@unique([channelId, epoch])
+}
+
+model E2eeWelcome {
+  id             String    @id @default(cuid())
+  channelId      String
+  epoch          Int // cihazın katılacağı epoch
+  targetDeviceId String
+  welcome        Bytes // opak MLS Welcome (ağaç içinde, ratchet_tree uzantısı)
+  deliveredAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([targetDeviceId, deliveredAt])
 }
