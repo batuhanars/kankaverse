@@ -1,0 +1,73 @@
+// Çekirdeğin tipli hataları. Uygulama kodu ts-mls hatalarını görmez, yalnız bunları yakalar.
+
+export class E2eeError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = new.target.name
+  }
+}
+
+/** crypto.getRandomValues yok: Math.random'a ASLA düşülmez, E2EE başlamaz. */
+export class RandomUnavailableError extends E2eeError {}
+
+/** Grupta (ya da KeyPackage'ta) sunucu listesinde olmayan bir cihaz var. */
+export class UnknownDeviceError extends E2eeError {
+  constructor(readonly deviceId: string) {
+    super(`Tanınmayan cihaz: ${deviceId}`)
+  }
+}
+
+/** Cihaz listede var ama imza anahtarı kayıtlı anahtarla bayt-bayt aynı değil. */
+export class DeviceKeyMismatchError extends E2eeError {
+  constructor(readonly deviceId: string) {
+    super(`Cihaz imza anahtarı kayıtlıyla uyuşmuyor: ${deviceId}`)
+  }
+}
+
+/** Yaprağın kimlik bilgisi BasicCredential değil ya da biçimi bozuk. */
+export class InvalidCredentialError extends E2eeError {}
+
+/** Uygulama mesajını gönderen yaprak, sunucunun bildirdiği senderDeviceId ile aynı değil. */
+export class SenderMismatchError extends E2eeError {
+  constructor(
+    readonly expected: string,
+    readonly actual: string,
+  ) {
+    super(`Gönderen cihaz uyuşmuyor: beklenen ${expected}, gelen ${actual}`)
+  }
+}
+
+/** Commit beklenirken başka bir MLS mesajı geldi, ya da epoch ilerlemedi. */
+export class UnexpectedMessageError extends E2eeError {}
+
+/** Bekleyen commit artık geçerli değil (grup epoch'u bu arada ilerledi). */
+export class StaleCommitError extends E2eeError {}
+
+/** Bu Welcome için cihazda eşleşen KeyPackage özel anahtarı yok. */
+export class NoMatchingKeyPackageError extends E2eeError {}
+
+/** Cihaza henüz sunucudan deviceId atanmadı (credential kimliği gerekli). */
+export class DeviceNotRegisteredError extends E2eeError {}
+
+/** İşlem grubun mevcut durumuna uymuyor (ör. üye olmayan cihazı çıkarma). */
+export class GroupStateError extends E2eeError {}
+
+/** serialize edilmiş veri bozuk ya da sürümü desteklenmiyor. */
+export class SerializationError extends E2eeError {}
+
+/** Grup işlemi (kurma, ekleme, çıkarma, commit işleme) MLS düzeyinde başarısız oldu. */
+export class GroupOperationError extends E2eeError {}
+
+/** Şifreli yük çözülemedi (MLS düzeyinde hata: yanlış epoch, tekrar, bozuk bayt). */
+export class DecryptError extends E2eeError {}
+
+/**
+ * ts-mls hatalarını çekirdeğin tipine çevirir; çekirdeğin kendi tipli hataları (UnknownDeviceError vb.)
+ * olduğu gibi geçer. Neden: uygulama kodu ts-mls adını/tiplerini görmemeli (sözleşme §1.3).
+ */
+export function wrapMlsError(e: unknown, Kind: new (m: string) => E2eeError = GroupOperationError): E2eeError {
+  if (e instanceof E2eeError) return e
+  const err = new Kind(e instanceof Error ? e.message : String(e))
+  err.cause = e
+  return err
+}

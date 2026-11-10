@@ -1,0 +1,23 @@
+{
+  "name": "@kankaverse/e2ee-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@noble/ciphers": "2.2.0",
+    "@noble/curves": "2.2.0",
+    "@noble/hashes": "2.4.0",
+    "ts-mls": "2.0.0-rc.16"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.0",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}
