@@ -42,7 +42,10 @@ const emit = defineEmits<{ close: [] }>()
         <div v-if="title" class="mb-5 shrink-0 pr-8">
           <h2 class="text-[22px] font-semibold text-[var(--kv-text-primary)]">{{ title }}</h2>
         </div>
-        <div class="overflow-y-auto flex-1 min-h-0">
+        <!-- Başlıksız modalda X'e ayrılan şerit: içeriğin ilk satırı X'in altına girmez -->
+        <div v-else class="h-5 shrink-0" />
+        <!-- Kaydırma alanı kartın sağ kenarına uzanır: kaydırma çubuğu X'in altına düşmez -->
+        <div class="overflow-y-auto flex-1 min-h-0 -mr-6 pr-6">
           <slot />
         </div>
       </div>

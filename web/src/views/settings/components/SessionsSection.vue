@@ -57,7 +57,7 @@ onMounted(load)
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-3">
+    <div class="flex items-center justify-between gap-3 mb-3">
       <h3 class="text-[15px] font-semibold" style="color: var(--kv-text-primary);">
         {{ t('security.sessions.title') }}
       </h3>
