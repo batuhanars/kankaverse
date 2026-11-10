@@ -222,7 +222,7 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
 - **R1 moderasyon kapasitesi (en kritik):** "dakikalar içinde insan moderatör" SLA'i tek kişiyle tutulamaz →
   AI ön-triyaj servisi (Sprint 4+ ayrı tier), davetli/kontrollü büyüme, **büyüme moderasyon kapasitesine endeksli**.
 - **R2 cold start:** pazar riski, planla değil gerçek topluluklarla azaltılır (GTM brief §10).
-- **R4 E2EE yok (bilinçli):** T&S sunucu-tarafı erişim gerektirir; gizlilik politikasında şeffafça yazılır.
+- **R4 E2EE (REVİZE 2026-11-05/10):** ortam dışı tüm DM'ler E2EE (MLS). Şikâyet edilen mesaj şikâyetçi cihazından iletilir (E4). Sözleşme `contracts/SPRINT_E1_DM_E2EE_CONTRACT.md`, aşamalar E1-E8. Herkese açılış E1-E4 sonrası.
 - **R7 AI-ekip sınırı:** auth/oturum + T&S karar fonksiyonları satır satır insan incelemesi (CLAUDE.md zorunluluğu).
 
 ---
