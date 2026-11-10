@@ -21,6 +21,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { Login2faDto } from './dto/login-2fa.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { resolveDeviceName } from '../../common/utils/device-name.util';
 import { normalizeClientType } from './utils/client-type.util';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -93,12 +94,16 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
     @Headers('x-client-type') clientTypeHeader?: string,
+    @Headers('x-client-device') clientDeviceHeader?: string,
+    @Headers('user-agent') userAgent?: string,
   ) {
     const clientType = normalizeClientType(clientTypeHeader);
+    const device = resolveDeviceName({ clientDevice: clientDeviceHeader, userAgent, clientType });
     const { user, accessToken, refreshToken } = await this.authService.register(
       dto,
       req.ip,
       clientType,
+      device,
     );
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
     return clientType === 'mobile' ? { user, accessToken, refreshToken } : { user, accessToken };
@@ -114,9 +119,12 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
     @Headers('x-client-type') clientTypeHeader?: string,
+    @Headers('x-client-device') clientDeviceHeader?: string,
+    @Headers('user-agent') userAgent?: string,
   ) {
     const clientType = normalizeClientType(clientTypeHeader);
-    const result = await this.authService.login(dto, req.ip, clientType);
+    const device = resolveDeviceName({ clientDevice: clientDeviceHeader, userAgent, clientType });
+    const result = await this.authService.login(dto, req.ip, clientType, device);
     if (result.type === 'challenge') {
       return { twoFactorRequired: true, challengeToken: result.challengeToken };
     }
@@ -136,12 +144,16 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
     @Headers('x-client-type') clientTypeHeader?: string,
+    @Headers('x-client-device') clientDeviceHeader?: string,
+    @Headers('user-agent') userAgent?: string,
   ) {
     const clientType = normalizeClientType(clientTypeHeader);
+    const device = resolveDeviceName({ clientDevice: clientDeviceHeader, userAgent, clientType });
     const { user, accessToken, refreshToken } = await this.authService.login2fa(
       dto,
       req.ip,
       clientType,
+      device,
     );
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
     return clientType === 'mobile' ? { user, accessToken, refreshToken } : { user, accessToken };
@@ -159,8 +171,11 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @Body() body: RefreshDto,
     @Headers('x-client-type') clientTypeHeader?: string,
+    @Headers('x-client-device') clientDeviceHeader?: string,
+    @Headers('user-agent') userAgent?: string,
   ) {
     const clientType = normalizeClientType(clientTypeHeader);
+    const device = resolveDeviceName({ clientDevice: clientDeviceHeader, userAgent, clientType });
     // req.cookies tipi @types/cookie-parser'da Record<string, any> — indeks erişimi any döner, cast ediyoruz.
     const cookieToken: string | undefined = req.cookies?.[REFRESH_COOKIE] as string | undefined;
     // [Sprint M0 — R7, 2026-07-29 revizyon] RN'in okhttp katmanı kendi cookie kavanozunu tutar; mobil
@@ -174,6 +189,7 @@ export class AuthController {
       rawToken,
       req.ip,
       usingCookie,
+      device,
     );
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
     return usingCookie ? { accessToken } : { accessToken, refreshToken };

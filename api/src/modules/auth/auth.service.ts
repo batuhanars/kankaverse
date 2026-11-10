@@ -115,7 +115,12 @@ export class AuthService implements OnModuleInit {
 
   // ── Temel auth ─────────────────────────────────────────────────────────────
 
-  async register(dto: RegisterDto, ip?: string, clientType?: 'mobile' | null) {
+  async register(
+    dto: RegisterDto,
+    ip?: string,
+    clientType?: 'mobile' | null,
+    device?: string | null,
+  ) {
     const email = dto.email.toLowerCase().trim();
     const birthDate = validateBirthDate(dto.birthDate);
 
@@ -211,6 +216,7 @@ export class AuthService implements OnModuleInit {
       undefined,
       user.email,
       clientType,
+      device,
     );
     return { user: await this.userDto(user), accessToken, refreshToken };
   }
@@ -279,7 +285,12 @@ export class AuthService implements OnModuleInit {
     });
   }
 
-  async login(dto: LoginDto, ip?: string, clientType?: 'mobile' | null): Promise<LoginResult> {
+  async login(
+    dto: LoginDto,
+    ip?: string,
+    clientType?: 'mobile' | null,
+    device?: string | null,
+  ): Promise<LoginResult> {
     // Tek alan: kullanıcı adı VEYA e-posta. E-posta '@' içerir (kullanıcı adı
     // pattern'i '@' içermez) → e-posta lowercase eşleşir, kullanıcı adı birebir.
     // Her ikisi de unique → findFirst OR güvenli (çakışma yok). Jenerik hata + dummy
@@ -327,11 +338,17 @@ export class AuthService implements OnModuleInit {
       undefined,
       user.email,
       clientType,
+      device,
     );
     return { type: 'session', user: await this.userDto(user), accessToken, refreshToken };
   }
 
-  async login2fa(dto: Login2faDto, ip?: string, clientType?: 'mobile' | null) {
+  async login2fa(
+    dto: Login2faDto,
+    ip?: string,
+    clientType?: 'mobile' | null,
+    device?: string | null,
+  ) {
     let payload: { sub: string; twoFactorChallenge: boolean };
     try {
       payload = this.jwtService.verify(dto.challengeToken, {
@@ -378,6 +395,7 @@ export class AuthService implements OnModuleInit {
       undefined,
       user.email,
       clientType,
+      device,
     );
     return { user: await this.userDto(user), accessToken, refreshToken };
   }
@@ -389,7 +407,7 @@ export class AuthService implements OnModuleInit {
    * bir web session'ının refresh token'ı hiçbir koşulda gövdeden kabul edilmez
    * (Sprint M0 contract §2.3). Diğer tüm rotasyon/reuse-detection mantığı değişmez.
    */
-  async refresh(rawRefreshToken: string, ip?: string, usingCookie = true) {
+  async refresh(rawRefreshToken: string, ip?: string, usingCookie = true, device?: string | null) {
     if (!rawRefreshToken) {
       throw new UnauthorizedException({
         message: 'Yenileme tokeni bulunamadı.',
@@ -484,6 +502,7 @@ export class AuthService implements OnModuleInit {
       session.tokenFamily,
       undefined,
       session.clientType as 'mobile' | null,
+      session.device ?? device,
     );
     return { accessToken, refreshToken };
   }
@@ -1001,6 +1020,7 @@ export class AuthService implements OnModuleInit {
     existingFamily?: string,
     userEmail?: string,
     clientType?: 'mobile' | null,
+    device?: string | null,
   ) {
     // Yeni cihaz tespiti: kullanıcının ilk oturumu değilse ve bu IP daha önce görülmemişse bildir
     if (ip && userEmail) {
@@ -1039,6 +1059,7 @@ export class AuthService implements OnModuleInit {
         tokenFamily: family,
         ip,
         clientType: clientType ?? null,
+        device: device ?? null,
         lastActiveAt: new Date(),
       },
     });

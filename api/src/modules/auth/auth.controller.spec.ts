@@ -65,7 +65,7 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
       undefined,
     );
 
-    expect(authServiceMock.login).toHaveBeenCalledWith(expect.anything(), '127.0.0.1', null);
+    expect(authServiceMock.login).toHaveBeenCalledWith(expect.anything(), '127.0.0.1', null, null);
     expect(res.cookie).toHaveBeenCalledWith('refresh_token', 'refresh-1', expect.anything());
     expect(body).toEqual({ user: { id: 'u1' }, accessToken: 'access-1' });
     expect(Object.keys(body)).toEqual(['user', 'accessToken']); // refreshToken anahtarı bile yok
@@ -87,7 +87,12 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
       'mobile',
     );
 
-    expect(authServiceMock.login).toHaveBeenCalledWith(expect.anything(), '127.0.0.1', 'mobile');
+    expect(authServiceMock.login).toHaveBeenCalledWith(
+      expect.anything(),
+      '127.0.0.1',
+      'mobile',
+      'Android uygulaması',
+    );
     expect(body).toEqual({
       user: { id: 'u1' },
       accessToken: 'access-1',
@@ -111,7 +116,7 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
       'desktop',
     );
 
-    expect(authServiceMock.login).toHaveBeenCalledWith(expect.anything(), '127.0.0.1', null);
+    expect(authServiceMock.login).toHaveBeenCalledWith(expect.anything(), '127.0.0.1', null, null);
     expect(body).toEqual({ user: { id: 'u1' }, accessToken: 'access-1' });
   });
 
@@ -140,7 +145,12 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
 
     const body = await controller.register({} as any, makeReq(), res, undefined);
 
-    expect(authServiceMock.register).toHaveBeenCalledWith(expect.anything(), '127.0.0.1', null);
+    expect(authServiceMock.register).toHaveBeenCalledWith(
+      expect.anything(),
+      '127.0.0.1',
+      null,
+      null,
+    );
     expect(body).toEqual({ user: { id: 'u1' }, accessToken: 'access-1' });
   });
 
@@ -154,7 +164,12 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
 
     const body = await controller.login2fa({} as any, makeReq(), res, 'mobile');
 
-    expect(authServiceMock.login2fa).toHaveBeenCalledWith(expect.anything(), '127.0.0.1', 'mobile');
+    expect(authServiceMock.login2fa).toHaveBeenCalledWith(
+      expect.anything(),
+      '127.0.0.1',
+      'mobile',
+      'Android uygulaması',
+    );
     expect(body).toEqual({
       user: { id: 'u1' },
       accessToken: 'access-1',
@@ -173,7 +188,7 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
 
     const body = await controller.refresh(makeReq({ refresh_token: 'cookie-token' }), res, {});
 
-    expect(authServiceMock.refresh).toHaveBeenCalledWith('cookie-token', '127.0.0.1', true);
+    expect(authServiceMock.refresh).toHaveBeenCalledWith('cookie-token', '127.0.0.1', true, null);
     expect(body).toEqual({ accessToken: 'access-2' });
     expect(Object.keys(body)).toEqual(['accessToken']);
   });
@@ -187,7 +202,7 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
 
     const body = await controller.refresh(makeReq(), res, { refreshToken: 'body-token' });
 
-    expect(authServiceMock.refresh).toHaveBeenCalledWith('body-token', '127.0.0.1', false);
+    expect(authServiceMock.refresh).toHaveBeenCalledWith('body-token', '127.0.0.1', false, null);
     expect(body).toEqual({ accessToken: 'access-3', refreshToken: 'refresh-3' });
   });
 
@@ -196,7 +211,7 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
     const res = makeRes();
 
     await expect(controller.refresh(makeReq(), res, {} as any)).rejects.toThrow();
-    expect(authServiceMock.refresh).toHaveBeenCalledWith('', '127.0.0.1', false);
+    expect(authServiceMock.refresh).toHaveBeenCalledWith('', '127.0.0.1', false, null);
   });
 
   // ── refresh: 2026-07-29 revizyonu — mobil + gövde token → cookie yok sayılır ──
@@ -219,7 +234,12 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
     );
 
     // Cookie mevcut olsa bile yok sayılır: service'e giden ham token gövdedekidir, usingCookie=false.
-    expect(authServiceMock.refresh).toHaveBeenCalledWith('body-token', '127.0.0.1', false);
+    expect(authServiceMock.refresh).toHaveBeenCalledWith(
+      'body-token',
+      '127.0.0.1',
+      false,
+      'Android uygulaması',
+    );
     expect(body).toEqual({ accessToken: 'access-4', refreshToken: 'refresh-4' });
     expect(Object.keys(body)).toEqual(['accessToken', 'refreshToken']);
   });
@@ -233,7 +253,12 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
 
     const body = await controller.refresh(makeReq(), res, { refreshToken: 'body-token' }, 'mobile');
 
-    expect(authServiceMock.refresh).toHaveBeenCalledWith('body-token', '127.0.0.1', false);
+    expect(authServiceMock.refresh).toHaveBeenCalledWith(
+      'body-token',
+      '127.0.0.1',
+      false,
+      'Android uygulaması',
+    );
     expect(body).toEqual({ accessToken: 'access-5', refreshToken: 'refresh-5' });
   });
 
@@ -251,7 +276,7 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
       undefined,
     );
 
-    expect(authServiceMock.refresh).toHaveBeenCalledWith('cookie-token', '127.0.0.1', true);
+    expect(authServiceMock.refresh).toHaveBeenCalledWith('cookie-token', '127.0.0.1', true, null);
     expect(body).toEqual({ accessToken: 'access-6' });
     expect(Object.keys(body)).toEqual(['accessToken']);
   });
@@ -265,7 +290,7 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
 
     await controller.refresh(makeReq(), res, { refreshToken: 'body-token' }, undefined);
 
-    expect(authServiceMock.refresh).toHaveBeenCalledWith('body-token', '127.0.0.1', false);
+    expect(authServiceMock.refresh).toHaveBeenCalledWith('body-token', '127.0.0.1', false, null);
   });
 
   it('refresh: X-Client-Type: desktop (allowlist dışı) + gövde token + cookie yok → mobil ayrıcalığı almaz, usingCookie=false', async () => {
@@ -282,7 +307,7 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
       'desktop',
     );
 
-    expect(authServiceMock.refresh).toHaveBeenCalledWith('body-token', '127.0.0.1', false);
+    expect(authServiceMock.refresh).toHaveBeenCalledWith('body-token', '127.0.0.1', false, null);
     expect(body).toEqual({ accessToken: 'access-8', refreshToken: 'refresh-8' });
   });
 
@@ -323,7 +348,12 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
       'Mobile',
     );
 
-    expect(authServiceMock.login).toHaveBeenCalledWith(expect.anything(), '127.0.0.1', 'mobile');
+    expect(authServiceMock.login).toHaveBeenCalledWith(
+      expect.anything(),
+      '127.0.0.1',
+      'mobile',
+      'Android uygulaması',
+    );
     expect(body).toEqual({
       user: { id: 'u1' },
       accessToken: 'access-1',
@@ -347,7 +377,12 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
       ' mobile ',
     );
 
-    expect(authServiceMock.login).toHaveBeenCalledWith(expect.anything(), '127.0.0.1', 'mobile');
+    expect(authServiceMock.login).toHaveBeenCalledWith(
+      expect.anything(),
+      '127.0.0.1',
+      'mobile',
+      'Android uygulaması',
+    );
     expect(body).toEqual({
       user: { id: 'u1' },
       accessToken: 'access-1',
@@ -366,7 +401,7 @@ describe('AuthController — X-Client-Type gövde davranışı', () => {
 
     const body = await controller.login({ identifier: 'x', password: 'y' }, makeReq(), res, 'web');
 
-    expect(authServiceMock.login).toHaveBeenCalledWith(expect.anything(), '127.0.0.1', null);
+    expect(authServiceMock.login).toHaveBeenCalledWith(expect.anything(), '127.0.0.1', null, null);
     expect(body).toEqual({ user: { id: 'u1' }, accessToken: 'access-1' });
   });
 });
