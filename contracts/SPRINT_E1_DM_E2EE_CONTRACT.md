@@ -1,6 +1,6 @@
 # SPRINT E1: 1-1 DM uçtan uca şifreleme (metin)
 
-> Durum: **TASARIM KİLİTLİ (2026-11-10, sahip onayı). Rev.2 (api adımı: cihaz oturum zincirine bağlı, ek alanlar). Rev.1 (aynı gün, adım 1 bulguları: ağaç Welcome içinde, geçmiş commit kuralı, çekirdek API kesinleşti, paketleme).** PM compose (Opus). **core + api + web + mobil.**
+> Durum: **TASARIM KİLİTLİ (2026-11-10, sahip onayı). Rev.3 (web adımı kararları, §6.2). Rev.2 (api adımı: cihaz oturum zincirine bağlı, ek alanlar). Rev.1 (aynı gün, adım 1 bulguları: ağaç Welcome içinde, geçmiş commit kuralı, çekirdek API kesinleşti, paketleme).** PM compose (Opus). **core + api + web + mobil.**
 > Yol haritası: E0 deneme ✅ → **E1 bu sprint** → E2 grup DM → E3 push/hızlı cevap → E4 şikâyet (franking) → E5 yedek → E6 medya → E7 doğrulama/yerel arama → E8 aramalar.
 > 🔴 **R7 bölgesi, tamamı.** Hiçbir parça sahibin satır satır incelemesi olmadan main'e girmez.
 > Başlangıç noktası: dal `spike/e2ee-mls` (e66659c). Deneme kodu üretime **kopyalanmaz**, referanstır.
@@ -181,6 +181,13 @@ E0 senaryolarının üretim API'siyle karşılığı (1-1 iki cihazlı, cihaz ek
 - **Mobil:** `metro.config.js` `watchFolders` + `extraNodeModules` (rapordaki kesin ayar), `tsconfig.json` `paths`. Kısa yol kopyasında `shared/` kardeş dizin olarak kopyalanır. EAS bulut derlemesinin `../shared`'ı alıp almadığı adım 4'te doğrulanır (yerel gradlew önce).
 - Her iki istemcide derleme öncesi `shared/e2ee-core` içinde `npm ci`.
 - **Küçük borç:** `CryptoProvider.loadSuite()` imzasında ts-mls tipi görünüyor (`@internal`); adım 2-3 sırasında çekirdeğin kendi tipiyle sarılır.
+
+## §6.2 Web adımı kararları (Rev.3, 2026-11-10)
+- **İptal edilmiş cihazın mesajı:** yalnız `createdAt >= revokedAt` olanlar gizlenir; iptalden önce gönderilenler kalır (çıkış yapan cihazın geçmişi herkesin ekranından silinmesin). Mobil aynı kural.
+- **Bilinen sınırlar (kabul):** (a) gruptan çıkarılan bir cihazın gönderdiği ama alıcıda henüz çözülmemiş mesaj, çıkarma commit'i işlendikten sonra çözülemez; azaltma: kanal açılışında önce mesajlar çözülür, commit senkronu sonra. (b) ts-mls varsayılan geçmiş penceresi (10 nesil geri, 200 ileri); çok uzun çevrimdışılıkta en eski mesajlar çözülemeyebilir. (c) Yeni cihaz en çok 500 mesaj geriye yürür. E1 cihaz turunda gözlenir; gerekirse pencere ayarı E2/E3'te.
+- **Web dev bağımlılıkları onaylı:** `vitest`, `fake-indexeddb` (yalnız test).
+- **Borç D-E2EE-2:** e2ee çekirdeği ana pakete giriyor; bayrak kapalı kullanıcı için tembel yükleme sonra.
+- **1-1 DM arama:** web'de 1-1 DM'de kanal içi arama zaten yok; not yalnız arama açıldığında görünür, ek iş yok.
 
 ## §7 Açık sorular (PM önerisiyle, sahip itiraz etmezse geçerli)
 - **Masaüstü (Electron):** web koduyla aynı, IndexedDB. Electron `safeStorage` ile güçlendirme sonra (borç D-E2EE-1).
