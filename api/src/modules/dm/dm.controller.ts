@@ -4,6 +4,7 @@ import {
   Post,
   Delete,
   Patch,
+  Put,
   Body,
   Param,
   UseGuards,
@@ -124,7 +125,10 @@ export class DmController {
 
   @Delete('groups/:id/members/:userId')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Gruptan üye çıkar — yalnız owner; owner kendini çıkaramaz' })
+  @ApiOperation({
+    summary:
+      '[R7] Gruptan üye çıkar — kurucu herkesi, yönetici yalnız normal üyeyi; kendini çıkaramazsın',
+  })
   removeGroupMember(
     @CurrentUser() user: { id: string },
     @Param('id') groupId: string,
@@ -142,12 +146,34 @@ export class DmController {
 
   @Patch('groups/:id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Grup adını güncelle — yalnız owner' })
+  @ApiOperation({ summary: 'Grup adını güncelle — kurucu veya yönetici' })
   renameGroupDm(
     @CurrentUser() user: { id: string },
     @Param('id') groupId: string,
     @Body() dto: RenameGroupDmDto,
   ) {
     return this.dmService.renameGroupDm(user.id, groupId, dto);
+  }
+
+  @Put('groups/:id/admins/:userId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '[R7] Üyeyi grup yöneticisi yap — yalnız kurucu' })
+  addGroupAdmin(
+    @CurrentUser() user: { id: string },
+    @Param('id') groupId: string,
+    @Param('userId') targetUserId: string,
+  ) {
+    return this.dmService.setGroupAdmin(user.id, groupId, targetUserId, true);
+  }
+
+  @Delete('groups/:id/admins/:userId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '[R7] Grup yöneticiliğini al — yalnız kurucu' })
+  removeGroupAdmin(
+    @CurrentUser() user: { id: string },
+    @Param('id') groupId: string,
+    @Param('userId') targetUserId: string,
+  ) {
+    return this.dmService.setGroupAdmin(user.id, groupId, targetUserId, false);
   }
 }

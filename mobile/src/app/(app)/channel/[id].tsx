@@ -30,7 +30,8 @@ export default function ChannelScreen() {
    * istek gerekmiyor); gelmezse yetki hesaplanamaz ve satır çizilmez — yanlış göstermektense
    * göstermemek.
    */
-  const canPin = useGuildPermission(guildId, 'MANAGE_MESSAGES');
+  // Aynı izin başkasının mesajını silmeyi de açar (web `MessageArea.canManageMessages` ile aynı).
+  const canManageMessages = useGuildPermission(guildId, 'MANAGE_MESSAGES');
   // C57: salt okunur kanal. Yazamayan üye kutu yerine bilgi satırı görür (sunucu otorite).
   const canManageChannels = useGuildPermission(guildId, 'MANAGE_CHANNELS');
   const [readOnly, setReadOnly] = useState(false);
@@ -185,7 +186,8 @@ export default function ChannelScreen() {
         markRead={channelsApi.markRead}
         typingMode="named"
         jumpToMessageId={jumpTo}
-        canPin={canPin}
+        canPin={canManageMessages}
+        canDeleteOthers={() => canManageMessages}
         disabledNotice={readOnly && !canManageChannels ? t('channel.readOnlyNotice') : null}
         // M3b §3.2 — profil alt-panelinin rol rozetleri için ortam bağlamı. Bu ekran `guildId`
         // olmadan da açılabiliyor (bildirim/arama yolu); o durumda panel Roller bölümünü çizmez.

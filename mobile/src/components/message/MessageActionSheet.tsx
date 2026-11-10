@@ -25,8 +25,10 @@ import { theme } from '@/theme';
 
 interface Props {
   visible: boolean;
-  /** Mesaj bana mı ait — düzenle/sil yalnız o zaman render edilir. */
+  /** Mesaj bana mı ait — düzenle yalnız o zaman render edilir. */
   isMine: boolean;
+  /** Sil satırı: kendi mesajım ya da ortamda `MANAGE_MESSAGES` (web ile aynı kural; sunucu otorite). */
+  canDelete: boolean;
   /** Bu mesaja hâlihazırda verdiğim tepkiler (vurgulu göstermek için). */
   myEmojis: string[];
   onClose: () => void;
@@ -58,6 +60,7 @@ interface Props {
 export function MessageActionSheet({
   visible,
   isMine,
+  canDelete,
   myEmojis,
   onClose,
   onToggleReaction,
@@ -168,7 +171,7 @@ export function MessageActionSheet({
               </Pressable>
             </View>
 
-            {isMine && (
+            {canDelete && (
               <View style={styles.group}>
                 <Pressable style={styles.option} onPress={onDelete}>
                   <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />

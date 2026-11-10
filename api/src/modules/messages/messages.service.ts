@@ -14,6 +14,7 @@ import { PermissionsService } from '../../shared/permissions/permissions.service
 import { AutomodService } from '../../shared/automod/automod.service';
 import { ModerationService } from '../../shared/moderation/moderation.service';
 import { MESSAGE_AUTHOR_SELECT } from '../../common/utils/message-author.select';
+import { canModerateGroupTarget, getGroupRole } from '../../shared/group-roles/group-roles';
 import { loadRoleEmojis } from '../../common/utils/role-emoji.util';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
@@ -39,13 +40,29 @@ export type ReactionChange = { removed: string | null; added: string | null };
 
 type ReactionAggDto = { emoji: string; count: number; reactedByMe: boolean };
 
-type ReplyToDto = { id: string; content: string; authorUsername: string } | null;
+/** Yanıt alıntısındaki ek özeti: istemci türe göre etiket + küçük önizleme çizer (adres yok, T&S kapısı aynı). */
+type ReplyAttachmentDto = Pick<
+  Attachment,
+  'id' | 'filename' | 'contentType' | 'scanStatus' | 'thumbnail'
+>;
+
+type ReplyToDto = {
+  id: string;
+  content: string;
+  authorUsername: string;
+  /** Alıntılanan mesajın İLK eki; eki yoksa null. */
+  attachment: ReplyAttachmentDto | null;
+} | null;
 
 type ReplyToRaw =
   | (Pick<Message, 'id' | 'content' | 'deletedAt' | 'webhookId' | 'webhookName'> & {
       author: Pick<User, 'username'>;
+      attachments?: ReplyAttachmentDto[];
     })
   | null;
+
+/** Alıntı metni: istemci 2-3 satır gösteriyor (WhatsApp gibi); 100 karakter tek satırı bile doldurmuyordu. */
+const REPLY_SNIPPET_MAX = 300;
 
 type MessageWithAuthor = Message & {
   author: Pick<User, 'id' | 'username' | 'avatarUrl' | 'avatarAnimatedUrl'>;
@@ -56,13 +73,25 @@ type MessageWithAuthor = Message & {
   pinnedAt: Date | null;
 };
 
-// replyTo snippet: ≤100 karakter; dosya ekli + boş içerik → "[dosya]"; silinmişse null
+// replyTo snippet: ≤REPLY_SNIPPET_MAX karakter; dosya ekli + boş içerik → "[dosya]" (eski istemciler
+// için korunuyor; yeni istemci `attachment` doluyken türe göre etiket gösterir); silinmişse null
 function buildReplyToDto(raw: ReplyToRaw): ReplyToDto {
   if (!raw || raw.deletedAt !== null) return null;
-  const snippet = raw.content.trim().length > 0 ? raw.content.slice(0, 100) : '[dosya]';
+  const snippet =
+    raw.content.trim().length > 0 ? raw.content.slice(0, REPLY_SNIPPET_MAX) : '[dosya]';
   // C35 §5.1: webhook mesajına yanıtta oluşturanın adı sızmaz, webhook'un görünen adı gösterilir
   const authorUsername = raw.webhookId ? (raw.webhookName ?? '') : raw.author.username;
-  return { id: raw.id, content: snippet, authorUsername };
+  const first = raw.attachments?.[0];
+  const attachment = first
+    ? {
+        id: first.id,
+        filename: first.filename,
+        contentType: first.contentType,
+        scanStatus: first.scanStatus,
+        thumbnail: first.thumbnail ?? null,
+      }
+    : null;
+  return { id: raw.id, content: snippet, authorUsername, attachment };
 }
 
 function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
@@ -167,6 +196,12 @@ const REPLY_TO_INCLUDE = {
     webhookId: true,
     webhookName: true,
     author: { select: { username: true } },
+    // Yalnız ilk ek: alıntıda tek küçük önizleme var (WhatsApp gibi).
+    attachments: {
+      select: { id: true, filename: true, contentType: true, scanStatus: true, thumbnail: true },
+      orderBy: { createdAt: 'asc' },
+      take: 1,
+    },
   },
 } as const;
 
@@ -836,29 +871,18 @@ export class MessagesService {
     }
 
     // Kendi mesajını silmek her zaman serbest.
-    // Başkasının mesajını silmek: guild kanalında MANAGE_MESSAGES izni gerekir.
+    // Başkasının mesajını silmek: guild kanalında MANAGE_MESSAGES izni gerekir;
+    // grup DM'de kurucu/yönetici hiyerarşisi (group-roles.ts); 1-1 DM'de hiç.
     if (message.authorId !== userId) {
-      if (!channel.guildId) {
-        // DM/grup DM kanalında başkasının mesajını silemezsin
-        throw new ForbiddenException({
-          message: 'Bu mesajı silme yetkiniz yok.',
-          error: 'NOT_MESSAGE_AUTHOR',
-        });
-      }
-      let canManage = await this.permissions.hasGuildPermission(
-        userId,
-        channel.guildId,
-        'MANAGE_MESSAGES',
-      );
-      // C35 §4.6: webhook mesajını MANAGE_WEBHOOKS sahibi de silebilir
-      if (!canManage && message.webhookId) {
-        canManage = await this.permissions.hasGuildPermission(
-          userId,
-          channel.guildId,
-          'MANAGE_WEBHOOKS',
-        );
-      }
-      if (!canManage) {
+      const allowed = channel.guildId
+        ? await this.canManageGuildMessage(userId, channel.guildId, message.webhookId)
+        : channel.type === 'GROUP_DM'
+          ? canModerateGroupTarget(
+              await getGroupRole(this.prisma, channel, userId),
+              await getGroupRole(this.prisma, channel, message.authorId),
+            )
+          : false; // 1-1 DM: başkasının mesajı silinemez
+      if (!allowed) {
         throw new ForbiddenException({
           message: 'Bu mesajı silme yetkiniz yok.',
           error: 'NOT_MESSAGE_AUTHOR',
@@ -872,6 +896,16 @@ export class MessagesService {
     });
 
     return null;
+  }
+
+  /** Ortam kanalında başkasının mesajı: MANAGE_MESSAGES; webhook mesajında MANAGE_WEBHOOKS da yeter (C35 §4.6). */
+  private async canManageGuildMessage(
+    userId: string,
+    guildId: string,
+    webhookId: string | null,
+  ): Promise<boolean> {
+    if (await this.permissions.hasGuildPermission(userId, guildId, 'MANAGE_MESSAGES')) return true;
+    return !!webhookId && this.permissions.hasGuildPermission(userId, guildId, 'MANAGE_WEBHOOKS');
   }
 
   /**

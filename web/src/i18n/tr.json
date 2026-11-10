@@ -1093,7 +1093,14 @@
     "to": "{author}'a yanıt",
     "snippet": "{author}'a yanıt — {snippet}",
     "cancel": "İptal",
-    "deleted": "Silinen mesaj"
+    "deleted": "Silinen mesaj",
+    "jump": "Yanıtlanan mesaja git",
+    "kind": {
+      "image": "Fotoğraf",
+      "video": "Video",
+      "audio": "Sesli mesaj",
+      "file": "Dosya"
+    }
   },
   "message": {
     "inputPlaceholder": "#{channel} kanalına mesaj yaz",
@@ -1416,7 +1423,11 @@
     "removeMember": "Üyeyi Gruptan Çıkar",
     "removeMemberConfirm": "{username} adlı üyeyi gruptan çıkarmak istediğinden emin misin?",
     "removeMemberAction": "Çıkar",
-    "removeMemberError": "Üye çıkarılamadı."
+    "removeMemberError": "Üye çıkarılamadı.",
+    "admin": "Yönetici",
+    "makeAdmin": "Yönetici yap",
+    "removeAdmin": "Yöneticiliği al",
+    "adminError": "Yetki değiştirilemedi."
   },
   "startChat": {
     "title": "Sohbet Başlat",
@@ -2191,6 +2202,14 @@
     "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
   },
   "mobile": {
+    "appUpdate": {
+      "available": "Kankaverse'ün yeni sürümü hazır.",
+      "update": "Güncelle",
+      "downloading": "Güncelleme indiriliyor…",
+      "downloadingPercent": "Güncelleme indiriliyor… %{percent}",
+      "ready": "Güncelleme indirildi. Yeniden başlatınca yeni sürüm açılır.",
+      "restart": "Yeniden başlat"
+    },
     "aiVideoRefs": {
       "add": "Dosya ekle",
       "addMedia": "Görsel veya video",

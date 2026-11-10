@@ -74,6 +74,12 @@ interface Props {
    * yapmıyor), ortam kanalında `MANAGE_MESSAGES` gerekiyor; o hesabı kanal ekranı yapıyor.
    */
   canPin?: boolean;
+  /**
+   * Başkasının bu mesajını silebilir miyim (web `MessageRow.canManageMessages` karşılığı). Ortam
+   * kanalında `MANAGE_MESSAGES`; grup DM'de kurucu/yönetici hiyerarşisi (`utils/groupRoles`);
+   * 1-1 DM'de verilmez. Kapı sunucuda; burada yalnız Sil satırını gösterir.
+   */
+  canDeleteOthers?: (message: MessageDto) => boolean;
   /** Başlıktaki "Sabitlenenler" düğmesi — yalnız yüzey varsa (kanal/DM ekranı verir). */
   onOpenPins?: () => void;
   /**
@@ -119,6 +125,7 @@ export function MessageScreen({
   showIdentity = true,
   jumpToMessageId,
   canPin = false,
+  canDeleteOthers,
   onOpenPins,
   mentionCandidates,
   everyoneRoleId,
@@ -450,6 +457,9 @@ export function MessageScreen({
                 }
                 onRetry={() => retryOptimistic(item.message)}
                 onDiscard={() => discardOptimistic(item.message)}
+                onPressReply={() => {
+                  if (item.message.replyToId) list.requestJump(item.message.replyToId);
+                }}
               />
               </SwipeToReply>
             </View>
@@ -483,6 +493,7 @@ export function MessageScreen({
 
       <MessageActionHost
         canPin={canPin}
+        canDeleteOthers={canDeleteOthers}
         actions={actions}
         onOpenProfile={setProfileTarget}
         onReply={

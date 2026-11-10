@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatMentionsPlain } from '@/utils/mentions';
 import type { MessageDto } from '@/api/messages';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
+import { attachmentIcon, replyBody, useAttachmentThumb } from './replyPreview';
 
 // M6a — `MessageBubble`'ın alt parçaları (dosya 300 satırı aşmasın diye ayrıldı; her biri tek yerde
 // kullanılıyor, genel amaçlı değil).
@@ -21,25 +22,64 @@ interface ReplyQuoteProps {
   isMine: boolean;
   resolveMention: (userId: string) => string | undefined;
   resolveRole?: (roleId: string) => string | undefined;
+  /** Dokununca alıntılanan mesaja gidilir (WhatsApp gibi). Silinmiş alıntıda verilse de çalışmaz. */
+  onPress?: () => void;
+  /** Baloncuğun uzun basışı (mesaj paneli); alıntının üstünde de aynı panel açılsın. */
+  onLongPress?: () => void;
 }
 
+/** Mobilde alıntı metni 3 satıra kadar (web 2); yazar adı üstte ayrı satırda. */
+const REPLY_QUOTE_LINES = 3;
+
 /** Yanıt alıntısı — baloncuk İÇİNDE, solda dikey çizgili blok. `replyTo` yoksa (alıntılanan mesaj
- *  silinmiş) sunucu yalnız `replyToId` döner; o durumda "Silinen mesaj" yazılır, satır gizlenmez. */
-export function ReplyQuote({ message, isMine, resolveMention, resolveRole }: ReplyQuoteProps) {
+ *  silinmiş) sunucu yalnız `replyToId` döner; o durumda "Silinen mesaj" yazılır, satır gizlenmez.
+ *  Alıntılanan mesajda ek varsa sağda küçük önizleme (görsel/video), metinde türe göre simge + etiket. */
+export function ReplyQuote({ message, isMine, resolveMention, resolveRole, onPress, onLongPress }: ReplyQuoteProps) {
+  const reply = message.replyTo;
+  const attachment = reply?.attachment ?? null;
+  const thumb = useAttachmentThumb(attachment);
+  const textStyle = [quoteStyles.text, isMine && quoteStyles.textMine];
   return (
-    <View style={[quoteStyles.block, { borderLeftColor: isMine ? theme.colors.textPrimary : theme.colors.accent500 }]}>
-      {message.replyTo ? (
-        <Text style={[quoteStyles.text, isMine && quoteStyles.textMine]} numberOfLines={1}>
-          <Text style={quoteStyles.author}>{message.replyTo.authorUsername}</Text>
-          {'  '}
-          {formatMentionsPlain(message.replyTo.content, resolveMention, t('mention.unknown'), resolveRole)}
-        </Text>
-      ) : (
-        <Text style={[quoteStyles.text, isMine && quoteStyles.textMine, quoteStyles.deleted]} numberOfLines={1}>
-          {t('reply.deleted')}
-        </Text>
-      )}
-    </View>
+    <Pressable
+      onPress={reply ? onPress : undefined}
+      onLongPress={onLongPress}
+      delayLongPress={350}
+      disabled={!reply || !onPress}
+      accessibilityRole={reply && onPress ? 'button' : undefined}
+      accessibilityHint={reply && onPress ? t('reply.jump') : undefined}
+      style={({ pressed }) => [
+        quoteStyles.block,
+        { borderLeftColor: isMine ? theme.colors.textPrimary : theme.colors.accent500 },
+        pressed && quoteStyles.pressed,
+      ]}
+    >
+      <View style={quoteStyles.textCol}>
+        {reply ? (
+          <>
+            <Text style={[quoteStyles.author, isMine && quoteStyles.authorMine]} numberOfLines={1}>
+              {reply.authorUsername}
+            </Text>
+            <Text style={textStyle} numberOfLines={REPLY_QUOTE_LINES}>
+              {attachment ? (
+                <>
+                  <Ionicons
+                    name={attachmentIcon(attachment)}
+                    size={12}
+                    color={isMine ? theme.colors.textBody : theme.colors.textSecondary}
+                  />{' '}
+                </>
+              ) : null}
+              {replyBody(formatMentionsPlain(reply.content, resolveMention, t('mention.unknown'), resolveRole), attachment)}
+            </Text>
+          </>
+        ) : (
+          <Text style={[...textStyle, quoteStyles.deleted]} numberOfLines={1}>
+            {t('reply.deleted')}
+          </Text>
+        )}
+      </View>
+      {thumb ? <Image source={{ uri: thumb }} style={quoteStyles.thumb} resizeMode="cover" /> : null}
+    </Pressable>
   );
 }
 
@@ -100,24 +140,45 @@ export function ReactionRow({ reactions, isMine, onToggleReaction, onLongPressRe
 
 const quoteStyles = StyleSheet.create({
   block: {
+    flexDirection: 'row',
     borderLeftWidth: 3,
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.borderSubtle,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  textCol: {
+    flexShrink: 1,
+    flexGrow: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    marginBottom: 4,
   },
   text: {
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xs,
+    lineHeight: 17,
   },
   // bubbleOwn üstünde textSecondary okunmuyor (bkz. tokens.ts bubbleOwn).
   textMine: {
     color: theme.colors.textBody,
   },
+  // Yazar adı WhatsApp gibi vurgu renginde; kendi baloncuğumda Kor üstünde Kor okunmaz → authorMine.
   author: {
-    color: theme.colors.textPrimary,
+    color: theme.colors.accent500,
+    fontSize: theme.fontSize.xs,
     fontWeight: '700',
+    marginBottom: 1,
+  },
+  authorMine: {
+    color: theme.colors.textPrimary,
+  },
+  thumb: {
+    width: 48,
+    minHeight: 48,
+    alignSelf: 'stretch',
   },
   deleted: {
     fontStyle: 'italic',

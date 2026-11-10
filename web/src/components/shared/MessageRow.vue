@@ -20,10 +20,12 @@ import ReceiptTick from './ReceiptTick.vue'
 import MessageActionsMenu from './MessageActionsMenu.vue'
 import MessageContextMenu from './MessageContextMenu.vue'
 import MessageEmbeds from './MessageEmbeds.vue'
+import ReplyQuote from './ReplyQuote.vue'
 import { formatMentionsPlain } from '@/utils/mentions'
 import { renderMessageHtml } from '@/utils/markdown'
 import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import { useActiveMenu } from '@/composables/useActiveMenu'
+import { useMessageJump } from '@/composables/useMessageJump'
 import type { MessageDto } from '@/types'
 
 // MessageActionsMenu instance ref — menuOpen'ı okumak için
@@ -167,6 +169,22 @@ function onRowLeave(e: MouseEvent) {
   rowHovered.value = false
   ;(e.currentTarget as HTMLElement).style.backgroundColor = ''
   showFollowTime.value = false
+}
+
+// Yanıt alıntısı: bahsetmeler okunur ada çevrilmiş düz metin + tıklayınca alıntılanan mesaja git.
+const replyText = computed(() =>
+  props.message.replyTo
+    ? formatMentionsPlain(
+        props.message.replyTo.content,
+        (id) => props.mentionResolver?.(id),
+        t('mention.unknown'),
+        (roleId) => props.roleResolver?.(roleId)?.name,
+      )
+    : '',
+)
+const { requestJump } = useMessageJump()
+function jumpToReplied() {
+  if (props.message.replyToId) requestJump(props.message.channelId, props.message.replyToId)
 }
 
 // Sprint V2 (Markdown): mesaj içeriğini güvenli HTML'e dönüştür.
@@ -337,23 +355,17 @@ const renderedContent = computed<string>(() => {
         </span>
       </div>
 
-      <!-- Yanıt alıntısı (replyToId doluysa, gövdenin üstünde) -->
-      <div
+      <!-- Yanıt alıntısı (replyToId doluysa, gövdenin üstünde). Tıklanınca alıntılanan mesaja
+           gidilir (yüklü değilse geriye sayfalanır, bkz. useJumpToMessage); silinmişse tıklanmaz. -->
+      <ReplyQuote
         v-if="message.replyToId"
-        class="flex items-center gap-1.5 mb-1 pl-2 text-[12px] max-w-[480px] truncate cursor-default rounded-[var(--kv-radius-sm)]"
-        style="border-left: 2px solid var(--kv-text-muted); color: var(--kv-text-muted);"
-      >
-        <span class="shrink-0">↩</span>
-        <template v-if="message.replyTo">
-          <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">
-            {{ message.replyTo.authorUsername }}
-          </span>
-          <span class="truncate">{{ formatMentionsPlain(message.replyTo.content, (id) => mentionResolver?.(id), t('mention.unknown'), (roleId) => roleResolver?.(roleId)?.name) }}</span>
-        </template>
-        <template v-else>
-          <span class="italic">{{ t('reply.deleted') }}</span>
-        </template>
-      </div>
+        class="mb-1 max-w-[520px]"
+        :author="message.replyTo ? message.replyTo.authorUsername : null"
+        :text="replyText"
+        :attachment="message.replyTo?.attachment"
+        :clickable="!!message.replyTo && !isLocal"
+        @open="jumpToReplied"
+      />
 
       <!-- Düzenleme modu: parent slot ile render eder — buraya slot açıyoruz -->
       <slot name="editing" />

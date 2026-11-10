@@ -9,8 +9,10 @@ interface Props {
   title: string;
   /** Grup DM mi — satır kümesini bu belirler (1-1'de tek satır: Sohbeti Temizle). */
   isGroup: boolean;
-  /** Grup sahibi miyim — Yeniden Adlandır / Grubu Sil yalnız buna bağlı. */
+  /** Grup kurucusu muyum — Grubu Sil yalnız buna bağlı. */
   isOwner: boolean;
+  /** Kurucu ya da yönetici miyim — Yeniden Adlandır buna bağlı (sunucu kapısıyla aynı). */
+  canRename: boolean;
   /** Başarısız bir aksiyonun Türkçe mesajı. Onay kutusu hata gösteremiyor (`ConfirmDialog`ın
    *  yüzeyi yok), o yüzden hata bu panele düşer — kullanıcı işlem tutmadığını görmeden kalmasın. */
   errorMessage: string;
@@ -44,6 +46,7 @@ export function DmMoreSheet({
   title,
   isGroup,
   isOwner,
+  canRename,
   errorMessage,
   onClose,
   onClear,
@@ -77,7 +80,7 @@ export function DmMoreSheet({
                     <Ionicons name="person-add-outline" size={20} color={theme.colors.textSecondary} />
                     <Text style={styles.optionText}>{t('group.addMember')}</Text>
                   </Pressable>
-                  {isOwner && (
+                  {canRename && (
                     <>
                       <View style={styles.divider} />
                       <Pressable style={styles.option} onPress={onRename}>

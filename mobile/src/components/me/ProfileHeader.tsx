@@ -7,6 +7,10 @@ import { animatedOrStatic, useReduceMotion } from '@/utils/animatedMedia';
 import { ImageViewer } from '../ImageViewer';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
+import { MarkdownText } from '../message/MarkdownText';
+
+/** Bio'da bahsetme çözülmez (kullanıcı adı listesi yok); token düz yedekle kalır. */
+const noMention = () => undefined;
 
 /**
  * "Sen" sekmesinin profil başlığı (M1d-C §3.1): afiş · avatar · kullanıcı adı · biyografi ·
@@ -106,7 +110,16 @@ export function ProfileHeader({ username, avatarUrl, card, surfaceColor, showDet
       <View style={styles.body}>
         <Text style={styles.username}>{username}</Text>
 
-        {showDetails && card?.bio ? <Text style={styles.bio}>{card.bio}</Text> : null}
+        {showDetails && card?.bio ? (
+          // Bio mesajla aynı güvenli markdown çizimi: bağlantılar tıklanabilir (yalnız http/https).
+          <MarkdownText
+            content={card.bio}
+            isMine={false}
+            resolveMention={noMention}
+            textStyle={styles.bio}
+            style={styles.bioWrap}
+          />
+        ) : null}
 
         {showDetails && card?.memberSince ? (
           <Text style={styles.memberSince}>
@@ -188,6 +201,8 @@ const styles = StyleSheet.create({
     color: theme.colors.textBody,
     fontSize: theme.fontSize.sm,
     lineHeight: 20,
+  },
+  bioWrap: {
     marginTop: 6,
   },
   memberSince: {

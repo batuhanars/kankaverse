@@ -13,6 +13,7 @@ import { friendsApi } from '@/api/friends'
 import { messagesApi } from '@/api/messages'
 import { bannerBackground } from '@/utils/bannerColor'
 import { animatedOrStatic } from '@/utils/animatedMedia'
+import { renderMessageHtml } from '@/utils/markdown'
 import ReportModal from './ReportModal.vue'
 import ImageLightbox from '@/components/shared/ImageLightbox.vue'
 import FullProfileModal from './FullProfileModal.vue'
@@ -110,6 +111,10 @@ function goToMyProfile() {
 }
 const popoverEl = ref<HTMLElement | null>(null)
 const card = ref<UserProfileCardDto | null>(null)
+// Bio: profil paneli/tam profil ile aynı güvenli render; bağlantılar tıklanabilir (http/https, yeni sekme).
+const bioHtml = computed(() =>
+  card.value?.bio ? renderMessageHtml(card.value.bio, () => undefined, '') : '',
+)
 const loading = ref(true)
 const adding = ref(false)
 const added = ref(false)
@@ -316,7 +321,7 @@ async function addFriend() {
           <div class="mt-3 rounded-[var(--kv-radius-md)] p-3 flex flex-col gap-3" style="background-color: var(--kv-bg-content);">
             <div>
               <h3 class="text-[10px] font-bold uppercase tracking-widest mb-1" style="color: var(--kv-text-muted);">{{ t('profile.bio') }}</h3>
-              <p v-if="card.bio" class="text-[13px] leading-relaxed break-words" style="color: var(--kv-text-body); display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden;">{{ card.bio }}</p>
+              <div v-if="card.bio" class="kv-md text-[13px] leading-relaxed break-words" style="color: var(--kv-text-body); display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden;" v-html="bioHtml" />
               <p v-else class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('profile.noBio') }}</p>
             </div>
             <div class="h-px" style="background-color: var(--kv-border-subtle);" />

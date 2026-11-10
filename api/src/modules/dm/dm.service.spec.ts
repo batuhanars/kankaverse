@@ -515,17 +515,38 @@ describe('DmService.removeGroupMember', () => {
   let service: DmService;
 
   const TARGET_ID = 'target-user-1';
+  const ADMIN_ID = 'admin-1';
+  const ADMIN_2 = 'admin-2';
+
+  /** Üyelik satırları: userId → isAdmin. Listede yoksa üye değil (null). */
+  function members(rows: Record<string, boolean>) {
+    prismaMock.channelMember.findUnique.mockImplementation(
+      ({ where }: { where: { channelId_userId: { userId: string } } }) => {
+        const uid = where.channelId_userId.userId;
+        return Promise.resolve(uid in rows ? { id: `cm-${uid}`, isAdmin: rows[uid] } : null);
+      },
+    );
+  }
 
   beforeEach(() => {
     resetMocks();
     service = makeService();
     prismaMock.channel.findUnique.mockResolvedValue(GROUP_CHANNEL);
-  });
-
-  it('owner hedef üyeyi çıkarır → üye silindi, null döner', async () => {
-    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm-target' });
     prismaMock.channelMember.delete.mockResolvedValue({});
     prismaMock.channelMember.count.mockResolvedValue(2);
+  });
+
+  async function errorOf(p: Promise<unknown>): Promise<string> {
+    try {
+      await p;
+    } catch (e) {
+      return ((e as ForbiddenException).getResponse() as { error: string }).error;
+    }
+    return 'NO_ERROR';
+  }
+
+  it('kurucu hedef üyeyi çıkarır → üye silindi, null döner', async () => {
+    members({ [CREATOR_ID]: false, [TARGET_ID]: false });
 
     const result = await service.removeGroupMember(CREATOR_ID, GROUP_ID, TARGET_ID);
 
@@ -533,50 +554,64 @@ describe('DmService.removeGroupMember', () => {
     expect(result).toBeNull();
   });
 
-  it('owner değil → ForbiddenException FORBIDDEN', async () => {
-    await expect(service.removeGroupMember('non-owner', GROUP_ID, TARGET_ID)).rejects.toThrow(
-      ForbiddenException,
-    );
-
-    try {
-      await service.removeGroupMember('non-owner', GROUP_ID, TARGET_ID);
-    } catch (e) {
-      const resp = (e as ForbiddenException).getResponse() as { error: string };
-      expect(resp.error).toBe('FORBIDDEN');
-    }
+  it('kurucu yöneticiyi de çıkarabilir', async () => {
+    members({ [CREATOR_ID]: false, [ADMIN_ID]: true });
+    await service.removeGroupMember(CREATOR_ID, GROUP_ID, ADMIN_ID);
+    expect(prismaMock.channelMember.delete).toHaveBeenCalledTimes(1);
   });
 
-  it('owner kendini çıkarmaya çalışır → BadRequestException CANNOT_REMOVE_SELF', async () => {
+  it('normal üye başkasını çıkaramaz → FORBIDDEN', async () => {
+    members({ 'non-owner': false, [TARGET_ID]: false });
+    expect(await errorOf(service.removeGroupMember('non-owner', GROUP_ID, TARGET_ID))).toBe(
+      'FORBIDDEN',
+    );
+    expect(prismaMock.channelMember.delete).not.toHaveBeenCalled();
+  });
+
+  it('üye olmayan çağıran → NOT_CHANNEL_MEMBER', async () => {
+    members({ [TARGET_ID]: false });
+    expect(await errorOf(service.removeGroupMember('outsider', GROUP_ID, TARGET_ID))).toBe(
+      'NOT_CHANNEL_MEMBER',
+    );
+  });
+
+  it('yönetici normal üyeyi çıkarır', async () => {
+    members({ [ADMIN_ID]: true, [TARGET_ID]: false });
+    await service.removeGroupMember(ADMIN_ID, GROUP_ID, TARGET_ID);
+    expect(prismaMock.channelMember.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('yönetici başka yöneticiyi ya da kurucuyu çıkaramaz → FORBIDDEN', async () => {
+    members({ [ADMIN_ID]: true, [ADMIN_2]: true, [CREATOR_ID]: false });
+    expect(await errorOf(service.removeGroupMember(ADMIN_ID, GROUP_ID, ADMIN_2))).toBe('FORBIDDEN');
+    expect(await errorOf(service.removeGroupMember(ADMIN_ID, GROUP_ID, CREATOR_ID))).toBe(
+      'FORBIDDEN',
+    );
+    expect(prismaMock.channelMember.delete).not.toHaveBeenCalled();
+  });
+
+  it('kendini çıkarmaya çalışır → BadRequestException CANNOT_REMOVE_SELF', async () => {
     await expect(service.removeGroupMember(CREATOR_ID, GROUP_ID, CREATOR_ID)).rejects.toThrow(
       BadRequestException,
     );
-
-    try {
-      await service.removeGroupMember(CREATOR_ID, GROUP_ID, CREATOR_ID);
-    } catch (e) {
-      const resp = (e as BadRequestException).getResponse() as { error: string };
-      expect(resp.error).toBe('CANNOT_REMOVE_SELF');
-    }
+    expect(await errorOf(service.removeGroupMember(CREATOR_ID, GROUP_ID, CREATOR_ID))).toBe(
+      'CANNOT_REMOVE_SELF',
+    );
   });
 
   it('hedef grup üyesi değil → NotFoundException MEMBER_NOT_FOUND', async () => {
-    prismaMock.channelMember.findUnique.mockResolvedValue(null);
+    members({ [CREATOR_ID]: false });
 
     await expect(service.removeGroupMember(CREATOR_ID, GROUP_ID, TARGET_ID)).rejects.toThrow(
       NotFoundException,
     );
-
-    try {
-      await service.removeGroupMember(CREATOR_ID, GROUP_ID, TARGET_ID);
-    } catch (e) {
-      const resp = (e as NotFoundException).getResponse() as { error: string };
-      expect(resp.error).toBe('MEMBER_NOT_FOUND');
-    }
+    expect(await errorOf(service.removeGroupMember(CREATOR_ID, GROUP_ID, TARGET_ID))).toBe(
+      'MEMBER_NOT_FOUND',
+    );
   });
 
   it('üye çıkınca kalan < 2 → kanal soft-delete', async () => {
-    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm-target' });
-    prismaMock.channelMember.delete.mockResolvedValue({});
+    members({ [CREATOR_ID]: false, [TARGET_ID]: false });
     prismaMock.channelMember.count.mockResolvedValue(1);
     prismaMock.channel.update.mockResolvedValue({});
 
@@ -586,6 +621,68 @@ describe('DmService.removeGroupMember', () => {
       where: { id: GROUP_ID },
       data: { deletedAt: expect.any(Date) },
     });
+  });
+});
+
+describe('[R7] DmService.setGroupAdmin + renameGroupDm (yönetici)', () => {
+  let service: DmService;
+  const TARGET_ID = 'target-user-1';
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.channel.findUnique.mockResolvedValue(GROUP_CHANNEL);
+  });
+
+  it('kurucu üyeyi yönetici yapar', async () => {
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm-t', isAdmin: false });
+    prismaMock.channelMember.update.mockResolvedValue({});
+
+    const res = await service.setGroupAdmin(CREATOR_ID, GROUP_ID, TARGET_ID, true);
+
+    expect(prismaMock.channelMember.update).toHaveBeenCalledWith({
+      where: { id: 'cm-t' },
+      data: { isAdmin: true },
+    });
+    expect(res).toEqual({ userId: TARGET_ID, isAdmin: true });
+  });
+
+  it('kurucu olmayan (yönetici dahil) yönetici atayamaz → FORBIDDEN', async () => {
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm-a', isAdmin: true });
+    await expect(service.setGroupAdmin('admin-1', GROUP_ID, TARGET_ID, true)).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(prismaMock.channelMember.update).not.toHaveBeenCalled();
+  });
+
+  it('kurucu kendine yöneticilik veremez → CANNOT_CHANGE_OWNER', async () => {
+    await expect(service.setGroupAdmin(CREATOR_ID, GROUP_ID, CREATOR_ID, true)).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('üye olmayana yöneticilik verilemez → MEMBER_NOT_FOUND', async () => {
+    prismaMock.channelMember.findUnique.mockResolvedValue(null);
+    await expect(service.setGroupAdmin(CREATOR_ID, GROUP_ID, TARGET_ID, true)).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('yönetici grubu yeniden adlandırabilir', async () => {
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm-a', isAdmin: true });
+    prismaMock.channel.update.mockResolvedValue({ id: GROUP_ID, name: 'Yeni' });
+
+    const res = await service.renameGroupDm('admin-1', GROUP_ID, { name: 'Yeni' });
+
+    expect(res).toEqual({ id: GROUP_ID, name: 'Yeni' });
+  });
+
+  it('normal üye grubu yeniden adlandıramaz → FORBIDDEN', async () => {
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm-m', isAdmin: false });
+    await expect(service.renameGroupDm('member-x', GROUP_ID, { name: 'Yeni' })).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(prismaMock.channel.update).not.toHaveBeenCalled();
   });
 });
 

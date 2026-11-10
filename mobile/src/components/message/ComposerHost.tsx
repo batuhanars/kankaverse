@@ -96,6 +96,7 @@ export function ComposerHost({
         bottomInset={bottomInset}
         replyToAuthor={composer.replyTo?.author.username}
         replyToSnippet={composer.replyTo?.content}
+        replyToAttachment={composer.replyTo?.attachments?.[0] ?? null}
         onCancelMode={composer.cancelMode}
         mentionSuggestions={mention.visible ? mention.suggestions : undefined}
         onMentionSelect={(candidate) => {

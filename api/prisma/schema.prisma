@@ -615,6 +615,7 @@ model ChannelMember {
   lastReadAt   DateTime?
   clearedAt    DateTime? // G4: kullanıcı DM'i inbox'tan temizledi; mesaj KAYDEDILIR, bu tarihten öncesi gizlenir
   lastReaction Json? // C46 §4b: {actorId, actorUsername, emoji, messageId, at}; DM liste satırı göstergesi
+  isAdmin      Boolean   @default(false) // GROUP_DM: kurucunun atadığı yönetici (1-1 DM ve ortamda hep false)
   createdAt    DateTime  @default(now())
 
   @@unique([channelId, userId])

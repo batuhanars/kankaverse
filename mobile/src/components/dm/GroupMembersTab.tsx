@@ -7,6 +7,7 @@ import { PresenceDot } from '../PresenceDot';
 import type { DmChannelDto, DmParticipantDto } from '@/api/dm';
 import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
+import { canModerateGroupTarget, groupRoleOf } from '@/utils/groupRoles';
 import { extractErrorMessage } from '@/api/errors';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { ProfileSheet } from '../profile/ProfileSheet';
@@ -37,13 +38,14 @@ interface Props {
  * - **Kendi satırın dokunulabilir değil** (kendini engelleyemez/çıkaramazsın)
  * - Üye satırına dokunma → profil alt-paneli (§3)
  *
- * 🔴 Yetki kararı istemcide YENİDEN HESAPLANMIYOR: bugünkü `authUser.id === channel.ownerId`
- * mantığı aynen taşındı (sunucu `dm.controller.ts` çıkar/adlandır/sil'i `ownerId`e bağlıyor).
- * Veri de yeni bir uçtan gelmiyor — `useDmStore` kanal listesinde zaten var.
+ * Grup yöneticisi (2026-11-10): kurucu üyeye yöneticilik verip alır (kalkan düğmesi); yönetici
+ * normal üyeleri çıkarabilir. Hiyerarşi `utils/groupRoles` (sunucu `shared/group-roles` aynası);
+ * istemci yalnız gizler, kapı sunucuda (R7).
  */
 export function GroupMembersTab({ channel }: Props) {
   const authUser = useAuthStore((s) => s.user);
   const removeGroupMember = useDmStore((s) => s.removeGroupMember);
+  const setGroupAdmin = useDmStore((s) => s.setGroupAdmin);
 
   const [removeTarget, setRemoveTarget] = useState<DmParticipantDto | null>(null);
   const [profileTarget, setProfileTarget] = useState<DmParticipantDto | null>(null);
@@ -51,15 +53,18 @@ export function GroupMembersTab({ channel }: Props) {
   const [actionError, setActionError] = useState('');
 
   const isOwner = authUser?.id === channel.ownerId;
+  const myRole = groupRoleOf(channel, authUser?.id);
+  const isAdmin = (id: string) => groupRoleOf(channel, id) === 'admin';
+  const canRemove = (id: string) =>
+    id !== authUser?.id && canModerateGroupTarget(myRole, groupRoleOf(channel, id));
   const statusMap = usePresenceStore((s) => s.statusMap);
   const gameByUser = useActivityStore((s) => s.byUser);
   const sections = useMemo(() => {
-    // Sahip önce (bugünkü sıra); bölümlere ayırma sırayı bozmaz. Grup DM'de rol/hoist yok.
-    const sorted = [...channel.members].sort((a, b) => {
-      if (a.id === channel.ownerId) return -1;
-      if (b.id === channel.ownerId) return 1;
-      return 0;
-    });
+    // Sıra: kurucu, yöneticiler, üyeler; bölümlere ayırma sırayı bozmaz.
+    const order = { owner: 0, admin: 1, member: 2 } as const;
+    const sorted = [...channel.members].sort(
+      (a, b) => order[groupRoleOf(channel, a.id)] - order[groupRoleOf(channel, b.id)],
+    );
     const online = sorted.filter((m) => (statusMap[m.id] ?? 'offline') !== 'offline');
     const offline = sorted.filter((m) => (statusMap[m.id] ?? 'offline') === 'offline');
     const result: { key: string; title: string; data: DmParticipantDto[] }[] = [];
@@ -70,7 +75,20 @@ export function GroupMembersTab({ channel }: Props) {
       result.push({ key: 'offline', title: t('member.offline', { n: offline.length }), data: offline });
     }
     return result;
-  }, [channel.members, channel.ownerId, statusMap]);
+  }, [channel, statusMap]);
+
+  async function onToggleAdmin(member: DmParticipantDto) {
+    if (busy) return;
+    setBusy(true);
+    setActionError('');
+    try {
+      await setGroupAdmin(channel.id, member.id, !isAdmin(member.id));
+    } catch (e) {
+      setActionError(extractErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function onRemoveMember() {
     if (!removeTarget) return;
@@ -137,7 +155,25 @@ export function GroupMembersTab({ channel }: Props) {
             </View>
             {item.id === channel.ownerId ? (
               <Text style={styles.ownerBadge}>👑</Text>
-            ) : isOwner ? (
+            ) : isAdmin(item.id) ? (
+              <Text style={styles.adminBadge}>{t('group.admin')}</Text>
+            ) : null}
+            {isOwner && item.id !== channel.ownerId ? (
+              <Pressable
+                onPress={() => void onToggleAdmin(item)}
+                disabled={busy}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={isAdmin(item.id) ? t('group.removeAdmin') : t('group.makeAdmin')}
+              >
+                <Ionicons
+                  name={isAdmin(item.id) ? 'shield' : 'shield-outline'}
+                  size={18}
+                  color={isAdmin(item.id) ? theme.colors.accent500 : theme.colors.textMuted}
+                />
+              </Pressable>
+            ) : null}
+            {canRemove(item.id) ? (
               <Pressable
                 onPress={() => setRemoveTarget(item)}
                 hitSlop={8}
@@ -220,6 +256,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   ownerBadge: { fontSize: theme.fontSize.base },
+  adminBadge: {
+    color: theme.colors.accent500,
+    backgroundColor: theme.colors.accentSubtle,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: theme.radius.sm,
+    overflow: 'hidden',
+  },
   removeIcon: { color: theme.colors.danger, fontSize: theme.fontSize.base },
   error: {
     color: theme.colors.danger,

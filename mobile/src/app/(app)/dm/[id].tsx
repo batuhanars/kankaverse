@@ -3,6 +3,7 @@ import { Alert, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { dmApi } from '@/api/dm';
+import { canModerateGroupTarget, groupRoleOf } from '@/utils/groupRoles';
 import type { MessageDto } from '@/api/messages';
 import { useAuthStore } from '@/stores/auth';
 import { clearLast } from '@/utils/resumeLastScreen';
@@ -70,6 +71,15 @@ export default function DmScreen() {
   // yani pratikte "her zaman true" ama açık tutuluyor: gelecekte bu ekrana üçüncü bir tür eklenirse
   // (yok bugün) sessizce ses özelliği kazanmasın.
   const isGroupDm = storeChannel ? storeChannel.type === 'GROUP_DM' : params.kind === 'group';
+  // Grup DM: kurucu/yönetici başkasının mesajını silebilir (hiyerarşi utils/groupRoles; kapı sunucuda).
+  // 1-1 DM'de hiç: başkasının mesajı silinemez.
+  const canDeleteOthers = (m: MessageDto) => {
+    if (storeChannel?.type !== 'GROUP_DM' || m.author.id === myUserId) return false;
+    return canModerateGroupTarget(
+      groupRoleOf(storeChannel, myUserId),
+      groupRoleOf(storeChannel, m.author.id),
+    );
+  };
   const voiceEligible = isDm || isGroupDm;
 
   /**
@@ -407,6 +417,7 @@ export default function DmScreen() {
         // kanal türünde ek kontrol yapmıyor, üyelik yeterli. Ortam kanalındaki `MANAGE_MESSAGES`
         // şartı buraya taşınmaz; olmayan bir kapıyı istemcide kurmak da gevşetmek kadar yanlış.
         canPin
+        canDeleteOthers={canDeleteOthers}
         onOpenPins={() =>
           router.push({
             pathname: '/pins',

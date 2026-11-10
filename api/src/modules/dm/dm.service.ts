@@ -1,5 +1,10 @@
 import { previewFromAttachments } from '../../common/utils/attachment-preview.util';
 import {
+  canModerateGroupTarget,
+  getGroupRole,
+  isGroupManager,
+} from '../../shared/group-roles/group-roles';
+import {
   Injectable,
   ForbiddenException,
   NotFoundException,
@@ -329,6 +334,8 @@ export class DmService {
         type: 'GROUP_DM' as const,
         name: m.channel.name ?? null,
         ownerId: m.channel.ownerId ?? null,
+        // Kurucunun atadığı yöneticiler (kurucu hariç; kurucu ownerId'den bilinir)
+        adminIds: m.channel.members.filter((cm) => cm.isAdmin).map((cm) => cm.userId),
         members: m.channel.members.map((cm) => ({
           id: cm.user.id,
           username: cm.user.username,
@@ -545,6 +552,7 @@ export class DmService {
       type: 'GROUP_DM' as const,
       name: channel.name ?? null,
       ownerId: creatorId,
+      adminIds: [] as string[],
       members: freshMembers.map((cm) => ({
         id: cm.user.id,
         username: cm.user.username,
@@ -633,14 +641,10 @@ export class DmService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // DELETE /dm/groups/:id/members/:userId — yalnız owner; hedef üyeyi çıkar
+  // DELETE /dm/groups/:id/members/:userId — [R7] kurucu herkesi, yönetici normal üyeyi çıkarır
   // ─────────────────────────────────────────────────────────────────────────────
   async removeGroupMember(callerId: string, groupId: string, targetUserId: string) {
     const channel = await this.requireGroupChannel(groupId);
-
-    if (channel.ownerId !== callerId) {
-      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
-    }
 
     if (targetUserId === callerId) {
       throw new BadRequestException({
@@ -648,6 +652,15 @@ export class DmService {
           'Kendinizi gruptan çıkaramazsınız. Gruptan ayrılmak için ayrılma seçeneğini kullanın.',
         error: 'CANNOT_REMOVE_SELF',
       });
+    }
+
+    await this.requireGroupMember(callerId, groupId);
+    const [actor, target] = await Promise.all([
+      getGroupRole(this.prisma, channel, callerId),
+      getGroupRole(this.prisma, channel, targetUserId),
+    ]);
+    if (!canModerateGroupTarget(actor, target)) {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
 
     const membership = await this.prisma.channelMember.findUnique({
@@ -692,12 +705,15 @@ export class DmService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // PATCH /dm/groups/:id — yalnız owner; grup adı güncelle
+  // PATCH /dm/groups/:id — kurucu veya yönetici; grup adı güncelle
   // ─────────────────────────────────────────────────────────────────────────────
   async renameGroupDm(userId: string, groupId: string, dto: RenameGroupDmDto) {
     const channel = await this.requireGroupChannel(groupId);
 
     if (channel.ownerId !== userId) {
+      await this.requireGroupMember(userId, groupId);
+    }
+    if (!isGroupManager(await getGroupRole(this.prisma, channel, userId))) {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
 
@@ -707,6 +723,36 @@ export class DmService {
     });
 
     return { id: updated.id, name: updated.name };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // PUT/DELETE /dm/groups/:id/admins/:userId — [R7] yalnız kurucu; üyeye yöneticilik ver/al
+  // ─────────────────────────────────────────────────────────────────────────────
+  async setGroupAdmin(callerId: string, groupId: string, targetUserId: string, isAdmin: boolean) {
+    const channel = await this.requireGroupChannel(groupId);
+
+    if (channel.ownerId !== callerId) {
+      throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
+    }
+    if (targetUserId === callerId) {
+      throw new BadRequestException({
+        message: 'Kurucu zaten tüm yetkilere sahip.',
+        error: 'CANNOT_CHANGE_OWNER',
+      });
+    }
+
+    const membership = await this.prisma.channelMember.findUnique({
+      where: { channelId_userId: { channelId: groupId, userId: targetUserId } },
+    });
+    if (!membership) {
+      throw new NotFoundException({
+        message: 'Kullanıcı bu grubun üyesi değil.',
+        error: 'MEMBER_NOT_FOUND',
+      });
+    }
+
+    await this.prisma.channelMember.update({ where: { id: membership.id }, data: { isAdmin } });
+    return { userId: targetUserId, isAdmin };
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

@@ -6,6 +6,8 @@ import type { MentionCandidate } from './useMentionCompose';
 import { VoiceRecorderBar } from './VoiceRecorderBar';
 import type { VoicePhase } from './useVoiceRecorder';
 import type { DraftAttachment } from '@/utils/attachmentUpload';
+import type { ReplyAttachmentDto } from '@/api/messages';
+import { attachmentIcon, replyBody, useAttachmentThumb } from './replyPreview';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -44,6 +46,8 @@ interface Props {
   replyToAuthor?: string | null;
   /** Yanıtlanan mesajın metni (kısaltılmış gösterilir). */
   replyToSnippet?: string | null;
+  /** Yanıtlanan mesajın ilk eki: şeritte türe göre etiket + sağda küçük önizleme (WhatsApp gibi). */
+  replyToAttachment?: ReplyAttachmentDto | null;
   /** Modu iptal et (× düğmesi). */
   onCancelMode?: () => void;
   /**
@@ -105,6 +109,7 @@ export function MessageComposer({
   bottomInset,
   replyToAuthor,
   replyToSnippet,
+  replyToAttachment,
   onCancelMode,
   mentionSuggestions,
   onMentionSelect,
@@ -121,6 +126,8 @@ export function MessageComposer({
   // Sunucu ile aynı kural: en az bir ek varsa boş metinle de gönderilebilir (`EMPTY_MESSAGE`).
   const canSend = (!!value.trim() || !!attachments?.length) && !sending;
   const modeActive = !!replyToAuthor;
+  const replyThumb = useAttachmentThumb(replyToAttachment);
+  const replyText = replyBody(replyToSnippet ?? '', replyToAttachment);
   const showAttach = !!onOpenAttach;
   const recording = !!voice && voice.phase !== 'idle';
   // Mikrofon gönder düğmesinin yerinde: kutu boş, ek yok, gönderim sürmüyor.
@@ -137,12 +144,18 @@ export function MessageComposer({
             <Text style={styles.modeLabel} numberOfLines={1}>
               {t('reply.to', { author: replyToAuthor ?? '' })}
             </Text>
-            {replyToSnippet ? (
+            {replyText ? (
               <Text style={styles.modeSnippet} numberOfLines={1}>
-                {replyToSnippet}
+                {replyToAttachment ? (
+                  <>
+                    <Ionicons name={attachmentIcon(replyToAttachment)} size={12} color={theme.colors.textMuted} />{' '}
+                  </>
+                ) : null}
+                {replyText}
               </Text>
             ) : null}
           </View>
+          {replyThumb ? <Image source={{ uri: replyThumb }} style={styles.modeThumb} resizeMode="cover" /> : null}
           <Pressable
             onPress={onCancelMode}
             // 20px ikon + her yandan 12 = 44dp. Önceden 10'du → 40dp, sınırın altındaydı.
@@ -354,6 +367,11 @@ const styles = StyleSheet.create({
     color: theme.colors.accent500,
     fontSize: theme.fontSize.xs,
     fontWeight: '700',
+  },
+  modeThumb: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.sm,
   },
   modeSnippet: {
     color: theme.colors.textMuted,

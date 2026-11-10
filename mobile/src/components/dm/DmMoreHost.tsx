@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import type { DmChannelDto } from '@/api/dm';
+import { groupRoleOf } from '@/utils/groupRoles';
 import { useAuthStore } from '@/stores/auth';
 import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
@@ -152,6 +153,7 @@ export function DmMoreHost({ channel, visible, onClose }: Props) {
         title={channelTitle(channel)}
         isGroup={isGroup}
         isOwner={isOwner}
+        canRename={isGroup && groupRoleOf(channel, authUser?.id) !== 'member'}
         errorMessage={actionError}
         onClose={closeAll}
         onClear={() => setConfirm('clear')}

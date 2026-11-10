@@ -83,6 +83,7 @@ interface DmState {
   createGroup: (memberIds: string[], name?: string) => Promise<DmChannelDto>;
   addGroupMember: (groupId: string, userId: string) => Promise<void>;
   removeGroupMember: (groupId: string, userId: string) => Promise<void>;
+  setGroupAdmin: (groupId: string, userId: string, isAdmin: boolean) => Promise<void>;
   leaveGroup: (groupId: string) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
   renameGroup: (groupId: string, name: string) => Promise<void>;
@@ -309,6 +310,17 @@ export const useDmStore = create<DmState>((set, get) => ({
       channels: s.channels.map((c) =>
         c.id === groupId && c.type === 'GROUP_DM' ? { ...c, members: c.members.filter((m) => m.id !== userId) } : c,
       ),
+    }));
+  },
+
+  async setGroupAdmin(groupId, userId, isAdmin) {
+    await dmApi.setGroupAdmin(groupId, userId, isAdmin);
+    set((s) => ({
+      channels: s.channels.map((c) => {
+        if (c.id !== groupId || c.type !== 'GROUP_DM') return c;
+        const rest = (c.adminIds ?? []).filter((id) => id !== userId);
+        return { ...c, adminIds: isAdmin ? [...rest, userId] : rest };
+      }),
     }));
   },
 

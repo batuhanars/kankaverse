@@ -14,7 +14,8 @@ import { messagesApi } from '@/api/messages'
 import { attachmentsApi } from '@/api/attachments'
 import KvModal from '@/components/ui/KvModal.vue'
 import DmTargetList from '@/components/shared/DmTargetList.vue'
-import { ScanStatus, type MessageDto, type DmChannelDto } from '@/types'
+import { useAttachmentThumb } from '@/composables/useAttachmentThumb'
+import type { MessageDto, DmChannelDto } from '@/types'
 
 const props = defineProps<{ message: MessageDto }>()
 const emit = defineEmits<{ close: [] }>()
@@ -33,16 +34,7 @@ const hasContent = computed(() => !!forwardText.value || attachments.value.lengt
 // Önizleme: ilk ek (birden fazlaysa "+N dosya" sayacı). Görsel için küçük resim adresi sunucudan,
 // video için mesajdaki kare; diğerleri dosya simgesi + adı.
 const firstAttachment = computed(() => attachments.value[0] ?? null)
-const previewThumb = ref<string | null>(null)
-const att0 = firstAttachment.value
-if (att0?.contentType.startsWith('video/') && att0.thumbnail) {
-  previewThumb.value = `data:image/jpeg;base64,${att0.thumbnail}`
-} else if (att0?.contentType.startsWith('image/') && att0.scanStatus === ScanStatus.CLEAN) {
-  attachmentsApi
-    .getUrl(att0.id)
-    .then((res) => (previewThumb.value = res.data.url))
-    .catch(() => {}) // önizleme kozmetik; iletme kapısı sunucuda
-}
+const previewThumb = useAttachmentThumb(() => firstAttachment.value)
 
 async function forwardTo(c: DmChannelDto) {
   if (sendingId.value || sentIds.value.has(c.id) || !hasContent.value) return

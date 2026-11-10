@@ -1177,6 +1177,71 @@ describe('MessagesService.deleteMessage', () => {
   });
 });
 
+// ── [R7] Grup DM'de başkasının mesajını silme: kurucu > yönetici > üye ──────────
+
+describe('[R7] MessagesService.deleteMessage — grup DM yetkisi', () => {
+  let service: MessagesService;
+
+  const GROUP_ID = 'group-1';
+  const OWNER = 'owner-1';
+  const ADMIN = 'admin-1';
+  const ADMIN_2 = 'admin-2';
+  const MEMBER = 'member-1';
+  const MEMBER_2 = 'member-2';
+  const GROUP = { id: GROUP_ID, type: 'GROUP_DM', guildId: null, ownerId: OWNER };
+  const ONE_TO_ONE = { id: 'dm-1', type: 'DM', guildId: null, ownerId: null };
+  const ADMINS = new Set([ADMIN, ADMIN_2]);
+
+  function msgBy(authorId: string) {
+    return { id: 'm-1', channelId: GROUP_ID, authorId, webhookId: null, deletedAt: null };
+  }
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    prismaMock.channelMember.findUnique.mockImplementation(
+      ({ where }: { where: { channelId_userId: { userId: string } } }) =>
+        Promise.resolve({ isAdmin: ADMINS.has(where.channelId_userId.userId) }),
+    );
+    prismaMock.message.update.mockResolvedValue({});
+  });
+
+  async function attempt(actor: string, author: string, channel: object = GROUP) {
+    membershipMock.requireChannelAccess.mockResolvedValue(channel);
+    prismaMock.message.findUnique.mockResolvedValue(msgBy(author));
+    try {
+      await service.deleteMessage(actor, GROUP_ID, 'm-1');
+      return 'OK';
+    } catch (e) {
+      return ((e as ForbiddenException).getResponse() as { error: string }).error;
+    }
+  }
+
+  it('kurucu üyenin ve yöneticinin mesajını siler', async () => {
+    expect(await attempt(OWNER, MEMBER)).toBe('OK');
+    expect(await attempt(OWNER, ADMIN)).toBe('OK');
+  });
+
+  it('yönetici normal üyenin mesajını siler', async () => {
+    expect(await attempt(ADMIN, MEMBER)).toBe('OK');
+  });
+
+  it('yönetici kurucunun ya da başka yöneticinin mesajını silemez', async () => {
+    expect(await attempt(ADMIN, OWNER)).toBe('NOT_MESSAGE_AUTHOR');
+    expect(await attempt(ADMIN, ADMIN_2)).toBe('NOT_MESSAGE_AUTHOR');
+  });
+
+  it('normal üye başkasının mesajını silemez', async () => {
+    expect(await attempt(MEMBER, MEMBER_2)).toBe('NOT_MESSAGE_AUTHOR');
+    expect(await attempt(MEMBER, OWNER)).toBe('NOT_MESSAGE_AUTHOR');
+  });
+
+  it('1-1 DM içinde başkasının mesajı hiç silinemez', async () => {
+    expect(await attempt(OWNER, MEMBER, ONE_TO_ONE)).toBe('NOT_MESSAGE_AUTHOR');
+    expect(prismaMock.message.update).not.toHaveBeenCalled();
+  });
+});
+
 // ── MessagesService.addReaction / removeReaction ─────────────────────────────
 
 describe('MessagesService.addReaction', () => {
@@ -1733,13 +1798,13 @@ describe('MessagesService.create — reply doğrulama + replyTo DTO', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // replyTo content snippet: 100 karakterde kesilir
+  // replyTo content snippet: 300 karakterde kesilir (istemci 2-3 satır gösterir)
   // ─────────────────────────────────────────────────────────────────────────
-  it("replyTo content 100 karakteri aşıyorsa snippet 100'de kesilir", async () => {
+  it("replyTo content 300 karakteri aşıyorsa snippet 300'de kesilir", async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
     prismaMock.message.findUnique.mockResolvedValueOnce(VALID_REPLY_TARGET);
 
-    const longContent = 'a'.repeat(200);
+    const longContent = 'a'.repeat(500);
     const replyToRaw = {
       id: REPLY_TARGET_ID,
       content: longContent,
@@ -1754,7 +1819,44 @@ describe('MessagesService.create — reply doğrulama + replyTo DTO', () => {
     });
 
     expect(result.replyTo).not.toBeNull();
-    expect(result.replyTo!.content.length).toBe(100);
+    expect(result.replyTo!.content.length).toBe(300);
+    expect(result.replyTo!.attachment).toBeNull();
+  });
+
+  it('replyTo alıntılanan mesajın ilk ekinin özetini taşır (adres yok)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValueOnce(VALID_REPLY_TARGET);
+
+    const replyToRaw = {
+      id: REPLY_TARGET_ID,
+      content: '',
+      deletedAt: null,
+      author: { username: 'gorselci' },
+      attachments: [
+        {
+          id: 'att-1',
+          filename: 'foto.png',
+          contentType: 'image/png',
+          scanStatus: 'CLEAN',
+          thumbnail: null,
+        },
+      ],
+    };
+    prismaMock.message.create.mockResolvedValue(makeCreatedMsgWithReply(replyToRaw));
+
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: 'cevap',
+      replyToId: REPLY_TARGET_ID,
+    });
+
+    expect(result.replyTo!.content).toBe('[dosya]');
+    expect(result.replyTo!.attachment).toEqual({
+      id: 'att-1',
+      filename: 'foto.png',
+      contentType: 'image/png',
+      scanStatus: 'CLEAN',
+      thumbnail: null,
+    });
   });
 
   // ─────────────────────────────────────────────────────────────────────────

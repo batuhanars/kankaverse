@@ -58,6 +58,8 @@ interface Props {
   /** C29: basarisiz gecici mesajin "Tekrar dene" / "Sil" eylemleri. */
   onRetry?: () => void;
   onDiscard?: () => void;
+  /** Yanıt alıntısına dokunuş: alıntılanan mesaja git (liste kaydırır + vurgular). */
+  onPressReply?: () => void;
 }
 
 // Sprint M6a — WhatsApp tarzı sağlı sollu baloncuk (web/masaüstü düz liste olarak kalır). Öbekleme
@@ -79,6 +81,7 @@ export function MessageBubble({
   onDoubleTap,
   onRetry,
   onDiscard,
+  onPressReply,
 }: Props) {
   // Jest her render'da yeniden kurulmasın: işleyici ref'te (mesajın `reactedByMe` kararı çağıranda,
   // en güncel mesajla verilir), jest yalnız var/yok'a bağlı.
@@ -211,6 +214,8 @@ export function MessageBubble({
               isMine={isMine}
               resolveMention={resolveMention}
               resolveRole={resolveRole}
+              onPress={isLocal ? undefined : onPressReply}
+              onLongPress={isLocal ? undefined : onLongPress}
             />
           )}
 

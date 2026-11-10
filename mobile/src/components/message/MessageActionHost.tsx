@@ -3,7 +3,7 @@ import { MessageActionSheet } from './MessageActionSheet';
 import { ForwardMessageModal } from './ForwardMessageModal';
 import { EmojiGifSheet } from './EmojiGifSheet';
 import { ReactionsSheet } from './ReactionsSheet';
-import type { MessageAuthorDto } from '@/api/messages';
+import type { MessageAuthorDto, MessageDto } from '@/api/messages';
 import { recordEmojiUse } from '@/utils/recentEmojis';
 import type { useMessageActions } from './useMessageActions';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -24,17 +24,20 @@ interface Props {
   onEdit: () => void;
   /** Sprint M1h — sabitleme yetkisi (ortamda `MANAGE_MESSAGES`, DM/grupta her üye). */
   canPin: boolean;
+  /** Başkasının bu mesajını silebilir miyim (ortamda `MANAGE_MESSAGES`, grupta kurucu/yönetici). */
+  canDeleteOthers?: (message: MessageDto) => boolean;
   /** C46 — "Tepkileri gör" panelinde kişiye dokunuş: çağıran ekran profil panelini açar. */
   onOpenProfile: (user: MessageAuthorDto) => void;
 }
 
-export function MessageActionHost({ actions, onReply, onEdit, canPin, onOpenProfile }: Props) {
+export function MessageActionHost({ actions, onReply, onEdit, canPin, canDeleteOthers, onOpenProfile }: Props) {
   const router = useRouter();
   return (
     <>
       <MessageActionSheet
         visible={!!actions.target}
         isMine={actions.isMine}
+        canDelete={actions.isMine || (!!actions.target && !!canDeleteOthers?.(actions.target))}
         myEmojis={actions.myEmojis}
         onClose={actions.close}
         onToggleReaction={(emoji) => {

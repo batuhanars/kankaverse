@@ -42,6 +42,8 @@ export type DmChannelDto =
       id: string;
       name: string | null;
       ownerId: string;
+      /** Kurucunun atadığı yöneticiler (kurucu hariç). Eski önbellekte alan yok → yönetici yok. */
+      adminIds?: string[];
       members: DmParticipantDto[];
       lastMessage: MessageDto | null;
       unread: boolean;
@@ -112,6 +114,12 @@ export const dmApi = {
   async removeGroupMember(groupId: string, userId: string): Promise<null> {
     const res = await http.delete<null>(`/dm/groups/${groupId}/members/${userId}`);
     return res.data;
+  },
+  /** Grup yöneticisi ver/al — yalnız kurucu (sunucu kapısı). */
+  async setGroupAdmin(groupId: string, userId: string, isAdmin: boolean): Promise<void> {
+    const url = `/dm/groups/${groupId}/admins/${userId}`;
+    if (isAdmin) await http.put(url);
+    else await http.delete(url);
   },
   async leaveGroup(groupId: string): Promise<null> {
     const res = await http.delete<null>(`/dm/groups/${groupId}/members/me`);

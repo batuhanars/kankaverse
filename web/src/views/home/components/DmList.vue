@@ -3,6 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useDmStore } from '@/stores/dm'
+import { groupRoleOf } from '@/utils/groupRoles'
 import { useFriendsStore } from '@/stores/friends'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { usePresenceStore } from '@/stores/presence'
@@ -342,6 +343,10 @@ async function confirmLeaveGroup() {
 const isGroupOwner = computed(
   () => !!menuGroup.value && menuGroup.value.ownerId === authStore.user?.id,
 )
+// Düzenle (ad): kurucu ya da yönetici (sunucu renameGroupDm kapısıyla aynı)
+const canEditGroup = computed(
+  () => !!menuGroup.value && groupRoleOf(menuGroup.value, authStore.user?.id) !== 'member',
+)
 
 const deleteGroupTarget = ref<GroupDmChannel | null>(null)
 const deletingGroupDm = ref(false)
@@ -559,8 +564,8 @@ async function confirmDeleteGroup() {
       <span>{{ t('group.addMember') }}</span>
     </button>
 
-    <!-- 2c. Düzenle (yalnız grup SAHİBİ — C51: ayar modalını açar) -->
-    <button v-if="isGroupOwner" class="kv-ctx__item" role="menuitem" @click="openGroupSettings">
+    <!-- 2c. Düzenle (grup kurucusu ya da yöneticisi — C51: ayar modalını açar) -->
+    <button v-if="canEditGroup" class="kv-ctx__item" role="menuitem" @click="openGroupSettings">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       <span>{{ t('group.editGroup') }}</span>
     </button>

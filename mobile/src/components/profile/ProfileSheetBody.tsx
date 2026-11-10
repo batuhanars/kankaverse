@@ -8,6 +8,10 @@ import { ProfileGameCard } from './ProfileGameCard';
 import { PlatformLogo } from './PlatformLogo';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
+import { MarkdownText } from '../message/MarkdownText';
+
+/** Bio'da bahsetme çözülmez (kullanıcı adı listesi yok); token düz yedekle kalır. */
+const noMention = () => undefined;
 
 interface Props {
   username: string;
@@ -115,7 +119,8 @@ export function ProfileSheetBody({ username, avatarUrl, card, identityFooter }: 
         <View style={styles.section}>
           {/* `settings.bioLabel` web'de zaten "Hakkımda" — yeni anahtar açılmadı. */}
           <Text style={styles.sectionTitle}>{t('settings.bioLabel')}</Text>
-          <Text style={styles.bio}>{card.bio}</Text>
+          {/* Bio mesajla aynı güvenli markdown çizimi: bağlantılar tıklanabilir (yalnız http/https). */}
+          <MarkdownText content={card.bio} isMine={false} resolveMention={noMention} textStyle={styles.bio} />
         </View>
       ) : null}
 

@@ -95,8 +95,9 @@ export function useOptimisticSend() {
       replyTo: replyTo
         ? {
             id: replyTo.id,
-            content: replyTo.content.trim() ? replyTo.content.slice(0, 100) : '[dosya]',
+            content: replyTo.content.trim() ? replyTo.content.slice(0, 300) : '[dosya]',
             authorUsername: replyTo.author.username,
+            attachment: replyTo.attachments?.[0] ?? null,
           }
         : null,
       author: {

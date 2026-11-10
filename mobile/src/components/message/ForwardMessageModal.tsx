@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { messagesApi, type MessageDto } from '@/api/messages';
 import { attachmentsApi } from '@/api/attachments';
 import { extractErrorMessage } from '@/api/errors';
+import { useAttachmentThumb } from './replyPreview';
 import { useDmStore } from '@/stores/dm';
 import { channelTitle } from '@/utils/channelTitle';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
@@ -56,24 +57,7 @@ export function ForwardMessageModal({ message, onClose }: Props) {
   const hasContent = !!forwardText || attachments.length > 0;
 
   // Onizleme kucuk resmi: video icin mesajdaki kare, gorsel icin sunucudan kisa omurlu adres.
-  const [previewUri, setPreviewUri] = useState<string | null>(
-    first?.contentType.startsWith('video/') && first.thumbnail
-      ? `data:image/jpeg;base64,${first.thumbnail}`
-      : null,
-  );
-  useEffect(() => {
-    if (!first || !first.contentType.startsWith('image/') || first.scanStatus !== 'CLEAN') return;
-    let cancelled = false;
-    attachmentsApi
-      .getUrl(first.id)
-      .then((res) => {
-        if (!cancelled) setPreviewUri(res.url);
-      })
-      .catch(() => {}); // onizleme kozmetik; iletme kapisi sunucuda
-    return () => {
-      cancelled = true;
-    };
-  }, [first]);
+  const previewUri = useAttachmentThumb(first);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLocaleLowerCase('tr');

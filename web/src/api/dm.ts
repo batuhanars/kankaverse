@@ -25,4 +25,9 @@ export const dmApi = {
     http.patch<{ id: string; name: string | null }>(`/dm/groups/${groupId}`, { name }),
   removeGroupMember: (groupId: string, userId: string) =>
     http.delete<null>(`/dm/groups/${groupId}/members/${userId}`),
+  // Grup yöneticisi ver/al — yalnız kurucu (sunucu kapısı)
+  setGroupAdmin: (groupId: string, userId: string, isAdmin: boolean) =>
+    isAdmin
+      ? http.put<{ userId: string; isAdmin: boolean }>(`/dm/groups/${groupId}/admins/${userId}`)
+      : http.delete<{ userId: string; isAdmin: boolean }>(`/dm/groups/${groupId}/admins/${userId}`),
 }

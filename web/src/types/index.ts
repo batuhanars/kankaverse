@@ -144,6 +144,8 @@ export type DmChannelDto =
       id: string
       name: string | null
       ownerId: string
+      // Kurucunun atadığı yöneticiler (kurucu hariç). Eski önbellekte alan yok → yönetici yok.
+      adminIds?: string[]
       members: GroupDmMemberDto[]
       lastMessage: MessageDto | null
       unread: boolean
@@ -361,10 +363,17 @@ export interface ReactionGroupDto {
   users: { id: string; username: string; avatarUrl: string | null }[]
 }
 
+/** Yanıt alıntısındaki ek özeti: alıntılanan mesajın İLK eki (adres yok, görsel `getUrl` ile gelir). */
+export type ReplyAttachmentDto = Pick<
+  AttachmentDto,
+  'id' | 'filename' | 'contentType' | 'scanStatus' | 'thumbnail'
+>
+
 export interface ReplyPreviewDto {
   id: string
   content: string
   authorUsername: string
+  attachment?: ReplyAttachmentDto | null // eski önbellek/olayda alan yok → yalnız metin
 }
 
 // C35 §2.5 - webhook mesajındaki embed (yalniz izinli alanlar; gorsel alani yok)

@@ -16,6 +16,7 @@ import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { useAudioQueue } from '@/composables/useExclusivePlayback'
 import { messagesApi } from '@/api/messages'
 import MessageItem from '@/components/shared/MessageItem.vue'
+import ReplyQuote from '@/components/shared/ReplyQuote.vue'
 import DateDivider from '@/components/shared/DateDivider.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import { ATTACHMENT_ACCEPT } from '@/utils/attachmentType'
@@ -493,17 +494,24 @@ function resetComposerHeight() {
         {{ typingLabel }}
       </div>
 
-      <!-- Yanıt önizleme bandı -->
+      <!-- Yanıt önizleme bandı: yazar + tek satır metin, ekli mesajda küçük önizleme -->
       <div
         v-if="replyingTo"
-        class="flex items-center gap-2 px-3 py-1.5 mb-1 rounded-t-[var(--kv-radius-sm)] text-[12px] truncate"
+        class="flex items-center gap-2 p-1.5 mb-1 rounded-t-[var(--kv-radius-sm)]"
         style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle); border-bottom: none;"
       >
-        <span class="shrink-0" style="color: var(--kv-text-muted);">↩</span>
-        <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">{{ t('reply.to', { author: replyingTo.author.username }) }}</span>
-        <span class="truncate" style="color: var(--kv-text-muted);">— {{ replyingTo.content }}</span>
+        <ReplyQuote
+          class="flex-1"
+          style="background-color: var(--kv-bg-content);"
+          :author="replyingTo.author.username"
+          :text="replyingTo.content"
+          :attachment="replyingTo.attachments?.[0] ?? null"
+          :lines="1"
+        >
+          <template #author>{{ t('reply.to', { author: replyingTo.author.username }) }}</template>
+        </ReplyQuote>
         <button
-          class="shrink-0 ml-auto cursor-pointer hover:opacity-80 transition-opacity"
+          class="shrink-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity"
           style="color: var(--kv-text-muted);"
           :title="t('reply.cancel')"
           @click="cancelReply"

@@ -17,7 +17,9 @@ import { useVoiceStore } from '@/stores/voice'
 import DmCallPanel from './DmCallPanel.vue'
 import { messagesApi } from '@/api/messages'
 import { formatMentionsPlain } from '@/utils/mentions'
+import { canModerateGroupTarget, groupRoleOf } from '@/utils/groupRoles'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import ReplyQuote from '@/components/shared/ReplyQuote.vue'
 import AttachmentComposeModal from '@/components/shared/AttachmentComposeModal.vue'
 import { ATTACHMENT_ACCEPT } from '@/utils/attachmentType'
 import { useComposerFileIntake } from '@/composables/useComposerFileIntake'
@@ -188,6 +190,16 @@ const dmPresence = computed<PresenceStatus | null>(() =>
 )
 const dmPresenceColor = computed(() => (dmPresence.value ? PRESENCE_COLOR[dmPresence.value] : null))
 const groupChannel = computed(() => props.channel.type === 'GROUP_DM' ? props.channel : null)
+// Grup DM: kurucu/yönetici başkasının mesajını silebilir (hiyerarşi groupRoles'ta; kapı sunucuda).
+// 1-1 DM'de hep false.
+const myGroupRole = computed(() =>
+  groupChannel.value ? groupRoleOf(groupChannel.value, authStore.user?.id) : 'member',
+)
+function canDeleteOthers(msg: MessageDto): boolean {
+  const g = groupChannel.value
+  if (!g || msg.author.id === authStore.user?.id) return false
+  return canModerateGroupTarget(myGroupRole.value, groupRoleOf(g, msg.author.id))
+}
 
 // REV-5: 1-1 DM'de karşı taraf arkadaş değilse "Arkadaş ekle" göster.
 // Engelliyken veya zaten arkadaşken/istek gönderildikten sonra gizlenir.
@@ -987,6 +999,7 @@ const dayLabels = computed<(string | null)[]>(() =>
           :mention-resolver="dmMentionResolver"
           :is-mentioned="isDmMentioned(msg)"
           :can-pin="true"
+          :can-manage-messages="canDeleteOthers(msg)"
           :receipt="messageReceipt(msg)"
           @reply="startReply"
           @forward="(m) => { forwardMsg = m; showForward = true }"
@@ -1112,17 +1125,24 @@ const dayLabels = computed<(string | null)[]>(() =>
             @change="onFileSelected"
           />
 
-          <!-- Yanıt önizleme bandı -->
+          <!-- Yanıt önizleme bandı: yazar + tek satır metin, ekli mesajda küçük önizleme -->
           <div
             v-if="replyingTo"
-            class="flex items-center gap-2 px-3 py-1.5 rounded-t-[var(--kv-radius-sm)] text-[12px] truncate"
+            class="flex items-center gap-2 p-1.5 rounded-t-[var(--kv-radius-sm)]"
             style="background-color: var(--kv-bg-elevated); border: 1px solid var(--kv-border-subtle); border-bottom: none;"
           >
-            <span class="shrink-0" style="color: var(--kv-text-muted);">↩</span>
-            <span class="font-semibold shrink-0" style="color: var(--kv-text-secondary);">{{ t('reply.to', { author: replyingTo.author.username }) }}</span>
-            <span class="truncate" style="color: var(--kv-text-muted);">— {{ formatMentionsPlain(replyingTo.content, dmMentionResolver, t('mention.unknown')) }}</span>
+            <ReplyQuote
+              class="flex-1"
+              style="background-color: var(--kv-bg-content);"
+              :author="replyingTo.author.username"
+              :text="formatMentionsPlain(replyingTo.content, dmMentionResolver, t('mention.unknown'))"
+              :attachment="replyingTo.attachments?.[0] ?? null"
+              :lines="1"
+            >
+              <template #author>{{ t('reply.to', { author: replyingTo.author.username }) }}</template>
+            </ReplyQuote>
             <button
-              class="shrink-0 ml-auto cursor-pointer hover:opacity-80 transition-opacity"
+              class="shrink-0 px-1.5 cursor-pointer hover:opacity-80 transition-opacity"
               style="color: var(--kv-text-muted);"
               :title="t('reply.cancel')"
               @click="cancelReply"
@@ -1154,6 +1174,7 @@ const dayLabels = computed<(string | null)[]>(() =>
       v-if="isGroup && showGroupPanel && groupChannel"
       :group-id="groupChannel.id"
       :owner-id="groupChannel.ownerId"
+      :admin-ids="groupChannel.adminIds"
       :members="groupChannel.members"
       @close="closeGroupPanel"
     />

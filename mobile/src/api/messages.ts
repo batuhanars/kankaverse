@@ -30,10 +30,15 @@ export interface AttachmentDto {
   aiGenerated?: boolean;
 }
 
+/** Yanıt alıntısındaki ek özeti: alıntılanan mesajın İLK eki (adres yok, görsel `getUrl` ile gelir). */
+export type ReplyAttachmentDto = Pick<AttachmentDto, 'id' | 'filename' | 'contentType' | 'scanStatus' | 'thumbnail'>;
+
 export interface ReplyPreviewDto {
   id: string;
   content: string;
   authorUsername: string;
+  /** Eski önbellek/olayda alan yok → yalnız metin. */
+  attachment?: ReplyAttachmentDto | null;
 }
 
 export interface MessageAuthorDto {

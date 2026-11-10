@@ -272,6 +272,15 @@ export const useDmStore = defineStore('dm', () => {
     }
   }
 
+  async function setGroupAdmin(groupId: string, userId: string, isAdmin: boolean) {
+    await dmApi.setGroupAdmin(groupId, userId, isAdmin)
+    const ch = channels.value.find((c) => c.id === groupId)
+    if (ch && ch.type === 'GROUP_DM') {
+      const rest = (ch.adminIds ?? []).filter((id) => id !== userId)
+      ch.adminIds = isAdmin ? [...rest, userId] : rest
+    }
+  }
+
   async function leaveGroup(groupId: string) {
     await dmApi.leaveGroup(groupId)
     removeChannel(groupId)
@@ -322,6 +331,7 @@ export const useDmStore = defineStore('dm', () => {
     createGroup,
     addGroupMember,
     removeGroupMember,
+    setGroupAdmin,
     leaveGroup,
     deleteGroup,
     renameGroup,
