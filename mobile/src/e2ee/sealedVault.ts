@@ -3,6 +3,7 @@
 // `expo-secure-store`'da; satırlar SQLite'ta. Bu dosya platformdan bağımsızdır (RowStore/KeyStore enjekte)
 // ki şifreleme mantığı cihazsız sınanabilsin. Web karşılığı: web/src/lib/e2ee/vault.ts (aynı ilke).
 import { gcm } from '@noble/ciphers/aes.js'
+import { utf8 } from '@kankaverse/e2ee-core'
 import type { Vault, VaultStore } from '@kankaverse/e2ee-client'
 
 const KEY_BYTES = 32
@@ -34,9 +35,8 @@ export interface KeyStore {
 
 export type RandomBytes = (n: number) => Uint8Array
 
-const enc = new TextEncoder()
 // AAD = kullanıcı + konum: mühürlü satır başka bir satır (ya da kullanıcı) yerine kopyalanırsa çözme başarısız olur.
-const aadFor = (userId: string, store: string, key: string) => enc.encode(`${userId}/${store}/${key}`)
+const aadFor = (userId: string, store: string, key: string) => utf8(`${userId}/${store}/${key}`)
 
 export class SealedVault implements Vault {
   private constructor(

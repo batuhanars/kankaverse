@@ -1,7 +1,7 @@
 // Mobil adaptörleri paylaşılan motora (shared/e2ee-client) bağlar: SQLite+Keystore vault, SerialQueue kilidi,
 // pureProvider (Hermes'te crypto.subtle yok), mobil HTTP. Motor mantığı burada YOK.
 import { E2eeEngine, serialLock, type WarningHandler } from '@kankaverse/e2ee-client'
-import { pureProvider } from '@kankaverse/e2ee-core'
+import { pureProvider, utf8Path } from '@kankaverse/e2ee-core'
 import { mobileE2eeApi } from './mobileApi'
 import { openMobileVault } from './sqliteRows'
 
@@ -17,7 +17,13 @@ const metric = (name: string, ms: number, count: number) => console.log(`[E2EE] 
 const log = (message: string, error?: unknown) =>
   console.error(message, error instanceof Error ? error.name : '')
 
+let pathLogged = false
+
 export function startMobileEngine(userId: string, onWarn: WarningHandler): Promise<E2eeEngine | null> {
+  if (!pathLogged) {
+    pathLogged = true
+    console.log(`[E2EE] UTF-8 yolu: ${utf8Path() === 'builtin' ? 'yerleşik' : 'saf JS'}`) // yalnız seçim, içerik yok
+  }
   return E2eeEngine.start(userId, {
     api: mobileE2eeApi,
     openVault: openMobileVault,
