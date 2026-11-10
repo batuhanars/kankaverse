@@ -9,6 +9,7 @@ import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
 import { useUnreadStore } from '@/stores/unread';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
+import { useAppUpdateStore } from '@/stores/appUpdate';
 import { AiVideoViewerHost } from '@/components/aiVideo/AiVideoViewerHost';
 import { AppToast } from '@/components/AppToast';
 import { useBackgroundSocket } from '@/realtime/useBackgroundSocket';
@@ -76,10 +77,13 @@ export default function AppLayout() {
     // hiçbir şey yapılmaz, yani her dönüşte gereksiz istek atılmaz.
     // C49 R3: süren yapay zeka video üretimi göstergesi - açılışta ve her ön plana dönüşte tek liste çağrısı.
     void restoreActiveAiVideo();
+    // Play uygulama içi güncelleme: açılışta ve ön plana dönüşte (store kendi aralığını tutar).
+    void useAppUpdateStore.getState().check();
     const sub = AppState.addEventListener('change', (state) => {
       if (state !== 'active') return;
       if (!isPushTokenRegistered()) void syncPushToken();
       void restoreActiveAiVideo();
+      void useAppUpdateStore.getState().check();
     });
     return () => {
       sub.remove();

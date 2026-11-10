@@ -8,6 +8,7 @@ import type { ChannelSummaryDto } from '@/api/channels';
 import type { DmChannelDto } from '@/api/dm';
 import { DmMenuHost } from '@/components/home/DmMenuHost';
 import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
+import { AppUpdateBanner } from '@/components/AppUpdateBanner';
 import { GuildRail, type RailSelection } from '@/components/home/GuildRail';
 import { DmSidebar } from '@/components/home/DmSidebar';
 import { ChannelSidebar } from '@/components/home/ChannelSidebar';
@@ -317,6 +318,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.screen} edges={['top']}>
       {/* Doğrulanmamış hesaba her açılışta görünen şerit (web AppShell karşılığı); rail+panelin üstünde, tam genişlik. */}
       {emailUnverified ? <EmailVerificationBanner /> : null}
+      <AppUpdateBanner />
       <View style={styles.row}>
       <GuildRail
         selection={selection}
