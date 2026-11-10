@@ -56,7 +56,7 @@ export class Hydrator {
   async isResolved(m: WireMessage): Promise<boolean> {
     if (!m.encrypted || !m.ciphertext) return true
     const stored = await this.ctx.store.loadMessage(m.id)
-    return stored?.digest === (await digestOf(fromB64(m.ciphertext)))
+    return stored?.digest === digestOf(fromB64(m.ciphertext))
   }
 
   private isHidden(m: WireMessage): boolean {
@@ -69,7 +69,7 @@ export class Hydrator {
 
   private async resolveOne(m: WireMessage, final: boolean): Promise<Resolution> {
     const ct = fromB64(m.ciphertext!)
-    const digest = await digestOf(ct)
+    const digest = digestOf(ct)
     const stored = await this.ctx.store.loadMessage(m.id)
     if (stored?.digest === digest) return { kind: 'record', record: stored }
     await this.init()
@@ -136,6 +136,8 @@ export class Hydrator {
   }
 }
 
-const pending = (final: boolean): Resolution => ({ kind: final ? 'unavailable' : 'pending' })
+const pending = (final: boolean): Resolution => ({
+  kind: final ? 'unavailable' : 'pending',
+})
 
 export type { Resolution }

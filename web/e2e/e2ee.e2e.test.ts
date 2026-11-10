@@ -10,7 +10,8 @@ import { io, type Socket } from 'socket.io-client'
 import { afterAll, describe, expect, it } from 'vitest'
 import { e2eeApi } from '@/api/e2ee'
 import { messagesApi } from '@/api/messages'
-import { E2eeEngine } from '@/lib/e2ee/engine'
+import type { E2eeEngine } from '@kankaverse/e2ee-client'
+import { startWebEngine } from '@/lib/e2ee/adapter'
 import type { MessageDto } from '@/types'
 
 const API = process.env.VITE_API_URL ?? 'http://localhost:3001'
@@ -68,7 +69,7 @@ async function newProfile(name: string, data: { accessToken: string; user: { id:
   }
   await new Promise<void>((resolve) => p.socket!.on('connect', () => resolve()))
   p.engine = (await as(p, () =>
-    E2eeEngine.start(p.userId, e2eeApi, (c, k) => p.warnings.push(`${c}:${k}`)),
+    startWebEngine(p.userId, e2eeApi, (c, k) => p.warnings.push(`${c}:${k}`)),
   ))!
   expect(p.engine).toBeTruthy()
   return p

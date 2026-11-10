@@ -1,7 +1,7 @@
 // Bekleyen Welcome'lar: gruba katılma (E1 §2.4). Kimlik doğrulama çekirdekte: Welcome'daki ağacın
 // HER yaprağı sunucu listesine karşı bayt-bayt doğrulanır, tanınmayan varsa katılım reddedilir.
 import { NoMatchingKeyPackageError, joinFromWelcome, type Device } from '@kankaverse/e2ee-core'
-import type { E2eeWelcomeRow } from '@/api/e2ee'
+import type { E2eeWelcomeRow } from './ports'
 import { fromB64 } from './b64'
 import { guardUntrusted } from './commitSync'
 import type { E2eeContext } from './context'

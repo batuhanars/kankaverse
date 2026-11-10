@@ -2,8 +2,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useMessagesStore } from '@/stores/messages'
 import { useE2eeStore } from '@/stores/e2ee'
-import { GroupNotReadyError } from '@/lib/e2ee/context'
-import { DeviceRemovedError } from '@/lib/e2ee/channelSync'
+import { DeviceRemovedError, GroupNotReadyError } from '@kankaverse/e2ee-client'
 import type { MessageDto } from '@/types'
 
 /**

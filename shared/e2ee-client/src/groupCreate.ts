@@ -1,8 +1,9 @@
 // İlk şifreli mesajda grubu kurma (E1 §2.4): claim → createGroup → POST group → confirmCommit.
 import { createGroup } from '@kankaverse/e2ee-core'
-import { e2eeErrorCode, type E2eeChannelState } from '@/api/e2ee'
+import { e2eeErrorCode } from './errors'
 import { fromB64, toB64 } from './b64'
 import type { E2eeContext } from './context'
+import type { E2eeChannelState } from './ports'
 import { devicesOf } from './registry'
 
 export type CreateOutcome = 'created' | 'exists' | 'ineligible'

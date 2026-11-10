@@ -1,38 +1,14 @@
 import http from './axios'
+import type {
+  E2eeApi,
+  E2eeChannelState,
+  E2eeCommitRow,
+  E2eeWelcomeItem,
+  E2eeWelcomeRow,
+} from '@kankaverse/e2ee-client'
 
-// E1 §2 uçları. Baytlar base64 metin (dönüşüm lib/e2ee tarafında). Envelope axios'ta açılır.
-
-export interface E2eeDeviceInfo {
-  deviceId: string
-  signatureKey: string
-  revokedAt: string | null
-}
-
-export interface E2eeChannelState {
-  encrypted: boolean
-  epoch: number | null
-  groupId: string | null
-  createdAt: string | null
-  members: { userId: string; devices: E2eeDeviceInfo[] }[]
-}
-
-export interface E2eeCommitRow {
-  epoch: number
-  commit: string
-  senderDeviceId: string
-}
-
-export interface E2eeWelcomeRow {
-  id: string
-  channelId: string
-  epoch: number
-  welcome: string
-}
-
-export interface E2eeWelcomeItem {
-  deviceId: string
-  welcome: string
-}
+// E1 §2 uçları (axios adaptörü). Tipler ve arayüz paylaşılan pakette (shared/e2ee-client). Envelope axios'ta açılır.
+export { e2eeErrorCode } from '@kankaverse/e2ee-client'
 
 export const e2eeApi = {
   status: () => http.get<{ enabled: boolean }>('/e2ee/status'),
@@ -66,9 +42,4 @@ export const e2eeApi = {
     http.get<E2eeCommitRow[]>(`/e2ee/channels/${channelId}/commits`, { params: { since } }),
   welcomes: () => http.get<E2eeWelcomeRow[]>('/e2ee/welcomes'),
   ackWelcome: (id: string) => http.post<null>(`/e2ee/welcomes/${id}/ack`),
-}
-
-/** Sunucunun makine hata kodu (envelope `error`), yoksa undefined. */
-export function e2eeErrorCode(e: unknown): string | undefined {
-  return (e as { response?: { data?: { error?: string } } }).response?.data?.error
-}
+} satisfies E2eeApi

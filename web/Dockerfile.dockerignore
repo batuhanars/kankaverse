@@ -5,6 +5,7 @@
 !shared/e2ee-core/package.json
 !shared/e2ee-core/package-lock.json
 !shared/e2ee-core/src
+!shared/e2ee-client/src
 **/node_modules
 **/dist
 web/.env

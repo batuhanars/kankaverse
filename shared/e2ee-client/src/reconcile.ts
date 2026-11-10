@@ -1,7 +1,7 @@
 // Grup üyeliğini sunucudaki cihaz listesiyle eşitler: iptal edileni çıkar, eksik etkin cihazı ekle (E1 §2.4).
 // Çevrimiçi HERHANGİ bir üye cihaz bunu yapabilir; yarışı sunucunun epoch kuralı çözer.
 import type { Group, PendingCommit } from '@kankaverse/e2ee-core'
-import { e2eeErrorCode } from '@/api/e2ee'
+import { e2eeErrorCode } from './errors'
 import { fromB64, toB64 } from './b64'
 import { catchUp, refreshView, type ChannelView } from './commitSync'
 import type { E2eeContext } from './context'

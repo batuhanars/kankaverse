@@ -32,7 +32,9 @@ export async function syncGroup(
 export async function syncChannel(ctx: E2eeContext, channelId: string): Promise<Group | null> {
   const group = await ctx.store.loadGroup(channelId)
   if (!group) return null
-  const view = { devices: devicesOf((await ctx.api.channelState(channelId)).data) }
+  const view = {
+    devices: devicesOf((await ctx.api.channelState(channelId)).data),
+  }
   await syncGroup(ctx, channelId, group, view)
   return group
 }

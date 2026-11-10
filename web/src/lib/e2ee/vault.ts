@@ -12,6 +12,7 @@ import {
   openDb,
   type StoreName,
 } from './idb'
+import type { Vault as VaultPort } from '@kankaverse/e2ee-client'
 
 const KEY_SLOT = 'storeKey'
 const IV_BYTES = 12
@@ -27,7 +28,7 @@ const enc = new TextEncoder()
 // AAD = kayıt konumu: şifreli kayıt başka bir kayıt yerine kopyalanırsa çözme başarısız olur.
 const aadFor = (store: StoreName, key: string) => enc.encode(`${store}/${key}`)
 
-export class Vault {
+export class Vault implements VaultPort {
   readonly userId: string
   private db: IDBDatabase
   private cryptoKey: CryptoKey

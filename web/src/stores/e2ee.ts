@@ -3,9 +3,8 @@ import { ref, shallowRef } from 'vue'
 import { e2eeApi } from '@/api/e2ee'
 import { messagesApi } from '@/api/messages'
 import { useDmStore } from '@/stores/dm'
-import type { ChannelInfo } from '@/lib/e2ee/channelSync'
-import type { WarningKind } from '@/lib/e2ee/context'
-import { E2eeEngine, type SentCipher } from '@/lib/e2ee/engine'
+import type { ChannelInfo, E2eeEngine, SentCipher, WarningKind } from '@kankaverse/e2ee-client'
+import { startWebEngine } from '@/lib/e2ee/adapter'
 import { destroyAllVaults } from '@/lib/e2ee/vault'
 import type { MessageDto } from '@/types'
 
@@ -29,7 +28,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
     if (engine.value?.userId === userId) return ready
     ready = (async () => {
       try {
-        engine.value = await E2eeEngine.start(userId, e2eeApi, setWarning)
+        engine.value = await startWebEngine(userId, e2eeApi, setWarning)
         await engine.value?.onWelcome()
       } catch (e) {
         console.error('[e2ee] başlatılamadı', e)
