@@ -11,6 +11,8 @@ export interface E2eeContext {
   /** Bu işlemde diskten tazelenen cihaz (bayat durum olmasın). */
   getDevice(): Promise<Device>
   warn(channelId: string, kind: WarningKind): void
+  yieldToUi?: () => Promise<void>
+  metric?: (name: string, ms: number, count: number) => void
 }
 
 /** Şifreli yük henüz gönderilemez (Welcome gelmedi, anahtar yok): kullanıcıya "tekrar dene". */

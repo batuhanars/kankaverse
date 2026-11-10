@@ -1,6 +1,8 @@
 import { t } from '@/i18n';
 import { getAccessToken, refreshAccessToken } from '@/api/http';
-import { messagesApi } from '@/api/messages';
+import { authApi } from '@/api/auth';
+import { initE2ee, sendMessage } from '@/stores/e2ee';
+import { useAuthStore } from '@/stores/auth';
 import { dmApi } from '@/api/dm';
 import { channelsApi } from '@/api/channels';
 import { NotifTargetType } from '@/api/notifications';
@@ -14,7 +16,7 @@ import { loadOwnAvatarUrl } from './ownAvatar';
 /**
  * C52: bildirimden Cevapla. C55: Okundu olarak isaretle + Sessize al ayni headless gorevden gecer,
  * dallanma burada (`action`). Kotlin `QuickReplyService` -> `KvQuickReply` headless gorevi (index.js).
- * Gonderme tek fonksiyonda (`sendReply`): E2EE geldiginde sifreleme buraya eklenir.
+ * Gonderme tek fonksiyonda (`sendReply`): sifreli 1-1 DM'de E2EE ile gider (E1).
  */
 
 type ReplyTaskData = {
@@ -29,7 +31,12 @@ type ReplyTaskData = {
 async function sendReply(conversationId: string, text: string): Promise<void> {
   // Uygulama kapaliyken bellekte erisim anahtari yok: mevcut tek-ucus yenileme kullanilir.
   if (!getAccessToken()) await refreshAccessToken();
-  await messagesApi.send(conversationId, text);
+  // E1: şifreli 1-1 DM'de düz metin sunucuda 409 verir. Hızlı cevap E2EE ile GİDER: motor aynı JS ortamında
+  // (ön plan/arka plan) hazırsa kullanılır; uygulama kapalıysa (başsız görev) önce kullanıcı + motor kurulur.
+  // Kurulamazsa gönderim hata verir ve bildirimde "gönderilemedi" görünür (sessizce kırık bırakılmaz).
+  const user = useAuthStore.getState().user ?? (await authApi.me());
+  await initE2ee(user.id);
+  await sendMessage(conversationId, text);
 }
 
 /** C55: okundu. Ortam kanali `guildId` ile ayrilir (DM'de guildId yok). Hata sessiz: bildirim zaten kapandi. */

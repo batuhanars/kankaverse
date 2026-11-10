@@ -1,4 +1,6 @@
-import { messagesApi, type MessageDto } from '@/api/messages';
+import type { MessageDto } from '@/api/messages';
+import { DeviceRemovedError, GroupNotReadyError } from '@kankaverse/e2ee-client';
+import { sendMessage } from '@/stores/e2ee';
 import { useAuthStore } from '@/stores/auth';
 import { useMessagesStore } from '@/stores/messages';
 import { t } from '@/i18n';
@@ -27,6 +29,9 @@ function newNonce(): string {
 
 /** Sunucu `message`'i (Turkce) varsa o; cevap hic gelmediyse (ag) "Baglanti yok" metni. */
 function errorText(e: unknown): string {
+  // E1: yerel şifreleme hataları (ağ hatası değil): kullanıcıya doğru sebep, "Tekrar dene" çalışır.
+  if (e instanceof GroupNotReadyError) return t('e2ee.errors.notReady');
+  if (e instanceof DeviceRemovedError) return t('e2ee.errors.deviceRemoved');
   const response = (e as { response?: { data?: { message?: string } } }).response;
   if (!response) return t('message.local.offline');
   return response.data?.message ?? t('common.error');
@@ -36,7 +41,7 @@ function transmit(channelId: string, nonce: string, text: string, replyToId: str
   const run = async () => {
     const store = useMessagesStore.getState();
     try {
-      const message = await messagesApi.send(channelId, text, replyToId, undefined, nonce);
+      const message = await sendMessage(channelId, text, replyToId, undefined, nonce);
       // Eslestirme store'da (appendMessage): WS yayini once geldiyse id dedup'a takilir.
       store.appendMessage(message);
     } catch (e) {

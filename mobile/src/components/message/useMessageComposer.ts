@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { messagesApi, type MessageDto } from '@/api/messages';
+import type { MessageDto } from '@/api/messages';
+import { sendMessage } from '@/stores/e2ee';
 import { extractErrorCode, extractErrorMessage } from '@/api/errors';
 import {
   isStorageUploadError,
@@ -137,7 +138,7 @@ export function useMessageComposer(
     const payload = mentions ? mentions.applyMentionTokens(trimmed) : trimmed;
     try {
       const attachmentIds = drafts.length ? await uploadAttachments(drafts) : undefined;
-      const message = await messagesApi.send(channelId, payload, replyTo?.id, attachmentIds);
+      const message = await sendMessage(channelId, payload, replyTo?.id, attachmentIds);
       appendMessage(message);
       setReplyTo(null);
       // Şerit zaten boşsa gereksiz render açılmasın (mutlu yol artık state'e hiç dokunmuyor).

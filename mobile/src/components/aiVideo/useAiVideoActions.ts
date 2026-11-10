@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
 import { getVideoMetaData } from 'react-native-compressor';
 import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo';
-import { messagesApi } from '@/api/messages';
+import { sendMessage } from '@/stores/e2ee';
 import { t } from '@/i18n';
 import type { PickedProfileMedia } from '@/utils/animatedMedia';
 import { useGalleryDownload } from '../message/useSaveToGallery';
@@ -118,7 +118,7 @@ export function useAiVideoActions({ mode, setBusy, setError, onSend, onUse }: Op
 
   /**
    * C49 R1: view kipinde seçilen hedefe gönderim. Chat kipiyle aynı iki adım (ek oluştur + galeriye kaydet),
-   * sonra mesaj gönderme çağrısı hedef kanal kimliğiyle (`messagesApi.send`, yeni uç yok). Hata metnini döner.
+   * sonra mesaj gönderme çağrısı hedef kanal kimliğiyle (`sendMessage` (şifreli DM'de şifreler), yeni uç yok). Hata metnini döner.
    */
   async function sendTo(channelId: string): Promise<string | null> {
     const r = await currentRow();
@@ -126,7 +126,7 @@ export function useAiVideoActions({ mode, setBusy, setError, onSend, onUse }: Op
     try {
       const { attachmentId } = await aiVideoApi.createAttachment(r.id);
       await saveRow(r);
-      await messagesApi.send(channelId, '', undefined, [attachmentId]);
+      await sendMessage(channelId, '', undefined, [attachmentId]);
       return null;
     } catch (e) {
       return aiVideoFailText(e);

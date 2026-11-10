@@ -2,6 +2,8 @@ import { Alert, AppState } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 import { getAccessToken, refreshAccessToken } from '@/api/http';
 import { useMessagesStore } from '@/stores/messages';
+import { hydrateOne } from '@/stores/e2ee';
+import { bindE2eeSocket } from './e2eeSocket';
 import { useTypingStore } from '@/stores/typing';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useAiVideoViewerStore } from '@/stores/aiVideoViewer';
@@ -167,13 +169,24 @@ function ensureSocket(): Socket {
     }
   });
 
+  bindE2eeSocket(socket); // E1: e2ee:welcome / e2ee:commit / e2ee:devices-changed
+
   socket.on('message.created', (message: MessageDto) => {
-    useMessagesStore.getState().appendMessage(message);
+    // E1: şifreli mesaj önce çözülür (motor işleri art arda yürütür, sıra korunur), şifresiz anında.
+    if (message.encrypted) {
+      void hydrateOne(message).then((m) => m && useMessagesStore.getState().appendMessage(m));
+    } else {
+      useMessagesStore.getState().appendMessage(message);
+    }
     useTypingStore.getState().handleClear(message.channelId, message.author.id);
   });
 
   socket.on('message.updated', (message: MessageDto) => {
-    useMessagesStore.getState().updateMessage(message);
+    if (message.encrypted) {
+      void hydrateOne(message).then((m) => m && useMessagesStore.getState().updateMessage(m));
+    } else {
+      useMessagesStore.getState().updateMessage(message);
+    }
   });
 
   socket.on('message.deleted', (data: { messageId: string; channelId: string }) => {
@@ -276,7 +289,7 @@ function ensureSocket(): Socket {
   // kimse dinlemiyordu → DM listesi, istek rozeti ve bildirim rozeti bayat kalıyordu. Web
   // `composables/useSocket.ts` ile aynı olay kümesi (bu sprintte kullanılan alt küme).
 
-  socket.on('dm.message', (data: { channelId: string; lastMessage: { content: string; createdAt: string }; senderId: string }) => {
+  socket.on('dm.message', (data: { channelId: string; lastMessage: { content: string; createdAt: string; encrypted?: boolean }; senderId: string }) => {
     useDmStore.getState().applyActivity(data);
   });
 

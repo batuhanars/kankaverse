@@ -1,4 +1,5 @@
-import { messagesApi, type MessageDto } from '@/api/messages';
+import type { MessageDto } from '@/api/messages';
+import { sendMessage } from '@/stores/e2ee';
 import { extractErrorMessage } from '@/api/errors';
 import { buildDraftAttachment } from '@/components/message/attachmentDraft';
 import { isStorageUploadError, uploadDraftAttachment } from '@/utils/attachmentUpload';
@@ -98,7 +99,7 @@ export async function sendShare(args: {
   if (files.length > 0 && attachmentIds.length === 0) return { sent: null, failures, sendError: null };
 
   try {
-    const sent = await messagesApi.send(channelId, note.trim(), undefined, attachmentIds);
+    const sent = await sendMessage(channelId, note.trim(), undefined, attachmentIds);
     return { sent, failures, sendError: null };
   } catch (e) {
     return { sent: null, failures, sendError: extractErrorMessage(e) };

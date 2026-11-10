@@ -13,6 +13,7 @@ import {
 import { resetSocket } from '@/realtime/socket';
 import { clearPushToken } from '@/notifications/push';
 import { clearResume } from '@/utils/resumeLastScreen';
+import { wipeE2ee } from '@/stores/e2ee';
 
 export type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated';
 export type LoginResult = 'ok' | 'challenge' | 'error';
@@ -75,6 +76,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } catch {
         clearAccessToken();
         await clearRefreshToken();
+        await wipeE2ee(); // oturum yok: yerel şifreli depo kimseye ait değil
         set({ user: null, status: 'unauthenticated' });
       }
     })();
@@ -89,6 +91,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ challenge: { challengeToken: result.challengeToken } });
         return 'challenge';
       }
+      // E1: yeni giriş = yeni oturum zinciri = yeni şifreleme cihazı. Eski oturumdan kalan yerel şifreli
+      // depo bu oturuma ait değildir (cihaz kimliği/anahtarı uyuşmaz) ve başka hesaba ait olabilir: silinir.
+      await wipeE2ee();
       setAccessToken(result.accessToken);
       if (result.refreshToken) {
         await setRefreshToken(result.refreshToken);
@@ -107,6 +112,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ errorMessage: null });
     try {
       const result = await authApi.loginTwoFa(challenge.challengeToken, code);
+      // E1: yeni giriş = yeni oturum zinciri = yeni şifreleme cihazı. Eski oturumdan kalan yerel şifreli
+      // depo bu oturuma ait değildir (cihaz kimliği/anahtarı uyuşmaz) ve başka hesaba ait olabilir: silinir.
+      await wipeE2ee();
       setAccessToken(result.accessToken);
       if (result.refreshToken) {
         await setRefreshToken(result.refreshToken);
@@ -123,6 +131,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ errorMessage: null });
     try {
       const result = await authApi.register(payload);
+      // E1: yeni giriş = yeni oturum zinciri = yeni şifreleme cihazı. Eski oturumdan kalan yerel şifreli
+      // depo bu oturuma ait değildir (cihaz kimliği/anahtarı uyuşmaz) ve başka hesaba ait olabilir: silinir.
+      await wipeE2ee();
       setAccessToken(result.accessToken);
       if (result.refreshToken) {
         await setRefreshToken(result.refreshToken);
@@ -151,6 +162,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       clearAccessToken();
       await clearRefreshToken();
       resetSocket();
+      await wipeE2ee(); // çıkışta tüm yerel şifreli depo silinir (E1 §5)
       set({ user: null, status: 'unauthenticated', challenge: null, errorMessage: null });
     }
   },
@@ -172,5 +184,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 // olarak kaydediyor; http.ts yalnız bu callback'i tetikliyor.
 setSessionExpiredHandler(() => {
   resetSocket();
+  void wipeE2ee(); // oturum zinciri bitti: cihaz sunucuda iptal edildi, yerel depo artık geçersiz
   useAuthStore.setState({ user: null, status: 'unauthenticated', challenge: null, errorMessage: null });
 });

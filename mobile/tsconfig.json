@@ -11,6 +11,12 @@
       ],
       "@modules/*": [
         "./modules/*"
+      ],
+      "@kankaverse/e2ee-core": [
+        "../shared/e2ee-core/src/index.ts"
+      ],
+      "@kankaverse/e2ee-client": [
+        "../shared/e2ee-client/src/index.ts"
       ]
     }
   },
@@ -19,5 +25,9 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "tests"
   ]
 }

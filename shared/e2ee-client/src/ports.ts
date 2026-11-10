@@ -109,4 +109,11 @@ export interface EngineDeps {
   onWarn: WarningHandler
   /** İsteğe bağlı günlük; içerik (mesaj metni, anahtar) ASLA verilmez. Varsayılan: console.error. */
   log?: (message: string, error?: unknown) => void
+  /**
+   * Toplu çözmede iki mesaj arasında olay döngüsüne dönmek için (mobil: setTimeout 0). Yoksa (web) dönülmez.
+   * Neden: ardışık `await` mikro görevdir, JS iş parçacığını bırakmaz; çözme ~70 ms/mesaj, arayüz donardı.
+   */
+  yieldToUi?: () => Promise<void>
+  /** İsteğe bağlı ölçüm: yalnız süre (ms) ve adet. İçerik ASLA verilmez. */
+  metric?: (name: string, ms: number, count: number) => void
 }

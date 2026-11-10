@@ -43,6 +43,8 @@ export class E2eeEngine {
   private withLock: WithLock
   private onWarn: WarningHandler
   private log: (message: string, error?: unknown) => void
+  private yieldToUi: EngineDeps['yieldToUi']
+  private metric: EngineDeps['metric']
   private own: OwnPlain = new Map()
 
   private constructor(userId: string, deps: EngineDeps, vault: Vault) {
@@ -53,6 +55,8 @@ export class E2eeEngine {
     this.withLock = deps.withLock
     this.onWarn = deps.onWarn
     this.log = deps.log ?? ((m, e) => console.error(m, e))
+    this.yieldToUi = deps.yieldToUi
+    this.metric = deps.metric
   }
 
   /** `null` = bu hesap için E2EE kapalı (bayrak/izin listesi). Cihaz kurulamazsa hata (uyarı ayrıca verilir). */
@@ -81,6 +85,8 @@ export class E2eeEngine {
       api: this.api,
       store: this.store,
       warn: this.onWarn,
+      yieldToUi: this.yieldToUi,
+      metric: this.metric,
       getDevice: async () => {
         device ??= await this.store.loadDevice()
         if (!device) throw new DeviceBrokenError('Yerel cihaz yok')

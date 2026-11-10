@@ -154,9 +154,9 @@ export default function DmRequestsScreen() {
                   )}
                   <Text style={styles.username}>{item.requester?.username ?? t('notification.someone')}</Text>
                 </View>
-                {item.preview ? (
+                {item.preview || item.encrypted ? (
                   <Text style={styles.preview} numberOfLines={2}>
-                    {item.preview}
+                    {item.encrypted ? t('e2ee.preview') : item.preview}
                   </Text>
                 ) : null}
                 <View style={styles.actions}>

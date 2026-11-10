@@ -20,7 +20,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 64,
+      "versionCode": 65,
       "permissions": [
         "android.permission.BLUETOOTH_CONNECT"
       ]
@@ -106,7 +106,8 @@
       ],
       "expo-audio",
       "expo-video",
-      "react-native-compressor"
+      "react-native-compressor",
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

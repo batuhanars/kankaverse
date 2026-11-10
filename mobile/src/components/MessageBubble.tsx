@@ -6,6 +6,7 @@ import { AttachmentView } from './AttachmentView';
 import { PresenceDot } from './PresenceDot';
 import { usePresenceStore, selectStatus } from '@/stores/presence';
 import { BubbleMeta, MetaSpacer, ReactionRow, ReplyQuote } from './message/BubbleParts';
+import { E2eeStatusNote } from './message/E2eeStatusNote';
 import { EmbedCards } from './message/EmbedCard';
 import { BUBBLE_TAP_MAX_DURATION_MS } from './message/MediaPressable';
 import { MarkdownText } from './message/MarkdownText';
@@ -233,6 +234,11 @@ export function MessageBubble({
 
           {isWebhook && embeds.length > 0 && (
             <EmbedCards embeds={embeds} resolveMention={resolveMention} resolveRole={resolveRole} />
+          )}
+
+          {/* E1: çözülemeyen / bilinmeyen sürümlü şifreli mesaj (metin yok, durum cümlesi) */}
+          {!hasContent && message.e2eeStatus && message.e2eeStatus !== 'ok' && (
+            <E2eeStatusNote status={message.e2eeStatus} />
           )}
 
           {/* Açıklama eklerin ALTINDA (sahip revizesi 2026-10-15, WhatsApp düzeni). */}

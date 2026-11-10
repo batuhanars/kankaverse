@@ -11,7 +11,8 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { messagesApi, type MessageDto } from '@/api/messages';
+import type { MessageDto } from '@/api/messages';
+import { sendMessage } from '@/stores/e2ee';
 import { attachmentsApi } from '@/api/attachments';
 import { extractErrorMessage } from '@/api/errors';
 import { useAttachmentThumb } from './replyPreview';
@@ -73,7 +74,7 @@ export function ForwardMessageModal({ message, onClose }: Props) {
       // Her hedef kendi kopyalarini alir (ek tek mesaja baglanir). Paralel kopya; biri reddedilirse
       // hedef "gonderildi" isaretlenmez (kopyalanip baglanmayan ek sahipsiz kalir, presign'daki gibi).
       const copies = await Promise.all(attachments.map((a) => attachmentsApi.forward(a.id)));
-      await messagesApi.send(
+      await sendMessage(
         channelId,
         forwardText,
         undefined,
