@@ -7,7 +7,7 @@ import {
   type WarningHandler,
   type WithLock,
 } from '@kankaverse/e2ee-client'
-import { webProvider } from '@kankaverse/e2ee-core'
+import { detectWebProvider } from '@kankaverse/e2ee-core'
 import { destroyOtherVaults, Vault } from './vault'
 
 const sameTab = serialLock()
@@ -21,11 +21,19 @@ const webLock: WithLock = (name, task) => {
   return sameTab(name, () => locks.request(name, task))
 }
 
-export function startWebEngine(
+let loggedPath = false
+
+export async function startWebEngine(
   userId: string,
   api: E2eeApi,
   onWarn: WarningHandler,
 ): Promise<E2eeEngine | null> {
+  // Eski Chromium (Electron 36 = 136) WebCrypto Ed25519 yok: motor saf noble yoluna duser.
+  const provider = await detectWebProvider()
+  if (!loggedPath) {
+    loggedPath = true
+    console.info(`[e2ee] kripto yolu: ${provider.name}`)
+  }
   return E2eeEngine.start(userId, {
     api,
     // Aynı tarayıcıdaki başka hesapların kalıntısı bu kullanıcıya karışmasın / sızmasın (hesap değişimi).
@@ -34,7 +42,7 @@ export function startWebEngine(
       return Vault.open(id)
     },
     withLock: webLock,
-    provider: webProvider,
+    provider,
     onWarn,
   })
 }
