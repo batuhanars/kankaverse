@@ -22,7 +22,7 @@ import AiVideoSendTargetModal from '@/components/shared/AiVideoSendTargetModal.v
 import { useAiVideo } from '@/composables/useAiVideo'
 import { useAiVideoViewer } from '@/composables/useAiVideoViewer'
 import { aiVideoApi, type AiVideoDto } from '@/api/aiVideo'
-import { messagesApi } from '@/api/messages'
+import { useE2eeStore } from '@/stores/e2ee'
 import { useToastStore } from '@/stores/toast'
 
 const props = defineProps<{ mode: 'chat' | 'media' | 'view'; initialId?: string }>()
@@ -184,7 +184,7 @@ async function onPickTarget(channelId: string) {
     return
   }
   try {
-    await messagesApi.send(channelId, '', undefined, [attachmentId])
+    await useE2eeStore().send(channelId, '', undefined, [attachmentId])
     toast.success(t('aiVideo.sent'))
     emit('close')
   } catch (e: unknown) {

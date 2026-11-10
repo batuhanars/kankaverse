@@ -8,9 +8,15 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // E1 §6.1: tek çekirdek, iki istemci. Paket kopyalanmaz, kaynağından derlenir.
+      '@kankaverse/e2ee-core': fileURLToPath(
+        new URL('../shared/e2ee-core/src/index.ts', import.meta.url),
+      ),
     },
   },
   server: {
+    // Çekirdek web/ dışında (../shared); dev sunucusu oradan dosya servis edebilsin.
+    fs: { allow: ['..'] },
     proxy: {
       '/api': {
         // 127.0.0.1 (localhost değil): localhost Windows'ta önce ::1'e çözülür,

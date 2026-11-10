@@ -14,6 +14,7 @@ import { useMessageJump } from '@/composables/useMessageJump'
 import { useMembersStore } from '@/stores/members'
 import { useAuthStore } from '@/stores/auth'
 import { useDmStore } from '@/stores/dm'
+import { useE2eeStore } from '@/stores/e2ee'
 import { formatMentionsPlain } from '@/utils/mentions'
 import type { MessageDto } from '@/types'
 
@@ -33,6 +34,7 @@ const { requestJump } = useMessageJump()
 const membersStore = useMembersStore()
 const authStore = useAuthStore()
 const dmStore = useDmStore()
+const e2eeStore = useE2eeStore()
 
 // REV-3 part2: aynı kutuda ortam üyelerini ara (client-side, anlık). Yalnız guild bağlamında.
 const memberResults = computed(() => {
@@ -187,6 +189,15 @@ function onDocKeydown(e: KeyboardEvent) {
         ✕
       </button>
     </div>
+
+    <!-- E1: şifreli DM'de sunucu araması şifreli mesajları görmez; kullanıcıya açıkça söylenir -->
+    <p
+      v-if="e2eeStore.channels[channelId]?.encrypted"
+      class="px-4 py-2 text-[12px] shrink-0 border-b"
+      style="color: var(--kv-text-muted); border-color: var(--kv-border-subtle);"
+    >
+      {{ t('e2ee.searchNote') }}
+    </p>
 
     <!-- Arama input'u -->
     <div class="px-4 py-2 shrink-0 border-b" style="border-color: var(--kv-border-subtle);">

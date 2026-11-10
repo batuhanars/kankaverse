@@ -11,6 +11,7 @@
 import { onMounted, onUnmounted, watch, ref, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useE2eeStore } from '@/stores/e2ee'
 import { useGuildsStore } from '@/stores/guilds'
 import { useChannelsStore } from '@/stores/channels'
 import { useDmStore } from '@/stores/dm'
@@ -36,6 +37,7 @@ import UserSettingsView from '@/views/settings/UserSettingsView.vue'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const e2eeStore = useE2eeStore()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
@@ -135,6 +137,8 @@ async function logout() {
 }
 
 onMounted(async () => {
+  // E1: bayrak açıksa cihaz kaydı + KeyPackage + bekleyen Welcome (arka planda; arayüzü bekletmez).
+  if (authStore.user) void e2eeStore.init(authStore.user.id)
   // İlk veri yükü: rail + DM listesi (her view kendi derin-verisini ayrıca kurar)
   await guildsStore.fetchGuilds()
   await dmStore.fetchChannels()

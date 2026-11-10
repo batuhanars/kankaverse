@@ -1,7 +1,9 @@
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useMessagesStore } from '@/stores/messages'
-import { messagesApi } from '@/api/messages'
+import { useE2eeStore } from '@/stores/e2ee'
+import { GroupNotReadyError } from '@/lib/e2ee/context'
+import { DeviceRemovedError } from '@/lib/e2ee/channelSync'
 import type { MessageDto } from '@/types'
 
 /**
@@ -33,9 +35,13 @@ export function useOptimisticSend() {
   const t = i18n.t
   const authStore = useAuthStore()
   const messagesStore = useMessagesStore()
+  const e2eeStore = useE2eeStore()
 
   /** Sunucu/ağ hatasını kullanıcıya gösterilecek Türkçe metne çevirir. */
   function errorText(e: unknown, onSlowMode?: (seconds: number | null) => void): string {
+    // E1: yerel şifreleme hataları (ağ hatası değil): kullanıcıya doğru sebep, "tekrar dene" çalışır.
+    if (e instanceof GroupNotReadyError) return t('e2ee.errors.notReady')
+    if (e instanceof DeviceRemovedError) return t('e2ee.errors.deviceRemoved')
     const data = (
       e as { response?: { data?: { error?: string; message?: string; retryAfter?: number } } }
     ).response?.data
@@ -61,7 +67,8 @@ export function useOptimisticSend() {
   ) {
     const run = async () => {
       try {
-        const { data } = await messagesApi.send(channelId, text, replyToId, undefined, nonce)
+        // E1: şifreli DM'de burada şifrelenir; çözülmüş (düz metinli) mesaj döner.
+        const data = await e2eeStore.send(channelId, text, replyToId, undefined, nonce)
         // Eşleştirme store'da (appendMessage): WS yayını önce geldiyse id dedup'a takılır.
         messagesStore.appendMessage(data)
       } catch (e: unknown) {

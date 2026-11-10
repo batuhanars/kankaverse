@@ -50,7 +50,11 @@ function fire(title: string, body: string, onClick: () => void, tag: string) {
  * DM / grup DM mesajı (dm.message WS olayı). isActive: kullanıcı şu an bu DM'i açık tutuyor mu.
  */
 export function maybeFireDmToast(
-  payload: { channelId: string; lastMessage: { content: string }; senderId: string },
+  payload: {
+    channelId: string
+    lastMessage: { content: string; encrypted?: boolean }
+    senderId: string
+  },
   isActive: boolean,
 ) {
   if (!isElectron()) return
@@ -67,7 +71,10 @@ export function maybeFireDmToast(
   const { t } = i18n.global
   const dm = useDmStore()
   const channel = dm.channels.find((c) => c.id === payload.channelId)
-  const content = payload.lastMessage.content || t('notification.someone')
+  // E1: şifreli DM'de sunucu içerik taşımaz; genel "🔒 Şifreli mesaj" gösterilir (E3'e kadar).
+  const content = payload.lastMessage.encrypted
+    ? t('e2ee.preview')
+    : payload.lastMessage.content || t('notification.someone')
 
   let title: string
   let body: string

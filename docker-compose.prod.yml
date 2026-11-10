@@ -51,7 +51,9 @@ services:
   web:
     image: ghcr.io/batuhanars/kankaverse-web:${IMAGE_TAG:-latest}
     build:
-      context: ./web
+      # E1 §6.1: context kök (web, shared/e2ee-core'u da derler)
+      context: .
+      dockerfile: web/Dockerfile
       args:
         # Build-time API URL — Vite gömer. Kendi domain'ine göre değiştir.
         VITE_API_URL: ${VITE_API_URL}

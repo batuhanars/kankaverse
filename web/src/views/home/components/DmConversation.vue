@@ -28,6 +28,11 @@ import ReportModal from '@/components/shared/ReportModal.vue'
 import ComposerBar from '@/components/shared/ComposerBar.vue'
 import MessageRow from '@/components/shared/MessageRow.vue'
 import DateDivider from '@/components/shared/DateDivider.vue'
+import E2eeDivider from '@/components/shared/E2eeDivider.vue'
+import E2eeLockIcon from '@/components/shared/E2eeLockIcon.vue'
+import E2eeWarningBanner from '@/components/shared/E2eeWarningBanner.vue'
+import { useE2eeChannelView } from '@/composables/useE2eeChannelView'
+import { useE2eeStore } from '@/stores/e2ee'
 import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
 import ReactionPill from '@/components/shared/ReactionPill.vue'
 import ReactionsModal from '@/components/shared/ReactionsModal.vue'
@@ -118,6 +123,7 @@ const { t } = useI18n()
 const optimistic = useOptimisticSend()
 const messagesStore = useMessagesStore()
 const dmStore = useDmStore()
+const e2eeStore = useE2eeStore()
 const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
 const callStore = useCallStore()
@@ -307,8 +313,13 @@ async function saveEdit() {
   state.loading = true
   state.error = ''
   try {
-    const { data } = await messagesApi.editMessage(props.channel.id, state.messageId, editMention.applyMentionTokens(trimmed))
-    messagesStore.updateMessage(data)
+    const text = editMention.applyMentionTokens(trimmed)
+    const target = messages.value.find((m) => m.id === state.messageId)
+    // E1: şifreli mesaj düzenlemesi yeni ciphertext ile gider (PATCH ciphertext), düz içerik sunucuya gitmez.
+    const updated = target?.encrypted
+      ? await e2eeStore.editEncrypted(props.channel.id, state.messageId, text)
+      : (await messagesApi.editMessage(props.channel.id, state.messageId, text)).data
+    if (updated) messagesStore.updateMessage(updated)
     editState.value = null
   } catch (e: unknown) {
     const err = e as { response?: { data?: { error?: string } } }
@@ -357,6 +368,7 @@ const messages = computed(() => messagesStore.messagesForChannel(props.channel.i
 // M6b §8.4: sesli mesaj sırası (biten ses → sıradaki)
 useAudioQueue(() => props.channel.id, messages)
 const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channel.id] ?? false)
+const e2eeView = useE2eeChannelView(() => props.channel.id, messages, hasMore)
 
 watch(
   () => props.channel.id,
@@ -365,7 +377,10 @@ watch(
     if (!id) return
     const ack = await joinChannel(id)
     realtimeError.value = !ack.ok
+    // E1: şifreli DM'de önce Welcome/commit'ler işlenir ki mesajlar doğru epoch'ta çözülsün.
+    await e2eeStore.openChannel(id)
     await messagesStore.fetchMessages(id)
+    void e2eeStore.syncChannel(id) // E1: mesajlar çözüldükten SONRA commit senkronu (sıra önemli)
     await dmStore.markRead(id)
     // REV-11: bu kanalda devam eden çağrı var mı (snapshot) → "Sese Katıl" göster.
     // Ayrıca canlı presence'a abone ol → biri çıkınca voice.participant_left ile liste
@@ -502,7 +517,7 @@ async function onAttachmentSent({ attachmentId, caption }: { attachmentId: strin
   const replyId = replyingTo.value?.id
   replyingTo.value = null
   try {
-    const { data } = await messagesApi.send(props.channel.id, caption, replyId, [attachmentId])
+    const data = await e2eeStore.send(props.channel.id, caption, replyId, [attachmentId])
     stickToBottom = true // kendi eki gönderdim → dibe kay
     messagesStore.appendMessage(data)
   } catch {
@@ -731,8 +746,11 @@ const dayLabels = computed<(string | null)[]>(() =>
             <span v-else>{{ dmChannel.otherUser.username[0].toUpperCase() }}</span>
           </div>
           <div class="flex-1 min-w-0 flex flex-col justify-center">
-            <span class="text-[15px] font-semibold truncate leading-[1.25]" style="color: var(--kv-text-primary);">
-              {{ dmChannel.otherUser.username }}
+            <span class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[15px] font-semibold truncate leading-[1.25]" style="color: var(--kv-text-primary);">
+                {{ dmChannel.otherUser.username }}
+              </span>
+              <E2eeLockIcon v-if="e2eeView.encrypted.value" />
             </span>
             <span
               v-if="dmPresenceColor && dmPresence"
@@ -973,6 +991,9 @@ const dayLabels = computed<(string | null)[]>(() =>
         {{ t('message.realtimeError') }}
       </div>
 
+      <!-- E1: tanınmayan cihaz / cihaz çıkarıldı uyarısı (mesajlaşma durur) -->
+      <E2eeWarningBanner v-if="e2eeView.warning.value" :kind="e2eeView.warning.value" />
+
       <!-- Aktif sesli arama kartı (kabul edilince mesajların üstünde) -->
       <DmCallPanel :channel-id="channel.id" />
 
@@ -999,6 +1020,7 @@ const dayLabels = computed<(string | null)[]>(() =>
         <template v-for="(msg, index) in messages" :key="msg.nonce ?? msg.id">
         <!-- C11: gün değişiminde ayraç (Bugün · Dün · 25 Ekim 2026) -->
         <DateDivider v-if="dayLabels[index]" :label="dayLabels[index] || ''" />
+        <E2eeDivider v-if="e2eeView.dividerIndex.value === index" />
         <MessageRow
           :message="msg"
           :is-mine="isMine(msg)"
@@ -1058,6 +1080,7 @@ const dayLabels = computed<(string | null)[]>(() =>
           </template>
         </MessageRow>
         </template>
+        <E2eeDivider v-if="e2eeView.dividerIndex.value === messages.length" />
       </div>
 
       <!-- En alta in: yukarı kaydırınca görünür; yukarıdayken gelen mesaj sayısı rozette (REV-9) -->

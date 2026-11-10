@@ -10,7 +10,7 @@ import { useToastStore } from '@/stores/toast'
 import { useAppModals } from '@/composables/useAppModals'
 import { usersApi } from '@/api/users'
 import { friendsApi } from '@/api/friends'
-import { messagesApi } from '@/api/messages'
+import { useE2eeStore } from '@/stores/e2ee'
 import { bannerBackground } from '@/utils/bannerColor'
 import { animatedOrStatic } from '@/utils/animatedMedia'
 import { renderMessageHtml } from '@/utils/markdown'
@@ -84,7 +84,7 @@ async function sendInline() {
   errorMsg.value = ''
   try {
     const channel = await dmStore.openChannel(props.userId)
-    await messagesApi.send(channel.id, text)
+    await useE2eeStore().send(channel.id, text)
     draft.value = ''
     void router.push({ name: 'dm', params: { channelId: channel.id } })
     emit('close')

@@ -12,6 +12,8 @@ import { useMembersStore } from '@/stores/members'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import type { GuildMemberDto, ChannelDto, CategoryDto, RoleDto } from '@/types'
 import { useAuthStore } from '@/stores/auth'
+import { useE2eeStore } from '@/stores/e2ee'
+import { bindE2eeSocket } from '@/composables/useE2eeSocket'
 import { useRolesStore } from '@/stores/roles'
 import { useActivityStore } from '@/stores/activity'
 import { useEventsStore } from '@/stores/events'
@@ -125,6 +127,7 @@ export function useSocket() {
   const membersStore = useMembersStore()
   const prefsStore = useNotificationPrefsStore()
   const authStore = useAuthStore()
+  const e2eeStore = useE2eeStore()
   const rolesStore = useRolesStore()
   const eventsStore = useEventsStore()
   const voiceStore = useVoiceStore()
@@ -211,15 +214,22 @@ export function useSocket() {
       }
     })
 
+    bindE2eeSocket(socket) // E1: e2ee:welcome / e2ee:commit / e2ee:devices-changed
+
     socket.on('message.created', (message: MessageDto) => {
-      messagesStore.appendMessage(message)
+      // E1: şifreli mesaj önce çözülür (sıra korunur: motor işleri art arda yürütür), şifresiz anında.
+      if (message.encrypted) {
+        void e2eeStore.hydrateOne(message).then((m) => m && messagesStore.appendMessage(m))
+      } else messagesStore.appendMessage(message)
       // Mesaj gelince o kanalda yazıyor göstergesini temizle
       clearTypingForChannel(message.channelId)
     })
 
     // Sprint 6.2: mesaj düzenleme / silme WS olayları
     socket.on('message.updated', (message: MessageDto) => {
-      messagesStore.updateMessage(message)
+      if (message.encrypted) {
+        void e2eeStore.hydrateOne(message).then((m) => m && messagesStore.updateMessage(m))
+      } else messagesStore.updateMessage(message)
     })
 
     socket.on('message.deleted', (data: { messageId: string; channelId: string }) => {
@@ -230,7 +240,7 @@ export function useSocket() {
       'dm.message',
       (data: {
         channelId: string
-        lastMessage: { content: string; createdAt: string }
+        lastMessage: { content: string; createdAt: string; encrypted?: boolean }
         senderId: string
       }) => {
         // Sprint WEB-PARITE §2.2 — susturulmuş/`NONE` DM okunmamış SAYILMAZ; ama sohbet listede

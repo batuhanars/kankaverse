@@ -137,7 +137,7 @@ async function reject(block: boolean) {
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-[14px] font-medium truncate" style="color: var(--kv-text-primary);">{{ req.requester?.username ?? '—' }}</p>
-            <p class="text-[12px] truncate" style="color: var(--kv-text-muted);">{{ req.preview }}</p>
+            <p class="text-[12px] truncate" style="color: var(--kv-text-muted);">{{ req.encrypted ? t('e2ee.preview') : req.preview }}</p>
           </div>
         </button>
       </div>
@@ -161,7 +161,7 @@ async function reject(block: boolean) {
         <!-- Mesaj detayı -->
         <div class="rounded-[var(--kv-radius-md)] border px-4 py-3 mb-6" style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);">
           <p class="text-[11px] font-semibold uppercase tracking-widest mb-1.5" style="color: var(--kv-text-muted);">{{ t('messageRequests.messageLabel') }}</p>
-          <p class="text-[14px] whitespace-pre-wrap break-words" style="color: var(--kv-text-primary);">{{ selected.preview }}</p>
+          <p class="text-[14px] whitespace-pre-wrap break-words" style="color: var(--kv-text-primary);">{{ selected.encrypted ? t('e2ee.preview') : selected.preview }}</p>
         </div>
 
         <!-- Aksiyonlar -->

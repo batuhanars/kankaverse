@@ -496,7 +496,7 @@ async function confirmDeleteGroup() {
             {{ t('dm.reactionPreview', { actor: ch.lastReaction.actorUsername, emoji: ch.lastReaction.emoji }) }}
           </p>
           <p v-else-if="ch.lastMessage" class="text-[12px] truncate" style="color: var(--kv-text-muted);">
-            {{ formatLastMessage(ch, ch.lastMessage.content) }}
+            {{ ch.lastMessage.encrypted ? t('e2ee.preview') : formatLastMessage(ch, ch.lastMessage.content) }}
           </p>
         </div>
 
