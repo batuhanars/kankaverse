@@ -174,7 +174,7 @@ E0 senaryolarının üretim API'siyle karşılığı (1-1 iki cihazlı, cihaz ek
 4. mobil (§5) → web ↔ telefon, telefon ↔ telefon denemesi (sahip cihazı + mümkünse ikinci marka)
 5. **R7 incelemesi 3** (istemci akışları) → merge, prod'a bayrak açık + izin listesi yalnız sahip ve test hesapları.
 
-**Cihaz turu DoD (sahip):** iki hesap, A'da web + telefon, B'de telefon: ilk mesajda grup kurulur, üç cihaz da çözer; A yeni tarayıcıda giriş yapınca o cihaz eklenir, eski mesajları "bu cihaz eklenmeden önce" görür, yenileri çözer; A bir oturumu kapatınca o cihaz gruptan çıkar ve yeni mesajı alamaz; uygulama kapatılıp açılınca geçmiş yerelden gelir; şifreli DM'de düz gönderim mümkün değil (sunucu reddeder); izin listesi dışı kullanıcıyla DM düz kalır.
+**Cihaz turu DoD (sahip):** (Rev.4: web ALICI tarafı gerçek tarayıcıda zorunlu, telefon yazar web okur; adım 3'te yalnız gönderen taraf tarayıcıda görüldü.) iki hesap, A'da web + telefon, B'de telefon: ilk mesajda grup kurulur, üç cihaz da çözer; A yeni tarayıcıda giriş yapınca o cihaz eklenir, eski mesajları "bu cihaz eklenmeden önce" görür, yenileri çözer; A bir oturumu kapatınca o cihaz gruptan çıkar ve yeni mesajı alamaz; uygulama kapatılıp açılınca geçmiş yerelden gelir; şifreli DM'de düz gönderim mümkün değil (sunucu reddeder); izin listesi dışı kullanıcıyla DM düz kalır.
 
 ## §6.1 Paketleme (Rev.1, adım 1 bulgusu)
 - **Web:** `vite.config.ts` alias `@kankaverse/e2ee-core` → `../shared/e2ee-core/src/index.ts` + `server.fs.allow: ['..']`; `tsconfig.app.json` `paths`. 🔴 Prod imajı: `web/Dockerfile` context'i `./web`, `../shared` imaja girmez. Adım 3'te web imajının context'i kök yapılır (`-f web/Dockerfile`, `COPY shared/e2ee-core`), CI `deploy.yml` buna göre; push sonrası CI'ın koştuğu teyit edilir.
