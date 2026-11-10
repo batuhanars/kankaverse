@@ -58,6 +58,7 @@ export async function createChannelGroup(
   }
   group.confirmCommit(pending)
   await ctx.store.saveGroup(channelId, group)
+  await ctx.store.saveJoinedAt(channelId, Date.now())
   return 'created'
 }
 

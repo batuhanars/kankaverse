@@ -5,6 +5,7 @@ import { GroupNotReadyError, type E2eeContext } from './context'
 import { createChannelGroup } from './groupCreate'
 import { reconcile } from './reconcile'
 import { devicesOf } from './registry'
+import { dropStaleGroup } from './staleGroup'
 import { processWelcomes } from './welcomes'
 
 export interface ChannelInfo {
@@ -28,13 +29,20 @@ export async function syncGroup(
   })
 }
 
-/** Yerel grubu yükler ve eşitler; grup yoksa null. */
+/**
+ * Yerel grubu yükler ve eşitler; grup yoksa null. Yerel grup bayatsa (§6.4) düşülür; sunucuda yeni grup
+ * varsa bekleyen Welcome ile katılınır. Bayat grupla commit işlenmez.
+ */
 export async function syncChannel(ctx: E2eeContext, channelId: string): Promise<Group | null> {
+  if (!(await ctx.store.loadGroup(channelId))) return null
+  const { data: state } = await ctx.api.channelState(channelId)
+  if (await dropStaleGroup(ctx, channelId, state)) {
+    if (!state.encrypted) return null
+    await processWelcomes(ctx)
+  }
   const group = await ctx.store.loadGroup(channelId)
   if (!group) return null
-  const view = {
-    devices: devicesOf((await ctx.api.channelState(channelId)).data),
-  }
+  const view = { devices: devicesOf(state) }
   await syncGroup(ctx, channelId, group, view)
   return group
 }
@@ -47,6 +55,7 @@ export async function syncChannel(ctx: E2eeContext, channelId: string): Promise<
 export async function openChannel(ctx: E2eeContext, channelId: string): Promise<ChannelInfo> {
   const { data: state } = await ctx.api.channelState(channelId)
   const info = { encrypted: state.encrypted, createdAt: state.createdAt }
+  await dropStaleGroup(ctx, channelId, state) // geri alma sonrası bayat grup (§6.4)
   if (!state.encrypted) return info
   if (!(await ctx.store.loadGroup(channelId))) await processWelcomes(ctx)
   return info
@@ -58,6 +67,7 @@ export async function openChannel(ctx: E2eeContext, channelId: string): Promise<
  */
 export async function groupForSend(ctx: E2eeContext, channelId: string): Promise<Group | null> {
   const { data: state } = await ctx.api.channelState(channelId)
+  await dropStaleGroup(ctx, channelId, state) // bayat grupla şifreleme yok (§6.4)
   if (!state.encrypted) {
     const outcome = await createChannelGroup(ctx, channelId, state)
     if (outcome === 'ineligible') return null

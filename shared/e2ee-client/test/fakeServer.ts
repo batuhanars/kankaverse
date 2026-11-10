@@ -47,6 +47,13 @@ export class FakeServer {
     d.kps = []
   }
 
+  /** Geri alma temizliği (§6.4): kanalın grubu, commit'leri ve Welcome'ları silinir; cihazlara dokunulmaz. */
+  rollback(channelId: string) {
+    this.groups.delete(channelId)
+    this.handshakes = this.handshakes.filter((h) => h.channelId !== channelId)
+    this.welcomes = this.welcomes.filter((w) => w.channelId !== channelId)
+  }
+
   deviceOfFamily(family: string): Dev | undefined {
     return [...this.devices.values()].find((d) => d.family === family)
   }

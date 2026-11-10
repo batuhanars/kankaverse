@@ -262,4 +262,88 @@ export function flowSuite(label: string, p: CryptoProvider) {
       expect(B1.warnings).toContainEqual([CH, 'unknown-device'])
     })
   })
+
+  describe(`[${label}] geri alma sonrası bayat yerel grup (§6.4)`, () => {
+    async function pair() {
+      const A1 = await login('A')
+      const B1 = await login('B')
+      const m1 = await send(A1, 'm1', 'geri almadan önce')
+      await as(B1, (e) => e.onWelcome())
+      await show(B1, [m1])
+      return { A1, B1, m1 }
+    }
+
+    it('eski grup yerelde, farklı groupId yeni Welcome: katılır, yeni mesaj çözülür, eski kayıt korunur', async () => {
+      const { A1, B1, m1 } = await pair()
+      const oldId = server.groups.get(CH)!.groupId
+      server.rollback(CH)
+      const m2 = await send(A1, 'm2', 'geri almadan sonra') // A bayat grubunu düşer, yeni grup kurar
+      expect(server.groups.get(CH)!.groupId).not.toBe(oldId)
+
+      expect(await as(B1, (e) => e.onWelcome())).toEqual([CH]) // bayat sayılıp katılındı
+      const shown = await show(B1, [m1, m2])
+      expect(shown.map((m) => m.content)).toEqual(['geri almadan önce', 'geri almadan sonra'])
+      // B yeni grupla cevap verir, A çözer.
+      const m3 = await send(B1, 'm3', 'cevap')
+      expect((await show(A1, [m3]))[0].content).toBe('cevap')
+    })
+
+    it('kanal açılışı (open) bayat grubu düşer ve yeni Welcome ile katılır', async () => {
+      const { A1, B1, m1 } = await pair()
+      server.rollback(CH)
+      const m2 = await send(A1, 'm2', 'yeni grup')
+      expect((await as(B1, (e) => e.open(CH))).encrypted).toBe(true)
+      expect((await show(B1, [m1, m2])).map((m) => m.content)).toEqual(['geri almadan önce', 'yeni grup'])
+    })
+
+    it('geri alma sonrası sunucu şifresiz (encrypted:false): bayat grup düşülür, mesaj kayıtları kalır', async () => {
+      const { B1, m1 } = await pair()
+      server.rollback(CH)
+      expect((await as(B1, (e) => e.open(CH))).encrypted).toBe(false)
+      expect(await B1.vault.get('groups', CH)).toBeNull()
+      expect((await show(B1, [m1]))[0].content).toBe('geri almadan önce')
+    })
+
+    it('aynı groupId: bayat Welcome hâlâ atlanır, grup durumu bozulmaz', async () => {
+      const { A1, B1, m1 } = await pair()
+      for (const w of server.welcomes) w.done = false // aynı grubun Welcome yeniden teslim
+      expect(await as(B1, (e) => e.onWelcome())).toEqual([]) // katılım yok, ack edildi
+      expect(server.welcomes.every((w) => w.done)).toBe(true)
+      const m2 = await send(A1, 'm2', 'hâlâ aynı grup')
+      expect((await show(B1, [m1, m2])).map((m) => m.content)).toEqual([
+        'geri almadan önce',
+        'hâlâ aynı grup',
+      ])
+    })
+
+    it('ağ/sunucu hatasında yerel grup SİLİNMEZ', async () => {
+      const { B1 } = await pair()
+      const real = server.apiFor('B', B1.family)
+      const down = () => Promise.reject(new Error('ağ yok'))
+      const broken = (await E2eeEngine.start('B', {
+        api: new Proxy(real, { get: (t, k) => (k === 'channelState' ? down : t[k as keyof typeof t]) }),
+        openVault: async () => B1.vault,
+        withLock: serialLock(),
+        provider,
+        onWarn: () => {},
+      }))!
+      await expect(broken.open(CH)).rejects.toThrow('ağ yok')
+      await expect(broken.onGroupChanged(CH)).rejects.toThrow('ağ yok')
+      expect(await B1.vault.get('groups', CH)).not.toBeNull()
+    })
+
+    it('etiket: katılımdan önceki mesaj undecryptable, katılımdan sonra çözülemeyen failed', async () => {
+      const { A1, B1, m1 } = await pair()
+      const A2 = await login('A')
+      await as(A1, (e) => e.onGroupChanged(CH))
+      await as(A2, (e) => e.onWelcome())
+      await as(B1, (e) => e.onGroupChanged(CH))
+      const m2 = await send(B1, 'm2', 'ikinci')
+      expect((await show(A2, [m1]))[0].e2eeStatus).toBe('undecryptable') // cihaz eklenmeden önce
+      expect((await show(A2, [m2]))[0].content).toBe('ikinci')
+      // Aynı şifreli yük ikinci kez: anahtar tüketildi, katılımdan SONRA gönderildi -> failed.
+      const replay = { ...m2, id: 'm2b', createdAt: '2099-01-01T00:00:00.000Z' }
+      expect((await show(A2, [replay]))[0]).toMatchObject({ content: '', e2eeStatus: 'failed' })
+    })
+  })
 }
