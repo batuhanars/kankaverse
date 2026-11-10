@@ -14,6 +14,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let message = 'Sunucu hatası oluştu.';
     let error = 'INTERNAL_ERROR';
     let retryAfter: number | undefined;
+    let currentEpoch: number | undefined;
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -26,6 +27,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         error = (r.error as string) ?? this.defaultError(statusCode);
         if (error === 'WEBHOOK_RATE_LIMITED' && typeof r.retryAfter === 'number') {
           retryAfter = r.retryAfter;
+        }
+        // E1: epoch çakışmasında istemci eksik commit'leri çekebilsin diye güncel epoch döner
+        if (error === 'E2EE_EPOCH_CONFLICT' && typeof r.currentEpoch === 'number') {
+          currentEpoch = r.currentEpoch;
         }
       } else {
         message = res;
@@ -48,6 +53,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       error,
       // C35 §2.7: Discord biçimi `retry_after` (saniye, sayı) + `retryAfter`; yalnız webhook hız sınırında
       ...(retryAfter !== undefined ? { retryAfter, retry_after: retryAfter } : {}),
+      ...(currentEpoch !== undefined ? { currentEpoch } : {}),
       timestamp: new Date().toISOString(),
       // C35 §2.3: gelen webhook adresindeki gizli token hata gövdesinde asla yansımaz
       path: maskWebhookPath(request.url),

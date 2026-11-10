@@ -43,6 +43,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       id: user.id,
       username: user.username,
       sessionId: payload.sessionId,
+      tokenFamily: session.tokenFamily, // E1: E2EE cihaz bağı (token içeriği değişmez)
       emailVerifiedAt: user.emailVerifiedAt,
       isModerator: user.isModerator,
     };

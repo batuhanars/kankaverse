@@ -482,6 +482,7 @@ describe('MessagesService enforcement — BAN/MUTE', () => {
       automodMock as any,
       configMock as any,
       moderationMock as any,
+      { planSend: jest.fn().mockResolvedValue({ encrypted: false }), planEdit: jest.fn() } as any,
     );
   }
 

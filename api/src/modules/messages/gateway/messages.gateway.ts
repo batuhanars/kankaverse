@@ -31,6 +31,7 @@ import {
 import { CallSignalService } from '../../../shared/call-signal/call-signal.service';
 import { VoiceService } from '../../voice/voice.service';
 import { GamesService } from '../../../shared/games/games.service';
+import { E2EE_PUSH_GENERIC_TEXT } from '../../e2ee/e2ee.constants';
 
 interface AuthSocket extends Socket {
   data: { userId: string; sessionId: string; username?: string };
@@ -819,17 +820,21 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     // Ek-yalnız mesajda gövde eklerden üretilir (ses/görsel/dosya); ek de yoksa eski '[dosya]'.
     const rawContent = typeof messageDto['content'] === 'string' ? messageDto['content'] : '';
-    const content =
-      previewFromAttachments(
-        rawContent,
-        messageDto['attachments'] as { contentType: string }[] | undefined,
-      ) || '[dosya]';
+    // E1: şifreli mesajda içerik sunucuya görünmez; push + liste önizlemesi sabit genel metin (E3'te değişecek).
+    const encrypted = messageDto['encrypted'] === true;
+    const content = encrypted
+      ? E2EE_PUSH_GENERIC_TEXT
+      : previewFromAttachments(
+          rawContent,
+          messageDto['attachments'] as { contentType: string }[] | undefined,
+        ) || '[dosya]';
 
     const payload = {
       channelId,
       lastMessage: {
         content,
         createdAt: messageDto['createdAt'] as string,
+        ...(encrypted ? { encrypted: true } : {}),
       },
       senderId: (messageDto['author'] as Record<string, string>)['id'],
     };

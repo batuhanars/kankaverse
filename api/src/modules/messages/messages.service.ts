@@ -16,6 +16,8 @@ import { ModerationService } from '../../shared/moderation/moderation.service';
 import { MESSAGE_AUTHOR_SELECT } from '../../common/utils/message-author.select';
 import { canModerateGroupTarget, getGroupRole } from '../../shared/group-roles/group-roles';
 import { loadRoleEmojis } from '../../common/utils/role-emoji.util';
+import { E2eeMessageService, E2eeSendPlan } from '../e2ee/e2ee-message.service';
+import { toB64 } from '../e2ee/e2ee.util';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { Attachment, Message, MessageReaction, Prisma, ScanStatus, User } from '@prisma/client';
@@ -165,6 +167,14 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
     // rol id'lerini görmeli (kendi rollerimle kesişim istemcide hesaplanır).
     mentionRoles: msg.mentionRoles ?? [],
     createdAt: msg.createdAt.toISOString(),
+    // E1: yalnız şifreli mesajda (şifresizde alan YOK). content '' kalır; istemci ciphertext'i çözer.
+    ...(msg.encrypted && msg.ciphertext
+      ? {
+          encrypted: true as const,
+          ciphertext: toB64(msg.ciphertext),
+          senderDeviceId: msg.senderDeviceId ?? null,
+        }
+      : {}),
   };
 }
 
@@ -216,6 +226,7 @@ export class MessagesService {
     private automod: AutomodService,
     private config: ConfigService,
     private moderation: ModerationService,
+    private e2ee: E2eeMessageService,
   ) {
     this.scanEnabled = config.get<boolean>('attachmentScanEnabled') ?? false;
   }
@@ -541,7 +552,7 @@ export class MessagesService {
     return dtos;
   }
 
-  async create(userId: string, channelId: string, dto: CreateMessageDto) {
+  async create(userId: string, channelId: string, dto: CreateMessageDto, tokenFamily?: string) {
     const channel = await this.membership.requireChannelAccess(userId, channelId);
 
     // R7 Enforcement: BAN (global) + MUTE (scope-aware) — webhook yürütmesiyle ORTAK çekirdek (C35 §3)
@@ -592,10 +603,18 @@ export class MessagesService {
       }
     }
 
+    // E1: şifreli kanalda ciphertext zorunlu/düz içerik yasak (409), şifresizde ciphertext 422; cihaz kapısı 403.
+    // (BAN/MUTE/salt-okunur kapılarından SONRA: yasaklı kullanıcı şifreleme durumunu yoklayamaz.)
+    const e2ee = await this.e2ee.planSend(
+      tokenFamily ? { id: userId, tokenFamily } : undefined,
+      channelId,
+      dto,
+    );
+
     // İçerik + ek doğrulama: ikisi de boş olamaz
     const hasContent = dto.content && dto.content.trim().length > 0;
     const hasAttachments = dto.attachmentIds && dto.attachmentIds.length > 0;
-    if (!hasContent && !hasAttachments) {
+    if (!hasContent && !hasAttachments && !e2ee.encrypted) {
       throw new BadRequestException({
         message: 'Mesaj içeriği veya en az bir dosya eki gereklidir.',
         error: 'EMPTY_MESSAGE',
@@ -678,11 +697,10 @@ export class MessagesService {
     }
 
     // §3: mention token parse + erişim doğrulaması (§4 T&S) — create'ten önce
-    const { mentions, mentionsEveryone, mentionRoles } = await this.resolveMentions(
-      channel,
-      dto.content ?? '',
-      userId,
-    );
+    // E1: şifreli mesajda içerik sunucuya görünmez → bahsetme çözümü yok (mentions=[]).
+    const { mentions, mentionsEveryone, mentionRoles } = e2ee.encrypted
+      ? { mentions: [], mentionsEveryone: false, mentionRoles: [] }
+      : await this.resolveMentions(channel, dto.content ?? '', userId);
 
     const message = await this.prisma.message.create({
       data: {
@@ -693,6 +711,7 @@ export class MessagesService {
         mentions,
         mentionsEveryone,
         mentionRoles,
+        ...this.e2eeMessageData(e2ee),
       },
       include: {
         author: { select: MESSAGE_AUTHOR_SELECT },
@@ -781,7 +800,44 @@ export class MessagesService {
     );
   }
 
-  async editMessage(userId: string, channelId: string, messageId: string, dto: UpdateMessageDto) {
+  /** E1: şifreli plan → Message alanları (şifresizde boş; `content` ayrıca '' kalır). */
+  private e2eeMessageData(plan: E2eeSendPlan) {
+    return plan.encrypted
+      ? { encrypted: true, ciphertext: plan.ciphertext, senderDeviceId: plan.senderDeviceId }
+      : {};
+  }
+
+  /** Mesaj + yazar + ek + tepki + yanıt alıntısı include'u (E1 şifreli düzenleme yolu için). */
+  private messageInclude() {
+    return {
+      author: { select: MESSAGE_AUTHOR_SELECT },
+      attachments: {
+        select: {
+          id: true,
+          filename: true,
+          contentType: true,
+          size: true,
+          scanStatus: true,
+          durationMs: true,
+          waveform: true,
+          thumbnail: true,
+          width: true,
+          height: true,
+          aiGenerationId: true,
+        },
+      },
+      reactions: { select: { userId: true, emoji: true } },
+      replyTo: REPLY_TO_INCLUDE,
+    } as const;
+  }
+
+  async editMessage(
+    userId: string,
+    channelId: string,
+    messageId: string,
+    dto: UpdateMessageDto,
+    tokenFamily?: string,
+  ) {
     const channel = await this.membership.requireChannelAccess(userId, channelId);
 
     const message = await this.prisma.message.findUnique({
@@ -805,6 +861,21 @@ export class MessagesService {
         message: 'Bu mesajı düzenleme yetkiniz yok.',
         error: 'NOT_MESSAGE_AUTHOR',
       });
+    }
+
+    // E1: şifreli mesajı yalnız `ciphertext` ile düzenle (mention/automod yok; içerik sunucuya görünmez).
+    const e2ee = await this.e2ee.planEdit(
+      tokenFamily ? { id: userId, tokenFamily } : undefined,
+      message,
+      dto,
+    );
+    if (e2ee.encrypted) {
+      const encUpdated = await this.prisma.message.update({
+        where: { id: messageId },
+        data: { editedAt: new Date(), ...this.e2eeMessageData(e2ee) },
+        include: this.messageInclude(),
+      });
+      return (await this.withRoleEmojis(channel.guildId, [toMessageDto(encUpdated, userId)]))[0];
     }
 
     // İçerik boş olamaz
@@ -1182,6 +1253,8 @@ export class MessagesService {
       where: {
         channelId,
         deletedAt: null,
+        // E1: şifreli mesajlar sunucu aramasına girmez (content '' zaten eşleşmez; açık koşul savunma derinliği)
+        encrypted: false,
         // q + has ortak helper'dan (ortam ucuyla aynı mantık — §5.1)
         ...this.buildSearchContentFilter(safeQ, hasFilter),
         // G4 clearedAt (gt) + cursor before (lt) TEK createdAt objesinde birleşik kalır (B1/D5)

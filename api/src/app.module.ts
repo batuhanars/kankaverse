@@ -30,6 +30,7 @@ import { PlatformUsersModule } from './modules/platform-users/platform-users.mod
 import { EmergencyModule } from './modules/emergency/emergency.module';
 import { GamesModule } from './modules/games/games.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { E2eeModule } from './modules/e2ee/e2ee.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -64,6 +65,7 @@ import configuration from './config/configuration';
     EmergencyModule,
     GamesModule,
     IntegrationsModule,
+    E2eeModule,
   ],
   providers: [
     {

@@ -31,6 +31,7 @@ function service() {
     automodMock as never,
     { get: jest.fn() } as never,
     moderationMock as never,
+    { planSend: jest.fn(), planEdit: jest.fn() } as never,
   );
 }
 

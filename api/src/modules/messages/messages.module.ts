@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { SharedModule } from '../../shared/shared.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { VoiceModule } from '../voice/voice.module';
+import { E2eeModule } from '../e2ee/e2ee.module';
 import { MessagesController, PinsController, GuildSearchController } from './messages.controller';
 import { MessagesService } from './messages.service';
 import { ReactionNotifierService } from './reaction-notifier.service';
@@ -13,7 +14,7 @@ import { MessagesGateway } from './gateway/messages.gateway';
 // VoiceService.getLiveParticipation ile sorar (LiveKit tarafı, tek doğruluk kaynağı — kopya
 // presence sorgusu yazılmadı). VoiceModule → MessagesModule bağımlılığı YOK, döngü riski yok.
 @Module({
-  imports: [JwtModule.register({}), SharedModule, NotificationsModule, VoiceModule],
+  imports: [JwtModule.register({}), SharedModule, NotificationsModule, VoiceModule, E2eeModule],
   controllers: [MessagesController, PinsController, GuildSearchController],
   providers: [MessagesService, MessagesGateway, ReactionNotifierService],
   // C35: WebhooksModule ortak çekirdeği (kapılar, DTO, yayın) bu iki servisten kullanır

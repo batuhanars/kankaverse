@@ -11,6 +11,8 @@ const prismaMock = {
   notificationPref: { deleteMany: jest.fn() },
   recoveryCode: { deleteMany: jest.fn() },
   recentGame: { deleteMany: jest.fn() },
+  e2eeDevice: { updateMany: jest.fn() },
+  e2eeKeyPackage: { deleteMany: jest.fn() },
   $transaction: jest.fn(),
 };
 
@@ -32,6 +34,8 @@ function resetMocks() {
   prismaMock.notificationPref.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.recoveryCode.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.recentGame.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.e2eeDevice.updateMany.mockResolvedValue({ count: 0 });
+  prismaMock.e2eeKeyPackage.deleteMany.mockResolvedValue({ count: 0 });
   // Varsayılan: interaktif transaction, tx = prismaMock'un kendisi
   prismaMock.$transaction.mockImplementation(
     async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock),
@@ -116,6 +120,13 @@ describe('PurgeJob.run — Sprint R6a §2 asgari kimlik imhası', () => {
     expect(typeof updateData.passwordHash).toBe('string');
     expect(updateData.passwordHash.length).toBeGreaterThan(0);
 
+    // E1: E2EE cihazları iptal + KeyPackage silme (aynı transaction)
+    expect(prismaMock.e2eeKeyPackage.deleteMany).toHaveBeenCalledWith({
+      where: { device: { userId: 'user-123' } },
+    });
+    expect(prismaMock.e2eeDevice.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 'user-123', revokedAt: null } }),
+    );
     expect(prismaMock.session.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-123' } });
     expect(prismaMock.pushToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-123' } });
     expect(prismaMock.notificationPref.deleteMany).toHaveBeenCalledWith({

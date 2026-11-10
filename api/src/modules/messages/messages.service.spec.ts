@@ -96,6 +96,9 @@ const moderationMock = {
   hasActiveMute: jest.fn().mockResolvedValue(false),
 };
 
+// E1: şifresiz plan (mevcut davranış testleri değişmez); E2EE kuralları e2ee-message.service.spec.ts'te
+const e2eeMock = { planSend: jest.fn(), planEdit: jest.fn() };
+
 function makeService() {
   return new MessagesService(
     prismaMock as any,
@@ -104,11 +107,14 @@ function makeService() {
     automodMock as any,
     configMock as any,
     moderationMock as any,
+    e2eeMock as any,
   );
 }
 
 function resetMocks() {
   jest.resetAllMocks();
+  e2eeMock.planSend.mockResolvedValue({ encrypted: false });
+  e2eeMock.planEdit.mockResolvedValue({ encrypted: false });
   prismaMock.guildMemberRole.findMany.mockResolvedValue([]);
   prismaMock.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(prismaMock));
   permissionsMock.hasGuildPermission.mockResolvedValue(true);
@@ -3702,5 +3708,101 @@ describe('MessagesService.create — C29 nonce yankısı', () => {
     const result = await service.create(USER_ID, GUILD_CHANNEL_ID, { content: 'selam' });
 
     expect('nonce' in result).toBe(false);
+  });
+});
+
+// ── E1: DM uçtan uca şifreleme — mesaj uçları ────────────────────────────────
+
+describe('MessagesService — E1 şifreli mesaj', () => {
+  let service: MessagesService;
+  const CT = new Uint8Array([1, 2, 3, 4]);
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+    membershipMock.requireChannelAccess.mockResolvedValue(DM_CHANNEL);
+  });
+
+  it('şifreli plan → content boş, mention çözülmez, ciphertext + senderDeviceId yazılır, DTO alanları döner', async () => {
+    e2eeMock.planSend.mockResolvedValue({
+      encrypted: true,
+      senderDeviceId: 'dev-1',
+      ciphertext: CT,
+    });
+    prismaMock.message.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ ...makeMsg('m-enc', new Date()), ...data }),
+    );
+
+    const dto = await service.create(USER_ID, CHANNEL_ID, { ciphertext: 'AQIDBA==' }, 'fam-1');
+
+    const data = (prismaMock.message.create.mock.calls[0][0] as { data: Record<string, unknown> })
+      .data;
+    expect(data.content).toBe('');
+    expect(data.mentions).toEqual([]);
+    expect(data.encrypted).toBe(true);
+    expect(data.ciphertext).toBe(CT);
+    expect(data.senderDeviceId).toBe('dev-1');
+    expect(e2eeMock.planSend).toHaveBeenCalledWith(
+      { id: USER_ID, tokenFamily: 'fam-1' },
+      CHANNEL_ID,
+      expect.any(Object),
+    );
+    expect(dto).toMatchObject({
+      content: '',
+      encrypted: true,
+      ciphertext: 'AQIDBA==',
+      senderDeviceId: 'dev-1',
+    });
+  });
+
+  it('şifresiz mesaj DTO sunda encrypted/ciphertext alanı YOK (mevcut istemciler değişmez)', async () => {
+    prismaMock.message.create.mockResolvedValue(makeMsg('m-plain', new Date()));
+    const dto = await service.create(USER_ID, CHANNEL_ID, { content: 'selam' });
+    expect('encrypted' in dto).toBe(false);
+    expect('ciphertext' in dto).toBe(false);
+  });
+
+  it('planSend hata fırlatırsa (409 E2EE_REQUIRED vb.) mesaj yazılmaz', async () => {
+    e2eeMock.planSend.mockRejectedValue(new Error('E2EE_REQUIRED'));
+    await expect(service.create(USER_ID, CHANNEL_ID, { content: 'düz' }, 'fam-1')).rejects.toThrow(
+      'E2EE_REQUIRED',
+    );
+    expect(prismaMock.message.create).not.toHaveBeenCalled();
+  });
+
+  it('şifreli mesaj düzenleme: ciphertext + senderDeviceId güncellenir, içerik yolu çalışmaz', async () => {
+    prismaMock.message.findUnique.mockResolvedValue({
+      id: 'm-enc',
+      authorId: USER_ID,
+      deletedAt: null,
+      webhookId: null,
+      encrypted: true,
+    });
+    e2eeMock.planEdit.mockResolvedValue({
+      encrypted: true,
+      senderDeviceId: 'dev-2',
+      ciphertext: CT,
+    });
+    prismaMock.message.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ ...makeMsg('m-enc', new Date()), ...data }),
+    );
+
+    const dto = await service.editMessage(USER_ID, CHANNEL_ID, 'm-enc', { ciphertext: 'AQIDBA==' });
+
+    const data = (prismaMock.message.update.mock.calls[0][0] as { data: Record<string, unknown> })
+      .data;
+    expect(data.ciphertext).toBe(CT);
+    expect(data.senderDeviceId).toBe('dev-2');
+    expect(data).not.toHaveProperty('content');
+    expect(dto).toMatchObject({ encrypted: true, senderDeviceId: 'dev-2' });
+  });
+
+  it('arama sorgusuna encrypted=false koşulu eklenir', async () => {
+    prismaMock.message.findMany.mockResolvedValue([]);
+    await service.searchMessages(USER_ID, CHANNEL_ID, 'merhaba');
+    const where = (
+      prismaMock.message.findMany.mock.calls[0][0] as { where: Record<string, unknown> }
+    ).where;
+    expect(where.encrypted).toBe(false);
   });
 });
