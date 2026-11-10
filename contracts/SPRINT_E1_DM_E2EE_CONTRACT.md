@@ -1,6 +1,6 @@
 # SPRINT E1: 1-1 DM uçtan uca şifreleme (metin)
 
-> Durum: **TASARIM KİLİTLİ (2026-11-10, sahip onayı). Rev.3 (web adımı kararları, §6.2). Rev.2 (api adımı: cihaz oturum zincirine bağlı, ek alanlar). Rev.1 (aynı gün, adım 1 bulguları: ağaç Welcome içinde, geçmiş commit kuralı, çekirdek API kesinleşti, paketleme).** PM compose (Opus). **core + api + web + mobil.**
+> Durum: **TASARIM KİLİTLİ (2026-11-10, sahip onayı). Rev.5 (ortak istemci motoru §6.3). Rev.4 (cihaz turu web alıcı). Rev.3 (web adımı kararları, §6.2). Rev.2 (api adımı: cihaz oturum zincirine bağlı, ek alanlar). Rev.1 (aynı gün, adım 1 bulguları: ağaç Welcome içinde, geçmiş commit kuralı, çekirdek API kesinleşti, paketleme).** PM compose (Opus). **core + api + web + mobil.**
 > Yol haritası: E0 deneme ✅ → **E1 bu sprint** → E2 grup DM → E3 push/hızlı cevap → E4 şikâyet (franking) → E5 yedek → E6 medya → E7 doğrulama/yerel arama → E8 aramalar.
 > 🔴 **R7 bölgesi, tamamı.** Hiçbir parça sahibin satır satır incelemesi olmadan main'e girmez.
 > Başlangıç noktası: dal `spike/e2ee-mls` (e66659c). Deneme kodu üretime **kopyalanmaz**, referanstır.
@@ -188,6 +188,9 @@ E0 senaryolarının üretim API'siyle karşılığı (1-1 iki cihazlı, cihaz ek
 - **Web dev bağımlılıkları onaylı:** `vitest`, `fake-indexeddb` (yalnız test).
 - **Borç D-E2EE-2:** e2ee çekirdeği ana pakete giriyor; bayrak kapalı kullanıcı için tembel yükleme sonra.
 - **1-1 DM arama:** web'de 1-1 DM'de kanal içi arama zaten yok; not yalnız arama açıldığında görünür, ek iş yok.
+
+## §6.3 Mobil adımı: ortak istemci motoru (Rev.5, 2026-11-10)
+§1.2 ilkesinin devamı: web'in `web/src/lib/e2ee/` motorundaki platformdan bağımsız mantık (commit senkronu, doğrulama listesi, grup kurma, uzlaştırma, hydrate kuralları, Welcome işleme, cihaz kurulumu akışı) **`shared/e2ee-client/`** paketine taşınır. Platforma özgü kısımlar arayüz olarak enjekte edilir: HTTP istemcisi (`E2eeApi`), şifreli yerel depo (`Vault`: get/put/delete/wipe), kilit (web: Web Locks + SerialQueue; mobil: SerialQueue), sağlayıcı (web: webProvider; mobil: pureProvider), saat/log. Web yalnız adaptör olur, davranışı DEĞİŞMEZ (mevcut 25 birim testi + e2e yeşil kalır). Mobil aynı motoru kendi adaptörleriyle kullanır. Taşıma ayrı commit; R7 incelemesinde yalnız taşıma diff'i ve yeni arayüzler gözden geçirilir.
 
 ## §7 Açık sorular (PM önerisiyle, sahip itiraz etmezse geçerli)
 - **Masaüstü (Electron):** web koduyla aynı, IndexedDB. Electron `safeStorage` ile güçlendirme sonra (borç D-E2EE-1).
