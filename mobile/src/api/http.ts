@@ -1,11 +1,34 @@
 import axios, { create as createAxios, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
+import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 // Sprint M0 contract §3 — hedefe göre değişir (README "Ortam Kurulumu"). Emülatör varsayılanı
 // 10.0.2.2 (host makine); .env / .env.example bunu belgeler.
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.0.2.2:3001';
 
 const REFRESH_TOKEN_KEY = 'kv_refresh_token';
+
+// [D91] Aktif Oturumlar listesindeki cihaz adı, ör. "Android - Xiaomi Redmi Note 13". Üretici model
+// adında zaten geçiyorsa tekrar edilmez; değer yoksa başlık gönderilmez. ASCII ile sınırlı:
+// okhttp başlık değerinde non-ASCII karakteri reddeder.
+function buildDeviceHeader(): string | null {
+  const model = Device.modelName?.trim() ?? '';
+  const maker = Device.manufacturer?.trim() ?? '';
+  const name =
+    maker && !model.toLowerCase().includes(maker.toLowerCase()) ? `${maker} ${model}`.trim() : model || maker;
+  if (!name) return null;
+  const os = Platform.OS === 'ios' ? 'iOS' : 'Android';
+  return `${os} - ${name}`.replace(/[^ -~]/g, '').slice(0, 60);
+}
+
+const DEVICE_HEADER = buildDeviceHeader();
+
+function clientHeaders(): Record<string, string> {
+  return DEVICE_HEADER
+    ? { 'X-Client-Type': 'mobile', 'X-Client-Device': DEVICE_HEADER }
+    : { 'X-Client-Type': 'mobile' };
+}
 
 // Access token contract §4 — YALNIZ bellekte. Diske asla yazılmaz; uygulama kapanınca gider,
 // bootstrap (refresh → /auth/me) tazeler.
@@ -79,7 +102,7 @@ async function doRefresh(): Promise<string> {
     { refreshToken },
     // Çıplak axios olduğu için instance timeout'u geçerli değil — bootstrap yolu da askıda
     // kalmasın diye aynı süre burada tekrar verilir (açılışta sonsuz splash olmaz).
-    { headers: { 'X-Client-Type': 'mobile' }, timeout: REQUEST_TIMEOUT_MS },
+    { headers: clientHeaders(), timeout: REQUEST_TIMEOUT_MS },
   );
   const data = res.data?.data;
   // Savunmacı kontrol (PM bulgusu 2026-07-29): sunucu beklenmedik bir gövde dönerse (ör. cookie
@@ -114,6 +137,7 @@ export function refreshAccessToken(): Promise<string> {
 // refresh token vermez, mobil akış hiç çalışmaz — contract §2.2).
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   config.headers.set('X-Client-Type', 'mobile');
+  if (DEVICE_HEADER) config.headers.set('X-Client-Device', DEVICE_HEADER);
   if (accessToken) {
     config.headers.set('Authorization', `Bearer ${accessToken}`);
   }
