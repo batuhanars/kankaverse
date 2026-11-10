@@ -1,6 +1,6 @@
 # SPRINT E1: 1-1 DM uçtan uca şifreleme (metin)
 
-> Durum: **TASARIM KİLİTLİ (2026-11-10, sahip onayı). Rev.5 (ortak istemci motoru §6.3). Rev.4 (cihaz turu web alıcı). Rev.3 (web adımı kararları, §6.2). Rev.2 (api adımı: cihaz oturum zincirine bağlı, ek alanlar). Rev.1 (aynı gün, adım 1 bulguları: ağaç Welcome içinde, geçmiş commit kuralı, çekirdek API kesinleşti, paketleme).** PM compose (Opus). **core + api + web + mobil.**
+> Durum: **TASARIM KİLİTLİ (2026-11-10, sahip onayı). Rev.6 (geri alma + grup kimliği §6.4). Rev.5 (ortak istemci motoru §6.3). Rev.4 (cihaz turu web alıcı). Rev.3 (web adımı kararları, §6.2). Rev.2 (api adımı: cihaz oturum zincirine bağlı, ek alanlar). Rev.1 (aynı gün, adım 1 bulguları: ağaç Welcome içinde, geçmiş commit kuralı, çekirdek API kesinleşti, paketleme).** PM compose (Opus). **core + api + web + mobil.**
 > Yol haritası: E0 deneme ✅ → **E1 bu sprint** → E2 grup DM → E3 push/hızlı cevap → E4 şikâyet (franking) → E5 yedek → E6 medya → E7 doğrulama/yerel arama → E8 aramalar.
 > 🔴 **R7 bölgesi, tamamı.** Hiçbir parça sahibin satır satır incelemesi olmadan main'e girmez.
 > Başlangıç noktası: dal `spike/e2ee-mls` (e66659c). Deneme kodu üretime **kopyalanmaz**, referanstır.
@@ -191,6 +191,12 @@ E0 senaryolarının üretim API'siyle karşılığı (1-1 iki cihazlı, cihaz ek
 
 ## §6.3 Mobil adımı: ortak istemci motoru (Rev.5, 2026-11-10)
 §1.2 ilkesinin devamı: web'in `web/src/lib/e2ee/` motorundaki platformdan bağımsız mantık (commit senkronu, doğrulama listesi, grup kurma, uzlaştırma, hydrate kuralları, Welcome işleme, cihaz kurulumu akışı) **`shared/e2ee-client/`** paketine taşınır. Platforma özgü kısımlar arayüz olarak enjekte edilir: HTTP istemcisi (`E2eeApi`), şifreli yerel depo (`Vault`: get/put/delete/wipe), kilit (web: Web Locks + SerialQueue; mobil: SerialQueue), sağlayıcı (web: webProvider; mobil: pureProvider), saat/log. Web yalnız adaptör olur, davranışı DEĞİŞMEZ (mevcut 25 birim testi + e2e yeşil kalır). Mobil aynı motoru kendi adaptörleriyle kullanır. Taşıma ayrı commit; R7 incelemesinde yalnız taşıma diff'i ve yeni arayüzler gözden geçirilir.
+
+## §6.4 Geri alma ve grup kimliği (Rev.6, 2026-11-10, cihaz turu sonrası)
+**Acil geri alma prosedürü (yerelde sınandı):** (1) `E2EE_ENABLED=false` + API yeniden başlatma; tek başına YETMEZ: şifreli sohbet kilitlenir (sunucu düz mesaja 409, istemci motoru kapalı). (2) Temizlik: şifreli mesajlar yumuşak silinir (`deletedAt`), `E2eeWelcome`/`E2eeHandshake`/`E2eeGroup` silinir; cihaz ve KeyPackage kayıtlarına dokunulmaz. Sonuç: sohbet düz metne döner, istemci çökmez (sahip cihazda teyit etti).
+**Bulgu (yeniden açılış):** bayrak tekrar açılınca yeni grup kurulur, ama eski grubu yerel deposunda tutan cihaz `needsJoin` kuralı (`welcomes.ts`: "yerel grup var ve etkinse Welcome bayat") yüzünden yeni Welcome'ı ack'leyip atar, yeni gruba katılmaz; yeni mesajlar "bu cihaz eklenmeden önce" etiketiyle görünür.
+**Kural:** yerel grubun `groupId`'si sunucunun bildirdiği `groupId` ile (`GET /e2ee/channels/:id`) eşleşmiyorsa yerel grup BAYATTIR: Welcome işlenirken katılınır (eski grup durumu değiştirilir), kanal senkronunda da bayat grupla commit/şifreleme yapılmaz. Daha önce çözülüp yerel depoda tutulan mesaj kayıtları korunur. Ağ ya da sunucu hatasında yerel grup SİLİNMEZ (yalnız kesin uyuşmazlıkta). Çözülemeyen mesajın etiketi: "eklenmeden önce" yalnız mesaj cihazın katılımından önceyse; aksi halde "çözülemedi". Kapsam yalnız `shared/e2ee-client` (+ gerekiyorsa istemci etiket metni); sunucu ve native değişmez.
+**DoD:** birim testi (eski grup yerelde + farklı groupId'li Welcome → katılır, yeni mesaj çözülür; aynı groupId'de davranış değişmez); yerelde sahip cihaz turu: geri alma → yeniden açma → üç cihaz da yeni mesajı çözer.
 
 ## §7 Açık sorular (PM önerisiyle, sahip itiraz etmezse geçerli)
 - **Masaüstü (Electron):** web koduyla aynı, IndexedDB. Electron `safeStorage` ile güçlendirme sonra (borç D-E2EE-1).
