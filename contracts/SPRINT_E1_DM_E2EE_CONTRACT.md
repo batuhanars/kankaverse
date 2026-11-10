@@ -1,6 +1,6 @@
 # SPRINT E1: 1-1 DM uçtan uca şifreleme (metin)
 
-> Durum: **TASARIM KİLİTLİ (2026-11-10, sahip onayı). Rev.1 (aynı gün, adım 1 bulguları: ağaç Welcome içinde, geçmiş commit kuralı, çekirdek API kesinleşti, paketleme).** PM compose (Opus). **core + api + web + mobil.**
+> Durum: **TASARIM KİLİTLİ (2026-11-10, sahip onayı). Rev.2 (api adımı: cihaz oturum zincirine bağlı, ek alanlar). Rev.1 (aynı gün, adım 1 bulguları: ağaç Welcome içinde, geçmiş commit kuralı, çekirdek API kesinleşti, paketleme).** PM compose (Opus). **core + api + web + mobil.**
 > Yol haritası: E0 deneme ✅ → **E1 bu sprint** → E2 grup DM → E3 push/hızlı cevap → E4 şikâyet (franking) → E5 yedek → E6 medya → E7 doğrulama/yerel arama → E8 aramalar.
 > 🔴 **R7 bölgesi, tamamı.** Hiçbir parça sahibin satır satır incelemesi olmadan main'e girmez.
 > Başlangıç noktası: dal `spike/e2ee-mls` (e66659c). Deneme kodu üretime **kopyalanmaz**, referanstır.
@@ -35,7 +35,7 @@ model E2eeDevice {
   id            String    @id @default(cuid())
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sessionId     String    @unique // oturum kapanınca/iptal edilince cihaz da iptal (§2.6)
+  tokenFamily   String    @unique // Rev.2: oturum zinciri (refresh rotasyonunda sabit); zincir bitince cihaz da iptal (§2.6)
   platform      String    // 'web' | 'android'
   signatureKey  Bytes     // MLS leaf imza açık anahtarı (Ed25519, 32 bayt)
   createdAt     DateTime  @default(now())
@@ -92,7 +92,7 @@ Migration yaz, yerel DB'ye uygula, `prisma migrate status` temiz, `prisma genera
 ### §2.3 Cihaz ve KeyPackage
 | Uç | Gövde / Dönüş | Kural |
 |---|---|---|
-| `POST /e2ee/devices` | `{ platform, signatureKey }` → `{ deviceId }` | Oturum başına tek cihaz (`sessionId` çağıranın oturumu, JWT'den). Aynı oturumla tekrar → mevcut cihaz döner ve `signatureKey` aynı olmalı, değilse 409 `E2EE_DEVICE_KEY_MISMATCH`. Kullanıcı başı en çok 10 aktif cihaz → 422 `E2EE_DEVICE_LIMIT`. |
+| `POST /e2ee/devices` | `{ platform, signatureKey }` → `{ deviceId }` | Oturum zinciri başına tek cihaz (`tokenFamily`, Rev.2: JWT'deki `sessionId` her refresh'te değişir, zincir sabit kalır; `JwtStrategy.validate()` okuduğu oturumdan `tokenFamily`'yi `request.user`'a ekler, token içeriği DEĞİŞMEZ). Aynı zincirle tekrar → mevcut cihaz döner ve `signatureKey` aynı olmalı, değilse 409 `E2EE_DEVICE_KEY_MISMATCH`. Kullanıcı başı en çok 10 aktif cihaz → 422 `E2EE_DEVICE_LIMIT`. |
 | `POST /e2ee/devices/me/key-packages` | `{ keyPackages: string[], lastResort?: string }` → `{ available }` | Yalnız kendi cihazına. Tek çağrıda ≤ 50. Bekleyen tüketilmemiş ≤ 100. `lastResort` gelirse eskisinin yerine geçer. |
 | `GET /e2ee/users/:userId/devices` | → `[{ deviceId, platform, signatureKey, createdAt }]` (aktifler) | Yalnız çağıranla **ortak bir DM kanalı** olan kullanıcı için (ya da kendisi). Aksi 403. |
 | `POST /e2ee/channels/:channelId/key-packages/claim` | `{ deviceIds: string[] }` → `[{ deviceId, keyPackage }]` | Çağıran kanal üyesi; hedef cihazlar kanal üyelerine ait. Her cihaz için bir tüketilmemiş KeyPackage **atomik** tüketilir (`UPDATE ... WHERE consumedAt IS NULL` tek satır); yoksa `lastResort` (tüketilmez). İkisi de yoksa o cihaz listede yok. Throttle: kullanıcı başı dakikada 30. |
@@ -112,15 +112,16 @@ Migration yaz, yerel DB'ye uygula, `prisma migrate status` temiz, `prisma genera
 
 ### §2.5 Mesaj
 - `POST /channels/:id/messages` (mevcut uç): `CreateMessageDto`'ya isteğe bağlı `ciphertext?: string` (base64, ≤ 32 KB), `epoch?: number`. Şifreli kanalda: `ciphertext` zorunlu, `content` **verilmemeli** → aksi 409 `E2EE_REQUIRED`. Şifresiz kanalda `ciphertext` gelirse 422 `E2EE_NOT_ENCRYPTED`. `attachmentIds` şifreli kanalda da geçerli (medya düz kalır, §0). `replyToId` düz üst veri.
-- `senderDeviceId` = çağıranın oturumundaki cihaz; cihazı yoksa ya da iptalse 403 `E2EE_DEVICE_REQUIRED`.
+- `senderDeviceId` = çağıranın oturum zincirindeki (`tokenFamily`) cihaz; cihazı yoksa ya da iptalse 403 `E2EE_DEVICE_REQUIRED`.
 - Mesaj DTO'su (liste + `message.created` yayını): şifreli mesajda `content: ''`, `encrypted: true`, `ciphertext` (base64), `senderDeviceId`. Diğer alanlar değişmez.
+- **Rev.2 ek alanlar:** mesaj DTO'sunda `encrypted` yalnız şifreli mesajda `true` olarak döner (şifresizde alan yok; istemci yokluğu `false` sayar, mevcut `toEqual` testleri kırılmaz). DM listesi `lastMessage` ve `dm.message` soket yükü aynı kuralla `encrypted: true` taşır; istemci önizlemede "🔒 Şifreli mesaj" gösterir (E3 sonrası yerel depodan gerçek önizleme).
 - `PATCH /channels/:id/messages/:messageId`: şifreli mesajda `ciphertext` ile, aynı kurallar. Silme, sabitleme, tepki aynen (tepki emojisi düz üst veri).
 - **Arama:** şifreli mesajlar sunucu aramasına girmez (`content = ''` zaten eşleşmez; yine de sorguya `encrypted = false` koşulu ekle).
 - **Automod:** DM'de zaten yok, değişiklik yok.
 - **Yönlendirme (C30):** istemci işi; şifreli kanala giden yönlendirme istemcide şifrelenir.
 
 ### §2.6 Oturum ve cihaz iptali
-Oturum çıkışı, "oturumlarım"dan kapatma, parola değişimiyle toplu iptal, hesap silme: bağlı `E2eeDevice.revokedAt` aynı transaction'da dolar, tüketilmemiş KeyPackage'ları silinir, kullanıcının DM kanallarına `e2ee:devices-changed` yayılır. İptal edilmiş cihaz hiçbir `/e2ee` ucunu çağıramaz. 🔴 Bu satırlar auth katmanına dokunur, R7.
+**Rev.2:** cihaz iptali yalnız zinciri GERÇEKTEN bitiren noktalara bağlanır: çıkış, "oturumlarım"dan kapatma / diğerlerini kapat, refresh token yeniden kullanımı ya da geçersiz token ile aile iptali, parola sıfırlama/değişimiyle toplu iptal, hesap silme ve temizlik işi. **Refresh rotasyonu (eski oturum satırını kapatıp aynı aileyle yenisini açan yol) cihazı İPTAL ETMEZ.** Her noktada tek satırlık `e2ee.revokeByFamilies(...)` çağrısı, aynı transaction içinde: `E2eeDevice.revokedAt` dolar, tüketilmemiş KeyPackage'lar silinir; `e2ee:devices-changed` yayını commit sonrası. İptal edilmiş cihaz hiçbir `/e2ee` ucunu çağıramaz. 🔴 Bu satırlar auth katmanına dokunur, R7; geliştirici dokunduğu her satırı listeler. Test: refresh rotasyonundan sonra cihaz aktif kalır ve mesaj gönderebilir; çıkıştan sonra iptal olur.
 
 ### §2.7 Gerçek zamanlı ve push
 - Soket: `e2ee:commit` `{ channelId, epoch }` (kanal odasına), `e2ee:welcome` `{ channelId }` (hedef kullanıcının kişisel odasına), `e2ee:devices-changed` `{ channelId, userId }`.
