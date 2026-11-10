@@ -440,7 +440,7 @@ export interface MessageDto {
   ciphertext?: string
   senderDeviceId?: string | null
   // E1 — YALNIZ yerel: çözme sonucu. 'ok' dışı = metin yok, arayüz durum metni gösterir.
-  e2eeStatus?: 'ok' | 'unsupported' | 'undecryptable'
+  e2eeStatus?: 'ok' | 'unsupported' | 'undecryptable' | 'failed'
 }
 
 // Sprint V2 — Özel kanal üye DTO (GET/POST /channels/:id/members)

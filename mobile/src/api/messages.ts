@@ -157,7 +157,7 @@ export interface MessageDto {
   ciphertext?: string;
   senderDeviceId?: string | null;
   /** E1 — YALNIZ yerel: çözme sonucu. 'ok' dışı = metin yok, baloncuk durum cümlesi gösterir. */
-  e2eeStatus?: 'ok' | 'unsupported' | 'undecryptable';
+  e2eeStatus?: 'ok' | 'unsupported' | 'undecryptable' | 'failed';
 }
 
 export const messagesApi = {

@@ -13,8 +13,11 @@ import {
 import { toB64 } from './b64'
 import type { Vault } from './ports'
 
-/** Çözme sonucu: ok = metin var; unsupported = bilinmeyen yük sürümü; undecryptable = çözülemedi. */
-export type StoredStatus = 'ok' | 'unsupported' | 'undecryptable'
+/**
+ * Çözme sonucu: ok = metin var; unsupported = bilinmeyen yük sürümü; undecryptable = cihaz gruba
+ * katılmadan önceki mesaj (ya da katılım zamanı bilinmiyor); failed = katılımdan sonra ama çözülemedi.
+ */
+export type StoredStatus = 'ok' | 'unsupported' | 'undecryptable' | 'failed'
 
 export interface StoredMessage {
   id: string
@@ -68,6 +71,22 @@ export class LocalStore {
 
   saveGroup(channelId: string, group: Group): Promise<void> {
     return this.vault.put('groups', channelId, group.serialize())
+  }
+
+  /** Bu cihazın gruba katılma/kurma zamanı (ms, yerel saat); eski kayıtlarda yok. */
+  async loadJoinedAt(channelId: string): Promise<number | null> {
+    const bytes = await this.vault.get('groups', `${channelId}:joinedAt`)
+    return bytes ? Number(fromUtf8(bytes)) : null
+  }
+
+  saveJoinedAt(channelId: string, at: number): Promise<void> {
+    return this.vault.put('groups', `${channelId}:joinedAt`, utf8(String(at)))
+  }
+
+  /** Yalnız grup durumunu düşer; çözülmüş mesaj kayıtlarına dokunmaz. */
+  async deleteGroup(channelId: string): Promise<void> {
+    await this.vault.delete('groups', channelId)
+    await this.vault.delete('groups', `${channelId}:joinedAt`)
   }
 
   async loadMessage(id: string): Promise<StoredMessage | null> {

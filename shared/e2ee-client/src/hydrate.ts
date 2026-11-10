@@ -8,6 +8,7 @@ import { syncGroup } from './channelSync'
 import type { E2eeContext } from './context'
 import { digestOf, type StoredMessage } from './localStore'
 import { devicesOf } from './registry'
+import { dropStaleGroup } from './staleGroup'
 import { decryptToRecord } from './decryptRecord'
 
 export interface WireMessage {
@@ -35,6 +36,7 @@ export class Hydrator {
   private group: Group | null | undefined
   private view: ChannelView | undefined
   private ownDeviceId: string | null = null
+  private joinedAt: number | null = null
   private ctx: E2eeContext
   private channelId: string
   private own: OwnPlain
@@ -47,9 +49,11 @@ export class Hydrator {
 
   private async init() {
     if (this.group !== undefined) return
-    this.group = await this.ctx.store.loadGroup(this.channelId)
-    this.ownDeviceId = (await this.ctx.getDevice()).deviceId
     const { data } = await this.ctx.api.channelState(this.channelId)
+    await dropStaleGroup(this.ctx, this.channelId, data) // bayat grupla çözme denenmez (§6.4)
+    this.group = await this.ctx.store.loadGroup(this.channelId)
+    this.joinedAt = await this.ctx.store.loadJoinedAt(this.channelId)
+    this.ownDeviceId = (await this.ctx.getDevice()).deviceId
     this.view = { devices: devicesOf(data) }
   }
 
@@ -97,9 +101,15 @@ export class Hydrator {
       return this.save(m, digest, rec.status, rec.body)
     } catch (e) {
       if (!(e instanceof DecryptError)) throw e
-      // Son turda hâlâ çözülemiyorsa kalıcı yaz: cihaz eklenmeden önceki mesaj, bir daha denenmez.
-      return final ? this.save(m, digest, 'undecryptable', '') : { kind: 'pending' }
+      // Son turda hâlâ çözülemiyorsa kalıcı yaz, bir daha denenmez. Katılımdan ÖNCEKİ mesaj
+      // "cihaz eklenmeden önce"; katılımdan sonrakiyse ayrı durum (zaman bilinmiyorsa eski davranış).
+      return final ? this.save(m, digest, this.failureStatus(m), '') : { kind: 'pending' }
     }
+  }
+
+  private failureStatus(m: WireMessage): StoredMessage['status'] {
+    const sentAfterJoin = this.joinedAt !== null && Date.parse(m.createdAt) >= this.joinedAt
+    return sentAfterJoin ? 'failed' : 'undecryptable'
   }
 
   private async save(

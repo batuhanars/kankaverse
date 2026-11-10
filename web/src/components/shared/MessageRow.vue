@@ -192,6 +192,13 @@ function jumpToReplied() {
 // Sprint V2 (Markdown): mesaj içeriğini güvenli HTML'e dönüştür.
 // renderMessageHtml: markdown-it render + DOMPurify sanitize + mention span.
 // v-html yalnız bu sanitize edilmiş string'i alır — ham içerik asla doğrudan girmez.
+// E1 §6.4: katılımdan önceki mesaj "eklenmeden önce", katılımdan sonra çözülemeyen "çözülemedi".
+const e2eeNote = computed<string>(() => {
+  const s = props.message.e2eeStatus
+  if (s === 'unsupported') return t('e2ee.unsupported')
+  return s === 'failed' ? t('e2ee.undecryptable') : t('e2ee.beforeDevice')
+})
+
 const renderedContent = computed<string>(() => {
   const content = props.message.content
   if (!content) return ''
@@ -426,7 +433,7 @@ const renderedContent = computed<string>(() => {
             class="text-[14px] italic"
             style="color: var(--kv-text-muted);"
           >
-            {{ message.e2eeStatus === 'unsupported' ? t('e2ee.unsupported') : t('e2ee.beforeDevice') }}
+            {{ e2eeNote }}
           </p>
           <!-- Yalnız ek (açıklamasız) -->
           <AttachmentView
