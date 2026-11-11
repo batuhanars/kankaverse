@@ -26,6 +26,7 @@ import { useGuildPermission } from '@/hooks/useGuildPermission';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { clearLast, getGuildChannelMap, setLastToGuild, takePendingTarget, takeResumedGuild } from '@/utils/resumeLastScreen';
 import { useAuthStore } from '@/stores/auth';
+import { useReportStore } from '@/stores/report';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -476,6 +477,13 @@ export default function HomeScreen() {
         guildIconUrl={menuGuild?.iconUrl}
         guildDescription={menuGuild?.description}
         canManage={menuGuildCanManage}
+        // E4 §4.1 — kendi ortamını şikâyet edemezsin (web ChannelPanel `!isOwner`).
+        canReport={!!menuGuild && menuGuild.ownerId !== myUserId}
+        onReport={() => {
+          const id = menuGuildId;
+          setMenuGuildId(null);
+          if (id) useReportStore.getState().openReport({ targetType: 'GUILD', targetId: id });
+        }}
         onClose={() => setMenuGuildId(null)}
         onMarkRead={() => {
           const id = menuGuildId;

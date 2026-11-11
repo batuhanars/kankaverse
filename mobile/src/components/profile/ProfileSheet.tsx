@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { usersApi, type UserCardDto } from '@/api/users';
 import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
+import { useReportStore } from '@/stores/report';
 import { extractErrorMessage } from '@/api/errors';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -209,7 +210,9 @@ export function ProfileSheet({ userId, username, avatarUrl, guildId, onClose, on
   const canRemoveFriend = !!card && !isSelf && card.friendStatus === 'friends';
   const canBlock = !!card && !isSelf && !card.selfBlocked;
   const canUnblock = !!card && !isSelf && card.selfBlocked;
-  const showMore = canRemoveFriend || canBlock || canUnblock;
+  // E4 §4.1: şikâyet de aynı menüde (web kullanıcı kartı ⋯ menüsü karşılığı); kendi profilimde yok.
+  const canReport = !!card && !isSelf;
+  const showMore = canRemoveFriend || canBlock || canUnblock || canReport;
 
   // Onay diyalogu AYRI katman kalır (§3.3): açılırken profil paneli gizlenir. ⋯ menüsü ise artık
   // katman değil — panelin İÇİNDE çiziliyor, panel görünür kalıyor (R5).
@@ -302,6 +305,12 @@ export function ProfileSheet({ userId, username, avatarUrl, guildId, onClose, on
                 canRemoveFriend={canRemoveFriend}
                 canBlock={canBlock}
                 canUnblock={canUnblock}
+                canReport={canReport}
+                onReport={() => {
+                  // Profil paneli kapanır, sonra şikâyet paneli açılır (tek modal; web kartı da kapatır).
+                  onClose();
+                  useReportStore.getState().openReport({ targetType: 'USER', targetId: userId });
+                }}
                 onClose={() => setLayer('profile')}
                 onRemoveFriend={() => setLayer('confirmRemove')}
                 onBlock={() => setLayer('confirmBlock')}

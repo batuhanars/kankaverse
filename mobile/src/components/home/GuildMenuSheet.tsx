@@ -23,6 +23,9 @@ interface Props {
   onMarkRead: () => void;
   /** Sprint M2b §4.3 — üçüncü aksiyon: bildirim tercihi ekranına götürür. Yetki gerekmez. */
   onNotifications: () => void;
+  /** E4 §4.1 (web C8 §5) — "Ortamı şikâyet et"; ortamın SAHİBİNDE satır hiç çizilmez. */
+  canReport: boolean;
+  onReport: () => void;
 }
 
 /**
@@ -57,6 +60,8 @@ export function GuildMenuSheet({
   onCreateCategory,
   onMarkRead,
   onNotifications,
+  canReport,
+  onReport,
 }: Props) {
   const bottomInset = useSheetInsets();
   return (
@@ -134,6 +139,14 @@ export function GuildMenuSheet({
                 <View style={styles.divider} />
                 <Pressable style={styles.option} onPress={onCreateCategory}>
                   <Text style={styles.optionText}>{t('category.createTitle')}</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {canReport && (
+              <View style={styles.group}>
+                <Pressable style={styles.option} onPress={onReport}>
+                  <Text style={[styles.optionText, styles.optionTextDanger]}>{t('report.reportGuild')}</Text>
                 </Pressable>
               </View>
             )}
@@ -230,6 +243,9 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.lg,
     fontWeight: '500',
+  },
+  optionTextDanger: {
+    color: theme.colors.danger,
   },
   divider: {
     height: 1,

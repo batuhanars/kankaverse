@@ -5,7 +5,13 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { moderationApi } from '@/api/moderation'
 import KvButton from '@/components/ui/KvButton.vue'
-import type { ReportDto, CreateActionPayload, ModActionType } from '@/api/moderation'
+import ReportEvidenceList from '@/components/moderation/ReportEvidenceList.vue'
+import type {
+  ReportDto,
+  ReportEvidenceDto,
+  CreateActionPayload,
+  ModActionType,
+} from '@/api/moderation'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -20,6 +26,28 @@ const actionSuccess = ref('')
 
 // Aksiyon formu: her rapor için ayrı state
 const actionForms = ref<Record<string, { type: ModActionType; reason: string; expiresInHours: string }>>({})
+
+// E4: kanıt ayrıntısı yalnız tıklanınca çekilir (her görüntüleme denetim kaydına yazılır, kuyruk yazmaz).
+const evidenceOpen = ref<Record<string, boolean>>({})
+const evidenceById = ref<Record<string, ReportEvidenceDto[]>>({})
+const evidenceLoading = ref<string | null>(null)
+const evidenceError = ref<Record<string, boolean>>({})
+
+async function toggleEvidence(report: ReportDto) {
+  const open = !evidenceOpen.value[report.id]
+  evidenceOpen.value[report.id] = open
+  if (!open || evidenceById.value[report.id]) return
+  evidenceLoading.value = report.id
+  evidenceError.value[report.id] = false
+  try {
+    const { data } = await moderationApi.getReport(report.id)
+    evidenceById.value[report.id] = data.evidence
+  } catch {
+    evidenceError.value[report.id] = true
+  } finally {
+    evidenceLoading.value = null
+  }
+}
 
 const ACTION_TYPES: ModActionType[] = ['WARN', 'MUTE', 'KICK', 'BAN']
 
@@ -231,6 +259,37 @@ function broadcasterSources(sources: string[]): string {
                 </div>
               </template>
               <span v-else class="text-[12px]" style="color: var(--kv-text-muted);">{{ t('moderation.emNone') }}</span>
+            </div>
+
+            <!-- E4: kanıt rozetleri + tıklayınca ayrıntı (mesaj şikâyetlerinde) -->
+            <div v-if="report.targetType === 'MESSAGE'" class="mb-3 flex flex-col gap-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <span
+                  class="px-2 py-0.5 rounded text-[11px] font-semibold"
+                  style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+                >{{ report.evidenceCount ? t('moderation.evidenceCount', { n: report.evidenceCount }) : t('moderation.evidenceNone') }}</span>
+                <span
+                  v-if="report.hasUnverified"
+                  class="px-2 py-0.5 rounded text-[11px] font-semibold"
+                  style="background-color: var(--kv-warning); color: #fff;"
+                >{{ t('moderation.evidenceUnverified') }}</span>
+                <button
+                  v-if="report.evidenceCount"
+                  type="button"
+                  class="text-[12px] cursor-pointer hover:underline"
+                  style="color: var(--kv-accent-500);"
+                  @click="toggleEvidence(report)"
+                >{{ evidenceOpen[report.id] ? t('moderation.evidenceHide') : t('moderation.evidenceShow') }}</button>
+              </div>
+              <template v-if="evidenceOpen[report.id]">
+                <p v-if="evidenceLoading === report.id" class="text-[12px] m-0" style="color: var(--kv-text-muted);">
+                  {{ t('moderation.evidenceLoading') }}
+                </p>
+                <p v-else-if="evidenceError[report.id]" class="text-[12px] m-0" style="color: var(--kv-danger);">
+                  {{ t('moderation.evidenceLoadError') }}
+                </p>
+                <ReportEvidenceList v-else-if="evidenceById[report.id]" :evidence="evidenceById[report.id]" />
+              </template>
             </div>
 
             <!-- CSAM uyarısı — içerik render edilmez -->

@@ -1,12 +1,19 @@
 // E2EE motoru: tek kullanıcı için cihaz, gruplar ve mesaj çözme/şifreleme. Tüm MLS durum işlemleri
 // `withLock`'tan geçer (E1 §1.7). Ağ, depo, kilit ve sağlayıcı enjekte edilir (ports.ts): testler sahte
 // sunucuyla, web ve mobil kendi adaptörleriyle çalışır.
-import { RandomUnavailableError, textPayload } from '@kankaverse/e2ee-core'
+import {
+  frank,
+  newFrankingKey,
+  RandomUnavailableError,
+  textPayload,
+  toBase64,
+  type Group,
+} from '@kankaverse/e2ee-core'
 import { fromB64, toB64 } from './b64'
 import { DeviceRemovedError, groupForSend, openChannel, syncChannel, type ChannelInfo } from './channelSync'
 import type { E2eeContext } from './context'
 import { DeviceBrokenError, ensureDevice } from './deviceSetup'
-import { Hydrator, type OwnPlain, type Resolution, type WireMessage } from './hydrate'
+import { Hydrator, type OwnEntry, type OwnPlain, type Resolution, type WireMessage } from './hydrate'
 import { digestOf, LocalStore, type StoredStatus } from './localStore'
 import type { E2eeApi, EngineDeps, Vault, WarningHandler, WithLock } from './ports'
 import { OFFLINE_API, withViewCache } from './viewCache'
@@ -49,7 +56,20 @@ export type LocalEngineDeps = Omit<EngineDeps, 'api' | 'onWarn'>
 export interface SentCipher {
   ciphertext: string
   epoch: number
+  /** E4: base64 (32 bayt) mesaj taahhüdü. Yalnız `franking` bayrağı açıkken (v2 yük); API'ye `frankingTag` olarak gider. */
+  frankingTag?: string
 }
+
+/** Şikâyet kanıtı öğesi (E4 §3.3 `evidence`): yalnız yerelde çözülmüş (`ok`) mesajlar. */
+export interface EvidenceItem {
+  messageId: string
+  body: string
+  sentAt: number
+  fk?: string
+}
+
+/** Hedef mesajdan önce kanıta giren en çok mesaj sayısı (E4 §3.3). */
+export const EVIDENCE_CONTEXT = 5
 
 export class E2eeEngine {
   readonly userId: string
@@ -62,6 +82,8 @@ export class E2eeEngine {
   private yieldToUi: EngineDeps['yieldToUi']
   private metric: EngineDeps['metric']
   private own: OwnPlain = new Map()
+  /** `/e2ee/status` bayrağı (E4 §2.2): true iken v2 yük + frankingTag gönderilir. */
+  private franking = false
 
   private constructor(
     userId: string,
@@ -89,8 +111,12 @@ export class E2eeEngine {
     if (!data.enabled) return null
     const vault = await deps.openVault(userId)
     const engine = new E2eeEngine(userId, deps, vault, deps.api, deps.onWarn)
+    engine.franking = data.franking === true
     try {
-      await engine.run(() => ensureDevice(deps.api, engine.store, deps.provider))
+      await engine.run(async () => {
+        await ensureDevice(deps.api, engine.store, deps.provider)
+        await engine.rememberFrankingFlag()
+      })
     } catch (e) {
       if (e instanceof DeviceBrokenError) deps.onWarn('', 'device-broken')
       throw e
@@ -109,10 +135,45 @@ export class E2eeEngine {
     const t1 = Date.now()
     const engine = new E2eeEngine(userId, deps, vault, null, () => {}) // uyarı yok: önbellek bayat olabilir
     const hasDevice = (await engine.store.loadDevice()) !== null
+    engine.franking = (await engine.store.loadFlags()).franking === true // ağsız: son bilinen bayrak
     // Soğuk açılış ölçümü (E3 Rev.3 k.5): yalnız süre.
     deps.metric?.('push-step vault-open', t1 - t0, 1)
     deps.metric?.('push-step device-open', Date.now() - t1, 1)
     return hasDevice ? engine : null
+  }
+
+  /** Bayrağı depoya yazar (yalnız değişince): ağsız motor (hızlı cevap) son bilineni kullanır. */
+  private async rememberFrankingFlag(): Promise<void> {
+    const flags = await this.store.loadFlags()
+    if ((flags.franking === true) !== this.franking) {
+      await this.store.saveFlags({ ...flags, franking: this.franking })
+    }
+  }
+
+  /**
+   * Grup şifrelemesi + taahhüt (E4 §2.1). Bayrak kapalı: v1, `frankingTag` yok. Açık: mesaj başına yeni `fk`,
+   * v2 yük, `tag = frank(fk, {kanal, gönderen cihaz, gövde, sentAt})`. Düz bilgi (`fk` dahil) `own`'a girer.
+   */
+  private async seal(
+    ctx: E2eeContext,
+    group: Group,
+    channelId: string,
+    text: string,
+  ): Promise<SentCipher> {
+    const sentAt = Date.now()
+    const fk = this.franking ? newFrankingKey() : undefined
+    const fkB64 = fk && toBase64(fk)
+    const sealed = await group.encrypt(textPayload(text, sentAt, fkB64))
+    // Şifreleme anahtarı tüketir: POST başarısız olsa bile durum geri alınamaz, hemen diske.
+    await ctx.store.saveGroup(channelId, group)
+    const entry: OwnEntry = { body: text, sentAt, fk: fkB64 }
+    this.own.set(digestOf(sealed.ciphertext), entry)
+    const out: SentCipher = { ciphertext: toB64(sealed.ciphertext), epoch: sealed.epoch }
+    if (fk) {
+      const senderDeviceId = (await ctx.getDevice()).deviceId ?? ''
+      out.frankingTag = toBase64(frank(fk, { channelId, senderDeviceId, body: text, sentAt }))
+    }
+    return out
   }
 
   private run<T>(task: (ctx: E2eeContext) => Promise<T>): Promise<T> {
@@ -164,11 +225,7 @@ export class E2eeEngine {
     return this.run(async (ctx) => {
       const group = await groupForSend(ctx, channelId)
       if (!group) return null
-      const sealed = await group.encrypt(textPayload(text, Date.now()))
-      // Şifreleme anahtarı tüketir: POST başarısız olsa bile durum geri alınamaz, hemen diske.
-      await ctx.store.saveGroup(channelId, group)
-      this.own.set(digestOf(sealed.ciphertext), text)
-      return { ciphertext: toB64(sealed.ciphertext), epoch: sealed.epoch }
+      return this.seal(ctx, group, channelId, text)
     })
   }
 
@@ -183,10 +240,7 @@ export class E2eeEngine {
       const group = await ctx.store.loadGroup(channelId)
       if (!group) return null
       if (!group.isActive) throw new DeviceRemovedError()
-      const sealed = await group.encrypt(textPayload(text, Date.now()))
-      await ctx.store.saveGroup(channelId, group)
-      this.own.set(digestOf(sealed.ciphertext), text)
-      return { ciphertext: toB64(sealed.ciphertext), epoch: sealed.epoch }
+      return this.seal(ctx, group, channelId, text)
     })
   }
 
@@ -195,14 +249,16 @@ export class E2eeEngine {
     return this.run(async (ctx) => {
       if (!msg.ciphertext) return
       const digest = digestOf(fromB64(msg.ciphertext))
-      const body = this.own.get(digest)
-      if (body === undefined) return
+      const own = this.own.get(digest)
+      if (own === undefined) return
       await ctx.store.saveMessage({
         id: msg.id,
         channelId: msg.channelId,
         status: 'ok',
-        body,
+        body: own.body,
         digest,
+        sentAt: own.sentAt,
+        ...(own.fk !== undefined && { fk: own.fk }),
       })
     })
   }
@@ -267,7 +323,9 @@ export class E2eeEngine {
     if (r?.kind === 'hidden') return []
     const plain = { ...m, ciphertext: undefined } // şifreli yük ekran durumunda tutulmaz
     if (r?.kind === 'record') {
-      return [{ ...plain, content: r.record.body, e2eeStatus: r.record.status }]
+      // `unverified` kayıtta gövde yerelde durur ama ekrana ASLA çıkmaz (E4: "Bu mesaj doğrulanamadı").
+      const content = r.record.status === 'unverified' ? '' : r.record.body
+      return [{ ...plain, content, e2eeStatus: r.record.status }]
     }
     return [{ ...plain, content: '', e2eeStatus: 'undecryptable' as const }]
   }
@@ -295,6 +353,51 @@ export class E2eeEngine {
   async quoteText(messageId: string): Promise<string | null> {
     const rec = await this.run((ctx) => ctx.store.loadMessage(messageId))
     return rec?.status === 'ok' ? rec.body : null
+  }
+
+  /**
+   * Şikâyet kanıtı (E4 §4): hedef mesaj + kanalda ondan önceki en çok 5 mesaj, YALNIZ yerel depoda `ok` olanlar.
+   * `olderMessages` hedeften ÖNCEKİ mesajlardır (çağıran verir; sıra önemsiz, motor zamana göre en yakın 5'i alır).
+   * Motor yalnız depodan okur, çözme yapmaz. Hedef `ok` değilse (çözülememiş/doğrulanmamış) kanıt boş döner:
+   * sunucu hedefin listede olmasını şart koşar, şikâyet yalnız referansla gider. Sıra: hedef önce, sonra eskiden yeniye.
+   */
+  collectEvidence(
+    channelId: string,
+    targetMessageId: string,
+    olderMessages: Pick<WireMessage, 'id' | 'createdAt'>[],
+  ): Promise<EvidenceItem[]> {
+    return this.run(async (ctx) => {
+      const nearest = [...olderMessages]
+        .filter((m) => m.id !== targetMessageId)
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || (a.id < b.id ? 1 : -1))
+        .slice(0, EVIDENCE_CONTEXT)
+        .reverse()
+      const out: EvidenceItem[] = []
+      const target = await this.evidenceOf(ctx, channelId, targetMessageId)
+      if (!target) return out
+      out.push(target)
+      for (const m of nearest) {
+        const item = await this.evidenceOf(ctx, channelId, m.id, Date.parse(m.createdAt))
+        if (item) out.push(item)
+      }
+      return out
+    })
+  }
+
+  private async evidenceOf(
+    ctx: E2eeContext,
+    channelId: string,
+    messageId: string,
+    fallbackSentAt = 0,
+  ): Promise<EvidenceItem | null> {
+    const rec = await ctx.store.loadMessage(messageId)
+    if (rec?.status !== 'ok' || rec.channelId !== channelId) return null
+    return {
+      messageId,
+      body: rec.body,
+      sentAt: rec.sentAt ?? fallbackSentAt, // E4 öncesi kayıt: v1 olduğundan zaten "doğrulanmamış" gider
+      ...(rec.fk !== undefined && { fk: rec.fk }),
+    }
   }
 
   /** Çıkış: bu kullanıcının tüm yerel şifreli deposunu siler. */

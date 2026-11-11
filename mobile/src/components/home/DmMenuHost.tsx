@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { dmApi, type DmChannelDto } from '@/api/dm';
 import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
+import { useReportStore } from '@/stores/report';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { NotifTargetType, type NotificationLevel } from '@/api/notifications';
 import { channelTitle } from '@/utils/channelTitle';
@@ -155,6 +156,12 @@ export function DmMenuHost({ channel, onClose, onOpenDetails, onAddFriend }: Pro
         onClear={() => {
           setClearTarget(channel);
           closeAll();
+        }}
+        canReport={!!otherUserId}
+        onReport={() => {
+          const id = otherUserId;
+          closeAll();
+          if (id) useReportStore.getState().openReport({ targetType: 'USER', targetId: id });
         }}
         onMutePress={onMutePress}
         onLevelPress={() => setSubSheet('level')}

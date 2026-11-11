@@ -14,10 +14,10 @@ import { toB64 } from './b64'
 import type { E2eeChannelState, Vault } from './ports'
 
 /**
- * Çözme sonucu: ok = metin var; unsupported = bilinmeyen yük sürümü; undecryptable = cihaz gruba
+ * Çözme sonucu: ok = metin var; unverified = v2 parmak izi tutmadı ya da yok (gövde yerelde saklanır, tag gelince yeniden doğrulanır; hiçbir yerde gösterilmez); unsupported = bilinmeyen yük sürümü; undecryptable = cihaz gruba
  * katılmadan önceki mesaj (ya da katılım zamanı bilinmiyor); failed = katılımdan sonra ama çözülemedi.
  */
-export type StoredStatus = 'ok' | 'unsupported' | 'undecryptable' | 'failed'
+export type StoredStatus = 'ok' | 'unsupported' | 'undecryptable' | 'failed' | 'unverified'
 
 export interface StoredMessage {
   id: string
@@ -26,10 +26,16 @@ export interface StoredMessage {
   body: string
   /** Şifreli yükün özeti: düzenlenmiş (yeni ciphertext'li) mesaj eski kayıtla karıştırılmaz. */
   digest: string
+  /** E4: v2 yükün parmak izi anahtarı (base64). Şikâyette kanıt olarak iletilir. v1'de yok. */
+  fk?: string
+  /** E4: yükteki gönderim zamanı (ms). Parmak izi `canon`'unda bu değer var (createdAt DEĞİL). */
+  sentAt?: number
 }
 
 interface Flags {
   lastResortUploaded: boolean
+  /** Son bilinen `/e2ee/status.franking`: ağsız motor (bildirim hızlı cevabı) hangi sürümü göndereceğini buradan bilir. */
+  franking?: boolean
 }
 
 /** Ciphertext'in kısa özeti (SHA-256 ilk 16 bayt). Gizli değil; yalnız sürüm ayırt etmek için. */

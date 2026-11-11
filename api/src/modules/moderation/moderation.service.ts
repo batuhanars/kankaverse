@@ -115,6 +115,16 @@ export class ModerationModuleService {
       },
     });
 
+    // Yazar adları TEK sorguyla (döngüde sorgu yok); silinmiş/bilinmeyen yazar için null.
+    const authorIds = [...new Set(r.evidence.flatMap((e) => (e.authorId ? [e.authorId] : [])))];
+    const users = authorIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: authorIds } },
+          select: { id: true, username: true },
+        })
+      : [];
+    const usernameById = new Map(users.map((u) => [u.id, u.username]));
+
     return {
       id: r.id,
       targetType: r.targetType,
@@ -130,7 +140,11 @@ export class ModerationModuleService {
       resolvedAt: r.resolvedAt?.toISOString() ?? null,
       evidencePurgeAt: r.evidencePurgeAt?.toISOString() ?? null,
       // kanıt yoksa boş dizi ("kanıt iletilmedi")
-      evidence: r.evidence.map((e) => ({ ...e, messageAt: e.messageAt.toISOString() })),
+      evidence: r.evidence.map((e) => ({
+        ...e,
+        authorUsername: (e.authorId && usernameById.get(e.authorId)) || null,
+        messageAt: e.messageAt.toISOString(),
+      })),
     };
   }
 

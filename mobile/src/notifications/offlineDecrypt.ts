@@ -44,6 +44,7 @@ export async function decryptOfflineForPush(
         encrypted: true,
         ciphertext: e.ciphertext,
         senderDeviceId: e.senderDeviceId,
+        frankingTag: e.frankingTag,
       });
     }
   } catch {

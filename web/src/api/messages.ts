@@ -26,7 +26,7 @@ export const messagesApi = {
   // E1: şifreli DM mesajı. content GÖNDERİLMEZ (sunucu 409 E2EE_REQUIRED); ciphertext base64.
   sendEncrypted(
     channelId: string,
-    cipher: { ciphertext: string; epoch: number },
+    cipher: { ciphertext: string; epoch: number; frankingTag?: string }, // E4: frankingTag yalnız v2'de
     replyToId?: string,
     nonce?: string,
     attachmentIds?: string[],
@@ -41,7 +41,7 @@ export const messagesApi = {
   editEncrypted(
     channelId: string,
     messageId: string,
-    cipher: { ciphertext: string; epoch: number },
+    cipher: { ciphertext: string; epoch: number; frankingTag?: string },
   ) {
     return http.patch<MessageDto>(`/channels/${channelId}/messages/${messageId}`, cipher)
   },

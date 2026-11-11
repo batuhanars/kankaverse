@@ -3,13 +3,24 @@ import { ref, shallowRef } from 'vue'
 import { e2eeApi } from '@/api/e2ee'
 import { messagesApi } from '@/api/messages'
 import { useDmStore } from '@/stores/dm'
-import type { ChannelInfo, E2eeEngine, SentCipher, WarningKind } from '@kankaverse/e2ee-client'
+import type {
+  ChannelInfo,
+  E2eeEngine,
+  EvidenceItem,
+  SentCipher,
+  WarningKind,
+} from '@kankaverse/e2ee-client'
 import { startWebEngine } from '@/lib/e2ee/adapter'
 import { destroyAllVaults } from '@/lib/e2ee/vault'
 import type { MessageDto } from '@/types'
 
 /** `dm.message` soketindeki şifreli yük (api `e2eePushField`, E3 Rev.5). */
-export type SocketE2ee = { ciphertext: string; senderDeviceId: string; createdAt: string }
+export type SocketE2ee = {
+  ciphertext: string
+  senderDeviceId: string
+  createdAt: string
+  frankingTag?: string // E4: v2 yükün taahhüdü
+}
 
 /**
  * E1 web istemcisi için tek giriş. Motor (lib/e2ee) arayüzden bağımsızdır; burası onu Pinia'ya ve
@@ -127,6 +138,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
       encrypted: true,
       ciphertext: last.e2ee.ciphertext,
       senderDeviceId: last.e2ee.senderDeviceId,
+      frankingTag: last.e2ee.frankingTag,
       replyToId: null,
       author: { id: senderId, username: '', avatarUrl: null },
       createdAt: last.e2ee.createdAt,
@@ -204,6 +216,20 @@ export const useE2eeStore = defineStore('e2ee', () => {
     return afterSend(data)
   }
 
+  /**
+   * E4 şikâyet kanıtı: hedef + önceki mesajlardan yerelde çözülmüş (`ok`) olanlar. `older` ekrandaki listedir
+   * (hedeften öncekiler). Motor yok / şifreli değil: boş dizi, şikâyet yalnız referansla gider.
+   */
+  async function collectEvidence(
+    channelId: string,
+    targetId: string,
+    older: MessageDto[],
+  ): Promise<EvidenceItem[]> {
+    await ready
+    if (!engine.value) return []
+    return engine.value.collectEvidence(channelId, targetId, older)
+  }
+
   return {
     engine,
     warnings,
@@ -220,5 +246,6 @@ export const useE2eeStore = defineStore('e2ee', () => {
     hydrateHistory,
     send,
     editEncrypted,
+    collectEvidence,
   }
 })

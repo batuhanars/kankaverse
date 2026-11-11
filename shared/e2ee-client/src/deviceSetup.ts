@@ -45,5 +45,5 @@ export async function topUpKeyPackages(api: E2eeApi, store: LocalStore, device: 
   // Önce yerele yaz: sunucuya giden her paketin özel anahtarı diskte olmadan Welcome gelirse katılamayız.
   await store.saveDevice(device)
   await api.uploadKeyPackages(fresh.map(toB64), lastResort ? toB64(lastResort) : undefined)
-  if (lastResort) await store.saveFlags({ lastResortUploaded: true })
+  if (lastResort) await store.saveFlags({ ...flags, lastResortUploaded: true })
 }

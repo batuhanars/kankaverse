@@ -1,6 +1,8 @@
 // e2ee-client: platformdan bağımsız istemci motoru (E1 §6.3). Web ve mobil yalnız adaptör yazar (ports.ts).
 export {
   E2eeEngine,
+  type EvidenceItem,
+  EVIDENCE_CONTEXT,
   type Hydrated,
   type LocalEngineDeps,
   type NotificationPreview,

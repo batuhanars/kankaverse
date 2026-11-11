@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ChannelInfo, E2eeEngine, SentCipher, WarningKind } from '@kankaverse/e2ee-client';
+import type { ChannelInfo, E2eeEngine, EvidenceItem, SentCipher, WarningKind } from '@kankaverse/e2ee-client';
 import { messagesApi, type MessageDto } from '@/api/messages';
 import { startMobileEngine } from '@/e2ee/startEngine';
 import { wipeMobileVaults } from '@/e2ee/sqliteRows';
@@ -142,7 +142,7 @@ export async function hydrateOne(m: MessageDto): Promise<MessageDto | null> {
  */
 export async function decryptDmLastMessage(
   channelId: string,
-  last: { id?: string; createdAt: string; e2ee?: { ciphertext: string; senderDeviceId: string; createdAt: string } },
+  last: { id?: string; createdAt: string; e2ee?: { ciphertext: string; senderDeviceId: string; createdAt: string; frankingTag?: string } },
   senderId: string,
 ): Promise<void> {
   const { id, e2ee } = last;
@@ -154,6 +154,7 @@ export async function decryptDmLastMessage(
     encrypted: true,
     ciphertext: e2ee.ciphertext,
     senderDeviceId: e2ee.senderDeviceId,
+    frankingTag: e2ee.frankingTag,
     replyToId: null,
     author: { id: senderId, username: '', avatarUrl: null },
     createdAt: e2ee.createdAt,
@@ -227,4 +228,19 @@ export async function editEncryptedMessage(
   const cipher = await get().engine?.encrypt(channelId, text);
   if (!cipher) throw new Error('Şifreli düzenleme için grup yok');
   return afterSend(await messagesApi.editEncrypted(channelId, messageId, cipher));
+}
+
+/**
+ * E4 sikayet kaniti (web `stores/e2ee.ts` `collectEvidence` karsiligi): hedef + onceki mesajlardan yerelde cozulmus
+ * (`ok`) olanlar. `older` ekrandaki listedir (hedeften oncekiler). Motor yok: bos dizi, sikayet yalniz referansla gider.
+ */
+export async function collectEvidence(
+  channelId: string,
+  targetId: string,
+  older: Pick<MessageDto, 'id' | 'createdAt'>[],
+): Promise<EvidenceItem[]> {
+  await ready;
+  const engine = get().engine;
+  if (!engine) return [];
+  return engine.collectEvidence(channelId, targetId, older);
 }
