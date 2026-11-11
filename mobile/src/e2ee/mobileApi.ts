@@ -33,6 +33,9 @@ export const mobileE2eeApi: E2eeApi = {
     http.get<E2eeCommitRow[]>(`/e2ee/channels/${channelId}/commits`, { params: { since } }),
   welcomes: () => http.get<E2eeWelcomeRow[]>('/e2ee/welcomes'),
   ackWelcome: (id) => http.post<null>(`/e2ee/welcomes/${id}/ack`),
+  // E5a Rev.2 §4.7: yerel mesajlar sunucuda hâlâ var mı (silinmiş geçmişte dönmez).
+  messagesExist: (channelId, ids) =>
+    http.post<{ existing: string[] }>('/e2ee/messages/exists', { channelId, ids }),
   // E5a yedek uçları (§3.2). Silme/sıfırlama reauth gövdesi taşır (axios DELETE gövdesi `data`).
   backupGet: () => http.get<BackupInfo>('/e2ee/backup'),
   backupPutKey: (body) => http.put<{ keyVersion: number }>('/e2ee/backup/key', body),
