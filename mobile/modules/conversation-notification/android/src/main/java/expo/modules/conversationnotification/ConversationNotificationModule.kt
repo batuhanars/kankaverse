@@ -36,8 +36,36 @@ class ConversationNotificationModule : Module() {
     AsyncFunction("show") { params: Map<String, Any?> ->
       val context = appContext.reactContext
       if (context != null) {
-        ConversationNotifier.show(context, params)
+        val messageId = params["messageId"] as? String
+        if (PushHold.takeFallbackDrew(messageId)) {
+          // E3 Rev.4: sure dolunca native genel metinle cizdi; JS gec geldi -> ikinci satir yerine metni guncelle.
+          ConversationNotifier.updateMessageText(
+            context,
+            params["conversationId"] as? String ?: return@AsyncFunction,
+            messageId ?: return@AsyncFunction,
+            params["text"] as? String ?: "",
+          )
+          Unit
+        } else {
+          PushHold.markJsDrew(messageId)
+          ConversationNotifier.show(context, params)
+          Unit
+        }
       }
+    }
+
+    // E3 Rev.4: JS gorevi bitti; KvFirebaseMessagingService'in tuttugu push penceresini birakir.
+    AsyncFunction("pushHandled") { messageId: String ->
+      PushHold.handled(messageId)
+    }
+
+    // E3 Rev.4: bu fonksiyonun varligi JS'e "push penceresi tutuluyor" der (modul yeni surum).
+    Function("isPushHoldActive") { true }
+
+    // E3 Rev.4: native yedek cizim icin etiket/renk/"ben" adi onbellegi (SharedPreferences).
+    AsyncFunction("setNotificationDefaults") { defaults: Map<String, Any?> ->
+      val context = appContext.reactContext
+      if (context != null) PushHold.saveDefaults(context, defaults)
     }
 
     // Hizli cevap: bildirime "ben"den mesaj ekler (yanit gitti / gonderilemedi gostergesi).

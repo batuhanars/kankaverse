@@ -32,11 +32,34 @@ describe('arka plan bildirim ve hızlı cevap yolunda zamanlayıcı yok', () => 
     'notifications/headlessEngine.ts',
     'notifications/ownAvatar.ts',
     'notifications/e2eePayload.ts',
+    'e2ee/cryptoMetrics.ts', // E3 Rev.4: push-crypto ölçüm sarmalayıcısı
   ])('%s setTimeout/setInterval içermez', (file) => {
     expect(read(file)).not.toMatch(/setTimeout|setInterval/);
   });
 
   it('hızlı cevap ağlı motor kurulumuna (initE2ee) dönmez', () => {
     expect(read('notifications/quickReply.ts')).not.toMatch(/prepareHeadlessEngine|initE2ee|startMobileEngine/);
+  });
+});
+
+// E3 Rev.4 §11: tutulan push penceresinde tek çizim ve "bitti" sinyali her çıkışta (finally) verilir; sinyal
+// verilmezse Kotlin 8 sn bekler. Kural kaynak düzeyinde sabitlenir (native modül cihazsız çalıştırılamaz).
+describe('tutulan push penceresi (Rev.4)', () => {
+  const push = read('notifications/conversationPush.ts');
+
+  it('modül dosyası setTimeout/setInterval içermez', () => {
+    const src = readFileSync(new URL('../../modules/conversation-notification/index.ts', import.meta.url), 'utf8');
+    expect(src).not.toMatch(/setTimeout|setInterval/);
+  });
+
+  it('pushHandled finally içinde, yalnız tutma modunda çağrılır', () => {
+    expect(push).toMatch(/finally \{\s*if \(holding && m\.messageId\) await pushHandled\(/);
+  });
+
+  it('tutma yolu tek çizim: presentOnce çözer sonra tek showConversationNotification', () => {
+    const body = push.slice(push.indexOf('async function presentOnce'), push.indexOf('TaskManager.defineTask('));
+    expect(body.match(/showConversationNotification\(/g)).toHaveLength(1);
+    expect(body).not.toContain('updateNotificationMessageText');
+    expect(body.indexOf('decryptOfflineForPush')).toBeLessThan(body.indexOf('showConversationNotification('));
   });
 });

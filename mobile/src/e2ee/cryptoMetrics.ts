@@ -14,7 +14,7 @@ function record(totals: Totals, name: string, t0: number): void {
 }
 
 function wrapGroup<T extends object>(totals: Totals, group: string, obj: T): T {
-  const out: Record<string, unknown> = { ...obj };
+  const out = { ...obj } as Record<string, unknown>;
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value !== 'function') continue;
     const name = `${group}.${key}`;

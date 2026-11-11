@@ -36,6 +36,16 @@ export type ConversationNotificationParams = {
   muteLabel?: string | null;
 };
 
+/** E3 Rev.4: native yedek cizim icin JS'in onbellege yazdigi degerler (tek kaynak JS; Kotlin yalniz okur). */
+export type NotificationDefaults = {
+  notificationChannelId: string;
+  meName: string;
+  color: string | null;
+  replyLabel: string;
+  markReadLabel: string;
+  muteLabel: string;
+};
+
 export type ConversationTap = {
   /** Native artan kimlik: ayni dokunus olay + getInitialTap ile iki kez gelirse tekillestirilir. */
   tapId?: number;
@@ -58,6 +68,9 @@ declare class NativeConversationNotificationModule extends NativeModule<TapEvent
   ): Promise<boolean>;
   updateMessageText?(conversationId: string, messageId: string, text: string): Promise<boolean>;
   finishQuickReply?(): Promise<void>;
+  pushHandled?(messageId: string): Promise<void>;
+  isPushHoldActive?(): boolean;
+  setNotificationDefaults?(defaults: NotificationDefaults): Promise<void>;
   getInitialTap(): ConversationTap | null;
 }
 
@@ -112,6 +125,24 @@ export function updateNotificationMessageText(
 /** E3 Rev.3: hızlı cevap görevi bitti; Kotlin alıcının `goAsync()` ile tuttuğu süreci bırakır. Modül eskiyse no-op. */
 export function finishQuickReply(): Promise<void> {
   return native?.finishQuickReply?.() ?? Promise.resolve();
+}
+
+/**
+ * E3 Rev.4: native FCM servisi şifreli push penceresini tutuyor mu (modül yeni sürümse true). Eski modülde false:
+ * JS Rev.3 akışına (göster + güncelle) döner.
+ */
+export function isPushHoldActive(): boolean {
+  return native?.isPushHoldActive?.() === true;
+}
+
+/** E3 Rev.4: JS görevi bitti; tutulan push penceresini bırakır. Modül eskiyse no-op. */
+export function pushHandled(messageId: string): Promise<void> {
+  return native?.pushHandled?.(messageId) ?? Promise.resolve();
+}
+
+/** E3 Rev.4: etiket/renk/"ben" adını native yedek çizim için önbelleğe yazar. Modül eskiyse no-op. */
+export function setNotificationDefaults(defaults: NotificationDefaults): Promise<void> {
+  return native?.setNotificationDefaults?.(defaults) ?? Promise.resolve();
 }
 
 /** Uygulamayı bildirime dokunarak açan intent (soğuk açılış); bir kez teslim edilir. */
