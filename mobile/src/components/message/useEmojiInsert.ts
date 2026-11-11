@@ -40,5 +40,11 @@ export function useEmojiInsert(value: string, onChangeText: (text: string) => vo
     setSelection({ start: caret, end: caret });
   }
 
-  return { open, setOpen, selection, onSelectionChange, clearSelection, insert };
+  /** D95 — imleci verilen konuma taşı (Bahset kısayolu; metin zaten yazıldıktan SONRA çağrılır). */
+  function placeCaret(pos: number) {
+    caretRef.current = { start: pos, end: pos };
+    setSelection({ start: pos, end: pos });
+  }
+
+  return { open, setOpen, selection, onSelectionChange, clearSelection, insert, placeCaret };
 }

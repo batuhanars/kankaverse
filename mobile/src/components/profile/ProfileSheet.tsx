@@ -25,6 +25,8 @@ interface Props {
   /** Engelle/arkadaşlıktan-çıkar/engel-kaldır başarıyla bittiğinde çağırır — çağıran ekran
    *  `canMessage`/`selfBlocked` durumunu tazeler. */
   onChanged?: () => void;
+  /** D95 — verilirse şeritte "Bahset" çizilir (yalnız yazma kutusu olan çok kişili sohbetten açılınca). */
+  onMention?: () => void;
 }
 
 /**
@@ -57,7 +59,7 @@ type Layer = 'profile' | 'more' | 'confirmBlock' | 'confirmRemove';
  * T&S (§3.4): minör statüsü sızmaz · ret metinleri jenerik · `selfBlocked` yalnız "ben engelledim" ·
  * kart yüklenemezse jenerik hata (varlık bilgisi verilmez).
  */
-export function ProfileSheet({ userId, username, avatarUrl, guildId, onClose, onChanged }: Props) {
+export function ProfileSheet({ userId, username, avatarUrl, guildId, onClose, onChanged, onMention }: Props) {
   const router = useRouter();
   const bottomInset = useSheetInsets();
 
@@ -179,6 +181,17 @@ export function ProfileSheet({ userId, username, avatarUrl, guildId, onClose, on
       icon: 'chatbubble-outline',
       label: t('profile.message'),
       onPress: doMessage,
+    });
+  }
+  if (onMention && card && !isSelf && !card.selfBlocked) {
+    stripActions.push({
+      key: 'mention',
+      icon: 'at-outline',
+      label: t('profile.mention'),
+      onPress: () => {
+        onClose();
+        onMention();
+      },
     });
   }
   if (showAddFriend) {

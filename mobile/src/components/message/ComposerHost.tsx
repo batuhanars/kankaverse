@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { TextInput } from 'react-native';
 import { useAuthStore } from '@/stores/auth';
 import { AiVideoSheet } from '../aiVideo/AiVideoSheet';
 import type { DraftAttachment } from '@/utils/attachmentUpload';
@@ -8,7 +9,7 @@ import { EmojiGifSheet } from './EmojiGifSheet';
 import { useEmojiInsert } from './useEmojiInsert';
 import { useVoiceRecorder } from './useVoiceRecorder';
 import type { useMessageComposer } from './useMessageComposer';
-import type { useMentionCompose } from './useMentionCompose';
+import type { MentionCandidate, useMentionCompose } from './useMentionCompose';
 
 /**
  * Sprint M3c — giriş şeridinin YERLEŞİMİ: kutu + ek paneli + emoji seçici bir arada.
@@ -29,6 +30,8 @@ interface Props {
   bottomInset: number;
   /** M6b — kayıt, sohbet değişince iptal edilsin diye kanal kimliğini bilir. */
   channelId: string;
+  /** D95 — profil panelinden "Bahset": her istek yeni nesne (aynı kişi tekrar seçilebilsin). */
+  mentionRequest?: { candidate: MentionCandidate } | null;
 }
 
 export function ComposerHost({
@@ -39,6 +42,7 @@ export function ComposerHost({
   typingLabel,
   bottomInset,
   channelId,
+  mentionRequest,
 }: Props) {
   const [attachOpen, setAttachOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -50,6 +54,19 @@ export function ComposerHost({
   // sırada yazılamazdı, çünkü o da `emoji`ye ihtiyaç duyuyor.
   const emoji = useEmojiInsert(composer.input, handleChangeText);
   const recorder = useVoiceRecorder(channelId);
+  const inputRef = useRef<TextInput>(null);
+
+  // D95 — Bahset: `@ad ` metnin sonuna eklenir (otomatik tamamlamayla aynı kayıt), kutu odaklanır,
+  // imleç sonda. Metin önce yazılır, imleç SONRA kurulur (useEmojiInsert sıra notu).
+  useEffect(() => {
+    if (!mentionRequest) return;
+    const next = mention.append(mentionRequest.candidate, composer.input);
+    composer.onChangeInput(next.text);
+    emoji.placeCaret(next.cursor);
+    inputRef.current?.focus();
+    // yalnız yeni istekte çalışır; composer/mention her render değişir
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mentionRequest]);
 
   // M6b — biten kayıt mevcut ek hattıyla gider (içerik boş, tek ek); kısa kayıt `null` → sessizce atılır.
   async function sendVoice() {
@@ -108,6 +125,7 @@ export function ComposerHost({
           emoji.onSelectionChange(start, end);
         }}
         selection={emoji.selection}
+        inputRef={inputRef}
         attachments={composer.attachments}
         onRemoveAttachment={composer.removeAttachment}
         onOpenAttach={() => setAttachOpen(true)}

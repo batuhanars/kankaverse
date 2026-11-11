@@ -479,7 +479,8 @@
     "noMutualFriends": "Ortak kanka yok.",
     "noMutualGuilds": "Ortak ortam yok.",
     "viewFull": "Profilin Tamamını Gör",
-    "message": "Mesaj"
+    "message": "Mesaj",
+    "mention": "Bahset"
   },
   "security": {
     "title": "Güvenlik Ayarları",
@@ -1175,6 +1176,7 @@
     "actions": {
       "profile": "Profil",
       "sendMessage": "Mesaj Gönder",
+      "mention": "Bahset",
       "copyId": "Kullanıcı ID'sini Kopyala",
       "manageRoles": "Rolleri Yönet",
       "noAssignableRoles": "Atanabilir rol yok.",
@@ -1929,6 +1931,7 @@
     "mutualGuildsShort": "{n} Ortak Ortam",
     "moreActions": "Daha fazla",
     "copyId": "Kullanıcı ID'sini Kopyala",
+    "mention": "Bahset",
     "idCopied": "Kullanıcı ID kopyalandı.",
     "memberSincePrefix": "Üyelik",
     "selfBlockedNote": "Bu kullanıcıyı engelledin.",

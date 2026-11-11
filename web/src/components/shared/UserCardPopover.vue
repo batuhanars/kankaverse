@@ -8,6 +8,7 @@ import { useDmStore } from '@/stores/dm'
 import { useActivityStore } from '@/stores/activity'
 import { useToastStore } from '@/stores/toast'
 import { useAppModals } from '@/composables/useAppModals'
+import { canMentionUser, mentionUser } from '@/composables/useComposerMentionBridge'
 import { usersApi } from '@/api/users'
 import { friendsApi } from '@/api/friends'
 import { useE2eeStore } from '@/stores/e2ee'
@@ -101,6 +102,13 @@ function goToVoice() {
   if (!card.value?.voiceStatus) return
   const v = card.value.voiceStatus
   void router.push({ name: 'channel', params: { guildId: v.guildId, channelId: v.channelId } })
+  emit('close')
+}
+
+// D95 — Bahset: aktif sohbetin yazma kutusuna ekle, kartı kapat
+function onMention() {
+  if (!card.value) return
+  mentionUser(card.value.id, card.value.username)
   emit('close')
 }
 
@@ -368,6 +376,17 @@ async function addFriend() {
               </span>
             </div>
           </div>
+
+          <!-- D95: Bahset — aktif sohbetin yazma kutusuna @ad ekler (yazma kutusu yoksa/1-1 DM'de/engelliyse yok) -->
+          <button
+            v-if="canMentionUser(card.id)"
+            type="button"
+            class="mt-3 w-full px-3 py-2 rounded-[var(--kv-radius-md)] text-[13px] font-medium cursor-pointer transition-colors hover:bg-[var(--kv-accent-subtle)]"
+            style="color: var(--kv-text-primary); border: 1px solid var(--kv-border-subtle);"
+            @click="onMention"
+          >
+            {{ t('userCard.mention') }}
+          </button>
 
           <!-- C10: Inline mesaj kutusu (mesaj gönderilebiliyorsa). Enter → gönder + DM'e geç. -->
           <div v-if="!isSelf && !card.selfBlocked && card.canMessage" class="mt-3">

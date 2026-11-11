@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AiVideoSparkles } from '../aiVideo/AiVideoSparkles';
@@ -67,6 +68,8 @@ interface Props {
    * `useEmojiInsert`).
    */
   selection?: { start: number; end: number } | null;
+  /** D95 — "Bahset" kısayolu kutuyu odaklayabilsin diye `TextInput` referansı. */
+  inputRef?: Ref<TextInput>;
   /** Sprint M3c §1 — `+` düğmesi. Verilmezse düğme çizilmez (yüzeyi olmayan ekranlar için). */
   onOpenAttach?: () => void;
   /** Sprint M3c §4 — emoji seçiciyi aç. Verilmezse düğme çizilmez. */
@@ -115,6 +118,7 @@ export function MessageComposer({
   onMentionSelect,
   onSelectionChange,
   selection,
+  inputRef,
   onOpenAttach,
   onOpenEmoji,
   onOpenAiVideo,
@@ -269,6 +273,7 @@ export function MessageComposer({
                 aynı sınırlara sahip bir kapsayıcıya göre yerleşsin. */}
             <View style={styles.inputWrap}>
               <TextInput
+                ref={inputRef}
                 value={value}
                 onChangeText={onChangeText}
                 placeholder={placeholder}

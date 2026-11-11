@@ -19,6 +19,7 @@ import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import UserCardPopover from '@/components/shared/UserCardPopover.vue'
 import GuildMemberRow from '@/components/layout/GuildMemberRow.vue'
+import { mentionUser } from '@/composables/useComposerMentionBridge'
 import type { GuildMemberDto, RoleDto } from '@/types'
 
 const { t } = useI18n()
@@ -167,6 +168,12 @@ async function messageMember(member: GuildMemberDto) {
     const err = e as { response?: { data?: { message?: string } } }
     toast.error(err.response?.data?.message ?? t('common.error'))
   }
+}
+
+// D95: menüden "Bahset" → aktif sohbetin yazma kutusuna @ad ekler
+function mentionMember(member: GuildMemberDto) {
+  closeMenu()
+  mentionUser(member.userId, member.username)
 }
 
 // C10: menüden "Kullanıcı ID'sini Kopyala"
@@ -464,6 +471,7 @@ async function confirmTransfer() {
           @select-member="openCard"
           @message-member="messageMember"
           @copy-member-id="copyMemberId"
+          @mention-member="mentionMember"
         />
       </template>
     </div>
