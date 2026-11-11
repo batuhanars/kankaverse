@@ -2462,7 +2462,10 @@
       "reply": "Cevapla",
       "markRead": "Okundu olarak işaretle",
       "mute": "Sessize al",
-      "replyFailed": "Gönderilemedi"
+      "replyFailed": "Gönderilemedi",
+      "hiddenPreview": "Yeni mesaj",
+      "showPreviewLabel": "Bildirimlerde mesaj içeriğini göster",
+      "showPreviewDesc": "Kapalıyken bildirimde yalnız gönderen ve \"Yeni mesaj\" görünür."
     },
     "guildNotifications": {
       "muteLabel": "{name} ortamını sustur",

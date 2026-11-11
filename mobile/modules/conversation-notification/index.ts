@@ -44,6 +44,9 @@ export type NotificationDefaults = {
   replyLabel: string;
   markReadLabel: string;
   muteLabel: string;
+  /** D94: açıkken yedek çizim `text` yerine `hiddenPreviewText` yazar. */
+  hidePreview: boolean;
+  hiddenPreviewText: string;
 };
 
 export type ConversationTap = {

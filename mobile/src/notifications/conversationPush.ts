@@ -1,7 +1,6 @@
 import { AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
-import appConfig from '../../app.json';
 import { t } from '@/i18n';
 import { useDmStore } from '@/stores/dm';
 import { getActiveChannelId } from '@/realtime/socket';
@@ -9,11 +8,13 @@ import {
   dismissConversationNotification,
   isPushHoldActive,
   pushHandled,
-  setNotificationDefaults,
   showConversationNotification,
   updateNotificationMessageText,
 } from '../../modules/conversation-notification';
 import { MESSAGE_CHANNEL_ID } from './push';
+import { accentColor, cacheNotificationDefaults } from './notificationDefaults';
+import { notificationText } from './notificationText';
+import { loadHidePreview } from './previewSetting';
 import { loadOwnAvatarUrl } from './ownAvatar';
 import { decryptOfflineForPush } from './offlineDecrypt';
 import { parseE2eePayload, type PushE2ee } from './e2eePayload';
@@ -119,17 +120,6 @@ function groupInitialOf(m: MessageData): string | null {
   return first ? first.toLocaleUpperCase('tr-TR') : null;
 }
 
-/** Vurgu rengi tek kaynak: app.json `expo-notifications` eklenti ayarı. */
-function accentColor(): string | null {
-  for (const plugin of appConfig.expo.plugins as unknown[]) {
-    if (Array.isArray(plugin) && plugin[0] === 'expo-notifications') {
-      const color = (plugin[1] as { color?: unknown } | undefined)?.color;
-      return typeof color === 'string' ? color : null;
-    }
-  }
-  return null;
-}
-
 /** Uygulama ön planda ve kullanıcı bu sohbeti okuyorsa bildirim gösterilmez. */
 function isConversationInView(conversationId: string): boolean {
   if (AppState.currentState !== 'active') return false;
@@ -211,14 +201,19 @@ async function decryptForUpgrade(m: MessageData): Promise<string | null> {
  * indirirken MIUI dondurma penceresi kapanabiliyor, cihaz turu 13:08). Çizim bitince çözüldüyse metin
  * sessizce değiştirilir. İçerik loglanmaz.
  */
-async function presentWithUpgrade(m: MessageData, show: () => Promise<unknown>): Promise<void> {
+async function presentWithUpgrade(
+  m: MessageData,
+  show: () => Promise<unknown>,
+  hidePreview: boolean,
+): Promise<void> {
   const t0 = Date.now();
   const plain = decryptForUpgrade(m);
   await show();
   const shownMs = Date.now() - t0;
   const text = await plain;
   if (__DEV__ || m.e2ee) console.log(`[E2EE] push-show ${shownMs}ms toplam ${Date.now() - t0}ms`);
-  if (text === null || !m.messageId) return;
+  // D94: çözme (depoya yazım) yine yapılır; içerik gizliyken bildirim metni DEĞİŞTİRİLMEZ.
+  if (hidePreview || text === null || !m.messageId) return;
   await updateNotificationMessageText(m.conversationId, m.messageId, text).catch(() => false);
 }
 
@@ -239,27 +234,12 @@ function showParams(m: MessageData, meAvatarUrl: string | null, text: string = m
 }
 
 /**
- * E3 Rev.4 §11.2: etiket/renk/"ben" adı native tarafa önbelleklenir; süre dolarsa Kotlin genel metni bunlarla
- * çizer. Ucuz tek köprü çağrısı, hata sessiz.
- */
-function cacheNotificationDefaults(): Promise<void> {
-  return setNotificationDefaults({
-    notificationChannelId: MESSAGE_CHANNEL_ID,
-    meName: t('mobile.notifications.me'),
-    color: accentColor(),
-    replyLabel: t('mobile.notifications.reply'),
-    markReadLabel: t('mobile.notifications.markRead'),
-    muteLabel: t('mobile.notifications.mute'),
-  }).catch(() => undefined);
-}
-
-/**
  * E3 Rev.4 §11.2: tutulan pencerede ÖNCE ağsız/zamanlayıcısız çözülür, sonra BİR kez çizilir: çözüldüyse gerçek
  * metin, değilse genel metin; iptal edilmiş cihazdan (`hidden`) çizilmez. İçerik loglanmaz.
  */
-async function presentOnce(m: MessageData, meAvatarUrl: string | null): Promise<void> {
+async function presentOnce(m: MessageData, meAvatarUrl: string | null, hidePreview: boolean): Promise<void> {
   const t0 = Date.now();
-  let text = m.text;
+  let decrypted: string | null = null;
   if (m.e2ee && m.messageId) {
     try {
       const r = await decryptOfflineForPush(m.messageId, m.conversationId, m.e2ee);
@@ -267,11 +247,12 @@ async function presentOnce(m: MessageData, meAvatarUrl: string | null): Promise<
         console.log(`[E2EE] push-once ${Date.now() - t0}ms gizli`);
         return;
       }
-      if (r.kind === 'text') text = r.body.slice(0, MAX_TEXT);
+      if (r.kind === 'text') decrypted = r.body.slice(0, MAX_TEXT);
     } catch {
       // sessiz: genel metinle çizilir
     }
   }
+  const text = notificationText(m.text, decrypted, hidePreview, t('mobile.notifications.hiddenPreview'));
   const decryptMs = Date.now() - t0;
   await showConversationNotification(showParams({ ...m, e2ee: null }, meAvatarUrl, text));
   console.log(`[E2EE] push-once çözme ${decryptMs}ms toplam ${Date.now() - t0}ms`);
@@ -308,14 +289,20 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
     // E3 Rev.4: native FCM servisi şifreli push'ta pencereyi tutuyorsa tek çizim yolu; "bitti" sinyali HER çıkışta.
     const holding = m.e2ee !== null && m.messageId !== null && isPushHoldActive();
     try {
-      await cacheNotificationDefaults();
+      const hidePreview = await loadHidePreview();
+      await cacheNotificationDefaults(hidePreview);
       if (isConversationInView(m.conversationId)) return;
       const meAvatarUrl = m.isGroup ? await loadOwnAvatarUrl() : null;
       if (holding) {
-        await presentOnce(m, meAvatarUrl);
+        await presentOnce(m, meAvatarUrl, hidePreview);
       } else {
         // Rev.3 (eski native / şifresiz): genel metinle çizilir (şifreli yük Kotlin'e geçmez); çözme paralel koşar.
-        await presentWithUpgrade(m, () => showConversationNotification(showParams({ ...m, e2ee: null }, meAvatarUrl)));
+        const text = notificationText(m.text, null, hidePreview, t('mobile.notifications.hiddenPreview'));
+        await presentWithUpgrade(
+          m,
+          () => showConversationNotification(showParams({ ...m, e2ee: null }, meAvatarUrl, text)),
+          hidePreview,
+        );
       }
     } finally {
       if (holding && m.messageId) await pushHandled(m.messageId).catch(() => undefined);
