@@ -1,6 +1,6 @@
 # SPRINT E5a: Şifreli DM geçmişinin sunucu yedeği (yedek şifresi)
 
-> Durum: **TASLAK (2026-11-11, PM compose, Opus). Sahip onayı bekliyor.** **e2ee-core + e2ee-client + api + web + mobil.**
+> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı; §5 uyarı ve §6 gizlilik metni onaylı, §9 açık sorular PM önerisiyle kabul).** PM compose (Opus). **e2ee-core + e2ee-client + api + web + mobil.**
 > Yol haritası: E0 ✅ → E1 ✅ → E3 ✅ → E4 (cihaz turu bekliyor) → **E5a yedek bu sprint** → E5b cihazdan cihaza aktarım → E2 grup DM → **herkese açılış** → E7 → E8.
 > 🔴 **R7 bölgesi, tamamı:** anahtar türetme ve yedek şifrelemesi (e2ee-core), yedek sahipliği ve silme (api), geri yükleme birleştirmesi (e2ee-client).
 > Dayanak: sahip kararı 2026-11-11 (iki yol, yedek şifresi, kurtarma anahtarı yok); kurul verdikti `knowledge/kurul/verdicts/2026-11-11-e5-yedek-ve-cihaz-aktarimi.md` (⚠ ŞARTLI, 6 koşul, sahip kabul etti); `SPRINT_E1_DM_E2EE_CONTRACT.md` §1 (ilkeler, yerel depo), `SPRINT_E4_E2EE_REPORT_CONTRACT.md` §2 (fk/sentAt).
