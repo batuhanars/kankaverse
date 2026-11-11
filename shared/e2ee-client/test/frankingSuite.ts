@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { E2eeEngine } from '../src/engine'
 import { serialLock } from '../src/lock'
+import { backupDeps } from './fakeBackup'
 import { as, CH, login, provider, send, server, show, type Msg } from './flowSuite'
 
 const at = (i: number) => new Date(Date.UTC(2026, 10, 10, 10, 0, i)).toISOString()
@@ -78,6 +79,7 @@ export function frankingSuite(label: string) {
       await as(B1, (e) => e.onWelcome())
       await show(B1, [{ ...m1, frankingTag: null }])
       const again = (await E2eeEngine.start('B', {
+        ...backupDeps(server),
         api: server.apiFor('B', B1.family),
         openVault: async () => B1.vault,
         withLock: serialLock(),

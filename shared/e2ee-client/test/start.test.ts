@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RandomUnavailableError, pureProvider } from '@kankaverse/e2ee-core'
 import { E2eeEngine } from '../src/engine'
 import { serialLock } from '../src/lock'
+import { backupDeps } from './fakeBackup'
 import { FakeServer } from './fakeServer'
 import { MemoryVault } from './memoryVault'
 
@@ -13,6 +14,7 @@ describe('motor başlatma', () => {
     const server = new FakeServer()
     const opened = vi.fn()
     const start = E2eeEngine.start('A', {
+      ...backupDeps(server),
       api: server.apiFor('A', 'fam'),
       openVault: async () => {
         opened()
