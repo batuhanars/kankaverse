@@ -9,6 +9,7 @@ import { DeviceBrokenError, ensureDevice } from './deviceSetup'
 import { Hydrator, type OwnPlain, type Resolution, type WireMessage } from './hydrate'
 import { digestOf, LocalStore, type StoredStatus } from './localStore'
 import type { E2eeApi, EngineDeps, Vault, WarningHandler, WithLock } from './ports'
+import { OFFLINE_API, withViewCache } from './viewCache'
 import { processWelcomes } from './welcomes'
 
 export type { WarningHandler }
@@ -42,6 +43,9 @@ function previewOf(r: Resolution | undefined): NotificationPreview {
   return { kind: 'unavailable' }
 }
 
+/** `openLocal` bağımlılıkları: ağ ve uyarı yok. */
+export type LocalEngineDeps = Omit<EngineDeps, 'api' | 'onWarn'>
+
 export interface SentCipher {
   ciphertext: string
   epoch: number
@@ -59,13 +63,20 @@ export class E2eeEngine {
   private metric: EngineDeps['metric']
   private own: OwnPlain = new Map()
 
-  private constructor(userId: string, deps: EngineDeps, vault: Vault) {
+  private constructor(
+    userId: string,
+    deps: LocalEngineDeps,
+    vault: Vault,
+    api: E2eeApi | null,
+    onWarn: WarningHandler,
+  ) {
     this.userId = userId
-    this.api = deps.api
     this.vault = vault
     this.store = new LocalStore(vault, deps.provider)
+    // Çevrimiçi yolda her channelState görünümü depoya yazar (E3 §9.1, tek nokta); yerel motorda ağ yok.
+    this.api = api ? withViewCache(api, this.store) : OFFLINE_API
     this.withLock = deps.withLock
-    this.onWarn = deps.onWarn
+    this.onWarn = onWarn
     this.log = deps.log ?? ((m, e) => console.error(m, e))
     this.yieldToUi = deps.yieldToUi
     this.metric = deps.metric
@@ -77,7 +88,7 @@ export class E2eeEngine {
     const { data } = await deps.api.status()
     if (!data.enabled) return null
     const vault = await deps.openVault(userId)
-    const engine = new E2eeEngine(userId, deps, vault)
+    const engine = new E2eeEngine(userId, deps, vault, deps.api, deps.onWarn)
     try {
       await engine.run(() => ensureDevice(deps.api, engine.store, deps.provider))
     } catch (e) {
@@ -85,6 +96,17 @@ export class E2eeEngine {
       throw e
     }
     return engine
+  }
+
+  /**
+   * Yalnız yerel depoyu açar (E3 §9.1): AĞ PORTU YOK, cihaz kaydı/KeyPackage/Welcome yok. Cihaz yoksa
+   * `null`. Dönen motorun ağlı metodları çağrılmaz; yalnız `decryptOffline` ve depo okumaları (`quoteText`).
+   */
+  static async openLocal(userId: string, deps: LocalEngineDeps): Promise<E2eeEngine | null> {
+    assertRandom()
+    const vault = await deps.openVault(userId)
+    const engine = new E2eeEngine(userId, deps, vault, null, () => {}) // uyarı yok: önbellek bayat olabilir
+    return (await engine.store.loadDevice()) ? engine : null
   }
 
   private run<T>(task: (ctx: E2eeContext) => Promise<T>): Promise<T> {
@@ -227,20 +249,20 @@ export class E2eeEngine {
   }
 
   /**
-   * Bildirim görevi için TEK mesajı çözer (E3 §3.1). Mesaj kuyruktan geçer ve sonucu depoya yazılır; sohbet
-   * sonra açılınca aynı mesaj depodan okunur, ikinci kez çözülmez. `hydrateIn` kullanılmaz: o ağ hatasını
-   * yutar, burada hatayı "unavailable"dan ayırmak ve hiçbir şeyi kalıcı yazmamak gerekir (resolveAll
-   * istisna fırlatırsa depoya dokunulmamıştır; yalnız commit senkronu sonrası DecryptError kalıcı yazılır).
+   * Bildirim görevi için TEK mesajı ağsız çözer (E3 §9.1). Depoda kayıt varsa onu döner; yoksa yerel grup +
+   * önbellekteki cihaz görünümüyle tek deneme. Başarıda düz metin ve grup durumu yazılır (sohbet açılınca
+   * ikinci çözme yok). Başarısızlık (DecryptError, grup/görünüm yok) `unavailable`'dır ve kalıcı HİÇBİR
+   * başarısızlık kaydı yazılmaz: eksik commit olabilir, karar çevrimiçi yolun. Kuyruktan geçer (`run`).
    */
-  async decryptForNotification(msg: WireMessage): Promise<NotificationPreview> {
+  async decryptOffline(msg: WireMessage): Promise<NotificationPreview> {
     try {
       const done = await this.run((ctx) =>
-        new Hydrator(ctx, msg.channelId, this.own).resolveAll([msg]),
+        new Hydrator(ctx, msg.channelId, this.own, true).resolveAll([msg]),
       )
       return previewOf(done.get(msg.id))
     } catch (e) {
       // İçerik/yük asla loglanmaz: yalnız hata türünün adı.
-      this.log(`[e2ee] bildirim çözülemedi: ${e instanceof Error ? e.name : typeof e}`)
+      this.log(`[e2ee] çevrimdışı çözülemedi: ${e instanceof Error ? e.name : typeof e}`)
       return { kind: 'unavailable' }
     }
   }

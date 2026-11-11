@@ -50,6 +50,16 @@ class ConversationNotificationModule : Module() {
       }
     }
 
+    // E3 Rev.2: gorunen bildirimdeki mesaj satirinin metnini degistirir (cozulmus metin). Yoksa false.
+    AsyncFunction("updateMessageText") { conversationId: String, messageId: String, text: String ->
+      val context = appContext.reactContext
+      if (context != null) {
+        ConversationNotifier.updateMessageText(context, conversationId, messageId, text)
+      } else {
+        false
+      }
+    }
+
     AsyncFunction("dismiss") { conversationId: String ->
       val context = appContext.reactContext
       if (context != null) {

@@ -40,21 +40,29 @@ export class Hydrator {
   private ctx: E2eeContext
   private channelId: string
   private own: OwnPlain
+  /**
+   * Çevrimdışı mod (E3 §9): ağa HİÇ çıkılmaz; görünüm önbellekten gelir, commit senkronu ve bayat grup
+   * kontrolü yok. Çözülemeyen mesaj `unavailable` döner ve ASLA kalıcı başarısızlık yazılmaz (eksik
+   * commit olabilir; karar çevrimiçi yolun).
+   */
+  private offline: boolean
 
-  constructor(ctx: E2eeContext, channelId: string, own: OwnPlain) {
+  constructor(ctx: E2eeContext, channelId: string, own: OwnPlain, offline = false) {
     this.ctx = ctx
     this.channelId = channelId
     this.own = own
+    this.offline = offline
   }
 
   private async init() {
     if (this.group !== undefined) return
-    const { data } = await this.ctx.api.channelState(this.channelId)
-    await dropStaleGroup(this.ctx, this.channelId, data) // bayat grupla çözme denenmez (§6.4)
+    const state = this.offline ? null : (await this.ctx.api.channelState(this.channelId)).data
+    if (state) await dropStaleGroup(this.ctx, this.channelId, state) // bayat grupla çözme denenmez (§6.4)
     this.group = await this.ctx.store.loadGroup(this.channelId)
     this.joinedAt = await this.ctx.store.loadJoinedAt(this.channelId)
     this.ownDeviceId = (await this.ctx.getDevice()).deviceId
-    this.view = { devices: devicesOf(data) }
+    const members = state ? state.members : await this.ctx.store.loadView(this.channelId)
+    this.view = members ? { devices: devicesOf({ members }) } : undefined
   }
 
   /** Kayıtta ve özeti aynıysa çözülmüş sayılır (liste sayfalama durma koşulu bunu kullanır). */
@@ -78,11 +86,14 @@ export class Hydrator {
     const stored = await this.ctx.store.loadMessage(m.id)
     if (stored?.digest === digest) return { kind: 'record', record: stored }
     await this.init()
+    if (this.offline && !this.view) return { kind: 'unavailable' } // önbellek görünümü yok: iptal kuralı uygulanamaz
     if (this.isHidden(m)) return { kind: 'hidden' }
     const body = this.own.get(digest)
     if (body !== undefined) return this.save(m, digest, 'ok', body)
     // Kendi cihazımızın gönderdiği ama düz metni elimizde olmayan mesaj çözülemez (anahtar kullanıldı).
-    if (m.senderDeviceId === this.ownDeviceId || !this.group) return pending(final)
+    if (m.senderDeviceId === this.ownDeviceId || !this.group) {
+      return this.offline ? { kind: 'unavailable' } : pending(final)
+    }
     return this.decrypt(m, ct, digest, final)
   }
 
@@ -101,6 +112,7 @@ export class Hydrator {
       return this.save(m, digest, rec.status, rec.body)
     } catch (e) {
       if (!(e instanceof DecryptError)) throw e
+      if (this.offline) return { kind: 'unavailable' } // commit eksik olabilir: kalıcı yazma, çevrimiçi yol karar verir
       // Son turda hâlâ çözülemiyorsa kalıcı yaz, bir daha denenmez. Katılımdan ÖNCEKİ mesaj
       // "cihaz eklenmeden önce"; katılımdan sonrakiyse ayrı durum (zaman bilinmiyorsa eski davranış).
       return final ? this.save(m, digest, this.failureStatus(m), '') : { kind: 'pending' }
@@ -147,7 +159,7 @@ export class Hydrator {
 
   /** İlk turda çözülemeyenler: belki mesaj yeni epoch'tan (commit eksik), commit'leri işle ve son kez dene. */
   private async catchUpThenFinalize(retry: WireMessage[], out: Map<string, Resolution>) {
-    if (this.group) {
+    if (this.group) { // yalnız çevrimiçi: çevrimdışı modda 'pending' hiç üretilmez
       await refreshView(this.ctx, this.channelId, this.view!)
       await syncGroup(this.ctx, this.channelId, this.group, this.view!)
     }

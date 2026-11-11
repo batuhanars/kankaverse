@@ -11,7 +11,7 @@ import {
   utf8,
 } from '@kankaverse/e2ee-core'
 import { toB64 } from './b64'
-import type { Vault } from './ports'
+import type { E2eeChannelState, Vault } from './ports'
 
 /**
  * Çözme sonucu: ok = metin var; unsupported = bilinmeyen yük sürümü; undecryptable = cihaz gruba
@@ -81,6 +81,20 @@ export class LocalStore {
 
   saveJoinedAt(channelId: string, at: number): Promise<void> {
     return this.vault.put('groups', `${channelId}:joinedAt`, utf8(String(at)))
+  }
+
+  /**
+   * Kanalın son bilinen cihaz görünümü (kayıtlı cihazlar, imza anahtarları, iptal zamanları). Çevrimiçi
+   * yolda her `channelState` sonrası yazılır; ağsız (bildirim) çözme yalnız bunu kullanır (E3 §9.1).
+   * Anahtar `groups` bölümünde (joinedAt gibi): cihaz durumu sıfırlanınca birlikte gider, yeni vault bölümü gerekmez.
+   */
+  async loadView(channelId: string): Promise<E2eeChannelState['members'] | null> {
+    const bytes = await this.vault.get('groups', `${channelId}:view`)
+    return bytes ? (JSON.parse(fromUtf8(bytes)) as E2eeChannelState['members']) : null
+  }
+
+  saveView(channelId: string, members: E2eeChannelState['members']): Promise<void> {
+    return this.vault.put('groups', `${channelId}:view`, utf8(JSON.stringify(members)))
   }
 
   /** Yalnız grup durumunu düşer; çözülmüş mesaj kayıtlarına dokunmaz. */

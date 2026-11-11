@@ -56,6 +56,7 @@ declare class NativeConversationNotificationModule extends NativeModule<TapEvent
     timestamp: number,
     meAvatarUrl: string | null,
   ): Promise<boolean>;
+  updateMessageText?(conversationId: string, messageId: string, text: string): Promise<boolean>;
   getInitialTap(): ConversationTap | null;
 }
 
@@ -96,6 +97,15 @@ export function appendOwnReplyToNotification(
   meAvatarUrl: string | null = null,
 ): Promise<boolean> {
   return native?.appendOwnReply?.(conversationId, text, timestamp, meAvatarUrl) ?? Promise.resolve(false);
+}
+
+/** E3: görünen bildirimdeki mesaj satırının metnini değiştirir. Satır/bildirim yoksa ya da modül eskiyse false. */
+export function updateNotificationMessageText(
+  conversationId: string,
+  messageId: string,
+  text: string,
+): Promise<boolean> {
+  return native?.updateMessageText?.(conversationId, messageId, text) ?? Promise.resolve(false);
 }
 
 /** Uygulamayı bildirime dokunarak açan intent (soğuk açılış); bir kez teslim edilir. */
