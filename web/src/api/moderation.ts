@@ -44,6 +44,36 @@ export interface ReportDto {
   priority: number
   createdAt: string
   contextSnapshot?: EmergencySnapshot
+  // E4 Rev.1: kuyruk kanıt içeriği DÖNMEZ, yalnız sayı ve doğrulanmamış var mı.
+  evidenceCount?: number
+  hasUnverified?: boolean
+}
+
+/** E4: ek yalnız referanstır (kopya yok); önizleme/indirme yok. */
+export interface EvidenceAttachmentRef {
+  id: string
+  contentType: string
+  size: number
+  storageKey?: string
+}
+
+/** E4 §3.4: şikâyet kanıt satırı. `source`: server = sunucunun okuduğu, reporter = şikâyetçinin cihazından. */
+export interface ReportEvidenceDto {
+  id: string
+  messageId: string
+  authorId: string | null
+  channelId: string
+  content: string
+  attachments: EvidenceAttachmentRef[]
+  messageAt: string
+  source: 'server' | 'reporter'
+  verified: boolean
+  isTarget: boolean
+}
+
+/** GET /moderation/reports/:id — her görüntüleme denetim kaydına yazılır. */
+export interface ReportDetailDto extends ReportDto {
+  evidence: ReportEvidenceDto[]
 }
 
 export interface CreateActionPayload {
@@ -67,6 +97,9 @@ export interface AuditLogDto {
 export const moderationApi = {
   getQueue(): Promise<ApiResponse<ReportDto[]>> {
     return api.get('/moderation/queue')
+  },
+  getReport(id: string): Promise<ApiResponse<ReportDetailDto>> {
+    return api.get(`/moderation/reports/${id}`)
   },
   createAction(payload: CreateActionPayload): Promise<ApiResponse<null>> {
     return api.post('/moderation/actions', payload)

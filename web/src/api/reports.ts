@@ -20,11 +20,20 @@ export const ReportReason = {
 } as const
 export type ReportReason = (typeof ReportReason)[keyof typeof ReportReason]
 
+/** E4: şifreli mesaj şikâyetinde şikâyetçinin cihazından giden çözülmüş mesaj (hedef + önceki 5). */
+export interface ReportEvidenceItem {
+  messageId: string
+  body: string
+  sentAt: number
+  fk?: string
+}
+
 export interface CreateReportPayload {
   targetType: ReportTargetType
   targetId: string
   reason: ReportReason
   description?: string
+  evidence?: ReportEvidenceItem[]
 }
 
 export const reportsApi = {

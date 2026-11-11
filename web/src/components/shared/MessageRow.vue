@@ -196,6 +196,7 @@ function jumpToReplied() {
 const e2eeNote = computed<string>(() => {
   const s = props.message.e2eeStatus
   if (s === 'unsupported') return t('e2ee.unsupported')
+  if (s === 'unverified') return t('e2ee.unverified') // E4: parmak izi tutmadı, gövde gösterilmez
   return s === 'failed' ? t('e2ee.undecryptable') : t('e2ee.beforeDevice')
 })
 
