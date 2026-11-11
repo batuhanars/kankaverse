@@ -1,6 +1,6 @@
 # SPRINT E4: Şikâyette kanıt (şifreli DM dahil) + mesaj parmak izi (franking)
 
-> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı; §7 açık sorular PM önerisiyle kabul). Rev.1 (aynı gün, api adımı PM incelemesi: erişim kapısı + ayrıntı ucu, §3.6). Rev.2 (aynı gün, sahip kararı: mobil şikâyet akışı, §4.1).** PM compose (Opus). **e2ee-core + e2ee-client + api + web + mobil.**
+> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı; §7 açık sorular PM önerisiyle kabul). Rev.1 (aynı gün, api adımı PM incelemesi: erişim kapısı + ayrıntı ucu, §3.6). Rev.2 (aynı gün, sahip kararı: mobil şikâyet akışı, §4.1). Rev.3 (aynı gün, sahip onayı: gizlilik metni onaylı, herkese açılışla yayına girer, §5.1).** PM compose (Opus). **e2ee-core + e2ee-client + api + web + mobil.**
 > Yol haritası: E0 ✅ → E1 ✅ → E3 ✅ → **E4 bu sprint** → E5 yedek → E2 grup DM → **yayın** → E7 → E8 (E6 medya ertelendi).
 > 🔴 **R7 bölgesi, tamamı:** T&S karar fonksiyonları (şikâyet, kanıt, moderasyon görünümü) + E2EE yük biçimi.
 > Dayanak: `SPRINT_E1_DM_E2EE_CONTRACT.md` (§1 ilkeler, §3.2 yük biçimi), sahip kararı 2026-11-05 (şikâyet modeli), sahip kararları 2026-11-11 (aşağıda).
@@ -121,12 +121,22 @@ model ReportEvidence {
 PM taslağı sahibe sunar, sahip onaylar. İçerik: (a) ortam dışı 1-1 DM metinleri uçtan uca şifreli; DM medyası şifreli değil (E6 ertelendi); (b) şikâyet edilen mesaj ve önceki 5 mesaj moderasyon için saklanır, kapanıştan 90 gün sonra silinir; (c) şifreli sohbette bu mesajları şikâyetçinin cihazı iletir, platform başka türlü okuyamaz; (d) web istemcisinin kodu sunucudan geldiği için web'de güvence mobilden zayıftır (E1 §4). Grup DM ifadesi E2 bitince güncellenir (yayın E2 sonrası).
 **Hukuk notu (muhalif görüş, ölçülü):** KVKK dayanağı (meşru menfaat / hukuki yükümlülük) ve 90 günlük süre için yayından önce bir hukuk okuması önerilir; E4'ün kodunu ya da açılışını bekletmez.
 
+### §5.1 Rev.3 (2026-11-11, sahip onayı): onaylı metin + zamanlama
+**Zamanlama değişti:** metin E4 deploy'unda DEĞİL, **herkese açılışla** (E5 + E2 sonrası) yayına girer. Gerekçe: şifreleme bugün yalnız izin listesindeki 3 sahip hesabında açık; "DM'ler şifreli" demek diğer herkes için yanlış olur. E4 deploy'u gizlilik metnine dokunmaz.
+**Onaylı metin** (web `tr.json` `legal.privacy.*`; E2 bitince köşeli ayraçlı kısımlar güncellenir):
+- `s3Item1`: "Ortam kanallarındaki [ve grup DM'lerdeki] içerik, moderasyon ve güvenlik (özellikle çocuk güvenliği) amacıyla sunucu tarafında erişilebilir."
+- `s3Item2`: değişmez.
+- `s3Item3` (yeni): "[Birebir DM'lerdeki] mesaj metinleri uçtan uca şifrelidir: yalnız sen ve konuştuğun kişinin cihazları okuyabilir, Kankaverse okuyamaz. DM'de paylaşılan görsel, dosya, ses ve videolar şu an bu şifrelemenin kapsamında değildir."
+- `s3Item4` (yeni): "Web ve masaüstü uygulamasının kodu her açılışta sunucumuzdan yüklenir. Bu yüzden şifreleme güvencesi orada mobil uygulamaya göre daha zayıftır."
+- `s5Body` sonuna: "Bir mesajı şikâyet ettiğinde, o mesaj ve sohbetteki önceki 5 mesaj moderasyon ekibine iletilir. Şifreli bir sohbette bu mesajları senin cihazın iletir, platform onları başka bir yolla okuyamaz. Her mesaj gönderilirken bir parmak izi taşır. Böylece iletilen mesajların değiştirilmediği doğrulanabilir. Şikâyet kanıtı, şikâyet kapandıktan 90 gün sonra silinir."
+- E2 sonrası: `s3Item1`'den "ve grup DM'lerdeki" çıkar, `s3Item3`'te "Birebir DM'lerdeki" → "Ortam dışı tüm DM'lerdeki".
+
 ## §6 Uygulama sırası
 1. `shared/e2ee-core`: `frank` / `verifyFrank` + kanonik biçim + test vektörleri → **R7-1**
 2. api (§3) + spec'ler → **R7-2**
 3. e2ee-client + web + mobil okuma (v2 + doğrulama + `fk` saklama) + şikâyet akışı + moderasyon paneli → **R7-3**
 4. Deploy (`E2EE_FRANKING=false`), vc68 Play. Play yayılınca bayrak açılır.
-5. Gizlilik metni (§5) sahip onayıyla aynı deploy'da.
+5. ~~Gizlilik metni (§5) sahip onayıyla aynı deploy'da.~~ Rev.3: metin onaylı (§5.1), herkese açılışla yayına girer.
 
 **Cihaz turu DoD (sahip):** iki hesap, şifreli DM: bayrak açıkken mesajlar normal okunur; bir mesajı şikâyet et → moderasyon panelinde hedef + önceki 5 mesaj "doğrulandı" etiketiyle; gönderen mesajı silse de kanıt panelde; şifresiz ortam mesajı şikâyeti → sunucu kaydıyla kanıt; kurcalanmış kanıt (test ucu ya da elle) "doğrulanmamış"; kapanıştan sonra `evidencePurgeAt` dolu.
 
