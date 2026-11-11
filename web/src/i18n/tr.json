@@ -1124,7 +1124,8 @@
       "seen": "Okundu"
     },
     "deleteConfirm": "Bu mesajı silmek istediğinden emin misin? Bu işlem geri alınamaz.",
-    "editHint": "Enter kaydet · Esc iptal",
+    "editHint": "Enter kaydet · Shift+Enter yeni satır · Esc vazgeç",
+    "editTitle": "Mesajı düzenle",
     "pin": "Sabitle",
     "unpin": "Sabitlemeyi kaldır",
     "pinned": "Sabitlendi",

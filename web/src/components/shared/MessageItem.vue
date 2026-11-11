@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useRolesStore } from '@/stores/roles'
@@ -12,6 +12,7 @@ import ForwardMessageModal from './ForwardMessageModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import ReactionPill from './ReactionPill.vue'
 import ReactionsModal from './ReactionsModal.vue'
+import MessageEditModal from './MessageEditModal.vue'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
 import type { MessageDto, GuildMemberDto } from '@/types'
 
@@ -111,7 +112,6 @@ const editing = ref(false)
 const editContent = ref('')
 const editLoading = ref(false)
 const editError = ref('')
-const editTextareaEl = ref<HTMLTextAreaElement | null>(null)
 
 // Silme durumu
 const showDeleteConfirm = ref(false)
@@ -172,13 +172,6 @@ function startEdit() {
   editInitial = editContent.value
   editError.value = ''
   editing.value = true
-  nextTick(() => {
-    if (editTextareaEl.value) {
-      editTextareaEl.value.focus()
-      editTextareaEl.value.style.height = 'auto'
-      editTextareaEl.value.style.height = editTextareaEl.value.scrollHeight + 'px'
-    }
-  })
 }
 
 function cancelEdit() {
@@ -213,16 +206,6 @@ async function saveEdit() {
   }
 }
 
-function onEditKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    saveEdit()
-  }
-  if (e.key === 'Escape') {
-    cancelEdit()
-  }
-}
-
 // Silme
 function openDeleteConfirm() {
   showDeleteConfirm.value = true
@@ -254,7 +237,6 @@ onUnmounted(() => {
     :message="message"
     :is-mine="isMine"
     :is-group-start="isGroupStart"
-    :is-editing="editing"
     :mention-resolver="mentionResolver"
     :role-resolver="roleResolver"
     :is-mentioned="isMentioned"
@@ -273,33 +255,6 @@ onUnmounted(() => {
     @retry="emit('retry', $event)"
     @discard="emit('discard', $event)"
   >
-    <!-- Düzenleme modu -->
-    <template #editing>
-      <div v-if="editing" class="mt-1">
-        <textarea
-          ref="editTextareaEl"
-          v-model="editContent"
-          rows="1"
-          class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] resize-none outline-none border"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary); border-color: var(--kv-border-strong); font-family: var(--kv-font-ui); max-height: 200px;"
-          :disabled="editLoading"
-          @keydown="onEditKeydown"
-          @input="($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
-        />
-        <p v-if="editError" class="text-[12px] mt-1" style="color: var(--kv-danger);">{{ editError }}</p>
-        <div class="flex gap-2 mt-1 text-[12px]" style="color: var(--kv-text-muted);">
-          <span>{{ t('message.editHint') }}</span>
-          <button
-            class="underline cursor-pointer hover:opacity-80"
-            style="color: var(--kv-danger);"
-            @click="cancelEdit"
-          >
-            {{ t('common.cancel') }}
-          </button>
-        </div>
-      </div>
-    </template>
-
     <!-- Reaksiyon pill'leri (guild kanalı) -->
     <template #reactions>
       <ReactionPill
@@ -312,6 +267,19 @@ onUnmounted(() => {
       />
     </template>
   </MessageRow>
+
+  <!-- D96: düzenleme katmanı -->
+  <MessageEditModal
+    v-if="editing"
+    v-model="editContent"
+    :message="message"
+    :loading="editLoading"
+    :error="editError"
+    :mention-resolver="mentionResolver"
+    :role-resolver="roleResolver"
+    @save="saveEdit"
+    @cancel="cancelEdit"
+  />
 
   <!-- Kullanıcı kartı (yazar adına tıklama — yalnız grup başında görünür) -->
   <UserCardPopover
