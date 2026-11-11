@@ -9,6 +9,7 @@
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { messagesApi } from '@/api/messages'
+import { useE2eeStore } from '@/stores/e2ee'
 import { useMessagesStore } from '@/stores/messages'
 import { useMessageJump } from '@/composables/useMessageJump'
 import { formatMentionsPlain } from '@/utils/mentions'
@@ -25,6 +26,7 @@ const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 const messagesStore = useMessagesStore()
+const e2ee = useE2eeStore()
 const { requestJump } = useMessageJump()
 
 // Sabit mesaja tıkla → listede o mesaja zıpla, popover'ı kapat
@@ -37,13 +39,24 @@ const pins = ref<MessageDto[]>([])
 const loading = ref(false)
 const error = ref('')
 
+// Şifreli sabitlenenler: düz metin YALNIZ yerel depodan (çözme/geriye yürüyüş yok); yoksa "Şifreli mesaj"
+async function fillEncryptedPins(list: MessageDto[]): Promise<MessageDto[]> {
+  return Promise.all(
+    list.map(async (m) => {
+      if (!m.encrypted) return m
+      const text = await e2ee.plainText(m.id)
+      return text === null ? m : { ...m, content: text }
+    }),
+  )
+}
+
 async function loadPins() {
   if (!props.channelId) return
   loading.value = true
   error.value = ''
   try {
     const res = await messagesApi.fetchPins(props.channelId)
-    pins.value = res.data
+    pins.value = await fillEncryptedPins(res.data)
   } catch {
     error.value = t('common.error')
   } finally {
@@ -218,6 +231,13 @@ defineExpose({ refresh })
               style="color: var(--kv-text-muted);"
             >
               {{ pin.attachments[0].filename }}
+            </p>
+            <p
+              v-else-if="pin.encrypted"
+              class="text-[13px] italic"
+              style="color: var(--kv-text-muted);"
+            >
+              {{ t('e2ee.encryptedQuote') }}
             </p>
           </div>
         </div>

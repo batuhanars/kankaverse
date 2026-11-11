@@ -23,6 +23,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import GroupSettingsModal from './GroupSettingsModal.vue'
 import ReportModal from '@/components/shared/ReportModal.vue'
 import FullProfileModal from '@/components/shared/FullProfileModal.vue'
+import { useEncryptedPreviews } from '@/composables/useEncryptedPreviews'
 import { formatMentionsPlain } from '@/utils/mentions'
 import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import type { DmChannelDto, UserProfileCardDto } from '@/types'
@@ -46,6 +47,11 @@ const { typingUsersForChannel } = useTyping(() => null)
 // Gönderenin giden PENDING isteği optimistik eklenmiş olabilir → burada elenir.
 const visibleChannels = computed(() =>
   dmStore.channels.filter((ch) => !(ch.type === 'DM' && ch.requestStatus === 'PENDING')),
+)
+
+const { previews } = useEncryptedPreviews(
+  () => visibleChannels.value,
+  () => props.activeChannelId,
 )
 
 function truncate(text: string, max = 40) {
@@ -136,6 +142,13 @@ function lastMsgResolver(ch: DmChannelDto) {
 
 function formatLastMessage(ch: DmChannelDto, content: string): string {
   return truncate(formatMentionsPlain(content, lastMsgResolver(ch), t('mention.unknown')))
+}
+
+// Şifreli son mesaj: depoda düz metin varsa o, yoksa sabit "Şifreli mesaj" (E3 §4.1)
+function previewText(ch: DmChannelDto, last: { id: string; content: string; encrypted?: boolean }): string {
+  if (!last.encrypted) return formatLastMessage(ch, last.content)
+  const plain = previews.value[last.id]
+  return plain ? formatLastMessage(ch, plain) : t('e2ee.preview')
 }
 
 // Grup için görüntü adı: ad varsa onu, yoksa üye adlarını birleştir
@@ -496,7 +509,7 @@ async function confirmDeleteGroup() {
             {{ t('dm.reactionPreview', { actor: ch.lastReaction.actorUsername, emoji: ch.lastReaction.emoji }) }}
           </p>
           <p v-else-if="ch.lastMessage" class="text-[12px] truncate" style="color: var(--kv-text-muted);">
-            {{ ch.lastMessage.encrypted ? t('e2ee.preview') : formatLastMessage(ch, ch.lastMessage.content) }}
+            {{ previewText(ch, ch.lastMessage) }}
           </p>
         </div>
 
