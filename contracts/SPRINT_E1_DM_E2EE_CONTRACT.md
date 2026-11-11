@@ -1,6 +1,6 @@
 # SPRINT E1: 1-1 DM uçtan uca şifreleme (metin)
 
-> Durum: **TASARIM KİLİTLİ (2026-11-10, sahip onayı). Rev.6 (geri alma + grup kimliği §6.4). Rev.5 (ortak istemci motoru §6.3). Rev.4 (cihaz turu web alıcı). Rev.3 (web adımı kararları, §6.2). Rev.2 (api adımı: cihaz oturum zincirine bağlı, ek alanlar). Rev.1 (aynı gün, adım 1 bulguları: ağaç Welcome içinde, geçmiş commit kuralı, çekirdek API kesinleşti, paketleme).** PM compose (Opus). **core + api + web + mobil.**
+> Durum: **TASARIM KİLİTLİ (2026-11-10, sahip onayı). Rev.7 (yeni cihaz yarışı §6.5). Rev.6 (geri alma + grup kimliği §6.4). Rev.5 (ortak istemci motoru §6.3). Rev.4 (cihaz turu web alıcı). Rev.3 (web adımı kararları, §6.2). Rev.2 (api adımı: cihaz oturum zincirine bağlı, ek alanlar). Rev.1 (aynı gün, adım 1 bulguları: ağaç Welcome içinde, geçmiş commit kuralı, çekirdek API kesinleşti, paketleme).** PM compose (Opus). **core + api + web + mobil.**
 > Yol haritası: E0 deneme ✅ → **E1 bu sprint** → E2 grup DM → E3 push/hızlı cevap → E4 şikâyet (franking) → E5 yedek → E6 medya → E7 doğrulama/yerel arama → E8 aramalar.
 > 🔴 **R7 bölgesi, tamamı.** Hiçbir parça sahibin satır satır incelemesi olmadan main'e girmez.
 > Başlangıç noktası: dal `spike/e2ee-mls` (e66659c). Deneme kodu üretime **kopyalanmaz**, referanstır.
@@ -197,6 +197,12 @@ E0 senaryolarının üretim API'siyle karşılığı (1-1 iki cihazlı, cihaz ek
 **Bulgu (yeniden açılış):** bayrak tekrar açılınca yeni grup kurulur, ama eski grubu yerel deposunda tutan cihaz `needsJoin` kuralı (`welcomes.ts`: "yerel grup var ve etkinse Welcome bayat") yüzünden yeni Welcome'ı ack'leyip atar, yeni gruba katılmaz; yeni mesajlar "bu cihaz eklenmeden önce" etiketiyle görünür.
 **Kural:** yerel grubun `groupId`'si sunucunun bildirdiği `groupId` ile (`GET /e2ee/channels/:id`) eşleşmiyorsa yerel grup BAYATTIR: Welcome işlenirken katılınır (eski grup durumu değiştirilir), kanal senkronunda da bayat grupla commit/şifreleme yapılmaz. Daha önce çözülüp yerel depoda tutulan mesaj kayıtları korunur. Ağ ya da sunucu hatasında yerel grup SİLİNMEZ (yalnız kesin uyuşmazlıkta). Çözülemeyen mesajın etiketi: "eklenmeden önce" yalnız mesaj cihazın katılımından önceyse; aksi halde "çözülemedi". Kapsam yalnız `shared/e2ee-client` (+ gerekiyorsa istemci etiket metni); sunucu ve native değişmez.
 **DoD:** birim testi (eski grup yerelde + farklı groupId'li Welcome → katılır, yeni mesaj çözülür; aynı groupId'de davranış değişmez); yerelde sahip cihaz turu: geri alma → yeniden açma → üç cihaz da yeni mesajı çözer.
+
+## §6.5 Yeni cihaz yarışı (Rev.7, 2026-11-11, E3 cihaz turu bulgusu)
+**Bulgu:** `POST /e2ee/devices` kaydı anında `e2ee:devices-changed` yayıyor; karşı cihaz hemen `claim` ediyor ama yeni cihaz KeyPackage'larını henüz üretiyor (telefonda 20 paket ~2 sn). `claim` boş döner, `reconcile` 'stuck' ile sessizce çıkar, bir daha denenmez. Yeni telefon "Sohbet şifreleniyor" uyarısında kalır, ta ki bir üye sohbeti yeniden açana dek. Canlıda iki kez görüldü (Sena 06:45, Okan 07:38). Web'de paket üretimi hızlı olduğu için E1 turunda görünmedi.
+**Kural:** `e2ee:devices-changed` cihaz kaydında DEĞİL, KeyPackage yüklemesinde yayılır: `POST /e2ee/devices/me/key-packages` öncesinde cihazın tüketilebilir paketi yoksa (tüketilmemiş sayısı 0 VE son çare paketi yok) ve yükleme sonrası varsa, commit sonrası yayın. Bu hem ilk yüklemeyi hem stoku tükenip yeniden dolan cihazı kapsar. Kayıttaki yayın kaldırılır (yalnız paket yokken anlamsız). İptal yolundaki yayın değişmez.
+**Kapsam:** yalnız api (`e2ee-devices.service.ts`). İstemci değişmez.
+**DoD:** spec: kayıt yayın yapmaz; ilk yükleme bir kez yayar; stoku olan cihazın ek yüklemesi yaymaz; son çare paketi olan cihaz yaymaz; tükenmiş cihazın yeniden yüklemesi yayar. Canlıda: yeni telefonla giriş, karşı taraf sohbetteyken ilk mesaj birkaç saniye içinde gider.
 
 ## §7 Açık sorular (PM önerisiyle, sahip itiraz etmezse geçerli)
 - **Masaüstü (Electron):** web koduyla aynı, IndexedDB. Electron `safeStorage` ile güçlendirme sonra (borç D-E2EE-1).

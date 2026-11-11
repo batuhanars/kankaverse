@@ -1,6 +1,6 @@
 # SPRINT E3: Şifreli DM'de bildirim önizlemesi, liste önizlemesi, sabitlenenler
 
-> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı).** PM compose (Opus). **e2ee-client + api + mobil + web.**
+> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı). Rev.1 (aynı gün, cihaz turu: çözme kısa servise taşındı, §8; §1.1 kaldırıldı).** PM compose (Opus). **e2ee-client + api + mobil + web.**
 > Yol haritası (revize, sahip 2026-11-11): E0 ✅ → E1 ✅ (canlı, izin listesi) → **E3 bu sprint** → E4 şikâyet → E5 yedek → **herkese açılış** → E2 grup DM → E6-E8.
 > 🔴 **R7 bölgesi.** Şifre çözme yolu ve push yüküne giren her alan sahibin satır satır incelemesinden geçer.
 > Dayanak: `SPRINT_E1_DM_E2EE_CONTRACT.md` (ilkeler §1 aynen geçerli), `SPRINT_C50_CONVERSATION_PUSH_CONTRACT.md` (v2 veri biçimi), `SPRINT_C52_QUICK_REPLY_CONTRACT.md` (hızlı cevap görevi).
@@ -139,3 +139,14 @@ versionCode **67**. Native değişiklik yok; yine de release paketi kısa yol ko
 - **Bildirim çekmecesi:** çözülmüş metin sistem bildiriminde durur, okununca/silinince gider. Bu, her mesajlaşma uygulamasındaki durum; kabul.
 - **2800 bayt üstü mesaj:** genel metinle bildirilir. Uzun mesajların yüzdesi E1 verisinde düşük görünüyorsa ek iş yok; gerekirse sonra `messageId` ile çekme.
 - **Web/masaüstü:** DM için işletim sistemi bildirimi yok, bu sprintte açılmıyor.
+
+## §8 Rev.1: çözme kısa arka plan servisinde (2026-11-11, cihaz turu bulgusu, sahip onayı)
+
+**Bulgu (M2101K7BG, MIUI, logcat):** push 10:57:14.5 → JS soğuk açılış 17.4 → `ExpoFirebaseMessagingService` biter 17.8 → MIUI süreci dondurur ("hibernation") 19.8. Çözme yarıda kalır; ne metin ne genel bildirim çıkar. Süreç sonradan çözülünce bildirim gecikmeli düşer (ilk telefonda ~15 dk). E3 öncesi bildirim JS yüklenir yüklenmez çizildiği için pencereye sığıyordu. Dondurulan süreçte JS zamanlayıcısı da durduğu için §5.1'deki 8 sn sınırı korumaz.
+
+**Karar:** §1.1 ("Kotlin değişmez") bu sprint için KALDIRILIR. Şifreli yükü olan mesaj push'unda çözme + çizim, hızlı cevaptaki (C52) `QuickReplyService` deseniyle bir `HeadlessJsTaskService` içinde koşar; servis açıkken sistem süreci dondurmaz.
+- **Kotlin:** `PushDecryptService` (`HeadlessJsTaskService`, görev adı `KvPushDecrypt`, üst süre **20 sn**, ön planda da çalışabilir, manifestte `exported=false`). Modüle `startPushDecrypt(dataJson: String): Boolean` fonksiyonu: servisi başlatır, başlatılamazsa (arka plan kısıtı vb.) `false`. Kotlin iş mantığı içermez: veriyi JS'e aynen geçirir.
+- **JS:** `conversationPush.ts` görevi, `e2ee` alanı olan mesajda (ve sohbet ekranda değilse) `startPushDecrypt(JSON)` çağırır ve döner. `true` ise işi servis görevi yapar; `false` ise hemen genel metinle bildirim gösterir (bugünkü yedek). `index.js` kökünde `AppRegistry.registerHeadlessTask('KvPushDecrypt', ...)`: mevcut `previewForPush` + `showConversationNotification` akışı (§5.1 kuralları aynen: `hidden` → gösterme, diğer her durum genel metin, 8 sn iç sınır). Çözme ve çizim kodu iki yerde kopyalanmaz; tek fonksiyon.
+- Şifreli yükü OLMAYAN mesaj push'u ve `read` / arama olayları bugünkü yoldan, değişmeden.
+- **Native değişiklik:** yeni derleme. versionCode **68**. Release paketi PM tarafından kısa yol kopyasında derlenir; modül `android/` klasörü kaynakla `cmp` eşitlenir, APK'da `PushDecryptService` sınıfı aranır ([[kisa-yol-derleme-kopyasi]]).
+- **DoD (sahip, M2101K7BG ve Redmi 14C):** uygulama kaydırılıp kapatılmışken gelen şifreli mesaj birkaç saniye içinde gerçek metinle bildirimde; logda `push-decrypt ... soğuk` satırı; telefon yeniden başlatıldıktan sonra da aynı. §6.1 turu bu derlemeyle tamamlanır.
