@@ -1,6 +1,6 @@
 # SPRINT E5a: Şifreli DM geçmişinin sunucu yedeği (yedek şifresi)
 
-> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı; §5 uyarı ve §6 gizlilik metni onaylı, §9 açık sorular PM önerisiyle kabul). Rev.1 (aynı gün, adım 0 sonucu, sahip onayı: mobilde native Argon2, §2.4).** PM compose (Opus). **e2ee-core + e2ee-client + api + web + mobil.**
+> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı; §5 uyarı ve §6 gizlilik metni onaylı, §9 açık sorular PM önerisiyle kabul). Rev.1 (aynı gün, adım 0 sonucu, sahip onayı: mobilde native Argon2, §2.4). Rev.2 (aynı gün, adım 3 PM incelemesi: varlık kontrolü + KDF üst sınırı, §4.7).** PM compose (Opus). **e2ee-core + e2ee-client + api + web + mobil.**
 > Yol haritası: E0 ✅ → E1 ✅ → E3 ✅ → E4 (cihaz turu bekliyor) → **E5a yedek bu sprint** → E5b cihazdan cihaza aktarım → E2 grup DM → **herkese açılış** → E7 → E8.
 > 🔴 **R7 bölgesi, tamamı:** anahtar türetme ve yedek şifrelemesi (e2ee-core), yedek sahipliği ve silme (api), geri yükleme birleştirmesi (e2ee-client).
 > Dayanak: sahip kararı 2026-11-11 (iki yol, yedek şifresi, kurtarma anahtarı yok); kurul verdikti `knowledge/kurul/verdicts/2026-11-11-e5-yedek-ve-cihaz-aktarimi.md` (⚠ ŞARTLI, 6 koşul, sahip kabul etti); `SPRINT_E1_DM_E2EE_CONTRACT.md` §1 (ilkeler, yerel depo), `SPRINT_E4_E2EE_REPORT_CONTRACT.md` §2 (fk/sentAt).
@@ -139,6 +139,14 @@ Kurulum/değişim/sıfırlama/silme yolları; `keyVersion` uyuşmazlığı 409; 
 
 ### §4.6 Metinler
 Tümü i18n (`e2ee.backup.*`), web `{'@'}` kaçışı. Em dash yok. Tarih/saat TR biçimi.
+
+### §4.7 Rev.2 (2026-11-11, adım 3 PM incelemesi)
+**Bulgu 1:** API silinmiş mesajı geçmişte döndürmüyor ve "silindi" işareti de vermiyor; çevrimdışıyken silinen mesajın yerel kaydı kalıyor ve görüntüye giriyordu (kurul k.4 ihlali).
+- **Yeni uç** `POST /e2ee/messages/exists` (JwtAuthGuard + E2eeEnabledGuard + throttle): gövde `{ channelId, ids: string[] }` (1..500, cuid), yanıt `{ existing: string[] }` (yalnız `deletedAt: null` ve o kanala ait olanlar). Çağıran kanala erişemiyorsa 403 (mevcut kanal erişim kontrolü). Yanıt içerik taşımaz. Yedek bayrağına bağlı DEĞİL (silme hijyeni yedekten bağımsız da işe yarar), E2EE bayrağına bağlı.
+- **Görüntü kurulurken:** yerel kayıtlar kanal başına 500'lük gruplarla sorulur; "yok" dönenler yerelden silinir (`deleteMessage`) ve görüntüye girmez. Ağ hatasında görüntü o tur alınmaz (fail-quiet, kirli kalır); eksik kontrolle görüntü YÜKLENMEZ.
+- **Geri yüklemede:** adaylar aynı uçla süzülür; "yok" dönen yazılmaz.
+**Bulgu 2:** istemci KDF parametresinde yalnız taban denetliyordu; kötü niyetli sunucu dev bellek dayatıp uygulamayı çökertebilir.
+- **Üst sınır** `BACKUP_KDF_MAX = { m: 262144 (256 MiB), t: 16, p: 1 }` e2ee-core `assertParams`'ta (aşılırsa `BackupParamsError`); API'nin üst sınırı aynı değere iner (`m ≤ 262144`).
 
 ## §5 Kullanıcıya görünen uyarı (kurulum ekranı, sahip onayı)
 "Yedeğin bu şifreyle kilitlenir. Şifre senin cihazından çıkmaz, biz de bilmeyiz. Unutursan yedeğini ne sen ne de biz açabiliriz. Kolay tahmin edilebilir bir şifre seçme."
