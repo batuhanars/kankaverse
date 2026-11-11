@@ -82,6 +82,43 @@ jobs:
         run: |
           set -e
           cd /home/deploy/kankaverse
+          # D98: disk doluluk kapısı. Pull'dan ÖNCE ölç; eşik üstündeyse güvenli temizlik dene,
+          # hâlâ doluysa deploy'u durdur (mevcut servisler çalışmaya devam eder, yarım deploy olmaz).
+          DISK_LIMIT=85
+          disk_pct() { df --output=pcent / | tail -1 | tr -dc '0-9'; }
+          # Konteynerlerin (çalışan/duran) kullandığı imaj + servis başına en yeni 3 sha etiketi
+          # dışındaki api/web/landing imajlarını sil. postgres/redis/caddy'ye dokunulmaz.
+          cleanup_old_images() {
+            USED=$(docker ps -aq | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null | sort -u || true)
+            for SVC in api web landing; do
+              REPO="ghcr.io/batuhanars/kankaverse-$SVC"
+              docker image ls "$REPO" --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
+                | grep -v -e ':<none>$' -e ':latest$' \
+                | while read -r REF; do
+                    docker image inspect --format '{{.Created}} {{.Id}} '"$REF" "$REF" 2>/dev/null || true
+                  done \
+                | sort -r | tail -n +4 \
+                | while read -r _ ID REF; do
+                    if echo "$USED" | grep -qx "$ID"; then continue; fi
+                    docker rmi "$REF" || true
+                  done || true
+            done
+          }
+          PCT=$(disk_pct)
+          echo "Disk doluluğu (deploy öncesi): %$PCT"
+          if [ "$PCT" -gt "$DISK_LIMIT" ]; then
+            echo "Eşik aşıldı, güvenli temizlik yapılıyor"
+            docker builder prune -af || true
+            docker image prune -f || true
+            cleanup_old_images || true
+            PCT=$(disk_pct)
+            echo "Disk doluluğu (temizlik sonrası): %$PCT"
+            if [ "$PCT" -gt "$DISK_LIMIT" ]; then
+              df -h /
+              echo "::error::Disk doluluğu %$PCT (eşik %$DISK_LIMIT). Deploy durduruldu; mevcut servisler çalışmaya devam ediyor. Sunucuda elle yer aç (docker system df)."
+              exit 1
+            fi
+          fi
           BEFORE=$(git rev-parse HEAD)
           # Repo private: https remote anonim pull edemiyor. Token'ı geçici Authorization
           # header'ı ile ver (URL'e gömme → ps/reflog sızıntısı yok). actions/checkout deseni.
@@ -101,4 +138,8 @@ jobs:
             echo "Caddyfile değişti → caddy restart"
             $COMPOSE restart caddy
           fi
-          docker image prune -f
+          # Temizlik hataları deploy'u düşürmez (yalnız ön kontrol eşiği durdurur).
+          docker image prune -f || true
+          cleanup_old_images || true
+          docker builder prune -af || true
+          df -h /
