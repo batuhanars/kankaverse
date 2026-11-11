@@ -9,7 +9,8 @@ import com.facebook.react.HeadlessJsTaskService
 
 /**
  * Bildirimdeki Cevapla / Okundu / Sessize al eylemlerinin hedefi. Yazilan metni RemoteInput'tan okur ve headless JS servisini
- * baslatir (uygulama oldurulmus olsa da JS calisir). Is mantigi yok: gonderme JS'te.
+ * baslatir (uygulama oldurulmus olsa da JS calisir). Is mantigi yok: gonderme JS'te. Alici `goAsync()` ile
+ * gorev bitene kadar (QuickReplyGate) sureci tutar.
  */
 class QuickReplyReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
@@ -32,6 +33,10 @@ class QuickReplyReceiver : BroadcastReceiver() {
       .putExtra(ConversationNotifier.EXTRA_GUILD_ID, intent.getStringExtra(ConversationNotifier.EXTRA_GUILD_ID))
       .putExtra(ConversationNotifier.EXTRA_ACTION, action)
       .putExtra(QuickReplyService.EXTRA_TEXT, text)
+    // E3 Rev.3: alici JS gorevi bitene kadar (en cok ~9 sn) yasar; MIUI sureci dondurmasin. `goAsync()` yalniz
+    // onReceive icinde cagrilabilir. Bitis: JS `finishQuickReply()` ya da QuickReplyGate'in native zaman asimi.
+    val pending = goAsync()
+    if (pending != null) QuickReplyGate.hold(pending)
     // Servis ayaga kalkana kadar islemci uyumasin (HeadlessJsTaskService dokumani: receiver'dan baslatirken sart).
     HeadlessJsTaskService.acquireWakeLockNow(context)
     try {
@@ -39,6 +44,7 @@ class QuickReplyReceiver : BroadcastReceiver() {
     } catch (e: Exception) {
       // Android 12+ arka plan servis kisiti (bildirim eyleminden normalde muaf; MIUI'de gozlenmeli).
       Log.e(TAG, "servis baslatilamadi", e)
+      QuickReplyGate.finishOldest() // gorev hic baslamadi: alicinin cikisini bekletme
     }
   }
 

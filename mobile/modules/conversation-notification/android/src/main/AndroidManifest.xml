@@ -1,5 +1,18 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools">
   <application>
+    <!-- E3 Rev.4: Expo'nun FCM servisi kaldirilir, onu genisleten KvFirebaseMessagingService kaydedilir
+         (push penceresini JS cozmeyi bitirene kadar tutar). -->
+    <service
+      android:name="expo.modules.notifications.service.ExpoFirebaseMessagingService"
+      tools:node="remove" />
+    <service
+      android:name="expo.modules.conversationnotification.KvFirebaseMessagingService"
+      android:exported="false">
+      <intent-filter android:priority="-1">
+        <action android:name="com.google.firebase.MESSAGING_EVENT" />
+      </intent-filter>
+    </service>
     <!-- Hizli cevap: bildirim Cevapla eylemi -> receiver -> headless JS servisi. -->
     <receiver
       android:name="expo.modules.conversationnotification.QuickReplyReceiver"

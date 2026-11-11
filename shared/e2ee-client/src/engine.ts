@@ -3,7 +3,7 @@
 // sunucuyla, web ve mobil kendi adaptörleriyle çalışır.
 import { RandomUnavailableError, textPayload } from '@kankaverse/e2ee-core'
 import { fromB64, toB64 } from './b64'
-import { groupForSend, openChannel, syncChannel, type ChannelInfo } from './channelSync'
+import { DeviceRemovedError, groupForSend, openChannel, syncChannel, type ChannelInfo } from './channelSync'
 import type { E2eeContext } from './context'
 import { DeviceBrokenError, ensureDevice } from './deviceSetup'
 import { Hydrator, type OwnPlain, type Resolution, type WireMessage } from './hydrate'
@@ -104,9 +104,15 @@ export class E2eeEngine {
    */
   static async openLocal(userId: string, deps: LocalEngineDeps): Promise<E2eeEngine | null> {
     assertRandom()
+    const t0 = Date.now()
     const vault = await deps.openVault(userId)
+    const t1 = Date.now()
     const engine = new E2eeEngine(userId, deps, vault, null, () => {}) // uyarı yok: önbellek bayat olabilir
-    return (await engine.store.loadDevice()) ? engine : null
+    const hasDevice = (await engine.store.loadDevice()) !== null
+    // Soğuk açılış ölçümü (E3 Rev.3 k.5): yalnız süre.
+    deps.metric?.('push-step vault-open', t1 - t0, 1)
+    deps.metric?.('push-step device-open', Date.now() - t1, 1)
+    return hasDevice ? engine : null
   }
 
   private run<T>(task: (ctx: E2eeContext) => Promise<T>): Promise<T> {
@@ -160,6 +166,24 @@ export class E2eeEngine {
       if (!group) return null
       const sealed = await group.encrypt(textPayload(text, Date.now()))
       // Şifreleme anahtarı tüketir: POST başarısız olsa bile durum geri alınamaz, hemen diske.
+      await ctx.store.saveGroup(channelId, group)
+      this.own.set(digestOf(sealed.ciphertext), text)
+      return { ciphertext: toB64(sealed.ciphertext), epoch: sealed.epoch }
+    })
+  }
+
+  /**
+   * Hafif şifreleme (E3 Rev.3 §10 k.3, bildirimden hızlı cevap): YALNIZ yerel grupla şifreler, AĞA ÇIKMAZ
+   * (`encrypt`'in aksine `channelState`/Welcome/grup kurma yok). Yerel grup yok → `null` (çağıran şifresiz sohbet
+   * sayıp düz gönderir; sunucu şifreli kanala düz mesajı reddeder). Cihaz gruptan çıkarılmışsa fırlatır: düz
+   * metin asla gönderilmesin. Durum hemen diske (anahtar tüketildi); düz metin `rememberSent` için bellekte kalır.
+   */
+  encryptOffline(channelId: string, text: string): Promise<SentCipher | null> {
+    return this.run(async (ctx) => {
+      const group = await ctx.store.loadGroup(channelId)
+      if (!group) return null
+      if (!group.isActive) throw new DeviceRemovedError()
+      const sealed = await group.encrypt(textPayload(text, Date.now()))
       await ctx.store.saveGroup(channelId, group)
       this.own.set(digestOf(sealed.ciphertext), text)
       return { ciphertext: toB64(sealed.ciphertext), epoch: sealed.epoch }

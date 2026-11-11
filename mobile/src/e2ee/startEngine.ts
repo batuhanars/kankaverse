@@ -1,13 +1,23 @@
 // Mobil adaptörleri paylaşılan motora (shared/e2ee-client) bağlar: SQLite+Keystore vault, SerialQueue kilidi,
 // pureProvider (Hermes'te crypto.subtle yok), mobil HTTP. Motor mantığı burada YOK.
 import { E2eeEngine, serialLock, type WarningHandler } from '@kankaverse/e2ee-client'
-import { pureProvider, utf8Path } from '@kankaverse/e2ee-core'
+import { pureProvider, tunePurePrecompute, utf8Path } from '@kankaverse/e2ee-core'
+import { meterProvider } from './cryptoMetrics'
 import { mobileE2eeApi } from './mobileApi'
 import { openMobileVault } from './sqliteRows'
 
 // Tek JS ortamı: bildirim görevi (C50/C52) de aynı ortamda koşar, ileride E3 aynı kuyruğa girecek.
 // Süreçler arası kilit gerekmez (web'deki Web Locks'un karşılığı yok).
 const withLock = serialLock()
+
+// E3 Rev.4 §11.3: Ed25519 önhesaplama penceresi küçültülür (tembel; tabloyu burada KURMAZ). Gerekçe ve ölçüm:
+// shared/e2ee-core/src/pure/suite.ts. Hermes'te soğuk çözmenin ana maliyeti bu tablonun ilk kurulumuydu.
+tunePurePrecompute()
+
+// Çevrimdışı (bildirim) motoru için ölçümlü sağlayıcı: süre sarmalar, kripto mantığına dokunmaz.
+const metered = meterProvider(pureProvider)
+/** Bildirim çözmesi bitince çağrılır: `[E2EE] push-crypto <ad> <ms>` satırlarını yazar. */
+export const flushPushCryptoMetrics = metered.flush
 
 const yieldToUi = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
@@ -27,7 +37,7 @@ export function openLocalMobileEngine(userId: string): Promise<E2eeEngine | null
   return E2eeEngine.openLocal(userId, {
     openVault: openMobileVault,
     withLock,
-    provider: pureProvider,
+    provider: metered.provider,
     log,
     yieldToUi,
     metric,

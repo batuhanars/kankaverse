@@ -15,7 +15,7 @@ export function encryptedLastIds(channels: DmChannelDto[]): string[] {
 /**
  * DM listesi önizlemesi (E3 §4.1): şifreli son mesajın düz metni yerel depodan okunur (çözme YOK).
  * İlk boyama beklemez: önce "Şifreli mesaj", okununca metin. Motor hazır olunca ve etkin sohbet
- * değişince (sohbette çözülmüş olabilir) bulunamayanlar yeniden denenir.
+ * değişince (sohbette çözülmüş olabilir) ya da yeni düz metin yazılınca (`plainTick`) bulunamayanlar yeniden denenir.
  */
 export function useEncryptedPreviews(channels: () => DmChannelDto[], trigger: () => unknown) {
   const e2ee = useE2eeStore()
@@ -33,7 +33,7 @@ export function useEncryptedPreviews(channels: () => DmChannelDto[], trigger: ()
   }
 
   watch(
-    () => [encryptedLastIds(channels()).join(','), e2ee.engine, trigger()],
+    () => [encryptedLastIds(channels()).join(','), e2ee.engine, e2ee.plainTick, trigger()],
     () => void load(encryptedLastIds(channels())),
     { immediate: true },
   )

@@ -46,4 +46,24 @@ describe('useEncryptedPreviews', () => {
     expect(spy).not.toHaveBeenCalledWith('m3')
     scope.stop()
   })
+
+  it('plainTick artınca (soketten çözülünce) önizleme depodan yeniden okunur', async () => {
+    const store = useE2eeStore()
+    let stored: string | null = null
+    vi.spyOn(store, 'plainText').mockImplementation(() => Promise.resolve(stored))
+    const scope = effectScope()
+    const { previews } = scope.run(() =>
+      useEncryptedPreviews(
+        () => [ch('a', { id: 'm1', encrypted: true })],
+        () => null,
+      ),
+    )!
+    await nextTick()
+    await Promise.resolve()
+    expect(previews.value.m1).toBeUndefined()
+    stored = 'gercek metin'
+    store.plainTick++
+    await vi.waitFor(() => expect(previews.value.m1).toBe('gercek metin'))
+    scope.stop()
+  })
 })

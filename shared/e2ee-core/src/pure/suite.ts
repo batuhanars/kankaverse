@@ -11,6 +11,22 @@ import { randomBytes } from './random'
 
 const SIGN_KEY_LEN = 32
 
+/**
+ * E3 Rev.4: Ed25519 taban nokta önhesaplama penceresi. @noble/curves varsayılanı W=8 (4224 noktalık tablo, ilk
+ * kullanımda kurulur); README: "noble-curves spends 10+ ms to generate 20MB+ of base point precomputes ...
+ * The generation is deferred until any method (pubkey, sign, verify) is called. User can force precompute
+ * generation by manually calling `Point.BASE.precompute(windowSize, false)`." Hermes'te BigInt yavaş olduğundan
+ * bu tablo soğuk bildirim çözmesinin ana maliyeti. W=4 (512 nokta, tembel) tabloyu ~8 kat küçültür; Node ölçümü
+ * (scripts/bench-ed25519.mjs): ilk doğrulama 26 -> 7 ms, sıcak doğrulama ~1,15 -> ~1,25 ms (+%8). Yalnız hız
+ * ayarı: imza sonuçları değişmez (aynı eğri aritmetiği, farklı tablo).
+ */
+const ED25519_PRECOMPUTE_WINDOW = 4
+
+/** Mobil sağlayıcı başlatılırken bir kez çağrılır (tembel: tabloyu şimdi KURMAZ, ilk kullanımda kurulur). */
+export function tunePurePrecompute(): void {
+  ed25519.Point.BASE.precompute(ED25519_PRECOMPUTE_WINDOW, true)
+}
+
 export const pureSuite1 = {
   kdf: {
     extract: async (salt: Uint8Array, ikm: Uint8Array) => extract(sha256, ikm, salt),

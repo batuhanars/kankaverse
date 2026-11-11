@@ -58,11 +58,22 @@ export class Hydrator {
     if (this.group !== undefined) return
     const state = this.offline ? null : (await this.ctx.api.channelState(this.channelId)).data
     if (state) await dropStaleGroup(this.ctx, this.channelId, state) // bayat grupla çözme denenmez (§6.4)
-    this.group = await this.ctx.store.loadGroup(this.channelId)
+    this.group = await this.step('group-load', () => this.ctx.store.loadGroup(this.channelId))
     this.joinedAt = await this.ctx.store.loadJoinedAt(this.channelId)
-    this.ownDeviceId = (await this.ctx.getDevice()).deviceId
-    const members = state ? state.members : await this.ctx.store.loadView(this.channelId)
+    this.ownDeviceId = (await this.step('device-load', () => this.ctx.getDevice())).deviceId
+    const members = state ? state.members : await this.step('view-load', () => this.ctx.store.loadView(this.channelId))
     this.view = members ? { devices: devicesOf({ members }) } : undefined
+  }
+
+  /** Çevrimdışı (bildirim) yolunda adım süresi ölçümü (E3 Rev.3 k.5): yalnız ad + süre, içerik yok. */
+  private async step<T>(name: string, fn: () => Promise<T>): Promise<T> {
+    if (!this.offline || !this.ctx.metric) return fn()
+    const t0 = Date.now()
+    try {
+      return await fn()
+    } finally {
+      this.ctx.metric(`push-step ${name}`, Date.now() - t0, 1)
+    }
   }
 
   /** Kayıtta ve özeti aynıysa çözülmüş sayılır (liste sayfalama durma koşulu bunu kullanır). */
@@ -104,10 +115,13 @@ export class Hydrator {
     final: boolean,
   ): Promise<Resolution> {
     try {
-      const result = await guardUntrusted(this.ctx, this.channelId, () =>
-        this.group!.decrypt(ct, m.senderDeviceId ?? ''),
-      )
-      await this.ctx.store.saveGroup(this.channelId, this.group!)
+      const result = await this.step('decrypt', async () => {
+        const r = await guardUntrusted(this.ctx, this.channelId, () =>
+          this.group!.decrypt(ct, m.senderDeviceId ?? ''),
+        )
+        await this.ctx.store.saveGroup(this.channelId, this.group!)
+        return r
+      })
       const rec = decryptToRecord(result.payload)
       return this.save(m, digest, rec.status, rec.body)
     } catch (e) {
@@ -149,7 +163,9 @@ export class Hydrator {
       if (r.kind === 'record' && r.fresh) {
         fresh++
         if (fresh === 10) this.ctx.metric?.('hydrate-first-10', Date.now() - t0, fresh)
-        await this.ctx.yieldToUi?.()
+        // Çevrimdışı (bildirim) yolunda mola YOK: RN arka planda JS zamanlayıcılarını duraklatır, setTimeout
+        // dönmez ve iş takılır (E3 Rev.2 cihaz turu). Tek mesaj çözüldüğü için arayüze nefes gerekmez.
+        if (!this.offline) await this.ctx.yieldToUi?.()
       }
     }
     if (fresh > 0) this.ctx.metric?.('hydrate-total', Date.now() - t0, fresh)

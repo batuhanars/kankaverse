@@ -16,12 +16,18 @@ function countGroupWrites(p: Profile) {
 type Lock = ReturnType<typeof serialLock>
 
 /** Profilin deposunu AĞ PORTSUZ açar (bildirim görevinin motoru). `log` çıktısı `logs`a düşer. */
-async function local(p: Profile, logs: string[] = [], withLock: Lock = serialLock()) {
+async function local(
+  p: Profile,
+  logs: string[] = [],
+  withLock: Lock = serialLock(),
+  yieldToUi?: () => Promise<void>,
+) {
   const engine = await E2eeEngine.openLocal(p.userId, {
     openVault: async () => p.vault,
     withLock,
     provider,
     log: (message, error) => logs.push(`${message} ${String(error ?? '')}`),
+    yieldToUi,
   })
   return engine!
 }
@@ -143,6 +149,60 @@ export function notificationSuite(label: string) {
         provider,
       })
       expect(none).toBeNull()
+    })
+
+    it('çevrimdışı çözmede yieldToUi HİÇ çağrılmaz (Rev.3 k.1: arka planda JS zamanlayıcısı durur); çevrimiçi yol çağırır', async () => {
+      const { A1, B1 } = await pair()
+      const m1 = await send(A1, 'm1', 'molasız')
+      const m2 = await send(A1, 'm2', 'molasız iki')
+      await as(B1, (e) => e.onWelcome())
+      const yielded = vi.fn(async () => {})
+      const offline = await local(B1, [], serialLock(), yielded)
+
+      expect(await offline.decryptOffline(m1)).toEqual({ kind: 'text', body: 'molasız' })
+      expect(await offline.decryptOffline(m2)).toEqual({ kind: 'text', body: 'molasız iki' })
+      expect(yielded).not.toHaveBeenCalled()
+    })
+
+    it('karşı örnek: casus bağlıyken çevrimiçi hydrate yieldToUi çağırır (yukarıdaki test yanlış yeşil olmasın)', async () => {
+      const { A1, B1 } = await pair()
+      const n1 = await send(A1, 'n1', 'mola var')
+      await as(B1, (e) => e.onWelcome())
+      const yielded = vi.fn(async () => {})
+      const online = (await E2eeEngine.start('B', {
+        api: server.apiFor('B', B1.family),
+        openVault: async () => B1.vault,
+        withLock: serialLock(),
+        provider,
+        onWarn: () => {},
+        yieldToUi: yielded,
+      }))!
+      await online.hydrate(CH, [n1])
+      expect(yielded).toHaveBeenCalled()
+    })
+
+    it('encryptOffline: ağsız şifreler, karşı taraf çözer, rememberSent sonrası kendi mesajım depodan okunur', async () => {
+      const { A1, B1 } = await pair()
+      const m1 = await send(A1, 'm1', 'selam')
+      await as(B1, (e) => e.onWelcome())
+      const logs: string[] = []
+      const offline = await local(B1, logs) // ağ portu yok: groupForSend/channelState çağrılsaydı OfflineApiError
+
+      const cipher = await offline.encryptOffline(CH, 'hızlı cevap')
+      expect(cipher).not.toBeNull()
+      expect(logs).toEqual([])
+      const reply: Msg = { ...m1, id: 'r1', ciphertext: cipher!.ciphertext, senderDeviceId: B1.deviceId() }
+      await offline.rememberSent(reply)
+      expect(await B1.vault.get('messages', 'r1')).not.toBeNull()
+
+      expect((await show(A1, [m1, reply])).map((m) => m.content)).toEqual(['selam', 'hızlı cevap'])
+      expect((await show(B1, [m1, reply])).map((m) => m.content)).toEqual(['selam', 'hızlı cevap']) // yerelden
+    })
+
+    it('encryptOffline: yerel grup yok → null (şifresiz sohbet), depo değişmez', async () => {
+      const { B1 } = await pair()
+      const offline = await local(B1)
+      expect(await offline.encryptOffline(CH, 'düz')).toBeNull()
     })
 
     it('bilinmeyen yük sürümü: unavailable', async () => {

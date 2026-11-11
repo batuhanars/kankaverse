@@ -8,10 +8,12 @@ import type { DmChannelDto } from '@/api/dm';
  * (`engine.quoteText`). İlk boyama beklemez: önce genel "Şifreli mesaj", okununca metin gelir.
  * Anahtar mesaj kimliği; depoda olmayan (null) kimlik tekrar denenir (sohbet/bildirim sonradan çözmüş olabilir).
  * Bildirim görevi mesajı liste baktıktan SONRA çözebilir (E3 Rev.2 cihaz turu): uygulama ön plana her
- * geldiğinde eksikler yeniden okunur.
+ * geldiğinde eksikler yeniden okunur. Ön planda soket/push çözmesi `plainTick`'i artırır (E3 Rev.5), eksikler
+ * o anda yeniden okunur.
  */
 export function useEncryptedPreviews(channels: DmChannelDto[]): Record<string, string> {
   const engine = useE2eeStore((s) => s.engine);
+  const plainTick = useE2eeStore((s) => s.plainTick);
   const [byMessageId, setById] = useState<Record<string, string>>({});
   const [activeTick, setActiveTick] = useState(0);
 
@@ -40,7 +42,7 @@ export function useEncryptedPreviews(channels: DmChannelDto[]): Record<string, s
     return () => {
       cancelled = true;
     };
-  }, [engine, channels, byMessageId, activeTick]);
+  }, [engine, channels, byMessageId, activeTick, plainTick]);
 
   return byMessageId;
 }

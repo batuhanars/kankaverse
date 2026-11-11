@@ -316,6 +316,8 @@ object ConversationNotifier {
   ): Boolean {
     val builder = NotificationCompat.Builder(context, source)
       .setStyle(style)
+      // E3 Rev.3 k.6: MIUI cizim + guncellemeyi iki gonderim sayiyor ("2" rozeti); stildeki mesaj sayisi verilir.
+      .setNumber(style.messages.size)
       .setContentText(contentText)
       .setWhen(whenMs)
       .setOnlyAlertOnce(true)

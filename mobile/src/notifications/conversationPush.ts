@@ -7,6 +7,9 @@ import { useDmStore } from '@/stores/dm';
 import { getActiveChannelId } from '@/realtime/socket';
 import {
   dismissConversationNotification,
+  isPushHoldActive,
+  pushHandled,
+  setNotificationDefaults,
   showConversationNotification,
   updateNotificationMessageText,
 } from '../../modules/conversation-notification';
@@ -192,15 +195,86 @@ async function handleCall(p: Record<string, unknown>): Promise<boolean> {
  * görünen bildirimdeki o mesajın metni sessizce değiştirilir. `hidden`/`unavailable`/hata: hiçbir şey
  * (bildirim genel metinle kalır). İçerik loglanmaz, hata türü bile.
  */
-async function upgradeToDecryptedText(m: MessageData): Promise<void> {
-  if (!m.e2ee || !m.messageId) return;
+/** Ağsız çözme (E3 §9): yalnız yerel depo; hata/sonuçsuz → null. Bildirim çizimini BEKLEMEZ (paralel). */
+async function decryptForUpgrade(m: MessageData): Promise<string | null> {
+  if (!m.e2ee || !m.messageId) return null;
   try {
     const r = await decryptOfflineForPush(m.messageId, m.conversationId, m.e2ee);
-    if (r.kind !== 'text') return;
-    await updateNotificationMessageText(m.conversationId, m.messageId, r.body.slice(0, MAX_TEXT));
+    return r.kind === 'text' ? r.body.slice(0, MAX_TEXT) : null;
   } catch {
-    // sessiz: bildirim zaten görünüyor
+    return null; // sessiz: bildirim genel metinle görünür
   }
+}
+
+/**
+ * E3 Rev.2 §9.3: bildirim genel metinle çizilir; şifreli yük varsa çözme AYNI ANDA başlar (çizim avatar
+ * indirirken MIUI dondurma penceresi kapanabiliyor, cihaz turu 13:08). Çizim bitince çözüldüyse metin
+ * sessizce değiştirilir. İçerik loglanmaz.
+ */
+async function presentWithUpgrade(m: MessageData, show: () => Promise<unknown>): Promise<void> {
+  const t0 = Date.now();
+  const plain = decryptForUpgrade(m);
+  await show();
+  const shownMs = Date.now() - t0;
+  const text = await plain;
+  if (__DEV__ || m.e2ee) console.log(`[E2EE] push-show ${shownMs}ms toplam ${Date.now() - t0}ms`);
+  if (text === null || !m.messageId) return;
+  await updateNotificationMessageText(m.conversationId, m.messageId, text).catch(() => false);
+}
+
+/** Çizim parametreleri (genel metin: `text`); etiketler/renk/"ben" adı native yedek çizimle aynı kaynaktan. */
+function showParams(m: MessageData, meAvatarUrl: string | null, text: string = m.text) {
+  return {
+    ...m,
+    text,
+    groupInitial: groupInitialOf(m),
+    notificationChannelId: MESSAGE_CHANNEL_ID,
+    meName: t('mobile.notifications.me'),
+    meAvatarUrl,
+    replyLabel: t('mobile.notifications.reply'),
+    markReadLabel: t('mobile.notifications.markRead'),
+    muteLabel: t('mobile.notifications.mute'),
+    color: accentColor(),
+  };
+}
+
+/**
+ * E3 Rev.4 §11.2: etiket/renk/"ben" adı native tarafa önbelleklenir; süre dolarsa Kotlin genel metni bunlarla
+ * çizer. Ucuz tek köprü çağrısı, hata sessiz.
+ */
+function cacheNotificationDefaults(): Promise<void> {
+  return setNotificationDefaults({
+    notificationChannelId: MESSAGE_CHANNEL_ID,
+    meName: t('mobile.notifications.me'),
+    color: accentColor(),
+    replyLabel: t('mobile.notifications.reply'),
+    markReadLabel: t('mobile.notifications.markRead'),
+    muteLabel: t('mobile.notifications.mute'),
+  }).catch(() => undefined);
+}
+
+/**
+ * E3 Rev.4 §11.2: tutulan pencerede ÖNCE ağsız/zamanlayıcısız çözülür, sonra BİR kez çizilir: çözüldüyse gerçek
+ * metin, değilse genel metin; iptal edilmiş cihazdan (`hidden`) çizilmez. İçerik loglanmaz.
+ */
+async function presentOnce(m: MessageData, meAvatarUrl: string | null): Promise<void> {
+  const t0 = Date.now();
+  let text = m.text;
+  if (m.e2ee && m.messageId) {
+    try {
+      const r = await decryptOfflineForPush(m.messageId, m.conversationId, m.e2ee);
+      if (r.kind === 'hidden') {
+        console.log(`[E2EE] push-once ${Date.now() - t0}ms gizli`);
+        return;
+      }
+      if (r.kind === 'text') text = r.body.slice(0, MAX_TEXT);
+    } catch {
+      // sessiz: genel metinle çizilir
+    }
+  }
+  const decryptMs = Date.now() - t0;
+  await showConversationNotification(showParams({ ...m, e2ee: null }, meAvatarUrl, text));
+  console.log(`[E2EE] push-once çözme ${decryptMs}ms toplam ${Date.now() - t0}ms`);
 }
 
 TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
@@ -231,21 +305,21 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
       logUndecodable(null, data);
       return;
     }
-    if (isConversationInView(m.conversationId)) return;
-    // Önce hemen, genel metinle (dondurma penceresine sığar); şifreli yük Kotlin'e geçmez.
-    const generic = { ...m, e2ee: null };
-    await showConversationNotification({
-      ...generic,
-      groupInitial: groupInitialOf(m),
-      notificationChannelId: MESSAGE_CHANNEL_ID,
-      meName: t('mobile.notifications.me'),
-      meAvatarUrl: m.isGroup ? await loadOwnAvatarUrl() : null,
-      replyLabel: t('mobile.notifications.reply'),
-      markReadLabel: t('mobile.notifications.markRead'),
-      muteLabel: t('mobile.notifications.mute'),
-      color: accentColor(),
-    });
-    await upgradeToDecryptedText(m);
+    // E3 Rev.4: native FCM servisi şifreli push'ta pencereyi tutuyorsa tek çizim yolu; "bitti" sinyali HER çıkışta.
+    const holding = m.e2ee !== null && m.messageId !== null && isPushHoldActive();
+    try {
+      await cacheNotificationDefaults();
+      if (isConversationInView(m.conversationId)) return;
+      const meAvatarUrl = m.isGroup ? await loadOwnAvatarUrl() : null;
+      if (holding) {
+        await presentOnce(m, meAvatarUrl);
+      } else {
+        // Rev.3 (eski native / şifresiz): genel metinle çizilir (şifreli yük Kotlin'e geçmez); çözme paralel koşar.
+        await presentWithUpgrade(m, () => showConversationNotification(showParams({ ...m, e2ee: null }, meAvatarUrl)));
+      }
+    } finally {
+      if (holding && m.messageId) await pushHandled(m.messageId).catch(() => undefined);
+    }
   } catch (e) {
     logUndecodable(e, data);
   }
