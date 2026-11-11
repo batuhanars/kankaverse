@@ -19,6 +19,21 @@ const log = (message: string, error?: unknown) =>
 
 let pathLogged = false
 
+/**
+ * E3 Rev.2: bildirim görevi için AĞSIZ motor (yalnız yerel depo; cihaz yoksa null). Aynı `withLock`
+ * kuyruğunu paylaşır, bu yüzden UI motoruyla çakışmaz. Ağ portu, API, oturum yenileme yok.
+ */
+export function openLocalMobileEngine(userId: string): Promise<E2eeEngine | null> {
+  return E2eeEngine.openLocal(userId, {
+    openVault: openMobileVault,
+    withLock,
+    provider: pureProvider,
+    log,
+    yieldToUi,
+    metric,
+  })
+}
+
 export function startMobileEngine(userId: string, onWarn: WarningHandler): Promise<E2eeEngine | null> {
   if (!pathLogged) {
     pathLogged = true

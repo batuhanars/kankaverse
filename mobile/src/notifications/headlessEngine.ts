@@ -6,13 +6,13 @@ import { useAuthStore } from '@/stores/auth';
 import { initE2ee } from '@/stores/e2ee';
 
 /**
- * E3 §5.1: uygulama kapalıyken (başsız görevler: bildirim çözme, hızlı cevap) E2EE motorunu kurmak için
- * kullanıcı kimliği gerekir; auth store boştur. Kimlik oturum açıkken buraya yazılır (`ownAvatar.ts`
+ * Uygulama kapalıyken (başsız görevler) E2EE motorunu kurmak için kullanıcı kimliği gerekir. Bildirim
+ * çözmesi (E3 Rev.2) yalnız `loadCachedUserId`'yi kullanır, ağlı `prepareHeadlessEngine` yalnız hızlı cevaptır; auth store boştur. Kimlik oturum açıkken buraya yazılır (`ownAvatar.ts`
  * deseni), görev ağ çağrısı yapmadan okur. YALNIZ kullanıcı kimliği saklanır, token YOK; çıkışta silinir.
  */
 const KEY = 'kv.cachedUserId';
 
-async function loadCachedUserId(): Promise<string | null> {
+export async function loadCachedUserId(): Promise<string | null> {
   try {
     const id = await AsyncStorage.getItem(KEY);
     return id && id.length > 0 ? id : null;

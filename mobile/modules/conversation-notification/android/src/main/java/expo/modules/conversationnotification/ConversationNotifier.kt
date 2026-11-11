@@ -1,5 +1,6 @@
 package expo.modules.conversationnotification
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -14,6 +15,7 @@ import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.graphics.Typeface
 import android.os.Build
+import android.service.notification.StatusBarNotification
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -40,6 +42,9 @@ object ConversationNotifier {
   internal const val EXTRA_TYPE = "kv_type"
   internal const val EXTRA_GUILD_ID = "kv_guild_id"
   private const val EXTRA_MESSAGE_ID = "kv_message_id"
+
+  // MessagingStyle.Message extras anahtari (E3 Rev.2): satirin mesaj kimligi; yoksa satir degistirilemez.
+  private const val EXTRA_MSG_ID = "kv_msg_id"
 
   private val tapCounter = java.util.concurrent.atomic.AtomicLong()
 
@@ -85,6 +90,8 @@ object ConversationNotifier {
     // MAX_MESSAGES kadarini tut. MessagingStyle'dan mesaj silinemedigi icin stil yeniden kurulur;
     // son mesaj listenin sonundadir (kucuk halde gorunen mesaj odur).
     val newMessage = NotificationCompat.MessagingStyle.Message(text, timestamp, sender)
+    // E3 Rev.2: JS sonradan bu satirin metnini degistirebilsin diye mesaj kimligi satira yazilir.
+    messageId?.let { newMessage.extras.putString(EXTRA_MSG_ID, it) }
     val messages = (existingMessages(manager, conversationId, notifId) + newMessage)
       .sortedBy { it.timestamp }
       .takeLast(MAX_MESSAGES)
@@ -236,15 +243,7 @@ object ConversationNotifier {
     timestamp: Long,
     meAvatarUrl: String?,
   ): Boolean {
-    val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    val notifId = conversationId.hashCode()
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
-    val active = (try {
-      manager.activeNotifications.firstOrNull { it.id == notifId && it.tag == conversationId }
-    } catch (e: Exception) {
-      Log.w(TAG, "aktif bildirimler okunamadi", e)
-      null
-    }) ?: return false
+    val active = activeConversationNotification(context, conversationId) ?: return false
     val old = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active.notification)
       ?: return false
     // Grup/ortamda "ben" kisisi kendi avatariyla yeniden kurulur (eski Person simgesi tasinmayabilir);
@@ -259,22 +258,74 @@ object ConversationNotifier {
     old.conversationTitle?.let { style.conversationTitle = it }
     val own = NotificationCompat.MessagingStyle.Message(text, timestamp, null as Person?)
     (old.messages + own).sortedBy { it.timestamp }.takeLast(MAX_MESSAGES).forEach { style.addMessage(it) }
-    val source = active.notification
+    return repost(context, conversationId, active.notification, style, text, timestamp)
+  }
+
+  /**
+   * E3 Rev.2: gorunen bildirimdeki `messageId`'li satirin metnini degistirir (genel metin -> cozulmus metin).
+   * Eylemler ve dokunma intent'i korunur, bildirim sessiz yenilenir. Bildirim ya da satir yoksa false
+   * (kullanici kapatmis, eski satir, ya da satira kimlik yazilmamis).
+   */
+  fun updateMessageText(context: Context, conversationId: String, messageId: String, text: String): Boolean {
+    val active = activeConversationNotification(context, conversationId) ?: return false
+    val old = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active.notification)
+      ?: return false
+    var found = false
+    val messages = old.messages.map { m ->
+      if (m.extras.getString(EXTRA_MSG_ID) != messageId) return@map m
+      found = true
+      val updated = NotificationCompat.MessagingStyle.Message(text, m.timestamp, m.person)
+      updated.extras.putAll(m.extras)
+      updated
+    }
+    if (!found) return false
+    val style = NotificationCompat.MessagingStyle(old.user)
+    style.isGroupConversation = old.isGroupConversation
+    old.conversationTitle?.let { style.conversationTitle = it }
+    messages.forEach { style.addMessage(it) }
+    // Kucuk halde gorunen metin (MIUI): listedeki son mesaj; zaman damgasi bildirimin kendisinde kalir.
+    val shown = messages.lastOrNull()?.text ?: text
+    return repost(context, conversationId, active.notification, style, shown, active.notification.`when`)
+  }
+
+  /** Bir sohbetin gorunen bildirimi; yoksa (kapatilmis) ya da okunamazsa null. */
+  private fun activeConversationNotification(context: Context, conversationId: String): StatusBarNotification? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null
+    val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    val notifId = conversationId.hashCode()
+    return try {
+      manager.activeNotifications.firstOrNull { it.id == notifId && it.tag == conversationId }
+    } catch (e: Exception) {
+      Log.w(TAG, "aktif bildirimler okunamadi", e)
+      null
+    }
+  }
+
+  /**
+   * Gorunen bildirimi yeni stille sessizce yeniden kurar (C52 `appendOwnReply` ve E3 `updateMessageText`
+   * ortak yolu). Yapicinin kopyalamasina guvenme: dokunma intent'i ve eylemler (Cevapla/Okundu/Sessize al)
+   * acikca tasinir; ayni PendingIntent'ler yeniden kullanilir (ekstralar ve RemoteInput sabit).
+   */
+  private fun repost(
+    context: Context,
+    conversationId: String,
+    source: Notification,
+    style: NotificationCompat.MessagingStyle,
+    contentText: CharSequence,
+    whenMs: Long,
+  ): Boolean {
     val builder = NotificationCompat.Builder(context, source)
       .setStyle(style)
-      .setContentText(text)
-      .setWhen(timestamp)
+      .setContentText(contentText)
+      .setWhen(whenMs)
       .setOnlyAlertOnce(true)
-    // Yapicinin kopyalamasina guvenme: dokunma intent'i ve Cevapla eylemi acikca tasinir (C52 §2).
-    // Ayni PendingIntent'ler yeniden kullanilir (ekstralar ve RemoteInput sabit).
     source.contentIntent?.let { builder.setContentIntent(it) }
     builder.clearActions()
     for (i in 0 until NotificationCompat.getActionCount(source)) {
       NotificationCompat.getAction(source, i)?.let { builder.addAction(it) }
     }
-    val rebuilt = builder.build()
     return try {
-      NotificationManagerCompat.from(context).notify(conversationId, notifId, rebuilt)
+      NotificationManagerCompat.from(context).notify(conversationId, conversationId.hashCode(), builder.build())
       true
     } catch (e: SecurityException) {
       Log.w(TAG, "POST_NOTIFICATIONS izni yok", e)

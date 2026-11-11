@@ -8,10 +8,11 @@ import { getActiveChannelId } from '@/realtime/socket';
 import {
   dismissConversationNotification,
   showConversationNotification,
+  updateNotificationMessageText,
 } from '../../modules/conversation-notification';
 import { MESSAGE_CHANNEL_ID } from './push';
 import { loadOwnAvatarUrl } from './ownAvatar';
-import { previewForPush } from './e2eePreview';
+import { decryptOfflineForPush } from './offlineDecrypt';
 import { parseE2eePayload, type PushE2ee } from './e2eePayload';
 
 /**
@@ -186,12 +187,20 @@ async function handleCall(p: Record<string, unknown>): Promise<boolean> {
   return true;
 }
 
-/** E3 §5.1: şifreli yük varsa bildirim metni çözülür; `null` = gösterme (iptal edilmiş cihaz). Yük Kotlin'e geçmez. */
-async function withDecryptedText(m: MessageData): Promise<MessageData | null> {
-  if (!m.e2ee) return m;
-  const r = await previewForPush(m.messageId, m.conversationId, m.e2ee);
-  if (r.kind === 'hidden') return null;
-  return { ...m, e2ee: null, text: r.kind === 'text' ? r.body.slice(0, MAX_TEXT) : m.text };
+/**
+ * E3 Rev.2 §9.3: bildirim ZATEN genel metinle çıktı; şifreli yük varsa yerel depodan (ağsız) çözülür ve
+ * görünen bildirimdeki o mesajın metni sessizce değiştirilir. `hidden`/`unavailable`/hata: hiçbir şey
+ * (bildirim genel metinle kalır). İçerik loglanmaz, hata türü bile.
+ */
+async function upgradeToDecryptedText(m: MessageData): Promise<void> {
+  if (!m.e2ee || !m.messageId) return;
+  try {
+    const r = await decryptOfflineForPush(m.messageId, m.conversationId, m.e2ee);
+    if (r.kind !== 'text') return;
+    await updateNotificationMessageText(m.conversationId, m.messageId, r.body.slice(0, MAX_TEXT));
+  } catch {
+    // sessiz: bildirim zaten görünüyor
+  }
 }
 
 TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
@@ -223,10 +232,10 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
       return;
     }
     if (isConversationInView(m.conversationId)) return;
-    const shown = await withDecryptedText(m);
-    if (!shown) return;
+    // Önce hemen, genel metinle (dondurma penceresine sığar); şifreli yük Kotlin'e geçmez.
+    const generic = { ...m, e2ee: null };
     await showConversationNotification({
-      ...shown,
+      ...generic,
       groupInitial: groupInitialOf(m),
       notificationChannelId: MESSAGE_CHANNEL_ID,
       meName: t('mobile.notifications.me'),
@@ -236,6 +245,7 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
       muteLabel: t('mobile.notifications.mute'),
       color: accentColor(),
     });
+    await upgradeToDecryptedText(m);
   } catch (e) {
     logUndecodable(e, data);
   }
