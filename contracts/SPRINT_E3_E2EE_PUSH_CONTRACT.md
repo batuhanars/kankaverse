@@ -1,6 +1,6 @@
 # SPRINT E3: Şifreli DM'de bildirim önizlemesi, liste önizlemesi, sabitlenenler
 
-> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı). Rev.1 (aynı gün, cihaz turu: çözme kısa servise taşındı, §8; §1.1 kaldırıldı).** PM compose (Opus). **e2ee-client + api + mobil + web.**
+> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı). Rev.2 (aynı gün: önce göster, sonra çevrimdışı çöz ve güncelle, §9; Rev.1 GEÇERSİZ). Rev.1 (çözme kısa servise taşındı, §8; §1.1 kaldırıldı).** PM compose (Opus). **e2ee-client + api + mobil + web.**
 > Yol haritası (revize, sahip 2026-11-11): E0 ✅ → E1 ✅ (canlı, izin listesi) → **E3 bu sprint** → E4 şikâyet → E5 yedek → **herkese açılış** → E2 grup DM → E6-E8.
 > 🔴 **R7 bölgesi.** Şifre çözme yolu ve push yüküne giren her alan sahibin satır satır incelemesinden geçer.
 > Dayanak: `SPRINT_E1_DM_E2EE_CONTRACT.md` (ilkeler §1 aynen geçerli), `SPRINT_C50_CONVERSATION_PUSH_CONTRACT.md` (v2 veri biçimi), `SPRINT_C52_QUICK_REPLY_CONTRACT.md` (hızlı cevap görevi).
@@ -150,3 +150,40 @@ versionCode **67**. Native değişiklik yok; yine de release paketi kısa yol ko
 - Şifreli yükü OLMAYAN mesaj push'u ve `read` / arama olayları bugünkü yoldan, değişmeden.
 - **Native değişiklik:** yeni derleme. versionCode **68**. Release paketi PM tarafından kısa yol kopyasında derlenir; modül `android/` klasörü kaynakla `cmp` eşitlenir, APK'da `PushDecryptService` sınıfı aranır ([[kisa-yol-derleme-kopyasi]]).
 - **DoD (sahip, M2101K7BG ve Redmi 14C):** uygulama kaydırılıp kapatılmışken gelen şifreli mesaj birkaç saniye içinde gerçek metinle bildirimde; logda `push-decrypt ... soğuk` satırı; telefon yeniden başlatıldıktan sonra da aynı. §6.1 turu bu derlemeyle tamamlanır.
+
+## §9 Rev.2: önce göster, sonra çevrimdışı çöz (2026-11-11, sahip onayı)
+
+**Rev.1 sonucu (M2101K7BG, vc68 sideload):** `PushDecryptService` başladı ama MIUI süreci yine dondurdu (11:12:14 "hibernation"), sistem servisi ~17 sn sonra "Waited long enough" ile kapattı; çözme hiç bitmedi. Arka plan servisi MIUI dondurmasını ENGELLEMİYOR. Ayrıca dondurulmuş süreçte ağ kesik olduğundan oturum yenileme zaman aşımına düştü ve istemci bunu "oturum bitti" sayıp çıkış yaptırdı (D97, ayrı düzeltme). **Rev.1 geçersiz;** dal `feat/e2ee-e3-push-service` merge EDİLMEZ, vc68 yalnız sahip cihazında denendi, Play'e gitmez.
+
+**İlkeler (Rev.2):**
+1. **Bildirim önce, hemen:** şifreli yükü olan mesajda bildirim, E3 öncesindeki gibi JS yüklenir yüklenmez `text` (genel metin) ile çizilir. Bu yol dondurma penceresine sığıyor (E1/C50 davranışı).
+2. **Arka planda AĞ YOK, OTURUM YENİLEME YOK.** Bildirim yolunda hiçbir HTTP çağrısı, `refreshAccessToken`, `authApi.me`, cihaz kaydı, KeyPackage, Welcome, commit senkronu yapılmaz. Bu kural testle sabitlenir (motor bu yolda API portu olmadan kurulur; çağrı = test hatası).
+3. **Sonra çevrimdışı çöz:** yalnız yerel depo (cihaz, yerel MLS grubu, önbellekteki cihaz görünümü) ile çözülür. Başarılıysa düz metin depoya yazılır (E1 §1.6, sohbet açılınca tekrar çözülmez) ve aynı bildirimdeki o mesajın metni gerçek metinle değiştirilir, sessizce (`setOnlyAlertOnce`). Başarısızsa hiçbir şey yapılmaz; bildirim genel metinle kalır, mesaj sohbet açılınca normal yoldan çözülür.
+4. **Kalıcı başarısızlık yazılmaz:** çevrimdışı yolda hiçbir mesaj `failed`/`undecryptable` olarak kaydedilmez (eksik commit olabilir; karar çevrimiçi yolun).
+5. Süreç dondurulursa iş yarıda kalır ve zararsızdır: bildirim zaten görünüyor.
+
+### §9.1 e2ee-client
+- `E2eeEngine.openLocal(userId, deps)` (ya da eşdeğeri): yalnız yerel depoyu açar, cihazı yükler; ağ portu ALMAZ. Cihaz yoksa `null`.
+- **Cihaz görünümü önbelleği:** çevrimiçi yolda her `channelState` sonrası kanalın cihaz görünümü (kayıtlı cihazlar + imza anahtarları + `revokedAt`) depoya yazılır (`saveView`/`loadView`). Çevrimdışı çözme bunu kullanır; önbellek yoksa `unavailable`.
+- `decryptOffline(msg): NotificationPreview`: yerel kayıtta varsa onu döner; yoksa yerel grup + önbellek görünümü ile tek deneme. İptal kuralı önbellek görünümüyle uygulanır (`hidden`). `DecryptError` ya da grup/görünüm yok → `unavailable`, depoya YAZILMAZ. Başarıda kayıt + grup durumu yazılır (mevcut kuyruk `withLock` içinde).
+- Testler: ağ portu olmadan uçtan uca çözme; çözülen mesaj sonra çevrimiçi `hydrate`'te depodan gelir (tek çözme); eksik commit gerektiren mesaj → `unavailable`, kayıt yok, sonra çevrimiçi yol çözer; önbellek yok → `unavailable`; iptal cihaz → `hidden`.
+- Rev.1'deki `decryptForNotification` (ağlı) bildirim yolundan kaldırılır; başka kullanıcısı yoksa silinir (dev raporlar).
+
+### §9.2 Kotlin (native değişiklik)
+- Mesaj kimliği: `showConversationNotification` her `MessagingStyle.Message`'a `messageId`'yi extras olarak koyar.
+- Yeni `updateMessageText(conversationId, messageId, text): Boolean`: görünen bildirimin stilini çıkarır, o `messageId`'li mesajın metnini değiştirir, dokunma intent'i ve eylemler (Cevapla, Okundu, Sessize al) korunarak yeniden kurar, `setOnlyAlertOnce(true)`. Bildirim ya da mesaj yoksa `false`. Kotlin iş mantığı içermez.
+- `hidden` sonucu: bu sürümde mesaj satırı genel metinle KALIR (içerik sızmaz; nadir durum). Kaldırma sonraya.
+- Rev.1'in `PushDecryptService` ve `startPushDecrypt`'i bu dala alınmaz.
+
+### §9.3 Mobil JS
+- `conversationPush.ts`: `e2ee` varsa önce `presentMessage` genel metinle (bugünkü E3 öncesi yol), ardından `decryptOffline` → `text` ise `updateMessageText`. Tüm adımlar hata yutar.
+- `headlessEngine.ts`'in bildirim yolu kullanımı kalkar (ağ yok). Hızlı cevap kendi yolunu korur (kullanıcı eylemi; D97 ile oturum düşürmez).
+- Metrik: `push-decrypt-offline <ms> sonuç=<text|hidden|unavailable> soğuk|sıcak`.
+- versionCode **69** (68 yalnız sideload). D97 mobil düzeltmesi aynı sürümde.
+
+### §9.4 DoD (sahip, M2101K7BG MIUI + Redmi 14C)
+- Uygulama kaydırılıp kapatılmışken şifreli mesaj: bildirim **hemen** (genel metinle ya da doğrudan gerçek metinle) düşer; gecikme yok.
+- Uygulama arka plandayken (dondurulmamış): bildirim kısa süre içinde gerçek metne döner.
+- Bildirime dokununca sohbette mesaj okunur (çözülmüş ya da normal yoldan çözülür), "çözülemedi" değil.
+- Telefon yeniden başlatıldıktan sonra da bildirim gelir; **oturum hiçbir senaryoda düşmez.**
+- `E2EE_PUSH_CIPHERTEXT=false` iken davranış E1 ile aynı.
