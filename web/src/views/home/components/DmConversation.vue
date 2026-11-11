@@ -33,6 +33,7 @@ import E2eeLockIcon from '@/components/shared/E2eeLockIcon.vue'
 import E2eeWarningBanner from '@/components/shared/E2eeWarningBanner.vue'
 import { useE2eeChannelView } from '@/composables/useE2eeChannelView'
 import { useE2eeStore } from '@/stores/e2ee'
+import MessageEditModal from '@/components/shared/MessageEditModal.vue'
 import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
 import ReactionPill from '@/components/shared/ReactionPill.vue'
 import ReactionsModal from '@/components/shared/ReactionsModal.vue'
@@ -80,7 +81,7 @@ interface EditState {
 }
 
 const editState = ref<EditState | null>(null)
-const editTextareaEl = ref<HTMLTextAreaElement | null>(null)
+const editTarget = computed(() => messages.value.find((m) => m.id === editState.value?.messageId))
 const showDeleteConfirm = ref(false)
 const deleteTargetId = ref<string | null>(null)
 const deleteLoading = ref(false)
@@ -288,13 +289,6 @@ function startEdit(msg: MessageDto) {
   const text = editMention.prepareEdit(msg.content, dmUserName, () => undefined)
   editInitial = text
   editState.value = { messageId: msg.id, content: text, loading: false, error: '' }
-  nextTick(() => {
-    if (editTextareaEl.value) {
-      editTextareaEl.value.focus()
-      editTextareaEl.value.style.height = 'auto'
-      editTextareaEl.value.style.height = editTextareaEl.value.scrollHeight + 'px'
-    }
-  })
 }
 
 function cancelEdit() {
@@ -328,16 +322,6 @@ async function saveEdit() {
       ? t('message.errors.MESSAGE_BLOCKED')
       : t('common.error')
     state.loading = false
-  }
-}
-
-function onEditKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    saveEdit()
-  }
-  if (e.key === 'Escape') {
-    cancelEdit()
   }
 }
 
@@ -1025,7 +1009,6 @@ const dayLabels = computed<(string | null)[]>(() =>
           :message="msg"
           :is-mine="isMine(msg)"
           :is-group-start="isGroupStart(index)"
-          :is-editing="isMine(msg) && editState?.messageId === msg.id"
           :mention-resolver="dmMentionResolver"
           :is-mentioned="isDmMentioned(msg)"
           :can-pin="true"
@@ -1043,29 +1026,6 @@ const dayLabels = computed<(string | null)[]>(() =>
           @retry="optimistic.retry"
           @discard="optimistic.discard"
         >
-          <!-- Inline düzenleme modu (kendi mesajı) -->
-          <template #editing>
-            <div v-if="isMine(msg) && editState?.messageId === msg.id" class="mt-1">
-              <textarea
-                ref="editTextareaEl"
-                v-model="editState!.content"
-                rows="1"
-                class="w-full px-3 py-2 rounded-[var(--kv-radius-sm)] text-[14px] resize-none outline-none border"
-                style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary); border-color: var(--kv-border-strong); font-family: var(--kv-font-ui); max-height: 200px;"
-                :disabled="editState!.loading"
-                @keydown="onEditKeydown"
-                @input="($event.target as HTMLTextAreaElement).style.height = 'auto'; ($event.target as HTMLTextAreaElement).style.height = ($event.target as HTMLTextAreaElement).scrollHeight + 'px'"
-              />
-              <p v-if="editState!.error" class="text-[12px] mt-1" style="color: var(--kv-danger);">{{ editState!.error }}</p>
-              <div class="flex gap-2 mt-1 text-[12px]" style="color: var(--kv-text-muted);">
-                <span>{{ t('message.editHint') }}</span>
-                <button class="underline cursor-pointer hover:opacity-80" style="color: var(--kv-danger);" @click="cancelEdit">
-                  {{ t('common.cancel') }}
-                </button>
-              </div>
-            </div>
-          </template>
-
           <!-- Reaksiyon pill'leri -->
           <template #reactions>
             <ReactionPill
@@ -1227,6 +1187,18 @@ const dayLabels = computed<(string | null)[]>(() =>
     :target-type="reportTargetType"
     :target-id="reportTargetId"
     @close="reportTargetId = null"
+  />
+
+  <!-- D96: düzenleme katmanı -->
+  <MessageEditModal
+    v-if="editState && editTarget"
+    v-model="editState.content"
+    :message="editTarget"
+    :loading="editState.loading"
+    :error="editState.error"
+    :mention-resolver="dmMentionResolver"
+    @save="saveEdit"
+    @cancel="cancelEdit"
   />
 
   <ForwardMessageModal
