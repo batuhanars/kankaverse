@@ -1,6 +1,6 @@
 # SPRINT E4: Şikâyette kanıt (şifreli DM dahil) + mesaj parmak izi (franking)
 
-> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı; §7 açık sorular PM önerisiyle kabul).** PM compose (Opus). **e2ee-core + e2ee-client + api + web + mobil.**
+> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı; §7 açık sorular PM önerisiyle kabul). Rev.1 (aynı gün, api adımı PM incelemesi: erişim kapısı + ayrıntı ucu, §3.6).** PM compose (Opus). **e2ee-core + e2ee-client + api + web + mobil.**
 > Yol haritası: E0 ✅ → E1 ✅ → E3 ✅ → **E4 bu sprint** → E5 yedek → E2 grup DM → **yayın** → E7 → E8 (E6 medya ertelendi).
 > 🔴 **R7 bölgesi, tamamı:** T&S karar fonksiyonları (şikâyet, kanıt, moderasyon görünümü) + E2EE yük biçimi.
 > Dayanak: `SPRINT_E1_DM_E2EE_CONTRACT.md` (§1 ilkeler, §3.2 yük biçimi), sahip kararı 2026-11-05 (şikâyet modeli), sahip kararları 2026-11-11 (aşağıda).
@@ -85,6 +85,11 @@ model ReportEvidence {
 
 ### §3.5 Testler (api)
 Şifresiz: hedef + önceki 5 sunucudan, `verified: true`; mesaj silinse de kanıt kalır. Şifreli: geçerli parmak izi → `verified: true`; değiştirilmiş `body` → `false`; başka kanalın mesajı → 422; üye olmayan şikâyetçi → mevcut yetki hatası; 7 öğe → 400. `frankingTag` uzunluk ve kanal kuralları. Moderasyon görüntülemesi audit yazar. Silme işi süresi dolanı siler, dolmayana dokunmaz. Kanonik biçim test vektörleri çekirdekle aynı. Mevcut reports/moderation spec'leri yeni kurala göre güncellenir (hangileri değişti listelenir).
+
+### §3.6 Rev.1 (PM incelemesi, api adımı)
+- **Erişim kapısı her MESSAGE şikâyetinde:** şikâyetçi hedef mesajın kanalına erişebilmeli (mevcut `requireChannelAccess`), hedef ve bağlam mesajları şikâyetçinin `clearedAt` sonrası olmalı; aksi 403/422 (mevcut kodlar). Şifresiz yolda bağlam sorgusu da bu kurala uyar (şikâyetçinin göremediği mesaj bağlama girmez). Gerekçe: tahmin edilen mesaj kimliğiyle başkalarının özel yazışmasını moderasyon kuyruğuna taşıma vektörü.
+- **Kuyruk içeriksiz, ayrıntı ayrı uç:** `GET moderation/queue` kanıt İÇERİĞİ döndürmez, yalnız `evidenceCount` ve `hasUnverified`. Yeni `GET moderation/reports/:id` (ModeratorGuard) kanıtı döndürür; `AuditLog` `report.evidence_view` yalnız bu uçta yazılır (eylem adı mevcut kalıpla `report.evidence_view`).
+- PATCH'te tag verilmezse eski tag silinir (yeni içerikle uyuşmaz) — onaylandı.
 
 ## §4 İstemciler (web + mobil)
 
