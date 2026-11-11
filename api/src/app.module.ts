@@ -31,6 +31,7 @@ import { EmergencyModule } from './modules/emergency/emergency.module';
 import { GamesModule } from './modules/games/games.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { E2eeModule } from './modules/e2ee/e2ee.module';
+import { E2eeBackupModule } from './modules/e2ee/e2ee-backup.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -66,6 +67,7 @@ import configuration from './config/configuration';
     GamesModule,
     IntegrationsModule,
     E2eeModule,
+    E2eeBackupModule,
   ],
   providers: [
     {

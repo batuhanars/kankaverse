@@ -139,6 +139,7 @@ model User {
   createdPlatformInvites PlatformInvite[]      @relation("PlatformInviteCreator")
   sessions               Session[]
   e2eeDevices            E2eeDevice[]
+  e2eeBackup             E2eeBackup?
   memberships            GuildMember[]
   ownedGuilds            Guild[]               @relation("GuildOwner")
   messages               Message[]
@@ -1014,4 +1015,32 @@ model E2eeWelcome {
   createdAt      DateTime  @default(now())
 
   @@index([targetDeviceId, deliveredAt])
+}
+
+/// E5a: şifreli DM yedeği anahtar kaydı. Sunucu yalnız tuz, parametre ve SARILMIŞ anahtarı tutar; yedek şifresi cihazdan çıkmaz.
+model E2eeBackup {
+  userId     String   @id
+  salt       Bytes // 16
+  params     Json // { m, t, p } Argon2id
+  wrappedKey Bytes // nonce(12) + AES-GCM çıktısı (60 bayt)
+  keyVersion Int // sıfırlamada artar
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// E5a: cihaz başına şifreli yerel mesaj görüntüsü (nesne özel bucket'ta). deviceId iptal edilse de KALIR (kayıp telefonun geçmişi).
+/// Bilerek User ilişkisi yok (sözleşme §3.1); hesap imhasında purge.job nesne + satırı açıkça siler.
+model E2eeBackupSnapshot {
+  id         String   @id @default(cuid())
+  userId     String
+  deviceId   String // E2eeDevice.id
+  keyVersion Int
+  objectKey  String // e2ee-backup/{userId}/{deviceId}/{sha256}
+  size       Int
+  sha256     String
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, deviceId])
+  @@index([userId])
 }

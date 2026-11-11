@@ -56,14 +56,20 @@ export class StorageService {
    * Dosya yükleme için presigned PUT URL üretir.
    * İstemci bu URL'ye doğrudan PUT yapar (backend dosya byte'ı taşımaz).
    */
-  async presignPut(key: string, contentType: string): Promise<string> {
+  async presignPut(
+    key: string,
+    contentType: string,
+    opts?: { contentLength?: number; expiresIn?: number },
+  ): Promise<string> {
     const command = new PutObjectCommand({
       Bucket: this.bucket,
       Key: key,
       ContentType: contentType,
+      // E5a: verilirse imzaya girer; istemci tam bu uzunlukla yüklemek zorunda.
+      ...(opts?.contentLength !== undefined && { ContentLength: opts.contentLength }),
     });
     const url = await getSignedUrl(this.client, command, {
-      expiresIn: PRESIGN_EXPIRES_SECONDS,
+      expiresIn: opts?.expiresIn ?? PRESIGN_EXPIRES_SECONDS,
     });
     this.logger.debug(`presignPut: key=${key} contentType=${contentType}`);
     return url;
