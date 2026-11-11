@@ -16,7 +16,7 @@ export interface ChannelDevices {
   revokedAt: Map<string, number>
 }
 
-export function devicesOf(state: E2eeChannelState): ChannelDevices {
+export function devicesOf(state: Pick<E2eeChannelState, 'members'>): ChannelDevices {
   const registered: ExpectedDevice[] = []
   const active: ExpectedDevice[] = []
   const revokedAt = new Map<string, number>()
