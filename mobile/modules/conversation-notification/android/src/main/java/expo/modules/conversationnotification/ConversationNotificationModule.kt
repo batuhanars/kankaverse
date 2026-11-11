@@ -60,6 +60,11 @@ class ConversationNotificationModule : Module() {
       }
     }
 
+    // E3 Rev.3: hizli cevap JS gorevi bitti; alicinin goAsync() ile tuttugu sonucu birakir (cift cagri zararsiz).
+    AsyncFunction("finishQuickReply") {
+      QuickReplyGate.finishOldest()
+    }
+
     AsyncFunction("dismiss") { conversationId: String ->
       val context = appContext.reactContext
       if (context != null) {

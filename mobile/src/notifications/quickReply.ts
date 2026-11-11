@@ -1,6 +1,6 @@
 import { t } from '@/i18n';
 import { getAccessToken, refreshAccessToken } from '@/api/http';
-import { sendMessage } from '@/stores/e2ee';
+import { messagesApi } from '@/api/messages';
 import { dmApi } from '@/api/dm';
 import { channelsApi } from '@/api/channels';
 import { NotifTargetType } from '@/api/notifications';
@@ -8,9 +8,9 @@ import { useDmStore } from '@/stores/dm';
 import { useUnreadStore } from '@/stores/unread';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { NOTIFICATION_QUICK_MUTE_MINUTES } from '@/utils/notifPrefUi';
-import { appendOwnReplyToNotification } from '../../modules/conversation-notification';
+import { appendOwnReplyToNotification, finishQuickReply } from '../../modules/conversation-notification';
 import { loadOwnAvatarUrl } from './ownAvatar';
-import { prepareHeadlessEngine } from './headlessEngine';
+import { pickLocalEngine } from './offlineDecrypt';
 
 /**
  * C52: bildirimden Cevapla. C55: Okundu olarak isaretle + Sessize al ayni headless gorevden gecer,
@@ -28,12 +28,21 @@ type ReplyTaskData = {
 };
 
 async function sendReply(conversationId: string, text: string): Promise<void> {
-  // E1: şifreli 1-1 DM'de düz metin sunucuda 409 verir. Hızlı cevap E2EE ile GİDER: motor aynı JS ortamında
-  // (ön plan/arka plan) hazırsa kullanılır; uygulama kapalıysa (başsız görev) önce kullanıcı + motor kurulur.
-  // Kurulamazsa gönderim hata verir ve bildirimde "gönderilemedi" görünür (sessizce kırık bırakılmaz).
-  // Erişim anahtarı yenileme + kullanıcı kimliği + motor: ortak yardımcıda (bildirim çözme ile aynı yol).
-  await prepareHeadlessEngine();
-  await sendMessage(conversationId, text);
+  // E3 Rev.3 §10 k.3: hafif hızlı cevap. Ağlı motor kurulumu (oturum + cihaz kaydı + KeyPackage + Welcome) YOK, MIUI
+  // penceresine sığmıyordu. Kanalın şifreli olup olmadığı YEREL grubun varlığından anlaşılır: `encryptOffline`
+  // yerel grup yoksa null döner ve düz yol izlenir (şifreli kanala düz mesajı sunucu 409 ile reddeder, bildirimde
+  // "Gönderilemedi" görünür). Ağa yalnız oturum yenileme (anahtar yoksa) ve mesaj POST'u çıkılır.
+  // Yenileme ŞİFRELEMEDEN ÖNCE: şifreleme anahtar tüketir, sonradan ağ düşerse boşa gitmesin.
+  if (!getAccessToken()) await refreshAccessToken();
+  const engine = await pickLocalEngine();
+  const cipher = engine ? await engine.encryptOffline(conversationId, text) : null;
+  if (!engine || !cipher) {
+    await messagesApi.send(conversationId, text);
+    return;
+  }
+  const sent = await messagesApi.sendEncrypted(conversationId, cipher);
+  // Düz metin yerel depoya: sohbet açılınca kendi cevabım okunur. Başarısızlık gönderimi geri almaz.
+  await engine.rememberSent(sent).catch(() => undefined);
 }
 
 /** C55: okundu. Ortam kanali `guildId` ile ayrilir (DM'de guildId yok). Hata sessiz: bildirim zaten kapandi. */
@@ -66,7 +75,7 @@ async function muteConversation(data: ReplyTaskData): Promise<void> {
   }
 }
 
-export async function runQuickReply(data: ReplyTaskData): Promise<void> {
+async function runAction(data: ReplyTaskData): Promise<void> {
   if (data.action === 'markRead') return markConversationRead(data);
   if (data.action === 'mute') return muteConversation(data);
   const text = data.text?.trim();
@@ -87,5 +96,17 @@ export async function runQuickReply(data: ReplyTaskData): Promise<void> {
     } catch {
       // Bildirim de guncellenemiyorsa yapilacak bir sey yok.
     }
+  }
+}
+
+/**
+ * Headless görev girişi. Her çıkış yolunda (başarı, hata, erken dönüş) Kotlin alıcıya "bitti" sinyali gider:
+ * alıcı `goAsync()` ile süreci bu ana kadar tutar (E3 Rev.3 k.4). Zamanlayıcı YOK (arka planda JS zamanlayıcıları durur).
+ */
+export async function runQuickReply(data: ReplyTaskData): Promise<void> {
+  try {
+    await runAction(data);
+  } finally {
+    await finishQuickReply().catch(() => undefined);
   }
 }

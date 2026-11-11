@@ -19,3 +19,24 @@ describe('bildirim çözme yolu ağsızdır', () => {
     expect(body).not.toMatch(/api:|mobileE2eeApi/);
   });
 });
+
+// E3 Rev.3 §10 kural 1: RN arka planda (aktif HeadlessJs görevi yokken) JS zamanlayıcılarını durdurur; bu yollarda
+// setTimeout/setInterval (mola, bekleme, zaman aşımı) kullanılırsa iş takılır. Kural kaynak düzeyinde sabitlenir.
+// `yieldToUi` tanımı startEngine'de yalnız ÇEVRİMİÇİ motora geçer; çevrimdışı yolda çağrılmaması
+// shared/e2ee-client testiyle sabittir.
+describe('arka plan bildirim ve hızlı cevap yolunda zamanlayıcı yok', () => {
+  it.each([
+    'notifications/conversationPush.ts',
+    'notifications/offlineDecrypt.ts',
+    'notifications/quickReply.ts',
+    'notifications/headlessEngine.ts',
+    'notifications/ownAvatar.ts',
+    'notifications/e2eePayload.ts',
+  ])('%s setTimeout/setInterval içermez', (file) => {
+    expect(read(file)).not.toMatch(/setTimeout|setInterval/);
+  });
+
+  it('hızlı cevap ağlı motor kurulumuna (initE2ee) dönmez', () => {
+    expect(read('notifications/quickReply.ts')).not.toMatch(/prepareHeadlessEngine|initE2ee|startMobileEngine/);
+  });
+});

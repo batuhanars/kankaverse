@@ -14,8 +14,12 @@ type Outcome = NotificationPreview['kind'];
 const metric = (ms: number, outcome: Outcome, cold: boolean) =>
   console.log(`[E2EE] push-decrypt-offline ${ms}ms sonuç=${outcome} ${cold ? 'soğuk' : 'sıcak'}`);
 
-/** UI'da motor açıksa o kullanılır (yalnız `decryptOffline` çağrılır); yoksa yerel motor ağsız açılır. */
-async function pickEngine() {
+/**
+ * UI'da motor açıksa o kullanılır; yoksa yerel motor ağsız açılır (kullanıcı kimliği önbellekten). Bildirim
+ * çözmesi ve hızlı cevap (`quickReply.ts`) ortak kullanır; yalnız `decryptOffline`/`encryptOffline`/`rememberSent`
+ * gibi ağsız uçlar çağrılmalıdır. Motor yoksa (E2EE kapalı, cihaz yok, kimlik yok) null.
+ */
+export async function pickLocalEngine() {
   const running = useE2eeStore.getState().engine;
   if (running) return running;
   const userId = await loadCachedUserId();
@@ -31,7 +35,7 @@ export async function decryptOfflineForPush(
   const t0 = Date.now();
   let result: NotificationPreview = { kind: 'unavailable' };
   try {
-    const engine = await pickEngine();
+    const engine = await pickLocalEngine();
     if (engine) {
       result = await engine.decryptOffline({
         id: messageId,

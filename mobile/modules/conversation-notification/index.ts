@@ -57,6 +57,7 @@ declare class NativeConversationNotificationModule extends NativeModule<TapEvent
     meAvatarUrl: string | null,
   ): Promise<boolean>;
   updateMessageText?(conversationId: string, messageId: string, text: string): Promise<boolean>;
+  finishQuickReply?(): Promise<void>;
   getInitialTap(): ConversationTap | null;
 }
 
@@ -106,6 +107,11 @@ export function updateNotificationMessageText(
   text: string,
 ): Promise<boolean> {
   return native?.updateMessageText?.(conversationId, messageId, text) ?? Promise.resolve(false);
+}
+
+/** E3 Rev.3: hızlı cevap görevi bitti; Kotlin alıcının `goAsync()` ile tuttuğu süreci bırakır. Modül eskiyse no-op. */
+export function finishQuickReply(): Promise<void> {
+  return native?.finishQuickReply?.() ?? Promise.resolve();
 }
 
 /** Uygulamayı bildirime dokunarak açan intent (soğuk açılış); bir kez teslim edilir. */
