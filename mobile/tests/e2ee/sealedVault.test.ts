@@ -23,6 +23,12 @@ class MemRows implements RowStore {
   async delete(u: string, s: string, key: string) {
     this.rows.delete(this.k(u, s, key));
   }
+  async keys(u: string, s: string) {
+    return [...this.rows.keys()]
+      .map((k) => k.split('\u0000'))
+      .filter(([ku, ks]) => ku === u && ks === s)
+      .map(([, , key]) => key);
+  }
   async deleteStores(u: string, stores: string[]) {
     for (const k of [...this.rows.keys()]) {
       const [ku, ks] = k.split('\u0000');
@@ -64,6 +70,16 @@ beforeEach(() => {
 });
 
 describe('SealedVault', () => {
+  it('keys: bölümdeki anahtarlar, başka bölüm ve başka kullanıcı karışmaz', async () => {
+    const v = await open('A');
+    await v.put('messages', 'm1', enc.encode('a'));
+    await v.put('messages', 'm2', enc.encode('b'));
+    await v.put('device', 'device', enc.encode('c'));
+    await (await open('B')).put('messages', 'x', enc.encode('d'));
+    expect((await v.keys('messages')).sort()).toEqual(['m1', 'm2']);
+    expect(await v.keys('groups')).toEqual([]);
+  });
+
   it('yazılan veri geri okunur', async () => {
     const v = await open('A');
     await v.put('messages', 'm1', enc.encode('merhaba çğıöşü'));
