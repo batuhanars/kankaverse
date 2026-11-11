@@ -40,6 +40,7 @@
 - **Mobil:** `mobile/modules/argon2/` yeni Expo yerel modülü (mevcut dört modülün deseni), Android'de Argon2'nin resmi C uygulamasını taşıyan hazır bir kütüphane (öncelik `argon2kt`; yoksa/uyumsuzsa resmi C kaynağı CMake ile). Bağımlılık PM onaylı. iOS kapsam dışı (Android-first).
 - **Uyum testi (zorunlu):** iki uygulama da RFC 9106 §5.3 Argon2id vektörünü birebir üretir, ayrıca sabit şifre/tuz/§2.1 tabanı için aynı çıktıyı verir (telefonda kurulan yedek web'de açılmalı). Mobil tarafı ölçüm ekranıyla cihazda doğrulanır.
 - **Adım 0b:** native modülle Redmi 14C'de ölçüm; hedef ~1 sn. Ölçüme göre §2.1 "hedef" parametresi sabitlenir (taban değişmez).
+- **Adım 0b sonucu (2026-11-11, Redmi 14C, release):** `argon2kt` 1.6.0 native: 19 MiB/t2 115 ms, 32 MiB/t2 197 ms, 64 MiB/t2 396 ms, 19 MiB/t4 202 ms. Uyum: C referans vektörü (password/somesalt, 64 MiB t2) ve p=4 vektörü EŞİT; kendi girdimizde native = noble (`7318c719…`). **Sabitlenen hedef parametre: `m=65536, t=4, p=1`** (telefonda ~0,8 sn, web ~0,8-1,5 sn). Taban (`m=19456, t=2`) yalnız indirilen başlık denetimi için alt sınır olarak kalır. Ölçüm dalları (`spike/e5a-*`) birleşmez; modül kodu R7-1/üretim işinde temiz olarak yeniden yazılır ya da taşınır.
 
 ### §2.2 Sarma ve görüntü şifreleme
 - `BMK = random(32)`, kullanıcı başına, bir kez.
