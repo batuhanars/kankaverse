@@ -24,6 +24,7 @@ const prismaMock = {
   },
   user: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
     update: jest.fn(),
   },
   guildMember: {
@@ -267,6 +268,7 @@ describe('ModerationModuleService kuyruk (iceriksiz) + getReport (E4 Rev.1)', ()
       evidence: [ev, { ...ev, id: 'e2', isTarget: false }],
     });
     prismaMock.auditLog.create.mockResolvedValue({});
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'a1', username: 'ayse' }]);
 
     const r = await service.getReport('mod-1', 'rpt-a');
 
@@ -286,6 +288,27 @@ describe('ModerationModuleService kuyruk (iceriksiz) + getReport (E4 Rev.1)', ()
     expect(r.evidence).toHaveLength(2);
     expect(r.evidence[0].messageAt).toBe('2026-11-11T09:59:00.000Z');
     expect(r.evidence[0].content).toBe('x');
+    // yazar adi tek sorguyla (ayni yazar tekrar etse de), bilinmeyen yazar null
+    expect(prismaMock.user.findMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['a1'] } },
+      select: { id: true, username: true },
+    });
+    expect(r.evidence[0].authorUsername).toBe('ayse');
+  });
+
+  it('getReport: yazari olmayan/silinmis kanit authorUsername null, yazar sorgusu atlanir', async () => {
+    prismaMock.report.findUnique.mockResolvedValue({
+      ...baseReport,
+      id: 'rpt-a',
+      resolvedAt: null,
+      evidencePurgeAt: null,
+      evidence: [{ ...ev, authorId: null }],
+    });
+    prismaMock.auditLog.create.mockResolvedValue({});
+    const r = await service.getReport('mod-1', 'rpt-a');
+    expect(prismaMock.user.findMany).not.toHaveBeenCalled();
+    expect(r.evidence[0].authorUsername).toBeNull();
   });
 
   it('getReport: denetim yazilamazsa yanit donmez', async () => {

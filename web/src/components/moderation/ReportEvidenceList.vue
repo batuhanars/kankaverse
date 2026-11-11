@@ -56,7 +56,7 @@ function formatSize(bytes: number): string {
           :style="labelStyle(labelOf(e))"
         >{{ t(`moderation.evidenceLabel.${labelOf(e)}`) }}</span>
         <span style="color: var(--kv-text-muted);">{{ t('moderation.evidenceAuthor') }}:</span>
-        <code class="break-all" style="font-family: var(--kv-font-mono); color: var(--kv-text-secondary);">{{ e.authorId ?? '—' }}</code>
+        <code class="break-all" style="font-family: var(--kv-font-mono); color: var(--kv-text-secondary);">{{ e.authorUsername ?? e.authorId ?? '' }}</code>
         <span style="color: var(--kv-text-muted);">{{ formatDate(e.messageAt) }}</span>
       </div>
       <p

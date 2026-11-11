@@ -62,6 +62,7 @@ export interface ReportEvidenceDto {
   id: string
   messageId: string
   authorId: string | null
+  authorUsername: string | null // yoksa (silinmiş hesap) kimlik gösterilir
   channelId: string
   content: string
   attachments: EvidenceAttachmentRef[]
