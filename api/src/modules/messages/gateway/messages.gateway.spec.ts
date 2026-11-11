@@ -767,6 +767,12 @@ describe('MessagesGateway.notifyDmActivity — push (M3 §2.6)', () => {
       expect(v2.messageId).toBe('msg-dm-1');
     });
 
+    it('E4: push v2 e2ee alanı frankingTag taşır (varsa)', async () => {
+      setup(true);
+      await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto({ frankingTag: 'dGFn' }));
+      expect(pushSendToUsersMock.mock.calls[0][1].v2.e2ee.frankingTag).toBe('dGFn');
+    });
+
     it('sınır üstü → e2ee yok, genel metin', async () => {
       setup(true);
       await gateway.notifyDmActivity(
@@ -825,6 +831,14 @@ describe('MessagesGateway.notifyDmActivity — push (M3 §2.6)', () => {
         await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto({ ciphertext: big }));
         expect(lastOf().e2ee.ciphertext).toBe(big);
         expect(lastOf().content).toBe(E2EE_PUSH_GENERIC_TEXT);
+      });
+
+      it('E4: frankingTag varsa dm.message e2ee alanında taşınır; yoksa alan eklenmez', async () => {
+        setup(true);
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto({ frankingTag: 'dGFn' }));
+        expect(lastOf().e2ee.frankingTag).toBe('dGFn');
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto());
+        expect('frankingTag' in lastOf().e2ee).toBe(false);
       });
 
       it('bayrak kapalı → e2ee yok', async () => {

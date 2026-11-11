@@ -44,7 +44,7 @@ export class E2eeController {
     summary: 'Çağıran için uçtan uca şifreleme açık mı (bayrak kapalıyken de cevap verir)',
   })
   status(@CurrentUser() user: RequestUser) {
-    return { enabled: this.flag.isEligible(user.id) };
+    return { enabled: this.flag.isEligible(user.id), franking: this.flag.franking };
   }
 
   @Post('devices')

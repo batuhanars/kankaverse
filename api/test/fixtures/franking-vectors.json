@@ -1,0 +1,74 @@
+[
+  {
+    "name": "turkce",
+    "input": {
+      "channelId": "ch_01",
+      "senderDeviceId": "dev_A1",
+      "body": "Merhaba dünya, çok güzel bir öğle: ığüşöç İĞÜŞÖÇ",
+      "sentAt": 1700000000000
+    },
+    "fk": "BRAbJjE8R1JdaHN+iZSfqrXAy9bh7PcCDRgjLjlET1o=",
+    "canon": "{\"c\":\"ch_01\",\"d\":\"dev_A1\",\"b\":\"Merhaba dünya, çok güzel bir öğle: ığüşöç İĞÜŞÖÇ\",\"s\":1700000000000}",
+    "tag": "yb/XUsdjaj9t0LQy5tJqLI8mENQf5RAKZ8DOkJsZjag="
+  },
+  {
+    "name": "emoji",
+    "input": {
+      "channelId": "ch_02",
+      "senderDeviceId": "dev_B2",
+      "body": "selam 👋🏽 kanka 🇹🇷 😀",
+      "sentAt": 1700000123456
+    },
+    "fk": "KjVAS1ZhbHeCjZijrrnEz9rl8PsGERwnMj1IU15pdH8=",
+    "canon": "{\"c\":\"ch_02\",\"d\":\"dev_B2\",\"b\":\"selam 👋🏽 kanka 🇹🇷 😀\",\"s\":1700000123456}",
+    "tag": "yN9Wip7Kys0Zw8uh1X+8iUaKVPppWO6o2Q4gKibjqNY="
+  },
+  {
+    "name": "tirnak-ters-bolu",
+    "input": {
+      "channelId": "ch_03",
+      "senderDeviceId": "dev_C3",
+      "body": "o \"dedi\" ki \\n değil, C:\\Users\\x ve 'tek' </script>",
+      "sentAt": 1
+    },
+    "fk": "T1plcHuGkZynsr3I097p9P8KFSArNkFMV2JteIOOmaQ=",
+    "canon": "{\"c\":\"ch_03\",\"d\":\"dev_C3\",\"b\":\"o \\\"dedi\\\" ki \\\\n değil, C:\\\\Users\\\\x ve 'tek' </script>\",\"s\":1}",
+    "tag": "CPhKuhIvBLROOnOnXHbv70GWsKRi/dSfusaocAcHpcg="
+  },
+  {
+    "name": "cok-satir",
+    "input": {
+      "channelId": "ch_04",
+      "senderDeviceId": "dev_D4",
+      "body": "satır 1\nsatır 2\r\n\tsatır 3\u0000son",
+      "sentAt": 1799999999999
+    },
+    "fk": "dH+KlaCrtsHM1+Lt+AMOGSQvOkVQW2ZxfIeSnaizvsk=",
+    "canon": "{\"c\":\"ch_04\",\"d\":\"dev_D4\",\"b\":\"satır 1\\nsatır 2\\r\\n\\tsatır 3\\u0000son\",\"s\":1799999999999}",
+    "tag": "1Mmk3qb8nAeuAEcn+XV47cjAuU3uHjWt9Kw7583IdJU="
+  },
+  {
+    "name": "bos-body",
+    "input": {
+      "channelId": "ch_05",
+      "senderDeviceId": "dev_E5",
+      "body": "",
+      "sentAt": 0
+    },
+    "fk": "maSvusXQ2+bx/AcSHSgzPklUX2p1gIuWoay3ws3Y4+4=",
+    "canon": "{\"c\":\"ch_05\",\"d\":\"dev_E5\",\"b\":\"\",\"s\":0}",
+    "tag": "VuTmND0IH0E8u96vT5+1hO3bPMuxWQGBnH6tpPTtO2M="
+  },
+  {
+    "name": "uzun-id",
+    "input": {
+      "channelId": "cmabcdefghijklmnopqrstuvw",
+      "senderDeviceId": "cmzyxwvutsrqponmlkjihgfed",
+      "body": "a",
+      "sentAt": 9007199254740991
+    },
+    "fk": "vsnU3+r1AAsWISw3Qk1YY255hI+apbC7xtHc5/L9CBM=",
+    "canon": "{\"c\":\"cmabcdefghijklmnopqrstuvw\",\"d\":\"cmzyxwvutsrqponmlkjihgfed\",\"b\":\"a\",\"s\":9007199254740991}",
+    "tag": "ktMLm2xeXET1a9fEr2HcOJq7ltUAJFx0F007pdp2FAA="
+  }
+]

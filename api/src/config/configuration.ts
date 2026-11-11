@@ -172,6 +172,8 @@ export default () => {
     // E1 — DM uçtan uca şifreleme. Varsayılan KAPALI. E2EE_USER_IDS dolu = yalnız o kullanıcılar uygun.
     // 🔴 Boş liste = herkes; sözleşme §0 kapısı (E1+E2+E3+E4) tamamlanmadan prod'da YASAK.
     e2eeEnabled: process.env.E2EE_ENABLED === 'true',
+    // E4 §2.2 — istemci v2 (parmak izli) yük göndersin mi. Okuma tarafı hazır olunca açılır (Play yayılınca).
+    e2eeFranking: process.env.E2EE_FRANKING === 'true',
     e2eeUserIds: (process.env.E2EE_USER_IDS ?? '')
       .split(',')
       .map((id) => id.trim())

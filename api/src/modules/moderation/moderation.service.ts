@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateActionDto, MediaTarget } from './dto/create-action.dto';
+import { REPORT_EVIDENCE_RETENTION_DAYS } from '../e2ee/e2ee.constants';
 
 /**
  * Moderasyon kuyruk + aksiyon servisi (R7 — insan incelemesi zorunlu).
@@ -20,7 +21,8 @@ export class ModerationModuleService {
   /**
    * GET /moderation/queue
    * OPEN + TRIAGED raporlar, priority DESC + createdAt ASC.
-   * CSAM raporunda ham içerik zaten saklanmıyor (contextSnapshot minimal) — güvenli.
+   * E4 Rev.1: kuyruk kanıt İÇERİĞİ döndürmez, yalnız `evidenceCount` + `hasUnverified`; denetim kaydı
+   * yazmaz. İçerik `GET /moderation/reports/:id` ucundadır (her görüntüleme denetlenir).
    */
   async getQueue() {
     const reports = await this.prisma.report.findMany({
@@ -37,6 +39,8 @@ export class ModerationModuleService {
         contextSnapshot: true,
         reporterId: true,
         createdAt: true,
+        // içerik SEÇİLMEZ: yalnız sayı ve doğrulanmamış var mı
+        evidence: { select: { verified: true } },
       },
     });
 
@@ -54,7 +58,80 @@ export class ModerationModuleService {
       contextSnapshot: r.contextSnapshot,
       reporterId: r.reporterId,
       createdAt: r.createdAt.toISOString(),
+      evidenceCount: r.evidence.length,
+      hasUnverified: r.evidence.some((e) => !e.verified),
     }));
+  }
+
+  /**
+   * GET /moderation/reports/:id — şikâyet + kanıt (önce hedef, sonra zaman sırası). Ek = yalnız referans.
+   * 🔴 R7 §1.4: her görüntüleme `AuditLog`'a `report.evidence_view` yazar (kim, ne zaman, hangi şikâyet;
+   * metadata yalnız sayı, içerik ASLA). Denetim yazılamazsa yanıt DÖNMEZ.
+   */
+  async getReport(moderatorId: string, reportId: string) {
+    const r = await this.prisma.report.findUnique({
+      where: { id: reportId },
+      select: {
+        id: true,
+        targetType: true,
+        targetId: true,
+        reason: true,
+        description: true,
+        status: true,
+        priority: true,
+        contextSnapshot: true,
+        reporterId: true,
+        createdAt: true,
+        resolvedAt: true,
+        evidencePurgeAt: true,
+        evidence: {
+          orderBy: [{ isTarget: 'desc' }, { messageAt: 'asc' }],
+          select: {
+            id: true,
+            messageId: true,
+            authorId: true,
+            channelId: true,
+            content: true,
+            attachments: true,
+            messageAt: true,
+            source: true,
+            verified: true,
+            isTarget: true,
+          },
+        },
+      },
+    });
+    if (!r) {
+      throw new NotFoundException({ message: 'Rapor bulunamadı.', error: 'REPORT_NOT_FOUND' });
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: moderatorId,
+        action: 'report.evidence_view',
+        entityType: 'Report',
+        entityId: r.id,
+        metadata: { evidenceCount: r.evidence.length },
+      },
+    });
+
+    return {
+      id: r.id,
+      targetType: r.targetType,
+      targetId: r.targetId,
+      reason: r.reason,
+      description: r.description,
+      status: r.status,
+      priority: r.priority,
+      csamFlag: r.reason === 'CSAM',
+      contextSnapshot: r.contextSnapshot,
+      reporterId: r.reporterId,
+      createdAt: r.createdAt.toISOString(),
+      resolvedAt: r.resolvedAt?.toISOString() ?? null,
+      evidencePurgeAt: r.evidencePurgeAt?.toISOString() ?? null,
+      // kanıt yoksa boş dizi ("kanıt iletilmedi")
+      evidence: r.evidence.map((e) => ({ ...e, messageAt: e.messageAt.toISOString() })),
+    };
   }
 
   /**
@@ -136,12 +213,17 @@ export class ModerationModuleService {
 
     // relatedReportId varsa raporu RESOLVED yap
     if (dto.relatedReportId) {
+      const resolvedAt = new Date();
       await this.prisma.report.update({
         where: { id: dto.relatedReportId },
         data: {
           status: 'RESOLVED',
           resolvedById: moderatorId,
-          resolvedAt: new Date(),
+          resolvedAt,
+          // E4 §3.4: kanıt kapanıştan 90 gün sonra silinir (silme işi bu tarihe bakar)
+          evidencePurgeAt: new Date(
+            resolvedAt.getTime() + REPORT_EVIDENCE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+          ),
         },
       });
     }

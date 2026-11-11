@@ -12,7 +12,24 @@ export type { PendingCommit, WelcomeOut } from './pending'
 export type { ExpectedDevice } from './members'
 export { tunePurePrecompute } from './pure/suite'
 export { webProvider, pureProvider, detectWebProvider, type CryptoProvider } from './provider'
-export { decodePayload, encodePayload, textPayload, type DecodedPayload, type TextPayload } from './payload'
+export {
+  decodePayload,
+  encodePayload,
+  textPayload,
+  type DecodedPayload,
+  type TextPayload,
+  type TextPayloadV1,
+  type TextPayloadV2,
+} from './payload'
+export {
+  FRANKING_KEY_LENGTH,
+  frank,
+  frankingCanon,
+  newFrankingKey,
+  verifyFrank,
+  type FrankingInput,
+} from './franking'
+export { fromBase64, toBase64 } from './bytes'
 export { SerialQueue } from './queue'
 // Tek UTF-8 yolu (yerleşik varsa o, yoksa katı saf JS); istemciler TextDecoder'ı doğrudan kullanmaz.
 export { fromUtf8, utf8, utf8Path, InvalidUtf8Error } from './utf8'

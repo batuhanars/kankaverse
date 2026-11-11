@@ -173,6 +173,8 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
           encrypted: true as const,
           ciphertext: toB64(msg.ciphertext),
           senderDeviceId: msg.senderDeviceId ?? null,
+          // E4: yalnız varsa (v1 istemci mesajında alan YOK). Okuyan cihaz kendi hesapladığıyla karşılaştırır.
+          ...(msg.frankingTag ? { frankingTag: toB64(msg.frankingTag) } : {}),
         }
       : {}),
   };
@@ -803,7 +805,12 @@ export class MessagesService {
   /** E1: şifreli plan → Message alanları (şifresizde boş; `content` ayrıca '' kalır). */
   private e2eeMessageData(plan: E2eeSendPlan) {
     return plan.encrypted
-      ? { encrypted: true, ciphertext: plan.ciphertext, senderDeviceId: plan.senderDeviceId }
+      ? {
+          encrypted: true,
+          ciphertext: plan.ciphertext,
+          senderDeviceId: plan.senderDeviceId,
+          frankingTag: plan.frankingTag,
+        }
       : {};
   }
 
