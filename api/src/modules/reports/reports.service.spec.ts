@@ -5,13 +5,17 @@ const prismaMock = {
   message: { findUnique: jest.fn() },
 };
 
+// E4: kanıt üretimi report-evidence.service.spec.ts'te; burada yalnız snapshot davranışı.
+const evidenceMock = { build: jest.fn() };
+
 describe('ReportsService (C35 §5.1 webhook mesajı)', () => {
   let service: ReportsService;
 
   beforeEach(() => {
     jest.resetAllMocks();
     prismaMock.report.create.mockResolvedValue({ id: 'rpt-1' });
-    service = new ReportsService(prismaMock as never);
+    evidenceMock.build.mockResolvedValue([]);
+    service = new ReportsService(prismaMock as never, evidenceMock as never);
   });
 
   it('webhook mesajı raporu webhookId ve sorumlu üyeyi (oluşturan) taşır; içerik yok', async () => {

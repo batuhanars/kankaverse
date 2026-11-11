@@ -13,6 +13,11 @@ export class E2eeFlagService {
     return this.config.get<boolean>('e2eeEnabled') === true;
   }
 
+  /** E4 §2.2: istemci yalnız true iken v2 (parmak izli) yük gönderir. Varsayılan false. */
+  get franking(): boolean {
+    return this.config.get<boolean>('e2eeFranking') === true;
+  }
+
   isEligible(userId: string): boolean {
     if (!this.enabled) return false;
     const allow = this.config.get<string[]>('e2eeUserIds') ?? [];

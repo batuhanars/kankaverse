@@ -4,15 +4,21 @@ import { useI18n } from 'vue-i18n'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvButton from '@/components/ui/KvButton.vue'
 import { reportsApi, ReportReason } from '@/api/reports'
-import type { ReportTargetType, CreateReportPayload } from '@/api/reports'
+import type { ReportTargetType, CreateReportPayload, ReportEvidenceItem } from '@/api/reports'
+import { useE2eeStore } from '@/stores/e2ee'
+import { useMessagesStore } from '@/stores/messages'
 
 const props = defineProps<{
   targetType: ReportTargetType
   targetId: string
+  /** Mesaj şikâyetinde mesajın kanalı: şifreli DM'de kanıt toplamak için ekrandaki listeye bakılır. */
+  channelId?: string
 }>()
 const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
+const e2eeStore = useE2eeStore()
+const messagesStore = useMessagesStore()
 
 const REASONS = [
   ReportReason.SPAM,
@@ -30,6 +36,26 @@ const submitting = ref(false)
 const submitted = ref(false)
 const errorMsg = ref('')
 
+/**
+ * E4 §4: şifreli DM'deki mesajın şikâyetinde, gönderimden önce hedef + ondan önceki mesajlardan (en çok 5,
+ * yalnız bu cihazda çözülmüş) kanıt toplanır. Şifresiz mesajda kanıt YOK: sunucu kendisi okur. Toplanamazsa
+ * şikâyet yine gider (yalnız referans); kanıt hatası şikâyeti engellemez.
+ */
+async function gatherEvidence(): Promise<ReportEvidenceItem[] | undefined> {
+  if (props.targetType !== 'MESSAGE' || !props.channelId) return undefined
+  const list = messagesStore.messagesForChannel(props.channelId)
+  const idx = list.findIndex((m) => m.id === props.targetId)
+  if (idx === -1 || !list[idx].encrypted) return undefined
+  try {
+    const older = list.slice(0, idx).filter((m) => !m.localStatus)
+    const items = await e2eeStore.collectEvidence(props.channelId, props.targetId, older)
+    return items.length ? items : undefined
+  } catch (e) {
+    console.error('[e2ee] kanıt toplanamadı', e)
+    return undefined
+  }
+}
+
 async function submit() {
   if (!selectedReason.value || submitting.value) return
   submitting.value = true
@@ -39,6 +65,7 @@ async function submit() {
     targetId: props.targetId,
     reason: selectedReason.value,
     description: description.value.trim() || undefined,
+    evidence: await gatherEvidence(),
   }
   try {
     await reportsApi.createReport(payload)
@@ -67,6 +94,15 @@ async function submit() {
     <template v-else>
       <p class="text-[13px] mb-4" style="color: var(--kv-text-muted);">
         {{ t('report.subtitle') }}
+      </p>
+
+      <!-- E4: mesaj şikâyetinde neyin iletileceği açıkça söylenir (şifreli ve şifresiz) -->
+      <p
+        v-if="targetType === 'MESSAGE'"
+        class="text-[13px] mb-4 px-3 py-2 rounded-[var(--kv-radius-md)]"
+        style="background-color: var(--kv-bg-elevated); color: var(--kv-text-body);"
+      >
+        {{ t('report.evidenceNotice') }}
       </p>
 
       <!-- Sebep listesi -->

@@ -18,3 +18,11 @@ describe('notificationText (D94)', () => {
     expect(notificationText('düz metin', null, true, HIDDEN)).toBe(HIDDEN);
   });
 });
+
+describe('notificationText: doğrulanamayan mesaj (E4)', () => {
+  // Motor `unverified` kaydı bildirim önizlemesinde `unavailable` döndürür (gövde yok) -> çağıran body=null verir.
+  it('gövde yoksa (unverified) ayar açıkken de genel metin gösterilir, mesaj içeriği sızmaz', () => {
+    expect(notificationText(GENERIC, null, false, HIDDEN)).toBe(GENERIC);
+  });
+});
+

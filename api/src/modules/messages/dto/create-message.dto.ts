@@ -7,11 +7,12 @@ import {
   IsNotEmpty,
   IsBase64,
   IsInt,
+  Matches,
   Min,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { MESSAGE_CONTENT_MAX } from '../messages.constants';
-import { E2EE_CIPHERTEXT_MAX_B64 } from '../../e2ee/e2ee.constants';
+import { E2EE_CIPHERTEXT_MAX_B64, FRANKING_TAG_B64_RE } from '../../e2ee/e2ee.constants';
 
 export class CreateMessageDto {
   @ApiPropertyOptional({ example: 'Merhaba kankaverse!', maxLength: MESSAGE_CONTENT_MAX })
@@ -37,6 +38,18 @@ export class CreateMessageDto {
   @IsInt()
   @Min(0)
   epoch?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'E4: şifreli mesajda gönderen taahhüdü, HMAC-SHA256(fk, canon). Base64, çözülünce TAM 32 bayt (aksi 400). Şifresiz kanalda 422 E2EE_NOT_ENCRYPTED.',
+    example: 'yb/XUsdjaj9t0LQy5tJqLI8mENQf5RAKZ8DOkJsZjag=',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(FRANKING_TAG_B64_RE, {
+    message: 'Parmak izi, 32 baytlık geçerli bir base64 değeri olmalı.',
+  })
+  frankingTag?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

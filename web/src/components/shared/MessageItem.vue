@@ -296,6 +296,7 @@ onUnmounted(() => {
     v-if="showReportModal"
     target-type="MESSAGE"
     :target-id="message.id"
+    :channel-id="message.channelId"
     @close="showReportModal = false"
   />
 

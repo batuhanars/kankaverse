@@ -1194,6 +1194,7 @@ const dayLabels = computed<(string | null)[]>(() =>
     v-if="reportTargetId"
     :target-type="reportTargetType"
     :target-id="reportTargetId"
+    :channel-id="channel.id"
     @close="reportTargetId = null"
   />
 

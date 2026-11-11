@@ -11,7 +11,7 @@ import type {
 export { e2eeErrorCode } from '@kankaverse/e2ee-client'
 
 export const e2eeApi = {
-  status: () => http.get<{ enabled: boolean }>('/e2ee/status'),
+  status: () => http.get<{ enabled: boolean; franking?: boolean }>('/e2ee/status'),
   registerDevice: (signatureKey: string) =>
     http.post<{ deviceId: string }>('/e2ee/devices', { platform: 'web', signatureKey }),
   available: () => http.get<{ available: number }>('/e2ee/devices/me'),

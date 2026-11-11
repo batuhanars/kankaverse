@@ -5,6 +5,9 @@ import { EmojiGifSheet } from './EmojiGifSheet';
 import { ReactionsSheet } from './ReactionsSheet';
 import type { MessageAuthorDto, MessageDto } from '@/api/messages';
 import { recordEmojiUse } from '@/utils/recentEmojis';
+import { canReportMessage } from '@/utils/reportPayload';
+import { useAuthStore } from '@/stores/auth';
+import { useReportStore } from '@/stores/report';
 import type { useMessageActions } from './useMessageActions';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { t } from '@/i18n';
@@ -32,6 +35,8 @@ interface Props {
 
 export function MessageActionHost({ actions, onReply, onEdit, canPin, canDeleteOthers, onOpenProfile }: Props) {
   const router = useRouter();
+  const myId = useAuthStore((s) => s.user?.id);
+  const openReport = useReportStore((s) => s.openReport);
   return (
     <>
       <MessageActionSheet
@@ -67,6 +72,14 @@ export function MessageActionHost({ actions, onReply, onEdit, canPin, canDeleteO
         onDelete={() => {
           actions.setDeleteTarget(actions.target);
           actions.close();
+        }}
+        canReport={
+          !!actions.target && canReportMessage(actions.target.author.id, myId, actions.target.localStatus)
+        }
+        onReport={() => {
+          const m = actions.target;
+          actions.close();
+          if (m) openReport({ targetType: 'MESSAGE', targetId: m.id, channelId: m.channelId });
         }}
         canPin={canPin}
         isPinned={actions.isPinned}

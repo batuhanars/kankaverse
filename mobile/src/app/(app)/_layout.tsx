@@ -13,6 +13,7 @@ import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { useAppUpdateStore } from '@/stores/appUpdate';
 import { AiVideoViewerHost } from '@/components/aiVideo/AiVideoViewerHost';
 import { AppToast } from '@/components/AppToast';
+import { ReportSheet } from '@/components/report/ReportSheet';
 import { useBackgroundSocket } from '@/realtime/useBackgroundSocket';
 import { syncPushToken, isPushTokenRegistered } from '@/notifications/push';
 import { ensureIncomingCallNotificationsSetup } from '@/notifications/incomingCall';
@@ -126,6 +127,7 @@ export default function AppLayout() {
       <Stack.Screen name="call" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
     </Stack>
     <AiVideoViewerHost />
+    <ReportSheet />
     <AppToast />
     </>
   );

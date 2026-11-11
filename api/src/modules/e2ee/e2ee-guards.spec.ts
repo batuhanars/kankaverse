@@ -70,7 +70,22 @@ describe('GET /e2ee/status', () => {
       null as never,
       null as never,
     );
-    expect(c.status({ id: 'u1' } as never)).toEqual({ enabled: false });
+    expect(c.status({ id: 'u1' } as never)).toEqual({ enabled: false, franking: false });
+  });
+
+  it('E4: franking bayrağı E2EE_FRANKING ile açılır, varsayılan false', () => {
+    const make = (cfg: Record<string, unknown>) =>
+      new E2eeController(
+        new E2eeFlagService(config({ e2eeEnabled: true, e2eeUserIds: [], ...cfg })),
+        null as never,
+        null as never,
+        null as never,
+      );
+    expect(make({}).status({ id: 'u1' } as never)).toEqual({ enabled: true, franking: false });
+    expect(make({ e2eeFranking: true }).status({ id: 'u1' } as never)).toEqual({
+      enabled: true,
+      franking: true,
+    });
   });
 });
 

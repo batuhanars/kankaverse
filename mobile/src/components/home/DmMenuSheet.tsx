@@ -41,6 +41,9 @@ interface Props {
   onAddFriend: () => void;
   onMarkRead: () => void;
   onClear: () => void;
+  /** E4 §4.1 — "Kullanıcıyı şikâyet et" (yalnız 1-1 DM: karşı taraf tek kişi). */
+  canReport: boolean;
+  onReport: () => void;
   /** Susturulmuşsa tek dokunuşla açar (web `MuteDurationFlyout` deseni); değilse süre seçici açılır
    *  — karar burada değil, çağıranda (`muted` zaten prop olarak elde). */
   onMutePress: (currentlyMuted: boolean) => void;
@@ -59,6 +62,8 @@ export function DmMenuSheet({
   onAddFriend,
   onMarkRead,
   onClear,
+  canReport,
+  onReport,
   onMutePress,
   onLevelPress,
 }: Props) {
@@ -136,6 +141,15 @@ export function DmMenuSheet({
                   {t('dm.clearConversation')}
                 </Text>
               </Pressable>
+              {canReport && (
+                <>
+                  <View style={styles.divider} />
+                  <Pressable style={styles.option} onPress={onReport}>
+                    <Ionicons name="flag-outline" size={20} color={theme.colors.danger} />
+                    <Text style={[styles.optionText, styles.optionTextDanger]}>{t('report.reportUser')}</Text>
+                  </Pressable>
+                </>
+              )}
             </View>
           </View>
         </Pressable>

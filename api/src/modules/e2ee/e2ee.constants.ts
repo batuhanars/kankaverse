@@ -18,6 +18,16 @@ export const E2EE_CIPHERTEXT_MAX_B64 = 32 * 1024;
 export const E2EE_KEY_PACKAGE_MAX_B64 = 16 * 1024;
 export const E2EE_HANDSHAKE_MAX_B64 = 128 * 1024;
 
+/** E4 §2.1: franking taahhüdü (HMAC-SHA256 çıktısı) ve parmak izi anahtarı bayt uzunlukları. */
+export const FRANKING_TAG_BYTES = 32;
+export const FRANKING_KEY_BYTES = 32;
+/** 32 bayt = 44 karakter base64 (43 + tek '='); DTO'da uzunluk kuralını tek regex ile uygular. */
+export const FRANKING_TAG_B64_RE = /^[A-Za-z0-9+/]{43}=$/;
+/** E4 §3.3: şikâyetle iletilen kanıt üst sınırı (hedef + önceki 5). */
+export const REPORT_EVIDENCE_MAX = 6;
+/** E4 §3.4: kanıt, şikâyet kapandıktan bu kadar gün sonra silinir. TEK yer. */
+export const REPORT_EVIDENCE_RETENTION_DAYS = 90;
+
 export const E2EE_GROUP_ID_BYTES = 32;
 export const E2EE_SIGNATURE_KEY_BYTES = 32;
 

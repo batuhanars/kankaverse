@@ -19,6 +19,7 @@ export interface Msg {
   encrypted?: boolean
   ciphertext?: string
   senderDeviceId?: string | null
+  frankingTag?: string | null
   e2eeStatus?: string
 }
 
@@ -66,8 +67,9 @@ export async function login(userId: string): Promise<Profile> {
 }
 
 /** Sunucunun döneceği mesaj DTO'su (şifreli: content '', ciphertext, senderDeviceId). */
-function dto(id: string, from: Profile, ciphertext: string, createdAt = T0): Msg {
+function dto(id: string, from: Profile, ciphertext: string, createdAt = T0, frankingTag?: string): Msg {
   return {
+    ...(frankingTag !== undefined && { frankingTag }),
     id,
     channelId: CH,
     content: '',
@@ -80,7 +82,7 @@ function dto(id: string, from: Profile, ciphertext: string, createdAt = T0): Msg
 
 export async function send(p: Profile, id: string, text: string, createdAt = T0): Promise<Msg> {
   const cipher = await as(p, (e) => e.encrypt(CH, text))
-  const msg = dto(id, p, cipher!.ciphertext, createdAt)
+  const msg = dto(id, p, cipher!.ciphertext, createdAt, cipher!.frankingTag)
   await as(p, (e) => e.rememberSent(msg))
   return msg
 }

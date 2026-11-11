@@ -39,6 +39,8 @@ export class FakeServer {
   hidden = new Map<string, Set<string>>()
   /** true ise bir sonraki commit gönderimi 409 ile reddedilir (çakışma yeniden deneme testi). */
   conflictOnce = false
+  /** `/e2ee/status.franking` (E4 §2.2): istemcinin v2 gönderip göndermeyeceği. */
+  franking = false
   private seq = 0
 
   revoke(deviceId: string, at: Date) {
@@ -66,7 +68,7 @@ export class FakeServer {
     }
     const ok = <T>(data: T) => Promise.resolve({ data })
     const api = {
-      status: () => ok({ enabled: true }),
+      status: () => ok({ enabled: true, franking: this.franking }),
       registerDevice: (key: string) => {
         const existing = this.deviceOfFamily(family)
         if (existing) {

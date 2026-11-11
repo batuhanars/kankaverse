@@ -9,7 +9,7 @@ import type { E2eeContext } from './context'
 import { digestOf, type StoredMessage } from './localStore'
 import { devicesOf } from './registry'
 import { dropStaleGroup } from './staleGroup'
-import { decryptToRecord } from './decryptRecord'
+import { decryptToRecord, frankingHolds } from './decryptRecord'
 
 export interface WireMessage {
   id: string
@@ -18,6 +18,8 @@ export interface WireMessage {
   encrypted?: boolean
   ciphertext?: string
   senderDeviceId?: string | null
+  /** E4: gönderenin mesaj taahhüdü (base64); v2 yükü doğrulamak için. */
+  frankingTag?: string | null
 }
 
 /** Ekranda gösterilecek karar: kayıt (gösterilir), 'hidden' (iptal cihazdan, gösterilmez) ya da henüz yok. */
@@ -29,8 +31,15 @@ type Resolution =
   | { kind: 'unavailable' }
   | { kind: 'pending' }
 
-/** Gönderilen/düzenlenen kendi mesajlarımızın düz metni: ciphertext özeti → metin (kendi mesajını çözemezsin). */
-export type OwnPlain = Map<string, string>
+/** Kendi mesajımızın düz bilgisi: yük metni, gönderim zamanı ve (v2 ise) parmak izi anahtarı. */
+export interface OwnEntry {
+  body: string
+  sentAt: number
+  fk?: string
+}
+
+/** Gönderilen/düzenlenen kendi mesajlarımız: ciphertext özeti → bilgi (kendi mesajını çözemezsin). */
+export type OwnPlain = Map<string, OwnEntry>
 
 export class Hydrator {
   private group: Group | null | undefined
@@ -95,17 +104,31 @@ export class Hydrator {
     const ct = fromB64(m.ciphertext!)
     const digest = digestOf(ct)
     const stored = await this.ctx.store.loadMessage(m.id)
-    if (stored?.digest === digest) return { kind: 'record', record: stored }
+    if (stored?.digest === digest) return { kind: 'record', record: await this.promoteIfVerified(m, stored) }
     await this.init()
     if (this.offline && !this.view) return { kind: 'unavailable' } // önbellek görünümü yok: iptal kuralı uygulanamaz
     if (this.isHidden(m)) return { kind: 'hidden' }
-    const body = this.own.get(digest)
-    if (body !== undefined) return this.save(m, digest, 'ok', body)
+    const own = this.own.get(digest)
+    if (own !== undefined) return this.save(m, digest, 'ok', own.body, own.fk, own.sentAt)
     // Kendi cihazımızın gönderdiği ama düz metni elimizde olmayan mesaj çözülemez (anahtar kullanıldı).
     if (m.senderDeviceId === this.ownDeviceId || !this.group) {
       return this.offline ? { kind: 'unavailable' } : pending(final)
     }
     return this.decrypt(m, ct, digest, final)
+  }
+
+  /**
+   * `unverified` kayıt, mesaj şimdi (doğru) `frankingTag` ile geldiyse depodaki `fk`+gövde+`sentAt` ile yeniden
+   * doğrulanır; tutarsa `ok`'a terfi eder (çözme gerekmez). Tag yoksa/yanlışsa `unverified` kalır.
+   */
+  private async promoteIfVerified(m: WireMessage, stored: StoredMessage): Promise<StoredMessage> {
+    if (stored.status !== 'unverified' || stored.fk === undefined || stored.sentAt === undefined) return stored
+    const claim = { fk: stored.fk, body: stored.body, sentAt: stored.sentAt }
+    const ctx = { channelId: m.channelId, senderDeviceId: m.senderDeviceId ?? '', frankingTag: m.frankingTag }
+    if (!frankingHolds(claim, ctx)) return stored
+    const promoted: StoredMessage = { ...stored, status: 'ok' }
+    await this.ctx.store.saveMessage(promoted)
+    return promoted
   }
 
   private async decrypt(
@@ -122,8 +145,12 @@ export class Hydrator {
         await this.ctx.store.saveGroup(this.channelId, this.group!)
         return r
       })
-      const rec = decryptToRecord(result.payload)
-      return this.save(m, digest, rec.status, rec.body)
+      const rec = decryptToRecord(result.payload, {
+        channelId: m.channelId,
+        senderDeviceId: m.senderDeviceId ?? '',
+        frankingTag: m.frankingTag,
+      })
+      return this.save(m, digest, rec.status, rec.body, rec.fk, rec.sentAt)
     } catch (e) {
       if (!(e instanceof DecryptError)) throw e
       if (this.offline) return { kind: 'unavailable' } // commit eksik olabilir: kalıcı yazma, çevrimiçi yol karar verir
@@ -143,8 +170,12 @@ export class Hydrator {
     digest: string,
     status: StoredMessage['status'],
     body: string,
+    fk?: string,
+    sentAt?: number,
   ): Promise<Resolution> {
-    const record = { id: m.id, channelId: m.channelId, status, body, digest }
+    const record: StoredMessage = { id: m.id, channelId: m.channelId, status, body, digest }
+    if (fk !== undefined) record.fk = fk
+    if (sentAt !== undefined) record.sentAt = sentAt
     await this.ctx.store.saveMessage(record)
     return { kind: 'record', record, fresh: true }
   }

@@ -46,6 +46,9 @@ interface Props {
   onEdit: () => void;
   onCopy: () => void;
   onDelete: () => void;
+  /** E4 §4.1 — "Şikâyet et" yalnız BAŞKASININ (gönderilmiş) mesajında; kendi mesajında satır hiç çizilmez. */
+  canReport: boolean;
+  onReport: () => void;
   /**
    * Sprint M1h — sabitleme satırı YALNIZ yetki varsa çizilir. Ortamda `MANAGE_MESSAGES`
    * (`useGuildPermission` ile hesaplanır), DM/grup DM'de her üye.
@@ -73,6 +76,8 @@ export function MessageActionSheet({
   onEdit,
   onCopy,
   onDelete,
+  canReport,
+  onReport,
   canPin,
   isPinned,
   onTogglePin,
@@ -171,12 +176,20 @@ export function MessageActionSheet({
               </Pressable>
             </View>
 
-            {canDelete && (
+            {(canReport || canDelete) && (
               <View style={styles.group}>
-                <Pressable style={styles.option} onPress={onDelete}>
-                  <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
-                  <Text style={[styles.optionText, styles.optionTextDanger]}>{t('message.delete')}</Text>
-                </Pressable>
+                {canReport && (
+                  <Pressable style={styles.option} onPress={onReport}>
+                    <Ionicons name="flag-outline" size={20} color={theme.colors.danger} />
+                    <Text style={[styles.optionText, styles.optionTextDanger]}>{t('report.reportMessage')}</Text>
+                  </Pressable>
+                )}
+                {canDelete && (
+                  <Pressable style={styles.option} onPress={onDelete}>
+                    <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
+                    <Text style={[styles.optionText, styles.optionTextDanger]}>{t('message.delete')}</Text>
+                  </Pressable>
+                )}
               </View>
             )}
           </View>
