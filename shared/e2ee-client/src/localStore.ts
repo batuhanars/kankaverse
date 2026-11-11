@@ -14,7 +14,7 @@ import { toB64 } from './b64'
 import type { E2eeChannelState, Vault } from './ports'
 
 /**
- * Çözme sonucu: ok = metin var; unverified = v2 parmak izi tutmadı ya da yok (gövde saklanmaz, gösterilmez); unsupported = bilinmeyen yük sürümü; undecryptable = cihaz gruba
+ * Çözme sonucu: ok = metin var; unverified = v2 parmak izi tutmadı ya da yok (gövde yerelde saklanır, tag gelince yeniden doğrulanır; hiçbir yerde gösterilmez); unsupported = bilinmeyen yük sürümü; undecryptable = cihaz gruba
  * katılmadan önceki mesaj (ya da katılım zamanı bilinmiyor); failed = katılımdan sonra ama çözülemedi.
  */
 export type StoredStatus = 'ok' | 'unsupported' | 'undecryptable' | 'failed' | 'unverified'
