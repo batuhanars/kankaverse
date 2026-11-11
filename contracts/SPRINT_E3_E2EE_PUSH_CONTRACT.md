@@ -1,6 +1,6 @@
 # SPRINT E3: Şifreli DM'de bildirim önizlemesi, liste önizlemesi, sabitlenenler
 
-> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı). Rev.2 (aynı gün: önce göster, sonra çevrimdışı çöz ve güncelle, §9; Rev.1 GEÇERSİZ). Rev.1 (çözme kısa servise taşındı, §8; §1.1 kaldırıldı).** PM compose (Opus). **e2ee-client + api + mobil + web.**
+> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı). Rev.5 (aynı gün: dm.message şifreli yük, masaüstü bildirimi + liste, mobil ön plan liste, §12). Rev.4 (push penceresini biz tutarız, tek bildirim; soğuk çözme < 1 sn, §11; cihazda GEÇTİ: soğuk 1,76 sn, arka plan 1,0 sn, "2" yok). Rev.3 (zamanlayıcı kuralı, paralel çözme, hafif hızlı cevap, §10). Rev.2 (önce göster, sonra çevrimdışı çöz ve güncelle, §9; Rev.1 GEÇERSİZ). Rev.1 (çözme kısa servise taşındı, §8; §1.1 kaldırıldı).** PM compose (Opus). **e2ee-client + api + mobil + web.**
 > Yol haritası (revize, sahip 2026-11-11): E0 ✅ → E1 ✅ (canlı, izin listesi) → **E3 bu sprint** → E4 şikâyet → E5 yedek → **herkese açılış** → E2 grup DM → E6-E8.
 > 🔴 **R7 bölgesi.** Şifre çözme yolu ve push yüküne giren her alan sahibin satır satır incelemesinden geçer.
 > Dayanak: `SPRINT_E1_DM_E2EE_CONTRACT.md` (ilkeler §1 aynen geçerli), `SPRINT_C50_CONVERSATION_PUSH_CONTRACT.md` (v2 veri biçimi), `SPRINT_C52_QUICK_REPLY_CONTRACT.md` (hızlı cevap görevi).
@@ -187,3 +187,48 @@ versionCode **67**. Native değişiklik yok; yine de release paketi kısa yol ko
 - Bildirime dokununca sohbette mesaj okunur (çözülmüş ya da normal yoldan çözülür), "çözülemedi" değil.
 - Telefon yeniden başlatıldıktan sonra da bildirim gelir; **oturum hiçbir senaryoda düşmez.**
 - `E2EE_PUSH_CIPHERTEXT=false` iken davranış E1 ile aynı.
+
+## §10 Rev.3: arka plan yolunun sağlamlaştırılması (2026-11-11, deneme `spike/e3-timers` d01ef1b, sahip onayı)
+
+**Deneme bulguları (M2101K7BG, MIUI varsayılan kısıtlamalar):**
+1. **JS zamanlayıcıları arka planda DURUR.** React Native, uygulama ön planda değilken ve aktif HeadlessJs görevi yokken `setTimeout`'u çalıştırmaz; expo-task-manager push görevi HeadlessJs sayılmaz. `Hydrator.resolveAll` her çözmeden sonra `yieldToUi` (mobilde `setTimeout(0)`) bekliyordu: mesaj çözülüp depoya yazılıyor, sonra iş takılıyordu; ancak başka bir HeadlessJs görevi (hızlı cevap) başlayınca devam ediyordu. Rev.0'ın 8 sn sınırı ve Rev.2'nin "5-14 sn" gecikmeleri bunun sonucuydu.
+2. **Çizim avatar indirmesini bekliyor.** `showConversationNotification` avatarı ağdan indirir (3+3 sn zaman aşımı); dondurulmuş süreç uyandırılınca ağ geç geldiği için çözme pencere kapanmadan başlayamıyordu.
+3. Düzeltmelerle ölçüm: soğuk açılış çizim 578 ms / toplam 3,6 sn; arka plan 453 ms / 0,49 sn. Bildirim önce genel metin, sonra gerçek metin.
+4. **Hızlı cevap** şifreli DM'de `initE2ee` (oturum + cihaz kaydı + KeyPackage + Welcome) yüzünden MIUI penceresine sığmıyor; `QuickReplyService` 30 sn'de kapanıyor, cevap ancak uygulama açılınca gidiyor. (Kısıtlama kaldırılınca gidiyor: teşhis teyitli.)
+5. **"2" rozeti:** bildirimde tek mesaj var (`number=0`); MIUI çiz + güncelle'yi iki gönderim sayıyor. Kozmetik.
+
+**Kurallar (Rev.3):**
+1. **Arka plan bildirim ve hızlı cevap yolunda zamanlayıcı YOK.** `setTimeout`/`setInterval`/zamanlayıcıya dayalı mola, bekleme, zaman aşımı kullanılmaz. Çevrimdışı `Hydrator` mola vermez (deneme satırı). Bu kural birim testiyle sabitlenir (çevrimdışı çözmede `yieldToUi` çağrılmaz).
+2. **Çözme çizimle paralel başlar**, çizim bitince çözülmüşse metin güncellenir (deneme `presentWithUpgrade`).
+3. **Hafif hızlı cevap:** şifreli DM'de cevap `initE2ee` ile DEĞİL, yerel motorla (`openLocal`) yerel grup üzerinden şifrelenir; ağa yalnız oturum yenileme (gerekirse) ve `POST` mesaj için çıkılır. Sunucu epoch çakışması (409) ya da yerel grup yok → bildirime "Gönderilemedi: …" (mevcut metin), sessiz kayıp yok. Gönderilen düz metin depoya yazılır (`rememberSent` karşılığı, sohbet açılınca kendi mesajı okunur). Şifresiz sohbette akış değişmez.
+4. **Cevap alıcısı işi bitene kadar süreci tutar:** `QuickReplyReceiver` `goAsync()` ile, JS görevi bitince (ya da en çok ~9 sn) `finish()`; böylece MIUI dondurma penceresi açık kalır. JS tarafına "bitti" sinyali modül fonksiyonuyla verilir. Sınırlar ve Android sürüm kuralları dev raporunda.
+5. **Soğuk açılış ölçümü:** `openLocal` + çözme adımlarının süresi ayrı ayrı ölçülür (yalnız süre), en pahalı adım raporlanır; kolay kazanç varsa (ör. tekrar açılmayan depo, önbelleğe alınan yerel motor — çıkışta temizlenecek şekilde) uygulanır, yoksa yalnız rapor.
+6. **"2" rozeti:** güncelleme yeniden kurulumunda `setNumber(<stildeki mesaj sayısı>)` denenir; MIUI'de etkisi cihazda gözlenir. Etkisizse kabul (kozmetik), borç olarak PLAN'a.
+
+**Kapsam:** `shared/e2ee-client` (yalnız kural 1 testi + gerekirse hafif şifreleme yardımcısı), `mobile` (JS + Kotlin). Sunucu değişmez. versionCode **70** (69 yalnız sideload).
+**DoD (sahip, MIUI varsayılan ayarlar):** kapalı ve arka plan uygulamada şifreli mesaj bildirimi önce genel metin, birkaç saniye içinde gerçek metin; bildirimden cevap 5 sn içinde karşıya ulaşır (kapalı uygulamada dahil); oturum hiçbir senaryoda düşmez; sohbet açılınca kendi cevabım okunur.
+
+## §11 Rev.4 (DENEME → sonra kilit): tek bildirim, doğrudan gerçek metin (2026-11-11, sahip onayı)
+
+**Hedef (sahip karşılaştırması):** yaygın E2EE mesajlaşma uygulaması bildirimi tek seferde, doğrudan gerçek metinle gösteriyor; geçici "🔒 Yeni mesaj" ve MIUI "2" yok. Yöntemleri (genel bilgi + çıkarım): push uyandırır, mesaj native kodda push işlem süresi içinde çözülür, bildirim bir kez çizilir.
+
+**Bizdeki engeller (vc70 ölçümü):** headless JS soğuk açılış ~3 sn; saf JS kriptonun ilk kullanımı (`push-step decrypt` soğuk 2,7 sn, sıcak 0,22 sn); Expo'nun push servisi işi JS'e devredip hemen biter, MIUI ~2 sn sonra dondurur.
+
+**Yaklaşım (kripto native'e TAŞINMAZ, E1 §1.1-1.2 korunur):**
+1. **Push penceresini biz tutarız (Kotlin):** kendi `FirebaseMessagingService` sınıfımız (Expo'nunkini genişletir; modül manifestinde Expo servisi `tools:node="remove"`, bizimki `com.google.firebase.MESSAGING_EVENT` ile). `onMessageReceived`: üst sınıfı çağırır (JS görevine teslim aynen), şifreli yükü olan v2 mesajında JS'ten "bitti" sinyali gelene ya da **8 sn** (native zaman aşımı) dolana dek bekler (`CountDownLatch`). Süre dolarsa native taraf bildirimi payload'daki genel metinle çizer (yalnız çizim, karar yok). Diğer push'lar beklemez.
+2. **JS tek çizim:** tutulan modda JS önce çözer (ağsız, zamanlayıcısız), sonra **bir kez** çizer: çözüldüyse gerçek metin, değilse genel metin; ardından "bitti" sinyali. Eski native (tutma yok) → Rev.3 akışı (göster + güncelle) aynen.
+3. **Soğuk çözme < 1 sn:** `decrypt` adımının içi ölçülür (imza doğrulama / anahtar türetme / AEAD). Sebep `@noble/curves` önhesaplamasıysa yalnız kütüphanenin belgelenmiş ayarıyla (ör. `precompute` pencere boyutu) küçültülür; sıcak yol > %50 gerilemez; RFC 9180 vektörleri ve tüm çekirdek testleri yeşil. Belgelenmiş ayar yoksa DUR, rapor.
+
+**Deneme DoD (sahip, MIUI varsayılan):** kapalı uygulamada şifreli mesaj bildirimi **tek seferde gerçek metinle** düşer (geçici metin yok, "2" yok); 8 sn'yi aşan durumda genel metin düşer (bildirim kaybolmaz); arka planda aynı; oturum düşmez. Tutarsa §11 kilitlenir ve yayına bu sürümle çıkılır.
+
+## §12 Rev.5: masaüstü bildirimi ve DM listesi (2026-11-11, sahip bulgusu)
+
+**Bulgu:** masaüstü (Electron) DM bildirimi ve DM listesi `dm.message` soket olayıyla beslenir; şifreli DM'de bu olay yalnız `encrypted: true` taşır, şifreli yük yalnız açık sohbetin odasına (`message.created`) gider. Sohbet açık değilken masaüstü çözecek veri bulamaz: bildirim ve liste "🔒 Şifreli mesaj" kalır. Mobilde ön planda (ana ekran) aynı sebeple liste genel metin gösterir.
+
+**Kurallar:**
+1. **api:** şifreli DM mesajında `dm.message` yükünün `lastMessage`'ına `e2ee: { ciphertext, senderDeviceId, createdAt }` eklenir (push'taki `e2ee` alanının aynısı, boyut sınırı YOK; soket). Bayrak: `E2EE_PUSH_CIPHERTEXT` ile aynı bayrak (ayrı bayrak açılmaz). Şifresiz mesaj ve `content`/genel metin kuralı değişmez.
+2. **Web/masaüstü:** `dm.message` gelince `e2ee` varsa motorla (çevrimiçi motor; web'de zamanlayıcı kısıtı yok) mesaj **önce** çözülüp depoya yazılır (tek çözme kuralı: depoda varsa okunur), sonra liste önizlemesi ve masaüstü bildirimi gerçek metinle. Çözülemezse/`hidden` → bugünkü genel metin (`hidden` ise bildirim de atılmaz). Çözme sırası korunur (motor kuyruğu). Bildirim gecikmesi: çözme beklenir ama en çok makul süre (motor hazır değilse genel metin, beklemeden).
+3. **Mobil (ön plan):** `dm.message` gelince `e2ee` varsa UI motoruyla çözülür, liste önizlemesi anında güncellenir (ör. çözüm sonrası önizleme haritasına yazma ya da motor/depo "çözüldü" sayacı). Arka plan bildirim yolu (Rev.4) değişmez; ikisi aynı kuyruktan geçer, mesaj iki kez çözülmez.
+4. Testler: api (alan var/yok/bayrak), e2ee-client gerekirse, web/mobil önizleme seçimi.
+
+**DoD (sahip):** masaüstü uygulaması açık, DM sohbeti açık DEĞİL: şifreli mesajda masaüstü bildirimi ve DM listesi gerçek metin. Mobil ana ekran açıkken: DM listesi gerçek metin. Sohbet açıkken mesajlar normal görünür (çift çözme/“çözülemedi” yok).
