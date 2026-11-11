@@ -20,6 +20,9 @@ interface Props {
   canBlock: boolean;
   /** `selfBlocked` → Engeli Kaldır. 🔴 "O beni engelledi" ASLA buraya girmez. */
   canUnblock: boolean;
+  /** E4 §4.1 — kendim değilsem "Kullanıcıyı şikâyet et". */
+  canReport: boolean;
+  onReport: () => void;
   /** Yalnız MENÜYÜ kapatır — profil paneli açık kalır. */
   onClose: () => void;
   onRemoveFriend: () => void;
@@ -53,6 +56,8 @@ export function ProfileMoreMenu({
   canRemoveFriend,
   canBlock,
   canUnblock,
+  canReport,
+  onReport,
   onClose,
   onRemoveFriend,
   onBlock,
@@ -83,6 +88,13 @@ export function ProfileMoreMenu({
           <Pressable style={styles.option} onPress={onUnblock} accessibilityRole="button">
             <Ionicons name="checkmark-circle-outline" size={18} color={theme.colors.textSecondary} />
             <Text style={styles.optionText}>{t('dm.unblock')}</Text>
+          </Pressable>
+        )}
+        {canReport && (canRemoveFriend || canBlock || canUnblock) && <View style={styles.divider} />}
+        {canReport && (
+          <Pressable style={styles.option} onPress={onReport} accessibilityRole="button">
+            <Ionicons name="flag-outline" size={18} color={theme.colors.danger} />
+            <Text style={[styles.optionText, styles.optionTextDanger]}>{t('report.reportUser')}</Text>
           </Pressable>
         )}
       </View>
