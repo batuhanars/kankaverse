@@ -10,6 +10,7 @@ import {
   setRefreshToken,
   setSessionExpiredHandler,
 } from '@/api/http';
+import { isDefinitiveRefreshRejection, retryTransient } from '@/api/refreshRejection';
 import { resetSocket } from '@/realtime/socket';
 import { clearPushToken } from '@/notifications/push';
 import { clearResume } from '@/utils/resumeLastScreen';
@@ -50,6 +51,9 @@ interface AuthState {
 // deseniyle aynı mantık) — store state'i değil, çünkü render'a bağlı olmamalı.
 let bootstrapPromise: Promise<void> | null = null;
 
+// D97: açılışta geçici hata (ağ/zaman aşımı/5xx) olursa 1 sn, sonra 3 sn bekleyip yeniden dener.
+const BOOTSTRAP_RETRY_DELAYS_MS = [1000, 3000] as const;
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   status: 'booting',
   user: null,
@@ -70,13 +74,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ status: 'unauthenticated' });
           return;
         }
-        await refreshAccessToken();
-        const user = await authApi.me();
+        // Geçici hatada splash'ta kalıp 2 kez daha dener; kesin red beklemeden düşer.
+        const user = await retryTransient(
+          async () => {
+            await refreshAccessToken();
+            return authApi.me();
+          },
+          BOOTSTRAP_RETRY_DELAYS_MS,
+          isDefinitiveRefreshRejection,
+        );
         set({ user, status: 'authenticated' });
-      } catch {
-        clearAccessToken();
-        await clearRefreshToken();
-        await wipeE2ee(); // oturum yok: yerel şifreli depo kimseye ait değil
+      } catch (e) {
+        // D97: ağ/zaman aşımı/5xx oturumu bitirmez. Token ve şifreli depo korunur (bir sonraki açılış
+        // yeniden dener); yalnız kesin red (401/403/token yok) oturumu siler.
+        if (isDefinitiveRefreshRejection(e)) {
+          clearAccessToken();
+          await clearRefreshToken();
+          await wipeE2ee(); // oturum yok: yerel şifreli depo kimseye ait değil
+        }
         set({ user: null, status: 'unauthenticated' });
       }
     })();

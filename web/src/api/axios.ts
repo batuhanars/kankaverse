@@ -1,5 +1,6 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse } from '@/types'
+import { isDefinitiveRefreshRejection } from '@/api/refreshRejection'
 
 // Prod: VITE_API_URL = https://api.<domain> (api kök'ten servis eder: /auth, /channels …).
 // Dev: tanımsız → '/api' (vite proxy 127.0.0.1:3001'e rewrite eder). Tek değişken iki ortamı kapsar.
@@ -76,10 +77,13 @@ http.interceptors.response.use(
         const newToken = await refreshAccessToken()
         original.headers.Authorization = `Bearer ${newToken}`
         return http(original)
-      } catch {
-        clearAccessToken()
-        // Login'e yönlendir — router import döngüsünden kaçınmak için event
-        window.dispatchEvent(new CustomEvent('kv:auth:expired'))
+      } catch (refreshError) {
+        // D97: yalnız kesin red oturumu düşürür; ağ/zaman aşımı/5xx'te orijinal hata döner.
+        if (isDefinitiveRefreshRejection(refreshError)) {
+          clearAccessToken()
+          // Login'e yönlendir — router import döngüsünden kaçınmak için event
+          window.dispatchEvent(new CustomEvent('kv:auth:expired'))
+        }
       }
     }
     return Promise.reject(error)
