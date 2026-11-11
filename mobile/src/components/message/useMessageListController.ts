@@ -153,7 +153,9 @@ export function useMessageListController(
       return;
     }
     if (loadingOlder) return;
-    if (channelState?.hasMore && jumpAttemptsRef.current < MAX_JUMP_FETCH_ATTEMPTS) {
+    // D99: ilk sayfa henüz gelmediyse (soguk acilis, sifreli DM hidrasyonu) bekle; hedefi dusurme.
+    if (!channelState) return;
+    if (channelState.hasMore && jumpAttemptsRef.current < MAX_JUMP_FETCH_ATTEMPTS) {
       jumpAttemptsRef.current += 1;
       setLoadingOlder(true);
       fetchOlder(channelId).finally(() => setLoadingOlder(false));
@@ -161,7 +163,7 @@ export function useMessageListController(
       // Ulaşılamadı (temizlenmiş/çok eski) — kullanıcı zaten bu kanalda kalır.
       setHighlightId(null);
     }
-  }, [highlightId, inverted, channelState?.hasMore, loadingOlder, channelId, fetchOlder]);
+  }, [highlightId, inverted, channelState, loadingOlder, channelId, fetchOlder]);
 
   useEffect(
     () => () => {
