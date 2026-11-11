@@ -56,6 +56,8 @@ export function maybeFireDmToast(
     senderId: string
   },
   isActive: boolean,
+  /** E3 Rev.5: şifreli mesajın çözülmüş düz metni (verilmezse genel metin). */
+  decryptedText?: string,
 ) {
   if (!isElectron()) return
   const auth = useAuthStore()
@@ -71,9 +73,9 @@ export function maybeFireDmToast(
   const { t } = i18n.global
   const dm = useDmStore()
   const channel = dm.channels.find((c) => c.id === payload.channelId)
-  // E1: şifreli DM'de sunucu içerik taşımaz; genel "🔒 Şifreli mesaj" gösterilir (E3'e kadar).
+  // Şifreli DM'de sunucu içerik taşımaz: çözülmüş metin varsa o, yoksa genel "🔒 Şifreli mesaj".
   const content = payload.lastMessage.encrypted
-    ? t('e2ee.preview')
+    ? (decryptedText ?? t('e2ee.preview'))
     : payload.lastMessage.content || t('notification.someone')
 
   let title: string

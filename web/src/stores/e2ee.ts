@@ -8,6 +8,9 @@ import { startWebEngine } from '@/lib/e2ee/adapter'
 import { destroyAllVaults } from '@/lib/e2ee/vault'
 import type { MessageDto } from '@/types'
 
+/** `dm.message` soketindeki şifreli yük (api `e2eePushField`, E3 Rev.5). */
+export type SocketE2ee = { ciphertext: string; senderDeviceId: string; createdAt: string }
+
 /**
  * E1 web istemcisi için tek giriş. Motor (lib/e2ee) arayüzden bağımsızdır; burası onu Pinia'ya ve
  * mevcut mesaj akışına (iyimser gönderim, soket, liste) bağlar. E2EE kapalıysa (bayrak/izin listesi) motor
@@ -17,6 +20,8 @@ export const useE2eeStore = defineStore('e2ee', () => {
   const engine = shallowRef<E2eeEngine | null>(null)
   const warnings = ref<Record<string, WarningKind>>({})
   const channels = ref<Record<string, ChannelInfo>>({})
+  /** Her yeni düz metin depoya yazıldığında artar; liste önizlemesi buna bağlıdır (E3 Rev.5). */
+  const plainTick = ref(0)
   let ready: Promise<void> = Promise.resolve()
 
   const setWarning = (channelId: string, kind: WarningKind) => {
@@ -104,6 +109,37 @@ export const useE2eeStore = defineStore('e2ee', () => {
     return (await hydrate(m.channelId, [m]))[0] ?? null
   }
 
+  /**
+   * E3 Rev.5 — `dm.message` soketindeki şifreli yükü (sohbet açık olmasa da) motorla çözer; tek çözme kuralı
+   * motordadır (depoda varsa okunur). Motor yoksa BEKLEMEDEN `none` (genel metin kalır). Başarıda
+   * `plainTick` artar, liste önizlemesi depodan okur. `hidden`: iptal cihazdan, bildirim de atılmaz.
+   */
+  async function resolveSocketPreview(
+    channelId: string,
+    last: { id: string; createdAt: string; e2ee: SocketE2ee },
+    senderId: string,
+  ): Promise<{ kind: 'text'; text: string } | { kind: 'hidden' } | { kind: 'none' }> {
+    if (!engine.value) return { kind: 'none' }
+    const wire: MessageDto = {
+      id: last.id,
+      channelId,
+      content: '',
+      encrypted: true,
+      ciphertext: last.e2ee.ciphertext,
+      senderDeviceId: last.e2ee.senderDeviceId,
+      replyToId: null,
+      author: { id: senderId, username: '', avatarUrl: null },
+      createdAt: last.e2ee.createdAt,
+      editedAt: null,
+      pinnedAt: null,
+    }
+    const m = await hydrateOne(wire)
+    if (!m) return { kind: 'hidden' }
+    if (m.e2eeStatus !== 'ok' || !m.content) return { kind: 'none' }
+    plainTick.value++
+    return { kind: 'text', text: m.content }
+  }
+
   async function hydrateHistory(
     channelId: string,
     descPage: MessageDto[],
@@ -176,7 +212,9 @@ export const useE2eeStore = defineStore('e2ee', () => {
     wipe,
     openChannel,
     syncChannel,
+    plainTick,
     plainText,
+    resolveSocketPreview,
     hydrate,
     hydrateOne,
     hydrateHistory,

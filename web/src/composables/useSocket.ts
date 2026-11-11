@@ -12,7 +12,7 @@ import { useMembersStore } from '@/stores/members'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import type { GuildMemberDto, ChannelDto, CategoryDto, RoleDto } from '@/types'
 import { useAuthStore } from '@/stores/auth'
-import { useE2eeStore } from '@/stores/e2ee'
+import { useE2eeStore, type SocketE2ee } from '@/stores/e2ee'
 import { bindE2eeSocket } from '@/composables/useE2eeSocket'
 import { useRolesStore } from '@/stores/roles'
 import { useActivityStore } from '@/stores/activity'
@@ -89,6 +89,25 @@ export function sendActivity(payload: ActivityPayload) {
 }
 
 /** Yapay zeka video bitti/başarısız: hazırsa "İzle" düğmeli bilgi, başarısızsa hata toast'ı. */
+/** Toast çözmeyi en çok bu kadar bekler (E3 Rev.5); aşılırsa genel metin (liste yine kendiliğinden güncellenir). */
+const TOAST_DECRYPT_WAIT_MS = 3000
+
+type SocketPreview = Awaited<ReturnType<ReturnType<typeof useE2eeStore>['resolveSocketPreview']>>
+
+function decryptForToast(
+  store: ReturnType<typeof useE2eeStore>,
+  channelId: string,
+  last: { id: string; createdAt: string; e2ee: SocketE2ee },
+  senderId: string,
+): Promise<SocketPreview> {
+  const none: SocketPreview = { kind: 'none' }
+  const timeout = new Promise<SocketPreview>((r) => setTimeout(() => r(none), TOAST_DECRYPT_WAIT_MS))
+  return Promise.race([
+    store.resolveSocketPreview(channelId, last, senderId).catch(() => none),
+    timeout,
+  ])
+}
+
 function showAiVideoDoneToast(dto: NotificationDto, openView: (id: string) => void) {
   const { t } = i18n.global
   const toast = useToastStore()
@@ -244,7 +263,13 @@ export function useSocket() {
       'dm.message',
       (data: {
         channelId: string
-        lastMessage: { id?: string; content: string; createdAt: string; encrypted?: boolean }
+        lastMessage: {
+          id?: string
+          content: string
+          createdAt: string
+          encrypted?: boolean
+          e2ee?: SocketE2ee
+        }
         senderId: string
       }) => {
         // Sprint WEB-PARITE §2.2 — susturulmuş/`NONE` DM okunmamış SAYILMAZ; ama sohbet listede
@@ -252,7 +277,25 @@ export function useSocket() {
         const { countUnread } = prefsStore.channelBadgeEffect(data.channelId)
         dmStore.applyActivity(data, { countUnread })
         // Masaüstü toast (DM/grup) — pencere arkada VEYA bu DM açık değilse
-        maybeFireDmToast(data, dmStore.activeDmChannelId === data.channelId)
+        const isActive = dmStore.activeDmChannelId === data.channelId
+        const { id, e2ee } = data.lastMessage
+        if (!data.lastMessage.encrypted || !e2ee || !id) {
+          maybeFireDmToast(data, isActive)
+          return
+        }
+        // E3 Rev.5: önce motorla çöz (liste `plainTick` ile kendiliğinden güncellenir), toast çözmeyi
+        // en çok TOAST_DECRYPT_WAIT_MS bekler; motor yoksa beklemeden, çözülemezse genel metin.
+        void decryptForToast(
+          e2eeStore,
+          data.channelId,
+          { id, createdAt: data.lastMessage.createdAt, e2ee },
+          data.senderId,
+        ).then(
+          (r) => {
+            if (r.kind === 'hidden') return // iptal cihazdan: bildirim yok
+            maybeFireDmToast(data, isActive, r.kind === 'text' ? r.text : undefined)
+          },
+        )
       },
     )
 
