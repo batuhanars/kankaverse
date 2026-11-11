@@ -11,6 +11,8 @@ import {
 } from '../../modules/conversation-notification';
 import { MESSAGE_CHANNEL_ID } from './push';
 import { loadOwnAvatarUrl } from './ownAvatar';
+import { previewForPush } from './e2eePreview';
+import { parseE2eePayload, type PushE2ee } from './e2eePayload';
 
 /**
  * C50 — veri-yalnız (v2) mesaj push'u. Sunucu v2 destekleyen cihaza `title`/`body` olmadan yalnız
@@ -41,6 +43,8 @@ type MessageData = {
   conversationIconUrl: string | null;
   text: string;
   timestamp: number;
+  /** E3: şifreli DM yükü (yalnız sunucu bayrağı açık ve yük sığıyorsa). `text` genel metin kalır. */
+  e2ee: PushE2ee | null;
 };
 
 type ReadData = { conversationIds: string[] };
@@ -88,6 +92,7 @@ function parseMessage(p: Record<string, unknown>): MessageData | null {
     conversationIconUrl: str(p.conversationIconUrl),
     text: (str(p.text) ?? '').slice(0, MAX_TEXT),
     timestamp: Number(p.timestamp) || Date.now(),
+    e2ee: parseE2eePayload(p.e2ee),
   };
 }
 
@@ -181,6 +186,14 @@ async function handleCall(p: Record<string, unknown>): Promise<boolean> {
   return true;
 }
 
+/** E3 §5.1: şifreli yük varsa bildirim metni çözülür; `null` = gösterme (iptal edilmiş cihaz). Yük Kotlin'e geçmez. */
+async function withDecryptedText(m: MessageData): Promise<MessageData | null> {
+  if (!m.e2ee) return m;
+  const r = await previewForPush(m.messageId, m.conversationId, m.e2ee);
+  if (r.kind === 'hidden') return null;
+  return { ...m, e2ee: null, text: r.kind === 'text' ? r.body.slice(0, MAX_TEXT) : m.text };
+}
+
 TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
   try {
     const response = parseCallResponse(data);
@@ -210,8 +223,10 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
       return;
     }
     if (isConversationInView(m.conversationId)) return;
+    const shown = await withDecryptedText(m);
+    if (!shown) return;
     await showConversationNotification({
-      ...m,
+      ...shown,
       groupInitial: groupInitialOf(m),
       notificationChannelId: MESSAGE_CHANNEL_ID,
       meName: t('mobile.notifications.me'),

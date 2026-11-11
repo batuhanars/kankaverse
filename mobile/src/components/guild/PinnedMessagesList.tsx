@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import { useFocusEffect } from 'expo-router';
 import { messagesApi, type MessageDto } from '@/api/messages';
 import { extractErrorMessage } from '@/api/errors';
+import { fillPinsFromStore } from '@/stores/e2ee';
 import { MessagePreviewRow } from './MessagePreviewRow';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -30,6 +31,7 @@ export function PinnedMessagesList({ channelId, onOpenMessage }: Props) {
     if (!channelId) return;
     messagesApi
       .listPins(channelId)
+      .then(fillPinsFromStore) // E3 §4.2: şifreli sabitlenenler yerel depodan
       .then((list) => {
         setPins(list);
         setState('ready');
