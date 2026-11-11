@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { AttachmentView } from './AttachmentView';
@@ -176,6 +176,8 @@ export function MessageBubble({
                 <View style={styles.avatar}>
                   {isWebhook ? (
                     <Ionicons name="hardware-chip-outline" size={17} color={theme.colors.accent500} />
+                  ) : message.author.avatarUrl ? (
+                    <Image source={{ uri: message.author.avatarUrl }} style={styles.avatarImage} />
                   ) : (
                     <Text style={styles.avatarText}>
                       {message.author.username.charAt(0).toUpperCase()}
@@ -314,6 +316,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accentSubtle,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarImage: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
   },
   avatarText: {
     color: theme.colors.accent500,
