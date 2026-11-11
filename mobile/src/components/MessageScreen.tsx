@@ -24,6 +24,7 @@ import { DateSeparator } from './message/DateSeparator';
 import { E2eeDivider } from './message/E2eeDivider';
 import { E2eeWarningBanner } from './message/E2eeWarningBanner';
 import { useE2eeChannelView } from './message/useE2eeChannelView';
+import { useBackupInChannel } from './backup/useBackupInChannel';
 import { useTypingEmitter } from './message/useTypingEmitter';
 import { useMessageComposer } from './message/useMessageComposer';
 import { discardOptimistic, retryOptimistic } from './message/useOptimisticSend';
@@ -280,6 +281,7 @@ export function MessageScreen({
   const plainMessages = useMemo(() => items.map((it) => it.message), [items]);
   const hasMoreOlder = useMessagesStore((s) => s.byChannel[channelId]?.hasMore ?? false);
   const e2eeView = useE2eeChannelView(channelId, plainMessages, hasMoreOlder);
+  useBackupInChannel(e2eeView.encrypted, fetchMessages); // E5a: kurulum sorusu + geri yükleme sonrası yenileme
   // M6b §8.4 — sesli mesaj otomatik geçişi için kronolojik (eski → yeni) CLEAN ses eki sırası.
   useEffect(() => {
     const ids = items.flatMap((it) =>

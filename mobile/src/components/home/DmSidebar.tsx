@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FriendsStrip } from './FriendsStrip';
+import { BackupRestoreBanner } from '@/components/backup/BackupRestoreBanner';
 import { Ionicons } from '@expo/vector-icons';
 import { type DmChannelDto } from '@/api/dm';
 import { DmRow } from './DmRow';
@@ -148,6 +149,9 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
       )}
 
       {welcome}
+
+      {/* E5a §4.4-3: yedek kurulu ama bu cihazda kilitli → geri yükleme bandı */}
+      <BackupRestoreBanner />
 
       {state === 'loading' && (
         <View style={styles.center}>
