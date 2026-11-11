@@ -35,6 +35,7 @@ import PlatformAiAccessSection from './components/PlatformAiAccessSection.vue'
 import MasaustuSection from './components/MasaustuSection.vue'
 import QuickReactionsSection from './components/QuickReactionsSection.vue'
 import ConnectionsSection from './components/ConnectionsSection.vue'
+import BackupSection from './components/BackupSection.vue'
 import { integrationsApi } from '@/api/integrations'
 import AnimatedClipModal from '@/components/shared/AnimatedClipModal.vue'
 
@@ -674,6 +675,9 @@ async function toggleReadReceipts(next: boolean) {
                     </button>
                   </div>
                 </section>
+
+                <!-- E5a: Sohbet yedeği (yedek bayrağı kapalıysa çizilmez) -->
+                <BackupSection />
 
                 <!-- Hesabı Sil -->
                 <section>

@@ -33,6 +33,7 @@ import ServerModal from './components/ServerModal.vue'
 import FriendAddModal from '@/views/home/components/FriendAddModal.vue'
 import IncomingCallModal from '@/components/shared/IncomingCallModal.vue'
 import UserSettingsView from '@/views/settings/UserSettingsView.vue'
+import BackupSetupPrompt from '@/components/shared/BackupSetupPrompt.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -227,6 +228,8 @@ onUnmounted(() => {
     <UserSettingsView v-if="showUserSettings" :initial-section="userSettingsSection" @close="closeUserSettings" />
     <!-- Gelen DM sesli arama (global) -->
     <IncomingCallModal />
+    <!-- E5a §4.4-1: şifreli DM ilk açıldığında bir kez sorulan yedek kurulumu -->
+    <BackupSetupPrompt />
   </div>
 </template>
 
