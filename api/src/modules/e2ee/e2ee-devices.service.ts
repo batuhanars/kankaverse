@@ -60,7 +60,6 @@ export class E2eeDevicesService {
           signatureKey: key,
         },
       });
-      void this.notify.devicesChanged(user.id);
       return { deviceId: created.id };
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
@@ -99,6 +98,14 @@ export class E2eeDevicesService {
     });
   }
 
+  /** Cihazın claim edilebilir paketi var mı: tüketilmemiş paket VEYA son çare paketi. */
+  private async hasClaimablePackage(deviceId: string): Promise<boolean> {
+    const n = await this.prisma.e2eeKeyPackage.count({
+      where: { deviceId, OR: [{ consumedAt: null }, { lastResort: true }] },
+    });
+    return n > 0;
+  }
+
   async available(user: RequestUser): Promise<{ available: number }> {
     const device = await this.requireActiveDevice(user);
     return { available: await this.countAvailable(device.id) };
@@ -114,6 +121,8 @@ export class E2eeDevicesService {
         'E2EE_KEY_PACKAGE_LIMIT',
       );
     }
+    // §6.5: yayın kayıtta değil, cihaz ilk kez claim edilebilir hale gelince (paket yokken yükleme).
+    const hadClaimable = await this.hasClaimablePackage(device.id);
     await this.prisma.$transaction([
       ...(dto.lastResort
         ? [
@@ -129,6 +138,9 @@ export class E2eeDevicesService {
         data: dto.keyPackages.map((kp) => ({ deviceId: device.id, data: fromB64(kp) })),
       }),
     ]);
+    if (!hadClaimable && (dto.keyPackages.length > 0 || dto.lastResort)) {
+      void this.notify.devicesChanged(user.id);
+    }
     return { available: await this.countAvailable(device.id) };
   }
 

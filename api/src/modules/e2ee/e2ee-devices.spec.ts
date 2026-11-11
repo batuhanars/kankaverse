@@ -29,7 +29,7 @@ function setup() {
 }
 
 describe('E2eeDevicesService.register (§2.3)', () => {
-  it('yeni zincir → cihaz oluşur, tokenFamily JWT zincirinden gelir, devices-changed yayılır', async () => {
+  it('yeni zincir → cihaz oluşur, tokenFamily JWT zincirinden gelir, devices-changed YAYILMAZ (§6.5)', async () => {
     const { prisma, notify, svc } = setup();
     prisma.e2eeDevice.findUnique.mockResolvedValue(null);
     prisma.e2eeDevice.create.mockResolvedValue({ id: 'dev-1' });
@@ -42,7 +42,7 @@ describe('E2eeDevicesService.register (§2.3)', () => {
       tokenFamily: 'fam-1',
       platform: 'web',
     });
-    expect(notify.devicesChanged).toHaveBeenCalledWith('u1');
+    expect(notify.devicesChanged).not.toHaveBeenCalled();
   });
 
   it('aynı zincir + aynı anahtar → mevcut cihaz (idempotent), yeni satır yok', async () => {
@@ -142,6 +142,51 @@ describe('E2eeDevicesService.uploadKeyPackages', () => {
     });
     expect(prisma.e2eeKeyPackage.create.mock.calls[0][0].data.lastResort).toBe(true);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  // §6.5: count çağrıları: (1) bekleyen sayısı, (2) claim edilebilir paket var mı
+  function withCounts(prisma: ReturnType<typeof setup>['prisma'], pending: number, claimable: number) {
+    prisma.e2eeDevice.findUnique.mockResolvedValue(activeDevice);
+    prisma.e2eeKeyPackage.count.mockImplementation(({ where }: { where: { OR?: unknown } }) =>
+      Promise.resolve(where.OR ? claimable : pending),
+    );
+  }
+
+  it('ilk yükleme (paket yok) devices-changed yayar, bir kez', async () => {
+    const { prisma, notify, svc } = setup();
+    withCounts(prisma, 0, 0);
+    await svc.uploadKeyPackages(USER, { keyPackages: [KEY_B64] });
+    expect(notify.devicesChanged).toHaveBeenCalledTimes(1);
+    expect(notify.devicesChanged).toHaveBeenCalledWith('u1');
+  });
+
+  it('stoku olan cihazın ek yüklemesi yaymaz', async () => {
+    const { prisma, notify, svc } = setup();
+    withCounts(prisma, 5, 5);
+    await svc.uploadKeyPackages(USER, { keyPackages: [KEY_B64] });
+    expect(notify.devicesChanged).not.toHaveBeenCalled();
+  });
+
+  it('yalnız son çare paketi olan cihazın yüklemesi yaymaz', async () => {
+    const { prisma, notify, svc } = setup();
+    withCounts(prisma, 0, 1);
+    await svc.uploadKeyPackages(USER, { keyPackages: [KEY_B64] });
+    expect(notify.devicesChanged).not.toHaveBeenCalled();
+  });
+
+  it('tükenmiş cihazın (tüketilmemiş 0, son çare yok) yeniden yüklemesi yayar', async () => {
+    const { prisma, notify, svc } = setup();
+    withCounts(prisma, 0, 0);
+    await svc.uploadKeyPackages(USER, { keyPackages: [KEY_B64], lastResort: KEY_B64 });
+    expect(notify.devicesChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('yükleme hata verirse yayın yapılmaz', async () => {
+    const { prisma, notify, svc } = setup();
+    withCounts(prisma, 0, 0);
+    prisma.$transaction.mockRejectedValueOnce(new Error('db'));
+    await expect(svc.uploadKeyPackages(USER, { keyPackages: [KEY_B64] })).rejects.toThrow('db');
+    expect(notify.devicesChanged).not.toHaveBeenCalled();
   });
 });
 
