@@ -169,7 +169,14 @@ export default function NotificationsScreen() {
       // taşınmıyordu → `resolveRole` boş liste görüp `@rol` yedeğine düşüyordu (aynı kusur iki
       // yerde durmasın). `guildId` zaten `NotificationDto`'da var (EVENT_CREATED dalı yukarıda
       // kullanıyor), yeni bir alan/istek gerekmiyor.
-      router.push({ pathname: '/channel/[id]', params: { id: n.channelId, name: '', guildId: n.guildId } });
+      router.push({ pathname: '/channel/[id]', params: {
+          id: n.channelId,
+          name: '',
+          guildId: n.guildId,
+          // D99: bildirimdeki mesaja kaydir (yoksa yalnız kanal acilir).
+          ...(n.messageId ? { jumpTo: n.messageId } : {}),
+        },
+      });
     } else {
       router.push({
         pathname: '/dm/[id]',
@@ -181,6 +188,7 @@ export default function NotificationsScreen() {
           kind: 'dm',
           canMessage: 'true',
           selfBlocked: 'false',
+          ...(n.messageId ? { jumpTo: n.messageId } : {}),
         },
       });
     }

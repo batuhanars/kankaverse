@@ -21,6 +21,8 @@ const jumpNonce = ref(0)
 
 // Hedef yüklü değilse en fazla bu kadar sayfa (50'lik) geriye yükle (~1000 mesaj).
 const MAX_JUMP_PAGES = 20
+// Kanalın ilk sayfası bu sürede gelmezse (hata/yavaş ağ) istek düşer; sonsuz bekleme yok.
+const INITIAL_LOAD_TIMEOUT_MS = 15000
 
 export function useMessageJump() {
   function requestJump(channelId: string, messageId: string) {
@@ -40,11 +42,35 @@ export function useJumpToMessage(listEl: Ref<HTMLElement | null>, channelId: () 
   const store = useMessagesStore()
   const isJumping = ref(false)
 
+  // D99: ilk sayfa yüklenene dek bekle. `hasMoreByChannel[cid]` ilk `fetchMessages` bitince
+  // (şifreli DM'de çözme dahil) tanımlanır; o zamana dek liste boştur ve zıplama kaçardı.
+  function waitInitialLoad(cid: string): Promise<void> {
+    if (store.hasMoreByChannel[cid] !== undefined) return Promise.resolve()
+    return new Promise((resolve) => {
+      let timer = 0
+      const stop = watch(
+        () => store.hasMoreByChannel[cid],
+        (v) => {
+          if (v === undefined) return
+          stop()
+          window.clearTimeout(timer)
+          resolve()
+        },
+      )
+      timer = window.setTimeout(() => {
+        stop()
+        resolve()
+      }, INITIAL_LOAD_TIMEOUT_MS)
+    })
+  }
+
   async function performJump(messageId: string) {
     const cid = channelId()
     if (!cid) return
     isJumping.value = true
     try {
+      await waitInitialLoad(cid)
+      await nextTick()
       // Hedef yüklü değilse bulunana dek geriye sayfala (sınırlı).
       let pages = 0
       while (!store.messagesForChannel(cid).some((m) => m.id === messageId)) {
@@ -81,7 +107,7 @@ export function useJumpToMessage(listEl: Ref<HTMLElement | null>, channelId: () 
     const msgId = targetMessageId.value
     targetMessageId.value = null
     targetChannelId.value = null
-    performJump(msgId)
+    void performJump(msgId)
   }
 
   // Aynı kanal (pins/arama): istek nonce'u değişince.
