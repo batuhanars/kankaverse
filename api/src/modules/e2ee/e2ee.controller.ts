@@ -10,17 +10,20 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import type { RequestUser } from '../../common/types/request-user';
 import { E2eeClaimService } from './e2ee-claim.service';
 import { E2eeDevicesService } from './e2ee-devices.service';
+import { E2eeExistsService } from './e2ee-exists.service';
 import { E2eeEnabledGuard } from './e2ee-enabled.guard';
 import { E2eeFlagService } from './e2ee-flag.service';
 import { E2eeGroupsService } from './e2ee-groups.service';
 import {
   ClaimKeyPackagesDto,
   CreateGroupDto,
+  MessagesExistDto,
   PostCommitDto,
   RegisterDeviceDto,
   UploadKeyPackagesDto,
@@ -37,6 +40,7 @@ export class E2eeController {
     private devices: E2eeDevicesService,
     private claims: E2eeClaimService,
     private groups: E2eeGroupsService,
+    private exists: E2eeExistsService,
   ) {}
 
   @Get('status')
@@ -146,6 +150,18 @@ export class E2eeController {
   ) {
     const n = Number.parseInt(since ?? '0', 10);
     return this.groups.listCommits(user.id, channelId, Number.isFinite(n) && n > 0 ? n : 0);
+  }
+
+  @Post('messages/exists')
+  @UseGuards(E2eeEnabledGuard, UserThrottlerGuard)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Kanalda hâlâ var olan (silinmemiş) mesaj kimlikleri (≤500; yedek hijyeni, içerik yok)',
+  })
+  messagesExist(@CurrentUser() user: RequestUser, @Body() dto: MessagesExistDto) {
+    return this.exists.existing(user.id, dto.channelId, dto.ids);
   }
 
   @Get('welcomes')

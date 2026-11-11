@@ -10,12 +10,15 @@ import {
   IsOptional,
   IsString,
   Max,
+  Matches,
   MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
 import {
   E2EE_CLAIM_MAX_DEVICES,
+  E2EE_EXISTS_MAX_IDS,
+  E2EE_ID_RE,
   E2EE_HANDSHAKE_MAX_B64,
   E2EE_KEY_PACKAGE_MAX_B64,
   E2EE_KEY_PACKAGES_PER_CALL,
@@ -61,6 +64,22 @@ export class ClaimKeyPackagesDto {
   @ArrayMaxSize(E2EE_CLAIM_MAX_DEVICES)
   @IsString({ each: true })
   deviceIds: string[];
+}
+
+/** E5a Rev.2 §4.7: yerel mesajların sunucuda hâlâ var olup olmadığını sorar. */
+export class MessagesExistDto {
+  @ApiProperty()
+  @IsString()
+  @Matches(E2EE_ID_RE, { message: 'Geçersiz kanal kimliği.' })
+  channelId: string;
+
+  @ApiProperty({ type: [String], description: 'Mesaj kimlikleri, 1..500' })
+  @IsArray()
+  @ArrayMinSize(1, { message: 'En az 1 mesaj kimliği gerekli.' })
+  @ArrayMaxSize(E2EE_EXISTS_MAX_IDS, { message: 'Tek çağrıda en fazla 500 mesaj kimliği.' })
+  @IsString({ each: true })
+  @Matches(E2EE_ID_RE, { each: true, message: 'Geçersiz mesaj kimliği.' })
+  ids: string[];
 }
 
 export class WelcomeItemDto {
