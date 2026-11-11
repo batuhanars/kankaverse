@@ -1,7 +1,10 @@
 /** E1 (DM E2EE) sabitleri. Sözleşme: contracts/SPRINT_E1_DM_E2EE_CONTRACT.md §2. */
 
-/** Şifreli DM için push/önizleme genel metni (E3'te şifreli yükle değişecek). */
+/** Şifreli DM için push/önizleme genel metni (şifre çözülemezse istemcinin yedek metni). */
 export const E2EE_PUSH_GENERIC_TEXT = '🔒 Yeni mesaj';
+
+/** E3 §2.1 — push'a konabilecek en uzun base64 şifreli yük (karakter); FCM 4 KB sınırı için. */
+export const E2EE_PUSH_MAX_CIPHERTEXT = 2800;
 
 export const E2EE_MAX_ACTIVE_DEVICES = 10;
 export const E2EE_KEY_PACKAGES_PER_CALL = 50;

@@ -4,6 +4,7 @@ import { messagesApi, type MessageDto } from '@/api/messages';
 import { startMobileEngine } from '@/e2ee/startEngine';
 import { wipeMobileVaults } from '@/e2ee/sqliteRows';
 import { useDmStore } from '@/stores/dm';
+import { t } from '@/i18n';
 
 /**
  * E1 mobil istemcinin tek girişi (web `stores/e2ee.ts` karşılığı). Motor (shared/e2ee-client) arayüzden
@@ -103,6 +104,23 @@ export async function hydrateMessages(channelId: string, asc: MessageDto[]): Pro
     ? await engine.hydrate(channelId, asc).catch(() => asc.map(undecryptable))
     : asc.map(undecryptable);
   return Promise.all(out.map(fillQuote));
+}
+
+/**
+ * E3 §4.2 (D92): sabitlenen şifreli mesajlar YALNIZ yerel depodan doldurulur (`hydrateMessages` değil: sabitlenen
+ * mesaj çok eski olabilir, geriye doğru çözme yürüyüşü tetiklenmemeli). Depoda yoksa genel "Şifreli mesaj".
+ */
+export async function fillPinsFromStore(pins: MessageDto[]): Promise<MessageDto[]> {
+  if (!pins.some((m) => m.encrypted)) return pins;
+  await ready;
+  const engine = get().engine;
+  return Promise.all(
+    pins.map(async (m) => {
+      if (!m.encrypted) return m;
+      const text = engine ? await engine.quoteText(m.id).catch(() => null) : null;
+      return { ...m, content: text ?? t('e2ee.encryptedQuote'), ciphertext: undefined };
+    }),
+  );
 }
 
 /** Tek mesaj (soket/HTTP yankısı). İptal cihazdan gelen mesaj elenir (null). */

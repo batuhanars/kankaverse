@@ -19,7 +19,7 @@ type LoadState = 'loading' | 'error' | 'ready';
 
 interface DmActivity {
   channelId: string;
-  lastMessage: { content: string; createdAt: string; encrypted?: boolean };
+  lastMessage: { id?: string; content: string; createdAt: string; encrypted?: boolean };
   senderId: string;
 }
 
@@ -171,6 +171,7 @@ export const useDmStore = create<DmState>((set, get) => ({
     const lastMessage: DmChannelDto['lastMessage'] = existing.lastMessage
       ? {
           ...existing.lastMessage,
+          id: payload.lastMessage.id ?? '', // E3: şifreli önizleme depodan bu kimlikle okunur
           content: payload.lastMessage.content,
           encrypted: payload.lastMessage.encrypted, // E1: yalnız şifreliyse true
           createdAt: payload.lastMessage.createdAt,
@@ -178,7 +179,7 @@ export const useDmStore = create<DmState>((set, get) => ({
       : {
           // Önceki lastMessage null idi — minimal şekle yazılır (web ile aynı; eksik alanlar
           // yalnız önizleme için kullanılmıyor, liste `content`+`createdAt` okuyor).
-          id: '',
+          id: payload.lastMessage.id ?? '',
           channelId: payload.channelId,
           content: payload.lastMessage.content,
           encrypted: payload.lastMessage.encrypted,

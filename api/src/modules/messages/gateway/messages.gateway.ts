@@ -23,6 +23,7 @@ import { DmPermissionService } from '../../../shared/dm-permission/dm-permission
 import { NotificationsService, isMuteActive } from '../../notifications/notifications.service';
 import { PushService } from '../../../shared/push/push.service';
 import {
+  V2E2eePayload,
   V2MessageData,
   channelConversationTitle,
   clampV2Text,
@@ -31,7 +32,7 @@ import {
 import { CallSignalService } from '../../../shared/call-signal/call-signal.service';
 import { VoiceService } from '../../voice/voice.service';
 import { GamesService } from '../../../shared/games/games.service';
-import { E2EE_PUSH_GENERIC_TEXT } from '../../e2ee/e2ee.constants';
+import { E2EE_PUSH_GENERIC_TEXT, E2EE_PUSH_MAX_CIPHERTEXT } from '../../e2ee/e2ee.constants';
 
 interface AuthSocket extends Socket {
   data: { userId: string; sessionId: string; username?: string };
@@ -832,6 +833,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const payload = {
       channelId,
       lastMessage: {
+        id: messageDto['id'] as string,
         content,
         createdAt: messageDto['createdAt'] as string,
         ...(encrypted ? { encrypted: true } : {}),
@@ -910,6 +912,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
           conversationIconUrl: null, // Channel'da simge alanı yok
           text: clampV2Text(body),
           timestamp: v2Timestamp(messageDto['createdAt']),
+          ...this.e2eePushField(messageDto),
         }
       : undefined;
 
@@ -947,6 +950,20 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         priority: 'high',
       })
       .catch(() => {});
+  }
+
+  /**
+   * E3 §2.1 — şifreli DM mesajının v2 push verisine şifreli yük. Yalnız bayrak açık + mesaj şifreli +
+   * base64 uzunluğu sınır altındaysa; aksi hâlde boş (bildirim genel metinle çıkar). Veri, mesaj
+   * kaydında zaten duran şifreli yüktür; düz içerik buraya hiç gelmez, loglanmaz.
+   */
+  private e2eePushField(messageDto: Record<string, unknown>): { e2ee?: V2E2eePayload } {
+    if (this.config.get<boolean>('e2eePushCiphertext') !== true) return {};
+    const { encrypted, ciphertext, senderDeviceId, createdAt } = messageDto;
+    if (encrypted !== true || typeof ciphertext !== 'string') return {};
+    if (typeof senderDeviceId !== 'string' || typeof createdAt !== 'string') return {};
+    if (ciphertext.length > E2EE_PUSH_MAX_CIPHERTEXT) return {};
+    return { e2ee: { ciphertext, senderDeviceId, createdAt } };
   }
 
   /**

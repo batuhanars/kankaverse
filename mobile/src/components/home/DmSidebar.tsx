@@ -15,6 +15,7 @@ import { formatMentionsPlain } from '@/utils/mentions';
 import { channelTitle } from '@/utils/channelTitle';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
+import { useEncryptedPreviews } from './useEncryptedPreviews';
 
 interface Props {
   onOpenDm: (channel: DmChannelDto) => void;
@@ -41,6 +42,7 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
   // Sözleşme §8.3 — liste artık `dm` store'undan okunur (soket katmanı oraya yazıyor). Yerel
   // state'te tutulurken canlı güncelleme tutunacak bir yer bulamıyordu.
   const channels = useDmStore((s) => s.channels);
+  const encryptedPreviews = useEncryptedPreviews(channels);
   const requestCount = useDmStore((s) => s.requestCount);
   // Gelen (incoming) istek sayısı — giden istekler kullanıcıdan eylem beklemiyor, sayılmaz.
   const friendRequestCount = useFriendsStore(
@@ -186,7 +188,8 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
               item.lastReaction && showUnread
                 ? t('dm.reactionPreview', { actor: item.lastReaction.actorUsername, emoji: item.lastReaction.emoji })
                 : item.lastMessage?.encrypted
-                  ? t('e2ee.preview') // E1: sunucu içerik taşımaz; E3'e kadar genel önizleme
+                  ? // E3 §4.1: yerel depoda düz metin varsa o, yoksa genel önizleme (çözme yapılmaz)
+                    (encryptedPreviews[item.lastMessage.id] ?? t('e2ee.preview'))
                   : item.lastMessage
                   ? formatMentionsPlain(item.lastMessage.content, resolver(item), t('mention.unknown'))
                   : '';

@@ -1,8 +1,6 @@
 import { t } from '@/i18n';
 import { getAccessToken, refreshAccessToken } from '@/api/http';
-import { authApi } from '@/api/auth';
-import { initE2ee, sendMessage } from '@/stores/e2ee';
-import { useAuthStore } from '@/stores/auth';
+import { sendMessage } from '@/stores/e2ee';
 import { dmApi } from '@/api/dm';
 import { channelsApi } from '@/api/channels';
 import { NotifTargetType } from '@/api/notifications';
@@ -12,6 +10,7 @@ import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
 import { NOTIFICATION_QUICK_MUTE_MINUTES } from '@/utils/notifPrefUi';
 import { appendOwnReplyToNotification } from '../../modules/conversation-notification';
 import { loadOwnAvatarUrl } from './ownAvatar';
+import { prepareHeadlessEngine } from './headlessEngine';
 
 /**
  * C52: bildirimden Cevapla. C55: Okundu olarak isaretle + Sessize al ayni headless gorevden gecer,
@@ -29,13 +28,11 @@ type ReplyTaskData = {
 };
 
 async function sendReply(conversationId: string, text: string): Promise<void> {
-  // Uygulama kapaliyken bellekte erisim anahtari yok: mevcut tek-ucus yenileme kullanilir.
-  if (!getAccessToken()) await refreshAccessToken();
   // E1: şifreli 1-1 DM'de düz metin sunucuda 409 verir. Hızlı cevap E2EE ile GİDER: motor aynı JS ortamında
   // (ön plan/arka plan) hazırsa kullanılır; uygulama kapalıysa (başsız görev) önce kullanıcı + motor kurulur.
   // Kurulamazsa gönderim hata verir ve bildirimde "gönderilemedi" görünür (sessizce kırık bırakılmaz).
-  const user = useAuthStore.getState().user ?? (await authApi.me());
-  await initE2ee(user.id);
+  // Erişim anahtarı yenileme + kullanıcı kimliği + motor: ortak yardımcıda (bildirim çözme ile aynı yol).
+  await prepareHeadlessEngine();
   await sendMessage(conversationId, text);
 }
 
