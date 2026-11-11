@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isDefinitiveRefreshRejection } from '../../src/api/refreshRejection';
+import { isDefinitiveRefreshRejection, retryTransient } from '../../src/api/refreshRejection';
 
 const httpError = (status: number) => Object.assign(new Error(`HTTP ${status}`), { response: { status } });
 
@@ -18,5 +18,38 @@ describe('isDefinitiveRefreshRejection', () => {
     expect(isDefinitiveRefreshRejection(new Error('REFRESH_RESPONSE_INVALID'))).toBe(false);
     expect(isDefinitiveRefreshRejection(null)).toBe(false);
     expect(isDefinitiveRefreshRejection(undefined)).toBe(false);
+  });
+});
+
+describe('retryTransient', () => {
+  const netErr = Object.assign(new Error('Network Error'), { code: 'ERR_NETWORK' });
+
+  it('geçici hatadan sonra başarılı olursa sonucu döner', async () => {
+    let calls = 0;
+    const fn = async () => {
+      calls++;
+      if (calls < 3) throw netErr;
+      return 'ok';
+    };
+    await expect(retryTransient(fn, [1, 1], isDefinitiveRefreshRejection)).resolves.toBe('ok');
+    expect(calls).toBe(3);
+  });
+  it('kesin hatada tek deneme yapar', async () => {
+    let calls = 0;
+    const fn = async () => {
+      calls++;
+      throw httpError(401);
+    };
+    await expect(retryTransient(fn, [1, 1], isDefinitiveRefreshRejection)).rejects.toThrow('HTTP 401');
+    expect(calls).toBe(1);
+  });
+  it('hep geçici hatada 3 deneme sonra hatayı fırlatır', async () => {
+    let calls = 0;
+    const fn = async () => {
+      calls++;
+      throw netErr;
+    };
+    await expect(retryTransient(fn, [1, 1], isDefinitiveRefreshRejection)).rejects.toBe(netErr);
+    expect(calls).toBe(3);
   });
 });
