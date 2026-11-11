@@ -32,6 +32,7 @@ export {
 export {
   BACKUP_KDF_DEFAULT,
   BACKUP_KDF_FLOOR,
+  BACKUP_KDF_MAX,
   SNAPSHOT_VERSION,
   deriveBackupKek,
   newBackupKey,
