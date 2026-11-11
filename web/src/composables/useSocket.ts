@@ -240,7 +240,7 @@ export function useSocket() {
       'dm.message',
       (data: {
         channelId: string
-        lastMessage: { content: string; createdAt: string; encrypted?: boolean }
+        lastMessage: { id?: string; content: string; createdAt: string; encrypted?: boolean }
         senderId: string
       }) => {
         // Sprint WEB-PARITE §2.2 — susturulmuş/`NONE` DM okunmamış SAYILMAZ; ama sohbet listede

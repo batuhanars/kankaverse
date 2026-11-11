@@ -84,6 +84,12 @@ export const useE2eeStore = defineStore('e2ee', () => {
     return { ...m, replyTo: text === null ? { ...r, e2eeUnknown: true } : { ...r, content: text } }
   }
 
+  /** Liste önizlemesi / sabitlenenler: YALNIZ depo okuması (çözme yok); yoksa null. */
+  async function plainText(messageId: string): Promise<string | null> {
+    await ready
+    return (await engine.value?.quoteText(messageId).catch(() => null)) ?? null
+  }
+
   async function hydrate(channelId: string, asc: MessageDto[]): Promise<MessageDto[]> {
     await ready
     if (!asc.some((m) => m.encrypted)) return Promise.all(asc.map(fillQuote))
@@ -170,6 +176,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
     wipe,
     openChannel,
     syncChannel,
+    plainText,
     hydrate,
     hydrateOne,
     hydrateHistory,
