@@ -210,10 +210,10 @@ export function notificationSuite(label: string) {
       const first = await send(A1, 'm1', 'önce') // grup kurulsun
       await as(B1, (e) => e.onWelcome())
       await show(B1, [first])
-      // v:2 yükü: motor yalnız v:1 üretir, bu yüzden göndericinin grubunu doğrudan açıp şifreliyoruz.
+      // v:3 yükü (v1/v2 bilinir, E4): motor v3 üretmez, bu yüzden göndericinin grubunu doğrudan açıp şifreliyoruz.
       const group = deserializeGroup((await A1.vault.get('groups', CH))!, provider)
-      const v2 = { v: 2, t: 'text', body: 'x', sentAt: 1 } as unknown as TextPayload
-      const sealed = await group.encrypt(v2)
+      const v3 = { v: 3, t: 'text', body: 'x', sentAt: 1 } as unknown as TextPayload
+      const sealed = await group.encrypt(v3)
       await A1.vault.put('groups', CH, group.serialize())
       const m2: Msg = { ...first, id: 'm2', ciphertext: toB64(sealed.ciphertext) }
 

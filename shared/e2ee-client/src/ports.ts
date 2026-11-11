@@ -45,7 +45,8 @@ export interface Reply<T> {
  * nesne olarak fırlatılır (axios hatası zaten böyle; mobil adaptör aynı şekli üretir).
  */
 export interface E2eeApi {
-  status(): Promise<Reply<{ enabled: boolean }>>
+  /** `franking`: E4 §2.2, true iken istemci v2 yük (parmak izi) gönderir; eski sunucuda yok = false. */
+  status(): Promise<Reply<{ enabled: boolean; franking?: boolean }>>
   /** Platform bilgisini (web/android) adaptör ekler; motor bilmez. */
   registerDevice(signatureKey: string): Promise<Reply<{ deviceId: string }>>
   available(): Promise<Reply<{ available: number }>>
