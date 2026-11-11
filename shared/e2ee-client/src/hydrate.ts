@@ -149,7 +149,9 @@ export class Hydrator {
       if (r.kind === 'record' && r.fresh) {
         fresh++
         if (fresh === 10) this.ctx.metric?.('hydrate-first-10', Date.now() - t0, fresh)
-        await this.ctx.yieldToUi?.()
+        // Çevrimdışı (bildirim) yolunda mola YOK: RN arka planda JS zamanlayıcılarını duraklatır, setTimeout
+        // dönmez ve iş takılır (E3 Rev.2 cihaz turu). Tek mesaj çözüldüğü için arayüze nefes gerekmez.
+        if (!this.offline) await this.ctx.yieldToUi?.()
       }
     }
     if (fresh > 0) this.ctx.metric?.('hydrate-total', Date.now() - t0, fresh)
