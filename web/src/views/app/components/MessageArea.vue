@@ -11,6 +11,7 @@ import { useSocket } from '@/composables/useSocket'
 import { useOptimisticSend } from '@/composables/useOptimisticSend'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
+import { useComposerMentionBridge } from '@/composables/useComposerMentionBridge'
 import { useJumpToMessage } from '@/composables/useMessageJump'
 import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { useAudioQueue } from '@/composables/useExclusivePlayback'
@@ -206,6 +207,13 @@ const mention = useMentionAutocomplete(
   () => everyoneMentionRoleId.value,
   () => mentionRoles.value,
 )
+
+// D95 — "Bahset" kısayolu: kart/üye menüsü bu yazma kutusuna ekler (salt okunurda düğme yok)
+useComposerMentionBridge({
+  mention,
+  textareaEl,
+  canMention: () => !!channelId.value && canWrite.value,
+})
 
 watch(
   channelId,

@@ -3,6 +3,7 @@ import GameLine from '@/components/shared/GameLine.vue'
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
+import { canMentionUser } from '@/composables/useComposerMentionBridge'
 import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import type { GuildMemberDto, RoleDto } from '@/types'
 import type { PresenceStatus } from '@/stores/presence'
@@ -52,6 +53,8 @@ const emit = defineEmits<{
   // C10: menüden Mesaj Gönder / Kullanıcı ID kopyala
   messageMember: [member: GuildMemberDto]
   copyMemberId: [userId: string]
+  // D95: menüden Bahset
+  mentionMember: [member: GuildMemberDto]
 }>()
 
 // C10: menü konumu (⋯ butonundan veya sağ-tık imlecinden). Teleport + fixed → satır overflow'undan bağımsız.
@@ -243,6 +246,16 @@ function onRowLeave(e: MouseEvent) {
             @click="emit('messageMember', member)"
           >
             {{ t('member.actions.sendMessage') }}
+          </button>
+
+          <!-- D95: Bahset (aktif yazma kutusu varsa; kendim/engelli/salt okunurda yok) -->
+          <button
+            v-if="canMentionUser(member.userId)"
+            class="w-full text-left px-3 py-2 text-[13px] transition-colors cursor-pointer hover:bg-[var(--kv-accent-subtle)]"
+            style="color: var(--kv-text-secondary);"
+            @click="emit('mentionMember', member)"
+          >
+            {{ t('member.actions.mention') }}
           </button>
 
           <!-- Moderasyon bölümü ayracı -->

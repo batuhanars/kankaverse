@@ -9,6 +9,7 @@ import { useSocket, voiceSubscribe, voiceUnsubscribe } from '@/composables/useSo
 import { useOptimisticSend } from '@/composables/useOptimisticSend'
 import { useTyping, useTypingLabel } from '@/composables/useTyping'
 import { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
+import { useComposerMentionBridge } from '@/composables/useComposerMentionBridge'
 import { useJumpToMessage } from '@/composables/useMessageJump'
 import { useAudioQueue } from '@/composables/useExclusivePlayback'
 import { useCall } from '@/composables/useCall'
@@ -170,6 +171,13 @@ const mention = useMentionAutocomplete(
   () => dmTextareaEl.value?.selectionStart ?? 0,
   (pos) => { nextTick(() => { dmTextareaEl.value?.setSelectionRange(pos, pos) }) },
 )
+
+// D95 — "Bahset" kısayolu: yalnız grup DM (1-1 DM'de bahsetmenin etkisi yok) ve yazma kutusu açıkken
+useComposerMentionBridge({
+  mention,
+  textareaEl: dmTextareaEl,
+  canMention: () => props.channel.type === 'GROUP_DM' && canMessage.value,
+})
 
 // C54: düzenleme kutusu için token<->ad dönüşümü (composer'dan ayrı örnek; pending haritaları karışmasın)
 const editMention = useMentionAutocomplete(

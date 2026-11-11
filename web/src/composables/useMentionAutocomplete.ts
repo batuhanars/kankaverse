@@ -151,6 +151,24 @@ export function useMentionAutocomplete(
     setTimeout(() => setCursor(newCursor), 0)
   }
 
+  /**
+   * D95 — "Bahset" kısayolu: @ yazmadan, kullanıcı kartı/üye menüsünden doğrudan ekleme.
+   * Kayıt biçimi selectSuggestion ile AYNI (`@ad ` + pendingMentions) → gönderimde aynı
+   * `<@userId>` dönüşümü uygulanır. Mevcut metin varsa sona eklenir (gerekirse önce boşluk).
+   * Yeni imleç konumunu (metin sonu) döndürür.
+   */
+  function insertMention(member: MentionMember): number {
+    const text = getContent()
+    const sep = text.length > 0 && !/\s$/.test(text) ? ' ' : ''
+    const newText = `${text}${sep}@${member.username} `
+    setContent(newText)
+    pendingMentions.value.set(member.username, member.id)
+    showPopover.value = false
+    suggestions.value = []
+    _currentQuery.value = null
+    return newText.length
+  }
+
   function onKeydown(e: KeyboardEvent): boolean {
     if (!showPopover.value) return false
     if (e.key === 'ArrowUp') {
@@ -258,6 +276,7 @@ export function useMentionAutocomplete(
     onInput,
     onKeydown,
     selectSuggestion,
+    insertMention,
     applyMentionTokens,
     prepareEdit,
     clearPending,
