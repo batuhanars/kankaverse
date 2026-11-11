@@ -25,6 +25,15 @@ export interface V2MessageData {
   conversationIconUrl: string | null;
   text: string;
   timestamp: number;
+  /** E3 — yalnız şifreli DM'de: telefondaki görev çözüp bildirimi çizer; `text` yedek genel metin kalır. */
+  e2ee?: V2E2eePayload;
+}
+
+/** E3 §2.1 — mesaj kaydındaki şifreli yük aynen; düz içerik ASLA. */
+export interface V2E2eePayload {
+  ciphertext: string;
+  senderDeviceId: string;
+  createdAt: string;
 }
 
 export interface V2ReadData {

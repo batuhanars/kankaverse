@@ -176,6 +176,9 @@ export default () => {
       .split(',')
       .map((id) => id.trim())
       .filter((id) => id.length > 0),
+    // E3 — şifreli DM push'una şifreli yük (telefonda çözülüp bildirimde gösterilir). Varsayılan KAPALI.
+    // Kapalıyken push bugünkü genel metinle gider; sorun olursa tek env ile geri dönülür.
+    e2eePushCiphertext: process.env.E2EE_PUSH_CIPHERTEXT === 'true',
     // C14 — yapay zeka ile video üretimi (Pika). Para harcar: yalnız panelden tanımlı hak (C43) + bayrak + anahtar.
     // PIKA_API_KEY yalnız sunucuda; hiçbir yanıtta/logda görünmez. Varsayılan KAPALI.
     aiVideo: {
