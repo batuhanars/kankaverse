@@ -7,7 +7,7 @@
 
 ## §0 Karar ve kapsam
 
-**Herkese açma kapısı (sahip, 2026-11-11, aynı gün revize):** E1 + E3 + E4 + E5 + E2 tamamlanmadan bayrak izin listesi dışına açılmaz. Sıra E4 → E5 → E2 → yayın. Yeni cihazda şifreli geçmiş yayında yedekle gelir; grup DM de yayında şifreli, ara dönem açıklaması gerekmez.
+**Herkese açma kapısı (sahip, 2026-11-11, aynı gün revize):** E1 + E3 + E4 + E5 + E2 tamamlanmadan bayrak izin listesi dışına açılmaz. Sıra E4 → E5 → E2 → yayın. Yayın sonrası E6 (medya) ertelenir, E7 → E8 (sahip, 2026-11-11; gerekçe PLAN.md R4). Yeni cihazda şifreli geçmiş yayında yedekle gelir; grup DM de yayında şifreli, ara dönem açıklaması gerekmez.
 
 **Bugünkü durum (E1):** şifreli 1-1 DM'de push gövdesi ve DM listesi önizlemesi sabit `"🔒 Yeni mesaj"` / `"🔒 Şifreli mesaj"`. Bildirimden hızlı cevap **zaten şifreli gidiyor** (`quickReply.ts` → `stores/e2ee.sendMessage`, E1'de yapıldı). Sabitlenen mesajlar listesi şifreli mesajı çözmüyor (D92).
 
