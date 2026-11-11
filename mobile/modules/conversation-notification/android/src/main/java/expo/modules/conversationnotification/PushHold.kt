@@ -17,7 +17,7 @@ internal object PushHold {
   const val HOLD_TIMEOUT_SECONDS = 8L
   private const val FALLBACK_CHANNEL_ID = "messages_v6" // push.ts MESSAGE_CHANNEL_ID ile ayni; JS onbellegi yoksa yedek
   private const val PREFS = "kv_notification_defaults"
-  private val DEFAULT_KEYS = listOf("replyLabel", "markReadLabel", "muteLabel", "meName", "color", "notificationChannelId")
+  private val DEFAULT_KEYS = listOf("replyLabel", "markReadLabel", "muteLabel", "meName", "color", "notificationChannelId", "hiddenPreviewText")
 
   private val latches = ConcurrentHashMap<String, CountDownLatch>()
   private val jsDrew: MutableSet<String> = ConcurrentHashMap.newKeySet()
@@ -68,6 +68,7 @@ internal object PushHold {
   fun saveDefaults(context: Context, defaults: Map<String, Any?>) {
     val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
     DEFAULT_KEYS.forEach { key -> (defaults[key] as? String)?.let { editor.putString(key, it) } }
+    (defaults["hidePreview"] as? Boolean)?.let { editor.putBoolean("hidePreview", it) } // D94
     editor.apply()
   }
 
@@ -78,6 +79,9 @@ internal object PushHold {
   fun drawFallback(context: Context, messageId: String, p: JSONObject) {
     if (jsDrew.remove(messageId)) return // JS cizmis ama bitti dememis: ikinci cizim yok
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    // D94: icerik gizleme acikken genel metin yerine onbellekteki "Yeni mesaj"; eski onbellekte alan yoksa false.
+    val hidePreview = prefs.getBoolean("hidePreview", false)
+    val text = if (hidePreview) (prefs.getString("hiddenPreviewText", null) ?: "") else (str(p, "text") ?: "").take(200)
     val params = mapOf<String, Any?>(
       "conversationId" to str(p, "conversationId"),
       "conversationTitle" to str(p, "conversationTitle"),
@@ -86,7 +90,7 @@ internal object PushHold {
       "senderName" to str(p, "senderName"),
       "senderAvatarUrl" to str(p, "senderAvatarUrl"),
       "conversationIconUrl" to str(p, "conversationIconUrl"),
-      "text" to (str(p, "text") ?: "").take(200),
+      "text" to text,
       "timestamp" to (if (p.has("timestamp")) p.optLong("timestamp") else System.currentTimeMillis()),
       "type" to str(p, "type"),
       "guildId" to str(p, "guildId"),

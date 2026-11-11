@@ -9,6 +9,7 @@ import { EmailVerificationBanner } from '@/components/EmailVerificationBanner';
 import { ProfileHeader } from '@/components/me/ProfileHeader';
 import { FriendsRow } from '@/components/me/FriendsRow';
 import { ReactionNotificationsRow } from '@/components/me/ReactionNotificationsRow';
+import { NotificationPreviewRow } from '@/components/me/NotificationPreviewRow';
 import { useFriendsStore } from '@/stores/friends';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -108,6 +109,8 @@ export default function MeScreen() {
           </Pressable>
           {/* C46: tepki bildirimleri anahtarı (hesap tercihi, sistem ayarı değil). */}
           <ReactionNotificationsRow />
+          {/* D94: bildirimde mesaj içeriğini gösterme (cihaza özel). */}
+          <NotificationPreviewRow />
           {/* Sistem bildirim ayarlarına kısayol (sahip talimatı 2026-08-11, Discord referansı).
               Bildirimler sekmesindeki uyarı şeridi YALNIZ izin kapalıyken çıkıyor; bu satır ise
               HER ZAMAN duruyor, çünkü kullanıcı izni açıkken de ses/titreşim gibi sistem tarafı

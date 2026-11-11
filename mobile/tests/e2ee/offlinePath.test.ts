@@ -31,6 +31,9 @@ describe('arka plan bildirim ve hızlı cevap yolunda zamanlayıcı yok', () => 
     'notifications/quickReply.ts',
     'notifications/headlessEngine.ts',
     'notifications/ownAvatar.ts',
+    'notifications/previewSetting.ts', // D94
+    'notifications/notificationText.ts', // D94
+    'notifications/notificationDefaults.ts', // D94
     'notifications/e2eePayload.ts',
     'e2ee/cryptoMetrics.ts', // E3 Rev.4: push-crypto ölçüm sarmalayıcısı
   ])('%s setTimeout/setInterval içermez', (file) => {
