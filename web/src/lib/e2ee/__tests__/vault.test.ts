@@ -105,6 +105,15 @@ describe('Vault', () => {
     expect(await listE2eeDbNames()).toEqual([dbNameFor('B')])
   })
 
+  it('keys: bölümdeki tüm anahtarlar, başka bölümler karışmaz', async () => {
+    const v = await Vault.open('u1')
+    await v.put('messages', 'm1', enc.encode('a'))
+    await v.put('messages', 'm2', enc.encode('b'))
+    await v.put('device', 'device', enc.encode('c'))
+    expect((await v.keys('messages')).sort()).toEqual(['m1', 'm2'])
+    expect(await v.keys('groups')).toEqual([])
+  })
+
   it('resetDeviceState: cihaz+grup gider, çözülmüş mesajlar kalır', async () => {
     const v = await Vault.open('A')
     await v.put('device', 'device', enc.encode('d'))

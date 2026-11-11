@@ -42,6 +42,10 @@ export const idbDelete = async (db: IDBDatabase, store: StoreName, key: string) 
   await wrap(db.transaction(store, 'readwrite').objectStore(store).delete(key))
 }
 
+/** Bölümdeki tüm anahtarlar (kayıt anahtarları hep metin). */
+export const idbKeys = async (db: IDBDatabase, store: StoreName): Promise<string[]> =>
+  (await wrap(db.transaction(store).objectStore(store).getAllKeys())).map(String)
+
 export const idbClear = async (db: IDBDatabase, store: StoreName) => {
   await wrap(db.transaction(store, 'readwrite').objectStore(store).clear())
 }

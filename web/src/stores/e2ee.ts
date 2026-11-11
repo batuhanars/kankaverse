@@ -217,6 +217,18 @@ export const useE2eeStore = defineStore('e2ee', () => {
   }
 
   /**
+   * E5a §4.1 silme boşluğu: şifreli DM mesajı silinince yerel düz kaydı da silinir (yedekte yaşamasın).
+   * Tek giriş: soket `message.deleted` ve yerel silme aynı yerden geçer. Şifreli DM değilse hiçbir şey yapmaz.
+   */
+  async function forgetMessage(channelId: string, messageId: string): Promise<void> {
+    await ready
+    if (!engine.value || !isOneToOneDm(channelId)) return
+    await engine.value
+      .forgetMessage(messageId)
+      .catch((e) => console.error('[e2ee] yerel kayıt silinemedi', e))
+  }
+
+  /**
    * E4 şikâyet kanıtı: hedef + önceki mesajlardan yerelde çözülmüş (`ok`) olanlar. `older` ekrandaki listedir
    * (hedeften öncekiler). Motor yok / şifreli değil: boş dizi, şikâyet yalnız referansla gider.
    */
@@ -247,5 +259,6 @@ export const useE2eeStore = defineStore('e2ee', () => {
     send,
     editEncrypted,
     collectEvidence,
+    forgetMessage,
   }
 })

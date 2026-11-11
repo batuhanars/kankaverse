@@ -257,6 +257,7 @@ export function useSocket() {
 
     socket.on('message.deleted', (data: { messageId: string; channelId: string }) => {
       messagesStore.removeMessage(data.channelId, data.messageId)
+      void e2eeStore.forgetMessage(data.channelId, data.messageId) // E5a §4.1: yerel düz kayıt da gider
     })
 
     socket.on(

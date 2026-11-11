@@ -7,6 +7,7 @@ import {
   idbClear,
   idbDelete,
   idbGet,
+  idbKeys,
   idbPut,
   listE2eeDbNames,
   openDb,
@@ -81,6 +82,10 @@ export class Vault implements VaultPort {
 
   delete(store: StoreName, key: string): Promise<void> {
     return idbDelete(this.db, store, key)
+  }
+
+  keys(store: StoreName): Promise<string[]> {
+    return idbKeys(this.db, store)
   }
 
   /** Cihaz + grup durumunu siler, çözülmüş mesajlar kalır (oturum zinciri değişti, anahtarlar geçersiz). */
