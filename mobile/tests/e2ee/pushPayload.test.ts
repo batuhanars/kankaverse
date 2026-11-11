@@ -8,6 +8,13 @@ describe('parseE2eePayload', () => {
     expect(parseE2eePayload(ok)).toEqual(ok);
     expect(parseE2eePayload(JSON.stringify(ok))).toEqual(ok);
   });
+  it('frankingTag varsa taşır (E4), yoksa ya da string değilse alanı koymaz', () => {
+    const tag = 'q'.repeat(43) + '=';
+    expect(parseE2eePayload({ ...ok, frankingTag: tag })).toEqual({ ...ok, frankingTag: tag });
+    expect(parseE2eePayload(JSON.stringify({ ...ok, frankingTag: tag }))?.frankingTag).toBe(tag);
+    expect(parseE2eePayload(ok)).not.toHaveProperty('frankingTag');
+    expect(parseE2eePayload({ ...ok, frankingTag: 7 })).not.toHaveProperty('frankingTag');
+  });
   it('eksik, boş ve bozuk girdide null döner', () => {
     expect(parseE2eePayload(undefined)).toBeNull();
     expect(parseE2eePayload('{bozuk')).toBeNull();

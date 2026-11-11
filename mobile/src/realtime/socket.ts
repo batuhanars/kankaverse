@@ -289,7 +289,7 @@ function ensureSocket(): Socket {
   // kimse dinlemiyordu → DM listesi, istek rozeti ve bildirim rozeti bayat kalıyordu. Web
   // `composables/useSocket.ts` ile aynı olay kümesi (bu sprintte kullanılan alt küme).
 
-  socket.on('dm.message', (data: { channelId: string; lastMessage: { id?: string; content: string; createdAt: string; encrypted?: boolean; e2ee?: { ciphertext: string; senderDeviceId: string; createdAt: string } }; senderId: string }) => {
+  socket.on('dm.message', (data: { channelId: string; lastMessage: { id?: string; content: string; createdAt: string; encrypted?: boolean; e2ee?: { ciphertext: string; senderDeviceId: string; createdAt: string; frankingTag?: string } }; senderId: string }) => {
     useDmStore.getState().applyActivity(data);
     // E3 Rev.5: şifreli yük varsa ön planda çöz; liste önizlemesi `plainTick` ile depodan okunur.
     void decryptDmLastMessage(data.channelId, data.lastMessage, data.senderId).catch(() => undefined);

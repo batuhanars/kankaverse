@@ -10,9 +10,10 @@ const KEYS = {
   unsupported: 'e2ee.unsupported',
   undecryptable: 'e2ee.beforeDevice',
   failed: 'e2ee.undecryptable',
+  unverified: 'e2ee.unverified',
 } as const;
 
-export function E2eeStatusNote({ status }: { status: 'unsupported' | 'undecryptable' | 'failed' }) {
+export function E2eeStatusNote({ status }: { status: 'unsupported' | 'undecryptable' | 'failed' | 'unverified' }) {
   return (
     <Text style={styles.note}>{t(KEYS[status])}</Text>
   );

@@ -142,7 +142,7 @@ export async function hydrateOne(m: MessageDto): Promise<MessageDto | null> {
  */
 export async function decryptDmLastMessage(
   channelId: string,
-  last: { id?: string; createdAt: string; e2ee?: { ciphertext: string; senderDeviceId: string; createdAt: string } },
+  last: { id?: string; createdAt: string; e2ee?: { ciphertext: string; senderDeviceId: string; createdAt: string; frankingTag?: string } },
   senderId: string,
 ): Promise<void> {
   const { id, e2ee } = last;
@@ -154,6 +154,7 @@ export async function decryptDmLastMessage(
     encrypted: true,
     ciphertext: e2ee.ciphertext,
     senderDeviceId: e2ee.senderDeviceId,
+    frankingTag: e2ee.frankingTag,
     replyToId: null,
     author: { id: senderId, username: '', avatarUrl: null },
     createdAt: e2ee.createdAt,

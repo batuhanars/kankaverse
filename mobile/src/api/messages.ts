@@ -156,8 +156,10 @@ export interface MessageDto {
   encrypted?: boolean;
   ciphertext?: string;
   senderDeviceId?: string | null;
+  /** E4 — v2 mesajın parmak izi (base64); okuyan cihaz kendi hesapladığıyla doğrular. */
+  frankingTag?: string | null;
   /** E1 — YALNIZ yerel: çözme sonucu. 'ok' dışı = metin yok, baloncuk durum cümlesi gösterir. */
-  e2eeStatus?: 'ok' | 'unsupported' | 'undecryptable' | 'failed';
+  e2eeStatus?: 'ok' | 'unsupported' | 'undecryptable' | 'failed' | 'unverified';
 }
 
 export const messagesApi = {
@@ -255,7 +257,7 @@ export const messagesApi = {
   /** E1: şifreli DM mesajı. `content` GÖNDERİLMEZ (sunucu 409 E2EE_REQUIRED); ciphertext base64. */
   async sendEncrypted(
     channelId: string,
-    cipher: { ciphertext: string; epoch: number },
+    cipher: { ciphertext: string; epoch: number; frankingTag?: string },
     replyToId?: string,
     nonce?: string,
     attachmentIds?: string[],
@@ -272,7 +274,7 @@ export const messagesApi = {
   async editEncrypted(
     channelId: string,
     messageId: string,
-    cipher: { ciphertext: string; epoch: number },
+    cipher: { ciphertext: string; epoch: number; frankingTag?: string },
   ): Promise<MessageDto> {
     const res = await http.patch<MessageDto>(`/channels/${channelId}/messages/${messageId}`, cipher);
     return res.data;
