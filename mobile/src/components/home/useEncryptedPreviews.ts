@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { useE2eeStore } from '@/stores/e2ee';
 import type { DmChannelDto } from '@/api/dm';
 
@@ -6,10 +7,20 @@ import type { DmChannelDto } from '@/api/dm';
  * E3 §4.1: DM listesinde şifreli son mesajın önizlemesi. Çözme YAPILMAZ, yalnız yerel depodan okunur
  * (`engine.quoteText`). İlk boyama beklemez: önce genel "Şifreli mesaj", okununca metin gelir.
  * Anahtar mesaj kimliği; depoda olmayan (null) kimlik tekrar denenir (sohbet/bildirim sonradan çözmüş olabilir).
+ * Bildirim görevi mesajı liste baktıktan SONRA çözebilir (E3 Rev.2 cihaz turu): uygulama ön plana her
+ * geldiğinde eksikler yeniden okunur.
  */
 export function useEncryptedPreviews(channels: DmChannelDto[]): Record<string, string> {
   const engine = useE2eeStore((s) => s.engine);
   const [byMessageId, setById] = useState<Record<string, string>>({});
+  const [activeTick, setActiveTick] = useState(0);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') setActiveTick((n) => n + 1);
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (!engine) return;
@@ -29,7 +40,7 @@ export function useEncryptedPreviews(channels: DmChannelDto[]): Record<string, s
     return () => {
       cancelled = true;
     };
-  }, [engine, channels, byMessageId]);
+  }, [engine, channels, byMessageId, activeTick]);
 
   return byMessageId;
 }
