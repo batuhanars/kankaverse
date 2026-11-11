@@ -66,7 +66,8 @@ function ShareBody({ payload }: { payload: SharePayload }) {
     setSending(false);
     setLabel('');
     if (res.sent && res.failures.length === 0) {
-      useShareIntentStore.getState().clear();
+      // Paylaşım burada SİLİNMEZ: silinince ShareScreen'in "paylaşım yok → ana ekran" koruması bu
+      // yönlendirmeyi eziyordu. Ekran kapanırken (unmount) zaten temizleniyor.
       router.replace(target.href);
       return;
     }
@@ -126,10 +127,7 @@ function ShareBody({ payload }: { payload: SharePayload }) {
         <View style={styles.actions}>
           {partiallySent && target ? (
             <Pressable
-              onPress={() => {
-                useShareIntentStore.getState().clear();
-                router.replace(target.href);
-              }}
+              onPress={() => router.replace(target.href)}
               style={styles.secondary}
             >
               <Text style={styles.secondaryText}>{t('mobile.share.openChat')}</Text>
