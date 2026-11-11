@@ -2625,6 +2625,29 @@ describe('MessagesService.findPins', () => {
   // ─────────────────────────────────────────────────────────────────────────
   // Sabitlenmiş mesaj yoksa boş dizi döner
   // ─────────────────────────────────────────────────────────────────────────
+  // E3 §2.4: şifreli sabitlenen mesaj mevcut DTO kuralıyla döner (istemci depodan doldurur).
+  it('şifreli sabitlenen mesaj: content boş, encrypted + ciphertext + senderDeviceId döner', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findMany.mockResolvedValue([
+      {
+        ...makePinnedMsg('msg-pin-enc', PINNED_AT_1),
+        content: '',
+        encrypted: true,
+        ciphertext: Buffer.from('gizli-yuk'),
+        senderDeviceId: 'dev-9',
+      },
+    ]);
+
+    const [dto] = await service.findPins(USER_ID, GUILD_CHANNEL_ID);
+
+    expect(dto).toMatchObject({
+      content: '',
+      encrypted: true,
+      ciphertext: Buffer.from('gizli-yuk').toString('base64'),
+      senderDeviceId: 'dev-9',
+    });
+  });
+
   it('sabitlenmiş mesaj yoksa boş dizi döner', async () => {
     membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
     prismaMock.message.findMany.mockResolvedValue([]);

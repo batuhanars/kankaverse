@@ -6,6 +6,7 @@
  */
 
 import { MessagesGateway } from './messages.gateway';
+import { E2EE_PUSH_GENERIC_TEXT, E2EE_PUSH_MAX_CIPHERTEXT } from '../../e2ee/e2ee.constants';
 import { CallSignalService } from '../../../shared/call-signal/call-signal.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
@@ -712,6 +713,105 @@ describe('MessagesGateway.notifyDmActivity — push (M3 §2.6)', () => {
         conversationIconUrl: null,
         senderAvatarUrl: null,
       });
+    });
+  });
+
+  // ── E3 §2: şifreli DM push'una şifreli yük + lastMessage.id ──
+  describe('E3 şifreli yük', () => {
+    const B64_OK = 'A'.repeat(E2EE_PUSH_MAX_CIPHERTEXT);
+    const SENDER_DEVICE = 'dev-1';
+
+    function encDto(overrides: Partial<Record<string, unknown>> = {}) {
+      return makeDmMessageDto({
+        content: '',
+        encrypted: true,
+        ciphertext: B64_OK,
+        senderDeviceId: SENDER_DEVICE,
+        ...overrides,
+      });
+    }
+
+    function setup(flag: boolean, v2 = true) {
+      configMock.get.mockImplementation((k: string) =>
+        k === 'e2eePushCiphertext' ? flag : undefined,
+      );
+      if (v2) (pushMock as any).v2Enabled = true;
+      prismaMock.channel.findUnique.mockResolvedValue({
+        guildId: null,
+        type: 'DM',
+        name: null,
+        dmRequestStatus: null,
+        dmRequesterId: null,
+      });
+      prismaMock.channelMember.findMany.mockResolvedValue([
+        { userId: AUTHOR_ID },
+        { userId: DM_MEMBER_ID },
+      ]);
+    }
+
+    afterEach(() => {
+      delete (pushMock as any).v2Enabled;
+    });
+
+    it('bayrak açık + şifreli + sınır altı → e2ee var, ciphertext aynı, text genel metin', async () => {
+      setup(true);
+      const dto = encDto();
+      await gateway.notifyDmActivity(DM_CHANNEL_ID, dto);
+      const v2 = pushSendToUsersMock.mock.calls[0][1].v2;
+      expect(v2.e2ee).toEqual({
+        ciphertext: B64_OK,
+        senderDeviceId: SENDER_DEVICE,
+        createdAt: dto['createdAt'],
+      });
+      expect(v2.text).toBe(E2EE_PUSH_GENERIC_TEXT);
+      expect(v2.messageId).toBe('msg-dm-1');
+    });
+
+    it('sınır üstü → e2ee yok, genel metin', async () => {
+      setup(true);
+      await gateway.notifyDmActivity(
+        DM_CHANNEL_ID,
+        encDto({ ciphertext: 'A'.repeat(E2EE_PUSH_MAX_CIPHERTEXT + 1) }),
+      );
+      const v2 = pushSendToUsersMock.mock.calls[0][1].v2;
+      expect(v2.e2ee).toBeUndefined();
+      expect(v2.text).toBe(E2EE_PUSH_GENERIC_TEXT);
+    });
+
+    it('bayrak kapalı → e2ee yok', async () => {
+      setup(false);
+      await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto());
+      expect(pushSendToUsersMock.mock.calls[0][1].v2.e2ee).toBeUndefined();
+    });
+
+    it('şifresiz mesaj → e2ee yok (bayrak açık olsa da)', async () => {
+      setup(true);
+      await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
+      expect(pushSendToUsersMock.mock.calls[0][1].v2.e2ee).toBeUndefined();
+    });
+
+    it('v1 (v2 kapalı) → v2 yok, gövde genel metin, şifreli yük push yükünde yok', async () => {
+      setup(true, false);
+      await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto());
+      const payload = pushSendToUsersMock.mock.calls[0][1];
+      expect(payload.v2).toBeUndefined();
+      expect(payload.body).toBe(E2EE_PUSH_GENERIC_TEXT);
+      expect(JSON.stringify(payload)).not.toContain(B64_OK);
+    });
+
+    it('dm.message soket yükünde lastMessage.id (şifreli ve şifresiz)', async () => {
+      setup(false);
+      await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto());
+      await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto({ id: 'msg-plain' }));
+      const emits = emitToUserMock.mock.calls.filter((c: any[]) => c[1] === 'dm.message');
+      expect(emits[0][2].lastMessage).toMatchObject({ id: 'msg-dm-1', encrypted: true });
+      expect(emits[emits.length - 1][2].lastMessage.id).toBe('msg-plain');
+    });
+
+    it('şifreli mesajdan MENTION push yolu çıkmaz (mentions boş → erken döner)', async () => {
+      setup(false);
+      await gateway.notifyMentions(DM_CHANNEL_ID, encDto({ mentions: [], mentionRoles: [] }));
+      expect(pushSendToUsersMock).not.toHaveBeenCalled();
     });
   });
 
