@@ -30,6 +30,18 @@ export interface Hydrated {
 const MAX_HISTORY_PAGES = 10 // geçmiş sayfası sınırı: ilk girişte sonsuza kadar geriye gitme
 const PAGE_SIZE = 50
 
+/** Bildirim için tek mesaj çözme sonucu (E3 §3.1). */
+export type NotificationPreview =
+  | { kind: 'text'; body: string } // çözüldü ya da daha önce çözülmüştü (depodan)
+  | { kind: 'hidden' } // iptal edilmiş cihazdan: bildirim gösterilmez
+  | { kind: 'unavailable' } // diğer her durum: çağıran genel metni gösterir
+
+function previewOf(r: Resolution | undefined): NotificationPreview {
+  if (r?.kind === 'hidden') return { kind: 'hidden' }
+  if (r?.kind === 'record' && r.record.status === 'ok') return { kind: 'text', body: r.record.body }
+  return { kind: 'unavailable' }
+}
+
 export interface SentCipher {
   ciphertext: string
   epoch: number
@@ -212,6 +224,25 @@ export class E2eeEngine {
       return [{ ...plain, content: r.record.body, e2eeStatus: r.record.status }]
     }
     return [{ ...plain, content: '', e2eeStatus: 'undecryptable' as const }]
+  }
+
+  /**
+   * Bildirim görevi için TEK mesajı çözer (E3 §3.1). Mesaj kuyruktan geçer ve sonucu depoya yazılır; sohbet
+   * sonra açılınca aynı mesaj depodan okunur, ikinci kez çözülmez. `hydrateIn` kullanılmaz: o ağ hatasını
+   * yutar, burada hatayı "unavailable"dan ayırmak ve hiçbir şeyi kalıcı yazmamak gerekir (resolveAll
+   * istisna fırlatırsa depoya dokunulmamıştır; yalnız commit senkronu sonrası DecryptError kalıcı yazılır).
+   */
+  async decryptForNotification(msg: WireMessage): Promise<NotificationPreview> {
+    try {
+      const done = await this.run((ctx) =>
+        new Hydrator(ctx, msg.channelId, this.own).resolveAll([msg]),
+      )
+      return previewOf(done.get(msg.id))
+    } catch (e) {
+      // İçerik/yük asla loglanmaz: yalnız hata türünün adı.
+      this.log(`[e2ee] bildirim çözülemedi: ${e instanceof Error ? e.name : typeof e}`)
+      return { kind: 'unavailable' }
+    }
   }
 
   /** Yanıt alıntısının düz metni depodan; yoksa null (arayüz "Şifreli mesaj" der). */

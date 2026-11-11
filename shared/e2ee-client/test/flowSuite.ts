@@ -8,10 +8,10 @@ import type { WarningKind } from '../src/ports'
 import { FakeServer } from './fakeServer'
 import { MemoryVault } from './memoryVault'
 
-const CH = 'ch1'
-const T0 = '2026-11-10T10:00:00.000Z'
+export const CH = 'ch1'
+export const T0 = '2026-11-10T10:00:00.000Z'
 
-interface Msg {
+export interface Msg {
   id: string
   channelId: string
   content: string
@@ -22,7 +22,7 @@ interface Msg {
   e2eeStatus?: string
 }
 
-interface Profile {
+export interface Profile {
   userId: string
   vault: MemoryVault
   family: string
@@ -31,16 +31,17 @@ interface Profile {
   deviceId: () => string
 }
 
-let server: FakeServer
-let provider: CryptoProvider
+// Canlı bağlama olarak dışa açılır: bildirim testleri aynı sunucu ve sağlayıcıyı kullanır (beforeEach burada).
+export let server: FakeServer
+export let provider: CryptoProvider
 let n = 0
 
 type WarnFn = (channelId: string, kind: WarningKind) => void
 
-const as = <T>(p: Profile, fn: (e: E2eeEngine) => Promise<T>): Promise<T> => fn(p.engine)
+export const as = <T>(p: Profile, fn: (e: E2eeEngine) => Promise<T>): Promise<T> => fn(p.engine)
 
 /** Aynı cihazı (aynı depo, aynı oturum zinciri) yeniden başlatır: uygulamayı kapatıp açmak. */
-const restart = (userId: string, family: string, vault: MemoryVault, warn: WarnFn = () => {}) =>
+export const restart = (userId: string, family: string, vault: MemoryVault, warn: WarnFn = () => {}) =>
   E2eeEngine.start(userId, {
     api: server.apiFor(userId, family),
     openVault: async () => vault,
@@ -49,7 +50,7 @@ const restart = (userId: string, family: string, vault: MemoryVault, warn: WarnF
     onWarn: warn,
   })
 
-async function login(userId: string): Promise<Profile> {
+export async function login(userId: string): Promise<Profile> {
   const vault = new MemoryVault()
   const family = `fam${++n}`
   const warnings: [string, WarningKind][] = []
@@ -77,14 +78,14 @@ function dto(id: string, from: Profile, ciphertext: string, createdAt = T0): Msg
   }
 }
 
-async function send(p: Profile, id: string, text: string, createdAt = T0): Promise<Msg> {
+export async function send(p: Profile, id: string, text: string, createdAt = T0): Promise<Msg> {
   const cipher = await as(p, (e) => e.encrypt(CH, text))
   const msg = dto(id, p, cipher!.ciphertext, createdAt)
   await as(p, (e) => e.rememberSent(msg))
   return msg
 }
 
-const show = async (p: Profile, msgs: Msg[]) => as(p, (e) => e.hydrate(CH, msgs))
+export const show = async (p: Profile, msgs: Msg[]) => as(p, (e) => e.hydrate(CH, msgs))
 
 export function flowSuite(label: string, p: CryptoProvider) {
   beforeEach(() => {
